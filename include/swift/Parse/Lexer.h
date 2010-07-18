@@ -45,6 +45,7 @@ private:
   void FormToken(tok::TokenKind Kind, const char *TokStart, Token &Result);
   
   void SkipSlashSlashComment();
+  void LexIdentifier(Token &Result);
 };
   
   

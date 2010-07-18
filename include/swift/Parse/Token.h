@@ -26,6 +26,7 @@ namespace tok {
   enum TokenKind {
     unknown = 0,
     eof,
+    identifier,
     
 #define KEYWORD(X) kw_ ## X,
     // Types.

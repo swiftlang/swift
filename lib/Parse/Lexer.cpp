@@ -17,8 +17,12 @@
 #include "swift/Parse/Lexer.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/ADT/StringSwitch.h"
 using namespace swift;
 
+//===----------------------------------------------------------------------===//
+// Setup and Helper Methods
+//===----------------------------------------------------------------------===//
 
 Lexer::Lexer(unsigned BufferID, llvm::SourceMgr &SM) : SourceMgr(SM) {
   Buffer = SM.getMemoryBuffer(BufferID);
@@ -38,7 +42,9 @@ void Lexer::FormToken(tok::TokenKind Kind, const char *TokStart, Token &Result){
   Result.setToken(Kind, llvm::StringRef(TokStart, CurPtr-TokStart));
 }
 
-
+//===----------------------------------------------------------------------===//
+// Lexer Subroutines
+//===----------------------------------------------------------------------===//
 
 /// SkipSlashSlashComment - Skip to the end of the line of a // comment.
 void Lexer::SkipSlashSlashComment() {
@@ -66,6 +72,30 @@ void Lexer::SkipSlashSlashComment() {
   }
 }
 
+
+// LexIdentifier - Match [a-zA-Z_][a-zA-Z_0-9]*
+void Lexer::LexIdentifier(Token &Result) {
+  const char *TokStart = CurPtr-1;
+  assert((isalpha(*TokStart) || *TokStart == '_') && "Unexpected start");
+  
+  // Lex [a-zA-Z_0-9]*
+  while (isalnum(*CurPtr) || *CurPtr == '_')
+    ++CurPtr;
+  
+  tok::TokenKind Kind =
+  llvm::StringSwitch<tok::TokenKind>(llvm::StringRef(TokStart, CurPtr-TokStart))
+    .Case("int", tok::kw_int)
+    .Case("var", tok::kw_var)
+    .Default(tok::identifier);
+  
+  
+  return FormToken(Kind, TokStart, Result);
+}
+
+
+//===----------------------------------------------------------------------===//
+// Main Lexer Loop
+//===----------------------------------------------------------------------===//
 
 void Lexer::Lex(Token &Result) {
   assert(CurPtr >= Buffer->getBufferStart() &&
@@ -103,12 +133,23 @@ Restart:
   case '-': return FormToken(tok::minus, TokStart, Result);
   case '*': return FormToken(tok::star,  TokStart, Result);
   case '/':
-    if (CurPtr[0] == '/') {
+    if (CurPtr[0] == '/') {  //  "//"
       SkipSlashSlashComment();
       goto Restart;
     }
       
     return FormToken(tok::slash, TokStart, Result);
+      
+  case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G':
+  case 'H': case 'I': case 'J': case 'K': case 'L': case 'M': case 'N':
+  case 'O': case 'P': case 'Q': case 'R': case 'S': case 'T': case 'U':
+  case 'V': case 'W': case 'X': case 'Y': case 'Z':
+  case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g':
+  case 'h': case 'i': case 'j': case 'k': case 'l': case 'm': case 'n':
+  case 'o': case 'p': case 'q': case 'r': case 's': case 't': case 'u':
+  case 'v': case 'w': case 'x': case 'y': case 'z':
+  case '_':
+    return LexIdentifier(Result);
   }
 }
 
