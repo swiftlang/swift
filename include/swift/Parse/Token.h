@@ -49,6 +49,10 @@ namespace tok {
     PUNCTUATOR(colon,       ":")
     PUNCTUATOR(semi,        ";")
     PUNCTUATOR(equal,       "=")
+    PUNCTUATOR(plus,        "+")
+    PUNCTUATOR(minus,       "-")
+    PUNCTUATOR(star,        "*")
+    PUNCTUATOR(slash,       "/")
     PUNCTUATOR(l_paren,     "(")
     PUNCTUATOR(r_paren,     ")")
     
