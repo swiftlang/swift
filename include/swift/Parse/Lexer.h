@@ -19,12 +19,21 @@
 
 #include "swift/Parse/Token.h"
 
+namespace llvm {
+  class MemoryBuffer;
+  class SourceMgr;
+}
+
 namespace swift {
 
 class Lexer {
+  llvm::SourceMgr &SourceMgr;
+  const llvm::MemoryBuffer *Buffer;
+
   Lexer(const Lexer&);          // DO NOT IMPLEMENT
   void operator=(const Lexer&); // DO NOT IMPLEMENT
 public:
+  Lexer(unsigned BufferID, llvm::SourceMgr &SM);
   
   void Lex(Token &Result);
 };

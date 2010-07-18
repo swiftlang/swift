@@ -20,9 +20,7 @@ TOOLNAME = swift
 include $(SWIFT_LEVEL)/../../Makefile.config
 
 LINK_COMPONENTS := $(TARGETS_TO_BUILD) bitwriter codegen ipo selectiondag
-#USEDLIBS = clangFrontend.a clangDriver.a clangCodeGen.a clangSema.a \
-#           clangChecker.a clangAnalysis.a clangRewrite.a  clangAST.a \
-#           clangParse.a clangLex.a clangBasic.a
+USEDLIBS = swiftParse.a
 
 include $(SWIFT_LEVEL)/Makefile
 

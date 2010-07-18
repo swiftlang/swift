@@ -15,8 +15,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/Lexer.h"
+#include "llvm/Support/SourceMgr.h"
 using namespace swift;
 
 
-
-int X;
+Lexer::Lexer(unsigned BufferID, llvm::SourceMgr &SM) : SourceMgr(SM) {
+  Buffer = SM.getMemoryBuffer(BufferID);
+  
+}
