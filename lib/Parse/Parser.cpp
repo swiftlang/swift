@@ -25,14 +25,15 @@ using llvm::SMLoc;
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
-Parser::Parser(unsigned BufferID, llvm::SourceMgr &SM) : SourceMgr(SM) {
-  L = new Lexer(BufferID, SM);
-  S = new Sema();
+Parser::Parser(unsigned BufferID, llvm::SourceMgr &SM)
+  : SourceMgr(SM),
+    L(*new Lexer(BufferID, SM)),
+    S(*new Sema()) {
 }
 
 Parser::~Parser() {
-  delete L;
-  delete S;
+  delete &L;
+  delete &S;
 }
 
 void Parser::Note(SMLoc Loc, const char *Message) {
@@ -49,7 +50,7 @@ void Parser::Error(SMLoc Loc, const char *Message) {
 
 void Parser::ConsumeToken() {
   assert(Tok.isNot(tok::eof) && "Lexing past eof!");
-  L->Lex(Tok);
+  L.Lex(Tok);
 }
 
 /// SkipUntil - Read tokens until we get to the specified token, then return.
@@ -194,17 +195,23 @@ bool Parser::ParseExpr(const char *Message) {
 ///     '(' expr ')'
 bool Parser::ParseExprPrimary(const char *Message) {
   switch (Tok.getKind()) {
-  case tok::numeric_constant: ConsumeToken(tok::numeric_constant); return false;
+  case tok::numeric_constant:
+    S.Expr.NumericConstant(Tok.getText(), Tok.getLocation());
+    ConsumeToken(tok::numeric_constant);
+    return false;
       
   case tok::l_paren: {
     SMLoc LPLoc = Tok.getLocation();  
     ConsumeToken(tok::l_paren);
     if (ParseExpr("expected expression in parentheses")) return true;
     
+    SMLoc RPLoc = Tok.getLocation();  
     if (ParseToken(tok::r_paren, "expected ')' in parenthesis expression")) {
       Note(LPLoc, "to match this opening '('");
       return true;
     }
+    
+    S.Expr.ParenExpr(LPLoc, RPLoc);
     return false;
   }
     

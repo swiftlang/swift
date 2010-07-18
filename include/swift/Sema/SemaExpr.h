@@ -1,4 +1,4 @@
-//===--- Sema.h - Swift Language Semantic Analysis --------------*- C++ -*-===//
+//===--- SemaExpr.h - Swift Expression Semantic Analysis --------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,28 +11,28 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines the Sema interface which implement hooks invoked by the 
-// parser to build the AST.
+// parser to build the AST for expressions.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SEMA_H
-#define SWIFT_SEMA_H
+#ifndef SWIFT_SEMA_EXPR_H
+#define SWIFT_SEMA_EXPR_H
 
-#include "swift/Sema/SemaExpr.h"
+#include "swift/Sema/SemaBase.h"
 
 namespace swift {
-
-/// Sema - This is the common semantic analysis module, which just has helper
-/// utilities shared by subclasses.
-class Sema {
-  Sema(const Sema&);           // DO NOT IMPLEMENT
-  void operator=(const Sema&); // DO NOT IMPLEMENT
-public:
-  SemaExpr Expr;
+  class Sema;
   
-  Sema();
+/// SemaExpr - Semantic analysis support for Swift expressions.
+class SemaExpr : public SemaBase {
+public:
+  SemaExpr(Sema &s);
+  
+  void NumericConstant(llvm::StringRef Text, llvm::SMLoc Loc);
+  void ParenExpr(llvm::SMLoc LPLoc, llvm::SMLoc RPLoc);
+  
 };
-
+  
 } // end namespace swift
 
 #endif

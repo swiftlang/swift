@@ -1,4 +1,4 @@
-//===--- Sema.cpp - Swift Language Semantic Analysis ----------------------===//
+//===--- SemaBase.cpp - Swift Language Semantic Analysis Utilities --------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file implements semantic analysis for Swift.
+//  This file implements the SemaBase interface
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Sema/Sema.h"
+#include "swift/Sema/SemaBase.h"
 using namespace swift;
 
-Sema::Sema() : Expr(*this) {
+SemaBase::SemaBase(Sema &s) : S(s) {
 }

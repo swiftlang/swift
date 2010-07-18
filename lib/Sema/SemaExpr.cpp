@@ -1,4 +1,4 @@
-//===--- Sema.cpp - Swift Language Semantic Analysis ----------------------===//
+//===--- SemaExpr.cpp - Swift Expression Semantic Analysis ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,12 +10,21 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file implements semantic analysis for Swift.
+//  This file implements semantic analysis for Swift expressions.
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Sema/Sema.h"
+#include "swift/Sema/SemaExpr.h"
+#include "llvm/Support/SMLoc.h"
+#include "llvm/ADT/StringRef.h"
 using namespace swift;
 
-Sema::Sema() : Expr(*this) {
+SemaExpr::SemaExpr(Sema &S) : SemaBase(S) {
+}
+
+void SemaExpr::NumericConstant(llvm::StringRef Text, llvm::SMLoc Loc) {
+}
+
+void SemaExpr::ParenExpr(llvm::SMLoc LPLoc, llvm::SMLoc RPLoc) {
+  
 }
