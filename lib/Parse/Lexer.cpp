@@ -73,7 +73,7 @@ void Lexer::SkipSlashSlashComment() {
 }
 
 
-// LexIdentifier - Match [a-zA-Z_][a-zA-Z_0-9]*
+/// LexIdentifier - Match [a-zA-Z_][a-zA-Z_0-9]*
 void Lexer::LexIdentifier(Token &Result) {
   const char *TokStart = CurPtr-1;
   assert((isalpha(*TokStart) || *TokStart == '_') && "Unexpected start");
@@ -88,8 +88,19 @@ void Lexer::LexIdentifier(Token &Result) {
     .Case("var", tok::kw_var)
     .Default(tok::identifier);
   
-  
   return FormToken(Kind, TokStart, Result);
+}
+
+/// LexDigit - Match [0-9]+
+void Lexer::LexDigit(Token &Result) {
+  const char *TokStart = CurPtr-1;
+  assert(isdigit(*TokStart) && "Unexpected start");
+
+  // Lex [0-9]*
+  while (isdigit(*CurPtr))
+    ++CurPtr;
+  
+  return FormToken(tok::numeric_constant, TokStart, Result);
 }
 
 
@@ -150,6 +161,10 @@ Restart:
   case 'v': case 'w': case 'x': case 'y': case 'z':
   case '_':
     return LexIdentifier(Result);
+      
+  case '0': case '1': case '2': case '3': case '4':
+  case '5': case '6': case '7': case '8': case '9':
+    return LexDigit(Result);
   }
 }
 

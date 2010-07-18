@@ -46,6 +46,7 @@ private:
   
   void SkipSlashSlashComment();
   void LexIdentifier(Token &Result);
+  void LexDigit(Token &Result);
 };
   
   
