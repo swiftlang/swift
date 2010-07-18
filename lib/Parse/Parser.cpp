@@ -211,12 +211,76 @@ bool Parser::ParseExprPrimary(const char *Message) {
   }
 }
 
+/// prec::Level - Binary operator precedences.   Low precedences numbers bind
+/// more weakly than high numbers.
+namespace prec {
+  enum Level {
+    Unknown = 0,    // Not a binary operator.
+    Additive,       // +, -
+    Multiplicative  // *, /, %
+  };
+}
+
+/// getBinOpPrecedence - Return the precedence of the specified binary operator
+/// token.
+///
+static prec::Level getBinOpPrecedence(tok::TokenKind Kind) {
+  switch (Kind) {
+  default: return prec::Unknown;
+  case tok::plus:
+  case tok::minus:                return prec::Additive;
+  //case tok::percent:
+  case tok::slash:
+  case tok::star:                 return prec::Multiplicative;
+  }
+}
+
+
 /// ParseExprBinaryRHS - Parse the right hand side of a binary expression and
 /// assemble it according to precedence rules.
 ///
 ///   expr-binary-rhs:
 ///     (binary-operator expr-primary)*
-bool Parser::ParseExprBinaryRHS() {
+bool Parser::ParseExprBinaryRHS(unsigned MinPrec) {
+  prec::Level NextTokPrec = getBinOpPrecedence(Tok.getKind());
+  while (1) {
+    // If this token has a lower precedence than we are allowed to parse (e.g.
+    // because we are called recursively, or because the token is not a binop),
+    // then we are done!
+    if (NextTokPrec < (prec::Level)MinPrec)
+      return false;
+    
+    // Consume the operator, saving the operator token for error reporting.
+    Token OpToken = Tok;
+    ConsumeToken();
+    
+    // TODO: Support ternary operators some day.
+    
+    // Parse another leaf here for the RHS of the operator.
+    if (ParseExprPrimary("expected expression after binary operator"))
+      return true;
+
+    // Remember the precedence of this operator and get the precedence of the
+    // operator immediately to the right of the RHS.
+    prec::Level ThisPrec = NextTokPrec;
+    NextTokPrec = getBinOpPrecedence(Tok.getKind());
+    
+    // TODO: All operators are left associative at the moment.
+    
+    // If the next operator binds more tightly with RHS than we do, evaluate the
+    // RHS as a complete subexpression first
+    if (ThisPrec < NextTokPrec) {
+      // Only parse things on the RHS that bind more tightly than the current
+      // operator.
+      if (ParseExprBinaryRHS(ThisPrec + 1))
+        return true;
+      
+      NextTokPrec = getBinOpPrecedence(Tok.getKind());
+    }
+    assert(NextTokPrec <= ThisPrec && "Recursion didn't work!");
+    
+    // TODO: Build AST.
+  }
+  
   return false;
 }
-

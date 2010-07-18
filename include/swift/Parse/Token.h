@@ -47,6 +47,9 @@ namespace tok {
 #undef KEYWORD
     
 #define PUNCTUATOR(X, Y) X,
+    PUNCTUATOR(l_paren,     "(")
+    PUNCTUATOR(r_paren,     ")")
+
     PUNCTUATOR(comma,       ",")
     PUNCTUATOR(colon,       ":")
     PUNCTUATOR(semi,        ";")
@@ -55,8 +58,6 @@ namespace tok {
     PUNCTUATOR(minus,       "-")
     PUNCTUATOR(star,        "*")
     PUNCTUATOR(slash,       "/")
-    PUNCTUATOR(l_paren,     "(")
-    PUNCTUATOR(r_paren,     ")")
     
 #undef PUNCTUATOR
     

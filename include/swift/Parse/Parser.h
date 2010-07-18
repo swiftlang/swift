@@ -91,7 +91,7 @@ private:
   // Expression Parsing
   bool ParseExpr(const char *Message = 0);
   bool ParseExprPrimary(const char *Message = 0);
-  bool ParseExprBinaryRHS();
+  bool ParseExprBinaryRHS(unsigned MinPrecedence = 1);
 };
   
 } // end namespace swift
