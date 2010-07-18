@@ -18,6 +18,7 @@
 #include "swift/Parse/Lexer.h"
 #include "llvm/Support/SourceMgr.h"
 using namespace swift;
+using llvm::SMLoc;
 
 //===----------------------------------------------------------------------===//
 // Setup and Helper Methods
@@ -31,11 +32,15 @@ Parser::~Parser() {
   delete L; 
 }
 
-void Parser::Warning(llvm::SMLoc Loc, const char *Message) {
+void Parser::Note(SMLoc Loc, const char *Message) {
+  SourceMgr.PrintMessage(Loc, Message, "note");
+}
+
+void Parser::Warning(SMLoc Loc, const char *Message) {
   SourceMgr.PrintMessage(Loc, Message, "warning");
 }
 
-void Parser::Error(llvm::SMLoc Loc, const char *Message) {
+void Parser::Error(SMLoc Loc, const char *Message) {
   SourceMgr.PrintMessage(Loc, Message, "error");
 }
 
@@ -172,11 +177,46 @@ bool Parser::ParseType(const char *Message) {
 // Expression Parsing
 //===----------------------------------------------------------------------===//
 
+/// ParseExpr
+///   expr:
+///     expr-primary (binary-operator expr-primary)*
 bool Parser::ParseExpr(const char *Message) {
+  return ParseExprPrimary(Message) ||
+         ParseExprBinaryRHS();
+}
+
+/// ParseExprPrimary
+///   expr-primary:
+///     numeric_constant
+///     '(' expr ')'
+bool Parser::ParseExprPrimary(const char *Message) {
   switch (Tok.getKind()) {
   case tok::numeric_constant: ConsumeToken(tok::numeric_constant); return false;
+      
+  case tok::l_paren: {
+    SMLoc LPLoc = Tok.getLocation();  
+    ConsumeToken(tok::l_paren);
+    if (ParseExpr("expected expression in parentheses")) return true;
+    
+    if (ParseToken(tok::r_paren, "expected ')' in parenthesis expression")) {
+      Note(LPLoc, "to match this opening '('");
+      return true;
+    }
+    return false;
+  }
+    
   default:
     Error(Tok.getLocation(), Message ? Message : "expected expression");
     return true;
   }
 }
+
+/// ParseExprBinaryRHS - Parse the right hand side of a binary expression and
+/// assemble it according to precedence rules.
+///
+///   expr-binary-rhs:
+///     (binary-operator expr-primary)*
+bool Parser::ParseExprBinaryRHS() {
+  return false;
+}
+

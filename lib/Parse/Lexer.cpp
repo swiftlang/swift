@@ -135,7 +135,10 @@ Restart:
       
     // Otherwise, this is the end of the buffer.  Return EOF.
     return FormToken(tok::eof, TokStart, Result);
-      
+
+  case '(': return FormToken(tok::l_paren, TokStart, Result);
+  case ')': return FormToken(tok::r_paren, TokStart, Result);
+
   case ',': return FormToken(tok::comma, TokStart, Result);
   case ':': return FormToken(tok::colon, TokStart, Result);
   case ';': return FormToken(tok::semi,  TokStart, Result);

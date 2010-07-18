@@ -63,6 +63,7 @@ private:
   ///
   void SkipUntil(tok::TokenKind T);
   
+  void Note(llvm::SMLoc Loc, const char *Message);
   void Warning(llvm::SMLoc Loc, const char *Message);
   void Error(llvm::SMLoc Loc, const char *Message);
   
@@ -89,6 +90,8 @@ private:
 
   // Expression Parsing
   bool ParseExpr(const char *Message = 0);
+  bool ParseExprPrimary(const char *Message = 0);
+  bool ParseExprBinaryRHS();
 };
   
 } // end namespace swift
