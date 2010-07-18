@@ -49,13 +49,52 @@ void Parser::ConsumeToken() {
 /// some likely good stopping point.
 ///
 void Parser::SkipUntil(tok::TokenKind T) {
-  if (Tok.is(T)) return;
+  // tok::unknown is a sentinel that means "don't skip".
+  if (T == tok::unknown) return;
   
   while (Tok.isNot(tok::eof) && Tok.isNot(T)) {
     switch (Tok.getKind()) {
     default: ConsumeToken(); break;
+    // TODO: Handle paren/brace/bracket recovery.
     }
   }
+}
+
+
+//===----------------------------------------------------------------------===//
+// Primitive Parsing
+//===----------------------------------------------------------------------===//
+
+/// ParseIdentifier - Consume an identifier if present and return its name in
+/// Result.  Otherwise, emit an error and return true.
+bool Parser::ParseIdentifier(llvm::StringRef &Result, const char *Message,
+                             tok::TokenKind SkipToTok) {
+  if (Tok.is(tok::identifier)) {
+    Result = Tok.getText();
+    ConsumeToken();
+    return false;
+  }
+  
+  Error(Tok.getLocation(), Message ? Message : "expected identifier");
+  return true;
+}
+
+/// ParseToken - The parser expects that 'K' is next in the input.  If so, it is
+/// consumed and false is returned.
+///
+/// If the input is malformed, this emits the specified error diagnostic.
+/// Next, if SkipToTok is specified, it calls SkipUntil(SkipToTok).  Finally,
+/// true is returned.
+bool Parser::ParseToken(tok::TokenKind K, const char *Message,
+                        tok::TokenKind SkipToTok) {
+  if (Tok.is(K)) {
+    ConsumeToken(K);
+    return false;
+  }
+  
+  Error(Tok.getLocation(), Message);
+  SkipUntil(SkipToTok);
+  return true;
 }
 
 
@@ -82,8 +121,7 @@ void Parser::ParseDeclTopLevel() {
   switch (Tok.getKind()) {
   default:
     Error(Tok.getLocation(), "expected a top level declaration");
-    SkipUntil(tok::semi);
-    return;
+    return SkipUntil(tok::semi);
   case tok::semi:   return ConsumeToken(tok::semi); 
   case tok::kw_var: return ParseDeclVar();
   }
@@ -91,8 +129,54 @@ void Parser::ParseDeclTopLevel() {
 
 /// ParseDeclVar
 ///   decl-var:
-///      'var' 
+///      'var' identifier ':' type ';'
+///      'var' identifier ':' type '=' expression ';'
+///      'var' identifier '=' expression ';'
 void Parser::ParseDeclVar() {
   ConsumeToken(tok::kw_var);
+
+  llvm::StringRef Identifier;
+  if (ParseIdentifier(Identifier, "expected identifier in var declaration"))
+    return SkipUntil(tok::semi);
   
+  if (ConsumeIf(tok::colon) &&
+      ParseType("expected type in var declaration"))
+    return SkipUntil(tok::semi);
+  
+  if (ConsumeIf(tok::equal) &&
+      ParseExpr("expected expression in var declaration"))
+    return SkipUntil(tok::semi);
+  
+  // TODO Sema: Diagnose when we don't have a type or an expression.
+  
+  ParseToken(tok::semi, "expected ';' at end of var declaration", tok::semi);
+}
+
+//===----------------------------------------------------------------------===//
+// Type Parsing
+//===----------------------------------------------------------------------===//
+
+/// ParseType
+///   type:
+///     int
+bool Parser::ParseType(const char *Message) {
+  switch (Tok.getKind()) {
+  case tok::kw_int: ConsumeToken(tok::kw_int); return false;
+  default:
+    Error(Tok.getLocation(), Message ? Message : "expected type");
+    return true;
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Expression Parsing
+//===----------------------------------------------------------------------===//
+
+bool Parser::ParseExpr(const char *Message) {
+  switch (Tok.getKind()) {
+  case tok::numeric_constant: ConsumeToken(tok::numeric_constant); return false;
+  default:
+    Error(Tok.getLocation(), Message ? Message : "expected expression");
+    return true;
+  }
 }

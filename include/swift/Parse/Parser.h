@@ -49,7 +49,13 @@ private:
     ConsumeToken();
   }
   
-  // ExpectAndConsume
+  /// ConsumeIf - If the current token is the specified kind, consume it and
+  /// return true.  Otherwise, return false without consuming it.
+  bool ConsumeIf(tok::TokenKind K) {
+    if (Tok.isNot(K)) return false;
+    ConsumeToken(K);
+    return true;
+  }
   
   /// SkipUntil - Read tokens until we get to the specified token, then return
   /// without consuming it.  Because we cannot guarantee that the token will
@@ -60,9 +66,29 @@ private:
   void Warning(llvm::SMLoc Loc, const char *Message);
   void Error(llvm::SMLoc Loc, const char *Message);
   
-  // Parser Implementation
+  // Primitive Parsing
+  bool ParseIdentifier(llvm::StringRef &Result, const char *Message = 0,
+                       tok::TokenKind SkipToTok = tok::unknown);
+
+  /// ParseToken - The parser expects that 'K' is next in the input.  If so, it
+  /// is consumed and false is returned.
+  ///
+  /// If the input is malformed, this emits the specified error diagnostic.
+  /// Next, if SkipToTok is specified, it calls SkipUntil(SkipToTok).  Finally,
+  /// true is returned.
+  bool ParseToken(tok::TokenKind K, const char *Message,
+                  tok::TokenKind SkipToTok = tok::unknown);
+  
+  
+  // Decl Parsing
   void ParseDeclTopLevel();
   void ParseDeclVar();
+  
+  // Type Parsing
+  bool ParseType(const char *Message = 0);
+
+  // Expression Parsing
+  bool ParseExpr(const char *Message = 0);
 };
   
 } // end namespace swift
