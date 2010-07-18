@@ -1,4 +1,4 @@
-//===--- Lexer.h - Swift Language Lexer -------------------------*- C++ -*-===//
+//===--- Parser.h - Swift Language Parser -----------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,46 +10,37 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file defines the Lexer interface.
+//  This file defines the Parser interface.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_LEXER_H
-#define SWIFT_LEXER_H
-
-#include "swift/Parse/Token.h"
+#ifndef SWIFT_PARSER_H
+#define SWIFT_PARSER_H
 
 namespace llvm {
-  class MemoryBuffer;
   class SourceMgr;
 }
 
 namespace swift {
-  class Token;
-
-class Lexer {
-  llvm::SourceMgr &SourceMgr;
-  const llvm::MemoryBuffer *Buffer;
-  const char *CurPtr;
-
-  Lexer(const Lexer&);          // DO NOT IMPLEMENT
-  void operator=(const Lexer&); // DO NOT IMPLEMENT
-public:
-  Lexer(unsigned BufferID, llvm::SourceMgr &SM);
+  class Lexer;
   
-  void Lex(Token &Result);
+class Parser {
+  llvm::SourceMgr &SourceMgr;
+  Lexer *L;
+  
+  Parser(const Parser&);         // DO NOT IMPLEMENT
+  void operator=(const Parser&); // DO NOT IMPLEMENT
+public:
+  Parser(unsigned BufferID, llvm::SourceMgr &SM);
+  ~Parser();
+  
+  void ParseTranslationUnit();
   
   
 private:
   void Warning(const char *Loc, const char *Message);
   void Error(const char *Loc, const char *Message);
-  void FormToken(tok::TokenKind Kind, const char *TokStart, Token &Result);
-  
-  void SkipSlashSlashComment();
-  void LexIdentifier(Token &Result);
-  void LexDigit(Token &Result);
 };
-  
   
 } // end namespace swift
 
