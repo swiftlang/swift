@@ -11,7 +11,7 @@
 ##===----------------------------------------------------------------------===##
 SWIFT_LEVEL := ..
 
-PARALLEL_DIRS = Lex Parse
+PARALLEL_DIRS = Parse
 
 include $(SWIFT_LEVEL)/Makefile
 

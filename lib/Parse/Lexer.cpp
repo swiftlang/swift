@@ -1,4 +1,4 @@
-//===--- Lexer.h - Swift Language Lexer -------------------------*- C++ -*-===//
+//===--- Lexer.cpp - Swift Language Lexer ---------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,26 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file defines the Lexer interface.
+//  This file implements the Lexer and Token interfaces.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_LEXER_H
-#define SWIFT_LEXER_H
+#include "swift/Parse/Lexer.h"
+using namespace swift;
 
-#include "swift/Lex/Token.h"
 
-namespace swift {
 
-class Lexer {
-  Lexer(const Lexer&);          // DO NOT IMPLEMENT
-  void operator=(const Lexer&); // DO NOT IMPLEMENT
-public:
-  
-  void Lex(Token &Result);
-};
-  
-  
-} // end namespace swift
-
-#endif
+int X;
