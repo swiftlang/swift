@@ -29,6 +29,7 @@ namespace swift {
 class Lexer {
   llvm::SourceMgr &SourceMgr;
   const llvm::MemoryBuffer *Buffer;
+  const char *CurPtr;
 
   Lexer(const Lexer&);          // DO NOT IMPLEMENT
   void operator=(const Lexer&); // DO NOT IMPLEMENT
@@ -36,6 +37,10 @@ public:
   Lexer(unsigned BufferID, llvm::SourceMgr &SM);
   
   void Lex(Token &Result);
+  
+  
+private:
+  void FormToken(tok::TokenKind Kind, const char *TokStart, Token &Result);
 };
   
   

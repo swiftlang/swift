@@ -68,9 +68,6 @@ class Token {
   ///
   tok::TokenKind Kind;
   
-  /// The location of the token.
-  llvm::SMLoc Loc;
-
   /// Text - The actual string covered by the token in the source buffer.
   llvm::StringRef Text;
   
@@ -86,31 +83,30 @@ public:
   
   /// getLocation - Return a source location identifier for the specified
   /// offset in the current file.
-  llvm::SMLoc getLocation() const { return Loc; }
-  void setLocation(llvm::SMLoc L) { Loc = L; }
+  llvm::SMLoc getLocation() const {
+    return llvm::SMLoc::getFromPointer(Text.begin());
+  }
 
   llvm::StringRef getText() const { return Text; }
   void setText(llvm::StringRef T) { Text = T; }
   
   unsigned getLength() const { return Text.size(); }
   
-  /// startToken - Reset all flags to cleared.
+  /// setToken - Set the token to the specified kind and source range.
   ///
-  void startToken() {
-    Kind = tok::unknown;
-    Loc = llvm::SMLoc();
-    Text = llvm::StringRef();
+  void setToken(tok::TokenKind K, llvm::StringRef T) {
+    Kind = K;
+    Text = T;
   }
 };
   
 } // end namespace swift
 
 
-#if 0
 namespace llvm {
+  template <typename T> struct isPodLike;
   template <>
   struct isPodLike<swift::Token> { static const bool value = true; };
 }  // end namespace llvm
-#endif
 
 #endif
