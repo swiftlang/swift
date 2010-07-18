@@ -20,7 +20,7 @@ TOOLNAME = swift
 include $(SWIFT_LEVEL)/../../Makefile.config
 
 LINK_COMPONENTS := $(TARGETS_TO_BUILD) bitwriter codegen ipo selectiondag
-USEDLIBS = swiftParse.a
+USEDLIBS = swiftParse.a swiftSema.a
 
 include $(SWIFT_LEVEL)/Makefile
 

@@ -25,10 +25,12 @@ namespace llvm {
 
 namespace swift {
   class Lexer;
+  class Sema;
   
 class Parser {
   llvm::SourceMgr &SourceMgr;
   Lexer *L;
+  Sema *S;
   
   /// Tok - This is the current token being considered by the parser.
   Token Tok;

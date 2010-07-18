@@ -16,6 +16,7 @@
 
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/Sema.h"
 #include "llvm/Support/SourceMgr.h"
 using namespace swift;
 using llvm::SMLoc;
@@ -26,10 +27,12 @@ using llvm::SMLoc;
 
 Parser::Parser(unsigned BufferID, llvm::SourceMgr &SM) : SourceMgr(SM) {
   L = new Lexer(BufferID, SM);
+  S = new Sema();
 }
 
 Parser::~Parser() {
-  delete L; 
+  delete L;
+  delete S;
 }
 
 void Parser::Note(SMLoc Loc, const char *Message) {
