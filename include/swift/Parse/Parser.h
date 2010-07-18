@@ -17,6 +17,8 @@
 #ifndef SWIFT_PARSER_H
 #define SWIFT_PARSER_H
 
+#include "swift/Parse/Token.h"
+
 namespace llvm {
   class SourceMgr;
 }
@@ -28,6 +30,9 @@ class Parser {
   llvm::SourceMgr &SourceMgr;
   Lexer *L;
   
+  /// Tok - This is the current token being considered by the parser.
+  Token Tok;
+  
   Parser(const Parser&);         // DO NOT IMPLEMENT
   void operator=(const Parser&); // DO NOT IMPLEMENT
 public:
@@ -36,10 +41,28 @@ public:
   
   void ParseTranslationUnit();
   
-  
 private:
-  void Warning(const char *Loc, const char *Message);
-  void Error(const char *Loc, const char *Message);
+  // Utilities.
+  void ConsumeToken();
+  void ConsumeToken(tok::TokenKind K) {
+    assert(Tok.is(K) && "Consuming wrong token kind");
+    ConsumeToken();
+  }
+  
+  // ExpectAndConsume
+  
+  /// SkipUntil - Read tokens until we get to the specified token, then return
+  /// without consuming it.  Because we cannot guarantee that the token will
+  /// ever occur, this skips to some likely good stopping point.
+  ///
+  void SkipUntil(tok::TokenKind T);
+  
+  void Warning(llvm::SMLoc Loc, const char *Message);
+  void Error(llvm::SMLoc Loc, const char *Message);
+  
+  // Parser Implementation
+  void ParseDeclTopLevel();
+  void ParseDeclVar();
 };
   
 } // end namespace swift
