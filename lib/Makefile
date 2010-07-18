@@ -11,7 +11,7 @@
 ##===----------------------------------------------------------------------===##
 SWIFT_LEVEL := ..
 
-PARALLEL_DIRS = Parse
+PARALLEL_DIRS = Parse Sema
 
 include $(SWIFT_LEVEL)/Makefile
 
