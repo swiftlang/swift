@@ -25,7 +25,12 @@ namespace swift {
   
 enum ExprKind {
   IntegerLiteralKind,
-  ParenExprKind
+  ParenExprKind,
+  
+  BinaryAddExprKind,
+  BinarySubExprKind,
+  BinaryMulExprKind,
+  BinaryDivExprKind
 };
   
   
@@ -75,7 +80,17 @@ public:
     : Expr(ParenExprKind), LParenLoc(lparenloc), SubExpr(subexpr),
       RParenLoc(rparenloc) {}
 };
+
+/// BinaryExpr - Binary expressions like 'x+y'.
+class BinaryExpr : public Expr {
+public:
+  Expr *LHS;
+  llvm::SMLoc OpLoc;
+  Expr *RHS;
   
+  BinaryExpr(ExprKind kind, Expr *lhs, llvm::SMLoc oploc, Expr *rhs)
+    : Expr(kind), LHS(lhs), OpLoc(oploc), RHS(rhs) {}
+};
   
 } // end namespace swift
 

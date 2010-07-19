@@ -30,7 +30,8 @@ public:
   
   Expr *ActOnNumericConstant(llvm::StringRef Text, llvm::SMLoc Loc);
   Expr *ActOnParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr, llvm::SMLoc RPLoc);
-  Expr *ActOnBinaryExpr(Expr *LHS, llvm::SMLoc OpLoc, Expr *RHS);
+  Expr *ActOnBinaryExpr(/*ExprKind*/unsigned Kind, Expr *LHS, llvm::SMLoc OpLoc,
+                        Expr *RHS);
 };
   
 } // end namespace swift

@@ -17,6 +17,7 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/Sema.h"
+#include "swift/AST/Expr.h"
 #include "llvm/Support/SourceMgr.h"
 using namespace swift;
 using llvm::SMLoc;
@@ -247,6 +248,18 @@ static prec::Level getBinOpPrecedence(tok::TokenKind Kind) {
   }
 }
 
+/// getBinOpKind - Return the expression kind of the specified token.
+static ExprKind getBinOpKind(tok::TokenKind Kind) {
+  switch (Kind) {
+  default: assert(0 && "not a binary operator!");
+  case tok::plus:                 return BinaryAddExprKind;
+  case tok::minus:                return BinarySubExprKind;
+    //case tok::percent:
+  case tok::slash:                return BinaryDivExprKind;
+  case tok::star:                 return BinaryMulExprKind;
+  }
+}
+
 
 /// ParseExprBinaryRHS - Parse the right hand side of a binary expression and
 /// assemble it according to precedence rules.
@@ -292,7 +305,8 @@ bool Parser::ParseExprBinaryRHS(Expr *&Result, unsigned MinPrec) {
     }
     assert(NextTokPrec <= ThisPrec && "Recursion didn't work!");
     
-    Result = S.Expr.ActOnBinaryExpr(Result, OpToken.getLocation(), Leaf);
+    Result = S.Expr.ActOnBinaryExpr(getBinOpKind(OpToken.getKind()), Result,
+                                    OpToken.getLocation(), Leaf);
   }
   
   return false;

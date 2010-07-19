@@ -33,7 +33,7 @@ Expr *SemaExpr::ActOnParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr,
   return new (S.Context) ParenExpr(LPLoc, SubExpr, RPLoc);
 }
 
-Expr *SemaExpr::ActOnBinaryExpr(Expr *LHS, llvm::SMLoc OpLoc, Expr *RHS) {
-  // TODO: Get Expr opcode.
-  return LHS;
+Expr *SemaExpr::ActOnBinaryExpr(unsigned Kind, Expr *LHS, llvm::SMLoc OpLoc,
+                                Expr *RHS) {
+  return new (S.Context) BinaryExpr((ExprKind)Kind, LHS, OpLoc, RHS);
 }
