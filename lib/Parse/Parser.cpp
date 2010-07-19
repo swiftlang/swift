@@ -143,14 +143,16 @@ void Parser::ParseDeclTopLevel() {
 ///      'var' identifier ':' type '=' expression ';'
 ///      'var' identifier '=' expression ';'
 void Parser::ParseDeclVar() {
+  SMLoc VarLoc = Tok.getLocation();
   ConsumeToken(tok::kw_var);
 
   llvm::StringRef Identifier;
   if (ParseIdentifier(Identifier, "expected identifier in var declaration"))
     return SkipUntil(tok::semi);
-  
+
+  Type *Ty = 0;
   if (ConsumeIf(tok::colon) &&
-      ParseType("expected type in var declaration"))
+      ParseType(Ty, "expected type in var declaration"))
     return SkipUntil(tok::semi);
   
   Expr *Init = 0;
@@ -158,7 +160,11 @@ void Parser::ParseDeclVar() {
       ParseExpr(Init, "expected expression in var declaration"))
     return SkipUntil(tok::semi);
   
-  // TODO Sema: Diagnose when we don't have a type or an expression.
+  // Diagnose when we don't have a type or an expression.
+  // FIXME: Sink into Sema.
+  if (Ty == 0 && Init == 0)
+    return Error(VarLoc, "var declaration must specify a type if no "
+                 "initializer is specified");
   
   ParseToken(tok::semi, "expected ';' at end of var declaration", tok::semi);
 }
@@ -170,9 +176,12 @@ void Parser::ParseDeclVar() {
 /// ParseType
 ///   type:
 ///     int
-bool Parser::ParseType(const char *Message) {
+bool Parser::ParseType(Type *&Result, const char *Message) {
   switch (Tok.getKind()) {
-  case tok::kw_int: ConsumeToken(tok::kw_int); return false;
+  case tok::kw_int:
+    Result = S.Context.IntType;
+    ConsumeToken(tok::kw_int);
+    return false;
   default:
     Error(Tok.getLocation(), Message ? Message : "expected type");
     return true;
@@ -214,7 +223,7 @@ bool Parser::ParseExprPrimary(Expr *&Result, const char *Message) {
       return true;
     }
     
-    S.Expr.ActOnParenExpr(LPLoc, SubExpr, RPLoc);
+    Result = S.Expr.ActOnParenExpr(LPLoc, SubExpr, RPLoc);
     return false;
   }
     

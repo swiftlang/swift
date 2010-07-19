@@ -28,6 +28,7 @@ namespace swift {
   class Sema;
   class ASTContext;
   class Expr;
+  class Type;
   
 class Parser {
   llvm::SourceMgr &SourceMgr;
@@ -90,7 +91,7 @@ private:
   void ParseDeclVar();
   
   // Type Parsing
-  bool ParseType(const char *Message = 0);
+  bool ParseType(Type *&Result, const char *Message = 0);
 
   // Expression Parsing
   bool ParseExpr(Expr *&Result, const char *Message = 0);
