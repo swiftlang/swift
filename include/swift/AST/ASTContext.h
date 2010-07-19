@@ -22,6 +22,7 @@ namespace llvm {
 }
 
 namespace swift {
+  class Type;
 
 /// ASTContext - This object creates and owns the AST objects.
 class ASTContext {
@@ -31,6 +32,9 @@ class ASTContext {
 public:
   ASTContext();
   ~ASTContext();
+  
+  /// IntType - This is 'int'.
+  Type * const IntType;
   
   void *Allocate(unsigned long Bytes, unsigned Alignment);
 };

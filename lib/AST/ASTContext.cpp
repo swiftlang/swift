@@ -15,11 +15,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Type.h"
 #include "llvm/Support/Allocator.h"
 using namespace swift;
 
-ASTContext::ASTContext() {
-  Allocator = new llvm::BumpPtrAllocator();
+ASTContext::ASTContext()
+  : Allocator(new llvm::BumpPtrAllocator()),
+    IntType(new (*this) BuiltinType(BuiltinIntKind)) {
 }
 
 ASTContext::~ASTContext() {

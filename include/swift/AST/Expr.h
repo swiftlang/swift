@@ -52,7 +52,7 @@ private:
   void operator delete(void *Data) throw();  // DO NOT IMPLEMENT.
   void *operator new(size_t Bytes, void *Mem) throw();  // DO NOT IMPLEMENT.
 public:
-  // Only allow allocation of Stmts using the allocator in ASTContext
+  // Only allow allocation of Exprs using the allocator in ASTContext
   // or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = 8) throw();  
