@@ -23,15 +23,23 @@
 namespace swift {
   class ASTContext;
   
+enum ExprKind {
+  IntegerLiteralKind,
+  ParenExprKind
+};
+  
+  
 /// Expr - Base class for all expressions in swift.
 class Expr {
   Expr(const Expr&);                 // DO NOT IMPLEMENT
   void operator=(const Expr&);       // DO NOT IMPLEMENT
+  ExprKind Kind;
 public:
   // TODO: Type.
   
-  Expr() {}
+  Expr(ExprKind kind) : Kind(kind) {}
 
+  ExprKind getKind() const { return Kind; }
   
 private:
   // Make placement new and vanilla new/delete illegal for Exprs.
@@ -45,15 +53,29 @@ public:
                      unsigned Alignment = 8) throw();  
 };
 
-  
+
 /// IntegerLiteral - Integer literal, like '4'.
 class IntegerLiteral : public Expr {
 public:
   llvm::StringRef Val;  // TODO: uint64_t.  APInt leaks.
   llvm::SMLoc Loc;
   
-  IntegerLiteral(llvm::StringRef V, llvm::SMLoc L) : Val(V), Loc(L) {}
+  IntegerLiteral(llvm::StringRef V, llvm::SMLoc L)
+    : Expr(IntegerLiteralKind), Val(V), Loc(L) {}
 };
+
+/// ParenExpr - Parenthesized expressions like '(x+x)'.
+class ParenExpr : public Expr {
+public:
+  llvm::SMLoc LParenLoc;
+  Expr *SubExpr;
+  llvm::SMLoc RParenLoc;
+  
+  ParenExpr(llvm::SMLoc lparenloc, Expr *subexpr, llvm::SMLoc rparenloc)
+    : Expr(ParenExprKind), LParenLoc(lparenloc), SubExpr(subexpr),
+      RParenLoc(rparenloc) {}
+};
+  
   
 } // end namespace swift
 

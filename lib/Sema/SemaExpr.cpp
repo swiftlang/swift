@@ -30,7 +30,7 @@ Expr *SemaExpr::ActOnNumericConstant(llvm::StringRef Text, llvm::SMLoc Loc) {
 
 Expr *SemaExpr::ActOnParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr,
                                llvm::SMLoc RPLoc) {
-  return SubExpr;
+  return new (S.Context) ParenExpr(LPLoc, SubExpr, RPLoc);
 }
 
 Expr *SemaExpr::ActOnBinaryExpr(Expr *LHS, llvm::SMLoc OpLoc, Expr *RHS) {
