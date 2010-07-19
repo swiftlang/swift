@@ -22,6 +22,7 @@
 
 namespace swift {
   class ASTContext;
+  class Type;
   
 enum ExprKind {
   IntegerLiteralKind,
@@ -40,9 +41,10 @@ class Expr {
   void operator=(const Expr&);       // DO NOT IMPLEMENT
   ExprKind Kind;
 public:
-  // TODO: Type.
+  /// Ty - This is the type of the expression.
+  Type *Ty;
   
-  Expr(ExprKind kind) : Kind(kind) {}
+  Expr(ExprKind kind, Type *ty) : Kind(kind), Ty(ty) {}
 
   ExprKind getKind() const { return Kind; }
   
@@ -65,8 +67,8 @@ public:
   llvm::StringRef Val;  // TODO: uint64_t.  APInt leaks.
   llvm::SMLoc Loc;
   
-  IntegerLiteral(llvm::StringRef V, llvm::SMLoc L)
-    : Expr(IntegerLiteralKind), Val(V), Loc(L) {}
+  IntegerLiteral(llvm::StringRef V, llvm::SMLoc L, Type *Ty)
+    : Expr(IntegerLiteralKind, Ty), Val(V), Loc(L) {}
 };
 
 /// ParenExpr - Parenthesized expressions like '(x+x)'.
@@ -76,8 +78,9 @@ public:
   Expr *SubExpr;
   llvm::SMLoc RParenLoc;
   
-  ParenExpr(llvm::SMLoc lparenloc, Expr *subexpr, llvm::SMLoc rparenloc)
-    : Expr(ParenExprKind), LParenLoc(lparenloc), SubExpr(subexpr),
+  ParenExpr(llvm::SMLoc lparenloc, Expr *subexpr, llvm::SMLoc rparenloc,
+            Type *Ty)
+    : Expr(ParenExprKind, Ty), LParenLoc(lparenloc), SubExpr(subexpr),
       RParenLoc(rparenloc) {}
 };
 
@@ -88,8 +91,8 @@ public:
   llvm::SMLoc OpLoc;
   Expr *RHS;
   
-  BinaryExpr(ExprKind kind, Expr *lhs, llvm::SMLoc oploc, Expr *rhs)
-    : Expr(kind), LHS(lhs), OpLoc(oploc), RHS(rhs) {}
+  BinaryExpr(ExprKind kind, Expr *lhs, llvm::SMLoc oploc, Expr *rhs, Type *Ty)
+    : Expr(kind, Ty), LHS(lhs), OpLoc(oploc), RHS(rhs) {}
 };
   
 } // end namespace swift
