@@ -15,7 +15,17 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "llvm/Support/Allocator.h"
 using namespace swift;
 
 ASTContext::ASTContext() {
+  Allocator = new llvm::BumpPtrAllocator();
+}
+
+ASTContext::~ASTContext() {
+  delete Allocator;
+}
+
+void *ASTContext::Allocate(unsigned long Bytes, unsigned Alignment) {
+  return Allocator->Allocate(Bytes, Alignment);
 }

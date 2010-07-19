@@ -17,14 +17,22 @@
 #ifndef SWIFT_ASTCONTEXT_H
 #define SWIFT_ASTCONTEXT_H
 
+namespace llvm {
+  class BumpPtrAllocator;
+}
+
 namespace swift {
 
 /// ASTContext - This object creates and owns the AST objects.
 class ASTContext {
   ASTContext(const ASTContext&);           // DO NOT IMPLEMENT
   void operator=(const ASTContext&);       // DO NOT IMPLEMENT
+  llvm::BumpPtrAllocator *Allocator;
 public:
   ASTContext();
+  ~ASTContext();
+  
+  void *Allocate(unsigned long Bytes, unsigned Alignment);
 };
   
 } // end namespace swift

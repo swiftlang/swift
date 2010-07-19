@@ -15,6 +15,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Sema/SemaExpr.h"
+#include "swift/Sema/Sema.h"
+#include "swift/AST/Expr.h"
 #include "llvm/Support/SMLoc.h"
 #include "llvm/ADT/StringRef.h"
 using namespace swift;
@@ -23,7 +25,7 @@ SemaExpr::SemaExpr(Sema &S) : SemaBase(S) {
 }
 
 Expr *SemaExpr::NumericConstant(llvm::StringRef Text, llvm::SMLoc Loc) {
-  return 0;
+  return new (S.Context) IntegerLiteral(Text, Loc);
 }
 
 Expr *SemaExpr::ParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr, llvm::SMLoc RPLoc) {

@@ -15,6 +15,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Expr.h"
+#include "swift/AST/ASTContext.h"
 using namespace swift;
 
-int x;
+// Only allow allocation of Stmts using the allocator in ASTContext
+// or by doing a placement new.
+void *Expr::operator new(size_t Bytes, ASTContext &C,
+                         unsigned Alignment) throw() {
+  return C.Allocate(Bytes, Alignment);
+}
