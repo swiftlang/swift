@@ -1,4 +1,4 @@
-//===--- Sema.h - Swift Language Semantic Analysis --------------*- C++ -*-===//
+//===--- ASTContext.h - AST Context Object ----------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,29 +10,23 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the Sema interface which implement hooks invoked by the 
-// parser to build the AST.
+// This file defines the ASTContext interface.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SEMA_H
-#define SWIFT_SEMA_H
-
-#include "swift/Sema/SemaExpr.h"
+#ifndef SWIFT_ASTCONTEXT_H
+#define SWIFT_ASTCONTEXT_H
 
 namespace swift {
 
-/// Sema - This is the common semantic analysis module, which has the high-level
-/// state that is shared by subclasses.
-class Sema {
-  Sema(const Sema&);           // DO NOT IMPLEMENT
-  void operator=(const Sema&); // DO NOT IMPLEMENT
+/// ASTContext - This object creates and owns the AST objects.
+class ASTContext {
+  ASTContext(const ASTContext&);           // DO NOT IMPLEMENT
+  void operator=(const ASTContext&);       // DO NOT IMPLEMENT
 public:
-  SemaExpr Expr;
-  
-  Sema();
+  ASTContext();
 };
-
+  
 } // end namespace swift
 
 #endif

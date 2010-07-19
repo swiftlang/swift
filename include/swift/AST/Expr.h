@@ -1,4 +1,4 @@
-//===--- Sema.h - Swift Language Semantic Analysis --------------*- C++ -*-===//
+//===--- Expr.h - Swift Language Expression ASTs ----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,29 +10,24 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the Sema interface which implement hooks invoked by the 
-// parser to build the AST.
+// This file defines the Expr class and subclasses.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SEMA_H
-#define SWIFT_SEMA_H
-
-#include "swift/Sema/SemaExpr.h"
+#ifndef SWIFT_EXPR_H
+#define SWIFT_EXPR_H
 
 namespace swift {
-
-/// Sema - This is the common semantic analysis module, which has the high-level
-/// state that is shared by subclasses.
-class Sema {
-  Sema(const Sema&);           // DO NOT IMPLEMENT
-  void operator=(const Sema&); // DO NOT IMPLEMENT
-public:
-  SemaExpr Expr;
   
-  Sema();
+/// Expr - Base class for all expressions in swift.
+class Expr {
+  Expr(const Expr&);                 // DO NOT IMPLEMENT
+  void operator=(const Expr&);       // DO NOT IMPLEMENT
+public:
+  Expr() {}
+  
 };
-
+  
 } // end namespace swift
 
 #endif
