@@ -33,8 +33,8 @@ public:
   ASTContext();
   ~ASTContext();
   
-  /// IntType - This is 'int'.
-  Type * const IntType;
+  Type * const VoidType; /// VoidType - This is 'void'.
+  Type * const IntType;  /// IntType - This is 'int'.
   
   void *Allocate(unsigned long Bytes, unsigned Alignment);
 };

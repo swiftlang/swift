@@ -31,6 +31,7 @@ namespace tok {
     
 #define KEYWORD(X) kw_ ## X,
     // Types.
+    KEYWORD(void)
     KEYWORD(int)
 //    KEYWORD(uint)
 //    KEYWORD(int8)

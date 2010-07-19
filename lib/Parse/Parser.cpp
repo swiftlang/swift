@@ -182,6 +182,10 @@ bool Parser::ParseType(Type *&Result, const char *Message) {
     Result = S.Context.IntType;
     ConsumeToken(tok::kw_int);
     return false;
+  case tok::kw_void:
+    Result = S.Context.VoidType;
+    ConsumeToken(tok::kw_void);
+    return false;
   default:
     Error(Tok.getLocation(), Message ? Message : "expected type");
     return true;

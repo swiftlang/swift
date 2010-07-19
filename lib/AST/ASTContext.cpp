@@ -21,6 +21,7 @@ using namespace swift;
 
 ASTContext::ASTContext()
   : Allocator(new llvm::BumpPtrAllocator()),
+    VoidType(new (*this) BuiltinType(BuiltinVoidKind)),
     IntType(new (*this) BuiltinType(BuiltinIntKind)) {
 }
 

@@ -84,6 +84,7 @@ void Lexer::LexIdentifier(Token &Result) {
   
   tok::TokenKind Kind =
   llvm::StringSwitch<tok::TokenKind>(llvm::StringRef(TokStart, CurPtr-TokStart))
+    .Case("void", tok::kw_void)
     .Case("int", tok::kw_int)
     .Case("var", tok::kw_var)
     .Default(tok::identifier);
