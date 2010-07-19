@@ -125,7 +125,13 @@ void Parser::ParseTranslationUnit() {
   while (Tok.isNot(tok::eof)) {
     Decl *D = 0;
     ParseDeclTopLevel(D);
+    
+    if (D)
+      Consumer.HandleTopLevelDecl(D);
   }
+  
+  // Notify consumer about the end of the translation unit.
+  Consumer.HandleEndOfTranslationUnit();
 }
 
 /// ParseDeclTopLevel

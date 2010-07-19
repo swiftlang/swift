@@ -35,7 +35,13 @@ public:
   
   ASTContext &getContext() const { return Context; }
   
+  /// HandleTopLevelDecl - This is called for every top-level declaration.
   virtual void HandleTopLevelDecl(Decl *D) {}
+  
+  /// HandleEndOfTranslationUnit - This method is called at the end of the
+  /// translation unit.
+  virtual void HandleEndOfTranslationUnit() {}
+  
 };  
   
 } // end namespace swift
