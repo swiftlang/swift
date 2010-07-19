@@ -42,7 +42,7 @@ class Parser {
   Parser(const Parser&);         // DO NOT IMPLEMENT
   void operator=(const Parser&); // DO NOT IMPLEMENT
 public:
-  Parser(unsigned BufferID, llvm::SourceMgr &SM, ASTContext &Context);
+  Parser(unsigned BufferID, ASTContext &Context);
   ~Parser();
   
   void ParseTranslationUnit();

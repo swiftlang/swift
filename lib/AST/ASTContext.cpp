@@ -19,8 +19,9 @@
 #include "llvm/Support/Allocator.h"
 using namespace swift;
 
-ASTContext::ASTContext()
+ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
   : Allocator(new llvm::BumpPtrAllocator()),
+    SourceMgr(sourcemgr),
     VoidType(new (*this) BuiltinType(BuiltinVoidKind)),
     IntType(new (*this) BuiltinType(BuiltinIntKind)) {
 }

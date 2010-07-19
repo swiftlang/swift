@@ -19,6 +19,7 @@
 
 namespace llvm {
   class BumpPtrAllocator;
+  class SourceMgr;
 }
 
 namespace swift {
@@ -30,8 +31,11 @@ class ASTContext {
   void operator=(const ASTContext&);       // DO NOT IMPLEMENT
   llvm::BumpPtrAllocator *Allocator;
 public:
-  ASTContext();
+  ASTContext(llvm::SourceMgr &SourceMgr);
   ~ASTContext();
+  
+  /// SourceMgr - The source manager object.
+  llvm::SourceMgr &SourceMgr;
   
   Type * const VoidType; /// VoidType - This is 'void'.
   Type * const IntType;  /// IntType - This is 'int'.

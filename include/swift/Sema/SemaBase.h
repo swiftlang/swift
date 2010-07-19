@@ -37,7 +37,9 @@ protected:
 public:
   SemaBase(Sema &s);
   
-  // TODO: Diagnostics stuff.
+  void Note(llvm::SMLoc Loc, const char *Message);
+  void Warning(llvm::SMLoc Loc, const char *Message);
+  void Error(llvm::SMLoc Loc, const char *Message);
 };
     
 } // end namespace swift

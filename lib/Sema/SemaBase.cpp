@@ -15,7 +15,19 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Sema/SemaBase.h"
+#include "swift/Sema/Sema.h"
+#include "llvm/Support/SourceMgr.h"
 using namespace swift;
 
 SemaBase::SemaBase(Sema &s) : S(s) {
+}
+
+void SemaBase::Note(llvm::SMLoc Loc, const char *Message) {
+  S.Context.SourceMgr.PrintMessage(Loc, Message, "note");
+}
+void SemaBase::Warning(llvm::SMLoc Loc, const char *Message) {
+  S.Context.SourceMgr.PrintMessage(Loc, Message, "warning");
+}
+void SemaBase::Error(llvm::SMLoc Loc, const char *Message) {
+  S.Context.SourceMgr.PrintMessage(Loc, Message, "error");
 }

@@ -27,9 +27,9 @@ using llvm::SMLoc;
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
-Parser::Parser(unsigned BufferID, llvm::SourceMgr &SM, ASTContext &Context)
-  : SourceMgr(SM),
-    L(*new Lexer(BufferID, SM)),
+Parser::Parser(unsigned BufferID, ASTContext &Context)
+  : SourceMgr(Context.SourceMgr),
+    L(*new Lexer(BufferID, SourceMgr)),
     S(*new Sema(Context)) {
 }
 
