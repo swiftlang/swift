@@ -163,12 +163,6 @@ void Parser::ParseDeclVar(Decl *&Result) {
       ParseExpr(Init, "expected expression in var declaration"))
     return SkipUntil(tok::semi);
   
-  // Diagnose when we don't have a type or an expression.
-  // FIXME: Sink into Sema.
-  if (Ty == 0 && Init == 0)
-    return Error(VarLoc, "var declaration must specify a type if no "
-                 "initializer is specified");
-  
   Result = S.ActOnVarDecl(VarLoc, Identifier, Ty, Init);
   
   ParseToken(tok::semi, "expected ';' at end of var declaration", tok::semi);

@@ -26,5 +26,13 @@ Sema::Sema(ASTContext &context) : Context(context), Expr(*this) {
 VarDecl *Sema::ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name, Type *Ty,
                             swift::Expr *Init) {
  
+  // Diagnose when we don't have a type or an expression.
+  if (Ty == 0 && Init == 0) {
+    Expr.Error(VarLoc, "var declaration must specify a type if no "
+               "initializer is specified");
+    // TODO: Recover better by making var have 'invalid' type.
+    return 0;
+  }
+  
   return new (Context) VarDecl(VarLoc, Name, Ty, Init);
 }
