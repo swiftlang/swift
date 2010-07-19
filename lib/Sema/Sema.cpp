@@ -15,7 +15,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Sema/Sema.h"
+#include "swift/AST/Decl.h"
 using namespace swift;
 
 Sema::Sema(ASTContext &context) : Context(context), Expr(*this) {
+}
+
+
+
+VarDecl *Sema::ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name, Type *Ty,
+                            swift::Expr *Init) {
+ 
+  return new (Context) VarDecl(VarLoc, Name, Ty, Init);
 }

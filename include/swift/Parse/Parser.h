@@ -29,6 +29,7 @@ namespace swift {
   class ASTContext;
   class Expr;
   class Type;
+  class Decl;
   
 class Parser {
   llvm::SourceMgr &SourceMgr;
@@ -87,8 +88,8 @@ private:
   
   
   // Decl Parsing
-  void ParseDeclTopLevel();
-  void ParseDeclVar();
+  void ParseDeclTopLevel(Decl *&Result);
+  void ParseDeclVar(Decl *&Result);
   
   // Type Parsing
   bool ParseType(Type *&Result, const char *Message = 0);

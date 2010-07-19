@@ -17,6 +17,7 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/Sema.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "llvm/Support/SourceMgr.h"
 using namespace swift;
@@ -119,21 +120,23 @@ void Parser::ParseTranslationUnit() {
   // Prime the lexer.
   ConsumeToken();
   
-  while (Tok.isNot(tok::eof))
-    ParseDeclTopLevel();
+  while (Tok.isNot(tok::eof)) {
+    Decl *D = 0;
+    ParseDeclTopLevel(D);
+  }
 }
 
 /// ParseDeclTopLevel
 ///   decl-top-level:
 ///     ';'
 ///     decl-var
-void Parser::ParseDeclTopLevel() {
+void Parser::ParseDeclTopLevel(Decl *&Result) {
   switch (Tok.getKind()) {
   default:
     Error(Tok.getLocation(), "expected a top level declaration");
     return SkipUntil(tok::semi);
   case tok::semi:   return ConsumeToken(tok::semi); 
-  case tok::kw_var: return ParseDeclVar();
+  case tok::kw_var: return ParseDeclVar(Result);
   }
 }
 
@@ -142,7 +145,7 @@ void Parser::ParseDeclTopLevel() {
 ///      'var' identifier ':' type ';'
 ///      'var' identifier ':' type '=' expression ';'
 ///      'var' identifier '=' expression ';'
-void Parser::ParseDeclVar() {
+void Parser::ParseDeclVar(Decl *&Result) {
   SMLoc VarLoc = Tok.getLocation();
   ConsumeToken(tok::kw_var);
 
@@ -165,6 +168,8 @@ void Parser::ParseDeclVar() {
   if (Ty == 0 && Init == 0)
     return Error(VarLoc, "var declaration must specify a type if no "
                  "initializer is specified");
+  
+  Result = S.ActOnVarDecl(VarLoc, Identifier, Ty, Init);
   
   ParseToken(tok::semi, "expected ';' at end of var declaration", tok::semi);
 }

@@ -22,6 +22,8 @@
 #include "swift/AST/ASTContext.h"
 
 namespace swift {
+  class VarDecl;
+  class Expr;
 
 /// Sema - This is the common semantic analysis module, which has the high-level
 /// state that is shared by subclasses.
@@ -33,6 +35,9 @@ public:
   SemaExpr Expr;
   
   Sema(ASTContext &Context);
+  
+  VarDecl *ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name, Type *Ty,
+                        swift::Expr *Init);
 };
 
 } // end namespace swift
