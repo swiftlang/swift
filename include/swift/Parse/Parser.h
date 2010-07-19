@@ -27,6 +27,7 @@ namespace swift {
   class Lexer;
   class Sema;
   class ASTContext;
+  class Expr;
   
 class Parser {
   llvm::SourceMgr &SourceMgr;
@@ -92,9 +93,9 @@ private:
   bool ParseType(const char *Message = 0);
 
   // Expression Parsing
-  bool ParseExpr(const char *Message = 0);
-  bool ParseExprPrimary(const char *Message = 0);
-  bool ParseExprBinaryRHS(unsigned MinPrecedence = 1);
+  bool ParseExpr(Expr *&Result, const char *Message = 0);
+  bool ParseExprPrimary(Expr *&Result, const char *Message = 0);
+  bool ParseExprBinaryRHS(Expr *&Result, unsigned MinPrecedence = 1);
 };
   
 } // end namespace swift

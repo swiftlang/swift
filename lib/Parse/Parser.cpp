@@ -152,8 +152,9 @@ void Parser::ParseDeclVar() {
       ParseType("expected type in var declaration"))
     return SkipUntil(tok::semi);
   
+  Expr *Init = 0;
   if (ConsumeIf(tok::equal) &&
-      ParseExpr("expected expression in var declaration"))
+      ParseExpr(Init, "expected expression in var declaration"))
     return SkipUntil(tok::semi);
   
   // TODO Sema: Diagnose when we don't have a type or an expression.
@@ -184,16 +185,16 @@ bool Parser::ParseType(const char *Message) {
 /// ParseExpr
 ///   expr:
 ///     expr-primary (binary-operator expr-primary)*
-bool Parser::ParseExpr(const char *Message) {
-  return ParseExprPrimary(Message) ||
-         ParseExprBinaryRHS();
+bool Parser::ParseExpr(Expr *&Result, const char *Message) {
+  return ParseExprPrimary(Result, Message) ||
+         ParseExprBinaryRHS(Result);
 }
 
 /// ParseExprPrimary
 ///   expr-primary:
 ///     numeric_constant
 ///     '(' expr ')'
-bool Parser::ParseExprPrimary(const char *Message) {
+bool Parser::ParseExprPrimary(Expr *&Result, const char *Message) {
   switch (Tok.getKind()) {
   case tok::numeric_constant:
     S.Expr.NumericConstant(Tok.getText(), Tok.getLocation());
@@ -203,7 +204,8 @@ bool Parser::ParseExprPrimary(const char *Message) {
   case tok::l_paren: {
     SMLoc LPLoc = Tok.getLocation();  
     ConsumeToken(tok::l_paren);
-    if (ParseExpr("expected expression in parentheses")) return true;
+    Expr *SubExpr = 0;
+    if (ParseExpr(SubExpr, "expected expression in parentheses")) return true;
     
     SMLoc RPLoc = Tok.getLocation();  
     if (ParseToken(tok::r_paren, "expected ')' in parenthesis expression")) {
@@ -211,7 +213,7 @@ bool Parser::ParseExprPrimary(const char *Message) {
       return true;
     }
     
-    S.Expr.ParenExpr(LPLoc, RPLoc);
+    S.Expr.ParenExpr(LPLoc, SubExpr, RPLoc);
     return false;
   }
     
@@ -251,7 +253,7 @@ static prec::Level getBinOpPrecedence(tok::TokenKind Kind) {
 ///
 ///   expr-binary-rhs:
 ///     (binary-operator expr-primary)*
-bool Parser::ParseExprBinaryRHS(unsigned MinPrec) {
+bool Parser::ParseExprBinaryRHS(Expr *&Result, unsigned MinPrec) {
   prec::Level NextTokPrec = getBinOpPrecedence(Tok.getKind());
   while (1) {
     // If this token has a lower precedence than we are allowed to parse (e.g.
@@ -267,7 +269,8 @@ bool Parser::ParseExprBinaryRHS(unsigned MinPrec) {
     // TODO: Support ternary operators some day.
     
     // Parse another leaf here for the RHS of the operator.
-    if (ParseExprPrimary("expected expression after binary operator"))
+    Expr *Leaf = 0;
+    if (ParseExprPrimary(Leaf, "expected expression after binary operator"))
       return true;
 
     // Remember the precedence of this operator and get the precedence of the
@@ -282,7 +285,7 @@ bool Parser::ParseExprBinaryRHS(unsigned MinPrec) {
     if (ThisPrec < NextTokPrec) {
       // Only parse things on the RHS that bind more tightly than the current
       // operator.
-      if (ParseExprBinaryRHS(ThisPrec + 1))
+      if (ParseExprBinaryRHS(Leaf, ThisPrec + 1))
         return true;
       
       NextTokPrec = getBinOpPrecedence(Tok.getKind());
