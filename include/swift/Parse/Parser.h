@@ -26,6 +26,7 @@ namespace llvm {
 namespace swift {
   class Lexer;
   class Sema;
+  class ASTContext;
   
 class Parser {
   llvm::SourceMgr &SourceMgr;
@@ -38,7 +39,7 @@ class Parser {
   Parser(const Parser&);         // DO NOT IMPLEMENT
   void operator=(const Parser&); // DO NOT IMPLEMENT
 public:
-  Parser(unsigned BufferID, llvm::SourceMgr &SM);
+  Parser(unsigned BufferID, llvm::SourceMgr &SM, ASTContext &Context);
   ~Parser();
   
   void ParseTranslationUnit();

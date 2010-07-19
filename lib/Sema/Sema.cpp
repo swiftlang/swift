@@ -17,5 +17,5 @@
 #include "swift/Sema/Sema.h"
 using namespace swift;
 
-Sema::Sema() : Expr(*this) {
+Sema::Sema(ASTContext &context) : Context(context), Expr(*this) {
 }

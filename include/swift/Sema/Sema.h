@@ -19,6 +19,7 @@
 #define SWIFT_SEMA_H
 
 #include "swift/Sema/SemaExpr.h"
+#include "swift/AST/ASTContext.h"
 
 namespace swift {
 
@@ -28,9 +29,10 @@ class Sema {
   Sema(const Sema&);           // DO NOT IMPLEMENT
   void operator=(const Sema&); // DO NOT IMPLEMENT
 public:
+  ASTContext &Context;
   SemaExpr Expr;
   
-  Sema();
+  Sema(ASTContext &Context);
 };
 
 } // end namespace swift
