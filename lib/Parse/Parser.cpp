@@ -197,7 +197,7 @@ bool Parser::ParseExpr(Expr *&Result, const char *Message) {
 bool Parser::ParseExprPrimary(Expr *&Result, const char *Message) {
   switch (Tok.getKind()) {
   case tok::numeric_constant:
-    S.Expr.NumericConstant(Tok.getText(), Tok.getLocation());
+    S.Expr.ActOnNumericConstant(Tok.getText(), Tok.getLocation());
     ConsumeToken(tok::numeric_constant);
     return false;
       
@@ -213,7 +213,7 @@ bool Parser::ParseExprPrimary(Expr *&Result, const char *Message) {
       return true;
     }
     
-    S.Expr.ParenExpr(LPLoc, SubExpr, RPLoc);
+    S.Expr.ActOnParenExpr(LPLoc, SubExpr, RPLoc);
     return false;
   }
     
@@ -292,7 +292,7 @@ bool Parser::ParseExprBinaryRHS(Expr *&Result, unsigned MinPrec) {
     }
     assert(NextTokPrec <= ThisPrec && "Recursion didn't work!");
     
-    // TODO: Build AST.
+    Result = S.Expr.ActOnBinaryExpr(Result, OpToken.getLocation(), Leaf);
   }
   
   return false;

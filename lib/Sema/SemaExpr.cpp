@@ -24,15 +24,16 @@ using namespace swift;
 SemaExpr::SemaExpr(Sema &S) : SemaBase(S) {
 }
 
-Expr *SemaExpr::NumericConstant(llvm::StringRef Text, llvm::SMLoc Loc) {
+Expr *SemaExpr::ActOnNumericConstant(llvm::StringRef Text, llvm::SMLoc Loc) {
   return new (S.Context) IntegerLiteral(Text, Loc);
 }
 
-Expr *SemaExpr::ParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr, llvm::SMLoc RPLoc) {
+Expr *SemaExpr::ActOnParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr,
+                               llvm::SMLoc RPLoc) {
   return SubExpr;
 }
 
-Expr *SemaExpr::BinaryExpr(Expr *LHS, llvm::SMLoc OpLoc, Expr *RHS) {
+Expr *SemaExpr::ActOnBinaryExpr(Expr *LHS, llvm::SMLoc OpLoc, Expr *RHS) {
   // TODO: Get Expr opcode.
   return LHS;
 }

@@ -28,9 +28,9 @@ class SemaExpr : public SemaBase {
 public:
   SemaExpr(Sema &s);
   
-  Expr *NumericConstant(llvm::StringRef Text, llvm::SMLoc Loc);
-  Expr *ParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr, llvm::SMLoc RPLoc);
-  Expr *BinaryExpr(Expr *LHS, llvm::SMLoc OpLoc, Expr *RHS);
+  Expr *ActOnNumericConstant(llvm::StringRef Text, llvm::SMLoc Loc);
+  Expr *ActOnParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr, llvm::SMLoc RPLoc);
+  Expr *ActOnBinaryExpr(Expr *LHS, llvm::SMLoc OpLoc, Expr *RHS);
 };
   
 } // end namespace swift
