@@ -22,6 +22,7 @@
 
 namespace llvm {
   class StringRef;
+  class raw_ostream;
 }
 
 namespace swift {
@@ -43,6 +44,13 @@ protected:
   Decl(DeclKind kind) : Kind(kind) {}
 public:
   DeclKind getKind() const { return Kind; }
+  
+  
+  void dump() const;
+  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) { return true; }
   
 private:
   // Make placement new and vanilla new/delete illegal for Decls.
@@ -67,6 +75,14 @@ public:
 
   VarDecl(llvm::SMLoc varloc, llvm::StringRef name, Type *ty, Expr *init)
     : Decl(VarDeclKind), VarLoc(varloc), Name(name), Ty(ty), Init(init) {}
+
+  
+  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) { return D->getKind() == VarDeclKind; }
+  static bool classof(const VarDecl *D) { return true; }
 
 };
   

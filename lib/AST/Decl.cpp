@@ -16,10 +16,33 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Expr.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/Support/raw_ostream.h"
 using namespace swift;
+using llvm::cast;
 
 // Only allow allocation of Decls using the allocator in ASTContext.
 void *Decl::operator new(size_t Bytes, ASTContext &C,
                          unsigned Alignment) throw() {
   return C.Allocate(Bytes, Alignment);
+}
+
+void Decl::dump() const { print(llvm::errs()); llvm::errs() << '\n'; }
+
+void Decl::print(llvm::raw_ostream &OS, unsigned Indent) const {
+  switch (getKind()) {
+  case VarDeclKind: return cast<VarDecl>(this)->print(OS, Indent);
+  }
+}
+
+
+void VarDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
+  OS.indent(Indent) << "(vardecl '" << Name << "'";
+  
+  if (Init) {
+    OS << '\n';
+//    Init->print(OS, Indent+1)
+  }
+  OS << ')';
 }

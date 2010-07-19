@@ -15,10 +15,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "ASTConsumers.h"
+#include "swift/AST/Decl.h"
 using namespace swift;
 
 
 /// HandleTopLevelDecl - This is called for every top-level declaration.
 void ASTDumper::HandleTopLevelDecl(Decl *D) {
-  
+  D->dump();
 }
