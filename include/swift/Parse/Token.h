@@ -80,6 +80,7 @@ class Token {
   llvm::StringRef Text;
   
 public:
+  Token() : Kind(tok::unknown) {}
   
   tok::TokenKind getKind() const { return Kind; }
   void setKind(tok::TokenKind K) { Kind = K; }

@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_EXPR_H
-#define SWIFT_EXPR_H
+#ifndef SWIFT_AST_EXPR_H
+#define SWIFT_AST_EXPR_H
 
 #include "llvm/Support/SMLoc.h"
 #include "llvm/ADT/StringRef.h"
