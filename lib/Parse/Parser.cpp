@@ -19,6 +19,7 @@
 #include "swift/Sema/Sema.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ASTConsumer.h"
 #include "llvm/Support/SourceMgr.h"
 using namespace swift;
 using llvm::SMLoc;
@@ -27,10 +28,11 @@ using llvm::SMLoc;
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
-Parser::Parser(unsigned BufferID, ASTContext &Context)
-  : SourceMgr(Context.SourceMgr),
+Parser::Parser(unsigned BufferID, ASTConsumer &consumer)
+  : Consumer(consumer),
+    SourceMgr(Consumer.getContext().SourceMgr),
     L(*new Lexer(BufferID, SourceMgr)),
-    S(*new Sema(Context)) {
+    S(*new Sema(Consumer.getContext())) {
 }
 
 Parser::~Parser() {

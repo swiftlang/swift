@@ -26,12 +26,14 @@ namespace llvm {
 namespace swift {
   class Lexer;
   class Sema;
-  class ASTContext;
   class Expr;
   class Type;
   class Decl;
+  class ASTContext;
+  class ASTConsumer;
   
 class Parser {
+  ASTConsumer &Consumer;
   llvm::SourceMgr &SourceMgr;
   Lexer &L;
   Sema &S;
@@ -42,7 +44,7 @@ class Parser {
   Parser(const Parser&);         // DO NOT IMPLEMENT
   void operator=(const Parser&); // DO NOT IMPLEMENT
 public:
-  Parser(unsigned BufferID, ASTContext &Context);
+  Parser(unsigned BufferID, ASTConsumer &Consumer);
   ~Parser();
   
   void ParseTranslationUnit();
