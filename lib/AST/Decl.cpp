@@ -42,7 +42,7 @@ void VarDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   
   if (Init) {
     OS << '\n';
-//    Init->print(OS, Indent+1)
+    Init->print(OS, Indent+1);
   }
   OS << ')';
 }

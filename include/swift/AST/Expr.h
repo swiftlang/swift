@@ -20,6 +20,10 @@
 #include "llvm/Support/SMLoc.h"
 #include "llvm/ADT/StringRef.h"
 
+namespace llvm {
+  class raw_ostream;
+}
+
 namespace swift {
   class ASTContext;
   class Type;
@@ -31,7 +35,11 @@ enum ExprKind {
   BinaryAddExprKind,
   BinarySubExprKind,
   BinaryMulExprKind,
-  BinaryDivExprKind
+  BinaryDivExprKind,
+  
+  
+  First_BinaryExpr = BinaryAddExprKind,
+  Last_BinaryExpr = BinaryDivExprKind
 };
   
   
@@ -48,6 +56,12 @@ public:
 
   ExprKind getKind() const { return Kind; }
   
+  void dump() const;
+  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Expr *) { return true; }
+
 private:
   // Make placement new and vanilla new/delete illegal for Exprs.
   void *operator new(size_t Bytes) throw();  // DO NOT IMPLEMENT.
@@ -69,6 +83,12 @@ public:
   
   IntegerLiteral(llvm::StringRef V, llvm::SMLoc L, Type *Ty)
     : Expr(IntegerLiteralKind, Ty), Val(V), Loc(L) {}
+  
+  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const IntegerLiteral *) { return true; }
+  static bool classof(const Expr *E) { return E->getKind()==IntegerLiteralKind;}
 };
 
 /// ParenExpr - Parenthesized expressions like '(x+x)'.
@@ -82,6 +102,12 @@ public:
             Type *Ty)
     : Expr(ParenExprKind, Ty), LParenLoc(lparenloc), SubExpr(subexpr),
       RParenLoc(rparenloc) {}
+
+  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ParenExpr *) { return true; }
+  static bool classof(const Expr *E) { return E->getKind() == ParenExprKind; }
 };
 
 /// BinaryExpr - Binary expressions like 'x+y'.
@@ -93,6 +119,14 @@ public:
   
   BinaryExpr(ExprKind kind, Expr *lhs, llvm::SMLoc oploc, Expr *rhs, Type *Ty)
     : Expr(kind, Ty), LHS(lhs), OpLoc(oploc), RHS(rhs) {}
+
+  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const BinaryExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() >= First_BinaryExpr &&
+           E->getKind() <= Last_BinaryExpr; }
 };
   
 } // end namespace swift

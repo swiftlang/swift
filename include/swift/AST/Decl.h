@@ -50,7 +50,7 @@ public:
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) { return true; }
+  static bool classof(const Decl *) { return true; }
   
 private:
   // Make placement new and vanilla new/delete illegal for Decls.

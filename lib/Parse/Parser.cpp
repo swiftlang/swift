@@ -218,7 +218,7 @@ bool Parser::ParseExpr(Expr *&Result, const char *Message) {
 bool Parser::ParseExprPrimary(Expr *&Result, const char *Message) {
   switch (Tok.getKind()) {
   case tok::numeric_constant:
-    S.Expr.ActOnNumericConstant(Tok.getText(), Tok.getLocation());
+    Result = S.Expr.ActOnNumericConstant(Tok.getText(), Tok.getLocation());
     ConsumeToken(tok::numeric_constant);
     return false;
       
