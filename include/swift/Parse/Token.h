@@ -60,6 +60,7 @@ namespace tok {
     PUNCTUATOR(star,        "*")
     PUNCTUATOR(slash,       "/")
     
+    PUNCTUATOR(arrow,       "->")
 #undef PUNCTUATOR
     
     NUM_TOKENS

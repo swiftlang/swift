@@ -21,9 +21,6 @@
 #include "llvm/ADT/StringRef.h"
 using namespace swift;
 
-SemaExpr::SemaExpr(Sema &S) : SemaBase(S) {
-}
-
 Expr *SemaExpr::ActOnNumericConstant(llvm::StringRef Text, llvm::SMLoc Loc) {
   return new (S.Context) IntegerLiteral(Text, Loc, S.Context.IntType);
 }

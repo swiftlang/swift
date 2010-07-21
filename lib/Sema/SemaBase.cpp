@@ -19,9 +19,6 @@
 #include "llvm/Support/SourceMgr.h"
 using namespace swift;
 
-SemaBase::SemaBase(Sema &s) : S(s) {
-}
-
 void SemaBase::Note(llvm::SMLoc Loc, const char *Message) {
   S.Context.SourceMgr.PrintMessage(Loc, Message, "note");
 }

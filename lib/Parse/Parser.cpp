@@ -21,6 +21,8 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ASTConsumer.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/PointerUnion.h"
 using namespace swift;
 using llvm::SMLoc;
 
@@ -107,6 +109,11 @@ bool Parser::ParseToken(tok::TokenKind K, const char *Message,
   
   Error(Tok.getLocation(), Message);
   SkipUntil(SkipToTok);
+  
+  // If we skipped ahead to the missing token and found it, consume it as if
+  // there were no error.
+  if (K == SkipToTok && Tok.is(SkipToTok))
+    ConsumeToken();
   return true;
 }
 
@@ -137,22 +144,27 @@ void Parser::ParseTranslationUnit() {
 /// ParseDeclTopLevel
 ///   decl-top-level:
 ///     ';'
-///     decl-var
+///     decl-var ';'
 void Parser::ParseDeclTopLevel(Decl *&Result) {
   switch (Tok.getKind()) {
   default:
     Error(Tok.getLocation(), "expected a top level declaration");
     return SkipUntil(tok::semi);
   case tok::semi:   return ConsumeToken(tok::semi); 
-  case tok::kw_var: return ParseDeclVar(Result);
+  case tok::kw_var:
+    ParseDeclVar(Result);
+    if (Result)
+      ParseToken(tok::semi, "expected ';' at end of var declaration",
+                 tok::semi);
+    return;
   }
 }
 
 /// ParseDeclVar
 ///   decl-var:
-///      'var' identifier ':' type ';'
-///      'var' identifier ':' type '=' expression ';'
-///      'var' identifier '=' expression ';'
+///      'var' identifier ':' type
+///      'var' identifier ':' type '=' expression 
+///      'var' identifier '=' expression
 void Parser::ParseDeclVar(Decl *&Result) {
   SMLoc VarLoc = Tok.getLocation();
   ConsumeToken(tok::kw_var);
@@ -172,8 +184,6 @@ void Parser::ParseDeclVar(Decl *&Result) {
     return SkipUntil(tok::semi);
   
   Result = S.ActOnVarDecl(VarLoc, Identifier, Ty, Init);
-  
-  ParseToken(tok::semi, "expected ';' at end of var declaration", tok::semi);
 }
 
 //===----------------------------------------------------------------------===//
@@ -182,21 +192,88 @@ void Parser::ParseDeclVar(Decl *&Result) {
 
 /// ParseType
 ///   type:
-///     int
+///     'int'
+///     'void'            // FIXME: Should be a 'type alias' for () eventually.
+///     type-tuple
+///     type '->' type
 bool Parser::ParseType(Type *&Result, const char *Message) {
   switch (Tok.getKind()) {
   case tok::kw_int:
-    Result = S.Context.IntType;
+    Result = S.type.ActOnIntType(Tok.getLocation());
     ConsumeToken(tok::kw_int);
     return false;
   case tok::kw_void:
-    Result = S.Context.VoidType;
+    Result = S.type.ActOnVoidType(Tok.getLocation());
     ConsumeToken(tok::kw_void);
     return false;
+  case tok::l_paren:
+    return ParseTypeTuple(Result);
   default:
     Error(Tok.getLocation(), Message ? Message : "expected type");
     return true;
   }
+}
+
+///   type-or-decl-var:
+///     type
+///     decl-var
+bool Parser::ParseTypeOrDeclVar(llvm::PointerUnion<Type*, Decl*> &Result,
+                                const char *Message) {
+  if (Tok.is(tok::kw_var)) {
+    Decl *ResultDecl = 0;
+    ParseDeclVar(ResultDecl);
+    Result = ResultDecl;
+    return ResultDecl != 0;
+  }
+  
+  Type *ResultType = 0;
+  if (ParseType(ResultType, Message)) return true;
+  Result = ResultType;
+  return false;
+}
+
+/// ParseTypeTuple
+///   type-tuple:
+///     '(' ')'
+///     '(' type-or-decl-var (',' type-or-decl-var)* ')'
+bool Parser::ParseTypeTuple(Type *&Result) {
+  assert(Tok.is(tok::l_paren) && "Not start of type tuple");
+  SMLoc LPLoc = Tok.getLocation();
+  ConsumeToken(tok::l_paren);
+
+  llvm::SmallVector<llvm::PointerUnion<Type*, Decl*>, 8> Elements;
+
+  if (Tok.isNot(tok::r_paren)) {
+    Elements.push_back(llvm::PointerUnion<Type*, Decl*>());
+    bool Error = 
+      ParseTypeOrDeclVar(Elements.back(),
+                         "expected type or var declaration in tuple");
+
+    // Parse (',' type-or-decl-var)* 
+    while (!Error && Tok.is(tok::comma)) {
+      ConsumeToken(tok::comma);
+      Elements.push_back(llvm::PointerUnion<Type*, Decl*>());
+      Error = ParseTypeOrDeclVar(Elements.back(),
+                                 "expected type or var declaration in tuple");
+    }
+    
+    if (Error) {
+      SkipUntil(tok::r_paren);
+      if (Tok.is(tok::r_paren))
+        ConsumeToken(tok::r_paren);
+      return true;
+    }
+  }
+  
+  SMLoc RPLoc = Tok.getLocation();
+  if (ParseToken(tok::r_paren, "expected ')' at end of tuple list",
+                 tok::r_paren)) {
+    Note(LPLoc, "to match this opening '('");
+    return true;
+  }
+  
+  Result = S.type.ActOnTupleType(LPLoc, Elements.data(), Elements.size(),RPLoc);
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -218,7 +295,7 @@ bool Parser::ParseExpr(Expr *&Result, const char *Message) {
 bool Parser::ParseExprPrimary(Expr *&Result, const char *Message) {
   switch (Tok.getKind()) {
   case tok::numeric_constant:
-    Result = S.Expr.ActOnNumericConstant(Tok.getText(), Tok.getLocation());
+    Result = S.expr.ActOnNumericConstant(Tok.getText(), Tok.getLocation());
     ConsumeToken(tok::numeric_constant);
     return false;
       
@@ -234,7 +311,7 @@ bool Parser::ParseExprPrimary(Expr *&Result, const char *Message) {
       return true;
     }
     
-    Result = S.Expr.ActOnParenExpr(LPLoc, SubExpr, RPLoc);
+    Result = S.expr.ActOnParenExpr(LPLoc, SubExpr, RPLoc);
     return false;
   }
     
@@ -325,7 +402,7 @@ bool Parser::ParseExprBinaryRHS(Expr *&Result, unsigned MinPrec) {
     }
     assert(NextTokPrec <= ThisPrec && "Recursion didn't work!");
     
-    Result = S.Expr.ActOnBinaryExpr(getBinOpKind(OpToken.getKind()), Result,
+    Result = S.expr.ActOnBinaryExpr(getBinOpKind(OpToken.getKind()), Result,
                                     OpToken.getLocation(), Leaf);
   }
   

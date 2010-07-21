@@ -18,7 +18,7 @@
 #include "swift/AST/Decl.h"
 using namespace swift;
 
-Sema::Sema(ASTContext &context) : Context(context), Expr(*this) {
+Sema::Sema(ASTContext &context) : Context(context), type(*this), expr(*this) {
 }
 
 
@@ -28,7 +28,7 @@ VarDecl *Sema::ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name, Type *Ty,
  
   // Diagnose when we don't have a type or an expression.
   if (Ty == 0 && Init == 0) {
-    Expr.Error(VarLoc, "var declaration must specify a type if no "
+    expr.Error(VarLoc, "var declaration must specify a type if no "
                "initializer is specified");
     // TODO: Recover better by making var have 'invalid' type.
     return 0;

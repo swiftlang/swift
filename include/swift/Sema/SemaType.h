@@ -1,4 +1,4 @@
-//===--- SemaExpr.h - Swift Expression Semantic Analysis --------*- C++ -*-===//
+//===--- SemaType.h - Swift Semantic Analysis for Types ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,27 +11,34 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines the Sema interface which implement hooks invoked by the 
-// parser to build the AST for expressions.
+// parser to build the AST for types.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SEMA_EXPR_H
-#define SWIFT_SEMA_EXPR_H
+#ifndef SWIFT_SEMA_TYPE_H
+#define SWIFT_SEMA_TYPE_H
 
 #include "swift/Sema/SemaBase.h"
 
+namespace llvm {
+  template <typename PT1, typename PT2>
+  class PointerUnion;
+}
 namespace swift {
   class Sema;
+  class Decl;
+  class Type;
   
-/// SemaExpr - Semantic analysis support for Swift expressions.
-class SemaExpr : public SemaBase {
+/// SemaType - Semantic analysis support for Swift types.
+class SemaType : public SemaBase {
 public:
-  explicit SemaExpr(Sema &S) : SemaBase(S) {}
-  
-  Expr *ActOnNumericConstant(llvm::StringRef Text, llvm::SMLoc Loc);
-  Expr *ActOnParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr, llvm::SMLoc RPLoc);
-  Expr *ActOnBinaryExpr(/*ExprKind*/unsigned Kind, Expr *LHS, llvm::SMLoc OpLoc,
-                        Expr *RHS);
+  explicit SemaType(Sema &S) : SemaBase(S) {}
+
+  Type *ActOnIntType(llvm::SMLoc Loc);
+  Type *ActOnVoidType(llvm::SMLoc Loc);
+  Type *ActOnTupleType(llvm::SMLoc LPLoc,
+                       llvm::PointerUnion<Type*, Decl*> const *Elements,
+                       unsigned NumElements, llvm::SMLoc RPLoc);
 };
   
 } // end namespace swift

@@ -21,6 +21,8 @@
 
 namespace llvm {
   class SourceMgr;
+  template <typename PT1, typename PT2>
+  class PointerUnion;
 }
 
 namespace swift {
@@ -95,6 +97,9 @@ private:
   
   // Type Parsing
   bool ParseType(Type *&Result, const char *Message = 0);
+  bool ParseTypeOrDeclVar(llvm::PointerUnion<Type*, Decl*> &Result,
+                          const char *Message = 0);
+  bool ParseTypeTuple(Type *&Result);
 
   // Expression Parsing
   bool ParseExpr(Expr *&Result, const char *Message = 0);

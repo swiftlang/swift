@@ -18,6 +18,7 @@
 #ifndef SWIFT_SEMA_H
 #define SWIFT_SEMA_H
 
+#include "swift/Sema/SemaType.h"
 #include "swift/Sema/SemaExpr.h"
 #include "swift/AST/ASTContext.h"
 
@@ -32,9 +33,14 @@ class Sema {
   void operator=(const Sema&); // DO NOT IMPLEMENT
 public:
   ASTContext &Context;
-  SemaExpr Expr;
   
-  Sema(ASTContext &Context);
+  // Sema subobjects for handling different subsystems.  These are public for
+  // direct access by clients.  They are lower case so they don't shadow the
+  // type names they correspond to.
+  SemaType type;
+  SemaExpr expr;
+  
+  explicit Sema(ASTContext &Context);
   
   VarDecl *ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name, Type *Ty,
                         swift::Expr *Init);

@@ -145,10 +145,15 @@ Restart:
   case ';': return FormToken(tok::semi,  TokStart, Result);
   case '=': return FormToken(tok::equal, TokStart, Result);
   case '+': return FormToken(tok::plus,  TokStart, Result);
-  case '-': return FormToken(tok::minus, TokStart, Result);
+  case '-':
+    if (CurPtr[0] == '>') { // "->"  
+      ++CurPtr;
+      return FormToken(tok::arrow, TokStart, Result);
+    }
+    return FormToken(tok::minus, TokStart, Result);
   case '*': return FormToken(tok::star,  TokStart, Result);
   case '/':
-    if (CurPtr[0] == '/') {  //  "//"
+    if (CurPtr[0] == '/') {  // "//"
       SkipSlashSlashComment();
       goto Restart;
     }

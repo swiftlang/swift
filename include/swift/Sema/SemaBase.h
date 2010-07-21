@@ -35,7 +35,7 @@ class SemaBase {
 protected:
   Sema &S;
 public:
-  SemaBase(Sema &s);
+  explicit SemaBase(Sema &s) : S(s) {}
   
   void Note(llvm::SMLoc Loc, const char *Message);
   void Warning(llvm::SMLoc Loc, const char *Message);
