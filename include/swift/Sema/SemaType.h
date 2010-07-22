@@ -27,6 +27,7 @@ namespace llvm {
 namespace swift {
   class Sema;
   class Decl;
+  class VarDecl;
   class Type;
   
 /// SemaType - Semantic analysis support for Swift types.
@@ -37,7 +38,7 @@ public:
   Type *ActOnIntType(llvm::SMLoc Loc);
   Type *ActOnVoidType(llvm::SMLoc Loc);
   Type *ActOnTupleType(llvm::SMLoc LPLoc,
-                       llvm::PointerUnion<Type*, Decl*> const *Elements,
+                       llvm::PointerUnion<Type*, VarDecl*> const *Elements,
                        unsigned NumElements, llvm::SMLoc RPLoc);
 };
   

@@ -130,10 +130,7 @@ void Parser::ParseTranslationUnit() {
   ConsumeToken();
   
   while (Tok.isNot(tok::eof)) {
-    Decl *D = 0;
-    ParseDeclTopLevel(D);
-    
-    if (D)
+    if (Decl *D = ParseDeclTopLevel())
       Consumer.HandleTopLevelDecl(D);
   }
   
@@ -145,45 +142,58 @@ void Parser::ParseTranslationUnit() {
 ///   decl-top-level:
 ///     ';'
 ///     decl-var ';'
-void Parser::ParseDeclTopLevel(Decl *&Result) {
+Decl *Parser::ParseDeclTopLevel() {
   switch (Tok.getKind()) {
   default:
     Error(Tok.getLocation(), "expected a top level declaration");
-    return SkipUntil(tok::semi);
-  case tok::semi:   return ConsumeToken(tok::semi); 
+    SkipUntil(tok::semi);
+    return 0;
+  case tok::semi:
+    ConsumeToken(tok::semi);
+    return 0; // Could do a top-level semi decl.
   case tok::kw_var:
-    ParseDeclVar(Result);
-    if (Result)
+    if (VarDecl *D = ParseDeclVar()) {
+      // On successful parse, eat the ;
       ParseToken(tok::semi, "expected ';' at end of var declaration",
                  tok::semi);
-    return;
+      return D;
+    }
+    return 0;
   }
 }
+
 
 /// ParseDeclVar
 ///   decl-var:
 ///      'var' identifier ':' type
 ///      'var' identifier ':' type '=' expression 
 ///      'var' identifier '=' expression
-void Parser::ParseDeclVar(Decl *&Result) {
+VarDecl *Parser::ParseDeclVar() {
   SMLoc VarLoc = Tok.getLocation();
   ConsumeToken(tok::kw_var);
-
+  
   llvm::StringRef Identifier;
-  if (ParseIdentifier(Identifier, "expected identifier in var declaration"))
-    return SkipUntil(tok::semi);
-
+  if (ParseIdentifier(Identifier, "expected identifier in var declaration")) {
+    // FIXME: Should stop at ',' when in a tuple argument.
+    SkipUntil(tok::semi);
+    return 0;
+  }
+  
   Type *Ty = 0;
   if (ConsumeIf(tok::colon) &&
-      ParseType(Ty, "expected type in var declaration"))
-    return SkipUntil(tok::semi);
+      ParseType(Ty, "expected type in var declaration")) {
+    SkipUntil(tok::semi);
+    return 0;
+  }
   
   Expr *Init = 0;
   if (ConsumeIf(tok::equal) &&
-      ParseExpr(Init, "expected expression in var declaration"))
-    return SkipUntil(tok::semi);
+      ParseExpr(Init, "expected expression in var declaration")) {
+    SkipUntil(tok::semi);
+    return 0;
+  }
   
-  Result = S.ActOnVarDecl(VarLoc, Identifier, Ty, Init);
+  return S.ActOnVarDecl(VarLoc, Identifier, Ty, Init);
 }
 
 //===----------------------------------------------------------------------===//
@@ -217,13 +227,11 @@ bool Parser::ParseType(Type *&Result, const char *Message) {
 ///   type-or-decl-var:
 ///     type
 ///     decl-var
-bool Parser::ParseTypeOrDeclVar(llvm::PointerUnion<Type*, Decl*> &Result,
+bool Parser::ParseTypeOrDeclVar(llvm::PointerUnion<Type*, VarDecl*> &Result,
                                 const char *Message) {
   if (Tok.is(tok::kw_var)) {
-    Decl *ResultDecl = 0;
-    ParseDeclVar(ResultDecl);
-    Result = ResultDecl;
-    return ResultDecl != 0;
+    Result = ParseDeclVar();
+    return Result != 0;
   }
   
   Type *ResultType = 0;
@@ -241,10 +249,10 @@ bool Parser::ParseTypeTuple(Type *&Result) {
   SMLoc LPLoc = Tok.getLocation();
   ConsumeToken(tok::l_paren);
 
-  llvm::SmallVector<llvm::PointerUnion<Type*, Decl*>, 8> Elements;
+  llvm::SmallVector<llvm::PointerUnion<Type*, VarDecl*>, 8> Elements;
 
   if (Tok.isNot(tok::r_paren)) {
-    Elements.push_back(llvm::PointerUnion<Type*, Decl*>());
+    Elements.push_back(llvm::PointerUnion<Type*, VarDecl*>());
     bool Error = 
       ParseTypeOrDeclVar(Elements.back(),
                          "expected type or var declaration in tuple");
@@ -252,7 +260,7 @@ bool Parser::ParseTypeTuple(Type *&Result) {
     // Parse (',' type-or-decl-var)* 
     while (!Error && Tok.is(tok::comma)) {
       ConsumeToken(tok::comma);
-      Elements.push_back(llvm::PointerUnion<Type*, Decl*>());
+      Elements.push_back(llvm::PointerUnion<Type*, VarDecl*>());
       Error = ParseTypeOrDeclVar(Elements.back(),
                                  "expected type or var declaration in tuple");
     }

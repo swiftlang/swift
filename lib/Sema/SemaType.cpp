@@ -28,7 +28,7 @@ Type *SemaType::ActOnVoidType(llvm::SMLoc Loc) {
 }
 
 Type *SemaType::ActOnTupleType(llvm::SMLoc LPLoc,
-                               llvm::PointerUnion<Type*, Decl*> const *Elements,
+                            llvm::PointerUnion<Type*, VarDecl*> const *Elements,
                                unsigned NumElements, llvm::SMLoc RPLoc) {
   
   // FIXME: Need an AST representation for tuple types.

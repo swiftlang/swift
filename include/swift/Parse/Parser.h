@@ -31,6 +31,7 @@ namespace swift {
   class Expr;
   class Type;
   class Decl;
+  class VarDecl;
   class ASTContext;
   class ASTConsumer;
   
@@ -92,12 +93,12 @@ private:
   
   
   // Decl Parsing
-  void ParseDeclTopLevel(Decl *&Result);
-  void ParseDeclVar(Decl *&Result);
+  Decl *ParseDeclTopLevel();
+  VarDecl *ParseDeclVar();
   
   // Type Parsing
   bool ParseType(Type *&Result, const char *Message = 0);
-  bool ParseTypeOrDeclVar(llvm::PointerUnion<Type*, Decl*> &Result,
+  bool ParseTypeOrDeclVar(llvm::PointerUnion<Type*, VarDecl*> &Result,
                           const char *Message = 0);
   bool ParseTypeTuple(Type *&Result);
 
