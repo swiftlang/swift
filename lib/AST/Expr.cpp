@@ -31,7 +31,7 @@ void *Expr::operator new(size_t Bytes, ASTContext &C,
 /// getLocStart - Return the location of the start of the expression.
 /// FIXME: Need to extend this to do full source ranges like Clang.
 llvm::SMLoc Expr::getLocStart() const {
-  switch (getKind()) {
+  switch (Kind) {
   case IntegerLiteralKind: return cast<IntegerLiteral>(this)->Loc;
   case ParenExprKind:      return cast<ParenExpr>(this)->LParenLoc;
   case BinaryAddExprKind:
@@ -47,7 +47,7 @@ llvm::SMLoc Expr::getLocStart() const {
 void Expr::dump() const { print(llvm::errs()); llvm::errs() << '\n'; }
 
 void Expr::print(llvm::raw_ostream &OS, unsigned Indent) const {
-  switch (getKind()) {
+  switch (Kind) {
   case IntegerLiteralKind: return cast<IntegerLiteral>(this)->print(OS, Indent);
   case ParenExprKind:      return cast<ParenExpr>(this)->print(OS, Indent);
   case BinaryAddExprKind:

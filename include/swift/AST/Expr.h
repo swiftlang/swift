@@ -47,14 +47,14 @@ enum ExprKind {
 class Expr {
   Expr(const Expr&);                 // DO NOT IMPLEMENT
   void operator=(const Expr&);       // DO NOT IMPLEMENT
-  ExprKind Kind;
 public:
+  /// Kind - The subclass of Expr that this is.
+  const ExprKind Kind;
+
   /// Ty - This is the type of the expression.
   Type *Ty;
   
   Expr(ExprKind kind, Type *ty) : Kind(kind), Ty(ty) {}
-
-  ExprKind getKind() const { return Kind; }
 
   /// getLocStart - Return the location of the start of the expression.
   /// FIXME: Need to extend this to do full source ranges like Clang.
@@ -93,7 +93,7 @@ public:
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const IntegerLiteral *) { return true; }
-  static bool classof(const Expr *E) { return E->getKind()==IntegerLiteralKind;}
+  static bool classof(const Expr *E) { return E->Kind == IntegerLiteralKind; }
 };
 
 /// ParenExpr - Parenthesized expressions like '(x+x)'.
@@ -112,7 +112,7 @@ public:
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ParenExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->getKind() == ParenExprKind; }
+  static bool classof(const Expr *E) { return E->Kind == ParenExprKind; }
 };
 
 /// BinaryExpr - Binary expressions like 'x+y'.
@@ -130,8 +130,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BinaryExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->getKind() >= First_BinaryExpr &&
-           E->getKind() <= Last_BinaryExpr; }
+    return E->Kind >= First_BinaryExpr && E->Kind <= Last_BinaryExpr; }
 };
   
 } // end namespace swift
