@@ -26,7 +26,6 @@ namespace swift {
   
   enum TypeKind {
     // BuiltinDependentKind,
-    BuiltinVoidKind,
     BuiltinIntKind,
     TupleTypeKind,
     FunctionTypeKind

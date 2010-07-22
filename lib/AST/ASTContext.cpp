@@ -28,12 +28,11 @@ typedef llvm::DenseMap<std::pair<Type*,Type*>, FunctionType*>FunctionTypesMapTy;
 
 ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
   : Allocator(new llvm::BumpPtrAllocator()),
+    TupleTypes(new TupleTypesMapTy()),
+    FunctionTypes(new FunctionTypesMapTy()),
     SourceMgr(sourcemgr),
-    VoidType(new (*this) BuiltinType(BuiltinVoidKind)),
+    VoidType(getTupleType(0, 0)), // void is aka "()"
     IntType(new (*this) BuiltinType(BuiltinIntKind)) {
-      
-  TupleTypes = new TupleTypesMapTy();
-  FunctionTypes = new FunctionTypesMapTy();
 }
 
 ASTContext::~ASTContext() {

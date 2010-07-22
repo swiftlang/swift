@@ -46,7 +46,7 @@ public:
   /// SourceMgr - The source manager object.
   llvm::SourceMgr &SourceMgr;
   
-  Type * const VoidType; /// VoidType - This is 'void'.
+  Type * const VoidType; /// VoidType - This is 'void', aka "()"
   Type * const IntType;  /// IntType - This is 'int'.
 
   /// getTupleType - Return the uniqued tuple type with the specified elements.
