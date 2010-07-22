@@ -35,11 +35,13 @@ namespace swift {
 class Type {
   Type(const Type&);                 // DO NOT IMPLEMENT
   void operator=(const Type&);       // DO NOT IMPLEMENT
-  TypeKind Kind;
 protected:
   Type(TypeKind kind) : Kind(kind) {}
 public:
-  TypeKind getKind() const { return Kind; }
+  const TypeKind Kind;
+
+  
+  
   
 private:
   // Make placement new and vanilla new/delete illegal for Types.
