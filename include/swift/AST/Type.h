@@ -20,6 +20,9 @@
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
 
+namespace llvm {
+  class raw_ostream;
+}
 namespace swift {
   class ASTContext;
   class VarDecl;
@@ -45,6 +48,9 @@ public:
   const TypeKind Kind;
 
   
+  void dump() const;
+  void print(llvm::raw_ostream &OS) const;
+  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Type *) { return true; }
 
@@ -59,14 +65,15 @@ public:
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = 8) throw();  
 };
-
+  
 /// BuiltinType - Trivial builtin types.
 class BuiltinType : public Type {
   friend class ASTContext;
   BuiltinType(TypeKind K) : Type(K) {}
 public:
   
-  
+  void print(llvm::raw_ostream &OS) const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BuiltinType *) { return true; }
   static bool classof(const Type *T) {
@@ -85,15 +92,19 @@ public:
   const TypeOrDecl * const Fields;
   const unsigned NumFields;
   
+  
+  
+  void print(llvm::raw_ostream &OS) const;
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TupleType *) { return true; }
+  static bool classof(const Type *T) { return T->Kind == TupleTypeKind;}
+
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, Fields, NumFields);
   }
   static void Profile(llvm::FoldingSetNodeID &ID, 
                       const TypeOrDecl *Fields, unsigned NumFields);
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TupleType *) { return true; }
-  static bool classof(const Type *T) { return T->Kind == TupleTypeKind;}
   
 private:
   TupleType(const TypeOrDecl *const fields, unsigned numfields)
@@ -108,6 +119,7 @@ public:
   Type *const Input;
   Type *const Result;
   
+  void print(llvm::raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const FunctionType *) { return true; }
@@ -120,5 +132,13 @@ private:
 };
   
 } // end namespace swift
+
+namespace llvm {
+  static inline llvm::raw_ostream &
+  operator<<(llvm::raw_ostream &OS, const swift::Type &Ty) {
+    Ty.print(OS);
+    return OS;
+  }
+}  
 
 #endif

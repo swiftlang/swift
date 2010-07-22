@@ -17,6 +17,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Type.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
@@ -38,7 +39,9 @@ void Decl::print(llvm::raw_ostream &OS, unsigned Indent) const {
 
 
 void VarDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(vardecl '" << Name << "'";
+  OS.indent(Indent) << "(vardecl '" << Name << "' type='";
+  Ty->print(OS);
+  OS << "'";
   
   if (Init) {
     OS << '\n';

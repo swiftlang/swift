@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Expr.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/ASTContext.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
@@ -44,7 +45,10 @@ llvm::SMLoc Expr::getLocStart() const {
 }
 
 
-void Expr::dump() const { print(llvm::errs()); llvm::errs() << '\n'; }
+void Expr::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
 
 void Expr::print(llvm::raw_ostream &OS, unsigned Indent) const {
   switch (Kind) {
@@ -58,17 +62,23 @@ void Expr::print(llvm::raw_ostream &OS, unsigned Indent) const {
 }
 
 void IntegerLiteral::print(llvm::raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(integer_literal " << Val << ')';
+  OS.indent(Indent) << "(integer_literal type='";
+  Ty->print(OS);
+  OS << "' value=" << Val << ')';
 }
 
 void ParenExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(paren_expr\n";
+  OS.indent(Indent) << "(paren_expr type='";
+  Ty->print(OS);
+  OS << "'\n";
   SubExpr->print(OS, Indent+1);
   OS << ')';
 }
 
 void BinaryExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(binary_expr\n";
+  OS.indent(Indent) << "(binary_expr type='";
+  Ty->print(OS);
+  OS << "'\n";
   LHS->print(OS, Indent+1);
   OS << '\n';
   RHS->print(OS, Indent+1);
