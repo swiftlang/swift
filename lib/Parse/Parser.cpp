@@ -17,9 +17,10 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/Sema.h"
+#include "swift/AST/ASTConsumer.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/ASTConsumer.h"
+#include "swift/AST/Type.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -202,26 +203,44 @@ VarDecl *Parser::ParseDeclVar() {
 
 /// ParseType
 ///   type:
+///     type-simple
+///     type-simple '->' type
+///
+///   type-simple:
 ///     'int'
 ///     'void'            // FIXME: Should be a 'type alias' for () eventually.
 ///     type-tuple
-///     type '->' type
+///
 bool Parser::ParseType(Type *&Result, const char *Message) {
+  // Parse type-simple first.
   switch (Tok.getKind()) {
   case tok::kw_int:
     Result = S.type.ActOnIntType(Tok.getLocation());
     ConsumeToken(tok::kw_int);
-    return false;
+    break;
   case tok::kw_void:
     Result = S.type.ActOnVoidType(Tok.getLocation());
     ConsumeToken(tok::kw_void);
-    return false;
+    break;
   case tok::l_paren:
-    return ParseTypeTuple(Result);
+    if (ParseTypeTuple(Result))
+      return true;
+    break;
   default:
     Error(Tok.getLocation(), Message ? Message : "expected type");
     return true;
   }
+  
+  // If there is an arrow, parse the rest of the type.
+  llvm::SMLoc ArrowLoc = Tok.getLocation();
+  if (ConsumeIf(tok::arrow)) {
+    Type *SecondHalf = 0;
+    if (ParseType(SecondHalf, "expected type in result of function type"))
+      return true;
+    Result = S.type.ActOnFunctionType(Result, ArrowLoc, SecondHalf);
+  }
+  
+  return false;
 }
 
 ///   type-or-decl-var:

@@ -29,6 +29,7 @@ namespace swift {
   class Decl;
   class VarDecl;
   class Type;
+  class TupleType;
   
 /// SemaType - Semantic analysis support for Swift types.
 class SemaType : public SemaBase {
@@ -37,9 +38,11 @@ public:
 
   Type *ActOnIntType(llvm::SMLoc Loc);
   Type *ActOnVoidType(llvm::SMLoc Loc);
-  Type *ActOnTupleType(llvm::SMLoc LPLoc,
-                       llvm::PointerUnion<Type*, VarDecl*> const *Elements,
-                       unsigned NumElements, llvm::SMLoc RPLoc);
+  TupleType *ActOnTupleType(llvm::SMLoc LPLoc,
+                            llvm::PointerUnion<Type*, VarDecl*> const *Elements,
+                            unsigned NumElements, llvm::SMLoc RPLoc);
+  
+  Type *ActOnFunctionType(Type *Input, llvm::SMLoc ArrowLoc, Type *Output);
 };
   
 } // end namespace swift

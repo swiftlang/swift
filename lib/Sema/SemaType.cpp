@@ -29,9 +29,9 @@ Type *SemaType::ActOnVoidType(llvm::SMLoc Loc) {
   return S.Context.VoidType;
 }
 
-Type *SemaType::ActOnTupleType(llvm::SMLoc LPLoc,
+TupleType *SemaType::ActOnTupleType(llvm::SMLoc LPLoc,
                             llvm::PointerUnion<Type*, VarDecl*> const *Elements,
-                               unsigned NumElements, llvm::SMLoc RPLoc) {
+                                    unsigned NumElements, llvm::SMLoc RPLoc) {
   // Verify that tuple elements don't have initializers.  In the future, we can
   // consider adding these back if we so desire.
   for (unsigned i = 0, e = NumElements; i != e; ++i) {
@@ -44,6 +44,11 @@ Type *SemaType::ActOnTupleType(llvm::SMLoc LPLoc,
     }
   }
   
-  // FIXME: Need an AST representation for tuple types.
   return S.Context.getTupleType(Elements, NumElements);
+}
+
+Type *SemaType::ActOnFunctionType(Type *Input, llvm::SMLoc ArrowLoc,
+                                  Type *Output) {
+  // FIXME: Need ast representation of function types.
+  return S.Context.VoidType;
 }
