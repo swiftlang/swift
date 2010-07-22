@@ -28,6 +28,7 @@ namespace llvm {
 namespace swift {
   class Type;
   class TupleType;
+  class FunctionType;
   class VarDecl;
 
 /// ASTContext - This object creates and owns the AST objects.
@@ -37,6 +38,7 @@ class ASTContext {
   llvm::BumpPtrAllocator *Allocator;
   
   llvm::FoldingSet<TupleType> TupleTypes;
+  void *FunctionTypes;  // DenseMap<std::pair<Type*,Type*>, FunctionType*>
 public:
   ASTContext(llvm::SourceMgr &SourceMgr);
   ~ASTContext();
@@ -50,6 +52,10 @@ public:
   /// getTupleType - Return the uniqued tuple type with the specified elements.
   TupleType *getTupleType(const llvm::PointerUnion<Type*, VarDecl*> *Fields,
                           unsigned NumFields);
+  
+  /// getFunctionType - Return a uniqued function type with the specified
+  /// input and result.
+  FunctionType *getFunctionType(Type *Input, Type *Result);
   
   void *Allocate(unsigned long Bytes, unsigned Alignment);
 };

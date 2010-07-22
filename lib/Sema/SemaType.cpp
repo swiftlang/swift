@@ -49,6 +49,5 @@ TupleType *SemaType::ActOnTupleType(llvm::SMLoc LPLoc,
 
 Type *SemaType::ActOnFunctionType(Type *Input, llvm::SMLoc ArrowLoc,
                                   Type *Output) {
-  // FIXME: Need ast representation of function types.
-  return S.Context.VoidType;
+  return S.Context.getFunctionType(Input, Output);
 }

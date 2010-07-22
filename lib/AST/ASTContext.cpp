@@ -17,17 +17,24 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Type.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/ADT/DenseMap.h"
 using namespace swift;
+
+/// FunctionTypesMapTy - This is the actual type underlying 'FunctionTypes'.
+typedef llvm::DenseMap<std::pair<Type*,Type*>, FunctionType*>FunctionTypesMapTy;
 
 ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
   : Allocator(new llvm::BumpPtrAllocator()),
     SourceMgr(sourcemgr),
     VoidType(new (*this) BuiltinType(BuiltinVoidKind)),
     IntType(new (*this) BuiltinType(BuiltinIntKind)) {
+      
+  FunctionTypes = new FunctionTypesMapTy();
 }
 
 ASTContext::~ASTContext() {
   delete Allocator;
+  delete (FunctionTypesMapTy*)FunctionTypes; FunctionTypes = 0;
 }
 
 void *ASTContext::Allocate(unsigned long Bytes, unsigned Alignment) {
@@ -70,4 +77,15 @@ TupleType *ASTContext::getTupleType(const TupleType::TypeOrDecl *Fields,
   TupleType *New = new (*this) TupleType(FieldsCopy, NumFields);
   TupleTypes.InsertNode(New, InsertPos);
   return New;
+}
+
+/// getFunctionType - Return a uniqued function type with the specified
+/// input and result.
+FunctionType *ASTContext::getFunctionType(Type *Input, Type *Result) {
+  FunctionType *&Entry =
+    (*(FunctionTypesMapTy*)FunctionTypes)[std::make_pair(Input, Result)];
+  if (Entry) return Entry;
+  
+  Entry = new (*this) FunctionType(Input, Result);
+  return Entry;
 }

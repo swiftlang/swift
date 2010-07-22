@@ -28,7 +28,8 @@ namespace swift {
     // BuiltinDependentKind,
     BuiltinVoidKind,
     BuiltinIntKind,
-    TupleTypeKind
+    TupleTypeKind,
+    FunctionTypeKind
   };
   
 /// Type - Base class for all types in Swift.
@@ -73,14 +74,29 @@ public:
   const TypeOrDecl * const Fields;
   const unsigned NumFields;
   
-  TupleType(const TypeOrDecl * const fields, unsigned numfields)
-    : Type(TupleTypeKind), Fields(fields), NumFields(numfields) {}
-  
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, Fields, NumFields);
   }
   static void Profile(llvm::FoldingSetNodeID &ID, 
                       const TypeOrDecl *Fields, unsigned NumFields);
+  
+private:
+  TupleType(const TypeOrDecl * const fields, unsigned numfields)
+    : Type(FunctionTypeKind), Fields(fields), NumFields(numfields) {}
+  friend class ASTContext;
+};
+  
+/// FunctionType - A function type has an input and result, e.g. "int -> int" or
+/// (var a : int, var b : int) -> (int, int)
+class FunctionType : public Type {
+public:
+  Type *const Input;
+  Type *const Result;
+  
+private:
+  FunctionType(Type *input, Type *result)
+    : Type(FunctionTypeKind), Input(input), Result(result) {}
+  friend class ASTContext;
 };
   
 } // end namespace swift
