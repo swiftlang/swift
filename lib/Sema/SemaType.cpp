@@ -16,6 +16,8 @@
 
 #include "swift/Sema/SemaType.h"
 #include "swift/Sema/Sema.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
@@ -30,7 +32,18 @@ Type *SemaType::ActOnVoidType(llvm::SMLoc Loc) {
 Type *SemaType::ActOnTupleType(llvm::SMLoc LPLoc,
                             llvm::PointerUnion<Type*, VarDecl*> const *Elements,
                                unsigned NumElements, llvm::SMLoc RPLoc) {
+  // Verify that tuple elements don't have initializers.  In the future, we can
+  // consider adding these back if we so desire.
+  for (unsigned i = 0, e = NumElements; i != e; ++i) {
+    if (VarDecl *D = Elements[i].dyn_cast<VarDecl*>()) {
+      if (D->Init != 0) {
+        Error(D->Init->getLocStart(),
+              "Tuple element should not have an initializer");
+        D->Init = 0;
+      }
+    }
+  }
   
   // FIXME: Need an AST representation for tuple types.
-  return S.Context.VoidType;
+  return S.Context.getTupleType(Elements, NumElements);
 }

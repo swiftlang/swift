@@ -17,6 +17,9 @@
 #ifndef SWIFT_ASTCONTEXT_H
 #define SWIFT_ASTCONTEXT_H
 
+#include "llvm/ADT/FoldingSet.h"
+#include "llvm/ADT/PointerUnion.h"
+
 namespace llvm {
   class BumpPtrAllocator;
   class SourceMgr;
@@ -24,12 +27,16 @@ namespace llvm {
 
 namespace swift {
   class Type;
+  class TupleType;
+  class VarDecl;
 
 /// ASTContext - This object creates and owns the AST objects.
 class ASTContext {
   ASTContext(const ASTContext&);           // DO NOT IMPLEMENT
   void operator=(const ASTContext&);       // DO NOT IMPLEMENT
   llvm::BumpPtrAllocator *Allocator;
+  
+  llvm::FoldingSet<TupleType> TupleTypes;
 public:
   ASTContext(llvm::SourceMgr &SourceMgr);
   ~ASTContext();
@@ -39,6 +46,10 @@ public:
   
   Type * const VoidType; /// VoidType - This is 'void'.
   Type * const IntType;  /// IntType - This is 'int'.
+
+  /// getTupleType - Return the uniqued tuple type with the specified elements.
+  TupleType *getTupleType(const llvm::PointerUnion<Type*, VarDecl*> *Fields,
+                          unsigned NumFields);
   
   void *Allocate(unsigned long Bytes, unsigned Alignment);
 };

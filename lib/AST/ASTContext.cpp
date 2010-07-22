@@ -33,3 +33,41 @@ ASTContext::~ASTContext() {
 void *ASTContext::Allocate(unsigned long Bytes, unsigned Alignment) {
   return Allocator->Allocate(Bytes, Alignment);
 }
+
+
+
+
+void TupleType::Profile(llvm::FoldingSetNodeID &ID, 
+                        const TypeOrDecl *Fields, unsigned NumFields) {
+  ID.AddInteger(NumFields);
+  for (unsigned i = 0; i != NumFields; ++i)
+    if (Type *Ty = Fields[i].dyn_cast<Type*>())
+      ID.AddPointer(Ty);
+    else
+      ID.AddPointer(Fields[i].get<VarDecl*>());
+}
+
+/// getTupleType - Return the uniqued tuple type with the specified elements.
+TupleType *ASTContext::getTupleType(const TupleType::TypeOrDecl *Fields,
+                                    unsigned NumFields) {
+  // Check to see if we've already seen this tuple before.
+  llvm::FoldingSetNodeID ID;
+  TupleType::Profile(ID, Fields, NumFields);
+ 
+  // FIXME: This is completely bogus.  The VarDecl fields are not being unique'd
+  // so they all get their own addresses.  This should unique all-type tuples
+  // though.
+  void *InsertPos = 0;
+  if (TupleType *TT = TupleTypes.FindNodeOrInsertPos(ID, InsertPos))
+    return TT;
+  
+  // Okay, we didn't find one.  Make a copy of the fields list into ASTContext
+  // owned memory.
+  TupleType::TypeOrDecl *FieldsCopy =
+    (TupleType::TypeOrDecl *)Allocate(sizeof(*Fields)*NumFields, 8);
+  memcpy(FieldsCopy, Fields, sizeof(*Fields)*NumFields);
+  
+  TupleType *New = new (*this) TupleType(FieldsCopy, NumFields);
+  TupleTypes.InsertNode(New, InsertPos);
+  return New;
+}

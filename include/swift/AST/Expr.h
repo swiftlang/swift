@@ -55,6 +55,11 @@ public:
   Expr(ExprKind kind, Type *ty) : Kind(kind), Ty(ty) {}
 
   ExprKind getKind() const { return Kind; }
+
+  /// getLocStart - Return the location of the start of the expression.
+  /// FIXME: Need to extend this to do full source ranges like Clang.
+  llvm::SMLoc getLocStart() const;
+  
   
   void dump() const;
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;

@@ -23,3 +23,4 @@ void *Type::operator new(size_t Bytes, ASTContext &C,
                          unsigned Alignment) throw() {
   return C.Allocate(Bytes, Alignment);
 }
+

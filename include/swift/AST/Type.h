@@ -17,18 +17,21 @@
 #ifndef SWIFT_TYPE_H
 #define SWIFT_TYPE_H
 
-#include <cstddef>
+#include "llvm/ADT/FoldingSet.h"
+#include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
   class ASTContext;
+  class VarDecl;
   
   enum TypeKind {
     // BuiltinDependentKind,
     BuiltinVoidKind,
-    BuiltinIntKind
+    BuiltinIntKind,
+    TupleTypeKind
   };
   
-/// Type - Base class for all types in swift.
+/// Type - Base class for all types in Swift.
 class Type {
   Type(const Type&);                 // DO NOT IMPLEMENT
   void operator=(const Type&);       // DO NOT IMPLEMENT
@@ -59,6 +62,27 @@ public:
   
 };
 
+/// TupleType - A tuple is a parenthesized list of types where each name has an
+/// optional name.
+///
+/// FIXME: Do we want to allow default values??
+/// 
+class TupleType : public Type, public llvm::FoldingSetNode {
+public:
+  typedef llvm::PointerUnion<Type*, VarDecl*> TypeOrDecl;
+  const TypeOrDecl * const Fields;
+  const unsigned NumFields;
+  
+  TupleType(const TypeOrDecl * const fields, unsigned numfields)
+    : Type(TupleTypeKind), Fields(fields), NumFields(numfields) {}
+  
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, Fields, NumFields);
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID, 
+                      const TypeOrDecl *Fields, unsigned NumFields);
+};
+  
 } // end namespace swift
 
 #endif

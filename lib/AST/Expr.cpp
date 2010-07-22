@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/ErrorHandling.h"
 using namespace swift;
 using llvm::cast;
 
@@ -26,6 +27,22 @@ void *Expr::operator new(size_t Bytes, ASTContext &C,
                          unsigned Alignment) throw() {
   return C.Allocate(Bytes, Alignment);
 }
+
+/// getLocStart - Return the location of the start of the expression.
+/// FIXME: Need to extend this to do full source ranges like Clang.
+llvm::SMLoc Expr::getLocStart() const {
+  switch (getKind()) {
+  case IntegerLiteralKind: return cast<IntegerLiteral>(this)->Loc;
+  case ParenExprKind:      return cast<ParenExpr>(this)->LParenLoc;
+  case BinaryAddExprKind:
+  case BinarySubExprKind:
+  case BinaryMulExprKind:
+  case BinaryDivExprKind: return cast<BinaryExpr>(this)->getLocStart();
+  }
+  
+  llvm_unreachable("expression type not handled!");
+}
+
 
 void Expr::dump() const { print(llvm::errs()); llvm::errs() << '\n'; }
 
