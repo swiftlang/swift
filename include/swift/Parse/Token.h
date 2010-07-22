@@ -91,9 +91,9 @@ public:
   bool is(tok::TokenKind K) const { return Kind == K; }
   bool isNot(tok::TokenKind K) const { return Kind != K; }
   
-  /// getLocation - Return a source location identifier for the specified
+  /// getLoc - Return a source location identifier for the specified
   /// offset in the current file.
-  llvm::SMLoc getLocation() const {
+  llvm::SMLoc getLoc() const {
     return llvm::SMLoc::getFromPointer(Text.begin());
   }
 

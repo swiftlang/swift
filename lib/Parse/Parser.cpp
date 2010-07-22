@@ -91,7 +91,7 @@ bool Parser::ParseIdentifier(llvm::StringRef &Result, const char *Message,
     return false;
   }
   
-  Error(Tok.getLocation(), Message ? Message : "expected identifier");
+  Error(Tok.getLoc(), Message ? Message : "expected identifier");
   return true;
 }
 
@@ -108,7 +108,7 @@ bool Parser::ParseToken(tok::TokenKind K, const char *Message,
     return false;
   }
   
-  Error(Tok.getLocation(), Message);
+  Error(Tok.getLoc(), Message);
   SkipUntil(SkipToTok);
   
   // If we skipped ahead to the missing token and found it, consume it as if
@@ -146,7 +146,7 @@ void Parser::ParseTranslationUnit() {
 Decl *Parser::ParseDeclTopLevel() {
   switch (Tok.getKind()) {
   default:
-    Error(Tok.getLocation(), "expected a top level declaration");
+    Error(Tok.getLoc(), "expected a top level declaration");
     SkipUntil(tok::semi);
     return 0;
   case tok::semi:
@@ -170,7 +170,7 @@ Decl *Parser::ParseDeclTopLevel() {
 ///      'var' identifier ':' type '=' expression 
 ///      'var' identifier '=' expression
 VarDecl *Parser::ParseDeclVar() {
-  SMLoc VarLoc = Tok.getLocation();
+  SMLoc VarLoc = Tok.getLoc();
   ConsumeToken(tok::kw_var);
   
   llvm::StringRef Identifier;
@@ -215,11 +215,11 @@ bool Parser::ParseType(Type *&Result, const char *Message) {
   // Parse type-simple first.
   switch (Tok.getKind()) {
   case tok::kw_int:
-    Result = S.type.ActOnIntType(Tok.getLocation());
+    Result = S.type.ActOnIntType(Tok.getLoc());
     ConsumeToken(tok::kw_int);
     break;
   case tok::kw_void:
-    Result = S.type.ActOnVoidType(Tok.getLocation());
+    Result = S.type.ActOnVoidType(Tok.getLoc());
     ConsumeToken(tok::kw_void);
     break;
   case tok::l_paren:
@@ -227,12 +227,12 @@ bool Parser::ParseType(Type *&Result, const char *Message) {
       return true;
     break;
   default:
-    Error(Tok.getLocation(), Message ? Message : "expected type");
+    Error(Tok.getLoc(), Message ? Message : "expected type");
     return true;
   }
   
   // If there is an arrow, parse the rest of the type.
-  llvm::SMLoc ArrowLoc = Tok.getLocation();
+  llvm::SMLoc ArrowLoc = Tok.getLoc();
   if (ConsumeIf(tok::arrow)) {
     Type *SecondHalf = 0;
     if (ParseType(SecondHalf, "expected type in result of function type"))
@@ -265,7 +265,7 @@ bool Parser::ParseTypeOrDeclVar(llvm::PointerUnion<Type*, VarDecl*> &Result,
 ///     '(' type-or-decl-var (',' type-or-decl-var)* ')'
 bool Parser::ParseTypeTuple(Type *&Result) {
   assert(Tok.is(tok::l_paren) && "Not start of type tuple");
-  SMLoc LPLoc = Tok.getLocation();
+  SMLoc LPLoc = Tok.getLoc();
   ConsumeToken(tok::l_paren);
 
   llvm::SmallVector<llvm::PointerUnion<Type*, VarDecl*>, 8> Elements;
@@ -292,7 +292,7 @@ bool Parser::ParseTypeTuple(Type *&Result) {
     }
   }
   
-  SMLoc RPLoc = Tok.getLocation();
+  SMLoc RPLoc = Tok.getLoc();
   if (ParseToken(tok::r_paren, "expected ')' at end of tuple list",
                  tok::r_paren)) {
     Note(LPLoc, "to match this opening '('");
@@ -322,17 +322,17 @@ bool Parser::ParseExpr(Expr *&Result, const char *Message) {
 bool Parser::ParseExprPrimary(Expr *&Result, const char *Message) {
   switch (Tok.getKind()) {
   case tok::numeric_constant:
-    Result = S.expr.ActOnNumericConstant(Tok.getText(), Tok.getLocation());
+    Result = S.expr.ActOnNumericConstant(Tok.getText(), Tok.getLoc());
     ConsumeToken(tok::numeric_constant);
     return false;
       
   case tok::l_paren: {
-    SMLoc LPLoc = Tok.getLocation();  
+    SMLoc LPLoc = Tok.getLoc();  
     ConsumeToken(tok::l_paren);
     Expr *SubExpr = 0;
     if (ParseExpr(SubExpr, "expected expression in parentheses")) return true;
     
-    SMLoc RPLoc = Tok.getLocation();  
+    SMLoc RPLoc = Tok.getLoc();  
     if (ParseToken(tok::r_paren, "expected ')' in parenthesis expression")) {
       Note(LPLoc, "to match this opening '('");
       return true;
@@ -343,7 +343,7 @@ bool Parser::ParseExprPrimary(Expr *&Result, const char *Message) {
   }
     
   default:
-    Error(Tok.getLocation(), Message ? Message : "expected expression");
+    Error(Tok.getLoc(), Message ? Message : "expected expression");
     return true;
   }
 }
@@ -430,7 +430,7 @@ bool Parser::ParseExprBinaryRHS(Expr *&Result, unsigned MinPrec) {
     assert(NextTokPrec <= ThisPrec && "Recursion didn't work!");
     
     Result = S.expr.ActOnBinaryExpr(getBinOpKind(OpToken.getKind()), Result,
-                                    OpToken.getLocation(), Leaf);
+                                    OpToken.getLoc(), Leaf);
   }
   
   return false;
