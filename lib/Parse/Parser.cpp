@@ -250,7 +250,7 @@ bool Parser::ParseTypeOrDeclVar(llvm::PointerUnion<Type*, VarDecl*> &Result,
                                 const char *Message) {
   if (Tok.is(tok::kw_var)) {
     Result = ParseDeclVar();
-    return Result != 0;
+    return Result.isNull();
   }
   
   Type *ResultType = 0;
