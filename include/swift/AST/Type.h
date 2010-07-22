@@ -28,7 +28,10 @@ namespace swift {
     // BuiltinDependentKind,
     BuiltinIntKind,
     TupleTypeKind,
-    FunctionTypeKind
+    FunctionTypeKind,
+    
+    Builtin_First = BuiltinIntKind,
+    Builtin_Last = BuiltinIntKind
   };
   
 /// Type - Base class for all types in Swift.
@@ -38,11 +41,13 @@ class Type {
 protected:
   Type(TypeKind kind) : Kind(kind) {}
 public:
+  /// Kind - The discriminator that indicates what subclass of type this is.
   const TypeKind Kind;
 
   
-  
-  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Type *) { return true; }
+
 private:
   // Make placement new and vanilla new/delete illegal for Types.
   void *operator new(size_t Bytes) throw();  // DO NOT IMPLEMENT.
@@ -62,6 +67,11 @@ class BuiltinType : public Type {
 public:
   
   
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const BuiltinType *) { return true; }
+  static bool classof(const Type *T) {
+    return T->Kind >= Builtin_First && T->Kind <= Builtin_Last;
+  }
 };
 
 /// TupleType - A tuple is a parenthesized list of types where each name has an
@@ -81,9 +91,13 @@ public:
   static void Profile(llvm::FoldingSetNodeID &ID, 
                       const TypeOrDecl *Fields, unsigned NumFields);
   
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TupleType *) { return true; }
+  static bool classof(const Type *T) { return T->Kind == TupleTypeKind;}
+  
 private:
-  TupleType(const TypeOrDecl * const fields, unsigned numfields)
-    : Type(FunctionTypeKind), Fields(fields), NumFields(numfields) {}
+  TupleType(const TypeOrDecl *const fields, unsigned numfields)
+    : Type(TupleTypeKind), Fields(fields), NumFields(numfields) {}
   friend class ASTContext;
 };
   
@@ -93,6 +107,11 @@ class FunctionType : public Type {
 public:
   Type *const Input;
   Type *const Result;
+  
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const FunctionType *) { return true; }
+  static bool classof(const Type *T) { return T->Kind == FunctionTypeKind;}
   
 private:
   FunctionType(Type *input, Type *result)
