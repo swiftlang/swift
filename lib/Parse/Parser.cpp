@@ -208,7 +208,7 @@ VarDecl *Parser::ParseDeclVar() {
 ///
 ///   type-simple:
 ///     'int'
-///     'void'            // FIXME: Should be a 'type alias' for () eventually.
+///     'void'   // FIXME: Should be a 'type alias' for () in standard library.
 ///     type-tuple
 ///
 bool Parser::ParseType(Type *&Result, const char *Message) {

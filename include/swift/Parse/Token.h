@@ -31,7 +31,7 @@ namespace tok {
     
 #define KEYWORD(X) kw_ ## X,
     // Types.
-    KEYWORD(void)
+    KEYWORD(void)  // FIXME: Should not be keyword, should be in stdlib.
     KEYWORD(int)
 //    KEYWORD(uint)
 //    KEYWORD(int8)
