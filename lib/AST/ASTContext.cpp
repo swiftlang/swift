@@ -20,6 +20,9 @@
 #include "llvm/ADT/DenseMap.h"
 using namespace swift;
 
+/// TupleTypesMapTy - This is the actual type underlying ASTContext::TupleTypes.
+typedef llvm::FoldingSet<TupleType> TupleTypesMapTy;
+
 /// FunctionTypesMapTy - This is the actual type underlying 'FunctionTypes'.
 typedef llvm::DenseMap<std::pair<Type*,Type*>, FunctionType*>FunctionTypesMapTy;
 
@@ -29,11 +32,13 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
     VoidType(new (*this) BuiltinType(BuiltinVoidKind)),
     IntType(new (*this) BuiltinType(BuiltinIntKind)) {
       
+  TupleTypes = new TupleTypesMapTy();
   FunctionTypes = new FunctionTypesMapTy();
 }
 
 ASTContext::~ASTContext() {
   delete Allocator;
+  delete (TupleTypesMapTy*)TupleTypes; TupleTypes = 0;
   delete (FunctionTypesMapTy*)FunctionTypes; FunctionTypes = 0;
 }
 
@@ -61,11 +66,14 @@ TupleType *ASTContext::getTupleType(const TupleType::TypeOrDecl *Fields,
   llvm::FoldingSetNodeID ID;
   TupleType::Profile(ID, Fields, NumFields);
  
+  
+  TupleTypesMapTy &TupleTypesMap = *(TupleTypesMapTy*)TupleTypes;
+  
   // FIXME: This is completely bogus.  The VarDecl fields are not being unique'd
   // so they all get their own addresses.  This should unique all-type tuples
   // though.
   void *InsertPos = 0;
-  if (TupleType *TT = TupleTypes.FindNodeOrInsertPos(ID, InsertPos))
+  if (TupleType *TT = TupleTypesMap.FindNodeOrInsertPos(ID, InsertPos))
     return TT;
   
   // Okay, we didn't find one.  Make a copy of the fields list into ASTContext
@@ -75,7 +83,7 @@ TupleType *ASTContext::getTupleType(const TupleType::TypeOrDecl *Fields,
   memcpy(FieldsCopy, Fields, sizeof(*Fields)*NumFields);
   
   TupleType *New = new (*this) TupleType(FieldsCopy, NumFields);
-  TupleTypes.InsertNode(New, InsertPos);
+  TupleTypesMap.InsertNode(New, InsertPos);
   return New;
 }
 

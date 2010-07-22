@@ -17,12 +17,12 @@
 #ifndef SWIFT_ASTCONTEXT_H
 #define SWIFT_ASTCONTEXT_H
 
-#include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
 
 namespace llvm {
   class BumpPtrAllocator;
   class SourceMgr;
+  template <typename T> class FoldingSet; 
 }
 
 namespace swift {
@@ -37,7 +37,7 @@ class ASTContext {
   void operator=(const ASTContext&);       // DO NOT IMPLEMENT
   llvm::BumpPtrAllocator *Allocator;
   
-  llvm::FoldingSet<TupleType> TupleTypes;
+  void *TupleTypes;     // llvm::FoldingSet<TupleType>
   void *FunctionTypes;  // DenseMap<std::pair<Type*,Type*>, FunctionType*>
 public:
   ASTContext(llvm::SourceMgr &SourceMgr);
