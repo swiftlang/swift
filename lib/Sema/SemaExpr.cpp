@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
 
@@ -41,9 +42,26 @@ Expr *SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
                            const llvm::PointerUnion<Expr*, VarDecl*> *Elements,
                                unsigned NumElements, bool HasMissingSemi,
                                llvm::SMLoc RBLoc) {
+  // Diagnose cases where there was a ; missing after a 'var'.
+  if (HasMissingSemi && Elements[NumElements-1].is<VarDecl*>()) {
+    Error(RBLoc, "expected ';' after var declaration");
+    HasMissingSemi = false;
+  }
+      
+  Type *ResultTy;
+  if (HasMissingSemi)
+    ResultTy = Elements[NumElements-1].get<Expr*>()->Ty;
+  else
+    ResultTy = S.Context.VoidType;
+  
+  llvm::PointerUnion<Expr*, VarDecl*> *NewElements = 
+    (llvm::PointerUnion<Expr*, VarDecl*> *)
+    S.Context.Allocate(sizeof(*Elements)*NumElements, 8);
+  memcpy(NewElements, Elements, sizeof(*Elements)*NumElements);
   
   // FIXME: Create the right node.
-  return new (S.Context) IntegerLiteral("1234", LBLoc, S.Context.IntType);
+  return new (S.Context) BraceExpr(LBLoc, NewElements, NumElements,
+                                   HasMissingSemi, RBLoc, ResultTy);
 }
 
 Expr *SemaExpr::ActOnParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr,

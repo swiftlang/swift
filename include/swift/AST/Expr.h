@@ -22,6 +22,8 @@
 
 namespace llvm {
   class raw_ostream;
+  template <typename PT1, typename PT2>
+  class PointerUnion;
 }
 
 namespace swift {
@@ -33,6 +35,7 @@ enum ExprKind {
   IntegerLiteralKind,
   DeclRefExprKind,
   ParenExprKind,
+  BraceExprKind,
   
   BinaryAddExprKind,
   BinarySubExprKind,
@@ -132,6 +135,33 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ParenExpr *) { return true; }
   static bool classof(const Expr *E) { return E->Kind == ParenExprKind; }
+};
+  
+/// BraceExpr - A brace enclosed sequence of expressions, like { 4; 5 }.  If the
+/// final expression is terminated with a ;, the result type of the brace expr
+/// is void, otherwise it is the value of the last expression.
+class BraceExpr : public Expr {
+public:
+  llvm::SMLoc LBLoc;
+  
+  llvm::PointerUnion<Expr*, VarDecl*> *Elements;
+  unsigned NumElements;
+  
+  /// This is true if the last expression in the brace expression is missing a
+  /// semicolon after it.
+  bool MissingSemi;
+  llvm::SMLoc RBLoc;
+
+  BraceExpr(llvm::SMLoc lbloc, llvm::PointerUnion<Expr*, VarDecl*> *elements,
+            unsigned numelements, bool missingsemi, llvm::SMLoc rbloc, Type *Ty)
+    : Expr(BraceExprKind, Ty), LBLoc(lbloc), Elements(elements),
+      NumElements(numelements), MissingSemi(missingsemi), RBLoc(rbloc) {}
+
+  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const BraceExpr *) { return true; }
+  static bool classof(const Expr *E) { return E->Kind == BraceExprKind; }
 };
 
 /// BinaryExpr - Binary expressions like 'x+y'.
