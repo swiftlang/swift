@@ -27,9 +27,11 @@ namespace llvm {
 namespace swift {
   class ASTContext;
   class Type;
+  class VarDecl;
   
 enum ExprKind {
   IntegerLiteralKind,
+  DeclRefExprKind,
   ParenExprKind,
   
   BinaryAddExprKind,
@@ -96,6 +98,23 @@ public:
   static bool classof(const Expr *E) { return E->Kind == IntegerLiteralKind; }
 };
 
+/// DeclRefExpr - A reference to a variable, "x".
+class DeclRefExpr : public Expr {
+public:
+  VarDecl *D;
+  llvm::SMLoc Loc;
+  
+  DeclRefExpr(VarDecl *d, llvm::SMLoc L, Type *Ty)
+    : Expr(DeclRefExprKind, Ty), D(d), Loc(L) {}
+  
+  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const DeclRefExpr *) { return true; }
+  static bool classof(const Expr *E) { return E->Kind == DeclRefExprKind; }
+};
+  
+  
 /// ParenExpr - Parenthesized expressions like '(x+x)'.
 class ParenExpr : public Expr {
 public:

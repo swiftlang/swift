@@ -161,6 +161,9 @@ Decl *Parser::ParseDeclTopLevel() {
     return 0; // Could do a top-level semi decl.
   case tok::kw_var:
     if (VarDecl *D = ParseDeclVar()) {
+      // Enter the var into the current scope.
+      S.decl.AddToScope(D);
+      
       // On successful parse, eat the ;
       ParseToken(tok::semi, "expected ';' at end of var declaration",
                  tok::semi);
@@ -325,6 +328,7 @@ bool Parser::ParseExpr(Expr *&Result, const char *Message) {
 /// ParseExprPrimary
 ///   expr-primary:
 ///     numeric_constant
+///     identifier
 ///     '(' expr ')'
 bool Parser::ParseExprPrimary(Expr *&Result, const char *Message) {
   switch (Tok.getKind()) {
@@ -332,8 +336,14 @@ bool Parser::ParseExprPrimary(Expr *&Result, const char *Message) {
     Result = S.expr.ActOnNumericConstant(Tok.getText(), Tok.getLoc());
     ConsumeToken(tok::numeric_constant);
     return false;
+
+  case tok::identifier:
+    Result = S.expr.ActOnIdentifierExpr(Tok.getText(), Tok.getLoc());
+    ConsumeToken(tok::identifier);
+    return false;
       
   case tok::l_paren: {
+    // FIXME: This should eventually become a tuple literal expression.
     SMLoc LPLoc = Tok.getLoc();  
     ConsumeToken(tok::l_paren);
     Expr *SubExpr = 0;

@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Expr.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/ASTContext.h"
 #include "llvm/Support/Casting.h"
@@ -34,6 +35,7 @@ void *Expr::operator new(size_t Bytes, ASTContext &C,
 llvm::SMLoc Expr::getLocStart() const {
   switch (Kind) {
   case IntegerLiteralKind: return cast<IntegerLiteral>(this)->Loc;
+  case DeclRefExprKind:    return cast<DeclRefExpr>(this)->Loc;
   case ParenExprKind:      return cast<ParenExpr>(this)->LParenLoc;
   case BinaryAddExprKind:
   case BinarySubExprKind:
@@ -53,6 +55,7 @@ void Expr::dump() const {
 void Expr::print(llvm::raw_ostream &OS, unsigned Indent) const {
   switch (Kind) {
   case IntegerLiteralKind: return cast<IntegerLiteral>(this)->print(OS, Indent);
+  case DeclRefExprKind:    return cast<DeclRefExpr>(this)->print(OS, Indent);
   case ParenExprKind:      return cast<ParenExpr>(this)->print(OS, Indent);
   case BinaryAddExprKind:
   case BinarySubExprKind:
@@ -65,6 +68,12 @@ void IntegerLiteral::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(integer_literal type='";
   Ty->print(OS);
   OS << "' value=" << Val << ')';
+}
+
+void DeclRefExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
+  OS.indent(Indent) << "(declrefexpr type='";
+  Ty->print(OS);
+  OS << "' decl=" << D->Name << ')';
 }
 
 void ParenExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {

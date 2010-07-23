@@ -17,6 +17,7 @@
 #include "swift/Sema/SemaExpr.h"
 #include "swift/Sema/Sema.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
@@ -24,6 +25,18 @@ using namespace swift;
 Expr *SemaExpr::ActOnNumericConstant(llvm::StringRef Text, llvm::SMLoc Loc) {
   return new (S.Context) IntegerLiteral(Text, Loc, S.Context.IntType);
 }
+
+Expr *SemaExpr::ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
+  VarDecl *D = S.decl.LookupName(S.Context.getIdentifier(Text));
+  if (D == 0) {
+    Error(Loc, "use of undeclared identifier");
+    // FIXME: Return error object.
+    return new (S.Context) IntegerLiteral(Text, Loc, S.Context.IntType);
+  }
+  
+  return new (S.Context) DeclRefExpr(D, Loc, D->Ty);
+}
+
 
 Expr *SemaExpr::ActOnParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr,
                                llvm::SMLoc RPLoc) {

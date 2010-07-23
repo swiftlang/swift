@@ -45,6 +45,13 @@ public:
   // Name lookup.
   //===--------------------------------------------------------------------===//
   
+  /// AddToScope - Register the specified decl as being in the current lexical
+  /// scope.
+  void AddToScope(VarDecl *D);
+  
+  /// LookupName - Perform a lexical scope lookup for the specified name,
+  /// returning the active decl if found or null if not.
+  VarDecl *LookupName(Identifier Name);
   
   //===--------------------------------------------------------------------===//
   // Declaration handling.

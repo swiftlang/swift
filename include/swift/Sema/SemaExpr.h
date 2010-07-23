@@ -30,6 +30,7 @@ public:
   explicit SemaExpr(Sema &S) : SemaBase(S) {}
   
   Expr *ActOnNumericConstant(llvm::StringRef Text, llvm::SMLoc Loc);
+  Expr *ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc);
   Expr *ActOnParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr, llvm::SMLoc RPLoc);
   Expr *ActOnBinaryExpr(/*ExprKind*/unsigned Kind, Expr *LHS, llvm::SMLoc OpLoc,
                         Expr *RHS);

@@ -33,6 +33,40 @@ SemaDecl::~SemaDecl() {
   delete ScopeHT;
 }
 
+//===----------------------------------------------------------------------===//
+// Name lookup.
+//===----------------------------------------------------------------------===//
+
+/// AddToScope - Register the specified decl as being in the current lexical
+/// scope.
+void SemaDecl::AddToScope(VarDecl *D) {
+  // FIXME: For now, don't allow shadowing at all.  This is because we want to
+  // reject redeclarations at the same scope (var x : int;  var x : int;) but
+  // ScopedHashTable doesn't give us a way to find out if an entry is in the
+  // current scope or not!
+  if (ScopeHT->count(D->Name)) {
+    Error(D->VarLoc,
+          "variable declaration conflicts with previous declaration");
+    Note(ScopeHT->lookup(D->Name)->VarLoc,
+         "previous declaration here");
+    return;
+  }
+  
+  ScopeHT->insert(D->Name, D);
+}
+
+/// LookupName - Perform a lexical scope lookup for the specified name,
+/// returning the active decl if found or null if not.
+VarDecl *SemaDecl::LookupName(Identifier Name) {
+  return ScopeHT->lookup(Name);
+}
+
+
+//===----------------------------------------------------------------------===//
+// Declaration handling.
+//===----------------------------------------------------------------------===//
+
+
 VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name,
                                 Type *Ty, Expr *Init) {
   
