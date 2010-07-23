@@ -139,6 +139,8 @@ Restart:
 
   case '(': return FormToken(tok::l_paren, TokStart, Result);
   case ')': return FormToken(tok::r_paren, TokStart, Result);
+  case '{': return FormToken(tok::l_brace, TokStart, Result);
+  case '}': return FormToken(tok::r_brace, TokStart, Result);
 
   case ',': return FormToken(tok::comma, TokStart, Result);
   case ':': return FormToken(tok::colon, TokStart, Result);

@@ -120,6 +120,38 @@ bool Parser::ParseToken(tok::TokenKind K, const char *Message,
   return true;
 }
 
+///   type-or-decl-var:
+///     type
+///     decl-var
+bool Parser::ParseTypeOrDeclVar(llvm::PointerUnion<Type*, VarDecl*> &Result,
+                                const char *Message) {
+  if (Tok.is(tok::kw_var)) {
+    Result = ParseDeclVar();
+    return Result.isNull();
+  }
+  
+  Type *ResultType = 0;
+  if (ParseType(ResultType, Message)) return true;
+  Result = ResultType;
+  return false;
+}
+
+///   expr-or-decl-var:
+///     type
+///     decl-var
+bool Parser::ParseExprOrDeclVar(llvm::PointerUnion<Expr*, VarDecl*> &Result,
+                                const char *Message) {
+  if (Tok.is(tok::kw_var)) {
+    Result = ParseDeclVar();
+    return Result.isNull();
+  }
+  
+  Expr *ResultExpr = 0;
+  if (ParseExpr(ResultExpr, Message)) return true;
+  Result = ResultExpr;
+  return false;
+}
+
 
 //===----------------------------------------------------------------------===//
 // Decl Parsing
@@ -253,22 +285,6 @@ bool Parser::ParseType(Type *&Result, const char *Message) {
   return false;
 }
 
-///   type-or-decl-var:
-///     type
-///     decl-var
-bool Parser::ParseTypeOrDeclVar(llvm::PointerUnion<Type*, VarDecl*> &Result,
-                                const char *Message) {
-  if (Tok.is(tok::kw_var)) {
-    Result = ParseDeclVar();
-    return Result.isNull();
-  }
-  
-  Type *ResultType = 0;
-  if (ParseType(ResultType, Message)) return true;
-  Result = ResultType;
-  return false;
-}
-
 /// ParseTypeTuple
 ///   type-tuple:
 ///     '(' ')'
@@ -330,6 +346,7 @@ bool Parser::ParseExpr(Expr *&Result, const char *Message) {
 ///     numeric_constant
 ///     identifier
 ///     '(' expr ')'
+///     expr-brace
 bool Parser::ParseExprPrimary(Expr *&Result, const char *Message) {
   switch (Tok.getKind()) {
   case tok::numeric_constant:
@@ -358,12 +375,82 @@ bool Parser::ParseExprPrimary(Expr *&Result, const char *Message) {
     Result = S.expr.ActOnParenExpr(LPLoc, SubExpr, RPLoc);
     return false;
   }
+      
+  case tok::l_brace:
+    return ParseExprBrace(Result);
     
   default:
     Error(Tok.getLoc(), Message ? Message : "expected expression");
     return true;
   }
 }
+
+
+/// ParseExprBrace - A brace enclosed expression list which may optionally end
+/// with a ; inside of it.  For example { 1; 4+5; } or { 1; 2 }.
+///
+///   expr-brace:
+///     '{' (expr-or-decl-var ';')* expr? }
+bool Parser::ParseExprBrace(Expr *&Result) {
+  SMLoc LBLoc = Tok.getLoc();
+  ConsumeToken(tok::l_brace);
+  
+  // This brace expression forms a lexical scope.
+  Scope BraceScope(S.decl);
+
+  llvm::SmallVector<llvm::PointerUnion<Expr*, VarDecl*>, 16> Entries;
+  
+  // MissingSemiAtEnd - Keep track of whether the last expression in the block
+  // had no semicolon.
+  bool MissingSemiAtEnd = true;
+  
+  // Parse the semicolon separated expression/var decls.
+  do {
+    // If we found a r_brace, then we either have an empty list {} or an
+    // expression list terminated with a semicolon.  Remember this and break.
+    if (Tok.is(tok::r_brace)) {
+      MissingSemiAtEnd = false;
+      break;
+    }
+
+    // Otherwise, we must have a var decl or expression.  Parse it up
+    Entries.push_back(llvm::PointerUnion<Expr*, VarDecl*>());
+    
+    // Parse the var or expression.  If we have an error, try to do nice
+    // recovery.
+    if (ParseExprOrDeclVar(Entries.back())) {
+      if (Tok.is(tok::semi)) {
+        Entries.pop_back();
+        ConsumeToken(tok::semi);
+        continue;
+      }
+      
+      // FIXME: Improve error recovery.
+      if (Tok.is(tok::semi) && Tok.isNot(tok::r_brace))
+        SkipUntil(tok::r_brace);
+      ConsumeIf(tok::r_brace);
+      return true;
+    }
+    
+    // If we just parsed a var decl, add it to the current scope.
+    if (VarDecl *D = Entries.back().dyn_cast<VarDecl*>())
+      S.decl.AddToScope(D);
+    
+  } while (ConsumeIf(tok::semi));
+  
+  SMLoc RBLoc = Tok.getLoc();
+  if (ParseToken(tok::r_brace, "expected '}' at end of brace expression",
+                 tok::r_brace)) {
+    Note(LBLoc, "to match this opening '{'");
+    return true;
+  }
+  
+  
+  Result = S.expr.ActOnBraceExpr(LBLoc, Entries.data(), Entries.size(),
+                                 MissingSemiAtEnd, RBLoc);
+  return false;
+}
+
 
 /// prec::Level - Binary operator precedences.   Low precedences numbers bind
 /// more weakly than high numbers.

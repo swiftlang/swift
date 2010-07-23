@@ -50,6 +50,8 @@ namespace tok {
 #define PUNCTUATOR(X, Y) X,
     PUNCTUATOR(l_paren,     "(")
     PUNCTUATOR(r_paren,     ")")
+    PUNCTUATOR(l_brace,     "{")
+    PUNCTUATOR(r_brace,     "}")
 
     PUNCTUATOR(comma,       ",")
     PUNCTUATOR(colon,       ":")

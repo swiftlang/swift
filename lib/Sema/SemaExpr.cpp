@@ -37,6 +37,14 @@ Expr *SemaExpr::ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
   return new (S.Context) DeclRefExpr(D, Loc, D->Ty);
 }
 
+Expr *SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
+                           const llvm::PointerUnion<Expr*, VarDecl*> *Elements,
+                               unsigned NumElements, bool HasMissingSemi,
+                               llvm::SMLoc RBLoc) {
+  
+  // FIXME: Create the right node.
+  return new (S.Context) IntegerLiteral("1234", LBLoc, S.Context.IntType);
+}
 
 Expr *SemaExpr::ActOnParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr,
                                llvm::SMLoc RPLoc) {

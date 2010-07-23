@@ -20,9 +20,14 @@
 
 #include "swift/Sema/SemaBase.h"
 
+namespace llvm {
+  template <typename PT1, typename PT2>
+  class PointerUnion;
+}
 namespace swift {
   class Sema;
   class Expr;
+  class VarDecl;
   
 /// SemaExpr - Semantic analysis support for Swift expressions.
 class SemaExpr : public SemaBase {
@@ -32,6 +37,11 @@ public:
   Expr *ActOnNumericConstant(llvm::StringRef Text, llvm::SMLoc Loc);
   Expr *ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc);
   Expr *ActOnParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr, llvm::SMLoc RPLoc);
+  Expr *ActOnBraceExpr(llvm::SMLoc LBLoc,
+                       const llvm::PointerUnion<Expr*, VarDecl*> *Elements,
+                       unsigned NumElements,
+                       bool HasMissingSemi,
+                       llvm::SMLoc RBLoc);
   Expr *ActOnBinaryExpr(/*ExprKind*/unsigned Kind, Expr *LHS, llvm::SMLoc OpLoc,
                         Expr *RHS);
 };
