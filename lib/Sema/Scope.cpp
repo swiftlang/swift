@@ -18,7 +18,7 @@
 #include "swift/Sema/SemaDecl.h"
 using namespace swift;
 
-Scope::Scope(SemaDecl &S) : HTScope(S.getScopeTable()) {
+Scope::Scope(SemaDecl &S) : HTScope(*S.ScopeHT) {
   
 }
 

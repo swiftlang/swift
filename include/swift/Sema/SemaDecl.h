@@ -36,20 +36,15 @@ class SemaDecl : public SemaBase {
   typedef llvm::ScopedHashTable<Identifier, VarDecl*,
                                 llvm::DenseMapInfo<Identifier> > ScopeHTType;
   ScopeHTType *const ScopeHT;
+  friend class Scope;
 public:
   explicit SemaDecl(Sema &S);
   ~SemaDecl();
   
   //===--------------------------------------------------------------------===//
-  // Scope management and name lookup.
+  // Name lookup.
   //===--------------------------------------------------------------------===//
   
-private:
-  friend class Scope;
-  ScopeHTType &getScopeTable() {
-    return *ScopeHT;
-  }
-public:
   
   //===--------------------------------------------------------------------===//
   // Declaration handling.
