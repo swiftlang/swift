@@ -16,9 +16,9 @@
 
 #include "swift/Sema/SemaExpr.h"
 #include "swift/Sema/Sema.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Expr.h"
 #include "llvm/Support/SMLoc.h"
-#include "llvm/ADT/StringRef.h"
 using namespace swift;
 
 Expr *SemaExpr::ActOnNumericConstant(llvm::StringRef Text, llvm::SMLoc Loc) {

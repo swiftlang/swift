@@ -18,6 +18,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/Sema.h"
 #include "swift/AST/ASTConsumer.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
@@ -194,7 +195,7 @@ VarDecl *Parser::ParseDeclVar() {
     return 0;
   }
   
-  return S.ActOnVarDecl(VarLoc, Identifier, Ty, Init);
+  return S.decl.ActOnVarDecl(VarLoc, Identifier, Ty, Init);
 }
 
 //===----------------------------------------------------------------------===//

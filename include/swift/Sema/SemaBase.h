@@ -24,9 +24,8 @@ namespace llvm {
 
 namespace swift {
   class Sema;
-  class Expr;
   
-/// SemaBase - Semantic analysis support for Swift expressions.  This provides
+/// SemaBase - Common base class for semantic analysis submodules. This provides
 /// the common stuff used by all sema modules.  It should not have any
 /// non-trivial state because it is replicated into every SemaXXX subclass.
 class SemaBase {

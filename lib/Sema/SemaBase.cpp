@@ -16,6 +16,7 @@
 
 #include "swift/Sema/SemaBase.h"
 #include "swift/Sema/Sema.h"
+#include "swift/AST/ASTContext.h"
 #include "llvm/Support/SourceMgr.h"
 using namespace swift;
 
