@@ -19,20 +19,45 @@
 #define SWIFT_SEMA_DECL_H
 
 #include "swift/Sema/SemaBase.h"
+#include "swift/AST/Identifier.h"
+
+namespace llvm {
+  template <typename K, typename V, typename KInfo>
+  class ScopedHashTable;
+}
 
 namespace swift {
   class Expr;
   class Type;
   class VarDecl;
   
-  /// SemaDecl - Semantic analysis support for Swift declarations.
-  class SemaDecl : public SemaBase {
-  public:
-    explicit SemaDecl(Sema &S) : SemaBase(S) {}
-
-    VarDecl *ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name, Type *Ty,
-                          Expr *Init);
-  };
+/// SemaDecl - Semantic analysis support for Swift declarations.
+class SemaDecl : public SemaBase {
+  typedef llvm::ScopedHashTable<Identifier, VarDecl*,
+                                llvm::DenseMapInfo<Identifier> > ScopeHTType;
+  ScopeHTType *const ScopeHT;
+public:
+  explicit SemaDecl(Sema &S);
+  ~SemaDecl();
+  
+  //===--------------------------------------------------------------------===//
+  // Scope management and name lookup.
+  //===--------------------------------------------------------------------===//
+  
+private:
+  friend class Scope;
+  ScopeHTType &getScopeTable() {
+    return *ScopeHT;
+  }
+public:
+  
+  //===--------------------------------------------------------------------===//
+  // Declaration handling.
+  //===--------------------------------------------------------------------===//
+  
+  VarDecl *ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name, Type *Ty,
+                        Expr *Init);
+};
   
 } // end namespace swift
 

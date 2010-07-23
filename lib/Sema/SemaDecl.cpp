@@ -16,6 +16,7 @@
 
 #include "swift/Sema/SemaDecl.h"
 #include "swift/Sema/Sema.h"
+#include "swift/Sema/Scope.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -23,6 +24,14 @@
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
 
+SemaDecl::SemaDecl(Sema &S)
+  : SemaBase(S),
+    ScopeHT(new ScopeHTType()) {
+}
+
+SemaDecl::~SemaDecl() {
+  delete ScopeHT;
+}
 
 VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name,
                                 Type *Ty, Expr *Init) {

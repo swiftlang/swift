@@ -17,6 +17,7 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/Sema.h"
+#include "swift/Sema/Scope.h"
 #include "swift/AST/ASTConsumer.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -131,9 +132,14 @@ void Parser::ParseTranslationUnit() {
   // Prime the lexer.
   ConsumeToken();
   
-  while (Tok.isNot(tok::eof)) {
-    if (Decl *D = ParseDeclTopLevel())
-      Consumer.HandleTopLevelDecl(D);
+  {
+    // The entire translation unit is in a big scope.
+    Scope OuterScope(S.decl);
+  
+    while (Tok.isNot(tok::eof)) {
+      if (Decl *D = ParseDeclTopLevel())
+        Consumer.HandleTopLevelDecl(D);
+    }
   }
   
   // Notify consumer about the end of the translation unit.

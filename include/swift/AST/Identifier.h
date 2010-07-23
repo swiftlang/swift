@@ -17,6 +17,8 @@
 #ifndef SWIFT_AST_IDENTIFIER_H
 #define SWIFT_AST_IDENTIFIER_H
 
+#include "llvm/ADT/DenseMapInfo.h"
+
 namespace llvm {
   class raw_ostream;
 }
@@ -36,12 +38,41 @@ public:
   explicit Identifier() : Pointer(0) {}
   
   const char *get() const { return Pointer; }
+  
+  bool operator==(Identifier RHS) const { return Pointer == RHS.Pointer; }
+  bool operator!=(Identifier RHS) const { return Pointer != RHS.Pointer; }
+  
+  static Identifier getEmptyKey() {
+    return Identifier((const char*)
+                      llvm::DenseMapInfo<const void*>::getEmptyKey());
+  }
+  static Identifier getTombstoneKey() {
+    return Identifier((const char*)
+                      llvm::DenseMapInfo<const void*>::getTombstoneKey());
+  }
 };
   
 } // end namespace swift
 
 namespace llvm {
   raw_ostream &operator<<(raw_ostream &OS, swift::Identifier I);
+  
+  // Identifiers hash just like pointers.
+  template<> struct DenseMapInfo<swift::Identifier> {
+    static swift::Identifier getEmptyKey() {
+      return swift::Identifier::getEmptyKey();
+    }
+    static swift::Identifier getTombstoneKey() {
+      return swift::Identifier::getTombstoneKey();
+    }
+    static unsigned getHashValue(swift::Identifier Val) {
+      return DenseMapInfo<const void*>::getHashValue(Val.get());
+    }
+    static bool isEqual(swift::Identifier LHS, swift::Identifier RHS) {
+      return LHS == RHS;
+    }
+  };
+  
 }
 
 #endif
