@@ -50,5 +50,5 @@ VarDecl *Sema::ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name, Type *Ty,
   if (Ty == 0)
     Ty = Init->Ty;
   
-  return new (Context) VarDecl(VarLoc, Name, Ty, Init);
+  return new (Context) VarDecl(VarLoc, Context.getIdentifier(Name), Ty, Init);
 }

@@ -17,6 +17,10 @@
 #ifndef SWIFT_AST_IDENTIFIER_H
 #define SWIFT_AST_IDENTIFIER_H
 
+namespace llvm {
+  class raw_ostream;
+}
+
 namespace swift {
   class ASTContext;
   
@@ -35,5 +39,9 @@ public:
 };
   
 } // end namespace swift
+
+namespace llvm {
+  raw_ostream &operator<<(raw_ostream &OS, swift::Identifier I);
+}
 
 #endif

@@ -17,11 +17,11 @@
 #ifndef SWIFT_DECL_H
 #define SWIFT_DECL_H
 
+#include "swift/AST/Identifier.h"
 #include "llvm/Support/SMLoc.h"
-#include "llvm/ADT/StringRef.h"
+#include <cstddef>
 
 namespace llvm {
-  class StringRef;
   class raw_ostream;
 }
 
@@ -69,11 +69,11 @@ class VarDecl : public Decl {
   friend class ASTContext;
 public:
   llvm::SMLoc VarLoc;    // Location of the 'var' token.
-  llvm::StringRef Name;
+  Identifier Name;
   Type *Ty;
   Expr *Init;
 
-  VarDecl(llvm::SMLoc varloc, llvm::StringRef name, Type *ty, Expr *init)
+  VarDecl(llvm::SMLoc varloc, Identifier name, Type *ty, Expr *init)
     : Decl(VarDeclKind), VarLoc(varloc), Name(name), Ty(ty), Init(init) {}
 
   
