@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SEMA_H
-#define SWIFT_SEMA_H
+#ifndef SWIFT_SEMA_SEMA_H
+#define SWIFT_SEMA_SEMA_H
 
 #include "swift/Sema/SemaType.h"
 #include "swift/Sema/SemaExpr.h"
@@ -41,6 +41,9 @@ public:
   SemaExpr expr;
   
   explicit Sema(ASTContext &Context);
+  
+  // Decl handling stuff.
+  
   
   VarDecl *ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name, Type *Ty,
                         swift::Expr *Init);

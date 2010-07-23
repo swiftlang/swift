@@ -14,15 +14,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_ASTCONTEXT_H
-#define SWIFT_ASTCONTEXT_H
+#ifndef SWIFT_AST_ASTCONTEXT_H
+#define SWIFT_AST_ASTCONTEXT_H
 
 #include "llvm/ADT/PointerUnion.h"
 
 namespace llvm {
   class BumpPtrAllocator;
   class SourceMgr;
-  template <typename T> class FoldingSet; 
+  class StringRef;
+  template <typename T> class FoldingSet;
 }
 
 namespace swift {
@@ -30,6 +31,7 @@ namespace swift {
   class TupleType;
   class FunctionType;
   class VarDecl;
+  class Identifier;
 
 /// ASTContext - This object creates and owns the AST objects.
 class ASTContext {
@@ -37,14 +39,27 @@ class ASTContext {
   void operator=(const ASTContext&);       // DO NOT IMPLEMENT
   llvm::BumpPtrAllocator *Allocator;
   
-  void *TupleTypes;     // llvm::FoldingSet<TupleType>
-  void *FunctionTypes;  // DenseMap<std::pair<Type*,Type*>, FunctionType*>
+  void *IdentifierTable; // llvm::StringMap<char>
+  
+  void *TupleTypes;      // llvm::FoldingSet<TupleType>
+  void *FunctionTypes;   // DenseMap<std::pair<Type*,Type*>, FunctionType*>
 public:
   ASTContext(llvm::SourceMgr &SourceMgr);
   ~ASTContext();
   
   /// SourceMgr - The source manager object.
   llvm::SourceMgr &SourceMgr;
+
+  /// Allocate - Allocate memory from the ASTContext bump pointer.
+  void *Allocate(unsigned long Bytes, unsigned Alignment);
+
+  /// getIdentifier - Return the uniqued and AST-Context-owned version of the
+  /// specified string.
+  Identifier getIdentifier(llvm::StringRef Str);
+    
+  //===--------------------------------------------------------------------===//
+  // Type manipulation routines.
+  //===--------------------------------------------------------------------===//
   
   Type * const VoidType; /// VoidType - This is 'void', aka "()"
   Type * const IntType;  /// IntType - This is 'int'.
@@ -56,8 +71,6 @@ public:
   /// getFunctionType - Return a uniqued function type with the specified
   /// input and result.
   FunctionType *getFunctionType(Type *Input, Type *Result);
-  
-  void *Allocate(unsigned long Bytes, unsigned Alignment);
 };
   
 } // end namespace swift

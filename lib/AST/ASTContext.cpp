@@ -15,10 +15,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/StringMap.h"
 using namespace swift;
+
+/// IdentifierTableMapTy - This is the type underlying IdentifierTable.
+typedef llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTableMapTy;
 
 /// TupleTypesMapTy - This is the actual type underlying ASTContext::TupleTypes.
 typedef llvm::FoldingSet<TupleType> TupleTypesMapTy;
@@ -28,6 +33,7 @@ typedef llvm::DenseMap<std::pair<Type*,Type*>, FunctionType*>FunctionTypesMapTy;
 
 ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
   : Allocator(new llvm::BumpPtrAllocator()),
+    IdentifierTable(new IdentifierTableMapTy(*Allocator)),
     TupleTypes(new TupleTypesMapTy()),
     FunctionTypes(new FunctionTypesMapTy()),
     SourceMgr(sourcemgr),
@@ -36,17 +42,29 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
 }
 
 ASTContext::~ASTContext() {
-  delete Allocator;
   delete (TupleTypesMapTy*)TupleTypes; TupleTypes = 0;
   delete (FunctionTypesMapTy*)FunctionTypes; FunctionTypes = 0;
+  delete (IdentifierTableMapTy*)IdentifierTable;
+  delete Allocator;
 }
 
 void *ASTContext::Allocate(unsigned long Bytes, unsigned Alignment) {
   return Allocator->Allocate(Bytes, Alignment);
 }
 
+/// getIdentifier - Return the uniqued and AST-Context-owned version of the
+/// specified string.
+Identifier ASTContext::getIdentifier(llvm::StringRef Str) {
+  // Make sure null pointers stay null.
+  if (Str.empty()) return Identifier(0);
+  
+  IdentifierTableMapTy &Table = *((IdentifierTableMapTy*)IdentifierTable);
+  return Identifier(Table.GetOrCreateValue(Str).getKeyData());
+}
 
-
+//===----------------------------------------------------------------------===//
+// Type manipulation routines.
+//===----------------------------------------------------------------------===//
 
 void TupleType::Profile(llvm::FoldingSetNodeID &ID, 
                         const TypeOrDecl *Fields, unsigned NumFields) {
