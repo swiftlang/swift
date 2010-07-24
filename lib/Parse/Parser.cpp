@@ -306,10 +306,18 @@ VarDecl *Parser::ParseDeclVar() {
   }
   
   NullablePtr<Expr> Init;
-  if (ConsumeIf(tok::equal) &&
-      ParseExpr(Init, "expected expression in var declaration")) {
-    SkipUntil(tok::semi);
-    return 0;
+  if (ConsumeIf(tok::equal)) {
+    if (ParseExpr(Init, "expected expression in var declaration")) {
+      SkipUntil(tok::semi);
+      return 0;
+    }
+  
+    // If there was an expression, but it had a parse error, give the var decl
+    // an artificial int type to avoid chained errors.
+    // FIXME: We really need to distinguish erroneous expr from missing expr in
+    // ActOnVarDecl.
+    if (Init.isNull() && Ty == 0)
+      Ty = S.Context.IntType;
   }
   
   return S.decl.ActOnVarDecl(VarLoc, Identifier, Ty, Init.getPtrOrNull(),
@@ -410,12 +418,49 @@ bool Parser::ParseTypeTuple(Type *&Result) {
 // Expression Parsing
 //===----------------------------------------------------------------------===//
 
+static bool isStartOfExpr(Token &Tok, Sema &S) {
+  if (Tok.is(tok::identifier)) {
+    // If this is a binary operator, then it isn't the start of an expr.
+    NamedDecl *ND = S.decl.LookupName(S.Context.getIdentifier(Tok.getText()));
+    
+    // Use of undeclared identifier.
+    if (ND == 0) return true;
+    
+    return ND->Attrs.InfixPrecedence == -1;
+  }
+  
+  return Tok.is(tok::numeric_constant) ||
+         Tok.is(tok::l_paren) || Tok.is(tok::l_brace);
+}
+
 /// ParseExpr
 ///   expr:
+///     expr-single+
+///   expr-single:
 ///     expr-primary (binary-operator expr-primary)*
 bool Parser::ParseExpr(NullablePtr<Expr> &Result, const char *Message) {
-  return ParseExprPrimary(Result, Message) ||
-         ParseExprBinaryRHS(Result);
+  // Parse the first expr-single.
+  if (ParseExprPrimary(Result, Message) || ParseExprBinaryRHS(Result) ||
+      Result.isNull())
+    return true;
+  
+  // If there was only one expr-single here, return it.
+  if (!isStartOfExpr(Tok, S))
+    return false;
+  
+  llvm::SmallVector<Expr*, 8> SequenceExprs;
+  SequenceExprs.push_back(Result.get());
+  do {
+    Result = 0;
+    if (ParseExprPrimary(Result, Message) || ParseExprBinaryRHS(Result) ||
+        Result.isNull())
+      return true;
+    SequenceExprs.push_back(Result.get());
+  } while (isStartOfExpr(Tok, S));
+
+  // FIXME: handle function application here.
+  Result = S.expr.ActOnSequence(SequenceExprs.data(), SequenceExprs.size());
+  return false;
 }
 
 /// ParseExprPrimary
@@ -637,10 +682,21 @@ bool Parser::ParseExprBinaryRHS(NullablePtr<Expr> &Result, unsigned MinPrec) {
     }
     assert(NextTokPrec <= ThisPrec && "Recursion didn't work!");
     
-    if (Result.isNonNull() && Leaf.isNonNull())
+    if (Result.isNonNull() && Leaf.isNonNull()) {
+      if (OpToken.is(tok::identifier)) {
+        // FIXME: Not modeling the parser tree very accurately here!
+        //Expr *SubExprs[] = { Result.get(), Leaf.get() };
+        //Result = S.expr.ActOnTupleExpr(OpToken.getLoc(), SubExprs, 2,
+        //                               OpToken.getLoc());
+        
+        // FIXME: Need an applyexpr.
+      }
+      
+      // fIXME: Remove BinExpr AST node + sema.
       Result = S.expr.ActOnBinaryExpr(getBinOpKind(OpToken.getKind()),
                                       Result.get(), OpToken.getLoc(),
                                       Leaf.get());
+    }
   }
   
   return false;

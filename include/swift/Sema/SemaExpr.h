@@ -47,6 +47,8 @@ public:
   ActOnBraceExpr(llvm::SMLoc LBLoc,
                  const llvm::PointerUnion<Expr*, NamedDecl*> *Elements,
                  unsigned NumElements, bool HasMissingSemi, llvm::SMLoc RBLoc);
+  llvm::NullablePtr<Expr> ActOnSequence(Expr **Exprs, unsigned NumExprs); 
+  
   llvm::NullablePtr<Expr> ActOnBinaryExpr(/*ExprKind*/unsigned Kind,
                                           Expr *LHS, llvm::SMLoc OpLoc,
                                           Expr *RHS);

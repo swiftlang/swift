@@ -99,6 +99,14 @@ SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
                                    RPLoc, ResultTy);
 }
 
+llvm::NullablePtr<Expr>
+SemaExpr::ActOnSequence(Expr **Exprs, unsigned NumExprs) {
+  
+  
+  return 0;
+}
+
+
 NullablePtr<Expr> 
 SemaExpr::ActOnBinaryExpr(unsigned Kind, Expr *LHS, llvm::SMLoc OpLoc,
                           Expr *RHS) {
