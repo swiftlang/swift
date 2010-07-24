@@ -375,7 +375,8 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
       return true;
     }
     
-    Result = S.expr.ActOnParenExpr(LPLoc, SubExpr, RPLoc);
+    if (SubExpr.isNonNull())
+      Result = S.expr.ActOnParenExpr(LPLoc, SubExpr.get(), RPLoc);
     return false;
   }
       
@@ -536,8 +537,10 @@ bool Parser::ParseExprBinaryRHS(NullablePtr<Expr> &Result, unsigned MinPrec) {
     }
     assert(NextTokPrec <= ThisPrec && "Recursion didn't work!");
     
-    Result = S.expr.ActOnBinaryExpr(getBinOpKind(OpToken.getKind()), Result,
-                                    OpToken.getLoc(), Leaf);
+    if (Result.isNonNull() && Leaf.isNonNull())
+      Result = S.expr.ActOnBinaryExpr(getBinOpKind(OpToken.getKind()),
+                                      Result.get(), OpToken.getLoc(),
+                                      Leaf.get());
   }
   
   return false;

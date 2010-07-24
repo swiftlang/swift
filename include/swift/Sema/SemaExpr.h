@@ -41,16 +41,14 @@ public:
   llvm::NullablePtr<Expr>
   ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc);
   llvm::NullablePtr<Expr>
-  ActOnParenExpr(llvm::SMLoc LPLoc, llvm::NullablePtr<Expr> SubExpr,
-                 llvm::SMLoc RPLoc);
+  ActOnParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr, llvm::SMLoc RPLoc);
   llvm::NullablePtr<Expr>
   ActOnBraceExpr(llvm::SMLoc LBLoc,
                  const llvm::PointerUnion<Expr*, VarDecl*> *Elements,
                  unsigned NumElements, bool HasMissingSemi, llvm::SMLoc RBLoc);
   llvm::NullablePtr<Expr> ActOnBinaryExpr(/*ExprKind*/unsigned Kind,
-                                          llvm::NullablePtr<Expr> LHS,
-                                          llvm::SMLoc OpLoc,
-                                          llvm::NullablePtr<Expr> RHS);
+                                          Expr *LHS, llvm::SMLoc OpLoc,
+                                          Expr *RHS);
 };
   
 } // end namespace swift

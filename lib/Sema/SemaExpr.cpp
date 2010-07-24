@@ -74,21 +74,15 @@ SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
 }
 
 NullablePtr<Expr> 
-SemaExpr::ActOnParenExpr(llvm::SMLoc LPLoc, NullablePtr<Expr> SubExprN,
+SemaExpr::ActOnParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr,
                          llvm::SMLoc RPLoc) {
-  if (SubExprN.isNull()) return 0;
-  Expr *SubExpr = SubExprN.get();
-  
   // FIXME: This should be a more general tuple expression.
   return new (S.Context) ParenExpr(LPLoc, SubExpr, RPLoc, SubExpr->Ty);
 }
 
 NullablePtr<Expr> 
-SemaExpr::ActOnBinaryExpr(unsigned Kind, NullablePtr<Expr> LHSN,
-                          llvm::SMLoc OpLoc, NullablePtr<Expr> RHSN) {
-  if (LHSN.isNull() || RHSN.isNull()) return 0;
-  Expr *LHS = LHSN.get(), *RHS = RHSN.get();
-  
+SemaExpr::ActOnBinaryExpr(unsigned Kind, Expr *LHS, llvm::SMLoc OpLoc,
+                          Expr *RHS) {
   
   // For now, the LHS and RHS of all binops have to be ints.
   if (LHS->Ty != S.Context.IntType) {
