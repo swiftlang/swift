@@ -71,7 +71,8 @@ public:
   Type *Ty;
   Expr *Init;
   
-  NamedDecl(Identifier name, Type *ty, Expr *init, DeclKind K) : Decl(K) {
+  NamedDecl(Identifier name, Type *ty, Expr *init, DeclKind K)
+    : Decl(K), Name(name), Ty(ty), Init(init) {
   }
   
   llvm::SMLoc getLocStart() const;
