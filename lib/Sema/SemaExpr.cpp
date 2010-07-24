@@ -32,8 +32,11 @@ Expr *SemaExpr::ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
   if (D == 0) {
     Error(Loc, "use of undeclared identifier");
     // FIXME: Return error object.
-    return new (S.Context) IntegerLiteral(Text, Loc, S.Context.IntType);
+    return new (S.Context) IntegerLiteral("0", Loc, S.Context.IntType);
   }
+  
+  // FIXME: If the decl had an "invalid" type, then return the error object to
+  // improve error recovery.
   
   return new (S.Context) DeclRefExpr(D, Loc, D->Ty);
 }
@@ -47,7 +50,10 @@ Expr *SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
     Error(RBLoc, "expected ';' after var declaration");
     HasMissingSemi = false;
   }
-      
+  
+  // TODO: If any of the elements has a function type (which didn't get called),
+  // then we want to produce a semantic error.
+  
   Type *ResultTy;
   if (HasMissingSemi)
     ResultTy = Elements[NumElements-1].get<Expr*>()->Ty;
@@ -72,6 +78,21 @@ Expr *SemaExpr::ActOnParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr,
 
 Expr *SemaExpr::ActOnBinaryExpr(unsigned Kind, Expr *LHS, llvm::SMLoc OpLoc,
                                 Expr *RHS) {
+  // For now, the LHS and RHS of all binops have to be ints.
+  if (LHS->Ty != S.Context.IntType) {
+    // TODO, Improve error message, include source range.
+    Error(OpLoc, "LHS subexpression doesn't have int type, it has XXX type");
+    // FIXME: Return error object.
+    return new (S.Context) IntegerLiteral("0", OpLoc, S.Context.IntType);
+  }
+
+  if (RHS->Ty != S.Context.IntType) {
+    // TODO, Improve error message, include source range.
+    Error(OpLoc, "RHS subexpression doesn't have int type, it has XXX type");
+    // FIXME: Return error object.
+    return new (S.Context) IntegerLiteral("0", OpLoc, S.Context.IntType);
+  }
+
   return new (S.Context) BinaryExpr((ExprKind)Kind, LHS, OpLoc, RHS,
                                     S.Context.IntType);
 }
