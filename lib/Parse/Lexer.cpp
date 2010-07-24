@@ -141,6 +141,8 @@ Restart:
   case ')': return FormToken(tok::r_paren, TokStart, Result);
   case '{': return FormToken(tok::l_brace, TokStart, Result);
   case '}': return FormToken(tok::r_brace, TokStart, Result);
+  case '[': return FormToken(tok::l_square, TokStart, Result);
+  case ']': return FormToken(tok::r_square, TokStart, Result);
 
   case ',': return FormToken(tok::comma, TokStart, Result);
   case ':': return FormToken(tok::colon, TokStart, Result);
@@ -161,7 +163,9 @@ Restart:
     }
       
     return FormToken(tok::slash, TokStart, Result);
-      
+
+  case '%': return FormToken(tok::identifier, TokStart, Result);
+
   case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G':
   case 'H': case 'I': case 'J': case 'K': case 'L': case 'M': case 'N':
   case 'O': case 'P': case 'Q': case 'R': case 'S': case 'T': case 'U':

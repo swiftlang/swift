@@ -68,7 +68,7 @@ NamedDecl *SemaDecl::LookupName(Identifier Name) {
 
 
 VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name,
-                                Type *Ty, Expr *Init) {
+                                Type *Ty, Expr *Init, DeclAttributes &Attrs) {
   
   // Diagnose when we don't have a type or an expression.
   if (Ty == 0 && Init == 0) {
@@ -92,6 +92,8 @@ VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name,
   if (Ty == 0)
     Ty = Init->Ty;
   
+  // FIXME: Validate attributes.
+  
   return new (S.Context) VarDecl(VarLoc, S.Context.getIdentifier(Name),
-                                 Ty, Init);
+                                 Ty, Init, Attrs);
 }

@@ -33,6 +33,7 @@ namespace swift {
   class Expr;
   class Type;
   class Decl;
+  class DeclAttributes;
   class VarDecl;
   class NamedDecl;
   class ASTContext;
@@ -101,6 +102,8 @@ private:
   
   // Decl Parsing
   Decl *ParseDeclTopLevel();
+  void ParseDeclAttributeList(DeclAttributes &Attributes);
+  bool ParseDeclAttribute(DeclAttributes &Attributes);
   VarDecl *ParseDeclVar();
   
   // Type Parsing

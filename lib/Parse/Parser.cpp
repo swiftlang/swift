@@ -209,14 +209,87 @@ Decl *Parser::ParseDeclTopLevel() {
 }
 
 
+/// ParseDeclAttribute
+///   decl-attribute:
+///     'infix' '=' numeric_constant
+bool Parser::ParseDeclAttribute(DeclAttributes &Attributes) {
+  if (Tok.is(tok::identifier) && Tok.getText() == "infix") {
+    if (Attributes.InfixPrecedence != -1)
+      Error(Tok.getLoc(), "infix precedence repeatedly specified");
+    ConsumeToken(tok::identifier);
+
+    // The default infix precedence is 100.
+    Attributes.InfixPrecedence = 100;
+    
+    if (ConsumeIf(tok::equal)) {
+      SMLoc PrecLoc = Tok.getLoc();
+      llvm::StringRef Text = Tok.getText();
+      if (!ParseToken(tok::numeric_constant,
+                      "expected precedence number in 'infix' attribute")) {
+        long long Value;
+        if (Text.getAsInteger(10, Value) || Value > 255 || Value < 0)
+          Error(PrecLoc, "invalid precedence: value must be between 0 and 255");
+        else
+          Attributes.InfixPrecedence = Value;
+      }
+    }
+    
+    return false;
+  }
+  
+  Error(Tok.getLoc(), "unknown declaration attribute");
+  SkipUntil(tok::r_square);
+  return true;
+}
+
+/// ParseDeclAttributeList
+///   decl-attribute-list:
+///     '[' ']'
+///     '[' decl-attribute (',' decl-attribute)* ']'
+void Parser::ParseDeclAttributeList(DeclAttributes &Attributes) {
+  Attributes.LSquareLoc = Tok.getLoc();
+  ConsumeToken(tok::l_square);
+  
+  // If this is an empty attribute list, consume it and return.
+  if (Tok.is(tok::r_square)) {
+    Attributes.RSquareLoc = Tok.getLoc();
+    ConsumeToken(tok::r_square);
+    return;
+  }
+  
+  bool HadError = ParseDeclAttribute(Attributes);
+  while (Tok.is(tok::comma)) {
+    ConsumeToken(tok::comma);
+    HadError |= ParseDeclAttribute(Attributes);
+  }
+
+  Attributes.RSquareLoc = Tok.getLoc();
+  if (ConsumeIf(tok::r_square))
+    return;
+  
+  // Otherwise, there was an error parsing the attribute list.  If we already
+  // reported an error, skip to a ], otherwise report the error.
+  if (!HadError)
+    ParseToken(tok::r_square, "expected ']' or ',' in attribute list",
+               tok::r_square);
+  else {
+    SkipUntil(tok::r_square);
+    ConsumeIf(tok::r_square);
+  }
+}
+
 /// ParseDeclVar
 ///   decl-var:
-///      'var' identifier ':' type
-///      'var' identifier ':' type '=' expression 
-///      'var' identifier '=' expression
+///      'var' decl-attribute-list? identifier ':' type
+///      'var' decl-attribute-list? identifier ':' type '=' expression 
+///      'var' decl-attribute-list? identifier '=' expression
 VarDecl *Parser::ParseDeclVar() {
   SMLoc VarLoc = Tok.getLoc();
   ConsumeToken(tok::kw_var);
+  
+  DeclAttributes Attributes;
+  if (Tok.is(tok::l_square))
+    ParseDeclAttributeList(Attributes);
   
   llvm::StringRef Identifier;
   if (ParseIdentifier(Identifier, "expected identifier in var declaration")) {
@@ -239,7 +312,8 @@ VarDecl *Parser::ParseDeclVar() {
     return 0;
   }
   
-  return S.decl.ActOnVarDecl(VarLoc, Identifier, Ty, Init.getPtrOrNull());
+  return S.decl.ActOnVarDecl(VarLoc, Identifier, Ty, Init.getPtrOrNull(),
+                             Attributes);
 }
 
 //===----------------------------------------------------------------------===//

@@ -34,6 +34,22 @@ enum DeclKind {
   VarDeclKind,
   FuncDeclKind
 };
+  
+/// DeclAttributes - These are attributes that may be applied to declarations.
+class DeclAttributes {
+public:
+  /// LSquareLoc/RSquareLoc - This is the location of the '[' and ']' in the
+  /// attribute specifier.  If this is an empty attribute specifier, then these
+  /// will be invalid locs.
+  llvm::SMLoc LSquareLoc, RSquareLoc;
+  
+  /// InfixPrecedence - If this is not negative, it indicates that the decl is
+  /// an infix operator with the specified precedence.
+  int InfixPrecedence;
+
+  DeclAttributes() : InfixPrecedence(-1) { }
+};
+
 
 /// Decl - Base class for all declarations in Swift.
 class Decl {
@@ -70,9 +86,11 @@ public:
   Identifier Name;
   Type *Ty;
   Expr *Init;
+  DeclAttributes Attrs;
   
-  NamedDecl(Identifier name, Type *ty, Expr *init, DeclKind K)
-    : Decl(K), Name(name), Ty(ty), Init(init) {
+  NamedDecl(Identifier name, Type *ty, Expr *init, const DeclAttributes &attrs,
+            DeclKind K)
+    : Decl(K), Name(name), Ty(ty), Init(init), Attrs(attrs) {
   }
   
   llvm::SMLoc getLocStart() const;
@@ -92,8 +110,9 @@ class VarDecl : public NamedDecl {
 public:
   llvm::SMLoc VarLoc;    // Location of the 'var' token.
 
-  VarDecl(llvm::SMLoc varloc, Identifier name, Type *ty, Expr *init)
-    : NamedDecl(name, ty, init, VarDeclKind) {}
+  VarDecl(llvm::SMLoc varloc, Identifier name, Type *ty, Expr *init,
+          const DeclAttributes &attrs)
+    : NamedDecl(name, ty, init, attrs, VarDeclKind) {}
 
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
   
