@@ -115,7 +115,7 @@ private:
   bool ParseExprPrimary(llvm::NullablePtr<Expr> &Result, const char *Message=0);
   bool ParseExprBrace(llvm::NullablePtr<Expr> &Result);
   bool ParseExprBinaryRHS(llvm::NullablePtr<Expr> &Result,
-                          unsigned MinPrecedence = 1);
+                          unsigned MinPrecedence = 0);
 };
   
 } // end namespace swift

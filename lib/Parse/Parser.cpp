@@ -534,23 +534,26 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
 /// more weakly than high numbers.
 namespace prec {
   enum Level {
-    Unknown = 0,    // Not a binary operator.
-    Additive,       // +, -
-    Multiplicative  // *, /, %
+    Unknown = -1,       // Not a binary operator.
+    Additive = 0,       // +, -
+    Multiplicative = 1  // *, /
   };
 }
 
 /// getBinOpPrecedence - Return the precedence of the specified binary operator
 /// token.
 ///
-static prec::Level getBinOpPrecedence(tok::TokenKind Kind) {
-  switch (Kind) {
+static int getBinOpPrecedence(const Token &Tok, Sema &S) {
+  switch (Tok.getKind()) {
   default: return prec::Unknown;
   case tok::plus:
   case tok::minus:                return prec::Additive;
-  //case tok::percent:
   case tok::slash:
   case tok::star:                 return prec::Multiplicative;
+  case tok::identifier:
+    NamedDecl *ND = S.decl.LookupName(S.Context.getIdentifier(Tok.getText()));
+    if (ND == 0) return prec::Unknown;
+    return ND->Attrs.InfixPrecedence;
   }
 }
 
@@ -558,9 +561,9 @@ static prec::Level getBinOpPrecedence(tok::TokenKind Kind) {
 static ExprKind getBinOpKind(tok::TokenKind Kind) {
   switch (Kind) {
   default: assert(0 && "not a binary operator!");
+  case tok::identifier: // FIXME: Remove this nonsense.
   case tok::plus:                 return BinaryAddExprKind;
   case tok::minus:                return BinarySubExprKind;
-    //case tok::percent:
   case tok::slash:                return BinaryDivExprKind;
   case tok::star:                 return BinaryMulExprKind;
   }
@@ -573,7 +576,7 @@ static ExprKind getBinOpKind(tok::TokenKind Kind) {
 ///   expr-binary-rhs:
 ///     (binary-operator expr-primary)*
 bool Parser::ParseExprBinaryRHS(NullablePtr<Expr> &Result, unsigned MinPrec) {
-  prec::Level NextTokPrec = getBinOpPrecedence(Tok.getKind());
+  int NextTokPrec = getBinOpPrecedence(Tok, S);
   while (1) {
     // If this token has a lower precedence than we are allowed to parse (e.g.
     // because we are called recursively, or because the token is not a binop),
@@ -594,8 +597,8 @@ bool Parser::ParseExprBinaryRHS(NullablePtr<Expr> &Result, unsigned MinPrec) {
 
     // Remember the precedence of this operator and get the precedence of the
     // operator immediately to the right of the RHS.
-    prec::Level ThisPrec = NextTokPrec;
-    NextTokPrec = getBinOpPrecedence(Tok.getKind());
+    int ThisPrec = NextTokPrec;
+    NextTokPrec = getBinOpPrecedence(Tok, S);
     
     // TODO: All operators are left associative at the moment.
     
@@ -607,7 +610,7 @@ bool Parser::ParseExprBinaryRHS(NullablePtr<Expr> &Result, unsigned MinPrec) {
       if (ParseExprBinaryRHS(Leaf, ThisPrec + 1))
         return true;
       
-      NextTokPrec = getBinOpPrecedence(Tok.getKind());
+      NextTokPrec = getBinOpPrecedence(Tok, S);
     }
     assert(NextTokPrec <= ThisPrec && "Recursion didn't work!");
     

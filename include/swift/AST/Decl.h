@@ -44,8 +44,9 @@ public:
   llvm::SMLoc LSquareLoc, RSquareLoc;
   
   /// InfixPrecedence - If this is not negative, it indicates that the decl is
-  /// an infix operator with the specified precedence.
-  int InfixPrecedence;
+  /// an infix operator with the specified precedence.  Otherwise, it is in the
+  /// range of 0-255.
+  short InfixPrecedence;
 
   DeclAttributes() : InfixPrecedence(-1) { }
 };
