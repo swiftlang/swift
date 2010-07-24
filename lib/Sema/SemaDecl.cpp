@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
 
@@ -92,7 +93,21 @@ VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name,
   if (Ty == 0)
     Ty = Init->Ty;
   
-  // FIXME: Validate attributes.
+  // Validate attributes.
+  
+  // If the decl has an infix precedence specified, then it must be a function
+  // whose input is a two element tuple.
+  if (Attrs.InfixPrecedence != -1) {
+    bool IsError = true;
+    if (FunctionType *FT = llvm::dyn_cast<FunctionType>(Ty))
+      if (TupleType *TT = llvm::dyn_cast<TupleType>(FT->Input))
+        IsError = TT->NumFields != 2;
+    if (IsError) {
+      Error(Attrs.LSquareLoc, "function with 'infix' specified must take "
+            "a two element tuple as input");
+      Attrs.InfixPrecedence = -1;
+    }
+  }
   
   return new (S.Context) VarDecl(VarLoc, S.Context.getIdentifier(Name),
                                  Ty, Init, Attrs);
