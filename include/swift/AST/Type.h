@@ -25,7 +25,7 @@ namespace llvm {
 }
 namespace swift {
   class ASTContext;
-  class VarDecl;
+  class NamedDecl;
   
   enum TypeKind {
     // BuiltinDependentKind,
@@ -88,7 +88,7 @@ public:
 /// 
 class TupleType : public Type, public llvm::FoldingSetNode {
 public:
-  typedef llvm::PointerUnion<Type*, VarDecl*> TypeOrDecl;
+  typedef llvm::PointerUnion<Type*, NamedDecl*> TypeOrDecl;
   const TypeOrDecl * const Fields;
   const unsigned NumFields;
   

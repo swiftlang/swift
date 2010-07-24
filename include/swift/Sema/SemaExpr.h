@@ -29,7 +29,7 @@ namespace llvm {
 namespace swift {
   class Sema;
   class Expr;
-  class VarDecl;
+  class NamedDecl;
   
 /// SemaExpr - Semantic analysis support for Swift expressions.
 class SemaExpr : public SemaBase {
@@ -44,7 +44,7 @@ public:
   ActOnParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr, llvm::SMLoc RPLoc);
   llvm::NullablePtr<Expr>
   ActOnBraceExpr(llvm::SMLoc LBLoc,
-                 const llvm::PointerUnion<Expr*, VarDecl*> *Elements,
+                 const llvm::PointerUnion<Expr*, NamedDecl*> *Elements,
                  unsigned NumElements, bool HasMissingSemi, llvm::SMLoc RBLoc);
   llvm::NullablePtr<Expr> ActOnBinaryExpr(/*ExprKind*/unsigned Kind,
                                           Expr *LHS, llvm::SMLoc OpLoc,

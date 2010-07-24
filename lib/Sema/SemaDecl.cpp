@@ -40,14 +40,14 @@ SemaDecl::~SemaDecl() {
 
 /// AddToScope - Register the specified decl as being in the current lexical
 /// scope.
-void SemaDecl::AddToScope(VarDecl *D) {
+void SemaDecl::AddToScope(NamedDecl *D) {
   // If we have a shadowed variable definition, check to see if we have a
   // redefinition: two definitions in the same scope with the same name.
-  std::pair<unsigned, VarDecl*> Entry = ScopeHT->lookup(D->Name);
+  std::pair<unsigned, NamedDecl*> Entry = ScopeHT->lookup(D->Name);
   if (Entry.second && Entry.first == CurScope->getDepth()) {
-    Error(D->VarLoc,
+    Error(D->getLocStart(),
           "variable declaration conflicts with previous declaration");
-    Note(ScopeHT->lookup(D->Name).second->VarLoc,
+    Note(ScopeHT->lookup(D->Name).second->getLocStart(),
          "previous declaration here");
     return;
   }
@@ -57,7 +57,7 @@ void SemaDecl::AddToScope(VarDecl *D) {
 
 /// LookupName - Perform a lexical scope lookup for the specified name,
 /// returning the active decl if found or null if not.
-VarDecl *SemaDecl::LookupName(Identifier Name) {
+NamedDecl *SemaDecl::LookupName(Identifier Name) {
   return ScopeHT->lookup(Name).second;
 }
 

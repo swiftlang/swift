@@ -31,8 +31,8 @@ namespace swift {
   class Expr;
   
 enum DeclKind {
-  VarDeclKind
-  //FuncDeclKind
+  VarDeclKind,
+  FuncDeclKind
 };
 
 /// Decl - Base class for all declarations in Swift.
@@ -64,21 +64,37 @@ public:
                      unsigned Alignment = 8) throw();  
 };
 
-/// VarDecl - 'var' declaration.
-class VarDecl : public Decl {
-  friend class ASTContext;
+/// NamedDecl - The common base class between VarDecl and FuncDecl. 
+class NamedDecl : public Decl {
 public:
-  llvm::SMLoc VarLoc;    // Location of the 'var' token.
   Identifier Name;
   Type *Ty;
   Expr *Init;
+  
+  NamedDecl(Identifier name, Type *ty, Expr *init, DeclKind K) : Decl(K) {
+  }
+  
+  llvm::SMLoc getLocStart() const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) {
+    return D->getKind() == VarDeclKind || D->getKind() == FuncDeclKind;
+  }
+  static bool classof(const NamedDecl *D) { return true; }
+  
+protected:
+  void printCommon(llvm::raw_ostream &OS, unsigned Indent) const;
+};
+
+/// VarDecl - 'var' declaration.
+class VarDecl : public NamedDecl {
+public:
+  llvm::SMLoc VarLoc;    // Location of the 'var' token.
 
   VarDecl(llvm::SMLoc varloc, Identifier name, Type *ty, Expr *init)
-    : Decl(VarDeclKind), VarLoc(varloc), Name(name), Ty(ty), Init(init) {}
+    : NamedDecl(name, ty, init, VarDeclKind) {}
 
-  
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
-
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == VarDeclKind; }
@@ -86,6 +102,22 @@ public:
 
 };
   
+
+/// FuncDecl - 'func' declaration.
+class FuncDecl : public NamedDecl {
+public:
+  llvm::SMLoc FuncLoc;    // Location of the 'func' token.
+
+  // FIXME: implement me.
+  
+  
+  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) { return D->getKind() == FuncDeclKind; }
+  static bool classof(const FuncDecl *D) { return true; }
+};
+
 } // end namespace swift
 
 #endif

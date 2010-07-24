@@ -73,7 +73,7 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
     if (Type *Ty = Fields[i].dyn_cast<Type*>())
       ID.AddPointer(Ty);
     else
-      ID.AddPointer(Fields[i].get<VarDecl*>());
+      ID.AddPointer(Fields[i].get<NamedDecl*>());
 }
 
 /// getTupleType - Return the uniqued tuple type with the specified elements.
@@ -86,9 +86,9 @@ TupleType *ASTContext::getTupleType(const TupleType::TypeOrDecl *Fields,
   
   TupleTypesMapTy &TupleTypesMap = *(TupleTypesMapTy*)TupleTypes;
   
-  // FIXME: This is completely bogus.  The VarDecl fields are not being unique'd
-  // so they all get their own addresses.  This should unique all-type tuples
-  // though.
+  // FIXME: This is completely bogus.  The NamedDecl fields are not being
+  // unique'd so they all get their own addresses.  This should unique all-type
+  // tuples though.
   void *InsertPos = 0;
   if (TupleType *TT = TupleTypesMap.FindNodeOrInsertPos(ID, InsertPos))
     return TT;

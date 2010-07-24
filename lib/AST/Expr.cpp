@@ -96,7 +96,7 @@ void BraceExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
     if (Expr *E = Elements[i].dyn_cast<Expr*>())
       E->print(OS, Indent+1);
     else
-      Elements[i].get<VarDecl*>()->print(OS, Indent+1);
+      Elements[i].get<NamedDecl*>()->print(OS, Indent+1);
   }
   
   OS << ')';

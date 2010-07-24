@@ -30,11 +30,12 @@ namespace swift {
   class Expr;
   class Type;
   class VarDecl;
+  class NamedDecl;
   class Scope;
   
 /// SemaDecl - Semantic analysis support for Swift declarations.
 class SemaDecl : public SemaBase {
-  typedef std::pair<unsigned, VarDecl*> ScopeEntry;
+  typedef std::pair<unsigned, NamedDecl*> ScopeEntry;
   typedef llvm::ScopedHashTable<Identifier, ScopeEntry,
                                 llvm::DenseMapInfo<Identifier> > ScopeHTType;
   ScopeHTType *const ScopeHT;
@@ -50,11 +51,11 @@ public:
   
   /// AddToScope - Register the specified decl as being in the current lexical
   /// scope.
-  void AddToScope(VarDecl *D);
+  void AddToScope(NamedDecl *D);
   
   /// LookupName - Perform a lexical scope lookup for the specified name,
   /// returning the active decl if found or null if not.
-  VarDecl *LookupName(Identifier Name);
+  NamedDecl *LookupName(Identifier Name);
   
   //===--------------------------------------------------------------------===//
   // Declaration handling.

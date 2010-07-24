@@ -29,7 +29,7 @@ namespace llvm {
 namespace swift {
   class ASTContext;
   class Type;
-  class VarDecl;
+  class NamedDecl;
   
 enum ExprKind {
   IntegerLiteralKind,
@@ -104,10 +104,10 @@ public:
 /// DeclRefExpr - A reference to a variable, "x".
 class DeclRefExpr : public Expr {
 public:
-  VarDecl *D;
+  NamedDecl *D;
   llvm::SMLoc Loc;
   
-  DeclRefExpr(VarDecl *d, llvm::SMLoc L, Type *Ty)
+  DeclRefExpr(NamedDecl *d, llvm::SMLoc L, Type *Ty)
     : Expr(DeclRefExprKind, Ty), D(d), Loc(L) {}
   
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
@@ -144,7 +144,7 @@ class BraceExpr : public Expr {
 public:
   llvm::SMLoc LBLoc;
   
-  llvm::PointerUnion<Expr*, VarDecl*> *Elements;
+  llvm::PointerUnion<Expr*, NamedDecl*> *Elements;
   unsigned NumElements;
   
   /// This is true if the last expression in the brace expression is missing a
@@ -152,7 +152,7 @@ public:
   bool MissingSemi;
   llvm::SMLoc RBLoc;
 
-  BraceExpr(llvm::SMLoc lbloc, llvm::PointerUnion<Expr*, VarDecl*> *elements,
+  BraceExpr(llvm::SMLoc lbloc, llvm::PointerUnion<Expr*, NamedDecl*> *elements,
             unsigned numelements, bool missingsemi, llvm::SMLoc rbloc, Type *Ty)
     : Expr(BraceExprKind, Ty), LBLoc(lbloc), Elements(elements),
       NumElements(numelements), MissingSemi(missingsemi), RBLoc(rbloc) {}

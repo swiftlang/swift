@@ -32,7 +32,7 @@ NullablePtr<Expr> SemaExpr::ActOnNumericConstant(llvm::StringRef Text,
 
 NullablePtr<Expr> 
 SemaExpr::ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
-  VarDecl *D = S.decl.LookupName(S.Context.getIdentifier(Text));
+  NamedDecl *D = S.decl.LookupName(S.Context.getIdentifier(Text));
   if (D == 0) {
     Error(Loc, "use of undeclared identifier");
     return 0;
@@ -45,11 +45,11 @@ SemaExpr::ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
 
 NullablePtr<Expr> 
 SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
-                         const llvm::PointerUnion<Expr*, VarDecl*> *Elements,
+                         const llvm::PointerUnion<Expr*, NamedDecl*> *Elements,
                          unsigned NumElements, bool HasMissingSemi,
                          llvm::SMLoc RBLoc) {
   // Diagnose cases where there was a ; missing after a 'var'.
-  if (HasMissingSemi && Elements[NumElements-1].is<VarDecl*>()) {
+  if (HasMissingSemi && Elements[NumElements-1].is<NamedDecl*>()) {
     Error(RBLoc, "expected ';' after var declaration");
     HasMissingSemi = false;
   }
@@ -63,8 +63,8 @@ SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
   else
     ResultTy = S.Context.VoidType;
   
-  llvm::PointerUnion<Expr*, VarDecl*> *NewElements = 
-    (llvm::PointerUnion<Expr*, VarDecl*> *)
+  llvm::PointerUnion<Expr*, NamedDecl*> *NewElements = 
+    (llvm::PointerUnion<Expr*, NamedDecl*> *)
     S.Context.Allocate(sizeof(*Elements)*NumElements, 8);
   memcpy(NewElements, Elements, sizeof(*Elements)*NumElements);
   

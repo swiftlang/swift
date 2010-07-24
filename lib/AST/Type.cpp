@@ -57,7 +57,8 @@ void TupleType::print(llvm::raw_ostream &OS) const {
       continue;
     }
     
-    VarDecl *VD = TD.get<VarDecl*>();
+    NamedDecl *VD = TD.get<NamedDecl*>();
+    assert(llvm::isa<VarDecl>(VD));
     OS << "var " << VD->Name << " : ";
     VD->Ty->print(OS);
     assert(VD->Init == 0 && "Don't handle inits");

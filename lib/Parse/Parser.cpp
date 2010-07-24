@@ -125,7 +125,7 @@ bool Parser::ParseToken(tok::TokenKind K, const char *Message,
 ///   type-or-decl-var:
 ///     type
 ///     decl-var
-bool Parser::ParseTypeOrDeclVar(llvm::PointerUnion<Type*, VarDecl*> &Result,
+bool Parser::ParseTypeOrDeclVar(llvm::PointerUnion<Type*, NamedDecl*> &Result,
                                 const char *Message) {
   if (Tok.is(tok::kw_var)) {
     Result = ParseDeclVar();
@@ -141,7 +141,7 @@ bool Parser::ParseTypeOrDeclVar(llvm::PointerUnion<Type*, VarDecl*> &Result,
 ///   expr-or-decl-var:
 ///     type
 ///     decl-var
-bool Parser::ParseExprOrDeclVar(llvm::PointerUnion<Expr*, VarDecl*> &Result,
+bool Parser::ParseExprOrDeclVar(llvm::PointerUnion<Expr*, NamedDecl*> &Result,
                                 const char *Message) {
   if (Tok.is(tok::kw_var)) {
     Result = ParseDeclVar();
@@ -297,10 +297,10 @@ bool Parser::ParseTypeTuple(Type *&Result) {
   SMLoc LPLoc = Tok.getLoc();
   ConsumeToken(tok::l_paren);
 
-  llvm::SmallVector<llvm::PointerUnion<Type*, VarDecl*>, 8> Elements;
+  llvm::SmallVector<llvm::PointerUnion<Type*, NamedDecl*>, 8> Elements;
 
   if (Tok.isNot(tok::r_paren)) {
-    Elements.push_back(llvm::PointerUnion<Type*, VarDecl*>());
+    Elements.push_back(llvm::PointerUnion<Type*, NamedDecl*>());
     bool Error = 
       ParseTypeOrDeclVar(Elements.back(),
                          "expected type or var declaration in tuple");
@@ -308,7 +308,7 @@ bool Parser::ParseTypeTuple(Type *&Result) {
     // Parse (',' type-or-decl-var)* 
     while (!Error && Tok.is(tok::comma)) {
       ConsumeToken(tok::comma);
-      Elements.push_back(llvm::PointerUnion<Type*, VarDecl*>());
+      Elements.push_back(llvm::PointerUnion<Type*, NamedDecl*>());
       Error = ParseTypeOrDeclVar(Elements.back(),
                                  "expected type or var declaration in tuple");
     }
@@ -402,7 +402,7 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
   // This brace expression forms a lexical scope.
   Scope BraceScope(S.decl);
 
-  llvm::SmallVector<llvm::PointerUnion<Expr*, VarDecl*>, 16> Entries;
+  llvm::SmallVector<llvm::PointerUnion<Expr*, NamedDecl*>, 16> Entries;
   
   // MissingSemiAtEnd - Keep track of whether the last expression in the block
   // had no semicolon.
@@ -418,7 +418,7 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
     }
 
     // Otherwise, we must have a var decl or expression.  Parse it up
-    Entries.push_back(llvm::PointerUnion<Expr*, VarDecl*>());
+    Entries.push_back(llvm::PointerUnion<Expr*, NamedDecl*>());
     
     // Parse the var or expression.  If we have an error, try to do nice
     // recovery.
@@ -437,7 +437,7 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
     }
     
     // If we just parsed a var decl, add it to the current scope.
-    if (VarDecl *D = Entries.back().dyn_cast<VarDecl*>())
+    if (NamedDecl *D = Entries.back().dyn_cast<NamedDecl*>())
       S.decl.AddToScope(D);
     
   } while (ConsumeIf(tok::semi));

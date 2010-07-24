@@ -34,6 +34,7 @@ namespace swift {
   class Type;
   class Decl;
   class VarDecl;
+  class NamedDecl;
   class ASTContext;
   class ASTConsumer;
   
@@ -93,9 +94,9 @@ private:
   bool ParseToken(tok::TokenKind K, const char *Message,
                   tok::TokenKind SkipToTok = tok::unknown);
   
-  bool ParseTypeOrDeclVar(llvm::PointerUnion<Type*, VarDecl*> &Result,
+  bool ParseTypeOrDeclVar(llvm::PointerUnion<Type*, NamedDecl*> &Result,
                           const char *Message = 0);
-  bool ParseExprOrDeclVar(llvm::PointerUnion<Expr*, VarDecl*> &Result,
+  bool ParseExprOrDeclVar(llvm::PointerUnion<Expr*, NamedDecl*> &Result,
                           const char *Message = 0);
   
   // Decl Parsing

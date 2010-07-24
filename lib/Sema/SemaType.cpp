@@ -31,12 +31,12 @@ Type *SemaType::ActOnVoidType(llvm::SMLoc Loc) {
 }
 
 Type *SemaType::ActOnTupleType(llvm::SMLoc LPLoc,
-                            llvm::PointerUnion<Type*, VarDecl*> const *Elements,
+                          llvm::PointerUnion<Type*, NamedDecl*> const *Elements,
                                unsigned NumElements, llvm::SMLoc RPLoc) {
   // Verify that tuple elements don't have initializers.  In the future, we can
   // consider adding these back if we so desire.
   for (unsigned i = 0, e = NumElements; i != e; ++i) {
-    if (VarDecl *D = Elements[i].dyn_cast<VarDecl*>()) {
+    if (NamedDecl *D = Elements[i].dyn_cast<NamedDecl*>()) {
       if (D->Init != 0) {
         Error(D->Init->getLocStart(),
               "tuple element should not have an initializer");
@@ -47,10 +47,11 @@ Type *SemaType::ActOnTupleType(llvm::SMLoc LPLoc,
   
   // If the tuple only has a single element type, then this is a grouping paren,
   // not a tuple.
-  // FIXME: How do we handle var declarations here?
+  // FIXME: How do we handle declarations here?
   if (NumElements == 1) {
-    if (VarDecl *D = Elements[0].dyn_cast<VarDecl*>()) {
-      Error(D->VarLoc, "grouping parenthesis cannot contain var declaration");
+    if (NamedDecl *D = Elements[0].dyn_cast<NamedDecl*>()) {
+      Error(D->getLocStart(), 
+            "grouping parenthesis cannot contain a declaration");
       // FIXME: need an error type for better recovery.
       return S.Context.VoidType;
     }

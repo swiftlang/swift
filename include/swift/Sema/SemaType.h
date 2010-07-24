@@ -27,7 +27,7 @@ namespace llvm {
 namespace swift {
   class Sema;
   class Decl;
-  class VarDecl;
+  class NamedDecl;
   class Type;
   class TupleType;
   
@@ -39,7 +39,7 @@ public:
   Type *ActOnIntType(llvm::SMLoc Loc);
   Type *ActOnVoidType(llvm::SMLoc Loc);
   Type *ActOnTupleType(llvm::SMLoc LPLoc,
-                       llvm::PointerUnion<Type*, VarDecl*> const *Elements,
+                       llvm::PointerUnion<Type*, NamedDecl*> const *Elements,
                        unsigned NumElements, llvm::SMLoc RPLoc);
   
   Type *ActOnFunctionType(Type *Input, llvm::SMLoc ArrowLoc, Type *Output);
