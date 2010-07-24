@@ -38,9 +38,9 @@ public:
 
   Type *ActOnIntType(llvm::SMLoc Loc);
   Type *ActOnVoidType(llvm::SMLoc Loc);
-  TupleType *ActOnTupleType(llvm::SMLoc LPLoc,
-                            llvm::PointerUnion<Type*, VarDecl*> const *Elements,
-                            unsigned NumElements, llvm::SMLoc RPLoc);
+  Type *ActOnTupleType(llvm::SMLoc LPLoc,
+                       llvm::PointerUnion<Type*, VarDecl*> const *Elements,
+                       unsigned NumElements, llvm::SMLoc RPLoc);
   
   Type *ActOnFunctionType(Type *Input, llvm::SMLoc ArrowLoc, Type *Output);
 };

@@ -66,7 +66,8 @@ Expr *SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
 
 Expr *SemaExpr::ActOnParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr,
                                llvm::SMLoc RPLoc) {
-  return new (S.Context) ParenExpr(LPLoc, SubExpr, RPLoc, S.Context.IntType);
+  // FIXME: This should be a more general tuple expression.
+  return new (S.Context) ParenExpr(LPLoc, SubExpr, RPLoc, SubExpr->Ty);
 }
 
 Expr *SemaExpr::ActOnBinaryExpr(unsigned Kind, Expr *LHS, llvm::SMLoc OpLoc,
