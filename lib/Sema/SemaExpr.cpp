@@ -19,15 +19,19 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
+using llvm::NullablePtr;
 
-Expr *SemaExpr::ActOnNumericConstant(llvm::StringRef Text, llvm::SMLoc Loc) {
+NullablePtr<Expr> SemaExpr::ActOnNumericConstant(llvm::StringRef Text,
+                                                 llvm::SMLoc Loc) {
   return new (S.Context) IntegerLiteral(Text, Loc, S.Context.IntType);
 }
 
-Expr *SemaExpr::ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
+NullablePtr<Expr> 
+SemaExpr::ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
   VarDecl *D = S.decl.LookupName(S.Context.getIdentifier(Text));
   if (D == 0) {
     Error(Loc, "use of undeclared identifier");
@@ -41,10 +45,11 @@ Expr *SemaExpr::ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
   return new (S.Context) DeclRefExpr(D, Loc, D->Ty);
 }
 
-Expr *SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
-                           const llvm::PointerUnion<Expr*, VarDecl*> *Elements,
-                               unsigned NumElements, bool HasMissingSemi,
-                               llvm::SMLoc RBLoc) {
+NullablePtr<Expr> 
+SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
+                         const llvm::PointerUnion<Expr*, VarDecl*> *Elements,
+                         unsigned NumElements, bool HasMissingSemi,
+                         llvm::SMLoc RBLoc) {
   // Diagnose cases where there was a ; missing after a 'var'.
   if (HasMissingSemi && Elements[NumElements-1].is<VarDecl*>()) {
     Error(RBLoc, "expected ';' after var declaration");
@@ -70,14 +75,23 @@ Expr *SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
                                    HasMissingSemi, RBLoc, ResultTy);
 }
 
-Expr *SemaExpr::ActOnParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr,
-                               llvm::SMLoc RPLoc) {
+NullablePtr<Expr> 
+SemaExpr::ActOnParenExpr(llvm::SMLoc LPLoc, NullablePtr<Expr> SubExprN,
+                         llvm::SMLoc RPLoc) {
+  if (SubExprN.isNull()) return 0;
+  Expr *SubExpr = SubExprN.get();
+  
   // FIXME: This should be a more general tuple expression.
   return new (S.Context) ParenExpr(LPLoc, SubExpr, RPLoc, SubExpr->Ty);
 }
 
-Expr *SemaExpr::ActOnBinaryExpr(unsigned Kind, Expr *LHS, llvm::SMLoc OpLoc,
-                                Expr *RHS) {
+NullablePtr<Expr> 
+SemaExpr::ActOnBinaryExpr(unsigned Kind, NullablePtr<Expr> LHSN,
+                          llvm::SMLoc OpLoc, NullablePtr<Expr> RHSN) {
+  if (LHSN.isNull() || RHSN.isNull()) return 0;
+  Expr *LHS = LHSN.get(), *RHS = RHSN.get();
+  
+  
   // For now, the LHS and RHS of all binops have to be ints.
   if (LHS->Ty != S.Context.IntType) {
     // TODO, Improve error message, include source range.

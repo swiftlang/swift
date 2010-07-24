@@ -23,6 +23,8 @@
 namespace llvm {
   template <typename PT1, typename PT2>
   class PointerUnion;
+  template<class T>
+  class NullablePtr;
 }
 namespace swift {
   class Sema;
@@ -34,16 +36,21 @@ class SemaExpr : public SemaBase {
 public:
   explicit SemaExpr(Sema &S) : SemaBase(S) {}
   
-  Expr *ActOnNumericConstant(llvm::StringRef Text, llvm::SMLoc Loc);
-  Expr *ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc);
-  Expr *ActOnParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr, llvm::SMLoc RPLoc);
-  Expr *ActOnBraceExpr(llvm::SMLoc LBLoc,
-                       const llvm::PointerUnion<Expr*, VarDecl*> *Elements,
-                       unsigned NumElements,
-                       bool HasMissingSemi,
-                       llvm::SMLoc RBLoc);
-  Expr *ActOnBinaryExpr(/*ExprKind*/unsigned Kind, Expr *LHS, llvm::SMLoc OpLoc,
-                        Expr *RHS);
+  llvm::NullablePtr<Expr>
+  ActOnNumericConstant(llvm::StringRef Text, llvm::SMLoc Loc);
+  llvm::NullablePtr<Expr>
+  ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc);
+  llvm::NullablePtr<Expr>
+  ActOnParenExpr(llvm::SMLoc LPLoc, llvm::NullablePtr<Expr> SubExpr,
+                 llvm::SMLoc RPLoc);
+  llvm::NullablePtr<Expr>
+  ActOnBraceExpr(llvm::SMLoc LBLoc,
+                 const llvm::PointerUnion<Expr*, VarDecl*> *Elements,
+                 unsigned NumElements, bool HasMissingSemi, llvm::SMLoc RBLoc);
+  llvm::NullablePtr<Expr> ActOnBinaryExpr(/*ExprKind*/unsigned Kind,
+                                          llvm::NullablePtr<Expr> LHS,
+                                          llvm::SMLoc OpLoc,
+                                          llvm::NullablePtr<Expr> RHS);
 };
   
 } // end namespace swift

@@ -24,10 +24,12 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/PointerUnion.h"
 using namespace swift;
 using llvm::SMLoc;
+using llvm::NullablePtr;
 
 //===----------------------------------------------------------------------===//
 // Setup and Helper Methods
@@ -146,9 +148,10 @@ bool Parser::ParseExprOrDeclVar(llvm::PointerUnion<Expr*, VarDecl*> &Result,
     return Result.isNull();
   }
   
-  Expr *ResultExpr = 0;
-  if (ParseExpr(ResultExpr, Message)) return true;
-  Result = ResultExpr;
+  NullablePtr<Expr> ResultExpr;
+  if (ParseExpr(ResultExpr, Message) || ResultExpr.isNull())
+    return true;
+  Result = ResultExpr.get();
   return false;
 }
 
@@ -229,14 +232,14 @@ VarDecl *Parser::ParseDeclVar() {
     return 0;
   }
   
-  Expr *Init = 0;
+  NullablePtr<Expr> Init;
   if (ConsumeIf(tok::equal) &&
       ParseExpr(Init, "expected expression in var declaration")) {
     SkipUntil(tok::semi);
     return 0;
   }
   
-  return S.decl.ActOnVarDecl(VarLoc, Identifier, Ty, Init);
+  return S.decl.ActOnVarDecl(VarLoc, Identifier, Ty, Init.getPtrOrNull());
 }
 
 //===----------------------------------------------------------------------===//
@@ -336,7 +339,7 @@ bool Parser::ParseTypeTuple(Type *&Result) {
 /// ParseExpr
 ///   expr:
 ///     expr-primary (binary-operator expr-primary)*
-bool Parser::ParseExpr(Expr *&Result, const char *Message) {
+bool Parser::ParseExpr(NullablePtr<Expr> &Result, const char *Message) {
   return ParseExprPrimary(Result, Message) ||
          ParseExprBinaryRHS(Result);
 }
@@ -347,7 +350,7 @@ bool Parser::ParseExpr(Expr *&Result, const char *Message) {
 ///     identifier
 ///     '(' expr ')'
 ///     expr-brace
-bool Parser::ParseExprPrimary(Expr *&Result, const char *Message) {
+bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
   switch (Tok.getKind()) {
   case tok::numeric_constant:
     Result = S.expr.ActOnNumericConstant(Tok.getText(), Tok.getLoc());
@@ -363,7 +366,7 @@ bool Parser::ParseExprPrimary(Expr *&Result, const char *Message) {
     // FIXME: This should eventually become a tuple literal expression.
     SMLoc LPLoc = Tok.getLoc();  
     ConsumeToken(tok::l_paren);
-    Expr *SubExpr = 0;
+    NullablePtr<Expr> SubExpr;
     if (ParseExpr(SubExpr, "expected expression in parentheses")) return true;
     
     SMLoc RPLoc = Tok.getLoc();  
@@ -391,7 +394,7 @@ bool Parser::ParseExprPrimary(Expr *&Result, const char *Message) {
 ///
 ///   expr-brace:
 ///     '{' (expr-or-decl-var ';')* expr? }
-bool Parser::ParseExprBrace(Expr *&Result) {
+bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
   SMLoc LBLoc = Tok.getLoc();
   ConsumeToken(tok::l_brace);
   
@@ -494,7 +497,7 @@ static ExprKind getBinOpKind(tok::TokenKind Kind) {
 ///
 ///   expr-binary-rhs:
 ///     (binary-operator expr-primary)*
-bool Parser::ParseExprBinaryRHS(Expr *&Result, unsigned MinPrec) {
+bool Parser::ParseExprBinaryRHS(NullablePtr<Expr> &Result, unsigned MinPrec) {
   prec::Level NextTokPrec = getBinOpPrecedence(Tok.getKind());
   while (1) {
     // If this token has a lower precedence than we are allowed to parse (e.g.
@@ -510,7 +513,7 @@ bool Parser::ParseExprBinaryRHS(Expr *&Result, unsigned MinPrec) {
     // TODO: Support ternary operators some day.
     
     // Parse another leaf here for the RHS of the operator.
-    Expr *Leaf = 0;
+    NullablePtr<Expr> Leaf;
     if (ParseExprPrimary(Leaf, "expected expression after binary operator"))
       return true;
 

@@ -23,6 +23,8 @@ namespace llvm {
   class SourceMgr;
   template <typename PT1, typename PT2>
   class PointerUnion;
+  template<class T>
+  class NullablePtr;
 }
 
 namespace swift {
@@ -105,10 +107,11 @@ private:
   bool ParseTypeTuple(Type *&Result);
 
   // Expression Parsing
-  bool ParseExpr(Expr *&Result, const char *Message = 0);
-  bool ParseExprPrimary(Expr *&Result, const char *Message = 0);
-  bool ParseExprBrace(Expr *&Result);
-  bool ParseExprBinaryRHS(Expr *&Result, unsigned MinPrecedence = 1);
+  bool ParseExpr(llvm::NullablePtr<Expr> &Result, const char *Message = 0);
+  bool ParseExprPrimary(llvm::NullablePtr<Expr> &Result, const char *Message=0);
+  bool ParseExprBrace(llvm::NullablePtr<Expr> &Result);
+  bool ParseExprBinaryRHS(llvm::NullablePtr<Expr> &Result,
+                          unsigned MinPrecedence = 1);
 };
   
 } // end namespace swift
