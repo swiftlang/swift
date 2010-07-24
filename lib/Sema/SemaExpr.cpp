@@ -35,13 +35,11 @@ SemaExpr::ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
   VarDecl *D = S.decl.LookupName(S.Context.getIdentifier(Text));
   if (D == 0) {
     Error(Loc, "use of undeclared identifier");
-    // FIXME: Return error object.
-    return new (S.Context) IntegerLiteral("0", Loc, S.Context.IntType);
+    return 0;
   }
   
   // FIXME: If the decl had an "invalid" type, then return the error object to
   // improve error recovery.
-  
   return new (S.Context) DeclRefExpr(D, Loc, D->Ty);
 }
 
@@ -96,15 +94,13 @@ SemaExpr::ActOnBinaryExpr(unsigned Kind, NullablePtr<Expr> LHSN,
   if (LHS->Ty != S.Context.IntType) {
     // TODO, Improve error message, include source range.
     Error(OpLoc, "LHS subexpression doesn't have int type, it has XXX type");
-    // FIXME: Return error object.
-    return new (S.Context) IntegerLiteral("0", OpLoc, S.Context.IntType);
+    return 0;
   }
 
   if (RHS->Ty != S.Context.IntType) {
     // TODO, Improve error message, include source range.
     Error(OpLoc, "RHS subexpression doesn't have int type, it has XXX type");
-    // FIXME: Return error object.
-    return new (S.Context) IntegerLiteral("0", OpLoc, S.Context.IntType);
+    return 0;
   }
 
   return new (S.Context) BinaryExpr((ExprKind)Kind, LHS, OpLoc, RHS,
