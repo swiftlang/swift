@@ -18,10 +18,15 @@
 #include "swift/Sema/SemaDecl.h"
 using namespace swift;
 
-Scope::Scope(SemaDecl &S) : HTScope(*S.ScopeHT) {
-  
+Scope::Scope(SemaDecl &S) : SD(S), HTScope(*S.ScopeHT), PrevScope(SD.CurScope) {
+  if (SD.CurScope)
+    Depth = SD.CurScope->Depth+1;
+  else
+    Depth = 0;
+  SD.CurScope = this;
 }
 
 Scope::~Scope() {
-  
+  assert(SD.CurScope == this && "Scope mismatch");
+  SD.CurScope = PrevScope;
 }

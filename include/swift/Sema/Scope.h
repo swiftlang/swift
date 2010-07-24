@@ -32,12 +32,20 @@ namespace swift {
 class Scope {
   Scope(const Scope&);          // DO NOT IMPLEMENT
   void operator=(const Scope&); // DO NOT IMPLEMENT
-  llvm::ScopedHashTableScope<Identifier, VarDecl*> HTScope;
+  
+  SemaDecl &SD;
+  
+  typedef std::pair<unsigned, VarDecl*> ScopeEntry;
+  llvm::ScopedHashTableScope<Identifier, ScopeEntry> HTScope;
+  Scope *PrevScope;
+  unsigned Depth;
 public:
   explicit Scope(SemaDecl &S);
   ~Scope();
 
-  
+  unsigned getDepth() const {
+    return Depth;
+  }
   
 };
   

@@ -26,7 +26,8 @@ using namespace swift;
 
 SemaDecl::SemaDecl(Sema &S)
   : SemaBase(S),
-    ScopeHT(new ScopeHTType()) {
+    ScopeHT(new ScopeHTType()),
+    CurScope(0) {
 }
 
 SemaDecl::~SemaDecl() {
@@ -40,25 +41,24 @@ SemaDecl::~SemaDecl() {
 /// AddToScope - Register the specified decl as being in the current lexical
 /// scope.
 void SemaDecl::AddToScope(VarDecl *D) {
-  // FIXME: For now, don't allow shadowing at all.  This is because we want to
-  // reject redeclarations at the same scope (var x : int;  var x : int;) but
-  // ScopedHashTable doesn't give us a way to find out if an entry is in the
-  // current scope or not!
-  if (ScopeHT->count(D->Name)) {
+  // If we have a shadowed variable definition, check to see if we have a
+  // redefinition: two definitions in the same scope with the same name.
+  std::pair<unsigned, VarDecl*> Entry = ScopeHT->lookup(D->Name);
+  if (Entry.second && Entry.first == CurScope->getDepth()) {
     Error(D->VarLoc,
           "variable declaration conflicts with previous declaration");
-    Note(ScopeHT->lookup(D->Name)->VarLoc,
+    Note(ScopeHT->lookup(D->Name).second->VarLoc,
          "previous declaration here");
     return;
   }
   
-  ScopeHT->insert(D->Name, D);
+  ScopeHT->insert(D->Name, std::make_pair(CurScope->getDepth(), D));
 }
 
 /// LookupName - Perform a lexical scope lookup for the specified name,
 /// returning the active decl if found or null if not.
 VarDecl *SemaDecl::LookupName(Identifier Name) {
-  return ScopeHT->lookup(Name);
+  return ScopeHT->lookup(Name).second;
 }
 
 

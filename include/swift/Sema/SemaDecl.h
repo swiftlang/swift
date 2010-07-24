@@ -30,12 +30,15 @@ namespace swift {
   class Expr;
   class Type;
   class VarDecl;
+  class Scope;
   
 /// SemaDecl - Semantic analysis support for Swift declarations.
 class SemaDecl : public SemaBase {
-  typedef llvm::ScopedHashTable<Identifier, VarDecl*,
+  typedef std::pair<unsigned, VarDecl*> ScopeEntry;
+  typedef llvm::ScopedHashTable<Identifier, ScopeEntry,
                                 llvm::DenseMapInfo<Identifier> > ScopeHTType;
   ScopeHTType *const ScopeHT;
+  Scope *CurScope;
   friend class Scope;
 public:
   explicit SemaDecl(Sema &S);
