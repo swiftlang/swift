@@ -34,7 +34,7 @@ namespace swift {
 enum ExprKind {
   IntegerLiteralKind,
   DeclRefExprKind,
-  ParenExprKind,
+  TupleExprKind,
   BraceExprKind,
   
   BinaryAddExprKind,
@@ -118,23 +118,27 @@ public:
 };
   
   
-/// ParenExpr - Parenthesized expressions like '(x+x)'.
-class ParenExpr : public Expr {
+/// TupleExpr - Parenthesized expressions like '(x+x)' and '(x, y, 4)'.  Tuple
+/// types automatically decay if they have a single element, this means that
+/// single element tuple literals, such as "(4)", will exist in the AST, but
+/// have a result type that is the same as the input operand type.
+class TupleExpr : public Expr {
 public:
   llvm::SMLoc LParenLoc;
-  Expr *SubExpr;
+  Expr **SubExprs;
+  unsigned NumSubExprs;
   llvm::SMLoc RParenLoc;
   
-  ParenExpr(llvm::SMLoc lparenloc, Expr *subexpr, llvm::SMLoc rparenloc,
-            Type *Ty)
-    : Expr(ParenExprKind, Ty), LParenLoc(lparenloc), SubExpr(subexpr),
-      RParenLoc(rparenloc) {}
+  TupleExpr(llvm::SMLoc lparenloc, Expr **subexprs, unsigned numsubexprs,
+            llvm::SMLoc rparenloc, Type *Ty)
+    : Expr(TupleExprKind, Ty), LParenLoc(lparenloc), SubExprs(subexprs),
+      NumSubExprs(numsubexprs), RParenLoc(rparenloc) {}
 
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const ParenExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == ParenExprKind; }
+  static bool classof(const TupleExpr *) { return true; }
+  static bool classof(const Expr *E) { return E->Kind == TupleExprKind; }
 };
   
 /// BraceExpr - A brace enclosed sequence of expressions, like { 4; 5 }.  If the

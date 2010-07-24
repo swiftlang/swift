@@ -41,7 +41,8 @@ public:
   llvm::NullablePtr<Expr>
   ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc);
   llvm::NullablePtr<Expr>
-  ActOnParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr, llvm::SMLoc RPLoc);
+  ActOnTupleExpr(llvm::SMLoc LPLoc, Expr **SubExpr, unsigned NumSubExprs,
+                 llvm::SMLoc RPLoc);
   llvm::NullablePtr<Expr>
   ActOnBraceExpr(llvm::SMLoc LBLoc,
                  const llvm::PointerUnion<Expr*, NamedDecl*> *Elements,

@@ -36,7 +36,7 @@ llvm::SMLoc Expr::getLocStart() const {
   switch (Kind) {
   case IntegerLiteralKind: return cast<IntegerLiteral>(this)->Loc;
   case DeclRefExprKind:    return cast<DeclRefExpr>(this)->Loc;
-  case ParenExprKind:      return cast<ParenExpr>(this)->LParenLoc;
+  case TupleExprKind:      return cast<TupleExpr>(this)->LParenLoc;
   case BraceExprKind:      return cast<BraceExpr>(this)->LBLoc;
   case BinaryAddExprKind:
   case BinarySubExprKind:
@@ -57,7 +57,7 @@ void Expr::print(llvm::raw_ostream &OS, unsigned Indent) const {
   switch (Kind) {
   case IntegerLiteralKind: return cast<IntegerLiteral>(this)->print(OS, Indent);
   case DeclRefExprKind:    return cast<DeclRefExpr>(this)->print(OS, Indent);
-  case ParenExprKind:      return cast<ParenExpr>(this)->print(OS, Indent);
+  case TupleExprKind:      return cast<TupleExpr>(this)->print(OS, Indent);
   case BraceExprKind:      return cast<BraceExpr>(this)->print(OS, Indent);
   case BinaryAddExprKind:
   case BinarySubExprKind:
@@ -78,11 +78,16 @@ void DeclRefExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS << "' decl=" << D->Name << ')';
 }
 
-void ParenExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
+void TupleExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(paren_expr type='";
   Ty->print(OS);
-  OS << "'\n";
-  SubExpr->print(OS, Indent+1);
+  OS << "'";
+  if (NumSubExprs != 0) {
+    for (unsigned i = 0, e = NumSubExprs; i != e; ++i) {
+      OS << '\n';
+      SubExprs[i]->print(OS, Indent+1);
+    }
+  }
   OS << ')';
 }
 

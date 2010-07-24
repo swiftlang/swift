@@ -422,7 +422,8 @@ bool Parser::ParseExpr(NullablePtr<Expr> &Result, const char *Message) {
 ///   expr-primary:
 ///     numeric_constant
 ///     identifier
-///     '(' expr ')'
+///     '(' ')'
+///     '(' expr (',' expr)* ')'
 ///     expr-brace
 bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
   switch (Tok.getKind()) {
@@ -440,8 +441,29 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
     // FIXME: This should eventually become a tuple literal expression.
     SMLoc LPLoc = Tok.getLoc();  
     ConsumeToken(tok::l_paren);
-    NullablePtr<Expr> SubExpr;
-    if (ParseExpr(SubExpr, "expected expression in parentheses")) return true;
+    
+    llvm::SmallVector<Expr*, 8> SubExprs;
+    bool AnyErroneousSubExprs = false;
+    
+    if (Tok.isNot(tok::r_paren)) {
+      NullablePtr<Expr> SubExpr;
+      if (ParseExpr(SubExpr, "expected expression in parentheses")) return true;
+      
+      if (SubExpr.isNull())
+        AnyErroneousSubExprs = true;
+      else
+        SubExprs.push_back(SubExpr.get());
+      
+      while (ConsumeIf(tok::comma)) {
+        SubExpr = 0;
+        if (ParseExpr(SubExpr, "expected expression in parentheses")) return true;
+        
+        if (SubExpr.isNull())
+          AnyErroneousSubExprs = true;
+        else
+          SubExprs.push_back(SubExpr.get());
+      }
+    }
     
     SMLoc RPLoc = Tok.getLoc();  
     if (ParseToken(tok::r_paren, "expected ')' in parenthesis expression")) {
@@ -449,8 +471,9 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
       return true;
     }
     
-    if (SubExpr.isNonNull())
-      Result = S.expr.ActOnParenExpr(LPLoc, SubExpr.get(), RPLoc);
+    if (!AnyErroneousSubExprs)
+      Result = S.expr.ActOnTupleExpr(LPLoc, SubExprs.data(), SubExprs.size(),
+                                     RPLoc);
     return false;
   }
       

@@ -19,8 +19,10 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Type.h"
 #include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
 using llvm::NullablePtr;
@@ -74,10 +76,27 @@ SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
 }
 
 NullablePtr<Expr> 
-SemaExpr::ActOnParenExpr(llvm::SMLoc LPLoc, Expr *SubExpr,
-                         llvm::SMLoc RPLoc) {
-  // FIXME: This should be a more general tuple expression.
-  return new (S.Context) ParenExpr(LPLoc, SubExpr, RPLoc, SubExpr->Ty);
+SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
+                         unsigned NumSubExprs, llvm::SMLoc RPLoc) {
+  
+  // A tuple expr with a single subexpression is just a grouping paren.
+  Type *ResultTy;
+  if (NumSubExprs == 1) {
+    ResultTy = SubExprs[0]->Ty;
+  } else {
+    // Compute the result type.
+    llvm::SmallVector<llvm::PointerUnion<Type*, NamedDecl*>, 8> ResultTyElts;
+    
+    for (unsigned i = 0, e = NumSubExprs; i != e; ++i)
+      ResultTyElts.push_back(SubExprs[i]->Ty);
+    
+    ResultTy = S.Context.getTupleType(ResultTyElts.data(), NumSubExprs);
+  }
+  
+  Expr **NewSubExprs = (Expr**)S.Context.Allocate(sizeof(Expr*)*NumSubExprs, 8);
+  memcpy(NewSubExprs, SubExprs, sizeof(Expr*)*NumSubExprs);
+  return new (S.Context) TupleExpr(LPLoc, NewSubExprs, NumSubExprs,
+                                   RPLoc, ResultTy);
 }
 
 NullablePtr<Expr> 
