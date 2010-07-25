@@ -41,8 +41,8 @@ SemaExpr::ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
     return 0;
   }
   
-  // FIXME: If the decl had an "invalid" type, then return the error object to
-  // improve error recovery.
+  // TODO: QOI: If the decl had an "invalid" bit set, then return the error
+  // object to improve error recovery.
   return new (S.Context) DeclRefExpr(D, Loc, D->Ty);
 }
 
@@ -51,20 +51,15 @@ SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
                          const llvm::PointerUnion<Expr*, NamedDecl*> *Elements,
                          unsigned NumElements, bool HasMissingSemi,
                          llvm::SMLoc RBLoc) {
-  // Diagnose cases where there was a ; missing after a 'var'.
-  if (HasMissingSemi && Elements[NumElements-1].is<NamedDecl*>()) {
-    Error(RBLoc, "expected ';' after var declaration");
-    HasMissingSemi = false;
-  }
-  
   // If any of the elements of the braces has a function type (which indicates
   // that a function didn't get called), then produce an error.  We don't do
   // this for the last element in the 'missing semi' case, because the brace
   // expr as a whole has the function result.
+  // TODO: What about tuples which contain functions by-value that are dead?
   for (unsigned i = 0; i != NumElements-(HasMissingSemi ? 1 : 0); ++i)
     if (Elements[i].is<Expr*>() &&
         llvm::isa<FunctionType>(Elements[i].get<Expr*>()->Ty))
-      // FIXME: Add source range.
+      // TODO: QOI: Add source range.
       Error(Elements[i].get<Expr*>()->getLocStart(),
             "expression resolves to an unevaluated function");
   
@@ -79,7 +74,6 @@ SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
     S.Context.Allocate(sizeof(*Elements)*NumElements, 8);
   memcpy(NewElements, Elements, sizeof(*Elements)*NumElements);
   
-  // FIXME: Create the right node.
   return new (S.Context) BraceExpr(LBLoc, NewElements, NumElements,
                                    HasMissingSemi, RBLoc, ResultTy);
 }
@@ -94,7 +88,7 @@ SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
     ResultTy = SubExprs[0]->Ty;
   } else {
     // Compute the result type.
-    llvm::SmallVector<llvm::PointerUnion<Type*, NamedDecl*>, 8> ResultTyElts;
+    llvm::SmallVector<TupleType::TypeOrDecl, 8> ResultTyElts;
     
     for (unsigned i = 0, e = NumSubExprs; i != e; ++i)
       ResultTyElts.push_back(SubExprs[i]->Ty);

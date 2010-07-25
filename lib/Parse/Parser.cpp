@@ -587,6 +587,11 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
     return true;
   }
   
+  // Diagnose cases where there was a ; missing after a 'var'.
+  if (MissingSemiAtEnd && Entries.back().is<NamedDecl*>()) {
+    Error(RBLoc, "expected ';' after var declaration");
+    MissingSemiAtEnd = false;
+  }
   
   Result = S.expr.ActOnBraceExpr(LBLoc, Entries.data(), Entries.size(),
                                  MissingSemiAtEnd, RBLoc);
