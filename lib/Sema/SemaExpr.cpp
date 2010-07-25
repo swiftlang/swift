@@ -57,8 +57,16 @@ SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
     HasMissingSemi = false;
   }
   
-  // TODO: If any of the elements has a function type (which didn't get called),
-  // then we want to produce a semantic error.
+  // If any of the elements of the braces has a function type (which indicates
+  // that a function didn't get called), then produce an error.  We don't do
+  // this for the last element in the 'missing semi' case, because the brace
+  // expr as a whole has the function result.
+  for (unsigned i = 0; i != NumElements-(HasMissingSemi ? 1 : 0); ++i)
+    if (Elements[i].is<Expr*>() &&
+        llvm::isa<FunctionType>(Elements[i].get<Expr*>()->Ty))
+      // FIXME: Add source range.
+      Error(Elements[i].get<Expr*>()->getLocStart(),
+            "expression resolves to an unevaluated function");
   
   Type *ResultTy;
   if (HasMissingSemi)
@@ -134,10 +142,13 @@ SemaExpr::ActOnSequence(Expr **Exprs, unsigned NumExprs) {
     ++i;
   }
   
+  if (NewNumElements == 1)
+    return NewElements[0].get<Expr*>();
   
   // FIXME: Generating a BraceExpr node is a hack here, add a new Expr node.
-  Type *ResultTy = Exprs[NumExprs-1]->Ty;
-  return new (S.Context) BraceExpr(llvm::SMLoc(), NewElements, NewNumElements,
+  Type *ResultTy = NewElements[NewNumElements-1].get<Expr*>()->Ty;
+  return new (S.Context) BraceExpr(NewElements[0].get<Expr*>()->getLocStart(),
+                                   NewElements, NewNumElements,
                                    true, llvm::SMLoc(), ResultTy);
 }
 
