@@ -439,26 +439,17 @@ static bool isStartOfExpr(Token &Tok, Sema &S) {
 ///   expr-single:
 ///     expr-primary (binary-operator expr-primary)*
 bool Parser::ParseExpr(NullablePtr<Expr> &Result, const char *Message) {
-  // Parse the first expr-single.
-  if (ParseExprPrimary(Result, Message) || ParseExprBinaryRHS(Result) ||
-      Result.isNull())
-    return true;
-  
-  // If there was only one expr-single here, return it.
-  if (!isStartOfExpr(Tok, S))
-    return false;
-  
   llvm::SmallVector<Expr*, 8> SequenceExprs;
-  SequenceExprs.push_back(Result.get());
   do {
+    // Parse the expr-single.
     Result = 0;
     if (ParseExprPrimary(Result, Message) || ParseExprBinaryRHS(Result) ||
         Result.isNull())
       return true;
+  
     SequenceExprs.push_back(Result.get());
   } while (isStartOfExpr(Tok, S));
 
-  // FIXME: handle function application here.
   Result = S.expr.ActOnSequence(SequenceExprs.data(), SequenceExprs.size());
   return false;
 }

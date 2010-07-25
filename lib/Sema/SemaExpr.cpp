@@ -101,9 +101,24 @@ SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
 
 llvm::NullablePtr<Expr>
 SemaExpr::ActOnSequence(Expr **Exprs, unsigned NumExprs) {
+  assert(NumExprs != 0 && "Empty sequence isn't possible");
+  
+  // Loop over all of the expressions, splitting instances of function
+  // application out into ApplyExpr nodes.
+
   
   
-  return 0;
+  // FIXME: Generating a BraceExpr node is a hack here, add a new Expr node.
+  llvm::PointerUnion<Expr*, NamedDecl*> *NewElements = 
+    (llvm::PointerUnion<Expr*, NamedDecl*> *)
+      S.Context.Allocate(sizeof(*NewElements)*NumExprs, 8);
+  for (unsigned i = 0; i != NumExprs; ++i)
+    NewElements[i] = Exprs[i];
+  
+  Type *ResultTy = Exprs[NumExprs-1]->Ty;
+  
+  return new (S.Context) BraceExpr(llvm::SMLoc(), NewElements, NumExprs, true,
+                                   llvm::SMLoc(), ResultTy);
 }
 
 
