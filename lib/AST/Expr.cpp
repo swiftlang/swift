@@ -38,6 +38,8 @@ llvm::SMLoc Expr::getLocStart() const {
   case DeclRefExprKind:    return cast<DeclRefExpr>(this)->Loc;
   case TupleExprKind:      return cast<TupleExpr>(this)->LParenLoc;
   case ApplyExprKind:      return cast<ApplyExpr>(this)->Fn->getLocStart();
+  case SequenceExprKind:
+    return cast<SequenceExpr>(this)->Elements[0]->getLocStart();
   case BraceExprKind:      return cast<BraceExpr>(this)->LBLoc;
   case BinaryExprKind:     return cast<BinaryExpr>(this)->LHS->getLocStart();
   }
@@ -57,6 +59,7 @@ void Expr::print(llvm::raw_ostream &OS, unsigned Indent) const {
   case DeclRefExprKind:    return cast<DeclRefExpr>(this)->print(OS, Indent);
   case TupleExprKind:      return cast<TupleExpr>(this)->print(OS, Indent);
   case ApplyExprKind:      return cast<ApplyExpr>(this)->print(OS, Indent);
+  case SequenceExprKind:   return cast<SequenceExpr>(this)->print(OS, Indent);
   case BraceExprKind:      return cast<BraceExpr>(this)->print(OS, Indent);
   case BinaryExprKind:     return cast<BinaryExpr>(this)->print(OS, Indent);
   }
@@ -97,6 +100,16 @@ void ApplyExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS << ')';
 }
 
+void SequenceExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
+  OS.indent(Indent) << "(sequence_expr type='";
+  Ty->print(OS);
+  OS << "'";
+  
+  for (unsigned i = 0, e = NumElements; i != e; ++i)
+    Elements[i]->print(OS << '\n', Indent+1);
+  
+  OS << ')';
+}
 
 void BraceExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(brace_expr type='";

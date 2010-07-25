@@ -106,8 +106,7 @@ llvm::NullablePtr<Expr>
 SemaExpr::ActOnSequence(Expr **Exprs, unsigned NumExprs) {
   assert(NumExprs != 0 && "Empty sequence isn't possible");
 
-  llvm::PointerUnion<Expr*, NamedDecl*> *NewElements = 
-    (llvm::PointerUnion<Expr*, NamedDecl*> *)
+  Expr **NewElements =(Expr**)
     S.Context.Allocate(sizeof(*NewElements)*NumExprs, 8);
   unsigned NewNumElements = 0;
 
@@ -138,20 +137,15 @@ SemaExpr::ActOnSequence(Expr **Exprs, unsigned NumExprs) {
       return 0;
     }
     
-    // FIXME: Do the check.  Need type predicates.
     Exprs[i+1] = new (S.Context) ApplyExpr(Exprs[i], Exprs[i+1],
                                            FT->Result);
     ++i;
   }
   
   if (NewNumElements == 1)
-    return NewElements[0].get<Expr*>();
+    return NewElements[0];
   
-  // FIXME: Generating a BraceExpr node is a hack here, add a new Expr node.
-  Type *ResultTy = NewElements[NewNumElements-1].get<Expr*>()->Ty;
-  return new (S.Context) BraceExpr(NewElements[0].get<Expr*>()->getLocStart(),
-                                   NewElements, NewNumElements,
-                                   true, llvm::SMLoc(), ResultTy);
+  return new (S.Context) SequenceExpr(NewElements, NewNumElements);
 }
 
 

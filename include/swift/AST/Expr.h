@@ -36,6 +36,7 @@ enum ExprKind {
   DeclRefExprKind,
   TupleExprKind,
   ApplyExprKind,
+  SequenceExprKind,
   BraceExprKind,
   BinaryExprKind
 };
@@ -151,6 +152,25 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ApplyExpr *) { return true; }
   static bool classof(const Expr *E) { return E->Kind == ApplyExprKind; }
+};
+
+/// SequenceExpr - a series of expressions which should be evaluated
+/// sequentially, e.g. foo()  bar().  This is like BraceExpr but doesn't have
+/// semicolons, braces, or declarations and can never be empty.
+class SequenceExpr : public Expr {
+public:
+  Expr **Elements;
+  unsigned NumElements;
+  
+  SequenceExpr(Expr **elements, unsigned numElements)
+    : Expr(SequenceExprKind, elements[numElements-1]->Ty),
+      Elements(elements), NumElements(numElements) { }
+
+  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const SequenceExpr *) { return true; }
+  static bool classof(const Expr *E) { return E->Kind == SequenceExprKind; }
 };
   
 /// BraceExpr - A brace enclosed sequence of expressions, like { 4; 5 }.  If the
