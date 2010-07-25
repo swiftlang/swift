@@ -104,6 +104,9 @@ public:
   const TypeOrDecl * const Fields;
   const unsigned NumFields;
   
+  /// getElementType - Return the type of the specified field, looking through
+  /// NamedDecls automatically.
+  Type *getElementType(unsigned FieldNo) const;
   
   
   void print(llvm::raw_ostream &OS) const;

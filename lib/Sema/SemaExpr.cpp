@@ -152,9 +152,31 @@ SemaExpr::ActOnSequence(Expr **Exprs, unsigned NumExprs) {
 NullablePtr<Expr> 
 SemaExpr::ActOnBinaryExpr(Expr *LHS, NamedDecl *OpFn,
                           llvm::SMLoc OpLoc, Expr *RHS) {
+  // Parser verified that OpFn has an Infix Precedence.  Sema verified that OpFn
+  // only has InfixPrecedence if it takes a 2 element tuple as input.
+  assert(OpFn->Attrs.InfixPrecedence != -1 &&
+         "Sema and parser should verify that only binary predicates are used"); 
+  FunctionType *FnTy = llvm::cast<FunctionType>(OpFn->Ty);
+  TupleType *Input = llvm::cast<TupleType>(FnTy->Input);
+  assert(Input->NumFields == 2 && "Sema error validating infix fn type");
+  
+  if (S.Context.getCanonicalType(Input->getElementType(0)) != 
+      S.Context.getCanonicalType(LHS->Ty)) {
+    // TODO: QOI: source range + types.
+    Error(OpLoc, "left hand side of binary operator has wrong type");
+    return 0;
+  }
+    
+  if (S.Context.getCanonicalType(Input->getElementType(1)) != 
+      S.Context.getCanonicalType(RHS->Ty)) {
+    // TODO: QOI: source range + types.
+    Error(OpLoc, "right hand side of binary operator has wrong type");
+    return 0;
+  }
 
+  
   // FIXME: Do sema here to check that the right types are being passed.
   
   return new (S.Context) BinaryExpr(LHS, OpFn, OpLoc, RHS,
-                                    S.Context.IntType);
+                                    FnTy->Result);
 }

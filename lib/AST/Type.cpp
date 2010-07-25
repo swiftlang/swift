@@ -28,6 +28,28 @@ void *Type::operator new(size_t Bytes, ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
+//===----------------------------------------------------------------------===//
+// Various Type Methods.
+//===----------------------------------------------------------------------===//
+
+
+/// getElementType - Return the type of the specified field, looking through
+/// NamedDecls automatically.
+Type *TupleType::getElementType(unsigned FieldNo) const {
+  assert(FieldNo < NumFields && "Invalid field number");
+  
+  if (Type *T = Fields[FieldNo].dyn_cast<Type*>())
+    return T;
+  
+  return Fields[FieldNo].get<NamedDecl*>()->Ty;
+}
+
+
+//===----------------------------------------------------------------------===//
+//  Type printing.
+//===----------------------------------------------------------------------===//
+
+
 void Type::dump() const {
   llvm::errs() << *this << '\n';
 }
@@ -69,3 +91,4 @@ void TupleType::print(llvm::raw_ostream &OS) const {
 void FunctionType::print(llvm::raw_ostream &OS) const {
   OS << *Input << " -> " << *Result;
 }
+
