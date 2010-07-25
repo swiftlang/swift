@@ -130,7 +130,13 @@ SemaExpr::ActOnSequence(Expr **Exprs, unsigned NumExprs) {
     // type matches the expected type of the function.
     FunctionType *FT = llvm::cast<FunctionType>(ExprTy);
     
-    
+    if (S.Context.getCanonicalType(FT->Input) !=
+        S.Context.getCanonicalType(Exprs[i+1]->Ty)) {
+      // FIXME: QOI: Source ranges + print the type.
+      Error(Exprs[i]->getLocStart(),
+            "operator to function invocation has wrong type");
+      return 0;
+    }
     
     // FIXME: Do the check.  Need type predicates.
     Exprs[i+1] = new (S.Context) ApplyExpr(Exprs[i], Exprs[i+1],
