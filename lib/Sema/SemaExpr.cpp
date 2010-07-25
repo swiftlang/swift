@@ -23,6 +23,7 @@
 #include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
 using llvm::NullablePtr;
@@ -102,23 +103,42 @@ SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
 llvm::NullablePtr<Expr>
 SemaExpr::ActOnSequence(Expr **Exprs, unsigned NumExprs) {
   assert(NumExprs != 0 && "Empty sequence isn't possible");
-  
+
+  llvm::PointerUnion<Expr*, NamedDecl*> *NewElements = 
+    (llvm::PointerUnion<Expr*, NamedDecl*> *)
+    S.Context.Allocate(sizeof(*NewElements)*NumExprs, 8);
+  unsigned NewNumElements = 0;
+
   // Loop over all of the expressions, splitting instances of function
   // application out into ApplyExpr nodes.
-
+  for (unsigned i = 0; i != NumExprs; ) {
+    Type *ExprTy = Exprs[i]->Ty;
+    // If this expression in the sequence is just a floating value that isn't
+    // a function, then we have a discarded value, such as "4 5".  Just add it
+    // to the sequence to be computed and move on.  Alternatively, if this is a
+    // function at the end of the sequence, do the same: the sequence's value is
+    // the function.
+    if (!llvm::isa<FunctionType>(ExprTy) ||  // Non-function value.
+        i == NumExprs-1) {                   // Last expr in sequence?
+      NewElements[NewNumElements++] = Exprs[i++];
+      continue;
+    }
+    
+    // Otherwise, we do have a function application.  Check that the argument
+    // type matches the expected type of the function.
+    FunctionType *FT = llvm::cast<FunctionType>(ExprTy);
+    
+    // FIXME: Do the check.  Need type predicates.
+    Exprs[i+1] = new (S.Context) ApplyExpr(Exprs[i], Exprs[i+1],
+                                           FT->Result);
+    ++i;
+  }
   
   
   // FIXME: Generating a BraceExpr node is a hack here, add a new Expr node.
-  llvm::PointerUnion<Expr*, NamedDecl*> *NewElements = 
-    (llvm::PointerUnion<Expr*, NamedDecl*> *)
-      S.Context.Allocate(sizeof(*NewElements)*NumExprs, 8);
-  for (unsigned i = 0; i != NumExprs; ++i)
-    NewElements[i] = Exprs[i];
-  
   Type *ResultTy = Exprs[NumExprs-1]->Ty;
-  
-  return new (S.Context) BraceExpr(llvm::SMLoc(), NewElements, NumExprs, true,
-                                   llvm::SMLoc(), ResultTy);
+  return new (S.Context) BraceExpr(llvm::SMLoc(), NewElements, NewNumElements,
+                                   true, llvm::SMLoc(), ResultTy);
 }
 
 

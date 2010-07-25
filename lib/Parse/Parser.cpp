@@ -450,6 +450,13 @@ bool Parser::ParseExpr(NullablePtr<Expr> &Result, const char *Message) {
     SequenceExprs.push_back(Result.get());
   } while (isStartOfExpr(Tok, S));
 
+  // If there is exactly one element in the sequence, it is a degenerate
+  // sequence that just returns the last value anyway, shortcut ActOnSequence.
+  if (SequenceExprs.size() == 1) {
+    Result = SequenceExprs.back();
+    return false;
+  }
+  
   Result = S.expr.ActOnSequence(SequenceExprs.data(), SequenceExprs.size());
   return false;
 }
