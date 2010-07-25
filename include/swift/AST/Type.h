@@ -39,14 +39,25 @@ namespace swift {
   
 /// Type - Base class for all types in Swift.
 class Type {
+  friend class ASTContext;
   Type(const Type&);                 // DO NOT IMPLEMENT
   void operator=(const Type&);       // DO NOT IMPLEMENT
+  
+  /// CanonicalType - This field is always set to 'this' for canonical types,
+  /// and is otherwise lazily populated by ASTContext when the canonical form of
+  /// a non-canonical type is requested.
+  Type *CanonicalType;
 protected:
-  Type(TypeKind kind) : Kind(kind) {}
+  Type(TypeKind kind) : Kind(kind), CanonicalType(0) {}
+  Type(TypeKind kind, Type *CanType) : Kind(kind), CanonicalType(CanType) {}
 public:
   /// Kind - The discriminator that indicates what subclass of type this is.
   const TypeKind Kind;
 
+  
+  /// isCanonical - Return true if this is a canonical type.
+  bool isCanonical() const { return CanonicalType == this; }
+  
   
   void dump() const;
   void print(llvm::raw_ostream &OS) const;
@@ -69,7 +80,8 @@ public:
 /// BuiltinType - Trivial builtin types.
 class BuiltinType : public Type {
   friend class ASTContext;
-  BuiltinType(TypeKind K) : Type(K) {}
+  // Builtin types are always canonical.
+  BuiltinType(TypeKind K) : Type(K, this) {}
 public:
   
   void print(llvm::raw_ostream &OS) const;
@@ -112,8 +124,8 @@ private:
   friend class ASTContext;
 };
   
-/// FunctionType - A function type has an input and result, e.g. "int -> int" or
-/// (var a : int, var b : int) -> (int, int)
+/// FunctionType - A function type has a single input and result, e.g.
+/// "int -> int" or (var a : int, var b : int) -> (int, int).
 class FunctionType : public Type {
 public:
   Type *const Input;

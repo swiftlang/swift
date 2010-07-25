@@ -15,9 +15,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 using namespace swift;
@@ -62,9 +64,44 @@ Identifier ASTContext::getIdentifier(llvm::StringRef Str) {
   return Identifier(Table.GetOrCreateValue(Str).getKeyData());
 }
 
+
 //===----------------------------------------------------------------------===//
 // Type manipulation routines.
 //===----------------------------------------------------------------------===//
+
+/// getCanonicalType - Get the canonicalized version of a type, stripping off
+/// sugar like argument names and type aliases.
+Type *ASTContext::getCanonicalType(Type *T) {
+  // If the type is itself canonical or if the canonical type was already
+  // computed, just return what we have.
+  if (T->CanonicalType)
+    return T->CanonicalType;
+  
+  switch (T->Kind) {
+  case BuiltinIntKind: assert(0 && "These are always canonical");
+  case TupleTypeKind: {
+    llvm::SmallVector<llvm::PointerUnion<Type*, NamedDecl*>, 8> CanElts;
+    TupleType *TT = llvm::cast<TupleType>(T);
+    CanElts.resize(TT->NumFields);
+    for (unsigned i = 0, e = TT->NumFields; i != e; ++i)
+      if (TT->Fields[i].is<Type*>())
+        CanElts[i] = getCanonicalType(TT->Fields[i].get<Type*>());
+      else
+        CanElts[i] = getCanonicalType(TT->Fields[i].get<NamedDecl*>()->Ty);
+    
+    return T->CanonicalType = getTupleType(CanElts.data(), CanElts.size());
+  }
+    
+  case FunctionTypeKind: {
+    FunctionType *FT = llvm::cast<FunctionType>(T);
+      
+    return T->CanonicalType = getFunctionType(getCanonicalType(FT->Input),
+                                              getCanonicalType(FT->Result));
+  }
+  }
+  assert(0 && "Unreachable");
+}
+
 
 void TupleType::Profile(llvm::FoldingSetNodeID &ID, 
                         const TypeOrDecl *Fields, unsigned NumFields) {
@@ -86,9 +123,10 @@ TupleType *ASTContext::getTupleType(const TupleType::TypeOrDecl *Fields,
   
   TupleTypesMapTy &TupleTypesMap = *(TupleTypesMapTy*)TupleTypes;
   
-  // FIXME: This is completely bogus.  The NamedDecl fields are not being
-  // unique'd so they all get their own addresses.  This should unique all-type
-  // tuples though.
+  // FIXME: This is pointless for types with named fields.  The NamedDecl fields
+  // themselves are not unique'd so they all get their own addresses, which
+  // means that we'll never get a hit here.  This should unique all-type tuples
+  // though.
   void *InsertPos = 0;
   if (TupleType *TT = TupleTypesMap.FindNodeOrInsertPos(ID, InsertPos))
     return TT;
@@ -101,6 +139,21 @@ TupleType *ASTContext::getTupleType(const TupleType::TypeOrDecl *Fields,
   
   TupleType *New = new (*this) TupleType(FieldsCopy, NumFields);
   TupleTypesMap.InsertNode(New, InsertPos);
+  
+  // If all of the elements of the tuple are canonical types, then the tuple is
+  // to.
+  bool IsCanonical = true;
+  for (unsigned i = 0; i != NumFields; ++i)
+    if (!Fields[i].is<Type*>() ||
+        !Fields[i].get<Type*>()->isCanonical()) {
+      IsCanonical = false;
+      break;
+    }
+
+  // If the type is canonical then set the canonical type pointer to itself.
+  if (IsCanonical)
+    New->CanonicalType = New;
+  
   return New;
 }
 
@@ -112,5 +165,10 @@ FunctionType *ASTContext::getFunctionType(Type *Input, Type *Result) {
   if (Entry) return Entry;
   
   Entry = new (*this) FunctionType(Input, Result);
+  
+  // If the input and result types are canonical, then so is the result.
+  if (Input->isCanonical() && Result->isCanonical())
+    Entry->CanonicalType = Entry;
+  
   return Entry;
 }

@@ -21,8 +21,6 @@
 #include "swift/AST/ASTConsumer.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
-#include "swift/AST/Type.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/SmallVector.h"
