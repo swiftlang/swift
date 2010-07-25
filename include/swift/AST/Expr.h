@@ -35,6 +35,7 @@ enum ExprKind {
   IntegerLiteralKind,
   DeclRefExprKind,
   TupleExprKind,
+  ApplyExprKind,
   BraceExprKind,
   
   BinaryAddExprKind,
@@ -139,6 +140,25 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TupleExpr *) { return true; }
   static bool classof(const Expr *E) { return E->Kind == TupleExprKind; }
+};
+
+/// ApplyExpr - Application of an argument to a function, which occurs
+/// syntactically through juxtaposition.  For example, f(1,2) is parsed as
+/// 'f' '(1,2)' which applies a tuple to the function, producing a result.
+class ApplyExpr : public Expr {
+public:
+  /// Fn - The function being invoked.
+  Expr *Fn;
+  /// Argument - The one argument being passed to it.
+  Expr *Arg;
+  ApplyExpr(Expr *fn, Expr *arg, Type *Ty)
+    : Expr(ApplyExprKind, Ty), Fn(fn), Arg(arg) {}
+
+  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ApplyExpr *) { return true; }
+  static bool classof(const Expr *E) { return E->Kind == ApplyExprKind; }
 };
   
 /// BraceExpr - A brace enclosed sequence of expressions, like { 4; 5 }.  If the
