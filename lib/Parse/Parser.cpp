@@ -658,21 +658,9 @@ bool Parser::ParseExprBinaryRHS(NullablePtr<Expr> &Result, unsigned MinPrec) {
     assert(NextTokPrec <= ThisPrec && "Recursion didn't work!");
     
     // Okay, we've finished the parse, form the AST node for the binop now.
-    if (Result.isNonNull() && Leaf.isNonNull()) {
-      // FIXME: Not modeling the parser tree very accurately here!  Should
-      // add a new infix apply expr.
-      Expr *SubExprs[] = { Result.get(), Leaf.get() };
-      Result = S.expr.ActOnTupleExpr(OpLoc, SubExprs, 2, OpLoc);
-
-      // FIXME: this is a ginormous hack.
-      
-      
-      
-      
-      // fIXME: Remove BinExpr AST node + sema.
+    if (Result.isNonNull() && Leaf.isNonNull())
       Result = S.expr.ActOnBinaryExpr(Result.get(), ThisTokOp, OpLoc,
                                       Leaf.get());
-    }
   }
   
   return false;
