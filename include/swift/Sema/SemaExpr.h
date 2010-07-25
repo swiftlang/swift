@@ -49,9 +49,8 @@ public:
                  unsigned NumElements, bool HasMissingSemi, llvm::SMLoc RBLoc);
   llvm::NullablePtr<Expr> ActOnSequence(Expr **Exprs, unsigned NumExprs); 
   
-  llvm::NullablePtr<Expr> ActOnBinaryExpr(/*ExprKind*/unsigned Kind,
-                                          Expr *LHS, llvm::SMLoc OpLoc,
-                                          Expr *RHS);
+  llvm::NullablePtr<Expr> ActOnBinaryExpr(Expr *LHS, NamedDecl *OpFn,
+                                          llvm::SMLoc OpLoc, Expr *RHS);
 };
   
 } // end namespace swift

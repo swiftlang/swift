@@ -136,6 +136,8 @@ SemaExpr::ActOnSequence(Expr **Exprs, unsigned NumExprs) {
     // type matches the expected type of the function.
     FunctionType *FT = llvm::cast<FunctionType>(ExprTy);
     
+    
+    
     // FIXME: Do the check.  Need type predicates.
     Exprs[i+1] = new (S.Context) ApplyExpr(Exprs[i], Exprs[i+1],
                                            FT->Result);
@@ -154,22 +156,11 @@ SemaExpr::ActOnSequence(Expr **Exprs, unsigned NumExprs) {
 
 
 NullablePtr<Expr> 
-SemaExpr::ActOnBinaryExpr(unsigned Kind, Expr *LHS, llvm::SMLoc OpLoc,
-                          Expr *RHS) {
+SemaExpr::ActOnBinaryExpr(Expr *LHS, NamedDecl *OpFn,
+                          llvm::SMLoc OpLoc, Expr *RHS) {
+
+  // FIXME: Do sema here to check that the right types are being passed.
   
-  // For now, the LHS and RHS of all binops have to be ints.
-  if (LHS->Ty != S.Context.IntType) {
-    // TODO, Improve error message, include source range.
-    Error(OpLoc, "LHS subexpression doesn't have int type, it has XXX type");
-    return 0;
-  }
-
-  if (RHS->Ty != S.Context.IntType) {
-    // TODO, Improve error message, include source range.
-    Error(OpLoc, "RHS subexpression doesn't have int type, it has XXX type");
-    return 0;
-  }
-
-  return new (S.Context) BinaryExpr((ExprKind)Kind, LHS, OpLoc, RHS,
+  return new (S.Context) BinaryExpr(LHS, OpFn, OpLoc, RHS,
                                     S.Context.IntType);
 }

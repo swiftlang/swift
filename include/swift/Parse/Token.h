@@ -59,10 +59,6 @@ namespace tok {
     PUNCTUATOR(colon,       ":")
     PUNCTUATOR(semi,        ";")
     PUNCTUATOR(equal,       "=")
-    PUNCTUATOR(plus,        "+")
-    PUNCTUATOR(minus,       "-")
-    PUNCTUATOR(star,        "*")
-    PUNCTUATOR(slash,       "/")
     
     PUNCTUATOR(arrow,       "->")
 #undef PUNCTUATOR

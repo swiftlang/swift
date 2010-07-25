@@ -596,43 +596,15 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
 }
 
 
-/// prec::Level - Binary operator precedences.   Low precedences numbers bind
-/// more weakly than high numbers.
-namespace prec {
-  enum Level {
-    Unknown = -1,       // Not a binary operator.
-    Additive = 0,       // +, -
-    Multiplicative = 1  // *, /
-  };
-}
-
-/// getBinOpPrecedence - Return the precedence of the specified binary operator
-/// token.
-///
-static int getBinOpPrecedence(const Token &Tok, Sema &S) {
-  switch (Tok.getKind()) {
-  default: return prec::Unknown;
-  case tok::plus:
-  case tok::minus:                return prec::Additive;
-  case tok::slash:
-  case tok::star:                 return prec::Multiplicative;
-  case tok::identifier:
-    NamedDecl *ND = S.decl.LookupName(S.Context.getIdentifier(Tok.getText()));
-    if (ND == 0) return prec::Unknown;
-    return ND->Attrs.InfixPrecedence;
-  }
-}
-
-/// getBinOpKind - Return the expression kind of the specified token.
-static ExprKind getBinOpKind(tok::TokenKind Kind) {
-  switch (Kind) {
-  default: assert(0 && "not a binary operator!");
-  case tok::identifier: // FIXME: Remove this nonsense.
-  case tok::plus:                 return BinaryAddExprKind;
-  case tok::minus:                return BinarySubExprKind;
-  case tok::slash:                return BinaryDivExprKind;
-  case tok::star:                 return BinaryMulExprKind;
-  }
+/// getBinOp - Return the NamedDecl for the token if it is an infix binary
+/// operator, otherwise return null.
+static NamedDecl *getBinOp(const Token &Tok, Sema &S) {
+  if (Tok.isNot(tok::identifier))
+    return 0;
+  NamedDecl *ND = S.decl.LookupName(S.Context.getIdentifier(Tok.getText()));
+  if (ND == 0 || ND->Attrs.InfixPrecedence == -1)
+    return 0;
+  return ND;
 }
 
 
@@ -642,16 +614,17 @@ static ExprKind getBinOpKind(tok::TokenKind Kind) {
 ///   expr-binary-rhs:
 ///     (binary-operator expr-primary)*
 bool Parser::ParseExprBinaryRHS(NullablePtr<Expr> &Result, unsigned MinPrec) {
-  int NextTokPrec = getBinOpPrecedence(Tok, S);
+  NamedDecl *NextTokOp = getBinOp(Tok, S);
+  int NextTokPrec = NextTokOp ? NextTokOp->Attrs.InfixPrecedence : -1;
   while (1) {
     // If this token has a lower precedence than we are allowed to parse (e.g.
     // because we are called recursively, or because the token is not a binop),
     // then we are done!
-    if (NextTokPrec < (prec::Level)MinPrec)
+    if (NextTokPrec < (int)MinPrec)
       return false;
     
-    // Consume the operator, saving the operator token for error reporting.
-    Token OpToken = Tok;
+    // Consume the operator, saving the operator location.
+    SMLoc OpLoc = Tok.getLoc();
     ConsumeToken();
     
     // TODO: Support ternary operators some day.
@@ -664,8 +637,11 @@ bool Parser::ParseExprBinaryRHS(NullablePtr<Expr> &Result, unsigned MinPrec) {
     // Remember the precedence of this operator and get the precedence of the
     // operator immediately to the right of the RHS.
     int ThisPrec = NextTokPrec;
-    NextTokPrec = getBinOpPrecedence(Tok, S);
+    NamedDecl *ThisTokOp = NextTokOp;
     
+    NextTokOp = getBinOp(Tok, S);
+    NextTokPrec = NextTokOp ? NextTokOp->Attrs.InfixPrecedence : -1;
+
     // TODO: All operators are left associative at the moment.
     
     // If the next operator binds more tightly with RHS than we do, evaluate the
@@ -676,23 +652,25 @@ bool Parser::ParseExprBinaryRHS(NullablePtr<Expr> &Result, unsigned MinPrec) {
       if (ParseExprBinaryRHS(Leaf, ThisPrec + 1))
         return true;
       
-      NextTokPrec = getBinOpPrecedence(Tok, S);
+      NextTokOp = getBinOp(Tok, S);
+      NextTokPrec = NextTokOp ? NextTokOp->Attrs.InfixPrecedence : -1;
     }
     assert(NextTokPrec <= ThisPrec && "Recursion didn't work!");
     
+    // Okay, we've finished the parse, form the AST node for the binop now.
     if (Result.isNonNull() && Leaf.isNonNull()) {
-      if (OpToken.is(tok::identifier)) {
-        // FIXME: Not modeling the parser tree very accurately here!
-        //Expr *SubExprs[] = { Result.get(), Leaf.get() };
-        //Result = S.expr.ActOnTupleExpr(OpToken.getLoc(), SubExprs, 2,
-        //                               OpToken.getLoc());
-        
-        // FIXME: Need an applyexpr.
-      }
+      // FIXME: Not modeling the parser tree very accurately here!  Should
+      // add a new infix apply expr.
+      Expr *SubExprs[] = { Result.get(), Leaf.get() };
+      Result = S.expr.ActOnTupleExpr(OpLoc, SubExprs, 2, OpLoc);
+
+      // FIXME: this is a ginormous hack.
+      
+      
+      
       
       // fIXME: Remove BinExpr AST node + sema.
-      Result = S.expr.ActOnBinaryExpr(getBinOpKind(OpToken.getKind()),
-                                      Result.get(), OpToken.getLoc(),
+      Result = S.expr.ActOnBinaryExpr(Result.get(), ThisTokOp, OpLoc,
                                       Leaf.get());
     }
   }

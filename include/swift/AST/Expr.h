@@ -37,15 +37,7 @@ enum ExprKind {
   TupleExprKind,
   ApplyExprKind,
   BraceExprKind,
-  
-  BinaryAddExprKind,
-  BinarySubExprKind,
-  BinaryMulExprKind,
-  BinaryDivExprKind,
-  
-  
-  First_BinaryExpr = BinaryAddExprKind,
-  Last_BinaryExpr = BinaryDivExprKind
+  BinaryExprKind
 };
   
   
@@ -188,22 +180,22 @@ public:
   static bool classof(const Expr *E) { return E->Kind == BraceExprKind; }
 };
 
-/// BinaryExpr - Binary expressions like 'x+y'.
+/// BinaryExpr - Infix binary expressions like 'x+y'.
 class BinaryExpr : public Expr {
 public:
   Expr *LHS;
+  NamedDecl *Fn;
   llvm::SMLoc OpLoc;
   Expr *RHS;
   
-  BinaryExpr(ExprKind kind, Expr *lhs, llvm::SMLoc oploc, Expr *rhs, Type *Ty)
-    : Expr(kind, Ty), LHS(lhs), OpLoc(oploc), RHS(rhs) {}
+  BinaryExpr(Expr *lhs, NamedDecl *fn, llvm::SMLoc oploc, Expr *rhs, Type *Ty)
+    : Expr(BinaryExprKind, Ty), LHS(lhs), Fn(fn), OpLoc(oploc), RHS(rhs) {}
 
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BinaryExpr *) { return true; }
-  static bool classof(const Expr *E) {
-    return E->Kind >= First_BinaryExpr && E->Kind <= Last_BinaryExpr; }
+  static bool classof(const Expr *E) { return E->Kind == BinaryExprKind; }
 };
   
 } // end namespace swift

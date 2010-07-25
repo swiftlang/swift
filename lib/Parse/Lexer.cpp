@@ -148,22 +148,24 @@ Restart:
   case ':': return FormToken(tok::colon, TokStart, Result);
   case ';': return FormToken(tok::semi,  TokStart, Result);
   case '=': return FormToken(tok::equal, TokStart, Result);
-  case '+': return FormToken(tok::plus,  TokStart, Result);
   case '-':
     if (CurPtr[0] == '>') { // "->"  
       ++CurPtr;
       return FormToken(tok::arrow, TokStart, Result);
     }
-    return FormToken(tok::minus, TokStart, Result);
-  case '*': return FormToken(tok::star,  TokStart, Result);
+    // '-' is an identifier.
+    return FormToken(tok::identifier, TokStart, Result);
   case '/':
     if (CurPtr[0] == '/') {  // "//"
       SkipSlashSlashComment();
       goto Restart;
     }
       
-    return FormToken(tok::slash, TokStart, Result);
+    // '/' is an identifier.
+    return FormToken(tok::identifier, TokStart, Result);
 
+  case '+':
+  case '*': 
   case '%': return FormToken(tok::identifier, TokStart, Result);
 
   case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G':

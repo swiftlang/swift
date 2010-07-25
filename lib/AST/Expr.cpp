@@ -39,10 +39,7 @@ llvm::SMLoc Expr::getLocStart() const {
   case TupleExprKind:      return cast<TupleExpr>(this)->LParenLoc;
   case ApplyExprKind:      return cast<ApplyExpr>(this)->Fn->getLocStart();
   case BraceExprKind:      return cast<BraceExpr>(this)->LBLoc;
-  case BinaryAddExprKind:
-  case BinarySubExprKind:
-  case BinaryMulExprKind:
-  case BinaryDivExprKind: return cast<BinaryExpr>(this)->getLocStart();
+  case BinaryExprKind:     return cast<BinaryExpr>(this)->LHS->getLocStart();
   }
   
   llvm_unreachable("expression type not handled!");
@@ -61,10 +58,7 @@ void Expr::print(llvm::raw_ostream &OS, unsigned Indent) const {
   case TupleExprKind:      return cast<TupleExpr>(this)->print(OS, Indent);
   case ApplyExprKind:      return cast<ApplyExpr>(this)->print(OS, Indent);
   case BraceExprKind:      return cast<BraceExpr>(this)->print(OS, Indent);
-  case BinaryAddExprKind:
-  case BinarySubExprKind:
-  case BinaryMulExprKind:
-  case BinaryDivExprKind: return cast<BinaryExpr>(this)->print(OS, Indent);
+  case BinaryExprKind:     return cast<BinaryExpr>(this)->print(OS, Indent);
   }
 }
 
@@ -122,7 +116,8 @@ void BraceExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
 
 
 void BinaryExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(binary_expr type='";
+  OS.indent(Indent) << "(binary_expr '";
+  OS << Fn->Name << "' type='";
   Ty->print(OS);
   OS << "'\n";
   LHS->print(OS, Indent+1);
