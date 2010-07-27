@@ -289,7 +289,9 @@ void Parser::ParseDeclAttributeList(DeclAttributes &Attributes) {
   }
 }
 
-/// ParseDeclVar
+/// ParseDeclVar - Parse a 'var' declaration, returning null (and doing no
+/// token skipping) on error.
+///
 ///   decl-var:
 ///      'var' decl-attribute-list? identifier ':' type
 ///      'var' decl-attribute-list? identifier ':' type '=' expression 
@@ -303,25 +305,18 @@ VarDecl *Parser::ParseDeclVar() {
     ParseDeclAttributeList(Attributes);
   
   llvm::StringRef Identifier;
-  if (ParseIdentifier(Identifier, "expected identifier in var declaration")) {
-    // FIXME: Should stop at ',' when in a tuple argument.
-    SkipUntil(tok::semi);
+  if (ParseIdentifier(Identifier, "expected identifier in var declaration"))
     return 0;
-  }
   
   Type *Ty = 0;
   if (ConsumeIf(tok::colon) &&
-      ParseType(Ty, "expected type in var declaration")) {
-    SkipUntil(tok::semi);
+      ParseType(Ty, "expected type in var declaration"))
     return 0;
-  }
   
   NullablePtr<Expr> Init;
   if (ConsumeIf(tok::equal)) {
-    if (ParseExpr(Init, "expected expression in var declaration")) {
-      SkipUntil(tok::semi);
+    if (ParseExpr(Init, "expected expression in var declaration"))
       return 0;
-    }
   
     // If there was an expression, but it had a parse error, give the var decl
     // an artificial int type to avoid chained errors.
