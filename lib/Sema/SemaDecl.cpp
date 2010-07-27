@@ -106,7 +106,6 @@ VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name,
       Error(VarLoc, "variable initializer's type ('TODO') does not match "
             "specified type 'TODO'");
       Ty = Init->Ty;
-      return 0;
     }
   }
   
@@ -125,7 +124,15 @@ ActOnFuncDecl(llvm::SMLoc FuncLoc, llvm::StringRef Name,
               Type *Ty, Expr *Body, DeclAttributes &Attrs) {
   assert(Ty && "Type not specified?");
 
-  // FIXME: Validate that the body's type matches the function's type.
+  // Validate that the body's type matches the function's type.
+  if (Expr *BodyE = S.expr.HandleConversionToType(Body, Ty))
+    Body = BodyE;
+  else {
+    // FIXME: Improve this to include the actual types!
+    Error(FuncLoc, "func body's's type ('TODO') does not match "
+          "specified type 'TODO'");
+    return 0;
+  }
   
   // Validate attributes.
   ValidateAttributes(Attrs, Ty, *this);
