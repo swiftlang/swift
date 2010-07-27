@@ -183,6 +183,7 @@ void Parser::ParseTranslationUnit() {
 ///   decl-top-level:
 ///     ';'
 ///     decl-var ';'
+///     decl-func
 Decl *Parser::ParseDeclTopLevel() {
   switch (Tok.getKind()) {
   default:
@@ -200,6 +201,13 @@ Decl *Parser::ParseDeclTopLevel() {
       // On successful parse, eat the ;
       ParseToken(tok::semi, "expected ';' at end of var declaration",
                  tok::semi);
+      return D;
+    }
+    return 0;
+  case tok::kw_func:
+    if (NamedDecl *D = ParseDeclFunc()) {
+      // Enter the function into the current scope.
+      S.decl.AddToScope(D);
       return D;
     }
     return 0;
@@ -320,6 +328,122 @@ VarDecl *Parser::ParseDeclVar() {
   
   return S.decl.ActOnVarDecl(VarLoc, Identifier, Ty, Init.getPtrOrNull(),
                              Attributes);
+}
+
+/// ParseDeclFunc
+///   decl-func:
+///     'func' decl-attribute-list? identifier arg-list ('->' type)? expr-brace
+///     'func' decl-attribute-list? identifier arg-list ('->' type)? ';'
+///   arg-list:
+///     '(' ')'
+///     '(' arg-func-formal (',' arg-func-formal)* ')'
+///   arg-func-formal:
+///     identifier? ':' type
+///
+/// TODO: eventually allow default arguments and attributes on arguments.
+///
+NamedDecl *Parser::ParseDeclFunc() {
+  SMLoc FuncLoc = Tok.getLoc();
+  ConsumeToken(tok::kw_func);
+
+  DeclAttributes Attributes;
+  // FIXME: Add immutable attribute.
+  if (Tok.is(tok::l_square))
+    ParseDeclAttributeList(Attributes);
+
+  llvm::StringRef Identifier;
+  if (ParseIdentifier(Identifier, "expected identifier in func declaration")) {
+    // FIXME: Should stop at end of {}!
+    SkipUntil(tok::semi);
+    return 0;
+  }
+  
+  SMLoc LPLoc = Tok.getLoc();
+  if (ParseToken(tok::l_paren,
+                 "expected '(' in argument list of func declaration")) {
+    // FIXME: Should stop at end of {}!
+    SkipUntil(tok::semi);
+    return 0;
+  }
+
+  Type *ArgListTy;
+  if (Tok.is(tok::r_paren)) {
+    ArgListTy = S.Context.VoidType;
+  } else {
+    llvm::SmallVector<llvm::PointerUnion<Type*, NamedDecl*>, 8> Elements;
+    
+    
+    // Read the comma-separated argument list.
+    do {
+      llvm::StringRef ParamIdentifier;
+      if (Tok.is(tok::identifier)) {
+        ParamIdentifier = Tok.getText();
+        ConsumeToken(tok::identifier);
+      }
+      
+      Type *ParamType = 0;
+      if (ParseToken(tok::colon,
+                     "expected ':' in argument list of func declaration") ||
+          ParseType(ParamType,
+                    "expected type in argument list of func declaration")) {
+        // FIXME: Should stop at end of {}!
+        SkipUntil(tok::semi);
+        return 0;
+      }
+      
+      DeclAttributes ParamAttributes;
+      VarDecl *ParamDecl = 
+        S.decl.ActOnVarDecl(SMLoc(), ParamIdentifier, ParamType, 0,
+                            ParamAttributes);
+
+      Elements.push_back(ParamDecl);
+    } while (ConsumeIf(tok::comma));
+    
+    ArgListTy = 
+      S.type.ActOnTupleType(LPLoc, Elements.data(), Elements.size(),
+                            Tok.getLoc());
+  }
+  
+  SMLoc RPLoc = Tok.getLoc();
+  if (ParseToken(tok::r_paren,
+                 "expected ')' at end of func declaration argument list",
+                 // FIXME: Should stop at end of {}!
+                 tok::semi)) {
+    Note(LPLoc, "to match this opening '('");
+    return 0;
+  }
+  
+  // If there is a return type, parse it.
+  Type *RetTy = S.Context.VoidType;
+  SMLoc ArrowLoc = Tok.getLoc();
+  if (ConsumeIf(tok::arrow)) {
+    if (ParseType(RetTy, "expected func declaration return type"))
+      return 0;
+  } else {
+    ArrowLoc = SMLoc();
+  }
+  
+  // Build the function type.
+  Type *FuncTy = S.type.ActOnFunctionType(ArgListTy, ArrowLoc, RetTy);
+  
+  // If this is a declaration, we're done.
+  if (ConsumeIf(tok::semi))
+    return S.decl.ActOnFuncDecl(FuncLoc, Identifier, FuncTy, 0,
+                                Attributes);
+
+  // Otherwise, we must have a brace literal.
+  if (Tok.isNot(tok::l_brace)) {
+    Error(Tok.getLoc(), "expected function body starting with '{'");
+    // FIXME: Should stop at end of {}!
+    return 0;
+  }
+
+  llvm::NullablePtr<Expr> Body;
+  if (ParseExprBrace(Body))
+    return 0;
+
+  return S.decl.ActOnFuncDecl(FuncLoc, Identifier, FuncTy, Body.getPtrOrNull(),
+                              Attributes);
 }
 
 //===----------------------------------------------------------------------===//

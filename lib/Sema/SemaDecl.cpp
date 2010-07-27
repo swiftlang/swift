@@ -112,3 +112,11 @@ VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name,
   return new (S.Context) VarDecl(VarLoc, S.Context.getIdentifier(Name),
                                  Ty, Init, Attrs);
 }
+
+FuncDecl *SemaDecl::
+ActOnFuncDecl(llvm::SMLoc FuncLoc, llvm::StringRef Name,
+              Type *Ty, Expr *Body, DeclAttributes &Attrs) {
+  
+  return 0;
+}
+

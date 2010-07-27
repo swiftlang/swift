@@ -43,6 +43,7 @@ namespace tok {
 //    KEYWORD(float)
     
     KEYWORD(var)
+    KEYWORD(func)
 
 //    KEYWORD(foreach)
 #undef KEYWORD

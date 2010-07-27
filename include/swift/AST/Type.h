@@ -48,8 +48,8 @@ class Type {
   /// a non-canonical type is requested.
   Type *CanonicalType;
 protected:
-  Type(TypeKind kind) : Kind(kind), CanonicalType(0) {}
-  Type(TypeKind kind, Type *CanType) : Kind(kind), CanonicalType(CanType) {}
+  Type(TypeKind kind) : CanonicalType(0), Kind(kind) {}
+  Type(TypeKind kind, Type *CanType) : CanonicalType(CanType), Kind(kind) {}
 public:
   /// Kind - The discriminator that indicates what subclass of type this is.
   const TypeKind Kind;

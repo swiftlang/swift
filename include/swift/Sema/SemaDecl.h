@@ -29,6 +29,7 @@ namespace llvm {
 namespace swift {
   class Expr;
   class Type;
+  class FuncDecl;
   class VarDecl;
   class NamedDecl;
   class Scope;
@@ -64,6 +65,8 @@ public:
   
   VarDecl *ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name, Type *Ty,
                         Expr *Init, DeclAttributes &Attrs);
+  FuncDecl *ActOnFuncDecl(llvm::SMLoc FuncLoc, llvm::StringRef Name,
+                          Type *Ty, Expr *Body, DeclAttributes &Attrs);
 };
   
 } // end namespace swift
