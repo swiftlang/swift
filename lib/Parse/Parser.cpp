@@ -334,7 +334,7 @@ VarDecl *Parser::ParseDeclVar() {
 /// caller handles this case and does recovery as appropriate.
 ///
 ///   decl-func:
-///     'func' decl-attribute-list? identifier arg-list ('->' type)? expr
+///     'func' decl-attribute-list? identifier arg-list ('->' type)? '='? expr
 ///     'func' decl-attribute-list? identifier arg-list ('->' type)? ';'
 ///   arg-list:
 ///     '(' ')'
@@ -423,7 +423,10 @@ FuncDecl *Parser::ParseDeclFunc() {
     return S.decl.ActOnFuncDecl(FuncLoc, Identifier, FuncTy, 0,
                                 Attributes);
 
-  // Otherwise, we must have an expression.
+  // Otherwise, we must have an expression.  Eat the optional '=' if present.
+  ConsumeIf(tok::equal);
+
+  // Then parse the expression.
   llvm::NullablePtr<Expr> Body;
   if (ParseExpr(Body, "expected expression parsing func body") ||
       Body.isNull())
