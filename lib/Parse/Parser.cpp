@@ -205,7 +205,7 @@ Decl *Parser::ParseDeclTopLevel() {
     }
     return 0;
   case tok::kw_func:
-    if (NamedDecl *D = ParseDeclFunc()) {
+    if (FuncDecl *D = ParseDeclFunc()) {
       // Enter the function into the current scope.
       S.decl.AddToScope(D);
       return D;
@@ -332,7 +332,7 @@ VarDecl *Parser::ParseDeclVar() {
 
 /// ParseDeclFunc
 ///   decl-func:
-///     'func' decl-attribute-list? identifier arg-list ('->' type)? expr-brace
+///     'func' decl-attribute-list? identifier arg-list ('->' type)? expr
 ///     'func' decl-attribute-list? identifier arg-list ('->' type)? ';'
 ///   arg-list:
 ///     '(' ')'
@@ -341,11 +341,8 @@ VarDecl *Parser::ParseDeclVar() {
 ///     identifier? ':' type
 ///
 /// TODO: eventually allow default arguments and attributes on arguments.
-/// TODO: No specific reason to force expr-brace here, could take any
-///   expression, which might be nice for trivial functions.  Actually, it
-///   interacts well with sequence expressions.  
 ///
-NamedDecl *Parser::ParseDeclFunc() {
+FuncDecl *Parser::ParseDeclFunc() {
   SMLoc FuncLoc = Tok.getLoc();
   ConsumeToken(tok::kw_func);
 
@@ -434,16 +431,13 @@ NamedDecl *Parser::ParseDeclFunc() {
     return S.decl.ActOnFuncDecl(FuncLoc, Identifier, FuncTy, 0,
                                 Attributes);
 
-  // Otherwise, we must have a brace literal.
-  if (Tok.isNot(tok::l_brace)) {
-    Error(Tok.getLoc(), "expected function body starting with '{'");
+  // Otherwise, we must have an expression.
+  llvm::NullablePtr<Expr> Body;
+  if (ParseExpr(Body, "expected expression parsing func body") ||
+      Body.isNull()) {
     // FIXME: Should stop at end of {}!
     return 0;
   }
-
-  llvm::NullablePtr<Expr> Body;
-  if (ParseExprBrace(Body))
-    return 0;
 
   return S.decl.ActOnFuncDecl(FuncLoc, Identifier, FuncTy, Body.getPtrOrNull(),
                               Attributes);

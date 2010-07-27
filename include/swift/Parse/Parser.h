@@ -106,7 +106,7 @@ private:
   void ParseDeclAttributeList(DeclAttributes &Attributes);
   bool ParseDeclAttribute(DeclAttributes &Attributes);
   VarDecl *ParseDeclVar();
-  NamedDecl *ParseDeclFunc();
+  FuncDecl *ParseDeclFunc();
   
   // Type Parsing
   bool ParseType(Type *&Result, const char *Message = 0);
