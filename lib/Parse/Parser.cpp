@@ -677,8 +677,7 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
     if (ParseExprOrDeclVar(Entries.back())) {
       if (Tok.is(tok::semi)) {
         Entries.pop_back();
-        ConsumeToken(tok::semi);
-        continue;
+        continue;  // Consume the ';' and keep going.
       }
       
       // FIXME: Improve error recovery.
