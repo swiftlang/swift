@@ -124,14 +124,17 @@ ActOnFuncDecl(llvm::SMLoc FuncLoc, llvm::StringRef Name,
               Type *Ty, Expr *Body, DeclAttributes &Attrs) {
   assert(Ty && "Type not specified?");
 
-  // Validate that the body's type matches the function's type.
-  if (Expr *BodyE = S.expr.HandleConversionToType(Body, Ty))
-    Body = BodyE;
-  else {
-    // FIXME: Improve this to include the actual types!
-    Error(FuncLoc, "func body's's type ('TODO') does not match "
-          "specified type 'TODO'");
-    return 0;
+  // Validate that the body's type matches the function's type if this isn't a
+  // external function.
+  if (Body) {
+    if (Expr *BodyE = S.expr.HandleConversionToType(Body, Ty))
+      Body = BodyE;
+    else {
+      // FIXME: Improve this to include the actual types!
+      Error(FuncLoc, "func body's's type ('TODO') does not match "
+            "specified type 'TODO'");
+      return 0;
+    }
   }
   
   // Validate attributes.
