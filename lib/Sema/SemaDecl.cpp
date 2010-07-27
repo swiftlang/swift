@@ -67,6 +67,22 @@ NamedDecl *SemaDecl::LookupName(Identifier Name) {
 // Declaration handling.
 //===----------------------------------------------------------------------===//
 
+/// ValidateAttributes - Check that the func/var declaration attributes are ok.
+static void ValidateAttributes(DeclAttributes &Attrs, Type *Ty, SemaDecl &SD) {
+  // If the decl has an infix precedence specified, then it must be a function
+  // whose input is a two element tuple.
+  if (Attrs.InfixPrecedence != -1) {
+    bool IsError = true;
+    if (FunctionType *FT = llvm::dyn_cast<FunctionType>(Ty))
+      if (TupleType *TT = llvm::dyn_cast<TupleType>(FT->Input))
+        IsError = TT->NumFields != 2;
+    if (IsError) {
+      SD.Error(Attrs.LSquareLoc, "function with 'infix' specified must take "
+               "a two element tuple as input");
+      Attrs.InfixPrecedence = -1;
+    }
+  }
+}
 
 VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name,
                                 Type *Ty, Expr *Init, DeclAttributes &Attrs) {
@@ -94,20 +110,7 @@ VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name,
     Ty = Init->Ty;
   
   // Validate attributes.
-  
-  // If the decl has an infix precedence specified, then it must be a function
-  // whose input is a two element tuple.
-  if (Attrs.InfixPrecedence != -1) {
-    bool IsError = true;
-    if (FunctionType *FT = llvm::dyn_cast<FunctionType>(Ty))
-      if (TupleType *TT = llvm::dyn_cast<TupleType>(FT->Input))
-        IsError = TT->NumFields != 2;
-    if (IsError) {
-      Error(Attrs.LSquareLoc, "function with 'infix' specified must take "
-            "a two element tuple as input");
-      Attrs.InfixPrecedence = -1;
-    }
-  }
+  ValidateAttributes(Attrs, Ty, *this);
   
   return new (S.Context) VarDecl(VarLoc, S.Context.getIdentifier(Name),
                                  Ty, Init, Attrs);
@@ -116,7 +119,14 @@ VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name,
 FuncDecl *SemaDecl::
 ActOnFuncDecl(llvm::SMLoc FuncLoc, llvm::StringRef Name,
               Type *Ty, Expr *Body, DeclAttributes &Attrs) {
+  assert(Ty && "Type not specified?");
+
+  // FIXME: Validate that the body's type matches the function's type.
   
-  return 0;
+  // Validate attributes.
+  ValidateAttributes(Attrs, Ty, *this);
+
+  return new (S.Context) FuncDecl(FuncLoc, S.Context.getIdentifier(Name),
+                                  Ty, Body, Attrs);
 }
 

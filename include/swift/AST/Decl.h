@@ -113,7 +113,7 @@ public:
 
   VarDecl(llvm::SMLoc varloc, Identifier name, Type *ty, Expr *init,
           const DeclAttributes &attrs)
-    : NamedDecl(name, ty, init, attrs, VarDeclKind) {}
+    : NamedDecl(name, ty, init, attrs, VarDeclKind), VarLoc(varloc) {}
 
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
   
@@ -129,8 +129,9 @@ class FuncDecl : public NamedDecl {
 public:
   llvm::SMLoc FuncLoc;    // Location of the 'func' token.
 
-  // FIXME: implement me.
-  
+  FuncDecl(llvm::SMLoc funcloc, Identifier name, Type *ty, Expr *init,
+          const DeclAttributes &attrs)
+    : NamedDecl(name, ty, init, attrs, VarDeclKind), FuncLoc(funcloc) {}
   
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
 
