@@ -98,12 +98,16 @@ VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name,
   
   // If both a type and an initializer are specified, make sure the
   // initializer's type agrees with the (redundant) type.
-  if (Ty && Init && Init->Ty != Ty) {
-    // FIXME: Improve this to include the actual types!
-    Error(VarLoc, "variable initializer's type ('TODO') does not match "
-          "specified type 'TODO'");
-    Ty = Init->Ty;
-    return 0;
+  if (Ty && Init) {
+    if (Expr *InitE = S.expr.HandleConversionToType(Init, Ty))
+      Init = InitE;
+    else {
+      // FIXME: Improve this to include the actual types!
+      Error(VarLoc, "variable initializer's type ('TODO') does not match "
+            "specified type 'TODO'");
+      Ty = Init->Ty;
+      return 0;
+    }
   }
   
   if (Ty == 0)

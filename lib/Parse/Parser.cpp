@@ -341,6 +341,9 @@ VarDecl *Parser::ParseDeclVar() {
 ///     identifier? ':' type
 ///
 /// TODO: eventually allow default arguments and attributes on arguments.
+/// TODO: No specific reason to force expr-brace here, could take any
+///   expression, which might be nice for trivial functions.  Actually, it
+///   interacts well with sequence expressions.  
 ///
 NamedDecl *Parser::ParseDeclFunc() {
   SMLoc FuncLoc = Tok.getLoc();

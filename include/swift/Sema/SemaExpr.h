@@ -29,6 +29,7 @@ namespace llvm {
 namespace swift {
   class Sema;
   class Expr;
+  class Type;
   class NamedDecl;
   
 /// SemaExpr - Semantic analysis support for Swift expressions.
@@ -36,6 +37,10 @@ class SemaExpr : public SemaBase {
 public:
   explicit SemaExpr(Sema &S) : SemaBase(S) {}
   
+  // Utility Functions
+  Expr *HandleConversionToType(Expr *E, Type *Ty);
+
+  // Action Implementations
   llvm::NullablePtr<Expr>
   ActOnNumericConstant(llvm::StringRef Text, llvm::SMLoc Loc);
   llvm::NullablePtr<Expr>

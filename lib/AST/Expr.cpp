@@ -41,6 +41,7 @@ llvm::SMLoc Expr::getLocStart() const {
   case SequenceExprKind:
     return cast<SequenceExpr>(this)->Elements[0]->getLocStart();
   case BraceExprKind:      return cast<BraceExpr>(this)->LBLoc;
+  case ClosureExprKind:    return cast<ClosureExpr>(this)->Input->getLocStart();
   case BinaryExprKind:     return cast<BinaryExpr>(this)->LHS->getLocStart();
   }
   
@@ -61,6 +62,7 @@ void Expr::print(llvm::raw_ostream &OS, unsigned Indent) const {
   case ApplyExprKind:      return cast<ApplyExpr>(this)->print(OS, Indent);
   case SequenceExprKind:   return cast<SequenceExpr>(this)->print(OS, Indent);
   case BraceExprKind:      return cast<BraceExpr>(this)->print(OS, Indent);
+  case ClosureExprKind:    return cast<ClosureExpr>(this)->print(OS, Indent);
   case BinaryExprKind:     return cast<BinaryExpr>(this)->print(OS, Indent);
   }
 }
@@ -127,6 +129,13 @@ void BraceExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS << ')';
 }
 
+void ClosureExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
+  OS.indent(Indent) << "(closure_expr type='";
+  Ty->print(OS);
+  OS << "'\n";
+  Input->print(OS, Indent+1);
+  OS << ')';
+}
 
 void BinaryExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(binary_expr '";

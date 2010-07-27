@@ -38,6 +38,7 @@ enum ExprKind {
   ApplyExprKind,
   SequenceExprKind,
   BraceExprKind,
+  ClosureExprKind,
   BinaryExprKind
 };
   
@@ -200,6 +201,24 @@ public:
   static bool classof(const Expr *E) { return E->Kind == BraceExprKind; }
 };
 
+  
+/// ClosureExpr - An expression which is implicitly created by using an
+/// expression in a function context where the expression's type matches the
+/// result of the function.
+class ClosureExpr : public Expr {
+public:
+  Expr *Input;
+  
+  ClosureExpr(Expr *input, Type *ResultTy)
+    : Expr(ClosureExprKind, ResultTy), Input(input) {}
+
+  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ClosureExpr *) { return true; }
+  static bool classof(const Expr *E) { return E->Kind == ClosureExprKind; }
+};
+  
 /// BinaryExpr - Infix binary expressions like 'x+y'.
 class BinaryExpr : public Expr {
 public:

@@ -28,6 +28,29 @@
 using namespace swift;
 using llvm::NullablePtr;
 
+//===----------------------------------------------------------------------===//
+// Utility Functions
+//===----------------------------------------------------------------------===//
+
+Expr *SemaExpr::HandleConversionToType(Expr *E, Type *OrigDestTy) {
+  // If we have an exact match of the (canonical) types, we're done.
+  Type *DestTy = S.Context.getCanonicalType(OrigDestTy);
+  Type *ETy = S.Context.getCanonicalType(E->Ty);
+  if (ETy == DestTy) return E;
+
+  // Otherwise, check to see if this is an auto-closure case.  This case happens
+  // when we convert an expression E to a function type whose result is E's
+  // type.
+  if (FunctionType *FT = llvm::dyn_cast<FunctionType>(DestTy))
+    if (FT->Result == ETy)
+      return new (S.Context) ClosureExpr(E, OrigDestTy);
+  return 0;
+}
+
+//===----------------------------------------------------------------------===//
+// Action Implementations
+//===----------------------------------------------------------------------===//
+
 NullablePtr<Expr> SemaExpr::ActOnNumericConstant(llvm::StringRef Text,
                                                  llvm::SMLoc Loc) {
   return new (S.Context) IntegerLiteral(Text, Loc, S.Context.IntType);
@@ -129,17 +152,16 @@ SemaExpr::ActOnSequence(Expr **Exprs, unsigned NumExprs) {
     // type matches the expected type of the function.
     FunctionType *FT = llvm::cast<FunctionType>(ExprTy);
     
-    if (S.Context.getCanonicalType(FT->Input) !=
-        S.Context.getCanonicalType(Exprs[i+1]->Ty)) {
-      // FIXME: QOI: Source ranges + print the type.
-      Error(Exprs[i]->getLocStart(),
-            "operator to function invocation has wrong type");
-      return 0;
+    if (Expr *Arg = HandleConversionToType(Exprs[i+1], FT->Input)) {
+      Exprs[i+1] = new (S.Context) ApplyExpr(Exprs[i], Arg, FT->Result);
+      ++i;
+      continue;
     }
     
-    Exprs[i+1] = new (S.Context) ApplyExpr(Exprs[i], Exprs[i+1],
-                                           FT->Result);
-    ++i;
+    // FIXME: QOI: Source ranges + print the type.
+    Error(Exprs[i]->getLocStart(),
+          "operator to function invocation has wrong type");
+    return 0;
   }
   
   if (NewNumElements == 1)
@@ -159,23 +181,23 @@ SemaExpr::ActOnBinaryExpr(Expr *LHS, NamedDecl *OpFn,
   FunctionType *FnTy = llvm::cast<FunctionType>(OpFn->Ty);
   TupleType *Input = llvm::cast<TupleType>(FnTy->Input);
   assert(Input->NumFields == 2 && "Sema error validating infix fn type");
-  
-  if (S.Context.getCanonicalType(Input->getElementType(0)) != 
-      S.Context.getCanonicalType(LHS->Ty)) {
+
+  // Verify that the LHS/RHS have the right type and do conversions as needed.
+  if (Expr *LHSI = HandleConversionToType(LHS, Input->getElementType(0)))
+    LHS = LHSI;
+  else {
     // TODO: QOI: source range + types.
     Error(OpLoc, "left hand side of binary operator has wrong type");
     return 0;
   }
     
-  if (S.Context.getCanonicalType(Input->getElementType(1)) != 
-      S.Context.getCanonicalType(RHS->Ty)) {
+  if (Expr *RHSI = HandleConversionToType(RHS, Input->getElementType(1)))
+    RHS = RHSI;
+  else {
     // TODO: QOI: source range + types.
     Error(OpLoc, "right hand side of binary operator has wrong type");
     return 0;
   }
-
-  
-  // FIXME: Do sema here to check that the right types are being passed.
   
   return new (S.Context) BinaryExpr(LHS, OpFn, OpLoc, RHS,
                                     FnTy->Result);
