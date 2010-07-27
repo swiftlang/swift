@@ -42,8 +42,8 @@ Expr *SemaExpr::HandleConversionToType(Expr *E, Type *OrigDestTy) {
   // when we convert an expression E to a function type whose result is E's
   // type.
   if (FunctionType *FT = llvm::dyn_cast<FunctionType>(DestTy))
-    if (FT->Result == ETy)
-      return new (S.Context) ClosureExpr(E, OrigDestTy);
+    if (Expr *ERes = HandleConversionToType(E, FT->Result))
+      return new (S.Context) ClosureExpr(ERes, OrigDestTy);
   return 0;
 }
 
