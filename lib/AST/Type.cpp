@@ -43,7 +43,7 @@ Type *TupleType::getElementType(unsigned FieldNo) const {
   
   return Fields[FieldNo].get<NamedDecl*>()->Ty;
 }
-
+ 
 
 //===----------------------------------------------------------------------===//
 //  Type printing.
