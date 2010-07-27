@@ -18,6 +18,7 @@
 #define SWIFT_AST_EXPR_H
 
 #include "llvm/Support/SMLoc.h"
+#include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace llvm {
@@ -30,6 +31,7 @@ namespace swift {
   class ASTContext;
   class Type;
   class NamedDecl;
+  class VarDecl;
   
 enum ExprKind {
   IntegerLiteralKind,
@@ -204,15 +206,29 @@ public:
   
 /// ClosureExpr - An expression which is implicitly created by using an
 /// expression in a function context where the expression's type matches the
-/// result of the function.
+/// result of the function.  The Decl list indicates which decls the formal
+/// arguments are bound to.
 class ClosureExpr : public Expr {
 public:
   Expr *Input;
   
-  ClosureExpr(Expr *input, Type *ResultTy)
-    : Expr(ClosureExprKind, ResultTy), Input(input) {}
+  /// AnonArgList - This specifies the decls that named anonymous arguments are
+  /// bound by this closure.  Note that elements of this list may be null when
+  /// the argument is not bound to an argument and that this list may be null if
+  /// named anonymous arguments are not used.  If the ArgList pointer is
+  /// non-null, then its length is indicated by getNumArgs().
+  llvm::NullablePtr<VarDecl> *ArgList;
+  
+  ClosureExpr(Expr *input, llvm::NullablePtr<VarDecl> *arglist, Type *ResultTy)
+    : Expr(ClosureExprKind, ResultTy), Input(input), ArgList(arglist) {}
 
+  /// getNumArgs - Return the number of arguments that this closure expr takes.
+  /// This is the length of the ArgList.
+  unsigned getNumArgs() const;
+  
+  
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ClosureExpr *) { return true; }

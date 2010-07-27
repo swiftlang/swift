@@ -24,6 +24,10 @@
 using namespace swift;
 using llvm::cast;
 
+//===----------------------------------------------------------------------===//
+// Expr methods.
+//===----------------------------------------------------------------------===//
+
 // Only allow allocation of Stmts using the allocator in ASTContext.
 void *Expr::operator new(size_t Bytes, ASTContext &C,
                          unsigned Alignment) throw() {
@@ -48,6 +52,25 @@ llvm::SMLoc Expr::getLocStart() const {
   llvm_unreachable("expression type not handled!");
 }
 
+//===----------------------------------------------------------------------===//
+// Support methods for Exprs.
+//===----------------------------------------------------------------------===//
+
+/// getNumArgs - Return the number of arguments that this closure expr takes.
+/// This is the length of the ArgList.
+unsigned ClosureExpr::getNumArgs() const {
+  // FIXME: This should desugar the type if needed!
+  Type *Input = cast<FunctionType>(Ty)->Input;
+  
+  if (TupleType *TT = llvm::dyn_cast<TupleType>(Input))
+    return TT->NumFields;
+  return 1;  
+}
+
+
+//===----------------------------------------------------------------------===//
+// Printing for Expr and all subclasses.
+//===----------------------------------------------------------------------===//
 
 void Expr::dump() const {
   print(llvm::errs());

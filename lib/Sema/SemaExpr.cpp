@@ -20,7 +20,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
-#include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
@@ -43,7 +42,7 @@ Expr *SemaExpr::HandleConversionToType(Expr *E, Type *OrigDestTy) {
   // type.
   if (FunctionType *FT = llvm::dyn_cast<FunctionType>(DestTy))
     if (Expr *ERes = HandleConversionToType(E, FT->Result))
-      return new (S.Context) ClosureExpr(ERes, OrigDestTy);
+      return new (S.Context) ClosureExpr(ERes, 0, OrigDestTy);
   return 0;
 }
 
