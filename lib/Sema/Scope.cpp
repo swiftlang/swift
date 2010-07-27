@@ -30,4 +30,3 @@ Scope::~Scope() {
   assert(SD.CurScope == this && "Scope mismatch");
   SD.CurScope = PrevScope;
 }
- 
