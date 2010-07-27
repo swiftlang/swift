@@ -57,6 +57,9 @@ $(RecursiveTargets)::
 	fi
 endif
 
+wc::
+	wc `find . -name \*.cpp -o -name \*.h`
+
 test::
 	@ $(MAKE) -C test
 
