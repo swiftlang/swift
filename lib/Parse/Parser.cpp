@@ -188,8 +188,7 @@ Decl *Parser::ParseDeclTopLevel() {
   switch (Tok.getKind()) {
   default:
     Error(Tok.getLoc(), "expected a top level declaration");
-    SkipUntil(tok::semi);
-    return 0;
+    break;
   case tok::semi:
     ConsumeToken(tok::semi);
     return 0; // Could do a top-level semi decl.
@@ -203,15 +202,21 @@ Decl *Parser::ParseDeclTopLevel() {
                  tok::semi);
       return D;
     }
-    return 0;
+    break;
   case tok::kw_func:
     if (FuncDecl *D = ParseDeclFunc()) {
       // Enter the function into the current scope.
       S.decl.AddToScope(D);
       return D;
     }
-    return 0;
+    break;
   }
+  
+  // On error, skip to the next top level declaration.
+  while (Tok.isNot(tok::eof) && Tok.isNot(tok::kw_var) &&
+         Tok.isNot(tok::kw_func))
+    ConsumeToken();
+  return 0;
 }
 
 
@@ -330,7 +335,9 @@ VarDecl *Parser::ParseDeclVar() {
                              Attributes);
 }
 
-/// ParseDeclFunc
+/// ParseDeclFunc - Parse a 'func' declaration, returning null on error.  The
+/// caller handles this case and does recovery as appropriate.
+///
 ///   decl-func:
 ///     'func' decl-attribute-list? identifier arg-list ('->' type)? expr
 ///     'func' decl-attribute-list? identifier arg-list ('->' type)? ';'
@@ -352,19 +359,13 @@ FuncDecl *Parser::ParseDeclFunc() {
     ParseDeclAttributeList(Attributes);
 
   llvm::StringRef Identifier;
-  if (ParseIdentifier(Identifier, "expected identifier in func declaration")) {
-    // FIXME: Should stop at end of {}!
-    SkipUntil(tok::semi);
+  if (ParseIdentifier(Identifier, "expected identifier in func declaration"))
     return 0;
-  }
   
   SMLoc LPLoc = Tok.getLoc();
   if (ParseToken(tok::l_paren,
-                 "expected '(' in argument list of func declaration")) {
-    // FIXME: Should stop at end of {}!
-    SkipUntil(tok::semi);
+                 "expected '(' in argument list of func declaration"))
     return 0;
-  }
 
   Type *ArgListTy;
   if (Tok.is(tok::r_paren)) {
@@ -376,6 +377,7 @@ FuncDecl *Parser::ParseDeclFunc() {
     // Read the comma-separated argument list.
     do {
       llvm::StringRef ParamIdentifier;
+      SMLoc StartLoc = Tok.getLoc();
       if (Tok.is(tok::identifier)) {
         ParamIdentifier = Tok.getText();
         ConsumeToken(tok::identifier);
@@ -385,15 +387,12 @@ FuncDecl *Parser::ParseDeclFunc() {
       if (ParseToken(tok::colon,
                      "expected ':' in argument list of func declaration") ||
           ParseType(ParamType,
-                    "expected type in argument list of func declaration")) {
-        // FIXME: Should stop at end of {}!
-        SkipUntil(tok::semi);
+                    "expected type in argument list of func declaration"))
         return 0;
-      }
       
       DeclAttributes ParamAttributes;
       VarDecl *ParamDecl = 
-        S.decl.ActOnVarDecl(SMLoc(), ParamIdentifier, ParamType, 0,
+        S.decl.ActOnVarDecl(StartLoc, ParamIdentifier, ParamType, 0,
                             ParamAttributes);
 
       Elements.push_back(ParamDecl);
@@ -406,9 +405,7 @@ FuncDecl *Parser::ParseDeclFunc() {
   
   SMLoc RPLoc = Tok.getLoc();
   if (ParseToken(tok::r_paren,
-                 "expected ')' at end of func declaration argument list",
-                 // FIXME: Should stop at end of {}!
-                 tok::semi)) {
+                 "expected ')' at end of func declaration argument list")) {
     Note(LPLoc, "to match this opening '('");
     return 0;
   }
@@ -434,10 +431,8 @@ FuncDecl *Parser::ParseDeclFunc() {
   // Otherwise, we must have an expression.
   llvm::NullablePtr<Expr> Body;
   if (ParseExpr(Body, "expected expression parsing func body") ||
-      Body.isNull()) {
-    // FIXME: Should stop at end of {}!
+      Body.isNull())
     return 0;
-  }
 
   return S.decl.ActOnFuncDecl(FuncLoc, Identifier, FuncTy, Body.getPtrOrNull(),
                               Attributes);
