@@ -62,10 +62,58 @@ NamedDecl *SemaDecl::LookupName(Identifier Name) {
   return ScopeHT->lookup(Name).second;
 }
 
+/// GetAnonDecl - Get the anondecl for the specified anonymous closure
+/// argument reference.  This occurs for use of _0 .. _9.
+AnonDecl *SemaDecl::GetAnonDecl(llvm::StringRef Text, llvm::SMLoc RefLoc) {
+  assert(Text.size() == 2 && Text[0] == '_' && 
+         Text[1] >= '0' && Text[1] <= '9' && "Not a valid anon decl");
+  unsigned ArgNo = Text[1]-'0';
+  
+  // If this is the first reference to the anonymous symbol decl, create it.
+  if (AnonClosureArgs.size() <= ArgNo || AnonClosureArgs[ArgNo].isNull()) {
+    // Otherwise, this is the first reference to the anonymous decl,
+    // synthesize it now.
+    if (ArgNo >= AnonClosureArgs.size())
+      AnonClosureArgs.resize(ArgNo+1);
+    
+    AnonClosureArgs[ArgNo] =
+      new (S.Context) AnonDecl(RefLoc, S.Context.getIdentifier(Text),
+                               // FIXME: Should be dependent type!
+                               S.Context.IntType);
+  }
+  return AnonClosureArgs[ArgNo].get();
+}
 
 //===----------------------------------------------------------------------===//
 // Declaration handling.
 //===----------------------------------------------------------------------===//
+
+/// ActOnTopLevelDecl - This is called after parsing a new top-level decl.
+void SemaDecl::ActOnTopLevelDecl(NamedDecl *D) {
+  // Enter the top-level declaration into the global scope.
+  // FIXME: This seems wrong, it should be visible before parsing the
+  // initializer/body to support recursion...
+  S.decl.AddToScope(D);
+
+  // Check for and diagnose any uses of anonymous arguments that were unbound.
+  for (unsigned i = 0, e = AnonClosureArgs.size(); i != e; ++i) {
+    if (AnonClosureArgs[i].isNull()) continue;
+    AnonDecl *AD = AnonClosureArgs[i].get();
+
+    Error(AD->UseLoc,
+          "use of anonymous closure argument in non-closure context");
+  }
+  AnonClosureArgs.clear();
+}
+
+/// ActOnTopLevelDeclError - This is called after an error parsing a top-level
+/// decl.
+void SemaDecl::ActOnTopLevelDeclError() {
+  // Clear out any referenced anonymous closure arguments without diagnosing
+  // them.  The error was already reported with the malformed decl.
+  AnonClosureArgs.clear();
+}
+
 
 /// ValidateAttributes - Check that the func/var declaration attributes are ok.
 static void ValidateAttributes(DeclAttributes &Attrs, Type *Ty, SemaDecl &SD) {

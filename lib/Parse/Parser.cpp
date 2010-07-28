@@ -194,8 +194,7 @@ Decl *Parser::ParseDeclTopLevel() {
     return 0; // Could do a top-level semi decl.
   case tok::kw_var:
     if (VarDecl *D = ParseDeclVar()) {
-      // Enter the var into the current scope.
-      S.decl.AddToScope(D);
+      S.decl.ActOnTopLevelDecl(D);
       
       // On successful parse, eat the ;
       ParseToken(tok::semi, "expected ';' at end of var declaration",
@@ -205,12 +204,13 @@ Decl *Parser::ParseDeclTopLevel() {
     break;
   case tok::kw_func:
     if (FuncDecl *D = ParseDeclFunc()) {
-      // Enter the function into the current scope.
-      S.decl.AddToScope(D);
+      S.decl.ActOnTopLevelDecl(D);
       return D;
     }
     break;
   }
+  
+  S.decl.ActOnTopLevelDeclError();
   
   // On error, skip to the next top level declaration.
   while (Tok.isNot(tok::eof) && Tok.isNot(tok::kw_var) &&

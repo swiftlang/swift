@@ -21,7 +21,6 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
@@ -31,18 +30,84 @@ using llvm::NullablePtr;
 // Utility Functions
 //===----------------------------------------------------------------------===//
 
+
+/// BindAndValidateClosureArgs - The specified list of anonymous closure
+/// arguments was bound to a closure function with the specified input
+/// arguments.  Validate the argument list and, if valid, allocate and return
+/// a pointer to the argument to be used for the ClosureExpr.
+static llvm::NullablePtr<AnonDecl> *
+BindAndValidateClosureArgs(const llvm::NullablePtr<AnonDecl> *AnonArgs,
+                           unsigned NumAnonArgs, Type *FuncInput, SemaExpr &SE){
+  // If the input to the function is a non-tuple, only _0 is valid, if it is a
+  // tuple, then _0.._N are valid depending on the number of inputs to the
+  // tuple.
+  unsigned NumInputArgs = 1;
+  if (TupleType *TT = llvm::dyn_cast<TupleType>(FuncInput))
+    NumInputArgs = TT->NumFields;
+  
+  // Verify that the code didn't use too many anonymous arguments, e.g. using _4
+  // when the bound function only has 2 inputs.
+  if (NumAnonArgs > NumInputArgs) {
+    for (unsigned i = NumInputArgs; i != NumAnonArgs; ++i) {
+      // Ignore elements not used.
+      if (AnonArgs[i].isNull()) continue;
+      
+      
+      SE.Error(AnonArgs[i].get()->UseLoc,
+               "use of invalid anonymous argument, with number higher than"
+               " # arguments to bound function");
+    }
+    NumAnonArgs = NumInputArgs;
+  }
+  
+  // TODO: Do type resolution of the subexpression now that we know the actual
+  // types of the arguments.
+  
+  // Return the right number of inputs.
+  llvm::NullablePtr<AnonDecl> *NewInputs =(llvm::NullablePtr<AnonDecl>*)
+    SE.S.Context.Allocate(sizeof(*NewInputs)*NumInputArgs, 8);
+  for (unsigned i = 0, e = NumInputArgs; i != e; ++i)
+    if (i < NumAnonArgs)
+      NewInputs[i] = AnonArgs[i];
+    else
+      NewInputs[i] = 0;
+  return NewInputs;
+}
+
 Expr *SemaExpr::HandleConversionToType(Expr *E, Type *OrigDestTy) {
   // If we have an exact match of the (canonical) types, we're done.
   Type *DestTy = S.Context.getCanonicalType(OrigDestTy);
   Type *ETy = S.Context.getCanonicalType(E->Ty);
   if (ETy == DestTy) return E;
-
+  
+  // If the input is a tuple and the output is a tuple with the same number of
+  // elements, see if we can convert each element.
+  // FIXME: Do this for "funcdecl4(funcdecl3(), 12);"
+  
   // Otherwise, check to see if this is an auto-closure case.  This case happens
   // when we convert an expression E to a function type whose result is E's
   // type.
-  if (FunctionType *FT = llvm::dyn_cast<FunctionType>(DestTy))
-    if (Expr *ERes = HandleConversionToType(E, FT->Result))
-      return new (S.Context) ClosureExpr(ERes, 0, OrigDestTy);
+  if (FunctionType *FT = llvm::dyn_cast<FunctionType>(DestTy)) {
+    // If there are any live anonymous closure arguments, save them off and
+    // remove them.  When binding something like _0+_1 to
+    // (int,int)->(int,int)->() the arguments bind to the first level, not the
+    // inner level.
+    llvm::SmallVector<llvm::NullablePtr<AnonDecl>, 8> AnonClosureArgs;
+    AnonClosureArgs.swap(S.decl.AnonClosureArgs);
+    
+    if (Expr *ERes = HandleConversionToType(E, FT->Result)) {
+      // If we bound any anonymous closure arguments, validate them and resolve
+      // their types.
+      llvm::NullablePtr<AnonDecl> *ActualArgList = 0;
+      if (!AnonClosureArgs.empty())
+        ActualArgList = BindAndValidateClosureArgs(AnonClosureArgs.data(),
+                                                   AnonClosureArgs.size(),
+                                                   FT->Input, *this);      
+      return new (S.Context) ClosureExpr(ERes, ActualArgList, OrigDestTy);
+    }
+    
+    AnonClosureArgs.swap(S.decl.AnonClosureArgs);
+  }
   return 0;
 }
 
@@ -58,14 +123,20 @@ NullablePtr<Expr> SemaExpr::ActOnNumericConstant(llvm::StringRef Text,
 NullablePtr<Expr> 
 SemaExpr::ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
   NamedDecl *D = S.decl.LookupName(S.Context.getIdentifier(Text));
-  if (D == 0) {
-    Error(Loc, "use of undeclared identifier");
-    return 0;
-  }
-  
+
+  // If this identifier is _0 -> _9, then it is a use of an implicit anonymous
+  // closure argument.
+  if (D == 0 && Text.size() == 2 &&
+      Text[0] == '_' && Text[1] >= '0' && Text[1] <= '9')
+    D = S.decl.GetAnonDecl(Text, Loc);
+                                 
   // TODO: QOI: If the decl had an "invalid" bit set, then return the error
   // object to improve error recovery.
-  return new (S.Context) DeclRefExpr(D, Loc, D->Ty);
+  if (D)
+    return new (S.Context) DeclRefExpr(D, Loc, D->Ty);
+  
+  Error(Loc, "use of undeclared identifier");
+  return 0;
 }
 
 NullablePtr<Expr> 

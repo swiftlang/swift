@@ -32,6 +32,7 @@ namespace swift {
   class Type;
   class NamedDecl;
   class VarDecl;
+  class AnonDecl;
   
 enum ExprKind {
   IntegerLiteralKind,
@@ -217,9 +218,9 @@ public:
   /// the argument is not bound to an argument and that this list may be null if
   /// named anonymous arguments are not used.  If the ArgList pointer is
   /// non-null, then its length is indicated by getNumArgs().
-  llvm::NullablePtr<VarDecl> *ArgList;
+  llvm::NullablePtr<AnonDecl> *ArgList;
   
-  ClosureExpr(Expr *input, llvm::NullablePtr<VarDecl> *arglist, Type *ResultTy)
+  ClosureExpr(Expr *input, llvm::NullablePtr<AnonDecl> *arglist, Type *ResultTy)
     : Expr(ClosureExprKind, ResultTy), Input(input), ArgList(arglist) {}
 
   /// getNumArgs - Return the number of arguments that this closure expr takes.

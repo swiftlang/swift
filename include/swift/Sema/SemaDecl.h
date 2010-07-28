@@ -20,6 +20,8 @@
 
 #include "swift/Sema/SemaBase.h"
 #include "swift/AST/Identifier.h"
+#include "llvm/ADT/NullablePtr.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace llvm {
   template <typename K, typename V, typename KInfo>
@@ -29,8 +31,9 @@ namespace llvm {
 namespace swift {
   class Expr;
   class Type;
-  class FuncDecl;
   class VarDecl;
+  class FuncDecl;
+  class AnonDecl;
   class NamedDecl;
   class Scope;
   class DeclAttributes;
@@ -44,6 +47,7 @@ class SemaDecl : public SemaBase {
   Scope *CurScope;
   friend class Scope;
 public:
+
   explicit SemaDecl(Sema &S);
   ~SemaDecl();
   
@@ -59,9 +63,27 @@ public:
   /// returning the active decl if found or null if not.
   NamedDecl *LookupName(Identifier Name);
   
+
+  /// AnonClosureArgs - These are the current active set of anonymous closure
+  /// arguments, named _0 ... _9.  These are added to the list when first
+  /// referenced in a context and cleared out when something uses them (binding
+  /// them to a ClosureExpr).
+  llvm::SmallVector<llvm::NullablePtr<AnonDecl>, 8> AnonClosureArgs;
+  
+  /// GetAnonDecl - Get the anondecl for the specified anonymous closure
+  /// argument reference.  This occurs for use of _0 .. _9.
+  AnonDecl *GetAnonDecl(llvm::StringRef Text, llvm::SMLoc RefLoc);
+  
   //===--------------------------------------------------------------------===//
   // Declaration handling.
   //===--------------------------------------------------------------------===//
+  
+  /// ActOnTopLevelDecl - This is called after parsing a new top-level decl.
+  void ActOnTopLevelDecl(NamedDecl *D);
+
+  /// ActOnTopLevelDeclError - This is called after an error parsing a top-level
+  /// decl.
+  void ActOnTopLevelDeclError();
   
   VarDecl *ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name, Type *Ty,
                         Expr *Init, DeclAttributes &Attrs);

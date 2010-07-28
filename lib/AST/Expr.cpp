@@ -156,6 +156,15 @@ void ClosureExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(closure_expr type='";
   Ty->print(OS);
   OS << "'\n";
+  
+  if (ArgList) {
+    for (unsigned i = 0, e = getNumArgs(); i != e; ++i)
+      if (ArgList[i].isNonNull()) {
+        ArgList[i].get()->print(OS, Indent+1);
+        OS << '\n';
+      }
+  }
+  
   Input->print(OS, Indent+1);
   OS << ')';
 }

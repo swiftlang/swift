@@ -32,7 +32,8 @@ namespace swift {
   
 enum DeclKind {
   VarDeclKind,
-  FuncDeclKind
+  FuncDeclKind,
+  AnonDeclKind
 };
   
 /// DeclAttributes - These are attributes that may be applied to declarations.
@@ -140,6 +141,23 @@ public:
   static bool classof(const FuncDecl *D) { return true; }
 };
 
+/// AnonDecl - Anonymous closure argument declaration, synthesized by referecing
+/// symbols _0 ... _9.
+class AnonDecl : public NamedDecl {
+public:
+  llvm::SMLoc UseLoc;    // Location of the first use in a context.
+  
+  AnonDecl(llvm::SMLoc useloc, Identifier name, Type *ty)
+  : NamedDecl(name, ty, 0, DeclAttributes(), AnonDeclKind), UseLoc(useloc) {}
+  
+  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) { return D->getKind() == AnonDeclKind; }
+  static bool classof(const AnonDecl *D) { return true; }
+};
+
+  
 } // end namespace swift
 
 #endif

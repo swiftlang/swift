@@ -31,9 +31,8 @@ namespace swift {
 class SemaBase {
   SemaBase(const SemaBase&);           // DO NOT IMPLEMENT
   void operator=(const SemaBase&);     // DO NOT IMPLEMENT
-protected:
-  Sema &S;
 public:
+  Sema &S;
   explicit SemaBase(Sema &s) : S(s) {}
   
   void Note(llvm::SMLoc Loc, const char *Message);

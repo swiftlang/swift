@@ -40,6 +40,7 @@ public:
   // Utility Functions
   Expr *HandleConversionToType(Expr *E, Type *Ty);
 
+  
   // Action Implementations
   llvm::NullablePtr<Expr>
   ActOnNumericConstant(llvm::StringRef Text, llvm::SMLoc Loc);
