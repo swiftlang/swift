@@ -36,8 +36,11 @@ using llvm::NullablePtr;
 /// arguments.  Validate the argument list and, if valid, allocate and return
 /// a pointer to the argument to be used for the ClosureExpr.
 static llvm::NullablePtr<AnonDecl> *
-BindAndValidateClosureArgs(const llvm::NullablePtr<AnonDecl> *AnonArgs,
-                           unsigned NumAnonArgs, Type *FuncInput, SemaExpr &SE){
+BindAndValidateClosureArgs(Type *FuncInput, SemaDecl &SD){
+  
+  const llvm::NullablePtr<AnonDecl> *AnonArgs = SD.AnonClosureArgs.data();
+  unsigned NumAnonArgs = SD.AnonClosureArgs.size();
+  
   // If the input to the function is a non-tuple, only _0 is valid, if it is a
   // tuple, then _0.._N are valid depending on the number of inputs to the
   // tuple.
@@ -53,7 +56,7 @@ BindAndValidateClosureArgs(const llvm::NullablePtr<AnonDecl> *AnonArgs,
       if (AnonArgs[i].isNull()) continue;
       
       
-      SE.Error(AnonArgs[i].get()->UseLoc,
+      SD.Error(AnonArgs[i].get()->UseLoc,
                "use of invalid anonymous argument, with number higher than"
                " # arguments to bound function");
     }
@@ -65,16 +68,20 @@ BindAndValidateClosureArgs(const llvm::NullablePtr<AnonDecl> *AnonArgs,
   
   // Return the right number of inputs.
   llvm::NullablePtr<AnonDecl> *NewInputs =(llvm::NullablePtr<AnonDecl>*)
-    SE.S.Context.Allocate(sizeof(*NewInputs)*NumInputArgs, 8);
+    SD.S.Context.Allocate(sizeof(*NewInputs)*NumInputArgs, 8);
   for (unsigned i = 0, e = NumInputArgs; i != e; ++i)
     if (i < NumAnonArgs)
       NewInputs[i] = AnonArgs[i];
     else
       NewInputs[i] = 0;
+  
+  // We used/consumed the anonymous closure arguments.
+  SD.AnonClosureArgs.clear();
   return NewInputs;
 }
 
-Expr *SemaExpr::HandleConversionToType(Expr *E, Type *OrigDestTy) {
+Expr *SemaExpr::HandleConversionToType(Expr *E, Type *OrigDestTy,
+                                       bool IgnoreAnonDecls) {
   // If we have an exact match of the (canonical) types, we're done.
   Type *DestTy = S.Context.getCanonicalType(OrigDestTy);
   Type *ETy = S.Context.getCanonicalType(E->Ty);
@@ -88,25 +95,19 @@ Expr *SemaExpr::HandleConversionToType(Expr *E, Type *OrigDestTy) {
   // when we convert an expression E to a function type whose result is E's
   // type.
   if (FunctionType *FT = llvm::dyn_cast<FunctionType>(DestTy)) {
-    // If there are any live anonymous closure arguments, save them off and
-    // remove them.  When binding something like _0+_1 to
+    // If there are any live anonymous closure arguments, this level will use
+    // them and remove them.  When binding something like _0+_1 to
     // (int,int)->(int,int)->() the arguments bind to the first level, not the
-    // inner level.
-    llvm::SmallVector<llvm::NullablePtr<AnonDecl>, 8> AnonClosureArgs;
-    AnonClosureArgs.swap(S.decl.AnonClosureArgs);
-    
-    if (Expr *ERes = HandleConversionToType(E, FT->Result)) {
+    // inner level.  To handle this, we ignore anonymous decls in the recursive
+    // case here.
+    if (Expr *ERes = HandleConversionToType(E, FT->Result, true)) {
       // If we bound any anonymous closure arguments, validate them and resolve
       // their types.
       llvm::NullablePtr<AnonDecl> *ActualArgList = 0;
-      if (!AnonClosureArgs.empty())
-        ActualArgList = BindAndValidateClosureArgs(AnonClosureArgs.data(),
-                                                   AnonClosureArgs.size(),
-                                                   FT->Input, *this);      
+      if (!IgnoreAnonDecls && !S.decl.AnonClosureArgs.empty())
+        ActualArgList = BindAndValidateClosureArgs(FT->Input, S.decl);      
       return new (S.Context) ClosureExpr(ERes, ActualArgList, OrigDestTy);
     }
-    
-    AnonClosureArgs.swap(S.decl.AnonClosureArgs);
   }
   return 0;
 }
@@ -222,7 +223,7 @@ SemaExpr::ActOnSequence(Expr **Exprs, unsigned NumExprs) {
     // type matches the expected type of the function.
     FunctionType *FT = llvm::cast<FunctionType>(ExprTy);
     
-    if (Expr *Arg = HandleConversionToType(Exprs[i+1], FT->Input)) {
+    if (Expr *Arg = HandleConversionToType(Exprs[i+1], FT->Input, false)) {
       Exprs[i+1] = new (S.Context) ApplyExpr(Exprs[i], Arg, FT->Result);
       ++i;
       continue;
@@ -253,7 +254,7 @@ SemaExpr::ActOnBinaryExpr(Expr *LHS, NamedDecl *OpFn,
   assert(Input->NumFields == 2 && "Sema error validating infix fn type");
 
   // Verify that the LHS/RHS have the right type and do conversions as needed.
-  if (Expr *LHSI = HandleConversionToType(LHS, Input->getElementType(0)))
+  if (Expr *LHSI = HandleConversionToType(LHS, Input->getElementType(0), false))
     LHS = LHSI;
   else {
     // TODO: QOI: source range + types.
@@ -261,7 +262,7 @@ SemaExpr::ActOnBinaryExpr(Expr *LHS, NamedDecl *OpFn,
     return 0;
   }
     
-  if (Expr *RHSI = HandleConversionToType(RHS, Input->getElementType(1)))
+  if (Expr *RHSI = HandleConversionToType(RHS, Input->getElementType(1), false))
     RHS = RHSI;
   else {
     // TODO: QOI: source range + types.

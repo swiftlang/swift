@@ -38,7 +38,8 @@ public:
   explicit SemaExpr(Sema &S) : SemaBase(S) {}
   
   // Utility Functions
-  Expr *HandleConversionToType(Expr *E, Type *Ty);
+  Expr *HandleConversionToType(Expr *E, Type *Ty,
+                               bool IgnoreAnonDecls);
 
   
   // Action Implementations

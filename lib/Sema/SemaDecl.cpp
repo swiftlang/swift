@@ -147,7 +147,7 @@ VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name,
   // If both a type and an initializer are specified, make sure the
   // initializer's type agrees with the (redundant) type.
   if (Ty && Init) {
-    if (Expr *InitE = S.expr.HandleConversionToType(Init, Ty))
+    if (Expr *InitE = S.expr.HandleConversionToType(Init, Ty, true))
       Init = InitE;
     else {
       // FIXME: Improve this to include the actual types!
@@ -175,7 +175,7 @@ ActOnFuncDecl(llvm::SMLoc FuncLoc, llvm::StringRef Name,
   // Validate that the body's type matches the function's type if this isn't a
   // external function.
   if (Body) {
-    if (Expr *BodyE = S.expr.HandleConversionToType(Body, Ty))
+    if (Expr *BodyE = S.expr.HandleConversionToType(Body, Ty, true))
       Body = BodyE;
     else {
       // FIXME: Improve this to include the actual types!
