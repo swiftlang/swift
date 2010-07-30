@@ -158,9 +158,9 @@ public:
   Expr **Elements;
   unsigned NumElements;
   
-  SequenceExpr(Expr **elements, unsigned numElements)
-    : Expr(SequenceExprKind, elements[numElements-1]->Ty),
-      Elements(elements), NumElements(numElements) { }
+  SequenceExpr(Expr **elements, unsigned numElements, Type *Ty)
+    : Expr(SequenceExprKind, Ty), Elements(elements), NumElements(numElements) {
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const SequenceExpr *) { return true; }
