@@ -92,8 +92,6 @@ public:
   IntegerLiteral(llvm::StringRef V, llvm::SMLoc L, Type *Ty)
     : Expr(IntegerLiteralKind, Ty), Val(V), Loc(L) {}
   
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const IntegerLiteral *) { return true; }
   static bool classof(const Expr *E) { return E->Kind == IntegerLiteralKind; }
@@ -107,8 +105,6 @@ public:
   
   DeclRefExpr(NamedDecl *d, llvm::SMLoc L, Type *Ty)
     : Expr(DeclRefExprKind, Ty), D(d), Loc(L) {}
-  
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const DeclRefExpr *) { return true; }
@@ -132,8 +128,6 @@ public:
     : Expr(TupleExprKind, Ty), LParenLoc(lparenloc), SubExprs(subexprs),
       NumSubExprs(numsubexprs), RParenLoc(rparenloc) {}
 
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TupleExpr *) { return true; }
   static bool classof(const Expr *E) { return E->Kind == TupleExprKind; }
@@ -151,8 +145,6 @@ public:
   ApplyExpr(Expr *fn, Expr *arg, Type *Ty)
     : Expr(ApplyExprKind, Ty), Fn(fn), Arg(arg) {}
 
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
-  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ApplyExpr *) { return true; }
   static bool classof(const Expr *E) { return E->Kind == ApplyExprKind; }
@@ -170,8 +162,6 @@ public:
     : Expr(SequenceExprKind, elements[numElements-1]->Ty),
       Elements(elements), NumElements(numElements) { }
 
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
-  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const SequenceExpr *) { return true; }
   static bool classof(const Expr *E) { return E->Kind == SequenceExprKind; }
@@ -197,8 +187,6 @@ public:
     : Expr(BraceExprKind, Ty), LBLoc(lbloc), Elements(elements),
       NumElements(numelements), MissingSemi(missingsemi), RBLoc(rbloc) {}
 
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
-  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BraceExpr *) { return true; }
   static bool classof(const Expr *E) { return E->Kind == BraceExprKind; }
@@ -228,9 +216,6 @@ public:
   unsigned getNumArgs() const;
   
   
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
-  
-  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ClosureExpr *) { return true; }
   static bool classof(const Expr *E) { return E->Kind == ClosureExprKind; }
@@ -246,8 +231,6 @@ public:
   
   BinaryExpr(Expr *lhs, NamedDecl *fn, llvm::SMLoc oploc, Expr *rhs, Type *Ty)
     : Expr(BinaryExprKind, Ty), LHS(lhs), Fn(fn), OpLoc(oploc), RHS(rhs) {}
-
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BinaryExpr *) { return true; }

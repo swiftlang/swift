@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Expr.h"
+#include "swift/AST/ExprVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/ASTContext.h"
@@ -72,110 +73,113 @@ unsigned ClosureExpr::getNumArgs() const {
 // Printing for Expr and all subclasses.
 //===----------------------------------------------------------------------===//
 
+namespace {
+class PrintExpr : public ExprVisitor<PrintExpr> {
+public:
+  llvm::raw_ostream &OS;
+  unsigned Indent;
+  
+  PrintExpr(llvm::raw_ostream &os, unsigned indent) : OS(os), Indent(indent) {
+  }
+  
+  void PrintRec(Expr *E) {
+    Indent += 2;
+    Visit(E);
+    Indent -= 2;
+  }
+  
+  void PrintRec(Decl *D) {
+    D->print(OS, Indent+2);
+  }
+
+  void VisitIntegerLiteral(IntegerLiteral *E) {
+    OS.indent(Indent) << "(integer_literal type='";
+    E->Ty->print(OS);
+    OS << "' value=" << E->Val << ')';
+  }
+  void VisitDeclRefExpr(DeclRefExpr *E) {
+    OS.indent(Indent) << "(declref_expr type='";
+    E->Ty->print(OS);
+    OS << "' decl=" << E->D->Name << ')';
+  }
+  void VisitTupleExpr(TupleExpr *E) {
+    OS.indent(Indent) << "(tuple_expr type='";
+    E->Ty->print(OS);
+    OS << '\'';
+    for (unsigned i = 0, e = E->NumSubExprs; i != e; ++i) {
+      OS << '\n';
+      PrintRec(E->SubExprs[i]);
+    }
+    OS << ')';
+  }
+  void VisitApplyExpr(ApplyExpr *E) {
+    OS.indent(Indent) << "(apply_expr type='";
+    E->Ty->print(OS);
+    OS << "'\n";
+    PrintRec(E->Fn);
+    OS << '\n';
+    PrintRec(E->Arg);
+    OS << ')';
+  }
+  void VisitSequenceExpr(SequenceExpr *E) {
+    OS.indent(Indent) << "(sequence_expr type='";
+    E->Ty->print(OS);
+    OS << '\'';
+    for (unsigned i = 0, e = E->NumElements; i != e; ++i) {
+      OS << '\n';
+      PrintRec(E->Elements[i]);
+    }
+    OS << ')';
+  }
+  void VisitBraceExpr(BraceExpr *E) {
+    OS.indent(Indent) << "(brace_expr type='";
+    E->Ty->print(OS);
+    OS << '\'';
+    for (unsigned i = 0, e = E->NumElements; i != e; ++i) {
+      OS << '\n';
+      if (Expr *SubExpr = E->Elements[i].dyn_cast<Expr*>())
+        PrintRec(SubExpr);
+      else
+        PrintRec(E->Elements[i].get<NamedDecl*>());
+    }
+    OS << ')';
+  }
+  void VisitClosureExpr(ClosureExpr *E) {
+    OS.indent(Indent) << "(closure_expr type='";
+    E->Ty->print(OS);
+    OS << "'\n";
+    
+    if (E->ArgList) {
+      for (unsigned i = 0, e = E->getNumArgs(); i != e; ++i)
+        if (E->ArgList[i].isNonNull()) {
+          PrintRec(E->ArgList[i].get());
+          OS << '\n';
+        }
+    }
+    
+    PrintRec(E->Input);
+    OS << ')';
+  }
+  void VisitBinaryExpr(BinaryExpr *E) {
+    OS.indent(Indent) << "(binary_expr '";
+    OS << E->Fn->Name << "' type='";
+    E->Ty->print(OS);
+    OS << "'\n";
+    PrintRec(E->LHS);
+    OS << '\n';
+    PrintRec(E->RHS);
+    OS << ')';
+  }
+};
+
+} // end anonymous namespace.
+
+
 void Expr::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
 }
 
 void Expr::print(llvm::raw_ostream &OS, unsigned Indent) const {
-  switch (Kind) {
-  case IntegerLiteralKind: return cast<IntegerLiteral>(this)->print(OS, Indent);
-  case DeclRefExprKind:    return cast<DeclRefExpr>(this)->print(OS, Indent);
-  case TupleExprKind:      return cast<TupleExpr>(this)->print(OS, Indent);
-  case ApplyExprKind:      return cast<ApplyExpr>(this)->print(OS, Indent);
-  case SequenceExprKind:   return cast<SequenceExpr>(this)->print(OS, Indent);
-  case BraceExprKind:      return cast<BraceExpr>(this)->print(OS, Indent);
-  case ClosureExprKind:    return cast<ClosureExpr>(this)->print(OS, Indent);
-  case BinaryExprKind:     return cast<BinaryExpr>(this)->print(OS, Indent);
-  }
-}
-
-void IntegerLiteral::print(llvm::raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(integer_literal type='";
-  Ty->print(OS);
-  OS << "' value=" << Val << ')';
-}
-
-void DeclRefExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(declref_expr type='";
-  Ty->print(OS);
-  OS << "' decl=" << D->Name << ')';
-}
-
-void TupleExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(tuple_expr type='";
-  Ty->print(OS);
-  OS << "'";
-  if (NumSubExprs != 0) {
-    for (unsigned i = 0, e = NumSubExprs; i != e; ++i) {
-      OS << '\n';
-      SubExprs[i]->print(OS, Indent+1);
-    }
-  }
-  OS << ')';
-}
-
-void ApplyExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(apply_expr type='";
-  Ty->print(OS);
-  OS << "'\n";
-  Fn->print(OS, Indent+1);
-  OS << '\n';
-  Arg->print(OS, Indent+1);
-  OS << ')';
-}
-
-void SequenceExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(sequence_expr type='";
-  Ty->print(OS);
-  OS << "'";
-  
-  for (unsigned i = 0, e = NumElements; i != e; ++i)
-    Elements[i]->print(OS << '\n', Indent+1);
-  
-  OS << ')';
-}
-
-void BraceExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(brace_expr type='";
-  Ty->print(OS);
-  OS << "'";
-  
-  for (unsigned i = 0, e = NumElements; i != e; ++i) {
-    OS << '\n';
-    if (Expr *E = Elements[i].dyn_cast<Expr*>())
-      E->print(OS, Indent+1);
-    else
-      Elements[i].get<NamedDecl*>()->print(OS, Indent+1);
-  }
-  
-  OS << ')';
-}
-
-void ClosureExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(closure_expr type='";
-  Ty->print(OS);
-  OS << "'\n";
-  
-  if (ArgList) {
-    for (unsigned i = 0, e = getNumArgs(); i != e; ++i)
-      if (ArgList[i].isNonNull()) {
-        ArgList[i].get()->print(OS, Indent+1);
-        OS << '\n';
-      }
-  }
-  
-  Input->print(OS, Indent+1);
-  OS << ')';
-}
-
-void BinaryExpr::print(llvm::raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(binary_expr '";
-  OS << Fn->Name << "' type='";
-  Ty->print(OS);
-  OS << "'\n";
-  LHS->print(OS, Indent+1);
-  OS << '\n';
-  RHS->print(OS, Indent+1);
-  OS << ')';
+  PrintExpr(OS, Indent).Visit(const_cast<Expr*>(this));
 }
