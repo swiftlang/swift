@@ -74,6 +74,7 @@ unsigned ClosureExpr::getNumArgs() const {
 //===----------------------------------------------------------------------===//
 
 namespace {
+/// PrintExpr - Visitor implementation of Expr::print.
 class PrintExpr : public ExprVisitor<PrintExpr> {
 public:
   llvm::raw_ostream &OS;

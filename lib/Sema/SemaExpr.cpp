@@ -42,43 +42,86 @@ class CoerceDependentResultToType
   friend class ExprVisitor<CoerceDependentResultToType, Expr*>;
   Type *DestTy;
   SemaExpr::ConversionReason Reason;
+  SemaExpr &SE;
   
   Expr *VisitIntegerLiteral(IntegerLiteral *E) {
     assert(0 && "Integer literal shouldn't have dependent type");
     return E;
   }
   Expr *VisitDeclRefExpr(DeclRefExpr *E) {
-    assert(0 && "Integer literal shouldn't have dependent type");
+    assert(llvm::isa<AnonDecl>(E->D) &&
+           "Only anondecls can have dependent type");
+    AnonDecl *AD = llvm::cast<AnonDecl>(E->D);
+
+    // FIXME: Really want a 'merge types' routine, that can handle paritally
+    // specified types if DestTy can be dependent. (i32, ?)  
+
+    // If the AnonDecl has Dependent type, give it and the DeclRefExpr the
+    // inferred type!
+    if (AD->Ty->Kind == BuiltinDependentKind) {
+      E->Ty = AD->Ty = DestTy;
+      return E;
+    }
+    
+    // If we already inferred a type for the AnonDecl and it matches the
+    // inferred type, just update the DeclRefExpr to match.
+    if (AD->Ty == DestTy) {
+      E->Ty = DestTy;
+      return E;
+    }
+    
+    // The same AnonDecl may be used in multiple places in an expression tree,
+    // and those uses may cause it to be inferred to have different types.  If
+    // this happens, diagnose the problem.
+    SE.Error(E->Loc,
+             "anonymous declaration inferred to have two different types");
     return E;
   }
   Expr *VisitTupleExpr(TupleExpr *E) {
-    assert(0 && "Integer literal shouldn't have dependent type");
+    // Handle the grouping paren case.
+    if (E->NumSubExprs == 1) {
+      Expr *SubExpr = doIt(E->SubExprs[0]);
+      if (SubExpr == 0) return 0;
+      E->SubExprs[0] = SubExpr;
+      E->Ty = SubExpr->Ty;
+      return E;
+    }
+    
+    assert(0 && "FIXME: Handle tuple with dependent type");
     return E;
   }
   Expr *VisitApplyExpr(ApplyExpr *E) {
-    assert(0 && "Integer literal shouldn't have dependent type");
+    assert(0 && "FIXME: Handle apply with dependent type");
     return E;
   }
   Expr *VisitSequenceExpr(SequenceExpr *E) {
-    assert(0 && "Integer literal shouldn't have dependent type");
+    Expr *SubExpr = doIt(E->Elements[E->NumElements-1]);
+    if (SubExpr == 0) return 0;
+    E->Elements[E->NumElements-1] = SubExpr;
+    E->Ty = SubExpr->Ty;
     return E;
   }
   Expr *VisitBraceExpr(BraceExpr *E) {
-    assert(0 && "Integer literal shouldn't have dependent type");
+    assert(E->MissingSemi && "Expression should have void type!");
+    Expr *SubExpr = doIt(E->Elements[E->NumElements-1].get<Expr*>());
+    if (SubExpr == 0) return 0;
+    E->Elements[E->NumElements-1] = SubExpr;
+    E->Ty = SubExpr->Ty;
     return E;
   }
   Expr *VisitClosureExpr(ClosureExpr *E) {
-    assert(0 && "Integer literal shouldn't have dependent type");
+    assert(0 && "FIXME: Handle closure with dependent type");
     return E;
   }
   Expr *VisitBinaryExpr(BinaryExpr *E) {
-    assert(0 && "Integer literal shouldn't have dependent type");
+    assert(0 && "FIXME: Handle binaryexpr with dependent type");
     return E;
   }
 
 public:
-  CoerceDependentResultToType(Type *destty, SemaExpr::ConversionReason reason)
-    : DestTy(destty), Reason(reason) {
+  CoerceDependentResultToType(Type *destty, SemaExpr::ConversionReason reason,
+                              SemaExpr &se)
+    : DestTy(destty), Reason(reason), SE(se) {
   }
   Expr *doIt(Expr *E) {
     assert(E->Ty->Dependent && "Expr doesn't have dependent type");
@@ -180,7 +223,7 @@ Expr *SemaExpr::HandleConversionToType(Expr *E, Type *OrigDestTy,
   // If E has dependent type, then this resolves the type: propagate the type
   // information into the subtree.
   if (E->Ty->Dependent)
-    return CoerceDependentResultToType(OrigDestTy, Reason).doIt(E);
+    return CoerceDependentResultToType(OrigDestTy, Reason, *this).doIt(E);
     
   
   // TODO: QOI: Source ranges + print the type.
