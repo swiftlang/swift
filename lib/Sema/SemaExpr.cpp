@@ -18,7 +18,7 @@
 #include "swift/Sema/Sema.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
+#include "swift/AST/ExprVisitor.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -26,6 +26,69 @@
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
 using llvm::NullablePtr;
+
+//===----------------------------------------------------------------------===//
+// Expression Type Coercing - PropagateTypeToResult
+//===----------------------------------------------------------------------===//
+
+/// CoerceDependentResultToType - This visitor is used when an expression with
+/// dependent type is used in a context which forces the type to a known Type.
+/// Perform this and return a new expression.  On error, diagnose the problem
+/// and return null. 
+namespace {
+  
+class CoerceDependentResultToType
+    : public ExprVisitor<CoerceDependentResultToType, Expr*> {
+  friend class ExprVisitor<CoerceDependentResultToType, Expr*>;
+  Type *DestTy;
+  SemaExpr::ConversionReason Reason;
+  
+  Expr *VisitIntegerLiteral(IntegerLiteral *E) {
+    assert(0 && "Integer literal shouldn't have dependent type");
+    return E;
+  }
+  Expr *VisitDeclRefExpr(DeclRefExpr *E) {
+    assert(0 && "Integer literal shouldn't have dependent type");
+    return E;
+  }
+  Expr *VisitTupleExpr(TupleExpr *E) {
+    assert(0 && "Integer literal shouldn't have dependent type");
+    return E;
+  }
+  Expr *VisitApplyExpr(ApplyExpr *E) {
+    assert(0 && "Integer literal shouldn't have dependent type");
+    return E;
+  }
+  Expr *VisitSequenceExpr(SequenceExpr *E) {
+    assert(0 && "Integer literal shouldn't have dependent type");
+    return E;
+  }
+  Expr *VisitBraceExpr(BraceExpr *E) {
+    assert(0 && "Integer literal shouldn't have dependent type");
+    return E;
+  }
+  Expr *VisitClosureExpr(ClosureExpr *E) {
+    assert(0 && "Integer literal shouldn't have dependent type");
+    return E;
+  }
+  Expr *VisitBinaryExpr(BinaryExpr *E) {
+    assert(0 && "Integer literal shouldn't have dependent type");
+    return E;
+  }
+
+public:
+  CoerceDependentResultToType(Type *destty, SemaExpr::ConversionReason reason)
+    : DestTy(destty), Reason(reason) {
+  }
+  Expr *doIt(Expr *E) {
+    assert(E->Ty->Dependent && "Expr doesn't have dependent type");
+    return Visit(E);
+  }
+};
+  
+  
+} // end anonymous namespace.
+
 
 //===----------------------------------------------------------------------===//
 // Utility Functions
@@ -55,7 +118,6 @@ BindAndValidateClosureArgs(Type *FuncInput, SemaDecl &SD){
     for (unsigned i = NumInputArgs; i != NumAnonArgs; ++i) {
       // Ignore elements not used.
       if (AnonArgs[i].isNull()) continue;
-      
       
       SD.Error(AnonArgs[i].get()->UseLoc,
                "use of invalid anonymous argument, with number higher than"
@@ -115,7 +177,13 @@ Expr *SemaExpr::HandleConversionToType(Expr *E, Type *OrigDestTy,
     }
   }
   
-  // FIXME: QOI: Source ranges + print the type.
+  // If E has dependent type, then this resolves the type: propagate the type
+  // information into the subtree.
+  if (E->Ty->Dependent)
+    return CoerceDependentResultToType(OrigDestTy, Reason).doIt(E);
+    
+  
+  // TODO: QOI: Source ranges + print the type.
   switch (Reason) {
   case CR_BinOpLHS:
     Error(E->getLocStart(), "left hand side of binary operator has wrong type");
