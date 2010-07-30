@@ -82,15 +82,19 @@ BindAndValidateClosureArgs(Type *FuncInput, SemaDecl &SD){
 }
 
 Expr *SemaExpr::HandleConversionToType(Expr *E, Type *OrigDestTy,
-                                       bool IgnoreAnonDecls) {
+                                       bool IgnoreAnonDecls,
+                                       ConversionReason Reason) {
   // If we have an exact match of the (canonical) types, we're done.
   Type *DestTy = S.Context.getCanonicalType(OrigDestTy);
   Type *ETy = S.Context.getCanonicalType(E->Ty);
   if (ETy == DestTy) return E;
   
+  assert(!DestTy->Dependent && "Result of conversion can't be dependent");
+  
   // If the input is a tuple and the output is a tuple with the same number of
   // elements, see if we can convert each element.
   // FIXME: Do this for "funcdecl4(funcdecl3(), 12);"
+  // FIXME: Do this for dependent types, to resolve: foo(_0, 4);
   
   // Otherwise, check to see if this is an auto-closure case.  This case happens
   // when we convert an expression E to a function type whose result is E's
@@ -101,7 +105,7 @@ Expr *SemaExpr::HandleConversionToType(Expr *E, Type *OrigDestTy,
     // (int,int)->(int,int)->() the arguments bind to the first level, not the
     // inner level.  To handle this, we ignore anonymous decls in the recursive
     // case here.
-    if (Expr *ERes = HandleConversionToType(E, FT->Result, true)) {
+    if (Expr *ERes = HandleConversionToType(E, FT->Result, true, Reason)) {
       // If we bound any anonymous closure arguments, validate them and resolve
       // their types.
       llvm::NullablePtr<AnonDecl> *ActualArgList = 0;
@@ -110,6 +114,28 @@ Expr *SemaExpr::HandleConversionToType(Expr *E, Type *OrigDestTy,
       return new (S.Context) ClosureExpr(ERes, ActualArgList, OrigDestTy);
     }
   }
+  
+  // FIXME: QOI: Source ranges + print the type.
+  switch (Reason) {
+  case CR_BinOpLHS:
+    Error(E->getLocStart(), "left hand side of binary operator has wrong type");
+    break;
+  case CR_BinOpRHS: 
+    Error(E->getLocStart(),"right hand side of binary operator has wrong type");
+    break;
+  case CR_FuncApply:
+    Error(E->getLocStart(), "argument to function invocation has wrong type");
+    break;
+  case CR_VarInit:
+    Error(E->getLocStart(),
+          "explicitly specified type doesn't match initializer expression");
+    break;
+  case CR_FuncBody:
+    Error(E->getLocStart(),
+          "type of func body doesn't match specified prototype");
+    break;
+  }
+  
   return 0;
 }
 
@@ -212,14 +238,12 @@ SemaExpr::ActOnJuxtaposition(Expr *E1, Expr *E2) {
   
   // Otherwise, we do have a function application.  Check that the argument
   // type matches the expected type of the function.
-  if (Expr *Arg = HandleConversionToType(E2, FT->Input, false)) {
-    E1 = new (S.Context) ApplyExpr(E1, Arg, FT->Result);
-    return llvm::PointerIntPair<Expr*, 1, bool>(E1, false);
-  }
-  
-  // FIXME: QOI: Source ranges + print the type.
-  Error(E1->getLocStart(), "operator to function invocation has wrong type");
-  return llvm::PointerIntPair<Expr*, 1, bool>(0, false);
+  E2 = HandleConversionToType(E2, FT->Input, false, CR_FuncApply);
+  if (E2 == 0)
+    return llvm::PointerIntPair<Expr*, 1, bool>(0, false);
+    
+  E1 = new (S.Context) ApplyExpr(E1, E2, FT->Result);
+  return llvm::PointerIntPair<Expr*, 1, bool>(E1, false);
 }
 
 
@@ -246,21 +270,13 @@ SemaExpr::ActOnBinaryExpr(Expr *LHS, NamedDecl *OpFn,
   assert(Input->NumFields == 2 && "Sema error validating infix fn type");
 
   // Verify that the LHS/RHS have the right type and do conversions as needed.
-  if (Expr *LHSI = HandleConversionToType(LHS, Input->getElementType(0), false))
-    LHS = LHSI;
-  else {
-    // TODO: QOI: source range + types.
-    Error(OpLoc, "left hand side of binary operator has wrong type");
-    return 0;
-  }
+  LHS = HandleConversionToType(LHS, Input->getElementType(0), false,
+                                      CR_BinOpLHS);
+  if (LHS == 0) return 0;
     
-  if (Expr *RHSI = HandleConversionToType(RHS, Input->getElementType(1), false))
-    RHS = RHSI;
-  else {
-    // TODO: QOI: source range + types.
-    Error(OpLoc, "right hand side of binary operator has wrong type");
-    return 0;
-  }
+  RHS = HandleConversionToType(RHS, Input->getElementType(1), false,
+                               CR_BinOpRHS);
+  if (RHS == 0) return 0;
   
   return new (S.Context) BinaryExpr(LHS, OpFn, OpLoc, RHS,
                                     FnTy->Result);

@@ -37,10 +37,29 @@ namespace swift {
 class SemaExpr : public SemaBase {
 public:
   explicit SemaExpr(Sema &S) : SemaBase(S) {}
+
   
   // Utility Functions
+
+  enum ConversionReason {
+    CR_BinOpLHS,  // Left side of binary operator.
+    CR_BinOpRHS,  // Right side of binary operator.
+    CR_FuncApply, // Application of function argument.
+    CR_VarInit,   // Var initializer
+    CR_FuncBody   // Function body specification.
+  };
+  
+  /// HandleConversionToType - Do semantic analysis of an expression in a
+  /// context that expects a particular type.  This does conversion to that type
+  /// if the types don't match and diagnoses cases where the conversion cannot
+  /// be performed.  The Reason specifies why this conversion is happening, for
+  /// diagnostic purposes.
+  ///
+  /// This emits a diagnostic and returns null on error.
+  ///
   Expr *HandleConversionToType(Expr *E, Type *Ty,
-                               bool IgnoreAnonDecls);
+                               bool IgnoreAnonDecls,
+                               ConversionReason Reason);
 
   
   // Action Implementations

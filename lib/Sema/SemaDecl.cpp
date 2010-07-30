@@ -78,7 +78,6 @@ AnonDecl *SemaDecl::GetAnonDecl(llvm::StringRef Text, llvm::SMLoc RefLoc) {
     
     AnonClosureArgs[ArgNo] =
       new (S.Context) AnonDecl(RefLoc, S.Context.getIdentifier(Text),
-                               // FIXME: Should be dependent type!
                                S.Context.IntType);
   }
   return AnonClosureArgs[ArgNo].get();
@@ -147,14 +146,12 @@ VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name,
   // If both a type and an initializer are specified, make sure the
   // initializer's type agrees with the (redundant) type.
   if (Ty && Init) {
-    if (Expr *InitE = S.expr.HandleConversionToType(Init, Ty, true))
+    Expr *InitE = S.expr.HandleConversionToType(Init, Ty, true,
+                                                SemaExpr::CR_VarInit);
+    if (InitE)
       Init = InitE;
-    else {
-      // FIXME: Improve this to include the actual types!
-      Error(VarLoc, "variable initializer's type ('TODO') does not match "
-            "specified type 'TODO'");
+    else
       Ty = Init->Ty;
-    }
   }
   
   if (Ty == 0)
@@ -175,14 +172,8 @@ ActOnFuncDecl(llvm::SMLoc FuncLoc, llvm::StringRef Name,
   // Validate that the body's type matches the function's type if this isn't a
   // external function.
   if (Body) {
-    if (Expr *BodyE = S.expr.HandleConversionToType(Body, Ty, true))
-      Body = BodyE;
-    else {
-      // FIXME: Improve this to include the actual types!
-      Error(FuncLoc, "func body's's type ('TODO') does not match "
-            "specified type 'TODO'");
-      return 0;
-    }
+    Body = S.expr.HandleConversionToType(Body, Ty, true, SemaExpr::CR_FuncBody);
+    if (Body == 0) return 0;
   }
   
   // Validate attributes.
