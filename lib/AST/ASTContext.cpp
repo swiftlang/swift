@@ -40,6 +40,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
     FunctionTypes(new FunctionTypesMapTy()),
     SourceMgr(sourcemgr),
     VoidType(getTupleType(0, 0)), // void is aka "()"
+    DependentType(new (*this) BuiltinType(BuiltinDependentKind)),
     IntType(new (*this) BuiltinType(BuiltinIntKind)) {
 }
 
@@ -78,7 +79,8 @@ Type *ASTContext::getCanonicalType(Type *T) {
     return T->CanonicalType;
   
   switch (T->Kind) {
-  case BuiltinIntKind: assert(0 && "These are always canonical");
+  case BuiltinIntKind:
+  case BuiltinDependentKind: assert(0 && "These are always canonical");
   case TupleTypeKind: {
     llvm::SmallVector<llvm::PointerUnion<Type*, NamedDecl*>, 8> CanElts;
     TupleType *TT = llvm::cast<TupleType>(T);
@@ -135,20 +137,22 @@ TupleType *ASTContext::getTupleType(const TupleType::TypeOrDecl *Fields,
   // owned memory.
   TupleType::TypeOrDecl *FieldsCopy =
     (TupleType::TypeOrDecl *)Allocate(sizeof(*Fields)*NumFields, 8);
-  memcpy(FieldsCopy, Fields, sizeof(*Fields)*NumFields);
   
-  TupleType *New = new (*this) TupleType(FieldsCopy, NumFields);
-  TupleTypesMap.InsertNode(New, InsertPos);
-  
-  // If all of the elements of the tuple are canonical types, then the tuple is
-  // to.
-  bool IsCanonical = true;
-  for (unsigned i = 0; i != NumFields; ++i)
-    if (!Fields[i].is<Type*>() ||
-        !Fields[i].get<Type*>()->isCanonical()) {
+  bool IsDependent = false;  // Any dependent element means this is dependent.
+  bool IsCanonical = true;   // All canonical elts means this is canonical.
+  for (unsigned i = 0, e = NumFields; i != e; ++i) {
+    FieldsCopy[i] = Fields[i];
+    if (Fields[i].is<Type*>()) {
+      IsDependent |= Fields[i].get<Type*>()->Dependent;
+      IsCanonical &= Fields[i].get<Type*>()->isCanonical();
+    } else {
+      // TODO: Can the vardecl have a dependent type?
       IsCanonical = false;
-      break;
     }
+  }
+
+  TupleType *New = new (*this) TupleType(FieldsCopy, NumFields, IsDependent);
+  TupleTypesMap.InsertNode(New, InsertPos);
 
   // If the type is canonical then set the canonical type pointer to itself.
   if (IsCanonical)
@@ -164,7 +168,9 @@ FunctionType *ASTContext::getFunctionType(Type *Input, Type *Result) {
     (*(FunctionTypesMapTy*)FunctionTypes)[std::make_pair(Input, Result)];
   if (Entry) return Entry;
   
-  Entry = new (*this) FunctionType(Input, Result);
+  bool isDependent = Input->Dependent | Result->Dependent;
+  
+  Entry = new (*this) FunctionType(Input, Result, isDependent);
   
   // If the input and result types are canonical, then so is the result.
   if (Input->isCanonical() && Result->isCanonical())

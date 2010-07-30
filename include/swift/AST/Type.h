@@ -28,12 +28,12 @@ namespace swift {
   class NamedDecl;
   
   enum TypeKind {
-    // BuiltinDependentKind,
+    BuiltinDependentKind,
     BuiltinIntKind,
     TupleTypeKind,
     FunctionTypeKind,
     
-    Builtin_First = BuiltinIntKind,
+    Builtin_First = BuiltinDependentKind,
     Builtin_Last = BuiltinIntKind
   };
   
@@ -48,12 +48,18 @@ class Type {
   /// a non-canonical type is requested.
   Type *CanonicalType;
 protected:
-  Type(TypeKind kind) : CanonicalType(0), Kind(kind) {}
-  Type(TypeKind kind, Type *CanType) : CanonicalType(CanType), Kind(kind) {}
+  Type(TypeKind kind, bool dependent, Type *CanType = 0)
+    : CanonicalType(CanType), Kind(kind), Dependent(dependent) {}
 public:
   /// Kind - The discriminator that indicates what subclass of type this is.
   const TypeKind Kind;
 
+  /// Dependent - This type is either the Dependent builtin type, or its type
+  /// graph recursively contains it.  This type occurs during semantic analysis,
+  /// and indicates that the type of an expression depends on its context.  For
+  /// example,  _0 has dependent type, and "(_0, 42)" is a tuple with dependent
+  /// type.
+  const bool Dependent;
   
   /// isCanonical - Return true if this is a canonical type.
   bool isCanonical() const { return CanonicalType == this; }
@@ -81,7 +87,7 @@ public:
 class BuiltinType : public Type {
   friend class ASTContext;
   // Builtin types are always canonical.
-  BuiltinType(TypeKind K) : Type(K, this) {}
+  BuiltinType(TypeKind K) : Type(K, K == BuiltinDependentKind, this) {}
 public:
   
   void print(llvm::raw_ostream &OS) const;
@@ -122,8 +128,8 @@ public:
                       const TypeOrDecl *Fields, unsigned NumFields);
   
 private:
-  TupleType(const TypeOrDecl *const fields, unsigned numfields)
-    : Type(TupleTypeKind), Fields(fields), NumFields(numfields) {}
+  TupleType(const TypeOrDecl *const fields, unsigned numfields, bool isDep)
+    : Type(TupleTypeKind, isDep), Fields(fields), NumFields(numfields) {}
   friend class ASTContext;
 };
   
@@ -141,8 +147,8 @@ public:
   static bool classof(const Type *T) { return T->Kind == FunctionTypeKind;}
   
 private:
-  FunctionType(Type *input, Type *result)
-    : Type(FunctionTypeKind), Input(input), Result(result) {}
+  FunctionType(Type *input, Type *result, bool isDep)
+    : Type(FunctionTypeKind, isDep), Input(input), Result(result) {}
   friend class ASTContext;
 };
   
