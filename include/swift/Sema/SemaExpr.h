@@ -19,6 +19,7 @@
 #define SWIFT_SEMA_EXPR_H
 
 #include "swift/Sema/SemaBase.h"
+#include "llvm/ADT/PointerIntPair.h"
 
 namespace llvm {
   template <typename PT1, typename PT2>
@@ -54,6 +55,8 @@ public:
   ActOnBraceExpr(llvm::SMLoc LBLoc,
                  const llvm::PointerUnion<Expr*, NamedDecl*> *Elements,
                  unsigned NumElements, bool HasMissingSemi, llvm::SMLoc RBLoc);
+  
+  llvm::PointerIntPair<Expr*, 1, bool> ActOnJuxtaposition(Expr *E1, Expr *E2);
   llvm::NullablePtr<Expr> ActOnSequence(Expr **Exprs, unsigned NumExprs); 
   
   llvm::NullablePtr<Expr> ActOnBinaryExpr(Expr *LHS, NamedDecl *OpFn,

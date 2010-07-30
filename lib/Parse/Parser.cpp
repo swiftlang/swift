@@ -551,7 +551,9 @@ static bool isStartOfExpr(Token &Tok, Sema &S) {
 ///   expr-single:
 ///     expr-primary (binary-operator expr-primary)*
 bool Parser::ParseExpr(NullablePtr<Expr> &Result, const char *Message) {
-  llvm::SmallVector<Expr*, 8> SequenceExprs;
+  llvm::SmallVector<Expr*, 8> SequencedExprs;
+  
+  Expr *LastExpr = 0;
   do {
     // Parse the expr-single.
     Result = 0;
@@ -559,17 +561,39 @@ bool Parser::ParseExpr(NullablePtr<Expr> &Result, const char *Message) {
         Result.isNull())
       return true;
   
-    SequenceExprs.push_back(Result.get());
+    // Check to see if this juxtaposition is application of a function with its
+    // arguments.  If so, bind the function application, otherwise, we have a
+    // sequence.
+    if (LastExpr == 0)
+      LastExpr = Result.get();
+    else {
+      llvm::PointerIntPair<Expr*, 1, bool>
+        ApplyRes = S.expr.ActOnJuxtaposition(LastExpr, Result.get());
+
+      if (!ApplyRes.getInt()) {
+        // Function application.
+        LastExpr = ApplyRes.getPointer();
+        if (LastExpr == 0) return true;
+      } else {
+        // Sequencing.
+        assert(ApplyRes.getPointer() == 0 && "Sequencing with a result?");
+        SequencedExprs.push_back(LastExpr);
+        LastExpr = Result.get();
+      }
+    }
   } while (isStartOfExpr(Tok, S));
 
+  assert(LastExpr && "Should have parsed at least one valid expression");
+  
   // If there is exactly one element in the sequence, it is a degenerate
   // sequence that just returns the last value anyway, shortcut ActOnSequence.
-  if (SequenceExprs.size() == 1) {
-    Result = SequenceExprs.back();
+  if (SequencedExprs.empty()) {
+    Result = LastExpr;
     return false;
   }
   
-  Result = S.expr.ActOnSequence(SequenceExprs.data(), SequenceExprs.size());
+  SequencedExprs.push_back(LastExpr);
+  Result = S.expr.ActOnSequence(SequencedExprs.data(), SequencedExprs.size());
   return false;
 }
 

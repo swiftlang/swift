@@ -21,6 +21,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
@@ -196,49 +197,40 @@ SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
                                    RPLoc, ResultTy);
 }
 
+/// ActOnJuxtaposition - This is invoked whenever the parser sees a
+/// juxtaposition operation.  If the two expressions can be applied, this
+/// returns the new expression (which can be null) and false, otherwise it
+/// return null and true to indicate that they are sequenced.
+llvm::PointerIntPair<Expr*, 1, bool>
+SemaExpr::ActOnJuxtaposition(Expr *E1, Expr *E2) {
+  // If this expression in the sequence is just a floating value that isn't
+  // a function, then we have a discarded value, such as "4 5".  Just return
+  // true so that it gets properly sequenced.
+  FunctionType *FT = llvm::dyn_cast<FunctionType>(E1->Ty);
+  if (FT == 0)
+    return llvm::PointerIntPair<Expr*, 1, bool>(0, true);
+  
+  // Otherwise, we do have a function application.  Check that the argument
+  // type matches the expected type of the function.
+  if (Expr *Arg = HandleConversionToType(E2, FT->Input, false)) {
+    E1 = new (S.Context) ApplyExpr(E1, Arg, FT->Result);
+    return llvm::PointerIntPair<Expr*, 1, bool>(E1, false);
+  }
+  
+  // FIXME: QOI: Source ranges + print the type.
+  Error(E1->getLocStart(), "operator to function invocation has wrong type");
+  return llvm::PointerIntPair<Expr*, 1, bool>(0, false);
+}
+
+
 llvm::NullablePtr<Expr>
 SemaExpr::ActOnSequence(Expr **Exprs, unsigned NumExprs) {
   assert(NumExprs != 0 && "Empty sequence isn't possible");
 
   Expr **NewElements =(Expr**)
     S.Context.Allocate(sizeof(*NewElements)*NumExprs, 8);
-  unsigned NewNumElements = 0;
-
-  // Loop over all of the expressions, splitting instances of function
-  // application out into ApplyExpr nodes.
-  for (unsigned i = 0; i != NumExprs; ) {
-    Type *ExprTy = Exprs[i]->Ty;
-    // If this expression in the sequence is just a floating value that isn't
-    // a function, then we have a discarded value, such as "4 5".  Just add it
-    // to the sequence to be computed and move on.  Alternatively, if this is a
-    // function at the end of the sequence, do the same: the sequence's value is
-    // the function.
-    if (!llvm::isa<FunctionType>(ExprTy) ||  // Non-function value.
-        i == NumExprs-1) {                   // Last expr in sequence?
-      NewElements[NewNumElements++] = Exprs[i++];
-      continue;
-    }
-    
-    // Otherwise, we do have a function application.  Check that the argument
-    // type matches the expected type of the function.
-    FunctionType *FT = llvm::cast<FunctionType>(ExprTy);
-    
-    if (Expr *Arg = HandleConversionToType(Exprs[i+1], FT->Input, false)) {
-      Exprs[i+1] = new (S.Context) ApplyExpr(Exprs[i], Arg, FT->Result);
-      ++i;
-      continue;
-    }
-    
-    // FIXME: QOI: Source ranges + print the type.
-    Error(Exprs[i]->getLocStart(),
-          "operator to function invocation has wrong type");
-    return 0;
-  }
-  
-  if (NewNumElements == 1)
-    return NewElements[0];
-  
-  return new (S.Context) SequenceExpr(NewElements, NewNumElements);
+  memcpy(NewElements, Exprs, sizeof(*NewElements)*NumExprs);
+  return new (S.Context) SequenceExpr(NewElements, NumExprs);
 }
 
 
