@@ -294,6 +294,20 @@ NullablePtr<Expr> SemaExpr::ActOnNumericConstant(llvm::StringRef Text,
   return new (S.Context) IntegerLiteral(Text, Loc, S.Context.IntType);
 }
 
+static bool SemaDeclRefExpr(NamedDecl *D, llvm::SMLoc Loc, Type *&ResultTy,
+                            SemaExpr &SE) {
+  if (D == 0) {
+    SE.Error(Loc, "use of undeclared identifier");
+    return true;
+  }
+
+  // TODO: QOI: If the decl had an "invalid" bit set, then return the error
+  // object to improve error recovery.
+  
+  ResultTy = D->Ty;
+  return false;
+}
+
 NullablePtr<Expr> 
 SemaExpr::ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
   NamedDecl *D = S.decl.LookupName(S.Context.getIdentifier(Text));
@@ -303,21 +317,18 @@ SemaExpr::ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
   if (D == 0 && Text.size() == 2 &&
       Text[0] == '_' && Text[1] >= '0' && Text[1] <= '9')
     D = S.decl.GetAnonDecl(Text, Loc);
-                                 
-  // TODO: QOI: If the decl had an "invalid" bit set, then return the error
-  // object to improve error recovery.
-  if (D)
-    return new (S.Context) DeclRefExpr(D, Loc, D->Ty);
+
+  Type *ResultTy = 0;
+  if (SemaDeclRefExpr(D, Loc, ResultTy, *this)) return 0;
   
-  Error(Loc, "use of undeclared identifier");
-  return 0;
+  return new (S.Context) DeclRefExpr(D, Loc, D->Ty);
 }
 
-NullablePtr<Expr> 
-SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
-                         const llvm::PointerUnion<Expr*, NamedDecl*> *Elements,
-                         unsigned NumElements, bool HasMissingSemi,
-                         llvm::SMLoc RBLoc) {
+static bool SemaBraceExpr(llvm::SMLoc LBLoc, 
+                          llvm::PointerUnion<Expr*, NamedDecl*> *Elements,
+                          unsigned NumElements,
+                          bool HasMissingSemi, llvm::SMLoc RBLoc, 
+                          Type *&ResultTy, SemaExpr &SE) {
   // If any of the elements of the braces has a function type (which indicates
   // that a function didn't get called), then produce an error.  We don't do
   // this for the last element in the 'missing semi' case, because the brace
@@ -327,30 +338,41 @@ SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
     if (Elements[i].is<Expr*>() &&
         llvm::isa<FunctionType>(Elements[i].get<Expr*>()->Ty))
       // TODO: QOI: Add source range.
-      Error(Elements[i].get<Expr*>()->getLocStart(),
-            "expression resolves to an unevaluated function");
-  
-  Type *ResultTy;
+      SE.Error(Elements[i].get<Expr*>()->getLocStart(),
+               "expression resolves to an unevaluated function");
+
   if (HasMissingSemi)
     ResultTy = Elements[NumElements-1].get<Expr*>()->Ty;
   else
-    ResultTy = S.Context.VoidType;
+    ResultTy = SE.S.Context.VoidType;
   
+  return false;
+}
+                          
+NullablePtr<Expr> 
+SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
+                         const llvm::PointerUnion<Expr*, NamedDecl*> *Elements,
+                         unsigned NumElements, bool HasMissingSemi,
+                         llvm::SMLoc RBLoc) {
   llvm::PointerUnion<Expr*, NamedDecl*> *NewElements = 
-    (llvm::PointerUnion<Expr*, NamedDecl*> *)
-    S.Context.Allocate(sizeof(*Elements)*NumElements, 8);
+  (llvm::PointerUnion<Expr*, NamedDecl*> *)
+  S.Context.Allocate(sizeof(*Elements)*NumElements, 8);
   memcpy(NewElements, Elements, sizeof(*Elements)*NumElements);
+  
+  Type *ResultTy = 0;
+  if (SemaBraceExpr(LBLoc, NewElements, NumElements, HasMissingSemi, RBLoc,
+                    ResultTy, *this))
+    return 0;
   
   return new (S.Context) BraceExpr(LBLoc, NewElements, NumElements,
                                    HasMissingSemi, RBLoc, ResultTy);
 }
 
-NullablePtr<Expr> 
-SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
-                         unsigned NumSubExprs, llvm::SMLoc RPLoc) {
-  
+
+static bool SemaTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
+                          unsigned NumSubExprs, llvm::SMLoc RPLoc,
+                          Type *&ResultTy, SemaExpr &SE) {
   // A tuple expr with a single subexpression is just a grouping paren.
-  Type *ResultTy;
   if (NumSubExprs == 1) {
     ResultTy = SubExprs[0]->Ty;
   } else {
@@ -360,11 +382,23 @@ SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
     for (unsigned i = 0, e = NumSubExprs; i != e; ++i)
       ResultTyElts.push_back(SubExprs[i]->Ty);
     
-    ResultTy = S.Context.getTupleType(ResultTyElts.data(), NumSubExprs);
+    ResultTy = SE.S.Context.getTupleType(ResultTyElts.data(), NumSubExprs);
   }
+  
+  return false;
+}
+
+NullablePtr<Expr> 
+SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
+                         unsigned NumSubExprs, llvm::SMLoc RPLoc) {
   
   Expr **NewSubExprs = (Expr**)S.Context.Allocate(sizeof(Expr*)*NumSubExprs, 8);
   memcpy(NewSubExprs, SubExprs, sizeof(Expr*)*NumSubExprs);
+
+  Type *ResultTy = 0;
+  if (SemaTupleExpr(LPLoc, NewSubExprs, NumSubExprs, RPLoc, ResultTy, *this))
+    return 0;
+    
   return new (S.Context) TupleExpr(LPLoc, NewSubExprs, NumSubExprs,
                                    RPLoc, ResultTy);
 }
