@@ -28,6 +28,246 @@ using namespace swift;
 using llvm::NullablePtr;
 
 //===----------------------------------------------------------------------===//
+// Expression Semantic Analysis Routines
+//===----------------------------------------------------------------------===//
+
+// Each expression node has an implementation here, which takes the properties
+// of the expression, validates it and computes a result type.  This is shared
+// logic between the Sema Action implementations and type inferencing code.
+//
+// These each produce diagnostics and return true on error.  On success, they
+// may mutate the input values, then return false.
+
+static bool SemaDeclRefExpr(NamedDecl *D, llvm::SMLoc Loc, Type *&ResultTy,
+                            SemaExpr &SE) {
+  if (D == 0) {
+    SE.Error(Loc, "use of undeclared identifier");
+    return true;
+  }
+  
+  // TODO: QOI: If the decl had an "invalid" bit set, then return the error
+  // object to improve error recovery.
+  
+  ResultTy = D->Ty;
+  return false;
+}
+
+static bool SemaBraceExpr(llvm::SMLoc LBLoc, 
+                          llvm::PointerUnion<Expr*, NamedDecl*> *Elements,
+                          unsigned NumElements,
+                          bool HasMissingSemi, llvm::SMLoc RBLoc, 
+                          Type *&ResultTy, SemaExpr &SE) {
+  // If any of the elements of the braces has a function type (which indicates
+  // that a function didn't get called), then produce an error.  We don't do
+  // this for the last element in the 'missing semi' case, because the brace
+  // expr as a whole has the function result.
+  // TODO: What about tuples which contain functions by-value that are dead?
+  for (unsigned i = 0; i != NumElements-(HasMissingSemi ? 1 : 0); ++i)
+    if (Elements[i].is<Expr*>() &&
+        llvm::isa<FunctionType>(Elements[i].get<Expr*>()->Ty))
+      // TODO: QOI: Add source range.
+      SE.Error(Elements[i].get<Expr*>()->getLocStart(),
+               "expression resolves to an unevaluated function");
+  
+  if (HasMissingSemi)
+    ResultTy = Elements[NumElements-1].get<Expr*>()->Ty;
+  else
+    ResultTy = SE.S.Context.VoidType;
+  
+  return false;
+}
+
+
+static bool SemaTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
+                          unsigned NumSubExprs, llvm::SMLoc RPLoc,
+                          Type *&ResultTy, SemaExpr &SE) {
+  // A tuple expr with a single subexpression is just a grouping paren.
+  if (NumSubExprs == 1) {
+    ResultTy = SubExprs[0]->Ty;
+  } else {
+    // Compute the result type.
+    llvm::SmallVector<TupleType::TypeOrDecl, 8> ResultTyElts;
+    
+    for (unsigned i = 0, e = NumSubExprs; i != e; ++i)
+      ResultTyElts.push_back(SubExprs[i]->Ty);
+    
+    ResultTy = SE.S.Context.getTupleType(ResultTyElts.data(), NumSubExprs);
+  }
+  
+  return false;
+}
+
+static bool SemaApplyExpr(Expr *&E1, Expr *&E2, Type *&ResultTy, SemaExpr &SE) {
+  if (E1->Ty->Dependent) {
+    ResultTy = SE.S.Context.DependentType;
+    return false;
+  }
+  
+  // If this expression in the sequence is just a floating value that isn't
+  // a function, then we have a discarded value, such as "4 5".  Just return
+  // true so that it gets properly sequenced.
+  FunctionType *FT = llvm::dyn_cast<FunctionType>(E1->Ty);
+  if (FT == 0) {
+    SE.Error(E1->getLocStart(),
+             "function application requires value of function type");
+    return true;
+  }
+  
+  // Otherwise, we do have a function application.  Check that the argument
+  // type matches the expected type of the function.
+  E2 = SE.HandleConversionToType(E2, FT->Input, false, SemaExpr::CR_FuncApply);
+  if (E2 == 0)
+    return true;
+  
+  ResultTy = FT->Result;
+  return false;
+}
+
+/// SemaSequence - Perform semantic analysis for sequence expressions.
+static bool SemaSequence(Expr **Elements, unsigned NumElements, Type *&ResultTy,
+                         SemaExpr &SE) {
+  ResultTy = Elements[NumElements-1]->Ty;
+  return false;
+}
+
+/// SemaBinaryExpr - Perform semantic analysis of binary expressions.
+static bool SemaBinaryExpr(Expr *&LHS, NamedDecl *OpFn,
+                           llvm::SMLoc OpLoc, Expr *&RHS, Type *&ResultTy,
+                           SemaExpr &SE) {
+  if (LHS->Ty->Dependent || RHS->Ty->Dependent) {
+    ResultTy = SE.S.Context.DependentType;
+    return false; 
+  }
+  
+  // Parser verified that OpFn has an Infix Precedence.  Sema verified that OpFn
+  // only has InfixPrecedence if it takes a 2 element tuple as input.
+  assert(OpFn->Attrs.InfixPrecedence != -1 &&
+         "Sema and parser should verify that only binary predicates are used"); 
+  FunctionType *FnTy = llvm::cast<FunctionType>(OpFn->Ty);
+  TupleType *Input = llvm::cast<TupleType>(FnTy->Input);
+  assert(Input->NumFields == 2 && "Sema error validating infix fn type");
+  
+  // Verify that the LHS/RHS have the right type and do conversions as needed.
+  LHS = SE.HandleConversionToType(LHS, Input->getElementType(0), false,
+                                  SemaExpr::CR_BinOpLHS);
+  if (LHS == 0) return true;
+  
+  RHS = SE.HandleConversionToType(RHS, Input->getElementType(1), false,
+                                  SemaExpr::CR_BinOpRHS);
+  if (RHS == 0) return true;
+  
+  ResultTy = FnTy->Result;
+  return false;
+}
+
+//===----------------------------------------------------------------------===//
+// Action Implementations
+//===----------------------------------------------------------------------===//
+
+NullablePtr<Expr> SemaExpr::ActOnNumericConstant(llvm::StringRef Text,
+                                                 llvm::SMLoc Loc) {
+  return new (S.Context) IntegerLiteral(Text, Loc, S.Context.IntType);
+}
+
+NullablePtr<Expr> 
+SemaExpr::ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
+  NamedDecl *D = S.decl.LookupName(S.Context.getIdentifier(Text));
+  
+  // If this identifier is _0 -> _9, then it is a use of an implicit anonymous
+  // closure argument.
+  if (D == 0 && Text.size() == 2 &&
+      Text[0] == '_' && Text[1] >= '0' && Text[1] <= '9')
+    D = S.decl.GetAnonDecl(Text, Loc);
+  
+  Type *ResultTy = 0;
+  if (SemaDeclRefExpr(D, Loc, ResultTy, *this)) return 0;
+  
+  return new (S.Context) DeclRefExpr(D, Loc, D->Ty);
+}
+
+NullablePtr<Expr> 
+SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
+                         const llvm::PointerUnion<Expr*, NamedDecl*> *Elements,
+                         unsigned NumElements, bool HasMissingSemi,
+                         llvm::SMLoc RBLoc) {
+  llvm::PointerUnion<Expr*, NamedDecl*> *NewElements = 
+  (llvm::PointerUnion<Expr*, NamedDecl*> *)
+  S.Context.Allocate(sizeof(*Elements)*NumElements, 8);
+  memcpy(NewElements, Elements, sizeof(*Elements)*NumElements);
+  
+  Type *ResultTy = 0;
+  if (SemaBraceExpr(LBLoc, NewElements, NumElements, HasMissingSemi, RBLoc,
+                    ResultTy, *this))
+    return 0;
+  
+  return new (S.Context) BraceExpr(LBLoc, NewElements, NumElements,
+                                   HasMissingSemi, RBLoc, ResultTy);
+}
+
+NullablePtr<Expr> 
+SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
+                         unsigned NumSubExprs, llvm::SMLoc RPLoc) {
+  
+  Expr **NewSubExprs = (Expr**)S.Context.Allocate(sizeof(Expr*)*NumSubExprs, 8);
+  memcpy(NewSubExprs, SubExprs, sizeof(Expr*)*NumSubExprs);
+  
+  Type *ResultTy = 0;
+  if (SemaTupleExpr(LPLoc, NewSubExprs, NumSubExprs, RPLoc, ResultTy, *this))
+    return 0;
+  
+  return new (S.Context) TupleExpr(LPLoc, NewSubExprs, NumSubExprs,
+                                   RPLoc, ResultTy);
+}
+
+/// ActOnJuxtaposition - This is invoked whenever the parser sees a
+/// juxtaposition operation.  If the two expressions can be applied, this
+/// returns the new expression (which can be null) and false, otherwise it
+/// return null and true to indicate that they are sequenced.
+llvm::PointerIntPair<Expr*, 1, bool>
+SemaExpr::ActOnJuxtaposition(Expr *E1, Expr *E2) {
+  // If this expression in the sequence is just a floating value that isn't
+  // a function, then we have a discarded value, such as "4 5".  Just return
+  // true so that it gets properly sequenced.  If the input is a dependent type,
+  // we assume that it is a function so that (_0 1 2 3) binds correctly.  If it
+  // is not a function, parens or ; can be used to disambiguate.
+  if (!llvm::isa<FunctionType>(E1->Ty) && E1->Ty->Kind != BuiltinDependentKind)
+    return llvm::PointerIntPair<Expr*, 1, bool>(0, true);
+  
+  // Okay, we have a function application, analyze it.
+  Type *ResultTy = 0;
+  if (SemaApplyExpr(E1, E2, ResultTy, *this))
+    return llvm::PointerIntPair<Expr*, 1, bool>(0, false);
+  
+  E1 = new (S.Context) ApplyExpr(E1, E2, ResultTy);
+  return llvm::PointerIntPair<Expr*, 1, bool>(E1, false);
+}
+
+
+llvm::NullablePtr<Expr>
+SemaExpr::ActOnSequence(Expr **Elements, unsigned NumElements) {
+  assert(NumElements != 0 && "Empty sequence isn't possible");
+  
+  Expr **NewElements =(Expr**)
+  S.Context.Allocate(sizeof(*NewElements)*NumElements, 8);
+  memcpy(NewElements, Elements, sizeof(*NewElements)*NumElements);
+  
+  Type *ResultTy = 0;
+  if (SemaSequence(NewElements, NumElements, ResultTy, *this)) return 0;
+  
+  return new (S.Context) SequenceExpr(NewElements, NumElements, ResultTy);
+}
+
+NullablePtr<Expr> 
+SemaExpr::ActOnBinaryExpr(Expr *LHS, NamedDecl *OpFn,
+                          llvm::SMLoc OpLoc, Expr *RHS) {
+  Type *ResultTy = 0;
+  if (SemaBinaryExpr(LHS, OpFn, OpLoc, RHS, ResultTy, *this)) return 0;
+  
+  return new (S.Context) BinaryExpr(LHS, OpFn, OpLoc, RHS, ResultTy);
+}
+
+
+//===----------------------------------------------------------------------===//
 // Expression Type Coercing - PropagateTypeToResult
 //===----------------------------------------------------------------------===//
 
@@ -285,231 +525,3 @@ Expr *SemaExpr::HandleConversionToType(Expr *E, Type *OrigDestTy,
   return 0;
 }
 
-//===----------------------------------------------------------------------===//
-// Action Implementations
-//===----------------------------------------------------------------------===//
-
-NullablePtr<Expr> SemaExpr::ActOnNumericConstant(llvm::StringRef Text,
-                                                 llvm::SMLoc Loc) {
-  return new (S.Context) IntegerLiteral(Text, Loc, S.Context.IntType);
-}
-
-static bool SemaDeclRefExpr(NamedDecl *D, llvm::SMLoc Loc, Type *&ResultTy,
-                            SemaExpr &SE) {
-  if (D == 0) {
-    SE.Error(Loc, "use of undeclared identifier");
-    return true;
-  }
-
-  // TODO: QOI: If the decl had an "invalid" bit set, then return the error
-  // object to improve error recovery.
-  
-  ResultTy = D->Ty;
-  return false;
-}
-
-NullablePtr<Expr> 
-SemaExpr::ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
-  NamedDecl *D = S.decl.LookupName(S.Context.getIdentifier(Text));
-
-  // If this identifier is _0 -> _9, then it is a use of an implicit anonymous
-  // closure argument.
-  if (D == 0 && Text.size() == 2 &&
-      Text[0] == '_' && Text[1] >= '0' && Text[1] <= '9')
-    D = S.decl.GetAnonDecl(Text, Loc);
-
-  Type *ResultTy = 0;
-  if (SemaDeclRefExpr(D, Loc, ResultTy, *this)) return 0;
-  
-  return new (S.Context) DeclRefExpr(D, Loc, D->Ty);
-}
-
-static bool SemaBraceExpr(llvm::SMLoc LBLoc, 
-                          llvm::PointerUnion<Expr*, NamedDecl*> *Elements,
-                          unsigned NumElements,
-                          bool HasMissingSemi, llvm::SMLoc RBLoc, 
-                          Type *&ResultTy, SemaExpr &SE) {
-  // If any of the elements of the braces has a function type (which indicates
-  // that a function didn't get called), then produce an error.  We don't do
-  // this for the last element in the 'missing semi' case, because the brace
-  // expr as a whole has the function result.
-  // TODO: What about tuples which contain functions by-value that are dead?
-  for (unsigned i = 0; i != NumElements-(HasMissingSemi ? 1 : 0); ++i)
-    if (Elements[i].is<Expr*>() &&
-        llvm::isa<FunctionType>(Elements[i].get<Expr*>()->Ty))
-      // TODO: QOI: Add source range.
-      SE.Error(Elements[i].get<Expr*>()->getLocStart(),
-               "expression resolves to an unevaluated function");
-
-  if (HasMissingSemi)
-    ResultTy = Elements[NumElements-1].get<Expr*>()->Ty;
-  else
-    ResultTy = SE.S.Context.VoidType;
-  
-  return false;
-}
-                          
-NullablePtr<Expr> 
-SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
-                         const llvm::PointerUnion<Expr*, NamedDecl*> *Elements,
-                         unsigned NumElements, bool HasMissingSemi,
-                         llvm::SMLoc RBLoc) {
-  llvm::PointerUnion<Expr*, NamedDecl*> *NewElements = 
-  (llvm::PointerUnion<Expr*, NamedDecl*> *)
-  S.Context.Allocate(sizeof(*Elements)*NumElements, 8);
-  memcpy(NewElements, Elements, sizeof(*Elements)*NumElements);
-  
-  Type *ResultTy = 0;
-  if (SemaBraceExpr(LBLoc, NewElements, NumElements, HasMissingSemi, RBLoc,
-                    ResultTy, *this))
-    return 0;
-  
-  return new (S.Context) BraceExpr(LBLoc, NewElements, NumElements,
-                                   HasMissingSemi, RBLoc, ResultTy);
-}
-
-
-static bool SemaTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
-                          unsigned NumSubExprs, llvm::SMLoc RPLoc,
-                          Type *&ResultTy, SemaExpr &SE) {
-  // A tuple expr with a single subexpression is just a grouping paren.
-  if (NumSubExprs == 1) {
-    ResultTy = SubExprs[0]->Ty;
-  } else {
-    // Compute the result type.
-    llvm::SmallVector<TupleType::TypeOrDecl, 8> ResultTyElts;
-    
-    for (unsigned i = 0, e = NumSubExprs; i != e; ++i)
-      ResultTyElts.push_back(SubExprs[i]->Ty);
-    
-    ResultTy = SE.S.Context.getTupleType(ResultTyElts.data(), NumSubExprs);
-  }
-  
-  return false;
-}
-
-NullablePtr<Expr> 
-SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
-                         unsigned NumSubExprs, llvm::SMLoc RPLoc) {
-  
-  Expr **NewSubExprs = (Expr**)S.Context.Allocate(sizeof(Expr*)*NumSubExprs, 8);
-  memcpy(NewSubExprs, SubExprs, sizeof(Expr*)*NumSubExprs);
-
-  Type *ResultTy = 0;
-  if (SemaTupleExpr(LPLoc, NewSubExprs, NumSubExprs, RPLoc, ResultTy, *this))
-    return 0;
-    
-  return new (S.Context) TupleExpr(LPLoc, NewSubExprs, NumSubExprs,
-                                   RPLoc, ResultTy);
-}
-
-static bool SemaApplyExpr(Expr *&E1, Expr *&E2, Type *&ResultTy, SemaExpr &SE) {
-  if (E1->Ty->Dependent) {
-    ResultTy = SE.S.Context.DependentType;
-    return false;
-  }
-  
-  // If this expression in the sequence is just a floating value that isn't
-  // a function, then we have a discarded value, such as "4 5".  Just return
-  // true so that it gets properly sequenced.
-  FunctionType *FT = llvm::dyn_cast<FunctionType>(E1->Ty);
-  if (FT == 0) {
-    SE.Error(E1->getLocStart(),
-             "function application requires value of function type");
-    return true;
-  }
-  
-  // Otherwise, we do have a function application.  Check that the argument
-  // type matches the expected type of the function.
-  E2 = SE.HandleConversionToType(E2, FT->Input, false, SemaExpr::CR_FuncApply);
-  if (E2 == 0)
-    return true;
-  
-  ResultTy = FT->Result;
-  return false;
-}
-
-
-/// ActOnJuxtaposition - This is invoked whenever the parser sees a
-/// juxtaposition operation.  If the two expressions can be applied, this
-/// returns the new expression (which can be null) and false, otherwise it
-/// return null and true to indicate that they are sequenced.
-llvm::PointerIntPair<Expr*, 1, bool>
-SemaExpr::ActOnJuxtaposition(Expr *E1, Expr *E2) {
-  // If this expression in the sequence is just a floating value that isn't
-  // a function, then we have a discarded value, such as "4 5".  Just return
-  // true so that it gets properly sequenced.  If the input is a dependent type,
-  // we assume that it is a function so that (_0 1 2 3) binds correctly.  If it
-  // is not a function, parens or ; can be used to disambiguate.
-  if (!llvm::isa<FunctionType>(E1->Ty) && E1->Ty->Kind != BuiltinDependentKind)
-    return llvm::PointerIntPair<Expr*, 1, bool>(0, true);
-  
-  // Okay, we have a function application, analyze it.
-  Type *ResultTy = 0;
-  if (SemaApplyExpr(E1, E2, ResultTy, *this))
-    return llvm::PointerIntPair<Expr*, 1, bool>(0, false);
-  
-  E1 = new (S.Context) ApplyExpr(E1, E2, ResultTy);
-  return llvm::PointerIntPair<Expr*, 1, bool>(E1, false);
-}
-
-
-/// SemaSequence - Perform semantic analysis for sequence expressions.
-static bool SemaSequence(Expr **Elements, unsigned NumElements, Type *&ResultTy,
-                         SemaExpr &SE) {
-  ResultTy = Elements[NumElements-1]->Ty;
-  return false;
-}
-
-llvm::NullablePtr<Expr>
-SemaExpr::ActOnSequence(Expr **Elements, unsigned NumElements) {
-  assert(NumElements != 0 && "Empty sequence isn't possible");
-
-  Expr **NewElements =(Expr**)
-    S.Context.Allocate(sizeof(*NewElements)*NumElements, 8);
-  memcpy(NewElements, Elements, sizeof(*NewElements)*NumElements);
-  
-  Type *ResultTy = 0;
-  if (SemaSequence(NewElements, NumElements, ResultTy, *this)) return 0;
-  
-  return new (S.Context) SequenceExpr(NewElements, NumElements, ResultTy);
-}
-
-/// SemaBinaryExpr - Perform semantic analysis of binary expressions.
-static bool SemaBinaryExpr(Expr *&LHS, NamedDecl *OpFn,
-                           llvm::SMLoc OpLoc, Expr *&RHS, Type *&ResultTy,
-                           SemaExpr &SE) {
-  if (LHS->Ty->Dependent || RHS->Ty->Dependent) {
-    ResultTy = SE.S.Context.DependentType;
-    return false; 
-  }
-  
-  // Parser verified that OpFn has an Infix Precedence.  Sema verified that OpFn
-  // only has InfixPrecedence if it takes a 2 element tuple as input.
-  assert(OpFn->Attrs.InfixPrecedence != -1 &&
-         "Sema and parser should verify that only binary predicates are used"); 
-  FunctionType *FnTy = llvm::cast<FunctionType>(OpFn->Ty);
-  TupleType *Input = llvm::cast<TupleType>(FnTy->Input);
-  assert(Input->NumFields == 2 && "Sema error validating infix fn type");
-  
-  // Verify that the LHS/RHS have the right type and do conversions as needed.
-  LHS = SE.HandleConversionToType(LHS, Input->getElementType(0), false,
-                               SemaExpr::CR_BinOpLHS);
-  if (LHS == 0) return true;
-  
-  RHS = SE.HandleConversionToType(RHS, Input->getElementType(1), false,
-                               SemaExpr::CR_BinOpRHS);
-  if (RHS == 0) return true;
-  
-  ResultTy = FnTy->Result;
-  return false;
-}
-
-NullablePtr<Expr> 
-SemaExpr::ActOnBinaryExpr(Expr *LHS, NamedDecl *OpFn,
-                          llvm::SMLoc OpLoc, Expr *RHS) {
-  Type *ResultTy = 0;
-  if (SemaBinaryExpr(LHS, OpFn, OpLoc, RHS, ResultTy, *this)) return 0;
-  
-  return new (S.Context) BinaryExpr(LHS, OpFn, OpLoc, RHS, ResultTy);
-}
