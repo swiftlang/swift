@@ -88,7 +88,8 @@ public:
   VarDecl *ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name, Type *Ty,
                         Expr *Init, DeclAttributes &Attrs);
   FuncDecl *ActOnFuncDecl(llvm::SMLoc FuncLoc, llvm::StringRef Name,
-                          Type *Ty, Expr *Body, DeclAttributes &Attrs);
+                          Type *Ty, DeclAttributes &Attrs);
+  FuncDecl *ActOnFuncBody(FuncDecl *FD, Expr *Body);
 };
   
 } // end namespace swift

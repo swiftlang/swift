@@ -166,20 +166,25 @@ VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name,
 
 FuncDecl *SemaDecl::
 ActOnFuncDecl(llvm::SMLoc FuncLoc, llvm::StringRef Name,
-              Type *Ty, Expr *Body, DeclAttributes &Attrs) {
+              Type *Ty, DeclAttributes &Attrs) {
   assert(Ty && "Type not specified?");
 
-  // Validate that the body's type matches the function's type if this isn't a
-  // external function.
-  if (Body) {
-    Body = S.expr.HandleConversionToType(Body, Ty, true, SemaExpr::CR_FuncBody);
-    if (Body == 0) return 0;
-  }
-  
   // Validate attributes.
   ValidateAttributes(Attrs, Ty, *this);
 
   return new (S.Context) FuncDecl(FuncLoc, S.Context.getIdentifier(Name),
-                                  Ty, Body, Attrs);
+                                  Ty, 0, Attrs);
 }
 
+FuncDecl *SemaDecl::ActOnFuncBody(FuncDecl *FD, Expr *Body) {
+  assert(FD && Body && "Elements of func body not specified?");
+         
+  // Validate that the body's type matches the function's type if this isn't a
+  // external function.
+  Body = S.expr.HandleConversionToType(Body, FD->Ty, true,
+                                       SemaExpr::CR_FuncBody);
+  if (Body == 0) return 0;
+  
+  FD->Init = Body;
+  return FD;
+}

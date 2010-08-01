@@ -418,10 +418,12 @@ FuncDecl *Parser::ParseDeclFunc() {
   // Build the function type.
   Type *FuncTy = S.type.ActOnFunctionType(ArgListTy, ArrowLoc, RetTy);
   
+  // Build the decl for the function.
+  FuncDecl *FD = S.decl.ActOnFuncDecl(FuncLoc, Identifier, FuncTy, Attributes);
+  
   // If this is a declaration, we're done.
   if (ConsumeIf(tok::semi))
-    return S.decl.ActOnFuncDecl(FuncLoc, Identifier, FuncTy, 0,
-                                Attributes);
+    return FD;
 
   // Otherwise, we must have an expression.  Eat the optional '=' if present.
   ConsumeIf(tok::equal);
@@ -432,8 +434,7 @@ FuncDecl *Parser::ParseDeclFunc() {
       Body.isNull())
     return 0;
 
-  return S.decl.ActOnFuncDecl(FuncLoc, Identifier, FuncTy, Body.getPtrOrNull(),
-                              Attributes);
+  return S.decl.ActOnFuncBody(FD, Body.get());
 }
 
 //===----------------------------------------------------------------------===//
