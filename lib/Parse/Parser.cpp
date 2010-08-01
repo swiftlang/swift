@@ -196,6 +196,11 @@ Decl *Parser::ParseDeclTopLevel() {
     if (VarDecl *D = ParseDeclVar()) {
       S.decl.ActOnTopLevelDecl(D);
       
+      // Enter the top-level declaration into the global scope.
+      // FIXME: This seems wrong, it should be visible before parsing the
+      // initializer/body to support recursion...
+      S.decl.AddToScope(D);
+      
       // On successful parse, eat the ;
       ParseToken(tok::semi, "expected ';' at end of var declaration",
                  tok::semi);
@@ -421,6 +426,11 @@ FuncDecl *Parser::ParseDeclFunc() {
   // Build the decl for the function.
   FuncDecl *FD = S.decl.ActOnFuncDecl(FuncLoc, Identifier, FuncTy, Attributes);
   
+  // Enter the func into the current scope, which allows it to be visible and
+  // used within its body.
+  if (FD)
+    S.decl.AddToScope(FD);
+
   // If this is a declaration, we're done.
   if (ConsumeIf(tok::semi))
     return FD;

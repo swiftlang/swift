@@ -89,11 +89,6 @@ AnonDecl *SemaDecl::GetAnonDecl(llvm::StringRef Text, llvm::SMLoc RefLoc) {
 
 /// ActOnTopLevelDecl - This is called after parsing a new top-level decl.
 void SemaDecl::ActOnTopLevelDecl(NamedDecl *D) {
-  // Enter the top-level declaration into the global scope.
-  // FIXME: This seems wrong, it should be visible before parsing the
-  // initializer/body to support recursion...
-  S.decl.AddToScope(D);
-
   // Check for and diagnose any uses of anonymous arguments that were unbound.
   for (unsigned i = 0, e = AnonClosureArgs.size(); i != e; ++i) {
     if (AnonClosureArgs[i].isNull()) continue;
