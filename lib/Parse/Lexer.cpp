@@ -93,6 +93,29 @@ void Lexer::LexIdentifier(Token &Result) {
   return FormToken(Kind, TokStart, Result);
 }
 
+/// LexPunctuationIdentifier - Match identifiers formed out of punctuation.
+void Lexer::LexPunctuationIdentifier(Token &Result) {
+  const char *TokStart = CurPtr-1;
+  const char *PunctuatorCharacters = "<>=!+-/*";
+  
+  CurPtr += strspn(CurPtr, PunctuatorCharacters);
+  
+  // Match various reserved words.
+  if (CurPtr-TokStart == 1) {
+    switch (TokStart[0]) {
+    case '=': return FormToken(tok::equal, TokStart, Result);
+    }
+  } else if (CurPtr-TokStart == 2) {
+    switch ((TokStart[0] << 8) | TokStart[1]) {
+    case ('-' << 8) | '>': // ->
+      return FormToken(tok::arrow, TokStart, Result);
+    }
+  }
+  
+  return FormToken(tok::identifier, TokStart, Result);
+}
+
+
 /// LexDigit - Match [0-9]+
 void Lexer::LexDigit(Token &Result) {
   const char *TokStart = CurPtr-1;
@@ -148,26 +171,25 @@ Restart:
   case ',': return FormToken(tok::comma, TokStart, Result);
   case ':': return FormToken(tok::colon, TokStart, Result);
   case ';': return FormToken(tok::semi,  TokStart, Result);
-  case '=': return FormToken(tok::equal, TokStart, Result);
-  case '-':
-    if (CurPtr[0] == '>') { // "->"  
-      ++CurPtr;
-      return FormToken(tok::arrow, TokStart, Result);
-    }
-    // '-' is an identifier.
-    return FormToken(tok::identifier, TokStart, Result);
+      
+  // Punctuator identifier characters.
   case '/':
     if (CurPtr[0] == '/') {  // "//"
       SkipSlashSlashComment();
       goto Restart;
     }
-      
-    // '/' is an identifier.
-    return FormToken(tok::identifier, TokStart, Result);
+    // '/' starts an identifier.
+    return LexPunctuationIdentifier(Result);
 
+  case '=':
+  case '-':
   case '+':
   case '*': 
-  case '%': return FormToken(tok::identifier, TokStart, Result);
+  case '%':
+  case '<':
+  case '>':
+  case '!':
+    return LexPunctuationIdentifier(Result);
 
   case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G':
   case 'H': case 'I': case 'J': case 'K': case 'L': case 'M': case 'N':
