@@ -121,7 +121,7 @@ static bool SemaApplyExpr(Expr *&E1, Expr *&E2, Type *&ResultTy, SemaExpr &SE) {
   
   // Otherwise, we do have a function application.  Check that the argument
   // type matches the expected type of the function.
-  E2 = SE.HandleConversionToType(E2, FT->Input, false, SemaExpr::CR_FuncApply);
+  E2 = SE.ConvertToType(E2, FT->Input, false, SemaExpr::CR_FuncApply);
   if (E2 == 0)
     return true;
   
@@ -154,12 +154,12 @@ static bool SemaBinaryExpr(Expr *&LHS, NamedDecl *OpFn,
   assert(Input->NumFields == 2 && "Sema error validating infix fn type");
   
   // Verify that the LHS/RHS have the right type and do conversions as needed.
-  LHS = SE.HandleConversionToType(LHS, Input->getElementType(0), false,
-                                  SemaExpr::CR_BinOpLHS);
+  LHS = SE.ConvertToType(LHS, Input->getElementType(0), false,
+                         SemaExpr::CR_BinOpLHS);
   if (LHS == 0) return true;
   
-  RHS = SE.HandleConversionToType(RHS, Input->getElementType(1), false,
-                                  SemaExpr::CR_BinOpRHS);
+  RHS = SE.ConvertToType(RHS, Input->getElementType(1), false,
+                         SemaExpr::CR_BinOpRHS);
   if (RHS == 0) return true;
   
   ResultTy = FnTy->Result;
@@ -541,12 +541,14 @@ BindAndValidateClosureArgs(Expr *Body, Type *FuncInput, SemaDecl &SD) {
   return NewInputs;
 }
 
-Expr *SemaExpr::HandleConversionToType(Expr *E, Type *OrigDestTy,
-                                       bool IgnoreAnonDecls,
-                                       ConversionReason Reason) {
+/// HandleConversionToType - This is the recursive implementation of
+/// ConvertToType.  It does not produce diagnostics, it just returns null on
+/// failure.
+static Expr *HandleConversionToType(Expr *E, Type *OrigDestTy,
+                                    bool IgnoreAnonDecls, SemaExpr &SE) {
   // If we have an exact match of the (canonical) types, we're done.
-  Type *DestTy = S.Context.getCanonicalType(OrigDestTy);
-  Type *ETy = S.Context.getCanonicalType(E->Ty);
+  Type *DestTy = SE.S.Context.getCanonicalType(OrigDestTy);
+  Type *ETy = SE.S.Context.getCanonicalType(E->Ty);
   if (ETy == DestTy) return E;
   
   assert(!DestTy->Dependent && "Result of conversion can't be dependent");
@@ -555,6 +557,19 @@ Expr *SemaExpr::HandleConversionToType(Expr *E, Type *OrigDestTy,
   // elements, see if we can convert each element.
   // FIXME: Do this for "funcdecl4(funcdecl3(), 12);"
   // FIXME: Do this for dependent types, to resolve: foo(_0, 4);
+  
+  if (TupleType *TT = llvm::dyn_cast<TupleType>(DestTy)) {
+    // If the destination is a tuple type with a single element, see if the
+    // expression's type is convertable to the element type.
+    if (TT->NumFields == 1) {
+      if (Expr *ERes = HandleConversionToType(E, TT->getElementType(0),
+                                              false, SE))
+        return new (SE.S.Context) TupleExpr(llvm::SMLoc(), &ERes, 1,
+                                            llvm::SMLoc(), DestTy);
+    }
+    
+    // Handle reswizzling elements based on names, handle default values.
+  }
   
   // Otherwise, check to see if this is an auto-closure case.  This case happens
   // when we convert an expression E to a function type whose result is E's
@@ -565,16 +580,16 @@ Expr *SemaExpr::HandleConversionToType(Expr *E, Type *OrigDestTy,
     // (int,int)->(int,int)->() the arguments bind to the first level, not the
     // inner level.  To handle this, we ignore anonymous decls in the recursive
     // case here.
-    if (Expr *ERes = HandleConversionToType(E, FT->Result, true, Reason)) {
+    if (Expr *ERes = HandleConversionToType(E, FT->Result, true, SE)) {
       // If we bound any anonymous closure arguments, validate them and resolve
       // their types.
       llvm::NullablePtr<AnonDecl> *ActualArgList = 0;
-      if (!IgnoreAnonDecls && !S.decl.AnonClosureArgs.empty()) {
-        ActualArgList = BindAndValidateClosureArgs(ERes, FT->Input, S.decl);
+      if (!IgnoreAnonDecls && !SE.S.decl.AnonClosureArgs.empty()) {
+        ActualArgList = BindAndValidateClosureArgs(ERes, FT->Input, SE.S.decl);
         if (ActualArgList == 0)
           return 0;
       }
-      return new (S.Context) ClosureExpr(ERes, ActualArgList, OrigDestTy);
+      return new (SE.S.Context) ClosureExpr(ERes, ActualArgList, OrigDestTy);
     }
   }
   
@@ -593,6 +608,18 @@ Expr *SemaExpr::HandleConversionToType(Expr *E, Type *OrigDestTy,
   // re-sema'd.
   if (E->Ty->Dependent)
     return E;
+  
+  // Could not do the conversion.
+  return 0;
+}
+
+
+
+Expr *SemaExpr::ConvertToType(Expr *E, Type *OrigDestTy,
+                              bool IgnoreAnonDecls,
+                              ConversionReason Reason) {
+  if (Expr *ERes = HandleConversionToType(E, OrigDestTy, IgnoreAnonDecls,*this))
+    return ERes;
   
   // TODO: QOI: Source ranges + print the type.
   switch (Reason) {

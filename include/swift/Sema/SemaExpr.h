@@ -49,17 +49,15 @@ public:
     CR_FuncBody   // Function body specification.
   };
   
-  /// HandleConversionToType - Do semantic analysis of an expression in a
-  /// context that expects a particular type.  This does conversion to that type
-  /// if the types don't match and diagnoses cases where the conversion cannot
-  /// be performed.  The Reason specifies why this conversion is happening, for
-  /// diagnostic purposes.
+  /// ConvertToType - Do semantic analysis of an expression in a context that
+  /// expects a particular type.  This does conversion to that type if the types
+  /// don't match and diagnoses cases where the conversion cannot be performed.
+  /// The Reason specifies why this conversion is happening, for diagnostic
+  /// purposes.
   ///
   /// This emits a diagnostic and returns null on error.
-  ///
-  Expr *HandleConversionToType(Expr *E, Type *Ty,
-                               bool IgnoreAnonDecls,
-                               ConversionReason Reason);
+  Expr *ConvertToType(Expr *E, Type *Ty, bool IgnoreAnonDecls,
+                      ConversionReason Reason);
 
   
   // Action Implementations

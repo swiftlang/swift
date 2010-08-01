@@ -45,17 +45,6 @@ Type *SemaType::ActOnTupleType(llvm::SMLoc LPLoc,
     }
   }
   
-  // If the tuple only has a single element type, then this is a grouping paren,
-  // not a tuple.
-  if (NumElements == 1) {
-    if (NamedDecl *D = Elements[0].dyn_cast<NamedDecl*>()) {
-      Error(D->getLocStart(), 
-            "grouping parenthesis cannot contain a declaration");
-      return D->Ty;
-    }
-    return Elements[0].get<Type*>();
-  }
-  
   return S.Context.getTupleType(Elements, NumElements);
 }
 
