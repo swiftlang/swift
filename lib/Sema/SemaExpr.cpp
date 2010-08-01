@@ -38,6 +38,12 @@ using llvm::NullablePtr;
 // These each produce diagnostics and return true on error.  On success, they
 // may mutate the input values, then return false.
 
+
+static bool SemaIntegerLiteral(Type *&ResultTy, SemaExpr &SE) {
+  ResultTy = SE.S.Context.IntType;
+  return false;
+}
+
 static bool SemaDeclRefExpr(NamedDecl *D, llvm::SMLoc Loc, Type *&ResultTy,
                             SemaExpr &SE) {
   if (D == 0) {
@@ -123,9 +129,9 @@ static bool SemaApplyExpr(Expr *&E1, Expr *&E2, Type *&ResultTy, SemaExpr &SE) {
   return false;
 }
 
-/// SemaSequence - Perform semantic analysis for sequence expressions.
-static bool SemaSequence(Expr **Elements, unsigned NumElements, Type *&ResultTy,
-                         SemaExpr &SE) {
+/// SemaSequenceExpr - Perform semantic analysis for sequence expressions.
+static bool SemaSequenceExpr(Expr **Elements, unsigned NumElements,
+                             Type *&ResultTy, SemaExpr &SE) {
   ResultTy = Elements[NumElements-1]->Ty;
   return false;
 }
@@ -166,7 +172,9 @@ static bool SemaBinaryExpr(Expr *&LHS, NamedDecl *OpFn,
 
 NullablePtr<Expr> SemaExpr::ActOnNumericConstant(llvm::StringRef Text,
                                                  llvm::SMLoc Loc) {
-  return new (S.Context) IntegerLiteral(Text, Loc, S.Context.IntType);
+  Type *ResultTy = 0;
+  if (SemaIntegerLiteral(ResultTy, *this)) return 0;
+  return new (S.Context) IntegerLiteral(Text, Loc, ResultTy);
 }
 
 NullablePtr<Expr> 
@@ -252,7 +260,7 @@ SemaExpr::ActOnSequence(Expr **Elements, unsigned NumElements) {
   memcpy(NewElements, Elements, sizeof(*NewElements)*NumElements);
   
   Type *ResultTy = 0;
-  if (SemaSequence(NewElements, NumElements, ResultTy, *this)) return 0;
+  if (SemaSequenceExpr(NewElements, NumElements, ResultTy, *this)) return 0;
   
   return new (S.Context) SequenceExpr(NewElements, NumElements, ResultTy);
 }
@@ -266,13 +274,95 @@ SemaExpr::ActOnBinaryExpr(Expr *LHS, NamedDecl *OpFn,
   return new (S.Context) BinaryExpr(LHS, OpFn, OpLoc, RHS, ResultTy);
 }
 
+//===----------------------------------------------------------------------===//
+// Expression Reanalysis - SemaExpressionTree
+//===----------------------------------------------------------------------===//
+
+
+namespace {
+  /// SemaExpressionTree - This class implements top-down (aka "leaf to root",
+  /// analyzing 1 and 4 before the + in "1+4") semantic analysis of an
+  /// already-existing expression tree.  This is performed when a closure is
+  /// formed and anonymous decls like "_4" get a concrete type associated with
+  /// them.  During the initial parse, these decls get a 'dependent' type, which
+  /// disables most semantic analysis associated with them.
+  ///
+  /// When the expression tree is bound to a context, the anonymous decls get a
+  /// concrete type and we have to rescan the tree to assign types to
+  /// intermediate nodes, introduce type coercion etc.  This visitor does this
+  /// job.  Each visit method reanalyzes the children of a node, then reanalyzes
+  /// the node, and returns true on error.
+  class SemaExpressionTree : public ExprVisitor<SemaExpressionTree, bool> {
+    friend class ExprVisitor<SemaExpressionTree, bool>;
+    SemaExpr &SE;
+    
+    bool VisitIntegerLiteral(IntegerLiteral *E) {
+      return SemaIntegerLiteral(E->Ty, SE);
+    }
+    bool VisitDeclRefExpr(DeclRefExpr *E) {
+      return SemaDeclRefExpr(E->D, E->Loc, E->Ty, SE);
+    }
+    bool VisitTupleExpr(TupleExpr *E) {
+      for (unsigned i = 0, e = E->NumSubExprs; i != e; ++i)
+        if (Visit(E->SubExprs[i]))
+          return true;
+      
+      return SemaTupleExpr(E->LParenLoc, E->SubExprs, E->NumSubExprs,
+                           E->RParenLoc, E->Ty, SE);
+    }
+    bool VisitApplyExpr(ApplyExpr *E) {
+      if (Visit(E->Fn) || Visit(E->Arg))
+        return true;
+      
+      return SemaApplyExpr(E->Fn, E->Arg, E->Ty, SE);
+    }
+    bool VisitSequenceExpr(SequenceExpr *E) {
+      for (unsigned i = 0, e = E->NumElements; i != e; ++i)
+        if (Visit(E->Elements[i]))
+          return true;
+      
+      return SemaSequenceExpr(E->Elements, E->NumElements, E->Ty, SE);
+    }
+    bool VisitBraceExpr(BraceExpr *E) {
+      for (unsigned i = 0, e = E->NumElements; i != e; ++i)
+        if (Expr *SubExpr = E->Elements[i].dyn_cast<Expr*>()) {
+          if (Visit(SubExpr)) return true;
+        } else if (Expr *Init = E->Elements[i].get<NamedDecl*>()->Init) {
+          if (Visit(Init)) return true;
+          E->Elements[i].get<NamedDecl*>()->Ty = Init->Ty;
+        }
+      
+      return SemaBraceExpr(E->LBLoc, E->Elements, E->NumElements,
+                           E->MissingSemi, E->RBLoc, E->Ty, SE);
+    }
+    bool VisitClosureExpr(ClosureExpr *E) {
+      // Anon-decls within a nested closure will have already been resolved, so
+      // we don't need to recurse into it.  This also prevents N^2 re-sema
+      // activity with lots of nested closures.
+      return false;      
+    }
+    bool VisitBinaryExpr(BinaryExpr *E) {
+      if (Visit(E->LHS) || Visit(E->RHS))
+        return true;
+      
+      return SemaBinaryExpr(E->LHS, E->Fn, E->OpLoc, E->RHS, E->Ty, SE);
+    }
+    
+  public:
+    SemaExpressionTree(SemaExpr &se) : SE(se) {}
+    bool doIt(Expr *E) {
+      return Visit(E);
+    }
+  };
+} // end anonymous namespace.
+
 
 //===----------------------------------------------------------------------===//
-// Expression Type Coercing - PropagateTypeToResult
+// Expression Type Coercing - CoerceDependentResultToType
 //===----------------------------------------------------------------------===//
 
 // Don't need bottom-up type propagation until we get generics or start caring
-// about diagnostics.
+// about diagnostics QoI.
 #if 0
 
 /// CoerceDependentResultToType - This visitor is used when an expression with
@@ -389,7 +479,7 @@ public:
 /// arguments.  Validate the argument list and, if valid, allocate and return
 /// a pointer to the argument to be used for the ClosureExpr.
 static llvm::NullablePtr<AnonDecl> *
-BindAndValidateClosureArgs(Type *FuncInput, SemaDecl &SD) {
+BindAndValidateClosureArgs(Expr *Body, Type *FuncInput, SemaDecl &SD) {
   const llvm::NullablePtr<AnonDecl> *AnonArgs = SD.AnonClosureArgs.data();
   unsigned NumAnonArgs = SD.AnonClosureArgs.size();
   
@@ -443,8 +533,8 @@ BindAndValidateClosureArgs(Type *FuncInput, SemaDecl &SD) {
   
   // Now that the AnonDecls have a type applied to them, redo semantic analysis
   // from the leaves of the expression tree up.
-  
-  
+  if (SemaExpressionTree(SD.S.expr).doIt(Body))
+    return 0;
   
   // We used/consumed the anonymous closure arguments.
   SD.AnonClosureArgs.clear();
@@ -479,8 +569,11 @@ Expr *SemaExpr::HandleConversionToType(Expr *E, Type *OrigDestTy,
       // If we bound any anonymous closure arguments, validate them and resolve
       // their types.
       llvm::NullablePtr<AnonDecl> *ActualArgList = 0;
-      if (!IgnoreAnonDecls && !S.decl.AnonClosureArgs.empty())
-        ActualArgList = BindAndValidateClosureArgs(FT->Input, S.decl);      
+      if (!IgnoreAnonDecls && !S.decl.AnonClosureArgs.empty()) {
+        ActualArgList = BindAndValidateClosureArgs(ERes, FT->Input, S.decl);
+        if (ActualArgList == 0)
+          return 0;
+      }
       return new (S.Context) ClosureExpr(ERes, ActualArgList, OrigDestTy);
     }
   }
