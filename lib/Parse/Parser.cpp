@@ -196,9 +196,9 @@ Decl *Parser::ParseDeclTopLevel() {
     if (VarDecl *D = ParseDeclVar()) {
       S.decl.ActOnTopLevelDecl(D);
       
-      // Enter the top-level declaration into the global scope.
-      // FIXME: This seems wrong, it should be visible before parsing the
-      // initializer/body to support recursion...
+      // Enter the top-level declaration into the global scope.  var's are not
+      // allowed to be recursive, so they are entered after the var and its
+      // initializer are parsed.
       S.decl.AddToScope(D);
       
       // On successful parse, eat the ;
@@ -646,7 +646,8 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
       
       while (ConsumeIf(tok::comma)) {
         SubExpr = 0;
-        if (ParseExpr(SubExpr, "expected expression in parentheses")) return true;
+        if (ParseExpr(SubExpr, "expected expression in parentheses"))
+          return true;
         
         if (SubExpr.isNull())
           AnyErroneousSubExprs = true;
@@ -715,7 +716,7 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
         continue;  // Consume the ';' and keep going.
       }
       
-      // FIXME: Improve error recovery.
+      // FIXME: QOI: Improve error recovery.
       if (Tok.is(tok::semi) && Tok.isNot(tok::r_brace))
         SkipUntil(tok::r_brace);
       ConsumeIf(tok::r_brace);

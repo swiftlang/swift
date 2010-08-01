@@ -553,11 +553,6 @@ static Expr *HandleConversionToType(Expr *E, Type *OrigDestTy,
   
   assert(!DestTy->Dependent && "Result of conversion can't be dependent");
   
-  // If the input is a tuple and the output is a tuple with the same number of
-  // elements, see if we can convert each element.
-  // FIXME: Do this for "funcdecl4(funcdecl3(), 12);"
-  // FIXME: Do this for dependent types, to resolve: foo(_0, 4);
-  
   if (TupleType *TT = llvm::dyn_cast<TupleType>(DestTy)) {
     // If the destination is a tuple type with a single element, see if the
     // expression's type is convertable to the element type.
@@ -567,6 +562,11 @@ static Expr *HandleConversionToType(Expr *E, Type *OrigDestTy,
         return new (SE.S.Context) TupleExpr(llvm::SMLoc(), &ERes, 1,
                                             llvm::SMLoc(), DestTy);
     }
+
+    // If the input is a tuple and the output is a tuple with the same number of
+    // elements, see if we can convert each element.
+    // FIXME: Do this for "funcdecl4(funcdecl3(), 12);"
+    // FIXME: Do this for dependent types, to resolve: foo(_0, 4);
     
     // Handle reswizzling elements based on names, handle default values.
   }
