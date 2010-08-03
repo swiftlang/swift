@@ -529,6 +529,9 @@ BindAndValidateClosureArgs(Expr *&Body, Type *FuncInput, SemaDecl &SD) {
   return NewInputs;
 }
 
+static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
+                                    SemaExpr &SE);
+
 /// ConvertTupleToTuple - This is called when a tuple expression is used in a
 /// (different) tuple context.  This either coerces the tuple to the requested
 /// destination type or returns null to indicate the failure.
@@ -595,16 +598,40 @@ static Expr *ConvertTupleToTuple(Expr *E, TupleType *DestTy, SemaExpr &SE) {
     if (!UsedElements[i])
       return 0;
   
-  // If the element types of the tuple don't line up, we have to do an
-  // extraction of all the elements and form a new tuple, otherwise we can use a
-  // TupleConvertExpr for brevity.
+  // It looks like the elements line up, walk through them and see if the types
+  // either agree or can be converted.  We unpack the source elementwise so we
+  // can do elementwise conversions as needed, then rebuild a new TupleExpr of
+  // the right destination type.
+  llvm::SmallVector<Expr*, 16> NewElements(DestTy->NumFields);
   
+  for (unsigned i = 0, e = DestTy->NumFields; i != e; ++i) {
+    // FIXME: This turns the AST into an ASDAG, which is seriously bad.  We
+    // should add a more tailored AST representation for this.
+    
+    // Extract the input element corresponding to this destination element.
+    unsigned SrcField = DestElementSources[i];
+    assert(SrcField != ~0U && "dest field not found?");
+    Expr *Src = new (SE.S.Context)
+       TupleElementExpr(E, llvm::SMLoc(), SrcField, llvm::SMLoc(),
+                        ETy->getElementType(SrcField));
+    
+    // Check to see if the src value can be converted to the destination element
+    // type.
+    Src = HandleConversionToType(Src, DestTy->getElementType(i), true, SE);
+    // TODO: QOI: Include a note about this failure!
+    if (Src == 0) return 0;
+    NewElements[i] = Src;
+  }
   
+  // If we got here, the type conversion is successful, create a new TupleExpr.  
   // FIXME: Do this for dependent types, to resolve: foo(_0, 4);
-  // Handle default values.
-  // FIXME: Handle default args etc.
-  //return new (SE.S.Context) TupleConvertExpr(E, DestTy);
-  return E;
+  // FIXME: Add default values.
+  Expr **NewSE =
+    (Expr**)SE.S.Context.Allocate(sizeof(Expr*)*DestTy->NumFields, 8);
+  memcpy(NewSE, NewElements.data(), sizeof(Expr*)*DestTy->NumFields);
+
+  return new (SE.S.Context) TupleExpr(llvm::SMLoc(), NewSE, NewElements.size(),
+                                      llvm::SMLoc(), DestTy);
 }
 
 /// HandleConversionToType - This is the recursive implementation of
