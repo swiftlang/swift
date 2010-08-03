@@ -45,6 +45,20 @@ Type *TupleType::getElementType(unsigned FieldNo) const {
 }
  
 
+/// getNamedElementId - If this tuple has a field with the specified name,
+/// return the field index, otherwise return -1.
+int TupleType::getNamedElementId(Identifier I) const {
+  for (unsigned i = 0, e = NumFields; i != e; ++i) {
+    if (NamedDecl *ND = Fields[i].dyn_cast<NamedDecl*>())
+      if (ND->Name == I)
+        return i;
+  }
+
+  // Otherwise, name not found.
+  return -1;
+}
+
+
 //===----------------------------------------------------------------------===//
 //  Type printing.
 //===----------------------------------------------------------------------===//

@@ -27,6 +27,7 @@
 using namespace swift;
 using llvm::NullablePtr;
 using llvm::isa;
+using llvm::dyn_cast;
 
 //===----------------------------------------------------------------------===//
 // Expression Semantic Analysis Routines
@@ -121,7 +122,7 @@ static bool SemaApplyExpr(Expr *&E1, Expr *&E2, Type *&ResultTy, SemaExpr &SE) {
   // If this expression in the sequence is just a floating value that isn't
   // a function, then we have a discarded value, such as "4 5".  Just return
   // true so that it gets properly sequenced.
-  FunctionType *FT = llvm::dyn_cast<FunctionType>(E1->Ty);
+  FunctionType *FT = dyn_cast<FunctionType>(E1->Ty);
   if (FT == 0) {
     SE.Error(E1->getLocStart(),
              "function application requires value of function type");
@@ -389,7 +390,7 @@ BindAndValidateClosureArgs(Expr *Body, Type *FuncInput, SemaDecl &SD) {
   // tuple, then _0.._N are valid depending on the number of inputs to the
   // tuple.
   unsigned NumInputArgs = 1;
-  if (TupleType *TT = llvm::dyn_cast<TupleType>(FuncInput))
+  if (TupleType *TT = dyn_cast<TupleType>(FuncInput))
     NumInputArgs = TT->NumFields;
   
   // Verify that the code didn't use too many anonymous arguments, e.g. using _4
@@ -417,7 +418,7 @@ BindAndValidateClosureArgs(Expr *Body, Type *FuncInput, SemaDecl &SD) {
   
   // Assign the AnonDecls their actual concrete types now that we know the
   // context they are being used in.
-  if (TupleType *TT = llvm::dyn_cast<TupleType>(FuncInput)) {
+  if (TupleType *TT = dyn_cast<TupleType>(FuncInput)) {
     for (unsigned i = 0, e = NumAnonArgs; i != e; ++i) {
       if (NewInputs[i].isNull()) continue;
       NewInputs[i].get()->Ty = TT->getElementType(i);
@@ -440,6 +441,78 @@ BindAndValidateClosureArgs(Expr *Body, Type *FuncInput, SemaDecl &SD) {
   return NewInputs;
 }
 
+/// ConvertTupleToTuple - This is called when a tuple expression is used in a
+/// (different) tuple context.  This either coerces the tuple to the requested
+/// destination type or returns null to indicate the failure.
+static Expr *ConvertTupleToTuple(Expr *E, TupleType *DestTy, SemaExpr &SE) {
+  TupleType *ETy = llvm::cast<TupleType>(E->Ty);
+  // FIXME: Type conversion of individual elements this for:
+  // "funcdecl4(funcdecl3(), 12);"
+  
+  // Check to see if this conversion is ok by looping over all the destination
+  // elements and seeing if they are provided by the input.
+  
+  // Keep track of which input elements are used.
+  // TODO: Record where the destination elements came from in the AST.
+  llvm::SmallVector<bool, 16> UsedElements(ETy->NumFields);
+  llvm::SmallVector<int, 16>  DestElementSources(DestTy->NumFields, -1);
+  
+  
+  // First off, see if we can resolve any named values from matching named
+  // inputs.
+  for (unsigned i = 0, e = DestTy->NumFields; i != e; ++i) {
+    // If this destination field is named, first check for a matching named
+    // element in the input, from any position.
+    NamedDecl *ND = DestTy->Fields[i].dyn_cast<NamedDecl*>();
+    if (ND == 0) continue;
+    
+    int InputElement = ETy->getNamedElementId(ND->Name);
+    if (InputElement == -1) continue;
+    
+    DestElementSources[i] = InputElement;
+    UsedElements[InputElement] = true;
+  }
+  
+  // Next step, resolve (in order) unmatched named results and unnamed results
+  // to any left-over unnamed input.
+  unsigned NextInputValue = 0;
+  for (unsigned i = 0, e = DestTy->NumFields; i != e; ++i) {
+    // If we already found an input to satisfy this output, we're done.
+    if (DestElementSources[i] != -1) continue;
+
+    // Scan for an unmatched unnamed input value.
+    while (1) {
+      // If we didn't find any input values, bail out.
+      // TODO: QOI: it would be good to indicate which dest element doesn't have
+      // a value in this sort of assignment failure.
+      if (NextInputValue == ETy->NumFields)
+        return 0;
+      
+      // If this input value is unnamed and unused, use it!
+      if (!UsedElements[NextInputValue] &&
+          ETy->Fields[NextInputValue].is<Type*>())
+        break;
+      
+      ++NextInputValue;
+    }
+
+    // Okay, we found an input value to use.
+    DestElementSources[i] = NextInputValue;
+    UsedElements[NextInputValue] = true;
+  }
+  
+  // If there were any unused input values, we fail.
+  // TODO: QOI: this should become a note if it really fails.
+  for (unsigned i = 0, e = UsedElements.size(); i != e; ++i)
+    if (!UsedElements[i])
+      return 0;
+  
+  // FIXME: Do this for dependent types, to resolve: foo(_0, 4);
+  // Handle default values.
+  // FIXME: Handle default args etc.
+  return new (SE.S.Context) TupleConvertExpr(E, DestTy);
+}
+
 /// HandleConversionToType - This is the recursive implementation of
 /// ConvertToType.  It does not produce diagnostics, it just returns null on
 /// failure.
@@ -453,7 +526,7 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
   assert(!isa<DependentType>(DestTy) &&
          "Result of conversion can't be dependent");
   
-  if (TupleType *TT = llvm::dyn_cast<TupleType>(DestTy)) {
+  if (TupleType *TT = dyn_cast<TupleType>(DestTy)) {
     // If the destination is a tuple type with a single element, see if the
     // expression's type is convertable to the element type.
     if (TT->NumFields == 1) {
@@ -467,23 +540,17 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
       }
     }
 
-    // If the input is a tuple and the output is a tuple with the same number of
-    // elements, see if we can convert each element.
-    // FIXME: Do this for "funcdecl4(funcdecl3(), 12);"
-    // FIXME: Do this for dependent types, to resolve: foo(_0, 4);
-    
-    // Handle reswizzling elements based on names, handle default values.
-    if (isa<TupleType>(ETy) &&
-        TT->NumFields == llvm::cast<TupleType>(ETy)->NumFields) {
-      // FIXME: Handle default args etc.
-      return new (SE.S.Context) TupleConvertExpr(E, DestTy);
-    }
+    // If the input is a tuple and the output is a tuple, see if we can convert
+    // each element.
+    if (isa<TupleType>(ETy))
+      if (Expr *Res = ConvertTupleToTuple(E, TT, SE))
+        return Res;
   }
   
   // Otherwise, check to see if this is an auto-closure case.  This case happens
   // when we convert an expression E to a function type whose result is E's
   // type.
-  if (FunctionType *FT = llvm::dyn_cast<FunctionType>(DestTy)) {
+  if (FunctionType *FT = dyn_cast<FunctionType>(DestTy)) {
     // If there are any live anonymous closure arguments, this level will use
     // them and remove them.  When binding something like _0+_1 to
     // (int,int)->(int,int)->() the arguments bind to the first level, not the

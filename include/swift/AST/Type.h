@@ -26,6 +26,7 @@ namespace llvm {
 namespace swift {
   class ASTContext;
   class NamedDecl;
+  class Identifier;
   
   enum TypeKind {
     BuiltinDependentKind,
@@ -125,6 +126,9 @@ public:
   /// NamedDecls automatically.
   Type *getElementType(unsigned FieldNo) const;
   
+  /// getNamedElementId - If this tuple has a field with the specified name,
+  /// return the field index, otherwise return -1.
+  int getNamedElementId(Identifier I) const;
   
   void print(llvm::raw_ostream &OS) const;
 
