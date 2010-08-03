@@ -67,7 +67,7 @@ public:
   
   // Builtin type and simple types that are used frequently.
   Type * const VoidType; /// VoidType - This is 'void', aka "()"
-  Type * const DependentType; /// DependentType - Type is dependent on context.
+  Type * const DependentTy; /// DependentTy - Type is dependent on context.
   Type * const IntType;  /// IntType - This is 'int'.
 
   /// getTupleType - Return the uniqued tuple type with the specified elements.

@@ -56,7 +56,7 @@ void Type::dump() const {
 
 void Type::print(llvm::raw_ostream &OS) const {
   switch (Kind) {
-  case BuiltinDependentKind:  return cast<BuiltinType>(this)->print(OS);
+  case BuiltinDependentKind:  return cast<DependentType>(this)->print(OS);
   case BuiltinIntKind:        return cast<BuiltinType>(this)->print(OS);
   case TupleTypeKind:         return cast<TupleType>(this)->print(OS);
   case FunctionTypeKind:      return cast<FunctionType>(this)->print(OS);
@@ -64,12 +64,11 @@ void Type::print(llvm::raw_ostream &OS) const {
 }
 
 void BuiltinType::print(llvm::raw_ostream &OS) const {
-  if (Kind == BuiltinIntKind) {
-    OS << "int";
-    return;
-  }
-  
-  assert(Kind == BuiltinDependentKind && "Unknown builtin type!");
+  assert(Kind == BuiltinIntKind && "Unknown builtin type!");
+  OS << "int";
+}
+
+void DependentType::print(llvm::raw_ostream &OS) const {
   OS << "<<dependent type>>";
 }
 

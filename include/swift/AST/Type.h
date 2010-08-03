@@ -33,7 +33,7 @@ namespace swift {
     TupleTypeKind,
     FunctionTypeKind,
     
-    Builtin_First = BuiltinDependentKind,
+    Builtin_First = BuiltinIntKind,
     Builtin_Last = BuiltinIntKind
   };
   
@@ -48,19 +48,12 @@ class Type {
   /// a non-canonical type is requested.
   Type *CanonicalType;
 protected:
-  Type(TypeKind kind, bool dependent, Type *CanType = 0)
-    : CanonicalType(CanType), Kind(kind), Dependent(dependent) {}
+  Type(TypeKind kind, Type *CanType = 0)
+    : CanonicalType(CanType), Kind(kind) {}
 public:
   /// Kind - The discriminator that indicates what subclass of type this is.
   const TypeKind Kind;
 
-  /// Dependent - This type is either the Dependent builtin type, or its type
-  /// graph recursively contains it.  This type occurs during semantic analysis,
-  /// and indicates that the type of an expression depends on its context.  For
-  /// example,  _0 has dependent type, and "(_0, 42)" is a tuple with dependent
-  /// type.
-  const bool Dependent;
-  
   /// isCanonical - Return true if this is a canonical type.
   bool isCanonical() const { return CanonicalType == this; }
   
@@ -87,7 +80,7 @@ public:
 class BuiltinType : public Type {
   friend class ASTContext;
   // Builtin types are always canonical.
-  BuiltinType(TypeKind K) : Type(K, K == BuiltinDependentKind, this) {}
+  BuiltinType(TypeKind kind) : Type(kind, this) {}
 public:
   
   void print(llvm::raw_ostream &OS) const;
@@ -96,6 +89,24 @@ public:
   static bool classof(const BuiltinType *) { return true; }
   static bool classof(const Type *T) {
     return T->Kind >= Builtin_First && T->Kind <= Builtin_Last;
+  }
+};
+  
+  
+/// DependentType - This is a expression type whose actual kind is specified by
+/// context which hasn't been provided yet.
+class DependentType : public Type {
+  friend class ASTContext;
+  // The Dependent type is always canonical.
+  DependentType() : Type(BuiltinDependentKind, this) {}
+public:
+  
+  void print(llvm::raw_ostream &OS) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const DependentType *) { return true; }
+  static bool classof(const Type *T) {
+    return T->Kind == BuiltinDependentKind;
   }
 };
 
@@ -128,8 +139,8 @@ public:
                       const TypeOrDecl *Fields, unsigned NumFields);
   
 private:
-  TupleType(const TypeOrDecl *const fields, unsigned numfields, bool isDep)
-    : Type(TupleTypeKind, isDep), Fields(fields), NumFields(numfields) {}
+  TupleType(const TypeOrDecl *const fields, unsigned numfields)
+    : Type(TupleTypeKind), Fields(fields), NumFields(numfields) {}
   friend class ASTContext;
 };
   
@@ -147,8 +158,8 @@ public:
   static bool classof(const Type *T) { return T->Kind == FunctionTypeKind;}
   
 private:
-  FunctionType(Type *input, Type *result, bool isDep)
-    : Type(FunctionTypeKind, isDep), Input(input), Result(result) {}
+  FunctionType(Type *input, Type *result)
+    : Type(FunctionTypeKind), Input(input), Result(result) {}
   friend class ASTContext;
 };
   

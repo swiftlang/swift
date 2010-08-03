@@ -26,6 +26,7 @@
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
 using llvm::NullablePtr;
+using llvm::isa;
 
 //===----------------------------------------------------------------------===//
 // Expression Semantic Analysis Routines
@@ -70,7 +71,7 @@ static bool SemaBraceExpr(llvm::SMLoc LBLoc,
   // TODO: What about tuples which contain functions by-value that are dead?
   for (unsigned i = 0; i != NumElements-(HasMissingSemi ? 1 : 0); ++i)
     if (Elements[i].is<Expr*>() &&
-        llvm::isa<FunctionType>(Elements[i].get<Expr*>()->Ty))
+        isa<FunctionType>(Elements[i].get<Expr*>()->Ty))
       // TODO: QOI: Add source range.
       SE.Error(Elements[i].get<Expr*>()->getLocStart(),
                "expression resolves to an unevaluated function");
@@ -96,16 +97,24 @@ static bool SemaTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
   // Compute the result type.
   llvm::SmallVector<TupleType::TypeOrDecl, 8> ResultTyElts;
   
-  for (unsigned i = 0, e = NumSubExprs; i != e; ++i)
+  for (unsigned i = 0, e = NumSubExprs; i != e; ++i) {
+    // If any of the tuple element types is dependent, the whole tuple should
+    // have dependent type.
+    if (isa<DependentType>(SubExprs[i]->Ty)) {
+      ResultTy = SubExprs[i]->Ty;
+      return false;
+    }
+    
     ResultTyElts.push_back(SubExprs[i]->Ty);
+  }
   
   ResultTy = SE.S.Context.getTupleType(ResultTyElts.data(), NumSubExprs);
   return false;
 }
 
 static bool SemaApplyExpr(Expr *&E1, Expr *&E2, Type *&ResultTy, SemaExpr &SE) {
-  if (E1->Ty->Dependent) {
-    ResultTy = SE.S.Context.DependentType;
+  if (isa<DependentType>(E1->Ty)) {
+    ResultTy = SE.S.Context.DependentTy;
     return false;
   }
   
@@ -140,8 +149,8 @@ static bool SemaSequenceExpr(Expr **Elements, unsigned NumElements,
 static bool SemaBinaryExpr(Expr *&LHS, NamedDecl *OpFn,
                            llvm::SMLoc OpLoc, Expr *&RHS, Type *&ResultTy,
                            SemaExpr &SE) {
-  if (LHS->Ty->Dependent || RHS->Ty->Dependent) {
-    ResultTy = SE.S.Context.DependentType;
+  if (isa<DependentType>(LHS->Ty) || isa<DependentType>(RHS->Ty)) {
+    ResultTy = SE.S.Context.DependentTy;
     return false; 
   }
   
@@ -238,7 +247,7 @@ SemaExpr::ActOnJuxtaposition(Expr *E1, Expr *E2) {
   // true so that it gets properly sequenced.  If the input is a dependent type,
   // we assume that it is a function so that (_0 1 2 3) binds correctly.  If it
   // is not a function, parens or ; can be used to disambiguate.
-  if (!llvm::isa<FunctionType>(E1->Ty) && E1->Ty->Kind != BuiltinDependentKind)
+  if (!isa<FunctionType>(E1->Ty) && E1->Ty->Kind != BuiltinDependentKind)
     return llvm::PointerIntPair<Expr*, 1, bool>(0, true);
   
   // Okay, we have a function application, analyze it.
@@ -312,7 +321,7 @@ namespace {
     }
     bool VisitTupleConvertExpr(TupleConvertExpr *E) {
       // The type of the tuple wouldn't be dependent to get this node.
-      assert(!E->Ty->Dependent);
+      assert(!isa<DependentType>(E->Ty));
       return Visit(E->SubExpr);
     }
     bool VisitApplyExpr(ApplyExpr *E) {
@@ -388,7 +397,7 @@ class CoerceDependentResultToType
     return E;
   }
   Expr *VisitDeclRefExpr(DeclRefExpr *E) {
-    assert(llvm::isa<AnonDecl>(E->D) &&
+    assert(isa<AnonDecl>(E->D) &&
            "Only anondecls can have dependent type");
     AnonDecl *AD = llvm::cast<AnonDecl>(E->D);
 
@@ -553,7 +562,8 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
   // If we have an exact match, we're done.
   if (ETy == DestTy) return E;
   
-  assert(!DestTy->Dependent && "Result of conversion can't be dependent");
+  assert(!isa<DependentType>(DestTy) &&
+         "Result of conversion can't be dependent");
   
   if (TupleType *TT = llvm::dyn_cast<TupleType>(DestTy)) {
     // If the destination is a tuple type with a single element, see if the
@@ -575,7 +585,7 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
     // FIXME: Do this for dependent types, to resolve: foo(_0, 4);
     
     // Handle reswizzling elements based on names, handle default values.
-    if (llvm::isa<TupleType>(ETy) &&
+    if (isa<TupleType>(ETy) &&
         TT->NumFields == llvm::cast<TupleType>(ETy)->NumFields) {
       // FIXME: Handle default args etc.
       return new (SE.S.Context) TupleConvertExpr(E, DestTy);
@@ -616,7 +626,7 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
   // If this has a dependent type, just return the expression, the nested
   // subexpression arguments will be bound later and the expression will be
   // re-sema'd.
-  if (E->Ty->Dependent)
+  if (isa<DependentType>(E->Ty))
     return E;
   
   // Could not do the conversion.
