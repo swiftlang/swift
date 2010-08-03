@@ -36,6 +36,7 @@ public:
     DISPATCH(IntegerLiteral);
     DISPATCH(DeclRefExpr);
     DISPATCH(TupleExpr);
+    DISPATCH(TupleConvertExpr);
     DISPATCH(ApplyExpr);
     DISPATCH(SequenceExpr);
     DISPATCH(BraceExpr);

@@ -38,6 +38,7 @@ enum ExprKind {
   IntegerLiteralKind,
   DeclRefExprKind,
   TupleExprKind,
+  TupleConvertExprKind,
   ApplyExprKind,
   SequenceExprKind,
   BraceExprKind,
@@ -133,6 +134,21 @@ public:
   static bool classof(const Expr *E) { return E->Kind == TupleExprKind; }
 };
 
+/// TupleConvertExpr - Convert one tuple type to another, shuffling elements
+/// around as appropriate.
+class TupleConvertExpr : public Expr {
+public:
+  Expr *SubExpr;
+  
+  TupleConvertExpr(Expr *subexpr, Type *Ty)
+  : Expr(TupleConvertExprKind, Ty), SubExpr(subexpr) {}
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TupleConvertExpr *) { return true; }
+  static bool classof(const Expr *E) { return E->Kind == TupleConvertExprKind; }
+};
+
+  
 /// ApplyExpr - Application of an argument to a function, which occurs
 /// syntactically through juxtaposition.  For example, f(1,2) is parsed as
 /// 'f' '(1,2)' which applies a tuple to the function, producing a result.

@@ -90,16 +90,16 @@ static bool SemaTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
   // A tuple expr with a single subexpression is just a grouping paren.
   if (NumSubExprs == 1) {
     ResultTy = SubExprs[0]->Ty;
-  } else {
-    // Compute the result type.
-    llvm::SmallVector<TupleType::TypeOrDecl, 8> ResultTyElts;
-    
-    for (unsigned i = 0, e = NumSubExprs; i != e; ++i)
-      ResultTyElts.push_back(SubExprs[i]->Ty);
-    
-    ResultTy = SE.S.Context.getTupleType(ResultTyElts.data(), NumSubExprs);
+    return false;
   }
   
+  // Compute the result type.
+  llvm::SmallVector<TupleType::TypeOrDecl, 8> ResultTyElts;
+  
+  for (unsigned i = 0, e = NumSubExprs; i != e; ++i)
+    ResultTyElts.push_back(SubExprs[i]->Ty);
+  
+  ResultTy = SE.S.Context.getTupleType(ResultTyElts.data(), NumSubExprs);
   return false;
 }
 
@@ -310,6 +310,11 @@ namespace {
       return SemaTupleExpr(E->LParenLoc, E->SubExprs, E->NumSubExprs,
                            E->RParenLoc, E->Ty, SE);
     }
+    bool VisitTupleConvertExpr(TupleConvertExpr *E) {
+      // The type of the tuple wouldn't be dependent to get this node.
+      assert(!E->Ty->Dependent);
+      return Visit(E->SubExpr);
+    }
     bool VisitApplyExpr(ApplyExpr *E) {
       if (Visit(E->Fn) || Visit(E->Arg))
         return true;
@@ -504,9 +509,6 @@ BindAndValidateClosureArgs(Expr *Body, Type *FuncInput, SemaDecl &SD) {
     NumAnonArgs = NumInputArgs;
   }
   
-  // TODO: Do type resolution of the subexpression now that we know the actual
-  // types of the arguments.
-  
   // Return the right number of inputs.
   llvm::NullablePtr<AnonDecl> *NewInputs =(llvm::NullablePtr<AnonDecl>*)
     SD.S.Context.Allocate(sizeof(*NewInputs)*NumInputArgs, 8);
@@ -544,11 +546,11 @@ BindAndValidateClosureArgs(Expr *Body, Type *FuncInput, SemaDecl &SD) {
 /// HandleConversionToType - This is the recursive implementation of
 /// ConvertToType.  It does not produce diagnostics, it just returns null on
 /// failure.
-static Expr *HandleConversionToType(Expr *E, Type *OrigDestTy,
-                                    bool IgnoreAnonDecls, SemaExpr &SE) {
-  // If we have an exact match of the (canonical) types, we're done.
-  Type *DestTy = SE.S.Context.getCanonicalType(OrigDestTy);
-  Type *ETy = SE.S.Context.getCanonicalType(E->Ty);
+static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
+                                    SemaExpr &SE) {
+  Type *ETy = E->Ty;
+  
+  // If we have an exact match, we're done.
   if (ETy == DestTy) return E;
   
   assert(!DestTy->Dependent && "Result of conversion can't be dependent");
@@ -558,9 +560,13 @@ static Expr *HandleConversionToType(Expr *E, Type *OrigDestTy,
     // expression's type is convertable to the element type.
     if (TT->NumFields == 1) {
       if (Expr *ERes = HandleConversionToType(E, TT->getElementType(0),
-                                              false, SE))
-        return new (SE.S.Context) TupleExpr(llvm::SMLoc(), &ERes, 1,
+                                              false, SE)) {
+        // Must allocate space for the AST node.
+        Expr **NewSE = (Expr**)SE.S.Context.Allocate(sizeof(Expr*), 8);
+        NewSE[0] = ERes;
+        return new (SE.S.Context) TupleExpr(llvm::SMLoc(), NewSE, 1,
                                             llvm::SMLoc(), DestTy);
+      }
     }
 
     // If the input is a tuple and the output is a tuple with the same number of
@@ -569,6 +575,11 @@ static Expr *HandleConversionToType(Expr *E, Type *OrigDestTy,
     // FIXME: Do this for dependent types, to resolve: foo(_0, 4);
     
     // Handle reswizzling elements based on names, handle default values.
+    if (llvm::isa<TupleType>(ETy) &&
+        TT->NumFields == llvm::cast<TupleType>(ETy)->NumFields) {
+      // FIXME: Handle default args etc.
+      return new (SE.S.Context) TupleConvertExpr(E, DestTy);
+    }
   }
   
   // Otherwise, check to see if this is an auto-closure case.  This case happens
@@ -589,14 +600,13 @@ static Expr *HandleConversionToType(Expr *E, Type *OrigDestTy,
         if (ActualArgList == 0)
           return 0;
       }
-      return new (SE.S.Context) ClosureExpr(ERes, ActualArgList, OrigDestTy);
+      return new (SE.S.Context) ClosureExpr(ERes, ActualArgList, DestTy);
     }
   }
   
   // When we want to do early bottom-up inference, this can be enabled
   // and fleshed out.
 #if 0
-  
   // If E has dependent type, then this resolves the type: propagate the type
   // information into the subtree.
   if (E->Ty->Dependent)
@@ -615,11 +625,14 @@ static Expr *HandleConversionToType(Expr *E, Type *OrigDestTy,
 
 
 
-Expr *SemaExpr::ConvertToType(Expr *E, Type *OrigDestTy,
-                              bool IgnoreAnonDecls,
+Expr *SemaExpr::ConvertToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
                               ConversionReason Reason) {
-  if (Expr *ERes = HandleConversionToType(E, OrigDestTy, IgnoreAnonDecls,*this))
+  if (Expr *ERes = HandleConversionToType(E, DestTy, IgnoreAnonDecls, *this))
     return ERes;
+  
+  // FIXME: We only have this because diagnostics are terrible right now.
+  E->dump();
+  DestTy->dump();
   
   // TODO: QOI: Source ranges + print the type.
   switch (Reason) {

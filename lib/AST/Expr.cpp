@@ -42,6 +42,8 @@ llvm::SMLoc Expr::getLocStart() const {
   case IntegerLiteralKind: return cast<IntegerLiteral>(this)->Loc;
   case DeclRefExprKind:    return cast<DeclRefExpr>(this)->Loc;
   case TupleExprKind:      return cast<TupleExpr>(this)->LParenLoc;
+  case TupleConvertExprKind:
+    return cast<TupleConvertExpr>(this)->SubExpr->getLocStart();
   case ApplyExprKind:      return cast<ApplyExpr>(this)->Fn->getLocStart();
   case SequenceExprKind:
     return cast<SequenceExpr>(this)->Elements[0]->getLocStart();
@@ -111,6 +113,13 @@ public:
       OS << '\n';
       PrintRec(E->SubExprs[i]);
     }
+    OS << ')';
+  }
+  void VisitTupleConvertExpr(TupleConvertExpr *E) {
+    OS.indent(Indent) << "(tuple_expr type='";
+    E->Ty->print(OS);
+    OS << "\'\n";
+    PrintRec(E->SubExpr);
     OS << ')';
   }
   void VisitApplyExpr(ApplyExpr *E) {
