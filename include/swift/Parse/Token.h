@@ -56,6 +56,7 @@ namespace tok {
     PUNCTUATOR(l_square,    "[")
     PUNCTUATOR(r_square,    "]")
 
+    PUNCTUATOR(period,      ".")
     PUNCTUATOR(comma,       ",")
     PUNCTUATOR(colon,       ":")
     PUNCTUATOR(semi,        ";")

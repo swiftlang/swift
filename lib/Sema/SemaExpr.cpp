@@ -85,6 +85,49 @@ static bool SemaBraceExpr(llvm::SMLoc LBLoc,
   return false;
 }
 
+static bool SemaDotIdentifier(Expr *E, llvm::SMLoc DotLoc,
+                              Identifier Name, llvm::SMLoc NameLoc,
+                              Type *&ResultTy, int &FieldNo, SemaExpr &SE) {
+  if (isa<DependentType>(E->Ty)) {
+    FieldNo = -1;
+    ResultTy = E->Ty;
+    return false;
+  }
+  
+  TupleType *TT = dyn_cast<TupleType>(E->Ty);
+  if (TT == 0) {
+    SE.Error(E->getLocStart(), "base type of field access is not a tuple");
+    return true;
+  }
+  
+  // If the field name exists, we win.
+  FieldNo = TT->getNamedElementId(Name);
+  if (FieldNo != -1) {
+    ResultTy = TT->getElementType(FieldNo);
+    return false;
+  }
+
+  // Okay, the field name was invalid.  If the field name starts with 'field'
+  // and is otherwise an integer, process it as a field index.
+  if (Name.getLength() == 6 &&
+      memcmp(Name.get(), "field", 5) == 0 &&
+      // FIXME: Support field numbers larger than 9.
+      isdigit(Name.get()[5])) {
+    FieldNo = Name.get()[5]-'0';
+    if (unsigned(FieldNo) >= TT->NumFields) {
+      SE.Error(NameLoc, "field number is too large for tuple");
+      return true;
+    }
+      
+    ResultTy = TT->getElementType(FieldNo);
+    return false;
+  }
+  
+  // Otherwise, we just have an unknown field name.
+  SE.Error(NameLoc, "unknown field in tuple");
+  return true;
+}
+
 
 static bool SemaTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
                           unsigned NumSubExprs, llvm::SMLoc RPLoc,
@@ -222,6 +265,25 @@ SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
                                    HasMissingSemi, RBLoc, ResultTy);
 }
 
+llvm::NullablePtr<Expr>
+SemaExpr::ActOnDotIdentifier(Expr *E, llvm::SMLoc DotLoc,
+                             llvm::StringRef NameStr,
+                             llvm::SMLoc NameLoc) {
+  Identifier Name = S.Context.getIdentifier(NameStr);
+  
+  Type *ResultTy = 0;
+  int FieldNo = -1;
+  if (SemaDotIdentifier(E, DotLoc, Name, NameLoc, ResultTy, FieldNo, *this))
+    return 0;
+  
+  // If the field number is -1, the the base expression is dependent.
+  if (FieldNo == -1)
+    return new (S.Context) UnresolvedDotExpr(E, DotLoc, Name, NameLoc,ResultTy);
+  
+  // TODO: Eventually . can be useful for things other than tuples.
+  return new (S.Context) TupleElementExpr(E, DotLoc, FieldNo, NameLoc,ResultTy);
+}
+
 NullablePtr<Expr> 
 SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
                          unsigned NumSubExprs, llvm::SMLoc RPLoc) {
@@ -302,70 +364,95 @@ namespace {
   /// intermediate nodes, introduce type coercion etc.  This visitor does this
   /// job.  Each visit method reanalyzes the children of a node, then reanalyzes
   /// the node, and returns true on error.
-  class SemaExpressionTree : public ExprVisitor<SemaExpressionTree, bool> {
-    friend class ExprVisitor<SemaExpressionTree, bool>;
+  class SemaExpressionTree : public ExprVisitor<SemaExpressionTree, Expr*> {
+    friend class ExprVisitor<SemaExpressionTree, Expr*>;
     SemaExpr &SE;
     
-    bool VisitIntegerLiteral(IntegerLiteral *E) {
-      return SemaIntegerLiteral(E->Ty, SE);
+    Expr *VisitIntegerLiteral(IntegerLiteral *E) {
+      if (SemaIntegerLiteral(E->Ty, SE)) return 0;
+      return E;
     }
-    bool VisitDeclRefExpr(DeclRefExpr *E) {
-      return SemaDeclRefExpr(E->D, E->Loc, E->Ty, SE);
+    Expr *VisitDeclRefExpr(DeclRefExpr *E) {
+      if (SemaDeclRefExpr(E->D, E->Loc, E->Ty, SE)) return 0;
+      return E;
     }
-    bool VisitTupleExpr(TupleExpr *E) {
+    Expr *VisitTupleExpr(TupleExpr *E) {
       for (unsigned i = 0, e = E->NumSubExprs; i != e; ++i)
-        if (Visit(E->SubExprs[i]))
-          return true;
+        if ((E->SubExprs[i] = Visit(E->SubExprs[i])) == 0)
+          return 0;
       
-      return SemaTupleExpr(E->LParenLoc, E->SubExprs, E->NumSubExprs,
-                           E->RParenLoc, E->Ty, SE);
+      if (SemaTupleExpr(E->LParenLoc, E->SubExprs, E->NumSubExprs,
+                        E->RParenLoc, E->Ty, SE)) return 0;
+      return E;
     }
-    bool VisitTupleConvertExpr(TupleConvertExpr *E) {
-      // The type of the tuple wouldn't be dependent to get this node.
+    Expr *VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
+      int FieldNo = -1;
+      if ((E->SubExpr = Visit(E->SubExpr)) == 0 ||
+          SemaDotIdentifier(E->SubExpr, E->DotLoc, E->Name, E->NameLoc, E->Ty,
+                            FieldNo, SE))
+        return 0;
+      
+      assert(FieldNo != -1 && "Resolved type should return a dependent expr");
+      
+      // TODO: Eventually . can be useful for things other than tuples.
+      return new (SE.S.Context) 
+        TupleElementExpr(E->SubExpr, E->DotLoc, FieldNo, E->NameLoc, E->Ty);
+    }
+    Expr *VisitTupleElementExpr(TupleElementExpr *E) {
+      // TupleElementExpr is fully resolved.
       assert(!isa<DependentType>(E->Ty));
-      return Visit(E->SubExpr);
+      E->SubExpr = Visit(E->SubExpr);
+      return E;
     }
-    bool VisitApplyExpr(ApplyExpr *E) {
-      if (Visit(E->Fn) || Visit(E->Arg))
-        return true;
-      
-      return SemaApplyExpr(E->Fn, E->Arg, E->Ty, SE);
+    
+    Expr *VisitApplyExpr(ApplyExpr *E) {
+      if ((E->Fn = Visit(E->Fn)) == 0 ||
+          (E->Arg = Visit(E->Arg)) == 0 ||
+          SemaApplyExpr(E->Fn, E->Arg, E->Ty, SE))
+        return 0;
+      return E;
     }
-    bool VisitSequenceExpr(SequenceExpr *E) {
+    Expr *VisitSequenceExpr(SequenceExpr *E) {
       for (unsigned i = 0, e = E->NumElements; i != e; ++i)
-        if (Visit(E->Elements[i]))
-          return true;
+        if ((E->Elements[i] = Visit(E->Elements[i])) == 0)
+          return 0;
       
-      return SemaSequenceExpr(E->Elements, E->NumElements, E->Ty, SE);
+      if (SemaSequenceExpr(E->Elements, E->NumElements, E->Ty, SE)) return 0;
+      return E;
     }
-    bool VisitBraceExpr(BraceExpr *E) {
+    Expr *VisitBraceExpr(BraceExpr *E) {
       for (unsigned i = 0, e = E->NumElements; i != e; ++i)
         if (Expr *SubExpr = E->Elements[i].dyn_cast<Expr*>()) {
-          if (Visit(SubExpr)) return true;
+          E->Elements[i] = Visit(SubExpr);
+          if (E->Elements[i].get<Expr*>() == 0) return 0;
         } else if (Expr *Init = E->Elements[i].get<NamedDecl*>()->Init) {
-          if (Visit(Init)) return true;
+          if ((Init = Visit(Init)) == 0) return 0;
           E->Elements[i].get<NamedDecl*>()->Ty = Init->Ty;
+          E->Elements[i].get<NamedDecl*>()->Init = Init;
         }
       
-      return SemaBraceExpr(E->LBLoc, E->Elements, E->NumElements,
-                           E->MissingSemi, E->RBLoc, E->Ty, SE);
+      if (SemaBraceExpr(E->LBLoc, E->Elements, E->NumElements,
+                        E->MissingSemi, E->RBLoc, E->Ty, SE)) return 0;
+      return E;
     }
-    bool VisitClosureExpr(ClosureExpr *E) {
+    Expr *VisitClosureExpr(ClosureExpr *E) {
       // Anon-decls within a nested closure will have already been resolved, so
       // we don't need to recurse into it.  This also prevents N^2 re-sema
       // activity with lots of nested closures.
-      return false;      
+      return E;      
     }
-    bool VisitBinaryExpr(BinaryExpr *E) {
-      if (Visit(E->LHS) || Visit(E->RHS))
-        return true;
+    Expr *VisitBinaryExpr(BinaryExpr *E) {
+      if ((E->LHS = Visit(E->LHS)) == 0 ||
+          (E->RHS = Visit(E->RHS)) == 0 ||
+          SemaBinaryExpr(E->LHS, E->Fn, E->OpLoc, E->RHS, E->Ty, SE))
+        return 0;
       
-      return SemaBinaryExpr(E->LHS, E->Fn, E->OpLoc, E->RHS, E->Ty, SE);
+      return E;
     }
     
   public:
     SemaExpressionTree(SemaExpr &se) : SE(se) {}
-    bool doIt(Expr *E) {
+    Expr *doIt(Expr *E) {
       return Visit(E);
     }
   };
@@ -382,7 +469,7 @@ namespace {
 /// arguments.  Validate the argument list and, if valid, allocate and return
 /// a pointer to the argument to be used for the ClosureExpr.
 static llvm::NullablePtr<AnonDecl> *
-BindAndValidateClosureArgs(Expr *Body, Type *FuncInput, SemaDecl &SD) {
+BindAndValidateClosureArgs(Expr *&Body, Type *FuncInput, SemaDecl &SD) {
   const llvm::NullablePtr<AnonDecl> *AnonArgs = SD.AnonClosureArgs.data();
   unsigned NumAnonArgs = SD.AnonClosureArgs.size();
   
@@ -433,7 +520,8 @@ BindAndValidateClosureArgs(Expr *Body, Type *FuncInput, SemaDecl &SD) {
   
   // Now that the AnonDecls have a type applied to them, redo semantic analysis
   // from the leaves of the expression tree up.
-  if (SemaExpressionTree(SD.S.expr).doIt(Body))
+  Body = SemaExpressionTree(SD.S.expr).doIt(Body);
+  if (Body == 0)
     return 0;
   
   // We used/consumed the anonymous closure arguments.
@@ -507,10 +595,16 @@ static Expr *ConvertTupleToTuple(Expr *E, TupleType *DestTy, SemaExpr &SE) {
     if (!UsedElements[i])
       return 0;
   
+  // If the element types of the tuple don't line up, we have to do an
+  // extraction of all the elements and form a new tuple, otherwise we can use a
+  // TupleConvertExpr for brevity.
+  
+  
   // FIXME: Do this for dependent types, to resolve: foo(_0, 4);
   // Handle default values.
   // FIXME: Handle default args etc.
-  return new (SE.S.Context) TupleConvertExpr(E, DestTy);
+  //return new (SE.S.Context) TupleConvertExpr(E, DestTy);
+  return E;
 }
 
 /// HandleConversionToType - This is the recursive implementation of

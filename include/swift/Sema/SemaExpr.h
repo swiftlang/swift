@@ -73,6 +73,10 @@ public:
                  const llvm::PointerUnion<Expr*, NamedDecl*> *Elements,
                  unsigned NumElements, bool HasMissingSemi, llvm::SMLoc RBLoc);
   
+  llvm::NullablePtr<Expr>
+  ActOnDotIdentifier(Expr *E, llvm::SMLoc DotLoc, llvm::StringRef Identifier,
+                     llvm::SMLoc IdentifierLoc);
+  
   llvm::PointerIntPair<Expr*, 1, bool> ActOnJuxtaposition(Expr *E1, Expr *E2);
   llvm::NullablePtr<Expr> ActOnSequence(Expr **Exprs, unsigned NumExprs); 
   

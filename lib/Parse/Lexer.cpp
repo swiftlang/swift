@@ -161,16 +161,17 @@ Restart:
     // Otherwise, this is the end of the buffer.  Return EOF.
     return FormToken(tok::eof, TokStart, Result);
 
-  case '(': return FormToken(tok::l_paren, TokStart, Result);
-  case ')': return FormToken(tok::r_paren, TokStart, Result);
-  case '{': return FormToken(tok::l_brace, TokStart, Result);
-  case '}': return FormToken(tok::r_brace, TokStart, Result);
+  case '(': return FormToken(tok::l_paren,  TokStart, Result);
+  case ')': return FormToken(tok::r_paren,  TokStart, Result);
+  case '{': return FormToken(tok::l_brace,  TokStart, Result);
+  case '}': return FormToken(tok::r_brace,  TokStart, Result);
   case '[': return FormToken(tok::l_square, TokStart, Result);
   case ']': return FormToken(tok::r_square, TokStart, Result);
 
-  case ',': return FormToken(tok::comma, TokStart, Result);
-  case ':': return FormToken(tok::colon, TokStart, Result);
-  case ';': return FormToken(tok::semi,  TokStart, Result);
+  case '.': return FormToken(tok::period,   TokStart, Result);
+  case ',': return FormToken(tok::comma,    TokStart, Result);
+  case ':': return FormToken(tok::colon,    TokStart, Result);
+  case ';': return FormToken(tok::semi,     TokStart, Result);
       
   // Punctuator identifier characters.
   case '/':

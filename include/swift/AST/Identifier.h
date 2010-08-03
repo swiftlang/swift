@@ -18,6 +18,7 @@
 #define SWIFT_AST_IDENTIFIER_H
 
 #include "llvm/ADT/DenseMapInfo.h"
+#include <cstring>
 
 namespace llvm {
   class raw_ostream;
@@ -38,6 +39,10 @@ public:
   explicit Identifier() : Pointer(0) {}
   
   const char *get() const { return Pointer; }
+  
+  unsigned getLength() const {
+    return ::strlen(Pointer);
+  }
   
   bool operator==(Identifier RHS) const { return Pointer == RHS.Pointer; }
   bool operator!=(Identifier RHS) const { return Pointer != RHS.Pointer; }

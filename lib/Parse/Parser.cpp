@@ -615,17 +615,19 @@ bool Parser::ParseExpr(NullablePtr<Expr> &Result, const char *Message) {
 ///     '(' ')'
 ///     '(' expr (',' expr)* ')'
 ///     expr-brace
+///     expr-primary '.' identifier
+///     expr-primary '.' numeric_constant
 bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
   switch (Tok.getKind()) {
   case tok::numeric_constant:
     Result = S.expr.ActOnNumericConstant(Tok.getText(), Tok.getLoc());
     ConsumeToken(tok::numeric_constant);
-    return false;
+    break;
 
   case tok::identifier:
     Result = S.expr.ActOnIdentifierExpr(Tok.getText(), Tok.getLoc());
     ConsumeToken(tok::identifier);
-    return false;
+    break;
       
   case tok::l_paren: {
     SMLoc LPLoc = Tok.getLoc();  
@@ -664,16 +666,35 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
     if (!AnyErroneousSubExprs)
       Result = S.expr.ActOnTupleExpr(LPLoc, SubExprs.data(), SubExprs.size(),
                                      RPLoc);
-    return false;
+    break;
   }
       
   case tok::l_brace:
-    return ParseExprBrace(Result);
+    if (ParseExprBrace(Result)) return true;
+    break;
     
   default:
     Error(Tok.getLoc(), Message ? Message : "expected expression");
     return true;
   }
+  
+  // Check for a .foo suffix.
+  llvm::SMLoc DotLoc = Tok.getLoc();
+  while (ConsumeIf(tok::period)) {
+    if (Tok.isNot(tok::identifier)) {
+      Error(Tok.getLoc(), "expected field name");
+      return true;
+    }
+      
+    if (!Result.isNull())
+      Result = S.expr.ActOnDotIdentifier(Result.get(), DotLoc, Tok.getText(),
+                                         Tok.getLoc());
+    ConsumeToken(tok::identifier);
+    DotLoc = Tok.getLoc();
+    continue;
+  }
+  
+  return false;
 }
 
 

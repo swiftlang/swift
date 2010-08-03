@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_EXPR_H
 #define SWIFT_AST_EXPR_H
 
+#include "swift/AST/Identifier.h"
 #include "llvm/Support/SMLoc.h"
 #include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/StringRef.h"
@@ -38,7 +39,8 @@ enum ExprKind {
   IntegerLiteralKind,
   DeclRefExprKind,
   TupleExprKind,
-  TupleConvertExprKind,
+  UnresolvedDotExprKind,
+  TupleElementExprKind,
   ApplyExprKind,
   SequenceExprKind,
   BraceExprKind,
@@ -134,18 +136,40 @@ public:
   static bool classof(const Expr *E) { return E->Kind == TupleExprKind; }
 };
 
-/// TupleConvertExpr - Convert one tuple type to another, shuffling elements
-/// around as appropriate.
-class TupleConvertExpr : public Expr {
+/// UnresolvedDotExpr - A field access to an expression with dependent type.
+class UnresolvedDotExpr : public Expr {
 public:
   Expr *SubExpr;
+  llvm::SMLoc DotLoc;
+  Identifier Name;
+  llvm::SMLoc NameLoc;
   
-  TupleConvertExpr(Expr *subexpr, Type *Ty)
-  : Expr(TupleConvertExprKind, Ty), SubExpr(subexpr) {}
+  UnresolvedDotExpr(Expr *subexpr, llvm::SMLoc dotloc, Identifier name,
+                    llvm::SMLoc nameloc, Type *Ty)
+  : Expr(UnresolvedDotExprKind, Ty), SubExpr(subexpr), DotLoc(dotloc),
+    Name(name), NameLoc(nameloc) {}
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const TupleConvertExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == TupleConvertExprKind; }
+  static bool classof(const UnresolvedDotExpr *) { return true; }
+  static bool classof(const Expr *E) { return E->Kind == UnresolvedDotExprKind;}
+};
+
+/// TupleElementExpr - Refer to an element of a tuple, e.g. "(1,2).field0".
+class TupleElementExpr : public Expr {
+public:
+  Expr *SubExpr;
+  llvm::SMLoc DotLoc;
+  unsigned FieldNo;
+  llvm::SMLoc NameLoc;
+  
+  TupleElementExpr(Expr *subexpr, llvm::SMLoc dotloc, unsigned fieldno,
+                   llvm::SMLoc nameloc, Type *Ty)
+  : Expr(TupleElementExprKind, Ty), SubExpr(subexpr), DotLoc(dotloc),
+    FieldNo(fieldno), NameLoc(nameloc) {}
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TupleElementExpr *) { return true; }
+  static bool classof(const Expr *E) { return E->Kind == TupleElementExprKind; }
 };
 
   
