@@ -628,7 +628,6 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
     return false;
       
   case tok::l_paren: {
-    // FIXME: This should eventually become a tuple literal expression.
     SMLoc LPLoc = Tok.getLoc();  
     ConsumeToken(tok::l_paren);
     
