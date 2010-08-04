@@ -493,10 +493,6 @@ bool Parser::ParseType(Type *&Result, const char *Message) {
     Result = S.type.ActOnIntType(Tok.getLoc());
     ConsumeToken(tok::kw_int);
     break;
-  case tok::kw_void:
-    Result = S.type.ActOnVoidType(Tok.getLoc());
-    ConsumeToken(tok::kw_void);
-    break;
   case tok::l_paren:
     if (ParseTypeTuple(Result))
       return true;
