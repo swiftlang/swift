@@ -502,11 +502,14 @@ bool Parser::ParseTypeTuple(Type *&Result) {
   llvm::SmallVector<TupleTypeElt, 8> Elements;
 
   if (Tok.isNot(tok::r_paren)) {
-    llvm::PointerUnion<Type*, NamedDecl*> Elt;
-    bool HadError = 
-      ParseTypeOrDeclVar(Elt, "expected type or var declaration in tuple");
+    bool HadError = false;
+    do {
+      llvm::PointerUnion<Type*, NamedDecl*> Elt;
+      HadError = 
+        ParseTypeOrDeclVar(Elt, "expected type or var declaration in tuple");
 
-    if (!HadError) {
+      if (HadError) break;
+      
       if (Type *T = Elt.dyn_cast<Type*>())
         Elements.push_back(TupleTypeElt(T));
       else {
@@ -516,26 +519,8 @@ bool Parser::ParseTypeTuple(Type *&Result) {
         // FIXME: Reject attributes.
         Elements.push_back(TupleTypeElt(ND->Ty, ND->Name));
       }
-    }
-    
-    // Parse (',' type-or-decl-var)* 
-    while (!HadError && Tok.is(tok::comma)) {
-      ConsumeToken(tok::comma);
-      HadError = ParseTypeOrDeclVar(Elt,
-                                 "expected type or var declaration in tuple");
-      
-      if (!HadError) {
-        if (Type *T = Elt.dyn_cast<Type*>())
-          Elements.push_back(TupleTypeElt(T));
-        else {
-          NamedDecl *ND = Elt.get<NamedDecl*>();
-          if (ND->Init)
-            Error(ND->getLocStart(), "cannot specify default values yet");
-          // FIXME: Reject attributes.
-          Elements.push_back(TupleTypeElt(ND->Ty, ND->Name));
-        }
-      }
-    }
+     
+    } while (ConsumeIf(tok::comma));
     
     if (HadError) {
       SkipUntil(tok::r_paren);
