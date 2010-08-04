@@ -42,7 +42,7 @@ using llvm::dyn_cast;
 
 
 static bool SemaIntegerLiteral(Type *&ResultTy, SemaExpr &SE) {
-  ResultTy = SE.S.Context.IntType;
+  ResultTy = SE.S.Context.TheInt32Type;
   return false;
 }
 

@@ -45,7 +45,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
     SourceMgr(sourcemgr),
     VoidType(getTupleType(0, 0)), // void is aka "()"
     DependentTy(new (*this) DependentType()),
-    IntType(new (*this) BuiltinType(BuiltinIntKind)) {
+    TheInt32Type(new (*this) BuiltinType(BuiltinInt32Kind)) {
 }
 
 ASTContext::~ASTContext() {
@@ -84,7 +84,7 @@ Type *ASTContext::getCanonicalType(Type *T) {
     return T->CanonicalType;
   
   switch (T->Kind) {
-  case BuiltinIntKind:
+  case BuiltinInt32Kind:
   case BuiltinDependentKind: assert(0 && "These are always canonical");
   case AliasTypeKind:
     return T->CanonicalType =

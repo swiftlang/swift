@@ -31,13 +31,13 @@ namespace swift {
   
   enum TypeKind {
     BuiltinDependentKind,
-    BuiltinIntKind,
+    BuiltinInt32Kind,
     AliasTypeKind,
     TupleTypeKind,
     FunctionTypeKind,
     
-    Builtin_First = BuiltinIntKind,
-    Builtin_Last = BuiltinIntKind
+    Builtin_First = BuiltinInt32Kind,
+    Builtin_Last = BuiltinInt32Kind
   };
   
 /// Type - Base class for all types in Swift.

@@ -23,11 +23,8 @@
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
 
-Type *SemaType::ActOnIntType(llvm::SMLoc Loc) {
-  return S.Context.IntType;
-}
-Type *SemaType::ActOnVoidType(llvm::SMLoc Loc) {
-  return S.Context.VoidType;
+Type *SemaType::ActOnInt32Type(llvm::SMLoc Loc) {
+  return S.Context.TheInt32Type;
 }
 
 Type *SemaType::ActOnTypeName(llvm::SMLoc Loc, llvm::StringRef Name) {

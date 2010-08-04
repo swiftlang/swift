@@ -37,9 +37,8 @@ class SemaType : public SemaBase {
 public:
   explicit SemaType(Sema &S) : SemaBase(S) {}
 
-  Type *ActOnIntType(llvm::SMLoc Loc);
+  Type *ActOnInt32Type(llvm::SMLoc Loc);
   Type *ActOnTypeName(llvm::SMLoc Loc, llvm::StringRef Name);
-  Type *ActOnVoidType(llvm::SMLoc Loc);
   Type *ActOnTupleType(llvm::SMLoc LPLoc, const TupleTypeElt *Elements,
                        unsigned NumElements, llvm::SMLoc RPLoc);
   Type *ActOnFunctionType(Type *Input, llvm::SMLoc ArrowLoc, Type *Output);

@@ -31,21 +31,20 @@ namespace tok {
     
 #define KEYWORD(X) kw_ ## X,
     // Types.
-    KEYWORD(int)
-//    KEYWORD(uint)
-//    KEYWORD(int8)
-//    KEYWORD(uint8)
-//    KEYWORD(int16)
-//    KEYWORD(uint16)
-//    KEYWORD(int64)
-//    KEYWORD(uint64)
-//    KEYWORD(float)
+//    KEYWORD(__builtin_int8_type)
+//    KEYWORD(__builtin_uint8_type)
+//    KEYWORD(__builtin_int16_type)
+//    KEYWORD(__builtin_uint16_type)
+    KEYWORD(__builtin_int32_type)
+//    KEYWORD(__builtin_uint32_type)
+//    KEYWORD(__builtin_int64_type)
+//    KEYWORD(__builtin_uint64_type)
+//    KEYWORD(__builtin_float_type)
+//    KEYWORD(__builtin_double_type)
     
     KEYWORD(typealias)
     KEYWORD(var)
     KEYWORD(func)
-
-//    KEYWORD(foreach)
 #undef KEYWORD
     
 #define PUNCTUATOR(X, Y) X,

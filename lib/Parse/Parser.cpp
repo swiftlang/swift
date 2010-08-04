@@ -353,7 +353,7 @@ VarDecl *Parser::ParseDeclVar() {
     // FIXME: We really need to distinguish erroneous expr from missing expr in
     // ActOnVarDecl.
     if (Init.isNull() && Ty == 0)
-      Ty = S.Context.IntType;
+      Ty = S.Context.TheInt32Type;
   }
   
   return S.decl.ActOnVarDecl(VarLoc, Identifier, Ty, Init.getPtrOrNull(),
@@ -487,11 +487,15 @@ bool Parser::ParseType(Type *&Result, const char *Message) {
   switch (Tok.getKind()) {
   case tok::identifier:
     Result = S.type.ActOnTypeName(Tok.getLoc(), Tok.getText());
+    if (Result == 0) {
+      Error(Tok.getLoc(), Message ? Message : "expected type");
+      return true;
+    }
     ConsumeToken(tok::identifier);
     break;
-  case tok::kw_int:
-    Result = S.type.ActOnIntType(Tok.getLoc());
-    ConsumeToken(tok::kw_int);
+  case tok::kw___builtin_int32_type:
+    Result = S.type.ActOnInt32Type(Tok.getLoc());
+    ConsumeToken(tok::kw___builtin_int32_type);
     break;
   case tok::l_paren:
     if (ParseTypeTuple(Result))
