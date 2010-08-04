@@ -42,6 +42,7 @@ namespace tok {
 //    KEYWORD(uint64)
 //    KEYWORD(float)
     
+    KEYWORD(typealias)
     KEYWORD(var)
     KEYWORD(func)
 

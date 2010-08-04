@@ -103,6 +103,7 @@ private:
   
   // Decl Parsing
   Decl *ParseDeclTopLevel();
+  bool ParseTypeAlias();
   void ParseDeclAttributeList(DeclAttributes &Attributes);
   bool ParseDeclAttribute(DeclAttributes &Attributes);
   VarDecl *ParseDeclVar();

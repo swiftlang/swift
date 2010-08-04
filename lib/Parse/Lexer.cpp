@@ -88,6 +88,7 @@ void Lexer::LexIdentifier(Token &Result) {
     .Case("int", tok::kw_int)
     .Case("var", tok::kw_var)
     .Case("func", tok::kw_func)
+    .Case("typealias", tok::kw_typealias)
     .Default(tok::identifier);
   
   return FormToken(Kind, TokStart, Result);

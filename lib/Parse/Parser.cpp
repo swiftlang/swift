@@ -193,6 +193,11 @@ Decl *Parser::ParseDeclTopLevel() {
   case tok::semi:
     ConsumeToken(tok::semi);
     return 0; // Could do a top-level semi decl.
+      
+  case tok::kw_typealias:
+    if (ParseTypeAlias()) break;
+    return 0;
+      
   case tok::kw_var:
     if (VarDecl *D = ParseDeclVar()) {
       S.decl.ActOnTopLevelDecl(D);
@@ -294,6 +299,25 @@ void Parser::ParseDeclAttributeList(DeclAttributes &Attributes) {
     ConsumeIf(tok::r_square);
   }
 }
+
+/// ParseTypeAlias
+///   alias-type:
+///     'typealias' identifier ':' type
+bool Parser::ParseTypeAlias() {
+  SMLoc TypeAliasLoc = Tok.getLoc();
+  ConsumeToken(tok::kw_typealias);
+  
+  llvm::StringRef Identifier;
+  Type *Ty = 0;
+  if (ParseIdentifier(Identifier, "expected identifier in var declaration") ||
+      ParseToken(tok::colon, "expected ':' in typealias declaration") ||
+      ParseType(Ty, "expected type in var declaration"))
+    return true;
+
+  // TODO: Semaize.
+  return false;
+}
+
 
 /// ParseDeclVar - Parse a 'var' declaration, returning null (and doing no
 /// token skipping) on error.
@@ -479,7 +503,7 @@ bool Parser::ParseType(Type *&Result, const char *Message) {
   }
   
   // If there is an arrow, parse the rest of the type.
-  llvm::SMLoc ArrowLoc = Tok.getLoc();
+  SMLoc ArrowLoc = Tok.getLoc();
   if (ConsumeIf(tok::arrow)) {
     Type *SecondHalf = 0;
     if (ParseType(SecondHalf, "expected type in result of function type"))
@@ -516,7 +540,11 @@ bool Parser::ParseTypeTuple(Type *&Result) {
         NamedDecl *ND = Elt.get<NamedDecl*>();
         if (ND->Init)
           Error(ND->getLocStart(), "cannot specify default values yet");
-        // FIXME: Reject attributes.
+        
+        if (ND->Attrs.LSquareLoc != SMLoc())
+          Error(ND->Attrs.LSquareLoc,
+                "cannot specify attributes on tuple elements");
+
         Elements.push_back(TupleTypeElt(ND->Ty, ND->Name));
       }
      
@@ -683,7 +711,7 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
   }
   
   // Check for a .foo suffix.
-  llvm::SMLoc DotLoc = Tok.getLoc();
+  SMLoc DotLoc = Tok.getLoc();
   while (ConsumeIf(tok::period)) {
     if (Tok.isNot(tok::identifier)) {
       Error(Tok.getLoc(), "expected field name");
