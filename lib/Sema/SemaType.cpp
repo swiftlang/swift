@@ -30,21 +30,8 @@ Type *SemaType::ActOnVoidType(llvm::SMLoc Loc) {
   return S.Context.VoidType;
 }
 
-Type *SemaType::ActOnTupleType(llvm::SMLoc LPLoc,
-                          llvm::PointerUnion<Type*, NamedDecl*> const *Elements,
+Type *SemaType::ActOnTupleType(llvm::SMLoc LPLoc, TupleTypeElt const *Elements,
                                unsigned NumElements, llvm::SMLoc RPLoc) {
-  // Verify that tuple elements don't have initializers.  In the future, we can
-  // consider adding these back if we so desire.
-  for (unsigned i = 0, e = NumElements; i != e; ++i) {
-    if (NamedDecl *D = Elements[i].dyn_cast<NamedDecl*>()) {
-      if (D->Init != 0) {
-        Error(D->Init->getLocStart(),
-              "tuple element should not have an initializer");
-        D->Init = 0;
-      }
-    }
-  }
-  
   return S.Context.getTupleType(Elements, NumElements);
 }
 

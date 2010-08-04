@@ -32,6 +32,7 @@ namespace swift {
   class FunctionType;
   class NamedDecl;
   class Identifier;
+  class TupleTypeElt;
 
 /// ASTContext - This object creates and owns the AST objects.
 class ASTContext {
@@ -71,7 +72,7 @@ public:
   Type * const IntType;  /// IntType - This is 'int'.
 
   /// getTupleType - Return the uniqued tuple type with the specified elements.
-  TupleType *getTupleType(const llvm::PointerUnion<Type*, NamedDecl*> *Fields,
+  TupleType *getTupleType(const TupleTypeElt *Fields,
                           unsigned NumFields);
   
   /// getFunctionType - Return a uniqued function type with the specified

@@ -21,6 +21,7 @@
 #include "swift/AST/ASTConsumer.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Type.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/SmallVector.h"
@@ -371,7 +372,7 @@ FuncDecl *Parser::ParseDeclFunc() {
   if (Tok.is(tok::r_paren)) {
     ArgListTy = S.Context.VoidType;
   } else {
-    llvm::SmallVector<llvm::PointerUnion<Type*, NamedDecl*>, 8> Elements;
+    llvm::SmallVector<TupleTypeElt, 8> Elements;
     
     
     // Read the comma-separated argument list.
@@ -390,12 +391,8 @@ FuncDecl *Parser::ParseDeclFunc() {
                     "expected type in argument list of func declaration"))
         return 0;
       
-      DeclAttributes ParamAttributes;
-      VarDecl *ParamDecl = 
-        S.decl.ActOnVarDecl(StartLoc, ParamIdentifier, ParamType, 0,
-                            ParamAttributes);
-
-      Elements.push_back(ParamDecl);
+      Elements.push_back(TupleTypeElt(ParamType,
+                                    S.Context.getIdentifier(ParamIdentifier)));
     } while (ConsumeIf(tok::comma));
     
     ArgListTy = 
@@ -502,23 +499,45 @@ bool Parser::ParseTypeTuple(Type *&Result) {
   SMLoc LPLoc = Tok.getLoc();
   ConsumeToken(tok::l_paren);
 
-  llvm::SmallVector<llvm::PointerUnion<Type*, NamedDecl*>, 8> Elements;
+  llvm::SmallVector<TupleTypeElt, 8> Elements;
 
   if (Tok.isNot(tok::r_paren)) {
-    Elements.push_back(llvm::PointerUnion<Type*, NamedDecl*>());
-    bool Error = 
-      ParseTypeOrDeclVar(Elements.back(),
-                         "expected type or var declaration in tuple");
+    llvm::PointerUnion<Type*, NamedDecl*> Elt;
+    bool HadError = 
+      ParseTypeOrDeclVar(Elt, "expected type or var declaration in tuple");
 
-    // Parse (',' type-or-decl-var)* 
-    while (!Error && Tok.is(tok::comma)) {
-      ConsumeToken(tok::comma);
-      Elements.push_back(llvm::PointerUnion<Type*, NamedDecl*>());
-      Error = ParseTypeOrDeclVar(Elements.back(),
-                                 "expected type or var declaration in tuple");
+    if (!HadError) {
+      if (Type *T = Elt.dyn_cast<Type*>())
+        Elements.push_back(TupleTypeElt(T));
+      else {
+        NamedDecl *ND = Elt.get<NamedDecl*>();
+        if (ND->Init)
+          Error(ND->getLocStart(), "cannot specify default values yet");
+        // FIXME: Reject attributes.
+        Elements.push_back(TupleTypeElt(ND->Ty, ND->Name));
+      }
     }
     
-    if (Error) {
+    // Parse (',' type-or-decl-var)* 
+    while (!HadError && Tok.is(tok::comma)) {
+      ConsumeToken(tok::comma);
+      HadError = ParseTypeOrDeclVar(Elt,
+                                 "expected type or var declaration in tuple");
+      
+      if (!HadError) {
+        if (Type *T = Elt.dyn_cast<Type*>())
+          Elements.push_back(TupleTypeElt(T));
+        else {
+          NamedDecl *ND = Elt.get<NamedDecl*>();
+          if (ND->Init)
+            Error(ND->getLocStart(), "cannot specify default values yet");
+          // FIXME: Reject attributes.
+          Elements.push_back(TupleTypeElt(ND->Ty, ND->Name));
+        }
+      }
+    }
+    
+    if (HadError) {
       SkipUntil(tok::r_paren);
       if (Tok.is(tok::r_paren))
         ConsumeToken(tok::r_paren);

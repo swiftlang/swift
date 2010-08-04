@@ -139,7 +139,7 @@ static bool SemaTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
   }
   
   // Compute the result type.
-  llvm::SmallVector<TupleType::TypeOrDecl, 8> ResultTyElts;
+  llvm::SmallVector<TupleTypeElt, 8> ResultTyElts(NumSubExprs);
   
   for (unsigned i = 0, e = NumSubExprs; i != e; ++i) {
     // If any of the tuple element types is dependent, the whole tuple should
@@ -149,7 +149,8 @@ static bool SemaTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
       return false;
     }
     
-    ResultTyElts.push_back(SubExprs[i]->Ty);
+    ResultTyElts[i].Ty = SubExprs[i]->Ty;
+    // Name is empty because we don't support named field exprs.
   }
   
   ResultTy = SE.S.Context.getTupleType(ResultTyElts.data(), NumSubExprs);
@@ -562,12 +563,12 @@ static Expr *ConvertTupleToTuple(Expr *E, TupleType *DestTy, SemaExpr &SE) {
   // First off, see if we can resolve any named values from matching named
   // inputs.
   for (unsigned i = 0, e = DestTy->NumFields; i != e; ++i) {
+    const TupleTypeElt &DestElt = DestTy->Fields[i];
     // If this destination field is named, first check for a matching named
     // element in the input, from any position.
-    NamedDecl *ND = DestTy->Fields[i].dyn_cast<NamedDecl*>();
-    if (ND == 0) continue;
+    if (DestElt.Name.get() == 0) continue;
     
-    int InputElement = ETy->getNamedElementId(ND->Name);
+    int InputElement = ETy->getNamedElementId(DestElt.Name);
     if (InputElement == -1) continue;
     
     DestElementSources[i] = InputElement;
@@ -591,7 +592,7 @@ static Expr *ConvertTupleToTuple(Expr *E, TupleType *DestTy, SemaExpr &SE) {
       
       // If this input value is unnamed and unused, use it!
       if (!UsedElements[NextInputValue] &&
-          ETy->Fields[NextInputValue].is<Type*>())
+          ETy->Fields[NextInputValue].Name.get() == 0)
         break;
       
       ++NextInputValue;
@@ -649,7 +650,7 @@ static Expr *ConvertTupleToTuple(Expr *E, TupleType *DestTy, SemaExpr &SE) {
 /// failure.
 static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
                                     SemaExpr &SE) {
-  Type *ETy = E->Ty;
+  Type *ETy = SE.S.Context.getCanonicalType(E->Ty);
   
   // If we have an exact match, we're done.
   if (ETy == DestTy) return E;
@@ -714,6 +715,7 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
 
 Expr *SemaExpr::ConvertToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
                               ConversionReason Reason) {
+  DestTy = S.Context.getCanonicalType(DestTy);
   if (Expr *ERes = HandleConversionToType(E, DestTy, IgnoreAnonDecls, *this))
     return ERes;
   

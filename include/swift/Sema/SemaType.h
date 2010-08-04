@@ -20,16 +20,13 @@
 
 #include "swift/Sema/SemaBase.h"
 
-namespace llvm {
-  template <typename PT1, typename PT2>
-  class PointerUnion;
-}
 namespace swift {
   class Sema;
   class Decl;
   class NamedDecl;
   class Type;
   class TupleType;
+  class TupleTypeElt;
   
 /// SemaType - Semantic analysis support for Swift types.
 class SemaType : public SemaBase {
@@ -38,8 +35,7 @@ public:
 
   Type *ActOnIntType(llvm::SMLoc Loc);
   Type *ActOnVoidType(llvm::SMLoc Loc);
-  Type *ActOnTupleType(llvm::SMLoc LPLoc,
-                       llvm::PointerUnion<Type*, NamedDecl*> const *Elements,
+  Type *ActOnTupleType(llvm::SMLoc LPLoc, const TupleTypeElt *Elements,
                        unsigned NumElements, llvm::SMLoc RPLoc);
   
   Type *ActOnFunctionType(Type *Input, llvm::SMLoc ArrowLoc, Type *Output);

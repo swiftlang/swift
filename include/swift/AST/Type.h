@@ -17,16 +17,17 @@
 #ifndef SWIFT_TYPE_H
 #define SWIFT_TYPE_H
 
+#include "swift/AST/Identifier.h"
 #include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/PointerUnion.h"
 
 namespace llvm {
   class raw_ostream;
 }
 namespace swift {
   class ASTContext;
-  class NamedDecl;
+  class Expr;
   class Identifier;
+  class NamedDecl;
   
   enum TypeKind {
     BuiltinDependentKind,
@@ -111,20 +112,33 @@ public:
   }
 };
 
+/// TupleTypeElt - This represents a single element of a tuple.
+class TupleTypeElt {
+public:
+  /// Ty - This is the type of the field, which is mandatory.
+  Type *Ty;
+  
+  /// Name - An optional name for the field.
+  Identifier Name;
+  //Expr *Init;  // TODO: Allow default values.
+  
+  TupleTypeElt(Type *ty = 0, Identifier name = Identifier())
+    : Ty(ty), Name(name) { }
+};
+  
 /// TupleType - A tuple is a parenthesized list of types where each name has an
 /// optional name.
 ///
-/// FIXME: Do we want to allow default values??
-/// 
 class TupleType : public Type, public llvm::FoldingSetNode {
 public:
-  typedef llvm::PointerUnion<Type*, NamedDecl*> TypeOrDecl;
-  const TypeOrDecl * const Fields;
+  const TupleTypeElt * const Fields;
   const unsigned NumFields;
   
   /// getElementType - Return the type of the specified field, looking through
   /// NamedDecls automatically.
-  Type *getElementType(unsigned FieldNo) const;
+  Type *getElementType(unsigned FieldNo) const {
+    return Fields[FieldNo].Ty;
+  }
   
   /// getNamedElementId - If this tuple has a field with the specified name,
   /// return the field index, otherwise return -1.
@@ -140,10 +154,10 @@ public:
     Profile(ID, Fields, NumFields);
   }
   static void Profile(llvm::FoldingSetNodeID &ID, 
-                      const TypeOrDecl *Fields, unsigned NumFields);
+                      const TupleTypeElt *Fields, unsigned NumFields);
   
 private:
-  TupleType(const TypeOrDecl *const fields, unsigned numfields)
+  TupleType(const TupleTypeElt *const fields, unsigned numfields)
     : Type(TupleTypeKind), Fields(fields), NumFields(numfields) {}
   friend class ASTContext;
 };

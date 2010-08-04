@@ -33,25 +33,13 @@ void *Type::operator new(size_t Bytes, ASTContext &C,
 //===----------------------------------------------------------------------===//
 
 
-/// getElementType - Return the type of the specified field, looking through
-/// NamedDecls automatically.
-Type *TupleType::getElementType(unsigned FieldNo) const {
-  assert(FieldNo < NumFields && "Invalid field number");
-  
-  if (Type *T = Fields[FieldNo].dyn_cast<Type*>())
-    return T;
-  
-  return Fields[FieldNo].get<NamedDecl*>()->Ty;
-}
- 
 
 /// getNamedElementId - If this tuple has a field with the specified name,
 /// return the field index, otherwise return -1.
 int TupleType::getNamedElementId(Identifier I) const {
   for (unsigned i = 0, e = NumFields; i != e; ++i) {
-    if (NamedDecl *ND = Fields[i].dyn_cast<NamedDecl*>())
-      if (ND->Name == I)
-        return i;
+    if (Fields[i].Name == I)
+      return i;
   }
 
   // Otherwise, name not found.
@@ -91,18 +79,14 @@ void TupleType::print(llvm::raw_ostream &OS) const {
   
   for (unsigned i = 0, e = NumFields; i != e; ++i) {
     if (i) OS << ", ";
-    const TypeOrDecl &TD = Fields[i];
+    const TupleTypeElt &TD = Fields[i];
     
-    if (Type *Ty = TD.dyn_cast<Type*>()) {
-      OS << *Ty;
+    if (TD.Name.get() == 0) {
+      OS << *TD.Ty;
       continue;
     }
     
-    NamedDecl *VD = TD.get<NamedDecl*>();
-    assert(llvm::isa<VarDecl>(VD));
-    OS << "var " << VD->Name << " : ";
-    VD->Ty->print(OS);
-    assert(VD->Init == 0 && "Don't handle inits");
+    OS << "var " << TD.Name << " : " << *TD.Ty;
   }
   OS << ")";
 }
