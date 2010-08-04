@@ -66,9 +66,9 @@ public:
   Type *getCanonicalType(Type *T);
   
   // Builtin type and simple types that are used frequently.
-  Type * const VoidType;      /// VoidType - This is 'void', aka "()"
-  Type * const DependentTy;   /// DependentTy - Type is dependent on context.
-  Type * const TheInt32Type;  /// TheInt32Type - 32-bit signed integer.
+  Type * const TheEmptyTupleType;  /// TheEmptyTupleType - This is "()"
+  Type * const TheDependentType;   /// TheDependentType - Dependent on context.
+  Type * const TheInt32Type;       /// TheInt32Type - 32-bit signed integer.
 
   /// getNamedType - This method does a lookup for the specified type name.  If
   /// no type with the specified name exists, null is returned.

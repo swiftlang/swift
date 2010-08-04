@@ -30,8 +30,8 @@ namespace swift {
   class NamedDecl;
   
   enum TypeKind {
-    BuiltinDependentKind,
     BuiltinInt32Kind,
+    DependentTypeKind,
     AliasTypeKind,
     TupleTypeKind,
     FunctionTypeKind,
@@ -101,7 +101,7 @@ public:
 class DependentType : public Type {
   friend class ASTContext;
   // The Dependent type is always canonical.
-  DependentType() : Type(BuiltinDependentKind, this) {}
+  DependentType() : Type(DependentTypeKind, this) {}
 public:
   
   void print(llvm::raw_ostream &OS) const;
@@ -109,7 +109,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const DependentType *) { return true; }
   static bool classof(const Type *T) {
-    return T->Kind == BuiltinDependentKind;
+    return T->Kind == DependentTypeKind;
   }
 };
 

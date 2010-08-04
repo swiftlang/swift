@@ -78,7 +78,7 @@ AnonDecl *SemaDecl::GetAnonDecl(llvm::StringRef Text, llvm::SMLoc RefLoc) {
     
     AnonClosureArgs[ArgNo] =
       new (S.Context) AnonDecl(RefLoc, S.Context.getIdentifier(Text),
-                               S.Context.DependentTy);
+                               S.Context.TheDependentType);
   }
   return AnonClosureArgs[ArgNo].get();
 }

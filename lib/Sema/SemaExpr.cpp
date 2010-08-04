@@ -80,7 +80,7 @@ static bool SemaBraceExpr(llvm::SMLoc LBLoc,
   if (HasMissingSemi)
     ResultTy = Elements[NumElements-1].get<Expr*>()->Ty;
   else
-    ResultTy = SE.S.Context.VoidType;
+    ResultTy = SE.S.Context.TheEmptyTupleType;
   
   return false;
 }
@@ -159,7 +159,7 @@ static bool SemaTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
 
 static bool SemaApplyExpr(Expr *&E1, Expr *&E2, Type *&ResultTy, SemaExpr &SE) {
   if (isa<DependentType>(E1->Ty)) {
-    ResultTy = SE.S.Context.DependentTy;
+    ResultTy = E1->Ty;
     return false;
   }
   
@@ -195,7 +195,7 @@ static bool SemaBinaryExpr(Expr *&LHS, NamedDecl *OpFn,
                            llvm::SMLoc OpLoc, Expr *&RHS, Type *&ResultTy,
                            SemaExpr &SE) {
   if (isa<DependentType>(LHS->Ty) || isa<DependentType>(RHS->Ty)) {
-    ResultTy = SE.S.Context.DependentTy;
+    ResultTy = SE.S.Context.TheDependentType;
     return false; 
   }
   
@@ -321,7 +321,7 @@ SemaExpr::ActOnJuxtaposition(Expr *E1, Expr *E2) {
   // true so that it gets properly sequenced.  If the input is a dependent type,
   // we assume that it is a function so that (_0 1 2 3) binds correctly.  If it
   // is not a function, parens or ; can be used to disambiguate.
-  if (!isa<FunctionType>(E1->Ty) && E1->Ty->Kind != BuiltinDependentKind)
+  if (!isa<FunctionType>(E1->Ty) && !isa<DependentType>(E1->Ty))
     return llvm::PointerIntPair<Expr*, 1, bool>(0, true);
   
   // Okay, we have a function application, analyze it.
@@ -524,7 +524,7 @@ BindAndValidateClosureArgs(Expr *&Body, Type *FuncInput, SemaDecl &SD) {
   } else if (NumInputArgs) {
     assert(NumInputArgs == 1 && NewInputs[0].isNonNull() &&
            "Must have unary case");
-    assert(NewInputs[0].get()->Ty->Kind == BuiltinDependentKind &&
+    assert(isa<DependentType>(NewInputs[0].get()->Ty) &&
            "AnonDecl doesn't have dependent type?");
     NewInputs[0].get()->Ty = FuncInput;
   }

@@ -394,7 +394,7 @@ FuncDecl *Parser::ParseDeclFunc() {
 
   Type *ArgListTy;
   if (Tok.is(tok::r_paren)) {
-    ArgListTy = S.Context.VoidType;
+    ArgListTy = S.Context.TheEmptyTupleType;
   } else {
     llvm::SmallVector<TupleTypeElt, 8> Elements;
     
@@ -432,7 +432,7 @@ FuncDecl *Parser::ParseDeclFunc() {
   }
   
   // If there is a return type, parse it.
-  Type *RetTy = S.Context.VoidType;
+  Type *RetTy = S.Context.TheEmptyTupleType;
   SMLoc ArrowLoc = Tok.getLoc();
   if (ConsumeIf(tok::arrow)) {
     if (ParseType(RetTy, "expected func declaration return type"))
