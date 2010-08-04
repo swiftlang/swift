@@ -314,7 +314,7 @@ bool Parser::ParseTypeAlias() {
       ParseType(Ty, "expected type in var declaration"))
     return true;
 
-  // TODO: Semaize.
+  S.type.ActOnTypeAlias(TypeAliasLoc, Identifier, Ty);
   return false;
 }
 
@@ -485,6 +485,10 @@ FuncDecl *Parser::ParseDeclFunc() {
 bool Parser::ParseType(Type *&Result, const char *Message) {
   // Parse type-simple first.
   switch (Tok.getKind()) {
+  case tok::identifier:
+    Result = S.type.ActOnTypeName(Tok.getLoc(), Tok.getText());
+    ConsumeToken(tok::identifier);
+    break;
   case tok::kw_int:
     Result = S.type.ActOnIntType(Tok.getLoc());
     ConsumeToken(tok::kw_int);

@@ -27,6 +27,9 @@ using namespace swift;
 /// IdentifierTableMapTy - This is the type underlying IdentifierTable.
 typedef llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTableMapTy;
 
+/// AliasTypesMapTy - This is the type underlying AliasTypes.
+typedef llvm::StringMap<AliasType*, llvm::BumpPtrAllocator&> AliasTypesMapTy;
+
 /// TupleTypesMapTy - This is the actual type underlying ASTContext::TupleTypes.
 typedef llvm::FoldingSet<TupleType> TupleTypesMapTy;
 
@@ -36,6 +39,7 @@ typedef llvm::DenseMap<std::pair<Type*,Type*>, FunctionType*>FunctionTypesMapTy;
 ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
   : Allocator(new llvm::BumpPtrAllocator()),
     IdentifierTable(new IdentifierTableMapTy(*Allocator)),
+    AliasTypes(new AliasTypesMapTy(*Allocator)),
     TupleTypes(new TupleTypesMapTy()),
     FunctionTypes(new FunctionTypesMapTy()),
     SourceMgr(sourcemgr),
@@ -45,6 +49,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
 }
 
 ASTContext::~ASTContext() {
+  delete (AliasTypesMapTy*)AliasTypes; AliasTypes = 0;
   delete (TupleTypesMapTy*)TupleTypes; TupleTypes = 0;
   delete (FunctionTypesMapTy*)FunctionTypes; FunctionTypes = 0;
   delete (IdentifierTableMapTy*)IdentifierTable;
@@ -81,6 +86,9 @@ Type *ASTContext::getCanonicalType(Type *T) {
   switch (T->Kind) {
   case BuiltinIntKind:
   case BuiltinDependentKind: assert(0 && "These are always canonical");
+  case AliasTypeKind:
+    return T->CanonicalType =
+      getCanonicalType(llvm::cast<AliasType>(T)->UnderlyingType);
   case TupleTypeKind: {
     llvm::SmallVector<TupleTypeElt, 8> CanElts;
     TupleType *TT = llvm::cast<TupleType>(T);
@@ -110,6 +118,25 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID, const TupleTypeElt *Fields,
     ID.AddPointer(Fields[i].Ty);
     ID.AddPointer(Fields[i].Name.get());
   }
+}
+
+/// getNamedType - This method does a lookup for the specified type name.  If
+/// no type with the specified name exists, null is returned.
+Type *ASTContext::getNamedType(Identifier Name) {
+  AliasTypesMapTy &Table = *((AliasTypesMapTy*)AliasTypes);
+  AliasTypesMapTy::iterator It = Table.find(Name.get());
+  return It == Table.end() ? 0 : It->second;
+}
+
+
+/// getAliasType - Return a new alias type.  This returns null if there is a
+/// conflict with an already existing alias type of the same name.
+AliasType *ASTContext::getAliasType(Identifier Name, Type *Underlying) {
+  AliasTypesMapTy &Table = *((AliasTypesMapTy*)AliasTypes);
+  AliasType *&Entry = Table.GetOrCreateValue(Name.get()).getValue();
+  if (Entry != 0) return 0;
+  
+  return Entry = new (*this) AliasType(Name, Underlying);
 }
 
 /// getTupleType - Return the uniqued tuple type with the specified elements.

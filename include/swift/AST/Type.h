@@ -32,6 +32,7 @@ namespace swift {
   enum TypeKind {
     BuiltinDependentKind,
     BuiltinIntKind,
+    AliasTypeKind,
     TupleTypeKind,
     FunctionTypeKind,
     
@@ -109,6 +110,26 @@ public:
   static bool classof(const DependentType *) { return true; }
   static bool classof(const Type *T) {
     return T->Kind == BuiltinDependentKind;
+  }
+};
+
+/// AliasType - An alias type is a name for another type, just like a typedef in
+/// C.
+class AliasType : public Type {
+  friend class ASTContext;
+  AliasType(Identifier name, Type *ty)
+    : Type(AliasTypeKind), Name(name), UnderlyingType(ty) {}
+public:
+  const Identifier Name;
+  Type *const UnderlyingType;
+  
+  
+  void print(llvm::raw_ostream &OS) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const AliasType *) { return true; }
+  static bool classof(const Type *T) {
+    return T->Kind == AliasTypeKind;
   }
 };
 

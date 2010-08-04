@@ -19,6 +19,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/ASTContext.h"
+#include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/ErrorHandling.h"

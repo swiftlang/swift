@@ -60,6 +60,7 @@ void Type::print(llvm::raw_ostream &OS) const {
   switch (Kind) {
   case BuiltinDependentKind:  return cast<DependentType>(this)->print(OS);
   case BuiltinIntKind:        return cast<BuiltinType>(this)->print(OS);
+  case AliasTypeKind:         return cast<AliasType>(this)->print(OS);
   case TupleTypeKind:         return cast<TupleType>(this)->print(OS);
   case FunctionTypeKind:      return cast<FunctionType>(this)->print(OS);
   }
@@ -72,6 +73,10 @@ void BuiltinType::print(llvm::raw_ostream &OS) const {
 
 void DependentType::print(llvm::raw_ostream &OS) const {
   OS << "<<dependent type>>";
+}
+
+void AliasType::print(llvm::raw_ostream &OS) const {
+  OS << Name.get();
 }
 
 void TupleType::print(llvm::raw_ostream &OS) const {

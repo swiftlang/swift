@@ -30,6 +30,11 @@ Type *SemaType::ActOnVoidType(llvm::SMLoc Loc) {
   return S.Context.VoidType;
 }
 
+Type *SemaType::ActOnTypeName(llvm::SMLoc Loc, llvm::StringRef Name) {
+  return S.Context.getNamedType(S.Context.getIdentifier(Name));
+}
+
+
 Type *SemaType::ActOnTupleType(llvm::SMLoc LPLoc, TupleTypeElt const *Elements,
                                unsigned NumElements, llvm::SMLoc RPLoc) {
   return S.Context.getTupleType(Elements, NumElements);
@@ -38,4 +43,9 @@ Type *SemaType::ActOnTupleType(llvm::SMLoc LPLoc, TupleTypeElt const *Elements,
 Type *SemaType::ActOnFunctionType(Type *Input, llvm::SMLoc ArrowLoc,
                                   Type *Output) {
   return S.Context.getFunctionType(Input, Output);
+}
+
+Type *SemaType::ActOnTypeAlias(llvm::SMLoc TypeAliasLoc, llvm::StringRef Name,
+                               Type *Ty) {
+  return S.Context.getAliasType(S.Context.getIdentifier(Name), Ty);
 }

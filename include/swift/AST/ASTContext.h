@@ -17,8 +17,6 @@
 #ifndef SWIFT_AST_ASTCONTEXT_H
 #define SWIFT_AST_ASTCONTEXT_H
 
-#include "llvm/ADT/PointerUnion.h"
-
 namespace llvm {
   class BumpPtrAllocator;
   class SourceMgr;
@@ -28,6 +26,7 @@ namespace llvm {
 
 namespace swift {
   class Type;
+  class AliasType;
   class TupleType;
   class FunctionType;
   class NamedDecl;
@@ -41,7 +40,7 @@ class ASTContext {
   llvm::BumpPtrAllocator *Allocator;
   
   void *IdentifierTable; // llvm::StringMap<char>
-  
+  void *AliasTypes;      // llvm::StringMap<AliasType*>
   void *TupleTypes;      // llvm::FoldingSet<TupleType>
   void *FunctionTypes;   // DenseMap<std::pair<Type*,Type*>, FunctionType*>
 public:
@@ -67,10 +66,18 @@ public:
   Type *getCanonicalType(Type *T);
   
   // Builtin type and simple types that are used frequently.
-  Type * const VoidType; /// VoidType - This is 'void', aka "()"
-  Type * const DependentTy; /// DependentTy - Type is dependent on context.
-  Type * const IntType;  /// IntType - This is 'int'.
+  Type * const VoidType;      /// VoidType - This is 'void', aka "()"
+  Type * const DependentTy;   /// DependentTy - Type is dependent on context.
+  Type * const IntType;       /// IntType - This is 'int'.
 
+  /// getNamedType - This method does a lookup for the specified type name.  If
+  /// no type with the specified name exists, null is returned.
+  Type *getNamedType(Identifier Name);
+  
+  /// getAliasType - Return a new alias type.  This returns null if there is a
+  /// conflict with an already existing alias type of the same name.
+  AliasType *getAliasType(Identifier Name, Type *Underlying);
+                          
   /// getTupleType - Return the uniqued tuple type with the specified elements.
   TupleType *getTupleType(const TupleTypeElt *Fields,
                           unsigned NumFields);
