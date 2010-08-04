@@ -616,7 +616,7 @@ bool Parser::ParseExpr(NullablePtr<Expr> &Result, const char *Message) {
 ///     '(' expr (',' expr)* ')'
 ///     expr-brace
 ///     expr-primary '.' identifier
-///     expr-primary '.' numeric_constant
+///     expr-primary expr-primary     Type sensitive: iff first one has fn type
 bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
   switch (Tok.getKind()) {
   case tok::numeric_constant:
@@ -692,6 +692,30 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
     ConsumeToken(tok::identifier);
     DotLoc = Tok.getLoc();
     continue;
+  }
+  
+  // Okay, we parsed the expression primary and any suffix expressions.  If the
+  // result has function type and if this is followed by another expression,
+  // then we have a juxtaposition case which is parsed.  Note that this
+  // production is ambiguous with the higher level "expr: expr-single+"
+  // production, as witnessed by examples like:
+  //     A + B C * D
+  // Which can be parsed either as:
+  //     A + (B C) * D         <-- Juxtaposition here
+  //     (A + B) (C * D)       <-- Juxtaposition in the expr production
+  // This is disambiguated based on whether B has function type or not.
+  while (!Result.isNull() && S.expr.ShouldGreedilyJuxtapose(Result.get()) &&
+         isStartOfExpr(Tok, S)) {
+    NullablePtr<Expr> RHS;
+    if (ParseExprPrimary(RHS, "expected expression after juxtaposed operator")||
+        RHS.isNull())
+      return true;
+    
+    llvm::PointerIntPair<Expr*, 1, bool>
+    Op = S.expr.ActOnJuxtaposition(Result.get(), RHS.get());
+    assert(!Op.getInt() && "ShouldGreedilyJuxtapose guaranteed an apply");
+    
+    Result = Op.getPointer();
   }
   
   return false;

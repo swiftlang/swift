@@ -223,6 +223,16 @@ static bool SemaBinaryExpr(Expr *&LHS, NamedDecl *OpFn,
 // Action Implementations
 //===----------------------------------------------------------------------===//
 
+/// ShouldGreedilyJuxtapose - This returns true if the specified expression on
+/// the LHS of a juxtaposition should bind very tightly instead of loosely.
+/// When this returns true, Sema is guaranteeing that juxtaposition will result
+/// in an ApplyExpr.
+bool SemaExpr::ShouldGreedilyJuxtapose(Expr *E) const {
+  assert(E && "Expression shouldn't be null");
+  return llvm::isa<FunctionType>(E->Ty);
+}
+
+
 NullablePtr<Expr> SemaExpr::ActOnNumericConstant(llvm::StringRef Text,
                                                  llvm::SMLoc Loc) {
   Type *ResultTy = 0;

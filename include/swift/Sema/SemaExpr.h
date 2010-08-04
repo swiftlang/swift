@@ -59,6 +59,9 @@ public:
   Expr *ConvertToType(Expr *E, Type *Ty, bool IgnoreAnonDecls,
                       ConversionReason Reason);
 
+  /// ShouldGreedilyJuxtapose - This returns true if the specified expression on
+  /// the LHS of a juxtaposition should bind very tightly instead of loosely.
+  bool ShouldGreedilyJuxtapose(Expr *E) const;
   
   // Action Implementations
   llvm::NullablePtr<Expr>
