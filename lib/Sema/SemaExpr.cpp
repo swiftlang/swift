@@ -528,13 +528,7 @@ BindAndValidateClosureArgs(Expr *&Body, Type *FuncInput, SemaDecl &SD) {
            "AnonDecl doesn't have dependent type?");
     NewInputs[0].get()->Ty = FuncInput;
   }
-  
-  // Now that the AnonDecls have a type applied to them, redo semantic analysis
-  // from the leaves of the expression tree up.
-  Body = SemaExpressionTree(SD.S.expr).doIt(Body);
-  if (Body == 0)
-    return 0;
-  
+
   // We used/consumed the anonymous closure arguments.
   SD.AnonClosureArgs.clear();
   return NewInputs;
@@ -682,22 +676,30 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
   // when we convert an expression E to a function type whose result is E's
   // type.
   if (FunctionType *FT = DestTy->getAs<FunctionType>()) {
+    // If we bound any anonymous closure arguments, validate them and resolve
+    // their types.
+    llvm::NullablePtr<AnonDecl> *ActualArgList = 0;
+    if (!IgnoreAnonDecls && !SE.S.decl.AnonClosureArgs.empty()) {
+      ActualArgList = BindAndValidateClosureArgs(E, FT->Input, SE.S.decl);
+      if (ActualArgList == 0)
+        return 0;
+    }
+
     // If there are any live anonymous closure arguments, this level will use
     // them and remove them.  When binding something like _0+_1 to
     // (int,int)->(int,int)->() the arguments bind to the first level, not the
     // inner level.  To handle this, we ignore anonymous decls in the recursive
     // case here.
-    if (Expr *ERes = HandleConversionToType(E, FT->Result, true, SE)) {
-      // If we bound any anonymous closure arguments, validate them and resolve
-      // their types.
-      llvm::NullablePtr<AnonDecl> *ActualArgList = 0;
-      if (!IgnoreAnonDecls && !SE.S.decl.AnonClosureArgs.empty()) {
-        ActualArgList = BindAndValidateClosureArgs(ERes, FT->Input, SE.S.decl);
-        if (ActualArgList == 0)
-          return 0;
-      }
-      return new (SE.S.Context) ClosureExpr(ERes, ActualArgList, DestTy);
-    }
+    Expr *ERes = HandleConversionToType(E, FT->Result, true, SE);
+    if (ERes == 0) return 0;
+  
+    // Now that the AnonDecls potentially have a type applied to them, redo
+    // semantic analysis from the leaves of the expression tree up.
+    ERes = SemaExpressionTree(SE).doIt(ERes);
+    if (ERes == 0)
+      return 0;
+    
+    return new (SE.S.Context) ClosureExpr(ERes, ActualArgList, DestTy);
   }
   
   // If this has a dependent type, just return the expression, the nested
