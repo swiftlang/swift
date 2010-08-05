@@ -167,12 +167,7 @@ Decl *Parser::ParseDeclTopLevel() {
   case tok::kw_var:
     if (VarDecl *D = ParseDeclVar()) {
       S.decl.ActOnTopLevelDecl(D);
-      
-      // Enter the top-level declaration into the global scope.  var's are not
-      // allowed to be recursive, so they are entered after the var and its
-      // initializer are parsed.
-      S.decl.AddToScope(D);
-      
+            
       // On successful parse, eat the ;
       ParseToken(tok::semi, "expected ';' at end of var declaration",
                  tok::semi);
@@ -379,8 +374,16 @@ VarDecl *Parser::ParseDeclVar() {
       Ty = S.Context.TheInt32Type;
   }
   
-  return S.decl.ActOnVarDecl(VarLoc, Identifier, Ty, Init.getPtrOrNull(),
-                             Attributes);
+  VarDecl *VD = S.decl.ActOnVarDecl(VarLoc, Identifier, Ty, Init.getPtrOrNull(),
+                                    Attributes);
+  
+  // Enter the declaration into the current scope.  Since var's are not allowed
+  // to be recursive, so they are entered after its initializer is parsed.  This
+  // does mean that stuff like this is different than C:
+  //    var x = 1; { var x = x+1; assert(x == 2); }
+  if (VD)
+    S.decl.AddToScope(VD);
+  return VD;
 }
 
 /// ParseDeclFunc - Parse a 'func' declaration, returning null on error.  The
@@ -821,13 +824,9 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
     // recovery.
     bool HadError = false;
     if (Tok.is(tok::kw_var)) {
-      if (NamedDecl *D = ParseDeclVar()) {
-        // If we just parsed a var decl, add it to the current scope.
-        S.decl.AddToScope(D);
-        Entries.back() = D;
-      } else {
+      Entries.back() = ParseDeclVar();
+      if (Entries.back().isNull())
         HadError = true;
-      }
     } else {
       NullablePtr<Expr> ResultExpr;
       if (ParseExpr(ResultExpr) || ResultExpr.isNull())
