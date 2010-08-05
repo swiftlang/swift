@@ -300,6 +300,60 @@ void Parser::ParseDeclAttributeList(DeclAttributes &Attributes) {
   }
 }
 
+/// NameRecord - This represents either a single identifier or a tree with
+/// children.
+namespace swift {
+class NameRecord {
+public:
+  Identifier Name;  // In the identifier case, this is the identifier.
+  llvm::SMLoc Loc;  // This is the first character of this name record.
+  unsigned NumChildren;
+  NameRecord *Children;
+  
+  NameRecord() : NumChildren(0), Children(0) {}
+};
+}
+
+/// ParseName
+///   name:
+///     identifier
+///     '(' ')'
+///     '(' name (',' name)* ')'
+bool Parser::ParseName(NameRecord &Record) {
+  Record.Loc = Tok.getLoc();
+
+  // Single name case.
+  if (Tok.is(tok::identifier)) {
+    Record.Name = S.Context.getIdentifier(Tok.getText());
+    ConsumeToken(tok::identifier);
+    return false;
+  }
+  
+  if (ParseToken(tok::l_paren, "expected identifier or '(' in var name"))
+    return true;
+  
+  llvm::SmallVector<NameRecord, 8> ChildNames;
+  
+  if (Tok.isNot(tok::r_paren)) {
+    do {
+      ChildNames.push_back(NameRecord());
+      if (ParseName(ChildNames.back())) return true;
+    } while (ConsumeIf(tok::comma));
+  }
+
+  Record.Children = 
+    (NameRecord *)S.Context.Allocate(sizeof(NameRecord)*ChildNames.size(), 8);
+  memcpy(Record.Children, ChildNames.data(),
+         sizeof(NameRecord)*ChildNames.size());
+  Record.NumChildren = ChildNames.size();
+
+  if (ParseToken(tok::r_paren, "expected ')' at end of var name"))
+    Note(Record.Loc, "to match this '('");
+  
+  return false;
+}
+
+
 /// ParseTypeAlias
 ///   alias-type:
 ///     'typealias' identifier ':' type
@@ -323,9 +377,9 @@ bool Parser::ParseTypeAlias() {
 /// token skipping) on error.
 ///
 ///   decl-var:
-///      'var' decl-attribute-list? identifier ':' type
-///      'var' decl-attribute-list? identifier ':' type '=' expression 
-///      'var' decl-attribute-list? identifier '=' expression
+///      'var' decl-attribute-list? name ':' type
+///      'var' decl-attribute-list? name ':' type '=' expression 
+///      'var' decl-attribute-list? name '=' expression
 VarDecl *Parser::ParseDeclVar() {
   SMLoc VarLoc = Tok.getLoc();
   ConsumeToken(tok::kw_var);
@@ -334,10 +388,13 @@ VarDecl *Parser::ParseDeclVar() {
   if (Tok.is(tok::l_square))
     ParseDeclAttributeList(Attributes);
   
+  //NameRecord Name;
+  //if (ParseName(Name)) return 0;
+
   llvm::StringRef Identifier;
   if (ParseIdentifier(Identifier, "expected identifier in var declaration"))
     return 0;
-  
+
   Type *Ty = 0;
   if (ConsumeIf(tok::colon) &&
       ParseType(Ty, "expected type in var declaration"))

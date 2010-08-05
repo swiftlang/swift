@@ -39,6 +39,7 @@ namespace swift {
   class NamedDecl;
   class ASTContext;
   class ASTConsumer;
+  class NameRecord;
   
 class Parser {
   ASTConsumer &Consumer;
@@ -106,6 +107,8 @@ private:
   bool ParseTypeAlias();
   void ParseDeclAttributeList(DeclAttributes &Attributes);
   bool ParseDeclAttribute(DeclAttributes &Attributes);
+  
+  bool ParseName(NameRecord &Record);
   VarDecl *ParseDeclVar();
   FuncDecl *ParseDeclFunc();
   
