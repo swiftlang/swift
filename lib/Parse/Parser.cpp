@@ -121,40 +121,6 @@ bool Parser::ParseToken(tok::TokenKind K, const char *Message,
   return true;
 }
 
-///   type-or-decl-var:
-///     type
-///     decl-var
-bool Parser::ParseTypeOrDeclVar(llvm::PointerUnion<Type*, NamedDecl*> &Result,
-                                const char *Message) {
-  if (Tok.is(tok::kw_var)) {
-    Result = ParseDeclVar();
-    return Result.isNull();
-  }
-  
-  Type *ResultType = 0;
-  if (ParseType(ResultType, Message)) return true;
-  Result = ResultType;
-  return false;
-}
-
-///   expr-or-decl-var:
-///     type
-///     decl-var
-bool Parser::ParseExprOrDeclVar(llvm::PointerUnion<Expr*, NamedDecl*> &Result,
-                                const char *Message) {
-  if (Tok.is(tok::kw_var)) {
-    Result = ParseDeclVar();
-    return Result.isNull();
-  }
-  
-  NullablePtr<Expr> ResultExpr;
-  if (ParseExpr(ResultExpr, Message) || ResultExpr.isNull())
-    return true;
-  Result = ResultExpr.get();
-  return false;
-}
-
-
 //===----------------------------------------------------------------------===//
 // Decl Parsing
 //===----------------------------------------------------------------------===//
@@ -579,6 +545,11 @@ bool Parser::ParseType(Type *&Result, const char *Message) {
 ///   type-tuple:
 ///     '(' ')'
 ///     '(' type-or-decl-var (',' type-or-decl-var)* ')'
+///
+///   type-or-decl-var:
+///     type
+///     decl-var
+///
 bool Parser::ParseTypeTuple(Type *&Result) {
   assert(Tok.is(tok::l_paren) && "Not start of type tuple");
   SMLoc LPLoc = Tok.getLoc();
@@ -589,26 +560,30 @@ bool Parser::ParseTypeTuple(Type *&Result) {
   if (Tok.isNot(tok::r_paren)) {
     bool HadError = false;
     do {
-      llvm::PointerUnion<Type*, NamedDecl*> Elt;
-      HadError = 
-        ParseTypeOrDeclVar(Elt, "expected type or var declaration in tuple");
-
-      if (HadError) break;
-      
-      if (Type *T = Elt.dyn_cast<Type*>())
-        Elements.push_back(TupleTypeElt(T));
-      else {
-        NamedDecl *ND = Elt.get<NamedDecl*>();
+      if (Tok.is(tok::kw_var)) {
+        NamedDecl *ND = ParseDeclVar();
+        if (ND == 0) {
+          HadError = true;
+          break;
+        }
+        
         if (ND->Init)
           Error(ND->getLocStart(), "cannot specify default values yet");
-        
         if (ND->Attrs.LSquareLoc != SMLoc())
           Error(ND->Attrs.LSquareLoc,
                 "cannot specify attributes on tuple elements");
-
+        
         Elements.push_back(TupleTypeElt(ND->Ty, ND->Name));
+        
+      } else {
+        Type *ResultType = 0;
+        if (ParseType(ResultType, "expected type or var declaration in tuple")){
+          HadError = true;
+          break;
+        }
+        Elements.push_back(TupleTypeElt(ResultType));
       }
-     
+      
     } while (ConsumeIf(tok::comma));
     
     if (HadError) {
@@ -820,6 +795,9 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
 ///
 ///   expr-brace:
 ///     '{' (expr-or-decl-var ';')* expr? }
+///   expr-or-decl-var:
+///     type
+///     decl-var
 bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
   SMLoc LBLoc = Tok.getLoc();
   ConsumeToken(tok::l_brace);
@@ -847,7 +825,24 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
     
     // Parse the var or expression.  If we have an error, try to do nice
     // recovery.
-    if (ParseExprOrDeclVar(Entries.back())) {
+    bool HadError = false;
+    if (Tok.is(tok::kw_var)) {
+      if (NamedDecl *D = ParseDeclVar()) {
+        // If we just parsed a var decl, add it to the current scope.
+        S.decl.AddToScope(D);
+        Entries.back() = D;
+      } else {
+        HadError = true;
+      }
+    } else {
+      NullablePtr<Expr> ResultExpr;
+      if (ParseExpr(ResultExpr) || ResultExpr.isNull())
+        HadError = true;
+      else
+        Entries.back() = ResultExpr.get();
+    }
+    
+    if (HadError) {
       if (Tok.is(tok::semi)) {
         Entries.pop_back();
         continue;  // Consume the ';' and keep going.
@@ -859,10 +854,6 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
       ConsumeIf(tok::r_brace);
       return true;
     }
-    
-    // If we just parsed a var decl, add it to the current scope.
-    if (NamedDecl *D = Entries.back().dyn_cast<NamedDecl*>())
-      S.decl.AddToScope(D);
     
   } while (ConsumeIf(tok::semi));
   

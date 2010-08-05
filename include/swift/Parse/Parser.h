@@ -97,11 +97,6 @@ private:
   bool ParseToken(tok::TokenKind K, const char *Message,
                   tok::TokenKind SkipToTok = tok::unknown);
   
-  bool ParseTypeOrDeclVar(llvm::PointerUnion<Type*, NamedDecl*> &Result,
-                          const char *Message = 0);
-  bool ParseExprOrDeclVar(llvm::PointerUnion<Expr*, NamedDecl*> &Result,
-                          const char *Message = 0);
-  
   // Decl Parsing
   Decl *ParseDeclTopLevel();
   bool ParseTypeAlias();
