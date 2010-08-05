@@ -19,6 +19,7 @@
 
 #include "swift/AST/Identifier.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/Support/Casting.h"
 
 namespace llvm {
   class raw_ostream;
@@ -28,6 +29,7 @@ namespace swift {
   class Expr;
   class Identifier;
   class NamedDecl;
+  class TupleType;
   
   enum TypeKind {
     BuiltinInt32Kind,
@@ -59,8 +61,17 @@ public:
 
   /// isCanonical - Return true if this is a canonical type.
   bool isCanonical() const { return CanonicalType == this; }
-  
-  
+    
+  /// Return true if the outermost level of this type is a sugared type.
+  Type *getDesugaredType();
+
+  /// If this type is a (potentially sugared) type of the specified kind, remove
+  /// the minimal amount of sugar required to get a pointer to the type.
+  template <typename T>
+  T *getAs() {
+    return llvm::dyn_cast<T>(getDesugaredType());
+  }
+
   void dump() const;
   void print(llvm::raw_ostream &OS) const;
   

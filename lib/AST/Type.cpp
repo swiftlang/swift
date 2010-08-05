@@ -17,7 +17,6 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 using llvm::cast;
@@ -32,7 +31,21 @@ void *Type::operator new(size_t Bytes, ASTContext &C,
 // Various Type Methods.
 //===----------------------------------------------------------------------===//
 
+Type *Type::getDesugaredType() {
+  switch (Kind) {
+  case DependentTypeKind:
+  case BuiltinInt32Kind:
+  case TupleTypeKind:
+  case FunctionTypeKind:
+    // None of these types have sugar at the outer level.
+    return this;
+  case AliasTypeKind:
+    return cast<AliasType>(this)->UnderlyingType->getDesugaredType();
+  }
 
+  assert(0 && "Unknown type kind");
+  return 0;
+}
 
 /// getNamedElementId - If this tuple has a field with the specified name,
 /// return the field index, otherwise return -1.

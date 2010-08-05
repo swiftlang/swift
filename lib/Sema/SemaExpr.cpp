@@ -547,9 +547,8 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
 /// (different) tuple context.  This either coerces the tuple to the requested
 /// destination type or returns null to indicate the failure.
 static Expr *ConvertTupleToTuple(Expr *E, TupleType *DestTy, SemaExpr &SE) {
-  TupleType *ETy = llvm::cast<TupleType>(E->Ty);
-  // FIXME: Type conversion of individual elements this for:
-  // "funcdecl4(funcdecl3(), 12);"
+  TupleType *ETy = E->Ty->getAs<TupleType>();
+  assert(ETy && "Expr is not a tuple!");
   
   // Check to see if this conversion is ok by looping over all the destination
   // elements and seeing if they are provided by the input.
@@ -650,15 +649,15 @@ static Expr *ConvertTupleToTuple(Expr *E, TupleType *DestTy, SemaExpr &SE) {
 /// failure.
 static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
                                     SemaExpr &SE) {
-  Type *ETy = SE.S.Context.getCanonicalType(E->Ty);
-  
   // If we have an exact match, we're done.
-  if (ETy == DestTy) return E;
+  if (SE.S.Context.getCanonicalType(E->Ty) ==
+        SE.S.Context.getCanonicalType(DestTy))
+    return E;
   
   assert(!isa<DependentType>(DestTy) &&
          "Result of conversion can't be dependent");
   
-  if (TupleType *TT = dyn_cast<TupleType>(DestTy)) {
+  if (TupleType *TT = DestTy->getAs<TupleType>()) {
     // If the destination is a tuple type with a single element, see if the
     // expression's type is convertable to the element type.
     if (TT->NumFields == 1) {
@@ -674,7 +673,7 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
 
     // If the input is a tuple and the output is a tuple, see if we can convert
     // each element.
-    if (isa<TupleType>(ETy))
+    if (E->Ty->getAs<TupleType>())
       if (Expr *Res = ConvertTupleToTuple(E, TT, SE))
         return Res;
   }
@@ -682,7 +681,7 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
   // Otherwise, check to see if this is an auto-closure case.  This case happens
   // when we convert an expression E to a function type whose result is E's
   // type.
-  if (FunctionType *FT = dyn_cast<FunctionType>(DestTy)) {
+  if (FunctionType *FT = DestTy->getAs<FunctionType>()) {
     // If there are any live anonymous closure arguments, this level will use
     // them and remove them.  When binding something like _0+_1 to
     // (int,int)->(int,int)->() the arguments bind to the first level, not the
@@ -715,7 +714,6 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
 
 Expr *SemaExpr::ConvertToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
                               ConversionReason Reason) {
-  DestTy = S.Context.getCanonicalType(DestTy);
   if (Expr *ERes = HandleConversionToType(E, DestTy, IgnoreAnonDecls, *this))
     return ERes;
   
