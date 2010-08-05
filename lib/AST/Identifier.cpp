@@ -20,5 +20,6 @@ using namespace swift;
 
 
 llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &OS, Identifier I) {
+  if (I.get() == 0) return OS << "(null identifier)";
   return OS << I.get();
 }
