@@ -35,6 +35,7 @@ namespace swift {
   class FuncDecl;
   class AnonDecl;
   class NamedDecl;
+  class ElementRefDecl;
   class Scope;
   class DeclAttributes;
   
@@ -84,12 +85,21 @@ public:
   /// ActOnTopLevelDeclError - This is called after an error parsing a top-level
   /// decl.
   void ActOnTopLevelDeclError();
-  
-  VarDecl *ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name, Type *Ty,
+
+  VarDecl *ActOnVarDecl(llvm::SMLoc VarLoc, Identifier Name, Type *Ty,
                         Expr *Init, DeclAttributes &Attrs);
   FuncDecl *ActOnFuncDecl(llvm::SMLoc FuncLoc, llvm::StringRef Name,
                           Type *Ty, DeclAttributes &Attrs);
   FuncDecl *ActOnFuncBody(FuncDecl *FD, Expr *Body);
+
+  // Name processing.
+  
+  /// ActOnElementName - Assign a name to an element of D specified by Path.
+  ElementRefDecl *ActOnElementName(Identifier Name, llvm::SMLoc NameLoc,
+                                   VarDecl *D, const unsigned *Path,
+                                   unsigned PathLen);
+  bool CheckAccessPathArity(unsigned NumChildren, llvm::SMLoc LPLoc, VarDecl *D,
+                            const unsigned *Path, unsigned PathLen);
 };
   
 } // end namespace swift

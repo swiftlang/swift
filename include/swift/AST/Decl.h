@@ -33,7 +33,8 @@ namespace swift {
 enum DeclKind {
   VarDeclKind,
   FuncDeclKind,
-  AnonDeclKind
+  AnonDeclKind,
+  ElementRefDeclKind
 };
   
 /// DeclAttributes - These are attributes that may be applied to declarations.
@@ -90,20 +91,24 @@ public:
   Expr *Init;
   DeclAttributes Attrs;
   
-  NamedDecl(Identifier name, Type *ty, Expr *init, const DeclAttributes &attrs,
-            DeclKind K)
-    : Decl(K), Name(name), Ty(ty), Init(init), Attrs(attrs) {
-  }
-  
   llvm::SMLoc getLocStart() const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->getKind() == VarDeclKind || D->getKind() == FuncDeclKind;
+    return (D->getKind() == VarDeclKind || D->getKind() == FuncDeclKind ||
+            D->getKind() == AnonDeclKind || D->getKind() == ElementRefDeclKind);
   }
   static bool classof(const NamedDecl *D) { return true; }
   
 protected:
+  NamedDecl(Identifier name, Type *ty, Expr *init, const DeclAttributes &attrs,
+            DeclKind K)
+    : Decl(K), Name(name), Ty(ty), Init(init), Attrs(attrs) {
+  }
+  NamedDecl(Identifier name, Type *ty, Expr *init, DeclKind K)
+    : Decl(K), Name(name), Ty(ty), Init(init) {
+  }
+  
   void printCommon(llvm::raw_ostream &OS, unsigned Indent) const;
 };
 
@@ -155,6 +160,27 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == AnonDeclKind; }
   static bool classof(const AnonDecl *D) { return true; }
+};
+  
+/// ElementRefDecl - A reference to the element of another decl which is formed
+/// through name binding.  For example, in "var (a,b) = f();" there is a VarDecl
+/// with no name and two ElementRefDecls (named A and B) referring to elements
+/// of the nameless vardecl.
+class ElementRefDecl : public NamedDecl {
+public:
+  VarDecl *VD;
+  llvm::SMLoc NameLoc;
+  // TODO: Access path.
+  
+  ElementRefDecl(VarDecl *vd, llvm::SMLoc nameloc, Identifier name, Type *ty)
+    : NamedDecl(name, ty, 0, ElementRefDeclKind), VD(vd), NameLoc(nameloc) {
+  }
+
+  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) { return D->getKind()==ElementRefDeclKind;}
+  static bool classof(const ElementRefDecl *D) { return true; }
 };
 
   

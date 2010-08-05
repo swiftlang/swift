@@ -84,6 +84,53 @@ AnonDecl *SemaDecl::GetAnonDecl(llvm::StringRef Text, llvm::SMLoc RefLoc) {
 }
 
 //===----------------------------------------------------------------------===//
+// Name Processing.
+//===----------------------------------------------------------------------===//
+
+static Type *GetTypeForPath(Type *Ty, const unsigned *Path, unsigned PathLen) {
+  if (PathLen == 0)
+    return Ty;
+  
+  // Right now, you can only dive into tuples.
+  TupleType *TT = llvm::dyn_cast<TupleType>(Ty);
+  if (TT == 0) return 0;
+  
+  // Reject invalid indices.
+  if (*Path >= TT->NumFields)
+    return 0;
+  
+  return GetTypeForPath(TT->getElementType(*Path), Path+1, PathLen-1);
+}
+
+/// ActOnElementName - Assign a name to an element of D specified by Path.
+ElementRefDecl *SemaDecl::
+ActOnElementName(Identifier Name, llvm::SMLoc NameLoc, VarDecl *D,
+                 const unsigned *Path, unsigned PathLen) {
+  Type *Ty = GetTypeForPath(D->Ty, Path, PathLen);
+  assert(Ty && "Access path validity should already have been checked by"
+         " CheckAccessPathArity");
+  
+  // Create the decl for this name and add it to the current scope.
+  return new (S.Context) ElementRefDecl(D, NameLoc, Name, Ty);
+}
+
+/// CheckAccessPathArity - Check that the type specified by the access path has
+/// the right arity and return false if so.  Otherwise emit an error and emit
+/// true.
+bool SemaDecl::CheckAccessPathArity(unsigned NumChildren, llvm::SMLoc LPLoc,
+                                    VarDecl *D,
+                                    const unsigned *Path, unsigned PathLen) {
+  TupleType *Ty =
+    llvm::dyn_cast_or_null<TupleType>(GetTypeForPath(D->Ty, Path, PathLen));
+  if (Ty && Ty->NumFields == NumChildren)
+    return false;
+  
+  Error(LPLoc,"tuple specifier has wrong number of elements for actual type");
+  return true;
+}
+
+
+//===----------------------------------------------------------------------===//
 // Declaration handling.
 //===----------------------------------------------------------------------===//
 
@@ -126,7 +173,7 @@ static void ValidateAttributes(DeclAttributes &Attrs, Type *Ty, SemaDecl &SD) {
   }
 }
 
-VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name,
+VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, Identifier Name,
                                 Type *Ty, Expr *Init, DeclAttributes &Attrs) {
   
   // Diagnose when we don't have a type or an expression.
@@ -154,8 +201,7 @@ VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, llvm::StringRef Name,
   // Validate attributes.
   ValidateAttributes(Attrs, Ty, *this);
   
-  return new (S.Context) VarDecl(VarLoc, S.Context.getIdentifier(Name),
-                                 Ty, Init, Attrs);
+  return new (S.Context) VarDecl(VarLoc, Name, Ty, Init, Attrs);
 }
 
 FuncDecl *SemaDecl::

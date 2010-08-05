@@ -334,6 +334,37 @@ bool Parser::ParseTypeAlias() {
 }
 
 
+/// AddElementNamesForVarDecl - This recursive function walks a name specifier
+/// adding ElementRefDecls for the named subcomponents and checking that types
+/// match up correctly.
+static void AddElementNamesForVarDecl(const NameRecord &Name,
+                                    llvm::SmallVectorImpl<unsigned> &AccessPath,
+                                      VarDecl *VD, SemaDecl &SD) {
+  // If this is a leaf name, ask sema to create a ElementRefDecl for us with the
+  // specified access path.
+  if (Name.Name.get()) {
+    NamedDecl *END = 
+      SD.ActOnElementName(Name.Name, Name.Loc, VD,
+                          AccessPath.data(), AccessPath.size());
+    SD.AddToScope(END);
+    return;
+  }
+  
+  // Otherwise, we have the paren case.  Verify that the currently named type
+  // has the right number of elements.  If so, we recursively process each.
+  if (SD.CheckAccessPathArity(Name.NumChildren, Name.Loc, VD,
+                              AccessPath.data(), AccessPath.size()))
+    return;
+ 
+  AccessPath.push_back(0);
+  for (unsigned i = 0, e = Name.NumChildren; i != e; ++i) {
+    AccessPath.back() = i;
+    AddElementNamesForVarDecl(Name.Children[i], AccessPath, VD, SD);
+  }
+  AccessPath.pop_back();
+}
+
+
 /// ParseDeclVar - Parse a 'var' declaration, returning null (and doing no
 /// token skipping) on error.
 ///
@@ -349,12 +380,8 @@ VarDecl *Parser::ParseDeclVar() {
   if (Tok.is(tok::l_square))
     ParseDeclAttributeList(Attributes);
   
-  //NameRecord Name;
-  //if (ParseName(Name)) return 0;
-
-  llvm::StringRef Identifier;
-  if (ParseIdentifier(Identifier, "expected identifier in var declaration"))
-    return 0;
+  NameRecord Name;
+  if (ParseName(Name)) return 0;
 
   Type *Ty = 0;
   if (ConsumeIf(tok::colon) &&
@@ -373,16 +400,25 @@ VarDecl *Parser::ParseDeclVar() {
     if (Init.isNull() && Ty == 0)
       Ty = S.Context.TheInt32Type;
   }
-  
-  VarDecl *VD = S.decl.ActOnVarDecl(VarLoc, Identifier, Ty, Init.getPtrOrNull(),
+
+  VarDecl *VD = S.decl.ActOnVarDecl(VarLoc, Name.Name, Ty, Init.getPtrOrNull(),
                                     Attributes);
+  if (VD == 0) return 0;
   
   // Enter the declaration into the current scope.  Since var's are not allowed
   // to be recursive, so they are entered after its initializer is parsed.  This
   // does mean that stuff like this is different than C:
   //    var x = 1; { var x = x+1; assert(x == 2); }
-  if (VD)
+  if (Name.Name.get())
     S.decl.AddToScope(VD);
+  else {
+    // If there is a more interesting name presented here, then we need to walk
+    // through it and synthesize the decls that reference the var elements as
+    // appropriate.
+    llvm::SmallVector<unsigned, 8> AccessPath;
+    AddElementNamesForVarDecl(Name, AccessPath, VD, S.decl);
+    
+  }
   return VD;
 }
 
