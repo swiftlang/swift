@@ -40,6 +40,7 @@ namespace swift {
   class ASTContext;
   class ASTConsumer;
   class NameRecord;
+  class TupleTypeElt;
   
 class Parser {
   ASTConsumer &Consumer;
@@ -110,6 +111,7 @@ private:
   // Type Parsing
   bool ParseType(Type *&Result, const char *Message = 0);
   bool ParseTypeTuple(Type *&Result);
+  bool ParseTypeTupleElement(TupleTypeElt &Result);
 
   // Expression Parsing
   bool ParseExpr(llvm::NullablePtr<Expr> &Result, const char *Message = 0);

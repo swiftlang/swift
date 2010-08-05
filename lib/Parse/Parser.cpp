@@ -541,14 +541,29 @@ bool Parser::ParseType(Type *&Result, const char *Message) {
   return false;
 }
 
+/// ParseTypeTupleElement
+///   type-tuple-element:
+///     type
+///     '.' identifier ':' type
+bool Parser::ParseTypeTupleElement(TupleTypeElt &Result) {
+  if (!ConsumeIf(tok::period))
+    return ParseType(Result.Ty, "expected type in tuple element");
+
+  llvm::StringRef Name;
+  if (ParseIdentifier(Name, "expected identifier in tuple element") ||
+      ParseToken(tok::colon, "expected ':' after tuple element name") ||
+      ParseType(Result.Ty, "expected type in tuple element"))
+    return true;
+  
+  Result.Name = S.Context.getIdentifier(Name);
+  return false;
+}
+
+
 /// ParseTypeTuple
 ///   type-tuple:
 ///     '(' ')'
-///     '(' type-or-decl-var (',' type-or-decl-var)* ')'
-///
-///   type-or-decl-var:
-///     type
-///     decl-var
+///     '(' type-tuple-element (',' type-tuple-element)* ')'
 ///
 bool Parser::ParseTypeTuple(Type *&Result) {
   assert(Tok.is(tok::l_paren) && "Not start of type tuple");
@@ -560,30 +575,9 @@ bool Parser::ParseTypeTuple(Type *&Result) {
   if (Tok.isNot(tok::r_paren)) {
     bool HadError = false;
     do {
-      if (Tok.is(tok::kw_var)) {
-        NamedDecl *ND = ParseDeclVar();
-        if (ND == 0) {
-          HadError = true;
-          break;
-        }
-        
-        if (ND->Init)
-          Error(ND->getLocStart(), "cannot specify default values yet");
-        if (ND->Attrs.LSquareLoc != SMLoc())
-          Error(ND->Attrs.LSquareLoc,
-                "cannot specify attributes on tuple elements");
-        
-        Elements.push_back(TupleTypeElt(ND->Ty, ND->Name));
-        
-      } else {
-        Type *ResultType = 0;
-        if (ParseType(ResultType, "expected type or var declaration in tuple")){
-          HadError = true;
-          break;
-        }
-        Elements.push_back(TupleTypeElt(ResultType));
-      }
-      
+      Elements.push_back(TupleTypeElt());
+      if ((HadError = ParseTypeTupleElement(Elements.back())))
+        break;
     } while (ConsumeIf(tok::comma));
     
     if (HadError) {
