@@ -513,6 +513,14 @@ FuncDecl *Parser::ParseDeclFunc() {
   // used within its body.
   if (FD)
     S.decl.AddToScope(FD);
+  
+  // Enter the arguments for the function into a new function-body scope.  We
+  // need this even if there is no function body to detect argument name
+  // duplication.
+  Scope FnBodyScope(S.decl);
+  
+  if (FD)
+    S.decl.CreateArgumentDeclsForFunc(FD);
 
   // If this is a declaration, we're done.
   if (ConsumeIf(tok::semi))
@@ -525,7 +533,7 @@ FuncDecl *Parser::ParseDeclFunc() {
   llvm::NullablePtr<Expr> Body;
   if (ParseExpr(Body, "expected expression parsing func body") ||
       Body.isNull())
-    return 0;
+    return 0;  // FIXME: Need to call a new ActOnFuncBodyError?
 
   return S.decl.ActOnFuncBody(FD, Body.get());
 }

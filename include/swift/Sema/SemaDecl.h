@@ -90,6 +90,7 @@ public:
                         Expr *Init, DeclAttributes &Attrs);
   FuncDecl *ActOnFuncDecl(llvm::SMLoc FuncLoc, llvm::StringRef Name,
                           Type *Ty, DeclAttributes &Attrs);
+  void CreateArgumentDeclsForFunc(FuncDecl *FD);
   FuncDecl *ActOnFuncBody(FuncDecl *FD, Expr *Body);
 
   // Name processing.

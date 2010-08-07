@@ -216,6 +216,83 @@ ActOnFuncDecl(llvm::SMLoc FuncLoc, llvm::StringRef Name,
                                   Ty, 0, Attrs);
 }
 
+/// FuncTypePiece - This little enum is used by AddFuncArgumentsToScope to keep
+/// track of where in a function type it is currently looking.  This affects how
+/// the decls are processed and created.
+enum FuncTypePiece {
+  FTP_Function,  // Looking at the initial functiontype itself.
+  FTP_Input,     // Looking at the input to the function type
+  FTP_Output     // Looking at the output to the function type.
+};
+
+/// AddFuncArgumentsToScope - Walk the type specified for a Func object (which
+/// is known to be a FunctionType on the outer level) creating and adding named
+/// arguments to the current scope.  This causes redefinition errors to be
+/// emitted.
+///
+/// Note that we really *do* want dyn_cast here, not getAs, because we do not
+/// want to look through type aliases or other sugar, we want to see what the
+/// user wrote in the func declaration.
+static void AddFuncArgumentsToScope(Type *Ty,
+                                    llvm::SmallVectorImpl<unsigned> &AccessPath,
+                                    FuncTypePiece Mode,
+                                    llvm::SMLoc FuncLoc, SemaDecl &SD) {
+  // Handle the function case first.
+  if (Mode == FTP_Function) {
+    FunctionType *FT = llvm::cast<FunctionType>(Ty);
+    AccessPath.push_back(0);
+    AddFuncArgumentsToScope(FT->Input, AccessPath, FTP_Input, FuncLoc, SD);
+    
+    AccessPath.back() = 1;
+    
+    // If this is a->b->c then we treat b as an input, not (b->c) as an output.
+    if (llvm::isa<FunctionType>(FT->Result))
+      AddFuncArgumentsToScope(FT->Result, AccessPath, FTP_Function, FuncLoc,SD);
+    else    
+      AddFuncArgumentsToScope(FT->Result, AccessPath, FTP_Output, FuncLoc, SD);
+    AccessPath.pop_back();
+    return;
+  }
+
+  // Otherwise, we're looking at an input or output to the func.  The only type
+  // we currently dive into is the humble tuple, which can be recursive.
+  TupleType *TT = llvm::dyn_cast<TupleType>(Ty);
+  if (TT == 0) return;
+
+  
+  AccessPath.push_back(0);
+
+  // For tuples, recursively processes their elements (to handle cases like:
+  //    (x : (.a : int, .b : int), y: int) -> ...
+  // and create decls for any named elements.
+  for (unsigned i = 0, e = TT->NumFields; i != e; ++i) {
+    AccessPath.back() = 1;
+    AddFuncArgumentsToScope(TT->Fields[i].Ty, AccessPath, Mode, FuncLoc, SD);
+
+    // If this field is named, create the argument decl for it.
+    Identifier Name = TT->Fields[i].Name;
+    // Ignore unnamed fields.
+    if (Name.get() == 0) continue;
+    
+    
+    // Eventually we should mark the input/outputs as readonly vs writeonly.
+    //bool isInput = Mode == FTP_Input;
+
+    // TODO: QOI, this diagnostic lacks location info and otherwise sucks.
+  }
+  
+  AccessPath.pop_back();
+}
+
+
+void SemaDecl::CreateArgumentDeclsForFunc(FuncDecl *FD) {
+
+  llvm::SmallVector<unsigned, 8> AccessPath;
+  AddFuncArgumentsToScope(FD->Ty, AccessPath, FTP_Function, FD->FuncLoc, *this);
+  
+}
+
+
 FuncDecl *SemaDecl::ActOnFuncBody(FuncDecl *FD, Expr *Body) {
   assert(FD && Body && "Elements of func body not specified?");
          
@@ -224,6 +301,9 @@ FuncDecl *SemaDecl::ActOnFuncBody(FuncDecl *FD, Expr *Body) {
   Body = S.expr.ConvertToType(Body, FD->Ty, false, SemaExpr::CR_FuncBody);
   if (Body == 0) return 0;
   
+  // TODO: Now that the body is type checked and bound, verify that the
+  // arguments used are the valid ones and build an extra layer of closure to
+  // bind the arguments.
   FD->Init = Body;
   return FD;
 }
