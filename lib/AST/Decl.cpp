@@ -33,9 +33,10 @@ void Decl::dump() const { print(llvm::errs()); llvm::errs() << '\n'; }
 
 void Decl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   switch (getKind()) {
-  case VarDeclKind:  return cast<VarDecl>(this)->print(OS, Indent);
-  case FuncDeclKind: return cast<FuncDecl>(this)->print(OS, Indent);
-  case AnonDeclKind: return cast<AnonDecl>(this)->print(OS, Indent);
+  case VarDeclKind:        return cast<VarDecl>(this)->print(OS, Indent);
+  case FuncDeclKind:       return cast<FuncDecl>(this)->print(OS, Indent);
+  case ArgDeclKind:        return cast<ArgDecl>(this)->print(OS, Indent);
+  case AnonDeclKind:       return cast<AnonDecl>(this)->print(OS, Indent);
   case ElementRefDeclKind: return cast<ElementRefDecl>(this)->print(OS, Indent);
   }
 }
@@ -43,9 +44,10 @@ void Decl::print(llvm::raw_ostream &OS, unsigned Indent) const {
 
 llvm::SMLoc NamedDecl::getLocStart() const {
   switch (getKind()) {
-  case VarDeclKind:  return cast<VarDecl>(this)->VarLoc;
-  case FuncDeclKind: return cast<FuncDecl>(this)->FuncLoc;
-  case AnonDeclKind: return cast<AnonDecl>(this)->UseLoc;
+  case VarDeclKind:        return cast<VarDecl>(this)->VarLoc;
+  case FuncDeclKind:       return cast<FuncDecl>(this)->FuncLoc;
+  case ArgDeclKind:        return cast<ArgDecl>(this)->FuncLoc;
+  case AnonDeclKind:       return cast<AnonDecl>(this)->UseLoc;
   case ElementRefDeclKind: return cast<ElementRefDecl>(this)->NameLoc;
   }
 
@@ -74,6 +76,11 @@ void VarDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
 
 void FuncDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(funcdecl ";
+  printCommon(OS, Indent);
+}
+
+void ArgDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
+  OS.indent(Indent) << "(argdecl ";
   printCommon(OS, Indent);
 }
 

@@ -33,6 +33,7 @@ namespace swift {
 enum DeclKind {
   VarDeclKind,
   FuncDeclKind,
+  ArgDeclKind,
   AnonDeclKind,
   ElementRefDeclKind
 };
@@ -144,6 +145,29 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == FuncDeclKind; }
   static bool classof(const FuncDecl *D) { return true; }
+};
+  
+  
+/// ArgDecl - A declaration representing a named function argument, in a func
+/// declaration.  For example, in "func x(a : int);", 'a' is an ArgDecl.
+///
+class ArgDecl : public NamedDecl {
+public:
+  // FIXME: We don't have good location information for the function argument
+  // declaration.
+  llvm::SMLoc FuncLoc;
+  
+  // FIXME: Store the access path here.
+  
+  ArgDecl(llvm::SMLoc funcloc, Identifier name, Type *ty)
+    : NamedDecl(name, ty, 0, DeclAttributes(), ArgDeclKind), FuncLoc(funcloc) {}
+
+  
+  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) { return D->getKind() == ArgDeclKind; }
+  static bool classof(const ArgDecl *D) { return true; }
 };
 
 /// AnonDecl - Anonymous closure argument declaration, synthesized by referecing

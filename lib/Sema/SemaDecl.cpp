@@ -275,10 +275,13 @@ static void AddFuncArgumentsToScope(Type *Ty,
     if (Name.get() == 0) continue;
     
     
+    // Create the argument decl for this named argument.
+    ArgDecl *AD = new (SD.S.Context) ArgDecl(FuncLoc, Name, TT->Fields[i].Ty);
+    
     // Eventually we should mark the input/outputs as readonly vs writeonly.
     //bool isInput = Mode == FTP_Input;
 
-    // TODO: QOI, this diagnostic lacks location info and otherwise sucks.
+    SD.AddToScope(AD);
   }
   
   AccessPath.pop_back();
