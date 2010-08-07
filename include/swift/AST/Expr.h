@@ -123,13 +123,15 @@ class TupleExpr : public Expr {
 public:
   llvm::SMLoc LParenLoc;
   Expr **SubExprs;
+  Identifier *SubExprNames;  // Can be null if no names.
   unsigned NumSubExprs;
   llvm::SMLoc RParenLoc;
   
-  TupleExpr(llvm::SMLoc lparenloc, Expr **subexprs, unsigned numsubexprs,
-            llvm::SMLoc rparenloc, Type *Ty)
+  TupleExpr(llvm::SMLoc lparenloc, Expr **subexprs, Identifier *subexprnames,
+            unsigned numsubexprs, llvm::SMLoc rparenloc, Type *Ty)
     : Expr(TupleExprKind, Ty), LParenLoc(lparenloc), SubExprs(subexprs),
-      NumSubExprs(numsubexprs), RParenLoc(rparenloc) {}
+      SubExprNames(subexprnames), NumSubExprs(numsubexprs),
+      RParenLoc(rparenloc) {}
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TupleExpr *) { return true; }

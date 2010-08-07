@@ -713,8 +713,7 @@ bool Parser::ParseExpr(NullablePtr<Expr> &Result, const char *Message) {
 ///   expr-primary:
 ///     numeric_constant
 ///     identifier
-///     '(' ')'
-///     '(' expr (',' expr)* ')'
+///     expr-paren
 ///     expr-brace
 ///     expr-primary '.' identifier
 ///     expr-primary expr-primary     Type sensitive: iff first one has fn type
@@ -730,45 +729,9 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
     ConsumeToken(tok::identifier);
     break;
       
-  case tok::l_paren: {
-    SMLoc LPLoc = Tok.getLoc();  
-    ConsumeToken(tok::l_paren);
-    
-    llvm::SmallVector<Expr*, 8> SubExprs;
-    bool AnyErroneousSubExprs = false;
-    
-    if (Tok.isNot(tok::r_paren)) {
-      NullablePtr<Expr> SubExpr;
-      if (ParseExpr(SubExpr, "expected expression in parentheses")) return true;
-      
-      if (SubExpr.isNull())
-        AnyErroneousSubExprs = true;
-      else
-        SubExprs.push_back(SubExpr.get());
-      
-      while (ConsumeIf(tok::comma)) {
-        SubExpr = 0;
-        if (ParseExpr(SubExpr, "expected expression in parentheses"))
-          return true;
-        
-        if (SubExpr.isNull())
-          AnyErroneousSubExprs = true;
-        else
-          SubExprs.push_back(SubExpr.get());
-      }
-    }
-    
-    SMLoc RPLoc = Tok.getLoc();  
-    if (ParseToken(tok::r_paren, "expected ')' in parenthesis expression")) {
-      Note(LPLoc, "to match this opening '('");
-      return true;
-    }
-    
-    if (!AnyErroneousSubExprs)
-      Result = S.expr.ActOnTupleExpr(LPLoc, SubExprs.data(), SubExprs.size(),
-                                     RPLoc);
+  case tok::l_paren:
+    if (ParseExprParen(Result)) return true;
     break;
-  }
       
   case tok::l_brace:
     if (ParseExprBrace(Result)) return true;
@@ -819,6 +782,67 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
     Result = Op.getPointer();
   }
   
+  return false;
+}
+
+/// ParseExprParen - Parse a tuple expression.
+///
+///   expr-paren: 
+///     '(' ')'
+///     '(' expr-paren-element (',' expr-paren-element)* ')'
+///
+///   expr-paren-element:
+///     ('.' identifier '=')? expr
+///
+bool Parser::ParseExprParen(llvm::NullablePtr<Expr> &Result) {
+  SMLoc LPLoc = Tok.getLoc();  
+  ConsumeToken(tok::l_paren);
+  
+  llvm::SmallVector<Expr*, 8> SubExprs;
+  llvm::SmallVector<Identifier, 8> SubExprNames; 
+  bool AnyErroneousSubExprs = false;
+  
+  if (Tok.isNot(tok::r_paren)) {
+    do {
+      Identifier FieldName;
+      // Check to see if there is a field specifier.
+      if (ConsumeIf(tok::period)) {
+        llvm::StringRef FieldNameStr;
+        if (ParseIdentifier(FieldNameStr,
+                          "expected field specifier name in tuple expression")||
+            ParseToken(tok::equal, "expected '=' in tuple expression"))
+          return true;
+        FieldName = S.Context.getIdentifier(FieldNameStr);
+      }
+      
+      if (!SubExprNames.empty())
+        SubExprNames.push_back(FieldName);
+      else if (FieldName.get()) {
+        SubExprNames.resize(SubExprs.size());
+        SubExprNames.push_back(FieldName);
+      }
+      
+      NullablePtr<Expr> SubExpr;
+      if (ParseExpr(SubExpr, "expected expression in parentheses")) return true;
+      
+      if (SubExpr.isNull())
+        AnyErroneousSubExprs = true;
+      else
+        SubExprs.push_back(SubExpr.get());
+    
+    } while (ConsumeIf(tok::comma));
+  }
+  
+  SMLoc RPLoc = Tok.getLoc();  
+  if (ParseToken(tok::r_paren, "expected ')' in parenthesis expression")) {
+    Note(LPLoc, "to match this opening '('");
+    return true;
+  }
+  
+  if (!AnyErroneousSubExprs)
+    Result = S.expr.ActOnTupleExpr(LPLoc, SubExprs.data(),
+                                   SubExprNames.empty()?0 : SubExprNames.data(),
+                                   SubExprs.size(), RPLoc);
   return false;
 }
 

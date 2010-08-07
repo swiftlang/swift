@@ -130,10 +130,12 @@ static bool SemaDotIdentifier(Expr *E, llvm::SMLoc DotLoc,
 
 
 static bool SemaTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
+                          Identifier *SubExprNames,
                           unsigned NumSubExprs, llvm::SMLoc RPLoc,
                           Type *&ResultTy, SemaExpr &SE) {
-  // A tuple expr with a single subexpression is just a grouping paren.
-  if (NumSubExprs == 1) {
+  // A tuple expr with a single subexpression and no name is just a grouping
+  // paren.
+  if (NumSubExprs == 1 && (SubExprNames == 0 || SubExprNames[0].get() == 0)) {
     ResultTy = SubExprs[0]->Ty;
     return false;
   }
@@ -150,7 +152,10 @@ static bool SemaTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
     }
     
     ResultTyElts[i].Ty = SubExprs[i]->Ty;
-    // Name is empty because we don't support named field exprs.
+
+    // If a name was specified for this element, use it.
+    if (SubExprNames)
+      ResultTyElts[i].Name = SubExprNames[i];
   }
   
   ResultTy = SE.S.Context.getTupleType(ResultTyElts.data(), NumSubExprs);
@@ -296,18 +301,28 @@ SemaExpr::ActOnDotIdentifier(Expr *E, llvm::SMLoc DotLoc,
 }
 
 NullablePtr<Expr> 
-SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
+SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr *const *SubExprs,
+                         const Identifier *SubExprNames,
                          unsigned NumSubExprs, llvm::SMLoc RPLoc) {
   
-  Expr **NewSubExprs = (Expr**)S.Context.Allocate(sizeof(Expr*)*NumSubExprs, 8);
-  memcpy(NewSubExprs, SubExprs, sizeof(Expr*)*NumSubExprs);
-  
+  Expr **NewSubExprs =
+    (Expr**)S.Context.Allocate(sizeof(SubExprs[0])*NumSubExprs, 8);
+  memcpy(NewSubExprs, SubExprs, sizeof(SubExprs[0])*NumSubExprs);
+
+  Identifier *NewSubExprsNames = 0;
+  if (SubExprNames) {
+    NewSubExprsNames =
+      (Identifier*)S.Context.Allocate(sizeof(SubExprNames[0])*NumSubExprs, 8);
+    memcpy(NewSubExprsNames, SubExprNames, sizeof(SubExprNames[0])*NumSubExprs);
+  }
+
   Type *ResultTy = 0;
-  if (SemaTupleExpr(LPLoc, NewSubExprs, NumSubExprs, RPLoc, ResultTy, *this))
+  if (SemaTupleExpr(LPLoc, NewSubExprs, NewSubExprsNames, NumSubExprs, RPLoc,
+                    ResultTy, *this))
     return 0;
   
-  return new (S.Context) TupleExpr(LPLoc, NewSubExprs, NumSubExprs,
-                                   RPLoc, ResultTy);
+  return new (S.Context) TupleExpr(LPLoc, NewSubExprs, NewSubExprsNames,
+                                   NumSubExprs, RPLoc, ResultTy);
 }
 
 /// ActOnJuxtaposition - This is invoked whenever the parser sees a
@@ -392,8 +407,8 @@ namespace {
         if ((E->SubExprs[i] = Visit(E->SubExprs[i])) == 0)
           return 0;
       
-      if (SemaTupleExpr(E->LParenLoc, E->SubExprs, E->NumSubExprs,
-                        E->RParenLoc, E->Ty, SE)) return 0;
+      if (SemaTupleExpr(E->LParenLoc, E->SubExprs, E->SubExprNames,
+                        E->NumSubExprs, E->RParenLoc, E->Ty, SE)) return 0;
       return E;
     }
     Expr *VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
@@ -608,6 +623,8 @@ static Expr *ConvertTupleToTuple(Expr *E, TupleType *DestTy, SemaExpr &SE) {
   // the right destination type.
   llvm::SmallVector<Expr*, 16> NewElements(DestTy->NumFields);
   
+  Identifier *NewNames = 0;
+
   for (unsigned i = 0, e = DestTy->NumFields; i != e; ++i) {
     // FIXME: This turns the AST into an ASDAG, which is seriously bad.  We
     // should add a more tailored AST representation for this.
@@ -625,6 +642,18 @@ static Expr *ConvertTupleToTuple(Expr *E, TupleType *DestTy, SemaExpr &SE) {
     // TODO: QOI: Include a note about this failure!
     if (Src == 0) return 0;
     NewElements[i] = Src;
+    
+    
+    if (DestTy->Fields[i].Name.get()) {
+      // Allocate the array on the first element with a name.
+      if (NewNames == 0) {
+        NewNames = (Identifier*)SE.S.Context.Allocate(sizeof(Identifier)*
+                                                      DestTy->NumFields, 8);
+        memset(NewNames, 0, sizeof(Identifier)*DestTy->NumFields);
+      }
+      
+      NewNames[i] = DestTy->Fields[i].Name;
+    }
   }
   
   // If we got here, the type conversion is successful, create a new TupleExpr.  
@@ -634,8 +663,8 @@ static Expr *ConvertTupleToTuple(Expr *E, TupleType *DestTy, SemaExpr &SE) {
     (Expr**)SE.S.Context.Allocate(sizeof(Expr*)*DestTy->NumFields, 8);
   memcpy(NewSE, NewElements.data(), sizeof(Expr*)*DestTy->NumFields);
 
-  return new (SE.S.Context) TupleExpr(llvm::SMLoc(), NewSE, NewElements.size(),
-                                      llvm::SMLoc(), DestTy);
+  return new (SE.S.Context) TupleExpr(llvm::SMLoc(), NewSE, NewNames,
+                                      NewElements.size(), llvm::SMLoc(),DestTy);
 }
 
 /// HandleConversionToType - This is the recursive implementation of
@@ -660,7 +689,15 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
         // Must allocate space for the AST node.
         Expr **NewSE = (Expr**)SE.S.Context.Allocate(sizeof(Expr*), 8);
         NewSE[0] = ERes;
-        return new (SE.S.Context) TupleExpr(llvm::SMLoc(), NewSE, 1,
+        
+        // Handle the name if the element is named.
+        Identifier *NewName = 0;
+        if (TT->Fields[0].Name.get()) {
+          NewName = (Identifier*)SE.S.Context.Allocate(sizeof(Identifier), 8);
+          NewName[0] = TT->Fields[0].Name;
+        }
+        
+        return new (SE.S.Context) TupleExpr(llvm::SMLoc(), NewSE, NewName, 1,
                                             llvm::SMLoc(), DestTy);
       }
     }

@@ -116,6 +116,7 @@ private:
   // Expression Parsing
   bool ParseExpr(llvm::NullablePtr<Expr> &Result, const char *Message = 0);
   bool ParseExprPrimary(llvm::NullablePtr<Expr> &Result, const char *Message=0);
+  bool ParseExprParen(llvm::NullablePtr<Expr> &Result);
   bool ParseExprBrace(llvm::NullablePtr<Expr> &Result);
   bool ParseExprBinaryRHS(llvm::NullablePtr<Expr> &Result,
                           unsigned MinPrecedence = 0);
