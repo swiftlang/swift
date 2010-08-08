@@ -519,6 +519,10 @@ bool Parser::ParseType(Type *&Result, const char *Message) {
     Result = S.type.ActOnInt32Type(Tok.getLoc());
     ConsumeToken(tok::kw___builtin_int32_type);
     break;
+  case tok::kw___builtin_else_hack_type:
+    Result = S.type.ActOnElseHackType(Tok.getLoc());
+    ConsumeToken(tok::kw___builtin_else_hack_type);
+    break;
   case tok::l_paren:
     if (ParseTypeTuple(Result))
       return true;
@@ -699,8 +703,6 @@ static bool isStartOfExpr(Token &Tok, Sema &S) {
 /// ParseExpr
 ///   expr:
 ///     expr-single+
-///   expr-single:
-///     expr-primary (binary-operator expr-primary)*
 bool Parser::ParseExpr(NullablePtr<Expr> &Result, const char *Message) {
   llvm::SmallVector<Expr*, 8> SequencedExprs;
   
@@ -708,10 +710,8 @@ bool Parser::ParseExpr(NullablePtr<Expr> &Result, const char *Message) {
   do {
     // Parse the expr-single.
     Result = 0;
-    if (ParseExprPrimary(Result, Message) || ParseExprBinaryRHS(Result) ||
-        Result.isNull())
-      return true;
-  
+    if (ParseExprSingle(Result) || Result.isNull()) return true;
+
     // Check to see if this juxtaposition is application of a function with its
     // arguments.  If so, bind the function application, otherwise, we have a
     // sequence.
@@ -747,6 +747,15 @@ bool Parser::ParseExpr(NullablePtr<Expr> &Result, const char *Message) {
   Result = S.expr.ActOnSequence(SequencedExprs.data(), SequencedExprs.size());
   return false;
 }
+
+/// ParseExprSingle
+///   expr-single:
+///     expr-primary (binary-operator expr-primary)*
+bool Parser::ParseExprSingle(llvm::NullablePtr<Expr> &Result,
+                             const char *Message) {
+  return ParseExprPrimary(Result, Message) || ParseExprBinaryRHS(Result);
+}
+
 
 /// ParseExprPrimary
 ///   expr-primary:
@@ -810,7 +819,7 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
   while (!Result.isNull() && S.expr.ShouldGreedilyJuxtapose(Result.get()) &&
          isStartOfExpr(Tok, S)) {
     NullablePtr<Expr> RHS;
-    if (ParseExprPrimary(RHS, "expected expression after juxtaposed operator")||
+    if (ParseExprSingle(RHS, "expected expression after juxtaposed operator") ||
         RHS.isNull())
       return true;
     

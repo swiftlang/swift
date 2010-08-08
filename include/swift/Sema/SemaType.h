@@ -38,6 +38,7 @@ public:
   explicit SemaType(Sema &S) : SemaBase(S) {}
 
   Type *ActOnInt32Type(llvm::SMLoc Loc);
+  Type *ActOnElseHackType(llvm::SMLoc Loc);
   Type *ActOnTypeName(llvm::SMLoc Loc, llvm::StringRef Name);
   Type *ActOnTupleType(llvm::SMLoc LPLoc, const TupleTypeElt *Elements,
                        unsigned NumElements, llvm::SMLoc RPLoc);

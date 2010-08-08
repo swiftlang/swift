@@ -119,6 +119,7 @@ private:
   
   // Expression Parsing
   bool ParseExpr(llvm::NullablePtr<Expr> &Result, const char *Message = 0);
+  bool ParseExprSingle(llvm::NullablePtr<Expr> &Result, const char *Message =0);
   bool ParseExprPrimary(llvm::NullablePtr<Expr> &Result, const char *Message=0);
   bool ParseExprParen(llvm::NullablePtr<Expr> &Result);
   bool ParseExprBrace(llvm::NullablePtr<Expr> &Result);
