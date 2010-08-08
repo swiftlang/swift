@@ -113,6 +113,10 @@ private:
   bool ParseTypeTuple(Type *&Result);
   bool ParseTypeTupleElement(TupleTypeElt &Result);
 
+  bool ParseArgListFnType(Type *&Result);
+  bool ParseArgListType(Type *&Result);
+  bool ParseArgListTypeTupleElement(TupleTypeElt &Result);
+  
   // Expression Parsing
   bool ParseExpr(llvm::NullablePtr<Expr> &Result, const char *Message = 0);
   bool ParseExprPrimary(llvm::NullablePtr<Expr> &Result, const char *Message=0);

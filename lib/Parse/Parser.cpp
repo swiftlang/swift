@@ -422,20 +422,13 @@ VarDecl *Parser::ParseDeclVar() {
   return VD;
 }
 
+
 /// ParseDeclFunc - Parse a 'func' declaration, returning null on error.  The
 /// caller handles this case and does recovery as appropriate.
 ///
 ///   decl-func:
-///     'func' decl-attribute-list? identifier arg-list ('->' type)? '='? expr
-///     'func' decl-attribute-list? identifier arg-list ('->' type)? ';'
-///   arg-list:
-///     '(' ')'
-///     '(' arg-func-formal (',' arg-func-formal)* ')'
-///   arg-func-formal:
-///     identifier? ':' type
-///
-/// TODO: eventually allow default arguments and attributes on arguments.
-///
+///     'func' decl-attribute-list? identifier arg-list-type '='? expr
+///     'func' decl-attribute-list? identifier arg-list-type ';'
 FuncDecl *Parser::ParseDeclFunc() {
   SMLoc FuncLoc = Tok.getLoc();
   ConsumeToken(tok::kw_func);
@@ -449,63 +442,22 @@ FuncDecl *Parser::ParseDeclFunc() {
   if (ParseIdentifier(Identifier, "expected identifier in func declaration"))
     return 0;
   
-  SMLoc LPLoc = Tok.getLoc();
-  if (ParseToken(tok::l_paren,
-                 "expected '(' in argument list of func declaration"))
+  // We force first type of a func declaration to be a tuple for consistency.
+  if (Tok.isNot(tok::l_paren)) {
+    Error(Tok.getLoc(), "expected '(' in argument list of func declaration");
     return 0;
+  }
+    
+  Type *FuncTy = 0;
+  if (ParseArgListFnType(FuncTy))
+    return 0;
+  
+  // If the parsed function type is not a function, then it is implicitly a
+  // function that returns void.
+  if (!llvm::isa<FunctionType>(FuncTy))
+    FuncTy = S.type.ActOnFunctionType(FuncTy, SMLoc(),
+                                      S.Context.TheEmptyTupleType);
 
-  Type *ArgListTy;
-  if (Tok.is(tok::r_paren)) {
-    ArgListTy = S.Context.TheEmptyTupleType;
-  } else {
-    llvm::SmallVector<TupleTypeElt, 8> Elements;
-    
-    
-    // Read the comma-separated argument list.
-    do {
-      llvm::StringRef ParamIdentifier;
-      SMLoc StartLoc = Tok.getLoc();
-      if (Tok.is(tok::identifier)) {
-        ParamIdentifier = Tok.getText();
-        ConsumeToken(tok::identifier);
-      }
-      
-      Type *ParamType = 0;
-      if (ParseToken(tok::colon,
-                     "expected ':' in argument list of func declaration") ||
-          ParseType(ParamType,
-                    "expected type in argument list of func declaration"))
-        return 0;
-      
-      Elements.push_back(TupleTypeElt(ParamType,
-                                    S.Context.getIdentifier(ParamIdentifier)));
-    } while (ConsumeIf(tok::comma));
-    
-    ArgListTy = 
-      S.type.ActOnTupleType(LPLoc, Elements.data(), Elements.size(),
-                            Tok.getLoc());
-  }
-  
-  SMLoc RPLoc = Tok.getLoc();
-  if (ParseToken(tok::r_paren,
-                 "expected ')' at end of func declaration argument list")) {
-    Note(LPLoc, "to match this opening '('");
-    return 0;
-  }
-  
-  // If there is a return type, parse it.
-  Type *RetTy = S.Context.TheEmptyTupleType;
-  SMLoc ArrowLoc = Tok.getLoc();
-  if (ConsumeIf(tok::arrow)) {
-    if (ParseType(RetTy, "expected func declaration return type"))
-      return 0;
-  } else {
-    ArrowLoc = SMLoc();
-  }
-  
-  // Build the function type.
-  Type *FuncTy = S.type.ActOnFunctionType(ArgListTy, ArrowLoc, RetTy);
-  
   // Build the decl for the function.
   FuncDecl *FD = S.decl.ActOnFuncDecl(FuncLoc, Identifier, FuncTy, Attributes);
   
@@ -645,6 +597,85 @@ bool Parser::ParseTypeTuple(Type *&Result) {
   Result = S.type.ActOnTupleType(LPLoc, Elements.data(), Elements.size(),RPLoc);
   return false;
 }
+
+/// ParseArgListFnType
+///   arg-list-fn-type:
+///     arg-list-type ('->' arg-list-fn-type)?
+///
+bool Parser::ParseArgListFnType(Type *&Result) {
+  if (ParseArgListType(Result)) return true;
+
+  SMLoc ArrowLoc = Tok.getLoc();
+  if (ConsumeIf(tok::arrow)) {
+    Type *FnResult = 0;
+    if (ParseArgListFnType(FnResult)) return true;
+    
+    // Build the function type.
+    Result = S.type.ActOnFunctionType(Result, ArrowLoc, FnResult);
+  }
+  
+  return false;
+}  
+
+/// ParseArgListType
+///   arg-list-type:
+///     arg-list-tuple
+///     type
+///
+///   arg-list-tuple:
+///     '(' ')'
+///     '(' arg-list-tuple-elt (',' arg-list-tuple-elt)* ')'
+///   arg-list-tuple-elt:
+///     identifier? ':' type
+///
+/// TODO: eventually allow default arguments and attributes on arguments.
+///
+bool Parser::ParseArgListType(Type *&Result) {
+  if (Tok.isNot(tok::l_paren))
+    return ParseType(Result);
+  
+  SMLoc LPLoc = Tok.getLoc();
+  if (ParseToken(tok::l_paren,
+                 "expected '(' in argument list of func declaration"))
+    return true;
+  
+  if (ConsumeIf(tok::r_paren)) {
+    Result = S.Context.TheEmptyTupleType;
+    return false;
+  }
+  
+  llvm::SmallVector<TupleTypeElt, 8> Elements;
+  
+  // Read the comma-separated argument list.
+  do {
+    llvm::StringRef ParamIdentifier = Tok.getText();
+    SMLoc StartLoc = Tok.getLoc();
+    if (!ConsumeIf(tok::identifier))
+      ParamIdentifier = llvm::StringRef();
+    
+    Type *ParamType = 0;
+    if (ParseToken(tok::colon,
+                   "expected ':' in argument list of func declaration") ||
+        ParseType(ParamType, "expected type in func argument list"))
+      return true;
+    
+    Elements.push_back(TupleTypeElt(ParamType,
+                                    S.Context.getIdentifier(ParamIdentifier)));
+  } while (ConsumeIf(tok::comma));
+  
+  SMLoc RPLoc = Tok.getLoc();
+  if (ParseToken(tok::r_paren,
+                 "expected ')' at end of func declaration argument list")) {
+    Note(LPLoc, "to match this opening '('");
+    return true;
+  }
+
+  Result = 
+    S.type.ActOnTupleType(LPLoc, Elements.data(), Elements.size(),Tok.getLoc());
+  
+  return false;
+}
+
 
 //===----------------------------------------------------------------------===//
 // Expression Parsing
