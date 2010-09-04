@@ -229,13 +229,25 @@ static bool SemaBinaryExpr(Expr *&LHS, NamedDecl *OpFn,
 // Action Implementations
 //===----------------------------------------------------------------------===//
 
-/// ShouldGreedilyJuxtapose - This returns true if the specified expression on
-/// the LHS of a juxtaposition should bind very tightly instead of loosely.
-/// When this returns true, Sema is guaranteeing that juxtaposition will result
-/// in an ApplyExpr.
-bool SemaExpr::ShouldGreedilyJuxtapose(Expr *E) const {
+/// getJuxtapositionGreediness - This returns an enum that specifies how
+/// tightly juxtaposition binds for a subexpression.  This allows functions
+/// to bind to their arguments tightly.  When this returns something other
+/// than NonGreedy, Sema is guaranteeing that juxtaposition will result in an
+/// ApplyExpr.
+SemaExpr::JuxtapositionGreediness
+SemaExpr::getJuxtapositionGreediness(Expr *E) const {
   assert(E && "Expression shouldn't be null");
-  return llvm::isa<FunctionType>(E->Ty);
+  if (!llvm::isa<FunctionType>(E->Ty))
+    return JG_NonGreedy;
+  
+  // If E is a function, it should bind very tightly to its argument:
+  // f a + b    -->  (f a) + b
+  if (isa<DeclRefExpr>(E))
+    return JG_LocallyGreedy;
+  
+  // If E is some expression that returns a function, it should bind loosely to
+  // its argument:  f a + b    -->  f (a + b)
+  return JG_Greedy;
 }
 
 

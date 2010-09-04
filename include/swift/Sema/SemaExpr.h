@@ -60,9 +60,18 @@ public:
   Expr *ConvertToType(Expr *E, Type *Ty, bool IgnoreAnonDecls,
                       ConversionReason Reason);
 
-  /// ShouldGreedilyJuxtapose - This returns true if the specified expression on
-  /// the LHS of a juxtaposition should bind very tightly instead of loosely.
-  bool ShouldGreedilyJuxtapose(Expr *E) const;
+  enum JuxtapositionGreediness {
+    JG_NonGreedy,       // Is not a function
+    JG_LocallyGreedy,   // Is a tightly binding function.
+    JG_Greedy           // Is a loosely binding function.
+  };
+
+  /// getJuxtapositionGreediness - This returns an enum that specifies how
+  /// tightly juxtaposition binds for a subexpression.  This allows functions
+  /// to bind to their arguments tightly.  When this returns something other
+  /// than NonGreedy, Sema is guaranteeing that juxtaposition will result in an
+  /// ApplyExpr.
+  JuxtapositionGreediness getJuxtapositionGreediness(Expr *E) const;
   
   // Action Implementations
   llvm::NullablePtr<Expr>

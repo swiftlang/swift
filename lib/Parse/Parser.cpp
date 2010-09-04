@@ -756,6 +756,7 @@ bool Parser::ParseExprSingle(llvm::NullablePtr<Expr> &Result,
   return ParseExprPrimary(Result, Message) || ParseExprBinaryRHS(Result);
 }
 
+#include "swift/AST/Expr.h"
 
 /// ParseExprPrimary
 ///   expr-primary:
@@ -816,12 +817,26 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
   //     A + (B C) * D         <-- Juxtaposition here
   //     (A + B) (C * D)       <-- Juxtaposition in the expr production
   // This is disambiguated based on whether B has function type or not.
-  while (!Result.isNull() && S.expr.ShouldGreedilyJuxtapose(Result.get()) &&
-         isStartOfExpr(Tok, S)) {
+  while (!Result.isNull() && isStartOfExpr(Tok, S)) {
+    
+    
     NullablePtr<Expr> RHS;
-    if (ParseExprSingle(RHS, "expected expression after juxtaposed operator") ||
-        RHS.isNull())
-      return true;
+    switch (S.expr.getJuxtapositionGreediness(Result.get())) {
+    default: assert(0 && "Unknown juxtaposition greediness");
+    case SemaExpr::JG_NonGreedy: return false;
+    case SemaExpr::JG_LocallyGreedy:
+      if (ParseExprPrimary(RHS,
+                           "expected expression after juxtaposed operator") ||
+          RHS.isNull())
+        return true;
+      break;
+    case SemaExpr::JG_Greedy:
+      if (ParseExprSingle(RHS,
+                          "expected expression after juxtaposed operator") ||
+          RHS.isNull())
+        return true;
+      break;
+    }
     
     llvm::PointerIntPair<Expr*, 1, bool>
     Op = S.expr.ActOnJuxtaposition(Result.get(), RHS.get());
