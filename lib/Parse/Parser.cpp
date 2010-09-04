@@ -756,8 +756,6 @@ bool Parser::ParseExprSingle(llvm::NullablePtr<Expr> &Result,
   return ParseExprPrimary(Result, Message) || ParseExprBinaryRHS(Result);
 }
 
-#include "swift/AST/Expr.h"
-
 /// ParseExprPrimary
 ///   expr-primary:
 ///     numeric_constant
