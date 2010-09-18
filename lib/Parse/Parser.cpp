@@ -1010,6 +1010,9 @@ static NamedDecl *getBinOp(const Token &Tok, Sema &S) {
 bool Parser::ParseExprBinaryRHS(NullablePtr<Expr> &Result, unsigned MinPrec) {
   NamedDecl *NextTokOp = getBinOp(Tok, S);
   int NextTokPrec = NextTokOp ? NextTokOp->Attrs.InfixPrecedence : -1;
+  // Assignment is a hack until we get generics.  Assignment gets the lowest
+  // precedence since it "returns void".
+  if (Tok.is(tok::equal)) NextTokPrec = 1;
   while (1) {
     // If this token has a lower precedence than we are allowed to parse (e.g.
     // because we are called recursively, or because the token is not a binop),
@@ -1035,6 +1038,7 @@ bool Parser::ParseExprBinaryRHS(NullablePtr<Expr> &Result, unsigned MinPrec) {
     
     NextTokOp = getBinOp(Tok, S);
     NextTokPrec = NextTokOp ? NextTokOp->Attrs.InfixPrecedence : -1;
+    if (Tok.is(tok::equal)) NextTokPrec = 1;
 
     // TODO: All operators are left associative at the moment.
     

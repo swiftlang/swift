@@ -182,7 +182,11 @@ public:
   }
   void VisitBinaryExpr(BinaryExpr *E) {
     OS.indent(Indent) << "(binary_expr '";
-    OS << E->Fn->Name << "' type='";
+    if (E->Fn)
+      OS << E->Fn->Name;
+    else
+      OS << "=";
+    OS << "' type='";
     E->Ty->print(OS);
     OS << "'\n";
     PrintRec(E->LHS);

@@ -196,12 +196,22 @@ static bool SemaSequenceExpr(Expr **Elements, unsigned NumElements,
 }
 
 /// SemaBinaryExpr - Perform semantic analysis of binary expressions.
+/// OpFn is null if this is an assignment (FIXME: we don't have generics yet).
 static bool SemaBinaryExpr(Expr *&LHS, NamedDecl *OpFn,
                            llvm::SMLoc OpLoc, Expr *&RHS, Type *&ResultTy,
                            SemaExpr &SE) {
   if (isa<DependentType>(LHS->Ty) || isa<DependentType>(RHS->Ty)) {
     ResultTy = SE.S.Context.TheDependentType;
     return false; 
+  }
+  
+  // If this is an assignment, then we coerce the RHS to the LHS.
+  if (OpFn == 0) {
+    RHS = SE.ConvertToType(RHS, LHS->Ty, false, SemaExpr::CR_BinOpRHS);
+    if (LHS == 0) return true;
+    
+    ResultTy = SE.S.Context.TheEmptyTupleType;
+    return false;
   }
   
   // Parser verified that OpFn has an Infix Precedence.  Sema verified that OpFn
