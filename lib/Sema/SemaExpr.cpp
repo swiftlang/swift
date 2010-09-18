@@ -262,10 +262,10 @@ NullablePtr<Expr>
 SemaExpr::ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
   NamedDecl *D = S.decl.LookupName(S.Context.getIdentifier(Text));
   
-  // If this identifier is _0 -> _9, then it is a use of an implicit anonymous
+  // If this identifier is $0 -> $9, then it is a use of an implicit anonymous
   // closure argument.
   if (D == 0 && Text.size() == 2 &&
-      Text[0] == '_' && Text[1] >= '0' && Text[1] <= '9')
+      Text[0] == '$' && Text[1] >= '0' && Text[1] <= '9')
     D = S.decl.GetAnonDecl(Text, Loc);
   
   Type *ResultTy = 0;
@@ -346,7 +346,7 @@ SemaExpr::ActOnJuxtaposition(Expr *E1, Expr *E2) {
   // If this expression in the sequence is just a floating value that isn't
   // a function, then we have a discarded value, such as "4 5".  Just return
   // true so that it gets properly sequenced.  If the input is a dependent type,
-  // we assume that it is a function so that (_0 1 2 3) binds correctly.  If it
+  // we assume that it is a function so that ($0 1 2 3) binds correctly.  If it
   // is not a function, parens or ; can be used to disambiguate.
   if (!isa<FunctionType>(E1->Ty) && !isa<DependentType>(E1->Ty))
     return llvm::PointerIntPair<Expr*, 1, bool>(0, true);
@@ -511,8 +511,8 @@ BindAndValidateClosureArgs(Expr *&Body, Type *FuncInput, SemaDecl &SD) {
   const llvm::NullablePtr<AnonDecl> *AnonArgs = SD.AnonClosureArgs.data();
   unsigned NumAnonArgs = SD.AnonClosureArgs.size();
   
-  // If the input to the function is a non-tuple, only _0 is valid, if it is a
-  // tuple, then _0.._N are valid depending on the number of inputs to the
+  // If the input to the function is a non-tuple, only $0 is valid, if it is a
+  // tuple, then $0..$N are valid depending on the number of inputs to the
   // tuple.
   unsigned NumInputArgs = 1;
   if (TupleType *TT = dyn_cast<TupleType>(FuncInput))
@@ -669,7 +669,7 @@ static Expr *ConvertTupleToTuple(Expr *E, TupleType *DestTy, SemaExpr &SE) {
   }
   
   // If we got here, the type conversion is successful, create a new TupleExpr.  
-  // FIXME: Do this for dependent types, to resolve: foo(_0, 4);
+  // FIXME: Do this for dependent types, to resolve: foo($0, 4);
   // FIXME: Add default values.
   Expr **NewSE =
     (Expr**)SE.S.Context.Allocate(sizeof(Expr*)*DestTy->NumFields, 8);
@@ -735,7 +735,7 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
     }
 
     // If there are any live anonymous closure arguments, this level will use
-    // them and remove them.  When binding something like _0+_1 to
+    // them and remove them.  When binding something like $0+$1 to
     // (int,int)->(int,int)->() the arguments bind to the first level, not the
     // inner level.  To handle this, we ignore anonymous decls in the recursive
     // case here.

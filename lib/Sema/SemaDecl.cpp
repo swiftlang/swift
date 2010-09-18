@@ -63,9 +63,9 @@ NamedDecl *SemaDecl::LookupName(Identifier Name) {
 }
 
 /// GetAnonDecl - Get the anondecl for the specified anonymous closure
-/// argument reference.  This occurs for use of _0 .. _9.
+/// argument reference.  This occurs for use of $0 .. $9.
 AnonDecl *SemaDecl::GetAnonDecl(llvm::StringRef Text, llvm::SMLoc RefLoc) {
-  assert(Text.size() == 2 && Text[0] == '_' && 
+  assert(Text.size() == 2 && Text[0] == '$' && 
          Text[1] >= '0' && Text[1] <= '9' && "Not a valid anon decl");
   unsigned ArgNo = Text[1]-'0';
   

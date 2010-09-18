@@ -171,7 +171,7 @@ public:
 };
 
 /// AnonDecl - Anonymous closure argument declaration, synthesized by referecing
-/// symbols _0 ... _9.
+/// symbols $0 ... $9.
 class AnonDecl : public NamedDecl {
 public:
   llvm::SMLoc UseLoc;    // Location of the first use in a context.

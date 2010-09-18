@@ -73,13 +73,14 @@ void Lexer::SkipSlashSlashComment() {
 }
 
 
-/// LexIdentifier - Match [a-zA-Z_][a-zA-Z_0-9]*
+/// LexIdentifier - Match [a-zA-Z_$][a-zA-Z_$0-9]*
 void Lexer::LexIdentifier(Token &Result) {
   const char *TokStart = CurPtr-1;
-  assert((isalpha(*TokStart) || *TokStart == '_') && "Unexpected start");
+  assert((isalpha(*TokStart) || *TokStart == '_' || *TokStart == '$') &&
+         "Unexpected start");
   
-  // Lex [a-zA-Z_0-9]*
-  while (isalnum(*CurPtr) || *CurPtr == '_')
+  // Lex [a-zA-Z_$0-9]*
+  while (isalnum(*CurPtr) || *CurPtr == '_' || *CurPtr == '$')
     ++CurPtr;
   
   tok::TokenKind Kind =
@@ -204,7 +205,7 @@ Restart:
   case 'h': case 'i': case 'j': case 'k': case 'l': case 'm': case 'n':
   case 'o': case 'p': case 'q': case 'r': case 's': case 't': case 'u':
   case 'v': case 'w': case 'x': case 'y': case 'z':
-  case '_':
+  case '_': case '$':
     return LexIdentifier(Result);
       
   case '0': case '1': case '2': case '3': case '4':

@@ -66,13 +66,13 @@ public:
   
 
   /// AnonClosureArgs - These are the current active set of anonymous closure
-  /// arguments, named _0 ... _9.  These are added to the list when first
+  /// arguments, named $0 ... $9.  These are added to the list when first
   /// referenced in a context and cleared out when something uses them (binding
   /// them to a ClosureExpr).
   llvm::SmallVector<llvm::NullablePtr<AnonDecl>, 8> AnonClosureArgs;
   
   /// GetAnonDecl - Get the anondecl for the specified anonymous closure
-  /// argument reference.  This occurs for use of _0 .. _9.
+  /// argument reference.  This occurs for use of $0 .. $9.
   AnonDecl *GetAnonDecl(llvm::StringRef Text, llvm::SMLoc RefLoc);
   
   //===--------------------------------------------------------------------===//
