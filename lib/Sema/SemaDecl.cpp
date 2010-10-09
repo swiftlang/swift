@@ -373,9 +373,15 @@ void SemaDecl::ActOnCompleteDataDecl(DataDecl *DD,
       // TODO: QoI: add note for previous definition.
       continue;
     }
+    
+    // If the Data Element takes a type argument, then it is actually a function
+    // that takes the type argument and returns the DDType.
+    Type *EltType = DDType;
+    if (Elements[i].EltType)
+      EltType = S.Context.getFunctionType(Elements[i].EltType, EltType);      
    
     NewElements[i] =
-      new (S.Context) DataElementDecl(Elements[i].NameLoc, NameI, DDType,
+      new (S.Context) DataElementDecl(Elements[i].NameLoc, NameI, EltType,
                                       Elements[i].EltType);
   }
   

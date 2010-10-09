@@ -73,7 +73,7 @@ void Type::dump() const {
 void Type::print(llvm::raw_ostream &OS) const {
   switch (Kind) {
   case DependentTypeKind:     return cast<DependentType>(this)->print(OS);
-  case BuiltinInt32Kind:
+  case BuiltinInt32Kind:      return cast<BuiltinType>(this)->print(OS);
   case AliasTypeKind:         return cast<AliasType>(this)->print(OS);
   case DataTypeKind:          return cast<DataType>(this)->print(OS);
   case TupleTypeKind:         return cast<TupleType>(this)->print(OS);
