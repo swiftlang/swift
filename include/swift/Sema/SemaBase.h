@@ -20,6 +20,7 @@
 namespace llvm {
   class SMLoc;
   class StringRef;
+  class Twine;
 }
 
 namespace swift {
@@ -35,9 +36,9 @@ public:
   Sema &S;
   explicit SemaBase(Sema &s) : S(s) {}
   
-  void Note(llvm::SMLoc Loc, const char *Message);
-  void Warning(llvm::SMLoc Loc, const char *Message);
-  void Error(llvm::SMLoc Loc, const char *Message);
+  void Note(llvm::SMLoc Loc, const llvm::Twine &Message);
+  void Warning(llvm::SMLoc Loc, const llvm::Twine &Message);
+  void Error(llvm::SMLoc Loc, const llvm::Twine &Message);
 };
     
 } // end namespace swift

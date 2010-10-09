@@ -22,6 +22,7 @@
 namespace llvm {
   class MemoryBuffer;
   class SourceMgr;
+  class Twine;
 }
 
 namespace swift {
@@ -41,8 +42,8 @@ public:
   
   
 private:
-  void Warning(const char *Loc, const char *Message);
-  void Error(const char *Loc, const char *Message);
+  void Warning(const char *Loc, const llvm::Twine &Message);
+  void Error(const char *Loc, const llvm::Twine &Message);
   void FormToken(tok::TokenKind Kind, const char *TokStart, Token &Result);
   
   void SkipSlashSlashComment();

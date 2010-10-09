@@ -25,6 +25,7 @@ namespace llvm {
   class PointerUnion;
   template<class T>
   class NullablePtr;
+  class Twine;
 }
 
 namespace swift {
@@ -81,9 +82,9 @@ private:
   ///
   void SkipUntil(tok::TokenKind T);
   
-  void Note(llvm::SMLoc Loc, const char *Message);
-  void Warning(llvm::SMLoc Loc, const char *Message);
-  void Error(llvm::SMLoc Loc, const char *Message);
+  void Note(llvm::SMLoc Loc, const llvm::Twine &Message);
+  void Warning(llvm::SMLoc Loc, const llvm::Twine &Message);
+  void Error(llvm::SMLoc Loc, const llvm::Twine &Message);
   
   // Primitive Parsing
   bool ParseIdentifier(llvm::StringRef &Result, const char *Message = 0,

@@ -47,15 +47,15 @@ Parser::~Parser() {
   delete &S;
 }
 
-void Parser::Note(SMLoc Loc, const char *Message) {
+void Parser::Note(SMLoc Loc, const llvm::Twine &Message) {
   SourceMgr.PrintMessage(Loc, Message, "note");
 }
 
-void Parser::Warning(SMLoc Loc, const char *Message) {
+void Parser::Warning(SMLoc Loc, const llvm::Twine &Message) {
   SourceMgr.PrintMessage(Loc, Message, "warning");
 }
 
-void Parser::Error(SMLoc Loc, const char *Message) {
+void Parser::Error(SMLoc Loc, const llvm::Twine &Message) {
   SourceMgr.PrintMessage(Loc, Message, "error");
 }
 

@@ -18,15 +18,14 @@
 #include "swift/Sema/Sema.h"
 #include "swift/AST/ASTContext.h"
 #include "llvm/Support/SourceMgr.h"
-#include "llvm/ADT/Twine.h"
 using namespace swift;
 
-void SemaBase::Note(llvm::SMLoc Loc, const char *Message) {
+void SemaBase::Note(llvm::SMLoc Loc, const llvm::Twine &Message) {
   S.Context.SourceMgr.PrintMessage(Loc, Message, "note");
 }
-void SemaBase::Warning(llvm::SMLoc Loc, const char *Message) {
+void SemaBase::Warning(llvm::SMLoc Loc, const llvm::Twine &Message) {
   S.Context.SourceMgr.PrintMessage(Loc, Message, "warning");
 }
-void SemaBase::Error(llvm::SMLoc Loc, const char *Message) {
+void SemaBase::Error(llvm::SMLoc Loc, const llvm::Twine &Message) {
   S.Context.SourceMgr.PrintMessage(Loc, Message, "error");
 }

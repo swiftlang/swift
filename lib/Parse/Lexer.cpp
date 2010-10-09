@@ -30,11 +30,11 @@ Lexer::Lexer(unsigned BufferID, llvm::SourceMgr &SM) : SourceMgr(SM) {
   CurPtr = Buffer->getBufferStart();
 }
 
-void Lexer::Warning(const char *Loc, const char *Message) {
+void Lexer::Warning(const char *Loc, const llvm::Twine &Message) {
   SourceMgr.PrintMessage(llvm::SMLoc::getFromPointer(Loc), Message, "warning");
 }
 
-void Lexer::Error(const char *Loc, const char *Message) {
+void Lexer::Error(const char *Loc, const llvm::Twine &Message) {
   SourceMgr.PrintMessage(llvm::SMLoc::getFromPointer(Loc), llvm::Twine(Message), "error");
 }
 
