@@ -87,7 +87,7 @@ void Parser::SkipUntil(tok::TokenKind T) {
 
 /// ParseIdentifier - Consume an identifier if present and return its name in
 /// Result.  Otherwise, emit an error and return true.
-bool Parser::ParseIdentifier(llvm::StringRef &Result, const char *Message,
+bool Parser::ParseIdentifier(llvm::StringRef &Result,const llvm::Twine &Message,
                              tok::TokenKind SkipToTok) {
   if (Tok.is(tok::identifier)) {
     Result = Tok.getText();
@@ -95,7 +95,7 @@ bool Parser::ParseIdentifier(llvm::StringRef &Result, const char *Message,
     return false;
   }
   
-  Error(Tok.getLoc(), Message ? Message : "expected identifier");
+  Error(Tok.getLoc(), Message);
   return true;
 }
 
@@ -829,7 +829,7 @@ bool Parser::ParseExprSingle(llvm::NullablePtr<Expr> &Result,
 /// ParseExprPrimary
 ///   expr-primary:
 ///     numeric_constant
-///     identifier
+///     expr-identifier
 ///     expr-paren
 ///     expr-brace
 ///     expr-primary '.' identifier
@@ -842,8 +842,7 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
     break;
 
   case tok::identifier:
-    Result = S.expr.ActOnIdentifierExpr(Tok.getText(), Tok.getLoc());
-    ConsumeToken(tok::identifier);
+    if (ParseExprIdentifier(Result)) return true;
     break;
       
   case tok::l_paren:
@@ -915,6 +914,36 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
   
   return false;
 }
+
+/// ParseExprIdentifier - Parse an identifier expression:
+///
+///   expr-identifier:
+///     identifier
+///     identifier '::' identifier
+bool Parser::ParseExprIdentifier(llvm::NullablePtr<Expr> &Result) {
+  llvm::StringRef Name = Tok.getText();
+  SMLoc Loc = Tok.getLoc(); 
+  ConsumeToken(tok::identifier);
+  
+  if (Tok.isNot(tok::coloncolon)) {
+    Result = S.expr.ActOnIdentifierExpr(Name, Loc);
+    return false;
+  }
+  
+  SMLoc ColonColonLoc = Tok.getLoc();
+  ConsumeToken(tok::coloncolon);
+
+  SMLoc Loc2 = Tok.getLoc();
+  llvm::StringRef Name2;
+  if (ParseIdentifier(Name2, "expected identifier after '" + Name +
+                      "::' expression"))
+    return true;
+
+  Result = S.expr.ActOnScopedIdentifierExpr(Name, Loc, ColonColonLoc,
+                                            Name2, Loc2);
+  return false;
+}
+
 
 /// ParseExprParen - Parse a tuple expression.
 ///

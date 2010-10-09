@@ -79,6 +79,11 @@ public:
   llvm::NullablePtr<Expr>
   ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc);
   llvm::NullablePtr<Expr>
+  ActOnScopedIdentifierExpr(llvm::StringRef ScopeName, llvm::SMLoc ScopeLoc,
+                            llvm::SMLoc ColonColonLoc,
+                            llvm::StringRef Name, llvm::SMLoc NameLoc);
+  
+  llvm::NullablePtr<Expr>
   ActOnTupleExpr(llvm::SMLoc LPLoc, Expr *const *SubExprs,
                  const Identifier *SubExprNames,
                  unsigned NumSubExprs, llvm::SMLoc RPLoc);

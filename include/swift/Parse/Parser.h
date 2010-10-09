@@ -87,7 +87,7 @@ private:
   void Error(llvm::SMLoc Loc, const llvm::Twine &Message);
   
   // Primitive Parsing
-  bool ParseIdentifier(llvm::StringRef &Result, const char *Message = 0,
+  bool ParseIdentifier(llvm::StringRef &Result, const llvm::Twine &Message,
                        tok::TokenKind SkipToTok = tok::unknown);
 
   /// ParseToken - The parser expects that 'K' is next in the input.  If so, it
@@ -124,6 +124,7 @@ private:
   bool ParseExpr(llvm::NullablePtr<Expr> &Result, const char *Message = 0);
   bool ParseExprSingle(llvm::NullablePtr<Expr> &Result, const char *Message =0);
   bool ParseExprPrimary(llvm::NullablePtr<Expr> &Result, const char *Message=0);
+  bool ParseExprIdentifier(llvm::NullablePtr<Expr> &Result);
   bool ParseExprParen(llvm::NullablePtr<Expr> &Result);
   bool ParseExprBrace(llvm::NullablePtr<Expr> &Result);
   bool ParseExprBinaryRHS(llvm::NullablePtr<Expr> &Result,

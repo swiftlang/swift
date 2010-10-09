@@ -173,8 +173,13 @@ Restart:
 
   case '.': return FormToken(tok::period,   TokStart, Result);
   case ',': return FormToken(tok::comma,    TokStart, Result);
-  case ':': return FormToken(tok::colon,    TokStart, Result);
   case ';': return FormToken(tok::semi,     TokStart, Result);
+      
+  case ':':
+    if (CurPtr[0] != ':')
+      return FormToken(tok::colon, TokStart, Result);
+    ++CurPtr;
+    return FormToken(tok::coloncolon, TokStart, Result);
       
   // Punctuator identifier characters.
   case '/':

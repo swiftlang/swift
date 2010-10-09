@@ -285,6 +285,35 @@ SemaExpr::ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
   return new (S.Context) DeclRefExpr(D, Loc, D->Ty);
 }
 
+llvm::NullablePtr<Expr> SemaExpr::
+ActOnScopedIdentifierExpr(llvm::StringRef ScopeName, llvm::SMLoc ScopeLoc,
+                          llvm::SMLoc ColonColonLoc,
+                          llvm::StringRef Name, llvm::SMLoc NameLoc) {
+  // Note: this is very simplistic support for scoped name lookup, extend when
+  // needed.
+  Type *TypeScope = S.Context.getNamedType(S.Context.getIdentifier(ScopeName));
+  if (TypeScope == 0) {
+    Error(ScopeLoc, "unknown type name '" + ScopeName + "' in expression");
+    return 0;
+  }
+  
+  // Look through type aliases etc.
+  DataType *DT = dyn_cast<DataType>(S.Context.getCanonicalType(TypeScope));
+  
+  // Reject things like int::x.
+  if (DT == 0) {
+    Error(ScopeLoc, "invalid type '" + ScopeName + "' for scoped access");
+    return 0;
+  }
+  
+  // FIXME: Need decls to refer to!
+  // FIXME: Reject invalid member.
+  
+  
+  return new (S.Context) DeclRefExpr(0, ScopeLoc, DT);
+}
+
+
 NullablePtr<Expr> 
 SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
                          const llvm::PointerUnion<Expr*, ValueDecl*> *Elements,
