@@ -43,8 +43,6 @@ public:
                        unsigned NumElements, llvm::SMLoc RPLoc);
   Type *ActOnFunctionType(Type *Input, llvm::SMLoc ArrowLoc, Type *Output);
   
-  
-  Type *ActOnTypeAlias(llvm::SMLoc TypeAliasLoc, llvm::StringRef Name,Type *Ty);
 };
   
 } // end namespace swift

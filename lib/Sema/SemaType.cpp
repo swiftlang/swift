@@ -45,8 +45,3 @@ Type *SemaType::ActOnFunctionType(Type *Input, llvm::SMLoc ArrowLoc,
                                   Type *Output) {
   return S.Context.getFunctionType(Input, Output);
 }
-
-Type *SemaType::ActOnTypeAlias(llvm::SMLoc TypeAliasLoc, llvm::StringRef Name,
-                               Type *Ty) {
-  return S.Context.getAliasType(S.Context.getIdentifier(Name), Ty);
-}

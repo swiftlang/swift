@@ -152,23 +152,21 @@ Type *ASTContext::getNamedType(Identifier Name) {
 }
 
 
-/// getAliasType - Return a new alias type.  This returns null if there is a
-/// conflict with an already existing alias type of the same name.
-AliasType *ASTContext::getAliasType(Identifier Name, Type *Underlying) {
+/// InstallAliasType - InstallAliasType a new alias type.
+void ASTContext::InstallAliasType(Identifier Name, Type *Underlying) {
   AliasType *&Entry = (*(AliasTypesMapTy*)AliasTypes)[Name];
   assert(Entry == 0 && "Redefinition of alias type");
   
-  return Entry = new (*this) AliasType(Name, Underlying);
+  Entry = new (*this) AliasType(Name, Underlying);
 }
 
-/// getDataType - Return the type corresponding to the specified data
+/// InstallDataType - Install the type corresponding to the specified data
 /// declaration.
-DataType *ASTContext::getDataType(DataDecl *TheDecl) {
+void ASTContext::InstallDataType(DataDecl *TheDecl) {
   assert(TheDecl->Name.get() != 0);
   DataType *&Entry = (*(DataTypesMapTy*)DataTypes)[TheDecl->Name];
-  if (Entry == 0)
-    Entry = new (*this) DataType(TheDecl);
-  return Entry;
+  assert(Entry == 0 && "Named type redefinition");
+  Entry = new (*this) DataType(TheDecl);
 }
 
 /// getTupleType - Return the uniqued tuple type with the specified elements.

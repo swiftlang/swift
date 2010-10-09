@@ -335,7 +335,7 @@ bool Parser::ParseTypeAlias() {
       ParseType(Ty, "expected type in var declaration"))
     return true;
 
-  S.type.ActOnTypeAlias(TypeAliasLoc, Identifier, Ty);
+  S.decl.ActOnTypeAlias(TypeAliasLoc, Identifier, Ty);
   return false;
 }
 

@@ -312,11 +312,37 @@ FuncDecl *SemaDecl::ActOnFuncBody(FuncDecl *FD, Expr *Body) {
   return FD;
 }
 
+
+void SemaDecl::ActOnTypeAlias(llvm::SMLoc TypeAliasLoc, llvm::StringRef Name,
+                               Type *Ty) {
+  Identifier NameI = S.Context.getIdentifier(Name);
+  
+  // FIXME: Should have a NamedType class with loc info to diagnose the
+  // redefinition?
+  if (S.Context.getNamedType(NameI)) {
+    Error(TypeAliasLoc, "redefinition of type named '" + Name + "'");
+    return;
+  }
+ 
+  S.Context.InstallAliasType(NameI, Ty);
+}
+
+
 DataDecl *SemaDecl::ActOnDataDecl(llvm::SMLoc DataLoc, Identifier Name,
                                   DeclAttributes &Attrs) {
   // FIXME: Do name lookup on the type to diagnose type redefinitions.
   
-  return new (S.Context) DataDecl(DataLoc, Name, Attrs);
+  DataDecl *TheDecl = new (S.Context) DataDecl(DataLoc, Name, Attrs);
+
+  // FIXME: Should have a NamedType class with loc info to diagnose the
+  // redefinition?
+  if (S.Context.getNamedType(Name))
+    Error(DataLoc, "redefinition of type named '" + llvm::StringRef(Name.get())+
+          "'");
+  else  
+    S.Context.InstallDataType(TheDecl);
+
+  return TheDecl;
 }
 
 /*struct DataElementInfo {

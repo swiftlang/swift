@@ -89,6 +89,8 @@ public:
   /// decl.
   void ActOnTopLevelDeclError();
 
+  void ActOnTypeAlias(llvm::SMLoc TypeAliasLoc, llvm::StringRef Name, Type *Ty);
+  
   VarDecl *ActOnVarDecl(llvm::SMLoc VarLoc, Identifier Name, Type *Ty,
                         Expr *Init, DeclAttributes &Attrs);
   FuncDecl *ActOnFuncDecl(llvm::SMLoc FuncLoc, llvm::StringRef Name,

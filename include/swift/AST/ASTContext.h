@@ -77,16 +77,18 @@ public:
   /// no type with the specified name exists, null is returned.
   ///
   /// FIXME: This is a total hack since we don't have scopes for types.
-  /// getNamedType should eventually be replaced.
+  /// getNamedType should eventually be replaced.  At that point, the "install"
+  /// functions should move out of here.
   Type *getNamedType(Identifier Name);
   
-  /// getAliasType - Return a new alias type.  This returns null if there is a
-  /// conflict with an already existing alias type of the same name.
-  AliasType *getAliasType(Identifier Name, Type *Underlying);
+  /// getAliasType - Add a new alias type to the named type map.  This returns
+  /// null if there is a conflict with an already existing alias type of the
+  /// same name.
+  void InstallAliasType(Identifier Name, Type *Underlying);
   
-  /// getDataType - Return the type corresponding to the specified data
+  /// InstallDataType - Return the type corresponding to the specified data
   /// declaration.
-  DataType *getDataType(DataDecl *TheDecl);
+  void InstallDataType(DataDecl *TheDecl);
                           
   /// getTupleType - Return the uniqued tuple type with the specified elements.
   TupleType *getTupleType(const TupleTypeElt *Fields,
