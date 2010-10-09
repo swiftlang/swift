@@ -112,7 +112,8 @@ private:
   FuncDecl *ParseDeclFunc();
   
   // Type Parsing
-  bool ParseType(Type *&Result, const char *Message = 0);
+  bool ParseType(Type *&Result);
+  bool ParseType(Type *&Result, const llvm::Twine &Message);
   bool ParseTypeTuple(Type *&Result);
   bool ParseTypeTupleElement(TupleTypeElt &Result);
 

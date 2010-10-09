@@ -530,6 +530,15 @@ bool Parser::ParseDeclData() {
 
     ConsumeToken(tok::identifier);
 
+    // See if we have a type specifier for this data element.  If so, parse it.
+    Type *EltType = 0;
+    if (Tok.isNot(tok::comma) && Tok.isNot(tok::r_brace))
+      if (ParseType(EltType, "expected type while parsing data element '" +
+                    Name + "'")) {
+        SkipUntil(tok::r_brace);
+        return true;
+      }
+    
     // Require comma separation.
     if (!ConsumeIf(tok::comma))
       break;
@@ -550,16 +559,15 @@ bool Parser::ParseDeclData() {
 ///
 ///   type-simple:
 ///     'int'
-///     'void'   // FIXME: Should be a 'type alias' for () in standard library.
 ///     type-tuple
 ///
-bool Parser::ParseType(Type *&Result, const char *Message) {
+bool Parser::ParseType(Type *&Result, const llvm::Twine &Message) {
   // Parse type-simple first.
   switch (Tok.getKind()) {
   case tok::identifier:
     Result = S.type.ActOnTypeName(Tok.getLoc(), Tok.getText());
     if (Result == 0) {
-      Error(Tok.getLoc(), Message ? Message : "expected type");
+      Error(Tok.getLoc(), Message);
       return true;
     }
     ConsumeToken(tok::identifier);
@@ -577,7 +585,7 @@ bool Parser::ParseType(Type *&Result, const char *Message) {
       return true;
     break;
   default:
-    Error(Tok.getLoc(), Message ? Message : "expected type");
+    Error(Tok.getLoc(), Message);
     return true;
   }
   
@@ -592,6 +600,11 @@ bool Parser::ParseType(Type *&Result, const char *Message) {
   
   return false;
 }
+
+bool Parser::ParseType(Type *&Result) {
+  return ParseType(Result, "expected type");
+}
+
 
 /// ParseTypeTupleElement
 ///   type-tuple-element:
