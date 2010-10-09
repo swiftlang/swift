@@ -45,6 +45,15 @@ llvm::SMLoc NamedDecl::getLocStart() const {
   return llvm::SMLoc();
 }
 
+DataElementDecl *DataDecl::getElement(Identifier Name) const {
+  // FIXME: Linear search is not great for large data decls.
+  for (unsigned i = 0, e = NumElements; i != e; ++i)
+    if (Elements[i]->Name == Name)
+      return Elements[i];
+  return 0;
+}
+
+
 
 void Decl::dump() const { print(llvm::errs()); llvm::errs() << '\n'; }
 

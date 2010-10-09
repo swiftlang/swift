@@ -346,15 +346,11 @@ DataDecl *SemaDecl::ActOnDataDecl(llvm::SMLoc DataLoc, Identifier Name,
   return TheDecl;
 }
 
-/*struct DataElementInfo {
-  llvm::SMLoc NameLoc;
-  llvm::StringRef Name;
-  Type *EltType;
-};*/
-
 void SemaDecl::ActOnCompleteDataDecl(DataDecl *DD,
                                      const DataElementInfo *Elements,
                                      unsigned NumElements) {
+  assert(DD->NumElements == 0 && "Data defined multiple times?");
+  
   Type *DDType = S.Context.getNamedType(DD->Name);
   assert(DDType && llvm::isa<DataType>(DDType) && "Symbol table mishap");
   

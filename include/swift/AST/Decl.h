@@ -131,11 +131,13 @@ public:
   }
 
   llvm::SMLoc getLocStart() const { return DataLoc; }
-  DataElementDecl *getElement(unsigned i) {
+  DataElementDecl *getElement(unsigned i) const {
     assert(i < NumElements && "Invalid index");
     return Elements[i];
   }
 
+  DataElementDecl *getElement(Identifier Name) const;
+  
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
 
   // Implement isa/cast/dyncast/etc.

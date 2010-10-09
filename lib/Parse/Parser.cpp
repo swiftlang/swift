@@ -526,7 +526,7 @@ DataDecl *Parser::ParseDeclData() {
   DataDecl *TheDataDecl = S.decl.ActOnDataDecl(DataLoc, DataIdentifier,
                                                Attributes);
   
-  llvm::SmallVector<SemaDecl::DataElementInfo, 8> ElementInfo;
+  llvm::SmallVector<SemaDecl::DataElementInfo, 8> ElementInfos;
   
   // Parse the comma separated list of data elements.
   while (Tok.is(tok::identifier)) {
@@ -546,6 +546,8 @@ DataDecl *Parser::ParseDeclData() {
         return 0;
       }
     
+    ElementInfos.push_back(ElementInfo);
+    
     // Require comma separation.
     if (!ConsumeIf(tok::comma))
       break;
@@ -553,8 +555,8 @@ DataDecl *Parser::ParseDeclData() {
 
   ParseToken(tok::r_brace, "expected '}' at end of data declaration");
   
-  S.decl.ActOnCompleteDataDecl(TheDataDecl, ElementInfo.data(),
-                               ElementInfo.size());
+  S.decl.ActOnCompleteDataDecl(TheDataDecl, ElementInfos.data(),
+                               ElementInfos.size());
   
   return TheDataDecl;
 }

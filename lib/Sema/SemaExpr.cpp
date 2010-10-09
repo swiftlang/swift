@@ -306,11 +306,19 @@ ActOnScopedIdentifierExpr(llvm::StringRef ScopeName, llvm::SMLoc ScopeLoc,
     return 0;
   }
   
-  // FIXME: Need decls to refer to!
-  // FIXME: Reject invalid member.
+  if (DT->TheDecl->NumElements == 0) {
+    Error(ScopeLoc, "data '" + ScopeName +
+          "' is not complete or has no elements");
+    return 0;
+  }
   
-  
-  return new (S.Context) DeclRefExpr(0, ScopeLoc, DT);
+  DataElementDecl *Elt = DT->TheDecl->getElement(S.Context.getIdentifier(Name));
+  if (Elt == 0) {
+    Error(ScopeLoc, "'" + Name + "' is not a member of '" + ScopeName + "'");
+    return 0;
+  }
+
+  return new (S.Context) DeclRefExpr(Elt, ScopeLoc, Elt->Ty);
 }
 
 
