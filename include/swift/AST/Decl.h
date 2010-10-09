@@ -20,6 +20,7 @@
 #include "swift/AST/Identifier.h"
 #include "llvm/Support/SMLoc.h"
 #include <cstddef>
+#include <cassert>
 
 namespace llvm {
   class raw_ostream;
@@ -29,11 +30,13 @@ namespace swift {
   class ASTContext;
   class Type;
   class Expr;
+  class DataElementDecl;
   
 enum DeclKind {
   DataDeclKind,
   VarDeclKind,
   FuncDeclKind,
+  DataElementDeclKind,
   ArgDeclKind,
   AnonDeclKind,
   ElementRefDeclKind
@@ -96,6 +99,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return (D->getKind() == VarDeclKind || D->getKind() == FuncDeclKind ||
+            D->getKind() == DataElementDeclKind || D->getKind() == ArgDeclKind||
             D->getKind() == AnonDeclKind || D->getKind() == ElementRefDeclKind||
             D->getKind() == DataDeclKind);
   }
@@ -117,12 +121,20 @@ class DataDecl : public NamedDecl {
 public:
   llvm::SMLoc DataLoc;
   
+  DataElementDecl **Elements;
+  unsigned NumElements;
+  
   DataDecl(llvm::SMLoc dataloc, Identifier name,
            const DeclAttributes &attrs = DeclAttributes())
-    : NamedDecl(DataDeclKind, name, attrs), DataLoc(dataloc) {
+    : NamedDecl(DataDeclKind, name, attrs),
+      DataLoc(dataloc), Elements(0), NumElements(0) {
   }
 
   llvm::SMLoc getLocStart() const { return DataLoc; }
+  DataElementDecl *getElement(unsigned i) {
+    assert(i < NumElements && "Invalid index");
+    return Elements[i];
+  }
 
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
 
@@ -132,8 +144,6 @@ public:
   }
   static bool classof(const DataDecl *D) { return true; }
 };
-
-
   
 /// ValueDecl - All named decls that are values in the language.  These can
 /// have an initializer, type, etc.
@@ -145,6 +155,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return (D->getKind() == VarDeclKind || D->getKind() == FuncDeclKind ||
+            D->getKind() == DataElementDeclKind || D->getKind() == ArgDeclKind||
             D->getKind() == AnonDeclKind || D->getKind() == ElementRefDeclKind);
   }
   static bool classof(const ValueDecl *D) { return true; }
@@ -198,7 +209,41 @@ public:
   static bool classof(const Decl *D) { return D->getKind() == FuncDeclKind; }
   static bool classof(const FuncDecl *D) { return true; }
 };
+
   
+/// DataElementDecl - This represents an element of a 'data' declaration, e.g.
+/// X and Y in:
+///   data d { X, Y int }
+/// The type of a DataElementDecl is always the DataType for the containing
+/// data.
+class DataElementDecl : public ValueDecl {
+public:
+  llvm::SMLoc IdentifierLoc;
+  
+  /// ArgumentType - This is the type specified with the data element.  For
+  /// example 'int' in the Y example above.  This is null if there is no type
+  /// associated with this data element.
+  Type *ArgumentType;
+  
+  
+  DataElementDecl(llvm::SMLoc identloc, Identifier name, Type *ty,
+                  Type *argtype)
+  : ValueDecl(DataElementDeclKind, name, ty, 0),
+    IdentifierLoc(identloc), ArgumentType(argtype) {}
+
+  
+  llvm::SMLoc getLocStart() const { return IdentifierLoc; }
+  
+  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) {
+    return D->getKind() == DataElementDeclKind;
+  }
+  static bool classof(const DataElementDecl *D) { return true; }
+ 
+};
+
   
 /// ArgDecl - A declaration representing a named function argument, in a func
 /// declaration.  For example, in "func x(a : int);", 'a' is an ArgDecl.

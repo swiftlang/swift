@@ -35,6 +35,7 @@ llvm::SMLoc NamedDecl::getLocStart() const {
   case DataDeclKind:       return cast<DataDecl>(this)->getLocStart();
   case VarDeclKind:        return cast<VarDecl>(this)->getLocStart();
   case FuncDeclKind:       return cast<FuncDecl>(this)->getLocStart();
+  case DataElementDeclKind:return cast<DataElementDecl>(this)->getLocStart();
   case ArgDeclKind:        return cast<ArgDecl>(this)->getLocStart();
   case AnonDeclKind:       return cast<AnonDecl>(this)->getLocStart();
   case ElementRefDeclKind: return cast<ElementRefDecl>(this)->getLocStart();
@@ -52,6 +53,7 @@ void Decl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   case DataDeclKind:       return cast<DataDecl>(this)->print(OS, Indent);
   case VarDeclKind:        return cast<VarDecl>(this)->print(OS, Indent);
   case FuncDeclKind:       return cast<FuncDecl>(this)->print(OS, Indent);
+  case DataElementDeclKind:return cast<DataElementDecl>(this)->print(OS,Indent);
   case ArgDeclKind:        return cast<ArgDecl>(this)->print(OS, Indent);
   case AnonDeclKind:       return cast<AnonDecl>(this)->print(OS, Indent);
   case ElementRefDeclKind: return cast<ElementRefDecl>(this)->print(OS, Indent);
@@ -89,6 +91,11 @@ void VarDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
 
 void FuncDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(funcdecl ";
+  printCommon(OS, Indent);
+}
+
+void DataElementDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
+  OS.indent(Indent) << "(dataeltdecl ";
   printCommon(OS, Indent);
 }
 

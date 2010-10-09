@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/SMLoc.h"
@@ -354,7 +355,36 @@ DataDecl *SemaDecl::ActOnDataDecl(llvm::SMLoc DataLoc, Identifier Name,
 void SemaDecl::ActOnCompleteDataDecl(DataDecl *DD,
                                      const DataElementInfo *Elements,
                                      unsigned NumElements) {
+  Type *DDType = S.Context.getNamedType(DD->Name);
+  assert(DDType && llvm::isa<DataType>(DDType) && "Symbol table mishap");
   
+  DataElementDecl **NewElements =(DataElementDecl**)
+    S.Context.Allocate(sizeof(*NewElements)*NumElements, 8);
+
+  llvm::SmallPtrSet<const char *, 16> SeenSoFar;
+  
+  for (unsigned i = 0; i != NumElements; ++i) {
+    Identifier NameI = S.Context.getIdentifier(Elements[i].Name);
+    
+    // If this was multiply defined, reject it.
+    if (!SeenSoFar.insert(NameI.get())) {
+      Error(Elements[i].NameLoc, "element named '" + Elements[i].Name +
+            "' defined multiple times");
+      // Don't copy this element into NewElements.
+      --i;
+      --NumElements;
+      --Elements;
+      // TODO: QoI: add note for previous definition.
+      continue;
+    }
+   
+    NewElements[i] =
+      new (S.Context) DataElementDecl(Elements[i].NameLoc, NameI, DDType,
+                                      Elements[i].EltType);
+  }
+  
+  DD->Elements = NewElements;
+  DD->NumElements = NumElements;
 }
 
 
