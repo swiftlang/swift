@@ -31,7 +31,7 @@ namespace swift {
   class Sema;
   class Expr;
   class Type;
-  class NamedDecl;
+  class ValueDecl;
   class Identifier;
   
 /// SemaExpr - Semantic analysis support for Swift expressions.
@@ -84,7 +84,7 @@ public:
                  unsigned NumSubExprs, llvm::SMLoc RPLoc);
   llvm::NullablePtr<Expr>
   ActOnBraceExpr(llvm::SMLoc LBLoc,
-                 const llvm::PointerUnion<Expr*, NamedDecl*> *Elements,
+                 const llvm::PointerUnion<Expr*, ValueDecl*> *Elements,
                  unsigned NumElements, bool HasMissingSemi, llvm::SMLoc RBLoc);
   
   llvm::NullablePtr<Expr>
@@ -94,7 +94,7 @@ public:
   llvm::PointerIntPair<Expr*, 1, bool> ActOnJuxtaposition(Expr *E1, Expr *E2);
   llvm::NullablePtr<Expr> ActOnSequence(Expr **Exprs, unsigned NumExprs); 
   
-  llvm::NullablePtr<Expr> ActOnBinaryExpr(Expr *LHS, NamedDecl *OpFn,
+  llvm::NullablePtr<Expr> ActOnBinaryExpr(Expr *LHS, ValueDecl *OpFn,
                                           llvm::SMLoc OpLoc, Expr *RHS);
 };
   

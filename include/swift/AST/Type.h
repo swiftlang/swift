@@ -28,7 +28,6 @@ namespace swift {
   class ASTContext;
   class Expr;
   class Identifier;
-  class NamedDecl;
   class TupleType;
   
   enum TypeKind {
@@ -167,8 +166,7 @@ public:
   const TupleTypeElt * const Fields;
   const unsigned NumFields;
   
-  /// getElementType - Return the type of the specified field, looking through
-  /// NamedDecls automatically.
+  /// getElementType - Return the type of the specified field.
   Type *getElementType(unsigned FieldNo) const {
     return Fields[FieldNo].Ty;
   }

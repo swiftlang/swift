@@ -88,8 +88,6 @@ public:
 class NamedDecl : public Decl {
 public:
   Identifier Name;
-  Type *Ty;
-  Expr *Init;
   DeclAttributes Attrs;
   
   llvm::SMLoc getLocStart() const;
@@ -102,26 +100,50 @@ public:
   static bool classof(const NamedDecl *D) { return true; }
   
 protected:
-  NamedDecl(Identifier name, Type *ty, Expr *init, const DeclAttributes &attrs,
-            DeclKind K)
-    : Decl(K), Name(name), Ty(ty), Init(init), Attrs(attrs) {
-  }
-  NamedDecl(Identifier name, Type *ty, Expr *init, DeclKind K)
-    : Decl(K), Name(name), Ty(ty), Init(init) {
+  NamedDecl(DeclKind K, Identifier name,
+            const DeclAttributes &attrs = DeclAttributes())
+    : Decl(K), Name(name), Attrs(attrs) {
   }
   
   void printCommon(llvm::raw_ostream &OS, unsigned Indent) const;
 };
+  
+  
+/// ValueDecl - All named decls that are values in the language.  These can
+/// have an initializer, type, etc.
+class ValueDecl : public NamedDecl {
+public:
+  Type *Ty;
+  Expr *Init;
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) {
+    return (D->getKind() == VarDeclKind || D->getKind() == FuncDeclKind ||
+            D->getKind() == AnonDeclKind || D->getKind() == ElementRefDeclKind);
+  }
+  static bool classof(const ValueDecl *D) { return true; }
+
+protected:
+  ValueDecl(DeclKind K, Identifier name, Type *ty, Expr *init,
+            const DeclAttributes &attrs = DeclAttributes())
+    : NamedDecl(K, name, attrs), Ty(ty), Init(init) {
+  }
+  void printCommon(llvm::raw_ostream &OS, unsigned Indent) const;
+};
+  
 
 /// VarDecl - 'var' declaration.
-class VarDecl : public NamedDecl {
+class VarDecl : public ValueDecl {
 public:
   llvm::SMLoc VarLoc;    // Location of the 'var' token.
 
   VarDecl(llvm::SMLoc varloc, Identifier name, Type *ty, Expr *init,
           const DeclAttributes &attrs)
-    : NamedDecl(name, ty, init, attrs, VarDeclKind), VarLoc(varloc) {}
+    : ValueDecl(VarDeclKind, name, ty, init, attrs), VarLoc(varloc) {}
 
+  
+  llvm::SMLoc getLocStart() const { return VarLoc; }
+  
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
   
   // Implement isa/cast/dyncast/etc.
@@ -132,13 +154,17 @@ public:
   
 
 /// FuncDecl - 'func' declaration.
-class FuncDecl : public NamedDecl {
+class FuncDecl : public ValueDecl {
 public:
   llvm::SMLoc FuncLoc;    // Location of the 'func' token.
 
   FuncDecl(llvm::SMLoc funcloc, Identifier name, Type *ty, Expr *init,
           const DeclAttributes &attrs)
-    : NamedDecl(name, ty, init, attrs, VarDeclKind), FuncLoc(funcloc) {}
+    : ValueDecl(VarDeclKind, name, ty, init, attrs), FuncLoc(funcloc) {}
+  
+  
+  llvm::SMLoc getLocStart() const { return FuncLoc; }
+
   
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
 
@@ -151,7 +177,7 @@ public:
 /// ArgDecl - A declaration representing a named function argument, in a func
 /// declaration.  For example, in "func x(a : int);", 'a' is an ArgDecl.
 ///
-class ArgDecl : public NamedDecl {
+class ArgDecl : public ValueDecl {
 public:
   // FIXME: We don't have good location information for the function argument
   // declaration.
@@ -160,8 +186,11 @@ public:
   // FIXME: Store the access path here.
   
   ArgDecl(llvm::SMLoc funcloc, Identifier name, Type *ty)
-    : NamedDecl(name, ty, 0, DeclAttributes(), ArgDeclKind), FuncLoc(funcloc) {}
+    : ValueDecl(ArgDeclKind, name, ty, 0, DeclAttributes()), FuncLoc(funcloc) {}
 
+
+  llvm::SMLoc getLocStart() const { return FuncLoc; }
+ 
   
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
   
@@ -172,12 +201,15 @@ public:
 
 /// AnonDecl - Anonymous closure argument declaration, synthesized by referecing
 /// symbols $0 ... $9.
-class AnonDecl : public NamedDecl {
+class AnonDecl : public ValueDecl {
 public:
   llvm::SMLoc UseLoc;    // Location of the first use in a context.
   
   AnonDecl(llvm::SMLoc useloc, Identifier name, Type *ty)
-  : NamedDecl(name, ty, 0, DeclAttributes(), AnonDeclKind), UseLoc(useloc) {}
+    : ValueDecl(AnonDeclKind, name, ty, 0, DeclAttributes()), UseLoc(useloc) {}
+  
+  llvm::SMLoc getLocStart() const { return UseLoc; }
+
   
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
   
@@ -190,16 +222,18 @@ public:
 /// through name binding.  For example, in "var (a,b) = f();" there is a VarDecl
 /// with no name and two ElementRefDecls (named A and B) referring to elements
 /// of the nameless vardecl.
-class ElementRefDecl : public NamedDecl {
+class ElementRefDecl : public ValueDecl {
 public:
   VarDecl *VD;
   llvm::SMLoc NameLoc;
   // TODO: Access path.
   
   ElementRefDecl(VarDecl *vd, llvm::SMLoc nameloc, Identifier name, Type *ty)
-    : NamedDecl(name, ty, 0, ElementRefDeclKind), VD(vd), NameLoc(nameloc) {
+    : ValueDecl(ElementRefDeclKind, name, ty, 0), VD(vd), NameLoc(nameloc) {
   }
 
+  llvm::SMLoc getLocStart() const { return NameLoc; }
+  
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
   
   // Implement isa/cast/dyncast/etc.

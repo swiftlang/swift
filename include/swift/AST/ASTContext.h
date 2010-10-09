@@ -29,7 +29,6 @@ namespace swift {
   class AliasType;
   class TupleType;
   class FunctionType;
-  class NamedDecl;
   class Identifier;
   class TupleTypeElt;
 

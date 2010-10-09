@@ -151,7 +151,7 @@ TupleType *ASTContext::getTupleType(const TupleTypeElt *Fields,
   
   TupleTypesMapTy &TupleTypesMap = *(TupleTypesMapTy*)TupleTypes;
   
-  // FIXME: This is pointless for types with named fields.  The NamedDecl fields
+  // FIXME: This is pointless for types with named fields.  The ValueDecl fields
   // themselves are not unique'd so they all get their own addresses, which
   // means that we'll never get a hit here.  This should unique all-type tuples
   // though.

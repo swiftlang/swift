@@ -31,7 +31,7 @@ namespace llvm {
 namespace swift {
   class ASTContext;
   class Type;
-  class NamedDecl;
+  class ValueDecl;
   class VarDecl;
   class AnonDecl;
   
@@ -100,13 +100,13 @@ public:
   static bool classof(const Expr *E) { return E->Kind == IntegerLiteralKind; }
 };
 
-/// DeclRefExpr - A reference to a variable, "x".
+/// DeclRefExpr - A reference to a value, "x".
 class DeclRefExpr : public Expr {
 public:
-  NamedDecl *D;
+  ValueDecl *D;
   llvm::SMLoc Loc;
   
-  DeclRefExpr(NamedDecl *d, llvm::SMLoc L, Type *Ty)
+  DeclRefExpr(ValueDecl *d, llvm::SMLoc L, Type *Ty)
     : Expr(DeclRefExprKind, Ty), D(d), Loc(L) {}
   
   // Implement isa/cast/dyncast/etc.
@@ -216,7 +216,7 @@ class BraceExpr : public Expr {
 public:
   llvm::SMLoc LBLoc;
   
-  llvm::PointerUnion<Expr*, NamedDecl*> *Elements;
+  llvm::PointerUnion<Expr*, ValueDecl*> *Elements;
   unsigned NumElements;
   
   /// This is true if the last expression in the brace expression is missing a
@@ -224,7 +224,7 @@ public:
   bool MissingSemi;
   llvm::SMLoc RBLoc;
 
-  BraceExpr(llvm::SMLoc lbloc, llvm::PointerUnion<Expr*, NamedDecl*> *elements,
+  BraceExpr(llvm::SMLoc lbloc, llvm::PointerUnion<Expr*, ValueDecl*> *elements,
             unsigned numelements, bool missingsemi, llvm::SMLoc rbloc, Type *Ty)
     : Expr(BraceExprKind, Ty), LBLoc(lbloc), Elements(elements),
       NumElements(numelements), MissingSemi(missingsemi), RBLoc(rbloc) {}
@@ -267,11 +267,11 @@ public:
 class BinaryExpr : public Expr {
 public:
   Expr *LHS;
-  NamedDecl *Fn;
+  ValueDecl *Fn;
   llvm::SMLoc OpLoc;
   Expr *RHS;
   
-  BinaryExpr(Expr *lhs, NamedDecl *fn, llvm::SMLoc oploc, Expr *rhs, Type *Ty)
+  BinaryExpr(Expr *lhs, ValueDecl *fn, llvm::SMLoc oploc, Expr *rhs, Type *Ty)
     : Expr(BinaryExprKind, Ty), LHS(lhs), Fn(fn), OpLoc(oploc), RHS(rhs) {}
 
   // Implement isa/cast/dyncast/etc.

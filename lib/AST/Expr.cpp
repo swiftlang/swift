@@ -160,7 +160,7 @@ public:
       if (Expr *SubExpr = E->Elements[i].dyn_cast<Expr*>())
         PrintRec(SubExpr);
       else
-        PrintRec(E->Elements[i].get<NamedDecl*>());
+        PrintRec(E->Elements[i].get<ValueDecl*>());
     }
     OS << ')';
   }

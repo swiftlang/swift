@@ -44,11 +44,11 @@ void Decl::print(llvm::raw_ostream &OS, unsigned Indent) const {
 
 llvm::SMLoc NamedDecl::getLocStart() const {
   switch (getKind()) {
-  case VarDeclKind:        return cast<VarDecl>(this)->VarLoc;
-  case FuncDeclKind:       return cast<FuncDecl>(this)->FuncLoc;
-  case ArgDeclKind:        return cast<ArgDecl>(this)->FuncLoc;
-  case AnonDeclKind:       return cast<AnonDecl>(this)->UseLoc;
-  case ElementRefDeclKind: return cast<ElementRefDecl>(this)->NameLoc;
+  case VarDeclKind:        return cast<VarDecl>(this)->getLocStart();
+  case FuncDeclKind:       return cast<FuncDecl>(this)->getLocStart();
+  case ArgDeclKind:        return cast<ArgDecl>(this)->getLocStart();
+  case AnonDeclKind:       return cast<AnonDecl>(this)->getLocStart();
+  case ElementRefDeclKind: return cast<ElementRefDecl>(this)->getLocStart();
   }
 
   assert(0 && "Unknown decl kind");
@@ -58,6 +58,10 @@ llvm::SMLoc NamedDecl::getLocStart() const {
 
 void NamedDecl::printCommon(llvm::raw_ostream &OS, unsigned Indent) const {
   OS << "'" << Name << "' type='";
+}
+
+void ValueDecl::printCommon(llvm::raw_ostream &OS, unsigned Indent) const {
+  NamedDecl::printCommon(OS, Indent);
   Ty->print(OS);
   OS << "'";
   
@@ -67,7 +71,6 @@ void NamedDecl::printCommon(llvm::raw_ostream &OS, unsigned Indent) const {
   }
   OS << ')';
 }
-
 
 void VarDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(vardecl ";

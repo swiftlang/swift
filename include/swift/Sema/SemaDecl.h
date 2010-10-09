@@ -37,14 +37,14 @@ namespace swift {
   class VarDecl;
   class FuncDecl;
   class AnonDecl;
-  class NamedDecl;
+  class ValueDecl;
   class ElementRefDecl;
   class Scope;
   class DeclAttributes;
   
 /// SemaDecl - Semantic analysis support for Swift declarations.
 class SemaDecl : public SemaBase {
-  typedef std::pair<unsigned, NamedDecl*> ScopeEntry;
+  typedef std::pair<unsigned, ValueDecl*> ScopeEntry;
   typedef llvm::ScopedHashTable<Identifier, ScopeEntry,
                                 llvm::DenseMapInfo<Identifier> > ScopeHTType;
   ScopeHTType *const ScopeHT;
@@ -61,11 +61,11 @@ public:
   
   /// AddToScope - Register the specified decl as being in the current lexical
   /// scope.
-  void AddToScope(NamedDecl *D);
+  void AddToScope(ValueDecl *D);
   
-  /// LookupName - Perform a lexical scope lookup for the specified name,
-  /// returning the active decl if found or null if not.
-  NamedDecl *LookupName(Identifier Name);
+  /// LookupValueName - Perform a lexical scope lookup for the specified name in
+  /// a value context, returning the active decl if found or null if not.
+  ValueDecl *LookupValueName(Identifier Name);
   
 
   /// AnonClosureArgs - These are the current active set of anonymous closure
@@ -83,7 +83,7 @@ public:
   //===--------------------------------------------------------------------===//
   
   /// ActOnTopLevelDecl - This is called after parsing a new top-level decl.
-  void ActOnTopLevelDecl(NamedDecl *D);
+  void ActOnTopLevelDecl(ValueDecl *D);
 
   /// ActOnTopLevelDeclError - This is called after an error parsing a top-level
   /// decl.

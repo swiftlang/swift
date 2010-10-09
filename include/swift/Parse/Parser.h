@@ -38,7 +38,6 @@ namespace swift {
   class DataDecl;
   class FuncDecl;
   class VarDecl;
-  class NamedDecl;
   class ASTContext;
   class ASTConsumer;
   class NameRecord;

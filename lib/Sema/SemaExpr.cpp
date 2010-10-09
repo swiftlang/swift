@@ -47,7 +47,7 @@ static bool SemaIntegerLiteral(Type *&ResultTy, SemaExpr &SE) {
   return false;
 }
 
-static bool SemaDeclRefExpr(NamedDecl *D, llvm::SMLoc Loc, Type *&ResultTy,
+static bool SemaDeclRefExpr(ValueDecl *D, llvm::SMLoc Loc, Type *&ResultTy,
                             SemaExpr &SE) {
   if (D == 0) {
     SE.Error(Loc, "use of undeclared identifier");
@@ -62,7 +62,7 @@ static bool SemaDeclRefExpr(NamedDecl *D, llvm::SMLoc Loc, Type *&ResultTy,
 }
 
 static bool SemaBraceExpr(llvm::SMLoc LBLoc, 
-                          llvm::PointerUnion<Expr*, NamedDecl*> *Elements,
+                          llvm::PointerUnion<Expr*, ValueDecl*> *Elements,
                           unsigned NumElements,
                           bool HasMissingSemi, llvm::SMLoc RBLoc, 
                           Type *&ResultTy, SemaExpr &SE) {
@@ -198,7 +198,7 @@ static bool SemaSequenceExpr(Expr **Elements, unsigned NumElements,
 
 /// SemaBinaryExpr - Perform semantic analysis of binary expressions.
 /// OpFn is null if this is an assignment (FIXME: we don't have generics yet).
-static bool SemaBinaryExpr(Expr *&LHS, NamedDecl *OpFn,
+static bool SemaBinaryExpr(Expr *&LHS, ValueDecl *OpFn,
                            llvm::SMLoc OpLoc, Expr *&RHS, Type *&ResultTy,
                            SemaExpr &SE) {
   if (isa<DependentType>(LHS->Ty) || isa<DependentType>(RHS->Ty)) {
@@ -271,7 +271,7 @@ NullablePtr<Expr> SemaExpr::ActOnNumericConstant(llvm::StringRef Text,
 
 NullablePtr<Expr> 
 SemaExpr::ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
-  NamedDecl *D = S.decl.LookupName(S.Context.getIdentifier(Text));
+  ValueDecl *D = S.decl.LookupValueName(S.Context.getIdentifier(Text));
   
   // If this identifier is $0 -> $9, then it is a use of an implicit anonymous
   // closure argument.
@@ -287,11 +287,11 @@ SemaExpr::ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
 
 NullablePtr<Expr> 
 SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
-                         const llvm::PointerUnion<Expr*, NamedDecl*> *Elements,
+                         const llvm::PointerUnion<Expr*, ValueDecl*> *Elements,
                          unsigned NumElements, bool HasMissingSemi,
                          llvm::SMLoc RBLoc) {
-  llvm::PointerUnion<Expr*, NamedDecl*> *NewElements = 
-  (llvm::PointerUnion<Expr*, NamedDecl*> *)
+  llvm::PointerUnion<Expr*, ValueDecl*> *NewElements = 
+  (llvm::PointerUnion<Expr*, ValueDecl*> *)
   S.Context.Allocate(sizeof(*Elements)*NumElements, 8);
   memcpy(NewElements, Elements, sizeof(*Elements)*NumElements);
   
@@ -387,7 +387,7 @@ SemaExpr::ActOnSequence(Expr **Elements, unsigned NumElements) {
 }
 
 NullablePtr<Expr> 
-SemaExpr::ActOnBinaryExpr(Expr *LHS, NamedDecl *OpFn,
+SemaExpr::ActOnBinaryExpr(Expr *LHS, ValueDecl *OpFn,
                           llvm::SMLoc OpLoc, Expr *RHS) {
   Type *ResultTy = 0;
   if (SemaBinaryExpr(LHS, OpFn, OpLoc, RHS, ResultTy, *this)) return 0;
@@ -474,10 +474,10 @@ namespace {
         if (Expr *SubExpr = E->Elements[i].dyn_cast<Expr*>()) {
           E->Elements[i] = Visit(SubExpr);
           if (E->Elements[i].get<Expr*>() == 0) return 0;
-        } else if (Expr *Init = E->Elements[i].get<NamedDecl*>()->Init) {
+        } else if (Expr *Init = E->Elements[i].get<ValueDecl*>()->Init) {
           if ((Init = Visit(Init)) == 0) return 0;
-          E->Elements[i].get<NamedDecl*>()->Ty = Init->Ty;
-          E->Elements[i].get<NamedDecl*>()->Init = Init;
+          E->Elements[i].get<ValueDecl*>()->Ty = Init->Ty;
+          E->Elements[i].get<ValueDecl*>()->Init = Init;
         }
       
       if (SemaBraceExpr(E->LBLoc, E->Elements, E->NumElements,

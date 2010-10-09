@@ -42,10 +42,10 @@ SemaDecl::~SemaDecl() {
 
 /// AddToScope - Register the specified decl as being in the current lexical
 /// scope.
-void SemaDecl::AddToScope(NamedDecl *D) {
+void SemaDecl::AddToScope(ValueDecl *D) {
   // If we have a shadowed variable definition, check to see if we have a
   // redefinition: two definitions in the same scope with the same name.
-  std::pair<unsigned, NamedDecl*> Entry = ScopeHT->lookup(D->Name);
+  std::pair<unsigned, ValueDecl*> Entry = ScopeHT->lookup(D->Name);
   if (Entry.second && Entry.first == CurScope->getDepth()) {
     Error(D->getLocStart(),
           "variable declaration conflicts with previous declaration");
@@ -57,9 +57,9 @@ void SemaDecl::AddToScope(NamedDecl *D) {
   ScopeHT->insert(D->Name, std::make_pair(CurScope->getDepth(), D));
 }
 
-/// LookupName - Perform a lexical scope lookup for the specified name,
+/// LookupValueName - Perform a lexical scope lookup for the specified name,
 /// returning the active decl if found or null if not.
-NamedDecl *SemaDecl::LookupName(Identifier Name) {
+ValueDecl *SemaDecl::LookupValueName(Identifier Name) {
   return ScopeHT->lookup(Name).second;
 }
 
@@ -136,7 +136,7 @@ bool SemaDecl::CheckAccessPathArity(unsigned NumChildren, llvm::SMLoc LPLoc,
 //===----------------------------------------------------------------------===//
 
 /// ActOnTopLevelDecl - This is called after parsing a new top-level decl.
-void SemaDecl::ActOnTopLevelDecl(NamedDecl *D) {
+void SemaDecl::ActOnTopLevelDecl(ValueDecl *D) {
   // Check for and diagnose any uses of anonymous arguments that were unbound.
   for (unsigned i = 0, e = AnonClosureArgs.size(); i != e; ++i) {
     if (AnonClosureArgs[i].isNull()) continue;

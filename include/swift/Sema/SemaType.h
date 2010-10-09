@@ -27,7 +27,6 @@ namespace llvm {
 namespace swift {
   class Sema;
   class Decl;
-  class NamedDecl;
   class Type;
   class TupleType;
   class TupleTypeElt;

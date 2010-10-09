@@ -349,7 +349,7 @@ static void AddElementNamesForVarDecl(const NameRecord &Name,
   // If this is a leaf name, ask sema to create a ElementRefDecl for us with the
   // specified access path.
   if (Name.Name.get()) {
-    NamedDecl *END = 
+    ValueDecl *END = 
       SD.ActOnElementName(Name.Name, Name.Loc, VD,
                           AccessPath.data(), AccessPath.size());
     SD.AddToScope(END);
@@ -761,12 +761,13 @@ bool Parser::ParseArgListType(Type *&Result) {
 static bool isStartOfExpr(Token &Tok, Sema &S) {
   if (Tok.is(tok::identifier)) {
     // If this is a binary operator, then it isn't the start of an expr.
-    NamedDecl *ND = S.decl.LookupName(S.Context.getIdentifier(Tok.getText()));
+    ValueDecl *VD =
+      S.decl.LookupValueName(S.Context.getIdentifier(Tok.getText()));
     
     // Use of undeclared identifier.
-    if (ND == 0) return true;
+    if (VD == 0) return true;
     
-    return ND->Attrs.InfixPrecedence == -1;
+    return VD->Attrs.InfixPrecedence == -1;
   }
   
   return Tok.is(tok::numeric_constant) ||
@@ -996,7 +997,7 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
   // This brace expression forms a lexical scope.
   Scope BraceScope(S.decl);
 
-  llvm::SmallVector<llvm::PointerUnion<Expr*, NamedDecl*>, 16> Entries;
+  llvm::SmallVector<llvm::PointerUnion<Expr*, ValueDecl*>, 16> Entries;
   
   // MissingSemiAtEnd - Keep track of whether the last expression in the block
   // had no semicolon.
@@ -1012,7 +1013,7 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
     }
 
     // Otherwise, we must have a var decl or expression.  Parse it up
-    Entries.push_back(llvm::PointerUnion<Expr*, NamedDecl*>());
+    Entries.push_back(llvm::PointerUnion<Expr*, ValueDecl*>());
     
     // Parse the var or expression.  If we have an error, try to do nice
     // recovery.
@@ -1052,7 +1053,7 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
   }
   
   // Diagnose cases where there was a ; missing after a 'var'.
-  if (MissingSemiAtEnd && Entries.back().is<NamedDecl*>()) {
+  if (MissingSemiAtEnd && Entries.back().is<ValueDecl*>()) {
     Error(RBLoc, "expected ';' after var declaration");
     MissingSemiAtEnd = false;
   }
@@ -1063,15 +1064,15 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
 }
 
 
-/// getBinOp - Return the NamedDecl for the token if it is an infix binary
+/// getBinOp - Return the ValueDecl for the token if it is an infix binary
 /// operator, otherwise return null.
-static NamedDecl *getBinOp(const Token &Tok, Sema &S) {
+static ValueDecl *getBinOp(const Token &Tok, Sema &S) {
   if (Tok.isNot(tok::identifier))
     return 0;
-  NamedDecl *ND = S.decl.LookupName(S.Context.getIdentifier(Tok.getText()));
-  if (ND == 0 || ND->Attrs.InfixPrecedence == -1)
+  ValueDecl *VD =S.decl.LookupValueName(S.Context.getIdentifier(Tok.getText()));
+  if (VD == 0 || VD->Attrs.InfixPrecedence == -1)
     return 0;
-  return ND;
+  return VD;
 }
 
 
@@ -1081,7 +1082,7 @@ static NamedDecl *getBinOp(const Token &Tok, Sema &S) {
 ///   expr-binary-rhs:
 ///     (binary-operator expr-primary)*
 bool Parser::ParseExprBinaryRHS(NullablePtr<Expr> &Result, unsigned MinPrec) {
-  NamedDecl *NextTokOp = getBinOp(Tok, S);
+  ValueDecl *NextTokOp = getBinOp(Tok, S);
   int NextTokPrec = NextTokOp ? NextTokOp->Attrs.InfixPrecedence : -1;
   // Assignment is a hack until we get generics.  Assignment gets the lowest
   // precedence since it "returns void".
@@ -1107,7 +1108,7 @@ bool Parser::ParseExprBinaryRHS(NullablePtr<Expr> &Result, unsigned MinPrec) {
     // Remember the precedence of this operator and get the precedence of the
     // operator immediately to the right of the RHS.
     int ThisPrec = NextTokPrec;
-    NamedDecl *ThisTokOp = NextTokOp;
+    ValueDecl *ThisTokOp = NextTokOp;
     
     NextTokOp = getBinOp(Tok, S);
     NextTokPrec = NextTokOp ? NextTokOp->Attrs.InfixPrecedence : -1;

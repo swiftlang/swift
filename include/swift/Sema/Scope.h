@@ -22,7 +22,7 @@
 #include "llvm/ADT/ScopedHashTable.h"
 
 namespace swift {
-  class NamedDecl;
+  class ValueDecl;
   class SemaDecl;
   
 /// Scope - This class represents lexical scopes.  These objects are created
@@ -35,7 +35,7 @@ class Scope {
   
   SemaDecl &SD;
   
-  typedef std::pair<unsigned, NamedDecl*> ScopeEntry;
+  typedef std::pair<unsigned, ValueDecl*> ScopeEntry;
   llvm::ScopedHashTableScope<Identifier, ScopeEntry> HTScope;
   Scope *PrevScope;
   unsigned Depth;
