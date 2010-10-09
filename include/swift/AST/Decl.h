@@ -31,6 +31,7 @@ namespace swift {
   class Expr;
   
 enum DeclKind {
+  DataDeclKind,
   VarDeclKind,
   FuncDeclKind,
   ArgDeclKind,
@@ -84,7 +85,7 @@ public:
                      unsigned Alignment = 8) throw();  
 };
 
-/// NamedDecl - The common base class between VarDecl and FuncDecl. 
+/// NamedDecl - The common base class between DataDecl and ValueDecl.
 class NamedDecl : public Decl {
 public:
   Identifier Name;
@@ -95,7 +96,8 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return (D->getKind() == VarDeclKind || D->getKind() == FuncDeclKind ||
-            D->getKind() == AnonDeclKind || D->getKind() == ElementRefDeclKind);
+            D->getKind() == AnonDeclKind || D->getKind() == ElementRefDeclKind||
+            D->getKind() == DataDeclKind);
   }
   static bool classof(const NamedDecl *D) { return true; }
   
@@ -107,7 +109,31 @@ protected:
   
   void printCommon(llvm::raw_ostream &OS, unsigned Indent) const;
 };
+
+
+/// DataDecl - 'data' declaration.  This  represents the data element itself,
+/// not the elements of the data.
+class DataDecl : public NamedDecl {
+public:
+  llvm::SMLoc DataLoc;
   
+  DataDecl(llvm::SMLoc dataloc, Identifier name,
+           const DeclAttributes &attrs = DeclAttributes())
+    : NamedDecl(DataDeclKind, name, attrs), DataLoc(dataloc) {
+  }
+
+  llvm::SMLoc getLocStart() const { return DataLoc; }
+
+  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) {
+    return D->getKind() == DataDeclKind;
+  }
+  static bool classof(const DataDecl *D) { return true; }
+};
+
+
   
 /// ValueDecl - All named decls that are values in the language.  These can
 /// have an initializer, type, etc.

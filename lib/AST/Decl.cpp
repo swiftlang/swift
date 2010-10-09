@@ -29,21 +29,10 @@ void *Decl::operator new(size_t Bytes, ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
-void Decl::dump() const { print(llvm::errs()); llvm::errs() << '\n'; }
-
-void Decl::print(llvm::raw_ostream &OS, unsigned Indent) const {
-  switch (getKind()) {
-  case VarDeclKind:        return cast<VarDecl>(this)->print(OS, Indent);
-  case FuncDeclKind:       return cast<FuncDecl>(this)->print(OS, Indent);
-  case ArgDeclKind:        return cast<ArgDecl>(this)->print(OS, Indent);
-  case AnonDeclKind:       return cast<AnonDecl>(this)->print(OS, Indent);
-  case ElementRefDeclKind: return cast<ElementRefDecl>(this)->print(OS, Indent);
-  }
-}
-
 
 llvm::SMLoc NamedDecl::getLocStart() const {
   switch (getKind()) {
+  case DataDeclKind:       return cast<DataDecl>(this)->getLocStart();
   case VarDeclKind:        return cast<VarDecl>(this)->getLocStart();
   case FuncDeclKind:       return cast<FuncDecl>(this)->getLocStart();
   case ArgDeclKind:        return cast<ArgDecl>(this)->getLocStart();
@@ -56,9 +45,28 @@ llvm::SMLoc NamedDecl::getLocStart() const {
 }
 
 
+void Decl::dump() const { print(llvm::errs()); llvm::errs() << '\n'; }
+
+void Decl::print(llvm::raw_ostream &OS, unsigned Indent) const {
+  switch (getKind()) {
+  case DataDeclKind:       return cast<DataDecl>(this)->print(OS, Indent);
+  case VarDeclKind:        return cast<VarDecl>(this)->print(OS, Indent);
+  case FuncDeclKind:       return cast<FuncDecl>(this)->print(OS, Indent);
+  case ArgDeclKind:        return cast<ArgDecl>(this)->print(OS, Indent);
+  case AnonDeclKind:       return cast<AnonDecl>(this)->print(OS, Indent);
+  case ElementRefDeclKind: return cast<ElementRefDecl>(this)->print(OS, Indent);
+  }
+}
+
 void NamedDecl::printCommon(llvm::raw_ostream &OS, unsigned Indent) const {
   OS << "'" << Name << "' type='";
 }
+
+void DataDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
+  OS.indent(Indent) << "(datadecl ";
+  printCommon(OS, Indent);
+}
+
 
 void ValueDecl::printCommon(llvm::raw_ostream &OS, unsigned Indent) const {
   NamedDecl::printCommon(OS, Indent);

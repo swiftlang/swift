@@ -314,7 +314,9 @@ FuncDecl *SemaDecl::ActOnFuncBody(FuncDecl *FD, Expr *Body) {
 
 DataDecl *SemaDecl::ActOnDataDecl(llvm::SMLoc DataLoc, Identifier Name,
                                   DeclAttributes &Attrs) {
-  return 0;
+  // FIXME: Do name lookup on the type to diagnose type redefinitions.
+  
+  return new (S.Context) DataDecl(DataLoc, Name, Attrs);
 }
 
 /*struct DataElementInfo {
