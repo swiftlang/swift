@@ -31,7 +31,6 @@ namespace tok {
     
 #define KEYWORD(X) kw_ ## X,
     // Types.
-    KEYWORD(__builtin_else_hack_type) // FIXME: REMOVE.
 //    KEYWORD(__builtin_int8_type)
 //    KEYWORD(__builtin_uint8_type)
 //    KEYWORD(__builtin_int16_type)

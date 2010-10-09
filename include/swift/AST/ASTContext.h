@@ -71,7 +71,6 @@ public:
   Type * const TheEmptyTupleType;  /// TheEmptyTupleType - This is "()"
   Type * const TheDependentType;   /// TheDependentType - Dependent on context.
   Type * const TheInt32Type;       /// TheInt32Type - 32-bit signed integer.
-  Type * const TheElseHackType;    /// FIXME: Remove this when we have UDTs.
 
   /// getNamedType - This method does a lookup for the specified type name.  If
   /// no type with the specified name exists, null is returned.

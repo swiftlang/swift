@@ -587,10 +587,6 @@ bool Parser::ParseType(Type *&Result, const llvm::Twine &Message) {
     Result = S.type.ActOnInt32Type(Tok.getLoc());
     ConsumeToken(tok::kw___builtin_int32_type);
     break;
-  case tok::kw___builtin_else_hack_type:
-    Result = S.type.ActOnElseHackType(Tok.getLoc());
-    ConsumeToken(tok::kw___builtin_else_hack_type);
-    break;
   case tok::l_paren:
     if (ParseTypeTuple(Result))
       return true;

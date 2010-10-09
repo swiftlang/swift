@@ -27,10 +27,6 @@ Type *SemaType::ActOnInt32Type(llvm::SMLoc Loc) {
   return S.Context.TheInt32Type;
 }
 
-Type *SemaType::ActOnElseHackType(llvm::SMLoc Loc) {
-  return S.Context.TheElseHackType;
-}
-
 Type *SemaType::ActOnTypeName(llvm::SMLoc Loc, llvm::StringRef Name) {
   return S.Context.getNamedType(S.Context.getIdentifier(Name));
 }

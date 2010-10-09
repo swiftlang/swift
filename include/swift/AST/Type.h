@@ -32,7 +32,6 @@ namespace swift {
   
   enum TypeKind {
     BuiltinInt32Kind,
-    BuiltinElseHackKind,
     DependentTypeKind,
     AliasTypeKind,
     DataTypeKind,
@@ -40,7 +39,7 @@ namespace swift {
     FunctionTypeKind,
     
     Builtin_First = BuiltinInt32Kind,
-    Builtin_Last = BuiltinElseHackKind
+    Builtin_Last = BuiltinInt32Kind
   };
   
 /// Type - Base class for all types in Swift.
@@ -149,7 +148,7 @@ public:
 class DataType : public Type {
   friend class ASTContext;
   DataType(DataDecl *DD)
-  : Type(DataTypeKind), TheDecl(DD) {}
+  : Type(DataTypeKind, this), TheDecl(DD) {}
 public:
   DataDecl *const TheDecl;
   

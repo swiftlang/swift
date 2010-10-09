@@ -49,8 +49,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
     SourceMgr(sourcemgr),
     TheEmptyTupleType(getTupleType(0, 0)),
     TheDependentType(new (*this) DependentType()),
-    TheInt32Type(new (*this) BuiltinType(BuiltinInt32Kind)),
-    TheElseHackType(new (*this) BuiltinType(BuiltinElseHackKind)) {
+    TheInt32Type(new (*this) BuiltinType(BuiltinInt32Kind)) {
 }
 
 ASTContext::~ASTContext() {
@@ -91,7 +90,6 @@ Type *ASTContext::getCanonicalType(Type *T) {
   
   switch (T->Kind) {
   case BuiltinInt32Kind:
-  case BuiltinElseHackKind:
   case DependentTypeKind:
   case DataTypeKind:
     assert(0 && "These are always canonical");
