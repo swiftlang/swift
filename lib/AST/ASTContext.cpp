@@ -30,6 +30,9 @@ typedef llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTableMapTy;
 /// AliasTypesMapTy - This is the type underlying AliasTypes.
 typedef llvm::StringMap<AliasType*, llvm::BumpPtrAllocator&> AliasTypesMapTy;
 
+/// DataTypesMapTy - This is the type underlying DataTypes.
+typedef llvm::DenseMap<DataDecl*, DataType*> DataTypesMapTy;
+
 /// TupleTypesMapTy - This is the actual type underlying ASTContext::TupleTypes.
 typedef llvm::FoldingSet<TupleType> TupleTypesMapTy;
 
@@ -40,6 +43,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
   : Allocator(new llvm::BumpPtrAllocator()),
     IdentifierTable(new IdentifierTableMapTy(*Allocator)),
     AliasTypes(new AliasTypesMapTy(*Allocator)),
+    DataTypes(new DataTypesMapTy()),
     TupleTypes(new TupleTypesMapTy()),
     FunctionTypes(new FunctionTypesMapTy()),
     SourceMgr(sourcemgr),
@@ -51,10 +55,11 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
 
 ASTContext::~ASTContext() {
   delete (AliasTypesMapTy*)AliasTypes; AliasTypes = 0;
+  delete (DataTypesMapTy*)DataTypes; DataTypes = 0;
   delete (TupleTypesMapTy*)TupleTypes; TupleTypes = 0;
   delete (FunctionTypesMapTy*)FunctionTypes; FunctionTypes = 0;
-  delete (IdentifierTableMapTy*)IdentifierTable;
-  delete Allocator;
+  delete (IdentifierTableMapTy*)IdentifierTable; IdentifierTable = 0;
+  delete Allocator; Allocator = 0;
 }
 
 void *ASTContext::Allocate(unsigned long Bytes, unsigned Alignment) {
@@ -87,7 +92,9 @@ Type *ASTContext::getCanonicalType(Type *T) {
   switch (T->Kind) {
   case BuiltinInt32Kind:
   case BuiltinElseHackKind:
-  case DependentTypeKind: assert(0 && "These are always canonical");
+  case DependentTypeKind:
+  case DataTypeKind:
+    assert(0 && "These are always canonical");
   case AliasTypeKind:
     return T->CanonicalType =
       getCanonicalType(llvm::cast<AliasType>(T)->UnderlyingType);
@@ -139,6 +146,15 @@ AliasType *ASTContext::getAliasType(Identifier Name, Type *Underlying) {
   if (Entry != 0) return 0;
   
   return Entry = new (*this) AliasType(Name, Underlying);
+}
+
+/// getDataType - Return the type corresponding to the specified data
+/// declaration.
+DataType *ASTContext::getDataType(DataDecl *TheDecl) {
+  DataType *&Entry = (*(DataTypesMapTy*)DataTypes)[TheDecl];
+  if (Entry == 0)
+    Entry = new (*this) DataType(TheDecl);
+  return Entry;
 }
 
 /// getTupleType - Return the uniqued tuple type with the specified elements.

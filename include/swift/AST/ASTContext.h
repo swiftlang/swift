@@ -27,10 +27,12 @@ namespace llvm {
 namespace swift {
   class Type;
   class AliasType;
+  class DataType;
   class TupleType;
   class FunctionType;
   class Identifier;
   class TupleTypeElt;
+  class DataDecl;
 
 /// ASTContext - This object creates and owns the AST objects.
 class ASTContext {
@@ -40,6 +42,7 @@ class ASTContext {
   
   void *IdentifierTable; // llvm::StringMap<char>
   void *AliasTypes;      // llvm::StringMap<AliasType*>
+  void *DataTypes;       // DenseMap<DataDecl*, DataType*>
   void *TupleTypes;      // llvm::FoldingSet<TupleType>
   void *FunctionTypes;   // DenseMap<std::pair<Type*,Type*>, FunctionType*>
 public:
@@ -77,6 +80,10 @@ public:
   /// getAliasType - Return a new alias type.  This returns null if there is a
   /// conflict with an already existing alias type of the same name.
   AliasType *getAliasType(Identifier Name, Type *Underlying);
+  
+  /// getDataType - Return the type corresponding to the specified data
+  /// declaration.
+  DataType *getDataType(DataDecl *TheDecl);
                           
   /// getTupleType - Return the uniqued tuple type with the specified elements.
   TupleType *getTupleType(const TupleTypeElt *Fields,

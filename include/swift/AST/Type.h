@@ -28,13 +28,14 @@ namespace swift {
   class ASTContext;
   class Expr;
   class Identifier;
-  class TupleType;
+  class DataDecl;
   
   enum TypeKind {
     BuiltinInt32Kind,
     BuiltinElseHackKind,
     DependentTypeKind,
     AliasTypeKind,
+    DataTypeKind,
     TupleTypeKind,
     FunctionTypeKind,
     
@@ -141,6 +142,23 @@ public:
   static bool classof(const AliasType *) { return true; }
   static bool classof(const Type *T) {
     return T->Kind == AliasTypeKind;
+  }
+};
+  
+/// DataType - A type declared with a 'data' declaration.
+class DataType : public Type {
+  friend class ASTContext;
+  DataType(DataDecl *DD)
+  : Type(DataTypeKind), TheDecl(DD) {}
+public:
+  DataDecl *const TheDecl;
+  
+  void print(llvm::raw_ostream &OS) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const DataType *) { return true; }
+  static bool classof(const Type *T) {
+    return T->Kind == DataTypeKind;
   }
 };
 

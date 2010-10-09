@@ -36,6 +36,7 @@ Type *Type::getDesugaredType() {
   case DependentTypeKind:
   case BuiltinInt32Kind:
   case BuiltinElseHackKind:
+  case DataTypeKind:
   case TupleTypeKind:
   case FunctionTypeKind:
     // None of these types have sugar at the outer level.
@@ -76,6 +77,7 @@ void Type::print(llvm::raw_ostream &OS) const {
   case BuiltinInt32Kind:
   case BuiltinElseHackKind:   return cast<BuiltinType>(this)->print(OS);
   case AliasTypeKind:         return cast<AliasType>(this)->print(OS);
+  case DataTypeKind:          return cast<DataType>(this)->print(OS);
   case TupleTypeKind:         return cast<TupleType>(this)->print(OS);
   case FunctionTypeKind:      return cast<FunctionType>(this)->print(OS);
   }
@@ -95,6 +97,10 @@ void DependentType::print(llvm::raw_ostream &OS) const {
 
 void AliasType::print(llvm::raw_ostream &OS) const {
   OS << Name.get();
+}
+
+void DataType::print(llvm::raw_ostream &OS) const {
+  OS << TheDecl->Name.get();
 }
 
 void TupleType::print(llvm::raw_ostream &OS) const {
