@@ -18,6 +18,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/Twine.h"
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -34,7 +35,7 @@ void Lexer::Warning(const char *Loc, const char *Message) {
 }
 
 void Lexer::Error(const char *Loc, const char *Message) {
-  SourceMgr.PrintMessage(llvm::SMLoc::getFromPointer(Loc), Message, "error");
+  SourceMgr.PrintMessage(llvm::SMLoc::getFromPointer(Loc), llvm::Twine(Message), "error");
 }
 
 

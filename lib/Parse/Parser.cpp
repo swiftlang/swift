@@ -24,8 +24,9 @@
 #include "swift/AST/Type.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/NullablePtr.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/Twine.h"
 using namespace swift;
 using llvm::SMLoc;
 using llvm::NullablePtr;
