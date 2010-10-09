@@ -311,3 +311,23 @@ FuncDecl *SemaDecl::ActOnFuncBody(FuncDecl *FD, Expr *Body) {
   FD->Init = Body;
   return FD;
 }
+
+DataDecl *SemaDecl::ActOnDataDecl(llvm::SMLoc DataLoc, Identifier Name,
+                                  DeclAttributes &Attrs) {
+  return 0;
+}
+
+/*struct DataElementInfo {
+  llvm::SMLoc NameLoc;
+  llvm::StringRef Name;
+  Type *EltType;
+};*/
+
+void SemaDecl::ActOnCompleteDataDecl(DataDecl *DD,
+                                     const DataElementInfo *Elements,
+                                     unsigned NumElements) {
+  
+}
+
+
+

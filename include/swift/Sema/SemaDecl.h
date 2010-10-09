@@ -22,6 +22,8 @@
 #include "swift/AST/Identifier.h"
 #include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/SMLoc.h"
 
 namespace llvm {
   template <typename K, typename V, typename KInfo>
@@ -31,6 +33,7 @@ namespace llvm {
 namespace swift {
   class Expr;
   class Type;
+  class DataDecl;
   class VarDecl;
   class FuncDecl;
   class AnonDecl;
@@ -93,6 +96,18 @@ public:
   void CreateArgumentDeclsForFunc(FuncDecl *FD);
   FuncDecl *ActOnFuncBody(FuncDecl *FD, Expr *Body);
 
+  DataDecl *ActOnDataDecl(llvm::SMLoc DataLoc, Identifier Name,
+                          DeclAttributes &Attrs);
+  
+  struct DataElementInfo {
+    llvm::SMLoc NameLoc;
+    llvm::StringRef Name;
+    Type *EltType;
+  };
+  
+  void ActOnCompleteDataDecl(DataDecl *DD, const DataElementInfo *Elements,
+                             unsigned NumElements);
+  
   // Name processing.
   
   /// ActOnElementName - Assign a name to an element of D specified by Path.

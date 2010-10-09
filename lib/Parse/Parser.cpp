@@ -508,33 +508,40 @@ FuncDecl *Parser::ParseDeclFunc() {
 ///      identifier
 ///      
 bool Parser::ParseDeclData() {
-  SMLoc VarLoc = Tok.getLoc();
+  SMLoc DataLoc = Tok.getLoc();
   ConsumeToken(tok::kw_data);
 
   DeclAttributes Attributes;
   if (Tok.is(tok::l_square))
     ParseDeclAttributeList(Attributes);
   
-  llvm::StringRef Identifier;
-  if (ParseIdentifier(Identifier, "expected identifier in data declaration") ||
+  llvm::StringRef DataName;
+  if (ParseIdentifier(DataName, "expected identifier in data declaration") ||
       ParseToken(tok::l_brace, "expected '{' in data declaration"))
     return true;
-
-  // Sema act on decl.
+  Identifier DataIdentifier = S.Context.getIdentifier(Tok.getText());
   
+  // Give the information about the decl to Sema.  This registers the data for
+  // name lookup allowing recursive datas.
+  DataDecl *TheDataDecl = S.decl.ActOnDataDecl(DataLoc, DataIdentifier,
+                                               Attributes);
+  
+  llvm::SmallVector<SemaDecl::DataElementInfo, 8> ElementInfo;
   
   // Parse the comma separated list of data elements.
   while (Tok.is(tok::identifier)) {
-    llvm::StringRef Name = Tok.getText();
-    SMLoc NameLoc = Tok.getLoc();
+    SemaDecl::DataElementInfo ElementInfo;
+    ElementInfo.Name = Tok.getText();
+    ElementInfo.NameLoc = Tok.getLoc();
+    ElementInfo.EltType = 0;
 
     ConsumeToken(tok::identifier);
 
     // See if we have a type specifier for this data element.  If so, parse it.
-    Type *EltType = 0;
     if (Tok.isNot(tok::comma) && Tok.isNot(tok::r_brace))
-      if (ParseType(EltType, "expected type while parsing data element '" +
-                    Name + "'")) {
+      if (ParseType(ElementInfo.EltType,
+                    "expected type while parsing data element '" +
+                    DataName + "'")) {
         SkipUntil(tok::r_brace);
         return true;
       }
@@ -543,8 +550,12 @@ bool Parser::ParseDeclData() {
     if (!ConsumeIf(tok::comma))
       break;
   }
-    
+
   ParseToken(tok::r_brace, "expected '}' at end of data declaration");
+  
+  S.decl.ActOnCompleteDataDecl(TheDataDecl, ElementInfo.data(),
+                               ElementInfo.size());
+  
   return false;
 }
 
