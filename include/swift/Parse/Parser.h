@@ -106,7 +106,7 @@ private:
   bool ParseDeclAttribute(DeclAttributes &Attributes);
   
   bool ParseName(NameRecord &Record);
-  bool ParseDeclData();
+  DataDecl *ParseDeclData();
   VarDecl *ParseDeclVar();
   FuncDecl *ParseDeclFunc();
   

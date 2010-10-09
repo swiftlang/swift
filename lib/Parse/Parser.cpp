@@ -167,9 +167,9 @@ Decl *Parser::ParseDeclTopLevel() {
     return 0;
 
   case tok::kw_data:
-    if (ParseDeclData()) break;
-    return 0;
-
+    if (DataDecl *D = ParseDeclData())
+      return D;
+    break;
   case tok::kw_func:
     if (FuncDecl *D = ParseDeclFunc()) {
       S.decl.ActOnTopLevelDecl(D);
@@ -507,7 +507,7 @@ FuncDecl *Parser::ParseDeclFunc() {
 ///   data-element:
 ///      identifier
 ///      
-bool Parser::ParseDeclData() {
+DataDecl *Parser::ParseDeclData() {
   SMLoc DataLoc = Tok.getLoc();
   ConsumeToken(tok::kw_data);
 
@@ -518,8 +518,8 @@ bool Parser::ParseDeclData() {
   llvm::StringRef DataName;
   if (ParseIdentifier(DataName, "expected identifier in data declaration") ||
       ParseToken(tok::l_brace, "expected '{' in data declaration"))
-    return true;
-  Identifier DataIdentifier = S.Context.getIdentifier(Tok.getText());
+    return 0;
+  Identifier DataIdentifier = S.Context.getIdentifier(DataName);
   
   // Give the information about the decl to Sema.  This registers the data for
   // name lookup allowing recursive datas.
@@ -543,7 +543,7 @@ bool Parser::ParseDeclData() {
                     "expected type while parsing data element '" +
                     DataName + "'")) {
         SkipUntil(tok::r_brace);
-        return true;
+        return 0;
       }
     
     // Require comma separation.
@@ -556,7 +556,7 @@ bool Parser::ParseDeclData() {
   S.decl.ActOnCompleteDataDecl(TheDataDecl, ElementInfo.data(),
                                ElementInfo.size());
   
-  return false;
+  return TheDataDecl;
 }
 
 //===----------------------------------------------------------------------===//

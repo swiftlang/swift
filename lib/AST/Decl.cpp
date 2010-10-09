@@ -59,17 +59,19 @@ void Decl::print(llvm::raw_ostream &OS, unsigned Indent) const {
 }
 
 void NamedDecl::printCommon(llvm::raw_ostream &OS, unsigned Indent) const {
-  OS << "'" << Name << "' type='";
+  OS << "'" << Name << "'";
 }
 
 void DataDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(datadecl ";
   printCommon(OS, Indent);
+  OS << ')';
 }
 
 
 void ValueDecl::printCommon(llvm::raw_ostream &OS, unsigned Indent) const {
   NamedDecl::printCommon(OS, Indent);
+  OS << " type='";
   Ty->print(OS);
   OS << "'";
   
