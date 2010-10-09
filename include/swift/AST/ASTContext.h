@@ -41,8 +41,8 @@ class ASTContext {
   llvm::BumpPtrAllocator *Allocator;
   
   void *IdentifierTable; // llvm::StringMap<char>
-  void *AliasTypes;      // llvm::StringMap<AliasType*>
-  void *DataTypes;       // DenseMap<DataDecl*, DataType*>
+  void *AliasTypes;      // llvm::DenseMap<Identifier, AliasType*>
+  void *DataTypes;       // llvm::DenseMap<Identifier, DataType*>
   void *TupleTypes;      // llvm::FoldingSet<TupleType>
   void *FunctionTypes;   // DenseMap<std::pair<Type*,Type*>, FunctionType*>
 public:
@@ -75,6 +75,9 @@ public:
 
   /// getNamedType - This method does a lookup for the specified type name.  If
   /// no type with the specified name exists, null is returned.
+  ///
+  /// FIXME: This is a total hack since we don't have scopes for types.
+  /// getNamedType should eventually be replaced.
   Type *getNamedType(Identifier Name);
   
   /// getAliasType - Return a new alias type.  This returns null if there is a

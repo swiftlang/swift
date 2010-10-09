@@ -28,10 +28,10 @@ using namespace swift;
 typedef llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTableMapTy;
 
 /// AliasTypesMapTy - This is the type underlying AliasTypes.
-typedef llvm::StringMap<AliasType*, llvm::BumpPtrAllocator&> AliasTypesMapTy;
+typedef llvm::DenseMap<Identifier, AliasType*> AliasTypesMapTy;
 
 /// DataTypesMapTy - This is the type underlying DataTypes.
-typedef llvm::DenseMap<DataDecl*, DataType*> DataTypesMapTy;
+typedef llvm::DenseMap<Identifier, DataType*> DataTypesMapTy;
 
 /// TupleTypesMapTy - This is the actual type underlying ASTContext::TupleTypes.
 typedef llvm::FoldingSet<TupleType> TupleTypesMapTy;
@@ -42,7 +42,7 @@ typedef llvm::DenseMap<std::pair<Type*,Type*>, FunctionType*>FunctionTypesMapTy;
 ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
   : Allocator(new llvm::BumpPtrAllocator()),
     IdentifierTable(new IdentifierTableMapTy(*Allocator)),
-    AliasTypes(new AliasTypesMapTy(*Allocator)),
+    AliasTypes(new AliasTypesMapTy()),
     DataTypes(new DataTypesMapTy()),
     TupleTypes(new TupleTypesMapTy()),
     FunctionTypes(new FunctionTypesMapTy()),
@@ -131,19 +131,32 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID, const TupleTypeElt *Fields,
 
 /// getNamedType - This method does a lookup for the specified type name.  If
 /// no type with the specified name exists, null is returned.
+///
+/// FIXME: This is a total hack since we don't have scopes for types.
+/// getNamedType should eventually be replaced.
 Type *ASTContext::getNamedType(Identifier Name) {
-  AliasTypesMapTy &Table = *((AliasTypesMapTy*)AliasTypes);
-  AliasTypesMapTy::iterator It = Table.find(Name.get());
-  return It == Table.end() ? 0 : It->second;
+  {
+    AliasTypesMapTy &Table = *((AliasTypesMapTy*)AliasTypes);
+    AliasTypesMapTy::iterator It = Table.find(Name);
+    if (It != Table.end())
+      return It->second;
+  }
+
+  {
+    DataTypesMapTy &Table = *((DataTypesMapTy*)DataTypes);
+    DataTypesMapTy::iterator It = Table.find(Name);
+    if (It != Table.end())
+      return It->second;
+  }
+  return 0;
 }
 
 
 /// getAliasType - Return a new alias type.  This returns null if there is a
 /// conflict with an already existing alias type of the same name.
 AliasType *ASTContext::getAliasType(Identifier Name, Type *Underlying) {
-  AliasTypesMapTy &Table = *((AliasTypesMapTy*)AliasTypes);
-  AliasType *&Entry = Table.GetOrCreateValue(Name.get()).getValue();
-  if (Entry != 0) return 0;
+  AliasType *&Entry = (*(AliasTypesMapTy*)AliasTypes)[Name];
+  assert(Entry == 0 && "Redefinition of alias type");
   
   return Entry = new (*this) AliasType(Name, Underlying);
 }
@@ -151,7 +164,8 @@ AliasType *ASTContext::getAliasType(Identifier Name, Type *Underlying) {
 /// getDataType - Return the type corresponding to the specified data
 /// declaration.
 DataType *ASTContext::getDataType(DataDecl *TheDecl) {
-  DataType *&Entry = (*(DataTypesMapTy*)DataTypes)[TheDecl];
+  assert(TheDecl->Name.get() != 0);
+  DataType *&Entry = (*(DataTypesMapTy*)DataTypes)[TheDecl->Name];
   if (Entry == 0)
     Entry = new (*this) DataType(TheDecl);
   return Entry;
