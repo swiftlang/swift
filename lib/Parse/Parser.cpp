@@ -91,7 +91,7 @@ bool Parser::ParseIdentifier(llvm::StringRef &Result, const char *Message,
                              tok::TokenKind SkipToTok) {
   if (Tok.is(tok::identifier)) {
     Result = Tok.getText();
-    ConsumeToken();
+    ConsumeToken(tok::identifier);
     return false;
   }
   
@@ -150,8 +150,9 @@ void Parser::ParseTranslationUnit() {
 /// ParseDeclTopLevel
 ///   decl-top-level:
 ///     ';'
-///     decl-var ';'
+///     decl-data
 ///     decl-func
+///     decl-var ';'
 Decl *Parser::ParseDeclTopLevel() {
   switch (Tok.getKind()) {
   default:
@@ -164,7 +165,17 @@ Decl *Parser::ParseDeclTopLevel() {
   case tok::kw_typealias:
     if (ParseTypeAlias()) break;
     return 0;
-      
+
+  case tok::kw_data:
+    if (ParseDeclData()) break;
+    return 0;
+
+  case tok::kw_func:
+    if (FuncDecl *D = ParseDeclFunc()) {
+      S.decl.ActOnTopLevelDecl(D);
+      return D;
+    }
+    break;
   case tok::kw_var:
     if (VarDecl *D = ParseDeclVar()) {
       S.decl.ActOnTopLevelDecl(D);
@@ -172,12 +183,6 @@ Decl *Parser::ParseDeclTopLevel() {
       // On successful parse, eat the ;
       ParseToken(tok::semi, "expected ';' at end of var declaration",
                  tok::semi);
-      return D;
-    }
-    break;
-  case tok::kw_func:
-    if (FuncDecl *D = ParseDeclFunc()) {
-      S.decl.ActOnTopLevelDecl(D);
       return D;
     }
     break;
@@ -489,6 +494,49 @@ FuncDecl *Parser::ParseDeclFunc() {
     return 0;  // FIXME: Need to call a new ActOnFuncBodyError?
 
   return S.decl.ActOnFuncBody(FD, Body.get());
+}
+
+/// ParseDeclVar - Parse a 'var' declaration, returning null (and doing no
+/// token skipping) on error.
+///
+///   decl-data:
+///      'data' decl-attribute-list? name '{' data-element-list '}'
+///   data-element-list:
+///      data-element ','?
+///      data-element ',' data-element-list
+///   data-element:
+///      identifier
+///      
+bool Parser::ParseDeclData() {
+  SMLoc VarLoc = Tok.getLoc();
+  ConsumeToken(tok::kw_data);
+
+  DeclAttributes Attributes;
+  if (Tok.is(tok::l_square))
+    ParseDeclAttributeList(Attributes);
+  
+  llvm::StringRef Identifier;
+  if (ParseIdentifier(Identifier, "expected identifier in data declaration") ||
+      ParseToken(tok::l_brace, "expected '{' in data declaration"))
+    return true;
+
+  // Sema act on decl.
+  
+  
+  // Parse the comma separated list of data elements.
+  while (Tok.is(tok::identifier)) {
+    llvm::StringRef Name = Tok.getText();
+    SMLoc NameLoc = Tok.getLoc();
+
+    ConsumeToken(tok::identifier);
+
+    // Require comma separation.
+    if (!ConsumeIf(tok::comma))
+      break;
+  }
+    
+  ParseToken(tok::r_brace, "expected '}' at end of data declaration");
+  return false;
 }
 
 //===----------------------------------------------------------------------===//

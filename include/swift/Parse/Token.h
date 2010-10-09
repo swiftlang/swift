@@ -43,9 +43,10 @@ namespace tok {
 //    KEYWORD(__builtin_float_type)
 //    KEYWORD(__builtin_double_type)
     
-    KEYWORD(typealias)
-    KEYWORD(var)
+    KEYWORD(data)
     KEYWORD(func)
+    KEYWORD(var)
+    KEYWORD(typealias)
 #undef KEYWORD
     
 #define PUNCTUATOR(X, Y) X,
