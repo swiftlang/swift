@@ -151,6 +151,7 @@ void Parser::ParseTranslationUnit() {
 ///   decl-top-level:
 ///     ';'
 ///     decl-data
+///     decl-struct
 ///     decl-func
 ///     decl-var ';'
 Decl *Parser::ParseDeclTopLevel() {
@@ -168,6 +169,10 @@ Decl *Parser::ParseDeclTopLevel() {
 
   case tok::kw_data:
     if (DataDecl *D = ParseDeclData())
+      return D;
+    break;
+  case tok::kw_struct:
+    if (DataDecl *D = ParseDeclStruct())
       return D;
     break;
   case tok::kw_func:
@@ -496,7 +501,7 @@ FuncDecl *Parser::ParseDeclFunc() {
   return S.decl.ActOnFuncBody(FD, Body.get());
 }
 
-/// ParseDeclVar - Parse a 'var' declaration, returning null (and doing no
+/// ParseDeclData - Parse a 'data' declaration, returning null (and doing no
 /// token skipping) on error.
 ///
 ///   decl-data:
@@ -560,6 +565,50 @@ DataDecl *Parser::ParseDeclData() {
   
   return TheDataDecl;
 }
+
+
+/// ParseDeclStruct - Parse a 'struct' declaration, returning null (and doing no
+/// token skipping) on error.  A 'struct' is just syntactic sugar for a data
+/// with a single element.
+///
+///   decl-struct:
+///      'struct' decl-attribute-list? identifier type-tuple
+///
+DataDecl *Parser::ParseDeclStruct() {
+  SMLoc StructLoc = Tok.getLoc();
+  ConsumeToken(tok::kw_struct);
+  
+  DeclAttributes Attributes;
+  if (Tok.is(tok::l_square))
+    ParseDeclAttributeList(Attributes);
+  
+  llvm::StringRef StructName;
+  if (ParseIdentifier(StructName, "expected identifier in struct declaration"))
+    return 0;
+  Identifier StructIdentifier = S.Context.getIdentifier(StructName);
+
+  if (Tok.isNot(tok::l_paren)) {
+    Error(Tok.getLoc(), "expected '(' in struct declaration");
+    return 0;
+  }
+  
+  Type *Ty = 0;
+  if (ParseTypeTuple(Ty)) return 0;
+  
+  
+  // If we got here, then the 'struct' is syntactically fine, invoke the
+  // semantic actions for the syntactically expanded data declaration.
+  DataDecl *TheDataDecl = S.decl.ActOnDataDecl(StructLoc, StructIdentifier,
+                                               Attributes);
+  
+  SemaDecl::DataElementInfo ElementInfo;
+  ElementInfo.Name = StructName;
+  ElementInfo.NameLoc = StructLoc;
+  ElementInfo.EltType = Ty;
+  S.decl.ActOnCompleteDataDecl(TheDataDecl, &ElementInfo, 1);
+  return TheDataDecl;
+}
+
 
 //===----------------------------------------------------------------------===//
 // Type Parsing

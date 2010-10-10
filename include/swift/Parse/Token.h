@@ -43,6 +43,7 @@ namespace tok {
 //    KEYWORD(__builtin_double_type)
     
     KEYWORD(data)
+    KEYWORD(struct)
     KEYWORD(func)
     KEYWORD(var)
     KEYWORD(typealias)

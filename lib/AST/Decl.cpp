@@ -76,6 +76,12 @@ void NamedDecl::printCommon(llvm::raw_ostream &OS, unsigned Indent) const {
 void DataDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(datadecl ";
   printCommon(OS, Indent);
+  
+  for (unsigned i = 0, e = NumElements; i != e; ++i) {
+    OS << '\n';
+    Elements[i]->print(OS, Indent+2);
+  }
+  
   OS << ')';
 }
 
@@ -88,7 +94,7 @@ void ValueDecl::printCommon(llvm::raw_ostream &OS, unsigned Indent) const {
   
   if (Init) {
     OS << '\n';
-    Init->print(OS, Indent+1);
+    Init->print(OS, Indent+2);
   }
   OS << ')';
 }
