@@ -75,6 +75,91 @@ unsigned ClosureExpr::getNumArgs() const {
   return 1;  
 }
 
+//===----------------------------------------------------------------------===//
+// Expression Walking
+//===----------------------------------------------------------------------===//
+
+namespace {
+  /// ExprWalker - This class implements a simple expression walker which
+  /// invokes a function pointer on every expression in an AST.  If the function
+  /// pointer returns true the walk is terminated.
+  class ExprWalker : public ExprVisitor<ExprWalker, bool> {
+    friend class ExprVisitor<ExprWalker, bool>;
+    bool (*Fn)(Expr *E, Expr::WalkOrder Order, void *Data);
+    void *Data;
+    
+    
+    bool VisitIntegerLiteral(IntegerLiteral *E) { return false; }
+    bool VisitDeclRefExpr(DeclRefExpr *E) { return false; }
+    bool VisitUnresolvedMemberExpr(UnresolvedMemberExpr *E) { return false; }
+    
+    bool VisitTupleExpr(TupleExpr *E) {
+      for (unsigned i = 0, e = E->NumSubExprs; i != e; ++i)
+        if (ProcessNode(E->SubExprs[i]))
+          return true;
+      return false;
+    }
+    bool VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
+      return ProcessNode(E->SubExpr);
+    }
+    bool VisitTupleElementExpr(TupleElementExpr *E) {
+      return ProcessNode(E->SubExpr);
+    }
+    
+    bool VisitApplyExpr(ApplyExpr *E) {
+      return ProcessNode(E->Fn) || ProcessNode(E->Arg);
+    }
+    bool VisitSequenceExpr(SequenceExpr *E) {
+      for (unsigned i = 0, e = E->NumElements; i != e; ++i)
+        if (ProcessNode(E->Elements[i]))
+          return true;
+      return false;
+    }
+    bool VisitBraceExpr(BraceExpr *E) {
+      for (unsigned i = 0, e = E->NumElements; i != e; ++i)
+        if (Expr *SubExpr = E->Elements[i].dyn_cast<Expr*>()) {
+          if (ProcessNode(SubExpr)) return true;
+        } else if (Expr *Init = E->Elements[i].get<ValueDecl*>()->Init) {
+          if (ProcessNode(Init)) return true;
+        }
+      
+      return false;
+    }
+    bool VisitClosureExpr(ClosureExpr *E) {
+      return ProcessNode(E->Input);
+    }
+    bool VisitBinaryExpr(BinaryExpr *E) {
+      return ProcessNode(E->LHS) || ProcessNode(E->RHS);
+    }
+    
+    bool ProcessNode(Expr *E) {
+      return Fn(E, Expr::Walk_PreOrder, Data) ||
+             Visit(E) ||
+             Fn(E, Expr::Walk_PostOrder, Data);
+    }
+    
+  public:
+    ExprWalker(bool (*fn)(Expr *E, Expr::WalkOrder Order, void *Data),
+               void *data) : Fn(fn), Data(data) {
+    }
+    bool doIt(Expr *E) {
+      return ProcessNode(E);
+    }
+  };
+} // end anonymous namespace.
+
+/// WalkExpr - This function walks all the subexpressions under this
+/// expression and invokes the specified function pointer on them.  The
+/// function pointer is invoked both before and after the children are visted,
+/// the WalkOrder specifies at each invocation which stage it is.  If the
+/// function pointer returns true then the walk is terminated and WalkExpr
+/// returns true.
+/// 
+bool Expr::WalkExpr(bool (*Fn)(Expr *E, WalkOrder Order, void *Data),
+                    void *Data) {
+  return ExprWalker(Fn, Data).doIt(this);  
+}
+
 
 //===----------------------------------------------------------------------===//
 // Printing for Expr and all subclasses.

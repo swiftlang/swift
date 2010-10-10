@@ -136,6 +136,26 @@ bool SemaDecl::CheckAccessPathArity(unsigned NumChildren, llvm::SMLoc LPLoc,
 // Declaration handling.
 //===----------------------------------------------------------------------===//
 
+/// DiagnoseUnresolvedTypes - This function is invoked on all nodes in an
+/// expression tree checking to make sure they don't contain any DependentTypes.
+static bool DiagnoseUnresolvedTypes(Expr *E, Expr::WalkOrder Order, void *Data){
+  // Ignore the preorder walk.  We'd rather diagnose use of unresolved types
+  // during the postorder walk so that the inner most expressions are diagnosed
+  // before the outermost ones.
+  if (Order == Expr::Walk_PreOrder)
+    return false;
+  
+  if (E->Ty->getAs<DependentType>() == 0)
+    return false;
+  
+  SemaDecl &SD = *(SemaDecl*)Data;
+  E->dump();  // FIXME: This is a gross hack because our diagnostics suck.
+  SD.Error(E->getLocStart(),
+           "ambiguous expression could not resolve a concrete type");
+  return true;
+}
+
+
 /// ActOnTopLevelDecl - This is called after parsing a new top-level decl.
 void SemaDecl::ActOnTopLevelDecl(ValueDecl *D) {
   // Check for and diagnose any uses of anonymous arguments that were unbound.
@@ -147,6 +167,9 @@ void SemaDecl::ActOnTopLevelDecl(ValueDecl *D) {
           "use of anonymous closure argument in non-closure context");
   }
   AnonClosureArgs.clear();
+  
+  if (Expr *E = D->Init)
+    E->WalkExpr(DiagnoseUnresolvedTypes, this);
 }
 
 /// ActOnTopLevelDeclError - This is called after an error parsing a top-level
@@ -306,9 +329,6 @@ FuncDecl *SemaDecl::ActOnFuncBody(FuncDecl *FD, Expr *Body) {
   Body = S.expr.ConvertToType(Body, FD->Ty, false, SemaExpr::CR_FuncBody);
   if (Body == 0) return 0;
   
-  // TODO: Now that the body is type checked and bound, verify that the
-  // arguments used are the valid ones and build an extra layer of closure to
-  // bind the arguments.
   FD->Init = Body;
   return FD;
 }

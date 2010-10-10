@@ -325,7 +325,7 @@ ActOnScopedIdentifierExpr(llvm::StringRef ScopeName, llvm::SMLoc ScopeLoc,
 llvm::NullablePtr<Expr>
 SemaExpr::ActOnUnresolvedMemberExpr(llvm::SMLoc ColonLoc, llvm::SMLoc NameLoc,
                                     llvm::StringRef Name) {
-  
+  // Handle :foo by just making an AST node.
   return new (S.Context) UnresolvedMemberExpr(ColonLoc, NameLoc,
                                               S.Context.getIdentifier(Name),
                                               S.Context.TheDependentType);

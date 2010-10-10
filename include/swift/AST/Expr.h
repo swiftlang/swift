@@ -68,6 +68,21 @@ public:
   llvm::SMLoc getLocStart() const;
   
   
+  enum WalkOrder {
+    Walk_PreOrder,
+    Walk_PostOrder
+  };
+  
+  /// WalkExpr - This function walks all the subexpressions under this
+  /// expression and invokes the specified function pointer on them.  The
+  /// function pointer is invoked both before and after the children are visted,
+  /// the WalkOrder specifies at each invocation which stage it is.  If the
+  /// function pointer returns true then the walk is terminated and WalkExpr
+  /// returns true.
+  /// 
+  bool WalkExpr(bool (*Fn)(Expr *E, WalkOrder Order, void *Data), void *Data);
+  
+  
   void dump() const;
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
 
