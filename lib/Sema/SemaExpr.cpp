@@ -28,6 +28,7 @@
 using namespace swift;
 using llvm::NullablePtr;
 using llvm::isa;
+using llvm::cast;
 using llvm::dyn_cast;
 
 //===----------------------------------------------------------------------===//
@@ -786,6 +787,19 @@ namespace {
     }
     
     Expr *VisitApplyExpr(ApplyExpr *E) {
+      // If we have ":f x" and the result type of the Apply is a DataType, then
+      // :f must be an element constructor for the Data value.  Note that
+      // handling this syntactically causes us to reject "(:f) x" as ambiguous.
+      if (UnresolvedMemberExpr *UME = dyn_cast<UnresolvedMemberExpr>(E->Fn))
+        if (DataType *DT = DestTy->getAs<DataType>()) {
+          // The data type must have an element of the specified name.
+          DataElementDecl *DED = DT->TheDecl->getElement(UME->Name);
+          if (DED == 0) return 0;
+          
+          E->Fn = new (SE.S.Context) DeclRefExpr(DED, UME->ColonLoc, DED->Ty);
+          if (SemaApplyExpr(E->Fn, E->Arg, E->Ty, SE))
+            return 0;
+        }
       return E;
     }
     Expr *VisitSequenceExpr(SequenceExpr *E) {
@@ -837,18 +851,7 @@ Expr *SemaCoerceBottomUp::VisitTupleExpr(TupleExpr *E) {
     return E;
   }
   
-  // Otherwise, we must have a tuple type.
-  TupleType *DestTType = DestTy->getAs<TupleType>();
-  if (DestTType == 0) return 0;
-  
-  // If the tuple expression or destination type have named elements, we have to
-  // match them up to handle the swizzle case for when:
-  //   (.y = 4, .x = 3)
-  // is converted to type:
-  //   (.x = int, .y = int)
-  llvm::SmallVector<Identifier, 8> Idents(E->NumSubExprs);
-  
-  return ConvertExprToTupleType(E, Idents.data(), Idents.size(), DestTType, SE);
+  return HandleConversionToType(E, DestTy, true, SE);
 }
 
 
@@ -964,6 +967,18 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
                                              ExprIdentMapping.size(), TT,
                                              SE))
         return Res;
+    }
+    
+    // If the element of the tuple has dependent type and is a TupleExpr, try to
+    // convert it.
+    if (E->Ty->getAs<DependentType>() && isa<TupleExpr>(E)) {
+      // If the tuple expression or destination type have named elements, we
+      // have to match them up to handle the swizzle case for when:
+      //   (.y = 4, .x = 3)
+      // is converted to type:
+      //   (.x = int, .y = int)
+      llvm::SmallVector<Identifier, 8> Idents(cast<TupleExpr>(E)->NumSubExprs);
+      return ConvertExprToTupleType(E, Idents.data(), Idents.size(), TT, SE);
     }
   }
   
