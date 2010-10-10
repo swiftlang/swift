@@ -745,9 +745,9 @@ static Expr *ConvertTupleToTuple(Expr *E, TupleType *DestTy, SemaExpr &SE) {
 /// failure.
 static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
                                     SemaExpr &SE) {
+  Type *CanDestTy = SE.S.Context.getCanonicalType(DestTy);
   // If we have an exact match, we're done.
-  if (SE.S.Context.getCanonicalType(E->Ty) ==
-        SE.S.Context.getCanonicalType(DestTy))
+  if (SE.S.Context.getCanonicalType(E->Ty) == CanDestTy)
     return E;
   
   assert(!isa<DependentType>(DestTy) &&
@@ -811,6 +811,21 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
     
     return new (SE.S.Context) ClosureExpr(ERes, ActualArgList, DestTy);
   }
+  
+  // If this is an UnresolvedMemberExpr, then this provides the type we've been
+  // looking for!
+  if (UnresolvedMemberExpr *UME = dyn_cast<UnresolvedMemberExpr>(E)) {
+    // The only valid type for an UME is a DataType.
+    DataType *DT = dyn_cast<DataType>(CanDestTy);
+    if (DT == 0) return 0;
+    
+    // The data type must have an element of the specified name.
+    DataElementDecl *DED = DT->TheDecl->getElement(UME->Name);
+    if (DED == 0) return 0;
+    
+    // If it does, then everything is good, resolve the reference.
+    return new (SE.S.Context) DeclRefExpr(DED, UME->ColonLoc, DED->Ty);
+  }  
   
   // If this has a dependent type, just return the expression, the nested
   // subexpression arguments will be bound later and the expression will be
