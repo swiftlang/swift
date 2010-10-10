@@ -321,6 +321,15 @@ ActOnScopedIdentifierExpr(llvm::StringRef ScopeName, llvm::SMLoc ScopeLoc,
   return new (S.Context) DeclRefExpr(Elt, ScopeLoc, Elt->Ty);
 }
 
+llvm::NullablePtr<Expr>
+SemaExpr::ActOnUnresolvedMemberExpr(llvm::SMLoc ColonLoc, llvm::SMLoc NameLoc,
+                                    llvm::StringRef Name) {
+  
+  return new (S.Context) UnresolvedMemberExpr(ColonLoc, NameLoc,
+                                              S.Context.getIdentifier(Name),
+                                              S.Context.TheDependentType);
+}
+
 
 NullablePtr<Expr> 
 SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
@@ -462,6 +471,10 @@ namespace {
       if (SemaDeclRefExpr(E->D, E->Loc, E->Ty, SE)) return 0;
       return E;
     }
+    Expr *VisitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
+      return E;
+    }
+    
     Expr *VisitTupleExpr(TupleExpr *E) {
       for (unsigned i = 0, e = E->NumSubExprs; i != e; ++i)
         if ((E->SubExprs[i] = Visit(E->SubExprs[i])) == 0)

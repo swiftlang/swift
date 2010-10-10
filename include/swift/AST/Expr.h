@@ -38,6 +38,7 @@ namespace swift {
 enum ExprKind {
   IntegerLiteralKind,
   DeclRefExprKind,
+  UnresolvedMemberExprKind,
   TupleExprKind,
   UnresolvedDotExprKind,
   TupleElementExprKind,
@@ -113,7 +114,28 @@ public:
   static bool classof(const DeclRefExpr *) { return true; }
   static bool classof(const Expr *E) { return E->Kind == DeclRefExprKind; }
 };
+
+/// UnresolvedMemberExpr - This represents ':foo', an unresolved reference to a
+/// member, which is to be resolved with context sensitive type information into
+/// bar::foo.  These always have dependent type.
+class UnresolvedMemberExpr : public Expr {
+public:
+  llvm::SMLoc ColonLoc;
+  llvm::SMLoc NameLoc;
+  Identifier Name;
   
+  UnresolvedMemberExpr(llvm::SMLoc colonLoc, llvm::SMLoc nameLoc,
+                       Identifier name, Type *Ty)
+    : Expr(UnresolvedMemberExprKind, Ty),
+      ColonLoc(colonLoc), NameLoc(nameLoc), Name(name) {
+  }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const UnresolvedMemberExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->Kind == UnresolvedMemberExprKind;
+  }
+};
   
 /// TupleExpr - Parenthesized expressions like '(x+x)' and '(x, y, 4)'.  Tuple
 /// types automatically decay if they have a single element, this means that
@@ -138,7 +160,8 @@ public:
   static bool classof(const Expr *E) { return E->Kind == TupleExprKind; }
 };
 
-/// UnresolvedDotExpr - A field access to an expression with dependent type.
+/// UnresolvedDotExpr - A field access (foo.bar) on an expression with dependent
+/// type.
 class UnresolvedDotExpr : public Expr {
 public:
   Expr *SubExpr;

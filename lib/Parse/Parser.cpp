@@ -768,7 +768,7 @@ static bool isStartOfExpr(Token &Tok, Sema &S) {
     return VD->Attrs.InfixPrecedence == -1;
   }
   
-  return Tok.is(tok::numeric_constant) ||
+  return Tok.is(tok::numeric_constant) || Tok.is(tok::colon) ||
          Tok.is(tok::l_paren) || Tok.is(tok::l_brace);
 }
 
@@ -832,6 +832,7 @@ bool Parser::ParseExprSingle(llvm::NullablePtr<Expr> &Result,
 ///   expr-primary:
 ///     numeric_constant
 ///     expr-identifier
+///     ':' identifier
 ///     expr-paren
 ///     expr-brace
 ///     expr-primary '.' identifier
@@ -843,9 +844,20 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
     ConsumeToken(tok::numeric_constant);
     break;
 
-  case tok::identifier:
+  case tok::identifier:  // foo   and  foo::bar
     if (ParseExprIdentifier(Result)) return true;
     break;
+
+  case tok::colon: {     // :foo
+    SMLoc ColonLoc = Tok.getLoc();
+    ConsumeToken(tok::colon);
+    llvm::StringRef Name;
+    SMLoc NameLoc = Tok.getLoc();
+    if (ParseIdentifier(Name, "expected identifier after ':' expression"))
+      return true;
+    Result = S.expr.ActOnUnresolvedMemberExpr(ColonLoc, NameLoc, Name);
+    break;
+  }
       
   case tok::l_paren:
     if (ParseExprParen(Result)) return true;

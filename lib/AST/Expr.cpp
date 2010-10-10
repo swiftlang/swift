@@ -42,6 +42,8 @@ llvm::SMLoc Expr::getLocStart() const {
   switch (Kind) {
   case IntegerLiteralKind: return cast<IntegerLiteral>(this)->Loc;
   case DeclRefExprKind:    return cast<DeclRefExpr>(this)->Loc;
+  case UnresolvedMemberExprKind:
+    return cast<UnresolvedMemberExpr>(this)->ColonLoc;
   case TupleExprKind:      return cast<TupleExpr>(this)->LParenLoc;
   case UnresolvedDotExprKind:
     return cast<UnresolvedDotExpr>(this)->SubExpr->getLocStart();
@@ -107,6 +109,11 @@ public:
     OS.indent(Indent) << "(declref_expr type='";
     E->Ty->print(OS);
     OS << "' decl=" << E->D->Name << ')';
+  }
+  void VisitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
+    OS.indent(Indent) << "(unresolved_member_expr type='";
+    E->Ty->print(OS);
+    OS << "\' name='" << E->Name << "')";
   }
   void VisitTupleExpr(TupleExpr *E) {
     OS.indent(Indent) << "(tuple_expr type='";
