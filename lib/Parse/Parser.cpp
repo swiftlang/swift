@@ -606,6 +606,13 @@ DataDecl *Parser::ParseDeclStruct() {
   ElementInfo.NameLoc = StructLoc;
   ElementInfo.EltType = Ty;
   S.decl.ActOnCompleteDataDecl(TheDataDecl, &ElementInfo, 1);
+  
+
+  // In addition to defining the data declaration, structs also inject their
+  // constructor into the global scope.
+  assert(TheDataDecl->NumElements == 1 && "Struct has exactly one element");
+  S.decl.AddToScope(TheDataDecl->Elements[0]);
+  
   return TheDataDecl;
 }
 
