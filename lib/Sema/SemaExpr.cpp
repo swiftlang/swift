@@ -201,7 +201,7 @@ static bool SemaSequenceExpr(Expr **Elements, unsigned NumElements,
 static bool SemaBinaryExpr(Expr *&LHS, ValueDecl *OpFn,
                            llvm::SMLoc OpLoc, Expr *&RHS, Type *&ResultTy,
                            SemaExpr &SE) {
-  if (isa<DependentType>(LHS->Ty) || isa<DependentType>(RHS->Ty)) {
+  if (isa<DependentType>(LHS->Ty)) {
     ResultTy = SE.S.Context.TheDependentType;
     return false; 
   }
@@ -445,6 +445,180 @@ SemaExpr::ActOnBinaryExpr(Expr *LHS, ValueDecl *OpFn,
 // Expression Reanalysis - SemaExpressionTree
 //===----------------------------------------------------------------------===//
 
+static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
+                                    SemaExpr &SE);
+
+
+/// ConvertExprToTupleType - Given an expression that has tuple type, convert it
+/// to have some other tuple type.  In practice, E either already has a tuple
+/// type (in which case ETy specifies which one) or it has dependent type, but
+/// we know it is a multi-element TupleExpr (in which case ETy is null).
+///
+/// In either case, the caller gives us a list of the expressions named
+/// arguments and a count of tuple elements for E in the IdentList+NumIdents
+/// array.  DestTy specifies the type to convert to, which is known to be a
+/// TupleType.
+static Expr *
+ConvertExprToTupleType(Expr *E, Identifier *IdentList, unsigned NumIdents,
+                       TupleType *DestTy, SemaExpr &SE) {
+  
+  // Check to see if this conversion is ok by looping over all the destination
+  // elements and seeing if they are provided by the input.
+  
+  // Keep track of which input elements are used.
+  // TODO: Record where the destination elements came from in the AST.
+  llvm::SmallVector<bool, 16> UsedElements(NumIdents);
+  llvm::SmallVector<int, 16>  DestElementSources(DestTy->NumFields, -1);
+  
+  
+  // First off, see if we can resolve any named values from matching named
+  // inputs.
+  for (unsigned i = 0, e = DestTy->NumFields; i != e; ++i) {
+    const TupleTypeElt &DestElt = DestTy->Fields[i];
+    // If this destination field is named, first check for a matching named
+    // element in the input, from any position.
+    if (DestElt.Name.get() == 0) continue;
+    
+    int InputElement = -1;
+    for (unsigned j = 0; j != NumIdents; ++j)
+      if (IdentList[j] == DestElt.Name) {
+        InputElement = j;
+        break;
+      }
+    if (InputElement == -1) continue;
+    
+    DestElementSources[i] = InputElement;
+    UsedElements[InputElement] = true;
+  }
+  
+  // Next step, resolve (in order) unmatched named results and unnamed results
+  // to any left-over unnamed input.
+  unsigned NextInputValue = 0;
+  for (unsigned i = 0, e = DestTy->NumFields; i != e; ++i) {
+    // If we already found an input to satisfy this output, we're done.
+    if (DestElementSources[i] != -1) continue;
+    
+    // Scan for an unmatched unnamed input value.
+    while (1) {
+      // If we didn't find any input values, bail out.
+      // TODO: QOI: it would be good to indicate which dest element doesn't have
+      // a value in this sort of assignment failure.
+      if (NextInputValue == NumIdents)
+        return 0;
+      
+      // If this input value is unnamed and unused, use it!
+      if (!UsedElements[NextInputValue] && IdentList[NextInputValue].get() == 0)
+        break;
+      
+      ++NextInputValue;
+    }
+    
+    // Okay, we found an input value to use.
+    DestElementSources[i] = NextInputValue;
+    UsedElements[NextInputValue] = true;
+  }
+  
+  // If there were any unused input values, we fail.
+  // TODO: QOI: this should become a note if it really fails.
+  for (unsigned i = 0, e = UsedElements.size(); i != e; ++i)
+    if (!UsedElements[i])
+      return 0;
+  
+  // It looks like the elements line up, walk through them and see if the types
+  // either agree or can be converted.  If the expression is a TupleExpr, we do
+  // this conversion in place.
+  TupleExpr *TE = dyn_cast<TupleExpr>(E);
+  if (TE && TE->NumSubExprs != 1) {
+    llvm::SmallVector<Expr*, 8> OrigElts(TE->SubExprs,
+                                         TE->SubExprs+TE->NumSubExprs);
+    llvm::SmallVector<Identifier, 8> OrigNames;
+    if (TE->SubExprNames)
+      OrigNames.append(TE->SubExprNames, TE->SubExprNames+TE->NumSubExprs);
+    
+    for (unsigned i = 0, e = DestTy->NumFields; i != e; ++i) {
+      // FIXME: This turns the AST into an ASDAG, which is seriously bad.  We
+      // should add a more tailored AST representation for this.
+      
+      // Extract the input element corresponding to this destination element.
+      unsigned SrcField = DestElementSources[i];
+      assert(SrcField != ~0U && "dest field not found?");
+      
+      // Check to see if the src value can be converted to the destination
+      // element type.
+      Expr *Elt = OrigElts[SrcField];
+      Elt = HandleConversionToType(Elt, DestTy->getElementType(i), true, SE);
+      // TODO: QOI: Include a note about this failure!
+      if (Elt == 0) return 0;
+      TE->SubExprs[i] = Elt;
+      
+      if (DestTy->Fields[i].Name.get()) {
+        // Allocate the array on the first element with a name.
+        if (TE->SubExprNames == 0) {
+          TE->SubExprNames =
+          (Identifier*)SE.S.Context.Allocate(sizeof(Identifier)*
+                                             DestTy->NumFields, 8);
+          memset(TE->SubExprNames, 0, sizeof(Identifier)*DestTy->NumFields);
+        }
+        
+        TE->SubExprNames[i] = DestTy->Fields[i].Name;
+      } else if (TE->SubExprNames)
+        TE->SubExprNames[i] = Identifier();
+    }
+    // Okay, we updated the tuple in place.
+    return E;
+  }
+  
+  // Otherwise, if it isn't a tuple literal, we unpack the source elementwise so
+  // we can do elementwise conversions as needed, then rebuild a new TupleExpr
+  // of the right destination type.
+  TupleType *ETy = E->Ty->getAs<TupleType>();
+  llvm::SmallVector<Expr*, 16> NewElements(DestTy->NumFields);
+  
+  Identifier *NewNames = 0;
+  
+  for (unsigned i = 0, e = DestTy->NumFields; i != e; ++i) {
+    // FIXME: This turns the AST into an ASDAG, which is seriously bad.  We
+    // should add a more tailored AST representation for this.
+    
+    // Extract the input element corresponding to this destination element.
+    unsigned SrcField = DestElementSources[i];
+    assert(SrcField != ~0U && "dest field not found?");
+    
+    Type *NewEltTy = ETy->getElementType(SrcField);
+    Expr *Src = new (SE.S.Context)
+    TupleElementExpr(E, llvm::SMLoc(), SrcField, llvm::SMLoc(), NewEltTy);
+    
+    // Check to see if the src value can be converted to the destination element
+    // type.
+    Src = HandleConversionToType(Src, DestTy->getElementType(i), true, SE);
+    // TODO: QOI: Include a note about this failure!
+    if (Src == 0) return 0;
+    NewElements[i] = Src;
+    
+    
+    if (DestTy->Fields[i].Name.get()) {
+      // Allocate the array on the first element with a name.
+      if (NewNames == 0) {
+        NewNames = (Identifier*)SE.S.Context.Allocate(sizeof(Identifier)*
+                                                      DestTy->NumFields, 8);
+        memset(NewNames, 0, sizeof(Identifier)*DestTy->NumFields);
+      }
+      
+      NewNames[i] = DestTy->Fields[i].Name;
+    }
+  }
+  
+  // If we got here, the type conversion is successful, create a new TupleExpr.  
+  // FIXME: Do this for dependent types, to resolve: foo($0, 4);
+  // FIXME: Add default values.
+  Expr **NewSE =
+  (Expr**)SE.S.Context.Allocate(sizeof(Expr*)*DestTy->NumFields, 8);
+  memcpy(NewSE, NewElements.data(), sizeof(Expr*)*DestTy->NumFields);
+  
+  return new (SE.S.Context) TupleExpr(llvm::SMLoc(), NewSE, NewNames,
+                                      NewElements.size(), llvm::SMLoc(),DestTy);
+}
+
 namespace {
   /// SemaExpressionTree - This class implements top-down (aka "leaf to root",
   /// analyzing 1 and 4 before the + in "1+4") semantic analysis of an
@@ -588,7 +762,7 @@ namespace {
     // been looking for!
     Expr *VisitUnresolvedMemberExpr(UnresolvedMemberExpr *UME) {
       // The only valid type for an UME is a DataType.
-      DataType *DT = dyn_cast<DataType>(DestTy);
+      DataType *DT = DestTy->getAs<DataType>();
       if (DT == 0) return 0;
       
       // The data type must have an element of the specified name.
@@ -599,9 +773,8 @@ namespace {
       return new (SE.S.Context) DeclRefExpr(DED, UME->ColonLoc, DED->Ty);
     }  
     
-    Expr *VisitTupleExpr(TupleExpr *E) {
-      return E;
-    }
+    Expr *VisitTupleExpr(TupleExpr *E);
+    
     Expr *VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
       return E;
     }
@@ -620,7 +793,17 @@ namespace {
       return E;
     }
     Expr *VisitBraceExpr(BraceExpr *E) {
-      // FIXME: Apply to last value of brace.
+      assert(E->MissingSemi && "Can't have dependent type when return ()");
+      assert(E->NumElements && "Can't have 0 elements + missing semi");
+      assert(E->Elements[E->NumElements-1].is<Expr*>() && "Decl is ()");
+ 
+      Expr *LastVal = E->Elements[E->NumElements-1].get<Expr*>();
+      
+      LastVal = HandleConversionToType(LastVal, DestTy, true, SE);
+      if (LastVal == 0) return 0;
+
+      // Update the end of the brace expression.
+      E->Elements[E->NumElements-1] = LastVal;
       return E;
     }
     Expr *VisitClosureExpr(ClosureExpr *E) {
@@ -632,13 +815,42 @@ namespace {
     
   public:
     SemaCoerceBottomUp(SemaExpr &se, Type *destTy) : SE(se), DestTy(destTy) {
-      assert(DestTy->isCanonical() && !isa<DependentType>(DestTy));
+      assert(!isa<DependentType>(DestTy));
     }
     Expr *doIt(Expr *E) {
       return Visit(E);
     }
   };
 } // end anonymous namespace.
+
+
+Expr *SemaCoerceBottomUp::VisitTupleExpr(TupleExpr *E) {
+  // If we're providing a type for a tuple expr, we have a couple of
+  // different cases.  If the tuple has a single element and the destination
+  // type is not a tuple type, then this just recursively forces the scalar
+  // type into the single element.
+  if (E->NumSubExprs == 1) {
+    Expr *ERes = HandleConversionToType(E->SubExprs[0], DestTy, true, SE);
+    if (ERes == 0) return 0;
+    
+    E->SubExprs[0] = ERes;
+    return E;
+  }
+  
+  // Otherwise, we must have a tuple type.
+  TupleType *DestTType = DestTy->getAs<TupleType>();
+  if (DestTType == 0) return 0;
+  
+  // If the tuple expression or destination type have named elements, we have to
+  // match them up to handle the swizzle case for when:
+  //   (.y = 4, .x = 3)
+  // is converted to type:
+  //   (.x = int, .y = int)
+  llvm::SmallVector<Identifier, 8> Idents(E->NumSubExprs);
+  
+  return ConvertExprToTupleType(E, Idents.data(), Idents.size(), DestTType, SE);
+}
+
 
 //===----------------------------------------------------------------------===//
 // Utility Functions
@@ -704,123 +916,7 @@ BindAndValidateClosureArgs(Expr *&Body, Type *FuncInput, SemaDecl &SD) {
   return NewInputs;
 }
 
-static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
-                                    SemaExpr &SE);
 
-/// ConvertTupleToTuple - This is called when a tuple expression is used in a
-/// (different) tuple context.  This either coerces the tuple to the requested
-/// destination type or returns null to indicate the failure.
-static Expr *ConvertTupleToTuple(Expr *E, TupleType *DestTy, SemaExpr &SE) {
-  TupleType *ETy = E->Ty->getAs<TupleType>();
-  assert(ETy && "Expr is not a tuple!");
-  
-  // Check to see if this conversion is ok by looping over all the destination
-  // elements and seeing if they are provided by the input.
-  
-  // Keep track of which input elements are used.
-  // TODO: Record where the destination elements came from in the AST.
-  llvm::SmallVector<bool, 16> UsedElements(ETy->NumFields);
-  llvm::SmallVector<int, 16>  DestElementSources(DestTy->NumFields, -1);
-  
-  
-  // First off, see if we can resolve any named values from matching named
-  // inputs.
-  for (unsigned i = 0, e = DestTy->NumFields; i != e; ++i) {
-    const TupleTypeElt &DestElt = DestTy->Fields[i];
-    // If this destination field is named, first check for a matching named
-    // element in the input, from any position.
-    if (DestElt.Name.get() == 0) continue;
-    
-    int InputElement = ETy->getNamedElementId(DestElt.Name);
-    if (InputElement == -1) continue;
-    
-    DestElementSources[i] = InputElement;
-    UsedElements[InputElement] = true;
-  }
-  
-  // Next step, resolve (in order) unmatched named results and unnamed results
-  // to any left-over unnamed input.
-  unsigned NextInputValue = 0;
-  for (unsigned i = 0, e = DestTy->NumFields; i != e; ++i) {
-    // If we already found an input to satisfy this output, we're done.
-    if (DestElementSources[i] != -1) continue;
-
-    // Scan for an unmatched unnamed input value.
-    while (1) {
-      // If we didn't find any input values, bail out.
-      // TODO: QOI: it would be good to indicate which dest element doesn't have
-      // a value in this sort of assignment failure.
-      if (NextInputValue == ETy->NumFields)
-        return 0;
-      
-      // If this input value is unnamed and unused, use it!
-      if (!UsedElements[NextInputValue] &&
-          ETy->Fields[NextInputValue].Name.get() == 0)
-        break;
-      
-      ++NextInputValue;
-    }
-
-    // Okay, we found an input value to use.
-    DestElementSources[i] = NextInputValue;
-    UsedElements[NextInputValue] = true;
-  }
-  
-  // If there were any unused input values, we fail.
-  // TODO: QOI: this should become a note if it really fails.
-  for (unsigned i = 0, e = UsedElements.size(); i != e; ++i)
-    if (!UsedElements[i])
-      return 0;
-  
-  // It looks like the elements line up, walk through them and see if the types
-  // either agree or can be converted.  We unpack the source elementwise so we
-  // can do elementwise conversions as needed, then rebuild a new TupleExpr of
-  // the right destination type.
-  llvm::SmallVector<Expr*, 16> NewElements(DestTy->NumFields);
-  
-  Identifier *NewNames = 0;
-
-  for (unsigned i = 0, e = DestTy->NumFields; i != e; ++i) {
-    // FIXME: This turns the AST into an ASDAG, which is seriously bad.  We
-    // should add a more tailored AST representation for this.
-    
-    // Extract the input element corresponding to this destination element.
-    unsigned SrcField = DestElementSources[i];
-    assert(SrcField != ~0U && "dest field not found?");
-    Expr *Src = new (SE.S.Context)
-       TupleElementExpr(E, llvm::SMLoc(), SrcField, llvm::SMLoc(),
-                        ETy->getElementType(SrcField));
-    
-    // Check to see if the src value can be converted to the destination element
-    // type.
-    Src = HandleConversionToType(Src, DestTy->getElementType(i), true, SE);
-    // TODO: QOI: Include a note about this failure!
-    if (Src == 0) return 0;
-    NewElements[i] = Src;
-    
-    
-    if (DestTy->Fields[i].Name.get()) {
-      // Allocate the array on the first element with a name.
-      if (NewNames == 0) {
-        NewNames = (Identifier*)SE.S.Context.Allocate(sizeof(Identifier)*
-                                                      DestTy->NumFields, 8);
-        memset(NewNames, 0, sizeof(Identifier)*DestTy->NumFields);
-      }
-      
-      NewNames[i] = DestTy->Fields[i].Name;
-    }
-  }
-  
-  // If we got here, the type conversion is successful, create a new TupleExpr.  
-  // FIXME: Do this for dependent types, to resolve: foo($0, 4);
-  // FIXME: Add default values.
-  Expr **NewSE =
-    (Expr**)SE.S.Context.Allocate(sizeof(Expr*)*DestTy->NumFields, 8);
-  memcpy(NewSE, NewElements.data(), sizeof(Expr*)*DestTy->NumFields);
-
-  return new (SE.S.Context) TupleExpr(llvm::SMLoc(), NewSE, NewNames,
-                                      NewElements.size(), llvm::SMLoc(),DestTy);
-}
 
 /// HandleConversionToType - This is the recursive implementation of
 /// ConvertToType.  It does not produce diagnostics, it just returns null on
@@ -859,9 +955,16 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
 
     // If the input is a tuple and the output is a tuple, see if we can convert
     // each element.
-    if (E->Ty->getAs<TupleType>())
-      if (Expr *Res = ConvertTupleToTuple(E, TT, SE))
+    if (TupleType *ETy = E->Ty->getAs<TupleType>()) {
+      llvm::SmallVector<Identifier, 8> ExprIdentMapping;
+      for (unsigned i = 0, e = ETy->NumFields; i != e; ++i)
+        ExprIdentMapping.push_back(ETy->Fields[i].Name);
+      
+      if (Expr *Res = ConvertExprToTupleType(E, ExprIdentMapping.data(),
+                                             ExprIdentMapping.size(), TT,
+                                             SE))
         return Res;
+    }
   }
   
   // Otherwise, check to see if this is an auto-closure case.  This case happens
@@ -900,7 +1003,7 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
   // :foo.  If this is a context sensitive expression, propagate the type down
   // into the subexpression.
   if (isa<DependentType>(E->Ty))
-    return SemaCoerceBottomUp(SE, CanDestTy).doIt(E);
+    return SemaCoerceBottomUp(SE, DestTy).doIt(E);
   
   // Could not do the conversion.
   return 0;
