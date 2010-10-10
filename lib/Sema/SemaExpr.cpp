@@ -445,7 +445,6 @@ SemaExpr::ActOnBinaryExpr(Expr *LHS, ValueDecl *OpFn,
 // Expression Reanalysis - SemaExpressionTree
 //===----------------------------------------------------------------------===//
 
-
 namespace {
   /// SemaExpressionTree - This class implements top-down (aka "leaf to root",
   /// analyzing 1 and 4 before the + in "1+4") semantic analysis of an
@@ -557,6 +556,89 @@ namespace {
   };
 } // end anonymous namespace.
 
+//===----------------------------------------------------------------------===//
+// SemaCoerceBottomUp
+//===----------------------------------------------------------------------===//
+
+namespace {
+  /// SemaCoerceBottomUp - This class implements bottom-up semantic analysis
+  /// (aka "root to leaf", using the type of "+" to infer the type of "a" in
+  /// "a+1") of an already-existing expression tree.  This is performed when an
+  /// expression with dependent type is used in a context that forces a specific
+  /// type.  
+  ///
+  /// Each visit method reanalyzes the node to see if the type can be propagated
+  /// into it.  If not, it returns it.  If so it checks to see if the type
+  /// is contradictory (in which case it returns NULL) otherwise it applies the
+  /// type (possibly recursively) and returns the new/updated expression.
+  class SemaCoerceBottomUp : public ExprVisitor<SemaCoerceBottomUp, Expr*> {
+    friend class ExprVisitor<SemaCoerceBottomUp, Expr*>;
+    SemaExpr &SE;
+    Type *DestTy;
+    
+    Expr *VisitIntegerLiteral(IntegerLiteral *E) {
+      assert(0 && "Integer literals never have dependent type!");
+      return 0;
+    }
+    Expr *VisitDeclRefExpr(DeclRefExpr *E) {
+      return E;
+    }
+    
+    // If this is an UnresolvedMemberExpr, then this provides the type we've
+    // been looking for!
+    Expr *VisitUnresolvedMemberExpr(UnresolvedMemberExpr *UME) {
+      // The only valid type for an UME is a DataType.
+      DataType *DT = dyn_cast<DataType>(DestTy);
+      if (DT == 0) return 0;
+      
+      // The data type must have an element of the specified name.
+      DataElementDecl *DED = DT->TheDecl->getElement(UME->Name);
+      if (DED == 0) return 0;
+      
+      // If it does, then everything is good, resolve the reference.
+      return new (SE.S.Context) DeclRefExpr(DED, UME->ColonLoc, DED->Ty);
+    }  
+    
+    Expr *VisitTupleExpr(TupleExpr *E) {
+      return E;
+    }
+    Expr *VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
+      return E;
+    }
+    
+    Expr *VisitTupleElementExpr(TupleElementExpr *E) {
+      // TupleElementExpr is fully resolved.
+      assert(0 && "This node doesn't exist for dependent types");
+      return 0;
+    }
+    
+    Expr *VisitApplyExpr(ApplyExpr *E) {
+      return E;
+    }
+    Expr *VisitSequenceExpr(SequenceExpr *E) {
+      // FIXME: Apply to last value of sequence.
+      return E;
+    }
+    Expr *VisitBraceExpr(BraceExpr *E) {
+      // FIXME: Apply to last value of brace.
+      return E;
+    }
+    Expr *VisitClosureExpr(ClosureExpr *E) {
+      return E;      
+    }
+    Expr *VisitBinaryExpr(BinaryExpr *E) {
+      return E;
+    }
+    
+  public:
+    SemaCoerceBottomUp(SemaExpr &se, Type *destTy) : SE(se), DestTy(destTy) {
+      assert(DestTy->isCanonical() && !isa<DependentType>(DestTy));
+    }
+    Expr *doIt(Expr *E) {
+      return Visit(E);
+    }
+  };
+} // end anonymous namespace.
 
 //===----------------------------------------------------------------------===//
 // Utility Functions
@@ -812,26 +894,13 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
     return new (SE.S.Context) ClosureExpr(ERes, ActualArgList, DestTy);
   }
   
-  // If this is an UnresolvedMemberExpr, then this provides the type we've been
-  // looking for!
-  if (UnresolvedMemberExpr *UME = dyn_cast<UnresolvedMemberExpr>(E)) {
-    // The only valid type for an UME is a DataType.
-    DataType *DT = dyn_cast<DataType>(CanDestTy);
-    if (DT == 0) return 0;
-    
-    // The data type must have an element of the specified name.
-    DataElementDecl *DED = DT->TheDecl->getElement(UME->Name);
-    if (DED == 0) return 0;
-    
-    // If it does, then everything is good, resolve the reference.
-    return new (SE.S.Context) DeclRefExpr(DED, UME->ColonLoc, DED->Ty);
-  }  
-  
-  // If this has a dependent type, just return the expression, the nested
-  // subexpression arguments will be bound later and the expression will be
-  // re-sema'd.
+  // If the input expression has a dependent type, then there are two cases:
+  // first this could be an AnonDecl whose type will be specified by a larger
+  // context, second, this could be a context sensitive expression value like
+  // :foo.  If this is a context sensitive expression, propagate the type down
+  // into the subexpression.
   if (isa<DependentType>(E->Ty))
-    return E;
+    return SemaCoerceBottomUp(SE, CanDestTy).doIt(E);
   
   // Could not do the conversion.
   return 0;
