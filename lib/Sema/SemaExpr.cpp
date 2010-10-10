@@ -96,37 +96,47 @@ static bool SemaDotIdentifier(Expr *E, llvm::SMLoc DotLoc,
     return false;
   }
   
-  TupleType *TT = dyn_cast<TupleType>(E->Ty);
-  if (TT == 0) {
-    SE.Error(E->getLocStart(), "base type of field access is not a tuple");
+  Type *ETy = E->Ty;
+
+  // If this is a member access to a data with a single element constructor,
+  // allow direct access to the type underlying the single element.  This
+  // allows element access on structs, for example.
+  if (DataType *DT = ETy->getAs<DataType>()) {
+    DataDecl *DD = DT->TheDecl;
+    if (DD->NumElements == 1 && DD->Elements[0]->ArgumentType)
+      ETy = DD->Elements[0]->ArgumentType;
+  }
+  
+  if (TupleType *TT = ETy->getAs<TupleType>()) {
+    // If the field name exists, we win.
+    FieldNo = TT->getNamedElementId(Name);
+    if (FieldNo != -1) {
+      ResultTy = TT->getElementType(FieldNo);
+      return false;
+    }
+
+    // Okay, the field name was invalid.  If the field name starts with 'field'
+    // and is otherwise an integer, process it as a field index.
+    if (Name.getLength() == 6 &&
+        memcmp(Name.get(), "field", 5) == 0 &&
+        // FIXME: Support field numbers larger than 9.
+        isdigit(Name.get()[5])) {
+      FieldNo = Name.get()[5]-'0';
+      if (unsigned(FieldNo) >= TT->NumFields) {
+        SE.Error(NameLoc, "field number is too large for tuple");
+        return true;
+      }
+        
+      ResultTy = TT->getElementType(FieldNo);
+      return false;
+    }
+    
+    // Otherwise, we just have an unknown field name.
+    SE.Error(NameLoc, "unknown field in tuple");
     return true;
   }
   
-  // If the field name exists, we win.
-  FieldNo = TT->getNamedElementId(Name);
-  if (FieldNo != -1) {
-    ResultTy = TT->getElementType(FieldNo);
-    return false;
-  }
-
-  // Okay, the field name was invalid.  If the field name starts with 'field'
-  // and is otherwise an integer, process it as a field index.
-  if (Name.getLength() == 6 &&
-      memcmp(Name.get(), "field", 5) == 0 &&
-      // FIXME: Support field numbers larger than 9.
-      isdigit(Name.get()[5])) {
-    FieldNo = Name.get()[5]-'0';
-    if (unsigned(FieldNo) >= TT->NumFields) {
-      SE.Error(NameLoc, "field number is too large for tuple");
-      return true;
-    }
-      
-    ResultTy = TT->getElementType(FieldNo);
-    return false;
-  }
-  
-  // Otherwise, we just have an unknown field name.
-  SE.Error(NameLoc, "unknown field in tuple");
+  SE.Error(DotLoc, "base type of field access has no fields");
   return true;
 }
 
