@@ -565,7 +565,9 @@ ConvertExprToTupleType(Expr *E, Identifier *IdentList, unsigned NumIdents,
       } else if (TE->SubExprNames)
         TE->SubExprNames[i] = Identifier();
     }
+    
     // Okay, we updated the tuple in place.
+    E->Ty = DestTy;
     return E;
   }
   
