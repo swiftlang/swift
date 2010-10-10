@@ -138,21 +138,22 @@ bool SemaDecl::CheckAccessPathArity(unsigned NumChildren, llvm::SMLoc LPLoc,
 
 /// DiagnoseUnresolvedTypes - This function is invoked on all nodes in an
 /// expression tree checking to make sure they don't contain any DependentTypes.
-static bool DiagnoseUnresolvedTypes(Expr *E, Expr::WalkOrder Order, void *Data){
+static Expr *DiagnoseUnresolvedTypes(Expr *E, Expr::WalkOrder Order,
+                                     void *Data){
   // Ignore the preorder walk.  We'd rather diagnose use of unresolved types
   // during the postorder walk so that the inner most expressions are diagnosed
   // before the outermost ones.
   if (Order == Expr::Walk_PreOrder)
-    return false;
+    return E;
   
   if (E->Ty->getAs<DependentType>() == 0)
-    return false;
+    return E;
   
   SemaDecl &SD = *(SemaDecl*)Data;
   E->dump();  // FIXME: This is a gross hack because our diagnostics suck.
   SD.Error(E->getLocStart(),
            "ambiguous expression could not resolve a concrete type");
-  return true;
+  return 0;
 }
 
 

@@ -77,10 +77,11 @@ public:
   /// expression and invokes the specified function pointer on them.  The
   /// function pointer is invoked both before and after the children are visted,
   /// the WalkOrder specifies at each invocation which stage it is.  If the
-  /// function pointer returns true then the walk is terminated and WalkExpr
-  /// returns true.
+  /// function pointer returns NULL then the walk is terminated and WalkExpr
+  /// returns NULL.  Otherwise, the returned expression is spliced back into the
+  /// AST or returned from WalkExpr if at the top-level.
   /// 
-  bool WalkExpr(bool (*Fn)(Expr *E, WalkOrder Order, void *Data), void *Data);
+  Expr *WalkExpr(Expr *(*Fn)(Expr *E, WalkOrder Order, void *Data), void *Data);
   
   
   void dump() const;

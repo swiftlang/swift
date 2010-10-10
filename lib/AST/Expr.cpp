@@ -83,66 +83,103 @@ namespace {
   /// ExprWalker - This class implements a simple expression walker which
   /// invokes a function pointer on every expression in an AST.  If the function
   /// pointer returns true the walk is terminated.
-  class ExprWalker : public ExprVisitor<ExprWalker, bool> {
-    friend class ExprVisitor<ExprWalker, bool>;
-    bool (*Fn)(Expr *E, Expr::WalkOrder Order, void *Data);
+  class ExprWalker : public ExprVisitor<ExprWalker, Expr*> {
+    friend class ExprVisitor<ExprWalker, Expr*>;
+    Expr *(*Fn)(Expr *E, Expr::WalkOrder Order, void *Data);
     void *Data;
     
     
-    bool VisitIntegerLiteral(IntegerLiteral *E) { return false; }
-    bool VisitDeclRefExpr(DeclRefExpr *E) { return false; }
-    bool VisitUnresolvedMemberExpr(UnresolvedMemberExpr *E) { return false; }
+    Expr *VisitIntegerLiteral(IntegerLiteral *E) { return E; }
+    Expr *VisitDeclRefExpr(DeclRefExpr *E) { return E; }
+    Expr *VisitUnresolvedMemberExpr(UnresolvedMemberExpr *E) { return E; }
     
-    bool VisitTupleExpr(TupleExpr *E) {
+    Expr *VisitTupleExpr(TupleExpr *E) {
       for (unsigned i = 0, e = E->NumSubExprs; i != e; ++i)
-        if (ProcessNode(E->SubExprs[i]))
-          return true;
-      return false;
+        if (Expr *Elt = ProcessNode(E->SubExprs[i]))
+          E->SubExprs[i] = Elt;
+        else
+          return 0;
+      return E;
     }
-    bool VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
-      return ProcessNode(E->SubExpr);
+    Expr *VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
+      if (Expr *E2 = ProcessNode(E->SubExpr)) {
+        E->SubExpr = E2;
+        return E;
+      }
+      return 0;
     }
-    bool VisitTupleElementExpr(TupleElementExpr *E) {
-      return ProcessNode(E->SubExpr);
+    Expr *VisitTupleElementExpr(TupleElementExpr *E) {
+      if (Expr *E2 = ProcessNode(E->SubExpr)) {
+        E->SubExpr = E2;
+        return E;
+      }
+      return 0;
     }
     
-    bool VisitApplyExpr(ApplyExpr *E) {
-      return ProcessNode(E->Fn) || ProcessNode(E->Arg);
+    Expr *VisitApplyExpr(ApplyExpr *E) {
+      Expr *E2 = ProcessNode(E->Fn);
+      if (E2 == 0) return 0;
+      E->Fn = E2;
+      
+      E2 = ProcessNode(E->Arg);
+      if (E2 == 0) return 0;
+      E->Arg = E2;
+      return E;
     }
-    bool VisitSequenceExpr(SequenceExpr *E) {
+    Expr *VisitSequenceExpr(SequenceExpr *E) {
       for (unsigned i = 0, e = E->NumElements; i != e; ++i)
-        if (ProcessNode(E->Elements[i]))
-          return true;
-      return false;
+        if (Expr *Elt = ProcessNode(E->Elements[i]))
+          E->Elements[i] = Elt;
+        else
+          return 0;
+      return E;
     }
-    bool VisitBraceExpr(BraceExpr *E) {
+    Expr *VisitBraceExpr(BraceExpr *E) {
       for (unsigned i = 0, e = E->NumElements; i != e; ++i)
         if (Expr *SubExpr = E->Elements[i].dyn_cast<Expr*>()) {
-          if (ProcessNode(SubExpr)) return true;
+          if (Expr *E2 = ProcessNode(SubExpr))
+            E->Elements[i] = E2;
+          else
+            return 0;
         } else if (Expr *Init = E->Elements[i].get<ValueDecl*>()->Init) {
-          if (ProcessNode(Init)) return true;
+          if (Expr *E2 = ProcessNode(Init))
+            E->Elements[i].get<ValueDecl*>()->Init = E2;
+          else
+            return 0;
         }
       
-      return false;
+      return E;
     }
-    bool VisitClosureExpr(ClosureExpr *E) {
-      return ProcessNode(E->Input);
+    Expr *VisitClosureExpr(ClosureExpr *E) {
+      if (Expr *E2 = ProcessNode(E->Input)) {
+        E->Input = E2;
+        return E;
+      }
+      return 0;
     }
-    bool VisitBinaryExpr(BinaryExpr *E) {
-      return ProcessNode(E->LHS) || ProcessNode(E->RHS);
+    Expr *VisitBinaryExpr(BinaryExpr *E) {
+      Expr *E2 = ProcessNode(E->LHS);
+      if (E2 == 0) return 0;
+      E->LHS = E2;
+      
+      E2 = ProcessNode(E->RHS);
+      if (E2 == 0) return 0;
+      E->RHS = E2;
+      return E;
     }
     
-    bool ProcessNode(Expr *E) {
-      return Fn(E, Expr::Walk_PreOrder, Data) ||
-             Visit(E) ||
-             Fn(E, Expr::Walk_PostOrder, Data);
+    Expr *ProcessNode(Expr *E) {
+      E = Fn(E, Expr::Walk_PreOrder, Data);
+      if (E) E = Visit(E);
+      if (E) E = Fn(E, Expr::Walk_PostOrder, Data);
+      return E;
     }
     
   public:
-    ExprWalker(bool (*fn)(Expr *E, Expr::WalkOrder Order, void *Data),
+    ExprWalker(Expr *(*fn)(Expr *E, Expr::WalkOrder Order, void *Data),
                void *data) : Fn(fn), Data(data) {
     }
-    bool doIt(Expr *E) {
+    Expr *doIt(Expr *E) {
       return ProcessNode(E);
     }
   };
@@ -155,7 +192,7 @@ namespace {
 /// function pointer returns true then the walk is terminated and WalkExpr
 /// returns true.
 /// 
-bool Expr::WalkExpr(bool (*Fn)(Expr *E, WalkOrder Order, void *Data),
+Expr *Expr::WalkExpr(Expr *(*Fn)(Expr *E, WalkOrder Order, void *Data),
                     void *Data) {
   return ExprWalker(Fn, Data).doIt(this);  
 }
