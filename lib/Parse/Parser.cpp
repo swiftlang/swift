@@ -627,7 +627,8 @@ DataDecl *Parser::ParseDeclStruct() {
 ///     type-simple '->' type
 ///
 ///   type-simple:
-///     'int'
+///     '__builtin_int32_type'
+///     identifier
 ///     type-tuple
 ///
 bool Parser::ParseType(Type *&Result, const llvm::Twine &Message) {
@@ -673,14 +674,11 @@ bool Parser::ParseType(Type *&Result) {
 
 /// ParseTypeTupleElement
 ///   type-tuple-element:
-///     type
-///     '.' identifier ':' type
+///     identifier? ':' type
 bool Parser::ParseTypeTupleElement(TupleTypeElt &Result) {
-  if (!ConsumeIf(tok::period))
-    return ParseType(Result.Ty, "expected type in tuple element");
-
   llvm::StringRef Name;
-  if (ParseIdentifier(Name, "expected identifier in tuple element") ||
+  if ((Tok.is(tok::identifier) &&
+       ParseIdentifier(Name, "expected identifier in tuple element")) ||
       ParseToken(tok::colon, "expected ':' after tuple element name") ||
       ParseType(Result.Ty, "expected type in tuple element"))
     return true;
