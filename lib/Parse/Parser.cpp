@@ -390,10 +390,12 @@ VarDecl *Parser::ParseDeclVar() {
   DeclAttributes Attributes;
   if (Tok.is(tok::l_square))
     ParseDeclAttributeList(Attributes);
-  
+
+  // FIXME: Use ParseTypeTupleElement to parse this once tuple elements are
+  // allowed to have initializers!
   NameRecord Name;
   if (ParseName(Name)) return 0;
-
+  
   Type *Ty = 0;
   if (ConsumeIf(tok::colon) &&
       ParseType(Ty, "expected type in var declaration"))
