@@ -100,7 +100,7 @@ void Lexer::LexIdentifier(Token &Result) {
 /// LexPunctuationIdentifier - Match identifiers formed out of punctuation.
 void Lexer::LexPunctuationIdentifier(Token &Result) {
   const char *TokStart = CurPtr-1;
-  const char *PunctuatorCharacters = "<>=!+-/*&|^";
+  const char *PunctuatorCharacters = "/=-+*%<>!&|^";
   
   CurPtr += strspn(CurPtr, PunctuatorCharacters);
   

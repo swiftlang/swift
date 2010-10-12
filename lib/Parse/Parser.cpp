@@ -153,7 +153,8 @@ void Parser::ParseTranslationUnit() {
 ///     decl-data
 ///     decl-struct
 ///     decl-func
-///     decl-var ';'
+///     decl-typealias
+///     decl-var
 Decl *Parser::ParseDeclTopLevel() {
   switch (Tok.getKind()) {
   default:
@@ -164,7 +165,7 @@ Decl *Parser::ParseDeclTopLevel() {
     return 0; // Could do a top-level semi decl.
       
   case tok::kw_typealias:
-    if (ParseTypeAlias()) break;
+    if (ParseDeclTypeAlias()) break;
     return 0;
 
   case tok::kw_data:
@@ -184,10 +185,6 @@ Decl *Parser::ParseDeclTopLevel() {
   case tok::kw_var:
     if (VarDecl *D = ParseDeclVar()) {
       S.decl.ActOnTopLevelDecl(D);
-            
-      // On successful parse, eat the ;
-      ParseToken(tok::semi, "expected ';' at end of var declaration",
-                 tok::semi);
       return D;
     }
     break;
@@ -203,10 +200,10 @@ Decl *Parser::ParseDeclTopLevel() {
 }
 
 
-/// ParseDeclAttribute
-///   decl-attribute:
+/// ParseAttribute
+///   attribute:
 ///     'infix' '=' numeric_constant
-bool Parser::ParseDeclAttribute(DeclAttributes &Attributes) {
+bool Parser::ParseAttribute(DeclAttributes &Attributes) {
   if (Tok.is(tok::identifier) && Tok.getText() == "infix") {
     if (Attributes.InfixPrecedence != -1)
       Error(Tok.getLoc(), "infix precedence repeatedly specified");
@@ -236,11 +233,11 @@ bool Parser::ParseDeclAttribute(DeclAttributes &Attributes) {
   return true;
 }
 
-/// ParseDeclAttributeList
-///   decl-attribute-list:
+/// ParseAttributeList
+///   attribute-list:
 ///     '[' ']'
-///     '[' decl-attribute (',' decl-attribute)* ']'
-void Parser::ParseDeclAttributeList(DeclAttributes &Attributes) {
+///     '[' attribute (',' attribute)* ']'
+void Parser::ParseAttributeList(DeclAttributes &Attributes) {
   Attributes.LSquareLoc = Tok.getLoc();
   ConsumeToken(tok::l_square);
   
@@ -251,10 +248,10 @@ void Parser::ParseDeclAttributeList(DeclAttributes &Attributes) {
     return;
   }
   
-  bool HadError = ParseDeclAttribute(Attributes);
+  bool HadError = ParseAttribute(Attributes);
   while (Tok.is(tok::comma)) {
     ConsumeToken(tok::comma);
-    HadError |= ParseDeclAttribute(Attributes);
+    HadError |= ParseAttribute(Attributes);
   }
 
   Attributes.RSquareLoc = Tok.getLoc();
@@ -286,12 +283,12 @@ public:
 };
 }
 
-/// ParseName
-///   name:
+/// ParseVarName
+///   var-name:
 ///     identifier
 ///     '(' ')'
 ///     '(' name (',' name)* ')'
-bool Parser::ParseName(NameRecord &Record) {
+bool Parser::ParseVarName(NameRecord &Record) {
   Record.Loc = Tok.getLoc();
 
   // Single name case.
@@ -309,7 +306,7 @@ bool Parser::ParseName(NameRecord &Record) {
   if (Tok.isNot(tok::r_paren)) {
     do {
       ChildNames.push_back(NameRecord());
-      if (ParseName(ChildNames.back())) return true;
+      if (ParseVarName(ChildNames.back())) return true;
     } while (ConsumeIf(tok::comma));
   }
 
@@ -326,10 +323,10 @@ bool Parser::ParseName(NameRecord &Record) {
 }
 
 
-/// ParseTypeAlias
-///   alias-type:
+/// ParseDeclTypeAlias
+///   decl-typealias:
 ///     'typealias' identifier ':' type
-bool Parser::ParseTypeAlias() {
+bool Parser::ParseDeclTypeAlias() {
   SMLoc TypeAliasLoc = Tok.getLoc();
   ConsumeToken(tok::kw_typealias);
   
@@ -380,21 +377,21 @@ static void AddElementNamesForVarDecl(const NameRecord &Name,
 /// token skipping) on error.
 ///
 ///   decl-var:
-///      'var' decl-attribute-list? name ':' type
-///      'var' decl-attribute-list? name ':' type '=' expression 
-///      'var' decl-attribute-list? name '=' expression
+///      'var' attribute-list? var-name ':' type
+///      'var' attribute-list? var-name ':' type '=' expr
+///      'var' attribute-list? var-name '=' expr
 VarDecl *Parser::ParseDeclVar() {
   SMLoc VarLoc = Tok.getLoc();
   ConsumeToken(tok::kw_var);
   
   DeclAttributes Attributes;
   if (Tok.is(tok::l_square))
-    ParseDeclAttributeList(Attributes);
+    ParseAttributeList(Attributes);
 
   // FIXME: Use ParseTypeTupleElement to parse this once tuple elements are
   // allowed to have initializers!
   NameRecord Name;
-  if (ParseName(Name)) return 0;
+  if (ParseVarName(Name)) return 0;
   
   Type *Ty = 0;
   if (ConsumeIf(tok::colon) &&
@@ -440,16 +437,16 @@ VarDecl *Parser::ParseDeclVar() {
 /// caller handles this case and does recovery as appropriate.
 ///
 ///   decl-func:
-///     'func' decl-attribute-list? identifier arg-list-type '='? expr
-///     'func' decl-attribute-list? identifier arg-list-type ';'
+///     'func' attribute-list? identifier arg-list-type '='? expr
+///     'func' attribute-list? identifier arg-list-type ';'
 FuncDecl *Parser::ParseDeclFunc() {
   SMLoc FuncLoc = Tok.getLoc();
   ConsumeToken(tok::kw_func);
 
   DeclAttributes Attributes;
-  // FIXME: Add immutable attribute.
+  // FIXME: Implicitly add immutable attribute.
   if (Tok.is(tok::l_square))
-    ParseDeclAttributeList(Attributes);
+    ParseAttributeList(Attributes);
 
   llvm::StringRef Identifier;
   if (ParseIdentifier(Identifier, "expected identifier in func declaration"))
@@ -507,12 +504,13 @@ FuncDecl *Parser::ParseDeclFunc() {
 /// token skipping) on error.
 ///
 ///   decl-data:
-///      'data' decl-attribute-list? name '{' data-element-list '}'
+///      'data' attribute-list? identifier '{' data-element-list '}'
 ///   data-element-list:
 ///      data-element ','?
 ///      data-element ',' data-element-list
 ///   data-element:
 ///      identifier
+///      identifier type
 ///      
 DataDecl *Parser::ParseDeclData() {
   SMLoc DataLoc = Tok.getLoc();
@@ -520,7 +518,7 @@ DataDecl *Parser::ParseDeclData() {
 
   DeclAttributes Attributes;
   if (Tok.is(tok::l_square))
-    ParseDeclAttributeList(Attributes);
+    ParseAttributeList(Attributes);
   
   llvm::StringRef DataName;
   if (ParseIdentifier(DataName, "expected identifier in data declaration") ||
@@ -574,7 +572,7 @@ DataDecl *Parser::ParseDeclData() {
 /// with a single element.
 ///
 ///   decl-struct:
-///      'struct' decl-attribute-list? identifier type-tuple
+///      'struct' attribute-list? identifier type
 ///
 DataDecl *Parser::ParseDeclStruct() {
   SMLoc StructLoc = Tok.getLoc();
@@ -582,7 +580,7 @@ DataDecl *Parser::ParseDeclStruct() {
   
   DeclAttributes Attributes;
   if (Tok.is(tok::l_square))
-    ParseDeclAttributeList(Attributes);
+    ParseAttributeList(Attributes);
   
   llvm::StringRef StructName;
   if (ParseIdentifier(StructName, "expected identifier in struct declaration"))
@@ -595,7 +593,7 @@ DataDecl *Parser::ParseDeclStruct() {
   }
   
   Type *Ty = 0;
-  if (ParseTypeTuple(Ty)) return 0;
+  if (ParseType(Ty)) return 0;
   
   
   // If we got here, then the 'struct' is syntactically fine, invoke the
@@ -626,7 +624,10 @@ DataDecl *Parser::ParseDeclStruct() {
 /// ParseType
 ///   type:
 ///     type-simple
-///     type-simple '->' type
+///     type-function
+///
+///   type-function:
+///     type-simple '->' type 
 ///
 ///   type-simple:
 ///     '__builtin_int32_type'
@@ -807,13 +808,17 @@ bool Parser::ParseExprSingle(llvm::NullablePtr<Expr> &Result,
 
 /// ParseExprPrimary
 ///   expr-primary:
-///     numeric_constant
+///     expr-literal
 ///     expr-identifier
 ///     ':' identifier
 ///     expr-paren
 ///     expr-brace
 ///     expr-primary '.' identifier
-///     expr-primary expr-primary     Type sensitive: iff first one has fn type
+///     expr-primary-fn expr-primary
+///   expr-primary-fn:
+///     expr-primary      Type sensitive: iff expr has fn type
+///   expr-literal:
+///     numeric_constant
 bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
   switch (Tok.getKind()) {
   case tok::numeric_constant:
@@ -1004,7 +1009,7 @@ bool Parser::ParseExprParen(llvm::NullablePtr<Expr> &Result) {
 ///   expr-brace:
 ///     '{' (expr-or-decl-var ';')* expr? }
 ///   expr-or-decl-var:
-///     type
+///     expr
 ///     decl-var
 bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
   SMLoc LBLoc = Tok.getLoc();

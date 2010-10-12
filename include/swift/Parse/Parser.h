@@ -101,11 +101,11 @@ private:
   
   // Decl Parsing
   Decl *ParseDeclTopLevel();
-  bool ParseTypeAlias();
-  void ParseDeclAttributeList(DeclAttributes &Attributes);
-  bool ParseDeclAttribute(DeclAttributes &Attributes);
+  bool ParseDeclTypeAlias();
+  void ParseAttributeList(DeclAttributes &Attributes);
+  bool ParseAttribute(DeclAttributes &Attributes);
+  bool ParseVarName(NameRecord &Record);
   
-  bool ParseName(NameRecord &Record);
   DataDecl *ParseDeclData();
   DataDecl *ParseDeclStruct();
   VarDecl *ParseDeclVar();
