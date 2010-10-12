@@ -1,0 +1,741 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+   "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+  <title>Swift Language Reference Manual</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="author" content="Chris Lattner">
+  <meta name="description"
+      content="Swift Language Reference Manual.">
+  <link rel="stylesheet" href="swift.css" type="text/css">
+    
+    <!-- FIXME: Self contained! -->
+  <script type="text/javascript" src="http://golang.org/doc/godocs.js"></script>
+
+</head>
+  
+<body>
+
+<h1>Swift Language Reference</h1>
+
+<!-- Hack to be compatible with the go stuff -->
+<input id="search" type="text" name="q" value="code search" class="inactive"
+   style="display: none"/>
+  
+<p>
+<!-- The Table of Contents is automatically inserted in this <div>.
+ Do not delete this <div>. -->
+<div id="nav"></div>
+</p>
+
+
+
+  <!-- ********************************************************************* -->
+  <h2>Introduction</h2>
+  <!-- ********************************************************************* -->
+  
+  <p>This is the language reference manual for the Swift language, which is
+  highly volatile and constantly under development.  It is my (Chris') intention
+  to keep this up to date as the prototype evolves.</p>
+  
+  <p>The grammar and structure of the language is defined in BNF form in yellow
+  boxes.  Examples are shown in gray boxes, and assume that the standard library
+  is in use (unless otherwise specified).</p>
+  
+  <!-- ===================================================================== -->
+  <h3>Why a New Language?</h3>
+  <!-- ===================================================================== -->
+  
+  <p>Really, truly, there are no good systems languages, and there are no really
+  great languages for designing large scale systems that need to evolve over
+  time.  Objective-C is really good at the later, but has scathes of performance
+  and extensibility problems, and is hemmed in on all sides by backwards, source
+  and binary compatibility issues.</p>
+  
+  <p>Insert more philosophical blather later.</p>
+  
+  <!-- ===================================================================== -->
+  <h3>Basic Goals</h3>
+  <!-- ===================================================================== -->
+
+  <ol>
+  <li>Support building great frameworks and applications, making it easier to
+    do the right thing by default and reducing the barrier of entry to our
+    systems.</li>
+  <li>Support low-level system programming.  We should want to write compilers,
+    operating system kernels, and media codecs in Swift.  This means that being
+    able to obtain high performance is really really important.</li>
+  <li>Provide really great tools.</li>
+  <li>Where possible, steal great ideas instead of innovating new things that
+      will work out in unpredictable ways.  It turns out that there are a lot
+      of good ideas already out there.</li>
+  <li>Lots of other stuff too.</li>
+  </ol>
+  
+  <!-- ===================================================================== -->
+  <h3>Basic Approach</h3>
+  <!-- ===================================================================== -->
+  
+  <p>The basic approach in designing and implementing the Swift prototype was to
+     start at the very bottom of the stack (simple expressions and the trivial
+     bits of the type system) and incrementally build things up one brick at a
+     time.  There is a big focus on making things as simple as possible and
+     having a clean internal core.  Where it makes sense some sugar (e.g. "func"
+     and "struct") is added on top to make the core more expressive for common
+     situations.</p>
+  
+  <p>One major aspect that dovetails with expressivity, learnability, and focus
+     on API development is that much of the language is implemented in a
+     standard library (inspired by the Haskell Standard Prelude).  By pushing
+     much of the boring parts of the language out of the compiler into the
+     library, we end up with a smaller core language and we force the language
+     that is left to be highly expressive and extensible, which we hope will
+     allow for great libraries to be built on top of it.
+  </p>
+  
+  
+  <!-- ********************************************************************* -->
+  <h2>Lexical Structure</h2>
+  <!-- ********************************************************************* -->
+  
+  <p>The lexical structure of a Swift file is very simple: the files are
+     tokenized according to the following productions and categories.</p>
+  
+  <!-- ===================================================================== -->
+  <h3>Whitespace and Comments</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    whitespace ::= ' '
+    whitespace ::= '\n'
+    whitespace ::= '\r'
+    whitespace ::= '\t'
+    whitespace ::= '\0'
+    comment    ::= //.*[\n\r]
+  </pre>
+
+  <p>Space, newline, tab, and the nul byte are all considered whitespace and are
+     discarded.</p>
+  
+  <p>Comments follow the BCPL style, starting with a "//" and running to the end
+     of the file.  Comments are ignored as whitespace.</p>
+  
+  <p>TODO: /**/ comments will be supported someday.</p>
+
+  <!-- ===================================================================== -->
+  <h3>Reserved Punctuation Tokens</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    punctuation ::= '('
+    punctuation ::= ')'
+    punctuation ::= '{'
+    punctuation ::= '}'
+    punctuation ::= '['
+    punctuation ::= ']'
+    punctuation ::= '.'
+    punctuation ::= ','
+    punctuation ::= ';'
+    punctuation ::= ':'
+    punctuation ::= '::'
+    punctuation ::= '='
+    punctuation ::= '-&gt;'
+  </pre>
+
+  <p>These are all reserved punctuation that are lexed into tokens.  Most other
+     punctionation is matched as <a href="identifier">identifiers</a>.
+  </p>
+
+  <!-- ===================================================================== -->
+  <h3>Reserved Keywords</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    keyword ::= '__builtin_int32_type'
+    keyword ::= 'data'
+    keyword ::= 'struct'
+    keyword ::= 'var'
+    keyword ::= 'func'
+    keyword ::= 'typealias'
+    keyword ::= '$[0-9]'
+  </pre>
+
+  <p>These are the builtin keywords.  Swift intentionally tries to reduce the
+     number of keywords where possible.</p>
+  
+  <p>FIXME: $0 and friends are modeled as an identifier not a keyword, the
+     proto needs to be fixed so that you aren't allowed to define $0.</p>
+
+  
+  <!-- ===================================================================== -->
+  <h3 id="numeric_constant">Numeric Constant</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    numeric_constant ::= [0-9]+
+  </pre>
+
+  <p>Numeric constant tokens represent simple integer values.</p>
+  <p>TODO: Obviously need a floating point constant when we have a fp type.</p>
+
+  
+  <!-- ===================================================================== -->
+  <h3 id="identifier">Identifier Tokens</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    identifier ::= [a-zA-Z_$][a-zA-Z_$0-9]*
+    identifier ::= [/=-+*%&lt;&gt;!&amp;|^]+
+  </pre>
+
+  
+  <p>There are two different regular expressions for identifiers, one for normal
+     identifiers and one for "punctuation identifiers".  This ensures that
+     something like "foo+bar" gets lexed into three identifiers, not one.
+  </p>
+  
+  
+  
+  <!-- ********************************************************************* -->
+  <h2 id="decl">Declarations</h2>
+  <!-- ********************************************************************* -->
+  
+  <pre class="grammar">
+    translation-unit ::= decl-top-level*
+    decl-top-level   ::= ';'
+    decl-top-level   ::= <a href="#decl-var">decl-var</a>
+    decl-top-level   ::= <a href="#decl-func">decl-func</a>
+    decl-top-level   ::= <a href="#decl-typealias">decl-typealias</a>
+    decl-top-level   ::= <a href="#decl-data">decl-data</a>
+    decl-top-level   ::= <a href="#decl-struct">decl-struct</a>
+  </pre>
+  
+  <p>A source file in Swift is parsed as a list of top level declarations.
+  Extraneous semi colons are allowed at top level, as are a number of other
+  declarations.</p>
+  
+  <p>FIXME: Need to define the module system.</p>
+  
+  <!-- ===================================================================== -->
+  <h3 id="decl-var">var</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    decl-var ::= 'var' <a href="#attribute-list">attribute-list</a>? <a href="#var-name">var-name</a> ':' <a href="#type">type</a>
+    decl-var ::= 'var' <a href="#attribute-list">attribute-list</a>? <a href="#var-name">var-name</a> ':' <a href="#type">type</a> '=' <a href="#expr">expr</a>
+    decl-var ::= 'var' <a href="#attribute-list">attribute-list</a>? <a href="#var-name">var-name</a> '=' <a href="#expr">expr</a>
+  </pre>
+
+  <p>'var' declarations form the backbone of value declarations in Swift and
+     are the core semantic model for these values.  The <a
+     href="#decl-func">func declaration</a> is just syntactic sugar for a var
+     declaration.</p>
+  
+  <p>Syntactically var declarations come in three forms.  In the first form,
+     a type is specified and the value is default initialized.  In the second
+     form the type is elided but a value is specified, the declaration gets the
+     specified value and has the same type as its initializer.  In the third
+     form, the values type is as specified and the initializer is <a
+     href="#sema_conversions">converted to</a> that type if required.</p>
+  
+  <p>Var declarations can optionally have a list of <a
+     href="#attribute-list">attributes</a> applied to them.  In addition, the
+     <a href="#var-name">name</a> given to the var can have structure that
+     allows fields of the returned value to be directly named and accessed in
+     later code.  Here are some examples of var declarations:</p>
+  
+  <pre class="example">
+    <i>// Simple examples.</i>
+    var a = 4
+    var b : int
+    var c : int = 42
+    
+    <i>// Declaring a function like value with 'var', using an attribute.</i>
+    <i>// The name here is "==", the type is a function that takes a tuple</i>
+    <i>// and returns an int.</i>
+    var [infix=120] == : (lhs : int, rhs : int) -> int
+    
+    <i>// This decodes the tuple return value into indendently named parts</i>
+    <i>// and both 'val' and 'err' are in scope after this line.</i>
+    var (val, err) = foo();
+  </pre>
+
+  
+  
+  <!-- ===================================================================== -->
+  <h3 id="decl-func">func</h3>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> <a href="#type">type</a> '='? <a href="#expr">expr</a>
+    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> <a href="#type">type</a> ';'
+  </pre>
+  
+  <p>A 'func' declaration is just shorthand syntax for the (extremely) common
+  case of a declaration of function value.  The argument list and optional
+  return value are specified by the type production of the function, and the
+  body is either not specified or is an arbitrary expression.  If the argument
+  type is not a function type, then the return value is implicitly inferred to
+  be "()".  All of the argument and return value names are injected into the
+  <a href="#sema_scope">scope</a> of the function body.</p>
+  
+  <p>FIXME: Why require a ';' after func?  There is no reason for this.</p>
+  
+  <p>FIXME: Func should be an immutable name binding, it should implicitly add
+     an attribute immutable when it exists.</p>
+
+  <p>FIXME: Incoming arguments should be readonly, result should be implicitly
+     writeonly when we have these attributes.</p>
+  
+  <p>Here are some examples of func definitions:</p>
+  
+  <pre class="example">
+    <i>// Implicitly returns (), aka <a href="#stdlib-void">void</a></i>
+    func a() {}
+
+    <i>// Same as 'a'</i>
+    func b() -> void {}
+
+    <i>// Really simple function</i>
+    func c(arg : int) -> void = arg+4
+
+    <i>// Simple operator.</i>
+    func [infix=120] + (lhs: int, rhs: int) -> int;
+
+    <i>// Function with multiple return values:</i>
+    func d(a : int) -> (b : int) -> (res1 : int, res2 : int);
+  </pre>
+
+  
+  <!-- ===================================================================== -->
+  <h3 id="decl-typealias">typealias</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    decl-typealias ::= 'typealias' <a href="#identifier">identifier</a> ':' <a href="#type">type</a>
+  </pre>
+
+  <p>Type alias makes a named alias of a type.  From that point on, the alias
+  may be used in all situations the specified name is.  This is the same thing
+  as a typedef in C.  It is named "typealias" because it really is an alias, not
+  a "new" type.</p>
+  
+  <p>Here are some examples of type aliases:</p>
+  
+  <pre class="example">
+    <i>// location is an alias for a tuple of ints.</i>
+    typealias location : (x : int, y : int)
+      
+    <i>// pair_fn is a function that takes two ins and returns a tuple.</i>
+    typealias pair_fn : int -> int -> (int, int)
+  </pre>
+
+  
+  <!-- ===================================================================== -->
+  <h3 id="decl-data">data</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    decl-data ::= 'data' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> '{' data-element-list '}'
+    
+    data-element-list ::= data-element ','?
+    data-element-list ::= data-element ',' data-element-list
+    
+    data-element      ::= <a href="#identifier">identifier</a>
+    data-element      ::= <a href="#identifier">identifier</a> <a href="#type">type</a>
+
+  </pre>
+  
+  <p>'data' declarations are the Swift <a 
+    href="http://en.wikipedia.org/wiki/Algebraic_data_type">algebraic data
+    type</a>, and they provide the functionality of disjoint enums and
+    discriminated unions.</p>
+  
+  <p>TODO: Need a better name than 'data', need to improve this description.
+     Mention that data element names are not injected into the current scope.
+  </p>
+  
+
+  <!-- ===================================================================== -->
+  <h3 id="decl-struct">struct</h3>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    decl-struct ::= 'struct' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> <a href="#type">type</a>
+  </pre>
+
+  <p>A struct declaration is syntactic sugar for a data declaration of a single
+  element.  Also injects the constructor into the current scope.</p>
+  
+  
+  <!-- ********************************************************************* -->
+  <h2>Attributes and Names</h2>
+  <!-- ********************************************************************* -->
+
+  <p>Attributes and names are building blocks for larger declaration grammar
+  productions.</p>
+  
+  <!-- ===================================================================== -->
+  <h3 id="attribute-list">Attribute Lists</h3>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    attribute-list ::= '[' ']'
+    attribute-list ::= '[' attribute (',' attribute)* ']'
+    
+    attribute      ::= attribute-infix
+  </pre>
+  
+  <p>An attribute is a (possibly empty) comma separated list of attributes.</p>
+  
+  <h4 id="attribute-infix">Infix Attribute</h4>
+    
+  <pre class="grammar">
+    attribute-infix ::= 'infix' '=' <a href="#numeric_constant">numeric_constant</a>
+  </pre>
+
+  <p>The only attribute supported so far is the 'infix' attribute.
+  FIXME: Describe requirements on function/var it is applied to, must be binary
+  etc.</p>
+  
+  <p>FIXME: Add support for a bunch more attributes.</p>
+
+  
+  <!-- ===================================================================== -->
+  <h3 id="var-name">Var Names</h3>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    var-name ::= <a href="#identifier">identifier</a>
+    var-name ::= '(' ')'
+    var-name ::= '(' var-name (',' var-name)* ')'
+  </pre>
+
+  <p>Names are used for <a href="#decl-var">var decls</a> to specify the name
+  bindings to set up.  The structure of the name is required to match up with
+  the type being matched.  An single identifier is always valid to capture the
+  entire value (potentially as an aggregate).</p>
+ 
+  
+  <!-- ********************************************************************* -->
+  <h2 id="type">Simple Data Types</h2>
+  <!-- ********************************************************************* -->
+  
+  <pre class="grammar">
+    type ::= type-simple
+    type ::= type-function
+  </pre>
+
+  <p>Swift has a small collection of core datatypes that are built into the
+      compiler.  Most datatypes that the user is exposed are defined by the
+      <a href="#stdlib">standard library</a>.</p>
+
+  <!-- ===================================================================== -->
+  <h3 id="type-builtin">Builtin and Named Types</h3>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    type-simple ::= '__builtin_int32_type'
+    type-simple ::= <a href="#identifier">identifier</a>
+  </pre>
+  
+  <p>'__builtin_int32_type' is the name of the 32-bit integer type.</p>
+  
+  <p>Types may also be named, through a <a href="#decl-data">data</a>
+     declaration, a <a href="#decl-typealias">typealias</a> etc.</p>
+
+  <p>TODO: Support builtin int8, int16, int64, bool, float and double.</p>
+
+  
+  <!-- ===================================================================== -->
+  <h3 id="type-tuple">Tuple Types</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    type-simple ::= type-tuple
+    type-tuple  ::= '(' ')'
+    type-tuple  ::= '(' type-tuple-element (',' type-tuple-element)* ')'
+  </pre>
+
+  <p>Syntactically, tuple types are simply a possibly empty list of tuple
+  elements.</p>
+
+  <p>Tuples are the primary form of data aggregation in Swift, and are used as
+  the building block of <a href="#type-function">function</a> argument lists,
+  multiple return values, <a href="#decl-struct">struct</a> and 
+  <a href="#decl-data">data</a> bodies, etc.  Because tuples are widely
+  accessible and available everywhere in the language, aggregate data access and
+  transformation is uniform and powerful.</p>
+  
+  <pre class="grammar">
+    type-tuple-element ::= <a href="#identifier">identifier</a>? ':' type
+  </pre>
+
+  <p>Each element of a tuple contains an optional name followed by a required
+  type.  The name affects swizzling of elements in the tuple when <a
+    href="#sema_conversions">tuple conversions</a> are performed.</p>
+  
+  <p>FIXME: Tuples should allow initializers (like var) unifying the production
+  for var and tuple elements as well as making tuples far more powerful
+  (supporting default values throughout swift).</p>
+
+  <!-- ===================================================================== -->
+  <h3 id="type-function">Function Types</h3>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    type-function ::= type-simple '-&gt;' type
+  </pre>
+
+  <p>Function types have a single input and single result type, separated by
+     an arrow.  Because each of the types is allowed to be a tuple, we do
+     support multiple argument lists and multiple results.  "Function" types are
+     more properly known as a "closure" type, because they can embody any
+     context captured when the function variable was formed.</p>
+  
+  <p>Because of the grammar structure, a nested function like "a -&gt; b -&gt;
+     c" is parsed as "a -&gt; (b -&gt; c)".  This means that if you declare this
+     that you can pass it one argument to get a function that "takes b and
+     returns c" or you can pass two arguments to "get a c".  For example:
+  </p>
+  
+  <pre class="example">
+    <i>// A simple function that takes a tuple and returns int:</i>
+    var a : (a : int, b : int) -&gt; int
+
+    <i>// A simple function that returns multiple values:</i>
+    var a : (a : int, b : int) -&gt; (val: int, err: int)
+
+    <i>// Declare a function that returns a function:</i>
+    var x : int -&gt; int -&gt; int;
+    
+    <i>// y has type int -&gt; int</i>
+    var y = x 1;
+
+    <i>// z1 and z2 both has type int, and both have the same value (assuming
+    // the function had no side effects).</i>
+    var z1 = x 1 2;
+    var z2 = y 2;
+  </pre>
+  
+  
+  
+  
+  <!-- ********************************************************************* -->
+  <h2 id="expr">Expressions</h2>
+  <!-- ********************************************************************* -->
+
+  <pre class="grammar">
+    expr ::= <a href="#expr-single">expr-single</a>+
+  </pre>
+
+  <p>At the top level, a sequence of "singular" expressions are allowed anytime
+   an expression is allowed.  The value of the expr is the result of the last
+   singular expression.  This grammar rule allows semicolons between expressions
+   to be elided.</p>
+
+  <pre class="example">
+    <i>// A silly, but valid, example:</i>
+    4 4 (4+5) 4 4
+    
+    <i>// A more reasonable example (usually written on multiple lines.</i>
+    foo()   x = 12    bar(49+1)   baz()
+    </i>
+  </pre>
+
+  <p>This grammar production is ambiguous with the <a 
+    href="#expr-apply">expr-apply</a> production, but binds very loosely.</p>
+  
+  <p>FIXME: Why is there the application logic in ParseExpr? expr-apply should
+     handle it.</p>
+  
+  <!-- ===================================================================== -->
+  <h3 id="expr-single">Singular Expressions</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    expr-single     ::= expr-primary (binary-operator expr-primary)*
+    binary-operator ::= identifier
+  </pre>
+
+  <p>Singular expressions are a binary-operator-separated list of primary
+  expressions.  A "binary operator" is any identifier which name lookup resolves
+  to a declaration with the <a href="#attribute-infix">infix</a> attribute.
+  The order of evaluation of the various subexpressions is defined by the
+  precedence of the infix attribute.
+  </p>
+  
+  <p>FIXME: Should this use the expr-identifier production to allow qualified
+     identifiers?  Data members cannot be declared infix, but future module
+     scopes seem worth accessing :)</p>
+
+  <p>A simple example is:</p>
+  
+  <pre class="example">
+    4 + 5 * 123 min 42
+  </pre>
+
+  <!-- ===================================================================== -->
+  <h3 id="expr-primary">Primary Expressions</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    expr-primary    ::= <a href="#expr-literal">expr-literal</a>
+    expr-primary    ::= <a href="#expr-identifier">expr-identifier</a>
+    expr-primary    ::= ':' <a href="#identifier">identifier</a>
+    expr-primary    ::= expr-paren
+    expr-primary    ::= expr-brace
+    expr-primary    ::= expr-apply
+    expr-primary    ::= expr-primary '.' <a href="#identifier">identifier</a>
+  </pre>
+  
+  <!-- ===================================================================== -->
+  <h3 id="expr-literal">Simple Literals</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    expr-literal ::= numeric_constant
+  </pre>
+  
+  <p>The only literal currently supported are integer constants.  These
+     have '__builtin_int32_type' type.</p>
+
+  <!-- ===================================================================== -->
+  <h3 id="expr-identifier">Identifiers</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    expr-identifier ::= <a href="#identifier">identifier</a>
+  </pre>
+  
+  <p>A raw identifier refers to a value visible in the current <a
+     href="#sema_scope">scope</a>, and has the type of the declaration returned
+     by name lookup.  Value declarations are installed with 
+     <a href="#decl-var">var</a> and <a href="decl-func">func</a>
+     declarations.</p>
+  
+  <pre class="grammar">
+    expr-identifier ::= <a href="#identifier">identifier</a> '::' <a href="#identifier">identifier</a>
+  </pre>
+
+  <p>Qualified identifiers look up a member of a <a href="decl-data">data</a>
+     or <a href="decl-struct">struct</a> declaration.  The first identifier is
+     looked up as a type name.</p>
+  
+  <p>TODO: split out a type-identifier production to refer to.</p>
+  
+  <!-- ===================================================================== -->
+  <h3 id="expr-apply">Function Application</h3>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    expr-apply      ::= expr-primary-fn expr-primary
+    expr-primary-fn ::= expr-primary
+  </pre>
+
+  <p>Juxtaposition of two expressions, when the former is of function type, is
+  application of a function to its argument.  This production is ambiguous with
+  the top level <a href="#expr">expr</a> production, but this binds very
+  tightly.</p>
+  
+  <p>A simple example:</p>
+  
+  <pre class="example">
+    <i>// Application of an empty tuple to the function f.</i>
+    f ()
+    <i>// Application of 4 to the function f, both are equivalent.</i>
+    g 4
+    g (4)
+    
+    <i>// Application of 4 to the function returned by h().</i>
+    h () 4
+
+    <i>// Application of "{}" to the function returned by the result of</i>
+    <i>// applying "(x)" to "if".</i>
+    if (x) {}
+  </pre>
+
+  <!-- ===================================================================== -->
+  <h3 id="expr-paren">Tuple Literals</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    expr-paren      ::= '(' ')'
+    expr-paren      ::= '(' expr-paren-element (',' expr-paren-element)* ')'
+    expr-paren-element ::= ('.' identifier '=')? expr
+  </pre>
+  
+  <p>Grouping paren and tuple literals. () as an example.</p>
+  
+    
+  <!-- ===================================================================== -->
+  <h3 id="expr-paren">Tuple Literals</h3>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    expr-brace       ::= '{' (expr-or-decl-var ';')* expr? }
+    expr-or-decl-var ::= expr
+    expr-or-decl-var ::= decl-var
+  </pre>
+
+  
+  <p>FIXME: Why the obsession with ';'?</p>
+  
+
+  <!-- ********************************************************************* -->
+  <h2 id="sema">Language Semantics</h2>
+  <!-- ********************************************************************* -->
+
+  <h3 id="sema_scope">Scope</h3>
+  <h3 id="sema_conversions">Standard Conversions</h3>
+  <h3 id="sema_anondecls">Anonymous Argument Resolution</h3>
+  <h3 id="sema_context">Context Sensitive Type Resolution</h3>
+
+  
+  <!-- ********************************************************************* -->
+  <h2>Protocols</h2>
+  <!-- ********************************************************************* -->
+
+  <!-- ********************************************************************* -->
+  <h2>Objects</h2>
+  <!-- ********************************************************************* -->
+  
+  <!-- ********************************************************************* -->
+  <h2>Generics</h2>
+  <!-- ********************************************************************* -->
+
+
+  <!-- ********************************************************************* -->
+  <h2 id="stdlib">Standard Library</h2>
+  <!-- ********************************************************************* -->
+
+  <h3 id="stdlib-alias">Standard Type Aliases</h3>
+  <h4 id="stdlib-void">void</h4>
+  
+  <pre class="stdlib">
+    <i>// void is just a type alias for the empty tuple.</i>
+    typealias void : ()
+  </pre>
+  
+  
+  <h4 id="stdlib-int">int</h4>
+  <pre class="stdlib">
+    <i>// int is just a type alias for the 32-bit integer type.</i>
+    typealias int : __builtin_int32_type
+  </pre>
+  
+  
+  
+<!-- *********************************************************************** -->
+<hr>
+<address>
+  <a href="http://jigsaw.w3.org/css-validator/check/referer"><img
+  src="http://jigsaw.w3.org/css-validator/images/vcss-blue" alt="Valid CSS"></a>
+  <a href="http://validator.w3.org/check/referer"><img
+    src="http://www.w3.org/Icons/valid-html401-blue" alt="Valid HTML 4.01"></a>
+  
+  <a href="mailto:sabre@nondot.org">Chris Lattner</a><br>
+</address>
+
+</body>
+</html>
