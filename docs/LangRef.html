@@ -43,18 +43,6 @@
   is in use (unless otherwise specified).</p>
   
   <!-- ===================================================================== -->
-  <h3>Why a New Language?</h3>
-  <!-- ===================================================================== -->
-  
-  <p>Really, truly, there are no good systems languages, and there are no really
-  great languages for designing large scale systems that need to evolve over
-  time.  Objective-C is really good at the later, but has scathes of performance
-  and extensibility problems, and is hemmed in on all sides by backwards, source
-  and binary compatibility issues.</p>
-  
-  <p>Insert more philosophical blather later.</p>
-  
-  <!-- ===================================================================== -->
   <h3>Basic Goals</h3>
   <!-- ===================================================================== -->
 
@@ -93,6 +81,7 @@
      allow for great libraries to be built on top of it.
   </p>
   
+  <p>More later.</p>
   
   <!-- ********************************************************************* -->
   <h2>Lexical Structure</h2>
@@ -221,9 +210,9 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-var ::= 'var' <a href="#attribute-list">attribute-list</a>? <a href="#var-name">var-name</a> ':' <a href="#type">type</a>
-    decl-var ::= 'var' <a href="#attribute-list">attribute-list</a>? <a href="#var-name">var-name</a> ':' <a href="#type">type</a> '=' <a href="#expr">expr</a>
-    decl-var ::= 'var' <a href="#attribute-list">attribute-list</a>? <a href="#var-name">var-name</a> '=' <a href="#expr">expr</a>
+    decl-var ::= 'var' <a href="#attribute-list">attribute-list</a>? var-name ':' <a href="#type">type</a>
+    decl-var ::= 'var' <a href="#attribute-list">attribute-list</a>? var-name ':' <a href="#type">type</a> '=' <a href="#expr">expr</a>
+    decl-var ::= 'var' <a href="#attribute-list">attribute-list</a>? var-name '=' <a href="#expr">expr</a>
   </pre>
 
   <p>'var' declarations form the backbone of value declarations in Swift and
@@ -239,10 +228,23 @@
      href="#sema_conversions">converted to</a> that type if required.</p>
   
   <p>Var declarations can optionally have a list of <a
-     href="#attribute-list">attributes</a> applied to them.  In addition, the
-     <a href="#var-name">name</a> given to the var can have structure that
-     allows fields of the returned value to be directly named and accessed in
-     later code.  Here are some examples of var declarations:</p>
+    href="#attribute-list">attributes</a> applied to them.</p>
+  
+  <pre class="grammar">
+    var-name ::= <a href="#identifier">identifier</a>
+    var-name ::= '(' ')'
+    var-name ::= '(' var-name (',' var-name)* ')'
+  </pre>
+  
+  <p>The name given to the var can have structure that allows fields of the
+     returned value to be directly named and accessed in later code.  The
+     structure of the name is required to match up with the type being matched.
+     An single identifier is always valid to capture the entire value
+     (potentially as an aggregate).</p>
+  
+  <p>FIXME: The body should be expr-singular.</p>
+  
+  <p>Here are some examples of var declarations:</p>
   
   <pre class="example">
     <i>// Simple examples.</i>
@@ -260,8 +262,7 @@
     var (val, err) = foo();
   </pre>
 
-  
-  
+    
   <!-- ===================================================================== -->
   <h3 id="decl-func">func</h3>
   <!-- ===================================================================== -->
@@ -279,7 +280,8 @@
   be "()".  All of the argument and return value names are injected into the
   <a href="#sema_scope">scope</a> of the function body.</p>
   
-  <p>FIXME: Why require a ';' after func?  There is no reason for this.</p>
+  <p>FIXME: Why require a ';' after func?  There is no reason for this.  Change
+     the body to be expr-singular instead.</p>
   
   <p>FIXME: Func should be an immutable name binding, it should implicitly add
      an attribute immutable when it exists.</p>
@@ -327,7 +329,7 @@
     typealias location : (x : int, y : int)
       
     <i>// pair_fn is a function that takes two ins and returns a tuple.</i>
-    typealias pair_fn : int -> int -> (int, int)
+    typealias pair_fn : int -> int -> (first : int, second : int)
   </pre>
 
   
@@ -346,13 +348,80 @@
 
   </pre>
   
-  <p>'data' declarations are the Swift <a 
-    href="http://en.wikipedia.org/wiki/Algebraic_data_type">algebraic data
-    type</a>, and they provide the functionality of disjoint enums and
-    discriminated unions.</p>
+  <p>A data declaration consists of a comma-separated list of data elements,
+  which are each either an identifier or an identifier with a type.  The runtime
+  representation of a value of data type only has one of the specified data
+  elements at a time: a data value is a simple discriminated union.  Data
+  declarations are known as <a 
+  href="http://en.wikipedia.org/wiki/Algebraic_data_type">algebraic data
+  types</a> by the broader programming language community.</p>
   
-  <p>TODO: Need a better name than 'data', need to improve this description.
-     Mention that data element names are not injected into the current scope.
+  <p>A data declaration declares two things: 1) the name of the data declaration
+  is defined as a new type name, and 2) each of the data elements declares a
+  constructor value which create a value of the data type with the specified
+  element kind.</p>
+  
+  <p>The type of data declaration is injected into the current scope, so it may
+  be used as a type name immediately.  The constructor values are defined in a
+  nested scope within the data descriptor type, so they must be accessed with
+  either a <a href="#expr-identifier">qualified identifier</a> or through
+  <a href="#expr-delayed-identifier">delayed identifier resolution</a>
+  with <a href="#sema_context">context sensitive type inference</a>.
+  </p>
+  
+  <p>If the data element has no type specified with it, then the type of the 
+  constructor is the type of the data declaration.  If a data element has a
+  type "T" associated with it, then the type of the constructor is a function
+  that takes "T" and returns the type of the data declaration.</p>
+  
+  <p>Here are some examples of data declarations:</p>
+  
+  <pre class="example">
+    <i>// Declares three "enums".</i>
+    data DataSearchFlags {
+      None, Backward, Anchored
+    }
+    
+    func f1(searchpolicy : DataSearchFlags);  <i>// DataSearchFlags is a valid type name</i>
+    func test1() {
+      f1(DataSearchFlags::None);  <i>// Use of constructor with qualified identifier</i>
+      f1(:None);                  <i>// Use of constructor with context sensitive type inference</i> 
+    
+      <i>// "None" has no type argument, so the constructor's type is "DataSearchFlags".</i> 
+      var a : DataSearchFlags = :None;
+    }
+    
+    data SomeInts {
+      None,             <i>// Doesn't conflict with previous "None".</i>
+      One int,          <i>// Argument type is simple int.</i>
+      Two (:int, :int)  <i>// Argument type is simple tuple.</i>
+    }
+    
+    func f2(a : SomeInts);
+    
+    func test2() {
+      <i>Constructors for data element can be used in the obvious way.</i>
+      f2(:None);
+      f2(:One 4);
+      f2(:Two(1, 2));
+    
+      <i>Constructor for None has type "SomeInts".</i>
+      var a : SomeInts = SomeInts::None;
+    
+      <i>Constructor for One has type "int -> SomeInts".</i>
+      var b : int -> SomeInts = SomeInts::One;
+    
+      <i>Constructor for Two has type "(:int,:int) -> SomeInts".</i>
+      var c : (:int,:int) -> SomeInts = SomeInts::Two;
+    }
+  </pre>
+    
+  
+  <p>TODO: Need a better name than 'data'.  Should attributes be allowed on data
+  elements?
+  TODO: Eventually, with generics we'll have equality and inequality operators.
+  Data decls should implicitly define these for their types.
+  TODO: Need pattern matching and element extraction.
   </p>
   
 
@@ -365,15 +434,44 @@
   </pre>
 
   <p>A struct declaration is syntactic sugar for a data declaration of a single
-  element.  Also injects the constructor into the current scope.</p>
+  element.  It requires that a type be specified, and declares a data with a 
+  single constructor value of the same name as the struct.</p>
   
+  <p>Note that unlike data, struct does inject this constructor value into the
+  global scope. This means that you don't need to use qualified lookup to get
+  access to the constructor for a struct.</p>
   
-  <!-- ********************************************************************* -->
-  <h2>Attributes and Names</h2>
-  <!-- ********************************************************************* -->
+  <p>These two declarations are equivalent (but have different names):</p>
 
-  <p>Attributes and names are building blocks for larger declaration grammar
-  productions.</p>
+  <pre class="example">
+    struct S1 (a : int, b : int)
+    
+    data S2 {
+      S2 (a : int, b : int)
+    }
+    var S2 = S2::S2;   <i>// Constructor injected into global scope.</i>
+  </pre>
+  
+  
+  <p>Here are some examples of structs:</p>
+  
+  <pre class="example">
+    struct Point (x : int, y : int)
+    struct Size (width : int, height : int)
+    struct Rect (origin : Point, size : Size)
+    
+    func test4() {
+      var a : Point;
+      var b = Point::Point(1, 2);     // Silly but fine.
+      var c = Point(.y = 1, .x = 2);  // Using injected name.
+    
+      var x1 = Rect(a, Size(42, 123));
+      var x2 = Rect(.size = Size(.width = 42, .height=123), .origin = a);
+    
+      var x1_area = x1.width*x1.height;
+    }
+  </pre>    
+  
   
   <!-- ===================================================================== -->
   <h3 id="attribute-list">Attribute Lists</h3>
@@ -401,50 +499,47 @@
   <p>FIXME: Add support for a bunch more attributes.</p>
 
   
-  <!-- ===================================================================== -->
-  <h3 id="var-name">Var Names</h3>
-  <!-- ===================================================================== -->
-
-  <pre class="grammar">
-    var-name ::= <a href="#identifier">identifier</a>
-    var-name ::= '(' ')'
-    var-name ::= '(' var-name (',' var-name)* ')'
-  </pre>
-
-  <p>Names are used for <a href="#decl-var">var decls</a> to specify the name
-  bindings to set up.  The structure of the name is required to match up with
-  the type being matched.  An single identifier is always valid to capture the
-  entire value (potentially as an aggregate).</p>
- 
-  
   <!-- ********************************************************************* -->
   <h2 id="type">Simple Data Types</h2>
   <!-- ********************************************************************* -->
   
   <pre class="grammar">
     type ::= type-simple
-    type ::= type-function
+    type ::= <a href="#type-function">type-function</a>
+    
+    type-simple ::= <a href="#type-builtin">type-builtin</a>
+    type-simple ::= <a href="#type-identifier">type-identifier</a>
+    type-simple ::= <a href="#type-tuple">type-tuple</a>
   </pre>
 
   <p>Swift has a small collection of core datatypes that are built into the
       compiler.  Most datatypes that the user is exposed are defined by the
-      <a href="#stdlib">standard library</a>.</p>
+      <a href="#stdlib">standard library</a> or declared as a user defined
+      type.</p>
 
   <!-- ===================================================================== -->
   <h3 id="type-builtin">Builtin and Named Types</h3>
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    type-simple ::= '__builtin_int32_type'
-    type-simple ::= <a href="#identifier">identifier</a>
+    type-builtin ::= '__builtin_int32_type'
   </pre>
   
   <p>'__builtin_int32_type' is the name of the 32-bit integer type.</p>
-  
-  <p>Types may also be named, through a <a href="#decl-data">data</a>
-     declaration, a <a href="#decl-typealias">typealias</a> etc.</p>
 
   <p>TODO: Support builtin int8, int16, int64, bool, float and double.</p>
+
+  
+  <!-- ===================================================================== -->
+  <h3 id="type-identifier">Named Types</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    type-identifier ::= <a href="#identifier">identifier</a>
+  </pre>
+
+  <p>Types may also be named, through a <a href="#decl-data">data</a>
+     declaration, a <a href="#decl-typealias">typealias</a> etc.</p>
 
   
   <!-- ===================================================================== -->
@@ -452,7 +547,6 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    type-simple ::= type-tuple
     type-tuple  ::= '(' ')'
     type-tuple  ::= '(' type-tuple-element (',' type-tuple-element)* ')'
   </pre>
@@ -468,7 +562,7 @@
   transformation is uniform and powerful.</p>
   
   <pre class="grammar">
-    type-tuple-element ::= <a href="#identifier">identifier</a>? ':' type
+    type-tuple-element ::= <a href="#identifier">identifier</a>? ':' <a href="#type">type</a>
   </pre>
 
   <p>Each element of a tuple contains an optional name followed by a required
@@ -479,12 +573,36 @@
   for var and tuple elements as well as making tuples far more powerful
   (supporting default values throughout swift).</p>
 
+  <pre class="example">
+  <i>// Variable definitions.</i>
+  var a : ()
+  var b : (:int, :int)
+  var c : (x : (), y : int)
+
+  <i>// Inferred types.</i>
+  var d = ()                   <i>// Type = ()</i>
+  var e = (.x = 1, .y = 2)     <i>// Type = (x : int, y : int)</i>
+  var f = (1, 2, 3)            <i>// Type = (:int, :int, :int)</i>
+
+  <i>// Function argument and result is a tuple type.</i>
+  func foo(x : int, y : int) -> (val : int, err : int);
+
+  <i>// data and struct declarations with tuple values.</i>
+  struct S (a : int, b : int)
+  data Vertex {
+    Point2 (x : int, y : int),
+    Point3 (x : int, y : int, z : int),
+    Point4 (w : int, x : int, y : int, z : int)
+  }
+  </pre>
+
+  
   <!-- ===================================================================== -->
   <h3 id="type-function">Function Types</h3>
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    type-function ::= type-simple '-&gt;' type
+    type-function ::= <a href="#type">type-simple</a> '-&gt;' <a href="#type">type</a>
   </pre>
 
   <p>Function types have a single input and single result type, separated by
@@ -582,19 +700,34 @@
   <pre class="grammar">
     expr-primary    ::= <a href="#expr-literal">expr-literal</a>
     expr-primary    ::= <a href="#expr-identifier">expr-identifier</a>
-    expr-primary    ::= ':' <a href="#identifier">identifier</a>
-    expr-primary    ::= expr-paren
-    expr-primary    ::= expr-brace
-    expr-primary    ::= expr-apply
+    expr-primary    ::= <a href="#expr-apply">expr-apply</a>
+    expr-primary    ::= <a href="#expr-paren">expr-paren</a>
+    expr-primary    ::= <a href="#expr-brace">expr-brace</a>
+    expr-primary    ::= <a href="#expr-delayed-identifier">expr-delayed-identifier</a>
     expr-primary    ::= expr-primary '.' <a href="#identifier">identifier</a>
   </pre>
+  
+  <p>Primary expressions are the root of most simple expressions.  The only
+     interesting grammer rule in expr-primary itself is the last one, which
+     is for field access.</p>
+  
+  <p>If the base expression is a tuple, then the identifier is either a named
+     field of the tuple, or it is the magic identifier "field[0-9]" that
+     accesses the specified anonymous member of the tuple.</p>
+  
+  <p>If the base expression is a data record with one data element, which has
+     an associated type of tuple (which is true of all struct declarations that
+     have tuple body type), then the field access directly accesses the
+     underlying tuple.</p>
+  
+  <p>No other field accesses are currently allowed.</p>
   
   <!-- ===================================================================== -->
   <h3 id="expr-literal">Simple Literals</h3>
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    expr-literal ::= numeric_constant
+    expr-literal ::= <a href="#numeric_constant">numeric_constant</a>
   </pre>
   
   <p>The only literal currently supported are integer constants.  These
@@ -615,22 +748,33 @@
      declarations.</p>
   
   <pre class="grammar">
-    expr-identifier ::= <a href="#identifier">identifier</a> '::' <a href="#identifier">identifier</a>
+    expr-identifier ::= <a href="#type-identifier">type-identifier</a> '::' <a href="#identifier">identifier</a>
   </pre>
 
   <p>Qualified identifiers look up a member of a <a href="decl-data">data</a>
      or <a href="decl-struct">struct</a> declaration.  The first identifier is
      looked up as a type name.</p>
+ 
+  <!-- ===================================================================== -->
+  <h3 id="expr-delayed-identifier">Delayed Identifier Resolution</h3>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    expr-delayed-identifier ::= ':' <a href="#identifier">identifier</a>
+  </pre>
   
-  <p>TODO: split out a type-identifier production to refer to.</p>
+  <p>Qualified reference waits for context sensitive type inference. 
+  TODO: explain more, give examples.  Some examples in the <a
+  href="#decl-data">data</a> section.</p>
+  
   
   <!-- ===================================================================== -->
   <h3 id="expr-apply">Function Application</h3>
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    expr-apply      ::= expr-primary-fn expr-primary
-    expr-primary-fn ::= expr-primary
+    expr-apply      ::= expr-primary-fn <a href="#expr-primary">expr-primary</a>
+    expr-primary-fn ::= <a href="#expr-primary">expr-primary</a>
   </pre>
 
   <p>Juxtaposition of two expressions, when the former is of function type, is
@@ -656,30 +800,66 @@
   </pre>
 
   <!-- ===================================================================== -->
-  <h3 id="expr-paren">Tuple Literals</h3>
+  <h3 id="expr-paren">Parenthesized Expressions</h3>
   <!-- ===================================================================== -->
   
   <pre class="grammar">
     expr-paren      ::= '(' ')'
     expr-paren      ::= '(' expr-paren-element (',' expr-paren-element)* ')'
-    expr-paren-element ::= ('.' identifier '=')? expr
+    expr-paren-element ::= ('.' <a href="#identifier">identifier</a> '=')? <a href="#expr">expr</a>
   </pre>
   
-  <p>Grouping paren and tuple literals. () as an example.</p>
+  <p>Parentheses expressions contain an (optionally empty) list of optionally
+     named values.  Parentheses in an expression context denote one of two
+     things: 1) grouping parentheses, or 2) a tuple literal.</p>
   
+  <p>Grouping parentheses occur when there is exactly one value in the list and
+     that value does not have a name.  In this case, the type of the parenthesis
+     expression is the type of the single value.</p>
+  
+  <p>All other cases are tuple literals.  The type of the expression is a tuple
+     type whose elements and order match that of the initializer.  If there are
+     any named elements, those elements become names for the tuple type.  A
+     parenthesis expression with no value has a type of the empty tuple.
+  </p>
+  
+  <p>Some examples:</p>
+  
+  <pre class="example">
+    <i>// Simple grouping parenthesis.</i>
+    var a = (4);             <i>// Type = int</i>
+    var b = (4+a);           <i>// Type = int</i>
     
+    <i>// Tuple literals.</i>
+    var c = ()               <i>// Type = ()</i>
+    var d = (4, 5)           <i>// Type = (:int,:int)</i>
+    var e = (c, d)           <i>// Type = ((), (:int, :int))</i>
+    
+    var f = (.x = 4, .y = 5) <i>// Type = (x : int, y : int)</i>
+    var g = (4, .y = 5, 6)   <i>// Type = (:int, y : int, :int)</i>
+    
+    <i>// Named arguments to functions.</i>
+    func foo(a : int, b : int);
+    foo   (.b = 4, .a = 1)
+  </pre>
+
+  
   <!-- ===================================================================== -->
-  <h3 id="expr-paren">Tuple Literals</h3>
+  <h3 id="expr-brace">Brace Literals</h3>
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    expr-brace       ::= '{' (expr-or-decl-var ';')* expr? }
-    expr-or-decl-var ::= expr
-    expr-or-decl-var ::= decl-var
+    expr-brace       ::= '{' (expr-or-decl-var ';')* <a href="#expr">expr</a>? }
+    expr-or-decl-var ::= <a href="#expr">expr</a>
+    expr-or-decl-var ::= <a href="#decl-var">decl-var</a>
   </pre>
 
   
+  
+  
   <p>FIXME: Why the obsession with ';'?</p>
+  <p>FIXME: Need to kill off "the result of {} is the result of the last expr if
+     it doesn't have a ; at the end.</p>
   
 
   <!-- ********************************************************************* -->
@@ -687,6 +867,10 @@
   <!-- ********************************************************************* -->
 
   <h3 id="sema_scope">Scope</h3>
+  
+  <p>identifier namespaces: tuple elements, types, values.
+  Scope within data decls.</p>
+  
   <h3 id="sema_conversions">Standard Conversions</h3>
   <h3 id="sema_anondecls">Anonymous Argument Resolution</h3>
   <h3 id="sema_context">Context Sensitive Type Resolution</h3>
