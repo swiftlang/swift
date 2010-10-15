@@ -28,6 +28,7 @@ namespace swift {
   class Sema;
   class Decl;
   class Type;
+  class Expr;
   class TupleType;
   class TupleTypeElt;
   
@@ -41,7 +42,8 @@ public:
   Type *ActOnTupleType(llvm::SMLoc LPLoc, const TupleTypeElt *Elements,
                        unsigned NumElements, llvm::SMLoc RPLoc);
   Type *ActOnFunctionType(Type *Input, llvm::SMLoc ArrowLoc, Type *Output);
-  
+  Type *ActOnArrayType(Type *BaseTy, llvm::SMLoc LSquareLoc, Expr *Size,
+                       llvm::SMLoc RSquareLoc);
 };
   
 } // end namespace swift

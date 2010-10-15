@@ -41,3 +41,9 @@ Type *SemaType::ActOnFunctionType(Type *Input, llvm::SMLoc ArrowLoc,
                                   Type *Output) {
   return S.Context.getFunctionType(Input, Output);
 }
+
+Type *SemaType::ActOnArrayType(Type *BaseTy, llvm::SMLoc LSquareLoc, Expr *Size,
+                               llvm::SMLoc RSquareLoc) {
+  // FIXME.
+  return BaseTy;
+}

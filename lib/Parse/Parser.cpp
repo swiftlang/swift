@@ -630,6 +630,8 @@ DataDecl *Parser::ParseDeclStruct() {
 ///   type:
 ///     type-simple
 ///     type-function
+///     type '[' ']'
+///     type '[' expr ']'
 ///
 ///   type-function:
 ///     type-simple '->' type 
@@ -663,14 +665,38 @@ bool Parser::ParseType(Type *&Result, const llvm::Twine &Message) {
     return true;
   }
   
-  // If there is an arrow, parse the rest of the type.
-  SMLoc ArrowLoc = Tok.getLoc();
-  if (ConsumeIf(tok::arrow)) {
-    Type *SecondHalf = 0;
-    if (ParseType(SecondHalf, "expected type in result of function type"))
-      return true;
-    Result = S.type.ActOnFunctionType(Result, ArrowLoc, SecondHalf);
+   while (1) {
+    // If there is an arrow, parse the rest of the type.
+    SMLoc TokLoc = Tok.getLoc();
+    if (ConsumeIf(tok::arrow)) {
+      Type *SecondHalf = 0;
+      if (ParseType(SecondHalf, "expected type in result of function type"))
+        return true;
+      Result = S.type.ActOnFunctionType(Result, TokLoc, SecondHalf);
+      continue;
+    }
+    
+    // If there is a square bracket, we have an array.
+    if (ConsumeIf(tok::l_square)) {
+      llvm::NullablePtr<Expr> Size;
+      if (!Tok.is(tok::r_square) &&
+          ParseExpr(Size, "expected expression for array type size"))
+        return true;
+      
+      SMLoc RArrayTok = Tok.getLoc();
+      if (ParseToken(tok::r_square, "expected ']' in array type")) {
+        Note(TokLoc, "to match this '['");
+        return true;
+      }
+      
+      Result = S.type.ActOnArrayType(Result, TokLoc, Size.getPtrOrNull(),
+                                     RArrayTok);
+      continue;
+    }
+    
+    break;
   }
+        
   
   return false;
 }

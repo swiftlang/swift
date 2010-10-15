@@ -665,8 +665,8 @@
   <p>This grammar production is ambiguous with the <a 
     href="#expr-apply">expr-apply</a> production, but binds very loosely.</p>
   
-  <p>FIXME: Why is there the application logic in ParseExpr? expr-apply should
-     handle it.</p>
+  <p>NOTE: The application logic in ParseExpr is here for the case when the
+     first expr has dependent type that later resolves to be a function.</p>
   
   <!-- ===================================================================== -->
   <h3 id="expr-single">Singular Expressions</h3>
@@ -684,7 +684,7 @@
   precedence of the infix attribute.
   </p>
   
-  <p>FIXME: Should this use the expr-identifier production to allow qualified
+  <p>TODO: Should this use the expr-identifier production to allow qualified
      identifiers?  Data members cannot be declared infix, but future module
      scopes seem worth accessing :)</p>
 
