@@ -203,7 +203,7 @@
   Extraneous semi colons are allowed at top level, as are a number of other
   declarations.</p>
   
-  <p>FIXME: Need to define the module system.</p>
+  <p>TODO: Need to define the module system.</p>
   
   <!-- ===================================================================== -->
   <h3 id="decl-var">var</h3>
@@ -214,6 +214,11 @@
     decl-var ::= 'var' <a href="#attribute-list">attribute-list</a>? var-name ':' <a href="#type">type</a> '=' <a href="#expr">expr</a>
     decl-var ::= 'var' <a href="#attribute-list">attribute-list</a>? var-name '=' <a href="#expr">expr</a>
   </pre>
+  <!-- 
+   Note that the initializer can't be expr-singular.  If it were we would fail
+   to handle dependent cases like "var x : somedata  = :foo(4)
+   -->
+  
 
   <p>'var' declarations form the backbone of value declarations in Swift and
      are the core semantic model for these values.  The <a
@@ -242,8 +247,6 @@
      An single identifier is always valid to capture the entire value
      (potentially as an aggregate).</p>
   
-  <p>FIXME: The body should be expr-singular.</p>
-  
   <p>Here are some examples of var declarations:</p>
   
   <pre class="example">
@@ -268,8 +271,9 @@
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> <a href="#type">type</a> '='? <a href="#expr">expr</a>
-    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> <a href="#type">type</a> ';'
+    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> <a href="#type">type</a> '=' <a href="#expr">expr</a>
+    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> <a href="#type">type</a> <a href="#brace-expr">brace-expr</a>
+    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> <a href="#type">type</a>
   </pre>
   
   <p>A 'func' declaration is just shorthand syntax for the (extremely) common
@@ -280,13 +284,10 @@
   be "()".  All of the argument and return value names are injected into the
   <a href="#sema_scope">scope</a> of the function body.</p>
   
-  <p>FIXME: Why require a ';' after func?  There is no reason for this.  Change
-     the body to be expr-singular instead.</p>
-  
-  <p>FIXME: Func should be an immutable name binding, it should implicitly add
+  <p>TODO: Func should be an immutable name binding, it should implicitly add
      an attribute immutable when it exists.</p>
 
-  <p>FIXME: Incoming arguments should be readonly, result should be implicitly
+  <p>TODO: Incoming arguments should be readonly, result should be implicitly
      writeonly when we have these attributes.</p>
   
   <p>Here are some examples of func definitions:</p>
@@ -496,7 +497,7 @@
   FIXME: Describe requirements on function/var it is applied to, must be binary
   etc.</p>
   
-  <p>FIXME: Add support for a bunch more attributes.</p>
+  <p>TODO: Add support for a bunch more attributes.</p>
 
   
   <!-- ********************************************************************* -->

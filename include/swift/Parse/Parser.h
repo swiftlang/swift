@@ -118,6 +118,7 @@ private:
   bool ParseTypeTupleElement(TupleTypeElt &Result);
 
   // Expression Parsing
+  bool isStartOfExpr(Token &Tok) const;
   bool ParseExpr(llvm::NullablePtr<Expr> &Result, const char *Message = 0);
   bool ParseExprSingle(llvm::NullablePtr<Expr> &Result, const char *Message =0);
   bool ParseExprPrimary(llvm::NullablePtr<Expr> &Result, const char *Message=0);

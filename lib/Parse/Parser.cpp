@@ -437,8 +437,9 @@ VarDecl *Parser::ParseDeclVar() {
 /// caller handles this case and does recovery as appropriate.
 ///
 ///   decl-func:
-///     'func' attribute-list? identifier arg-list-type '='? expr
-///     'func' attribute-list? identifier arg-list-type ';'
+///     'func' attribute-list? identifier arg-list-type '=' expr
+///     'func' attribute-list? identifier arg-list-type expr-brace
+///     'func' attribute-list? identifier arg-list-type 
 FuncDecl *Parser::ParseDeclFunc() {
   SMLoc FuncLoc = Tok.getLoc();
   ConsumeToken(tok::kw_func);
@@ -484,18 +485,22 @@ FuncDecl *Parser::ParseDeclFunc() {
   if (FD)
     S.decl.CreateArgumentDeclsForFunc(FD);
 
-  // If this is a declaration, we're done.
-  if (ConsumeIf(tok::semi))
-    return FD;
-
-  // Otherwise, we must have an expression.  Eat the optional '=' if present.
-  ConsumeIf(tok::equal);
-
   // Then parse the expression.
   llvm::NullablePtr<Expr> Body;
-  if (ParseExpr(Body, "expected expression parsing func body") ||
-      Body.isNull())
-    return 0;  // FIXME: Need to call a new ActOnFuncBodyError?
+
+  // Check to see if we have a "= expr" or "{" which is a brace expr.
+  if (ConsumeIf(tok::equal)) {
+    if (ParseExpr(Body, "expected expression parsing func body") ||
+        Body.isNull())
+      return 0;  // FIXME: Need to call a new ActOnFuncBodyError?
+  } else if (Tok.is(tok::l_brace)) {
+    if (ParseExprBrace(Body) || Body.isNull())
+      return 0;  // FIXME: Need to call a new ActOnFuncBodyError?
+  }
+
+  // If this is a declaration, we're done.
+  if (Body.isNull())
+    return FD;
 
   return S.decl.ActOnFuncBody(FD, Body.get());
 }
@@ -734,7 +739,7 @@ bool Parser::ParseTypeTuple(Type *&Result) {
 // Expression Parsing
 //===----------------------------------------------------------------------===//
 
-static bool isStartOfExpr(Token &Tok, Sema &S) {
+bool Parser::isStartOfExpr(Token &Tok) const {
   if (Tok.is(tok::identifier)) {
     // If this is a binary operator, then it isn't the start of an expr.
     ValueDecl *VD =
@@ -782,7 +787,7 @@ bool Parser::ParseExpr(NullablePtr<Expr> &Result, const char *Message) {
         LastExpr = Result.get();
       }
     }
-  } while (isStartOfExpr(Tok, S));
+  } while (isStartOfExpr(Tok));
 
   assert(LastExpr && "Should have parsed at least one valid expression");
   
@@ -880,9 +885,7 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
   //     A + (B C) * D         <-- Juxtaposition here
   //     (A + B) (C * D)       <-- Juxtaposition in the expr production
   // This is disambiguated based on whether B has function type or not.
-  while (!Result.isNull() && isStartOfExpr(Tok, S)) {
-    
-    
+  while (!Result.isNull() && isStartOfExpr(Tok)) {
     NullablePtr<Expr> RHS;
     switch (S.expr.getJuxtapositionGreediness(Result.get())) {
     default: assert(0 && "Unknown juxtaposition greediness");
