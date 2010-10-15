@@ -1010,10 +1010,11 @@ bool Parser::ParseExprParen(llvm::NullablePtr<Expr> &Result) {
 /// with a ; inside of it.  For example { 1; 4+5; } or { 1; 2 }.
 ///
 ///   expr-brace:
-///     '{' (expr-or-decl-var ';')* expr? }
-///   expr-or-decl-var:
+///     '{' expr-brace-item* '}'
+///   expr-brace-item:
 ///     expr
 ///     decl-var
+///     ';'
 bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
   SMLoc LBLoc = Tok.getLoc();
   ConsumeToken(tok::l_brace);
@@ -1025,17 +1026,15 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
   
   // MissingSemiAtEnd - Keep track of whether the last expression in the block
   // had no semicolon.
-  bool MissingSemiAtEnd = true;
+  bool MissingSemiAtEnd = false;
   
-  // Parse the semicolon separated expression/var decls.
-  do {
-    // If we found a r_brace, then we either have an empty list {} or an
-    // expression list terminated with a semicolon.  Remember this and break.
-    if (Tok.is(tok::r_brace)) {
-      MissingSemiAtEnd = false;
-      break;
-    }
+  while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
+    MissingSemiAtEnd = false;
 
+    // If this is a semi, eat it and ignore it.
+    if (ConsumeIf(tok::semi))
+      continue;
+    
     // Otherwise, we must have a var decl or expression.  Parse it up
     Entries.push_back(llvm::PointerUnion<Expr*, ValueDecl*>());
     
@@ -1050,8 +1049,10 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
       NullablePtr<Expr> ResultExpr;
       if (ParseExpr(ResultExpr) || ResultExpr.isNull())
         HadError = true;
-      else
+      else {
         Entries.back() = ResultExpr.get();
+        MissingSemiAtEnd = true;
+      }
     }
     
     if (HadError) {
@@ -1066,20 +1067,13 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
       ConsumeIf(tok::r_brace);
       return true;
     }
-    
-  } while (ConsumeIf(tok::semi));
+  }
   
   SMLoc RBLoc = Tok.getLoc();
   if (ParseToken(tok::r_brace, "expected '}' at end of brace expression",
                  tok::r_brace)) {
     Note(LBLoc, "to match this opening '{'");
     return true;
-  }
-  
-  // Diagnose cases where there was a ; missing after a 'var'.
-  if (MissingSemiAtEnd && Entries.back().is<ValueDecl*>()) {
-    Error(RBLoc, "expected ';' after var declaration");
-    MissingSemiAtEnd = false;
   }
   
   Result = S.expr.ActOnBraceExpr(LBLoc, Entries.data(), Entries.size(),

@@ -850,15 +850,13 @@
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    expr-brace       ::= '{' (expr-or-decl-var ';')* <a href="#expr">expr</a>? }
-    expr-or-decl-var ::= <a href="#expr">expr</a>
-    expr-or-decl-var ::= <a href="#decl-var">decl-var</a>
+    expr-brace       ::= '{' expr-brace-item* '}'
+    expr-brace-item  ::= ';'
+    expr-brace-item  ::= <a href="#expr">expr</a>
+    expr-brace-item  ::= <a href="#decl-var">decl-var</a>
   </pre>
 
   
-  
-  
-  <p>FIXME: Why the obsession with ';'?</p>
   <p>FIXME: Need to kill off "the result of {} is the result of the last expr if
      it doesn't have a ; at the end.</p>
   
