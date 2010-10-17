@@ -38,6 +38,7 @@ Type *Type::getDesugaredType() {
   case DataTypeKind:
   case TupleTypeKind:
   case FunctionTypeKind:
+  case ArrayTypeKind:
     // None of these types have sugar at the outer level.
     return this;
   case AliasTypeKind:
@@ -78,6 +79,7 @@ void Type::print(llvm::raw_ostream &OS) const {
   case DataTypeKind:          return cast<DataType>(this)->print(OS);
   case TupleTypeKind:         return cast<TupleType>(this)->print(OS);
   case FunctionTypeKind:      return cast<FunctionType>(this)->print(OS);
+  case ArrayTypeKind:         return cast<ArrayType>(this)->print(OS);
   }
 }
 
@@ -121,3 +123,9 @@ void FunctionType::print(llvm::raw_ostream &OS) const {
   OS << *Input << " -> " << *Result;
 }
 
+void ArrayType::print(llvm::raw_ostream &OS) const {
+  OS << *Base << '[';
+  if (Size)
+    OS << Size;
+  OS << ']';
+  }

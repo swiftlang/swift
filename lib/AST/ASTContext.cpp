@@ -39,6 +39,9 @@ typedef llvm::FoldingSet<TupleType> TupleTypesMapTy;
 /// FunctionTypesMapTy - This is the actual type underlying 'FunctionTypes'.
 typedef llvm::DenseMap<std::pair<Type*,Type*>, FunctionType*>FunctionTypesMapTy;
 
+/// ArrayTypesMapTy - This is the actual type underlying 'ArrayTypes'.
+typedef llvm::DenseMap<std::pair<Type*, uint64_t>, ArrayType*> ArrayTypesMapTy;
+
 ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
   : Allocator(new llvm::BumpPtrAllocator()),
     IdentifierTable(new IdentifierTableMapTy(*Allocator)),
@@ -46,6 +49,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
     DataTypes(new DataTypesMapTy()),
     TupleTypes(new TupleTypesMapTy()),
     FunctionTypes(new FunctionTypesMapTy()),
+    ArrayTypes(new ArrayTypesMapTy()),
     SourceMgr(sourcemgr),
     TheEmptyTupleType(getTupleType(0, 0)),
     TheDependentType(new (*this) DependentType()),
@@ -57,6 +61,7 @@ ASTContext::~ASTContext() {
   delete (DataTypesMapTy*)DataTypes; DataTypes = 0;
   delete (TupleTypesMapTy*)TupleTypes; TupleTypes = 0;
   delete (FunctionTypesMapTy*)FunctionTypes; FunctionTypes = 0;
+  delete (ArrayTypesMapTy*)ArrayTypes; ArrayTypes = 0;
   delete (IdentifierTableMapTy*)IdentifierTable; IdentifierTable = 0;
   delete Allocator; Allocator = 0;
 }
@@ -113,6 +118,9 @@ Type *ASTContext::getCanonicalType(Type *T) {
     return T->CanonicalType = getFunctionType(getCanonicalType(FT->Input),
                                               getCanonicalType(FT->Result));
   }
+  case ArrayTypeKind:
+    ArrayType *AT = llvm::cast<ArrayType>(T);
+    return T->CanonicalType = getArrayType(getCanonicalType(AT->Base),AT->Size);
   }
   assert(0 && "Unreachable");
 }
@@ -217,6 +225,21 @@ FunctionType *ASTContext::getFunctionType(Type *Input, Type *Result) {
   
   // If the input and result types are canonical, then so is the result.
   if (Input->isCanonical() && Result->isCanonical())
+    Entry->CanonicalType = Entry;
+  
+  return Entry;
+}
+
+/// getArrayType - Return a uniqued array type with the specified base type
+/// and the specified size.  Size=0 indicates an unspecified size array.
+ArrayType *ASTContext::getArrayType(Type *BaseType, uint64_t Size) {
+  ArrayType *&Entry =
+    (*(ArrayTypesMapTy*)FunctionTypes)[std::make_pair(BaseType, Size)];
+  if (Entry) return Entry;
+
+  Entry = new (*this) ArrayType(BaseType, Size);
+  
+  if (BaseType->isCanonical())
     Entry->CanonicalType = Entry;
   
   return Entry;

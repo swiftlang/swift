@@ -17,6 +17,8 @@
 #ifndef SWIFT_AST_ASTCONTEXT_H
 #define SWIFT_AST_ASTCONTEXT_H
 
+#include "llvm/Support/DataTypes.h"
+
 namespace llvm {
   class BumpPtrAllocator;
   class SourceMgr;
@@ -26,10 +28,10 @@ namespace llvm {
 
 namespace swift {
   class Type;
-  class AliasType;
   class DataType;
   class TupleType;
   class FunctionType;
+  class ArrayType;
   class Identifier;
   class TupleTypeElt;
   class DataDecl;
@@ -44,7 +46,8 @@ class ASTContext {
   void *AliasTypes;      // llvm::DenseMap<Identifier, AliasType*>
   void *DataTypes;       // llvm::DenseMap<Identifier, DataType*>
   void *TupleTypes;      // llvm::FoldingSet<TupleType>
-  void *FunctionTypes;   // DenseMap<std::pair<Type*,Type*>, FunctionType*>
+  void *FunctionTypes;   // DenseMap<std::pair<Type*, Type*>, FunctionType*>
+  void *ArrayTypes;      // DenseMap<std::pair<Type*, uint64_t>, ArrayType*>
 public:
   ASTContext(llvm::SourceMgr &SourceMgr);
   ~ASTContext();
@@ -96,6 +99,10 @@ public:
   /// getFunctionType - Return a uniqued function type with the specified
   /// input and result.
   FunctionType *getFunctionType(Type *Input, Type *Result);
+
+  /// getArrayType - Return a uniqued array type with the specified base type
+  /// and the specified size.  Size=0 indicates an unspecified size array.
+  ArrayType *getArrayType(Type *BaseType, uint64_t Size);                          
 };
   
 } // end namespace swift

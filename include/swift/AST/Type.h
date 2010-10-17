@@ -37,6 +37,7 @@ namespace swift {
     DataTypeKind,
     TupleTypeKind,
     FunctionTypeKind,
+    ArrayTypeKind,
     
     Builtin_First = BuiltinInt32Kind,
     Builtin_Last = BuiltinInt32Kind
@@ -225,10 +226,33 @@ public:
   
 private:
   FunctionType(Type *input, Type *result)
-    : Type(FunctionTypeKind), Input(input), Result(result) {}
+  : Type(FunctionTypeKind), Input(input), Result(result) {}
   friend class ASTContext;
 };
   
+  
+/// ArrayType - An array type has a base type and either an unspecified or a
+/// constant size.  For example "int[]" and "int[4]".  Array types cannot have
+/// size = 0.
+class ArrayType : public Type {
+public:
+  Type *const Base;
+  
+  /// Size - When this is zero it indicates an unsized array like "int[]".
+  uint64_t Size;
+  
+  void print(llvm::raw_ostream &OS) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ArrayType *) { return true; }
+  static bool classof(const Type *T) { return T->Kind == ArrayTypeKind; }
+  
+private:
+  ArrayType(Type *base, uint64_t size)
+    : Type(ArrayTypeKind), Base(base), Size(size) {}
+  friend class ASTContext;
+};
+
 } // end namespace swift
 
 namespace llvm {
