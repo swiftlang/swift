@@ -630,11 +630,14 @@ DataDecl *Parser::ParseDeclStruct() {
 ///   type:
 ///     type-simple
 ///     type-function
-///     type '[' ']'
-///     type '[' expr ']'
+///     type-array
 ///
 ///   type-function:
 ///     type-simple '->' type 
+///
+///   type-array:
+///     type '[' ']'
+///     type '[' expr ']'
 ///
 ///   type-simple:
 ///     '__builtin_int32_type'

@@ -507,6 +507,7 @@
   <pre class="grammar">
     type ::= type-simple
     type ::= <a href="#type-function">type-function</a>
+    type ::= <a href="#type-array">type-array</a>
     
     type-simple ::= <a href="#type-builtin">type-builtin</a>
     type-simple ::= <a href="#type-identifier">type-identifier</a>
@@ -637,8 +638,67 @@
     var z2 = y 2;
   </pre>
   
+  <!-- ===================================================================== -->
+  <h3 id="type-array">Array Types</h3>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    type-array ::= <a href="#type">type</a> '[' ']'
+    type-array ::= <a href="#type">type</a> '[' <a href="#expr">expr</a> ']'
+  </pre>
   
+  <p>Array types include a base type and an optional size.  Array types indicate
+  a linear sequence of elements stored consequtively memory.  Array elements may
+  be efficiently indexed in constant time.  All array indexes are bounds checked
+  and out of bound accesses are diagnosed with either a compile time or
+  runtime failure (FIXME: runtime failure mode not specified).</p>
   
+  <p>While they look syntactically very similar, an array type with a size has
+  very different semantics than an array without.  In the former case, the type
+  indicates a declaration of actual storage space.  In the later case, the type
+  indicates a <em>reference</em> to storage space allocated elsewhere of
+  runtime-specified size.
+  </p>
+
+  <p>For an array with a size, the size must be more than zero (no
+  indices would be valid).  For now, the array size must be a literal integer.
+  TODO: Define a notion like C's integer-constant-expression for how constant
+  folding works.</p>
+  
+  <p>FIXME: int[][] not valid because the element type isn't sized.  We need
+  some constraint to reject this.</p>
+  
+  <p>Some example array types:</p>
+  
+  <pre class="example">
+    <i>// A simple array declaration:</i>
+    var a : int[4];
+    
+    <i>// A reference to another array:</i>
+    var b : int[] = a;
+        
+    <i>// Declare a two dimensional array:</i>
+    var c : int[4][4];
+    
+    <i>// Declare a reference to another array, two dimensional:</i>
+    var d : int[4][];
+
+    <i>// Declare an array of function pointers:</i>
+    var array_fn_ptrs : (: int -> int)[42];
+    var g = array_fn_ptrs[12](4);
+
+    <i>// Without parens, this is a function that returns a fixed size array:</i>
+    var fn_returning_array : int -> int[42];
+    var h : int[42] = fn_returning_array(4);
+    
+    <i>// You can even have arrays of tuples and other things, these work right
+    // through composition:</i>
+    var array_of_tuples : (a : int, b : int)[42];
+    var tuple_of_arrays : (a : int[42], b : int[42]);
+    
+    array_of_tuples[12].a = array_of_tuples[13].b;
+    tuple_of_arrays.a[12] = array_of_tuples.b[13];
+  </pre>
   
   <!-- ********************************************************************* -->
   <h2 id="expr">Expressions</h2>
