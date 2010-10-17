@@ -112,6 +112,8 @@ public:
   IntegerLiteral(llvm::StringRef V, llvm::SMLoc L, Type *Ty)
     : Expr(IntegerLiteralKind, Ty), Val(V), Loc(L) {}
   
+  uint64_t getValue() const;
+  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const IntegerLiteral *) { return true; }
   static bool classof(const Expr *E) { return E->Kind == IntegerLiteralKind; }

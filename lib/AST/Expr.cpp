@@ -75,6 +75,14 @@ unsigned ClosureExpr::getNumArgs() const {
   return 1;  
 }
 
+uint64_t IntegerLiteral::getValue() const {
+  unsigned long long IntVal;
+  bool Error = Val.getAsInteger(0, IntVal);
+  assert(!Error && "Invalid IntegerLiteral formed"); (void)Error;
+  return IntVal;
+}
+
+
 //===----------------------------------------------------------------------===//
 // Expression Walking
 //===----------------------------------------------------------------------===//

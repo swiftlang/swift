@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
 
@@ -44,6 +45,24 @@ Type *SemaType::ActOnFunctionType(Type *Input, llvm::SMLoc ArrowLoc,
 
 Type *SemaType::ActOnArrayType(Type *BaseTy, llvm::SMLoc LSquareLoc, Expr *Size,
                                llvm::SMLoc RSquareLoc) {
-  // FIXME.
-  return BaseTy;
+  // Unsized arrays.
+  if (Size == 0)
+    return S.Context.getArrayType(BaseTy, 0);
+  
+  // FIXME: Add real support for evaluating constant expressions for array
+  // sizes.
+  uint64_t SizeVal;
+  if (IntegerLiteral *IL = llvm::dyn_cast<IntegerLiteral>(Size))
+    SizeVal = IL->getValue();
+  else {
+    Error(Size->getLocStart(), "invalid type size, not a constant");
+    SizeVal = 1;
+  }
+  
+  if (SizeVal == 0) {
+    Error(Size->getLocStart(), "array types must be larger than zero elements");
+    SizeVal = 1;
+  }
+  
+  return S.Context.getArrayType(BaseTy, SizeVal);
 }

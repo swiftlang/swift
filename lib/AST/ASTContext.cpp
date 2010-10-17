@@ -234,7 +234,7 @@ FunctionType *ASTContext::getFunctionType(Type *Input, Type *Result) {
 /// and the specified size.  Size=0 indicates an unspecified size array.
 ArrayType *ASTContext::getArrayType(Type *BaseType, uint64_t Size) {
   ArrayType *&Entry =
-    (*(ArrayTypesMapTy*)FunctionTypes)[std::make_pair(BaseType, Size)];
+    (*(ArrayTypesMapTy*)ArrayTypes)[std::make_pair(BaseType, Size)];
   if (Entry) return Entry;
 
   Entry = new (*this) ArrayType(BaseType, Size);
