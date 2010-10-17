@@ -99,6 +99,9 @@ public:
   ActOnDotIdentifier(Expr *E, llvm::SMLoc DotLoc, llvm::StringRef Identifier,
                      llvm::SMLoc IdentifierLoc);
   
+  llvm::NullablePtr<Expr>
+  ActOnArraySubscript(Expr *Base,llvm::SMLoc LLoc, Expr *Idx, llvm::SMLoc RLoc);
+  
   llvm::PointerIntPair<Expr*, 1, bool> ActOnJuxtaposition(Expr *E1, Expr *E2);
   llvm::NullablePtr<Expr> ActOnSequence(Expr **Exprs, unsigned NumExprs); 
   

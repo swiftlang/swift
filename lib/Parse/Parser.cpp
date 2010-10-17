@@ -848,6 +848,7 @@ bool Parser::ParseExprSingle(llvm::NullablePtr<Expr> &Result,
 ///     expr-paren
 ///     expr-brace
 ///     expr-primary '.' identifier
+///     expr-primary '[' expr-single ']'
 ///     expr-primary-fn expr-primary
 ///   expr-primary-fn:
 ///     expr-primary      Type sensitive: iff expr has fn type
@@ -888,20 +889,41 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
     return true;
   }
   
-  // Check for a .foo suffix.
-  SMLoc DotLoc = Tok.getLoc();
-  while (ConsumeIf(tok::period)) {
-    if (Tok.isNot(tok::identifier)) {
-      Error(Tok.getLoc(), "expected field name");
-      return true;
+  // Handle suffix expressions.
+  while (1) {
+    // Check for a .foo suffix.
+    SMLoc TokLoc = Tok.getLoc();
+    if (ConsumeIf(tok::period)) {
+      if (Tok.isNot(tok::identifier)) {
+        Error(Tok.getLoc(), "expected field name");
+        return true;
+      }
+        
+      if (!Result.isNull())
+        Result = S.expr.ActOnDotIdentifier(Result.get(), TokLoc, Tok.getText(),
+                                           Tok.getLoc());
+      ConsumeToken(tok::identifier);
+      continue;
     }
+    
+    // Check for a [expr] suffix.
+    if (ConsumeIf(tok::l_square)) {
+      NullablePtr<Expr> Idx;
+      if (ParseExprSingle(Idx, "expected expression parsing array index"))
+        return true;
       
-    if (!Result.isNull())
-      Result = S.expr.ActOnDotIdentifier(Result.get(), DotLoc, Tok.getText(),
-                                         Tok.getLoc());
-    ConsumeToken(tok::identifier);
-    DotLoc = Tok.getLoc();
-    continue;
+      SMLoc RLoc = Tok.getLoc();
+      if (ParseToken(tok::r_square, "expected ']'")) {
+        Note(TokLoc, "to match this '['");
+        return true;        
+      }
+      
+      if (!Result.isNull() && !Idx.isNull())
+        Result = S.expr.ActOnArraySubscript(Result.get(), TokLoc, Idx.get(),
+                                            RLoc);
+    }
+        
+    break;
   }
   
   // Okay, we parsed the expression primary and any suffix expressions.  If the

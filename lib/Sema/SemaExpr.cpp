@@ -275,6 +275,14 @@ SemaExpr::getJuxtapositionGreediness(Expr *E) const {
 
 NullablePtr<Expr> SemaExpr::ActOnNumericConstant(llvm::StringRef Text,
                                                  llvm::SMLoc Loc) {
+  // The integer literal must fit in 64-bits.
+  unsigned long long Val;
+  if (Text.getAsInteger(0, Val)) {
+    Error(Loc, "invalid immediate for integer literal, value too large");
+    Text = "1";
+  }
+  
+  
   Type *ResultTy = 0;
   if (SemaIntegerLiteral(ResultTy, *this)) return 0;
   return new (S.Context) IntegerLiteral(Text, Loc, ResultTy);
@@ -379,6 +387,14 @@ SemaExpr::ActOnDotIdentifier(Expr *E, llvm::SMLoc DotLoc,
   // TODO: Eventually . can be useful for things other than tuples.
   return new (S.Context) TupleElementExpr(E, DotLoc, FieldNo, NameLoc,ResultTy);
 }
+
+llvm::NullablePtr<Expr>
+SemaExpr::ActOnArraySubscript(Expr *Base, llvm::SMLoc LLoc, Expr *Idx,
+                              llvm::SMLoc RLoc) {
+  // FIXME: Implement.
+  return Base;
+}
+
 
 NullablePtr<Expr> 
 SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr *const *SubExprs,
