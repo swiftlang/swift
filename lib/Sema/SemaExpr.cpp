@@ -391,7 +391,8 @@ SemaExpr::ActOnDotIdentifier(Expr *E, llvm::SMLoc DotLoc,
 llvm::NullablePtr<Expr>
 SemaExpr::ActOnArraySubscript(Expr *Base, llvm::SMLoc LLoc, Expr *Idx,
                               llvm::SMLoc RLoc) {
-  // FIXME: Implement.
+  // FIXME: Implement.  This should lookup "subscript(Base, Idx)" as a function
+  // call.
   return Base;
 }
 

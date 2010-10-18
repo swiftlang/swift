@@ -765,23 +765,11 @@
     expr-primary    ::= <a href="#expr-paren">expr-paren</a>
     expr-primary    ::= <a href="#expr-brace">expr-brace</a>
     expr-primary    ::= <a href="#expr-delayed-identifier">expr-delayed-identifier</a>
-    expr-primary    ::= expr-primary '.' <a href="#identifier">identifier</a>
+    expr-primary    ::= <a href="#expr-field">expr-field</a>
+    expr-primary    ::= <a href="#expr-subscript">expr-subscript</a>
   </pre>
   
-  <p>Primary expressions are the root of most simple expressions.  The only
-     interesting grammer rule in expr-primary itself is the last one, which
-     is for field access.</p>
-  
-  <p>If the base expression is a tuple, then the identifier is either a named
-     field of the tuple, or it is the magic identifier "field[0-9]" that
-     accesses the specified anonymous member of the tuple.</p>
-  
-  <p>If the base expression is a data record with one data element, which has
-     an associated type of tuple (which is true of all struct declarations that
-     have tuple body type), then the field access directly accesses the
-     underlying tuple.</p>
-  
-  <p>No other field accesses are currently allowed.</p>
+  <p>Primary expressions are the root of most simple expressions.</p>
   
   <!-- ===================================================================== -->
   <h3 id="expr-literal">Simple Literals</h3>
@@ -828,6 +816,52 @@
   TODO: explain more, give examples.  Some examples in the <a
   href="#decl-data">data</a> section.</p>
   
+  
+  <!-- ===================================================================== -->
+  <h3 id="expr-field">Field Expressions</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    expr-field ::= <a href="#expr-primary">expr-primary</a> '.' <a href="#identifier">identifier</a>
+  </pre>
+  
+  <p>If the base expression is a tuple, then the identifier is either a named
+  field of the tuple, or it is the magic identifier "field[0-9]" that
+  accesses the specified anonymous member of the tuple.</p>
+  
+  <p>If the base expression is a data record with one data element, which has
+  an associated type of tuple (which is true of all struct declarations that
+  have tuple body type), then the field access directly accesses the
+  underlying tuple.</p>
+  
+  <p>No other field accesses are currently allowed.</p>
+  
+  <!-- ===================================================================== -->
+  <h3 id="expr-subscript">Subscript Expressions</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    expr-subscript ::= <a href="#expr-primary">expr-primary</a> '[' <a href="#expr-single">expr-single</a> ']'
+  </pre>
+  
+  <p>FIXME: Array subscript should just be an overloaded operator like any
+  other.  a[x] should just call a function subscript(a, x).  This will allow
+  natural support for arrays and dictionaries, whose implementation of subscript
+  comes from the stdlib.</p>
+  
+  <p>FIXME2: Two problems with this: 1) we need support for lvalue function
+  calls e.g. f(a, x) = 4, otherwise we can't use an array subscript as an
+  lvalue. 2) we want overloading in the long term to get non-array types.</p>
+  
+  
+  <!--
+  <p>On an array, the subscript expression accesses the specified element number
+  of the array, where the first element is numbered zero.  The index expression
+  is required to convert to an integer type.  All array accesses
+  are bounds checked and out-of-bounds array accesses are detected at either
+  compile time or run time.</p>
+  
+  <p>TODO: Eventually support map operations etc.</p> -->
   
   <!-- ===================================================================== -->
   <h3 id="expr-apply">Function Application</h3>

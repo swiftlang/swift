@@ -847,13 +847,21 @@ bool Parser::ParseExprSingle(llvm::NullablePtr<Expr> &Result,
 ///     ':' identifier
 ///     expr-paren
 ///     expr-brace
-///     expr-primary '.' identifier
-///     expr-primary '[' expr-single ']'
+///     expr-field
+///     expr-subscript
 ///     expr-primary-fn expr-primary
+///
 ///   expr-primary-fn:
 ///     expr-primary      Type sensitive: iff expr has fn type
+///
 ///   expr-literal:
 ///     numeric_constant
+///
+///   expr-field:
+///     expr-primary '.' identifier
+///
+///   expr-subscript:
+///     expr-primary '[' expr-single ']'
 bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
   switch (Tok.getKind()) {
   case tok::numeric_constant:
