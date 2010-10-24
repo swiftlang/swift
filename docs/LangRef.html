@@ -155,6 +155,9 @@
   <p>FIXME: $0 and friends are modeled as an identifier not a keyword, the
      proto needs to be fixed so that you aren't allowed to define $0.</p>
 
+  <p>FIXME: Change "foo.field0" to "foo.$0" for accessing an anonymous tuple
+     element.</p>
+
   
   <!-- ===================================================================== -->
   <h3 id="numeric_constant">Numeric Constant</h3>
@@ -349,6 +352,9 @@
 
   </pre>
   
+  <p>FIXME: This should be "identifier ':' type" for similarity with the rest
+  of the grammar!</p>
+  
   <p>A data declaration consists of a comma-separated list of data elements,
   which are each either an identifier or an identifier with a type.  The runtime
   representation of a value of data type only has one of the specified data
@@ -416,10 +422,9 @@
       var c : (:int,:int) -> SomeInts = SomeInts::Two;
     }
   </pre>
-    
   
-  <p>TODO: Need a better name than 'data'.  Should attributes be allowed on data
-  elements?
+  <p>TODO: Need a better name than 'data', how about 'oneof'?  Should attributes
+  be allowed on data elements?
   TODO: Eventually, with generics we'll have equality and inequality operators.
   Data decls should implicitly define these for their types.
   TODO: Need pattern matching and element extraction.
