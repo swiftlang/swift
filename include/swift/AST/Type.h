@@ -28,13 +28,13 @@ namespace swift {
   class ASTContext;
   class Expr;
   class Identifier;
-  class DataDecl;
+  class OneOfDecl;
   
   enum TypeKind {
     BuiltinInt32Kind,
     DependentTypeKind,
     AliasTypeKind,
-    DataTypeKind,
+    OneOfTypeKind,
     TupleTypeKind,
     FunctionTypeKind,
     ArrayTypeKind,
@@ -145,20 +145,20 @@ public:
   }
 };
   
-/// DataType - A type declared with a 'data' declaration.
-class DataType : public Type {
+/// OneOfType - A type declared with a 'oneof' declaration.
+class OneOfType : public Type {
   friend class ASTContext;
-  DataType(DataDecl *DD)
-  : Type(DataTypeKind, this), TheDecl(DD) {}
+  OneOfType(OneOfDecl *DD)
+  : Type(OneOfTypeKind, this), TheDecl(DD) {}
 public:
-  DataDecl *const TheDecl;
+  OneOfDecl *const TheDecl;
   
   void print(llvm::raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const DataType *) { return true; }
+  static bool classof(const OneOfType *) { return true; }
   static bool classof(const Type *T) {
-    return T->Kind == DataTypeKind;
+    return T->Kind == OneOfTypeKind;
   }
 };
 

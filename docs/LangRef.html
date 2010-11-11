@@ -141,7 +141,7 @@
   
   <pre class="grammar">
     keyword ::= '__builtin_int32_type'
-    keyword ::= 'data'
+    keyword ::= 'oneof'
     keyword ::= 'struct'
     keyword ::= 'var'
     keyword ::= 'func'
@@ -198,7 +198,7 @@
     decl-top-level   ::= <a href="#decl-var">decl-var</a>
     decl-top-level   ::= <a href="#decl-func">decl-func</a>
     decl-top-level   ::= <a href="#decl-typealias">decl-typealias</a>
-    decl-top-level   ::= <a href="#decl-data">decl-data</a>
+    decl-top-level   ::= <a href="#decl-oneof">decl-oneof</a>
     decl-top-level   ::= <a href="#decl-struct">decl-struct</a>
   </pre>
   
@@ -219,7 +219,7 @@
   </pre>
   <!-- 
    Note that the initializer can't be expr-singular.  If it were we would fail
-   to handle dependent cases like "var x : somedata  = :foo(4)
+   to handle dependent cases like "var x : somestruct  = :foo(4)
    -->
   
 
@@ -338,54 +338,55 @@
 
   
   <!-- ===================================================================== -->
-  <h3 id="decl-data">data</h3>
+  <h3 id="decl-oneof">oneof</h3>
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-data ::= 'data' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> '{' data-element-list '}'
+    decl-oneof ::= 'oneof' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> '{' oneof-element-list '}'
     
-    data-element-list ::= data-element ','?
-    data-element-list ::= data-element ',' data-element-list
+    oneof-element-list ::= oneof-element ','?
+    oneof-element-list ::= oneof-element ',' oneof-element-list
     
-    data-element      ::= <a href="#identifier">identifier</a>
-    data-element      ::= <a href="#identifier">identifier</a> <a href="#type">type</a>
+    oneof-element      ::= <a href="#identifier">identifier</a>
+    oneof-element      ::= <a href="#identifier">identifier</a> <a href="#type">type</a>
 
   </pre>
   
   <p>FIXME: This should be "identifier ':' type" for similarity with the rest
   of the grammar!</p>
   
-  <p>A data declaration consists of a comma-separated list of data elements,
+  <p>A oneof declaration consists of a comma-separated list of elements,
   which are each either an identifier or an identifier with a type.  The runtime
-  representation of a value of data type only has one of the specified data
-  elements at a time: a data value is a simple discriminated union.  Data
+  representation of a value of oneof type only has one of the specified oneof
+  elements at a time: a oneof value is a simple discriminated union.  Oneof
   declarations are known as <a 
   href="http://en.wikipedia.org/wiki/Algebraic_data_type">algebraic data
   types</a> by the broader programming language community.</p>
   
-  <p>A data declaration declares two things: 1) the name of the data declaration
-  is defined as a new type name, and 2) each of the data elements declares a
-  constructor value which create a value of the data type with the specified
+  <p>A oneof declaration declares two things: 1) the name of the data
+  declaration
+  is defined as a new type name, and 2) each of the oneof elements declares a
+  constructor value which create a value of the oneof type with the specified
   element kind.</p>
   
-  <p>The type of data declaration is injected into the current scope, so it may
+  <p>The type of oneof declaration is injected into the current scope, so it may
   be used as a type name immediately.  The constructor values are defined in a
-  nested scope within the data descriptor type, so they must be accessed with
+  nested scope within the oneof descriptor type, so they must be accessed with
   either a <a href="#expr-identifier">qualified identifier</a> or through
   <a href="#expr-delayed-identifier">delayed identifier resolution</a>
   with <a href="#sema_context">context sensitive type inference</a>.
   </p>
   
-  <p>If the data element has no type specified with it, then the type of the 
-  constructor is the type of the data declaration.  If a data element has a
+  <p>If the oneof element has no type specified with it, then the type of the 
+  constructor is the type of the oneof declaration.  If a oneof element has a
   type "T" associated with it, then the type of the constructor is a function
-  that takes "T" and returns the type of the data declaration.</p>
+  that takes "T" and returns the type of the oneof declaration.</p>
   
-  <p>Here are some examples of data declarations:</p>
+  <p>Here are some examples of oneof declarations:</p>
   
   <pre class="example">
     <i>// Declares three "enums".</i>
-    data DataSearchFlags {
+    oneof DataSearchFlags {
       None, Backward, Anchored
     }
     
@@ -398,7 +399,7 @@
       var a : DataSearchFlags = :None;
     }
     
-    data SomeInts {
+    oneof SomeInts {
       None,             <i>// Doesn't conflict with previous "None".</i>
       One int,          <i>// Argument type is simple int.</i>
       Two (:int, :int)  <i>// Argument type is simple tuple.</i>
@@ -407,7 +408,7 @@
     func f2(a : SomeInts);
     
     func test2() {
-      <i>Constructors for data element can be used in the obvious way.</i>
+      <i>Constructors for oneof element can be used in the obvious way.</i>
       f2(:None);
       f2(:One 4);
       f2(:Two(1, 2));
@@ -423,10 +424,9 @@
     }
   </pre>
   
-  <p>TODO: Need a better name than 'data', how about 'oneof'?  Should attributes
-  be allowed on data elements?
+  <p>TODO: Should attributes be allowed on oneof elements?
   TODO: Eventually, with generics we'll have equality and inequality operators.
-  Data decls should implicitly define these for their types.
+  Oneof decls should implicitly define these for their types.
   TODO: Need pattern matching and element extraction.
   </p>
   
@@ -439,11 +439,11 @@
     decl-struct ::= 'struct' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> <a href="#type">type</a>
   </pre>
 
-  <p>A struct declaration is syntactic sugar for a data declaration of a single
-  element.  It requires that a type be specified, and declares a data with a 
+  <p>A struct declaration is syntactic sugar for a oneof declaration of a single
+  element.  It requires that a type be specified, and declares a oneof with a 
   single constructor value of the same name as the struct.</p>
   
-  <p>Note that unlike data, struct does inject this constructor value into the
+  <p>Note that unlike oneof, struct does inject this constructor value into the
   global scope. This means that you don't need to use qualified lookup to get
   access to the constructor for a struct.</p>
   
@@ -452,7 +452,7 @@
   <pre class="example">
     struct S1 (a : int, b : int)
     
-    data S2 {
+    oneof S2 {
       S2 (a : int, b : int)
     }
     var S2 = S2::S2;   <i>// Constructor injected into global scope.</i>
@@ -545,7 +545,7 @@
     type-identifier ::= <a href="#identifier">identifier</a>
   </pre>
 
-  <p>Types may also be named, through a <a href="#decl-data">data</a>
+  <p>Types may also be named, through a <a href="#decl-oneof">oneof</a>
      declaration, a <a href="#decl-typealias">typealias</a> etc.</p>
 
   
@@ -564,7 +564,7 @@
   <p>Tuples are the primary form of data aggregation in Swift, and are used as
   the building block of <a href="#type-function">function</a> argument lists,
   multiple return values, <a href="#decl-struct">struct</a> and 
-  <a href="#decl-data">data</a> bodies, etc.  Because tuples are widely
+  <a href="#decl-oneof">oneof</a> bodies, etc.  Because tuples are widely
   accessible and available everywhere in the language, aggregate data access and
   transformation is uniform and powerful.</p>
   
@@ -594,9 +594,9 @@
   <i>// Function argument and result is a tuple type.</i>
   func foo(x : int, y : int) -> (val : int, err : int);
 
-  <i>// data and struct declarations with tuple values.</i>
+  <i>// oneof and struct declarations with tuple values.</i>
   struct S (a : int, b : int)
-  data Vertex {
+  oneof Vertex {
     Point2 (x : int, y : int),
     Point3 (x : int, y : int, z : int),
     Point4 (w : int, x : int, y : int, z : int)
@@ -750,7 +750,7 @@
   </p>
   
   <p>TODO: Should this use the expr-identifier production to allow qualified
-     identifiers?  Data members cannot be declared infix, but future module
+     identifiers?  Oneof members cannot be declared infix, but future module
      scopes seem worth accessing :)</p>
 
   <p>A simple example is:</p>
@@ -805,7 +805,7 @@
     expr-identifier ::= <a href="#type-identifier">type-identifier</a> '::' <a href="#identifier">identifier</a>
   </pre>
 
-  <p>Qualified identifiers look up a member of a <a href="decl-data">data</a>
+  <p>Qualified identifiers look up a member of a <a href="decl-oneof">oneof</a>
      or <a href="decl-struct">struct</a> declaration.  The first identifier is
      looked up as a type name.</p>
  
@@ -819,7 +819,7 @@
   
   <p>Qualified reference waits for context sensitive type inference. 
   TODO: explain more, give examples.  Some examples in the <a
-  href="#decl-data">data</a> section.</p>
+  href="#decl-oneof">oneof</a> section.</p>
   
   
   <!-- ===================================================================== -->
@@ -834,7 +834,7 @@
   field of the tuple, or it is the magic identifier "field[0-9]" that
   accesses the specified anonymous member of the tuple.</p>
   
-  <p>If the base expression is a data record with one data element, which has
+  <p>If the base expression is a oneof record with one element, which has
   an associated type of tuple (which is true of all struct declarations that
   have tuple body type), then the field access directly accesses the
   underlying tuple.</p>
@@ -967,7 +967,7 @@
   <h3 id="sema_scope">Scope</h3>
   
   <p>identifier namespaces: tuple elements, types, values.
-  Scope within data decls.</p>
+  Scope within oneof decls.</p>
   
   <h3 id="sema_conversions">Standard Conversions</h3>
   <h3 id="sema_anondecls">Anonymous Argument Resolution</h3>

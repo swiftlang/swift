@@ -35,7 +35,8 @@ void Lexer::Warning(const char *Loc, const llvm::Twine &Message) {
 }
 
 void Lexer::Error(const char *Loc, const llvm::Twine &Message) {
-  SourceMgr.PrintMessage(llvm::SMLoc::getFromPointer(Loc), llvm::Twine(Message), "error");
+  SourceMgr.PrintMessage(llvm::SMLoc::getFromPointer(Loc), llvm::Twine(Message),
+                         "error");
 }
 
 
@@ -87,7 +88,7 @@ void Lexer::LexIdentifier(Token &Result) {
   tok::TokenKind Kind =
   llvm::StringSwitch<tok::TokenKind>(llvm::StringRef(TokStart, CurPtr-TokStart))
     .Case("__builtin_int32_type", tok::kw___builtin_int32_type)
-    .Case("data", tok::kw_data)
+    .Case("oneof", tok::kw_oneof)
     .Case("struct", tok::kw_struct)
     .Case("var", tok::kw_var)
     .Case("func", tok::kw_func)

@@ -30,13 +30,13 @@ namespace swift {
   class ASTContext;
   class Type;
   class Expr;
-  class DataElementDecl;
+  class OneOfElementDecl;
   
 enum DeclKind {
-  DataDeclKind,
+  OneOfDeclKind,
   VarDeclKind,
   FuncDeclKind,
-  DataElementDeclKind,
+  OneOfElementDeclKind,
   ArgDeclKind,
   AnonDeclKind,
   ElementRefDeclKind
@@ -88,7 +88,7 @@ public:
                      unsigned Alignment = 8) throw();  
 };
 
-/// NamedDecl - The common base class between DataDecl and ValueDecl.
+/// NamedDecl - The common base class between OneOfDecl and ValueDecl.
 class NamedDecl : public Decl {
 public:
   Identifier Name;
@@ -99,9 +99,9 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return (D->getKind() == VarDeclKind || D->getKind() == FuncDeclKind ||
-            D->getKind() == DataElementDeclKind || D->getKind() == ArgDeclKind||
+            D->getKind() == OneOfElementDeclKind || D->getKind() == ArgDeclKind||
             D->getKind() == AnonDeclKind || D->getKind() == ElementRefDeclKind||
-            D->getKind() == DataDeclKind);
+            D->getKind() == OneOfDeclKind);
   }
   static bool classof(const NamedDecl *D) { return true; }
   
@@ -115,36 +115,36 @@ protected:
 };
 
 
-/// DataDecl - 'data' declaration.  This  represents the data element itself,
-/// not the elements of the data.
-class DataDecl : public NamedDecl {
+/// OneOfDecl - 'oneof' declaration.  This  represents the oneof declaration
+/// itself, not its elements.
+class OneOfDecl : public NamedDecl {
 public:
-  llvm::SMLoc DataLoc;
+  llvm::SMLoc OneOfLoc;
   
-  DataElementDecl **Elements;
+  OneOfElementDecl **Elements;
   unsigned NumElements;
   
-  DataDecl(llvm::SMLoc dataloc, Identifier name,
-           const DeclAttributes &attrs = DeclAttributes())
-    : NamedDecl(DataDeclKind, name, attrs),
-      DataLoc(dataloc), Elements(0), NumElements(0) {
+  OneOfDecl(llvm::SMLoc oneofloc, Identifier name,
+            const DeclAttributes &attrs = DeclAttributes())
+    : NamedDecl(OneOfDeclKind, name, attrs),
+      OneOfLoc(oneofloc), Elements(0), NumElements(0) {
   }
 
-  llvm::SMLoc getLocStart() const { return DataLoc; }
-  DataElementDecl *getElement(unsigned i) const {
+  llvm::SMLoc getLocStart() const { return OneOfLoc; }
+  OneOfElementDecl *getElement(unsigned i) const {
     assert(i < NumElements && "Invalid index");
     return Elements[i];
   }
 
-  DataElementDecl *getElement(Identifier Name) const;
+  OneOfElementDecl *getElement(Identifier Name) const;
   
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->getKind() == DataDeclKind;
+    return D->getKind() == OneOfDeclKind;
   }
-  static bool classof(const DataDecl *D) { return true; }
+  static bool classof(const OneOfDecl *D) { return true; }
 };
   
 /// ValueDecl - All named decls that are values in the language.  These can
@@ -157,7 +157,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return (D->getKind() == VarDeclKind || D->getKind() == FuncDeclKind ||
-            D->getKind() == DataElementDeclKind || D->getKind() == ArgDeclKind||
+            D->getKind() == OneOfElementDeclKind || D->getKind() == ArgDeclKind||
             D->getKind() == AnonDeclKind || D->getKind() == ElementRefDeclKind);
   }
   static bool classof(const ValueDecl *D) { return true; }
@@ -213,24 +213,24 @@ public:
 };
 
   
-/// DataElementDecl - This represents an element of a 'data' declaration, e.g.
+/// OneOfElementDecl - This represents an element of a 'oneof' declaration, e.g.
 /// X and Y in:
-///   data d { X, Y int }
-/// The type of a DataElementDecl is always the DataType for the containing
-/// data.
-class DataElementDecl : public ValueDecl {
+///   oneof d { X : int, Y : int, Z }
+/// The type of a OneOfElementDecl is always the OneOfType for the containing
+/// oneof.
+class OneOfElementDecl : public ValueDecl {
 public:
   llvm::SMLoc IdentifierLoc;
   
-  /// ArgumentType - This is the type specified with the data element.  For
+  /// ArgumentType - This is the type specified with the oneof element.  For
   /// example 'int' in the Y example above.  This is null if there is no type
-  /// associated with this data element.
+  /// associated with this element (such as in the Z example).
   Type *ArgumentType;
   
   
-  DataElementDecl(llvm::SMLoc identloc, Identifier name, Type *ty,
-                  Type *argtype)
-  : ValueDecl(DataElementDeclKind, name, ty, 0),
+  OneOfElementDecl(llvm::SMLoc identloc, Identifier name, Type *ty,
+                   Type *argtype)
+  : ValueDecl(OneOfElementDeclKind, name, ty, 0),
     IdentifierLoc(identloc), ArgumentType(argtype) {}
 
   
@@ -240,9 +240,9 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->getKind() == DataElementDeclKind;
+    return D->getKind() == OneOfElementDeclKind;
   }
-  static bool classof(const DataElementDecl *D) { return true; }
+  static bool classof(const OneOfElementDecl *D) { return true; }
  
 };
 

@@ -201,7 +201,7 @@ namespace {
 /// returns true.
 /// 
 Expr *Expr::WalkExpr(Expr *(*Fn)(Expr *E, WalkOrder Order, void *Data),
-                    void *Data) {
+                     void *Data) {
   return ExprWalker(Fn, Data).doIt(this);  
 }
 

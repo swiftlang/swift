@@ -98,11 +98,11 @@ static bool SemaDotIdentifier(Expr *E, llvm::SMLoc DotLoc,
   
   Type *ETy = E->Ty;
 
-  // If this is a member access to a data with a single element constructor,
+  // If this is a member access to a oneof with a single element constructor,
   // allow direct access to the type underlying the single element.  This
   // allows element access on structs, for example.
-  if (DataType *DT = ETy->getAs<DataType>()) {
-    DataDecl *DD = DT->TheDecl;
+  if (OneOfType *DT = ETy->getAs<OneOfType>()) {
+    OneOfDecl *DD = DT->TheDecl;
     if (DD->NumElements == 1 && DD->Elements[0]->ArgumentType)
       ETy = DD->Elements[0]->ArgumentType;
   }
@@ -317,7 +317,7 @@ ActOnScopedIdentifierExpr(llvm::StringRef ScopeName, llvm::SMLoc ScopeLoc,
   }
   
   // Look through type aliases etc.
-  DataType *DT = dyn_cast<DataType>(S.Context.getCanonicalType(TypeScope));
+  OneOfType *DT = dyn_cast<OneOfType>(S.Context.getCanonicalType(TypeScope));
   
   // Reject things like int::x.
   if (DT == 0) {
@@ -326,12 +326,12 @@ ActOnScopedIdentifierExpr(llvm::StringRef ScopeName, llvm::SMLoc ScopeLoc,
   }
   
   if (DT->TheDecl->NumElements == 0) {
-    Error(ScopeLoc, "data '" + ScopeName +
+    Error(ScopeLoc, "oneof '" + ScopeName +
           "' is not complete or has no elements");
     return 0;
   }
   
-  DataElementDecl *Elt = DT->TheDecl->getElement(S.Context.getIdentifier(Name));
+  OneOfElementDecl *Elt = DT->TheDecl->getElement(S.Context.getIdentifier(Name));
   if (Elt == 0) {
     Error(ScopeLoc, "'" + Name + "' is not a member of '" + ScopeName + "'");
     return 0;
@@ -791,12 +791,12 @@ namespace {
     // If this is an UnresolvedMemberExpr, then this provides the type we've
     // been looking for!
     Expr *VisitUnresolvedMemberExpr(UnresolvedMemberExpr *UME) {
-      // The only valid type for an UME is a DataType.
-      DataType *DT = DestTy->getAs<DataType>();
+      // The only valid type for an UME is a OneOfType.
+      OneOfType *DT = DestTy->getAs<OneOfType>();
       if (DT == 0) return 0;
       
-      // The data type must have an element of the specified name.
-      DataElementDecl *DED = DT->TheDecl->getElement(UME->Name);
+      // The oneof type must have an element of the specified name.
+      OneOfElementDecl *DED = DT->TheDecl->getElement(UME->Name);
       if (DED == 0) return 0;
       
       // If it does, then everything is good, resolve the reference.
@@ -816,13 +816,13 @@ namespace {
     }
     
     Expr *VisitApplyExpr(ApplyExpr *E) {
-      // If we have ":f x" and the result type of the Apply is a DataType, then
-      // :f must be an element constructor for the Data value.  Note that
+      // If we have ":f x" and the result type of the Apply is a OneOfType, then
+      // :f must be an element constructor for the oneof value.  Note that
       // handling this syntactically causes us to reject "(:f) x" as ambiguous.
       if (UnresolvedMemberExpr *UME = dyn_cast<UnresolvedMemberExpr>(E->Fn))
-        if (DataType *DT = DestTy->getAs<DataType>()) {
-          // The data type must have an element of the specified name.
-          DataElementDecl *DED = DT->TheDecl->getElement(UME->Name);
+        if (OneOfType *DT = DestTy->getAs<OneOfType>()) {
+          // The oneof type must have an element of the specified name.
+          OneOfElementDecl *DED = DT->TheDecl->getElement(UME->Name);
           if (DED == 0) return 0;
           
           E->Fn = new (SE.S.Context) DeclRefExpr(DED, UME->ColonLoc, DED->Ty);

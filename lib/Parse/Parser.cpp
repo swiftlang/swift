@@ -150,7 +150,7 @@ void Parser::ParseTranslationUnit() {
 /// ParseDeclTopLevel
 ///   decl-top-level:
 ///     ';'
-///     decl-data
+///     decl-oneof
 ///     decl-struct
 ///     decl-func
 ///     decl-typealias
@@ -168,12 +168,12 @@ Decl *Parser::ParseDeclTopLevel() {
     if (ParseDeclTypeAlias()) break;
     return 0;
 
-  case tok::kw_data:
-    if (DataDecl *D = ParseDeclData())
-      return D;
+  case tok::kw_oneof:
+    if (OneOfDecl *O = ParseDeclOneOf())
+      return O;
     break;
   case tok::kw_struct:
-    if (DataDecl *D = ParseDeclStruct())
+    if (OneOfDecl *D = ParseDeclStruct())
       return D;
     break;
   case tok::kw_func:
@@ -505,53 +505,53 @@ FuncDecl *Parser::ParseDeclFunc() {
   return S.decl.ActOnFuncBody(FD, Body.get());
 }
 
-/// ParseDeclData - Parse a 'data' declaration, returning null (and doing no
+/// ParseDeclOneOf - Parse a 'oneof' declaration, returning null (and doing no
 /// token skipping) on error.
 ///
-///   decl-data:
-///      'data' attribute-list? identifier '{' data-element-list '}'
-///   data-element-list:
-///      data-element ','?
-///      data-element ',' data-element-list
-///   data-element:
+///   decl-oneof:
+///      'oneof' attribute-list? identifier '{' oneof-element-list '}'
+///   oneof-element-list:
+///      oneof-element ','?
+///      oneof-element ',' oneof-element-list
+///   oneof-element:
 ///      identifier
 ///      identifier type
 ///      
-DataDecl *Parser::ParseDeclData() {
-  SMLoc DataLoc = Tok.getLoc();
-  ConsumeToken(tok::kw_data);
+OneOfDecl *Parser::ParseDeclOneOf() {
+  SMLoc OneOfLoc = Tok.getLoc();
+  ConsumeToken(tok::kw_oneof);
 
   DeclAttributes Attributes;
   if (Tok.is(tok::l_square))
     ParseAttributeList(Attributes);
   
-  llvm::StringRef DataName;
-  if (ParseIdentifier(DataName, "expected identifier in data declaration") ||
-      ParseToken(tok::l_brace, "expected '{' in data declaration"))
+  llvm::StringRef OneOfName;
+  if (ParseIdentifier(OneOfName, "expected identifier in oneof declaration") ||
+      ParseToken(tok::l_brace, "expected '{' in oneof declaration"))
     return 0;
-  Identifier DataIdentifier = S.Context.getIdentifier(DataName);
+  Identifier OneOfIdentifier = S.Context.getIdentifier(OneOfName);
   
-  // Give the information about the decl to Sema.  This registers the data for
-  // name lookup allowing recursive datas.
-  DataDecl *TheDataDecl = S.decl.ActOnDataDecl(DataLoc, DataIdentifier,
-                                               Attributes);
+  // Give the information about the decl to Sema.  This registers the oneof for
+  // name lookup allowing recursive oneof's.
+  OneOfDecl *TheOneOfDecl = S.decl.ActOnOneOfDecl(OneOfLoc, OneOfIdentifier,
+                                                  Attributes);
   
-  llvm::SmallVector<SemaDecl::DataElementInfo, 8> ElementInfos;
+  llvm::SmallVector<SemaDecl::OneOfElementInfo, 8> ElementInfos;
   
-  // Parse the comma separated list of data elements.
+  // Parse the comma separated list of oneof elements.
   while (Tok.is(tok::identifier)) {
-    SemaDecl::DataElementInfo ElementInfo;
+    SemaDecl::OneOfElementInfo ElementInfo;
     ElementInfo.Name = Tok.getText();
     ElementInfo.NameLoc = Tok.getLoc();
     ElementInfo.EltType = 0;
 
     ConsumeToken(tok::identifier);
 
-    // See if we have a type specifier for this data element.  If so, parse it.
+    // See if we have a type specifier for this oneof element.  If so, parse it.
     if (Tok.isNot(tok::comma) && Tok.isNot(tok::r_brace))
       if (ParseType(ElementInfo.EltType,
-                    "expected type while parsing data element '" +
-                    DataName + "'")) {
+                    "expected type while parsing oneof element '" +
+                    OneOfName + "'")) {
         SkipUntil(tok::r_brace);
         return 0;
       }
@@ -563,23 +563,23 @@ DataDecl *Parser::ParseDeclData() {
       break;
   }
 
-  ParseToken(tok::r_brace, "expected '}' at end of data declaration");
+  ParseToken(tok::r_brace, "expected '}' at end of oneof declaration");
   
-  S.decl.ActOnCompleteDataDecl(TheDataDecl, ElementInfos.data(),
-                               ElementInfos.size());
+  S.decl.ActOnCompleteOneOfDecl(TheOneOfDecl, ElementInfos.data(),
+                                ElementInfos.size());
   
-  return TheDataDecl;
+  return TheOneOfDecl;
 }
 
 
 /// ParseDeclStruct - Parse a 'struct' declaration, returning null (and doing no
-/// token skipping) on error.  A 'struct' is just syntactic sugar for a data
+/// token skipping) on error.  A 'struct' is just syntactic sugar for a oneof
 /// with a single element.
 ///
 ///   decl-struct:
 ///      'struct' attribute-list? identifier type
 ///
-DataDecl *Parser::ParseDeclStruct() {
+OneOfDecl *Parser::ParseDeclStruct() {
   SMLoc StructLoc = Tok.getLoc();
   ConsumeToken(tok::kw_struct);
   
@@ -602,23 +602,23 @@ DataDecl *Parser::ParseDeclStruct() {
   
   
   // If we got here, then the 'struct' is syntactically fine, invoke the
-  // semantic actions for the syntactically expanded data declaration.
-  DataDecl *TheDataDecl = S.decl.ActOnDataDecl(StructLoc, StructIdentifier,
+  // semantic actions for the syntactically expanded oneof declaration.
+  OneOfDecl *TheOneOfDecl = S.decl.ActOnOneOfDecl(StructLoc, StructIdentifier,
                                                Attributes);
   
-  SemaDecl::DataElementInfo ElementInfo;
+  SemaDecl::OneOfElementInfo ElementInfo;
   ElementInfo.Name = StructName;
   ElementInfo.NameLoc = StructLoc;
   ElementInfo.EltType = Ty;
-  S.decl.ActOnCompleteDataDecl(TheDataDecl, &ElementInfo, 1);
+  S.decl.ActOnCompleteOneOfDecl(TheOneOfDecl, &ElementInfo, 1);
   
 
-  // In addition to defining the data declaration, structs also inject their
+  // In addition to defining the oneof declaration, structs also inject their
   // constructor into the global scope.
-  assert(TheDataDecl->NumElements == 1 && "Struct has exactly one element");
-  S.decl.AddToScope(TheDataDecl->Elements[0]);
+  assert(TheOneOfDecl->NumElements == 1 && "Struct has exactly one element");
+  S.decl.AddToScope(TheOneOfDecl->Elements[0]);
   
-  return TheDataDecl;
+  return TheOneOfDecl;
 }
 
 

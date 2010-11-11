@@ -32,10 +32,10 @@ void *Decl::operator new(size_t Bytes, ASTContext &C,
 
 llvm::SMLoc NamedDecl::getLocStart() const {
   switch (getKind()) {
-  case DataDeclKind:       return cast<DataDecl>(this)->getLocStart();
+  case OneOfDeclKind:       return cast<OneOfDecl>(this)->getLocStart();
   case VarDeclKind:        return cast<VarDecl>(this)->getLocStart();
   case FuncDeclKind:       return cast<FuncDecl>(this)->getLocStart();
-  case DataElementDeclKind:return cast<DataElementDecl>(this)->getLocStart();
+  case OneOfElementDeclKind:return cast<OneOfElementDecl>(this)->getLocStart();
   case ArgDeclKind:        return cast<ArgDecl>(this)->getLocStart();
   case AnonDeclKind:       return cast<AnonDecl>(this)->getLocStart();
   case ElementRefDeclKind: return cast<ElementRefDecl>(this)->getLocStart();
@@ -45,8 +45,8 @@ llvm::SMLoc NamedDecl::getLocStart() const {
   return llvm::SMLoc();
 }
 
-DataElementDecl *DataDecl::getElement(Identifier Name) const {
-  // FIXME: Linear search is not great for large data decls.
+OneOfElementDecl *OneOfDecl::getElement(Identifier Name) const {
+  // FIXME: Linear search is not great for large oneof decls.
   for (unsigned i = 0, e = NumElements; i != e; ++i)
     if (Elements[i]->Name == Name)
       return Elements[i];
@@ -59,10 +59,10 @@ void Decl::dump() const { print(llvm::errs()); llvm::errs() << '\n'; }
 
 void Decl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   switch (getKind()) {
-  case DataDeclKind:       return cast<DataDecl>(this)->print(OS, Indent);
+  case OneOfDeclKind:       return cast<OneOfDecl>(this)->print(OS, Indent);
   case VarDeclKind:        return cast<VarDecl>(this)->print(OS, Indent);
   case FuncDeclKind:       return cast<FuncDecl>(this)->print(OS, Indent);
-  case DataElementDeclKind:return cast<DataElementDecl>(this)->print(OS,Indent);
+  case OneOfElementDeclKind:return cast<OneOfElementDecl>(this)->print(OS,Indent);
   case ArgDeclKind:        return cast<ArgDecl>(this)->print(OS, Indent);
   case AnonDeclKind:       return cast<AnonDecl>(this)->print(OS, Indent);
   case ElementRefDeclKind: return cast<ElementRefDecl>(this)->print(OS, Indent);
@@ -73,8 +73,8 @@ void NamedDecl::printCommon(llvm::raw_ostream &OS, unsigned Indent) const {
   OS << "'" << Name << "'";
 }
 
-void DataDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(datadecl ";
+void OneOfDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
+  OS.indent(Indent) << "(oneofdecl ";
   printCommon(OS, Indent);
   
   for (unsigned i = 0, e = NumElements; i != e; ++i) {
@@ -109,8 +109,8 @@ void FuncDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   printCommon(OS, Indent);
 }
 
-void DataElementDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(dataeltdecl ";
+void OneOfElementDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
+  OS.indent(Indent) << "(oneofelementdecl ";
   printCommon(OS, Indent);
 }
 

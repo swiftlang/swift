@@ -35,7 +35,7 @@ namespace swift {
   class Type;
   class Decl;
   class DeclAttributes;
-  class DataDecl;
+  class OneOfDecl;
   class FuncDecl;
   class VarDecl;
   class ASTContext;
@@ -106,8 +106,8 @@ private:
   bool ParseAttribute(DeclAttributes &Attributes);
   bool ParseVarName(NameRecord &Record);
   
-  DataDecl *ParseDeclData();
-  DataDecl *ParseDeclStruct();
+  OneOfDecl *ParseDeclOneOf();
+  OneOfDecl *ParseDeclStruct();
   VarDecl *ParseDeclVar();
   FuncDecl *ParseDeclFunc();
   

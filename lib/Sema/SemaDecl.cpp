@@ -350,32 +350,32 @@ void SemaDecl::ActOnTypeAlias(llvm::SMLoc TypeAliasLoc, llvm::StringRef Name,
 }
 
 
-DataDecl *SemaDecl::ActOnDataDecl(llvm::SMLoc DataLoc, Identifier Name,
+OneOfDecl *SemaDecl::ActOnOneOfDecl(llvm::SMLoc OneOfLoc, Identifier Name,
                                   DeclAttributes &Attrs) {
   // FIXME: Do name lookup on the type to diagnose type redefinitions.
   
-  DataDecl *TheDecl = new (S.Context) DataDecl(DataLoc, Name, Attrs);
+  OneOfDecl *TheDecl = new (S.Context) OneOfDecl(OneOfLoc, Name, Attrs);
 
   // FIXME: Should have a NamedType class with loc info to diagnose the
   // redefinition?
   if (S.Context.getNamedType(Name))
-    Error(DataLoc, "redefinition of type named '" + llvm::StringRef(Name.get())+
-          "'");
-  else  
-    S.Context.InstallDataType(TheDecl);
+    Error(OneOfLoc, "redefinition of type named '" +
+          llvm::StringRef(Name.get()) + "'");
+  else
+    S.Context.InstallOneOfType(TheDecl);
 
   return TheDecl;
 }
 
-void SemaDecl::ActOnCompleteDataDecl(DataDecl *DD,
-                                     const DataElementInfo *Elements,
+void SemaDecl::ActOnCompleteOneOfDecl(OneOfDecl *DD,
+                                     const OneOfElementInfo *Elements,
                                      unsigned NumElements) {
-  assert(DD->NumElements == 0 && "Data defined multiple times?");
+  assert(DD->NumElements == 0 && "OneOf defined multiple times?");
   
   Type *DDType = S.Context.getNamedType(DD->Name);
-  assert(DDType && llvm::isa<DataType>(DDType) && "Symbol table mishap");
+  assert(DDType && llvm::isa<OneOfType>(DDType) && "Symbol table mishap");
   
-  DataElementDecl **NewElements =(DataElementDecl**)
+  OneOfElementDecl **NewElements =(OneOfElementDecl**)
     S.Context.Allocate(sizeof(*NewElements)*NumElements, 8);
 
   llvm::SmallPtrSet<const char *, 16> SeenSoFar;
@@ -395,14 +395,14 @@ void SemaDecl::ActOnCompleteDataDecl(DataDecl *DD,
       continue;
     }
     
-    // If the Data Element takes a type argument, then it is actually a function
-    // that takes the type argument and returns the DDType.
+    // If the OneOf Element takes a type argument, then it is actually a
+    // function that takes the type argument and returns the DDType.
     Type *EltType = DDType;
     if (Elements[i].EltType)
       EltType = S.Context.getFunctionType(Elements[i].EltType, EltType);      
    
     NewElements[i] =
-      new (S.Context) DataElementDecl(Elements[i].NameLoc, NameI, EltType,
+      new (S.Context) OneOfElementDecl(Elements[i].NameLoc, NameI, EltType,
                                       Elements[i].EltType);
   }
   

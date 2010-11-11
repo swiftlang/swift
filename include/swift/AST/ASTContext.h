@@ -28,13 +28,13 @@ namespace llvm {
 
 namespace swift {
   class Type;
-  class DataType;
+  class OneOfType;
   class TupleType;
   class FunctionType;
   class ArrayType;
   class Identifier;
   class TupleTypeElt;
-  class DataDecl;
+  class OneOfDecl;
 
 /// ASTContext - This object creates and owns the AST objects.
 class ASTContext {
@@ -44,7 +44,7 @@ class ASTContext {
   
   void *IdentifierTable; // llvm::StringMap<char>
   void *AliasTypes;      // llvm::DenseMap<Identifier, AliasType*>
-  void *DataTypes;       // llvm::DenseMap<Identifier, DataType*>
+  void *OneOfTypes;      // llvm::DenseMap<Identifier, OneOfType*>
   void *TupleTypes;      // llvm::FoldingSet<TupleType>
   void *FunctionTypes;   // DenseMap<std::pair<Type*, Type*>, FunctionType*>
   void *ArrayTypes;      // DenseMap<std::pair<Type*, uint64_t>, ArrayType*>
@@ -88,9 +88,9 @@ public:
   /// same name.
   void InstallAliasType(Identifier Name, Type *Underlying);
   
-  /// InstallDataType - Return the type corresponding to the specified data
+  /// InstallOneOfType - Return the type corresponding to the specified oneof
   /// declaration.
-  void InstallDataType(DataDecl *TheDecl);
+  void InstallOneOfType(OneOfDecl *TheDecl);
                           
   /// getTupleType - Return the uniqued tuple type with the specified elements.
   TupleType *getTupleType(const TupleTypeElt *Fields,

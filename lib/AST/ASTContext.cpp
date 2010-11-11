@@ -30,8 +30,8 @@ typedef llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTableMapTy;
 /// AliasTypesMapTy - This is the type underlying AliasTypes.
 typedef llvm::DenseMap<Identifier, AliasType*> AliasTypesMapTy;
 
-/// DataTypesMapTy - This is the type underlying DataTypes.
-typedef llvm::DenseMap<Identifier, DataType*> DataTypesMapTy;
+/// OneOfTypesMapTy - This is the type underlying OneOfTypes.
+typedef llvm::DenseMap<Identifier, OneOfType*> OneOfTypesMapTy;
 
 /// TupleTypesMapTy - This is the actual type underlying ASTContext::TupleTypes.
 typedef llvm::FoldingSet<TupleType> TupleTypesMapTy;
@@ -46,7 +46,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
   : Allocator(new llvm::BumpPtrAllocator()),
     IdentifierTable(new IdentifierTableMapTy(*Allocator)),
     AliasTypes(new AliasTypesMapTy()),
-    DataTypes(new DataTypesMapTy()),
+    OneOfTypes(new OneOfTypesMapTy()),
     TupleTypes(new TupleTypesMapTy()),
     FunctionTypes(new FunctionTypesMapTy()),
     ArrayTypes(new ArrayTypesMapTy()),
@@ -58,7 +58,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
 
 ASTContext::~ASTContext() {
   delete (AliasTypesMapTy*)AliasTypes; AliasTypes = 0;
-  delete (DataTypesMapTy*)DataTypes; DataTypes = 0;
+  delete (OneOfTypesMapTy*)OneOfTypes; OneOfTypes = 0;
   delete (TupleTypesMapTy*)TupleTypes; TupleTypes = 0;
   delete (FunctionTypesMapTy*)FunctionTypes; FunctionTypes = 0;
   delete (ArrayTypesMapTy*)ArrayTypes; ArrayTypes = 0;
@@ -96,7 +96,7 @@ Type *ASTContext::getCanonicalType(Type *T) {
   switch (T->Kind) {
   case BuiltinInt32Kind:
   case DependentTypeKind:
-  case DataTypeKind:
+  case OneOfTypeKind:
     assert(0 && "These are always canonical");
   case AliasTypeKind:
     return T->CanonicalType =
@@ -149,8 +149,8 @@ Type *ASTContext::getNamedType(Identifier Name) {
   }
 
   {
-    DataTypesMapTy &Table = *((DataTypesMapTy*)DataTypes);
-    DataTypesMapTy::iterator It = Table.find(Name);
+    OneOfTypesMapTy &Table = *((OneOfTypesMapTy*)OneOfTypes);
+    OneOfTypesMapTy::iterator It = Table.find(Name);
     if (It != Table.end())
       return It->second;
   }
@@ -166,13 +166,13 @@ void ASTContext::InstallAliasType(Identifier Name, Type *Underlying) {
   Entry = new (*this) AliasType(Name, Underlying);
 }
 
-/// InstallDataType - Install the type corresponding to the specified data
+/// InstallOneOfType - Install the type corresponding to the specified oneof
 /// declaration.
-void ASTContext::InstallDataType(DataDecl *TheDecl) {
+void ASTContext::InstallOneOfType(OneOfDecl *TheDecl) {
   assert(TheDecl->Name.get() != 0);
-  DataType *&Entry = (*(DataTypesMapTy*)DataTypes)[TheDecl->Name];
+  OneOfType *&Entry = (*(OneOfTypesMapTy*)OneOfTypes)[TheDecl->Name];
   assert(Entry == 0 && "Named type redefinition");
-  Entry = new (*this) DataType(TheDecl);
+  Entry = new (*this) OneOfType(TheDecl);
 }
 
 /// getTupleType - Return the uniqued tuple type with the specified elements.

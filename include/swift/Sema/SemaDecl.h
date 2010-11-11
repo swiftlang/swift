@@ -33,7 +33,7 @@ namespace llvm {
 namespace swift {
   class Expr;
   class Type;
-  class DataDecl;
+  class OneOfDecl;
   class VarDecl;
   class FuncDecl;
   class AnonDecl;
@@ -98,16 +98,16 @@ public:
   void CreateArgumentDeclsForFunc(FuncDecl *FD);
   FuncDecl *ActOnFuncBody(FuncDecl *FD, Expr *Body);
 
-  DataDecl *ActOnDataDecl(llvm::SMLoc DataLoc, Identifier Name,
+  OneOfDecl *ActOnOneOfDecl(llvm::SMLoc OneOfLoc, Identifier Name,
                           DeclAttributes &Attrs);
   
-  struct DataElementInfo {
+  struct OneOfElementInfo {
     llvm::SMLoc NameLoc;
     llvm::StringRef Name;
     Type *EltType;
   };
   
-  void ActOnCompleteDataDecl(DataDecl *DD, const DataElementInfo *Elements,
+  void ActOnCompleteOneOfDecl(OneOfDecl *DD, const OneOfElementInfo *Elements,
                              unsigned NumElements);
   
   // Name processing.

@@ -35,7 +35,7 @@ Type *Type::getDesugaredType() {
   switch (Kind) {
   case DependentTypeKind:
   case BuiltinInt32Kind:
-  case DataTypeKind:
+  case OneOfTypeKind:
   case TupleTypeKind:
   case FunctionTypeKind:
   case ArrayTypeKind:
@@ -76,7 +76,7 @@ void Type::print(llvm::raw_ostream &OS) const {
   case DependentTypeKind:     return cast<DependentType>(this)->print(OS);
   case BuiltinInt32Kind:      return cast<BuiltinType>(this)->print(OS);
   case AliasTypeKind:         return cast<AliasType>(this)->print(OS);
-  case DataTypeKind:          return cast<DataType>(this)->print(OS);
+  case OneOfTypeKind:          return cast<OneOfType>(this)->print(OS);
   case TupleTypeKind:         return cast<TupleType>(this)->print(OS);
   case FunctionTypeKind:      return cast<FunctionType>(this)->print(OS);
   case ArrayTypeKind:         return cast<ArrayType>(this)->print(OS);
@@ -98,7 +98,7 @@ void AliasType::print(llvm::raw_ostream &OS) const {
   OS << Name.get();
 }
 
-void DataType::print(llvm::raw_ostream &OS) const {
+void OneOfType::print(llvm::raw_ostream &OS) const {
   OS << TheDecl->Name.get();
 }
 
@@ -128,4 +128,4 @@ void ArrayType::print(llvm::raw_ostream &OS) const {
   if (Size)
     OS << Size;
   OS << ']';
-  }
+}
