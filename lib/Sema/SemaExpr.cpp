@@ -115,20 +115,20 @@ static bool SemaDotIdentifier(Expr *E, llvm::SMLoc DotLoc,
       return false;
     }
 
-    // Okay, the field name was invalid.  If the field name starts with 'field'
-    // and is otherwise an integer, process it as a field index.
-    if (Name.getLength() == 6 &&
-        memcmp(Name.get(), "field", 5) == 0 &&
-        // FIXME: Support field numbers larger than 9.
-        isdigit(Name.get()[5])) {
-      FieldNo = Name.get()[5]-'0';
-      if (unsigned(FieldNo) >= TT->NumFields) {
-        SE.Error(NameLoc, "field number is too large for tuple");
-        return true;
-      }
+    // Okay, the field name was invalid.  If this is a dollarident like $4,
+    // process it as a field index.
+    if (Name.getLength() > 1 && Name.get()[0] == '$') {
+      unsigned Value = 0;
+      if (!llvm::StringRef(Name.get()+1).getAsInteger(10, Value)) {
+        if (Value >= TT->NumFields) {
+          SE.Error(NameLoc, "field number is too large for tuple");
+          return true;
+        }
         
-      ResultTy = TT->getElementType(FieldNo);
-      return false;
+        FieldNo = Value;
+        ResultTy = TT->getElementType(Value);
+        return false;
+      }
     }
     
     // Otherwise, we just have an unknown field name.
@@ -291,6 +291,7 @@ NullablePtr<Expr> SemaExpr::ActOnNumericConstant(llvm::StringRef Text,
 NullablePtr<Expr> 
 SemaExpr::ActOnDollarIdentExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
   ValueDecl *D = S.decl.GetAnonDecl(Text, Loc);
+  if (D == 0) return 0;
   
   Type *ResultTy = 0;
   if (SemaDeclRefExpr(D, Loc, ResultTy, *this)) return 0;

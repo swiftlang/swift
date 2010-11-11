@@ -69,11 +69,10 @@ ValueDecl *SemaDecl::LookupValueName(Identifier Name) {
 AnonDecl *SemaDecl::GetAnonDecl(llvm::StringRef Text, llvm::SMLoc RefLoc) {
   assert(Text.size() >= 2 && Text[0] == '$' && 
          Text[1] >= '0' && Text[1] <= '9' && "Not a valid anon decl");
-  unsigned ArgNo = Text[1]-'0';
-  
-  for (unsigned i = 2, e = Text.size(); i != e; ++i) {
-    assert(isdigit(Text[i]) && "Invalid digit in anondecl");
-    ArgNo = ArgNo*10+(Text[i]-'0');
+  unsigned ArgNo = 0;
+  if (Text.substr(1).getAsInteger(10, ArgNo)) {
+    Error(RefLoc, "invalid name in $ expression");
+    return 0;
   }
            
   // If this is the first reference to the anonymous symbol decl, create it.

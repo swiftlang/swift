@@ -860,6 +860,7 @@ bool Parser::ParseExprSingle(llvm::NullablePtr<Expr> &Result,
 ///
 ///   expr-field:
 ///     expr-primary '.' identifier
+///     expr-primary '.' dollarident
 ///
 ///   expr-subscript:
 ///     expr-primary '[' expr-single ']'
@@ -904,7 +905,7 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
     // Check for a .foo suffix.
     SMLoc TokLoc = Tok.getLoc();
     if (ConsumeIf(tok::period)) {
-      if (Tok.isNot(tok::identifier)) {
+      if (Tok.isNot(tok::identifier) && Tok.isNot(tok::dollarident)) {
         Error(Tok.getLoc(), "expected field name");
         return true;
       }
@@ -912,7 +913,10 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
       if (!Result.isNull())
         Result = S.expr.ActOnDotIdentifier(Result.get(), TokLoc, Tok.getText(),
                                            Tok.getLoc());
-      ConsumeToken(tok::identifier);
+      if (Tok.is(tok::identifier))
+        ConsumeToken(tok::identifier);
+      else
+        ConsumeToken(tok::dollarident);
       continue;
     }
     

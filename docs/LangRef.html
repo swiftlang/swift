@@ -234,9 +234,6 @@
   fixed purpose names that are defined by the implementation.
   </p>
 
-  <p>FIXME: Change "foo.field0" to "foo.$0" for accessing an anonymous tuple
-  element.</p>
-
   
   <!-- ********************************************************************* -->
   <h2 id="decl">Declarations</h2>
@@ -919,12 +916,11 @@
   
   <pre class="grammar">
     expr-field ::= <a href="#expr-primary">expr-primary</a> '.' <a href="#identifier">identifier</a>
+    expr-field ::= <a href="#expr-primary">expr-primary</a> '.' <a href="#dollarident">dollarident</a>
   </pre>
-  
-  <!--dollarident-->
-  
+    
   <p>If the base expression is a tuple, then the identifier is either a named
-  field of the tuple, or it is the magic identifier "field[0-9]" that
+  field of the tuple, or it is the magic identifier "$[0-9]+" that
   accesses the specified anonymous member of the tuple.</p>
   
   <p>If the base expression is a oneof record with one element, which has
@@ -933,8 +929,6 @@
   underlying tuple.</p>
   
   <p>No other field accesses are currently allowed.</p>
-  
-  <p>FIXME: Change field0 to $0</p>
   
   <!-- ===================================================================== -->
   <h3 id="expr-subscript">Subscript Expressions</h3>
