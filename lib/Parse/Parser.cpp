@@ -515,7 +515,7 @@ FuncDecl *Parser::ParseDeclFunc() {
 ///      oneof-element ',' oneof-element-list
 ///   oneof-element:
 ///      identifier
-///      identifier type
+///      identifier ':' type
 ///      
 OneOfDecl *Parser::ParseDeclOneOf() {
   SMLoc OneOfLoc = Tok.getLoc();
@@ -548,7 +548,7 @@ OneOfDecl *Parser::ParseDeclOneOf() {
     ConsumeToken(tok::identifier);
 
     // See if we have a type specifier for this oneof element.  If so, parse it.
-    if (Tok.isNot(tok::comma) && Tok.isNot(tok::r_brace))
+    if (ConsumeIf(tok::colon))
       if (ParseType(ElementInfo.EltType,
                     "expected type while parsing oneof element '" +
                     OneOfName + "'")) {

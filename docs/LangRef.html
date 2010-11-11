@@ -33,7 +33,7 @@
     In addition to the main spec, there are lots of open ended questions,
     justification, and ideas of what best practices should be.  That random
     discussion is placed in boxes to the right side of the main text (like this
-    one) to make clarify what is normative and what is discussion.
+    one) to clarify what is normative and what is discussion.
   </div>
   
   
@@ -405,12 +405,9 @@
     oneof-element-list ::= oneof-element ',' oneof-element-list
     
     oneof-element      ::= <a href="#identifier">identifier</a>
-    oneof-element      ::= <a href="#identifier">identifier</a> <a href="#type">type</a>
+    oneof-element      ::= <a href="#identifier">identifier</a> ':' <a href="#type">type</a>
 
   </pre>
-  
-  <p>FIXME: This should be "identifier ':' type" for similarity with the rest
-  of the grammar!</p>
   
   <p>A oneof declaration consists of a comma-separated list of elements,
   which are each either an identifier or an identifier with a type.  The runtime
