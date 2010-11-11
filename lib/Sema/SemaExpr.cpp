@@ -289,14 +289,18 @@ NullablePtr<Expr> SemaExpr::ActOnNumericConstant(llvm::StringRef Text,
 }
 
 NullablePtr<Expr> 
+SemaExpr::ActOnDollarIdentExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
+  ValueDecl *D = S.decl.GetAnonDecl(Text, Loc);
+  
+  Type *ResultTy = 0;
+  if (SemaDeclRefExpr(D, Loc, ResultTy, *this)) return 0;
+  
+  return new (S.Context) DeclRefExpr(D, Loc, D->Ty);
+}
+
+NullablePtr<Expr> 
 SemaExpr::ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
   ValueDecl *D = S.decl.LookupValueName(S.Context.getIdentifier(Text));
-  
-  // If this identifier is $0 -> $9, then it is a use of an implicit anonymous
-  // closure argument.
-  if (D == 0 && Text.size() == 2 &&
-      Text[0] == '$' && Text[1] >= '0' && Text[1] <= '9')
-    D = S.decl.GetAnonDecl(Text, Loc);
   
   Type *ResultTy = 0;
   if (SemaDeclRefExpr(D, Loc, ResultTy, *this)) return 0;

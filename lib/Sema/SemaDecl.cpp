@@ -67,10 +67,15 @@ ValueDecl *SemaDecl::LookupValueName(Identifier Name) {
 /// GetAnonDecl - Get the anondecl for the specified anonymous closure
 /// argument reference.  This occurs for use of $0 .. $9.
 AnonDecl *SemaDecl::GetAnonDecl(llvm::StringRef Text, llvm::SMLoc RefLoc) {
-  assert(Text.size() == 2 && Text[0] == '$' && 
+  assert(Text.size() >= 2 && Text[0] == '$' && 
          Text[1] >= '0' && Text[1] <= '9' && "Not a valid anon decl");
   unsigned ArgNo = Text[1]-'0';
   
+  for (unsigned i = 2, e = Text.size(); i != e; ++i) {
+    assert(isdigit(Text[i]) && "Invalid digit in anondecl");
+    ArgNo = ArgNo*10+(Text[i]-'0');
+  }
+           
   // If this is the first reference to the anonymous symbol decl, create it.
   if (AnonClosureArgs.size() <= ArgNo || AnonClosureArgs[ArgNo].isNull()) {
     // Otherwise, this is the first reference to the anonymous decl,

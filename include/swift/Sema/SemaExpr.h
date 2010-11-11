@@ -77,6 +77,8 @@ public:
   llvm::NullablePtr<Expr>
   ActOnNumericConstant(llvm::StringRef Text, llvm::SMLoc Loc);
   llvm::NullablePtr<Expr>
+  ActOnDollarIdentExpr(llvm::StringRef Text, llvm::SMLoc Loc);
+  llvm::NullablePtr<Expr>
   ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc);
   llvm::NullablePtr<Expr>
   ActOnScopedIdentifierExpr(llvm::StringRef ScopeName, llvm::SMLoc ScopeLoc,

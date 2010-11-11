@@ -75,11 +75,10 @@ void Lexer::SkipSlashSlashComment() {
 }
 
 
-/// LexIdentifier - Match [a-zA-Z_$][a-zA-Z_$0-9]*
+/// LexIdentifier - Match [a-zA-Z_][a-zA-Z_$0-9]*
 void Lexer::LexIdentifier(Token &Result) {
   const char *TokStart = CurPtr-1;
-  assert((isalpha(*TokStart) || *TokStart == '_' || *TokStart == '$') &&
-         "Unexpected start");
+  assert((isalpha(*TokStart) || *TokStart == '_') && "Unexpected start");
   
   // Lex [a-zA-Z_$0-9]*
   while (isalnum(*CurPtr) || *CurPtr == '_' || *CurPtr == '$')
@@ -118,6 +117,18 @@ void Lexer::LexPunctuationIdentifier(Token &Result) {
   }
   
   return FormToken(tok::identifier, TokStart, Result);
+}
+
+/// LexDollarIdent - Match $[0-9a-zA-Z_$]*
+void Lexer::LexDollarIdent(Token &Result) {
+  const char *TokStart = CurPtr-1;
+  assert(*TokStart == '$');
+  
+  // Lex [a-zA-Z_$0-9]*
+  while (isalnum(*CurPtr) || *CurPtr == '_' || *CurPtr == '$')
+    ++CurPtr;
+  
+  return FormToken(tok::dollarident, TokStart, Result);
 }
 
 
@@ -213,8 +224,11 @@ Restart:
   case 'h': case 'i': case 'j': case 'k': case 'l': case 'm': case 'n':
   case 'o': case 'p': case 'q': case 'r': case 's': case 't': case 'u':
   case 'v': case 'w': case 'x': case 'y': case 'z':
-  case '_': case '$':
+  case '_':
     return LexIdentifier(Result);
+  
+  case '$':
+    return LexDollarIdent(Result);
       
   case '0': case '1': case '2': case '3': case '4':
   case '5': case '6': case '7': case '8': case '9':

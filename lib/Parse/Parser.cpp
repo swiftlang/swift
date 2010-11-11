@@ -781,7 +781,8 @@ bool Parser::isStartOfExpr(Token &Tok) const {
   }
   
   return Tok.is(tok::numeric_constant) || Tok.is(tok::colon) ||
-         Tok.is(tok::l_paren) || Tok.is(tok::l_brace);
+         Tok.is(tok::l_paren) || Tok.is(tok::l_brace) ||
+         Tok.is(tok::dollarident);
 }
 
 /// ParseExpr
@@ -851,11 +852,11 @@ bool Parser::ParseExprSingle(llvm::NullablePtr<Expr> &Result,
 ///     expr-subscript
 ///     expr-primary-fn expr-primary
 ///
-///   expr-primary-fn:
-///     expr-primary      Type sensitive: iff expr has fn type
-///
 ///   expr-literal:
 ///     numeric_constant
+///
+///   expr-primary-fn:
+///     expr-primary      Type sensitive: iff expr has fn type
 ///
 ///   expr-field:
 ///     expr-primary '.' identifier
@@ -869,6 +870,7 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
     ConsumeToken(tok::numeric_constant);
     break;
 
+  case tok::dollarident: // $1
   case tok::identifier:  // foo   and  foo::bar
     if (ParseExprIdentifier(Result)) return true;
     break;
@@ -977,12 +979,29 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
 ///
 ///   expr-identifier:
 ///     identifier
+///     dollarident
 ///     identifier '::' identifier
 bool Parser::ParseExprIdentifier(llvm::NullablePtr<Expr> &Result) {
   llvm::StringRef Name = Tok.getText();
-  SMLoc Loc = Tok.getLoc(); 
-  ConsumeToken(tok::identifier);
+  SMLoc Loc = Tok.getLoc();
   
+  if (Tok.is(tok::dollarident)) {
+    ConsumeToken(tok::dollarident);
+    assert(Name[0] == '$' && "Not a dollarident");
+    bool AllNumeric = true;
+    for (unsigned i = 1, e = Name.size(); i != e; ++i)
+      AllNumeric &= isdigit(Name[i]);
+    
+    if (Name.size() == 1 || !AllNumeric) {
+      Error(Loc, "invalid identifier, expected expression");
+      return true;
+    }
+    Result = S.expr.ActOnDollarIdentExpr(Name, Loc);
+    return false;
+  }
+
+  ConsumeToken(tok::identifier);
+
   if (Tok.isNot(tok::coloncolon)) {
     Result = S.expr.ActOnIdentifierExpr(Name, Loc);
     return false;

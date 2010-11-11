@@ -184,17 +184,11 @@
     keyword ::= 'var'
     keyword ::= 'func'
     keyword ::= 'typealias'
-    keyword ::= '$[0-9]'
   </pre>
 
   <p>These are the builtin keywords.  Swift intentionally tries to reduce the
      number of keywords where possible.</p>
 
-  <p>FIXME: $0 and friends are modeled as an identifier not a keyword, the
-  proto needs to be fixed so that you aren't allowed to define $0.</p>
-  <p>FIXME: Change "foo.field0" to "foo.$0" for accessing an anonymous tuple
-  element.</p>
-  <p>FIXME: Allow $1234</p>
   <p>FIXME: __ should be considered the compiler/languages reserved namespace,
   any use of an unknown identifier here should be an error.</p>
 
@@ -216,10 +210,9 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    identifier ::= [a-zA-Z_$][a-zA-Z_$0-9]*
+    identifier ::= [a-zA-Z_][a-zA-Z_$0-9]*
     identifier ::= [/=-+*%&lt;&gt;!&amp;|^]+
   </pre>
-
   
   <p>There are two different regular expressions for identifiers, one for normal
      identifiers and one for "punctuation identifiers".  This ensures that
@@ -228,7 +221,22 @@
      between these two forms of identifiers.
   </p>
   
+  <!-- ===================================================================== -->
+  <h3 id="dollarident">Implementation Identifier Token</h3>
+  <!-- ===================================================================== -->
   
+  <pre class="grammar">
+    dollarident ::= $[0-9a-zA-Z_$]*
+  </pre>
+  
+  
+  <p>Tokens that start with a $ are separate class of identifier, which are
+  fixed purpose names that are defined by the implementation.
+  </p>
+
+  <p>FIXME: Change "foo.field0" to "foo.$0" for accessing an anonymous tuple
+  element.</p>
+
   
   <!-- ********************************************************************* -->
   <h2 id="decl">Declarations</h2>
@@ -710,7 +718,7 @@
   a linear sequence of elements stored consequtively memory.  Array elements may
   be efficiently indexed in constant time.  All array indexes are bounds checked
   and out of bound accesses are diagnosed with either a compile time or
-  runtime failure (FIXME: runtime failure mode not specified).</p>
+  runtime failure (TODO: runtime failure mode not specified).</p>
   
   <p>While they look syntactically very similar, an array type with a size has
   very different semantics than an array without.  In the former case, the type
@@ -876,6 +884,15 @@
      declarations.</p>
   
   <pre class="grammar">
+    expr-identifier ::= <a href="#dollarident">dollarident</a>
+  </pre>
+
+  <p>A use of an implementation identifier whose name fits the "$[0-9]+" regular
+  expression is a reference to an anonymous closure argument that is formed when
+  the containing expression is <a href="#sema_anondecls">coerced into a closure
+  context</a>.  All other implementation identifiers are invalid.</p>
+  
+  <pre class="grammar">
     expr-identifier ::= <a href="#type-identifier">type-identifier</a> '::' <a href="#identifier">identifier</a>
   </pre>
 
@@ -903,6 +920,8 @@
   <pre class="grammar">
     expr-field ::= <a href="#expr-primary">expr-primary</a> '.' <a href="#identifier">identifier</a>
   </pre>
+  
+  <!--dollarident-->
   
   <p>If the base expression is a tuple, then the identifier is either a named
   field of the tuple, or it is the magic identifier "field[0-9]" that

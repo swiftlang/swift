@@ -27,6 +27,7 @@ namespace tok {
     unknown = 0,
     eof,
     identifier,
+    dollarident,
     numeric_constant,
     
 #define KEYWORD(X) kw_ ## X,
