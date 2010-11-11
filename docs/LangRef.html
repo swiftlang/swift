@@ -9,18 +9,13 @@
       content="Swift Language Reference Manual.">
   <link rel="stylesheet" href="swift.css" type="text/css">
     
-    <!-- FIXME: Self contained! -->
-  <script type="text/javascript" src="http://golang.org/doc/godocs.js"></script>
+  <script type="text/javascript" src="toc.js"></script>
 
 </head>
   
 <body>
 
 <h1>Swift Language Reference</h1>
-
-<!-- Hack to be compatible with the go stuff -->
-<input id="search" type="text" name="q" value="code search" class="inactive"
-   style="display: none"/>
   
 <p>
 <!-- The Table of Contents is automatically inserted in this <div>.
@@ -33,6 +28,14 @@
   <!-- ********************************************************************* -->
   <h2>Introduction</h2>
   <!-- ********************************************************************* -->
+
+  <div class="commentary">
+    In addition to the main spec, there are lots of open ended questions,
+    justification, and ideas of what best practices should be.  That random
+    discussion is placed in boxes to the right side of the main text (like this
+    one) to make clarify what is normative and what is discussion.
+  </div>
+  
   
   <p>This is the language reference manual for the Swift language, which is
   highly volatile and constantly under development.  It is my (Chris') intention
@@ -41,10 +44,16 @@
   <p>The grammar and structure of the language is defined in BNF form in yellow
   boxes.  Examples are shown in gray boxes, and assume that the standard library
   is in use (unless otherwise specified).</p>
-  
+    
   <!-- ===================================================================== -->
   <h3>Basic Goals</h3>
   <!-- ===================================================================== -->
+
+  <div class="commentary">
+    A non-goal of the Swift project in general is to become some amazing
+    research project.  We really want to focus on delivering a real product,
+    and having the design and spec co-evolve.
+  </div>
 
   <ol>
   <li>Support building great frameworks and applications, making it easier to
@@ -87,13 +96,26 @@
   <h2>Lexical Structure</h2>
   <!-- ********************************************************************* -->
   
+  <div class="commentary">
+    Not all characters are "taken" in the language, this is because it is still
+    growing.  As there becomes a reason to assign things into the identifier or
+    punctuation bucket, we will do so as swift evolves.
+  </div>
+  
   <p>The lexical structure of a Swift file is very simple: the files are
-     tokenized according to the following productions and categories.</p>
+     tokenized according to the following productions and categories.  As is
+     usual with most languages, tokenization uses the maximal munch rule and
+     whitespace separates tokens.  This means that "a b" and "ab" lex into
+     different token streams and are therefore different in the grammar.</p>
   
   <!-- ===================================================================== -->
   <h3>Whitespace and Comments</h3>
   <!-- ===================================================================== -->
   
+  <div class="commentary">
+    TODO: /**/ comments will be supported when I get around to it.
+  </div>
+
   <pre class="grammar">
     whitespace ::= ' '
     whitespace ::= '\n'
@@ -109,12 +131,17 @@
   <p>Comments follow the BCPL style, starting with a "//" and running to the end
      of the file.  Comments are ignored as whitespace.</p>
   
-  <p>TODO: /**/ comments will be supported someday.</p>
-
   <!-- ===================================================================== -->
   <h3>Reserved Punctuation Tokens</h3>
   <!-- ===================================================================== -->
-  
+
+  <div class="commentary">
+    The difference between reserved punctuation and identifiers is that you
+    can't "overload an operator" with one of these names.<br><br>
+    Note that -&gt; is used for function types "() -&gt; int", not pointer
+    dereferencing.
+  </div>
+
   <pre class="grammar">
     punctuation ::= '('
     punctuation ::= ')'
@@ -132,13 +159,24 @@
   </pre>
 
   <p>These are all reserved punctuation that are lexed into tokens.  Most other
-     punctionation is matched as <a href="identifier">identifiers</a>.
+     punctuation is matched as <a href="identifier">identifiers</a>.
   </p>
 
   <!-- ===================================================================== -->
   <h3>Reserved Keywords</h3>
   <!-- ===================================================================== -->
-  
+
+  <div class="commentary">
+    The number of keywords is reduced by pushing most control flow and other
+    stuff into the library.  This allows us to add new stuff to the library in
+    the future without worrying about conflicting with the user's namespace.
+    Because 'if' is just a library function, you can shadow "if" with your own
+    variable (though this is an example of a silly thing that is not a good
+    practice of course).<br><br>
+
+    Idea: Should _foo be "private" and "foo" be public?   
+  </div>
+
   <pre class="grammar">
     keyword ::= '__builtin_int32_type'
     keyword ::= 'oneof'
@@ -151,12 +189,14 @@
 
   <p>These are the builtin keywords.  Swift intentionally tries to reduce the
      number of keywords where possible.</p>
-  
-  <p>FIXME: $0 and friends are modeled as an identifier not a keyword, the
-     proto needs to be fixed so that you aren't allowed to define $0.</p>
 
+  <p>FIXME: $0 and friends are modeled as an identifier not a keyword, the
+  proto needs to be fixed so that you aren't allowed to define $0.</p>
   <p>FIXME: Change "foo.field0" to "foo.$0" for accessing an anonymous tuple
-     element.</p>
+  element.</p>
+  <p>FIXME: Allow $1234</p>
+  <p>FIXME: __ should be considered the compiler/languages reserved namespace,
+  any use of an unknown identifier here should be an error.</p>
 
   
   <!-- ===================================================================== -->
@@ -183,7 +223,9 @@
   
   <p>There are two different regular expressions for identifiers, one for normal
      identifiers and one for "punctuation identifiers".  This ensures that
-     something like "foo+bar" gets lexed into three identifiers, not one.
+     something like "foo+bar" gets lexed into three identifiers, not one. Aside
+     from the regex that controls lexing behavior, there is no other difference
+     between these two forms of identifiers.
   </p>
   
   
@@ -206,7 +248,12 @@
   Extraneous semi colons are allowed at top level, as are a number of other
   declarations.</p>
   
-  <p>TODO: Need to define the module system.</p>
+  <p>TODO: Need to define the module system, which will give us 'import' and
+  'module'.</p>
+  
+  <p>FIXME: Code should be definable at the top level of a file as well, this
+  becomes a static constructor for a library and is the "main" for an
+  executable.</p>
   
   <!-- ===================================================================== -->
   <h3 id="decl-var">var</h3>
@@ -336,10 +383,20 @@
     typealias pair_fn : int -> int -> (first : int, second : int)
   </pre>
 
+  <p>FIXME: It's not "from that point on", you should be able to declare a type
+  alias after using it.  Need to separate name binding from parsing logic.
+  Without this, mutually dependent component members can't exist.</p>
   
   <!-- ===================================================================== -->
   <h3 id="decl-oneof">oneof</h3>
   <!-- ===================================================================== -->
+  
+  <div class="commentary">
+    In actual practice, we expect oneof to be commonly used for "enums" and
+    "struct" below to be used for data declarations.  The use of "oneof" for
+    discriminated unions will be much less common (but is still very important)
+    than its use for "enums".
+  </div>
   
   <pre class="grammar">
     decl-oneof ::= 'oneof' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> '{' oneof-element-list '}'
@@ -709,6 +766,13 @@
   <h2 id="expr">Expressions</h2>
   <!-- ********************************************************************* -->
 
+  <div class="commentary">
+    The goal of semicolon elision is to clean up the common case where ;'s are
+    just clutter.  While they allow people to write confusing and obfuscated
+    code, any language feature can be abused.  We'll encourage good practices in
+    the documentation and frameworks.
+  </div>
+
   <pre class="grammar">
     expr ::= <a href="#expr-single">expr-single</a>+
   </pre>
@@ -722,8 +786,11 @@
     <i>// A silly, but valid, example:</i>
     4 4 (4+5) 4 4
     
-    <i>// A more reasonable example (usually written on multiple lines.</i>
-    foo()   x = 12    bar(49+1)   baz()
+    <i>// A more reasonable example.</i>
+    foo()
+    x = 12
+    bar(49+1)
+    baz()
     </i>
   </pre>
 
@@ -780,6 +847,16 @@
   <h3 id="expr-literal">Simple Literals</h3>
   <!-- ===================================================================== -->
   
+  <div class="commentary">
+    In the short-term, this works, but this isn't satisfactory: The whole idea
+    of having 'int' be defined in the library is that we want the runtime to
+    define it.  Having literals fixed to a specific type defeats this.  This
+    also breaks things like 64-bit integers etc.  There are a couple of ways to
+    handle this, such as C++'0x user defined literal suffixes, go's approach of
+    treating them as arbitrary precision integers that are resolved to a type
+    later, etc.  We must return to this at some point.
+  </div>
+
   <pre class="grammar">
     expr-literal ::= <a href="#numeric_constant">numeric_constant</a>
   </pre>
@@ -840,6 +917,8 @@
   underlying tuple.</p>
   
   <p>No other field accesses are currently allowed.</p>
+  
+  <p>FIXME: Change field0 to $0</p>
   
   <!-- ===================================================================== -->
   <h3 id="expr-subscript">Subscript Expressions</h3>
