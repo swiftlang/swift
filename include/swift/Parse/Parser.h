@@ -117,7 +117,6 @@ private:
   bool ParseType(Type *&Result);
   bool ParseType(Type *&Result, const llvm::Twine &Message);
   bool ParseTypeTuple(Type *&Result);
-  bool ParseTypeTupleElement(TupleTypeElt &Result);
 
   // Expression Parsing
   bool isStartOfExpr(Token &Tok) const;

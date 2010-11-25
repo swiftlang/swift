@@ -401,7 +401,7 @@ static void AddElementNamesForVarDecl(const NameRecord &Name,
 /// token skipping) on error.
 ///
 ///   decl-var:
-///      'var' attribute-list? var-name type-and-init
+///      'var' attribute-list? var-name value-specifier
 VarDecl *Parser::ParseDeclVar() {
   SMLoc VarLoc = Tok.getLoc();
   ConsumeToken(tok::kw_var);
@@ -410,8 +410,6 @@ VarDecl *Parser::ParseDeclVar() {
   if (Tok.is(tok::l_square))
     ParseAttributeList(Attributes);
 
-  // FIXME: Use ParseTypeTupleElement to parse this once tuple elements are
-  // allowed to have initializers!
   NameRecord Name;
   if (ParseVarName(Name)) return 0;
   
@@ -717,27 +715,10 @@ bool Parser::ParseType(Type *&Result) {
   return ParseType(Result, "expected type");
 }
 
-
-/// ParseTypeTupleElement
-///   type-tuple-element:
-///     identifier? ':' type
-bool Parser::ParseTypeTupleElement(TupleTypeElt &Result) {
-  llvm::StringRef Name;
-  if ((Tok.is(tok::identifier) &&
-       ParseIdentifier(Name, "expected identifier in tuple element")) ||
-      ParseToken(tok::colon, "expected ':' after tuple element name") ||
-      ParseType(Result.Ty, "expected type in tuple element"))
-    return true;
-  
-  Result.Name = S.Context.getIdentifier(Name);
-  return false;
-}
-
-
 /// ParseTypeTuple
 ///   type-tuple:
 ///     '(' ')'
-///     '(' type-tuple-element (',' type-tuple-element)* ')'
+///     '(' identifier? value-specifier (',' identifier? value-specifier)* ')'
 ///
 bool Parser::ParseTypeTuple(Type *&Result) {
   assert(Tok.is(tok::l_paren) && "Not start of type tuple");
@@ -750,8 +731,21 @@ bool Parser::ParseTypeTuple(Type *&Result) {
     bool HadError = false;
     do {
       Elements.push_back(TupleTypeElt());
-      if ((HadError = ParseTypeTupleElement(Elements.back())))
+      TupleTypeElt &Result = Elements.back();
+      
+      if (Tok.is(tok::identifier)) {
+        llvm::StringRef Name;
+        HadError = ParseIdentifier(Name,"expected identifier in tuple element");
+        if (HadError) break;
+        Result.Name = S.Context.getIdentifier(Name);
+      }
+      
+      NullablePtr<Expr> Init;
+      if ((HadError = ParseValueSpecifier(Result.Ty, Init)))
         break;
+      
+      // FIXME: Don't discard init!
+          
     } while (ConsumeIf(tok::comma));
     
     if (HadError) {
