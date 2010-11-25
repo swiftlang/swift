@@ -47,7 +47,8 @@ Type *SemaType::ActOnTupleType(llvm::SMLoc LPLoc, TupleTypeElt *Elements,
     else if (Init) {
       // If both a type and an initializer are specified, make sure the
       // initializer's type agrees with the (redundant) type.
-      Expr *InitE = S.expr.ConvertToType(Init, Ty, false, SemaExpr::CR_VarInit);
+      Expr *InitE = S.expr.ConvertToType(Init, Ty, false,
+                                         SemaExpr::CR_TupleInit);
       if (InitE)
         Init = InitE;
       else

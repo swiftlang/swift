@@ -103,10 +103,12 @@ namespace {
     
     Expr *VisitTupleExpr(TupleExpr *E) {
       for (unsigned i = 0, e = E->NumSubExprs; i != e; ++i)
-        if (Expr *Elt = ProcessNode(E->SubExprs[i]))
-          E->SubExprs[i] = Elt;
-        else
-          return 0;
+        if (E->SubExprs[i]) {
+          if (Expr *Elt = ProcessNode(E->SubExprs[i]))
+            E->SubExprs[i] = Elt;
+          else
+            return 0;
+        }
       return E;
     }
     Expr *VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
@@ -251,7 +253,10 @@ public:
     OS << '\'';
     for (unsigned i = 0, e = E->NumSubExprs; i != e; ++i) {
       OS << '\n';
-      PrintRec(E->SubExprs[i]);
+      if (E->SubExprs[i])
+        PrintRec(E->SubExprs[i]);
+      else
+        OS.indent(Indent+2) << "<<tuple element default value>>";
     }
     OS << ')';
   }

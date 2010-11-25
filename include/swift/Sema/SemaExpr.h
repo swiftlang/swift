@@ -47,6 +47,7 @@ public:
     CR_BinOpRHS,  // Right side of binary operator.
     CR_FuncApply, // Application of function argument.
     CR_VarInit,   // Var initializer
+    CR_TupleInit, // Tuple element initializer.
     CR_FuncBody   // Function body specification.
   };
   

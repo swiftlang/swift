@@ -162,6 +162,8 @@ public:
 class TupleExpr : public Expr {
 public:
   llvm::SMLoc LParenLoc;
+  /// SubExprs - Elements of these can be set to null to get the default init
+  /// value for the tuple element.
   Expr **SubExprs;
   Identifier *SubExprNames;  // Can be null if no names.
   unsigned NumSubExprs;

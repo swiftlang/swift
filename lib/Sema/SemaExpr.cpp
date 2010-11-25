@@ -156,14 +156,29 @@ static bool SemaTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
   llvm::SmallVector<TupleTypeElt, 8> ResultTyElts(NumSubExprs);
   
   for (unsigned i = 0, e = NumSubExprs; i != e; ++i) {
-    // If any of the tuple element types is dependent, the whole tuple should
-    // have dependent type.
-    if (isa<DependentType>(SubExprs[i]->Ty)) {
-      ResultTy = SubExprs[i]->Ty;
-      return false;
-    }
+    // If the element value is missing, it has the value of the default
+    // expression of the result type, which must be known.
+    if (SubExprs[i] == 0) {
+      assert(ResultTy && isa<TupleType>(ResultTy) && 
+             "Can't have default value without a result type");
+      
+      ResultTyElts[i].Ty = cast<TupleType>(ResultTy)->getElementType(i);
+      
+      // FIXME: What about a default value that is dependent?
+      if (isa<DependentType>(ResultTyElts[i].Ty)) {
+        ResultTy = ResultTyElts[i].Ty;
+        return false;
+      }
+    } else {
+      // If any of the tuple element types is dependent, the whole tuple should
+      // have dependent type.
+      if (isa<DependentType>(SubExprs[i]->Ty)) {
+        ResultTy = SubExprs[i]->Ty;
+        return false;
+      }
     
-    ResultTyElts[i].Ty = SubExprs[i]->Ty;
+      ResultTyElts[i].Ty = SubExprs[i]->Ty;
+    }
 
     // If a name was specified for this element, use it.
     if (SubExprNames)
@@ -685,8 +700,9 @@ namespace {
     
     Expr *VisitTupleExpr(TupleExpr *E) {
       for (unsigned i = 0, e = E->NumSubExprs; i != e; ++i)
-        if ((E->SubExprs[i] = Visit(E->SubExprs[i])) == 0)
-          return 0;
+        if (E->SubExprs[i])
+          if ((E->SubExprs[i] = Visit(E->SubExprs[i])) == 0)
+            return 0;
       
       if (SemaTupleExpr(E->LParenLoc, E->SubExprs, E->SubExprNames,
                         E->NumSubExprs, E->RParenLoc, E->Ty, SE)) return 0;
@@ -953,6 +969,73 @@ BindAndValidateClosureArgs(Expr *&Body, Type *FuncInput, SemaDecl &SD) {
   return NewInputs;
 }
 
+/// getTupleFieldForScalarInit - If the specified tuple type can be assigned a
+/// scalar value, return the element number that the scalar provides.  For this
+/// to be true, the tuple has to be non-empty, and must have at most one element
+/// lacking a default value.
+static int getTupleFieldForScalarInit(TupleType *TT) {
+  if (TT->NumFields == 0) return -1;
+  
+  int FieldWithoutDefault = -1;
+  for (unsigned i = 0, e = TT->NumFields; i != e; ++i) {
+    // Ignore fields with a default value.
+    if (TT->Fields[i].Init) continue;
+
+    // If we already saw a field missing a default value, then we cannot assign
+    // a scalar to this tuple.
+    if (FieldWithoutDefault != -1)
+      return -1;
+    
+    // Otherwise, remember this field number.
+    FieldWithoutDefault = i;    
+  }
+  
+  // If all the elements have default values, the scalar initializes the first
+  // value in the tuple.
+  return FieldWithoutDefault == -1 ? 0 : FieldWithoutDefault;
+}
+
+static Expr *HandleScalarConversionToTupleType(Expr *E, Type *DestTy,
+                                               SemaExpr &SE) {
+  TupleType *TT = DestTy->getAs<TupleType>();
+  
+  // If the destination is a tuple type with at most one element that has no
+  // default value, see if the expression's type is convertable to the
+  // element type.  This handles assigning 4 to "(a = 4, b : int)".
+  int ScalarField = getTupleFieldForScalarInit(TT);
+  if (ScalarField == -1) return 0;
+  
+  Type *ScalarType = TT->getElementType(ScalarField);
+  Expr *ERes = HandleConversionToType(E, ScalarType, false, SE);
+  if (ERes == 0) return 0;
+  
+  unsigned NumFields = TT->NumFields;
+  
+  // Must allocate space for the AST node.
+  Expr **NewSE = (Expr**)SE.S.Context.Allocate(sizeof(Expr*)*NumFields, 8);
+  
+  bool NeedsNames = false;
+  for (unsigned i = 0, e = NumFields; i != e; ++i) {
+    if (i == ScalarField)
+      NewSE[i] = ERes;
+    else
+      NewSE[i] = 0;
+    
+    NeedsNames |= TT->Fields[i].Name != Identifier();
+  }
+  
+  // Handle the name if the element is named.
+  Identifier *NewName = 0;
+  if (NeedsNames) {
+    NewName = (Identifier*)SE.S.Context.Allocate(sizeof(Identifier) *
+                                                 NumFields, 8);
+    for (unsigned i = 0, e = NumFields; i != e; ++i)
+      NewName[i] = TT->Fields[i].Name;
+  }
+  
+  return new (SE.S.Context) TupleExpr(E->getLocStart(), NewSE, NewName,
+                                      NumFields, llvm::SMLoc(), DestTy);
+}
 
 
 /// HandleConversionToType - This is the recursive implementation of
@@ -969,27 +1052,10 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
          "Result of conversion can't be dependent");
   
   if (TupleType *TT = DestTy->getAs<TupleType>()) {
-    // If the destination is a tuple type with a single element, see if the
-    // expression's type is convertable to the element type.
-    if (TT->NumFields == 1) {
-      if (Expr *ERes = HandleConversionToType(E, TT->getElementType(0),
-                                              false, SE)) {
-        // Must allocate space for the AST node.
-        Expr **NewSE = (Expr**)SE.S.Context.Allocate(sizeof(Expr*), 8);
-        NewSE[0] = ERes;
-        
-        // Handle the name if the element is named.
-        Identifier *NewName = 0;
-        if (TT->Fields[0].Name.get()) {
-          NewName = (Identifier*)SE.S.Context.Allocate(sizeof(Identifier), 8);
-          NewName[0] = TT->Fields[0].Name;
-        }
-        
-        return new (SE.S.Context) TupleExpr(llvm::SMLoc(), NewSE, NewName, 1,
-                                            llvm::SMLoc(), DestTy);
-      }
-    }
-
+    // If this is a scalar to tuple conversion, form the tuple and return it.
+    if (Expr *Res = HandleScalarConversionToTupleType(E, DestTy, SE))
+      return Res;
+    
     // If the input is a tuple and the output is a tuple, see if we can convert
     // each element.
     if (TupleType *ETy = E->Ty->getAs<TupleType>()) {
@@ -1083,6 +1149,10 @@ Expr *SemaExpr::ConvertToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
   case CR_VarInit:
     Error(E->getLocStart(),
           "explicitly specified type doesn't match initializer expression");
+    break;
+  case CR_TupleInit:
+    Error(E->getLocStart(),
+          "explicitly specified type doesn't match default value type");
     break;
   case CR_FuncBody:
     Error(E->getLocStart(),

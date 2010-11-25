@@ -170,7 +170,9 @@ public:
 
   /// Ty - This is the type of the field, which is mandatory.
   Type *Ty;
-  
+
+  /// Init - This is a default value for the tuple element, used if an explicit
+  /// value is not specified.
   Expr *Init;
   
   TupleTypeElt(Type *ty = 0, Identifier name = Identifier(), Expr *init = 0)
