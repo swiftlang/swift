@@ -205,19 +205,13 @@ static void ValidateAttributes(DeclAttributes &Attrs, Type *Ty, SemaDecl &SD) {
 
 VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, Identifier Name,
                                 Type *Ty, Expr *Init, DeclAttributes &Attrs) {
+  assert((Ty != 0 || Init != 0) && "Must have a type or an expr already");
   
-  // Diagnose when we don't have a type or an expression.
-  if (Ty == 0 && Init == 0) {
-    Error(VarLoc, "var declaration must specify a type if no "
-          "initializer is specified");
-    // TODO: Recover better by still creating var, but making it have 'invalid'
-    // type.
-    return 0;
-  }
-  
-  // If both a type and an initializer are specified, make sure the
-  // initializer's type agrees with the (redundant) type.
-  if (Ty && Init) {
+  if (Ty == 0)
+    Ty = Init->Ty;
+  else if (Init) {
+    // If both a type and an initializer are specified, make sure the
+    // initializer's type agrees with the (redundant) type.
     Expr *InitE = S.expr.ConvertToType(Init, Ty, false, SemaExpr::CR_VarInit);
     if (InitE)
       Init = InitE;
@@ -225,8 +219,6 @@ VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, Identifier Name,
       Ty = Init->Ty;
   }
   
-  if (Ty == 0)
-    Ty = Init->Ty;
   
   // Validate attributes.
   ValidateAttributes(Attrs, Ty, *this);

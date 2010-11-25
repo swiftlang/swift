@@ -127,6 +127,14 @@ bool Parser::ParseToken(tok::TokenKind K, const char *Message,
 ///   ':' type '=' expr
 ///   '=' expr
 bool Parser::ParseValueSpecifier(Type *&Ty, NullablePtr<Expr> &Init) {
+  // Diagnose when we don't have a type or an expression.
+  if (Tok.isNot(tok::colon) && Tok.isNot(tok::equal)) {
+    Error(Tok.getLoc(), "expected a type or an initializer");
+    // TODO: Recover better by still creating var, but making it have
+    // 'invalid' type so that uses of the identifier are not errors.
+    return true;
+  }
+  
   if (ConsumeIf(tok::colon) &&
       ParseType(Ty, "expected type in var declaration"))
     return true;
@@ -743,9 +751,7 @@ bool Parser::ParseTypeTuple(Type *&Result) {
       NullablePtr<Expr> Init;
       if ((HadError = ParseValueSpecifier(Result.Ty, Init)))
         break;
-      
-      // FIXME: Don't discard init!
-          
+      Result.Init = Init.getPtrOrNull();
     } while (ConsumeIf(tok::comma));
     
     if (HadError) {

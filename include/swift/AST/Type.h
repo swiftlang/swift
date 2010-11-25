@@ -165,15 +165,16 @@ public:
 /// TupleTypeElt - This represents a single element of a tuple.
 class TupleTypeElt {
 public:
+  /// Name - An optional name for the field.
+  Identifier Name;
+
   /// Ty - This is the type of the field, which is mandatory.
   Type *Ty;
   
-  /// Name - An optional name for the field.
-  Identifier Name;
-  //Expr *Init;  // TODO: Allow default values.
+  Expr *Init;
   
-  TupleTypeElt(Type *ty = 0, Identifier name = Identifier())
-    : Ty(ty), Name(name) { }
+  TupleTypeElt(Type *ty = 0, Identifier name = Identifier(), Expr *init = 0)
+    : Name(name), Ty(ty), Init(init) { }
 };
   
 /// TupleType - A tuple is a parenthesized list of types where each name has an

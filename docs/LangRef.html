@@ -617,10 +617,10 @@
   
   <pre class="grammar">
     type-tuple  ::= '(' ')'
-    type-tuple  ::= '(' type-tuple-element (',' type-tuple-element)* ')'
+    type-tuple  ::= '(' identifier? <a href="#value-specifier">value-specifier</a> (',' identifier? <a href="#value-specifier">value-specifier</a>)* ')'
   </pre>
 
-  <p>Syntactically, tuple types are simply a possibly empty list of tuple
+  <p>Syntactically, tuple types are simply a possibly empty list of
   elements.</p>
 
   <p>Tuples are the primary form of data aggregation in Swift, and are used as
@@ -629,32 +629,27 @@
   <a href="#decl-oneof">oneof</a> bodies, etc.  Because tuples are widely
   accessible and available everywhere in the language, aggregate data access and
   transformation is uniform and powerful.</p>
-  
-  <pre class="grammar">
-    type-tuple-element ::= <a href="#identifier">identifier</a>? ':' <a href="#type">type</a>
-  </pre>
 
-  <p>Each element of a tuple contains an optional name followed by a required
-  type.  The name affects swizzling of elements in the tuple when <a
-    href="#sema_conversions">tuple conversions</a> are performed.</p>
+  <p>Each element of a tuple contains an optional name followed by a type and/or
+  and default value expression, whose type conversion rules work like those in a
+  var declaration.  The name affects swizzling of elements in the tuple when <a
+  href="#sema_conversions">tuple conversions</a> are performed.</p>
   
-  <p>FIXME: Tuples should allow initializers (like var) unifying the production
-  for var and tuple elements as well as making tuples far more powerful
-  (supporting default values throughout swift).</p>
-
   <pre class="example">
   <i>// Variable definitions.</i>
   var a : ()
   var b : (:int, :int)
   var c : (x : (), y : int)
+  var d : (a : int, b = 4)       <i>// Value is initialized to (0,4)</i>
+  var e : (a : int, b = 4) = (1) <i>// Value is initialized to (1,4)</i>
 
-  <i>// Inferred types.</i>
-  var d = ()                   <i>// Type = ()</i>
-  var e = (.x = 1, .y = 2)     <i>// Type = (x : int, y : int)</i>
-  var f = (1, 2, 3)            <i>// Type = (:int, :int, :int)</i>
+  <i>// Tuple type inferred from an initializers:</i>
+  var m = ()                     <i>// Type = ()</i>
+  var n = (.x = 1, .y = 2)       <i>// Type = (x : int, y : int)</i>
+  var o = (1, 2, 3)              <i>// Type = (:int, :int, :int)</i>
 
   <i>// Function argument and result is a tuple type.</i>
-  func foo(x : int, y : int) -> (val : int, err : int);
+  func foo(x : int, y : int) -&gt; (val : int, err : int);
 
   <i>// oneof and struct declarations with tuple values.</i>
   struct S (a : int, b : int)

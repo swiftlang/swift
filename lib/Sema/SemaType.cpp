@@ -33,8 +33,28 @@ Type *SemaType::ActOnTypeName(llvm::SMLoc Loc, llvm::StringRef Name) {
 }
 
 
-Type *SemaType::ActOnTupleType(llvm::SMLoc LPLoc, TupleTypeElt const *Elements,
+Type *SemaType::ActOnTupleType(llvm::SMLoc LPLoc, TupleTypeElt *Elements,
                                unsigned NumElements, llvm::SMLoc RPLoc) {
+  // Validate the elements.
+  for (unsigned i = 0; i != NumElements; ++i) {
+    Type *&Ty = Elements[i].Ty;
+    Expr *&Init = Elements[i].Init;
+    assert((Ty != 0 || Init != 0) && "Must have a type or an expr already");
+    
+    // If a type isn't specified, get the element type from the initializer.
+    if (Ty == 0)
+      Ty = Init->Ty;
+    else if (Init) {
+      // If both a type and an initializer are specified, make sure the
+      // initializer's type agrees with the (redundant) type.
+      Expr *InitE = S.expr.ConvertToType(Init, Ty, false, SemaExpr::CR_VarInit);
+      if (InitE)
+        Init = InitE;
+      else
+        Ty = Init->Ty;
+    }
+  }
+  
   return S.Context.getTupleType(Elements, NumElements);
 }
 
