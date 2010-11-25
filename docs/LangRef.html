@@ -265,9 +265,11 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-var ::= 'var' <a href="#attribute-list">attribute-list</a>? var-name ':' <a href="#type">type</a>
-    decl-var ::= 'var' <a href="#attribute-list">attribute-list</a>? var-name ':' <a href="#type">type</a> '=' <a href="#expr">expr</a>
-    decl-var ::= 'var' <a href="#attribute-list">attribute-list</a>? var-name '=' <a href="#expr">expr</a>
+    decl-var ::= 'var' <a href="#attribute-list">attribute-list</a>? var-name <a href="#value-specifier">value-specifier</a>
+    
+    value-specifier ::= ':' <a href="#type">type</a>
+    value-specifier ::= ':' <a href="#type">type</a> '=' <a href="#expr">expr</a>
+    value-specifier ::= '=' <a href="#expr">expr</a>
   </pre>
   <!-- 
    Note that the initializer can't be expr-singular.  If it were we would fail
@@ -280,7 +282,8 @@
      href="#decl-func">func declaration</a> is just syntactic sugar for a var
      declaration.</p>
   
-  <p>Syntactically var declarations come in three forms.  In the first form,
+  <p>Syntactically var declarations come in three forms from the value-specifier
+     production.  In the first form,
      a type is specified and the value is default initialized.  In the second
      form the type is elided but a value is specified, the declaration gets the
      specified value and has the same type as its initializer.  In the third

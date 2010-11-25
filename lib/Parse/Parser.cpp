@@ -122,6 +122,31 @@ bool Parser::ParseToken(tok::TokenKind K, const char *Message,
   return true;
 }
 
+/// value-specifier:
+///   ':' type
+///   ':' type '=' expr
+///   '=' expr
+bool Parser::ParseValueSpecifier(Type *&Ty, NullablePtr<Expr> &Init) {
+  if (ConsumeIf(tok::colon) &&
+      ParseType(Ty, "expected type in var declaration"))
+    return true;
+  
+  if (ConsumeIf(tok::equal)) {
+    if (ParseExpr(Init, "expected expression in var declaration"))
+      return true;
+    
+    // If there was an expression, but it had a parse error, give the var decl
+    // an artificial int type to avoid chained errors.
+    // FIXME: We really need to distinguish erroneous expr from missing expr in
+    // ActOnVarDecl.
+    if (Init.isNull() && Ty == 0)
+      Ty = S.Context.TheInt32Type;
+  }
+  
+  return false;
+}
+
+
 //===----------------------------------------------------------------------===//
 // Decl Parsing
 //===----------------------------------------------------------------------===//
@@ -372,14 +397,11 @@ static void AddElementNamesForVarDecl(const NameRecord &Name,
   AccessPath.pop_back();
 }
 
-
 /// ParseDeclVar - Parse a 'var' declaration, returning null (and doing no
 /// token skipping) on error.
 ///
 ///   decl-var:
-///      'var' attribute-list? var-name ':' type
-///      'var' attribute-list? var-name ':' type '=' expr
-///      'var' attribute-list? var-name '=' expr
+///      'var' attribute-list? var-name type-and-init
 VarDecl *Parser::ParseDeclVar() {
   SMLoc VarLoc = Tok.getLoc();
   ConsumeToken(tok::kw_var);
@@ -394,22 +416,9 @@ VarDecl *Parser::ParseDeclVar() {
   if (ParseVarName(Name)) return 0;
   
   Type *Ty = 0;
-  if (ConsumeIf(tok::colon) &&
-      ParseType(Ty, "expected type in var declaration"))
-    return 0;
-  
   NullablePtr<Expr> Init;
-  if (ConsumeIf(tok::equal)) {
-    if (ParseExpr(Init, "expected expression in var declaration"))
-      return 0;
-  
-    // If there was an expression, but it had a parse error, give the var decl
-    // an artificial int type to avoid chained errors.
-    // FIXME: We really need to distinguish erroneous expr from missing expr in
-    // ActOnVarDecl.
-    if (Init.isNull() && Ty == 0)
-      Ty = S.Context.TheInt32Type;
-  }
+  if (ParseValueSpecifier(Ty, Init))
+    return 0;
 
   VarDecl *VD = S.decl.ActOnVarDecl(VarLoc, Name.Name, Ty, Init.getPtrOrNull(),
                                     Attributes);

@@ -99,6 +99,8 @@ private:
   bool ParseToken(tok::TokenKind K, const char *Message,
                   tok::TokenKind SkipToTok = tok::unknown);
   
+  bool ParseValueSpecifier(Type *&Ty, llvm::NullablePtr<Expr> &Init);
+  
   // Decl Parsing
   Decl *ParseDeclTopLevel();
   bool ParseDeclTypeAlias();
