@@ -498,14 +498,11 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
 
 
 /// ConvertExprToTupleType - Given an expression that has tuple type, convert it
-/// to have some other tuple type.  In practice, E either already has a tuple
-/// type (in which case ETy specifies which one) or it has dependent type, but
-/// we know it is a multi-element TupleExpr (in which case ETy is null).
+/// to have some other tuple type.
 ///
-/// In either case, the caller gives us a list of the expressions named
-/// arguments and a count of tuple elements for E in the IdentList+NumIdents
-/// array.  DestTy specifies the type to convert to, which is known to be a
-/// TupleType.
+/// The caller gives us a list of the expressions named arguments and a count of
+/// tuple elements for E in the IdentList+NumIdents array.  DestTy specifies the
+/// type to convert to, which is known to be a TupleType.
 static Expr *
 ConvertExprToTupleType(Expr *E, Identifier *IdentList, unsigned NumIdents,
                        TupleType *DestTy, SemaExpr &SE) {
@@ -548,17 +545,30 @@ ConvertExprToTupleType(Expr *E, Identifier *IdentList, unsigned NumIdents,
     
     // Scan for an unmatched unnamed input value.
     while (1) {
-      // If we didn't find any input values, bail out.
-      // TODO: QOI: it would be good to indicate which dest element doesn't have
-      // a value in this sort of assignment failure.
+      // If we didn't find any input values, we ran out of inputs to use.
       if (NextInputValue == NumIdents)
-        return 0;
+        break;
       
       // If this input value is unnamed and unused, use it!
       if (!UsedElements[NextInputValue] && IdentList[NextInputValue].get() == 0)
         break;
       
       ++NextInputValue;
+    }
+
+    // If we ran out of input values, we either don't have enough sources to
+    // fill the dest (as in when assigning (1,2) to (int,int,int), or we ran out
+    // and default values should be used.
+    if (NextInputValue == NumIdents) {
+      // TODO: QOI: it would be good to indicate which dest element doesn't have
+      // a value in this sort of assignment failure.
+      if (DestTy->Fields[i].Init == 0)
+        return 0;
+
+      // If the default initializer should be used, leave the DestElementSources
+      // field set to -2.
+      DestElementSources[i] = -2;
+      continue;
     }
     
     // Okay, we found an input value to use.
@@ -576,7 +586,7 @@ ConvertExprToTupleType(Expr *E, Identifier *IdentList, unsigned NumIdents,
   // either agree or can be converted.  If the expression is a TupleExpr, we do
   // this conversion in place.
   TupleExpr *TE = dyn_cast<TupleExpr>(E);
-  if (TE && TE->NumSubExprs != 1) {
+  if (TE && TE->NumSubExprs != 1 && TE->NumSubExprs == DestTy->NumFields) {
     llvm::SmallVector<Expr*, 8> OrigElts(TE->SubExprs,
                                          TE->SubExprs+TE->NumSubExprs);
     llvm::SmallVector<Identifier, 8> OrigNames;
@@ -590,6 +600,13 @@ ConvertExprToTupleType(Expr *E, Identifier *IdentList, unsigned NumIdents,
       // Extract the input element corresponding to this destination element.
       unsigned SrcField = DestElementSources[i];
       assert(SrcField != ~0U && "dest field not found?");
+      
+      // If SrcField is -2, then the destination element should use its default
+      // value.
+      if (SrcField == -2U) {
+        TE->SubExprs[i] = 0;
+        continue;
+      }
       
       // Check to see if the src value can be converted to the destination
       // element type.
@@ -633,18 +650,22 @@ ConvertExprToTupleType(Expr *E, Identifier *IdentList, unsigned NumIdents,
     // Extract the input element corresponding to this destination element.
     unsigned SrcField = DestElementSources[i];
     assert(SrcField != ~0U && "dest field not found?");
-    
-    Type *NewEltTy = ETy->getElementType(SrcField);
-    Expr *Src = new (SE.S.Context)
-    TupleElementExpr(E, llvm::SMLoc(), SrcField, llvm::SMLoc(), NewEltTy);
-    
-    // Check to see if the src value can be converted to the destination element
-    // type.
-    Src = HandleConversionToType(Src, DestTy->getElementType(i), true, SE);
-    // TODO: QOI: Include a note about this failure!
-    if (Src == 0) return 0;
-    NewElements[i] = Src;
-    
+  
+    if (SrcField == -2U) {
+      // Use the default element for the tuple.
+      NewElements[i] = 0;
+    } else {
+      Type *NewEltTy = ETy->getElementType(SrcField);
+      Expr *Src = new (SE.S.Context)
+        TupleElementExpr(E, llvm::SMLoc(), SrcField, llvm::SMLoc(), NewEltTy);
+      
+      // Check to see if the src value can be converted to the destination
+      // element type.
+      Src = HandleConversionToType(Src, DestTy->getElementType(i), true, SE);
+      // TODO: QOI: Include a note about this failure!
+      if (Src == 0) return 0;
+      NewElements[i] = Src;
+    }
     
     if (DestTy->Fields[i].Name.get()) {
       // Allocate the array on the first element with a name.
@@ -995,6 +1016,10 @@ static int getTupleFieldForScalarInit(TupleType *TT) {
   return FieldWithoutDefault == -1 ? 0 : FieldWithoutDefault;
 }
 
+/// HandleScalarConversionToTupleType - Check to see if the destination type
+/// (which is known to be a tuple) has a single element that requires an
+/// initializer and if the specified expression can convert to that type.  If
+/// so, convert the scalar to the tuple type.
 static Expr *HandleScalarConversionToTupleType(Expr *E, Type *DestTy,
                                                SemaExpr &SE) {
   TupleType *TT = DestTy->getAs<TupleType>();
@@ -1064,8 +1089,7 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
         ExprIdentMapping.push_back(ETy->Fields[i].Name);
       
       if (Expr *Res = ConvertExprToTupleType(E, ExprIdentMapping.data(),
-                                             ExprIdentMapping.size(), TT,
-                                             SE))
+                                             ExprIdentMapping.size(), TT, SE))
         return Res;
     }
     

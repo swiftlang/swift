@@ -132,6 +132,7 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID, const TupleTypeElt *Fields,
   for (unsigned i = 0; i != NumFields; ++i) {
     ID.AddPointer(Fields[i].Ty);
     ID.AddPointer(Fields[i].Name.get());
+    ID.AddPointer(Fields[i].Init);
   }
 }
 
@@ -188,7 +189,7 @@ TupleType *ASTContext::getTupleType(const TupleTypeElt *Fields,
   // FIXME: This is pointless for types with named fields.  The ValueDecl fields
   // themselves are not unique'd so they all get their own addresses, which
   // means that we'll never get a hit here.  This should unique all-type tuples
-  // though.
+  // though.  Likewise with default values.
   void *InsertPos = 0;
   if (TupleType *TT = TupleTypesMap.FindNodeOrInsertPos(ID, InsertPos))
     return TT;
