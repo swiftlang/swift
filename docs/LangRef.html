@@ -1046,6 +1046,18 @@
   <p>FIXME: Need to kill off "the result of {} is the result of the last expr if
      it doesn't have a ; at the end.</p>
   
+  
+  <!-- ********************************************************************* -->
+  <h2>Protocols</h2>
+  <!-- ********************************************************************* -->
+  
+  <!-- ********************************************************************* -->
+  <h2>Objects</h2>
+  <!-- ********************************************************************* -->
+  
+  <!-- ********************************************************************* -->
+  <h2>Generics</h2>
+  <!-- ********************************************************************* -->
 
   <!-- ********************************************************************* -->
   <h2 id="sema">Language Semantics</h2>
@@ -1060,25 +1072,28 @@
   <h3 id="sema_anondecls">Anonymous Argument Resolution</h3>
   <h3 id="sema_context">Context Sensitive Type Resolution</h3>
 
-  
-  <!-- ********************************************************************* -->
-  <h2>Protocols</h2>
-  <!-- ********************************************************************* -->
-
-  <!-- ********************************************************************* -->
-  <h2>Objects</h2>
-  <!-- ********************************************************************* -->
-  
-  <!-- ********************************************************************* -->
-  <h2>Generics</h2>
-  <!-- ********************************************************************* -->
 
 
   <!-- ********************************************************************* -->
   <h2 id="stdlib">Standard Library</h2>
   <!-- ********************************************************************* -->
 
-  <h3 id="stdlib-alias">Standard Type Aliases</h3>
+  <div class="commentary">
+    It would be really great to have literate swift code someday, that way
+    this could be generated directly from the code.  This would also be powerful
+    for Swift library developers to be able to depend on being available and
+    standardized.
+  </div>
+
+  <p>This describes some of the standard swift code as it is being built up.
+     Since Swift is designed to give power to the library developers, much of
+     what is normally considered the "language" is actually just implemented in
+     the library.</p>
+  
+  <!-- ===================================================================== -->
+  <h3 id="stdlib-simple-types">Simple Types</h3>
+  <!-- ===================================================================== -->
+  
   <h4 id="stdlib-void">void</h4>
   
   <pre class="stdlib">
@@ -1092,8 +1107,64 @@
     <i>// int is just a type alias for the 32-bit integer type.</i>
     typealias int : __builtin_int32_type
   </pre>
+
+
+  <h4 id="stdlib-bool">bool, true, false</h4>
   
+  <pre class="stdlib">
+    <i>// bool is a simple discriminated union.</i>
+    oneof bool {
+      true, false
+    }
+    
+    <i>// Allow true and false to be used unqualified.</i>
+    var true = bool::true
+    var false = bool::false
+  </pre>
+
+  <!-- ===================================================================== -->
+  <h3 id="stdlib-arithmetic">Arithmetic and Logical Operations</h3>
+  <!-- ===================================================================== -->
+
+  <div class="commentary">
+    This is all eagerly awaiting the day when we have generics and overloading.
+    For now, int is the only arithmetic type :)
+  </div>
+
+  <h4 id="stdlib-arithmetic">Arithmetic Operators</h4>
   
+  <pre class="stdlib">
+    <i>// Simple binary operators, following the same precedence as C.</i>
+    func [infix=200] * (lhs: int, rhs: int) -&gt; int
+    func [infix=200] / (lhs: int, rhs: int) -&gt; int
+    func [infix=200] % (lhs: int, rhs: int) -&gt; int
+    func [infix=190] + (lhs: int, rhs: int) -&gt; int
+    func [infix=190] - (lhs: int, rhs: int) -&gt; int
+    <i>// In C, &lt;&lt;, &gt;&gt; is 180.</i>
+  </pre>
+
+  <h4 id="stdlib-comparison">Relational and Equality Operators</h4>
+
+  <pre class="stdlib">
+    var [infix=170] &lt;  : (lhs : int, rhs : int) -&gt; bool
+    var [infix=170] &gt;  : (lhs : int, rhs : int) -&gt; bool
+    var [infix=170] &lt;= : (lhs : int, rhs : int) -&gt; bool
+    var [infix=170] &gt;= : (lhs : int, rhs : int) -&gt; bool
+    var [infix=160] == : (lhs : int, rhs : int) -&gt; bool
+    var [infix=160] != : (lhs : int, rhs : int) -&gt; bool
+    <i>// In C, bitwise logical operators are 130,140,150.</i>
+  </pre>
+
+  <h4 id="stdlib-short-circuit-logical">Short Circuiting Logical Operators</h4>
+  
+  <pre class="stdlib">
+    func [infix=120] &amp;&amp; (lhs: bool, rhs: ()-&gt;bool) -&gt; bool
+    func [infix=110] || (lhs: bool, rhs: ()-&gt;bool) -&gt; bool
+    <i>// In C, 100 is ?:</i>
+    <i>// In C, 90 is =, *=, += etc.</i>
+  </pre>
+
+
   
 <!-- *********************************************************************** -->
 <hr>
