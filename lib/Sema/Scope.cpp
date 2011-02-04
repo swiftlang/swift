@@ -18,7 +18,9 @@
 #include "swift/Sema/SemaDecl.h"
 using namespace swift;
 
-Scope::Scope(SemaDecl &S) : SD(S), HTScope(*S.ScopeHT), PrevScope(SD.CurScope) {
+Scope::Scope(SemaDecl &S) : SD(S),
+   HTScope(*(llvm::ScopedHashTable<Identifier, ScopeEntry>*)S.ScopeHT),
+   PrevScope(SD.CurScope) {
   if (SD.CurScope)
     Depth = SD.CurScope->Depth+1;
   else

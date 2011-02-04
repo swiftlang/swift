@@ -25,11 +25,6 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/SMLoc.h"
 
-namespace llvm {
-  template <typename K, typename V, typename KInfo>
-  class ScopedHashTable;
-}
-
 namespace swift {
   class Expr;
   class Type;
@@ -44,10 +39,7 @@ namespace swift {
   
 /// SemaDecl - Semantic analysis support for Swift declarations.
 class SemaDecl : public SemaBase {
-  typedef std::pair<unsigned, ValueDecl*> ScopeEntry;
-  typedef llvm::ScopedHashTable<Identifier, ScopeEntry,
-                                llvm::DenseMapInfo<Identifier> > ScopeHTType;
-  ScopeHTType *const ScopeHT;
+  void *const ScopeHT; // ScopedHashTable<Identifier, ScopeEntry>
   Scope *CurScope;
   friend class Scope;
 public:
