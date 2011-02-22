@@ -71,7 +71,7 @@ unsigned ClosureExpr::getNumArgs() const {
   Type *Input = cast<FunctionType>(Ty)->Input;
   
   if (TupleType *TT = llvm::dyn_cast<TupleType>(Input))
-    return TT->NumFields;
+    return TT->Fields.size();
   return 1;  
 }
 

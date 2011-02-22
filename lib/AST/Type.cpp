@@ -52,7 +52,7 @@ Type *Type::getDesugaredType() {
 /// getNamedElementId - If this tuple has a field with the specified name,
 /// return the field index, otherwise return -1.
 int TupleType::getNamedElementId(Identifier I) const {
-  for (unsigned i = 0, e = NumFields; i != e; ++i) {
+  for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
     if (Fields[i].Name == I)
       return i;
   }
@@ -105,7 +105,7 @@ void OneOfType::print(llvm::raw_ostream &OS) const {
 void TupleType::print(llvm::raw_ostream &OS) const {
   OS << "(";
   
-  for (unsigned i = 0, e = NumFields; i != e; ++i) {
+  for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
     if (i) OS << ", ";
     const TupleTypeElt &TD = Fields[i];
     

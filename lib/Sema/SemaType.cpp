@@ -57,7 +57,8 @@ Type *SemaType::ActOnTupleType(llvm::SMLoc LPLoc, TupleTypeElt *Elements,
     }
   }
   
-  return S.Context.getTupleType(Elements, NumElements);
+  return S.Context.getTupleType(llvm::ArrayRef<TupleTypeElt>(Elements,
+                                                             NumElements));
 }
 
 Type *SemaType::ActOnFunctionType(Type *Input, llvm::SMLoc ArrowLoc,

@@ -19,6 +19,7 @@
 
 #include "swift/AST/Identifier.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/Casting.h"
 
 namespace llvm {
@@ -184,8 +185,7 @@ public:
 ///
 class TupleType : public Type, public llvm::FoldingSetNode {
 public:
-  const TupleTypeElt * const Fields;
-  const unsigned NumFields;
+  const llvm::ArrayRef<TupleTypeElt> Fields;
   
   /// getElementType - Return the type of the specified field.
   Type *getElementType(unsigned FieldNo) const {
@@ -203,14 +203,14 @@ public:
   static bool classof(const Type *T) { return T->Kind == TupleTypeKind;}
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, Fields, NumFields);
+    Profile(ID, Fields);
   }
   static void Profile(llvm::FoldingSetNodeID &ID, 
-                      const TupleTypeElt *Fields, unsigned NumFields);
+                      llvm::ArrayRef<TupleTypeElt> Fields);
   
 private:
-  TupleType(const TupleTypeElt *const fields, unsigned numfields)
-    : Type(TupleTypeKind), Fields(fields), NumFields(numfields) {}
+  TupleType(llvm::ArrayRef<TupleTypeElt> fields)
+    : Type(TupleTypeKind), Fields(fields) {}
   friend class ASTContext;
 };
   

@@ -120,7 +120,7 @@ static bool SemaDotIdentifier(Expr *E, llvm::SMLoc DotLoc,
     if (Name.getLength() > 1 && Name.get()[0] == '$') {
       unsigned Value = 0;
       if (!llvm::StringRef(Name.get()+1).getAsInteger(10, Value)) {
-        if (Value >= TT->NumFields) {
+        if (Value >= TT->Fields.size()) {
           SE.Error(NameLoc, "field number is too large for tuple");
           return true;
         }
@@ -185,7 +185,7 @@ static bool SemaTupleExpr(llvm::SMLoc LPLoc, Expr **SubExprs,
       ResultTyElts[i].Name = SubExprNames[i];
   }
   
-  ResultTy = SE.S.Context.getTupleType(ResultTyElts.data(), NumSubExprs);
+  ResultTy = SE.S.Context.getTupleType(ResultTyElts);
   return false;
 }
 
@@ -247,7 +247,7 @@ static bool SemaBinaryExpr(Expr *&LHS, ValueDecl *OpFn,
          "Sema and parser should verify that only binary predicates are used"); 
   FunctionType *FnTy = llvm::cast<FunctionType>(OpFn->Ty);
   TupleType *Input = llvm::cast<TupleType>(FnTy->Input);
-  assert(Input->NumFields == 2 && "Sema error validating infix fn type");
+  assert(Input->Fields.size() == 2 && "Sema error validating infix fn type");
   
   // Verify that the LHS/RHS have the right type and do conversions as needed.
   LHS = SE.ConvertToType(LHS, Input->getElementType(0), false,
@@ -515,12 +515,12 @@ ConvertExprToTupleType(Expr *E, Identifier *IdentList, unsigned NumIdents,
   // Keep track of which input elements are used.
   // TODO: Record where the destination elements came from in the AST.
   llvm::SmallVector<bool, 16> UsedElements(NumIdents);
-  llvm::SmallVector<int, 16>  DestElementSources(DestTy->NumFields, -1);
+  llvm::SmallVector<int, 16>  DestElementSources(DestTy->Fields.size(), -1);
   
   
   // First off, see if we can resolve any named values from matching named
   // inputs.
-  for (unsigned i = 0, e = DestTy->NumFields; i != e; ++i) {
+  for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
     const TupleTypeElt &DestElt = DestTy->Fields[i];
     // If this destination field is named, first check for a matching named
     // element in the input, from any position.
@@ -541,7 +541,7 @@ ConvertExprToTupleType(Expr *E, Identifier *IdentList, unsigned NumIdents,
   // Next step, resolve (in order) unmatched named results and unnamed results
   // to any left-over unnamed input.
   unsigned NextInputValue = 0;
-  for (unsigned i = 0, e = DestTy->NumFields; i != e; ++i) {
+  for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
     // If we already found an input to satisfy this output, we're done.
     if (DestElementSources[i] != -1) continue;
     
@@ -588,14 +588,14 @@ ConvertExprToTupleType(Expr *E, Identifier *IdentList, unsigned NumIdents,
   // either agree or can be converted.  If the expression is a TupleExpr, we do
   // this conversion in place.
   TupleExpr *TE = dyn_cast<TupleExpr>(E);
-  if (TE && TE->NumSubExprs != 1 && TE->NumSubExprs == DestTy->NumFields) {
+  if (TE && TE->NumSubExprs != 1 && TE->NumSubExprs == DestTy->Fields.size()) {
     llvm::SmallVector<Expr*, 8> OrigElts(TE->SubExprs,
                                          TE->SubExprs+TE->NumSubExprs);
     llvm::SmallVector<Identifier, 8> OrigNames;
     if (TE->SubExprNames)
       OrigNames.append(TE->SubExprNames, TE->SubExprNames+TE->NumSubExprs);
     
-    for (unsigned i = 0, e = DestTy->NumFields; i != e; ++i) {
+    for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
       // FIXME: This turns the AST into an ASDAG, which is seriously bad.  We
       // should add a more tailored AST representation for this.
       
@@ -623,8 +623,8 @@ ConvertExprToTupleType(Expr *E, Identifier *IdentList, unsigned NumIdents,
         if (TE->SubExprNames == 0) {
           TE->SubExprNames =
           (Identifier*)SE.S.Context.Allocate(sizeof(Identifier)*
-                                             DestTy->NumFields, 8);
-          memset(TE->SubExprNames, 0, sizeof(Identifier)*DestTy->NumFields);
+                                             DestTy->Fields.size(), 8);
+          memset(TE->SubExprNames, 0, sizeof(Identifier)*DestTy->Fields.size());
         }
         
         TE->SubExprNames[i] = DestTy->Fields[i].Name;
@@ -641,11 +641,11 @@ ConvertExprToTupleType(Expr *E, Identifier *IdentList, unsigned NumIdents,
   // we can do elementwise conversions as needed, then rebuild a new TupleExpr
   // of the right destination type.
   TupleType *ETy = E->Ty->getAs<TupleType>();
-  llvm::SmallVector<Expr*, 16> NewElements(DestTy->NumFields);
+  llvm::SmallVector<Expr*, 16> NewElements(DestTy->Fields.size());
   
   Identifier *NewNames = 0;
   
-  for (unsigned i = 0, e = DestTy->NumFields; i != e; ++i) {
+  for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
     // FIXME: This turns the AST into an ASDAG, which is seriously bad.  We
     // should add a more tailored AST representation for this.
     
@@ -673,8 +673,8 @@ ConvertExprToTupleType(Expr *E, Identifier *IdentList, unsigned NumIdents,
       // Allocate the array on the first element with a name.
       if (NewNames == 0) {
         NewNames = (Identifier*)SE.S.Context.Allocate(sizeof(Identifier)*
-                                                      DestTy->NumFields, 8);
-        memset(NewNames, 0, sizeof(Identifier)*DestTy->NumFields);
+                                                      DestTy->Fields.size(), 8);
+        memset(NewNames, 0, sizeof(Identifier)*DestTy->Fields.size());
       }
       
       NewNames[i] = DestTy->Fields[i].Name;
@@ -685,8 +685,8 @@ ConvertExprToTupleType(Expr *E, Identifier *IdentList, unsigned NumIdents,
   // FIXME: Do this for dependent types, to resolve: foo($0, 4);
   // FIXME: Add default values.
   Expr **NewSE =
-  (Expr**)SE.S.Context.Allocate(sizeof(Expr*)*DestTy->NumFields, 8);
-  memcpy(NewSE, NewElements.data(), sizeof(Expr*)*DestTy->NumFields);
+  (Expr**)SE.S.Context.Allocate(sizeof(Expr*)*DestTy->Fields.size(), 8);
+  memcpy(NewSE, NewElements.data(), sizeof(Expr*)*DestTy->Fields.size());
   
   return new (SE.S.Context) TupleExpr(llvm::SMLoc(), NewSE, NewNames,
                                       NewElements.size(), llvm::SMLoc(),DestTy);
@@ -947,7 +947,7 @@ BindAndValidateClosureArgs(Expr *&Body, Type *FuncInput, SemaDecl &SD) {
   // tuple.
   unsigned NumInputArgs = 1;
   if (TupleType *TT = dyn_cast<TupleType>(FuncInput))
-    NumInputArgs = TT->NumFields;
+    NumInputArgs = TT->Fields.size();
   
   // Verify that the code didn't use too many anonymous arguments, e.g. using _4
   // when the bound function only has 2 inputs.
@@ -997,10 +997,10 @@ BindAndValidateClosureArgs(Expr *&Body, Type *FuncInput, SemaDecl &SD) {
 /// to be true, the tuple has to be non-empty, and must have at most one element
 /// lacking a default value.
 static int getTupleFieldForScalarInit(TupleType *TT) {
-  if (TT->NumFields == 0) return -1;
+  if (TT->Fields.size() == 0) return -1;
   
   int FieldWithoutDefault = -1;
-  for (unsigned i = 0, e = TT->NumFields; i != e; ++i) {
+  for (unsigned i = 0, e = TT->Fields.size(); i != e; ++i) {
     // Ignore fields with a default value.
     if (TT->Fields[i].Init) continue;
 
@@ -1036,7 +1036,7 @@ static Expr *HandleScalarConversionToTupleType(Expr *E, Type *DestTy,
   Expr *ERes = HandleConversionToType(E, ScalarType, false, SE);
   if (ERes == 0) return 0;
   
-  unsigned NumFields = TT->NumFields;
+  unsigned NumFields = TT->Fields.size();
   
   // Must allocate space for the AST node.
   Expr **NewSE = (Expr**)SE.S.Context.Allocate(sizeof(Expr*)*NumFields, 8);
@@ -1087,7 +1087,7 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
     // each element.
     if (TupleType *ETy = E->Ty->getAs<TupleType>()) {
       llvm::SmallVector<Identifier, 8> ExprIdentMapping;
-      for (unsigned i = 0, e = ETy->NumFields; i != e; ++i)
+      for (unsigned i = 0, e = ETy->Fields.size(); i != e; ++i)
         ExprIdentMapping.push_back(ETy->Fields[i].Name);
       
       if (Expr *Res = ConvertExprToTupleType(E, ExprIdentMapping.data(),

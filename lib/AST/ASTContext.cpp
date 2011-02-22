@@ -43,7 +43,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
     FunctionTypes(new FunctionTypesMapTy()),
     ArrayTypes(new ArrayTypesMapTy()),
     SourceMgr(sourcemgr),
-    TheEmptyTupleType(getTupleType(0, 0)),
+    TheEmptyTupleType(getTupleType(llvm::ArrayRef<TupleTypeElt>())),
     TheDependentType(new (*this) DependentType()),
     TheInt32Type(new (*this) BuiltinType(BuiltinInt32Kind)) {
 }
@@ -94,13 +94,13 @@ Type *ASTContext::getCanonicalType(Type *T) {
   case TupleTypeKind: {
     llvm::SmallVector<TupleTypeElt, 8> CanElts;
     TupleType *TT = llvm::cast<TupleType>(T);
-    CanElts.resize(TT->NumFields);
-    for (unsigned i = 0, e = TT->NumFields; i != e; ++i) {
+    CanElts.resize(TT->Fields.size());
+    for (unsigned i = 0, e = TT->Fields.size(); i != e; ++i) {
       CanElts[i].Name = TT->Fields[i].Name;
       CanElts[i].Ty = getCanonicalType(TT->Fields[i].Ty);
     }
     
-    return T->CanonicalType = getTupleType(CanElts.data(), CanElts.size());
+    return T->CanonicalType = getTupleType(CanElts);
   }
     
   case FunctionTypeKind: {
@@ -116,10 +116,10 @@ Type *ASTContext::getCanonicalType(Type *T) {
 }
 
 
-void TupleType::Profile(llvm::FoldingSetNodeID &ID, const TupleTypeElt *Fields,
-                        unsigned NumFields) {
-  ID.AddInteger(NumFields);
-  for (unsigned i = 0; i != NumFields; ++i) {
+void TupleType::Profile(llvm::FoldingSetNodeID &ID,
+                        llvm::ArrayRef<TupleTypeElt> Fields) {
+  ID.AddInteger(Fields.size());
+  for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
     ID.AddPointer(Fields[i].Ty);
     ID.AddPointer(Fields[i].Name.get());
     ID.AddPointer(Fields[i].Init);
@@ -127,12 +127,10 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID, const TupleTypeElt *Fields,
 }
 
 /// getTupleType - Return the uniqued tuple type with the specified elements.
-TupleType *ASTContext::getTupleType(const TupleTypeElt *Fields,
-                                    unsigned NumFields) {
+TupleType *ASTContext::getTupleType(llvm::ArrayRef<TupleTypeElt> Fields) {
   // Check to see if we've already seen this tuple before.
   llvm::FoldingSetNodeID ID;
-  TupleType::Profile(ID, Fields, NumFields);
- 
+  TupleType::Profile(ID, Fields);
   
   TupleTypesMapTy &TupleTypesMap = *(TupleTypesMapTy*)TupleTypes;
   
@@ -147,15 +145,17 @@ TupleType *ASTContext::getTupleType(const TupleTypeElt *Fields,
   // Okay, we didn't find one.  Make a copy of the fields list into ASTContext
   // owned memory.
   TupleTypeElt *FieldsCopy =
-    (TupleTypeElt *)Allocate(sizeof(*Fields)*NumFields, 8);
+    (TupleTypeElt *)Allocate(sizeof(Fields[0])*Fields.size(), 8);
   
   bool IsCanonical = true;   // All canonical elts means this is canonical.
-  for (unsigned i = 0, e = NumFields; i != e; ++i) {
+  for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
     FieldsCopy[i] = Fields[i];
     IsCanonical &= Fields[i].Ty->isCanonical();
   }
 
-  TupleType *New = new (*this) TupleType(FieldsCopy, NumFields);
+  Fields = llvm::ArrayRef<TupleTypeElt>(FieldsCopy, Fields.size());
+  
+  TupleType *New = new (*this) TupleType(Fields);
   TupleTypesMap.InsertNode(New, InsertPos);
 
   // If the type is canonical then set the canonical type pointer to itself.

@@ -24,6 +24,7 @@ namespace llvm {
   class SourceMgr;
   class StringRef;
   template <typename T> class FoldingSet;
+  template <typename T> class ArrayRef;
 }
 
 namespace swift {
@@ -74,8 +75,7 @@ public:
   Type * const TheInt32Type;       /// TheInt32Type - 32-bit signed integer.
 
   /// getTupleType - Return the uniqued tuple type with the specified elements.
-  TupleType *getTupleType(const TupleTypeElt *Fields,
-                          unsigned NumFields);
+  TupleType *getTupleType(llvm::ArrayRef<TupleTypeElt> Fields);
   
   /// getFunctionType - Return a uniqued function type with the specified
   /// input and result.

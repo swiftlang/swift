@@ -142,7 +142,7 @@ static Type *GetTypeForPath(Type *Ty, const unsigned *Path, unsigned PathLen) {
   if (TT == 0) return 0;
   
   // Reject invalid indices.
-  if (*Path >= TT->NumFields)
+  if (*Path >= TT->Fields.size())
     return 0;
   
   return GetTypeForPath(TT->getElementType(*Path), Path+1, PathLen-1);
@@ -168,7 +168,7 @@ bool SemaDecl::CheckAccessPathArity(unsigned NumChildren, llvm::SMLoc LPLoc,
                                     const unsigned *Path, unsigned PathLen) {
   TupleType *Ty =
     llvm::dyn_cast_or_null<TupleType>(GetTypeForPath(D->Ty, Path, PathLen));
-  if (Ty && Ty->NumFields == NumChildren)
+  if (Ty && Ty->Fields.size() == NumChildren)
     return false;
   
   Error(LPLoc,"tuple specifier has wrong number of elements for actual type");
@@ -234,7 +234,7 @@ static void ValidateAttributes(DeclAttributes &Attrs, Type *Ty, SemaDecl &SD) {
     bool IsError = true;
     if (FunctionType *FT = llvm::dyn_cast<FunctionType>(Ty))
       if (TupleType *TT = llvm::dyn_cast<TupleType>(FT->Input))
-        IsError = TT->NumFields != 2;
+        IsError = TT->Fields.size() != 2;
     if (IsError) {
       SD.Error(Attrs.LSquareLoc, "function with 'infix' specified must take "
                "a two element tuple as input");
@@ -327,7 +327,7 @@ static void AddFuncArgumentsToScope(Type *Ty,
   // For tuples, recursively processes their elements (to handle cases like:
   //    (x : (.a : int, .b : int), y: int) -> ...
   // and create decls for any named elements.
-  for (unsigned i = 0, e = TT->NumFields; i != e; ++i) {
+  for (unsigned i = 0, e = TT->Fields.size(); i != e; ++i) {
     AccessPath.back() = 1;
     AddFuncArgumentsToScope(TT->Fields[i].Ty, AccessPath, Mode, FuncLoc, SD);
 
