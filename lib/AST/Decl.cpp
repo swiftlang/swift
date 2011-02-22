@@ -53,7 +53,7 @@ Type *NamedTypeDecl::createTypeForDecl(ASTContext &C) {
   assert(TypeForDecl == 0 && "Type already created?");
   
   if (TypeAliasDecl *TAD = llvm::dyn_cast<TypeAliasDecl>(this))
-    return TypeForDecl = new (C) AliasType(TAD->Name, TAD->UnderlyingTy);
+    return TypeForDecl = new (C) AliasType(TAD);
   
   OneOfDecl *OOD = cast<OneOfDecl>(this);
   return TypeForDecl = new (C) OneOfType(OOD);

@@ -28,6 +28,7 @@ namespace swift {
   class ASTContext;
   class Expr;
   class Identifier;
+  class TypeAliasDecl;
   class OneOfDecl;
   
   enum TypeKind {
@@ -129,11 +130,10 @@ public:
 /// C.
 class AliasType : public Type {
   friend class NamedTypeDecl;
-  AliasType(Identifier name, Type *ty)
-    : Type(AliasTypeKind), Name(name), UnderlyingType(ty) {}
+  // AliasTypes are never canonical.
+  AliasType(TypeAliasDecl *d) : Type(AliasTypeKind), TheDecl(d) {}
 public:
-  const Identifier Name;
-  Type *const UnderlyingType;
+  TypeAliasDecl *const TheDecl;
   
   
   void print(llvm::raw_ostream &OS) const;
@@ -148,8 +148,8 @@ public:
 /// OneOfType - A type declared with a 'oneof' declaration.
 class OneOfType : public Type {
   friend class NamedTypeDecl;
-  OneOfType(OneOfDecl *DD)
-  : Type(OneOfTypeKind, this), TheDecl(DD) {}
+  // OneOfTypes are always canonical.
+  OneOfType(OneOfDecl *DD) : Type(OneOfTypeKind, this), TheDecl(DD) {}
 public:
   OneOfDecl *const TheDecl;
   

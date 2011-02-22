@@ -95,7 +95,7 @@ Type *ASTContext::getCanonicalType(Type *T) {
     assert(0 && "These are always canonical");
   case AliasTypeKind:
     return T->CanonicalType =
-      getCanonicalType(llvm::cast<AliasType>(T)->UnderlyingType);
+      getCanonicalType(llvm::cast<AliasType>(T)->TheDecl->UnderlyingTy);
   case TupleTypeKind: {
     llvm::SmallVector<TupleTypeElt, 8> CanElts;
     TupleType *TT = llvm::cast<TupleType>(T);

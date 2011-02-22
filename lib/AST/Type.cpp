@@ -42,7 +42,7 @@ Type *Type::getDesugaredType() {
     // None of these types have sugar at the outer level.
     return this;
   case AliasTypeKind:
-    return cast<AliasType>(this)->UnderlyingType->getDesugaredType();
+    return cast<AliasType>(this)->TheDecl->UnderlyingTy->getDesugaredType();
   }
 
   assert(0 && "Unknown type kind");
@@ -95,7 +95,7 @@ void DependentType::print(llvm::raw_ostream &OS) const {
 }
 
 void AliasType::print(llvm::raw_ostream &OS) const {
-  OS << Name.get();
+  OS << TheDecl->Name.get();
 }
 
 void OneOfType::print(llvm::raw_ostream &OS) const {
