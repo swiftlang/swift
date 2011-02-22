@@ -32,7 +32,8 @@ void *Decl::operator new(size_t Bytes, ASTContext &C,
 
 llvm::SMLoc NamedDecl::getLocStart() const {
   switch (getKind()) {
-  case OneOfDeclKind:       return cast<OneOfDecl>(this)->getLocStart();
+  case TypeAliasDeclKind:  return cast<TypeAliasDecl>(this)->getLocStart(); 
+  case OneOfDeclKind:      return cast<OneOfDecl>(this)->getLocStart();
   case VarDeclKind:        return cast<VarDecl>(this)->getLocStart();
   case FuncDeclKind:       return cast<FuncDecl>(this)->getLocStart();
   case OneOfElementDeclKind:return cast<OneOfElementDecl>(this)->getLocStart();
@@ -59,10 +60,12 @@ void Decl::dump() const { print(llvm::errs()); llvm::errs() << '\n'; }
 
 void Decl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   switch (getKind()) {
-  case OneOfDeclKind:       return cast<OneOfDecl>(this)->print(OS, Indent);
+  case TypeAliasDeclKind:  return cast<TypeAliasDecl>(this)->print(OS, Indent);
+  case OneOfDeclKind:      return cast<OneOfDecl>(this)->print(OS, Indent);
   case VarDeclKind:        return cast<VarDecl>(this)->print(OS, Indent);
   case FuncDeclKind:       return cast<FuncDecl>(this)->print(OS, Indent);
-  case OneOfElementDeclKind:return cast<OneOfElementDecl>(this)->print(OS,Indent);
+  case OneOfElementDeclKind:
+    return cast<OneOfElementDecl>(this)->print(OS,Indent);
   case ArgDeclKind:        return cast<ArgDecl>(this)->print(OS, Indent);
   case AnonDeclKind:       return cast<AnonDecl>(this)->print(OS, Indent);
   case ElementRefDeclKind: return cast<ElementRefDecl>(this)->print(OS, Indent);
@@ -72,6 +75,15 @@ void Decl::print(llvm::raw_ostream &OS, unsigned Indent) const {
 void NamedDecl::printCommon(llvm::raw_ostream &OS, unsigned Indent) const {
   OS << "'" << Name << "'";
 }
+
+void TypeAliasDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
+  OS.indent(Indent) << "(typealias ";
+  printCommon(OS, Indent);
+  
+  UnderlyingTy->print(OS);
+  OS << ')';
+}
+
 
 void OneOfDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(oneofdecl ";

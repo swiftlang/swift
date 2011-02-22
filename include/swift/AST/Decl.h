@@ -33,6 +33,7 @@ namespace swift {
   class OneOfElementDecl;
   
 enum DeclKind {
+  TypeAliasDeclKind,
   OneOfDeclKind,
   VarDeclKind,
   FuncDeclKind,
@@ -99,8 +100,9 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return (D->getKind() == VarDeclKind || D->getKind() == FuncDeclKind ||
-            D->getKind() == OneOfElementDeclKind || D->getKind() == ArgDeclKind||
-            D->getKind() == AnonDeclKind || D->getKind() == ElementRefDeclKind||
+            D->getKind() == OneOfElementDeclKind ||
+            D->getKind() == ArgDeclKind || D->getKind() == AnonDeclKind ||
+            D->getKind() == ElementRefDeclKind ||
             D->getKind() == OneOfDeclKind);
   }
   static bool classof(const NamedDecl *D) { return true; }
@@ -113,11 +115,65 @@ protected:
   
   void printCommon(llvm::raw_ostream &OS, unsigned Indent) const;
 };
+  
+/// NamedTypeDecl - This is the common base class of all named type decls, like
+/// OneOfDecl, TypeAliasDecl, etc.
+/// 
+class NamedTypeDecl : public NamedDecl {
+public:
+  
+  
+  /// getTypeForDecl - Return the type that represents this decl in a type
+  /// context.
+  Type *getTypeForDecl() const;
+  
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) {
+    return D->getKind() == OneOfDeclKind;
+  }
+  static bool classof(const NamedTypeDecl *D) { return true; }
+
+
+protected:
+  NamedTypeDecl(DeclKind K, Identifier name, const DeclAttributes &attrs)
+    : NamedDecl(K, name, attrs) {
+  }
+};
+  
+  
+/// TypeAliasDecl - This is a declaration of a typealias, for example:
+///
+///    typealias foo : int
+///
+class TypeAliasDecl : public NamedTypeDecl {
+public:
+  llvm::SMLoc TypeAliasLoc;
+  Type *UnderlyingTy;
+  
+  TypeAliasDecl(llvm::SMLoc typealiasloc, Identifier name, Type *underlyingty,
+                const DeclAttributes &attrs = DeclAttributes())
+    : NamedTypeDecl(TypeAliasDeclKind, name, attrs),
+      TypeAliasLoc(typealiasloc), UnderlyingTy(underlyingty) {
+  }
+
+  llvm::SMLoc getLocStart() const { return TypeAliasLoc; }
+
+  
+  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) {
+    return D->getKind() == TypeAliasDeclKind;
+  }
+  static bool classof(const TypeAliasDecl *D) { return true; }
+
+};
 
 
 /// OneOfDecl - 'oneof' declaration.  This  represents the oneof declaration
 /// itself, not its elements.
-class OneOfDecl : public NamedDecl {
+class OneOfDecl : public NamedTypeDecl {
 public:
   llvm::SMLoc OneOfLoc;
   
@@ -126,7 +182,7 @@ public:
   
   OneOfDecl(llvm::SMLoc oneofloc, Identifier name,
             const DeclAttributes &attrs = DeclAttributes())
-    : NamedDecl(OneOfDeclKind, name, attrs),
+    : NamedTypeDecl(OneOfDeclKind, name, attrs),
       OneOfLoc(oneofloc), Elements(0), NumElements(0) {
   }
 
