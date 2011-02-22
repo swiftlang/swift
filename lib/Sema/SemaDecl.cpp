@@ -56,6 +56,18 @@ SemaDecl::~SemaDecl() {
 // Name lookup.
 //===----------------------------------------------------------------------===//
 
+/// LookupValueName - Perform a lexical scope lookup for the specified name,
+/// returning the active decl if found or null if not.
+ValueDecl *SemaDecl::LookupValueName(Identifier Name) {
+  return getValueHT(ValueScopeHT).lookup(Name).second;
+}
+
+/// LookupTypeName - Perform a lexical scope lookup for the specified name in
+/// a type context, returning the active decl if found or null if not.
+NamedTypeDecl *SemaDecl::LookupTypeName(Identifier Name) {
+  return getTypeHT(TypeScopeHT).lookup(Name).second;
+}
+
 /// AddToScope - Register the specified decl as being in the current lexical
 /// scope.
 void SemaDecl::AddToScope(ValueDecl *D) {
@@ -66,8 +78,7 @@ void SemaDecl::AddToScope(ValueDecl *D) {
   if (Entry.second && Entry.first == CurScope->getDepth()) {
     Error(D->getLocStart(),
           "variable declaration conflicts with previous declaration");
-    Note(getValueHT(ValueScopeHT).lookup(D->Name).second->getLocStart(),
-         "previous declaration here");
+    Note(LookupValueName(D->Name)->getLocStart(), "previous declaration here");
     return;
   }
   
@@ -75,10 +86,22 @@ void SemaDecl::AddToScope(ValueDecl *D) {
                                   std::make_pair(CurScope->getDepth(), D));
 }
 
-/// LookupValueName - Perform a lexical scope lookup for the specified name,
-/// returning the active decl if found or null if not.
-ValueDecl *SemaDecl::LookupValueName(Identifier Name) {
-  return getValueHT(ValueScopeHT).lookup(Name).second;
+/// AddToScope - Register the specified decl as being in the current lexical
+/// scope.
+void SemaDecl::AddToScope(NamedTypeDecl *D) {
+  // If we have a shadowed type definition, check to see if we have a
+  // redefinition: two definitions in the same scope with the same name.
+  std::pair<unsigned, NamedTypeDecl*> Entry =
+    getTypeHT(TypeScopeHT).lookup(D->Name);
+  if (Entry.second && Entry.first == CurScope->getDepth()) {
+    Error(D->getLocStart(),
+          "redefinition of type named '" +llvm::StringRef(D->Name.get()) + "'");
+    Note(LookupTypeName(D->Name)->getLocStart(), "previous declaration here");
+    return;
+  }
+  
+  getTypeHT(TypeScopeHT).insert(D->Name,
+                                std::make_pair(CurScope->getDepth(), D));
 }
 
 /// GetAnonDecl - Get the anondecl for the specified anonymous closure
@@ -351,37 +374,16 @@ FuncDecl *SemaDecl::ActOnFuncBody(FuncDecl *FD, Expr *Body) {
 TypeAliasDecl *SemaDecl::ActOnTypeAlias(llvm::SMLoc TypeAliasLoc,
                                         Identifier Name, Type *Ty) {
 
-  TypeAliasDecl *TheDecl =
-    new (S.Context) TypeAliasDecl(TypeAliasLoc, Name, Ty);
-
-  // FIXME: Should have a NamedType class with loc info to diagnose the
-  // redefinition?
-  if (S.Context.getNamedType(Name)) {
-    Error(TypeAliasLoc, "redefinition of type named '" + 
-          llvm::StringRef(Name.get()) + "'");
-  } else {
-    // FIXME: Name lookup for types is pretty insane!
-    S.Context.installTypeDecl(Name, TheDecl);
-  }
-  
+  TypeAliasDecl *TheDecl =new (S.Context) TypeAliasDecl(TypeAliasLoc, Name, Ty);
+  AddToScope(TheDecl);
   return TheDecl;
 }
 
 
 OneOfDecl *SemaDecl::ActOnOneOfDecl(llvm::SMLoc OneOfLoc, Identifier Name,
-                                  DeclAttributes &Attrs) {
-  // FIXME: Do name lookup on the type to diagnose type redefinitions.
-  
+                                    DeclAttributes &Attrs) {
   OneOfDecl *TheDecl = new (S.Context) OneOfDecl(OneOfLoc, Name, Attrs);
-
-  // FIXME: Should have a NamedType class with loc info to diagnose the
-  // redefinition?
-  if (S.Context.getNamedType(Name))
-    Error(OneOfLoc, "redefinition of type named '" +
-          llvm::StringRef(Name.get()) + "'");
-  else
-    S.Context.installTypeDecl(Name, TheDecl);
-
+  AddToScope(TheDecl);
   return TheDecl;
 }
 

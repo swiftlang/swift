@@ -28,6 +28,7 @@
 namespace swift {
   class Expr;
   class Type;
+  class NamedTypeDecl;
   class TypeAliasDecl;
   class OneOfDecl;
   class VarDecl;
@@ -56,11 +57,16 @@ public:
   /// AddToScope - Register the specified decl as being in the current lexical
   /// scope.
   void AddToScope(ValueDecl *D);
+  void AddToScope(NamedTypeDecl *D);
   
   /// LookupValueName - Perform a lexical scope lookup for the specified name in
   /// a value context, returning the active decl if found or null if not.
   ValueDecl *LookupValueName(Identifier Name);
-  
+
+  /// LookupTypeName - Perform a lexical scope lookup for the specified name in
+  /// a type context, returning the active decl if found or null if not.
+  NamedTypeDecl *LookupTypeName(Identifier Name);
+
 
   /// AnonClosureArgs - These are the current active set of anonymous closure
   /// arguments, named $0 ... $9.  These are added to the list when first

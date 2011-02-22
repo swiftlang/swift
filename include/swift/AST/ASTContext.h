@@ -43,7 +43,6 @@ class ASTContext {
   llvm::BumpPtrAllocator *Allocator;
   
   void *IdentifierTable; // llvm::StringMap<char>
-  void *TypeDecls;       // llvm::DenseMap<Identifier, NamedTypeDecl*>
   void *TupleTypes;      // llvm::FoldingSet<TupleType>
   void *FunctionTypes;   // DenseMap<std::pair<Type*, Type*>, FunctionType*>
   void *ArrayTypes;      // DenseMap<std::pair<Type*, uint64_t>, ArrayType*>
@@ -74,17 +73,6 @@ public:
   Type * const TheDependentType;   /// TheDependentType - Dependent on context.
   Type * const TheInt32Type;       /// TheInt32Type - 32-bit signed integer.
 
-  /// getNamedType - This method does a lookup for the specified type name.  If
-  /// no type with the specified name exists, null is returned.
-  ///
-  /// FIXME: This is a total hack since we don't have scopes for types.
-  /// getNamedType should eventually be replaced.  At that point, the "install"
-  /// functions should move out of here.
-  NamedTypeDecl *getNamedType(Identifier Name);
-  
-  /// installTypeDecl - Add a new named type decl to the named type map.
-  void installTypeDecl(Identifier Name, NamedTypeDecl *Decl);
-  
   /// getTupleType - Return the uniqued tuple type with the specified elements.
   TupleType *getTupleType(const TupleTypeElt *Fields,
                           unsigned NumFields);

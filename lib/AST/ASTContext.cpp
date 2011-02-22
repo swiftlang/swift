@@ -27,9 +27,6 @@ using namespace swift;
 /// IdentifierTableMapTy - This is the type underlying IdentifierTable.
 typedef llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTableMapTy;
 
-/// TypeDeclsMapTy - This is the type underlying TypeDecls.
-typedef llvm::DenseMap<Identifier, NamedTypeDecl*> TypeDeclsMapTy;
-
 /// TupleTypesMapTy - This is the actual type underlying ASTContext::TupleTypes.
 typedef llvm::FoldingSet<TupleType> TupleTypesMapTy;
 
@@ -42,7 +39,6 @@ typedef llvm::DenseMap<std::pair<Type*, uint64_t>, ArrayType*> ArrayTypesMapTy;
 ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
   : Allocator(new llvm::BumpPtrAllocator()),
     IdentifierTable(new IdentifierTableMapTy(*Allocator)),
-    TypeDecls(new TypeDeclsMapTy()),
     TupleTypes(new TupleTypesMapTy()),
     FunctionTypes(new FunctionTypesMapTy()),
     ArrayTypes(new ArrayTypesMapTy()),
@@ -53,7 +49,6 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
 }
 
 ASTContext::~ASTContext() {
-  delete (TypeDeclsMapTy*)TypeDecls; TypeDecls = 0;
   delete (TupleTypesMapTy*)TupleTypes; TupleTypes = 0;
   delete (FunctionTypesMapTy*)FunctionTypes; FunctionTypes = 0;
   delete (ArrayTypesMapTy*)ArrayTypes; ArrayTypes = 0;
@@ -129,27 +124,6 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID, const TupleTypeElt *Fields,
     ID.AddPointer(Fields[i].Name.get());
     ID.AddPointer(Fields[i].Init);
   }
-}
-
-/// getNamedType - This method does a lookup for the specified type name.  If
-/// no type with the specified name exists, null is returned.
-///
-/// FIXME: This is a total hack since we don't have scopes for types.
-/// getNamedType should eventually be replaced.
-NamedTypeDecl *ASTContext::getNamedType(Identifier Name) {
-  TypeDeclsMapTy &Table = *((TypeDeclsMapTy*)TypeDecls);
-  TypeDeclsMapTy::iterator It = Table.find(Name);
-  if (It != Table.end())
-    return It->second;
-  return 0;
-}
-
-
-/// installTypeDecl - 
-void ASTContext::installTypeDecl(Identifier Name, NamedTypeDecl *Decl) {
-  NamedTypeDecl *&Entry = (*(TypeDeclsMapTy*)TypeDecls)[Name];
-  assert(Entry == 0 && "Redefinition of alias type");
-  Entry = Decl;
 }
 
 /// getTupleType - Return the uniqued tuple type with the specified elements.

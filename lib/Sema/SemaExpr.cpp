@@ -331,7 +331,7 @@ ActOnScopedIdentifierExpr(llvm::StringRef ScopeName, llvm::SMLoc ScopeLoc,
   // Note: this is very simplistic support for scoped name lookup, extend when
   // needed.
   NamedTypeDecl *TypeScopeDecl =
-    S.Context.getNamedType(S.Context.getIdentifier(ScopeName));
+    S.decl.LookupTypeName(S.Context.getIdentifier(ScopeName));
   if (TypeScopeDecl == 0) {
     Error(ScopeLoc, "unknown type name '" + ScopeName + "' in expression");
     return 0;
@@ -353,7 +353,7 @@ ActOnScopedIdentifierExpr(llvm::StringRef ScopeName, llvm::SMLoc ScopeLoc,
     return 0;
   }
   
-  OneOfElementDecl *Elt = DT->TheDecl->getElement(S.Context.getIdentifier(Name));
+  OneOfElementDecl *Elt =DT->TheDecl->getElement(S.Context.getIdentifier(Name));
   if (Elt == 0) {
     Error(ScopeLoc, "'" + Name + "' is not a member of '" + ScopeName + "'");
     return 0;
