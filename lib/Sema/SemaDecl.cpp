@@ -27,21 +27,29 @@
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
 
-typedef std::pair<unsigned, ValueDecl*> ScopeEntry;
-typedef llvm::ScopedHashTable<Identifier, ScopeEntry> ScopeHTType;
+typedef std::pair<unsigned, ValueDecl*> ValueScopeEntry;
+typedef llvm::ScopedHashTable<Identifier, ValueScopeEntry> ValueScopeHTType;
 
-static ScopeHTType &getHT(void *P) {
-  return *(ScopeHTType*)P;
+typedef std::pair<unsigned, NamedTypeDecl*> TypeScopeEntry;
+typedef llvm::ScopedHashTable<Identifier, TypeScopeEntry> TypeScopeHTType;
+
+static ValueScopeHTType &getValueHT(void *P) {
+  return *(ValueScopeHTType*)P;
+}
+static TypeScopeHTType &getTypeHT(void *P) {
+  return *(TypeScopeHTType*)P;
 }
 
 SemaDecl::SemaDecl(Sema &S)
   : SemaBase(S),
-    ScopeHT(new ScopeHTType()),
+    ValueScopeHT(new ValueScopeHTType()),
+    TypeScopeHT(new TypeScopeHTType()),
     CurScope(0) {
 }
 
 SemaDecl::~SemaDecl() {
-  delete &getHT(ScopeHT);
+  delete &getValueHT(ValueScopeHT);
+  delete &getTypeHT(TypeScopeHT);
 }
 
 //===----------------------------------------------------------------------===//
@@ -53,22 +61,24 @@ SemaDecl::~SemaDecl() {
 void SemaDecl::AddToScope(ValueDecl *D) {
   // If we have a shadowed variable definition, check to see if we have a
   // redefinition: two definitions in the same scope with the same name.
-  std::pair<unsigned, ValueDecl*> Entry = getHT(ScopeHT).lookup(D->Name);
+  std::pair<unsigned, ValueDecl*> Entry =
+    getValueHT(ValueScopeHT).lookup(D->Name);
   if (Entry.second && Entry.first == CurScope->getDepth()) {
     Error(D->getLocStart(),
           "variable declaration conflicts with previous declaration");
-    Note(getHT(ScopeHT).lookup(D->Name).second->getLocStart(),
+    Note(getValueHT(ValueScopeHT).lookup(D->Name).second->getLocStart(),
          "previous declaration here");
     return;
   }
   
-  getHT(ScopeHT).insert(D->Name, std::make_pair(CurScope->getDepth(), D));
+  getValueHT(ValueScopeHT).insert(D->Name,
+                                  std::make_pair(CurScope->getDepth(), D));
 }
 
 /// LookupValueName - Perform a lexical scope lookup for the specified name,
 /// returning the active decl if found or null if not.
 ValueDecl *SemaDecl::LookupValueName(Identifier Name) {
-  return getHT(ScopeHT).lookup(Name).second;
+  return getValueHT(ValueScopeHT).lookup(Name).second;
 }
 
 /// GetAnonDecl - Get the anondecl for the specified anonymous closure

@@ -40,7 +40,8 @@ namespace swift {
   
 /// SemaDecl - Semantic analysis support for Swift declarations.
 class SemaDecl : public SemaBase {
-  void *const ScopeHT; // ScopedHashTable<Identifier, ScopeEntry>
+  void *const ValueScopeHT; // ScopedHashTable<Identifier, ValueScopeEntry>
+  void *const TypeScopeHT;  // ScopedHashTable<Identifier, TypeScopeEntry>
   Scope *CurScope;
   friend class Scope;
 public:

@@ -19,7 +19,8 @@
 using namespace swift;
 
 Scope::Scope(SemaDecl &S) : SD(S),
-   HTScope(*(llvm::ScopedHashTable<Identifier, ScopeEntry>*)S.ScopeHT),
+   ValueHTScope(*(ValueScopeHTTy*)S.ValueScopeHT),
+   TypeHTScope(*(TypeScopeHTTy*)S.TypeScopeHT),
    PrevScope(SD.CurScope) {
   if (SD.CurScope)
     Depth = SD.CurScope->Depth+1;

@@ -23,6 +23,7 @@
 
 namespace swift {
   class ValueDecl;
+  class NamedTypeDecl;
   class SemaDecl;
   
 /// Scope - This class represents lexical scopes.  These objects are created
@@ -34,9 +35,16 @@ class Scope {
   void operator=(const Scope&); // DO NOT IMPLEMENT
   
   SemaDecl &SD;
+
+  typedef std::pair<unsigned, ValueDecl*> ValueScopeEntry;
+  typedef std::pair<unsigned, NamedTypeDecl*> TypeScopeEntry;
   
-  typedef std::pair<unsigned, ValueDecl*> ScopeEntry;
-  llvm::ScopedHashTableScope<Identifier, ScopeEntry> HTScope;
+  typedef llvm::ScopedHashTable<Identifier, ValueScopeEntry> ValueScopeHTTy;
+  typedef llvm::ScopedHashTable<Identifier, TypeScopeEntry> TypeScopeHTTy;
+
+  llvm::ScopedHashTableScope<Identifier, ValueScopeEntry> ValueHTScope;
+  llvm::ScopedHashTableScope<Identifier, TypeScopeEntry> TypeHTScope;
+
   Scope *PrevScope;
   unsigned Depth;
 public:
