@@ -34,7 +34,7 @@ namespace swift {
   class ArrayType;
   class Identifier;
   class TupleTypeElt;
-  class OneOfDecl;
+  class NamedTypeDecl;
 
 /// ASTContext - This object creates and owns the AST objects.
 class ASTContext {
@@ -43,8 +43,7 @@ class ASTContext {
   llvm::BumpPtrAllocator *Allocator;
   
   void *IdentifierTable; // llvm::StringMap<char>
-  void *AliasTypes;      // llvm::DenseMap<Identifier, AliasType*>
-  void *OneOfTypes;      // llvm::DenseMap<Identifier, OneOfType*>
+  void *TypeDecls;       // llvm::DenseMap<Identifier, NamedTypeDecl*>
   void *TupleTypes;      // llvm::FoldingSet<TupleType>
   void *FunctionTypes;   // DenseMap<std::pair<Type*, Type*>, FunctionType*>
   void *ArrayTypes;      // DenseMap<std::pair<Type*, uint64_t>, ArrayType*>
@@ -81,17 +80,11 @@ public:
   /// FIXME: This is a total hack since we don't have scopes for types.
   /// getNamedType should eventually be replaced.  At that point, the "install"
   /// functions should move out of here.
-  Type *getNamedType(Identifier Name);
+  NamedTypeDecl *getNamedType(Identifier Name);
   
-  /// getAliasType - Add a new alias type to the named type map.  This returns
-  /// null if there is a conflict with an already existing alias type of the
-  /// same name.
-  void InstallAliasType(Identifier Name, Type *Underlying);
+  /// installTypeDecl - Add a new named type decl to the named type map.
+  void installTypeDecl(Identifier Name, NamedTypeDecl *Decl);
   
-  /// InstallOneOfType - Return the type corresponding to the specified oneof
-  /// declaration.
-  void InstallOneOfType(OneOfDecl *TheDecl);
-                          
   /// getTupleType - Return the uniqued tuple type with the specified elements.
   TupleType *getTupleType(const TupleTypeElt *Fields,
                           unsigned NumFields);

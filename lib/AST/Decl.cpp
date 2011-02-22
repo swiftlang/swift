@@ -46,6 +46,21 @@ llvm::SMLoc NamedDecl::getLocStart() const {
   return llvm::SMLoc();
 }
 
+
+/// getTypeForDecl - Return the type that represents this decl in a type
+/// context.
+Type *NamedTypeDecl::createTypeForDecl(ASTContext &C) {
+  assert(TypeForDecl == 0 && "Type already created?");
+  
+  if (TypeAliasDecl *TAD = llvm::dyn_cast<TypeAliasDecl>(this))
+    return TypeForDecl = new (C) AliasType(TAD->Name, TAD->UnderlyingTy);
+  
+  OneOfDecl *OOD = cast<OneOfDecl>(this);
+  return TypeForDecl = new (C) OneOfType(OOD);
+}
+
+
+
 OneOfElementDecl *OneOfDecl::getElement(Identifier Name) const {
   // FIXME: Linear search is not great for large oneof decls.
   for (unsigned i = 0, e = NumElements; i != e; ++i)
@@ -79,9 +94,9 @@ void NamedDecl::printCommon(llvm::raw_ostream &OS, unsigned Indent) const {
 void TypeAliasDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(typealias ";
   printCommon(OS, Indent);
-  OS << " type=";
+  OS << " type='";
   UnderlyingTy->print(OS);
-  OS << ')';
+  OS << "')";
 }
 
 

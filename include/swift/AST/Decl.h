@@ -103,7 +103,8 @@ public:
             D->getKind() == OneOfElementDeclKind ||
             D->getKind() == ArgDeclKind || D->getKind() == AnonDeclKind ||
             D->getKind() == ElementRefDeclKind ||
-            D->getKind() == OneOfDeclKind);
+            D->getKind() == OneOfDeclKind ||
+            D->getKind() == TypeAliasDeclKind);
   }
   static bool classof(const NamedDecl *D) { return true; }
   
@@ -120,17 +121,25 @@ protected:
 /// OneOfDecl, TypeAliasDecl, etc.
 /// 
 class NamedTypeDecl : public NamedDecl {
+  /// TypeForDecl - This is the type that corresponds to this decl.  This is
+  /// lazily created the first time getTypeForDecl is called.
+  mutable Type *TypeForDecl;
 public:
   
   
   /// getTypeForDecl - Return the type that represents this decl in a type
   /// context.
-  Type *getTypeForDecl() const;
+  Type *getTypeForDecl(ASTContext &C) const {
+    if (TypeForDecl)
+      return TypeForDecl;
+    return const_cast<NamedTypeDecl*>(this)->createTypeForDecl(C);
+  }
   
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->getKind() == OneOfDeclKind;
+    return D->getKind() == OneOfDeclKind ||
+           D->getKind() == TypeAliasDeclKind;
   }
   static bool classof(const NamedTypeDecl *D) { return true; }
 
@@ -139,6 +148,8 @@ protected:
   NamedTypeDecl(DeclKind K, Identifier name, const DeclAttributes &attrs)
     : NamedDecl(K, name, attrs) {
   }
+private:
+  Type *createTypeForDecl(ASTContext &C);
 };
   
   

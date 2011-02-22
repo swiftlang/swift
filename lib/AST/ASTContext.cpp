@@ -27,11 +27,8 @@ using namespace swift;
 /// IdentifierTableMapTy - This is the type underlying IdentifierTable.
 typedef llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTableMapTy;
 
-/// AliasTypesMapTy - This is the type underlying AliasTypes.
-typedef llvm::DenseMap<Identifier, AliasType*> AliasTypesMapTy;
-
-/// OneOfTypesMapTy - This is the type underlying OneOfTypes.
-typedef llvm::DenseMap<Identifier, OneOfType*> OneOfTypesMapTy;
+/// TypeDeclsMapTy - This is the type underlying TypeDecls.
+typedef llvm::DenseMap<Identifier, NamedTypeDecl*> TypeDeclsMapTy;
 
 /// TupleTypesMapTy - This is the actual type underlying ASTContext::TupleTypes.
 typedef llvm::FoldingSet<TupleType> TupleTypesMapTy;
@@ -45,8 +42,7 @@ typedef llvm::DenseMap<std::pair<Type*, uint64_t>, ArrayType*> ArrayTypesMapTy;
 ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
   : Allocator(new llvm::BumpPtrAllocator()),
     IdentifierTable(new IdentifierTableMapTy(*Allocator)),
-    AliasTypes(new AliasTypesMapTy()),
-    OneOfTypes(new OneOfTypesMapTy()),
+    TypeDecls(new TypeDeclsMapTy()),
     TupleTypes(new TupleTypesMapTy()),
     FunctionTypes(new FunctionTypesMapTy()),
     ArrayTypes(new ArrayTypesMapTy()),
@@ -57,8 +53,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
 }
 
 ASTContext::~ASTContext() {
-  delete (AliasTypesMapTy*)AliasTypes; AliasTypes = 0;
-  delete (OneOfTypesMapTy*)OneOfTypes; OneOfTypes = 0;
+  delete (TypeDeclsMapTy*)TypeDecls; TypeDecls = 0;
   delete (TupleTypesMapTy*)TupleTypes; TupleTypes = 0;
   delete (FunctionTypesMapTy*)FunctionTypes; FunctionTypes = 0;
   delete (ArrayTypesMapTy*)ArrayTypes; ArrayTypes = 0;
@@ -141,39 +136,20 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID, const TupleTypeElt *Fields,
 ///
 /// FIXME: This is a total hack since we don't have scopes for types.
 /// getNamedType should eventually be replaced.
-Type *ASTContext::getNamedType(Identifier Name) {
-  {
-    AliasTypesMapTy &Table = *((AliasTypesMapTy*)AliasTypes);
-    AliasTypesMapTy::iterator It = Table.find(Name);
-    if (It != Table.end())
-      return It->second;
-  }
-
-  {
-    OneOfTypesMapTy &Table = *((OneOfTypesMapTy*)OneOfTypes);
-    OneOfTypesMapTy::iterator It = Table.find(Name);
-    if (It != Table.end())
-      return It->second;
-  }
+NamedTypeDecl *ASTContext::getNamedType(Identifier Name) {
+  TypeDeclsMapTy &Table = *((TypeDeclsMapTy*)TypeDecls);
+  TypeDeclsMapTy::iterator It = Table.find(Name);
+  if (It != Table.end())
+    return It->second;
   return 0;
 }
 
 
-/// InstallAliasType - InstallAliasType a new alias type.
-void ASTContext::InstallAliasType(Identifier Name, Type *Underlying) {
-  AliasType *&Entry = (*(AliasTypesMapTy*)AliasTypes)[Name];
+/// installTypeDecl - 
+void ASTContext::installTypeDecl(Identifier Name, NamedTypeDecl *Decl) {
+  NamedTypeDecl *&Entry = (*(TypeDeclsMapTy*)TypeDecls)[Name];
   assert(Entry == 0 && "Redefinition of alias type");
-  
-  Entry = new (*this) AliasType(Name, Underlying);
-}
-
-/// InstallOneOfType - Install the type corresponding to the specified oneof
-/// declaration.
-void ASTContext::InstallOneOfType(OneOfDecl *TheDecl) {
-  assert(TheDecl->Name.get() != 0);
-  OneOfType *&Entry = (*(OneOfTypesMapTy*)OneOfTypes)[TheDecl->Name];
-  assert(Entry == 0 && "Named type redefinition");
-  Entry = new (*this) OneOfType(TheDecl);
+  Entry = Decl;
 }
 
 /// getTupleType - Return the uniqued tuple type with the specified elements.

@@ -29,7 +29,8 @@ Type *SemaType::ActOnInt32Type(llvm::SMLoc Loc) {
 }
 
 Type *SemaType::ActOnTypeName(llvm::SMLoc Loc, llvm::StringRef Name) {
-  return S.Context.getNamedType(S.Context.getIdentifier(Name));
+  NamedTypeDecl *D = S.Context.getNamedType(S.Context.getIdentifier(Name));
+  return D ? D->getTypeForDecl(S.Context) : 0;
 }
 
 

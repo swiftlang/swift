@@ -351,7 +351,7 @@ TypeAliasDecl *SemaDecl::ActOnTypeAlias(llvm::SMLoc TypeAliasLoc,
           llvm::StringRef(Name.get()) + "'");
   } else {
     // FIXME: Name lookup for types is pretty insane!
-    S.Context.InstallAliasType(Name, Ty);
+    S.Context.installTypeDecl(Name, TheDecl);
   }
   
   return TheDecl;
@@ -370,7 +370,7 @@ OneOfDecl *SemaDecl::ActOnOneOfDecl(llvm::SMLoc OneOfLoc, Identifier Name,
     Error(OneOfLoc, "redefinition of type named '" +
           llvm::StringRef(Name.get()) + "'");
   else
-    S.Context.InstallOneOfType(TheDecl);
+    S.Context.installTypeDecl(Name, TheDecl);
 
   return TheDecl;
 }
@@ -380,7 +380,7 @@ void SemaDecl::ActOnCompleteOneOfDecl(OneOfDecl *DD,
                                      unsigned NumElements) {
   assert(DD->NumElements == 0 && "OneOf defined multiple times?");
   
-  Type *DDType = S.Context.getNamedType(DD->Name);
+  Type *DDType = DD->getTypeForDecl(S.Context);
   assert(DDType && llvm::isa<OneOfType>(DDType) && "Symbol table mishap");
   
   OneOfElementDecl **NewElements =(OneOfElementDecl**)

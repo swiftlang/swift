@@ -128,7 +128,7 @@ public:
 /// AliasType - An alias type is a name for another type, just like a typedef in
 /// C.
 class AliasType : public Type {
-  friend class ASTContext;
+  friend class NamedTypeDecl;
   AliasType(Identifier name, Type *ty)
     : Type(AliasTypeKind), Name(name), UnderlyingType(ty) {}
 public:
@@ -147,7 +147,7 @@ public:
   
 /// OneOfType - A type declared with a 'oneof' declaration.
 class OneOfType : public Type {
-  friend class ASTContext;
+  friend class NamedTypeDecl;
   OneOfType(OneOfDecl *DD)
   : Type(OneOfTypeKind, this), TheDecl(DD) {}
 public:

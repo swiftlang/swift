@@ -330,11 +330,13 @@ ActOnScopedIdentifierExpr(llvm::StringRef ScopeName, llvm::SMLoc ScopeLoc,
                           llvm::StringRef Name, llvm::SMLoc NameLoc) {
   // Note: this is very simplistic support for scoped name lookup, extend when
   // needed.
-  Type *TypeScope = S.Context.getNamedType(S.Context.getIdentifier(ScopeName));
-  if (TypeScope == 0) {
+  NamedTypeDecl *TypeScopeDecl =
+    S.Context.getNamedType(S.Context.getIdentifier(ScopeName));
+  if (TypeScopeDecl == 0) {
     Error(ScopeLoc, "unknown type name '" + ScopeName + "' in expression");
     return 0;
   }
+  Type *TypeScope = TypeScopeDecl->getTypeForDecl(S.Context);
   
   // Look through type aliases etc.
   OneOfType *DT = dyn_cast<OneOfType>(S.Context.getCanonicalType(TypeScope));
