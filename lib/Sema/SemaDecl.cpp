@@ -338,18 +338,23 @@ FuncDecl *SemaDecl::ActOnFuncBody(FuncDecl *FD, Expr *Body) {
 }
 
 
-void SemaDecl::ActOnTypeAlias(llvm::SMLoc TypeAliasLoc, llvm::StringRef Name,
-                               Type *Ty) {
-  Identifier NameI = S.Context.getIdentifier(Name);
-  
+TypeAliasDecl *SemaDecl::ActOnTypeAlias(llvm::SMLoc TypeAliasLoc,
+                                        Identifier Name, Type *Ty) {
+
+  TypeAliasDecl *TheDecl =
+    new (S.Context) TypeAliasDecl(TypeAliasLoc, Name, Ty);
+
   // FIXME: Should have a NamedType class with loc info to diagnose the
   // redefinition?
-  if (S.Context.getNamedType(NameI)) {
-    Error(TypeAliasLoc, "redefinition of type named '" + Name + "'");
-    return;
+  if (S.Context.getNamedType(Name)) {
+    Error(TypeAliasLoc, "redefinition of type named '" + 
+          llvm::StringRef(Name.get()) + "'");
+  } else {
+    // FIXME: Name lookup for types is pretty insane!
+    S.Context.InstallAliasType(Name, Ty);
   }
- 
-  S.Context.InstallAliasType(NameI, Ty);
+  
+  return TheDecl;
 }
 
 

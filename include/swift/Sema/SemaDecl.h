@@ -28,6 +28,7 @@
 namespace swift {
   class Expr;
   class Type;
+  class TypeAliasDecl;
   class OneOfDecl;
   class VarDecl;
   class FuncDecl;
@@ -82,7 +83,8 @@ public:
   /// decl.
   void ActOnTopLevelDeclError();
 
-  void ActOnTypeAlias(llvm::SMLoc TypeAliasLoc, llvm::StringRef Name, Type *Ty);
+  TypeAliasDecl *ActOnTypeAlias(llvm::SMLoc TypeAliasLoc, Identifier Name,
+                                Type *Ty);
   
   VarDecl *ActOnVarDecl(llvm::SMLoc VarLoc, Identifier Name, Type *Ty,
                         Expr *Init, DeclAttributes &Attrs);

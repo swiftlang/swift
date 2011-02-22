@@ -198,7 +198,8 @@ Decl *Parser::ParseDeclTopLevel() {
     return 0; // Could do a top-level semi decl.
       
   case tok::kw_typealias:
-    if (ParseDeclTypeAlias()) break;
+    if (TypeAliasDecl *D = ParseDeclTypeAlias())
+      return D;
     return 0;
 
   case tok::kw_oneof:
@@ -359,19 +360,18 @@ bool Parser::ParseVarName(NameRecord &Record) {
 /// ParseDeclTypeAlias
 ///   decl-typealias:
 ///     'typealias' identifier ':' type
-bool Parser::ParseDeclTypeAlias() {
+TypeAliasDecl *Parser::ParseDeclTypeAlias() {
   SMLoc TypeAliasLoc = Tok.getLoc();
   ConsumeToken(tok::kw_typealias);
   
-  llvm::StringRef Identifier;
+  llvm::StringRef Id;
   Type *Ty = 0;
-  if (ParseIdentifier(Identifier, "expected identifier in var declaration") ||
+  if (ParseIdentifier(Id, "expected identifier in var declaration") ||
       ParseToken(tok::colon, "expected ':' in typealias declaration") ||
       ParseType(Ty, "expected type in var declaration"))
-    return true;
+    return 0;
 
-  S.decl.ActOnTypeAlias(TypeAliasLoc, Identifier, Ty);
-  return false;
+  return S.decl.ActOnTypeAlias(TypeAliasLoc, S.Context.getIdentifier(Id), Ty);
 }
 
 

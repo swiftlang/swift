@@ -35,6 +35,7 @@ namespace swift {
   class Type;
   class Decl;
   class DeclAttributes;
+  class TypeAliasDecl;
   class OneOfDecl;
   class FuncDecl;
   class VarDecl;
@@ -103,7 +104,7 @@ private:
   
   // Decl Parsing
   Decl *ParseDeclTopLevel();
-  bool ParseDeclTypeAlias();
+  TypeAliasDecl *ParseDeclTypeAlias();
   void ParseAttributeList(DeclAttributes &Attributes);
   bool ParseAttribute(DeclAttributes &Attributes);
   bool ParseVarName(NameRecord &Record);

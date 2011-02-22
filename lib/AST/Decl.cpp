@@ -79,7 +79,7 @@ void NamedDecl::printCommon(llvm::raw_ostream &OS, unsigned Indent) const {
 void TypeAliasDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(typealias ";
   printCommon(OS, Indent);
-  
+  OS << " type=";
   UnderlyingTy->print(OS);
   OS << ')';
 }
