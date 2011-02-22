@@ -1113,7 +1113,7 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
   // This brace expression forms a lexical scope.
   Scope BraceScope(S.decl);
 
-  llvm::SmallVector<llvm::PointerUnion<Expr*, ValueDecl*>, 16> Entries;
+  llvm::SmallVector<llvm::PointerUnion<Expr*, Decl*>, 16> Entries;
   
   // MissingSemiAtEnd - Keep track of whether the last expression in the block
   // had no semicolon.
@@ -1127,26 +1127,32 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
       continue;
     
     // Otherwise, we must have a var decl or expression.  Parse it up
-    Entries.push_back(llvm::PointerUnion<Expr*, ValueDecl*>());
+    Entries.push_back(llvm::PointerUnion<Expr*, Decl*>());
     
-    // Parse the var or expression.  If we have an error, try to do nice
-    // recovery.
-    bool HadError = false;
-    if (Tok.is(tok::kw_var)) {
+    // Parse the decl or expression.    
+    switch (Tok.getKind()) {
+    case tok::kw_var:
       Entries.back() = ParseDeclVar();
-      if (Entries.back().isNull())
-        HadError = true;
-    } else {
+      break;
+    case tok::kw_typealias:
+      Entries.back() = ParseDeclTypeAlias();
+      break;
+    case tok::kw_oneof:
+      Entries.back() = ParseDeclOneOf();
+      break;
+    case tok::kw_struct:
+      Entries.back() = ParseDeclStruct();
+      break;
+    default:
       NullablePtr<Expr> ResultExpr;
-      if (ParseExpr(ResultExpr) || ResultExpr.isNull())
-        HadError = true;
-      else {
+      if (!ParseExpr(ResultExpr) && !ResultExpr.isNull()) {
         Entries.back() = ResultExpr.get();
         MissingSemiAtEnd = true;
       }
+      break;
     }
     
-    if (HadError) {
+    if (Entries.back().isNull()) {
       if (Tok.is(tok::semi)) {
         Entries.pop_back();
         continue;  // Consume the ';' and keep going.
@@ -1167,8 +1173,7 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
     return true;
   }
   
-  Result = S.expr.ActOnBraceExpr(LBLoc, Entries.data(), Entries.size(),
-                                 MissingSemiAtEnd, RBLoc);
+  Result = S.expr.ActOnBraceExpr(LBLoc, Entries, MissingSemiAtEnd, RBLoc);
   return false;
 }
 

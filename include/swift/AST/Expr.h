@@ -32,7 +32,7 @@ namespace swift {
   class ASTContext;
   class Type;
   class ValueDecl;
-  class VarDecl;
+  class Decl;
   class AnonDecl;
   
 enum ExprKind {
@@ -259,7 +259,7 @@ class BraceExpr : public Expr {
 public:
   llvm::SMLoc LBLoc;
   
-  llvm::PointerUnion<Expr*, ValueDecl*> *Elements;
+  llvm::PointerUnion<Expr*, Decl*> *Elements;
   unsigned NumElements;
   
   /// This is true if the last expression in the brace expression is missing a
@@ -267,7 +267,7 @@ public:
   bool MissingSemi;
   llvm::SMLoc RBLoc;
 
-  BraceExpr(llvm::SMLoc lbloc, llvm::PointerUnion<Expr*, ValueDecl*> *elements,
+  BraceExpr(llvm::SMLoc lbloc, llvm::PointerUnion<Expr*, Decl*> *elements,
             unsigned numelements, bool missingsemi, llvm::SMLoc rbloc, Type *Ty)
     : Expr(BraceExprKind, Ty), LBLoc(lbloc), Elements(elements),
       NumElements(numelements), MissingSemi(missingsemi), RBLoc(rbloc) {}

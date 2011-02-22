@@ -22,12 +22,12 @@
 #include "llvm/ADT/PointerIntPair.h"
 
 namespace llvm {
-  template <typename PT1, typename PT2>
-  class PointerUnion;
-  template<class T>
-  class NullablePtr;
+  template <typename PT1, typename PT2> class PointerUnion;
+  template<class T> class NullablePtr;
+  template<class T> class ArrayRef;
 }
 namespace swift {
+  class Decl;
   class Sema;
   class Expr;
   class Type;
@@ -95,8 +95,8 @@ public:
                  unsigned NumSubExprs, llvm::SMLoc RPLoc);
   llvm::NullablePtr<Expr>
   ActOnBraceExpr(llvm::SMLoc LBLoc,
-                 const llvm::PointerUnion<Expr*, ValueDecl*> *Elements,
-                 unsigned NumElements, bool HasMissingSemi, llvm::SMLoc RBLoc);
+                 llvm::ArrayRef<llvm::PointerUnion<Expr*, Decl*> > Elements,
+                 bool HasMissingSemi, llvm::SMLoc RBLoc);
   
   llvm::NullablePtr<Expr>
   ActOnDotIdentifier(Expr *E, llvm::SMLoc DotLoc, llvm::StringRef Identifier,

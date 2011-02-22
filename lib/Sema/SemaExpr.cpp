@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExprVisitor.h"
 #include "swift/AST/Type.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/Twine.h"
@@ -63,7 +64,7 @@ static bool SemaDeclRefExpr(ValueDecl *D, llvm::SMLoc Loc, Type *&ResultTy,
 }
 
 static bool SemaBraceExpr(llvm::SMLoc LBLoc, 
-                          llvm::PointerUnion<Expr*, ValueDecl*> *Elements,
+                          llvm::PointerUnion<Expr*, Decl*> *Elements,
                           unsigned NumElements,
                           bool HasMissingSemi, llvm::SMLoc RBLoc, 
                           Type *&ResultTy, SemaExpr &SE) {
@@ -374,20 +375,19 @@ SemaExpr::ActOnUnresolvedMemberExpr(llvm::SMLoc ColonLoc, llvm::SMLoc NameLoc,
 
 NullablePtr<Expr> 
 SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
-                         const llvm::PointerUnion<Expr*, ValueDecl*> *Elements,
-                         unsigned NumElements, bool HasMissingSemi,
-                         llvm::SMLoc RBLoc) {
-  llvm::PointerUnion<Expr*, ValueDecl*> *NewElements = 
-  (llvm::PointerUnion<Expr*, ValueDecl*> *)
-  S.Context.Allocate(sizeof(*Elements)*NumElements, 8);
-  memcpy(NewElements, Elements, sizeof(*Elements)*NumElements);
+                     llvm::ArrayRef<llvm::PointerUnion<Expr*, Decl*> > Elements,
+                         bool HasMissingSemi, llvm::SMLoc RBLoc) {
+  llvm::PointerUnion<Expr*, Decl*> *NewElements = 
+    (llvm::PointerUnion<Expr*, Decl*> *)
+    S.Context.Allocate(sizeof(Elements[0])*Elements.size(), 8);
+  memcpy(NewElements, Elements.data(), sizeof(Elements[0])*Elements.size());
   
   Type *ResultTy = 0;
-  if (SemaBraceExpr(LBLoc, NewElements, NumElements, HasMissingSemi, RBLoc,
+  if (SemaBraceExpr(LBLoc, NewElements, Elements.size(), HasMissingSemi, RBLoc,
                     ResultTy, *this))
     return 0;
   
-  return new (S.Context) BraceExpr(LBLoc, NewElements, NumElements,
+  return new (S.Context) BraceExpr(LBLoc, NewElements, Elements.size(),
                                    HasMissingSemi, RBLoc, ResultTy);
 }
 
@@ -767,15 +767,21 @@ namespace {
       return E;
     }
     Expr *VisitBraceExpr(BraceExpr *E) {
-      for (unsigned i = 0, e = E->NumElements; i != e; ++i)
+      for (unsigned i = 0, e = E->NumElements; i != e; ++i) {
         if (Expr *SubExpr = E->Elements[i].dyn_cast<Expr*>()) {
           E->Elements[i] = Visit(SubExpr);
           if (E->Elements[i].get<Expr*>() == 0) return 0;
-        } else if (Expr *Init = E->Elements[i].get<ValueDecl*>()->Init) {
-          if ((Init = Visit(Init)) == 0) return 0;
-          E->Elements[i].get<ValueDecl*>()->Ty = Init->Ty;
-          E->Elements[i].get<ValueDecl*>()->Init = Init;
+          continue;
         }
+        
+        if (ValueDecl *VD = dyn_cast<ValueDecl>(E->Elements[i].get<Decl*>())) {
+          if (Expr *Init = VD->Init) {
+            if ((Init = Visit(Init)) == 0) return 0;
+            VD->Ty = Init->Ty;
+            VD->Init = Init;
+          }
+        }
+      }
       
       if (SemaBraceExpr(E->LBLoc, E->Elements, E->NumElements,
                         E->MissingSemi, E->RBLoc, E->Ty, SE)) return 0;

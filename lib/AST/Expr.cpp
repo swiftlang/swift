@@ -145,18 +145,23 @@ namespace {
       return E;
     }
     Expr *VisitBraceExpr(BraceExpr *E) {
-      for (unsigned i = 0, e = E->NumElements; i != e; ++i)
+      for (unsigned i = 0, e = E->NumElements; i != e; ++i) {
         if (Expr *SubExpr = E->Elements[i].dyn_cast<Expr*>()) {
           if (Expr *E2 = ProcessNode(SubExpr))
             E->Elements[i] = E2;
           else
             return 0;
-        } else if (Expr *Init = E->Elements[i].get<ValueDecl*>()->Init) {
-          if (Expr *E2 = ProcessNode(Init))
-            E->Elements[i].get<ValueDecl*>()->Init = E2;
-          else
-            return 0;
+          continue;
         }
+        Decl *D = E->Elements[i].get<Decl*>();
+        if (ValueDecl *VD = llvm::dyn_cast<ValueDecl>(D))
+          if (Expr *Init = VD->Init) {
+            if (Expr *E2 = ProcessNode(Init))
+              VD->Init = E2;
+            else
+              return 0;
+          }
+      }
       
       return E;
     }
@@ -302,7 +307,7 @@ public:
       if (Expr *SubExpr = E->Elements[i].dyn_cast<Expr*>())
         PrintRec(SubExpr);
       else
-        PrintRec(E->Elements[i].get<ValueDecl*>());
+        PrintRec(E->Elements[i].get<Decl*>());
     }
     OS << ')';
   }
