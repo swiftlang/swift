@@ -18,7 +18,7 @@
 #include "swift/Sema/SemaDecl.h"
 using namespace swift;
 
-Scope::Scope(SemaDecl &S) : SD(S),
+ValueScope::ValueScope(SemaDecl &S) : SD(S),
    HTScope(*(llvm::ScopedHashTable<Identifier, ScopeEntry>*)S.ScopeHT),
    PrevScope(SD.CurScope) {
   if (SD.CurScope)
@@ -28,7 +28,7 @@ Scope::Scope(SemaDecl &S) : SD(S),
   SD.CurScope = this;
 }
 
-Scope::~Scope() {
+ValueScope::~ValueScope() {
   assert(SD.CurScope == this && "Scope mismatch");
   SD.CurScope = PrevScope;
 }

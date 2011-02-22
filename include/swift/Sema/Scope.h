@@ -25,23 +25,23 @@ namespace swift {
   class ValueDecl;
   class SemaDecl;
   
-/// Scope - This class represents lexical scopes.  These objects are created
-/// and destroyed as the parser is running, and name lookup happens relative
-/// to them.
+/// ValueScope - This class represents lexical scopes for values like variables
+/// and functions.  These objects are created and destroyed as the parser is
+/// running, and name lookup happens relative to them.
 ///
-class Scope {
-  Scope(const Scope&);          // DO NOT IMPLEMENT
-  void operator=(const Scope&); // DO NOT IMPLEMENT
+class ValueScope {
+  ValueScope(const ValueScope&);     // DO NOT IMPLEMENT
+  void operator=(const ValueScope&); // DO NOT IMPLEMENT
   
   SemaDecl &SD;
   
   typedef std::pair<unsigned, ValueDecl*> ScopeEntry;
   llvm::ScopedHashTableScope<Identifier, ScopeEntry> HTScope;
-  Scope *PrevScope;
+  ValueScope *PrevScope;
   unsigned Depth;
 public:
-  explicit Scope(SemaDecl &S);
-  ~Scope();
+  explicit ValueScope(SemaDecl &S);
+  ~ValueScope();
 
   unsigned getDepth() const {
     return Depth;

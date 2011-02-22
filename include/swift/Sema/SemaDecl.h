@@ -35,14 +35,14 @@ namespace swift {
   class AnonDecl;
   class ValueDecl;
   class ElementRefDecl;
-  class Scope;
+  class ValueScope;
   class DeclAttributes;
   
 /// SemaDecl - Semantic analysis support for Swift declarations.
 class SemaDecl : public SemaBase {
   void *const ScopeHT; // ScopedHashTable<Identifier, ScopeEntry>
-  Scope *CurScope;
-  friend class Scope;
+  ValueScope *CurScope;
+  friend class ValueScope;
 public:
 
   explicit SemaDecl(Sema &S);

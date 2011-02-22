@@ -168,7 +168,7 @@ void Parser::ParseTranslationUnit() {
   
   {
     // The entire translation unit is in a big scope.
-    Scope OuterScope(S.decl);
+    ValueScope OuterScope(S.decl);
   
     while (Tok.isNot(tok::eof)) {
       if (Decl *D = ParseDeclTopLevel())
@@ -495,7 +495,7 @@ FuncDecl *Parser::ParseDeclFunc() {
   // Enter the arguments for the function into a new function-body scope.  We
   // need this even if there is no function body to detect argument name
   // duplication.
-  Scope FnBodyScope(S.decl);
+  ValueScope FnBodyScope(S.decl);
   
   if (FD)
     S.decl.CreateArgumentDeclsForFunc(FD);
@@ -1111,7 +1111,7 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
   ConsumeToken(tok::l_brace);
   
   // This brace expression forms a lexical scope.
-  Scope BraceScope(S.decl);
+  ValueScope BraceScope(S.decl);
 
   llvm::SmallVector<llvm::PointerUnion<Expr*, ValueDecl*>, 16> Entries;
   
