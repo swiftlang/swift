@@ -1,6 +1,12 @@
 
+SWIFT = $(wildcard /Users/sabre/Library/Developer/Xcode/DerivedData/*/Build/Products/Debug/Swift)
+#SWIFT = swift
+
 test:
-	swift simple.swift -parse
+	$(SWIFT) data.swift
+	$(SWIFT) name-binding.swift
+	$(SWIFT) expr-stmt.swift
+#	$(SWIFT) arrays.swift
 
 clean:
 	@#
