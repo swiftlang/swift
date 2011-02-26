@@ -35,6 +35,7 @@ namespace swift {
   
   enum TypeKind {
     BuiltinInt32Kind,
+    UnresolvedTypeKind,
     DependentTypeKind,
     NameAliasTypeKind,
     TupleTypeKind,
@@ -110,6 +111,24 @@ public:
   }
 };
   
+/// UnresolvedType - This is the type that represents a use of a type that
+/// wasn't forward declared.  This type exists during the parsing phase before
+/// name binding, and can only be the underlying type of a TypeAliasDecl.
+class UnresolvedType : public Type {
+  friend class ASTContext;
+  // The Unresolved type is always canonical.
+  UnresolvedType() : Type(UnresolvedTypeKind, this) {}
+public:
+  
+  void print(llvm::raw_ostream &OS) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const UnresolvedType *) { return true; }
+  static bool classof(const Type *T) {
+    return T->Kind == UnresolvedTypeKind;
+  }
+};
+
   
 /// DependentType - This is a expression type whose actual kind is specified by
 /// context which hasn't been provided yet.

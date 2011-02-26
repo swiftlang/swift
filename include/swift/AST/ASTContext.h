@@ -72,6 +72,7 @@ public:
   
   // Builtin type and simple types that are used frequently.
   Type * const TheEmptyTupleType;  /// TheEmptyTupleType - This is "()"
+  Type * const TheUnresolvedType;  /// TheUnresolvedType - Not name bound.
   Type * const TheDependentType;   /// TheDependentType - Dependent on context.
   Type * const TheInt32Type;       /// TheInt32Type - 32-bit signed integer.
 

@@ -65,6 +65,10 @@ Type *SemaType::ActOnTupleType(llvm::SMLoc LPLoc, TupleTypeElt *Elements,
 OneOfType *SemaType::ActOnOneOfType(llvm::SMLoc OneOfLoc, 
                                     const DeclAttributes &Attrs,
                                     llvm::ArrayRef<OneOfElementInfo> Elts) {
+  // No attributes are valid on oneof types at this time.
+  if (!Attrs.empty())
+    Error(Attrs.LSquareLoc, "oneof types are not allowed to have attributes");
+  
   llvm::SmallPtrSet<const char *, 16> SeenSoFar;
   llvm::SmallVector<OneOfElementDecl *, 16> EltDecls;
     

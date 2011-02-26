@@ -44,6 +44,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
     ArrayTypes(new ArrayTypesMapTy()),
     SourceMgr(sourcemgr),
     TheEmptyTupleType(getTupleType(llvm::ArrayRef<TupleTypeElt>())),
+    TheUnresolvedType(new (*this) UnresolvedType()),
     TheDependentType(new (*this) DependentType()),
     TheInt32Type(new (*this) BuiltinType(BuiltinInt32Kind)) {
 }
@@ -83,14 +84,16 @@ Type *ASTContext::getCanonicalType(Type *T) {
   if (T->CanonicalType)
     return T->CanonicalType;
   
+  Type *Result = 0;
   switch (T->Kind) {
   case BuiltinInt32Kind:
+  case UnresolvedTypeKind:
   case DependentTypeKind:
   case OneOfTypeKind:
     assert(0 && "These are always canonical");
   case NameAliasTypeKind:
-    return T->CanonicalType =
-      getCanonicalType(llvm::cast<NameAliasType>(T)->getDesugaredType());
+    Result = getCanonicalType(llvm::cast<NameAliasType>(T)->getDesugaredType());
+    break;
   case TupleTypeKind: {
     llvm::SmallVector<TupleTypeElt, 8> CanElts;
     TupleType *TT = llvm::cast<TupleType>(T);
@@ -98,21 +101,47 @@ Type *ASTContext::getCanonicalType(Type *T) {
     for (unsigned i = 0, e = TT->Fields.size(); i != e; ++i) {
       CanElts[i].Name = TT->Fields[i].Name;
       CanElts[i].Ty = getCanonicalType(TT->Fields[i].Ty);
+
+      // If any elements are unresolved, then so is this.
+      if (UnresolvedType *UT = llvm::dyn_cast<UnresolvedType>(CanElts[i].Ty)) {
+        Result = UT;
+        break;
+      }
     }
     
-    return T->CanonicalType = getTupleType(CanElts);
+    Result = getTupleType(CanElts);
+    break;
   }
     
   case FunctionTypeKind: {
     FunctionType *FT = llvm::cast<FunctionType>(T);
-    return T->CanonicalType = getFunctionType(getCanonicalType(FT->Input),
-                                              getCanonicalType(FT->Result));
+    Type *In = getCanonicalType(FT->Input);
+    Type *Out = getCanonicalType(FT->Result);
+    if (!llvm::isa<UnresolvedType>(In) && !llvm::isa<UnresolvedType>(Out))
+      Result = getFunctionType(In, Out);
+    else
+      Result = TheUnresolvedType;
+    break;
   }
   case ArrayTypeKind:
     ArrayType *AT = llvm::cast<ArrayType>(T);
-    return T->CanonicalType = getArrayType(getCanonicalType(AT->Base),AT->Size);
+    Type *EltTy = getCanonicalType(AT->Base);
+    if (!llvm::isa<UnresolvedType>(EltTy))
+      Result = getArrayType(EltTy, AT->Size);
+    else
+      Result = TheUnresolvedType;
+    break;
   }
-  assert(0 && "Unreachable");
+  assert(Result && "Case not implemented!");
+  
+  // If the result of cannonicalization is a real type, memoize it.  If it is an
+  // unresolved type, don't memoize it because they we'd need to clear all these
+  // caches during name binding.
+  /// FIXME: A better solution is to assert on any unresolved types here and
+  /// just prevent the parser and ASTBuilder from ever calling getCanonicalType.
+  if (!llvm::isa<UnresolvedType>(Result))
+    T->CanonicalType = Result;
+  return Result;
 }
 
 

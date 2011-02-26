@@ -34,6 +34,7 @@ void *Type::operator new(size_t Bytes, ASTContext &C,
 Type *Type::getDesugaredType() {
   switch (Kind) {
   case DependentTypeKind:
+  case UnresolvedTypeKind:
   case BuiltinInt32Kind:
   case OneOfTypeKind:
   case TupleTypeKind:
@@ -83,6 +84,7 @@ void Type::dump() const {
 void Type::print(llvm::raw_ostream &OS) const {
   switch (Kind) {
   case DependentTypeKind:     return cast<DependentType>(this)->print(OS);
+    case UnresolvedTypeKind:  return cast<UnresolvedType>(this)->print(OS);
   case BuiltinInt32Kind:      return cast<BuiltinType>(this)->print(OS);
   case NameAliasTypeKind:     return cast<NameAliasType>(this)->print(OS);
   case OneOfTypeKind:         return cast<OneOfType>(this)->print(OS);
@@ -97,6 +99,10 @@ void BuiltinType::print(llvm::raw_ostream &OS) const {
   default: assert(0 && "Unknown builtin type");
   case BuiltinInt32Kind: OS << "__builtin_int32_type"; break;
   }
+}
+
+void UnresolvedType::print(llvm::raw_ostream &OS) const {
+  OS << "<<unresolved type>>";
 }
 
 void DependentType::print(llvm::raw_ostream &OS) const {

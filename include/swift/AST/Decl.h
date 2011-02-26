@@ -57,6 +57,9 @@ public:
   short InfixPrecedence;
 
   DeclAttributes() : InfixPrecedence(-1) { }
+  
+  
+  bool empty() const { return InfixPrecedence == -1; }
 };
 
 
