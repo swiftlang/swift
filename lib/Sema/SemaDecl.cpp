@@ -21,7 +21,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/SMLoc.h"
@@ -30,7 +29,7 @@ using namespace swift;
 typedef std::pair<unsigned, ValueDecl*> ValueScopeEntry;
 typedef llvm::ScopedHashTable<Identifier, ValueScopeEntry> ValueScopeHTType;
 
-typedef std::pair<unsigned, NamedTypeDecl*> TypeScopeEntry;
+typedef std::pair<unsigned, TypeAliasDecl*> TypeScopeEntry;
 typedef llvm::ScopedHashTable<Identifier, TypeScopeEntry> TypeScopeHTType;
 
 static ValueScopeHTType &getValueHT(void *P) {
@@ -64,7 +63,7 @@ ValueDecl *SemaDecl::LookupValueName(Identifier Name) {
 
 /// LookupTypeName - Perform a lexical scope lookup for the specified name in
 /// a type context, returning the active decl if found or null if not.
-NamedTypeDecl *SemaDecl::LookupTypeName(Identifier Name) {
+TypeAliasDecl *SemaDecl::LookupTypeName(Identifier Name) {
   return getTypeHT(TypeScopeHT).lookup(Name).second;
 }
 
@@ -88,10 +87,10 @@ void SemaDecl::AddToScope(ValueDecl *D) {
 
 /// AddToScope - Register the specified decl as being in the current lexical
 /// scope.
-void SemaDecl::AddToScope(NamedTypeDecl *D) {
+void SemaDecl::AddToScope(TypeAliasDecl *D) {
   // If we have a shadowed type definition, check to see if we have a
   // redefinition: two definitions in the same scope with the same name.
-  std::pair<unsigned, NamedTypeDecl*> Entry =
+  std::pair<unsigned, TypeAliasDecl*> Entry =
     getTypeHT(TypeScopeHT).lookup(D->Name);
   if (Entry.second && Entry.first == CurScope->getDepth()) {
     Error(D->getLocStart(),
@@ -267,15 +266,14 @@ VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, Identifier Name,
 }
 
 FuncDecl *SemaDecl::
-ActOnFuncDecl(llvm::SMLoc FuncLoc, llvm::StringRef Name,
+ActOnFuncDecl(llvm::SMLoc FuncLoc, Identifier Name,
               Type *Ty, DeclAttributes &Attrs) {
   assert(Ty && "Type not specified?");
 
   // Validate attributes.
   ValidateAttributes(Attrs, Ty, *this);
 
-  return new (S.Context) FuncDecl(FuncLoc, S.Context.getIdentifier(Name),
-                                  Ty, 0, Attrs);
+  return new (S.Context) FuncDecl(FuncLoc, Name, Ty, 0, Attrs);
 }
 
 /// FuncTypePiece - This little enum is used by AddFuncArgumentsToScope to keep
@@ -370,6 +368,30 @@ FuncDecl *SemaDecl::ActOnFuncBody(FuncDecl *FD, Expr *Body) {
   return FD;
 }
 
+Decl *SemaDecl::ActOnStructDecl(llvm::SMLoc StructLoc, DeclAttributes &Attrs,
+                                llvm::StringRef Name, Type *Ty) {
+  // The 'struct' is syntactically fine, invoke the semantic actions for the
+  // syntactically expanded oneof type.  Struct declarations are just sugar for
+  // other existing constructs.
+  SemaType::OneOfElementInfo ElementInfo;
+  ElementInfo.Name = Name;
+  ElementInfo.NameLoc = StructLoc;
+  ElementInfo.EltType = Ty;
+  OneOfType *OneOfTy = S.type.ActOnOneOfType(StructLoc, Attrs, ElementInfo);
+  
+  // Given the type, we create a TypeAlias and inject it into the current scope.
+  TypeAliasDecl *TAD = S.decl.ActOnTypeAlias(StructLoc,
+                                             S.Context.getIdentifier(Name),
+                                             OneOfTy);
+  
+  // In addition to defining the oneof declaration, structs also inject their
+  // constructor into the global scope.
+  assert(OneOfTy->Elements.size() == 1 && "Struct has exactly one element");
+  S.decl.AddToScope(OneOfTy->getElement(0));
+  
+  return TAD;
+}
+
 
 TypeAliasDecl *SemaDecl::ActOnTypeAlias(llvm::SMLoc TypeAliasLoc,
                                         Identifier Name, Type *Ty) {
@@ -378,57 +400,3 @@ TypeAliasDecl *SemaDecl::ActOnTypeAlias(llvm::SMLoc TypeAliasLoc,
   AddToScope(TheDecl);
   return TheDecl;
 }
-
-
-OneOfDecl *SemaDecl::ActOnOneOfDecl(llvm::SMLoc OneOfLoc, Identifier Name,
-                                    DeclAttributes &Attrs) {
-  OneOfDecl *TheDecl = new (S.Context) OneOfDecl(OneOfLoc, Name, Attrs);
-  AddToScope(TheDecl);
-  return TheDecl;
-}
-
-void SemaDecl::ActOnCompleteOneOfDecl(OneOfDecl *DD,
-                                     const OneOfElementInfo *Elements,
-                                     unsigned NumElements) {
-  assert(DD->NumElements == 0 && "OneOf defined multiple times?");
-  
-  Type *DDType = DD->getTypeForDecl(S.Context);
-  assert(DDType && llvm::isa<OneOfType>(DDType) && "Symbol table mishap");
-  
-  OneOfElementDecl **NewElements =(OneOfElementDecl**)
-    S.Context.Allocate(sizeof(*NewElements)*NumElements, 8);
-
-  llvm::SmallPtrSet<const char *, 16> SeenSoFar;
-  
-  for (unsigned i = 0; i != NumElements; ++i) {
-    Identifier NameI = S.Context.getIdentifier(Elements[i].Name);
-    
-    // If this was multiply defined, reject it.
-    if (!SeenSoFar.insert(NameI.get())) {
-      Error(Elements[i].NameLoc, "element named '" + Elements[i].Name +
-            "' defined multiple times");
-      // Don't copy this element into NewElements.
-      --i;
-      --NumElements;
-      --Elements;
-      // TODO: QoI: add note for previous definition.
-      continue;
-    }
-    
-    // If the OneOf Element takes a type argument, then it is actually a
-    // function that takes the type argument and returns the DDType.
-    Type *EltType = DDType;
-    if (Elements[i].EltType)
-      EltType = S.Context.getFunctionType(Elements[i].EltType, EltType);      
-   
-    NewElements[i] =
-      new (S.Context) OneOfElementDecl(Elements[i].NameLoc, NameI, EltType,
-                                      Elements[i].EltType);
-  }
-  
-  DD->Elements = NewElements;
-  DD->NumElements = NumElements;
-}
-
-
-

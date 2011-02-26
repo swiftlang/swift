@@ -36,7 +36,6 @@ namespace swift {
   class Decl;
   class DeclAttributes;
   class TypeAliasDecl;
-  class OneOfDecl;
   class FuncDecl;
   class VarDecl;
   class ASTContext;
@@ -109,8 +108,8 @@ private:
   bool ParseAttribute(DeclAttributes &Attributes);
   bool ParseVarName(NameRecord &Record);
   
-  OneOfDecl *ParseDeclOneOf();
-  OneOfDecl *ParseDeclStruct();
+  Decl *ParseDeclOneOf();
+  Decl *ParseDeclStruct();
   VarDecl *ParseDeclVar();
   FuncDecl *ParseDeclFunc();
   
@@ -118,6 +117,8 @@ private:
   bool ParseType(Type *&Result);
   bool ParseType(Type *&Result, const llvm::Twine &Message);
   bool ParseTypeTuple(Type *&Result);
+  bool ParseTypeOneOfBody(llvm::SMLoc OneOfLoc, const DeclAttributes &Attrs,
+                          Type *&Result);
 
   // Expression Parsing
   bool isStartOfExpr(Token &Tok) const;

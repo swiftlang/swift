@@ -19,10 +19,9 @@
 #define SWIFT_SEMA_TYPE_H
 
 #include "swift/Sema/SemaBase.h"
-
-namespace llvm {
-  class StringRef;
-}
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/SMLoc.h"
 
 namespace swift {
   class Sema;
@@ -31,6 +30,8 @@ namespace swift {
   class Expr;
   class TupleType;
   class TupleTypeElt;
+  class DeclAttributes;
+  class OneOfType;
   
 /// SemaType - Semantic analysis support for Swift types.
 class SemaType : public SemaBase {
@@ -44,6 +45,15 @@ public:
   Type *ActOnFunctionType(Type *Input, llvm::SMLoc ArrowLoc, Type *Output);
   Type *ActOnArrayType(Type *BaseTy, llvm::SMLoc LSquareLoc, Expr *Size,
                        llvm::SMLoc RSquareLoc);
+  
+  struct OneOfElementInfo {
+    llvm::SMLoc NameLoc;
+    llvm::StringRef Name;
+    Type *EltType;
+  };
+  
+  OneOfType *ActOnOneOfType(llvm::SMLoc OneOfLoc, const DeclAttributes &Attrs,
+                            llvm::ArrayRef<OneOfElementInfo> Elts);
 };
   
 } // end namespace swift

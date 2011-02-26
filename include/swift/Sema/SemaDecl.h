@@ -23,14 +23,12 @@
 #include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/SMLoc.h"
 
 namespace swift {
   class Expr;
   class Type;
-  class NamedTypeDecl;
+  class Decl;
   class TypeAliasDecl;
-  class OneOfDecl;
   class VarDecl;
   class FuncDecl;
   class AnonDecl;
@@ -57,7 +55,7 @@ public:
   /// AddToScope - Register the specified decl as being in the current lexical
   /// scope.
   void AddToScope(ValueDecl *D);
-  void AddToScope(NamedTypeDecl *D);
+  void AddToScope(TypeAliasDecl *D);
   
   /// LookupValueName - Perform a lexical scope lookup for the specified name in
   /// a value context, returning the active decl if found or null if not.
@@ -65,7 +63,7 @@ public:
 
   /// LookupTypeName - Perform a lexical scope lookup for the specified name in
   /// a type context, returning the active decl if found or null if not.
-  NamedTypeDecl *LookupTypeName(Identifier Name);
+  TypeAliasDecl *LookupTypeName(Identifier Name);
 
 
   /// AnonClosureArgs - These are the current active set of anonymous closure
@@ -95,22 +93,13 @@ public:
   
   VarDecl *ActOnVarDecl(llvm::SMLoc VarLoc, Identifier Name, Type *Ty,
                         Expr *Init, DeclAttributes &Attrs);
-  FuncDecl *ActOnFuncDecl(llvm::SMLoc FuncLoc, llvm::StringRef Name,
+  FuncDecl *ActOnFuncDecl(llvm::SMLoc FuncLoc, Identifier Name,
                           Type *Ty, DeclAttributes &Attrs);
   void CreateArgumentDeclsForFunc(FuncDecl *FD);
   FuncDecl *ActOnFuncBody(FuncDecl *FD, Expr *Body);
 
-  OneOfDecl *ActOnOneOfDecl(llvm::SMLoc OneOfLoc, Identifier Name,
-                          DeclAttributes &Attrs);
-  
-  struct OneOfElementInfo {
-    llvm::SMLoc NameLoc;
-    llvm::StringRef Name;
-    Type *EltType;
-  };
-  
-  void ActOnCompleteOneOfDecl(OneOfDecl *DD, const OneOfElementInfo *Elements,
-                             unsigned NumElements);
+  Decl *ActOnStructDecl(llvm::SMLoc StructLoc, DeclAttributes &Attrs,
+                        llvm::StringRef Name, Type *Ty);
   
   // Name processing.
   

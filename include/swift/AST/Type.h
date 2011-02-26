@@ -20,6 +20,7 @@
 #include "swift/AST/Identifier.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/SMLoc.h"
 #include "llvm/Support/Casting.h"
 
 namespace llvm {
@@ -30,14 +31,14 @@ namespace swift {
   class Expr;
   class Identifier;
   class TypeAliasDecl;
-  class OneOfDecl;
+  class OneOfElementDecl;
   
   enum TypeKind {
     BuiltinInt32Kind,
     DependentTypeKind,
-    AliasTypeKind,
-    OneOfTypeKind,
+    NameAliasTypeKind,
     TupleTypeKind,
+    OneOfTypeKind,
     FunctionTypeKind,
     ArrayTypeKind,
     
@@ -127,39 +128,21 @@ public:
   }
 };
 
-/// AliasType - An alias type is a name for another type, just like a typedef in
-/// C.
-class AliasType : public Type {
-  friend class NamedTypeDecl;
-  // AliasTypes are never canonical.
-  AliasType(TypeAliasDecl *d) : Type(AliasTypeKind), TheDecl(d) {}
+/// NameAliasType - An alias type is a name for another type, just like a
+/// typedef in C.
+class NameAliasType : public Type {
+  friend class TypeAliasDecl;
+  // NameAliasType are never canonical.
+  NameAliasType(TypeAliasDecl *d) : Type(NameAliasTypeKind), TheDecl(d) {}
 public:
   TypeAliasDecl *const TheDecl;
-  
-  
+   
   void print(llvm::raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const AliasType *) { return true; }
+  static bool classof(const NameAliasType *) { return true; }
   static bool classof(const Type *T) {
-    return T->Kind == AliasTypeKind;
-  }
-};
-  
-/// OneOfType - A type declared with a 'oneof' declaration.
-class OneOfType : public Type {
-  friend class NamedTypeDecl;
-  // OneOfTypes are always canonical.
-  OneOfType(OneOfDecl *DD) : Type(OneOfTypeKind, this), TheDecl(DD) {}
-public:
-  OneOfDecl *const TheDecl;
-  
-  void print(llvm::raw_ostream &OS) const;
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const OneOfType *) { return true; }
-  static bool classof(const Type *T) {
-    return T->Kind == OneOfTypeKind;
+    return T->Kind == NameAliasTypeKind;
   }
 };
 
@@ -214,6 +197,36 @@ private:
   friend class ASTContext;
 };
   
+/// OneOfType - a 'oneof' type.  This represents the oneof type itself, not its
+/// elements (which are OneOfElementDecl's).
+class OneOfType : public Type {
+public:
+  const llvm::SMLoc OneOfLoc;
+  const llvm::ArrayRef<OneOfElementDecl*> Elements;
+  
+  llvm::SMLoc getLocStart() const { return OneOfLoc; }
+  OneOfElementDecl *getElement(unsigned i) const {
+    assert(i < Elements.size() && "Invalid index");
+    return Elements[i];
+  }
+  
+  OneOfElementDecl *getElement(Identifier Name) const;
+  
+  void print(llvm::raw_ostream &O) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const OneOfType *D) { return true; }
+  static bool classof(const Type *T) { return T->Kind == OneOfTypeKind; }
+  
+private:
+  // oneof types are always canonical.
+  OneOfType(llvm::SMLoc oneofloc, llvm::ArrayRef<OneOfElementDecl*> Elts)
+    : Type(OneOfTypeKind, this), OneOfLoc(oneofloc), Elements(Elts) {
+  }
+  friend class ASTContext;
+};
+
+  
 /// FunctionType - A function type has a single input and result, e.g.
 /// "int -> int" or (var a : int, var b : int) -> (int, int).
 class FunctionType : public Type {
@@ -229,7 +242,7 @@ public:
   
 private:
   FunctionType(Type *input, Type *result)
-  : Type(FunctionTypeKind), Input(input), Result(result) {}
+    : Type(FunctionTypeKind), Input(input), Result(result) {}
   friend class ASTContext;
 };
   

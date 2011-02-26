@@ -31,10 +31,10 @@ namespace swift {
   class Type;
   class Expr;
   class OneOfElementDecl;
+  class NameAliasType;
   
 enum DeclKind {
   TypeAliasDeclKind,
-  OneOfDeclKind,
   VarDeclKind,
   FuncDeclKind,
   OneOfElementDeclKind,
@@ -89,7 +89,7 @@ public:
                      unsigned Alignment = 8) throw();  
 };
 
-/// NamedDecl - The common base class between OneOfDecl and ValueDecl.
+/// NamedDecl - The common base class between TypeAliasDecl and ValueDecl.
 class NamedDecl : public Decl {
 public:
   Identifier Name;
@@ -103,7 +103,6 @@ public:
             D->getKind() == OneOfElementDeclKind ||
             D->getKind() == ArgDeclKind || D->getKind() == AnonDeclKind ||
             D->getKind() == ElementRefDeclKind ||
-            D->getKind() == OneOfDeclKind ||
             D->getKind() == TypeAliasDeclKind);
   }
   static bool classof(const NamedDecl *D) { return true; }
@@ -117,59 +116,27 @@ protected:
   void printCommon(llvm::raw_ostream &OS, unsigned Indent) const;
 };
   
-/// NamedTypeDecl - This is the common base class of all named type decls, like
-/// OneOfDecl, TypeAliasDecl, etc.
-/// 
-class NamedTypeDecl : public NamedDecl {
-  /// TypeForDecl - This is the type that corresponds to this decl.  This is
-  /// lazily created the first time getTypeForDecl is called.
-  mutable Type *TypeForDecl;
-public:
-  
-  
-  /// getTypeForDecl - Return the type that represents this decl in a type
-  /// context.
-  Type *getTypeForDecl(ASTContext &C) const {
-    if (TypeForDecl)
-      return TypeForDecl;
-    return const_cast<NamedTypeDecl*>(this)->createTypeForDecl(C);
-  }
-  
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) {
-    return D->getKind() == OneOfDeclKind ||
-           D->getKind() == TypeAliasDeclKind;
-  }
-  static bool classof(const NamedTypeDecl *D) { return true; }
-
-
-protected:
-  NamedTypeDecl(DeclKind K, Identifier name, const DeclAttributes &attrs)
-    : NamedDecl(K, name, attrs) {
-  }
-private:
-  Type *createTypeForDecl(ASTContext &C);
-};
-  
-  
 /// TypeAliasDecl - This is a declaration of a typealias, for example:
 ///
 ///    typealias foo : int
 ///
-class TypeAliasDecl : public NamedTypeDecl {
+class TypeAliasDecl : public NamedDecl {
+  /// The type that represents this (sugared) name alias.
+  mutable NameAliasType *AliasTy;
 public:
   llvm::SMLoc TypeAliasLoc;
   Type *UnderlyingTy;
   
   TypeAliasDecl(llvm::SMLoc typealiasloc, Identifier name, Type *underlyingty,
                 const DeclAttributes &attrs = DeclAttributes())
-    : NamedTypeDecl(TypeAliasDeclKind, name, attrs),
+    : NamedDecl(TypeAliasDeclKind, name, attrs),
       TypeAliasLoc(typealiasloc), UnderlyingTy(underlyingty) {
   }
 
   llvm::SMLoc getLocStart() const { return TypeAliasLoc; }
 
+  /// getAliasType - Return the sugared version of this decl as a Type.
+  NameAliasType *getAliasType(ASTContext &C) const;
   
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
   
@@ -179,39 +146,6 @@ public:
   }
   static bool classof(const TypeAliasDecl *D) { return true; }
 
-};
-
-
-/// OneOfDecl - 'oneof' declaration.  This  represents the oneof declaration
-/// itself, not its elements.
-class OneOfDecl : public NamedTypeDecl {
-public:
-  llvm::SMLoc OneOfLoc;
-  
-  OneOfElementDecl **Elements;
-  unsigned NumElements;
-  
-  OneOfDecl(llvm::SMLoc oneofloc, Identifier name,
-            const DeclAttributes &attrs = DeclAttributes())
-    : NamedTypeDecl(OneOfDeclKind, name, attrs),
-      OneOfLoc(oneofloc), Elements(0), NumElements(0) {
-  }
-
-  llvm::SMLoc getLocStart() const { return OneOfLoc; }
-  OneOfElementDecl *getElement(unsigned i) const {
-    assert(i < NumElements && "Invalid index");
-    return Elements[i];
-  }
-
-  OneOfElementDecl *getElement(Identifier Name) const;
-  
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) {
-    return D->getKind() == OneOfDeclKind;
-  }
-  static bool classof(const OneOfDecl *D) { return true; }
 };
   
 /// ValueDecl - All named decls that are values in the language.  These can

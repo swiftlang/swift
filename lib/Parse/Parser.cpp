@@ -203,11 +203,11 @@ Decl *Parser::ParseDeclTopLevel() {
     return 0;
 
   case tok::kw_oneof:
-    if (OneOfDecl *O = ParseDeclOneOf())
+    if (Decl *O = ParseDeclOneOf())
       return O;
     break;
   case tok::kw_struct:
-    if (OneOfDecl *D = ParseDeclStruct())
+    if (Decl *D = ParseDeclStruct())
       return D;
     break;
   case tok::kw_func:
@@ -485,7 +485,9 @@ FuncDecl *Parser::ParseDeclFunc() {
                                       S.Context.TheEmptyTupleType);
 
   // Build the decl for the function.
-  FuncDecl *FD = S.decl.ActOnFuncDecl(FuncLoc, Identifier, FuncTy, Attributes);
+  FuncDecl *FD = S.decl.ActOnFuncDecl(FuncLoc,
+                                      S.Context.getIdentifier(Identifier),
+                                      FuncTy, Attributes);
   
   // Enter the func into the current scope, which allows it to be visible and
   // used within its body.
@@ -524,7 +526,9 @@ FuncDecl *Parser::ParseDeclFunc() {
 /// token skipping) on error.
 ///
 ///   decl-oneof:
-///      'oneof' attribute-list? identifier '{' oneof-element-list '}'
+///      'oneof' attribute-list? identifier oneof-body
+///   oneof-body:
+///      '{' oneof-element-list '}'
 ///   oneof-element-list:
 ///      oneof-element ','?
 ///      oneof-element ',' oneof-element-list
@@ -532,7 +536,7 @@ FuncDecl *Parser::ParseDeclFunc() {
 ///      identifier
 ///      identifier ':' type
 ///      
-OneOfDecl *Parser::ParseDeclOneOf() {
+Decl *Parser::ParseDeclOneOf() {
   SMLoc OneOfLoc = Tok.getLoc();
   ConsumeToken(tok::kw_oneof);
 
@@ -540,50 +544,17 @@ OneOfDecl *Parser::ParseDeclOneOf() {
   if (Tok.is(tok::l_square))
     ParseAttributeList(Attributes);
   
+  SMLoc NameLoc = Tok.getLoc();
   llvm::StringRef OneOfName;
-  if (ParseIdentifier(OneOfName, "expected identifier in oneof declaration") ||
-      ParseToken(tok::l_brace, "expected '{' in oneof declaration"))
+  if (ParseIdentifier(OneOfName, "expected identifier in oneof declaration"))
     return 0;
-  Identifier OneOfIdentifier = S.Context.getIdentifier(OneOfName);
-  
-  // Give the information about the decl to Sema.  This registers the oneof for
-  // name lookup allowing recursive oneof's.
-  OneOfDecl *TheOneOfDecl = S.decl.ActOnOneOfDecl(OneOfLoc, OneOfIdentifier,
-                                                  Attributes);
-  
-  llvm::SmallVector<SemaDecl::OneOfElementInfo, 8> ElementInfos;
-  
-  // Parse the comma separated list of oneof elements.
-  while (Tok.is(tok::identifier)) {
-    SemaDecl::OneOfElementInfo ElementInfo;
-    ElementInfo.Name = Tok.getText();
-    ElementInfo.NameLoc = Tok.getLoc();
-    ElementInfo.EltType = 0;
 
-    ConsumeToken(tok::identifier);
+  Type *OneOfType = 0;
+  if (ParseTypeOneOfBody(OneOfLoc, Attributes, OneOfType))
+    return 0;
 
-    // See if we have a type specifier for this oneof element.  If so, parse it.
-    if (ConsumeIf(tok::colon))
-      if (ParseType(ElementInfo.EltType,
-                    "expected type while parsing oneof element '" +
-                    OneOfName + "'")) {
-        SkipUntil(tok::r_brace);
-        return 0;
-      }
-    
-    ElementInfos.push_back(ElementInfo);
-    
-    // Require comma separation.
-    if (!ConsumeIf(tok::comma))
-      break;
-  }
-
-  ParseToken(tok::r_brace, "expected '}' at end of oneof declaration");
-  
-  S.decl.ActOnCompleteOneOfDecl(TheOneOfDecl, ElementInfos.data(),
-                                ElementInfos.size());
-  
-  return TheOneOfDecl;
+  return S.decl.ActOnTypeAlias(NameLoc, S.Context.getIdentifier(OneOfName),
+                               OneOfType);
 }
 
 
@@ -594,7 +565,7 @@ OneOfDecl *Parser::ParseDeclOneOf() {
 ///   decl-struct:
 ///      'struct' attribute-list? identifier type
 ///
-OneOfDecl *Parser::ParseDeclStruct() {
+Decl *Parser::ParseDeclStruct() {
   SMLoc StructLoc = Tok.getLoc();
   ConsumeToken(tok::kw_struct);
   
@@ -605,7 +576,6 @@ OneOfDecl *Parser::ParseDeclStruct() {
   llvm::StringRef StructName;
   if (ParseIdentifier(StructName, "expected identifier in struct declaration"))
     return 0;
-  Identifier StructIdentifier = S.Context.getIdentifier(StructName);
 
   if (Tok.isNot(tok::l_paren)) {
     Error(Tok.getLoc(), "expected '(' in struct declaration");
@@ -615,25 +585,7 @@ OneOfDecl *Parser::ParseDeclStruct() {
   Type *Ty = 0;
   if (ParseType(Ty)) return 0;
   
-  
-  // If we got here, then the 'struct' is syntactically fine, invoke the
-  // semantic actions for the syntactically expanded oneof declaration.
-  OneOfDecl *TheOneOfDecl = S.decl.ActOnOneOfDecl(StructLoc, StructIdentifier,
-                                               Attributes);
-  
-  SemaDecl::OneOfElementInfo ElementInfo;
-  ElementInfo.Name = StructName;
-  ElementInfo.NameLoc = StructLoc;
-  ElementInfo.EltType = Ty;
-  S.decl.ActOnCompleteOneOfDecl(TheOneOfDecl, &ElementInfo, 1);
-  
-
-  // In addition to defining the oneof declaration, structs also inject their
-  // constructor into the global scope.
-  assert(TheOneOfDecl->NumElements == 1 && "Struct has exactly one element");
-  S.decl.AddToScope(TheOneOfDecl->Elements[0]);
-  
-  return TheOneOfDecl;
+  return S.decl.ActOnStructDecl(StructLoc, Attributes, StructName, Ty);
 }
 
 
@@ -658,6 +610,10 @@ OneOfDecl *Parser::ParseDeclStruct() {
 ///     '__builtin_int32_type'
 ///     identifier
 ///     type-tuple
+///     type-oneof
+///
+///   type-oneof:
+///     'oneof' attribute-list? oneof-body
 ///
 bool Parser::ParseType(Type *&Result, const llvm::Twine &Message) {
   // Parse type-simple first.
@@ -678,6 +634,18 @@ bool Parser::ParseType(Type *&Result, const llvm::Twine &Message) {
     if (ParseTypeTuple(Result))
       return true;
     break;
+  case tok::kw_oneof: {
+    SMLoc OneOfLoc = Tok.getLoc();
+    ConsumeToken(tok::kw_oneof);
+      
+    DeclAttributes Attributes;
+    if (Tok.is(tok::l_square))
+      ParseAttributeList(Attributes);
+
+    if (ParseTypeOneOfBody(OneOfLoc, Attributes, Result))
+      return true;
+    break;
+  }
   default:
     Error(Tok.getLoc(), Message);
     return true;
@@ -772,6 +740,54 @@ bool Parser::ParseTypeTuple(Type *&Result) {
   Result = S.type.ActOnTupleType(LPLoc, Elements.data(), Elements.size(),RPLoc);
   return false;
 }
+
+///   oneof-body:
+///      '{' oneof-element-list '}'
+///   oneof-element-list:
+///      oneof-element ','?
+///      oneof-element ',' oneof-element-list
+///   oneof-element:
+///      identifier
+///      identifier ':' type
+///      
+bool Parser::ParseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
+                                Type *&Result) {
+  if (ParseToken(tok::l_brace, "expected '{' in oneof type"))
+    return true;
+  
+  llvm::SmallVector<SemaType::OneOfElementInfo, 8> ElementInfos;
+  
+  // Parse the comma separated list of oneof elements.
+  while (Tok.is(tok::identifier)) {
+    SemaType::OneOfElementInfo ElementInfo;
+    ElementInfo.Name = Tok.getText();
+    ElementInfo.NameLoc = Tok.getLoc();
+    ElementInfo.EltType = 0;
+    
+    ConsumeToken(tok::identifier);
+    
+    // See if we have a type specifier for this oneof element.  If so, parse it.
+    if (ConsumeIf(tok::colon))
+      if (ParseType(ElementInfo.EltType,
+                    "expected type while parsing oneof element '" +
+                    ElementInfo.Name + "'")) {
+        SkipUntil(tok::r_brace);
+        return true;
+      }
+    
+    ElementInfos.push_back(ElementInfo);
+    
+    // Require comma separation.
+    if (!ConsumeIf(tok::comma))
+      break;
+  }
+  
+  ParseToken(tok::r_brace, "expected '}' at end of oneof");
+  
+  Result = S.type.ActOnOneOfType(OneOfLoc, Attrs, ElementInfos);
+  return false;
+}
+
 
 //===----------------------------------------------------------------------===//
 // Expression Parsing

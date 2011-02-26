@@ -20,6 +20,7 @@
 #include "llvm/Support/DataTypes.h"
 
 namespace llvm {
+  class SMLoc;
   class BumpPtrAllocator;
   class SourceMgr;
   class StringRef;
@@ -35,7 +36,7 @@ namespace swift {
   class ArrayType;
   class Identifier;
   class TupleTypeElt;
-  class NamedTypeDecl;
+  class OneOfElementDecl;
 
 /// ASTContext - This object creates and owns the AST objects.
 class ASTContext {
@@ -83,7 +84,12 @@ public:
 
   /// getArrayType - Return a uniqued array type with the specified base type
   /// and the specified size.  Size=0 indicates an unspecified size array.
-  ArrayType *getArrayType(Type *BaseType, uint64_t Size);                          
+  ArrayType *getArrayType(Type *BaseType, uint64_t Size);
+  
+  /// getNewOneOfType - Return a new instance of oneof type.  These are never
+  /// uniqued because the loc is generally different.
+  OneOfType *getNewOneOfType(llvm::SMLoc OneOfLoc,
+                             llvm::ArrayRef<OneOfElementDecl*> Elements);
 };
   
 } // end namespace swift

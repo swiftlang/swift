@@ -103,9 +103,8 @@ static bool SemaDotIdentifier(Expr *E, llvm::SMLoc DotLoc,
   // allow direct access to the type underlying the single element.  This
   // allows element access on structs, for example.
   if (OneOfType *DT = ETy->getAs<OneOfType>()) {
-    OneOfDecl *DD = DT->TheDecl;
-    if (DD->NumElements == 1 && DD->Elements[0]->ArgumentType)
-      ETy = DD->Elements[0]->ArgumentType;
+    if (DT->Elements.size() == 1 && DT->Elements[0]->ArgumentType)
+      ETy = DT->Elements[0]->ArgumentType;
   }
   
   if (TupleType *TT = ETy->getAs<TupleType>()) {
@@ -331,16 +330,16 @@ ActOnScopedIdentifierExpr(llvm::StringRef ScopeName, llvm::SMLoc ScopeLoc,
                           llvm::StringRef Name, llvm::SMLoc NameLoc) {
   // Note: this is very simplistic support for scoped name lookup, extend when
   // needed.
-  NamedTypeDecl *TypeScopeDecl =
+  TypeAliasDecl *TypeScopeDecl =
     S.decl.LookupTypeName(S.Context.getIdentifier(ScopeName));
   if (TypeScopeDecl == 0) {
     Error(ScopeLoc, "unknown type name '" + ScopeName + "' in expression");
     return 0;
   }
-  Type *TypeScope = TypeScopeDecl->getTypeForDecl(S.Context);
+  Type *TypeScope = S.Context.getCanonicalType(TypeScopeDecl->UnderlyingTy);
   
   // Look through type aliases etc.
-  OneOfType *DT = dyn_cast<OneOfType>(S.Context.getCanonicalType(TypeScope));
+  OneOfType *DT = dyn_cast<OneOfType>(TypeScope);
   
   // Reject things like int::x.
   if (DT == 0) {
@@ -348,13 +347,13 @@ ActOnScopedIdentifierExpr(llvm::StringRef ScopeName, llvm::SMLoc ScopeLoc,
     return 0;
   }
   
-  if (DT->TheDecl->NumElements == 0) {
+  if (DT->Elements.empty()) {
     Error(ScopeLoc, "oneof '" + ScopeName +
           "' is not complete or has no elements");
     return 0;
   }
   
-  OneOfElementDecl *Elt =DT->TheDecl->getElement(S.Context.getIdentifier(Name));
+  OneOfElementDecl *Elt = DT->getElement(S.Context.getIdentifier(Name));
   if (Elt == 0) {
     Error(ScopeLoc, "'" + Name + "' is not a member of '" + ScopeName + "'");
     return 0;
@@ -846,7 +845,7 @@ namespace {
       if (DT == 0) return 0;
       
       // The oneof type must have an element of the specified name.
-      OneOfElementDecl *DED = DT->TheDecl->getElement(UME->Name);
+      OneOfElementDecl *DED = DT->getElement(UME->Name);
       if (DED == 0) return 0;
       
       // If it does, then everything is good, resolve the reference.
@@ -872,7 +871,7 @@ namespace {
       if (UnresolvedMemberExpr *UME = dyn_cast<UnresolvedMemberExpr>(E->Fn))
         if (OneOfType *DT = DestTy->getAs<OneOfType>()) {
           // The oneof type must have an element of the specified name.
-          OneOfElementDecl *DED = DT->TheDecl->getElement(UME->Name);
+          OneOfElementDecl *DED = DT->getElement(UME->Name);
           if (DED == 0) return 0;
           
           E->Fn = new (SE.S.Context) DeclRefExpr(DED, UME->ColonLoc, DED->Ty);
@@ -1049,7 +1048,7 @@ static Expr *HandleScalarConversionToTupleType(Expr *E, Type *DestTy,
   
   bool NeedsNames = false;
   for (unsigned i = 0, e = NumFields; i != e; ++i) {
-    if (i == ScalarField)
+    if (i == (unsigned)ScalarField)
       NewSE[i] = ERes;
     else
       NewSE[i] = 0;

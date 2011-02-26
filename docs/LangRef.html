@@ -407,44 +407,34 @@
   </div>
   
   <pre class="grammar">
-    decl-oneof ::= 'oneof' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> '{' oneof-element-list '}'
-    
-    oneof-element-list ::= oneof-element ','?
-    oneof-element-list ::= oneof-element ',' oneof-element-list
-    
-    oneof-element      ::= <a href="#identifier">identifier</a>
-    oneof-element      ::= <a href="#identifier">identifier</a> ':' <a href="#type">type</a>
-
+    decl-oneof ::= 'oneof' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> oneof-body
   </pre>
   
-  <p>A oneof declaration consists of a comma-separated list of elements,
-  which are each either an identifier or an identifier with a type.  The runtime
-  representation of a value of oneof type only has one of the specified oneof
-  elements at a time: a oneof value is a simple discriminated union.  Oneof
-  declarations are known as <a 
-  href="http://en.wikipedia.org/wiki/Algebraic_data_type">algebraic data
-  types</a> by the broader programming language community.</p>
+  <p>A oneof declaration is simple syntactic sugar for a <a 
+     href="#type-oneof">oneof</a> type and a <a
+     href="#decl-typealias">typealias</a> declaration together, and is a
+     convenient way to declare a type and name it at the same
+     time.  In the underlying implementation of the language, there is only one
+     way to name a type (typealias).  Please see <a href="#type-oneof">oneof
+     types</a> for more information about their capabilities.  Here are two
+     exactly equivalent declarations for intuition:</p>
+
+  <pre class="example">
+    <i>// Declare discriminated union with typealias + oneof type.</i>
+    typealias SomeInts : oneof {
+      None,
+      One int,
+      Two (:int, :int)
+    }
+    <i>// Declare discriminated union with oneof decl (preferred).</i>
+    oneof SomeInts {
+      None,
+      One int,
+      Two (:int, :int)
+    }
+  </pre>
   
-  <p>A oneof declaration declares two things: 1) the name of the data
-  declaration
-  is defined as a new type name, and 2) each of the oneof elements declares a
-  constructor value which create a value of the oneof type with the specified
-  element kind.</p>
-  
-  <p>The type of oneof declaration is injected into the current scope, so it may
-  be used as a type name immediately.  The constructor values are defined in a
-  nested scope within the oneof descriptor type, so they must be accessed with
-  either a <a href="#expr-identifier">qualified identifier</a> or through
-  <a href="#expr-delayed-identifier">delayed identifier resolution</a>
-  with <a href="#sema_context">context sensitive type inference</a>.
-  </p>
-  
-  <p>If the oneof element has no type specified with it, then the type of the 
-  constructor is the type of the oneof declaration.  If a oneof element has a
-  type "T" associated with it, then the type of the constructor is a function
-  that takes "T" and returns the type of the oneof declaration.</p>
-  
-  <p>Here are some examples of oneof declarations:</p>
+  <p>Here are some more examples of oneof declarations:</p>
   
   <pre class="example">
     <i>// Declares three "enums".</i>
@@ -486,13 +476,6 @@
     }
   </pre>
   
-  <p>TODO: Should attributes be allowed on oneof elements?
-  TODO: Eventually, with generics we'll have equality and inequality operators.
-  Oneof decls should implicitly define these for their types.
-  TODO: Need pattern matching and element extraction.
-  </p>
-  
-
   <!-- ===================================================================== -->
   <h3 id="decl-struct">struct</h3>
   <!-- ===================================================================== -->
@@ -579,12 +562,15 @@
     type-simple ::= <a href="#type-builtin">type-builtin</a>
     type-simple ::= <a href="#type-identifier">type-identifier</a>
     type-simple ::= <a href="#type-tuple">type-tuple</a>
+    type-simple ::= <a href="#type-oneof">oneof Types</a>
   </pre>
 
   <p>Swift has a small collection of core datatypes that are built into the
       compiler.  Most datatypes that the user is exposed are defined by the
       <a href="#stdlib">standard library</a> or declared as a user defined
       type.</p>
+  
+  FIXME: Why is array a type instead of type-simple?
 
   <!-- ===================================================================== -->
   <h3 id="type-builtin">Builtin and Named Types</h3>
@@ -762,6 +748,88 @@
     tuple_of_arrays.a[12] = array_of_tuples.b[13];
   </pre>
   
+  
+  <!-- ===================================================================== -->
+  <h3 id="type-oneof">oneof Types</h3>
+  <!-- ===================================================================== -->
+  
+  <div class="commentary">
+    In actual practice, we expect explicit oneof types to be rare, used mainly
+    as a replacement for "bool" arguments.  It will be much more common to use
+    oneof decls for "enums" and "struct" decls for data declarations.  The use
+    of "oneof" for discriminated unions will be much less common (but is still
+    very important) than its use for "enums".  In any case, the decl form of
+    these are important syntactic sugar for the type version of oneof.
+  </div>
+  
+  <pre class="grammar">
+    type-oneof ::= 'oneof' <a href="#attribute-list">attribute-list</a>? oneof-body
+    oneof-body         ::= '{' oneof-element-list '}'
+    
+    oneof-element-list ::= oneof-element ','?
+    oneof-element-list ::= oneof-element ',' oneof-element-list
+    
+    oneof-element      ::= <a href="#identifier">identifier</a>
+    oneof-element      ::= <a href="#identifier">identifier</a> ':' <a href="#type">type</a>
+    
+  </pre>
+  
+  <p>A oneof type consists of a comma-separated list of elements,
+  which are each either an identifier or an identifier with a type.  The runtime
+  representation of a value of oneof type only has one of the specified oneof
+  elements at a time: a oneof value is a simple discriminated union.  Oneof
+  types are known as <a 
+    href="http://en.wikipedia.org/wiki/Algebraic_data_type">algebraic data
+    types</a> by the broader programming language community.</p>
+  
+  <p>A oneof types declares two things: 1) the type itself as an anonymous type,
+  and 2) each of the oneof elements declares a constructor value which create a
+  value of the oneof type with the specified element kind.  The constructor
+  values are defined in a nested scope within the oneof descriptor type, so they
+  must be accessed with either a <a href="#expr-identifier">qualified
+  identifier</a> (if the type itself is named) or through <a
+  href="#expr-delayed-identifier">delayed identifier resolution</a>
+  with <a href="#sema_context">context sensitive type inference</a>.
+  </p>
+
+  <p>If the oneof element has no type specified with it, then the type of the 
+  constructor is the oneof type.  If a oneof element has a
+  type "T" associated with it, then the type of the constructor is a function
+  that takes "T" and returns the oneof type.</p>
+  
+  <p>Here are some examples of oneof types:</p>
+  
+  <pre class="example">
+    <i>// Declares three "enums" using a oneof type.  Better and easier with a
+    // <a href="#decl-oneof">oneof declaration</a> though.</i>
+    typealias DataSearchFlags : oneof {
+      None, Backward, Anchored
+    }
+    
+    func f1(searchpolicy : DataSearchFlags);
+    func test1() {
+      f1(DataSearchFlags::None);  <i>// Use of constructor with qualified identifier</i>
+      f1(:None);                  <i>// Use of constructor with context sensitive type inference</i> 
+    
+      <i>// "None" has no type argument, so the constructor's type is "DataSearchFlags".</i> 
+      var a : DataSearchFlags = :None;
+    }
+    
+    <i>// More typical use case, anonymous argument for flags.</i> 
+    func search(val : int, direction : oneof { Up, Down });
+    
+    func test2() {
+      search(4, :Up);
+      search(17, :Down);
+    }
+  </pre>
+  
+  <p>TODO: Should attributes be allowed on oneof elements?
+  TODO: Eventually, with generics we'll have equality and inequality operators.
+    Oneof decls should implicitly define these for their types.
+  TODO: Need pattern matching and element extraction.
+  </p>
+  
   <!-- ********************************************************************* -->
   <h2 id="expr">Expressions</h2>
   <!-- ********************************************************************* -->
@@ -891,9 +959,8 @@
     expr-identifier ::= <a href="#type-identifier">type-identifier</a> '::' <a href="#identifier">identifier</a>
   </pre>
 
-  <p>Qualified identifiers look up a member of a <a href="decl-oneof">oneof</a>
-     or <a href="decl-struct">struct</a> declaration.  The first identifier is
-     looked up as a type name.</p>
+  <p>Qualified identifiers look up a member of a <a href="type-oneof">oneof</a>
+     type.  The first identifier is looked up as a type name.</p>
  
   <!-- ===================================================================== -->
   <h3 id="expr-delayed-identifier">Delayed Identifier Resolution</h3>

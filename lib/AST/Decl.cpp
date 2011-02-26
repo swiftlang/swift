@@ -33,7 +33,6 @@ void *Decl::operator new(size_t Bytes, ASTContext &C,
 llvm::SMLoc NamedDecl::getLocStart() const {
   switch (getKind()) {
   case TypeAliasDeclKind:  return cast<TypeAliasDecl>(this)->getLocStart(); 
-  case OneOfDeclKind:      return cast<OneOfDecl>(this)->getLocStart();
   case VarDeclKind:        return cast<VarDecl>(this)->getLocStart();
   case FuncDeclKind:       return cast<FuncDecl>(this)->getLocStart();
   case OneOfElementDeclKind:return cast<OneOfElementDecl>(this)->getLocStart();
@@ -46,37 +45,25 @@ llvm::SMLoc NamedDecl::getLocStart() const {
   return llvm::SMLoc();
 }
 
-
-/// getTypeForDecl - Return the type that represents this decl in a type
-/// context.
-Type *NamedTypeDecl::createTypeForDecl(ASTContext &C) {
-  assert(TypeForDecl == 0 && "Type already created?");
-  
-  if (TypeAliasDecl *TAD = llvm::dyn_cast<TypeAliasDecl>(this))
-    return TypeForDecl = new (C) AliasType(TAD);
-  
-  OneOfDecl *OOD = cast<OneOfDecl>(this);
-  return TypeForDecl = new (C) OneOfType(OOD);
+/// getAliasType - Return the sugared version of this decl as a Type.
+NameAliasType *TypeAliasDecl::getAliasType(ASTContext &C) const {
+  // Lazily create AliasTy. 
+  if (AliasTy == 0)
+    AliasTy = new (C) NameAliasType(const_cast<TypeAliasDecl*>(this));
+   
+  return AliasTy;
 }
 
 
-
-OneOfElementDecl *OneOfDecl::getElement(Identifier Name) const {
-  // FIXME: Linear search is not great for large oneof decls.
-  for (unsigned i = 0, e = NumElements; i != e; ++i)
-    if (Elements[i]->Name == Name)
-      return Elements[i];
-  return 0;
-}
-
-
+//===----------------------------------------------------------------------===//
+//  Decl printing.
+//===----------------------------------------------------------------------===//
 
 void Decl::dump() const { print(llvm::errs()); llvm::errs() << '\n'; }
 
 void Decl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   switch (getKind()) {
   case TypeAliasDeclKind:  return cast<TypeAliasDecl>(this)->print(OS, Indent);
-  case OneOfDeclKind:      return cast<OneOfDecl>(this)->print(OS, Indent);
   case VarDeclKind:        return cast<VarDecl>(this)->print(OS, Indent);
   case FuncDeclKind:       return cast<FuncDecl>(this)->print(OS, Indent);
   case OneOfElementDeclKind:
@@ -97,19 +84,6 @@ void TypeAliasDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS << " type='";
   UnderlyingTy->print(OS);
   OS << "')";
-}
-
-
-void OneOfDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(oneofdecl ";
-  printCommon(OS, Indent);
-  
-  for (unsigned i = 0, e = NumElements; i != e; ++i) {
-    OS << '\n';
-    Elements[i]->print(OS, Indent+2);
-  }
-  
-  OS << ')';
 }
 
 

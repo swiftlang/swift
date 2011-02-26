@@ -88,9 +88,9 @@ Type *ASTContext::getCanonicalType(Type *T) {
   case DependentTypeKind:
   case OneOfTypeKind:
     assert(0 && "These are always canonical");
-  case AliasTypeKind:
+  case NameAliasTypeKind:
     return T->CanonicalType =
-      getCanonicalType(llvm::cast<AliasType>(T)->TheDecl->UnderlyingTy);
+      getCanonicalType(llvm::cast<NameAliasType>(T)->getDesugaredType());
   case TupleTypeKind: {
     llvm::SmallVector<TupleTypeElt, 8> CanElts;
     TupleType *TT = llvm::cast<TupleType>(T);
@@ -164,6 +164,20 @@ TupleType *ASTContext::getTupleType(llvm::ArrayRef<TupleTypeElt> Fields) {
   
   return New;
 }
+
+/// getNewOneOfType - Return a new instance of oneof type.  These are never
+/// uniqued because the loc is generally different.
+OneOfType *ASTContext::getNewOneOfType(llvm::SMLoc OneOfLoc,
+                                   llvm::ArrayRef<OneOfElementDecl*> InElts) {
+  
+  OneOfElementDecl **NewElements = (OneOfElementDecl**)
+    Allocate(sizeof(*NewElements)*InElts.size(), 8);
+  memcpy(NewElements, InElts.data(), sizeof(*NewElements)*InElts.size());
+
+  return new (*this) OneOfType(OneOfLoc,
+                 llvm::ArrayRef<OneOfElementDecl*>(NewElements, InElts.size()));
+}
+
 
 /// getFunctionType - Return a uniqued function type with the specified
 /// input and result.
