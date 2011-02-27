@@ -23,6 +23,7 @@
 #include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include <vector>
 
 namespace swift {
   class Expr;
@@ -43,11 +44,19 @@ class SemaDecl : public SemaBase {
   void *const TypeScopeHT;  // ScopedHashTable<Identifier, TypeScopeEntry>
   Scope *CurScope;
   friend class Scope;
+  
+  /// UnresolvedTypes - This keeps track of all of the unresolved types in the
+  /// AST.
+  std::vector<TypeAliasDecl *> UnresolvedTypes;
 public:
 
   explicit SemaDecl(Sema &S);
   ~SemaDecl();
   
+  /// handleEndOfTranslationUnit - This is invoked at the end of the translation
+  /// unit.
+  void handleEndOfTranslationUnit();
+
   //===--------------------------------------------------------------------===//
   // Name lookup.
   //===--------------------------------------------------------------------===//
@@ -62,8 +71,9 @@ public:
   ValueDecl *LookupValueName(Identifier Name);
 
   /// LookupTypeName - Perform a lexical scope lookup for the specified name in
-  /// a type context, returning the active decl if found or null if not.
-  TypeAliasDecl *LookupTypeName(Identifier Name);
+  /// a type context, returning the decl if found or installing and returning a
+  /// new Unresolved one if not.
+  TypeAliasDecl *LookupTypeName(Identifier Name, llvm::SMLoc Loc);
 
 
   /// AnonClosureArgs - These are the current active set of anonymous closure
@@ -109,6 +119,7 @@ public:
                                    unsigned PathLen);
   bool CheckAccessPathArity(unsigned NumChildren, llvm::SMLoc LPLoc, VarDecl *D,
                             const unsigned *Path, unsigned PathLen);
+  
 };
   
 } // end namespace swift

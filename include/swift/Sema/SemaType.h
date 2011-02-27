@@ -32,6 +32,7 @@ namespace swift {
   class TupleTypeElt;
   class DeclAttributes;
   class OneOfType;
+  class Identifier;
   
 /// SemaType - Semantic analysis support for Swift types.
 class SemaType : public SemaBase {
@@ -39,7 +40,7 @@ public:
   explicit SemaType(Sema &S) : SemaBase(S) {}
 
   Type *ActOnInt32Type(llvm::SMLoc Loc);
-  Type *ActOnTypeName(llvm::SMLoc Loc, llvm::StringRef Name);
+  Type *ActOnTypeName(llvm::SMLoc Loc, Identifier Name);
   Type *ActOnTupleType(llvm::SMLoc LPLoc, TupleTypeElt *Elements,
                        unsigned NumElements, llvm::SMLoc RPLoc);
   Type *ActOnFunctionType(Type *Input, llvm::SMLoc ArrowLoc, Type *Output);

@@ -51,6 +51,15 @@ SemaDecl::~SemaDecl() {
   delete &getTypeHT(TypeScopeHT);
 }
 
+
+/// handleEndOfTranslationUnit - This is invoked at the end of the translation
+/// unit.
+void SemaDecl::handleEndOfTranslationUnit() {
+  // Verify that any forward declared types were ultimately defined.
+  for (unsigned i = 0, e = UnresolvedTypes.size(); i != e; ++i)
+    Error(UnresolvedTypes[i]->getLocStart(), "use of declared type");
+}
+
 //===----------------------------------------------------------------------===//
 // Name lookup.
 //===----------------------------------------------------------------------===//
@@ -62,9 +71,26 @@ ValueDecl *SemaDecl::LookupValueName(Identifier Name) {
 }
 
 /// LookupTypeName - Perform a lexical scope lookup for the specified name in
-/// a type context, returning the active decl if found or null if not.
-TypeAliasDecl *SemaDecl::LookupTypeName(Identifier Name) {
-  return getTypeHT(TypeScopeHT).lookup(Name).second;
+/// a type context, returning the decl if found or installing and returning a
+/// new Unresolved one if not.
+TypeAliasDecl *SemaDecl::LookupTypeName(Identifier Name, llvm::SMLoc Loc) {
+  TypeAliasDecl *TAD = getTypeHT(TypeScopeHT).lookup(Name).second;
+  if (TAD) return TAD;
+  
+  // If we don't have a definition for this type, introduce a new TypeAliasDecl
+  // with an unresolved underlying type.
+  TAD = new (S.Context) TypeAliasDecl(Loc, Name, S.Context.TheUnresolvedType);
+  UnresolvedTypes.push_back(TAD);
+  
+  // Inject this into the outermost scope so that subsequent name lookups of the
+  // same type will find it.
+  llvm::ScopedHashTableScope<Identifier, TypeScopeEntry> *S =
+    getTypeHT(TypeScopeHT).getCurScope();
+  while (S->getParentScope())
+    S = S->getParentScope();
+  
+  getTypeHT(TypeScopeHT).insertIntoScope(S, Name, std::make_pair(0, TAD));
+  return TAD;
 }
 
 /// AddToScope - Register the specified decl as being in the current lexical
@@ -95,7 +121,8 @@ void SemaDecl::AddToScope(TypeAliasDecl *D) {
   if (Entry.second && Entry.first == CurScope->getDepth()) {
     Error(D->getLocStart(),
           "redefinition of type named '" +llvm::StringRef(D->Name.get()) + "'");
-    Note(LookupTypeName(D->Name)->getLocStart(), "previous declaration here");
+    Note(LookupTypeName(D->Name, D->getLocStart())->getLocStart(),
+         "previous declaration here");
     return;
   }
   

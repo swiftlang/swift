@@ -176,6 +176,9 @@ void Parser::ParseTranslationUnit() {
     }
   }
   
+  // Notify sema about the end of the translation unit.
+  S.decl.handleEndOfTranslationUnit();
+  
   // Notify consumer about the end of the translation unit.
   Consumer.HandleEndOfTranslationUnit();
 }
@@ -619,11 +622,8 @@ bool Parser::ParseType(Type *&Result, const llvm::Twine &Message) {
   // Parse type-simple first.
   switch (Tok.getKind()) {
   case tok::identifier:
-    Result = S.type.ActOnTypeName(Tok.getLoc(), Tok.getText());
-    if (Result == 0) {
-      Error(Tok.getLoc(), Message);
-      return true;
-    }
+    Result = S.type.ActOnTypeName(Tok.getLoc(),
+                                  S.Context.getIdentifier(Tok.getText()));
     ConsumeToken(tok::identifier);
     break;
   case tok::kw___builtin_int32_type:

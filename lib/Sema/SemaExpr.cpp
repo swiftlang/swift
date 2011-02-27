@@ -297,7 +297,6 @@ NullablePtr<Expr> SemaExpr::ActOnNumericConstant(llvm::StringRef Text,
     Text = "1";
   }
   
-  
   Type *ResultTy = 0;
   if (SemaIntegerLiteral(ResultTy, *this)) return 0;
   return new (S.Context) IntegerLiteral(Text, Loc, ResultTy);
@@ -331,12 +330,10 @@ ActOnScopedIdentifierExpr(llvm::StringRef ScopeName, llvm::SMLoc ScopeLoc,
   // Note: this is very simplistic support for scoped name lookup, extend when
   // needed.
   TypeAliasDecl *TypeScopeDecl =
-    S.decl.LookupTypeName(S.Context.getIdentifier(ScopeName));
-  if (TypeScopeDecl == 0) {
-    Error(ScopeLoc, "unknown type name '" + ScopeName + "' in expression");
-    return 0;
-  }
+    S.decl.LookupTypeName(S.Context.getIdentifier(ScopeName), ScopeLoc);
   Type *TypeScope = S.Context.getCanonicalType(TypeScopeDecl->UnderlyingTy);
+
+  // FIXME: Handle UnresolvedType.
   
   // Look through type aliases etc.
   OneOfType *DT = dyn_cast<OneOfType>(TypeScope);
