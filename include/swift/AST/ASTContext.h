@@ -48,6 +48,8 @@ class ASTContext {
   void *TupleTypes;      // llvm::FoldingSet<TupleType>
   void *FunctionTypes;   // DenseMap<std::pair<Type*, Type*>, FunctionType*>
   void *ArrayTypes;      // DenseMap<std::pair<Type*, uint64_t>, ArrayType*>
+  
+  bool HadError;
 public:
   ASTContext(llvm::SourceMgr &SourceMgr);
   ~ASTContext();
@@ -61,7 +63,16 @@ public:
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
   Identifier getIdentifier(llvm::StringRef Str);
-    
+  
+  /// setHadError - This is called when an error message is emitted.
+  void setHadError() {
+    HadError = true;
+  }
+  
+  bool hadError() const {
+    return HadError;
+  }
+  
   //===--------------------------------------------------------------------===//
   // Type manipulation routines.
   //===--------------------------------------------------------------------===//

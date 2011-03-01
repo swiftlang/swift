@@ -47,6 +47,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
     TheUnresolvedType(new (*this) UnresolvedType()),
     TheDependentType(new (*this) DependentType()),
     TheInt32Type(new (*this) BuiltinType(BuiltinInt32Kind)) {
+  HadError = false;
 }
 
 ASTContext::~ASTContext() {

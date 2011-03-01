@@ -27,5 +27,6 @@ void SemaBase::Warning(llvm::SMLoc Loc, const llvm::Twine &Message) {
   S.Context.SourceMgr.PrintMessage(Loc, Message, "warning");
 }
 void SemaBase::Error(llvm::SMLoc Loc, const llvm::Twine &Message) {
+  S.Context.setHadError();
   S.Context.SourceMgr.PrintMessage(Loc, Message, "error");
 }

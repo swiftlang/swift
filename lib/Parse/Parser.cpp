@@ -38,7 +38,7 @@ using llvm::NullablePtr;
 Parser::Parser(unsigned BufferID, ASTConsumer &consumer)
   : Consumer(consumer),
     SourceMgr(Consumer.getContext().SourceMgr),
-    L(*new Lexer(BufferID, SourceMgr)),
+    L(*new Lexer(BufferID, Consumer.getContext())),
     S(*new Sema(Consumer.getContext())) {
 }
 
@@ -56,6 +56,7 @@ void Parser::Warning(SMLoc Loc, const llvm::Twine &Message) {
 }
 
 void Parser::Error(SMLoc Loc, const llvm::Twine &Message) {
+  Consumer.getContext().setHadError();
   SourceMgr.PrintMessage(Loc, Message, "error");
 }
 

@@ -27,16 +27,18 @@ namespace llvm {
 
 namespace swift {
   class Token;
+  class ASTContext;
 
 class Lexer {
   llvm::SourceMgr &SourceMgr;
   const llvm::MemoryBuffer *Buffer;
   const char *CurPtr;
+  ASTContext &Context;
 
   Lexer(const Lexer&);          // DO NOT IMPLEMENT
   void operator=(const Lexer&); // DO NOT IMPLEMENT
 public:
-  Lexer(unsigned BufferID, llvm::SourceMgr &SM);
+  Lexer(unsigned BufferID, ASTContext &Context);
   
   void Lex(Token &Result);
   

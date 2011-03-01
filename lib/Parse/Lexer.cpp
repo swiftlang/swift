@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/Lexer.h"
+#include "swift/AST/ASTContext.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -25,8 +26,9 @@ using namespace swift;
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
-Lexer::Lexer(unsigned BufferID, llvm::SourceMgr &SM) : SourceMgr(SM) {
-  Buffer = SM.getMemoryBuffer(BufferID);
+Lexer::Lexer(unsigned BufferID, ASTContext &context)
+  : SourceMgr(context.SourceMgr), Context(context) {
+  Buffer = SourceMgr.getMemoryBuffer(BufferID);
   CurPtr = Buffer->getBufferStart();
 }
 
@@ -35,6 +37,7 @@ void Lexer::Warning(const char *Loc, const llvm::Twine &Message) {
 }
 
 void Lexer::Error(const char *Loc, const llvm::Twine &Message) {
+  Context.setHadError();
   SourceMgr.PrintMessage(llvm::SMLoc::getFromPointer(Loc), llvm::Twine(Message),
                          "error");
 }
