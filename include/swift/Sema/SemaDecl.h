@@ -23,7 +23,6 @@
 #include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-#include <vector>
 
 namespace swift {
   class Expr;
@@ -47,7 +46,7 @@ class SemaDecl : public SemaBase {
   
   /// UnresolvedTypes - This keeps track of all of the unresolved types in the
   /// AST.
-  std::vector<TypeAliasDecl *> UnresolvedTypes;
+  void *const UnresolvedTypes; // DenseMap<Identifier, TypeAliasDecl *>
 public:
 
   explicit SemaDecl(Sema &S);
@@ -64,7 +63,6 @@ public:
   /// AddToScope - Register the specified decl as being in the current lexical
   /// scope.
   void AddToScope(ValueDecl *D);
-  void AddToScope(TypeAliasDecl *D);
   
   /// LookupValueName - Perform a lexical scope lookup for the specified name in
   /// a value context, returning the active decl if found or null if not.

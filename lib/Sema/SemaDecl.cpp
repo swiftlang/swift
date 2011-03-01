@@ -39,16 +39,23 @@ static TypeScopeHTType &getTypeHT(void *P) {
   return *(TypeScopeHTType*)P;
 }
 
+typedef llvm::DenseMap<Identifier,TypeAliasDecl*> UnresolvedTypesMapTy;
+static UnresolvedTypesMapTy &getUnresolvedTypesHT(void *P){
+  return *(UnresolvedTypesMapTy*)P;
+}
+
 SemaDecl::SemaDecl(Sema &S)
   : SemaBase(S),
     ValueScopeHT(new ValueScopeHTType()),
     TypeScopeHT(new TypeScopeHTType()),
-    CurScope(0) {
+    CurScope(0),
+    UnresolvedTypes(new UnresolvedTypesMapTy()){
 }
 
 SemaDecl::~SemaDecl() {
   delete &getValueHT(ValueScopeHT);
   delete &getTypeHT(TypeScopeHT);
+  delete &getUnresolvedTypesHT(UnresolvedTypes);
 }
 
 
@@ -56,8 +63,10 @@ SemaDecl::~SemaDecl() {
 /// unit.
 void SemaDecl::handleEndOfTranslationUnit() {
   // Verify that any forward declared types were ultimately defined.
-  for (unsigned i = 0, e = UnresolvedTypes.size(); i != e; ++i)
-    Error(UnresolvedTypes[i]->getLocStart(), "use of declared type");
+  UnresolvedTypesMapTy &UT = getUnresolvedTypesHT(UnresolvedTypes);
+  // FIXME: Nondeterminstic iteration.
+  for (UnresolvedTypesMapTy::iterator I = UT.begin(), E = UT.end(); I != E; ++I)
+    Error(I->second->getLocStart(), "use of undeclared type");
 }
 
 //===----------------------------------------------------------------------===//
@@ -80,7 +89,7 @@ TypeAliasDecl *SemaDecl::LookupTypeName(Identifier Name, llvm::SMLoc Loc) {
   // If we don't have a definition for this type, introduce a new TypeAliasDecl
   // with an unresolved underlying type.
   TAD = new (S.Context) TypeAliasDecl(Loc, Name, S.Context.TheUnresolvedType);
-  UnresolvedTypes.push_back(TAD);
+  getUnresolvedTypesHT(UnresolvedTypes)[Name] = TAD;
   
   // Inject this into the outermost scope so that subsequent name lookups of the
   // same type will find it.
@@ -109,25 +118,6 @@ void SemaDecl::AddToScope(ValueDecl *D) {
   
   getValueHT(ValueScopeHT).insert(D->Name,
                                   std::make_pair(CurScope->getDepth(), D));
-}
-
-/// AddToScope - Register the specified decl as being in the current lexical
-/// scope.
-void SemaDecl::AddToScope(TypeAliasDecl *D) {
-  // If we have a shadowed type definition, check to see if we have a
-  // redefinition: two definitions in the same scope with the same name.
-  std::pair<unsigned, TypeAliasDecl*> Entry =
-    getTypeHT(TypeScopeHT).lookup(D->Name);
-  if (Entry.second && Entry.first == CurScope->getDepth()) {
-    Error(D->getLocStart(),
-          "redefinition of type named '" +llvm::StringRef(D->Name.get()) + "'");
-    Note(LookupTypeName(D->Name, D->getLocStart())->getLocStart(),
-         "previous declaration here");
-    return;
-  }
-  
-  getTypeHT(TypeScopeHT).insert(D->Name,
-                                std::make_pair(CurScope->getDepth(), D));
 }
 
 /// GetAnonDecl - Get the anondecl for the specified anonymous closure
@@ -376,10 +366,8 @@ static void AddFuncArgumentsToScope(Type *Ty,
 
 
 void SemaDecl::CreateArgumentDeclsForFunc(FuncDecl *FD) {
-
   llvm::SmallVector<unsigned, 8> AccessPath;
   AddFuncArgumentsToScope(FD->Ty, AccessPath, FTP_Function, FD->FuncLoc, *this);
-  
 }
 
 
@@ -422,8 +410,35 @@ Decl *SemaDecl::ActOnStructDecl(llvm::SMLoc StructLoc, DeclAttributes &Attrs,
 
 TypeAliasDecl *SemaDecl::ActOnTypeAlias(llvm::SMLoc TypeAliasLoc,
                                         Identifier Name, Type *Ty) {
+  std::pair<unsigned,TypeAliasDecl*> Entry =getTypeHT(TypeScopeHT).lookup(Name);
 
-  TypeAliasDecl *TheDecl =new (S.Context) TypeAliasDecl(TypeAliasLoc, Name, Ty);
-  AddToScope(TheDecl);
-  return TheDecl;
+  // If we have no existing entry, or if the existing entry is at a different
+  // scope level then this is a valid insertion.
+  if (Entry.second == 0 || Entry.first != CurScope->getDepth()) {
+    TypeAliasDecl *New = new (S.Context) TypeAliasDecl(TypeAliasLoc, Name, Ty);
+    getTypeHT(TypeScopeHT).insert(Name,
+                                  std::make_pair(CurScope->getDepth(), New));
+    return New;
+  }
+  
+  TypeAliasDecl *ExistingDecl = Entry.second;
+  
+  // If the previous definition was just a use of an undeclared type, complete
+  // the type now.
+  if (llvm::isa<UnresolvedType>(ExistingDecl->UnderlyingTy)) {
+    // Remove the entry for this type from the UnresolvedTypes map.
+    getUnresolvedTypesHT(UnresolvedTypes).erase(Name);
+    
+    // Update the decl we already have to be the correct type.
+    ExistingDecl->TypeAliasLoc = TypeAliasLoc;
+    ExistingDecl->UnderlyingTy = Ty;
+    return ExistingDecl;
+  }
+  
+  // Otherwise, we have a redefinition: two definitions in the same scope with
+  // the same name.
+  Error(TypeAliasLoc,
+        "redefinition of type named '" +llvm::StringRef(Name.get()) + "'");
+  Note(ExistingDecl->getLocStart(), "previous declaration here");
+  return ExistingDecl;
 }
