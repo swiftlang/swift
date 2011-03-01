@@ -66,7 +66,8 @@ void SemaDecl::handleEndOfTranslationUnit() {
   UnresolvedTypesMapTy &UT = getUnresolvedTypesHT(UnresolvedTypes);
   // FIXME: Nondeterminstic iteration.
   for (UnresolvedTypesMapTy::iterator I = UT.begin(), E = UT.end(); I != E; ++I)
-    Error(I->second->getLocStart(), "use of undeclared type");
+    Error(I->second->getLocStart(), "use of undeclared type '" + I->first.str()
+          + "'");
 }
 
 //===----------------------------------------------------------------------===//

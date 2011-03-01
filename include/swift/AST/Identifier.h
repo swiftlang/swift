@@ -18,6 +18,7 @@
 #define SWIFT_AST_IDENTIFIER_H
 
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/StringRef.h"
 #include <cstring>
 
 namespace llvm {
@@ -39,6 +40,8 @@ public:
   explicit Identifier() : Pointer(0) {}
   
   const char *get() const { return Pointer; }
+  
+  llvm::StringRef str() const { return Pointer; }
   
   unsigned getLength() const {
     return ::strlen(Pointer);
