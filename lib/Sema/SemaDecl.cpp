@@ -150,11 +150,14 @@ AnonDecl *SemaDecl::GetAnonDecl(llvm::StringRef Text, llvm::SMLoc RefLoc) {
 // Name Processing.
 //===----------------------------------------------------------------------===//
 
+/// GetTypeForPath - This returns the type of an element of the specified type.
+/// This is always a structural, syntactic, query as it is used for name
+/// processing, which is in the space of "how people wrote it".
 static Type *GetTypeForPath(Type *Ty, llvm::ArrayRef<unsigned> Path) {
-  if (Path.size() == 0)
+  if (Path.empty())
     return Ty;
   
-  // Right now, you can only dive into tuples.
+  // Right now, you can only dive into syntactic tuples.
   TupleType *TT = llvm::dyn_cast<TupleType>(Ty);
   if (TT == 0) return 0;
   
@@ -186,7 +189,7 @@ bool SemaDecl::CheckAccessPathArity(unsigned NumChildren, llvm::SMLoc LPLoc,
   if (Ty && Ty->Fields.size() == NumChildren)
     return false;
   
-  Error(LPLoc,"tuple specifier has wrong number of elements for actual type");
+  Error(LPLoc, "tuple specifier has wrong number of elements for actual type");
   return true;
 }
 
@@ -198,7 +201,7 @@ bool SemaDecl::CheckAccessPathArity(unsigned NumChildren, llvm::SMLoc LPLoc,
 /// DiagnoseUnresolvedTypes - This function is invoked on all nodes in an
 /// expression tree checking to make sure they don't contain any DependentTypes.
 static Expr *DiagnoseUnresolvedTypes(Expr *E, Expr::WalkOrder Order,
-                                     void *Data){
+                                     void *Data) {
   // Ignore the preorder walk.  We'd rather diagnose use of unresolved types
   // during the postorder walk so that the inner most expressions are diagnosed
   // before the outermost ones.
@@ -273,7 +276,6 @@ VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, Identifier Name,
     else
       Ty = Init->Ty;
   }
-  
   
   // Validate attributes.
   ValidateAttributes(Attrs, Ty, *this);

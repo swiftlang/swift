@@ -755,13 +755,13 @@ bool Parser::ParseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
     ConsumeToken(tok::identifier);
     
     // See if we have a type specifier for this oneof element.  If so, parse it.
-    if (ConsumeIf(tok::colon))
-      if (ParseType(ElementInfo.EltType,
-                    "expected type while parsing oneof element '" +
-                    ElementInfo.Name + "'")) {
-        SkipUntil(tok::r_brace);
-        return true;
-      }
+    if (ConsumeIf(tok::colon) &&
+        ParseType(ElementInfo.EltType,
+                  "expected type while parsing oneof element '" +
+                  ElementInfo.Name + "'")) {
+      SkipUntil(tok::r_brace);
+      return true;
+    }
     
     ElementInfos.push_back(ElementInfo);
     
