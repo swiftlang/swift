@@ -82,12 +82,12 @@ public:
   llvm::NullablePtr<Expr>
   ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc);
   llvm::NullablePtr<Expr>
-  ActOnScopedIdentifierExpr(llvm::StringRef ScopeName, llvm::SMLoc ScopeLoc,
+  ActOnScopedIdentifierExpr(Identifier ScopeName, llvm::SMLoc ScopeLoc,
                             llvm::SMLoc ColonColonLoc,
-                            llvm::StringRef Name, llvm::SMLoc NameLoc);
+                            Identifier Name, llvm::SMLoc NameLoc);
   llvm::NullablePtr<Expr>
   ActOnUnresolvedMemberExpr(llvm::SMLoc ColonLoc, llvm::SMLoc NameLoc,
-                            llvm::StringRef Name);
+                            Identifier Name);
   
   llvm::NullablePtr<Expr>
   ActOnTupleExpr(llvm::SMLoc LPLoc, Expr *const *SubExprs,

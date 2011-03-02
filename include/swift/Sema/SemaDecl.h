@@ -24,6 +24,9 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 
+namespace llvm {
+  template <typename T> class ArrayRef;
+}
 namespace swift {
   class Expr;
   class Type;
@@ -107,16 +110,15 @@ public:
   FuncDecl *ActOnFuncBody(FuncDecl *FD, Expr *Body);
 
   Decl *ActOnStructDecl(llvm::SMLoc StructLoc, DeclAttributes &Attrs,
-                        llvm::StringRef Name, Type *Ty);
+                        Identifier Name, Type *Ty);
   
   // Name processing.
   
   /// ActOnElementName - Assign a name to an element of D specified by Path.
   ElementRefDecl *ActOnElementName(Identifier Name, llvm::SMLoc NameLoc,
-                                   VarDecl *D, const unsigned *Path,
-                                   unsigned PathLen);
+                                   VarDecl *D, llvm::ArrayRef<unsigned> Path);
   bool CheckAccessPathArity(unsigned NumChildren, llvm::SMLoc LPLoc, VarDecl *D,
-                            const unsigned *Path, unsigned PathLen);
+                            llvm::ArrayRef<unsigned> Path);
   
 };
   

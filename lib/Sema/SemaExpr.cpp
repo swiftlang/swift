@@ -324,13 +324,12 @@ SemaExpr::ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
 }
 
 llvm::NullablePtr<Expr> SemaExpr::
-ActOnScopedIdentifierExpr(llvm::StringRef ScopeName, llvm::SMLoc ScopeLoc,
+ActOnScopedIdentifierExpr(Identifier ScopeName, llvm::SMLoc ScopeLoc,
                           llvm::SMLoc ColonColonLoc,
-                          llvm::StringRef Name, llvm::SMLoc NameLoc) {
+                          Identifier Name, llvm::SMLoc NameLoc) {
   // Note: this is very simplistic support for scoped name lookup, extend when
   // needed.
-  TypeAliasDecl *TypeScopeDecl =
-    S.decl.LookupTypeName(S.Context.getIdentifier(ScopeName), ScopeLoc);
+  TypeAliasDecl *TypeScopeDecl = S.decl.LookupTypeName(ScopeName, ScopeLoc);
   Type *TypeScope = S.Context.getCanonicalType(TypeScopeDecl->UnderlyingTy);
 
   // FIXME: Handle UnresolvedType.
@@ -340,19 +339,20 @@ ActOnScopedIdentifierExpr(llvm::StringRef ScopeName, llvm::SMLoc ScopeLoc,
   
   // Reject things like int::x.
   if (DT == 0) {
-    Error(ScopeLoc, "invalid type '" + ScopeName + "' for scoped access");
+    Error(ScopeLoc, "invalid type '" + ScopeName.str() + "' for scoped access");
     return 0;
   }
   
   if (DT->Elements.empty()) {
-    Error(ScopeLoc, "oneof '" + ScopeName +
+    Error(ScopeLoc, "oneof '" + ScopeName.str() +
           "' is not complete or has no elements");
     return 0;
   }
   
-  OneOfElementDecl *Elt = DT->getElement(S.Context.getIdentifier(Name));
+  OneOfElementDecl *Elt = DT->getElement(Name);
   if (Elt == 0) {
-    Error(ScopeLoc, "'" + Name + "' is not a member of '" + ScopeName + "'");
+    Error(ScopeLoc, "'" + Name.str() + "' is not a member of '" +
+          ScopeName.str() + "'");
     return 0;
   }
 
@@ -361,10 +361,9 @@ ActOnScopedIdentifierExpr(llvm::StringRef ScopeName, llvm::SMLoc ScopeLoc,
 
 llvm::NullablePtr<Expr>
 SemaExpr::ActOnUnresolvedMemberExpr(llvm::SMLoc ColonLoc, llvm::SMLoc NameLoc,
-                                    llvm::StringRef Name) {
+                                    Identifier Name) {
   // Handle :foo by just making an AST node.
-  return new (S.Context) UnresolvedMemberExpr(ColonLoc, NameLoc,
-                                              S.Context.getIdentifier(Name),
+  return new (S.Context) UnresolvedMemberExpr(ColonLoc, NameLoc, Name,
                                               S.Context.TheDependentType);
 }
 

@@ -150,8 +150,8 @@ AnonDecl *SemaDecl::GetAnonDecl(llvm::StringRef Text, llvm::SMLoc RefLoc) {
 // Name Processing.
 //===----------------------------------------------------------------------===//
 
-static Type *GetTypeForPath(Type *Ty, const unsigned *Path, unsigned PathLen) {
-  if (PathLen == 0)
+static Type *GetTypeForPath(Type *Ty, llvm::ArrayRef<unsigned> Path) {
+  if (Path.size() == 0)
     return Ty;
   
   // Right now, you can only dive into tuples.
@@ -159,17 +159,17 @@ static Type *GetTypeForPath(Type *Ty, const unsigned *Path, unsigned PathLen) {
   if (TT == 0) return 0;
   
   // Reject invalid indices.
-  if (*Path >= TT->Fields.size())
+  if (Path[0] >= TT->Fields.size())
     return 0;
   
-  return GetTypeForPath(TT->getElementType(*Path), Path+1, PathLen-1);
+  return GetTypeForPath(TT->getElementType(Path[0]), Path.slice(1));
 }
 
 /// ActOnElementName - Assign a name to an element of D specified by Path.
 ElementRefDecl *SemaDecl::
 ActOnElementName(Identifier Name, llvm::SMLoc NameLoc, VarDecl *D,
-                 const unsigned *Path, unsigned PathLen) {
-  Type *Ty = GetTypeForPath(D->Ty, Path, PathLen);
+                 llvm::ArrayRef<unsigned> Path) {
+  Type *Ty = GetTypeForPath(D->Ty, Path);
   assert(Ty && "Access path validity should already have been checked by"
          " CheckAccessPathArity");
   
@@ -181,10 +181,8 @@ ActOnElementName(Identifier Name, llvm::SMLoc NameLoc, VarDecl *D,
 /// the right arity and return false if so.  Otherwise emit an error and emit
 /// true.
 bool SemaDecl::CheckAccessPathArity(unsigned NumChildren, llvm::SMLoc LPLoc,
-                                    VarDecl *D,
-                                    const unsigned *Path, unsigned PathLen) {
-  TupleType *Ty =
-    llvm::dyn_cast_or_null<TupleType>(GetTypeForPath(D->Ty, Path, PathLen));
+                                    VarDecl *D, llvm::ArrayRef<unsigned> Path) {
+  TupleType *Ty =llvm::dyn_cast_or_null<TupleType>(GetTypeForPath(D->Ty, Path));
   if (Ty && Ty->Fields.size() == NumChildren)
     return false;
   
@@ -385,20 +383,18 @@ FuncDecl *SemaDecl::ActOnFuncBody(FuncDecl *FD, Expr *Body) {
 }
 
 Decl *SemaDecl::ActOnStructDecl(llvm::SMLoc StructLoc, DeclAttributes &Attrs,
-                                llvm::StringRef Name, Type *Ty) {
+                                Identifier Name, Type *Ty) {
   // The 'struct' is syntactically fine, invoke the semantic actions for the
   // syntactically expanded oneof type.  Struct declarations are just sugar for
   // other existing constructs.
   SemaType::OneOfElementInfo ElementInfo;
-  ElementInfo.Name = Name;
+  ElementInfo.Name = Name.str();
   ElementInfo.NameLoc = StructLoc;
   ElementInfo.EltType = Ty;
   OneOfType *OneOfTy = S.type.ActOnOneOfType(StructLoc, Attrs, ElementInfo);
   
   // Given the type, we create a TypeAlias and inject it into the current scope.
-  TypeAliasDecl *TAD = S.decl.ActOnTypeAlias(StructLoc,
-                                             S.Context.getIdentifier(Name),
-                                             OneOfTy);
+  TypeAliasDecl *TAD = S.decl.ActOnTypeAlias(StructLoc, Name, OneOfTy);
   
   // In addition to defining the oneof declaration, structs also inject their
   // constructor into the global scope.

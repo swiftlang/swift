@@ -389,17 +389,13 @@ static void AddElementNamesForVarDecl(const NameRecord &Name,
   // If this is a leaf name, ask sema to create a ElementRefDecl for us with the
   // specified access path.
   if (Name.Name.get()) {
-    ValueDecl *END = 
-      SD.ActOnElementName(Name.Name, Name.Loc, VD,
-                          AccessPath.data(), AccessPath.size());
-    SD.AddToScope(END);
+    SD.AddToScope(SD.ActOnElementName(Name.Name, Name.Loc, VD, AccessPath));
     return;
   }
   
   // Otherwise, we have the paren case.  Verify that the currently named type
   // has the right number of elements.  If so, we recursively process each.
-  if (SD.CheckAccessPathArity(Name.NumChildren, Name.Loc, VD,
-                              AccessPath.data(), AccessPath.size()))
+  if (SD.CheckAccessPathArity(Name.NumChildren, Name.Loc, VD, AccessPath))
     return;
  
   AccessPath.push_back(0);
@@ -447,7 +443,6 @@ VarDecl *Parser::ParseDeclVar() {
     // appropriate.
     llvm::SmallVector<unsigned, 8> AccessPath;
     AddElementNamesForVarDecl(Name, AccessPath, VD, S.decl);
-    
   }
   return VD;
 }
@@ -483,8 +478,8 @@ FuncDecl *Parser::ParseDeclFunc() {
   if (ParseType(FuncTy))
     return 0;
   
-  // If the parsed function type is not a function, then it is implicitly a
-  // function that returns void.
+  // If the parsed function type is not spelled as a function type (i.e., has an
+  // '->' in it), then it is implicitly a function that returns ().
   if (!llvm::isa<FunctionType>(FuncTy))
     FuncTy = S.type.ActOnFunctionType(FuncTy, SMLoc(),
                                       S.Context.TheEmptyTupleType);
@@ -551,11 +546,9 @@ Decl *Parser::ParseDeclOneOf() {
   
   SMLoc NameLoc = Tok.getLoc();
   llvm::StringRef OneOfName;
-  if (ParseIdentifier(OneOfName, "expected identifier in oneof declaration"))
-    return 0;
-
   Type *OneOfType = 0;
-  if (ParseTypeOneOfBody(OneOfLoc, Attributes, OneOfType))
+  if (ParseIdentifier(OneOfName, "expected identifier in oneof declaration") ||
+      ParseTypeOneOfBody(OneOfLoc, Attributes, OneOfType))
     return 0;
 
   return S.decl.ActOnTypeAlias(NameLoc, S.Context.getIdentifier(OneOfName),
@@ -590,7 +583,8 @@ Decl *Parser::ParseDeclStruct() {
   Type *Ty = 0;
   if (ParseType(Ty)) return 0;
   
-  return S.decl.ActOnStructDecl(StructLoc, Attributes, StructName, Ty);
+  return S.decl.ActOnStructDecl(StructLoc, Attributes, 
+                                S.Context.getIdentifier(StructName), Ty);
 }
 
 
@@ -910,7 +904,8 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
     SMLoc NameLoc = Tok.getLoc();
     if (ParseIdentifier(Name, "expected identifier after ':' expression"))
       return true;
-    Result = S.expr.ActOnUnresolvedMemberExpr(ColonLoc, NameLoc, Name);
+    Result = S.expr.ActOnUnresolvedMemberExpr(ColonLoc, NameLoc,
+                                              S.Context.getIdentifier(Name));
     break;
   }
       
@@ -1013,10 +1008,9 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
 ///     dollarident
 ///     identifier '::' identifier
 bool Parser::ParseExprIdentifier(llvm::NullablePtr<Expr> &Result) {
-  llvm::StringRef Name = Tok.getText();
-  SMLoc Loc = Tok.getLoc();
-  
   if (Tok.is(tok::dollarident)) {
+    llvm::StringRef Name = Tok.getText();
+    SMLoc Loc = Tok.getLoc();
     ConsumeToken(tok::dollarident);
     assert(Name[0] == '$' && "Not a dollarident");
     bool AllNumeric = true;
@@ -1031,7 +1025,10 @@ bool Parser::ParseExprIdentifier(llvm::NullablePtr<Expr> &Result) {
     return false;
   }
 
-  ConsumeToken(tok::identifier);
+  assert(Tok.is(tok::identifier));
+  SMLoc Loc = Tok.getLoc();
+  llvm::StringRef Name;
+  ParseIdentifier(Name, "");
 
   if (Tok.isNot(tok::coloncolon)) {
     Result = S.expr.ActOnIdentifierExpr(Name, Loc);
@@ -1047,8 +1044,10 @@ bool Parser::ParseExprIdentifier(llvm::NullablePtr<Expr> &Result) {
                       "::' expression"))
     return true;
 
-  Result = S.expr.ActOnScopedIdentifierExpr(Name, Loc, ColonColonLoc,
-                                            Name2, Loc2);
+  Result = S.expr.ActOnScopedIdentifierExpr(S.Context.getIdentifier(Name), Loc,
+                                            ColonColonLoc,
+                                            S.Context.getIdentifier(Name2),
+                                            Loc2);
   return false;
 }
 
