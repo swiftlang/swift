@@ -60,6 +60,22 @@ public:
   /// Allocate - Allocate memory from the ASTContext bump pointer.
   void *Allocate(unsigned long Bytes, unsigned Alignment);
 
+  template <typename T>
+  T *Allocate(unsigned NElts) {
+    T *Res = (T*)Allocate(sizeof(T)*NElts, __alignof__(T));
+    for (unsigned i = 0; i != NElts; ++i)
+      new (Res+i) T();
+    return Res;
+  }
+
+  template <typename T, typename It>
+  T *AllocateCopy(It Start, It End) {
+    T *Res = (T*)Allocate(sizeof(T)*(End-Start), __alignof__(T));
+    for (unsigned i = 0; Start != End; ++Start, ++i)
+      new (Res+i) T(*Start);
+    return Res;
+  }
+
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
   Identifier getIdentifier(llvm::StringRef Str);

@@ -374,9 +374,8 @@ SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
                      llvm::ArrayRef<llvm::PointerUnion<Expr*, Decl*> > Elements,
                          bool HasMissingSemi, llvm::SMLoc RBLoc) {
   llvm::PointerUnion<Expr*, Decl*> *NewElements = 
-    (llvm::PointerUnion<Expr*, Decl*> *)
-    S.Context.Allocate(sizeof(Elements[0])*Elements.size(), 8);
-  memcpy(NewElements, Elements.data(), sizeof(Elements[0])*Elements.size());
+    S.Context.AllocateCopy<llvm::PointerUnion<Expr*, Decl*> >(Elements.begin(),
+                                                              Elements.end());
   
   Type *ResultTy = 0;
   if (SemaBraceExpr(LBLoc, NewElements, Elements.size(), HasMissingSemi, RBLoc,
@@ -421,14 +420,12 @@ SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr *const *SubExprs,
                          unsigned NumSubExprs, llvm::SMLoc RPLoc) {
   
   Expr **NewSubExprs =
-    (Expr**)S.Context.Allocate(sizeof(SubExprs[0])*NumSubExprs, 8);
-  memcpy(NewSubExprs, SubExprs, sizeof(SubExprs[0])*NumSubExprs);
+    S.Context.AllocateCopy<Expr*>(SubExprs, SubExprs+NumSubExprs);
 
   Identifier *NewSubExprsNames = 0;
   if (SubExprNames) {
     NewSubExprsNames =
-      (Identifier*)S.Context.Allocate(sizeof(SubExprNames[0])*NumSubExprs, 8);
-    memcpy(NewSubExprsNames, SubExprNames, sizeof(SubExprNames[0])*NumSubExprs);
+      S.Context.AllocateCopy<Identifier>(SubExprNames,SubExprNames+NumSubExprs);
   }
 
   Type *ResultTy = 0;
@@ -468,9 +465,8 @@ llvm::NullablePtr<Expr>
 SemaExpr::ActOnSequence(Expr **Elements, unsigned NumElements) {
   assert(NumElements != 0 && "Empty sequence isn't possible");
   
-  Expr **NewElements =(Expr**)
-  S.Context.Allocate(sizeof(*NewElements)*NumElements, 8);
-  memcpy(NewElements, Elements, sizeof(*NewElements)*NumElements);
+  Expr **NewElements =
+    S.Context.AllocateCopy<Expr*>(Elements, Elements+NumElements);
   
   Type *ResultTy = 0;
   if (SemaSequenceExpr(NewElements, NumElements, ResultTy, *this)) return 0;
@@ -616,12 +612,9 @@ ConvertExprToTupleType(Expr *E, Identifier *IdentList, unsigned NumIdents,
       
       if (DestTy->Fields[i].Name.get()) {
         // Allocate the array on the first element with a name.
-        if (TE->SubExprNames == 0) {
+        if (TE->SubExprNames == 0)
           TE->SubExprNames =
-          (Identifier*)SE.S.Context.Allocate(sizeof(Identifier)*
-                                             DestTy->Fields.size(), 8);
-          memset(TE->SubExprNames, 0, sizeof(Identifier)*DestTy->Fields.size());
-        }
+            SE.S.Context.Allocate<Identifier>(DestTy->Fields.size());
         
         TE->SubExprNames[i] = DestTy->Fields[i].Name;
       } else if (TE->SubExprNames)
@@ -667,11 +660,8 @@ ConvertExprToTupleType(Expr *E, Identifier *IdentList, unsigned NumIdents,
     
     if (DestTy->Fields[i].Name.get()) {
       // Allocate the array on the first element with a name.
-      if (NewNames == 0) {
-        NewNames = (Identifier*)SE.S.Context.Allocate(sizeof(Identifier)*
-                                                      DestTy->Fields.size(), 8);
-        memset(NewNames, 0, sizeof(Identifier)*DestTy->Fields.size());
-      }
+      if (NewNames == 0)
+        NewNames = SE.S.Context.Allocate<Identifier>(DestTy->Fields.size());
       
       NewNames[i] = DestTy->Fields[i].Name;
     }
@@ -681,8 +671,7 @@ ConvertExprToTupleType(Expr *E, Identifier *IdentList, unsigned NumIdents,
   // FIXME: Do this for dependent types, to resolve: foo($0, 4);
   // FIXME: Add default values.
   Expr **NewSE =
-  (Expr**)SE.S.Context.Allocate(sizeof(Expr*)*DestTy->Fields.size(), 8);
-  memcpy(NewSE, NewElements.data(), sizeof(Expr*)*DestTy->Fields.size());
+    SE.S.Context.AllocateCopy<Expr*>(NewElements.begin(), NewElements.end());
   
   return new (SE.S.Context) TupleExpr(llvm::SMLoc(), NewSE, NewNames,
                                       NewElements.size(), llvm::SMLoc(),DestTy);
@@ -966,8 +955,8 @@ BindAndValidateClosureArgs(Expr *&Body, Type *FuncInput, SemaDecl &SD) {
   }
   
   // Return the right number of inputs.
-  llvm::NullablePtr<AnonDecl> *NewInputs =(llvm::NullablePtr<AnonDecl>*)
-    SD.S.Context.Allocate(sizeof(*NewInputs)*NumInputArgs, 8);
+  llvm::NullablePtr<AnonDecl> *NewInputs =
+    SD.S.Context.Allocate<llvm::NullablePtr<AnonDecl> >(NumInputArgs);
   for (unsigned i = 0, e = NumInputArgs; i != e; ++i)
     if (i < NumAnonArgs)
       NewInputs[i] = AnonArgs[i];
@@ -1041,7 +1030,7 @@ static Expr *HandleScalarConversionToTupleType(Expr *E, Type *DestTy,
   unsigned NumFields = TT->Fields.size();
   
   // Must allocate space for the AST node.
-  Expr **NewSE = (Expr**)SE.S.Context.Allocate(sizeof(Expr*)*NumFields, 8);
+  Expr **NewSE = SE.S.Context.Allocate<Expr*>(NumFields);
   
   bool NeedsNames = false;
   for (unsigned i = 0, e = NumFields; i != e; ++i) {
@@ -1056,8 +1045,7 @@ static Expr *HandleScalarConversionToTupleType(Expr *E, Type *DestTy,
   // Handle the name if the element is named.
   Identifier *NewName = 0;
   if (NeedsNames) {
-    NewName = (Identifier*)SE.S.Context.Allocate(sizeof(Identifier) *
-                                                 NumFields, 8);
+    NewName = SE.S.Context.Allocate<Identifier>(NumFields);
     for (unsigned i = 0, e = NumFields; i != e; ++i)
       NewName[i] = TT->Fields[i].Name;
   }

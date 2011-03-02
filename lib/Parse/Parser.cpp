@@ -88,8 +88,8 @@ void Parser::SkipUntil(tok::TokenKind T) {
 
 /// ParseIdentifier - Consume an identifier if present and return its name in
 /// Result.  Otherwise, emit an error and return true.
-bool Parser::ParseIdentifier(llvm::StringRef &Result,const llvm::Twine &Message,
-                             tok::TokenKind SkipToTok) {
+bool Parser::ParseIdentifier(llvm::StringRef &Result,
+                             const llvm::Twine &Message) {
   if (Tok.is(tok::identifier)) {
     Result = Tok.getText();
     ConsumeToken(tok::identifier);
@@ -136,10 +136,12 @@ bool Parser::ParseValueSpecifier(Type *&Ty, NullablePtr<Expr> &Init) {
     return true;
   }
   
+  // Parse the type if present.
   if (ConsumeIf(tok::colon) &&
       ParseType(Ty, "expected type in var declaration"))
     return true;
   
+  // Parse the initializer, if present.
   if (ConsumeIf(tok::equal)) {
     if (ParseExpr(Init, "expected expression in var declaration"))
       return true;
@@ -232,7 +234,8 @@ Decl *Parser::ParseDeclTopLevel() {
   
   // On error, skip to the next top level declaration.
   while (Tok.isNot(tok::eof) && Tok.isNot(tok::kw_var) &&
-         Tok.isNot(tok::kw_func))
+         Tok.isNot(tok::kw_func) && Tok.isNot(tok::kw_oneof) &&
+         Tok.isNot(tok::kw_struct) && Tok.isNot(tok::kw_typealias))
     ConsumeToken();
   return 0;
 }
@@ -308,7 +311,7 @@ void Parser::ParseAttributeList(DeclAttributes &Attributes) {
 }
 
 /// NameRecord - This represents either a single identifier or a tree with
-/// children.
+/// children.  This structure corresponds to the var-name grammar production.
 namespace swift {
 class NameRecord {
 public:
@@ -348,10 +351,8 @@ bool Parser::ParseVarName(NameRecord &Record) {
     } while (ConsumeIf(tok::comma));
   }
 
-  Record.Children = 
-    (NameRecord *)S.Context.Allocate(sizeof(NameRecord)*ChildNames.size(), 8);
-  memcpy(Record.Children, ChildNames.data(),
-         sizeof(NameRecord)*ChildNames.size());
+  Record.Children = S.Context.AllocateCopy<NameRecord>(ChildNames.begin(),
+                                                       ChildNames.end());
   Record.NumChildren = ChildNames.size();
 
   if (ParseToken(tok::r_paren, "expected ')' at end of var name"))

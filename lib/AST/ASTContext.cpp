@@ -175,13 +175,11 @@ TupleType *ASTContext::getTupleType(llvm::ArrayRef<TupleTypeElt> Fields) {
   // Okay, we didn't find one.  Make a copy of the fields list into ASTContext
   // owned memory.
   TupleTypeElt *FieldsCopy =
-    (TupleTypeElt *)Allocate(sizeof(Fields[0])*Fields.size(), 8);
+    AllocateCopy<TupleTypeElt>(Fields.begin(), Fields.end());
   
   bool IsCanonical = true;   // All canonical elts means this is canonical.
-  for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
-    FieldsCopy[i] = Fields[i];
+  for (unsigned i = 0, e = Fields.size(); i != e; ++i)
     IsCanonical &= Fields[i].Ty->isCanonical();
-  }
 
   Fields = llvm::ArrayRef<TupleTypeElt>(FieldsCopy, Fields.size());
   
@@ -200,9 +198,8 @@ TupleType *ASTContext::getTupleType(llvm::ArrayRef<TupleTypeElt> Fields) {
 OneOfType *ASTContext::getNewOneOfType(llvm::SMLoc OneOfLoc,
                                    llvm::ArrayRef<OneOfElementDecl*> InElts) {
   
-  OneOfElementDecl **NewElements = (OneOfElementDecl**)
-    Allocate(sizeof(*NewElements)*InElts.size(), 8);
-  memcpy(NewElements, InElts.data(), sizeof(*NewElements)*InElts.size());
+  OneOfElementDecl **NewElements =
+    AllocateCopy<OneOfElementDecl*>(InElts.begin(), InElts.end());
 
   return new (*this) OneOfType(OneOfLoc,
                  llvm::ArrayRef<OneOfElementDecl*>(NewElements, InElts.size()));

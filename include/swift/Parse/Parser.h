@@ -87,8 +87,7 @@ private:
   void Error(llvm::SMLoc Loc, const llvm::Twine &Message);
   
   // Primitive Parsing
-  bool ParseIdentifier(llvm::StringRef &Result, const llvm::Twine &Message,
-                       tok::TokenKind SkipToTok = tok::unknown);
+  bool ParseIdentifier(llvm::StringRef &Result, const llvm::Twine &Message);
 
   /// ParseToken - The parser expects that 'K' is next in the input.  If so, it
   /// is consumed and false is returned.
