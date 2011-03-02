@@ -333,8 +333,7 @@ bool Parser::ParseVarName(NameRecord &Record) {
 
   // Single name case.
   if (Tok.is(tok::identifier)) {
-    Record.Name = S.Context.getIdentifier(Tok.getText());
-    ConsumeToken(tok::identifier);
+    ParseIdentifier(Record.Name, "");
     return false;
   }
   
@@ -557,7 +556,7 @@ Decl *Parser::ParseDeclOneOf() {
 /// with a single element.
 ///
 ///   decl-struct:
-///      'struct' attribute-list? identifier type
+///      'struct' attribute-list? identifier type-tuple
 ///
 Decl *Parser::ParseDeclStruct() {
   SMLoc StructLoc = Tok.getLoc();
@@ -571,14 +570,16 @@ Decl *Parser::ParseDeclStruct() {
   if (ParseIdentifier(StructName, "expected identifier in struct declaration"))
     return 0;
 
-  if (Tok.isNot(tok::l_paren)) {
-    Error(Tok.getLoc(), "expected '(' in struct declaration");
-    return 0;
-  }
-  
   Type *Ty = 0;
   if (ParseType(Ty)) return 0;
-  
+
+  // The type is required to be syntactically a tuple type.
+  if (!llvm::isa<TupleType>(Ty)) {
+    Error(StructLoc, "element type of struct is not a tuple");
+    // FIXME: Should set this as an erroroneous decl.
+    return 0;
+  }      
+          
   return S.decl.ActOnStructDecl(StructLoc, Attributes, StructName, Ty);
 }
 

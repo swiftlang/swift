@@ -481,12 +481,12 @@
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-struct ::= 'struct' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> <a href="#type">type</a>
+    decl-struct ::= 'struct' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> <a href="#type-tuple">type-tuple</a>
   </pre>
 
   <p>A struct declaration is syntactic sugar for a oneof declaration of a single
-  element.  It requires that a type be specified, and declares a oneof with a 
-  single constructor value of the same name as the struct.</p>
+  element.  It requires that a tuple type be specified, and declares a oneof
+  with a  single constructor value of the same name as the struct.</p>
   
   <p>Note that unlike oneof, struct does inject this constructor value into the
   global scope. This means that you don't need to use qualified lookup to get
