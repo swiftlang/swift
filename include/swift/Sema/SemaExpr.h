@@ -80,7 +80,7 @@ public:
   llvm::NullablePtr<Expr>
   ActOnDollarIdentExpr(llvm::StringRef Text, llvm::SMLoc Loc);
   llvm::NullablePtr<Expr>
-  ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc);
+  ActOnIdentifierExpr(Identifier Text, llvm::SMLoc Loc);
   llvm::NullablePtr<Expr>
   ActOnScopedIdentifierExpr(Identifier ScopeName, llvm::SMLoc ScopeLoc,
                             llvm::SMLoc ColonColonLoc,

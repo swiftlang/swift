@@ -88,10 +88,9 @@ void Parser::SkipUntil(tok::TokenKind T) {
 
 /// ParseIdentifier - Consume an identifier if present and return its name in
 /// Result.  Otherwise, emit an error and return true.
-bool Parser::ParseIdentifier(llvm::StringRef &Result,
-                             const llvm::Twine &Message) {
+bool Parser::ParseIdentifier(Identifier &Result, const llvm::Twine &Message) {
   if (Tok.is(tok::identifier)) {
-    Result = Tok.getText();
+    Result = S.Context.getIdentifier(Tok.getText());
     ConsumeToken(tok::identifier);
     return false;
   }
@@ -369,14 +368,14 @@ TypeAliasDecl *Parser::ParseDeclTypeAlias() {
   SMLoc TypeAliasLoc = Tok.getLoc();
   ConsumeToken(tok::kw_typealias);
   
-  llvm::StringRef Id;
+  Identifier Id;
   Type *Ty = 0;
   if (ParseIdentifier(Id, "expected identifier in var declaration") ||
       ParseToken(tok::colon, "expected ':' in typealias declaration") ||
       ParseType(Ty, "expected type in var declaration"))
     return 0;
 
-  return S.decl.ActOnTypeAlias(TypeAliasLoc, S.Context.getIdentifier(Id), Ty);
+  return S.decl.ActOnTypeAlias(TypeAliasLoc, Id, Ty);
 }
 
 
@@ -464,8 +463,8 @@ FuncDecl *Parser::ParseDeclFunc() {
   if (Tok.is(tok::l_square))
     ParseAttributeList(Attributes);
 
-  llvm::StringRef Identifier;
-  if (ParseIdentifier(Identifier, "expected identifier in func declaration"))
+  Identifier Name;
+  if (ParseIdentifier(Name, "expected identifier in func declaration"))
     return 0;
   
   // We force first type of a func declaration to be a tuple for consistency.
@@ -485,9 +484,7 @@ FuncDecl *Parser::ParseDeclFunc() {
                                       S.Context.TheEmptyTupleType);
 
   // Build the decl for the function.
-  FuncDecl *FD = S.decl.ActOnFuncDecl(FuncLoc,
-                                      S.Context.getIdentifier(Identifier),
-                                      FuncTy, Attributes);
+  FuncDecl *FD = S.decl.ActOnFuncDecl(FuncLoc, Name, FuncTy, Attributes);
   
   // Enter the func into the current scope, which allows it to be visible and
   // used within its body.
@@ -545,14 +542,13 @@ Decl *Parser::ParseDeclOneOf() {
     ParseAttributeList(Attributes);
   
   SMLoc NameLoc = Tok.getLoc();
-  llvm::StringRef OneOfName;
+  Identifier OneOfName;
   Type *OneOfType = 0;
   if (ParseIdentifier(OneOfName, "expected identifier in oneof declaration") ||
       ParseTypeOneOfBody(OneOfLoc, Attributes, OneOfType))
     return 0;
 
-  return S.decl.ActOnTypeAlias(NameLoc, S.Context.getIdentifier(OneOfName),
-                               OneOfType);
+  return S.decl.ActOnTypeAlias(NameLoc, OneOfName, OneOfType);
 }
 
 
@@ -571,7 +567,7 @@ Decl *Parser::ParseDeclStruct() {
   if (Tok.is(tok::l_square))
     ParseAttributeList(Attributes);
   
-  llvm::StringRef StructName;
+  Identifier StructName;
   if (ParseIdentifier(StructName, "expected identifier in struct declaration"))
     return 0;
 
@@ -583,8 +579,7 @@ Decl *Parser::ParseDeclStruct() {
   Type *Ty = 0;
   if (ParseType(Ty)) return 0;
   
-  return S.decl.ActOnStructDecl(StructLoc, Attributes, 
-                                S.Context.getIdentifier(StructName), Ty);
+  return S.decl.ActOnStructDecl(StructLoc, Attributes, StructName, Ty);
 }
 
 
@@ -705,12 +700,8 @@ bool Parser::ParseTypeTuple(Type *&Result) {
       Elements.push_back(TupleTypeElt());
       TupleTypeElt &Result = Elements.back();
       
-      if (Tok.is(tok::identifier)) {
-        llvm::StringRef Name;
-        HadError = ParseIdentifier(Name,"expected identifier in tuple element");
-        if (HadError) break;
-        Result.Name = S.Context.getIdentifier(Name);
-      }
+      if (Tok.is(tok::identifier))
+        ParseIdentifier(Result.Name, "");
       
       NullablePtr<Expr> Init;
       if ((HadError = ParseValueSpecifier(Result.Ty, Init)))
@@ -900,12 +891,11 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
   case tok::colon: {     // :foo
     SMLoc ColonLoc = Tok.getLoc();
     ConsumeToken(tok::colon);
-    llvm::StringRef Name;
+    Identifier Name;
     SMLoc NameLoc = Tok.getLoc();
     if (ParseIdentifier(Name, "expected identifier after ':' expression"))
       return true;
-    Result = S.expr.ActOnUnresolvedMemberExpr(ColonLoc, NameLoc,
-                                              S.Context.getIdentifier(Name));
+    Result = S.expr.ActOnUnresolvedMemberExpr(ColonLoc, NameLoc, Name);
     break;
   }
       
@@ -1027,7 +1017,7 @@ bool Parser::ParseExprIdentifier(llvm::NullablePtr<Expr> &Result) {
 
   assert(Tok.is(tok::identifier));
   SMLoc Loc = Tok.getLoc();
-  llvm::StringRef Name;
+  Identifier Name;
   ParseIdentifier(Name, "");
 
   if (Tok.isNot(tok::coloncolon)) {
@@ -1039,15 +1029,13 @@ bool Parser::ParseExprIdentifier(llvm::NullablePtr<Expr> &Result) {
   ConsumeToken(tok::coloncolon);
 
   SMLoc Loc2 = Tok.getLoc();
-  llvm::StringRef Name2;
-  if (ParseIdentifier(Name2, "expected identifier after '" + Name +
+  Identifier Name2;
+  if (ParseIdentifier(Name2, "expected identifier after '" + Name.str() +
                       "::' expression"))
     return true;
 
-  Result = S.expr.ActOnScopedIdentifierExpr(S.Context.getIdentifier(Name), Loc,
-                                            ColonColonLoc,
-                                            S.Context.getIdentifier(Name2),
-                                            Loc2);
+  Result = S.expr.ActOnScopedIdentifierExpr(Name, Loc, ColonColonLoc,
+                                            Name2, Loc2);
   return false;
 }
 
@@ -1074,12 +1062,10 @@ bool Parser::ParseExprParen(llvm::NullablePtr<Expr> &Result) {
       Identifier FieldName;
       // Check to see if there is a field specifier.
       if (ConsumeIf(tok::period)) {
-        llvm::StringRef FieldNameStr;
-        if (ParseIdentifier(FieldNameStr,
+        if (ParseIdentifier(FieldName,
                           "expected field specifier name in tuple expression")||
             ParseToken(tok::equal, "expected '=' in tuple expression"))
           return true;
-        FieldName = S.Context.getIdentifier(FieldNameStr);
       }
       
       if (!SubExprNames.empty())

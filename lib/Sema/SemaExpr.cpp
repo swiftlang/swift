@@ -314,8 +314,8 @@ SemaExpr::ActOnDollarIdentExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
 }
 
 NullablePtr<Expr> 
-SemaExpr::ActOnIdentifierExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
-  ValueDecl *D = S.decl.LookupValueName(S.Context.getIdentifier(Text));
+SemaExpr::ActOnIdentifierExpr(Identifier Text, llvm::SMLoc Loc) {
+  ValueDecl *D = S.decl.LookupValueName(Text);
   
   Type *ResultTy = 0;
   if (SemaDeclRefExpr(D, Loc, ResultTy, *this)) return 0;
