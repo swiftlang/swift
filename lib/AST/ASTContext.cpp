@@ -84,11 +84,12 @@ Type *ASTContext::getCanonicalType(Type *T) {
   // computed, just return what we have.
   if (T->CanonicalType)
     return T->CanonicalType;
-  
+    
   Type *Result = 0;
   switch (T->Kind) {
-  case BuiltinInt32Kind:
   case UnresolvedTypeKind:
+    assert(0 && "Cannot call getCanonicalType before name binding is complete");
+  case BuiltinInt32Kind:
   case DependentTypeKind:
   case OneOfTypeKind:
     assert(0 && "These are always canonical");
@@ -134,14 +135,6 @@ Type *ASTContext::getCanonicalType(Type *T) {
     break;
   }
   assert(Result && "Case not implemented!");
-  
-  // If the result of cannonicalization is a real type, memoize it.  If it is an
-  // unresolved type, don't memoize it because they we'd need to clear all these
-  // caches during name binding.
-  /// FIXME: A better solution is to assert on any unresolved types here and
-  /// just prevent the parser and ASTBuilder from ever calling getCanonicalType.
-  if (!llvm::isa<UnresolvedType>(Result))
-    T->CanonicalType = Result;
   return Result;
 }
 
