@@ -18,6 +18,7 @@
 #define SWIFT_AST_ASTCONTEXT_H
 
 #include "llvm/Support/DataTypes.h"
+#include "llvm/ADT/ArrayRef.h"
 
 namespace llvm {
   class SMLoc;
@@ -76,6 +77,12 @@ public:
     return Res;
   }
 
+  template<typename T>
+  llvm::ArrayRef<T*> AllocateCopy(llvm::ArrayRef<T*> Arr) {
+    return llvm::ArrayRef<T*>(AllocateCopy<T*>(Arr.begin(), Arr.end()),
+                              Arr.size());
+  }
+
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
   Identifier getIdentifier(llvm::StringRef Str);
@@ -115,7 +122,8 @@ public:
   ArrayType *getArrayType(Type *BaseType, uint64_t Size);
   
   /// getNewOneOfType - Return a new instance of oneof type.  These are never
-  /// uniqued because the loc is generally different.
+  /// uniqued each syntactic instance of them is semantically considered to be a
+  /// different type.
   OneOfType *getNewOneOfType(llvm::SMLoc OneOfLoc,
                              llvm::ArrayRef<OneOfElementDecl*> Elements);
 };

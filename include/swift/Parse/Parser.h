@@ -35,17 +35,16 @@ namespace swift {
   class Type;
   class Decl;
   class DeclAttributes;
+  class TranslationUnitDecl;
   class TypeAliasDecl;
   class FuncDecl;
   class VarDecl;
   class ASTContext;
-  class ASTConsumer;
   class NameRecord;
   class TupleTypeElt;
   class Identifier;
   
 class Parser {
-  ASTConsumer &Consumer;
   llvm::SourceMgr &SourceMgr;
   Lexer &L;
   Sema &S;
@@ -56,10 +55,10 @@ class Parser {
   Parser(const Parser&);         // DO NOT IMPLEMENT
   void operator=(const Parser&); // DO NOT IMPLEMENT
 public:
-  Parser(unsigned BufferID, ASTConsumer &Consumer);
+  Parser(unsigned BufferID, ASTContext &Ctx);
   ~Parser();
   
-  void ParseTranslationUnit();
+  TranslationUnitDecl *parseTranslationUnit();
   
 private:
   // Utilities.

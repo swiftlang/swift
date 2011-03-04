@@ -18,7 +18,6 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/Sema.h"
 #include "swift/Sema/Scope.h"
-#include "swift/AST/ASTConsumer.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
@@ -35,11 +34,10 @@ using llvm::NullablePtr;
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
-Parser::Parser(unsigned BufferID, ASTConsumer &consumer)
-  : Consumer(consumer),
-    SourceMgr(Consumer.getContext().SourceMgr),
-    L(*new Lexer(BufferID, Consumer.getContext())),
-    S(*new Sema(Consumer.getContext())) {
+Parser::Parser(unsigned BufferID, ASTContext &Context)
+  : SourceMgr(Context.SourceMgr),
+    L(*new Lexer(BufferID, Context)),
+    S(*new Sema(Context)) {
 }
 
 Parser::~Parser() {
@@ -56,7 +54,7 @@ void Parser::Warning(SMLoc Loc, const llvm::Twine &Message) {
 }
 
 void Parser::Error(SMLoc Loc, const llvm::Twine &Message) {
-  Consumer.getContext().setHadError();
+  S.Context.setHadError();
   SourceMgr.PrintMessage(Loc, Message, "error");
 }
 
@@ -164,25 +162,30 @@ bool Parser::ParseValueSpecifier(Type *&Ty, NullablePtr<Expr> &Init) {
 /// ParseTranslationUnit
 ///   translation-unit:
 ///     decl-top-level*
-void Parser::ParseTranslationUnit() {
+TranslationUnitDecl *Parser::parseTranslationUnit() {
   // Prime the lexer.
   ConsumeToken();
+  SMLoc FileStartLoc = Tok.getLoc();
   
+  TranslationUnitDecl *Result =
+    new (S.Context) TranslationUnitDecl(FileStartLoc, S.Context);
+  
+  llvm::SmallVector<Decl*, 128> Decls;
   {
     // The entire translation unit is in a big scope.
     Scope OuterScope(S.decl);
   
     while (Tok.isNot(tok::eof)) {
       if (Decl *D = ParseDeclTopLevel())
-        Consumer.HandleTopLevelDecl(D);
+        Decls.push_back(D);
     }
   }
   
   // Notify sema about the end of the translation unit.
   S.decl.handleEndOfTranslationUnit();
   
-  // Notify consumer about the end of the translation unit.
-  Consumer.HandleEndOfTranslationUnit();
+  Result->Decls = S.Context.AllocateCopy(llvm::ArrayRef<Decl*>(Decls));
+  return Result;
 }
 
 /// ParseDeclTopLevel

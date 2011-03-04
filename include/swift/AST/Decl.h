@@ -19,6 +19,7 @@
 
 #include "swift/AST/Identifier.h"
 #include "llvm/Support/SMLoc.h"
+#include "llvm/ADT/ArrayRef.h"
 #include <cstddef>
 #include <cassert>
 
@@ -34,6 +35,7 @@ namespace swift {
   class NameAliasType;
   
 enum DeclKind {
+  TranslationUnitDeclKind,
   TypeAliasDeclKind,
   VarDeclKind,
   FuncDeclKind,
@@ -92,6 +94,35 @@ public:
                      unsigned Alignment = 8) throw();  
 };
 
+  
+/// TranslationUnitDecl - This contains information about all of the decls and
+/// external references in a translation unit, which is one file.
+class TranslationUnitDecl : public Decl {
+public:
+  llvm::SMLoc FileStartLoc;
+
+  ASTContext &Ctx;
+
+  /// Decls - This is the list of all of the top-level declarations in the
+  /// translation unit.  This is filled in at the end of the parse phase.
+  llvm::ArrayRef<Decl*> Decls;
+  
+  TranslationUnitDecl(llvm::SMLoc fileStartLoc, ASTContext &C)
+    : Decl(TranslationUnitDeclKind), FileStartLoc(fileStartLoc), Ctx(C) {
+  }
+
+  llvm::SMLoc getLocStart() const { return FileStartLoc; }
+  
+  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) {
+    return D->getKind() == TranslationUnitDeclKind;
+  }
+  static bool classof(const TranslationUnitDecl *D) { return true; }
+};
+  
+  
 /// NamedDecl - The common base class between TypeAliasDecl and ValueDecl.
 class NamedDecl : public Decl {
 public:

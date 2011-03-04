@@ -32,6 +32,8 @@ void *Decl::operator new(size_t Bytes, ASTContext &C,
 
 llvm::SMLoc NamedDecl::getLocStart() const {
   switch (getKind()) {
+  case TranslationUnitDeclKind:
+    return cast<TranslationUnitDecl>(this)->getLocStart();
   case TypeAliasDeclKind:  return cast<TypeAliasDecl>(this)->getLocStart(); 
   case VarDeclKind:        return cast<VarDecl>(this)->getLocStart();
   case FuncDeclKind:       return cast<FuncDecl>(this)->getLocStart();
@@ -63,6 +65,8 @@ void Decl::dump() const { print(llvm::errs()); llvm::errs() << '\n'; }
 
 void Decl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   switch (getKind()) {
+  case TranslationUnitDeclKind:
+    return cast<TranslationUnitDecl>(this)->print(OS, Indent);
   case TypeAliasDeclKind:  return cast<TypeAliasDecl>(this)->print(OS, Indent);
   case VarDeclKind:        return cast<VarDecl>(this)->print(OS, Indent);
   case FuncDeclKind:       return cast<FuncDecl>(this)->print(OS, Indent);
@@ -72,6 +76,13 @@ void Decl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   case AnonDeclKind:       return cast<AnonDecl>(this)->print(OS, Indent);
   case ElementRefDeclKind: return cast<ElementRefDecl>(this)->print(OS, Indent);
   }
+}
+
+void TranslationUnitDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
+  OS.indent(Indent) << "(translation_unit\n";
+  for (unsigned i = 0, e = Decls.size(); i != e; ++i)
+    Decls[i]->print(OS, Indent+2);
+  OS << ')';
 }
 
 void NamedDecl::printCommon(llvm::raw_ostream &OS, unsigned Indent) const {
