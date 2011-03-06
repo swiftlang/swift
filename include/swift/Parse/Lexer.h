@@ -44,8 +44,8 @@ public:
   
   
 private:
-  void Warning(const char *Loc, const llvm::Twine &Message);
-  void Error(const char *Loc, const llvm::Twine &Message);
+  void warning(const char *Loc, const llvm::Twine &Message);
+  void error(const char *Loc, const llvm::Twine &Message);
   void FormToken(tok::TokenKind Kind, const char *TokStart, Token &Result);
   
   void SkipSlashSlashComment();

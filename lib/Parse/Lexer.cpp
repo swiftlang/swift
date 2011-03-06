@@ -32,11 +32,11 @@ Lexer::Lexer(unsigned BufferID, ASTContext &context)
   CurPtr = Buffer->getBufferStart();
 }
 
-void Lexer::Warning(const char *Loc, const llvm::Twine &Message) {
+void Lexer::warning(const char *Loc, const llvm::Twine &Message) {
   SourceMgr.PrintMessage(llvm::SMLoc::getFromPointer(Loc), Message, "warning");
 }
 
-void Lexer::Error(const char *Loc, const llvm::Twine &Message) {
+void Lexer::error(const char *Loc, const llvm::Twine &Message) {
   Context.setHadError();
   SourceMgr.PrintMessage(llvm::SMLoc::getFromPointer(Loc), llvm::Twine(Message),
                          "error");
@@ -65,13 +65,13 @@ void Lexer::SkipSlashSlashComment() {
       // If this is a random nul character in the middle of a buffer, skip it as
       // whitespace.
       if (CurPtr-1 != Buffer->getBufferEnd()) {
-        Warning(CurPtr-1, "nul character embedded in middle of file");
+        warning(CurPtr-1, "nul character embedded in middle of file");
         break;
       }
         
       // Otherwise, we have a // comment at end of file, warn and return.
       --CurPtr;
-      Warning(CurPtr-1, "no newline at end of // comment");
+      warning(CurPtr-1, "no newline at end of // comment");
       return;
     }
   }
@@ -161,7 +161,7 @@ Restart:
   
   switch (*CurPtr++) {
   default:
-    Error(CurPtr-1, "invalid character in source file");
+    error(CurPtr-1, "invalid character in source file");
     return FormToken(tok::unknown, TokStart, Result);
 
   case ' ':
@@ -173,7 +173,7 @@ Restart:
     // If this is a random nul character in the middle of a buffer, skip it as
     // whitespace.
     if (CurPtr-1 != Buffer->getBufferEnd()) {
-      Warning(CurPtr-1, "nul character embedded in middle of file");
+      warning(CurPtr-1, "nul character embedded in middle of file");
       goto Restart;
     }
       

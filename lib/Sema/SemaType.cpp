@@ -66,7 +66,7 @@ OneOfType *SemaType::ActOnOneOfType(llvm::SMLoc OneOfLoc,
                                     llvm::ArrayRef<OneOfElementInfo> Elts) {
   // No attributes are valid on oneof types at this time.
   if (!Attrs.empty())
-    Error(Attrs.LSquareLoc, "oneof types are not allowed to have attributes");
+    error(Attrs.LSquareLoc, "oneof types are not allowed to have attributes");
   
   llvm::SmallPtrSet<const char *, 16> SeenSoFar;
   llvm::SmallVector<OneOfElementDecl *, 16> EltDecls;
@@ -77,7 +77,7 @@ OneOfType *SemaType::ActOnOneOfType(llvm::SMLoc OneOfLoc,
     
     // If this was multiply defined, reject it.
     if (!SeenSoFar.insert(NameI.get())) {
-      Error(Elts[i].NameLoc, "element named '" + Elts[i].Name +
+      error(Elts[i].NameLoc, "element named '" + Elts[i].Name +
             "' defined multiple times");
       // Don't copy this element into NewElements.
       // TODO: QoI: add note for previous definition.
@@ -124,12 +124,12 @@ Type *SemaType::ActOnArrayType(Type *BaseTy, llvm::SMLoc LSquareLoc, Expr *Size,
   if (IntegerLiteral *IL = llvm::dyn_cast<IntegerLiteral>(Size))
     SizeVal = IL->getValue();
   else {
-    Error(Size->getLocStart(), "invalid type size, not a constant");
+    error(Size->getLocStart(), "invalid type size, not a constant");
     SizeVal = 1;
   }
   
   if (SizeVal == 0) {
-    Error(Size->getLocStart(), "array types must be larger than zero elements");
+    error(Size->getLocStart(), "array types must be larger than zero elements");
     SizeVal = 1;
   }
   

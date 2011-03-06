@@ -45,35 +45,35 @@ Parser::~Parser() {
   delete &S;
 }
 
-void Parser::Note(SMLoc Loc, const llvm::Twine &Message) {
+void Parser::note(SMLoc Loc, const llvm::Twine &Message) {
   SourceMgr.PrintMessage(Loc, Message, "note");
 }
 
-void Parser::Warning(SMLoc Loc, const llvm::Twine &Message) {
+void Parser::warning(SMLoc Loc, const llvm::Twine &Message) {
   SourceMgr.PrintMessage(Loc, Message, "warning");
 }
 
-void Parser::Error(SMLoc Loc, const llvm::Twine &Message) {
+void Parser::error(SMLoc Loc, const llvm::Twine &Message) {
   S.Context.setHadError();
   SourceMgr.PrintMessage(Loc, Message, "error");
 }
 
-void Parser::ConsumeToken() {
+void Parser::consumeToken() {
   assert(Tok.isNot(tok::eof) && "Lexing past eof!");
   L.Lex(Tok);
 }
 
-/// SkipUntil - Read tokens until we get to the specified token, then return.
+/// skipUntil - Read tokens until we get to the specified token, then return.
 /// Because we cannot guarantee that the token will ever occur, this skips to
 /// some likely good stopping point.
 ///
-void Parser::SkipUntil(tok::TokenKind T) {
+void Parser::skipUntil(tok::TokenKind T) {
   // tok::unknown is a sentinel that means "don't skip".
   if (T == tok::unknown) return;
   
   while (Tok.isNot(tok::eof) && Tok.isNot(T)) {
     switch (Tok.getKind()) {
-    default: ConsumeToken(); break;
+    default: consumeToken(); break;
     // TODO: Handle paren/brace/bracket recovery.
     }
   }
@@ -84,39 +84,39 @@ void Parser::SkipUntil(tok::TokenKind T) {
 // Primitive Parsing
 //===----------------------------------------------------------------------===//
 
-/// ParseIdentifier - Consume an identifier if present and return its name in
+/// parseIdentifier - Consume an identifier if present and return its name in
 /// Result.  Otherwise, emit an error and return true.
-bool Parser::ParseIdentifier(Identifier &Result, const llvm::Twine &Message) {
+bool Parser::parseIdentifier(Identifier &Result, const llvm::Twine &Message) {
   if (Tok.is(tok::identifier)) {
     Result = S.Context.getIdentifier(Tok.getText());
-    ConsumeToken(tok::identifier);
+    consumeToken(tok::identifier);
     return false;
   }
   
-  Error(Tok.getLoc(), Message);
+  error(Tok.getLoc(), Message);
   return true;
 }
 
-/// ParseToken - The parser expects that 'K' is next in the input.  If so, it is
+/// parseToken - The parser expects that 'K' is next in the input.  If so, it is
 /// consumed and false is returned.
 ///
 /// If the input is malformed, this emits the specified error diagnostic.
-/// Next, if SkipToTok is specified, it calls SkipUntil(SkipToTok).  Finally,
+/// Next, if SkipToTok is specified, it calls skipUntil(SkipToTok).  Finally,
 /// true is returned.
-bool Parser::ParseToken(tok::TokenKind K, const char *Message,
+bool Parser::parseToken(tok::TokenKind K, const char *Message,
                         tok::TokenKind SkipToTok) {
   if (Tok.is(K)) {
-    ConsumeToken(K);
+    consumeToken(K);
     return false;
   }
   
-  Error(Tok.getLoc(), Message);
-  SkipUntil(SkipToTok);
+  error(Tok.getLoc(), Message);
+  skipUntil(SkipToTok);
   
   // If we skipped ahead to the missing token and found it, consume it as if
   // there were no error.
   if (K == SkipToTok && Tok.is(SkipToTok))
-    ConsumeToken();
+    consumeToken();
   return true;
 }
 
@@ -124,23 +124,23 @@ bool Parser::ParseToken(tok::TokenKind K, const char *Message,
 ///   ':' type
 ///   ':' type '=' expr
 ///   '=' expr
-bool Parser::ParseValueSpecifier(Type *&Ty, NullablePtr<Expr> &Init) {
+bool Parser::parseValueSpecifier(Type *&Ty, NullablePtr<Expr> &Init) {
   // Diagnose when we don't have a type or an expression.
   if (Tok.isNot(tok::colon) && Tok.isNot(tok::equal)) {
-    Error(Tok.getLoc(), "expected a type or an initializer");
+    error(Tok.getLoc(), "expected a type or an initializer");
     // TODO: Recover better by still creating var, but making it have
     // 'invalid' type so that uses of the identifier are not errors.
     return true;
   }
   
   // Parse the type if present.
-  if (ConsumeIf(tok::colon) &&
-      ParseType(Ty, "expected type in var declaration"))
+  if (consumeIf(tok::colon) &&
+      parseType(Ty, "expected type in var declaration"))
     return true;
   
   // Parse the initializer, if present.
-  if (ConsumeIf(tok::equal)) {
-    if (ParseExpr(Init, "expected expression in var declaration"))
+  if (consumeIf(tok::equal)) {
+    if (parseExpr(Init, "expected expression in var declaration"))
       return true;
     
     // If there was an expression, but it had a parse error, give the var decl
@@ -164,7 +164,7 @@ bool Parser::ParseValueSpecifier(Type *&Ty, NullablePtr<Expr> &Init) {
 ///     decl-top-level*
 TranslationUnitDecl *Parser::parseTranslationUnit() {
   // Prime the lexer.
-  ConsumeToken();
+  consumeToken();
   SMLoc FileStartLoc = Tok.getLoc();
   
   TranslationUnitDecl *Result =
@@ -176,7 +176,7 @@ TranslationUnitDecl *Parser::parseTranslationUnit() {
     Scope OuterScope(S.decl);
   
     while (Tok.isNot(tok::eof)) {
-      if (Decl *D = ParseDeclTopLevel())
+      if (Decl *D = parseDeclTopLevel())
         Decls.push_back(D);
     }
   }
@@ -188,7 +188,7 @@ TranslationUnitDecl *Parser::parseTranslationUnit() {
   return Result;
 }
 
-/// ParseDeclTopLevel
+/// parseDeclTopLevel
 ///   decl-top-level:
 ///     ';'
 ///     decl-oneof
@@ -196,36 +196,36 @@ TranslationUnitDecl *Parser::parseTranslationUnit() {
 ///     decl-func
 ///     decl-typealias
 ///     decl-var
-Decl *Parser::ParseDeclTopLevel() {
+Decl *Parser::parseDeclTopLevel() {
   switch (Tok.getKind()) {
   default:
-    Error(Tok.getLoc(), "expected a top level declaration");
+    error(Tok.getLoc(), "expected a top level declaration");
     break;
   case tok::semi:
-    ConsumeToken(tok::semi);
+    consumeToken(tok::semi);
     return 0; // Could do a top-level semi decl.
       
   case tok::kw_typealias:
-    if (TypeAliasDecl *D = ParseDeclTypeAlias())
+    if (TypeAliasDecl *D = parseDeclTypeAlias())
       return D;
     return 0;
 
   case tok::kw_oneof:
-    if (Decl *O = ParseDeclOneOf())
+    if (Decl *O = parseDeclOneOf())
       return O;
     break;
   case tok::kw_struct:
-    if (Decl *D = ParseDeclStruct())
+    if (Decl *D = parseDeclStruct())
       return D;
     break;
   case tok::kw_func:
-    if (FuncDecl *D = ParseDeclFunc()) {
+    if (FuncDecl *D = parseDeclFunc()) {
       S.decl.ActOnTopLevelDecl(D);
       return D;
     }
     break;
   case tok::kw_var:
-    if (VarDecl *D = ParseDeclVar()) {
+    if (VarDecl *D = parseDeclVar()) {
       S.decl.ActOnTopLevelDecl(D);
       return D;
     }
@@ -238,31 +238,31 @@ Decl *Parser::ParseDeclTopLevel() {
   while (Tok.isNot(tok::eof) && Tok.isNot(tok::kw_var) &&
          Tok.isNot(tok::kw_func) && Tok.isNot(tok::kw_oneof) &&
          Tok.isNot(tok::kw_struct) && Tok.isNot(tok::kw_typealias))
-    ConsumeToken();
+    consumeToken();
   return 0;
 }
 
 
-/// ParseAttribute
+/// parseAttribute
 ///   attribute:
 ///     'infix' '=' numeric_constant
-bool Parser::ParseAttribute(DeclAttributes &Attributes) {
+bool Parser::parseAttribute(DeclAttributes &Attributes) {
   if (Tok.is(tok::identifier) && Tok.getText() == "infix") {
     if (Attributes.InfixPrecedence != -1)
-      Error(Tok.getLoc(), "infix precedence repeatedly specified");
-    ConsumeToken(tok::identifier);
+      error(Tok.getLoc(), "infix precedence repeatedly specified");
+    consumeToken(tok::identifier);
 
     // The default infix precedence is 100.
     Attributes.InfixPrecedence = 100;
     
-    if (ConsumeIf(tok::equal)) {
+    if (consumeIf(tok::equal)) {
       SMLoc PrecLoc = Tok.getLoc();
       llvm::StringRef Text = Tok.getText();
-      if (!ParseToken(tok::numeric_constant,
+      if (!parseToken(tok::numeric_constant,
                       "expected precedence number in 'infix' attribute")) {
         long long Value;
         if (Text.getAsInteger(10, Value) || Value > 255 || Value < 0)
-          Error(PrecLoc, "invalid precedence: value must be between 0 and 255");
+          error(PrecLoc, "invalid precedence: value must be between 0 and 255");
         else
           Attributes.InfixPrecedence = Value;
       }
@@ -271,44 +271,44 @@ bool Parser::ParseAttribute(DeclAttributes &Attributes) {
     return false;
   }
   
-  Error(Tok.getLoc(), "unknown declaration attribute");
-  SkipUntil(tok::r_square);
+  error(Tok.getLoc(), "unknown declaration attribute");
+  skipUntil(tok::r_square);
   return true;
 }
 
-/// ParseAttributeList
+/// parseAttributeList
 ///   attribute-list:
 ///     '[' ']'
 ///     '[' attribute (',' attribute)* ']'
-void Parser::ParseAttributeList(DeclAttributes &Attributes) {
+void Parser::parseAttributeList(DeclAttributes &Attributes) {
   Attributes.LSquareLoc = Tok.getLoc();
-  ConsumeToken(tok::l_square);
+  consumeToken(tok::l_square);
   
   // If this is an empty attribute list, consume it and return.
   if (Tok.is(tok::r_square)) {
     Attributes.RSquareLoc = Tok.getLoc();
-    ConsumeToken(tok::r_square);
+    consumeToken(tok::r_square);
     return;
   }
   
-  bool HadError = ParseAttribute(Attributes);
+  bool HadError = parseAttribute(Attributes);
   while (Tok.is(tok::comma)) {
-    ConsumeToken(tok::comma);
-    HadError |= ParseAttribute(Attributes);
+    consumeToken(tok::comma);
+    HadError |= parseAttribute(Attributes);
   }
 
   Attributes.RSquareLoc = Tok.getLoc();
-  if (ConsumeIf(tok::r_square))
+  if (consumeIf(tok::r_square))
     return;
   
   // Otherwise, there was an error parsing the attribute list.  If we already
   // reported an error, skip to a ], otherwise report the error.
   if (!HadError)
-    ParseToken(tok::r_square, "expected ']' or ',' in attribute list",
+    parseToken(tok::r_square, "expected ']' or ',' in attribute list",
                tok::r_square);
   else {
-    SkipUntil(tok::r_square);
-    ConsumeIf(tok::r_square);
+    skipUntil(tok::r_square);
+    consumeIf(tok::r_square);
   }
 }
 
@@ -326,21 +326,21 @@ public:
 };
 }
 
-/// ParseVarName
+/// parseVarName
 ///   var-name:
 ///     identifier
 ///     '(' ')'
 ///     '(' name (',' name)* ')'
-bool Parser::ParseVarName(NameRecord &Record) {
+bool Parser::parseVarName(NameRecord &Record) {
   Record.Loc = Tok.getLoc();
 
   // Single name case.
   if (Tok.is(tok::identifier)) {
-    ParseIdentifier(Record.Name, "");
+    parseIdentifier(Record.Name, "");
     return false;
   }
   
-  if (ParseToken(tok::l_paren, "expected identifier or '(' in var name"))
+  if (parseToken(tok::l_paren, "expected identifier or '(' in var name"))
     return true;
   
   llvm::SmallVector<NameRecord, 8> ChildNames;
@@ -348,33 +348,33 @@ bool Parser::ParseVarName(NameRecord &Record) {
   if (Tok.isNot(tok::r_paren)) {
     do {
       ChildNames.push_back(NameRecord());
-      if (ParseVarName(ChildNames.back())) return true;
-    } while (ConsumeIf(tok::comma));
+      if (parseVarName(ChildNames.back())) return true;
+    } while (consumeIf(tok::comma));
   }
 
   Record.Children = S.Context.AllocateCopy<NameRecord>(ChildNames.begin(),
                                                        ChildNames.end());
   Record.NumChildren = ChildNames.size();
 
-  if (ParseToken(tok::r_paren, "expected ')' at end of var name"))
-    Note(Record.Loc, "to match this '('");
+  if (parseToken(tok::r_paren, "expected ')' at end of var name"))
+    note(Record.Loc, "to match this '('");
   
   return false;
 }
 
 
-/// ParseDeclTypeAlias
+/// parseDeclTypeAlias
 ///   decl-typealias:
 ///     'typealias' identifier ':' type
-TypeAliasDecl *Parser::ParseDeclTypeAlias() {
+TypeAliasDecl *Parser::parseDeclTypeAlias() {
   SMLoc TypeAliasLoc = Tok.getLoc();
-  ConsumeToken(tok::kw_typealias);
+  consumeToken(tok::kw_typealias);
   
   Identifier Id;
   Type *Ty = 0;
-  if (ParseIdentifier(Id, "expected identifier in var declaration") ||
-      ParseToken(tok::colon, "expected ':' in typealias declaration") ||
-      ParseType(Ty, "expected type in var declaration"))
+  if (parseIdentifier(Id, "expected identifier in var declaration") ||
+      parseToken(tok::colon, "expected ':' in typealias declaration") ||
+      parseType(Ty, "expected type in var declaration"))
     return 0;
 
   return S.decl.ActOnTypeAlias(TypeAliasLoc, Id, Ty);
@@ -407,25 +407,25 @@ static void AddElementNamesForVarDecl(const NameRecord &Name,
   AccessPath.pop_back();
 }
 
-/// ParseDeclVar - Parse a 'var' declaration, returning null (and doing no
+/// parseDeclVar - Parse a 'var' declaration, returning null (and doing no
 /// token skipping) on error.
 ///
 ///   decl-var:
 ///      'var' attribute-list? var-name value-specifier
-VarDecl *Parser::ParseDeclVar() {
+VarDecl *Parser::parseDeclVar() {
   SMLoc VarLoc = Tok.getLoc();
-  ConsumeToken(tok::kw_var);
+  consumeToken(tok::kw_var);
   
   DeclAttributes Attributes;
   if (Tok.is(tok::l_square))
-    ParseAttributeList(Attributes);
+    parseAttributeList(Attributes);
 
   NameRecord Name;
-  if (ParseVarName(Name)) return 0;
+  if (parseVarName(Name)) return 0;
   
   Type *Ty = 0;
   NullablePtr<Expr> Init;
-  if (ParseValueSpecifier(Ty, Init))
+  if (parseValueSpecifier(Ty, Init))
     return 0;
 
   VarDecl *VD = S.decl.ActOnVarDecl(VarLoc, Name.Name, Ty, Init.getPtrOrNull(),
@@ -449,34 +449,34 @@ VarDecl *Parser::ParseDeclVar() {
 }
 
 
-/// ParseDeclFunc - Parse a 'func' declaration, returning null on error.  The
+/// parseDeclFunc - Parse a 'func' declaration, returning null on error.  The
 /// caller handles this case and does recovery as appropriate.
 ///
 ///   decl-func:
 ///     'func' attribute-list? identifier arg-list-type '=' expr
 ///     'func' attribute-list? identifier arg-list-type expr-brace
 ///     'func' attribute-list? identifier arg-list-type 
-FuncDecl *Parser::ParseDeclFunc() {
+FuncDecl *Parser::parseDeclFunc() {
   SMLoc FuncLoc = Tok.getLoc();
-  ConsumeToken(tok::kw_func);
+  consumeToken(tok::kw_func);
 
   DeclAttributes Attributes;
   // FIXME: Implicitly add immutable attribute.
   if (Tok.is(tok::l_square))
-    ParseAttributeList(Attributes);
+    parseAttributeList(Attributes);
 
   Identifier Name;
-  if (ParseIdentifier(Name, "expected identifier in func declaration"))
+  if (parseIdentifier(Name, "expected identifier in func declaration"))
     return 0;
   
   // We force first type of a func declaration to be a tuple for consistency.
   if (Tok.isNot(tok::l_paren)) {
-    Error(Tok.getLoc(), "expected '(' in argument list of func declaration");
+    error(Tok.getLoc(), "expected '(' in argument list of func declaration");
     return 0;
   }
     
   Type *FuncTy = 0;
-  if (ParseType(FuncTy))
+  if (parseType(FuncTy))
     return 0;
   
   // If the parsed function type is not spelled as a function type (i.e., has an
@@ -505,12 +505,12 @@ FuncDecl *Parser::ParseDeclFunc() {
   llvm::NullablePtr<Expr> Body;
 
   // Check to see if we have a "= expr" or "{" which is a brace expr.
-  if (ConsumeIf(tok::equal)) {
-    if (ParseExpr(Body, "expected expression parsing func body") ||
+  if (consumeIf(tok::equal)) {
+    if (parseExpr(Body, "expected expression parsing func body") ||
         Body.isNull())
       return 0;  // FIXME: Need to call a new ActOnFuncBodyError?
   } else if (Tok.is(tok::l_brace)) {
-    if (ParseExprBrace(Body) || Body.isNull())
+    if (parseExprBrace(Body) || Body.isNull())
       return 0;  // FIXME: Need to call a new ActOnFuncBodyError?
   }
 
@@ -521,7 +521,7 @@ FuncDecl *Parser::ParseDeclFunc() {
   return S.decl.ActOnFuncBody(FD, Body.get());
 }
 
-/// ParseDeclOneOf - Parse a 'oneof' declaration, returning null (and doing no
+/// parseDeclOneOf - Parse a 'oneof' declaration, returning null (and doing no
 /// token skipping) on error.
 ///
 ///   decl-oneof:
@@ -535,50 +535,50 @@ FuncDecl *Parser::ParseDeclFunc() {
 ///      identifier
 ///      identifier ':' type
 ///      
-Decl *Parser::ParseDeclOneOf() {
+Decl *Parser::parseDeclOneOf() {
   SMLoc OneOfLoc = Tok.getLoc();
-  ConsumeToken(tok::kw_oneof);
+  consumeToken(tok::kw_oneof);
 
   DeclAttributes Attributes;
   if (Tok.is(tok::l_square))
-    ParseAttributeList(Attributes);
+    parseAttributeList(Attributes);
   
   SMLoc NameLoc = Tok.getLoc();
   Identifier OneOfName;
   Type *OneOfType = 0;
-  if (ParseIdentifier(OneOfName, "expected identifier in oneof declaration") ||
-      ParseTypeOneOfBody(OneOfLoc, Attributes, OneOfType))
+  if (parseIdentifier(OneOfName, "expected identifier in oneof declaration") ||
+      parseTypeOneOfBody(OneOfLoc, Attributes, OneOfType))
     return 0;
 
   return S.decl.ActOnTypeAlias(NameLoc, OneOfName, OneOfType);
 }
 
 
-/// ParseDeclStruct - Parse a 'struct' declaration, returning null (and doing no
+/// parseDeclStruct - Parse a 'struct' declaration, returning null (and doing no
 /// token skipping) on error.  A 'struct' is just syntactic sugar for a oneof
 /// with a single element.
 ///
 ///   decl-struct:
 ///      'struct' attribute-list? identifier type-tuple
 ///
-Decl *Parser::ParseDeclStruct() {
+Decl *Parser::parseDeclStruct() {
   SMLoc StructLoc = Tok.getLoc();
-  ConsumeToken(tok::kw_struct);
+  consumeToken(tok::kw_struct);
   
   DeclAttributes Attributes;
   if (Tok.is(tok::l_square))
-    ParseAttributeList(Attributes);
+    parseAttributeList(Attributes);
   
   Identifier StructName;
-  if (ParseIdentifier(StructName, "expected identifier in struct declaration"))
+  if (parseIdentifier(StructName, "expected identifier in struct declaration"))
     return 0;
 
   Type *Ty = 0;
-  if (ParseType(Ty)) return 0;
+  if (parseType(Ty)) return 0;
 
   // The type is required to be syntactically a tuple type.
   if (!llvm::isa<TupleType>(Ty)) {
-    Error(StructLoc, "element type of struct is not a tuple");
+    error(StructLoc, "element type of struct is not a tuple");
     // FIXME: Should set this as an erroroneous decl.
     return 0;
   }      
@@ -591,7 +591,7 @@ Decl *Parser::ParseDeclStruct() {
 // Type Parsing
 //===----------------------------------------------------------------------===//
 
-/// ParseType
+/// parseType
 ///   type:
 ///     type-simple
 ///     type-function
@@ -613,60 +613,60 @@ Decl *Parser::ParseDeclStruct() {
 ///   type-oneof:
 ///     'oneof' attribute-list? oneof-body
 ///
-bool Parser::ParseType(Type *&Result, const llvm::Twine &Message) {
+bool Parser::parseType(Type *&Result, const llvm::Twine &Message) {
   // Parse type-simple first.
   switch (Tok.getKind()) {
   case tok::identifier:
     Result = S.type.ActOnTypeName(Tok.getLoc(),
                                   S.Context.getIdentifier(Tok.getText()));
-    ConsumeToken(tok::identifier);
+    consumeToken(tok::identifier);
     break;
   case tok::kw___builtin_int32_type:
     Result = S.type.ActOnInt32Type(Tok.getLoc());
-    ConsumeToken(tok::kw___builtin_int32_type);
+    consumeToken(tok::kw___builtin_int32_type);
     break;
   case tok::l_paren:
-    if (ParseTypeTuple(Result))
+    if (parseTypeTuple(Result))
       return true;
     break;
   case tok::kw_oneof: {
     SMLoc OneOfLoc = Tok.getLoc();
-    ConsumeToken(tok::kw_oneof);
+    consumeToken(tok::kw_oneof);
       
     DeclAttributes Attributes;
     if (Tok.is(tok::l_square))
-      ParseAttributeList(Attributes);
+      parseAttributeList(Attributes);
 
-    if (ParseTypeOneOfBody(OneOfLoc, Attributes, Result))
+    if (parseTypeOneOfBody(OneOfLoc, Attributes, Result))
       return true;
     break;
   }
   default:
-    Error(Tok.getLoc(), Message);
+    error(Tok.getLoc(), Message);
     return true;
   }
   
    while (1) {
     // If there is an arrow, parse the rest of the type.
     SMLoc TokLoc = Tok.getLoc();
-    if (ConsumeIf(tok::arrow)) {
+    if (consumeIf(tok::arrow)) {
       Type *SecondHalf = 0;
-      if (ParseType(SecondHalf, "expected type in result of function type"))
+      if (parseType(SecondHalf, "expected type in result of function type"))
         return true;
       Result = S.type.ActOnFunctionType(Result, TokLoc, SecondHalf);
       continue;
     }
     
     // If there is a square bracket, we have an array.
-    if (ConsumeIf(tok::l_square)) {
+    if (consumeIf(tok::l_square)) {
       llvm::NullablePtr<Expr> Size;
       if (!Tok.is(tok::r_square) &&
-          ParseExpr(Size, "expected expression for array type size"))
+          parseExpr(Size, "expected expression for array type size"))
         return true;
       
       SMLoc RArrayTok = Tok.getLoc();
-      if (ParseToken(tok::r_square, "expected ']' in array type")) {
-        Note(TokLoc, "to match this '['");
+      if (parseToken(tok::r_square, "expected ']' in array type")) {
+        note(TokLoc, "to match this '['");
         return true;
       }
       
@@ -682,19 +682,19 @@ bool Parser::ParseType(Type *&Result, const llvm::Twine &Message) {
   return false;
 }
 
-bool Parser::ParseType(Type *&Result) {
-  return ParseType(Result, "expected type");
+bool Parser::parseType(Type *&Result) {
+  return parseType(Result, "expected type");
 }
 
-/// ParseTypeTuple
+/// parseTypeTuple
 ///   type-tuple:
 ///     '(' ')'
 ///     '(' identifier? value-specifier (',' identifier? value-specifier)* ')'
 ///
-bool Parser::ParseTypeTuple(Type *&Result) {
+bool Parser::parseTypeTuple(Type *&Result) {
   assert(Tok.is(tok::l_paren) && "Not start of type tuple");
   SMLoc LPLoc = Tok.getLoc();
-  ConsumeToken(tok::l_paren);
+  consumeToken(tok::l_paren);
 
   llvm::SmallVector<TupleTypeElt, 8> Elements;
 
@@ -705,26 +705,26 @@ bool Parser::ParseTypeTuple(Type *&Result) {
       TupleTypeElt &Result = Elements.back();
       
       if (Tok.is(tok::identifier))
-        ParseIdentifier(Result.Name, "");
+        parseIdentifier(Result.Name, "");
       
       NullablePtr<Expr> Init;
-      if ((HadError = ParseValueSpecifier(Result.Ty, Init)))
+      if ((HadError = parseValueSpecifier(Result.Ty, Init)))
         break;
       Result.Init = Init.getPtrOrNull();
-    } while (ConsumeIf(tok::comma));
+    } while (consumeIf(tok::comma));
     
     if (HadError) {
-      SkipUntil(tok::r_paren);
+      skipUntil(tok::r_paren);
       if (Tok.is(tok::r_paren))
-        ConsumeToken(tok::r_paren);
+        consumeToken(tok::r_paren);
       return true;
     }
   }
   
   SMLoc RPLoc = Tok.getLoc();
-  if (ParseToken(tok::r_paren, "expected ')' at end of tuple list",
+  if (parseToken(tok::r_paren, "expected ')' at end of tuple list",
                  tok::r_paren)) {
-    Note(LPLoc, "to match this opening '('");
+    note(LPLoc, "to match this opening '('");
     return true;
   }
   
@@ -741,9 +741,9 @@ bool Parser::ParseTypeTuple(Type *&Result) {
 ///      identifier
 ///      identifier ':' type
 ///      
-bool Parser::ParseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
+bool Parser::parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
                                 Type *&Result) {
-  if (ParseToken(tok::l_brace, "expected '{' in oneof type"))
+  if (parseToken(tok::l_brace, "expected '{' in oneof type"))
     return true;
   
   llvm::SmallVector<SemaType::OneOfElementInfo, 8> ElementInfos;
@@ -755,25 +755,25 @@ bool Parser::ParseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
     ElementInfo.NameLoc = Tok.getLoc();
     ElementInfo.EltType = 0;
     
-    ConsumeToken(tok::identifier);
+    consumeToken(tok::identifier);
     
     // See if we have a type specifier for this oneof element.  If so, parse it.
-    if (ConsumeIf(tok::colon) &&
-        ParseType(ElementInfo.EltType,
+    if (consumeIf(tok::colon) &&
+        parseType(ElementInfo.EltType,
                   "expected type while parsing oneof element '" +
                   ElementInfo.Name + "'")) {
-      SkipUntil(tok::r_brace);
+      skipUntil(tok::r_brace);
       return true;
     }
     
     ElementInfos.push_back(ElementInfo);
     
     // Require comma separation.
-    if (!ConsumeIf(tok::comma))
+    if (!consumeIf(tok::comma))
       break;
   }
   
-  ParseToken(tok::r_brace, "expected '}' at end of oneof");
+  parseToken(tok::r_brace, "expected '}' at end of oneof");
   
   Result = S.type.ActOnOneOfType(OneOfLoc, Attrs, ElementInfos);
   return false;
@@ -801,17 +801,17 @@ bool Parser::isStartOfExpr(Token &Tok) const {
          Tok.is(tok::dollarident);
 }
 
-/// ParseExpr
+/// parseExpr
 ///   expr:
 ///     expr-single+
-bool Parser::ParseExpr(NullablePtr<Expr> &Result, const char *Message) {
+bool Parser::parseExpr(NullablePtr<Expr> &Result, const char *Message) {
   llvm::SmallVector<Expr*, 8> SequencedExprs;
   
   Expr *LastExpr = 0;
   do {
     // Parse the expr-single.
     Result = 0;
-    if (ParseExprSingle(Result) || Result.isNull()) return true;
+    if (parseExprSingle(Result) || Result.isNull()) return true;
 
     // Check to see if this juxtaposition is application of a function with its
     // arguments.  If so, bind the function application, otherwise, we have a
@@ -849,15 +849,15 @@ bool Parser::ParseExpr(NullablePtr<Expr> &Result, const char *Message) {
   return false;
 }
 
-/// ParseExprSingle
+/// parseExprSingle
 ///   expr-single:
 ///     expr-primary (binary-operator expr-primary)*
-bool Parser::ParseExprSingle(llvm::NullablePtr<Expr> &Result,
+bool Parser::parseExprSingle(llvm::NullablePtr<Expr> &Result,
                              const char *Message) {
-  return ParseExprPrimary(Result, Message) || ParseExprBinaryRHS(Result);
+  return parseExprPrimary(Result, Message) || parseExprBinaryRHS(Result);
 }
 
-/// ParseExprPrimary
+/// parseExprPrimary
 ///   expr-primary:
 ///     expr-literal
 ///     expr-identifier
@@ -880,39 +880,39 @@ bool Parser::ParseExprSingle(llvm::NullablePtr<Expr> &Result,
 ///
 ///   expr-subscript:
 ///     expr-primary '[' expr-single ']'
-bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
+bool Parser::parseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
   switch (Tok.getKind()) {
   case tok::numeric_constant:
     Result = S.expr.ActOnNumericConstant(Tok.getText(), Tok.getLoc());
-    ConsumeToken(tok::numeric_constant);
+    consumeToken(tok::numeric_constant);
     break;
 
   case tok::dollarident: // $1
   case tok::identifier:  // foo   and  foo::bar
-    if (ParseExprIdentifier(Result)) return true;
+    if (parseExprIdentifier(Result)) return true;
     break;
 
   case tok::colon: {     // :foo
     SMLoc ColonLoc = Tok.getLoc();
-    ConsumeToken(tok::colon);
+    consumeToken(tok::colon);
     Identifier Name;
     SMLoc NameLoc = Tok.getLoc();
-    if (ParseIdentifier(Name, "expected identifier after ':' expression"))
+    if (parseIdentifier(Name, "expected identifier after ':' expression"))
       return true;
     Result = S.expr.ActOnUnresolvedMemberExpr(ColonLoc, NameLoc, Name);
     break;
   }
       
   case tok::l_paren:
-    if (ParseExprParen(Result)) return true;
+    if (parseExprParen(Result)) return true;
     break;
       
   case tok::l_brace:
-    if (ParseExprBrace(Result)) return true;
+    if (parseExprBrace(Result)) return true;
     break;
     
   default:
-    Error(Tok.getLoc(), Message ? Message : "expected expression");
+    error(Tok.getLoc(), Message ? Message : "expected expression");
     return true;
   }
   
@@ -920,9 +920,9 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
   while (1) {
     // Check for a .foo suffix.
     SMLoc TokLoc = Tok.getLoc();
-    if (ConsumeIf(tok::period)) {
+    if (consumeIf(tok::period)) {
       if (Tok.isNot(tok::identifier) && Tok.isNot(tok::dollarident)) {
-        Error(Tok.getLoc(), "expected field name");
+        error(Tok.getLoc(), "expected field name");
         return true;
       }
         
@@ -930,21 +930,21 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
         Result = S.expr.ActOnDotIdentifier(Result.get(), TokLoc, Tok.getText(),
                                            Tok.getLoc());
       if (Tok.is(tok::identifier))
-        ConsumeToken(tok::identifier);
+        consumeToken(tok::identifier);
       else
-        ConsumeToken(tok::dollarident);
+        consumeToken(tok::dollarident);
       continue;
     }
     
     // Check for a [expr] suffix.
-    if (ConsumeIf(tok::l_square)) {
+    if (consumeIf(tok::l_square)) {
       NullablePtr<Expr> Idx;
-      if (ParseExprSingle(Idx, "expected expression parsing array index"))
+      if (parseExprSingle(Idx, "expected expression parsing array index"))
         return true;
       
       SMLoc RLoc = Tok.getLoc();
-      if (ParseToken(tok::r_square, "expected ']'")) {
-        Note(TokLoc, "to match this '['");
+      if (parseToken(tok::r_square, "expected ']'")) {
+        note(TokLoc, "to match this '['");
         return true;        
       }
       
@@ -972,13 +972,13 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
     default: assert(0 && "Unknown juxtaposition greediness");
     case SemaExpr::JG_NonGreedy: return false;
     case SemaExpr::JG_LocallyGreedy:
-      if (ParseExprPrimary(RHS,
+      if (parseExprPrimary(RHS,
                            "expected expression after juxtaposed operator") ||
           RHS.isNull())
         return true;
       break;
     case SemaExpr::JG_Greedy:
-      if (ParseExprSingle(RHS,
+      if (parseExprSingle(RHS,
                           "expected expression after juxtaposed operator") ||
           RHS.isNull())
         return true;
@@ -995,24 +995,24 @@ bool Parser::ParseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
   return false;
 }
 
-/// ParseExprIdentifier - Parse an identifier expression:
+/// parseExprIdentifier - Parse an identifier expression:
 ///
 ///   expr-identifier:
 ///     identifier
 ///     dollarident
 ///     identifier '::' identifier
-bool Parser::ParseExprIdentifier(llvm::NullablePtr<Expr> &Result) {
+bool Parser::parseExprIdentifier(llvm::NullablePtr<Expr> &Result) {
   if (Tok.is(tok::dollarident)) {
     llvm::StringRef Name = Tok.getText();
     SMLoc Loc = Tok.getLoc();
-    ConsumeToken(tok::dollarident);
+    consumeToken(tok::dollarident);
     assert(Name[0] == '$' && "Not a dollarident");
     bool AllNumeric = true;
     for (unsigned i = 1, e = Name.size(); i != e; ++i)
       AllNumeric &= isdigit(Name[i]);
     
     if (Name.size() == 1 || !AllNumeric) {
-      Error(Loc, "invalid identifier, expected expression");
+      error(Loc, "invalid identifier, expected expression");
       return true;
     }
     Result = S.expr.ActOnDollarIdentExpr(Name, Loc);
@@ -1022,7 +1022,7 @@ bool Parser::ParseExprIdentifier(llvm::NullablePtr<Expr> &Result) {
   assert(Tok.is(tok::identifier));
   SMLoc Loc = Tok.getLoc();
   Identifier Name;
-  ParseIdentifier(Name, "");
+  parseIdentifier(Name, "");
 
   if (Tok.isNot(tok::coloncolon)) {
     Result = S.expr.ActOnIdentifierExpr(Name, Loc);
@@ -1030,11 +1030,11 @@ bool Parser::ParseExprIdentifier(llvm::NullablePtr<Expr> &Result) {
   }
   
   SMLoc ColonColonLoc = Tok.getLoc();
-  ConsumeToken(tok::coloncolon);
+  consumeToken(tok::coloncolon);
 
   SMLoc Loc2 = Tok.getLoc();
   Identifier Name2;
-  if (ParseIdentifier(Name2, "expected identifier after '" + Name.str() +
+  if (parseIdentifier(Name2, "expected identifier after '" + Name.str() +
                       "::' expression"))
     return true;
 
@@ -1044,7 +1044,7 @@ bool Parser::ParseExprIdentifier(llvm::NullablePtr<Expr> &Result) {
 }
 
 
-/// ParseExprParen - Parse a tuple expression.
+/// parseExprParen - Parse a tuple expression.
 ///
 ///   expr-paren: 
 ///     '(' ')'
@@ -1053,9 +1053,9 @@ bool Parser::ParseExprIdentifier(llvm::NullablePtr<Expr> &Result) {
 ///   expr-paren-element:
 ///     ('.' identifier '=')? expr
 ///
-bool Parser::ParseExprParen(llvm::NullablePtr<Expr> &Result) {
+bool Parser::parseExprParen(llvm::NullablePtr<Expr> &Result) {
   SMLoc LPLoc = Tok.getLoc();  
-  ConsumeToken(tok::l_paren);
+  consumeToken(tok::l_paren);
   
   llvm::SmallVector<Expr*, 8> SubExprs;
   llvm::SmallVector<Identifier, 8> SubExprNames; 
@@ -1065,10 +1065,10 @@ bool Parser::ParseExprParen(llvm::NullablePtr<Expr> &Result) {
     do {
       Identifier FieldName;
       // Check to see if there is a field specifier.
-      if (ConsumeIf(tok::period)) {
-        if (ParseIdentifier(FieldName,
+      if (consumeIf(tok::period)) {
+        if (parseIdentifier(FieldName,
                           "expected field specifier name in tuple expression")||
-            ParseToken(tok::equal, "expected '=' in tuple expression"))
+            parseToken(tok::equal, "expected '=' in tuple expression"))
           return true;
       }
       
@@ -1080,19 +1080,19 @@ bool Parser::ParseExprParen(llvm::NullablePtr<Expr> &Result) {
       }
       
       NullablePtr<Expr> SubExpr;
-      if (ParseExpr(SubExpr, "expected expression in parentheses")) return true;
+      if (parseExpr(SubExpr, "expected expression in parentheses")) return true;
       
       if (SubExpr.isNull())
         AnyErroneousSubExprs = true;
       else
         SubExprs.push_back(SubExpr.get());
     
-    } while (ConsumeIf(tok::comma));
+    } while (consumeIf(tok::comma));
   }
   
   SMLoc RPLoc = Tok.getLoc();  
-  if (ParseToken(tok::r_paren, "expected ')' in parenthesis expression")) {
-    Note(LPLoc, "to match this opening '('");
+  if (parseToken(tok::r_paren, "expected ')' in parenthesis expression")) {
+    note(LPLoc, "to match this opening '('");
     return true;
   }
   
@@ -1104,7 +1104,7 @@ bool Parser::ParseExprParen(llvm::NullablePtr<Expr> &Result) {
 }
 
 
-/// ParseExprBrace - A brace enclosed expression list which may optionally end
+/// parseExprBrace - A brace enclosed expression list which may optionally end
 /// with a ; inside of it.  For example { 1; 4+5; } or { 1; 2 }.
 ///
 ///   expr-brace:
@@ -1113,9 +1113,9 @@ bool Parser::ParseExprParen(llvm::NullablePtr<Expr> &Result) {
 ///     expr
 ///     decl-var
 ///     ';'
-bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
+bool Parser::parseExprBrace(NullablePtr<Expr> &Result) {
   SMLoc LBLoc = Tok.getLoc();
-  ConsumeToken(tok::l_brace);
+  consumeToken(tok::l_brace);
   
   // This brace expression forms a lexical scope.
   Scope BraceScope(S.decl);
@@ -1130,7 +1130,7 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
     MissingSemiAtEnd = false;
 
     // If this is a semi, eat it and ignore it.
-    if (ConsumeIf(tok::semi))
+    if (consumeIf(tok::semi))
       continue;
     
     // Otherwise, we must have a var decl or expression.  Parse it up
@@ -1139,20 +1139,20 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
     // Parse the decl or expression.    
     switch (Tok.getKind()) {
     case tok::kw_var:
-      Entries.back() = ParseDeclVar();
+      Entries.back() = parseDeclVar();
       break;
     case tok::kw_typealias:
-      Entries.back() = ParseDeclTypeAlias();
+      Entries.back() = parseDeclTypeAlias();
       break;
     case tok::kw_oneof:
-      Entries.back() = ParseDeclOneOf();
+      Entries.back() = parseDeclOneOf();
       break;
     case tok::kw_struct:
-      Entries.back() = ParseDeclStruct();
+      Entries.back() = parseDeclStruct();
       break;
     default:
       NullablePtr<Expr> ResultExpr;
-      if (!ParseExpr(ResultExpr) && !ResultExpr.isNull()) {
+      if (!parseExpr(ResultExpr) && !ResultExpr.isNull()) {
         Entries.back() = ResultExpr.get();
         MissingSemiAtEnd = true;
       }
@@ -1167,16 +1167,16 @@ bool Parser::ParseExprBrace(NullablePtr<Expr> &Result) {
       
       // FIXME: QOI: Improve error recovery.
       if (Tok.is(tok::semi) && Tok.isNot(tok::r_brace))
-        SkipUntil(tok::r_brace);
-      ConsumeIf(tok::r_brace);
+        skipUntil(tok::r_brace);
+      consumeIf(tok::r_brace);
       return true;
     }
   }
   
   SMLoc RBLoc = Tok.getLoc();
-  if (ParseToken(tok::r_brace, "expected '}' at end of brace expression",
+  if (parseToken(tok::r_brace, "expected '}' at end of brace expression",
                  tok::r_brace)) {
-    Note(LBLoc, "to match this opening '{'");
+    note(LBLoc, "to match this opening '{'");
     return true;
   }
   
@@ -1197,12 +1197,12 @@ static ValueDecl *getBinOp(const Token &Tok, Sema &S) {
 }
 
 
-/// ParseExprBinaryRHS - Parse the right hand side of a binary expression and
+/// parseExprBinaryRHS - Parse the right hand side of a binary expression and
 /// assemble it according to precedence rules.
 ///
 ///   expr-binary-rhs:
 ///     (binary-operator expr-primary)*
-bool Parser::ParseExprBinaryRHS(NullablePtr<Expr> &Result, unsigned MinPrec) {
+bool Parser::parseExprBinaryRHS(NullablePtr<Expr> &Result, unsigned MinPrec) {
   ValueDecl *NextTokOp = getBinOp(Tok, S);
   int NextTokPrec = NextTokOp ? NextTokOp->Attrs.InfixPrecedence : -1;
   // Assignment is a hack until we get generics.  Assignment gets the lowest
@@ -1217,13 +1217,13 @@ bool Parser::ParseExprBinaryRHS(NullablePtr<Expr> &Result, unsigned MinPrec) {
     
     // Consume the operator, saving the operator location.
     SMLoc OpLoc = Tok.getLoc();
-    ConsumeToken();
+    consumeToken();
     
     // TODO: Support ternary operators some day.
     
     // Parse another leaf here for the RHS of the operator.
     NullablePtr<Expr> Leaf;
-    if (ParseExprPrimary(Leaf, "expected expression after binary operator"))
+    if (parseExprPrimary(Leaf, "expected expression after binary operator"))
       return true;
 
     // Remember the precedence of this operator and get the precedence of the
@@ -1242,7 +1242,7 @@ bool Parser::ParseExprBinaryRHS(NullablePtr<Expr> &Result, unsigned MinPrec) {
     if (ThisPrec < NextTokPrec) {
       // Only parse things on the RHS that bind more tightly than the current
       // operator.
-      if (ParseExprBinaryRHS(Leaf, ThisPrec + 1))
+      if (parseExprBinaryRHS(Leaf, ThisPrec + 1))
         return true;
       
       NextTokOp = getBinOp(Tok, S);

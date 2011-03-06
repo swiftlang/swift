@@ -62,72 +62,72 @@ public:
   
 private:
   // Utilities.
-  void ConsumeToken();
-  void ConsumeToken(tok::TokenKind K) {
+  void consumeToken();
+  void consumeToken(tok::TokenKind K) {
     assert(Tok.is(K) && "Consuming wrong token kind");
-    ConsumeToken();
+    consumeToken();
   }
   
-  /// ConsumeIf - If the current token is the specified kind, consume it and
+  /// consumeIf - If the current token is the specified kind, consume it and
   /// return true.  Otherwise, return false without consuming it.
-  bool ConsumeIf(tok::TokenKind K) {
+  bool consumeIf(tok::TokenKind K) {
     if (Tok.isNot(K)) return false;
-    ConsumeToken(K);
+    consumeToken(K);
     return true;
   }
   
-  /// SkipUntil - Read tokens until we get to the specified token, then return
+  /// skipUntil - Read tokens until we get to the specified token, then return
   /// without consuming it.  Because we cannot guarantee that the token will
   /// ever occur, this skips to some likely good stopping point.
   ///
-  void SkipUntil(tok::TokenKind T);
+  void skipUntil(tok::TokenKind T);
   
-  void Note(llvm::SMLoc Loc, const llvm::Twine &Message);
-  void Warning(llvm::SMLoc Loc, const llvm::Twine &Message);
-  void Error(llvm::SMLoc Loc, const llvm::Twine &Message);
+  void note(llvm::SMLoc Loc, const llvm::Twine &Message);
+  void warning(llvm::SMLoc Loc, const llvm::Twine &Message);
+  void error(llvm::SMLoc Loc, const llvm::Twine &Message);
   
   // Primitive Parsing
-  bool ParseIdentifier(Identifier &Result, const llvm::Twine &Message);
+  bool parseIdentifier(Identifier &Result, const llvm::Twine &Message);
 
-  /// ParseToken - The parser expects that 'K' is next in the input.  If so, it
+  /// parseToken - The parser expects that 'K' is next in the input.  If so, it
   /// is consumed and false is returned.
   ///
   /// If the input is malformed, this emits the specified error diagnostic.
-  /// Next, if SkipToTok is specified, it calls SkipUntil(SkipToTok).  Finally,
+  /// Next, if SkipToTok is specified, it calls skipUntil(SkipToTok).  Finally,
   /// true is returned.
-  bool ParseToken(tok::TokenKind K, const char *Message,
+  bool parseToken(tok::TokenKind K, const char *Message,
                   tok::TokenKind SkipToTok = tok::unknown);
   
-  bool ParseValueSpecifier(Type *&Ty, llvm::NullablePtr<Expr> &Init);
+  bool parseValueSpecifier(Type *&Ty, llvm::NullablePtr<Expr> &Init);
   
   // Decl Parsing
-  Decl *ParseDeclTopLevel();
-  TypeAliasDecl *ParseDeclTypeAlias();
-  void ParseAttributeList(DeclAttributes &Attributes);
-  bool ParseAttribute(DeclAttributes &Attributes);
-  bool ParseVarName(NameRecord &Record);
+  Decl *parseDeclTopLevel();
+  TypeAliasDecl *parseDeclTypeAlias();
+  void parseAttributeList(DeclAttributes &Attributes);
+  bool parseAttribute(DeclAttributes &Attributes);
+  bool parseVarName(NameRecord &Record);
   
-  Decl *ParseDeclOneOf();
-  Decl *ParseDeclStruct();
-  VarDecl *ParseDeclVar();
-  FuncDecl *ParseDeclFunc();
+  Decl *parseDeclOneOf();
+  Decl *parseDeclStruct();
+  VarDecl *parseDeclVar();
+  FuncDecl *parseDeclFunc();
   
   // Type Parsing
-  bool ParseType(Type *&Result);
-  bool ParseType(Type *&Result, const llvm::Twine &Message);
-  bool ParseTypeTuple(Type *&Result);
-  bool ParseTypeOneOfBody(llvm::SMLoc OneOfLoc, const DeclAttributes &Attrs,
+  bool parseType(Type *&Result);
+  bool parseType(Type *&Result, const llvm::Twine &Message);
+  bool parseTypeTuple(Type *&Result);
+  bool parseTypeOneOfBody(llvm::SMLoc OneOfLoc, const DeclAttributes &Attrs,
                           Type *&Result);
 
   // Expression Parsing
   bool isStartOfExpr(Token &Tok) const;
-  bool ParseExpr(llvm::NullablePtr<Expr> &Result, const char *Message = 0);
-  bool ParseExprSingle(llvm::NullablePtr<Expr> &Result, const char *Message =0);
-  bool ParseExprPrimary(llvm::NullablePtr<Expr> &Result, const char *Message=0);
-  bool ParseExprIdentifier(llvm::NullablePtr<Expr> &Result);
-  bool ParseExprParen(llvm::NullablePtr<Expr> &Result);
-  bool ParseExprBrace(llvm::NullablePtr<Expr> &Result);
-  bool ParseExprBinaryRHS(llvm::NullablePtr<Expr> &Result,
+  bool parseExpr(llvm::NullablePtr<Expr> &Result, const char *Message = 0);
+  bool parseExprSingle(llvm::NullablePtr<Expr> &Result, const char *Message =0);
+  bool parseExprPrimary(llvm::NullablePtr<Expr> &Result, const char *Message=0);
+  bool parseExprIdentifier(llvm::NullablePtr<Expr> &Result);
+  bool parseExprParen(llvm::NullablePtr<Expr> &Result);
+  bool parseExprBrace(llvm::NullablePtr<Expr> &Result);
+  bool parseExprBinaryRHS(llvm::NullablePtr<Expr> &Result,
                           unsigned MinPrecedence = 0);
 };
   

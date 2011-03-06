@@ -66,7 +66,7 @@ void SemaDecl::handleEndOfTranslationUnit() {
   UnresolvedTypesMapTy &UT = getUnresolvedTypesHT(UnresolvedTypes);
   // FIXME: Nondeterminstic iteration.
   for (UnresolvedTypesMapTy::iterator I = UT.begin(), E = UT.end(); I != E; ++I)
-    Error(I->second->getLocStart(), "use of undeclared type '" + I->first.str()
+    error(I->second->getLocStart(), "use of undeclared type '" + I->first.str()
           + "'");
 }
 
@@ -111,9 +111,9 @@ void SemaDecl::AddToScope(ValueDecl *D) {
   std::pair<unsigned, ValueDecl*> Entry =
     getValueHT(ValueScopeHT).lookup(D->Name);
   if (Entry.second && Entry.first == CurScope->getDepth()) {
-    Error(D->getLocStart(),
+    error(D->getLocStart(),
           "variable declaration conflicts with previous declaration");
-    Note(LookupValueName(D->Name)->getLocStart(), "previous declaration here");
+    warning(LookupValueName(D->Name)->getLocStart(), "previous declaration here");
     return;
   }
   
@@ -128,7 +128,7 @@ AnonDecl *SemaDecl::GetAnonDecl(llvm::StringRef Text, llvm::SMLoc RefLoc) {
          Text[1] >= '0' && Text[1] <= '9' && "Not a valid anon decl");
   unsigned ArgNo = 0;
   if (Text.substr(1).getAsInteger(10, ArgNo)) {
-    Error(RefLoc, "invalid name in $ expression");
+    error(RefLoc, "invalid name in $ expression");
     return 0;
   }
            
@@ -189,7 +189,7 @@ bool SemaDecl::CheckAccessPathArity(unsigned NumChildren, llvm::SMLoc LPLoc,
   if (Ty && Ty->Fields.size() == NumChildren)
     return false;
   
-  Error(LPLoc, "tuple specifier has wrong number of elements for actual type");
+  error(LPLoc, "tuple specifier has wrong number of elements for actual type");
   return true;
 }
 
@@ -213,7 +213,7 @@ static Expr *DiagnoseUnresolvedTypes(Expr *E, Expr::WalkOrder Order,
   
   SemaDecl &SD = *(SemaDecl*)Data;
   E->dump();  // FIXME: This is a gross hack because our diagnostics suck.
-  SD.Error(E->getLocStart(),
+  SD.error(E->getLocStart(),
            "ambiguous expression could not resolve a concrete type");
   return 0;
 }
@@ -226,7 +226,7 @@ void SemaDecl::ActOnTopLevelDecl(ValueDecl *D) {
     if (AnonClosureArgs[i].isNull()) continue;
     AnonDecl *AD = AnonClosureArgs[i].get();
 
-    Error(AD->UseLoc,
+    error(AD->UseLoc,
           "use of anonymous closure argument in non-closure context");
   }
   AnonClosureArgs.clear();
@@ -254,7 +254,7 @@ static void ValidateAttributes(DeclAttributes &Attrs, Type *Ty, SemaDecl &SD) {
       if (TupleType *TT = llvm::dyn_cast<TupleType>(FT->Input))
         IsError = TT->Fields.size() != 2;
     if (IsError) {
-      SD.Error(Attrs.LSquareLoc, "function with 'infix' specified must take "
+      SD.error(Attrs.LSquareLoc, "function with 'infix' specified must take "
                "a two element tuple as input");
       Attrs.InfixPrecedence = -1;
     }
@@ -436,8 +436,8 @@ TypeAliasDecl *SemaDecl::ActOnTypeAlias(llvm::SMLoc TypeAliasLoc,
   
   // Otherwise, we have a redefinition: two definitions in the same scope with
   // the same name.
-  Error(TypeAliasLoc,
+  error(TypeAliasLoc,
         "redefinition of type named '" +llvm::StringRef(Name.get()) + "'");
-  Note(ExistingDecl->getLocStart(), "previous declaration here");
+  warning(ExistingDecl->getLocStart(), "previous declaration here");
   return ExistingDecl;
 }

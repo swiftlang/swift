@@ -36,9 +36,9 @@ public:
   Sema &S;
   explicit SemaBase(Sema &s) : S(s) {}
   
-  void Note(llvm::SMLoc Loc, const llvm::Twine &Message);
-  void Warning(llvm::SMLoc Loc, const llvm::Twine &Message);
-  void Error(llvm::SMLoc Loc, const llvm::Twine &Message);
+  void note(llvm::SMLoc Loc, const llvm::Twine &Message);
+  void warning(llvm::SMLoc Loc, const llvm::Twine &Message);
+  void error(llvm::SMLoc Loc, const llvm::Twine &Message);
 };
     
 } // end namespace swift

@@ -52,7 +52,7 @@ static bool SemaIntegerLiteral(Type *&ResultTy, SemaExpr &SE) {
 static bool SemaDeclRefExpr(ValueDecl *D, llvm::SMLoc Loc, Type *&ResultTy,
                             SemaExpr &SE) {
   if (D == 0) {
-    SE.Error(Loc, "use of undeclared identifier");
+    SE.error(Loc, "use of undeclared identifier");
     return true;
   }
   
@@ -77,7 +77,7 @@ static bool SemaBraceExpr(llvm::SMLoc LBLoc,
     if (Elements[i].is<Expr*>() &&
         isa<FunctionType>(Elements[i].get<Expr*>()->Ty))
       // TODO: QOI: Add source range.
-      SE.Error(Elements[i].get<Expr*>()->getLocStart(),
+      SE.error(Elements[i].get<Expr*>()->getLocStart(),
                "expression resolves to an unevaluated function");
   
   if (HasMissingSemi)
@@ -121,7 +121,7 @@ static bool SemaDotIdentifier(Expr *E, llvm::SMLoc DotLoc,
       unsigned Value = 0;
       if (!llvm::StringRef(Name.get()+1).getAsInteger(10, Value)) {
         if (Value >= TT->Fields.size()) {
-          SE.Error(NameLoc, "field number is too large for tuple");
+          SE.error(NameLoc, "field number is too large for tuple");
           return true;
         }
         
@@ -132,11 +132,11 @@ static bool SemaDotIdentifier(Expr *E, llvm::SMLoc DotLoc,
     }
     
     // Otherwise, we just have an unknown field name.
-    SE.Error(NameLoc, "unknown field in tuple");
+    SE.error(NameLoc, "unknown field in tuple");
     return true;
   }
   
-  SE.Error(DotLoc, "base type of field access has no fields");
+  SE.error(DotLoc, "base type of field access has no fields");
   return true;
 }
 
@@ -200,7 +200,7 @@ static bool SemaApplyExpr(Expr *&E1, Expr *&E2, Type *&ResultTy, SemaExpr &SE) {
   // true so that it gets properly sequenced.
   FunctionType *FT = dyn_cast<FunctionType>(E1->Ty);
   if (FT == 0) {
-    SE.Error(E1->getLocStart(),
+    SE.error(E1->getLocStart(),
              "function application requires value of function type");
     return true;
   }
@@ -293,7 +293,7 @@ NullablePtr<Expr> SemaExpr::ActOnNumericConstant(llvm::StringRef Text,
   // The integer literal must fit in 64-bits.
   unsigned long long Val;
   if (Text.getAsInteger(0, Val)) {
-    Error(Loc, "invalid immediate for integer literal, value too large");
+    error(Loc, "invalid immediate for integer literal, value too large");
     Text = "1";
   }
   
@@ -339,19 +339,19 @@ ActOnScopedIdentifierExpr(Identifier ScopeName, llvm::SMLoc ScopeLoc,
   
   // Reject things like int::x.
   if (DT == 0) {
-    Error(ScopeLoc, "invalid type '" + ScopeName.str() + "' for scoped access");
+    error(ScopeLoc, "invalid type '" + ScopeName.str() + "' for scoped access");
     return 0;
   }
   
   if (DT->Elements.empty()) {
-    Error(ScopeLoc, "oneof '" + ScopeName.str() +
+    error(ScopeLoc, "oneof '" + ScopeName.str() +
           "' is not complete or has no elements");
     return 0;
   }
   
   OneOfElementDecl *Elt = DT->getElement(Name);
   if (Elt == 0) {
-    Error(ScopeLoc, "'" + Name.str() + "' is not a member of '" +
+    error(ScopeLoc, "'" + Name.str() + "' is not a member of '" +
           ScopeName.str() + "'");
     return 0;
   }
@@ -946,7 +946,7 @@ BindAndValidateClosureArgs(Expr *&Body, Type *FuncInput, SemaDecl &SD) {
       // Ignore elements not used.
       if (AnonArgs[i].isNull()) continue;
       
-      SD.Error(AnonArgs[i].get()->UseLoc,
+      SD.error(AnonArgs[i].get()->UseLoc,
                "use of invalid anonymous argument, with number higher than"
                " # arguments to bound function");
     }
@@ -1153,24 +1153,24 @@ Expr *SemaExpr::ConvertToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
   // TODO: QOI: Source ranges + print the type.
   switch (Reason) {
   case CR_BinOpLHS:
-    Error(E->getLocStart(), "left hand side of binary operator has wrong type");
+    error(E->getLocStart(), "left hand side of binary operator has wrong type");
     break;
   case CR_BinOpRHS: 
-    Error(E->getLocStart(),"right hand side of binary operator has wrong type");
+    error(E->getLocStart(),"right hand side of binary operator has wrong type");
     break;
   case CR_FuncApply:
-    Error(E->getLocStart(), "argument to function invocation has wrong type");
+    error(E->getLocStart(), "argument to function invocation has wrong type");
     break;
   case CR_VarInit:
-    Error(E->getLocStart(),
+    error(E->getLocStart(),
           "explicitly specified type doesn't match initializer expression");
     break;
   case CR_TupleInit:
-    Error(E->getLocStart(),
+    error(E->getLocStart(),
           "explicitly specified type doesn't match default value type");
     break;
   case CR_FuncBody:
-    Error(E->getLocStart(),
+    error(E->getLocStart(),
           "type of func body doesn't match specified prototype");
     break;
   }
