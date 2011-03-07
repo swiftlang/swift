@@ -80,8 +80,10 @@ void Decl::print(llvm::raw_ostream &OS, unsigned Indent) const {
 
 void TranslationUnitDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(translation_unit\n";
-  for (unsigned i = 0, e = Decls.size(); i != e; ++i)
+  for (unsigned i = 0, e = Decls.size(); i != e; ++i) {
     Decls[i]->print(OS, Indent+2);
+    if (i != e-1) OS << "\n";
+  }
   OS << ')';
 }
 
