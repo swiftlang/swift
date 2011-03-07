@@ -49,7 +49,7 @@ SemaDecl::SemaDecl(Sema &S)
     ValueScopeHT(new ValueScopeHTType()),
     TypeScopeHT(new TypeScopeHTType()),
     CurScope(0),
-    UnresolvedTypes(new UnresolvedTypesMapTy()){
+    UnresolvedTypes(new UnresolvedTypesMapTy()) {
 }
 
 SemaDecl::~SemaDecl() {

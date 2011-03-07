@@ -38,6 +38,7 @@ namespace swift {
 enum ExprKind {
   IntegerLiteralKind,
   DeclRefExprKind,
+  UnresolvedDeclRefExprKind,
   UnresolvedMemberExprKind,
   TupleExprKind,
   UnresolvedDotExprKind,
@@ -131,6 +132,29 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const DeclRefExpr *) { return true; }
   static bool classof(const Expr *E) { return E->Kind == DeclRefExprKind; }
+};
+  
+/// UnresolvedDeclRefExpr - This represents use of an undeclared identifier,
+/// which may ultimately be a use of something that hasn't been defined yet, it
+/// may be a use of something that got imported (which will be resolved during
+/// sema), or may just be a use of an unknown identifier.
+///
+/// The type of this is always TheUnresolvedType.
+///
+class UnresolvedDeclRefExpr : public Expr {
+public:
+  Identifier Name;
+  llvm::SMLoc Loc;
+  
+  UnresolvedDeclRefExpr(Identifier name, llvm::SMLoc loc, Type *Ty)
+    : Expr(UnresolvedDeclRefExprKind, Ty), Name(name), Loc(loc) {
+  }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const UnresolvedDeclRefExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->Kind == UnresolvedDeclRefExprKind;
+  }
 };
 
 /// UnresolvedMemberExpr - This represents ':foo', an unresolved reference to a

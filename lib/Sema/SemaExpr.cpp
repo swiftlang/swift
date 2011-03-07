@@ -20,7 +20,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExprVisitor.h"
 #include "swift/AST/Type.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/Twine.h"
@@ -316,6 +315,11 @@ SemaExpr::ActOnDollarIdentExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
 NullablePtr<Expr> 
 SemaExpr::ActOnIdentifierExpr(Identifier Text, llvm::SMLoc Loc) {
   ValueDecl *D = S.decl.LookupValueName(Text);
+  
+  if (D == 0)
+    return new (S.Context) UnresolvedDeclRefExpr(Text, Loc,
+                                                 S.Context.TheUnresolvedType);
+  
   
   Type *ResultTy = 0;
   if (SemaDeclRefExpr(D, Loc, ResultTy, *this)) return 0;
@@ -701,6 +705,9 @@ namespace {
       if (SemaDeclRefExpr(E->D, E->Loc, E->Ty, SE)) return 0;
       return E;
     }
+    Expr *VisitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
+      return E;
+    }
     Expr *VisitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
       return E;
     }
@@ -839,6 +846,9 @@ namespace {
     
     Expr *VisitTupleExpr(TupleExpr *E);
     
+    Expr *VisitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
+      return E;
+    }
     Expr *VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
       return E;
     }
