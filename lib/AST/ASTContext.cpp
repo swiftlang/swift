@@ -172,7 +172,7 @@ TupleType *ASTContext::getTupleType(llvm::ArrayRef<TupleTypeElt> Fields) {
   
   bool IsCanonical = true;   // All canonical elts means this is canonical.
   for (unsigned i = 0, e = Fields.size(); i != e; ++i)
-    IsCanonical &= Fields[i].Ty->isCanonical();
+    IsCanonical &= Fields[i].Ty ? Fields[i].Ty->isCanonical() : false;
 
   Fields = llvm::ArrayRef<TupleTypeElt>(FieldsCopy, Fields.size());
   

@@ -150,49 +150,27 @@ AnonDecl *SemaDecl::GetAnonDecl(llvm::StringRef Text, llvm::SMLoc RefLoc) {
 // Name Processing.
 //===----------------------------------------------------------------------===//
 
-/// GetTypeForPath - This returns the type of an element of the specified type.
-/// This is always a structural, syntactic, query as it is used for name
-/// processing, which is in the space of "how people wrote it".
-static Type *GetTypeForPath(Type *Ty, llvm::ArrayRef<unsigned> Path) {
-  if (Path.empty())
-    return Ty;
-  
-  // Right now, you can only dive into syntactic tuples.
-  TupleType *TT = llvm::dyn_cast<TupleType>(Ty);
-  if (TT == 0) return 0;
-  
-  // Reject invalid indices.
-  if (Path[0] >= TT->Fields.size())
-    return 0;
-  
-  return GetTypeForPath(TT->getElementType(Path[0]), Path.slice(1));
-}
-
 /// ActOnElementName - Assign a name to an element of D specified by Path.
 ElementRefDecl *SemaDecl::
 ActOnElementName(Identifier Name, llvm::SMLoc NameLoc, VarDecl *D,
                  llvm::ArrayRef<unsigned> Path) {
-  Type *Ty = GetTypeForPath(D->Ty, Path);
-  assert(Ty && "Access path validity should already have been checked by"
-         " CheckAccessPathArity");
+  Type *Ty = ElementRefDecl::getTypeForPath(D->Ty, Path);
+
+  // If the type of the path is obviously invalid, diagnose it now and refuse to
+  // create the decl.  The most common result here is DependentType, which
+  // allows type checking to resolve this later.
+  if (Ty == 0) {
+    error(NameLoc, "'" + Name.str() + "' is an invalid index for '" +
+          D->Ty->getString() + "'");
+    return 0;
+  }
+  
+  // Copy the access path into ASTContext's memory.
+  Path = S.Context.AllocateCopy(Path);
   
   // Create the decl for this name and add it to the current scope.
-  return new (S.Context) ElementRefDecl(D, NameLoc, Name, Ty);
+  return new (S.Context) ElementRefDecl(D, NameLoc, Name, Path, Ty);
 }
-
-/// CheckAccessPathArity - Check that the type specified by the access path has
-/// the right arity and return false if so.  Otherwise emit an error and emit
-/// true.
-bool SemaDecl::CheckAccessPathArity(unsigned NumChildren, llvm::SMLoc LPLoc,
-                                    VarDecl *D, llvm::ArrayRef<unsigned> Path) {
-  TupleType *Ty =llvm::dyn_cast_or_null<TupleType>(GetTypeForPath(D->Ty, Path));
-  if (Ty && Ty->Fields.size() == NumChildren)
-    return false;
-  
-  error(LPLoc, "tuple specifier has wrong number of elements for actual type");
-  return true;
-}
-
 
 //===----------------------------------------------------------------------===//
 // Declaration handling.
@@ -221,6 +199,7 @@ static Expr *DiagnoseUnresolvedTypes(Expr *E, Expr::WalkOrder Order,
 
 /// ActOnTopLevelDecl - This is called after parsing a new top-level decl.
 void SemaDecl::ActOnTopLevelDecl(ValueDecl *D) {
+#if 0
   // Check for and diagnose any uses of anonymous arguments that were unbound.
   for (unsigned i = 0, e = AnonClosureArgs.size(); i != e; ++i) {
     if (AnonClosureArgs[i].isNull()) continue;
@@ -229,10 +208,14 @@ void SemaDecl::ActOnTopLevelDecl(ValueDecl *D) {
     error(AD->UseLoc,
           "use of anonymous closure argument in non-closure context");
   }
+#endif
+  
   AnonClosureArgs.clear();
   
+#if 0
   if (Expr *E = D->Init)
     E->WalkExpr(DiagnoseUnresolvedTypes, this);
+#endif
 }
 
 /// ActOnTopLevelDeclError - This is called after an error parsing a top-level
@@ -244,41 +227,11 @@ void SemaDecl::ActOnTopLevelDeclError() {
 }
 
 
-/// ValidateAttributes - Check that the func/var declaration attributes are ok.
-static void ValidateAttributes(DeclAttributes &Attrs, Type *Ty, SemaDecl &SD) {
-  // If the decl has an infix precedence specified, then it must be a function
-  // whose input is a two element tuple.
-  if (Attrs.InfixPrecedence != -1) {
-    bool IsError = true;
-    if (FunctionType *FT = llvm::dyn_cast<FunctionType>(Ty))
-      if (TupleType *TT = llvm::dyn_cast<TupleType>(FT->Input))
-        IsError = TT->Fields.size() != 2;
-    if (IsError) {
-      SD.error(Attrs.LSquareLoc, "function with 'infix' specified must take "
-               "a two element tuple as input");
-      Attrs.InfixPrecedence = -1;
-    }
-  }
-}
-
 VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, Identifier Name,
                                 Type *Ty, Expr *Init, DeclAttributes &Attrs) {
   assert((Ty != 0 || Init != 0) && "Must have a type or an expr already");
-  
   if (Ty == 0)
-    Ty = Init->Ty;
-  else if (Init) {
-    // If both a type and an initializer are specified, make sure the
-    // initializer's type agrees with the (redundant) type.
-    Expr *InitE = S.expr.ConvertToType(Init, Ty, false, SemaExpr::CR_VarInit);
-    if (InitE)
-      Init = InitE;
-    else
-      Ty = Init->Ty;
-  }
-  
-  // Validate attributes.
-  ValidateAttributes(Attrs, Ty, *this);
+    Ty = S.Context.TheDependentType;
   
   return new (S.Context) VarDecl(VarLoc, Name, Ty, Init, Attrs);
 }
@@ -287,9 +240,6 @@ FuncDecl *SemaDecl::
 ActOnFuncDecl(llvm::SMLoc FuncLoc, Identifier Name,
               Type *Ty, DeclAttributes &Attrs) {
   assert(Ty && "Type not specified?");
-
-  // Validate attributes.
-  ValidateAttributes(Attrs, Ty, *this);
 
   return new (S.Context) FuncDecl(FuncLoc, Name, Ty, 0, Attrs);
 }
@@ -374,12 +324,6 @@ void SemaDecl::CreateArgumentDeclsForFunc(FuncDecl *FD) {
 
 FuncDecl *SemaDecl::ActOnFuncBody(FuncDecl *FD, Expr *Body) {
   assert(FD && Body && "Elements of func body not specified?");
-         
-  // Validate that the body's type matches the function's type if this isn't a
-  // external function.
-  Body = S.expr.ConvertToType(Body, FD->Ty, false, SemaExpr::CR_FuncBody);
-  if (Body == 0) return 0;
-  
   FD->Init = Body;
   return FD;
 }

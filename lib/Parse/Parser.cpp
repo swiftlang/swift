@@ -20,6 +20,7 @@
 #include "swift/Sema/Scope.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/NullablePtr.h"
@@ -175,10 +176,8 @@ TranslationUnitDecl *Parser::parseTranslationUnit() {
     // The entire translation unit is in a big scope.
     Scope OuterScope(S.decl);
   
-    while (Tok.isNot(tok::eof)) {
-      if (Decl *D = parseDeclTopLevel())
-        Decls.push_back(D);
-    }
+    while (Tok.isNot(tok::eof))
+      parseDeclTopLevel(Decls);
   }
   
   // Notify sema about the end of the translation unit.
@@ -196,39 +195,43 @@ TranslationUnitDecl *Parser::parseTranslationUnit() {
 ///     decl-func
 ///     decl-typealias
 ///     decl-var
-Decl *Parser::parseDeclTopLevel() {
+void Parser::parseDeclTopLevel(llvm::SmallVectorImpl<Decl *> &Decls) {
   switch (Tok.getKind()) {
   default:
     error(Tok.getLoc(), "expected a top level declaration");
     break;
   case tok::semi:
+    // Could create a decl for top-level semicolons.
     consumeToken(tok::semi);
-    return 0; // Could do a top-level semi decl.
+    return;
       
   case tok::kw_typealias:
     if (TypeAliasDecl *D = parseDeclTypeAlias())
-      return D;
-    return 0;
-
+      return Decls.push_back(D);
+    break;
   case tok::kw_oneof:
     if (Decl *O = parseDeclOneOf())
-      return O;
+      return Decls.push_back(O);
     break;
   case tok::kw_struct:
     if (Decl *D = parseDeclStruct())
-      return D;
+      return Decls.push_back(D);
     break;
   case tok::kw_func:
     if (FuncDecl *D = parseDeclFunc()) {
       S.decl.ActOnTopLevelDecl(D);
-      return D;
+      return Decls.push_back(D);
     }
     break;
   case tok::kw_var:
-    if (VarDecl *D = parseDeclVar()) {
-      S.decl.ActOnTopLevelDecl(D);
-      return D;
-    }
+    if (!parseDeclVar(Decls))
+      return;
+    
+#if 0
+  // FIXME: Remove ActOnTopLevelDecl argument.
+#endif
+    S.decl.ActOnTopLevelDecl(0);
+    
     break;
   }
   
@@ -239,7 +242,6 @@ Decl *Parser::parseDeclTopLevel() {
          Tok.isNot(tok::kw_func) && Tok.isNot(tok::kw_oneof) &&
          Tok.isNot(tok::kw_struct) && Tok.isNot(tok::kw_typealias))
     consumeToken();
-  return 0;
 }
 
 
@@ -386,23 +388,29 @@ TypeAliasDecl *Parser::parseDeclTypeAlias() {
 /// match up correctly.
 static void AddElementNamesForVarDecl(const NameRecord &Name,
                                     llvm::SmallVectorImpl<unsigned> &AccessPath,
-                                      VarDecl *VD, SemaDecl &SD) {
+                                      VarDecl *VD, SemaDecl &SD,
+                                      llvm::SmallVectorImpl<Decl *> &Decls) {
   // If this is a leaf name, ask sema to create a ElementRefDecl for us with the
   // specified access path.
   if (Name.Name.get()) {
-    SD.AddToScope(SD.ActOnElementName(Name.Name, Name.Loc, VD, AccessPath));
+    ElementRefDecl *ERD =
+      SD.ActOnElementName(Name.Name, Name.Loc, VD, AccessPath);
+    Decls.push_back(ERD);
+    SD.AddToScope(ERD);
     return;
   }
   
+#if 0
   // Otherwise, we have the paren case.  Verify that the currently named type
   // has the right number of elements.  If so, we recursively process each.
   if (SD.CheckAccessPathArity(Name.NumChildren, Name.Loc, VD, AccessPath))
     return;
+#endif
  
   AccessPath.push_back(0);
   for (unsigned i = 0, e = Name.NumChildren; i != e; ++i) {
     AccessPath.back() = i;
-    AddElementNamesForVarDecl(Name.Children[i], AccessPath, VD, SD);
+    AddElementNamesForVarDecl(Name.Children[i], AccessPath, VD, SD, Decls);
   }
   AccessPath.pop_back();
 }
@@ -412,7 +420,7 @@ static void AddElementNamesForVarDecl(const NameRecord &Name,
 ///
 ///   decl-var:
 ///      'var' attribute-list? var-name value-specifier
-VarDecl *Parser::parseDeclVar() {
+bool Parser::parseDeclVar(llvm::SmallVectorImpl<Decl *> &Decls) {
   SMLoc VarLoc = Tok.getLoc();
   consumeToken(tok::kw_var);
   
@@ -421,19 +429,21 @@ VarDecl *Parser::parseDeclVar() {
     parseAttributeList(Attributes);
 
   NameRecord Name;
-  if (parseVarName(Name)) return 0;
+  if (parseVarName(Name)) return true;
   
   Type *Ty = 0;
   NullablePtr<Expr> Init;
   if (parseValueSpecifier(Ty, Init))
-    return 0;
+    return true;
 
   VarDecl *VD = S.decl.ActOnVarDecl(VarLoc, Name.Name, Ty, Init.getPtrOrNull(),
                                     Attributes);
-  if (VD == 0) return 0;
+  if (VD == 0) return true;
+  
+  Decls.push_back(VD);
   
   // Enter the declaration into the current scope.  Since var's are not allowed
-  // to be recursive, so they are entered after its initializer is parsed.  This
+  // to be recursive, they are entered after its initializer is parsed.  This
   // does mean that stuff like this is different than C:
   //    var x = 1; { var x = x+1; assert(x == 2); }
   if (Name.Name.get())
@@ -443,9 +453,9 @@ VarDecl *Parser::parseDeclVar() {
     // through it and synthesize the decls that reference the var elements as
     // appropriate.
     llvm::SmallVector<unsigned, 8> AccessPath;
-    AddElementNamesForVarDecl(Name, AccessPath, VD, S.decl);
+    AddElementNamesForVarDecl(Name, AccessPath, VD, S.decl, Decls);
   }
-  return VD;
+  return false;
 }
 
 
@@ -784,77 +794,35 @@ bool Parser::parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
 // Expression Parsing
 //===----------------------------------------------------------------------===//
 
-bool Parser::isStartOfExpr(Token &Tok) const {
-  if (Tok.is(tok::identifier)) {
-    // If this is a binary operator, then it isn't the start of an expr.
-    ValueDecl *VD =
-      S.decl.LookupValueName(S.Context.getIdentifier(Tok.getText()));
-    
-    // Use of undeclared identifier.
-    if (VD == 0) return true;
-    
-    return VD->Attrs.InfixPrecedence == -1;
-  }
-  
+static bool isStartOfExpr(Token &Tok) {
   return Tok.is(tok::numeric_constant) || Tok.is(tok::colon) ||
          Tok.is(tok::l_paren) || Tok.is(tok::l_brace) ||
-         Tok.is(tok::dollarident);
+         Tok.is(tok::dollarident) || Tok.is(tok::identifier);
 }
 
 /// parseExpr
 ///   expr:
-///     expr-single+
+///     expr-primary+
 bool Parser::parseExpr(NullablePtr<Expr> &Result, const char *Message) {
   llvm::SmallVector<Expr*, 8> SequencedExprs;
   
-  Expr *LastExpr = 0;
   do {
-    // Parse the expr-single.
+    // Parse the expr-primary.
     Result = 0;
-    if (parseExprSingle(Result) || Result.isNull()) return true;
+    if (parseExprPrimary(Result) || Result.isNull()) return true;
 
-    // Check to see if this juxtaposition is application of a function with its
-    // arguments.  If so, bind the function application, otherwise, we have a
-    // sequence.
-    if (LastExpr == 0)
-      LastExpr = Result.get();
-    else {
-      llvm::PointerIntPair<Expr*, 1, bool>
-        ApplyRes = S.expr.ActOnJuxtaposition(LastExpr, Result.get());
-
-      if (!ApplyRes.getInt()) {
-        // Function application.
-        LastExpr = ApplyRes.getPointer();
-        if (LastExpr == 0) return true;
-      } else {
-        // Sequencing.
-        assert(ApplyRes.getPointer() == 0 && "Sequencing with a result?");
-        SequencedExprs.push_back(LastExpr);
-        LastExpr = Result.get();
-      }
-    }
+    SequencedExprs.push_back(Result.get());    
   } while (isStartOfExpr(Tok));
-
-  assert(LastExpr && "Should have parsed at least one valid expression");
   
   // If there is exactly one element in the sequence, it is a degenerate
   // sequence that just returns the last value anyway, shortcut ActOnSequence.
-  if (SequencedExprs.empty()) {
-    Result = LastExpr;
+  if (SequencedExprs.size() == 1) {
+    Result = SequencedExprs[0];
     return false;
   }
   
-  SequencedExprs.push_back(LastExpr);
-  Result = S.expr.ActOnSequence(SequencedExprs.data(), SequencedExprs.size());
+  Result = S.expr.ActOnSequence(SequencedExprs);
   return false;
-}
-
-/// parseExprSingle
-///   expr-single:
-///     expr-primary (binary-operator expr-primary)*
-bool Parser::parseExprSingle(llvm::NullablePtr<Expr> &Result,
-                             const char *Message) {
-  return parseExprPrimary(Result, Message) || parseExprBinaryRHS(Result);
 }
 
 /// parseExprPrimary
@@ -879,7 +847,7 @@ bool Parser::parseExprSingle(llvm::NullablePtr<Expr> &Result,
 ///     expr-primary '.' dollarident
 ///
 ///   expr-subscript:
-///     expr-primary '[' expr-single ']'
+///     expr-primary '[' expr ']'
 bool Parser::parseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
   switch (Tok.getKind()) {
   case tok::numeric_constant:
@@ -939,7 +907,7 @@ bool Parser::parseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
     // Check for a [expr] suffix.
     if (consumeIf(tok::l_square)) {
       NullablePtr<Expr> Idx;
-      if (parseExprSingle(Idx, "expected expression parsing array index"))
+      if (parseExpr(Idx, "expected expression parsing array index"))
         return true;
       
       SMLoc RLoc = Tok.getLoc();
@@ -954,42 +922,6 @@ bool Parser::parseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
     }
         
     break;
-  }
-  
-  // Okay, we parsed the expression primary and any suffix expressions.  If the
-  // result has function type and if this is followed by another expression,
-  // then we have a juxtaposition case which is parsed.  Note that this
-  // production is ambiguous with the higher level "expr: expr-single+"
-  // production, as witnessed by examples like:
-  //     A + B C * D
-  // Which can be parsed either as:
-  //     A + (B C) * D         <-- Juxtaposition here
-  //     (A + B) (C * D)       <-- Juxtaposition in the expr production
-  // This is disambiguated based on whether B has function type or not.
-  while (!Result.isNull() && isStartOfExpr(Tok)) {
-    NullablePtr<Expr> RHS;
-    switch (S.expr.getJuxtapositionGreediness(Result.get())) {
-    default: assert(0 && "Unknown juxtaposition greediness");
-    case SemaExpr::JG_NonGreedy: return false;
-    case SemaExpr::JG_LocallyGreedy:
-      if (parseExprPrimary(RHS,
-                           "expected expression after juxtaposed operator") ||
-          RHS.isNull())
-        return true;
-      break;
-    case SemaExpr::JG_Greedy:
-      if (parseExprSingle(RHS,
-                          "expected expression after juxtaposed operator") ||
-          RHS.isNull())
-        return true;
-      break;
-    }
-    
-    llvm::PointerIntPair<Expr*, 1, bool>
-    Op = S.expr.ActOnJuxtaposition(Result.get(), RHS.get());
-    assert(!Op.getInt() && "ShouldGreedilyJuxtapose guaranteed an apply");
-    
-    Result = Op.getPointer();
   }
   
   return false;
@@ -1111,6 +1043,7 @@ bool Parser::parseExprParen(llvm::NullablePtr<Expr> &Result) {
 ///     '{' expr-brace-item* '}'
 ///   expr-brace-item:
 ///     expr
+///     expr '=' expr
 ///     decl-var
 ///     ';'
 bool Parser::parseExprBrace(NullablePtr<Expr> &Result) {
@@ -1138,9 +1071,15 @@ bool Parser::parseExprBrace(NullablePtr<Expr> &Result) {
     
     // Parse the decl or expression.    
     switch (Tok.getKind()) {
-    case tok::kw_var:
-      Entries.back() = parseDeclVar();
+    case tok::kw_var: {
+      llvm::SmallVector<Decl*, 4> VD;
+      if (parseDeclVar(VD)) break; // Error.
+      assert(!VD.empty() && "Cannot return an empty decl list on success!");
+      Entries.back() = VD[0];
+      for (unsigned i = 1, e = VD.size(); i != e; ++i)
+        Entries.push_back(VD[i]);
       break;
+    }
     case tok::kw_typealias:
       Entries.back() = parseDeclTypeAlias();
       break;
@@ -1152,10 +1091,25 @@ bool Parser::parseExprBrace(NullablePtr<Expr> &Result) {
       break;
     default:
       NullablePtr<Expr> ResultExpr;
-      if (!parseExpr(ResultExpr) && !ResultExpr.isNull()) {
-        Entries.back() = ResultExpr.get();
-        MissingSemiAtEnd = true;
+      if (parseExpr(ResultExpr) || ResultExpr.isNull())
+        break;
+        
+      // FIXME: Assignment is a hack until we get generics.  We really want to
+      // parse '=' as any other overloaded/generic binary operator.
+      if (Tok.is(tok::equal)) {
+        SMLoc EqualLoc = Tok.getLoc();
+        consumeToken();
+        NullablePtr<Expr> RHSExpr;
+        if (parseExpr(RHSExpr) || RHSExpr.isNull())
+          break;
+        
+        // FIXME: Assignment is represented with null Fn.
+        ResultExpr = new (S.Context) BinaryExpr(ResultExpr.get(), 0, EqualLoc,
+                                                RHSExpr.get());
       }
+        
+      Entries.back() = ResultExpr.get();
+      MissingSemiAtEnd = true;
       break;
     }
     
@@ -1181,80 +1135,5 @@ bool Parser::parseExprBrace(NullablePtr<Expr> &Result) {
   }
   
   Result = S.expr.ActOnBraceExpr(LBLoc, Entries, MissingSemiAtEnd, RBLoc);
-  return false;
-}
-
-
-/// getBinOp - Return the ValueDecl for the token if it is an infix binary
-/// operator, otherwise return null.
-static ValueDecl *getBinOp(const Token &Tok, Sema &S) {
-  if (Tok.isNot(tok::identifier))
-    return 0;
-  ValueDecl *VD =S.decl.LookupValueName(S.Context.getIdentifier(Tok.getText()));
-  if (VD == 0 || VD->Attrs.InfixPrecedence == -1)
-    return 0;
-  return VD;
-}
-
-
-/// parseExprBinaryRHS - Parse the right hand side of a binary expression and
-/// assemble it according to precedence rules.
-///
-///   expr-binary-rhs:
-///     (binary-operator expr-primary)*
-bool Parser::parseExprBinaryRHS(NullablePtr<Expr> &Result, unsigned MinPrec) {
-  ValueDecl *NextTokOp = getBinOp(Tok, S);
-  int NextTokPrec = NextTokOp ? NextTokOp->Attrs.InfixPrecedence : -1;
-  // Assignment is a hack until we get generics.  Assignment gets the lowest
-  // precedence since it "returns void".
-  if (Tok.is(tok::equal)) NextTokPrec = 1;
-  while (1) {
-    // If this token has a lower precedence than we are allowed to parse (e.g.
-    // because we are called recursively, or because the token is not a binop),
-    // then we are done!
-    if (NextTokPrec < (int)MinPrec)
-      return false;
-    
-    // Consume the operator, saving the operator location.
-    SMLoc OpLoc = Tok.getLoc();
-    consumeToken();
-    
-    // TODO: Support ternary operators some day.
-    
-    // Parse another leaf here for the RHS of the operator.
-    NullablePtr<Expr> Leaf;
-    if (parseExprPrimary(Leaf, "expected expression after binary operator"))
-      return true;
-
-    // Remember the precedence of this operator and get the precedence of the
-    // operator immediately to the right of the RHS.
-    int ThisPrec = NextTokPrec;
-    ValueDecl *ThisTokOp = NextTokOp;
-    
-    NextTokOp = getBinOp(Tok, S);
-    NextTokPrec = NextTokOp ? NextTokOp->Attrs.InfixPrecedence : -1;
-    if (Tok.is(tok::equal)) NextTokPrec = 1;
-
-    // TODO: All operators are left associative at the moment.
-    
-    // If the next operator binds more tightly with RHS than we do, evaluate the
-    // RHS as a complete subexpression first
-    if (ThisPrec < NextTokPrec) {
-      // Only parse things on the RHS that bind more tightly than the current
-      // operator.
-      if (parseExprBinaryRHS(Leaf, ThisPrec + 1))
-        return true;
-      
-      NextTokOp = getBinOp(Tok, S);
-      NextTokPrec = NextTokOp ? NextTokOp->Attrs.InfixPrecedence : -1;
-    }
-    assert(NextTokPrec <= ThisPrec && "Recursion didn't work!");
-    
-    // Okay, we've finished the parse, form the AST node for the binop now.
-    if (Result.isNonNull() && Leaf.isNonNull())
-      Result = S.expr.ActOnBinaryExpr(Result.get(), ThisTokOp, OpLoc,
-                                      Leaf.get());
-  }
-  
   return false;
 }

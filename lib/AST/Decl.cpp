@@ -56,6 +56,34 @@ NameAliasType *TypeAliasDecl::getAliasType(ASTContext &C) const {
   return AliasTy;
 }
 
+/// getTypeForPath - Given a type and an access path into it, return the
+/// referenced element type.  If the access path is invalid for the specified
+/// type, this returns null.
+Type *ElementRefDecl::getTypeForPath(Type *Ty, llvm::ArrayRef<unsigned> Path) {
+  assert(Ty && "getTypeForPath() doesn't allow a null type!");
+  
+  if (Path.empty())
+    return Ty;
+  
+  Ty = Ty->getDesugaredType();
+  
+  // If we reach a dependent type, just return it.
+  if (llvm::isa<DependentType>(Ty))
+    return Ty;
+  
+  // Right now, you can only dive into tuples.  Eventually this should handle
+  // oneof's etc.
+  if (TupleType *TT = llvm::dyn_cast<TupleType>(Ty)) {
+    // Reject invalid indices.
+    if (Path[0] >= TT->Fields.size())
+      return 0;
+  
+    return getTypeForPath(TT->getElementType(Path[0]), Path.slice(1));
+  }
+  
+  return 0;
+}
+
 
 //===----------------------------------------------------------------------===//
 //  Decl printing.
@@ -87,8 +115,15 @@ void TranslationUnitDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS << ')';
 }
 
+static void PrintDeclName(const NamedDecl *D, llvm::raw_ostream &OS) {
+  if (D->Name.get())
+    OS << '\'' << D->Name << '\'';
+  else
+    OS << "'anonname=" << (const void*)D << '\'';
+}
+
 void NamedDecl::printCommon(llvm::raw_ostream &OS, unsigned Indent) const {
-  OS << "'" << Name << "'";
+  PrintDeclName(this, OS);
 }
 
 void TypeAliasDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
@@ -110,36 +145,48 @@ void ValueDecl::printCommon(llvm::raw_ostream &OS, unsigned Indent) const {
     OS << '\n';
     Init->print(OS, Indent+2);
   }
-  OS << ')';
 }
 
 void VarDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(vardecl ";
   printCommon(OS, Indent);
+  OS << ')';
 }
 
 void FuncDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(funcdecl ";
   printCommon(OS, Indent);
+  OS << ')';
 }
 
 void OneOfElementDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(oneofelementdecl ";
   printCommon(OS, Indent);
+  OS << ')';
 }
 
 void ArgDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(argdecl ";
   printCommon(OS, Indent);
+  OS << ')';
 }
 
 void AnonDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(anondecl ";
   printCommon(OS, Indent);
+  OS << ')';
 }
 
 void ElementRefDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(elementrefdecl ";
   printCommon(OS, Indent);
+  OS << '\n';
+  OS.indent(Indent+2);
+  OS << "(accesspath ";
+  PrintDeclName(VD, OS);
+  for (unsigned i = 0, e = AccessPath.size(); i != e; ++i)
+    OS << ", " << AccessPath[i];
+  
+  OS << "))";
 }
 

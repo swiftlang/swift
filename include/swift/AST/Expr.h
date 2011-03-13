@@ -62,7 +62,7 @@ public:
   /// Ty - This is the type of the expression.
   Type *Ty;
   
-  Expr(ExprKind kind, Type *ty) : Kind(kind), Ty(ty) {}
+  Expr(ExprKind kind, Type *ty = 0) : Kind(kind), Ty(ty) {}
 
   /// getLocStart - Return the location of the start of the expression.
   /// FIXME: QOI: Need to extend this to do full source ranges like Clang.
@@ -107,11 +107,11 @@ public:
 /// IntegerLiteral - Integer literal, like '4'.
 class IntegerLiteral : public Expr {
 public:
-  llvm::StringRef Val;  // TODO: uint64_t.  APInt leaks.
+  llvm::StringRef Val;  // Use StringRef instead of APInt, APInt leaks.
   llvm::SMLoc Loc;
   
-  IntegerLiteral(llvm::StringRef V, llvm::SMLoc L, Type *Ty)
-    : Expr(IntegerLiteralKind, Ty), Val(V), Loc(L) {}
+  IntegerLiteral(llvm::StringRef V, llvm::SMLoc L)
+    : Expr(IntegerLiteralKind), Val(V), Loc(L) {}
   
   uint64_t getValue() const;
   
@@ -126,7 +126,7 @@ public:
   ValueDecl *D;
   llvm::SMLoc Loc;
   
-  DeclRefExpr(ValueDecl *d, llvm::SMLoc L, Type *Ty)
+  DeclRefExpr(ValueDecl *d, llvm::SMLoc L, Type *Ty = 0)
     : Expr(DeclRefExprKind, Ty), D(d), Loc(L) {}
   
   // Implement isa/cast/dyncast/etc.
@@ -139,15 +139,13 @@ public:
 /// may be a use of something that got imported (which will be resolved during
 /// sema), or may just be a use of an unknown identifier.
 ///
-/// The type of this is always TheUnresolvedType.
-///
 class UnresolvedDeclRefExpr : public Expr {
 public:
   Identifier Name;
   llvm::SMLoc Loc;
   
-  UnresolvedDeclRefExpr(Identifier name, llvm::SMLoc loc, Type *Ty)
-    : Expr(UnresolvedDeclRefExprKind, Ty), Name(name), Loc(loc) {
+  UnresolvedDeclRefExpr(Identifier name, llvm::SMLoc loc)
+    : Expr(UnresolvedDeclRefExprKind), Name(name), Loc(loc) {
   }
   
   // Implement isa/cast/dyncast/etc.
@@ -167,8 +165,8 @@ public:
   Identifier Name;
   
   UnresolvedMemberExpr(llvm::SMLoc colonLoc, llvm::SMLoc nameLoc,
-                       Identifier name, Type *Ty)
-    : Expr(UnresolvedMemberExprKind, Ty),
+                       Identifier name)
+    : Expr(UnresolvedMemberExprKind),
       ColonLoc(colonLoc), NameLoc(nameLoc), Name(name) {
   }
   
@@ -194,7 +192,7 @@ public:
   llvm::SMLoc RParenLoc;
   
   TupleExpr(llvm::SMLoc lparenloc, Expr **subexprs, Identifier *subexprnames,
-            unsigned numsubexprs, llvm::SMLoc rparenloc, Type *Ty)
+            unsigned numsubexprs, llvm::SMLoc rparenloc, Type *Ty = 0)
     : Expr(TupleExprKind, Ty), LParenLoc(lparenloc), SubExprs(subexprs),
       SubExprNames(subexprnames), NumSubExprs(numsubexprs),
       RParenLoc(rparenloc) {}
@@ -214,8 +212,8 @@ public:
   llvm::SMLoc NameLoc;
   
   UnresolvedDotExpr(Expr *subexpr, llvm::SMLoc dotloc, Identifier name,
-                    llvm::SMLoc nameloc, Type *Ty)
-  : Expr(UnresolvedDotExprKind, Ty), SubExpr(subexpr), DotLoc(dotloc),
+                    llvm::SMLoc nameloc)
+  : Expr(UnresolvedDotExprKind), SubExpr(subexpr), DotLoc(dotloc),
     Name(name), NameLoc(nameloc) {}
   
   // Implement isa/cast/dyncast/etc.
@@ -232,8 +230,8 @@ public:
   llvm::SMLoc NameLoc;
   
   TupleElementExpr(Expr *subexpr, llvm::SMLoc dotloc, unsigned fieldno,
-                   llvm::SMLoc nameloc, Type *Ty)
-  : Expr(TupleElementExprKind, Ty), SubExpr(subexpr), DotLoc(dotloc),
+                   llvm::SMLoc nameloc, Type *ty = 0)
+  : Expr(TupleElementExprKind, ty), SubExpr(subexpr), DotLoc(dotloc),
     FieldNo(fieldno), NameLoc(nameloc) {}
   
   // Implement isa/cast/dyncast/etc.
@@ -267,8 +265,8 @@ public:
   Expr **Elements;
   unsigned NumElements;
   
-  SequenceExpr(Expr **elements, unsigned numElements, Type *Ty)
-    : Expr(SequenceExprKind, Ty), Elements(elements), NumElements(numElements) {
+  SequenceExpr(Expr **elements, unsigned numElements)
+    : Expr(SequenceExprKind), Elements(elements), NumElements(numElements) {
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -292,8 +290,8 @@ public:
   llvm::SMLoc RBLoc;
 
   BraceExpr(llvm::SMLoc lbloc, llvm::PointerUnion<Expr*, Decl*> *elements,
-            unsigned numelements, bool missingsemi, llvm::SMLoc rbloc, Type *Ty)
-    : Expr(BraceExprKind, Ty), LBLoc(lbloc), Elements(elements),
+            unsigned numelements, bool missingsemi, llvm::SMLoc rbloc)
+    : Expr(BraceExprKind), LBLoc(lbloc), Elements(elements),
       NumElements(numelements), MissingSemi(missingsemi), RBLoc(rbloc) {}
 
   // Implement isa/cast/dyncast/etc.
@@ -338,7 +336,7 @@ public:
   llvm::SMLoc OpLoc;
   Expr *RHS;
   
-  BinaryExpr(Expr *lhs, ValueDecl *fn, llvm::SMLoc oploc, Expr *rhs, Type *Ty)
+  BinaryExpr(Expr *lhs, ValueDecl *fn, llvm::SMLoc oploc, Expr *rhs, Type *Ty=0)
     : Expr(BinaryExprKind, Ty), LHS(lhs), Fn(fn), OpLoc(oploc), RHS(rhs) {}
 
   // Implement isa/cast/dyncast/etc.

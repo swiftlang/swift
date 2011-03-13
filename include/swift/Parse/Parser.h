@@ -26,6 +26,7 @@ namespace llvm {
   template<class T>
   class NullablePtr;
   class Twine;
+  template <typename T> class SmallVectorImpl;
 }
 
 namespace swift {
@@ -44,6 +45,12 @@ namespace swift {
   class TupleTypeElt;
   class Identifier;
   
+  /// performTypeChecking - Once parsing and namebinding are complete, these
+  /// walks the AST to resolve types and diagnose problems therein.
+  ///
+  /// FIXME: This should be moved out to somewhere else.
+  void performTypeChecking(TranslationUnitDecl *TUD, ASTContext &Ctx);
+
 class Parser {
   llvm::SourceMgr &SourceMgr;
   Lexer &L;
@@ -101,7 +108,7 @@ private:
   bool parseValueSpecifier(Type *&Ty, llvm::NullablePtr<Expr> &Init);
   
   // Decl Parsing
-  Decl *parseDeclTopLevel();
+  void parseDeclTopLevel(llvm::SmallVectorImpl<Decl *> &Decls);
   TypeAliasDecl *parseDeclTypeAlias();
   void parseAttributeList(DeclAttributes &Attributes);
   bool parseAttribute(DeclAttributes &Attributes);
@@ -109,7 +116,7 @@ private:
   
   Decl *parseDeclOneOf();
   Decl *parseDeclStruct();
-  VarDecl *parseDeclVar();
+  bool parseDeclVar(llvm::SmallVectorImpl<Decl *> &Decls);
   FuncDecl *parseDeclFunc();
   
   // Type Parsing
@@ -120,15 +127,12 @@ private:
                           Type *&Result);
 
   // Expression Parsing
-  bool isStartOfExpr(Token &Tok) const;
   bool parseExpr(llvm::NullablePtr<Expr> &Result, const char *Message = 0);
   bool parseExprSingle(llvm::NullablePtr<Expr> &Result, const char *Message =0);
   bool parseExprPrimary(llvm::NullablePtr<Expr> &Result, const char *Message=0);
   bool parseExprIdentifier(llvm::NullablePtr<Expr> &Result);
   bool parseExprParen(llvm::NullablePtr<Expr> &Result);
   bool parseExprBrace(llvm::NullablePtr<Expr> &Result);
-  bool parseExprBinaryRHS(llvm::NullablePtr<Expr> &Result,
-                          unsigned MinPrecedence = 0);
 };
   
 } // end namespace swift

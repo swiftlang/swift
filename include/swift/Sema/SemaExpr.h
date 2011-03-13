@@ -40,40 +40,6 @@ public:
   explicit SemaExpr(Sema &S) : SemaBase(S) {}
 
   
-  // Utility Functions
-
-  enum ConversionReason {
-    CR_BinOpLHS,  // Left side of binary operator.
-    CR_BinOpRHS,  // Right side of binary operator.
-    CR_FuncApply, // Application of function argument.
-    CR_VarInit,   // Var initializer
-    CR_TupleInit, // Tuple element initializer.
-    CR_FuncBody   // Function body specification.
-  };
-  
-  /// ConvertToType - Do semantic analysis of an expression in a context that
-  /// expects a particular type.  This does conversion to that type if the types
-  /// don't match and diagnoses cases where the conversion cannot be performed.
-  /// The Reason specifies why this conversion is happening, for diagnostic
-  /// purposes.
-  ///
-  /// This emits a diagnostic and returns null on error.
-  Expr *ConvertToType(Expr *E, Type *Ty, bool IgnoreAnonDecls,
-                      ConversionReason Reason);
-
-  enum JuxtapositionGreediness {
-    JG_NonGreedy,       // Is not a function
-    JG_LocallyGreedy,   // Is a tightly binding function.
-    JG_Greedy           // Is a loosely binding function.
-  };
-
-  /// getJuxtapositionGreediness - This returns an enum that specifies how
-  /// tightly juxtaposition binds for a subexpression.  This allows functions
-  /// to bind to their arguments tightly.  When this returns something other
-  /// than NonGreedy, Sema is guaranteeing that juxtaposition will result in an
-  /// ApplyExpr.
-  JuxtapositionGreediness getJuxtapositionGreediness(Expr *E) const;
-  
   // Action Implementations
   llvm::NullablePtr<Expr>
   ActOnNumericConstant(llvm::StringRef Text, llvm::SMLoc Loc);
@@ -105,11 +71,7 @@ public:
   llvm::NullablePtr<Expr>
   ActOnArraySubscript(Expr *Base,llvm::SMLoc LLoc, Expr *Idx, llvm::SMLoc RLoc);
   
-  llvm::PointerIntPair<Expr*, 1, bool> ActOnJuxtaposition(Expr *E1, Expr *E2);
-  llvm::NullablePtr<Expr> ActOnSequence(Expr **Exprs, unsigned NumExprs); 
-  
-  llvm::NullablePtr<Expr> ActOnBinaryExpr(Expr *LHS, ValueDecl *OpFn,
-                                          llvm::SMLoc OpLoc, Expr *RHS);
+  llvm::NullablePtr<Expr> ActOnSequence(llvm::ArrayRef<Expr *> Exprs); 
 };
   
 } // end namespace swift

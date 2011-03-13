@@ -285,6 +285,7 @@ public:
 /// ArgDecl - A declaration representing a named function argument, in a func
 /// declaration.  For example, in "func x(a : int);", 'a' is an ArgDecl.
 ///
+/// TODO: Should this be a special case of ElementRefDecl?
 class ArgDecl : public ValueDecl {
 public:
   // FIXME: We don't have good location information for the function argument
@@ -334,12 +335,21 @@ class ElementRefDecl : public ValueDecl {
 public:
   VarDecl *VD;
   llvm::SMLoc NameLoc;
-  // TODO: Access path.
+  llvm::ArrayRef<unsigned> AccessPath;
   
-  ElementRefDecl(VarDecl *vd, llvm::SMLoc nameloc, Identifier name, Type *ty)
-    : ValueDecl(ElementRefDeclKind, name, ty, 0), VD(vd), NameLoc(nameloc) {
+  ElementRefDecl(VarDecl *vd, llvm::SMLoc nameloc, Identifier name,
+                 llvm::ArrayRef<unsigned> path, Type *ty)
+    : ValueDecl(ElementRefDeclKind, name, ty, 0), VD(vd), NameLoc(nameloc),
+      AccessPath(path) {
   }
 
+  /// getTypeForPath - Given a type and an access path into it, return the
+  /// referenced element type.  If the access path is invalid for the specified
+  /// type, this returns null.  If the query goes into an unresolved (dependent)
+  /// part of the type, this returns TheDependentType.
+  static Type *getTypeForPath(Type *Ty, llvm::ArrayRef<unsigned> Path);
+  
+  
   llvm::SMLoc getLocStart() const { return NameLoc; }
   
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
