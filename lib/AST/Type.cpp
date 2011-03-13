@@ -82,6 +82,10 @@ void Type::dump() const {
 }
 
 void Type::print(llvm::raw_ostream &OS) const {
+  if (this == 0) {
+    OS << "<null>";
+    return;
+  }
   switch (Kind) {
   case DependentTypeKind:     return cast<DependentType>(this)->print(OS);
     case UnresolvedTypeKind:  return cast<UnresolvedType>(this)->print(OS);
@@ -114,16 +118,16 @@ void NameAliasType::print(llvm::raw_ostream &OS) const {
 }
 
 void OneOfType::print(llvm::raw_ostream &OS) const {
-  OS << "oneof {";
+  OS << "oneof { ";
     
   for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
-    OS << ' ';
-    if (i) OS << ", " << Elements[i]->Name;
+    if (i) OS << ", ";
+    OS << Elements[i]->Name;
     if (Elements[i]->ArgumentType)
       OS << " : " << *Elements[i]->ArgumentType;
   }
   
-  OS << " }";
+  OS << '}';
 }
 
 void TupleType::print(llvm::raw_ostream &OS) const {

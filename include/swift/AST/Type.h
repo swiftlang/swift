@@ -67,7 +67,8 @@ public:
   /// isCanonical - Return true if this is a canonical type.
   bool isCanonical() const { return CanonicalType == this; }
     
-  /// Return true if the outermost level of this type is a sugared type.
+  /// getDesugaredType - If this type is a sugared type, remove all levels of
+  /// sugar until we get down to a non-sugar type.
   Type *getDesugaredType();
 
   /// If this type is a (potentially sugared) type of the specified kind, remove
