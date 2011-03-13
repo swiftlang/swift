@@ -77,6 +77,16 @@ OneOfElementDecl *OneOfType::getElement(Identifier Name) const {
 //  Type printing.
 //===----------------------------------------------------------------------===//
 
+/// getString - Return the name of the type as a string, for use in
+/// diagnostics only.
+std::string Type::getString() const {
+  std::string Result;
+  llvm::raw_string_ostream OS(Result);
+  OS << *this;
+  return OS.str();
+}
+
+
 void Type::dump() const {
   llvm::errs() << *this << '\n';
 }

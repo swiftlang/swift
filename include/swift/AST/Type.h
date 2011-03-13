@@ -78,6 +78,10 @@ public:
     return llvm::dyn_cast<T>(getDesugaredType());
   }
 
+  /// getString - Return the name of the type as a string, for use in
+  /// diagnostics only.
+  std::string getString() const;
+  
   void dump() const;
   void print(llvm::raw_ostream &OS) const;
   
