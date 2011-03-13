@@ -78,9 +78,9 @@ public:
   }
 
   template<typename T>
-  llvm::ArrayRef<T*> AllocateCopy(llvm::ArrayRef<T*> Arr) {
-    return llvm::ArrayRef<T*>(AllocateCopy<T*>(Arr.begin(), Arr.end()),
-                              Arr.size());
+  llvm::ArrayRef<T> AllocateCopy(llvm::ArrayRef<T> Arr) {
+    return llvm::ArrayRef<T>(AllocateCopy<T>(Arr.begin(), Arr.end()),
+                             Arr.size());
   }
 
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
