@@ -49,18 +49,22 @@ namespace {
       Context.setHadError();
       Context.SourceMgr.PrintMessage(Loc, Message, "error");
     }
+    
+    bool validateType(Type *T);
+
+    void typeCheck(TypeAliasDecl *TAD);
 
     void typeCheck(ValueDecl *VD) {
       // No types to resolved for a ElementRefDecl.
-      if (isa<ElementRefDecl>(VD))
-        return;
-    
-      if (VarDecl *Var = dyn_cast<VarDecl>(VD))
+      if (ElementRefDecl *ERD = dyn_cast<ElementRefDecl>(VD))
+        typeCheck(ERD);
+      else if (VarDecl *Var = dyn_cast<VarDecl>(VD))
         typeCheck(Var);
       else
         typeCheck(cast<FuncDecl>(VD));
     }
     
+    void typeCheck(ElementRefDecl *ERD);
     void typeCheck(FuncDecl *FD);
     void typeCheck(VarDecl *VD);
     
@@ -787,22 +791,11 @@ Expr *SemaExpressionTree::VisitBraceExpr(BraceExpr *E) {
     }
     
     Decl *D = E->Elements[i].get<Decl*>();
+    if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D))
+      TC.typeCheck(TAD);
+
     if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
       TC.typeCheck(VD);
-    
-    if (ElementRefDecl *ERD = dyn_cast<ElementRefDecl>(D)) {
-      if (isa<DependentType>(ERD->Ty)) {
-        if (Type *T = ElementRefDecl::getTypeForPath(ERD->VD->Ty,
-                                                     ERD->AccessPath))
-          ERD->Ty = T;
-        else {
-          TC.error(ERD->getLocStart(), "'" + ERD->Name.str() +
-                   "' is an invalid index for '" + ERD->VD->Ty->getString() +
-                   "'");
-          return 0;
-        }
-      }
-    }
   }
     
   if (SemaBraceExpr(E->LBLoc, E->Elements, E->NumElements,
@@ -1209,6 +1202,97 @@ Expr *TypeChecker::convertToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
   return 0;
 }
 
+//===----------------------------------------------------------------------===//
+// Type Validation
+//===----------------------------------------------------------------------===//
+
+/// validateType - Types can contain expressions (in the default values for
+/// tuple elements), and thus need semantic analysis to ensure that these
+/// expressions are valid and that they have the appropriate conversions etc.
+///
+/// This returns true if the type is invalid.
+bool TypeChecker::validateType(Type *T) {
+  assert(T && "Cannot validate null types!");
+  
+  // If a type has a canonical type, then it is known safe.
+  if (T->hasCanonicalTypeComputed()) return false;
+  
+  switch (T->Kind) {
+  case UnresolvedTypeKind:
+  case BuiltinInt32Kind:
+  case DependentTypeKind:
+    return false;
+  case OneOfTypeKind: {
+    OneOfType *OOT = cast<OneOfType>(T);
+    for (unsigned i = 0, e = OOT->Elements.size(); i != e; ++i) {
+      if (OOT->Elements[i]->ArgumentType == 0) continue;
+      if (validateType(OOT->Elements[i]->ArgumentType)) return true;
+    }
+    break;
+  }
+  case NameAliasTypeKind:
+    if (validateType(llvm::cast<NameAliasType>(T)->TheDecl->UnderlyingTy))
+      return true;
+    break;
+  case TupleTypeKind: {
+    TupleType *TT = llvm::cast<TupleType>(T);
+    
+    // Okay, we found an uncanonicalized tuple type, which might have default
+    // values.  If so, we'll potentially have to update it.
+    for (unsigned i = 0, e = TT->Fields.size(); i != e; ++i) {
+      // The element has *at least* a type or an initializer, so we start by
+      // verifying each individually.
+      Type *EltTy = TT->Fields[i].Ty;
+      if (EltTy && validateType(EltTy))
+        return true;
+
+      Expr *EltInit = TT->Fields[i].Init;
+      if (EltInit == 0) continue;
+      
+      checkBody(EltInit);
+      if (EltInit == 0) return true;
+        
+      // If both a type and an initializer are specified, make sure the
+      // initializer's type agrees with the (redundant) type.
+      if (EltTy) {
+        EltInit = convertToType(EltInit, EltTy, false, CR_TupleInit);
+        if (EltInit == 0) return true;
+      } else {
+        EltTy = EltInit->Ty;
+      }
+
+      TT->updateInitializedElementType(i, EltTy, EltInit);
+    }
+    break;
+  }
+      
+  case FunctionTypeKind: {
+    FunctionType *FT = llvm::cast<FunctionType>(T);
+    if (validateType(FT->Input) ||
+        validateType(FT->Result))
+      return true;
+    break;
+  }
+  case ArrayTypeKind:
+    ArrayType *AT = llvm::cast<ArrayType>(T);
+    if (validateType(AT->Base))
+      return true;
+    // FIXME: We need to check AT->Size!
+    break;
+  }
+  
+  // Now that we decided that this type is ok, get the canonical type for it so
+  // that we never reanalyze it again.
+  // If it is ever a performance win to avoid computing canonical types, we can
+  // just keep a SmallPtrSet of analyzed Types in TypeChecker.
+  Context.getCanonicalType(T);
+  
+  // FIXME: This isn't good enough: top-level stuff can have these as well and
+  // their types need to be resolved at the end of name binding.  Perhaps we
+  // should require them to have explicit types even if they have values and 
+  // let the value mismatch be detected at typechecking time? 
+  return false;
+}
 
 //===----------------------------------------------------------------------===//
 // Type Checking Entrypoint
@@ -1237,13 +1321,31 @@ void TypeChecker::checkBody(Expr *&E) {
   E = SemaExpressionTree(*this).doIt(E);
 }
 
+void TypeChecker::typeCheck(TypeAliasDecl *TAD) {
+  validateType(TAD->UnderlyingTy);
+}
+
+void TypeChecker::typeCheck(ElementRefDecl *ERD) {
+  // If the type is already resolved we're done.  ElementRefDecls are simple.
+  if (!isa<DependentType>(ERD->Ty)) return;
+  
+  if (Type *T = ElementRefDecl::getTypeForPath(ERD->VD->Ty, ERD->AccessPath))
+    ERD->Ty = T;
+  else {
+    error(ERD->getLocStart(), "'" + ERD->Name.str() +
+          "' is an invalid index for '" + ERD->VD->Ty->getString() +
+          "'");
+  }
+}
+
 void TypeChecker::typeCheck(VarDecl *VD) {
+  validateType(VD->Ty);
+
   // Check Init.  
   if (VD->Init == 0) {
     // If we have no initializer and the type is dependent, then the initializer
     // was invalid and removed.
     if (isa<DependentType>(VD->Ty)) return;
-    
   } else if (isa<DependentType>(VD->Ty)) {
     checkBody(VD->Init);
     if (VD->Init)
@@ -1261,6 +1363,8 @@ void TypeChecker::typeCheck(VarDecl *VD) {
 
 
 void TypeChecker::typeCheck(FuncDecl *FD) {
+  validateType(FD->Ty);
+
   if (FD->Init) {
     // Validate that the body's type matches the function's type if this isn't a
     // external function.

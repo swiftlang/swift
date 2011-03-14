@@ -66,6 +66,10 @@ public:
 
   /// isCanonical - Return true if this is a canonical type.
   bool isCanonical() const { return CanonicalType == this; }
+  
+  /// hasCanonicalTypeComputed - Return true if we've already computed a
+  /// canonical version of this type.
+  bool hasCanonicalTypeComputed() const { return CanonicalType != 0; }
     
   /// getDesugaredType - If this type is a sugared type, remove all levels of
   /// sugar until we get down to a non-sugar type.
@@ -202,6 +206,15 @@ public:
   /// getNamedElementId - If this tuple has a field with the specified name,
   /// return the field index, otherwise return -1.
   int getNamedElementId(Identifier I) const;
+  
+  /// hasAnyDefaultValues - Return true if any of our elements has a default
+  /// value.
+  bool hasAnyDefaultValues() const;
+  
+  /// updateInitializedElementType - This methods updates the element type and
+  /// initializer for a non-canonical TupleType that has an initializer for the
+  /// specified element.  This should only be used by TypeChecker.
+  void updateInitializedElementType(unsigned EltNo, Type *NewTy, Expr *NewInit);
   
   void print(llvm::raw_ostream &OS) const;
 

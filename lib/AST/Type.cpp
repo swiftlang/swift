@@ -50,6 +50,15 @@ Type *Type::getDesugaredType() {
   return 0;
 }
 
+/// hasAnyDefaultValues - Return true if any of our elements has a default
+/// value.
+bool TupleType::hasAnyDefaultValues() const {
+  for (unsigned i = 0, e = Fields.size(); i != e; ++i)
+    if (Fields[i].Init)
+      return true;
+  return false;
+}
+
 /// getNamedElementId - If this tuple has a field with the specified name,
 /// return the field index, otherwise return -1.
 int TupleType::getNamedElementId(Identifier I) const {
@@ -60,6 +69,19 @@ int TupleType::getNamedElementId(Identifier I) const {
 
   // Otherwise, name not found.
   return -1;
+}
+
+/// updateInitializedElementType - This methods updates the element type and
+/// initializer for a non-canonical TupleType that has an initializer for the
+/// specified element.  This should only be used by TypeChecker.
+void TupleType::updateInitializedElementType(unsigned EltNo, Type *NewTy,
+                                             Expr *NewInit) {
+  assert(!hasCanonicalTypeComputed() &&
+         "Cannot munge an already canonicalized type!");
+  TupleTypeElt &Elt = const_cast<TupleTypeElt&>(Fields[EltNo]);
+  assert(Elt.Init && "Can only update elements with default values");
+  Elt.Ty = NewTy;
+  Elt.Init = NewInit;
 }
 
 OneOfElementDecl *OneOfType::getElement(Identifier Name) const {
