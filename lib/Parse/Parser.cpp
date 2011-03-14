@@ -314,53 +314,39 @@ void Parser::parseAttributeList(DeclAttributes &Attributes) {
   }
 }
 
-/// NameRecord - This represents either a single identifier or a tree with
-/// children.  This structure corresponds to the var-name grammar production.
-namespace swift {
-class NameRecord {
-public:
-  Identifier Name;  // In the identifier case, this is the identifier.
-  llvm::SMLoc Loc;  // This is the first character of this name record.
-  unsigned NumChildren;
-  NameRecord *Children;
-  
-  NameRecord() : NumChildren(0), Children(0) {}
-};
-}
-
 /// parseVarName
 ///   var-name:
 ///     identifier
 ///     '(' ')'
 ///     '(' name (',' name)* ')'
-bool Parser::parseVarName(NameRecord &Record) {
-  Record.Loc = Tok.getLoc();
-
+bool Parser::parseVarName(DeclVarName &Name) {
   // Single name case.
   if (Tok.is(tok::identifier)) {
-    parseIdentifier(Record.Name, "");
+    Name.LPLoc = Name.RPLoc = Tok.getLoc();
+    parseIdentifier(Name.Name, "");
     return false;
   }
   
+  Name.LPLoc = Tok.getLoc();
   if (parseToken(tok::l_paren, "expected identifier or '(' in var name"))
     return true;
   
-  llvm::SmallVector<NameRecord, 8> ChildNames;
+  llvm::SmallVector<DeclVarName*, 8> ChildNames;
   
   if (Tok.isNot(tok::r_paren)) {
     do {
-      ChildNames.push_back(NameRecord());
-      if (parseVarName(ChildNames.back())) return true;
+      DeclVarName *Elt = new (S.Context) DeclVarName();
+      if (parseVarName(*Elt)) return true;
+      ChildNames.push_back(Elt);
     } while (consumeIf(tok::comma));
   }
 
-  Record.Children = S.Context.AllocateCopy<NameRecord>(ChildNames.begin(),
-                                                       ChildNames.end());
-  Record.NumChildren = ChildNames.size();
-
+  Name.RPLoc = Tok.getLoc();
   if (parseToken(tok::r_paren, "expected ')' at end of var name"))
-    note(Record.Loc, "to match this '('");
-  
+    note(Name.LPLoc, "to match this '('");
+
+  Name.Elements = ChildNames;
+  Name.Elements = S.Context.AllocateCopy(Name.Elements);
   return false;
 }
 
@@ -386,33 +372,33 @@ TypeAliasDecl *Parser::parseDeclTypeAlias() {
 /// AddElementNamesForVarDecl - This recursive function walks a name specifier
 /// adding ElementRefDecls for the named subcomponents and checking that types
 /// match up correctly.
-static void AddElementNamesForVarDecl(const NameRecord &Name,
+static void AddElementNamesForVarDecl(const DeclVarName *Name,
                                     llvm::SmallVectorImpl<unsigned> &AccessPath,
                                       VarDecl *VD, SemaDecl &SD,
                                       llvm::SmallVectorImpl<Decl *> &Decls) {
-  // If this is a leaf name, ask sema to create a ElementRefDecl for us with the
-  // specified access path.
-  if (Name.Name.get()) {
+  if (Name->isSimple()) {
+    // If this is a leaf name, ask sema to create a ElementRefDecl for us with 
+    // the specified access path.
     ElementRefDecl *ERD =
-      SD.ActOnElementName(Name.Name, Name.Loc, VD, AccessPath);
+      SD.ActOnElementName(Name->Name, Name->LPLoc, VD, AccessPath);
     Decls.push_back(ERD);
     SD.AddToScope(ERD);
     return;
   }
   
+  AccessPath.push_back(0);
+  for (unsigned i = 0, e = Name->Elements.size(); i != e; ++i) {
+    AccessPath.back() = i;
+    AddElementNamesForVarDecl(Name->Elements[i], AccessPath, VD, SD, Decls);
+  }
+  AccessPath.pop_back();
+
 #if 0
   // Otherwise, we have the paren case.  Verify that the currently named type
   // has the right number of elements.  If so, we recursively process each.
   if (SD.CheckAccessPathArity(Name.NumChildren, Name.Loc, VD, AccessPath))
     return;
 #endif
- 
-  AccessPath.push_back(0);
-  for (unsigned i = 0, e = Name.NumChildren; i != e; ++i) {
-    AccessPath.back() = i;
-    AddElementNamesForVarDecl(Name.Children[i], AccessPath, VD, SD, Decls);
-  }
-  AccessPath.pop_back();
 }
 
 /// parseDeclVar - Parse a 'var' declaration, returning null (and doing no
@@ -428,15 +414,15 @@ bool Parser::parseDeclVar(llvm::SmallVectorImpl<Decl *> &Decls) {
   if (Tok.is(tok::l_square))
     parseAttributeList(Attributes);
 
-  NameRecord Name;
-  if (parseVarName(Name)) return true;
+  DeclVarName VarName;
+  if (parseVarName(VarName)) return true;
   
   Type *Ty = 0;
   NullablePtr<Expr> Init;
   if (parseValueSpecifier(Ty, Init))
     return true;
 
-  VarDecl *VD = S.decl.ActOnVarDecl(VarLoc, Name.Name, Ty, Init.getPtrOrNull(),
+  VarDecl *VD = S.decl.ActOnVarDecl(VarLoc, VarName, Ty, Init.getPtrOrNull(),
                                     Attributes);
   if (VD == 0) return true;
   
@@ -446,14 +432,14 @@ bool Parser::parseDeclVar(llvm::SmallVectorImpl<Decl *> &Decls) {
   // to be recursive, they are entered after its initializer is parsed.  This
   // does mean that stuff like this is different than C:
   //    var x = 1; { var x = x+1; assert(x == 2); }
-  if (Name.Name.get())
+  if (VarName.isSimple())
     S.decl.AddToScope(VD);
   else {
     // If there is a more interesting name presented here, then we need to walk
     // through it and synthesize the decls that reference the var elements as
     // appropriate.
     llvm::SmallVector<unsigned, 8> AccessPath;
-    AddElementNamesForVarDecl(Name, AccessPath, VD, S.decl, Decls);
+    AddElementNamesForVarDecl(VD->NestedName, AccessPath, VD, S.decl, Decls);
   }
   return false;
 }

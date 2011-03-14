@@ -24,6 +24,12 @@ using namespace swift;
 using llvm::cast;
 
 // Only allow allocation of Decls using the allocator in ASTContext.
+void *DeclVarName::operator new(size_t Bytes, ASTContext &C,
+                                unsigned Alignment) throw() {
+  return C.Allocate(Bytes, Alignment);
+}
+
+// Only allow allocation of Decls using the allocator in ASTContext.
 void *Decl::operator new(size_t Bytes, ASTContext &C,
                          unsigned Alignment) throw() {
   return C.Allocate(Bytes, Alignment);

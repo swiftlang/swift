@@ -64,6 +64,38 @@ public:
   bool empty() const { return InfixPrecedence == -1; }
 };
 
+  
+  
+/// DeclVarName - This is a recursive structure that represents the varname
+/// datatype which can be used to name various pieces of a var definition.  For
+/// example:  var ((a, b), c) = foo();
+///
+class DeclVarName {
+public:
+  /// LPLoc/RPLoc - This is the location of the '(' and ')' if this is a complex
+  /// name, or both contain the same location if this is simple.
+  llvm::SMLoc LPLoc, RPLoc;
+  
+  // If this is a simple name like "a", this contains the identifier.
+  Identifier Name;
+  
+  llvm::ArrayRef<DeclVarName*> Elements;
+  
+  DeclVarName() {}
+  bool isSimple() const { return LPLoc == RPLoc; }
+
+private:
+  // Make placement new and vanilla new/delete illegal for DeclVarNames.
+  void *operator new(size_t Bytes) throw();  // DO NOT IMPLEMENT.
+  void operator delete(void *Data) throw();  // DO NOT IMPLEMENT.
+  void *operator new(size_t Bytes, void *Mem) throw();  // DO NOT IMPLEMENT.
+public:
+  // Only allow allocation of Types using the allocator in ASTContext
+  // or by doing a placement new.
+  void *operator new(size_t Bytes, ASTContext &C,
+                     unsigned Alignment = 8) throw();  
+};
+
 
 /// Decl - Base class for all declarations in Swift.
 class Decl {
@@ -202,17 +234,26 @@ protected:
     : NamedDecl(K, name, attrs), Ty(ty), Init(init) {
   }
   void printCommon(llvm::raw_ostream &OS, unsigned Indent) const;
-};
-  
+};  
 
 /// VarDecl - 'var' declaration.
 class VarDecl : public ValueDecl {
 public:
   llvm::SMLoc VarLoc;    // Location of the 'var' token.
 
+  /// NestedName - If this is a simple var definition, the name is stored in the
+  /// name identifier.  If the varname is complex, Name is empty and this
+  /// contains the nested name specifier.
+  DeclVarName *NestedName;
+  
   VarDecl(llvm::SMLoc varloc, Identifier name, Type *ty, Expr *init,
           const DeclAttributes &attrs)
-    : ValueDecl(VarDeclKind, name, ty, init, attrs), VarLoc(varloc) {}
+    : ValueDecl(VarDeclKind, name, ty, init, attrs), VarLoc(varloc),
+      NestedName(0) {}
+  VarDecl(llvm::SMLoc varloc, DeclVarName *name, Type *ty, Expr *init,
+          const DeclAttributes &attrs)
+    : ValueDecl(VarDeclKind, Identifier(), ty, init, attrs), VarLoc(varloc),
+      NestedName(name) {}
 
   
   llvm::SMLoc getLocStart() const { return VarLoc; }

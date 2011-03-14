@@ -41,7 +41,7 @@ namespace swift {
   class FuncDecl;
   class VarDecl;
   class ASTContext;
-  class NameRecord;
+  class DeclVarName;
   class TupleTypeElt;
   class Identifier;
   
@@ -116,7 +116,7 @@ private:
   TypeAliasDecl *parseDeclTypeAlias();
   void parseAttributeList(DeclAttributes &Attributes);
   bool parseAttribute(DeclAttributes &Attributes);
-  bool parseVarName(NameRecord &Record);
+  bool parseVarName(DeclVarName &Name);
   
   Decl *parseDeclOneOf();
   Decl *parseDeclStruct();

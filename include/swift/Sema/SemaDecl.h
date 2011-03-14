@@ -39,6 +39,7 @@ namespace swift {
   class ElementRefDecl;
   class Scope;
   class DeclAttributes;
+  class DeclVarName;
   
 /// SemaDecl - Semantic analysis support for Swift declarations.
 class SemaDecl : public SemaBase {
@@ -102,7 +103,7 @@ public:
   TypeAliasDecl *ActOnTypeAlias(llvm::SMLoc TypeAliasLoc, Identifier Name,
                                 Type *Ty);
   
-  VarDecl *ActOnVarDecl(llvm::SMLoc VarLoc, Identifier Name, Type *Ty,
+  VarDecl *ActOnVarDecl(llvm::SMLoc VarLoc, DeclVarName &Name, Type *Ty,
                         Expr *Init, DeclAttributes &Attrs);
   FuncDecl *ActOnFuncDecl(llvm::SMLoc FuncLoc, Identifier Name,
                           Type *Ty, DeclAttributes &Attrs);

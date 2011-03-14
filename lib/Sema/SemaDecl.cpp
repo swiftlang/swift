@@ -226,14 +226,20 @@ void SemaDecl::ActOnTopLevelDeclError() {
   AnonClosureArgs.clear();
 }
 
-
-VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, Identifier Name,
+/// Note that DeclVarName is sitting on the stack, not copied into the
+/// ASTContext.
+VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, DeclVarName &Name,
                                 Type *Ty, Expr *Init, DeclAttributes &Attrs) {
   assert((Ty != 0 || Init != 0) && "Must have a type or an expr already");
   if (Ty == 0)
     Ty = S.Context.TheDependentType;
   
-  return new (S.Context) VarDecl(VarLoc, Name, Ty, Init, Attrs);
+  if (Name.isSimple())
+    return new (S.Context) VarDecl(VarLoc, Name.Name, Ty, Init, Attrs);
+  
+  // Copy the name into the ASTContext heap.
+  DeclVarName *TmpName = new (S.Context) DeclVarName(Name);
+  return new (S.Context) VarDecl(VarLoc, TmpName, Ty, Init, Attrs);
 }
 
 FuncDecl *SemaDecl::

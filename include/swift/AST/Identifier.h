@@ -47,6 +47,12 @@ public:
     return ::strlen(Pointer);
   }
   
+  bool empty() const { return Pointer == 0; }
+  
+  static Identifier getFromOpaquePointer(void *P) {
+    return Identifier((const char*)P);
+  }
+  
   bool operator==(Identifier RHS) const { return Pointer == RHS.Pointer; }
   bool operator!=(Identifier RHS) const { return Pointer != RHS.Pointer; }
   
@@ -81,6 +87,20 @@ namespace llvm {
     }
   };
   
-}
+  // An Identifier is "pointer like".
+  template<typename T> class PointerLikeTypeTraits;
+  template<>
+  class PointerLikeTypeTraits<swift::Identifier> {
+  public:
+    static inline void *getAsVoidPointer(swift::Identifier I) {
+      return (void*)I.get();
+    }
+    static inline swift::Identifier getFromVoidPointer(void *P) {
+      return swift::Identifier::getFromOpaquePointer(P);
+    }
+    enum { NumLowBitsAvailable = 3 };
+  };
+  
+} // end namespace llvm
 
 #endif
