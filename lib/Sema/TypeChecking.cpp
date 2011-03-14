@@ -578,27 +578,8 @@ namespace {
     }
     Expr *VisitSequenceExpr(SequenceExpr *E);
     
-    Expr *VisitBraceExpr(BraceExpr *E) {
-      for (unsigned i = 0, e = E->NumElements; i != e; ++i) {
-        if (Expr *SubExpr = E->Elements[i].dyn_cast<Expr*>()) {
-          if ((SubExpr = Visit(SubExpr)) == 0) return 0;
-          E->Elements[i] = SubExpr;
-          continue;
-        }
-        
-        if (ValueDecl *VD = dyn_cast<ValueDecl>(E->Elements[i].get<Decl*>())) {
-          if (Expr *Init = VD->Init) {
-            if ((Init = Visit(Init)) == 0) return 0;
-            VD->Ty = Init->Ty;
-            VD->Init = Init;
-          }
-        }
-      }
-      
-      if (SemaBraceExpr(E->LBLoc, E->Elements, E->NumElements,
-                        E->MissingSemi, E->RBLoc, E->Ty, TC)) return 0;
-      return E;
-    }
+    Expr *VisitBraceExpr(BraceExpr *E);
+    
     Expr *VisitClosureExpr(ClosureExpr *E) {
       // Anon-decls within a nested closure will have already been resolved, so
       // we don't need to recurse into it.  This also prevents N^2 re-sema
@@ -783,6 +764,43 @@ Expr *SemaExpressionTree::VisitSequenceExpr(SequenceExpr *E) {
     return E->Elements[0];
   
   if (SemaSequenceExpr(E->Elements, E->NumElements, E->Ty, TC)) return 0;
+  return E;
+}
+
+Expr *SemaExpressionTree::VisitBraceExpr(BraceExpr *E) {
+  for (unsigned i = 0, e = E->NumElements; i != e; ++i) {
+    if (Expr *SubExpr = E->Elements[i].dyn_cast<Expr*>()) {
+      if ((SubExpr = Visit(SubExpr)) == 0) return 0;
+      E->Elements[i] = SubExpr;
+      continue;
+    }
+    
+    Decl *D = E->Elements[i].get<Decl*>();
+    if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
+      if (Expr *Init = VD->Init) {
+        if ((Init = Visit(Init)) == 0) return 0;
+        VD->Ty = Init->Ty;
+        VD->Init = Init;
+      }
+    }
+    
+    if (ElementRefDecl *ERD = dyn_cast<ElementRefDecl>(D)) {
+      if (isa<DependentType>(ERD->Ty)) {
+        if (Type *T = ElementRefDecl::getTypeForPath(ERD->VD->Ty,
+                                                     ERD->AccessPath))
+          ERD->Ty = T;
+        else {
+          TC.error(ERD->getLocStart(), "'" + ERD->Name.str() +
+                   "' is an invalid index for '" + ERD->VD->Ty->getString() +
+                   "'");
+          return 0;
+        }
+      }
+    }
+  }
+    
+  if (SemaBraceExpr(E->LBLoc, E->Elements, E->NumElements,
+                    E->MissingSemi, E->RBLoc, E->Ty, TC)) return 0;
   return E;
 }
 
