@@ -49,6 +49,17 @@ namespace {
       Context.setHadError();
       Context.SourceMgr.PrintMessage(Loc, Message, "error");
     }
+
+    void typeCheck(ValueDecl *VD) {
+      // No types to resolved for a ElementRefDecl.
+      if (isa<ElementRefDecl>(VD))
+        return;
+    
+      if (VarDecl *Var = dyn_cast<VarDecl>(VD))
+        typeCheck(Var);
+      else
+        typeCheck(cast<FuncDecl>(VD));
+    }
     
     void typeCheck(FuncDecl *FD);
     void typeCheck(VarDecl *VD);
@@ -776,13 +787,8 @@ Expr *SemaExpressionTree::VisitBraceExpr(BraceExpr *E) {
     }
     
     Decl *D = E->Elements[i].get<Decl*>();
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
-      if (Expr *Init = VD->Init) {
-        if ((Init = Visit(Init)) == 0) return 0;
-        VD->Ty = Init->Ty;
-        VD->Init = Init;
-      }
-    }
+    if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+      TC.typeCheck(VD);
     
     if (ElementRefDecl *ERD = dyn_cast<ElementRefDecl>(D)) {
       if (isa<DependentType>(ERD->Ty)) {
@@ -1266,6 +1272,28 @@ void TypeChecker::typeCheck(FuncDecl *FD) {
   validateAttributes(FD->Attrs, FD->Ty);
 }
 
+/// DiagnoseUnresolvedTypes - This function is invoked on all nodes in an
+/// expression tree checking to make sure they don't contain any DependentTypes.
+static Expr *DiagnoseUnresolvedTypes(Expr *E, Expr::WalkOrder Order,
+                                     void *Data) {
+  // Ignore the preorder walk.  We'd rather diagnose use of unresolved types
+  // during the postorder walk so that the inner most expressions are diagnosed
+  // before the outermost ones.
+  if (Order == Expr::Walk_PreOrder)
+    return E;
+  
+  // Use getAs to strip off sugar.
+  if (E->Ty->getAs<DependentType>() == 0)
+    return E;
+  
+  TypeChecker &TC = *(TypeChecker*)Data;
+  E->dump();  // FIXME: This is a gross hack because our diagnostics suck.
+  TC.error(E->getLocStart(),
+           "ambiguous expression could not resolve a concrete type");
+  return 0;
+}
+
+
 
 /// performTypeChecking - Once parsing and namebinding are complete, these
 /// walks the AST to resolve types and diagnose problems therein.
@@ -1274,22 +1302,31 @@ void TypeChecker::typeCheck(FuncDecl *FD) {
 void swift::performTypeChecking(TranslationUnitDecl *TUD, ASTContext &Ctx) {
   TypeChecker TC(Ctx);
   // At this point name binding has been performed and we have to do full type
-  // checking and anonymous name binding resolution.
+  // checking and anonymous name binding resolution.  All top level decls have
+  // types and the contents of each decl can be processed in turn to resolve all
+  // types for expressions contained within them.
   for (llvm::ArrayRef<Decl*>::iterator I = TUD->Decls.begin(),
        E = TUD->Decls.end(); I != E; ++I) {
     // Ignore top level typealiases and elementrefs.
     if (isa<TypeAliasDecl>(*I))
       // FIXME: Should validate that these aren't circular.
       continue;
+
+    ValueDecl *VD = cast<ValueDecl>(*I);
+    TC.typeCheck(VD);
     
-    if (isa<ElementRefDecl>(*I))
-      continue;
-    
-    if (VarDecl *VD = dyn_cast<VarDecl>(*I)) {
-      TC.typeCheck(VD);
-      continue;
-    }
-    
-    TC.typeCheck(cast<FuncDecl>(*I));
+    // Check the initializer/body to make sure that we succeeded in resolving
+    // all of the types contained within it.  We should not have any
+    // DependentType's left for subexpressions.
+    if (Expr *E = VD->Init)
+      E->WalkExpr(DiagnoseUnresolvedTypes, &TC);
   }
+  
+#if 0
+  // Otherwise, we have the paren case.  Verify that the currently named type
+  // has the right number of elements.  If so, we recursively process each.
+  if (SD.CheckAccessPathArity(Name.NumChildren, Name.Loc, VD, AccessPath))
+    return;
+#endif
+
 }

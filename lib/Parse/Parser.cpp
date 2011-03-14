@@ -392,13 +392,6 @@ static void AddElementNamesForVarDecl(const DeclVarName *Name,
     AddElementNamesForVarDecl(Name->Elements[i], AccessPath, VD, SD, Decls);
   }
   AccessPath.pop_back();
-
-#if 0
-  // Otherwise, we have the paren case.  Verify that the currently named type
-  // has the right number of elements.  If so, we recursively process each.
-  if (SD.CheckAccessPathArity(Name.NumChildren, Name.Loc, VD, AccessPath))
-    return;
-#endif
 }
 
 /// parseDeclVar - Parse a 'var' declaration, returning null (and doing no
