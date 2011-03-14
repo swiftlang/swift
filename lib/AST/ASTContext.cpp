@@ -102,13 +102,9 @@ Type *ASTContext::getCanonicalType(Type *T) {
     CanElts.resize(TT->Fields.size());
     for (unsigned i = 0, e = TT->Fields.size(); i != e; ++i) {
       CanElts[i].Name = TT->Fields[i].Name;
+      assert(TT->Fields[i].Ty &&
+             "Cannot get canonical type of TypeChecked TupleType!");
       CanElts[i].Ty = getCanonicalType(TT->Fields[i].Ty);
-
-      // If any elements are unresolved, then so is this.
-      if (UnresolvedType *UT = llvm::dyn_cast<UnresolvedType>(CanElts[i].Ty)) {
-        Result = UT;
-        break;
-      }
     }
     
     Result = getTupleType(CanElts);
@@ -119,19 +115,13 @@ Type *ASTContext::getCanonicalType(Type *T) {
     FunctionType *FT = llvm::cast<FunctionType>(T);
     Type *In = getCanonicalType(FT->Input);
     Type *Out = getCanonicalType(FT->Result);
-    if (!llvm::isa<UnresolvedType>(In) && !llvm::isa<UnresolvedType>(Out))
-      Result = getFunctionType(In, Out);
-    else
-      Result = TheUnresolvedType;
+    Result = getFunctionType(In, Out);
     break;
   }
   case ArrayTypeKind:
     ArrayType *AT = llvm::cast<ArrayType>(T);
     Type *EltTy = getCanonicalType(AT->Base);
-    if (!llvm::isa<UnresolvedType>(EltTy))
-      Result = getArrayType(EltTy, AT->Size);
-    else
-      Result = TheUnresolvedType;
+    Result = getArrayType(EltTy, AT->Size);
     break;
   }
   assert(Result && "Case not implemented!");
