@@ -10,7 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file implements semantic analysis for Swift types.
+// This file implements semantic analysis for expressions, and other pieces
+// that require final type checking.  If this passes a translation unit with no
+// errors, then it is good to go.
 //
 //===----------------------------------------------------------------------===//
 
@@ -23,7 +25,6 @@
 #include "swift/AST/Type.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/SourceMgr.h"
 using namespace swift;
 using llvm::isa;
@@ -530,8 +531,7 @@ namespace {
     Expr *VisitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
       TC.error(E->getLocStart(),
            "FIXME: UnresolvedDeclRefExpr should be resolved by name binding!");
-      E->Ty = TC.Context.TheUnresolvedType;
-      return E;
+      return 0;
     }
     Expr *VisitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
       E->Ty = TC.Context.TheDependentType;
@@ -564,7 +564,8 @@ namespace {
     Expr *VisitTupleElementExpr(TupleElementExpr *E) {
       // TupleElementExpr is fully resolved.
       assert(!isa<DependentType>(E->Ty));
-      E->SubExpr = Visit(E->SubExpr);
+      if ((E->SubExpr = Visit(E->SubExpr)) == 0)
+        return 0;
       return E;
     }
     
@@ -580,8 +581,8 @@ namespace {
     Expr *VisitBraceExpr(BraceExpr *E) {
       for (unsigned i = 0, e = E->NumElements; i != e; ++i) {
         if (Expr *SubExpr = E->Elements[i].dyn_cast<Expr*>()) {
-          E->Elements[i] = Visit(SubExpr);
-          if (E->Elements[i].get<Expr*>() == 0) return 0;
+          if ((SubExpr = Visit(SubExpr)) == 0) return 0;
+          E->Elements[i] = SubExpr;
           continue;
         }
         
@@ -1208,23 +1209,27 @@ void TypeChecker::validateAttributes(DeclAttributes &Attrs, Type *Ty) {
 
 
 void TypeChecker::checkBody(Expr *&E) {
-  if (Expr *Res = SemaExpressionTree(*this).doIt(E))
-    E = Res;
+  assert(E != 0 && "Can't check a null body!");
+  E = SemaExpressionTree(*this).doIt(E);
 }
 
 void TypeChecker::typeCheck(VarDecl *VD) {
   // Check Init.  
   if (VD->Init == 0) {
-    assert(!isa<DependentType>(VD->Ty) &&
-           "Parser: No type or initializer specified?");
+    // If we have no initializer and the type is dependent, then the initializer
+    // was invalid and removed.
+    if (isa<DependentType>(VD->Ty)) return;
+    
   } else if (isa<DependentType>(VD->Ty)) {
     checkBody(VD->Init);
-    VD->Ty = VD->Init->Ty;
+    if (VD->Init)
+      VD->Ty = VD->Init->Ty;
   } else {
     // If both a type and an initializer are specified, make sure the
     // initializer's type agrees (or converts) to the redundant type.
     checkBody(VD->Init);
-    VD->Init = convertToType(VD->Init, VD->Ty, false, CR_VarInit);
+    if (VD->Init)
+      VD->Init = convertToType(VD->Init, VD->Ty, false, CR_VarInit);
   }
   
   validateAttributes(VD->Attrs, VD->Ty);
@@ -1236,7 +1241,8 @@ void TypeChecker::typeCheck(FuncDecl *FD) {
     // Validate that the body's type matches the function's type if this isn't a
     // external function.
     checkBody(FD->Init);
-    FD->Init = convertToType(FD->Init, FD->Ty, false, CR_FuncBody);
+    if (FD->Init)
+      FD->Init = convertToType(FD->Init, FD->Ty, false, CR_FuncBody);
   }
   
   validateAttributes(FD->Attrs, FD->Ty);

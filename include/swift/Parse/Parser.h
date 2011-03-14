@@ -45,7 +45,11 @@ namespace swift {
   class TupleTypeElt;
   class Identifier;
   
-  /// performTypeChecking - Once parsing and namebinding are complete, these
+  /// performNameBinding - Once parsing is complete, this walks the AST to
+  /// resolve names and do other top-level validation.
+  void performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx);
+  
+  /// performTypeChecking - Once parsing and namebinding are complete, this
   /// walks the AST to resolve types and diagnose problems therein.
   ///
   /// FIXME: This should be moved out to somewhere else.

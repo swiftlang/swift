@@ -179,7 +179,6 @@ public:
     return D->getKind() == TypeAliasDeclKind;
   }
   static bool classof(const TypeAliasDecl *D) { return true; }
-
 };
   
 /// ValueDecl - All named decls that are values in the language.  These can
