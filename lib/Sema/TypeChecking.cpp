@@ -1267,10 +1267,6 @@ void swift::performTypeChecking(TranslationUnitDecl *TUD, ASTContext &Ctx) {
     if (isa<ElementRefDecl>(*I))
       continue;
     
-#if 0
-    // FIXME: SHOULD REJECT TOP LEVEL ERDs with no type!
-#endif
-    
     if (VarDecl *VD = dyn_cast<VarDecl>(*I)) {
       TC.typeCheck(VD);
       continue;
