@@ -50,7 +50,7 @@ namespace {
       Context.SourceMgr.PrintMessage(Loc, Message, "error");
     }
     
-    bool validateType(Type *T);
+    bool validateType(Type *&T);
 
     void typeCheck(TypeAliasDecl *TAD);
 
@@ -70,9 +70,6 @@ namespace {
     
     void validateAttributes(DeclAttributes &Attrs, Type *Ty);
     
-    void checkBody(Expr *&E);
-    
-    
     // Utility Functions
     enum ConversionReason {
       CR_BinOpLHS,  // Left side of binary operator.
@@ -82,7 +79,10 @@ namespace {
       CR_TupleInit, // Tuple element initializer.
       CR_FuncBody   // Function body specification.
     };
+
+    void checkBody(Expr *&E, Type *DestTy, ConversionReason Res);
     
+
     /// ConvertToType - Do semantic analysis of an expression in a context that
     /// expects a particular type.  This does conversion to that type if the types
     /// don't match and diagnoses cases where the conversion cannot be performed.
@@ -1211,11 +1211,13 @@ Expr *TypeChecker::convertToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
 /// expressions are valid and that they have the appropriate conversions etc.
 ///
 /// This returns true if the type is invalid.
-bool TypeChecker::validateType(Type *T) {
+bool TypeChecker::validateType(Type *&T) {
   assert(T && "Cannot validate null types!");
   
   // If a type has a canonical type, then it is known safe.
   if (T->hasCanonicalTypeComputed()) return false;
+
+  bool IsValid = true;
   
   switch (T->Kind) {
   case UnresolvedTypeKind:
@@ -1231,8 +1233,7 @@ bool TypeChecker::validateType(Type *T) {
     break;
   }
   case NameAliasTypeKind:
-    if (validateType(llvm::cast<NameAliasType>(T)->TheDecl->UnderlyingTy))
-      return true;
+    IsValid = validateType(llvm::cast<NameAliasType>(T)->TheDecl->UnderlyingTy);
     break;
   case TupleTypeKind: {
     TupleType *TT = llvm::cast<TupleType>(T);
@@ -1243,20 +1244,28 @@ bool TypeChecker::validateType(Type *T) {
       // The element has *at least* a type or an initializer, so we start by
       // verifying each individually.
       Type *EltTy = TT->Fields[i].Ty;
-      if (EltTy && validateType(EltTy))
-        return true;
+      if (EltTy && validateType(EltTy)) {
+        IsValid = false;
+        break;
+      }
 
       Expr *EltInit = TT->Fields[i].Init;
       if (EltInit == 0) continue;
       
-      checkBody(EltInit);
-      if (EltInit == 0) return true;
+      checkBody(EltInit, EltTy, CR_TupleInit);
+      if (EltInit == 0) {
+        IsValid = false;
+        break;
+      }
         
       // If both a type and an initializer are specified, make sure the
       // initializer's type agrees with the (redundant) type.
       if (EltTy) {
         EltInit = convertToType(EltInit, EltTy, false, CR_TupleInit);
-        if (EltInit == 0) return true;
+        if (EltInit == 0) {
+          IsValid = false;
+          break;
+        }
       } else {
         EltTy = EltInit->Ty;
       }
@@ -1268,19 +1277,31 @@ bool TypeChecker::validateType(Type *T) {
       
   case FunctionTypeKind: {
     FunctionType *FT = llvm::cast<FunctionType>(T);
-    if (validateType(FT->Input) ||
-        validateType(FT->Result))
-      return true;
+    if ((T = FT->Input, validateType(T)) ||
+        (T = FT->Result, validateType(T))) {
+      IsValid = false;
+      break;
+    }
+    T = FT;
     break;
   }
   case ArrayTypeKind:
     ArrayType *AT = llvm::cast<ArrayType>(T);
-    if (validateType(AT->Base))
-      return true;
-    // FIXME: We need to check AT->Size!
+    if (T = AT->Base, validateType(T)) {
+      IsValid = false;
+      break;
+    }
+    T = AT;
+    // FIXME: We need to check AT->Size! (It also has to be convertible to int).
     break;
   }
-  
+
+  // If we determined that this type is invalid, erase it in the caller.
+  if (!IsValid) {
+    T = Context.TheUnresolvedType;
+    return true;
+  }
+
   // Now that we decided that this type is ok, get the canonical type for it so
   // that we never reanalyze it again.
   // If it is ever a performance win to avoid computing canonical types, we can
@@ -1315,67 +1336,6 @@ void TypeChecker::validateAttributes(DeclAttributes &Attrs, Type *Ty) {
   }
 }
 
-
-void TypeChecker::checkBody(Expr *&E) {
-  assert(E != 0 && "Can't check a null body!");
-  E = SemaExpressionTree(*this).doIt(E);
-}
-
-void TypeChecker::typeCheck(TypeAliasDecl *TAD) {
-  validateType(TAD->UnderlyingTy);
-}
-
-void TypeChecker::typeCheck(ElementRefDecl *ERD) {
-  // If the type is already resolved we're done.  ElementRefDecls are simple.
-  if (!isa<DependentType>(ERD->Ty)) return;
-  
-  if (Type *T = ElementRefDecl::getTypeForPath(ERD->VD->Ty, ERD->AccessPath))
-    ERD->Ty = T;
-  else {
-    error(ERD->getLocStart(), "'" + ERD->Name.str() +
-          "' is an invalid index for '" + ERD->VD->Ty->getString() +
-          "'");
-  }
-}
-
-void TypeChecker::typeCheck(VarDecl *VD) {
-  validateType(VD->Ty);
-
-  // Check Init.  
-  if (VD->Init == 0) {
-    // If we have no initializer and the type is dependent, then the initializer
-    // was invalid and removed.
-    if (isa<DependentType>(VD->Ty)) return;
-  } else if (isa<DependentType>(VD->Ty)) {
-    checkBody(VD->Init);
-    if (VD->Init)
-      VD->Ty = VD->Init->Ty;
-  } else {
-    // If both a type and an initializer are specified, make sure the
-    // initializer's type agrees (or converts) to the redundant type.
-    checkBody(VD->Init);
-    if (VD->Init)
-      VD->Init = convertToType(VD->Init, VD->Ty, false, CR_VarInit);
-  }
-  
-  validateAttributes(VD->Attrs, VD->Ty);
-}
-
-
-void TypeChecker::typeCheck(FuncDecl *FD) {
-  validateType(FD->Ty);
-
-  if (FD->Init) {
-    // Validate that the body's type matches the function's type if this isn't a
-    // external function.
-    checkBody(FD->Init);
-    if (FD->Init)
-      FD->Init = convertToType(FD->Init, FD->Ty, false, CR_FuncBody);
-  }
-  
-  validateAttributes(FD->Attrs, FD->Ty);
-}
-
 /// DiagnoseUnresolvedTypes - This function is invoked on all nodes in an
 /// expression tree checking to make sure they don't contain any DependentTypes.
 static Expr *DiagnoseUnresolvedTypes(Expr *E, Expr::WalkOrder Order,
@@ -1398,6 +1358,72 @@ static Expr *DiagnoseUnresolvedTypes(Expr *E, Expr::WalkOrder Order,
 }
 
 
+/// checkBody - Check the body of a declaration which can have an optional type
+/// that it is converted to.
+void TypeChecker::checkBody(Expr *&E, Type *DestTy, ConversionReason Res) {
+  assert(E != 0 && "Can't check a null body!");
+  E = SemaExpressionTree(*this).doIt(E);
+  if (E == 0) return;
+  if (DestTy)
+    E = convertToType(E, DestTy, false, Res);
+  
+  // Check the initializer/body to make sure that we succeeded in resolving
+  // all of the types contained within it.  We should not have any
+  // DependentType's left for subexpressions.
+  if (E && E->WalkExpr(DiagnoseUnresolvedTypes, this) == 0)
+    E = 0;
+}
+
+void TypeChecker::typeCheck(TypeAliasDecl *TAD) {
+  validateType(TAD->UnderlyingTy);
+}
+
+void TypeChecker::typeCheck(ElementRefDecl *ERD) {
+  // If the type is already resolved we're done.  ElementRefDecls are simple.
+  if (!isa<DependentType>(ERD->Ty)) return;
+  
+  if (Type *T = ElementRefDecl::getTypeForPath(ERD->VD->Ty, ERD->AccessPath))
+    ERD->Ty = T;
+  else {
+    error(ERD->getLocStart(), "'" + ERD->Name.str() +
+          "' is an invalid index for '" + ERD->VD->Ty->getString() +
+          "'");
+  }
+}
+
+void TypeChecker::typeCheck(VarDecl *VD) {
+  if (validateType(VD->Ty)) return;
+
+  // Check Init.  
+  if (VD->Init == 0) {
+    // If we have no initializer and the type is dependent, then the initializer
+    // was invalid and removed.
+    if (isa<DependentType>(VD->Ty)) return;
+  } else if (isa<DependentType>(VD->Ty)) {
+    checkBody(VD->Init, 0, CR_VarInit);
+    if (VD->Init)
+      VD->Ty = VD->Init->Ty;
+  } else {
+    // If both a type and an initializer are specified, make sure the
+    // initializer's type agrees (or converts) to the redundant type.
+    checkBody(VD->Init, VD->Ty, CR_VarInit);
+  }
+  
+  validateAttributes(VD->Attrs, VD->Ty);
+}
+
+
+void TypeChecker::typeCheck(FuncDecl *FD) {
+  if (validateType(FD->Ty)) return;
+
+  if (FD->Init) {
+    // Validate that the body's type matches the function's type if this isn't a
+    // external function.
+    checkBody(FD->Init, FD->Ty, CR_FuncBody);
+  }
+  
+  validateAttributes(FD->Attrs, FD->Ty);
+}
 
 /// performTypeChecking - Once parsing and namebinding are complete, these
 /// walks the AST to resolve types and diagnose problems therein.
@@ -1418,12 +1444,6 @@ void swift::performTypeChecking(TranslationUnitDecl *TUD, ASTContext &Ctx) {
 
     ValueDecl *VD = cast<ValueDecl>(*I);
     TC.typeCheck(VD);
-    
-    // Check the initializer/body to make sure that we succeeded in resolving
-    // all of the types contained within it.  We should not have any
-    // DependentType's left for subexpressions.
-    if (Expr *E = VD->Init)
-      E->WalkExpr(DiagnoseUnresolvedTypes, &TC);
   }
   
 #if 0
