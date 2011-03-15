@@ -1228,12 +1228,13 @@ bool TypeChecker::validateType(Type *&T) {
     OneOfType *OOT = cast<OneOfType>(T);
     for (unsigned i = 0, e = OOT->Elements.size(); i != e; ++i) {
       if (OOT->Elements[i]->ArgumentType == 0) continue;
-      if (validateType(OOT->Elements[i]->ArgumentType)) return true;
+      IsValid &= !validateType(OOT->Elements[i]->ArgumentType);
+      if (!IsValid) break;
     }
     break;
   }
   case NameAliasTypeKind:
-    IsValid = validateType(llvm::cast<NameAliasType>(T)->TheDecl->UnderlyingTy);
+    IsValid =!validateType(llvm::cast<NameAliasType>(T)->TheDecl->UnderlyingTy);
     break;
   case TupleTypeKind: {
     TupleType *TT = llvm::cast<TupleType>(T);
@@ -1298,6 +1299,8 @@ bool TypeChecker::validateType(Type *&T) {
 
   // If we determined that this type is invalid, erase it in the caller.
   if (!IsValid) {
+    // FIXME: This should set the type to some Error type, which is
+    // distinguishable from unresolved.
     T = Context.TheUnresolvedType;
     return true;
   }
