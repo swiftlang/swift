@@ -973,18 +973,46 @@ Expr *SemaCoerceBottomUp::VisitTupleExpr(TupleExpr *E) {
 // Type Conversion
 //===----------------------------------------------------------------------===//
 
-class AnonDecl;
+namespace {
+struct AnonClosureArgExprFinder {
+  llvm::SmallVector<AnonClosureArgExpr*, 8> ClosureArgs;
+  
+  static Expr *WalkFn(Expr *E, Expr::WalkOrder Order, void *finder) {
+    AnonClosureArgExprFinder &Finder = *(AnonClosureArgExprFinder*)finder;
+    
+    // We ignore the postorder walk.
+    if (Order != Expr::Walk_PreOrder) return E;
+
+    // If this is a ClosureExpr, don't walk into it.  This would find *its*
+    // anonymous closure arguments, not ours.
+    if (isa<ClosureExpr>(E)) return 0; // Don't recurse into it.
+    
+    // If we found a closure argument, remember it.
+    if (AnonClosureArgExpr *A = dyn_cast<AnonClosureArgExpr>(E))
+      Finder.ClosureArgs.push_back(A);
+    return E;
+  }
+  
+  void findArgs(Expr *E) {
+    E->WalkExpr(WalkFn, this);    
+  }
+};
+}
 
 /// BindAndValidateClosureArgs - The specified list of anonymous closure
 /// arguments was bound to a closure function with the specified input
 /// arguments.  Validate the argument list and, if valid, allocate and return
 /// a pointer to the argument to be used for the ClosureExpr.
-static llvm::NullablePtr<AnonDecl> *
-BindAndValidateClosureArgs(Expr *&Body, Type *FuncInput, TypeChecker &TD) {
-  return 0;
-#if 0
-  const llvm::NullablePtr<AnonDecl> *AnonArgs = TD.AnonClosureArgs.data();
-  unsigned NumAnonArgs = TD.AnonClosureArgs.size();
+static bool
+BindAndValidateClosureArgs(Expr *Body, Type *FuncInput, TypeChecker &TC) {
+  // Walk the body to see if it has any anonymous arguments.  Note that this
+  // isn't a particularly efficient thing to do.
+  AnonClosureArgExprFinder ArgFinder;
+  ArgFinder.findArgs(Body);
+  
+  // If there is nothing to do, just return an unmolested closure body.
+  if (ArgFinder.ClosureArgs.empty())
+    return false;
   
   // If the input to the function is a non-tuple, only $0 is valid, if it is a
   // tuple, then $0..$N are valid depending on the number of inputs to the
@@ -993,48 +1021,32 @@ BindAndValidateClosureArgs(Expr *&Body, Type *FuncInput, TypeChecker &TD) {
   if (TupleType *TT = dyn_cast<TupleType>(FuncInput))
     NumInputArgs = TT->Fields.size();
   
-  // Verify that the code didn't use too many anonymous arguments, e.g. using _4
-  // when the bound function only has 2 inputs.
-  if (NumAnonArgs > NumInputArgs) {
-    for (unsigned i = NumInputArgs; i != NumAnonArgs; ++i) {
-      // Ignore elements not used.
-      if (AnonArgs[i].isNull()) continue;
-      
-      TD.error(AnonArgs[i].get()->UseLoc,
+  for (unsigned ArgNo = 0, e = ArgFinder.ClosureArgs.size();
+       ArgNo != e; ++ArgNo) {
+    AnonClosureArgExpr *A = ArgFinder.ClosureArgs[ArgNo];
+    
+    assert(isa<DependentType>(A->Ty) && "Anon arg already has a type?");
+    
+    // Verify that the argument number isn't too large, e.g. using $4 when the
+    // bound function only has 2 inputs.
+    if (A->ArgNo >= NumInputArgs) {
+      TC.error(A->Loc,
                "use of invalid anonymous argument, with number higher than"
                " # arguments to bound function");
+      return true;
     }
-    NumAnonArgs = NumInputArgs;
+  
+    // Assign the AnonDecls their actual concrete types now that we know the
+    // context they are being used in.
+    if (TupleType *TT = dyn_cast<TupleType>(FuncInput)) {
+      A->Ty = TT->getElementType(A->ArgNo);
+    } else {
+      assert(NumInputArgs == 1 && "Must have unary case");
+      A->Ty = FuncInput;
+    }
   }
   
-  // Return the right number of inputs.
-  llvm::NullablePtr<AnonDecl> *NewInputs =
-    TD.Context.Allocate<llvm::NullablePtr<AnonDecl> >(NumInputArgs);
-  for (unsigned i = 0, e = NumInputArgs; i != e; ++i)
-    if (i < NumAnonArgs)
-      NewInputs[i] = AnonArgs[i];
-    else
-      NewInputs[i] = 0;
-  
-  // Assign the AnonDecls their actual concrete types now that we know the
-  // context they are being used in.
-  if (TupleType *TT = dyn_cast<TupleType>(FuncInput)) {
-    for (unsigned i = 0, e = NumAnonArgs; i != e; ++i) {
-      if (NewInputs[i].isNull()) continue;
-      NewInputs[i].get()->Ty = TT->getElementType(i);
-    }
-  } else if (NumInputArgs) {
-    assert(NumInputArgs == 1 && NewInputs[0].isNonNull() &&
-           "Must have unary case");
-    assert(isa<DependentType>(NewInputs[0].get()->Ty) &&
-           "AnonDecl doesn't have dependent type?");
-    NewInputs[0].get()->Ty = FuncInput;
-  }
-
-  // We used/consumed the anonymous closure arguments.
-  TD.AnonClosureArgs.clear();
-  return NewInputs;
-#endif
+  return false;
 }
 
 /// getTupleFieldForScalarInit - If the specified tuple type can be assigned a
@@ -1108,7 +1120,6 @@ static Expr *HandleScalarConversionToTupleType(Expr *E, Type *DestTy,
                                     NumFields, SMLoc(), DestTy);
 }
 
-
 /// HandleConversionToType - This is the recursive implementation of
 /// ConvertToType.  It does not produce diagnostics, it just returns null on
 /// failure.
@@ -1155,16 +1166,10 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
   // when we convert an expression E to a function type whose result is E's
   // type.
   if (FunctionType *FT = DestTy->getAs<FunctionType>()) {
-#if 0
     // If we bound any anonymous closure arguments, validate them and resolve
     // their types.
-    llvm::NullablePtr<AnonDecl> *ActualArgList = 0;
-    if (!IgnoreAnonDecls && !SE.S.decl.AnonClosureArgs.empty()) {
-      ActualArgList = BindAndValidateClosureArgs(E, FT->Input, TC);
-      if (ActualArgList == 0)
-        return 0;
-    }
-#endif
+    if (!IgnoreAnonDecls && BindAndValidateClosureArgs(E, FT->Input, TC))
+      return 0;
 
     // If there are any live anonymous closure arguments, this level will use
     // them and remove them.  When binding something like $0+$1 to
@@ -1174,8 +1179,8 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
     Expr *ERes = HandleConversionToType(E, FT->Result, true, TC);
     if (ERes == 0) return 0;
   
-    // Now that the AnonDecls potentially have a type applied to them, redo
-    // semantic analysis from the leaves of the expression tree up.
+    // Now that the AnonClosureArgExpr's potentially have a type, redo semantic
+    // analysis from the leaves of the expression tree up.
     ERes = SemaExpressionTree::doIt(ERes, TC);
     if (ERes == 0)
       return 0;
