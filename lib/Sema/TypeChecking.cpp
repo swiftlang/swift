@@ -128,31 +128,6 @@ static bool SemaDeclRefExpr(ValueDecl *D, SMLoc Loc, Type *&ResultTy,
   return false;
 }
 
-static bool SemaBraceExpr(SMLoc LBLoc, 
-                          llvm::PointerUnion<Expr*, Decl*> *Elements,
-                          unsigned NumElements,
-                          bool HasMissingSemi, SMLoc RBLoc, 
-                          Type *&ResultTy, TypeChecker &TC) {
-  // If any of the elements of the braces has a function type (which indicates
-  // that a function didn't get called), then produce an error.  We don't do
-  // this for the last element in the 'missing semi' case, because the brace
-  // expr as a whole has the function result.
-  // TODO: What about tuples which contain functions by-value that are dead?
-  for (unsigned i = 0; i != NumElements-(HasMissingSemi ? 1 : 0); ++i)
-    if (Elements[i].is<Expr*>() &&
-        isa<FunctionType>(Elements[i].get<Expr*>()->Ty))
-      // TODO: QOI: Add source range.
-      TC.error(Elements[i].get<Expr*>()->getLocStart(),
-               "expression resolves to an unevaluated function");
-  
-  if (HasMissingSemi)
-    ResultTy = Elements[NumElements-1].get<Expr*>()->Ty;
-  else
-    ResultTy = TC.Context.TheEmptyTupleType;
-  
-  return false;
-}
-
 static bool SemaDotIdentifier(Expr *E, SMLoc DotLoc,
                               Identifier Name, SMLoc NameLoc,
                               Type *&ResultTy, int &FieldNo, TypeChecker &TC) {
@@ -533,9 +508,6 @@ namespace {
   /// intermediate nodes, introduce type coercion etc.  This visitor does this
   /// job.  Each visit method reanalyzes the children of a node, then reanalyzes
   /// the node, and returns true on error.
-  
-  // FIXME: This should become a post-order walker!
-  
   class SemaExpressionTree : public ExprVisitor<SemaExpressionTree, Expr*> {
     friend class ExprVisitor<SemaExpressionTree, Expr*>;
     TypeChecker &TC;
@@ -558,19 +530,14 @@ namespace {
     }
     
     Expr *VisitTupleExpr(TupleExpr *E) {
-      for (unsigned i = 0, e = E->NumSubExprs; i != e; ++i)
-        if (E->SubExprs[i])
-          if ((E->SubExprs[i] = Visit(E->SubExprs[i])) == 0)
-            return 0;
-      
       if (SemaTupleExpr(E->LParenLoc, E->SubExprs, E->SubExprNames,
-                        E->NumSubExprs, E->RParenLoc, E->Ty, TC)) return 0;
+                        E->NumSubExprs, E->RParenLoc, E->Ty, TC))
+        return 0;
       return E;
     }
     Expr *VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
       int FieldNo = -1;
-      if ((E->SubExpr = Visit(E->SubExpr)) == 0 ||
-          SemaDotIdentifier(E->SubExpr, E->DotLoc, E->Name, E->NameLoc, E->Ty,
+      if (SemaDotIdentifier(E->SubExpr, E->DotLoc, E->Name, E->NameLoc, E->Ty,
                             FieldNo, TC))
         return 0;
       
@@ -583,27 +550,25 @@ namespace {
     Expr *VisitTupleElementExpr(TupleElementExpr *E) {
       // TupleElementExpr is fully resolved.
       assert(!isa<DependentType>(E->Ty));
-      if ((E->SubExpr = Visit(E->SubExpr)) == 0)
-        return 0;
       return E;
     }
     
     Expr *VisitApplyExpr(ApplyExpr *E) {
-      if ((E->Fn = Visit(E->Fn)) == 0 ||
-          (E->Arg = Visit(E->Arg)) == 0 ||
-          SemaApplyExpr(E->Fn, E->Arg, E->Ty, TC))
+      if (SemaApplyExpr(E->Fn, E->Arg, E->Ty, TC))
         return 0;
       return E;
     }
     Expr *VisitSequenceExpr(SequenceExpr *E);
     
-    Expr *VisitBraceExpr(BraceExpr *E);
+    Expr *VisitBraceExpr(BraceExpr *E) {
+      assert(0 && "BraceExprs should be processed in the prepass");
+      return 0;
+    }
+    void PreProcessBraceExpr(BraceExpr *E);
     
     Expr *VisitClosureExpr(ClosureExpr *E) {
-      // Anon-decls within a nested closure will have already been resolved, so
-      // we don't need to recurse into it.  This also prevents N^2 re-sema
-      // activity with lots of nested closures.
-      return E;      
+      assert(0 && "Should not walk into ClosureExprs!");
+      return 0;
     }
     
     Expr *VisitAnonClosureArgExpr(AnonClosureArgExpr *E) {
@@ -616,18 +581,48 @@ namespace {
     }
     
     Expr *VisitBinaryExpr(BinaryExpr *E) {
-      if ((E->LHS = Visit(E->LHS)) == 0 ||
-          (E->RHS = Visit(E->RHS)) == 0 ||
-          SemaBinaryExpr(E->LHS, E->Fn, E->OpLoc, E->RHS, E->Ty, TC))
+      if (SemaBinaryExpr(E->LHS, E->Fn, E->OpLoc, E->RHS, E->Ty, TC))
         return 0;
       
       return E;
     }
     
-  public:
     SemaExpressionTree(TypeChecker &tc) : TC(tc) {}
+    
+    static Expr *WalkFn(Expr *E, Expr::WalkOrder Order, void *set) {
+      SemaExpressionTree &SET = *static_cast<SemaExpressionTree*>(set);
+      // This is implemented as a postorder walk.
+      if (Order == Expr::Walk_PreOrder) {
+        // Do not walk into ClosureExpr's.  Anonexprs within a nested closure
+        // will have already been resolved, so we don't need to recurse into it.
+        // This also prevents N^2 re-sema activity with lots of nested closures.
+        if (isa<ClosureExpr>(E)) return 0;
+        
+        // Do not descend into BraceExpr's, because we want to handle the var
+        // initializers in a custom way.  Instead, just call VisitBraceExpr in
+        // the prepass (which itself manually descends) and then tell the walker
+        // to not dive into it.
+        if (BraceExpr *BE = dyn_cast<BraceExpr>(E)) {
+          SET.PreProcessBraceExpr(BE);
+          return 0;
+        }
+        
+        return E;
+      }
+      
+      // Dispatch to the right visitor case in the post-order walk.  We know
+      // that the operands have already been processed and are valid.
+      return SET.Visit(E);
+    }
+
     Expr *doIt(Expr *E) {
-      return Visit(E);
+      return E->WalkExpr(WalkFn, this);
+    }
+    
+  public:
+    static Expr *doIt(Expr *E, TypeChecker &TC) {
+      SemaExpressionTree SET(TC);
+      return SET.doIt(E);
     }
   };
 } // end anonymous namespace.
@@ -772,10 +767,6 @@ static void ReduceJuxtaposedExprs(SequenceExpr *E, unsigned Elt,
 }
 
 Expr *SemaExpressionTree::VisitSequenceExpr(SequenceExpr *E) {
-  for (unsigned i = 0, e = E->NumElements; i != e; ++i)
-    if ((E->Elements[i] = Visit(E->Elements[i])) == 0)
-      return 0;
-  
   // If types of leaves were newly resolved, then this sequence may have
   // just changed from a sequence of operations into a binary expression,
   // function application or something else.  Check this now.  This is
@@ -796,10 +787,18 @@ Expr *SemaExpressionTree::VisitSequenceExpr(SequenceExpr *E) {
   return E;
 }
 
-Expr *SemaExpressionTree::VisitBraceExpr(BraceExpr *E) {
+void SemaExpressionTree::PreProcessBraceExpr(BraceExpr *E) {
+  // Braces have to manually walk into subtrees for expressions, because we
+  // terminate the walk we're in for them (so we can handle decls custom).
   for (unsigned i = 0, e = E->NumElements; i != e; ++i) {
     if (Expr *SubExpr = E->Elements[i].dyn_cast<Expr*>()) {
-      if ((SubExpr = Visit(SubExpr)) == 0) return 0;
+      if ((SubExpr = doIt(SubExpr)) == 0) {
+        memmove(&E->Elements[i], &E->Elements[i+1],
+                E->NumElements-i-1);
+        --i; --e;
+        if (e == 0)
+          E->MissingSemi = false;
+      }
       E->Elements[i] = SubExpr;
       continue;
     }
@@ -811,10 +810,23 @@ Expr *SemaExpressionTree::VisitBraceExpr(BraceExpr *E) {
     if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
       TC.typeCheck(VD);
   }
-    
-  if (SemaBraceExpr(E->LBLoc, E->Elements, E->NumElements,
-                    E->MissingSemi, E->RBLoc, E->Ty, TC)) return 0;
-  return E;
+  
+  // If any of the elements of the braces has a function type (which indicates
+  // that a function didn't get called), then produce an error.  We don't do
+  // this for the last element in the 'missing semi' case, because the brace
+  // expr as a whole has the function result.
+  // TODO: What about tuples which contain functions by-value that are dead?
+  for (unsigned i = 0; i != E->NumElements-(E->MissingSemi ? 1 : 0); ++i)
+    if (E->Elements[i].is<Expr*>() &&
+        isa<FunctionType>(E->Elements[i].get<Expr*>()->Ty))
+      // TODO: QOI: Add source range.
+      TC.error(E->Elements[i].get<Expr*>()->getLocStart(),
+               "expression resolves to an unevaluated function");
+  
+  if (E->MissingSemi)
+    E->Ty = E->Elements[E->NumElements-1].get<Expr*>()->Ty;
+  else
+    E->Ty = TC.Context.TheEmptyTupleType;
 }
 
 
@@ -1164,7 +1176,7 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
   
     // Now that the AnonDecls potentially have a type applied to them, redo
     // semantic analysis from the leaves of the expression tree up.
-    ERes = SemaExpressionTree(TC).doIt(ERes);
+    ERes = SemaExpressionTree::doIt(ERes, TC);
     if (ERes == 0)
       return 0;
     
@@ -1391,7 +1403,7 @@ static Expr *DiagnoseUnresolvedTypes(Expr *E, Expr::WalkOrder Order,
 /// that it is converted to.
 void TypeChecker::checkBody(Expr *&E, Type *DestTy, ConversionReason Res) {
   assert(E != 0 && "Can't check a null body!");
-  E = SemaExpressionTree(*this).doIt(E);
+  E = SemaExpressionTree::doIt(E, *this);
   if (E == 0) return;
   if (DestTy)
     E = convertToType(E, DestTy, false, Res);
