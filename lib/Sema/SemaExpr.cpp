@@ -124,26 +124,8 @@ SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
 
 llvm::NullablePtr<Expr>
 SemaExpr::ActOnDotIdentifier(Expr *E, llvm::SMLoc DotLoc,
-                             llvm::StringRef NameStr,
-                             llvm::SMLoc NameLoc) {
-  Identifier Name = S.Context.getIdentifier(NameStr);
-  
-#if 0
-  Type *ResultTy = 0;
-  int FieldNo = -1;
-  if (SemaDotIdentifier(E, DotLoc, Name, NameLoc, ResultTy, FieldNo, *this))
-    return 0;
-  
-  // If the field number is -1, the the base expression is dependent.
-  if (FieldNo == -1)
-    ;
-#endif
+                             Identifier Name, llvm::SMLoc NameLoc) {
   return new (S.Context) UnresolvedDotExpr(E, DotLoc, Name, NameLoc);
-  
-#if 0
-  // TODO: Eventually . can be useful for things other than tuples.
-  return new (S.Context) TupleElementExpr(E, DotLoc, FieldNo, NameLoc,ResultTy);
-#endif
 }
 
 llvm::NullablePtr<Expr>

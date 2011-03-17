@@ -572,7 +572,7 @@ namespace {
                             FieldNo, TC))
         return 0;
       
-      assert(FieldNo != -1 && "Resolved type should return a dependent expr");
+      assert(FieldNo != -1 && "Resolved type shouldnt return a dependent expr");
       
       // TODO: Eventually . can be useful for things other than tuples.
       return new (TC.Context) 

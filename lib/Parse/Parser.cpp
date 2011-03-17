@@ -874,7 +874,8 @@ bool Parser::parseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
       }
         
       if (!Result.isNull())
-        Result = S.expr.ActOnDotIdentifier(Result.get(), TokLoc, Tok.getText(),
+        Result = S.expr.ActOnDotIdentifier(Result.get(), TokLoc, 
+                                         S.Context.getIdentifier(Tok.getText()),
                                            Tok.getLoc());
       if (Tok.is(tok::identifier))
         consumeToken(tok::identifier);

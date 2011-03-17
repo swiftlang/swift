@@ -65,7 +65,7 @@ public:
                  bool HasMissingSemi, llvm::SMLoc RBLoc);
   
   llvm::NullablePtr<Expr>
-  ActOnDotIdentifier(Expr *E, llvm::SMLoc DotLoc, llvm::StringRef Identifier,
+  ActOnDotIdentifier(Expr *E, llvm::SMLoc DotLoc, Identifier Name,
                      llvm::SMLoc IdentifierLoc);
   
   llvm::NullablePtr<Expr>
