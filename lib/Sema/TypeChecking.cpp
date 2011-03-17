@@ -70,6 +70,8 @@ namespace {
     
     void validateAttributes(DeclAttributes &Attrs, Type *Ty);
     
+    bool validateVarName(Type *Ty, DeclVarName *Name);
+
     // Utility Functions
     enum ConversionReason {
       CR_BinOpLHS,  // Left side of binary operator.
@@ -1391,7 +1393,46 @@ void TypeChecker::typeCheck(ElementRefDecl *ERD) {
     error(ERD->getLocStart(), "'" + ERD->Name.str() +
           "' is an invalid index for '" + ERD->VD->Ty->getString() +
           "'");
+    // FIXME: This should be "invalid"
+    ERD->Ty = Context.TheEmptyTupleType;
   }
+}
+
+bool TypeChecker::validateVarName(Type *Ty, DeclVarName *Name) {
+  // Check for a type specifier mismatch on this level.
+  assert(Ty && "This lookup should never fail");
+
+  // If this is a simple varname, then it matches any type, and we're done.
+  if (Name->isSimple())
+    return false;
+
+  // If we're peering into an unresolved type, we can't analyze it yet.
+  if (Ty->getAs<DependentType>() != 0) return false;
+
+  // If we have a complex case, Ty must be a tuple and the name specifier must
+  // have the correct number of elements.
+  TupleType *AccessedTuple = Ty->getAs<TupleType>();
+  if (AccessedTuple == 0) {
+    error(Name->LPLoc, "name specifier matches '" + Ty->getString() +
+          "' which is not a tuple");
+    return true;
+  }
+
+  // Verify the # elements line up.
+  if (Name->Elements.size() != AccessedTuple->Fields.size()) {
+    error(Name->LPLoc, "name specifier matches '" + Ty->getString() +
+          "' which requires " + llvm::Twine(AccessedTuple->Fields.size()) +
+          " names, but has " + llvm::Twine(Name->Elements.size()));
+    return true;
+  }
+  
+  // Okay, everything looks good at this level, recurse.
+  for (unsigned i = 0, e = Name->Elements.size(); i != e; ++i) {
+    if (validateVarName(AccessedTuple->Fields[i].Ty, Name->Elements[i]))
+      return true;
+  }
+
+  return false;
 }
 
 void TypeChecker::typeCheck(VarDecl *VD) {
@@ -1413,6 +1454,11 @@ void TypeChecker::typeCheck(VarDecl *VD) {
   }
   
   validateAttributes(VD->Attrs, VD->Ty);
+  
+  // If the VarDecl had a name specifier, verify that it lines up with the
+  // actual type of the VarDecl.
+  if (VD->NestedName && validateVarName(VD->Ty, VD->NestedName))
+    VD->NestedName = 0;
 }
 
 
@@ -1448,12 +1494,4 @@ void swift::performTypeChecking(TranslationUnitDecl *TUD, ASTContext &Ctx) {
     ValueDecl *VD = cast<ValueDecl>(*I);
     TC.typeCheck(VD);
   }
-  
-#if 0
-  // Otherwise, we have the paren case.  Verify that the currently named type
-  // has the right number of elements.  If so, we recursively process each.
-  if (SD.CheckAccessPathArity(Name.NumChildren, Name.Loc, VD, AccessPath))
-    return;
-#endif
-
 }
