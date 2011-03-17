@@ -63,6 +63,7 @@ SemaDecl::~SemaDecl() {
 /// unit.
 void SemaDecl::handleEndOfTranslationUnit() {
   // Verify that any forward declared types were ultimately defined.
+  // TODO: Move this to name binding!
   UnresolvedTypesMapTy &UT = getUnresolvedTypesHT(UnresolvedTypes);
   // FIXME: Nondeterminstic iteration.
   for (UnresolvedTypesMapTy::iterator I = UT.begin(), E = UT.end(); I != E; ++I)

@@ -546,8 +546,7 @@ namespace {
       return E;
     }
     Expr *VisitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
-      TC.error(E->getLocStart(),
-           "FIXME: UnresolvedDeclRefExpr should be resolved by name binding!");
+      assert(0 && "UnresolvedDeclRefExpr should be resolved by name binding!");
       return 0;
     }
     Expr *VisitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {

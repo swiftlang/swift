@@ -18,7 +18,9 @@
 #include "swift/Parse/Parser.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/SourceMgr.h"
@@ -34,6 +36,16 @@ namespace {
     ASTContext &Context;
     NameBinder(ASTContext &C) : Context(C) {}
     
+    /// TopLevelValues - This is the list of top-level declarations we have.
+    llvm::DenseMap<Identifier, ValueDecl *> TopLevelValues;
+    
+    void addNamedTopLevelDecl(ValueDecl *VD) {
+      TopLevelValues[VD->Name] = VD;
+    }
+    
+    Expr *bindValueName(Identifier I, SMLoc Loc);
+    
+    
     void note(SMLoc Loc, const llvm::Twine &Message) {
       Context.SourceMgr.PrintMessage(Loc, Message, "note");
     }
@@ -47,36 +59,74 @@ namespace {
   };
 }
 
+/// bindValueName - This is invoked for each UnresolvedDeclRefExpr in the AST.
+Expr *NameBinder::bindValueName(Identifier Name, SMLoc Loc) {
+  // Right now we don't have import or anything else, so we just handle forward
+  // references.
+  llvm::DenseMap<Identifier, ValueDecl *>::iterator I =
+    TopLevelValues.find(Name);
+  if (I == TopLevelValues.end()) {
+    error(Loc, "use of unresolved identifier '" + Name.str() + "'");
+    return 0;
+  }
+  
+  // If we found a resolved decl, replace the unresolved ref with a resolved
+  // DeclRefExpr.
+  return new (Context) DeclRefExpr(I->second, Loc);
+}
+
+
+static Expr *BindNames(Expr *E, Expr::WalkOrder Order, void *binder) {
+  NameBinder &Binder = *static_cast<NameBinder*>(binder);
+  
+  // Ignore the preorder walk.
+  if (Order == Expr::Walk_PreOrder)
+    return E;
+  
+  // Ignore everything except UnresolvedDeclRefExpr.
+  UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E);
+  if (UDRE == 0) return E;
+  
+  return Binder.bindValueName(UDRE->Name, UDRE->Loc);  
+}
 
 /// performNameBinding - Once parsing is complete, this walks the AST to
 /// resolve names and do other top-level validation.
+///
+/// At this parsing has been performed, but we still have UnresolvedDeclRefExpr
+/// nodes for unresolved value names, and we may have unresolved type names as
+/// well.  This handles import directives and forward references.
 void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
   NameBinder Binder(Ctx);
-  // At this point name binding has been performed and we have to do full type
-  // checking and anonymous name binding resolution.
+  
+  // Do a prepass over the declarations to make sure they have basic sanity and
+  // to find the list of top-level value declarations.
   for (llvm::ArrayRef<Decl*>::iterator I = TUD->Decls.begin(),
        E = TUD->Decls.end(); I != E; ++I) {
-    Decl *D = *I;
     
     // If any top-level value decl has an unresolved type, then it is erroneous.
     // It is not valid to have something like "var x = 4" at the top level, all
     // types must be explicit here.
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
-      if (isa<DependentType>(VD->Ty))
-        Binder.error(VD->getLocStart(),
-                     "top level declarations require a type specifier");
-      continue;
-    }
-        
-    // Otherwise, ignore top level typealiases and elementrefs.
-    if (isa<TypeAliasDecl>(D) || isa<ElementRefDecl>(D))
-      continue;
-    
-    if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
-      (void)VD;
-      continue;
+    ValueDecl *VD = dyn_cast<ValueDecl>(*I);
+    if (VD == 0) continue;
+    // Verify that values have a type specified.
+    if (isa<DependentType>(VD->Ty)) {
+      Binder.error(VD->getLocStart(),
+                   "top level declarations require a type specifier");
+      // FIXME: Should mark the decl as invalid.
+      VD->Ty = Ctx.TheEmptyTupleType;
     }
     
-    (void)cast<FuncDecl>(D);
+    if (!VD->Name.empty())
+      Binder.addNamedTopLevelDecl(VD);
+  }
+  
+  // Now that we know the top-level value names, go through and resolve any
+  // UnresolvedDeclRefExprs that exist.
+  for (llvm::ArrayRef<Decl*>::iterator I = TUD->Decls.begin(),
+       E = TUD->Decls.end(); I != E; ++I) {
+    if (ValueDecl *VD = dyn_cast<ValueDecl>(*I))
+      if (VD->Init)
+        VD->Init = VD->Init->WalkExpr(BindNames, &Binder);
   }
 }
