@@ -55,6 +55,8 @@ llvm::SMLoc Expr::getLocStart() const {
     return cast<SequenceExpr>(this)->Elements[0]->getLocStart();
   case BraceExprKind:      return cast<BraceExpr>(this)->LBLoc;
   case ClosureExprKind:    return cast<ClosureExpr>(this)->Input->getLocStart();
+  case AnonClosureArgExprKind:
+    return cast<AnonClosureArgExpr>(this)->Loc;
   case BinaryExprKind:     return cast<BinaryExpr>(this)->LHS->getLocStart();
   }
   
@@ -174,6 +176,9 @@ namespace {
       }
       return 0;
     }
+    
+    Expr *VisitAnonClosureArgExpr(AnonClosureArgExpr *E) { return E; }
+
     Expr *VisitBinaryExpr(BinaryExpr *E) {
       Expr *E2 = ProcessNode(E->LHS);
       if (E2 == 0) return 0;
@@ -322,17 +327,14 @@ public:
     OS.indent(Indent) << "(closure_expr type='";
     E->Ty->print(OS);
     OS << "'\n";
-    
-    if (E->ArgList) {
-      for (unsigned i = 0, e = E->getNumArgs(); i != e; ++i)
-        if (E->ArgList[i].isNonNull()) {
-          PrintRec(E->ArgList[i].get());
-          OS << '\n';
-        }
-    }
-    
     PrintRec(E->Input);
     OS << ')';
+  }
+  
+  void VisitAnonClosureArgExpr(AnonClosureArgExpr *E) {
+    OS.indent(Indent) << "(anon_closure_arg_expr type='";
+    E->Ty->print(OS);
+    OS << "')";
   }
   void VisitBinaryExpr(BinaryExpr *E) {
     OS.indent(Indent) << "(binary_expr '";

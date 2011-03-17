@@ -44,6 +44,7 @@ public:
     DISPATCH(SequenceExpr);
     DISPATCH(BraceExpr);
     DISPATCH(ClosureExpr);
+    DISPATCH(AnonClosureArgExpr);
     DISPATCH(BinaryExpr);
 #undef DISPATCH
     }

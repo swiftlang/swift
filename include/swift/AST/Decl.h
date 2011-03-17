@@ -41,7 +41,6 @@ enum DeclKind {
   FuncDeclKind,
   OneOfElementDeclKind,
   ArgDeclKind,
-  AnonDeclKind,
   ElementRefDeclKind
 };
   
@@ -167,7 +166,7 @@ public:
   static bool classof(const Decl *D) {
     return (D->getKind() == VarDeclKind || D->getKind() == FuncDeclKind ||
             D->getKind() == OneOfElementDeclKind ||
-            D->getKind() == ArgDeclKind || D->getKind() == AnonDeclKind ||
+            D->getKind() == ArgDeclKind || 
             D->getKind() == ElementRefDeclKind ||
             D->getKind() == TypeAliasDeclKind);
   }
@@ -223,8 +222,8 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return (D->getKind() == VarDeclKind || D->getKind() == FuncDeclKind ||
-            D->getKind() == OneOfElementDeclKind || D->getKind() == ArgDeclKind||
-            D->getKind() == AnonDeclKind || D->getKind() == ElementRefDeclKind);
+            D->getKind() == OneOfElementDeclKind ||D->getKind() == ArgDeclKind||
+            D->getKind() == ElementRefDeclKind);
   }
   static bool classof(const ValueDecl *D) { return true; }
 
@@ -348,25 +347,6 @@ public:
   static bool classof(const ArgDecl *D) { return true; }
 };
 
-/// AnonDecl - Anonymous closure argument declaration, synthesized by referecing
-/// symbols $0 ... $9.
-class AnonDecl : public ValueDecl {
-public:
-  llvm::SMLoc UseLoc;    // Location of the first use in a context.
-  
-  AnonDecl(llvm::SMLoc useloc, Identifier name, Type *ty)
-    : ValueDecl(AnonDeclKind, name, ty, 0, DeclAttributes()), UseLoc(useloc) {}
-  
-  llvm::SMLoc getLocStart() const { return UseLoc; }
-
-  
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) { return D->getKind() == AnonDeclKind; }
-  static bool classof(const AnonDecl *D) { return true; }
-};
-  
 /// ElementRefDecl - A reference to the element of another decl which is formed
 /// through name binding.  For example, in "var (a,b) = f();" there is a VarDecl
 /// with no name and two ElementRefDecls (named A and B) referring to elements

@@ -33,7 +33,6 @@ namespace swift {
   class Type;
   class ValueDecl;
   class Decl;
-  class AnonDecl;
   
 enum ExprKind {
   IntegerLiteralKind,
@@ -47,6 +46,7 @@ enum ExprKind {
   SequenceExprKind,
   BraceExprKind,
   ClosureExprKind,
+  AnonClosureArgExprKind,
   BinaryExprKind
 };
   
@@ -308,24 +308,28 @@ class ClosureExpr : public Expr {
 public:
   Expr *Input;
   
-  /// AnonArgList - This specifies the decls that named anonymous arguments are
-  /// bound by this closure.  Note that elements of this list may be null when
-  /// the argument is not bound to an argument and that this list may be null if
-  /// named anonymous arguments are not used.  If the ArgList pointer is
-  /// non-null, then its length is indicated by getNumArgs().
-  llvm::NullablePtr<AnonDecl> *ArgList;
-  
-  ClosureExpr(Expr *input, llvm::NullablePtr<AnonDecl> *arglist, Type *ResultTy)
-    : Expr(ClosureExprKind, ResultTy), Input(input), ArgList(arglist) {}
+  ClosureExpr(Expr *input, Type *ResultTy)
+    : Expr(ClosureExprKind, ResultTy), Input(input) {}
 
   /// getNumArgs - Return the number of arguments that this closure expr takes.
-  /// This is the length of the ArgList.
   unsigned getNumArgs() const;
-  
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ClosureExpr *) { return true; }
   static bool classof(const Expr *E) { return E->Kind == ClosureExprKind; }
+};
+  
+class AnonClosureArgExpr : public Expr {
+public:
+  unsigned ArgNo;
+  llvm::SMLoc Loc;
+  
+  AnonClosureArgExpr(unsigned argNo, llvm::SMLoc loc)
+    : Expr(AnonClosureArgExprKind), ArgNo(argNo), Loc(loc) {}
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const AnonClosureArgExpr *) { return true; }
+  static bool classof(const Expr *E) { return E->Kind ==AnonClosureArgExprKind;}
 };
   
 /// BinaryExpr - Infix binary expressions like 'x+y'.

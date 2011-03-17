@@ -34,7 +34,6 @@ namespace swift {
   class TypeAliasDecl;
   class VarDecl;
   class FuncDecl;
-  class AnonDecl;
   class ValueDecl;
   class ElementRefDecl;
   class Scope;
@@ -76,30 +75,11 @@ public:
   /// a type context, returning the decl if found or installing and returning a
   /// new Unresolved one if not.
   TypeAliasDecl *LookupTypeName(Identifier Name, llvm::SMLoc Loc);
-
-
-  /// AnonClosureArgs - These are the current active set of anonymous closure
-  /// arguments, named $0 ... $9.  These are added to the list when first
-  /// referenced in a context and cleared out when something uses them (binding
-  /// them to a ClosureExpr).
-  llvm::SmallVector<llvm::NullablePtr<AnonDecl>, 8> AnonClosureArgs;
-  
-  /// GetAnonDecl - Get the anondecl for the specified anonymous closure
-  /// argument reference.  This occurs for use of $0 .. $9.  This returns null
-  /// on an invalid name.
-  AnonDecl *GetAnonDecl(llvm::StringRef Text, llvm::SMLoc RefLoc);
   
   //===--------------------------------------------------------------------===//
   // Declaration handling.
   //===--------------------------------------------------------------------===//
   
-  /// ActOnTopLevelDecl - This is called after parsing a new top-level decl.
-  void ActOnTopLevelDecl(ValueDecl *D);
-
-  /// ActOnTopLevelDeclError - This is called after an error parsing a top-level
-  /// decl.
-  void ActOnTopLevelDeclError();
-
   TypeAliasDecl *ActOnTypeAlias(llvm::SMLoc TypeAliasLoc, Identifier Name,
                                 Type *Ty);
   

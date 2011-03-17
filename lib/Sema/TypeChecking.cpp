@@ -85,7 +85,7 @@ namespace {
     void checkBody(Expr *&E, Type *DestTy, ConversionReason Res);
     
 
-    /// ConvertToType - Do semantic analysis of an expression in a context that
+    /// convertToType - Do semantic analysis of an expression in a context that
     /// expects a particular type.  This does conversion to that type if the types
     /// don't match and diagnoses cases where the conversion cannot be performed.
     /// The Reason specifies why this conversion is happening, for diagnostic
@@ -258,8 +258,8 @@ static bool SemaApplyExpr(Expr *&E1, Expr *&E2, Type *&ResultTy,
                           TypeChecker &TC) {
   FunctionType *FT = cast<FunctionType>(E1->Ty);
   
-  // Otherwise, we do have a function application.  Check that the argument
-  // type matches the expected type of the function.
+  // We have a function application.  Check that the argument type matches the
+  // expected type of the function.
   E2 = TC.convertToType(E2, FT->Input, false, TypeChecker::CR_FuncApply);
   if (E2 == 0)
     return true;
@@ -533,6 +533,9 @@ namespace {
   /// intermediate nodes, introduce type coercion etc.  This visitor does this
   /// job.  Each visit method reanalyzes the children of a node, then reanalyzes
   /// the node, and returns true on error.
+  
+  // FIXME: This should become a post-order walker!
+  
   class SemaExpressionTree : public ExprVisitor<SemaExpressionTree, Expr*> {
     friend class ExprVisitor<SemaExpressionTree, Expr*>;
     TypeChecker &TC;
@@ -602,6 +605,16 @@ namespace {
       // activity with lots of nested closures.
       return E;      
     }
+    
+    Expr *VisitAnonClosureArgExpr(AnonClosureArgExpr *E) {
+      // Nothing we can do here.  These remain as resolved or unresolved as they
+      // always were.  If no type is assigned, we give them a dependent type so
+      // that we get resolution later.
+      if (E->Ty == 0)
+        E->Ty = TC.Context.TheDependentType;
+      return E;
+    }
+    
     Expr *VisitBinaryExpr(BinaryExpr *E) {
       if ((E->LHS = Visit(E->LHS)) == 0 ||
           (E->RHS = Visit(E->RHS)) == 0 ||
@@ -907,6 +920,11 @@ namespace {
     Expr *VisitClosureExpr(ClosureExpr *E) {
       return E;      
     }
+    
+    Expr *VisitAnonClosureArgExpr(AnonClosureArgExpr *E) {
+      return E;
+    }
+
     Expr *VisitBinaryExpr(BinaryExpr *E) {
       return E;
     }
@@ -943,6 +961,7 @@ Expr *SemaCoerceBottomUp::VisitTupleExpr(TupleExpr *E) {
 // Type Conversion
 //===----------------------------------------------------------------------===//
 
+class AnonDecl;
 
 /// BindAndValidateClosureArgs - The specified list of anonymous closure
 /// arguments was bound to a closure function with the specified input
@@ -1124,10 +1143,10 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
   // when we convert an expression E to a function type whose result is E's
   // type.
   if (FunctionType *FT = DestTy->getAs<FunctionType>()) {
+#if 0
     // If we bound any anonymous closure arguments, validate them and resolve
     // their types.
     llvm::NullablePtr<AnonDecl> *ActualArgList = 0;
-#if 0
     if (!IgnoreAnonDecls && !SE.S.decl.AnonClosureArgs.empty()) {
       ActualArgList = BindAndValidateClosureArgs(E, FT->Input, TC);
       if (ActualArgList == 0)
@@ -1149,7 +1168,7 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
     if (ERes == 0)
       return 0;
     
-    return new (TC.Context) ClosureExpr(ERes, ActualArgList, DestTy);
+    return new (TC.Context) ClosureExpr(ERes, DestTy);
   }
   
   // If the input expression has a dependent type, then there are two cases:
@@ -1171,32 +1190,38 @@ Expr *TypeChecker::convertToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
   if (Expr *ERes = HandleConversionToType(E, DestTy, IgnoreAnonDecls, *this))
     return ERes;
   
-  // FIXME: We only have this because diagnostics are terrible right now.
+  // FIXME: We only have this because diagnostics are terrible right now.  When
+  // we have expression underlining this should be removed.
   E->dump();
-  DestTy->dump();
   
   // TODO: QOI: Source ranges + print the type.
   switch (Reason) {
   case CR_BinOpLHS:
-    error(E->getLocStart(), "left hand side of binary operator has wrong type");
+    error(E->getLocStart(), "left hand side of binary operator has type '" +
+          E->Ty->getString() + "', expected '" + DestTy->getString() + "'");
     break;
   case CR_BinOpRHS: 
-    error(E->getLocStart(),"right hand side of binary operator has wrong type");
+    error(E->getLocStart(),"right hand side of binary operator has type '" +
+          E->Ty->getString() + "', expected '" + DestTy->getString() + "'");
     break;
   case CR_FuncApply:
-    error(E->getLocStart(), "argument to function invocation has wrong type");
+    error(E->getLocStart(), "argument to function invocation has type '" +
+          E->Ty->getString() + "', expected '" + DestTy->getString() + "'");
     break;
   case CR_VarInit:
     error(E->getLocStart(),
-          "explicitly specified type doesn't match initializer expression");
+          "cannot convert initializer type '" + E->Ty->getString() +
+          "' to explicitly specified type '" + DestTy->getString() + "'");
     break;
   case CR_TupleInit:
     error(E->getLocStart(),
-          "explicitly specified type doesn't match default value type");
+          "cannot convert default value type '" + E->Ty->getString() +
+          "' to explicitly specified type '" + DestTy->getString() + "'");
     break;
   case CR_FuncBody:
     error(E->getLocStart(),
-          "type of func body doesn't match specified prototype");
+          "function body type '" + E->Ty->getString() +
+          "' doesn't match specified prototype '" + DestTy->getString() + "'");
     break;
   }
   

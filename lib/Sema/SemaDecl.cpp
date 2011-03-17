@@ -122,31 +122,6 @@ void SemaDecl::AddToScope(ValueDecl *D) {
                                   std::make_pair(CurScope->getDepth(), D));
 }
 
-/// GetAnonDecl - Get the anondecl for the specified anonymous closure
-/// argument reference.  This occurs for use of $0 .. $9.
-AnonDecl *SemaDecl::GetAnonDecl(llvm::StringRef Text, llvm::SMLoc RefLoc) {
-  assert(Text.size() >= 2 && Text[0] == '$' && 
-         Text[1] >= '0' && Text[1] <= '9' && "Not a valid anon decl");
-  unsigned ArgNo = 0;
-  if (Text.substr(1).getAsInteger(10, ArgNo)) {
-    error(RefLoc, "invalid name in $ expression");
-    return 0;
-  }
-           
-  // If this is the first reference to the anonymous symbol decl, create it.
-  if (AnonClosureArgs.size() <= ArgNo || AnonClosureArgs[ArgNo].isNull()) {
-    // Otherwise, this is the first reference to the anonymous decl,
-    // synthesize it now.
-    if (ArgNo >= AnonClosureArgs.size())
-      AnonClosureArgs.resize(ArgNo+1);
-    
-    AnonClosureArgs[ArgNo] =
-      new (S.Context) AnonDecl(RefLoc, S.Context.getIdentifier(Text),
-                               S.Context.TheDependentType);
-  }
-  return AnonClosureArgs[ArgNo].get();
-}
-
 //===----------------------------------------------------------------------===//
 // Name Processing.
 //===----------------------------------------------------------------------===//
@@ -176,30 +151,6 @@ ActOnElementName(Identifier Name, llvm::SMLoc NameLoc, VarDecl *D,
 //===----------------------------------------------------------------------===//
 // Declaration handling.
 //===----------------------------------------------------------------------===//
-
-/// ActOnTopLevelDecl - This is called after parsing a new top-level decl.
-void SemaDecl::ActOnTopLevelDecl(ValueDecl *D) {
-#if 0
-  // Check for and diagnose any uses of anonymous arguments that were unbound.
-  for (unsigned i = 0, e = AnonClosureArgs.size(); i != e; ++i) {
-    if (AnonClosureArgs[i].isNull()) continue;
-    AnonDecl *AD = AnonClosureArgs[i].get();
-
-    error(AD->UseLoc,
-          "use of anonymous closure argument in non-closure context");
-  }
-#endif
-  
-  AnonClosureArgs.clear();
-}
-
-/// ActOnTopLevelDeclError - This is called after an error parsing a top-level
-/// decl.
-void SemaDecl::ActOnTopLevelDeclError() {
-  // Clear out any referenced anonymous closure arguments without diagnosing
-  // them.  The error was already reported with the malformed decl.
-  AnonClosureArgs.clear();
-}
 
 /// Note that DeclVarName is sitting on the stack, not copied into the
 /// ASTContext.

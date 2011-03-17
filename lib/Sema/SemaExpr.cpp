@@ -49,10 +49,15 @@ NullablePtr<Expr> SemaExpr::ActOnNumericConstant(llvm::StringRef Text,
 
 NullablePtr<Expr> 
 SemaExpr::ActOnDollarIdentExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
-  ValueDecl *D = S.decl.GetAnonDecl(Text, Loc);
-  if (D == 0) return 0;
-  
-  return new (S.Context) DeclRefExpr(D, Loc);
+  assert(Text.size() >= 2 && Text[0] == '$' && 
+         Text[1] >= '0' && Text[1] <= '9' && "Not a valid anon decl");
+  unsigned ArgNo = 0;
+  if (Text.substr(1).getAsInteger(10, ArgNo)) {
+    error(Loc, "invalid name in $ expression");
+    return 0;
+  }
+
+  return new (S.Context) AnonClosureArgExpr(ArgNo, Loc);
 }
 
 NullablePtr<Expr> 

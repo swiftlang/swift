@@ -218,24 +218,14 @@ void Parser::parseDeclTopLevel(llvm::SmallVectorImpl<Decl *> &Decls) {
       return Decls.push_back(D);
     break;
   case tok::kw_func:
-    if (FuncDecl *D = parseDeclFunc()) {
-      S.decl.ActOnTopLevelDecl(D);
+    if (FuncDecl *D = parseDeclFunc())
       return Decls.push_back(D);
-    }
     break;
   case tok::kw_var:
     if (!parseDeclVar(Decls))
       return;
-    
-#if 0
-  // FIXME: Remove ActOnTopLevelDecl argument.
-#endif
-    S.decl.ActOnTopLevelDecl(0);
-    
     break;
   }
-  
-  S.decl.ActOnTopLevelDeclError();
   
   // On error, skip to the next top level declaration.
   while (Tok.isNot(tok::eof) && Tok.isNot(tok::kw_var) &&
