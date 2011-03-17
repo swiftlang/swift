@@ -274,7 +274,7 @@ public:
 
   FuncDecl(llvm::SMLoc funcloc, Identifier name, Type *ty, Expr *init,
           const DeclAttributes &attrs)
-    : ValueDecl(VarDeclKind, name, ty, init, attrs), FuncLoc(funcloc) {}
+    : ValueDecl(FuncDeclKind, name, ty, init, attrs), FuncLoc(funcloc) {}
   
   
   llvm::SMLoc getLocStart() const { return FuncLoc; }
