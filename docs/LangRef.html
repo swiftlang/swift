@@ -916,21 +916,20 @@
   <!-- ===================================================================== -->
   
   <div class="commentary">
-    In the short-term, this works, but this isn't satisfactory: The whole idea
-    of having 'int' be defined in the library is that we want the runtime to
-    define it.  Having literals fixed to a specific type defeats this.  This
-    also breaks things like 64-bit integers etc.  There are a couple of ways to
-    handle this, such as C++'0x user defined literal suffixes, go's approach of
-    treating them as arbitrary precision integers that are resolved to a type
-    later, etc.  We must return to this at some point.
+    Consider something like C++'0x user defined literal suffixes or go's
+    approach of treating them as arbitrary precision integers that are resolved
+    to a type later, etc.  This can be handled in the library since the library
+    defines what concrete type to use.
   </div>
 
   <pre class="grammar">
     expr-literal ::= <a href="#numeric_constant">numeric_constant</a>
   </pre>
   
-  <p>The only literal currently supported are integer constants.  These
-     have '__builtin_int32_type' type.</p>
+  <p>The only literal currently supported are integer constants.  These are
+     given 'integer_literal_type' type, which must be defined by the library.
+     If an integer literal is used and integer_literal_type is not defined, then
+     the code is malformed.</p>
 
   <!-- ===================================================================== -->
   <h3 id="expr-identifier">Identifiers</h3>
@@ -1137,7 +1136,11 @@
   
   <p>identifier namespaces: tuple elements, types, values.
   Scope within oneof decls.</p>
-  
+
+  <h3 id="sema_namebinding">Name Binding</h3>
+
+  <h3 id="sema_typechecking">Type Checking</h3>
+
   <h3 id="sema_conversions">Standard Conversions</h3>
   <h3 id="sema_anondecls">Anonymous Argument Resolution</h3>
   <h3 id="sema_context">Context Sensitive Type Resolution</h3>
