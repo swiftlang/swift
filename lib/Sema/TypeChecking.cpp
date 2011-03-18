@@ -974,79 +974,74 @@ Expr *SemaCoerceBottomUp::VisitTupleExpr(TupleExpr *E) {
 //===----------------------------------------------------------------------===//
 
 namespace {
-struct AnonClosureArgExprFinder {
-  llvm::SmallVector<AnonClosureArgExpr*, 8> ClosureArgs;
+struct RewriteAnonArgExpr {
+  Type *FuncInputTy;
+  TypeChecker &TC;
   
-  static Expr *WalkFn(Expr *E, Expr::WalkOrder Order, void *finder) {
-    AnonClosureArgExprFinder &Finder = *(AnonClosureArgExprFinder*)finder;
+  RewriteAnonArgExpr(Type *funcInputTy, TypeChecker &tc)
+    : FuncInputTy(funcInputTy), TC(tc) {}
+  
+  static Expr *WalkFn(Expr *E, Expr::WalkOrder Order, void *rewriter) {
+    RewriteAnonArgExpr &Rewriter = *static_cast<RewriteAnonArgExpr*>(rewriter);
+    Type *FuncInputTy = Rewriter.FuncInputTy;
+  
+    if (Order == Expr::Walk_PreOrder) {
+      // If this is a ClosureExpr, don't walk into it.  This would find *its*
+      // anonymous closure arguments, not ours.
+      if (isa<ClosureExpr>(E)) return 0; // Don't recurse into it.
+      
+      // Otherwise, do recurse into it.  We handle anon args in the postorder
+      // visitation.
+      return E;
+    }
+  
+    // If we found a closure argument, process it.
+    AnonClosureArgExpr *A = dyn_cast<AnonClosureArgExpr>(E);
+    if (A == 0) return E;  
     
-    // We ignore the postorder walk.
-    if (Order != Expr::Walk_PreOrder) return E;
-
-    // If this is a ClosureExpr, don't walk into it.  This would find *its*
-    // anonymous closure arguments, not ours.
-    if (isa<ClosureExpr>(E)) return 0; // Don't recurse into it.
-    
-    // If we found a closure argument, remember it.
-    if (AnonClosureArgExpr *A = dyn_cast<AnonClosureArgExpr>(E))
-      Finder.ClosureArgs.push_back(A);
-    return E;
-  }
-  
-  void findArgs(Expr *E) {
-    E->WalkExpr(WalkFn, this);    
-  }
-};
-}
-
-/// BindAndValidateClosureArgs - The specified list of anonymous closure
-/// arguments was bound to a closure function with the specified input
-/// arguments.  Validate the argument list and, if valid, allocate and return
-/// a pointer to the argument to be used for the ClosureExpr.
-static bool
-BindAndValidateClosureArgs(Expr *Body, Type *FuncInput, TypeChecker &TC) {
-  // Walk the body to see if it has any anonymous arguments.  Note that this
-  // isn't a particularly efficient thing to do.
-  AnonClosureArgExprFinder ArgFinder;
-  ArgFinder.findArgs(Body);
-  
-  // If there is nothing to do, just return an unmolested closure body.
-  if (ArgFinder.ClosureArgs.empty())
-    return false;
-  
-  // If the input to the function is a non-tuple, only $0 is valid, if it is a
-  // tuple, then $0..$N are valid depending on the number of inputs to the
-  // tuple.
-  unsigned NumInputArgs = 1;
-  if (TupleType *TT = dyn_cast<TupleType>(FuncInput))
-    NumInputArgs = TT->Fields.size();
-  
-  for (unsigned ArgNo = 0, e = ArgFinder.ClosureArgs.size();
-       ArgNo != e; ++ArgNo) {
-    AnonClosureArgExpr *A = ArgFinder.ClosureArgs[ArgNo];
+    // If the input to the function is a non-tuple, only $0 is valid, if it is a
+    // tuple, then $0..$N are valid depending on the number of inputs to the
+    // tuple.
+    unsigned NumInputArgs = 1;
+    if (TupleType *TT = dyn_cast<TupleType>(FuncInputTy))
+      NumInputArgs = TT->Fields.size();
     
     assert(isa<DependentType>(A->Ty) && "Anon arg already has a type?");
     
     // Verify that the argument number isn't too large, e.g. using $4 when the
     // bound function only has 2 inputs.
     if (A->ArgNo >= NumInputArgs) {
-      TC.error(A->Loc,
+      Rewriter.TC.error(A->Loc,
                "use of invalid anonymous argument, with number higher than"
                " # arguments to bound function");
-      return true;
+      return 0;
     }
-  
+    
     // Assign the AnonDecls their actual concrete types now that we know the
     // context they are being used in.
-    if (TupleType *TT = dyn_cast<TupleType>(FuncInput)) {
+    if (TupleType *TT = dyn_cast<TupleType>(FuncInputTy)) {
       A->Ty = TT->getElementType(A->ArgNo);
     } else {
       assert(NumInputArgs == 1 && "Must have unary case");
-      A->Ty = FuncInput;
+      A->Ty = FuncInputTy;
     }
+    return A;
   }
+};
+} // end anonymous namespace
+
+/// BindAndValidateClosureArgs - The specified list of anonymous closure
+/// arguments was bound to a closure function with the specified input
+/// arguments.  Validate the argument list and, if valid, allocate and return
+/// a pointer to the argument to be used for the ClosureExpr.
+static bool
+BindAndValidateClosureArgs(Expr *Body, Type *FuncInput, TypeChecker &TC) {  
+  RewriteAnonArgExpr Rewriter(FuncInput, TC);
   
-  return false;
+  // Walk the body and rewrite any anonymous arguments.  Note that this
+  // isn't a particularly efficient way to handle this, because we walk subtrees
+  // even if they have no anonymous arguments..
+  return Body->WalkExpr(RewriteAnonArgExpr::WalkFn, &Rewriter) == 0;
 }
 
 /// getTupleFieldForScalarInit - If the specified tuple type can be assigned a
