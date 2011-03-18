@@ -118,6 +118,7 @@ private:
   bool parseAttribute(DeclAttributes &Attributes);
   bool parseVarName(DeclVarName &Name);
   
+  Decl *parseDeclImport();
   Decl *parseDeclOneOf();
   Decl *parseDeclStruct();
   bool parseDeclVar(llvm::SmallVectorImpl<Decl *> &Decls);

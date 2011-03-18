@@ -42,7 +42,8 @@ namespace tok {
 //    KEYWORD(__builtin_uint64_type)
 //    KEYWORD(__builtin_float_type)
 //    KEYWORD(__builtin_double_type)
-    
+
+    KEYWORD(import)
     KEYWORD(oneof)
     KEYWORD(struct)
     KEYWORD(func)

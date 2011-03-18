@@ -152,6 +152,12 @@ ActOnElementName(Identifier Name, llvm::SMLoc NameLoc, VarDecl *D,
 // Declaration handling.
 //===----------------------------------------------------------------------===//
 
+Decl *SemaDecl::ActOnImportDecl(llvm::SMLoc ImportLoc, Identifier ModuleName,
+                                DeclAttributes &Attrs) {
+  return 0;
+}
+
+
 /// Note that DeclVarName is sitting on the stack, not copied into the
 /// ASTContext.
 VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, DeclVarName &Name,

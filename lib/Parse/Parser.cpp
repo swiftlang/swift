@@ -190,6 +190,7 @@ TranslationUnitDecl *Parser::parseTranslationUnit() {
 /// parseDeclTopLevel
 ///   decl-top-level:
 ///     ';'
+///     decl-import
 ///     decl-oneof
 ///     decl-struct
 ///     decl-func
@@ -205,6 +206,10 @@ void Parser::parseDeclTopLevel(llvm::SmallVectorImpl<Decl *> &Decls) {
     consumeToken(tok::semi);
     return;
       
+  case tok::kw_import:
+      if (Decl *I = parseDeclImport())
+        return Decls.push_back(I);
+      break;
   case tok::kw_typealias:
     if (TypeAliasDecl *D = parseDeclTypeAlias())
       return Decls.push_back(D);
@@ -303,6 +308,28 @@ void Parser::parseAttributeList(DeclAttributes &Attributes) {
     consumeIf(tok::r_square);
   }
 }
+
+/// parseDeclImport - Parse an 'import' declaration, returning null (and doing
+/// no token skipping) on error.
+///
+///   decl-import:
+///      'import' attribute-list? identifier
+///
+Decl *Parser::parseDeclImport() {
+  SMLoc ImportLoc = Tok.getLoc();
+  consumeToken(tok::kw_import);
+  
+  DeclAttributes Attributes;
+  if (Tok.is(tok::l_square))
+    parseAttributeList(Attributes);
+  
+  Identifier ModuleName;
+  if (parseIdentifier(ModuleName, "expected module name in import declaration"))
+    return 0;
+  
+  return S.decl.ActOnImportDecl(ImportLoc, ModuleName, Attributes);
+}
+
 
 /// parseVarName
 ///   var-name:

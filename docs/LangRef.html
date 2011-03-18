@@ -23,8 +23,6 @@
 <div id="nav"></div>
 </p>
 
-
-
   <!-- ********************************************************************* -->
   <h2>Introduction</h2>
   <!-- ********************************************************************* -->
@@ -91,6 +89,18 @@
   </p>
   
   <p>More later.</p>
+  
+  <!-- ********************************************************************* -->
+  <h2>Phases of Translation</h2>
+  <!-- ********************************************************************* -->
+
+  <p>
+  parsing (TODO: "import swift" implicitly added to translation unit)
+  <a href="#namebind">Name Binding</a> 
+  Type Checking
+  Code Generation
+  Linking
+  </p>
   
   <!-- ********************************************************************* -->
   <h2>Lexical Structure</h2>
@@ -179,6 +189,7 @@
 
   <pre class="grammar">
     keyword ::= '__builtin_int32_type'
+    keyword ::= 'import'
     keyword ::= 'oneof'
     keyword ::= 'struct'
     keyword ::= 'var'
@@ -242,6 +253,7 @@
   <pre class="grammar">
     translation-unit ::= decl-top-level*
     decl-top-level   ::= ';'
+    decl-top-level   ::= <a href="#decl-import">decl-import</a>
     decl-top-level   ::= <a href="#decl-var">decl-var</a>
     decl-top-level   ::= <a href="#decl-func">decl-func</a>
     decl-top-level   ::= <a href="#decl-typealias">decl-typealias</a>
@@ -253,13 +265,44 @@
   Extraneous semi colons are allowed at top level, as are a number of other
   declarations.</p>
   
-  <p>TODO: Need to define the module system, which will give us 'import' and
-  'module'.</p>
+  <p>TODO: Need to define the module system more.</p>
   
   <p>FIXME: Code should be definable at the top level of a file as well, this
   becomes a static constructor for a library and is the "main" for an
-  executable.</p>
+  executable.  This allows 'print "hello world"' to work as a complete app.</p>
   
+  <!-- ===================================================================== -->
+  <h3 id="decl-import">import</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    decl-import ::= 'import' attribute-list? identifier
+  </pre>  
+  
+  <p>'import' declarations allow named values and types to be accessed with
+  local names, even when they are defined in other modules and namespaces.  See
+  the section on <a href="#namebind">name binding</a> for more
+  information on how these work.</p>
+  
+  <p>'import' directives only impact a single translation unit: imports in one
+  swift file do not affect name lookup in another file. import directives can
+  only occur at the top level of a file.</p>
+  
+  <p>Currently you can only import another module in its entirety.
+  FIXME: Allow "import swift.foo" to import one thing, and "import
+  swift.foo.bar" when we have namespaces.</p>
+  
+  <pre class="example">
+    <i>// Import all of the top level symbols and types in a package.</i>
+    import swift
+
+    <i>// Import all of the symbols within a namespace.</i>
+    import swift.io
+
+    <i>// Import a single variable, function, type, etc.</i>
+    import swift.io.bufferedstream
+  </pre>
+
   <!-- ===================================================================== -->
   <h3 id="decl-var">var</h3>
   <!-- ===================================================================== -->
@@ -288,7 +331,7 @@
      form the type is elided but a value is specified, the declaration gets the
      specified value and has the same type as its initializer.  In the third
      form, the values type is as specified and the initializer is <a
-     href="#sema_conversions">converted to</a> that type if required.</p>
+     href="#typecheck_conversions">converted to</a> that type if required.</p>
   
   <p>Var declarations can optionally have a list of <a
     href="#attribute-list">attributes</a> applied to them.</p>
@@ -340,7 +383,7 @@
   body is either not specified or is an arbitrary expression.  If the argument
   type is not a function type, then the return value is implicitly inferred to
   be "()".  All of the argument and return value names are injected into the
-  <a href="#sema_scope">scope</a> of the function body.</p>
+  <a href="#namebind_scope">scope</a> of the function body.</p>
   
   <p>TODO: Func should be an immutable name binding, it should implicitly add
      an attribute immutable when it exists.</p>
@@ -619,7 +662,7 @@
   <p>Each element of a tuple contains an optional name followed by a type and/or
   and default value expression, whose type conversion rules work like those in a
   var declaration.  The name affects swizzling of elements in the tuple when <a
-  href="#sema_conversions">tuple conversions</a> are performed.</p>
+  href="#typecheck_conversions">tuple conversions</a> are performed.</p>
   
   <pre class="example">
   <i>// Variable definitions.</i>
@@ -789,7 +832,7 @@
   must be accessed with either a <a href="#expr-identifier">qualified
   identifier</a> (if the type itself is named) or through <a
   href="#expr-delayed-identifier">delayed identifier resolution</a>
-  with <a href="#sema_context">context sensitive type inference</a>.
+  with <a href="#typecheck_context">context sensitive type inference</a>.
   </p>
 
   <p>If the oneof element has no type specified with it, then the type of the 
@@ -940,7 +983,8 @@
   </pre>
   
   <p>A raw identifier refers to a value visible in the current <a
-     href="#sema_scope">scope</a>, and has the type of the declaration returned
+     href="#namebind_scope">scope</a>, and has the type of the declaration
+     returned
      by name lookup.  Value declarations are installed with 
      <a href="#decl-var">var</a> and <a href="decl-func">func</a>
      declarations.</p>
@@ -951,7 +995,7 @@
 
   <p>A use of an implementation identifier whose name fits the "$[0-9]+" regular
   expression is a reference to an anonymous closure argument that is formed when
-  the containing expression is <a href="#sema_anondecls">coerced into a closure
+  the containing expression is <a href="#typecheck_anon">coerced into a closure
   context</a>.  All other implementation identifiers are invalid.</p>
   
   <pre class="grammar">
@@ -1129,23 +1173,64 @@
   <!-- ********************************************************************* -->
 
   <!-- ********************************************************************* -->
-  <h2 id="sema">Language Semantics</h2>
+  <h2 id="namebind">Name Binding</h2>
   <!-- ********************************************************************* -->
 
-  <h3 id="sema_scope">Scope</h3>
+  <p>Name binding in swift is performed in different ways depending on what
+  language entity is being considered:</p>
   
-  <p>identifier namespaces: tuple elements, types, values.
-  Scope within oneof decls.</p>
+  <p>Value names (for <a 
+  href="#decl-var">var</a> and <a href="#decl-func">func</a> declarations) and
+  type names (for <a href="#decl-typealias">typealias</a>, <a
+  href="#decl-oneof">oneof</a>, and <a href="#decl-struct">struct</a>
+  declarations) follow the same <a href="#namebind_scope">scope</a> and
+  <a href="#namebind_typevalue_lookup">name lookup</a> rules as described below.
+  </p>
 
-  <h3 id="sema_namebinding">Name Binding</h3>
+  <p>tuple element names</p>
+  
+  <p>scope within oneof decls</p>
+  
+  <p>Context sensitive member references are resolved <a
+    href="#typecheck_context">during type checking</a>.</p>
+  
+  <h3 id="namebind_scope">Scopes for Type and Value Names</h3>
 
-  <h3 id="sema_typechecking">Type Checking</h3>
+  
+  
+  <h3 id="namebind_typevalue_lookup">Name Lookup for Type and Value Names</h3>
+    
+  <p>Basic algo:</p>
+    
+  <ul>
+  <li>Search the current scope tree for a local name.  Local names cannot be
+      forward referenced.</li>
+  <li>Bind to names defined in the current component, including the current
+      translation unit. TODO: is this a good thing?  We could require explicit
+      imports if we wanted to.</li>
+  <li>Bind to identifiers that are imported with an import directive.  Imports
+      are searched in order of introduction (top-down).  The location of an
+      import directive in a file (e.g. between func decls) does not affect name
+      lookup, but the order of imports w.r.t. each other does.</li>
+  </ul>
+    
+  <h3 id="namebind_field">Name Lookup for Field Expressions</h3>
+    
+  <p>
+  <a href="#expr-field">Field Expressions</a> bind to name of tuple elements.
+  </p>
+  
+  <!-- ********************************************************************* -->
+  <h2 id="typecheck">Type Checking</h2>
+  <!-- ********************************************************************* -->
 
-  <h3 id="sema_conversions">Standard Conversions</h3>
-  <h3 id="sema_anondecls">Anonymous Argument Resolution</h3>
-  <h3 id="sema_context">Context Sensitive Type Resolution</h3>
-
-
+  <p>
+  Binary expressions, function application, etc.
+  </p>
+  
+  <h3 id="typecheck_conversions">Standard Conversions</h3>
+  <h3 id="typecheck_anon">Anonymous Argument Resolution</h3>
+  <h3 id="typecheck_context">Context Sensitive Type Resolution</h3>
 
   <!-- ********************************************************************* -->
   <h2 id="stdlib">Standard Library</h2>
@@ -1162,6 +1247,10 @@
      Since Swift is designed to give power to the library developers, much of
      what is normally considered the "language" is actually just implemented in
      the library.</p>
+    
+  <p>All of this code is published by the 'swift' module, which is
+     implicitly imported into each translation unit, unless a command line flag
+     is passed to change or disable this behavior.</p>
   
   <!-- ===================================================================== -->
   <h3 id="stdlib-simple-types">Simple Types</h3>
