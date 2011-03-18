@@ -120,7 +120,7 @@ void Type::print(llvm::raw_ostream &OS) const {
   }
   switch (Kind) {
   case DependentTypeKind:     return cast<DependentType>(this)->print(OS);
-    case UnresolvedTypeKind:  return cast<UnresolvedType>(this)->print(OS);
+  case UnresolvedTypeKind:    return cast<UnresolvedType>(this)->print(OS);
   case BuiltinInt32Kind:      return cast<BuiltinType>(this)->print(OS);
   case NameAliasTypeKind:     return cast<NameAliasType>(this)->print(OS);
   case OneOfTypeKind:         return cast<OneOfType>(this)->print(OS);

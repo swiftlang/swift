@@ -113,8 +113,8 @@ public:
   llvm::StringRef Val;  // Use StringRef instead of APInt, APInt leaks.
   llvm::SMLoc Loc;
   
-  IntegerLiteral(llvm::StringRef V, llvm::SMLoc L)
-    : Expr(IntegerLiteralKind), Val(V), Loc(L) {}
+  IntegerLiteral(llvm::StringRef V, llvm::SMLoc L, Type *Ty)
+    : Expr(IntegerLiteralKind, Ty), Val(V), Loc(L) {}
   
   uint64_t getValue() const;
   

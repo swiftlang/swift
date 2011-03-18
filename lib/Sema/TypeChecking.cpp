@@ -109,11 +109,6 @@ namespace {
 // These each produce diagnostics and return true on error.  On success, they
 // may mutate the input values, then return false.
 
-static bool SemaIntegerLiteral(Type *&ResultTy, TypeChecker &TC) {
-  ResultTy = TC.Context.TheInt32Type;
-  return false;
-}
-
 static bool SemaDeclRefExpr(ValueDecl *D, SMLoc Loc, Type *&ResultTy,
                             TypeChecker &TC) {
   if (D == 0) {
@@ -513,7 +508,6 @@ namespace {
     TypeChecker &TC;
     
     Expr *VisitIntegerLiteral(IntegerLiteral *E) {
-      if (SemaIntegerLiteral(E->Ty, TC)) return 0;
       return E;
     }
     Expr *VisitDeclRefExpr(DeclRefExpr *E) {
