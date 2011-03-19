@@ -61,7 +61,27 @@ SemaDecl::~SemaDecl() {
 
 /// handleEndOfTranslationUnit - This is invoked at the end of the translation
 /// unit.
-void SemaDecl::handleEndOfTranslationUnit() {
+void SemaDecl::handleEndOfTranslationUnit(TranslationUnitDecl *TUD) {
+  // Do a prepass over the declarations to make sure they have basic sanity and
+  // to find the list of top-level value declarations.
+  for (llvm::ArrayRef<Decl*>::iterator I = TUD->Decls.begin(),
+       E = TUD->Decls.end(); I != E; ++I) {
+    
+    // If any top-level value decl has an unresolved type, then it is erroneous.
+    // It is not valid to have something like "var x = 4" at the top level, all
+    // types must be explicit here.
+    ValueDecl *VD = llvm::dyn_cast<ValueDecl>(*I);
+    if (VD == 0) continue;
+    
+    // Verify that values have a type specified.
+    if (llvm::isa<DependentType>(VD->Ty)) {
+      error(VD->getLocStart(),
+            "top level declarations require a type specifier");
+      // FIXME: Should mark the decl as invalid.
+      VD->Ty = S.Context.TheEmptyTupleType;
+    }
+  }
+  
   // Verify that any forward declared types were ultimately defined.
   // TODO: Move this to name binding!
   UnresolvedTypesMapTy &UT = getUnresolvedTypesHT(UnresolvedTypes);

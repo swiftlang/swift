@@ -36,6 +36,7 @@ namespace swift {
   class FuncDecl;
   class ValueDecl;
   class ElementRefDecl;
+  class TranslationUnitDecl;
   class Scope;
   class DeclAttributes;
   class DeclVarName;
@@ -57,7 +58,7 @@ public:
   
   /// handleEndOfTranslationUnit - This is invoked at the end of the translation
   /// unit.
-  void handleEndOfTranslationUnit();
+  void handleEndOfTranslationUnit(TranslationUnitDecl *Result);
 
   //===--------------------------------------------------------------------===//
   // Name lookup.

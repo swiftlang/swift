@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file implements name binding for Swift types.
+//  This file implements name binding for Swift.
 //
 //===----------------------------------------------------------------------===//
 
@@ -99,26 +99,13 @@ static Expr *BindNames(Expr *E, Expr::WalkOrder Order, void *binder) {
 void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
   NameBinder Binder(Ctx);
   
-  // Do a prepass over the declarations to make sure they have basic sanity and
-  // to find the list of top-level value declarations.
+  // Do a prepass over the declarations to find the list of top-level value
+  // declarations.
   for (llvm::ArrayRef<Decl*>::iterator I = TUD->Decls.begin(),
        E = TUD->Decls.end(); I != E; ++I) {
-    
-    // If any top-level value decl has an unresolved type, then it is erroneous.
-    // It is not valid to have something like "var x = 4" at the top level, all
-    // types must be explicit here.
-    ValueDecl *VD = dyn_cast<ValueDecl>(*I);
-    if (VD == 0) continue;
-    // Verify that values have a type specified.
-    if (isa<DependentType>(VD->Ty)) {
-      Binder.error(VD->getLocStart(),
-                   "top level declarations require a type specifier");
-      // FIXME: Should mark the decl as invalid.
-      VD->Ty = Ctx.TheEmptyTupleType;
-    }
-    
-    if (!VD->Name.empty())
-      Binder.addNamedTopLevelDecl(VD);
+    if (ValueDecl *VD = dyn_cast<ValueDecl>(*I))
+      if (!VD->Name.empty())
+        Binder.addNamedTopLevelDecl(VD);
   }
   
   // Now that we know the top-level value names, go through and resolve any

@@ -180,10 +180,11 @@ TranslationUnitDecl *Parser::parseTranslationUnit() {
       parseDeclTopLevel(Decls);
   }
   
-  // Notify sema about the end of the translation unit.
-  S.decl.handleEndOfTranslationUnit();
-  
   Result->Decls = S.Context.AllocateCopy(llvm::ArrayRef<Decl*>(Decls));
+
+  // Notify sema about the end of the translation unit.
+  S.decl.handleEndOfTranslationUnit(Result);
+  
   return Result;
 }
 
