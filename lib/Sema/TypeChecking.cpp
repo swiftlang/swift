@@ -1516,8 +1516,8 @@ void swift::performTypeChecking(TranslationUnitDecl *TUD, ASTContext &Ctx) {
   // types for expressions contained within them.
   for (llvm::ArrayRef<Decl*>::iterator I = TUD->Decls.begin(),
        E = TUD->Decls.end(); I != E; ++I) {
-    // Ignore top level typealiases and elementrefs.
-    if (isa<TypeAliasDecl>(*I))
+    // Ignore top level typealiases and imports.
+    if (isa<TypeAliasDecl>(*I) || isa<ImportDecl>(*I))
       // FIXME: Should validate that these aren't circular.
       continue;
 

@@ -36,6 +36,7 @@ namespace swift {
   
 enum DeclKind {
   TranslationUnitDeclKind,
+  ImportDeclKind,
   TypeAliasDeclKind,
   VarDeclKind,
   FuncDeclKind,
@@ -124,7 +125,6 @@ public:
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = 8) throw();  
 };
-
   
 /// TranslationUnitDecl - This contains information about all of the decls and
 /// external references in a translation unit, which is one file.
@@ -152,7 +152,29 @@ public:
   }
   static bool classof(const TranslationUnitDecl *D) { return true; }
 };
+
+/// ImportDecl - This represents a single import declaration, e.g.:
+///   import swift
+class ImportDecl : public Decl {
+public:
+  llvm::SMLoc ImportLoc;
+  Identifier Name;
   
+  ImportDecl(llvm::SMLoc importLoc, Identifier name)
+    : Decl(ImportDeclKind), ImportLoc(importLoc), Name(name) {
+  }
+  
+  llvm::SMLoc getLocStart() const { return ImportLoc; }
+
+  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) {
+    return D->getKind() == ImportDeclKind;
+  }
+  static bool classof(const ImportDecl *D) { return true; }
+};
+
   
 /// NamedDecl - The common base class between TypeAliasDecl and ValueDecl.
 class NamedDecl : public Decl {

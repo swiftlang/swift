@@ -40,6 +40,7 @@ llvm::SMLoc NamedDecl::getLocStart() const {
   switch (getKind()) {
   case TranslationUnitDeclKind:
     return cast<TranslationUnitDecl>(this)->getLocStart();
+  case ImportDeclKind: return cast<ImportDecl>(this)->getLocStart();
   case TypeAliasDeclKind:  return cast<TypeAliasDecl>(this)->getLocStart(); 
   case VarDeclKind:        return cast<VarDecl>(this)->getLocStart();
   case FuncDeclKind:       return cast<FuncDecl>(this)->getLocStart();
@@ -100,6 +101,7 @@ void Decl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   switch (getKind()) {
   case TranslationUnitDeclKind:
     return cast<TranslationUnitDecl>(this)->print(OS, Indent);
+  case ImportDeclKind:     return cast<ImportDecl>(this)->print(OS, Indent);
   case TypeAliasDeclKind:  return cast<TypeAliasDecl>(this)->print(OS, Indent);
   case VarDeclKind:        return cast<VarDecl>(this)->print(OS, Indent);
   case FuncDeclKind:       return cast<FuncDecl>(this)->print(OS, Indent);
@@ -117,6 +119,10 @@ void TranslationUnitDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
     if (i != e-1) OS << "\n";
   }
   OS << ')';
+}
+
+void ImportDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
+  OS.indent(Indent) << "(import_decl '" << Name << "')";
 }
 
 static void PrintDeclName(const NamedDecl *D, llvm::raw_ostream &OS) {

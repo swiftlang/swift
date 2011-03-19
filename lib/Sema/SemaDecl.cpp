@@ -154,7 +154,9 @@ ActOnElementName(Identifier Name, llvm::SMLoc NameLoc, VarDecl *D,
 
 Decl *SemaDecl::ActOnImportDecl(llvm::SMLoc ImportLoc, Identifier ModuleName,
                                 DeclAttributes &Attrs) {
-  return 0;
+  if (!Attrs.empty())
+    error(Attrs.LSquareLoc, "invalid attributes specified for import");
+  return new (S.Context) ImportDecl(ImportLoc, ModuleName);
 }
 
 
