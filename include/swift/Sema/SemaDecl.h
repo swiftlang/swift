@@ -51,6 +51,8 @@ class SemaDecl : public SemaBase {
   /// UnresolvedTypes - This keeps track of all of the unresolved types in the
   /// AST.
   void *const UnresolvedTypes; // DenseMap<Identifier, TypeAliasDecl *>
+  
+  llvm::SmallVector<TypeAliasDecl*, 8> UnresolvedTypeList;
 public:
 
   explicit SemaDecl(Sema &S);
@@ -58,7 +60,7 @@ public:
   
   /// handleEndOfTranslationUnit - This is invoked at the end of the translation
   /// unit.
-  void handleEndOfTranslationUnit(TranslationUnitDecl *Result);
+  void handleEndOfTranslationUnit(TranslationUnitDecl *TU);
 
   //===--------------------------------------------------------------------===//
   // Name lookup.

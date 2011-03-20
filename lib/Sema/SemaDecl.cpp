@@ -88,11 +88,21 @@ void SemaDecl::handleEndOfTranslationUnit(TranslationUnitDecl *TUD) {
   
   // Verify that any forward declared types were ultimately defined.
   // TODO: Move this to name binding!
-  UnresolvedTypesMapTy &UT = getUnresolvedTypesHT(UnresolvedTypes);
-  // FIXME: Nondeterminstic iteration.
-  for (UnresolvedTypesMapTy::iterator I = UT.begin(), E = UT.end(); I != E; ++I)
-    error(I->second->getLocStart(), "use of undeclared type '" + I->first.str()
-          + "'");
+  unsigned Next = 0;
+  for (unsigned i = 0, e = UnresolvedTypeList.size(); i != e; ++i) {
+    TypeAliasDecl *Decl = UnresolvedTypeList[i];
+    
+    // If a type got defined, remove it from the vector.
+    if (!llvm::isa<UnresolvedType>(Decl->UnderlyingTy))
+      continue;
+    
+    UnresolvedTypeList[Next++] = Decl;
+  }
+  // Trip out stuff that got replaced.
+  UnresolvedTypeList.resize(Next);
+    
+  TUD->UnresolvedTypesForParser =
+    S.Context.AllocateCopy(llvm::ArrayRef<TypeAliasDecl*>(UnresolvedTypeList));
 }
 
 //===----------------------------------------------------------------------===//
@@ -116,6 +126,7 @@ TypeAliasDecl *SemaDecl::LookupTypeName(Identifier Name, llvm::SMLoc Loc) {
   // with an unresolved underlying type.
   TAD = new (S.Context) TypeAliasDecl(Loc, Name, S.Context.TheUnresolvedType);
   getUnresolvedTypesHT(UnresolvedTypes)[Name] = TAD;
+  UnresolvedTypeList.push_back(TAD);
   
   // Inject this into the outermost scope so that subsequent name lookups of the
   // same type will find it.
@@ -335,6 +346,8 @@ TypeAliasDecl *SemaDecl::ActOnTypeAlias(llvm::SMLoc TypeAliasLoc,
   if (llvm::isa<UnresolvedType>(ExistingDecl->UnderlyingTy)) {
     // Remove the entry for this type from the UnresolvedTypes map.
     getUnresolvedTypesHT(UnresolvedTypes).erase(Name);
+    
+    // This will get removed from UnresolvedTypeList at the end of the TU.
     
     // Update the decl we already have to be the correct type.
     ExistingDecl->TypeAliasLoc = TypeAliasLoc;

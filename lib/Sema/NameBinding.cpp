@@ -216,4 +216,13 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
       if (VD->Init)
         VD->Init = VD->Init->WalkExpr(BindNames, &Binder);
   }
+
+  // Type binding.  Loop over all of the unresolved types in the translation
+  // unit, resolving them with imports.
+  for (unsigned i = 0, e = TUD->UnresolvedTypesForParser.size(); i != e; ++i) {
+    TypeAliasDecl *TA = TUD->UnresolvedTypesForParser[i];
+    
+    Binder.error(TA->getLocStart(),
+                 "use of undeclared type '" + TA->Name.str() + "'");
+  }
 }

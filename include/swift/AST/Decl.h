@@ -33,6 +33,7 @@ namespace swift {
   class Expr;
   class OneOfElementDecl;
   class NameAliasType;
+  class TypeAliasDecl;
   
 enum DeclKind {
   TranslationUnitDeclKind,
@@ -137,6 +138,10 @@ public:
   /// Decls - This is the list of all of the top-level declarations in the
   /// translation unit.  This is filled in at the end of the parse phase.
   llvm::ArrayRef<Decl*> Decls;
+  
+  /// UnresolvedTypes - This is a list of types that were unresolved at the end
+  /// of the translation unit's parse phase.
+  llvm::ArrayRef<TypeAliasDecl*> UnresolvedTypesForParser;
   
   TranslationUnitDecl(llvm::SMLoc fileStartLoc, ASTContext &C)
     : Decl(TranslationUnitDeclKind), FileStartLoc(fileStartLoc), Ctx(C) {
