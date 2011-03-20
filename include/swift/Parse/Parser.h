@@ -71,6 +71,8 @@ public:
   
   TranslationUnitDecl *parseTranslationUnit();
   
+  typedef llvm::PointerUnion<Expr*, Decl*> ExprOrDecl;
+
 private:
   // Utilities.
   void consumeToken();
@@ -112,7 +114,8 @@ private:
   bool parseValueSpecifier(Type *&Ty, llvm::NullablePtr<Expr> &Init);
   
   // Decl Parsing
-  void parseDeclTopLevel(llvm::SmallVectorImpl<Decl *> &Decls);
+  bool parseDeclExprList(llvm::SmallVectorImpl<ExprOrDecl> &Decls,
+                         bool &MissingSemiAtEnd, bool IsTopLevel);
   TypeAliasDecl *parseDeclTypeAlias();
   void parseAttributeList(DeclAttributes &Attributes);
   bool parseAttribute(DeclAttributes &Attributes);
@@ -121,7 +124,7 @@ private:
   Decl *parseDeclImport();
   Decl *parseDeclOneOf();
   Decl *parseDeclStruct();
-  bool parseDeclVar(llvm::SmallVectorImpl<Decl *> &Decls);
+  bool parseDeclVar(llvm::SmallVectorImpl<ExprOrDecl> &Decls);
   FuncDecl *parseDeclFunc();
   
   // Type Parsing

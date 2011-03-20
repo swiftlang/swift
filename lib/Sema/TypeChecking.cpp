@@ -57,11 +57,11 @@ namespace {
     void typeCheck(ValueDecl *VD) {
       // No types to resolved for a ElementRefDecl.
       if (ElementRefDecl *ERD = dyn_cast<ElementRefDecl>(VD))
-        typeCheck(ERD);
-      else if (VarDecl *Var = dyn_cast<VarDecl>(VD))
-        typeCheck(Var);
-      else
-        typeCheck(cast<FuncDecl>(VD));
+        return typeCheck(ERD);
+      if (VarDecl *Var = dyn_cast<VarDecl>(VD))
+        return typeCheck(Var);
+      
+      typeCheck(cast<FuncDecl>(VD));
     }
     
     void typeCheck(ElementRefDecl *ERD);
@@ -1245,6 +1245,8 @@ Expr *TypeChecker::convertToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
 /// This returns true if the type is invalid.
 bool TypeChecker::validateType(Type *&T) {
   assert(T && "Cannot validate null types!");
+
+  // FIXME: Verify that these aren't circular and infinite size.
   
   // If a type has a canonical type, then it is known safe.
   if (T->hasCanonicalTypeComputed()) return false;
@@ -1510,18 +1512,9 @@ void TypeChecker::typeCheck(FuncDecl *FD) {
 /// FIXME: This should be moved out to somewhere else.
 void swift::performTypeChecking(TranslationUnitDecl *TUD, ASTContext &Ctx) {
   TypeChecker TC(Ctx);
-  // At this point name binding has been performed and we have to do full type
-  // checking and anonymous name binding resolution.  All top level decls have
-  // types and the contents of each decl can be processed in turn to resolve all
-  // types for expressions contained within them.
-  for (llvm::ArrayRef<Decl*>::iterator I = TUD->Decls.begin(),
-       E = TUD->Decls.end(); I != E; ++I) {
-    // Ignore top level typealiases and imports.
-    if (isa<TypeAliasDecl>(*I) || isa<ImportDecl>(*I))
-      // FIXME: Should validate that these aren't circular.
-      continue;
-
-    ValueDecl *VD = cast<ValueDecl>(*I);
-    TC.typeCheck(VD);
-  }
+  
+  // Type check the top-level BraceExpr.  This sorts out any top-level
+  // expressions and recursively processes the rest of the translation unit.
+  TUD->Body =
+    llvm::cast_or_null<BraceExpr>(SemaExpressionTree::doIt(TUD->Body, TC));
 }

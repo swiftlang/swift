@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
+#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/SMLoc.h"
@@ -61,17 +62,24 @@ SemaDecl::~SemaDecl() {
 
 /// handleEndOfTranslationUnit - This is invoked at the end of the translation
 /// unit.
-void SemaDecl::handleEndOfTranslationUnit(TranslationUnitDecl *TUD) {
+void SemaDecl::handleEndOfTranslationUnit(TranslationUnitDecl *TUD,
+                                          llvm::SMLoc FileStart,
+                                          llvm::ArrayRef<ExprOrDecl> Items,
+                                          llvm::SMLoc FileEnd) {
+  // First thing, we transform the body into a brace expression.
+  TUD->Body = S.expr.ActOnBraceExpr(FileStart, Items, false, FileEnd);
   
   // Do a prepass over the declarations to make sure they have basic sanity and
   // to find the list of top-level value declarations.
-  for (llvm::ArrayRef<Decl*>::iterator I = TUD->Decls.begin(),
-       E = TUD->Decls.end(); I != E; ++I) {
+  for (unsigned i = 0, e = TUD->Body->NumElements; i != e; ++i) {
+    if (!TUD->Body->Elements[i].is<Decl*>()) continue;
     
+    Decl *D = TUD->Body->Elements[i].get<Decl*>();
+       
     // If any top-level value decl has an unresolved type, then it is erroneous.
     // It is not valid to have something like "var x = 4" at the top level, all
     // types must be explicit here.
-    ValueDecl *VD = llvm::dyn_cast<ValueDecl>(*I);
+    ValueDecl *VD = llvm::dyn_cast<ValueDecl>(D);
     if (VD == 0) continue;
 
     // FIXME: This can be better handled in the various ActOnDecl methods when

@@ -251,14 +251,15 @@
   <!-- ********************************************************************* -->
   
   <pre class="grammar">
-    translation-unit ::= decl-top-level*
-    decl-top-level   ::= ';'
-    decl-top-level   ::= <a href="#decl-import">decl-import</a>
-    decl-top-level   ::= <a href="#decl-var">decl-var</a>
-    decl-top-level   ::= <a href="#decl-func">decl-func</a>
-    decl-top-level   ::= <a href="#decl-typealias">decl-typealias</a>
-    decl-top-level   ::= <a href="#decl-oneof">decl-oneof</a>
-    decl-top-level   ::= <a href="#decl-struct">decl-struct</a>
+    translation-unit ::= top-level-item*
+    top-level-item   ::= ';'
+    top-level-item   ::= <a href="#decl-import">decl-import</a>
+    top-level-item   ::= <a href="#decl-var">decl-var</a>
+    top-level-item   ::= <a href="#decl-func">decl-func</a>
+    top-level-item   ::= <a href="#decl-typealias">decl-typealias</a>
+    top-level-item   ::= <a href="#decl-oneof">decl-oneof</a>
+    top-level-item   ::= <a href="#decl-struct">decl-struct</a>
+    top-level-item   ::= <a href="#expr">expr</a>
   </pre>
   
   <p>A source file in Swift is parsed as a list of top level declarations.
@@ -267,7 +268,8 @@
   
   <p>TODO: Need to define the module system more.</p>
   
-  <p>FIXME: Code should be definable at the top level of a file as well, this
+  <p>Expressions at the top level of a file are executed at program startup time
+  in bottom-up order in the module dependence graph.  This
   becomes a static constructor for a library and is the "main" for an
   executable.  This allows 'print "hello world"' to work as a complete app.</p>
   
@@ -1150,6 +1152,7 @@
     expr-brace-item  ::= ';'
     expr-brace-item  ::= <a href="#expr">expr</a>
     expr-brace-item  ::= <a href="#decl-var">decl-var</a>
+    expr-brace-item   ::= <a href="#decl-func">decl-func</a>
     expr-brace-item  ::= <a href="#decl-typealias">decl-typealias</a>
     expr-brace-item  ::= <a href="#decl-oneof">decl-oneof</a>
     expr-brace-item  ::= <a href="#decl-struct">decl-struct</a>

@@ -33,12 +33,14 @@ namespace swift {
   class Type;
   class ValueDecl;
   class Identifier;
+  class BraceExpr;
   
 /// SemaExpr - Semantic analysis support for Swift expressions.
 class SemaExpr : public SemaBase {
 public:
   explicit SemaExpr(Sema &S) : SemaBase(S) {}
 
+  typedef llvm::PointerUnion<Expr*, Decl*> ExprOrDecl;
   
   // Action Implementations
   llvm::NullablePtr<Expr>
@@ -59,10 +61,9 @@ public:
   ActOnTupleExpr(llvm::SMLoc LPLoc, Expr *const *SubExprs,
                  const Identifier *SubExprNames,
                  unsigned NumSubExprs, llvm::SMLoc RPLoc);
-  llvm::NullablePtr<Expr>
-  ActOnBraceExpr(llvm::SMLoc LBLoc,
-                 llvm::ArrayRef<llvm::PointerUnion<Expr*, Decl*> > Elements,
-                 bool HasMissingSemi, llvm::SMLoc RBLoc);
+  BraceExpr *ActOnBraceExpr(llvm::SMLoc LBLoc,
+                            llvm::ArrayRef<ExprOrDecl> Elements,
+                            bool HasMissingSemi, llvm::SMLoc RBLoc);
   
   llvm::NullablePtr<Expr>
   ActOnDotIdentifier(Expr *E, llvm::SMLoc DotLoc, Identifier Name,

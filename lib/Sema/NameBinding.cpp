@@ -22,6 +22,7 @@
 #include "swift/AST/Type.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"
+#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
@@ -62,12 +63,11 @@ namespace {
 TypeAliasDecl *ReferencedModule::lookupType(ImportDecl *ID, Identifier Name) {
  
   if (TopLevelTypes.empty()) {
-    for (llvm::ArrayRef<Decl*>::iterator I = TUD->Decls.begin(),
-         E = TUD->Decls.end(); I != E; ++I) {
-      if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(*I))
-        if (!TAD->Name.empty())
-          TopLevelTypes[TAD->Name] = TAD;
-    }
+    for (unsigned i = 0, e = TUD->Body->NumElements; i != e; ++i)
+      if (Decl *D = TUD->Body->Elements[i].dyn_cast<Decl*>())
+        if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D))
+          if (!TAD->Name.empty())
+            TopLevelTypes[TAD->Name] = TAD;
   }
   
   llvm::DenseMap<Identifier, TypeAliasDecl*>::iterator I =
@@ -83,12 +83,11 @@ ValueDecl *ReferencedModule::lookupValue(ImportDecl *ID, Identifier Name) {
     
   // If we haven't built a map of the top-level values, do so now.
   if (TopLevelValues.empty()) {
-    for (llvm::ArrayRef<Decl*>::iterator I = TUD->Decls.begin(),
-         E = TUD->Decls.end(); I != E; ++I) {
-      if (ValueDecl *VD = dyn_cast<ValueDecl>(*I))
-        if (!VD->Name.empty())
-          TopLevelValues[VD->Name] = VD;
-    }
+    for (unsigned i = 0, e = TUD->Body->NumElements; i != e; ++i)
+      if (Decl *D = TUD->Body->Elements[i].dyn_cast<Decl*>())
+        if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+          if (!VD->Name.empty())
+            TopLevelValues[VD->Name] = VD;
   }
    
   llvm::DenseMap<Identifier, ValueDecl *>::iterator I =
@@ -239,15 +238,15 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
   
   // Do a prepass over the declarations to find the list of top-level value
   // declarations.
-  for (llvm::ArrayRef<Decl*>::iterator I = TUD->Decls.begin(),
-       E = TUD->Decls.end(); I != E; ++I) {
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(*I))
-      if (!VD->Name.empty())
-        Binder.addNamedTopLevelDecl(VD);
+  for (unsigned i = 0, e = TUD->Body->NumElements; i != e; ++i)
+    if (Decl *D = TUD->Body->Elements[i].dyn_cast<Decl*>()) {
+      if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+        if (!VD->Name.empty())
+          Binder.addNamedTopLevelDecl(VD);
     
-    if (ImportDecl *ID = dyn_cast<ImportDecl>(*I))
-      Binder.addImport(ID);
-  }
+      if (ImportDecl *ID = dyn_cast<ImportDecl>(D))
+        Binder.addImport(ID);
+    }
   
   // Type binding.  Loop over all of the unresolved types in the translation
   // unit, resolving them with imports.
@@ -268,10 +267,13 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
 
   // Now that we know the top-level value names, go through and resolve any
   // UnresolvedDeclRefExprs that exist.
-  for (llvm::ArrayRef<Decl*>::iterator I = TUD->Decls.begin(),
-       E = TUD->Decls.end(); I != E; ++I) {
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(*I))
-      if (VD->Init)
-        VD->Init = VD->Init->WalkExpr(BindNames, &Binder);
-  }
+  for (unsigned i = 0, e = TUD->Body->NumElements; i != e; ++i)
+    if (Decl *D = TUD->Body->Elements[i].dyn_cast<Decl*>()) {
+      if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+        if (VD->Init)
+          VD->Init = VD->Init->WalkExpr(BindNames, &Binder);
+    } else {
+      TUD->Body->Elements[i] =
+        TUD->Body->Elements[i].get<Expr*>()->WalkExpr(BindNames, &Binder);
+    }
 }

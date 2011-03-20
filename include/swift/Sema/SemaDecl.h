@@ -26,6 +26,7 @@
 
 namespace llvm {
   template <typename T> class ArrayRef;
+  template <typename PT1, typename PT2> class PointerUnion;
 }
 namespace swift {
   class Expr;
@@ -58,9 +59,14 @@ public:
   explicit SemaDecl(Sema &S);
   ~SemaDecl();
   
+  typedef llvm::PointerUnion<Expr*, Decl*> ExprOrDecl;
+
   /// handleEndOfTranslationUnit - This is invoked at the end of the translation
   /// unit.
-  void handleEndOfTranslationUnit(TranslationUnitDecl *TU);
+  void handleEndOfTranslationUnit(TranslationUnitDecl *TU,
+                                  llvm::SMLoc FileStart,
+                                  llvm::ArrayRef<ExprOrDecl> Items,
+                                  llvm::SMLoc FileEnd);
 
   //===--------------------------------------------------------------------===//
   // Name lookup.

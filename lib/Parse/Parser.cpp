@@ -162,84 +162,24 @@ bool Parser::parseValueSpecifier(Type *&Ty, NullablePtr<Expr> &Init) {
 
 /// ParseTranslationUnit
 ///   translation-unit:
-///     decl-top-level*
+///     top-level-item*
 TranslationUnitDecl *Parser::parseTranslationUnit() {
   // Prime the lexer.
   consumeToken();
   SMLoc FileStartLoc = Tok.getLoc();
   
-  TranslationUnitDecl *Result =
-    new (S.Context) TranslationUnitDecl(FileStartLoc, S.Context);
+  TranslationUnitDecl *Result = new (S.Context) TranslationUnitDecl(S.Context);
   
-  llvm::SmallVector<Decl*, 128> Decls;
-  {
-    // The entire translation unit is in a big scope.
-    Scope OuterScope(S.decl);
+  // Parse the body of the file.
+  llvm::SmallVector<ExprOrDecl, 128> Items;
+  bool MissingSemiAtEnd = false; // Don't care, FIXME remove.
+  parseDeclExprList(Items, MissingSemiAtEnd, true);
   
-    while (Tok.isNot(tok::eof))
-      parseDeclTopLevel(Decls);
-  }
-  
-  Result->Decls = S.Context.AllocateCopy(llvm::ArrayRef<Decl*>(Decls));
-
   // Notify sema about the end of the translation unit.
-  S.decl.handleEndOfTranslationUnit(Result);
+  S.decl.handleEndOfTranslationUnit(Result, FileStartLoc, Items, Tok.getLoc());
   
   return Result;
 }
-
-/// parseDeclTopLevel
-///   decl-top-level:
-///     ';'
-///     decl-import
-///     decl-oneof
-///     decl-struct
-///     decl-func
-///     decl-typealias
-///     decl-var
-void Parser::parseDeclTopLevel(llvm::SmallVectorImpl<Decl *> &Decls) {
-  switch (Tok.getKind()) {
-  default:
-    error(Tok.getLoc(), "expected a top level declaration");
-    break;
-  case tok::semi:
-    // Could create a decl for top-level semicolons.
-    consumeToken(tok::semi);
-    return;
-      
-  case tok::kw_import:
-      if (Decl *I = parseDeclImport())
-        return Decls.push_back(I);
-      break;
-  case tok::kw_typealias:
-    if (TypeAliasDecl *D = parseDeclTypeAlias())
-      return Decls.push_back(D);
-    break;
-  case tok::kw_oneof:
-    if (Decl *O = parseDeclOneOf())
-      return Decls.push_back(O);
-    break;
-  case tok::kw_struct:
-    if (Decl *D = parseDeclStruct())
-      return Decls.push_back(D);
-    break;
-  case tok::kw_func:
-    if (FuncDecl *D = parseDeclFunc())
-      return Decls.push_back(D);
-    break;
-  case tok::kw_var:
-    if (!parseDeclVar(Decls))
-      return;
-    break;
-  }
-  
-  // On error, skip to the next top level declaration.
-  while (Tok.isNot(tok::eof) && Tok.isNot(tok::kw_var) &&
-         Tok.isNot(tok::kw_func) && Tok.isNot(tok::kw_oneof) &&
-         Tok.isNot(tok::kw_struct) && Tok.isNot(tok::kw_typealias))
-    consumeToken();
-}
-
 
 /// parseAttribute
 ///   attribute:
@@ -393,7 +333,7 @@ TypeAliasDecl *Parser::parseDeclTypeAlias() {
 static void AddElementNamesForVarDecl(const DeclVarName *Name,
                                     llvm::SmallVectorImpl<unsigned> &AccessPath,
                                       VarDecl *VD, SemaDecl &SD,
-                                      llvm::SmallVectorImpl<Decl *> &Decls) {
+                              llvm::SmallVectorImpl<Parser::ExprOrDecl> &Decls){
   if (Name->isSimple()) {
     // If this is a leaf name, ask sema to create a ElementRefDecl for us with 
     // the specified access path.
@@ -417,7 +357,7 @@ static void AddElementNamesForVarDecl(const DeclVarName *Name,
 ///
 ///   decl-var:
 ///      'var' attribute-list? var-name value-specifier
-bool Parser::parseDeclVar(llvm::SmallVectorImpl<Decl *> &Decls) {
+bool Parser::parseDeclVar(llvm::SmallVectorImpl<ExprOrDecl> &Decls) {
   SMLoc VarLoc = Tok.getLoc();
   consumeToken(tok::kw_var);
   
@@ -1043,51 +983,84 @@ bool Parser::parseExprParen(llvm::NullablePtr<Expr> &Result) {
 ///     expr
 ///     expr '=' expr
 ///     decl-var
+///     decl-oneof
+///     decl-struct
+///     decl-typealias
 ///     ';'
-bool Parser::parseExprBrace(NullablePtr<Expr> &Result) {
+bool Parser::parseExprBrace(llvm::NullablePtr<Expr> &Result) {
   SMLoc LBLoc = Tok.getLoc();
   consumeToken(tok::l_brace);
-  
-  // This brace expression forms a lexical scope.
-  Scope BraceScope(S.decl);
 
-  llvm::SmallVector<llvm::PointerUnion<Expr*, Decl*>, 16> Entries;
-  
+  llvm::SmallVector<ExprOrDecl, 16> Entries;
+
   // MissingSemiAtEnd - Keep track of whether the last expression in the block
   // had no semicolon.
   bool MissingSemiAtEnd = false;
+  if (parseDeclExprList(Entries, MissingSemiAtEnd, false /*NotTopLevel*/))
+    return true;
   
+  SMLoc RBLoc = Tok.getLoc();
+  if (parseToken(tok::r_brace, "expected '}' at end of brace expression",
+                 tok::r_brace)) {
+    note(LBLoc, "to match this opening '{'");
+    return true;
+  }
+  
+  Result = S.expr.ActOnBraceExpr(LBLoc, Entries, MissingSemiAtEnd, RBLoc);
+  return false;
+}
+
+///   expr-brace-item:
+///     expr
+///     expr '=' expr
+///     decl-var
+///     decl-oneof
+///     decl-struct
+///     decl-typealias
+///     ';'
+bool Parser::parseDeclExprList(llvm::SmallVectorImpl<ExprOrDecl> &Entries,
+                               bool &MissingSemiAtEnd, bool IsTopLevel) {
+  // This forms a lexical scope.
+  Scope BraceScope(S.decl);
+    
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
     MissingSemiAtEnd = false;
 
-    // If this is a semi, eat it and ignore it.
-    if (consumeIf(tok::semi))
-      continue;
-    
-    // Otherwise, we must have a var decl or expression.  Parse it up
-    Entries.push_back(llvm::PointerUnion<Expr*, Decl*>());
-    
     // Parse the decl or expression.    
     switch (Tok.getKind()) {
-    case tok::kw_var: {
-      llvm::SmallVector<Decl*, 4> VD;
-      if (parseDeclVar(VD)) break; // Error.
-      assert(!VD.empty() && "Cannot return an empty decl list on success!");
-      Entries.back() = VD[0];
-      for (unsigned i = 1, e = VD.size(); i != e; ++i)
-        Entries.push_back(VD[i]);
+    case tok::semi:
+      // Could create a decl for semicolons if we care.
+      consumeToken(tok::semi);
+      continue;
+        
+    case tok::kw_import:
+      Entries.push_back(parseDeclImport());
+
+      if (Entries.back() && !IsTopLevel) {
+        error(Entries.back().get<Decl*>()->getLocStart(),
+              "import is only valid at file scope");
+        Entries.pop_back();
+      }
       break;
-    }
+      
+    case tok::kw_var:
+      parseDeclVar(Entries);
+      break;
+    case tok::kw_func:
+      Entries.push_back(parseDeclFunc());
+      break;
     case tok::kw_typealias:
-      Entries.back() = parseDeclTypeAlias();
+      Entries.push_back(parseDeclTypeAlias());
       break;
     case tok::kw_oneof:
-      Entries.back() = parseDeclOneOf();
+      Entries.push_back(parseDeclOneOf());
       break;
     case tok::kw_struct:
-      Entries.back() = parseDeclStruct();
+      Entries.push_back(parseDeclStruct());
       break;
     default:
+      Entries.push_back(ExprOrDecl());
+        
       NullablePtr<Expr> ResultExpr;
       if (parseExpr(ResultExpr) || ResultExpr.isNull())
         break;
@@ -1112,10 +1085,9 @@ bool Parser::parseExprBrace(NullablePtr<Expr> &Result) {
     }
     
     if (Entries.back().isNull()) {
-      if (Tok.is(tok::semi)) {
-        Entries.pop_back();
+      Entries.pop_back();
+      if (Tok.is(tok::semi))
         continue;  // Consume the ';' and keep going.
-      }
       
       // FIXME: QOI: Improve error recovery.
       if (Tok.is(tok::semi) && Tok.isNot(tok::r_brace))
@@ -1124,14 +1096,6 @@ bool Parser::parseExprBrace(NullablePtr<Expr> &Result) {
       return true;
     }
   }
-  
-  SMLoc RBLoc = Tok.getLoc();
-  if (parseToken(tok::r_brace, "expected '}' at end of brace expression",
-                 tok::r_brace)) {
-    note(LBLoc, "to match this opening '{'");
-    return true;
-  }
-  
-  Result = S.expr.ActOnBraceExpr(LBLoc, Entries, MissingSemiAtEnd, RBLoc);
+
   return false;
 }

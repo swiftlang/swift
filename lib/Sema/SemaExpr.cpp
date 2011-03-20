@@ -119,13 +119,11 @@ SemaExpr::ActOnUnresolvedMemberExpr(llvm::SMLoc ColonLoc, llvm::SMLoc NameLoc,
 }
 
 
-NullablePtr<Expr> 
-SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
-                     llvm::ArrayRef<llvm::PointerUnion<Expr*, Decl*> > Elements,
-                         bool HasMissingSemi, llvm::SMLoc RBLoc) {
-  llvm::PointerUnion<Expr*, Decl*> *NewElements = 
-    S.Context.AllocateCopy<llvm::PointerUnion<Expr*, Decl*> >(Elements.begin(),
-                                                              Elements.end());
+BraceExpr *SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
+                                    llvm::ArrayRef<ExprOrDecl> Elements,
+                                    bool HasMissingSemi, llvm::SMLoc RBLoc) {
+  ExprOrDecl *NewElements = 
+    S.Context.AllocateCopy<ExprOrDecl>(Elements.begin(), Elements.end());
   
   return new (S.Context) BraceExpr(LBLoc, NewElements, Elements.size(),
                                    HasMissingSemi, RBLoc);

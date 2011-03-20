@@ -35,8 +35,12 @@ void *Decl::operator new(size_t Bytes, ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
+llvm::SMLoc TranslationUnitDecl::getLocStart() const {
+  return Body ? Body->getLocStart() : llvm::SMLoc();
+}
 
-llvm::SMLoc NamedDecl::getLocStart() const {
+
+llvm::SMLoc Decl::getLocStart() const {
   switch (getKind()) {
   case TranslationUnitDeclKind:
     return cast<TranslationUnitDecl>(this)->getLocStart();
@@ -114,10 +118,10 @@ void Decl::print(llvm::raw_ostream &OS, unsigned Indent) const {
 
 void TranslationUnitDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(translation_unit\n";
-  for (unsigned i = 0, e = Decls.size(); i != e; ++i) {
-    Decls[i]->print(OS, Indent+2);
-    if (i != e-1) OS << "\n";
-  }
+  if (Body)
+    Body->print(OS, Indent+2);
+  else
+    OS.indent(Indent+2) << "(null body!)";
   OS << ')';
 }
 

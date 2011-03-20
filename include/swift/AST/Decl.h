@@ -31,6 +31,7 @@ namespace swift {
   class ASTContext;
   class Type;
   class Expr;
+  class BraceExpr;
   class OneOfElementDecl;
   class NameAliasType;
   class TypeAliasDecl;
@@ -108,6 +109,7 @@ protected:
 public:
   DeclKind getKind() const { return Kind; }
   
+  llvm::SMLoc getLocStart() const;
   
   void dump() const;
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
@@ -131,23 +133,21 @@ public:
 /// external references in a translation unit, which is one file.
 class TranslationUnitDecl : public Decl {
 public:
-  llvm::SMLoc FileStartLoc;
-
   ASTContext &Ctx;
 
-  /// Decls - This is the list of all of the top-level declarations in the
-  /// translation unit.  This is filled in at the end of the parse phase.
-  llvm::ArrayRef<Decl*> Decls;
+  /// Body - This is a synthesized BraceExpr that holds the top level
+  /// expressions and declarations for a translation unit.
+  BraceExpr *Body;
   
   /// UnresolvedTypes - This is a list of types that were unresolved at the end
   /// of the translation unit's parse phase.
   llvm::ArrayRef<TypeAliasDecl*> UnresolvedTypesForParser;
   
-  TranslationUnitDecl(llvm::SMLoc fileStartLoc, ASTContext &C)
-    : Decl(TranslationUnitDeclKind), FileStartLoc(fileStartLoc), Ctx(C) {
+  TranslationUnitDecl(ASTContext &C)
+    : Decl(TranslationUnitDeclKind), Ctx(C) {
   }
 
-  llvm::SMLoc getLocStart() const { return FileStartLoc; }
+  llvm::SMLoc getLocStart() const;
   
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
 
@@ -186,8 +186,6 @@ class NamedDecl : public Decl {
 public:
   Identifier Name;
   DeclAttributes Attrs;
-  
-  llvm::SMLoc getLocStart() const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
