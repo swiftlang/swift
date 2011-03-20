@@ -115,6 +115,9 @@ namespace {
 
 ReferencedModule *NameBinder::
 getReferencedModule(SMLoc Loc, Identifier ModuleID) {
+  // TODO: We currently just recursively parse referenced modules.  This works
+  // fine for now since they are each a single file.  Ultimately we'll want a
+  // compiled form of AST's like clang's that support lazy deserialization.
   std::string InputFilename = ModuleID.get()+std::string(".swift");
   
   // Open the input file.

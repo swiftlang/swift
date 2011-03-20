@@ -138,7 +138,7 @@ void SemaDecl::AddToScope(ValueDecl *D) {
   if (Entry.second && Entry.first == CurScope->getDepth()) {
     error(D->getLocStart(),
           "variable declaration conflicts with previous declaration");
-    warning(LookupValueName(D->Name)->getLocStart(), "previous declaration here");
+    note(LookupValueName(D->Name)->getLocStart(), "previous declaration here");
     return;
   }
   
