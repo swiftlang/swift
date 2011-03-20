@@ -38,6 +38,7 @@ namespace {
     TranslationUnitDecl *TUD;
     
     llvm::DenseMap<Identifier, ValueDecl *> TopLevelValues;
+    llvm::DenseMap<Identifier, TypeAliasDecl *> TopLevelTypes;
 
   public:
     ReferencedModule(TranslationUnitDecl *tud) : TUD(tud) {}
@@ -45,12 +46,34 @@ namespace {
       // Nothing to destroy here, TU is ASTContext allocated.
     }
 
+    /// lookupType - Resolve a reference to a type name that found this module
+    /// with the specified import declaration.
+    TypeAliasDecl *lookupType(ImportDecl *ID, Identifier Name);
+
     /// lookupValue - Resolve a reference to a value name that found this module
     /// through the specified import declaration.
     ValueDecl *lookupValue(ImportDecl *ID, Identifier Name);
   };
 } // end anonymous namespace.
 
+
+/// lookupType - Resolve a reference to a type name that found this module
+/// with the specified import declaration.
+TypeAliasDecl *ReferencedModule::lookupType(ImportDecl *ID, Identifier Name) {
+ 
+  if (TopLevelTypes.empty()) {
+    for (llvm::ArrayRef<Decl*>::iterator I = TUD->Decls.begin(),
+         E = TUD->Decls.end(); I != E; ++I) {
+      if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(*I))
+        if (!TAD->Name.empty())
+          TopLevelTypes[TAD->Name] = TAD;
+    }
+  }
+  
+  llvm::DenseMap<Identifier, TypeAliasDecl*>::iterator I =
+    TopLevelTypes.find(Name);
+  return I != TopLevelTypes.end() ? I->second : 0;
+}
 
 /// lookupValue - Resolve a reference to a value name that found this module
 /// through the specified import declaration.
@@ -95,6 +118,8 @@ namespace {
 
     Expr *bindValueName(Identifier I, SMLoc Loc);
     
+    TypeAliasDecl *lookupTypeName(Identifier I);
+    
     void note(SMLoc Loc, const llvm::Twine &Message) {
       Context.SourceMgr.PrintMessage(Loc, Message, "note");
     }
@@ -137,6 +162,10 @@ getReferencedModule(SMLoc Loc, Identifier ModuleID) {
   if (TUD == 0)
     return 0;
   
+  // Do we have to do name binding on it to ensure that types are fully
+  // resolved?
+  //performNameBinding(TUD, Context);
+  
   ReferencedModule *RM = new ReferencedModule(TUD);
   LoadedModules.push_back(RM);
   return RM;
@@ -147,6 +176,18 @@ void NameBinder::addImport(ImportDecl *ID) {
   if (ReferencedModule *RM = getReferencedModule(ID->ImportLoc, ID->Name))
     Imports.push_back(std::make_pair(ID, RM));
 }
+
+/// lookupTypeName - Lookup the specified type name in imports.  We know that it
+/// has already been resolved within the current translation unit.  This returns
+/// null if there is no match found.
+TypeAliasDecl *NameBinder::lookupTypeName(Identifier Name) {
+  for (unsigned i = 0, e = Imports.size(); i != e; ++i)
+    if (TypeAliasDecl *D = Imports[i].second->lookupType(Imports[i].first,Name))
+      return D;
+
+  return 0;
+}
+
 
 
 /// bindValueName - This is invoked for each UnresolvedDeclRefExpr in the AST.
@@ -208,6 +249,23 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
       Binder.addImport(ID);
   }
   
+  // Type binding.  Loop over all of the unresolved types in the translation
+  // unit, resolving them with imports.
+  for (unsigned i = 0, e = TUD->UnresolvedTypesForParser.size(); i != e; ++i) {
+    TypeAliasDecl *TA = TUD->UnresolvedTypesForParser[i];
+
+    if (TypeAliasDecl *Result = Binder.lookupTypeName(TA->Name)) {
+      assert(isa<UnresolvedType>(TA->UnderlyingTy) && "Not an unresolved type");
+      // Update the decl we already have to be the correct type.
+      TA->TypeAliasLoc = Result->TypeAliasLoc;
+      TA->UnderlyingTy = Result->UnderlyingTy;
+      continue;
+    }
+    
+    Binder.error(TA->getLocStart(),
+                 "use of undeclared type '" + TA->Name.str() + "'");
+  }
+
   // Now that we know the top-level value names, go through and resolve any
   // UnresolvedDeclRefExprs that exist.
   for (llvm::ArrayRef<Decl*>::iterator I = TUD->Decls.begin(),
@@ -215,14 +273,5 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
     if (ValueDecl *VD = dyn_cast<ValueDecl>(*I))
       if (VD->Init)
         VD->Init = VD->Init->WalkExpr(BindNames, &Binder);
-  }
-
-  // Type binding.  Loop over all of the unresolved types in the translation
-  // unit, resolving them with imports.
-  for (unsigned i = 0, e = TUD->UnresolvedTypesForParser.size(); i != e; ++i) {
-    TypeAliasDecl *TA = TUD->UnresolvedTypesForParser[i];
-    
-    Binder.error(TA->getLocStart(),
-                 "use of undeclared type '" + TA->Name.str() + "'");
   }
 }
