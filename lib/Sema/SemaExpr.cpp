@@ -47,7 +47,7 @@ NullablePtr<Expr> SemaExpr::ActOnNumericConstant(llvm::StringRef Text,
   // The type of an integer literal is always "integer_literal_type", which
   // should be defined by the library.
   Identifier TyName = S.Context.getIdentifier("integer_literal_type");
-  Type *Ty = S.decl.LookupTypeName(TyName, Loc)->UnderlyingTy;
+  Type *Ty = S.decl.LookupTypeName(TyName, Loc)->getAliasType(S.Context);
   return new (S.Context) IntegerLiteral(Text, Loc, Ty);
 }
 
