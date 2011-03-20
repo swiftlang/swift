@@ -284,7 +284,8 @@ class BraceExpr : public Expr {
 public:
   llvm::SMLoc LBLoc;
   
-  llvm::PointerUnion<Expr*, Decl*> *Elements;
+  typedef llvm::PointerUnion<Expr*, Decl*> ExprOrDecl;
+  ExprOrDecl *Elements;
   unsigned NumElements;
   
   /// This is true if the last expression in the brace expression is missing a
@@ -292,7 +293,7 @@ public:
   bool MissingSemi;
   llvm::SMLoc RBLoc;
 
-  BraceExpr(llvm::SMLoc lbloc, llvm::PointerUnion<Expr*, Decl*> *elements,
+  BraceExpr(llvm::SMLoc lbloc, ExprOrDecl *elements,
             unsigned numelements, bool missingsemi, llvm::SMLoc rbloc)
     : Expr(BraceExprKind), LBLoc(lbloc), Elements(elements),
       NumElements(numelements), MissingSemi(missingsemi), RBLoc(rbloc) {}
