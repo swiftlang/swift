@@ -1445,18 +1445,19 @@ void TypeChecker::checkBody(Expr *&E, Type *DestTy, ConversionReason Res,
   // separately and independently of the var.  If the user really really wanted
   // something silly like this, then they should have used parens, as in:
   //  var x = (4 foo())
-  if (SequenceExpr *SE = dyn_cast<SequenceExpr>(E)) {
-    E = SE->Elements[0];
-    if (ExcessElements)
-      ExcessElements->append(SE->Elements+1, SE->Elements+SE->NumElements);
-    else {
-      // If this context doesn't want any extra expressions, reject them. This
-      // is not the best error message in the world :).
-      for (unsigned i = 1, e = SE->NumElements; i != e; ++i)
-        error(SE->Elements[i]->getLocStart(),
-              "expected a singular expression: this expression is unbound");
+  if (SequenceExpr *SE = dyn_cast<SequenceExpr>(E))
+    if (SE->Elements[0]->Ty->getAs<DependentType>() == 0) {
+      E = SE->Elements[0];
+      if (ExcessElements)
+        ExcessElements->append(SE->Elements+1, SE->Elements+SE->NumElements);
+      else {
+        // If this context doesn't want any extra expressions, reject them. This
+        // is not the best error message in the world :).
+        for (unsigned i = 1, e = SE->NumElements; i != e; ++i)
+          error(SE->Elements[i]->getLocStart(),
+                "expected a singular expression: this expression is unbound");
+      }
     }
-  }
   
   if (DestTy)
     E = convertToType(E, DestTy, false, Res);
