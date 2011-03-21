@@ -1446,7 +1446,15 @@ void TypeChecker::checkBody(Expr *&E, Type *DestTy, ConversionReason Res,
   // something silly like this, then they should have used parens, as in:
   //  var x = (4 foo())
   if (SequenceExpr *SE = dyn_cast<SequenceExpr>(E))
-    if (SE->Elements[0]->Ty->getAs<DependentType>() == 0) {
+#if 0
+    // FIXME: This is busted for something like this:
+    //   var e : ZeroOneTwoThree = :Three(1, 2, 3)      foo();
+    // We'll end up trying to convert foo() to be a ZeroOneTwoThree, which will
+    // fail, and then we get a UnresolvedTypes error.  This may be acceptable,
+    // but it is unfortunate that the ; placement has a semantic effect here.
+    // Disabling this so it continues to show a test failure.
+#endif
+    if (!isa<DependentType>(SE->Elements[0]->Ty) || 1) {
       E = SE->Elements[0];
       if (ExcessElements)
         ExcessElements->append(SE->Elements+1, SE->Elements+SE->NumElements);
