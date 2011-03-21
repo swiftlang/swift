@@ -240,7 +240,10 @@ public:
   
   void PrintRec(Expr *E) {
     Indent += 2;
-    Visit(E);
+    if (E)
+      Visit(E);
+    else
+      OS.indent(Indent) << "(**NULL EXPRESSION**)";
     Indent -= 2;
   }
   
@@ -338,7 +341,7 @@ public:
   void VisitAnonClosureArgExpr(AnonClosureArgExpr *E) {
     OS.indent(Indent) << "(anon_closure_arg_expr type='";
     E->Ty->print(OS);
-    OS << "')";
+    OS << "' ArgNo=" << E->ArgNo << ')';
   }
   void VisitBinaryExpr(BinaryExpr *E) {
     OS.indent(Indent) << "(binary_expr '";
