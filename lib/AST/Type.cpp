@@ -169,14 +169,12 @@ void TupleType::print(llvm::raw_ostream &OS) const {
     if (i) OS << ", ";
     const TupleTypeElt &TD = Fields[i];
     
-    if (TD.Name.get() == 0) {
-      OS << *TD.Ty;
-      continue;
-    }
+    if (!TD.Name.empty())
+      OS << TD.Name << ' ';
     
-    OS << "var " << TD.Name << " : " << *TD.Ty;
+    OS << ": " << *TD.Ty;
   }
-  OS << ")";
+  OS << ')';
 }
 
 void FunctionType::print(llvm::raw_ostream &OS) const {
