@@ -312,15 +312,21 @@ FuncDecl *SemaDecl::ActOnFuncBody(FuncDecl *FD, Expr *Body) {
 }
 
 Decl *SemaDecl::ActOnStructDecl(llvm::SMLoc StructLoc, DeclAttributes &Attrs,
-                                Identifier Name, Type *Ty) {
+                                Identifier Name, Type *BodyTy) {
+  // Get the TypeAlias for the name that we'll eventually have.  This ensures
+  // that the constructors generated have the pretty name for the type instead
+  // of the raw oneof.
+  Type *TypeName = S.type.ActOnTypeName(StructLoc, Name);
+  
   // The 'struct' is syntactically fine, invoke the semantic actions for the
   // syntactically expanded oneof type.  Struct declarations are just sugar for
   // other existing constructs.
   SemaType::OneOfElementInfo ElementInfo;
   ElementInfo.Name = Name.str();
   ElementInfo.NameLoc = StructLoc;
-  ElementInfo.EltType = Ty;
-  OneOfType *OneOfTy = S.type.ActOnOneOfType(StructLoc, Attrs, ElementInfo);
+  ElementInfo.EltType = BodyTy;
+  OneOfType *OneOfTy =
+    S.type.ActOnOneOfType(StructLoc, Attrs, ElementInfo, TypeName);
   
   // Given the type, we create a TypeAlias and inject it into the current scope.
   TypeAliasDecl *TAD = S.decl.ActOnTypeAlias(StructLoc, Name, OneOfTy);

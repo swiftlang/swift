@@ -42,7 +42,8 @@ Type *SemaType::ActOnTupleType(llvm::SMLoc LPLoc, TupleTypeElt *Elements,
 
 OneOfType *SemaType::ActOnOneOfType(llvm::SMLoc OneOfLoc, 
                                     const DeclAttributes &Attrs,
-                                    llvm::ArrayRef<OneOfElementInfo> Elts) {
+                                    llvm::ArrayRef<OneOfElementInfo> Elts,
+                                    Type *PrettyTypeName) {
   // No attributes are valid on oneof types at this time.
   if (!Attrs.empty())
     error(Attrs.LSquareLoc, "oneof types are not allowed to have attributes");
@@ -74,7 +75,7 @@ OneOfType *SemaType::ActOnOneOfType(llvm::SMLoc OneOfLoc,
   // Now that the oneof type is created, we can go back and give proper types to
   // each element decl.
   for (unsigned i = 0, e = EltDecls.size(); i != e; ++i) {
-    Type *EltTy = Result;
+    Type *EltTy = PrettyTypeName ? PrettyTypeName : Result;
     // If the OneOf Element takes a type argument, then it is actually a
     // function that takes the type argument and returns the OneOfType.
     if (Type *ArgTy = EltDecls[i]->ArgumentType)
