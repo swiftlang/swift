@@ -726,7 +726,7 @@ static void ReduceJuxtaposedExprs(SequenceExpr *E, unsigned Elt,
   Expr *EltExpr = E->Elements[Elt];
   
   // If this expression isn't a function type, then it doesn't juxtapose.
-  if (!llvm::isa<FunctionType>(EltExpr->Ty))
+  if (EltExpr->Ty->getAs<FunctionType>() == 0)
     return;
   
   // If this is a function, then it can juxtapose.  Note that the grammar
