@@ -494,7 +494,8 @@ Decl *Parser::parseDeclOneOf() {
   Identifier OneOfName;
   Type *OneOfType = 0;
   if (parseIdentifier(OneOfName, "expected identifier in oneof declaration") ||
-      parseTypeOneOfBody(OneOfLoc, Attributes, OneOfType))
+      parseTypeOneOfBody(OneOfLoc, Attributes, OneOfType,
+                         S.type.ActOnTypeName(NameLoc, OneOfName)))
     return 0;
 
   return S.decl.ActOnTypeAlias(NameLoc, OneOfName, OneOfType);
@@ -687,9 +688,12 @@ bool Parser::parseTypeTuple(Type *&Result) {
 ///   oneof-element:
 ///      identifier
 ///      identifier ':' type
-///      
+///
+/// If TypeName is specified, it is the type that the constructors should be
+/// built with, so that they preserve the name of the oneof decl that contains
+/// this.
 bool Parser::parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
-                                Type *&Result) {
+                                Type *&Result, Type *TypeName) {
   if (parseToken(tok::l_brace, "expected '{' in oneof type"))
     return true;
   
@@ -722,7 +726,7 @@ bool Parser::parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
   
   parseToken(tok::r_brace, "expected '}' at end of oneof");
   
-  Result = S.type.ActOnOneOfType(OneOfLoc, Attrs, ElementInfos);
+  Result = S.type.ActOnOneOfType(OneOfLoc, Attrs, ElementInfos, TypeName);
   return false;
 }
 
