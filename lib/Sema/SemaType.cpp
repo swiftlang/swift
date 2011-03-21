@@ -43,7 +43,7 @@ Type *SemaType::ActOnTupleType(llvm::SMLoc LPLoc, TupleTypeElt *Elements,
 OneOfType *SemaType::ActOnOneOfType(llvm::SMLoc OneOfLoc, 
                                     const DeclAttributes &Attrs,
                                     llvm::ArrayRef<OneOfElementInfo> Elts,
-                                    Type *PrettyTypeName) {
+                                    TypeAliasDecl *PrettyTypeName) {
   // No attributes are valid on oneof types at this time.
   if (!Attrs.empty())
     error(Attrs.LSquareLoc, "oneof types are not allowed to have attributes");
@@ -51,7 +51,12 @@ OneOfType *SemaType::ActOnOneOfType(llvm::SMLoc OneOfLoc,
   llvm::SmallPtrSet<const char *, 16> SeenSoFar;
   llvm::SmallVector<OneOfElementDecl *, 16> EltDecls;
     
+  // If we have a PrettyTypeName to use, use it.  Otherwise, just assign the
+  // constructors a temporary dummy type.
   Type *TmpTy = S.Context.TheEmptyTupleType;
+  if (PrettyTypeName)
+    TmpTy = PrettyTypeName->getAliasType(S.Context);
+  
   for (unsigned i = 0, e = Elts.size(); i != e; ++i) {
     Identifier NameI = S.Context.getIdentifier(Elts[i].Name);
     
@@ -63,24 +68,36 @@ OneOfType *SemaType::ActOnOneOfType(llvm::SMLoc OneOfLoc,
       // TODO: QoI: add note for previous definition.
       continue;
     }
+    
+    Type *EltTy = TmpTy;
+    if (Type *ArgTy = Elts[i].EltType)
+      if (PrettyTypeName)
+        EltTy = S.Context.getFunctionType(ArgTy, EltTy);
 
     // Create a decl for each element, giving each a temporary type.
     EltDecls.push_back(
-      new (S.Context) OneOfElementDecl(Elts[i].NameLoc, NameI, TmpTy,
+      new (S.Context) OneOfElementDecl(Elts[i].NameLoc, NameI, EltTy,
                                        Elts[i].EltType));
   }
   
   OneOfType *Result = S.Context.getNewOneOfType(OneOfLoc, EltDecls);
-  
-  // Now that the oneof type is created, we can go back and give proper types to
-  // each element decl.
-  for (unsigned i = 0, e = EltDecls.size(); i != e; ++i) {
-    Type *EltTy = PrettyTypeName ? PrettyTypeName : Result;
-    // If the OneOf Element takes a type argument, then it is actually a
-    // function that takes the type argument and returns the OneOfType.
-    if (Type *ArgTy = EltDecls[i]->ArgumentType)
-      EltTy = S.Context.getFunctionType(ArgTy, EltTy);
-    EltDecls[i]->Ty = EltTy;
+
+  if (PrettyTypeName) {
+    // If we have a pretty name for this, complete it to its actual type.
+    assert(llvm::isa<UnresolvedType>(PrettyTypeName->UnderlyingTy) &&
+           "Not an incomplete decl to complete!");
+    PrettyTypeName->UnderlyingTy = Result;
+  } else {
+    // Now that the oneof type is created, we can go back and give proper types
+    // to each element decl.
+    for (unsigned i = 0, e = EltDecls.size(); i != e; ++i) {
+      Type *EltTy = Result;
+      // If the OneOf Element takes a type argument, then it is actually a
+      // function that takes the type argument and returns the OneOfType.
+      if (Type *ArgTy = EltDecls[i]->ArgumentType)
+        EltTy = S.Context.getFunctionType(ArgTy, EltTy);
+      EltDecls[i]->Ty = EltTy;
+    }
   }
   
   return Result;

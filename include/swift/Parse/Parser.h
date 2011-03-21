@@ -132,7 +132,7 @@ private:
   bool parseType(Type *&Result, const llvm::Twine &Message);
   bool parseTypeTuple(Type *&Result);
   bool parseTypeOneOfBody(llvm::SMLoc OneOfLoc, const DeclAttributes &Attrs,
-                          Type *&Result, Type *TypeName = 0);
+                          Type *&Result, TypeAliasDecl *TypeName = 0);
 
   // Expression Parsing
   bool parseExpr(llvm::NullablePtr<Expr> &Result, const char *Message = 0);

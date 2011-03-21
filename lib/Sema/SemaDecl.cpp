@@ -316,8 +316,9 @@ Decl *SemaDecl::ActOnStructDecl(llvm::SMLoc StructLoc, DeclAttributes &Attrs,
   // Get the TypeAlias for the name that we'll eventually have.  This ensures
   // that the constructors generated have the pretty name for the type instead
   // of the raw oneof.
-  Type *TypeName = S.type.ActOnTypeName(StructLoc, Name);
-  
+  TypeAliasDecl *TAD = S.decl.ActOnTypeAlias(StructLoc, Name,
+                                             S.Context.TheUnresolvedType);
+
   // The 'struct' is syntactically fine, invoke the semantic actions for the
   // syntactically expanded oneof type.  Struct declarations are just sugar for
   // other existing constructs.
@@ -325,17 +326,12 @@ Decl *SemaDecl::ActOnStructDecl(llvm::SMLoc StructLoc, DeclAttributes &Attrs,
   ElementInfo.Name = Name.str();
   ElementInfo.NameLoc = StructLoc;
   ElementInfo.EltType = BodyTy;
-  OneOfType *OneOfTy =
-    S.type.ActOnOneOfType(StructLoc, Attrs, ElementInfo, TypeName);
-  
-  // Given the type, we create a TypeAlias and inject it into the current scope.
-  TypeAliasDecl *TAD = S.decl.ActOnTypeAlias(StructLoc, Name, OneOfTy);
-  
+  OneOfType *OneOfTy = S.type.ActOnOneOfType(StructLoc, Attrs, ElementInfo,TAD);
+
   // In addition to defining the oneof declaration, structs also inject their
   // constructor into the global scope.
   assert(OneOfTy->Elements.size() == 1 && "Struct has exactly one element");
   S.decl.AddToScope(OneOfTy->getElement(0));
-  
   return TAD;
 }
 

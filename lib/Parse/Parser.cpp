@@ -493,12 +493,15 @@ Decl *Parser::parseDeclOneOf() {
   SMLoc NameLoc = Tok.getLoc();
   Identifier OneOfName;
   Type *OneOfType = 0;
-  if (parseIdentifier(OneOfName, "expected identifier in oneof declaration") ||
-      parseTypeOneOfBody(OneOfLoc, Attributes, OneOfType,
-                         S.type.ActOnTypeName(NameLoc, OneOfName)))
+  if (parseIdentifier(OneOfName, "expected identifier in oneof declaration"))
+    return 0;
+  
+  TypeAliasDecl *TAD = S.decl.ActOnTypeAlias(NameLoc, OneOfName,
+                                             S.Context.TheUnresolvedType);
+  if (parseTypeOneOfBody(OneOfLoc, Attributes, OneOfType, TAD))
     return 0;
 
-  return S.decl.ActOnTypeAlias(NameLoc, OneOfName, OneOfType);
+  return TAD;
 }
 
 
@@ -693,7 +696,7 @@ bool Parser::parseTypeTuple(Type *&Result) {
 /// built with, so that they preserve the name of the oneof decl that contains
 /// this.
 bool Parser::parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
-                                Type *&Result, Type *TypeName) {
+                                Type *&Result, TypeAliasDecl *TypeName) {
   if (parseToken(tok::l_brace, "expected '{' in oneof type"))
     return true;
   

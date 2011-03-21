@@ -33,6 +33,7 @@ namespace swift {
   class DeclAttributes;
   class OneOfType;
   class Identifier;
+  class TypeAliasDecl;
   
 /// SemaType - Semantic analysis support for Swift types.
 class SemaType : public SemaBase {
@@ -55,7 +56,7 @@ public:
   
   OneOfType *ActOnOneOfType(llvm::SMLoc OneOfLoc, const DeclAttributes &Attrs,
                             llvm::ArrayRef<OneOfElementInfo> Elts,
-                            Type *PrettyTypeName = 0);
+                            TypeAliasDecl *PrettyTypeName = 0);
 };
   
 } // end namespace swift
