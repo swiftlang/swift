@@ -54,7 +54,8 @@ public:
   };
   
   OneOfType *ActOnOneOfType(llvm::SMLoc OneOfLoc, const DeclAttributes &Attrs,
-                            llvm::ArrayRef<OneOfElementInfo> Elts);
+                            llvm::ArrayRef<OneOfElementInfo> Elts,
+                            Type *PrettyTypeName = 0);
 };
   
 } // end namespace swift
