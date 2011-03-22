@@ -95,14 +95,15 @@ namespace {
     
 
     /// convertToType - Do semantic analysis of an expression in a context that
-    /// expects a particular type.  This does conversion to that type if the types
-    /// don't match and diagnoses cases where the conversion cannot be performed.
+    /// expects a particular type.  This performs a conversion to that type if
+    /// the types don't match and diagnoses cases where the conversion cannot be
+    /// performed.
+    ///
     /// The Reason specifies why this conversion is happening, for diagnostic
     /// purposes.
     ///
     /// This emits a diagnostic and returns null on error.
-    Expr *convertToType(Expr *E, Type *Ty, bool IgnoreAnonDecls,
-                        ConversionReason Reason);
+    Expr *convertToType(Expr *E, Type *Ty, ConversionReason Reason);
   };
 }  // end anonymous namespace
 
@@ -236,7 +237,7 @@ static bool SemaApplyExpr(Expr *&E1, Expr *&E2, Type *&ResultTy,
   
   // We have a function application.  Check that the argument type matches the
   // expected type of the function.
-  E2 = TC.convertToType(E2, FT->Input, false, TypeChecker::CR_FuncApply);
+  E2 = TC.convertToType(E2, FT->Input, TypeChecker::CR_FuncApply);
   if (E2 == 0)
     return true;
   
@@ -273,7 +274,7 @@ static bool SemaBinaryExpr(Expr *&LHS, ValueDecl *OpFn,
   
   // If this is an assignment, then we coerce the RHS to the LHS.
   if (OpFn == 0) {
-    RHS = TC.convertToType(RHS, LHS->Ty, false, TypeChecker::CR_BinOpRHS);
+    RHS = TC.convertToType(RHS, LHS->Ty, TypeChecker::CR_BinOpRHS);
     if (LHS == 0) return true;
     
     ResultTy = TC.Context.TheEmptyTupleType;
@@ -289,11 +290,11 @@ static bool SemaBinaryExpr(Expr *&LHS, ValueDecl *OpFn,
   assert(Input->Fields.size() == 2 && "Sema error validating infix fn type");
   
   // Verify that the LHS/RHS have the right type and do conversions as needed.
-  LHS = TC.convertToType(LHS, Input->getElementType(0), false,
+  LHS = TC.convertToType(LHS, Input->getElementType(0),
                          TypeChecker::CR_BinOpLHS);
   if (LHS == 0) return true;
   
-  RHS = TC.convertToType(RHS, Input->getElementType(1), false,
+  RHS = TC.convertToType(RHS, Input->getElementType(1),
                          TypeChecker::CR_BinOpRHS);
   if (RHS == 0) return true;
   
@@ -1236,9 +1237,9 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
 
 
 
-Expr *TypeChecker::convertToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
+Expr *TypeChecker::convertToType(Expr *E, Type *DestTy,
                                  ConversionReason Reason) {
-  if (Expr *ERes = HandleConversionToType(E, DestTy, IgnoreAnonDecls, *this))
+  if (Expr *ERes = HandleConversionToType(E, DestTy, false, *this))
     return ERes;
   
   // FIXME: We only have this because diagnostics are terrible right now.  When
@@ -1341,7 +1342,7 @@ bool TypeChecker::validateType(Type *&T) {
       // If both a type and an initializer are specified, make sure the
       // initializer's type agrees with the (redundant) type.
       if (EltTy) {
-        EltInit = convertToType(EltInit, EltTy, false, CR_TupleInit);
+        EltInit = convertToType(EltInit, EltTy, CR_TupleInit);
         if (EltInit == 0) {
           IsValid = false;
           break;
@@ -1474,7 +1475,7 @@ void TypeChecker::checkBody(Expr *&E, Type *DestTy, ConversionReason Res,
   }
   
   if (DestTy)
-    E = convertToType(E, DestTy, false, Res);
+    E = convertToType(E, DestTy, Res);
   
   // Check the initializer/body to make sure that we succeeded in resolving
   // all of the types contained within it.  We should not have any
