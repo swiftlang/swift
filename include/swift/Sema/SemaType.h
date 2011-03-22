@@ -42,8 +42,8 @@ public:
 
   Type *ActOnInt32Type(llvm::SMLoc Loc);
   Type *ActOnTypeName(llvm::SMLoc Loc, Identifier Name);
-  Type *ActOnTupleType(llvm::SMLoc LPLoc, TupleTypeElt *Elements,
-                       unsigned NumElements, llvm::SMLoc RPLoc);
+  Type *ActOnTupleType(llvm::SMLoc LPLoc, llvm::ArrayRef<TupleTypeElt> Elements,
+                       llvm::SMLoc RPLoc);
   Type *ActOnFunctionType(Type *Input, llvm::SMLoc ArrowLoc, Type *Output);
   Type *ActOnArrayType(Type *BaseTy, llvm::SMLoc LSquareLoc, Expr *Size,
                        llvm::SMLoc RSquareLoc);

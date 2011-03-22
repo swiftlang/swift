@@ -34,10 +34,10 @@ Type *SemaType::ActOnTypeName(llvm::SMLoc Loc, Identifier Name) {
 }
 
 
-Type *SemaType::ActOnTupleType(llvm::SMLoc LPLoc, TupleTypeElt *Elements,
-                               unsigned NumElements, llvm::SMLoc RPLoc) {
-  return S.Context.getTupleType(llvm::ArrayRef<TupleTypeElt>(Elements,
-                                                             NumElements));
+Type *SemaType::ActOnTupleType(llvm::SMLoc LPLoc, 
+                               llvm::ArrayRef<TupleTypeElt> Elements,
+                               llvm::SMLoc RPLoc) {
+  return S.Context.getTupleType(Elements);
 }
 
 OneOfType *SemaType::ActOnOneOfType(llvm::SMLoc OneOfLoc, 

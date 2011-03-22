@@ -679,7 +679,7 @@ bool Parser::parseTypeTuple(Type *&Result) {
     return true;
   }
   
-  Result = S.type.ActOnTupleType(LPLoc, Elements.data(), Elements.size(),RPLoc);
+  Result = S.type.ActOnTupleType(LPLoc, Elements, RPLoc);
   return false;
 }
 
