@@ -742,9 +742,6 @@ BindAndValidateClosureArgs(Expr *Body, Type *FuncInput, TypeChecker &TC) {
 // SemaCoerceBottomUp
 //===----------------------------------------------------------------------===//
 
-static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
-                                    TypeChecker &TC);
-
 namespace {
   /// SemaCoerceBottomUp - This class implements bottom-up semantic analysis
   /// (aka "root to leaf", using the type of "+" to infer the type of "a" in
@@ -833,7 +830,7 @@ namespace {
  
       Expr *LastVal = E->Elements[E->NumElements-1].get<Expr*>();
       
-      LastVal = HandleConversionToType(LastVal, DestTy, true, TC);
+      LastVal = convertToType(LastVal, DestTy, true, TC);
       if (LastVal == 0) return 0;
 
       // Update the end of the brace expression.
@@ -852,13 +849,24 @@ namespace {
       return E;
     }
     
-  public:
     SemaCoerceBottomUp(TypeChecker &tc, Type *destTy) : TC(tc), DestTy(destTy) {
       assert(!isa<DependentType>(DestTy));
     }
     Expr *doIt(Expr *E) {
       return Visit(E);
     }
+  public:
+    
+    /// convertToType - This is the main entrypoint to SemaCoerceBottomUp.
+    static Expr *convertToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
+                               TypeChecker &TC);
+
+  private:
+    static Expr *convertScalarToTupleType(Expr *E, TupleType *DestTy,
+                                          TypeChecker &TC);
+    static Expr *
+    convertTupleToTupleType(Expr *E, unsigned NumExprElements,
+                            TupleType *DestTy, TypeChecker &TC);
   };
 } // end anonymous namespace.
 
@@ -869,7 +877,7 @@ Expr *SemaCoerceBottomUp::VisitTupleExpr(TupleExpr *E) {
   // type is not a tuple type, then this just recursively forces the scalar
   // type into the single element.
   if (E->isGroupingParen()) {
-    Expr *ERes = HandleConversionToType(E->SubExprs[0], DestTy, true, TC);
+    Expr *ERes = convertToType(E->SubExprs[0], DestTy, true, TC);
     if (ERes == 0) return 0;
     
     E->SubExprs[0] = ERes;
@@ -880,20 +888,20 @@ Expr *SemaCoerceBottomUp::VisitTupleExpr(TupleExpr *E) {
     return E;
   }
   
-  return HandleConversionToType(E, DestTy, true, TC);
+  return convertToType(E, DestTy, true, TC);
 }
 
 
 
-/// ConvertExprToTupleType - Given an expression that has tuple type, convert it
-/// to have some other tuple type.
+/// convertTupleToTupleType - Given an expression that has tuple type, convert
+/// it to have some other tuple type.
 ///
 /// The caller gives us a list of the expressions named arguments and a count of
 /// tuple elements for E in the IdentList+NumIdents array.  DestTy specifies the
 /// type to convert to, which is known to be a TupleType.
-static Expr *
-ConvertExprToTupleType(Expr *E, unsigned NumExprElements,
-                       TupleType *DestTy, TypeChecker &TC) {
+Expr *
+SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
+                                            TupleType *DestTy, TypeChecker &TC){
   
   // If the tuple expression or destination type have named elements, we
   // have to match them up to handle the swizzle case for when:
@@ -1012,7 +1020,7 @@ ConvertExprToTupleType(Expr *E, unsigned NumExprElements,
       // Check to see if the src value can be converted to the destination
       // element type.
       Expr *Elt = OrigElts[SrcField];
-      Elt = HandleConversionToType(Elt, DestTy->getElementType(i), true, TC);
+      Elt = convertToType(Elt, DestTy->getElementType(i), true, TC);
       // TODO: QOI: Include a note about this failure!
       if (Elt == 0) return 0;
       TE->SubExprs[i] = Elt;
@@ -1059,7 +1067,7 @@ ConvertExprToTupleType(Expr *E, unsigned NumExprElements,
       
       // Check to see if the src value can be converted to the destination
       // element type.
-      Src = HandleConversionToType(Src, DestTy->getElementType(i), true, TC);
+      Src = convertToType(Src, DestTy->getElementType(i), true, TC);
       // TODO: QOI: Include a note about this failure!
       if (Src == 0) return 0;
       NewElements[i] = Src;
@@ -1084,13 +1092,6 @@ ConvertExprToTupleType(Expr *E, unsigned NumExprElements,
                                     NewElements.size(), llvm::SMLoc(), 
                                     false, DestTy);
 }
-
-
-
-//===----------------------------------------------------------------------===//
-// Type Conversion
-//===----------------------------------------------------------------------===//
-
 
 /// getTupleFieldForScalarInit - If the specified tuple type can be assigned a
 /// scalar value, return the element number that the scalar provides.  For this
@@ -1118,12 +1119,10 @@ static int getTupleFieldForScalarInit(TupleType *TT) {
   return FieldWithoutDefault == -1 ? 0 : FieldWithoutDefault;
 }
 
-/// HandleScalarConversionToTupleType - Check to see if the destination type
-/// (which is known to be a tuple) has a single element that requires an
-/// initializer and if the specified expression can convert to that type.  If
-/// so, convert the scalar to the tuple type.
-static Expr *HandleScalarConversionToTupleType(Expr *E, TupleType *DestTy,
-                                               TypeChecker &TC) {
+/// convertScalarToTupleType - Convert the specified expression to the specified
+/// tuple type, which is known to be initializable with one element.
+Expr *SemaCoerceBottomUp::convertScalarToTupleType(Expr *E, TupleType *DestTy,
+                                                   TypeChecker &TC) {
   // If the destination is a tuple type with at most one element that has no
   // default value, see if the expression's type is convertable to the
   // element type.  This handles assigning 4 to "(a = 4, b : int)".
@@ -1131,7 +1130,7 @@ static Expr *HandleScalarConversionToTupleType(Expr *E, TupleType *DestTy,
   if (ScalarField == -1) return 0;
   
   Type *ScalarType = DestTy->getElementType(ScalarField);
-  Expr *ERes = HandleConversionToType(E, ScalarType, false, TC);
+  Expr *ERes = convertToType(E, ScalarType, false, TC);
   if (ERes == 0) return 0;
   
   unsigned NumFields = DestTy->Fields.size();
@@ -1164,8 +1163,9 @@ static Expr *HandleScalarConversionToTupleType(Expr *E, TupleType *DestTy,
 /// HandleConversionToType - This is the recursive implementation of
 /// ConvertToType.  It does not produce diagnostics, it just returns null on
 /// failure.
-static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
-                                    TypeChecker &TC) {
+Expr *SemaCoerceBottomUp::convertToType(Expr *E, Type *DestTy,
+                                        bool IgnoreAnonDecls,
+                                        TypeChecker &TC) {
   // If we have an exact match, we're done.
   if (E->Ty->getCanonicalType(TC.Context) ==
          DestTy->getCanonicalType(TC.Context))
@@ -1185,16 +1185,16 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
     // If the element of the tuple has dependent type and is a TupleExpr, try to
     // convert it.
     if ((isa<TupleExpr>(E) && !cast<TupleExpr>(E)->isGroupingParen()))
-      return ConvertExprToTupleType(E, cast<TupleExpr>(E)->NumSubExprs, TT, TC);
+      return convertTupleToTupleType(E, cast<TupleExpr>(E)->NumSubExprs, TT,TC);
 
     // If the is a scalar to tuple conversion, form the tuple and return it.
     if (getTupleFieldForScalarInit(TT) != -1)
-      return HandleScalarConversionToTupleType(E, TT, TC);
+      return convertScalarToTupleType(E, TT, TC);
     
     // If the input is a tuple and the output is a tuple, see if we can convert
     // each element.
     if (TupleType *ETy = E->Ty->getAs<TupleType>())
-      return ConvertExprToTupleType(E, ETy->Fields.size(), TT, TC);
+      return convertTupleToTupleType(E, ETy->Fields.size(), TT, TC);
   }
   
   // Otherwise, check to see if this is an auto-closure case.  This case happens
@@ -1211,7 +1211,7 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
     // (int,int)->(int,int)->() the arguments bind to the first level, not the
     // inner level.  To handle this, we ignore anonymous decls in the recursive
     // case here.
-    Expr *ERes = HandleConversionToType(E, FT->Result, true, TC);
+    Expr *ERes = convertToType(E, FT->Result, true, TC);
     if (ERes == 0) return 0;
   
     // Now that the AnonClosureArgExpr's potentially have a type, redo semantic
@@ -1239,7 +1239,7 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
 
 Expr *TypeChecker::convertToType(Expr *E, Type *DestTy,
                                  ConversionReason Reason) {
-  if (Expr *ERes = HandleConversionToType(E, DestTy, false, *this))
+  if (Expr *ERes = SemaCoerceBottomUp::convertToType(E, DestTy, false, *this))
     return ERes;
   
   // FIXME: We only have this because diagnostics are terrible right now.  When
