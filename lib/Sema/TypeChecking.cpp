@@ -785,9 +785,7 @@ namespace {
         TC.error(UME->getLocStart(),
                  "type '" + DestTy->getString() + "' has no member named '" +
                  UME->Name.str() + "'");
-#if 0
-        // FIXME: Note where the oneof is declared.
-#endif
+        TC.note(DT->OneOfLoc, "type declared here");
         return 0;
       }
       
@@ -989,17 +987,19 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
         DestElementSources[i] = -2;
         continue;
       }        
+     
+      // If this is a TupleExpr (common case) get a more precise location for
+      // the element we care about.
+      SMLoc ErrorLoc = E->getLocStart();
+      if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
+        ErrorLoc = TE->RParenLoc;
       
-#if 0
-      // Get element loc if this is a TupleExpr.
-#endif
-
       if (DestTy->Fields[i].Name.empty())
-        TC.error(E->getLocStart(), "no value to initialize tuple element #" +
+        TC.error(ErrorLoc, "no value to initialize tuple element #" +
                  llvm::Twine(i) + " in expression of type '" +
                  E->Ty->getString() + "'");
       else
-        TC.error(E->getLocStart(), "no value to initialize tuple element '" +
+        TC.error(ErrorLoc, "no value to initialize tuple element '" +
                  DestTy->Fields[i].Name.str() + "' (#" + llvm::Twine(i) +
                  ") in expression of type '" + E->Ty->getString() + "'");
       return 0;
@@ -1013,15 +1013,19 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   // If there were any unused input values, we fail.
   for (unsigned i = 0, e = UsedElements.size(); i != e; ++i)
     if (!UsedElements[i]) {
-#if 0
-      // Get element loc if this is a TupleExpr.
-#endif
+      // If this is a TupleExpr (common case) get a more precise location for
+      // the element we care about.
+      SMLoc ErrorLoc = E->getLocStart();
+      if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
+        if (Expr *SubExp = TE->SubExprs[i])
+          ErrorLoc = SubExp->getLocStart();
+      
     if (IdentList[i].empty())
-      TC.error(E->getLocStart(), "element #" + llvm::Twine(i) +
+      TC.error(ErrorLoc, "element #" + llvm::Twine(i) +
                " of tuple value not used when converting to type '" +
                DestTy->getString() + "'");
     else
-      TC.error(E->getLocStart(), "tuple element '" + IdentList[i].str() +
+      TC.error(ErrorLoc, "tuple element '" + IdentList[i].str() +
                "' (#" + llvm::Twine(i) + ") of tuple value not used when "
                "converting to type '" + DestTy->getString() + "'");
       return 0;
