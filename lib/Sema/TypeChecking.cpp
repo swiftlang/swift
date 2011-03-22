@@ -306,210 +306,6 @@ static bool SemaBinaryExpr(Expr *&LHS, ValueDecl *OpFn,
 // Expression Reanalysis - SemaExpressionTree
 //===----------------------------------------------------------------------===//
 
-static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
-                                    TypeChecker &TC);
-
-
-/// ConvertExprToTupleType - Given an expression that has tuple type, convert it
-/// to have some other tuple type.
-///
-/// The caller gives us a list of the expressions named arguments and a count of
-/// tuple elements for E in the IdentList+NumIdents array.  DestTy specifies the
-/// type to convert to, which is known to be a TupleType.
-static Expr *
-ConvertExprToTupleType(Expr *E, unsigned NumExprElements,
-                       TupleType *DestTy, TypeChecker &TC) {
-  
-  // If the tuple expression or destination type have named elements, we
-  // have to match them up to handle the swizzle case for when:
-  //   (.y = 4, .x = 3)
-  // is converted to type:
-  //   (.x = int, .y = int)
-  llvm::SmallVector<Identifier, 8> IdentList(NumExprElements);
-  
-  if (TupleType *ETy = E->Ty->getAs<TupleType>()) {
-    assert(ETy->Fields.size() == NumExprElements && "Expr #elements mismatch!");
-    for (unsigned i = 0, e = ETy->Fields.size(); i != e; ++i)
-      IdentList[i] = ETy->Fields[i].Name;
-  }  
-  
-  // Check to see if this conversion is ok by looping over all the destination
-  // elements and seeing if they are provided by the input.
-  
-  // Keep track of which input elements are used.
-  // TODO: Record where the destination elements came from in the AST.
-  llvm::SmallVector<bool, 16> UsedElements(NumExprElements);
-  llvm::SmallVector<int, 16>  DestElementSources(DestTy->Fields.size(), -1);
-  
-  
-  // First off, see if we can resolve any named values from matching named
-  // inputs.
-  for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
-    const TupleTypeElt &DestElt = DestTy->Fields[i];
-    // If this destination field is named, first check for a matching named
-    // element in the input, from any position.
-    if (DestElt.Name.get() == 0) continue;
-    
-    int InputElement = -1;
-    for (unsigned j = 0; j != NumExprElements; ++j)
-      if (IdentList[j] == DestElt.Name) {
-        InputElement = j;
-        break;
-      }
-    if (InputElement == -1) continue;
-    
-    DestElementSources[i] = InputElement;
-    UsedElements[InputElement] = true;
-  }
-  
-  // Next step, resolve (in order) unmatched named results and unnamed results
-  // to any left-over unnamed input.
-  unsigned NextInputValue = 0;
-  for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
-    // If we already found an input to satisfy this output, we're done.
-    if (DestElementSources[i] != -1) continue;
-    
-    // Scan for an unmatched unnamed input value.
-    while (1) {
-      // If we didn't find any input values, we ran out of inputs to use.
-      if (NextInputValue == NumExprElements)
-        break;
-      
-      // If this input value is unnamed and unused, use it!
-      if (!UsedElements[NextInputValue] && IdentList[NextInputValue].get() == 0)
-        break;
-      
-      ++NextInputValue;
-    }
-
-    // If we ran out of input values, we either don't have enough sources to
-    // fill the dest (as in when assigning (1,2) to (int,int,int), or we ran out
-    // and default values should be used.
-    if (NextInputValue == NumExprElements) {
-      // TODO: QOI: it would be good to indicate which dest element doesn't have
-      // a value in this sort of assignment failure.
-      if (DestTy->Fields[i].Init == 0)
-        return 0;
-
-      // If the default initializer should be used, leave the DestElementSources
-      // field set to -2.
-      DestElementSources[i] = -2;
-      continue;
-    }
-    
-    // Okay, we found an input value to use.
-    DestElementSources[i] = NextInputValue;
-    UsedElements[NextInputValue] = true;
-  }
-  
-  // If there were any unused input values, we fail.
-  // TODO: QOI: this should become a note if it really fails.
-  for (unsigned i = 0, e = UsedElements.size(); i != e; ++i)
-    if (!UsedElements[i])
-      return 0;
-  
-  // It looks like the elements line up, walk through them and see if the types
-  // either agree or can be converted.  If the expression is a TupleExpr, we do
-  // this conversion in place.
-  TupleExpr *TE = dyn_cast<TupleExpr>(E);
-  if (TE && TE->NumSubExprs != 1 && TE->NumSubExprs == DestTy->Fields.size()) {
-    llvm::SmallVector<Expr*, 8> OrigElts(TE->SubExprs,
-                                         TE->SubExprs+TE->NumSubExprs);
-    llvm::SmallVector<Identifier, 8> OrigNames;
-    if (TE->SubExprNames)
-      OrigNames.append(TE->SubExprNames, TE->SubExprNames+TE->NumSubExprs);
-    
-    for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
-      // FIXME: This turns the AST into an ASDAG, which is seriously bad.  We
-      // should add a more tailored AST representation for this.
-      
-      // Extract the input element corresponding to this destination element.
-      unsigned SrcField = DestElementSources[i];
-      assert(SrcField != ~0U && "dest field not found?");
-      
-      // If SrcField is -2, then the destination element should use its default
-      // value.
-      if (SrcField == -2U) {
-        TE->SubExprs[i] = 0;
-        continue;
-      }
-      
-      // Check to see if the src value can be converted to the destination
-      // element type.
-      Expr *Elt = OrigElts[SrcField];
-      Elt = HandleConversionToType(Elt, DestTy->getElementType(i), true, TC);
-      // TODO: QOI: Include a note about this failure!
-      if (Elt == 0) return 0;
-      TE->SubExprs[i] = Elt;
-      
-      if (DestTy->Fields[i].Name.get()) {
-        // Allocate the array on the first element with a name.
-        if (TE->SubExprNames == 0)
-          TE->SubExprNames =
-            TC.Context.Allocate<Identifier>(DestTy->Fields.size());
-        
-        TE->SubExprNames[i] = DestTy->Fields[i].Name;
-      } else if (TE->SubExprNames)
-        TE->SubExprNames[i] = Identifier();
-    }
-    
-    // Okay, we updated the tuple in place.
-    E->Ty = DestTy;
-    return E;
-  }
-  
-  // Otherwise, if it isn't a tuple literal, we unpack the source elementwise so
-  // we can do elementwise conversions as needed, then rebuild a new TupleExpr
-  // of the right destination type.
-  TupleType *ETy = E->Ty->getAs<TupleType>();
-  llvm::SmallVector<Expr*, 16> NewElements(DestTy->Fields.size());
-  
-  Identifier *NewNames = 0;
-  
-  for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
-    // FIXME: This turns the AST into an ASDAG, which is seriously bad.  We
-    // should add a more tailored AST representation for this.
-    
-    // Extract the input element corresponding to this destination element.
-    unsigned SrcField = DestElementSources[i];
-    assert(SrcField != ~0U && "dest field not found?");
-  
-    if (SrcField == -2U) {
-      // Use the default element for the tuple.
-      NewElements[i] = 0;
-    } else {
-      Type *NewEltTy = ETy->getElementType(SrcField);
-      Expr *Src = new (TC.Context)
-        TupleElementExpr(E, llvm::SMLoc(), SrcField, llvm::SMLoc(), NewEltTy);
-      
-      // Check to see if the src value can be converted to the destination
-      // element type.
-      Src = HandleConversionToType(Src, DestTy->getElementType(i), true, TC);
-      // TODO: QOI: Include a note about this failure!
-      if (Src == 0) return 0;
-      NewElements[i] = Src;
-    }
-    
-    if (DestTy->Fields[i].Name.get()) {
-      // Allocate the array on the first element with a name.
-      if (NewNames == 0)
-        NewNames = TC.Context.Allocate<Identifier>(DestTy->Fields.size());
-      
-      NewNames[i] = DestTy->Fields[i].Name;
-    }
-  }
-  
-  // If we got here, the type conversion is successful, create a new TupleExpr.  
-  // FIXME: Do this for dependent types, to resolve: foo($0, 4);
-  // FIXME: Add default values.
-  Expr **NewSE =
-    TC.Context.AllocateCopy<Expr*>(NewElements.begin(), NewElements.end());
-  
-  return new (TC.Context) TupleExpr(llvm::SMLoc(), NewSE, NewNames,
-                                    NewElements.size(), llvm::SMLoc(), 
-                                    false, DestTy);
-}
-
 namespace {
   /// SemaExpressionTree - This class implements top-down (aka "leaf to root",
   /// analyzing 1 and 4 before the + in "1+4") semantic analysis of an
@@ -864,10 +660,89 @@ void SemaExpressionTree::PreProcessBraceExpr(BraceExpr *E) {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// BindAndValidateClosureArgs - When a closure is formed, this walks an AST to
+// update AnonClosureArgExpr to be of the right type.
+//===----------------------------------------------------------------------===//
+
+namespace {
+struct RewriteAnonArgExpr {
+  Type *FuncInputTy;
+  TypeChecker &TC;
+  
+  RewriteAnonArgExpr(Type *funcInputTy, TypeChecker &tc)
+    : FuncInputTy(funcInputTy), TC(tc) {}
+  
+  static Expr *WalkFn(Expr *E, Expr::WalkOrder Order, void *rewriter) {
+    RewriteAnonArgExpr &Rewriter = *static_cast<RewriteAnonArgExpr*>(rewriter);
+    Type *FuncInputTy = Rewriter.FuncInputTy;
+  
+    if (Order == Expr::Walk_PreOrder) {
+      // If this is a ClosureExpr, don't walk into it.  This would find *its*
+      // anonymous closure arguments, not ours.
+      if (isa<ClosureExpr>(E)) return 0; // Don't recurse into it.
+      
+      // Otherwise, do recurse into it.  We handle anon args in the postorder
+      // visitation.
+      return E;
+    }
+  
+    // If we found a closure argument, process it.
+    AnonClosureArgExpr *A = dyn_cast<AnonClosureArgExpr>(E);
+    if (A == 0) return E;  
+    
+    // If the input to the function is a non-tuple, only $0 is valid, if it is a
+    // tuple, then $0..$N are valid depending on the number of inputs to the
+    // tuple.
+    unsigned NumInputArgs = 1;
+    if (TupleType *TT = dyn_cast<TupleType>(FuncInputTy))
+      NumInputArgs = TT->Fields.size();
+    
+    assert(isa<DependentType>(A->Ty) && "Anon arg already has a type?");
+    
+    // Verify that the argument number isn't too large, e.g. using $4 when the
+    // bound function only has 2 inputs.
+    if (A->ArgNo >= NumInputArgs) {
+      Rewriter.TC.error(A->Loc,
+               "use of invalid anonymous argument, with number higher than"
+               " # arguments to bound function");
+      return 0;
+    }
+    
+    // Assign the AnonDecls their actual concrete types now that we know the
+    // context they are being used in.
+    if (TupleType *TT = dyn_cast<TupleType>(FuncInputTy)) {
+      A->Ty = TT->getElementType(A->ArgNo);
+    } else {
+      assert(NumInputArgs == 1 && "Must have unary case");
+      A->Ty = FuncInputTy;
+    }
+    return A;
+  }
+};
+} // end anonymous namespace
+
+/// BindAndValidateClosureArgs - The specified list of anonymous closure
+/// arguments was bound to a closure function with the specified input
+/// arguments.  Validate the argument list and, if valid, allocate and return
+/// a pointer to the argument to be used for the ClosureExpr.
+static bool
+BindAndValidateClosureArgs(Expr *Body, Type *FuncInput, TypeChecker &TC) {  
+  RewriteAnonArgExpr Rewriter(FuncInput, TC);
+  
+  // Walk the body and rewrite any anonymous arguments.  Note that this
+  // isn't a particularly efficient way to handle this, because we walk subtrees
+  // even if they have no anonymous arguments..
+  return Body->WalkExpr(RewriteAnonArgExpr::WalkFn, &Rewriter) == 0;
+}
+
 
 //===----------------------------------------------------------------------===//
 // SemaCoerceBottomUp
 //===----------------------------------------------------------------------===//
+
+static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
+                                    TypeChecker &TC);
 
 namespace {
   /// SemaCoerceBottomUp - This class implements bottom-up semantic analysis
@@ -1008,80 +883,213 @@ Expr *SemaCoerceBottomUp::VisitTupleExpr(TupleExpr *E) {
 }
 
 
+
+/// ConvertExprToTupleType - Given an expression that has tuple type, convert it
+/// to have some other tuple type.
+///
+/// The caller gives us a list of the expressions named arguments and a count of
+/// tuple elements for E in the IdentList+NumIdents array.  DestTy specifies the
+/// type to convert to, which is known to be a TupleType.
+static Expr *
+ConvertExprToTupleType(Expr *E, unsigned NumExprElements,
+                       TupleType *DestTy, TypeChecker &TC) {
+  
+  // If the tuple expression or destination type have named elements, we
+  // have to match them up to handle the swizzle case for when:
+  //   (.y = 4, .x = 3)
+  // is converted to type:
+  //   (.x = int, .y = int)
+  llvm::SmallVector<Identifier, 8> IdentList(NumExprElements);
+  
+  if (TupleType *ETy = E->Ty->getAs<TupleType>()) {
+    assert(ETy->Fields.size() == NumExprElements && "Expr #elements mismatch!");
+    for (unsigned i = 0, e = ETy->Fields.size(); i != e; ++i)
+      IdentList[i] = ETy->Fields[i].Name;
+  }  
+  
+  // Check to see if this conversion is ok by looping over all the destination
+  // elements and seeing if they are provided by the input.
+  
+  // Keep track of which input elements are used.
+  // TODO: Record where the destination elements came from in the AST.
+  llvm::SmallVector<bool, 16> UsedElements(NumExprElements);
+  llvm::SmallVector<int, 16>  DestElementSources(DestTy->Fields.size(), -1);
+  
+  
+  // First off, see if we can resolve any named values from matching named
+  // inputs.
+  for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
+    const TupleTypeElt &DestElt = DestTy->Fields[i];
+    // If this destination field is named, first check for a matching named
+    // element in the input, from any position.
+    if (DestElt.Name.get() == 0) continue;
+    
+    int InputElement = -1;
+    for (unsigned j = 0; j != NumExprElements; ++j)
+      if (IdentList[j] == DestElt.Name) {
+        InputElement = j;
+        break;
+      }
+    if (InputElement == -1) continue;
+    
+    DestElementSources[i] = InputElement;
+    UsedElements[InputElement] = true;
+  }
+  
+  // Next step, resolve (in order) unmatched named results and unnamed results
+  // to any left-over unnamed input.
+  unsigned NextInputValue = 0;
+  for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
+    // If we already found an input to satisfy this output, we're done.
+    if (DestElementSources[i] != -1) continue;
+    
+    // Scan for an unmatched unnamed input value.
+    while (1) {
+      // If we didn't find any input values, we ran out of inputs to use.
+      if (NextInputValue == NumExprElements)
+        break;
+      
+      // If this input value is unnamed and unused, use it!
+      if (!UsedElements[NextInputValue] && IdentList[NextInputValue].get() == 0)
+        break;
+      
+      ++NextInputValue;
+    }
+    
+    // If we ran out of input values, we either don't have enough sources to
+    // fill the dest (as in when assigning (1,2) to (int,int,int), or we ran out
+    // and default values should be used.
+    if (NextInputValue == NumExprElements) {
+      // TODO: QOI: it would be good to indicate which dest element doesn't have
+      // a value in this sort of assignment failure.
+      if (DestTy->Fields[i].Init == 0)
+        return 0;
+      
+      // If the default initializer should be used, leave the DestElementSources
+      // field set to -2.
+      DestElementSources[i] = -2;
+      continue;
+    }
+    
+    // Okay, we found an input value to use.
+    DestElementSources[i] = NextInputValue;
+    UsedElements[NextInputValue] = true;
+  }
+  
+  // If there were any unused input values, we fail.
+  // TODO: QOI: this should become a note if it really fails.
+  for (unsigned i = 0, e = UsedElements.size(); i != e; ++i)
+    if (!UsedElements[i])
+      return 0;
+  
+  // It looks like the elements line up, walk through them and see if the types
+  // either agree or can be converted.  If the expression is a TupleExpr, we do
+  // this conversion in place.
+  TupleExpr *TE = dyn_cast<TupleExpr>(E);
+  if (TE && TE->NumSubExprs != 1 && TE->NumSubExprs == DestTy->Fields.size()) {
+    llvm::SmallVector<Expr*, 8> OrigElts(TE->SubExprs,
+                                         TE->SubExprs+TE->NumSubExprs);
+    llvm::SmallVector<Identifier, 8> OrigNames;
+    if (TE->SubExprNames)
+      OrigNames.append(TE->SubExprNames, TE->SubExprNames+TE->NumSubExprs);
+    
+    for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
+      // FIXME: This turns the AST into an ASDAG, which is seriously bad.  We
+      // should add a more tailored AST representation for this.
+      
+      // Extract the input element corresponding to this destination element.
+      unsigned SrcField = DestElementSources[i];
+      assert(SrcField != ~0U && "dest field not found?");
+      
+      // If SrcField is -2, then the destination element should use its default
+      // value.
+      if (SrcField == -2U) {
+        TE->SubExprs[i] = 0;
+        continue;
+      }
+      
+      // Check to see if the src value can be converted to the destination
+      // element type.
+      Expr *Elt = OrigElts[SrcField];
+      Elt = HandleConversionToType(Elt, DestTy->getElementType(i), true, TC);
+      // TODO: QOI: Include a note about this failure!
+      if (Elt == 0) return 0;
+      TE->SubExprs[i] = Elt;
+      
+      if (DestTy->Fields[i].Name.get()) {
+        // Allocate the array on the first element with a name.
+        if (TE->SubExprNames == 0)
+          TE->SubExprNames =
+          TC.Context.Allocate<Identifier>(DestTy->Fields.size());
+        
+        TE->SubExprNames[i] = DestTy->Fields[i].Name;
+      } else if (TE->SubExprNames)
+        TE->SubExprNames[i] = Identifier();
+    }
+    
+    // Okay, we updated the tuple in place.
+    E->Ty = DestTy;
+    return E;
+  }
+  
+  // Otherwise, if it isn't a tuple literal, we unpack the source elementwise so
+  // we can do elementwise conversions as needed, then rebuild a new TupleExpr
+  // of the right destination type.
+  TupleType *ETy = E->Ty->getAs<TupleType>();
+  llvm::SmallVector<Expr*, 16> NewElements(DestTy->Fields.size());
+  
+  Identifier *NewNames = 0;
+  
+  for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
+    // FIXME: This turns the AST into an ASDAG, which is seriously bad.  We
+    // should add a more tailored AST representation for this.
+    
+    // Extract the input element corresponding to this destination element.
+    unsigned SrcField = DestElementSources[i];
+    assert(SrcField != ~0U && "dest field not found?");
+    
+    if (SrcField == -2U) {
+      // Use the default element for the tuple.
+      NewElements[i] = 0;
+    } else {
+      Type *NewEltTy = ETy->getElementType(SrcField);
+      Expr *Src = new (TC.Context)
+      TupleElementExpr(E, llvm::SMLoc(), SrcField, llvm::SMLoc(), NewEltTy);
+      
+      // Check to see if the src value can be converted to the destination
+      // element type.
+      Src = HandleConversionToType(Src, DestTy->getElementType(i), true, TC);
+      // TODO: QOI: Include a note about this failure!
+      if (Src == 0) return 0;
+      NewElements[i] = Src;
+    }
+    
+    if (DestTy->Fields[i].Name.get()) {
+      // Allocate the array on the first element with a name.
+      if (NewNames == 0)
+        NewNames = TC.Context.Allocate<Identifier>(DestTy->Fields.size());
+      
+      NewNames[i] = DestTy->Fields[i].Name;
+    }
+  }
+  
+  // If we got here, the type conversion is successful, create a new TupleExpr.  
+  // FIXME: Do this for dependent types, to resolve: foo($0, 4);
+  // FIXME: Add default values.
+  Expr **NewSE =
+  TC.Context.AllocateCopy<Expr*>(NewElements.begin(), NewElements.end());
+  
+  return new (TC.Context) TupleExpr(llvm::SMLoc(), NewSE, NewNames,
+                                    NewElements.size(), llvm::SMLoc(), 
+                                    false, DestTy);
+}
+
+
+
 //===----------------------------------------------------------------------===//
 // Type Conversion
 //===----------------------------------------------------------------------===//
 
-namespace {
-struct RewriteAnonArgExpr {
-  Type *FuncInputTy;
-  TypeChecker &TC;
-  
-  RewriteAnonArgExpr(Type *funcInputTy, TypeChecker &tc)
-    : FuncInputTy(funcInputTy), TC(tc) {}
-  
-  static Expr *WalkFn(Expr *E, Expr::WalkOrder Order, void *rewriter) {
-    RewriteAnonArgExpr &Rewriter = *static_cast<RewriteAnonArgExpr*>(rewriter);
-    Type *FuncInputTy = Rewriter.FuncInputTy;
-  
-    if (Order == Expr::Walk_PreOrder) {
-      // If this is a ClosureExpr, don't walk into it.  This would find *its*
-      // anonymous closure arguments, not ours.
-      if (isa<ClosureExpr>(E)) return 0; // Don't recurse into it.
-      
-      // Otherwise, do recurse into it.  We handle anon args in the postorder
-      // visitation.
-      return E;
-    }
-  
-    // If we found a closure argument, process it.
-    AnonClosureArgExpr *A = dyn_cast<AnonClosureArgExpr>(E);
-    if (A == 0) return E;  
-    
-    // If the input to the function is a non-tuple, only $0 is valid, if it is a
-    // tuple, then $0..$N are valid depending on the number of inputs to the
-    // tuple.
-    unsigned NumInputArgs = 1;
-    if (TupleType *TT = dyn_cast<TupleType>(FuncInputTy))
-      NumInputArgs = TT->Fields.size();
-    
-    assert(isa<DependentType>(A->Ty) && "Anon arg already has a type?");
-    
-    // Verify that the argument number isn't too large, e.g. using $4 when the
-    // bound function only has 2 inputs.
-    if (A->ArgNo >= NumInputArgs) {
-      Rewriter.TC.error(A->Loc,
-               "use of invalid anonymous argument, with number higher than"
-               " # arguments to bound function");
-      return 0;
-    }
-    
-    // Assign the AnonDecls their actual concrete types now that we know the
-    // context they are being used in.
-    if (TupleType *TT = dyn_cast<TupleType>(FuncInputTy)) {
-      A->Ty = TT->getElementType(A->ArgNo);
-    } else {
-      assert(NumInputArgs == 1 && "Must have unary case");
-      A->Ty = FuncInputTy;
-    }
-    return A;
-  }
-};
-} // end anonymous namespace
-
-/// BindAndValidateClosureArgs - The specified list of anonymous closure
-/// arguments was bound to a closure function with the specified input
-/// arguments.  Validate the argument list and, if valid, allocate and return
-/// a pointer to the argument to be used for the ClosureExpr.
-static bool
-BindAndValidateClosureArgs(Expr *Body, Type *FuncInput, TypeChecker &TC) {  
-  RewriteAnonArgExpr Rewriter(FuncInput, TC);
-  
-  // Walk the body and rewrite any anonymous arguments.  Note that this
-  // isn't a particularly efficient way to handle this, because we walk subtrees
-  // even if they have no anonymous arguments..
-  return Body->WalkExpr(RewriteAnonArgExpr::WalkFn, &Rewriter) == 0;
-}
 
 /// getTupleFieldForScalarInit - If the specified tuple type can be assigned a
 /// scalar value, return the element number that the scalar provides.  For this
