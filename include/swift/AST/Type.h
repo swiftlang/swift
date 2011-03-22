@@ -70,7 +70,11 @@ public:
   /// hasCanonicalTypeComputed - Return true if we've already computed a
   /// canonical version of this type.
   bool hasCanonicalTypeComputed() const { return CanonicalType != 0; }
-    
+  
+  /// getCanonicalType - Return the canonical version of this type, which has
+  /// sugar from all levels stripped off.
+  Type *getCanonicalType(ASTContext &Ctx);
+  
   /// getDesugaredType - If this type is a sugared type, remove all levels of
   /// sugar until we get down to a non-sugar type.
   Type *getDesugaredType();

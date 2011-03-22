@@ -100,10 +100,6 @@ public:
   // Type manipulation routines.
   //===--------------------------------------------------------------------===//
   
-  /// getCanonicalType - Get the canonicalized version of a type, stripping off
-  /// sugar like argument names and type aliases.
-  Type *getCanonicalType(Type *T);
-  
   // Builtin type and simple types that are used frequently.
   Type * const TheEmptyTupleType;  /// TheEmptyTupleType - This is "()"
   Type * const TheUnresolvedType;  /// TheUnresolvedType - Not name bound.

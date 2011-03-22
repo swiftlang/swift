@@ -77,58 +77,6 @@ Identifier ASTContext::getIdentifier(llvm::StringRef Str) {
 // Type manipulation routines.
 //===----------------------------------------------------------------------===//
 
-/// getCanonicalType - Get the canonicalized version of a type, stripping off
-/// sugar like argument names and type aliases.
-Type *ASTContext::getCanonicalType(Type *T) {
-  // If the type is itself canonical or if the canonical type was already
-  // computed, just return what we have.
-  if (T->CanonicalType)
-    return T->CanonicalType;
-    
-  Type *Result = 0;
-  switch (T->Kind) {
-  case UnresolvedTypeKind:
-    assert(0 && "Cannot call getCanonicalType before name binding is complete");
-  case BuiltinInt32Kind:
-  case DependentTypeKind:
-  case OneOfTypeKind:
-    assert(0 && "These are always canonical");
-  case NameAliasTypeKind:
-    Result = getCanonicalType(llvm::cast<NameAliasType>(T)->getDesugaredType());
-    break;
-  case TupleTypeKind: {
-    llvm::SmallVector<TupleTypeElt, 8> CanElts;
-    TupleType *TT = llvm::cast<TupleType>(T);
-    CanElts.resize(TT->Fields.size());
-    for (unsigned i = 0, e = TT->Fields.size(); i != e; ++i) {
-      CanElts[i].Name = TT->Fields[i].Name;
-      assert(TT->Fields[i].Ty &&
-             "Cannot get canonical type of TypeChecked TupleType!");
-      CanElts[i].Ty = getCanonicalType(TT->Fields[i].Ty);
-    }
-    
-    Result = getTupleType(CanElts);
-    break;
-  }
-    
-  case FunctionTypeKind: {
-    FunctionType *FT = llvm::cast<FunctionType>(T);
-    Type *In = getCanonicalType(FT->Input);
-    Type *Out = getCanonicalType(FT->Result);
-    Result = getFunctionType(In, Out);
-    break;
-  }
-  case ArrayTypeKind:
-    ArrayType *AT = llvm::cast<ArrayType>(T);
-    Type *EltTy = getCanonicalType(AT->Base);
-    Result = getArrayType(EltTy, AT->Size);
-    break;
-  }
-  assert(Result && "Case not implemented!");
-  return Result;
-}
-
-
 void TupleType::Profile(llvm::FoldingSetNodeID &ID,
                         llvm::ArrayRef<TupleTypeElt> Fields) {
   ID.AddInteger(Fields.size());

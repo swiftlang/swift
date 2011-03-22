@@ -1146,9 +1146,9 @@ static Expr *HandleScalarConversionToTupleType(Expr *E, Type *DestTy,
 /// failure.
 static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
                                     TypeChecker &TC) {
-  Type *CanDestTy = TC.Context.getCanonicalType(DestTy);
   // If we have an exact match, we're done.
-  if (TC.Context.getCanonicalType(E->Ty) == CanDestTy)
+  if (E->Ty->getCanonicalType(TC.Context) ==
+         DestTy->getCanonicalType(TC.Context))
     return E;
   
   assert(!isa<DependentType>(DestTy) &&
@@ -1375,7 +1375,7 @@ bool TypeChecker::validateType(Type *&T) {
   // that we never reanalyze it again.
   // If it is ever a performance win to avoid computing canonical types, we can
   // just keep a SmallPtrSet of analyzed Types in TypeChecker.
-  Context.getCanonicalType(T);
+  T->getCanonicalType(Context);
   
   // FIXME: This isn't good enough: top-level stuff can have these as well and
   // their types need to be resolved at the end of name binding.  Perhaps we

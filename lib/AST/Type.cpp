@@ -31,6 +31,59 @@ void *Type::operator new(size_t Bytes, ASTContext &C,
 // Various Type Methods.
 //===----------------------------------------------------------------------===//
 
+/// getCanonicalType - Return the canonical version of this type, which has
+/// sugar from all levels stripped off.
+Type *Type::getCanonicalType(ASTContext &Ctx) {
+  // If the type is itself canonical or if the canonical type was already
+  // computed, just return what we have.
+  if (CanonicalType)
+    return CanonicalType;
+  
+  Type *Result = 0;
+  switch (Kind) {
+  case UnresolvedTypeKind:
+    assert(0 && "Cannot call getCanonicalType before name binding is complete");
+  case BuiltinInt32Kind:
+  case DependentTypeKind:
+  case OneOfTypeKind:
+    assert(0 && "These are always canonical");
+  case NameAliasTypeKind:
+    Result = llvm::cast<NameAliasType>(this)->
+                  getDesugaredType()->getCanonicalType(Ctx);
+    break;
+  case TupleTypeKind: {
+    llvm::SmallVector<TupleTypeElt, 8> CanElts;
+    TupleType *TT = llvm::cast<TupleType>(this);
+    CanElts.resize(TT->Fields.size());
+    for (unsigned i = 0, e = TT->Fields.size(); i != e; ++i) {
+      CanElts[i].Name = TT->Fields[i].Name;
+      assert(TT->Fields[i].Ty &&
+             "Cannot get canonical type of TypeChecked TupleType!");
+      CanElts[i].Ty = TT->Fields[i].Ty->getCanonicalType(Ctx);
+    }
+    
+    Result = Ctx.getTupleType(CanElts);
+    break;
+  }
+    
+  case FunctionTypeKind: {
+    FunctionType *FT = llvm::cast<FunctionType>(this);
+    Type *In = FT->Input->getCanonicalType(Ctx);
+    Type *Out = FT->Result->getCanonicalType(Ctx);
+    Result = Ctx.getFunctionType(In, Out);
+    break;
+  }
+  case ArrayTypeKind:
+    ArrayType *AT = llvm::cast<ArrayType>(this);
+    Type *EltTy = AT->Base->getCanonicalType(Ctx);
+    Result = Ctx.getArrayType(EltTy, AT->Size);
+    break;
+  }
+  assert(Result && "Case not implemented!");
+  return Result;
+}
+
+
 Type *Type::getDesugaredType() {
   switch (Kind) {
   case DependentTypeKind:

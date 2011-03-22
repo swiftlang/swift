@@ -82,7 +82,7 @@ ActOnScopedIdentifierExpr(Identifier ScopeName, llvm::SMLoc ScopeLoc,
   // Note: this is very simplistic support for scoped name lookup, extend when
   // needed.
   TypeAliasDecl *TypeScopeDecl = S.decl.LookupTypeName(ScopeName, ScopeLoc);
-  Type *TypeScope = S.Context.getCanonicalType(TypeScopeDecl->UnderlyingTy);
+  Type *TypeScope = TypeScopeDecl->UnderlyingTy->getCanonicalType(S.Context);
 
   // FIXME: Handle UnresolvedType.
   
