@@ -1434,9 +1434,8 @@ static Expr *DiagnoseUnresolvedTypes(Expr *E, Expr::WalkOrder Order,
     return E;
   
   TypeChecker &TC = *(TypeChecker*)Data;
-  E->dump();  // FIXME: This is a gross hack because our diagnostics suck.
   TC.error(E->getLocStart(),
-           "ambiguous expression could not resolve a concrete type");
+           "ambiguous expression was not resolved to a concrete type");
   return 0;
 }
 
