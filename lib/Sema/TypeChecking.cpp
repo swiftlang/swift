@@ -981,11 +981,20 @@ Expr *SemaCoerceBottomUp::VisitTupleExpr(TupleExpr *E) {
   // different cases.  If the tuple has a single element and the destination
   // type is not a tuple type, then this just recursively forces the scalar
   // type into the single element.
-  if (E->NumSubExprs == 1) {
+  if (E->NumSubExprs == 1 &&
+      // A tuple expr with a single subexpression and no name is just a grouping
+      // paren.
+      (E->SubExprNames == 0 || E->SubExprNames[0].empty())) {
+
     Expr *ERes = HandleConversionToType(E->SubExprs[0], DestTy, true, TC);
     if (ERes == 0) return 0;
     
     E->SubExprs[0] = ERes;
+
+    if (SemaTupleExpr(E->LParenLoc, E->SubExprs, E->SubExprNames,
+                      E->NumSubExprs, E->RParenLoc, E->Ty, TC))
+      return 0;
+
     return E;
   }
   
@@ -1445,27 +1454,18 @@ void TypeChecker::checkBody(Expr *&E, Type *DestTy, ConversionReason Res,
   // separately and independently of the var.  If the user really really wanted
   // something silly like this, then they should have used parens, as in:
   //  var x = (4 foo())
-  if (SequenceExpr *SE = dyn_cast<SequenceExpr>(E))
-#if 0
-    // FIXME: This is busted for something like this:
-    //   var e : ZeroOneTwoThree = :Three(1, 2, 3)      foo();
-    // We'll end up trying to convert foo() to be a ZeroOneTwoThree, which will
-    // fail, and then we get a UnresolvedTypes error.  This may be acceptable,
-    // but it is unfortunate that the ; placement has a semantic effect here.
-    // Disabling this so it continues to show a test failure.
-#endif
-    if (!isa<DependentType>(SE->Elements[0]->Ty) || 1) {
-      E = SE->Elements[0];
-      if (ExcessElements)
-        ExcessElements->append(SE->Elements+1, SE->Elements+SE->NumElements);
-      else {
-        // If this context doesn't want any extra expressions, reject them. This
-        // is not the best error message in the world :).
-        for (unsigned i = 1, e = SE->NumElements; i != e; ++i)
-          error(SE->Elements[i]->getLocStart(),
-                "expected a singular expression: this expression is unbound");
-      }
+  if (SequenceExpr *SE = dyn_cast<SequenceExpr>(E)) {
+    E = SE->Elements[0];
+    if (ExcessElements)
+      ExcessElements->append(SE->Elements+1, SE->Elements+SE->NumElements);
+    else {
+      // If this context doesn't want any extra expressions, reject them. This
+      // is not the best error message in the world :).
+      for (unsigned i = 1, e = SE->NumElements; i != e; ++i)
+        error(SE->Elements[i]->getLocStart(),
+              "expected a singular expression: this expression is unbound");
     }
+  }
   
   if (DestTy)
     E = convertToType(E, DestTy, false, Res);
