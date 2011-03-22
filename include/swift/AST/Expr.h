@@ -184,6 +184,9 @@ public:
 /// types automatically decay if they have a single element, this means that
 /// single element tuple literals, such as "(4)", will exist in the AST, but
 /// have a result type that is the same as the input operand type.
+///
+/// When a tuple element is formed with a default value for the type, the
+/// corresponding SubExpr element will be null.
 class TupleExpr : public Expr {
 public:
   llvm::SMLoc LParenLoc;
@@ -200,10 +203,15 @@ public:
       SubExprNames(subexprnames), NumSubExprs(numsubexprs),
       RParenLoc(rparenloc) {}
 
+  Identifier getElementName(unsigned i) const {
+    assert(i < NumSubExprs && "Invalid element index");
+    return SubExprNames ? SubExprNames[i] : Identifier();
+  }
+  
   /// isGroupingParen - Return true if this is a grouping parenthesis, in which
   /// the input and result types are the same.
   bool isGroupingParen() const {
-    return NumSubExprs == 1 && (SubExprNames == 0 || SubExprNames[0].empty());
+    return NumSubExprs == 1 && getElementName(0).empty();
   }
   
   // Implement isa/cast/dyncast/etc.

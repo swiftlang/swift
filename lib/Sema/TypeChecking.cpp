@@ -977,11 +977,7 @@ Expr *SemaCoerceBottomUp::VisitTupleExpr(TupleExpr *E) {
   // different cases.  If the tuple has a single element and the destination
   // type is not a tuple type, then this just recursively forces the scalar
   // type into the single element.
-  if (E->NumSubExprs == 1 &&
-      // A tuple expr with a single subexpression and no name is just a grouping
-      // paren.
-      (E->SubExprNames == 0 || E->SubExprNames[0].empty())) {
-
+  if (E->isGroupingParen()) {
     Expr *ERes = HandleConversionToType(E->SubExprs[0], DestTy, true, TC);
     if (ERes == 0) return 0;
     
