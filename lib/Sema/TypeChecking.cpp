@@ -72,25 +72,14 @@ namespace {
     
     bool validateVarName(Type *Ty, DeclVarName *Name);
 
-    // Utility Functions
-    enum ConversionReason {
-      CR_BinOpLHS,  // Left side of binary operator.
-      CR_BinOpRHS,  // Right side of binary operator.
-      CR_FuncApply, // Application of function argument.
-      CR_VarInit,   // Var initializer
-      CR_TupleInit, // Tuple element initializer.
-      CR_FuncBody   // Function body specification.
-    };
-
     /// checkBody - Type check an expression that is used in a top-level
     /// context like a var/func body, or tuple default value.  If DestTy is
-    /// specified, the expression is coerced to the requested type.  The
-    /// specified ConversionReason is used to produce a diagnostic on error.
+    /// specified, the expression is coerced to the requested type.
     ///
     /// If the body turns out to be a sequence, this returns the single element
     /// with the excess in the provided SmallVector.  If the SmallVector is not
     /// provided, errors are emitted for the excess expressions.
-    void checkBody(Expr *&E, Type *DestTy, ConversionReason Res,
+    void checkBody(Expr *&E, Type *DestTy,
                    llvm::SmallVectorImpl<Expr*> *ExcessElements);
     
 
@@ -99,11 +88,8 @@ namespace {
     /// the types don't match and diagnoses cases where the conversion cannot be
     /// performed.
     ///
-    /// The Reason specifies why this conversion is happening, for diagnostic
-    /// purposes.
-    ///
     /// This emits a diagnostic and returns null on error.
-    Expr *convertToType(Expr *E, Type *Ty, ConversionReason Reason);
+    Expr *convertToType(Expr *E, Type *Ty);
   };
 }  // end anonymous namespace
 
@@ -237,10 +223,12 @@ static bool SemaApplyExpr(Expr *&E1, Expr *&E2, Type *&ResultTy,
   
   // We have a function application.  Check that the argument type matches the
   // expected type of the function.
-  E2 = TC.convertToType(E2, FT->Input, TypeChecker::CR_FuncApply);
-  if (E2 == 0)
+  E2 = TC.convertToType(E2, FT->Input);
+  if (E2 == 0) {
+    TC.note(E1->getLocStart(),
+            "while converting function argument to expected type");
     return true;
-  
+  }  
   ResultTy = FT->Result;
   return false;
 }
@@ -274,8 +262,11 @@ static bool SemaBinaryExpr(Expr *&LHS, ValueDecl *OpFn,
   
   // If this is an assignment, then we coerce the RHS to the LHS.
   if (OpFn == 0) {
-    RHS = TC.convertToType(RHS, LHS->Ty, TypeChecker::CR_BinOpRHS);
-    if (LHS == 0) return true;
+    RHS = TC.convertToType(RHS, LHS->Ty);
+    if (LHS == 0) {
+      TC.note(OpLoc, "while converting assigned value to destination type");
+      return true; 
+    }
     
     ResultTy = TC.Context.TheEmptyTupleType;
     return false;
@@ -290,13 +281,19 @@ static bool SemaBinaryExpr(Expr *&LHS, ValueDecl *OpFn,
   assert(Input->Fields.size() == 2 && "Sema error validating infix fn type");
   
   // Verify that the LHS/RHS have the right type and do conversions as needed.
-  LHS = TC.convertToType(LHS, Input->getElementType(0),
-                         TypeChecker::CR_BinOpLHS);
-  if (LHS == 0) return true;
+  LHS = TC.convertToType(LHS, Input->getElementType(0));
+  if (LHS == 0) {
+    TC.note(OpLoc,
+            "while converting left side of binary operator to expected type");
+    return true;
+  }
   
-  RHS = TC.convertToType(RHS, Input->getElementType(1),
-                         TypeChecker::CR_BinOpRHS);
-  if (RHS == 0) return true;
+  RHS = TC.convertToType(RHS, Input->getElementType(1));
+  if (RHS == 0) {
+    TC.note(OpLoc,
+            "while converting right side of binary operator to expected type");
+    return true;
+  }
   
   ResultTy = FnTy->Result;
   return false;
@@ -1237,46 +1234,16 @@ Expr *SemaCoerceBottomUp::convertToType(Expr *E, Type *DestTy,
 
 
 
-Expr *TypeChecker::convertToType(Expr *E, Type *DestTy,
-                                 ConversionReason Reason) {
+Expr *TypeChecker::convertToType(Expr *E, Type *DestTy) {
   if (Expr *ERes = SemaCoerceBottomUp::convertToType(E, DestTy, false, *this))
     return ERes;
   
   // FIXME: We only have this because diagnostics are terrible right now.  When
   // we have expression underlining this should be removed.
   E->dump();
-  
-  // TODO: QOI: Source ranges + print the type.
-  switch (Reason) {
-  case CR_BinOpLHS:
-    error(E->getLocStart(), "left hand side of binary operator has type '" +
-          E->Ty->getString() + "', expected '" + DestTy->getString() + "'");
-    break;
-  case CR_BinOpRHS: 
-    error(E->getLocStart(),"right hand side of binary operator has type '" +
-          E->Ty->getString() + "', expected '" + DestTy->getString() + "'");
-    break;
-  case CR_FuncApply:
-    error(E->getLocStart(), "argument to function invocation has type '" +
-          E->Ty->getString() + "', expected '" + DestTy->getString() + "'");
-    break;
-  case CR_VarInit:
-    error(E->getLocStart(),
-          "cannot convert initializer type '" + E->Ty->getString() +
-          "' to explicitly specified type '" + DestTy->getString() + "'");
-    break;
-  case CR_TupleInit:
-    error(E->getLocStart(),
-          "cannot convert default value type '" + E->Ty->getString() +
-          "' to explicitly specified type '" + DestTy->getString() + "'");
-    break;
-  case CR_FuncBody:
-    error(E->getLocStart(),
-          "function body type '" + E->Ty->getString() +
-          "' doesn't match specified prototype '" + DestTy->getString() + "'");
-    break;
-  }
-  
+
+  error(E->getLocStart(), "invalid conversion from type '" +
+        E->Ty->getString() + "' to '" + DestTy->getString() + "'");
   return 0;
 }
 
@@ -1333,23 +1300,20 @@ bool TypeChecker::validateType(Type *&T) {
       Expr *EltInit = TT->Fields[i].Init;
       if (EltInit == 0) continue;
       
-      checkBody(EltInit, EltTy, CR_TupleInit, 0);
+      SMLoc InitLoc = EltInit->getLocStart();
+      checkBody(EltInit, EltTy, 0);
       if (EltInit == 0) {
+        note(InitLoc, "while converting default tuple value to element type");
         IsValid = false;
         break;
       }
         
       // If both a type and an initializer are specified, make sure the
       // initializer's type agrees with the (redundant) type.
-      if (EltTy) {
-        EltInit = convertToType(EltInit, EltTy, CR_TupleInit);
-        if (EltInit == 0) {
-          IsValid = false;
-          break;
-        }
-      } else {
-        EltTy = EltInit->Ty;
-      }
+      assert(EltTy == 0 || 
+             EltTy->getCanonicalType(Context) ==
+             EltInit->Ty->getCanonicalType(Context));
+      EltTy = EltInit->Ty;
 
       TT->updateInitializedElementType(i, EltTy, EltInit);
     }
@@ -1443,12 +1407,11 @@ static Expr *DiagnoseUnresolvedTypes(Expr *E, Expr::WalkOrder Order,
 
 /// checkBody - Type check an expression that is used in a top-level
 /// context like a var/func body, or tuple default value.  If DestTy is
-/// specified, the expression is coerced to the requested type.  The
-/// specified ConversionReason is used to produce a diagnostic on error.
+/// specified, the expression is coerced to the requested type.
 ///
 /// If the body turns out to be a sequence, this returns the single element
 /// with the excess in the provided smallvector.
-void TypeChecker::checkBody(Expr *&E, Type *DestTy, ConversionReason Res,
+void TypeChecker::checkBody(Expr *&E, Type *DestTy,
                             llvm::SmallVectorImpl<Expr*> *ExcessElements) {
   assert(E != 0 && "Can't check a null body!");
   E = SemaExpressionTree::doIt(E, *this);
@@ -1475,7 +1438,7 @@ void TypeChecker::checkBody(Expr *&E, Type *DestTy, ConversionReason Res,
   }
   
   if (DestTy)
-    E = convertToType(E, DestTy, Res);
+    E = convertToType(E, DestTy);
   
   // Check the initializer/body to make sure that we succeeded in resolving
   // all of the types contained within it.  We should not have any
@@ -1550,13 +1513,19 @@ void TypeChecker::typeCheck(VarDecl *VD,
     // was invalid and removed.
     if (isa<DependentType>(VD->Ty)) return;
   } else if (isa<DependentType>(VD->Ty)) {
-    checkBody(VD->Init, 0, CR_VarInit, &ExcessExprs);
-    if (VD->Init)
+    checkBody(VD->Init, 0, &ExcessExprs);
+    if (VD->Init == 0)
+      note(VD->getLocStart(),
+           "while converting 'var' initializer to declared type");
+    else
       VD->Ty = VD->Init->Ty;
   } else {
     // If both a type and an initializer are specified, make sure the
     // initializer's type agrees (or converts) to the redundant type.
-    checkBody(VD->Init, VD->Ty, CR_VarInit, &ExcessExprs);
+    checkBody(VD->Init, VD->Ty, &ExcessExprs);
+    if (VD->Init == 0)
+      note(VD->getLocStart(), 
+           "while converting 'var' initializer to declared type");
   }
   
   validateAttributes(VD->Attrs, VD->Ty);
@@ -1574,8 +1543,11 @@ void TypeChecker::typeCheck(FuncDecl *FD,
 
   // Validate that the body's type matches the function's type if this isn't a
   // external function.
-  if (FD->Init)
-    checkBody(FD->Init, FD->Ty, CR_FuncBody, &ExcessExprs);
+  if (FD->Init) {
+    checkBody(FD->Init, FD->Ty, &ExcessExprs);
+    if (FD->Init == 0)
+      note(FD->getLocStart(), "while converting 'func' body to declared type");
+  }
   
   validateAttributes(FD->Attrs, FD->Ty);
 }
