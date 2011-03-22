@@ -157,8 +157,13 @@ SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr *const *SubExprs,
     NewSubExprsNames =
       S.Context.AllocateCopy<Identifier>(SubExprNames,SubExprNames+NumSubExprs);
 
+  bool IsGrouping = false;
+  if (NumSubExprs == 1 &&
+      (SubExprNames == 0 || SubExprNames[0].empty()))
+    IsGrouping = true;
+  
   return new (S.Context) TupleExpr(LPLoc, NewSubExprs, NewSubExprsNames,
-                                   NumSubExprs, RPLoc);
+                                   NumSubExprs, RPLoc, IsGrouping);
 }
 
 

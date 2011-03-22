@@ -493,7 +493,8 @@ ConvertExprToTupleType(Expr *E, llvm::ArrayRef<Identifier> IdentList,
     TC.Context.AllocateCopy<Expr*>(NewElements.begin(), NewElements.end());
   
   return new (TC.Context) TupleExpr(llvm::SMLoc(), NewSE, NewNames,
-                                    NewElements.size(), llvm::SMLoc(), DestTy);
+                                    NewElements.size(), llvm::SMLoc(), 
+                                    false, DestTy);
 }
 
 namespace {
@@ -1136,7 +1137,7 @@ static Expr *HandleScalarConversionToTupleType(Expr *E, Type *DestTy,
   }
   
   return new (TC.Context) TupleExpr(E->getLocStart(), NewSE, NewName,
-                                    NumFields, SMLoc(), DestTy);
+                                    NumFields, SMLoc(), false, DestTy);
 }
 
 /// HandleConversionToType - This is the recursive implementation of

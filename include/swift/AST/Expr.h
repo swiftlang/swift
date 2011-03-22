@@ -197,11 +197,21 @@ public:
   unsigned NumSubExprs;
   llvm::SMLoc RParenLoc;
   
+  /// IsGrouping - True if this is a syntactic grouping expression where the
+  /// source and result types are the same.  This is only true for
+  /// single-element tuples with no element name.
+  bool IsGrouping;
+  
   TupleExpr(llvm::SMLoc lparenloc, Expr **subexprs, Identifier *subexprnames,
-            unsigned numsubexprs, llvm::SMLoc rparenloc, Type *Ty = 0)
+            unsigned numsubexprs, llvm::SMLoc rparenloc, bool isGrouping,
+            Type *Ty = 0)
     : Expr(TupleExprKind, Ty), LParenLoc(lparenloc), SubExprs(subexprs),
       SubExprNames(subexprnames), NumSubExprs(numsubexprs),
-      RParenLoc(rparenloc) {}
+      RParenLoc(rparenloc), IsGrouping(isGrouping) {
+    assert((!isGrouping ||
+            (NumSubExprs == 1 && getElementName(0).empty() && SubExprs[0])) &&
+           "Invalid grouping paren");
+  }
 
   Identifier getElementName(unsigned i) const {
     assert(i < NumSubExprs && "Invalid element index");
@@ -211,7 +221,7 @@ public:
   /// isGroupingParen - Return true if this is a grouping parenthesis, in which
   /// the input and result types are the same.
   bool isGroupingParen() const {
-    return NumSubExprs == 1 && getElementName(0).empty();
+    return IsGrouping;
   }
   
   // Implement isa/cast/dyncast/etc.
