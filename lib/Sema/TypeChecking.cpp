@@ -735,7 +735,8 @@ static void ReduceJuxtaposedExprs(SequenceExpr *E, unsigned Elt,
   // Which can be parsed either as:
   //     A + (B C) * D         <-- Juxtaposition here
   //     (A + B) (C * D)       <-- Juxtaposition at a higher level.
-  // This is disambiguated based on whether B has function type or not.
+  // This is disambiguated based on whether B has function type or not.  If so,
+  // it binds tightly to C.
 
   // If EltExpr a directly named function, it should bind very tightly to its
   // single argument:   f a + b    -->  (f a) + b
