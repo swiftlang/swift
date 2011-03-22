@@ -772,11 +772,24 @@ namespace {
     Expr *VisitUnresolvedMemberExpr(UnresolvedMemberExpr *UME) {
       // The only valid type for an UME is a OneOfType.
       OneOfType *DT = DestTy->getAs<OneOfType>();
-      if (DT == 0) return 0;
+      if (DT == 0) {
+        TC.error(UME->getLocStart(),
+                 "dependent reference to member '" + UME->Name.str() +
+                 "' cannot convert to '" + DestTy->getString() + "'");
+        return 0;
+      }
       
       // The oneof type must have an element of the specified name.
       OneOfElementDecl *DED = DT->getElement(UME->Name);
-      if (DED == 0) return 0;
+      if (DED == 0) {
+        TC.error(UME->getLocStart(),
+                 "type '" + DestTy->getString() + "' has no member named '" +
+                 UME->Name.str() + "'");
+#if 0
+        // FIXME: Note where the oneof is declared.
+#endif
+        return 0;
+      }
       
       // If it does, then everything is good, resolve the reference.
       return new (TC.Context) DeclRefExpr(DED, UME->ColonLoc, DED->Ty);
@@ -810,8 +823,12 @@ namespace {
           if (OneOfType *DT = DestTy->getAs<OneOfType>()) {
             // The oneof type must have an element of the specified name.
             OneOfElementDecl *DED = DT->getElement(UME->Name);
-            if (DED == 0 || !isa<FunctionType>(DED->Ty)) return 0;
-          
+            if (DED == 0 || !isa<FunctionType>(DED->Ty)) {
+              TC.error(UME->getLocStart(), "invalid type '" +
+                       DestTy->getString() + "' to initialize member");
+              return 0;
+            }
+              
             Expr *Fn = new (TC.Context) DeclRefExpr(DED, UME->ColonLoc,DED->Ty);
             
             if (SemaApplyExpr(Fn, E->Elements[1], E->Ty, TC))
@@ -878,11 +895,9 @@ Expr *SemaCoerceBottomUp::VisitTupleExpr(TupleExpr *E) {
   // type is not a tuple type, then this just recursively forces the scalar
   // type into the single element.
   if (E->isGroupingParen()) {
-    Expr *ERes = convertToType(E->SubExprs[0], DestTy, true, TC);
-    if (ERes == 0) return 0;
+    E->SubExprs[0] = convertToType(E->SubExprs[0], DestTy, true, TC);
+    if (E->SubExprs[0] == 0) return 0;
     
-    E->SubExprs[0] = ERes;
-
     if (SemaTupleExpr(E, TC))
       return 0;
 
@@ -891,8 +906,6 @@ Expr *SemaCoerceBottomUp::VisitTupleExpr(TupleExpr *E) {
   
   return convertToType(E, DestTy, true, TC);
 }
-
-
 
 /// convertTupleToTupleType - Given an expression that has tuple type, convert
 /// it to have some other tuple type.
@@ -970,15 +983,26 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     // fill the dest (as in when assigning (1,2) to (int,int,int), or we ran out
     // and default values should be used.
     if (NextInputValue == NumExprElements) {
-      // TODO: QOI: it would be good to indicate which dest element doesn't have
-      // a value in this sort of assignment failure.
-      if (DestTy->Fields[i].Init == 0)
-        return 0;
+      if (DestTy->Fields[i].Init != 0) {
+        // If the default initializer should be used, leave the
+        // DestElementSources field set to -2.
+        DestElementSources[i] = -2;
+        continue;
+      }        
       
-      // If the default initializer should be used, leave the DestElementSources
-      // field set to -2.
-      DestElementSources[i] = -2;
-      continue;
+#if 0
+      // Get element loc if this is a TupleExpr.
+#endif
+
+      if (DestTy->Fields[i].Name.empty())
+        TC.error(E->getLocStart(), "no value to initialize tuple element #" +
+                 llvm::Twine(i) + " in expression of type '" +
+                 E->Ty->getString() + "'");
+      else
+        TC.error(E->getLocStart(), "no value to initialize tuple element '" +
+                 DestTy->Fields[i].Name.str() + "' (#" + llvm::Twine(i) +
+                 ") in expression of type '" + E->Ty->getString() + "'");
+      return 0;
     }
     
     // Okay, we found an input value to use.
@@ -987,10 +1011,21 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   }
   
   // If there were any unused input values, we fail.
-  // TODO: QOI: this should become a note if it really fails.
   for (unsigned i = 0, e = UsedElements.size(); i != e; ++i)
-    if (!UsedElements[i])
+    if (!UsedElements[i]) {
+#if 0
+      // Get element loc if this is a TupleExpr.
+#endif
+    if (IdentList[i].empty())
+      TC.error(E->getLocStart(), "element #" + llvm::Twine(i) +
+               " of tuple value not used when converting to type '" +
+               DestTy->getString() + "'");
+    else
+      TC.error(E->getLocStart(), "tuple element '" + IdentList[i].str() +
+               "' (#" + llvm::Twine(i) + ") of tuple value not used when "
+               "converting to type '" + DestTy->getString() + "'");
       return 0;
+    }
   
   // It looks like the elements line up, walk through them and see if the types
   // either agree or can be converted.  If the expression is a TupleExpr, we do
@@ -1128,7 +1163,7 @@ Expr *SemaCoerceBottomUp::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   // default value, see if the expression's type is convertable to the
   // element type.  This handles assigning 4 to "(a = 4, b : int)".
   int ScalarField = getTupleFieldForScalarInit(DestTy);
-  if (ScalarField == -1) return 0;
+  assert(ScalarField != -1);
   
   Type *ScalarType = DestTy->getElementType(ScalarField);
   Expr *ERes = convertToType(E, ScalarType, false, TC);
@@ -1233,22 +1268,15 @@ Expr *SemaCoerceBottomUp::convertToType(Expr *E, Type *DestTy,
     return SemaCoerceBottomUp(TC, DestTy).doIt(E);
   
   // Could not do the conversion.
+  TC.error(E->getLocStart(), "invalid conversion from type '" +
+           E->Ty->getString() + "' to '" + DestTy->getString() + "'");
   return 0;
 }
 
 
 
 Expr *TypeChecker::convertToType(Expr *E, Type *DestTy) {
-  if (Expr *ERes = SemaCoerceBottomUp::convertToType(E, DestTy, false, *this))
-    return ERes;
-  
-  // FIXME: We only have this because diagnostics are terrible right now.  When
-  // we have expression underlining this should be removed.
-  E->dump();
-
-  error(E->getLocStart(), "invalid conversion from type '" +
-        E->Ty->getString() + "' to '" + DestTy->getString() + "'");
-  return 0;
+  return SemaCoerceBottomUp::convertToType(E, DestTy, false, *this);
 }
 
 //===----------------------------------------------------------------------===//
