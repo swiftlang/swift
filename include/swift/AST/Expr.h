@@ -200,6 +200,12 @@ public:
       SubExprNames(subexprnames), NumSubExprs(numsubexprs),
       RParenLoc(rparenloc) {}
 
+  /// isGroupingParen - Return true if this is a grouping parenthesis, in which
+  /// the input and result types are the same.
+  bool isGroupingParen() const {
+    return NumSubExprs == 1 && (SubExprNames == 0 || SubExprNames[0].empty());
+  }
+  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TupleExpr *) { return true; }
   static bool classof(const Expr *E) { return E->Kind == TupleExprKind; }

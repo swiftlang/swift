@@ -185,51 +185,48 @@ static bool SemaDotIdentifier(Expr *E, SMLoc DotLoc,
 }
 
 
-static bool SemaTupleExpr(SMLoc LPLoc, Expr **SubExprs,
-                          Identifier *SubExprNames,
-                          unsigned NumSubExprs, SMLoc RPLoc,
-                          Type *&ResultTy, TypeChecker &TC) {
+static bool SemaTupleExpr(TupleExpr *TE, TypeChecker &TC) {
   // A tuple expr with a single subexpression and no name is just a grouping
   // paren.
-  if (NumSubExprs == 1 && (SubExprNames == 0 || SubExprNames[0].get() == 0)) {
-    ResultTy = SubExprs[0]->Ty;
+  if (TE->isGroupingParen()) {
+    TE->Ty = TE->SubExprs[0]->Ty;
     return false;
   }
   
   // Compute the result type.
-  llvm::SmallVector<TupleTypeElt, 8> ResultTyElts(NumSubExprs);
+  llvm::SmallVector<TupleTypeElt, 8> ResultTyElts(TE->NumSubExprs);
   
-  for (unsigned i = 0, e = NumSubExprs; i != e; ++i) {
+  for (unsigned i = 0, e = TE->NumSubExprs; i != e; ++i) {
     // If the element value is missing, it has the value of the default
     // expression of the result type, which must be known.
-    if (SubExprs[i] == 0) {
-      assert(ResultTy && isa<TupleType>(ResultTy) && 
+    if (TE->SubExprs[i] == 0) {
+      assert(TE->Ty && isa<TupleType>(TE->Ty) && 
              "Can't have default value without a result type");
       
-      ResultTyElts[i].Ty = cast<TupleType>(ResultTy)->getElementType(i);
+      ResultTyElts[i].Ty = cast<TupleType>(TE->Ty)->getElementType(i);
       
       // FIXME: What about a default value that is dependent?
       if (isa<DependentType>(ResultTyElts[i].Ty)) {
-        ResultTy = ResultTyElts[i].Ty;
+        TE->Ty = ResultTyElts[i].Ty;
         return false;
       }
     } else {
       // If any of the tuple element types is dependent, the whole tuple should
       // have dependent type.
-      if (isa<DependentType>(SubExprs[i]->Ty)) {
-        ResultTy = SubExprs[i]->Ty;
+      if (isa<DependentType>(TE->SubExprs[i]->Ty)) {
+        TE->Ty = TE->SubExprs[i]->Ty;
         return false;
       }
     
-      ResultTyElts[i].Ty = SubExprs[i]->Ty;
+      ResultTyElts[i].Ty = TE->SubExprs[i]->Ty;
     }
 
     // If a name was specified for this element, use it.
-    if (SubExprNames)
-      ResultTyElts[i].Name = SubExprNames[i];
+    if (TE->SubExprNames)
+      ResultTyElts[i].Name = TE->SubExprNames[i];
   }
   
-  ResultTy = TC.Context.getTupleType(ResultTyElts);
+  TE->Ty = TC.Context.getTupleType(ResultTyElts);
   return false;
 }
 
@@ -533,8 +530,7 @@ namespace {
     }
     
     Expr *VisitTupleExpr(TupleExpr *E) {
-      if (SemaTupleExpr(E->LParenLoc, E->SubExprs, E->SubExprNames,
-                        E->NumSubExprs, E->RParenLoc, E->Ty, TC))
+      if (SemaTupleExpr(E, TC))
         return 0;
       return E;
     }
@@ -991,8 +987,7 @@ Expr *SemaCoerceBottomUp::VisitTupleExpr(TupleExpr *E) {
     
     E->SubExprs[0] = ERes;
 
-    if (SemaTupleExpr(E->LParenLoc, E->SubExprs, E->SubExprNames,
-                      E->NumSubExprs, E->RParenLoc, E->Ty, TC))
+    if (SemaTupleExpr(E, TC))
       return 0;
 
     return E;
