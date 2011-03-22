@@ -1155,10 +1155,6 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
          "Result of conversion can't be dependent");
   
   if (TupleType *TT = DestTy->getAs<TupleType>()) {
-    // If this is a scalar to tuple conversion, form the tuple and return it.
-    if (Expr *Res = HandleScalarConversionToTupleType(E, DestTy, TC))
-      return Res;
-    
     // If the input is a tuple and the output is a tuple, see if we can convert
     // each element.
     if (TupleType *ETy = E->Ty->getAs<TupleType>()) {
@@ -1170,9 +1166,14 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
         return Res;
     }
     
+    // If this is a scalar to tuple conversion, form the tuple and return it.
+    if (Expr *Res = HandleScalarConversionToTupleType(E, DestTy, TC))
+      return Res;
+    
     // If the element of the tuple has dependent type and is a TupleExpr, try to
     // convert it.
-    if (E->Ty->getAs<DependentType>() && isa<TupleExpr>(E)) {
+    if (E->Ty->getAs<DependentType>() &&
+        (isa<TupleExpr>(E) && !cast<TupleExpr>(E)->isGroupingParen())) {
       // If the tuple expression or destination type have named elements, we
       // have to match them up to handle the swizzle case for when:
       //   (.y = 4, .x = 3)

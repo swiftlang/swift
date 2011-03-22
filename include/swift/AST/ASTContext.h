@@ -103,7 +103,11 @@ public:
   // Builtin type and simple types that are used frequently.
   Type * const TheEmptyTupleType;  /// TheEmptyTupleType - This is "()"
   Type * const TheUnresolvedType;  /// TheUnresolvedType - Not name bound.
-  Type * const TheDependentType;   /// TheDependentType - Dependent on context.
+  
+  /// TheDependentType - Dependent on context.  This is given to an anonymous
+  /// closure argument (e.g. $4) and to UnresolvedMemberExprs (e.g. :foo) during
+  /// type checking until they are resolved to something with concrete type.
+  Type * const TheDependentType;
   Type * const TheInt32Type;       /// TheInt32Type - 32-bit signed integer.
 
   /// getTupleType - Return the uniqued tuple type with the specified elements.
