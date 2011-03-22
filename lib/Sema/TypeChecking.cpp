@@ -317,15 +317,28 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
 /// tuple elements for E in the IdentList+NumIdents array.  DestTy specifies the
 /// type to convert to, which is known to be a TupleType.
 static Expr *
-ConvertExprToTupleType(Expr *E, llvm::ArrayRef<Identifier> IdentList,
+ConvertExprToTupleType(Expr *E, unsigned NumExprElements,
                        TupleType *DestTy, TypeChecker &TC) {
+  
+  // If the tuple expression or destination type have named elements, we
+  // have to match them up to handle the swizzle case for when:
+  //   (.y = 4, .x = 3)
+  // is converted to type:
+  //   (.x = int, .y = int)
+  llvm::SmallVector<Identifier, 8> IdentList(NumExprElements);
+  
+  if (TupleType *ETy = E->Ty->getAs<TupleType>()) {
+    assert(ETy->Fields.size() == NumExprElements && "Expr #elements mismatch!");
+    for (unsigned i = 0, e = ETy->Fields.size(); i != e; ++i)
+      IdentList[i] = ETy->Fields[i].Name;
+  }  
   
   // Check to see if this conversion is ok by looping over all the destination
   // elements and seeing if they are provided by the input.
   
   // Keep track of which input elements are used.
   // TODO: Record where the destination elements came from in the AST.
-  llvm::SmallVector<bool, 16> UsedElements(IdentList.size());
+  llvm::SmallVector<bool, 16> UsedElements(NumExprElements);
   llvm::SmallVector<int, 16>  DestElementSources(DestTy->Fields.size(), -1);
   
   
@@ -338,7 +351,7 @@ ConvertExprToTupleType(Expr *E, llvm::ArrayRef<Identifier> IdentList,
     if (DestElt.Name.get() == 0) continue;
     
     int InputElement = -1;
-    for (unsigned j = 0, e2 = IdentList.size(); j != e2; ++j)
+    for (unsigned j = 0; j != NumExprElements; ++j)
       if (IdentList[j] == DestElt.Name) {
         InputElement = j;
         break;
@@ -359,7 +372,7 @@ ConvertExprToTupleType(Expr *E, llvm::ArrayRef<Identifier> IdentList,
     // Scan for an unmatched unnamed input value.
     while (1) {
       // If we didn't find any input values, we ran out of inputs to use.
-      if (NextInputValue == IdentList.size())
+      if (NextInputValue == NumExprElements)
         break;
       
       // If this input value is unnamed and unused, use it!
@@ -372,7 +385,7 @@ ConvertExprToTupleType(Expr *E, llvm::ArrayRef<Identifier> IdentList,
     // If we ran out of input values, we either don't have enough sources to
     // fill the dest (as in when assigning (1,2) to (int,int,int), or we ran out
     // and default values should be used.
-    if (NextInputValue == IdentList.size()) {
+    if (NextInputValue == NumExprElements) {
       // TODO: QOI: it would be good to indicate which dest element doesn't have
       // a value in this sort of assignment failure.
       if (DestTy->Fields[i].Init == 0)
@@ -1153,35 +1166,28 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
   
   assert(!isa<DependentType>(DestTy) &&
          "Result of conversion can't be dependent");
+
+  // If the expression is a grouping parenthesis and it has a dependent type,
+  // just force the type through it.
+  if (isa<DependentType>(E->Ty))
+    if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
+      if (TE->isGroupingParen())
+        return SemaCoerceBottomUp(TC, DestTy).doIt(E);
   
   if (TupleType *TT = DestTy->getAs<TupleType>()) {
-    // If the input is a tuple and the output is a tuple, see if we can convert
-    // each element.
-    if (TupleType *ETy = E->Ty->getAs<TupleType>()) {
-      llvm::SmallVector<Identifier, 8> ExprIdentMapping;
-      for (unsigned i = 0, e = ETy->Fields.size(); i != e; ++i)
-        ExprIdentMapping.push_back(ETy->Fields[i].Name);
-      
-      if (Expr *Res = ConvertExprToTupleType(E, ExprIdentMapping, TT, TC))
-        return Res;
-    }
-    
-    // If this is a scalar to tuple conversion, form the tuple and return it.
-    if (Expr *Res = HandleScalarConversionToTupleType(E, DestTy, TC))
-      return Res;
-    
     // If the element of the tuple has dependent type and is a TupleExpr, try to
     // convert it.
-    if (E->Ty->getAs<DependentType>() &&
-        (isa<TupleExpr>(E) && !cast<TupleExpr>(E)->isGroupingParen())) {
-      // If the tuple expression or destination type have named elements, we
-      // have to match them up to handle the swizzle case for when:
-      //   (.y = 4, .x = 3)
-      // is converted to type:
-      //   (.x = int, .y = int)
-      llvm::SmallVector<Identifier, 8> Idents(cast<TupleExpr>(E)->NumSubExprs);
-      return ConvertExprToTupleType(E, Idents, TT, TC);
-    }
+    if ((isa<TupleExpr>(E) && !cast<TupleExpr>(E)->isGroupingParen()))
+      return ConvertExprToTupleType(E, cast<TupleExpr>(E)->NumSubExprs, TT, TC);
+
+    // If the is a scalar to tuple conversion, form the tuple and return it.
+    if (getTupleFieldForScalarInit(TT) != -1)
+      return HandleScalarConversionToTupleType(E, DestTy, TC);
+    
+    // If the input is a tuple and the output is a tuple, see if we can convert
+    // each element.
+    if (TupleType *ETy = E->Ty->getAs<TupleType>())
+      return ConvertExprToTupleType(E, ETy->Fields.size(), TT, TC);
   }
   
   // Otherwise, check to see if this is an auto-closure case.  This case happens
