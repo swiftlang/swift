@@ -566,6 +566,10 @@ static void ReduceJuxtaposedExprs(SequenceExpr *E, unsigned Elt,
     // Drop the function.  FIXME: This is terrible recovery.
     memmove(E->Elements+Elt, E->Elements+Elt+1,
             (E->NumElements-Elt-1)*sizeof(E->Elements[0]));
+    // Replace the argument with a dead empty tuple.
+    E->Elements[Elt] =
+      new (TC.Context) TupleExpr(SMLoc(), 0, 0, 0, SMLoc(),
+                                 false, TC.Context.TheEmptyTupleType);
   }
   --E->NumElements;
   
