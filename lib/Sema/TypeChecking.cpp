@@ -1478,8 +1478,8 @@ void TypeChecker::checkBody(Expr *&E, Type *DestTy,
   // Check the initializer/body to make sure that we succeeded in resolving
   // all of the types contained within it.  We should not have any
   // DependentType's left for subexpressions.
-  if (E && E->WalkExpr(DiagnoseUnresolvedTypes, this) == 0)
-    E = 0;
+  if (E)
+    E = E->WalkExpr(DiagnoseUnresolvedTypes, this);
 }
 
 void TypeChecker::typeCheck(TypeAliasDecl *TAD) {
@@ -1540,7 +1540,10 @@ bool TypeChecker::validateVarName(Type *Ty, DeclVarName *Name) {
 
 void TypeChecker::typeCheck(VarDecl *VD,
                             llvm::SmallVectorImpl<Expr*> &ExcessExprs) {
-  if (validateType(VD->Ty)) return;
+  if (validateType(VD->Ty)) {
+    VD->Init = 0;
+    return; 
+  }
 
   // Check Init.  
   if (VD->Init == 0) {
@@ -1574,7 +1577,10 @@ void TypeChecker::typeCheck(VarDecl *VD,
 
 void TypeChecker::typeCheck(FuncDecl *FD,
                             llvm::SmallVectorImpl<Expr*> &ExcessExprs) {
-  if (validateType(FD->Ty)) return;
+  if (validateType(FD->Ty)) {
+    FD->Init = 0;
+    return;
+  }
 
   // Validate that the body's type matches the function's type if this isn't a
   // external function.
