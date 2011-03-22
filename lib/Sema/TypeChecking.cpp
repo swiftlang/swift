@@ -1113,21 +1113,19 @@ static int getTupleFieldForScalarInit(TupleType *TT) {
 /// (which is known to be a tuple) has a single element that requires an
 /// initializer and if the specified expression can convert to that type.  If
 /// so, convert the scalar to the tuple type.
-static Expr *HandleScalarConversionToTupleType(Expr *E, Type *DestTy,
+static Expr *HandleScalarConversionToTupleType(Expr *E, TupleType *DestTy,
                                                TypeChecker &TC) {
-  TupleType *TT = DestTy->getAs<TupleType>();
-  
   // If the destination is a tuple type with at most one element that has no
   // default value, see if the expression's type is convertable to the
   // element type.  This handles assigning 4 to "(a = 4, b : int)".
-  int ScalarField = getTupleFieldForScalarInit(TT);
+  int ScalarField = getTupleFieldForScalarInit(DestTy);
   if (ScalarField == -1) return 0;
   
-  Type *ScalarType = TT->getElementType(ScalarField);
+  Type *ScalarType = DestTy->getElementType(ScalarField);
   Expr *ERes = HandleConversionToType(E, ScalarType, false, TC);
   if (ERes == 0) return 0;
   
-  unsigned NumFields = TT->Fields.size();
+  unsigned NumFields = DestTy->Fields.size();
   
   // Must allocate space for the AST node.
   Expr **NewSE = TC.Context.Allocate<Expr*>(NumFields);
@@ -1139,7 +1137,7 @@ static Expr *HandleScalarConversionToTupleType(Expr *E, Type *DestTy,
     else
       NewSE[i] = 0;
     
-    NeedsNames |= TT->Fields[i].Name != Identifier();
+    NeedsNames |= DestTy->Fields[i].Name != Identifier();
   }
   
   // Handle the name if the element is named.
@@ -1147,7 +1145,7 @@ static Expr *HandleScalarConversionToTupleType(Expr *E, Type *DestTy,
   if (NeedsNames) {
     NewName = TC.Context.Allocate<Identifier>(NumFields);
     for (unsigned i = 0, e = NumFields; i != e; ++i)
-      NewName[i] = TT->Fields[i].Name;
+      NewName[i] = DestTy->Fields[i].Name;
   }
   
   return new (TC.Context) TupleExpr(E->getLocStart(), NewSE, NewName,
@@ -1182,7 +1180,7 @@ static Expr *HandleConversionToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
 
     // If the is a scalar to tuple conversion, form the tuple and return it.
     if (getTupleFieldForScalarInit(TT) != -1)
-      return HandleScalarConversionToTupleType(E, DestTy, TC);
+      return HandleScalarConversionToTupleType(E, TT, TC);
     
     // If the input is a tuple and the output is a tuple, see if we can convert
     // each element.
