@@ -92,7 +92,8 @@ public:
   TypeAliasDecl *ActOnTypeAlias(llvm::SMLoc TypeAliasLoc, Identifier Name,
                                 Type *Ty);
   
-  Decl *ActOnImportDecl(llvm::SMLoc ImportLoc, Identifier ModuleName,
+  Decl *ActOnImportDecl(llvm::SMLoc ImportLoc,
+                        llvm::ArrayRef<std::pair<Identifier,llvm::SMLoc> > Path,
                         DeclAttributes &Attrs);
   
   VarDecl *ActOnVarDecl(llvm::SMLoc VarLoc, DeclVarName &Name, Type *Ty,

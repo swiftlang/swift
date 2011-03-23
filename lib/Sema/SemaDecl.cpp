@@ -195,11 +195,14 @@ ActOnElementName(Identifier Name, llvm::SMLoc NameLoc, VarDecl *D,
 // Declaration handling.
 //===----------------------------------------------------------------------===//
 
-Decl *SemaDecl::ActOnImportDecl(llvm::SMLoc ImportLoc, Identifier ModuleName,
+Decl *SemaDecl::ActOnImportDecl(llvm::SMLoc ImportLoc,
+                        llvm::ArrayRef<std::pair<Identifier,llvm::SMLoc> > Path,
                                 DeclAttributes &Attrs) {
   if (!Attrs.empty())
     error(Attrs.LSquareLoc, "invalid attributes specified for import");
-  return new (S.Context) ImportDecl(ImportLoc, ModuleName);
+  
+  Path = S.Context.AllocateCopy(Path);
+  return new (S.Context) ImportDecl(ImportLoc, Path);
 }
 
 

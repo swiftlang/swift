@@ -278,7 +278,7 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-import ::= 'import' attribute-list? identifier
+    decl-import ::= 'import' attribute-list? identifier ('.' identifier)*
   </pre>  
   
   <p>'import' declarations allow named values and types to be accessed with
@@ -290,9 +290,11 @@
   swift file do not affect name lookup in another file. import directives can
   only occur at the top level of a file.</p>
   
-  <p>Currently you can only import another module in its entirety.
-  FIXME: Allow "import swift.foo" to import one thing, and "import
-  swift.foo.bar" when we have namespaces.</p>
+  <p>If a single identifier is specified for the import declaration, then the
+  entire module is imported in its entirety into the current scope.  If a
+  scope (such as a namespace) is named, then all entities in the namespace are
+  imported.  If a specific type or variable is named (e.g. "import swift.int")
+  then only the one type and/or value is imported.</p>
   
   <pre class="example">
     <i>// Import all of the top level symbols and types in a package.</i>
@@ -1259,8 +1261,9 @@
      the library.</p>
     
   <p>All of this code is published by the 'swift' module, which is
-     implicitly imported into each translation unit, unless a command line flag
-     is passed to change or disable this behavior.</p>
+     implicitly imported into each translation unit, unless some sort of pragma
+     in the code (attribute on an import?) is used to change or disable this
+     behavior.</p>
   
   <!-- ===================================================================== -->
   <h3 id="stdlib-simple-types">Simple Types</h3>

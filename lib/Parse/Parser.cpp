@@ -254,7 +254,7 @@ void Parser::parseAttributeList(DeclAttributes &Attributes) {
 /// no token skipping) on error.
 ///
 ///   decl-import:
-///      'import' attribute-list? identifier
+///      'import' attribute-list? identifier ('.' identifier)*
 ///
 Decl *Parser::parseDeclImport() {
   SMLoc ImportLoc = Tok.getLoc();
@@ -264,11 +264,20 @@ Decl *Parser::parseDeclImport() {
   if (Tok.is(tok::l_square))
     parseAttributeList(Attributes);
   
-  Identifier ModuleName;
-  if (parseIdentifier(ModuleName, "expected module name in import declaration"))
+  llvm::SmallVector<std::pair<Identifier, SMLoc>, 8> ImportPath(1);
+  ImportPath.back().second = Tok.getLoc();
+  if (parseIdentifier(ImportPath.back().first,
+                      "expected module name in import declaration"))
     return 0;
   
-  return S.decl.ActOnImportDecl(ImportLoc, ModuleName, Attributes);
+  while (consumeIf(tok::period)) {
+    ImportPath.push_back(std::make_pair(Identifier(), Tok.getLoc()));
+    if (parseIdentifier(ImportPath.back().first,
+                        "expected name in import declaration"))
+      return 0;
+  }
+  
+  return S.decl.ActOnImportDecl(ImportLoc, ImportPath, Attributes);
 }
 
 

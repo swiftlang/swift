@@ -61,7 +61,13 @@ namespace {
 /// lookupType - Resolve a reference to a type name that found this module
 /// with the specified import declaration.
 TypeAliasDecl *ReferencedModule::lookupType(ImportDecl *ID, Identifier Name) {
- 
+  assert(ID->AccessPath.size() <= 2 && "Don't handle this yet");
+  
+  // If this import is specific to some named type or decl ("import swift.int")
+  // then filter out any lookups that don't match.
+  if (ID->AccessPath.size() == 2 && ID->AccessPath[1].first != Name)
+    return 0;
+  
   if (TopLevelTypes.empty()) {
     for (unsigned i = 0, e = TUD->Body->NumElements; i != e; ++i)
       if (Decl *D = TUD->Body->Elements[i].dyn_cast<Decl*>())
@@ -80,6 +86,12 @@ TypeAliasDecl *ReferencedModule::lookupType(ImportDecl *ID, Identifier Name) {
 ValueDecl *ReferencedModule::lookupValue(ImportDecl *ID, Identifier Name) {
   // TODO: ImportDecls cannot specified namespaces or individual entities
   // yet, so everything is just a lookup at the top-level.
+  assert(ID->AccessPath.size() <= 2 && "Don't handle this yet");
+
+  // If this import is specific to some named type or decl ("import swift.int")
+  // then filter out any lookups that don't match.
+  if (ID->AccessPath.size() == 2 && ID->AccessPath[1].first != Name)
+    return 0;
     
   // If we haven't built a map of the top-level values, do so now.
   if (TopLevelValues.empty()) {
@@ -133,27 +145,28 @@ namespace {
     /// getReferencedModule - Load a module referenced by an import statement,
     /// emitting an error at the specified location and returning null on
     /// failure.
-    ReferencedModule *getReferencedModule(llvm::SMLoc Loc, Identifier ModuleID);
+    ReferencedModule *getReferencedModule(std::pair<Identifier,SMLoc> ModuleID);
   };
 }
 
 ReferencedModule *NameBinder::
-getReferencedModule(SMLoc Loc, Identifier ModuleID) {
+getReferencedModule(std::pair<Identifier, SMLoc> ModuleID) {
   // TODO: We currently just recursively parse referenced modules.  This works
   // fine for now since they are each a single file.  Ultimately we'll want a
   // compiled form of AST's like clang's that support lazy deserialization.
-  std::string InputFilename = ModuleID.get()+std::string(".swift");
+  std::string InputFilename = ModuleID.first.get()+std::string(".swift");
   
   // Open the input file.
   llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
   if (llvm::error_code Err =
         llvm::MemoryBuffer::getFile(InputFilename, InputFile)) {
-    error(Loc, "opening import file '" + InputFilename + "': " + Err.message());
+    error(ModuleID.second,
+          "opening import file '" + InputFilename + "': " + Err.message());
     return 0;
   }
 
   unsigned BufferID =
-    Context.SourceMgr.AddNewSourceBuffer(InputFile.take(), Loc);
+    Context.SourceMgr.AddNewSourceBuffer(InputFile.take(), ModuleID.second);
 
   // Parse the translation unit, but don't do name binding or type checking.
   // This can produce new errors etc if the input is erroneous.
@@ -161,8 +174,9 @@ getReferencedModule(SMLoc Loc, Identifier ModuleID) {
   if (TUD == 0)
     return 0;
   
-  // Do we have to do name binding on it to ensure that types are fully
-  // resolved?
+  // We have to do name binding on it to ensure that types are fully resolved.
+  // This should eventually be eliminated by having actual fully resolved binary
+  // dumps of the code instead of reparsing though.
   //performNameBinding(TUD, Context);
   
   ReferencedModule *RM = new ReferencedModule(TUD);
@@ -172,8 +186,16 @@ getReferencedModule(SMLoc Loc, Identifier ModuleID) {
 
 
 void NameBinder::addImport(ImportDecl *ID) {
-  if (ReferencedModule *RM = getReferencedModule(ID->ImportLoc, ID->Name))
-    Imports.push_back(std::make_pair(ID, RM));
+  ReferencedModule *RM = getReferencedModule(ID->AccessPath[0]);
+  if (RM == 0) return;
+  
+  // FIXME: Validate the access path against the module.  Reject things like
+  // import swift.aslkdfja
+  if (ID->AccessPath.size() > 2)
+    return error(ID->AccessPath[2].second,
+                 "invalid declaration referenced in import");
+  
+  Imports.push_back(std::make_pair(ID, RM));
 }
 
 /// lookupTypeName - Lookup the specified type name in imports.  We know that it

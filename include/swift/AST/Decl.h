@@ -160,13 +160,15 @@ public:
 
 /// ImportDecl - This represents a single import declaration, e.g.:
 ///   import swift
+///   import swift.int
 class ImportDecl : public Decl {
 public:
   llvm::SMLoc ImportLoc;
-  Identifier Name;
+  llvm::ArrayRef<std::pair<Identifier,llvm::SMLoc> > AccessPath;
   
-  ImportDecl(llvm::SMLoc importLoc, Identifier name)
-    : Decl(ImportDeclKind), ImportLoc(importLoc), Name(name) {
+  ImportDecl(llvm::SMLoc importLoc,
+             llvm::ArrayRef<std::pair<Identifier,llvm::SMLoc> > path)
+    : Decl(ImportDeclKind), ImportLoc(importLoc), AccessPath(path) {
   }
   
   llvm::SMLoc getLocStart() const { return ImportLoc; }

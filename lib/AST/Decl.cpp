@@ -126,7 +126,10 @@ void TranslationUnitDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
 }
 
 void ImportDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(import_decl '" << Name << "')";
+  OS.indent(Indent) << "(import_decl '" << AccessPath[0].first;
+  for (unsigned i = 1, e = AccessPath.size(); i != e; ++i)
+    OS << "." << AccessPath[i].first;
+  OS << "')";
 }
 
 static void PrintDeclName(const NamedDecl *D, llvm::raw_ostream &OS) {
