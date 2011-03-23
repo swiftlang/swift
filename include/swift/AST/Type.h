@@ -253,6 +253,12 @@ public:
   
   OneOfElementDecl *getElement(Identifier Name) const;
   
+  /// hasSingleElement - Return true if this is a single element oneof that has
+  /// an argument type.  These are typically (but not necessarily) made with
+  /// 'struct'.  Since it is unambiguous which slice is being referenced,
+  /// various syntactic forms are allowed for these, like direct "foo.x" syntax.
+  bool hasSingleElement() const;
+  
   void print(llvm::raw_ostream &O) const;
   
   // Implement isa/cast/dyncast/etc.

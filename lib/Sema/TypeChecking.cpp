@@ -133,10 +133,9 @@ static bool SemaDotIdentifier(Expr *E, SMLoc DotLoc,
   // If this is a member access to a oneof with a single element constructor,
   // allow direct access to the type underlying the single element.  This
   // allows element access on structs, for example.
-  if (OneOfType *DT = ETy->getAs<OneOfType>()) {
-    if (DT->Elements.size() == 1 && DT->Elements[0]->ArgumentType)
+  if (OneOfType *DT = ETy->getAs<OneOfType>())
+    if (DT->hasSingleElement())
       ETy = DT->Elements[0]->ArgumentType;
-  }
   
   if (TupleType *TT = ETy->getAs<TupleType>()) {
     // If the field name exists, we win.

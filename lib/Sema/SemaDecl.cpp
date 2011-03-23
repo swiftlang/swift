@@ -330,7 +330,8 @@ Decl *SemaDecl::ActOnStructDecl(llvm::SMLoc StructLoc, DeclAttributes &Attrs,
   ElementInfo.NameLoc = StructLoc;
   ElementInfo.EltType = BodyTy;
   OneOfType *OneOfTy = S.type.ActOnOneOfType(StructLoc, Attrs, ElementInfo,TAD);
-
+  assert(OneOfTy->hasSingleElement() && "Somehow isn't a struct?");
+  
   // In addition to defining the oneof declaration, structs also inject their
   // constructor into the global scope.
   assert(OneOfTy->Elements.size() == 1 && "Struct has exactly one element");
