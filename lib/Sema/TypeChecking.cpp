@@ -1516,6 +1516,12 @@ bool TypeChecker::validateVarName(Type *Ty, DeclVarName *Name) {
   // If we're peering into an unresolved type, we can't analyze it yet.
   if (Ty->getAs<DependentType>() != 0) return false;
 
+  // If we have a single-element oneof (like a struct) then we allow matching
+  // the struct elements with the tuple syntax.
+  if (OneOfType *OOT = Ty->getAs<OneOfType>())
+    if (OOT->hasSingleElement())
+      Ty = OOT->getElement(0)->ArgumentType;
+  
   // If we have a complex case, Ty must be a tuple and the name specifier must
   // have the correct number of elements.
   TupleType *AccessedTuple = Ty->getAs<TupleType>();

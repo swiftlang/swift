@@ -350,7 +350,9 @@
      returned value to be directly named and accessed in later code.  The
      structure of the name is required to match up with the type being matched.
      An single identifier is always valid to capture the entire value
-     (potentially as an aggregate).</p>
+     (potentially as an aggregate).  Parenthesized values match up against tuple
+     types and against single element oneof types.
+  </p>
   
   <p>Here are some examples of var declarations:</p>
   
@@ -368,6 +370,10 @@
     <i>// This decodes the tuple return value into indendently named parts</i>
     <i>// and both 'val' and 'err' are in scope after this line.</i>
     var (val, err) = foo();
+    
+    <i>// This binds elements of a struct into local variables.</i>
+    struct point (x : int, y : int)
+    var (a, b) = foo()  <i>// when foo returns a 'point'.</i>
   </pre>
 
     

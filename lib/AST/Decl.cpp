@@ -81,6 +81,12 @@ Type *ElementRefDecl::getTypeForPath(Type *Ty, llvm::ArrayRef<unsigned> Path) {
   if (llvm::isa<DependentType>(Ty))
     return Ty;
   
+  // If we have a single-element oneof (like a struct) then we allow matching
+  // the struct elements with the tuple syntax.
+  if (OneOfType *OOT = Ty->getAs<OneOfType>())
+    if (OOT->hasSingleElement())
+      Ty = OOT->getElement(0)->ArgumentType;
+  
   // Right now, you can only dive into tuples.  Eventually this should handle
   // oneof's etc.
   if (TupleType *TT = llvm::dyn_cast<TupleType>(Ty)) {
