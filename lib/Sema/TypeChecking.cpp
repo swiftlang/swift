@@ -1215,16 +1215,21 @@ Expr *SemaCoerceBottomUp::convertToType(Expr *E, Type *DestTy,
          "Result of conversion can't be dependent");
 
   // If the expression is a grouping parenthesis and it has a dependent type,
-  // just force the type through it.
-  if (isa<DependentType>(E->Ty))
-    if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
-      if (TE->isGroupingParen())
-        return SemaCoerceBottomUp(TC, DestTy).doIt(E);
+  // just force the type through it, regardless of what DestTy is.
+  if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
+    if (TE->isGroupingParen())
+      return SemaCoerceBottomUp(TC, DestTy).doIt(E);
   
   if (TupleType *TT = DestTy->getAs<TupleType>()) {
+    // Type conversions are carefully ranked so that they "do the right thing",
+    // because they can be highly ambiguous.  For example, consider something
+    // like foo(4, 5) when foo is declared to take ((int,int=3), int=6).  This
+    // could be parsed as either ((4,5), 6) or ((4,3),5), but the later one is
+    // the "right" answer.
+    
     // If the element of the tuple has dependent type and is a TupleExpr, try to
     // convert it.
-    if ((isa<TupleExpr>(E) && !cast<TupleExpr>(E)->isGroupingParen()))
+    if (isa<TupleExpr>(E))
       return convertTupleToTupleType(E, cast<TupleExpr>(E)->NumSubExprs, TT,TC);
 
     // If the is a scalar to tuple conversion, form the tuple and return it.

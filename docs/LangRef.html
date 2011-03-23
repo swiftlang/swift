@@ -1232,6 +1232,13 @@
   </p>
   
   <h3 id="typecheck_conversions">Standard Conversions</h3>
+  
+  <!--
+   Consider foo(4, 5) when foo is declared to take ((int,int=3), int=6).  This
+   could be parsed as either ((4,5), 6) or ((4,3),5), but the later one is
+   the "right" answer.
+  -->
+  
   <h3 id="typecheck_anon">Anonymous Argument Resolution</h3>
   <h3 id="typecheck_context">Context Sensitive Type Resolution</h3>
 
