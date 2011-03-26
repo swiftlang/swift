@@ -162,7 +162,7 @@ static bool SemaDotIdentifier(Expr *E, SMLoc DotLoc,
     }
     
     // Otherwise, we just have an unknown field name.
-    TC.error(NameLoc, "unknown field in tuple");
+    TC.error(NameLoc, "unknown field in type '" + E->Ty->getString() + "'");
     return true;
   }
   
