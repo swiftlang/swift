@@ -82,33 +82,10 @@ ActOnScopedIdentifierExpr(Identifier ScopeName, llvm::SMLoc ScopeLoc,
   // Note: this is very simplistic support for scoped name lookup, extend when
   // needed.
   TypeAliasDecl *TypeScopeDecl = S.decl.LookupTypeName(ScopeName, ScopeLoc);
-  Type *TypeScope = TypeScopeDecl->UnderlyingTy->getCanonicalType(S.Context);
-
-  // FIXME: Handle UnresolvedType.
   
-  // Look through type aliases etc.
-  OneOfType *DT = dyn_cast<OneOfType>(TypeScope);
-  
-  // Reject things like int::x.
-  if (DT == 0) {
-    error(ScopeLoc, "invalid type '" + ScopeName.str() + "' for scoped access");
-    return 0;
-  }
-  
-  if (DT->Elements.empty()) {
-    error(ScopeLoc, "oneof '" + ScopeName.str() +
-          "' is not complete or has no elements");
-    return 0;
-  }
-  
-  OneOfElementDecl *Elt = DT->getElement(Name);
-  if (Elt == 0) {
-    error(ScopeLoc, "'" + Name.str() + "' is not a member of '" +
-          ScopeName.str() + "'");
-    return 0;
-  }
-
-  return new (S.Context) DeclRefExpr(Elt, ScopeLoc);
+  return new (S.Context) UnresolvedScopedIdentifierExpr(TypeScopeDecl, ScopeLoc,
+                                                        ColonColonLoc, NameLoc,
+                                                        Name);
 }
 
 llvm::NullablePtr<Expr>

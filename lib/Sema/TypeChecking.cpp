@@ -353,6 +353,37 @@ namespace {
       return new (TC.Context) 
         TupleElementExpr(E->SubExpr, E->DotLoc, FieldNo, E->NameLoc, E->Ty);
     }
+    
+    Expr *VisitUnresolvedScopedIdentifierExpr
+    (UnresolvedScopedIdentifierExpr *E) {
+      Type *TypeScope = E->TypeDecl->UnderlyingTy->getCanonicalType(TC.Context);
+      
+      // Look through type aliases etc.
+      OneOfType *DT = dyn_cast<OneOfType>(TypeScope);
+      
+      // Reject things like int::x.
+      if (DT == 0) {
+        TC.error(E->TypeDeclLoc, "invalid type '" + E->TypeDecl->Name.str() +
+                 "' for scoped access");
+        return 0;
+      }
+      
+      if (DT->Elements.empty()) {
+        TC.error(E->TypeDeclLoc, "oneof '" + E->TypeDecl->Name.str() +
+                 "' is not complete or has no elements");
+        return 0;
+      }
+      
+      OneOfElementDecl *Elt = DT->getElement(E->Name);
+      if (Elt == 0) {
+        TC.error(E->NameLoc, "'" + E->Name.str() + "' is not a member of '" +
+                 E->TypeDecl->Name.str() + "'");
+        return 0;
+      }
+      
+      return Visit(new (TC.Context) DeclRefExpr(Elt, E->TypeDeclLoc));
+    }
+    
     Expr *VisitTupleElementExpr(TupleElementExpr *E) {
       // TupleElementExpr is fully resolved.
       assert(!isa<DependentType>(E->Ty));
@@ -799,6 +830,11 @@ namespace {
     }
     Expr *VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
       return E;
+    }
+    
+    Expr *VisitUnresolvedScopedIdentifierExpr
+    (UnresolvedScopedIdentifierExpr *E) {
+      assert(0 && "This node should be resolved already!");
     }
     
     Expr *VisitTupleElementExpr(TupleElementExpr *E) {

@@ -37,6 +37,7 @@ public:
     DISPATCH(DeclRefExpr);
     DISPATCH(UnresolvedDeclRefExpr);
     DISPATCH(UnresolvedMemberExpr);
+    DISPATCH(UnresolvedScopedIdentifierExpr);
     DISPATCH(TupleExpr);
     DISPATCH(UnresolvedDotExpr);
     DISPATCH(TupleElementExpr);

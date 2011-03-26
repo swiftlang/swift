@@ -33,12 +33,14 @@ namespace swift {
   class Type;
   class ValueDecl;
   class Decl;
+  class TypeAliasDecl;
   
 enum ExprKind {
   IntegerLiteralKind,
   DeclRefExprKind,
   UnresolvedDeclRefExprKind,
   UnresolvedMemberExprKind,
+  UnresolvedScopedIdentifierExprKind,
   TupleExprKind,
   UnresolvedDotExprKind,
   TupleElementExprKind,
@@ -177,6 +179,29 @@ public:
   static bool classof(const UnresolvedMemberExpr *) { return true; }
   static bool classof(const Expr *E) {
     return E->Kind == UnresolvedMemberExprKind;
+  }
+};
+  
+/// UnresolvedScopedIdentifierExpr - This represents "foo::bar", an unresolved
+/// reference to a type foo and a member bar within it.
+class UnresolvedScopedIdentifierExpr : public Expr {
+public:
+  TypeAliasDecl *TypeDecl;
+  llvm::SMLoc TypeDeclLoc, ColonColonLoc, NameLoc;
+  Identifier Name;
+  
+  UnresolvedScopedIdentifierExpr(TypeAliasDecl *typeDecl,
+                                 llvm::SMLoc typeDeclLoc, llvm::SMLoc colonLoc,
+                                 llvm::SMLoc nameLoc, Identifier name)
+  : Expr(UnresolvedScopedIdentifierExprKind), TypeDecl(typeDecl),
+    TypeDeclLoc(typeDeclLoc), ColonColonLoc(colonLoc), NameLoc(nameLoc),
+    Name(name) {
+  }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const UnresolvedScopedIdentifierExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->Kind == UnresolvedScopedIdentifierExprKind;
   }
 };
   

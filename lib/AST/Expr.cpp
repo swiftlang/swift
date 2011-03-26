@@ -45,6 +45,8 @@ llvm::SMLoc Expr::getLocStart() const {
   case UnresolvedDeclRefExprKind: return cast<UnresolvedDeclRefExpr>(this)->Loc;
   case UnresolvedMemberExprKind:
     return cast<UnresolvedMemberExpr>(this)->ColonLoc;
+  case UnresolvedScopedIdentifierExprKind:
+    return cast<UnresolvedScopedIdentifierExpr>(this)->TypeDeclLoc;
   case TupleExprKind:      return cast<TupleExpr>(this)->LParenLoc;
   case UnresolvedDotExprKind:
     return cast<UnresolvedDotExpr>(this)->SubExpr->getLocStart();
@@ -104,6 +106,9 @@ namespace {
     Expr *VisitDeclRefExpr(DeclRefExpr *E) { return E; }
     Expr *VisitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) { return E; }
     Expr *VisitUnresolvedMemberExpr(UnresolvedMemberExpr *E) { return E; }
+    Expr *VisitUnresolvedScopedIdentifierExpr(UnresolvedScopedIdentifierExpr*E){
+      return E;
+    }
     
     Expr *VisitTupleExpr(TupleExpr *E) {
       for (unsigned i = 0, e = E->NumSubExprs; i != e; ++i)
@@ -269,6 +274,11 @@ public:
   void VisitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     OS.indent(Indent) << "(unresolved_member_expr type='";
     E->Ty->print(OS);
+    OS << "\' name='" << E->Name << "')";
+  }
+  void VisitUnresolvedScopedIdentifierExpr(UnresolvedScopedIdentifierExpr *E) {
+    OS.indent(Indent) << "(unresolved_scoped_identifier_expr type='"
+      << E->TypeDecl->Name;
     OS << "\' name='" << E->Name << "')";
   }
   void VisitTupleExpr(TupleExpr *E) {
