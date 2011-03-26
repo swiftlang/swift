@@ -139,6 +139,7 @@ private:
   bool parseExprSingle(llvm::NullablePtr<Expr> &Result, const char *Message =0);
   bool parseExprPrimary(llvm::NullablePtr<Expr> &Result, const char *Message=0);
   bool parseExprIdentifier(llvm::NullablePtr<Expr> &Result);
+  bool parseExprDollarIdentifier(llvm::NullablePtr<Expr> &Result);
   bool parseExprParen(llvm::NullablePtr<Expr> &Result);
   bool parseExprBrace(llvm::NullablePtr<Expr> &Result);
 };

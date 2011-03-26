@@ -809,6 +809,8 @@ bool Parser::parseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
     break;
 
   case tok::dollarident: // $1
+    if (parseExprDollarIdentifier(Result)) return true;
+    break;
   case tok::identifier:  // foo   and  foo::bar
     if (parseExprIdentifier(Result)) return true;
     break;
@@ -881,30 +883,32 @@ bool Parser::parseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
   return false;
 }
 
+///   expr-identifier:
+///     dollarident
+bool Parser::parseExprDollarIdentifier(llvm::NullablePtr<Expr> &Result) {
+  llvm::StringRef Name = Tok.getText();
+  SMLoc Loc = Tok.getLoc();
+  consumeToken(tok::dollarident);
+  assert(Name[0] == '$' && "Not a dollarident");
+  bool AllNumeric = true;
+  for (unsigned i = 1, e = Name.size(); i != e; ++i)
+    AllNumeric &= isdigit(Name[i]);
+  
+  if (Name.size() == 1 || !AllNumeric) {
+    error(Loc, "invalid identifier, expected expression");
+    return true;
+  }
+  Result = S.expr.ActOnDollarIdentExpr(Name, Loc);
+  return false;
+}
+
+
 /// parseExprIdentifier - Parse an identifier expression:
 ///
 ///   expr-identifier:
 ///     identifier
-///     dollarident
 ///     identifier '::' identifier
 bool Parser::parseExprIdentifier(llvm::NullablePtr<Expr> &Result) {
-  if (Tok.is(tok::dollarident)) {
-    llvm::StringRef Name = Tok.getText();
-    SMLoc Loc = Tok.getLoc();
-    consumeToken(tok::dollarident);
-    assert(Name[0] == '$' && "Not a dollarident");
-    bool AllNumeric = true;
-    for (unsigned i = 1, e = Name.size(); i != e; ++i)
-      AllNumeric &= isdigit(Name[i]);
-    
-    if (Name.size() == 1 || !AllNumeric) {
-      error(Loc, "invalid identifier, expected expression");
-      return true;
-    }
-    Result = S.expr.ActOnDollarIdentExpr(Name, Loc);
-    return false;
-  }
-
   assert(Tok.is(tok::identifier));
   SMLoc Loc = Tok.getLoc();
   Identifier Name;
