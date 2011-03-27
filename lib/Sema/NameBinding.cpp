@@ -127,7 +127,7 @@ namespace {
     
     void addImport(ImportDecl *ID);
 
-    Expr *bindValueName(Identifier I, SMLoc Loc);
+    ValueDecl *bindValueName(Identifier I, SMLoc Loc);
     
     TypeAliasDecl *lookupTypeName(Identifier I);
     
@@ -212,23 +212,19 @@ TypeAliasDecl *NameBinder::lookupTypeName(Identifier Name) {
 
 
 /// bindValueName - This is invoked for each UnresolvedDeclRefExpr in the AST.
-Expr *NameBinder::bindValueName(Identifier Name, SMLoc Loc) {
+ValueDecl *NameBinder::bindValueName(Identifier Name, SMLoc Loc) {
   // Resolve forward references defined within the module.
   llvm::DenseMap<Identifier, ValueDecl *>::iterator I =
     TopLevelValues.find(Name);
-    // If we found a resolved decl, replace the unresolved ref with a resolved
-    // DeclRefExpr.
+  // If we found a match, return the decl.
   if (I != TopLevelValues.end())
-    return new (Context) DeclRefExpr(I->second, Loc);
+    return I->second;
 
   // If we still haven't found it, scrape through all of the imports, taking the
   // first match of the name.
   for (unsigned i = 0, e = Imports.size(); i != e; ++i)
-    if (ValueDecl *D = Imports[i].second->lookupValue(Imports[i].first, Name)) {
-      // If we found a match, replace the unresolved ref with a resolved
-      // DeclRefExpr.
-      return new (Context) DeclRefExpr(D, Loc);
-    }
+    if (ValueDecl *D = Imports[i].second->lookupValue(Imports[i].first, Name))
+      return D;  // If we found a match, return the decl.
 
   error(Loc, "use of unresolved identifier '" + Name.str() + "'");
   return 0;
@@ -246,7 +242,10 @@ static Expr *BindNames(Expr *E, Expr::WalkOrder Order, void *binder) {
   UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E);
   if (UDRE == 0) return E;
   
-  return Binder.bindValueName(UDRE->Name, UDRE->Loc);  
+  ValueDecl *D = Binder.bindValueName(UDRE->Name, UDRE->Loc);
+  if (D == 0) return 0;
+  
+  return new (Binder.Context) DeclRefExpr(D, UDRE->Loc);
 }
 
 /// performNameBinding - Once parsing is complete, this walks the AST to
