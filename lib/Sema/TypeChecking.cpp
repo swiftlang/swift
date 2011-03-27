@@ -128,6 +128,7 @@ static bool SemaDotIdentifier(Expr *E, SMLoc DotLoc,
     return false;
   }
   
+  // First, check to see if this is a reference to a field in the type.
   Type *ETy = E->Ty;
 
   // If this is a member access to a oneof with a single element constructor,
@@ -160,13 +161,14 @@ static bool SemaDotIdentifier(Expr *E, SMLoc DotLoc,
         return false;
       }
     }
-    
-    // Otherwise, we just have an unknown field name.
-    TC.error(NameLoc, "unknown field in type '" + E->Ty->getString() + "'");
-    return true;
   }
   
-  TC.error(DotLoc, "base type of field access has no fields");
+  // Next, check to see if "a.f" is actually being used as sugar for "f a",
+  // which is a function application of 'a' to 'f'.
+  ETy = E->Ty;
+  
+  TC.error(DotLoc, "base type '" + E->Ty->getString() + 
+           "' has valid '.' expression for this field");
   return true;
 }
 
@@ -347,7 +349,7 @@ namespace {
                             FieldNo, TC))
         return 0;
       
-      assert(FieldNo != -1 && "Resolved type shouldnt return a dependent expr");
+      assert(FieldNo != -1 &&"Resolved type shouldn't return a dependent expr");
       
       // TODO: Eventually . can be useful for things other than tuples.
       return new (TC.Context) 
@@ -1138,7 +1140,7 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     } else {
       Type *NewEltTy = ETy->getElementType(SrcField);
       Expr *Src = new (TC.Context)
-      TupleElementExpr(E, llvm::SMLoc(), SrcField, llvm::SMLoc(), NewEltTy);
+        TupleElementExpr(E, llvm::SMLoc(), SrcField, llvm::SMLoc(), NewEltTy);
       
       // Check to see if the src value can be converted to the destination
       // element type.
