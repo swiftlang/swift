@@ -60,7 +60,8 @@ public:
   llvm::NullablePtr<Expr>
   ActOnTupleExpr(llvm::SMLoc LPLoc, Expr *const *SubExprs,
                  const Identifier *SubExprNames,
-                 unsigned NumSubExprs, llvm::SMLoc RPLoc);
+                 unsigned NumSubExprs, llvm::SMLoc RPLoc,
+                 bool IsPrecededByIdentifier);
   BraceExpr *ActOnBraceExpr(llvm::SMLoc LBLoc,
                             llvm::ArrayRef<ExprOrDecl> Elements,
                             bool HasMissingSemi, llvm::SMLoc RBLoc);

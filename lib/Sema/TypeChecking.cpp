@@ -493,6 +493,32 @@ static void ReduceBinaryExprs(SequenceExpr *E, unsigned Elt,
   // reduce it down to a single value first.
   ReduceJuxtaposedExprs(E, Elt, TC);
   
+  // If the expression is a top level tuple expression like "(x, y)" and it was
+  // immediately preceded by an identifier, like "f(x,y)" then diagnose this as
+  // an error.  The tuple is pointless and it is likely that the user expected
+  // the function to bind to the arguments.  Examples could be: f.a().b when
+  // a is declared as taking a single argument.
+  if (TupleExpr *TE = dyn_cast<TupleExpr>(E->Elements[Elt]))
+    if (TE->IsPrecededByIdentifier) {
+      bool AllResolved = true;
+      // If the expressions before this one aren't resolved yet, don't emit this
+      // error.
+      for (unsigned i = 0; i != Elt; ++i)
+        if (E->Elements[i]->Ty->getAs<DependentType>() != 0)
+          AllResolved = false;
+      if (AllResolved) {
+        TC.error(TE->getLocStart(),
+               "tuple expression isn't bound to identifier, add ' ' before it");
+        // Drop this expression.
+        memmove(E->Elements+Elt, E->Elements+Elt+1, 
+                (E->NumElements-Elt-1)*sizeof(E->Elements[0]));
+        --E->NumElements;
+        if (Elt != E->NumElements)
+          ReduceBinaryExprs(E, Elt, TC, MinPrec);
+        return;
+      }
+    }
+  
   while (1) {
     ValueDecl *ThisOp = getBinOp(E, Elt+1);
     
@@ -601,7 +627,7 @@ static void ReduceJuxtaposedExprs(SequenceExpr *E, unsigned Elt,
     // Replace the argument with a dead empty tuple.
     E->Elements[Elt] =
       new (TC.Context) TupleExpr(SMLoc(), 0, 0, 0, SMLoc(),
-                                 false, TC.Context.TheEmptyTupleType);
+                                 false, false, TC.Context.TheEmptyTupleType);
   }
   --E->NumElements;
   
@@ -615,7 +641,7 @@ Expr *SemaExpressionTree::VisitSequenceExpr(SequenceExpr *E) {
   // just changed from a sequence of operations into a binary expression,
   // function application or something else.  Check this now.  This is
   // actually effectively just parsing logic.
-  for (unsigned i = 0; i != E->NumElements; ++i) {
+  for (unsigned i = 0; i < E->NumElements; ++i) {
     // If Elts[i] is the start of a binary expression sequence, reduce it down
     // to a single element.
     ReduceBinaryExprs(E, i, TC);
@@ -1163,11 +1189,11 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   // FIXME: Do this for dependent types, to resolve: foo($0, 4);
   // FIXME: Add default values.
   Expr **NewSE =
-  TC.Context.AllocateCopy<Expr*>(NewElements.begin(), NewElements.end());
+    TC.Context.AllocateCopy<Expr*>(NewElements.begin(), NewElements.end());
   
   return new (TC.Context) TupleExpr(llvm::SMLoc(), NewSE, NewNames,
                                     NewElements.size(), llvm::SMLoc(), 
-                                    false, DestTy);
+                                    false, false, DestTy);
 }
 
 /// getTupleFieldForScalarInit - If the specified tuple type can be assigned a
@@ -1234,7 +1260,7 @@ Expr *SemaCoerceBottomUp::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   }
   
   return new (TC.Context) TupleExpr(E->getLocStart(), NewSE, NewName,
-                                    NumFields, SMLoc(), false, DestTy);
+                                    NumFields, SMLoc(), false, false, DestTy);
 }
 
 /// HandleConversionToType - This is the recursive implementation of

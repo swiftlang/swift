@@ -986,10 +986,17 @@ bool Parser::parseExprParen(llvm::NullablePtr<Expr> &Result) {
     return true;
   }
   
+  // Determine whether the left paren was immediately preceded by an identifier,
+  // as in 'foo()', which indicates that the tuple needs to be bound to that
+  // identifier somehow.  This is a highly skanky way to get this, but it works
+  // reasonably well.
+  bool IsPrecededByIdentifier = L.isPrecededByIdentifier(LPLoc);
+  
   if (!AnyErroneousSubExprs)
     Result = S.expr.ActOnTupleExpr(LPLoc, SubExprs.data(),
                                    SubExprNames.empty()?0 : SubExprNames.data(),
-                                   SubExprs.size(), RPLoc);
+                                   SubExprs.size(), RPLoc,
+                                   IsPrecededByIdentifier);
   return false;
 }
 

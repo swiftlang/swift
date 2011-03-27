@@ -41,7 +41,10 @@ public:
   Lexer(unsigned BufferID, ASTContext &Context);
   
   void Lex(Token &Result);
-  
+
+  /// Return true if the character right before the specified location is part
+  /// of an identifier.
+  bool isPrecededByIdentifier(llvm::SMLoc L) const;
   
 private:
   void warning(const char *Loc, const llvm::Twine &Message);

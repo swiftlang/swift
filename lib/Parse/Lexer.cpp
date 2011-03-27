@@ -77,6 +77,27 @@ void Lexer::SkipSlashSlashComment() {
   }
 }
 
+/// isPunctuationIdentifierChar - Return true if the specified character is a
+/// valid part of a punctuation identifier.
+static bool isPunctuationIdentifierChar(char C) {
+  return strchr("/=-+*%<>!&|^", C) != 0;
+}
+
+/// Return true if the character right before the specified location is part
+/// of an identifier.
+bool Lexer::isPrecededByIdentifier(llvm::SMLoc L) const {
+  int BufferID = SourceMgr.FindBufferContainingLoc(L);
+  assert(BufferID != -1 && "Invalid location");
+  const llvm::MemoryBuffer *MB = SourceMgr.getMemoryBuffer(BufferID);
+  
+  // Reject the first character of the file.
+  if (L.getPointer() == MB->getBufferStart())
+    return false;
+  
+  char C = L.getPointer()[-1];
+  return isalnum(C) || C == '_' || C == '$' || isPunctuationIdentifierChar(C);
+}
+
 
 /// LexIdentifier - Match [a-zA-Z_][a-zA-Z_$0-9]*
 void Lexer::LexIdentifier(Token &Result) {
@@ -104,9 +125,9 @@ void Lexer::LexIdentifier(Token &Result) {
 /// LexPunctuationIdentifier - Match identifiers formed out of punctuation.
 void Lexer::LexPunctuationIdentifier(Token &Result) {
   const char *TokStart = CurPtr-1;
-  const char *PunctuatorCharacters = "/=-+*%<>!&|^";
-  
-  CurPtr += strspn(CurPtr, PunctuatorCharacters);
+
+  while (isPunctuationIdentifierChar(*CurPtr))
+    ++CurPtr;
   
   // Match various reserved words.
   if (CurPtr-TokStart == 1) {

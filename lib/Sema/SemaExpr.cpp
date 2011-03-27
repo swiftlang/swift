@@ -124,7 +124,8 @@ SemaExpr::ActOnArraySubscript(Expr *Base, llvm::SMLoc LLoc, Expr *Idx,
 NullablePtr<Expr> 
 SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr *const *SubExprs,
                          const Identifier *SubExprNames,
-                         unsigned NumSubExprs, llvm::SMLoc RPLoc) {
+                         unsigned NumSubExprs, llvm::SMLoc RPLoc,
+                         bool IsPrecededByIdentifier) {
   
   Expr **NewSubExprs =
     S.Context.AllocateCopy<Expr*>(SubExprs, SubExprs+NumSubExprs);
@@ -140,7 +141,8 @@ SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr *const *SubExprs,
     IsGrouping = true;
   
   return new (S.Context) TupleExpr(LPLoc, NewSubExprs, NewSubExprsNames,
-                                   NumSubExprs, RPLoc, IsGrouping);
+                                   NumSubExprs, RPLoc, IsGrouping,
+                                   IsPrecededByIdentifier);
 }
 
 

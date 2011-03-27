@@ -227,12 +227,17 @@ public:
   /// single-element tuples with no element name.
   bool IsGrouping;
   
+  /// IsPrecededByIdentifier - True if the '(' of this tuple expression was
+  /// immediately preceded by an identifier.
+  bool IsPrecededByIdentifier;
+  
   TupleExpr(llvm::SMLoc lparenloc, Expr **subexprs, Identifier *subexprnames,
             unsigned numsubexprs, llvm::SMLoc rparenloc, bool isGrouping,
-            Type *Ty = 0)
+            bool isPrecededByIdentifier, Type *Ty = 0)
     : Expr(TupleExprKind, Ty), LParenLoc(lparenloc), SubExprs(subexprs),
       SubExprNames(subexprnames), NumSubExprs(numsubexprs),
-      RParenLoc(rparenloc), IsGrouping(isGrouping) {
+      RParenLoc(rparenloc), IsGrouping(isGrouping),
+      IsPrecededByIdentifier(isPrecededByIdentifier) {
     assert((!isGrouping ||
             (NumSubExprs == 1 && getElementName(0).empty() && SubExprs[0])) &&
            "Invalid grouping paren");
