@@ -168,7 +168,7 @@ static bool SemaDotIdentifier(Expr *E, SMLoc DotLoc,
   ETy = E->Ty;
   
   TC.error(DotLoc, "base type '" + E->Ty->getString() + 
-           "' has valid '.' expression for this field");
+           "' has no valid '.' expression for this field");
   return true;
 }
 
