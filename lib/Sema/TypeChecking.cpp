@@ -119,60 +119,6 @@ static bool SemaDeclRefExpr(ValueDecl *D, SMLoc Loc, Type *&ResultTy,
   return false;
 }
 
-static bool SemaDotIdentifier(Expr *E, SMLoc DotLoc,
-                              Identifier Name, SMLoc NameLoc,
-                              Type *&ResultTy, int &FieldNo, TypeChecker &TC) {
-  if (isa<DependentType>(E->Ty)) {
-    FieldNo = -1;
-    ResultTy = E->Ty;
-    return false;
-  }
-  
-  // First, check to see if this is a reference to a field in the type.
-  Type *ETy = E->Ty;
-
-  // If this is a member access to a oneof with a single element constructor,
-  // allow direct access to the type underlying the single element.  This
-  // allows element access on structs, for example.
-  if (OneOfType *DT = ETy->getAs<OneOfType>())
-    if (DT->hasSingleElement())
-      ETy = DT->Elements[0]->ArgumentType;
-  
-  if (TupleType *TT = ETy->getAs<TupleType>()) {
-    // If the field name exists, we win.
-    FieldNo = TT->getNamedElementId(Name);
-    if (FieldNo != -1) {
-      ResultTy = TT->getElementType(FieldNo);
-      return false;
-    }
-
-    // Okay, the field name was invalid.  If this is a dollarident like $4,
-    // process it as a field index.
-    if (Name.getLength() > 1 && Name.get()[0] == '$') {
-      unsigned Value = 0;
-      if (!llvm::StringRef(Name.get()+1).getAsInteger(10, Value)) {
-        if (Value >= TT->Fields.size()) {
-          TC.error(NameLoc, "field number is too large for tuple");
-          return true;
-        }
-        
-        FieldNo = Value;
-        ResultTy = TT->getElementType(Value);
-        return false;
-      }
-    }
-  }
-  
-  // Next, check to see if "a.f" is actually being used as sugar for "f a",
-  // which is a function application of 'a' to 'f'.
-  ETy = E->Ty;
-  
-  TC.error(DotLoc, "base type '" + E->Ty->getString() + 
-           "' has no valid '.' expression for this field");
-  return true;
-}
-
-
 static bool SemaTupleExpr(TupleExpr *TE, TypeChecker &TC) {
   // A tuple expr with a single subexpression and no name is just a grouping
   // paren.
@@ -343,18 +289,7 @@ namespace {
         return 0;
       return E;
     }
-    Expr *VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
-      int FieldNo = -1;
-      if (SemaDotIdentifier(E->SubExpr, E->DotLoc, E->Name, E->NameLoc, E->Ty,
-                            FieldNo, TC))
-        return 0;
-      
-      assert(FieldNo != -1 &&"Resolved type shouldn't return a dependent expr");
-      
-      // TODO: Eventually . can be useful for things other than tuples.
-      return new (TC.Context) 
-        TupleElementExpr(E->SubExpr, E->DotLoc, FieldNo, E->NameLoc, E->Ty);
-    }
+    Expr *VisitUnresolvedDotExpr(UnresolvedDotExpr *E);
     
     Expr *VisitUnresolvedScopedIdentifierExpr
     (UnresolvedScopedIdentifierExpr *E) {
@@ -465,6 +400,68 @@ namespace {
     }
   };
 } // end anonymous namespace.
+
+Expr *SemaExpressionTree::VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
+  Type *SubExprTy = E->SubExpr->Ty;
+  if (isa<DependentType>(SubExprTy))
+    return E;
+    
+  // First, check to see if this is a reference to a field in the type.
+    
+  // If this is a member access to a oneof with a single element constructor,
+  // allow direct access to the type underlying the single element.  This
+  // allows element access on structs, for example.
+  if (OneOfType *DT = SubExprTy->getAs<OneOfType>())
+    if (DT->hasSingleElement())
+      SubExprTy = DT->Elements[0]->ArgumentType;
+    
+  if (TupleType *TT = SubExprTy->getAs<TupleType>()) {
+    // If the field name exists, we win.
+    int FieldNo = TT->getNamedElementId(E->Name);
+    if (FieldNo != -1)
+      return new (TC.Context) 
+        TupleElementExpr(E->SubExpr, E->DotLoc, FieldNo, E->NameLoc,
+                         TT->getElementType(FieldNo));
+
+    // Okay, the field name was invalid.  If this is a dollarident like $4,
+    // process it as a field index.
+    if (E->Name.str().startswith("$")) {
+      unsigned Value = 0;
+      if (!E->Name.str().substr(1).getAsInteger(10, Value)) {
+        if (Value >= TT->Fields.size()) {
+          TC.error(E->NameLoc, "field number is too large for tuple");
+          return 0;
+        }
+        
+        return new (TC.Context) 
+          TupleElementExpr(E->SubExpr, E->DotLoc, FieldNo, E->NameLoc,
+                           TT->getElementType(Value));
+      }
+    }
+  }
+  
+  // Next, check to see if "a.f" is actually being used as sugar for "f a",
+  // which is a function application of 'a' to 'f'.
+  if (E->ResolvedDecl) {
+    assert(E->ResolvedDecl->Ty->getAs<FunctionType>() &&
+           "Should have only bound to functions");
+    
+    // Apply the base value to the function.
+    Expr *FnRef = 
+      new (TC.Context) DeclRefExpr(E->ResolvedDecl, E->NameLoc,
+                                   E->ResolvedDecl->Ty);
+    Type *ResultTy = 0;
+    if (SemaApplyExpr(FnRef, E->SubExpr, ResultTy, TC))
+      return 0;
+    
+    return new (TC.Context) ApplyExpr(FnRef, E->SubExpr, ResultTy);
+  }
+  
+  TC.error(E->DotLoc, "base type '" + SubExprTy->getString() + 
+           "' has no valid '.' expression for this field");
+  return 0;
+}
+
 
 /// getBinOp - Return the ValueDecl for the expression if it is an infix binary
 /// operator, otherwise return null.

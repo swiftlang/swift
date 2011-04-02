@@ -297,7 +297,10 @@ public:
   void VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     OS.indent(Indent) << "(unresolved_dot_expr type='";
     E->Ty->print(OS);
-    OS << "\' field '" << E->Name.get() << "'\n";
+    OS << "\' field '" << E->Name.get() << "'";
+    if (E->ResolvedDecl)
+      OS << " decl resolved!";
+    OS << '\n';
     PrintRec(E->SubExpr);
     OS << ')';
   }

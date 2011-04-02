@@ -268,6 +268,10 @@ public:
   Identifier Name;
   llvm::SMLoc NameLoc;
   
+  /// ResolvedDecl - If the name refers to any local or top-level declarations,
+  /// the name binder fills it in here.
+  ValueDecl *ResolvedDecl;
+  
   UnresolvedDotExpr(Expr *subexpr, llvm::SMLoc dotloc, Identifier name,
                     llvm::SMLoc nameloc)
   : Expr(UnresolvedDotExprKind), SubExpr(subexpr), DotLoc(dotloc),

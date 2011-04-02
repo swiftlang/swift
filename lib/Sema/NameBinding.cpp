@@ -127,7 +127,7 @@ namespace {
     
     void addImport(ImportDecl *ID);
 
-    ValueDecl *bindValueName(Identifier I, SMLoc Loc);
+    ValueDecl *bindValueName(Identifier I);
     
     TypeAliasDecl *lookupTypeName(Identifier I);
     
@@ -211,8 +211,9 @@ TypeAliasDecl *NameBinder::lookupTypeName(Identifier Name) {
 
 
 
-/// bindValueName - This is invoked for each UnresolvedDeclRefExpr in the AST.
-ValueDecl *NameBinder::bindValueName(Identifier Name, SMLoc Loc) {
+/// bindValueName - This is invoked for each name reference in the AST, and
+/// returns a decl if found or null if not.
+ValueDecl *NameBinder::bindValueName(Identifier Name) {
   // Resolve forward references defined within the module.
   llvm::DenseMap<Identifier, ValueDecl *>::iterator I =
     TopLevelValues.find(Name);
@@ -226,7 +227,6 @@ ValueDecl *NameBinder::bindValueName(Identifier Name, SMLoc Loc) {
     if (ValueDecl *D = Imports[i].second->lookupValue(Imports[i].first, Name))
       return D;  // If we found a match, return the decl.
 
-  error(Loc, "use of unresolved identifier '" + Name.str() + "'");
   return 0;
 }
 
@@ -238,14 +238,27 @@ static Expr *BindNames(Expr *E, Expr::WalkOrder Order, void *binder) {
   if (Order == Expr::Walk_PreOrder)
     return E;
   
-  // Ignore everything except UnresolvedDeclRefExpr.
-  UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E);
-  if (UDRE == 0) return E;
+  // Process UnresolvedDeclRefExpr.
+  if (UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
+    ValueDecl *D = Binder.bindValueName(UDRE->Name);
+    if (D == 0) {
+      Binder.error(UDRE->Loc, "use of unresolved identifier '" +
+                   UDRE->Name.str() + "'");
+      return 0;
+    }
+    return new (Binder.Context) DeclRefExpr(D, UDRE->Loc);
+  }
   
-  ValueDecl *D = Binder.bindValueName(UDRE->Name, UDRE->Loc);
-  if (D == 0) return 0;
+  // A reference to foo.bar may be an application ("bar foo"), so look up bar.
+  if (UnresolvedDotExpr *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
+    UDE->ResolvedDecl = Binder.bindValueName(UDE->Name);
+    // Only bind to functions.
+    if (UDE->ResolvedDecl && !UDE->ResolvedDecl->Ty->getAs<FunctionType>())
+      UDE->ResolvedDecl = 0;
+  }
   
-  return new (Binder.Context) DeclRefExpr(D, UDRE->Loc);
+  // Otherwise, not something that needs name binding.
+  return E;
 }
 
 /// performNameBinding - Once parsing is complete, this walks the AST to
