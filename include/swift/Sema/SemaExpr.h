@@ -46,34 +46,20 @@ public:
   llvm::NullablePtr<Expr>
   ActOnNumericConstant(llvm::StringRef Text, llvm::SMLoc Loc);
   llvm::NullablePtr<Expr>
-  ActOnDollarIdentExpr(llvm::StringRef Text, llvm::SMLoc Loc);
-  llvm::NullablePtr<Expr>
   ActOnIdentifierExpr(Identifier Text, llvm::SMLoc Loc);
   llvm::NullablePtr<Expr>
   ActOnScopedIdentifierExpr(Identifier ScopeName, llvm::SMLoc ScopeLoc,
                             llvm::SMLoc ColonColonLoc,
                             Identifier Name, llvm::SMLoc NameLoc);
-  llvm::NullablePtr<Expr>
-  ActOnUnresolvedMemberExpr(llvm::SMLoc ColonLoc, llvm::SMLoc NameLoc,
-                            Identifier Name);
   
   llvm::NullablePtr<Expr>
   ActOnTupleExpr(llvm::SMLoc LPLoc, Expr *const *SubExprs,
                  const Identifier *SubExprNames,
                  unsigned NumSubExprs, llvm::SMLoc RPLoc,
                  bool IsPrecededByIdentifier);
-  BraceExpr *ActOnBraceExpr(llvm::SMLoc LBLoc,
-                            llvm::ArrayRef<ExprOrDecl> Elements,
-                            bool HasMissingSemi, llvm::SMLoc RBLoc);
-  
-  llvm::NullablePtr<Expr>
-  ActOnDotIdentifier(Expr *E, llvm::SMLoc DotLoc, Identifier Name,
-                     llvm::SMLoc IdentifierLoc);
   
   llvm::NullablePtr<Expr>
   ActOnArraySubscript(Expr *Base,llvm::SMLoc LLoc, Expr *Idx, llvm::SMLoc RLoc);
-  
-  llvm::NullablePtr<Expr> ActOnSequence(llvm::ArrayRef<Expr *> Exprs); 
 };
   
 } // end namespace swift

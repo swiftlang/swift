@@ -67,7 +67,10 @@ void SemaDecl::handleEndOfTranslationUnit(TranslationUnitDecl *TUD,
                                           llvm::ArrayRef<ExprOrDecl> Items,
                                           llvm::SMLoc FileEnd) {
   // First thing, we transform the body into a brace expression.
-  TUD->Body = S.expr.ActOnBraceExpr(FileStart, Items, false, FileEnd);
+  ExprOrDecl *NewElements = 
+    S.Context.AllocateCopy<ExprOrDecl>(Items.begin(), Items.end());
+  TUD->Body = new (S.Context) BraceExpr(FileStart, NewElements, Items.size(),
+                                        false, FileEnd);
   
   // Do a prepass over the declarations to make sure they have basic sanity and
   // to find the list of top-level value declarations.

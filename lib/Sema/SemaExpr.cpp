@@ -51,18 +51,6 @@ NullablePtr<Expr> SemaExpr::ActOnNumericConstant(llvm::StringRef Text,
   return new (S.Context) IntegerLiteral(Text, Loc, Ty);
 }
 
-NullablePtr<Expr> 
-SemaExpr::ActOnDollarIdentExpr(llvm::StringRef Text, llvm::SMLoc Loc) {
-  assert(Text.size() >= 2 && Text[0] == '$' && 
-         Text[1] >= '0' && Text[1] <= '9' && "Not a valid anon decl");
-  unsigned ArgNo = 0;
-  if (Text.substr(1).getAsInteger(10, ArgNo)) {
-    error(Loc, "invalid name in $ expression");
-    return 0;
-  }
-
-  return new (S.Context) AnonClosureArgExpr(ArgNo, Loc);
-}
 
 NullablePtr<Expr> 
 SemaExpr::ActOnIdentifierExpr(Identifier Text, llvm::SMLoc Loc) {
@@ -70,7 +58,6 @@ SemaExpr::ActOnIdentifierExpr(Identifier Text, llvm::SMLoc Loc) {
   
   if (D == 0)
     return new (S.Context) UnresolvedDeclRefExpr(Text, Loc);
-  
   
   return new (S.Context) DeclRefExpr(D, Loc);
 }
@@ -86,30 +73,6 @@ ActOnScopedIdentifierExpr(Identifier ScopeName, llvm::SMLoc ScopeLoc,
   return new (S.Context) UnresolvedScopedIdentifierExpr(TypeScopeDecl, ScopeLoc,
                                                         ColonColonLoc, NameLoc,
                                                         Name);
-}
-
-llvm::NullablePtr<Expr>
-SemaExpr::ActOnUnresolvedMemberExpr(llvm::SMLoc ColonLoc, llvm::SMLoc NameLoc,
-                                    Identifier Name) {
-  // Handle :foo by just making an AST node.
-  return new (S.Context) UnresolvedMemberExpr(ColonLoc, NameLoc, Name);
-}
-
-
-BraceExpr *SemaExpr::ActOnBraceExpr(llvm::SMLoc LBLoc,
-                                    llvm::ArrayRef<ExprOrDecl> Elements,
-                                    bool HasMissingSemi, llvm::SMLoc RBLoc) {
-  ExprOrDecl *NewElements = 
-    S.Context.AllocateCopy<ExprOrDecl>(Elements.begin(), Elements.end());
-  
-  return new (S.Context) BraceExpr(LBLoc, NewElements, Elements.size(),
-                                   HasMissingSemi, RBLoc);
-}
-
-llvm::NullablePtr<Expr>
-SemaExpr::ActOnDotIdentifier(Expr *E, llvm::SMLoc DotLoc,
-                             Identifier Name, llvm::SMLoc NameLoc) {
-  return new (S.Context) UnresolvedDotExpr(E, DotLoc, Name, NameLoc);
 }
 
 llvm::NullablePtr<Expr>
@@ -143,15 +106,4 @@ SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr *const *SubExprs,
   return new (S.Context) TupleExpr(LPLoc, NewSubExprs, NewSubExprsNames,
                                    NumSubExprs, RPLoc, IsGrouping,
                                    IsPrecededByIdentifier);
-}
-
-
-llvm::NullablePtr<Expr>
-SemaExpr::ActOnSequence(llvm::ArrayRef<Expr *> Elements) {
-  assert(!Elements.empty() && "Empty sequence isn't possible");
-  
-  Expr **NewElements =
-    S.Context.AllocateCopy<Expr*>(Elements.begin(), Elements.end());
-  
-  return new (S.Context) SequenceExpr(NewElements, Elements.size());
 }

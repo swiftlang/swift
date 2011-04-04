@@ -774,7 +774,12 @@ bool Parser::parseExpr(NullablePtr<Expr> &Result, const char *Message) {
     return false;
   }
   
-  Result = S.expr.ActOnSequence(SequencedExprs);
+  assert(!SequencedExprs.empty() && "Empty sequence isn't possible");
+  
+  Expr **NewElements =
+    S.Context.AllocateCopy<Expr*>(SequencedExprs.begin(), SequencedExprs.end());
+  
+  Result = new (S.Context) SequenceExpr(NewElements, SequencedExprs.size());
   return false;
 }
 
@@ -822,7 +827,9 @@ bool Parser::parseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
     SMLoc NameLoc = Tok.getLoc();
     if (parseIdentifier(Name, "expected identifier after ':' expression"))
       return true;
-    Result = S.expr.ActOnUnresolvedMemberExpr(ColonLoc, NameLoc, Name);
+    
+    // Handle :foo by just making an AST node.
+    Result = new (S.Context) UnresolvedMemberExpr(ColonLoc, NameLoc, Name);
     break;
   }
       
@@ -849,10 +856,11 @@ bool Parser::parseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
         return true;
       }
         
-      if (!Result.isNull())
-        Result = S.expr.ActOnDotIdentifier(Result.get(), TokLoc, 
-                                         S.Context.getIdentifier(Tok.getText()),
-                                           Tok.getLoc());
+      if (!Result.isNull()) {
+        Identifier Name = S.Context.getIdentifier(Tok.getText());
+        Result = new (S.Context) UnresolvedDotExpr(Result.get(), TokLoc,
+                                                   Name, Tok.getLoc());
+      }
       if (Tok.is(tok::identifier))
         consumeToken(tok::identifier);
       else
@@ -898,7 +906,14 @@ bool Parser::parseExprDollarIdentifier(llvm::NullablePtr<Expr> &Result) {
     error(Loc, "invalid identifier, expected expression");
     return true;
   }
-  Result = S.expr.ActOnDollarIdentExpr(Name, Loc);
+  
+  unsigned ArgNo = 0;
+  if (Name.substr(1).getAsInteger(10, ArgNo)) {
+    error(Loc, "invalid name in $ expression");
+    return true;
+  }
+  
+  Result = new (S.Context) AnonClosureArgExpr(ArgNo, Loc);
   return false;
 }
 
@@ -985,18 +1000,20 @@ bool Parser::parseExprParen(llvm::NullablePtr<Expr> &Result) {
     note(LPLoc, "to match this opening '('");
     return true;
   }
-  
+
+  if (AnyErroneousSubExprs)
+    return false;
+
   // Determine whether the left paren was immediately preceded by an identifier,
   // as in 'foo()', which indicates that the tuple needs to be bound to that
   // identifier somehow.  This is a highly skanky way to get this, but it works
   // reasonably well.
   bool IsPrecededByIdentifier = L.isPrecededByIdentifier(LPLoc);
   
-  if (!AnyErroneousSubExprs)
-    Result = S.expr.ActOnTupleExpr(LPLoc, SubExprs.data(),
-                                   SubExprNames.empty()?0 : SubExprNames.data(),
-                                   SubExprs.size(), RPLoc,
-                                   IsPrecededByIdentifier);
+  Result = S.expr.ActOnTupleExpr(LPLoc, SubExprs.data(),
+                                 SubExprNames.empty()?0 : SubExprNames.data(),
+                                 SubExprs.size(), RPLoc,
+                                 IsPrecededByIdentifier);
   return false;
 }
 
@@ -1033,7 +1050,11 @@ bool Parser::parseExprBrace(llvm::NullablePtr<Expr> &Result) {
     return true;
   }
   
-  Result = S.expr.ActOnBraceExpr(LBLoc, Entries, MissingSemiAtEnd, RBLoc);
+  ExprOrDecl *NewElements = 
+    S.Context.AllocateCopy<ExprOrDecl>(Entries.begin(), Entries.end());
+  
+  Result = new (S.Context) BraceExpr(LBLoc, NewElements, Entries.size(),
+                                     MissingSemiAtEnd, RBLoc);
   return false;
 }
 
