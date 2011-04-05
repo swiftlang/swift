@@ -22,7 +22,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ExprVisitor.h"
-#include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/SourceMgr.h"
@@ -50,7 +50,7 @@ namespace {
       Context.SourceMgr.PrintMessage(Loc, Message, "error");
     }
     
-    bool validateType(Type *&T);
+    bool validateType(Type &T);
 
     void typeCheck(TypeAliasDecl *TAD);
 
@@ -68,9 +68,9 @@ namespace {
     void typeCheck(FuncDecl *FD, llvm::SmallVectorImpl<Expr*> &ExcessExprs);
     void typeCheck(VarDecl *VD, llvm::SmallVectorImpl<Expr*> &ExcessExprs);
     
-    void validateAttributes(DeclAttributes &Attrs, Type *Ty);
+    void validateAttributes(DeclAttributes &Attrs, Type Ty);
     
-    bool validateVarName(Type *Ty, DeclVarName *Name);
+    bool validateVarName(Type Ty, DeclVarName *Name);
 
     /// checkBody - Type check an expression that is used in a top-level
     /// context like a var/func body, or tuple default value.  If DestTy is
@@ -79,7 +79,7 @@ namespace {
     /// If the body turns out to be a sequence, this returns the single element
     /// with the excess in the provided SmallVector.  If the SmallVector is not
     /// provided, errors are emitted for the excess expressions.
-    void checkBody(Expr *&E, Type *DestTy,
+    void checkBody(Expr *&E, Type DestTy,
                    llvm::SmallVectorImpl<Expr*> *ExcessElements);
     
 
@@ -89,7 +89,7 @@ namespace {
     /// performed.
     ///
     /// This emits a diagnostic and returns null on error.
-    Expr *convertToType(Expr *E, Type *Ty);
+    Expr *convertToType(Expr *E, Type Ty);
   };
 }  // end anonymous namespace
 
@@ -105,7 +105,7 @@ namespace {
 // These each produce diagnostics and return true on error.  On success, they
 // may mutate the input values, then return false.
 
-static bool SemaDeclRefExpr(ValueDecl *D, SMLoc Loc, Type *&ResultTy,
+static bool SemaDeclRefExpr(ValueDecl *D, SMLoc Loc, Type &ResultTy,
                             TypeChecker &TC) {
   if (D == 0) {
     TC.error(Loc, "use of undeclared identifier");
@@ -134,20 +134,21 @@ static bool SemaTupleExpr(TupleExpr *TE, TypeChecker &TC) {
     // If the element value is missing, it has the value of the default
     // expression of the result type, which must be known.
     if (TE->SubExprs[i] == 0) {
-      assert(TE->Ty && isa<TupleType>(TE->Ty) && 
+      assert(TE->Ty && isa<TupleType>(TE->Ty.getPointer()) && 
              "Can't have default value without a result type");
       
-      ResultTyElts[i].Ty = cast<TupleType>(TE->Ty)->getElementType(i);
+      ResultTyElts[i].Ty =
+        cast<TupleType>(TE->Ty.getPointer())->getElementType(i);
       
       // FIXME: What about a default value that is dependent?
-      if (isa<DependentType>(ResultTyElts[i].Ty)) {
+      if (ResultTyElts[i].Ty->is<DependentType>()) {
         TE->Ty = ResultTyElts[i].Ty;
         return false;
       }
     } else {
       // If any of the tuple element types is dependent, the whole tuple should
       // have dependent type.
-      if (isa<DependentType>(TE->SubExprs[i]->Ty)) {
+      if (TE->SubExprs[i]->Ty->is<DependentType>()) {
         TE->Ty = TE->SubExprs[i]->Ty;
         return false;
       }
@@ -164,9 +165,9 @@ static bool SemaTupleExpr(TupleExpr *TE, TypeChecker &TC) {
   return false;
 }
 
-static bool SemaApplyExpr(Expr *&E1, Expr *&E2, Type *&ResultTy,
+static bool SemaApplyExpr(Expr *&E1, Expr *&E2, Type &ResultTy,
                           TypeChecker &TC) {
-  FunctionType *FT = cast<FunctionType>(E1->Ty);
+  FunctionType *FT = cast<FunctionType>(E1->Ty.getPointer());
   
   // We have a function application.  Check that the argument type matches the
   // expected type of the function.
@@ -182,13 +183,13 @@ static bool SemaApplyExpr(Expr *&E1, Expr *&E2, Type *&ResultTy,
 
 /// SemaSequenceExpr - Perform semantic analysis for sequence expressions.
 static bool SemaSequenceExpr(Expr **Elements, unsigned NumElements,
-                             Type *&ResultTy, TypeChecker &TC) {
+                             Type &ResultTy, TypeChecker &TC) {
   // If any of the operands of the sequence have a dependent type, then so does
   // the sequence.  Dependent values can be resolved to function types, so the
   // last value of the sequence may be an operand to the function, not the
   // result of the sequence.
   for (unsigned i = 0; i != NumElements; ++i)
-    if (isa<DependentType>(Elements[i]->Ty)) {
+    if (Elements[i]->Ty->is<DependentType>()) {
       ResultTy = Elements[i]->Ty;
       return false;
     }
@@ -200,9 +201,9 @@ static bool SemaSequenceExpr(Expr **Elements, unsigned NumElements,
 /// SemaBinaryExpr - Perform semantic analysis of binary expressions.
 /// OpFn is null if this is an assignment (FIXME: we don't have generics yet).
 static bool SemaBinaryExpr(Expr *&LHS, ValueDecl *OpFn,
-                           SMLoc OpLoc, Expr *&RHS, Type *&ResultTy,
+                           SMLoc OpLoc, Expr *&RHS, Type &ResultTy,
                            TypeChecker &TC) {
-  if (isa<DependentType>(LHS->Ty)) {
+  if (LHS->Ty->is<DependentType>()) {
     ResultTy = TC.Context.TheDependentType;
     return false; 
   }
@@ -223,8 +224,8 @@ static bool SemaBinaryExpr(Expr *&LHS, ValueDecl *OpFn,
   // only has InfixPrecedence if it takes a 2 element tuple as input.
   assert(OpFn->Attrs.InfixPrecedence != -1 &&
          "Sema and parser should verify that only binary predicates are used"); 
-  FunctionType *FnTy = cast<FunctionType>(OpFn->Ty);
-  TupleType *Input = cast<TupleType>(FnTy->Input);
+  FunctionType *FnTy = cast<FunctionType>(OpFn->Ty.getPointer());
+  TupleType *Input = cast<TupleType>(FnTy->Input.getPointer());
   assert(Input->Fields.size() == 2 && "Sema error validating infix fn type");
   
   // Verify that the LHS/RHS have the right type and do conversions as needed.
@@ -293,7 +294,8 @@ namespace {
     
     Expr *VisitUnresolvedScopedIdentifierExpr
     (UnresolvedScopedIdentifierExpr *E) {
-      Type *TypeScope = E->TypeDecl->UnderlyingTy->getCanonicalType(TC.Context);
+      TypeBase *TypeScope =
+        E->TypeDecl->UnderlyingTy->getCanonicalType(TC.Context);
       
       // Look through type aliases etc.
       OneOfType *DT = dyn_cast<OneOfType>(TypeScope);
@@ -323,7 +325,7 @@ namespace {
     
     Expr *VisitTupleElementExpr(TupleElementExpr *E) {
       // TupleElementExpr is fully resolved.
-      assert(!isa<DependentType>(E->Ty));
+      assert(!E->Ty->is<DependentType>());
       return E;
     }
     
@@ -349,7 +351,7 @@ namespace {
       // Nothing we can do here.  These remain as resolved or unresolved as they
       // always were.  If no type is assigned, we give them a dependent type so
       // that we get resolution later.
-      if (E->Ty == 0)
+      if (E->Ty.isNull())
         E->Ty = TC.Context.TheDependentType;
       return E;
     }
@@ -402,8 +404,8 @@ namespace {
 } // end anonymous namespace.
 
 Expr *SemaExpressionTree::VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
-  Type *SubExprTy = E->SubExpr->Ty;
-  if (isa<DependentType>(SubExprTy))
+  Type SubExprTy = E->SubExpr->Ty;
+  if (SubExprTy->is<DependentType>())
     return E;
     
   // First, check to see if this is a reference to a field in the type.
@@ -443,14 +445,14 @@ Expr *SemaExpressionTree::VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   // Next, check to see if "a.f" is actually being used as sugar for "f a",
   // which is a function application of 'a' to 'f'.
   if (E->ResolvedDecl) {
-    assert(E->ResolvedDecl->Ty->getAs<FunctionType>() &&
+    assert(E->ResolvedDecl->Ty->is<FunctionType>() &&
            "Should have only bound to functions");
     
     // Apply the base value to the function.
     Expr *FnRef = 
       new (TC.Context) DeclRefExpr(E->ResolvedDecl, E->NameLoc,
                                    E->ResolvedDecl->Ty);
-    Type *ResultTy = 0;
+    Type ResultTy;
     if (SemaApplyExpr(FnRef, E->SubExpr, ResultTy, TC))
       return 0;
     
@@ -501,7 +503,7 @@ static void ReduceBinaryExprs(SequenceExpr *E, unsigned Elt,
       // If the expressions before this one aren't resolved yet, don't emit this
       // error.
       for (unsigned i = 0; i != Elt; ++i)
-        if (E->Elements[i]->Ty->getAs<DependentType>() != 0)
+        if (E->Elements[i]->Ty->is<DependentType>())
           AllResolved = false;
       if (AllResolved) {
         TC.error(TE->getLocStart(),
@@ -585,7 +587,7 @@ static void ReduceJuxtaposedExprs(SequenceExpr *E, unsigned Elt,
   Expr *EltExpr = E->Elements[Elt];
   
   // If this expression isn't a function type, then it doesn't juxtapose.
-  if (EltExpr->Ty->getAs<FunctionType>() == 0)
+  if (!EltExpr->Ty->is<FunctionType>())
     return;
   
   // If this is a function, then it can juxtapose.  Note that the grammar
@@ -611,7 +613,7 @@ static void ReduceJuxtaposedExprs(SequenceExpr *E, unsigned Elt,
   Expr *ArgExpr = E->Elements[Elt+1];
 
   // Okay, we have a function application, analyze it.
-  Type *ResultTy = 0;
+  Type ResultTy;
   if (!SemaApplyExpr(EltExpr, ArgExpr, ResultTy, TC)) {
     E->Elements[Elt] = new (TC.Context) ApplyExpr(EltExpr, ArgExpr, ResultTy);
     // Drop the argument.
@@ -694,7 +696,7 @@ void SemaExpressionTree::PreProcessBraceExpr(BraceExpr *E) {
   // TODO: What about tuples which contain functions by-value that are dead?
   for (unsigned i = 0, e = NewElements.size()-(E->MissingSemi ?1:0);i != e; ++i)
     if (NewElements[i].is<Expr*>() &&
-        isa<FunctionType>(NewElements[i].get<Expr*>()->Ty))
+        NewElements[i].get<Expr*>()->Ty->is<FunctionType>())
       // TODO: QOI: Add source range.
       TC.error(NewElements[i].get<Expr*>()->getLocStart(),
                "expression resolves to an unevaluated function");
@@ -724,15 +726,15 @@ void SemaExpressionTree::PreProcessBraceExpr(BraceExpr *E) {
 
 namespace {
 struct RewriteAnonArgExpr {
-  Type *FuncInputTy;
+  Type FuncInputTy;
   TypeChecker &TC;
   
-  RewriteAnonArgExpr(Type *funcInputTy, TypeChecker &tc)
+  RewriteAnonArgExpr(Type funcInputTy, TypeChecker &tc)
     : FuncInputTy(funcInputTy), TC(tc) {}
   
   static Expr *WalkFn(Expr *E, Expr::WalkOrder Order, void *rewriter) {
     RewriteAnonArgExpr &Rewriter = *static_cast<RewriteAnonArgExpr*>(rewriter);
-    Type *FuncInputTy = Rewriter.FuncInputTy;
+    Type FuncInputTy = Rewriter.FuncInputTy;
   
     if (Order == Expr::Walk_PreOrder) {
       // If this is a ClosureExpr, don't walk into it.  This would find *its*
@@ -752,10 +754,10 @@ struct RewriteAnonArgExpr {
     // tuple, then $0..$N are valid depending on the number of inputs to the
     // tuple.
     unsigned NumInputArgs = 1;
-    if (TupleType *TT = dyn_cast<TupleType>(FuncInputTy))
+    if (TupleType *TT = dyn_cast<TupleType>(FuncInputTy.getPointer()))
       NumInputArgs = TT->Fields.size();
     
-    assert(isa<DependentType>(A->Ty) && "Anon arg already has a type?");
+    assert(A->Ty->is<DependentType>() && "Anon arg already has a type?");
     
     // Verify that the argument number isn't too large, e.g. using $4 when the
     // bound function only has 2 inputs.
@@ -768,7 +770,7 @@ struct RewriteAnonArgExpr {
     
     // Assign the AnonDecls their actual concrete types now that we know the
     // context they are being used in.
-    if (TupleType *TT = dyn_cast<TupleType>(FuncInputTy)) {
+    if (TupleType *TT = dyn_cast<TupleType>(FuncInputTy.getPointer())) {
       A->Ty = TT->getElementType(A->ArgNo);
     } else {
       assert(NumInputArgs == 1 && "Must have unary case");
@@ -784,7 +786,7 @@ struct RewriteAnonArgExpr {
 /// arguments.  Validate the argument list and, if valid, allocate and return
 /// a pointer to the argument to be used for the ClosureExpr.
 static bool
-BindAndValidateClosureArgs(Expr *Body, Type *FuncInput, TypeChecker &TC) {  
+BindAndValidateClosureArgs(Expr *Body, Type FuncInput, TypeChecker &TC) {  
   RewriteAnonArgExpr Rewriter(FuncInput, TC);
   
   // Walk the body and rewrite any anonymous arguments.  Note that this
@@ -812,7 +814,7 @@ namespace {
   class SemaCoerceBottomUp : public ExprVisitor<SemaCoerceBottomUp, Expr*> {
     friend class ExprVisitor<SemaCoerceBottomUp, Expr*>;
     TypeChecker &TC;
-    Type *DestTy;
+    Type DestTy;
     
     Expr *VisitIntegerLiteral(IntegerLiteral *E) {
       assert(0 && "Integer literals never have dependent type!");
@@ -881,7 +883,7 @@ namespace {
           if (OneOfType *DT = DestTy->getAs<OneOfType>()) {
             // The oneof type must have an element of the specified name.
             OneOfElementDecl *DED = DT->getElement(UME->Name);
-            if (DED == 0 || !isa<FunctionType>(DED->Ty)) {
+            if (DED == 0 || !DED->Ty->is<FunctionType>()) {
               TC.error(UME->getLocStart(), "invalid type '" +
                        DestTy->getString() + "' to initialize member");
               return 0;
@@ -925,8 +927,8 @@ namespace {
       return E;
     }
     
-    SemaCoerceBottomUp(TypeChecker &tc, Type *destTy) : TC(tc), DestTy(destTy) {
-      assert(!isa<DependentType>(DestTy));
+    SemaCoerceBottomUp(TypeChecker &tc, Type destTy) : TC(tc), DestTy(destTy) {
+      assert(!DestTy->is<DependentType>());
     }
     Expr *doIt(Expr *E) {
       return Visit(E);
@@ -934,7 +936,7 @@ namespace {
   public:
     
     /// convertToType - This is the main entrypoint to SemaCoerceBottomUp.
-    static Expr *convertToType(Expr *E, Type *DestTy, bool IgnoreAnonDecls,
+    static Expr *convertToType(Expr *E, Type DestTy, bool IgnoreAnonDecls,
                                TypeChecker &TC);
 
   private:
@@ -1161,7 +1163,7 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       // Use the default element for the tuple.
       NewElements[i] = 0;
     } else {
-      Type *NewEltTy = ETy->getElementType(SrcField);
+      Type NewEltTy = ETy->getElementType(SrcField);
       Expr *Src = new (TC.Context)
         TupleElementExpr(E, llvm::SMLoc(), SrcField, llvm::SMLoc(), NewEltTy);
       
@@ -1229,7 +1231,7 @@ Expr *SemaCoerceBottomUp::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   int ScalarField = getTupleFieldForScalarInit(DestTy);
   assert(ScalarField != -1);
   
-  Type *ScalarType = DestTy->getElementType(ScalarField);
+  Type ScalarType = DestTy->getElementType(ScalarField);
   Expr *ERes = convertToType(E, ScalarType, false, TC);
   if (ERes == 0) return 0;
   
@@ -1263,15 +1265,14 @@ Expr *SemaCoerceBottomUp::convertScalarToTupleType(Expr *E, TupleType *DestTy,
 /// HandleConversionToType - This is the recursive implementation of
 /// ConvertToType.  It does not produce diagnostics, it just returns null on
 /// failure.
-Expr *SemaCoerceBottomUp::convertToType(Expr *E, Type *DestTy,
-                                        bool IgnoreAnonDecls,
-                                        TypeChecker &TC) {
+Expr *SemaCoerceBottomUp::convertToType(Expr *E, Type DestTy,
+                                        bool IgnoreAnonDecls, TypeChecker &TC) {
   // If we have an exact match, we're done.
   if (E->Ty->getCanonicalType(TC.Context) ==
          DestTy->getCanonicalType(TC.Context))
     return E;
   
-  assert(!isa<DependentType>(DestTy) &&
+  assert(!DestTy->is<DependentType>() &&
          "Result of conversion can't be dependent");
 
   // If the expression is a grouping parenthesis and it has a dependent type,
@@ -1333,7 +1334,7 @@ Expr *SemaCoerceBottomUp::convertToType(Expr *E, Type *DestTy,
   // context, second, this could be a context sensitive expression value like
   // :foo.  If this is a context sensitive expression, propagate the type down
   // into the subexpression.
-  if (isa<DependentType>(E->Ty))
+  if (E->Ty->is<DependentType>())
     return SemaCoerceBottomUp(TC, DestTy).doIt(E);
   
   // Could not do the conversion.
@@ -1344,7 +1345,7 @@ Expr *SemaCoerceBottomUp::convertToType(Expr *E, Type *DestTy,
 
 
 
-Expr *TypeChecker::convertToType(Expr *E, Type *DestTy) {
+Expr *TypeChecker::convertToType(Expr *E, Type DestTy) {
   return SemaCoerceBottomUp::convertToType(E, DestTy, false, *this);
 }
 
@@ -1357,9 +1358,10 @@ Expr *TypeChecker::convertToType(Expr *E, Type *DestTy) {
 /// expressions are valid and that they have the appropriate conversions etc.
 ///
 /// This returns true if the type is invalid.
-bool TypeChecker::validateType(Type *&T) {
-  assert(T && "Cannot validate null types!");
+bool TypeChecker::validateType(Type &InTy) {
+  assert(InTy && "Cannot validate null types!");
 
+  TypeBase *T = InTy.getPointer();
   // FIXME: Verify that these aren't circular and infinite size.
   
   // If a type has a canonical type, then it is known safe.
@@ -1375,7 +1377,7 @@ bool TypeChecker::validateType(Type *&T) {
   case OneOfTypeKind: {
     OneOfType *OOT = cast<OneOfType>(T);
     for (unsigned i = 0, e = OOT->Elements.size(); i != e; ++i) {
-      if (OOT->Elements[i]->ArgumentType == 0) continue;
+      if (OOT->Elements[i]->ArgumentType.isNull()) continue;
       IsValid &= !validateType(OOT->Elements[i]->ArgumentType);
       if (!IsValid) break;
     }
@@ -1392,7 +1394,7 @@ bool TypeChecker::validateType(Type *&T) {
     for (unsigned i = 0, e = TT->Fields.size(); i != e; ++i) {
       // The element has *at least* a type or an initializer, so we start by
       // verifying each individually.
-      Type *EltTy = TT->Fields[i].Ty;
+      Type EltTy = TT->Fields[i].Ty;
       if (EltTy && validateType(EltTy)) {
         IsValid = false;
         break;
@@ -1411,7 +1413,7 @@ bool TypeChecker::validateType(Type *&T) {
         
       // If both a type and an initializer are specified, make sure the
       // initializer's type agrees with the (redundant) type.
-      assert(EltTy == 0 || 
+      assert(EltTy.isNull() || 
              EltTy->getCanonicalType(Context) ==
              EltInit->Ty->getCanonicalType(Context));
       EltTy = EltInit->Ty;
@@ -1423,21 +1425,21 @@ bool TypeChecker::validateType(Type *&T) {
       
   case FunctionTypeKind: {
     FunctionType *FT = llvm::cast<FunctionType>(T);
-    if ((T = FT->Input, validateType(T)) ||
-        (T = FT->Result, validateType(T))) {
+    if ((InTy = FT->Input, validateType(InTy)) ||
+        (InTy = FT->Result, validateType(InTy))) {
       IsValid = false;
       break;
     }
-    T = FT;
+    InTy = FT;
     break;
   }
   case ArrayTypeKind:
     ArrayType *AT = llvm::cast<ArrayType>(T);
-    if (T = AT->Base, validateType(T)) {
+    if (InTy = AT->Base, validateType(InTy)) {
       IsValid = false;
       break;
     }
-    T = AT;
+    InTy = AT;
     // FIXME: We need to check AT->Size! (It also has to be convertible to int).
     break;
   }
@@ -1446,7 +1448,7 @@ bool TypeChecker::validateType(Type *&T) {
   if (!IsValid) {
     // FIXME: This should set the type to some Error type, which is
     // distinguishable from unresolved.
-    T = Context.TheUnresolvedType;
+    InTy = Context.TheUnresolvedType;
     return true;
   }
 
@@ -1454,7 +1456,7 @@ bool TypeChecker::validateType(Type *&T) {
   // that we never reanalyze it again.
   // If it is ever a performance win to avoid computing canonical types, we can
   // just keep a SmallPtrSet of analyzed Types in TypeChecker.
-  T->getCanonicalType(Context);
+  InTy->getCanonicalType(Context);
   
   // FIXME: This isn't good enough: top-level stuff can have these as well and
   // their types need to be resolved at the end of name binding.  Perhaps we
@@ -1468,13 +1470,13 @@ bool TypeChecker::validateType(Type *&T) {
 //===----------------------------------------------------------------------===//
 
 /// validateAttributes - Check that the func/var declaration attributes are ok.
-void TypeChecker::validateAttributes(DeclAttributes &Attrs, Type *Ty) {
+void TypeChecker::validateAttributes(DeclAttributes &Attrs, Type Ty) {
   // If the decl has an infix precedence specified, then it must be a function
   // whose input is a two element tuple.
   if (Attrs.InfixPrecedence != -1) {
     bool IsError = true;
-    if (FunctionType *FT = dyn_cast<FunctionType>(Ty))
-      if (TupleType *TT = dyn_cast<TupleType>(FT->Input))
+    if (FunctionType *FT = dyn_cast<FunctionType>(Ty.getPointer()))
+      if (TupleType *TT = dyn_cast<TupleType>(FT->Input.getPointer()))
         IsError = TT->Fields.size() != 2;
     if (IsError) {
       error(Attrs.LSquareLoc, "function with 'infix' specified must take "
@@ -1494,8 +1496,8 @@ static Expr *DiagnoseUnresolvedTypes(Expr *E, Expr::WalkOrder Order,
   if (Order == Expr::Walk_PreOrder)
     return E;
   
-  // Use getAs to strip off sugar.
-  if (E->Ty->getAs<DependentType>() == 0)
+  // Use is to strip off sugar.
+  if (!E->Ty->is<DependentType>())
     return E;
   
   TypeChecker &TC = *(TypeChecker*)Data;
@@ -1511,7 +1513,7 @@ static Expr *DiagnoseUnresolvedTypes(Expr *E, Expr::WalkOrder Order,
 ///
 /// If the body turns out to be a sequence, this returns the single element
 /// with the excess in the provided smallvector.
-void TypeChecker::checkBody(Expr *&E, Type *DestTy,
+void TypeChecker::checkBody(Expr *&E, Type DestTy,
                             llvm::SmallVectorImpl<Expr*> *ExcessElements) {
   assert(E != 0 && "Can't check a null body!");
   E = SemaExpressionTree::doIt(E, *this);
@@ -1553,9 +1555,9 @@ void TypeChecker::typeCheck(TypeAliasDecl *TAD) {
 
 void TypeChecker::typeCheck(ElementRefDecl *ERD) {
   // If the type is already resolved we're done.  ElementRefDecls are simple.
-  if (!isa<DependentType>(ERD->Ty)) return;
+  if (!ERD->Ty->is<DependentType>()) return;
   
-  if (Type *T = ElementRefDecl::getTypeForPath(ERD->VD->Ty, ERD->AccessPath))
+  if (Type T = ElementRefDecl::getTypeForPath(ERD->VD->Ty, ERD->AccessPath))
     ERD->Ty = T;
   else {
     error(ERD->getLocStart(), "'" + ERD->Name.str() +
@@ -1566,7 +1568,7 @@ void TypeChecker::typeCheck(ElementRefDecl *ERD) {
   }
 }
 
-bool TypeChecker::validateVarName(Type *Ty, DeclVarName *Name) {
+bool TypeChecker::validateVarName(Type Ty, DeclVarName *Name) {
   // Check for a type specifier mismatch on this level.
   assert(Ty && "This lookup should never fail");
 
@@ -1575,7 +1577,7 @@ bool TypeChecker::validateVarName(Type *Ty, DeclVarName *Name) {
     return false;
 
   // If we're peering into an unresolved type, we can't analyze it yet.
-  if (Ty->getAs<DependentType>() != 0) return false;
+  if (Ty->is<DependentType>()) return false;
 
   // If we have a single-element oneof (like a struct) then we allow matching
   // the struct elements with the tuple syntax.
@@ -1620,8 +1622,8 @@ void TypeChecker::typeCheck(VarDecl *VD,
   if (VD->Init == 0) {
     // If we have no initializer and the type is dependent, then the initializer
     // was invalid and removed.
-    if (isa<DependentType>(VD->Ty)) return;
-  } else if (isa<DependentType>(VD->Ty)) {
+    if (VD->Ty->is<DependentType>()) return;
+  } else if (VD->Ty->is<DependentType>()) {
     checkBody(VD->Init, 0, &ExcessExprs);
     if (VD->Init == 0)
       note(VD->getLocStart(),

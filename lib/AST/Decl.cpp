@@ -17,7 +17,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
@@ -69,13 +69,13 @@ NameAliasType *TypeAliasDecl::getAliasType(ASTContext &C) const {
 /// getTypeForPath - Given a type and an access path into it, return the
 /// referenced element type.  If the access path is invalid for the specified
 /// type, this returns null.
-Type *ElementRefDecl::getTypeForPath(Type *Ty, llvm::ArrayRef<unsigned> Path) {
-  assert(Ty && "getTypeForPath() doesn't allow a null type!");
+Type ElementRefDecl::getTypeForPath(Type InTy, llvm::ArrayRef<unsigned> Path) {
+  assert(!InTy.isNull() && "getTypeForPath() doesn't allow a null type!");
   
   if (Path.empty())
-    return Ty;
+    return InTy;
   
-  Ty = Ty->getDesugaredType();
+  TypeBase *Ty = InTy->getDesugaredType();
   
   // If we reach a dependent type, just return it.
   if (llvm::isa<DependentType>(Ty))
@@ -85,10 +85,10 @@ Type *ElementRefDecl::getTypeForPath(Type *Ty, llvm::ArrayRef<unsigned> Path) {
   // the struct elements with the tuple syntax.
   if (OneOfType *OOT = Ty->getAs<OneOfType>())
     if (OOT->hasSingleElement())
-      Ty = OOT->getElement(0)->ArgumentType;
+      Ty = OOT->getElement(0)->ArgumentType->getDesugaredType();
   
-  // Right now, you can only dive into tuples.  Eventually this should handle
-  // oneof's etc.
+  // Right now, you can only dive into syntactic tuples.  Eventually this should 
+  // handle oneof's etc.
   if (TupleType *TT = llvm::dyn_cast<TupleType>(Ty)) {
     // Reject invalid indices.
     if (Path[0] >= TT->Fields.size())

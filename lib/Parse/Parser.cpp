@@ -21,7 +21,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -125,7 +125,7 @@ bool Parser::parseToken(tok::TokenKind K, const char *Message,
 ///   ':' type
 ///   ':' type '=' expr
 ///   '=' expr
-bool Parser::parseValueSpecifier(Type *&Ty, NullablePtr<Expr> &Init) {
+bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init) {
   // Diagnose when we don't have a type or an expression.
   if (Tok.isNot(tok::colon) && Tok.isNot(tok::equal)) {
     error(Tok.getLoc(), "expected a type or an initializer");
@@ -148,7 +148,7 @@ bool Parser::parseValueSpecifier(Type *&Ty, NullablePtr<Expr> &Init) {
     // an artificial int type to avoid chained errors.
     // FIXME: We really need to distinguish erroneous expr from missing expr in
     // ActOnVarDecl.
-    if (Init.isNull() && Ty == 0)
+    if (Init.isNull() && Ty.isNull())
       Ty = S.Context.TheInt32Type;
   }
   
@@ -326,7 +326,7 @@ TypeAliasDecl *Parser::parseDeclTypeAlias() {
   consumeToken(tok::kw_typealias);
   
   Identifier Id;
-  Type *Ty = 0;
+  Type Ty;
   if (parseIdentifier(Id, "expected identifier in var declaration") ||
       parseToken(tok::colon, "expected ':' in typealias declaration") ||
       parseType(Ty, "expected type in var declaration"))
@@ -377,7 +377,7 @@ bool Parser::parseDeclVar(llvm::SmallVectorImpl<ExprOrDecl> &Decls) {
   DeclVarName VarName;
   if (parseVarName(VarName)) return true;
   
-  Type *Ty = 0;
+  Type Ty;
   NullablePtr<Expr> Init;
   if (parseValueSpecifier(Ty, Init))
     return true;
@@ -431,13 +431,13 @@ FuncDecl *Parser::parseDeclFunc() {
     return 0;
   }
     
-  Type *FuncTy = 0;
+  Type FuncTy;
   if (parseType(FuncTy))
     return 0;
   
   // If the parsed function type is not spelled as a function type (i.e., has an
   // '->' in it), then it is implicitly a function that returns ().
-  if (!llvm::isa<FunctionType>(FuncTy))
+  if (!llvm::isa<FunctionType>(FuncTy.getPointer()))
     FuncTy = S.type.ActOnFunctionType(FuncTy, SMLoc(),
                                       S.Context.TheEmptyTupleType);
 
@@ -501,7 +501,7 @@ Decl *Parser::parseDeclOneOf() {
   
   SMLoc NameLoc = Tok.getLoc();
   Identifier OneOfName;
-  Type *OneOfType = 0;
+  Type OneOfType;
   if (parseIdentifier(OneOfName, "expected identifier in oneof declaration"))
     return 0;
   
@@ -533,11 +533,11 @@ Decl *Parser::parseDeclStruct() {
   if (parseIdentifier(StructName, "expected identifier in struct declaration"))
     return 0;
 
-  Type *Ty = 0;
+  Type Ty;
   if (parseType(Ty)) return 0;
 
   // The type is required to be syntactically a tuple type.
-  if (!llvm::isa<TupleType>(Ty)) {
+  if (!llvm::isa<TupleType>(Ty.getPointer())) {
     error(StructLoc, "element type of struct is not a tuple");
     // FIXME: Should set this as an erroroneous decl.
     return 0;
@@ -573,7 +573,7 @@ Decl *Parser::parseDeclStruct() {
 ///   type-oneof:
 ///     'oneof' attribute-list? oneof-body
 ///
-bool Parser::parseType(Type *&Result, const llvm::Twine &Message) {
+bool Parser::parseType(Type &Result, const llvm::Twine &Message) {
   // Parse type-simple first.
   switch (Tok.getKind()) {
   case tok::identifier:
@@ -610,7 +610,7 @@ bool Parser::parseType(Type *&Result, const llvm::Twine &Message) {
     // If there is an arrow, parse the rest of the type.
     SMLoc TokLoc = Tok.getLoc();
     if (consumeIf(tok::arrow)) {
-      Type *SecondHalf = 0;
+      Type SecondHalf;
       if (parseType(SecondHalf, "expected type in result of function type"))
         return true;
       Result = S.type.ActOnFunctionType(Result, TokLoc, SecondHalf);
@@ -642,7 +642,7 @@ bool Parser::parseType(Type *&Result, const llvm::Twine &Message) {
   return false;
 }
 
-bool Parser::parseType(Type *&Result) {
+bool Parser::parseType(Type &Result) {
   return parseType(Result, "expected type");
 }
 
@@ -651,7 +651,7 @@ bool Parser::parseType(Type *&Result) {
 ///     '(' ')'
 ///     '(' identifier? value-specifier (',' identifier? value-specifier)* ')'
 ///
-bool Parser::parseTypeTuple(Type *&Result) {
+bool Parser::parseTypeTuple(Type &Result) {
   assert(Tok.is(tok::l_paren) && "Not start of type tuple");
   SMLoc LPLoc = Tok.getLoc();
   consumeToken(tok::l_paren);
@@ -705,7 +705,7 @@ bool Parser::parseTypeTuple(Type *&Result) {
 /// built with, so that they preserve the name of the oneof decl that contains
 /// this.
 bool Parser::parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
-                                Type *&Result, TypeAliasDecl *TypeName) {
+                                Type &Result, TypeAliasDecl *TypeName) {
   if (parseToken(tok::l_brace, "expected '{' in oneof type"))
     return true;
   

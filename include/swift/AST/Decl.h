@@ -18,6 +18,7 @@
 #define SWIFT_DECL_H
 
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Type.h"
 #include "llvm/Support/SMLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include <cstddef>
@@ -217,9 +218,9 @@ class TypeAliasDecl : public NamedDecl {
   mutable NameAliasType *AliasTy;
 public:
   llvm::SMLoc TypeAliasLoc;
-  Type *UnderlyingTy;
+  Type UnderlyingTy;
   
-  TypeAliasDecl(llvm::SMLoc typealiasloc, Identifier name, Type *underlyingty,
+  TypeAliasDecl(llvm::SMLoc typealiasloc, Identifier name, Type underlyingty,
                 const DeclAttributes &attrs = DeclAttributes())
     : NamedDecl(TypeAliasDeclKind, name, attrs),
       TypeAliasLoc(typealiasloc), UnderlyingTy(underlyingty) {
@@ -243,7 +244,7 @@ public:
 /// have an initializer, type, etc.
 class ValueDecl : public NamedDecl {
 public:
-  Type *Ty;
+  Type Ty;
   Expr *Init;
 
   // Implement isa/cast/dyncast/etc.
@@ -255,7 +256,7 @@ public:
   static bool classof(const ValueDecl *D) { return true; }
 
 protected:
-  ValueDecl(DeclKind K, Identifier name, Type *ty, Expr *init,
+  ValueDecl(DeclKind K, Identifier name, Type ty, Expr *init,
             const DeclAttributes &attrs = DeclAttributes())
     : NamedDecl(K, name, attrs), Ty(ty), Init(init) {
   }
@@ -272,11 +273,11 @@ public:
   /// contains the nested name specifier.
   DeclVarName *NestedName;
   
-  VarDecl(llvm::SMLoc varloc, Identifier name, Type *ty, Expr *init,
+  VarDecl(llvm::SMLoc varloc, Identifier name, Type ty, Expr *init,
           const DeclAttributes &attrs)
     : ValueDecl(VarDeclKind, name, ty, init, attrs), VarLoc(varloc),
       NestedName(0) {}
-  VarDecl(llvm::SMLoc varloc, DeclVarName *name, Type *ty, Expr *init,
+  VarDecl(llvm::SMLoc varloc, DeclVarName *name, Type ty, Expr *init,
           const DeclAttributes &attrs)
     : ValueDecl(VarDeclKind, Identifier(), ty, init, attrs), VarLoc(varloc),
       NestedName(name) {}
@@ -298,7 +299,7 @@ class FuncDecl : public ValueDecl {
 public:
   llvm::SMLoc FuncLoc;    // Location of the 'func' token.
 
-  FuncDecl(llvm::SMLoc funcloc, Identifier name, Type *ty, Expr *init,
+  FuncDecl(llvm::SMLoc funcloc, Identifier name, Type ty, Expr *init,
           const DeclAttributes &attrs)
     : ValueDecl(FuncDeclKind, name, ty, init, attrs), FuncLoc(funcloc) {}
   
@@ -326,11 +327,10 @@ public:
   /// ArgumentType - This is the type specified with the oneof element.  For
   /// example 'int' in the Y example above.  This is null if there is no type
   /// associated with this element (such as in the Z example).
-  Type *ArgumentType;
+  Type ArgumentType;
   
   
-  OneOfElementDecl(llvm::SMLoc identloc, Identifier name, Type *ty,
-                   Type *argtype)
+  OneOfElementDecl(llvm::SMLoc identloc, Identifier name, Type ty, Type argtype)
   : ValueDecl(OneOfElementDeclKind, name, ty, 0),
     IdentifierLoc(identloc), ArgumentType(argtype) {}
 
@@ -360,7 +360,7 @@ public:
   
   // FIXME: Store the access path here.
   
-  ArgDecl(llvm::SMLoc funcloc, Identifier name, Type *ty)
+  ArgDecl(llvm::SMLoc funcloc, Identifier name, Type ty)
     : ValueDecl(ArgDeclKind, name, ty, 0, DeclAttributes()), FuncLoc(funcloc) {}
 
 
@@ -385,7 +385,7 @@ public:
   llvm::ArrayRef<unsigned> AccessPath;
   
   ElementRefDecl(VarDecl *vd, llvm::SMLoc nameloc, Identifier name,
-                 llvm::ArrayRef<unsigned> path, Type *ty)
+                 llvm::ArrayRef<unsigned> path, Type ty)
     : ValueDecl(ElementRefDeclKind, name, ty, 0), VD(vd), NameLoc(nameloc),
       AccessPath(path) {
   }
@@ -394,7 +394,7 @@ public:
   /// referenced element type.  If the access path is invalid for the specified
   /// type, this returns null.  If the query goes into an unresolved (dependent)
   /// part of the type, this returns TheDependentType.
-  static Type *getTypeForPath(Type *Ty, llvm::ArrayRef<unsigned> Path);
+  static Type getTypeForPath(Type Ty, llvm::ArrayRef<unsigned> Path);
   
   
   llvm::SMLoc getLocStart() const { return NameLoc; }

@@ -19,7 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExprVisitor.h"
-#include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/Twine.h"
@@ -47,7 +47,7 @@ NullablePtr<Expr> SemaExpr::ActOnNumericConstant(llvm::StringRef Text,
   // The type of an integer literal is always "integer_literal_type", which
   // should be defined by the library.
   Identifier TyName = S.Context.getIdentifier("integer_literal_type");
-  Type *Ty = S.decl.LookupTypeName(TyName, Loc)->getAliasType(S.Context);
+  Type Ty = S.decl.LookupTypeName(TyName, Loc)->getAliasType(S.Context);
   return new (S.Context) IntegerLiteral(Text, Loc, Ty);
 }
 

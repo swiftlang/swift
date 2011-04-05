@@ -19,7 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -253,7 +253,7 @@ static Expr *BindNames(Expr *E, Expr::WalkOrder Order, void *binder) {
   if (UnresolvedDotExpr *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
     UDE->ResolvedDecl = Binder.bindValueName(UDE->Name);
     // Only bind to functions.
-    if (UDE->ResolvedDecl && !UDE->ResolvedDecl->Ty->getAs<FunctionType>())
+    if (UDE->ResolvedDecl && !UDE->ResolvedDecl->Ty->is<FunctionType>())
       UDE->ResolvedDecl = 0;
   }
   
@@ -288,7 +288,8 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
     TypeAliasDecl *TA = TUD->UnresolvedTypesForParser[i];
 
     if (TypeAliasDecl *Result = Binder.lookupTypeName(TA->Name)) {
-      assert(isa<UnresolvedType>(TA->UnderlyingTy) && "Not an unresolved type");
+      assert(isa<UnresolvedType>(TA->UnderlyingTy.getPointer()) &&
+             "Not an unresolved type");
       // Update the decl we already have to be the correct type.
       TA->TypeAliasLoc = Result->TypeAliasLoc;
       TA->UnderlyingTy = Result->UnderlyingTy;

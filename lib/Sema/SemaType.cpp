@@ -19,22 +19,22 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
 
-Type *SemaType::ActOnInt32Type(llvm::SMLoc Loc) {
+Type SemaType::ActOnInt32Type(llvm::SMLoc Loc) {
   return S.Context.TheInt32Type;
 }
 
-Type *SemaType::ActOnTypeName(llvm::SMLoc Loc, Identifier Name) {
+Type SemaType::ActOnTypeName(llvm::SMLoc Loc, Identifier Name) {
   return S.decl.LookupTypeName(Name, Loc)->getAliasType(S.Context);
 }
 
 
-Type *SemaType::ActOnTupleType(llvm::SMLoc LPLoc, 
+Type SemaType::ActOnTupleType(llvm::SMLoc LPLoc, 
                                llvm::ArrayRef<TupleTypeElt> Elements,
                                llvm::SMLoc RPLoc) {
   return S.Context.getTupleType(Elements);
@@ -53,7 +53,7 @@ OneOfType *SemaType::ActOnOneOfType(llvm::SMLoc OneOfLoc,
     
   // If we have a PrettyTypeName to use, use it.  Otherwise, just assign the
   // constructors a temporary dummy type.
-  Type *TmpTy = S.Context.TheEmptyTupleType;
+  Type TmpTy = S.Context.TheEmptyTupleType;
   if (PrettyTypeName)
     TmpTy = PrettyTypeName->getAliasType(S.Context);
   
@@ -69,8 +69,8 @@ OneOfType *SemaType::ActOnOneOfType(llvm::SMLoc OneOfLoc,
       continue;
     }
     
-    Type *EltTy = TmpTy;
-    if (Type *ArgTy = Elts[i].EltType)
+    Type EltTy = TmpTy;
+    if (Type ArgTy = Elts[i].EltType)
       if (PrettyTypeName)
         EltTy = S.Context.getFunctionType(ArgTy, EltTy);
 
@@ -84,17 +84,18 @@ OneOfType *SemaType::ActOnOneOfType(llvm::SMLoc OneOfLoc,
 
   if (PrettyTypeName) {
     // If we have a pretty name for this, complete it to its actual type.
-    assert(llvm::isa<UnresolvedType>(PrettyTypeName->UnderlyingTy) &&
+    assert(llvm::isa<UnresolvedType>(PrettyTypeName->UnderlyingTy
+                                                .getPointer()) &&
            "Not an incomplete decl to complete!");
     PrettyTypeName->UnderlyingTy = Result;
   } else {
     // Now that the oneof type is created, we can go back and give proper types
     // to each element decl.
     for (unsigned i = 0, e = EltDecls.size(); i != e; ++i) {
-      Type *EltTy = Result;
+      Type EltTy = Result;
       // If the OneOf Element takes a type argument, then it is actually a
       // function that takes the type argument and returns the OneOfType.
-      if (Type *ArgTy = EltDecls[i]->ArgumentType)
+      if (Type ArgTy = EltDecls[i]->ArgumentType)
         EltTy = S.Context.getFunctionType(ArgTy, EltTy);
       EltDecls[i]->Ty = EltTy;
     }
@@ -104,13 +105,12 @@ OneOfType *SemaType::ActOnOneOfType(llvm::SMLoc OneOfLoc,
 }
 
 
-Type *SemaType::ActOnFunctionType(Type *Input, llvm::SMLoc ArrowLoc,
-                                  Type *Output) {
+Type SemaType::ActOnFunctionType(Type Input, llvm::SMLoc ArrowLoc, Type Output){
   return S.Context.getFunctionType(Input, Output);
 }
 
-Type *SemaType::ActOnArrayType(Type *BaseTy, llvm::SMLoc LSquareLoc, Expr *Size,
-                               llvm::SMLoc RSquareLoc) {
+Type SemaType::ActOnArrayType(Type BaseTy, llvm::SMLoc LSquareLoc, Expr *Size,
+                              llvm::SMLoc RSquareLoc) {
   // Unsized arrays.
   if (Size == 0)
     return S.Context.getArrayType(BaseTy, 0);

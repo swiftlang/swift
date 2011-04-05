@@ -90,21 +90,21 @@ public:
   //===--------------------------------------------------------------------===//
   
   TypeAliasDecl *ActOnTypeAlias(llvm::SMLoc TypeAliasLoc, Identifier Name,
-                                Type *Ty);
+                                Type Ty);
   
   Decl *ActOnImportDecl(llvm::SMLoc ImportLoc,
                         llvm::ArrayRef<std::pair<Identifier,llvm::SMLoc> > Path,
                         DeclAttributes &Attrs);
   
-  VarDecl *ActOnVarDecl(llvm::SMLoc VarLoc, DeclVarName &Name, Type *Ty,
+  VarDecl *ActOnVarDecl(llvm::SMLoc VarLoc, DeclVarName &Name, Type Ty,
                         Expr *Init, DeclAttributes &Attrs);
   FuncDecl *ActOnFuncDecl(llvm::SMLoc FuncLoc, Identifier Name,
-                          Type *Ty, DeclAttributes &Attrs);
+                          Type Ty, DeclAttributes &Attrs);
   void CreateArgumentDeclsForFunc(FuncDecl *FD);
   FuncDecl *ActOnFuncBody(FuncDecl *FD, Expr *Body);
 
   Decl *ActOnStructDecl(llvm::SMLoc StructLoc, DeclAttributes &Attrs,
-                        Identifier Name, Type *Ty);
+                        Identifier Name, Type Ty);
   
   // Name processing.
   

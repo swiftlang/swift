@@ -17,7 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
-#include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/ADT/DenseMap.h"
@@ -31,10 +31,10 @@ typedef llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTableMapTy;
 typedef llvm::FoldingSet<TupleType> TupleTypesMapTy;
 
 /// FunctionTypesMapTy - This is the actual type underlying 'FunctionTypes'.
-typedef llvm::DenseMap<std::pair<Type*,Type*>, FunctionType*>FunctionTypesMapTy;
+typedef llvm::DenseMap<std::pair<Type,Type>, FunctionType*> FunctionTypesMapTy;
 
 /// ArrayTypesMapTy - This is the actual type underlying 'ArrayTypes'.
-typedef llvm::DenseMap<std::pair<Type*, uint64_t>, ArrayType*> ArrayTypesMapTy;
+typedef llvm::DenseMap<std::pair<Type, uint64_t>, ArrayType*> ArrayTypesMapTy;
 
 ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
   : Allocator(new llvm::BumpPtrAllocator()),
@@ -81,7 +81,7 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
                         llvm::ArrayRef<TupleTypeElt> Fields) {
   ID.AddInteger(Fields.size());
   for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
-    ID.AddPointer(Fields[i].Ty);
+    ID.AddPointer(Fields[i].Ty.getPointer());
     ID.AddPointer(Fields[i].Name.get());
     ID.AddPointer(Fields[i].Init);
   }
@@ -110,7 +110,7 @@ TupleType *ASTContext::getTupleType(llvm::ArrayRef<TupleTypeElt> Fields) {
   
   bool IsCanonical = true;   // All canonical elts means this is canonical.
   for (unsigned i = 0, e = Fields.size(); i != e; ++i)
-    IsCanonical &= Fields[i].Ty ? Fields[i].Ty->isCanonical() : false;
+    IsCanonical &= Fields[i].Ty.isNull() ? false : Fields[i].Ty->isCanonical();
 
   Fields = llvm::ArrayRef<TupleTypeElt>(FieldsCopy, Fields.size());
   
@@ -139,7 +139,7 @@ OneOfType *ASTContext::getNewOneOfType(llvm::SMLoc OneOfLoc,
 
 /// getFunctionType - Return a uniqued function type with the specified
 /// input and result.
-FunctionType *ASTContext::getFunctionType(Type *Input, Type *Result) {
+FunctionType *ASTContext::getFunctionType(Type Input, Type Result) {
   FunctionType *&Entry =
     (*(FunctionTypesMapTy*)FunctionTypes)[std::make_pair(Input, Result)];
   if (Entry) return Entry;
@@ -155,7 +155,7 @@ FunctionType *ASTContext::getFunctionType(Type *Input, Type *Result) {
 
 /// getArrayType - Return a uniqued array type with the specified base type
 /// and the specified size.  Size=0 indicates an unspecified size array.
-ArrayType *ASTContext::getArrayType(Type *BaseType, uint64_t Size) {
+ArrayType *ASTContext::getArrayType(Type BaseType, uint64_t Size) {
   ArrayType *&Entry =
     (*(ArrayTypesMapTy*)ArrayTypes)[std::make_pair(BaseType, Size)];
   if (Entry) return Entry;

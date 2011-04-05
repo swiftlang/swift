@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "llvm/Support/raw_ostream.h"
@@ -22,7 +22,7 @@ using namespace swift;
 using llvm::cast;
 
 // Only allow allocation of Stmts using the allocator in ASTContext.
-void *Type::operator new(size_t Bytes, ASTContext &C,
+void *TypeBase::operator new(size_t Bytes, ASTContext &C,
                          unsigned Alignment) throw() {
   return C.Allocate(Bytes, Alignment);
 }
@@ -33,13 +33,13 @@ void *Type::operator new(size_t Bytes, ASTContext &C,
 
 /// getCanonicalType - Return the canonical version of this type, which has
 /// sugar from all levels stripped off.
-Type *Type::getCanonicalType(ASTContext &Ctx) {
+TypeBase *TypeBase::getCanonicalType(ASTContext &Ctx) {
   // If the type is itself canonical or if the canonical type was already
   // computed, just return what we have.
   if (CanonicalType)
     return CanonicalType;
   
-  Type *Result = 0;
+  TypeBase *Result = 0;
   switch (Kind) {
   case UnresolvedTypeKind:
     assert(0 && "Cannot call getCanonicalType before name binding is complete");
@@ -57,7 +57,7 @@ Type *Type::getCanonicalType(ASTContext &Ctx) {
     CanElts.resize(TT->Fields.size());
     for (unsigned i = 0, e = TT->Fields.size(); i != e; ++i) {
       CanElts[i].Name = TT->Fields[i].Name;
-      assert(TT->Fields[i].Ty &&
+      assert(!TT->Fields[i].Ty.isNull() &&
              "Cannot get canonical type of TypeChecked TupleType!");
       CanElts[i].Ty = TT->Fields[i].Ty->getCanonicalType(Ctx);
     }
@@ -68,14 +68,14 @@ Type *Type::getCanonicalType(ASTContext &Ctx) {
     
   case FunctionTypeKind: {
     FunctionType *FT = llvm::cast<FunctionType>(this);
-    Type *In = FT->Input->getCanonicalType(Ctx);
-    Type *Out = FT->Result->getCanonicalType(Ctx);
+    Type In = FT->Input->getCanonicalType(Ctx);
+    Type Out = FT->Result->getCanonicalType(Ctx);
     Result = Ctx.getFunctionType(In, Out);
     break;
   }
   case ArrayTypeKind:
     ArrayType *AT = llvm::cast<ArrayType>(this);
-    Type *EltTy = AT->Base->getCanonicalType(Ctx);
+    Type EltTy = AT->Base->getCanonicalType(Ctx);
     Result = Ctx.getArrayType(EltTy, AT->Size);
     break;
   }
@@ -84,7 +84,7 @@ Type *Type::getCanonicalType(ASTContext &Ctx) {
 }
 
 
-Type *Type::getDesugaredType() {
+TypeBase *TypeBase::getDesugaredType() {
   switch (Kind) {
   case DependentTypeKind:
   case UnresolvedTypeKind:
@@ -127,7 +127,7 @@ int TupleType::getNamedElementId(Identifier I) const {
 /// updateInitializedElementType - This methods updates the element type and
 /// initializer for a non-canonical TupleType that has an initializer for the
 /// specified element.  This should only be used by TypeChecker.
-void TupleType::updateInitializedElementType(unsigned EltNo, Type *NewTy,
+void TupleType::updateInitializedElementType(unsigned EltNo, Type NewTy,
                                              Expr *NewInit) {
   assert(!hasCanonicalTypeComputed() &&
          "Cannot munge an already canonicalized type!");
@@ -150,7 +150,7 @@ OneOfElementDecl *OneOfType::getElement(Identifier Name) const {
 /// 'struct'.  Since it is unambiguous which slice is being referenced,
 /// various syntactic forms are allowed for these, like direct "foo.x" syntax.
 bool OneOfType::hasSingleElement() const {
-  return Elements.size() == 1 && Elements[0]->ArgumentType != 0;
+  return Elements.size() == 1 && !Elements[0]->ArgumentType.isNull();
 }
 
 
@@ -159,25 +159,43 @@ bool OneOfType::hasSingleElement() const {
 //  Type printing.
 //===----------------------------------------------------------------------===//
 
+void Type::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
+void Type::print(llvm::raw_ostream &OS) const {
+  if (isNull())
+    OS << "<null>";
+  else
+    Ptr->print(OS);
+}
+
 /// getString - Return the name of the type as a string, for use in
 /// diagnostics only.
 std::string Type::getString() const {
   std::string Result;
   llvm::raw_string_ostream OS(Result);
-  OS << *this;
+  print(OS);
   return OS.str();
 }
 
 
-void Type::dump() const {
-  llvm::errs() << *this << '\n';
+/// getString - Return the name of the type as a string, for use in
+/// diagnostics only.
+std::string TypeBase::getString() const {
+  std::string Result;
+  llvm::raw_string_ostream OS(Result);
+  print(OS);
+  return OS.str();
 }
 
-void Type::print(llvm::raw_ostream &OS) const {
-  if (this == 0) {
-    OS << "<null>";
-    return;
-  }
+
+void TypeBase::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
+
+void TypeBase::print(llvm::raw_ostream &OS) const {
   switch (Kind) {
   case DependentTypeKind:     return cast<DependentType>(this)->print(OS);
   case UnresolvedTypeKind:    return cast<UnresolvedType>(this)->print(OS);
@@ -215,8 +233,8 @@ void OneOfType::print(llvm::raw_ostream &OS) const {
   for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
     if (i) OS << ", ";
     OS << Elements[i]->Name;
-    if (Elements[i]->ArgumentType)
-      OS << " : " << *Elements[i]->ArgumentType;
+    if (!Elements[i]->ArgumentType.isNull())
+      OS << " : " << Elements[i]->ArgumentType;
   }
   
   OS << '}';
@@ -232,17 +250,17 @@ void TupleType::print(llvm::raw_ostream &OS) const {
     if (!TD.Name.empty())
       OS << TD.Name << ' ';
     
-    OS << ": " << *TD.Ty;
+    OS << ": " << TD.Ty;
   }
   OS << ')';
 }
 
 void FunctionType::print(llvm::raw_ostream &OS) const {
-  OS << *Input << " -> " << *Result;
+  OS << Input << " -> " << Result;
 }
 
 void ArrayType::print(llvm::raw_ostream &OS) const {
-  OS << *Base << '[';
+  OS << Base << '[';
   if (Size)
     OS << Size;
   OS << ']';

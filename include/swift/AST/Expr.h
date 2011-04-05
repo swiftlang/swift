@@ -18,6 +18,7 @@
 #define SWIFT_AST_EXPR_H
 
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Type.h"
 #include "llvm/Support/SMLoc.h"
 #include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/StringRef.h"
@@ -62,9 +63,9 @@ public:
   const ExprKind Kind;
 
   /// Ty - This is the type of the expression.
-  Type *Ty;
+  Type Ty;
   
-  Expr(ExprKind kind, Type *ty = 0) : Kind(kind), Ty(ty) {}
+  Expr(ExprKind kind, Type ty = Type()) : Kind(kind), Ty(ty) {}
 
   /// getLocStart - Return the location of the start of the expression.
   /// FIXME: QOI: Need to extend this to do full source ranges like Clang.
@@ -115,7 +116,7 @@ public:
   llvm::StringRef Val;  // Use StringRef instead of APInt, APInt leaks.
   llvm::SMLoc Loc;
   
-  IntegerLiteral(llvm::StringRef V, llvm::SMLoc L, Type *Ty)
+  IntegerLiteral(llvm::StringRef V, llvm::SMLoc L, Type Ty)
     : Expr(IntegerLiteralKind, Ty), Val(V), Loc(L) {}
   
   uint64_t getValue() const;
@@ -131,7 +132,7 @@ public:
   ValueDecl *D;
   llvm::SMLoc Loc;
   
-  DeclRefExpr(ValueDecl *d, llvm::SMLoc L, Type *Ty = 0)
+  DeclRefExpr(ValueDecl *d, llvm::SMLoc L, Type Ty = Type())
     : Expr(DeclRefExprKind, Ty), D(d), Loc(L) {}
   
   // Implement isa/cast/dyncast/etc.
@@ -233,7 +234,7 @@ public:
   
   TupleExpr(llvm::SMLoc lparenloc, Expr **subexprs, Identifier *subexprnames,
             unsigned numsubexprs, llvm::SMLoc rparenloc, bool isGrouping,
-            bool isPrecededByIdentifier, Type *Ty = 0)
+            bool isPrecededByIdentifier, Type Ty = Type())
     : Expr(TupleExprKind, Ty), LParenLoc(lparenloc), SubExprs(subexprs),
       SubExprNames(subexprnames), NumSubExprs(numsubexprs),
       RParenLoc(rparenloc), IsGrouping(isGrouping),
@@ -291,7 +292,7 @@ public:
   llvm::SMLoc NameLoc;
   
   TupleElementExpr(Expr *subexpr, llvm::SMLoc dotloc, unsigned fieldno,
-                   llvm::SMLoc nameloc, Type *ty = 0)
+                   llvm::SMLoc nameloc, Type ty = Type())
   : Expr(TupleElementExprKind, ty), SubExpr(subexpr), DotLoc(dotloc),
     FieldNo(fieldno), NameLoc(nameloc) {}
   
@@ -310,7 +311,7 @@ public:
   Expr *Fn;
   /// Argument - The one argument being passed to it.
   Expr *Arg;
-  ApplyExpr(Expr *fn, Expr *arg, Type *Ty)
+  ApplyExpr(Expr *fn, Expr *arg, Type Ty)
     : Expr(ApplyExprKind, Ty), Fn(fn), Arg(arg) {}
 
   // Implement isa/cast/dyncast/etc.
@@ -370,7 +371,7 @@ class ClosureExpr : public Expr {
 public:
   Expr *Input;
   
-  ClosureExpr(Expr *input, Type *ResultTy)
+  ClosureExpr(Expr *input, Type ResultTy)
     : Expr(ClosureExprKind, ResultTy), Input(input) {}
 
   /// getNumArgs - Return the number of arguments that this closure expr takes.
@@ -402,7 +403,8 @@ public:
   llvm::SMLoc OpLoc;
   Expr *RHS;
   
-  BinaryExpr(Expr *lhs, ValueDecl *fn, llvm::SMLoc oploc, Expr *rhs, Type *Ty=0)
+  BinaryExpr(Expr *lhs, ValueDecl *fn, llvm::SMLoc oploc, Expr *rhs,
+             Type Ty = Type())
     : Expr(BinaryExprKind, Ty), LHS(lhs), Fn(fn), OpLoc(oploc), RHS(rhs) {}
 
   // Implement isa/cast/dyncast/etc.

@@ -19,6 +19,7 @@
 
 #include "llvm/Support/DataTypes.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "swift/AST/Type.h"
 
 namespace llvm {
   class SMLoc;
@@ -101,25 +102,25 @@ public:
   //===--------------------------------------------------------------------===//
   
   // Builtin type and simple types that are used frequently.
-  Type * const TheEmptyTupleType;  /// TheEmptyTupleType - This is "()"
-  Type * const TheUnresolvedType;  /// TheUnresolvedType - Not name bound.
+  const Type TheEmptyTupleType;  /// TheEmptyTupleType - This is "()"
+  const Type TheUnresolvedType;  /// TheUnresolvedType - Not name bound.
   
   /// TheDependentType - Dependent on context.  This is given to an anonymous
   /// closure argument (e.g. $4) and to UnresolvedMemberExprs (e.g. :foo) during
   /// type checking until they are resolved to something with concrete type.
-  Type * const TheDependentType;
-  Type * const TheInt32Type;       /// TheInt32Type - 32-bit signed integer.
+  const Type TheDependentType;
+  const Type TheInt32Type;       /// TheInt32Type - 32-bit signed integer.
 
   /// getTupleType - Return the uniqued tuple type with the specified elements.
   TupleType *getTupleType(llvm::ArrayRef<TupleTypeElt> Fields);
   
   /// getFunctionType - Return a uniqued function type with the specified
   /// input and result.
-  FunctionType *getFunctionType(Type *Input, Type *Result);
+  FunctionType *getFunctionType(Type Input, Type Result);
 
   /// getArrayType - Return a uniqued array type with the specified base type
   /// and the specified size.  Size=0 indicates an unspecified size array.
-  ArrayType *getArrayType(Type *BaseType, uint64_t Size);
+  ArrayType *getArrayType(Type BaseType, uint64_t Size);
   
   /// getNewOneOfType - Return a new instance of oneof type.  These are never
   /// uniqued each syntactic instance of them is semantically considered to be a

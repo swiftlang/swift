@@ -111,7 +111,7 @@ private:
   bool parseToken(tok::TokenKind K, const char *Message,
                   tok::TokenKind SkipToTok = tok::unknown);
   
-  bool parseValueSpecifier(Type *&Ty, llvm::NullablePtr<Expr> &Init);
+  bool parseValueSpecifier(Type &Ty, llvm::NullablePtr<Expr> &Init);
   
   // Decl Parsing
   bool parseDeclExprList(llvm::SmallVectorImpl<ExprOrDecl> &Decls,
@@ -128,11 +128,11 @@ private:
   FuncDecl *parseDeclFunc();
   
   // Type Parsing
-  bool parseType(Type *&Result);
-  bool parseType(Type *&Result, const llvm::Twine &Message);
-  bool parseTypeTuple(Type *&Result);
+  bool parseType(Type &Result);
+  bool parseType(Type &Result, const llvm::Twine &Message);
+  bool parseTypeTuple(Type &Result);
   bool parseTypeOneOfBody(llvm::SMLoc OneOfLoc, const DeclAttributes &Attrs,
-                          Type *&Result, TypeAliasDecl *TypeName = 0);
+                          Type &Result, TypeAliasDecl *TypeName = 0);
 
   // Expression Parsing
   bool parseExpr(llvm::NullablePtr<Expr> &Result, const char *Message = 0);

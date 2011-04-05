@@ -18,6 +18,7 @@
 #ifndef SWIFT_SEMA_TYPE_H
 #define SWIFT_SEMA_TYPE_H
 
+#include "swift/AST/Type.h"
 #include "swift/Sema/SemaBase.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
@@ -40,18 +41,18 @@ class SemaType : public SemaBase {
 public:
   explicit SemaType(Sema &S) : SemaBase(S) {}
 
-  Type *ActOnInt32Type(llvm::SMLoc Loc);
-  Type *ActOnTypeName(llvm::SMLoc Loc, Identifier Name);
-  Type *ActOnTupleType(llvm::SMLoc LPLoc, llvm::ArrayRef<TupleTypeElt> Elements,
-                       llvm::SMLoc RPLoc);
-  Type *ActOnFunctionType(Type *Input, llvm::SMLoc ArrowLoc, Type *Output);
-  Type *ActOnArrayType(Type *BaseTy, llvm::SMLoc LSquareLoc, Expr *Size,
+  Type ActOnInt32Type(llvm::SMLoc Loc);
+  Type ActOnTypeName(llvm::SMLoc Loc, Identifier Name);
+  Type ActOnTupleType(llvm::SMLoc LPLoc, llvm::ArrayRef<TupleTypeElt> Elements,
+                      llvm::SMLoc RPLoc);
+  Type ActOnFunctionType(Type Input, llvm::SMLoc ArrowLoc, Type Output);
+  Type ActOnArrayType(Type BaseTy, llvm::SMLoc LSquareLoc, Expr *Size,
                        llvm::SMLoc RSquareLoc);
   
   struct OneOfElementInfo {
     llvm::SMLoc NameLoc;
     llvm::StringRef Name;
-    Type *EltType;
+    Type EltType;
   };
   
   OneOfType *ActOnOneOfType(llvm::SMLoc OneOfLoc, const DeclAttributes &Attrs,

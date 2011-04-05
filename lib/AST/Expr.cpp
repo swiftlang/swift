@@ -17,7 +17,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ExprVisitor.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/AST/ASTContext.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/Casting.h"
@@ -72,10 +72,9 @@ llvm::SMLoc Expr::getLocStart() const {
 /// getNumArgs - Return the number of arguments that this closure expr takes.
 /// This is the length of the ArgList.
 unsigned ClosureExpr::getNumArgs() const {
-  // FIXME: This should desugar the type if needed!
-  Type *Input = cast<FunctionType>(Ty)->Input;
+  Type Input = Ty->getAs<FunctionType>()->Input;
   
-  if (TupleType *TT = llvm::dyn_cast<TupleType>(Input))
+  if (TupleType *TT = Input->getAs<TupleType>())
     return TT->Fields.size();
   return 1;  
 }

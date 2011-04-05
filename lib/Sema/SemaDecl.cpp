@@ -20,7 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Casting.h"
@@ -89,7 +89,7 @@ void SemaDecl::handleEndOfTranslationUnit(TranslationUnitDecl *TUD,
     // they get passed in a parent context decl.
 
     // Verify that values have a type specified.
-    if (llvm::isa<DependentType>(VD->Ty)) {
+    if (VD->Ty->is<DependentType>()) {
       error(VD->getLocStart(),
             "top level declarations require a type specifier");
       // FIXME: Should mark the decl as invalid.
@@ -104,12 +104,12 @@ void SemaDecl::handleEndOfTranslationUnit(TranslationUnitDecl *TUD,
     TypeAliasDecl *Decl = UnresolvedTypeList[i];
     
     // If a type got defined, remove it from the vector.
-    if (!llvm::isa<UnresolvedType>(Decl->UnderlyingTy))
+    if (!llvm::isa<UnresolvedType>(Decl->UnderlyingTy.getPointer()))
       continue;
     
     UnresolvedTypeList[Next++] = Decl;
   }
-  // Trip out stuff that got replaced.
+  // Strip out stuff that got replaced.
   UnresolvedTypeList.resize(Next);
     
   TUD->UnresolvedTypesForParser =
@@ -176,12 +176,12 @@ void SemaDecl::AddToScope(ValueDecl *D) {
 ElementRefDecl *SemaDecl::
 ActOnElementName(Identifier Name, llvm::SMLoc NameLoc, VarDecl *D,
                  llvm::ArrayRef<unsigned> Path) {
-  Type *Ty = ElementRefDecl::getTypeForPath(D->Ty, Path);
+  Type Ty = ElementRefDecl::getTypeForPath(D->Ty, Path);
 
   // If the type of the path is obviously invalid, diagnose it now and refuse to
   // create the decl.  The most common result here is DependentType, which
   // allows type checking to resolve this later.
-  if (Ty == 0) {
+  if (Ty.isNull()) {
     error(NameLoc, "'" + Name.str() + "' is an invalid index for '" +
           D->Ty->getString() + "'");
     return 0;
@@ -212,9 +212,9 @@ Decl *SemaDecl::ActOnImportDecl(llvm::SMLoc ImportLoc,
 /// Note that DeclVarName is sitting on the stack, not copied into the
 /// ASTContext.
 VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, DeclVarName &Name,
-                                Type *Ty, Expr *Init, DeclAttributes &Attrs) {
-  assert((Ty != 0 || Init != 0) && "Must have a type or an expr already");
-  if (Ty == 0)
+                                Type Ty, Expr *Init, DeclAttributes &Attrs) {
+  assert((!Ty.isNull() || Init != 0) && "Must have a type or an expr already");
+  if (Ty.isNull())
     Ty = S.Context.TheDependentType;
   
   if (Name.isSimple())
@@ -227,8 +227,8 @@ VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, DeclVarName &Name,
 
 FuncDecl *SemaDecl::
 ActOnFuncDecl(llvm::SMLoc FuncLoc, Identifier Name,
-              Type *Ty, DeclAttributes &Attrs) {
-  assert(Ty && "Type not specified?");
+              Type Ty, DeclAttributes &Attrs) {
+  assert(!Ty.isNull() && "Type not specified?");
 
   return new (S.Context) FuncDecl(FuncLoc, Name, Ty, 0, Attrs);
 }
@@ -250,20 +250,20 @@ enum FuncTypePiece {
 /// Note that we really *do* want dyn_cast here, not getAs, because we do not
 /// want to look through type aliases or other sugar, we want to see what the
 /// user wrote in the func declaration.
-static void AddFuncArgumentsToScope(Type *Ty,
+static void AddFuncArgumentsToScope(Type Ty,
                                     llvm::SmallVectorImpl<unsigned> &AccessPath,
                                     FuncTypePiece Mode,
                                     llvm::SMLoc FuncLoc, SemaDecl &SD) {
   // Handle the function case first.
   if (Mode == FTP_Function) {
-    FunctionType *FT = llvm::cast<FunctionType>(Ty);
+    FunctionType *FT = llvm::cast<FunctionType>(Ty.getPointer());
     AccessPath.push_back(0);
     AddFuncArgumentsToScope(FT->Input, AccessPath, FTP_Input, FuncLoc, SD);
     
     AccessPath.back() = 1;
     
     // If this is a->b->c then we treat b as an input, not (b->c) as an output.
-    if (llvm::isa<FunctionType>(FT->Result))
+    if (llvm::isa<FunctionType>(FT->Result.getPointer()))
       AddFuncArgumentsToScope(FT->Result, AccessPath, FTP_Function, FuncLoc,SD);
     else    
       AddFuncArgumentsToScope(FT->Result, AccessPath, FTP_Output, FuncLoc, SD);
@@ -272,8 +272,9 @@ static void AddFuncArgumentsToScope(Type *Ty,
   }
 
   // Otherwise, we're looking at an input or output to the func.  The only type
-  // we currently dive into is the humble tuple, which can be recursive.
-  TupleType *TT = llvm::dyn_cast<TupleType>(Ty);
+  // we currently dive into is the humble tuple, which can be recursive.  This
+  // should dive in syntactically.
+  TupleType *TT = llvm::dyn_cast<TupleType>(Ty.getPointer());
   if (TT == 0) return;
 
   
@@ -318,7 +319,7 @@ FuncDecl *SemaDecl::ActOnFuncBody(FuncDecl *FD, Expr *Body) {
 }
 
 Decl *SemaDecl::ActOnStructDecl(llvm::SMLoc StructLoc, DeclAttributes &Attrs,
-                                Identifier Name, Type *BodyTy) {
+                                Identifier Name, Type BodyTy) {
   // Get the TypeAlias for the name that we'll eventually have.  This ensures
   // that the constructors generated have the pretty name for the type instead
   // of the raw oneof.
@@ -344,7 +345,7 @@ Decl *SemaDecl::ActOnStructDecl(llvm::SMLoc StructLoc, DeclAttributes &Attrs,
 
 
 TypeAliasDecl *SemaDecl::ActOnTypeAlias(llvm::SMLoc TypeAliasLoc,
-                                        Identifier Name, Type *Ty) {
+                                        Identifier Name, Type Ty) {
   std::pair<unsigned,TypeAliasDecl*> Entry =getTypeHT(TypeScopeHT).lookup(Name);
 
   // If we have no existing entry, or if the existing entry is at a different
@@ -360,7 +361,7 @@ TypeAliasDecl *SemaDecl::ActOnTypeAlias(llvm::SMLoc TypeAliasLoc,
   
   // If the previous definition was just a use of an undeclared type, complete
   // the type now.
-  if (llvm::isa<UnresolvedType>(ExistingDecl->UnderlyingTy)) {
+  if (ExistingDecl->UnderlyingTy->is<UnresolvedType>()) {
     // Remove the entry for this type from the UnresolvedTypes map.
     getUnresolvedTypesHT(UnresolvedTypes).erase(Name);
     
