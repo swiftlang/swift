@@ -43,11 +43,6 @@ public:
   void dump() const;
   void print(llvm::raw_ostream &OS) const;
 
-  // FIXME: Remove these.
-  bool operator==(Type RHS) const { return Ptr == RHS.Ptr; }
-  bool operator!=(Type RHS) const { return Ptr != RHS.Ptr; }
-  
-  
   /// getString - Return the name of the type as a string, for use in
   /// diagnostics only.
   std::string getString() const;
