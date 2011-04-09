@@ -222,7 +222,7 @@ public:
   
   TypeAliasDecl(llvm::SMLoc typealiasloc, Identifier name, Type underlyingty,
                 const DeclAttributes &attrs = DeclAttributes())
-    : NamedDecl(TypeAliasDeclKind, name, attrs),
+    : NamedDecl(TypeAliasDeclKind, name, attrs), AliasTy(0),
       TypeAliasLoc(typealiasloc), UnderlyingTy(underlyingty) {
   }
 
