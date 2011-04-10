@@ -31,6 +31,13 @@ void *TypeBase::operator new(size_t Bytes, ASTContext &C,
 // Various Type Methods.
 //===----------------------------------------------------------------------===//
 
+/// isEqual - Return true if these two types are equal, ignoring sugar.
+bool TypeBase::isEqual(Type Other, ASTContext &Ctx) {
+  return getCanonicalType(Ctx) == Other.getPointer()->getCanonicalType(Ctx);
+}
+
+
+
 /// getCanonicalType - Return the canonical version of this type, which has
 /// sugar from all levels stripped off.
 TypeBase *TypeBase::getCanonicalType(ASTContext &Ctx) {

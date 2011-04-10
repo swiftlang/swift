@@ -832,7 +832,14 @@ namespace {
     }
     
     Expr *VisitOverloadSetRefExpr(OverloadSetRefExpr *E) {
-      // FIXME: Apply a type.
+      // If any decl that is in the overload set exactly matches the expected
+      // type, then select it.
+      // FIXME: Conversion ranking.
+      for (unsigned i = 0, e = E->Decls.size(); i != e; ++i) {
+        ValueDecl *VD = E->Decls[i];
+        if (VD->Ty->isEqual(DestTy, TC.Context))
+          return new (TC.Context) DeclRefExpr(VD, E->Loc, VD->Ty);
+      }
       return E;
     }
     

@@ -76,6 +76,9 @@ public:
   /// sugar from all levels stripped off.
   TypeBase *getCanonicalType(ASTContext &Ctx);
   
+  /// isEqual - Return true if these two types are equal, ignoring sugar.
+  bool isEqual(Type Other, ASTContext &Ctx);
+  
   /// getDesugaredType - If this type is a sugared type, remove all levels of
   /// sugar until we get down to a non-sugar type.
   TypeBase *getDesugaredType();
