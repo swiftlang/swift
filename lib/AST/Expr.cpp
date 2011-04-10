@@ -296,8 +296,8 @@ public:
   void VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     OS.indent(Indent) << "(unresolved_dot_expr type='" << E->Ty;
     OS << "\' field '" << E->Name.get() << "'";
-    if (E->ResolvedDecl)
-      OS << " decl resolved!";
+    if (!E->ResolvedDecls.empty())
+      OS << " decl resolved to " << E->ResolvedDecls.size() << "candidate(s)!";
     OS << '\n';
     PrintRec(E->SubExpr);
     OS << ')';

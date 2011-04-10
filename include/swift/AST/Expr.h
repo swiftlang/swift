@@ -149,8 +149,9 @@ public:
   llvm::ArrayRef<ValueDecl*> Decls;
   llvm::SMLoc Loc;
   
-  OverloadSetRefExpr(llvm::ArrayRef<ValueDecl*> decls, llvm::SMLoc L)
-  : Expr(OverloadSetRefExprKind), Decls(decls), Loc(L) {}
+  OverloadSetRefExpr(llvm::ArrayRef<ValueDecl*> decls, llvm::SMLoc L,
+                     Type Ty = Type())
+  : Expr(OverloadSetRefExprKind, Ty), Decls(decls), Loc(L) {}
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const OverloadSetRefExpr *) { return true; }
@@ -289,8 +290,8 @@ public:
   llvm::SMLoc NameLoc;
   
   /// ResolvedDecl - If the name refers to any local or top-level declarations,
-  /// the name binder fills it in here.
-  ValueDecl *ResolvedDecl;
+  /// the name binder fills them in here.
+  llvm::ArrayRef<ValueDecl*> ResolvedDecls;
   
   UnresolvedDotExpr(Expr *subexpr, llvm::SMLoc dotloc, Identifier name,
                     llvm::SMLoc nameloc)

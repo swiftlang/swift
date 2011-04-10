@@ -466,20 +466,28 @@ Expr *SemaExpressionTree::VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   
   // Next, check to see if "a.f" is actually being used as sugar for "f a",
   // which is a function application of 'a' to 'f'.
-  if (E->ResolvedDecl) {
-    assert(E->ResolvedDecl->Ty->is<FunctionType>() &&
+  if (!E->ResolvedDecls.empty()) {
+    assert(E->ResolvedDecls[0]->Ty->is<FunctionType>() &&
            "Should have only bound to functions");
-    
-    // Apply the base value to the function.
-    Expr *FnRef = 
-      new (TC.Context) DeclRefExpr(E->ResolvedDecl, E->NameLoc,
-                                   E->ResolvedDecl->Ty);
+    Expr *FnRef;
+    // Apply the base value to the function there is a single candidate in the
+    // set then this is directly resolved, otherwise it is an overload case..
+    if (E->ResolvedDecls.size() == 1)
+      FnRef = new (TC.Context) DeclRefExpr(E->ResolvedDecls[0], E->NameLoc,
+                                           E->ResolvedDecls[0]->Ty);
+    else
+      FnRef = new (TC.Context) OverloadSetRefExpr(E->ResolvedDecls, E->NameLoc,
+                                                  TC.Context.TheDependentType);
+        
     Type ResultTy;
     if (SemaApplyExpr(FnRef, E->SubExpr, ResultTy, TC))
       return 0;
     
     return new (TC.Context) ApplyExpr(FnRef, E->SubExpr, ResultTy);
   }
+  
+  // TODO: Otherwise, do an argument dependent lookup in the namespace of the
+  // base type.
   
   TC.error(E->DotLoc, "base type '" + SubExprTy->getString() + 
            "' has no valid '.' expression for this field");

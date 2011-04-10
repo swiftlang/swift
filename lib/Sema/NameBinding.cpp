@@ -362,14 +362,11 @@ static Expr *BindNames(Expr *E, Expr::WalkOrder Order, void *binder) {
   // don't find anything juicy.
   if (UnresolvedDotExpr *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
     llvm::SmallVector<ValueDecl*, 4> Decls;
-    // Only bind to functions.
+    // Perform .-style name lookup.
     Binder.bindValueName(UDE->Name, Decls, NLK_DotLookup);
 
-    // FIXME: should return a set.
-    if (!Decls.empty()) {
-      assert(Decls.size() == 1 && "FIXME: Don't support overloaded . exprs");
-      UDE->ResolvedDecl = Decls.front();
-    }
+    // Copy the overload set into ASTContext memory.
+    UDE->ResolvedDecls = Binder.Context.AllocateCopy<ValueDecl*>(Decls);
     return UDE;
   }
   
