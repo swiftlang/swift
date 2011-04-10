@@ -917,88 +917,58 @@
   <!-- ********************************************************************* -->
 
   <div class="commentary">
-    The goal of semicolon elision is to clean up the common case where ;'s are
-    just clutter.  While they allow people to write confusing and obfuscated
-    code, any language feature can be abused.  We'll encourage good practices in
-    the documentation and frameworks.
+    Support for user defined operators and separation of parsing from type
+    analysis and name binding leads to a somewhat unusual system where
+    expression parsing just doesn't do very much.  This does lead to interesting
+    phases of translation though, because we do "parsing" of expressions late
+    (in type checking) instead of right after lexing.<br><br>
+    
+    Semicolons in C are generally just clutter.  Swift generally defines away
+    their use through the type system (and careful grammar structure).
   </div>
 
   <pre class="grammar">
-    expr ::= <a href="#expr-single">expr-single</a>+
+    expr            ::= expr-primary+
+    expr-primary    ::= <a href="#expr-literal">expr-literal</a>
+    expr-primary    ::= <a href="#expr-identifier">expr-identifier</a>
+    expr-primary    ::= <a href="#expr-paren">expr-paren</a>
+    expr-primary    ::= <a href="#expr-brace">expr-brace</a>
+    expr-primary    ::= <a href="#expr-delayed-identifier">expr-delayed-identifier</a>
+    expr-primary    ::= <a href="#expr-dot">expr-dot</a>
+    expr-primary    ::= <a href="#expr-subscript">expr-subscript</a>
   </pre>
 
-  <p>At the top level, a sequence of "singular" expressions are allowed anytime
-   an expression is allowed.  The value of the expr is the result of the last
-   singular expression.  This grammar rule allows semicolons between expressions
-   to be elided.</p>
+  <p>At the top level of the expression grammar, expressions are a sequence of
+   "primary" expressions.</p>
 
   <pre class="example">
-    <i>// A silly, but valid, example:</i>
+    <i>// A silly, but valid, example of a single 'expr':</i>
     4 4 (4+5) 4 4
     
-    <i>// A more reasonable example.</i>
+    <i>// A more reasonable example:</i>
     foo()
     x = 12
     bar(49+1)
     baz()
     </i>
+    
+    <i>// An example that is parsed as one list of three primary expressions,
+    // but is resolved in type checking to a var decl followed by a separate
+    // apply expression.</i>
+    var x = 4 foo()
   </pre>
-
-  <p>This grammar production is ambiguous with the <a 
-    href="#expr-apply">expr-apply</a> production, but binds very loosely.</p>
-  
-  <!-- ===================================================================== -->
-  <h3 id="expr-single">Singular Expressions</h3>
-  <!-- ===================================================================== -->
-  
-  <pre class="grammar">
-    expr-single     ::= expr-primary (binary-operator expr-primary)*
-    binary-operator ::= identifier
-  </pre>
-
-  <p>Singular expressions are a binary-operator-separated list of primary
-  expressions.  A "binary operator" is any identifier which name lookup resolves
-  to a declaration with the <a href="#attribute-infix">infix</a> attribute.
-  The order of evaluation of the various subexpressions is defined by the
-  precedence of the infix attribute.
-  </p>
-  
-  <p>TODO: Should this use the expr-identifier production to allow qualified
-     identifiers?  Oneof members cannot be declared infix, but future module
-     scopes seem worth accessing :)</p>
-
-  <p>A simple example is:</p>
-  
-  <pre class="example">
-    4 + 5 * 123 min 42
-  </pre>
-
-  <!-- ===================================================================== -->
-  <h3 id="expr-primary">Primary Expressions</h3>
-  <!-- ===================================================================== -->
-  
-  <pre class="grammar">
-    expr-primary    ::= <a href="#expr-literal">expr-literal</a>
-    expr-primary    ::= <a href="#expr-identifier">expr-identifier</a>
-    expr-primary    ::= <a href="#expr-apply">expr-apply</a>
-    expr-primary    ::= <a href="#expr-paren">expr-paren</a>
-    expr-primary    ::= <a href="#expr-brace">expr-brace</a>
-    expr-primary    ::= <a href="#expr-delayed-identifier">expr-delayed-identifier</a>
-    expr-primary    ::= <a href="#expr-field">expr-field</a>
-    expr-primary    ::= <a href="#expr-subscript">expr-subscript</a>
-  </pre>
-  
-  <p>Primary expressions are the root of most simple expressions.</p>
   
   <!-- ===================================================================== -->
   <h3 id="expr-literal">Simple Literals</h3>
   <!-- ===================================================================== -->
   
   <div class="commentary">
-    Consider something like C++'0x user defined literal suffixes or go's
-    approach of treating them as arbitrary precision integers that are resolved
-    to a type later, etc.  This can be handled in the library since the library
-    defines what concrete type to use.
+    Consider treating literal numbers like go's arbitrary precision integers
+    that are resolved to a type later.  It would be really great for x+4.0 to
+    work if x is a float, not a double.  Likewise when we have multiple
+    different width integers floating around.  This is somewhat easy (just give
+    numbers dependent type) but we would needs some magic to make "var x = 4"
+    work, since we want it to get a default type, not be ambiguous.
   </div>
 
   <pre class="grammar">
@@ -1018,59 +988,101 @@
     expr-identifier ::= <a href="#identifier">identifier</a>
   </pre>
   
-  <p>A raw identifier refers to a value visible in the current <a
-     href="#namebind_scope">scope</a>, and has the type of the declaration
-     returned
-     by name lookup.  Value declarations are installed with 
-     <a href="#decl-var">var</a> and <a href="decl-func">func</a>
-     declarations.</p>
-  
+  <p>A raw identifier refers to a value found via <a
+     href="#namebind_value_lookup_unqual">unqualified value lookup</a>, and has
+     the type of the declaration returned by name lookup and overload
+     resolution.  Value declarations are installed with <a 
+     href="#decl-var">var</a> and the syntactic sugar forms like <a 
+     href="decl-func">func</a> declarations.</p>
+    
   <pre class="grammar">
     expr-identifier ::= <a href="#dollarident">dollarident</a>
   </pre>
 
-  <p>A use of an implementation identifier whose name fits the "$[0-9]+" regular
+  <p>A use of an identifier whose name fits the "$[0-9]+" regular
   expression is a reference to an anonymous closure argument that is formed when
   the containing expression is <a href="#typecheck_anon">coerced into a closure
-  context</a>.  All other implementation identifiers are invalid.</p>
+  context</a>.  All other dollar identifiers are invalid.</p>
   
   <pre class="grammar">
     expr-identifier ::= <a href="#type-identifier">type-identifier</a> '::' <a href="#identifier">identifier</a>
   </pre>
 
-  <p>Qualified identifiers look up a member of a <a href="type-oneof">oneof</a>
-     type.  The first identifier is looked up as a type name.</p>
+  <p>Qualified identifiers look up a constructor member of a <a
+    href="type-oneof">oneof</a> type (and eventually into namespaces).  The
+  first identifier is looked up as a <a href="#type-identifier">type name</a>.
+  </p>
  
   <!-- ===================================================================== -->
   <h3 id="expr-delayed-identifier">Delayed Identifier Resolution</h3>
   <!-- ===================================================================== -->
 
+  <div class="commentary">
+    The ":bar" syntax was picked because it is "half" of a fully qualified
+    "foo::bar" reference.
+  </div>
+  
   <pre class="grammar">
     expr-delayed-identifier ::= ':' <a href="#identifier">identifier</a>
   </pre>
   
-  <p>Qualified reference waits for context sensitive type inference. 
-  TODO: explain more, give examples.  Some examples in the <a
-  href="#decl-oneof">oneof</a> section.</p>
+  <p>A delayed identifier expression refers to a constructor of a <a 
+    href="type-oneof">oneof</a> type, without knowing which type it is referring
+    to.  The expression is resolved to a constructor of a concrete type through
+    context sensitive type inference.  Delayed identifier resolution is actually
+    more powerful than qualified identifier resolution, because it can find
+    constructors of anonymous types.</p>
   
+  <pre class="example">
+    <i>// A function with an argument that has an anonymous type.</i> 
+    func search(val : int, direction : oneof { Up, Down });
+    
+    func f() {
+      search(42, :Up);
+      search(17, :Down);
+    }
+  </pre>
   
   <!-- ===================================================================== -->
-  <h3 id="expr-field">Field Expressions</h3>
+  <h3 id="expr-dot">Dot Expressions</h3>
   <!-- ===================================================================== -->
   
+  <div class="commentary">
+    Instead of using "foo.$1" to get to fields of a tuple (which is ugly), we
+    could use "foo[1]".  This would then make people want to use variable
+    indexes into tuples though, which is a bad idea.
+  </div>
+
   <pre class="grammar">
-    expr-field ::= <a href="#expr-primary">expr-primary</a> '.' <a href="#identifier">identifier</a>
-    expr-field ::= <a href="#expr-primary">expr-primary</a> '.' <a href="#dollarident">dollarident</a>
+    expr-dot ::= <a href="#expr">expr-primary</a> '.' <a href="#dollarident">dollarident</a>
   </pre>
     
-  <p>If the base expression is a tuple, then the identifier is either a named
-  field of the tuple, or it is the magic identifier "$[0-9]+" that
-  accesses the specified anonymous member of the tuple.</p>
-  
-  <p>If the base expression is a oneof record with one element, which has
+  <p>If the base expression has <a href="#type-tuple">tuple type</a>, then the
+  magic identifier "$[0-9]+" accesses the specified anonymous member of the
+  tuple.  Otherwise, this form is invalid.</p>
+
+  <pre class="grammar">
+    expr-dot ::= <a href="#expr">expr-primary</a> '.' <a href="#identifier">identifier</a>
+  </pre>
+
+  <p>If the base expression has <a href="#type-tuple">tuple type</a> and if the
+  identifier is the name of a field in the tuple, then this is a reference to
+  the specified field.</p>
+
+  <p>
+  FIXME: Remove by injecting field members are overloaded functions.
+  If the base expression is a oneof record with one element, which has
   an associated type of tuple (which is true of all struct declarations that
   have tuple body type), then the field access directly accesses the
   underlying tuple.</p>
+  
+  <p>Otherwise, if <a href="#namebind_value_lookup_dot">dot name lookup</a> is
+  performed, and this expression is treated as function application.  "x.foo"
+  is treated as a synonym for "foo x", (other than the differing name lookup
+  rules).</p>
+
+  <p>TODO: If dot name lookup fails, do ADL into the namespace of the base
+  expression's type.</p>
   
   <p>No other field accesses are currently allowed.</p>
   
@@ -1078,8 +1090,13 @@
   <h3 id="expr-subscript">Subscript Expressions</h3>
   <!-- ===================================================================== -->
   
+  <div class="commentary">
+    As with arrays, this is just hacked in for now.  Revisit this after we have
+    generics.
+  </div>
+
   <pre class="grammar">
-    expr-subscript ::= <a href="#expr-primary">expr-primary</a> '[' <a href="#expr-single">expr-single</a> ']'
+    expr-subscript ::= <a href="#expr">expr-primary</a> '[' <a href="#expr-single">expr-single</a> ']'
   </pre>
   
   <p>FIXME: Array subscript should just be an overloaded operator like any
@@ -1101,37 +1118,6 @@
   
   <p>TODO: Eventually support map operations etc.</p> -->
   
-  <!-- ===================================================================== -->
-  <h3 id="expr-apply">Function Application</h3>
-  <!-- ===================================================================== -->
-
-  <pre class="grammar">
-    expr-apply      ::= expr-primary-fn <a href="#expr-primary">expr-primary</a>
-    expr-primary-fn ::= <a href="#expr-primary">expr-primary</a>
-  </pre>
-
-  <p>Juxtaposition of two expressions, when the former is of function type, is
-  application of a function to its argument.  This production is ambiguous with
-  the top level <a href="#expr">expr</a> production, but this binds very
-  tightly.</p>
-  
-  <p>A simple example:</p>
-  
-  <pre class="example">
-    <i>// Application of an empty tuple to the function f.</i>
-    f ()
-    <i>// Application of 4 to the function f, both are equivalent.</i>
-    g 4
-    g (4)
-    
-    <i>// Application of 4 to the function returned by h().</i>
-    h () 4
-
-    <i>// Application of "{}" to the function returned by the result of</i>
-    <i>// applying "(x)" to "if".</i>
-    if (x) {}
-  </pre>
-
   <!-- ===================================================================== -->
   <h3 id="expr-paren">Parenthesized Expressions</h3>
   <!-- ===================================================================== -->
@@ -1173,7 +1159,7 @@
     
     <i>// Named arguments to functions.</i>
     func foo(a : int, b : int);
-    foo   (.b = 4, .a = 1)
+    foo(.b = 4, .a = 1)
   </pre>
 
   
@@ -1182,21 +1168,88 @@
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    expr-brace       ::= '{' expr-brace-item* '}'
-    expr-brace-item  ::= ';'
-    expr-brace-item  ::= <a href="#expr">expr</a>
-    expr-brace-item  ::= <a href="#decl-var">decl-var</a>
-    expr-brace-item   ::= <a href="#decl-func">decl-func</a>
-    expr-brace-item  ::= <a href="#decl-typealias">decl-typealias</a>
-    expr-brace-item  ::= <a href="#decl-oneof">decl-oneof</a>
-    expr-brace-item  ::= <a href="#decl-struct">decl-struct</a>
+    expr-brace      ::= '{' expr-brace-item* '}'
+    expr-brace-item ::= ';'
+    expr-brace-item ::= <a href="#expr">expr</a>
+    expr-brace-item ::= <a href="#decl-var">decl-var</a>
+    expr-brace-item ::= <a href="#decl-func">decl-func</a>
+    expr-brace-item ::= <a href="#decl-typealias">decl-typealias</a>
+    expr-brace-item ::= <a href="#decl-oneof">decl-oneof</a>
+    expr-brace-item ::= <a href="#decl-struct">decl-struct</a>
   </pre>
 
   
   <p>FIXME: Need to kill off "the result of {} is the result of the last expr if
-     it doesn't have a ; at the end.</p>
+     it doesn't have a ; at the end.  Add return statement instead.</p>
   
+  <!-- ===================================================================== -->
+  <h3 id="expr-apply">Function Application</h3>
+  <!-- ===================================================================== -->
   
+  <div class="commentary">
+    Type conversions/casts are just normal function calls: int(4.0) just runs
+    the (overloaded) 'int' function on its argument.  Separation of the value
+    and type namespace makes this simple.
+  </div>
+
+  <pre class="grammar">
+    expr-apply ::= <a href="#expr">expr</a> <a href="#expr">expr</a>
+  </pre>
+  
+  <p>Juxtaposition of two expressions, when the former is of function type, is
+  application of a function to its argument, and the argument is converted to
+  the expected argument type.  For example, "foo()" is a juxtaposition of the
+  foo expression with an empty tuple.</p>
+  
+  <p>This expression is not formed by the parser, it is formed by the type
+  checker when it is processing consequtive sequences of primary expressions and
+  finds something of function type.</p>
+  
+  <p>A simple example:</p>
+  
+  <pre class="example">
+    <i>// Application of an empty tuple to the function f.</i>
+    f ()
+    <i>// Application of 4 to the function f, both are equivalent.</i>
+    g 4
+    g (4)
+    
+    <i>// Application of 4 to the function returned by h().</i>
+    var h : int -&gt; int -&gt; int;
+    ...
+    h () 4
+    
+    <i>// Application of "{}" to the function returned by the result of
+    // applying "(x)" to "if".</i>
+    if (x) {}
+  </pre>
+  
+  <!-- ===================================================================== -->
+  <h3 id="expr-infix">Infix Binary Expressions</h3>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    expr-infix ::= expr identifier expr
+  </pre>
+
+  <p>Infix binary expressions are not formed during parsing, they are formed
+  during type checking, when a sequence of primary expressions is being type
+  checked and a value with the <a href="#attribute-infix">infix</a> attribute
+  is found.  The order of evaluation of the various subexpressions is defined by
+  the precedence of the infix attribute.
+  </p>
+  
+  <p>TODO: Should this use the expr-identifier production to allow qualified
+    identifiers?  This would allow "foo swift::min bar".  Oneof members cannot
+    be declared infix, but future module/namespace scopes seem worth
+    accessing, though ADL is probably enough.</p>
+
+  <p>A simple example is:</p>
+  
+  <pre class="example">
+    4 + 5 * 123 min 42
+  </pre>
+
   <!-- ********************************************************************* -->
   <h2>Protocols</h2>
   <!-- ********************************************************************* -->
@@ -1234,6 +1287,8 @@
   <h3 id="namebind_scope">Scopes for Type and Value Names</h3>
 
   
+  <h3 id="namebind_value_lookup_unqual">Name Lookup Unqualified Value Names</h3>
+  <h3 id="namebind_value_lookup_dot">"dot" Name Lookup Value Names</h3>
   
   <h3 id="namebind_typevalue_lookup">Name Lookup for Type and Value Names</h3>
     
@@ -1251,10 +1306,10 @@
       lookup, but the order of imports w.r.t. each other does.</li>
   </ul>
     
-  <h3 id="namebind_field">Name Lookup for Field Expressions</h3>
+  <h3 id="namebind_dot">Name Lookup for Dot Expressions</h3>
     
   <p>
-  <a href="#expr-field">Field Expressions</a> bind to name of tuple elements.
+  <a href="#expr-dot">Dot Expressions</a> bind to name of tuple elements.
   </p>
   
   <!-- ********************************************************************* -->

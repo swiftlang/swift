@@ -781,14 +781,13 @@ bool Parser::parseExpr(NullablePtr<Expr> &Result, const char *Message) {
   return false;
 }
 
-/// parseExprPrimary
 ///   expr-primary:
 ///     expr-literal
 ///     expr-identifier
 ///     ':' identifier
 ///     expr-paren
 ///     expr-brace
-///     expr-field
+///     expr-dot
 ///     expr-subscript
 ///     expr-primary-fn expr-primary
 ///
@@ -798,7 +797,7 @@ bool Parser::parseExpr(NullablePtr<Expr> &Result, const char *Message) {
 ///   expr-primary-fn:
 ///     expr-primary      Type sensitive: iff expr has fn type
 ///
-///   expr-field:
+///   expr-dot:
 ///     expr-primary '.' identifier
 ///     expr-primary '.' dollarident
 ///
