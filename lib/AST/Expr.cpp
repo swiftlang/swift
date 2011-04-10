@@ -42,6 +42,7 @@ llvm::SMLoc Expr::getLocStart() const {
   switch (Kind) {
   case IntegerLiteralKind: return cast<IntegerLiteral>(this)->Loc;
   case DeclRefExprKind:    return cast<DeclRefExpr>(this)->Loc;
+  case OverloadSetRefExprKind: return cast<OverloadSetRefExpr>(this)->Loc;
   case UnresolvedDeclRefExprKind: return cast<UnresolvedDeclRefExpr>(this)->Loc;
   case UnresolvedMemberExprKind:
     return cast<UnresolvedMemberExpr>(this)->ColonLoc;
@@ -103,6 +104,7 @@ namespace {
     
     Expr *VisitIntegerLiteral(IntegerLiteral *E) { return E; }
     Expr *VisitDeclRefExpr(DeclRefExpr *E) { return E; }
+    Expr *VisitOverloadSetRefExpr(OverloadSetRefExpr *E) { return E; }
     Expr *VisitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) { return E; }
     Expr *VisitUnresolvedMemberExpr(UnresolvedMemberExpr *E) { return E; }
     Expr *VisitUnresolvedScopedIdentifierExpr(UnresolvedScopedIdentifierExpr*E){
@@ -256,23 +258,23 @@ public:
   }
 
   void VisitIntegerLiteral(IntegerLiteral *E) {
-    OS.indent(Indent) << "(integer_literal type='";
-    E->Ty->print(OS);
+    OS.indent(Indent) << "(integer_literal type='" << E->Ty;
     OS << "' value=" << E->Val << ')';
   }
   void VisitDeclRefExpr(DeclRefExpr *E) {
-    OS.indent(Indent) << "(declref_expr type='";
-    E->Ty->print(OS);
+    OS.indent(Indent) << "(declref_expr type='" << E->Ty;
     OS << "' decl=" << E->D->Name << ')';
   }
+  void VisitOverloadSetRefExpr(OverloadSetRefExpr *E) {
+    OS.indent(Indent) << "(overloadsetref_expr type='" << E->Ty;
+    OS << "' decl=" << E->Decls[0]->Name << ')';
+  }
   void VisitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
-    OS.indent(Indent) << "(unresolved_decl_ref_expr type='";
-    E->Ty->print(OS);
+    OS.indent(Indent) << "(unresolved_decl_ref_expr type='" << E->Ty;
     OS << "' name=" << E->Name << ')';
   }
   void VisitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
-    OS.indent(Indent) << "(unresolved_member_expr type='";
-    E->Ty->print(OS);
+    OS.indent(Indent) << "(unresolved_member_expr type='" << E->Ty;
     OS << "\' name='" << E->Name << "')";
   }
   void VisitUnresolvedScopedIdentifierExpr(UnresolvedScopedIdentifierExpr *E) {
@@ -281,9 +283,7 @@ public:
     OS << "\' name='" << E->Name << "')";
   }
   void VisitTupleExpr(TupleExpr *E) {
-    OS.indent(Indent) << "(tuple_expr type='";
-    E->Ty->print(OS);
-    OS << '\'';
+    OS.indent(Indent) << "(tuple_expr type='" << E->Ty << '\'';
     for (unsigned i = 0, e = E->NumSubExprs; i != e; ++i) {
       OS << '\n';
       if (E->SubExprs[i])
@@ -294,8 +294,7 @@ public:
     OS << ')';
   }
   void VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
-    OS.indent(Indent) << "(unresolved_dot_expr type='";
-    E->Ty->print(OS);
+    OS.indent(Indent) << "(unresolved_dot_expr type='" << E->Ty;
     OS << "\' field '" << E->Name.get() << "'";
     if (E->ResolvedDecl)
       OS << " decl resolved!";
@@ -304,25 +303,20 @@ public:
     OS << ')';
   }
   void VisitTupleElementExpr(TupleElementExpr *E) {
-    OS.indent(Indent) << "(tuple_element_expr type='";
-    E->Ty->print(OS);
+    OS.indent(Indent) << "(tuple_element_expr type='" << E->Ty;
     OS << "\' field #" << E->FieldNo << "\n";
     PrintRec(E->SubExpr);
     OS << ')';
   }
   void VisitApplyExpr(ApplyExpr *E) {
-    OS.indent(Indent) << "(apply_expr type='";
-    E->Ty->print(OS);
-    OS << "'\n";
+    OS.indent(Indent) << "(apply_expr type='" << E->Ty << "'\n";
     PrintRec(E->Fn);
     OS << '\n';
     PrintRec(E->Arg);
     OS << ')';
   }
   void VisitSequenceExpr(SequenceExpr *E) {
-    OS.indent(Indent) << "(sequence_expr type='";
-    E->Ty->print(OS);
-    OS << '\'';
+    OS.indent(Indent) << "(sequence_expr type='" << E->Ty << '\'';
     for (unsigned i = 0, e = E->NumElements; i != e; ++i) {
       OS << '\n';
       PrintRec(E->Elements[i]);
@@ -330,9 +324,7 @@ public:
     OS << ')';
   }
   void VisitBraceExpr(BraceExpr *E) {
-    OS.indent(Indent) << "(brace_expr type='";
-    E->Ty->print(OS);
-    OS << '\'';
+    OS.indent(Indent) << "(brace_expr type='" << E->Ty << '\'';
     for (unsigned i = 0, e = E->NumElements; i != e; ++i) {
       OS << '\n';
       if (Expr *SubExpr = E->Elements[i].dyn_cast<Expr*>())
@@ -343,16 +335,13 @@ public:
     OS << ')';
   }
   void VisitClosureExpr(ClosureExpr *E) {
-    OS.indent(Indent) << "(closure_expr type='";
-    E->Ty->print(OS);
-    OS << "'\n";
+    OS.indent(Indent) << "(closure_expr type='" << E->Ty << "'\n";
     PrintRec(E->Input);
     OS << ')';
   }
   
   void VisitAnonClosureArgExpr(AnonClosureArgExpr *E) {
-    OS.indent(Indent) << "(anon_closure_arg_expr type='";
-    E->Ty->print(OS);
+    OS.indent(Indent) << "(anon_closure_arg_expr type='" << E->Ty;
     OS << "' ArgNo=" << E->ArgNo << ')';
   }
   void VisitBinaryExpr(BinaryExpr *E) {
@@ -361,9 +350,7 @@ public:
       OS << E->Fn->Name;
     else
       OS << "=";
-    OS << "' type='";
-    E->Ty->print(OS);
-    OS << "'\n";
+    OS << "' type='" << E->Ty << "'\n";
     PrintRec(E->LHS);
     OS << '\n';
     PrintRec(E->RHS);

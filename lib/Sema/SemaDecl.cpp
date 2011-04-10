@@ -123,7 +123,12 @@ void SemaDecl::handleEndOfTranslationUnit(TranslationUnitDecl *TUD,
 /// LookupValueName - Perform a lexical scope lookup for the specified name,
 /// returning the active decl if found or null if not.
 ValueDecl *SemaDecl::LookupValueName(Identifier Name) {
-  return getValueHT(ValueScopeHT).lookup(Name).second;
+  std::pair<unsigned, ValueDecl*> Res = getValueHT(ValueScopeHT).lookup(Name);
+  // If we found nothing, or we found a decl at the top-level, return nothing.
+  // We ignore results at the top-level because we may have overloading that
+  // will be resolved properly by name binding.
+  if (Res.first == 0) return 0;
+  return Res.second;
 }
 
 /// LookupTypeName - Perform a lexical scope lookup for the specified name in
@@ -365,14 +370,15 @@ FuncDecl *SemaDecl::ActOnFuncBody(FuncDecl *FD, Expr *Body) {
   return FD;
 }
 
-Decl *SemaDecl::ActOnStructDecl(llvm::SMLoc StructLoc, DeclAttributes &Attrs,
-                                Identifier Name, Type BodyTy) {
+void SemaDecl::ActOnStructDecl(llvm::SMLoc StructLoc, DeclAttributes &Attrs,
+                               Identifier Name, Type BodyTy,
+                               llvm::SmallVectorImpl<ExprOrDecl> &Decls) {
   // Get the TypeAlias for the name that we'll eventually have.  This ensures
   // that the constructors generated have the pretty name for the type instead
   // of the raw oneof.
   TypeAliasDecl *TAD = S.decl.ActOnTypeAlias(StructLoc, Name,
                                              S.Context.TheUnresolvedType);
-
+  Decls.push_back(TAD);
   // The 'struct' is syntactically fine, invoke the semantic actions for the
   // syntactically expanded oneof type.  Struct declarations are just sugar for
   // other existing constructs.
@@ -387,7 +393,7 @@ Decl *SemaDecl::ActOnStructDecl(llvm::SMLoc StructLoc, DeclAttributes &Attrs,
   // constructor into the global scope.
   assert(OneOfTy->Elements.size() == 1 && "Struct has exactly one element");
   S.decl.AddToScope(OneOfTy->getElement(0));
-  return TAD;
+  Decls.push_back(OneOfTy->getElement(0));
 }
 
 

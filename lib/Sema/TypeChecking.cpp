@@ -61,6 +61,9 @@ namespace {
       if (VarDecl *Var = dyn_cast<VarDecl>(VD))
         return typeCheck(Var, ExcessExprs);
       
+      if (isa<OneOfElementDecl>(VD))
+        return;  // FIXME: No type checking required for this?
+      
       typeCheck(cast<FuncDecl>(VD), ExcessExprs);
     }
     
@@ -274,6 +277,10 @@ namespace {
     }
     Expr *VisitDeclRefExpr(DeclRefExpr *E) {
       if (SemaDeclRefExpr(E->D, E->Loc, E->Ty, TC)) return 0;
+      return E;
+    }
+    Expr *VisitOverloadSetRefExpr(OverloadSetRefExpr *E) {
+      E->Ty = TC.Context.TheDependentType;
       return E;
     }
     Expr *VisitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
@@ -821,6 +828,11 @@ namespace {
       return 0;
     }
     Expr *VisitDeclRefExpr(DeclRefExpr *E) {
+      return E;
+    }
+    
+    Expr *VisitOverloadSetRefExpr(OverloadSetRefExpr *E) {
+      // FIXME: Apply a type.
       return E;
     }
     

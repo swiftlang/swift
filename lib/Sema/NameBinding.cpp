@@ -98,6 +98,12 @@ namespace {
   };
 }
 
+/// NLKind - This is the kind of name lookup we're performing.
+enum NLKind {
+  NLK_UnqualifiedLookup,
+  NLK_DotLookup
+};
+
 namespace {
   class ReferencedModule {
     // FIXME: A module can be more than one translation unit eventually.
@@ -120,7 +126,7 @@ namespace {
     /// through the specified import declaration.
     void lookupValue(ImportDecl *ID, Identifier Name,
                      llvm::SmallVectorImpl<ValueDecl*> &Result,
-                     bool OnlyReturnFunctions);
+                     NLKind LookupKind);
   };
 } // end anonymous namespace.
 
@@ -152,7 +158,7 @@ TypeAliasDecl *ReferencedModule::lookupType(ImportDecl *ID, Identifier Name) {
 /// through the specified import declaration.
 void ReferencedModule::lookupValue(ImportDecl *ID, Identifier Name,
                                    llvm::SmallVectorImpl<ValueDecl*> &Result,
-                                   bool OnlyReturnFunctions) {
+                                   NLKind LookupKind) {
   // TODO: ImportDecls cannot specified namespaces or individual entities
   // yet, so everything is just a lookup at the top-level.
   assert(ID->AccessPath.size() <= 2 && "Don't handle this yet");
@@ -176,9 +182,13 @@ void ReferencedModule::lookupValue(ImportDecl *ID, Identifier Name,
   if (I == TopLevelValues.end()) return;
   
   Result.reserve(I->second.size());
-  for (unsigned i = 0, e = I->second.size(); i != e; ++i)
-    if (!OnlyReturnFunctions || I->second[i]->Ty->is<FunctionType>())
-      Result.push_back(I->second[i]);
+  for (unsigned i = 0, e = I->second.size(); i != e; ++i) {
+    // Dot Lookup ignores values with non-function types.
+    if (LookupKind == NLK_DotLookup && !I->second[i]->Ty->is<FunctionType>())
+      continue;
+    
+    Result.push_back(I->second[i]);
+  }
 }
 
 
@@ -204,7 +214,7 @@ namespace {
     void addImport(ImportDecl *ID);
 
     void bindValueName(Identifier I, llvm::SmallVectorImpl<ValueDecl*> &Result,
-                       bool OnlyReturnFunctions = false);
+                       NLKind LookupKind);
     
     TypeAliasDecl *lookupTypeName(Identifier I);
     
@@ -293,7 +303,7 @@ TypeAliasDecl *NameBinder::lookupTypeName(Identifier Name) {
 /// then this will only return a decl if it has function type.
 void NameBinder::bindValueName(Identifier Name, 
                                llvm::SmallVectorImpl<ValueDecl*> &Result,
-                               bool OnlyReturnFunctions) {
+                               NLKind LookupKind) {
   // Resolve forward references defined within the module.
   llvm::DenseMap<Identifier, TinyVector>::iterator I =
     TopLevelValues.find(Name);
@@ -302,8 +312,12 @@ void NameBinder::bindValueName(Identifier Name,
     Result.reserve(I->second.size());
     for (unsigned i = 0, e = I->second.size(); i != e; ++i) {
       ValueDecl *VD = I->second[i];
-      if (!OnlyReturnFunctions || VD->Ty->is<FunctionType>())
-        Result.push_back(I->second[i]);
+      
+      // Dot Lookup ignores values with non-function types.
+      if (LookupKind == NLK_DotLookup && !VD->Ty->is<FunctionType>())
+        continue;
+
+      Result.push_back(VD);
     }
     if (!Result.empty())
       return;
@@ -312,8 +326,7 @@ void NameBinder::bindValueName(Identifier Name,
   // If we still haven't found it, scrape through all of the imports, taking the
   // first match of the name.
   for (unsigned i = 0, e = Imports.size(); i != e; ++i) {
-    Imports[i].second->lookupValue(Imports[i].first, Name, Result,
-                                   OnlyReturnFunctions);
+    Imports[i].second->lookupValue(Imports[i].first, Name, Result, LookupKind);
     if (!Result.empty()) return;  // If we found a match, return the decls.
   }
 }
@@ -328,7 +341,7 @@ static Expr *BindNames(Expr *E, Expr::WalkOrder Order, void *binder) {
   // Process UnresolvedDeclRefExpr.
   if (UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
     llvm::SmallVector<ValueDecl*, 4> Decls;
-    Binder.bindValueName(UDRE->Name, Decls);
+    Binder.bindValueName(UDRE->Name, Decls, NLK_UnqualifiedLookup);
     if (Decls.empty()) {
       Binder.error(UDRE->Loc, "use of unresolved identifier '" +
                    UDRE->Name.str() + "'");
@@ -337,7 +350,11 @@ static Expr *BindNames(Expr *E, Expr::WalkOrder Order, void *binder) {
     if (Decls.size() == 1)
       return new (Binder.Context) DeclRefExpr(Decls[0], UDRE->Loc);
     
-    assert(0 && "unimp!");
+    // Copy the overload set into ASTContext memory.
+    llvm::ArrayRef<ValueDecl*> DeclList =
+      Binder.Context.AllocateCopy<ValueDecl*>(Decls);
+    
+    return new (Binder.Context) OverloadSetRefExpr(DeclList, UDRE->Loc);
   }
   
   // A reference to foo.bar may be an application ("bar foo"), so look up bar.
@@ -346,11 +363,13 @@ static Expr *BindNames(Expr *E, Expr::WalkOrder Order, void *binder) {
   if (UnresolvedDotExpr *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
     llvm::SmallVector<ValueDecl*, 4> Decls;
     // Only bind to functions.
-    Binder.bindValueName(UDE->Name, Decls, true /*require functions*/);
+    Binder.bindValueName(UDE->Name, Decls, NLK_DotLookup);
 
     // FIXME: should return a set.
-    if (!Decls.empty())
+    if (!Decls.empty()) {
+      assert(Decls.size() == 1 && "FIXME: Don't support overloaded . exprs");
       UDE->ResolvedDecl = Decls.front();
+    }
     return UDE;
   }
   

@@ -103,8 +103,9 @@ public:
   void CreateArgumentDeclsForFunc(FuncDecl *FD);
   FuncDecl *ActOnFuncBody(FuncDecl *FD, Expr *Body);
 
-  Decl *ActOnStructDecl(llvm::SMLoc StructLoc, DeclAttributes &Attrs,
-                        Identifier Name, Type Ty);
+  void ActOnStructDecl(llvm::SMLoc StructLoc, DeclAttributes &Attrs,
+                       Identifier Name, Type Ty,
+                       llvm::SmallVectorImpl<ExprOrDecl> &Decls);
   
   // Name processing.
   

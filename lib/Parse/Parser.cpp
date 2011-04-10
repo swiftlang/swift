@@ -521,7 +521,7 @@ Decl *Parser::parseDeclOneOf() {
 ///   decl-struct:
 ///      'struct' attribute-list? identifier type-tuple
 ///
-Decl *Parser::parseDeclStruct() {
+bool Parser::parseDeclStruct(llvm::SmallVectorImpl<ExprOrDecl> &Decls) {
   SMLoc StructLoc = Tok.getLoc();
   consumeToken(tok::kw_struct);
   
@@ -531,19 +531,20 @@ Decl *Parser::parseDeclStruct() {
   
   Identifier StructName;
   if (parseIdentifier(StructName, "expected identifier in struct declaration"))
-    return 0;
+    return true;
 
   Type Ty;
-  if (parseType(Ty)) return 0;
+  if (parseType(Ty)) return true;
 
   // The type is required to be syntactically a tuple type.
   if (!llvm::isa<TupleType>(Ty.getPointer())) {
     error(StructLoc, "element type of struct is not a tuple");
     // FIXME: Should set this as an erroroneous decl.
-    return 0;
-  }      
+    return true;
+  }
           
-  return S.decl.ActOnStructDecl(StructLoc, Attributes, StructName, Ty);
+  S.decl.ActOnStructDecl(StructLoc, Attributes, StructName, Ty, Decls);
+  return false;
 }
 
 
@@ -1104,7 +1105,7 @@ bool Parser::parseDeclExprList(llvm::SmallVectorImpl<ExprOrDecl> &Entries,
       Entries.push_back(parseDeclOneOf());
       break;
     case tok::kw_struct:
-      Entries.push_back(parseDeclStruct());
+      parseDeclStruct(Entries);
       break;
     default:
       Entries.push_back(ExprOrDecl());

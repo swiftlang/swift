@@ -21,6 +21,7 @@
 #include "swift/AST/Type.h"
 #include "llvm/Support/SMLoc.h"
 #include "llvm/ADT/NullablePtr.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace llvm {
@@ -39,6 +40,7 @@ namespace swift {
 enum ExprKind {
   IntegerLiteralKind,
   DeclRefExprKind,
+  OverloadSetRefExprKind,
   UnresolvedDeclRefExprKind,
   UnresolvedMemberExprKind,
   UnresolvedScopedIdentifierExprKind,
@@ -138,6 +140,23 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const DeclRefExpr *) { return true; }
   static bool classof(const Expr *E) { return E->Kind == DeclRefExprKind; }
+};
+
+/// OverloadSetRefExpr - A reference to an overloaded set of values with a
+/// single name.
+class OverloadSetRefExpr : public Expr {
+public:
+  llvm::ArrayRef<ValueDecl*> Decls;
+  llvm::SMLoc Loc;
+  
+  OverloadSetRefExpr(llvm::ArrayRef<ValueDecl*> decls, llvm::SMLoc L)
+  : Expr(OverloadSetRefExprKind), Decls(decls), Loc(L) {}
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const OverloadSetRefExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->Kind == OverloadSetRefExprKind;
+  }
 };
   
 /// UnresolvedDeclRefExpr - This represents use of an undeclared identifier,

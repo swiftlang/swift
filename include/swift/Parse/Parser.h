@@ -123,7 +123,7 @@ private:
   
   Decl *parseDeclImport();
   Decl *parseDeclOneOf();
-  Decl *parseDeclStruct();
+  bool parseDeclStruct(llvm::SmallVectorImpl<ExprOrDecl> &Decls);
   bool parseDeclVar(llvm::SmallVectorImpl<ExprOrDecl> &Decls);
   FuncDecl *parseDeclFunc();
   

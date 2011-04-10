@@ -35,6 +35,7 @@ public:
         
     DISPATCH(IntegerLiteral);
     DISPATCH(DeclRefExpr);
+    DISPATCH(OverloadSetRefExpr);
     DISPATCH(UnresolvedDeclRefExpr);
     DISPATCH(UnresolvedMemberExpr);
     DISPATCH(UnresolvedScopedIdentifierExpr);
