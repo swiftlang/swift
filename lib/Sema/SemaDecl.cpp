@@ -163,6 +163,24 @@ static void DiagnoseRedefinition(ValueDecl *Prev, ValueDecl *New, SemaDecl &SD){
     SD.note(Prev->getLocStart(), "previous declaration here");
 }
 
+/// CheckValidOverload - Check whether it is ok for D1 and D2 to be declared at
+/// the same scope.  This check is a transitive relationship, so if "D1 is a
+/// valid overload of D2" and "D2 is a valid overload of D3" then we know that
+/// D1/D3 are valid overloads and we don't have to check all permutations.
+static bool CheckValidOverload(const ValueDecl *D1, const ValueDecl *D2,
+                               SemaDecl &SD) {
+  if (D1->Attrs.isInfix() != D2->Attrs.isInfix()) {
+    SD.error(D1->getLocStart(),
+             "overload of a binary operator must also be a binary operator");
+    SD.note(D2->getLocStart(),
+            "previous declaration here");
+    return true;
+  }
+  
+  // Otherwise, everything is fine.
+  return false;
+}
+
 /// AddToScope - Register the specified decl as being in the current lexical
 /// scope.
 void SemaDecl::AddToScope(ValueDecl *D) {
@@ -181,10 +199,16 @@ void SemaDecl::AddToScope(ValueDecl *D) {
     // to track this?
     if (CurScope->getDepth() != 0)
       return DiagnoseRedefinition(PrevDecl, D, *this);
-        
+    
+    // If this is at top-level scope, validate that the members of the overload
+    // set all agree.
+    
+    // Check to see if D and PrevDecl are valid in the same overload set.
+    if (CheckValidOverload(D, PrevDecl, *this))
+      return;
+    
     // Note: we don't check whether all of the elements of the overload set have
-    // different types.  This is checked later.  We also don't check that all
-    // values found with unqualified lookup have the same infix-ness.
+    // different argument types.  This is checked later.
   }
   
   getValueHT(ValueScopeHT).insert(D->Name,
