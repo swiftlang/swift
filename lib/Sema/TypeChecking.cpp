@@ -170,17 +170,37 @@ static bool SemaTupleExpr(TupleExpr *TE, TypeChecker &TC) {
 
 static bool SemaApplyExpr(Expr *&E1, Expr *&E2, Type &ResultTy,
                           TypeChecker &TC) {
-  FunctionType *FT = cast<FunctionType>(E1->Ty.getPointer());
+  // If we have a concrete function type, then we win.
+  if (FunctionType *FT = E1->Ty->getAs<FunctionType>()) {
+    // We have a function application.  Check that the argument type matches the
+    // expected type of the function.
+    E2 = TC.convertToType(E2, FT->Input);
+    if (E2 == 0) {
+      TC.note(E1->getLocStart(),
+              "while converting function argument to expected type");
+      return true;
+    }  
+    ResultTy = FT->Result;
+    return false;
+  }
   
-  // We have a function application.  Check that the argument type matches the
-  // expected type of the function.
-  E2 = TC.convertToType(E2, FT->Input);
-  if (E2 == 0) {
-    TC.note(E1->getLocStart(),
-            "while converting function argument to expected type");
-    return true;
-  }  
-  ResultTy = FT->Result;
+  // Otherwise, we must have an application to an overload set.  See if we can
+  // resolve which overload member is based on the argument type.
+  if (!E2->Ty->is<DependentType>()) {
+    OverloadSetRefExpr *OS = cast<OverloadSetRefExpr>(E1);
+    for (unsigned i = 0, e = OS->Decls.size(); i != e; ++i) {
+      Type ArgTy = OS->Decls[i]->Ty->getAs<FunctionType>()->Input;
+      // If we found an exact match, disambiguate the overload set.
+      if (ArgTy->isEqual(E2->Ty, TC.Context)) {
+        E1 = new (TC.Context) DeclRefExpr(OS->Decls[i], OS->Loc,
+                                          OS->Decls[i]->Ty);
+        return SemaApplyExpr(E1, E2, ResultTy, TC);
+      }
+      // TODO: implement conversion ranking!
+    }
+  }
+  // Otherwise, we can't resolve the argument type yet.
+  ResultTy = E2->Ty;
   return false;
 }
 
@@ -578,6 +598,26 @@ static void ReduceBinaryExprs(SequenceExpr *E, unsigned Elt,
   }
 }
 
+/// isKnownToBeAFunction - return true if this expression is known to be a
+/// function, and therefore allows application of a value to it.  This controls
+/// "parsing" of SequenceExprs into their underlying expression.
+static bool isKnownToBeAFunction(Expr *E) {
+  // If the expression has function type, then it's clearly a function.
+  if (E->Ty->is<FunctionType>())
+    return true;
+  
+  // If the expression is an overload set and all members are functions, then
+  // clearly we have a function!
+  if (OverloadSetRefExpr *OSRE = dyn_cast<OverloadSetRefExpr>(E)) {
+    for (unsigned i = 0, e = OSRE->Decls.size(); i != e; ++i)
+      if (!OSRE->Decls[i]->Ty->is<FunctionType>())
+        return false;
+    return true;
+  }
+  
+  return false;
+}
+
 /// ReduceJuxtaposedExprs - Given an element of a sequence expression, check to
 /// see if it is the start of a juxtaposed sequence.  If so, reduce it down to
 /// a single element.  This allows functions to bind to their arguments.
@@ -588,8 +628,8 @@ static void ReduceJuxtaposedExprs(SequenceExpr *E, unsigned Elt,
 
   Expr *EltExpr = E->Elements[Elt];
   
-  // If this expression isn't a function type, then it doesn't juxtapose.
-  if (!EltExpr->Ty->is<FunctionType>())
+  // If this expression isn't a function, then it doesn't juxtapose.
+  if (!isKnownToBeAFunction(EltExpr))
     return;
   
   // If this is a function, then it can juxtapose.  Note that the grammar
@@ -609,7 +649,7 @@ static void ReduceJuxtaposedExprs(SequenceExpr *E, unsigned Elt,
   // If this is some other expression that returns something of function type,
   // then reduce the subexpression first and then apply it to the function.
   // This gives:    f a + b    -->  f (a + b)
-  if (!isa<DeclRefExpr>(EltExpr))
+  if (!isa<DeclRefExpr>(EltExpr) && !isa<OverloadSetRefExpr>(EltExpr))
     ReduceBinaryExprs(E, Elt+1, TC);    
   
   Expr *ArgExpr = E->Elements[Elt+1];
