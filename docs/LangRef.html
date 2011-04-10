@@ -184,7 +184,10 @@
     variable (though this is an example of a silly thing that is not a good
     practice of course).<br><br>
 
-    Idea: Should _foo be "private" and "foo" be public?   
+    Idea: Should _foo be "private" and "foo" be public, how about "Foo" vs
+    "foo"? In the code you immediately know whether something is exported, and
+    don't need to sprinkle attributes everywhere, OTOH, it makes it harder to 
+    remember (like not having a naming convention).   
   </div>
 
   <pre class="grammar">
@@ -288,7 +291,7 @@
   
   <p>'import' directives only impact a single translation unit: imports in one
   swift file do not affect name lookup in another file. import directives can
-  only occur at the top level of a file.</p>
+  only occur at the top level of a file, not within a function or namespace.</p>
   
   <p>If a single identifier is specified for the import declaration, then the
   entire module is imported in its entirety into the current scope.  If a
@@ -311,6 +314,10 @@
   <h3 id="decl-var">var</h3>
   <!-- ===================================================================== -->
   
+  <div class="commentary">
+    Eventually need to add support for "var x,y : int".
+  </div>
+  
   <pre class="grammar">
     decl-var ::= 'var' <a href="#attribute-list">attribute-list</a>? var-name <a href="#value-specifier">value-specifier</a>
     
@@ -329,12 +336,12 @@
      href="#decl-func">func declaration</a> is just syntactic sugar for a var
      declaration.</p>
   
-  <p>Syntactically var declarations come in three forms from the value-specifier
-     production.  In the first form,
+  <p>Syntactically, var declarations come in three forms from the
+     value-specifier production.  In the first form,
      a type is specified and the value is default initialized.  In the second
      form the type is elided but a value is specified, the declaration gets the
      specified value and has the same type as its initializer.  In the third
-     form, the values type is as specified and the initializer is <a
+     form, the value's type is as specified and the initializer is <a
      href="#typecheck_conversions">converted to</a> that type if required.</p>
   
   <p>Var declarations can optionally have a list of <a
@@ -367,7 +374,7 @@
     <i>// and returns an int.</i>
     var [infix=120] == : (lhs : int, rhs : int) -> int
     
-    <i>// This decodes the tuple return value into indendently named parts</i>
+    <i>// This decodes the tuple return value into independently named parts</i>
     <i>// and both 'val' and 'err' are in scope after this line.</i>
     var (val, err) = foo();
     
@@ -429,10 +436,9 @@
     decl-typealias ::= 'typealias' <a href="#identifier">identifier</a> ':' <a href="#type">type</a>
   </pre>
 
-  <p>Type alias makes a named alias of a type.  From that point on, the alias
-  may be used in all situations the specified name is.  This is the same thing
-  as a typedef in C.  It is named "typealias" because it really is an alias, not
-  a "new" type.</p>
+  <p>'typealias' makes a named alias of a type, like a typedef in C.  From that
+  point on, the alias may be used in all situations the specified name is.  It
+  is named "typealias" because it really is an alias, not a "new" type.</p>
   
   <p>Here are some examples of type aliases:</p>
   
@@ -444,9 +450,9 @@
     typealias pair_fn : int -> int -> (first : int, second : int)
   </pre>
 
-  <p>FIXME: It's not "from that point on", you should be able to declare a type
-  alias after using it.  Need to separate name binding from parsing logic.
-  Without this, mutually dependent component members can't exist.</p>
+  <p>'typealias' is the core semantic model for all named types.  For example, a
+  <a  href="#decl-oneof">oneof decl</a> is just syntactic sugar for a <a
+  href="#type-oneof">oneof type</a> and a 'typealias'.</p>
   
   <!-- ===================================================================== -->
   <h3 id="decl-oneof">oneof</h3>
@@ -463,14 +469,13 @@
     decl-oneof ::= 'oneof' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> oneof-body
   </pre>
   
-  <p>A oneof declaration is simple syntactic sugar for a <a 
+  <p>A oneof declaration is a convenient way to declare a type and name it at
+  the same time, as it is simple syntactic sugar for a <a 
      href="#type-oneof">oneof</a> type and a <a
-     href="#decl-typealias">typealias</a> declaration together, and is a
-     convenient way to declare a type and name it at the same
-     time.  In the underlying implementation of the language, there is only one
-     way to name a type (typealias).  Please see <a href="#type-oneof">oneof
-     types</a> for more information about their capabilities.  Here are two
-     exactly equivalent declarations for intuition:</p>
+     href="#decl-typealias">typealias</a> declaration.  Please see <a
+    href="#type-oneof">oneof types</a> for more information about their
+    capabilities.  Here are two exactly equivalent declarations for
+    intuition:</p>
 
   <pre class="example">
     <i>// Declare discriminated union with typealias + oneof type.</i>
@@ -538,12 +543,14 @@
   </pre>
 
   <p>A struct declaration is syntactic sugar for a oneof declaration of a single
-  element.  It requires that a tuple type be specified, and declares a oneof
-  with a  single constructor value of the same name as the struct.</p>
+  element, and a 'typealias'.  It requires that a tuple type be specified, and
+  declares a oneof with a single constructor value of the same name as the
+  struct.</p>
   
-  <p>Note that unlike oneof, struct does inject this constructor value into the
-  global scope. This means that you don't need to use qualified lookup to get
-  access to the constructor for a struct.</p>
+  <p>Note that unlike <a href="#decl-oneof">oneof</a>, 'struct' <em>does</em>
+  inject its single constructor value into the containing scope. This means that
+  you don't need to use qualified lookup to get access to the constructor for a
+  struct.</p>
   
   <p>These two declarations are equivalent (but have different names):</p>
 
@@ -604,7 +611,7 @@
 
   
   <!-- ********************************************************************* -->
-  <h2 id="type">Simple Data Types</h2>
+  <h2 id="type">Types</h2>
   <!-- ********************************************************************* -->
   
   <pre class="grammar">
@@ -621,12 +628,14 @@
   <p>Swift has a small collection of core datatypes that are built into the
       compiler.  Most datatypes that the user is exposed are defined by the
       <a href="#stdlib">standard library</a> or declared as a user defined
-      type.</p>
+      types.</p>
   
+  <p>
   FIXME: Why is array a type instead of type-simple?
+  </p>
 
   <!-- ===================================================================== -->
-  <h3 id="type-builtin">Builtin and Named Types</h3>
+  <h3 id="type-builtin">Builtin Primitive Types</h3>
   <!-- ===================================================================== -->
 
   <pre class="grammar">
@@ -646,9 +655,14 @@
     type-identifier ::= <a href="#identifier">identifier</a>
   </pre>
 
-  <p>Types may also be named, through a <a href="#decl-oneof">oneof</a>
-     declaration, a <a href="#decl-typealias">typealias</a> etc.</p>
+  <p>Named types may be used simply by using their name.  Named types are
+     introduced by <a href="#decl-typealias">typealias</a> declarations or
+     through syntactic sugar that expands to one.</p>
 
+  <pre class="example">
+    typealias location : (x : int, y : int)
+    var x : location      <i>// use of a named type.</i>
+  </pre>
   
   <!-- ===================================================================== -->
   <h3 id="type-tuple">Tuple Types</h3>
@@ -659,7 +673,7 @@
     type-tuple  ::= '(' identifier? <a href="#value-specifier">value-specifier</a> (',' identifier? <a href="#value-specifier">value-specifier</a>)* ')'
   </pre>
 
-  <p>Syntactically, tuple types are simply a possibly empty list of
+  <p>Syntactically, tuple types are simply a (possibly empty) list of
   elements.</p>
 
   <p>Tuples are the primary form of data aggregation in Swift, and are used as
@@ -709,15 +723,16 @@
   </pre>
 
   <p>Function types have a single input and single result type, separated by
-     an arrow.  Because each of the types is allowed to be a tuple, we do
-     support multiple argument lists and multiple results.  "Function" types are
+     an arrow.  Because each of the types is allowed to be a tuple, we trivially
+     support multiple arguments and multiple results.  "Function" types are
      more properly known as a "closure" type, because they can embody any
-     context captured when the function variable was formed.</p>
+     context captured when the function value was formed.</p>
   
-  <p>Because of the grammar structure, a nested function like "a -&gt; b -&gt;
-     c" is parsed as "a -&gt; (b -&gt; c)".  This means that if you declare this
-     that you can pass it one argument to get a function that "takes b and
-     returns c" or you can pass two arguments to "get a c".  For example:
+  <p>Because of the grammar structure, a nested function type like 
+     "a -&gt; b -&gt; c" is parsed as "a -&gt; (b -&gt; c)".  This means that if 
+     you declare this that you can pass it one argument to get a function that
+     "takes b and returns c" or you can pass two arguments to "get a c".  For
+     example:
   </p>
   
   <pre class="example">
@@ -743,6 +758,13 @@
   <h3 id="type-array">Array Types</h3>
   <!-- ===================================================================== -->
 
+  <div class="commentary">
+    Array types are currently a hack, and only partially implemented in the
+    compiler.  Arrays don't make sense to fully define until we have generics,
+    because array syntax should just be sugar for a standard library type.
+    "int[4]" should just be sugar for array&lt;int, 4&gt; or whatever.
+  </div>
+  
   <pre class="grammar">
     type-array ::= <a href="#type">type</a> '[' ']'
     type-array ::= <a href="#type">type</a> '[' <a href="#expr">expr</a> ']'
@@ -760,6 +782,10 @@
   indicates a <em>reference</em> to storage space allocated elsewhere of
   runtime-specified size.
   </p>
+  
+  <p>FIXME: We should separate out "Arrays" from "Slices".  Arrays should always
+  require a size and is by-value, a slice is a by-ref and never have a
+  (statically specified) size.</p>
 
   <p>For an array with a size, the size must be more than zero (no
   indices would be valid).  For now, the array size must be a literal integer.
@@ -767,7 +793,7 @@
   folding works.</p>
   
   <p>FIXME: int[][] not valid because the element type isn't sized.  We need
-  some constraint to reject this.</p>
+  some constraint to reject this, or do we?</p>
   
   <p>Some example array types:</p>
   
@@ -812,15 +838,17 @@
     oneof decls for "enums" and "struct" decls for data declarations.  The use
     of "oneof" for discriminated unions will be much less common (but is still
     very important) than its use for "enums".  In any case, the decl form of
-    these are important syntactic sugar for the type version of oneof.
+    this is important syntactic sugar for the type version of oneof.<br><br>
+    
+    'oneof' types are known as <a 
+      href="http://en.wikipedia.org/wiki/Algebraic_data_type">algebraic data
+      types</a> by the broader programming language community.  The name 'oneof'
+    comes from CLU.
   </div>
   
   <pre class="grammar">
-    type-oneof ::= 'oneof' <a href="#attribute-list">attribute-list</a>? oneof-body
-    oneof-body         ::= '{' oneof-element-list '}'
-    
-    oneof-element-list ::= oneof-element ','?
-    oneof-element-list ::= oneof-element ',' oneof-element-list
+    type-oneof         ::= 'oneof' <a href="#attribute-list">attribute-list</a>? oneof-body
+    oneof-body         ::= '{' oneof-element (',' oneof-element)* '}'
     
     oneof-element      ::= <a href="#identifier">identifier</a>
     oneof-element      ::= <a href="#identifier">identifier</a> ':' <a href="#type">type</a>
@@ -830,13 +858,10 @@
   <p>A oneof type consists of a comma-separated list of elements,
   which are each either an identifier or an identifier with a type.  The runtime
   representation of a value of oneof type only has one of the specified oneof
-  elements at a time: a oneof value is a simple discriminated union.  Oneof
-  types are known as <a 
-    href="http://en.wikipedia.org/wiki/Algebraic_data_type">algebraic data
-    types</a> by the broader programming language community.</p>
+  elements at a time: a oneof value is a simple discriminated union.</p>
   
-  <p>A oneof types declares two things: 1) the type itself as an anonymous type,
-  and 2) each of the oneof elements declares a constructor value which create a
+  <p>A oneof type declares two things: 1) the type itself as an anonymous type,
+  and 2) each of the oneof elements declares a constructor value which creates a
   value of the oneof type with the specified element kind.  The constructor
   values are defined in a nested scope within the oneof descriptor type, so they
   must be accessed with either a <a href="#expr-identifier">qualified
@@ -849,6 +874,9 @@
   constructor is the oneof type.  If a oneof element has a
   type "T" associated with it, then the type of the constructor is a function
   that takes "T" and returns the oneof type.</p>
+  
+  <p>A default initialized value of oneof type is initialized to the first
+  element type in the list, with the default value for its element type.</p>
   
   <p>Here are some examples of oneof types:</p>
   
@@ -868,11 +896,12 @@
       var a : DataSearchFlags = :None;
     }
     
-    <i>// More typical use case, anonymous argument for flags.</i> 
+    <i>// A more typical use case, anonymous argument for flags, death to
+    // content-free bools in function arguments.</i> 
     func search(val : int, direction : oneof { Up, Down });
     
     func test2() {
-      search(4, :Up);
+      search(42, :Up);
       search(17, :Down);
     }
   </pre>
@@ -917,9 +946,6 @@
 
   <p>This grammar production is ambiguous with the <a 
     href="#expr-apply">expr-apply</a> production, but binds very loosely.</p>
-  
-  <p>NOTE: The application logic in ParseExpr is here for the case when the
-     first expr has dependent type that later resolves to be a function.</p>
   
   <!-- ===================================================================== -->
   <h3 id="expr-single">Singular Expressions</h3>

@@ -694,10 +694,7 @@ bool Parser::parseTypeTuple(Type &Result) {
 }
 
 ///   oneof-body:
-///      '{' oneof-element-list '}'
-///   oneof-element-list:
-///      oneof-element ','?
-///      oneof-element ',' oneof-element-list
+///      '{' oneof-element (',' oneof-element)* '}'
 ///   oneof-element:
 ///      identifier
 ///      identifier ':' type
