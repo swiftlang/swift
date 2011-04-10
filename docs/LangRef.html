@@ -54,12 +54,15 @@
   </div>
 
   <ol>
-  <li>Support building great frameworks and applications, making it easier to
-    do the right thing by default and reducing the barrier of entry to our
-    systems.</li>
+  <li>Support building great frameworks and applications, with a specific focus
+    on permiting rich and powerful APIs.</li>
+  <li>Get the defaults right: this reduces the barrier to entry and increases
+    the odds that the right thing happens.</li>
+  <li>Through our support for building great APIs, we aim to provide an
+    expressive and productive language that is fun to program in.</li>
   <li>Support low-level system programming.  We should want to write compilers,
     operating system kernels, and media codecs in Swift.  This means that being
-    able to obtain high performance is really really important.</li>
+    able to obtain high performance is really quite important.</li>
   <li>Provide really great tools.</li>
   <li>Where possible, steal great ideas instead of innovating new things that
       will work out in unpredictable ways.  It turns out that there are a lot
@@ -94,16 +97,44 @@
   <h2>Phases of Translation</h2>
   <!-- ********************************************************************* -->
 
+  <div class="commentary">
+    The careful factoring of the grammar allows forward referencing of
+    types and values and allows parsing without resolution of import
+    declarations.
+  </div>
+
+  <p>Swift has a strict separation between its phases of translation, and the
+  grammar is carefully factored so that there is never ambiguity about whether
+  an identifier refers to a type of a value. The phases of translation are:</p>
+  
+  <ul>
+  <li><a href="#lexical">Lexing</a>: A translation unit is broken into tokens
+    according to a (nearly, /**/ comments can be nested) regular grammar.</li>
+  <li>Parsing and AST Building: The tokens are parsed according to the grammar
+    set out below.  The grammar is context free and does not require any "type
+    feedback" from the lexer or later stages.  During parsing, name binding for
+    references to local variables and other declarations that are not at
+    translation unit (and eventually namespace) scope are bound.
+  </li>
+  <li><a href="#namebind">Name Binding</a>: At this phase, references to
+    non-local types and values are bound, and <a href="#decl-import">import
+      directives</a> are both validated and searched.  Name binding can cause
+      recursive compilation of modules that are referenced but not yet built.
+  </li>
+  <li><a href="#typecheck">Type Checking</a>: During this phase all types are
+    resolved within value definitions, <a href="#expr-apply">function
+    application</a> and <a href="#expr-infix">binary expressions</a> are found
+    and formed, and overloaded functions are resolved.</li>
+  <li>Code Generation</li>
+  <li>Linking</li>
+  </ul>
+  
   <p>
-  parsing (TODO: "import swift" implicitly added to translation unit)
-  <a href="#namebind">Name Binding</a> 
-  Type Checking
-  Code Generation
-  Linking
+  TODO: "import swift" implicitly added as the last import in translation unit.
   </p>
   
   <!-- ********************************************************************* -->
-  <h2>Lexical Structure</h2>
+  <h2 id="lexical">Lexical Structure</h2>
   <!-- ********************************************************************* -->
   
   <div class="commentary">
