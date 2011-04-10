@@ -108,10 +108,76 @@ ValueDecl *ReferencedModule::lookupValue(ImportDecl *ID, Identifier Name) {
 }
 
 namespace {
+  struct TinyVector {
+    typedef llvm::SmallVector<ValueDecl*, 4> VecTy;
+    llvm::PointerUnion<ValueDecl*, VecTy*> Val;
+    
+    TinyVector() {}
+    TinyVector(const TinyVector &RHS) : Val(RHS.Val) {
+      if (VecTy *V = Val.dyn_cast<VecTy*>())
+        Val = new VecTy(*V);
+    }
+    ~TinyVector() {
+      if (VecTy *V = Val.dyn_cast<VecTy*>())
+        delete V;
+    }
+    
+    unsigned size() const {
+      if (Val.isNull())
+        return 0;
+      if (Val.is<ValueDecl*>())
+        return 1;
+      return Val.get<VecTy*>()->size();
+    }
+    
+    ValueDecl *operator[](unsigned i) const {
+      assert(!Val.isNull() && "vector empty");
+      if (ValueDecl *V = Val.dyn_cast<ValueDecl*>()) {
+        assert(i == 0 && "tinyvector index out of range");
+        return V;
+      }
+      
+      assert(i < Val.get<VecTy*>()->size() && "tinyvector index out of range");
+      return (*Val.get<VecTy*>())[i];
+    }
+    
+    void push_back(ValueDecl *VD) {
+      assert(VD != 0 && "Can't add a null value");
+      
+      // If we have nothing, add something.
+      if (Val.isNull()) {
+        Val = VD;
+        return;
+      }
+      
+      // If we have a single value, convert to a vector.
+      if (ValueDecl *V = Val.dyn_cast<ValueDecl*>()) {
+        Val = new VecTy();
+        Val.get<VecTy*>()->push_back(V);
+      }
+      
+      // Add the new value, we know we have a vector.
+      Val.get<VecTy*>()->push_back(VD);
+    }
+    
+    ValueDecl *front() const {
+      assert(!Val.isNull() && "vector empty");
+      if (ValueDecl *V = Val.dyn_cast<ValueDecl*>())
+        return V;
+      return Val.get<VecTy*>()->front();
+    }
+    
+  private:
+    void operator=(const TinyVector&); // DISABLED.
+  };
+}
+
+namespace {  
   class NameBinder {
     std::vector<ReferencedModule *> LoadedModules;
+    
     /// TopLevelValues - This is the list of top-level declarations we have.
-    llvm::DenseMap<Identifier, ValueDecl *> TopLevelValues;
+    llvm::DenseMap<Identifier, TinyVector> TopLevelValues;
     llvm::SmallVector<std::pair<ImportDecl*, ReferencedModule*>, 4> Imports;
   public:
     ASTContext &Context;
@@ -122,7 +188,7 @@ namespace {
     }
     
     void addNamedTopLevelDecl(ValueDecl *VD) {
-      TopLevelValues[VD->Name] = VD;
+      TopLevelValues[VD->Name].push_back(VD);
     }
     
     void addImport(ImportDecl *ID);
@@ -215,11 +281,11 @@ TypeAliasDecl *NameBinder::lookupTypeName(Identifier Name) {
 /// returns a decl if found or null if not.
 ValueDecl *NameBinder::bindValueName(Identifier Name) {
   // Resolve forward references defined within the module.
-  llvm::DenseMap<Identifier, ValueDecl *>::iterator I =
+  llvm::DenseMap<Identifier, TinyVector>::iterator I =
     TopLevelValues.find(Name);
   // If we found a match, return the decl.
   if (I != TopLevelValues.end())
-    return I->second;
+    return I->second.front();
 
   // If we still haven't found it, scrape through all of the imports, taking the
   // first match of the name.

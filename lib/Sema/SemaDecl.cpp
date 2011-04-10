@@ -150,18 +150,41 @@ TypeAliasDecl *SemaDecl::LookupTypeName(Identifier Name, llvm::SMLoc Loc) {
   return TAD;
 }
 
+static void DiagnoseRedefinition(ValueDecl *Prev, ValueDecl *New, SemaDecl &SD){
+  assert(New != Prev && "Cannot conflict with self");
+  if (New->Init)
+    SD.error(New->getLocStart(), "definition conflicts with previous value");
+  else
+    SD.error(New->getLocStart(), "declaration conflicts with previous value");
+  
+  if (Prev->Init)
+    SD.note(Prev->getLocStart(), "previous definition here");
+  else
+    SD.note(Prev->getLocStart(), "previous declaration here");
+}
+
 /// AddToScope - Register the specified decl as being in the current lexical
 /// scope.
 void SemaDecl::AddToScope(ValueDecl *D) {
   // If we have a shadowed variable definition, check to see if we have a
   // redefinition: two definitions in the same scope with the same name.
-  std::pair<unsigned, ValueDecl*> Entry =
-    getValueHT(ValueScopeHT).lookup(D->Name);
-  if (Entry.second && Entry.first == CurScope->getDepth()) {
-    error(D->getLocStart(),
-          "variable declaration conflicts with previous declaration");
-    note(LookupValueName(D->Name)->getLocStart(), "previous declaration here");
-    return;
+  ValueScopeHTType &ValueHT = getValueHT(ValueScopeHT);
+  ValueScopeHTType::iterator EntryI = ValueHT.begin(D->Name);
+  
+  // A redefinition is a hit in the scoped table at the same depth.
+  if (EntryI != ValueHT.end() && EntryI->first == CurScope->getDepth()) {
+    ValueDecl *PrevDecl = EntryI->second;
+    
+    // If this is at top-level scope, we allow overloading.  If not, we don't.
+    // FIXME: This should be tied to whether the scope corresponds to a
+    // DeclContext like a TranslationUnit or a Namespace.  Add a bit to Scope
+    // to track this?
+    if (CurScope->getDepth() != 0)
+      return DiagnoseRedefinition(PrevDecl, D, *this);
+        
+    // Note: we don't check whether all of the elements of the overload set have
+    // different types.  This is checked later.  We also don't check that all
+    // values found with unqualified lookup have the same infix-ness.
   }
   
   getValueHT(ValueScopeHT).insert(D->Name,
