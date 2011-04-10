@@ -57,7 +57,7 @@ namespace llvm {
     return OS;
   }
     
-  // Types hash just like pointers.
+  // Type hashes just like pointers.
   template<> struct DenseMapInfo<swift::Type> {
     static swift::Type getEmptyKey() {
       return llvm::DenseMapInfo<swift::TypeBase*>::getEmptyKey();

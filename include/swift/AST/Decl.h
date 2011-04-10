@@ -65,6 +65,9 @@ public:
   
   
   bool empty() const { return InfixPrecedence == -1; }
+  
+  /// isInfix - Return true if this is a binary infix operation.
+  bool isInfix() const { return InfixPrecedence != -1; }
 };
 
   
