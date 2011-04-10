@@ -206,11 +206,6 @@ static bool SemaSequenceExpr(Expr **Elements, unsigned NumElements,
 static bool SemaBinaryExpr(Expr *&LHS, ValueDecl *OpFn,
                            SMLoc OpLoc, Expr *&RHS, Type &ResultTy,
                            TypeChecker &TC) {
-  if (LHS->Ty->is<DependentType>()) {
-    ResultTy = TC.Context.TheDependentType;
-    return false; 
-  }
-  
   // If this is an assignment, then we coerce the RHS to the LHS.
   if (OpFn == 0) {
     RHS = TC.convertToType(RHS, LHS->Ty);
