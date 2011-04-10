@@ -46,6 +46,10 @@ public:
   /// getString - Return the name of the type as a string, for use in
   /// diagnostics only.
   std::string getString() const;
+  
+private:
+  void operator==(Type T) const;  // DISABLED.
+  void operator!=(Type T) const;  // DISABLED.
 };
   
 } // end namespace swift

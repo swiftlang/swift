@@ -925,6 +925,12 @@ namespace {
     }
     
     Expr *VisitApplyExpr(ApplyExpr *E) {
+      // FIXME: Given an ApplyExpr of "a b" where "a" is an overloaded value, we
+      // may be able to prune the overload set based on the known result type.
+      // Doing this may allow the ambiguity to resolve by removing candidates
+      // that caused the ambiguity.  For example if we know that the destination
+      // type is 'int', and we had "int -> int" and "SomeTy -> float", we can
+      // prune the second one, and then recursively apply 'int' to b.
       return E;
     }
     Expr *VisitSequenceExpr(SequenceExpr *E) {
