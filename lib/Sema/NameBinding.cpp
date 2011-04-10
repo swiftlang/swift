@@ -34,80 +34,6 @@ using llvm::cast;
 using llvm::SMLoc;
 
 namespace {
-  class ReferencedModule {
-    // FIXME: A module can be more than one translation unit eventually.
-    TranslationUnitDecl *TUD;
-    
-    llvm::DenseMap<Identifier, ValueDecl *> TopLevelValues;
-    llvm::DenseMap<Identifier, TypeAliasDecl *> TopLevelTypes;
-
-  public:
-    ReferencedModule(TranslationUnitDecl *tud) : TUD(tud) {}
-    ~ReferencedModule() {
-      // Nothing to destroy here, TU is ASTContext allocated.
-    }
-
-    /// lookupType - Resolve a reference to a type name that found this module
-    /// with the specified import declaration.
-    TypeAliasDecl *lookupType(ImportDecl *ID, Identifier Name);
-
-    /// lookupValue - Resolve a reference to a value name that found this module
-    /// through the specified import declaration.
-    ValueDecl *lookupValue(ImportDecl *ID, Identifier Name);
-  };
-} // end anonymous namespace.
-
-
-/// lookupType - Resolve a reference to a type name that found this module
-/// with the specified import declaration.
-TypeAliasDecl *ReferencedModule::lookupType(ImportDecl *ID, Identifier Name) {
-  assert(ID->AccessPath.size() <= 2 && "Don't handle this yet");
-  
-  // If this import is specific to some named type or decl ("import swift.int")
-  // then filter out any lookups that don't match.
-  if (ID->AccessPath.size() == 2 && ID->AccessPath[1].first != Name)
-    return 0;
-  
-  if (TopLevelTypes.empty()) {
-    for (unsigned i = 0, e = TUD->Body->NumElements; i != e; ++i)
-      if (Decl *D = TUD->Body->Elements[i].dyn_cast<Decl*>())
-        if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D))
-          if (!TAD->Name.empty())
-            TopLevelTypes[TAD->Name] = TAD;
-  }
-  
-  llvm::DenseMap<Identifier, TypeAliasDecl*>::iterator I =
-    TopLevelTypes.find(Name);
-  return I != TopLevelTypes.end() ? I->second : 0;
-}
-
-/// lookupValue - Resolve a reference to a value name that found this module
-/// through the specified import declaration.
-ValueDecl *ReferencedModule::lookupValue(ImportDecl *ID, Identifier Name) {
-  // TODO: ImportDecls cannot specified namespaces or individual entities
-  // yet, so everything is just a lookup at the top-level.
-  assert(ID->AccessPath.size() <= 2 && "Don't handle this yet");
-
-  // If this import is specific to some named type or decl ("import swift.int")
-  // then filter out any lookups that don't match.
-  if (ID->AccessPath.size() == 2 && ID->AccessPath[1].first != Name)
-    return 0;
-    
-  // If we haven't built a map of the top-level values, do so now.
-  if (TopLevelValues.empty()) {
-    for (unsigned i = 0, e = TUD->Body->NumElements; i != e; ++i)
-      if (Decl *D = TUD->Body->Elements[i].dyn_cast<Decl*>())
-        if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-          if (!VD->Name.empty())
-            TopLevelValues[VD->Name] = VD;
-  }
-   
-  llvm::DenseMap<Identifier, ValueDecl *>::iterator I =
-    TopLevelValues.find(Name);
-  return I != TopLevelValues.end() ? I->second : 0;
-}
-
-namespace {
   struct TinyVector {
     typedef llvm::SmallVector<ValueDecl*, 4> VecTy;
     llvm::PointerUnion<ValueDecl*, VecTy*> Val;
@@ -172,6 +98,90 @@ namespace {
   };
 }
 
+namespace {
+  class ReferencedModule {
+    // FIXME: A module can be more than one translation unit eventually.
+    TranslationUnitDecl *TUD;
+    
+    llvm::DenseMap<Identifier, TinyVector> TopLevelValues;
+    llvm::DenseMap<Identifier, TypeAliasDecl *> TopLevelTypes;
+
+  public:
+    ReferencedModule(TranslationUnitDecl *tud) : TUD(tud) {}
+    ~ReferencedModule() {
+      // Nothing to destroy here, TU is ASTContext allocated.
+    }
+
+    /// lookupType - Resolve a reference to a type name that found this module
+    /// with the specified import declaration.
+    TypeAliasDecl *lookupType(ImportDecl *ID, Identifier Name);
+
+    /// lookupValue - Resolve a reference to a value name that found this module
+    /// through the specified import declaration.
+    void lookupValue(ImportDecl *ID, Identifier Name,
+                     llvm::SmallVectorImpl<ValueDecl*> &Result,
+                     bool OnlyReturnFunctions);
+  };
+} // end anonymous namespace.
+
+
+/// lookupType - Resolve a reference to a type name that found this module
+/// with the specified import declaration.
+TypeAliasDecl *ReferencedModule::lookupType(ImportDecl *ID, Identifier Name) {
+  assert(ID->AccessPath.size() <= 2 && "Don't handle this yet");
+  
+  // If this import is specific to some named type or decl ("import swift.int")
+  // then filter out any lookups that don't match.
+  if (ID->AccessPath.size() == 2 && ID->AccessPath[1].first != Name)
+    return 0;
+  
+  if (TopLevelTypes.empty()) {
+    for (unsigned i = 0, e = TUD->Body->NumElements; i != e; ++i)
+      if (Decl *D = TUD->Body->Elements[i].dyn_cast<Decl*>())
+        if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D))
+          if (!TAD->Name.empty())
+            TopLevelTypes[TAD->Name] = TAD;
+  }
+  
+  llvm::DenseMap<Identifier, TypeAliasDecl*>::iterator I =
+    TopLevelTypes.find(Name);
+  return I != TopLevelTypes.end() ? I->second : 0;
+}
+
+/// lookupValue - Resolve a reference to a value name that found this module
+/// through the specified import declaration.
+void ReferencedModule::lookupValue(ImportDecl *ID, Identifier Name,
+                                   llvm::SmallVectorImpl<ValueDecl*> &Result,
+                                   bool OnlyReturnFunctions) {
+  // TODO: ImportDecls cannot specified namespaces or individual entities
+  // yet, so everything is just a lookup at the top-level.
+  assert(ID->AccessPath.size() <= 2 && "Don't handle this yet");
+
+  // If this import is specific to some named type or decl ("import swift.int")
+  // then filter out any lookups that don't match.
+  if (ID->AccessPath.size() == 2 && ID->AccessPath[1].first != Name)
+    return;
+    
+  // If we haven't built a map of the top-level values, do so now.
+  if (TopLevelValues.empty()) {
+    for (unsigned i = 0, e = TUD->Body->NumElements; i != e; ++i)
+      if (Decl *D = TUD->Body->Elements[i].dyn_cast<Decl*>())
+        if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+          if (!VD->Name.empty())
+            TopLevelValues[VD->Name].push_back(VD);
+  }
+   
+  llvm::DenseMap<Identifier, TinyVector>::iterator I =
+    TopLevelValues.find(Name);
+  if (I == TopLevelValues.end()) return;
+  
+  Result.reserve(I->second.size());
+  for (unsigned i = 0, e = I->second.size(); i != e; ++i)
+    if (!OnlyReturnFunctions || I->second[i]->Ty->is<FunctionType>())
+      Result.push_back(I->second[i]);
+}
+
+
 namespace {  
   class NameBinder {
     std::vector<ReferencedModule *> LoadedModules;
@@ -193,7 +203,8 @@ namespace {
     
     void addImport(ImportDecl *ID);
 
-    ValueDecl *bindValueName(Identifier I);
+    void bindValueName(Identifier I, llvm::SmallVectorImpl<ValueDecl*> &Result,
+                       bool OnlyReturnFunctions = false);
     
     TypeAliasDecl *lookupTypeName(Identifier I);
     
@@ -278,24 +289,34 @@ TypeAliasDecl *NameBinder::lookupTypeName(Identifier Name) {
 
 
 /// bindValueName - This is invoked for each name reference in the AST, and
-/// returns a decl if found or null if not.
-ValueDecl *NameBinder::bindValueName(Identifier Name) {
+/// returns a decl if found or null if not.  If OnlyReturnFunctions is true,
+/// then this will only return a decl if it has function type.
+void NameBinder::bindValueName(Identifier Name, 
+                               llvm::SmallVectorImpl<ValueDecl*> &Result,
+                               bool OnlyReturnFunctions) {
   // Resolve forward references defined within the module.
   llvm::DenseMap<Identifier, TinyVector>::iterator I =
     TopLevelValues.find(Name);
-  // If we found a match, return the decl.
-  if (I != TopLevelValues.end())
-    return I->second.front();
+  // If we found a match, return the decls.
+  if (I != TopLevelValues.end()) {
+    Result.reserve(I->second.size());
+    for (unsigned i = 0, e = I->second.size(); i != e; ++i) {
+      ValueDecl *VD = I->second[i];
+      if (!OnlyReturnFunctions || VD->Ty->is<FunctionType>())
+        Result.push_back(I->second[i]);
+    }
+    if (!Result.empty())
+      return;
+  }
 
   // If we still haven't found it, scrape through all of the imports, taking the
   // first match of the name.
-  for (unsigned i = 0, e = Imports.size(); i != e; ++i)
-    if (ValueDecl *D = Imports[i].second->lookupValue(Imports[i].first, Name))
-      return D;  // If we found a match, return the decl.
-
-  return 0;
+  for (unsigned i = 0, e = Imports.size(); i != e; ++i) {
+    Imports[i].second->lookupValue(Imports[i].first, Name, Result,
+                                   OnlyReturnFunctions);
+    if (!Result.empty()) return;  // If we found a match, return the decls.
+  }
 }
-
 
 static Expr *BindNames(Expr *E, Expr::WalkOrder Order, void *binder) {
   NameBinder &Binder = *static_cast<NameBinder*>(binder);
@@ -306,21 +327,31 @@ static Expr *BindNames(Expr *E, Expr::WalkOrder Order, void *binder) {
   
   // Process UnresolvedDeclRefExpr.
   if (UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
-    ValueDecl *D = Binder.bindValueName(UDRE->Name);
-    if (D == 0) {
+    llvm::SmallVector<ValueDecl*, 4> Decls;
+    Binder.bindValueName(UDRE->Name, Decls);
+    if (Decls.empty()) {
       Binder.error(UDRE->Loc, "use of unresolved identifier '" +
                    UDRE->Name.str() + "'");
       return 0;
     }
-    return new (Binder.Context) DeclRefExpr(D, UDRE->Loc);
+    if (Decls.size() == 1)
+      return new (Binder.Context) DeclRefExpr(Decls[0], UDRE->Loc);
+    
+    assert(0 && "unimp!");
   }
   
   // A reference to foo.bar may be an application ("bar foo"), so look up bar.
+  // It may also be a tuple field reference, so don't report an error here if we
+  // don't find anything juicy.
   if (UnresolvedDotExpr *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
-    UDE->ResolvedDecl = Binder.bindValueName(UDE->Name);
+    llvm::SmallVector<ValueDecl*, 4> Decls;
     // Only bind to functions.
-    if (UDE->ResolvedDecl && !UDE->ResolvedDecl->Ty->is<FunctionType>())
-      UDE->ResolvedDecl = 0;
+    Binder.bindValueName(UDE->Name, Decls, true /*require functions*/);
+
+    // FIXME: should return a set.
+    if (!Decls.empty())
+      UDE->ResolvedDecl = Decls.front();
+    return UDE;
   }
   
   // Otherwise, not something that needs name binding.
