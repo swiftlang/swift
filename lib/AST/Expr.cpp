@@ -351,10 +351,14 @@ public:
   }
   void VisitBinaryExpr(BinaryExpr *E) {
     OS.indent(Indent) << "(binary_expr '";
-    if (E->Fn)
-      OS << E->Fn->Name;
-    else
+    if (!E->Fn)
       OS << "=";
+    else if (DeclRefExpr *DRE = llvm::dyn_cast<DeclRefExpr>(E->Fn))
+      OS << DRE->D->Name;
+    else if (OverloadSetRefExpr *OO = llvm::dyn_cast<OverloadSetRefExpr>(E->Fn))
+      OS << OO->Decls[0]->Name;
+    else
+      OS << "***UNKNOWN***";
     OS << "' type='" << E->Ty << "'\n";
     PrintRec(E->LHS);
     OS << '\n';

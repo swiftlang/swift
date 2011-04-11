@@ -223,25 +223,46 @@ static bool SemaSequenceExpr(Expr **Elements, unsigned NumElements,
 
 /// SemaBinaryExpr - Perform semantic analysis of binary expressions.
 /// OpFn is null if this is an assignment (FIXME: we don't have generics yet).
-static bool SemaBinaryExpr(Expr *&LHS, ValueDecl *OpFn,
-                           SMLoc OpLoc, Expr *&RHS, Type &ResultTy,
+static bool SemaBinaryExpr(Expr *&LHS, Expr *&OpFn, Expr *&RHS, Type &ResultTy,
                            TypeChecker &TC) {
   // If this is an assignment, then we coerce the RHS to the LHS.
   if (OpFn == 0) {
     RHS = TC.convertToType(RHS, LHS->Ty);
     if (LHS == 0) {
-      TC.note(OpLoc, "while converting assigned value to destination type");
+      TC.note(RHS->getLocStart(),
+              "while converting assigned value to destination type");
       return true; 
     }
     
     ResultTy = TC.Context.TheEmptyTupleType;
     return false;
   }
+
+  // If this is an overloaded binary operator, try to resolve which candidate
+  // is the right one.
+  if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(OpFn)) {
+    // FIXME: we really need conversion ranking for this to prune out impossible
+    // candidates.  For now we just look for an exact match.
+    for (unsigned i = 0, e = OO->Decls.size(); i != e; ++i) {
+      ValueDecl *Fn = OO->Decls[i];
+      
+      FunctionType *FnTy = cast<FunctionType>(Fn->Ty.getPointer());
+      TupleType *Input = cast<TupleType>(FnTy->Input.getPointer());
+      assert(Input->Fields.size() == 2 &&"Sema error validating infix fn type");
+
+      if (Input->getElementType(0)->isEqual(LHS->Ty, TC.Context) &&
+          Input->getElementType(1)->isEqual(RHS->Ty, TC.Context)) {
+        OpFn = new (TC.Context) DeclRefExpr(Fn, OO->Loc, Fn->Ty);
+        return SemaBinaryExpr(LHS, OpFn, RHS, ResultTy, TC);
+      }
+    }
+    
+    ResultTy = TC.Context.TheDependentType;
+    return false;
+  }
   
   // Parser verified that OpFn has an Infix Precedence.  Sema verified that OpFn
   // only has InfixPrecedence if it takes a 2 element tuple as input.
-  assert(OpFn->Attrs.InfixPrecedence != -1 &&
-         "Sema and parser should verify that only binary predicates are used"); 
   FunctionType *FnTy = cast<FunctionType>(OpFn->Ty.getPointer());
   TupleType *Input = cast<TupleType>(FnTy->Input.getPointer());
   assert(Input->Fields.size() == 2 && "Sema error validating infix fn type");
@@ -249,14 +270,14 @@ static bool SemaBinaryExpr(Expr *&LHS, ValueDecl *OpFn,
   // Verify that the LHS/RHS have the right type and do conversions as needed.
   LHS = TC.convertToType(LHS, Input->getElementType(0));
   if (LHS == 0) {
-    TC.note(OpLoc,
+    TC.note(OpFn->getLocStart(),
             "while converting left side of binary operator to expected type");
     return true;
   }
   
   RHS = TC.convertToType(RHS, Input->getElementType(1));
   if (RHS == 0) {
-    TC.note(OpLoc,
+    TC.note(OpFn->getLocStart(),
             "while converting right side of binary operator to expected type");
     return true;
   }
@@ -379,7 +400,7 @@ namespace {
     }
     
     Expr *VisitBinaryExpr(BinaryExpr *E) {
-      if (SemaBinaryExpr(E->LHS, E->Fn, E->OpLoc, E->RHS, E->Ty, TC))
+      if (SemaBinaryExpr(E->LHS, E->Fn, E->RHS, E->Ty, TC))
         return 0;
       
       return E;
@@ -502,17 +523,21 @@ Expr *SemaExpressionTree::VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
 }
 
 
-/// getBinOp - Return the ValueDecl for the expression if it is an infix binary
-/// operator, otherwise return null.
-static ValueDecl *getBinOp(SequenceExpr *E, unsigned Elt) {
-  if (Elt >= E->NumElements) return 0;
+/// getBinOp - If the specified expression is an infix binary operator, return
+/// its precedence, otherwise return -1.
+static int getBinOp(SequenceExpr *E, unsigned Elt) {
+  if (Elt >= E->NumElements) return -1;
   
-  DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->Elements[Elt]);
-  if (DRE == 0) return 0;
+  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->Elements[Elt]))
+    return DRE->D->Attrs.InfixPrecedence;
   
-  if (DRE->D->Attrs.InfixPrecedence == -1)
-    return 0;
-  return DRE->D;
+  // If this is an overload set, the entire overload set is known to have the
+  // same precedence level.
+  if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E->Elements[Elt]))
+    return OO->Decls[0]->Attrs.InfixPrecedence;
+  
+  // Not a binary operator.
+  return -1;
 }
 
 static void ReduceJuxtaposedExprs(SequenceExpr *E, unsigned Elt,
@@ -530,14 +555,10 @@ static void ReduceBinaryExprs(SequenceExpr *E, unsigned Elt,
   ReduceJuxtaposedExprs(E, Elt, TC);
   
   while (1) {
-    ValueDecl *ThisOp = getBinOp(E, Elt+1);
-    
-    int ThisPrec = ThisOp ? ThisOp->Attrs.InfixPrecedence : -1;
+    int ThisPrec = getBinOp(E, Elt+1);
     if (ThisPrec < (int)MinPrec)
       break;
     
-    SMLoc ThisOpLoc = E->Elements[Elt+1]->getLocStart();
-
     // TODO: Support ternary operators some day.
     
     // Get the next expression, which is the RHS of the binary operator.
@@ -555,8 +576,7 @@ static void ReduceBinaryExprs(SequenceExpr *E, unsigned Elt,
     // Get the precedence of the operator immediately to the right of the RHS
     // of the RHS of the binop (if present).  This is looking for the multiply
     // in "x+y*z".
-    ValueDecl *NextOp = getBinOp(E, Elt+3);
-    int NextPrec = NextOp ? NextOp->Attrs.InfixPrecedence : -1;
+    int NextPrec = getBinOp(E, Elt+3);
     
     // TODO: All operators are left associative at the moment.
     
@@ -568,16 +588,15 @@ static void ReduceBinaryExprs(SequenceExpr *E, unsigned Elt,
       // operator.
       ReduceBinaryExprs(E, Elt+2, TC, ThisPrec+1);
       
-      NextOp = getBinOp(E, Elt+3);
-      NextPrec = NextOp ? NextOp->Attrs.InfixPrecedence : -1;
+      NextPrec = getBinOp(E, Elt+3);
     }
     assert(NextPrec <= ThisPrec && "Recursion didn't work!");
 
     // Okay, we've finished the parse, form the AST node for the binop now.
     BinaryExpr *RBE =
-      new (TC.Context) BinaryExpr(E->Elements[Elt], ThisOp, ThisOpLoc,
+      new (TC.Context) BinaryExpr(E->Elements[Elt], E->Elements[Elt+1],
                                   E->Elements[Elt+2]);
-    if (!SemaBinaryExpr(RBE->LHS, RBE->Fn, RBE->OpLoc, RBE->RHS, RBE->Ty, TC))
+    if (!SemaBinaryExpr(RBE->LHS, RBE->Fn, RBE->RHS, RBE->Ty, TC))
       E->Elements[Elt] = RBE;
     
     // The binop and the RHS are now consumed, move everything down.
@@ -605,10 +624,6 @@ static bool isKnownToBeAFunction(Expr *E) {
   }
   
   return false;
-}
-
-static bool isTightlyBindingBinop(ValueDecl *Op) {
-  return Op && Op->Attrs.InfixPrecedence >= 230;
 }
 
 /// ReduceJuxtaposedExprs - Given an element of a sequence expression, check to
@@ -667,7 +682,7 @@ static void ReduceJuxtaposedExprs(SequenceExpr *E, unsigned Elt,
   if (!isa<DeclRefExpr>(EltExpr) && !isa<OverloadSetRefExpr>(EltExpr) &&
       (isa<DeclRefExpr>(E->Elements[Elt+1]) || 
        isa<OverloadSetRefExpr>(E->Elements[Elt+1]) ||
-       isTightlyBindingBinop(getBinOp(E, Elt+2)))) {
+       getBinOp(E, Elt+2) > 230)) {
     ReduceBinaryExprs(E, Elt+1, TC);
     
     // If there was an error and we dropped the argument, bail out.

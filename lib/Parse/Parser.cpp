@@ -1118,7 +1118,7 @@ bool Parser::parseDeclExprList(llvm::SmallVectorImpl<ExprOrDecl> &Entries,
           break;
         
         // FIXME: Assignment is represented with null Fn.
-        ResultExpr = new (S.Context) BinaryExpr(ResultExpr.get(), 0, EqualLoc,
+        ResultExpr = new (S.Context) BinaryExpr(ResultExpr.get(), 0,
                                                 RHSExpr.get());
       }
         

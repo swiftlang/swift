@@ -425,13 +425,11 @@ public:
 class BinaryExpr : public Expr {
 public:
   Expr *LHS;
-  ValueDecl *Fn;
-  llvm::SMLoc OpLoc;
+  Expr *Fn;
   Expr *RHS;
   
-  BinaryExpr(Expr *lhs, ValueDecl *fn, llvm::SMLoc oploc, Expr *rhs,
-             Type Ty = Type())
-    : Expr(BinaryExprKind, Ty), LHS(lhs), Fn(fn), OpLoc(oploc), RHS(rhs) {}
+  BinaryExpr(Expr *lhs, Expr *fn, Expr *rhs, Type Ty = Type())
+    : Expr(BinaryExprKind, Ty), LHS(lhs), Fn(fn), RHS(rhs) {}
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BinaryExpr *) { return true; }
