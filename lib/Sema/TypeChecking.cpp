@@ -607,6 +607,10 @@ static bool isKnownToBeAFunction(Expr *E) {
   return false;
 }
 
+static bool isTightlyBindingBinop(ValueDecl *Op) {
+  return Op && Op->Attrs.InfixPrecedence >= 230;
+}
+
 /// ReduceJuxtaposedExprs - Given an element of a sequence expression, check to
 /// see if it is the start of a juxtaposed sequence.  If so, reduce it down to
 /// a single element.  This allows functions to bind to their arguments.
@@ -640,6 +644,9 @@ static void ReduceJuxtaposedExprs(SequenceExpr *E, unsigned Elt,
   if (!isKnownToBeAFunction(EltExpr))
     return;
   
+  // FIXME: FIXME: This is a huge parsing hack for 'else' and should just be
+  // ripped out.  Please kill me.
+  
   // If this is a function, then it can juxtapose.  Note that the grammar
   // effectively imposed by this is ambiguous with the top level of sequenced
   // expressions: "f() g()" is initially parsed as 4 exprs in a sequence:
@@ -656,8 +663,11 @@ static void ReduceJuxtaposedExprs(SequenceExpr *E, unsigned Elt,
   // single argument:   f a + b    -->  (f a) + b
   // If this is some other expression that returns something of function type,
   // then reduce the subexpression first and then apply it to the function.
-  // This gives:    f a + b    -->  f (a + b)
-  if (!isa<DeclRefExpr>(EltExpr) && !isa<OverloadSetRefExpr>(EltExpr)) {
+  // This gives:    f() a + b    -->  f() (a + b), not (f() a) + b
+  if (!isa<DeclRefExpr>(EltExpr) && !isa<OverloadSetRefExpr>(EltExpr) &&
+      (isa<DeclRefExpr>(E->Elements[Elt+1]) || 
+       isa<OverloadSetRefExpr>(E->Elements[Elt+1]) ||
+       isTightlyBindingBinop(getBinOp(E, Elt+2)))) {
     ReduceBinaryExprs(E, Elt+1, TC);
     
     // If there was an error and we dropped the argument, bail out.
