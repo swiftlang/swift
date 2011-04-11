@@ -50,7 +50,7 @@ llvm::SMLoc Expr::getLocStart() const {
     return cast<UnresolvedScopedIdentifierExpr>(this)->TypeDeclLoc;
   case TupleExprKind:      return cast<TupleExpr>(this)->LParenLoc;
   case UnresolvedDotExprKind:
-    return cast<UnresolvedDotExpr>(this)->SubExpr->getLocStart();
+    return cast<UnresolvedDotExpr>(this)->getLocStart();
   case TupleElementExprKind:
     return cast<TupleElementExpr>(this)->SubExpr->getLocStart();
   case ApplyExprKind:      return cast<ApplyExpr>(this)->Fn->getLocStart();
@@ -122,6 +122,9 @@ namespace {
       return E;
     }
     Expr *VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
+      if (!E->SubExpr)
+        return E;
+      
       if (Expr *E2 = ProcessNode(E->SubExpr)) {
         E->SubExpr = E2;
         return E;
@@ -297,9 +300,11 @@ public:
     OS.indent(Indent) << "(unresolved_dot_expr type='" << E->Ty;
     OS << "\' field '" << E->Name.get() << "'";
     if (!E->ResolvedDecls.empty())
-      OS << " decl resolved to " << E->ResolvedDecls.size() << "candidate(s)!";
-    OS << '\n';
-    PrintRec(E->SubExpr);
+      OS << " decl resolved to " << E->ResolvedDecls.size() << " candidate(s)!";
+    if (E->SubExpr) {
+      OS << '\n';
+      PrintRec(E->SubExpr);
+    }
     OS << ')';
   }
   void VisitTupleElementExpr(TupleElementExpr *E) {

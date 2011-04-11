@@ -759,10 +759,7 @@ bool Parser::parseExpr(NullablePtr<Expr> &Result, const char *Message) {
   
   do {
     // Parse the expr-primary.
-    Result = 0;
-    if (parseExprPrimary(Result) || Result.isNull()) return true;
-
-    SequencedExprs.push_back(Result.get());    
+    if (parseExprPrimary(SequencedExprs)) return true;
   } while (isStartOfExpr(Tok));
   
   // If there is exactly one element in the sequence, it is a degenerate
@@ -789,13 +786,9 @@ bool Parser::parseExpr(NullablePtr<Expr> &Result, const char *Message) {
 ///     expr-brace
 ///     expr-dot
 ///     expr-subscript
-///     expr-primary-fn expr-primary
 ///
 ///   expr-literal:
 ///     numeric_constant
-///
-///   expr-primary-fn:
-///     expr-primary      Type sensitive: iff expr has fn type
 ///
 ///   expr-dot:
 ///     expr-primary '.' identifier
@@ -803,18 +796,19 @@ bool Parser::parseExpr(NullablePtr<Expr> &Result, const char *Message) {
 ///
 ///   expr-subscript:
 ///     expr-primary '[' expr ']'
-bool Parser::parseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
+bool Parser::parseExprPrimary(llvm::SmallVectorImpl<Expr*> &Result) {
+  llvm::NullablePtr<Expr> R;
   switch (Tok.getKind()) {
   case tok::numeric_constant:
-    Result = S.expr.ActOnNumericConstant(Tok.getText(), Tok.getLoc());
+    R = S.expr.ActOnNumericConstant(Tok.getText(), Tok.getLoc());
     consumeToken(tok::numeric_constant);
     break;
 
   case tok::dollarident: // $1
-    if (parseExprDollarIdentifier(Result)) return true;
+    if (parseExprDollarIdentifier(R)) return true;
     break;
   case tok::identifier:  // foo   and  foo::bar
-    if (parseExprIdentifier(Result)) return true;
+    if (parseExprIdentifier(R)) return true;
     break;
 
   case tok::colon: {     // :foo
@@ -826,22 +820,25 @@ bool Parser::parseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
       return true;
     
     // Handle :foo by just making an AST node.
-    Result = new (S.Context) UnresolvedMemberExpr(ColonLoc, NameLoc, Name);
+    R = new (S.Context) UnresolvedMemberExpr(ColonLoc, NameLoc, Name);
     break;
   }
       
   case tok::l_paren:
-    if (parseExprParen(Result)) return true;
+    if (parseExprParen(R)) return true;
     break;
       
   case tok::l_brace:
-    if (parseExprBrace(Result)) return true;
+    if (parseExprBrace(R)) return true;
     break;
     
   default:
-    error(Tok.getLoc(), Message ? Message : "expected expression");
+    error(Tok.getLoc(), "expected expression");
     return true;
   }
+  
+  if (!R.isNull())
+    Result.push_back(R.get());
   
   // Handle suffix expressions.
   while (1) {
@@ -853,10 +850,10 @@ bool Parser::parseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
         return true;
       }
         
-      if (!Result.isNull()) {
+      if (!R.isNull()) {
         Identifier Name = S.Context.getIdentifier(Tok.getText());
-        Result = new (S.Context) UnresolvedDotExpr(Result.get(), TokLoc,
-                                                   Name, Tok.getLoc());
+        Result.push_back(new (S.Context) UnresolvedDotExpr(0, TokLoc, Name,
+                                                           Tok.getLoc()));
       }
       if (Tok.is(tok::identifier))
         consumeToken(tok::identifier);
@@ -877,9 +874,10 @@ bool Parser::parseExprPrimary(NullablePtr<Expr> &Result, const char *Message) {
         return true;        
       }
       
-      if (!Result.isNull() && !Idx.isNull())
-        Result = S.expr.ActOnArraySubscript(Result.get(), TokLoc, Idx.get(),
-                                            RLoc);
+      if (!R.isNull() && !Idx.isNull()) {
+        // FIXME: Implement.  This should add an unresolved subscript node, just
+        // like UnresolvedDotExpr.
+      }
     }
         
     break;

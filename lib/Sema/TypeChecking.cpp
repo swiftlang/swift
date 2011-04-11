@@ -426,6 +426,13 @@ namespace {
 } // end anonymous namespace.
 
 Expr *SemaExpressionTree::VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
+  // If the base expression hasn't been found yet, then we can't process this
+  // value.
+  if (E->SubExpr == 0) {
+    E->Ty = TC.Context.TheDependentType;
+    return E;
+  }
+  
   Type SubExprTy = E->SubExpr->Ty;
   if (SubExprTy->is<DependentType>())
     return E;
@@ -610,6 +617,25 @@ static void ReduceJuxtaposedExprs(SequenceExpr *E, unsigned Elt,
 
   Expr *EltExpr = E->Elements[Elt];
   
+  // If we have a .foo suffix, and if it isn't bound to a base expression, then
+  // we just found our base.
+  if (UnresolvedDotExpr *UDE = dyn_cast<UnresolvedDotExpr>(E->Elements[Elt+1]))
+    if (UDE->SubExpr == 0) {
+      // Set EltExpr as the base expression.
+      UDE->SubExpr = EltExpr;
+      
+      memmove(E->Elements+Elt, E->Elements+Elt+1,
+              (E->NumElements-Elt-1)*sizeof(E->Elements[0]));
+      --E->NumElements;
+      
+      // Reprocess the newly formed expression.
+      EltExpr = SemaExpressionTree::doIt(UDE, TC);
+      if (EltExpr)
+        E->Elements[Elt] = EltExpr;
+      
+      return ReduceJuxtaposedExprs(E, Elt, TC);
+    }
+
   // If this expression isn't a function, then it doesn't juxtapose.
   if (!isKnownToBeAFunction(EltExpr))
     return;

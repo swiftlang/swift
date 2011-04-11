@@ -366,7 +366,8 @@ static Expr *BindNames(Expr *E, Expr::WalkOrder Order, void *binder) {
     Binder.bindValueName(UDE->Name, Decls, NLK_DotLookup);
 
     // Copy the overload set into ASTContext memory.
-    UDE->ResolvedDecls = Binder.Context.AllocateCopy<ValueDecl*>(Decls);
+    if (!Decls.empty())
+      UDE->ResolvedDecls = Binder.Context.AllocateCopy<ValueDecl*>(Decls);
     return UDE;
   }
   

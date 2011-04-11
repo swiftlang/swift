@@ -75,15 +75,6 @@ ActOnScopedIdentifierExpr(Identifier ScopeName, llvm::SMLoc ScopeLoc,
                                                         Name);
 }
 
-llvm::NullablePtr<Expr>
-SemaExpr::ActOnArraySubscript(Expr *Base, llvm::SMLoc LLoc, Expr *Idx,
-                              llvm::SMLoc RLoc) {
-  // FIXME: Implement.  This should lookup "subscript(Base, Idx)" as a function
-  // call.
-  return Base;
-}
-
-
 NullablePtr<Expr> 
 SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr *const *SubExprs,
                          const Identifier *SubExprNames,

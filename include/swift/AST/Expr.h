@@ -281,10 +281,12 @@ public:
 };
 
 /// UnresolvedDotExpr - A field access (foo.bar) on an expression with dependent
-/// type.
+/// type.  Before type checking, the SubExpr is null (because we don't know how
+/// much is bound), and during TypeChecking SubExpr may be bound to a
+/// subexpression.
 class UnresolvedDotExpr : public Expr {
 public:
-  Expr *SubExpr;
+  Expr *SubExpr;       // Can be null!
   llvm::SMLoc DotLoc;
   Identifier Name;
   llvm::SMLoc NameLoc;
@@ -297,6 +299,10 @@ public:
                     llvm::SMLoc nameloc)
   : Expr(UnresolvedDotExprKind), SubExpr(subexpr), DotLoc(dotloc),
     Name(name), NameLoc(nameloc) {}
+  
+  llvm::SMLoc getLocStart() const {
+    return SubExpr ? SubExpr->getLocStart() : DotLoc;
+  }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedDotExpr *) { return true; }
