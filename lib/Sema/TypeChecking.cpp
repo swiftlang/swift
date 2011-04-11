@@ -188,17 +188,29 @@ static bool SemaApplyExpr(Expr *&E1, Expr *&E2, Type &ResultTy,
   // resolve which overload member is based on the argument type.
   if (!E2->Ty->is<DependentType>()) {
     OverloadSetRefExpr *OS = cast<OverloadSetRefExpr>(E1);
+    int CandidateFound = -1;
     for (unsigned i = 0, e = OS->Decls.size(); i != e; ++i) {
       Type ArgTy = OS->Decls[i]->Ty->getAs<FunctionType>()->Input;
       // If we found an exact match, disambiguate the overload set.
       if (ArgTy->isEqual(E2->Ty, TC.Context)) {
-        E1 = new (TC.Context) DeclRefExpr(OS->Decls[i], OS->Loc,
-                                          OS->Decls[i]->Ty);
-        return SemaApplyExpr(E1, E2, ResultTy, TC);
-      }
+        // If we found multiple possible candidates, then we fail.
+        if (CandidateFound != -1) {
+          CandidateFound = -1;
+          break;
+        }
+        
+        CandidateFound = i;
+      }          
       // TODO: implement conversion ranking!
     }
+    
+    if (CandidateFound != -1) {
+      E1 = new (TC.Context) DeclRefExpr(OS->Decls[CandidateFound], OS->Loc,
+                                        OS->Decls[CandidateFound]->Ty);
+      return SemaApplyExpr(E1, E2, ResultTy, TC);
+    }
   }
+  
   // Otherwise, we can't resolve the argument type yet.
   ResultTy = E2->Ty;
   return false;
@@ -1046,6 +1058,9 @@ namespace {
     }
 
     Expr *VisitBinaryExpr(BinaryExpr *E) {
+      // TODO: If the function is an overload set and the result type that we're
+      // coercing onto the binop is completely incompatible with some elements
+      // of the overload set, trim them out.      
       return E;
     }
     
