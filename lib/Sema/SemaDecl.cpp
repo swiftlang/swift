@@ -174,11 +174,10 @@ static void DiagnoseRedefinition(ValueDecl *Prev, ValueDecl *New, SemaDecl &SD){
 /// D1/D3 are valid overloads and we don't have to check all permutations.
 static bool CheckValidOverload(const ValueDecl *D1, const ValueDecl *D2,
                                SemaDecl &SD) {
-  if (D1->Attrs.isInfix() != D2->Attrs.isInfix()) {
+  if (D1->Attrs.InfixPrecedence != D2->Attrs.InfixPrecedence) {
     SD.error(D1->getLocStart(),
-             "overload of a binary operator must also be a binary operator");
-    SD.note(D2->getLocStart(),
-            "previous declaration here");
+             "infix precedence of functions in an overload set must match");
+    SD.note(D2->getLocStart(), "previous declaration here");
     return true;
   }
   
