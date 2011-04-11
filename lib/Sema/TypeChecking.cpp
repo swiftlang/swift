@@ -522,32 +522,6 @@ static void ReduceBinaryExprs(SequenceExpr *E, unsigned Elt,
   // reduce it down to a single value first.
   ReduceJuxtaposedExprs(E, Elt, TC);
   
-  // If the expression is a top level tuple expression like "(x, y)" and it was
-  // immediately preceded by an identifier, like "f(x,y)" then diagnose this as
-  // an error.  The tuple is pointless and it is likely that the user expected
-  // the function to bind to the arguments.  Examples could be: f.a().b when
-  // a is declared as taking a single argument.
-  if (TupleExpr *TE = dyn_cast<TupleExpr>(E->Elements[Elt]))
-    if (TE->IsPrecededByIdentifier) {
-      bool AllResolved = true;
-      // If the expressions before this one aren't resolved yet, don't emit this
-      // error.
-      for (unsigned i = 0; i != Elt; ++i)
-        if (E->Elements[i]->Ty->is<DependentType>())
-          AllResolved = false;
-      if (AllResolved) {
-        TC.error(TE->getLocStart(),
-               "tuple expression isn't bound to identifier, add ' ' before it");
-        // Drop this expression.
-        memmove(E->Elements+Elt, E->Elements+Elt+1, 
-                (E->NumElements-Elt-1)*sizeof(E->Elements[0]));
-        --E->NumElements;
-        if (Elt != E->NumElements)
-          ReduceBinaryExprs(E, Elt, TC, MinPrec);
-        return;
-      }
-    }
-  
   while (1) {
     ValueDecl *ThisOp = getBinOp(E, Elt+1);
     
@@ -657,8 +631,13 @@ static void ReduceJuxtaposedExprs(SequenceExpr *E, unsigned Elt,
   // If this is some other expression that returns something of function type,
   // then reduce the subexpression first and then apply it to the function.
   // This gives:    f a + b    -->  f (a + b)
-  if (!isa<DeclRefExpr>(EltExpr) && !isa<OverloadSetRefExpr>(EltExpr))
-    ReduceBinaryExprs(E, Elt+1, TC);    
+  if (!isa<DeclRefExpr>(EltExpr) && !isa<OverloadSetRefExpr>(EltExpr)) {
+    ReduceBinaryExprs(E, Elt+1, TC);
+    
+    // If there was an error and we dropped the argument, bail out.
+    if (E->NumElements == Elt+1)
+      return;
+  }
   
   Expr *ArgExpr = E->Elements[Elt+1];
 
@@ -703,6 +682,30 @@ Expr *SemaExpressionTree::VisitSequenceExpr(SequenceExpr *E) {
     return E->Elements[0];
   
   if (SemaSequenceExpr(E->Elements, E->NumElements, E->Ty, TC)) return 0;
+  
+  // If the expression is a top level tuple expression like "(x, y)" and it was
+  // immediately preceded by an identifier, like "f(x,y)" then diagnose this as
+  // an error.  The tuple is pointless and it is likely that the user expected
+  // the function to bind to the arguments.  Examples could be: f.a().b when
+  // a is declared as taking a single argument.
+  for (unsigned i = 0, e = E->NumElements; i != e; ++i) {
+    // If not fully resolved, bail out.
+    if (E->Elements[i]->Ty->is<DependentType>()) break;
+    
+    if (TupleExpr *TE = dyn_cast<TupleExpr>(E->Elements[i]))
+      if (TE->IsPrecededByIdentifier) {
+        TC.error(TE->getLocStart(),
+               "tuple expression isn't bound to identifier, add ' ' before it");
+        // Drop this expression.
+        memmove(E->Elements+i, E->Elements+i+1, 
+                (E->NumElements-i-1)*sizeof(E->Elements[0]));
+        --E->NumElements;
+        
+        if (E->NumElements == 1)
+          return E->Elements[0];
+      }
+  }
+  
   return E;
 }
 
