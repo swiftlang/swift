@@ -1,0 +1,87 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1038\cocoasubrtf350
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;\f1\fnil\fcharset0 Monaco;}
+{\colortbl;\red255\green255\blue255;}
+\margl1440\margr1440\vieww14660\viewh15060\viewkind0
+\deftab720
+\pard\pardeftab720\ql\qnatural
+
+\f0\b\fs24 \cf0 Memory Layout of Typed Values
+\b0 \
+\
+Swift has both value types and reference types, where a value type is copied around by-value (and modifying copies doesn't change the original). \'a0Reference types are basically a pointer to the underlying type. \'a0The pointer is passed around by value, but this leads to sharing of the pointed-to value. \'a0Values types for local variables in functions are nominally stored on the stack or in registers (though can be promoted to the heap, as in ObjC blocks).\
+\
+There are many simple values types: tuples, integers and floating point values, and sized array values are all value types. \'a0For example:\
+\
+\pard\pardeftab720\ql\qnatural
+
+\f1 \cf0 \'a0\'a0func foo() \{\
+\'a0\'a0 \'a0var myarray : int[42];\
+\'a0\'a0\}\
+\pard\pardeftab720\ql\qnatural
+
+\f0 \cf0 \
+... declares an array of 42 integers on the stack, there is no heap allocation involved.\
+\
+Objects (when we figure out what they look like) are always implicitly reference types. \'a0Functions and array slices are reference types. \'a0As a silly example:\
+\pard\pardeftab720\ql\qnatural
+
+\f1 \cf0 \
+\'a0\'a0func foo() \{\
+\'a0\'a0 \'a0var myarray : int[42];\
+\'a0\'a0 \'a0var arr : int[] = myarray; \'a0 \'a0 // Reference to myarray.\
+\'a0\'a0 \'a0arr[4] = 1; \'a0 \'a0 \'a0 \'a0 \'a0 \'a0 \'a0 \'a0 \'a0 \'a0// Updates myarray.\
+\'a0\'a0\}\
+\pard\pardeftab720\ql\qnatural
+
+\f0 \cf0 \
+Aggregates (structs and oneof) default to being value types, but can be declared as reference types with the byref attribute:\
+\
+\pard\pardeftab720\ql\qnatural
+
+\f1 \cf0 \'a0\'a0struct [byref] MyList (\
+\'a0\'a0 \'a0data : int,\
+\'a0\'a0 \'a0next : MyList\
+\'a0\'a0)\
+\
+\pard\pardeftab720\ql\qnatural
+
+\f0 \cf0 The eventual "any" type and protocol types are reference values that store small values directly inside themselves and autobox larger values.  We'll eventually support a real "pointer type" (probably with a "*") which are only used for pointers to non-swift C datatypes.\
+\
+All reference types should be optionally qualified with the 'weak' modifier. \'a0A weak reference drops to null if the underlying reference value is destroyed while the reference is still live. \'a0This qualifier can be represented syntactically in several forms, but the actual spelling of it isn't important right now.\
+\
+\
+\pard\pardeftab720\ql\qnatural
+
+\b \cf0 Memory Management Approach and Ownership Model
+\b0 \
+\
+Swift provides automatic memory management with deterministic object lifecycle and predictable destruction through an Automated Reference Counting (ARC) approach. When the last strong reference to an reference value is removed it is destroyed and any uses of weak references to it produce a null value.\
+\
+Compared to manual memory management (ala new/delete, malloc/free, retain/release), automatic reference counting eliminates the possibility of dangling pointer bugs, substantially reduces occurrences of memory leaks, and is much simpler to learn and less code to write. \'a0On the other hand, there is more inherent refcount overhead to cannot be avoided (we hope the optimizer will remove much of it).\
+\
+Compared to accurate garbage collection (ala Java or .NET), ARC provides deterministic object destruction (thus able to support RAII idioms), reclaims objects faster (thus has a lower average amount of memory allocated), does not have finalization (or resurrection, or other confusing semantics), does not suffer from unpredictable pauses, and is simpler to implement. \'a0ARC is also much more reasonable to use in space constrained environments like firmware and kernels than a full GC. \'a0On the other hand, basic ARC can leak with cyclic strong references and does not compact the heap (so it may have higher memory footprint in some cases). \'a0Adding a cycle collector + compactor to ARC may be an interesting later project.\
+\
+Compared to conservative GC (ala ObjC libauto), ARC does not suffer from leaks caused by conservative stack scanning or subtle bugs due to lost write barriers etc. \'a0Otherwise it is similar to the normal GC case.\
+\
+
+\b \
+Runtime Implementation and Moving Parts
+\b0 \
+\
+Many of the details are up for debate and change, but the best approach is to start with something simple and implementable, then experiment with variants when we have enough code working to do performance measurements. \'a0Here is one possible implementation approach to start with:\
+\
+Each reference value is stored in the swift heap, and they each have an object header word containing a refcount and some bits for the runtime to play with. \'a0The refcount reflects the number of strong references to the object. \'a0If there are any weak references to the object, a "has weak references" bit is set in the object header and a count of the weak references is stored in an on-the-side hashtable.\
+\
+When a reference is copied into a strong reference, the copy decrements the\'a0strong\'a0refcount of the overwritten reference and\'a0increments the refcount of the new pointee. \'a0When a reference is copied into a weak reference, the weak refcount of the old pointer is reduced and the weak refcount of the new pointer is incremented (allocating a hash table entry and setting the "has weak ref" bit in the object header if needed). \'a0When memory is allocated, it is returned from the allocation function and has a refcount of 1 (the returned pointer). \'a0\
+\
+When a strong refcount goes to zero, the object is dead. \'a0The first step is to run the object destructor if it exists or to null out the object if it doesn't. \'a0This can cause recursive destruction of objects. \'a0After the object is destroyed, the on-the-side hash table is checked to see if there are any weak references, if not, the memory is freed. \'a0Otherwise the memory is left allocated (but has been destructed). \'a0Whenever a\'a0weak ref count goes to zero, a check is done to see if the strong ref count of the object is already zero. \'a0If so, the (already destructed) memory for the object is deallocated.\
+\
+One annoying part of using ARC instead of GC is that references to heap objects always have to get to the refcount. \'a0I don't think that this requirement affects anything other than array references (int[]), which are effectively inner pointers into an existing object or stack. \'a0While originally envisioned to be two words (pointer + element count), the array reference representation now needs to be three words: pointer, element count, containing object pointer.\
+\
+\
+
+\b Runtime Optimizations
+\b0 \
+\
+As described, ARC would be very expensive at runtime, continuously atomically diddling around with refcounts. \'a0The optimizer should aim to eliminate as many redundant refcounts manipulations as it can (and is one more reason that neither the strong nor the weak refcount should be exposed/accessible\'a0to user code). \'a0This can clean up a lot of redundant manipulation from local variables on the stack and trivial getters, for example.\
+}

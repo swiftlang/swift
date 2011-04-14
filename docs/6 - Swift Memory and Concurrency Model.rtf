@@ -1,0 +1,213 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1038\cocoasubrtf350
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;\red0\green63\blue160;}
+\margl1440\margr1440\vieww13680\viewh17120\viewkind0
+\deftab720
+\pard\pardeftab720\ql\qnatural
+
+\f0\b\fs52 \cf0 Swift Memory and Concurrency model
+\b0 \
+\pard\pardeftab720\ql\qnatural
+
+\fs24 \cf0 \
+The goal of this writeup is to provide a safe and efficient way to model, design, and implement concurrent applications in Swift. \'a0It is believed that it will completely eliminate data races and lock deadlock issues from swift apps, and will allow for important performance wins as well. \'a0This happens by eliminating shared mutable data, locks, and the need for most atomic memory accesses. \'a0The model is quite different from what traditional unix folks are used to though. :-)\
+\
+As usual, Swift will eventually support unsafe constructs, so if it turns out that the model isn't strong enough for some particular use case, that coder can always fall back to the hunting for concurrency with arrows and bone knives instead of using the native language support. \'a0Ideally this will never be required though.\
+\
+This starts by describing the basic model, then talks about issues and some possible extensions to improve the model.\
+\'a0\
+\pard\pardeftab720\ql\qnatural
+
+\b\fs40 \cf0 Language Concepts
+\b0 \
+\pard\pardeftab720\ql\qnatural
+
+\fs24 \cf0 \
+The 
+\b unit of concurrency
+\b0  in Swift is an Actor. \'a0As an execution context, an actor corresponds to a (light weight) thread or dispatch queue that can respond to a declared list of asynch messages. \'a0Each actor has its own private set of mutable data, and can communicate to other actors by sending them asynch messages. \'a0Only one message can be active at a time (you can also extend the model to allow read/writer locks as a refinement) in an actor. \'a0Through the type system, it is impossible for an actor to read or change another actor's mutable data: all mutable data is private to some actor. \'a0When a message is sent from one actor to another, the argument is deep copied to ensure that two actors can never share mutable data.\
+\
+To achieve this, there are three important kinds of memory object in Swift. \'a0Given a type, it is obvious what kind it is from its definition. These kinds are:\
+\
+1.\'a0
+\b Immutable Data
+\b0  - Immutable data (which can have a constructor, but whose value cannot be changed after it completes) is sharable across actors, and it would make sense to unique them where possible. \'a0Immutable data can (transitively) point to other immutable data, but it isn't valid (and the compiler rejects) immutable data that is pointing to mutable data. \'a0For example:\
+\
+struct [immutable,byref] IList ( data : int, next : List)\'a0\
+...\
+\'a0\'a0var a =\'a0IList(1,\'a0IList(2,\'a0IList(3, nil)))\
+...\
+\'a0\'a0a.data = 42 \'a0 // error, can't mutate field of immutable 'IList' type!\
+\'a0\'a0a.next = nil \'a0 \'a0// error, same deal\
+\'a0\'a0a = IList(2, IList(3, nil)) // ok, "a" itself is mutable, it now points to something new.\
+\'a0\'a0a = IList(1, a) \'a0 \'a0 \'a0 \'a0 \'a0 \'a0 \'a0 \'a0 // ok\
+\
+Strings are a very important example of (byref) immutable data.\
+\
+2. 
+\b Normal mutable data
+\b0  - Data (structs, simple values like int, objects, etc) is mutable by default, and are thus local to the containing actor. \'a0Mutable data can point to immutable data with no problem, and since it is local to an actor, no synchronization or atomic accesses are ever required for any mutable data. \'a0For example:\
+\
+struct [byref] MEntry (x : int, y : int, list : IList)\
+...\
+\'a0\'a0var b =\'a0MEntry(4, 2, IList(1, nil))\
+\'a0\'a0b.x = 4 \'a0 \'a0 \'a0 \'a0// ok\
+\'a0\'a0b.y = 71 \'a0 \'a0 \'a0// ok\
+\'a0\'a0b.list = nil \'a0 // ok\
+\'a0\'a0b.list = IList(2, nil) // ok\
+\'a0\'a0b.list.data = 42 \'a0 \'a0 \'a0// error, can't change immutable data.\
+\
+As part of mutable data, it is worth pointing out that mutable "global variables" in Swift are not truly global, they are local to the current actor (somewhat similar to "thread local storage", or perhaps to "an ivar on the actor"). \'a0Immutable global variables (like lookup tables) are simple immutable data just like today. \'a0Global variables with "static constructors / initializers" in the C++ sense have their constructor lazily run on the first use of the variable.\
+\
+Not having mutable shared state also prevents race conditions from turning into safety violations. \'a0Here's the go issue I was referring to:\'a0{\field{\*\fldinst{HYPERLINK "http://research.swtch.com/2010/02/off-to-races.html"}}{\fldrslt \cf2 \ul \ulc2 http://research.swtch.com/2010/02/off-to-races.html}}\
+\
+\
+3. 
+\b Actors
+\b0  - In addition to being the unit of concurrency, Actors have an address and are thus memory objects. \'a0Actors themselves can have mutable fields, one actor can point to another, and mutable data can point to an actor. \'a0However, any mutable data in an actor can only be directly accessed by that actor, it isn't possible for one actor to access another actor's mutable data. \'a0Also note that actors and objects are completely unrelated: it is not possible for an object to inherit from an actor, and it is not possible for an actor to inherit from an object. \'a0Either can contain the other as an ivar though.\
+\
+Syntax for actors is TBD and not super important for now, but here is a silly multithreaded mandelbrot example, that does each pixel in "parallel", to illustrate some ideas:\
+\
+func\'a0do_mandelbrot(x : float, y : float) -> int \{\
+\'a0\'a0 // details elided. Not a great example that needs lots of local data :-)\
+\}\
+\
+actor MandelbrotCalculator \{\
+\'a0\'a0func compute(x : float, y : float, Driver D) \{\
+\'a0\'a0 \'a0var num_iters = do_mandelbrot(x, y)\
+\'a0\'a0 \'a0D.collect_point(x, y,\'a0num_iters)\
+\'a0\'a0\}\'a0\
+\}\
+\
+actor Driver \{\
+\'a0\'a0var result : image; \'a0 \'a0 \'a0// result and numpoints are mutable per-actor data.\
+\'a0\'a0var numpoints : int;\
+\'a0\'a0func main() \{\
+\'a0\'a0 \'a0 result = new image()\
+\'a0\'a0 \'a0 foreach i in -2.0 .. 2.0 by 0.001 \{\
+\'a0\'a0 \'a0 \'a0 \'a0// Arbitrarily, create one\'a0MandelbrotCalculator for each row.\
+\'a0\'a0 \'a0 \'a0 \'a0var MC =\'a0new MandelbrotCalculator()\
+\'a0\'a0 \'a0 \'a0 \'a0foreach j in\'a0-2.0 .. 2.0 by 0.001\'a0\{\
+\'a0\'a0 \'a0 \'a0 \'a0 \'a0 MC.compute(i, j, self)\
+\'a0\'a0 \'a0 \'a0 \'a0 \'a0 ++numpoints;\
+\'a0\'a0 \'a0 \'a0 \'a0\}\
+\'a0\'a0 \'a0 \'a0\}\
+\'a0\'a0\}\
+\
+\'a0\'a0func collect_point(x : float, y : float,\'a0num_iters\'a0: int) \{\
+\'a0\'a0 \'a0result.setPoint(x, y, Color(num_iters,\'a0num_iters,\'a0num_iters))\
+\'a0\'a0 \'a0if (--numpoints == 0)\
+\'a0\'a0 \'a0 \'a0 draw(result)\
+\'a0\'a0\}\
+\}\
+\
+Though actors have mutable data (like 'result' and 'numpoints'), there is no need for any synchronization on that mutable data.\
+\
+One of the great things about this model (in my opinion) is that it gives programmers a way to reason about granularity, and the data copy/sharing issue gives them something very concrete and understandable that they can use to make design decisions when building their app. \'a0While it is a common pattern to have one class that corresponds to a thread in C++ and ObjC, this is an informal pattern -- baking this into the language with actors and giving a semantic difference between objects and actors makes the tradeoffs crisp and easy to understand and reason about.\
+\
+\
+\pard\pardeftab720\ql\qnatural
+
+\b\fs40 \cf0 Memory Ownership Model
+\b0 \
+\pard\pardeftab720\ql\qnatural
+
+\b\fs24 \cf0 \
+\pard\pardeftab720\ql\qnatural
+
+\b0 \cf0 Within an actor there is a question of how ownership is handled. \'a0It's not in the scope of this document to say what the "one true model" is, but here are a couple of interesting observations:\
+\
+1. 
+\b Automated reference counting
+\b0  would be much more efficient in this model than in ObjC, because the compiler statically knows whether something is mutable data or is shared. \'a0Mutable data (e.g. normal objects) can be ref counted with non-atomic reference counting, which is 20-30x faster than atomic adjustments. \'a0Actors are shared, so they'd have to have atomic ref counts, but they should be much much less common than the normal objects in the program. \'a0Immutable data is shared (and thus needs atomic reference counts) but there are optimizations that can be performed since the edges in the pointer graph can never change and cycles aren't possible in immutable data.\
+\
+2. 
+\b Garbage collection
+\b0  for mutable data becomes a lot more attractive than in ObjC for four reasons: \'a01) all GC is local to an actor, so you don't need to stop the world to do a collection. \'a0 2) actors have natural local quiescent points: when they have finished servicing a message, if their dispatch queue is empty, they go to sleep. \'a0If nothing else in the CPU needs the thread, it would be a natural time to collect. \'a03) GC\'a0would be fully precise in Swift, unlike in ObjC, no conservative stack scanning or other hacks are needed. \'a04) If GC is used for mutable data, it would make sense to still use reference counting for actors themselves and especially for immutable data, meaning that you'd have *no* "whole process" GC.\
+\
+3. Each actor can use a 
+\b different memory management policy:\'a0
+\b0 it is completely fine for one actor to be GC and one actor to be ARC, and another to be manually malloc/freed (and thus unsafe) because actors can't reach each other's pointers. \'a0However, realistically, we will still have to pick "the right" model, because different actors can share the same code (e.g. they can instantiate the same objects) and the compiled code has to implement the model the actor wants.\
+\
+\
+\pard\pardeftab720\ql\qnatural
+
+\b\fs40 \cf0 Issues with this Model
+\b0 \
+\pard\pardeftab720\ql\qnatural
+
+\b\fs24 \cf0 \
+\pard\pardeftab720\ql\qnatural
+
+\b0 \cf0 There are two significant issues with this model: 1) the amount of data copying may be excessive if you have lots of messages each passing lots of mutable data that is deep copied, and 2) the awkward nature of asynch programming for some (common) classes of programming. \'a0For example, the "branch and rejoin" pattern in the example requires a counter to know when everyone rejoined. \'a0Getters are a pain to implement, etc.\
+\
+I'd advocate implementing the simple model first, but once it is there, there are several extensions that can help with these two problems:\
+\
+\pard\pardeftab720\ql\qnatural
+
+\b \cf0 No copy is needed for some important cases:
+\b0  If you can prove (through the type system) that an object graph has a single (unique) pointer to it, the pointer value can be sent in the message and nil'd out in the sender. \'a0In this way you're "transferring" ownership of the subgraph from one actor to the other. \'a0It's not fully clear how to do this though. \'a0Another similar example: if we add some way for an actor to self destruct along with a message send, then it is safe for an actor to transfer any and all of its mutable state to another actor when it destroys itself, avoiding a copy.\
+\
+
+\b Getters for trivial immutable actor fields
+\b0 : If an actor has an ivar with an immutable type, then we can make all stores to it atomic, and allow other actors to access the ivar. \'a0Silly example:\
+\
+actor Window \{\
+\'a0\'a0var title : string; \'a0// string is an immutable by-ref type.\
+...\
+\}\
+\
+...\'a0\
+\'a0\'a0var x = new Window;\
+\'a0\'a0print(x.title) \'a0 // ok, all stores will be atomic, an (recursively) immutable data is valid in all actors, so this is fine to load.\
+...\
+\
+
+\b Actor messages with return values
+\b0 : Strict actor messages are one-way and thus always have to "return void". \'a0However, it would be straightforward to allow them to return a value, and have the invoker specify a "block" to run with the return value. \'a0This block would be executed on the sending actor after the result is computed (and copied back to the sender). \'a0I don't have a good syntax for this off-hand, but something like this should get the idea across:\
+\
+struct MyInfo (value : int, ...)\
+\
+actor Whatever \{\
+\'a0\'a0func getWhatever() -> MyInfo \{ ... \}\
+\}\
+\
+actor SomethingElse \{\
+\'a0\'a0var x : Whatever = ...\
+\'a0\'a0var sum : int\
+\'a0\
+\'a0\'a0func SomeMessage() \{\
+\'a0\'a0 \'a0... abc ...\
+\'a0\'a0 \'a0 [ var info <= x.getWhatever()\
+\'a0\'a0 \'a0 \'a0 sum += info.value\
+\'a0\'a0 \'a0 ]\
+\'a0\'a0 \'a0... \'a0def ...\
+\'a0\'a0\}\
+\}\
+\
+We'd need special syntax for this (yes, I know the proposal above is awful) because the semantics are surprising: the implementation of this sends a message to the "whatever" actor with a "self" pointer and a block to run after the message is completed. \'a0When "getWhatever" completes, it posts a message back to the "something else" actor and that message executes the "sum += line". \'a0I think that something like this would be incredibly useful, but we need some way to indicate that the block will run *after the current 'somemessage' message completes* (thus, after "def"), and that *other messages on SomethingElse* may be serviced before the block is run.\
+\
+\
+\pard\pardeftab720\ql\qnatural
+
+\b\fs40 \cf0 Some blue sky kinds of random thoughts:
+\b0 \
+\pard\pardeftab720\ql\qnatural
+
+\fs24 \cf0 \
+\pard\pardeftab720\ql\qnatural
+
+\b \cf0 \strike \strikec0 Distributed Programming
+\b0  - Since deep copy is part of the language and "deep copy" is so similar to "serialization", it would be easy to do a simple "Distributed Objects" implementation. \'a0At first glance, it seems that the only new thing it would "require" is for message sends to be able to fail, which is highly related to exception handling.\strike0\striked0 \
+\
+\
+\pard\pardeftab720\ql\qnatural
+
+\b \cf0 Immutable Data w/Synch and Lazy Faulting
+\b0 \'a0- Not a fully baked idea, but if you're heavily using immutable data to avoid copies, a "distributed objects" implementation would suffer because it would have to deep copy all the immutable data that the receiver doesn't have, defeating the optimization. \'a0One approach to handling this is to treat this as a data synch problem, and have the client fault pieces of the immutable data subgraph in on demand, instead of eagerly copying it.\
+\
+\
+
+\b OpenCL Integration
+\b0  with this model could be really natural: the GPU is an inherently asynch device to talk to.\'a0\
+}
