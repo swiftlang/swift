@@ -47,9 +47,9 @@ then the user would have to write:\
 \
 \'a0x = (myfile.lines, "\\t").join2\
 \
-which is not the effect that w're going for. \'a0 As a simpler example, consider something like:\
+which is "not the effect that w're going for". \'a0 As a simpler example, consider something like:\
 \
-\'a0\'a0struct rect (width : int, height : int)\
+\'a0\'a0struct rect \{ width : int, height : int \}\
 \
 you'd have to define some methods as something like:\
 \
@@ -69,7 +69,7 @@ Method Syntax:
 \
 There are lots of reasons to want to add methods (which are accessed through dot syntax) to types after the type is defined. \'a0Before we get to that, note that things like this are possible, if a bit kooky:\
 \
-\'a0\'a0 struct X (\'a0f : int -> int\'a0)\
+\'a0\'a0 struct X \{\'a0f : int -> int\'a0\}\
 \'a0\'a0 var a : X = ....\
 \'a0\'a0 var b = \'a0x.f(4)\
 \
