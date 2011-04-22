@@ -130,7 +130,7 @@ private:
   // Type Parsing
   bool parseType(Type &Result);
   bool parseType(Type &Result, const llvm::Twine &Message);
-  bool parseTypeTuple(Type &Result);
+  bool parseTypeTupleBody(llvm::SMLoc LPLoc, Type &Result);
   bool parseTypeOneOfBody(llvm::SMLoc OneOfLoc, const DeclAttributes &Attrs,
                           Type &Result, TypeAliasDecl *TypeName = 0);
 

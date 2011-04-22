@@ -519,7 +519,7 @@ Decl *Parser::parseDeclOneOf() {
 /// with a single element.
 ///
 ///   decl-struct:
-///      'struct' attribute-list? identifier type-tuple
+///      'struct' attribute-list? identifier { type-tuple-body? }
 ///
 bool Parser::parseDeclStruct(llvm::SmallVectorImpl<ExprOrDecl> &Decls) {
   SMLoc StructLoc = Tok.getLoc();
@@ -533,8 +533,17 @@ bool Parser::parseDeclStruct(llvm::SmallVectorImpl<ExprOrDecl> &Decls) {
   if (parseIdentifier(StructName, "expected identifier in struct declaration"))
     return true;
 
+  SMLoc LBLoc = Tok.getLoc();
+  if (parseToken(tok::l_brace, "expected '{' in struct"))
+    return true;
+  
   Type Ty;
-  if (parseType(Ty)) return true;
+  if (parseTypeTupleBody(LBLoc, Ty)) return true;
+
+  if (parseToken(tok::r_brace, "expected '{' in struct")) {
+    note(LBLoc, "to match this opening '{'");
+    return true;
+  }
 
   // The type is required to be syntactically a tuple type.
   if (!llvm::isa<TupleType>(Ty.getPointer())) {
@@ -586,10 +595,19 @@ bool Parser::parseType(Type &Result, const llvm::Twine &Message) {
     Result = S.type.ActOnInt32Type(Tok.getLoc());
     consumeToken(tok::kw___builtin_int32_type);
     break;
-  case tok::l_paren:
-    if (parseTypeTuple(Result))
+  case tok::l_paren: {
+    SMLoc LPLoc = Tok.getLoc();
+    consumeToken(tok::l_paren);
+    if (parseTypeTupleBody(LPLoc, Result))
       return true;
+
+    if (parseToken(tok::r_paren, "expected ')' at end of tuple list",
+                   tok::r_paren)) {
+      note(LPLoc, "to match this opening '('");
+      return true;
+    }
     break;
+  }
   case tok::kw_oneof: {
     SMLoc OneOfLoc = Tok.getLoc();
     consumeToken(tok::kw_oneof);
@@ -607,7 +625,7 @@ bool Parser::parseType(Type &Result, const llvm::Twine &Message) {
     return true;
   }
   
-   while (1) {
+  while (1) {
     // If there is an arrow, parse the rest of the type.
     SMLoc TokLoc = Tok.getLoc();
     if (consumeIf(tok::arrow)) {
@@ -647,19 +665,16 @@ bool Parser::parseType(Type &Result) {
   return parseType(Result, "expected type");
 }
 
-/// parseTypeTuple
+/// parseTypeTupleBody
 ///   type-tuple:
-///     '(' ')'
-///     '(' identifier? value-specifier (',' identifier? value-specifier)* ')'
+///     '(' type-tuple-body? ')'
+///   type-tuple-body:
+///     identifier? value-specifier (',' identifier? value-specifier)*
 ///
-bool Parser::parseTypeTuple(Type &Result) {
-  assert(Tok.is(tok::l_paren) && "Not start of type tuple");
-  SMLoc LPLoc = Tok.getLoc();
-  consumeToken(tok::l_paren);
-
+bool Parser::parseTypeTupleBody(SMLoc LPLoc, Type &Result) {
   llvm::SmallVector<TupleTypeElt, 8> Elements;
 
-  if (Tok.isNot(tok::r_paren)) {
+  if (Tok.isNot(tok::r_paren) && Tok.isNot(tok::r_brace)) {
     bool HadError = false;
     do {
       Elements.push_back(TupleTypeElt());
@@ -683,11 +698,6 @@ bool Parser::parseTypeTuple(Type &Result) {
   }
   
   SMLoc RPLoc = Tok.getLoc();
-  if (parseToken(tok::r_paren, "expected ')' at end of tuple list",
-                 tok::r_paren)) {
-    note(LPLoc, "to match this opening '('");
-    return true;
-  }
   
   Result = S.type.ActOnTupleType(LPLoc, Elements, RPLoc);
   return false;
