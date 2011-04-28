@@ -224,6 +224,12 @@ public:
   /// value.
   bool hasAnyDefaultValues() const;
   
+  /// getFieldForScalarInit - If a tuple of this type can be initialized with a
+  /// scalar, return the field number that the scalar is assigned to.  If not,
+  /// return -1.
+  int getFieldForScalarInit() const;
+  
+  
   /// updateInitializedElementType - This methods updates the element type and
   /// initializer for a non-canonical TupleType that has an initializer for the
   /// specified element.  This should only be used by TypeChecker.

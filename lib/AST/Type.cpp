@@ -131,6 +131,32 @@ int TupleType::getNamedElementId(Identifier I) const {
   return -1;
 }
 
+/// getFieldForScalarInit - If a tuple of this type can be initialized with a
+/// scalar, return the field number that the scalar is assigned to.  If not,
+/// return -1.
+int TupleType::getFieldForScalarInit() const {
+  if (Fields.empty()) return -1;
+  
+  int FieldWithoutDefault = -1;
+  for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
+    // Ignore fields with a default value.
+    if (Fields[i].Init) continue;
+    
+    // If we already saw a field missing a default value, then we cannot assign
+    // a scalar to this tuple.
+    if (FieldWithoutDefault != -1)
+      return -1;
+    
+    // Otherwise, remember this field number.
+    FieldWithoutDefault = i;    
+  }
+  
+  // If all the elements have default values, the scalar initializes the first
+  // value in the tuple.
+  return FieldWithoutDefault == -1 ? 0 : FieldWithoutDefault;
+}
+
+
 /// updateInitializedElementType - This methods updates the element type and
 /// initializer for a non-canonical TupleType that has an initializer for the
 /// specified element.  This should only be used by TypeChecker.
@@ -160,10 +186,8 @@ bool OneOfType::hasSingleElement() const {
   return Elements.size() == 1 && !Elements[0]->ArgumentType.isNull();
 }
 
-
-
 //===----------------------------------------------------------------------===//
-//  Type printing.
+//  Type Printing
 //===----------------------------------------------------------------------===//
 
 void Type::dump() const {

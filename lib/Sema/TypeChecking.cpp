@@ -1095,9 +1095,7 @@ Expr *SemaCoerceBottomUp::VisitTupleExpr(TupleExpr *E) {
     E->SubExprs[0] = convertToType(E->SubExprs[0], DestTy, true, TC);
     if (E->SubExprs[0] == 0) return 0;
     
-    if (SemaTupleExpr(E, TC))
-      return 0;
-
+    E->Ty = E->SubExprs[0]->Ty;
     return E;
   }
   
@@ -1332,32 +1330,6 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
                                     false, false, DestTy);
 }
 
-/// getTupleFieldForScalarInit - If the specified tuple type can be assigned a
-/// scalar value, return the element number that the scalar provides.  For this
-/// to be true, the tuple has to be non-empty, and must have at most one element
-/// lacking a default value.
-static int getTupleFieldForScalarInit(TupleType *TT) {
-  if (TT->Fields.size() == 0) return -1;
-  
-  int FieldWithoutDefault = -1;
-  for (unsigned i = 0, e = TT->Fields.size(); i != e; ++i) {
-    // Ignore fields with a default value.
-    if (TT->Fields[i].Init) continue;
-
-    // If we already saw a field missing a default value, then we cannot assign
-    // a scalar to this tuple.
-    if (FieldWithoutDefault != -1)
-      return -1;
-    
-    // Otherwise, remember this field number.
-    FieldWithoutDefault = i;    
-  }
-  
-  // If all the elements have default values, the scalar initializes the first
-  // value in the tuple.
-  return FieldWithoutDefault == -1 ? 0 : FieldWithoutDefault;
-}
-
 /// convertScalarToTupleType - Convert the specified expression to the specified
 /// tuple type, which is known to be initializable with one element.
 Expr *SemaCoerceBottomUp::convertScalarToTupleType(Expr *E, TupleType *DestTy,
@@ -1365,7 +1337,7 @@ Expr *SemaCoerceBottomUp::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   // If the destination is a tuple type with at most one element that has no
   // default value, see if the expression's type is convertable to the
   // element type.  This handles assigning 4 to "(a = 4, b : int)".
-  int ScalarField = getTupleFieldForScalarInit(DestTy);
+  int ScalarField = DestTy->getFieldForScalarInit();
   assert(ScalarField != -1);
   
   Type ScalarType = DestTy->getElementType(ScalarField);
@@ -1400,8 +1372,10 @@ Expr *SemaCoerceBottomUp::convertScalarToTupleType(Expr *E, TupleType *DestTy,
 }
 
 /// HandleConversionToType - This is the recursive implementation of
-/// ConvertToType.  It does not produce diagnostics, it just returns null on
-/// failure.
+/// ConvertToType.  It does produces diagnostics and returns null on failure.
+///
+/// NOTE: This needs to be kept in synch with getConversionRank in Expr.cpp.
+///
 Expr *SemaCoerceBottomUp::convertToType(Expr *E, Type DestTy,
                                         bool IgnoreAnonDecls, TypeChecker &TC) {
   // If we have an exact match, we're done.
@@ -1415,8 +1389,13 @@ Expr *SemaCoerceBottomUp::convertToType(Expr *E, Type DestTy,
   // If the expression is a grouping parenthesis and it has a dependent type,
   // just force the type through it, regardless of what DestTy is.
   if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
-    if (TE->isGroupingParen())
-      return SemaCoerceBottomUp(TC, DestTy).doIt(E);
+    if (TE->isGroupingParen()) {
+      TE->SubExprs[0] = convertToType(TE->SubExprs[0], DestTy,
+                                      IgnoreAnonDecls, TC);
+      if (TE->SubExprs[0] == 0) return 0;
+      TE->Ty = TE->SubExprs[0]->Ty;
+      return TE;
+    }
   
   if (TupleType *TT = DestTy->getAs<TupleType>()) {
     // Type conversions are carefully ranked so that they "do the right thing",
@@ -1427,11 +1406,11 @@ Expr *SemaCoerceBottomUp::convertToType(Expr *E, Type DestTy,
     
     // If the element of the tuple has dependent type and is a TupleExpr, try to
     // convert it.
-    if (isa<TupleExpr>(E))
-      return convertTupleToTupleType(E, cast<TupleExpr>(E)->NumSubExprs, TT,TC);
+    if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
+      return convertTupleToTupleType(TE, TE->NumSubExprs, TT,TC);
 
     // If the is a scalar to tuple conversion, form the tuple and return it.
-    if (getTupleFieldForScalarInit(TT) != -1)
+    if (TT->getFieldForScalarInit() != -1)
       return convertScalarToTupleType(E, TT, TC);
     
     // If the input is a tuple and the output is a tuple, see if we can convert
