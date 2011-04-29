@@ -1328,55 +1328,36 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   // we can do elementwise conversions as needed, then rebuild a new TupleExpr
   // of the right destination type.
   TupleType *ETy = E->Ty->getAs<TupleType>();
-  llvm::SmallVector<Expr*, 16> NewElements(DestTy->Fields.size());
-  
-  Identifier *NewNames = 0;
+  llvm::SmallVector<int, 16> NewElements(DestTy->Fields.size());
   
   for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
-    // FIXME: This turns the AST into an ASDAG, which is seriously bad.  We
-    // should add a more tailored AST representation for this.
-    
     // Extract the input element corresponding to this destination element.
     unsigned SrcField = DestElementSources[i];
     assert(SrcField != ~0U && "dest field not found?");
     
     if (SrcField == -2U) {
       // Use the default element for the tuple.
-      NewElements[i] = 0;
-    } else {
-      if (ETy->getElementType(SrcField)->getCanonicalType(TC.Context) !=
-          DestTy->getElementType(i)->getCanonicalType(TC.Context)) {
-        TC.error(E->getLocStart(), "element #" + llvm::Twine(i) +
-                 " of tuple value has type '" +
-                 ETy->getElementType(SrcField)->getString() +
-                 "', but expected type '" + 
-                 DestTy->getElementType(i)->getString() + "'");
-        return 0;
-      }
-      
-      Type NewEltTy = ETy->getElementType(SrcField);
-      NewElements[i] = new (TC.Context)
-        TupleElementExpr(E, llvm::SMLoc(), SrcField, llvm::SMLoc(), NewEltTy);
+      NewElements[i] = -1;
+      continue;
     }
     
-    if (DestTy->Fields[i].Name.get()) {
-      // Allocate the array on the first element with a name.
-      if (NewNames == 0)
-        NewNames = TC.Context.Allocate<Identifier>(DestTy->Fields.size());
-      
-      NewNames[i] = DestTy->Fields[i].Name;
+    if (ETy->getElementType(SrcField)->getCanonicalType(TC.Context) !=
+        DestTy->getElementType(i)->getCanonicalType(TC.Context)) {
+      TC.error(E->getLocStart(), "element #" + llvm::Twine(i) +
+               " of tuple value has type '" +
+               ETy->getElementType(SrcField)->getString() +
+               "', but expected type '" + 
+               DestTy->getElementType(i)->getString() + "'");
+      return 0;
     }
+    
+    NewElements[i] = SrcField;
   }
   
   // If we got here, the type conversion is successful, create a new TupleExpr.  
-  // FIXME: Do this for dependent types, to resolve: foo($0, 4);
-  // FIXME: Add default values.
-  Expr **NewSE =
-    TC.Context.AllocateCopy<Expr*>(NewElements.begin(), NewElements.end());
+  llvm::ArrayRef<int> Mapping = TC.Context.AllocateCopy(NewElements);
   
-  return new (TC.Context) TupleExpr(llvm::SMLoc(), NewSE, NewNames,
-                                    NewElements.size(), llvm::SMLoc(), 
-                                    false, false, DestTy);
+  return new (TC.Context) TupleShuffleExpr(E, Mapping, DestTy);
 }
 
 /// convertScalarToTupleType - Convert the specified expression to the specified

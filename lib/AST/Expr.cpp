@@ -534,7 +534,12 @@ public:
     OS << ')';
   }
   void VisitTupleShuffleExpr(TupleShuffleExpr *E) {
-    OS.indent(Indent) << "(tuple_shuffle type='" << E->Ty << "'\n";
+    OS.indent(Indent) << "(tuple_shuffle type='" << E->Ty << "' Elements=[";
+    for (unsigned i = 0, e = E->ElementMapping.size(); i != e; ++i) {
+      if (i) OS << ", ";
+      OS << E->ElementMapping[i];
+    }
+    OS << "]\n";
     PrintRec(E->SubExpr);
     OS << ')';
   }
