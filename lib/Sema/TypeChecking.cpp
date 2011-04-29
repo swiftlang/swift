@@ -266,8 +266,10 @@ static bool SemaBinaryExpr(Expr *&LHS, Expr *&OpFn, Expr *&RHS, Type &ResultTy,
   // If this is an overloaded binary operator, try to resolve which candidate
   // is the right one.
   if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(OpFn)) {
-    // FIXME: we really need conversion ranking for this to prune out impossible
-    // candidates.  For now we just look for an exact match.
+    // Pick the best candidate according to their conversion rank.
+    int BestCandidateFound = -1;
+    Expr::ConversionRank BestRank = Expr::CR_Invalid;
+    
     for (unsigned i = 0, e = OO->Decls.size(); i != e; ++i) {
       ValueDecl *Fn = OO->Decls[i];
       
@@ -275,13 +277,37 @@ static bool SemaBinaryExpr(Expr *&LHS, Expr *&OpFn, Expr *&RHS, Type &ResultTy,
       TupleType *Input = cast<TupleType>(FnTy->Input.getPointer());
       assert(Input->Fields.size() == 2 &&"Sema error validating infix fn type");
 
-      if (Input->getElementType(0)->isEqual(LHS->Ty, TC.Context) &&
-          Input->getElementType(1)->isEqual(RHS->Ty, TC.Context)) {
-        OpFn = new (TC.Context) DeclRefExpr(Fn, OO->Loc, Fn->Ty);
-        return SemaBinaryExpr(LHS, OpFn, RHS, ResultTy, TC);
+      Expr::ConversionRank Rank =
+        std::max(LHS->getRankOfConversionTo(Input->getElementType(0),
+                                            TC.Context),
+                 RHS->getRankOfConversionTo(Input->getElementType(1),
+                                            TC.Context));
+      
+      // If this conversion is worst than our best candidate, ignore it.
+      if (Rank > BestRank)
+        continue;
+      
+      // If this is better than our previous candidate, use it!
+      if (Rank < BestRank) {
+        BestRank = Rank;
+        BestCandidateFound = i;
+        continue;
       }
+      
+      // Otherwise, this is a repeat of an existing candidate with the same
+      // rank.  This means that the candidates at this rank are ambiguous with
+      // respect to each other, so none can be used.  If something comes along
+      // with a lower rank we can use it though.
+      BestCandidateFound = -1;
     }
     
+    if (BestCandidateFound != -1) {
+      ValueDecl *Fn = OO->Decls[BestCandidateFound];
+      OpFn = new (TC.Context) DeclRefExpr(Fn, OO->Loc, Fn->Ty);
+      return SemaBinaryExpr(LHS, OpFn, RHS, ResultTy, TC);
+    }
+    
+    // FIXME: Emit an error about overload resolution failure.
     ResultTy = TC.Context.TheDependentType;
     return false;
   }
