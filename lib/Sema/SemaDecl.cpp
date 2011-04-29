@@ -112,8 +112,7 @@ void SemaDecl::handleEndOfTranslationUnit(TranslationUnitDecl *TUD,
   // Strip out stuff that got replaced.
   UnresolvedTypeList.resize(Next);
     
-  TUD->UnresolvedTypesForParser =
-    S.Context.AllocateCopy(llvm::ArrayRef<TypeAliasDecl*>(UnresolvedTypeList));
+  TUD->UnresolvedTypesForParser = S.Context.AllocateCopy(UnresolvedTypeList);
 }
 
 //===----------------------------------------------------------------------===//
