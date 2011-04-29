@@ -47,6 +47,7 @@ enum ExprKind {
   TupleExprKind,
   UnresolvedDotExprKind,
   TupleElementExprKind,
+  TupleShuffleExprKind,
   ApplyExprKind,
   SequenceExprKind,
   BraceExprKind,
@@ -349,6 +350,28 @@ public:
   static bool classof(const Expr *E) { return E->Kind == TupleElementExprKind; }
 };
 
+/// TupleShuffleExpr - This represents a permutation of a tuple value to a new
+/// tuple type.  The expression's type is known to be a tuple type and the
+/// subexpression is known to have a tuple type as well.
+class TupleShuffleExpr : public Expr {
+public:
+  Expr *SubExpr;
+  
+  /// This contains an entry for each element in the Expr type.  Each element
+  /// specifies which index from the SubExpr that the destination element gets.
+  /// If the element value is -1, then the destination value gets the default
+  /// initializer for that tuple element value.
+  llvm::ArrayRef<int> ElementMapping;
+  
+  TupleShuffleExpr(Expr *subExpr, llvm::ArrayRef<int> elementMapping, Type Ty)
+    : Expr(TupleShuffleExprKind, Ty), SubExpr(subExpr),
+      ElementMapping(elementMapping) {}
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TupleShuffleExpr *) { return true; }
+  static bool classof(const Expr *E) { return E->Kind == TupleShuffleExprKind; }
+};
+  
   
 /// ApplyExpr - Application of an argument to a function, which occurs
 /// syntactically through juxtaposition.  For example, f(1,2) is parsed as

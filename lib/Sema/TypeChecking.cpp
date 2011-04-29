@@ -423,6 +423,12 @@ namespace {
       return E;
     }
     
+    Expr *VisitTupleShuffleExpr(TupleShuffleExpr *E) {
+      // TupleShuffleExpr is fully resolved.
+      assert(!E->Ty->is<DependentType>());
+      return E;
+    }
+    
     Expr *VisitApplyExpr(ApplyExpr *E) {
       if (SemaApplyExpr(E->Fn, E->Arg, E->Ty, TC))
         return 0;
@@ -1036,6 +1042,13 @@ namespace {
       assert(0 && "This node doesn't exist for dependent types");
       return 0;
     }
+    
+    Expr *VisitTupleShuffleExpr(TupleShuffleExpr *E) {
+      // TupleElementExpr is fully resolved.
+      assert(0 && "This node doesn't exist for dependent types");
+      return 0;
+    }
+
     
     Expr *VisitApplyExpr(ApplyExpr *E) {
       // FIXME: Given an ApplyExpr of "a b" where "a" is an overloaded value, we

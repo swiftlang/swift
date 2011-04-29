@@ -42,6 +42,7 @@ public:
     DISPATCH(TupleExpr);
     DISPATCH(UnresolvedDotExpr);
     DISPATCH(TupleElementExpr);
+    DISPATCH(TupleShuffleExpr);
     DISPATCH(ApplyExpr);
     DISPATCH(SequenceExpr);
     DISPATCH(BraceExpr);

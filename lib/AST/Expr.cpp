@@ -54,6 +54,8 @@ llvm::SMLoc Expr::getLocStart() const {
     return cast<UnresolvedDotExpr>(this)->getLocStart();
   case TupleElementExprKind:
     return cast<TupleElementExpr>(this)->SubExpr->getLocStart();
+  case TupleShuffleExprKind:
+    return cast<TupleShuffleExpr>(this)->SubExpr->getLocStart();
   case ApplyExprKind:      return cast<ApplyExpr>(this)->Fn->getLocStart();
   case SequenceExprKind:
     return cast<SequenceExpr>(this)->Elements[0]->getLocStart();
@@ -349,6 +351,14 @@ namespace {
       return 0;
     }
     
+    Expr *VisitTupleShuffleExpr(TupleShuffleExpr *E) {
+      if (Expr *E2 = ProcessNode(E->SubExpr)) {
+        E->SubExpr = E2;
+        return E;
+      }
+      return 0;
+    }
+    
     Expr *VisitApplyExpr(ApplyExpr *E) {
       Expr *E2 = ProcessNode(E->Fn);
       if (E2 == 0) return 0;
@@ -523,6 +533,12 @@ public:
     PrintRec(E->SubExpr);
     OS << ')';
   }
+  void VisitTupleShuffleExpr(TupleShuffleExpr *E) {
+    OS.indent(Indent) << "(tuple_shuffle type='" << E->Ty << "'\n";
+    PrintRec(E->SubExpr);
+    OS << ')';
+  }
+
   void VisitApplyExpr(ApplyExpr *E) {
     OS.indent(Indent) << "(apply_expr type='" << E->Ty << "'\n";
     PrintRec(E->Fn);
