@@ -1331,22 +1331,19 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       // Use the default element for the tuple.
       NewElements[i] = 0;
     } else {
-#if 0
       if (ETy->getElementType(SrcField)->getCanonicalType(TC.Context) !=
-          DestTy->getElementType(i)->getCanonicalType(TC.Context))
+          DestTy->getElementType(i)->getCanonicalType(TC.Context)) {
+        TC.error(E->getLocStart(), "element #" + llvm::Twine(i) +
+                 " of tuple value has type '" +
+                 ETy->getElementType(SrcField)->getString() +
+                 "', but expected type '" + 
+                 DestTy->getElementType(i)->getString() + "'");
         return 0;
-#endif 
+      }
       
       Type NewEltTy = ETy->getElementType(SrcField);
-      Expr *Src = new (TC.Context)
+      NewElements[i] = new (TC.Context)
         TupleElementExpr(E, llvm::SMLoc(), SrcField, llvm::SMLoc(), NewEltTy);
-      
-      // Check to see if the src value can be converted to the destination
-      // element type.
-      Src = convertToType(Src, DestTy->getElementType(i), true, TC);
-      // TODO: QOI: Include a note about this failure!
-      if (Src == 0) return 0;
-      NewElements[i] = Src;
     }
     
     if (DestTy->Fields[i].Name.get()) {
