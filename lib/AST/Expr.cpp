@@ -25,6 +25,7 @@
 #include "llvm/Support/ErrorHandling.h"
 using namespace swift;
 using llvm::cast;
+using llvm::dyn_cast;
 
 //===----------------------------------------------------------------------===//
 // Expr methods.
@@ -86,6 +87,215 @@ uint64_t IntegerLiteral::getValue() const {
   assert(!Error && "Invalid IntegerLiteral formed"); (void)Error;
   return IntVal;
 }
+
+//===----------------------------------------------------------------------===//
+//  Type Conversion Ranking
+//===----------------------------------------------------------------------===//
+
+/// convertTupleToTupleType - Given an expression that has tuple type, convert
+/// it to have some other tuple type.
+///
+/// The caller gives us a list of the expressions named arguments and a count of
+/// tuple elements for E in the IdentList+NumIdents array.  DestTy specifies the
+/// type to convert to, which is known to be a TupleType.
+static Expr::ConversionRank 
+getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
+                                  TupleType *DestTy, ASTContext &Ctx) {
+  // If the tuple expression or destination type have named elements, we
+  // have to match them up to handle the swizzle case for when:
+  //   (.y = 4, .x = 3)
+  // is converted to type:
+  //   (.x = int, .y = int)
+  llvm::SmallVector<Identifier, 8> IdentList(NumExprElements);
+  
+  // Check to see if this conversion is ok by looping over all the destination
+  // elements and seeing if they are provided by the input.
+  
+  // Keep track of which input elements are used.
+  llvm::SmallVector<bool, 16> UsedElements(NumExprElements);
+  llvm::SmallVector<int, 16>  DestElementSources(DestTy->Fields.size(), -1);
+
+  if (TupleType *ETy = E->Ty->getAs<TupleType>()) {
+    assert(ETy->Fields.size() == NumExprElements && "Expr #elements mismatch!");
+    for (unsigned i = 0, e = ETy->Fields.size(); i != e; ++i)
+      IdentList[i] = ETy->Fields[i].Name;
+  
+    // First off, see if we can resolve any named values from matching named
+    // inputs.
+    for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
+      const TupleTypeElt &DestElt = DestTy->Fields[i];
+      // If this destination field is named, first check for a matching named
+      // element in the input, from any position.
+      if (DestElt.Name.empty()) continue;
+      
+      int InputElement = -1;
+      for (unsigned j = 0; j != NumExprElements; ++j)
+        if (IdentList[j] == DestElt.Name) {
+          InputElement = j;
+          break;
+        }
+      if (InputElement == -1) continue;
+      
+      DestElementSources[i] = InputElement;
+      UsedElements[InputElement] = true;
+    }
+  }
+  
+  // Next step, resolve (in order) unmatched named results and unnamed results
+  // to any left-over unnamed input.
+  unsigned NextInputValue = 0;
+  for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
+    // If we already found an input to satisfy this output, we're done.
+    if (DestElementSources[i] != -1) continue;
+    
+    // Scan for an unmatched unnamed input value.
+    while (1) {
+      // If we didn't find any input values, we ran out of inputs to use.
+      if (NextInputValue == NumExprElements)
+        break;
+      
+      // If this input value is unnamed and unused, use it!
+      if (!UsedElements[NextInputValue] && IdentList[NextInputValue].empty())
+        break;
+      
+      ++NextInputValue;
+    }
+    
+    // If we ran out of input values, we either don't have enough sources to
+    // fill the dest (as in when assigning (1,2) to (int,int,int), or we ran out
+    // and default values should be used.
+    if (NextInputValue == NumExprElements) {
+      if (DestTy->Fields[i].Init == 0)
+        return Expr::CR_Invalid;
+        
+      // If the default initializer should be used, leave the
+      // DestElementSources field set to -2.
+      DestElementSources[i] = -2;
+      continue;
+    }
+    
+    // Okay, we found an input value to use.
+    DestElementSources[i] = NextInputValue;
+    UsedElements[NextInputValue] = true;
+  }
+  
+  // If there were any unused input values, we fail.
+  for (unsigned i = 0, e = UsedElements.size(); i != e; ++i)
+    if (!UsedElements[i])
+      return Expr::CR_Invalid;
+  
+  // It looks like the elements line up, walk through them and see if the types
+  // either agree or can be converted.  If the expression is a TupleExpr, we do
+  // this conversion in place.
+  const TupleExpr *TE = dyn_cast<TupleExpr>(E);
+  if (TE && TE->NumSubExprs != 1 && TE->NumSubExprs == DestTy->Fields.size()) {
+    Expr::ConversionRank CurRank = Expr::CR_Identity;
+    
+    // The conversion rank of the tuple is the worst case of the conversion rank
+    // of each of its elements.
+    for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
+      // Extract the input element corresponding to this destination element.
+      unsigned SrcField = DestElementSources[i];
+      assert(SrcField != ~0U && "dest field not found?");
+      
+      // If SrcField is -2, then the destination element just uses its default
+      // value.
+      if (SrcField == -2U)
+        continue;
+     
+      // Check to see if the src value can be converted to the destination
+      // element type.
+      Expr *Elt = TE->SubExprs[SrcField];
+      CurRank = std::max(CurRank,
+                         Elt->getRankOfConversionTo(DestTy->getElementType(i),
+                                                    Ctx));
+    }
+    return CurRank;
+  }
+  
+  // A tuple-to-tuple conversion of a non-parenthesized tuple is allowed to
+  // permute the elements, but cannot perform conversions of each value.
+  TupleType *ETy = E->Ty->getAs<TupleType>();
+  for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
+    // Extract the input element corresponding to this destination element.
+    unsigned SrcField = DestElementSources[i];
+    assert(SrcField != ~0U && "dest field not found?");
+
+    // If SrcField is -2, then the destination element just uses its default
+    // value.
+    if (SrcField == -2U)
+      continue;
+
+    // The element types must match up exactly.
+    if (ETy->getElementType(SrcField)->getCanonicalType(Ctx) !=
+        DestTy->getElementType(i)->getCanonicalType(Ctx))
+      return Expr::CR_Invalid;
+  }
+
+  return Expr::CR_Identity;
+}
+
+
+/// getConversionRank - Return the conversion rank for converting a value 'E' to
+/// type 'ToTy'.
+///
+/// Note that this code needs to be kept carefully in synch with
+/// SemaCoerceBottomUp::convertToType.
+static Expr::ConversionRank 
+getConversionRank(const Expr *E, Type DestTy, ASTContext &Ctx) {
+  assert(!DestTy->is<DependentType>() &&
+         "Result of conversion can't be dependent");
+
+  // Exact matches are identity conversions.
+  if (E->Ty->getCanonicalType(Ctx) == DestTy->getCanonicalType(Ctx))
+    return Expr::CR_Identity;
+  
+  // If the expression is a grouping parenthesis, then it is an identity
+  // conversion of the underlying expression.
+  if (const TupleExpr *TE = dyn_cast<TupleExpr>(E))
+    if (TE->isGroupingParen())
+      return getConversionRank(TE->SubExprs[0], DestTy, Ctx);
+  
+  if (TupleType *TT = DestTy->getAs<TupleType>()) {
+    if (const TupleExpr *TE = dyn_cast<TupleExpr>(E))
+      return getTupleToTupleTypeConversionRank(TE, TE->NumSubExprs, TT, Ctx);
+    
+    // If the is a scalar to tuple conversion, form the tuple and return it.
+    int ScalarFieldNo = TT->getFieldForScalarInit();
+    if (ScalarFieldNo != -1) {
+      // If the destination is a tuple type with at most one element that has no
+      // default value, see if the expression's type is convertable to the
+      // element type.  This handles assigning 4 to "(a = 4, b : int)".
+      return getConversionRank(E, TT->getElementType(ScalarFieldNo), Ctx);
+    }
+    
+    // If the input is a tuple and the output is a tuple, see if we can convert
+    // each element.
+    if (TupleType *ETy = E->Ty->getAs<TupleType>())
+      return getTupleToTupleTypeConversionRank(E, ETy->Fields.size(), TT, Ctx);
+  }
+
+  // Otherwise, check to see if this is an auto-closure case.  This case happens
+  // when we convert an expression E to a function type whose result is E's
+  // type.
+  if (FunctionType *FT = DestTy->getAs<FunctionType>()) {
+    if (getConversionRank(E, FT->Result, Ctx) == Expr::CR_Invalid)
+      return Expr::CR_Invalid;
+    
+    return Expr::CR_AutoClosure;
+  }
+
+  // If the expression has a dependent type or we have some other case, we fail.
+  return Expr::CR_Invalid;
+}
+
+/// getRankOfConversionTo - Return the rank of a conversion from the current
+/// type to the specified type.
+Expr::ConversionRank 
+Expr::getRankOfConversionTo(Type DestTy, ASTContext &Ctx) const {
+  return getConversionRank(this, DestTy, Ctx);
+}
+
 
 
 //===----------------------------------------------------------------------===//
@@ -167,7 +377,7 @@ namespace {
           continue;
         }
         Decl *D = E->Elements[i].get<Decl*>();
-        if (ValueDecl *VD = llvm::dyn_cast<ValueDecl>(D))
+        if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
           if (Expr *Init = VD->Init) {
             if (Expr *E2 = ProcessNode(Init))
               VD->Init = E2;
@@ -353,9 +563,9 @@ public:
     OS.indent(Indent) << "(binary_expr '";
     if (!E->Fn)
       OS << "=";
-    else if (DeclRefExpr *DRE = llvm::dyn_cast<DeclRefExpr>(E->Fn))
+    else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->Fn))
       OS << DRE->D->Name;
-    else if (OverloadSetRefExpr *OO = llvm::dyn_cast<OverloadSetRefExpr>(E->Fn))
+    else if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E->Fn))
       OS << OO->Decls[0]->Name;
     else
       OS << "***UNKNOWN***";

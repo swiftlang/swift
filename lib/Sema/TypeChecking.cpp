@@ -188,27 +188,40 @@ static bool SemaApplyExpr(Expr *&E1, Expr *&E2, Type &ResultTy,
   // resolve which overload member is based on the argument type.
   if (!E2->Ty->is<DependentType>()) {
     OverloadSetRefExpr *OS = cast<OverloadSetRefExpr>(E1);
-    int CandidateFound = -1;
+    int BestCandidateFound = -1;
+    Expr::ConversionRank BestRank = Expr::CR_Invalid;
+    
     for (unsigned i = 0, e = OS->Decls.size(); i != e; ++i) {
       Type ArgTy = OS->Decls[i]->Ty->getAs<FunctionType>()->Input;
       // If we found an exact match, disambiguate the overload set.
-      if (ArgTy->isEqual(E2->Ty, TC.Context)) {
-        // If we found multiple possible candidates, then we fail.
-        if (CandidateFound != -1) {
-          CandidateFound = -1;
-          break;
-        }
-        
-        CandidateFound = i;
-      }          
-      // TODO: implement conversion ranking!
+      Expr::ConversionRank Rank =
+        E2->getRankOfConversionTo(ArgTy, TC.Context);
+      
+      // If this conversion is worst than our best candidate, ignore it.
+      if (Rank > BestRank)
+        continue;
+      
+      // If this is better than our previous candidate, use it!
+      if (Rank < BestRank) {
+        BestRank = Rank;
+        BestCandidateFound = i;
+        continue;
+      }
+      
+      // Otherwise, this is a repeat of an existing candidate with the same
+      // rank.  This means that the candidates at this rank are ambiguous with
+      // respect to each other, so none can be used.  If something comes along
+      // with a lower rank we can use it though.
+      BestCandidateFound = -1;
     }
     
-    if (CandidateFound != -1) {
-      E1 = new (TC.Context) DeclRefExpr(OS->Decls[CandidateFound], OS->Loc,
-                                        OS->Decls[CandidateFound]->Ty);
+    if (BestCandidateFound != -1) {
+      E1 = new (TC.Context) DeclRefExpr(OS->Decls[BestCandidateFound], OS->Loc,
+                                        OS->Decls[BestCandidateFound]->Ty);
       return SemaApplyExpr(E1, E2, ResultTy, TC);
     }
+    
+    // FIXME: Emit an error here if we have an overload resolution failure.
   }
   
   // Otherwise, we can't resolve the argument type yet.
@@ -1078,7 +1091,7 @@ namespace {
 
   private:
     static Expr *convertScalarToTupleType(Expr *E, TupleType *DestTy,
-                                          TypeChecker &TC);
+                                          unsigned FieldNo, TypeChecker &TC);
     static Expr *
     convertTupleToTupleType(Expr *E, unsigned NumExprElements,
                             TupleType *DestTy, TypeChecker &TC);
@@ -1119,12 +1132,6 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   //   (.x = int, .y = int)
   llvm::SmallVector<Identifier, 8> IdentList(NumExprElements);
   
-  if (TupleType *ETy = E->Ty->getAs<TupleType>()) {
-    assert(ETy->Fields.size() == NumExprElements && "Expr #elements mismatch!");
-    for (unsigned i = 0, e = ETy->Fields.size(); i != e; ++i)
-      IdentList[i] = ETy->Fields[i].Name;
-  }  
-  
   // Check to see if this conversion is ok by looping over all the destination
   // elements and seeing if they are provided by the input.
   
@@ -1132,26 +1139,31 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   // TODO: Record where the destination elements came from in the AST.
   llvm::SmallVector<bool, 16> UsedElements(NumExprElements);
   llvm::SmallVector<int, 16>  DestElementSources(DestTy->Fields.size(), -1);
-  
-  
-  // First off, see if we can resolve any named values from matching named
-  // inputs.
-  for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
-    const TupleTypeElt &DestElt = DestTy->Fields[i];
-    // If this destination field is named, first check for a matching named
-    // element in the input, from any position.
-    if (DestElt.Name.get() == 0) continue;
+
+  if (TupleType *ETy = E->Ty->getAs<TupleType>()) {
+    assert(ETy->Fields.size() == NumExprElements && "Expr #elements mismatch!");
+    for (unsigned i = 0, e = ETy->Fields.size(); i != e; ++i)
+      IdentList[i] = ETy->Fields[i].Name;
     
-    int InputElement = -1;
-    for (unsigned j = 0; j != NumExprElements; ++j)
-      if (IdentList[j] == DestElt.Name) {
-        InputElement = j;
-        break;
-      }
-    if (InputElement == -1) continue;
-    
-    DestElementSources[i] = InputElement;
-    UsedElements[InputElement] = true;
+    // First off, see if we can resolve any named values from matching named
+    // inputs.
+    for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
+      const TupleTypeElt &DestElt = DestTy->Fields[i];
+      // If this destination field is named, first check for a matching named
+      // element in the input, from any position.
+      if (DestElt.Name.empty()) continue;
+      
+      int InputElement = -1;
+      for (unsigned j = 0; j != NumExprElements; ++j)
+        if (IdentList[j] == DestElt.Name) {
+          InputElement = j;
+          break;
+        }
+      if (InputElement == -1) continue;
+      
+      DestElementSources[i] = InputElement;
+      UsedElements[InputElement] = true;
+    }
   }
   
   // Next step, resolve (in order) unmatched named results and unnamed results
@@ -1168,7 +1180,7 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
         break;
       
       // If this input value is unnamed and unused, use it!
-      if (!UsedElements[NextInputValue] && IdentList[NextInputValue].get() == 0)
+      if (!UsedElements[NextInputValue] && IdentList[NextInputValue].empty())
         break;
       
       ++NextInputValue;
@@ -1235,14 +1247,8 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   if (TE && TE->NumSubExprs != 1 && TE->NumSubExprs == DestTy->Fields.size()) {
     llvm::SmallVector<Expr*, 8> OrigElts(TE->SubExprs,
                                          TE->SubExprs+TE->NumSubExprs);
-    llvm::SmallVector<Identifier, 8> OrigNames;
-    if (TE->SubExprNames)
-      OrigNames.append(TE->SubExprNames, TE->SubExprNames+TE->NumSubExprs);
     
     for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
-      // FIXME: This turns the AST into an ASDAG, which is seriously bad.  We
-      // should add a more tailored AST representation for this.
-      
       // Extract the input element corresponding to this destination element.
       unsigned SrcField = DestElementSources[i];
       assert(SrcField != ~0U && "dest field not found?");
@@ -1257,6 +1263,7 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       // Check to see if the src value can be converted to the destination
       // element type.
       Expr *Elt = OrigElts[SrcField];
+      
       Elt = convertToType(Elt, DestTy->getElementType(i), true, TC);
       // TODO: QOI: Include a note about this failure!
       if (Elt == 0) return 0;
@@ -1298,6 +1305,12 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       // Use the default element for the tuple.
       NewElements[i] = 0;
     } else {
+#if 0
+      if (ETy->getElementType(SrcField)->getCanonicalType(TC.Context) !=
+          DestTy->getElementType(i)->getCanonicalType(TC.Context))
+        return 0;
+#endif 
+      
       Type NewEltTy = ETy->getElementType(SrcField);
       Expr *Src = new (TC.Context)
         TupleElementExpr(E, llvm::SMLoc(), SrcField, llvm::SMLoc(), NewEltTy);
@@ -1333,13 +1346,11 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
 /// convertScalarToTupleType - Convert the specified expression to the specified
 /// tuple type, which is known to be initializable with one element.
 Expr *SemaCoerceBottomUp::convertScalarToTupleType(Expr *E, TupleType *DestTy,
+                                                   unsigned ScalarField,
                                                    TypeChecker &TC) {
   // If the destination is a tuple type with at most one element that has no
   // default value, see if the expression's type is convertable to the
   // element type.  This handles assigning 4 to "(a = 4, b : int)".
-  int ScalarField = DestTy->getFieldForScalarInit();
-  assert(ScalarField != -1);
-  
   Type ScalarType = DestTy->getElementType(ScalarField);
   Expr *ERes = convertToType(E, ScalarType, false, TC);
   if (ERes == 0) return 0;
@@ -1410,8 +1421,9 @@ Expr *SemaCoerceBottomUp::convertToType(Expr *E, Type DestTy,
       return convertTupleToTupleType(TE, TE->NumSubExprs, TT,TC);
 
     // If the is a scalar to tuple conversion, form the tuple and return it.
-    if (TT->getFieldForScalarInit() != -1)
-      return convertScalarToTupleType(E, TT, TC);
+    int ScalarFieldNo = TT->getFieldForScalarInit();
+    if (ScalarFieldNo != -1)
+      return convertScalarToTupleType(E, TT, ScalarFieldNo, TC);
     
     // If the input is a tuple and the output is a tuple, see if we can convert
     // each element.

@@ -72,8 +72,7 @@ public:
   /// getLocStart - Return the location of the start of the expression.
   /// FIXME: QOI: Need to extend this to do full source ranges like Clang.
   llvm::SMLoc getLocStart() const;
-  
-  
+    
   enum WalkOrder {
     Walk_PreOrder,
     Walk_PostOrder
@@ -92,6 +91,29 @@ public:
   /// NULL.
   Expr *WalkExpr(Expr *(*Fn)(Expr *E, WalkOrder Order, void *Data), void *Data);
   
+  
+  /// ConversionRank - This enum specifies the rank of an implicit conversion
+  /// of a value from one type to another.  These are ordered from cheapest to
+  /// most expensive.
+  enum ConversionRank {
+    /// CR_Identity - It is free to convert these two types.  For example,
+    /// identical types return this, types that are just aliases of each other
+    /// do as well, conversion of a scalar to a single-element tuple, etc.
+    CR_Identity,
+    
+    /// CR_AutoClosure - Conversion of the source type to the destination type
+    /// requires the introduction of a closure.  This occurs with a conversion
+    /// from "()" to "()->()" type, for example.
+    CR_AutoClosure,
+    
+    /// CR_Invalid - It isn't valid to convert these types.  For example, it
+    /// isn't valid to convert a value of type "()" to "(int)".
+    CR_Invalid
+  };
+  
+  /// getRankOfConversionTo - Return the rank of a conversion from the current
+  /// type to the specified type.
+  ConversionRank getRankOfConversionTo(Type DestTy, ASTContext &Ctx) const;
   
   void dump() const;
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
