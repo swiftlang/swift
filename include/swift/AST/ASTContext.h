@@ -84,6 +84,12 @@ public:
                              Arr.size());
   }
 
+  template<typename T>
+  llvm::ArrayRef<T> AllocateCopy(const llvm::SmallVectorImpl<T> &Vec) {
+    return AllocateCopy(llvm::ArrayRef<T>(Vec));
+  }
+
+  
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
   Identifier getIdentifier(llvm::StringRef Str);

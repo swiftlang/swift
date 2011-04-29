@@ -351,8 +351,7 @@ static Expr *BindNames(Expr *E, Expr::WalkOrder Order, void *binder) {
       return new (Binder.Context) DeclRefExpr(Decls[0], UDRE->Loc);
     
     // Copy the overload set into ASTContext memory.
-    llvm::ArrayRef<ValueDecl*> DeclList =
-      Binder.Context.AllocateCopy<ValueDecl*>(Decls);
+    llvm::ArrayRef<ValueDecl*> DeclList = Binder.Context.AllocateCopy(Decls);
     
     return new (Binder.Context) OverloadSetRefExpr(DeclList, UDRE->Loc);
   }
@@ -367,7 +366,7 @@ static Expr *BindNames(Expr *E, Expr::WalkOrder Order, void *binder) {
 
     // Copy the overload set into ASTContext memory.
     if (!Decls.empty())
-      UDE->ResolvedDecls = Binder.Context.AllocateCopy<ValueDecl*>(Decls);
+      UDE->ResolvedDecls = Binder.Context.AllocateCopy(Decls);
     return UDE;
   }
   

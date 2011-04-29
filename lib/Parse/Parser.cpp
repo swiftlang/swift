@@ -312,8 +312,7 @@ bool Parser::parseVarName(DeclVarName &Name) {
   if (parseToken(tok::r_paren, "expected ')' at end of var name"))
     note(Name.LPLoc, "to match this '('");
 
-  Name.Elements = ChildNames;
-  Name.Elements = S.Context.AllocateCopy(Name.Elements);
+  Name.Elements = S.Context.AllocateCopy(ChildNames);
   return false;
 }
 
