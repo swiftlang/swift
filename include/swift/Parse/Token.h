@@ -31,15 +31,14 @@ namespace tok {
     numeric_constant,
     
 #define KEYWORD(X) kw_ ## X,
-    // Types.
-//    KEYWORD(__builtin_int8_type)
-//    KEYWORD(__builtin_uint8_type)
-//    KEYWORD(__builtin_int16_type)
-//    KEYWORD(__builtin_uint16_type)
+    // Types.  No uint version should be added here, these should always be
+    // wrapped with UDT's that have the operations.  These correspond to LLVM IR
+    // types.
+    KEYWORD(__builtin_int1_type)
+    KEYWORD(__builtin_int8_type)
+    KEYWORD(__builtin_int16_type)
     KEYWORD(__builtin_int32_type)
-//    KEYWORD(__builtin_uint32_type)
-//    KEYWORD(__builtin_int64_type)
-//    KEYWORD(__builtin_uint64_type)
+    KEYWORD(__builtin_int64_type)
 //    KEYWORD(__builtin_float_type)
 //    KEYWORD(__builtin_double_type)
 

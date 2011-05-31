@@ -50,7 +50,11 @@ TypeBase *TypeBase::getCanonicalType(ASTContext &Ctx) {
   switch (Kind) {
   case UnresolvedTypeKind:
     assert(0 && "Cannot call getCanonicalType before name binding is complete");
+  case BuiltinInt1Kind:
+  case BuiltinInt8Kind:
+  case BuiltinInt16Kind:
   case BuiltinInt32Kind:
+  case BuiltinInt64Kind:
   case DependentTypeKind:
   case OneOfTypeKind:
     assert(0 && "These are always canonical");
@@ -95,7 +99,11 @@ TypeBase *TypeBase::getDesugaredType() {
   switch (Kind) {
   case DependentTypeKind:
   case UnresolvedTypeKind:
+  case BuiltinInt1Kind:
+  case BuiltinInt8Kind:
+  case BuiltinInt16Kind:
   case BuiltinInt32Kind:
+  case BuiltinInt64Kind:
   case OneOfTypeKind:
   case TupleTypeKind:
   case FunctionTypeKind:
@@ -230,7 +238,11 @@ void TypeBase::print(llvm::raw_ostream &OS) const {
   switch (Kind) {
   case DependentTypeKind:     return cast<DependentType>(this)->print(OS);
   case UnresolvedTypeKind:    return cast<UnresolvedType>(this)->print(OS);
-  case BuiltinInt32Kind:      return cast<BuiltinType>(this)->print(OS);
+  case BuiltinInt1Kind:
+  case BuiltinInt8Kind:
+  case BuiltinInt16Kind:
+  case BuiltinInt32Kind:
+  case BuiltinInt64Kind:      return cast<BuiltinType>(this)->print(OS);
   case NameAliasTypeKind:     return cast<NameAliasType>(this)->print(OS);
   case OneOfTypeKind:         return cast<OneOfType>(this)->print(OS);
   case TupleTypeKind:         return cast<TupleType>(this)->print(OS);
@@ -242,7 +254,11 @@ void TypeBase::print(llvm::raw_ostream &OS) const {
 void BuiltinType::print(llvm::raw_ostream &OS) const {
   switch (Kind) {
   default: assert(0 && "Unknown builtin type");
+  case BuiltinInt1Kind:  OS << "__builtin_int1_type"; break;
+  case BuiltinInt8Kind:  OS << "__builtin_int8_type"; break;
+  case BuiltinInt16Kind: OS << "__builtin_int16_type"; break;
   case BuiltinInt32Kind: OS << "__builtin_int32_type"; break;
+  case BuiltinInt64Kind: OS << "__builtin_int64_type"; break;
   }
 }
 

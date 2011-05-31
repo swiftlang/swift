@@ -41,7 +41,6 @@ class SemaType : public SemaBase {
 public:
   explicit SemaType(Sema &S) : SemaBase(S) {}
 
-  Type ActOnInt32Type(llvm::SMLoc Loc);
   Type ActOnTypeName(llvm::SMLoc Loc, Identifier Name);
   Type ActOnTupleType(llvm::SMLoc LPLoc, llvm::ArrayRef<TupleTypeElt> Elements,
                       llvm::SMLoc RPLoc);

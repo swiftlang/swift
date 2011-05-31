@@ -218,11 +218,19 @@
     Idea: Should _foo be "private" and "foo" be public, how about "Foo" vs
     "foo"? In the code you immediately know whether something is exported, and
     don't need to sprinkle attributes everywhere, OTOH, it makes it harder to 
-    remember (like not having a naming convention).   
+    remember (like not having a naming convention).<br><br>
+    
+    Enumerating the integer types is expedient, but silly and unneeded.  There
+    isn't a good reason to expose an i13 LLVM IR type, but i128 would be
+    reasonable.
   </div>
 
   <pre class="grammar">
+    keyword ::= '__builtin_int1_type'
+    keyword ::= '__builtin_int8_type'
+    keyword ::= '__builtin_int16_type'
     keyword ::= '__builtin_int32_type'
+    keyword ::= '__builtin_int64_type'
     keyword ::= 'import'
     keyword ::= 'oneof'
     keyword ::= 'struct'
@@ -670,12 +678,19 @@
   <!-- ===================================================================== -->
 
   <pre class="grammar">
+    type-builtin ::= '__builtin_int1_type'
+    type-builtin ::= '__builtin_int8_type'
+    type-builtin ::= '__builtin_int16_type'
     type-builtin ::= '__builtin_int32_type'
+    type-builtin ::= '__builtin_int64_type'
   </pre>
   
-  <p>'__builtin_int32_type' is the name of the 32-bit integer type.</p>
+  <p>'__builtin_int*_type's are the name of the integer types of the
+  corresponding size.  These types specify a storage, but they have no semantics
+  assigned to them (e.g. signed vs unsigned arithmetic) because there are no
+  operations on them built into the language.</p>
 
-  <p>TODO: Support builtin int8, int16, int64, bool, float and double.</p>
+  <p>TODO: Support builtin float and double.</p>
 
   
   <!-- ===================================================================== -->
@@ -1397,8 +1412,8 @@
   
   <h4 id="stdlib-int">int</h4>
   <pre class="stdlib">
-    <i>// int is just a type alias for the 32-bit integer type.</i>
-    typealias int : __builtin_int32_type
+    <i>// int is just a type alias for the 64-bit integer type.</i>
+    typealias int : __builtin_int64_type
   </pre>
 
 

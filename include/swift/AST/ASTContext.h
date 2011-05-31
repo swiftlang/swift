@@ -115,7 +115,11 @@ public:
   /// closure argument (e.g. $4) and to UnresolvedMemberExprs (e.g. :foo) during
   /// type checking until they are resolved to something with concrete type.
   const Type TheDependentType;
-  const Type TheInt32Type;       /// TheInt32Type - 32-bit signed integer.
+  const Type TheInt1Type;        /// TheInt1Type  - 1-bit integer.
+  const Type TheInt8Type;        /// TheInt8Type  - 8-bit integer.
+  const Type TheInt16Type;       /// TheInt16Type - 16-bit integer.
+  const Type TheInt32Type;       /// TheInt32Type - 32-bit integer.
+  const Type TheInt64Type;       /// TheInt64Type - 64-bit integer.
 
   /// getTupleType - Return the uniqued tuple type with the specified elements.
   TupleType *getTupleType(llvm::ArrayRef<TupleTypeElt> Fields);

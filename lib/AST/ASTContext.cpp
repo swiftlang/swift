@@ -46,7 +46,11 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
     TheEmptyTupleType(getTupleType(llvm::ArrayRef<TupleTypeElt>())),
     TheUnresolvedType(new (*this) UnresolvedType()),
     TheDependentType(new (*this) DependentType()),
-    TheInt32Type(new (*this) BuiltinType(BuiltinInt32Kind)) {
+    TheInt1Type(new (*this) BuiltinType(BuiltinInt1Kind)),
+    TheInt8Type(new (*this) BuiltinType(BuiltinInt8Kind)),
+    TheInt16Type(new (*this) BuiltinType(BuiltinInt16Kind)),
+    TheInt32Type(new (*this) BuiltinType(BuiltinInt32Kind)),
+    TheInt64Type(new (*this) BuiltinType(BuiltinInt64Kind)) {
   HadError = false;
 }
 

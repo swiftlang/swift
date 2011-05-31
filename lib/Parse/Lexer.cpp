@@ -110,7 +110,11 @@ void Lexer::LexIdentifier(Token &Result) {
   
   tok::TokenKind Kind =
   llvm::StringSwitch<tok::TokenKind>(llvm::StringRef(TokStart, CurPtr-TokStart))
+    .Case("__builtin_int1_type",  tok::kw___builtin_int1_type)
+    .Case("__builtin_int8_type",  tok::kw___builtin_int8_type)
+    .Case("__builtin_int16_type", tok::kw___builtin_int16_type)
     .Case("__builtin_int32_type", tok::kw___builtin_int32_type)
+    .Case("__builtin_int64_type", tok::kw___builtin_int64_type)
     .Case("import", tok::kw_import)
     .Case("oneof", tok::kw_oneof)
     .Case("struct", tok::kw_struct)

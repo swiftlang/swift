@@ -1516,7 +1516,11 @@ bool TypeChecker::validateType(Type &InTy) {
   
   switch (T->Kind) {
   case UnresolvedTypeKind:
+  case BuiltinInt1Kind:
+  case BuiltinInt8Kind:
+  case BuiltinInt16Kind:
   case BuiltinInt32Kind:
+  case BuiltinInt64Kind:
   case DependentTypeKind:
     return false;
   case OneOfTypeKind: {

@@ -25,10 +25,6 @@
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
 
-Type SemaType::ActOnInt32Type(llvm::SMLoc Loc) {
-  return S.Context.TheInt32Type;
-}
-
 Type SemaType::ActOnTypeName(llvm::SMLoc Loc, Identifier Name) {
   return S.decl.LookupTypeName(Name, Loc)->getAliasType(S.Context);
 }

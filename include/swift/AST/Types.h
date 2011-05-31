@@ -35,7 +35,11 @@ namespace swift {
   class OneOfElementDecl;
   
   enum TypeKind {
+    BuiltinInt1Kind,
+    BuiltinInt8Kind,
+    BuiltinInt16Kind,
     BuiltinInt32Kind,
+    BuiltinInt64Kind,
     UnresolvedTypeKind,
     DependentTypeKind,
     NameAliasTypeKind,
@@ -44,8 +48,8 @@ namespace swift {
     FunctionTypeKind,
     ArrayTypeKind,
     
-    Builtin_First = BuiltinInt32Kind,
-    Builtin_Last = BuiltinInt32Kind
+    Builtin_First = BuiltinInt1Kind,
+    Builtin_Last = BuiltinInt64Kind
   };
   
 /// TypeBase - Base class for all types in Swift.

@@ -590,9 +590,25 @@ bool Parser::parseType(Type &Result, const llvm::Twine &Message) {
                                   S.Context.getIdentifier(Tok.getText()));
     consumeToken(tok::identifier);
     break;
+  case tok::kw___builtin_int1_type:
+    Result = S.Context.TheInt1Type;
+    consumeToken(tok::kw___builtin_int1_type);
+    break;
+  case tok::kw___builtin_int8_type:
+    Result = S.Context.TheInt8Type;
+    consumeToken(tok::kw___builtin_int8_type);
+    break;
+  case tok::kw___builtin_int16_type:
+    Result = S.Context.TheInt16Type;
+    consumeToken(tok::kw___builtin_int16_type);
+    break;
   case tok::kw___builtin_int32_type:
-    Result = S.type.ActOnInt32Type(Tok.getLoc());
+    Result = S.Context.TheInt32Type;
     consumeToken(tok::kw___builtin_int32_type);
+    break;
+  case tok::kw___builtin_int64_type:
+    Result = S.Context.TheInt64Type;
+    consumeToken(tok::kw___builtin_int64_type);
     break;
   case tok::l_paren: {
     SMLoc LPLoc = Tok.getLoc();
