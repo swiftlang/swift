@@ -1412,8 +1412,8 @@
   
   <h4 id="stdlib-int">int</h4>
   <pre class="stdlib">
-    <i>// int is just a type alias for the 64-bit integer type.</i>
-    typealias int : __builtin_int64_type
+    <i>// int is just a wrapper around the 64-bit integer type.</i>
+    struct int { value : __builtin_int64_type }
   </pre>
 
 
