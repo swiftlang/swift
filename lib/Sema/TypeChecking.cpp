@@ -802,9 +802,9 @@ Expr *SemaExpressionTree::VisitSequenceExpr(SequenceExpr *E) {
 Expr *SemaExpressionTree::VisitIfExpr(IfExpr *E) {
   // The if condition must have __builtin_int1 type.  This is after the
   // conversion function is added by sema.
-  E->Cond = TC.convertToType(E->Cond, TC.Context.TheInt1Type);
-  if (E->Cond == 0) {
-    TC.note(E->IfLoc, "while processing 'if' condition");
+  if (!E->Cond->Ty->isEqual(TC.Context.TheInt1Type, TC.Context)) {
+    TC.error(E->Cond->getLocStart(), "expression of type '" +
+             E->Cond->Ty->getString() + "' is not legal in a condition");
     return 0;
   }
   
