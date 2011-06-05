@@ -59,7 +59,7 @@ public:
                  bool IsPrecededByIdentifier);
 
   llvm::NullablePtr<Expr>
-  ActOnIfExpr(llvm::SMLoc IfPLoc, Expr *Cond, Expr *Normal, 
+  ActOnIfExpr(llvm::SMLoc IfLoc, Expr *Cond, Expr *Normal, 
               llvm::SMLoc ElseLoc, Expr *Else);
 };
   

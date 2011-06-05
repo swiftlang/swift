@@ -100,9 +100,18 @@ SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr *const *SubExprs,
 }
 
 NullablePtr<Expr>
-SemaExpr::ActOnIfExpr(llvm::SMLoc IfPLoc, Expr *Cond, Expr *Normal,
-                      llvm::SMLoc ElseLoc, Expr *Else){
-  // FIXME: Build an AST correctly, do lookup for conversion to logic value.
+SemaExpr::ActOnIfExpr(llvm::SMLoc IfLoc, Expr *Cond, Expr *Normal,
+                      llvm::SMLoc ElseLoc, Expr *Else) {
+  assert(Cond && Normal);  // Else may be null.
+  
+  // The condition needs to be convertible to a logic value.  Build a call to
+  // "convertToLogicValue" passing in the condition as an argument.
+  Identifier C2LVFuncId = S.Context.getIdentifier("convertToLogicValue");
+  Expr *C2LVFunc = ActOnIdentifierExpr(C2LVFuncId, IfLoc).get();
+
+  Cond = new (S.Context) ApplyExpr(C2LVFunc, Cond, S.Context.TheUnresolvedType);
+  
+  // FIXME: Build an AST correctly.
   return Cond;
 }
 
