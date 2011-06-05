@@ -111,7 +111,6 @@ SemaExpr::ActOnIfExpr(llvm::SMLoc IfLoc, Expr *Cond, Expr *Normal,
 
   Cond = new (S.Context) ApplyExpr(C2LVFunc, Cond, S.Context.TheUnresolvedType);
   
-  // FIXME: Build an AST correctly.
-  return Cond;
+  return new (S.Context) IfExpr(IfLoc, Cond, Normal, ElseLoc, Else);
 }
 

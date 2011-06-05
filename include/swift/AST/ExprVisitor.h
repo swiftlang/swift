@@ -49,6 +49,7 @@ public:
     DISPATCH(ClosureExpr);
     DISPATCH(AnonClosureArgExpr);
     DISPATCH(BinaryExpr);
+    DISPATCH(IfExpr);
 #undef DISPATCH
     }
     assert(0 && "Not reachable, all cases handled");

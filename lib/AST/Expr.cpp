@@ -64,6 +64,7 @@ llvm::SMLoc Expr::getLocStart() const {
   case AnonClosureArgExprKind:
     return cast<AnonClosureArgExpr>(this)->Loc;
   case BinaryExprKind:     return cast<BinaryExpr>(this)->LHS->getLocStart();
+  case IfExprKind:         return cast<IfExpr>(this)->IfLoc;
   }
   
   llvm_unreachable("expression type not handled!");
@@ -419,6 +420,26 @@ namespace {
       return E;
     }
     
+    Expr *VisitIfExpr(IfExpr *E) {
+      if (Expr *E2 = ProcessNode(E->Cond))
+        E->Cond = E2;
+      else
+        return 0;
+      
+      if (Expr *E2 = ProcessNode(E->Then))
+        E->Then = E2;
+      else
+        return 0;
+      
+      if (E->Else) {
+        if (Expr *E2 = ProcessNode(E->Else))
+          E->Else = E2;
+        else
+          return 0;
+      }
+      return E;
+    }
+    
     Expr *ProcessNode(Expr *E) {
       // Try the preorder visitation.  If it returns null, we just skip entering
       // subnodes of this tree.
@@ -594,6 +615,17 @@ public:
     PrintRec(E->LHS);
     OS << '\n';
     PrintRec(E->RHS);
+    OS << ')';
+  }
+  void VisitIfExpr(IfExpr *E) {
+    OS.indent(Indent) << "(if_expr type='" << E->Ty << "'\n";
+    PrintRec(E->Cond);
+    OS << '\n';
+    PrintRec(E->Then);
+    if (E->Else) {
+      OS << '\n';
+      PrintRec(E->Else);
+    }
     OS << ')';
   }
 };

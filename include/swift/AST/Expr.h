@@ -53,7 +53,8 @@ enum ExprKind {
   BraceExprKind,
   ClosureExprKind,
   AnonClosureArgExprKind,
-  BinaryExprKind
+  BinaryExprKind,
+  IfExprKind
 };
   
   
@@ -479,6 +480,27 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BinaryExpr *) { return true; }
   static bool classof(const Expr *E) { return E->Kind == BinaryExprKind; }
+};
+
+/// IfExpr - if/then/else expression.  If no 'else' is specified, then the
+/// ElseLoc location is not specified and the Else expression is null.  The
+/// condition of the 'if' is required to have a __builtin_int1 type.
+class IfExpr : public Expr {
+public:
+  llvm::SMLoc IfLoc;
+  Expr *Cond;
+  Expr *Then;
+  llvm::SMLoc ElseLoc;
+  Expr *Else;
+  
+  IfExpr(llvm::SMLoc IfLoc, Expr *cond, Expr *Then, llvm::SMLoc ElseLoc,
+         Expr *Else, Type Ty = Type())
+    : Expr(IfExprKind, Ty),
+      IfLoc(IfLoc), Cond(cond), Then(Then), ElseLoc(ElseLoc), Else(Else) {}
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const IfExpr *) { return true; }
+  static bool classof(const Expr *E) { return E->Kind == IfExprKind; }
 };
   
 } // end namespace swift

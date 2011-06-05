@@ -463,6 +463,8 @@ namespace {
       return E;
     }
     
+    Expr *VisitIfExpr(IfExpr *E);
+    
     SemaExpressionTree(TypeChecker &tc) : TC(tc) {}
     
     static Expr *WalkFn(Expr *E, Expr::WalkOrder Order, void *set) {
@@ -797,6 +799,35 @@ Expr *SemaExpressionTree::VisitSequenceExpr(SequenceExpr *E) {
   return E;
 }
 
+Expr *SemaExpressionTree::VisitIfExpr(IfExpr *E) {
+  // The if condition must have __builtin_int1 type.  This is after the
+  // conversion function is added by sema.
+  E->Cond = TC.convertToType(E->Cond, TC.Context.TheInt1Type);
+  if (E->Cond == 0) {
+    TC.note(E->IfLoc, "while processing 'if' condition");
+    return 0;
+  }
+  
+  // The Then/Else bodies must have '()' type.
+  E->Then = TC.convertToType(E->Then, TC.Context.TheEmptyTupleType);
+  if (E->Then == 0) {
+    TC.note(E->IfLoc, "while processing 'if' body");
+    return 0;
+  }
+  
+  if (E->Else) {
+    E->Else = TC.convertToType(E->Else, TC.Context.TheEmptyTupleType);
+    if (E->Else == 0) {
+      TC.note(E->ElseLoc, "while processing 'else' body of 'if'");
+      return 0;
+    }
+  }
+
+  E->Ty = TC.Context.TheEmptyTupleType;
+  return E;
+}
+
+
 void SemaExpressionTree::PreProcessBraceExpr(BraceExpr *E) {
   llvm::SmallVector<Expr*, 4> ExcessExprs;
   
@@ -932,7 +963,7 @@ BindAndValidateClosureArgs(Expr *Body, Type FuncInput, TypeChecker &TC) {
   
   // Walk the body and rewrite any anonymous arguments.  Note that this
   // isn't a particularly efficient way to handle this, because we walk subtrees
-  // even if they have no anonymous arguments..
+  // even if they have no anonymous arguments.
   return Body->WalkExpr(RewriteAnonArgExpr::WalkFn, &Rewriter) == 0;
 }
 
@@ -1095,6 +1126,11 @@ namespace {
       // of the overload set, trim them out.      
       return E;
     }
+    
+    Expr *VisitIfExpr(IfExpr *E) {
+      return E;
+    }
+
     
     SemaCoerceBottomUp(TypeChecker &tc, Type destTy) : TC(tc), DestTy(destTy) {
       assert(!DestTy->is<DependentType>());
