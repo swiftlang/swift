@@ -59,9 +59,11 @@ void Parser::error(SMLoc Loc, const llvm::Twine &Message) {
   SourceMgr.PrintMessage(Loc, Message, "error");
 }
 
-void Parser::consumeToken() {
+llvm::SMLoc Parser::consumeToken() {
+  llvm::SMLoc Loc = Tok.getLoc();
   assert(Tok.isNot(tok::eof) && "Lexing past eof!");
   L.Lex(Tok);
+  return Loc;
 }
 
 /// skipUntil - Read tokens until we get to the specified token, then return.
@@ -219,13 +221,11 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
 ///     '[' ']'
 ///     '[' attribute (',' attribute)* ']'
 void Parser::parseAttributeList(DeclAttributes &Attributes) {
-  Attributes.LSquareLoc = Tok.getLoc();
-  consumeToken(tok::l_square);
+  Attributes.LSquareLoc = consumeToken(tok::l_square);
   
   // If this is an empty attribute list, consume it and return.
   if (Tok.is(tok::r_square)) {
-    Attributes.RSquareLoc = Tok.getLoc();
-    consumeToken(tok::r_square);
+    Attributes.RSquareLoc = consumeToken(tok::r_square);
     return;
   }
   
@@ -257,8 +257,7 @@ void Parser::parseAttributeList(DeclAttributes &Attributes) {
 ///      'import' attribute-list? identifier ('.' identifier)*
 ///
 Decl *Parser::parseDeclImport() {
-  SMLoc ImportLoc = Tok.getLoc();
-  consumeToken(tok::kw_import);
+  SMLoc ImportLoc = consumeToken(tok::kw_import);
   
   DeclAttributes Attributes;
   if (Tok.is(tok::l_square))
@@ -321,8 +320,7 @@ bool Parser::parseVarName(DeclVarName &Name) {
 ///   decl-typealias:
 ///     'typealias' identifier ':' type
 TypeAliasDecl *Parser::parseDeclTypeAlias() {
-  SMLoc TypeAliasLoc = Tok.getLoc();
-  consumeToken(tok::kw_typealias);
+  SMLoc TypeAliasLoc = consumeToken(tok::kw_typealias);
   
   Identifier Id;
   Type Ty;
@@ -366,8 +364,7 @@ static void AddElementNamesForVarDecl(const DeclVarName *Name,
 ///   decl-var:
 ///      'var' attribute-list? var-name value-specifier
 bool Parser::parseDeclVar(llvm::SmallVectorImpl<ExprOrDecl> &Decls) {
-  SMLoc VarLoc = Tok.getLoc();
-  consumeToken(tok::kw_var);
+  SMLoc VarLoc = consumeToken(tok::kw_var);
   
   DeclAttributes Attributes;
   if (Tok.is(tok::l_square))
@@ -412,8 +409,7 @@ bool Parser::parseDeclVar(llvm::SmallVectorImpl<ExprOrDecl> &Decls) {
 ///     'func' attribute-list? identifier arg-list-type expr-brace
 ///     'func' attribute-list? identifier arg-list-type 
 FuncDecl *Parser::parseDeclFunc() {
-  SMLoc FuncLoc = Tok.getLoc();
-  consumeToken(tok::kw_func);
+  SMLoc FuncLoc = consumeToken(tok::kw_func);
 
   DeclAttributes Attributes;
   // FIXME: Implicitly add immutable attribute.
@@ -491,8 +487,7 @@ FuncDecl *Parser::parseDeclFunc() {
 ///      identifier ':' type
 ///      
 Decl *Parser::parseDeclOneOf() {
-  SMLoc OneOfLoc = Tok.getLoc();
-  consumeToken(tok::kw_oneof);
+  SMLoc OneOfLoc = consumeToken(tok::kw_oneof);
 
   DeclAttributes Attributes;
   if (Tok.is(tok::l_square))
@@ -521,8 +516,7 @@ Decl *Parser::parseDeclOneOf() {
 ///      'struct' attribute-list? identifier { type-tuple-body? }
 ///
 bool Parser::parseDeclStruct(llvm::SmallVectorImpl<ExprOrDecl> &Decls) {
-  SMLoc StructLoc = Tok.getLoc();
-  consumeToken(tok::kw_struct);
+  SMLoc StructLoc = consumeToken(tok::kw_struct);
   
   DeclAttributes Attributes;
   if (Tok.is(tok::l_square))
@@ -611,8 +605,7 @@ bool Parser::parseType(Type &Result, const llvm::Twine &Message) {
     consumeToken(tok::kw___builtin_int64_type);
     break;
   case tok::l_paren: {
-    SMLoc LPLoc = Tok.getLoc();
-    consumeToken(tok::l_paren);
+    SMLoc LPLoc = consumeToken(tok::l_paren);
     if (parseTypeTupleBody(LPLoc, Result))
       return true;
 
@@ -624,8 +617,7 @@ bool Parser::parseType(Type &Result, const llvm::Twine &Message) {
     break;
   }
   case tok::kw_oneof: {
-    SMLoc OneOfLoc = Tok.getLoc();
-    consumeToken(tok::kw_oneof);
+    SMLoc OneOfLoc = consumeToken(tok::kw_oneof);
       
     DeclAttributes Attributes;
     if (Tok.is(tok::l_square))
@@ -853,8 +845,7 @@ bool Parser::parseExprPrimary(llvm::SmallVectorImpl<Expr*> &Result) {
     break;
 
   case tok::colon: {     // :foo
-    SMLoc ColonLoc = Tok.getLoc();
-    consumeToken(tok::colon);
+    SMLoc ColonLoc = consumeToken(tok::colon);
     Identifier Name;
     SMLoc NameLoc = Tok.getLoc();
     if (parseIdentifier(Name, "expected identifier after ':' expression"))
@@ -935,8 +926,7 @@ bool Parser::parseExprPrimary(llvm::SmallVectorImpl<Expr*> &Result) {
 ///     dollarident
 bool Parser::parseExprDollarIdentifier(llvm::NullablePtr<Expr> &Result) {
   llvm::StringRef Name = Tok.getText();
-  SMLoc Loc = Tok.getLoc();
-  consumeToken(tok::dollarident);
+  SMLoc Loc = consumeToken(tok::dollarident);
   assert(Name[0] == '$' && "Not a dollarident");
   bool AllNumeric = true;
   for (unsigned i = 1, e = Name.size(); i != e; ++i)
@@ -974,8 +964,7 @@ bool Parser::parseExprIdentifier(llvm::NullablePtr<Expr> &Result) {
     return false;
   }
   
-  SMLoc ColonColonLoc = Tok.getLoc();
-  consumeToken(tok::coloncolon);
+  SMLoc ColonColonLoc = consumeToken(tok::coloncolon);
 
   SMLoc Loc2 = Tok.getLoc();
   Identifier Name2;
@@ -999,8 +988,7 @@ bool Parser::parseExprIdentifier(llvm::NullablePtr<Expr> &Result) {
 ///     ('.' identifier '=')? expr
 ///
 bool Parser::parseExprParen(llvm::NullablePtr<Expr> &Result) {
-  SMLoc LPLoc = Tok.getLoc();  
-  consumeToken(tok::l_paren);
+  SMLoc LPLoc = consumeToken(tok::l_paren);
   
   llvm::SmallVector<Expr*, 8> SubExprs;
   llvm::SmallVector<Identifier, 8> SubExprNames; 
@@ -1073,8 +1061,7 @@ bool Parser::parseExprParen(llvm::NullablePtr<Expr> &Result) {
 ///     decl-typealias
 ///     ';'
 bool Parser::parseExprBrace(llvm::NullablePtr<Expr> &Result) {
-  SMLoc LBLoc = Tok.getLoc();
-  consumeToken(tok::l_brace);
+  SMLoc LBLoc = consumeToken(tok::l_brace);
 
   llvm::SmallVector<ExprOrDecl, 16> Entries;
 
@@ -1157,8 +1144,7 @@ bool Parser::parseDeclExprList(llvm::SmallVectorImpl<ExprOrDecl> &Entries,
       // FIXME: Assignment is a hack until we get generics.  We really want to
       // parse '=' as any other overloaded/generic binary operator.
       if (Tok.is(tok::equal)) {
-        SMLoc EqualLoc = Tok.getLoc();
-        consumeToken();
+        SMLoc EqualLoc = consumeToken();
         NullablePtr<Expr> RHSExpr;
         if (parseExpr(RHSExpr, false) || RHSExpr.isNull())
           break;
@@ -1197,8 +1183,7 @@ bool Parser::parseDeclExprList(llvm::SmallVectorImpl<ExprOrDecl> &Entries,
 ///     'else' brace-expr
 ///     'else' expr-if
 bool Parser::parseExprIf(llvm::NullablePtr<Expr> &Result) {
-  SMLoc IfLoc = Tok.getLoc();
-  consumeToken(tok::kw_if);
+  SMLoc IfLoc = consumeToken(tok::kw_if);
 
   llvm::NullablePtr<Expr> Condition;
   if (parseExpr(Condition, true, "expected expresssion in 'if' condition"))
@@ -1224,6 +1209,8 @@ bool Parser::parseExprIf(llvm::NullablePtr<Expr> &Result) {
       error(Tok.getLoc(), "expected '{' or 'if' after 'else'");
       if (parseExpr(ElseBody, false)) return true;
     }
+  } else {
+    ElseLoc = SMLoc();
   }
 
   // If our condition and normal expression parsed correctly, build an AST.

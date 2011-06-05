@@ -75,10 +75,10 @@ public:
 
 private:
   // Utilities.
-  void consumeToken();
-  void consumeToken(tok::TokenKind K) {
+  llvm::SMLoc consumeToken();
+  llvm::SMLoc consumeToken(tok::TokenKind K) {
     assert(Tok.is(K) && "Consuming wrong token kind");
-    consumeToken();
+    return consumeToken();
   }
   
   /// consumeIf - If the current token is the specified kind, consume it and
