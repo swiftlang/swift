@@ -135,13 +135,15 @@ private:
                           Type &Result, TypeAliasDecl *TypeName = 0);
 
   // Expression Parsing
-  bool parseExpr(llvm::NullablePtr<Expr> &Result, const char *Message = 0);
+  bool parseExpr(llvm::NullablePtr<Expr> &Result, bool NonBraceOnly,
+                 const char *Message = 0);
   bool parseExprSingle(llvm::NullablePtr<Expr> &Result, const char *Message =0);
   bool parseExprPrimary(llvm::SmallVectorImpl<Expr*> &Result);
   bool parseExprIdentifier(llvm::NullablePtr<Expr> &Result);
   bool parseExprDollarIdentifier(llvm::NullablePtr<Expr> &Result);
   bool parseExprParen(llvm::NullablePtr<Expr> &Result);
   bool parseExprBrace(llvm::NullablePtr<Expr> &Result);
+  bool parseExprIf(llvm::NullablePtr<Expr> &Result);
 };
   
 } // end namespace swift

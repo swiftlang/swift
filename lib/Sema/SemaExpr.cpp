@@ -98,3 +98,11 @@ SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr *const *SubExprs,
                                    NumSubExprs, RPLoc, IsGrouping,
                                    IsPrecededByIdentifier);
 }
+
+NullablePtr<Expr>
+SemaExpr::ActOnIfExpr(llvm::SMLoc IfPLoc, Expr *Cond, Expr *Normal,
+                      llvm::SMLoc ElseLoc, Expr *Else){
+  // FIXME: Build an AST correctly, do lookup for conversion to logic value.
+  return Cond;
+}
+

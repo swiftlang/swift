@@ -48,6 +48,10 @@ namespace tok {
     KEYWORD(func)
     KEYWORD(var)
     KEYWORD(typealias)
+    
+    // Statements
+    KEYWORD(if)
+    KEYWORD(else)
 #undef KEYWORD
     
 #define PUNCTUATOR(X, Y) X,

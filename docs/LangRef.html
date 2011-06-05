@@ -237,6 +237,9 @@
     keyword ::= 'var'
     keyword ::= 'func'
     keyword ::= 'typealias'
+
+    keyword ::= 'if'
+    keyword ::= 'else'
   </pre>
 
   <p>These are the builtin keywords.  Swift intentionally tries to reduce the
@@ -970,18 +973,27 @@
     (in type checking) instead of right after lexing.<br><br>
     
     Semicolons in C are generally just clutter.  Swift generally defines away
-    their use through the type system (and careful grammar structure).
+    their use through the type system (and careful grammar structure).<br><br>
+    
+    Brace expressions don't fit naturally into the grammar anymore, because we
+    don't want them in some places (e.g. the condition of an 'if').  It would
+    be nice if they were not allowed in general as an expression anymore, but
+    that would detract from their use as closures etc.
   </div>
 
   <pre class="grammar">
-    expr            ::= expr-primary+
-    expr-primary    ::= <a href="#expr-literal">expr-literal</a>
-    expr-primary    ::= <a href="#expr-identifier">expr-identifier</a>
-    expr-primary    ::= <a href="#expr-paren">expr-paren</a>
-    expr-primary    ::= <a href="#expr-brace">expr-brace</a>
-    expr-primary    ::= <a href="#expr-delayed-identifier">expr-delayed-identifier</a>
-    expr-primary    ::= <a href="#expr-dot">expr-dot</a>
-    expr-primary    ::= <a href="#expr-subscript">expr-subscript</a>
+    expr                   ::= expr-primary+
+    expr-non-brace         ::= expr-primary-non-brace+
+    
+    expr-primary           ::= expr-non-brace | <a href="#expr-brace">expr-brace</a>
+    expr-primary-non-brace ::= <a href="#expr-literal">expr-literal</a>
+    expr-primary-non-brace ::= <a href="#expr-identifier">expr-identifier</a>
+    expr-primary-non-brace ::= <a href="#expr-paren">expr-paren</a>
+    expr-primary-non-brace ::= <a href="#expr-delayed-identifier">expr-delayed-identifier</a>
+    expr-primary-non-brace ::= <a href="#expr-dot">expr-dot</a>
+    expr-primary-non-brace ::= <a href="#expr-subscript">expr-subscript</a>
+
+    expr-primary-non-brace ::= <a href="#expr-if">expr-if</a>
   </pre>
 
   <p>At the top level of the expression grammar, expressions are a sequence of
@@ -1296,6 +1308,44 @@
     4 + 5 * 123 min 42
   </pre>
 
+  <!-- ===================================================================== -->
+  <h3 id="expr-if">'if' Expression</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    expr-if      ::= 'if' expr-non-brace brace-expr expr-if-else?
+    expr-if-else ::= 'else' brace-expr
+    expr-if-else ::= 'else' expr-if
+  </pre>
+  
+  <p>'if' expressions provide a simple control transfer operations that evalutes
+  the condition, then invokes the 'convertToLogicValue' function on the result,
+  and determines the direction of the branch based on the result of
+  convertToLogicValue.  This structure allows any type that can be converted to
+  a logic value to be used in an 'if' expression.  The result type of an 'if'
+  expression is always '()', and the brace-expr operands are always forced to
+  '()' type.
+  </p>
+  
+  <p>If there is no convertToLogicValue function that accepts a 'T', or if 
+  the resultant function does not produce a value of '<a
+  href="#type-builtin">__builtin_int1_type</a>' type, then the code is
+  malformed.
+  </p>
+  
+  <p>Some examples include:</p>
+  
+  <pre class="example">
+    if true { /*...*/ }
+    
+    if X == 4 { } else { }
+
+    if X == 4 {
+    } else if X == 5 {
+    } else {
+    }
+  </pre>
+  
   <!-- ********************************************************************* -->
   <h2>Protocols</h2>
   <!-- ********************************************************************* -->
@@ -1429,7 +1479,22 @@
     var true = bool::true
     var false = bool::false
   </pre>
+  
+  <!-- ===================================================================== -->
+  <h3 id="stdlib-logic-value">Logic Value Evalution For Control Flow</h3>
+  <!-- ===================================================================== -->
+  
+  <h4 id="stdlib-void">void</h4>
+  
+  <pre class="stdlib">
+    <i>// logic_value is the standard type to be used for values that can be
+    // used in control flow conditionals.</i>
+    typealias logic_value : __builtin_int1_type
 
+    func convertToLogicValue(v : logic_value) -> logic_value
+    func convertToLogicValue(v : bool) -> logic_value
+  </pre>
+  
   <!-- ===================================================================== -->
   <h3 id="stdlib-arithmetic">Arithmetic and Logical Operations</h3>
   <!-- ===================================================================== -->

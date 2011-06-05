@@ -57,6 +57,10 @@ public:
                  const Identifier *SubExprNames,
                  unsigned NumSubExprs, llvm::SMLoc RPLoc,
                  bool IsPrecededByIdentifier);
+
+  llvm::NullablePtr<Expr>
+  ActOnIfExpr(llvm::SMLoc IfPLoc, Expr *Cond, Expr *Normal, 
+              llvm::SMLoc ElseLoc, Expr *Else);
 };
   
 } // end namespace swift

@@ -141,7 +141,7 @@ bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init) {
   
   // Parse the initializer, if present.
   if (consumeIf(tok::equal)) {
-    if (parseExpr(Init, "expected expression in var declaration"))
+    if (parseExpr(Init, false, "expected expression in var declaration"))
       return true;
     
     // If there was an expression, but it had a parse error, give the var decl
@@ -461,7 +461,7 @@ FuncDecl *Parser::parseDeclFunc() {
 
   // Check to see if we have a "= expr" or "{" which is a brace expr.
   if (consumeIf(tok::equal)) {
-    if (parseExpr(Body, "expected expression parsing func body") ||
+    if (parseExpr(Body, false, "expected expression parsing func body") ||
         Body.isNull())
       return 0;  // FIXME: Need to call a new ActOnFuncBodyError?
   } else if (Tok.is(tok::l_brace)) {
@@ -655,7 +655,7 @@ bool Parser::parseType(Type &Result, const llvm::Twine &Message) {
     if (consumeIf(tok::l_square)) {
       llvm::NullablePtr<Expr> Size;
       if (!Tok.is(tok::r_square) &&
-          parseExpr(Size, "expected expression for array type size"))
+          parseExpr(Size, false, "expected expression for array type size"))
         return true;
       
       SMLoc RArrayTok = Tok.getLoc();
@@ -779,11 +779,18 @@ static bool isStartOfExpr(Token &Tok) {
 /// parseExpr
 ///   expr:
 ///     expr-primary+
-bool Parser::parseExpr(NullablePtr<Expr> &Result, const char *Message) {
+///
+///   expr-non-brace:
+///     expr-primary-non-brace+
+///
+bool Parser::parseExpr(NullablePtr<Expr> &Result, bool NonBraceOnly,
+                       const char *Message) {
   llvm::SmallVector<Expr*, 8> SequencedExprs;
   
   do {
-    // Parse the expr-primary.
+    if (NonBraceOnly && Tok.is(tok::l_brace)) break;
+    
+    // Parse the expr-primary or expr-primary-non-brace.
     if (parseExprPrimary(SequencedExprs)) return true;
   } while (isStartOfExpr(Tok));
   
@@ -794,7 +801,10 @@ bool Parser::parseExpr(NullablePtr<Expr> &Result, const char *Message) {
     return false;
   }
   
-  assert(!SequencedExprs.empty() && "Empty sequence isn't possible");
+  if (SequencedExprs.empty()) {
+    error(Tok.getLoc(), Message);
+    return true;
+  }
   
   Expr **NewElements =
     S.Context.AllocateCopy<Expr*>(SequencedExprs.begin(), SequencedExprs.end());
@@ -803,14 +813,20 @@ bool Parser::parseExpr(NullablePtr<Expr> &Result, const char *Message) {
   return false;
 }
 
+/// parseExprPrimary
+///
 ///   expr-primary:
+///     expr-primary-non-brace
+///     expr-brace
+///
+///   expr-primary-non-brace:
 ///     expr-literal
 ///     expr-identifier
 ///     ':' identifier
 ///     expr-paren
-///     expr-brace
 ///     expr-dot
 ///     expr-subscript
+///     expr-if
 ///
 ///   expr-literal:
 ///     numeric_constant
@@ -856,6 +872,10 @@ bool Parser::parseExprPrimary(llvm::SmallVectorImpl<Expr*> &Result) {
   case tok::l_brace:
     if (parseExprBrace(R)) return true;
     break;
+      
+  case tok::kw_if:
+    if (parseExprIf(R)) return true;
+    break;
     
   default:
     error(Tok.getLoc(), "expected expression");
@@ -890,7 +910,7 @@ bool Parser::parseExprPrimary(llvm::SmallVectorImpl<Expr*> &Result) {
     // Check for a [expr] suffix.
     if (consumeIf(tok::l_square)) {
       NullablePtr<Expr> Idx;
-      if (parseExpr(Idx, "expected expression parsing array index"))
+      if (parseExpr(Idx, false, "expected expression parsing array index"))
         return true;
       
       SMLoc RLoc = Tok.getLoc();
@@ -1005,7 +1025,8 @@ bool Parser::parseExprParen(llvm::NullablePtr<Expr> &Result) {
       }
       
       NullablePtr<Expr> SubExpr;
-      if (parseExpr(SubExpr, "expected expression in parentheses")) return true;
+      if (parseExpr(SubExpr, false, "expected expression in parentheses"))
+        return true;
       
       if (SubExpr.isNull())
         AnyErroneousSubExprs = true;
@@ -1130,7 +1151,7 @@ bool Parser::parseDeclExprList(llvm::SmallVectorImpl<ExprOrDecl> &Entries,
       Entries.push_back(ExprOrDecl());
         
       NullablePtr<Expr> ResultExpr;
-      if (parseExpr(ResultExpr) || ResultExpr.isNull())
+      if (parseExpr(ResultExpr, false) || ResultExpr.isNull())
         break;
         
       // FIXME: Assignment is a hack until we get generics.  We really want to
@@ -1139,7 +1160,7 @@ bool Parser::parseDeclExprList(llvm::SmallVectorImpl<ExprOrDecl> &Entries,
         SMLoc EqualLoc = Tok.getLoc();
         consumeToken();
         NullablePtr<Expr> RHSExpr;
-        if (parseExpr(RHSExpr) || RHSExpr.isNull())
+        if (parseExpr(RHSExpr, false) || RHSExpr.isNull())
           break;
         
         // FIXME: Assignment is represented with null Fn.
@@ -1167,3 +1188,48 @@ bool Parser::parseDeclExprList(llvm::SmallVectorImpl<ExprOrDecl> &Entries,
 
   return false;
 }
+
+
+/// 
+///   expr-if:
+///     'if' expr-non-brace brace-expr expr-if-else?
+///   expr-if-else:
+///     'else' brace-expr
+///     'else' expr-if
+bool Parser::parseExprIf(llvm::NullablePtr<Expr> &Result) {
+  SMLoc IfLoc = Tok.getLoc();
+  consumeToken(tok::kw_if);
+
+  llvm::NullablePtr<Expr> Condition;
+  if (parseExpr(Condition, true, "expected expresssion in 'if' condition"))
+    return true;
+  
+  if (Tok.isNot(tok::l_brace)) {
+    error(Tok.getLoc(), "expected '{' after 'if' condition");
+    return true;
+  }
+  
+  
+  llvm::NullablePtr<Expr> NormalBody;
+  if (parseExprBrace(NormalBody)) return true;
+  
+  llvm::NullablePtr<Expr> ElseBody;
+  SMLoc ElseLoc = Tok.getLoc();
+  if (consumeIf(tok::kw_else)) {
+    if (Tok.is(tok::kw_if)) {
+      if (parseExprIf(ElseBody)) return true;
+    } else if (Tok.is(tok::l_brace)) {
+      if (parseExprBrace(ElseBody)) return true;
+    } else {
+      error(Tok.getLoc(), "expected '{' or 'if' after 'else'");
+      if (parseExpr(ElseBody, false)) return true;
+    }
+  }
+
+  // If our condition and normal expression parsed correctly, build an AST.
+  if (Condition.isNonNull() && NormalBody.isNonNull())
+    Result = S.expr.ActOnIfExpr(IfLoc, Condition.get(), NormalBody.get(),
+                                ElseLoc, ElseBody.getPtrOrNull());
+  return false;
+}
+
