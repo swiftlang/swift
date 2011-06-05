@@ -716,10 +716,7 @@ static void ReduceJuxtaposedExprs(SequenceExpr *E, unsigned Elt,
   if (!isKnownToBeAFunction(EltExpr))
     return;
   
-  // FIXME: FIXME: This is a huge parsing hack for 'else' and should just be
-  // ripped out.  Please kill me.
-  
-  // If this is a function, then it can juxtapose.  Note that the grammar
+   // If this is a function, then it can juxtapose.  Note that the grammar
   // effectively imposed by this is ambiguous with the top level of sequenced
   // expressions: "f() g()" is initially parsed as 4 exprs in a sequence:
   // "f () g ()".  Because f and g are functions, they bind to their arguments
@@ -730,23 +727,6 @@ static void ReduceJuxtaposedExprs(SequenceExpr *E, unsigned Elt,
   //     (A + B) (C * D)       <-- Juxtaposition at a higher level.
   // This is disambiguated based on whether B has function type or not.  If so,
   // it binds tightly to C.
-
-  // If EltExpr a directly named function, it should bind very tightly to its
-  // single argument:   f a + b    -->  (f a) + b
-  // If this is some other expression that returns something of function type,
-  // then reduce the subexpression first and then apply it to the function.
-  // This gives:    f() a + b    -->  f() (a + b), not (f() a) + b
-  if (!isa<DeclRefExpr>(EltExpr) && !isa<OverloadSetRefExpr>(EltExpr) &&
-      (isa<DeclRefExpr>(E->Elements[Elt+1]) || 
-       isa<OverloadSetRefExpr>(E->Elements[Elt+1]) ||
-       getBinOp(E, Elt+2) > 230)) {
-    ReduceBinaryExprs(E, Elt+1, TC);
-    
-    // If there was an error and we dropped the argument, bail out.
-    if (E->NumElements == Elt+1)
-      return;
-  }
-  
   Expr *ArgExpr = E->Elements[Elt+1];
 
   // Okay, we have a function application, analyze it.
