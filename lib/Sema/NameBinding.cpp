@@ -27,6 +27,8 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/system_error.h"
+#include "llvm/Support/Path.h"
+
 using namespace swift;
 using llvm::isa;
 using llvm::dyn_cast;
@@ -199,6 +201,11 @@ namespace {
     /// TopLevelValues - This is the list of top-level declarations we have.
     llvm::DenseMap<Identifier, TinyVector> TopLevelValues;
     llvm::SmallVector<std::pair<ImportDecl*, ReferencedModule*>, 4> Imports;
+    
+    llvm::error_code findModule(llvm::StringRef Module, 
+                                SMLoc ImportLoc,
+                                llvm::OwningPtr<llvm::MemoryBuffer> &Buffer);
+    
   public:
     ASTContext &Context;
     NameBinder(ASTContext &C) : Context(C) {}
@@ -236,19 +243,51 @@ namespace {
   };
 }
 
+llvm::error_code NameBinder::findModule(llvm::StringRef Module, 
+                                        SMLoc ImportLoc,
+                                llvm::OwningPtr<llvm::MemoryBuffer> &Buffer) {
+  std::string ModuleFilename = Module.str() + std::string(".swift");
+  
+  // First, search in the directory corresponding to the import location.
+  // FIXME: This screams for a proper FileManager abstraction.
+  llvm::SourceMgr &SourceMgr = Context.SourceMgr;
+  int CurrentBufferID = SourceMgr.FindBufferContainingLoc(ImportLoc);
+  if (CurrentBufferID >= 0) {
+    const llvm::MemoryBuffer *ImportingBuffer 
+      = SourceMgr.getBufferInfo(CurrentBufferID).Buffer;
+    llvm::StringRef CurrentDirectory 
+      = llvm::sys::path::parent_path(ImportingBuffer->getBufferIdentifier());
+    if (!CurrentDirectory.empty()) {
+      llvm::SmallString<128> InputFilename(CurrentDirectory);
+      llvm::sys::path::append(InputFilename, ModuleFilename);
+      llvm::error_code Err = llvm::MemoryBuffer::getFile(InputFilename, Buffer);
+      if (!Err)
+        return Err;
+    }
+  }
+  
+  // Second, search in the current directory.
+  llvm::error_code Err = llvm::MemoryBuffer::getFile(ModuleFilename, Buffer);
+  if (!Err)
+    return Err;
+
+  // FIXME: Search in the include directories.
+  return Err;
+}
+
 ReferencedModule *NameBinder::
 getReferencedModule(std::pair<Identifier, SMLoc> ModuleID) {
   // TODO: We currently just recursively parse referenced modules.  This works
   // fine for now since they are each a single file.  Ultimately we'll want a
   // compiled form of AST's like clang's that support lazy deserialization.
-  std::string InputFilename = ModuleID.first.get()+std::string(".swift");
   
   // Open the input file.
   llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
-  if (llvm::error_code Err =
-        llvm::MemoryBuffer::getFile(InputFilename, InputFile)) {
+  if (llvm::error_code Err = findModule(ModuleID.first.str(), ModuleID.second,
+                                        InputFile)) {
     error(ModuleID.second,
-          "opening import file '" + InputFilename + "': " + Err.message());
+          "opening import file '" + ModuleID.first.str() + ".swift': " 
+          + Err.message());
     return 0;
   }
 
