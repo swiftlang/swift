@@ -165,3 +165,11 @@ include_directories(BEFORE
 add_subdirectory(lib)
 add_subdirectory(tools)
 add_subdirectory(test)
+
+# Add a documentation target so that documentation shows up in the
+# Xcode project.
+add_custom_target(Documentation
+  SOURCES README.txt
+  docs/LangRef.html
+  docs/swift.css
+  docs/toc.js)
