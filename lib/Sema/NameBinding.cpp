@@ -22,7 +22,7 @@
 #include "swift/AST/Types.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"
-#include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
@@ -35,71 +35,6 @@ using llvm::dyn_cast;
 using llvm::cast;
 using llvm::SMLoc;
 
-namespace {
-  struct TinyVector {
-    typedef llvm::SmallVector<ValueDecl*, 4> VecTy;
-    llvm::PointerUnion<ValueDecl*, VecTy*> Val;
-    
-    TinyVector() {}
-    TinyVector(const TinyVector &RHS) : Val(RHS.Val) {
-      if (VecTy *V = Val.dyn_cast<VecTy*>())
-        Val = new VecTy(*V);
-    }
-    ~TinyVector() {
-      if (VecTy *V = Val.dyn_cast<VecTy*>())
-        delete V;
-    }
-    
-    unsigned size() const {
-      if (Val.isNull())
-        return 0;
-      if (Val.is<ValueDecl*>())
-        return 1;
-      return Val.get<VecTy*>()->size();
-    }
-    
-    ValueDecl *operator[](unsigned i) const {
-      assert(!Val.isNull() && "vector empty");
-      if (ValueDecl *V = Val.dyn_cast<ValueDecl*>()) {
-        assert(i == 0 && "tinyvector index out of range");
-        return V;
-      }
-      
-      assert(i < Val.get<VecTy*>()->size() && "tinyvector index out of range");
-      return (*Val.get<VecTy*>())[i];
-    }
-    
-    void push_back(ValueDecl *VD) {
-      assert(VD != 0 && "Can't add a null value");
-      
-      // If we have nothing, add something.
-      if (Val.isNull()) {
-        Val = VD;
-        return;
-      }
-      
-      // If we have a single value, convert to a vector.
-      if (ValueDecl *V = Val.dyn_cast<ValueDecl*>()) {
-        Val = new VecTy();
-        Val.get<VecTy*>()->push_back(V);
-      }
-      
-      // Add the new value, we know we have a vector.
-      Val.get<VecTy*>()->push_back(VD);
-    }
-    
-    ValueDecl *front() const {
-      assert(!Val.isNull() && "vector empty");
-      if (ValueDecl *V = Val.dyn_cast<ValueDecl*>())
-        return V;
-      return Val.get<VecTy*>()->front();
-    }
-    
-  private:
-    void operator=(const TinyVector&); // DISABLED.
-  };
-}
-
 /// NLKind - This is the kind of name lookup we're performing.
 enum NLKind {
   NLK_UnqualifiedLookup,
@@ -111,7 +46,7 @@ namespace {
     // FIXME: A module can be more than one translation unit eventually.
     TranslationUnitDecl *TUD;
     
-    llvm::DenseMap<Identifier, TinyVector> TopLevelValues;
+    llvm::DenseMap<Identifier, llvm::TinyPtrVector<ValueDecl*> > TopLevelValues;
     llvm::DenseMap<Identifier, TypeAliasDecl *> TopLevelTypes;
 
   public:
@@ -179,7 +114,7 @@ void ReferencedModule::lookupValue(ImportDecl *ID, Identifier Name,
             TopLevelValues[VD->Name].push_back(VD);
   }
    
-  llvm::DenseMap<Identifier, TinyVector>::iterator I =
+  llvm::DenseMap<Identifier, llvm::TinyPtrVector<ValueDecl*> >::iterator I =
     TopLevelValues.find(Name);
   if (I == TopLevelValues.end()) return;
   
@@ -199,7 +134,7 @@ namespace {
     std::vector<ReferencedModule *> LoadedModules;
     
     /// TopLevelValues - This is the list of top-level declarations we have.
-    llvm::DenseMap<Identifier, TinyVector> TopLevelValues;
+    llvm::DenseMap<Identifier, llvm::TinyPtrVector<ValueDecl*> > TopLevelValues;
     llvm::SmallVector<std::pair<ImportDecl*, ReferencedModule*>, 4> Imports;
     
     llvm::error_code findModule(llvm::StringRef Module, 
@@ -344,7 +279,7 @@ void NameBinder::bindValueName(Identifier Name,
                                llvm::SmallVectorImpl<ValueDecl*> &Result,
                                NLKind LookupKind) {
   // Resolve forward references defined within the module.
-  llvm::DenseMap<Identifier, TinyVector>::iterator I =
+  llvm::DenseMap<Identifier, llvm::TinyPtrVector<ValueDecl*> >::iterator I =
     TopLevelValues.find(Name);
   // If we found a match, return the decls.
   if (I != TopLevelValues.end()) {
