@@ -2,6 +2,64 @@
 //  General Type State Notes 
 //===----------------------------------------------------------------------===//
 
+//===----------------------------------------------------------------------===//
+//  Immutability
+//===----------------------------------------------------------------------===//
+
+Using Typestate to control immutability requires recursive immutability
+propagation (just like sending a value in a message does a recursive deep copy).
+This brings up interesting questions:
+
+1) should types be able to opt-in or out of Immutabilizability?
+2) It seems that 'int' shouldn't be bloated by tracking the possibility of
+   immutabilizability.
+3) We can reserve a bit in the object header for reference types to indicate
+   "has become immutable".
+4) If a type opts-out of immutabilization (either explicitly or implicitly) then
+   a recursive type derived from it can only be immutabilized if the type is
+   explicitly marked immutable.  For example, you could only turn a struct
+   immutable if it contained "const int's"?  Or is this really only true for
+   reference types?  It seems that the immutability of a value-type element can
+   follow the immutability of the containing object.  Array slices need a
+   pointer to the containing object for more than just the refcount it seems.
+
+//===----------------------------------------------------------------------===//
+//  Typestate + GC + ARC
+//===----------------------------------------------------------------------===//
+
+A random email from Mike Ferris.  DVTInvalidation models a type state, one which
+requires recursive transitive propagation just like immutable does:
+
+"For what it is worth, Xcode 4 has a general DVTInvalidation protocol that many
+of our objects adopt.  This was a hard-won lesson dealing with GC where just
+because something is ready to be collected does not mean it will be immediately.
+
+We use this to clean up held resources and as a statement of intent that this
+object is now "done".  Many of our objects that conform to this protocol also
+assert validity in key external entry points to attempt to enforce that once
+they're invalid, no one should be talking to them.
+
+In a couple cases we have found single-ownership to be insufficient and, in
+those cases, we do have, essentially, ref-counting of validity.  But in the
+vast majority of cases, there is a single owner who _should_ be controlling the
+useful lifetime of these objects.  And anyone else keeping them alive after that
+useful lifetime is basically in error (and is in a position to be caught by our
+validity assertions.)
+
+At some point I am sure we'll be switching to ARC and, as we do, the forcing
+function that caused us to adopt the DVTInvalidation pattern may fall by the
+wayside (i.e. the arbitrary latency between ready to be collected and
+collected).  But I doubt we would consider not having the protocol as we do
+this.  It has been useful in many ways to formalize this notion if only because
+it forces more rigorous consideration of ownership models and gives us a
+pragmatic way to enforce them.
+
+The one thing that has been a challenge is that adoption of DVTInvalidation is
+somewhat viral.  If you own an object that in invalidate-able, then you pretty
+much have to be invalidate-able yourself (or have an equivalent guaranteed
+trigger to be sure you'll eventually invalidate the object)...  Over time, more
+and more of our classes wind up adopting this protocol.  I am not sure that's a
+bad thing, but it has been an observed effect of having this pattern."
 
 
 //===----------------------------------------------------------------------===//
