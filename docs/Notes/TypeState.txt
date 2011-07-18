@@ -1,0 +1,96 @@
+//===----------------------------------------------------------------------===//
+//  General Type State Notes 
+//===----------------------------------------------------------------------===//
+
+
+
+//===----------------------------------------------------------------------===//
+//  Plaid Language notes
+//===----------------------------------------------------------------------===//
+
+http://plaid-lang.org/ aka http://www.cs.cmu.edu/~aldrich/plaid/
+
+This paper uses the hybrid dynamic/static approach I chatted to Ted about (which
+attaches dynamic tags to values, which the optimizer then tries to remove). This
+moves the approach from "crazy theory" to "has at least been implemented
+somewhere once":
+http://www.cs.cmu.edu/~aldrich/papers/plaid-oopsla11.pdf
+
+It allows typestate changes to change representation.  It sounds to me like
+conjoined discriminated unions + type state.
+
+Cute typestate example: the state transition from egg, to caterpillar, to pupae,
+to butterfly.
+
+It only allows data types with finite/enumerable typestates.
+
+It defines typestates with syntax that looks like it is defining types:
+
+  state File {
+    val filename;
+  }
+
+  state OpenFile case of File = {
+    val filePtr;
+    method read() { ... } 
+    method close() { this <- ClosedFile; }
+  }
+
+  state ClosedFile case of File {
+    method open() { this <- OpenFile; }
+  }
+
+Makes it really seem like a discriminated union.  The stated reason to do this
+is to avoid having "null pointers" and other invalid data around when in a state
+where it is not valid.  It seems that another reasonable approach would be to
+tag data members as only being valid in some states.  Both have tradeoffs.
+Doing either of them would be a great way to avoid having to declare stuff
+"optional/?" just because of typestate, and even permits other types that don't
+have a handy sentinel.  It is still useful to define unconditional data, and
+still useful to allow size-optimization by deriving state from a field ("-1 is a
+closed file state" - at least if we don't have good integer size bounds, which
+we do want anyway).
+
+It strikes me that typestate declarations themselves (e.g. a type can be in the
+"open" or "closed" state) should be independently declared from types and should
+have the same sort of visibility controls as types.  I should be able to declare
+a protocol/java interface along the lines of:
+
+  protocol fileproto {
+    open(...) closed;
+    close(...) opened;
+  }
+
+using "public" closed/opened states.  Insert fragility concerns here.
+
+It supports multidimensional typestate, where a class can transition in multiple
+dimensions without having to manually manage a matrix of states.  This seems
+particularly useful in cases where you have inheritance.  A base class may
+define its own set of states.  A derived class will have those states, plus
+additional dimensions if they wanted.  For example, an NSView could be visible
+or not, while a NSButton derived class could be Normal or Pressed Down, etc.
+
+Generics: "mechanisms like type parameterization need to be duplicated for
+typestate, so that we can talk not only about a list of files, but also about a
+list of *open* files".
+
+
+You should be allowed to declare typestate transitions on "this" any any by-ref
+arguments/ret values on functions.  In Plaid syntax:
+  public void open() [ClosedFile>>OpenFile]
+
+should be a precondition that 'this' starts out in the ClosedFile state and a
+postcondition that it ends up in the OpenFile state.  The implementation could
+be checked against this contract.
+
+Their onward2009 paper contains the usual set of aliasing restrictions and
+conflation of immutable with something-not-typestate that I come to expect from
+the field.
+
+Their examples remind me that discriminated unions should be allowed to have a
+'base class': data that is common and available across all the slices.  Changing
+to another slice should not change this stuff.
+
+'instate' is the keyword they choose to use for a dynamic state test.
+
+//===----------------------------------------------------------------------===//
