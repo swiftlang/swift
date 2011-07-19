@@ -214,6 +214,9 @@ class TupleType : public TypeBase, public llvm::FoldingSetNode {
 public:
   const ArrayRef<TupleTypeElt> Fields;
   
+  /// getTupleType - Return the uniqued tuple type with the specified elements.
+  static TupleType *get(ArrayRef<TupleTypeElt> Fields, ASTContext &C);
+  
   /// getElementType - Return the type of the specified field.
   Type getElementType(unsigned FieldNo) const {
     return Fields[FieldNo].Ty;
@@ -251,9 +254,8 @@ public:
                       ArrayRef<TupleTypeElt> Fields);
   
 private:
-  TupleType(ArrayRef<TupleTypeElt> fields)
-    : TypeBase(TupleTypeKind), Fields(fields) {}
-  friend class ASTContext;
+  TupleType(ArrayRef<TupleTypeElt> fields, bool isCanonical)
+    : TypeBase(TupleTypeKind, isCanonical ? this : 0), Fields(fields) {}
 };
   
 /// OneOfType - a 'oneof' type.  This represents the oneof type itself, not its

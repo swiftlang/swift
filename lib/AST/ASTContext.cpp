@@ -42,7 +42,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
     FunctionTypes(new FunctionTypesMapTy()),
     ArrayTypes(new ArrayTypesMapTy()),
     SourceMgr(sourcemgr),
-    TheEmptyTupleType(getTupleType(ArrayRef<TupleTypeElt>())),
+    TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheUnresolvedType(new (*this) UnresolvedType()),
     TheDependentType(new (*this) DependentType()),
     TheInt1Type(new (*this) BuiltinType(BuiltinInt1Kind)),
@@ -91,12 +91,12 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
 }
 
 /// getTupleType - Return the uniqued tuple type with the specified elements.
-TupleType *ASTContext::getTupleType(ArrayRef<TupleTypeElt> Fields) {
+TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
   // Check to see if we've already seen this tuple before.
   llvm::FoldingSetNodeID ID;
   TupleType::Profile(ID, Fields);
   
-  TupleTypesMapTy &TupleTypesMap = *(TupleTypesMapTy*)TupleTypes;
+  TupleTypesMapTy &TupleTypesMap = *(TupleTypesMapTy*)C.TupleTypes;
   
   // FIXME: This is pointless for types with named fields.  The ValueDecl fields
   // themselves are not unique'd so they all get their own addresses, which
@@ -109,7 +109,7 @@ TupleType *ASTContext::getTupleType(ArrayRef<TupleTypeElt> Fields) {
   // Okay, we didn't find one.  Make a copy of the fields list into ASTContext
   // owned memory.
   TupleTypeElt *FieldsCopy =
-    AllocateCopy<TupleTypeElt>(Fields.begin(), Fields.end());
+    C.AllocateCopy<TupleTypeElt>(Fields.begin(), Fields.end());
   
   bool IsCanonical = true;   // All canonical elts means this is canonical.
   for (unsigned i = 0, e = Fields.size(); i != e; ++i)
@@ -117,13 +117,9 @@ TupleType *ASTContext::getTupleType(ArrayRef<TupleTypeElt> Fields) {
 
   Fields = ArrayRef<TupleTypeElt>(FieldsCopy, Fields.size());
   
-  TupleType *New = new (*this) TupleType(Fields);
+  TupleType *New = new (C) TupleType(Fields, IsCanonical);
   TupleTypesMap.InsertNode(New, InsertPos);
 
-  // If the type is canonical then set the canonical type pointer to itself.
-  if (IsCanonical)
-    New->CanonicalType = New;
-  
   return New;
 }
 

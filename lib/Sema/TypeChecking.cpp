@@ -161,7 +161,7 @@ static bool SemaTupleExpr(TupleExpr *TE, TypeChecker &TC) {
       ResultTyElts[i].Name = TE->SubExprNames[i];
   }
   
-  TE->Ty = TC.Context.getTupleType(ResultTyElts);
+  TE->Ty = TupleType::get(ResultTyElts, TC.Context);
   return false;
 }
 

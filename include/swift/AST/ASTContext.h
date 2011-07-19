@@ -121,9 +121,6 @@ public:
   const Type TheInt32Type;       /// TheInt32Type - 32-bit integer.
   const Type TheInt64Type;       /// TheInt64Type - 64-bit integer.
 
-  /// getTupleType - Return the uniqued tuple type with the specified elements.
-  TupleType *getTupleType(ArrayRef<TupleTypeElt> Fields);
-
   /// getNewOneOfType - Return a new instance of oneof type.  These are never
   /// uniqued each syntactic instance of them is semantically considered to be a
   /// different type.

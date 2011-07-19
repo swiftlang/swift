@@ -300,7 +300,7 @@ ActOnMethDecl(SMLoc MethLoc, Type ReceiverType, Identifier FuncName, Type Ty,
   // Install the first type as the receiver, as a tuple with element named
   // 'this'.  This turns "int->int" on FooTy into "(this : FooTy)->(int->int)".
   TupleTypeElt ReceiverElt(ReceiverType, S.Context.getIdentifier("this"));
-  ReceiverType = S.Context.getTupleType(ReceiverElt);
+  ReceiverType = TupleType::get(ReceiverElt, S.Context);
   Ty = S.type.ActOnFunctionType(ReceiverType, SMLoc(), Ty);
   
   return new (S.Context) MethDecl(MethLoc, FuncName, Ty, 0, Attrs); 

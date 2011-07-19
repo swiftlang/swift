@@ -33,7 +33,7 @@ Type SemaType::ActOnTypeName(SMLoc Loc, Identifier Name) {
 Type SemaType::ActOnTupleType(SMLoc LPLoc, 
                                ArrayRef<TupleTypeElt> Elements,
                                SMLoc RPLoc) {
-  return S.Context.getTupleType(Elements);
+  return TupleType::get(Elements, S.Context);
 }
 
 OneOfType *SemaType::ActOnOneOfType(SMLoc OneOfLoc, 

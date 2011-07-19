@@ -72,7 +72,7 @@ TypeBase *TypeBase::getCanonicalType(ASTContext &Ctx) {
       CanElts[i].Ty = TT->Fields[i].Ty->getCanonicalType(Ctx);
     }
     
-    Result = Ctx.getTupleType(CanElts);
+    Result = TupleType::get(CanElts, Ctx);
     break;
   }
     
