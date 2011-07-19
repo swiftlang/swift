@@ -46,6 +46,7 @@ namespace tok {
     KEYWORD(oneof)
     KEYWORD(struct)
     KEYWORD(func)
+    KEYWORD(meth)
     KEYWORD(var)
     KEYWORD(typealias)
     
