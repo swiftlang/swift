@@ -80,7 +80,7 @@ TypeBase *TypeBase::getCanonicalType(ASTContext &Ctx) {
     FunctionType *FT = cast<FunctionType>(this);
     Type In = FT->Input->getCanonicalType(Ctx);
     Type Out = FT->Result->getCanonicalType(Ctx);
-    Result = Ctx.getFunctionType(In, Out);
+    Result = FunctionType::get(In, Out, Ctx);
     break;
   }
   case ArrayTypeKind:

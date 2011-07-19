@@ -299,6 +299,9 @@ public:
   const Type Input;
   const Type Result;
   
+  // 'Constructor' Factory Function
+  static FunctionType *get(Type Input, Type Result, ASTContext &C);
+  
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
@@ -306,9 +309,7 @@ public:
   static bool classof(const TypeBase *T) { return T->Kind == FunctionTypeKind;}
   
 private:
-  FunctionType(Type input, Type result)
-    : TypeBase(FunctionTypeKind), Input(input), Result(result) {}
-  friend class ASTContext;
+  FunctionType(Type input, Type result);
 };
   
   

@@ -68,7 +68,7 @@ OneOfType *SemaType::ActOnOneOfType(SMLoc OneOfLoc,
     Type EltTy = TmpTy;
     if (Type ArgTy = Elts[i].EltType)
       if (PrettyTypeName)
-        EltTy = S.Context.getFunctionType(ArgTy, EltTy);
+        EltTy = FunctionType::get(ArgTy, EltTy, S.Context);
 
     // Create a decl for each element, giving each a temporary type.
     EltDecls.push_back(
@@ -91,7 +91,7 @@ OneOfType *SemaType::ActOnOneOfType(SMLoc OneOfLoc,
       // If the OneOf Element takes a type argument, then it is actually a
       // function that takes the type argument and returns the OneOfType.
       if (Type ArgTy = EltDecls[i]->ArgumentType)
-        EltTy = S.Context.getFunctionType(ArgTy, EltTy);
+        EltTy = FunctionType::get(ArgTy, EltTy, S.Context);
       EltDecls[i]->Ty = EltTy;
     }
   }
@@ -101,7 +101,7 @@ OneOfType *SemaType::ActOnOneOfType(SMLoc OneOfLoc,
 
 
 Type SemaType::ActOnFunctionType(Type Input, SMLoc ArrowLoc, Type Output){
-  return S.Context.getFunctionType(Input, Output);
+  return FunctionType::get(Input, Output, S.Context);
 }
 
 Type SemaType::ActOnArrayType(Type BaseTy, SMLoc LSquareLoc, Expr *Size,

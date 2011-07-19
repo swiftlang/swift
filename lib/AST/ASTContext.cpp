@@ -140,21 +140,23 @@ OneOfType *ASTContext::getNewOneOfType(SMLoc OneOfLoc,
 }
 
 
-/// getFunctionType - Return a uniqued function type with the specified
+/// FunctionType::get - Return a uniqued function type with the specified
 /// input and result.
-FunctionType *ASTContext::getFunctionType(Type Input, Type Result) {
+FunctionType *FunctionType::get(Type Input, Type Result, ASTContext &C) {
   FunctionType *&Entry =
-    (*(FunctionTypesMapTy*)FunctionTypes)[std::make_pair(Input, Result)];
+    (*(FunctionTypesMapTy*)C.FunctionTypes)[std::make_pair(Input, Result)];
   if (Entry) return Entry;
   
-  Entry = new (*this) FunctionType(Input, Result);
-  
-  // If the input and result types are canonical, then so is the result.
-  if (Input->isCanonical() && Result->isCanonical())
-    Entry->CanonicalType = Entry;
-  
-  return Entry;
+  return Entry = new (C) FunctionType(Input, Result);
 }
+
+// If the input and result types are canonical, then so is the result.
+FunctionType::FunctionType(Type input, Type result)
+  : TypeBase(FunctionTypeKind,
+             (input->isCanonical() && result->isCanonical()) ? this : 0),
+    Input(input), Result(result) {
+}
+
 
 /// getArrayType - Return a uniqued array type with the specified base type
 /// and the specified size.  Size=0 indicates an unspecified size array.

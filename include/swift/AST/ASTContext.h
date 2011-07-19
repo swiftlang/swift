@@ -43,14 +43,16 @@ class ASTContext {
   ASTContext(const ASTContext&);           // DO NOT IMPLEMENT
   void operator=(const ASTContext&);       // DO NOT IMPLEMENT
   llvm::BumpPtrAllocator *Allocator;
-  
+  bool HadError;
+public:
+  // Members that should only be used by ASTContext.cpp.
   void *IdentifierTable; // llvm::StringMap<char>
   void *TupleTypes;      // llvm::FoldingSet<TupleType>
   void *FunctionTypes;   // DenseMap<std::pair<Type*, Type*>, FunctionType*>
   void *ArrayTypes;      // DenseMap<std::pair<Type*, uint64_t>, ArrayType*>
-  
-  bool HadError;
+
 public:
+  
   ASTContext(llvm::SourceMgr &SourceMgr);
   ~ASTContext();
   
@@ -121,10 +123,6 @@ public:
 
   /// getTupleType - Return the uniqued tuple type with the specified elements.
   TupleType *getTupleType(ArrayRef<TupleTypeElt> Fields);
-  
-  /// getFunctionType - Return a uniqued function type with the specified
-  /// input and result.
-  FunctionType *getFunctionType(Type Input, Type Result);
 
   /// getArrayType - Return a uniqued array type with the specified base type
   /// and the specified size.  Size=0 indicates an unspecified size array.
