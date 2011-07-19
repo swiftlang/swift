@@ -43,6 +43,7 @@ enum DeclKind {
   TypeAliasDeclKind,
   VarDeclKind,
   FuncDeclKind,
+  MethDeclKind,
   OneOfElementDeclKind,
   ArgDeclKind,
   ElementRefDeclKind
@@ -196,6 +197,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return (D->getKind() == VarDeclKind || D->getKind() == FuncDeclKind ||
+            D->getKind() == MethDeclKind ||
             D->getKind() == OneOfElementDeclKind ||
             D->getKind() == ArgDeclKind || 
             D->getKind() == ElementRefDeclKind ||
@@ -253,6 +255,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return (D->getKind() == VarDeclKind || D->getKind() == FuncDeclKind ||
+            D->getKind() == MethDeclKind ||
             D->getKind() == OneOfElementDeclKind ||D->getKind() == ArgDeclKind||
             D->getKind() == ElementRefDeclKind);
   }
@@ -315,6 +318,26 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == FuncDeclKind; }
   static bool classof(const FuncDecl *D) { return true; }
+};
+
+/// MethDecl - 'meth' declaration.
+class MethDecl : public ValueDecl {
+public:
+  llvm::SMLoc MethLoc;    // Location of the 'meth' token.
+  
+  MethDecl(llvm::SMLoc methloc, Identifier name, Type ty, Expr *init,
+           const DeclAttributes &attrs)
+  : ValueDecl(MethDeclKind, name, ty, init, attrs), MethLoc(methloc) {}
+  
+  
+  llvm::SMLoc getLocStart() const { return MethLoc; }
+  
+  
+  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) { return D->getKind() == MethDeclKind; }
+  static bool classof(const MethDecl *D) { return true; }
 };
 
   

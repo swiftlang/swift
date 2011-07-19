@@ -57,19 +57,20 @@ namespace {
     void typeCheck(ValueDecl *VD, llvm::SmallVectorImpl<Expr*> &ExcessExprs) {
       // No types to resolved for a ElementRefDecl.
       if (ElementRefDecl *ERD = dyn_cast<ElementRefDecl>(VD))
-        return typeCheck(ERD);
+        return typeCheckERD(ERD);
       if (VarDecl *Var = dyn_cast<VarDecl>(VD))
-        return typeCheck(Var, ExcessExprs);
+        return typeCheckVarDecl(Var, ExcessExprs);
       
       if (isa<OneOfElementDecl>(VD))
         return;  // FIXME: No type checking required for this?
       
-      typeCheck(cast<FuncDecl>(VD), ExcessExprs);
+      typeCheckValueDecl(cast<ValueDecl>(VD), ExcessExprs);
     }
     
-    void typeCheck(ElementRefDecl *ERD);
-    void typeCheck(FuncDecl *FD, llvm::SmallVectorImpl<Expr*> &ExcessExprs);
-    void typeCheck(VarDecl *VD, llvm::SmallVectorImpl<Expr*> &ExcessExprs);
+    void typeCheckERD(ElementRefDecl *ERD);
+    void typeCheckVarDecl(VarDecl *VD, llvm::SmallVectorImpl<Expr*> &ExcessExprs);
+    void typeCheckValueDecl(ValueDecl *VD,
+                            llvm::SmallVectorImpl<Expr*> &ExcessExprs);
     
     void validateAttributes(DeclAttributes &Attrs, Type Ty);
     
@@ -1718,7 +1719,7 @@ void TypeChecker::typeCheck(TypeAliasDecl *TAD) {
   validateType(TAD->UnderlyingTy);
 }
 
-void TypeChecker::typeCheck(ElementRefDecl *ERD) {
+void TypeChecker::typeCheckERD(ElementRefDecl *ERD) {
   // If the type is already resolved we're done.  ElementRefDecls are simple.
   if (!ERD->Ty->is<DependentType>()) return;
   
@@ -1776,8 +1777,8 @@ bool TypeChecker::validateVarName(Type Ty, DeclVarName *Name) {
   return false;
 }
 
-void TypeChecker::typeCheck(VarDecl *VD,
-                            llvm::SmallVectorImpl<Expr*> &ExcessExprs) {
+void TypeChecker::typeCheckVarDecl(VarDecl *VD,
+                                   llvm::SmallVectorImpl<Expr*> &ExcessExprs) {
   if (validateType(VD->Ty)) {
     VD->Init = 0;
     return; 
@@ -1813,22 +1814,21 @@ void TypeChecker::typeCheck(VarDecl *VD,
 }
 
 
-void TypeChecker::typeCheck(FuncDecl *FD,
-                            llvm::SmallVectorImpl<Expr*> &ExcessExprs) {
-  if (validateType(FD->Ty)) {
-    FD->Init = 0;
+void TypeChecker::typeCheckValueDecl(ValueDecl *VD,
+                                     llvm::SmallVectorImpl<Expr*> &ExcessExprs){
+  if (validateType(VD->Ty)) {
+    VD->Init = 0;
     return;
   }
 
-  // Validate that the body's type matches the function's type if this isn't a
-  // external function.
-  if (FD->Init) {
-    checkBody(FD->Init, FD->Ty, &ExcessExprs);
-    if (FD->Init == 0)
-      note(FD->getLocStart(), "while converting 'func' body to declared type");
+  // Validate that the initializers type matches the expected type.
+  if (VD->Init) {
+    checkBody(VD->Init, VD->Ty, &ExcessExprs);
+    if (VD->Init == 0)
+      note(VD->getLocStart(), "while converting body to declared type");
   }
   
-  validateAttributes(FD->Attrs, FD->Ty);
+  validateAttributes(VD->Attrs, VD->Ty);
 }
 
 /// performTypeChecking - Once parsing and namebinding are complete, these

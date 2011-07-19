@@ -283,6 +283,22 @@ ActOnFuncDecl(llvm::SMLoc FuncLoc, Identifier Name,
   return new (S.Context) FuncDecl(FuncLoc, Name, Ty, 0, Attrs);
 }
 
+
+MethDecl *SemaDecl::
+ActOnMethDecl(llvm::SMLoc MethLoc, Type ReceiverType,
+              Identifier FuncName, Type Ty, DeclAttributes &Attrs) {
+  assert(!Ty.isNull() && "Type not specified?");
+  
+  // Install the first type as the receiver, as a tuple with element named
+  // 'this'.  This turns "int->int" on FooTy into "(this : FooTy)->(int->int)".
+  TupleTypeElt ReceiverElt(ReceiverType, S.Context.getIdentifier("this"));
+  ReceiverType = S.Context.getTupleType(ReceiverElt);
+  Ty = S.type.ActOnFunctionType(ReceiverType, llvm::SMLoc(), Ty);
+  
+  return new (S.Context) MethDecl(MethLoc, FuncName, Ty, 0, Attrs); 
+}
+
+
 /// FuncTypePiece - This little enum is used by AddFuncArgumentsToScope to keep
 /// track of where in a function type it is currently looking.  This affects how
 /// the decls are processed and created.
@@ -356,16 +372,16 @@ static void AddFuncArgumentsToScope(Type Ty,
 }
 
 
-void SemaDecl::CreateArgumentDeclsForFunc(FuncDecl *FD) {
+void SemaDecl::CreateArgumentDeclsForFunc(ValueDecl *D) {
   llvm::SmallVector<unsigned, 8> AccessPath;
-  AddFuncArgumentsToScope(FD->Ty, AccessPath, FTP_Function, FD->FuncLoc, *this);
+  AddFuncArgumentsToScope(D->Ty, AccessPath, FTP_Function,
+                          D->getLocStart(), *this);
 }
 
 
-FuncDecl *SemaDecl::ActOnFuncBody(FuncDecl *FD, Expr *Body) {
+void SemaDecl::ActOnFuncBody(ValueDecl *FD, Expr *Body) {
   assert(FD && Body && "Elements of func body not specified?");
   FD->Init = Body;
-  return FD;
 }
 
 void SemaDecl::ActOnStructDecl(llvm::SMLoc StructLoc, DeclAttributes &Attrs,

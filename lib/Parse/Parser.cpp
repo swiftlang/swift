@@ -469,7 +469,8 @@ FuncDecl *Parser::parseDeclFunc() {
   if (Body.isNull())
     return FD;
 
-  return S.decl.ActOnFuncBody(FD, Body.get());
+  S.decl.ActOnFuncBody(FD, Body.get());
+  return FD;
 }
 
 
@@ -490,10 +491,10 @@ MethDecl *Parser::parseDeclMeth() {
   if (Tok.is(tok::l_square))
     parseAttributeList(Attributes);
 
-  Identifier TypeName, Name;
+  Identifier TypeName, FuncName;
   if (parseIdentifier(TypeName, "expected type name in 'meth' declaration") ||
       parseToken(tok::coloncolon, "expected '::' in 'meth' declaration") ||
-      parseIdentifier(Name, "expected identifier in 'meth' declaration"))
+      parseIdentifier(FuncName, "expected identifier in 'meth' declaration"))
     return 0;
   
   // We force first type of a meth declaration to be a tuple for consistency.
@@ -511,26 +512,26 @@ MethDecl *Parser::parseDeclMeth() {
   if (!llvm::isa<FunctionType>(FuncTy.getPointer()))
     FuncTy = S.type.ActOnFunctionType(FuncTy, SMLoc(),
                                       S.Context.TheEmptyTupleType);
-  MethDecl *MD = 0;
   
-#if 0
-  // Build the decl for the function.
-  FuncDecl *FD = S.decl.ActOnFuncDecl(FuncLoc, Name, FuncTy, Attributes);
+  // Look up the type name. FIXME: Inaccurate loc.
+  Type ReceiverTy = S.type.ActOnTypeName(MethLoc, TypeName);
+  
+  // Build the decl for the method.
+  MethDecl *MD = 
+    S.decl.ActOnMethDecl(MethLoc, ReceiverTy, FuncName, FuncTy, Attributes);
   
   // Enter the func into the current scope, which allows it to be visible and
   // used within its body.
-  if (FD)
-    S.decl.AddToScope(FD);
+  if (MD)
+    S.decl.AddToScope(MD);
   
   // Enter the arguments for the function into a new function-body scope.  We
   // need this even if there is no function body to detect argument name
   // duplication.
-  Scope FnBodyScope(S.decl);
+  Scope MethBodyScope(S.decl);
   
-  if (FD)
-    S.decl.CreateArgumentDeclsForFunc(FD);
-#endif
-  
+  if (MD)
+    S.decl.CreateArgumentDeclsForFunc(MD);
   
   // Then parse the expression.
   llvm::NullablePtr<Expr> Body;
@@ -544,8 +545,8 @@ MethDecl *Parser::parseDeclMeth() {
   if (Body.isNull())
     return MD;
 
-  //return S.decl.ActOnMethBody(MD, Body.get());
-  return 0;
+  S.decl.ActOnFuncBody(MD, Body.get());
+  return MD;
 }
 
 /// parseDeclOneOf - Parse a 'oneof' declaration, returning null (and doing no
@@ -1204,7 +1205,7 @@ bool Parser::parseDeclExprList(llvm::SmallVectorImpl<ExprOrDecl> &Entries,
       Entries.push_back(parseDeclFunc());
       break;
     case tok::kw_meth:
-      Entries.push_back((FuncDecl*)parseDeclMeth());
+      Entries.push_back(parseDeclMeth());
       break;
     case tok::kw_typealias:
       Entries.push_back(parseDeclTypeAlias());
