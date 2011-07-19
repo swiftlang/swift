@@ -110,7 +110,7 @@ private:
   bool parseToken(tok::TokenKind K, const char *Message,
                   tok::TokenKind SkipToTok = tok::unknown);
   
-  bool parseValueSpecifier(Type &Ty, llvm::NullablePtr<Expr> &Init);
+  bool parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init);
   
   // Decl Parsing
   bool parseDeclExprList(SmallVectorImpl<ExprOrDecl> &Decls,
@@ -135,15 +135,15 @@ private:
                           Type &Result, TypeAliasDecl *TypeName = 0);
 
   // Expression Parsing
-  bool parseExpr(llvm::NullablePtr<Expr> &Result, bool NonBraceOnly,
+  bool parseExpr(NullablePtr<Expr> &Result, bool NonBraceOnly,
                  const char *Message = 0);
-  bool parseExprSingle(llvm::NullablePtr<Expr> &Result, const char *Message =0);
+  bool parseExprSingle(NullablePtr<Expr> &Result, const char *Message =0);
   bool parseExprPrimary(SmallVectorImpl<Expr*> &Result);
-  bool parseExprIdentifier(llvm::NullablePtr<Expr> &Result);
-  bool parseExprDollarIdentifier(llvm::NullablePtr<Expr> &Result);
-  bool parseExprParen(llvm::NullablePtr<Expr> &Result);
-  bool parseExprBrace(llvm::NullablePtr<Expr> &Result);
-  bool parseExprIf(llvm::NullablePtr<Expr> &Result);
+  bool parseExprIdentifier(NullablePtr<Expr> &Result);
+  bool parseExprDollarIdentifier(NullablePtr<Expr> &Result);
+  bool parseExprParen(NullablePtr<Expr> &Result);
+  bool parseExprBrace(NullablePtr<Expr> &Result);
+  bool parseExprIf(NullablePtr<Expr> &Result);
 };
   
 } // end namespace swift

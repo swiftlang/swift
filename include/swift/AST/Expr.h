@@ -118,7 +118,7 @@ public:
   ConversionRank getRankOfConversionTo(Type DestTy, ASTContext &Ctx) const;
   
   void dump() const;
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  void print(raw_ostream &OS, unsigned Indent = 0) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Expr *) { return true; }

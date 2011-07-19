@@ -28,7 +28,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
-using llvm::NullablePtr;
 
 //===----------------------------------------------------------------------===//
 // Setup and Helper Methods
@@ -452,7 +451,7 @@ FuncDecl *Parser::parseDeclFunc() {
     S.decl.CreateArgumentDeclsForFunc(FD);
 
   // Then parse the expression.
-  llvm::NullablePtr<Expr> Body;
+  NullablePtr<Expr> Body;
 
   // Check to see if we have a "= expr" or "{" which is a brace expr.
   if (consumeIf(tok::equal)) {
@@ -529,7 +528,7 @@ MethDecl *Parser::parseDeclMeth() {
     S.decl.CreateArgumentDeclsForFunc(MD);
   
   // Then parse the expression.
-  llvm::NullablePtr<Expr> Body;
+  NullablePtr<Expr> Body;
 
   // Check to see if we have a body.
   if (Tok.is(tok::l_brace) &&
@@ -717,7 +716,7 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
     
     // If there is a square bracket, we have an array.
     if (consumeIf(tok::l_square)) {
-      llvm::NullablePtr<Expr> Size;
+      NullablePtr<Expr> Size;
       if (!Tok.is(tok::r_square) &&
           parseExpr(Size, false, "expected expression for array type size"))
         return true;
@@ -902,7 +901,7 @@ bool Parser::parseExpr(NullablePtr<Expr> &Result, bool NonBraceOnly,
 ///   expr-subscript:
 ///     expr-primary '[' expr ']'
 bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &Result) {
-  llvm::NullablePtr<Expr> R;
+  NullablePtr<Expr> R;
   switch (Tok.getKind()) {
   case tok::numeric_constant:
     R = S.expr.ActOnNumericConstant(Tok.getText(), Tok.getLoc());
@@ -996,7 +995,7 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &Result) {
 
 ///   expr-identifier:
 ///     dollarident
-bool Parser::parseExprDollarIdentifier(llvm::NullablePtr<Expr> &Result) {
+bool Parser::parseExprDollarIdentifier(NullablePtr<Expr> &Result) {
   StringRef Name = Tok.getText();
   SMLoc Loc = consumeToken(tok::dollarident);
   assert(Name[0] == '$' && "Not a dollarident");
@@ -1025,7 +1024,7 @@ bool Parser::parseExprDollarIdentifier(llvm::NullablePtr<Expr> &Result) {
 ///   expr-identifier:
 ///     identifier
 ///     identifier '::' identifier
-bool Parser::parseExprIdentifier(llvm::NullablePtr<Expr> &Result) {
+bool Parser::parseExprIdentifier(NullablePtr<Expr> &Result) {
   assert(Tok.is(tok::identifier));
   SMLoc Loc = Tok.getLoc();
   Identifier Name;
@@ -1059,7 +1058,7 @@ bool Parser::parseExprIdentifier(llvm::NullablePtr<Expr> &Result) {
 ///   expr-paren-element:
 ///     ('.' identifier '=')? expr
 ///
-bool Parser::parseExprParen(llvm::NullablePtr<Expr> &Result) {
+bool Parser::parseExprParen(NullablePtr<Expr> &Result) {
   SMLoc LPLoc = consumeToken(tok::l_paren);
   
   SmallVector<Expr*, 8> SubExprs;
@@ -1132,7 +1131,7 @@ bool Parser::parseExprParen(llvm::NullablePtr<Expr> &Result) {
 ///     decl-struct
 ///     decl-typealias
 ///     ';'
-bool Parser::parseExprBrace(llvm::NullablePtr<Expr> &Result) {
+bool Parser::parseExprBrace(NullablePtr<Expr> &Result) {
   SMLoc LBLoc = consumeToken(tok::l_brace);
 
   SmallVector<ExprOrDecl, 16> Entries;
@@ -1259,10 +1258,10 @@ bool Parser::parseDeclExprList(SmallVectorImpl<ExprOrDecl> &Entries,
 ///   expr-if-else:
 ///     'else' brace-expr
 ///     'else' expr-if
-bool Parser::parseExprIf(llvm::NullablePtr<Expr> &Result) {
+bool Parser::parseExprIf(NullablePtr<Expr> &Result) {
   SMLoc IfLoc = consumeToken(tok::kw_if);
 
-  llvm::NullablePtr<Expr> Condition;
+  NullablePtr<Expr> Condition;
   if (parseExpr(Condition, true, "expected expresssion in 'if' condition"))
     return true;
   
@@ -1272,10 +1271,10 @@ bool Parser::parseExprIf(llvm::NullablePtr<Expr> &Result) {
   }
   
   
-  llvm::NullablePtr<Expr> NormalBody;
+  NullablePtr<Expr> NormalBody;
   if (parseExprBrace(NormalBody)) return true;
   
-  llvm::NullablePtr<Expr> ElseBody;
+  NullablePtr<Expr> ElseBody;
   SMLoc ElseLoc = Tok.getLoc();
   if (consumeIf(tok::kw_else)) {
     if (Tok.is(tok::kw_if)) {

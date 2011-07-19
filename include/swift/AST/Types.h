@@ -103,7 +103,7 @@ public:
   std::string getString() const;
   
   void dump() const;
-  void print(llvm::raw_ostream &OS) const;
+  void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *) { return true; }
@@ -127,7 +127,7 @@ class BuiltinType : public TypeBase {
   BuiltinType(TypeKind kind) : TypeBase(kind, this) {}
 public:
   
-  void print(llvm::raw_ostream &OS) const;
+  void print(raw_ostream &OS) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BuiltinType *) { return true; }
@@ -145,7 +145,7 @@ class UnresolvedType : public TypeBase {
   UnresolvedType() : TypeBase(UnresolvedTypeKind, this) {}
 public:
   
-  void print(llvm::raw_ostream &OS) const;
+  void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedType *) { return true; }
@@ -163,7 +163,7 @@ class DependentType : public TypeBase {
   DependentType() : TypeBase(DependentTypeKind, this) {}
 public:
   
-  void print(llvm::raw_ostream &OS) const;
+  void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const DependentType *) { return true; }
@@ -181,7 +181,7 @@ class NameAliasType : public TypeBase {
 public:
   TypeAliasDecl *const TheDecl;
    
-  void print(llvm::raw_ostream &OS) const;
+  void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const NameAliasType *) { return true; }
@@ -238,7 +238,7 @@ public:
   /// specified element.  This should only be used by TypeChecker.
   void updateInitializedElementType(unsigned EltNo, Type NewTy, Expr *NewInit);
   
-  void print(llvm::raw_ostream &OS) const;
+  void print(raw_ostream &OS) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TupleType *) { return true; }
@@ -277,7 +277,7 @@ public:
   /// various syntactic forms are allowed for these, like direct "foo.x" syntax.
   bool hasSingleElement() const;
   
-  void print(llvm::raw_ostream &O) const;
+  void print(raw_ostream &O) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const OneOfType *D) { return true; }
@@ -299,7 +299,7 @@ public:
   const Type Input;
   const Type Result;
   
-  void print(llvm::raw_ostream &OS) const;
+  void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const FunctionType *) { return true; }
@@ -322,7 +322,7 @@ public:
   /// Size - When this is zero it indicates an unsized array like "int[]".
   uint64_t Size;
   
-  void print(llvm::raw_ostream &OS) const;
+  void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ArrayType *) { return true; }

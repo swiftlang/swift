@@ -106,7 +106,7 @@ Type ElementRefDecl::getTypeForPath(Type InTy, ArrayRef<unsigned> Path) {
 
 void Decl::dump() const { print(llvm::errs()); llvm::errs() << '\n'; }
 
-void Decl::print(llvm::raw_ostream &OS, unsigned Indent) const {
+void Decl::print(raw_ostream &OS, unsigned Indent) const {
   switch (getKind()) {
   case TranslationUnitDeclKind:
     return cast<TranslationUnitDecl>(this)->print(OS, Indent);
@@ -122,7 +122,7 @@ void Decl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   }
 }
 
-void TranslationUnitDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
+void TranslationUnitDecl::print(raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(translation_unit\n";
   if (Body)
     Body->print(OS, Indent+2);
@@ -131,25 +131,25 @@ void TranslationUnitDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
   OS << ')';
 }
 
-void ImportDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
+void ImportDecl::print(raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(import_decl '" << AccessPath[0].first;
   for (unsigned i = 1, e = AccessPath.size(); i != e; ++i)
     OS << "." << AccessPath[i].first;
   OS << "')";
 }
 
-static void PrintDeclName(const NamedDecl *D, llvm::raw_ostream &OS) {
+static void PrintDeclName(const NamedDecl *D, raw_ostream &OS) {
   if (D->Name.get())
     OS << '\'' << D->Name << '\'';
   else
     OS << "'anonname=" << (const void*)D << '\'';
 }
 
-void NamedDecl::printCommon(llvm::raw_ostream &OS, unsigned Indent) const {
+void NamedDecl::printCommon(raw_ostream &OS, unsigned Indent) const {
   PrintDeclName(this, OS);
 }
 
-void TypeAliasDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
+void TypeAliasDecl::print(raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(typealias ";
   printCommon(OS, Indent);
   OS << " type='";
@@ -158,7 +158,7 @@ void TypeAliasDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
 }
 
 
-void ValueDecl::printCommon(llvm::raw_ostream &OS, unsigned Indent) const {
+void ValueDecl::printCommon(raw_ostream &OS, unsigned Indent) const {
   NamedDecl::printCommon(OS, Indent);
   OS << " type='";
   Ty->print(OS);
@@ -170,37 +170,37 @@ void ValueDecl::printCommon(llvm::raw_ostream &OS, unsigned Indent) const {
   }
 }
 
-void VarDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
+void VarDecl::print(raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(vardecl ";
   printCommon(OS, Indent);
   OS << ')';
 }
 
-void FuncDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
+void FuncDecl::print(raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(funcdecl ";
   printCommon(OS, Indent);
   OS << ')';
 }
 
-void MethDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
+void MethDecl::print(raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(methdecl ";
   printCommon(OS, Indent);
   OS << ')';
 }
 
-void OneOfElementDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
+void OneOfElementDecl::print(raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(oneofelementdecl ";
   printCommon(OS, Indent);
   OS << ')';
 }
 
-void ArgDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
+void ArgDecl::print(raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(argdecl ";
   printCommon(OS, Indent);
   OS << ')';
 }
 
-void ElementRefDecl::print(llvm::raw_ostream &OS, unsigned Indent) const {
+void ElementRefDecl::print(raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(elementrefdecl ";
   printCommon(OS, Indent);
   OS << '\n';

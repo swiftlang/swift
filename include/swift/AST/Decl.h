@@ -112,7 +112,7 @@ public:
   SMLoc getLocStart() const;
   
   void dump() const;
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  void print(raw_ostream &OS, unsigned Indent = 0) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *) { return true; }
@@ -149,7 +149,7 @@ public:
 
   SMLoc getLocStart() const;
   
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  void print(raw_ostream &OS, unsigned Indent = 0) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -173,7 +173,7 @@ public:
   
   SMLoc getLocStart() const { return ImportLoc; }
 
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  void print(raw_ostream &OS, unsigned Indent = 0) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -206,7 +206,7 @@ protected:
     : Decl(K), Name(name), Attrs(attrs) {
   }
   
-  void printCommon(llvm::raw_ostream &OS, unsigned Indent) const;
+  void printCommon(raw_ostream &OS, unsigned Indent) const;
 };
   
 /// TypeAliasDecl - This is a declaration of a typealias, for example:
@@ -231,7 +231,7 @@ public:
   /// getAliasType - Return the sugared version of this decl as a Type.
   NameAliasType *getAliasType(ASTContext &C) const;
   
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  void print(raw_ostream &OS, unsigned Indent = 0) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -261,7 +261,7 @@ protected:
             const DeclAttributes &attrs = DeclAttributes())
     : NamedDecl(K, name, attrs), Ty(ty), Init(init) {
   }
-  void printCommon(llvm::raw_ostream &OS, unsigned Indent) const;
+  void printCommon(raw_ostream &OS, unsigned Indent) const;
 };  
 
 /// VarDecl - 'var' declaration.
@@ -286,7 +286,7 @@ public:
   
   SMLoc getLocStart() const { return VarLoc; }
   
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  void print(raw_ostream &OS, unsigned Indent = 0) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == VarDeclKind; }
@@ -308,7 +308,7 @@ public:
   SMLoc getLocStart() const { return FuncLoc; }
 
   
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  void print(raw_ostream &OS, unsigned Indent = 0) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == FuncDeclKind; }
@@ -328,7 +328,7 @@ public:
   SMLoc getLocStart() const { return MethLoc; }
   
   
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  void print(raw_ostream &OS, unsigned Indent = 0) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == MethDeclKind; }
@@ -358,7 +358,7 @@ public:
   
   SMLoc getLocStart() const { return IdentifierLoc; }
   
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  void print(raw_ostream &OS, unsigned Indent = 0) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -388,7 +388,7 @@ public:
   SMLoc getLocStart() const { return FuncLoc; }
  
   
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  void print(raw_ostream &OS, unsigned Indent = 0) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == ArgDeclKind; }
@@ -420,7 +420,7 @@ public:
   
   SMLoc getLocStart() const { return NameLoc; }
   
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  void print(raw_ostream &OS, unsigned Indent = 0) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind()==ElementRefDeclKind;}

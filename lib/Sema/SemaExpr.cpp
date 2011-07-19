@@ -25,7 +25,6 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
-using llvm::NullablePtr;
 
 //===----------------------------------------------------------------------===//
 // Action Implementations
@@ -58,7 +57,7 @@ SemaExpr::ActOnIdentifierExpr(Identifier Text, SMLoc Loc) {
   return new (S.Context) DeclRefExpr(D, Loc);
 }
 
-llvm::NullablePtr<Expr> SemaExpr::
+NullablePtr<Expr> SemaExpr::
 ActOnScopedIdentifierExpr(Identifier ScopeName, SMLoc ScopeLoc,
                           SMLoc ColonColonLoc,
                           Identifier Name, SMLoc NameLoc) {

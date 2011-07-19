@@ -43,22 +43,22 @@ public:
   typedef llvm::PointerUnion<Expr*, Decl*> ExprOrDecl;
   
   // Action Implementations
-  llvm::NullablePtr<Expr>
+  NullablePtr<Expr>
   ActOnNumericConstant(StringRef Text, SMLoc Loc);
-  llvm::NullablePtr<Expr>
+  NullablePtr<Expr>
   ActOnIdentifierExpr(Identifier Text, SMLoc Loc);
-  llvm::NullablePtr<Expr>
+  NullablePtr<Expr>
   ActOnScopedIdentifierExpr(Identifier ScopeName, SMLoc ScopeLoc,
                             SMLoc ColonColonLoc,
                             Identifier Name, SMLoc NameLoc);
   
-  llvm::NullablePtr<Expr>
+  NullablePtr<Expr>
   ActOnTupleExpr(SMLoc LPLoc, Expr *const *SubExprs,
                  const Identifier *SubExprNames,
                  unsigned NumSubExprs, SMLoc RPLoc,
                  bool IsPrecededByIdentifier);
 
-  llvm::NullablePtr<Expr>
+  NullablePtr<Expr>
   ActOnIfExpr(SMLoc IfLoc, Expr *Cond, Expr *Normal, 
               SMLoc ElseLoc, Expr *Else);
 };

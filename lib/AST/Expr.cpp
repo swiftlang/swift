@@ -479,10 +479,10 @@ namespace {
 /// PrintExpr - Visitor implementation of Expr::print.
 class PrintExpr : public ExprVisitor<PrintExpr> {
 public:
-  llvm::raw_ostream &OS;
+  raw_ostream &OS;
   unsigned Indent;
   
-  PrintExpr(llvm::raw_ostream &os, unsigned indent) : OS(os), Indent(indent) {
+  PrintExpr(raw_ostream &os, unsigned indent) : OS(os), Indent(indent) {
   }
   
   void PrintRec(Expr *E) {
@@ -635,6 +635,6 @@ void Expr::dump() const {
   llvm::errs() << '\n';
 }
 
-void Expr::print(llvm::raw_ostream &OS, unsigned Indent) const {
+void Expr::print(raw_ostream &OS, unsigned Indent) const {
   PrintExpr(OS, Indent).Visit(const_cast<Expr*>(this));
 }

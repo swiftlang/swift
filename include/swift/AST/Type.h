@@ -42,7 +42,7 @@ public:
   operator bool() const { return Ptr != 0; }
   
   void dump() const;
-  void print(llvm::raw_ostream &OS) const;
+  void print(raw_ostream &OS) const;
 
   /// getString - Return the name of the type as a string, for use in
   /// diagnostics only.
@@ -56,8 +56,8 @@ private:
 } // end namespace swift
 
 namespace llvm {
-  static inline llvm::raw_ostream &
-  operator<<(llvm::raw_ostream &OS, swift::Type Ty) {
+  static inline raw_ostream &
+  operator<<(raw_ostream &OS, swift::Type Ty) {
     Ty.print(OS);
     return OS;
   }

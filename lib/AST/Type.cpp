@@ -201,7 +201,7 @@ void Type::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
 }
-void Type::print(llvm::raw_ostream &OS) const {
+void Type::print(raw_ostream &OS) const {
   if (isNull())
     OS << "<null>";
   else
@@ -233,7 +233,7 @@ void TypeBase::dump() const {
   llvm::errs() << '\n';
 }
 
-void TypeBase::print(llvm::raw_ostream &OS) const {
+void TypeBase::print(raw_ostream &OS) const {
   switch (Kind) {
   case DependentTypeKind:     return cast<DependentType>(this)->print(OS);
   case UnresolvedTypeKind:    return cast<UnresolvedType>(this)->print(OS);
@@ -250,7 +250,7 @@ void TypeBase::print(llvm::raw_ostream &OS) const {
   }
 }
 
-void BuiltinType::print(llvm::raw_ostream &OS) const {
+void BuiltinType::print(raw_ostream &OS) const {
   switch (Kind) {
   default: assert(0 && "Unknown builtin type");
   case BuiltinInt1Kind:  OS << "__builtin_int1_type"; break;
@@ -261,19 +261,19 @@ void BuiltinType::print(llvm::raw_ostream &OS) const {
   }
 }
 
-void UnresolvedType::print(llvm::raw_ostream &OS) const {
+void UnresolvedType::print(raw_ostream &OS) const {
   OS << "<<unresolved type>>";
 }
 
-void DependentType::print(llvm::raw_ostream &OS) const {
+void DependentType::print(raw_ostream &OS) const {
   OS << "<<dependent type>>";
 }
 
-void NameAliasType::print(llvm::raw_ostream &OS) const {
+void NameAliasType::print(raw_ostream &OS) const {
   OS << TheDecl->Name.get();
 }
 
-void OneOfType::print(llvm::raw_ostream &OS) const {
+void OneOfType::print(raw_ostream &OS) const {
   OS << "oneof { ";
     
   for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
@@ -286,7 +286,7 @@ void OneOfType::print(llvm::raw_ostream &OS) const {
   OS << '}';
 }
 
-void TupleType::print(llvm::raw_ostream &OS) const {
+void TupleType::print(raw_ostream &OS) const {
   OS << "(";
   
   for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
@@ -301,11 +301,11 @@ void TupleType::print(llvm::raw_ostream &OS) const {
   OS << ')';
 }
 
-void FunctionType::print(llvm::raw_ostream &OS) const {
+void FunctionType::print(raw_ostream &OS) const {
   OS << Input << " -> " << Result;
 }
 
-void ArrayType::print(llvm::raw_ostream &OS) const {
+void ArrayType::print(raw_ostream &OS) const {
   OS << Base << '[';
   if (Size)
     OS << Size;
