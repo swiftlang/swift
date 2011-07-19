@@ -491,11 +491,16 @@ MethDecl *Parser::parseDeclMeth() {
   if (Tok.is(tok::l_square))
     parseAttributeList(Attributes);
 
+  SMLoc TypeNameLoc = Tok.getLoc();
+  
   Identifier TypeName, FuncName;
   if (parseIdentifier(TypeName, "expected type name in 'meth' declaration") ||
       parseToken(tok::coloncolon, "expected '::' in 'meth' declaration") ||
       parseIdentifier(FuncName, "expected identifier in 'meth' declaration"))
     return 0;
+  
+  // Look up the type name.
+  Type ReceiverTy = S.type.ActOnTypeName(TypeNameLoc, TypeName);
   
   // We force first type of a meth declaration to be a tuple for consistency.
   if (Tok.isNot(tok::l_paren)) {
@@ -506,15 +511,6 @@ MethDecl *Parser::parseDeclMeth() {
   Type FuncTy;
   if (parseType(FuncTy))
     return 0;
-  
-  // If the parsed function type is not spelled as a function type (i.e., has an
-  // '->' in it), then it is implicitly a function that returns ().
-  if (!llvm::isa<FunctionType>(FuncTy.getPointer()))
-    FuncTy = S.type.ActOnFunctionType(FuncTy, SMLoc(),
-                                      S.Context.TheEmptyTupleType);
-  
-  // Look up the type name. FIXME: Inaccurate loc.
-  Type ReceiverTy = S.type.ActOnTypeName(MethLoc, TypeName);
   
   // Build the decl for the method.
   MethDecl *MD = 

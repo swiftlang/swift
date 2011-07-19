@@ -26,6 +26,7 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
+using llvm::SMLoc;
 
 typedef std::pair<unsigned, ValueDecl*> ValueScopeEntry;
 typedef llvm::ScopedHashTable<Identifier, ValueScopeEntry> ValueScopeHTType;
@@ -63,9 +64,9 @@ SemaDecl::~SemaDecl() {
 /// handleEndOfTranslationUnit - This is invoked at the end of the translation
 /// unit.
 void SemaDecl::handleEndOfTranslationUnit(TranslationUnitDecl *TUD,
-                                          llvm::SMLoc FileStart,
+                                          SMLoc FileStart,
                                           llvm::ArrayRef<ExprOrDecl> Items,
-                                          llvm::SMLoc FileEnd) {
+                                          SMLoc FileEnd) {
   // First thing, we transform the body into a brace expression.
   ExprOrDecl *NewElements = 
     S.Context.AllocateCopy<ExprOrDecl>(Items.begin(), Items.end());
@@ -133,7 +134,7 @@ ValueDecl *SemaDecl::LookupValueName(Identifier Name) {
 /// LookupTypeName - Perform a lexical scope lookup for the specified name in
 /// a type context, returning the decl if found or installing and returning a
 /// new Unresolved one if not.
-TypeAliasDecl *SemaDecl::LookupTypeName(Identifier Name, llvm::SMLoc Loc) {
+TypeAliasDecl *SemaDecl::LookupTypeName(Identifier Name, SMLoc Loc) {
   TypeAliasDecl *TAD = getTypeHT(TypeScopeHT).lookup(Name).second;
   if (TAD) return TAD;
   
@@ -224,7 +225,7 @@ void SemaDecl::AddToScope(ValueDecl *D) {
 
 /// ActOnElementName - Assign a name to an element of D specified by Path.
 ElementRefDecl *SemaDecl::
-ActOnElementName(Identifier Name, llvm::SMLoc NameLoc, VarDecl *D,
+ActOnElementName(Identifier Name, SMLoc NameLoc, VarDecl *D,
                  llvm::ArrayRef<unsigned> Path) {
   Type Ty = ElementRefDecl::getTypeForPath(D->Ty, Path);
 
@@ -248,8 +249,8 @@ ActOnElementName(Identifier Name, llvm::SMLoc NameLoc, VarDecl *D,
 // Declaration handling.
 //===----------------------------------------------------------------------===//
 
-Decl *SemaDecl::ActOnImportDecl(llvm::SMLoc ImportLoc,
-                        llvm::ArrayRef<std::pair<Identifier,llvm::SMLoc> > Path,
+Decl *SemaDecl::ActOnImportDecl(SMLoc ImportLoc,
+                        llvm::ArrayRef<std::pair<Identifier, SMLoc> > Path,
                                 DeclAttributes &Attrs) {
   if (!Attrs.empty())
     error(Attrs.LSquareLoc, "invalid attributes specified for import");
@@ -261,7 +262,7 @@ Decl *SemaDecl::ActOnImportDecl(llvm::SMLoc ImportLoc,
 
 /// Note that DeclVarName is sitting on the stack, not copied into the
 /// ASTContext.
-VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, DeclVarName &Name,
+VarDecl *SemaDecl::ActOnVarDecl(SMLoc VarLoc, DeclVarName &Name,
                                 Type Ty, Expr *Init, DeclAttributes &Attrs) {
   assert((!Ty.isNull() || Init != 0) && "Must have a type or an expr already");
   if (Ty.isNull())
@@ -276,24 +277,33 @@ VarDecl *SemaDecl::ActOnVarDecl(llvm::SMLoc VarLoc, DeclVarName &Name,
 }
 
 FuncDecl *SemaDecl::
-ActOnFuncDecl(llvm::SMLoc FuncLoc, Identifier Name,
-              Type Ty, DeclAttributes &Attrs) {
+ActOnFuncDecl(SMLoc FuncLoc, Identifier Name, Type Ty, DeclAttributes &Attrs) {
   assert(!Ty.isNull() && "Type not specified?");
+
+  // If the parsed type is not spelled as a function type (i.e., has no '->' in
+  // it), then it is implicitly a function that returns ().
+  if (!llvm::isa<FunctionType>(Ty.getPointer()))
+    Ty = S.type.ActOnFunctionType(Ty, SMLoc(), S.Context.TheEmptyTupleType);
 
   return new (S.Context) FuncDecl(FuncLoc, Name, Ty, 0, Attrs);
 }
 
 
 MethDecl *SemaDecl::
-ActOnMethDecl(llvm::SMLoc MethLoc, Type ReceiverType,
-              Identifier FuncName, Type Ty, DeclAttributes &Attrs) {
+ActOnMethDecl(SMLoc MethLoc, Type ReceiverType, Identifier FuncName, Type Ty,
+              DeclAttributes &Attrs) {
   assert(!Ty.isNull() && "Type not specified?");
+  
+  // If the parsed type is not spelled as a function type (i.e., has no '->' in
+  // it), then it is implicitly a function that returns ().
+  if (!llvm::isa<FunctionType>(Ty.getPointer()))
+    Ty = S.type.ActOnFunctionType(Ty, SMLoc(), S.Context.TheEmptyTupleType);
   
   // Install the first type as the receiver, as a tuple with element named
   // 'this'.  This turns "int->int" on FooTy into "(this : FooTy)->(int->int)".
   TupleTypeElt ReceiverElt(ReceiverType, S.Context.getIdentifier("this"));
   ReceiverType = S.Context.getTupleType(ReceiverElt);
-  Ty = S.type.ActOnFunctionType(ReceiverType, llvm::SMLoc(), Ty);
+  Ty = S.type.ActOnFunctionType(ReceiverType, SMLoc(), Ty);
   
   return new (S.Context) MethDecl(MethLoc, FuncName, Ty, 0, Attrs); 
 }
@@ -319,7 +329,7 @@ enum FuncTypePiece {
 static void AddFuncArgumentsToScope(Type Ty,
                                     llvm::SmallVectorImpl<unsigned> &AccessPath,
                                     FuncTypePiece Mode,
-                                    llvm::SMLoc FuncLoc, SemaDecl &SD) {
+                                    SMLoc FuncLoc, SemaDecl &SD) {
   // Handle the function case first.
   if (Mode == FTP_Function) {
     FunctionType *FT = llvm::cast<FunctionType>(Ty.getPointer());
@@ -384,7 +394,7 @@ void SemaDecl::ActOnFuncBody(ValueDecl *FD, Expr *Body) {
   FD->Init = Body;
 }
 
-void SemaDecl::ActOnStructDecl(llvm::SMLoc StructLoc, DeclAttributes &Attrs,
+void SemaDecl::ActOnStructDecl(SMLoc StructLoc, DeclAttributes &Attrs,
                                Identifier Name, Type BodyTy,
                                llvm::SmallVectorImpl<ExprOrDecl> &Decls) {
   // Get the TypeAlias for the name that we'll eventually have.  This ensures
@@ -411,7 +421,7 @@ void SemaDecl::ActOnStructDecl(llvm::SMLoc StructLoc, DeclAttributes &Attrs,
 }
 
 
-TypeAliasDecl *SemaDecl::ActOnTypeAlias(llvm::SMLoc TypeAliasLoc,
+TypeAliasDecl *SemaDecl::ActOnTypeAlias(SMLoc TypeAliasLoc,
                                         Identifier Name, Type Ty) {
   std::pair<unsigned,TypeAliasDecl*> Entry =getTypeHT(TypeScopeHT).lookup(Name);
 
