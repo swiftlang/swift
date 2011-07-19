@@ -113,7 +113,7 @@ private:
   bool parseValueSpecifier(Type &Ty, llvm::NullablePtr<Expr> &Init);
   
   // Decl Parsing
-  bool parseDeclExprList(llvm::SmallVectorImpl<ExprOrDecl> &Decls,
+  bool parseDeclExprList(SmallVectorImpl<ExprOrDecl> &Decls,
                          bool &MissingSemiAtEnd, bool IsTopLevel);
   TypeAliasDecl *parseDeclTypeAlias();
   void parseAttributeList(DeclAttributes &Attributes);
@@ -122,8 +122,8 @@ private:
   
   Decl *parseDeclImport();
   Decl *parseDeclOneOf();
-  bool parseDeclStruct(llvm::SmallVectorImpl<ExprOrDecl> &Decls);
-  bool parseDeclVar(llvm::SmallVectorImpl<ExprOrDecl> &Decls);
+  bool parseDeclStruct(SmallVectorImpl<ExprOrDecl> &Decls);
+  bool parseDeclVar(SmallVectorImpl<ExprOrDecl> &Decls);
   FuncDecl *parseDeclFunc();
   MethDecl *parseDeclMeth();
   
@@ -138,7 +138,7 @@ private:
   bool parseExpr(llvm::NullablePtr<Expr> &Result, bool NonBraceOnly,
                  const char *Message = 0);
   bool parseExprSingle(llvm::NullablePtr<Expr> &Result, const char *Message =0);
-  bool parseExprPrimary(llvm::SmallVectorImpl<Expr*> &Result);
+  bool parseExprPrimary(SmallVectorImpl<Expr*> &Result);
   bool parseExprIdentifier(llvm::NullablePtr<Expr> &Result);
   bool parseExprDollarIdentifier(llvm::NullablePtr<Expr> &Result);
   bool parseExprParen(llvm::NullablePtr<Expr> &Result);

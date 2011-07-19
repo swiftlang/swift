@@ -77,14 +77,14 @@ public:
   }
 
   template<typename T>
-  llvm::ArrayRef<T> AllocateCopy(llvm::ArrayRef<T> Arr) {
-    return llvm::ArrayRef<T>(AllocateCopy<T>(Arr.begin(), Arr.end()),
+  ArrayRef<T> AllocateCopy(ArrayRef<T> Arr) {
+    return ArrayRef<T>(AllocateCopy<T>(Arr.begin(), Arr.end()),
                              Arr.size());
   }
 
   template<typename T>
-  llvm::ArrayRef<T> AllocateCopy(const llvm::SmallVectorImpl<T> &Vec) {
-    return AllocateCopy(llvm::ArrayRef<T>(Vec));
+  ArrayRef<T> AllocateCopy(const SmallVectorImpl<T> &Vec) {
+    return AllocateCopy(ArrayRef<T>(Vec));
   }
 
   
@@ -120,7 +120,7 @@ public:
   const Type TheInt64Type;       /// TheInt64Type - 64-bit integer.
 
   /// getTupleType - Return the uniqued tuple type with the specified elements.
-  TupleType *getTupleType(llvm::ArrayRef<TupleTypeElt> Fields);
+  TupleType *getTupleType(ArrayRef<TupleTypeElt> Fields);
   
   /// getFunctionType - Return a uniqued function type with the specified
   /// input and result.
@@ -134,7 +134,7 @@ public:
   /// uniqued each syntactic instance of them is semantically considered to be a
   /// different type.
   OneOfType *getNewOneOfType(SMLoc OneOfLoc,
-                             llvm::ArrayRef<OneOfElementDecl*> Elements);
+                             ArrayRef<OneOfElementDecl*> Elements);
 };
   
 } // end namespace swift

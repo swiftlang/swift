@@ -57,7 +57,7 @@ namespace {
     /// lookupValue - Resolve a reference to a value name that found this module
     /// through the specified import declaration.
     void lookupValue(ImportDecl *ID, Identifier Name,
-                     llvm::SmallVectorImpl<ValueDecl*> &Result,
+                     SmallVectorImpl<ValueDecl*> &Result,
                      NLKind LookupKind);
   };
 } // end anonymous namespace.
@@ -89,7 +89,7 @@ TypeAliasDecl *ReferencedModule::lookupType(ImportDecl *ID, Identifier Name) {
 /// lookupValue - Resolve a reference to a value name that found this module
 /// through the specified import declaration.
 void ReferencedModule::lookupValue(ImportDecl *ID, Identifier Name,
-                                   llvm::SmallVectorImpl<ValueDecl*> &Result,
+                                   SmallVectorImpl<ValueDecl*> &Result,
                                    NLKind LookupKind) {
   // TODO: ImportDecls cannot specified namespaces or individual entities
   // yet, so everything is just a lookup at the top-level.
@@ -130,7 +130,7 @@ namespace {
     
     /// TopLevelValues - This is the list of top-level declarations we have.
     llvm::DenseMap<Identifier, llvm::TinyPtrVector<ValueDecl*> > TopLevelValues;
-    llvm::SmallVector<std::pair<ImportDecl*, ReferencedModule*>, 4> Imports;
+    SmallVector<std::pair<ImportDecl*, ReferencedModule*>, 4> Imports;
     
     llvm::error_code findModule(StringRef Module, 
                                 SMLoc ImportLoc,
@@ -150,7 +150,7 @@ namespace {
     
     void addImport(ImportDecl *ID);
 
-    void bindValueName(Identifier I, llvm::SmallVectorImpl<ValueDecl*> &Result,
+    void bindValueName(Identifier I, SmallVectorImpl<ValueDecl*> &Result,
                        NLKind LookupKind);
     
     TypeAliasDecl *lookupTypeName(Identifier I);
@@ -271,7 +271,7 @@ TypeAliasDecl *NameBinder::lookupTypeName(Identifier Name) {
 /// returns a decl if found or null if not.  If OnlyReturnFunctions is true,
 /// then this will only return a decl if it has function type.
 void NameBinder::bindValueName(Identifier Name, 
-                               llvm::SmallVectorImpl<ValueDecl*> &Result,
+                               SmallVectorImpl<ValueDecl*> &Result,
                                NLKind LookupKind) {
   // Resolve forward references defined within the module.
   llvm::DenseMap<Identifier, llvm::TinyPtrVector<ValueDecl*> >::iterator I =
@@ -309,7 +309,7 @@ static Expr *BindNames(Expr *E, Expr::WalkOrder Order, void *binder) {
   
   // Process UnresolvedDeclRefExpr.
   if (UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
-    llvm::SmallVector<ValueDecl*, 4> Decls;
+    SmallVector<ValueDecl*, 4> Decls;
     Binder.bindValueName(UDRE->Name, Decls, NLK_UnqualifiedLookup);
     if (Decls.empty()) {
       Binder.error(UDRE->Loc, "use of unresolved identifier '" +
@@ -320,7 +320,7 @@ static Expr *BindNames(Expr *E, Expr::WalkOrder Order, void *binder) {
       return new (Binder.Context) DeclRefExpr(Decls[0], UDRE->Loc);
     
     // Copy the overload set into ASTContext memory.
-    llvm::ArrayRef<ValueDecl*> DeclList = Binder.Context.AllocateCopy(Decls);
+    ArrayRef<ValueDecl*> DeclList = Binder.Context.AllocateCopy(Decls);
     
     return new (Binder.Context) OverloadSetRefExpr(DeclList, UDRE->Loc);
   }
@@ -329,7 +329,7 @@ static Expr *BindNames(Expr *E, Expr::WalkOrder Order, void *binder) {
   // It may also be a tuple field reference, so don't report an error here if we
   // don't find anything juicy.
   if (UnresolvedDotExpr *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
-    llvm::SmallVector<ValueDecl*, 4> Decls;
+    SmallVector<ValueDecl*, 4> Decls;
     // Perform .-style name lookup.
     Binder.bindValueName(UDE->Name, Decls, NLK_DotLookup);
 

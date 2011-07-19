@@ -25,9 +25,9 @@ namespace llvm {
   // Containers
   class StringRef;
   class Twine;
-  // also SmallVector, ArrayRef, StringRef, Twine ...
-  //  template <typename T> class SmallVectorImpl;
-
+  template <typename T> class SmallVectorImpl;
+  template <typename T, unsigned N> class SmallVector;
+  template<typename T> class ArrayRef;
   
   // also raw_ostream
  
@@ -47,6 +47,9 @@ namespace swift {
   // Containers
   using llvm::StringRef;
   using llvm::Twine;
+  using llvm::SmallVectorImpl;
+  using llvm::SmallVector;
+  using llvm::ArrayRef;
 
   // Other common classes.
   using llvm::SMLoc;

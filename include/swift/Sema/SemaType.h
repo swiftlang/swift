@@ -42,7 +42,7 @@ public:
   explicit SemaType(Sema &S) : SemaBase(S) {}
 
   Type ActOnTypeName(SMLoc Loc, Identifier Name);
-  Type ActOnTupleType(SMLoc LPLoc, llvm::ArrayRef<TupleTypeElt> Elements,
+  Type ActOnTupleType(SMLoc LPLoc, ArrayRef<TupleTypeElt> Elements,
                       SMLoc RPLoc);
   Type ActOnFunctionType(Type Input, SMLoc ArrowLoc, Type Output);
   Type ActOnArrayType(Type BaseTy, SMLoc LSquareLoc, Expr *Size,
@@ -55,7 +55,7 @@ public:
   };
   
   OneOfType *ActOnOneOfType(SMLoc OneOfLoc, const DeclAttributes &Attrs,
-                            llvm::ArrayRef<OneOfElementInfo> Elts,
+                            ArrayRef<OneOfElementInfo> Elts,
                             TypeAliasDecl *PrettyTypeName = 0);
 };
   

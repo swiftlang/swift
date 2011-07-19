@@ -31,21 +31,21 @@ Type SemaType::ActOnTypeName(SMLoc Loc, Identifier Name) {
 
 
 Type SemaType::ActOnTupleType(SMLoc LPLoc, 
-                               llvm::ArrayRef<TupleTypeElt> Elements,
+                               ArrayRef<TupleTypeElt> Elements,
                                SMLoc RPLoc) {
   return S.Context.getTupleType(Elements);
 }
 
 OneOfType *SemaType::ActOnOneOfType(SMLoc OneOfLoc, 
                                     const DeclAttributes &Attrs,
-                                    llvm::ArrayRef<OneOfElementInfo> Elts,
+                                    ArrayRef<OneOfElementInfo> Elts,
                                     TypeAliasDecl *PrettyTypeName) {
   // No attributes are valid on oneof types at this time.
   if (!Attrs.empty())
     error(Attrs.LSquareLoc, "oneof types are not allowed to have attributes");
   
   llvm::SmallPtrSet<const char *, 16> SeenSoFar;
-  llvm::SmallVector<OneOfElementDecl *, 16> EltDecls;
+  SmallVector<OneOfElementDecl *, 16> EltDecls;
     
   // If we have a PrettyTypeName to use, use it.  Otherwise, just assign the
   // constructors a temporary dummy type.

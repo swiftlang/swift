@@ -212,7 +212,7 @@ public:
 ///
 class TupleType : public TypeBase, public llvm::FoldingSetNode {
 public:
-  const llvm::ArrayRef<TupleTypeElt> Fields;
+  const ArrayRef<TupleTypeElt> Fields;
   
   /// getElementType - Return the type of the specified field.
   Type getElementType(unsigned FieldNo) const {
@@ -248,10 +248,10 @@ public:
     Profile(ID, Fields);
   }
   static void Profile(llvm::FoldingSetNodeID &ID, 
-                      llvm::ArrayRef<TupleTypeElt> Fields);
+                      ArrayRef<TupleTypeElt> Fields);
   
 private:
-  TupleType(llvm::ArrayRef<TupleTypeElt> fields)
+  TupleType(ArrayRef<TupleTypeElt> fields)
     : TypeBase(TupleTypeKind), Fields(fields) {}
   friend class ASTContext;
 };
@@ -261,7 +261,7 @@ private:
 class OneOfType : public TypeBase {
 public:
   const SMLoc OneOfLoc;
-  const llvm::ArrayRef<OneOfElementDecl*> Elements;
+  const ArrayRef<OneOfElementDecl*> Elements;
   
   SMLoc getLocStart() const { return OneOfLoc; }
   OneOfElementDecl *getElement(unsigned i) const {
@@ -285,7 +285,7 @@ public:
   
 private:
   // oneof types are always canonical.
-  OneOfType(SMLoc oneofloc, llvm::ArrayRef<OneOfElementDecl*> Elts)
+  OneOfType(SMLoc oneofloc, ArrayRef<OneOfElementDecl*> Elts)
     : TypeBase(OneOfTypeKind, this), OneOfLoc(oneofloc), Elements(Elts) {
   }
   friend class ASTContext;

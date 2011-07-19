@@ -81,7 +81,7 @@ public:
   // If this is a simple name like "a", this contains the identifier.
   Identifier Name;
   
-  llvm::ArrayRef<DeclVarName*> Elements;
+  ArrayRef<DeclVarName*> Elements;
   
   DeclVarName() {}
   bool isSimple() const { return LPLoc == RPLoc; }
@@ -141,7 +141,7 @@ public:
   
   /// UnresolvedTypes - This is a list of types that were unresolved at the end
   /// of the translation unit's parse phase.
-  llvm::ArrayRef<TypeAliasDecl*> UnresolvedTypesForParser;
+  ArrayRef<TypeAliasDecl*> UnresolvedTypesForParser;
   
   TranslationUnitDecl(ASTContext &C)
     : Decl(TranslationUnitDeclKind), Ctx(C) {
@@ -164,10 +164,10 @@ public:
 class ImportDecl : public Decl {
 public:
   SMLoc ImportLoc;
-  llvm::ArrayRef<std::pair<Identifier,SMLoc> > AccessPath;
+  ArrayRef<std::pair<Identifier,SMLoc> > AccessPath;
   
   ImportDecl(SMLoc importLoc,
-             llvm::ArrayRef<std::pair<Identifier,SMLoc> > path)
+             ArrayRef<std::pair<Identifier,SMLoc> > path)
     : Decl(ImportDeclKind), ImportLoc(importLoc), AccessPath(path) {
   }
   
@@ -403,10 +403,10 @@ class ElementRefDecl : public ValueDecl {
 public:
   VarDecl *VD;
   SMLoc NameLoc;
-  llvm::ArrayRef<unsigned> AccessPath;
+  ArrayRef<unsigned> AccessPath;
   
   ElementRefDecl(VarDecl *vd, SMLoc nameloc, Identifier name,
-                 llvm::ArrayRef<unsigned> path, Type ty)
+                 ArrayRef<unsigned> path, Type ty)
     : ValueDecl(ElementRefDeclKind, name, ty, 0), VD(vd), NameLoc(nameloc),
       AccessPath(path) {
   }
@@ -415,7 +415,7 @@ public:
   /// referenced element type.  If the access path is invalid for the specified
   /// type, this returns null.  If the query goes into an unresolved (dependent)
   /// part of the type, this returns TheDependentType.
-  static Type getTypeForPath(Type Ty, llvm::ArrayRef<unsigned> Path);
+  static Type getTypeForPath(Type Ty, ArrayRef<unsigned> Path);
   
   
   SMLoc getLocStart() const { return NameLoc; }

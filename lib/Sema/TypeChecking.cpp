@@ -50,7 +50,7 @@ namespace {
 
     void typeCheck(TypeAliasDecl *TAD);
 
-    void typeCheck(ValueDecl *VD, llvm::SmallVectorImpl<Expr*> &ExcessExprs) {
+    void typeCheck(ValueDecl *VD, SmallVectorImpl<Expr*> &ExcessExprs) {
       // No types to resolved for a ElementRefDecl.
       if (ElementRefDecl *ERD = dyn_cast<ElementRefDecl>(VD))
         return typeCheckERD(ERD);
@@ -64,9 +64,9 @@ namespace {
     }
     
     void typeCheckERD(ElementRefDecl *ERD);
-    void typeCheckVarDecl(VarDecl *VD, llvm::SmallVectorImpl<Expr*> &ExcessExprs);
+    void typeCheckVarDecl(VarDecl *VD, SmallVectorImpl<Expr*> &ExcessExprs);
     bool typeCheckValueDecl(ValueDecl *VD,
-                            llvm::SmallVectorImpl<Expr*> &ExcessExprs);
+                            SmallVectorImpl<Expr*> &ExcessExprs);
     
     void validateAttributes(DeclAttributes &Attrs, Type Ty);
     
@@ -80,7 +80,7 @@ namespace {
     /// with the excess in the provided SmallVector.  If the SmallVector is not
     /// provided, errors are emitted for the excess expressions.
     void checkBody(Expr *&E, Type DestTy,
-                   llvm::SmallVectorImpl<Expr*> *ExcessElements);
+                   SmallVectorImpl<Expr*> *ExcessElements);
     
 
     /// convertToType - Do semantic analysis of an expression in a context that
@@ -128,7 +128,7 @@ static bool SemaTupleExpr(TupleExpr *TE, TypeChecker &TC) {
   }
   
   // Compute the result type.
-  llvm::SmallVector<TupleTypeElt, 8> ResultTyElts(TE->NumSubExprs);
+  SmallVector<TupleTypeElt, 8> ResultTyElts(TE->NumSubExprs);
   
   for (unsigned i = 0, e = TE->NumSubExprs; i != e; ++i) {
     // If the element value is missing, it has the value of the default
@@ -826,9 +826,9 @@ Expr *SemaExpressionTree::VisitIfExpr(IfExpr *E) {
 
 
 void SemaExpressionTree::PreProcessBraceExpr(BraceExpr *E) {
-  llvm::SmallVector<Expr*, 4> ExcessExprs;
+  SmallVector<Expr*, 4> ExcessExprs;
   
-  llvm::SmallVector<BraceExpr::ExprOrDecl, 32> NewElements;
+  SmallVector<BraceExpr::ExprOrDecl, 32> NewElements;
   
   // Braces have to manually walk into subtrees for expressions, because we
   // terminate the walk we're in for them (so we can handle decls custom).
@@ -1182,15 +1182,15 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   //   (.y = 4, .x = 3)
   // is converted to type:
   //   (.x = int, .y = int)
-  llvm::SmallVector<Identifier, 8> IdentList(NumExprElements);
+  SmallVector<Identifier, 8> IdentList(NumExprElements);
   
   // Check to see if this conversion is ok by looping over all the destination
   // elements and seeing if they are provided by the input.
   
   // Keep track of which input elements are used.
   // TODO: Record where the destination elements came from in the AST.
-  llvm::SmallVector<bool, 16> UsedElements(NumExprElements);
-  llvm::SmallVector<int, 16>  DestElementSources(DestTy->Fields.size(), -1);
+  SmallVector<bool, 16> UsedElements(NumExprElements);
+  SmallVector<int, 16>  DestElementSources(DestTy->Fields.size(), -1);
 
   if (TupleType *ETy = E->Ty->getAs<TupleType>()) {
     assert(ETy->Fields.size() == NumExprElements && "Expr #elements mismatch!");
@@ -1297,7 +1297,7 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   // this conversion in place.
   TupleExpr *TE = dyn_cast<TupleExpr>(E);
   if (TE && TE->NumSubExprs != 1 && TE->NumSubExprs == DestTy->Fields.size()) {
-    llvm::SmallVector<Expr*, 8> OrigElts(TE->SubExprs,
+    SmallVector<Expr*, 8> OrigElts(TE->SubExprs,
                                          TE->SubExprs+TE->NumSubExprs);
     
     for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
@@ -1341,7 +1341,7 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   // we can do elementwise conversions as needed, then rebuild a new TupleExpr
   // of the right destination type.
   TupleType *ETy = E->Ty->getAs<TupleType>();
-  llvm::SmallVector<int, 16> NewElements(DestTy->Fields.size());
+  SmallVector<int, 16> NewElements(DestTy->Fields.size());
   
   for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
     // Extract the input element corresponding to this destination element.
@@ -1368,7 +1368,7 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   }
   
   // If we got here, the type conversion is successful, create a new TupleExpr.  
-  llvm::ArrayRef<int> Mapping = TC.Context.AllocateCopy(NewElements);
+  ArrayRef<int> Mapping = TC.Context.AllocateCopy(NewElements);
   
   return new (TC.Context) TupleShuffleExpr(E, Mapping, DestTy);
 }
@@ -1676,7 +1676,7 @@ static Expr *DiagnoseUnresolvedTypes(Expr *E, Expr::WalkOrder Order,
 /// If the body turns out to be a sequence, this returns the single element
 /// with the excess in the provided smallvector.
 void TypeChecker::checkBody(Expr *&E, Type DestTy,
-                            llvm::SmallVectorImpl<Expr*> *ExcessElements) {
+                            SmallVectorImpl<Expr*> *ExcessElements) {
   assert(E != 0 && "Can't check a null body!");
   E = SemaExpressionTree::doIt(E, *this);
   if (E == 0) return;
@@ -1774,7 +1774,7 @@ bool TypeChecker::validateVarName(Type Ty, DeclVarName *Name) {
 }
 
 void TypeChecker::typeCheckVarDecl(VarDecl *VD,
-                                   llvm::SmallVectorImpl<Expr*> &ExcessExprs) {
+                                   SmallVectorImpl<Expr*> &ExcessExprs) {
   // Type check the ValueDecl part of a VarDecl.
   if (typeCheckValueDecl(VD, ExcessExprs))
     return;
@@ -1787,7 +1787,7 @@ void TypeChecker::typeCheckVarDecl(VarDecl *VD,
 
 
 bool TypeChecker::typeCheckValueDecl(ValueDecl *VD,
-                                     llvm::SmallVectorImpl<Expr*> &ExcessExprs){
+                                     SmallVectorImpl<Expr*> &ExcessExprs){
   if (validateType(VD->Ty)) {
     VD->Init = 0;
     return true;

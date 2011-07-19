@@ -54,7 +54,7 @@ class SemaDecl : public SemaBase {
   /// AST.
   void *const UnresolvedTypes; // DenseMap<Identifier, TypeAliasDecl *>
   
-  llvm::SmallVector<TypeAliasDecl*, 8> UnresolvedTypeList;
+  SmallVector<TypeAliasDecl*, 8> UnresolvedTypeList;
 public:
 
   explicit SemaDecl(Sema &S);
@@ -66,7 +66,7 @@ public:
   /// unit.
   void handleEndOfTranslationUnit(TranslationUnitDecl *TU,
                                   SMLoc FileStart,
-                                  llvm::ArrayRef<ExprOrDecl> Items,
+                                  ArrayRef<ExprOrDecl> Items,
                                   SMLoc FileEnd);
 
   //===--------------------------------------------------------------------===//
@@ -94,7 +94,7 @@ public:
                                 Type Ty);
   
   Decl *ActOnImportDecl(SMLoc ImportLoc,
-                        llvm::ArrayRef<std::pair<Identifier,SMLoc> > Path,
+                        ArrayRef<std::pair<Identifier,SMLoc> > Path,
                         DeclAttributes &Attrs);
   
   VarDecl *ActOnVarDecl(SMLoc VarLoc, DeclVarName &Name, Type Ty,
@@ -109,15 +109,15 @@ public:
 
   void ActOnStructDecl(SMLoc StructLoc, DeclAttributes &Attrs,
                        Identifier Name, Type Ty,
-                       llvm::SmallVectorImpl<ExprOrDecl> &Decls);
+                       SmallVectorImpl<ExprOrDecl> &Decls);
   
   // Name processing.
   
   /// ActOnElementName - Assign a name to an element of D specified by Path.
   ElementRefDecl *ActOnElementName(Identifier Name, SMLoc NameLoc,
-                                   VarDecl *D, llvm::ArrayRef<unsigned> Path);
+                                   VarDecl *D, ArrayRef<unsigned> Path);
   bool CheckAccessPathArity(unsigned NumChildren, SMLoc LPLoc, VarDecl *D,
-                            llvm::ArrayRef<unsigned> Path);
+                            ArrayRef<unsigned> Path);
   
 };
   

@@ -106,14 +106,14 @@ getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
   //   (.y = 4, .x = 3)
   // is converted to type:
   //   (.x = int, .y = int)
-  llvm::SmallVector<Identifier, 8> IdentList(NumExprElements);
+  SmallVector<Identifier, 8> IdentList(NumExprElements);
   
   // Check to see if this conversion is ok by looping over all the destination
   // elements and seeing if they are provided by the input.
   
   // Keep track of which input elements are used.
-  llvm::SmallVector<bool, 16> UsedElements(NumExprElements);
-  llvm::SmallVector<int, 16>  DestElementSources(DestTy->Fields.size(), -1);
+  SmallVector<bool, 16> UsedElements(NumExprElements);
+  SmallVector<int, 16>  DestElementSources(DestTy->Fields.size(), -1);
 
   if (TupleType *ETy = E->Ty->getAs<TupleType>()) {
     assert(ETy->Fields.size() == NumExprElements && "Expr #elements mismatch!");

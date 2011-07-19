@@ -172,7 +172,7 @@ TranslationUnitDecl *Parser::parseTranslationUnit() {
   TranslationUnitDecl *Result = new (S.Context) TranslationUnitDecl(S.Context);
   
   // Parse the body of the file.
-  llvm::SmallVector<ExprOrDecl, 128> Items;
+  SmallVector<ExprOrDecl, 128> Items;
   bool MissingSemiAtEnd = false; // Don't care, FIXME remove.
   parseDeclExprList(Items, MissingSemiAtEnd, true);
   
@@ -262,7 +262,7 @@ Decl *Parser::parseDeclImport() {
   if (Tok.is(tok::l_square))
     parseAttributeList(Attributes);
   
-  llvm::SmallVector<std::pair<Identifier, SMLoc>, 8> ImportPath(1);
+  SmallVector<std::pair<Identifier, SMLoc>, 8> ImportPath(1);
   ImportPath.back().second = Tok.getLoc();
   if (parseIdentifier(ImportPath.back().first,
                       "expected module name in import declaration"))
@@ -296,7 +296,7 @@ bool Parser::parseVarName(DeclVarName &Name) {
   if (parseToken(tok::l_paren, "expected identifier or '(' in var name"))
     return true;
   
-  llvm::SmallVector<DeclVarName*, 8> ChildNames;
+  SmallVector<DeclVarName*, 8> ChildNames;
   
   if (Tok.isNot(tok::r_paren)) {
     do {
@@ -336,9 +336,9 @@ TypeAliasDecl *Parser::parseDeclTypeAlias() {
 /// adding ElementRefDecls for the named subcomponents and checking that types
 /// match up correctly.
 static void AddElementNamesForVarDecl(const DeclVarName *Name,
-                                    llvm::SmallVectorImpl<unsigned> &AccessPath,
+                                    SmallVectorImpl<unsigned> &AccessPath,
                                       VarDecl *VD, SemaDecl &SD,
-                              llvm::SmallVectorImpl<Parser::ExprOrDecl> &Decls){
+                              SmallVectorImpl<Parser::ExprOrDecl> &Decls){
   if (Name->isSimple()) {
     // If this is a leaf name, ask sema to create a ElementRefDecl for us with 
     // the specified access path.
@@ -362,7 +362,7 @@ static void AddElementNamesForVarDecl(const DeclVarName *Name,
 ///
 ///   decl-var:
 ///      'var' attribute-list? var-name value-specifier
-bool Parser::parseDeclVar(llvm::SmallVectorImpl<ExprOrDecl> &Decls) {
+bool Parser::parseDeclVar(SmallVectorImpl<ExprOrDecl> &Decls) {
   SMLoc VarLoc = consumeToken(tok::kw_var);
   
   DeclAttributes Attributes;
@@ -393,7 +393,7 @@ bool Parser::parseDeclVar(llvm::SmallVectorImpl<ExprOrDecl> &Decls) {
     // If there is a more interesting name presented here, then we need to walk
     // through it and synthesize the decls that reference the var elements as
     // appropriate.
-    llvm::SmallVector<unsigned, 8> AccessPath;
+    SmallVector<unsigned, 8> AccessPath;
     AddElementNamesForVarDecl(VD->NestedName, AccessPath, VD, S.decl, Decls);
   }
   return false;
@@ -587,7 +587,7 @@ Decl *Parser::parseDeclOneOf() {
 ///   decl-struct:
 ///      'struct' attribute-list? identifier { type-tuple-body? }
 ///
-bool Parser::parseDeclStruct(llvm::SmallVectorImpl<ExprOrDecl> &Decls) {
+bool Parser::parseDeclStruct(SmallVectorImpl<ExprOrDecl> &Decls) {
   SMLoc StructLoc = consumeToken(tok::kw_struct);
   
   DeclAttributes Attributes;
@@ -751,7 +751,7 @@ bool Parser::parseType(Type &Result) {
 ///     identifier? value-specifier (',' identifier? value-specifier)*
 ///
 bool Parser::parseTypeTupleBody(SMLoc LPLoc, Type &Result) {
-  llvm::SmallVector<TupleTypeElt, 8> Elements;
+  SmallVector<TupleTypeElt, 8> Elements;
 
   if (Tok.isNot(tok::r_paren) && Tok.isNot(tok::r_brace)) {
     bool HadError = false;
@@ -796,7 +796,7 @@ bool Parser::parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
   if (parseToken(tok::l_brace, "expected '{' in oneof type"))
     return true;
   
-  llvm::SmallVector<SemaType::OneOfElementInfo, 8> ElementInfos;
+  SmallVector<SemaType::OneOfElementInfo, 8> ElementInfos;
   
   // Parse the comma separated list of oneof elements.
   while (Tok.is(tok::identifier)) {
@@ -849,7 +849,7 @@ static bool isStartOfExpr(Token &Tok) {
 ///
 bool Parser::parseExpr(NullablePtr<Expr> &Result, bool NonBraceOnly,
                        const char *Message) {
-  llvm::SmallVector<Expr*, 8> SequencedExprs;
+  SmallVector<Expr*, 8> SequencedExprs;
   
   do {
     if (NonBraceOnly && Tok.is(tok::l_brace)) break;
@@ -901,7 +901,7 @@ bool Parser::parseExpr(NullablePtr<Expr> &Result, bool NonBraceOnly,
 ///
 ///   expr-subscript:
 ///     expr-primary '[' expr ']'
-bool Parser::parseExprPrimary(llvm::SmallVectorImpl<Expr*> &Result) {
+bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &Result) {
   llvm::NullablePtr<Expr> R;
   switch (Tok.getKind()) {
   case tok::numeric_constant:
@@ -1062,8 +1062,8 @@ bool Parser::parseExprIdentifier(llvm::NullablePtr<Expr> &Result) {
 bool Parser::parseExprParen(llvm::NullablePtr<Expr> &Result) {
   SMLoc LPLoc = consumeToken(tok::l_paren);
   
-  llvm::SmallVector<Expr*, 8> SubExprs;
-  llvm::SmallVector<Identifier, 8> SubExprNames; 
+  SmallVector<Expr*, 8> SubExprs;
+  SmallVector<Identifier, 8> SubExprNames; 
   bool AnyErroneousSubExprs = false;
   
   if (Tok.isNot(tok::r_paren)) {
@@ -1135,7 +1135,7 @@ bool Parser::parseExprParen(llvm::NullablePtr<Expr> &Result) {
 bool Parser::parseExprBrace(llvm::NullablePtr<Expr> &Result) {
   SMLoc LBLoc = consumeToken(tok::l_brace);
 
-  llvm::SmallVector<ExprOrDecl, 16> Entries;
+  SmallVector<ExprOrDecl, 16> Entries;
 
   // MissingSemiAtEnd - Keep track of whether the last expression in the block
   // had no semicolon.
@@ -1168,7 +1168,7 @@ bool Parser::parseExprBrace(llvm::NullablePtr<Expr> &Result) {
 ///     decl-struct
 ///     decl-typealias
 ///     ';'
-bool Parser::parseDeclExprList(llvm::SmallVectorImpl<ExprOrDecl> &Entries,
+bool Parser::parseDeclExprList(SmallVectorImpl<ExprOrDecl> &Entries,
                                bool &MissingSemiAtEnd, bool IsTopLevel) {
   // This forms a lexical scope.
   Scope BraceScope(S.decl);

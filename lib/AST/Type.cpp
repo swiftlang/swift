@@ -62,7 +62,7 @@ TypeBase *TypeBase::getCanonicalType(ASTContext &Ctx) {
                   getDesugaredType()->getCanonicalType(Ctx);
     break;
   case TupleTypeKind: {
-    llvm::SmallVector<TupleTypeElt, 8> CanElts;
+    SmallVector<TupleTypeElt, 8> CanElts;
     TupleType *TT = cast<TupleType>(this);
     CanElts.resize(TT->Fields.size());
     for (unsigned i = 0, e = TT->Fields.size(); i != e; ++i) {

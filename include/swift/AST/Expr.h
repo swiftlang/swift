@@ -170,10 +170,10 @@ public:
 /// single name.
 class OverloadSetRefExpr : public Expr {
 public:
-  llvm::ArrayRef<ValueDecl*> Decls;
+  ArrayRef<ValueDecl*> Decls;
   SMLoc Loc;
   
-  OverloadSetRefExpr(llvm::ArrayRef<ValueDecl*> decls, SMLoc L,
+  OverloadSetRefExpr(ArrayRef<ValueDecl*> decls, SMLoc L,
                      Type Ty = Type())
   : Expr(OverloadSetRefExprKind, Ty), Decls(decls), Loc(L) {}
   
@@ -317,7 +317,7 @@ public:
   
   /// ResolvedDecl - If the name refers to any local or top-level declarations,
   /// the name binder fills them in here.
-  llvm::ArrayRef<ValueDecl*> ResolvedDecls;
+  ArrayRef<ValueDecl*> ResolvedDecls;
   
   UnresolvedDotExpr(Expr *subexpr, SMLoc dotloc, Identifier name,
                     SMLoc nameloc)
@@ -362,9 +362,9 @@ public:
   /// specifies which index from the SubExpr that the destination element gets.
   /// If the element value is -1, then the destination value gets the default
   /// initializer for that tuple element value.
-  llvm::ArrayRef<int> ElementMapping;
+  ArrayRef<int> ElementMapping;
   
-  TupleShuffleExpr(Expr *subExpr, llvm::ArrayRef<int> elementMapping, Type Ty)
+  TupleShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping, Type Ty)
     : Expr(TupleShuffleExprKind, Ty), SubExpr(subExpr),
       ElementMapping(elementMapping) {}
   

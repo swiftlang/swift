@@ -68,7 +68,7 @@ NameAliasType *TypeAliasDecl::getAliasType(ASTContext &C) const {
 /// getTypeForPath - Given a type and an access path into it, return the
 /// referenced element type.  If the access path is invalid for the specified
 /// type, this returns null.
-Type ElementRefDecl::getTypeForPath(Type InTy, llvm::ArrayRef<unsigned> Path) {
+Type ElementRefDecl::getTypeForPath(Type InTy, ArrayRef<unsigned> Path) {
   assert(!InTy.isNull() && "getTypeForPath() doesn't allow a null type!");
   
   if (Path.empty())

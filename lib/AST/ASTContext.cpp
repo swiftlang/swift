@@ -42,7 +42,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
     FunctionTypes(new FunctionTypesMapTy()),
     ArrayTypes(new ArrayTypesMapTy()),
     SourceMgr(sourcemgr),
-    TheEmptyTupleType(getTupleType(llvm::ArrayRef<TupleTypeElt>())),
+    TheEmptyTupleType(getTupleType(ArrayRef<TupleTypeElt>())),
     TheUnresolvedType(new (*this) UnresolvedType()),
     TheDependentType(new (*this) DependentType()),
     TheInt1Type(new (*this) BuiltinType(BuiltinInt1Kind)),
@@ -81,7 +81,7 @@ Identifier ASTContext::getIdentifier(StringRef Str) {
 //===----------------------------------------------------------------------===//
 
 void TupleType::Profile(llvm::FoldingSetNodeID &ID,
-                        llvm::ArrayRef<TupleTypeElt> Fields) {
+                        ArrayRef<TupleTypeElt> Fields) {
   ID.AddInteger(Fields.size());
   for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
     ID.AddPointer(Fields[i].Ty.getPointer());
@@ -91,7 +91,7 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
 }
 
 /// getTupleType - Return the uniqued tuple type with the specified elements.
-TupleType *ASTContext::getTupleType(llvm::ArrayRef<TupleTypeElt> Fields) {
+TupleType *ASTContext::getTupleType(ArrayRef<TupleTypeElt> Fields) {
   // Check to see if we've already seen this tuple before.
   llvm::FoldingSetNodeID ID;
   TupleType::Profile(ID, Fields);
@@ -115,7 +115,7 @@ TupleType *ASTContext::getTupleType(llvm::ArrayRef<TupleTypeElt> Fields) {
   for (unsigned i = 0, e = Fields.size(); i != e; ++i)
     IsCanonical &= Fields[i].Ty.isNull() ? false : Fields[i].Ty->isCanonical();
 
-  Fields = llvm::ArrayRef<TupleTypeElt>(FieldsCopy, Fields.size());
+  Fields = ArrayRef<TupleTypeElt>(FieldsCopy, Fields.size());
   
   TupleType *New = new (*this) TupleType(Fields);
   TupleTypesMap.InsertNode(New, InsertPos);
@@ -130,13 +130,13 @@ TupleType *ASTContext::getTupleType(llvm::ArrayRef<TupleTypeElt> Fields) {
 /// getNewOneOfType - Return a new instance of oneof type.  These are never
 /// uniqued because the loc is generally different.
 OneOfType *ASTContext::getNewOneOfType(SMLoc OneOfLoc,
-                                   llvm::ArrayRef<OneOfElementDecl*> InElts) {
+                                   ArrayRef<OneOfElementDecl*> InElts) {
   
   OneOfElementDecl **NewElements =
     AllocateCopy<OneOfElementDecl*>(InElts.begin(), InElts.end());
 
   return new (*this) OneOfType(OneOfLoc,
-                 llvm::ArrayRef<OneOfElementDecl*>(NewElements, InElts.size()));
+                 ArrayRef<OneOfElementDecl*>(NewElements, InElts.size()));
 }
 
 

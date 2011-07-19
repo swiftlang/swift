@@ -63,7 +63,7 @@ SemaDecl::~SemaDecl() {
 /// unit.
 void SemaDecl::handleEndOfTranslationUnit(TranslationUnitDecl *TUD,
                                           SMLoc FileStart,
-                                          llvm::ArrayRef<ExprOrDecl> Items,
+                                          ArrayRef<ExprOrDecl> Items,
                                           SMLoc FileEnd) {
   // First thing, we transform the body into a brace expression.
   ExprOrDecl *NewElements = 
@@ -224,7 +224,7 @@ void SemaDecl::AddToScope(ValueDecl *D) {
 /// ActOnElementName - Assign a name to an element of D specified by Path.
 ElementRefDecl *SemaDecl::
 ActOnElementName(Identifier Name, SMLoc NameLoc, VarDecl *D,
-                 llvm::ArrayRef<unsigned> Path) {
+                 ArrayRef<unsigned> Path) {
   Type Ty = ElementRefDecl::getTypeForPath(D->Ty, Path);
 
   // If the type of the path is obviously invalid, diagnose it now and refuse to
@@ -248,7 +248,7 @@ ActOnElementName(Identifier Name, SMLoc NameLoc, VarDecl *D,
 //===----------------------------------------------------------------------===//
 
 Decl *SemaDecl::ActOnImportDecl(SMLoc ImportLoc,
-                        llvm::ArrayRef<std::pair<Identifier, SMLoc> > Path,
+                        ArrayRef<std::pair<Identifier, SMLoc> > Path,
                                 DeclAttributes &Attrs) {
   if (!Attrs.empty())
     error(Attrs.LSquareLoc, "invalid attributes specified for import");
@@ -325,7 +325,7 @@ enum FuncTypePiece {
 /// want to look through type aliases or other sugar, we want to see what the
 /// user wrote in the func declaration.
 static void AddFuncArgumentsToScope(Type Ty,
-                                    llvm::SmallVectorImpl<unsigned> &AccessPath,
+                                    SmallVectorImpl<unsigned> &AccessPath,
                                     FuncTypePiece Mode,
                                     SMLoc FuncLoc, SemaDecl &SD) {
   // Handle the function case first.
@@ -381,7 +381,7 @@ static void AddFuncArgumentsToScope(Type Ty,
 
 
 void SemaDecl::CreateArgumentDeclsForFunc(ValueDecl *D) {
-  llvm::SmallVector<unsigned, 8> AccessPath;
+  SmallVector<unsigned, 8> AccessPath;
   AddFuncArgumentsToScope(D->Ty, AccessPath, FTP_Function,
                           D->getLocStart(), *this);
 }
@@ -394,7 +394,7 @@ void SemaDecl::ActOnFuncBody(ValueDecl *FD, Expr *Body) {
 
 void SemaDecl::ActOnStructDecl(SMLoc StructLoc, DeclAttributes &Attrs,
                                Identifier Name, Type BodyTy,
-                               llvm::SmallVectorImpl<ExprOrDecl> &Decls) {
+                               SmallVectorImpl<ExprOrDecl> &Decls) {
   // Get the TypeAlias for the name that we'll eventually have.  This ensures
   // that the constructors generated have the pretty name for the type instead
   // of the raw oneof.
