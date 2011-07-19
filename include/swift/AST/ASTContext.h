@@ -120,12 +120,6 @@ public:
   const Type TheInt16Type;       /// TheInt16Type - 16-bit integer.
   const Type TheInt32Type;       /// TheInt32Type - 32-bit integer.
   const Type TheInt64Type;       /// TheInt64Type - 64-bit integer.
-
-  /// getNewOneOfType - Return a new instance of oneof type.  These are never
-  /// uniqued each syntactic instance of them is semantically considered to be a
-  /// different type.
-  OneOfType *getNewOneOfType(SMLoc OneOfLoc,
-                             ArrayRef<OneOfElementDecl*> Elements);
 };
   
 } // end namespace swift

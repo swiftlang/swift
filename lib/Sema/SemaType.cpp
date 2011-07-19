@@ -76,7 +76,7 @@ OneOfType *SemaType::ActOnOneOfType(SMLoc OneOfLoc,
                                        Elts[i].EltType));
   }
   
-  OneOfType *Result = S.Context.getNewOneOfType(OneOfLoc, EltDecls);
+  OneOfType *Result = OneOfType::getNew(OneOfLoc, EltDecls, S.Context);
 
   if (PrettyTypeName) {
     // If we have a pretty name for this, complete it to its actual type.

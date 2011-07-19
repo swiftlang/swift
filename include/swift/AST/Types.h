@@ -265,6 +265,13 @@ public:
   const SMLoc OneOfLoc;
   const ArrayRef<OneOfElementDecl*> Elements;
   
+  /// getNew - Return a new instance of oneof type.  These are never uniqued
+  /// since each syntactic instance of them is semantically considered to be a
+  /// different type.
+  static OneOfType *getNew(SMLoc OneOfLoc,
+                           ArrayRef<OneOfElementDecl*> Elements,
+                           ASTContext &C);
+ 
   SMLoc getLocStart() const { return OneOfLoc; }
   OneOfElementDecl *getElement(unsigned i) const {
     assert(i < Elements.size() && "Invalid index");
@@ -290,7 +297,6 @@ private:
   OneOfType(SMLoc oneofloc, ArrayRef<OneOfElementDecl*> Elts)
     : TypeBase(OneOfTypeKind, this), OneOfLoc(oneofloc), Elements(Elts) {
   }
-  friend class ASTContext;
 };
 
   
