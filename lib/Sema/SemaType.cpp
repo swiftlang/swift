@@ -49,7 +49,7 @@ OneOfType *SemaType::ActOnOneOfType(SMLoc OneOfLoc,
     
   // If we have a PrettyTypeName to use, use it.  Otherwise, just assign the
   // constructors a temporary dummy type.
-  Type TmpTy = S.Context.TheEmptyTupleType;
+  Type TmpTy = TupleType::getEmpty(S.Context);
   if (PrettyTypeName)
     TmpTy = PrettyTypeName->getAliasType(S.Context);
   

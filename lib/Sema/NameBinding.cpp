@@ -397,6 +397,6 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
       if (TUD->Body->Elements[i] == 0)
         TUD->Body->Elements[i] =
           new (Ctx) TupleExpr(SMLoc(), 0, 0, 0, SMLoc(), false, false,
-                              Ctx.TheEmptyTupleType);
+                              TupleType::getEmpty(Ctx));
     }
 }

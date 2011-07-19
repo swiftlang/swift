@@ -80,6 +80,11 @@ Identifier ASTContext::getIdentifier(StringRef Str) {
 // Type manipulation routines.
 //===----------------------------------------------------------------------===//
 
+// Simple accessors.
+Type UnresolvedType::get(ASTContext &C) { return C.TheUnresolvedType; }
+Type DependentType::get(ASTContext &C) { return C.TheDependentType; }
+Type TupleType::getEmpty(ASTContext &C) { return C.TheEmptyTupleType; }
+
 void TupleType::Profile(llvm::FoldingSetNodeID &ID,
                         ArrayRef<TupleTypeElt> Fields) {
   ID.AddInteger(Fields.size());

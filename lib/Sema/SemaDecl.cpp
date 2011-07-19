@@ -92,7 +92,7 @@ void SemaDecl::handleEndOfTranslationUnit(TranslationUnitDecl *TUD,
       error(VD->getLocStart(),
             "top level declarations require a type specifier");
       // FIXME: Should mark the decl as invalid.
-      VD->Ty = S.Context.TheEmptyTupleType;
+      VD->Ty = TupleType::getEmpty(S.Context);
     }
   }
   
@@ -138,7 +138,7 @@ TypeAliasDecl *SemaDecl::LookupTypeName(Identifier Name, SMLoc Loc) {
   
   // If we don't have a definition for this type, introduce a new TypeAliasDecl
   // with an unresolved underlying type.
-  TAD = new (S.Context) TypeAliasDecl(Loc, Name, S.Context.TheUnresolvedType);
+  TAD = new (S.Context) TypeAliasDecl(Loc, Name,UnresolvedType::get(S.Context));
   getUnresolvedTypesHT(UnresolvedTypes)[Name] = TAD;
   UnresolvedTypeList.push_back(TAD);
   
@@ -264,7 +264,7 @@ VarDecl *SemaDecl::ActOnVarDecl(SMLoc VarLoc, DeclVarName &Name,
                                 Type Ty, Expr *Init, DeclAttributes &Attrs) {
   assert((!Ty.isNull() || Init != 0) && "Must have a type or an expr already");
   if (Ty.isNull())
-    Ty = S.Context.TheDependentType;
+    Ty = DependentType::get(S.Context);
   
   if (Name.isSimple())
     return new (S.Context) VarDecl(VarLoc, Name.Name, Ty, Init, Attrs);
@@ -281,7 +281,7 @@ ActOnFuncDecl(SMLoc FuncLoc, Identifier Name, Type Ty, DeclAttributes &Attrs) {
   // If the parsed type is not spelled as a function type (i.e., has no '->' in
   // it), then it is implicitly a function that returns ().
   if (!isa<FunctionType>(Ty.getPointer()))
-    Ty = S.type.ActOnFunctionType(Ty, SMLoc(), S.Context.TheEmptyTupleType);
+    Ty = S.type.ActOnFunctionType(Ty, SMLoc(), TupleType::getEmpty(S.Context));
 
   return new (S.Context) FuncDecl(FuncLoc, Name, Ty, 0, Attrs);
 }
@@ -295,7 +295,7 @@ ActOnMethDecl(SMLoc MethLoc, Type ReceiverType, Identifier FuncName, Type Ty,
   // If the parsed type is not spelled as a function type (i.e., has no '->' in
   // it), then it is implicitly a function that returns ().
   if (!isa<FunctionType>(Ty.getPointer()))
-    Ty = S.type.ActOnFunctionType(Ty, SMLoc(), S.Context.TheEmptyTupleType);
+    Ty = S.type.ActOnFunctionType(Ty, SMLoc(), TupleType::getEmpty(S.Context));
   
   // Install the first type as the receiver, as a tuple with element named
   // 'this'.  This turns "int->int" on FooTy into "(this : FooTy)->(int->int)".
@@ -399,7 +399,7 @@ void SemaDecl::ActOnStructDecl(SMLoc StructLoc, DeclAttributes &Attrs,
   // that the constructors generated have the pretty name for the type instead
   // of the raw oneof.
   TypeAliasDecl *TAD = S.decl.ActOnTypeAlias(StructLoc, Name,
-                                             S.Context.TheUnresolvedType);
+                                             UnresolvedType::get(S.Context));
   Decls.push_back(TAD);
   // The 'struct' is syntactically fine, invoke the semantic actions for the
   // syntactically expanded oneof type.  Struct declarations are just sugar for

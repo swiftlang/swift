@@ -432,7 +432,7 @@ FuncDecl *Parser::parseDeclFunc() {
   // '->' in it), then it is implicitly a function that returns ().
   if (!isa<FunctionType>(FuncTy.getPointer()))
     FuncTy = S.type.ActOnFunctionType(FuncTy, SMLoc(),
-                                      S.Context.TheEmptyTupleType);
+                                      TupleType::getEmpty(S.Context));
 
   // Build the decl for the function.
   FuncDecl *FD = S.decl.ActOnFuncDecl(FuncLoc, Name, FuncTy, Attributes);
@@ -571,7 +571,7 @@ Decl *Parser::parseDeclOneOf() {
     return 0;
   
   TypeAliasDecl *TAD = S.decl.ActOnTypeAlias(NameLoc, OneOfName,
-                                             S.Context.TheUnresolvedType);
+                                             UnresolvedType::get(S.Context));
   if (parseTypeOneOfBody(OneOfLoc, Attributes, OneOfType, TAD))
     return 0;
 

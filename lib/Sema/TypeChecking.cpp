@@ -256,7 +256,7 @@ static bool SemaBinaryExpr(Expr *&LHS, Expr *&OpFn, Expr *&RHS, Type &ResultTy,
       return true; 
     }
     
-    ResultTy = TC.Context.TheEmptyTupleType;
+    ResultTy = TupleType::getEmpty(TC.Context);
     return false;
   }
 
@@ -305,7 +305,7 @@ static bool SemaBinaryExpr(Expr *&LHS, Expr *&OpFn, Expr *&RHS, Type &ResultTy,
     }
     
     // FIXME: Emit an error about overload resolution failure.
-    ResultTy = TC.Context.TheDependentType;
+    ResultTy = DependentType::get(TC.Context);
     return false;
   }
   
@@ -364,7 +364,7 @@ namespace {
       return E;
     }
     Expr *VisitOverloadSetRefExpr(OverloadSetRefExpr *E) {
-      E->Ty = TC.Context.TheDependentType;
+      E->Ty = DependentType::get(TC.Context);
       return E;
     }
     Expr *VisitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
@@ -372,7 +372,7 @@ namespace {
       return 0;
     }
     Expr *VisitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
-      E->Ty = TC.Context.TheDependentType;
+      E->Ty = DependentType::get(TC.Context);
       return E;
     }
     
@@ -449,7 +449,7 @@ namespace {
       // always were.  If no type is assigned, we give them a dependent type so
       // that we get resolution later.
       if (E->Ty.isNull())
-        E->Ty = TC.Context.TheDependentType;
+        E->Ty = DependentType::get(TC.Context);
       return E;
     }
     
@@ -506,7 +506,7 @@ Expr *SemaExpressionTree::VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   // If the base expression hasn't been found yet, then we can't process this
   // value.
   if (E->SubExpr == 0) {
-    E->Ty = TC.Context.TheDependentType;
+    E->Ty = DependentType::get(TC.Context);
     return E;
   }
   
@@ -561,7 +561,7 @@ Expr *SemaExpressionTree::VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
                                            E->ResolvedDecls[0]->Ty);
     else
       FnRef = new (TC.Context) OverloadSetRefExpr(E->ResolvedDecls, E->NameLoc,
-                                                  TC.Context.TheDependentType);
+                                                DependentType::get(TC.Context));
         
     Type ResultTy;
     if (SemaApplyExpr(FnRef, E->SubExpr, ResultTy, TC))
@@ -742,7 +742,7 @@ static void ReduceJuxtaposedExprs(SequenceExpr *E, unsigned Elt,
     // Replace the argument with a dead empty tuple.
     E->Elements[Elt] =
       new (TC.Context) TupleExpr(SMLoc(), 0, 0, 0, SMLoc(),
-                                 false, false, TC.Context.TheEmptyTupleType);
+                                 false, false, TupleType::getEmpty(TC.Context));
   }
   --E->NumElements;
   
@@ -806,21 +806,21 @@ Expr *SemaExpressionTree::VisitIfExpr(IfExpr *E) {
   }
   
   // The Then/Else bodies must have '()' type.
-  E->Then = TC.convertToType(E->Then, TC.Context.TheEmptyTupleType);
+  E->Then = TC.convertToType(E->Then, TupleType::getEmpty(TC.Context));
   if (E->Then == 0) {
     TC.note(E->IfLoc, "while processing 'if' body");
     return 0;
   }
   
   if (E->Else) {
-    E->Else = TC.convertToType(E->Else, TC.Context.TheEmptyTupleType);
+    E->Else = TC.convertToType(E->Else, TupleType::getEmpty(TC.Context));
     if (E->Else == 0) {
       TC.note(E->ElseLoc, "while processing 'else' body of 'if'");
       return 0;
     }
   }
 
-  E->Ty = TC.Context.TheEmptyTupleType;
+  E->Ty = TupleType::getEmpty(TC.Context);
   return E;
 }
 
@@ -873,7 +873,7 @@ void SemaExpressionTree::PreProcessBraceExpr(BraceExpr *E) {
   if (E->MissingSemi)
     E->Ty = NewElements.back().get<Expr*>()->Ty;
   else
-    E->Ty = TC.Context.TheEmptyTupleType;
+    E->Ty = TupleType::getEmpty(TC.Context);
   
   // Reinstall the list now that we potentially mutated it.
   if (NewElements.size() <= E->NumElements) {
@@ -1610,7 +1610,7 @@ bool TypeChecker::validateType(Type &InTy) {
   if (!IsValid) {
     // FIXME: This should set the type to some Error type, which is
     // distinguishable from unresolved.
-    InTy = Context.TheUnresolvedType;
+    InTy = UnresolvedType::get(Context);
     return true;
   }
 
@@ -1726,7 +1726,7 @@ void TypeChecker::typeCheckERD(ElementRefDecl *ERD) {
           "' is an invalid index for '" + ERD->VD->Ty->getString() +
           "'");
     // FIXME: This should be "invalid"
-    ERD->Ty = Context.TheEmptyTupleType;
+    ERD->Ty = TupleType::getEmpty(Context);
   }
 }
 

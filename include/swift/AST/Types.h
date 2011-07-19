@@ -126,7 +126,6 @@ class BuiltinType : public TypeBase {
   // Builtin types are always canonical.
   BuiltinType(TypeKind kind) : TypeBase(kind, this) {}
 public:
-  
   void print(raw_ostream &OS) const;
 
   // Implement isa/cast/dyncast/etc.
@@ -144,6 +143,7 @@ class UnresolvedType : public TypeBase {
   // The Unresolved type is always canonical.
   UnresolvedType() : TypeBase(UnresolvedTypeKind, this) {}
 public:
+  static Type get(ASTContext &C);
   
   void print(raw_ostream &OS) const;
   
@@ -162,7 +162,8 @@ class DependentType : public TypeBase {
   // The Dependent type is always canonical.
   DependentType() : TypeBase(DependentTypeKind, this) {}
 public:
-  
+  static Type get(ASTContext &C);
+
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
@@ -214,8 +215,11 @@ class TupleType : public TypeBase, public llvm::FoldingSetNode {
 public:
   const ArrayRef<TupleTypeElt> Fields;
   
-  /// getTupleType - Return the uniqued tuple type with the specified elements.
+  /// get - Return the uniqued tuple type with the specified elements.
   static TupleType *get(ArrayRef<TupleTypeElt> Fields, ASTContext &C);
+
+  /// getEmpty - Return the empty tuple type '()'.
+  static Type getEmpty(ASTContext &C);
   
   /// getElementType - Return the type of the specified field.
   Type getElementType(unsigned FieldNo) const {
