@@ -39,6 +39,7 @@ namespace swift {
   class TranslationUnitDecl;
   class TypeAliasDecl;
   class FuncDecl;
+  class MethDecl;
   class VarDecl;
   class ASTContext;
   class DeclVarName;
@@ -126,6 +127,7 @@ private:
   bool parseDeclStruct(llvm::SmallVectorImpl<ExprOrDecl> &Decls);
   bool parseDeclVar(llvm::SmallVectorImpl<ExprOrDecl> &Decls);
   FuncDecl *parseDeclFunc();
+  MethDecl *parseDeclMeth();
   
   // Type Parsing
   bool parseType(Type &Result);

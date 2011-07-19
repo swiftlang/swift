@@ -472,6 +472,82 @@ FuncDecl *Parser::parseDeclFunc() {
   return S.decl.ActOnFuncBody(FD, Body.get());
 }
 
+
+/// parseDeclMeth - Parse a 'meth' declaration, returning null on error.  The
+/// caller handles this case and does recovery as appropriate.
+///
+///   decl-meth:
+///     'meth' attribute-list? type-identifier '::' identifier 
+///            arg-list-type expr-brace?
+///
+/// FIXME: Add '=' syntax or rip out func's support for it.
+///
+MethDecl *Parser::parseDeclMeth() {
+  SMLoc MethLoc = consumeToken(tok::kw_meth);
+
+  DeclAttributes Attributes;
+  // FIXME: Implicitly add immutable attribute.
+  if (Tok.is(tok::l_square))
+    parseAttributeList(Attributes);
+
+  Identifier TypeName, Name;
+  if (parseIdentifier(TypeName, "expected type name in 'meth' declaration") ||
+      parseToken(tok::coloncolon, "expected '::' in 'meth' declaration") ||
+      parseIdentifier(Name, "expected identifier in 'meth' declaration"))
+    return 0;
+  
+  // We force first type of a meth declaration to be a tuple for consistency.
+  if (Tok.isNot(tok::l_paren)) {
+    error(Tok.getLoc(), "expected '(' in argument list of 'meth' declaration");
+    return 0;
+  }
+    
+  Type FuncTy;
+  if (parseType(FuncTy))
+    return 0;
+  
+  // If the parsed function type is not spelled as a function type (i.e., has an
+  // '->' in it), then it is implicitly a function that returns ().
+  if (!llvm::isa<FunctionType>(FuncTy.getPointer()))
+    FuncTy = S.type.ActOnFunctionType(FuncTy, SMLoc(),
+                                      S.Context.TheEmptyTupleType);
+  MethDecl *MD = 0;
+  
+#if 0
+  // Build the decl for the function.
+  FuncDecl *FD = S.decl.ActOnFuncDecl(FuncLoc, Name, FuncTy, Attributes);
+  
+  // Enter the func into the current scope, which allows it to be visible and
+  // used within its body.
+  if (FD)
+    S.decl.AddToScope(FD);
+  
+  // Enter the arguments for the function into a new function-body scope.  We
+  // need this even if there is no function body to detect argument name
+  // duplication.
+  Scope FnBodyScope(S.decl);
+  
+  if (FD)
+    S.decl.CreateArgumentDeclsForFunc(FD);
+#endif
+  
+  
+  // Then parse the expression.
+  llvm::NullablePtr<Expr> Body;
+
+  // Check to see if we have a body.
+  if (Tok.is(tok::l_brace) &&
+      (parseExprBrace(Body) || Body.isNull()))
+    return 0;  // FIXME: Need to call a new ActOnMethBodyError?
+
+  // If this is a declaration, we're done.
+  if (Body.isNull())
+    return MD;
+
+  //return S.decl.ActOnMethBody(MD, Body.get());
+  return 0;
+}
+
 /// parseDeclOneOf - Parse a 'oneof' declaration, returning null (and doing no
 /// token skipping) on error.
 ///
@@ -1090,6 +1166,8 @@ bool Parser::parseExprBrace(llvm::NullablePtr<Expr> &Result) {
 ///     expr
 ///     expr '=' expr
 ///     decl-var
+///     decl-func
+///     decl-meth
 ///     decl-oneof
 ///     decl-struct
 ///     decl-typealias
@@ -1124,6 +1202,9 @@ bool Parser::parseDeclExprList(llvm::SmallVectorImpl<ExprOrDecl> &Entries,
       break;
     case tok::kw_func:
       Entries.push_back(parseDeclFunc());
+      break;
+    case tok::kw_meth:
+      Entries.push_back((FuncDecl*)parseDeclMeth());
       break;
     case tok::kw_typealias:
       Entries.push_back(parseDeclTypeAlias());

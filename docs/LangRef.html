@@ -300,6 +300,7 @@
     top-level-item   ::= <a href="#decl-import">decl-import</a>
     top-level-item   ::= <a href="#decl-var">decl-var</a>
     top-level-item   ::= <a href="#decl-func">decl-func</a>
+    top-level-item   ::= <a href="#decl-meth">decl-meth</a>
     top-level-item   ::= <a href="#decl-typealias">decl-typealias</a>
     top-level-item   ::= <a href="#decl-oneof">decl-oneof</a>
     top-level-item   ::= <a href="#decl-struct">decl-struct</a>
@@ -466,6 +467,47 @@
 
     <i>// Function with multiple return values:</i>
     func d(a : int) -> (b : int) -> (res1 : int, res2 : int);
+  </pre>
+
+  <!-- ===================================================================== -->
+  <h3 id="decl-meth">meth</h3>
+  <!-- ===================================================================== -->
+
+  <div class="commentary">
+    'meth' syntax is shorthand for defining a function that can be used with
+    dot syntax on the receiver type.
+  </div>
+
+  <pre class="grammar">
+    decl-meth ::= 'meth' <a href="#attribute-list">attribute-list</a>? <a href="#type-identifier">type-identifier</a> '::' <a href="#identifier">identifier</a> <a href="#type">type</a> <a href="#brace-expr">brace-expr</a>?
+  </pre>
+  
+  <p>A 'meth' declaration is shorthand syntax for declaring a 'func' with a 
+  compound function type.  The argument list and optional
+  return value are specified by the type production of the function, and the
+  body is either not specified or is an arbitrary expression.  If the argument
+  type is not a function type, then the return value is implicitly inferred to
+  be "()".  All of the argument and return value names are injected into the
+  <a href="#namebind_scope">scope</a> of the function body.  The initial first
+  argument is of the type specified before the '::'.</p>
+  
+  <p>'meth' declarations may not be declared infix.</p>
+  
+  <p>Here are some examples of meth definitions:</p>
+  
+  <pre class="example">
+    <i>// Implicitly returns (), aka <a href="#stdlib-void">void</a></i>.
+    <i>// This declares a function 'a' of type "t1 -> () -> ()".</i>
+    meth t1::a() {}
+
+    <i>// Same as 'a'</i>
+    meth t1::a() -> void {}
+
+    <i>// A simple method on a trivial type.</i>
+    struct bankaccount { amount : int }
+    func bankaccount::deposit(arg : int) {
+      amount = amount + arg
+    }
   </pre>
 
   
