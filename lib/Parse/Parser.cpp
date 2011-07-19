@@ -431,7 +431,7 @@ FuncDecl *Parser::parseDeclFunc() {
   
   // If the parsed function type is not spelled as a function type (i.e., has an
   // '->' in it), then it is implicitly a function that returns ().
-  if (!llvm::isa<FunctionType>(FuncTy.getPointer()))
+  if (!isa<FunctionType>(FuncTy.getPointer()))
     FuncTy = S.type.ActOnFunctionType(FuncTy, SMLoc(),
                                       S.Context.TheEmptyTupleType);
 
@@ -611,7 +611,7 @@ bool Parser::parseDeclStruct(llvm::SmallVectorImpl<ExprOrDecl> &Decls) {
   }
 
   // The type is required to be syntactically a tuple type.
-  if (!llvm::isa<TupleType>(Ty.getPointer())) {
+  if (!isa<TupleType>(Ty.getPointer())) {
     error(StructLoc, "element type of struct is not a tuple");
     // FIXME: Should set this as an erroroneous decl.
     return true;

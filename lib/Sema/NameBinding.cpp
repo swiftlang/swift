@@ -28,11 +28,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/system_error.h"
 #include "llvm/Support/Path.h"
-
 using namespace swift;
-using llvm::isa;
-using llvm::dyn_cast;
-using llvm::cast;
 
 /// NLKind - This is the kind of name lookup we're performing.
 enum NLKind {

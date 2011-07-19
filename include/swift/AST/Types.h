@@ -22,7 +22,6 @@
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/SMLoc.h"
-#include "llvm/Support/Casting.h"
 
 namespace llvm {
   class raw_ostream;
@@ -91,12 +90,12 @@ public:
   /// the minimal amount of sugar required to get a pointer to the type.
   template <typename T>
   T *getAs() {
-    return llvm::dyn_cast<T>(getDesugaredType());
+    return dyn_cast<T>(getDesugaredType());
   }
 
   template <typename T>
   bool is() {
-    return llvm::isa<T>(getDesugaredType());
+    return isa<T>(getDesugaredType());
   }
   
   /// getString - Return the name of the type as a string, for use in

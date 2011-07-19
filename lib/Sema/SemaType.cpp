@@ -80,8 +80,7 @@ OneOfType *SemaType::ActOnOneOfType(SMLoc OneOfLoc,
 
   if (PrettyTypeName) {
     // If we have a pretty name for this, complete it to its actual type.
-    assert(llvm::isa<UnresolvedType>(PrettyTypeName->UnderlyingTy
-                                                .getPointer()) &&
+    assert(isa<UnresolvedType>(PrettyTypeName->UnderlyingTy.getPointer()) &&
            "Not an incomplete decl to complete!");
     PrettyTypeName->UnderlyingTy = Result;
   } else {
@@ -114,7 +113,7 @@ Type SemaType::ActOnArrayType(Type BaseTy, SMLoc LSquareLoc, Expr *Size,
   // FIXME: Add real support for evaluating constant expressions for array
   // sizes.
   uint64_t SizeVal;
-  if (IntegerLiteral *IL = llvm::dyn_cast<IntegerLiteral>(Size))
+  if (IntegerLiteral *IL = dyn_cast<IntegerLiteral>(Size))
     SizeVal = IL->getValue();
   else {
     error(Size->getLocStart(), "invalid type size, not a constant");

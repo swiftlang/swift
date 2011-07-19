@@ -27,9 +27,6 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/SourceMgr.h"
 using namespace swift;
-using llvm::isa;
-using llvm::dyn_cast;
-using llvm::cast;
 
 
 namespace {
@@ -1549,10 +1546,10 @@ bool TypeChecker::validateType(Type &InTy) {
     break;
   }
   case NameAliasTypeKind:
-    IsValid =!validateType(llvm::cast<NameAliasType>(T)->TheDecl->UnderlyingTy);
+    IsValid =!validateType(cast<NameAliasType>(T)->TheDecl->UnderlyingTy);
     break;
   case TupleTypeKind: {
-    TupleType *TT = llvm::cast<TupleType>(T);
+    TupleType *TT = cast<TupleType>(T);
     
     // Okay, we found an uncanonicalized tuple type, which might have default
     // values.  If so, we'll potentially have to update it.
@@ -1589,7 +1586,7 @@ bool TypeChecker::validateType(Type &InTy) {
   }
       
   case FunctionTypeKind: {
-    FunctionType *FT = llvm::cast<FunctionType>(T);
+    FunctionType *FT = cast<FunctionType>(T);
     if ((InTy = FT->Input, validateType(InTy)) ||
         (InTy = FT->Result, validateType(InTy))) {
       IsValid = false;
@@ -1599,7 +1596,7 @@ bool TypeChecker::validateType(Type &InTy) {
     break;
   }
   case ArrayTypeKind:
-    ArrayType *AT = llvm::cast<ArrayType>(T);
+    ArrayType *AT = cast<ArrayType>(T);
     if (InTy = AT->Base, validateType(InTy)) {
       IsValid = false;
       break;
@@ -1835,5 +1832,5 @@ void swift::performTypeChecking(TranslationUnitDecl *TUD, ASTContext &Ctx) {
   // Type check the top-level BraceExpr.  This sorts out any top-level
   // expressions and recursively processes the rest of the translation unit.
   TUD->Body =
-    llvm::cast_or_null<BraceExpr>(SemaExpressionTree::doIt(TUD->Body, TC));
+    cast_or_null<BraceExpr>(SemaExpressionTree::doIt(TUD->Body, TC));
 }

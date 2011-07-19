@@ -19,7 +19,6 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Types.h"
 #include "llvm/Support/Allocator.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 using namespace swift;

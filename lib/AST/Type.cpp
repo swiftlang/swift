@@ -19,7 +19,6 @@
 #include "swift/AST/Decl.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
-using llvm::cast;
 
 // Only allow allocation of Stmts using the allocator in ASTContext.
 void *TypeBase::operator new(size_t Bytes, ASTContext &C,
@@ -59,12 +58,12 @@ TypeBase *TypeBase::getCanonicalType(ASTContext &Ctx) {
   case OneOfTypeKind:
     assert(0 && "These are always canonical");
   case NameAliasTypeKind:
-    Result = llvm::cast<NameAliasType>(this)->
+    Result = cast<NameAliasType>(this)->
                   getDesugaredType()->getCanonicalType(Ctx);
     break;
   case TupleTypeKind: {
     llvm::SmallVector<TupleTypeElt, 8> CanElts;
-    TupleType *TT = llvm::cast<TupleType>(this);
+    TupleType *TT = cast<TupleType>(this);
     CanElts.resize(TT->Fields.size());
     for (unsigned i = 0, e = TT->Fields.size(); i != e; ++i) {
       CanElts[i].Name = TT->Fields[i].Name;
@@ -78,14 +77,14 @@ TypeBase *TypeBase::getCanonicalType(ASTContext &Ctx) {
   }
     
   case FunctionTypeKind: {
-    FunctionType *FT = llvm::cast<FunctionType>(this);
+    FunctionType *FT = cast<FunctionType>(this);
     Type In = FT->Input->getCanonicalType(Ctx);
     Type Out = FT->Result->getCanonicalType(Ctx);
     Result = Ctx.getFunctionType(In, Out);
     break;
   }
   case ArrayTypeKind:
-    ArrayType *AT = llvm::cast<ArrayType>(this);
+    ArrayType *AT = cast<ArrayType>(this);
     Type EltTy = AT->Base->getCanonicalType(Ctx);
     Result = Ctx.getArrayType(EltTy, AT->Size);
     break;

@@ -18,10 +18,8 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
-using llvm::cast;
 
 // Only allow allocation of Decls using the allocator in ASTContext.
 void *DeclVarName::operator new(size_t Bytes, ASTContext &C,
@@ -79,7 +77,7 @@ Type ElementRefDecl::getTypeForPath(Type InTy, llvm::ArrayRef<unsigned> Path) {
   TypeBase *Ty = InTy->getDesugaredType();
   
   // If we reach a dependent type, just return it.
-  if (llvm::isa<DependentType>(Ty))
+  if (isa<DependentType>(Ty))
     return Ty;
   
   // If we have a single-element oneof (like a struct) then we allow matching
@@ -90,7 +88,7 @@ Type ElementRefDecl::getTypeForPath(Type InTy, llvm::ArrayRef<unsigned> Path) {
   
   // Right now, you can only dive into syntactic tuples.  Eventually this should 
   // handle oneof's etc.
-  if (TupleType *TT = llvm::dyn_cast<TupleType>(Ty)) {
+  if (TupleType *TT = dyn_cast<TupleType>(Ty)) {
     // Reject invalid indices.
     if (Path[0] >= TT->Fields.size())
       return 0;

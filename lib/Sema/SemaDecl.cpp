@@ -23,7 +23,6 @@
 #include "swift/AST/Types.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
 
@@ -82,7 +81,7 @@ void SemaDecl::handleEndOfTranslationUnit(TranslationUnitDecl *TUD,
     // If any top-level value decl has an unresolved type, then it is erroneous.
     // It is not valid to have something like "var x = 4" at the top level, all
     // types must be explicit here.
-    ValueDecl *VD = llvm::dyn_cast<ValueDecl>(D);
+    ValueDecl *VD = dyn_cast<ValueDecl>(D);
     if (VD == 0) continue;
 
     // FIXME: This can be better handled in the various ActOnDecl methods when
@@ -104,7 +103,7 @@ void SemaDecl::handleEndOfTranslationUnit(TranslationUnitDecl *TUD,
     TypeAliasDecl *Decl = UnresolvedTypeList[i];
     
     // If a type got defined, remove it from the vector.
-    if (!llvm::isa<UnresolvedType>(Decl->UnderlyingTy.getPointer()))
+    if (!isa<UnresolvedType>(Decl->UnderlyingTy.getPointer()))
       continue;
     
     UnresolvedTypeList[Next++] = Decl;
@@ -281,7 +280,7 @@ ActOnFuncDecl(SMLoc FuncLoc, Identifier Name, Type Ty, DeclAttributes &Attrs) {
 
   // If the parsed type is not spelled as a function type (i.e., has no '->' in
   // it), then it is implicitly a function that returns ().
-  if (!llvm::isa<FunctionType>(Ty.getPointer()))
+  if (!isa<FunctionType>(Ty.getPointer()))
     Ty = S.type.ActOnFunctionType(Ty, SMLoc(), S.Context.TheEmptyTupleType);
 
   return new (S.Context) FuncDecl(FuncLoc, Name, Ty, 0, Attrs);
@@ -295,7 +294,7 @@ ActOnMethDecl(SMLoc MethLoc, Type ReceiverType, Identifier FuncName, Type Ty,
   
   // If the parsed type is not spelled as a function type (i.e., has no '->' in
   // it), then it is implicitly a function that returns ().
-  if (!llvm::isa<FunctionType>(Ty.getPointer()))
+  if (!isa<FunctionType>(Ty.getPointer()))
     Ty = S.type.ActOnFunctionType(Ty, SMLoc(), S.Context.TheEmptyTupleType);
   
   // Install the first type as the receiver, as a tuple with element named
@@ -331,14 +330,14 @@ static void AddFuncArgumentsToScope(Type Ty,
                                     SMLoc FuncLoc, SemaDecl &SD) {
   // Handle the function case first.
   if (Mode == FTP_Function) {
-    FunctionType *FT = llvm::cast<FunctionType>(Ty.getPointer());
+    FunctionType *FT = cast<FunctionType>(Ty.getPointer());
     AccessPath.push_back(0);
     AddFuncArgumentsToScope(FT->Input, AccessPath, FTP_Input, FuncLoc, SD);
     
     AccessPath.back() = 1;
     
     // If this is a->b->c then we treat b as an input, not (b->c) as an output.
-    if (llvm::isa<FunctionType>(FT->Result.getPointer()))
+    if (isa<FunctionType>(FT->Result.getPointer()))
       AddFuncArgumentsToScope(FT->Result, AccessPath, FTP_Function, FuncLoc,SD);
     else    
       AddFuncArgumentsToScope(FT->Result, AccessPath, FTP_Output, FuncLoc, SD);
@@ -349,7 +348,7 @@ static void AddFuncArgumentsToScope(Type Ty,
   // Otherwise, we're looking at an input or output to the func.  The only type
   // we currently dive into is the humble tuple, which can be recursive.  This
   // should dive in syntactically.
-  TupleType *TT = llvm::dyn_cast<TupleType>(Ty.getPointer());
+  TupleType *TT = dyn_cast<TupleType>(Ty.getPointer());
   if (TT == 0) return;
 
   

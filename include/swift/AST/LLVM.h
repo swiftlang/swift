@@ -18,19 +18,29 @@
 #ifndef SWIFT_AST_LLVM_H
 #define SWIFT_AST_LLVM_H
 
+#include "llvm/Support/Casting.h"
+
 // Forward declarations.
 namespace llvm {
-  class SMLoc;
-  
-  // also cast/dyn_cast etc.
   // also raw_ostream
   
   // also SmallVector, ArrayRef, StringRef, Twine ...
   
+  // Other common classes.
+  class SMLoc;  
 } // end namespace llvm;
 
 
 namespace swift {
+  // Casting operators.
+  using llvm::isa;
+  using llvm::cast;
+  using llvm::dyn_cast;
+  using llvm::dyn_cast_or_null;
+  using llvm::cast_or_null;
+
+  
+  // Other common classes.
   using llvm::SMLoc;
   
 } // end namespace swift

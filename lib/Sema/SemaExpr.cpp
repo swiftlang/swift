@@ -23,13 +23,9 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
 using llvm::NullablePtr;
-using llvm::isa;
-using llvm::cast;
-using llvm::dyn_cast;
 
 //===----------------------------------------------------------------------===//
 // Action Implementations

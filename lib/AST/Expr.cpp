@@ -20,12 +20,9 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/ASTContext.h"
 #include "llvm/ADT/PointerUnion.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/ErrorHandling.h"
 using namespace swift;
-using llvm::cast;
-using llvm::dyn_cast;
 
 //===----------------------------------------------------------------------===//
 // Expr methods.
