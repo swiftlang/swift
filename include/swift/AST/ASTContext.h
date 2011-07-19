@@ -124,10 +124,6 @@ public:
   /// getTupleType - Return the uniqued tuple type with the specified elements.
   TupleType *getTupleType(ArrayRef<TupleTypeElt> Fields);
 
-  /// getArrayType - Return a uniqued array type with the specified base type
-  /// and the specified size.  Size=0 indicates an unspecified size array.
-  ArrayType *getArrayType(Type BaseType, uint64_t Size);
-  
   /// getNewOneOfType - Return a new instance of oneof type.  These are never
   /// uniqued each syntactic instance of them is semantically considered to be a
   /// different type.

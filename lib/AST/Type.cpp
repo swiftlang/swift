@@ -86,7 +86,7 @@ TypeBase *TypeBase::getCanonicalType(ASTContext &Ctx) {
   case ArrayTypeKind:
     ArrayType *AT = cast<ArrayType>(this);
     Type EltTy = AT->Base->getCanonicalType(Ctx);
-    Result = Ctx.getArrayType(EltTy, AT->Size);
+    Result = ArrayType::get(EltTy, AT->Size, Ctx);
     break;
   }
   assert(Result && "Case not implemented!");

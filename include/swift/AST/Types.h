@@ -299,7 +299,7 @@ public:
   const Type Input;
   const Type Result;
   
-  // 'Constructor' Factory Function
+  /// 'Constructor' Factory Function
   static FunctionType *get(Type Input, Type Result, ASTContext &C);
   
   void print(raw_ostream &OS) const;
@@ -323,6 +323,10 @@ public:
   /// Size - When this is zero it indicates an unsized array like "int[]".
   uint64_t Size;
   
+  /// 'Constructor' Factory Function.
+  /// Size=0 indicates an unspecified size array.
+  static ArrayType *get(Type BaseType, uint64_t Size, ASTContext &C);
+  
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
@@ -330,9 +334,7 @@ public:
   static bool classof(const TypeBase *T) { return T->Kind == ArrayTypeKind; }
   
 private:
-  ArrayType(Type base, uint64_t size)
-    : TypeBase(ArrayTypeKind), Base(base), Size(size) {}
-  friend class ASTContext;
+  ArrayType(Type base, uint64_t size);
 };
 
 } // end namespace swift

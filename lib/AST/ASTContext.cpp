@@ -160,15 +160,16 @@ FunctionType::FunctionType(Type input, Type result)
 
 /// getArrayType - Return a uniqued array type with the specified base type
 /// and the specified size.  Size=0 indicates an unspecified size array.
-ArrayType *ASTContext::getArrayType(Type BaseType, uint64_t Size) {
+ArrayType *ArrayType::get(Type BaseType, uint64_t Size, ASTContext &C) {
   ArrayType *&Entry =
-    (*(ArrayTypesMapTy*)ArrayTypes)[std::make_pair(BaseType, Size)];
+    (*(ArrayTypesMapTy*)C.ArrayTypes)[std::make_pair(BaseType, Size)];
   if (Entry) return Entry;
 
-  Entry = new (*this) ArrayType(BaseType, Size);
-  
-  if (BaseType->isCanonical())
-    Entry->CanonicalType = Entry;
-  
-  return Entry;
+  return Entry = new (C) ArrayType(BaseType, Size);
 }
+
+ArrayType::ArrayType(Type base, uint64_t size)
+  : TypeBase(ArrayTypeKind, base->isCanonical() ? this : 0),
+    Base(base), Size(size) {}
+
+

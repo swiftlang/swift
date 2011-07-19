@@ -108,7 +108,7 @@ Type SemaType::ActOnArrayType(Type BaseTy, SMLoc LSquareLoc, Expr *Size,
                               SMLoc RSquareLoc) {
   // Unsized arrays.
   if (Size == 0)
-    return S.Context.getArrayType(BaseTy, 0);
+    return ArrayType::get(BaseTy, 0, S.Context);
   
   // FIXME: Add real support for evaluating constant expressions for array
   // sizes.
@@ -125,5 +125,5 @@ Type SemaType::ActOnArrayType(Type BaseTy, SMLoc LSquareLoc, Expr *Size,
     SizeVal = 1;
   }
   
-  return S.Context.getArrayType(BaseTy, SizeVal);
+  return ArrayType::get(BaseTy, SizeVal, S.Context);
 }
