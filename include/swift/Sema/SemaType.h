@@ -41,20 +41,20 @@ class SemaType : public SemaBase {
 public:
   explicit SemaType(Sema &S) : SemaBase(S) {}
 
-  Type ActOnTypeName(llvm::SMLoc Loc, Identifier Name);
-  Type ActOnTupleType(llvm::SMLoc LPLoc, llvm::ArrayRef<TupleTypeElt> Elements,
-                      llvm::SMLoc RPLoc);
-  Type ActOnFunctionType(Type Input, llvm::SMLoc ArrowLoc, Type Output);
-  Type ActOnArrayType(Type BaseTy, llvm::SMLoc LSquareLoc, Expr *Size,
-                       llvm::SMLoc RSquareLoc);
+  Type ActOnTypeName(SMLoc Loc, Identifier Name);
+  Type ActOnTupleType(SMLoc LPLoc, llvm::ArrayRef<TupleTypeElt> Elements,
+                      SMLoc RPLoc);
+  Type ActOnFunctionType(Type Input, SMLoc ArrowLoc, Type Output);
+  Type ActOnArrayType(Type BaseTy, SMLoc LSquareLoc, Expr *Size,
+                       SMLoc RSquareLoc);
   
   struct OneOfElementInfo {
-    llvm::SMLoc NameLoc;
+    SMLoc NameLoc;
     llvm::StringRef Name;
     Type EltType;
   };
   
-  OneOfType *ActOnOneOfType(llvm::SMLoc OneOfLoc, const DeclAttributes &Attrs,
+  OneOfType *ActOnOneOfType(SMLoc OneOfLoc, const DeclAttributes &Attrs,
                             llvm::ArrayRef<OneOfElementInfo> Elts,
                             TypeAliasDecl *PrettyTypeName = 0);
 };

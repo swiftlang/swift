@@ -20,13 +20,13 @@
 #include "llvm/Support/SourceMgr.h"
 using namespace swift;
 
-void SemaBase::note(llvm::SMLoc Loc, const llvm::Twine &Message) {
+void SemaBase::note(SMLoc Loc, const llvm::Twine &Message) {
   S.Context.SourceMgr.PrintMessage(Loc, Message, "note");
 }
-void SemaBase::warning(llvm::SMLoc Loc, const llvm::Twine &Message) {
+void SemaBase::warning(SMLoc Loc, const llvm::Twine &Message) {
   S.Context.SourceMgr.PrintMessage(Loc, Message, "warning");
 }
-void SemaBase::error(llvm::SMLoc Loc, const llvm::Twine &Message) {
+void SemaBase::error(SMLoc Loc, const llvm::Twine &Message) {
   S.Context.setHadError();
   S.Context.SourceMgr.PrintMessage(Loc, Message, "error");
 }

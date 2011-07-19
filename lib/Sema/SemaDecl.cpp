@@ -26,7 +26,6 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
-using llvm::SMLoc;
 
 typedef std::pair<unsigned, ValueDecl*> ValueScopeEntry;
 typedef llvm::ScopedHashTable<Identifier, ValueScopeEntry> ValueScopeHTType;

@@ -44,23 +44,23 @@ public:
   
   // Action Implementations
   llvm::NullablePtr<Expr>
-  ActOnNumericConstant(llvm::StringRef Text, llvm::SMLoc Loc);
+  ActOnNumericConstant(llvm::StringRef Text, SMLoc Loc);
   llvm::NullablePtr<Expr>
-  ActOnIdentifierExpr(Identifier Text, llvm::SMLoc Loc);
+  ActOnIdentifierExpr(Identifier Text, SMLoc Loc);
   llvm::NullablePtr<Expr>
-  ActOnScopedIdentifierExpr(Identifier ScopeName, llvm::SMLoc ScopeLoc,
-                            llvm::SMLoc ColonColonLoc,
-                            Identifier Name, llvm::SMLoc NameLoc);
+  ActOnScopedIdentifierExpr(Identifier ScopeName, SMLoc ScopeLoc,
+                            SMLoc ColonColonLoc,
+                            Identifier Name, SMLoc NameLoc);
   
   llvm::NullablePtr<Expr>
-  ActOnTupleExpr(llvm::SMLoc LPLoc, Expr *const *SubExprs,
+  ActOnTupleExpr(SMLoc LPLoc, Expr *const *SubExprs,
                  const Identifier *SubExprNames,
-                 unsigned NumSubExprs, llvm::SMLoc RPLoc,
+                 unsigned NumSubExprs, SMLoc RPLoc,
                  bool IsPrecededByIdentifier);
 
   llvm::NullablePtr<Expr>
-  ActOnIfExpr(llvm::SMLoc IfLoc, Expr *Cond, Expr *Normal, 
-              llvm::SMLoc ElseLoc, Expr *Else);
+  ActOnIfExpr(SMLoc IfLoc, Expr *Cond, Expr *Normal, 
+              SMLoc ElseLoc, Expr *Else);
 };
   
 } // end namespace swift

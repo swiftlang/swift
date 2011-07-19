@@ -33,7 +33,6 @@ using namespace swift;
 using llvm::isa;
 using llvm::dyn_cast;
 using llvm::cast;
-using llvm::SMLoc;
 
 /// NLKind - This is the kind of name lookup we're performing.
 enum NLKind {

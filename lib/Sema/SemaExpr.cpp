@@ -36,7 +36,7 @@ using llvm::dyn_cast;
 //===----------------------------------------------------------------------===//
 
 NullablePtr<Expr> SemaExpr::ActOnNumericConstant(llvm::StringRef Text,
-                                                 llvm::SMLoc Loc) {
+                                                 SMLoc Loc) {
   // The integer literal must fit in 64-bits.
   unsigned long long Val;
   if (Text.getAsInteger(0, Val)) {
@@ -53,7 +53,7 @@ NullablePtr<Expr> SemaExpr::ActOnNumericConstant(llvm::StringRef Text,
 
 
 NullablePtr<Expr> 
-SemaExpr::ActOnIdentifierExpr(Identifier Text, llvm::SMLoc Loc) {
+SemaExpr::ActOnIdentifierExpr(Identifier Text, SMLoc Loc) {
   ValueDecl *D = S.decl.LookupValueName(Text);
   
   if (D == 0)
@@ -63,9 +63,9 @@ SemaExpr::ActOnIdentifierExpr(Identifier Text, llvm::SMLoc Loc) {
 }
 
 llvm::NullablePtr<Expr> SemaExpr::
-ActOnScopedIdentifierExpr(Identifier ScopeName, llvm::SMLoc ScopeLoc,
-                          llvm::SMLoc ColonColonLoc,
-                          Identifier Name, llvm::SMLoc NameLoc) {
+ActOnScopedIdentifierExpr(Identifier ScopeName, SMLoc ScopeLoc,
+                          SMLoc ColonColonLoc,
+                          Identifier Name, SMLoc NameLoc) {
   // Note: this is very simplistic support for scoped name lookup, extend when
   // needed.
   TypeAliasDecl *TypeScopeDecl = S.decl.LookupTypeName(ScopeName, ScopeLoc);
@@ -76,9 +76,9 @@ ActOnScopedIdentifierExpr(Identifier ScopeName, llvm::SMLoc ScopeLoc,
 }
 
 NullablePtr<Expr> 
-SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr *const *SubExprs,
+SemaExpr::ActOnTupleExpr(SMLoc LPLoc, Expr *const *SubExprs,
                          const Identifier *SubExprNames,
-                         unsigned NumSubExprs, llvm::SMLoc RPLoc,
+                         unsigned NumSubExprs, SMLoc RPLoc,
                          bool IsPrecededByIdentifier) {
   
   Expr **NewSubExprs =
@@ -100,8 +100,8 @@ SemaExpr::ActOnTupleExpr(llvm::SMLoc LPLoc, Expr *const *SubExprs,
 }
 
 NullablePtr<Expr>
-SemaExpr::ActOnIfExpr(llvm::SMLoc IfLoc, Expr *Cond, Expr *Normal,
-                      llvm::SMLoc ElseLoc, Expr *Else) {
+SemaExpr::ActOnIfExpr(SMLoc IfLoc, Expr *Cond, Expr *Normal,
+                      SMLoc ElseLoc, Expr *Else) {
   assert(Cond && Normal);  // Else may be null.
   
   // The condition needs to be convertible to a logic value.  Build a call to

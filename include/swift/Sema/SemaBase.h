@@ -17,8 +17,9 @@
 #ifndef SWIFT_SEMABASE_H
 #define SWIFT_SEMABASE_H
 
+#include "swift/AST/LLVM.h"
+
 namespace llvm {
-  class SMLoc;
   class StringRef;
   class Twine;
 }
@@ -36,9 +37,9 @@ public:
   Sema &S;
   explicit SemaBase(Sema &s) : S(s) {}
   
-  void note(llvm::SMLoc Loc, const llvm::Twine &Message);
-  void warning(llvm::SMLoc Loc, const llvm::Twine &Message);
-  void error(llvm::SMLoc Loc, const llvm::Twine &Message);
+  void note(SMLoc Loc, const llvm::Twine &Message);
+  void warning(SMLoc Loc, const llvm::Twine &Message);
+  void error(SMLoc Loc, const llvm::Twine &Message);
 };
     
 } // end namespace swift

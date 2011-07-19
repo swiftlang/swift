@@ -44,7 +44,7 @@ public:
 
   /// Return true if the character right before the specified location is part
   /// of an identifier.
-  bool isPrecededByIdentifier(llvm::SMLoc L) const;
+  bool isPrecededByIdentifier(SMLoc L) const;
   
 private:
   void warning(const char *Loc, const llvm::Twine &Message);

@@ -135,7 +135,7 @@ public:
   /// getNewOneOfType - Return a new instance of oneof type.  These are never
   /// uniqued each syntactic instance of them is semantically considered to be a
   /// different type.
-  OneOfType *getNewOneOfType(llvm::SMLoc OneOfLoc,
+  OneOfType *getNewOneOfType(SMLoc OneOfLoc,
                              llvm::ArrayRef<OneOfElementDecl*> Elements);
 };
   

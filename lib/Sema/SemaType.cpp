@@ -25,18 +25,18 @@
 #include "llvm/Support/SMLoc.h"
 using namespace swift;
 
-Type SemaType::ActOnTypeName(llvm::SMLoc Loc, Identifier Name) {
+Type SemaType::ActOnTypeName(SMLoc Loc, Identifier Name) {
   return S.decl.LookupTypeName(Name, Loc)->getAliasType(S.Context);
 }
 
 
-Type SemaType::ActOnTupleType(llvm::SMLoc LPLoc, 
+Type SemaType::ActOnTupleType(SMLoc LPLoc, 
                                llvm::ArrayRef<TupleTypeElt> Elements,
-                               llvm::SMLoc RPLoc) {
+                               SMLoc RPLoc) {
   return S.Context.getTupleType(Elements);
 }
 
-OneOfType *SemaType::ActOnOneOfType(llvm::SMLoc OneOfLoc, 
+OneOfType *SemaType::ActOnOneOfType(SMLoc OneOfLoc, 
                                     const DeclAttributes &Attrs,
                                     llvm::ArrayRef<OneOfElementInfo> Elts,
                                     TypeAliasDecl *PrettyTypeName) {
@@ -101,12 +101,12 @@ OneOfType *SemaType::ActOnOneOfType(llvm::SMLoc OneOfLoc,
 }
 
 
-Type SemaType::ActOnFunctionType(Type Input, llvm::SMLoc ArrowLoc, Type Output){
+Type SemaType::ActOnFunctionType(Type Input, SMLoc ArrowLoc, Type Output){
   return S.Context.getFunctionType(Input, Output);
 }
 
-Type SemaType::ActOnArrayType(Type BaseTy, llvm::SMLoc LSquareLoc, Expr *Size,
-                              llvm::SMLoc RSquareLoc) {
+Type SemaType::ActOnArrayType(Type BaseTy, SMLoc LSquareLoc, Expr *Size,
+                              SMLoc RSquareLoc) {
   // Unsized arrays.
   if (Size == 0)
     return S.Context.getArrayType(BaseTy, 0);

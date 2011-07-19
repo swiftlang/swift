@@ -130,7 +130,7 @@ TupleType *ASTContext::getTupleType(llvm::ArrayRef<TupleTypeElt> Fields) {
 
 /// getNewOneOfType - Return a new instance of oneof type.  These are never
 /// uniqued because the loc is generally different.
-OneOfType *ASTContext::getNewOneOfType(llvm::SMLoc OneOfLoc,
+OneOfType *ASTContext::getNewOneOfType(SMLoc OneOfLoc,
                                    llvm::ArrayRef<OneOfElementDecl*> InElts) {
   
   OneOfElementDecl **NewElements =

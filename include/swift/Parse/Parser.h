@@ -76,8 +76,8 @@ public:
 
 private:
   // Utilities.
-  llvm::SMLoc consumeToken();
-  llvm::SMLoc consumeToken(tok::TokenKind K) {
+  SMLoc consumeToken();
+  SMLoc consumeToken(tok::TokenKind K) {
     assert(Tok.is(K) && "Consuming wrong token kind");
     return consumeToken();
   }
@@ -96,9 +96,9 @@ private:
   ///
   void skipUntil(tok::TokenKind T);
   
-  void note(llvm::SMLoc Loc, const llvm::Twine &Message);
-  void warning(llvm::SMLoc Loc, const llvm::Twine &Message);
-  void error(llvm::SMLoc Loc, const llvm::Twine &Message);
+  void note(SMLoc Loc, const llvm::Twine &Message);
+  void warning(SMLoc Loc, const llvm::Twine &Message);
+  void error(SMLoc Loc, const llvm::Twine &Message);
   
   // Primitive Parsing
   bool parseIdentifier(Identifier &Result, const llvm::Twine &Message);
@@ -132,8 +132,8 @@ private:
   // Type Parsing
   bool parseType(Type &Result);
   bool parseType(Type &Result, const llvm::Twine &Message);
-  bool parseTypeTupleBody(llvm::SMLoc LPLoc, Type &Result);
-  bool parseTypeOneOfBody(llvm::SMLoc OneOfLoc, const DeclAttributes &Attrs,
+  bool parseTypeTupleBody(SMLoc LPLoc, Type &Result);
+  bool parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
                           Type &Result, TypeAliasDecl *TypeName = 0);
 
   // Expression Parsing

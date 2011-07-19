@@ -30,7 +30,6 @@ using namespace swift;
 using llvm::isa;
 using llvm::dyn_cast;
 using llvm::cast;
-using llvm::SMLoc;
 
 
 namespace {

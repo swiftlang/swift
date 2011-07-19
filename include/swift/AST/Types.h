@@ -261,10 +261,10 @@ private:
 /// elements (which are OneOfElementDecl's).
 class OneOfType : public TypeBase {
 public:
-  const llvm::SMLoc OneOfLoc;
+  const SMLoc OneOfLoc;
   const llvm::ArrayRef<OneOfElementDecl*> Elements;
   
-  llvm::SMLoc getLocStart() const { return OneOfLoc; }
+  SMLoc getLocStart() const { return OneOfLoc; }
   OneOfElementDecl *getElement(unsigned i) const {
     assert(i < Elements.size() && "Invalid index");
     return Elements[i];
@@ -286,7 +286,7 @@ public:
   
 private:
   // oneof types are always canonical.
-  OneOfType(llvm::SMLoc oneofloc, llvm::ArrayRef<OneOfElementDecl*> Elts)
+  OneOfType(SMLoc oneofloc, llvm::ArrayRef<OneOfElementDecl*> Elts)
     : TypeBase(OneOfTypeKind, this), OneOfLoc(oneofloc), Elements(Elts) {
   }
   friend class ASTContext;

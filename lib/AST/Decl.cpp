@@ -35,12 +35,12 @@ void *Decl::operator new(size_t Bytes, ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
-llvm::SMLoc TranslationUnitDecl::getLocStart() const {
-  return Body ? Body->getLocStart() : llvm::SMLoc();
+SMLoc TranslationUnitDecl::getLocStart() const {
+  return Body ? Body->getLocStart() : SMLoc();
 }
 
 
-llvm::SMLoc Decl::getLocStart() const {
+SMLoc Decl::getLocStart() const {
   switch (getKind()) {
   case TranslationUnitDeclKind:
     return cast<TranslationUnitDecl>(this)->getLocStart();
@@ -55,7 +55,7 @@ llvm::SMLoc Decl::getLocStart() const {
   }
 
   assert(0 && "Unknown decl kind");
-  return llvm::SMLoc();
+  return SMLoc();
 }
 
 /// getAliasType - Return the sugared version of this decl as a Type.

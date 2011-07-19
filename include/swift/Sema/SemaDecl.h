@@ -65,9 +65,9 @@ public:
   /// handleEndOfTranslationUnit - This is invoked at the end of the translation
   /// unit.
   void handleEndOfTranslationUnit(TranslationUnitDecl *TU,
-                                  llvm::SMLoc FileStart,
+                                  SMLoc FileStart,
                                   llvm::ArrayRef<ExprOrDecl> Items,
-                                  llvm::SMLoc FileEnd);
+                                  SMLoc FileEnd);
 
   //===--------------------------------------------------------------------===//
   // Name lookup.
@@ -84,39 +84,39 @@ public:
   /// LookupTypeName - Perform a lexical scope lookup for the specified name in
   /// a type context, returning the decl if found or installing and returning a
   /// new Unresolved one if not.
-  TypeAliasDecl *LookupTypeName(Identifier Name, llvm::SMLoc Loc);
+  TypeAliasDecl *LookupTypeName(Identifier Name, SMLoc Loc);
   
   //===--------------------------------------------------------------------===//
   // Declaration handling.
   //===--------------------------------------------------------------------===//
   
-  TypeAliasDecl *ActOnTypeAlias(llvm::SMLoc TypeAliasLoc, Identifier Name,
+  TypeAliasDecl *ActOnTypeAlias(SMLoc TypeAliasLoc, Identifier Name,
                                 Type Ty);
   
-  Decl *ActOnImportDecl(llvm::SMLoc ImportLoc,
-                        llvm::ArrayRef<std::pair<Identifier,llvm::SMLoc> > Path,
+  Decl *ActOnImportDecl(SMLoc ImportLoc,
+                        llvm::ArrayRef<std::pair<Identifier,SMLoc> > Path,
                         DeclAttributes &Attrs);
   
-  VarDecl *ActOnVarDecl(llvm::SMLoc VarLoc, DeclVarName &Name, Type Ty,
+  VarDecl *ActOnVarDecl(SMLoc VarLoc, DeclVarName &Name, Type Ty,
                         Expr *Init, DeclAttributes &Attrs);
-  FuncDecl *ActOnFuncDecl(llvm::SMLoc FuncLoc, Identifier Name,
+  FuncDecl *ActOnFuncDecl(SMLoc FuncLoc, Identifier Name,
                           Type Ty, DeclAttributes &Attrs);
-  MethDecl *ActOnMethDecl(llvm::SMLoc MethLoc, Type ReceiverType,
+  MethDecl *ActOnMethDecl(SMLoc MethLoc, Type ReceiverType,
                           Identifier FuncName, Type Ty, DeclAttributes &Attrs);
 
   void CreateArgumentDeclsForFunc(ValueDecl *D);
   void ActOnFuncBody(ValueDecl *FD, Expr *Body);
 
-  void ActOnStructDecl(llvm::SMLoc StructLoc, DeclAttributes &Attrs,
+  void ActOnStructDecl(SMLoc StructLoc, DeclAttributes &Attrs,
                        Identifier Name, Type Ty,
                        llvm::SmallVectorImpl<ExprOrDecl> &Decls);
   
   // Name processing.
   
   /// ActOnElementName - Assign a name to an element of D specified by Path.
-  ElementRefDecl *ActOnElementName(Identifier Name, llvm::SMLoc NameLoc,
+  ElementRefDecl *ActOnElementName(Identifier Name, SMLoc NameLoc,
                                    VarDecl *D, llvm::ArrayRef<unsigned> Path);
-  bool CheckAccessPathArity(unsigned NumChildren, llvm::SMLoc LPLoc, VarDecl *D,
+  bool CheckAccessPathArity(unsigned NumChildren, SMLoc LPLoc, VarDecl *D,
                             llvm::ArrayRef<unsigned> Path);
   
 };

@@ -73,7 +73,7 @@ public:
 
   /// getLocStart - Return the location of the start of the expression.
   /// FIXME: QOI: Need to extend this to do full source ranges like Clang.
-  llvm::SMLoc getLocStart() const;
+  SMLoc getLocStart() const;
     
   enum WalkOrder {
     Walk_PreOrder,
@@ -140,9 +140,9 @@ public:
 class IntegerLiteral : public Expr {
 public:
   llvm::StringRef Val;  // Use StringRef instead of APInt, APInt leaks.
-  llvm::SMLoc Loc;
+  SMLoc Loc;
   
-  IntegerLiteral(llvm::StringRef V, llvm::SMLoc L, Type Ty)
+  IntegerLiteral(llvm::StringRef V, SMLoc L, Type Ty)
     : Expr(IntegerLiteralKind, Ty), Val(V), Loc(L) {}
   
   uint64_t getValue() const;
@@ -156,9 +156,9 @@ public:
 class DeclRefExpr : public Expr {
 public:
   ValueDecl *D;
-  llvm::SMLoc Loc;
+  SMLoc Loc;
   
-  DeclRefExpr(ValueDecl *d, llvm::SMLoc L, Type Ty = Type())
+  DeclRefExpr(ValueDecl *d, SMLoc L, Type Ty = Type())
     : Expr(DeclRefExprKind, Ty), D(d), Loc(L) {}
   
   // Implement isa/cast/dyncast/etc.
@@ -171,9 +171,9 @@ public:
 class OverloadSetRefExpr : public Expr {
 public:
   llvm::ArrayRef<ValueDecl*> Decls;
-  llvm::SMLoc Loc;
+  SMLoc Loc;
   
-  OverloadSetRefExpr(llvm::ArrayRef<ValueDecl*> decls, llvm::SMLoc L,
+  OverloadSetRefExpr(llvm::ArrayRef<ValueDecl*> decls, SMLoc L,
                      Type Ty = Type())
   : Expr(OverloadSetRefExprKind, Ty), Decls(decls), Loc(L) {}
   
@@ -192,9 +192,9 @@ public:
 class UnresolvedDeclRefExpr : public Expr {
 public:
   Identifier Name;
-  llvm::SMLoc Loc;
+  SMLoc Loc;
   
-  UnresolvedDeclRefExpr(Identifier name, llvm::SMLoc loc)
+  UnresolvedDeclRefExpr(Identifier name, SMLoc loc)
     : Expr(UnresolvedDeclRefExprKind), Name(name), Loc(loc) {
   }
   
@@ -210,11 +210,11 @@ public:
 /// bar::foo.  These always have dependent type.
 class UnresolvedMemberExpr : public Expr {
 public:
-  llvm::SMLoc ColonLoc;
-  llvm::SMLoc NameLoc;
+  SMLoc ColonLoc;
+  SMLoc NameLoc;
   Identifier Name;
   
-  UnresolvedMemberExpr(llvm::SMLoc colonLoc, llvm::SMLoc nameLoc,
+  UnresolvedMemberExpr(SMLoc colonLoc, SMLoc nameLoc,
                        Identifier name)
     : Expr(UnresolvedMemberExprKind),
       ColonLoc(colonLoc), NameLoc(nameLoc), Name(name) {
@@ -232,12 +232,12 @@ public:
 class UnresolvedScopedIdentifierExpr : public Expr {
 public:
   TypeAliasDecl *TypeDecl;
-  llvm::SMLoc TypeDeclLoc, ColonColonLoc, NameLoc;
+  SMLoc TypeDeclLoc, ColonColonLoc, NameLoc;
   Identifier Name;
   
   UnresolvedScopedIdentifierExpr(TypeAliasDecl *typeDecl,
-                                 llvm::SMLoc typeDeclLoc, llvm::SMLoc colonLoc,
-                                 llvm::SMLoc nameLoc, Identifier name)
+                                 SMLoc typeDeclLoc, SMLoc colonLoc,
+                                 SMLoc nameLoc, Identifier name)
   : Expr(UnresolvedScopedIdentifierExprKind), TypeDecl(typeDecl),
     TypeDeclLoc(typeDeclLoc), ColonColonLoc(colonLoc), NameLoc(nameLoc),
     Name(name) {
@@ -259,13 +259,13 @@ public:
 /// corresponding SubExpr element will be null.
 class TupleExpr : public Expr {
 public:
-  llvm::SMLoc LParenLoc;
+  SMLoc LParenLoc;
   /// SubExprs - Elements of these can be set to null to get the default init
   /// value for the tuple element.
   Expr **SubExprs;
   Identifier *SubExprNames;  // Can be null if no names.
   unsigned NumSubExprs;
-  llvm::SMLoc RParenLoc;
+  SMLoc RParenLoc;
   
   /// IsGrouping - True if this is a syntactic grouping expression where the
   /// source and result types are the same.  This is only true for
@@ -276,8 +276,8 @@ public:
   /// immediately preceded by an identifier.
   bool IsPrecededByIdentifier;
   
-  TupleExpr(llvm::SMLoc lparenloc, Expr **subexprs, Identifier *subexprnames,
-            unsigned numsubexprs, llvm::SMLoc rparenloc, bool isGrouping,
+  TupleExpr(SMLoc lparenloc, Expr **subexprs, Identifier *subexprnames,
+            unsigned numsubexprs, SMLoc rparenloc, bool isGrouping,
             bool isPrecededByIdentifier, Type Ty = Type())
     : Expr(TupleExprKind, Ty), LParenLoc(lparenloc), SubExprs(subexprs),
       SubExprNames(subexprnames), NumSubExprs(numsubexprs),
@@ -311,20 +311,20 @@ public:
 class UnresolvedDotExpr : public Expr {
 public:
   Expr *SubExpr;       // Can be null!
-  llvm::SMLoc DotLoc;
+  SMLoc DotLoc;
   Identifier Name;
-  llvm::SMLoc NameLoc;
+  SMLoc NameLoc;
   
   /// ResolvedDecl - If the name refers to any local or top-level declarations,
   /// the name binder fills them in here.
   llvm::ArrayRef<ValueDecl*> ResolvedDecls;
   
-  UnresolvedDotExpr(Expr *subexpr, llvm::SMLoc dotloc, Identifier name,
-                    llvm::SMLoc nameloc)
+  UnresolvedDotExpr(Expr *subexpr, SMLoc dotloc, Identifier name,
+                    SMLoc nameloc)
   : Expr(UnresolvedDotExprKind), SubExpr(subexpr), DotLoc(dotloc),
     Name(name), NameLoc(nameloc) {}
   
-  llvm::SMLoc getLocStart() const {
+  SMLoc getLocStart() const {
     return SubExpr ? SubExpr->getLocStart() : DotLoc;
   }
   
@@ -337,12 +337,12 @@ public:
 class TupleElementExpr : public Expr {
 public:
   Expr *SubExpr;
-  llvm::SMLoc DotLoc;
+  SMLoc DotLoc;
   unsigned FieldNo;
-  llvm::SMLoc NameLoc;
+  SMLoc NameLoc;
   
-  TupleElementExpr(Expr *subexpr, llvm::SMLoc dotloc, unsigned fieldno,
-                   llvm::SMLoc nameloc, Type ty = Type())
+  TupleElementExpr(Expr *subexpr, SMLoc dotloc, unsigned fieldno,
+                   SMLoc nameloc, Type ty = Type())
   : Expr(TupleElementExprKind, ty), SubExpr(subexpr), DotLoc(dotloc),
     FieldNo(fieldno), NameLoc(nameloc) {}
   
@@ -413,7 +413,7 @@ public:
 /// is void, otherwise it is the value of the last expression.
 class BraceExpr : public Expr {
 public:
-  llvm::SMLoc LBLoc;
+  SMLoc LBLoc;
   
   typedef llvm::PointerUnion<Expr*, Decl*> ExprOrDecl;
   ExprOrDecl *Elements;
@@ -422,10 +422,10 @@ public:
   /// This is true if the last expression in the brace expression is missing a
   /// semicolon after it.
   bool MissingSemi;
-  llvm::SMLoc RBLoc;
+  SMLoc RBLoc;
 
-  BraceExpr(llvm::SMLoc lbloc, ExprOrDecl *elements,
-            unsigned numelements, bool missingsemi, llvm::SMLoc rbloc)
+  BraceExpr(SMLoc lbloc, ExprOrDecl *elements,
+            unsigned numelements, bool missingsemi, SMLoc rbloc)
     : Expr(BraceExprKind), LBLoc(lbloc), Elements(elements),
       NumElements(numelements), MissingSemi(missingsemi), RBLoc(rbloc) {}
 
@@ -457,9 +457,9 @@ public:
 class AnonClosureArgExpr : public Expr {
 public:
   unsigned ArgNo;
-  llvm::SMLoc Loc;
+  SMLoc Loc;
   
-  AnonClosureArgExpr(unsigned argNo, llvm::SMLoc loc)
+  AnonClosureArgExpr(unsigned argNo, SMLoc loc)
     : Expr(AnonClosureArgExprKind), ArgNo(argNo), Loc(loc) {}
   
   // Implement isa/cast/dyncast/etc.
@@ -487,13 +487,13 @@ public:
 /// condition of the 'if' is required to have a __builtin_int1 type.
 class IfExpr : public Expr {
 public:
-  llvm::SMLoc IfLoc;
+  SMLoc IfLoc;
   Expr *Cond;
   Expr *Then;
-  llvm::SMLoc ElseLoc;
+  SMLoc ElseLoc;
   Expr *Else;
   
-  IfExpr(llvm::SMLoc IfLoc, Expr *cond, Expr *Then, llvm::SMLoc ElseLoc,
+  IfExpr(SMLoc IfLoc, Expr *cond, Expr *Then, SMLoc ElseLoc,
          Expr *Else, Type Ty = Type())
     : Expr(IfExprKind, Ty),
       IfLoc(IfLoc), Cond(cond), Then(Then), ElseLoc(ElseLoc), Else(Else) {}

@@ -28,7 +28,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
-using llvm::SMLoc;
 using llvm::NullablePtr;
 
 //===----------------------------------------------------------------------===//
@@ -59,8 +58,8 @@ void Parser::error(SMLoc Loc, const llvm::Twine &Message) {
   SourceMgr.PrintMessage(Loc, Message, "error");
 }
 
-llvm::SMLoc Parser::consumeToken() {
-  llvm::SMLoc Loc = Tok.getLoc();
+SMLoc Parser::consumeToken() {
+  SMLoc Loc = Tok.getLoc();
   assert(Tok.isNot(tok::eof) && "Lexing past eof!");
   L.Lex(Tok);
   return Loc;

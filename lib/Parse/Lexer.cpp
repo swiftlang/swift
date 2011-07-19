@@ -33,12 +33,12 @@ Lexer::Lexer(unsigned BufferID, ASTContext &context)
 }
 
 void Lexer::warning(const char *Loc, const llvm::Twine &Message) {
-  SourceMgr.PrintMessage(llvm::SMLoc::getFromPointer(Loc), Message, "warning");
+  SourceMgr.PrintMessage(SMLoc::getFromPointer(Loc), Message, "warning");
 }
 
 void Lexer::error(const char *Loc, const llvm::Twine &Message) {
   Context.setHadError();
-  SourceMgr.PrintMessage(llvm::SMLoc::getFromPointer(Loc), llvm::Twine(Message),
+  SourceMgr.PrintMessage(SMLoc::getFromPointer(Loc), llvm::Twine(Message),
                          "error");
 }
 
@@ -85,7 +85,7 @@ static bool isPunctuationIdentifierChar(char C) {
 
 /// Return true if the character right before the specified location is part
 /// of an identifier.
-bool Lexer::isPrecededByIdentifier(llvm::SMLoc L) const {
+bool Lexer::isPrecededByIdentifier(SMLoc L) const {
   int BufferID = SourceMgr.FindBufferContainingLoc(L);
   assert(BufferID != -1 && "Invalid location");
   const llvm::MemoryBuffer *MB = SourceMgr.getMemoryBuffer(BufferID);

@@ -19,6 +19,7 @@
 
 #include "llvm/Support/SMLoc.h"
 #include "llvm/ADT/StringRef.h"
+#include "swift/AST/LLVM.h"
 
 namespace swift {
 
@@ -103,8 +104,8 @@ public:
   
   /// getLoc - Return a source location identifier for the specified
   /// offset in the current file.
-  llvm::SMLoc getLoc() const {
-    return llvm::SMLoc::getFromPointer(Text.begin());
+  SMLoc getLoc() const {
+    return SMLoc::getFromPointer(Text.begin());
   }
 
   llvm::StringRef getText() const { return Text; }

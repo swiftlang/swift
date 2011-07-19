@@ -22,11 +22,6 @@
 #include "llvm/Support/SMLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include <cstddef>
-#include <cassert>
-
-namespace llvm {
-  class raw_ostream;
-}
 
 namespace swift {
   class ASTContext;
@@ -55,7 +50,7 @@ public:
   /// LSquareLoc/RSquareLoc - This is the location of the '[' and ']' in the
   /// attribute specifier.  If this is an empty attribute specifier, then these
   /// will be invalid locs.
-  llvm::SMLoc LSquareLoc, RSquareLoc;
+  SMLoc LSquareLoc, RSquareLoc;
   
   /// InfixPrecedence - If this is not negative, it indicates that the decl is
   /// an infix operator with the specified precedence.  Otherwise, it is in the
@@ -81,7 +76,7 @@ class DeclVarName {
 public:
   /// LPLoc/RPLoc - This is the location of the '(' and ')' if this is a complex
   /// name, or both contain the same location if this is simple.
-  llvm::SMLoc LPLoc, RPLoc;
+  SMLoc LPLoc, RPLoc;
   
   // If this is a simple name like "a", this contains the identifier.
   Identifier Name;
@@ -114,7 +109,7 @@ protected:
 public:
   DeclKind getKind() const { return Kind; }
   
-  llvm::SMLoc getLocStart() const;
+  SMLoc getLocStart() const;
   
   void dump() const;
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
@@ -152,7 +147,7 @@ public:
     : Decl(TranslationUnitDeclKind), Ctx(C) {
   }
 
-  llvm::SMLoc getLocStart() const;
+  SMLoc getLocStart() const;
   
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
 
@@ -168,15 +163,15 @@ public:
 ///   import swift.int
 class ImportDecl : public Decl {
 public:
-  llvm::SMLoc ImportLoc;
-  llvm::ArrayRef<std::pair<Identifier,llvm::SMLoc> > AccessPath;
+  SMLoc ImportLoc;
+  llvm::ArrayRef<std::pair<Identifier,SMLoc> > AccessPath;
   
-  ImportDecl(llvm::SMLoc importLoc,
-             llvm::ArrayRef<std::pair<Identifier,llvm::SMLoc> > path)
+  ImportDecl(SMLoc importLoc,
+             llvm::ArrayRef<std::pair<Identifier,SMLoc> > path)
     : Decl(ImportDeclKind), ImportLoc(importLoc), AccessPath(path) {
   }
   
-  llvm::SMLoc getLocStart() const { return ImportLoc; }
+  SMLoc getLocStart() const { return ImportLoc; }
 
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
   
@@ -222,16 +217,16 @@ class TypeAliasDecl : public NamedDecl {
   /// The type that represents this (sugared) name alias.
   mutable NameAliasType *AliasTy;
 public:
-  llvm::SMLoc TypeAliasLoc;
+  SMLoc TypeAliasLoc;
   Type UnderlyingTy;
   
-  TypeAliasDecl(llvm::SMLoc typealiasloc, Identifier name, Type underlyingty,
+  TypeAliasDecl(SMLoc typealiasloc, Identifier name, Type underlyingty,
                 const DeclAttributes &attrs = DeclAttributes())
     : NamedDecl(TypeAliasDeclKind, name, attrs), AliasTy(0),
       TypeAliasLoc(typealiasloc), UnderlyingTy(underlyingty) {
   }
 
-  llvm::SMLoc getLocStart() const { return TypeAliasLoc; }
+  SMLoc getLocStart() const { return TypeAliasLoc; }
 
   /// getAliasType - Return the sugared version of this decl as a Type.
   NameAliasType *getAliasType(ASTContext &C) const;
@@ -272,24 +267,24 @@ protected:
 /// VarDecl - 'var' declaration.
 class VarDecl : public ValueDecl {
 public:
-  llvm::SMLoc VarLoc;    // Location of the 'var' token.
+  SMLoc VarLoc;    // Location of the 'var' token.
 
   /// NestedName - If this is a simple var definition, the name is stored in the
   /// name identifier.  If the varname is complex, Name is empty and this
   /// contains the nested name specifier.
   DeclVarName *NestedName;
   
-  VarDecl(llvm::SMLoc varloc, Identifier name, Type ty, Expr *init,
+  VarDecl(SMLoc varloc, Identifier name, Type ty, Expr *init,
           const DeclAttributes &attrs)
     : ValueDecl(VarDeclKind, name, ty, init, attrs), VarLoc(varloc),
       NestedName(0) {}
-  VarDecl(llvm::SMLoc varloc, DeclVarName *name, Type ty, Expr *init,
+  VarDecl(SMLoc varloc, DeclVarName *name, Type ty, Expr *init,
           const DeclAttributes &attrs)
     : ValueDecl(VarDeclKind, Identifier(), ty, init, attrs), VarLoc(varloc),
       NestedName(name) {}
 
   
-  llvm::SMLoc getLocStart() const { return VarLoc; }
+  SMLoc getLocStart() const { return VarLoc; }
   
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
   
@@ -303,14 +298,14 @@ public:
 /// FuncDecl - 'func' declaration.
 class FuncDecl : public ValueDecl {
 public:
-  llvm::SMLoc FuncLoc;    // Location of the 'func' token.
+  SMLoc FuncLoc;    // Location of the 'func' token.
 
-  FuncDecl(llvm::SMLoc funcloc, Identifier name, Type ty, Expr *init,
+  FuncDecl(SMLoc funcloc, Identifier name, Type ty, Expr *init,
           const DeclAttributes &attrs)
     : ValueDecl(FuncDeclKind, name, ty, init, attrs), FuncLoc(funcloc) {}
   
   
-  llvm::SMLoc getLocStart() const { return FuncLoc; }
+  SMLoc getLocStart() const { return FuncLoc; }
 
   
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
@@ -323,14 +318,14 @@ public:
 /// MethDecl - 'meth' declaration.
 class MethDecl : public ValueDecl {
 public:
-  llvm::SMLoc MethLoc;    // Location of the 'meth' token.
+  SMLoc MethLoc;    // Location of the 'meth' token.
   
-  MethDecl(llvm::SMLoc methloc, Identifier name, Type ty, Expr *init,
+  MethDecl(SMLoc methloc, Identifier name, Type ty, Expr *init,
            const DeclAttributes &attrs)
   : ValueDecl(MethDeclKind, name, ty, init, attrs), MethLoc(methloc) {}
   
   
-  llvm::SMLoc getLocStart() const { return MethLoc; }
+  SMLoc getLocStart() const { return MethLoc; }
   
   
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
@@ -348,7 +343,7 @@ public:
 /// oneof.
 class OneOfElementDecl : public ValueDecl {
 public:
-  llvm::SMLoc IdentifierLoc;
+  SMLoc IdentifierLoc;
   
   /// ArgumentType - This is the type specified with the oneof element.  For
   /// example 'int' in the Y example above.  This is null if there is no type
@@ -356,12 +351,12 @@ public:
   Type ArgumentType;
   
   
-  OneOfElementDecl(llvm::SMLoc identloc, Identifier name, Type ty, Type argtype)
+  OneOfElementDecl(SMLoc identloc, Identifier name, Type ty, Type argtype)
   : ValueDecl(OneOfElementDeclKind, name, ty, 0),
     IdentifierLoc(identloc), ArgumentType(argtype) {}
 
   
-  llvm::SMLoc getLocStart() const { return IdentifierLoc; }
+  SMLoc getLocStart() const { return IdentifierLoc; }
   
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
   
@@ -382,15 +377,15 @@ class ArgDecl : public ValueDecl {
 public:
   // FIXME: We don't have good location information for the function argument
   // declaration.
-  llvm::SMLoc FuncLoc;
+  SMLoc FuncLoc;
   
   // FIXME: Store the access path here.
   
-  ArgDecl(llvm::SMLoc funcloc, Identifier name, Type ty)
+  ArgDecl(SMLoc funcloc, Identifier name, Type ty)
     : ValueDecl(ArgDeclKind, name, ty, 0, DeclAttributes()), FuncLoc(funcloc) {}
 
 
-  llvm::SMLoc getLocStart() const { return FuncLoc; }
+  SMLoc getLocStart() const { return FuncLoc; }
  
   
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
@@ -407,10 +402,10 @@ public:
 class ElementRefDecl : public ValueDecl {
 public:
   VarDecl *VD;
-  llvm::SMLoc NameLoc;
+  SMLoc NameLoc;
   llvm::ArrayRef<unsigned> AccessPath;
   
-  ElementRefDecl(VarDecl *vd, llvm::SMLoc nameloc, Identifier name,
+  ElementRefDecl(VarDecl *vd, SMLoc nameloc, Identifier name,
                  llvm::ArrayRef<unsigned> path, Type ty)
     : ValueDecl(ElementRefDeclKind, name, ty, 0), VD(vd), NameLoc(nameloc),
       AccessPath(path) {
@@ -423,7 +418,7 @@ public:
   static Type getTypeForPath(Type Ty, llvm::ArrayRef<unsigned> Path);
   
   
-  llvm::SMLoc getLocStart() const { return NameLoc; }
+  SMLoc getLocStart() const { return NameLoc; }
   
   void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
   
