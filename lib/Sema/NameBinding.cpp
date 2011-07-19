@@ -132,7 +132,7 @@ namespace {
     llvm::DenseMap<Identifier, llvm::TinyPtrVector<ValueDecl*> > TopLevelValues;
     llvm::SmallVector<std::pair<ImportDecl*, ReferencedModule*>, 4> Imports;
     
-    llvm::error_code findModule(llvm::StringRef Module, 
+    llvm::error_code findModule(StringRef Module, 
                                 SMLoc ImportLoc,
                                 llvm::OwningPtr<llvm::MemoryBuffer> &Buffer);
     
@@ -155,13 +155,13 @@ namespace {
     
     TypeAliasDecl *lookupTypeName(Identifier I);
     
-    void note(SMLoc Loc, const llvm::Twine &Message) {
+    void note(SMLoc Loc, const Twine &Message) {
       Context.SourceMgr.PrintMessage(Loc, Message, "note");
     }
-    void warning(SMLoc Loc, const llvm::Twine &Message) {
+    void warning(SMLoc Loc, const Twine &Message) {
       Context.SourceMgr.PrintMessage(Loc, Message, "warning");
     }
-    void error(SMLoc Loc, const llvm::Twine &Message) {
+    void error(SMLoc Loc, const Twine &Message) {
       Context.setHadError();
       Context.SourceMgr.PrintMessage(Loc, Message, "error");
     }
@@ -173,7 +173,7 @@ namespace {
   };
 }
 
-llvm::error_code NameBinder::findModule(llvm::StringRef Module, 
+llvm::error_code NameBinder::findModule(StringRef Module, 
                                         SMLoc ImportLoc,
                                 llvm::OwningPtr<llvm::MemoryBuffer> &Buffer) {
   std::string ModuleFilename = Module.str() + std::string(".swift");
@@ -185,7 +185,7 @@ llvm::error_code NameBinder::findModule(llvm::StringRef Module,
   if (CurrentBufferID >= 0) {
     const llvm::MemoryBuffer *ImportingBuffer 
       = SourceMgr.getBufferInfo(CurrentBufferID).Buffer;
-    llvm::StringRef CurrentDirectory 
+    StringRef CurrentDirectory 
       = llvm::sys::path::parent_path(ImportingBuffer->getBufferIdentifier());
     if (!CurrentDirectory.empty()) {
       llvm::SmallString<128> InputFilename(CurrentDirectory);

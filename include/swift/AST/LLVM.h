@@ -22,10 +22,15 @@
 
 // Forward declarations.
 namespace llvm {
-  // also raw_ostream
-  
+  // Containers
+  class StringRef;
+  class Twine;
   // also SmallVector, ArrayRef, StringRef, Twine ...
+  //  template <typename T> class SmallVectorImpl;
+
   
+  // also raw_ostream
+ 
   // Other common classes.
   class SMLoc;  
 } // end namespace llvm;
@@ -39,7 +44,10 @@ namespace swift {
   using llvm::dyn_cast_or_null;
   using llvm::cast_or_null;
 
-  
+  // Containers
+  using llvm::StringRef;
+  using llvm::Twine;
+
   // Other common classes.
   using llvm::SMLoc;
   

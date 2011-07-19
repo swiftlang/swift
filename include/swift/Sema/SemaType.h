@@ -50,7 +50,7 @@ public:
   
   struct OneOfElementInfo {
     SMLoc NameLoc;
-    llvm::StringRef Name;
+    StringRef Name;
     Type EltType;
   };
   

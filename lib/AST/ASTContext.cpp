@@ -67,7 +67,7 @@ void *ASTContext::Allocate(unsigned long Bytes, unsigned Alignment) {
 
 /// getIdentifier - Return the uniqued and AST-Context-owned version of the
 /// specified string.
-Identifier ASTContext::getIdentifier(llvm::StringRef Str) {
+Identifier ASTContext::getIdentifier(StringRef Str) {
   // Make sure null pointers stay null.
   if (Str.empty()) return Identifier(0);
   

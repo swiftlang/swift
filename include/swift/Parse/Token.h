@@ -89,7 +89,7 @@ class Token {
   tok::TokenKind Kind;
   
   /// Text - The actual string covered by the token in the source buffer.
-  llvm::StringRef Text;
+  StringRef Text;
   
 public:
   Token() : Kind(tok::unknown) {}
@@ -108,14 +108,14 @@ public:
     return SMLoc::getFromPointer(Text.begin());
   }
 
-  llvm::StringRef getText() const { return Text; }
-  void setText(llvm::StringRef T) { Text = T; }
+  StringRef getText() const { return Text; }
+  void setText(StringRef T) { Text = T; }
   
   unsigned getLength() const { return Text.size(); }
   
   /// setToken - Set the token to the specified kind and source range.
   ///
-  void setToken(tok::TokenKind K, llvm::StringRef T) {
+  void setToken(tok::TokenKind K, StringRef T) {
     Kind = K;
     Text = T;
   }

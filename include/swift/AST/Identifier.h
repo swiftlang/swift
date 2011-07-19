@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_IDENTIFIER_H
 #define SWIFT_AST_IDENTIFIER_H
 
+#include "swift/AST/LLVM.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/StringRef.h"
 #include <cstring>
@@ -41,7 +42,7 @@ public:
   
   const char *get() const { return Pointer; }
   
-  llvm::StringRef str() const { return Pointer; }
+  StringRef str() const { return Pointer; }
   
   unsigned getLength() const {
     return ::strlen(Pointer);

@@ -22,10 +22,8 @@
 #include "swift/AST/Type.h"
 
 namespace llvm {
-  class SMLoc;
   class BumpPtrAllocator;
   class SourceMgr;
-  class StringRef;
   template <typename T> class FoldingSet;
   template <typename T> class ArrayRef;
 }
@@ -92,7 +90,7 @@ public:
   
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
-  Identifier getIdentifier(llvm::StringRef Str);
+  Identifier getIdentifier(StringRef Str);
   
   /// setHadError - This is called when an error message is emitted.
   void setHadError() {

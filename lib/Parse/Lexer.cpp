@@ -32,19 +32,19 @@ Lexer::Lexer(unsigned BufferID, ASTContext &context)
   CurPtr = Buffer->getBufferStart();
 }
 
-void Lexer::warning(const char *Loc, const llvm::Twine &Message) {
+void Lexer::warning(const char *Loc, const Twine &Message) {
   SourceMgr.PrintMessage(SMLoc::getFromPointer(Loc), Message, "warning");
 }
 
-void Lexer::error(const char *Loc, const llvm::Twine &Message) {
+void Lexer::error(const char *Loc, const Twine &Message) {
   Context.setHadError();
-  SourceMgr.PrintMessage(SMLoc::getFromPointer(Loc), llvm::Twine(Message),
+  SourceMgr.PrintMessage(SMLoc::getFromPointer(Loc), Twine(Message),
                          "error");
 }
 
 
 void Lexer::FormToken(tok::TokenKind Kind, const char *TokStart, Token &Result){
-  Result.setToken(Kind, llvm::StringRef(TokStart, CurPtr-TokStart));
+  Result.setToken(Kind, StringRef(TokStart, CurPtr-TokStart));
 }
 
 //===----------------------------------------------------------------------===//
@@ -109,7 +109,7 @@ void Lexer::LexIdentifier(Token &Result) {
     ++CurPtr;
   
   tok::TokenKind Kind =
-  llvm::StringSwitch<tok::TokenKind>(llvm::StringRef(TokStart, CurPtr-TokStart))
+  llvm::StringSwitch<tok::TokenKind>(StringRef(TokStart, CurPtr-TokStart))
     .Case("__builtin_int1_type",  tok::kw___builtin_int1_type)
     .Case("__builtin_int8_type",  tok::kw___builtin_int8_type)
     .Case("__builtin_int16_type", tok::kw___builtin_int16_type)

@@ -25,8 +25,6 @@ namespace llvm {
   class PointerUnion;
   template<class T>
   class NullablePtr;
-  class Twine;
-  template <typename T> class SmallVectorImpl;
 }
 
 namespace swift {
@@ -96,12 +94,12 @@ private:
   ///
   void skipUntil(tok::TokenKind T);
   
-  void note(SMLoc Loc, const llvm::Twine &Message);
-  void warning(SMLoc Loc, const llvm::Twine &Message);
-  void error(SMLoc Loc, const llvm::Twine &Message);
+  void note(SMLoc Loc, const Twine &Message);
+  void warning(SMLoc Loc, const Twine &Message);
+  void error(SMLoc Loc, const Twine &Message);
   
   // Primitive Parsing
-  bool parseIdentifier(Identifier &Result, const llvm::Twine &Message);
+  bool parseIdentifier(Identifier &Result, const Twine &Message);
 
   /// parseToken - The parser expects that 'K' is next in the input.  If so, it
   /// is consumed and false is returned.
@@ -131,7 +129,7 @@ private:
   
   // Type Parsing
   bool parseType(Type &Result);
-  bool parseType(Type &Result, const llvm::Twine &Message);
+  bool parseType(Type &Result, const Twine &Message);
   bool parseTypeTupleBody(SMLoc LPLoc, Type &Result);
   bool parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
                           Type &Result, TypeAliasDecl *TypeName = 0);

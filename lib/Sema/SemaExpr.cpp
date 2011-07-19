@@ -31,7 +31,7 @@ using llvm::NullablePtr;
 // Action Implementations
 //===----------------------------------------------------------------------===//
 
-NullablePtr<Expr> SemaExpr::ActOnNumericConstant(llvm::StringRef Text,
+NullablePtr<Expr> SemaExpr::ActOnNumericConstant(StringRef Text,
                                                  SMLoc Loc) {
   // The integer literal must fit in 64-bits.
   unsigned long long Val;

@@ -19,11 +19,6 @@
 
 #include "swift/AST/LLVM.h"
 
-namespace llvm {
-  class StringRef;
-  class Twine;
-}
-
 namespace swift {
   class Sema;
   
@@ -37,9 +32,9 @@ public:
   Sema &S;
   explicit SemaBase(Sema &s) : S(s) {}
   
-  void note(SMLoc Loc, const llvm::Twine &Message);
-  void warning(SMLoc Loc, const llvm::Twine &Message);
-  void error(SMLoc Loc, const llvm::Twine &Message);
+  void note(SMLoc Loc, const Twine &Message);
+  void warning(SMLoc Loc, const Twine &Message);
+  void error(SMLoc Loc, const Twine &Message);
 };
     
 } // end namespace swift

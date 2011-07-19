@@ -35,13 +35,13 @@ namespace {
     ASTContext &Context;
     TypeChecker(ASTContext &C) : Context(C) {}
     
-    void note(SMLoc Loc, const llvm::Twine &Message) {
+    void note(SMLoc Loc, const Twine &Message) {
       Context.SourceMgr.PrintMessage(Loc, Message, "note");
     }
-    void warning(SMLoc Loc, const llvm::Twine &Message) {
+    void warning(SMLoc Loc, const Twine &Message) {
       Context.SourceMgr.PrintMessage(Loc, Message, "warning");
     }
-    void error(SMLoc Loc, const llvm::Twine &Message) {
+    void error(SMLoc Loc, const Twine &Message) {
       Context.setHadError();
       Context.SourceMgr.PrintMessage(Loc, Message, "error");
     }
@@ -1257,11 +1257,11 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       
       if (DestTy->Fields[i].Name.empty())
         TC.error(ErrorLoc, "no value to initialize tuple element #" +
-                 llvm::Twine(i) + " in expression of type '" +
+                 Twine(i) + " in expression of type '" +
                  E->Ty->getString() + "'");
       else
         TC.error(ErrorLoc, "no value to initialize tuple element '" +
-                 DestTy->Fields[i].Name.str() + "' (#" + llvm::Twine(i) +
+                 DestTy->Fields[i].Name.str() + "' (#" + Twine(i) +
                  ") in expression of type '" + E->Ty->getString() + "'");
       return 0;
     }
@@ -1282,12 +1282,12 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
           ErrorLoc = SubExp->getLocStart();
       
     if (IdentList[i].empty())
-      TC.error(ErrorLoc, "element #" + llvm::Twine(i) +
+      TC.error(ErrorLoc, "element #" + Twine(i) +
                " of tuple value not used when converting to type '" +
                DestTy->getString() + "'");
     else
       TC.error(ErrorLoc, "tuple element '" + IdentList[i].str() +
-               "' (#" + llvm::Twine(i) + ") of tuple value not used when "
+               "' (#" + Twine(i) + ") of tuple value not used when "
                "converting to type '" + DestTy->getString() + "'");
       return 0;
     }
@@ -1356,7 +1356,7 @@ SemaCoerceBottomUp::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     
     if (ETy->getElementType(SrcField)->getCanonicalType(TC.Context) !=
         DestTy->getElementType(i)->getCanonicalType(TC.Context)) {
-      TC.error(E->getLocStart(), "element #" + llvm::Twine(i) +
+      TC.error(E->getLocStart(), "element #" + Twine(i) +
                " of tuple value has type '" +
                ETy->getElementType(SrcField)->getString() +
                "', but expected type '" + 
@@ -1759,8 +1759,8 @@ bool TypeChecker::validateVarName(Type Ty, DeclVarName *Name) {
   // Verify the # elements line up.
   if (Name->Elements.size() != AccessedTuple->Fields.size()) {
     error(Name->LPLoc, "name specifier matches '" + Ty->getString() +
-          "' which requires " + llvm::Twine(AccessedTuple->Fields.size()) +
-          " names, but has " + llvm::Twine(Name->Elements.size()));
+          "' which requires " + Twine(AccessedTuple->Fields.size()) +
+          " names, but has " + Twine(Name->Elements.size()));
     return true;
   }
   

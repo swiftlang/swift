@@ -44,7 +44,7 @@ public:
   
   // Action Implementations
   llvm::NullablePtr<Expr>
-  ActOnNumericConstant(llvm::StringRef Text, SMLoc Loc);
+  ActOnNumericConstant(StringRef Text, SMLoc Loc);
   llvm::NullablePtr<Expr>
   ActOnIdentifierExpr(Identifier Text, SMLoc Loc);
   llvm::NullablePtr<Expr>

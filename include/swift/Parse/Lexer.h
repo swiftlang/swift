@@ -22,7 +22,6 @@
 namespace llvm {
   class MemoryBuffer;
   class SourceMgr;
-  class Twine;
 }
 
 namespace swift {
@@ -47,8 +46,8 @@ public:
   bool isPrecededByIdentifier(SMLoc L) const;
   
 private:
-  void warning(const char *Loc, const llvm::Twine &Message);
-  void error(const char *Loc, const llvm::Twine &Message);
+  void warning(const char *Loc, const Twine &Message);
+  void error(const char *Loc, const Twine &Message);
   void FormToken(tok::TokenKind Kind, const char *TokStart, Token &Result);
   
   void SkipSlashSlashComment();

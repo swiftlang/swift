@@ -45,15 +45,15 @@ Parser::~Parser() {
   delete &S;
 }
 
-void Parser::note(SMLoc Loc, const llvm::Twine &Message) {
+void Parser::note(SMLoc Loc, const Twine &Message) {
   SourceMgr.PrintMessage(Loc, Message, "note");
 }
 
-void Parser::warning(SMLoc Loc, const llvm::Twine &Message) {
+void Parser::warning(SMLoc Loc, const Twine &Message) {
   SourceMgr.PrintMessage(Loc, Message, "warning");
 }
 
-void Parser::error(SMLoc Loc, const llvm::Twine &Message) {
+void Parser::error(SMLoc Loc, const Twine &Message) {
   S.Context.setHadError();
   SourceMgr.PrintMessage(Loc, Message, "error");
 }
@@ -88,7 +88,7 @@ void Parser::skipUntil(tok::TokenKind T) {
 
 /// parseIdentifier - Consume an identifier if present and return its name in
 /// Result.  Otherwise, emit an error and return true.
-bool Parser::parseIdentifier(Identifier &Result, const llvm::Twine &Message) {
+bool Parser::parseIdentifier(Identifier &Result, const Twine &Message) {
   if (Tok.is(tok::identifier)) {
     Result = S.Context.getIdentifier(Tok.getText());
     consumeToken(tok::identifier);
@@ -196,7 +196,7 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     
     if (consumeIf(tok::equal)) {
       SMLoc PrecLoc = Tok.getLoc();
-      llvm::StringRef Text = Tok.getText();
+      StringRef Text = Tok.getText();
       if (!parseToken(tok::numeric_constant,
                       "expected precedence number in 'infix' attribute")) {
         long long Value;
@@ -648,7 +648,7 @@ bool Parser::parseDeclStruct(llvm::SmallVectorImpl<ExprOrDecl> &Decls) {
 ///   type-oneof:
 ///     'oneof' attribute-list? oneof-body
 ///
-bool Parser::parseType(Type &Result, const llvm::Twine &Message) {
+bool Parser::parseType(Type &Result, const Twine &Message) {
   // Parse type-simple first.
   switch (Tok.getKind()) {
   case tok::identifier:
@@ -997,7 +997,7 @@ bool Parser::parseExprPrimary(llvm::SmallVectorImpl<Expr*> &Result) {
 ///   expr-identifier:
 ///     dollarident
 bool Parser::parseExprDollarIdentifier(llvm::NullablePtr<Expr> &Result) {
-  llvm::StringRef Name = Tok.getText();
+  StringRef Name = Tok.getText();
   SMLoc Loc = consumeToken(tok::dollarident);
   assert(Name[0] == '$' && "Not a dollarident");
   bool AllNumeric = true;

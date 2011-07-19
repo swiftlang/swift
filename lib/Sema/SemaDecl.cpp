@@ -451,7 +451,7 @@ TypeAliasDecl *SemaDecl::ActOnTypeAlias(SMLoc TypeAliasLoc,
   // Otherwise, we have a redefinition: two definitions in the same scope with
   // the same name.
   error(TypeAliasLoc,
-        "redefinition of type named '" +llvm::StringRef(Name.get()) + "'");
+        "redefinition of type named '" +StringRef(Name.get()) + "'");
   warning(ExistingDecl->getLocStart(), "previous declaration here");
   return ExistingDecl;
 }

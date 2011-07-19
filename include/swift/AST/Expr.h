@@ -139,10 +139,10 @@ public:
 /// IntegerLiteral - Integer literal, like '4'.
 class IntegerLiteral : public Expr {
 public:
-  llvm::StringRef Val;  // Use StringRef instead of APInt, APInt leaks.
+  StringRef Val;  // Use StringRef instead of APInt, APInt leaks.
   SMLoc Loc;
   
-  IntegerLiteral(llvm::StringRef V, SMLoc L, Type Ty)
+  IntegerLiteral(StringRef V, SMLoc L, Type Ty)
     : Expr(IntegerLiteralKind, Ty), Val(V), Loc(L) {}
   
   uint64_t getValue() const;
