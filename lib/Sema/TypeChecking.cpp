@@ -69,7 +69,7 @@ namespace {
     
     void typeCheckERD(ElementRefDecl *ERD);
     void typeCheckVarDecl(VarDecl *VD, llvm::SmallVectorImpl<Expr*> &ExcessExprs);
-    void typeCheckValueDecl(ValueDecl *VD,
+    bool typeCheckValueDecl(ValueDecl *VD,
                             llvm::SmallVectorImpl<Expr*> &ExcessExprs);
     
     void validateAttributes(DeclAttributes &Attrs, Type Ty);
@@ -1779,16 +1779,29 @@ bool TypeChecker::validateVarName(Type Ty, DeclVarName *Name) {
 
 void TypeChecker::typeCheckVarDecl(VarDecl *VD,
                                    llvm::SmallVectorImpl<Expr*> &ExcessExprs) {
+  // Type check the ValueDecl part of a VarDecl.
+  if (typeCheckValueDecl(VD, ExcessExprs))
+    return;
+  
+  // If the VarDecl had a name specifier, verify that it lines up with the
+  // actual type of the VarDecl.
+  if (VD->NestedName && validateVarName(VD->Ty, VD->NestedName))
+    VD->NestedName = 0;
+}
+
+
+bool TypeChecker::typeCheckValueDecl(ValueDecl *VD,
+                                     llvm::SmallVectorImpl<Expr*> &ExcessExprs){
   if (validateType(VD->Ty)) {
     VD->Init = 0;
-    return; 
+    return true;
   }
 
-  // Check Init.  
+  // Validate that the initializers type matches the expected type.
   if (VD->Init == 0) {
     // If we have no initializer and the type is dependent, then the initializer
     // was invalid and removed.
-    if (VD->Ty->is<DependentType>()) return;
+    if (VD->Ty->is<DependentType>()) return true;
   } else if (VD->Ty->is<DependentType>()) {
     checkBody(VD->Init, 0, &ExcessExprs);
     if (VD->Init == 0)
@@ -1801,34 +1814,11 @@ void TypeChecker::typeCheckVarDecl(VarDecl *VD,
     // initializer's type agrees (or converts) to the redundant type.
     checkBody(VD->Init, VD->Ty, &ExcessExprs);
     if (VD->Init == 0)
-      note(VD->getLocStart(), 
-           "while converting 'var' initializer to declared type");
-  }
-  
-  validateAttributes(VD->Attrs, VD->Ty);
-  
-  // If the VarDecl had a name specifier, verify that it lines up with the
-  // actual type of the VarDecl.
-  if (VD->NestedName && validateVarName(VD->Ty, VD->NestedName))
-    VD->NestedName = 0;
-}
-
-
-void TypeChecker::typeCheckValueDecl(ValueDecl *VD,
-                                     llvm::SmallVectorImpl<Expr*> &ExcessExprs){
-  if (validateType(VD->Ty)) {
-    VD->Init = 0;
-    return;
-  }
-
-  // Validate that the initializers type matches the expected type.
-  if (VD->Init) {
-    checkBody(VD->Init, VD->Ty, &ExcessExprs);
-    if (VD->Init == 0)
       note(VD->getLocStart(), "while converting body to declared type");
   }
   
   validateAttributes(VD->Attrs, VD->Ty);
+  return false;
 }
 
 /// performTypeChecking - Once parsing and namebinding are complete, these
