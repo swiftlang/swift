@@ -1813,8 +1813,13 @@ bool TypeChecker::typeCheckValueDecl(ValueDecl *VD,
     // If both a type and an initializer are specified, make sure the
     // initializer's type agrees (or converts) to the redundant type.
     checkBody(VD->Init, VD->Ty, &ExcessExprs);
-    if (VD->Init == 0)
-      note(VD->getLocStart(), "while converting body to declared type");
+    if (VD->Init == 0) {
+      if (isa<VarDecl>(VD))
+        note(VD->getLocStart(),
+             "while converting 'var' initializer to declared type");
+      else
+        note(VD->getLocStart(), "while converting body to declared type");
+    }
   }
   
   validateAttributes(VD->Attrs, VD->Ty);
