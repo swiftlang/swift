@@ -208,12 +208,10 @@
   <!-- ===================================================================== -->
 
   <div class="commentary">
-    The number of keywords is reduced by pushing most control flow and other
-    stuff into the library.  This allows us to add new stuff to the library in
+    The number of keywords is reduced by pushing most functionality
+    into the library.  This allows us to add new stuff to the library in
     the future without worrying about conflicting with the user's namespace.
-    Because 'if' is just a library function, you can shadow "if" with your own
-    variable (though this is an example of a silly thing that is not a good
-    practice of course).<br><br>
+    <br><br>
 
     Idea: Should _foo be "private" and "foo" be public, how about "Foo" vs
     "foo"? In the code you immediately know whether something is exported, and
