@@ -262,6 +262,7 @@ public:
   SMLoc LParenLoc;
   /// SubExprs - Elements of these can be set to null to get the default init
   /// value for the tuple element.
+  // FIXME: Switch to MutableArrayRef.
   Expr **SubExprs;
   Identifier *SubExprNames;  // Can be null if no names.
   unsigned NumSubExprs;
@@ -396,6 +397,7 @@ public:
 /// semicolons, braces, or declarations and can never be empty.
 class SequenceExpr : public Expr {
 public:
+  // FIXME: Switch to MutableArrayRef.
   Expr **Elements;
   unsigned NumElements;
   
@@ -416,6 +418,7 @@ public:
   SMLoc LBLoc;
   
   typedef llvm::PointerUnion<Expr*, Decl*> ExprOrDecl;
+  // FIXME: Switch to MutableArrayRef.
   ExprOrDecl *Elements;
   unsigned NumElements;
   

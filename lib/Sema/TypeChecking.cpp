@@ -673,8 +673,8 @@ static bool isKnownToBeAFunction(Expr *E) {
   // If the expression is an overload set and all members are functions, then
   // clearly we have a function!
   if (OverloadSetRefExpr *OSRE = dyn_cast<OverloadSetRefExpr>(E)) {
-    for (unsigned i = 0, e = OSRE->Decls.size(); i != e; ++i)
-      if (!OSRE->Decls[i]->Ty->is<FunctionType>())
+    for (ValueDecl *Elt :OSRE->Decls)
+      if (!Elt->Ty->is<FunctionType>())
         return false;
     return true;
   }
@@ -853,8 +853,8 @@ void SemaExpressionTree::PreProcessBraceExpr(BraceExpr *E) {
       
       // If we have something like 'var x = 4 foo()', then install foo() as an
       // expression *after* the VarDecl.
-      for (unsigned i = 0, e = ExcessExprs.size(); i != e; ++i)
-        NewElements.push_back(ExcessExprs[i]);
+      for (Expr *Elt : ExcessExprs)
+        NewElements.push_back(Elt);
     }
   }
   
@@ -997,8 +997,7 @@ namespace {
       // If any decl that is in the overload set exactly matches the expected
       // type, then select it.
       // FIXME: Conversion ranking.
-      for (unsigned i = 0, e = E->Decls.size(); i != e; ++i) {
-        ValueDecl *VD = E->Decls[i];
+      for (ValueDecl *VD : E->Decls) {
         if (VD->Ty->isEqual(DestTy, TC.Context))
           return new (TC.Context) DeclRefExpr(VD, E->Loc, VD->Ty);
       }
@@ -1536,17 +1535,15 @@ bool TypeChecker::validateType(Type &InTy) {
   case BuiltinInt64Kind:
   case DependentTypeKind:
     return false;
-  case OneOfTypeKind: {
-    OneOfType *OOT = cast<OneOfType>(T);
-    for (unsigned i = 0, e = OOT->Elements.size(); i != e; ++i) {
-      if (OOT->Elements[i]->ArgumentType.isNull()) continue;
-      IsValid &= !validateType(OOT->Elements[i]->ArgumentType);
+  case OneOfTypeKind:
+    for (OneOfElementDecl *Elt : cast<OneOfType>(T)->Elements) {
+      if (Elt->ArgumentType.isNull()) continue;
+      IsValid &= !validateType(Elt->ArgumentType);
       if (!IsValid) break;
     }
     break;
-  }
   case NameAliasTypeKind:
-    IsValid =!validateType(cast<NameAliasType>(T)->TheDecl->UnderlyingTy);
+    IsValid = !validateType(cast<NameAliasType>(T)->TheDecl->UnderlyingTy);
     break;
   case TupleTypeKind: {
     TupleType *TT = cast<TupleType>(T);

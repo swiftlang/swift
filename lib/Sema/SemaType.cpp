@@ -53,12 +53,12 @@ OneOfType *SemaType::ActOnOneOfType(SMLoc OneOfLoc,
   if (PrettyTypeName)
     TmpTy = PrettyTypeName->getAliasType(S.Context);
   
-  for (unsigned i = 0, e = Elts.size(); i != e; ++i) {
-    Identifier NameI = S.Context.getIdentifier(Elts[i].Name);
+  for (const OneOfElementInfo &Elt : Elts) {
+    Identifier NameI = S.Context.getIdentifier(Elt.Name);
     
     // If this was multiply defined, reject it.
     if (!SeenSoFar.insert(NameI.get())) {
-      error(Elts[i].NameLoc, "element named '" + Elts[i].Name +
+      error(Elt.NameLoc, "element named '" + Elt.Name +
             "' defined multiple times");
       // Don't copy this element into NewElements.
       // TODO: QoI: add note for previous definition.
@@ -66,14 +66,14 @@ OneOfType *SemaType::ActOnOneOfType(SMLoc OneOfLoc,
     }
     
     Type EltTy = TmpTy;
-    if (Type ArgTy = Elts[i].EltType)
+    if (Type ArgTy = Elt.EltType)
       if (PrettyTypeName)
         EltTy = FunctionType::get(ArgTy, EltTy, S.Context);
 
     // Create a decl for each element, giving each a temporary type.
     EltDecls.push_back(
-      new (S.Context) OneOfElementDecl(Elts[i].NameLoc, NameI, EltTy,
-                                       Elts[i].EltType));
+      new (S.Context) OneOfElementDecl(Elt.NameLoc, NameI, EltTy,
+                                       Elt.EltType));
   }
   
   OneOfType *Result = OneOfType::getNew(OneOfLoc, EltDecls, S.Context);
@@ -86,13 +86,13 @@ OneOfType *SemaType::ActOnOneOfType(SMLoc OneOfLoc,
   } else {
     // Now that the oneof type is created, we can go back and give proper types
     // to each element decl.
-    for (unsigned i = 0, e = EltDecls.size(); i != e; ++i) {
+    for (OneOfElementDecl *Elt : EltDecls) {
       Type EltTy = Result;
       // If the OneOf Element takes a type argument, then it is actually a
       // function that takes the type argument and returns the OneOfType.
-      if (Type ArgTy = EltDecls[i]->ArgumentType)
+      if (Type ArgTy = Elt->ArgumentType)
         EltTy = FunctionType::get(ArgTy, EltTy, S.Context);
-      EltDecls[i]->Ty = EltTy;
+      Elt->Ty = EltTy;
     }
   }
   

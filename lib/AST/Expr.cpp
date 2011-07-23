@@ -117,8 +117,10 @@ getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
 
   if (TupleType *ETy = E->Ty->getAs<TupleType>()) {
     assert(ETy->Fields.size() == NumExprElements && "Expr #elements mismatch!");
-    for (unsigned i = 0, e = ETy->Fields.size(); i != e; ++i)
-      IdentList[i] = ETy->Fields[i].Name;
+    { unsigned i = 0;
+    for (const TupleTypeElt &Elt : ETy->Fields)
+      IdentList[i++] = Elt.Name;
+    }
   
     // First off, see if we can resolve any named values from matching named
     // inputs.
@@ -180,8 +182,8 @@ getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
   }
   
   // If there were any unused input values, we fail.
-  for (unsigned i = 0, e = UsedElements.size(); i != e; ++i)
-    if (!UsedElements[i])
+  for (bool Elt : UsedElements)
+    if (!Elt)
       return Expr::CR_Invalid;
   
   // It looks like the elements line up, walk through them and see if the types

@@ -120,8 +120,8 @@ TypeBase *TypeBase::getDesugaredType() {
 /// hasAnyDefaultValues - Return true if any of our elements has a default
 /// value.
 bool TupleType::hasAnyDefaultValues() const {
-  for (unsigned i = 0, e = Fields.size(); i != e; ++i)
-    if (Fields[i].Init)
+  for (const TupleTypeElt &Elt : Fields)
+    if (Elt.Init)
       return true;
   return false;
 }
@@ -179,9 +179,9 @@ void TupleType::updateInitializedElementType(unsigned EltNo, Type NewTy,
 
 OneOfElementDecl *OneOfType::getElement(Identifier Name) const {
   // FIXME: Linear search is not great for large oneof decls.
-  for (unsigned i = 0, e = Elements.size(); i != e; ++i)
-    if (Elements[i]->Name == Name)
-      return Elements[i];
+  for (OneOfElementDecl *Elt : Elements)
+    if (Elt->Name == Name)
+      return Elt;
   return 0;
 }
 

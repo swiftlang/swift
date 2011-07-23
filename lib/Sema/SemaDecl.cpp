@@ -99,8 +99,7 @@ void SemaDecl::handleEndOfTranslationUnit(TranslationUnitDecl *TUD,
   // Verify that any forward declared types were ultimately defined.
   // TODO: Move this to name binding!
   unsigned Next = 0;
-  for (unsigned i = 0, e = UnresolvedTypeList.size(); i != e; ++i) {
-    TypeAliasDecl *Decl = UnresolvedTypeList[i];
+  for (TypeAliasDecl *Decl : UnresolvedTypeList) {
     
     // If a type got defined, remove it from the vector.
     if (!isa<UnresolvedType>(Decl->UnderlyingTy.getPointer()))

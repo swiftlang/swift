@@ -114,12 +114,12 @@ void ReferencedModule::lookupValue(ImportDecl *ID, Identifier Name,
   if (I == TopLevelValues.end()) return;
   
   Result.reserve(I->second.size());
-  for (unsigned i = 0, e = I->second.size(); i != e; ++i) {
+  for (ValueDecl *Elt : I->second) {
     // Dot Lookup ignores values with non-function types.
-    if (LookupKind == NLK_DotLookup && !I->second[i]->Ty->is<FunctionType>())
+    if (LookupKind == NLK_DotLookup && !Elt->Ty->is<FunctionType>())
       continue;
     
-    Result.push_back(I->second[i]);
+    Result.push_back(Elt);
   }
 }
 
@@ -140,8 +140,8 @@ namespace {
     ASTContext &Context;
     NameBinder(ASTContext &C) : Context(C) {}
     ~NameBinder() {
-      for (unsigned i = 0, e = LoadedModules.size(); i != e; ++i)
-        delete LoadedModules[i];      
+      for (ReferencedModule *M : LoadedModules)
+        delete M;
     }
     
     void addNamedTopLevelDecl(ValueDecl *VD) {
@@ -258,8 +258,8 @@ void NameBinder::addImport(ImportDecl *ID) {
 /// has already been resolved within the current translation unit.  This returns
 /// null if there is no match found.
 TypeAliasDecl *NameBinder::lookupTypeName(Identifier Name) {
-  for (unsigned i = 0, e = Imports.size(); i != e; ++i)
-    if (TypeAliasDecl *D = Imports[i].second->lookupType(Imports[i].first,Name))
+  for (auto &ImpEntry : Imports)
+    if (TypeAliasDecl *D = ImpEntry.second->lookupType(ImpEntry.first, Name))
       return D;
 
   return 0;
@@ -274,14 +274,11 @@ void NameBinder::bindValueName(Identifier Name,
                                SmallVectorImpl<ValueDecl*> &Result,
                                NLKind LookupKind) {
   // Resolve forward references defined within the module.
-  llvm::DenseMap<Identifier, llvm::TinyPtrVector<ValueDecl*> >::iterator I =
-    TopLevelValues.find(Name);
+  auto I = TopLevelValues.find(Name);
   // If we found a match, return the decls.
   if (I != TopLevelValues.end()) {
     Result.reserve(I->second.size());
-    for (unsigned i = 0, e = I->second.size(); i != e; ++i) {
-      ValueDecl *VD = I->second[i];
-      
+    for (ValueDecl *VD : I->second) {
       // Dot Lookup ignores values with non-function types.
       if (LookupKind == NLK_DotLookup && !VD->Ty->is<FunctionType>())
         continue;
@@ -294,8 +291,8 @@ void NameBinder::bindValueName(Identifier Name,
 
   // If we still haven't found it, scrape through all of the imports, taking the
   // first match of the name.
-  for (unsigned i = 0, e = Imports.size(); i != e; ++i) {
-    Imports[i].second->lookupValue(Imports[i].first, Name, Result, LookupKind);
+  for (auto &ImpEntry : Imports) {
+    ImpEntry.second->lookupValue(ImpEntry.first, Name, Result, LookupKind);
     if (!Result.empty()) return;  // If we found a match, return the decls.
   }
 }
@@ -366,9 +363,7 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
   
   // Type binding.  Loop over all of the unresolved types in the translation
   // unit, resolving them with imports.
-  for (unsigned i = 0, e = TUD->UnresolvedTypesForParser.size(); i != e; ++i) {
-    TypeAliasDecl *TA = TUD->UnresolvedTypesForParser[i];
-
+  for (TypeAliasDecl *TA : TUD->UnresolvedTypesForParser) {
     if (TypeAliasDecl *Result = Binder.lookupTypeName(TA->Name)) {
       assert(isa<UnresolvedType>(TA->UnderlyingTy.getPointer()) &&
              "Not an unresolved type");
