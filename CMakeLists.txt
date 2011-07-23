@@ -67,11 +67,14 @@ set(SWIFT_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 # Xcode: use libc++ and c++'0x using proper build settings.
 if ( XCODE )
   # Force usage of Clang.
-  set(CMAKE_XCODE_ATTRIBUTE_GCC_VERSION "com.apple.compilers.llvm.clang.1_0")
+  set(CMAKE_XCODE_ATTRIBUTE_GCC_VERSION "com.apple.compilers.llvm.clang.1_0"
+      CACHE STRING "Xcode Compiler")
   # Use C++'0X.
-  set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD "gnu++0x")
+  set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD "c++0x"
+      CACHE STRING "Xcode C++ Language Standard")
   # Use libc++.
-  #set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++")
+  set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++"
+      CACHE STRING "Xcode C++ Standard Library")
   # Enable some warnings not enabled by default.
   set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_ABOUT_RETURN_TYPE "YES")
   set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_UNUSED_VALUE "YES")
