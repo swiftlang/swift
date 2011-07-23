@@ -88,10 +88,10 @@ Type TupleType::getEmpty(ASTContext &C) { return C.TheEmptyTupleType; }
 void TupleType::Profile(llvm::FoldingSetNodeID &ID,
                         ArrayRef<TupleTypeElt> Fields) {
   ID.AddInteger(Fields.size());
-  for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
-    ID.AddPointer(Fields[i].Ty.getPointer());
-    ID.AddPointer(Fields[i].Name.get());
-    ID.AddPointer(Fields[i].Init);
+  for (auto &I : Fields) {
+    ID.AddPointer(I.Ty.getPointer());
+    ID.AddPointer(I.Name.get());
+    ID.AddPointer(I.Init);
   }
 }
 

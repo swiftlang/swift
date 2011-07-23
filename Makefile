@@ -23,6 +23,8 @@ PARALLEL_DIRS :=
 
 endif
 
+CXX.Flags += -std=gnu++0x
+
 ifeq ($(MAKECMDGOALS),libs-only)
   DIRS := $(filter-out tools docs, $(DIRS))
   OPTIONAL_DIRS :=
