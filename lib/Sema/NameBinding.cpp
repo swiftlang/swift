@@ -41,7 +41,7 @@ namespace {
     // FIXME: A module can be more than one translation unit eventually.
     TranslationUnitDecl *TUD;
     
-    llvm::DenseMap<Identifier, llvm::TinyPtrVector<ValueDecl*> > TopLevelValues;
+    llvm::DenseMap<Identifier, llvm::TinyPtrVector<ValueDecl*>> TopLevelValues;
     llvm::DenseMap<Identifier, TypeAliasDecl *> TopLevelTypes;
 
   public:
@@ -81,8 +81,7 @@ TypeAliasDecl *ReferencedModule::lookupType(ImportDecl *ID, Identifier Name) {
             TopLevelTypes[TAD->Name] = TAD;
   }
   
-  llvm::DenseMap<Identifier, TypeAliasDecl*>::iterator I =
-    TopLevelTypes.find(Name);
+  auto I = TopLevelTypes.find(Name);
   return I != TopLevelTypes.end() ? I->second : 0;
 }
 
@@ -109,8 +108,7 @@ void ReferencedModule::lookupValue(ImportDecl *ID, Identifier Name,
             TopLevelValues[VD->Name].push_back(VD);
   }
    
-  llvm::DenseMap<Identifier, llvm::TinyPtrVector<ValueDecl*> >::iterator I =
-    TopLevelValues.find(Name);
+  auto I = TopLevelValues.find(Name);
   if (I == TopLevelValues.end()) return;
   
   Result.reserve(I->second.size());
@@ -129,7 +127,7 @@ namespace {
     std::vector<ReferencedModule *> LoadedModules;
     
     /// TopLevelValues - This is the list of top-level declarations we have.
-    llvm::DenseMap<Identifier, llvm::TinyPtrVector<ValueDecl*> > TopLevelValues;
+    llvm::DenseMap<Identifier, llvm::TinyPtrVector<ValueDecl*>> TopLevelValues;
     SmallVector<std::pair<ImportDecl*, ReferencedModule*>, 4> Imports;
     
     llvm::error_code findModule(StringRef Module, 

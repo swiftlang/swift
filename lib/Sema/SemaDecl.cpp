@@ -247,7 +247,7 @@ ActOnElementName(Identifier Name, SMLoc NameLoc, VarDecl *D,
 //===----------------------------------------------------------------------===//
 
 Decl *SemaDecl::ActOnImportDecl(SMLoc ImportLoc,
-                        ArrayRef<std::pair<Identifier, SMLoc> > Path,
+                        ArrayRef<std::pair<Identifier, SMLoc>> Path,
                                 DeclAttributes &Attrs) {
   if (!Attrs.empty())
     error(Attrs.LSquareLoc, "invalid attributes specified for import");
