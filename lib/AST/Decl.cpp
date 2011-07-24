@@ -40,16 +40,17 @@ SMLoc TranslationUnitDecl::getLocStart() const {
 
 SMLoc Decl::getLocStart() const {
   switch (getKind()) {
-  case TranslationUnitDeclKind:
+  case DeclKind::TranslationUnit:
     return cast<TranslationUnitDecl>(this)->getLocStart();
-  case ImportDeclKind: return cast<ImportDecl>(this)->getLocStart();
-  case TypeAliasDeclKind:  return cast<TypeAliasDecl>(this)->getLocStart(); 
-  case VarDeclKind:        return cast<VarDecl>(this)->getLocStart();
-  case FuncDeclKind:       return cast<FuncDecl>(this)->getLocStart();
-  case MethDeclKind:       return cast<MethDecl>(this)->getLocStart();
-  case OneOfElementDeclKind:return cast<OneOfElementDecl>(this)->getLocStart();
-  case ArgDeclKind:        return cast<ArgDecl>(this)->getLocStart();
-  case ElementRefDeclKind: return cast<ElementRefDecl>(this)->getLocStart();
+  case DeclKind::Import: return cast<ImportDecl>(this)->getLocStart();
+  case DeclKind::TypeAlias:  return cast<TypeAliasDecl>(this)->getLocStart(); 
+  case DeclKind::Var:        return cast<VarDecl>(this)->getLocStart();
+  case DeclKind::Func:       return cast<FuncDecl>(this)->getLocStart();
+  case DeclKind::Meth:       return cast<MethDecl>(this)->getLocStart();
+  case DeclKind::OneOfElement:
+    return cast<OneOfElementDecl>(this)->getLocStart();
+  case DeclKind::Arg:        return cast<ArgDecl>(this)->getLocStart();
+  case DeclKind::ElementRef: return cast<ElementRefDecl>(this)->getLocStart();
   }
 
   assert(0 && "Unknown decl kind");
@@ -108,17 +109,19 @@ void Decl::dump() const { print(llvm::errs()); llvm::errs() << '\n'; }
 
 void Decl::print(raw_ostream &OS, unsigned Indent) const {
   switch (getKind()) {
-  case TranslationUnitDeclKind:
+  case DeclKind::TranslationUnit:
     return cast<TranslationUnitDecl>(this)->print(OS, Indent);
-  case ImportDeclKind:     return cast<ImportDecl>(this)->print(OS, Indent);
-  case TypeAliasDeclKind:  return cast<TypeAliasDecl>(this)->print(OS, Indent);
-  case VarDeclKind:        return cast<VarDecl>(this)->print(OS, Indent);
-  case FuncDeclKind:       return cast<FuncDecl>(this)->print(OS, Indent);
-  case MethDeclKind:       return cast<MethDecl>(this)->print(OS, Indent);
-  case OneOfElementDeclKind:
+  case DeclKind::Import:     return cast<ImportDecl>(this)->print(OS, Indent);
+  case DeclKind::TypeAlias:
+    return cast<TypeAliasDecl>(this)->print(OS, Indent);
+  case DeclKind::Var:        return cast<VarDecl>(this)->print(OS, Indent);
+  case DeclKind::Func:       return cast<FuncDecl>(this)->print(OS, Indent);
+  case DeclKind::Meth:       return cast<MethDecl>(this)->print(OS, Indent);
+  case DeclKind::OneOfElement:
     return cast<OneOfElementDecl>(this)->print(OS,Indent);
-  case ArgDeclKind:        return cast<ArgDecl>(this)->print(OS, Indent);
-  case ElementRefDeclKind: return cast<ElementRefDecl>(this)->print(OS, Indent);
+  case DeclKind::Arg:        return cast<ArgDecl>(this)->print(OS, Indent);
+  case DeclKind::ElementRef:
+    return cast<ElementRefDecl>(this)->print(OS, Indent);
   }
 }
 

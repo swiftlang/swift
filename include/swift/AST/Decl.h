@@ -32,16 +32,16 @@ namespace swift {
   class NameAliasType;
   class TypeAliasDecl;
   
-enum DeclKind {
-  TranslationUnitDeclKind,
-  ImportDeclKind,
-  TypeAliasDeclKind,
-  VarDeclKind,
-  FuncDeclKind,
-  MethDeclKind,
-  OneOfElementDeclKind,
-  ArgDeclKind,
-  ElementRefDeclKind
+enum class DeclKind {
+  TranslationUnit,
+  Import,
+  TypeAlias,
+  Var,
+  Func,
+  Meth,
+  OneOfElement,
+  Arg,
+  ElementRef
 };
   
 /// DeclAttributes - These are attributes that may be applied to declarations.
@@ -144,7 +144,7 @@ public:
   ArrayRef<TypeAliasDecl*> UnresolvedTypesForParser;
   
   TranslationUnitDecl(ASTContext &C)
-    : Decl(TranslationUnitDeclKind), Ctx(C) {
+    : Decl(DeclKind::TranslationUnit), Ctx(C) {
   }
 
   SMLoc getLocStart() const;
@@ -153,7 +153,7 @@ public:
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->getKind() == TranslationUnitDeclKind;
+    return D->getKind() == DeclKind::TranslationUnit;
   }
   static bool classof(const TranslationUnitDecl *D) { return true; }
 };
@@ -168,7 +168,7 @@ public:
   
   ImportDecl(SMLoc importLoc,
              ArrayRef<std::pair<Identifier,SMLoc>> path)
-    : Decl(ImportDeclKind), ImportLoc(importLoc), AccessPath(path) {
+    : Decl(DeclKind::Import), ImportLoc(importLoc), AccessPath(path) {
   }
   
   SMLoc getLocStart() const { return ImportLoc; }
@@ -177,7 +177,7 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->getKind() == ImportDeclKind;
+    return D->getKind() == DeclKind::Import;
   }
   static bool classof(const ImportDecl *D) { return true; }
 };
@@ -191,12 +191,12 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return (D->getKind() == VarDeclKind || D->getKind() == FuncDeclKind ||
-            D->getKind() == MethDeclKind ||
-            D->getKind() == OneOfElementDeclKind ||
-            D->getKind() == ArgDeclKind || 
-            D->getKind() == ElementRefDeclKind ||
-            D->getKind() == TypeAliasDeclKind);
+    return (D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Func ||
+            D->getKind() == DeclKind::Meth ||
+            D->getKind() == DeclKind::OneOfElement ||
+            D->getKind() == DeclKind::Arg || 
+            D->getKind() == DeclKind::ElementRef ||
+            D->getKind() == DeclKind::TypeAlias);
   }
   static bool classof(const NamedDecl *D) { return true; }
   
@@ -222,7 +222,7 @@ public:
   
   TypeAliasDecl(SMLoc typealiasloc, Identifier name, Type underlyingty,
                 const DeclAttributes &attrs = DeclAttributes())
-    : NamedDecl(TypeAliasDeclKind, name, attrs), AliasTy(0),
+    : NamedDecl(DeclKind::TypeAlias, name, attrs), AliasTy(0),
       TypeAliasLoc(typealiasloc), UnderlyingTy(underlyingty) {
   }
 
@@ -235,7 +235,7 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->getKind() == TypeAliasDeclKind;
+    return D->getKind() == DeclKind::TypeAlias;
   }
   static bool classof(const TypeAliasDecl *D) { return true; }
 };
@@ -249,10 +249,11 @@ public:
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return (D->getKind() == VarDeclKind || D->getKind() == FuncDeclKind ||
-            D->getKind() == MethDeclKind ||
-            D->getKind() == OneOfElementDeclKind ||D->getKind() == ArgDeclKind||
-            D->getKind() == ElementRefDeclKind);
+    return (D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Func ||
+            D->getKind() == DeclKind::Meth ||
+            D->getKind() == DeclKind::OneOfElement ||
+            D->getKind() == DeclKind::Arg ||
+            D->getKind() == DeclKind::ElementRef);
   }
   static bool classof(const ValueDecl *D) { return true; }
 
@@ -276,11 +277,11 @@ public:
   
   VarDecl(SMLoc varloc, Identifier name, Type ty, Expr *init,
           const DeclAttributes &attrs)
-    : ValueDecl(VarDeclKind, name, ty, init, attrs), VarLoc(varloc),
+    : ValueDecl(DeclKind::Var, name, ty, init, attrs), VarLoc(varloc),
       NestedName(0) {}
   VarDecl(SMLoc varloc, DeclVarName *name, Type ty, Expr *init,
           const DeclAttributes &attrs)
-    : ValueDecl(VarDeclKind, Identifier(), ty, init, attrs), VarLoc(varloc),
+    : ValueDecl(DeclKind::Var, Identifier(), ty, init, attrs), VarLoc(varloc),
       NestedName(name) {}
 
   
@@ -289,7 +290,7 @@ public:
   void print(raw_ostream &OS, unsigned Indent = 0) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) { return D->getKind() == VarDeclKind; }
+  static bool classof(const Decl *D) { return D->getKind() == DeclKind::Var; }
   static bool classof(const VarDecl *D) { return true; }
 
 };
@@ -302,7 +303,7 @@ public:
 
   FuncDecl(SMLoc funcloc, Identifier name, Type ty, Expr *init,
           const DeclAttributes &attrs)
-    : ValueDecl(FuncDeclKind, name, ty, init, attrs), FuncLoc(funcloc) {}
+    : ValueDecl(DeclKind::Func, name, ty, init, attrs), FuncLoc(funcloc) {}
   
   
   SMLoc getLocStart() const { return FuncLoc; }
@@ -311,7 +312,7 @@ public:
   void print(raw_ostream &OS, unsigned Indent = 0) const;
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) { return D->getKind() == FuncDeclKind; }
+  static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
   static bool classof(const FuncDecl *D) { return true; }
 };
 
@@ -322,7 +323,7 @@ public:
   
   MethDecl(SMLoc methloc, Identifier name, Type ty, Expr *init,
            const DeclAttributes &attrs)
-  : ValueDecl(MethDeclKind, name, ty, init, attrs), MethLoc(methloc) {}
+  : ValueDecl(DeclKind::Meth, name, ty, init, attrs), MethLoc(methloc) {}
   
   
   SMLoc getLocStart() const { return MethLoc; }
@@ -331,7 +332,7 @@ public:
   void print(raw_ostream &OS, unsigned Indent = 0) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) { return D->getKind() == MethDeclKind; }
+  static bool classof(const Decl *D) { return D->getKind() == DeclKind::Meth; }
   static bool classof(const MethDecl *D) { return true; }
 };
 
@@ -352,7 +353,7 @@ public:
   
   
   OneOfElementDecl(SMLoc identloc, Identifier name, Type ty, Type argtype)
-  : ValueDecl(OneOfElementDeclKind, name, ty, 0),
+  : ValueDecl(DeclKind::OneOfElement, name, ty, 0),
     IdentifierLoc(identloc), ArgumentType(argtype) {}
 
   
@@ -362,7 +363,7 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->getKind() == OneOfElementDeclKind;
+    return D->getKind() == DeclKind::OneOfElement;
   }
   static bool classof(const OneOfElementDecl *D) { return true; }
  
@@ -382,7 +383,8 @@ public:
   // FIXME: Store the access path here.
   
   ArgDecl(SMLoc funcloc, Identifier name, Type ty)
-    : ValueDecl(ArgDeclKind, name, ty, 0, DeclAttributes()), FuncLoc(funcloc) {}
+    : ValueDecl(DeclKind::Arg, name, ty, 0, DeclAttributes()),
+      FuncLoc(funcloc) {}
 
 
   SMLoc getLocStart() const { return FuncLoc; }
@@ -391,7 +393,7 @@ public:
   void print(raw_ostream &OS, unsigned Indent = 0) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) { return D->getKind() == ArgDeclKind; }
+  static bool classof(const Decl *D) { return D->getKind() == DeclKind::Arg; }
   static bool classof(const ArgDecl *D) { return true; }
 };
 
@@ -407,7 +409,7 @@ public:
   
   ElementRefDecl(VarDecl *vd, SMLoc nameloc, Identifier name,
                  ArrayRef<unsigned> path, Type ty)
-    : ValueDecl(ElementRefDeclKind, name, ty, 0), VD(vd), NameLoc(nameloc),
+    : ValueDecl(DeclKind::ElementRef, name, ty, 0), VD(vd), NameLoc(nameloc),
       AccessPath(path) {
   }
 
@@ -423,7 +425,9 @@ public:
   void print(raw_ostream &OS, unsigned Indent = 0) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) { return D->getKind()==ElementRefDeclKind;}
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::ElementRef;
+  }
   static bool classof(const ElementRefDecl *D) { return true; }
 };
 
