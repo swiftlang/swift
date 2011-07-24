@@ -51,8 +51,8 @@ namespace swift {
 /// TypeBase - Base class for all types in Swift.
 class TypeBase {
   friend class ASTContext;
-  TypeBase(const TypeBase&);                 // DO NOT IMPLEMENT
-  void operator=(const TypeBase&);           // DO NOT IMPLEMENT
+  TypeBase(const TypeBase&) = delete;
+  void operator=(const TypeBase&) = delete;
   
   /// CanonicalType - This field is always set to 'this' for canonical types,
   /// and is otherwise lazily populated by ASTContext when the canonical form of
@@ -107,9 +107,9 @@ public:
 
 private:
   // Make placement new and vanilla new/delete illegal for Types.
-  void *operator new(size_t Bytes) throw();  // DO NOT IMPLEMENT.
-  void operator delete(void *Data) throw();  // DO NOT IMPLEMENT.
-  void *operator new(size_t Bytes, void *Mem) throw();  // DO NOT IMPLEMENT.
+  void *operator new(size_t Bytes) throw() = delete;
+  void operator delete(void *Data) throw() = delete;
+  void *operator new(size_t Bytes, void *Mem) throw() = delete;
 public:
   // Only allow allocation of Types using the allocator in ASTContext
   // or by doing a placement new.

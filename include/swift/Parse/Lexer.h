@@ -34,8 +34,8 @@ class Lexer {
   const char *CurPtr;
   ASTContext &Context;
 
-  Lexer(const Lexer&);          // DO NOT IMPLEMENT
-  void operator=(const Lexer&); // DO NOT IMPLEMENT
+  Lexer(const Lexer&) = delete;
+  void operator=(const Lexer&) = delete;
 public:
   Lexer(unsigned BufferID, ASTContext &Context);
   

@@ -30,8 +30,8 @@ namespace swift {
 /// Sema - This is the common semantic analysis module, which has the high-level
 /// state that is shared by subclasses.
 class Sema {
-  Sema(const Sema&);           // DO NOT IMPLEMENT
-  void operator=(const Sema&); // DO NOT IMPLEMENT
+  Sema(const Sema&) = delete;
+  void operator=(const Sema&) = delete;
 public:
   ASTContext &Context;
   

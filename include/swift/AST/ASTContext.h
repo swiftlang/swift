@@ -40,8 +40,8 @@ namespace swift {
 
 /// ASTContext - This object creates and owns the AST objects.
 class ASTContext {
-  ASTContext(const ASTContext&);           // DO NOT IMPLEMENT
-  void operator=(const ASTContext&);       // DO NOT IMPLEMENT
+  ASTContext(const ASTContext&) = delete;
+  void operator=(const ASTContext&) = delete;
   llvm::BumpPtrAllocator *Allocator;
   bool HadError;
 public:

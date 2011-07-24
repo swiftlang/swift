@@ -26,8 +26,8 @@ namespace swift {
 /// the common stuff used by all sema modules.  It should not have any
 /// non-trivial state because it is replicated into every SemaXXX subclass.
 class SemaBase {
-  SemaBase(const SemaBase&);           // DO NOT IMPLEMENT
-  void operator=(const SemaBase&);     // DO NOT IMPLEMENT
+  SemaBase(const SemaBase&) = delete;
+  void operator=(const SemaBase&) = delete;
 public:
   Sema &S;
   explicit SemaBase(Sema &s) : S(s) {}

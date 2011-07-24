@@ -88,9 +88,9 @@ public:
 
 private:
   // Make placement new and vanilla new/delete illegal for DeclVarNames.
-  void *operator new(size_t Bytes) throw();  // DO NOT IMPLEMENT.
-  void operator delete(void *Data) throw();  // DO NOT IMPLEMENT.
-  void *operator new(size_t Bytes, void *Mem) throw();  // DO NOT IMPLEMENT.
+  void *operator new(size_t Bytes) throw() = delete;
+  void operator delete(void *Data) throw() = delete;
+  void *operator new(size_t Bytes, void *Mem) throw() = delete;
 public:
   // Only allow allocation of Types using the allocator in ASTContext
   // or by doing a placement new.
@@ -101,8 +101,8 @@ public:
 
 /// Decl - Base class for all declarations in Swift.
 class Decl {
-  Decl(const Decl&);                 // DO NOT IMPLEMENT
-  void operator=(const Decl&);       // DO NOT IMPLEMENT
+  Decl(const Decl&) = delete;
+  void operator=(const Decl&) = delete;
   DeclKind Kind;
 protected:
   Decl(DeclKind kind) : Kind(kind) {}
@@ -119,9 +119,9 @@ public:
   
 private:
   // Make placement new and vanilla new/delete illegal for Decls.
-  void *operator new(size_t Bytes) throw();  // DO NOT IMPLEMENT.
-  void operator delete(void *Data) throw();  // DO NOT IMPLEMENT.
-  void *operator new(size_t Bytes, void *Mem) throw();  // DO NOT IMPLEMENT.
+  void *operator new(size_t Bytes) throw() = delete;
+  void operator delete(void *Data) throw() = delete;
+  void *operator new(size_t Bytes, void *Mem) throw() = delete;
 public:
   // Only allow allocation of Types using the allocator in ASTContext
   // or by doing a placement new.

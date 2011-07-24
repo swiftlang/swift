@@ -62,8 +62,8 @@ class Parser {
   /// Tok - This is the current token being considered by the parser.
   Token Tok;
   
-  Parser(const Parser&);         // DO NOT IMPLEMENT
-  void operator=(const Parser&); // DO NOT IMPLEMENT
+  Parser(const Parser&) = delete;
+  void operator=(const Parser&) = delete;
 public:
   Parser(unsigned BufferID, ASTContext &Ctx);
   ~Parser();

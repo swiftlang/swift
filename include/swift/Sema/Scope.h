@@ -31,8 +31,8 @@ namespace swift {
 /// to them.
 ///
 class Scope {
-  Scope(const Scope&);          // DO NOT IMPLEMENT
-  void operator=(const Scope&); // DO NOT IMPLEMENT
+  Scope(const Scope&) = delete;
+  void operator=(const Scope&) = delete;
   
   SemaDecl &SD;
 

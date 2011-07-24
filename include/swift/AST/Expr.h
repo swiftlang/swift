@@ -60,8 +60,8 @@ enum ExprKind {
   
 /// Expr - Base class for all expressions in swift.
 class Expr {
-  Expr(const Expr&);                 // DO NOT IMPLEMENT
-  void operator=(const Expr&);       // DO NOT IMPLEMENT
+  Expr(const Expr&) = delete;
+  void operator=(const Expr&) = delete;
 public:
   /// Kind - The subclass of Expr that this is.
   const ExprKind Kind;
@@ -125,9 +125,9 @@ public:
 
 private:
   // Make placement new and vanilla new/delete illegal for Exprs.
-  void *operator new(size_t Bytes) throw();  // DO NOT IMPLEMENT.
-  void operator delete(void *Data) throw();  // DO NOT IMPLEMENT.
-  void *operator new(size_t Bytes, void *Mem) throw();  // DO NOT IMPLEMENT.
+  void *operator new(size_t Bytes) throw() = delete;
+  void operator delete(void *Data) throw() = delete;
+  void *operator new(size_t Bytes, void *Mem) throw() = delete;
 public:
   // Only allow allocation of Exprs using the allocator in ASTContext
   // or by doing a placement new.
