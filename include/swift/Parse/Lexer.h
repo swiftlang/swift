@@ -48,7 +48,7 @@ public:
 private:
   void warning(const char *Loc, const Twine &Message);
   void error(const char *Loc, const Twine &Message);
-  void FormToken(tok::TokenKind Kind, const char *TokStart, Token &Result);
+  void FormToken(tok Kind, const char *TokStart, Token &Result);
   
   void SkipSlashSlashComment();
   void LexIdentifier(Token &Result);

@@ -23,60 +23,58 @@
 
 namespace swift {
 
-namespace tok {
-  enum TokenKind {
-    unknown = 0,
-    eof,
-    identifier,
-    dollarident,
-    numeric_constant,
-    
+enum class tok {
+  unknown = 0,
+  eof,
+  identifier,
+  dollarident,
+  numeric_constant,
+  
 #define KEYWORD(X) kw_ ## X,
-    // Types.  No uint version should be added here, these should always be
-    // wrapped with UDT's that have the operations.  These correspond to LLVM IR
-    // types.
-    KEYWORD(__builtin_int1_type)
-    KEYWORD(__builtin_int8_type)
-    KEYWORD(__builtin_int16_type)
-    KEYWORD(__builtin_int32_type)
-    KEYWORD(__builtin_int64_type)
+  // Types.  No uint version should be added here, these should always be
+  // wrapped with UDT's that have the operations.  These correspond to LLVM IR
+  // types.
+  KEYWORD(__builtin_int1_type)
+  KEYWORD(__builtin_int8_type)
+  KEYWORD(__builtin_int16_type)
+  KEYWORD(__builtin_int32_type)
+  KEYWORD(__builtin_int64_type)
 //    KEYWORD(__builtin_float_type)
 //    KEYWORD(__builtin_double_type)
 
-    KEYWORD(import)
-    KEYWORD(oneof)
-    KEYWORD(struct)
-    KEYWORD(func)
-    KEYWORD(meth)
-    KEYWORD(var)
-    KEYWORD(typealias)
-    
-    // Statements
-    KEYWORD(if)
-    KEYWORD(else)
+  KEYWORD(import)
+  KEYWORD(oneof)
+  KEYWORD(struct)
+  KEYWORD(func)
+  KEYWORD(meth)
+  KEYWORD(var)
+  KEYWORD(typealias)
+  
+  // Statements
+  KEYWORD(if)
+  KEYWORD(else)
 #undef KEYWORD
-    
+  
 #define PUNCTUATOR(X, Y) X,
-    PUNCTUATOR(l_paren,     "(")
-    PUNCTUATOR(r_paren,     ")")
-    PUNCTUATOR(l_brace,     "{")
-    PUNCTUATOR(r_brace,     "}")
-    PUNCTUATOR(l_square,    "[")
-    PUNCTUATOR(r_square,    "]")
+  PUNCTUATOR(l_paren,     "(")
+  PUNCTUATOR(r_paren,     ")")
+  PUNCTUATOR(l_brace,     "{")
+  PUNCTUATOR(r_brace,     "}")
+  PUNCTUATOR(l_square,    "[")
+  PUNCTUATOR(r_square,    "]")
 
-    PUNCTUATOR(period,      ".")
-    PUNCTUATOR(comma,       ",")
-    PUNCTUATOR(colon,       ":")
-    PUNCTUATOR(coloncolon,  "::")
-    PUNCTUATOR(semi,        ";")
-    PUNCTUATOR(equal,       "=")
-    
-    PUNCTUATOR(arrow,       "->")
+  PUNCTUATOR(period,      ".")
+  PUNCTUATOR(comma,       ",")
+  PUNCTUATOR(colon,       ":")
+  PUNCTUATOR(coloncolon,  "::")
+  PUNCTUATOR(semi,        ";")
+  PUNCTUATOR(equal,       "=")
+  
+  PUNCTUATOR(arrow,       "->")
 #undef PUNCTUATOR
-    
-    NUM_TOKENS
-  };
-} // end namespace tok.
+  
+  NUM_TOKENS
+};
 
 /// Token - This structure provides full information about a lexed token.
 /// It is not intended to be space efficient, it is intended to return as much
@@ -86,7 +84,7 @@ namespace tok {
 class Token {
   /// Kind - The actual flavor of token this is.
   ///
-  tok::TokenKind Kind;
+  tok Kind;
   
   /// Text - The actual string covered by the token in the source buffer.
   StringRef Text;
@@ -94,13 +92,13 @@ class Token {
 public:
   Token() : Kind(tok::unknown) {}
   
-  tok::TokenKind getKind() const { return Kind; }
-  void setKind(tok::TokenKind K) { Kind = K; }
+  tok getKind() const { return Kind; }
+  void setKind(tok K) { Kind = K; }
   
   /// is/isNot - Predicates to check if this token is a specific kind, as in
   /// "if (Tok.is(tok::l_brace)) {...}".
-  bool is(tok::TokenKind K) const { return Kind == K; }
-  bool isNot(tok::TokenKind K) const { return Kind != K; }
+  bool is(tok K) const { return Kind == K; }
+  bool isNot(tok K) const { return Kind != K; }
   
   /// getLoc - Return a source location identifier for the specified
   /// offset in the current file.
@@ -115,7 +113,7 @@ public:
   
   /// setToken - Set the token to the specified kind and source range.
   ///
-  void setToken(tok::TokenKind K, StringRef T) {
+  void setToken(tok K, StringRef T) {
     Kind = K;
     Text = T;
   }

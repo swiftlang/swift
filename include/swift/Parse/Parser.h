@@ -75,14 +75,14 @@ public:
 private:
   // Utilities.
   SMLoc consumeToken();
-  SMLoc consumeToken(tok::TokenKind K) {
+  SMLoc consumeToken(tok K) {
     assert(Tok.is(K) && "Consuming wrong token kind");
     return consumeToken();
   }
   
   /// consumeIf - If the current token is the specified kind, consume it and
   /// return true.  Otherwise, return false without consuming it.
-  bool consumeIf(tok::TokenKind K) {
+  bool consumeIf(tok K) {
     if (Tok.isNot(K)) return false;
     consumeToken(K);
     return true;
@@ -92,7 +92,7 @@ private:
   /// without consuming it.  Because we cannot guarantee that the token will
   /// ever occur, this skips to some likely good stopping point.
   ///
-  void skipUntil(tok::TokenKind T);
+  void skipUntil(tok T);
   
   void note(SMLoc Loc, const Twine &Message);
   void warning(SMLoc Loc, const Twine &Message);
@@ -107,8 +107,7 @@ private:
   /// If the input is malformed, this emits the specified error diagnostic.
   /// Next, if SkipToTok is specified, it calls skipUntil(SkipToTok).  Finally,
   /// true is returned.
-  bool parseToken(tok::TokenKind K, const char *Message,
-                  tok::TokenKind SkipToTok = tok::unknown);
+  bool parseToken(tok K, const char *Message, tok SkipToTok = tok::unknown);
   
   bool parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init);
   

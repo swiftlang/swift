@@ -68,7 +68,7 @@ SMLoc Parser::consumeToken() {
 /// Because we cannot guarantee that the token will ever occur, this skips to
 /// some likely good stopping point.
 ///
-void Parser::skipUntil(tok::TokenKind T) {
+void Parser::skipUntil(tok T) {
   // tok::unknown is a sentinel that means "don't skip".
   if (T == tok::unknown) return;
   
@@ -104,8 +104,7 @@ bool Parser::parseIdentifier(Identifier &Result, const Twine &Message) {
 /// If the input is malformed, this emits the specified error diagnostic.
 /// Next, if SkipToTok is specified, it calls skipUntil(SkipToTok).  Finally,
 /// true is returned.
-bool Parser::parseToken(tok::TokenKind K, const char *Message,
-                        tok::TokenKind SkipToTok) {
+bool Parser::parseToken(tok K, const char *Message, tok SkipToTok) {
   if (Tok.is(K)) {
     consumeToken(K);
     return false;

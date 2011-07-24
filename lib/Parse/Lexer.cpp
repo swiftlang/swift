@@ -43,7 +43,7 @@ void Lexer::error(const char *Loc, const Twine &Message) {
 }
 
 
-void Lexer::FormToken(tok::TokenKind Kind, const char *TokStart, Token &Result){
+void Lexer::FormToken(tok Kind, const char *TokStart, Token &Result){
   Result.setToken(Kind, StringRef(TokStart, CurPtr-TokStart));
 }
 
@@ -108,8 +108,8 @@ void Lexer::LexIdentifier(Token &Result) {
   while (isalnum(*CurPtr) || *CurPtr == '_' || *CurPtr == '$')
     ++CurPtr;
   
-  tok::TokenKind Kind =
-  llvm::StringSwitch<tok::TokenKind>(StringRef(TokStart, CurPtr-TokStart))
+  tok Kind =
+  llvm::StringSwitch<tok>(StringRef(TokStart, CurPtr-TokStart))
     .Case("__builtin_int1_type",  tok::kw___builtin_int1_type)
     .Case("__builtin_int8_type",  tok::kw___builtin_int8_type)
     .Case("__builtin_int16_type", tok::kw___builtin_int16_type)
