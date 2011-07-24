@@ -164,10 +164,10 @@ public:
 class ImportDecl : public Decl {
 public:
   SMLoc ImportLoc;
-  ArrayRef<std::pair<Identifier,SMLoc> > AccessPath;
+  ArrayRef<std::pair<Identifier,SMLoc>> AccessPath;
   
   ImportDecl(SMLoc importLoc,
-             ArrayRef<std::pair<Identifier,SMLoc> > path)
+             ArrayRef<std::pair<Identifier,SMLoc>> path)
     : Decl(ImportDeclKind), ImportLoc(importLoc), AccessPath(path) {
   }
   

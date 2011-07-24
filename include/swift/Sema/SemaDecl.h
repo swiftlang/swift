@@ -94,7 +94,7 @@ public:
                                 Type Ty);
   
   Decl *ActOnImportDecl(SMLoc ImportLoc,
-                        ArrayRef<std::pair<Identifier,SMLoc> > Path,
+                        ArrayRef<std::pair<Identifier,SMLoc>> Path,
                         DeclAttributes &Attrs);
   
   VarDecl *ActOnVarDecl(SMLoc VarLoc, DeclVarName &Name, Type Ty,
