@@ -402,8 +402,9 @@ bool Parser::parseDeclVar(SmallVectorImpl<ExprOrDecl> &Decls) {
 /// caller handles this case and does recovery as appropriate.
 ///
 ///   decl-func:
-///     'func' attribute-list? identifier arg-list-type expr-brace
-///     'func' attribute-list? identifier arg-list-type 
+///     'func' attribute-list? identifier arg-list-type expr-brace?
+///     'func' attribute-list? type-identifier '::' identifier 
+///            arg-list-type expr-brace?
 FuncDecl *Parser::parseDeclFunc() {
   SMLoc FuncLoc = consumeToken(tok::kw_func);
 
@@ -412,9 +413,22 @@ FuncDecl *Parser::parseDeclFunc() {
   if (Tok.is(tok::l_square))
     parseAttributeList(Attributes);
 
+  Type ReceiverTy;
   Identifier Name;
+  SMLoc TypeNameLoc = Tok.getLoc();
   if (parseIdentifier(Name, "expected identifier in func declaration"))
     return 0;
+
+  // If this is method syntax, the first name is the receiver type.  Parse the
+  // actual function name.
+  if (consumeIf(tok::coloncolon)) {
+    // Look up the type name.
+    ReceiverTy = S.type.ActOnTypeName(TypeNameLoc, Name);
+    
+    if (parseIdentifier(Name, "expected identifier in 'func' declaration"))
+      return 0;
+  }
+
   
   // We force first type of a func declaration to be a tuple for consistency.
   if (Tok.isNot(tok::l_paren)) {
@@ -426,14 +440,9 @@ FuncDecl *Parser::parseDeclFunc() {
   if (parseType(FuncTy))
     return 0;
   
-  // If the parsed function type is not spelled as a function type (i.e., has an
-  // '->' in it), then it is implicitly a function that returns ().
-  if (!isa<FunctionType>(FuncTy.getPointer()))
-    FuncTy = S.type.ActOnFunctionType(FuncTy, SMLoc(),
-                                      TupleType::getEmpty(S.Context));
-
   // Build the decl for the function.
-  FuncDecl *FD = S.decl.ActOnFuncDecl(FuncLoc, Name, FuncTy, Attributes);
+  FuncDecl *FD = S.decl.ActOnFuncDecl(FuncLoc, ReceiverTy, Name, FuncTy,
+                                      Attributes);
   
   // Enter the func into the current scope, which allows it to be visible and
   // used within its body.
@@ -459,73 +468,6 @@ FuncDecl *Parser::parseDeclFunc() {
   }
 
   return FD;
-}
-
-
-/// parseDeclMeth - Parse a 'meth' declaration, returning null on error.  The
-/// caller handles this case and does recovery as appropriate.
-///
-///   decl-meth:
-///     'meth' attribute-list? type-identifier '::' identifier 
-///            arg-list-type expr-brace?
-///
-MethDecl *Parser::parseDeclMeth() {
-  SMLoc MethLoc = consumeToken(tok::kw_meth);
-
-  DeclAttributes Attributes;
-  // FIXME: Implicitly add immutable attribute.
-  if (Tok.is(tok::l_square))
-    parseAttributeList(Attributes);
-
-  SMLoc TypeNameLoc = Tok.getLoc();
-  
-  Identifier TypeName, FuncName;
-  if (parseIdentifier(TypeName, "expected type name in 'meth' declaration") ||
-      parseToken(tok::coloncolon, "expected '::' in 'meth' declaration") ||
-      parseIdentifier(FuncName, "expected identifier in 'meth' declaration"))
-    return 0;
-  
-  // Look up the type name.
-  Type ReceiverTy = S.type.ActOnTypeName(TypeNameLoc, TypeName);
-  
-  // We force first type of a meth declaration to be a tuple for consistency.
-  if (Tok.isNot(tok::l_paren)) {
-    error(Tok.getLoc(), "expected '(' in argument list of 'meth' declaration");
-    return 0;
-  }
-    
-  Type FuncTy;
-  if (parseType(FuncTy))
-    return 0;
-  
-  // Build the decl for the method.
-  MethDecl *MD = 
-    S.decl.ActOnMethDecl(MethLoc, ReceiverTy, FuncName, FuncTy, Attributes);
-  
-  // Enter the func into the current scope, which allows it to be visible and
-  // used within its body.
-  if (MD)
-    S.decl.AddToScope(MD);
-  
-  // Enter the arguments for the function into a new function-body scope.  We
-  // need this even if there is no function body to detect argument name
-  // duplication.
-  Scope MethBodyScope(S.decl);
-  
-  if (MD)
-    S.decl.CreateArgumentDeclsForFunc(MD);
-  
-  // Then parse the expression.
-  NullablePtr<Expr> Body;
-
-  // Check to see if we have a body.
-  if (Tok.is(tok::l_brace)) {
-    if (parseExprBrace(Body) || Body.isNull())
-      return 0;  // FIXME: Need to call a new ActOnMethBodyError?
-    S.decl.ActOnFuncBody(MD, Body.get());
-  }
-  
-  return MD;
 }
 
 /// parseDeclOneOf - Parse a 'oneof' declaration, returning null (and doing no
@@ -1182,9 +1124,6 @@ bool Parser::parseDeclExprList(SmallVectorImpl<ExprOrDecl> &Entries,
       break;
     case tok::kw_func:
       Entries.push_back(parseDeclFunc());
-      break;
-    case tok::kw_meth:
-      Entries.push_back(parseDeclMeth());
       break;
     case tok::kw_typealias:
       Entries.push_back(parseDeclTypeAlias());

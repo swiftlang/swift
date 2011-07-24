@@ -46,7 +46,6 @@ SMLoc Decl::getLocStart() const {
   case DeclKind::TypeAlias:  return cast<TypeAliasDecl>(this)->getLocStart(); 
   case DeclKind::Var:        return cast<VarDecl>(this)->getLocStart();
   case DeclKind::Func:       return cast<FuncDecl>(this)->getLocStart();
-  case DeclKind::Meth:       return cast<MethDecl>(this)->getLocStart();
   case DeclKind::OneOfElement:
     return cast<OneOfElementDecl>(this)->getLocStart();
   case DeclKind::Arg:        return cast<ArgDecl>(this)->getLocStart();
@@ -116,7 +115,6 @@ void Decl::print(raw_ostream &OS, unsigned Indent) const {
     return cast<TypeAliasDecl>(this)->print(OS, Indent);
   case DeclKind::Var:        return cast<VarDecl>(this)->print(OS, Indent);
   case DeclKind::Func:       return cast<FuncDecl>(this)->print(OS, Indent);
-  case DeclKind::Meth:       return cast<MethDecl>(this)->print(OS, Indent);
   case DeclKind::OneOfElement:
     return cast<OneOfElementDecl>(this)->print(OS,Indent);
   case DeclKind::Arg:        return cast<ArgDecl>(this)->print(OS, Indent);
@@ -181,12 +179,6 @@ void VarDecl::print(raw_ostream &OS, unsigned Indent) const {
 
 void FuncDecl::print(raw_ostream &OS, unsigned Indent) const {
   OS.indent(Indent) << "(funcdecl ";
-  printCommon(OS, Indent);
-  OS << ')';
-}
-
-void MethDecl::print(raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(methdecl ";
   printCommon(OS, Indent);
   OS << ')';
 }

@@ -124,7 +124,6 @@ private:
   bool parseDeclStruct(SmallVectorImpl<ExprOrDecl> &Decls);
   bool parseDeclVar(SmallVectorImpl<ExprOrDecl> &Decls);
   FuncDecl *parseDeclFunc();
-  MethDecl *parseDeclMeth();
   
   // Type Parsing
   bool parseType(Type &Result);

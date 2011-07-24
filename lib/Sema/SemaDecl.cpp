@@ -274,37 +274,26 @@ VarDecl *SemaDecl::ActOnVarDecl(SMLoc VarLoc, DeclVarName &Name,
 }
 
 FuncDecl *SemaDecl::
-ActOnFuncDecl(SMLoc FuncLoc, Identifier Name, Type Ty, DeclAttributes &Attrs) {
-  assert(!Ty.isNull() && "Type not specified?");
-
-  // If the parsed type is not spelled as a function type (i.e., has no '->' in
-  // it), then it is implicitly a function that returns ().
-  if (!isa<FunctionType>(Ty.getPointer()))
-    Ty = S.type.ActOnFunctionType(Ty, SMLoc(), TupleType::getEmpty(S.Context));
-
-  return new (S.Context) FuncDecl(FuncLoc, Name, Ty, 0, Attrs);
-}
-
-
-MethDecl *SemaDecl::
-ActOnMethDecl(SMLoc MethLoc, Type ReceiverType, Identifier FuncName, Type Ty,
+ActOnFuncDecl(SMLoc FuncLoc, Type ReceiverType, Identifier Name, Type Ty,
               DeclAttributes &Attrs) {
   assert(!Ty.isNull() && "Type not specified?");
-  
+
   // If the parsed type is not spelled as a function type (i.e., has no '->' in
   // it), then it is implicitly a function that returns ().
   if (!isa<FunctionType>(Ty.getPointer()))
     Ty = S.type.ActOnFunctionType(Ty, SMLoc(), TupleType::getEmpty(S.Context));
-  
-  // Install the first type as the receiver, as a tuple with element named
-  // 'this'.  This turns "int->int" on FooTy into "(this : FooTy)->(int->int)".
-  TupleTypeElt ReceiverElt(ReceiverType, S.Context.getIdentifier("this"));
-  ReceiverType = TupleType::get(ReceiverElt, S.Context);
-  Ty = S.type.ActOnFunctionType(ReceiverType, SMLoc(), Ty);
-  
-  return new (S.Context) MethDecl(MethLoc, FuncName, Ty, 0, Attrs); 
-}
 
+  // If a receiver type was specified, install the first type as the receiver,
+  // as a tuple with element named 'this'.  This turns "int->int" on FooTy into
+  // "(this : FooTy)->(int->int)".
+  if (!ReceiverType.isNull()) {
+    TupleTypeElt ReceiverElt(ReceiverType, S.Context.getIdentifier("this"));
+    ReceiverType = TupleType::get(ReceiverElt, S.Context);
+    Ty = S.type.ActOnFunctionType(ReceiverType, SMLoc(), Ty);
+  }
+  
+  return new (S.Context) FuncDecl(FuncLoc, Name, Ty, 0, Attrs);
+}
 
 /// FuncTypePiece - This little enum is used by AddFuncArgumentsToScope to keep
 /// track of where in a function type it is currently looking.  This affects how

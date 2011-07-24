@@ -99,7 +99,7 @@ public:
   
   VarDecl *ActOnVarDecl(SMLoc VarLoc, DeclVarName &Name, Type Ty,
                         Expr *Init, DeclAttributes &Attrs);
-  FuncDecl *ActOnFuncDecl(SMLoc FuncLoc, Identifier Name,
+  FuncDecl *ActOnFuncDecl(SMLoc FuncLoc, Type ReceiverTy, Identifier Name,
                           Type Ty, DeclAttributes &Attrs);
   MethDecl *ActOnMethDecl(SMLoc MethLoc, Type ReceiverType,
                           Identifier FuncName, Type Ty, DeclAttributes &Attrs);

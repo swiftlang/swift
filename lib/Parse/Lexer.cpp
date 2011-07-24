@@ -119,7 +119,7 @@ void Lexer::LexIdentifier(Token &Result) {
     .Case("oneof", tok::kw_oneof)
     .Case("struct", tok::kw_struct)
     .Case("var", tok::kw_var)
-    .Case("func", tok::kw_func).Case("meth", tok::kw_meth)
+    .Case("func", tok::kw_func)
     .Case("typealias", tok::kw_typealias)
   
     // Statements

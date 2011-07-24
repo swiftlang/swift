@@ -38,7 +38,6 @@ enum class DeclKind {
   TypeAlias,
   Var,
   Func,
-  Meth,
   OneOfElement,
   Arg,
   ElementRef
@@ -192,7 +191,6 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return (D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Func ||
-            D->getKind() == DeclKind::Meth ||
             D->getKind() == DeclKind::OneOfElement ||
             D->getKind() == DeclKind::Arg || 
             D->getKind() == DeclKind::ElementRef ||
@@ -250,7 +248,6 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return (D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Func ||
-            D->getKind() == DeclKind::Meth ||
             D->getKind() == DeclKind::OneOfElement ||
             D->getKind() == DeclKind::Arg ||
             D->getKind() == DeclKind::ElementRef);
@@ -316,27 +313,6 @@ public:
   static bool classof(const FuncDecl *D) { return true; }
 };
 
-/// MethDecl - 'meth' declaration.
-class MethDecl : public ValueDecl {
-public:
-  SMLoc MethLoc;    // Location of the 'meth' token.
-  
-  MethDecl(SMLoc methloc, Identifier name, Type ty, Expr *init,
-           const DeclAttributes &attrs)
-  : ValueDecl(DeclKind::Meth, name, ty, init, attrs), MethLoc(methloc) {}
-  
-  
-  SMLoc getLocStart() const { return MethLoc; }
-  
-  
-  void print(raw_ostream &OS, unsigned Indent = 0) const;
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) { return D->getKind() == DeclKind::Meth; }
-  static bool classof(const MethDecl *D) { return true; }
-};
-
-  
 /// OneOfElementDecl - This represents an element of a 'oneof' declaration, e.g.
 /// X and Y in:
 ///   oneof d { X : int, Y : int, Z }
