@@ -38,23 +38,23 @@ namespace swift {
   class TypeAliasDecl;
   
 enum ExprKind {
-  IntegerLiteralKind,
-  DeclRefExprKind,
-  OverloadSetRefExprKind,
-  UnresolvedDeclRefExprKind,
-  UnresolvedMemberExprKind,
-  UnresolvedScopedIdentifierExprKind,
-  TupleExprKind,
-  UnresolvedDotExprKind,
-  TupleElementExprKind,
-  TupleShuffleExprKind,
-  ApplyExprKind,
-  SequenceExprKind,
-  BraceExprKind,
-  ClosureExprKind,
-  AnonClosureArgExprKind,
-  BinaryExprKind,
-  IfExprKind
+  IntegerLiteral,
+  DeclRef,
+  OverloadSetRef,
+  UnresolvedDeclRef,
+  UnresolvedMember,
+  UnresolvedScopedIdentifier,
+  Tuple,
+  UnresolvedDot,
+  TupleElement,
+  TupleShuffle,
+  Apply,
+  Sequence,
+  Brace,
+  Closure,
+  AnonClosureArg,
+  Binary,
+  If
 };
   
   
@@ -136,20 +136,22 @@ public:
 };
 
 
-/// IntegerLiteral - Integer literal, like '4'.
-class IntegerLiteral : public Expr {
+/// IntegerLiteralExpr - Integer literal, like '4'.
+class IntegerLiteralExpr : public Expr {
 public:
   StringRef Val;  // Use StringRef instead of APInt, APInt leaks.
   SMLoc Loc;
   
-  IntegerLiteral(StringRef V, SMLoc L, Type Ty)
-    : Expr(IntegerLiteralKind, Ty), Val(V), Loc(L) {}
+  IntegerLiteralExpr(StringRef V, SMLoc L, Type Ty)
+    : Expr(ExprKind::IntegerLiteral, Ty), Val(V), Loc(L) {}
   
   uint64_t getValue() const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const IntegerLiteral *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == IntegerLiteralKind; }
+  static bool classof(const IntegerLiteralExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->Kind == ExprKind::IntegerLiteral;
+  }
 };
 
 /// DeclRefExpr - A reference to a value, "x".
@@ -159,11 +161,11 @@ public:
   SMLoc Loc;
   
   DeclRefExpr(ValueDecl *d, SMLoc L, Type Ty = Type())
-    : Expr(DeclRefExprKind, Ty), D(d), Loc(L) {}
+    : Expr(ExprKind::DeclRef, Ty), D(d), Loc(L) {}
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const DeclRefExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == DeclRefExprKind; }
+  static bool classof(const Expr *E) { return E->Kind == ExprKind::DeclRef; }
 };
 
 /// OverloadSetRefExpr - A reference to an overloaded set of values with a
@@ -175,12 +177,12 @@ public:
   
   OverloadSetRefExpr(ArrayRef<ValueDecl*> decls, SMLoc L,
                      Type Ty = Type())
-  : Expr(OverloadSetRefExprKind, Ty), Decls(decls), Loc(L) {}
+  : Expr(ExprKind::OverloadSetRef, Ty), Decls(decls), Loc(L) {}
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const OverloadSetRefExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->Kind == OverloadSetRefExprKind;
+    return E->Kind == ExprKind::OverloadSetRef;
   }
 };
   
@@ -195,13 +197,13 @@ public:
   SMLoc Loc;
   
   UnresolvedDeclRefExpr(Identifier name, SMLoc loc)
-    : Expr(UnresolvedDeclRefExprKind), Name(name), Loc(loc) {
+    : Expr(ExprKind::UnresolvedDeclRef), Name(name), Loc(loc) {
   }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedDeclRefExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->Kind == UnresolvedDeclRefExprKind;
+    return E->Kind == ExprKind::UnresolvedDeclRef;
   }
 };
 
@@ -216,14 +218,14 @@ public:
   
   UnresolvedMemberExpr(SMLoc colonLoc, SMLoc nameLoc,
                        Identifier name)
-    : Expr(UnresolvedMemberExprKind),
+    : Expr(ExprKind::UnresolvedMember),
       ColonLoc(colonLoc), NameLoc(nameLoc), Name(name) {
   }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedMemberExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->Kind == UnresolvedMemberExprKind;
+    return E->Kind == ExprKind::UnresolvedMember;
   }
 };
   
@@ -238,7 +240,7 @@ public:
   UnresolvedScopedIdentifierExpr(TypeAliasDecl *typeDecl,
                                  SMLoc typeDeclLoc, SMLoc colonLoc,
                                  SMLoc nameLoc, Identifier name)
-  : Expr(UnresolvedScopedIdentifierExprKind), TypeDecl(typeDecl),
+  : Expr(ExprKind::UnresolvedScopedIdentifier), TypeDecl(typeDecl),
     TypeDeclLoc(typeDeclLoc), ColonColonLoc(colonLoc), NameLoc(nameLoc),
     Name(name) {
   }
@@ -246,7 +248,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedScopedIdentifierExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->Kind == UnresolvedScopedIdentifierExprKind;
+    return E->Kind == ExprKind::UnresolvedScopedIdentifier;
   }
 };
   
@@ -280,7 +282,7 @@ public:
   TupleExpr(SMLoc lparenloc, Expr **subexprs, Identifier *subexprnames,
             unsigned numsubexprs, SMLoc rparenloc, bool isGrouping,
             bool isPrecededByIdentifier, Type Ty = Type())
-    : Expr(TupleExprKind, Ty), LParenLoc(lparenloc), SubExprs(subexprs),
+    : Expr(ExprKind::Tuple, Ty), LParenLoc(lparenloc), SubExprs(subexprs),
       SubExprNames(subexprnames), NumSubExprs(numsubexprs),
       RParenLoc(rparenloc), IsGrouping(isGrouping),
       IsPrecededByIdentifier(isPrecededByIdentifier) {
@@ -302,7 +304,7 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TupleExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == TupleExprKind; }
+  static bool classof(const Expr *E) { return E->Kind == ExprKind::Tuple; }
 };
 
 /// UnresolvedDotExpr - A field access (foo.bar) on an expression with dependent
@@ -322,7 +324,7 @@ public:
   
   UnresolvedDotExpr(Expr *subexpr, SMLoc dotloc, Identifier name,
                     SMLoc nameloc)
-  : Expr(UnresolvedDotExprKind), SubExpr(subexpr), DotLoc(dotloc),
+  : Expr(ExprKind::UnresolvedDot), SubExpr(subexpr), DotLoc(dotloc),
     Name(name), NameLoc(nameloc) {}
   
   SMLoc getLocStart() const {
@@ -331,7 +333,9 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedDotExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == UnresolvedDotExprKind;}
+  static bool classof(const Expr *E) {
+    return E->Kind == ExprKind::UnresolvedDot;
+  }
 };
 
 /// TupleElementExpr - Refer to an element of a tuple, e.g. "(1,2).field0".
@@ -344,12 +348,14 @@ public:
   
   TupleElementExpr(Expr *subexpr, SMLoc dotloc, unsigned fieldno,
                    SMLoc nameloc, Type ty = Type())
-  : Expr(TupleElementExprKind, ty), SubExpr(subexpr), DotLoc(dotloc),
+  : Expr(ExprKind::TupleElement, ty), SubExpr(subexpr), DotLoc(dotloc),
     FieldNo(fieldno), NameLoc(nameloc) {}
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TupleElementExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == TupleElementExprKind; }
+  static bool classof(const Expr *E) {
+    return E->Kind == ExprKind::TupleElement;
+  }
 };
 
 /// TupleShuffleExpr - This represents a permutation of a tuple value to a new
@@ -366,12 +372,14 @@ public:
   ArrayRef<int> ElementMapping;
   
   TupleShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping, Type Ty)
-    : Expr(TupleShuffleExprKind, Ty), SubExpr(subExpr),
+    : Expr(ExprKind::TupleShuffle, Ty), SubExpr(subExpr),
       ElementMapping(elementMapping) {}
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TupleShuffleExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == TupleShuffleExprKind; }
+  static bool classof(const Expr *E) {
+    return E->Kind == ExprKind::TupleShuffle;
+  }
 };
   
   
@@ -385,11 +393,11 @@ public:
   /// Argument - The one argument being passed to it.
   Expr *Arg;
   ApplyExpr(Expr *fn, Expr *arg, Type Ty)
-    : Expr(ApplyExprKind, Ty), Fn(fn), Arg(arg) {}
+    : Expr(ExprKind::Apply, Ty), Fn(fn), Arg(arg) {}
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ApplyExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == ApplyExprKind; }
+  static bool classof(const Expr *E) { return E->Kind == ExprKind::Apply; }
 };
 
 /// SequenceExpr - a series of expressions which should be evaluated
@@ -402,12 +410,12 @@ public:
   unsigned NumElements;
   
   SequenceExpr(Expr **elements, unsigned numElements)
-    : Expr(SequenceExprKind), Elements(elements), NumElements(numElements) {
+    : Expr(ExprKind::Sequence), Elements(elements), NumElements(numElements) {
   }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const SequenceExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == SequenceExprKind; }
+  static bool classof(const Expr *E) { return E->Kind == ExprKind::Sequence; }
 };
   
 /// BraceExpr - A brace enclosed sequence of expressions, like { 4; 5 }.  If the
@@ -429,12 +437,12 @@ public:
 
   BraceExpr(SMLoc lbloc, ExprOrDecl *elements,
             unsigned numelements, bool missingsemi, SMLoc rbloc)
-    : Expr(BraceExprKind), LBLoc(lbloc), Elements(elements),
+    : Expr(ExprKind::Brace), LBLoc(lbloc), Elements(elements),
       NumElements(numelements), MissingSemi(missingsemi), RBLoc(rbloc) {}
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BraceExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == BraceExprKind; }
+  static bool classof(const Expr *E) { return E->Kind == ExprKind::Brace; }
 };
 
   
@@ -447,14 +455,14 @@ public:
   Expr *Input;
   
   ClosureExpr(Expr *input, Type ResultTy)
-    : Expr(ClosureExprKind, ResultTy), Input(input) {}
+    : Expr(ExprKind::Closure, ResultTy), Input(input) {}
 
   /// getNumArgs - Return the number of arguments that this closure expr takes.
   unsigned getNumArgs() const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ClosureExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == ClosureExprKind; }
+  static bool classof(const Expr *E) { return E->Kind == ExprKind::Closure; }
 };
   
 class AnonClosureArgExpr : public Expr {
@@ -463,11 +471,13 @@ public:
   SMLoc Loc;
   
   AnonClosureArgExpr(unsigned argNo, SMLoc loc)
-    : Expr(AnonClosureArgExprKind), ArgNo(argNo), Loc(loc) {}
+    : Expr(ExprKind::AnonClosureArg), ArgNo(argNo), Loc(loc) {}
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const AnonClosureArgExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind ==AnonClosureArgExprKind;}
+  static bool classof(const Expr *E) {
+    return E->Kind == ExprKind::AnonClosureArg;
+  }
 };
   
 /// BinaryExpr - Infix binary expressions like 'x+y'.
@@ -478,11 +488,11 @@ public:
   Expr *RHS;
   
   BinaryExpr(Expr *lhs, Expr *fn, Expr *rhs, Type Ty = Type())
-    : Expr(BinaryExprKind, Ty), LHS(lhs), Fn(fn), RHS(rhs) {}
+    : Expr(ExprKind::Binary, Ty), LHS(lhs), Fn(fn), RHS(rhs) {}
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BinaryExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == BinaryExprKind; }
+  static bool classof(const Expr *E) { return E->Kind == ExprKind::Binary; }
 };
 
 /// IfExpr - if/then/else expression.  If no 'else' is specified, then the
@@ -498,12 +508,12 @@ public:
   
   IfExpr(SMLoc IfLoc, Expr *cond, Expr *Then, SMLoc ElseLoc,
          Expr *Else, Type Ty = Type())
-    : Expr(IfExprKind, Ty),
+    : Expr(ExprKind::If, Ty),
       IfLoc(IfLoc), Cond(cond), Then(Then), ElseLoc(ElseLoc), Else(Else) {}
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const IfExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == IfExprKind; }
+  static bool classof(const Expr *E) { return E->Kind == ExprKind::If; }
 };
   
 } // end namespace swift

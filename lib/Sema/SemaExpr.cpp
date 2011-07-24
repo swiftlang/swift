@@ -43,7 +43,7 @@ NullablePtr<Expr> SemaExpr::ActOnNumericConstant(StringRef Text,
   // should be defined by the library.
   Identifier TyName = S.Context.getIdentifier("integer_literal_type");
   Type Ty = S.decl.LookupTypeName(TyName, Loc)->getAliasType(S.Context);
-  return new (S.Context) IntegerLiteral(Text, Loc, Ty);
+  return new (S.Context) IntegerLiteralExpr(Text, Loc, Ty);
 }
 
 

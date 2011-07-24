@@ -356,7 +356,7 @@ namespace {
     friend class ExprVisitor<SemaExpressionTree, Expr*>;
     TypeChecker &TC;
     
-    Expr *VisitIntegerLiteral(IntegerLiteral *E) {
+    Expr *VisitIntegerLiteralExpr(IntegerLiteralExpr *E) {
       return E;
     }
     Expr *VisitDeclRefExpr(DeclRefExpr *E) {
@@ -985,7 +985,7 @@ namespace {
     TypeChecker &TC;
     Type DestTy;
     
-    Expr *VisitIntegerLiteral(IntegerLiteral *E) {
+    Expr *VisitIntegerLiteralExpr(IntegerLiteralExpr *E) {
       assert(0 && "Integer literals never have dependent type!");
       return 0;
     }

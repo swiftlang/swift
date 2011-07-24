@@ -38,30 +38,40 @@ void *Expr::operator new(size_t Bytes, ASTContext &C,
 /// FIXME: Need to extend this to do full source ranges like Clang.
 SMLoc Expr::getLocStart() const {
   switch (Kind) {
-  case IntegerLiteralKind: return cast<IntegerLiteral>(this)->Loc;
-  case DeclRefExprKind:    return cast<DeclRefExpr>(this)->Loc;
-  case OverloadSetRefExprKind: return cast<OverloadSetRefExpr>(this)->Loc;
-  case UnresolvedDeclRefExprKind: return cast<UnresolvedDeclRefExpr>(this)->Loc;
-  case UnresolvedMemberExprKind:
+  case ExprKind::IntegerLiteral:
+    return cast<IntegerLiteralExpr>(this)->Loc;
+  case ExprKind::DeclRef:
+    return cast<DeclRefExpr>(this)->Loc;
+  case ExprKind::OverloadSetRef:
+    return cast<OverloadSetRefExpr>(this)->Loc;
+  case ExprKind::UnresolvedDeclRef:
+    return cast<UnresolvedDeclRefExpr>(this)->Loc;
+  case ExprKind::UnresolvedMember:
     return cast<UnresolvedMemberExpr>(this)->ColonLoc;
-  case UnresolvedScopedIdentifierExprKind:
+  case ExprKind::UnresolvedScopedIdentifier:
     return cast<UnresolvedScopedIdentifierExpr>(this)->TypeDeclLoc;
-  case TupleExprKind:      return cast<TupleExpr>(this)->LParenLoc;
-  case UnresolvedDotExprKind:
+  case ExprKind::Tuple:
+    return cast<TupleExpr>(this)->LParenLoc;
+  case ExprKind::UnresolvedDot:
     return cast<UnresolvedDotExpr>(this)->getLocStart();
-  case TupleElementExprKind:
+  case ExprKind::TupleElement:
     return cast<TupleElementExpr>(this)->SubExpr->getLocStart();
-  case TupleShuffleExprKind:
+  case ExprKind::TupleShuffle:
     return cast<TupleShuffleExpr>(this)->SubExpr->getLocStart();
-  case ApplyExprKind:      return cast<ApplyExpr>(this)->Fn->getLocStart();
-  case SequenceExprKind:
+  case ExprKind::Apply:
+    return cast<ApplyExpr>(this)->Fn->getLocStart();
+  case ExprKind::Sequence:
     return cast<SequenceExpr>(this)->Elements[0]->getLocStart();
-  case BraceExprKind:      return cast<BraceExpr>(this)->LBLoc;
-  case ClosureExprKind:    return cast<ClosureExpr>(this)->Input->getLocStart();
-  case AnonClosureArgExprKind:
+  case ExprKind::Brace:
+    return cast<BraceExpr>(this)->LBLoc;
+  case ExprKind::Closure:
+    return cast<ClosureExpr>(this)->Input->getLocStart();
+  case ExprKind::AnonClosureArg:
     return cast<AnonClosureArgExpr>(this)->Loc;
-  case BinaryExprKind:     return cast<BinaryExpr>(this)->LHS->getLocStart();
-  case IfExprKind:         return cast<IfExpr>(this)->IfLoc;
+  case ExprKind::Binary:
+    return cast<BinaryExpr>(this)->LHS->getLocStart();
+  case ExprKind::If:
+    return cast<IfExpr>(this)->IfLoc;
   }
   
   llvm_unreachable("expression type not handled!");
@@ -81,7 +91,7 @@ unsigned ClosureExpr::getNumArgs() const {
   return 1;  
 }
 
-uint64_t IntegerLiteral::getValue() const {
+uint64_t IntegerLiteralExpr::getValue() const {
   unsigned long long IntVal;
   bool Error = Val.getAsInteger(0, IntVal);
   assert(!Error && "Invalid IntegerLiteral formed"); (void)Error;
@@ -314,7 +324,7 @@ namespace {
     void *Data;
     
     
-    Expr *VisitIntegerLiteral(IntegerLiteral *E) { return E; }
+    Expr *VisitIntegerLiteralExpr(IntegerLiteralExpr *E) { return E; }
     Expr *VisitDeclRefExpr(DeclRefExpr *E) { return E; }
     Expr *VisitOverloadSetRefExpr(OverloadSetRefExpr *E) { return E; }
     Expr *VisitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) { return E; }
@@ -500,8 +510,8 @@ public:
     D->print(OS, Indent+2);
   }
 
-  void VisitIntegerLiteral(IntegerLiteral *E) {
-    OS.indent(Indent) << "(integer_literal type='" << E->Ty;
+  void VisitIntegerLiteralExpr(IntegerLiteralExpr *E) {
+    OS.indent(Indent) << "(integer_literal_expr type='" << E->Ty;
     OS << "' value=" << E->Val << ')';
   }
   void VisitDeclRefExpr(DeclRefExpr *E) {

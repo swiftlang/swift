@@ -30,26 +30,26 @@ public:
     switch (E->Kind) {
 
 #define DISPATCH(CLASS) \
-  case CLASS##Kind: \
-  return static_cast<ImplClass*>(this)->Visit ## CLASS(static_cast<CLASS*>(E))
+  case ExprKind::CLASS: \
+  return static_cast<ImplClass*>(this)->Visit ## CLASS ## Expr(static_cast<CLASS##Expr*>(E))
         
     DISPATCH(IntegerLiteral);
-    DISPATCH(DeclRefExpr);
-    DISPATCH(OverloadSetRefExpr);
-    DISPATCH(UnresolvedDeclRefExpr);
-    DISPATCH(UnresolvedMemberExpr);
-    DISPATCH(UnresolvedScopedIdentifierExpr);
-    DISPATCH(TupleExpr);
-    DISPATCH(UnresolvedDotExpr);
-    DISPATCH(TupleElementExpr);
-    DISPATCH(TupleShuffleExpr);
-    DISPATCH(ApplyExpr);
-    DISPATCH(SequenceExpr);
-    DISPATCH(BraceExpr);
-    DISPATCH(ClosureExpr);
-    DISPATCH(AnonClosureArgExpr);
-    DISPATCH(BinaryExpr);
-    DISPATCH(IfExpr);
+    DISPATCH(DeclRef);
+    DISPATCH(OverloadSetRef);
+    DISPATCH(UnresolvedDeclRef);
+    DISPATCH(UnresolvedMember);
+    DISPATCH(UnresolvedScopedIdentifier);
+    DISPATCH(Tuple);
+    DISPATCH(UnresolvedDot);
+    DISPATCH(TupleElement);
+    DISPATCH(TupleShuffle);
+    DISPATCH(Apply);
+    DISPATCH(Sequence);
+    DISPATCH(Brace);
+    DISPATCH(Closure);
+    DISPATCH(AnonClosureArg);
+    DISPATCH(Binary);
+    DISPATCH(If);
 #undef DISPATCH
     }
     assert(0 && "Not reachable, all cases handled");

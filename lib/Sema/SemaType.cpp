@@ -113,7 +113,7 @@ Type SemaType::ActOnArrayType(Type BaseTy, SMLoc LSquareLoc, Expr *Size,
   // FIXME: Add real support for evaluating constant expressions for array
   // sizes.
   uint64_t SizeVal;
-  if (IntegerLiteral *IL = dyn_cast<IntegerLiteral>(Size))
+  if (IntegerLiteralExpr *IL = dyn_cast<IntegerLiteralExpr>(Size))
     SizeVal = IL->getValue();
   else {
     error(Size->getLocStart(), "invalid type size, not a constant");
