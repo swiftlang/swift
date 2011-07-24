@@ -403,7 +403,6 @@ bool Parser::parseDeclVar(SmallVectorImpl<ExprOrDecl> &Decls) {
 /// caller handles this case and does recovery as appropriate.
 ///
 ///   decl-func:
-///     'func' attribute-list? identifier arg-list-type '=' expr
 ///     'func' attribute-list? identifier arg-list-type expr-brace
 ///     'func' attribute-list? identifier arg-list-type 
 FuncDecl *Parser::parseDeclFunc() {
@@ -453,21 +452,13 @@ FuncDecl *Parser::parseDeclFunc() {
   // Then parse the expression.
   NullablePtr<Expr> Body;
 
-  // Check to see if we have a "= expr" or "{" which is a brace expr.
-  if (consumeIf(tok::equal)) {
-    if (parseExpr(Body, false, "expected expression parsing func body") ||
-        Body.isNull())
-      return 0;  // FIXME: Need to call a new ActOnFuncBodyError?
-  } else if (Tok.is(tok::l_brace)) {
+  // Check to see if we have a "{" which is a brace expr.
+  if (Tok.is(tok::l_brace)) {
     if (parseExprBrace(Body) || Body.isNull())
       return 0;  // FIXME: Need to call a new ActOnFuncBodyError?
+    S.decl.ActOnFuncBody(FD, Body.get());
   }
 
-  // If this is a declaration, we're done.
-  if (Body.isNull())
-    return FD;
-
-  S.decl.ActOnFuncBody(FD, Body.get());
   return FD;
 }
 
@@ -478,8 +469,6 @@ FuncDecl *Parser::parseDeclFunc() {
 ///   decl-meth:
 ///     'meth' attribute-list? type-identifier '::' identifier 
 ///            arg-list-type expr-brace?
-///
-/// FIXME: Add '=' syntax or rip out func's support for it.
 ///
 MethDecl *Parser::parseDeclMeth() {
   SMLoc MethLoc = consumeToken(tok::kw_meth);
@@ -531,15 +520,12 @@ MethDecl *Parser::parseDeclMeth() {
   NullablePtr<Expr> Body;
 
   // Check to see if we have a body.
-  if (Tok.is(tok::l_brace) &&
-      (parseExprBrace(Body) || Body.isNull()))
-    return 0;  // FIXME: Need to call a new ActOnMethBodyError?
-
-  // If this is a declaration, we're done.
-  if (Body.isNull())
-    return MD;
-
-  S.decl.ActOnFuncBody(MD, Body.get());
+  if (Tok.is(tok::l_brace)) {
+    if (parseExprBrace(Body) || Body.isNull())
+      return 0;  // FIXME: Need to call a new ActOnMethBodyError?
+    S.decl.ActOnFuncBody(MD, Body.get());
+  }
+  
   return MD;
 }
 
