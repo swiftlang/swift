@@ -309,10 +309,10 @@ ActOnMethDecl(SMLoc MethLoc, Type ReceiverType, Identifier FuncName, Type Ty,
 /// FuncTypePiece - This little enum is used by AddFuncArgumentsToScope to keep
 /// track of where in a function type it is currently looking.  This affects how
 /// the decls are processed and created.
-enum FuncTypePiece {
-  FTP_Function,  // Looking at the initial functiontype itself.
-  FTP_Input,     // Looking at the input to the function type
-  FTP_Output     // Looking at the output to the function type.
+enum class FuncTypePiece {
+  Function,  // Looking at the initial functiontype itself.
+  Input,     // Looking at the input to the function type
+  Output     // Looking at the output to the function type.
 };
 
 /// AddFuncArgumentsToScope - Walk the type specified for a Func object (which
@@ -328,18 +328,21 @@ static void AddFuncArgumentsToScope(Type Ty,
                                     FuncTypePiece Mode,
                                     SMLoc FuncLoc, SemaDecl &SD) {
   // Handle the function case first.
-  if (Mode == FTP_Function) {
+  if (Mode == FuncTypePiece::Function) {
     FunctionType *FT = cast<FunctionType>(Ty.getPointer());
     AccessPath.push_back(0);
-    AddFuncArgumentsToScope(FT->Input, AccessPath, FTP_Input, FuncLoc, SD);
+    AddFuncArgumentsToScope(FT->Input, AccessPath, FuncTypePiece::Input,
+                            FuncLoc, SD);
     
     AccessPath.back() = 1;
     
     // If this is a->b->c then we treat b as an input, not (b->c) as an output.
     if (isa<FunctionType>(FT->Result.getPointer()))
-      AddFuncArgumentsToScope(FT->Result, AccessPath, FTP_Function, FuncLoc,SD);
+      AddFuncArgumentsToScope(FT->Result, AccessPath,
+                              FuncTypePiece::Function, FuncLoc,SD);
     else    
-      AddFuncArgumentsToScope(FT->Result, AccessPath, FTP_Output, FuncLoc, SD);
+      AddFuncArgumentsToScope(FT->Result, AccessPath,
+                              FuncTypePiece::Output, FuncLoc, SD);
     AccessPath.pop_back();
     return;
   }
@@ -370,7 +373,7 @@ static void AddFuncArgumentsToScope(Type Ty,
     ArgDecl *AD = new (SD.S.Context) ArgDecl(FuncLoc, Name, TT->Fields[i].Ty);
     
     // Eventually we should mark the input/outputs as readonly vs writeonly.
-    //bool isInput = Mode == FTP_Input;
+    //bool isInput = Mode == FuncTypePiece::Input;
 
     SD.AddToScope(AD);
   }
@@ -381,7 +384,7 @@ static void AddFuncArgumentsToScope(Type Ty,
 
 void SemaDecl::CreateArgumentDeclsForFunc(ValueDecl *D) {
   SmallVector<unsigned, 8> AccessPath;
-  AddFuncArgumentsToScope(D->Ty, AccessPath, FTP_Function,
+  AddFuncArgumentsToScope(D->Ty, AccessPath, FuncTypePiece::Function,
                           D->getLocStart(), *this);
 }
 

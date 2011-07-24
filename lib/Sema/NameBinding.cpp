@@ -31,9 +31,9 @@
 using namespace swift;
 
 /// NLKind - This is the kind of name lookup we're performing.
-enum NLKind {
-  NLK_UnqualifiedLookup,
-  NLK_DotLookup
+enum class NLKind {
+  UnqualifiedLookup,
+  DotLookup
 };
 
 namespace {
@@ -114,7 +114,7 @@ void ReferencedModule::lookupValue(ImportDecl *ID, Identifier Name,
   Result.reserve(I->second.size());
   for (ValueDecl *Elt : I->second) {
     // Dot Lookup ignores values with non-function types.
-    if (LookupKind == NLK_DotLookup && !Elt->Ty->is<FunctionType>())
+    if (LookupKind == NLKind::DotLookup && !Elt->Ty->is<FunctionType>())
       continue;
     
     Result.push_back(Elt);
@@ -278,7 +278,7 @@ void NameBinder::bindValueName(Identifier Name,
     Result.reserve(I->second.size());
     for (ValueDecl *VD : I->second) {
       // Dot Lookup ignores values with non-function types.
-      if (LookupKind == NLK_DotLookup && !VD->Ty->is<FunctionType>())
+      if (LookupKind == NLKind::DotLookup && !VD->Ty->is<FunctionType>())
         continue;
 
       Result.push_back(VD);
@@ -305,7 +305,7 @@ static Expr *BindNames(Expr *E, Expr::WalkOrder Order, void *binder) {
   // Process UnresolvedDeclRefExpr.
   if (UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
     SmallVector<ValueDecl*, 4> Decls;
-    Binder.bindValueName(UDRE->Name, Decls, NLK_UnqualifiedLookup);
+    Binder.bindValueName(UDRE->Name, Decls, NLKind::UnqualifiedLookup);
     if (Decls.empty()) {
       Binder.error(UDRE->Loc, "use of unresolved identifier '" +
                    UDRE->Name.str() + "'");
@@ -326,7 +326,7 @@ static Expr *BindNames(Expr *E, Expr::WalkOrder Order, void *binder) {
   if (UnresolvedDotExpr *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
     SmallVector<ValueDecl*, 4> Decls;
     // Perform .-style name lookup.
-    Binder.bindValueName(UDE->Name, Decls, NLK_DotLookup);
+    Binder.bindValueName(UDE->Name, Decls, NLKind::DotLookup);
 
     // Copy the overload set into ASTContext memory.
     if (!Decls.empty())
