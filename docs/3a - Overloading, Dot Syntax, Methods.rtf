@@ -1,4 +1,4 @@
-{\rtf1\ansi\ansicpg1252\cocoartf1038\cocoasubrtf350
+{\rtf1\ansi\ansicpg1252\cocoartf1038\cocoasubrtf360
 {\fonttbl\f0\fswiss\fcharset0 Helvetica;}
 {\colortbl;\red255\green255\blue255;}
 \margl1440\margr1440\vieww11760\viewh14200\viewkind0
@@ -53,7 +53,7 @@ which is "not the effect that w're going for". \'a0 As a simpler example, consid
 \
 you'd have to define some methods as something like:\
 \
-\'a0\'a0func area(r : rect) -> int = r.width*r.height \'a0 // this is not terrible.\
+\'a0\'a0func area(r : rect) -> int \{ return r.width*r.height \} \'a0 // this is not terrible.\
 \'a0\'a0func print(r : rect) -> (os : ostream) -> void \{\
 \'a0\'a0 \'a0os << r.width <<\'a0", " <<\'a0r.height << " area=" << r.area;\
 \'a0\'a0\}\
@@ -77,9 +77,9 @@ However, this is not what most people want, because it inflates X by the size of
 \
 As seen above, you can do this through var/func, but no one is going to be happy using the double arrow syntax for defining methods on types, and it is very very handy to have 'this' and implicit name lookup relative to 'this'. \'a0As such, Swift allows defining methods on types with the 'meth' keyword. \'a0The idea is simple, the methods above can be declared as:\
 \
-meth rect::area : int = width*height;\
+func rect::area() -> int \{ return width*height; \}\
 \'a0\'a0\
-meth rect::print(os : ostream) \{\
+func rect::print(os : ostream) \{\
 \'a0\'a0os << width << ", " << height\'a0<< " area="\'a0<< this.area;\
 \}\
 \

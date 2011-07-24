@@ -49,8 +49,9 @@ public:
   std::string getString() const;
   
 private:
-  void operator==(Type T) const;  // DISABLED.
-  void operator!=(Type T) const;  // DISABLED.
+  // Direct comparison is disabled for types, because they may not be canonical.
+  void operator==(Type T) const = delete;
+  void operator!=(Type T) const = delete;
 };
   
 } // end namespace swift
