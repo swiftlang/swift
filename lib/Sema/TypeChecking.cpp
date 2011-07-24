@@ -467,7 +467,7 @@ namespace {
     static Expr *WalkFn(Expr *E, Expr::WalkOrder Order, void *set) {
       SemaExpressionTree &SET = *static_cast<SemaExpressionTree*>(set);
       // This is implemented as a postorder walk.
-      if (Order == Expr::Walk_PreOrder) {
+      if (Order == Expr::WalkOrder::PreOrder) {
         // Do not walk into ClosureExpr's.  Anonexprs within a nested closure
         // will have already been resolved, so we don't need to recurse into it.
         // This also prevents N^2 re-sema activity with lots of nested closures.
@@ -905,7 +905,7 @@ struct RewriteAnonArgExpr {
     RewriteAnonArgExpr &Rewriter = *static_cast<RewriteAnonArgExpr*>(rewriter);
     Type FuncInputTy = Rewriter.FuncInputTy;
   
-    if (Order == Expr::Walk_PreOrder) {
+    if (Order == Expr::WalkOrder::PreOrder) {
       // If this is a ClosureExpr, don't walk into it.  This would find *its*
       // anonymous closure arguments, not ours.
       if (isa<ClosureExpr>(E)) return 0; // Don't recurse into it.
@@ -1527,25 +1527,25 @@ bool TypeChecker::validateType(Type &InTy) {
   bool IsValid = true;
   
   switch (T->Kind) {
-  case UnresolvedTypeKind:
-  case BuiltinInt1Kind:
-  case BuiltinInt8Kind:
-  case BuiltinInt16Kind:
-  case BuiltinInt32Kind:
-  case BuiltinInt64Kind:
-  case DependentTypeKind:
+  case TypeKind::Unresolved:
+  case TypeKind::BuiltinInt1:
+  case TypeKind::BuiltinInt8:
+  case TypeKind::BuiltinInt16:
+  case TypeKind::BuiltinInt32:
+  case TypeKind::BuiltinInt64:
+  case TypeKind::Dependent:
     return false;
-  case OneOfTypeKind:
+  case TypeKind::OneOf:
     for (OneOfElementDecl *Elt : cast<OneOfType>(T)->Elements) {
       if (Elt->ArgumentType.isNull()) continue;
       IsValid &= !validateType(Elt->ArgumentType);
       if (!IsValid) break;
     }
     break;
-  case NameAliasTypeKind:
+  case TypeKind::NameAlias:
     IsValid = !validateType(cast<NameAliasType>(T)->TheDecl->UnderlyingTy);
     break;
-  case TupleTypeKind: {
+  case TypeKind::Tuple: {
     TupleType *TT = cast<TupleType>(T);
     
     // Okay, we found an uncanonicalized tuple type, which might have default
@@ -1582,7 +1582,7 @@ bool TypeChecker::validateType(Type &InTy) {
     break;
   }
       
-  case FunctionTypeKind: {
+  case TypeKind::Function: {
     FunctionType *FT = cast<FunctionType>(T);
     if ((InTy = FT->Input, validateType(InTy)) ||
         (InTy = FT->Result, validateType(InTy))) {
@@ -1592,7 +1592,7 @@ bool TypeChecker::validateType(Type &InTy) {
     InTy = FT;
     break;
   }
-  case ArrayTypeKind:
+  case TypeKind::Array:
     ArrayType *AT = cast<ArrayType>(T);
     if (InTy = AT->Base, validateType(InTy)) {
       IsValid = false;
@@ -1652,7 +1652,7 @@ static Expr *DiagnoseUnresolvedTypes(Expr *E, Expr::WalkOrder Order,
   // Ignore the preorder walk.  We'd rather diagnose use of unresolved types
   // during the postorder walk so that the inner most expressions are diagnosed
   // before the outermost ones.
-  if (Order == Expr::Walk_PreOrder)
+  if (Order == Expr::WalkOrder::PreOrder)
     return E;
   
   // Use is to strip off sugar.

@@ -452,11 +452,11 @@ namespace {
     Expr *ProcessNode(Expr *E) {
       // Try the preorder visitation.  If it returns null, we just skip entering
       // subnodes of this tree.
-      Expr *E2 = Fn(E, Expr::Walk_PreOrder, Data);
+      Expr *E2 = Fn(E, Expr::WalkOrder::PreOrder, Data);
       if (E2 == 0) return E;
       
       if (E) E = Visit(E);
-      if (E) E = Fn(E, Expr::Walk_PostOrder, Data);
+      if (E) E = Fn(E, Expr::Expr::WalkOrder::PostOrder, Data);
       return E;
     }
     

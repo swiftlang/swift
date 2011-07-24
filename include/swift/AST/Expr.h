@@ -75,9 +75,9 @@ public:
   /// FIXME: QOI: Need to extend this to do full source ranges like Clang.
   SMLoc getLocStart() const;
     
-  enum WalkOrder {
-    Walk_PreOrder,
-    Walk_PostOrder
+  enum class WalkOrder {
+    PreOrder,
+    PostOrder
   };
   
   /// WalkExpr - This function walks all the subexpressions under this

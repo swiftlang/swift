@@ -23,9 +23,6 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/SMLoc.h"
 
-namespace llvm {
-  class raw_ostream;
-}
 namespace swift {
   class ASTContext;
   class Expr;
@@ -33,22 +30,22 @@ namespace swift {
   class TypeAliasDecl;
   class OneOfElementDecl;
   
-  enum TypeKind {
-    BuiltinInt1Kind,
-    BuiltinInt8Kind,
-    BuiltinInt16Kind,
-    BuiltinInt32Kind,
-    BuiltinInt64Kind,
-    UnresolvedTypeKind,
-    DependentTypeKind,
-    NameAliasTypeKind,
-    TupleTypeKind,
-    OneOfTypeKind,
-    FunctionTypeKind,
-    ArrayTypeKind,
+  enum class TypeKind {
+    BuiltinInt1,
+    BuiltinInt8,
+    BuiltinInt16,
+    BuiltinInt32,
+    BuiltinInt64,
+    Unresolved,
+    Dependent,
+    NameAlias,
+    Tuple,
+    OneOf,
+    Function,
+    Array,
     
-    Builtin_First = BuiltinInt1Kind,
-    Builtin_Last = BuiltinInt64Kind
+    Builtin_First = BuiltinInt1,
+    Builtin_Last = BuiltinInt64
   };
   
 /// TypeBase - Base class for all types in Swift.
@@ -131,7 +128,8 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BuiltinType *) { return true; }
   static bool classof(const TypeBase *T) {
-    return T->Kind >= Builtin_First && T->Kind <= Builtin_Last;
+    return T->Kind >= TypeKind::Builtin_First &&
+           T->Kind <= TypeKind::Builtin_Last;
   }
 };
   
@@ -141,7 +139,7 @@ public:
 class UnresolvedType : public TypeBase {
   friend class ASTContext;
   // The Unresolved type is always canonical.
-  UnresolvedType() : TypeBase(UnresolvedTypeKind, this) {}
+  UnresolvedType() : TypeBase(TypeKind::Unresolved, this) {}
 public:
   static Type get(ASTContext &C);
   
@@ -150,7 +148,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedType *) { return true; }
   static bool classof(const TypeBase *T) {
-    return T->Kind == UnresolvedTypeKind;
+    return T->Kind == TypeKind::Unresolved;
   }
 };
 
@@ -160,7 +158,7 @@ public:
 class DependentType : public TypeBase {
   friend class ASTContext;
   // The Dependent type is always canonical.
-  DependentType() : TypeBase(DependentTypeKind, this) {}
+  DependentType() : TypeBase(TypeKind::Dependent, this) {}
 public:
   static Type get(ASTContext &C);
 
@@ -169,7 +167,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const DependentType *) { return true; }
   static bool classof(const TypeBase *T) {
-    return T->Kind == DependentTypeKind;
+    return T->Kind == TypeKind::Dependent;
   }
 };
 
@@ -178,7 +176,7 @@ public:
 class NameAliasType : public TypeBase {
   friend class TypeAliasDecl;
   // NameAliasType are never canonical.
-  NameAliasType(TypeAliasDecl *d) : TypeBase(NameAliasTypeKind), TheDecl(d) {}
+  NameAliasType(TypeAliasDecl *d) : TypeBase(TypeKind::NameAlias), TheDecl(d) {}
 public:
   TypeAliasDecl *const TheDecl;
    
@@ -187,7 +185,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const NameAliasType *) { return true; }
   static bool classof(const TypeBase *T) {
-    return T->Kind == NameAliasTypeKind;
+    return T->Kind == TypeKind::NameAlias;
   }
 };
 
@@ -249,7 +247,7 @@ public:
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TupleType *) { return true; }
-  static bool classof(const TypeBase *T) { return T->Kind == TupleTypeKind;}
+  static bool classof(const TypeBase *T) { return T->Kind == TypeKind::Tuple; }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, Fields);
@@ -259,7 +257,7 @@ public:
   
 private:
   TupleType(ArrayRef<TupleTypeElt> fields, bool isCanonical)
-    : TypeBase(TupleTypeKind, isCanonical ? this : 0), Fields(fields) {}
+    : TypeBase(TypeKind::Tuple, isCanonical ? this : 0), Fields(fields) {}
 };
   
 /// OneOfType - a 'oneof' type.  This represents the oneof type itself, not its
@@ -294,12 +292,12 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const OneOfType *D) { return true; }
-  static bool classof(const TypeBase *T) { return T->Kind == OneOfTypeKind; }
+  static bool classof(const TypeBase *T) { return T->Kind == TypeKind::OneOf; }
   
 private:
   // oneof types are always canonical.
   OneOfType(SMLoc oneofloc, ArrayRef<OneOfElementDecl*> Elts)
-    : TypeBase(OneOfTypeKind, this), OneOfLoc(oneofloc), Elements(Elts) {
+    : TypeBase(TypeKind::OneOf, this), OneOfLoc(oneofloc), Elements(Elts) {
   }
 };
 
@@ -318,7 +316,9 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const FunctionType *) { return true; }
-  static bool classof(const TypeBase *T) { return T->Kind == FunctionTypeKind;}
+  static bool classof(const TypeBase *T) {
+    return T->Kind == TypeKind::Function;
+  }
   
 private:
   FunctionType(Type input, Type result);
@@ -343,7 +343,7 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ArrayType *) { return true; }
-  static bool classof(const TypeBase *T) { return T->Kind == ArrayTypeKind; }
+  static bool classof(const TypeBase *T) { return T->Kind == TypeKind::Array; }
   
 private:
   ArrayType(Type base, uint64_t size);

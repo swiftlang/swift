@@ -47,21 +47,21 @@ TypeBase *TypeBase::getCanonicalType(ASTContext &Ctx) {
   
   TypeBase *Result = 0;
   switch (Kind) {
-  case UnresolvedTypeKind:
+  case TypeKind::Unresolved:
     assert(0 && "Cannot call getCanonicalType before name binding is complete");
-  case BuiltinInt1Kind:
-  case BuiltinInt8Kind:
-  case BuiltinInt16Kind:
-  case BuiltinInt32Kind:
-  case BuiltinInt64Kind:
-  case DependentTypeKind:
-  case OneOfTypeKind:
+  case TypeKind::BuiltinInt1:
+  case TypeKind::BuiltinInt8:
+  case TypeKind::BuiltinInt16:
+  case TypeKind::BuiltinInt32:
+  case TypeKind::BuiltinInt64:
+  case TypeKind::Dependent:
+  case TypeKind::OneOf:
     assert(0 && "These are always canonical");
-  case NameAliasTypeKind:
+  case TypeKind::NameAlias:
     Result = cast<NameAliasType>(this)->
                   getDesugaredType()->getCanonicalType(Ctx);
     break;
-  case TupleTypeKind: {
+  case TypeKind::Tuple: {
     SmallVector<TupleTypeElt, 8> CanElts;
     TupleType *TT = cast<TupleType>(this);
     CanElts.resize(TT->Fields.size());
@@ -76,14 +76,14 @@ TypeBase *TypeBase::getCanonicalType(ASTContext &Ctx) {
     break;
   }
     
-  case FunctionTypeKind: {
+  case TypeKind::Function: {
     FunctionType *FT = cast<FunctionType>(this);
     Type In = FT->Input->getCanonicalType(Ctx);
     Type Out = FT->Result->getCanonicalType(Ctx);
     Result = FunctionType::get(In, Out, Ctx);
     break;
   }
-  case ArrayTypeKind:
+  case TypeKind::Array:
     ArrayType *AT = cast<ArrayType>(this);
     Type EltTy = AT->Base->getCanonicalType(Ctx);
     Result = ArrayType::get(EltTy, AT->Size, Ctx);
@@ -96,20 +96,20 @@ TypeBase *TypeBase::getCanonicalType(ASTContext &Ctx) {
 
 TypeBase *TypeBase::getDesugaredType() {
   switch (Kind) {
-  case DependentTypeKind:
-  case UnresolvedTypeKind:
-  case BuiltinInt1Kind:
-  case BuiltinInt8Kind:
-  case BuiltinInt16Kind:
-  case BuiltinInt32Kind:
-  case BuiltinInt64Kind:
-  case OneOfTypeKind:
-  case TupleTypeKind:
-  case FunctionTypeKind:
-  case ArrayTypeKind:
+  case TypeKind::Dependent:
+  case TypeKind::Unresolved:
+  case TypeKind::BuiltinInt1:
+  case TypeKind::BuiltinInt8:
+  case TypeKind::BuiltinInt16:
+  case TypeKind::BuiltinInt32:
+  case TypeKind::BuiltinInt64:
+  case TypeKind::OneOf:
+  case TypeKind::Tuple:
+  case TypeKind::Function:
+  case TypeKind::Array:
     // None of these types have sugar at the outer level.
     return this;
-  case NameAliasTypeKind:
+  case TypeKind::NameAlias:
     return cast<NameAliasType>(this)->TheDecl->UnderlyingTy->getDesugaredType();
   }
 
@@ -235,29 +235,29 @@ void TypeBase::dump() const {
 
 void TypeBase::print(raw_ostream &OS) const {
   switch (Kind) {
-  case DependentTypeKind:     return cast<DependentType>(this)->print(OS);
-  case UnresolvedTypeKind:    return cast<UnresolvedType>(this)->print(OS);
-  case BuiltinInt1Kind:
-  case BuiltinInt8Kind:
-  case BuiltinInt16Kind:
-  case BuiltinInt32Kind:
-  case BuiltinInt64Kind:      return cast<BuiltinType>(this)->print(OS);
-  case NameAliasTypeKind:     return cast<NameAliasType>(this)->print(OS);
-  case OneOfTypeKind:         return cast<OneOfType>(this)->print(OS);
-  case TupleTypeKind:         return cast<TupleType>(this)->print(OS);
-  case FunctionTypeKind:      return cast<FunctionType>(this)->print(OS);
-  case ArrayTypeKind:         return cast<ArrayType>(this)->print(OS);
+  case TypeKind::Dependent:     return cast<DependentType>(this)->print(OS);
+  case TypeKind::Unresolved:    return cast<UnresolvedType>(this)->print(OS);
+  case TypeKind::BuiltinInt1:
+  case TypeKind::BuiltinInt8:
+  case TypeKind::BuiltinInt16:
+  case TypeKind::BuiltinInt32:
+  case TypeKind::BuiltinInt64:  return cast<BuiltinType>(this)->print(OS);
+  case TypeKind::NameAlias:     return cast<NameAliasType>(this)->print(OS);
+  case TypeKind::OneOf:         return cast<OneOfType>(this)->print(OS);
+  case TypeKind::Tuple:         return cast<TupleType>(this)->print(OS);
+  case TypeKind::Function:      return cast<FunctionType>(this)->print(OS);
+  case TypeKind::Array:         return cast<ArrayType>(this)->print(OS);
   }
 }
 
 void BuiltinType::print(raw_ostream &OS) const {
   switch (Kind) {
   default: assert(0 && "Unknown builtin type");
-  case BuiltinInt1Kind:  OS << "__builtin_int1_type"; break;
-  case BuiltinInt8Kind:  OS << "__builtin_int8_type"; break;
-  case BuiltinInt16Kind: OS << "__builtin_int16_type"; break;
-  case BuiltinInt32Kind: OS << "__builtin_int32_type"; break;
-  case BuiltinInt64Kind: OS << "__builtin_int64_type"; break;
+  case TypeKind::BuiltinInt1:  OS << "__builtin_int1_type"; break;
+  case TypeKind::BuiltinInt8:  OS << "__builtin_int8_type"; break;
+  case TypeKind::BuiltinInt16: OS << "__builtin_int16_type"; break;
+  case TypeKind::BuiltinInt32: OS << "__builtin_int32_type"; break;
+  case TypeKind::BuiltinInt64: OS << "__builtin_int64_type"; break;
   }
 }
 

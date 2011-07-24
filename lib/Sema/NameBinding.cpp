@@ -299,7 +299,7 @@ static Expr *BindNames(Expr *E, Expr::WalkOrder Order, void *binder) {
   NameBinder &Binder = *static_cast<NameBinder*>(binder);
   
   // Ignore the preorder walk.
-  if (Order == Expr::Walk_PreOrder)
+  if (Order == Expr::WalkOrder::PreOrder)
     return E;
   
   // Process UnresolvedDeclRefExpr.

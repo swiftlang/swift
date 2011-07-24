@@ -45,11 +45,11 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheUnresolvedType(new (*this) UnresolvedType()),
     TheDependentType(new (*this) DependentType()),
-    TheInt1Type(new (*this) BuiltinType(BuiltinInt1Kind)),
-    TheInt8Type(new (*this) BuiltinType(BuiltinInt8Kind)),
-    TheInt16Type(new (*this) BuiltinType(BuiltinInt16Kind)),
-    TheInt32Type(new (*this) BuiltinType(BuiltinInt32Kind)),
-    TheInt64Type(new (*this) BuiltinType(BuiltinInt64Kind)) {
+    TheInt1Type(new (*this) BuiltinType(TypeKind::BuiltinInt1)),
+    TheInt8Type(new (*this) BuiltinType(TypeKind::BuiltinInt8)),
+    TheInt16Type(new (*this) BuiltinType(TypeKind::BuiltinInt16)),
+    TheInt32Type(new (*this) BuiltinType(TypeKind::BuiltinInt32)),
+    TheInt64Type(new (*this) BuiltinType(TypeKind::BuiltinInt64)) {
   HadError = false;
 }
 
@@ -153,7 +153,7 @@ FunctionType *FunctionType::get(Type Input, Type Result, ASTContext &C) {
 
 // If the input and result types are canonical, then so is the result.
 FunctionType::FunctionType(Type input, Type result)
-  : TypeBase(FunctionTypeKind,
+  : TypeBase(TypeKind::Function,
              (input->isCanonical() && result->isCanonical()) ? this : 0),
     Input(input), Result(result) {
 }
@@ -170,7 +170,7 @@ ArrayType *ArrayType::get(Type BaseType, uint64_t Size, ASTContext &C) {
 }
 
 ArrayType::ArrayType(Type base, uint64_t size)
-  : TypeBase(ArrayTypeKind, base->isCanonical() ? this : 0),
+  : TypeBase(TypeKind::Array, base->isCanonical() ? this : 0),
     Base(base), Size(size) {}
 
 
