@@ -79,8 +79,12 @@ public:
 
     string();
     ~string();
+    // copy
     string(const string& s);
     string& operator=(const string& s);
+    // move
+    string(string&& s);
+    string& operator=(string&& s);
     // What constructors do we want?
     // This one currently models pointer into rom and C++ layout
     template <std::size_t N>

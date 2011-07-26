@@ -203,6 +203,30 @@ string::operator=(const string& s)
     return *this;
 }
 
+string::string(string&& s)
+    : data_(s.data_),
+      word1_(s.word1_),
+      offset_bytes_(s.offset_bytes_)
+{
+    s.data_ = nullptr;
+    s.word1_ = 0;
+    s.offset_bytes_ = 0;
+}
+
+string&
+string::operator=(string&& s)
+{
+    if (owns_)
+        release();
+    data_ = s.data_;
+    word1_ = s.word1_;
+    offset_bytes_ = s.offset_bytes_;
+    s.data_ = nullptr;
+    s.word1_ = 0;
+    s.offset_bytes_ = 0;
+    return *this;
+}
+
 void
 string::init_rom(const char* str, std::size_t N)
 {
