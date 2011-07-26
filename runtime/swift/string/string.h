@@ -103,6 +103,8 @@ public:
 
     string substring(std::size_t start, std::size_t size) const;
 
+    void swap(string& s);
+
 private:
 
     void init_rom(const char* str, std::size_t N);
@@ -118,5 +120,7 @@ private:
 
     friend class range;
 };
+
+inline void swap(string& x, string& y) {x.swap(y);}
 
 #endif  // STRING_H

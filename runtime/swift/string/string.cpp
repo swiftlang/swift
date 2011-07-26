@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <utility>
 
 // Private implementation functions in unnamed namespace
 namespace
@@ -216,14 +217,7 @@ string::string(string&& s)
 string&
 string::operator=(string&& s)
 {
-    if (owns_)
-        release();
-    data_ = s.data_;
-    word1_ = s.word1_;
-    offset_bytes_ = s.offset_bytes_;
-    s.data_ = nullptr;
-    s.word1_ = 0;
-    s.offset_bytes_ = 0;
+    swap(s);
     return *this;
 }
 
@@ -308,6 +302,14 @@ string::substring(std::size_t start_chars, std::size_t size_chars) const
         }
     }
     return result;
+}
+
+void
+string::swap(string& s)
+{
+    std::swap(data_, s.data_);
+    std::swap(word1_, s.word1_);
+    std::swap(offset_bytes_, s.offset_bytes_);
 }
 
 void
