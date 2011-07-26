@@ -96,12 +96,6 @@ int main()
     std::cout << s7.size() << '\n';
     std::cout << s7.size_bytes() << '\n';
     for (string::range r(s7); !r.is_empty(); r.next())
-        print(r.get_utf32(), ' ');
-    std::cout << '\n';
-    for (string::range r(s7); !r.is_empty(); r.next())
-        print(r.get_utf16(), ' ');
-    std::cout << '\n';
-    for (string::range r(s7); !r.is_empty(); r.next())
-        print(r.get_utf8(), ' ');
+        print(r.get(), ' ');
     std::cout << '\n';
 }

@@ -1,25 +1,11 @@
 #ifndef STRING_H
 #define STRING_H
 
-// This is a rough prototype string class referred to as S1+ in the strings.html
-// document.  It is a descriminated union of two pointer types.  One pointer
-// points into ROM.  The other pointer points to a ref-counted block of
-// dynamically allocated memory.
+// This is a rough prototype string class referred to as S3 in the strings.html
+// document.
 // 
 // The string sports a primative "range" class instead of traditional C++
-// iterators. The range offers 3 views of the contents:  UTF-8, UTF-16 and
-// UTF-32.
-
-// This prototype does not accurately model the string data layout in rom.  It
-//   does point into rom to simulate the memory management.  But it points to
-//   a C++ string literal in rom instead of a swift literal in rom.  The swift
-//   literal in rom will have more data, such as the number of bytes, and/or
-//   the number of code points.
-
-// To support embedded null characters in a string, we need to store the number
-//   of bytes in a string.  Otherwise to find the number of bytes in a
-//   (non-ascii) UTF-8 string we need to actually decode it to find the number
-//   of bytes.
+// iterators. The range offers 1 view of the contents:  UTF-32.
 
 // This prototype does not yet draw a distinction between recoverable errors and
 //   non-recoverable errors.  Everything is an exception.  That will surely
@@ -27,20 +13,25 @@
 
 #include <cstddef>
 #include <climits>
-#include <array>
+#include <cstdint>
 
 // A hack to tell the constructor the argument is pointing into ROM.  Without
 // this hack, string literals are drawn to the wrong constructor.
 struct tag {};
 
 // string invariant:  Points to null, or points to valid UTF-8 characters.
-// The number of code points can be represented by ptrdiff_t.
+// The number of code points can be represented by 31 bits.
 // A string with an internal null ptr represents an empty string.
+// is_not_ascii_ is true if the string contains a non-ascii character.
 
 class string
 {
     union
     {
+        // Need help knowing which bit I can steal from data_ pointer.  Unless
+        //   swift promises to align character data in rom, this pointer is
+        //   1-byte-aligned.
+        // Currently stealing high bit.  This is scary on 32 bit platform.
         const char* data_;
         struct
         {
@@ -53,17 +44,17 @@ class string
 #endif
         };
     };
+    union
+    {
+        std::uint32_t word1_;
+        struct
+        {
+            std::uint32_t is_not_ascii_ : 1;
+            std::uint32_t size_chars_ : 31;
+        };
+    };
+    std::uint32_t offset_bytes_;
 
-    void init_rom(const char* str, std::size_t N);
-
-    const std::size_t& count() const
-        {return *(reinterpret_cast<const std::size_t*>
-                                        (static_cast<const char*>(*this)) - 1);}
-    std::size_t& count()
-            {return const_cast<std::size_t&>(((const string*)this)->count());}
-
-    void retain() const;
-    void release();
 public:
     // Example range view
     //   range invariant: s_ points to a valid string.
@@ -80,12 +71,10 @@ public:
         explicit range(const string& s);
 
         // increment to next code point
-        void next();                                // not in empty state
+        void next();                       // not in empty state
         // observers
         bool is_empty() const;
-        std::array<char, 4> get_utf8() const;       // not in empty state
-        std::array<char16_t, 2> get_utf16() const;  // not in empty state
-        char32_t get_utf32() const;                 // not in empty state
+        char32_t get() const;              // not in empty state
     };
 
     string();
@@ -96,7 +85,7 @@ public:
     // This one currently models pointer into rom and C++ layout
     template <std::size_t N>
         string(const char (&str)[N], tag)
-            {init_rom(str, N);}
+            {init_rom(str, N-1);}  // don't count trailing null
     // This one currently models dynamic ownership, and swift layout
     string(const char* s);
 
@@ -107,6 +96,21 @@ public:
 
     std::size_t size() const;        // number of code points
     std::size_t size_bytes() const;  // number of bytes
+
+    string substring(std::size_t start, std::size_t size) const;
+
+private:
+
+    void init_rom(const char* str, std::size_t N);
+
+    const std::size_t& count() const
+        {return *(reinterpret_cast<const std::size_t*>
+                                        (static_cast<const char*>(*this)) - 1);}
+    std::size_t& count()
+            {return const_cast<std::size_t&>(((const string*)this)->count());}
+
+    void retain() const;
+    void release();
 
     friend class range;
 };

@@ -32,7 +32,7 @@
 <address align=right>
 <a href="mailto:hhinnant@apple.com">Howard Hinnant</a><br>
 
-2011-07-22
+2011-07-26
 </address>
 <hr>
 
@@ -228,6 +228,31 @@ It is a bit more complicated than <code>S0</code> and <code>S1</code>, but not
 overly so.  And I believe that <code>S1<sup>+</sup></code> (like <code>S0</code>
 and <code>S1</code>) is a viable candidate to be the type of a string literal.
 </p>
+
+<h2><code>S3</code></h2>
+
+<img src="s3.tiff" alt="string type s3" />
+
+<p>
+The <code>S3</code> data structure is also an immutable string.  By storing the
+size outside of the data, plus an offset, one can build a very efficient
+<code>substring</code> operation simply by making a copy of <code>S3</code>
+and changing the size and offset.
+</p>
+
+<p>
+One bit is set aside to indicate whether or not the utf-8 data is all ascii.
+Zero has been chosen to mean that the data is all ascii.  This choice was made
+so that a default string could set all bits zero and have that represent an
+empty string (which contains no non-ascii characters).
+</p>
+
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
 
 <h2><code>S2</code></h2>
 
