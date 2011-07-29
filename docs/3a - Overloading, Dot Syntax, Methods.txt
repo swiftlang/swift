@@ -66,7 +66,7 @@ something like:
 
 you'd have to define some methods as something like:
 
-  func area(r : rect) -> int = r.width*r.height   // this is not terrible.
+  func area(r : rect) -> int { return r.width*r.height } // this is not terrible
   func print(r : rect) -> (os : ostream) -> void {
     os << r.width << ", " << r.height << " area=" << r.area;
   }
@@ -97,16 +97,16 @@ giving a capability along the same lines as Objective-C categories.
 As seen above, you can do this through var/func, but no one is going to be happy
 using the double arrow syntax for defining methods on types, and it is very very
 handy to have 'this' and implicit name lookup relative to 'this'.  As such,
-Swift allows defining methods on types with the 'meth' keyword.  The idea is
+Swift allows defining methods on types with the 'func' keyword.  The idea is
 simple, the methods above can be declared as:
 
-meth rect::area : int = width*height;
+func rect::area : int = width*height;
   
-meth rect::print(os : ostream) {
+func rect::print(os : ostream) {
   os << width << ", " << height << " area=" << this.area;
 }
 
-This is just syntactic sugar for the exact function above.  'meth' definitions
+This is just syntactic sugar for the exact function above.  method definitions
 are just sugar for func definitions (which are themselves just sugar for 'var'
 definitions), with the following effects:
 
