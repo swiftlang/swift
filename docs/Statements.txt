@@ -1,0 +1,45 @@
+Statements
+==========
+
+After discussion, it seems clear that we should introduce the concept of a
+'statement', and make if/return/etc be statement.  The requirement is that
+statements can only exist directly as children of {} blocks.
+
+Statements that control execution of a block of code (like if, while, etc)
+should require braces around the block (more specifically, require the sub-block
+to be a statement).  This is to force a style, taking away the innate desire to
+optimize these out or to locally have to pick a style guideline.  Forcing braces
+defines away classes of bugs, removes the classic if/else grammar ambiguity, and
+helps establish culture.
+
+Because statements cannot exist in general expression contexts, we disallow such
+fun things as:
+
+func f() {
+  foo(return 42)
+}
+
+from being autoclosuring to a closure that returns 42 (if foo takes
+"() -> int").  If you want to write this, just write "foo(42)".
+
+
+if
+==
+
+'if' is a simple if/then/else construct whose 'else' is optional.  The condition
+on an 'if' does not require parentheses, because they do not add value at all.
+Because parentheses are valid expressions, they can still be used by people who
+feel compelled to.
+
+Note that the classic "if (x = 42) {}" bug should not be possible in swift
+because "=" should not produce a value (but we may allow chained assignment).
+
+
+return
+======
+
+'return' produces a value from the containing function.  Return converts the
+subexpression to return value type, allowing multiple return values, interfacing
+with default values, etc.
+
+
