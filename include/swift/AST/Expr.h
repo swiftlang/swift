@@ -27,9 +27,11 @@
 namespace swift {
   class ASTContext;
   class Type;
+  class ArgDecl;
   class ValueDecl;
   class Decl;
   class Stmt;
+  class BraceStmt;
   class TypeAliasDecl;
   
 enum class ExprKind {
@@ -45,6 +47,7 @@ enum class ExprKind {
   TupleShuffle,
   Apply,
   Sequence,
+  Func,
   Closure,
   AnonClosureArg,
   Binary
@@ -418,7 +421,17 @@ public:
   static bool classof(const SequenceExpr *) { return true; }
   static bool classof(const Expr *E) { return E->Kind == ExprKind::Sequence; }
 };
+
+/// FuncExpr - An explicit unnamed closure definition, which can optionally have
+/// named arguments.
+///    e.g.  func(a : int) -> int { return a+1 }
+class FuncExpr : public Expr {
+public:
+  SMLoc FuncLoc;
   
+  ArrayRef<ArgDecl*> NamedArgs;
+  BraceStmt *Body;
+};
   
 /// ClosureExpr - An expression which is implicitly created by using an
 /// expression in a function context where the expression's type matches the

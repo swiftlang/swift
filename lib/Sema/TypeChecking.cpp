@@ -352,8 +352,8 @@ namespace {
   /// intermediate nodes, introduce type coercion etc.  This visitor does this
   /// job.  Each visit method reanalyzes the children of a node, then reanalyzes
   /// the node, and returns true on error.
-  class SemaExpressionTree : public ExprStmtVisitor<SemaExpressionTree,
-                                                    Expr*, Stmt*> {
+  class SemaExpressionTree
+  : public ExprStmtVisitor<SemaExpressionTree, Expr*, Stmt*> {
     friend class ExprStmtVisitor<SemaExpressionTree, Expr*, Stmt*>;
     TypeChecker &TC;
     
@@ -436,6 +436,11 @@ namespace {
     
     void PreProcessBraceStmt(BraceStmt *BS);
     
+    Expr *visitFuncExpr(FuncExpr *E) {
+      assert(0 && "Should not walk into FuncExprs!");
+      return 0;
+    }
+
     Expr *visitClosureExpr(ClosureExpr *E) {
       assert(0 && "Should not walk into ClosureExprs!");
       return 0;
@@ -462,7 +467,18 @@ namespace {
       return 0;
     }
 
-    Stmt *visitIfStmt(IfStmt *S);
+    Stmt *visitIfStmt(IfStmt *IS) {
+      // The if condition must have __builtin_int1 type.  This is after the
+      // conversion function is added by sema.
+      // FIXME: Why isn't this using convertToType?
+      if (!IS->Cond->Ty->isEqual(TC.Context.TheInt1Type, TC.Context)) {
+        TC.error(IS->Cond->getLocStart(), "expression of type '" +
+                 IS->Cond->Ty->getString() + "' is not legal in a condition");
+        return 0;
+      }
+      
+      return IS;
+    }
     
     SemaExpressionTree(TypeChecker &tc) : TC(tc) {}
     
@@ -470,10 +486,11 @@ namespace {
       SemaExpressionTree &SET = *static_cast<SemaExpressionTree*>(set);
       // This is implemented as a postorder walk.
       if (Order == Expr::WalkOrder::PreOrder) {
-        // Do not walk into ClosureExpr's.  Anonexprs within a nested closure
-        // will have already been resolved, so we don't need to recurse into it.
+        // Do not walk into ClosureExpr or FuncExprs's.  Anonexprs within a
+        // nested closures will have already been resolved, so we don't need to
+        // recurse into it.
         // This also prevents N^2 re-sema activity with lots of nested closures.
-        if (isa<ClosureExpr>(E)) return 0;
+        if (isa<ClosureExpr>(E) || isa<FuncExpr>(E)) return 0;
         
         return E;
       }
@@ -819,19 +836,6 @@ Expr *SemaExpressionTree::visitSequenceExpr(SequenceExpr *E) {
   return E;
 }
 
-Stmt *SemaExpressionTree::visitIfStmt(IfStmt *IS) {
-  // The if condition must have __builtin_int1 type.  This is after the
-  // conversion function is added by sema.
-  // FIXME: Why isn't this using convertToType?
-  if (!IS->Cond->Ty->isEqual(TC.Context.TheInt1Type, TC.Context)) {
-    TC.error(IS->Cond->getLocStart(), "expression of type '" +
-             IS->Cond->Ty->getString() + "' is not legal in a condition");
-    return 0;
-  }
-
-  return IS;
-}
-
 
 void SemaExpressionTree::PreProcessBraceStmt(BraceStmt *BS) {
   SmallVector<Expr*, 4> ExcessExprs;
@@ -1098,6 +1102,10 @@ namespace {
       
       // FIXME: Apply to last value of sequence.
       return E;
+    }
+
+    Expr *visitFuncExpr(FuncExpr *E) {
+      return E;      
     }
 
     Expr *visitClosureExpr(ClosureExpr *E) {

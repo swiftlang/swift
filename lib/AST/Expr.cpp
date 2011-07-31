@@ -61,6 +61,8 @@ SMLoc Expr::getLocStart() const {
     return cast<ApplyExpr>(this)->Fn->getLocStart();
   case ExprKind::Sequence:
     return cast<SequenceExpr>(this)->Elements[0]->getLocStart();
+  case ExprKind::Func:
+    return cast<FuncExpr>(this)->FuncLoc;
   case ExprKind::Closure:
     return cast<ClosureExpr>(this)->Input->getLocStart();
   case ExprKind::AnonClosureArg:
@@ -384,6 +386,15 @@ namespace {
           return 0;
       return E;
     }
+    
+    Expr *visitFuncExpr(FuncExpr *E) {
+      if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(E->Body))) {
+        E->Body = S;
+        return E;
+      }
+      return 0;
+    }
+    
     Expr *visitClosureExpr(ClosureExpr *E) {
       if (Expr *E2 = doIt(E->Input)) {
         E->Input = E2;
@@ -619,6 +630,11 @@ public:
       OS << '\n';
       printRec(E->Elements[i]);
     }
+    OS << ')';
+  }
+  void visitFuncExpr(FuncExpr *E) {
+    OS.indent(Indent) << "(func_expr type='" << E->Ty << "'\n";
+    printRec(E->Body);
     OS << ')';
   }
   void visitClosureExpr(ClosureExpr *E) {

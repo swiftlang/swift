@@ -309,10 +309,6 @@ enum class FuncTypePiece {
 /// is known to be a FunctionType on the outer level) creating and adding named
 /// arguments to the current scope.  This causes redefinition errors to be
 /// emitted.
-///
-/// Note that we really *do* want dyn_cast here, not getAs, because we do not
-/// want to look through type aliases or other sugar, we want to see what the
-/// user wrote in the func declaration.
 static void AddFuncArgumentsToScope(Type Ty,
                                     SmallVectorImpl<unsigned> &AccessPath,
                                     FuncTypePiece Mode,
@@ -340,6 +336,10 @@ static void AddFuncArgumentsToScope(Type Ty,
   // Otherwise, we're looking at an input or output to the func.  The only type
   // we currently dive into is the humble tuple, which can be recursive.  This
   // should dive in syntactically.
+  ///
+  /// Note that we really *do* want dyn_cast here, not getAs, because we do not
+  /// want to look through type aliases or other sugar, we want to see what the
+  /// user wrote in the func declaration.
   TupleType *TT = dyn_cast<TupleType>(Ty.getPointer());
   if (TT == 0) return;
 
