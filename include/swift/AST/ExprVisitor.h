@@ -31,7 +31,8 @@ public:
 
 #define DISPATCH(CLASS) \
   case ExprKind::CLASS: \
-  return static_cast<ImplClass*>(this)->Visit ## CLASS ## Expr(static_cast<CLASS##Expr*>(E))
+  return static_cast<ImplClass*>(this)->Visit ## CLASS ## \
+    Expr(static_cast<CLASS##Expr*>(E))
         
     DISPATCH(IntegerLiteral);
     DISPATCH(DeclRef);
