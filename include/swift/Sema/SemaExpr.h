@@ -29,6 +29,7 @@ namespace llvm {
 namespace swift {
   class Decl;
   class Expr;
+  class FuncExpr;
   class Sema;
   class Stmt;
   class Type;
@@ -61,6 +62,9 @@ public:
   NullablePtr<Stmt>
   ActOnIfStmt(SMLoc IfLoc, Expr *Cond, Stmt *Normal, 
               SMLoc ElseLoc, Stmt *Else);
+  
+  FuncExpr *ActOnFuncExprStart(SMLoc FuncLoc, Type FuncTy);
+  
 };
   
 } // end namespace swift

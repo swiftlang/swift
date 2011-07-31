@@ -428,7 +428,6 @@ FuncDecl *Parser::parseDeclFunc() {
     if (parseIdentifier(Name, "expected identifier in 'func' declaration"))
       return 0;
   }
-
   
   // We force first type of a func declaration to be a tuple for consistency.
   if (Tok.isNot(tok::l_paren)) {
@@ -440,33 +439,49 @@ FuncDecl *Parser::parseDeclFunc() {
   if (parseType(FuncTy))
     return 0;
   
-  // Build the decl for the function.
-  FuncDecl *FD = S.decl.ActOnFuncDecl(FuncLoc, ReceiverTy, Name, FuncTy,
-                                      Attributes);
+  // If the parsed type is not spelled as a function type (i.e., has no '->' in
+  // it), then it is implicitly a function that returns ().
+  if (!isa<FunctionType>(FuncTy.getPointer()))
+    FuncTy = S.type.ActOnFunctionType(FuncTy, SMLoc(),
+                                      TupleType::getEmpty(S.Context));
   
-  // Enter the func into the current scope, which allows it to be visible and
-  // used within its body.
-  if (FD)
-    S.decl.AddToScope(FD);
+  // If a receiver type was specified, install the first type as the receiver,
+  // as a tuple with element named 'this'.  This turns "int->int" on FooTy into
+  // "(this : FooTy)->(int->int)".
+  if (!ReceiverTy.isNull()) {
+    TupleTypeElt ReceiverElt(ReceiverTy, S.Context.getIdentifier("this"));
+    FuncTy = S.type.ActOnFunctionType(TupleType::get(ReceiverElt, S.Context),
+                                      SMLoc(), FuncTy);
+  }
   
   // Enter the arguments for the function into a new function-body scope.  We
   // need this even if there is no function body to detect argument name
   // duplication.
-  Scope FnBodyScope(S.decl);
-  
-  if (FD)
-    S.decl.CreateArgumentDeclsForFunc(FD);
-
-  // Then parse the expression.
-  NullablePtr<Stmt> Body;
-
-  // Check to see if we have a "{" which is a brace expr.
-  if (Tok.is(tok::l_brace)) {
-    if (parseStmtBrace(Body) || Body.isNull())
-      return 0;  // FIXME: Need to call a new ActOnFuncBodyError?
-    S.decl.ActOnFuncBody(FD, cast<BraceStmt>(Body.get()));
+  FuncExpr *FE = 0;
+  {
+    Scope FnBodyScope(S.decl);
+    
+    FE = S.expr.ActOnFuncExprStart(FuncLoc, FuncTy);
+    
+    // Then parse the expression.
+    NullablePtr<Stmt> Body;
+    
+    // Check to see if we have a "{" which is a brace expr.
+    if (Tok.is(tok::l_brace)) {
+      if (parseStmtBrace(Body) || Body.isNull())
+        return 0;
+      
+      FE->Body = cast<BraceStmt>(Body.get());
+    } else {
+      // Note, we just discard FE here.  It is bump pointer allocated, so this
+      // is fine (if suboptimal)
+      FE = 0;
+    }
   }
-
+  
+  // Create the decl for the func and add it to the parent scope.
+  FuncDecl *FD = new (S.Context) FuncDecl(FuncLoc, Name, FuncTy, FE,Attributes);
+  S.decl.AddToScope(FD);
   return FD;
 }
 
@@ -762,8 +777,8 @@ bool Parser::parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
 
 static bool isStartOfExpr(Token &Tok) {
   return Tok.is(tok::numeric_constant) || Tok.is(tok::colon) ||
-         Tok.is(tok::l_paren) || Tok.is(tok::l_brace) ||
-         Tok.is(tok::dollarident) || Tok.is(tok::identifier);
+         Tok.is(tok::l_paren) || Tok.is(tok::dollarident) ||
+         Tok.is(tok::identifier);
 }
 
 /// parseExpr

@@ -437,8 +437,7 @@ namespace {
     void PreProcessBraceStmt(BraceStmt *BS);
     
     Expr *visitFuncExpr(FuncExpr *E) {
-      assert(0 && "Should not walk into FuncExprs!");
-      return 0;
+      return E;
     }
 
     Expr *visitClosureExpr(ClosureExpr *E) {
@@ -486,11 +485,10 @@ namespace {
       SemaExpressionTree &SET = *static_cast<SemaExpressionTree*>(set);
       // This is implemented as a postorder walk.
       if (Order == Expr::WalkOrder::PreOrder) {
-        // Do not walk into ClosureExpr or FuncExprs's.  Anonexprs within a
-        // nested closures will have already been resolved, so we don't need to
-        // recurse into it.
+        // Do not walk into ClosureExpr.  Anonexprs within a nested closures
+        // will have already been resolved, so we don't need to recurse into it.
         // This also prevents N^2 re-sema activity with lots of nested closures.
-        if (isa<ClosureExpr>(E) || isa<FuncExpr>(E)) return 0;
+        if (isa<ClosureExpr>(E)) return 0;
         
         return E;
       }

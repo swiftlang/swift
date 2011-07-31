@@ -431,6 +431,16 @@ public:
   
   ArrayRef<ArgDecl*> NamedArgs;
   BraceStmt *Body;
+  
+  FuncExpr(SMLoc FuncLoc, Type FnType,
+           ArrayRef<ArgDecl*> NamedArgs, BraceStmt *Body = 0)
+    : Expr(ExprKind::Func, FnType), FuncLoc(FuncLoc), NamedArgs(NamedArgs),
+      Body(Body) {}
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const FuncExpr *) { return true; }
+  static bool classof(const Expr *E) { return E->Kind == ExprKind::Func; }
+
 };
   
 /// ClosureExpr - An expression which is implicitly created by using an

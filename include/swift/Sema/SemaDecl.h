@@ -36,7 +36,6 @@ namespace swift {
   class TypeAliasDecl;
   class VarDecl;
   class FuncDecl;
-  class MethDecl;
   class ValueDecl;
   class ElementRefDecl;
   class TranslationUnitDecl;
@@ -100,13 +99,6 @@ public:
   
   VarDecl *ActOnVarDecl(SMLoc VarLoc, DeclVarName &Name, Type Ty,
                         Expr *Init, DeclAttributes &Attrs);
-  FuncDecl *ActOnFuncDecl(SMLoc FuncLoc, Type ReceiverTy, Identifier Name,
-                          Type Ty, DeclAttributes &Attrs);
-  MethDecl *ActOnMethDecl(SMLoc MethLoc, Type ReceiverType,
-                          Identifier FuncName, Type Ty, DeclAttributes &Attrs);
-
-  void CreateArgumentDeclsForFunc(ValueDecl *D);
-  void ActOnFuncBody(ValueDecl *FD, BraceStmt *Body);
 
   void ActOnStructDecl(SMLoc StructLoc, DeclAttributes &Attrs,
                        Identifier Name, Type Ty,
