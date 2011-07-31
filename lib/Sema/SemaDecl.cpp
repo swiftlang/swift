@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
@@ -68,8 +69,8 @@ void SemaDecl::handleEndOfTranslationUnit(TranslationUnitDecl *TUD,
   // First thing, we transform the body into a brace expression.
   ExprStmtOrDecl *NewElements = 
     S.Context.AllocateCopy<ExprStmtOrDecl>(Items.begin(), Items.end());
-  TUD->Body = new (S.Context) BraceExpr(FileStart, NewElements, Items.size(),
-                                        false, FileEnd);
+  TUD->Body = new (S.Context) BraceStmt(FileStart, NewElements, Items.size(),
+                                        FileEnd);
   
   // Do a prepass over the declarations to make sure they have basic sanity and
   // to find the list of top-level value declarations.
@@ -378,9 +379,9 @@ void SemaDecl::CreateArgumentDeclsForFunc(ValueDecl *D) {
 }
 
 
-void SemaDecl::ActOnFuncBody(ValueDecl *FD, Expr *Body) {
+void SemaDecl::ActOnFuncBody(ValueDecl *FD, BraceStmt *Body) {
   assert(FD && Body && "Elements of func body not specified?");
-  FD->Init = Body;
+  // FD->Init = Body;
 }
 
 void SemaDecl::ActOnStructDecl(SMLoc StructLoc, DeclAttributes &Attrs,

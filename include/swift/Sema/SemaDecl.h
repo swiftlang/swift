@@ -31,6 +31,7 @@ namespace swift {
   class Decl;
   class Expr;
   class Stmt;
+  class BraceStmt;
   class Type;
   class TypeAliasDecl;
   class VarDecl;
@@ -105,7 +106,7 @@ public:
                           Identifier FuncName, Type Ty, DeclAttributes &Attrs);
 
   void CreateArgumentDeclsForFunc(ValueDecl *D);
-  void ActOnFuncBody(ValueDecl *FD, Expr *Body);
+  void ActOnFuncBody(ValueDecl *FD, BraceStmt *Body);
 
   void ActOnStructDecl(SMLoc StructLoc, DeclAttributes &Attrs,
                        Identifier Name, Type Ty,

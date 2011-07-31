@@ -295,14 +295,8 @@
   
   <pre class="grammar">
     translation-unit ::= top-level-item*
-    top-level-item   ::= <a href="#decl-import">decl-import</a>
-    top-level-item   ::= <a href="#decl-var">decl-var</a>
-    top-level-item   ::= <a href="#decl-func">decl-func</a>
-    top-level-item   ::= <a href="#decl-typealias">decl-typealias</a>
-    top-level-item   ::= <a href="#decl-oneof">decl-oneof</a>
-    top-level-item   ::= <a href="#decl-struct">decl-struct</a>
-    top-level-item   ::= <a href="#expr">expr</a>
-    top-level-item   ::= <a href="#stmt">stmt</a>
+    top-level-item ::= <a href="#decl-import">decl-import</a>
+    top-level-item ::= <a href="#stmt-brace">stmt-brace-item</a>
   </pre>
   
   <p>A source file in Swift is parsed as a list of top level declarations.
@@ -416,7 +410,7 @@
     
     <i>// This decodes the tuple return value into independently named parts</i>
     <i>// and both 'val' and 'err' are in scope after this line.</i>
-    var (val, err) = foo();
+    var (val, err) = foo()
     
     <i>// This binds elements of a struct into local variables.</i>
     struct point { x : int, y : int }
@@ -429,8 +423,8 @@
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> <a href="#type">type</a> <a href="#expr-brace">expr-brace</a>?
-    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#type-identifier">type-identifier</a> '::' <a href="#identifier">identifier</a> <a href="#type">type</a> <a href="#expr-brace">expr-brace</a>?
+    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> <a href="#type">type</a> <a href="#stmt-brace">stmt-brace</a>?
+    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#type-identifier">type-identifier</a> '::' <a href="#identifier">identifier</a> <a href="#type">type</a> <a href="#stmt-brace">stmt-brace</a>?
   </pre>
   
   <div class="commentary">
@@ -484,10 +478,10 @@
     func d(a : int) -> (b : int) -> (res1 : int, res2 : int)
     
     <i>// Same as: func e(this : sometype) -> (a : int) -> int</i>
-    func sometype::e(a : int) -> int;
+    func sometype::e(a : int) -> int
 
     <i>// Same as: func f(this : sometype) -> (a : int) -> ()</i>
-    func sometype::f(a : int);
+    func sometype::f(a : int)
     
     <i>// A more realistic example on a trivial type.</i>
     struct bankaccount { amount : int }
@@ -568,13 +562,13 @@
       None, Backward, Anchored
     }
     
-    func f1(searchpolicy : DataSearchFlags);  <i>// DataSearchFlags is a valid type name</i>
+    func f1(searchpolicy : DataSearchFlags)  <i>// DataSearchFlags is a valid type name</i>
     func test1() {
-      f1(DataSearchFlags::None);  <i>// Use of constructor with qualified identifier</i>
-      f1(:None);                  <i>// Use of constructor with context sensitive type inference</i> 
+      f1(DataSearchFlags::None)  <i>// Use of constructor with qualified identifier</i>
+      f1(:None)                  <i>// Use of constructor with context sensitive type inference</i> 
     
       <i>// "None" has no type argument, so the constructor's type is "DataSearchFlags".</i> 
-      var a : DataSearchFlags = :None;
+      var a : DataSearchFlags = :None
     }
     
     oneof SomeInts {
@@ -583,22 +577,22 @@
       Two (:int, :int)  <i>// Argument type is simple tuple.</i>
     }
     
-    func f2(a : SomeInts);
+    func f2(a : SomeInts)
     
     func test2() {
       <i>Constructors for oneof element can be used in the obvious way.</i>
-      f2(:None);
-      f2(:One 4);
-      f2(:Two(1, 2));
+      f2(:None)
+      f2(:One 4)
+      f2(:Two(1, 2))
     
       <i>Constructor for None has type "SomeInts".</i>
-      var a : SomeInts = SomeInts::None;
+      var a : SomeInts = SomeInts::None
     
       <i>Constructor for One has type "int -> SomeInts".</i>
-      var b : int -> SomeInts = SomeInts::One;
+      var b : int -> SomeInts = SomeInts::One
     
       <i>Constructor for Two has type "(:int,:int) -> SomeInts".</i>
-      var c : (:int,:int) -> SomeInts = SomeInts::Two;
+      var c : (:int,:int) -> SomeInts = SomeInts::Two
     }
   </pre>
   
@@ -628,7 +622,7 @@
     oneof S2 {
       S2 (a : int, b : int)
     }
-    var S2 = S2::S2;   <i>// Constructor injected into global scope.</i>
+    var S2 = S2::S2   <i>// Constructor injected into global scope.</i>
   </pre>
   
   
@@ -640,14 +634,14 @@
     struct Rect { origin : Point, size : Size }
     
     func test4() {
-      var a : Point;
-      var b = Point::Point(1, 2);     // Silly but fine.
-      var c = Point(.y = 1, .x = 2);  // Using injected name.
+      var a : Point
+      var b = Point::Point(1, 2)     // Silly but fine.
+      var c = Point(.y = 1, .x = 2)  // Using injected name.
     
-      var x1 = Rect(a, Size(42, 123));
-      var x2 = Rect(.size = Size(.width = 42, .height=123), .origin = a);
+      var x1 = Rect(a, Size(42, 123))
+      var x2 = Rect(.size = Size(.width = 42, .height=123), .origin = a)
     
-      var x1_area = x1.width*x1.height;
+      var x1_area = x1.width*x1.height
     }
   </pre>    
   
@@ -777,7 +771,7 @@
   var o = (1, 2, 3)              <i>// Type = (:int, :int, :int)</i>
 
   <i>// Function argument and result is a tuple type.</i>
-  func foo(x : int, y : int) -&gt; (val : int, err : int);
+  func foo(x : int, y : int) -&gt; (val : int, err : int)
 
   <i>// oneof and struct declarations with tuple values.</i>
     struct S { a : int, b : int }
@@ -818,15 +812,15 @@
     var a : (a : int, b : int) -&gt; (val: int, err: int)
 
     <i>// Declare a function that returns a function:</i>
-    var x : int -&gt; int -&gt; int;
+    var x : int -&gt; int -&gt; int
     
     <i>// y has type int -&gt; int</i>
-    var y = x 1;
+    var y = x 1
 
     <i>// z1 and z2 both has type int, and both have the same value (assuming
     // the function had no side effects).</i>
-    var z1 = x 1 2;
-    var z2 = y 2;
+    var z1 = x 1 2
+    var z2 = y 2
   </pre>
   
   <!-- ===================================================================== -->
@@ -874,32 +868,32 @@
   
   <pre class="example">
     <i>// A simple array declaration:</i>
-    var a : int[4];
+    var a : int[4]
     
     <i>// A reference to another array:</i>
-    var b : int[] = a;
+    var b : int[] = a
         
     <i>// Declare a two dimensional array:</i>
-    var c : int[4][4];
+    var c : int[4][4]
     
     <i>// Declare a reference to another array, two dimensional:</i>
-    var d : int[4][];
+    var d : int[4][]
 
     <i>// Declare an array of function pointers:</i>
-    var array_fn_ptrs : (: int -> int)[42];
-    var g = array_fn_ptrs[12](4);
+    var array_fn_ptrs : (: int -> int)[42]
+    var g = array_fn_ptrs[12](4)
 
     <i>// Without parens, this is a function that returns a fixed size array:</i>
-    var fn_returning_array : int -> int[42];
-    var h : int[42] = fn_returning_array(4);
+    var fn_returning_array : int -> int[42]
+    var h : int[42] = fn_returning_array(4)
     
     <i>// You can even have arrays of tuples and other things, these work right
     // through composition:</i>
-    var array_of_tuples : (a : int, b : int)[42];
-    var tuple_of_arrays : (a : int[42], b : int[42]);
+    var array_of_tuples : (a : int, b : int)[42]
+    var tuple_of_arrays : (a : int[42], b : int[42])
     
-    array_of_tuples[12].a = array_of_tuples[13].b;
-    tuple_of_arrays.a[12] = array_of_tuples.b[13];
+    array_of_tuples[12].a = array_of_tuples[13].b
+    tuple_of_arrays.a[12] = array_of_tuples.b[13]
   </pre>
   
   
@@ -962,22 +956,22 @@
       None, Backward, Anchored
     }
     
-    func f1(searchpolicy : DataSearchFlags);
+    func f1(searchpolicy : DataSearchFlags)
     func test1() {
-      f1(DataSearchFlags::None);  <i>// Use of constructor with qualified identifier</i>
-      f1(:None);                  <i>// Use of constructor with context sensitive type inference</i> 
+      f1(DataSearchFlags::None)  <i>// Use of constructor with qualified identifier</i>
+      f1(:None)                  <i>// Use of constructor with context sensitive type inference</i> 
     
       <i>// "None" has no type argument, so the constructor's type is "DataSearchFlags".</i> 
-      var a : DataSearchFlags = :None;
+      var a : DataSearchFlags = :None
     }
     
     <i>// A more typical use case, anonymous argument for flags, death to
     // content-free bools in function arguments.</i> 
-    func search(val : int, direction : oneof { Up, Down });
+    func search(val : int, direction : oneof { Up, Down })
     
     func test2() {
-      search(42, :Up);
-      search(17, :Down);
+      search(42, :Up)
+      search(17, :Down)
     }
   </pre>
   
@@ -1008,15 +1002,13 @@
 
   <pre class="grammar">
     expr                   ::= expr-primary+
-    expr-non-brace         ::= expr-primary-non-brace+
     
-    expr-primary           ::= expr-non-brace | <a href="#expr-brace">expr-brace</a>
-    expr-primary-non-brace ::= <a href="#expr-literal">expr-literal</a>
-    expr-primary-non-brace ::= <a href="#expr-identifier">expr-identifier</a>
-    expr-primary-non-brace ::= <a href="#expr-paren">expr-paren</a>
-    expr-primary-non-brace ::= <a href="#expr-delayed-identifier">expr-delayed-identifier</a>
-    expr-primary-non-brace ::= <a href="#expr-dot">expr-dot</a>
-    expr-primary-non-brace ::= <a href="#expr-subscript">expr-subscript</a>
+    expr-primary ::= <a href="#expr-literal">expr-literal</a>
+    expr-primary ::= <a href="#expr-identifier">expr-identifier</a>
+    expr-primary ::= <a href="#expr-paren">expr-paren</a>
+    expr-primary ::= <a href="#expr-delayed-identifier">expr-delayed-identifier</a>
+    expr-primary ::= <a href="#expr-dot">expr-dot</a>
+    expr-primary ::= <a href="#expr-subscript">expr-subscript</a>
   </pre>
 
   <p>At the top level of the expression grammar, expressions are a sequence of
@@ -1116,11 +1108,11 @@
   
   <pre class="example">
     <i>// A function with an argument that has an anonymous type.</i> 
-    func search(val : int, direction : oneof { Up, Down });
+    func search(val : int, direction : oneof { Up, Down })
     
     func f() {
-      search(42, :Up);
-      search(17, :Down);
+      search(42, :Up)
+      search(17, :Down)
     }
   </pre>
   
@@ -1227,8 +1219,8 @@
   
   <pre class="example">
     <i>// Simple grouping parenthesis.</i>
-    var a = (4);             <i>// Type = int</i>
-    var b = (4+a);           <i>// Type = int</i>
+    var a = (4)             <i>// Type = int</i>
+    var b = (4+a)           <i>// Type = int</i>
     
     <i>// Tuple literals.</i>
     var c = ()               <i>// Type = ()</i>
@@ -1239,29 +1231,10 @@
     var g = (4, .y = 5, 6)   <i>// Type = (:int, y : int, :int)</i>
     
     <i>// Named arguments to functions.</i>
-    func foo(a : int, b : int);
+    func foo(a : int, b : int)
     foo(.b = 4, .a = 1)
   </pre>
 
-  
-  <!-- ===================================================================== -->
-  <h3 id="expr-brace">Brace Literals</h3>
-  <!-- ===================================================================== -->
-
-  <pre class="grammar">
-    expr-brace      ::= '{' expr-brace-item* '}'
-    expr-brace-item ::= <a href="#expr">expr</a>
-    expr-brace-item ::= <a href="#expr">stmt</a>
-    expr-brace-item ::= <a href="#decl-var">decl-var</a>
-    expr-brace-item ::= <a href="#decl-func">decl-func</a>
-    expr-brace-item ::= <a href="#decl-typealias">decl-typealias</a>
-    expr-brace-item ::= <a href="#decl-oneof">decl-oneof</a>
-    expr-brace-item ::= <a href="#decl-struct">decl-struct</a>
-  </pre>
-
-  
-  <p>FIXME: Need to kill off "the result of {} is the result of the last expr if
-     it doesn't have a ; at the end.  Add return statement instead.</p>
   
   <!-- ===================================================================== -->
   <h3 id="expr-apply">Function Application</h3>
@@ -1296,7 +1269,7 @@
     g (4)
     
     <i>// Application of 4 to the function returned by h().</i>
-    var h : int -&gt; int -&gt; int;
+    var h : int -&gt; int -&gt; int
     ...
     h () 4
     
@@ -1348,7 +1321,7 @@
 
   <p>Statements blah blah blah ... </p>
 
-  <p>FIXME: Return stmt, assignment is a stmt, expr-brace becomes a statement?
+  <p>FIXME: Return stmt, assignment is a stmt
   
   <pre class="example">
     <i>// A function with some statements.</i> 
@@ -1361,12 +1334,31 @@
   </pre>
 
   <!-- ===================================================================== -->
+  <h3 id="stmt-brace">Brace Statement</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    stmt-brace      ::= '{' stmt-brace-item* '}'
+    stmt-brace-item ::= <a href="#expr">expr</a>
+    stmt-brace-item ::= <a href="#expr">stmt</a>
+    stmt-brace-item ::= <a href="#decl-var">decl-var</a>
+    stmt-brace-item ::= <a href="#decl-func">decl-func</a>
+    stmt-brace-item ::= <a href="#decl-typealias">decl-typealias</a>
+    stmt-brace-item ::= <a href="#decl-oneof">decl-oneof</a>
+    stmt-brace-item ::= <a href="#decl-struct">decl-struct</a>
+  </pre>
+  
+  <p>The brace statement provides a sequencing operation which evaluates the
+     members of its body in order.
+  </p>
+
+
+  <!-- ===================================================================== -->
   <h3 id="stmt-if">'if' Statement</h3>
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    stmt-if      ::= 'if' expr-non-brace <a href="#expr-brace">expr-brace</a> expr-if-else?
-    expr-if-else ::= 'else' <a href="#expr-brace">expr-brace</a>
+    stmt-if      ::= 'if' expr <a href="#stmt-brace">stmt-brace</a> expr-if-else?
     expr-if-else ::= 'else' stmt
   </pre>
   

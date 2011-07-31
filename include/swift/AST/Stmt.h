@@ -20,11 +20,17 @@
 #include "swift/AST/LLVM.h"
 #include "llvm/Support/SMLoc.h"
 
+namespace llvm {
+  template <typename PT1, typename PT2, typename PT3> class PointerUnion3;
+}
+
 namespace swift {
   class ASTContext;
+  class Decl;
   class Expr;
 
 enum class StmtKind {
+  Brace,
   If
 };
 
@@ -60,20 +66,44 @@ public:
 
 };
   
+
+/// BraceStmt - A brace enclosed sequence of expressions, stmts, or decls, like
+/// { 4; 5 }.
+class BraceStmt : public Stmt {
+public:
+  SMLoc LBLoc;
   
+  typedef llvm::PointerUnion3<Expr*, Stmt*, Decl*> ExprStmtOrDecl;
+  // FIXME: Switch to MutableArrayRef.
+  ExprStmtOrDecl *Elements;
+  unsigned NumElements;
+  
+  SMLoc RBLoc;
+  
+  BraceStmt(SMLoc lbloc, ExprStmtOrDecl *elements,
+            unsigned numelements, SMLoc rbloc)
+  : Stmt(StmtKind::Brace), LBLoc(lbloc), Elements(elements),
+    NumElements(numelements), RBLoc(rbloc) {}
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const BraceStmt *) { return true; }
+  static bool classof(const Stmt *S) { return S->Kind == StmtKind::Brace; }
+};
+
+
 /// IfStmt - if/then/else statement.  If no 'else' is specified, then the
-/// ElseLoc location is not specified and the Else expression is null.  The
+/// ElseLoc location is not specified and the Else statement is null.  The
 /// condition of the 'if' is required to have a __builtin_int1 type.
 class IfStmt : public Stmt {
 public:
   SMLoc IfLoc;
   Expr *Cond;
-  Expr *Then;
+  Stmt *Then;
   SMLoc ElseLoc;
-  Expr *Else;
+  Stmt *Else;
   
-  IfStmt(SMLoc IfLoc, Expr *cond, Expr *Then, SMLoc ElseLoc,
-         Expr *Else)
+  IfStmt(SMLoc IfLoc, Expr *cond, Stmt *Then, SMLoc ElseLoc,
+         Stmt *Else)
   : Stmt(StmtKind::If),
     IfLoc(IfLoc), Cond(cond), Then(Then), ElseLoc(ElseLoc), Else(Else) {}
   

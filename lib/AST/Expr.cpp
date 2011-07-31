@@ -21,7 +21,6 @@
 #include "swift/AST/ASTContext.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/ErrorHandling.h"
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -62,8 +61,6 @@ SMLoc Expr::getLocStart() const {
     return cast<ApplyExpr>(this)->Fn->getLocStart();
   case ExprKind::Sequence:
     return cast<SequenceExpr>(this)->Elements[0]->getLocStart();
-  case ExprKind::Brace:
-    return cast<BraceExpr>(this)->LBLoc;
   case ExprKind::Closure:
     return cast<ClosureExpr>(this)->Input->getLocStart();
   case ExprKind::AnonClosureArg:
@@ -72,7 +69,8 @@ SMLoc Expr::getLocStart() const {
     return cast<BinaryExpr>(this)->LHS->getLocStart();
   }
   
-  llvm_unreachable("expression type not handled!");
+  assert(0 && "expression type not handled!");
+  abort();
 }
 
 //===----------------------------------------------------------------------===//
@@ -386,35 +384,6 @@ namespace {
           return 0;
       return E;
     }
-    Expr *VisitBraceExpr(BraceExpr *E) {
-      for (unsigned i = 0, e = E->NumElements; i != e; ++i) {
-        if (Expr *SubExpr = E->Elements[i].dyn_cast<Expr*>()) {
-          if (Expr *E2 = doIt(SubExpr))
-            E->Elements[i] = E2;
-          else
-            return 0;
-          continue;
-        }
-        
-        if (Stmt *S = E->Elements[i].dyn_cast<Stmt*>()) {
-          if (Stmt *S2 = doIt(S))
-            E->Elements[i] = S2;
-          else
-            return 0;
-          continue;
-        }
-        Decl *D = E->Elements[i].get<Decl*>();
-        if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-          if (Expr *Init = VD->Init) {
-            if (Expr *E2 = doIt(Init))
-              VD->Init = E2;
-            else
-              return 0;
-          }
-      }
-      
-      return E;
-    }
     Expr *VisitClosureExpr(ClosureExpr *E) {
       if (Expr *E2 = doIt(E->Input)) {
         E->Input = E2;
@@ -436,20 +405,50 @@ namespace {
       return E;
     }
     
+    Stmt *visitBraceStmt(BraceStmt *BS) {
+      for (unsigned i = 0, e = BS->NumElements; i != e; ++i) {
+        if (Expr *SubExpr = BS->Elements[i].dyn_cast<Expr*>()) {
+          if (Expr *E2 = doIt(SubExpr))
+            BS->Elements[i] = E2;
+          else
+            return 0;
+          continue;
+        }
+        
+        if (Stmt *S = BS->Elements[i].dyn_cast<Stmt*>()) {
+          if (Stmt *S2 = doIt(S))
+            BS->Elements[i] = S2;
+          else
+            return 0;
+          continue;
+        }
+        Decl *D = BS->Elements[i].get<Decl*>();
+        if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+          if (Expr *Init = VD->Init) {
+            if (Expr *E2 = doIt(Init))
+              VD->Init = E2;
+            else
+              return 0;
+          }
+      }
+      
+      return BS;
+    }
+
     Stmt *visitIfStmt(IfStmt *IS) {
       if (Expr *E2 = doIt(IS->Cond))
         IS->Cond = E2;
       else
         return 0;
       
-      if (Expr *E2 = doIt(IS->Then))
-        IS->Then = E2;
+      if (Stmt *S2 = doIt(IS->Then))
+        IS->Then = S2;
       else
         return 0;
       
       if (IS->Else) {
-        if (Expr *E2 = doIt(IS->Else))
-          IS->Else = E2;
+        if (Stmt *S2 = doIt(IS->Else))
+          IS->Else = S2;
         else
           return 0;
       }
@@ -619,19 +618,6 @@ public:
     for (unsigned i = 0, e = E->NumElements; i != e; ++i) {
       OS << '\n';
       PrintRec(E->Elements[i]);
-    }
-    OS << ')';
-  }
-  void VisitBraceExpr(BraceExpr *E) {
-    OS.indent(Indent) << "(brace_expr type='" << E->Ty << '\'';
-    for (unsigned i = 0, e = E->NumElements; i != e; ++i) {
-      OS << '\n';
-      if (Expr *SubExpr = E->Elements[i].dyn_cast<Expr*>())
-        PrintRec(SubExpr);
-      else if (Stmt *SubStmt = E->Elements[i].dyn_cast<Stmt*>())
-        PrintRec(SubStmt);
-      else
-        PrintRec(E->Elements[i].get<Decl*>());
     }
     OS << ')';
   }

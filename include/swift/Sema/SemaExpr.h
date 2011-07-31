@@ -34,7 +34,6 @@ namespace swift {
   class Type;
   class ValueDecl;
   class Identifier;
-  class BraceExpr;
   
 /// SemaExpr - Semantic analysis support for Swift expressions.
 class SemaExpr : public SemaBase {
@@ -60,8 +59,8 @@ public:
                  bool IsPrecededByIdentifier);
 
   NullablePtr<Stmt>
-  ActOnIfStmt(SMLoc IfLoc, Expr *Cond, Expr *Normal, 
-              SMLoc ElseLoc, Expr *Else);
+  ActOnIfStmt(SMLoc IfLoc, Expr *Cond, Stmt *Normal, 
+              SMLoc ElseLoc, Stmt *Else);
 };
   
 } // end namespace swift

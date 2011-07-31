@@ -96,8 +96,8 @@ SemaExpr::ActOnTupleExpr(SMLoc LPLoc, Expr *const *SubExprs,
 }
 
 NullablePtr<Stmt>
-SemaExpr::ActOnIfStmt(SMLoc IfLoc, Expr *Cond, Expr *Normal,
-                      SMLoc ElseLoc, Expr *Else) {
+SemaExpr::ActOnIfStmt(SMLoc IfLoc, Expr *Cond, Stmt *Normal,
+                      SMLoc ElseLoc, Stmt *Else) {
   assert(Cond && Normal);  // Else may be null.
   
   // The condition needs to be convertible to a logic value.  Build a call to

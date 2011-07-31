@@ -24,10 +24,6 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 
-namespace llvm {
-  template <typename PT1, typename PT2, typename PT3> class PointerUnion3;
-}
-
 namespace swift {
   class ASTContext;
   class Type;
@@ -49,7 +45,6 @@ enum class ExprKind {
   TupleShuffle,
   Apply,
   Sequence,
-  Brace,
   Closure,
   AnonClosureArg,
   Binary
@@ -408,8 +403,7 @@ public:
 };
 
 /// SequenceExpr - a series of expressions which should be evaluated
-/// sequentially, e.g. foo()  bar().  This is like BraceExpr but doesn't have
-/// semicolons, braces, or declarations and can never be empty.
+/// sequentially, e.g. foo()  bar().
 class SequenceExpr : public Expr {
 public:
   // FIXME: Switch to MutableArrayRef.
@@ -425,33 +419,6 @@ public:
   static bool classof(const Expr *E) { return E->Kind == ExprKind::Sequence; }
 };
   
-/// BraceExpr - A brace enclosed sequence of expressions, like { 4; 5 }.  If the
-/// final expression is terminated with a ;, the result type of the brace expr
-/// is void, otherwise it is the value of the last expression.
-class BraceExpr : public Expr {
-public:
-  SMLoc LBLoc;
-  
-  typedef llvm::PointerUnion3<Expr*, Stmt*, Decl*> ExprStmtOrDecl;
-  // FIXME: Switch to MutableArrayRef.
-  ExprStmtOrDecl *Elements;
-  unsigned NumElements;
-  
-  /// This is true if the last expression in the brace expression is missing a
-  /// semicolon after it.
-  bool MissingSemi;
-  SMLoc RBLoc;
-
-  BraceExpr(SMLoc lbloc, ExprStmtOrDecl *elements,
-            unsigned numelements, bool missingsemi, SMLoc rbloc)
-    : Expr(ExprKind::Brace), LBLoc(lbloc), Elements(elements),
-      NumElements(numelements), MissingSemi(missingsemi), RBLoc(rbloc) {}
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const BraceExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == ExprKind::Brace; }
-};
-
   
 /// ClosureExpr - An expression which is implicitly created by using an
 /// expression in a function context where the expression's type matches the

@@ -21,6 +21,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/NullablePtr.h"
@@ -140,7 +141,7 @@ bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init) {
   
   // Parse the initializer, if present.
   if (consumeIf(tok::equal)) {
-    if (parseExpr(Init, false, "expected expression in var declaration"))
+    if (parseExpr(Init, "expected expression in var declaration"))
       return true;
     
     // If there was an expression, but it had a parse error, give the var decl
@@ -171,8 +172,7 @@ TranslationUnitDecl *Parser::parseTranslationUnit() {
   
   // Parse the body of the file.
   SmallVector<ExprStmtOrDecl, 128> Items;
-  bool MissingSemiAtEnd = false; // Don't care, FIXME remove.
-  parseBraceItemList(Items, MissingSemiAtEnd, true);
+  parseBraceItemList(Items, true);
   
   // Notify sema about the end of the translation unit.
   S.decl.handleEndOfTranslationUnit(Result, FileStartLoc, Items, Tok.getLoc());
@@ -458,13 +458,13 @@ FuncDecl *Parser::parseDeclFunc() {
     S.decl.CreateArgumentDeclsForFunc(FD);
 
   // Then parse the expression.
-  NullablePtr<Expr> Body;
+  NullablePtr<Stmt> Body;
 
   // Check to see if we have a "{" which is a brace expr.
   if (Tok.is(tok::l_brace)) {
-    if (parseExprBrace(Body) || Body.isNull())
+    if (parseStmtBrace(Body) || Body.isNull())
       return 0;  // FIXME: Need to call a new ActOnFuncBodyError?
-    S.decl.ActOnFuncBody(FD, Body.get());
+    S.decl.ActOnFuncBody(FD, cast<BraceStmt>(Body.get()));
   }
 
   return FD;
@@ -645,7 +645,7 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
     if (consumeIf(tok::l_square)) {
       NullablePtr<Expr> Size;
       if (!Tok.is(tok::r_square) &&
-          parseExpr(Size, false, "expected expression for array type size"))
+          parseExpr(Size, "expected expression for array type size"))
         return true;
       
       SMLoc RArrayTok = Tok.getLoc();
@@ -770,17 +770,11 @@ static bool isStartOfExpr(Token &Tok) {
 ///   expr:
 ///     expr-primary+
 ///
-///   expr-non-brace:
-///     expr-primary-non-brace+
-///
-bool Parser::parseExpr(NullablePtr<Expr> &Result, bool NonBraceOnly,
-                       const char *Message) {
+bool Parser::parseExpr(NullablePtr<Expr> &Result, const char *Message) {
   SmallVector<Expr*, 8> SequencedExprs;
   
   do {
-    if (NonBraceOnly && Tok.is(tok::l_brace)) break;
-    
-    // Parse the expr-primary or expr-primary-non-brace.
+    // Parse the expr-primary
     if (parseExprPrimary(SequencedExprs)) return true;
   } while (isStartOfExpr(Tok));
   
@@ -806,10 +800,6 @@ bool Parser::parseExpr(NullablePtr<Expr> &Result, bool NonBraceOnly,
 /// parseExprPrimary
 ///
 ///   expr-primary:
-///     expr-primary-non-brace
-///     expr-brace
-///
-///   expr-primary-non-brace:
 ///     expr-literal
 ///     expr-identifier
 ///     ':' identifier
@@ -856,11 +846,7 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &Result) {
   case tok::l_paren:
     if (parseExprParen(R)) return true;
     break;
-      
-  case tok::l_brace:
-    if (parseExprBrace(R)) return true;
-    break;
-      
+
   default:
     error(Tok.getLoc(), "expected expression");
     return true;
@@ -894,7 +880,7 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &Result) {
     // Check for a [expr] suffix.
     if (consumeIf(tok::l_square)) {
       NullablePtr<Expr> Idx;
-      if (parseExpr(Idx, false, "expected expression parsing array index"))
+      if (parseExpr(Idx, "expected expression parsing array index"))
         return true;
       
       SMLoc RLoc = Tok.getLoc();
@@ -1006,7 +992,7 @@ bool Parser::parseExprParen(NullablePtr<Expr> &Result) {
       }
       
       NullablePtr<Expr> SubExpr;
-      if (parseExpr(SubExpr, false, "expected expression in parentheses"))
+      if (parseExpr(SubExpr, "expected expression in parentheses"))
         return true;
       
       if (SubExpr.isNull())
@@ -1040,38 +1026,6 @@ bool Parser::parseExprParen(NullablePtr<Expr> &Result) {
 }
 
 
-/// parseExprBrace - A brace enclosed expression list which may optionally end
-/// with a ; inside of it.  For example { 1; 4+5; } or { 1; 2 }.
-///
-///   expr-brace:
-///     '{' expr-brace-item* '}'
-///
-bool Parser::parseExprBrace(NullablePtr<Expr> &Result) {
-  SMLoc LBLoc = consumeToken(tok::l_brace);
-
-  SmallVector<ExprStmtOrDecl, 16> Entries;
-
-  // MissingSemiAtEnd - Keep track of whether the last expression in the block
-  // had no semicolon.
-  bool MissingSemiAtEnd = false;
-  if (parseBraceItemList(Entries, MissingSemiAtEnd, false /*NotTopLevel*/))
-    return true;
-  
-  SMLoc RBLoc = Tok.getLoc();
-  if (parseToken(tok::r_brace, "expected '}' at end of brace expression",
-                 tok::r_brace)) {
-    note(LBLoc, "to match this opening '{'");
-    return true;
-  }
-  
-  ExprStmtOrDecl *NewElements = 
-    S.Context.AllocateCopy<ExprStmtOrDecl>(Entries.begin(), Entries.end());
-  
-  Result = new (S.Context) BraceExpr(LBLoc, NewElements, Entries.size(),
-                                     MissingSemiAtEnd, RBLoc);
-  return false;
-}
-
 ///   expr-brace-item:
 ///     expr
 ///     expr '=' expr      // FIXME: Should be part of stmt.
@@ -1085,30 +1039,29 @@ bool Parser::parseExprBrace(NullablePtr<Expr> &Result) {
 ///
 ///   stmt:
 ///     ';'
+///     stmt-brace
 ///     stmt-if
 bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
-                                bool &MissingSemiAtEnd, bool IsTopLevel) {
+                                bool IsTopLevel) {
   // This forms a lexical scope.
   Scope BraceScope(S.decl);
     
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-    MissingSemiAtEnd = false;
-
-    // Parse the decl or expression.    
+    // Parse the decl, stmt, or expression.    
     switch (Tok.getKind()) {
     case tok::semi:
       // Could create a stmt for semicolons if we care.
       consumeToken(tok::semi);
       continue;
         
-    case tok::kw_if: {
+    case tok::kw_if:
+    case tok::l_brace: {
       Entries.push_back(ExprStmtOrDecl());
 
       NullablePtr<Stmt> ResultStmt;
-      if (parseStmtIf(ResultStmt)) break;
+      if (parseStmt(ResultStmt)) break;
       
       Entries.back() = ResultStmt.get();
-      MissingSemiAtEnd = false;
       break;
     }
         
@@ -1141,7 +1094,7 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       Entries.push_back(ExprStmtOrDecl());
         
       NullablePtr<Expr> ResultExpr;
-      if (parseExpr(ResultExpr, false) || ResultExpr.isNull())
+      if (parseExpr(ResultExpr) || ResultExpr.isNull())
         break;
         
       // FIXME: Assignment is a hack until we get generics.  We really want to
@@ -1149,7 +1102,7 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       if (Tok.is(tok::equal)) {
         SMLoc EqualLoc = consumeToken();
         NullablePtr<Expr> RHSExpr;
-        if (parseExpr(RHSExpr, false) || RHSExpr.isNull())
+        if (parseExpr(RHSExpr) || RHSExpr.isNull())
           break;
         
         // FIXME: Assignment is represented with null Fn.
@@ -1158,7 +1111,6 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       }
         
       Entries.back() = ResultExpr.get();
-      MissingSemiAtEnd = true;
       break;
     }
     
@@ -1178,44 +1130,72 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
   return false;
 }
 
+bool Parser::parseStmt(NullablePtr<Stmt> &Result) {
+  switch (Tok.getKind()) {
+  case tok::l_brace:
+    return parseStmtBrace(Result);
+  case tok::kw_if:
+    return parseStmtIf(Result);
+  default:
+    error(Tok.getLoc(), "expected statement");
+    return true;
+  }
+}
+
+/// parseStmtBrace - A brace enclosed expression/statement/decl list.  For
+/// example { 1; 4+5; } or { 1; 2 }.
+///
+///   stmt-brace:
+///     '{' stmt-brace-item* '}'
+///
+bool Parser::parseStmtBrace(NullablePtr<Stmt> &Result) {
+  SMLoc LBLoc = consumeToken(tok::l_brace);
+  
+  SmallVector<ExprStmtOrDecl, 16> Entries;
+  
+  if (parseBraceItemList(Entries, false /*NotTopLevel*/))
+    return true;
+  
+  SMLoc RBLoc = Tok.getLoc();
+  if (parseToken(tok::r_brace, "expected '}' at end of brace expression",
+                 tok::r_brace)) {
+    note(LBLoc, "to match this opening '{'");
+    return true;
+  }
+  
+  ExprStmtOrDecl *NewElements = 
+    S.Context.AllocateCopy<ExprStmtOrDecl>(Entries.begin(), Entries.end());
+  
+  Result = new (S.Context) BraceStmt(LBLoc, NewElements, Entries.size(), RBLoc);
+  return false;
+}
+
 
 /// 
 ///   stmt-if:
-///     'if' expr-non-brace brace-expr expr-if-else?
-///   expr-if-else:
-///     'else' brace-expr
-///    // 'else' stmt
+///     'if' expr stmt-brace stmt-if-else?
+///   stmt-if-else:
+///    'else' stmt
 bool Parser::parseStmtIf(NullablePtr<Stmt> &Result) {
   SMLoc IfLoc = consumeToken(tok::kw_if);
 
   NullablePtr<Expr> Condition;
-  if (parseExpr(Condition, true, "expected expresssion in 'if' condition"))
+  if (parseExpr(Condition, "expected expresssion in 'if' condition"))
     return true;
   
+  // FIXME: Why require braces? Any stmt could do.
   if (Tok.isNot(tok::l_brace)) {
     error(Tok.getLoc(), "expected '{' after 'if' condition");
     return true;
   }
   
+  NullablePtr<Stmt> NormalBody;
+  if (parseStmtBrace(NormalBody)) return true;
   
-  NullablePtr<Expr> NormalBody;
-  if (parseExprBrace(NormalBody)) return true;
-  
-  NullablePtr<Expr> ElseBody;
+  NullablePtr<Stmt> ElseBody;
   SMLoc ElseLoc = Tok.getLoc();
   if (consumeIf(tok::kw_else)) {
-#if 0
-    if (Tok.is(tok::kw_if)) {
-      if (parseExprIf(ElseBody)) return true;
-    } else
-      ;
-#endif
-    if (Tok.is(tok::l_brace)) {
-      if (parseExprBrace(ElseBody)) return true;
-    } else {
-      error(Tok.getLoc(), "expected '{' or 'if' after 'else'");
-      if (parseExpr(ElseBody, false)) return true;
-    }
+    if (parseStmt(ElseBody)) return true;
   } else {
     ElseLoc = SMLoc();
   }

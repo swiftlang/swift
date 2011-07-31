@@ -434,11 +434,7 @@ namespace {
     }
     Expr *VisitSequenceExpr(SequenceExpr *E);
     
-    Expr *VisitBraceExpr(BraceExpr *E) {
-      assert(0 && "BraceExprs should be processed in the prepass");
-      return 0;
-    }
-    void PreProcessBraceExpr(BraceExpr *E);
+    void PreProcessBraceStmt(BraceStmt *BS);
     
     Expr *VisitClosureExpr(ClosureExpr *E) {
       assert(0 && "Should not walk into ClosureExprs!");
@@ -460,7 +456,12 @@ namespace {
       
       return E;
     }
-    
+
+    Stmt *visitBraceStmt(BraceStmt *BS) {
+      assert(0 && "BraceStmts should be processed in the prepass");
+      return 0;
+    }
+
     Stmt *visitIfStmt(IfStmt *S);
     
     SemaExpressionTree(TypeChecker &tc) : TC(tc) {}
@@ -474,15 +475,6 @@ namespace {
         // This also prevents N^2 re-sema activity with lots of nested closures.
         if (isa<ClosureExpr>(E)) return 0;
         
-        // Do not descend into BraceExpr's, because we want to handle the var
-        // initializers in a custom way.  Instead, just call VisitBraceExpr in
-        // the prepass (which itself manually descends) and then tell the walker
-        // to not dive into it.
-        if (BraceExpr *BE = dyn_cast<BraceExpr>(E)) {
-          SET.PreProcessBraceExpr(BE);
-          return 0;
-        }
-        
         return E;
       }
       
@@ -494,8 +486,18 @@ namespace {
     static Stmt *WalkStmtFn(Stmt *S, Expr::WalkOrder Order, void *set) {
       SemaExpressionTree &SET = *static_cast<SemaExpressionTree*>(set);
       // This is implemented as a postorder walk.
-      if (Order == Expr::WalkOrder::PreOrder)
+      if (Order == Expr::WalkOrder::PreOrder) {
+        // Do not descend into BraceStmt's, because we want to handle the var
+        // initializers in a custom way.  Instead, just call visitBraceStmt in
+        // the prepass (which itself manually descends) and then tell the walker
+        // to not dive into it.
+        if (BraceStmt *BS = dyn_cast<BraceStmt>(S)) {
+          SET.PreProcessBraceStmt(BS);
+          return 0;
+        }
+        
         return S;
+      }
       
       // Dispatch to the right visitor case in the post-order walk.  We know
       // that the operands have already been processed and are valid.
@@ -509,11 +511,16 @@ namespace {
     Stmt *doIt(Stmt *S) {
       return Expr::WalkExpr(S, WalkExprFn, WalkStmtFn, this);
     }
-
+                                                  
   public:
     static Expr *doIt(Expr *E, TypeChecker &TC) {
       SemaExpressionTree SET(TC);
       return SET.doIt(E);
+    }
+                                                  
+    static void doIt(BraceStmt *BS, TypeChecker &TC) {
+      SemaExpressionTree SET(TC);
+      SET.PreProcessBraceStmt(BS);
     }
   };
 } // end anonymous namespace.
@@ -815,56 +822,38 @@ Expr *SemaExpressionTree::VisitSequenceExpr(SequenceExpr *E) {
 Stmt *SemaExpressionTree::visitIfStmt(IfStmt *IS) {
   // The if condition must have __builtin_int1 type.  This is after the
   // conversion function is added by sema.
+  // FIXME: Why isn't this using convertToType?
   if (!IS->Cond->Ty->isEqual(TC.Context.TheInt1Type, TC.Context)) {
     TC.error(IS->Cond->getLocStart(), "expression of type '" +
              IS->Cond->Ty->getString() + "' is not legal in a condition");
     return 0;
-  }
-  
-  // The Then/Else bodies must have '()' type.
-  IS->Then = TC.convertToType(IS->Then, TupleType::getEmpty(TC.Context));
-  if (IS->Then == 0) {
-    TC.note(IS->IfLoc, "while processing 'if' body");
-    return 0;
-  }
-  
-  if (IS->Else) {
-    IS->Else = TC.convertToType(IS->Else, TupleType::getEmpty(TC.Context));
-    if (IS->Else == 0) {
-      TC.note(IS->ElseLoc, "while processing 'else' body of 'if'");
-      return 0;
-    }
   }
 
   return IS;
 }
 
 
-void SemaExpressionTree::PreProcessBraceExpr(BraceExpr *E) {
+void SemaExpressionTree::PreProcessBraceStmt(BraceStmt *BS) {
   SmallVector<Expr*, 4> ExcessExprs;
   
-  SmallVector<BraceExpr::ExprStmtOrDecl, 32> NewElements;
+  SmallVector<BraceStmt::ExprStmtOrDecl, 32> NewElements;
   
   // Braces have to manually walk into subtrees for expressions, because we
   // terminate the walk we're in for them (so we can handle decls custom).
-  for (unsigned i = 0, e = E->NumElements; i != e; ++i) {
-    if (Expr *SubExpr = E->Elements[i].dyn_cast<Expr*>()) {
-      if ((SubExpr = doIt(SubExpr)) == 0)
-        E->MissingSemi = false;
-      else
+  for (unsigned i = 0, e = BS->NumElements; i != e; ++i) {
+    if (Expr *SubExpr = BS->Elements[i].dyn_cast<Expr*>()) {
+      if ((SubExpr = doIt(SubExpr)))
         NewElements.push_back(SubExpr);
       continue;
     }
     
-    if (Stmt *SubStmt = E->Elements[i].dyn_cast<Stmt*>()) {
-      if ((SubStmt = doIt(SubStmt)) == 0)
-        E->MissingSemi = false;
-      else
+    if (Stmt *SubStmt = BS->Elements[i].dyn_cast<Stmt*>()) {
+      if ((SubStmt = doIt(SubStmt)))
         NewElements.push_back(SubStmt);
       continue;
     }
     
-    Decl *D = E->Elements[i].get<Decl*>();
+    Decl *D = BS->Elements[i].get<Decl*>();
     NewElements.push_back(D);
     
     if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D))
@@ -882,32 +871,25 @@ void SemaExpressionTree::PreProcessBraceExpr(BraceExpr *E) {
   }
   
   // If any of the elements of the braces has a function type (which indicates
-  // that a function didn't get called), then produce an error.  We don't do
-  // this for the last element in the 'missing semi' case, because the brace
-  // expr as a whole has the function result.
+  // that a function didn't get called), then produce an error.
   // TODO: What about tuples which contain functions by-value that are dead?
-  for (unsigned i = 0, e = NewElements.size()-(E->MissingSemi ?1:0);i != e; ++i)
+  for (unsigned i = 0, e = NewElements.size(); i != e; ++i)
     if (NewElements[i].is<Expr*>() &&
         NewElements[i].get<Expr*>()->Ty->is<FunctionType>())
       // TODO: QOI: Add source range.
       TC.error(NewElements[i].get<Expr*>()->getLocStart(),
                "expression resolves to an unevaluated function");
   
-  if (E->MissingSemi)
-    E->Ty = NewElements.back().get<Expr*>()->Ty;
-  else
-    E->Ty = TupleType::getEmpty(TC.Context);
-  
   // Reinstall the list now that we potentially mutated it.
-  if (NewElements.size() <= E->NumElements) {
-    memcpy(E->Elements, NewElements.data(),
-           NewElements.size()*sizeof(E->Elements[0]));
-    E->NumElements = NewElements.size();
+  if (NewElements.size() <= BS->NumElements) {
+    memcpy(BS->Elements, NewElements.data(),
+           NewElements.size()*sizeof(BS->Elements[0]));
+    BS->NumElements = NewElements.size();
   } else {
-    E->Elements = 
-      TC.Context.AllocateCopy<BraceExpr::ExprStmtOrDecl>(NewElements.begin(),
+    BS->Elements = 
+      TC.Context.AllocateCopy<BraceStmt::ExprStmtOrDecl>(NewElements.begin(),
                                                          NewElements.end());
-    E->NumElements = NewElements.size();
+    BS->NumElements = NewElements.size();
   }
 }
 
@@ -1117,20 +1099,7 @@ namespace {
       // FIXME: Apply to last value of sequence.
       return E;
     }
-    Expr *VisitBraceExpr(BraceExpr *E) {
-      assert(E->MissingSemi && "Can't have dependent type when return ()");
-      assert(E->NumElements && "Can't have 0 elements + missing semi");
-      assert(E->Elements[E->NumElements-1].is<Expr*>() && "Decl is ()");
- 
-      Expr *LastVal = E->Elements[E->NumElements-1].get<Expr*>();
-      
-      LastVal = convertToType(LastVal, DestTy, true, TC);
-      if (LastVal == 0) return 0;
 
-      // Update the end of the brace expression.
-      E->Elements[E->NumElements-1] = LastVal;
-      return E;
-    }
     Expr *VisitClosureExpr(ClosureExpr *E) {
       return E;      
     }
@@ -1846,6 +1815,5 @@ void swift::performTypeChecking(TranslationUnitDecl *TUD, ASTContext &Ctx) {
   
   // Type check the top-level BraceExpr.  This sorts out any top-level
   // expressions and recursively processes the rest of the translation unit.
-  TUD->Body =
-    cast_or_null<BraceExpr>(SemaExpressionTree::doIt(TUD->Body, TC));
+  SemaExpressionTree::doIt(TUD->Body, TC);
 }

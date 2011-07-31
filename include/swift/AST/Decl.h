@@ -27,7 +27,7 @@ namespace swift {
   class ASTContext;
   class Type;
   class Expr;
-  class BraceExpr;
+  class BraceStmt;
   class OneOfElementDecl;
   class NameAliasType;
   class TypeAliasDecl;
@@ -134,9 +134,9 @@ class TranslationUnitDecl : public Decl {
 public:
   ASTContext &Ctx;
 
-  /// Body - This is a synthesized BraceExpr that holds the top level
+  /// Body - This is a synthesized BraceStmt that holds the top level
   /// expressions and declarations for a translation unit.
-  BraceExpr *Body;
+  BraceStmt *Body;
   
   /// UnresolvedTypes - This is a list of types that were unresolved at the end
   /// of the translation unit's parse phase.

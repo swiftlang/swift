@@ -114,7 +114,7 @@ private:
   bool parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init);
 
   bool parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Decls,
-                          bool &MissingSemiAtEnd, bool IsTopLevel);
+                          bool IsTopLevel);
 
   // Decl Parsing
   TypeAliasDecl *parseDeclTypeAlias();
@@ -136,16 +136,16 @@ private:
                           Type &Result, TypeAliasDecl *TypeName = 0);
 
   // Expression Parsing
-  bool parseExpr(NullablePtr<Expr> &Result, bool NonBraceOnly,
-                 const char *Message = 0);
+  bool parseExpr(NullablePtr<Expr> &Result, const char *Message = 0);
   bool parseExprSingle(NullablePtr<Expr> &Result, const char *Message =0);
   bool parseExprPrimary(SmallVectorImpl<Expr*> &Result);
   bool parseExprIdentifier(NullablePtr<Expr> &Result);
   bool parseExprDollarIdentifier(NullablePtr<Expr> &Result);
   bool parseExprParen(NullablePtr<Expr> &Result);
-  bool parseExprBrace(NullablePtr<Expr> &Result);
   
   // Statement Parsing
+  bool parseStmt(NullablePtr<Stmt> &Result);
+  bool parseStmtBrace(NullablePtr<Stmt> &Result);
   bool parseStmtIf(NullablePtr<Stmt> &Result);
 
 };

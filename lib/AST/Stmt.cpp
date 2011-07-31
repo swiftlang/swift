@@ -15,9 +15,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Stmt.h"
-#include "swift/AST/ExprVisitor.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Expr.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/ExprVisitor.h"
+#include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
@@ -35,6 +36,8 @@ void *Stmt::operator new(size_t Bytes, ASTContext &C,
 /// FIXME: Need to extend this to do full source ranges like Clang.
 SMLoc Stmt::getLocStart() const {
   switch (Kind) {
+  case StmtKind::Brace:
+    return cast<BraceStmt>(this)->LBLoc;
   case StmtKind::If:
     return cast<IfStmt>(this)->IfLoc;
   }
@@ -71,8 +74,21 @@ public:
     Indent -= 2;
   }
   
-  void PrintRec(Expr *E) {
-    E->print(OS, Indent+2);
+  void PrintRec(Decl *D) { D->print(OS, Indent+2); }
+  void PrintRec(Expr *E) { E->print(OS, Indent+2); }
+  
+  void visitBraceStmt(BraceStmt *S) {
+    OS.indent(Indent) << "(brace_expr";
+    for (unsigned i = 0, e = S->NumElements; i != e; ++i) {
+      OS << '\n';
+      if (Expr *SubExpr = S->Elements[i].dyn_cast<Expr*>())
+        PrintRec(SubExpr);
+      else if (Stmt *SubStmt = S->Elements[i].dyn_cast<Stmt*>())
+        PrintRec(SubStmt);
+      else
+        PrintRec(S->Elements[i].get<Decl*>());
+    }
+    OS << ')';
   }
   
   void visitIfStmt(IfStmt *S) {

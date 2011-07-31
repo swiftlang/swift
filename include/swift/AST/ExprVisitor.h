@@ -48,7 +48,6 @@ public:
     DISPATCH(TupleShuffle);
     DISPATCH(Apply);
     DISPATCH(Sequence);
-    DISPATCH(Brace);
     DISPATCH(Closure);
     DISPATCH(AnonClosureArg);
     DISPATCH(Binary);
@@ -66,6 +65,7 @@ public:
   return static_cast<ImplClass*>(this)->visit ## CLASS ## \
     Stmt(static_cast<CLASS##Stmt*>(S))
         
+    DISPATCH(Brace);
     DISPATCH(If);
 #undef DISPATCH
     }
