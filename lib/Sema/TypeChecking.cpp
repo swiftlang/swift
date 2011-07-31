@@ -352,8 +352,9 @@ namespace {
   /// intermediate nodes, introduce type coercion etc.  This visitor does this
   /// job.  Each visit method reanalyzes the children of a node, then reanalyzes
   /// the node, and returns true on error.
-  class SemaExpressionTree : public ExprVisitor<SemaExpressionTree, Expr*,bool>{
-    friend class ExprVisitor<SemaExpressionTree, Expr*, bool>;
+  class SemaExpressionTree : public ExprVisitor<SemaExpressionTree,
+                                                Expr*, Stmt*> {
+    friend class ExprVisitor<SemaExpressionTree, Expr*, Stmt*>;
     TypeChecker &TC;
     
     Expr *VisitIntegerLiteralExpr(IntegerLiteralExpr *E) {
@@ -460,13 +461,11 @@ namespace {
       return E;
     }
     
-#if 0
-    bool visitIfStmt(IfStmt *S);
-#endif
+    Stmt *visitIfStmt(IfStmt *S);
     
     SemaExpressionTree(TypeChecker &tc) : TC(tc) {}
     
-    static Expr *WalkFn(Expr *E, Expr::WalkOrder Order, void *set) {
+    static Expr *WalkExprFn(Expr *E, Expr::WalkOrder Order, void *set) {
       SemaExpressionTree &SET = *static_cast<SemaExpressionTree*>(set);
       // This is implemented as a postorder walk.
       if (Order == Expr::WalkOrder::PreOrder) {
@@ -492,12 +491,23 @@ namespace {
       return SET.Visit(E);
     }
 
-    Expr *doIt(Expr *E) {
-      return E->WalkExpr(WalkFn, this);
+    static Stmt *WalkStmtFn(Stmt *S, Expr::WalkOrder Order, void *set) {
+      SemaExpressionTree &SET = *static_cast<SemaExpressionTree*>(set);
+      // This is implemented as a postorder walk.
+      if (Order == Expr::WalkOrder::PreOrder)
+        return S;
+      
+      // Dispatch to the right visitor case in the post-order walk.  We know
+      // that the operands have already been processed and are valid.
+      return SET.visit(S);
     }
-        
-    bool doIt(Stmt *S) {
-      return Expr::WalkExpr(S, WalkFn, this);
+
+    Expr *doIt(Expr *E) {
+      return E->WalkExpr(WalkExprFn, WalkStmtFn, this);
+    }
+
+    Stmt *doIt(Stmt *S) {
+      return Expr::WalkExpr(S, WalkExprFn, WalkStmtFn, this);
     }
 
   public:
@@ -802,34 +812,32 @@ Expr *SemaExpressionTree::VisitSequenceExpr(SequenceExpr *E) {
   return E;
 }
 
-#if 0
-bool SemaExpressionTree::visitIfStmt(IfStmt *IS) {
+Stmt *SemaExpressionTree::visitIfStmt(IfStmt *IS) {
   // The if condition must have __builtin_int1 type.  This is after the
   // conversion function is added by sema.
   if (!IS->Cond->Ty->isEqual(TC.Context.TheInt1Type, TC.Context)) {
     TC.error(IS->Cond->getLocStart(), "expression of type '" +
              IS->Cond->Ty->getString() + "' is not legal in a condition");
-    return true;
+    return 0;
   }
   
   // The Then/Else bodies must have '()' type.
   IS->Then = TC.convertToType(IS->Then, TupleType::getEmpty(TC.Context));
   if (IS->Then == 0) {
     TC.note(IS->IfLoc, "while processing 'if' body");
-    return true;
+    return 0;
   }
   
   if (IS->Else) {
     IS->Else = TC.convertToType(IS->Else, TupleType::getEmpty(TC.Context));
     if (IS->Else == 0) {
       TC.note(IS->ElseLoc, "while processing 'else' body of 'if'");
-      return true;
+      return 0;
     }
   }
 
-  return false;
+  return IS;
 }
-#endif
 
 
 void SemaExpressionTree::PreProcessBraceExpr(BraceExpr *E) {
@@ -849,10 +857,10 @@ void SemaExpressionTree::PreProcessBraceExpr(BraceExpr *E) {
     }
     
     if (Stmt *SubStmt = E->Elements[i].dyn_cast<Stmt*>()) {
-      if (!doIt(SubStmt))
-        NewElements.push_back(SubStmt);
-      else
+      if ((SubStmt = doIt(SubStmt)) == 0)
         E->MissingSemi = false;
+      else
+        NewElements.push_back(SubStmt);
       continue;
     }
     
@@ -976,7 +984,7 @@ BindAndValidateClosureArgs(Expr *Body, Type FuncInput, TypeChecker &TC) {
   // Walk the body and rewrite any anonymous arguments.  Note that this
   // isn't a particularly efficient way to handle this, because we walk subtrees
   // even if they have no anonymous arguments.
-  return Body->WalkExpr(RewriteAnonArgExpr::WalkFn, &Rewriter) == 0;
+  return Body->WalkExpr(RewriteAnonArgExpr::WalkFn, 0, &Rewriter) == 0;
 }
 
 
@@ -1715,7 +1723,7 @@ void TypeChecker::checkBody(Expr *&E, Type DestTy,
   // all of the types contained within it.  We should not have any
   // DependentType's left for subexpressions.
   if (E)
-    E = E->WalkExpr(DiagnoseUnresolvedTypes, this);
+    E = E->WalkExpr(DiagnoseUnresolvedTypes, 0, this);
 }
 
 void TypeChecker::typeCheck(TypeAliasDecl *TAD) {

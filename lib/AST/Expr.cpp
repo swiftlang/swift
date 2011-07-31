@@ -316,9 +316,10 @@ namespace {
   /// ExprWalker - This class implements a simple expression walker which
   /// invokes a function pointer on every expression in an AST.  If the function
   /// pointer returns true the walk is terminated.
-  class ExprWalker : public ExprVisitor<ExprWalker, Expr*, bool> {
-    friend class ExprVisitor<ExprWalker, Expr*, bool>;
-    Expr *(*Fn)(Expr *E, Expr::WalkOrder Order, void *Data);
+  class ExprWalker : public ExprVisitor<ExprWalker, Expr*, Stmt*> {
+    friend class ExprVisitor<ExprWalker, Expr*, Stmt*>;
+    Expr *(*ExprFn)(Expr *E, Expr::WalkOrder Order, void *Data);
+    Stmt *(*StmtFn)(Stmt *S, Expr::WalkOrder Order, void *Data);
     void *Data;
     
     
@@ -334,7 +335,7 @@ namespace {
     Expr *VisitTupleExpr(TupleExpr *E) {
       for (unsigned i = 0, e = E->NumSubExprs; i != e; ++i)
         if (E->SubExprs[i]) {
-          if (Expr *Elt = ProcessNode(E->SubExprs[i]))
+          if (Expr *Elt = doIt(E->SubExprs[i]))
             E->SubExprs[i] = Elt;
           else
             return 0;
@@ -345,14 +346,14 @@ namespace {
       if (!E->SubExpr)
         return E;
       
-      if (Expr *E2 = ProcessNode(E->SubExpr)) {
+      if (Expr *E2 = doIt(E->SubExpr)) {
         E->SubExpr = E2;
         return E;
       }
       return 0;
     }
     Expr *VisitTupleElementExpr(TupleElementExpr *E) {
-      if (Expr *E2 = ProcessNode(E->SubExpr)) {
+      if (Expr *E2 = doIt(E->SubExpr)) {
         E->SubExpr = E2;
         return E;
       }
@@ -360,7 +361,7 @@ namespace {
     }
     
     Expr *VisitTupleShuffleExpr(TupleShuffleExpr *E) {
-      if (Expr *E2 = ProcessNode(E->SubExpr)) {
+      if (Expr *E2 = doIt(E->SubExpr)) {
         E->SubExpr = E2;
         return E;
       }
@@ -368,18 +369,18 @@ namespace {
     }
     
     Expr *VisitApplyExpr(ApplyExpr *E) {
-      Expr *E2 = ProcessNode(E->Fn);
+      Expr *E2 = doIt(E->Fn);
       if (E2 == 0) return 0;
       E->Fn = E2;
       
-      E2 = ProcessNode(E->Arg);
+      E2 = doIt(E->Arg);
       if (E2 == 0) return 0;
       E->Arg = E2;
       return E;
     }
     Expr *VisitSequenceExpr(SequenceExpr *E) {
       for (unsigned i = 0, e = E->NumElements; i != e; ++i)
-        if (Expr *Elt = ProcessNode(E->Elements[i]))
+        if (Expr *Elt = doIt(E->Elements[i]))
           E->Elements[i] = Elt;
         else
           return 0;
@@ -388,7 +389,7 @@ namespace {
     Expr *VisitBraceExpr(BraceExpr *E) {
       for (unsigned i = 0, e = E->NumElements; i != e; ++i) {
         if (Expr *SubExpr = E->Elements[i].dyn_cast<Expr*>()) {
-          if (Expr *E2 = ProcessNode(SubExpr))
+          if (Expr *E2 = doIt(SubExpr))
             E->Elements[i] = E2;
           else
             return 0;
@@ -396,13 +397,16 @@ namespace {
         }
         
         if (Stmt *S = E->Elements[i].dyn_cast<Stmt*>()) {
-          if (visit(S)) return 0;
+          if (Stmt *S2 = doIt(S))
+            E->Elements[i] = S2;
+          else
+            return 0;
           continue;
         }
         Decl *D = E->Elements[i].get<Decl*>();
         if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
           if (Expr *Init = VD->Init) {
-            if (Expr *E2 = ProcessNode(Init))
+            if (Expr *E2 = doIt(Init))
               VD->Init = E2;
             else
               return 0;
@@ -412,7 +416,7 @@ namespace {
       return E;
     }
     Expr *VisitClosureExpr(ClosureExpr *E) {
-      if (Expr *E2 = ProcessNode(E->Input)) {
+      if (Expr *E2 = doIt(E->Input)) {
         E->Input = E2;
         return E;
       }
@@ -422,53 +426,70 @@ namespace {
     Expr *VisitAnonClosureArgExpr(AnonClosureArgExpr *E) { return E; }
 
     Expr *VisitBinaryExpr(BinaryExpr *E) {
-      Expr *E2 = ProcessNode(E->LHS);
+      Expr *E2 = doIt(E->LHS);
       if (E2 == 0) return 0;
       E->LHS = E2;
       
-      E2 = ProcessNode(E->RHS);
+      E2 = doIt(E->RHS);
       if (E2 == 0) return 0;
       E->RHS = E2;
       return E;
     }
     
-    bool visitIfStmt(IfStmt *IS) {
-      if (Expr *E2 = ProcessNode(IS->Cond))
+    Stmt *visitIfStmt(IfStmt *IS) {
+      if (Expr *E2 = doIt(IS->Cond))
         IS->Cond = E2;
       else
-        return true;
+        return 0;
       
-      if (Expr *E2 = ProcessNode(IS->Then))
+      if (Expr *E2 = doIt(IS->Then))
         IS->Then = E2;
       else
-        return true;
+        return 0;
       
       if (IS->Else) {
-        if (Expr *E2 = ProcessNode(IS->Else))
+        if (Expr *E2 = doIt(IS->Else))
           IS->Else = E2;
         else
-          return true;
+          return 0;
       }
-      return false;
+      return IS;
     }
-    
-    Expr *ProcessNode(Expr *E) {
+       
+  public:
+    ExprWalker(Expr *(*exprfn)(Expr *E, Expr::WalkOrder Order, void *Data),
+               Stmt *(*stmtfn)(Stmt *S, Expr::WalkOrder Order, void *Data),
+               void *data) : ExprFn(exprfn), StmtFn(stmtfn), Data(data) {
+    }
+    Expr *doIt(Expr *E) {
+      // If no visitor function wants to get called before/after the node, just
+      // walk into it.
+      if (ExprFn == 0)
+        return Visit(E);
+      
       // Try the preorder visitation.  If it returns null, we just skip entering
       // subnodes of this tree.
-      Expr *E2 = Fn(E, Expr::WalkOrder::PreOrder, Data);
+      Expr *E2 = ExprFn(E, Expr::WalkOrder::PreOrder, Data);
       if (E2 == 0) return E;
       
       if (E) E = Visit(E);
-      if (E) E = Fn(E, Expr::Expr::WalkOrder::PostOrder, Data);
+      if (E) E = ExprFn(E, Expr::Expr::WalkOrder::PostOrder, Data);
       return E;
     }
-    
-  public:
-    ExprWalker(Expr *(*fn)(Expr *E, Expr::WalkOrder Order, void *Data),
-               void *data) : Fn(fn), Data(data) {
-    }
-    Expr *doIt(Expr *E) {
-      return ProcessNode(E);
+    Stmt *doIt(Stmt *S) {
+      // If no visitor function wants to get called before/after the node, just
+      // walk into it.
+      if (StmtFn == 0)
+        return visit(S);
+      
+      // Try the preorder visitation.  If it returns null, we just skip entering
+      // subnodes of this tree.
+      Stmt *S2 = StmtFn(S, Expr::WalkOrder::PreOrder, Data);
+      if (S2 == 0) return S;
+      
+      if (S) S = visit(S);
+      if (S) S = StmtFn(S, Expr::Expr::WalkOrder::PostOrder, Data);
+      return S;
     }
   };
 } // end anonymous namespace.
@@ -480,16 +501,18 @@ namespace {
 /// function pointer returns true then the walk is terminated and WalkExpr
 /// returns true.
 /// 
-Expr *Expr::WalkExpr(Expr *(*Fn)(Expr *E, WalkOrder Order, void *Data),
+Expr *Expr::WalkExpr(Expr *(*ExprFn)(Expr *E, WalkOrder Order, void *Data),
+                     Stmt *(*StmtFn)(Stmt *S, WalkOrder Order, void *Data),
                      void *Data) {
-  return ExprWalker(Fn, Data).doIt(this);  
+  return ExprWalker(ExprFn, StmtFn, Data).doIt(this);  
 }
 
 /// WalkExpr - This walks all of the expressions contained within a statement.
-bool Expr::WalkExpr(Stmt *S,
-                    Expr *(*Fn)(Expr *E, WalkOrder Order, void *Data),
+Stmt *Expr::WalkExpr(Stmt *S,
+                    Expr *(*ExprFn)(Expr *E, WalkOrder Order, void *Data),
+                    Stmt *(*StmtFn)(Stmt *S, WalkOrder Order, void *Data),
                     void *Data) {
-  return ExprWalker(Fn, Data).visit(S);  
+  return ExprWalker(ExprFn, StmtFn, Data).doIt(S);  
 }
 
 

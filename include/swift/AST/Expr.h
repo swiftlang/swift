@@ -89,12 +89,18 @@ public:
   /// subtree is not visited.  If the function pointer returns NULL from a
   /// post-order invocation, then the walk is terminated and WalkExpr returns
   /// NULL.
-  Expr *WalkExpr(Expr *(*Fn)(Expr *E, WalkOrder Order, void *Data), void *Data);
+  ///
+  /// This walker invokes the StmtFn on each statement, just like expressions.
+  ///
+  Expr *WalkExpr(Expr *(*ExprFn)(Expr *E, WalkOrder Order, void *Data),
+                 Stmt *(*StmtFn)(Stmt *E, WalkOrder Order, void *Data),
+                 void *Data);
   
   /// WalkExpr - This walks all of the expressions contained within a statement.
-  static bool WalkExpr(Stmt *S,
-                       Expr *(*Fn)(Expr *E, WalkOrder Order, void *Data),
-                       void *Data);
+  static Stmt *WalkExpr(Stmt *S,
+                        Expr *(*Fn)(Expr *E, WalkOrder Order, void *Data),
+                        Stmt *(*StmtFn)(Stmt *E, WalkOrder Order, void *Data),
+                        void *Data);
   
   /// ConversionRank - This enum specifies the rank of an implicit conversion
   /// of a value from one type to another.  These are ordered from cheapest to
