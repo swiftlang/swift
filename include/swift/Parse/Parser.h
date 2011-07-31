@@ -142,6 +142,7 @@ private:
   bool parseExprIdentifier(NullablePtr<Expr> &Result);
   bool parseExprDollarIdentifier(NullablePtr<Expr> &Result);
   bool parseExprParen(NullablePtr<Expr> &Result);
+  bool parseExprLambda(NullablePtr<Expr> &Result);
   
   // Statement Parsing
   bool parseStmt(NullablePtr<Stmt> &Result);

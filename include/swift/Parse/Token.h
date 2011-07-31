@@ -42,12 +42,16 @@ enum class tok {
 //    KEYWORD(__builtin_float_type)
 //    KEYWORD(__builtin_double_type)
 
+  // Deck and type keywords.
   KEYWORD(import)
   KEYWORD(oneof)
   KEYWORD(struct)
   KEYWORD(func)
   KEYWORD(var)
   KEYWORD(typealias)
+  
+  // Expressions.
+  KEYWORD(lambda)
   
   // Statements
   KEYWORD(if)

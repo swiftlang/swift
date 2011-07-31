@@ -778,7 +778,7 @@ bool Parser::parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
 static bool isStartOfExpr(Token &Tok) {
   return Tok.is(tok::numeric_constant) || Tok.is(tok::colon) ||
          Tok.is(tok::l_paren) || Tok.is(tok::dollarident) ||
-         Tok.is(tok::identifier);
+         Tok.is(tok::identifier) || Tok.is(tok::kw_lambda);
 }
 
 /// parseExpr
@@ -819,6 +819,7 @@ bool Parser::parseExpr(NullablePtr<Expr> &Result, const char *Message) {
 ///     expr-identifier
 ///     ':' identifier
 ///     expr-paren
+///     expr-lambda
 ///     expr-dot
 ///     expr-subscript
 ///
@@ -862,6 +863,10 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &Result) {
     if (parseExprParen(R)) return true;
     break;
 
+  case tok::kw_lambda:
+    if (parseExprLambda(R)) return true;
+    break;
+      
   default:
     error(Tok.getLoc(), "expected expression");
     return true;
@@ -1038,6 +1043,48 @@ bool Parser::parseExprParen(NullablePtr<Expr> &Result) {
                                  SubExprs.size(), RPLoc,
                                  IsPrecededByIdentifier);
   return false;
+}
+
+/// parseExprLambda - Parse a lambda expression.
+///
+///   expr-lambda: 
+///     'lambda' type? stmt-brace
+bool Parser::parseExprLambda(NullablePtr<Expr> &Result) {
+  SMLoc LambdaLoc = consumeToken(tok::kw_lambda);
+
+  Type Ty;
+  if (Tok.isNot(tok::l_brace)) {
+    if (parseType(Ty))
+      return 0;
+  } else {
+    Ty = TupleType::getEmpty(S.Context);
+  }
+  
+  // If the parsed type is not spelled as a function type (i.e., has no '->' in
+  // it), then it is implicitly a function that returns ().
+  if (!isa<FunctionType>(Ty.getPointer()))
+    Ty = S.type.ActOnFunctionType(Ty, SMLoc(), TupleType::getEmpty(S.Context));
+
+  // The arguments to the lambda are defined in their own scope.
+  Scope LambdaBodyScope(S.decl);
+  FuncExpr *FE = S.expr.ActOnFuncExprStart(LambdaLoc, Ty);
+
+  
+  // Check to see if we have a "{" which is a brace expr.
+  if (Tok.isNot(tok::l_brace)) {
+    error(Tok.getLoc(), "expected '{' in lambda expression");
+    return true;
+  }
+
+  
+  // Then parse the expression.
+  NullablePtr<Stmt> Body;
+  
+  if (parseStmtBrace(Body) || Body.isNull())
+    return true;
+    
+  FE->Body = cast<BraceStmt>(Body.get());
+  return FE;
 }
 
 

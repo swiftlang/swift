@@ -368,7 +368,7 @@
   <p>'var' declarations form the backbone of value declarations in Swift and
      are the core semantic model for these values.  The <a
      href="#decl-func">func declaration</a> is just syntactic sugar for a var
-     declaration.</p>
+     declaration with an <a href="#expr-lambda">lambda</a> body.</p>
   
   <p>Syntactically, var declarations come in three forms from the
      value-specifier production.  In the first form,
@@ -406,7 +406,7 @@
     <i>// Declaring a function like value with 'var', using an attribute.</i>
     <i>// The name here is "==", the type is a function that takes a tuple</i>
     <i>// and returns an int.</i>
-    var [infix=120] == : (lhs : int, rhs : int) -> int
+    var [infix=120] == : (lhs : int, rhs : int) -&gt; int
     
     <i>// This decodes the tuple return value into independently named parts</i>
     <i>// and both 'val' and 'err' are in scope after this line.</i>
@@ -438,9 +438,9 @@
   and the body is either not specified or is a brace expression.  Like other
   declarations, functions are can have attributes.</p>
   
-  <p>If the type is not a function type (i.e., has no -&gt; in it at top-level),
-  then the return value is implicitly inferred to be "()".  All of the argument
-  and return value names are injected into the
+  <p>If the type is not syntactically a function type (i.e., has no -&gt; in it
+  at top-level), then the return value is implicitly inferred to be "()".  All
+  of the argument and return value names are injected into the
   <a href="#namebind_scope">scope</a> of the function body.</p>
   
   <p>When the second form is used, the underlying declaration is defined to take
@@ -466,21 +466,24 @@
     func a() {}
 
     <i>// Same as 'a'</i>
-    func b() -> void {}
+    func a1() -&gt; void {}
+    var a2 = lambda ()-&gt;() {}
+    var a3 = lambda () {}
+    var a4 = lambda {}
 
     <i>// Really simple function</i>
-    func c(arg : int) -> int { return arg+4 }
+    func c(arg : int) -&gt; int { return arg+4 }
 
     <i>// Simple operator.</i>
-    func [infix=120] + (lhs: int, rhs: int) -> int
+    func [infix=120] + (lhs: int, rhs: int) -&gt; int
 
     <i>// Function with multiple return values:</i>
-    func d(a : int) -> (b : int) -> (res1 : int, res2 : int)
+    func d(a : int) -&gt; (b : int) -&gt; (res1 : int, res2 : int)
     
-    <i>// Same as: func e(this : sometype) -> (a : int) -> int</i>
-    func sometype::e(a : int) -> int
+    <i>// Same as: func e(this : sometype) -&gt; (a : int) -&gt; int</i>
+    func sometype::e(a : int) -&gt; int
 
-    <i>// Same as: func f(this : sometype) -> (a : int) -> ()</i>
+    <i>// Same as: func f(this : sometype) -&gt; (a : int) -&gt; ()</i>
     func sometype::f(a : int)
     
     <i>// A more realistic example on a trivial type.</i>
@@ -509,7 +512,7 @@
     typealias location : (x : int, y : int)
       
     <i>// pair_fn is a function that takes two ints and returns a tuple.</i>
-    typealias pair_fn : int -> int -> (first : int, second : int)
+    typealias pair_fn : int -&gt; int -&gt; (first : int, second : int)
   </pre>
 
   <p>'typealias' is the core semantic model for all named types.  For example, a
@@ -588,11 +591,11 @@
       <i>Constructor for None has type "SomeInts".</i>
       var a : SomeInts = SomeInts::None
     
-      <i>Constructor for One has type "int -> SomeInts".</i>
-      var b : int -> SomeInts = SomeInts::One
+      <i>Constructor for One has type "int -&gt; SomeInts".</i>
+      var b : int -&gt; SomeInts = SomeInts::One
     
-      <i>Constructor for Two has type "(:int,:int) -> SomeInts".</i>
-      var c : (:int,:int) -> SomeInts = SomeInts::Two
+      <i>Constructor for Two has type "(:int,:int) -&gt; SomeInts".</i>
+      var c : (:int,:int) -&gt; SomeInts = SomeInts::Two
     }
   </pre>
   
@@ -880,11 +883,11 @@
     var d : int[4][]
 
     <i>// Declare an array of function pointers:</i>
-    var array_fn_ptrs : (: int -> int)[42]
+    var array_fn_ptrs : (: int -&gt; int)[42]
     var g = array_fn_ptrs[12](4)
 
     <i>// Without parens, this is a function that returns a fixed size array:</i>
-    var fn_returning_array : int -> int[42]
+    var fn_returning_array : int -&gt; int[42]
     var h : int[42] = fn_returning_array(4)
     
     <i>// You can even have arrays of tuples and other things, these work right
@@ -1007,6 +1010,7 @@
     expr-primary ::= <a href="#expr-identifier">expr-identifier</a>
     expr-primary ::= <a href="#expr-paren">expr-paren</a>
     expr-primary ::= <a href="#expr-delayed-identifier">expr-delayed-identifier</a>
+    expr-primary ::= <a href="#expr-lambda">expr-lambda</a>
     expr-primary ::= <a href="#expr-dot">expr-dot</a>
     expr-primary ::= <a href="#expr-subscript">expr-subscript</a>
   </pre>
@@ -1115,6 +1119,48 @@
       search(17, :Down)
     }
   </pre>
+
+  <!-- ===================================================================== -->
+  <h3 id="expr-lambda">Lambda Expressions</h3>
+  <!-- ===================================================================== -->
+
+  <div class="commentary">
+    Lambda expressions will probably not be widely used directly, but they are
+    the core semantic model underlying 'func' declarations, and can be
+    convenient for declaring first-class function values that want named
+    arguments.
+  </div>
+  
+  <pre class="grammar">
+    expr-lambda ::= 'lambda' <a href="#type">type</a>? <a href="#stmt-brace">stmt-brace</a>
+  </pre>
+
+  <p>A lambda expression is an anonymous (unnamed) function literal definition,
+     which can define named arguments (and whose names are in scope for its
+     body) and that can refer to values defined in parent scopes.</p>
+  
+  <p>A lambda captures a reference to any values in parent scopes that are
+     used.</p>
+  
+  <p>If a type is specified in the lambda expression, it specifies the signature
+     of the anonymous function.  If the type is not lexically a function type,
+     it is made into one by declaring a function type that takes the specified
+     type and returns ().  If no type is specified, the type of the lambda is
+     "()-&gt;()".</p>
+
+  <p>TODO: Allow attributes on lambdas when useful.</p>
+
+  <pre class="example">
+    <i>// A simple lambda.</i>
+    var a = lambda(val : int) { print(val+1) }
+    
+    <i>// A recursive lambda.</i>
+    var fib = lambda(n : int) {
+      if (n &lt; 2) return n;
+      return fib(n-1)+fib(n-2)
+    }
+  </pre>
+
   
   <!-- ===================================================================== -->
   <h3 id="expr-dot">Dot Expressions</h3>
@@ -1325,7 +1371,7 @@
   
   <pre class="example">
     <i>// A function with some statements.</i> 
-    func fib(v : int) -> int {
+    func fib(v : int) -&gt; int {
       if v &lt; 2 {
         return v
       }
@@ -1533,8 +1579,8 @@
     // used in control flow conditionals.</i>
     typealias logic_value : __builtin_int1_type
 
-    func convertToLogicValue(v : logic_value) -> logic_value
-    func convertToLogicValue(v : bool) -> logic_value
+    func convertToLogicValue(v : logic_value) -&gt; logic_value
+    func convertToLogicValue(v : bool) -&gt; logic_value
   </pre>
   
   <!-- ===================================================================== -->
