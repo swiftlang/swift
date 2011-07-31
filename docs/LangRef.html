@@ -295,7 +295,6 @@
   
   <pre class="grammar">
     translation-unit ::= top-level-item*
-    top-level-item   ::= ';'
     top-level-item   ::= <a href="#decl-import">decl-import</a>
     top-level-item   ::= <a href="#decl-var">decl-var</a>
     top-level-item   ::= <a href="#decl-func">decl-func</a>
@@ -303,6 +302,7 @@
     top-level-item   ::= <a href="#decl-oneof">decl-oneof</a>
     top-level-item   ::= <a href="#decl-struct">decl-struct</a>
     top-level-item   ::= <a href="#expr">expr</a>
+    top-level-item   ::= <a href="#stmt">stmt</a>
   </pre>
   
   <p>A source file in Swift is parsed as a list of top level declarations.
@@ -429,8 +429,8 @@
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> <a href="#type">type</a> <a href="#brace-expr">brace-expr</a>?
-    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#type-identifier">type-identifier</a> '::' <a href="#identifier">identifier</a> <a href="#type">type</a> <a href="#brace-expr">brace-expr</a>?
+    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> <a href="#type">type</a> <a href="#expr-brace">expr-brace</a>?
+    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#type-identifier">type-identifier</a> '::' <a href="#identifier">identifier</a> <a href="#type">type</a> <a href="#expr-brace">expr-brace</a>?
   </pre>
   
   <div class="commentary">
@@ -1017,8 +1017,6 @@
     expr-primary-non-brace ::= <a href="#expr-delayed-identifier">expr-delayed-identifier</a>
     expr-primary-non-brace ::= <a href="#expr-dot">expr-dot</a>
     expr-primary-non-brace ::= <a href="#expr-subscript">expr-subscript</a>
-
-    expr-primary-non-brace ::= <a href="#expr-if">expr-if</a>
   </pre>
 
   <p>At the top level of the expression grammar, expressions are a sequence of
@@ -1252,8 +1250,8 @@
 
   <pre class="grammar">
     expr-brace      ::= '{' expr-brace-item* '}'
-    expr-brace-item ::= ';'
     expr-brace-item ::= <a href="#expr">expr</a>
+    expr-brace-item ::= <a href="#expr">stmt</a>
     expr-brace-item ::= <a href="#decl-var">decl-var</a>
     expr-brace-item ::= <a href="#decl-func">decl-func</a>
     expr-brace-item ::= <a href="#decl-typealias">decl-typealias</a>
@@ -1334,28 +1332,49 @@
   </pre>
 
   <!-- ********************************************************************* -->
-  <h2>Statements</h2>
+  <h2 id = "stmt">Statements</h2>
   <!-- ********************************************************************* -->
 
-  <p>Statements  ... </p>
+  <div class="commentary">
+    Statements can only exist in contexts that are themselves a stmt or a
+    compound expression.  Statements have no type, they just induce control
+    flow changes.
+  </div>
   
+  <pre class="grammar">
+    stmt ::= ';'
+    stmt ::= <a href="#stmt-if">stmt-if</a>
+  </pre>
+
+  <p>Statements blah blah blah ... </p>
+
+  <p>FIXME: Return stmt, assignment is a stmt, expr-brace becomes a statement?
+  
+  <pre class="example">
+    <i>// A function with some statements.</i> 
+    func fib(v : int) -> int {
+      if v &lt; 2 {
+        return v
+      }
+      return fib(v-1)+fib(v-2)
+    }
+  </pre>
+
   <!-- ===================================================================== -->
-  <h3 id="expr-if">'if' Expression</h3>
+  <h3 id="stmt-if">'if' Statement</h3>
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    expr-if      ::= 'if' expr-non-brace brace-expr expr-if-else?
-    expr-if-else ::= 'else' brace-expr
-    expr-if-else ::= 'else' expr-if
+    stmt-if      ::= 'if' expr-non-brace <a href="#expr-brace">expr-brace</a> expr-if-else?
+    expr-if-else ::= 'else' <a href="#expr-brace">expr-brace</a>
+    expr-if-else ::= 'else' stmt
   </pre>
   
-  <p>'if' expressions provide a simple control transfer operations that evalutes
+  <p>'if' statements provide a simple control transfer operations that evalutes
   the condition, then invokes the 'convertToLogicValue' function on the result,
   and determines the direction of the branch based on the result of
   convertToLogicValue.  This structure allows any type that can be converted to
-  a logic value to be used in an 'if' expression.  The result type of an 'if'
-  expression is always '()', and the brace-expr operands are always forced to
-  '()' type.
+  a logic value to be used in an 'if' condition.
   </p>
   
   <p>If there is no convertToLogicValue function that accepts a 'T', or if 

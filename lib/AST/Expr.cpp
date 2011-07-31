@@ -70,8 +70,6 @@ SMLoc Expr::getLocStart() const {
     return cast<AnonClosureArgExpr>(this)->Loc;
   case ExprKind::Binary:
     return cast<BinaryExpr>(this)->LHS->getLocStart();
-  case ExprKind::If:
-    return cast<IfExpr>(this)->IfLoc;
   }
   
   llvm_unreachable("expression type not handled!");
@@ -318,8 +316,8 @@ namespace {
   /// ExprWalker - This class implements a simple expression walker which
   /// invokes a function pointer on every expression in an AST.  If the function
   /// pointer returns true the walk is terminated.
-  class ExprWalker : public ExprVisitor<ExprWalker, Expr*> {
-    friend class ExprVisitor<ExprWalker, Expr*>;
+  class ExprWalker : public ExprVisitor<ExprWalker, Expr*, bool> {
+    friend class ExprVisitor<ExprWalker, Expr*, bool>;
     Expr *(*Fn)(Expr *E, Expr::WalkOrder Order, void *Data);
     void *Data;
     
@@ -396,6 +394,11 @@ namespace {
             return 0;
           continue;
         }
+        
+        if (Stmt *S = E->Elements[i].dyn_cast<Stmt*>()) {
+          if (visit(S)) return 0;
+          continue;
+        }
         Decl *D = E->Elements[i].get<Decl*>();
         if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
           if (Expr *Init = VD->Init) {
@@ -429,24 +432,24 @@ namespace {
       return E;
     }
     
-    Expr *VisitIfExpr(IfExpr *E) {
-      if (Expr *E2 = ProcessNode(E->Cond))
-        E->Cond = E2;
+    bool visitIfStmt(IfStmt *IS) {
+      if (Expr *E2 = ProcessNode(IS->Cond))
+        IS->Cond = E2;
       else
-        return 0;
+        return true;
       
-      if (Expr *E2 = ProcessNode(E->Then))
-        E->Then = E2;
+      if (Expr *E2 = ProcessNode(IS->Then))
+        IS->Then = E2;
       else
-        return 0;
+        return true;
       
-      if (E->Else) {
-        if (Expr *E2 = ProcessNode(E->Else))
-          E->Else = E2;
+      if (IS->Else) {
+        if (Expr *E2 = ProcessNode(IS->Else))
+          IS->Else = E2;
         else
-          return 0;
+          return true;
       }
-      return E;
+      return false;
     }
     
     Expr *ProcessNode(Expr *E) {
@@ -482,6 +485,14 @@ Expr *Expr::WalkExpr(Expr *(*Fn)(Expr *E, WalkOrder Order, void *Data),
   return ExprWalker(Fn, Data).doIt(this);  
 }
 
+/// WalkExpr - This walks all of the expressions contained within a statement.
+bool Expr::WalkExpr(Stmt *S,
+                    Expr *(*Fn)(Expr *E, WalkOrder Order, void *Data),
+                    void *Data) {
+  return ExprWalker(Fn, Data).visit(S);  
+}
+
+
 
 //===----------------------------------------------------------------------===//
 // Printing for Expr and all subclasses.
@@ -506,9 +517,8 @@ public:
     Indent -= 2;
   }
   
-  void PrintRec(Decl *D) {
-    D->print(OS, Indent+2);
-  }
+  void PrintRec(Decl *D) { D->print(OS, Indent+2); }
+  void PrintRec(Stmt *S) { S->print(OS, Indent+2); }
 
   void VisitIntegerLiteralExpr(IntegerLiteralExpr *E) {
     OS.indent(Indent) << "(integer_literal_expr type='" << E->Ty;
@@ -595,6 +605,8 @@ public:
       OS << '\n';
       if (Expr *SubExpr = E->Elements[i].dyn_cast<Expr*>())
         PrintRec(SubExpr);
+      else if (Stmt *SubStmt = E->Elements[i].dyn_cast<Stmt*>())
+        PrintRec(SubStmt);
       else
         PrintRec(E->Elements[i].get<Decl*>());
     }
@@ -624,17 +636,6 @@ public:
     PrintRec(E->LHS);
     OS << '\n';
     PrintRec(E->RHS);
-    OS << ')';
-  }
-  void VisitIfExpr(IfExpr *E) {
-    OS.indent(Indent) << "(if_expr type='" << E->Ty << "'\n";
-    PrintRec(E->Cond);
-    OS << '\n';
-    PrintRec(E->Then);
-    if (E->Else) {
-      OS << '\n';
-      PrintRec(E->Else);
-    }
     OS << ')';
   }
 };

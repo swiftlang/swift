@@ -18,15 +18,17 @@
 #define SWIFT_AST_EXPRVISITOR_H
 
 #include "swift/AST/Expr.h"
+#include "swift/AST/Stmt.h"
 
 namespace swift {
   
 /// ExprVisitor - This is a simple visitor class for Swift expressions.
-template<typename ImplClass, typename RetTy = void> 
+template<typename ImplClass,
+         typename ExprRetTy = void, typename StmtRetTy = void> 
 class ExprVisitor {
 public:
 
-  RetTy Visit(Expr *E) {
+  ExprRetTy Visit(Expr *E) {
     switch (E->Kind) {
 
 #define DISPATCH(CLASS) \
@@ -50,6 +52,20 @@ public:
     DISPATCH(Closure);
     DISPATCH(AnonClosureArg);
     DISPATCH(Binary);
+#undef DISPATCH
+    }
+    assert(0 && "Not reachable, all cases handled");
+    abort();
+  }
+  
+  StmtRetTy visit(Stmt *S) {
+    switch (S->Kind) {
+
+#define DISPATCH(CLASS) \
+  case StmtKind::CLASS: \
+  return static_cast<ImplClass*>(this)->visit ## CLASS ## \
+    Stmt(static_cast<CLASS##Stmt*>(S))
+        
     DISPATCH(If);
 #undef DISPATCH
     }

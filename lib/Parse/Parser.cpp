@@ -170,9 +170,9 @@ TranslationUnitDecl *Parser::parseTranslationUnit() {
   TranslationUnitDecl *Result = new (S.Context) TranslationUnitDecl(S.Context);
   
   // Parse the body of the file.
-  SmallVector<ExprOrDecl, 128> Items;
+  SmallVector<ExprStmtOrDecl, 128> Items;
   bool MissingSemiAtEnd = false; // Don't care, FIXME remove.
-  parseDeclExprList(Items, MissingSemiAtEnd, true);
+  parseBraceItemList(Items, MissingSemiAtEnd, true);
   
   // Notify sema about the end of the translation unit.
   S.decl.handleEndOfTranslationUnit(Result, FileStartLoc, Items, Tok.getLoc());
@@ -336,7 +336,7 @@ TypeAliasDecl *Parser::parseDeclTypeAlias() {
 static void AddElementNamesForVarDecl(const DeclVarName *Name,
                                     SmallVectorImpl<unsigned> &AccessPath,
                                       VarDecl *VD, SemaDecl &SD,
-                              SmallVectorImpl<Parser::ExprOrDecl> &Decls){
+                              SmallVectorImpl<Parser::ExprStmtOrDecl> &Decls){
   if (Name->isSimple()) {
     // If this is a leaf name, ask sema to create a ElementRefDecl for us with 
     // the specified access path.
@@ -360,7 +360,7 @@ static void AddElementNamesForVarDecl(const DeclVarName *Name,
 ///
 ///   decl-var:
 ///      'var' attribute-list? var-name value-specifier
-bool Parser::parseDeclVar(SmallVectorImpl<ExprOrDecl> &Decls) {
+bool Parser::parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   SMLoc VarLoc = consumeToken(tok::kw_var);
   
   DeclAttributes Attributes;
@@ -513,7 +513,7 @@ Decl *Parser::parseDeclOneOf() {
 ///   decl-struct:
 ///      'struct' attribute-list? identifier { type-tuple-body? }
 ///
-bool Parser::parseDeclStruct(SmallVectorImpl<ExprOrDecl> &Decls) {
+bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   SMLoc StructLoc = consumeToken(tok::kw_struct);
   
   DeclAttributes Attributes;
@@ -816,7 +816,6 @@ bool Parser::parseExpr(NullablePtr<Expr> &Result, bool NonBraceOnly,
 ///     expr-paren
 ///     expr-dot
 ///     expr-subscript
-///     expr-if
 ///
 ///   expr-literal:
 ///     numeric_constant
@@ -862,10 +861,6 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &Result) {
     if (parseExprBrace(R)) return true;
     break;
       
-  case tok::kw_if:
-    if (parseExprIf(R)) return true;
-    break;
-    
   default:
     error(Tok.getLoc(), "expected expression");
     return true;
@@ -1050,23 +1045,16 @@ bool Parser::parseExprParen(NullablePtr<Expr> &Result) {
 ///
 ///   expr-brace:
 ///     '{' expr-brace-item* '}'
-///   expr-brace-item:
-///     expr
-///     expr '=' expr
-///     decl-var
-///     decl-oneof
-///     decl-struct
-///     decl-typealias
-///     ';'
+///
 bool Parser::parseExprBrace(NullablePtr<Expr> &Result) {
   SMLoc LBLoc = consumeToken(tok::l_brace);
 
-  SmallVector<ExprOrDecl, 16> Entries;
+  SmallVector<ExprStmtOrDecl, 16> Entries;
 
   // MissingSemiAtEnd - Keep track of whether the last expression in the block
   // had no semicolon.
   bool MissingSemiAtEnd = false;
-  if (parseDeclExprList(Entries, MissingSemiAtEnd, false /*NotTopLevel*/))
+  if (parseBraceItemList(Entries, MissingSemiAtEnd, false /*NotTopLevel*/))
     return true;
   
   SMLoc RBLoc = Tok.getLoc();
@@ -1076,8 +1064,8 @@ bool Parser::parseExprBrace(NullablePtr<Expr> &Result) {
     return true;
   }
   
-  ExprOrDecl *NewElements = 
-    S.Context.AllocateCopy<ExprOrDecl>(Entries.begin(), Entries.end());
+  ExprStmtOrDecl *NewElements = 
+    S.Context.AllocateCopy<ExprStmtOrDecl>(Entries.begin(), Entries.end());
   
   Result = new (S.Context) BraceExpr(LBLoc, NewElements, Entries.size(),
                                      MissingSemiAtEnd, RBLoc);
@@ -1086,16 +1074,20 @@ bool Parser::parseExprBrace(NullablePtr<Expr> &Result) {
 
 ///   expr-brace-item:
 ///     expr
-///     expr '=' expr
+///     expr '=' expr      // FIXME: Should be part of stmt.
+///     stmt
 ///     decl-var
 ///     decl-func
 ///     decl-meth
 ///     decl-oneof
 ///     decl-struct
 ///     decl-typealias
+///
+///   stmt:
 ///     ';'
-bool Parser::parseDeclExprList(SmallVectorImpl<ExprOrDecl> &Entries,
-                               bool &MissingSemiAtEnd, bool IsTopLevel) {
+///     stmt-if
+bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
+                                bool &MissingSemiAtEnd, bool IsTopLevel) {
   // This forms a lexical scope.
   Scope BraceScope(S.decl);
     
@@ -1105,9 +1097,20 @@ bool Parser::parseDeclExprList(SmallVectorImpl<ExprOrDecl> &Entries,
     // Parse the decl or expression.    
     switch (Tok.getKind()) {
     case tok::semi:
-      // Could create a decl for semicolons if we care.
+      // Could create a stmt for semicolons if we care.
       consumeToken(tok::semi);
       continue;
+        
+    case tok::kw_if: {
+      Entries.push_back(ExprStmtOrDecl());
+
+      NullablePtr<Stmt> ResultStmt;
+      if (parseStmtIf(ResultStmt)) break;
+      
+      Entries.back() = ResultStmt.get();
+      MissingSemiAtEnd = false;
+      break;
+    }
         
     case tok::kw_import:
       Entries.push_back(parseDeclImport());
@@ -1135,7 +1138,7 @@ bool Parser::parseDeclExprList(SmallVectorImpl<ExprOrDecl> &Entries,
       parseDeclStruct(Entries);
       break;
     default:
-      Entries.push_back(ExprOrDecl());
+      Entries.push_back(ExprStmtOrDecl());
         
       NullablePtr<Expr> ResultExpr;
       if (parseExpr(ResultExpr, false) || ResultExpr.isNull())
@@ -1177,12 +1180,12 @@ bool Parser::parseDeclExprList(SmallVectorImpl<ExprOrDecl> &Entries,
 
 
 /// 
-///   expr-if:
+///   stmt-if:
 ///     'if' expr-non-brace brace-expr expr-if-else?
 ///   expr-if-else:
 ///     'else' brace-expr
-///     'else' expr-if
-bool Parser::parseExprIf(NullablePtr<Expr> &Result) {
+///    // 'else' stmt
+bool Parser::parseStmtIf(NullablePtr<Stmt> &Result) {
   SMLoc IfLoc = consumeToken(tok::kw_if);
 
   NullablePtr<Expr> Condition;
@@ -1201,9 +1204,13 @@ bool Parser::parseExprIf(NullablePtr<Expr> &Result) {
   NullablePtr<Expr> ElseBody;
   SMLoc ElseLoc = Tok.getLoc();
   if (consumeIf(tok::kw_else)) {
+#if 0
     if (Tok.is(tok::kw_if)) {
       if (parseExprIf(ElseBody)) return true;
-    } else if (Tok.is(tok::l_brace)) {
+    } else
+      ;
+#endif
+    if (Tok.is(tok::l_brace)) {
       if (parseExprBrace(ElseBody)) return true;
     } else {
       error(Tok.getLoc(), "expected '{' or 'if' after 'else'");
@@ -1215,7 +1222,7 @@ bool Parser::parseExprIf(NullablePtr<Expr> &Result) {
 
   // If our condition and normal expression parsed correctly, build an AST.
   if (Condition.isNonNull() && NormalBody.isNonNull())
-    Result = S.expr.ActOnIfExpr(IfLoc, Condition.get(), NormalBody.get(),
+    Result = S.expr.ActOnIfStmt(IfLoc, Condition.get(), NormalBody.get(),
                                 ElseLoc, ElseBody.getPtrOrNull());
   return false;
 }

@@ -23,6 +23,8 @@ namespace llvm {
   class SourceMgr;
   template <typename PT1, typename PT2>
   class PointerUnion;
+  template <typename PT1, typename PT2, typename PT3>
+  class PointerUnion3;
   template<class T>
   class NullablePtr;
 }
@@ -31,6 +33,7 @@ namespace swift {
   class Lexer;
   class Sema;
   class Expr;
+  class Stmt;
   class Type;
   class Decl;
   class DeclAttributes;
@@ -70,8 +73,7 @@ public:
   
   TranslationUnitDecl *parseTranslationUnit();
   
-  typedef llvm::PointerUnion<Expr*, Decl*> ExprOrDecl;
-
+  typedef llvm::PointerUnion3<Expr*, Stmt*, Decl*> ExprStmtOrDecl;
 private:
   // Utilities.
   SMLoc consumeToken();
@@ -110,10 +112,11 @@ private:
   bool parseToken(tok K, const char *Message, tok SkipToTok = tok::unknown);
   
   bool parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init);
-  
+
+  bool parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Decls,
+                          bool &MissingSemiAtEnd, bool IsTopLevel);
+
   // Decl Parsing
-  bool parseDeclExprList(SmallVectorImpl<ExprOrDecl> &Decls,
-                         bool &MissingSemiAtEnd, bool IsTopLevel);
   TypeAliasDecl *parseDeclTypeAlias();
   void parseAttributeList(DeclAttributes &Attributes);
   bool parseAttribute(DeclAttributes &Attributes);
@@ -121,8 +124,8 @@ private:
   
   Decl *parseDeclImport();
   Decl *parseDeclOneOf();
-  bool parseDeclStruct(SmallVectorImpl<ExprOrDecl> &Decls);
-  bool parseDeclVar(SmallVectorImpl<ExprOrDecl> &Decls);
+  bool parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls);
+  bool parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls);
   FuncDecl *parseDeclFunc();
   
   // Type Parsing
@@ -141,7 +144,10 @@ private:
   bool parseExprDollarIdentifier(NullablePtr<Expr> &Result);
   bool parseExprParen(NullablePtr<Expr> &Result);
   bool parseExprBrace(NullablePtr<Expr> &Result);
-  bool parseExprIf(NullablePtr<Expr> &Result);
+  
+  // Statement Parsing
+  bool parseStmtIf(NullablePtr<Stmt> &Result);
+
 };
   
 } // end namespace swift

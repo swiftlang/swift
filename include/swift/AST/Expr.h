@@ -25,9 +25,7 @@
 #include "llvm/ADT/StringRef.h"
 
 namespace llvm {
-  class raw_ostream;
-  template <typename PT1, typename PT2>
-  class PointerUnion;
+  template <typename PT1, typename PT2, typename PT3> class PointerUnion3;
 }
 
 namespace swift {
@@ -35,9 +33,10 @@ namespace swift {
   class Type;
   class ValueDecl;
   class Decl;
+  class Stmt;
   class TypeAliasDecl;
   
-enum ExprKind {
+enum class ExprKind {
   IntegerLiteral,
   DeclRef,
   OverloadSetRef,
@@ -53,8 +52,7 @@ enum ExprKind {
   Brace,
   Closure,
   AnonClosureArg,
-  Binary,
-  If
+  Binary
 };
   
   
@@ -93,6 +91,10 @@ public:
   /// NULL.
   Expr *WalkExpr(Expr *(*Fn)(Expr *E, WalkOrder Order, void *Data), void *Data);
   
+  /// WalkExpr - This walks all of the expressions contained within a statement.
+  static bool WalkExpr(Stmt *S,
+                       Expr *(*Fn)(Expr *E, WalkOrder Order, void *Data),
+                       void *Data);
   
   /// ConversionRank - This enum specifies the rank of an implicit conversion
   /// of a value from one type to another.  These are ordered from cheapest to
@@ -123,16 +125,15 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Expr *) { return true; }
 
-private:
-  // Make placement new and vanilla new/delete illegal for Exprs.
-  void *operator new(size_t Bytes) throw() = delete;
-  void operator delete(void *Data) throw() = delete;
-  void *operator new(size_t Bytes, void *Mem) throw() = delete;
-public:
   // Only allow allocation of Exprs using the allocator in ASTContext
   // or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = 8) throw();  
+
+  // Make placement new and vanilla new/delete illegal for Exprs.
+  void *operator new(size_t Bytes) throw() = delete;
+  void operator delete(void *Data) throw() = delete;
+  void *operator new(size_t Bytes, void *Mem) throw() = delete;
 };
 
 
@@ -425,9 +426,9 @@ class BraceExpr : public Expr {
 public:
   SMLoc LBLoc;
   
-  typedef llvm::PointerUnion<Expr*, Decl*> ExprOrDecl;
+  typedef llvm::PointerUnion3<Expr*, Stmt*, Decl*> ExprStmtOrDecl;
   // FIXME: Switch to MutableArrayRef.
-  ExprOrDecl *Elements;
+  ExprStmtOrDecl *Elements;
   unsigned NumElements;
   
   /// This is true if the last expression in the brace expression is missing a
@@ -435,7 +436,7 @@ public:
   bool MissingSemi;
   SMLoc RBLoc;
 
-  BraceExpr(SMLoc lbloc, ExprOrDecl *elements,
+  BraceExpr(SMLoc lbloc, ExprStmtOrDecl *elements,
             unsigned numelements, bool missingsemi, SMLoc rbloc)
     : Expr(ExprKind::Brace), LBLoc(lbloc), Elements(elements),
       NumElements(numelements), MissingSemi(missingsemi), RBLoc(rbloc) {}
@@ -493,27 +494,6 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BinaryExpr *) { return true; }
   static bool classof(const Expr *E) { return E->Kind == ExprKind::Binary; }
-};
-
-/// IfExpr - if/then/else expression.  If no 'else' is specified, then the
-/// ElseLoc location is not specified and the Else expression is null.  The
-/// condition of the 'if' is required to have a __builtin_int1 type.
-class IfExpr : public Expr {
-public:
-  SMLoc IfLoc;
-  Expr *Cond;
-  Expr *Then;
-  SMLoc ElseLoc;
-  Expr *Else;
-  
-  IfExpr(SMLoc IfLoc, Expr *cond, Expr *Then, SMLoc ElseLoc,
-         Expr *Else, Type Ty = Type())
-    : Expr(ExprKind::If, Ty),
-      IfLoc(IfLoc), Cond(cond), Then(Then), ElseLoc(ElseLoc), Else(Else) {}
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const IfExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == ExprKind::If; }
 };
   
 } // end namespace swift

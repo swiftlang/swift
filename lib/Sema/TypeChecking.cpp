@@ -352,8 +352,8 @@ namespace {
   /// intermediate nodes, introduce type coercion etc.  This visitor does this
   /// job.  Each visit method reanalyzes the children of a node, then reanalyzes
   /// the node, and returns true on error.
-  class SemaExpressionTree : public ExprVisitor<SemaExpressionTree, Expr*> {
-    friend class ExprVisitor<SemaExpressionTree, Expr*>;
+  class SemaExpressionTree : public ExprVisitor<SemaExpressionTree, Expr*,bool>{
+    friend class ExprVisitor<SemaExpressionTree, Expr*, bool>;
     TypeChecker &TC;
     
     Expr *VisitIntegerLiteralExpr(IntegerLiteralExpr *E) {
@@ -460,7 +460,9 @@ namespace {
       return E;
     }
     
-    Expr *VisitIfExpr(IfExpr *E);
+#if 0
+    bool visitIfStmt(IfStmt *S);
+#endif
     
     SemaExpressionTree(TypeChecker &tc) : TC(tc) {}
     
@@ -493,7 +495,11 @@ namespace {
     Expr *doIt(Expr *E) {
       return E->WalkExpr(WalkFn, this);
     }
-    
+        
+    bool doIt(Stmt *S) {
+      return Expr::WalkExpr(S, WalkFn, this);
+    }
+
   public:
     static Expr *doIt(Expr *E, TypeChecker &TC) {
       SemaExpressionTree SET(TC);
@@ -796,39 +802,40 @@ Expr *SemaExpressionTree::VisitSequenceExpr(SequenceExpr *E) {
   return E;
 }
 
-Expr *SemaExpressionTree::VisitIfExpr(IfExpr *E) {
+#if 0
+bool SemaExpressionTree::visitIfStmt(IfStmt *IS) {
   // The if condition must have __builtin_int1 type.  This is after the
   // conversion function is added by sema.
-  if (!E->Cond->Ty->isEqual(TC.Context.TheInt1Type, TC.Context)) {
-    TC.error(E->Cond->getLocStart(), "expression of type '" +
-             E->Cond->Ty->getString() + "' is not legal in a condition");
-    return 0;
+  if (!IS->Cond->Ty->isEqual(TC.Context.TheInt1Type, TC.Context)) {
+    TC.error(IS->Cond->getLocStart(), "expression of type '" +
+             IS->Cond->Ty->getString() + "' is not legal in a condition");
+    return true;
   }
   
   // The Then/Else bodies must have '()' type.
-  E->Then = TC.convertToType(E->Then, TupleType::getEmpty(TC.Context));
-  if (E->Then == 0) {
-    TC.note(E->IfLoc, "while processing 'if' body");
-    return 0;
+  IS->Then = TC.convertToType(IS->Then, TupleType::getEmpty(TC.Context));
+  if (IS->Then == 0) {
+    TC.note(IS->IfLoc, "while processing 'if' body");
+    return true;
   }
   
-  if (E->Else) {
-    E->Else = TC.convertToType(E->Else, TupleType::getEmpty(TC.Context));
-    if (E->Else == 0) {
-      TC.note(E->ElseLoc, "while processing 'else' body of 'if'");
-      return 0;
+  if (IS->Else) {
+    IS->Else = TC.convertToType(IS->Else, TupleType::getEmpty(TC.Context));
+    if (IS->Else == 0) {
+      TC.note(IS->ElseLoc, "while processing 'else' body of 'if'");
+      return true;
     }
   }
 
-  E->Ty = TupleType::getEmpty(TC.Context);
-  return E;
+  return false;
 }
+#endif
 
 
 void SemaExpressionTree::PreProcessBraceExpr(BraceExpr *E) {
   SmallVector<Expr*, 4> ExcessExprs;
   
-  SmallVector<BraceExpr::ExprOrDecl, 32> NewElements;
+  SmallVector<BraceExpr::ExprStmtOrDecl, 32> NewElements;
   
   // Braces have to manually walk into subtrees for expressions, because we
   // terminate the walk we're in for them (so we can handle decls custom).
@@ -838,6 +845,14 @@ void SemaExpressionTree::PreProcessBraceExpr(BraceExpr *E) {
         E->MissingSemi = false;
       else
         NewElements.push_back(SubExpr);
+      continue;
+    }
+    
+    if (Stmt *SubStmt = E->Elements[i].dyn_cast<Stmt*>()) {
+      if (!doIt(SubStmt))
+        NewElements.push_back(SubStmt);
+      else
+        E->MissingSemi = false;
       continue;
     }
     
@@ -882,8 +897,8 @@ void SemaExpressionTree::PreProcessBraceExpr(BraceExpr *E) {
     E->NumElements = NewElements.size();
   } else {
     E->Elements = 
-      TC.Context.AllocateCopy<BraceExpr::ExprOrDecl>(NewElements.begin(),
-                                                     NewElements.end());
+      TC.Context.AllocateCopy<BraceExpr::ExprStmtOrDecl>(NewElements.begin(),
+                                                         NewElements.end());
     E->NumElements = NewElements.size();
   }
 }
@@ -1122,11 +1137,6 @@ namespace {
       // of the overload set, trim them out.      
       return E;
     }
-    
-    Expr *VisitIfExpr(IfExpr *E) {
-      return E;
-    }
-
     
     SemaCoerceBottomUp(TypeChecker &tc, Type destTy) : TC(tc), DestTy(destTy) {
       assert(!DestTy->is<DependentType>());
@@ -1411,7 +1421,7 @@ Expr *SemaCoerceBottomUp::convertScalarToTupleType(Expr *E, TupleType *DestTy,
                                     NumFields, SMLoc(), false, false, DestTy);
 }
 
-/// HandleConversionToType - This is the recursive implementation of
+/// convertToType - This is the recursive implementation of
 /// ConvertToType.  It does produces diagnostics and returns null on failure.
 ///
 /// NOTE: This needs to be kept in synch with getConversionRank in Expr.cpp.

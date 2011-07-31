@@ -18,6 +18,7 @@
 #include "swift/Sema/Sema.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/ExprVisitor.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -94,8 +95,8 @@ SemaExpr::ActOnTupleExpr(SMLoc LPLoc, Expr *const *SubExprs,
                                    IsPrecededByIdentifier);
 }
 
-NullablePtr<Expr>
-SemaExpr::ActOnIfExpr(SMLoc IfLoc, Expr *Cond, Expr *Normal,
+NullablePtr<Stmt>
+SemaExpr::ActOnIfStmt(SMLoc IfLoc, Expr *Cond, Expr *Normal,
                       SMLoc ElseLoc, Expr *Else) {
   assert(Cond && Normal);  // Else may be null.
   
@@ -107,6 +108,6 @@ SemaExpr::ActOnIfExpr(SMLoc IfLoc, Expr *Cond, Expr *Normal,
   Cond = new (S.Context) ApplyExpr(C2LVFunc, Cond,
                                    UnresolvedType::get(S.Context));
   
-  return new (S.Context) IfExpr(IfLoc, Cond, Normal, ElseLoc, Else);
+  return new (S.Context) IfStmt(IfLoc, Cond, Normal, ElseLoc, Else);
 }
 

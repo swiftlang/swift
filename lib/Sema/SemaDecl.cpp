@@ -63,11 +63,11 @@ SemaDecl::~SemaDecl() {
 /// unit.
 void SemaDecl::handleEndOfTranslationUnit(TranslationUnitDecl *TUD,
                                           SMLoc FileStart,
-                                          ArrayRef<ExprOrDecl> Items,
+                                          ArrayRef<ExprStmtOrDecl> Items,
                                           SMLoc FileEnd) {
   // First thing, we transform the body into a brace expression.
-  ExprOrDecl *NewElements = 
-    S.Context.AllocateCopy<ExprOrDecl>(Items.begin(), Items.end());
+  ExprStmtOrDecl *NewElements = 
+    S.Context.AllocateCopy<ExprStmtOrDecl>(Items.begin(), Items.end());
   TUD->Body = new (S.Context) BraceExpr(FileStart, NewElements, Items.size(),
                                         false, FileEnd);
   
@@ -385,7 +385,7 @@ void SemaDecl::ActOnFuncBody(ValueDecl *FD, Expr *Body) {
 
 void SemaDecl::ActOnStructDecl(SMLoc StructLoc, DeclAttributes &Attrs,
                                Identifier Name, Type BodyTy,
-                               SmallVectorImpl<ExprOrDecl> &Decls) {
+                               SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   // Get the TypeAlias for the name that we'll eventually have.  This ensures
   // that the constructors generated have the pretty name for the type instead
   // of the raw oneof.

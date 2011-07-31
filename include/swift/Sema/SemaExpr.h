@@ -28,8 +28,9 @@ namespace llvm {
 }
 namespace swift {
   class Decl;
-  class Sema;
   class Expr;
+  class Sema;
+  class Stmt;
   class Type;
   class ValueDecl;
   class Identifier;
@@ -58,8 +59,8 @@ public:
                  unsigned NumSubExprs, SMLoc RPLoc,
                  bool IsPrecededByIdentifier);
 
-  NullablePtr<Expr>
-  ActOnIfExpr(SMLoc IfLoc, Expr *Cond, Expr *Normal, 
+  NullablePtr<Stmt>
+  ActOnIfStmt(SMLoc IfLoc, Expr *Cond, Expr *Normal, 
               SMLoc ElseLoc, Expr *Else);
 };
   

@@ -25,13 +25,13 @@
 #include "llvm/ADT/StringRef.h"
 
 namespace llvm {
-  template <typename T> class ArrayRef;
-  template <typename PT1, typename PT2> class PointerUnion;
+  template <typename PT1, typename PT2, typename PT3> class PointerUnion3;
 }
 namespace swift {
-  class Expr;
-  class Type;
   class Decl;
+  class Expr;
+  class Stmt;
+  class Type;
   class TypeAliasDecl;
   class VarDecl;
   class FuncDecl;
@@ -60,13 +60,13 @@ public:
   explicit SemaDecl(Sema &S);
   ~SemaDecl();
   
-  typedef llvm::PointerUnion<Expr*, Decl*> ExprOrDecl;
+  typedef llvm::PointerUnion3<Expr*, Stmt*, Decl*> ExprStmtOrDecl;
 
   /// handleEndOfTranslationUnit - This is invoked at the end of the translation
   /// unit.
   void handleEndOfTranslationUnit(TranslationUnitDecl *TU,
                                   SMLoc FileStart,
-                                  ArrayRef<ExprOrDecl> Items,
+                                  ArrayRef<ExprStmtOrDecl> Items,
                                   SMLoc FileEnd);
 
   //===--------------------------------------------------------------------===//
@@ -109,7 +109,7 @@ public:
 
   void ActOnStructDecl(SMLoc StructLoc, DeclAttributes &Attrs,
                        Identifier Name, Type Ty,
-                       SmallVectorImpl<ExprOrDecl> &Decls);
+                       SmallVectorImpl<ExprStmtOrDecl> &Decls);
   
   // Name processing.
   
