@@ -17,7 +17,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/ExprVisitor.h"
+#include "swift/AST/ExprStmtVisitor.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
@@ -57,7 +57,7 @@ SMLoc Stmt::getLocStart() const {
 
 namespace {
 /// PrintStmt - Visitor implementation of Expr::print.
-class PrintStmt : public ExprVisitor<PrintStmt> {
+class PrintStmt : public ExprStmtVisitor<PrintStmt> {
 public:
   raw_ostream &OS;
   unsigned Indent;
