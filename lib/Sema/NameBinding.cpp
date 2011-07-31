@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"
@@ -377,19 +378,21 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
 
   // Now that we know the top-level value names, go through and resolve any
   // UnresolvedDeclRefExprs that exist.
-  for (unsigned i = 0, e = TUD->Body->NumElements; i != e; ++i)
-    if (Decl *D = TUD->Body->Elements[i].dyn_cast<Decl*>()) {
+  for (unsigned i = 0, e = TUD->Body->NumElements; i != e; ++i) {
+    BraceStmt::ExprStmtOrDecl &Elt = TUD->Body->Elements[i];
+    if (Decl *D = Elt.dyn_cast<Decl*>()) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
         if (VD->Init)
           VD->Init = VD->Init->WalkExpr(BindNames, 0, &Binder);
+    } else if (Stmt *S = Elt.dyn_cast<Stmt*>()) {
+      Elt = Expr::WalkExpr(S, BindNames, 0, &Binder);
     } else {
-      TUD->Body->Elements[i] =
-        TUD->Body->Elements[i].get<Expr*>()->WalkExpr(BindNames, 0, &Binder);
-     
-      // Fill in null results with a dummy expression.
-      if (TUD->Body->Elements[i] == 0)
-        TUD->Body->Elements[i] =
-          new (Ctx) TupleExpr(SMLoc(), 0, 0, 0, SMLoc(), false, false,
-                              TupleType::getEmpty(Ctx));
+      Elt = Elt.get<Expr*>()->WalkExpr(BindNames, 0, &Binder);
     }
+    
+    // Fill in null results with a dummy expression.
+    if (Elt.isNull())
+      Elt = new (Ctx) TupleExpr(SMLoc(), 0, 0, 0, SMLoc(), false, false,
+                                TupleType::getEmpty(Ctx));
+  }
 }
