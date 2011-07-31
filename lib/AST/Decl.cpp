@@ -16,8 +16,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Expr.h"
-#include "swift/AST/Stmt.h"
+#include "swift/AST/ExprStmtVisitor.h"
 #include "swift/AST/Types.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
@@ -40,7 +39,7 @@ SMLoc TranslationUnitDecl::getLocStart() const {
 
 
 SMLoc Decl::getLocStart() const {
-  switch (getKind()) {
+  switch (Kind) {
   case DeclKind::TranslationUnit:
     return cast<TranslationUnitDecl>(this)->getLocStart();
   case DeclKind::Import: return cast<ImportDecl>(this)->getLocStart();
@@ -105,107 +104,117 @@ Type ElementRefDecl::getTypeForPath(Type InTy, ArrayRef<unsigned> Path) {
 //  Decl printing.
 //===----------------------------------------------------------------------===//
 
-void Decl::dump() const { print(llvm::errs()); llvm::errs() << '\n'; }
+namespace {
+  /// PrintDecl - Visitor implementation of Decl::print.
+  class PrintDecl : public ExprStmtVisitor<PrintDecl> {
+  public:
+    raw_ostream &OS;
+    unsigned Indent;
+    
+    PrintDecl(raw_ostream &os, unsigned indent) : OS(os), Indent(indent) {
+    }
+    
+    void printRec(Expr *E) { E->print(OS, Indent+2); }
+    void printRec(Stmt *S) { S->print(OS, Indent+2); }
+
+    void printCommon(Decl *D, const char *Name) {
+      OS.indent(Indent) << "(" << Name;
+    }
+
+    void visitTranslationUnitDecl(TranslationUnitDecl *TUD) {
+      printCommon(TUD, "translation_unit");
+      OS << '\n';
+      if (TUD->Body)
+        printRec(TUD->Body);
+      else
+        OS.indent(Indent+2) << "(null body!)";
+      OS << ')';
+    }
+
+    void visitImportDecl(ImportDecl *ID) {
+      printCommon(ID, "import_decl");
+      OS << " '" << ID->AccessPath[0].first;
+      for (unsigned i = 1, e = ID->AccessPath.size(); i != e; ++i)
+        OS << "." << ID->AccessPath[i].first;
+      OS << "')";
+    }
+
+    void printDeclName(NamedDecl *D) {
+      if (D->Name.get())
+        OS << '\'' << D->Name << '\'';
+      else
+        OS << "'anonname=" << (const void*)D << '\'';
+    }
+    
+    void printCommon(NamedDecl *D, const char *Name) {
+      printCommon((Decl*)D, Name);
+      OS << ' ';
+      printDeclName(D);
+    }
+    
+    void visitTypeAliasDecl(TypeAliasDecl *TAD) {
+      printCommon(TAD, "typealias");
+      OS << " type='";
+      TAD->UnderlyingTy->print(OS);
+      OS << "')";
+    }
+
+    void printCommon(ValueDecl *VD, const char *Name) {
+      printCommon((NamedDecl*)VD, Name);
+      OS << " type='";
+      VD->Ty->print(OS);
+      OS << "'";
+      
+      if (VD->Init) {
+        OS << '\n';
+        printRec(VD->Init);
+      }
+    }
+    
+    
+    void visitVarDecl(VarDecl *VD) {
+      printCommon(VD, "vardecl");
+      OS << ')';
+    }
+    
+    void visitFuncDecl(FuncDecl *FD) {
+      printCommon(FD, "funcdecl");
+      OS << ')';
+    }
+    
+    void visitOneOfElementDecl(OneOfElementDecl *OOED) {
+      printCommon(OOED, "oneofelementdecl");
+      OS << ')';
+    }
+    
+    void visitArgDecl(ArgDecl *AD) {
+      printCommon(AD, "argdecl");
+      OS << ')';
+    }
+
+    void visitElementRefDecl(ElementRefDecl *ERD) {
+      printCommon(ERD, "elementrefdecl");
+      OS << '\n';
+      OS.indent(Indent+2);
+      OS << "(accesspath ";
+      printDeclName(ERD->VD);
+      for (unsigned i = 0, e = ERD->AccessPath.size(); i != e; ++i)
+        OS << ", " << ERD->AccessPath[i];
+      
+      OS << "))";
+    }
+    
+
+  };
+} // end anonymous namespace.
+
+
 
 void Decl::print(raw_ostream &OS, unsigned Indent) const {
-  switch (getKind()) {
-  case DeclKind::TranslationUnit:
-    return cast<TranslationUnitDecl>(this)->print(OS, Indent);
-  case DeclKind::Import:     return cast<ImportDecl>(this)->print(OS, Indent);
-  case DeclKind::TypeAlias:
-    return cast<TypeAliasDecl>(this)->print(OS, Indent);
-  case DeclKind::Var:        return cast<VarDecl>(this)->print(OS, Indent);
-  case DeclKind::Func:       return cast<FuncDecl>(this)->print(OS, Indent);
-  case DeclKind::OneOfElement:
-    return cast<OneOfElementDecl>(this)->print(OS,Indent);
-  case DeclKind::Arg:        return cast<ArgDecl>(this)->print(OS, Indent);
-  case DeclKind::ElementRef:
-    return cast<ElementRefDecl>(this)->print(OS, Indent);
-  }
+  PrintDecl(OS, Indent).visit(const_cast<Decl*>(this));
 }
 
-void TranslationUnitDecl::print(raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(translation_unit\n";
-  if (Body)
-    Body->print(OS, Indent+2);
-  else
-    OS.indent(Indent+2) << "(null body!)";
-  OS << ')';
+void Decl::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
 }
-
-void ImportDecl::print(raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(import_decl '" << AccessPath[0].first;
-  for (unsigned i = 1, e = AccessPath.size(); i != e; ++i)
-    OS << "." << AccessPath[i].first;
-  OS << "')";
-}
-
-static void PrintDeclName(const NamedDecl *D, raw_ostream &OS) {
-  if (D->Name.get())
-    OS << '\'' << D->Name << '\'';
-  else
-    OS << "'anonname=" << (const void*)D << '\'';
-}
-
-void NamedDecl::printCommon(raw_ostream &OS, unsigned Indent) const {
-  PrintDeclName(this, OS);
-}
-
-void TypeAliasDecl::print(raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(typealias ";
-  printCommon(OS, Indent);
-  OS << " type='";
-  UnderlyingTy->print(OS);
-  OS << "')";
-}
-
-
-void ValueDecl::printCommon(raw_ostream &OS, unsigned Indent) const {
-  NamedDecl::printCommon(OS, Indent);
-  OS << " type='";
-  Ty->print(OS);
-  OS << "'";
-  
-  if (Init) {
-    OS << '\n';
-    Init->print(OS, Indent+2);
-  }
-}
-
-void VarDecl::print(raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(vardecl ";
-  printCommon(OS, Indent);
-  OS << ')';
-}
-
-void FuncDecl::print(raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(funcdecl ";
-  printCommon(OS, Indent);
-  OS << ')';
-}
-
-void OneOfElementDecl::print(raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(oneofelementdecl ";
-  printCommon(OS, Indent);
-  OS << ')';
-}
-
-void ArgDecl::print(raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(argdecl ";
-  printCommon(OS, Indent);
-  OS << ')';
-}
-
-void ElementRefDecl::print(raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << "(elementrefdecl ";
-  printCommon(OS, Indent);
-  OS << '\n';
-  OS.indent(Indent+2);
-  OS << "(accesspath ";
-  PrintDeclName(VD, OS);
-  for (unsigned i = 0, e = AccessPath.size(); i != e; ++i)
-    OS << ", " << AccessPath[i];
-  
-  OS << "))";
-}
-

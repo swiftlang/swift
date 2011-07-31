@@ -102,11 +102,10 @@ public:
 class Decl {
   Decl(const Decl&) = delete;
   void operator=(const Decl&) = delete;
-  DeclKind Kind;
 protected:
   Decl(DeclKind kind) : Kind(kind) {}
 public:
-  DeclKind getKind() const { return Kind; }
+  const DeclKind Kind;
   
   SMLoc getLocStart() const;
   
@@ -148,11 +147,9 @@ public:
 
   SMLoc getLocStart() const;
   
-  void print(raw_ostream &OS, unsigned Indent = 0) const;
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::TranslationUnit;
+    return D->Kind == DeclKind::TranslationUnit;
   }
   static bool classof(const TranslationUnitDecl *D) { return true; }
 };
@@ -172,11 +169,9 @@ public:
   
   SMLoc getLocStart() const { return ImportLoc; }
 
-  void print(raw_ostream &OS, unsigned Indent = 0) const;
-  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::Import;
+    return D->Kind == DeclKind::Import;
   }
   static bool classof(const ImportDecl *D) { return true; }
 };
@@ -190,11 +185,11 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return (D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Func ||
-            D->getKind() == DeclKind::OneOfElement ||
-            D->getKind() == DeclKind::Arg || 
-            D->getKind() == DeclKind::ElementRef ||
-            D->getKind() == DeclKind::TypeAlias);
+    return (D->Kind == DeclKind::Var || D->Kind == DeclKind::Func ||
+            D->Kind == DeclKind::OneOfElement ||
+            D->Kind == DeclKind::Arg || 
+            D->Kind == DeclKind::ElementRef ||
+            D->Kind == DeclKind::TypeAlias);
   }
   static bool classof(const NamedDecl *D) { return true; }
   
@@ -203,8 +198,6 @@ protected:
             const DeclAttributes &attrs = DeclAttributes())
     : Decl(K), Name(name), Attrs(attrs) {
   }
-  
-  void printCommon(raw_ostream &OS, unsigned Indent) const;
 };
   
 /// TypeAliasDecl - This is a declaration of a typealias, for example:
@@ -229,11 +222,9 @@ public:
   /// getAliasType - Return the sugared version of this decl as a Type.
   NameAliasType *getAliasType(ASTContext &C) const;
   
-  void print(raw_ostream &OS, unsigned Indent = 0) const;
-  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::TypeAlias;
+    return D->Kind == DeclKind::TypeAlias;
   }
   static bool classof(const TypeAliasDecl *D) { return true; }
 };
@@ -247,10 +238,10 @@ public:
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return (D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Func ||
-            D->getKind() == DeclKind::OneOfElement ||
-            D->getKind() == DeclKind::Arg ||
-            D->getKind() == DeclKind::ElementRef);
+    return (D->Kind == DeclKind::Var || D->Kind == DeclKind::Func ||
+            D->Kind == DeclKind::OneOfElement ||
+            D->Kind == DeclKind::Arg ||
+            D->Kind == DeclKind::ElementRef);
   }
   static bool classof(const ValueDecl *D) { return true; }
 
@@ -259,7 +250,6 @@ protected:
             const DeclAttributes &attrs = DeclAttributes())
     : NamedDecl(K, name, attrs), Ty(ty), Init(init) {
   }
-  void printCommon(raw_ostream &OS, unsigned Indent) const;
 };  
 
 /// VarDecl - 'var' declaration.
@@ -284,10 +274,8 @@ public:
   
   SMLoc getLocStart() const { return VarLoc; }
   
-  void print(raw_ostream &OS, unsigned Indent = 0) const;
-  
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) { return D->getKind() == DeclKind::Var; }
+  static bool classof(const Decl *D) { return D->Kind == DeclKind::Var; }
   static bool classof(const VarDecl *D) { return true; }
 
 };
@@ -306,10 +294,8 @@ public:
   SMLoc getLocStart() const { return FuncLoc; }
 
   
-  void print(raw_ostream &OS, unsigned Indent = 0) const;
-
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
+  static bool classof(const Decl *D) { return D->Kind == DeclKind::Func; }
   static bool classof(const FuncDecl *D) { return true; }
 };
 
@@ -335,11 +321,9 @@ public:
   
   SMLoc getLocStart() const { return IdentifierLoc; }
   
-  void print(raw_ostream &OS, unsigned Indent = 0) const;
-  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::OneOfElement;
+    return D->Kind == DeclKind::OneOfElement;
   }
   static bool classof(const OneOfElementDecl *D) { return true; }
  
@@ -366,10 +350,8 @@ public:
   SMLoc getLocStart() const { return FuncLoc; }
  
   
-  void print(raw_ostream &OS, unsigned Indent = 0) const;
-  
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) { return D->getKind() == DeclKind::Arg; }
+  static bool classof(const Decl *D) { return D->Kind == DeclKind::Arg; }
   static bool classof(const ArgDecl *D) { return true; }
 };
 
@@ -398,11 +380,9 @@ public:
   
   SMLoc getLocStart() const { return NameLoc; }
   
-  void print(raw_ostream &OS, unsigned Indent = 0) const;
-  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::ElementRef;
+    return D->Kind == DeclKind::ElementRef;
   }
   static bool classof(const ElementRefDecl *D) { return true; }
 };

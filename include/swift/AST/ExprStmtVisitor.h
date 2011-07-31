@@ -14,9 +14,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_AST_EXPRSTMTVISITOR_H
-#define SWIFT_AST_EXPRSTMTVISITOR_H
+#ifndef SWIFT_AST_ASTVISITOR_H
+#define SWIFT_AST_ASTVISITOR_H
 
+#include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 
@@ -24,10 +25,34 @@ namespace swift {
   
 /// ExprStmtVisitor - This is a simple visitor class for Swift expressions.
 template<typename ImplClass,
-         typename ExprRetTy = void, typename StmtRetTy = void> 
+         typename ExprRetTy = void,
+         typename StmtRetTy = void,
+         typename DeclRetTy = void> 
 class ExprStmtVisitor {
 public:
 
+  DeclRetTy visit(Decl *D) {
+    switch (D->Kind) {
+        
+#define DISPATCH(CLASS) \
+  case DeclKind::CLASS: \
+  return static_cast<ImplClass*>(this)->visit ## CLASS ## \
+    Decl(static_cast<CLASS##Decl*>(D))
+
+      DISPATCH(TranslationUnit);
+      DISPATCH(Import);
+      DISPATCH(TypeAlias);
+      DISPATCH(Var);
+      DISPATCH(Func);
+      DISPATCH(OneOfElement);
+      DISPATCH(Arg);
+      DISPATCH(ElementRef);
+#undef DISPATCH
+    }
+    assert(0 && "Not reachable, all cases handled");
+    abort();
+  }
+  
   ExprRetTy visit(Expr *E) {
     switch (E->Kind) {
 
