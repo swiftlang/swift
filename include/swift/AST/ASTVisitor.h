@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the ASTVisitor class.
+// This file defines the ASTVisitor class, and the DeclVisitor, ExprVisitor, and
+// StmtVisitor template typedefs.
 //
 //===----------------------------------------------------------------------===//
 
@@ -101,6 +102,15 @@ public:
 };
   
   
+template<typename ImplClass, typename ExprRetTy = void>
+using ExprVisitor = ASTVisitor<ImplClass, ExprRetTy>;
+
+template<typename ImplClass, typename StmtRetTy = void>
+using StmtVisitor = ASTVisitor<ImplClass, void, StmtRetTy>;
+
+template<typename ImplClass, typename DeclRetTy = void>
+using DeclVisitor = ASTVisitor<ImplClass, void, DeclRetTy>;
+
 } // end namespace swift
   
 #endif

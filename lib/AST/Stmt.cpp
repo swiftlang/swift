@@ -56,7 +56,7 @@ SMLoc Stmt::getLocStart() const {
 
 namespace {
 /// PrintStmt - Visitor implementation of Expr::print.
-class PrintStmt : public ASTVisitor<PrintStmt> {
+class PrintStmt : public StmtVisitor<PrintStmt> {
 public:
   raw_ostream &OS;
   unsigned Indent;

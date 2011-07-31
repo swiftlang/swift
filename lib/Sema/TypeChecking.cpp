@@ -985,8 +985,8 @@ namespace {
   /// into it.  If not, it returns it.  If so it checks to see if the type
   /// is contradictory (in which case it returns NULL) otherwise it applies the
   /// type (possibly recursively) and returns the new/updated expression.
-  class SemaCoerceBottomUp : public ASTVisitor<SemaCoerceBottomUp, Expr*> {
-    friend class ASTVisitor<SemaCoerceBottomUp, Expr*>;
+  class SemaCoerceBottomUp : public ExprVisitor<SemaCoerceBottomUp, Expr*> {
+    friend ExprVisitor<SemaCoerceBottomUp, Expr*>;
     TypeChecker &TC;
     Type DestTy;
     

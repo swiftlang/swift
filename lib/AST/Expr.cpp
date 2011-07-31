@@ -532,7 +532,7 @@ Stmt *Expr::WalkExpr(Stmt *S,
 
 namespace {
 /// PrintExpr - Visitor implementation of Expr::print.
-class PrintExpr : public ASTVisitor<PrintExpr> {
+class PrintExpr : public ExprVisitor<PrintExpr> {
 public:
   raw_ostream &OS;
   unsigned Indent;

@@ -106,7 +106,7 @@ Type ElementRefDecl::getTypeForPath(Type InTy, ArrayRef<unsigned> Path) {
 
 namespace {
   /// PrintDecl - Visitor implementation of Decl::print.
-  class PrintDecl : public ASTVisitor<PrintDecl> {
+  class PrintDecl : public DeclVisitor<PrintDecl> {
   public:
     raw_ostream &OS;
     unsigned Indent;
