@@ -459,6 +459,10 @@ namespace {
       return E;
     }
 
+    Stmt *visitSemiStmt(SemiStmt *S) {
+      return S;
+    }
+
     Stmt *visitBraceStmt(BraceStmt *BS) {
       assert(0 && "BraceStmts should be processed in the prepass");
       return 0;

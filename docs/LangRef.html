@@ -1361,7 +1361,8 @@
   </div>
   
   <pre class="grammar">
-    stmt ::= ';'
+    stmt ::= <a href="#stmt-semicolon">stmt-semicolon</a>
+    stmt ::= <a href="#stmt-brace">stmt-brace</a>
     stmt ::= <a href="#stmt-if">stmt-if</a>
   </pre>
 
@@ -1379,6 +1380,16 @@
     }
   </pre>
 
+  <!-- ===================================================================== -->
+  <h3 id="stmt-semicolon">Semicolon Statement</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    stmt-semicolon ::= ';'
+  </pre>
+  
+  <p>The semicolon statement has no effect.</p>
+  
   <!-- ===================================================================== -->
   <h3 id="stmt-brace">Brace Statement</h3>
   <!-- ===================================================================== -->

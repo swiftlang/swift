@@ -92,6 +92,7 @@ public:
   return static_cast<ImplClass*>(this)->visit ## CLASS ## \
     Stmt(static_cast<CLASS##Stmt*>(S))
         
+    DISPATCH(Semi);
     DISPATCH(Brace);
     DISPATCH(If);
 #undef DISPATCH

@@ -1099,10 +1099,6 @@ bool Parser::parseExprLambda(NullablePtr<Expr> &Result) {
 ///     decl-struct
 ///     decl-typealias
 ///
-///   stmt:
-///     ';'
-///     stmt-brace
-///     stmt-if
 bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
                                 bool IsTopLevel) {
   // This forms a lexical scope.
@@ -1112,10 +1108,6 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     // Parse the decl, stmt, or expression.    
     switch (Tok.getKind()) {
     case tok::semi:
-      // Could create a stmt for semicolons if we care.
-      consumeToken(tok::semi);
-      continue;
-        
     case tok::kw_if:
     case tok::l_brace: {
       Entries.push_back(ExprStmtOrDecl());
@@ -1192,8 +1184,17 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
   return false;
 }
 
+///   stmt:
+///     ';'
+///     stmt-brace
+///     stmt-if
 bool Parser::parseStmt(NullablePtr<Stmt> &Result) {
   switch (Tok.getKind()) {
+  case tok::semi:
+    Result = new (S.Context) SemiStmt(Tok.getLoc());
+    consumeToken(tok::semi);
+    return false;
+      
   case tok::l_brace:
     return parseStmtBrace(Result);
   case tok::kw_if:

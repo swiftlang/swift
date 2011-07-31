@@ -76,8 +76,12 @@ public:
   void PrintRec(Decl *D) { D->print(OS, Indent+2); }
   void PrintRec(Expr *E) { E->print(OS, Indent+2); }
   
+  void visitSemiStmt(SemiStmt *S) {
+    OS.indent(Indent) << "(semi_stmt)";
+  }
+  
   void visitBraceStmt(BraceStmt *S) {
-    OS.indent(Indent) << "(brace_expr";
+    OS.indent(Indent) << "(brace_stmt";
     for (unsigned i = 0, e = S->NumElements; i != e; ++i) {
       OS << '\n';
       if (Expr *SubExpr = S->Elements[i].dyn_cast<Expr*>())

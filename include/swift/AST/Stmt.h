@@ -30,6 +30,7 @@ namespace swift {
   class Expr;
 
 enum class StmtKind {
+  Semi,
   Brace,
   If
 };
@@ -65,7 +66,19 @@ public:
   void *operator new(size_t Bytes, void *Mem) throw() = delete;
 
 };
+
+/// SemiStmt - A semicolon, the noop statement: ";"
+class SemiStmt : public Stmt {
+public:
+  SMLoc Loc;
   
+  SemiStmt(SMLoc Loc) : Stmt(StmtKind::Semi), Loc(Loc) {}
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const SemiStmt *) { return true; }
+  static bool classof(const Stmt *S) { return S->Kind == StmtKind::Semi; }
+};
+
 
 /// BraceStmt - A brace enclosed sequence of expressions, stmts, or decls, like
 /// { 4; 5 }.

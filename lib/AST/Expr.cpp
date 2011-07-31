@@ -415,6 +415,10 @@ namespace {
       return E;
     }
     
+    Stmt *visitSemiStmt(SemiStmt *SS) {
+      return SS;
+    }
+    
     Stmt *visitBraceStmt(BraceStmt *BS) {
       for (unsigned i = 0, e = BS->NumElements; i != e; ++i) {
         if (Expr *SubExpr = BS->Elements[i].dyn_cast<Expr*>()) {
