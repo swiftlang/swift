@@ -1,4 +1,4 @@
-//===-- ExprStmtVisitor.h - Expression and Statement Visitor ----*- C++ -*-===//
+//===-- ASTVisitor.h - Decl, Expr and Stmt Visitor --------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the ExprStmtVisitor class.
+// This file defines the ASTVisitor class.
 //
 //===----------------------------------------------------------------------===//
 
@@ -23,12 +23,12 @@
 
 namespace swift {
   
-/// ExprStmtVisitor - This is a simple visitor class for Swift expressions.
+/// ASTVisitor - This is a simple visitor class for Swift expressions.
 template<typename ImplClass,
          typename ExprRetTy = void,
          typename StmtRetTy = void,
          typename DeclRetTy = void> 
-class ExprStmtVisitor {
+class ASTVisitor {
 public:
 
   DeclRetTy visit(Decl *D) {

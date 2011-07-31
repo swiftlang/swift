@@ -19,9 +19,7 @@
 // FIXME: Entrypoint declared in Parser.h
 #include "swift/Parse/Parser.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
-#include "swift/AST/ExprStmtVisitor.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
@@ -353,8 +351,8 @@ namespace {
   /// job.  Each visit method reanalyzes the children of a node, then reanalyzes
   /// the node, and returns true on error.
   class SemaExpressionTree
-  : public ExprStmtVisitor<SemaExpressionTree, Expr*, Stmt*> {
-    friend class ExprStmtVisitor<SemaExpressionTree, Expr*, Stmt*>;
+  : public ASTVisitor<SemaExpressionTree, Expr*, Stmt*> {
+    friend class ASTVisitor<SemaExpressionTree, Expr*, Stmt*>;
     TypeChecker &TC;
     
     Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
@@ -987,8 +985,8 @@ namespace {
   /// into it.  If not, it returns it.  If so it checks to see if the type
   /// is contradictory (in which case it returns NULL) otherwise it applies the
   /// type (possibly recursively) and returns the new/updated expression.
-  class SemaCoerceBottomUp : public ExprStmtVisitor<SemaCoerceBottomUp, Expr*> {
-    friend class ExprStmtVisitor<SemaCoerceBottomUp, Expr*>;
+  class SemaCoerceBottomUp : public ASTVisitor<SemaCoerceBottomUp, Expr*> {
+    friend class ASTVisitor<SemaCoerceBottomUp, Expr*>;
     TypeChecker &TC;
     Type DestTy;
     

@@ -15,8 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Expr.h"
-#include "swift/AST/ExprStmtVisitor.h"
-#include "swift/AST/Decl.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/ASTContext.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -316,8 +315,8 @@ namespace {
   /// ExprWalker - This class implements a simple expression walker which
   /// invokes a function pointer on every expression in an AST.  If the function
   /// pointer returns true the walk is terminated.
-  class ExprWalker : public ExprStmtVisitor<ExprWalker, Expr*, Stmt*> {
-    friend class ExprStmtVisitor<ExprWalker, Expr*, Stmt*>;
+  class ExprWalker : public ASTVisitor<ExprWalker, Expr*, Stmt*> {
+    friend class ASTVisitor<ExprWalker, Expr*, Stmt*>;
     Expr *(*ExprFn)(Expr *E, Expr::WalkOrder Order, void *Data);
     Stmt *(*StmtFn)(Stmt *S, Expr::WalkOrder Order, void *Data);
     void *Data;
@@ -533,7 +532,7 @@ Stmt *Expr::WalkExpr(Stmt *S,
 
 namespace {
 /// PrintExpr - Visitor implementation of Expr::print.
-class PrintExpr : public ExprStmtVisitor<PrintExpr> {
+class PrintExpr : public ASTVisitor<PrintExpr> {
 public:
   raw_ostream &OS;
   unsigned Indent;

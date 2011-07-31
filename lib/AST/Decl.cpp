@@ -16,7 +16,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ExprStmtVisitor.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Types.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
@@ -106,7 +106,7 @@ Type ElementRefDecl::getTypeForPath(Type InTy, ArrayRef<unsigned> Path) {
 
 namespace {
   /// PrintDecl - Visitor implementation of Decl::print.
-  class PrintDecl : public ExprStmtVisitor<PrintDecl> {
+  class PrintDecl : public ASTVisitor<PrintDecl> {
   public:
     raw_ostream &OS;
     unsigned Indent;
