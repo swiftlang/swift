@@ -28,12 +28,12 @@ template<typename ImplClass,
 class ExprVisitor {
 public:
 
-  ExprRetTy Visit(Expr *E) {
+  ExprRetTy visit(Expr *E) {
     switch (E->Kind) {
 
 #define DISPATCH(CLASS) \
   case ExprKind::CLASS: \
-  return static_cast<ImplClass*>(this)->Visit ## CLASS ## \
+  return static_cast<ImplClass*>(this)->visit ## CLASS ## \
     Expr(static_cast<CLASS##Expr*>(E))
         
     DISPATCH(IntegerLiteral);

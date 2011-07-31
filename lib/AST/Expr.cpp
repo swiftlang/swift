@@ -321,16 +321,16 @@ namespace {
     void *Data;
     
     
-    Expr *VisitIntegerLiteralExpr(IntegerLiteralExpr *E) { return E; }
-    Expr *VisitDeclRefExpr(DeclRefExpr *E) { return E; }
-    Expr *VisitOverloadSetRefExpr(OverloadSetRefExpr *E) { return E; }
-    Expr *VisitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) { return E; }
-    Expr *VisitUnresolvedMemberExpr(UnresolvedMemberExpr *E) { return E; }
-    Expr *VisitUnresolvedScopedIdentifierExpr(UnresolvedScopedIdentifierExpr*E){
+    Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *E) { return E; }
+    Expr *visitDeclRefExpr(DeclRefExpr *E) { return E; }
+    Expr *visitOverloadSetRefExpr(OverloadSetRefExpr *E) { return E; }
+    Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) { return E; }
+    Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) { return E; }
+    Expr *visitUnresolvedScopedIdentifierExpr(UnresolvedScopedIdentifierExpr*E){
       return E;
     }
     
-    Expr *VisitTupleExpr(TupleExpr *E) {
+    Expr *visitTupleExpr(TupleExpr *E) {
       for (unsigned i = 0, e = E->NumSubExprs; i != e; ++i)
         if (E->SubExprs[i]) {
           if (Expr *Elt = doIt(E->SubExprs[i]))
@@ -340,7 +340,7 @@ namespace {
         }
       return E;
     }
-    Expr *VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
+    Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
       if (!E->SubExpr)
         return E;
       
@@ -350,7 +350,7 @@ namespace {
       }
       return 0;
     }
-    Expr *VisitTupleElementExpr(TupleElementExpr *E) {
+    Expr *visitTupleElementExpr(TupleElementExpr *E) {
       if (Expr *E2 = doIt(E->SubExpr)) {
         E->SubExpr = E2;
         return E;
@@ -358,7 +358,7 @@ namespace {
       return 0;
     }
     
-    Expr *VisitTupleShuffleExpr(TupleShuffleExpr *E) {
+    Expr *visitTupleShuffleExpr(TupleShuffleExpr *E) {
       if (Expr *E2 = doIt(E->SubExpr)) {
         E->SubExpr = E2;
         return E;
@@ -366,7 +366,7 @@ namespace {
       return 0;
     }
     
-    Expr *VisitApplyExpr(ApplyExpr *E) {
+    Expr *visitApplyExpr(ApplyExpr *E) {
       Expr *E2 = doIt(E->Fn);
       if (E2 == 0) return 0;
       E->Fn = E2;
@@ -376,7 +376,7 @@ namespace {
       E->Arg = E2;
       return E;
     }
-    Expr *VisitSequenceExpr(SequenceExpr *E) {
+    Expr *visitSequenceExpr(SequenceExpr *E) {
       for (unsigned i = 0, e = E->NumElements; i != e; ++i)
         if (Expr *Elt = doIt(E->Elements[i]))
           E->Elements[i] = Elt;
@@ -384,7 +384,7 @@ namespace {
           return 0;
       return E;
     }
-    Expr *VisitClosureExpr(ClosureExpr *E) {
+    Expr *visitClosureExpr(ClosureExpr *E) {
       if (Expr *E2 = doIt(E->Input)) {
         E->Input = E2;
         return E;
@@ -392,9 +392,9 @@ namespace {
       return 0;
     }
     
-    Expr *VisitAnonClosureArgExpr(AnonClosureArgExpr *E) { return E; }
+    Expr *visitAnonClosureArgExpr(AnonClosureArgExpr *E) { return E; }
 
-    Expr *VisitBinaryExpr(BinaryExpr *E) {
+    Expr *visitBinaryExpr(BinaryExpr *E) {
       Expr *E2 = doIt(E->LHS);
       if (E2 == 0) return 0;
       E->LHS = E2;
@@ -464,14 +464,14 @@ namespace {
       // If no visitor function wants to get called before/after the node, just
       // walk into it.
       if (ExprFn == 0)
-        return Visit(E);
+        return visit(E);
       
       // Try the preorder visitation.  If it returns null, we just skip entering
       // subnodes of this tree.
       Expr *E2 = ExprFn(E, Expr::WalkOrder::PreOrder, Data);
       if (E2 == 0) return E;
       
-      if (E) E = Visit(E);
+      if (E) E = visit(E);
       if (E) E = ExprFn(E, Expr::Expr::WalkOrder::PostOrder, Data);
       return E;
     }
@@ -530,108 +530,108 @@ public:
   PrintExpr(raw_ostream &os, unsigned indent) : OS(os), Indent(indent) {
   }
   
-  void PrintRec(Expr *E) {
+  void printRec(Expr *E) {
     Indent += 2;
     if (E)
-      Visit(E);
+      visit(E);
     else
       OS.indent(Indent) << "(**NULL EXPRESSION**)";
     Indent -= 2;
   }
   
-  void PrintRec(Decl *D) { D->print(OS, Indent+2); }
-  void PrintRec(Stmt *S) { S->print(OS, Indent+2); }
+  void printRec(Decl *D) { D->print(OS, Indent+2); }
+  void printRec(Stmt *S) { S->print(OS, Indent+2); }
 
-  void VisitIntegerLiteralExpr(IntegerLiteralExpr *E) {
+  void visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
     OS.indent(Indent) << "(integer_literal_expr type='" << E->Ty;
     OS << "' value=" << E->Val << ')';
   }
-  void VisitDeclRefExpr(DeclRefExpr *E) {
+  void visitDeclRefExpr(DeclRefExpr *E) {
     OS.indent(Indent) << "(declref_expr type='" << E->Ty;
     OS << "' decl=" << E->D->Name << ')';
   }
-  void VisitOverloadSetRefExpr(OverloadSetRefExpr *E) {
+  void visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
     OS.indent(Indent) << "(overloadsetref_expr type='" << E->Ty;
     OS << "' decl=" << E->Decls[0]->Name << ')';
   }
-  void VisitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
+  void visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
     OS.indent(Indent) << "(unresolved_decl_ref_expr type='" << E->Ty;
     OS << "' name=" << E->Name << ')';
   }
-  void VisitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
+  void visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     OS.indent(Indent) << "(unresolved_member_expr type='" << E->Ty;
     OS << "\' name='" << E->Name << "')";
   }
-  void VisitUnresolvedScopedIdentifierExpr(UnresolvedScopedIdentifierExpr *E) {
+  void visitUnresolvedScopedIdentifierExpr(UnresolvedScopedIdentifierExpr *E) {
     OS.indent(Indent) << "(unresolved_scoped_identifier_expr type='"
       << E->TypeDecl->Name;
     OS << "\' name='" << E->Name << "')";
   }
-  void VisitTupleExpr(TupleExpr *E) {
+  void visitTupleExpr(TupleExpr *E) {
     OS.indent(Indent) << "(tuple_expr type='" << E->Ty << '\'';
     for (unsigned i = 0, e = E->NumSubExprs; i != e; ++i) {
       OS << '\n';
       if (E->SubExprs[i])
-        PrintRec(E->SubExprs[i]);
+        printRec(E->SubExprs[i]);
       else
         OS.indent(Indent+2) << "<<tuple element default value>>";
     }
     OS << ')';
   }
-  void VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
+  void visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     OS.indent(Indent) << "(unresolved_dot_expr type='" << E->Ty;
     OS << "\' field '" << E->Name.get() << "'";
     if (!E->ResolvedDecls.empty())
       OS << " decl resolved to " << E->ResolvedDecls.size() << " candidate(s)!";
     if (E->SubExpr) {
       OS << '\n';
-      PrintRec(E->SubExpr);
+      printRec(E->SubExpr);
     }
     OS << ')';
   }
-  void VisitTupleElementExpr(TupleElementExpr *E) {
+  void visitTupleElementExpr(TupleElementExpr *E) {
     OS.indent(Indent) << "(tuple_element_expr type='" << E->Ty;
     OS << "\' field #" << E->FieldNo << "\n";
-    PrintRec(E->SubExpr);
+    printRec(E->SubExpr);
     OS << ')';
   }
-  void VisitTupleShuffleExpr(TupleShuffleExpr *E) {
+  void visitTupleShuffleExpr(TupleShuffleExpr *E) {
     OS.indent(Indent) << "(tuple_shuffle type='" << E->Ty << "' Elements=[";
     for (unsigned i = 0, e = E->ElementMapping.size(); i != e; ++i) {
       if (i) OS << ", ";
       OS << E->ElementMapping[i];
     }
     OS << "]\n";
-    PrintRec(E->SubExpr);
+    printRec(E->SubExpr);
     OS << ')';
   }
 
-  void VisitApplyExpr(ApplyExpr *E) {
+  void visitApplyExpr(ApplyExpr *E) {
     OS.indent(Indent) << "(apply_expr type='" << E->Ty << "'\n";
-    PrintRec(E->Fn);
+    printRec(E->Fn);
     OS << '\n';
-    PrintRec(E->Arg);
+    printRec(E->Arg);
     OS << ')';
   }
-  void VisitSequenceExpr(SequenceExpr *E) {
+  void visitSequenceExpr(SequenceExpr *E) {
     OS.indent(Indent) << "(sequence_expr type='" << E->Ty << '\'';
     for (unsigned i = 0, e = E->NumElements; i != e; ++i) {
       OS << '\n';
-      PrintRec(E->Elements[i]);
+      printRec(E->Elements[i]);
     }
     OS << ')';
   }
-  void VisitClosureExpr(ClosureExpr *E) {
+  void visitClosureExpr(ClosureExpr *E) {
     OS.indent(Indent) << "(closure_expr type='" << E->Ty << "'\n";
-    PrintRec(E->Input);
+    printRec(E->Input);
     OS << ')';
   }
   
-  void VisitAnonClosureArgExpr(AnonClosureArgExpr *E) {
+  void visitAnonClosureArgExpr(AnonClosureArgExpr *E) {
     OS.indent(Indent) << "(anon_closure_arg_expr type='" << E->Ty;
     OS << "' ArgNo=" << E->ArgNo << ')';
   }
-  void VisitBinaryExpr(BinaryExpr *E) {
+  void visitBinaryExpr(BinaryExpr *E) {
     OS.indent(Indent) << "(binary_expr '";
     if (!E->Fn)
       OS << "=";
@@ -642,9 +642,9 @@ public:
     else
       OS << "***UNKNOWN***";
     OS << "' type='" << E->Ty << "'\n";
-    PrintRec(E->LHS);
+    printRec(E->LHS);
     OS << '\n';
-    PrintRec(E->RHS);
+    printRec(E->RHS);
     OS << ')';
   }
 };
@@ -658,5 +658,5 @@ void Expr::dump() const {
 }
 
 void Expr::print(raw_ostream &OS, unsigned Indent) const {
-  PrintExpr(OS, Indent).Visit(const_cast<Expr*>(this));
+  PrintExpr(OS, Indent).visit(const_cast<Expr*>(this));
 }

@@ -357,34 +357,34 @@ namespace {
     friend class ExprVisitor<SemaExpressionTree, Expr*, Stmt*>;
     TypeChecker &TC;
     
-    Expr *VisitIntegerLiteralExpr(IntegerLiteralExpr *E) {
+    Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
       return E;
     }
-    Expr *VisitDeclRefExpr(DeclRefExpr *E) {
+    Expr *visitDeclRefExpr(DeclRefExpr *E) {
       if (SemaDeclRefExpr(E->D, E->Loc, E->Ty, TC)) return 0;
       return E;
     }
-    Expr *VisitOverloadSetRefExpr(OverloadSetRefExpr *E) {
+    Expr *visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
       E->Ty = DependentType::get(TC.Context);
       return E;
     }
-    Expr *VisitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
+    Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
       assert(0 && "UnresolvedDeclRefExpr should be resolved by name binding!");
       return 0;
     }
-    Expr *VisitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
+    Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
       E->Ty = DependentType::get(TC.Context);
       return E;
     }
     
-    Expr *VisitTupleExpr(TupleExpr *E) {
+    Expr *visitTupleExpr(TupleExpr *E) {
       if (SemaTupleExpr(E, TC))
         return 0;
       return E;
     }
-    Expr *VisitUnresolvedDotExpr(UnresolvedDotExpr *E);
+    Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *E);
     
-    Expr *VisitUnresolvedScopedIdentifierExpr
+    Expr *visitUnresolvedScopedIdentifierExpr
     (UnresolvedScopedIdentifierExpr *E) {
       TypeBase *TypeScope =
         E->TypeDecl->UnderlyingTy->getCanonicalType(TC.Context);
@@ -412,36 +412,36 @@ namespace {
         return 0;
       }
       
-      return Visit(new (TC.Context) DeclRefExpr(Elt, E->TypeDeclLoc));
+      return visit(new (TC.Context) DeclRefExpr(Elt, E->TypeDeclLoc));
     }
     
-    Expr *VisitTupleElementExpr(TupleElementExpr *E) {
+    Expr *visitTupleElementExpr(TupleElementExpr *E) {
       // TupleElementExpr is fully resolved.
       assert(!E->Ty->is<DependentType>());
       return E;
     }
     
-    Expr *VisitTupleShuffleExpr(TupleShuffleExpr *E) {
+    Expr *visitTupleShuffleExpr(TupleShuffleExpr *E) {
       // TupleShuffleExpr is fully resolved.
       assert(!E->Ty->is<DependentType>());
       return E;
     }
     
-    Expr *VisitApplyExpr(ApplyExpr *E) {
+    Expr *visitApplyExpr(ApplyExpr *E) {
       if (SemaApplyExpr(E->Fn, E->Arg, E->Ty, TC))
         return 0;
       return E;
     }
-    Expr *VisitSequenceExpr(SequenceExpr *E);
+    Expr *visitSequenceExpr(SequenceExpr *E);
     
     void PreProcessBraceStmt(BraceStmt *BS);
     
-    Expr *VisitClosureExpr(ClosureExpr *E) {
+    Expr *visitClosureExpr(ClosureExpr *E) {
       assert(0 && "Should not walk into ClosureExprs!");
       return 0;
     }
     
-    Expr *VisitAnonClosureArgExpr(AnonClosureArgExpr *E) {
+    Expr *visitAnonClosureArgExpr(AnonClosureArgExpr *E) {
       // Nothing we can do here.  These remain as resolved or unresolved as they
       // always were.  If no type is assigned, we give them a dependent type so
       // that we get resolution later.
@@ -450,7 +450,7 @@ namespace {
       return E;
     }
     
-    Expr *VisitBinaryExpr(BinaryExpr *E) {
+    Expr *visitBinaryExpr(BinaryExpr *E) {
       if (SemaBinaryExpr(E->LHS, E->Fn, E->RHS, E->Ty, TC))
         return 0;
       
@@ -480,7 +480,7 @@ namespace {
       
       // Dispatch to the right visitor case in the post-order walk.  We know
       // that the operands have already been processed and are valid.
-      return SET.Visit(E);
+      return SET.visit(E);
     }
 
     static Stmt *WalkStmtFn(Stmt *S, Expr::WalkOrder Order, void *set) {
@@ -525,7 +525,7 @@ namespace {
   };
 } // end anonymous namespace.
 
-Expr *SemaExpressionTree::VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
+Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   // If the base expression hasn't been found yet, then we can't process this
   // value.
   if (E->SubExpr == 0) {
@@ -774,7 +774,7 @@ static void ReduceJuxtaposedExprs(SequenceExpr *E, unsigned Elt,
   ReduceJuxtaposedExprs(E, Elt, TC);
 }
 
-Expr *SemaExpressionTree::VisitSequenceExpr(SequenceExpr *E) {
+Expr *SemaExpressionTree::visitSequenceExpr(SequenceExpr *E) {
   // If types of leaves were newly resolved, then this sequence may have
   // just changed from a sequence of operations into a binary expression,
   // function application or something else.  Check this now.  This is
@@ -990,15 +990,15 @@ namespace {
     TypeChecker &TC;
     Type DestTy;
     
-    Expr *VisitIntegerLiteralExpr(IntegerLiteralExpr *E) {
+    Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
       assert(0 && "Integer literals never have dependent type!");
       return 0;
     }
-    Expr *VisitDeclRefExpr(DeclRefExpr *E) {
+    Expr *visitDeclRefExpr(DeclRefExpr *E) {
       return E;
     }
     
-    Expr *VisitOverloadSetRefExpr(OverloadSetRefExpr *E) {
+    Expr *visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
       // If any decl that is in the overload set exactly matches the expected
       // type, then select it.
       // FIXME: Conversion ranking.
@@ -1011,7 +1011,7 @@ namespace {
     
     // If this is an UnresolvedMemberExpr, then this provides the type we've
     // been looking for!
-    Expr *VisitUnresolvedMemberExpr(UnresolvedMemberExpr *UME) {
+    Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *UME) {
       // The only valid type for an UME is a OneOfType.
       OneOfType *DT = DestTy->getAs<OneOfType>();
       if (DT == 0) {
@@ -1035,34 +1035,34 @@ namespace {
       return new (TC.Context) DeclRefExpr(DED, UME->ColonLoc, DED->Ty);
     }  
     
-    Expr *VisitTupleExpr(TupleExpr *E);
+    Expr *visitTupleExpr(TupleExpr *E);
     
-    Expr *VisitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
+    Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
       return E;
     }
-    Expr *VisitUnresolvedDotExpr(UnresolvedDotExpr *E) {
+    Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
       return E;
     }
     
-    Expr *VisitUnresolvedScopedIdentifierExpr
+    Expr *visitUnresolvedScopedIdentifierExpr
     (UnresolvedScopedIdentifierExpr *E) {
       assert(0 && "This node should be resolved already!");
     }
     
-    Expr *VisitTupleElementExpr(TupleElementExpr *E) {
+    Expr *visitTupleElementExpr(TupleElementExpr *E) {
       // TupleElementExpr is fully resolved.
       assert(0 && "This node doesn't exist for dependent types");
       return 0;
     }
     
-    Expr *VisitTupleShuffleExpr(TupleShuffleExpr *E) {
+    Expr *visitTupleShuffleExpr(TupleShuffleExpr *E) {
       // TupleElementExpr is fully resolved.
       assert(0 && "This node doesn't exist for dependent types");
       return 0;
     }
 
     
-    Expr *VisitApplyExpr(ApplyExpr *E) {
+    Expr *visitApplyExpr(ApplyExpr *E) {
       // FIXME: Given an ApplyExpr of "a b" where "a" is an overloaded value, we
       // may be able to prune the overload set based on the known result type.
       // Doing this may allow the ambiguity to resolve by removing candidates
@@ -1071,7 +1071,7 @@ namespace {
       // prune the second one, and then recursively apply 'int' to b.
       return E;
     }
-    Expr *VisitSequenceExpr(SequenceExpr *E) {
+    Expr *visitSequenceExpr(SequenceExpr *E) {
       // If we have ":f x" and the result type of the Apply is a OneOfType, then
       // :f must be an element constructor for the oneof value.  Note that
       // handling this syntactically causes us to reject "(:f) x" as ambiguous.
@@ -1100,15 +1100,15 @@ namespace {
       return E;
     }
 
-    Expr *VisitClosureExpr(ClosureExpr *E) {
+    Expr *visitClosureExpr(ClosureExpr *E) {
       return E;      
     }
     
-    Expr *VisitAnonClosureArgExpr(AnonClosureArgExpr *E) {
+    Expr *visitAnonClosureArgExpr(AnonClosureArgExpr *E) {
       return E;
     }
 
-    Expr *VisitBinaryExpr(BinaryExpr *E) {
+    Expr *visitBinaryExpr(BinaryExpr *E) {
       // TODO: If the function is an overload set and the result type that we're
       // coercing onto the binop is completely incompatible with some elements
       // of the overload set, trim them out.      
@@ -1119,7 +1119,7 @@ namespace {
       assert(!DestTy->is<DependentType>());
     }
     Expr *doIt(Expr *E) {
-      return Visit(E);
+      return visit(E);
     }
   public:
     
@@ -1137,7 +1137,7 @@ namespace {
 } // end anonymous namespace.
 
 
-Expr *SemaCoerceBottomUp::VisitTupleExpr(TupleExpr *E) {
+Expr *SemaCoerceBottomUp::visitTupleExpr(TupleExpr *E) {
   // If we're providing a type for a tuple expr, we have a couple of
   // different cases.  If the tuple has a single element and the destination
   // type is not a tuple type, then this just recursively forces the scalar
