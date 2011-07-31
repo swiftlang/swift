@@ -48,7 +48,7 @@ public:
     DISPATCH(TupleShuffle);
     DISPATCH(Apply);
     DISPATCH(Sequence);
-    DISPATCH(Func);
+    DISPATCH(Lambda);
     DISPATCH(Closure);
     DISPATCH(AnonClosureArg);
     DISPATCH(Binary);

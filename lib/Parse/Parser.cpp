@@ -457,11 +457,11 @@ FuncDecl *Parser::parseDeclFunc() {
   // Enter the arguments for the function into a new function-body scope.  We
   // need this even if there is no function body to detect argument name
   // duplication.
-  FuncExpr *FE = 0;
+  LambdaExpr *LE = 0;
   {
     Scope FnBodyScope(S.decl);
     
-    FE = S.expr.ActOnFuncExprStart(FuncLoc, FuncTy);
+    LE = S.expr.ActOnLambdaExprStart(FuncLoc, FuncTy);
     
     // Then parse the expression.
     NullablePtr<Stmt> Body;
@@ -471,16 +471,16 @@ FuncDecl *Parser::parseDeclFunc() {
       if (parseStmtBrace(Body) || Body.isNull())
         return 0;
       
-      FE->Body = cast<BraceStmt>(Body.get());
+      LE->Body = cast<BraceStmt>(Body.get());
     } else {
       // Note, we just discard FE here.  It is bump pointer allocated, so this
       // is fine (if suboptimal)
-      FE = 0;
+      LE = 0;
     }
   }
   
   // Create the decl for the func and add it to the parent scope.
-  FuncDecl *FD = new (S.Context) FuncDecl(FuncLoc, Name, FuncTy, FE,Attributes);
+  FuncDecl *FD = new (S.Context) FuncDecl(FuncLoc, Name, FuncTy, LE,Attributes);
   S.decl.AddToScope(FD);
   return FD;
 }
@@ -1067,7 +1067,7 @@ bool Parser::parseExprLambda(NullablePtr<Expr> &Result) {
 
   // The arguments to the lambda are defined in their own scope.
   Scope LambdaBodyScope(S.decl);
-  FuncExpr *FE = S.expr.ActOnFuncExprStart(LambdaLoc, Ty);
+  LambdaExpr *LE = S.expr.ActOnLambdaExprStart(LambdaLoc, Ty);
 
   
   // Check to see if we have a "{" which is a brace expr.
@@ -1083,8 +1083,8 @@ bool Parser::parseExprLambda(NullablePtr<Expr> &Result) {
   if (parseStmtBrace(Body) || Body.isNull())
     return true;
     
-  FE->Body = cast<BraceStmt>(Body.get());
-  return FE;
+  LE->Body = cast<BraceStmt>(Body.get());
+  return LE;
 }
 
 

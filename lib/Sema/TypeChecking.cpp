@@ -436,7 +436,7 @@ namespace {
     
     void PreProcessBraceStmt(BraceStmt *BS);
     
-    Expr *visitFuncExpr(FuncExpr *E) {
+    Expr *visitLambdaExpr(LambdaExpr *E) {
       return E;
     }
 
@@ -1102,7 +1102,7 @@ namespace {
       return E;
     }
 
-    Expr *visitFuncExpr(FuncExpr *E) {
+    Expr *visitLambdaExpr(LambdaExpr *E) {
       return E;      
     }
 
