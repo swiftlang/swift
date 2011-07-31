@@ -3,5 +3,6 @@ add_swift_library(swiftAST
   Decl.cpp
   Expr.cpp
   Identifier.cpp
+  Stmt.cpp
   Type.cpp)
 
