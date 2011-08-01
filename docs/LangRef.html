@@ -1402,7 +1402,7 @@
   </div>
 
   <pre class="grammar">
-    stmt-assign ::= expr '=' expr
+    stmt-assign ::= <a href="#expr">expr</a> '=' <a href="#expr">expr</a>
   </pre>
   
   <p>The assignment statement evaluates its left hand side as some sort of
@@ -1437,8 +1437,8 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    stmt-if      ::= 'if' expr <a href="#stmt-brace">stmt-brace</a> expr-if-else?
-    expr-if-else ::= 'else' stmt
+    stmt-if      ::= 'if' <a href="#expr">expr</a> <a href="#stmt-brace">stmt-brace</a> expr-if-else?
+    expr-if-else ::= 'else' <a href="#stmt">stmt</a>
   </pre>
   
   <p>'if' statements provide a simple control transfer operations that evalutes
