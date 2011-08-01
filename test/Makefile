@@ -29,11 +29,24 @@ ifdef VG
   LIT_ARGS += "--vg"
 endif
 
-all:: 
+all:: lit.site.cfg
 	@ echo '--- Running swift tests for $(TARGET_TRIPLE) ---'
 	@ $(PYTHON) $(LLVM_SRC_ROOT)/utils/lit/lit.py \
 	  $(LIT_ARGS) $(TESTARGS) $(TESTDIRS)
 
+FORCE:
+
+lit.site.cfg: FORCE
+	@echo "Making Clang 'lit.site.cfg' file..."
+	@$(ECHOPATH) s=@LLVM_SOURCE_DIR@=$(LLVM_SRC_ROOT)=g > lit.tmp
+	@$(ECHOPATH) s=@LLVM_BINARY_DIR@=$(LLVM_OBJ_ROOT)=g >> lit.tmp
+	@$(ECHOPATH) s=@LLVM_TOOLS_DIR@=$(ToolDir)=g >> lit.tmp
+	@$(ECHOPATH) s=@LLVM_LIBS_DIR@=$(LibDir)=g >> lit.tmp
+	@$(ECHOPATH) s=@SWIFT_SOURCE_DIR@=$(PROJ_SRC_DIR)/..=g >> lit.tmp
+	@$(ECHOPATH) s=@SWIFT_BINARY_DIR@=$(PROJ_OBJ_DIR)/..=g >> lit.tmp
+	@$(ECHOPATH) s=@TARGET_TRIPLE@=$(TARGET_TRIPLE)=g >> lit.tmp
+	@sed -f lit.tmp $(PROJ_SRC_DIR)/lit.site.cfg.in > $@
+	@-rm -f lit.tmp
 
 clean::
 	@ find . -name Output | xargs rm -fr
