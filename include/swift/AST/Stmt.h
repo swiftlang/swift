@@ -31,6 +31,7 @@ namespace swift {
 
 enum class StmtKind {
   Semi,
+  Assign,
   Brace,
   If
 };
@@ -77,6 +78,21 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const SemiStmt *) { return true; }
   static bool classof(const Stmt *S) { return S->Kind == StmtKind::Semi; }
+};
+
+/// AssignStmt - A value assignment, like "x = y".
+class AssignStmt : public Stmt {
+public:
+  Expr *Dest;
+  SMLoc EqualLoc;
+  Expr *Src;
+  
+  AssignStmt(Expr *Dest, SMLoc EqualLoc, Expr *Src)
+    : Stmt(StmtKind::Assign), Dest(Dest), EqualLoc(EqualLoc), Src(Src) {}
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const AssignStmt *) { return true; }
+  static bool classof(const Stmt *S) { return S->Kind == StmtKind::Assign; }
 };
 
 

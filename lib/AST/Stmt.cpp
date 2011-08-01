@@ -37,6 +37,8 @@ SMLoc Stmt::getLocStart() const {
   switch (Kind) {
   case StmtKind::Semi:
     return cast<SemiStmt>(this)->Loc;
+  case StmtKind::Assign:
+    return cast<AssignStmt>(this)->Dest->getLocStart();
   case StmtKind::Brace:
     return cast<BraceStmt>(this)->LBLoc;
   case StmtKind::If:
@@ -46,11 +48,6 @@ SMLoc Stmt::getLocStart() const {
   assert(0 && "Not reachable, all cases handled");
   abort();
 }
-
-
-//===----------------------------------------------------------------------===//
-// Printing for Stmt and all subclasses.
-//===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
 // Printing for Stmt and all subclasses.
@@ -66,7 +63,7 @@ public:
   PrintStmt(raw_ostream &os, unsigned indent) : OS(os), Indent(indent) {
   }
   
-  void PrintRec(Stmt *S) {
+  void printRec(Stmt *S) {
     Indent += 2;
     if (S)
       visit(S);
@@ -75,35 +72,43 @@ public:
     Indent -= 2;
   }
   
-  void PrintRec(Decl *D) { D->print(OS, Indent+2); }
-  void PrintRec(Expr *E) { E->print(OS, Indent+2); }
+  void printRec(Decl *D) { D->print(OS, Indent+2); }
+  void printRec(Expr *E) { E->print(OS, Indent+2); }
   
   void visitSemiStmt(SemiStmt *S) {
     OS.indent(Indent) << "(semi_stmt)";
   }
-  
+
+  void visitAssignStmt(AssignStmt *S) {
+    OS.indent(Indent) << "(assign_stmt\n";
+    printRec(S->Dest);
+    OS << '\n';
+    printRec(S->Src);
+    OS << ')';
+  }
+
   void visitBraceStmt(BraceStmt *S) {
     OS.indent(Indent) << "(brace_stmt";
     for (unsigned i = 0, e = S->NumElements; i != e; ++i) {
       OS << '\n';
       if (Expr *SubExpr = S->Elements[i].dyn_cast<Expr*>())
-        PrintRec(SubExpr);
+        printRec(SubExpr);
       else if (Stmt *SubStmt = S->Elements[i].dyn_cast<Stmt*>())
-        PrintRec(SubStmt);
+        printRec(SubStmt);
       else
-        PrintRec(S->Elements[i].get<Decl*>());
+        printRec(S->Elements[i].get<Decl*>());
     }
     OS << ')';
   }
   
   void visitIfStmt(IfStmt *S) {
     OS.indent(Indent) << "(if_stmt\n";
-    PrintRec(S->Cond);
+    printRec(S->Cond);
     OS << '\n';
-    PrintRec(S->Then);
+    printRec(S->Then);
     if (S->Else) {
       OS << '\n';
-      PrintRec(S->Else);
+      printRec(S->Else);
     }
     OS << ')';
   }

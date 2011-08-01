@@ -1090,7 +1090,7 @@ bool Parser::parseExprLambda(NullablePtr<Expr> &Result) {
 
 ///   expr-brace-item:
 ///     expr
-///     expr '=' expr      // FIXME: Should be part of stmt.
+///     expr '=' expr
 ///     stmt
 ///     decl-var
 ///     decl-func
@@ -1098,7 +1098,6 @@ bool Parser::parseExprLambda(NullablePtr<Expr> &Result) {
 ///     decl-oneof
 ///     decl-struct
 ///     decl-typealias
-///
 bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
                                 bool IsTopLevel) {
   // This forms a lexical scope.
@@ -1150,18 +1149,17 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       NullablePtr<Expr> ResultExpr;
       if (parseExpr(ResultExpr) || ResultExpr.isNull())
         break;
-        
-      // FIXME: Assignment is a hack until we get generics.  We really want to
-      // parse '=' as any other overloaded/generic binary operator.
+      
+      // Check for assignment.
       if (Tok.is(tok::equal)) {
         SMLoc EqualLoc = consumeToken();
         NullablePtr<Expr> RHSExpr;
         if (parseExpr(RHSExpr) || RHSExpr.isNull())
           break;
         
-        // FIXME: Assignment is represented with null Fn.
-        ResultExpr = new (S.Context) BinaryExpr(ResultExpr.get(), 0,
-                                                RHSExpr.get());
+        Entries.back() = new (S.Context) AssignStmt(ResultExpr.get(), EqualLoc,
+                                                    RHSExpr.get());
+        break;
       }
         
       Entries.back() = ResultExpr.get();

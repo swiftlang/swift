@@ -1368,7 +1368,7 @@
 
   <p>Statements blah blah blah ... </p>
 
-  <p>FIXME: Return stmt, assignment is a stmt
+  <p>FIXME: Return stmt</p>
   
   <pre class="example">
     <i>// A function with some statements.</i> 
@@ -1391,13 +1391,35 @@
   <p>The semicolon statement has no effect.</p>
   
   <!-- ===================================================================== -->
+  <h3 id="stmt-assign">Assignment Statement</h3>
+  <!-- ===================================================================== -->
+  
+  <div class="commentary">
+    Note that this is is part of the stmt-brace-item production, not part of the
+    stmt production.  This disallows raw assignments in 'else' cases and other
+    places that take a stmt.  This is particularly important given that primary
+    expression binding/decomposition is handled during type checking.
+  </div>
+
+  <pre class="grammar">
+    stmt-assign ::= expr '=' expr
+  </pre>
+  
+  <p>The assignment statement evaluates its left hand side as some sort of
+     lvalue, then evaluates the right hand side, the assigns one to the other -
+     somehow.
+  </p>
+  
+
+  <!-- ===================================================================== -->
   <h3 id="stmt-brace">Brace Statement</h3>
   <!-- ===================================================================== -->
   
   <pre class="grammar">
     stmt-brace      ::= '{' stmt-brace-item* '}'
     stmt-brace-item ::= <a href="#expr">expr</a>
-    stmt-brace-item ::= <a href="#expr">stmt</a>
+    stmt-brace-item ::= <a href="#stmt-assign">stmt-assign</a>
+    stmt-brace-item ::= <a href="#stmt">stmt</a>
     stmt-brace-item ::= <a href="#decl-var">decl-var</a>
     stmt-brace-item ::= <a href="#decl-func">decl-func</a>
     stmt-brace-item ::= <a href="#decl-typealias">decl-typealias</a>

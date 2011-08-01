@@ -245,19 +245,6 @@ static bool SemaSequenceExpr(Expr **Elements, unsigned NumElements,
 /// OpFn is null if this is an assignment (FIXME: we don't have generics yet).
 static bool SemaBinaryExpr(Expr *&LHS, Expr *&OpFn, Expr *&RHS, Type &ResultTy,
                            TypeChecker &TC) {
-  // If this is an assignment, then we coerce the RHS to the LHS.
-  if (OpFn == 0) {
-    RHS = TC.convertToType(RHS, LHS->Ty);
-    if (LHS == 0) {
-      TC.note(RHS->getLocStart(),
-              "while converting assigned value to destination type");
-      return true; 
-    }
-    
-    ResultTy = TupleType::getEmpty(TC.Context);
-    return false;
-  }
-
   // If this is an overloaded binary operator, try to resolve which candidate
   // is the right one.
   if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(OpFn)) {
@@ -460,6 +447,18 @@ namespace {
     }
 
     Stmt *visitSemiStmt(SemiStmt *S) {
+      return S;
+    }
+    
+    Stmt *visitAssignStmt(AssignStmt *S) {
+      // Coerce the source to the destination type.
+      S->Src = TC.convertToType(S->Src, S->Dest->Ty);
+      if (S->Src == 0) {
+        TC.note(S->EqualLoc,
+                "while converting assigned value to destination type");
+        return 0;
+      }
+      
       return S;
     }
 

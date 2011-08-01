@@ -93,6 +93,7 @@ public:
     Stmt(static_cast<CLASS##Stmt*>(S))
         
     DISPATCH(Semi);
+    DISPATCH(Assign);
     DISPATCH(Brace);
     DISPATCH(If);
 #undef DISPATCH

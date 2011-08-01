@@ -419,6 +419,19 @@ namespace {
       return SS;
     }
     
+    Stmt *visitAssignStmt(AssignStmt *AS) {
+      if (Expr *E = doIt(AS->Dest))
+        AS->Dest = E;
+      else
+        return 0;
+
+      if (Expr *E = doIt(AS->Src))
+        AS->Src = E;
+      else
+        return 0;
+      return AS;
+    }
+    
     Stmt *visitBraceStmt(BraceStmt *BS) {
       for (unsigned i = 0, e = BS->NumElements; i != e; ++i) {
         if (Expr *SubExpr = BS->Elements[i].dyn_cast<Expr*>()) {
