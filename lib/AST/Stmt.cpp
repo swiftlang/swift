@@ -35,6 +35,8 @@ void *Stmt::operator new(size_t Bytes, ASTContext &C,
 /// FIXME: Need to extend this to do full source ranges like Clang.
 SMLoc Stmt::getLocStart() const {
   switch (Kind) {
+  case StmtKind::Semi:
+    return cast<SemiStmt>(this)->Loc;
   case StmtKind::Brace:
     return cast<BraceStmt>(this)->LBLoc;
   case StmtKind::If:
