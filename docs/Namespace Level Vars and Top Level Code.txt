@@ -71,3 +71,54 @@ does top level code and multiple actors.  As such, the logical semantics are:
 5. If/when some other actor refers to a variable in a file with TLC, it is
    allocated and initialized lazily just like globals in "has no TLC" files.
 
+
+On "Not Having Headers"
+=======================
+
+One intentional design decision in swift is to not have header files, even for
+public API.  This is a design point like Java, but unlike C or Objective-C.
+Having header files for public API is nice for a couple of reasons:
+
+ 1. You *force* people to think about what they are making public, and the act
+    of having to put it into a header makes them think about its fragility and
+    duration over time.
+ 2. Headers are a very convenient place to get an overview of what an API
+    is and does.  In Java you get all the implementation details of a class
+    mixed in with its public API, which makes it very difficult to understand
+    "at a glance" what a class does.
+ 3. Headers are very useful documentation for Objective-C because we ship the
+    headers but not the implementation of system classes.  This allows "jump to
+    definition" to go to the declaration of an API in the header, which is
+    conveniently co-located with headerdoc. 
+    
+On the other hand, headers have a number of disadvantages including:
+
+ 1. It is plain code duplication, with all the negative effects of it.  It slows
+    down development, can get out of synch, makes changing API more difficult,
+    etc.
+ 2. If the prototype and implementation get out of synch, it is caught by the
+    compiler, but this isn't true for API comments.
+ 3. Swift natively won't "need" headers, so we'd have to specifically add this
+    capability, making the language more complicated.
+ 4. The implementation of a framework may not be in swift.  If you're talking to
+    a C or C++ framework, showing a C or C++ header when "jumping to definition"
+    is not particularly helpful.  We'd prefer to show you the synthesized API
+    that swift code should be using.
+ 5. In Swift, the implementation of some datatype can be split across different
+    files.  Forcing all their declarations to be next to each other lexically is
+    an arbitrary restriction.
+
+To address the disadvantages of not having headers, we think that we should:
+
+ 1. Standardize on a syntax for doc comments, and bake it into the language.
+    Mistakes using it should be diagnosed by the compiler.  It should be a
+    warning for public API to not have comments.
+ 2. There needs to be an API that dumps out the public interface for a compiled
+    module/domain in swift syntax, slicing on a declaration.   When used on a
+    type, for example, this would show the type definition and the declaration
+    of all of the methods on it.
+ 3. The API dumper should always dump in swift syntax, even when run on a Clang
+    C/C++/ObjC module.  It should make it very clear what the API maps to in
+    swift syntax, so it is obvious how to use it.
+ 4. Not having headers forces us to have really great tools support/integration.
+
