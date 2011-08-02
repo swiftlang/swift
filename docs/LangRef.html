@@ -1362,6 +1362,7 @@
   
   <pre class="grammar">
     stmt ::= <a href="#stmt-semicolon">stmt-semicolon</a>
+    stmt ::= <a href="#stmt-assign">stmt-assign</a>
     stmt ::= <a href="#stmt-brace">stmt-brace</a>
     stmt ::= <a href="#stmt-if">stmt-if</a>
   </pre>
@@ -1394,13 +1395,6 @@
   <h3 id="stmt-assign">Assignment Statement</h3>
   <!-- ===================================================================== -->
   
-  <div class="commentary">
-    Note that this is is part of the stmt-brace-item production, not part of the
-    stmt production.  This disallows raw assignments in 'else' cases and other
-    places that take a stmt.  This is particularly important given that primary
-    expression binding/decomposition is handled during type checking.
-  </div>
-
   <pre class="grammar">
     stmt-assign ::= <a href="#expr">expr</a> '=' <a href="#expr">expr</a>
   </pre>
@@ -1418,7 +1412,6 @@
   <pre class="grammar">
     stmt-brace      ::= '{' stmt-brace-item* '}'
     stmt-brace-item ::= <a href="#expr">expr</a>
-    stmt-brace-item ::= <a href="#stmt-assign">stmt-assign</a>
     stmt-brace-item ::= <a href="#stmt">stmt</a>
     stmt-brace-item ::= <a href="#decl-var">decl-var</a>
     stmt-brace-item ::= <a href="#decl-func">decl-func</a>
@@ -1438,7 +1431,8 @@
   
   <pre class="grammar">
     stmt-if      ::= 'if' <a href="#expr">expr</a> <a href="#stmt-brace">stmt-brace</a> expr-if-else?
-    expr-if-else ::= 'else' <a href="#stmt">stmt</a>
+    expr-if-else ::= 'else' <a href="#stmt-brace">stmt-brace</a>
+    expr-if-else ::= 'else' stmt-if
   </pre>
   
   <p>'if' statements provide a simple control transfer operations that evalutes

@@ -59,9 +59,8 @@ public:
                  unsigned NumSubExprs, SMLoc RPLoc,
                  bool IsPrecededByIdentifier);
 
-  NullablePtr<Stmt>
-  ActOnIfStmt(SMLoc IfLoc, Expr *Cond, Stmt *Normal, 
-              SMLoc ElseLoc, Stmt *Else);
+  Stmt *ActOnIfStmt(SMLoc IfLoc, Expr *Cond, Stmt *Normal, 
+                    SMLoc ElseLoc, Stmt *Else);
   
   LambdaExpr *ActOnLambdaExprStart(SMLoc FuncLoc, Type FuncTy);
   

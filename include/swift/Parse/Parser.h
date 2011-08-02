@@ -34,6 +34,7 @@ namespace swift {
   class Sema;
   class Expr;
   class Stmt;
+  class BraceStmt;
   class Type;
   class Decl;
   class DeclAttributes;
@@ -145,9 +146,8 @@ private:
   bool parseExprLambda(NullablePtr<Expr> &Result);
   
   // Statement Parsing
-  bool parseStmt(NullablePtr<Stmt> &Result);
-  bool parseStmtBrace(NullablePtr<Stmt> &Result);
-  bool parseStmtIf(NullablePtr<Stmt> &Result);
+  BraceStmt *parseStmtBrace();
+  Stmt *parseStmtIf();
 
 };
   

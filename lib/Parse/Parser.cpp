@@ -468,10 +468,11 @@ FuncDecl *Parser::parseDeclFunc() {
     
     // Check to see if we have a "{" which is a brace expr.
     if (Tok.is(tok::l_brace)) {
-      if (parseStmtBrace(Body) || Body.isNull())
+      BraceStmt *Body = parseStmtBrace();
+      if (Body == 0)
         return 0;
       
-      LE->Body = cast<BraceStmt>(Body.get());
+      LE->Body = Body;
     } else {
       // Note, we just discard FE here.  It is bump pointer allocated, so this
       // is fine (if suboptimal)
@@ -1055,7 +1056,7 @@ bool Parser::parseExprLambda(NullablePtr<Expr> &Result) {
   Type Ty;
   if (Tok.isNot(tok::l_brace)) {
     if (parseType(Ty))
-      return 0;
+      return true;
   } else {
     Ty = TupleType::getEmpty(S.Context);
   }
@@ -1068,29 +1069,24 @@ bool Parser::parseExprLambda(NullablePtr<Expr> &Result) {
   // The arguments to the lambda are defined in their own scope.
   Scope LambdaBodyScope(S.decl);
   LambdaExpr *LE = S.expr.ActOnLambdaExprStart(LambdaLoc, Ty);
-
   
   // Check to see if we have a "{" which is a brace expr.
   if (Tok.isNot(tok::l_brace)) {
     error(Tok.getLoc(), "expected '{' in lambda expression");
     return true;
   }
-
   
   // Then parse the expression.
-  NullablePtr<Stmt> Body;
+  LE->Body = parseStmtBrace();
+  if (LE->Body == 0) return true;
   
-  if (parseStmtBrace(Body) || Body.isNull())
-    return true;
-    
-  LE->Body = cast<BraceStmt>(Body.get());
-  return LE;
+  Result = LE;
+  return false;
 }
 
 
 ///   expr-brace-item:
 ///     expr
-///     expr '=' expr
 ///     stmt
 ///     decl-var
 ///     decl-func
@@ -1098,6 +1094,11 @@ bool Parser::parseExprLambda(NullablePtr<Expr> &Result) {
 ///     decl-oneof
 ///     decl-struct
 ///     decl-typealias
+///   stmt:
+///     ';'
+///     expr '=' expr
+///     stmt-brace
+///     stmt-if
 bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
                                 bool IsTopLevel) {
   // This forms a lexical scope.
@@ -1107,16 +1108,17 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     // Parse the decl, stmt, or expression.    
     switch (Tok.getKind()) {
     case tok::semi:
-    case tok::kw_if:
-    case tok::l_brace: {
-      Entries.push_back(ExprStmtOrDecl());
-
-      NullablePtr<Stmt> ResultStmt;
-      if (parseStmt(ResultStmt)) break;
-      
-      Entries.back() = ResultStmt.get();
+      Entries.push_back(new (S.Context) SemiStmt(Tok.getLoc()));
+      consumeToken(tok::semi);
       break;
-    }
+
+    case tok::l_brace:
+      Entries.push_back(parseStmtBrace());
+      break;
+
+    case tok::kw_if:
+      Entries.push_back(parseStmtIf());
+      break;
         
     case tok::kw_import:
       Entries.push_back(parseDeclImport());
@@ -1182,53 +1184,31 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
   return false;
 }
 
-///   stmt:
-///     ';'
-///     stmt-brace
-///     stmt-if
-bool Parser::parseStmt(NullablePtr<Stmt> &Result) {
-  switch (Tok.getKind()) {
-  case tok::semi:
-    Result = new (S.Context) SemiStmt(Tok.getLoc());
-    consumeToken(tok::semi);
-    return false;
-      
-  case tok::l_brace:
-    return parseStmtBrace(Result);
-  case tok::kw_if:
-    return parseStmtIf(Result);
-  default:
-    error(Tok.getLoc(), "expected statement");
-    return true;
-  }
-}
-
 /// parseStmtBrace - A brace enclosed expression/statement/decl list.  For
 /// example { 1; 4+5; } or { 1; 2 }.
 ///
 ///   stmt-brace:
 ///     '{' stmt-brace-item* '}'
 ///
-bool Parser::parseStmtBrace(NullablePtr<Stmt> &Result) {
+BraceStmt *Parser::parseStmtBrace() {
   SMLoc LBLoc = consumeToken(tok::l_brace);
   
   SmallVector<ExprStmtOrDecl, 16> Entries;
   
   if (parseBraceItemList(Entries, false /*NotTopLevel*/))
-    return true;
+    return 0;
   
   SMLoc RBLoc = Tok.getLoc();
   if (parseToken(tok::r_brace, "expected '}' at end of brace expression",
                  tok::r_brace)) {
     note(LBLoc, "to match this opening '{'");
-    return true;
+    return 0;
   }
   
   ExprStmtOrDecl *NewElements = 
     S.Context.AllocateCopy<ExprStmtOrDecl>(Entries.begin(), Entries.end());
   
-  Result = new (S.Context) BraceStmt(LBLoc, NewElements, Entries.size(), RBLoc);
-  return false;
+  return new (S.Context) BraceStmt(LBLoc, NewElements, Entries.size(), RBLoc);
 }
 
 
@@ -1236,35 +1216,42 @@ bool Parser::parseStmtBrace(NullablePtr<Stmt> &Result) {
 ///   stmt-if:
 ///     'if' expr stmt-brace stmt-if-else?
 ///   stmt-if-else:
-///    'else' stmt
-bool Parser::parseStmtIf(NullablePtr<Stmt> &Result) {
+///    'else' stmt-brace
+///    'else' stmt-if
+Stmt *Parser::parseStmtIf() {
   SMLoc IfLoc = consumeToken(tok::kw_if);
 
   NullablePtr<Expr> Condition;
   if (parseExpr(Condition, "expected expresssion in 'if' condition"))
-    return true;
+    return 0;
   
-  // FIXME: Why require braces? Any stmt could do.
   if (Tok.isNot(tok::l_brace)) {
     error(Tok.getLoc(), "expected '{' after 'if' condition");
-    return true;
+    return 0;
   }
   
-  NullablePtr<Stmt> NormalBody;
-  if (parseStmtBrace(NormalBody)) return true;
+  BraceStmt *NormalBody = parseStmtBrace();
+  if (NormalBody == 0) return 0;
   
   NullablePtr<Stmt> ElseBody;
   SMLoc ElseLoc = Tok.getLoc();
   if (consumeIf(tok::kw_else)) {
-    if (parseStmt(ElseBody)) return true;
+    if (Tok.is(tok::l_brace))
+      ElseBody = parseStmtBrace();
+    else if (Tok.is(tok::kw_if))
+      ElseBody = parseStmtIf();
+    else {
+      error(Tok.getLoc(), "expected '{' or 'if' after else");
+      ElseLoc = SMLoc();
+    }
   } else {
     ElseLoc = SMLoc();
   }
 
   // If our condition and normal expression parsed correctly, build an AST.
-  if (Condition.isNonNull() && NormalBody.isNonNull())
-    Result = S.expr.ActOnIfStmt(IfLoc, Condition.get(), NormalBody.get(),
-                                ElseLoc, ElseBody.getPtrOrNull());
-  return false;
+  if (Condition.isNonNull())
+    return S.expr.ActOnIfStmt(IfLoc, Condition.get(), NormalBody,
+                              ElseLoc, ElseBody.getPtrOrNull());
+  return 0;
 }
 
