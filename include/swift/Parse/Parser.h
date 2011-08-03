@@ -146,6 +146,7 @@ private:
   
   // Statement Parsing
   BraceStmt *parseStmtBrace();
+  Stmt *parseStmtReturn();
   Stmt *parseStmtIf();
 
 };

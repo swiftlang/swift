@@ -1110,6 +1110,7 @@ bool Parser::parseExprFunc(NullablePtr<Expr> &Result) {
 ///     ';'
 ///     expr '=' expr
 ///     stmt-brace
+///     stmt-return
 ///     stmt-if
 bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
                                 bool IsTopLevel) {
@@ -1123,15 +1124,15 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       Entries.push_back(new (S.Context) SemiStmt(Tok.getLoc()));
       consumeToken(tok::semi);
       break;
-
     case tok::l_brace:
       Entries.push_back(parseStmtBrace());
       break;
-
+    case tok::kw_return:
+      Entries.push_back(parseStmtReturn());
+      break;
     case tok::kw_if:
       Entries.push_back(parseStmtIf());
       break;
-        
     case tok::kw_import:
       Entries.push_back(parseDeclImport());
 
@@ -1227,6 +1228,31 @@ BraceStmt *Parser::parseStmtBrace() {
     S.Context.AllocateCopy<ExprStmtOrDecl>(Entries.begin(), Entries.end());
   
   return new (S.Context) BraceStmt(LBLoc, NewElements, Entries.size(), RBLoc);
+}
+
+/// parseStmtReturn
+///
+///   stmt-return:
+///     return expr?
+///   
+Stmt *Parser::parseStmtReturn() {
+  SMLoc ReturnLoc = consumeToken(tok::kw_return);
+
+  // Handle the ambiguity between consuming the expression and allowing the
+  // enclosing stmt-brace to get it by eagerly eating it.
+  Expr *Result;
+  if (isStartOfExpr(Tok, peekToken())) {
+    NullablePtr<Expr> ResultTmp;
+    if (parseExpr(ResultTmp, "expected expresssion in 'return' statement") ||
+        ResultTmp.isNull())
+      return 0;
+    Result = ResultTmp.get();
+  } else {
+    // Result value defaults to ().
+    Result = new (S.Context) TupleExpr(SMLoc(), 0, 0, 0, SMLoc(), false, false);
+  }
+  
+  return new (S.Context) ReturnStmt(ReturnLoc, Result);
 }
 
 

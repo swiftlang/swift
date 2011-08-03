@@ -466,6 +466,11 @@ namespace {
       assert(0 && "BraceStmts should be processed in the prepass");
       return 0;
     }
+    
+    Stmt *visitReturnStmt(ReturnStmt *RS) {
+      // FIXME: Convert the subexpr to the return type..
+      return RS;
+    }
 
     Stmt *visitIfStmt(IfStmt *IS) {
       // The if condition must have __builtin_int1 type.  This is after the

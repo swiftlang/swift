@@ -41,6 +41,8 @@ SMLoc Stmt::getLocStart() const {
     return cast<AssignStmt>(this)->Dest->getLocStart();
   case StmtKind::Brace:
     return cast<BraceStmt>(this)->LBLoc;
+  case StmtKind::Return:
+    return cast<ReturnStmt>(this)->ReturnLoc;
   case StmtKind::If:
     return cast<IfStmt>(this)->IfLoc;
   }
@@ -98,6 +100,12 @@ public:
       else
         printRec(S->Elements[i].get<Decl*>());
     }
+    OS << ')';
+  }
+  
+  void visitReturnStmt(ReturnStmt *S) {
+    OS.indent(Indent) << "(return_stmt\n";
+    printRec(S->Result);
     OS << ')';
   }
   

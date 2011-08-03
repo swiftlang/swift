@@ -33,6 +33,7 @@ enum class StmtKind {
   Semi,
   Assign,
   Brace,
+  Return,
   If
 };
 
@@ -119,6 +120,21 @@ public:
   static bool classof(const Stmt *S) { return S->Kind == StmtKind::Brace; }
 };
 
+/// ReturnStmt - A return statement.  Return statements with no specified
+/// subexpression are expanded into a return of the empty tuple in the parser.
+///    return 42
+class ReturnStmt : public Stmt {
+public:
+  SMLoc ReturnLoc;
+  Expr *Result;
+  
+  ReturnStmt(SMLoc ReturnLoc, Expr *Result)
+    : Stmt(StmtKind::Return), ReturnLoc(ReturnLoc), Result(Result) {}
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ReturnStmt *) { return true; }
+  static bool classof(const Stmt *S) { return S->Kind == StmtKind::Return; }
+};
 
 /// IfStmt - if/then/else statement.  If no 'else' is specified, then the
 /// ElseLoc location is not specified and the Else statement is null.  The

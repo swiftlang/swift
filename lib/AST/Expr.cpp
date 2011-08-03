@@ -462,6 +462,14 @@ namespace {
       return BS;
     }
 
+    Stmt *visitReturnStmt(ReturnStmt *RS) {
+      if (Expr *E = doIt(RS->Result))
+        RS->Result = E;
+      else
+        return 0;
+      return RS;
+    }
+    
     Stmt *visitIfStmt(IfStmt *IS) {
       if (Expr *E2 = doIt(IS->Cond))
         IS->Cond = E2;

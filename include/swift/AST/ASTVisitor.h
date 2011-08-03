@@ -95,6 +95,7 @@ public:
     DISPATCH(Semi);
     DISPATCH(Assign);
     DISPATCH(Brace);
+    DISPATCH(Return);
     DISPATCH(If);
 #undef DISPATCH
     }
