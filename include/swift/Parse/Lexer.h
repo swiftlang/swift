@@ -41,7 +41,7 @@ class Lexer {
 public:
   Lexer(unsigned BufferID, ASTContext &Context);
   
-  void Lex(Token &Result) {
+  void lex(Token &Result) {
     Result = NextToken;
     if (Result.isNot(tok::eof))
       lexImpl();

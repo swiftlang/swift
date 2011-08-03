@@ -61,7 +61,7 @@ void Parser::error(SMLoc Loc, const Twine &Message) {
 SMLoc Parser::consumeToken() {
   SMLoc Loc = Tok.getLoc();
   assert(Tok.isNot(tok::eof) && "Lexing past eof!");
-  L.Lex(Tok);
+  L.lex(Tok);
   return Loc;
 }
 
