@@ -193,7 +193,7 @@ static void AddFuncArgumentsToScope(Type Ty,
 }
 
 
-LambdaExpr *SemaExpr::ActOnLambdaExprStart(SMLoc FuncLoc, Type FuncTy) {
+FuncExpr *SemaExpr::ActOnFuncExprStart(SMLoc FuncLoc, Type FuncTy) {
   SmallVector<unsigned, 8> AccessPath;
   SmallVector<ArgDecl*, 8> ArgDecls;
   AddFuncArgumentsToScope(FuncTy, AccessPath, FuncTypePiece::Function,
@@ -201,8 +201,8 @@ LambdaExpr *SemaExpr::ActOnLambdaExprStart(SMLoc FuncLoc, Type FuncTy) {
   
   ArrayRef<ArgDecl*> Args = ArgDecls;
   
-  return new (S.Context) LambdaExpr(FuncLoc, FuncTy,
-                                    S.Context.AllocateCopy(Args));
+  return new (S.Context) FuncExpr(FuncLoc, FuncTy,
+                                  S.Context.AllocateCopy(Args));
 }
 
 

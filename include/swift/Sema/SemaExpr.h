@@ -29,7 +29,7 @@ namespace llvm {
 namespace swift {
   class Decl;
   class Expr;
-  class LambdaExpr;
+  class FuncExpr;
   class Sema;
   class Stmt;
   class Type;
@@ -62,7 +62,7 @@ public:
   Stmt *ActOnIfStmt(SMLoc IfLoc, Expr *Cond, Stmt *Normal, 
                     SMLoc ElseLoc, Stmt *Else);
   
-  LambdaExpr *ActOnLambdaExprStart(SMLoc FuncLoc, Type FuncTy);
+  FuncExpr *ActOnFuncExprStart(SMLoc FuncLoc, Type FuncTy);
   
 };
   

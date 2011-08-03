@@ -368,7 +368,7 @@
   <p>'var' declarations form the backbone of value declarations in Swift and
      are the core semantic model for these values.  The <a
      href="#decl-func">func declaration</a> is just syntactic sugar for a var
-     declaration with an <a href="#expr-lambda">lambda</a> body.</p>
+     declaration with an <a href="#expr-func">expr-func</a> body.</p>
   
   <p>Syntactically, var declarations come in three forms from the
      value-specifier production.  In the first form,
@@ -467,9 +467,9 @@
 
     <i>// Same as 'a'</i>
     func a1() -&gt; void {}
-    var a2 = lambda ()-&gt;() {}
-    var a3 = lambda () {}
-    var a4 = lambda {}
+    var a2 = func ()-&gt;() {}
+    var a3 = func () {}
+    var a4 = func {}
 
     <i>// Really simple function</i>
     func c(arg : int) -&gt; int { return arg+4 }
@@ -1010,7 +1010,7 @@
     expr-primary ::= <a href="#expr-identifier">expr-identifier</a>
     expr-primary ::= <a href="#expr-paren">expr-paren</a>
     expr-primary ::= <a href="#expr-delayed-identifier">expr-delayed-identifier</a>
-    expr-primary ::= <a href="#expr-lambda">expr-lambda</a>
+    expr-primary ::= <a href="#expr-func">expr-func</a>
     expr-primary ::= <a href="#expr-dot">expr-dot</a>
     expr-primary ::= <a href="#expr-subscript">expr-subscript</a>
   </pre>
@@ -1121,42 +1121,42 @@
   </pre>
 
   <!-- ===================================================================== -->
-  <h3 id="expr-lambda">Lambda Expressions</h3>
+  <h3 id="expr-func">Func Expressions</h3>
   <!-- ===================================================================== -->
 
   <div class="commentary">
-    Lambda expressions will probably not be widely used directly, but they are
+    Func expressions will probably not be widely used directly, but they are
     the core semantic model underlying 'func' declarations, and can be
     convenient for declaring first-class function values that want named
     arguments.
   </div>
   
   <pre class="grammar">
-    expr-lambda ::= 'lambda' <a href="#type">type</a>? <a href="#stmt-brace">stmt-brace</a>
+    expr-func ::= 'func' <a href="#type">type</a>? <a href="#stmt-brace">stmt-brace</a>
   </pre>
 
-  <p>A lambda expression is an anonymous (unnamed) function literal definition,
+  <p>A func expression is an anonymous (unnamed) function literal definition,
      which can define named arguments (and whose names are in scope for its
      body) and that can refer to values defined in parent scopes.</p>
   
-  <p>A lambda captures a reference to any values in parent scopes that are
-     used.</p>
+  <p>A func expression captures a reference to any values in parent scopes that
+     are used.</p>
   
-  <p>If a type is specified in the lambda expression, it specifies the signature
+  <p>If a type is specified in the func expression, it specifies the signature
      of the anonymous function.  The first element of the type must be a tuple
      type (thus it must start with '(').  If the entire type is not lexically a
      function type, it is made into one by declaring a function type that takes
      the specified type and returns ().  If no type is specified, the type of
-     the lambda is "<tt>()-&gt;()</tt>".</p>
+     the func is "<tt>()-&gt;()</tt>".</p>
 
-  <p>TODO: Allow attributes on lambdas when useful.</p>
+  <p>TODO: Allow attributes on funcs when useful.</p>
 
   <pre class="example">
-    <i>// A simple lambda.</i>
-    var a = lambda(val : int) { print(val+1) }
+    <i>// A simple func expression.</i>
+    var a = func(val : int) { print(val+1) }
     
-    <i>// A recursive lambda.</i>
-    var fib = lambda(n : int) {
+    <i>// A recursive func expression.</i>
+    var fib = func(n : int) {
       if (n &lt; 2) return n;
       return fib(n-1)+fib(n-2)
     }

@@ -47,7 +47,7 @@ enum class ExprKind {
   TupleShuffle,
   Apply,
   Sequence,
-  Lambda,
+  Func,
   Closure,
   AnonClosureArg,
   Binary
@@ -422,24 +422,24 @@ public:
   static bool classof(const Expr *E) { return E->Kind == ExprKind::Sequence; }
 };
 
-/// LambdaExpr - An explicit unnamed lambda definition, which can optionally
+/// FuncExpr - An explicit unnamed func definition, which can optionally
 /// have named arguments.
-///    e.g.  lambda(a : int) -> int { return a+1 }
-class LambdaExpr : public Expr {
+///    e.g.  func(a : int) -> int { return a+1 }
+class FuncExpr : public Expr {
 public:
   SMLoc FuncLoc;
   
   ArrayRef<ArgDecl*> NamedArgs;
   BraceStmt *Body;
   
-  LambdaExpr(SMLoc FuncLoc, Type FnType,
-             ArrayRef<ArgDecl*> NamedArgs, BraceStmt *Body = 0)
-    : Expr(ExprKind::Lambda, FnType), FuncLoc(FuncLoc), NamedArgs(NamedArgs),
+  FuncExpr(SMLoc FuncLoc, Type FnType,
+           ArrayRef<ArgDecl*> NamedArgs, BraceStmt *Body = 0)
+    : Expr(ExprKind::Func, FnType), FuncLoc(FuncLoc), NamedArgs(NamedArgs),
       Body(Body) {}
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const LambdaExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == ExprKind::Lambda; }
+  static bool classof(const FuncExpr *) { return true; }
+  static bool classof(const Expr *E) { return E->Kind == ExprKind::Func; }
 
 };
   

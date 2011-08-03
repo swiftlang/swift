@@ -462,11 +462,11 @@ FuncDecl *Parser::parseDeclFunc() {
   // Enter the arguments for the function into a new function-body scope.  We
   // need this even if there is no function body to detect argument name
   // duplication.
-  LambdaExpr *LE = 0;
+  FuncExpr *FE = 0;
   {
     Scope FnBodyScope(S.decl);
     
-    LE = S.expr.ActOnLambdaExprStart(FuncLoc, FuncTy);
+    FE = S.expr.ActOnFuncExprStart(FuncLoc, FuncTy);
     
     // Then parse the expression.
     NullablePtr<Stmt> Body;
@@ -477,16 +477,16 @@ FuncDecl *Parser::parseDeclFunc() {
       if (Body == 0)
         return 0;
       
-      LE->Body = Body;
+      FE->Body = Body;
     } else {
       // Note, we just discard FE here.  It is bump pointer allocated, so this
       // is fine (if suboptimal)
-      LE = 0;
+      FE = 0;
     }
   }
   
   // Create the decl for the func and add it to the parent scope.
-  FuncDecl *FD = new (S.Context) FuncDecl(FuncLoc, Name, FuncTy, LE,Attributes);
+  FuncDecl *FD = new (S.Context) FuncDecl(FuncLoc, Name, FuncTy, FE,Attributes);
   S.decl.AddToScope(FD);
   return FD;
 }
@@ -832,7 +832,7 @@ bool Parser::parseExpr(NullablePtr<Expr> &Result, const char *Message) {
 ///     expr-identifier
 ///     ':' identifier
 ///     expr-paren
-///     expr-lambda
+///     expr-func
 ///     expr-dot
 ///     expr-subscript
 ///
@@ -1060,7 +1060,7 @@ bool Parser::parseExprParen(NullablePtr<Expr> &Result) {
 
 /// parseExprFunc - Parse a func expression.
 ///
-///   expr-lambda: 
+///   expr-func: 
 ///     'func' type? stmt-brace
 ///
 /// The type must start with '(' if present.
@@ -1085,7 +1085,7 @@ bool Parser::parseExprFunc(NullablePtr<Expr> &Result) {
 
   // The arguments to the func are defined in their own scope.
   Scope FuncBodyScope(S.decl);
-  LambdaExpr *LE = S.expr.ActOnLambdaExprStart(FuncLoc, Ty);
+  FuncExpr *FE = S.expr.ActOnFuncExprStart(FuncLoc, Ty);
   
   // Check to see if we have a "{" which is a brace expr.
   if (Tok.isNot(tok::l_brace)) {
@@ -1094,10 +1094,10 @@ bool Parser::parseExprFunc(NullablePtr<Expr> &Result) {
   }
   
   // Then parse the expression.
-  LE->Body = parseStmtBrace();
-  if (LE->Body == 0) return true;
+  FE->Body = parseStmtBrace();
+  if (FE->Body == 0) return true;
   
-  Result = LE;
+  Result = FE;
   return false;
 }
 
