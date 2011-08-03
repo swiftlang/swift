@@ -407,9 +407,9 @@ bool Parser::parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
 /// caller handles this case and does recovery as appropriate.
 ///
 ///   decl-func:
-///     'func' attribute-list? identifier arg-list-type expr-brace?
+///     'func' attribute-list? identifier arg-list-type stmt-brace?
 ///     'func' attribute-list? type-identifier '::' identifier 
-///            arg-list-type expr-brace?
+///            arg-list-type stmt-brace?
 FuncDecl *Parser::parseDeclFunc() {
   SMLoc FuncLoc = consumeToken(tok::kw_func);
 
@@ -1102,7 +1102,7 @@ bool Parser::parseExprFunc(NullablePtr<Expr> &Result) {
 }
 
 
-///   expr-brace-item:
+///   stmt-brace-item:
 ///     decl
 ///     expr
 ///     stmt
