@@ -30,6 +30,9 @@ Lexer::Lexer(unsigned BufferID, ASTContext &context)
   : SourceMgr(context.SourceMgr), Context(context) {
   Buffer = SourceMgr.getMemoryBuffer(BufferID);
   CurPtr = Buffer->getBufferStart();
+    
+  // Prime the lexer.
+  lexImpl();
 }
 
 void Lexer::warning(const char *Loc, const Twine &Message) {
@@ -43,16 +46,16 @@ void Lexer::error(const char *Loc, const Twine &Message) {
 }
 
 
-void Lexer::FormToken(tok Kind, const char *TokStart, Token &Result){
-  Result.setToken(Kind, StringRef(TokStart, CurPtr-TokStart));
+void Lexer::formToken(tok Kind, const char *TokStart) {
+  NextToken.setToken(Kind, StringRef(TokStart, CurPtr-TokStart));
 }
 
 //===----------------------------------------------------------------------===//
 // Lexer Subroutines
 //===----------------------------------------------------------------------===//
 
-/// SkipSlashSlashComment - Skip to the end of the line of a // comment.
-void Lexer::SkipSlashSlashComment() {
+/// skipSlashSlashComment - Skip to the end of the line of a // comment.
+void Lexer::skipSlashSlashComment() {
   assert(CurPtr[0] == '/' && CurPtr[-1] == '/' && "Not a // comment");
   while (1) {
     switch (*CurPtr++) {
@@ -99,8 +102,8 @@ bool Lexer::isPrecededByIdentifier(SMLoc L) const {
 }
 
 
-/// LexIdentifier - Match [a-zA-Z_][a-zA-Z_$0-9]*
-void Lexer::LexIdentifier(Token &Result) {
+/// lexIdentifier - Match [a-zA-Z_][a-zA-Z_$0-9]*
+void Lexer::lexIdentifier() {
   const char *TokStart = CurPtr-1;
   assert((isalpha(*TokStart) || *TokStart == '_') && "Unexpected start");
   
@@ -131,11 +134,11 @@ void Lexer::LexIdentifier(Token &Result) {
     .Case("else", tok::kw_else)
     .Default(tok::identifier);
   
-  return FormToken(Kind, TokStart, Result);
+  return formToken(Kind, TokStart);
 }
 
-/// LexPunctuationIdentifier - Match identifiers formed out of punctuation.
-void Lexer::LexPunctuationIdentifier(Token &Result) {
+/// lexPunctuationIdentifier - Match identifiers formed out of punctuation.
+void Lexer::lexPunctuationIdentifier() {
   const char *TokStart = CurPtr-1;
 
   while (isPunctuationIdentifierChar(*CurPtr))
@@ -144,20 +147,20 @@ void Lexer::LexPunctuationIdentifier(Token &Result) {
   // Match various reserved words.
   if (CurPtr-TokStart == 1) {
     switch (TokStart[0]) {
-    case '=': return FormToken(tok::equal, TokStart, Result);
+    case '=': return formToken(tok::equal, TokStart);
     }
   } else if (CurPtr-TokStart == 2) {
     switch ((TokStart[0] << 8) | TokStart[1]) {
     case ('-' << 8) | '>': // ->
-      return FormToken(tok::arrow, TokStart, Result);
+      return formToken(tok::arrow, TokStart);
     }
   }
   
-  return FormToken(tok::identifier, TokStart, Result);
+  return formToken(tok::identifier, TokStart);
 }
 
-/// LexDollarIdent - Match $[0-9a-zA-Z_$]*
-void Lexer::LexDollarIdent(Token &Result) {
+/// lexDollarIdent - Match $[0-9a-zA-Z_$]*
+void Lexer::lexDollarIdent() {
   const char *TokStart = CurPtr-1;
   assert(*TokStart == '$');
   
@@ -165,12 +168,12 @@ void Lexer::LexDollarIdent(Token &Result) {
   while (isalnum(*CurPtr) || *CurPtr == '_' || *CurPtr == '$')
     ++CurPtr;
   
-  return FormToken(tok::dollarident, TokStart, Result);
+  return formToken(tok::dollarident, TokStart);
 }
 
 
-/// LexDigit - Match [0-9]+
-void Lexer::LexDigit(Token &Result) {
+/// lexDigit - Match [0-9]+
+void Lexer::lexDigit() {
   const char *TokStart = CurPtr-1;
   assert(isdigit(*TokStart) && "Unexpected start");
 
@@ -178,7 +181,7 @@ void Lexer::LexDigit(Token &Result) {
   while (isdigit(*CurPtr))
     ++CurPtr;
   
-  return FormToken(tok::numeric_constant, TokStart, Result);
+  return formToken(tok::numeric_constant, TokStart);
 }
 
 
@@ -186,7 +189,7 @@ void Lexer::LexDigit(Token &Result) {
 // Main Lexer Loop
 //===----------------------------------------------------------------------===//
 
-void Lexer::Lex(Token &Result) {
+void Lexer::lexImpl() {
   assert(CurPtr >= Buffer->getBufferStart() &&
          CurPtr <= Buffer->getBufferEnd() && "Cur Char Pointer out of range!");
 Restart:
@@ -196,7 +199,7 @@ Restart:
   switch (*CurPtr++) {
   default:
     error(CurPtr-1, "invalid character in source file");
-    return FormToken(tok::unknown, TokStart, Result);
+    return formToken(tok::unknown, TokStart);
 
   case ' ':
   case '\t':
@@ -212,33 +215,33 @@ Restart:
     }
       
     // Otherwise, this is the end of the buffer.  Return EOF.
-    return FormToken(tok::eof, TokStart, Result);
+    return formToken(tok::eof, TokStart);
 
-  case '(': return FormToken(tok::l_paren,  TokStart, Result);
-  case ')': return FormToken(tok::r_paren,  TokStart, Result);
-  case '{': return FormToken(tok::l_brace,  TokStart, Result);
-  case '}': return FormToken(tok::r_brace,  TokStart, Result);
-  case '[': return FormToken(tok::l_square, TokStart, Result);
-  case ']': return FormToken(tok::r_square, TokStart, Result);
+  case '(': return formToken(tok::l_paren,  TokStart);
+  case ')': return formToken(tok::r_paren,  TokStart);
+  case '{': return formToken(tok::l_brace,  TokStart);
+  case '}': return formToken(tok::r_brace,  TokStart);
+  case '[': return formToken(tok::l_square, TokStart);
+  case ']': return formToken(tok::r_square, TokStart);
 
-  case '.': return FormToken(tok::period,   TokStart, Result);
-  case ',': return FormToken(tok::comma,    TokStart, Result);
-  case ';': return FormToken(tok::semi,     TokStart, Result);
+  case '.': return formToken(tok::period,   TokStart);
+  case ',': return formToken(tok::comma,    TokStart);
+  case ';': return formToken(tok::semi,     TokStart);
       
   case ':':
     if (CurPtr[0] != ':')
-      return FormToken(tok::colon, TokStart, Result);
+      return formToken(tok::colon, TokStart);
     ++CurPtr;
-    return FormToken(tok::coloncolon, TokStart, Result);
+    return formToken(tok::coloncolon, TokStart);
       
   // Punctuator identifier characters.
   case '/':
     if (CurPtr[0] == '/') {  // "//"
-      SkipSlashSlashComment();
+      skipSlashSlashComment();
       goto Restart;
     }
     // '/' starts an identifier.
-    return LexPunctuationIdentifier(Result);
+    return lexPunctuationIdentifier();
 
   case '=':
   case '-':
@@ -251,7 +254,7 @@ Restart:
   case '&':
   case '|':
   case '^':
-    return LexPunctuationIdentifier(Result);
+    return lexPunctuationIdentifier();
 
   case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G':
   case 'H': case 'I': case 'J': case 'K': case 'L': case 'M': case 'N':
@@ -262,14 +265,14 @@ Restart:
   case 'o': case 'p': case 'q': case 'r': case 's': case 't': case 'u':
   case 'v': case 'w': case 'x': case 'y': case 'z':
   case '_':
-    return LexIdentifier(Result);
+    return lexIdentifier();
   
   case '$':
-    return LexDollarIdent(Result);
+    return lexDollarIdent();
       
   case '0': case '1': case '2': case '3': case '4':
   case '5': case '6': case '7': case '8': case '9':
-    return LexDigit(Result);
+    return lexDigit();
   }
 }
 

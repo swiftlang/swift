@@ -34,13 +34,23 @@ class Lexer {
   const char *CurPtr;
   ASTContext &Context;
 
+  Token NextToken;
+  
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
 public:
   Lexer(unsigned BufferID, ASTContext &Context);
   
-  void Lex(Token &Result);
+  void Lex(Token &Result) {
+    Result = NextToken;
+    if (Result.isNot(tok::eof))
+      lexImpl();
+  }
 
+  /// peekNextToken - Return the next token to be returned by Lex without
+  /// actually lexing it.
+  const Token &peekNextToken() const { return NextToken; }
+  
   /// Return true if the character right before the specified location is part
   /// of an identifier.
   bool isPrecededByIdentifier(SMLoc L) const;
@@ -48,13 +58,14 @@ public:
 private:
   void warning(const char *Loc, const Twine &Message);
   void error(const char *Loc, const Twine &Message);
-  void FormToken(tok Kind, const char *TokStart, Token &Result);
+  void lexImpl();
+  void formToken(tok Kind, const char *TokStart);
   
-  void SkipSlashSlashComment();
-  void LexIdentifier(Token &Result);
-  void LexDollarIdent(Token &Result);
-  void LexPunctuationIdentifier(Token &Result);
-  void LexDigit(Token &Result);
+  void skipSlashSlashComment();
+  void lexIdentifier();
+  void lexDollarIdent();
+  void lexPunctuationIdentifier();
+  void lexDigit();
 };
   
   
