@@ -1054,12 +1054,13 @@ bool Parser::parseExprLambda(NullablePtr<Expr> &Result) {
   SMLoc LambdaLoc = consumeToken(tok::kw_lambda);
 
   Type Ty;
-  if (Tok.isNot(tok::l_brace)) {
-    if (parseType(Ty))
-      return true;
-  } else {
+  if (Tok.is(tok::l_brace))
     Ty = TupleType::getEmpty(S.Context);
-  }
+  else if (!Tok.is(tok::l_paren)) {
+    error(Tok.getLoc(), "expected '(' in lambda argument list");
+    return true;
+  } else if (parseType(Ty))
+    return true;
   
   // If the parsed type is not spelled as a function type (i.e., has no '->' in
   // it), then it is implicitly a function that returns ().

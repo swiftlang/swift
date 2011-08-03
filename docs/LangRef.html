@@ -1143,10 +1143,11 @@
      used.</p>
   
   <p>If a type is specified in the lambda expression, it specifies the signature
-     of the anonymous function.  If the type is not lexically a function type,
-     it is made into one by declaring a function type that takes the specified
-     type and returns ().  If no type is specified, the type of the lambda is
-     "()-&gt;()".</p>
+     of the anonymous function.  The first element of the type must be a tuple
+     type (thus it must start with '(').  If the entire type is not lexically a
+     function type, it is made into one by declaring a function type that takes
+     the specified type and returns ().  If no type is specified, the type of
+     the lambda is "<tt>()-&gt;()</tt>".</p>
 
   <p>TODO: Allow attributes on lambdas when useful.</p>
 
