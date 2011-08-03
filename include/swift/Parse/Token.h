@@ -53,6 +53,7 @@ enum class tok {
   // Statements
   KEYWORD(if)
   KEYWORD(else)
+  KEYWORD(return)
 #undef KEYWORD
   
 #define PUNCTUATOR(X, Y) X,

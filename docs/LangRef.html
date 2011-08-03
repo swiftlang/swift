@@ -1360,6 +1360,7 @@
     stmt ::= <a href="#stmt-semicolon">stmt-semicolon</a>
     stmt ::= <a href="#stmt-assign">stmt-assign</a>
     stmt ::= <a href="#stmt-brace">stmt-brace</a>
+    stmt ::= <a href="#stmt-return">stmt-return</a>
     stmt ::= <a href="#stmt-if">stmt-if</a>
   </pre>
 
@@ -1419,7 +1420,27 @@
      grammatically identical to a brace statement without the braces.
   </p>
 
-
+  <!-- ===================================================================== -->
+  <h3 id="stmt-return">'return' Statement</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    stmt-return ::= 'return' <a href="#expr">expr</a>
+    stmt-return ::= 'return'
+  </pre>
+  
+  <p>The return statement sets the return value of the current <a 
+     href="#decl-func">func declaration</a> or <a href="#expr-func">func
+     expression</a> and transfers control out of the function.  It sets the
+     return value by converting the specified expression result (or '()' if
+     none is specified) to the return type of the 'func'.
+  </p>
+  
+  <p>The stmt-return grammar is ambiguous: "{ return 4 }" could be parsed as
+     {"return" "4"} or as a single statement.  Ambiguity here is resolved toward
+     the first production, because control flow can't transfer to an
+     subexpression.</p>
+  
   <!-- ===================================================================== -->
   <h3 id="stmt-if">'if' Statement</h3>
   <!-- ===================================================================== -->

@@ -129,6 +129,7 @@ void Lexer::lexIdentifier() {
     // Statements
     .Case("if", tok::kw_if)
     .Case("else", tok::kw_else)
+    .Case("return", tok::kw_return)
     .Default(tok::identifier);
   
   return formToken(Kind, TokStart);
