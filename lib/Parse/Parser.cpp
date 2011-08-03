@@ -167,7 +167,7 @@ bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init) {
 
 /// ParseTranslationUnit
 ///   translation-unit:
-///     top-level-item*
+///     stmt-brace-item*
 TranslationUnitDecl *Parser::parseTranslationUnit() {
   // Prime the lexer.
   consumeToken();
@@ -1103,14 +1103,9 @@ bool Parser::parseExprFunc(NullablePtr<Expr> &Result) {
 
 
 ///   expr-brace-item:
+///     decl
 ///     expr
 ///     stmt
-///     decl-var
-///     decl-func
-///     decl-meth
-///     decl-oneof
-///     decl-struct
-///     decl-typealias
 ///   stmt:
 ///     ';'
 ///     expr '=' expr

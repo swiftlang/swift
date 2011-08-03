@@ -294,24 +294,17 @@
   <!-- ********************************************************************* -->
   
   <pre class="grammar">
-    translation-unit ::= top-level-item*
-    top-level-item ::= <a href="#decl-import">decl-import</a>
-    top-level-item ::= <a href="#stmt-brace">stmt-brace-item</a>
+    decl ::= <a href="#decl-import">decl-import</a>
+    decl ::= <a href="#decl-var">decl-var</a>
+    decl ::= <a href="#decl-func">decl-func</a>
+    decl ::= <a href="#decl-typealias">decl-typealias</a>
+    decl ::= <a href="#decl-oneof">decl-oneof</a>
+    decl ::= <a href="#decl-struct">decl-struct</a>
   </pre>
   
-  <p>A source file in Swift is parsed as a list of top level declarations.
-  Extraneous semi colons are allowed at top level, as are a number of other
-  declarations.</p>
-  
-  <p>TODO: Need to define the module system more.</p>
-  
-  <p>Expressions at the top level of a file are executed at program startup time
-  in bottom-up order in the module dependence graph.  This
-  becomes a static constructor for a library and is the "main" for an
-  executable.  This allows 'print "hello world"' to work as a complete app.</p>
   
   <!-- ===================================================================== -->
-  <h3 id="decl-import">import</h3>
+  <h3 id="decl-import">import Declarations</h3>
   <!-- ===================================================================== -->
   
   <pre class="grammar">
@@ -321,7 +314,8 @@
   <p>'import' declarations allow named values and types to be accessed with
   local names, even when they are defined in other modules and namespaces.  See
   the section on <a href="#namebind">name binding</a> for more
-  information on how these work.</p>
+  information on how these work.  import declarations are only allowed at
+  translation unit scope.</p>
   
   <p>'import' directives only impact a single translation unit: imports in one
   swift file do not affect name lookup in another file. import directives can
@@ -345,11 +339,12 @@
   </pre>
 
   <!-- ===================================================================== -->
-  <h3 id="decl-var">var</h3>
+  <h3 id="decl-var">var Declarations</h3>
   <!-- ===================================================================== -->
   
   <div class="commentary">
-    Eventually need to add support for "var x,y : int".
+    Eventually add support for "var x,y : int", to allow declarating multiple
+    values of the same type?
   </div>
   
   <pre id="value-specifier" class="grammar">
@@ -419,7 +414,7 @@
 
     
   <!-- ===================================================================== -->
-  <h3 id="decl-func">func</h3>
+  <h3 id="decl-func">func Declarations</h3>
   <!-- ===================================================================== -->
 
   <pre class="grammar">
@@ -494,7 +489,7 @@
   </pre>
   
   <!-- ===================================================================== -->
-  <h3 id="decl-typealias">typealias</h3>
+  <h3 id="decl-typealias">typealias Declarations</h3>
   <!-- ===================================================================== -->
   
   <pre class="grammar">
@@ -520,7 +515,7 @@
   href="#type-oneof">oneof type</a> and a 'typealias'.</p>
   
   <!-- ===================================================================== -->
-  <h3 id="decl-oneof">oneof</h3>
+  <h3 id="decl-oneof">oneof Declarations</h3>
   <!-- ===================================================================== -->
   
   <div class="commentary">
@@ -600,7 +595,7 @@
   </pre>
   
   <!-- ===================================================================== -->
-  <h3 id="decl-struct">struct</h3>
+  <h3 id="decl-struct">struct Declarations</h3>
   <!-- ===================================================================== -->
 
   <pre class="grammar">
@@ -1412,17 +1407,16 @@
   
   <pre class="grammar">
     stmt-brace      ::= '{' stmt-brace-item* '}'
+    stmt-brace-item ::= <a href="#decl">decl</a>
     stmt-brace-item ::= <a href="#expr">expr</a>
     stmt-brace-item ::= <a href="#stmt">stmt</a>
-    stmt-brace-item ::= <a href="#decl-var">decl-var</a>
-    stmt-brace-item ::= <a href="#decl-func">decl-func</a>
-    stmt-brace-item ::= <a href="#decl-typealias">decl-typealias</a>
-    stmt-brace-item ::= <a href="#decl-oneof">decl-oneof</a>
-    stmt-brace-item ::= <a href="#decl-struct">decl-struct</a>
+    
+    translation-unit ::= <a href="#stmt-brace">stmt-brace-item</a>*
   </pre>
   
   <p>The brace statement provides a sequencing operation which evaluates the
-     members of its body in order.
+     members of its body in order.  The top level of a swift source file is
+     grammatically identical to a brace statement without the braces.
   </p>
 
 
