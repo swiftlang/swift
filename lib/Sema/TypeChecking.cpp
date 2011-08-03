@@ -845,8 +845,22 @@ void SemaExpressionTree::PreProcessBraceStmt(BraceStmt *BS) {
   // terminate the walk we're in for them (so we can handle decls custom).
   for (unsigned i = 0, e = BS->NumElements; i != e; ++i) {
     if (Expr *SubExpr = BS->Elements[i].dyn_cast<Expr*>()) {
-      if ((SubExpr = doIt(SubExpr)))
-        NewElements.push_back(SubExpr);
+      if ((SubExpr = doIt(SubExpr)) == 0)
+        continue;
+      
+      // If the SubStmt is a SequenceExpr, see if we can inline it into our
+      // brace statement.  We can do this when the types of all of the elements
+      // are resolved.  When this happens, the sequence expr itself gets a
+      // resolved type.
+      if (SequenceExpr *SE = dyn_cast<SequenceExpr>(SubExpr))
+        if (!SE->Ty->is<DependentType>()) {
+          for (unsigned i = 0, e = SE->NumElements; i != e; ++i)
+            NewElements.push_back(SE->Elements[i]);
+          continue;
+        }
+      
+      // Otherwise it is a normal expression or an as-yet-unresolved sequence.
+      NewElements.push_back(SubExpr);
       continue;
     }
     
