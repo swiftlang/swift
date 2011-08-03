@@ -50,9 +50,6 @@ enum class tok {
   KEYWORD(var)
   KEYWORD(typealias)
   
-  // Expressions.
-  KEYWORD(lambda)
-  
   // Statements
   KEYWORD(if)
   KEYWORD(else)

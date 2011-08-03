@@ -126,9 +126,6 @@ void Lexer::lexIdentifier() {
     .Case("func", tok::kw_func)
     .Case("typealias", tok::kw_typealias)
   
-    // Expressions
-    .Case("lambda", tok::kw_lambda)
-  
     // Statements
     .Case("if", tok::kw_if)
     .Case("else", tok::kw_else)

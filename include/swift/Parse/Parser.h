@@ -21,12 +21,8 @@
 
 namespace llvm {
   class SourceMgr;
-  template <typename PT1, typename PT2>
-  class PointerUnion;
-  template <typename PT1, typename PT2, typename PT3>
-  class PointerUnion3;
-  template<class T>
-  class NullablePtr;
+  template <typename PT1, typename PT2, typename PT3> class PointerUnion3;
+  template<class T> class NullablePtr;
 }
 
 namespace swift {
@@ -76,6 +72,9 @@ public:
   
   typedef llvm::PointerUnion3<Expr*, Stmt*, Decl*> ExprStmtOrDecl;
 private:
+  /// peekToken - Return the next token that will be installed by consumeToken.
+  const Token &peekToken();
+  
   // Utilities.
   SMLoc consumeToken();
   SMLoc consumeToken(tok K) {
@@ -143,7 +142,7 @@ private:
   bool parseExprIdentifier(NullablePtr<Expr> &Result);
   bool parseExprDollarIdentifier(NullablePtr<Expr> &Result);
   bool parseExprParen(NullablePtr<Expr> &Result);
-  bool parseExprLambda(NullablePtr<Expr> &Result);
+  bool parseExprFunc(NullablePtr<Expr> &Result);
   
   // Statement Parsing
   BraceStmt *parseStmtBrace();

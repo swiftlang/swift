@@ -58,6 +58,11 @@ void Parser::error(SMLoc Loc, const Twine &Message) {
   SourceMgr.PrintMessage(Loc, Message, "error");
 }
 
+/// peekToken - Return the next token that will be installed by consumeToken.
+const Token &Parser::peekToken() {
+  return L.peekNextToken();
+}
+
 SMLoc Parser::consumeToken() {
   SMLoc Loc = Tok.getLoc();
   assert(Tok.isNot(tok::eof) && "Lexing past eof!");
@@ -776,10 +781,17 @@ bool Parser::parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
 // Expression Parsing
 //===----------------------------------------------------------------------===//
 
-static bool isStartOfExpr(Token &Tok) {
-  return Tok.is(tok::numeric_constant) || Tok.is(tok::colon) ||
-         Tok.is(tok::l_paren) || Tok.is(tok::dollarident) ||
-         Tok.is(tok::identifier) || Tok.is(tok::kw_lambda);
+static bool isStartOfExpr(const Token &Tok, const Token &Next) {
+  if (Tok.is(tok::numeric_constant) || Tok.is(tok::colon) ||
+      Tok.is(tok::l_paren) || Tok.is(tok::dollarident) ||
+      Tok.is(tok::identifier))
+    return true;
+  
+  // "func(" and "func{" are func expressions.  "func x" is a func declaration.
+  if (Tok.is(tok::kw_func) &&
+      (Next.is(tok::l_paren) || Next.is(tok::l_brace)))
+    return true;
+  return false;
 }
 
 /// parseExpr
@@ -792,7 +804,7 @@ bool Parser::parseExpr(NullablePtr<Expr> &Result, const char *Message) {
   do {
     // Parse the expr-primary
     if (parseExprPrimary(SequencedExprs)) return true;
-  } while (isStartOfExpr(Tok));
+  } while (isStartOfExpr(Tok, peekToken()));
   
   // If there is exactly one element in the sequence, it is a degenerate
   // sequence that just returns the last value anyway, shortcut ActOnSequence.
@@ -864,8 +876,8 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &Result) {
     if (parseExprParen(R)) return true;
     break;
 
-  case tok::kw_lambda:
-    if (parseExprLambda(R)) return true;
+  case tok::kw_func:
+    if (parseExprFunc(R)) return true;
     break;
       
   default:
@@ -1046,34 +1058,38 @@ bool Parser::parseExprParen(NullablePtr<Expr> &Result) {
   return false;
 }
 
-/// parseExprLambda - Parse a lambda expression.
+/// parseExprFunc - Parse a func expression.
 ///
 ///   expr-lambda: 
-///     'lambda' type? stmt-brace
-bool Parser::parseExprLambda(NullablePtr<Expr> &Result) {
-  SMLoc LambdaLoc = consumeToken(tok::kw_lambda);
+///     'func' type? stmt-brace
+///
+/// The type must start with '(' if present.
+///
+bool Parser::parseExprFunc(NullablePtr<Expr> &Result) {
+  SMLoc FuncLoc = consumeToken(tok::kw_func);
 
   Type Ty;
-  if (Tok.is(tok::l_brace))
+  if (Tok.is(tok::l_brace)) {
     Ty = TupleType::getEmpty(S.Context);
-  else if (!Tok.is(tok::l_paren)) {
-    error(Tok.getLoc(), "expected '(' in lambda argument list");
+  } else if (!Tok.is(tok::l_paren)) {
+    error(Tok.getLoc(), "expected '(' in func expression argument list");
     return true;
-  } else if (parseType(Ty))
+  } else if (parseType(Ty)) {
     return true;
+  }
   
   // If the parsed type is not spelled as a function type (i.e., has no '->' in
   // it), then it is implicitly a function that returns ().
   if (!isa<FunctionType>(Ty.getPointer()))
     Ty = S.type.ActOnFunctionType(Ty, SMLoc(), TupleType::getEmpty(S.Context));
 
-  // The arguments to the lambda are defined in their own scope.
-  Scope LambdaBodyScope(S.decl);
-  LambdaExpr *LE = S.expr.ActOnLambdaExprStart(LambdaLoc, Ty);
+  // The arguments to the func are defined in their own scope.
+  Scope FuncBodyScope(S.decl);
+  LambdaExpr *LE = S.expr.ActOnLambdaExprStart(FuncLoc, Ty);
   
   // Check to see if we have a "{" which is a brace expr.
   if (Tok.isNot(tok::l_brace)) {
-    error(Tok.getLoc(), "expected '{' in lambda expression");
+    error(Tok.getLoc(), "expected '{' in func expression");
     return true;
   }
   
@@ -1134,9 +1150,6 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     case tok::kw_var:
       parseDeclVar(Entries);
       break;
-    case tok::kw_func:
-      Entries.push_back(parseDeclFunc());
-      break;
     case tok::kw_typealias:
       Entries.push_back(parseDeclTypeAlias());
       break;
@@ -1146,6 +1159,15 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     case tok::kw_struct:
       parseDeclStruct(Entries);
       break;
+    case tok::kw_func:
+      // "func identifier" and "func [attribute]" is a func declaration,
+      // otherwise we have a func expression.
+      if (peekToken().is(tok::identifier) ||
+          peekToken().is(tok::l_square)) {
+        Entries.push_back(parseDeclFunc());
+        break;
+      }
+      // FALL THROUGH into expression case.
     default:
       Entries.push_back(ExprStmtOrDecl());
         
