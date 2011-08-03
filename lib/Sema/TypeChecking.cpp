@@ -1657,17 +1657,27 @@ void TypeChecker::validateAttributes(DeclAttributes &Attrs, Type Ty) {
 /// expression tree checking to make sure they don't contain any DependentTypes.
 static Expr *DiagnoseUnresolvedTypes(Expr *E, Expr::WalkOrder Order,
                                      void *Data) {
+  TypeChecker &TC = *(TypeChecker*)Data;
+  
   // Ignore the preorder walk.  We'd rather diagnose use of unresolved types
   // during the postorder walk so that the inner most expressions are diagnosed
   // before the outermost ones.
   if (Order == Expr::WalkOrder::PreOrder)
     return E;
   
+  // If we have an unresolved SequenceExpr, then it was a sequence used in a
+  // context that didn't allow it (e.g. "(4 5)+7") which is just redundant.
+  if (isa<SequenceExpr>(E)) {
+    // FIXME: This really wants source ranges.
+    TC.error(E->getLocStart(),
+           "sequence of multiple expressions used where only one was expected");
+    return 0;
+  }  
+  
   // Use is to strip off sugar.
   if (!E->Ty->is<DependentType>())
     return E;
   
-  TypeChecker &TC = *(TypeChecker*)Data;
   TC.error(E->getLocStart(),
            "ambiguous expression was not resolved to a concrete type");
   return 0;
