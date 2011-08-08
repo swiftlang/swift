@@ -102,7 +102,7 @@ In its most basic form, a protocol is a collection of function signatures:\
 	  func title() -> string\
 	\}\
 \
-Document describes types that have a title() method that accepts no arguments and returns a string. Note that there is implicitly a 'self' or 'this' type, which is the type that conforms to the protocol itself. This follows how most object-oriented languages describe interfaces, but deviates from Haskell type classes and C++ concepts, which require explicit type parameters for all of the types. We'll revisit this decision later.\
+Document describes types that have a title() operation that accepts no arguments and returns a string. Note that there is implicitly a 'self' or 'this' type, which is the type that conforms to the protocol itself. This follows how most object-oriented languages describe interfaces, but deviates from Haskell type classes and C++ concepts, which require explicit type parameters for all of the types. We'll revisit this decision later.\
 \
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
 
@@ -165,11 +165,11 @@ Self types are not without their costs, particularly in the case where Self is u
 \b Associated Types
 \b0 \
 \
-In addition to Self, a protocol's methods often need to refer to types that are related to the type of 'Self', such as a type of data stored in a collection, or the node and edge types of a graph. For example, this would allow us to cleanly describe a protocol for collections:\
+In addition to Self, a protocol's operations often need to refer to types that are related to the type of 'Self', such as a type of data stored in a collection, or the node and edge types of a graph. For example, this would allow us to cleanly describe a protocol for collections:\
 \
 	protocol Collection \{\
 	  typealias Value\
-              func forEach(callback : (Value) -> void)\
+              func forEach(callback : (value : Value) -> void)\
               func add(value : Value)\
 	\}\
 \
@@ -196,7 +196,7 @@ Naturally, such polymorphism is dynamic, and will require boxing of value types 
 	print(doc.title()) // okay: title() is part of the Document protocol, so we can call it\
 	doc.serialize(stout); // okay: serialize() is part of the Serializable protocol\
 \
-Any type should be able to be protocol-qualified, so for example one could have String<Document> to refer to an entity of type 'string' that conforms to the Document protocol. The sub typing relationship here is fairly obvious: T<P1, P2, \'85 PN> is a subtype of U<Q1, Q2, \'85, QN> if T is a subtype of U and if the set of protocols that T and P1, P2, \'85., PN conform to is a superset of the set of protocols that U and Q1, Q2, \'85, QN conform to (remembering that conforming to a protocol implies conformance to all of the protocols it inherits, transitively). \
+Any given Swift type should be able to be protocol-qualified, so for example one could have String<Document> to refer to an entity of type 'string' that conforms to the Document protocol. The sub typing relationship here is fairly obvious: T<P1, P2, \'85 PN> is a subtype of U<Q1, Q2, \'85, QN> if T is a subtype of U and if the set of protocols that T and P1, P2, \'85., PN conform to is a superset of the set of protocols that U and Q1, Q2, \'85, QN conform to (remembering that conforming to a protocol implies conformance to all of the protocols it inherits, transitively). \
 \
 We can now see how Self types interact with subtype polymorphism. For example, say we have two values of type Any<Comparable>, and we try to compare them:\
 \
@@ -205,7 +205,7 @@ We can now see how Self types interact with subtype polymorphism. For example, s
 	if x == y \{ // well-typed?\
 	\}\
 \
-Whether x == y is well-typed is not statically determinable, since the dynamic type of x may different from the dynamic type of y, even if they are both comparable (e.g., one is an int and the other a string). Our options here are either to call this ill-typed and require the user to do something (e.g., introduce a dynamically-checked cast) or to perform the type checking dynamically. \
+Whether x == y is well-typed is not statically determinable, since the dynamic type of x may different from the dynamic type of y, even if they are both comparable (e.g., one is an int and the other a string). If possible, I'd like to resolve this by performing dynamic type checking at the call site. The important observation here is that, statically, there are two overloads of this function (x's Comparable == and y's Comparable ==); if those happen to be the same function (e.g., the types of x and y, along with the protocol implementations of Comparable for both x and y), then the dynamic check succeeds. There be dragons here.\
 \
 
 \b\fs40 Bounded Parametric Polymorphism
@@ -219,7 +219,7 @@ Protocols provide a natural way to express the constraints of a generic function
 \
   struct ListNode[T<Copyable>] \{\
     var Value : T\
-    typealias NextNode = one of \{ ListNode(T), End \}\
+    oneof NextNode \{ ListNode(T), End \}\
     var Next : NextNode\
   \}\
 \
@@ -366,7 +366,7 @@ Random collisions between types are fairly rare. However, when one is using prot
 \
 	struct List[T<Copyable>] <Collection> \{ // List[T] is a collection. <> overload?\
 	  typealias Value = T\
-              func forEach(callback : (Value) -> void) \{ /* Implement this */ \}\
+              func forEach(callback : (value : Value) -> void) \{ /* Implement this */ \}\
               func add(value : Value) \{ /* Implement this */ \}\
 	\}\
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
@@ -374,7 +374,7 @@ Random collisions between types are fairly rare. However, when one is using prot
 \b \cf0 \
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
 
-\b0 \cf0 This explicit protocol conformance declaration forces the compiler to check that List[T] actually does meet the requirements of the Collection type. If we were missing a method (say, forEach) or had the wrong method signature, the definition of 'List' would be ill-formed. 
+\b0 \cf0 This explicit protocol conformance declaration forces the compiler to check that List[T] actually does meet the requirements of the Collection type. If we were missing an operation (say, forEach) or had the wrong signature, the definition of 'List' would be ill-formed. 
 \b \
 \
 Retroactive Modeling\
@@ -388,7 +388,7 @@ In Swift, one could provide support for retroactive modeling by allowing class e
 \
 	extension string<Collection> \{\
 	  typealias Value = char\
-              func forEach(callback : (Value) -> void) \{ /* use existing string routines to enumerate characters */ \}\
+              func forEach(callback : (value : Value) -> void) \{ /* use existing string routines to enumerate characters */ \}\
               func add(value : Value) \{ self += value /* append character */ \}\
 	\}\
 \
