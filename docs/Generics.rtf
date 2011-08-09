@@ -1,4 +1,4 @@
-{\rtf1\ansi\ansicpg1252\cocoartf1138\cocoasubrtf120
+{\rtf1\ansi\ansicpg1252\cocoartf1138
 {\fonttbl\f0\fswiss\fcharset0 Helvetica;}
 {\colortbl;\red255\green255\blue255;}
 {\*\listtable{\list\listtemplateid1\listhybrid{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{disc\}}{\leveltext\leveltemplateid1\'01\uc0\u8226 ;}{\levelnumbers;}\fi-360\li720\lin720 }{\listname ;}\listid1}
@@ -106,18 +106,18 @@ Document describes types that have a title() operation that accepts no arguments
 \
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
 
-\b \cf0 Protocol Inheritance
+\b \cf0 Protocol Refinement
 \b0 \
 \
 Composition of protocols is important to help programmers organize and understand a large number of protocols and the data types that conform to those protocols. For example, we could extend our Document protocol to cover documents that support versioning:\
 \
-	protocol VersionedDocument<Document> \{\
+	protocol VersionedDocument : Document \{\
 	  func version() -> int\
 	\}\
 \
-Multiple inheritance is permitted, allowing us to form a directed acyclic graph of protocols:\
+Multiple refinement is permitted, allowing us to form a directed acyclic graph of protocols:\
 \
-	protocol PersistentDocument<VersionedDocument, Serializable> \{\
+	protocol PersistentDocument : VersionedDocument, Serializable \{\
 	  func saveToFile(filename : path)\
 	\}\
 \
@@ -175,6 +175,10 @@ In addition to Self, a protocol's operations often need to refer to types that a
 \
 It is important here that a generic function that refers to a given type T, which is known to be a collection, can access the associated types corresponding to T. For example, one could implement an "accumulate" operation for an arbitrary Collection, but doing so requires us to specify some constraints on the Value type of the collection. We'll return to this later.\
 \
+
+\b Note
+\b0 : we think we want to replace "typealias" here with something else, such as "typename".\
+\
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
 
 \b\fs40 \cf0 Subtype Polymorphism\
@@ -184,31 +188,69 @@ Subtype polymorphism is based on the notion of substitutability. If a type S is 
 \i dynamic
 \i0 , in the sense that the substitution occurs at run-time, even if it is statically type-checked. \
 \
-Subtype polymorphism works best when there is a "top" type, such that every type in the language is a subtype of "top". Java has java.lang.Object, C# has object, Objective-C has "id" (although "id" is weird, because it is also convertible to everything; it's best not to use it as a model). Swift should have such a type, which I recommend calling "Any"\
+In Swift, we consider protocols to be types. A value of protocol type means, essentially, a value of any (dynamically-determined) type T that conforms to the given protocol. Thus, a variable can be declared with type "Serializable", e.g.,\
+\
+	var x : Serializable = // value of any Serializable type\
+	x.serialize(); // okay: serialize() is part of the Serializable protocol\
+\
+This gives rise to a natural "top" type, such that every type in the language is a subtype of "top". Java has java.lang.Object, C# has object, Objective-C has "id" (although "id" is weird, because it is also convertible to everything; it's best not to use it as a model). In Swift, the "top" type is simply a protocol with no requirements:\
+\
+	protocol Any \{\}\
 \
 	var value : Any = 17 // an any can hold an integer\
 	value = "hello" // or a string\
 	value = (42, "hello", Red) // or anything else\
 \
-Naturally, such polymorphism is dynamic, and will require boxing of value types to implement. More interesting, however, is that one cannot actually do much with a value of type Any: it might be copyable (but only if all types are copyable), or comparable (but only if all types are comparable). To make Any types useful, we allow protocol-qualified types, for example:\
+Naturally, such polymorphism is dynamic, and will require boxing of value types to implement. We can now see how Self types interact with subtype polymorphism. For example, say we have two values of type Comparable, and we try to compare them:\
 \
-	var doc : Any<Document, Serializable>\
-	print(doc.title()) // okay: title() is part of the Document protocol, so we can call it\
-	doc.serialize(stout); // okay: serialize() is part of the Serializable protocol\
-\
-Any given Swift type should be able to be protocol-qualified, so for example one could have String<Document> to refer to an entity of type 'string' that conforms to the Document protocol. The sub typing relationship here is fairly obvious: T<P1, P2, \'85 PN> is a subtype of U<Q1, Q2, \'85, QN> if T is a subtype of U and if the set of protocols that T and P1, P2, \'85., PN conform to is a superset of the set of protocols that U and Q1, Q2, \'85, QN conform to (remembering that conforming to a protocol implies conformance to all of the protocols it inherits, transitively). \
-\
-We can now see how Self types interact with subtype polymorphism. For example, say we have two values of type Any<Comparable>, and we try to compare them:\
-\
-	var x : Any<Comparable> = \'85\
-	var y : Any<Comparable> = \'85\
+	var x : Comparable = \'85\
+	var y : Comparable = \'85\
 	if x == y \{ // well-typed?\
 	\}\
 \
-Whether x == y is well-typed is not statically determinable, since the dynamic type of x may different from the dynamic type of y, even if they are both comparable (e.g., one is an int and the other a string). If possible, I'd like to resolve this by performing dynamic type checking at the call site. The important observation here is that, statically, there are two overloads of this function (x's Comparable == and y's Comparable ==); if those happen to be the same function (e.g., the types of x and y, along with the protocol implementations of Comparable for both x and y), then the dynamic check succeeds. There be dragons here.\
+Whether x == y is well-typed is not statically determinable, since the dynamic type of x may different from the dynamic type of y, even if they are both comparable (e.g., one is an int and the other a string). I suggest that this be considered ill-formed for now; we can revisit later if it becomes a problem.\
 \
+To express types that meet the requirements of several protocols, one can just create a new protocol aggregating those protocols:\
+\
+	protocol SerializableDocument : Document, Serializable \{ \}\
+	var doc : SerializableDocument\
+	print(doc.title()) // okay: title() is part of the Document protocol, so we can call it\
+	doc.serialize(stout); // okay: serialize() is part of the Serializable protocol\
+\
+Since this syntax is fairly heavyweight, we introduce a shorthand syntax\
+\
+	var doc : protocol<Document, Serializable>\
+\
+that allows us to declare an unnamed protocol that combines several other protocols. It's semantically identical to\
+\
+	protocol UniqueName : Document, Serializable \{ \}\
+	var doc : UniqueName\
+\
+As an extension, anonymous protocols can also build off an existing type, taking the signatures from the type's method and turning them into part of an unnamed protocol:\
+\
+	struct Point \{\
+	  func getX() -> int \{ \'85 \}\
+	  func getY() -> int \{ \'85 \}\
+	\}\
+\
+	var value : protocol<Point,Document,Serializable> // equivalent to\'85\
+\
+	protocol UniqueName : Document, Serializable \{\
+	  func getX() -> int\
+	  func getY() -> int\
+	\}\
+	var value : UniqueName\
+\
+Note that the UniqueName in this case *must* be unique, and cannot escape outside of the local context. This is important because while types can grow by adding new methods (because they are non-fragile), protocols cannot grow by adding new methods, since a type written to conform to the old version of that protocol would no longer conform to the new version of that protocol. If we allowed the name of these protocols to escape, then the type that the protocol is based on would essentially be fixed for all time, which is not acceptable.\
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
 
-\b\fs40 Bounded Parametric Polymorphism
+\b \cf0 Note
+\b0 : For me, the use cases of implicitly defining a protocol based on a type's methods are not compelling enough to introduce this wart. Back when we used the ObjC-like Type<Proto1, Proto2, \'85> syntax, these use cases directly fell out of the syntax. I suggest dropping this feature.\
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+
+\b\fs40 \cf0 Bounded Parametric Polymorphism
 \b0\fs24 \
 \
 Parametric polymorphism is based on the idea of providing type parameters for a generic function or type. When using that function or type, one substitutes concrete types for the type parameters. Strictly speaking, parametric polymorphism allows *any* type to be substituted for a type parameter, but it's useless in practice because that means that generic functions or types cannot do anything to the type parameters: they must instead rely on first-class functions passed into the generic function or type to perform any meaningful work. \
@@ -217,23 +259,23 @@ Far more useful (and prevalent) is bounded parametric polymorphism, which allows
 \
 Protocols provide a natural way to express the constraints of a generic function in Swift. For example, one could define a generic linked list as:\
 \
-  struct ListNode[T<Copyable>] \{\
+  struct ListNode<T : Copyable> \{\
     var Value : T\
     oneof NextNode \{ ListNode(T), End \}\
     var Next : NextNode\
   \}\
 \
-  struct List[T<Copyable>] \{\
-    var First : ListNode[T]::NextNode\
+  struct List<T : Copyable> \{\
+    var First : ListNode<T>::NextNode\
   \}\
 \
 This list works on any type T, so long as that type T is Copyable (so that values can be copied into the list). One could then add a generic function that inserts at the beginning of the list:\
 \
-  func insertAtBeginning[T<Copyable>](list : List[T], value : T) \{\
-    list.First = ListNode[T](value, list.First)\
+  func insertAtBeginning<T : Copyable>(list : List<T>, value : T) \{\
+    list.First = ListNode<T>(value, list.First)\
   \}\
 \
-Note that this insertAtBeginning function can operate on any type that meets the Copyable requirements, include List[any<Copyable>], allowing use to freely mix dynamic polymorphism with bounded parametric polymorphism.\
+Note that this insertAtBeginning function can operate on any type that meets the Copyable requirements, including List<Copyable>, allowing us to freely mix dynamic polymorphism with bounded parametric polymorphism.\
 \
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
 
@@ -241,12 +283,12 @@ Note that this insertAtBeginning function can operate on any type that meets the
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
 
 \b0 \cf0 \
-Within the type parameter list of a generic type or function (e.g., the [T<Copyable>] in ListNode[T<Comparable>]), the 'T' introduces a new type parameter and the angle brackets provide constraints on that  type parameter. Within the body of the generic type or function, any of the functions or types described by the constraints are available. For example, let's implement a find() operation on lists:\
+Within the type parameter list of a generic type or function (e.g., the <T : Copyable> in ListNode<T : Comparable>), the 'T' introduces a new type parameter and the (optional) ": type" provides a constraint that type parameter, which may be any type (but will typically be a protocol) Within the body of the generic type or function, any of the functions or types described by the constraints are available. For example, let's implement a find() operation on lists:\
 \
-  func find[T<Copyable,Comparable>](list : List[T], value : T) -> int \{\
+  func find<T : protocol<Copyable,Comparable>>(list : List<T>, value : T) -> int \{\
     var index = 0\
     var current = list.First\
-    while current is ListNode[T] \{ // now I'm just making stuff up\
+    while current is ListNode<T> \{ // now I'm just making stuff up\
       if current.Value == value \{ // okay: T is Comparable\
         return index\
       \}\
@@ -256,15 +298,16 @@ Within the type parameter list of a generic type or function (e.g., the [T<Copya
     return -1\
   \}\
 \
-In addition to providing constraints on the type parameters, we also need to be able to constrain associated types. For example, let's generalize our find algorithm to work on any ordered collection:\
+In addition to providing constraints on the type parameters, we also need to be able to constrain associated types. To do so, we introduce the notion of a requires clause, which follows the signature of the generic type or function. For example, let's generalize our find algorithm to work on any ordered collection:\
 \
-	protocol OrderedCollection<Collection> \{\
+	protocol OrderedCollection : Collection \{\
 	  func size() -> int;\
               func getAt(index : int) -> Value    // Value is an associated type\
 	\}\
 \
-            func find[C<OrderedCollection>, C::Value<Comparable>](collection : C, value : C::Value)\
-	             -> int \{\
+            func find<C : OrderedCollection>(collection : C, value : C::Value)-> int \
+	   requires C::Value : Comparable\
+	\{\
 	  foreach index : int in range(0, collection.size()) \{ // making up syntax again\
 	    if (collection.getAt(index) == value) \{ // okay: we know that C::Value is Comparable\
 	      return index;\
@@ -272,6 +315,11 @@ In addition to providing constraints on the type parameters, we also need to be 
 	  \}\
 	  return -1;\
 	\}\
+\
+The requires clause is actually the more general way of expressing constraints, and the constraints expressed in the angle brackets (e.g., <C : OrderedCollection>)are just sugar for a requires clause. For example, the above find() signature is equivalent to\
+\
+            func find<C>(collection : C, value : C::Value)-> int \
+	   requires C : OrderedCollection, C::Value : Comparable\
 \
 There are two other important kinds of constraints that need to be expressible. Before we get to those, consider a simple "Range" protocol that lets us describe a range of values of some given value type:\
 \
@@ -282,38 +330,69 @@ There are two other important kinds of constraints that need to be expressible. 
               func getRest() -> Self\
 	\}\
 \
-Now, we want to express the notion of an enumerable collection, which provides a range\
+Now, we want to express the notion of an enumerable collection, which provides a range, which we do using a requires clause inside the protocol\
 \
-	protocol EnumerableCollection<Collection> \{\
-	  typealias RangeType<Range, R::Value == Value>\
+	protocol EnumerableCollection : Collection \{\
+	  typealias RangeType\
+              requires RangeType : Range, RangeType::Value == Value\
 	  func getRange() -> RangeType\
 	\}\
 \
 Here, we are specifying constraints on an associated type (RangeType must conform to the Range protocol), and also ensuring that the type of values produced by querying the range is the same as the type of values stored in the container. This is important, for example, for use with the Comparable protocol (and any protocol using Self types), because it maintains type identity within the generic function or type.\
+\
+We now note that the protocol refinement is actually just syntactic sugar for a requires clause on the Self type, e.g.,\
+\
+	protocol SerializableDocument : Document, Serializable \{ \}\
+\
+is equivalent to\
+\
+	protocol SerializableDocument \{\
+	  requires Self : Document, Self : Serializable\
+	\}\
 \
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
 
 \b \cf0 Constraint Inference
 \b0 \
 \
-Note that the signature of both the first 'find' and 'insertAtBeginning' have some redundancy of description: they both explicitly require that T be Copyable, but the use of the type List[T] implies that T is Copyable. As such, we should infer any constraints that are directly implied by types that make up the signature of the function, so the signatures of these functions could be:\
+Note that the signature of both the first 'find' and 'insertAtBeginning' have some redundancy of description: they both explicitly require that T be Copyable, but the use of the type List<T> already implies that T is Copyable. As such, we should infer any constraints that are directly implied by types that make up the signature of the function, so the signatures of these functions could be:\
 \
-	func insertAtBeginning[T](list : List[T], value : T) \{ // List[T] means that T conforms to Copyable\
+	func insertAtBeginning<T>(list : List<T>, value : T) \{ // List<T> implies that T : Copyable\
 	  // \'85\
 	\}\
 \
-	func find[T<Comparable>](list : List[T], value : T) -> int \{ // List[T] means that T conforms to Copyable \
+	func find<T :Comparable>(list : List<T>, value : T) -> int \{ // List<T> implies that T : Copyable \
 	  // ...\
 	\}\
 \
-\
+
+\b Type Parameter Deduction\
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
 
-\b\fs40 \cf0 Conforming to a Protocol
+\b0 \cf0 \
+As noted above, type arguments will be deduced from the call arguments to a generic function:\
+\
+	var values : list<int>\
+	insertAtBeginning(values, 17) // deduces T = int\
+\
+Since Swift already has top-down type inference (as well as the C++-like bottom-up inference), we can also deduce type arguments from the result type\
+\
+	func cast<T, U>(value : T) -> U \{ \'85 \} \
+	var x : any\
+	var y : int = cast(x) // deduces T=any, U = int\
+\
+We require that all type parameters for a generic function be deducible. We introduce this restriction so that we can avoid introducing a syntax for explicitly specifying type arguments to a generic function, e.g.,\
+\
+	var y : int = cast<int>(x) // not permitted: < is the less-than operator\
+\
+This syntax is horribly ambiguous in C++, and with good type argument deduction, should not be necessary in Swift.\
+\
+
+\b\fs40 Conforming to a Protocol
 \fs24 \
 \
 
-\b0 Thus far, we have not actually shown how a type can meet the requirements of a protocol. One possibility is that protocol conformance is implicit. This is essentially duck typing, where a class is assumed to conform to a protocol if it meets the syntactic requirements of the protocol. For example, given\
+\b0 Thus far, we have not actually shown how a type can meet the requirements of a protocol. The most direct way this can occur is implicitly. This is essentially duck typing, where a type is assumed to conform to a protocol if it meets the syntactic requirements of the protocol. For example, given\
 \
 	protocol Shape \{\
 	  func draw();\
@@ -321,11 +400,11 @@ Note that the signature of both the first 'find' and 'insertAtBeginning' have so
 \
 one could implement a function that draws a sequence of shapes, e.g.,\
 \
-	func drawAll[C<EnumerableCollection>, C::Value<Shape>](collection : C) \{\
+	func drawAll<C : EnumerableCollection>(collection : C) requires C::Value : Shape \{\
 	  // details uninteresting\
 	\}\
 \
-This would make the following code well-formed (assuming that List[T] is an EnumerableCollection):\
+This would make the following code well-formed (assuming that List<T> is an EnumerableCollection):\
 \
 	struct Circle \{\
 	  var center : Point;\
@@ -336,10 +415,10 @@ This would make the following code well-formed (assuming that List[T] is an Enum
 	  \}\
 	\}\
 	\
-	var circles : List[Circle]\
+	var circles : List<Circle>\
 	drawAll(circles)\
 \
-Note that there are two levels of inference going on here: the first is inference of the argument for the type parameter C based on the function argument (this is called template argument deduction in C++; it's critical for making generics work cleanly). The second is implicitly checking whether the type Circle conforms to the protocol Shape. Since Circle provides a draw() method with the appropriate type, implicit protocol conformance concludes that Circle conforms to Shape and type-checking succeeds.\
+Note that there are two levels of inference going on here: the first is inference of the argument for the type parameter C based on the function argument (this is called template argument deduction in C++; see the section on argument deduction, below). The second is implicitly checking whether the type Circle conforms to the protocol Shape. Since Circle provides a draw() method with the appropriate type, implicit protocol conformance concludes that Circle conforms to Shape and type-checking succeeds.\
 \
 Implicit protocol conformance is convenient. It can run into some trouble when an entity that syntactically matches a protocol doesn't provide the required semantics. For example, Cowboys also know how to "draw!":\
 \
@@ -351,10 +430,10 @@ Implicit protocol conformance is convenient. It can run into some trouble when a
 	  \}\
 	\}\
 	\
-	var cowboys : List[Cowboys]\
+	var cowboys : List<Cowboys>\
 	drawAll(cowboys) // dangerous, and probably not what the user intended\
 \
-Random collisions between types are fairly rare. However, when one is using protocol inheritance with fine-grained (semantic or mostly-semantic) differences between protocols in the hierarchy, they become more common. See http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2005/n1798.html for examples of this problem as it surfaced with C++ concepts.\
+Random collisions between types are fairly rare. However, when one is using protocol refinement with fine-grained (semantic or mostly-semantic) differences between protocols in the hierarchy, they become more common. See http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2005/n1798.html for examples of this problem as it surfaced with C++ concepts. Our hope is that, with implicit protocol conformance being the only option in Swift, library developers will avoid building refinement hierarchies that run into this trouble.\
 \
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
 
@@ -362,9 +441,9 @@ Random collisions between types are fairly rare. However, when one is using prot
 \
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
 
-\b0 \cf0 Regardless of whether implicit protocol conformance is supported, we need to have a model for explicitly declaring that a type is intended to conform to a protocol. Type authors use this to help make sure that they are actually implementing the right methods. For example, if we want our generic List type to be a Collection, we can specify that it is by adding a protocol conformance annotation to the type:\
+\b0 \cf0 Type authors often implement types that are intended to conform to a particular protocol. For example, if we want our generic List type to be a Collection, we can specify that it is by adding a protocol conformance annotation to the type:\
 \
-	struct List[T<Copyable>] <Collection> \{ // List[T] is a collection. <> overload?\
+	struct List<T : Copyable> : Collection \{ // List<T> is a collection\
 	  typealias Value = T\
               func forEach(callback : (value : Value) -> void) \{ /* Implement this */ \}\
               func add(value : Value) \{ /* Implement this */ \}\
@@ -374,7 +453,7 @@ Random collisions between types are fairly rare. However, when one is using prot
 \b \cf0 \
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
 
-\b0 \cf0 This explicit protocol conformance declaration forces the compiler to check that List[T] actually does meet the requirements of the Collection type. If we were missing an operation (say, forEach) or had the wrong signature, the definition of 'List' would be ill-formed. 
+\b0 \cf0 This explicit protocol conformance declaration forces the compiler to check that List<T> actually does meet the requirements of the Collection type. If we were missing an operation (say, forEach) or had the wrong signature, the definition of 'List' would be ill-formed. 
 \b \
 \
 Retroactive Modeling\
@@ -386,7 +465,7 @@ When using a set of libraries, it's fairly common that one library defines a pro
 \
 In Swift, one could provide support for retroactive modeling by allowing class extensions, e.g.,\
 \
-	extension string<Collection> \{\
+	extension string : Collection \{\
 	  typealias Value = char\
               func forEach(callback : (value : Value) -> void) \{ /* use existing string routines to enumerate characters */ \}\
               func add(value : Value) \{ self += value /* append character */ \}\
@@ -395,9 +474,9 @@ In Swift, one could provide support for retroactive modeling by allowing class e
 Once an extension is defined, the extension now conforms to the Collection protocol, e.g.,\
 \
 	var s : string;\
-	var collection : any<Collection> = s // okay; string conforms to Collection now\
+	var collection : Collection = s // okay; string conforms to Collection now\
 	\
-One can also use string as if it had the collection's members:\
+One can also use string as if it had Collection's members:\
 \
 	var s : string\
 	s.add('\\n') // okay: uses the extension\
@@ -443,7 +522,7 @@ One can also use string as if it had the collection's members:\
 \b0 \
 This makes it easier both to implement generic algorithms (which can use the most natural syntax) and to make a new type conform to the protocol. For example, if we were to define only the core algorithms in our BigNum type:\
 \
-	struct BigNum<Numeric> \{\
+	struct BigNum : Numeric \{\
 	  func +(other : BigNum) -> BigNum \{ \'85 \}\
 	  func -() -> BigNum \{ \'85 \}\
 	\}\
@@ -464,10 +543,10 @@ Because generics are constrained, a well-typed generic function or type can be t
 \
 The translation model is fairly simple. Consider the generic find() we implemented for lists, above:\
 \
-	func find[T<Copyable,Comparable>](list : List[T], value : T) -> int \{\
+	func find<T : protocol<Copyable,Comparable>>(list : List<T>, value : T) -> int \{\
 	  var index = 0\
 	  var current = list.First\
-	  while current is ListNode[T] \{ // now I'm just making stuff up\
+	  while current is ListNode<T> \{ // now I'm just making stuff up\
 	    if current.Value == value \{ // okay: T is Comparable\
 	      return index\
 	    \}\
@@ -477,7 +556,7 @@ The translation model is fairly simple. Consider the generic find() we implement
 	  return -1\
 	\}\
 \
-to translate this into executable code, we form a vtable for each of the constraints on the generic function. In this case, we'll have a vtable for T<Copyable> and T<Comparable>. Every operation within the body of this generic function type-checks to either an operation on some concrete type (e.g., the operations on int), to an operation within a protocol (which requires indirection through the corresponding vtable), or to an operation on a generic type definition, all of which can easily be emitted as object code.\
+to translate this into executable code, we form a vtable for each of the constraints on the generic function. In this case, we'll have a vtable for Copyable T and Comparable T. Every operation within the body of this generic function type-checks to either an operation on some concrete type (e.g., the operations on int), to an operation within a protocol (which requires indirection through the corresponding vtable), or to an operation on a generic type definition, all of which can easily be emitted as object code.\
 \
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
 
@@ -496,19 +575,20 @@ to translate this into executable code, we form a vtable for each of the constra
 
 \b0\fs24 Generic functions can be overloaded based entirely on constraints. For example, consider a binary search algorithm:\
 \
-	func binarySearch[C<EnumerableCollection>, C::Value<Ordered>]\
-	            (collection : C, value : C::Value) -> C::RangeType \{\
+	func binarySearch<C : EnumerableCollection>(collection : C, value : C::Value) \
+	           -> C::RangeType \
+	        requires C::Value : Ordered \{\
 	  // We can perform log(N) comparisons, but EnumerableCollection only supports linear\
 	  // walks, so this is linear time\
 	\}\
 	\
-	protocol RandomAccessRange<Range> \{\
+	protocol RandomAccessRange : Range \{\
               func split() -> (Range, Range) // splits a range in half, returning both halves\
 	\}\
 \
-	func binarySearch[C<EnumerableCollection>, C::Value<Ordered>,\
-                                              C::RangeType<RandomAccessRange>]\
-	            (collection : C, value : C::Value) -> C::RangeType \{\
+	func binarySearch<C : EnumerableCollection>(collection : C, value : C::Value) \
+	           -> C::RangeType\
+	          requires C::Value : Ordered, C::RangeType : RandomAccessRange \{\
 	  // We can perform log(N) comparisons and log(N) range splits, so this is logarithmic time\
 	\}\
 \
@@ -518,11 +598,12 @@ If binarySearch is called with a sequence whose range type conforms to RandomAcc
 \
 There is a question as to when this overloading occurs. For example, binarySearch might be called as a subroutine of another generic function with minimal requirements:\
 \
-	func doSomethingWithSearch[C<EnumerableCollection>, C::Value<Ordered>]\
-	            (collection : C, value : C::Value) -> C::RangeType \{\
+	func doSomethingWithSearch<C : EnumerableCollection>\
+	            (collection : C, value : C::Value) -> C::RangeType \
+	         requires C::Value : Ordered \{\
 	  binarySearch(collection, value);\
 	\}\
 \
-At the time when the generic definition of doSomethingWithSearch is type-checked, only the first binarySearch() function applies, since we don't know that C::RangeType conforms to RandomAccessRange. However, when doSomethingWithSearch is actually invoked, C::RangeType might conform to the RandomAccessRange, in which case we'd be better off picking the second binarySearch. This amounts to run-time overload resolution, which may be desirable , but also has downsides, such as the potential for run-time failures due to ambiguities and the cost of performing such an expensive operation at these call sites. Of course, that cost could be mitigated in hot generic functions via the specialization mentioned above.
-\b\fs40 \
-}
+At the time when the generic definition of doSomethingWithSearch is type-checked, only the first binarySearch() function applies, since we don't know that C::RangeType conforms to RandomAccessRange. However, when doSomethingWithSearch is actually invoked, C::RangeType might conform to the RandomAccessRange, in which case we'd be better off picking the second binarySearch. This amounts to run-time overload resolution, which may be desirable , but also has downsides, such as the potential for run-time failures due to ambiguities and the cost of performing such an expensive operation at these call sites. Of course, that cost could be mitigated in hot generic functions via the specialization mentioned above.\
+\
+Our current proposal for this is to decide statically which function is called (based on similar partial-ordering rules as used in C++), and avoid run-time overload resolution. If this proves onerous, we can revisit the decision later.}
