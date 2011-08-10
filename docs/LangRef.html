@@ -526,7 +526,7 @@
   </div>
   
   <pre class="grammar">
-    decl-oneof ::= 'oneof' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> oneof-body
+    decl-oneof ::= 'oneof' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> <a href="#type-oneof">oneof-body</a>
   </pre>
   
   <p>A oneof declaration is a convenient way to declare a type and name it at
@@ -541,14 +541,14 @@
     <i>// Declare discriminated union with typealias + oneof type.</i>
     typealias SomeInts : oneof {
       None,
-      One int,
-      Two (:int, :int)
+      One : int,
+      Two : (:int, :int)
     }
     <i>// Declare discriminated union with oneof decl (preferred).</i>
     oneof SomeInts {
       None,
-      One int,
-      Two (:int, :int)
+      One : int,
+      Two : (:int, :int)
     }
   </pre>
   
@@ -570,9 +570,9 @@
     }
     
     oneof SomeInts {
-      None,             <i>// Doesn't conflict with previous "None".</i>
-      One int,          <i>// Argument type is simple int.</i>
-      Two (:int, :int)  <i>// Argument type is simple tuple.</i>
+      None,               <i>// Doesn't conflict with previous "None".</i>
+      One : int,          <i>// Argument type is simple int.</i>
+      Two : (:int, :int)  <i>// Argument type is simple tuple.</i>
     }
     
     func f2(a : SomeInts)
@@ -618,7 +618,7 @@
     struct S1 { a : int, b : int }
     
     oneof S2 {
-      S2 (a : int, b : int)
+      S2 : (a : int, b : int)
     }
     var S2 = S2::S2   <i>// Constructor injected into global scope.</i>
   </pre>
@@ -774,9 +774,9 @@
   <i>// oneof and struct declarations with tuple values.</i>
     struct S { a : int, b : int }
   oneof Vertex {
-    Point2 (x : int, y : int),
-    Point3 (x : int, y : int, z : int),
-    Point4 (w : int, x : int, y : int, z : int)
+    Point2 : (x : int, y : int),
+    Point3 : (x : int, y : int, z : int),
+    Point4 : (w : int, x : int, y : int, z : int)
   }
   </pre>
 
