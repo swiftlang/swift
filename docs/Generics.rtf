@@ -226,31 +226,8 @@ that allows us to declare an unnamed protocol that combines several other protoc
 	protocol UniqueName : Document, Serializable \{ \}\
 	var doc : UniqueName\
 \
-As an extension, anonymous protocols can also build off an existing type, taking the signatures from the type's method and turning them into part of an unnamed protocol:\
-\
-	struct Point \{\
-	  func getX() -> int \{ \'85 \}\
-	  func getY() -> int \{ \'85 \}\
-	\}\
-\
-	var value : protocol<Point,Document,Serializable> // equivalent to\'85\
-\
-	protocol UniqueName : Document, Serializable \{\
-	  func getX() -> int\
-	  func getY() -> int\
-	\}\
-	var value : UniqueName\
-\
-Note that the UniqueName in this case *must* be unique, and cannot escape outside of the local context. This is important because while types can grow by adding new methods (because they are non-fragile), protocols cannot grow by adding new methods, since a type written to conform to the old version of that protocol would no longer conform to the new version of that protocol. If we allowed the name of these protocols to escape, then the type that the protocol is based on would essentially be fixed for all time, which is not acceptable.\
-\
-\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
 
-\b \cf0 Note
-\b0 : For me, the use cases of implicitly defining a protocol based on a type's methods are not compelling enough to introduce this wart. Back when we used the ObjC-like Type<Proto1, Proto2, \'85> syntax, these use cases directly fell out of the syntax. I suggest dropping this feature.\
-\
-\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
-
-\b\fs40 \cf0 Bounded Parametric Polymorphism
+\b\fs40 Bounded Parametric Polymorphism
 \b0\fs24 \
 \
 Parametric polymorphism is based on the idea of providing type parameters for a generic function or type. When using that function or type, one substitutes concrete types for the type parameters. Strictly speaking, parametric polymorphism allows *any* type to be substituted for a type parameter, but it's useless in practice because that means that generic functions or types cannot do anything to the type parameters: they must instead rely on first-class functions passed into the generic function or type to perform any meaningful work. \
@@ -261,7 +238,7 @@ Protocols provide a natural way to express the constraints of a generic function
 \
   struct ListNode<T : Copyable> \{\
     var Value : T\
-    oneof NextNode \{ ListNode(T), End \}\
+    oneof NextNode \{ Node (: ListNode<T>), End \}\
     var Next : NextNode\
   \}\
 \
@@ -288,7 +265,7 @@ Within the type parameter list of a generic type or function (e.g., the <T : Cop
   func find<T : protocol<Copyable,Comparable>>(list : List<T>, value : T) -> int \{\
     var index = 0\
     var current = list.First\
-    while current is ListNode<T> \{ // now I'm just making stuff up\
+    while current is Node \{ // now I'm just making stuff up\
       if current.Value == value \{ // okay: T is Comparable\
         return index\
       \}\
@@ -320,6 +297,8 @@ The requires clause is actually the more general way of expressing constraints, 
 \
             func find<C>(collection : C, value : C::Value)-> int \
 	   requires C : OrderedCollection, C::Value : Comparable\
+\
+Note that find<C> is shorthand for (and equivalent to) find<C : Any>, since every type conforms to the Any protocol.\
 \
 There are two other important kinds of constraints that need to be expressible. Before we get to those, consider a simple "Range" protocol that lets us describe a range of values of some given value type:\
 \
