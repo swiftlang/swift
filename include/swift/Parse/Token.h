@@ -27,6 +27,7 @@ enum class tok {
   unknown = 0,
   eof,
   identifier,
+  oper,
   dollarident,
   numeric_constant,
   

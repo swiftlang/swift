@@ -154,7 +154,7 @@ void Lexer::lexPunctuationIdentifier() {
     }
   }
   
-  return formToken(tok::identifier, TokStart);
+  return formToken(tok::oper, TokStart);
 }
 
 /// lexDollarIdent - Match $[0-9a-zA-Z_$]*

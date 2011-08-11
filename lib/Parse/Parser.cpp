@@ -94,9 +94,9 @@ void Parser::skipUntil(tok T) {
 /// parseIdentifier - Consume an identifier if present and return its name in
 /// Result.  Otherwise, emit an error and return true.
 bool Parser::parseIdentifier(Identifier &Result, const Twine &Message) {
-  if (Tok.is(tok::identifier)) {
+  if (Tok.is(tok::identifier) || Tok.is(tok::oper)) {
     Result = S.Context.getIdentifier(Tok.getText());
-    consumeToken(tok::identifier);
+    consumeToken(Tok.getKind());
     return false;
   }
   
@@ -289,7 +289,7 @@ Decl *Parser::parseDeclImport() {
 ///     '(' name (',' name)* ')'
 bool Parser::parseVarName(DeclVarName &Name) {
   // Single name case.
-  if (Tok.is(tok::identifier)) {
+  if (Tok.is(tok::identifier) || Tok.is(tok::oper)) {
     Name.LPLoc = Name.RPLoc = Tok.getLoc();
     parseIdentifier(Name.Name, "");
     return false;
@@ -599,9 +599,10 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
   // Parse type-simple first.
   switch (Tok.getKind()) {
   case tok::identifier:
+  case tok::oper:
     Result = S.type.ActOnTypeName(Tok.getLoc(),
                                   S.Context.getIdentifier(Tok.getText()));
-    consumeToken(tok::identifier);
+    consumeToken(Tok.getKind());
     break;
   case tok::kw___builtin_int1_type:
     Result = S.Context.TheInt1Type;
@@ -706,7 +707,7 @@ bool Parser::parseTypeTupleBody(SMLoc LPLoc, Type &Result) {
       Elements.push_back(TupleTypeElt());
       TupleTypeElt &Result = Elements.back();
       
-      if (Tok.is(tok::identifier))
+      if (Tok.is(tok::identifier) || Tok.is(tok::oper))
         parseIdentifier(Result.Name, "");
       
       NullablePtr<Expr> Init;
@@ -746,13 +747,13 @@ bool Parser::parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
   SmallVector<SemaType::OneOfElementInfo, 8> ElementInfos;
   
   // Parse the comma separated list of oneof elements.
-  while (Tok.is(tok::identifier)) {
+  while (Tok.is(tok::identifier) || Tok.is(tok::oper)) {
     SemaType::OneOfElementInfo ElementInfo;
     ElementInfo.Name = Tok.getText();
     ElementInfo.NameLoc = Tok.getLoc();
     ElementInfo.EltType = 0;
     
-    consumeToken(tok::identifier);
+    consumeToken(Tok.getKind());
     
     // See if we have a type specifier for this oneof element.  If so, parse it.
     if (consumeIf(tok::colon) &&
@@ -784,7 +785,7 @@ bool Parser::parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
 static bool isStartOfExpr(const Token &Tok, const Token &Next) {
   if (Tok.is(tok::numeric_constant) || Tok.is(tok::colon) ||
       Tok.is(tok::l_paren) || Tok.is(tok::dollarident) ||
-      Tok.is(tok::identifier))
+      Tok.is(tok::identifier) || Tok.is(tok::oper))
     return true;
   
   // "func(" and "func{" are func expressions.  "func x" is a func declaration.
@@ -856,6 +857,7 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &Result) {
   case tok::dollarident: // $1
     if (parseExprDollarIdentifier(R)) return true;
     break;
+  case tok::oper:
   case tok::identifier:  // foo   and  foo::bar
     if (parseExprIdentifier(R)) return true;
     break;
@@ -893,7 +895,8 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &Result) {
     // Check for a .foo suffix.
     SMLoc TokLoc = Tok.getLoc();
     if (consumeIf(tok::period)) {
-      if (Tok.isNot(tok::identifier) && Tok.isNot(tok::dollarident)) {
+      if (Tok.isNot(tok::identifier) && Tok.isNot(tok::oper) &&
+          Tok.isNot(tok::dollarident)) {
         error(Tok.getLoc(), "expected field name");
         return true;
       }
@@ -905,6 +908,8 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &Result) {
       }
       if (Tok.is(tok::identifier))
         consumeToken(tok::identifier);
+      else if (Tok.is(tok::oper))
+        consumeToken(tok::oper);
       else
         consumeToken(tok::dollarident);
       continue;
@@ -966,7 +971,7 @@ bool Parser::parseExprDollarIdentifier(NullablePtr<Expr> &Result) {
 ///     identifier
 ///     identifier '::' identifier
 bool Parser::parseExprIdentifier(NullablePtr<Expr> &Result) {
-  assert(Tok.is(tok::identifier));
+  assert(Tok.is(tok::identifier) || Tok.is(tok::oper));
   SMLoc Loc = Tok.getLoc();
   Identifier Name;
   parseIdentifier(Name, "");
@@ -1159,6 +1164,7 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       // "func identifier" and "func [attribute]" is a func declaration,
       // otherwise we have a func expression.
       if (peekToken().is(tok::identifier) ||
+          peekToken().is(tok::oper) ||
           peekToken().is(tok::l_square)) {
         Entries.push_back(parseDeclFunc());
         break;
