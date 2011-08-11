@@ -489,6 +489,19 @@ namespace {
       }
       return IS;
     }
+    
+    Stmt *visitWhileStmt(WhileStmt *WS) {
+      if (Expr *E2 = doIt(WS->Cond))
+        WS->Cond = E2;
+      else
+        return 0;
+      
+      if (Stmt *S2 = doIt(WS->Body))
+        WS->Body = S2;
+      else
+        return 0;
+      return WS;
+    }
        
   public:
     ExprWalker(Expr *(*exprfn)(Expr *E, Expr::WalkOrder Order, void *Data),

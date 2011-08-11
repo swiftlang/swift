@@ -475,16 +475,23 @@ namespace {
     Stmt *visitIfStmt(IfStmt *IS) {
       // The if condition must have __builtin_int1 type.  This is after the
       // conversion function is added by sema.
-      // FIXME: Why isn't this using convertToType?
-      if (!IS->Cond->Ty->isEqual(TC.Context.TheInt1Type, TC.Context)) {
-        TC.error(IS->Cond->getLocStart(), "expression of type '" +
-                 IS->Cond->Ty->getString() + "' is not legal in a condition");
+      IS->Cond = TC.convertToType(IS->Cond, TC.Context.TheInt1Type);
+      if (IS->Cond == 0)
         return 0;
-      }
       
       return IS;
     }
-    
+
+    Stmt *visitWhileStmt(WhileStmt *WS) {
+      // The if condition must have __builtin_int1 type.  This is after the
+      // conversion function is added by sema.
+      WS->Cond = TC.convertToType(WS->Cond, TC.Context.TheInt1Type);
+      if (WS->Cond == 0)
+        return 0;
+      
+      return WS;
+    }
+
     SemaExpressionTree(TypeChecker &tc) : TC(tc) {}
     
     static Expr *WalkExprFn(Expr *E, Expr::WalkOrder Order, void *set) {

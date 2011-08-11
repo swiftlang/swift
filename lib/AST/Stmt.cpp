@@ -45,6 +45,8 @@ SMLoc Stmt::getLocStart() const {
     return cast<ReturnStmt>(this)->ReturnLoc;
   case StmtKind::If:
     return cast<IfStmt>(this)->IfLoc;
+  case StmtKind::While:
+    return cast<WhileStmt>(this)->WhileLoc;
   }
   
   assert(0 && "Not reachable, all cases handled");
@@ -118,6 +120,13 @@ public:
       OS << '\n';
       printRec(S->Else);
     }
+    OS << ')';
+  }
+  void visitWhileStmt(WhileStmt *S) {
+    OS.indent(Indent) << "(while_stmt\n";
+    printRec(S->Cond);
+    OS << '\n';
+    printRec(S->Body);
     OS << ')';
   }
 };

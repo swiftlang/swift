@@ -97,6 +97,7 @@ public:
     DISPATCH(Brace);
     DISPATCH(Return);
     DISPATCH(If);
+    DISPATCH(While);
 #undef DISPATCH
     }
     assert(0 && "Not reachable, all cases handled");

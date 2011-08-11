@@ -34,7 +34,8 @@ enum class StmtKind {
   Assign,
   Brace,
   Return,
-  If
+  If,
+  While
 };
 
 /// Stmt - Base class for all statements in swift.
@@ -147,17 +148,33 @@ public:
   SMLoc ElseLoc;
   Stmt *Else;
   
-  IfStmt(SMLoc IfLoc, Expr *cond, Stmt *Then, SMLoc ElseLoc,
+  IfStmt(SMLoc IfLoc, Expr *Cond, Stmt *Then, SMLoc ElseLoc,
          Stmt *Else)
   : Stmt(StmtKind::If),
-    IfLoc(IfLoc), Cond(cond), Then(Then), ElseLoc(ElseLoc), Else(Else) {}
+    IfLoc(IfLoc), Cond(Cond), Then(Then), ElseLoc(ElseLoc), Else(Else) {}
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const IfStmt *) { return true; }
   static bool classof(const Stmt *S) { return S->Kind == StmtKind::If; }
 };
 
+/// WhileStmt - while statement.  The condition is required to have a
+/// __builtin_int1 type.
+class WhileStmt : public Stmt {
+public:
+  SMLoc WhileLoc;
+  Expr *Cond;
+  Stmt *Body;
   
+  WhileStmt(SMLoc WhileLoc, Expr *Cond, Stmt *Body)
+  : Stmt(StmtKind::While),
+    WhileLoc(WhileLoc), Cond(Cond), Body(Body) {}
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const WhileStmt *) { return true; }
+  static bool classof(const Stmt *S) { return S->Kind == StmtKind::While; }
+};
+
 } // end namespace swift
 
 #endif
