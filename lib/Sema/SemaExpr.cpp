@@ -95,22 +95,19 @@ SemaExpr::ActOnTupleExpr(SMLoc LPLoc, Expr *const *SubExprs,
                                    IsPrecededByIdentifier);
 }
 
-Stmt *SemaExpr::ActOnIfStmt(SMLoc IfLoc, Expr *Cond, Stmt *Normal,
-                            SMLoc ElseLoc, Stmt *Else) {
-  assert(Cond && Normal);  // Else may be null.
+/// ActOnCondition - Handle a condition to an if/while statement, inserting
+/// the call that will convert to a 1-bit type.
+Expr *SemaExpr::ActOnCondition(Expr *Cond) {
+  assert(Cond);  // Else may be null.
   
   // The condition needs to be convertible to a logic value.  Build a call to
   // "convertToLogicValue" passing in the condition as an argument.
   Identifier C2LVFuncId = S.Context.getIdentifier("convertToLogicValue");
-  Expr *C2LVFunc = ActOnIdentifierExpr(C2LVFuncId, IfLoc).get();
-
-  Cond = new (S.Context) ApplyExpr(C2LVFunc, Cond,
-                                   UnresolvedType::get(S.Context));
+  Expr *C2LVFunc = ActOnIdentifierExpr(C2LVFuncId, Cond->getLocStart()).get();
   
-  return new (S.Context) IfStmt(IfLoc, Cond, Normal, ElseLoc, Else);
+  return new (S.Context) ApplyExpr(C2LVFunc, Cond,
+                                   UnresolvedType::get(S.Context));
 }
-
-
 
 
 /// FuncTypePiece - This little enum is used by AddFuncArgumentsToScope to keep

@@ -1138,6 +1138,9 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     case tok::kw_if:
       Entries.push_back(parseStmtIf());
       break;
+    case tok::kw_while:
+      Entries.push_back(parseStmtWhile());
+      break;
     case tok::kw_import:
       Entries.push_back(parseDeclImport());
 
@@ -1299,9 +1302,40 @@ Stmt *Parser::parseStmtIf() {
   }
 
   // If our condition and normal expression parsed correctly, build an AST.
-  if (Condition.isNonNull())
-    return S.expr.ActOnIfStmt(IfLoc, Condition.get(), NormalBody,
-                              ElseLoc, ElseBody.getPtrOrNull());
-  return 0;
+  if (Condition.isNull())
+    return 0;
+  
+  Expr *Cond = S.expr.ActOnCondition(Condition.get());
+  
+  return new (S.Context) IfStmt(IfLoc, Cond, NormalBody, ElseLoc,
+                                ElseBody.getPtrOrNull());
 }
+
+/// 
+///   stmt-while:
+///     'while' expr stmt-brace
+Stmt *Parser::parseStmtWhile() {
+  SMLoc WhileLoc = consumeToken(tok::kw_while);
+  
+  NullablePtr<Expr> Condition;
+  if (parseExpr(Condition, "expected expresssion in 'while' condition"))
+    return 0;
+  
+  if (Tok.isNot(tok::l_brace)) {
+    error(Tok.getLoc(), "expected '{' after 'while' condition");
+    return 0;
+  }
+  
+  BraceStmt *Body = parseStmtBrace();
+  if (Body == 0) return 0;
+  
+  // If our condition and normal expression parsed correctly, build an AST.
+  if (Condition.isNull())
+    return 0;
+  
+  Expr *Cond = S.expr.ActOnCondition(Condition.get());
+
+  return new (S.Context) WhileStmt(WhileLoc, Cond, Body);
+}
+
 

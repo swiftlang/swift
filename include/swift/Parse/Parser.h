@@ -148,6 +148,7 @@ private:
   BraceStmt *parseStmtBrace();
   Stmt *parseStmtReturn();
   Stmt *parseStmtIf();
+  Stmt *parseStmtWhile();
 
 };
   

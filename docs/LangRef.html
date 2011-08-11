@@ -1358,6 +1358,7 @@
     stmt ::= <a href="#stmt-brace">stmt-brace</a>
     stmt ::= <a href="#stmt-return">stmt-return</a>
     stmt ::= <a href="#stmt-if">stmt-if</a>
+    stmt ::= <a href="#stmt-while">stmt-while</a>
   </pre>
 
   <p>Statements blah blah blah ... </p>
@@ -1463,9 +1464,13 @@
   <p>Some examples include:</p>
   
   <pre class="example">
-    if true { /*...*/ }
+    if true {
+      /*...*/
+    }
     
-    if X == 4 { } else { }
+    if X == 4 {
+    } else {
+    }
 
     if X == 4 {
     } else if X == 5 {
@@ -1473,6 +1478,39 @@
     }
   </pre>
   
+  <!-- ===================================================================== -->
+  <h3 id="stmt-while">'while' Statement</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    stmt-while      ::= 'while' <a href="#expr">expr</a> <a href="#stmt-brace">stmt-brace</a>
+  </pre>
+  
+  <p>'while' statements provide simple loop construct which (on each iteration
+  of the loop) evalutes the condition, then invokes the 'convertToLogicValue'
+  function on the result and uses it to determine whether to keep looping.
+  This structure allows any type that can be converted to a logic value to be
+  used in an 'if' condition.
+  </p>
+  
+  <p>If there is no convertToLogicValue function that accepts a 'T', or if 
+  the resultant function does not produce a value of '<a
+  href="#type-builtin">__builtin_int1_type</a>' type, then the code is
+  malformed.
+  </p>
+  
+  <p>Some examples include:</p>
+  
+  <pre class="example">
+    while true {
+      /*...*/
+    }
+    
+    while X == 4 {
+      X = 3
+    }
+  </pre>
+
   <!-- ********************************************************************* -->
   <h2>Protocols</h2>
   <!-- ********************************************************************* -->

@@ -59,9 +59,10 @@ public:
                  unsigned NumSubExprs, SMLoc RPLoc,
                  bool IsPrecededByIdentifier);
 
-  Stmt *ActOnIfStmt(SMLoc IfLoc, Expr *Cond, Stmt *Normal, 
-                    SMLoc ElseLoc, Stmt *Else);
-  
+  /// ActOnCondition - Handle a condition to an if/while statement, inserting
+  /// the call that will convert to a 1-bit type.
+  Expr *ActOnCondition(Expr *Cond);
+ 
   FuncExpr *ActOnFuncExprStart(SMLoc FuncLoc, Type FuncTy);
   
 };

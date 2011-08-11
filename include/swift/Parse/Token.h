@@ -54,6 +54,7 @@ enum class tok {
   // Statements
   KEYWORD(if)
   KEYWORD(else)
+  KEYWORD(while)
   KEYWORD(return)
 #undef KEYWORD
   
