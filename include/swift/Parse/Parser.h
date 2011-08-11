@@ -43,6 +43,7 @@ namespace swift {
   class DeclVarName;
   class TupleTypeElt;
   class Identifier;
+  template<typename T> class ParseResult;
   
   /// performNameBinding - Once parsing is complete, this walks the AST to
   /// resolve names and do other top-level validation.
@@ -136,13 +137,12 @@ private:
                           Type &Result, TypeAliasDecl *TypeName = 0);
 
   // Expression Parsing
-  bool parseExpr(NullablePtr<Expr> &Result, const char *Message = 0);
-  bool parseExprSingle(NullablePtr<Expr> &Result, const char *Message =0);
-  bool parseExprPrimary(SmallVectorImpl<Expr*> &Result);
-  bool parseExprIdentifier(NullablePtr<Expr> &Result);
-  bool parseExprDollarIdentifier(NullablePtr<Expr> &Result);
-  bool parseExprParen(NullablePtr<Expr> &Result);
-  bool parseExprFunc(NullablePtr<Expr> &Result);
+  ParseResult<Expr> parseExpr(const char *Message = 0);
+  bool parseExprPrimary(SmallVectorImpl<Expr*> &Results);
+  ParseResult<Expr> parseExprIdentifier();
+  ParseResult<Expr> parseExprDollarIdentifier();
+  ParseResult<Expr> parseExprParen();
+  ParseResult<Expr> parseExprFunc();
   
   // Statement Parsing
   BraceStmt *parseStmtBrace();

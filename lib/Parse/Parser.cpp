@@ -29,6 +29,71 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
+  
+  
+//===----------------------------------------------------------------------===//
+// ParseResult Helper class.
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+/// ParseResult - This is used for code in the parser and Sema that returns an
+/// AST node that can fail for one of two reasons: 1) a parse error, or
+/// 2) a semantic error.  In the later case, we should continue parsing but
+/// ignore the parsed node.  In the former case, we should abort parsing and try
+/// recovery.  This also allows direct representation of Absent, which is when
+/// the parser didn't try parsing this node for some reason.
+///
+/// For compatibility with 'true returns mean parse failure', this evaluates as
+/// true when a parse failure in a bool context.
+///
+/// Wouldn't it be nice to express this as a oneof?
+///
+template<typename T>
+class ParseResult {
+  T *Value;
+public:
+  ParseResult() : Value(0) {} // Initialize to Absent.
+  ParseResult(T *V) { operator=(V); }
+  ParseResult(bool V) {
+    assert(V && "Should only be used for 'return true'");
+    Value = (T*)1;
+  }
+
+  /// When constructed from a NullablePtr, we know that this is a Sema result,
+  /// so we either have a valid value or a SemaError.
+  ParseResult(NullablePtr<T> Arg) {
+    if (Arg.isNull())
+      Value = (T*)2;
+    else
+      Value = Arg.get();
+  }
+  
+  static ParseResult getSemaError() {
+    return ParseResult(NullablePtr<T>());
+  }
+
+  bool isAbsent() const { return Value == 0; }
+  bool isParseError() const { return Value == (T*)1; }
+  bool isSemaError() const { return Value == (T*)2; }
+  bool isSuccess() const {
+    return !isAbsent() && !isParseError() && !isSemaError();
+  }
+  
+  operator bool() const { return isParseError(); }
+  
+  void operator=(T *V) {
+    Value = V;
+    assert(isSuccess() && "Didn't assign a normal value");
+  }
+  
+  T *get() const {
+    assert(isSuccess() && "Not a successful parse");
+    return Value;
+  }
+};
+}
+
 
 //===----------------------------------------------------------------------===//
 // Setup and Helper Methods
@@ -146,14 +211,18 @@ bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init) {
   
   // Parse the initializer, if present.
   if (consumeIf(tok::equal)) {
-    if (parseExpr(Init, "expected expression in var declaration"))
+    ParseResult<Expr> Tmp;
+    if ((Tmp = parseExpr("expected expression in var declaration")))
       return true;
+    
+    if (!Tmp.isSemaError())
+      Init = Tmp.get();
     
     // If there was an expression, but it had a parse error, give the var decl
     // an artificial int type to avoid chained errors.
     // FIXME: We really need to distinguish erroneous expr from missing expr in
     // ActOnVarDecl.
-    if (Init.isNull() && Ty.isNull())
+    if (Tmp.isSemaError() && Ty.isNull())
       Ty = S.Context.TheInt32Type;
   }
   
@@ -665,9 +734,9 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
     
     // If there is a square bracket, we have an array.
     if (consumeIf(tok::l_square)) {
-      NullablePtr<Expr> Size;
+      ParseResult<Expr> Size;
       if (!Tok.is(tok::r_square) &&
-          parseExpr(Size, "expected expression for array type size"))
+          (Size = parseExpr("expected expression for array type size")))
         return true;
       
       SMLoc RArrayTok = Tok.getLoc();
@@ -676,8 +745,10 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
         return true;
       }
       
-      Result = S.type.ActOnArrayType(Result, TokLoc, Size.getPtrOrNull(),
-                                     RArrayTok);
+      // FIXME: On a semantic error, we're changing what we're parsing here.
+      if (Size.isSuccess())
+        Result = S.type.ActOnArrayType(Result, TokLoc, Size.get(),
+                                       RArrayTok);
       continue;
     }
     
@@ -799,9 +870,10 @@ static bool isStartOfExpr(const Token &Tok, const Token &Next) {
 ///   expr:
 ///     expr-primary+
 ///
-bool Parser::parseExpr(NullablePtr<Expr> &Result, const char *Message) {
+ParseResult<Expr> Parser::parseExpr(const char *Message) {
   SmallVector<Expr*, 8> SequencedExprs;
   
+  ParseResult<Expr> Tmp;
   do {
     // Parse the expr-primary
     if (parseExprPrimary(SequencedExprs)) return true;
@@ -809,10 +881,8 @@ bool Parser::parseExpr(NullablePtr<Expr> &Result, const char *Message) {
   
   // If there is exactly one element in the sequence, it is a degenerate
   // sequence that just returns the last value anyway, shortcut ActOnSequence.
-  if (SequencedExprs.size() == 1) {
-    Result = SequencedExprs[0];
-    return false;
-  }
+  if (SequencedExprs.size() == 1)
+    return SequencedExprs[0];
   
   if (SequencedExprs.empty()) {
     error(Tok.getLoc(), Message);
@@ -822,8 +892,7 @@ bool Parser::parseExpr(NullablePtr<Expr> &Result, const char *Message) {
   Expr **NewElements =
     S.Context.AllocateCopy<Expr*>(SequencedExprs.begin(), SequencedExprs.end());
   
-  Result = new (S.Context) SequenceExpr(NewElements, SequencedExprs.size());
-  return false;
+  return new (S.Context) SequenceExpr(NewElements, SequencedExprs.size());
 }
 
 /// parseExprPrimary
@@ -846,20 +915,20 @@ bool Parser::parseExpr(NullablePtr<Expr> &Result, const char *Message) {
 ///
 ///   expr-subscript:
 ///     expr-primary '[' expr ']'
-bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &Result) {
-  NullablePtr<Expr> R;
+bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &ResVec) {
+  ParseResult<Expr> Result;
   switch (Tok.getKind()) {
   case tok::numeric_constant:
-    R = S.expr.ActOnNumericConstant(Tok.getText(), Tok.getLoc());
+    Result = S.expr.ActOnNumericConstant(Tok.getText(), Tok.getLoc());
     consumeToken(tok::numeric_constant);
     break;
 
   case tok::dollarident: // $1
-    if (parseExprDollarIdentifier(R)) return true;
+    Result = parseExprDollarIdentifier();
     break;
   case tok::oper:
   case tok::identifier:  // foo   and  foo::bar
-    if (parseExprIdentifier(R)) return true;
+    Result = parseExprIdentifier();
     break;
 
   case tok::colon: {     // :foo
@@ -870,16 +939,16 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &Result) {
       return true;
     
     // Handle :foo by just making an AST node.
-    R = new (S.Context) UnresolvedMemberExpr(ColonLoc, NameLoc, Name);
+    Result = new (S.Context) UnresolvedMemberExpr(ColonLoc, NameLoc, Name);
     break;
   }
       
   case tok::l_paren:
-    if (parseExprParen(R)) return true;
+    Result = parseExprParen();
     break;
 
   case tok::kw_func:
-    if (parseExprFunc(R)) return true;
+    Result = parseExprFunc();
     break;
       
   default:
@@ -887,29 +956,30 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &Result) {
     return true;
   }
   
-  if (!R.isNull())
-    Result.push_back(R.get());
-  
+  // If we had a parse error, don't attempt to parse suffixes.  Do keep going if
+  // we had semantic errors though.
+  if (Result.isParseError())
+    return true;
+  if (!Result.isSemaError())
+    ResVec.push_back(Result.get());
+    
   // Handle suffix expressions.
   while (1) {
     // Check for a .foo suffix.
     SMLoc TokLoc = Tok.getLoc();
     if (consumeIf(tok::period)) {
-      if (Tok.isNot(tok::identifier) && Tok.isNot(tok::oper) &&
-          Tok.isNot(tok::dollarident)) {
+      if (Tok.isNot(tok::identifier) && Tok.isNot(tok::dollarident)) {
         error(Tok.getLoc(), "expected field name");
         return true;
       }
         
-      if (!R.isNull()) {
+      if (!Result.isSemaError()) {
         Identifier Name = S.Context.getIdentifier(Tok.getText());
-        Result.push_back(new (S.Context) UnresolvedDotExpr(0, TokLoc, Name,
+        ResVec.push_back(new (S.Context) UnresolvedDotExpr(0, TokLoc, Name,
                                                            Tok.getLoc()));
       }
       if (Tok.is(tok::identifier))
         consumeToken(tok::identifier);
-      else if (Tok.is(tok::oper))
-        consumeToken(tok::oper);
       else
         consumeToken(tok::dollarident);
       continue;
@@ -917,8 +987,8 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &Result) {
     
     // Check for a [expr] suffix.
     if (consumeIf(tok::l_square)) {
-      NullablePtr<Expr> Idx;
-      if (parseExpr(Idx, "expected expression parsing array index"))
+      ParseResult<Expr> Idx;
+      if ((Idx = parseExpr("expected expression parsing array index")))
         return true;
       
       SMLoc RLoc = Tok.getLoc();
@@ -927,9 +997,10 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &Result) {
         return true;        
       }
       
-      if (!R.isNull() && !Idx.isNull()) {
+      if (!Result.isSemaError() && !Idx.isSemaError()) {
         // FIXME: Implement.  This should add an unresolved subscript node, just
         // like UnresolvedDotExpr.
+        Result = Result;
       }
     }
         
@@ -941,7 +1012,7 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &Result) {
 
 ///   expr-identifier:
 ///     dollarident
-bool Parser::parseExprDollarIdentifier(NullablePtr<Expr> &Result) {
+ParseResult<Expr> Parser::parseExprDollarIdentifier() {
   StringRef Name = Tok.getText();
   SMLoc Loc = consumeToken(tok::dollarident);
   assert(Name[0] == '$' && "Not a dollarident");
@@ -951,17 +1022,16 @@ bool Parser::parseExprDollarIdentifier(NullablePtr<Expr> &Result) {
   
   if (Name.size() == 1 || !AllNumeric) {
     error(Loc, "invalid identifier, expected expression");
-    return true;
+    return ParseResult<Expr>::getSemaError();
   }
   
   unsigned ArgNo = 0;
   if (Name.substr(1).getAsInteger(10, ArgNo)) {
     error(Loc, "invalid name in $ expression");
-    return true;
+    return ParseResult<Expr>::getSemaError();
   }
   
-  Result = new (S.Context) AnonClosureArgExpr(ArgNo, Loc);
-  return false;
+  return new (S.Context) AnonClosureArgExpr(ArgNo, Loc);
 }
 
 
@@ -970,16 +1040,14 @@ bool Parser::parseExprDollarIdentifier(NullablePtr<Expr> &Result) {
 ///   expr-identifier:
 ///     identifier
 ///     identifier '::' identifier
-bool Parser::parseExprIdentifier(NullablePtr<Expr> &Result) {
+ParseResult<Expr> Parser::parseExprIdentifier() {
   assert(Tok.is(tok::identifier) || Tok.is(tok::oper));
   SMLoc Loc = Tok.getLoc();
   Identifier Name;
   parseIdentifier(Name, "");
 
-  if (Tok.isNot(tok::coloncolon)) {
-    Result = S.expr.ActOnIdentifierExpr(Name, Loc);
-    return false;
-  }
+  if (Tok.isNot(tok::coloncolon))
+    return S.expr.ActOnIdentifierExpr(Name, Loc);
   
   SMLoc ColonColonLoc = consumeToken(tok::coloncolon);
 
@@ -989,9 +1057,7 @@ bool Parser::parseExprIdentifier(NullablePtr<Expr> &Result) {
                       "::' expression"))
     return true;
 
-  Result = S.expr.ActOnScopedIdentifierExpr(Name, Loc, ColonColonLoc,
-                                            Name2, Loc2);
-  return false;
+  return S.expr.ActOnScopedIdentifierExpr(Name, Loc, ColonColonLoc, Name2,Loc2);
 }
 
 
@@ -1004,12 +1070,12 @@ bool Parser::parseExprIdentifier(NullablePtr<Expr> &Result) {
 ///   expr-paren-element:
 ///     ('.' identifier '=')? expr
 ///
-bool Parser::parseExprParen(NullablePtr<Expr> &Result) {
+ParseResult<Expr> Parser::parseExprParen() {
   SMLoc LPLoc = consumeToken(tok::l_paren);
   
   SmallVector<Expr*, 8> SubExprs;
   SmallVector<Identifier, 8> SubExprNames; 
-  bool AnyErroneousSubExprs = false;
+  bool AnySubExprSemaErrors = false;
   
   if (Tok.isNot(tok::r_paren)) {
     do {
@@ -1029,12 +1095,12 @@ bool Parser::parseExprParen(NullablePtr<Expr> &Result) {
         SubExprNames.push_back(FieldName);
       }
       
-      NullablePtr<Expr> SubExpr;
-      if (parseExpr(SubExpr, "expected expression in parentheses"))
+      ParseResult<Expr> SubExpr;
+      if ((SubExpr = parseExpr("expected expression in parentheses")))
         return true;
       
-      if (SubExpr.isNull())
-        AnyErroneousSubExprs = true;
+      if (SubExpr.isSemaError())
+        AnySubExprSemaErrors = true;
       else
         SubExprs.push_back(SubExpr.get());
     
@@ -1047,8 +1113,8 @@ bool Parser::parseExprParen(NullablePtr<Expr> &Result) {
     return true;
   }
 
-  if (AnyErroneousSubExprs)
-    return false;
+  if (AnySubExprSemaErrors)
+    return ParseResult<Expr>::getSemaError();
 
   // Determine whether the left paren was immediately preceded by an identifier,
   // as in 'foo()', which indicates that the tuple needs to be bound to that
@@ -1056,11 +1122,9 @@ bool Parser::parseExprParen(NullablePtr<Expr> &Result) {
   // reasonably well.
   bool IsPrecededByIdentifier = L.isPrecededByIdentifier(LPLoc);
   
-  Result = S.expr.ActOnTupleExpr(LPLoc, SubExprs.data(),
-                                 SubExprNames.empty()?0 : SubExprNames.data(),
-                                 SubExprs.size(), RPLoc,
-                                 IsPrecededByIdentifier);
-  return false;
+  return S.expr.ActOnTupleExpr(LPLoc, SubExprs.data(),
+                               SubExprNames.empty()?0 : SubExprNames.data(),
+                               SubExprs.size(), RPLoc, IsPrecededByIdentifier);
 }
 
 /// parseExprFunc - Parse a func expression.
@@ -1070,7 +1134,7 @@ bool Parser::parseExprParen(NullablePtr<Expr> &Result) {
 ///
 /// The type must start with '(' if present.
 ///
-bool Parser::parseExprFunc(NullablePtr<Expr> &Result) {
+ParseResult<Expr> Parser::parseExprFunc() {
   SMLoc FuncLoc = consumeToken(tok::kw_func);
 
   Type Ty;
@@ -1102,8 +1166,7 @@ bool Parser::parseExprFunc(NullablePtr<Expr> &Result) {
   FE->Body = parseStmtBrace();
   if (FE->Body == 0) return true;
   
-  Result = FE;
-  return false;
+  return FE;
 }
 
 
@@ -1123,6 +1186,8 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
   Scope BraceScope(S.decl);
     
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
+    bool NeedParseErrorRecovery = false;
+    
     // Parse the decl, stmt, or expression.    
     switch (Tok.getKind()) {
     case tok::semi:
@@ -1174,35 +1239,45 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       }
       // FALL THROUGH into expression case.
     default:
-      Entries.push_back(ExprStmtOrDecl());
-        
-      NullablePtr<Expr> ResultExpr;
-      if (parseExpr(ResultExpr) || ResultExpr.isNull())
+      ParseResult<Expr> ResultExpr;
+      if ((ResultExpr = parseExpr())) {
+        NeedParseErrorRecovery = true;
         break;
+      }
       
-      // Check for assignment.
-      if (Tok.is(tok::equal)) {
-        SMLoc EqualLoc = consumeToken();
-        NullablePtr<Expr> RHSExpr;
-        if (parseExpr(RHSExpr) || RHSExpr.isNull())
-          break;
-        
-        Entries.back() = new (S.Context) AssignStmt(ResultExpr.get(), EqualLoc,
-                                                    RHSExpr.get());
+      // Check for assignment.  If we don't have it, then we just have a simple
+      // expression.
+      if (Tok.isNot(tok::equal)) {
+        if (!ResultExpr.isSemaError())
+          Entries.push_back(ResultExpr.get());
         break;
       }
         
-      Entries.back() = ResultExpr.get();
+      SMLoc EqualLoc = consumeToken();
+      ParseResult<Expr> RHSExpr;
+      if ((RHSExpr = parseExpr())) {
+        NeedParseErrorRecovery = true;
+        break;
+      }
+      
+      if (!ResultExpr.isSemaError() && !RHSExpr.isSemaError())
+        Entries.push_back(new (S.Context) AssignStmt(ResultExpr.get(),
+                                                     EqualLoc,RHSExpr.get()));
       break;
     }
     
-    if (Entries.back().isNull()) {
+    // FIXME: This is a hack.
+    if (!Entries.empty() && Entries.back().isNull()) {
       Entries.pop_back();
+      NeedParseErrorRecovery = true;
+    }
+    
+    if (NeedParseErrorRecovery) {
       if (Tok.is(tok::semi))
         continue;  // Consume the ';' and keep going.
       
       // FIXME: QOI: Improve error recovery.
-      if (Tok.is(tok::semi) && Tok.isNot(tok::r_brace))
+      if (Tok.isNot(tok::r_brace))
         skipUntil(tok::r_brace);
       consumeIf(tok::r_brace);
       return true;
@@ -1251,9 +1326,10 @@ Stmt *Parser::parseStmtReturn() {
   // enclosing stmt-brace to get it by eagerly eating it.
   Expr *Result;
   if (isStartOfExpr(Tok, peekToken())) {
-    NullablePtr<Expr> ResultTmp;
-    if (parseExpr(ResultTmp, "expected expresssion in 'return' statement") ||
-        ResultTmp.isNull())
+    ParseResult<Expr> ResultTmp;
+    if ((ResultTmp = parseExpr("expected expresssion in 'return' statement")) ||
+        // FIXME: Sema errors should be propagated.
+        ResultTmp.isSemaError())
       return 0;
     Result = ResultTmp.get();
   } else {
@@ -1274,8 +1350,8 @@ Stmt *Parser::parseStmtReturn() {
 Stmt *Parser::parseStmtIf() {
   SMLoc IfLoc = consumeToken(tok::kw_if);
 
-  NullablePtr<Expr> Condition;
-  if (parseExpr(Condition, "expected expresssion in 'if' condition"))
+  ParseResult<Expr> Condition;
+  if ((Condition = parseExpr("expected expresssion in 'if' condition")))
     return 0;
   
   if (Tok.isNot(tok::l_brace)) {
@@ -1302,7 +1378,8 @@ Stmt *Parser::parseStmtIf() {
   }
 
   // If our condition and normal expression parsed correctly, build an AST.
-  if (Condition.isNull())
+  // FIXME: Sema errors should be propagated.
+  if (Condition.isSemaError())
     return 0;
   
   Expr *Cond = S.expr.ActOnCondition(Condition.get());
@@ -1317,8 +1394,8 @@ Stmt *Parser::parseStmtIf() {
 Stmt *Parser::parseStmtWhile() {
   SMLoc WhileLoc = consumeToken(tok::kw_while);
   
-  NullablePtr<Expr> Condition;
-  if (parseExpr(Condition, "expected expresssion in 'while' condition"))
+  ParseResult<Expr> Condition;
+  if ((Condition = parseExpr("expected expresssion in 'while' condition")))
     return 0;
   
   if (Tok.isNot(tok::l_brace)) {
@@ -1330,7 +1407,8 @@ Stmt *Parser::parseStmtWhile() {
   if (Body == 0) return 0;
   
   // If our condition and normal expression parsed correctly, build an AST.
-  if (Condition.isNull())
+  // FIXME: Sema errors should be propagated.
+  if (Condition.isSemaError())
     return 0;
   
   Expr *Cond = S.expr.ActOnCondition(Condition.get());

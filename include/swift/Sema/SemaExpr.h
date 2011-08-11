@@ -43,7 +43,7 @@ public:
 
   typedef llvm::PointerUnion<Expr*, Decl*> ExprOrDecl;
   
-  // Action Implementations
+  // Action Implementations.  These return null on semantic errors.
   NullablePtr<Expr>
   ActOnNumericConstant(StringRef Text, SMLoc Loc);
   NullablePtr<Expr>
