@@ -138,7 +138,8 @@ private:
 
   // Expression Parsing
   ParseResult<Expr> parseExpr(const char *Message = 0);
-  bool parseExprPrimary(SmallVectorImpl<Expr*> &Results);
+  bool parseExprPrimary(SmallVectorImpl<Expr*> &Results,
+                        const char *Message = 0);
   ParseResult<Expr> parseExprIdentifier();
   ParseResult<Expr> parseExprDollarIdentifier();
   ParseResult<Expr> parseExprParen();

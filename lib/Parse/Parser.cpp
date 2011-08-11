@@ -212,7 +212,7 @@ bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init) {
   // Parse the initializer, if present.
   if (consumeIf(tok::equal)) {
     ParseResult<Expr> Tmp;
-    if ((Tmp = parseExpr("expected expression in var declaration")))
+    if ((Tmp = parseExpr("expected expression in value specifier")))
       return true;
     
     if (!Tmp.isSemaError())
@@ -876,18 +876,20 @@ ParseResult<Expr> Parser::parseExpr(const char *Message) {
   ParseResult<Expr> Tmp;
   do {
     // Parse the expr-primary
-    if (parseExprPrimary(SequencedExprs)) return true;
+    if (parseExprPrimary(SequencedExprs, Message)) return true;
+    
+    // The message is only valid for the first subexpr.
+    Message = 0;
   } while (isStartOfExpr(Tok, peekToken()));
   
   // If there is exactly one element in the sequence, it is a degenerate
   // sequence that just returns the last value anyway, shortcut ActOnSequence.
   if (SequencedExprs.size() == 1)
     return SequencedExprs[0];
-  
-  if (SequencedExprs.empty()) {
-    error(Tok.getLoc(), Message);
-    return true;
-  }
+
+  // If nothing was parsed, then a parse error has already been emitted.
+  if (SequencedExprs.empty())
+    return ParseResult<Expr>::getSemaError();
   
   Expr **NewElements =
     S.Context.AllocateCopy<Expr*>(SequencedExprs.begin(), SequencedExprs.end());
@@ -915,7 +917,8 @@ ParseResult<Expr> Parser::parseExpr(const char *Message) {
 ///
 ///   expr-subscript:
 ///     expr-primary '[' expr ']'
-bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &ResVec) {
+bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &ResVec,
+                              const char *Message) {
   ParseResult<Expr> Result;
   switch (Tok.getKind()) {
   case tok::numeric_constant:
@@ -952,7 +955,7 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &ResVec) {
     break;
       
   default:
-    error(Tok.getLoc(), "expected expression");
+    error(Tok.getLoc(), Message ? Message : "expected expression");
     return true;
   }
   
@@ -1255,7 +1258,7 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
         
       SMLoc EqualLoc = consumeToken();
       ParseResult<Expr> RHSExpr;
-      if ((RHSExpr = parseExpr())) {
+      if ((RHSExpr = parseExpr("expected expression in assignment"))) {
         NeedParseErrorRecovery = true;
         break;
       }
