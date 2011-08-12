@@ -963,7 +963,10 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &ResVec,
     Result = new (S.Context) UnresolvedMemberExpr(ColonLoc, NameLoc, Name);
     break;
   }
-      
+
+  // A spaced left parenthesis can generally start a tuple expression.
+  // What it can't do is start a call.
+  case tok::l_paren:
   case tok::l_paren_space:
     Result = parseExprParen();
     break;
@@ -1008,6 +1011,7 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &ResVec,
     }
     
     // Check for a () suffix, which indicates a call.
+    // Note that this cannot be a l_paren_space.
     if (Tok.is(tok::l_paren)) {
       if ((Result = parseExprParen())) return true;
       if (!Result.isSemaError())
@@ -1242,7 +1246,7 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
         Entries.pop_back();
       }
       break;
-      
+
     case tok::kw_var:
       parseDeclVar(Entries);
       break;

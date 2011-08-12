@@ -243,10 +243,6 @@ void Lexer::lexImpl() {
   assert(CurPtr >= Buffer->getBufferStart() &&
          CurPtr <= Buffer->getBufferEnd() && "Cur Char Pointer out of range!");
   
-  // Keep track of the end of the previous token for whitespace sensitive tokens
-  // like '('.
-  const char *EndOfPrevToken = CurPtr;
-  
 Restart:
   // Remember the start of the token so we can form the text range.
   const char *TokStart = CurPtr;
@@ -274,24 +270,25 @@ Restart:
 
   case '(': {
     // This is either l_paren or l_paren_space depending on whether there is
-    // whitespace before it and whether there was an operator before it.
-    if (CurPtr-1 != EndOfPrevToken)
-      return formToken(tok::l_paren_space, TokStart);  // had whitespace.
+    // whitespace before it.
+    bool PrecededBySpace;
 
-    // '(' at the start of a buffer is considered to be the start of an
-    // expression.
-    if (EndOfPrevToken == Buffer->getBufferStart())
+    // For these purposes, the start of the file is considered to be
+    // preceeded by infinite whitespace.
+    if (CurPtr - 1 == Buffer->getBufferStart()) {
+      PrecededBySpace = true;
+
+    // Otherwise, our list of whitespace characters is pretty short.
+    } else {
+      char LastChar = *(CurPtr - 2);
+      PrecededBySpace = (LastChar == ' ' || LastChar == '\t' ||
+                         LastChar == '\r' || LastChar == '\r' ||
+                         LastChar == '\0');
+    }
+
+    if (PrecededBySpace)
       return formToken(tok::l_paren_space, TokStart);
 
-    char LastTokenChar = EndOfPrevToken[-1];
-    
-    // If this '(' was preceded by operator or some other punctuation (but not
-    // ')'), then it is the start of an expression.
-    if (isPunctuationIdentifierChar(LastTokenChar) ||
-        LastTokenChar == '(' || LastTokenChar == '{' || LastTokenChar == '[')
-      return formToken(tok::l_paren_space, TokStart);
-      
-    // Otherwise, a ( without whitespace.
     return formToken(tok::l_paren, TokStart);
   }
   case ')': return formToken(tok::r_paren,  TokStart);
