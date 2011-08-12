@@ -45,7 +45,7 @@ enum class ExprKind {
   UnresolvedDot,
   TupleElement,
   TupleShuffle,
-  Apply,
+  Call,
   Sequence,
   Func,
   Closure,
@@ -388,21 +388,21 @@ public:
 };
   
   
-/// ApplyExpr - Application of an argument to a function, which occurs
-/// syntactically through juxtaposition.  For example, f(1,2) is parsed as
-/// 'f' '(1,2)' which applies a tuple to the function, producing a result.
-class ApplyExpr : public Expr {
+/// CallExpr - Application of an argument to a function, which occurs
+/// syntactically through juxtaposition with a TupleExpr whose
+/// leading '(' is unspaced.
+class CallExpr : public Expr {
 public:
   /// Fn - The function being invoked.
   Expr *Fn;
   /// Argument - The one argument being passed to it.
   Expr *Arg;
-  ApplyExpr(Expr *fn, Expr *arg, Type Ty)
-    : Expr(ExprKind::Apply, Ty), Fn(fn), Arg(arg) {}
+  CallExpr(Expr *fn, Expr *arg, Type Ty)
+    : Expr(ExprKind::Call, Ty), Fn(fn), Arg(arg) {}
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const ApplyExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == ExprKind::Apply; }
+  static bool classof(const CallExpr *) { return true; }
+  static bool classof(const Expr *E) { return E->Kind == ExprKind::Call; }
 };
 
 /// SequenceExpr - a series of expressions which should be evaluated

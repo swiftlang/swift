@@ -56,8 +56,8 @@ SMLoc Expr::getLocStart() const {
     return cast<TupleElementExpr>(this)->SubExpr->getLocStart();
   case ExprKind::TupleShuffle:
     return cast<TupleShuffleExpr>(this)->SubExpr->getLocStart();
-  case ExprKind::Apply:
-    return cast<ApplyExpr>(this)->Fn->getLocStart();
+  case ExprKind::Call:
+    return cast<CallExpr>(this)->Fn->getLocStart();
   case ExprKind::Sequence:
     return cast<SequenceExpr>(this)->Elements[0]->getLocStart();
   case ExprKind::Func:
@@ -367,7 +367,7 @@ namespace {
       return 0;
     }
     
-    Expr *visitApplyExpr(ApplyExpr *E) {
+    Expr *visitCallExpr(CallExpr *E) {
       Expr *E2 = doIt(E->Fn);
       if (E2 == 0) return 0;
       E->Fn = E2;
@@ -654,7 +654,7 @@ public:
     OS << ')';
   }
 
-  void visitApplyExpr(ApplyExpr *E) {
+  void visitCallExpr(CallExpr *E) {
     OS.indent(Indent) << "(apply_expr type='" << E->Ty << "'\n";
     printRec(E->Fn);
     OS << '\n';

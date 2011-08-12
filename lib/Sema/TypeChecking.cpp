@@ -158,8 +158,10 @@ static bool SemaTupleExpr(TupleExpr *TE, TypeChecker &TC) {
   return false;
 }
 
-static bool SemaApplyExpr(Expr *&E1, Expr *&E2, Type &ResultTy,
-                          TypeChecker &TC) {
+static bool SemaCallExpr(CallExpr *E, TypeChecker &TC) {
+  Expr *&E1 = E->Fn;
+  Expr *&E2 = E->Arg;
+
   // If we have a concrete function type, then we win.
   if (FunctionType *FT = E1->Ty->getAs<FunctionType>()) {
     // We have a function application.  Check that the argument type matches the
@@ -170,7 +172,7 @@ static bool SemaApplyExpr(Expr *&E1, Expr *&E2, Type &ResultTy,
               "while converting function argument to expected type");
       return true;
     }  
-    ResultTy = FT->Result;
+    E->Ty = FT->Result;
     return false;
   }
   
@@ -213,14 +215,14 @@ static bool SemaApplyExpr(Expr *&E1, Expr *&E2, Type &ResultTy,
     if (BestCandidateFound != -1) {
       E1 = new (TC.Context) DeclRefExpr(OS->Decls[BestCandidateFound], OS->Loc,
                                         OS->Decls[BestCandidateFound]->Ty);
-      return SemaApplyExpr(E1, E2, ResultTy, TC);
+      return SemaCallExpr(E, TC);
     }
     
     // FIXME: Emit an error here if we have an overload resolution failure.
   }
   
   // Otherwise, we can't resolve the argument type yet.
-  ResultTy = E2->Ty;
+  E->Ty = E2->Ty;
   return false;
 }
 
@@ -395,8 +397,8 @@ namespace {
       return E;
     }
     
-    Expr *visitApplyExpr(ApplyExpr *E) {
-      if (SemaApplyExpr(E->Fn, E->Arg, E->Ty, TC))
+    Expr *visitCallExpr(CallExpr *E) {
+      if (SemaCallExpr(E, TC))
         return 0;
       return E;
     }
@@ -596,12 +598,12 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     else
       FnRef = new (TC.Context) OverloadSetRefExpr(E->ResolvedDecls, E->NameLoc,
                                                 DependentType::get(TC.Context));
-        
-    Type ResultTy;
-    if (SemaApplyExpr(FnRef, E->SubExpr, ResultTy, TC))
+
+    CallExpr *Call = new (TC.Context) CallExpr(FnRef, E->SubExpr, Type());
+    if (SemaCallExpr(Call, TC))
       return 0;
     
-    return new (TC.Context) ApplyExpr(FnRef, E->SubExpr, ResultTy);
+    return Call;
   }
   
   // TODO: Otherwise, do an argument dependent lookup in the namespace of the
@@ -914,8 +916,8 @@ namespace {
     }
 
     
-    Expr *visitApplyExpr(ApplyExpr *E) {
-      // If we have ":f(x)" and the result type of the Apply is a OneOfType, then
+    Expr *visitCallExpr(CallExpr *E) {
+      // If we have ":f(x)" and the result type of the call is a OneOfType, then
       // :f must be an element constructor for the oneof value.  Note that
       // handling this syntactically causes us to reject "(:f) x" as ambiguous.
       if (UnresolvedMemberExpr *UME =
@@ -928,19 +930,17 @@ namespace {
                      DestTy->getString() + "' to initialize member");
             return 0;
           }
-              
-          Expr *fn = new (TC.Context) DeclRefExpr(DED, UME->ColonLoc, DED->Ty);
-          Expr *arg = E->Arg;
-          Type type;
-            
-          if (SemaApplyExpr(fn, arg, type, TC))
+
+          // FIXME: Preserve source locations.
+          E->Fn = new (TC.Context) DeclRefExpr(DED, UME->ColonLoc, DED->Ty);
+          if (SemaCallExpr(E, TC))
             return 0;
             
-          return new (TC.Context) ApplyExpr(fn, arg, type);
+          return E;
         }
       }
       
-      // FIXME: Given an ApplyExpr of "a b" where "a" is an overloaded value, we
+      // FIXME: Given a CallExpr a(b) where "a" is an overloaded value, we
       // may be able to prune the overload set based on the known result type.
       // Doing this may allow the ambiguity to resolve by removing candidates
       // that caused the ambiguity.  For example if we know that the destination

@@ -1073,7 +1073,7 @@ ParseResult<Expr> Parser::parseExprPrimary(const char *Message) {
       if (Arg.isSemaError())
         Result = ParseResult<Expr>::getSemaError();
       else if (!Result.isSemaError())
-        Result = new (S.Context) ApplyExpr(Result.get(), Arg.get(), Type());
+        Result = new (S.Context) CallExpr(Result.get(), Arg.get(), Type());
       continue;
     }
     

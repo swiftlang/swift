@@ -72,7 +72,7 @@ public:
     DISPATCH(UnresolvedDot);
     DISPATCH(TupleElement);
     DISPATCH(TupleShuffle);
-    DISPATCH(Apply);
+    DISPATCH(Call);
     DISPATCH(Sequence);
     DISPATCH(Func);
     DISPATCH(Closure);

@@ -105,7 +105,7 @@ Expr *SemaExpr::ActOnCondition(Expr *Cond) {
   Identifier C2LVFuncId = S.Context.getIdentifier("convertToLogicValue");
   Expr *C2LVFunc = ActOnIdentifierExpr(C2LVFuncId, Cond->getLocStart()).get();
   
-  return new (S.Context) ApplyExpr(C2LVFunc, Cond, Type());
+  return new (S.Context) CallExpr(C2LVFunc, Cond, Type());
 }
 
 
