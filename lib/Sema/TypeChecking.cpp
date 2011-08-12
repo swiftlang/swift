@@ -44,7 +44,8 @@ namespace {
       Context.SourceMgr.PrintMessage(Loc, Message, "error");
     }
     
-    bool validateType(Type &T);
+    bool validateType(ValueDecl *VD);
+    bool validateType(Type T);
 
     void typeCheck(TypeAliasDecl *TAD);
 
@@ -1378,12 +1379,21 @@ Expr *TypeChecker::convertToType(Expr *E, Type DestTy) {
 // Type Validation
 //===----------------------------------------------------------------------===//
 
+/// validateType - Recursively check to see if the type of a decl is valid.  If
+/// not, diagnose the problem and collapse it to an ErrorType.
+bool TypeChecker::validateType(ValueDecl *VD) {
+  if (!validateType(VD->Ty)) return false;
+  
+  VD->Ty = ErrorType::get(Context);
+  return true;
+}
+
 /// validateType - Types can contain expressions (in the default values for
 /// tuple elements), and thus need semantic analysis to ensure that these
 /// expressions are valid and that they have the appropriate conversions etc.
 ///
 /// This returns true if the type is invalid.
-bool TypeChecker::validateType(Type &InTy) {
+bool TypeChecker::validateType(Type InTy) {
   assert(InTy && "Cannot validate null types!");
 
   TypeBase *T = InTy.getPointer();
@@ -1392,12 +1402,12 @@ bool TypeChecker::validateType(Type &InTy) {
   // If a type has a canonical type, then it is known safe.
   if (T->hasCanonicalTypeComputed()) return false;
 
-  bool IsValid = true;
+  bool IsInvalid = false;
   
   switch (T->Kind) {
   case TypeKind::Error:
     // Error already diagnosed.
-    return false;
+    return true;
   case TypeKind::BuiltinInt1:
   case TypeKind::BuiltinInt8:
   case TypeKind::BuiltinInt16:
@@ -1407,13 +1417,18 @@ bool TypeChecker::validateType(Type &InTy) {
     return false;
   case TypeKind::OneOf:
     for (OneOfElementDecl *Elt : cast<OneOfType>(T)->Elements) {
-      if (Elt->ArgumentType.isNull()) continue;
-      IsValid &= !validateType(Elt->ArgumentType);
-      if (!IsValid) break;
+      // Ignore element decls that have no associated type.
+      if (Elt->ArgumentType.isNull())
+        continue;
+      
+      IsInvalid = validateType(Elt);
+      if (IsInvalid) break;
     }
     break;
   case TypeKind::NameAlias:
-    IsValid = !validateType(cast<NameAliasType>(T)->TheDecl->UnderlyingTy);
+    IsInvalid = validateType(cast<NameAliasType>(T)->TheDecl->UnderlyingTy);
+    if (IsInvalid)
+      cast<NameAliasType>(T)->TheDecl->UnderlyingTy = ErrorType::get(Context);
     break;
   case TypeKind::Tuple: {
     TupleType *TT = cast<TupleType>(T);
@@ -1425,7 +1440,7 @@ bool TypeChecker::validateType(Type &InTy) {
       // verifying each individually.
       Type EltTy = TT->Fields[i].Ty;
       if (EltTy && validateType(EltTy)) {
-        IsValid = false;
+        IsInvalid = true;
         break;
       }
 
@@ -1436,15 +1451,13 @@ bool TypeChecker::validateType(Type &InTy) {
       checkBody(EltInit, EltTy, 0);
       if (EltInit == 0) {
         note(InitLoc, "while converting default tuple value to element type");
-        IsValid = false;
+        IsInvalid = true;
         break;
       }
         
       // If both a type and an initializer are specified, make sure the
       // initializer's type agrees with the (redundant) type.
-      assert(EltTy.isNull() || 
-             EltTy->getCanonicalType(Context) ==
-             EltInit->Ty->getCanonicalType(Context));
+      assert(EltTy.isNull() || EltTy->isEqual(EltInit->Ty, Context));
       EltTy = EltInit->Ty;
 
       TT->updateInitializedElementType(i, EltTy, EltInit);
@@ -1454,27 +1467,18 @@ bool TypeChecker::validateType(Type &InTy) {
       
   case TypeKind::Function: {
     FunctionType *FT = cast<FunctionType>(T);
-    if ((InTy = FT->Input, validateType(InTy)) ||
-        (InTy = FT->Result, validateType(InTy))) {
-      IsValid = false;
-      break;
-    }
-    InTy = FT;
+    IsInvalid = validateType(FT->Input) || validateType(FT->Result);
     break;
   }
   case TypeKind::Array:
     ArrayType *AT = cast<ArrayType>(T);
-    if (InTy = AT->Base, validateType(InTy)) {
-      IsValid = false;
-      break;
-    }
-    InTy = AT;
+    IsInvalid = validateType(AT->Base);
     // FIXME: We need to check AT->Size! (It also has to be convertible to int).
     break;
   }
 
   // If we determined that this type is invalid, erase it in the caller.
-  if (!IsValid) {
+  if (IsInvalid) {
     InTy = ErrorType::get(Context);
     return true;
   }
@@ -1587,7 +1591,7 @@ void TypeChecker::checkBody(Expr *&E, Type DestTy,
 }
 
 void TypeChecker::typeCheck(TypeAliasDecl *TAD) {
-  validateType(TAD->UnderlyingTy);
+  validateType(TAD->getAliasType(Context));
 }
 
 void TypeChecker::typeCheckERD(ElementRefDecl *ERD) {
@@ -1662,8 +1666,8 @@ void TypeChecker::typeCheckVarDecl(VarDecl *VD,
 
 
 bool TypeChecker::typeCheckValueDecl(ValueDecl *VD,
-                                     SmallVectorImpl<Expr*> &ExcessExprs){
-  if (validateType(VD->Ty)) {
+                                     SmallVectorImpl<Expr*> &ExcessExprs) {
+  if (validateType(VD)) {
     VD->Init = 0;
     return true;
   }
