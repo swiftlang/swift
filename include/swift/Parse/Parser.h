@@ -112,7 +112,7 @@ private:
   /// true is returned.
   bool parseToken(tok K, const char *Message, tok SkipToTok = tok::unknown);
   
-  bool parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init);
+  bool parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init, bool Single);
 
   bool parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Decls,
                           bool IsTopLevel);
@@ -137,10 +137,12 @@ private:
                           Type &Result, TypeAliasDecl *TypeName = 0);
 
   // Expression Parsing
+  ParseResult<Expr> parseSingleExpr(const char *Message = 0);
   ParseResult<Expr> parseExpr(const char *Message = 0);
-  bool parseExprPrimary(SmallVectorImpl<Expr*> &Results,
-                        const char *Message = 0);
+  ParseResult<Expr> parseExprPrimary(const char *Message = 0);
+  ParseResult<Expr> parseExprUnary(const char *Message = 0);
   ParseResult<Expr> parseExprIdentifier();
+  Expr *parseExprOperator();
   ParseResult<Expr> parseExprDollarIdentifier();
   ParseResult<Expr> parseExprParen();
   ParseResult<Expr> parseExprFunc();

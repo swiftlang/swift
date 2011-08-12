@@ -182,7 +182,12 @@ static bool SemaApplyExpr(Expr *&E1, Expr *&E2, Type &ResultTy,
   // Otherwise, we must have an application to an overload set.  See if we can
   // resolve which overload member is based on the argument type.
   if (!E2->Ty->is<DependentType>()) {
-    OverloadSetRefExpr *OS = cast<OverloadSetRefExpr>(E1);
+    OverloadSetRefExpr *OS = dyn_cast<OverloadSetRefExpr>(E1);
+    if (!OS) {
+      TC.error(E1->getLocStart(), "called expression isn't a function");
+      return true;
+    }
+
     int BestCandidateFound = -1;
     Expr::ConversionRank BestRank = Expr::CR_Invalid;
     
@@ -221,23 +226,6 @@ static bool SemaApplyExpr(Expr *&E1, Expr *&E2, Type &ResultTy,
   
   // Otherwise, we can't resolve the argument type yet.
   ResultTy = E2->Ty;
-  return false;
-}
-
-/// SemaSequenceExpr - Perform semantic analysis for sequence expressions.
-static bool SemaSequenceExpr(Expr **Elements, unsigned NumElements,
-                             Type &ResultTy, TypeChecker &TC) {
-  // If any of the operands of the sequence have a dependent type, then so does
-  // the sequence.  Dependent values can be resolved to function types, so the
-  // last value of the sequence may be an operand to the function, not the
-  // result of the sequence.
-  for (unsigned i = 0; i != NumElements; ++i)
-    if (Elements[i]->Ty->is<DependentType>()) {
-      ResultTy = Elements[i]->Ty;
-      return false;
-    }
-  
-  ResultTy = Elements[NumElements-1]->Ty;
   return false;
 }
 
@@ -632,219 +620,79 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
 
 /// getBinOp - If the specified expression is an infix binary operator, return
 /// its precedence, otherwise return -1.
-static int getBinOp(SequenceExpr *E, unsigned Elt) {
-  if (Elt >= E->NumElements) return -1;
-  
-  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->Elements[Elt]))
+static int getBinOp(Expr *E) {
+  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
     return DRE->D->Attrs.InfixPrecedence;
   
   // If this is an overload set, the entire overload set is known to have the
   // same precedence level.
-  if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E->Elements[Elt]))
+  if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E))
     return OO->Decls[0]->Attrs.InfixPrecedence;
   
   // Not a binary operator.
   return -1;
 }
 
-static void ReduceJuxtaposedExprs(SequenceExpr *E, unsigned Elt,
-                                  TypeChecker &TC);
+/// ReduceBinaryExprs - We have a sequence of unary expressions;  parse
+/// it, using binary precedence rules, into a sequence of binary operators.
+static Expr *ReduceBinaryExprs(SequenceExpr *E, unsigned &Elt,
+                               TypeChecker &TC, unsigned MinPrec = 0) {
+  Expr *LHS = E->Elements[Elt];
 
+  // The parser only produces well-formed sequences.
+  
+  while (Elt+1 != E->NumElements) {
+    assert(Elt+2 < E->NumElements);
 
-/// ReduceBinaryExprs - If the specified element is the start of a binary
-/// expression sequence, form the binary expression, reducing it down into a
-/// single expression.
-static void ReduceBinaryExprs(SequenceExpr *E, unsigned Elt,
-                              TypeChecker &TC, unsigned MinPrec = 0) {
-  
-  // If the expression we're looking at is that start of a juxtaposed sequence,
-  // reduce it down to a single value first.
-  ReduceJuxtaposedExprs(E, Elt, TC);
-  
-  while (1) {
-    int ThisPrec = getBinOp(E, Elt+1);
-    if (ThisPrec < (int)MinPrec)
-      break;
-    
-    // TODO: Support ternary operators some day.
-    
-    // Get the next expression, which is the RHS of the binary operator.
-    if (Elt+2 == E->NumElements) {
-      TC.error(E->Elements[Elt+1]->getLocStart(),
-               "expected expression after binary operator");
-      --E->NumElements;  // Discard the binary operator.
-      break;
+    Expr *leftOperator = E->Elements[Elt+1];
+    int leftPrecedence = getBinOp(leftOperator);
+    if (leftPrecedence < (int) MinPrec) {
+      if (leftPrecedence == -1)
+        TC.error(leftOperator->getLocStart(),
+                 "operator is not a binary operator");
+      return 0;
     }
-    
-    // If the RHS is the start of a juxtaposed sequence, reduce it down to a
-    // single expression.
-    ReduceJuxtaposedExprs(E, Elt+2, TC);
+
+    Elt += 2;
+    Expr *RHS = E->Elements[Elt];
     
     // Get the precedence of the operator immediately to the right of the RHS
     // of the RHS of the binop (if present).  This is looking for the multiply
     // in "x+y*z".
-    int NextPrec = getBinOp(E, Elt+3);
+    if (Elt+1 != E->NumElements) {
+      assert(Elt+2 < E->NumElements);
+      Expr *rightOperator = E->Elements[Elt+1];
+      int rightPrecedence = getBinOp(rightOperator);
     
-    // TODO: All operators are left associative at the moment.
+      // TODO: All operators are left associative at the moment.
     
-    // If the next operator binds more tightly with RHS than we do, evaluate the
-    // RHS as a complete subexpression first.  This happens with "x+y*z", where
-    // we want to reduce y*z to a single sub-expression of the add.
-    if (ThisPrec < NextPrec) {
-      // Only parse things on the RHS that bind more tightly than the current
-      // operator.
-      ReduceBinaryExprs(E, Elt+2, TC, ThisPrec+1);
-      
-      NextPrec = getBinOp(E, Elt+3);
+      // If the next operator binds more tightly with RHS than we do,
+      // evaluate the RHS as a complete subexpression first.  This
+      // happens with "x+y*z", where we want to reduce y*z to a single
+      // sub-expression of the add.
+      if (leftPrecedence < rightPrecedence) {
+        RHS = ReduceBinaryExprs(E, Elt, TC, (unsigned) (leftPrecedence+1));
+        if (!RHS) return 0;
+      } else if (rightPrecedence == -1) {
+        TC.error(rightOperator->getLocStart(),
+                 "operator is not a binary operator");
+      }
     }
-    assert(NextPrec <= ThisPrec && "Recursion didn't work!");
 
     // Okay, we've finished the parse, form the AST node for the binop now.
-    BinaryExpr *RBE =
-      new (TC.Context) BinaryExpr(E->Elements[Elt], E->Elements[Elt+1],
-                                  E->Elements[Elt+2]);
-    if (!SemaBinaryExpr(RBE->LHS, RBE->Fn, RBE->RHS, RBE->Ty, TC))
-      E->Elements[Elt] = RBE;
-    
-    // The binop and the RHS are now consumed, move everything down.
-    memmove(E->Elements+Elt+1, E->Elements+Elt+3, 
-            (E->NumElements-Elt-3)*sizeof(E->Elements[0]));
-    E->NumElements -= 2;
+    BinaryExpr *RBE = new (TC.Context) BinaryExpr(LHS, leftOperator, RHS);
+    if (SemaBinaryExpr(RBE->LHS, RBE->Fn, RBE->RHS, RBE->Ty, TC))
+      return 0;
+
+    LHS = RBE;
   }
-}
 
-/// isKnownToBeAFunction - return true if this expression is known to be a
-/// function, and therefore allows application of a value to it.  This controls
-/// "parsing" of SequenceExprs into their underlying expression.
-static bool isKnownToBeAFunction(Expr *E) {
-  // If the expression has function type, then it's clearly a function.
-  if (E->Ty->is<FunctionType>())
-    return true;
-  
-  // If the expression is an overload set and all members are functions, then
-  // clearly we have a function!
-  if (OverloadSetRefExpr *OSRE = dyn_cast<OverloadSetRefExpr>(E)) {
-    for (ValueDecl *Elt :OSRE->Decls)
-      if (!Elt->Ty->is<FunctionType>())
-        return false;
-    return true;
-  }
-  
-  return false;
-}
-
-/// ReduceJuxtaposedExprs - Given an element of a sequence expression, check to
-/// see if it is the start of a juxtaposed sequence.  If so, reduce it down to
-/// a single element.  This allows functions to bind to their arguments.
-static void ReduceJuxtaposedExprs(SequenceExpr *E, unsigned Elt,
-                                  TypeChecker &TC) {
-  // If there are no subsequent expression, then it isn't juxtaposed.
-  if (Elt+1 == E->NumElements) return;
-
-  Expr *EltExpr = E->Elements[Elt];
-  
-  // If we have a .foo suffix, and if it isn't bound to a base expression, then
-  // we just found our base.
-  if (UnresolvedDotExpr *UDE = dyn_cast<UnresolvedDotExpr>(E->Elements[Elt+1]))
-    if (UDE->SubExpr == 0) {
-      // Set EltExpr as the base expression.
-      UDE->SubExpr = EltExpr;
-      
-      memmove(E->Elements+Elt, E->Elements+Elt+1,
-              (E->NumElements-Elt-1)*sizeof(E->Elements[0]));
-      --E->NumElements;
-      
-      // Reprocess the newly formed expression.
-      EltExpr = SemaExpressionTree::doIt(UDE, TC);
-      if (EltExpr)
-        E->Elements[Elt] = EltExpr;
-      
-      return ReduceJuxtaposedExprs(E, Elt, TC);
-    }
-
-  // If this expression isn't a function, then it doesn't juxtapose.
-  if (!isKnownToBeAFunction(EltExpr))
-    return;
-  
-   // If this is a function, then it can juxtapose.  Note that the grammar
-  // effectively imposed by this is ambiguous with the top level of sequenced
-  // expressions: "f() g()" is initially parsed as 4 exprs in a sequence:
-  // "f () g ()".  Because f and g are functions, they bind to their arguments
-  // yielding "(f()) (g())".  This also handles more complex cases like:
-  //     A + B C * D
-  // Which can be parsed either as:
-  //     A + (B C) * D         <-- Juxtaposition here
-  //     (A + B) (C * D)       <-- Juxtaposition at a higher level.
-  // This is disambiguated based on whether B has function type or not.  If so,
-  // it binds tightly to C.
-  Expr *ArgExpr = E->Elements[Elt+1];
-
-  // Okay, we have a function application, analyze it.
-  Type ResultTy;
-  if (!SemaApplyExpr(EltExpr, ArgExpr, ResultTy, TC)) {
-    E->Elements[Elt] = new (TC.Context) ApplyExpr(EltExpr, ArgExpr, ResultTy);
-    // Drop the argument.
-    memmove(E->Elements+Elt+1, E->Elements+Elt+2, 
-            (E->NumElements-Elt-2)*sizeof(E->Elements[0]));
-  } else {
-    // Drop the function.  FIXME: This is terrible recovery.
-    memmove(E->Elements+Elt, E->Elements+Elt+1,
-            (E->NumElements-Elt-1)*sizeof(E->Elements[0]));
-    // Replace the argument with a dead empty tuple.
-    E->Elements[Elt] =
-      new (TC.Context) TupleExpr(SMLoc(), 0, 0, 0, SMLoc(),
-                                 false, false, TupleType::getEmpty(TC.Context));
-  }
-  --E->NumElements;
-  
-  // Check to see if there are more functions arguments to apply, as in,
-  // something like  f()()  where f has type ()->()->().
-  ReduceJuxtaposedExprs(E, Elt, TC);
+  return LHS;
 }
 
 Expr *SemaExpressionTree::visitSequenceExpr(SequenceExpr *E) {
-  // If types of leaves were newly resolved, then this sequence may have
-  // just changed from a sequence of operations into a binary expression,
-  // function application or something else.  Check this now.  This is
-  // actually effectively just parsing logic.
-  for (unsigned i = 0; i < E->NumElements; ++i) {
-    // If Elts[i] is the start of a binary expression sequence, reduce it down
-    // to a single element.
-    ReduceBinaryExprs(E, i, TC);
-  }
-
-  assert(E->NumElements != 0 && "Must have at least one element");
-  
-  // If we reduced this down to a single element, then we're done.
-  if (E->NumElements == 1)
-    return E->Elements[0];
-  
-  if (SemaSequenceExpr(E->Elements, E->NumElements, E->Ty, TC)) return 0;
-  
-  // If the expression is a top level tuple expression like "(x, y)" and it was
-  // immediately preceded by an identifier, like "f(x,y)" then diagnose this as
-  // an error.  The tuple is pointless and it is likely that the user expected
-  // the function to bind to the arguments.  Examples could be: f.a().b when
-  // a is declared as taking a single argument.
-  for (unsigned i = 0, e = E->NumElements; i != e; ++i) {
-    // If not fully resolved, bail out.
-    if (E->Elements[i]->Ty->is<DependentType>()) break;
-    
-    if (TupleExpr *TE = dyn_cast<TupleExpr>(E->Elements[i]))
-      if (TE->IsPrecededByIdentifier) {
-        TC.error(TE->getLocStart(),
-               "tuple expression isn't bound to identifier, add ' ' before it");
-        // Drop this expression.
-        memmove(E->Elements+i, E->Elements+i+1, 
-                (E->NumElements-i-1)*sizeof(E->Elements[0]));
-        --E->NumElements;
-        
-        if (E->NumElements == 1)
-          return E->Elements[0];
-      }
-  }
-  
-  return E;
+  unsigned i = 0;
+  return ReduceBinaryExprs(E, i, TC);
 }
 
 
@@ -1092,6 +940,31 @@ namespace {
 
     
     Expr *visitApplyExpr(ApplyExpr *E) {
+      // If we have ":f(x)" and the result type of the Apply is a OneOfType, then
+      // :f must be an element constructor for the oneof value.  Note that
+      // handling this syntactically causes us to reject "(:f) x" as ambiguous.
+      if (UnresolvedMemberExpr *UME =
+            dyn_cast<UnresolvedMemberExpr>(E->Fn)) {
+        if (OneOfType *DT = DestTy->getAs<OneOfType>()) {
+          // The oneof type must have an element of the specified name.
+          OneOfElementDecl *DED = DT->getElement(UME->Name);
+          if (DED == 0 || !DED->Ty->is<FunctionType>()) {
+            TC.error(UME->getLocStart(), "invalid type '" +
+                     DestTy->getString() + "' to initialize member");
+            return 0;
+          }
+              
+          Expr *fn = new (TC.Context) DeclRefExpr(DED, UME->ColonLoc, DED->Ty);
+          Expr *arg = E->Arg;
+          Type type;
+            
+          if (SemaApplyExpr(fn, arg, type, TC))
+            return 0;
+            
+          return new (TC.Context) ApplyExpr(fn, arg, type);
+        }
+      }
+      
       // FIXME: Given an ApplyExpr of "a b" where "a" is an overloaded value, we
       // may be able to prune the overload set based on the known result type.
       // Doing this may allow the ambiguity to resolve by removing candidates
@@ -1101,31 +974,6 @@ namespace {
       return E;
     }
     Expr *visitSequenceExpr(SequenceExpr *E) {
-      // If we have ":f x" and the result type of the Apply is a OneOfType, then
-      // :f must be an element constructor for the oneof value.  Note that
-      // handling this syntactically causes us to reject "(:f) x" as ambiguous.
-      if (E->NumElements == 2) {
-        if (UnresolvedMemberExpr *UME =
-              dyn_cast<UnresolvedMemberExpr>(E->Elements[0]))
-          if (OneOfType *DT = DestTy->getAs<OneOfType>()) {
-            // The oneof type must have an element of the specified name.
-            OneOfElementDecl *DED = DT->getElement(UME->Name);
-            if (DED == 0 || !DED->Ty->is<FunctionType>()) {
-              TC.error(UME->getLocStart(), "invalid type '" +
-                       DestTy->getString() + "' to initialize member");
-              return 0;
-            }
-              
-            Expr *Fn = new (TC.Context) DeclRefExpr(DED, UME->ColonLoc,DED->Ty);
-            
-            if (SemaApplyExpr(Fn, E->Elements[1], E->Ty, TC))
-              return 0;
-            
-            return new (TC.Context) ApplyExpr(Fn, E->Elements[1], E->Ty);
-          }
-      }
-      
-      // FIXME: Apply to last value of sequence.
       return E;
     }
 

@@ -70,12 +70,12 @@ public:
   /// getLocStart - Return the location of the start of the expression.
   /// FIXME: QOI: Need to extend this to do full source ranges like Clang.
   SMLoc getLocStart() const;
-    
+
   enum class WalkOrder {
     PreOrder,
     PostOrder
   };
-  
+
   /// WalkExpr - This function walks all the subexpressions under this
   /// expression and invokes the specified function pointer on them.  The
   /// function pointer is invoked both before and after the children are visted,

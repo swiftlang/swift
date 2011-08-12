@@ -208,7 +208,8 @@ bool Parser::parseToken(tok K, const char *Message, tok SkipToTok) {
 ///   ':' type
 ///   ':' type '=' expr
 ///   '=' expr
-bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init) {
+bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init,
+                                 bool SingleInit) {
   // Diagnose when we don't have a type or an expression.
   if (Tok.isNot(tok::colon) && Tok.isNot(tok::equal)) {
     error(Tok.getLoc(), "expected a type or an initializer");
@@ -225,7 +226,12 @@ bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init) {
   // Parse the initializer, if present.
   if (consumeIf(tok::equal)) {
     ParseResult<Expr> Tmp;
-    if ((Tmp = parseExpr("expected expression in value specifier")))
+    if (SingleInit) {
+      Tmp = parseSingleExpr("expected expression in value specifier");
+    } else {
+      Tmp = parseExpr("expected expression in value specifier");
+    }
+    if (Tmp)
       return true;
     
     if (!Tmp.isSemaError())
@@ -461,7 +467,7 @@ bool Parser::parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   
   Type Ty;
   NullablePtr<Expr> Init;
-  if (parseValueSpecifier(Ty, Init))
+  if (parseValueSpecifier(Ty, Init, /*single*/ false))
     return true;
 
   VarDecl *VD = S.decl.ActOnVarDecl(VarLoc, VarName, Ty, Init.getPtrOrNull(),
@@ -683,7 +689,6 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
   // Parse type-simple first.
   switch (Tok.getKind()) {
   case tok::identifier:
-  case tok::oper:
     Result = S.type.ActOnTypeName(Tok.getLoc(),
                                   S.Context.getIdentifier(Tok.getText()));
     consumeToken(Tok.getKind());
@@ -752,7 +757,7 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
     if (consumeIf(tok::l_square)) {
       ParseResult<Expr> Size;
       if (!Tok.is(tok::r_square) &&
-          (Size = parseExpr("expected expression for array type size")))
+          (Size = parseSingleExpr("expected expression for array type size")))
         return true;
       
       SMLoc RArrayTok = Tok.getLoc();
@@ -794,11 +799,11 @@ bool Parser::parseTypeTupleBody(SMLoc LPLoc, Type &Result) {
       Elements.push_back(TupleTypeElt());
       TupleTypeElt &Result = Elements.back();
       
-      if (Tok.is(tok::identifier) || Tok.is(tok::oper))
+      if (Tok.is(tok::identifier))
         parseIdentifier(Result.Name, "");
       
       NullablePtr<Expr> Init;
-      if ((HadError = parseValueSpecifier(Result.Ty, Init)))
+      if ((HadError = parseValueSpecifier(Result.Ty, Init, /*single*/ true)))
         break;
       Result.Init = Init.getPtrOrNull();
     } while (consumeIf(tok::comma));
@@ -883,35 +888,89 @@ static bool isStartOfExpr(const Token &Tok, const Token &Next) {
   return false;
 }
 
+/// parseSingleExpr
+///
+/// Parse an expression in a context that requires a single expression.
+ParseResult<Expr> Parser::parseSingleExpr(const char *message) {
+  ParseResult<Expr> result = parseExpr(message);
+  if (result) return true;
+
+  // Kill all the following expressions.  This is not necessarily
+  // good for certain kinds of recovery.
+  if (isStartOfExpr(Tok, peekToken())) {
+    SMLoc loc = Tok.getLoc();
+    do {
+      ParseResult<Expr> extra = parseExpr(message);
+      if (extra) break;
+    } while (isStartOfExpr(Tok, peekToken()));
+
+    error(loc, "expected a singular expression");
+  }
+
+  return result;
+}
+
 /// parseExpr
 ///   expr:
-///     expr-primary+
+///     expr-unary
+///     expr-unary operator expr
 ///
+/// The sequencing here is not structural, i.e. binary operators are
+/// not inherently right-associative.
 ParseResult<Expr> Parser::parseExpr(const char *Message) {
   SmallVector<Expr*, 8> SequencedExprs;
-  
-  ParseResult<Expr> Tmp;
-  do {
-    // Parse the expr-primary
-    if (parseExprPrimary(SequencedExprs, Message)) return true;
-    
+
+  bool hasSemaError = false;
+
+  while (true) {
+    // Parse a primary expression.
+    ParseResult<Expr> Primary = parseExprUnary(Message);
+    if (Primary.isParseError())
+      return true;
+
+    if (Primary.isSemaError()) {
+      hasSemaError = true;
+    } else {
+      SequencedExprs.push_back(Primary.get());
+    }
+
+    // If the next token is not an operator, we're done.
+    if (!Tok.is(tok::oper))
+      break;
+
+    // Parse the operator.  If this ever gains the ability to fail, we
+    // probably need to do something to keep the SequenceExpr in a
+    // valid state.
+    Expr *Operator = parseExprOperator();
+    SequencedExprs.push_back(Operator);
+
     // The message is only valid for the first subexpr.
-    Message = 0;
-  } while (isStartOfExpr(Tok, peekToken()));
-  
-  // If there is exactly one element in the sequence, it is a degenerate
-  // sequence that just returns the last value anyway, shortcut ActOnSequence.
+    Message = "expected expression after operator";
+  }
+
+  // If we had semantic errors, just fail here.
+  if (hasSemaError)
+    return ParseResult<Expr>::getSemaError();
+  assert(!SequencedExprs.empty());
+
+  // If we saw no operators, don't build a sequence.
   if (SequencedExprs.size() == 1)
     return SequencedExprs[0];
 
-  // If nothing was parsed, then a parse error has already been emitted.
-  if (SequencedExprs.empty())
-    return ParseResult<Expr>::getSemaError();
-  
   Expr **NewElements =
     S.Context.AllocateCopy<Expr*>(SequencedExprs.begin(), SequencedExprs.end());
   
   return new (S.Context) SequenceExpr(NewElements, SequencedExprs.size());
+}
+
+/// parseExprUnary
+///
+///   expr-unary:
+///     expr-primary
+///     operator expr-unary
+ParseResult<Expr> Parser::parseExprUnary(const char *Message) {
+  // TODO: implement
+  return parseExprPrimary(Message);
 }
 
 /// parseExprPrimary
@@ -934,8 +993,7 @@ ParseResult<Expr> Parser::parseExpr(const char *Message) {
 ///
 ///   expr-subscript:
 ///     expr-primary '[' expr ']'
-bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &ResVec,
-                              const char *Message) {
+ParseResult<Expr> Parser::parseExprPrimary(const char *Message) {
   ParseResult<Expr> Result;
   switch (Tok.getKind()) {
   case tok::numeric_constant:
@@ -946,7 +1004,6 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &ResVec,
   case tok::dollarident: // $1
     Result = parseExprDollarIdentifier();
     break;
-  case tok::oper:
   case tok::identifier:  // foo   and  foo::bar
     Result = parseExprIdentifier();
     break;
@@ -983,8 +1040,6 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &ResVec,
   // we had semantic errors though.
   if (Result.isParseError())
     return true;
-  if (!Result.isSemaError())
-    ResVec.push_back(Result.get());
     
   // Handle suffix expressions.
   while (1) {
@@ -999,8 +1054,8 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &ResVec,
         
       if (!Result.isSemaError()) {
         Identifier Name = S.Context.getIdentifier(Tok.getText());
-        ResVec.push_back(new (S.Context) UnresolvedDotExpr(0, TokLoc, Name,
-                                                           Tok.getLoc()));
+        Result = new (S.Context) UnresolvedDotExpr(Result.get(), TokLoc, Name,
+                                                   Tok.getLoc());
       }
       if (Tok.is(tok::identifier))
         consumeToken(tok::identifier);
@@ -1012,16 +1067,18 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &ResVec,
     // Check for a () suffix, which indicates a call.
     // Note that this cannot be a l_paren_space.
     if (Tok.is(tok::l_paren)) {
-      if ((Result = parseExprParen())) return true;
-      if (!Result.isSemaError())
-        ResVec.push_back(Result.get());
+      ParseResult<Expr> Arg = parseExprParen();
+      if (Arg.isParseError()) return true;
+      if (Arg.isSemaError()) Result = true;
+      else if (!Result.isSemaError())
+        Result = new (S.Context) ApplyExpr(Result.get(), Arg.get(), Type());
       continue;
     }
     
     // Check for a [expr] suffix.
     if (consumeIf(tok::l_square)) {
       ParseResult<Expr> Idx;
-      if ((Idx = parseExpr("expected expression parsing array index")))
+      if ((Idx = parseSingleExpr("expected expression parsing array index")))
         return true;
       
       SMLoc RLoc = Tok.getLoc();
@@ -1031,8 +1088,8 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &ResVec,
       }
       
       if (!Result.isSemaError() && !Idx.isSemaError()) {
-        // FIXME: Implement.  This should add an unresolved subscript node, just
-        // like UnresolvedDotExpr.
+        // FIXME: Implement.  This should modify Result like the cases
+        // above.
         Result = Result;
       }
     }
@@ -1040,7 +1097,7 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &ResVec,
     break;
   }
   
-  return false;
+  return Result;
 }
 
 ///   expr-identifier:
@@ -1068,13 +1125,27 @@ ParseResult<Expr> Parser::parseExprDollarIdentifier() {
 }
 
 
+/// parseExprOperator - Parse an operator reference expression.  These
+/// are not "proper" expressions; they can only appear interlaced in
+/// SequenceExprs.
+Expr *Parser::parseExprOperator() {
+  assert(Tok.is(tok::oper));
+  SMLoc Loc = Tok.getLoc();
+  Identifier Name;
+  parseIdentifier(Name, "");
+
+  ParseResult<Expr> Result = S.expr.ActOnIdentifierExpr(Name, Loc);
+  assert(Result.isSuccess() && "operator reference failed?");
+  return Result.get();
+}
+
 /// parseExprIdentifier - Parse an identifier expression:
 ///
 ///   expr-identifier:
 ///     identifier
 ///     identifier '::' identifier
 ParseResult<Expr> Parser::parseExprIdentifier() {
-  assert(Tok.is(tok::identifier) || Tok.is(tok::oper));
+  assert(Tok.is(tok::identifier));
   SMLoc Loc = Tok.getLoc();
   Identifier Name;
   parseIdentifier(Name, "");
@@ -1129,7 +1200,7 @@ ParseResult<Expr> Parser::parseExprParen() {
       }
       
       ParseResult<Expr> SubExpr;
-      if ((SubExpr = parseExpr("expected expression in parentheses")))
+      if ((SubExpr = parseSingleExpr("expected expression in parentheses")))
         return true;
       
       if (SubExpr.isSemaError())
@@ -1400,7 +1471,7 @@ ParseResult<Stmt> Parser::parseStmtIf() {
 
   ParseResult<Expr> Condition;
   ParseResult<BraceStmt> NormalBody;
-  if ((Condition = parseExpr("expected expresssion in 'if' condition")) ||
+  if ((Condition = parseSingleExpr("expected expresssion in 'if' condition")) ||
       (NormalBody = parseStmtBrace("expected '{' after 'if' condition")))
     return true;
     
@@ -1439,7 +1510,8 @@ ParseResult<Stmt> Parser::parseStmtWhile() {
   
   ParseResult<Expr> Condition;
   ParseResult<BraceStmt> Body;
-  if ((Condition = parseExpr("expected expresssion in 'while' condition")) ||
+  if ((Condition
+         = parseSingleExpr("expected expresssion in 'while' condition")) ||
       (Body = parseStmtBrace("expected '{' after 'while' condition")))
     return true;
   
