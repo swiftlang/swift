@@ -1251,7 +1251,7 @@ Expr *SemaCoerceBottomUp::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   }
   
   return new (TC.Context) TupleExpr(E->getLocStart(), NewSE, NewName,
-                                    NumFields, SMLoc(), false, false, DestTy);
+                                    NumFields, SMLoc(), false, DestTy);
 }
 
 /// convertToType - This is the recursive implementation of

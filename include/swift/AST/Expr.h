@@ -280,17 +280,12 @@ public:
   /// single-element tuples with no element name.
   bool IsGrouping;
   
-  /// IsPrecededByIdentifier - True if the '(' of this tuple expression was
-  /// immediately preceded by an identifier.
-  bool IsPrecededByIdentifier;
-  
   TupleExpr(SMLoc lparenloc, Expr **subexprs, Identifier *subexprnames,
             unsigned numsubexprs, SMLoc rparenloc, bool isGrouping,
-            bool isPrecededByIdentifier, Type Ty = Type())
+            Type Ty = Type())
     : Expr(ExprKind::Tuple, Ty), LParenLoc(lparenloc), SubExprs(subexprs),
       SubExprNames(subexprnames), NumSubExprs(numsubexprs),
-      RParenLoc(rparenloc), IsGrouping(isGrouping),
-      IsPrecededByIdentifier(isPrecededByIdentifier) {
+      RParenLoc(rparenloc), IsGrouping(isGrouping) {
     assert((!isGrouping ||
             (NumSubExprs == 1 && getElementName(0).empty() && SubExprs[0])) &&
            "Invalid grouping paren");

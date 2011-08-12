@@ -1222,15 +1222,9 @@ ParseResult<Expr> Parser::parseExprParen() {
   if (AnySubExprSemaErrors)
     return ParseResult<Expr>::getSemaError();
 
-  // Determine whether the left paren was immediately preceded by an identifier,
-  // as in 'foo()', which indicates that the tuple needs to be bound to that
-  // identifier somehow.  This is a highly skanky way to get this, but it works
-  // reasonably well.
-  bool IsPrecededByIdentifier = L.isPrecededByIdentifier(LPLoc);
-  
   return S.expr.ActOnTupleExpr(LPLoc, SubExprs.data(),
                                SubExprNames.empty()?0 : SubExprNames.data(),
-                               SubExprs.size(), RPLoc, IsPrecededByIdentifier);
+                               SubExprs.size(), RPLoc);
 }
 
 /// parseExprFunc - Parse a func expression.
@@ -1453,7 +1447,7 @@ ParseResult<Stmt> Parser::parseStmtReturn() {
       return true;
   } else {
     // Result value defaults to ().
-    Result = new (S.Context) TupleExpr(SMLoc(), 0, 0, 0, SMLoc(), false, false);
+    Result = new (S.Context) TupleExpr(SMLoc(), 0, 0, 0, SMLoc(), false);
   }
 
   if (!Result.isSemaError())

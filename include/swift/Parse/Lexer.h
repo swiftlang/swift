@@ -51,10 +51,6 @@ public:
   /// actually lexing it.
   const Token &peekNextToken() const { return NextToken; }
   
-  /// Return true if the character right before the specified location is part
-  /// of an identifier.
-  bool isPrecededByIdentifier(SMLoc L) const;
-  
 private:
   void note(const char *Loc, const Twine &Message);
   void warning(const char *Loc, const Twine &Message);

@@ -55,8 +55,7 @@ public:
   NullablePtr<Expr>
   ActOnTupleExpr(SMLoc LPLoc, Expr *const *SubExprs,
                  const Identifier *SubExprNames,
-                 unsigned NumSubExprs, SMLoc RPLoc,
-                 bool IsPrecededByIdentifier);
+                 unsigned NumSubExprs, SMLoc RPLoc);
 
   /// ActOnCondition - Handle a condition to an if/while statement, inserting
   /// the call that will convert to a 1-bit type.

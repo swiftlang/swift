@@ -74,8 +74,7 @@ ActOnScopedIdentifierExpr(Identifier ScopeName, SMLoc ScopeLoc,
 NullablePtr<Expr> 
 SemaExpr::ActOnTupleExpr(SMLoc LPLoc, Expr *const *SubExprs,
                          const Identifier *SubExprNames,
-                         unsigned NumSubExprs, SMLoc RPLoc,
-                         bool IsPrecededByIdentifier) {
+                         unsigned NumSubExprs, SMLoc RPLoc) {
   
   Expr **NewSubExprs =
     S.Context.AllocateCopy<Expr*>(SubExprs, SubExprs+NumSubExprs);
@@ -91,8 +90,7 @@ SemaExpr::ActOnTupleExpr(SMLoc LPLoc, Expr *const *SubExprs,
     IsGrouping = true;
   
   return new (S.Context) TupleExpr(LPLoc, NewSubExprs, NewSubExprsNames,
-                                   NumSubExprs, RPLoc, IsGrouping,
-                                   IsPrecededByIdentifier);
+                                   NumSubExprs, RPLoc, IsGrouping);
 }
 
 /// ActOnCondition - Handle a condition to an if/while statement, inserting
