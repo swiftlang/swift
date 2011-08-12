@@ -655,7 +655,7 @@ public:
   }
 
   void visitCallExpr(CallExpr *E) {
-    OS.indent(Indent) << "(apply_expr type='" << E->Ty << "'\n";
+    OS.indent(Indent) << "(call_expr type='" << E->Ty << "'\n";
     printRec(E->Fn);
     OS << '\n';
     printRec(E->Arg);
