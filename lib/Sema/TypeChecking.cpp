@@ -26,7 +26,6 @@
 #include "llvm/Support/SourceMgr.h"
 using namespace swift;
 
-
 namespace {
   class TypeChecker {
   public:
@@ -104,6 +103,11 @@ static bool SemaDeclRefExpr(ValueDecl *D, SMLoc Loc, Type &ResultTy,
     TC.error(Loc, "use of undeclared identifier");
     return true;
   }
+  
+  // If the decl had an invalid type, then an error has already been emitted,
+  // just propagate it up.
+  if (D->Ty->is<ErrorType>())
+    return true;
   
   // TODO: QOI: If the decl had an "invalid" bit set, then return the error
   // object to improve error recovery.
