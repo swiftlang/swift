@@ -197,8 +197,8 @@ static bool SemaCallExpr(CallExpr *E, TypeChecker &TC) {
   // resolve which overload member is based on the argument type.
   OverloadSetRefExpr *OS = dyn_cast<OverloadSetRefExpr>(E1);
   if (!OS) {
-    TC.error(E1->getLocStart(), "called expression isn't a function");
-    return true;
+    E->Ty = E1->Ty;
+    return false;
   }
 
   int BestCandidateFound = -1;
