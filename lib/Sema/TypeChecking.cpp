@@ -977,7 +977,8 @@ namespace {
       return E;
     }
     Expr *visitSequenceExpr(SequenceExpr *E) {
-      return E;
+      assert(0 && "SequenceExprs should all be resolved by this pass");
+      return 0;
     }
 
     Expr *visitFuncExpr(FuncExpr *E) {
@@ -1531,14 +1532,7 @@ static Expr *DiagnoseUnresolvedTypes(Expr *E, Expr::WalkOrder Order,
   if (Order == Expr::WalkOrder::PreOrder)
     return E;
   
-  // If we have an unresolved SequenceExpr, then it was a sequence used in a
-  // context that didn't allow it (e.g. "(4 5)+7") which is just redundant.
-  if (isa<SequenceExpr>(E)) {
-    // FIXME: This really wants source ranges.
-    TC.error(E->getLocStart(),
-           "sequence of multiple expressions used where only one was expected");
-    return 0;
-  }  
+  assert(!isa<SequenceExpr>(E) && "Should have resolved this");
   
   // Use is to strip off sugar.
   if (!E->Ty->is<DependentType>())
