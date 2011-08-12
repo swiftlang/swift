@@ -164,7 +164,9 @@
   </pre>
 
   <p>Space, newline, tab, and the nul byte are all considered whitespace and are
-     discarded.</p>
+     discarded, with one exception:  a '(' which does not follow a
+     non-whitespace character is different kind of token (called
+     <em>spaced</em>) from one which does not (called <em>unspaced</em>).</p>
   
   <p>Comments may follow the BCPL style, starting with a "//" and running to the
      end of the line, or may be nested /**/ style comments.  Comments are
@@ -182,7 +184,8 @@
   </div>
 
   <pre class="grammar">
-    punctuation ::= '('
+    punctuation ::= '(' [spaced]
+    punctuation ::= '(' [unspaced]
     punctuation ::= ')'
     punctuation ::= '{'
     punctuation ::= '}'
@@ -256,22 +259,15 @@
   <p>Numeric constant tokens represent simple integer values.</p>
   <p>TODO: Obviously need a floating point constant when we have a fp type.</p>
 
-  
   <!-- ===================================================================== -->
   <h3 id="identifier">Identifier Tokens</h3>
   <!-- ===================================================================== -->
   
   <pre class="grammar">
     identifier ::= [a-zA-Z_][a-zA-Z_$0-9]*
-    identifier ::= [/=-+*%&lt;&gt;!&amp;|^]+
+    operator ::= [/=-+*%&lt;&gt;!&amp;|^]+
+    any-identifier ::= identifier | operator
   </pre>
-  
-  <p>There are two different regular expressions for identifiers, one for normal
-     identifiers and one for "punctuation identifiers".  This ensures that
-     something like "foo+bar" gets lexed into three identifiers, not one. Aside
-     from the regex that controls lexing behavior, there is no other difference
-     between these two forms of identifiers.
-  </p>
   
   <!-- ===================================================================== -->
   <h3 id="dollarident">Implementation Identifier Token</h3>
@@ -306,7 +302,7 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-import ::= 'import' attribute-list? identifier ('.' identifier)*
+    decl-import ::= 'import' attribute-list? any-identifier ('.' any-identifier)*
   </pre>  
   
   <p>'import' declarations allow named values and types to be accessed with
@@ -375,9 +371,9 @@
     href="#attribute-list">attributes</a> applied to them.</p>
   
   <pre class="grammar">
-    var-name ::= <a href="#identifier">identifier</a>
-    var-name ::= '(' ')'
-    var-name ::= '(' var-name (',' var-name)* ')'
+    var-name ::= <a href="#identifier">any-identifier</a>
+    var-name ::= '('[any] ')'
+    var-name ::= '('[any] var-name (',' var-name)* ')'
   </pre>
   
   <p>The name given to the var can have structure that allows fields of the
@@ -416,8 +412,8 @@
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> <a href="#type">type</a> <a href="#stmt-brace">stmt-brace</a>?
-    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#type-identifier">type-identifier</a> '::' <a href="#identifier">identifier</a> <a href="#type">type</a> <a href="#stmt-brace">stmt-brace</a>?
+    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">any-identifier</a> <a href="#type">type</a> <a href="#stmt-brace">stmt-brace</a>?
+    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#type-identifier">type-identifier</a> '::' <a href="#identifier">any-identifier</a> <a href="#type">type</a> <a href="#stmt-brace">stmt-brace</a>?
   </pre>
   
   <div class="commentary">
@@ -662,6 +658,9 @@
   </pre>
 
   <p>The only attribute supported so far is the 'infix' attribute.
+  The 'infix' attribute may only be applied to a variable or function
+  declaration which declares a single name that is an
+  <a href="#identifier"><tt>operator</tt></a>.
   FIXME: Describe requirements on function/var it is applied to, must be binary
   etc.</p>
   
@@ -734,7 +733,7 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    type-tuple ::= '(' type-tuple-body? ')'
+    type-tuple ::= '('[any] type-tuple-body? ')'
     type-tuple-body ::= identifier? <a href="#value-specifier">value-specifier</a> (',' identifier? <a href="#value-specifier">value-specifier</a>)* 
   </pre>
 
@@ -982,14 +981,14 @@
   <!-- ********************************************************************* -->
 
   <div class="commentary">
-    Support for user defined operators and separation of parsing from type
-    analysis and name binding leads to a somewhat unusual system where
-    expression parsing just doesn't do very much.  This does lead to interesting
-    phases of translation though, because we do "parsing" of expressions late
-    (in type checking) instead of right after lexing.<br><br>
+    Support for user-defined operators causes some amount of parsing
+    to be delayed until after name resolution has occurred.  Other
+    restrictions and disambiguations in the grammar permit the parser
+    to decide all other aspects of parsing, such as where statements
+    must be divided.
     
-    Semicolons in C are generally just clutter.  Swift generally defines away
-    their use through the type system (and careful grammar structure).<br><br>
+    Semicolons in C are generally just clutter.  Swift generally tries
+    to define away their use.<br><br>
     
     Brace expressions don't fit naturally into the grammar anymore.  It would
     be nice if they were not allowed in general as an expression anymore, but
@@ -997,35 +996,36 @@
   </div>
 
   <pre class="grammar">
-    expr         ::= expr-primary+
+    expr         ::= expr-unary (operator expr-unary)*
+
+    expr-unary   ::= expr-primary
+    expr-unary   ::= operator expr-unary
+
+    expr-postfix ::= expr-primary
+    expr-postfix ::= <a href="#expr-apply">expr-apply</a>
+    expr-postfix ::= <a href="#expr-subscript">expr-subscript</a>
+    expr-postfix ::= <a href="#expr-dot">expr-dot</a>
     
     expr-primary ::= <a href="#expr-literal">expr-literal</a>
     expr-primary ::= <a href="#expr-identifier">expr-identifier</a>
     expr-primary ::= <a href="#expr-paren">expr-paren</a>
     expr-primary ::= <a href="#expr-delayed-identifier">expr-delayed-identifier</a>
     expr-primary ::= <a href="#expr-func">expr-func</a>
-    expr-primary ::= <a href="#expr-dot">expr-dot</a>
-    expr-primary ::= <a href="#expr-subscript">expr-subscript</a>
   </pre>
 
-  <p>At the top level of the expression grammar, expressions are a sequence of
-   "primary" expressions.</p>
+  <p>At the top level of the expression grammar, expressions are a
+    sequence of unary expressions joined by operators.  When parsing
+    an expr, any operator immediately following an expr-unary
+    continues the expression, and the program is ill-formed if it is
+    not then followed by another expr-unary.  This resolves an
+    ambiguity which could otherwise arise in statement contexts due to
+    semicolon elision.</p>
 
   <pre class="example">
-    <i>// A silly, but valid, example of a single 'expr':</i>
-    4 4 (4+5) 4 4
-    
-    <i>// A more reasonable example:</i>
-    foo()
-    x = 12
+    5 !- +~123 -+- ~+6
+    (foo)(())
     bar(49+1)
     baz()
-    </i>
-    
-    <i>// An example that is parsed as one list of three primary expressions,
-    // but is resolved in type checking to a var decl followed by a separate
-    // apply expression.</i>
-    var x = 4 foo()
   </pre>
   
   <!-- ===================================================================== -->
@@ -1075,7 +1075,7 @@
   context</a>.  All other dollar identifiers are invalid.</p>
   
   <pre class="grammar">
-    expr-identifier ::= <a href="#type-identifier">type-identifier</a> '::' <a href="#identifier">identifier</a>
+    expr-identifier ::= <a href="#type-identifier">type-identifier</a> '::' <a href="#identifier">any-identifier</a>
   </pre>
 
   <p>Qualified identifiers look up a constructor member of a <a
@@ -1137,7 +1137,7 @@
   
   <p>If a type is specified in the func expression, it specifies the signature
      of the anonymous function.  The first element of the type must be a tuple
-     type (thus it must start with '(').  If the entire type is not lexically a
+     type (thus it must start with '('[any]).  If the entire type is not lexically a
      function type, it is made into one by declaring a function type that takes
      the specified type and returns ().  If no type is specified, the type of
      the func is "<tt>()-&gt;()</tt>".</p>
@@ -1167,7 +1167,7 @@
   </div>
 
   <pre class="grammar">
-    expr-dot ::= <a href="#expr">expr-primary</a> '.' <a href="#dollarident">dollarident</a>
+    expr-dot ::= <a href="#expr">expr-postfix</a> '.' <a href="#dollarident">dollarident</a>
   </pre>
     
   <p>If the base expression has <a href="#type-tuple">tuple type</a>, then the
@@ -1175,7 +1175,7 @@
   tuple.  Otherwise, this form is invalid.</p>
 
   <pre class="grammar">
-    expr-dot ::= <a href="#expr">expr-primary</a> '.' <a href="#identifier">identifier</a>
+    expr-dot ::= <a href="#expr">expr-postfix</a> '.' <a href="#identifier">identifier</a>
   </pre>
 
   <p>If the base expression has <a href="#type-tuple">tuple type</a> and if the
@@ -1209,7 +1209,7 @@
   </div>
 
   <pre class="grammar">
-    expr-subscript ::= <a href="#expr">expr-primary</a> '[' <a href="#expr-single">expr-single</a> ']'
+    expr-subscript ::= <a href="#expr">expr-postfix</a> '[' <a href="#expr-single">expr</a> ']'
   </pre>
   
   <p>FIXME: Array subscript should just be an overloaded operator like any
@@ -1236,8 +1236,8 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    expr-paren      ::= '(' ')'
-    expr-paren      ::= '(' expr-paren-element (',' expr-paren-element)* ')'
+    expr-paren      ::= '('[any] ')'
+    expr-paren      ::= '('[any] expr-paren-element (',' expr-paren-element)* ')'
     expr-paren-element ::= ('.' <a href="#identifier">identifier</a> '=')? <a href="#expr">expr</a>
   </pre>
   
@@ -1287,48 +1287,42 @@
   </div>
 
   <pre class="grammar">
-    expr-apply ::= <a href="#expr">expr</a> <a href="#expr">expr</a>
+    expr-apply ::= <a href="#expr">expr-postfix</a> <a href="#expr-paren">expr-paren</a>
   </pre>
-  
-  <p>Juxtaposition of two expressions, when the former is of function type, is
-  application of a function to its argument, and the argument is converted to
-  the expected argument type.  For example, "foo()" is a juxtaposition of the
-  foo expression with an empty tuple.</p>
-  
-  <p>This expression is not formed by the parser, it is formed by the type
-  checker when it is processing consequtive sequences of primary expressions and
-  finds something of function type.</p>
+
+  <p>The leading <tt>'('</tt> of the <tt>expr-paren</tt> must be
+  a <tt>'('[unspaced]</tt>.  This greatly reduces the likelihood of
+  confusion from semicolon elision, without requiring feedback from
+  the typechecker or more aggressive whitespace sensitivity.</p>
   
   <p>A simple example:</p>
   
   <pre class="example">
     <i>// Application of an empty tuple to the function f.</i>
-    f ()
-    <i>// Application of 4 to the function f, both are equivalent.</i>
-    g 4
-    g (4)
+    f()
+    <i>// Application of 4 to the function f.</i>
+    g(4)
     
     <i>// Application of 4 to the function returned by h().</i>
     var h : int -&gt; int -&gt; int
     ...
-    h () 4
+    h()(4)
   </pre>
   
   <!-- ===================================================================== -->
-  <h3 id="expr-infix">Infix Binary Expressions</h3>
+  <h3 id="expr-binary">Binary Operators</h3>
   <!-- ===================================================================== -->
 
-  <pre class="grammar">
-    expr-infix ::= expr identifier expr
-  </pre>
+  <p>Infix binary expressions are not formed during parsing.  Instead,
+  they are formed after name resolution by building a tree from an
+  operator-delimited sequence of unary expressions.  Precedence and
+  associativity are determined by the <a href="#attribute-infix">infix</a>
+  attribute on the resolved names, which must fully agree.</p>
 
-  <p>Infix binary expressions are not formed during parsing, they are formed
-  during type checking, when a sequence of primary expressions is being type
-  checked and a value with the <a href="#attribute-infix">infix</a> attribute
-  is found.  The order of evaluation of the various subexpressions is defined by
-  the precedence of the infix attribute.
-  </p>
-  
+  <p>If an operator is used as a binary operator, but name resolution
+  does not find at least one function of binary operator type, the
+  expression is ill-formed.</p>
+
   <p>TODO: Should this use the expr-identifier production to allow qualified
     identifiers?  This would allow "foo swift::min bar".  Oneof members cannot
     be declared infix, but future module/namespace scopes seem worth
@@ -1337,8 +1331,16 @@
   <p>A simple example is:</p>
   
   <pre class="example">
-    4 + 5 * 123 min 42
+    4 + 5 * 123
   </pre>
+
+  <!-- ===================================================================== -->
+  <h3 id="expr-unary">Unary Operators</h3>
+  <!-- ===================================================================== -->
+
+  <p>If an operator is used as a unary operator, but name resolution
+  does not find at least one function of unary operator type, the
+  expression is ill-formed.</p>
 
   <!-- ********************************************************************* -->
   <h2 id = "stmt">Statements</h2>
@@ -1388,7 +1390,7 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    stmt-assign ::= <a href="#expr">expr</a> '=' <a href="#expr">expr</a>
+    stmt-assign ::= <a href="#expr">expr-postfix</a> '=' <a href="#expr">expr</a>
   </pre>
   
   <p>The assignment statement evaluates its left hand side as some sort of
