@@ -122,7 +122,7 @@
       recursive compilation of modules that are referenced but not yet built.
   </li>
   <li><a href="#typecheck">Type Checking</a>: During this phase all types are
-    resolved within value definitions, <a href="#expr-apply">function
+    resolved within value definitions, <a href="#expr-call">function
     application</a> and <a href="#expr-infix">binary expressions</a> are found
     and formed, and overloaded functions are resolved.</li>
   <li>Code Generation</li>
@@ -166,7 +166,8 @@
   <p>Space, newline, tab, and the nul byte are all considered whitespace and are
      discarded, with one exception:  a '(' which does not follow a
      non-whitespace character is different kind of token (called
-     <em>spaced</em>) from one which does not (called <em>unspaced</em>).</p>
+     <em>spaced</em>) from one which does not (called <em>unspaced</em>).
+     A '(' at the beginning of a file is spaced.</p>
   
   <p>Comments may follow the BCPL style, starting with a "//" and running to the
      end of the line, or may be nested /**/ style comments.  Comments are
@@ -184,8 +185,13 @@
   </div>
 
   <pre class="grammar">
-    punctuation ::= '(' [spaced]
-    punctuation ::= '(' [unspaced]
+    lparen-spaced   ::= '('      // preceded by space
+    lparen-unspaced ::= '('      // not preceded by space
+    lparen-any      ::= lparen-spaced
+    lparen-any      ::= lparen-unspaced
+
+    punctuation ::= lparen-spaced
+    punctuation ::= lparen-unspaced
     punctuation ::= ')'
     punctuation ::= '{'
     punctuation ::= '}'
@@ -372,8 +378,8 @@
   
   <pre class="grammar">
     var-name ::= <a href="#identifier">any-identifier</a>
-    var-name ::= '('[any] ')'
-    var-name ::= '('[any] var-name (',' var-name)* ')'
+    var-name ::= lparen-any ')'
+    var-name ::= lparen-any var-name (',' var-name)* ')'
   </pre>
   
   <p>The name given to the var can have structure that allows fields of the
@@ -657,12 +663,12 @@
     attribute-infix ::= 'infix' '=' <a href="#numeric_constant">numeric_constant</a>
   </pre>
 
-  <p>The only attribute supported so far is the 'infix' attribute.
-  The 'infix' attribute may only be applied to a variable or function
-  declaration which declares a single name that is an
+  <p>The only attribute supported so far is the 'infix' attribute.</p>
+
+  <p>The 'infix' attribute may only be applied to the declaration of a
+  function of binary operator type whose name is an
   <a href="#identifier"><tt>operator</tt></a>.
-  FIXME: Describe requirements on function/var it is applied to, must be binary
-  etc.</p>
+  FIXME: Implement these restrictions.</p>
   
   <p>TODO: Add support for a bunch more attributes.</p>
 
@@ -733,7 +739,7 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    type-tuple ::= '('[any] type-tuple-body? ')'
+    type-tuple ::= lparen-any type-tuple-body? ')'
     type-tuple-body ::= identifier? <a href="#value-specifier">value-specifier</a> (',' identifier? <a href="#value-specifier">value-specifier</a>)* 
   </pre>
 
@@ -985,7 +991,7 @@
     to be delayed until after name resolution has occurred.  Other
     restrictions and disambiguations in the grammar permit the parser
     to decide all other aspects of parsing, such as where statements
-    must be divided.
+    must be divided.<br><br>
     
     Semicolons in C are generally just clutter.  Swift generally tries
     to define away their use.<br><br>
@@ -1002,7 +1008,7 @@
     expr-unary   ::= operator expr-unary
 
     expr-postfix ::= expr-primary
-    expr-postfix ::= <a href="#expr-apply">expr-apply</a>
+    expr-postfix ::= <a href="#expr-call">expr-call</a>
     expr-postfix ::= <a href="#expr-subscript">expr-subscript</a>
     expr-postfix ::= <a href="#expr-dot">expr-dot</a>
     
@@ -1137,7 +1143,7 @@
   
   <p>If a type is specified in the func expression, it specifies the signature
      of the anonymous function.  The first element of the type must be a tuple
-     type (thus it must start with '('[any]).  If the entire type is not lexically a
+     type (thus it must start with '(').  If the entire type is not lexically a
      function type, it is made into one by declaring a function type that takes
      the specified type and returns ().  If no type is specified, the type of
      the func is "<tt>()-&gt;()</tt>".</p>
@@ -1236,10 +1242,13 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    expr-paren      ::= '('[any] ')'
-    expr-paren      ::= '('[any] expr-paren-element (',' expr-paren-element)* ')'
+    expr-paren      ::= lparen-any ')'
+    expr-paren      ::= lparen-any expr-paren-element (',' expr-paren-element)* ')'
     expr-paren-element ::= ('.' <a href="#identifier">identifier</a> '=')? <a href="#expr">expr</a>
   </pre>
+
+  <p>Some enclosing productions restrict the <tt>lparen-any</tt> to a
+     <tt>lparen-unspaced</tt>.</p>
   
   <p>Parentheses expressions contain an (optionally empty) list of optionally
      named values.  Parentheses in an expression context denote one of two
@@ -1277,7 +1286,7 @@
 
   
   <!-- ===================================================================== -->
-  <h3 id="expr-apply">Function Application</h3>
+  <h3 id="expr-call">Function Application</h3>
   <!-- ===================================================================== -->
   
   <div class="commentary">
@@ -1287,15 +1296,15 @@
   </div>
 
   <pre class="grammar">
-    expr-apply ::= <a href="#expr">expr-postfix</a> <a href="#expr-paren">expr-paren</a>
+    expr-call ::= <a href="#expr">expr-postfix</a> <a href="#expr-paren">expr-paren</a>
   </pre>
 
   <p>The leading <tt>'('</tt> of the <tt>expr-paren</tt> must be
-  a <tt>'('[unspaced]</tt>.  This greatly reduces the likelihood of
+  a <tt>lparen-unspaced</tt>.  This greatly reduces the likelihood of
   confusion from semicolon elision, without requiring feedback from
   the typechecker or more aggressive whitespace sensitivity.</p>
   
-  <p>A simple example:</p>
+  <p>Simple examples:</p>
   
   <pre class="example">
     <i>// Application of an empty tuple to the function f.</i>
@@ -1307,6 +1316,10 @@
     var h : int -&gt; int -&gt; int
     ...
     h()(4)
+
+    <i>// Two separate statements</i>
+    i()
+    (j <+ 2)()
   </pre>
   
   <!-- ===================================================================== -->
