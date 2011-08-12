@@ -174,7 +174,7 @@ void Parser::skipUntil(tok T) {
 bool Parser::parseIdentifier(Identifier &Result, const Twine &Message) {
   if (Tok.is(tok::identifier) || Tok.is(tok::oper)) {
     Result = S.Context.getIdentifier(Tok.getText());
-    consumeToken(Tok.getKind());
+    consumeToken();
     return false;
   }
   
@@ -839,13 +839,13 @@ bool Parser::parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
   SmallVector<SemaType::OneOfElementInfo, 8> ElementInfos;
   
   // Parse the comma separated list of oneof elements.
-  while (Tok.is(tok::identifier) || Tok.is(tok::oper)) {
+  while (Tok.is(tok::identifier)) {
     SemaType::OneOfElementInfo ElementInfo;
     ElementInfo.Name = Tok.getText();
     ElementInfo.NameLoc = Tok.getLoc();
     ElementInfo.EltType = 0;
     
-    consumeToken(Tok.getKind());
+    consumeToken(tok::identifier);
     
     // See if we have a type specifier for this oneof element.  If so, parse it.
     if (consumeIf(tok::colon) &&
