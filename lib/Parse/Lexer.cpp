@@ -281,9 +281,7 @@ Restart:
     // Otherwise, our list of whitespace characters is pretty short.
     } else {
       char LastChar = *(CurPtr - 2);
-      PrecededBySpace = (LastChar == ' ' || LastChar == '\t' ||
-                         LastChar == '\r' || LastChar == '\r' ||
-                         LastChar == '\0');
+      PrecededBySpace = (isspace(LastChar) || LastChar == '\0');
     }
 
     if (PrecededBySpace)
