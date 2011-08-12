@@ -228,17 +228,30 @@ static bool SemaCallExpr(CallExpr *E, TypeChecker &TC) {
     BestCandidateFound = -1;
   }
   
+  // If we found a successful match, resolve the overload set to it and continue
+  // type checking.
   if (BestCandidateFound != -1) {
     E1 = new (TC.Context) DeclRefExpr(OS->Decls[BestCandidateFound], OS->Loc,
                                       OS->Decls[BestCandidateFound]->Ty);
     return SemaCallExpr(E, TC);
   }
   
-  // FIXME: Emit an error here if we have an overload resolution failure.
-  
-  // Otherwise, we can't resolve the argument type yet.
-  E->Ty = E2->Ty;
-  return false;
+  // Otherwise we have either an ambiguity between multiple possible candidates
+  // or not candidate at all.
+  if (BestRank == Expr::CR_Invalid)
+    TC.error(E1->getLocStart(), "no candidates found for call");
+  else {
+    TC.error(E1->getLocStart(), "overloading ambiguity found");
+    
+    // Print out the candidate set.
+    for (auto TheDecl : OS->Decls) {
+      Type ArgTy = TheDecl->Ty->getAs<FunctionType>()->Input;
+      if (E2->getRankOfConversionTo(ArgTy, TC.Context) != BestRank)
+        continue;
+      TC.note(TheDecl->getLocStart(), "found this candidate");
+    }
+  }
+  return true;
 }
 
 /// SemaBinaryExpr - Perform semantic analysis of binary expressions.
