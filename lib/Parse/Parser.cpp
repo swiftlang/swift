@@ -891,23 +891,21 @@ static bool isStartOfExpr(const Token &Tok, const Token &Next) {
 /// parseSingleExpr
 ///
 /// Parse an expression in a context that requires a single expression.
-ParseResult<Expr> Parser::parseSingleExpr(const char *message) {
-  ParseResult<Expr> result = parseExpr(message);
-  if (result) return true;
+ParseResult<Expr> Parser::parseSingleExpr(const char *Message) {
+  ParseResult<Expr> Result = parseExpr(Message);
+  if (Result) return true;
 
   // Kill all the following expressions.  This is not necessarily
   // good for certain kinds of recovery.
   if (isStartOfExpr(Tok, peekToken())) {
-    SMLoc loc = Tok.getLoc();
+    error(Tok.getLoc(), "expected a singular expression");
     do {
-      ParseResult<Expr> extra = parseExpr(message);
-      if (extra) break;
+      ParseResult<Expr> Extra = parseExpr(Message);
+      if (Extra) break;
     } while (isStartOfExpr(Tok, peekToken()));
-
-    error(loc, "expected a singular expression");
   }
 
-  return result;
+  return Result;
 }
 
 /// parseExpr
@@ -920,7 +918,7 @@ ParseResult<Expr> Parser::parseSingleExpr(const char *message) {
 ParseResult<Expr> Parser::parseExpr(const char *Message) {
   SmallVector<Expr*, 8> SequencedExprs;
 
-  bool hasSemaError = false;
+  bool HasSemaError = false;
 
   while (true) {
     // Parse a primary expression.
@@ -929,7 +927,7 @@ ParseResult<Expr> Parser::parseExpr(const char *Message) {
       return true;
 
     if (Primary.isSemaError()) {
-      hasSemaError = true;
+      HasSemaError = true;
     } else {
       SequencedExprs.push_back(Primary.get());
     }
@@ -949,7 +947,7 @@ ParseResult<Expr> Parser::parseExpr(const char *Message) {
   }
 
   // If we had semantic errors, just fail here.
-  if (hasSemaError)
+  if (HasSemaError)
     return ParseResult<Expr>::getSemaError();
   assert(!SequencedExprs.empty());
 

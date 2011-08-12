@@ -673,11 +673,11 @@ static Expr *ReduceBinaryExprs(SequenceExpr *E, unsigned &Elt,
   while (Elt+1 != E->NumElements) {
     assert(Elt+2 < E->NumElements);
 
-    Expr *leftOperator = E->Elements[Elt+1];
-    int leftPrecedence = getBinOp(leftOperator);
-    if (leftPrecedence < (int) MinPrec) {
-      if (leftPrecedence == -1)
-        TC.error(leftOperator->getLocStart(),
+    Expr *LeftOperator = E->Elements[Elt+1];
+    int LeftPrecedence = getBinOp(LeftOperator);
+    if (LeftPrecedence < (int)MinPrec) {
+      if (LeftPrecedence == -1)
+        TC.error(LeftOperator->getLocStart(),
                  "operator is not a binary operator");
       return 0;
     }
@@ -690,8 +690,8 @@ static Expr *ReduceBinaryExprs(SequenceExpr *E, unsigned &Elt,
     // in "x+y*z".
     if (Elt+1 != E->NumElements) {
       assert(Elt+2 < E->NumElements);
-      Expr *rightOperator = E->Elements[Elt+1];
-      int rightPrecedence = getBinOp(rightOperator);
+      Expr *RightOperator = E->Elements[Elt+1];
+      int RightPrecedence = getBinOp(RightOperator);
     
       // TODO: All operators are left associative at the moment.
     
@@ -699,17 +699,17 @@ static Expr *ReduceBinaryExprs(SequenceExpr *E, unsigned &Elt,
       // evaluate the RHS as a complete subexpression first.  This
       // happens with "x+y*z", where we want to reduce y*z to a single
       // sub-expression of the add.
-      if (leftPrecedence < rightPrecedence) {
-        RHS = ReduceBinaryExprs(E, Elt, TC, (unsigned) (leftPrecedence+1));
+      if (LeftPrecedence < RightPrecedence) {
+        RHS = ReduceBinaryExprs(E, Elt, TC, (unsigned) (LeftPrecedence+1));
         if (!RHS) return 0;
-      } else if (rightPrecedence == -1) {
-        TC.error(rightOperator->getLocStart(),
+      } else if (RightPrecedence == -1) {
+        TC.error(RightOperator->getLocStart(),
                  "operator is not a binary operator");
       }
     }
 
     // Okay, we've finished the parse, form the AST node for the binop now.
-    BinaryExpr *RBE = new (TC.Context) BinaryExpr(LHS, leftOperator, RHS);
+    BinaryExpr *RBE = new (TC.Context) BinaryExpr(LHS, LeftOperator, RHS);
     if (SemaBinaryExpr(RBE->LHS, RBE->Fn, RBE->RHS, RBE->Ty, TC))
       return 0;
 
