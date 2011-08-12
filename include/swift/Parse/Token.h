@@ -59,6 +59,7 @@ enum class tok {
 #undef KEYWORD
   
 #define PUNCTUATOR(X, Y) X,
+  PUNCTUATOR(l_paren_space, "(")
   PUNCTUATOR(l_paren,     "(")
   PUNCTUATOR(r_paren,     ")")
   PUNCTUATOR(l_brace,     "{")

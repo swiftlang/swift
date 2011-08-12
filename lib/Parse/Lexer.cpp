@@ -242,6 +242,11 @@ void Lexer::lexDigit() {
 void Lexer::lexImpl() {
   assert(CurPtr >= Buffer->getBufferStart() &&
          CurPtr <= Buffer->getBufferEnd() && "Cur Char Pointer out of range!");
+  
+  // Keep track of the end of the previous token for whitespace sensitive tokens
+  // like '('.
+  const char *EndOfPrevToken = CurPtr;
+  
 Restart:
   // Remember the start of the token so we can form the text range.
   const char *TokStart = CurPtr;
@@ -267,7 +272,28 @@ Restart:
     // Otherwise, this is the end of the buffer.  Return EOF.
     return formToken(tok::eof, TokStart);
 
-  case '(': return formToken(tok::l_paren,  TokStart);
+  case '(': {
+    // This is either l_paren or l_paren_space depending on whether there is
+    // whitespace before it and whether there was an operator before it.
+    if (CurPtr-1 != EndOfPrevToken)
+      return formToken(tok::l_paren_space, TokStart);  // had whitespace.
+
+    // '(' at the start of a buffer is considered to be the start of an
+    // expression.
+    if (EndOfPrevToken == Buffer->getBufferStart())
+      return formToken(tok::l_paren_space, TokStart);
+
+    char LastTokenChar = EndOfPrevToken[-1];
+    
+    // If this '(' was preceded by operator or some other punctuation (but not
+    // ')'), then it is the start of an expression.
+    if (isPunctuationIdentifierChar(LastTokenChar) ||
+        LastTokenChar == '(' || LastTokenChar == '{' || LastTokenChar == '[')
+      return formToken(tok::l_paren_space, TokStart);
+      
+    // Otherwise, a ( without whitespace.
+    return formToken(tok::l_paren, TokStart);
+  }
   case ')': return formToken(tok::r_paren,  TokStart);
   case '{': return formToken(tok::l_brace,  TokStart);
   case '}': return formToken(tok::r_brace,  TokStart);

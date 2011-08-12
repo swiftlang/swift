@@ -377,9 +377,11 @@ bool Parser::parseVarName(DeclVarName &Name) {
     return false;
   }
   
-  Name.LPLoc = Tok.getLoc();
-  if (parseToken(tok::l_paren, "expected identifier or '(' in var name"))
+  if (Tok.isNot(tok::l_paren) && Tok.isNot(tok::l_paren_space)) {
+    error(Tok.getLoc(), "expected identifier or '(' in var name");
     return true;
+  }
+  Name.LPLoc = consumeToken();
   
   SmallVector<DeclVarName*, 8> ChildNames;
   
@@ -517,7 +519,7 @@ FuncDecl *Parser::parseDeclFunc() {
   }
   
   // We force first type of a func declaration to be a tuple for consistency.
-  if (Tok.isNot(tok::l_paren)) {
+  if (Tok.isNot(tok::l_paren) && Tok.isNot(tok::l_paren_space)) {
     error(Tok.getLoc(), "expected '(' in argument list of func declaration");
     return 0;
   }
@@ -707,8 +709,9 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
     Result = S.Context.TheInt64Type;
     consumeToken(tok::kw___builtin_int64_type);
     break;
-  case tok::l_paren: {
-    SMLoc LPLoc = consumeToken(tok::l_paren);
+  case tok::l_paren:
+  case tok::l_paren_space: {
+    SMLoc LPLoc = consumeToken();
     if (parseTypeTupleBody(LPLoc, Result))
       return true;
 
@@ -869,13 +872,14 @@ bool Parser::parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
 
 static bool isStartOfExpr(const Token &Tok, const Token &Next) {
   if (Tok.is(tok::numeric_constant) || Tok.is(tok::colon) ||
-      Tok.is(tok::l_paren) || Tok.is(tok::dollarident) ||
+      Tok.is(tok::l_paren_space) || Tok.is(tok::dollarident) ||
       Tok.is(tok::identifier) || Tok.is(tok::oper))
     return true;
   
   // "func(" and "func{" are func expressions.  "func x" is a func declaration.
   if (Tok.is(tok::kw_func) &&
-      (Next.is(tok::l_paren) || Next.is(tok::l_brace)))
+      (Next.is(tok::l_paren) || Next.is(tok::l_paren_space) ||
+       Next.is(tok::l_brace)))
     return true;
   return false;
 }
@@ -960,7 +964,7 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &ResVec,
     break;
   }
       
-  case tok::l_paren:
+  case tok::l_paren_space:
     Result = parseExprParen();
     break;
 
@@ -984,6 +988,7 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &ResVec,
   while (1) {
     // Check for a .foo suffix.
     SMLoc TokLoc = Tok.getLoc();
+    
     if (consumeIf(tok::period)) {
       if (Tok.isNot(tok::identifier) && Tok.isNot(tok::dollarident)) {
         error(Tok.getLoc(), "expected field name");
@@ -999,6 +1004,14 @@ bool Parser::parseExprPrimary(SmallVectorImpl<Expr*> &ResVec,
         consumeToken(tok::identifier);
       else
         consumeToken(tok::dollarident);
+      continue;
+    }
+    
+    // Check for a () suffix, which indicates a call.
+    if (Tok.is(tok::l_paren)) {
+      if ((Result = parseExprParen())) return true;
+      if (!Result.isSemaError())
+        ResVec.push_back(Result.get());
       continue;
     }
     
@@ -1088,7 +1101,7 @@ ParseResult<Expr> Parser::parseExprIdentifier() {
 ///     ('.' identifier '=')? expr
 ///
 ParseResult<Expr> Parser::parseExprParen() {
-  SMLoc LPLoc = consumeToken(tok::l_paren);
+  SMLoc LPLoc = consumeToken();
   
   SmallVector<Expr*, 8> SubExprs;
   SmallVector<Identifier, 8> SubExprNames; 
@@ -1157,7 +1170,7 @@ ParseResult<Expr> Parser::parseExprFunc() {
   Type Ty;
   if (Tok.is(tok::l_brace)) {
     Ty = TupleType::getEmpty(S.Context);
-  } else if (!Tok.is(tok::l_paren)) {
+  } else if (!Tok.is(tok::l_paren) && !Tok.is(tok::l_paren_space)) {
     error(Tok.getLoc(), "expected '(' in func expression argument list");
     return true;
   } else if (parseType(Ty)) {
