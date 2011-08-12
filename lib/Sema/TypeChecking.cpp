@@ -49,23 +49,22 @@ namespace {
 
     void typeCheck(TypeAliasDecl *TAD);
 
-    void typeCheck(ValueDecl *VD, SmallVectorImpl<Expr*> &ExcessExprs) {
+    void typeCheck(ValueDecl *VD) {
       // No types to resolved for a ElementRefDecl.
       if (ElementRefDecl *ERD = dyn_cast<ElementRefDecl>(VD))
         return typeCheckERD(ERD);
       if (VarDecl *Var = dyn_cast<VarDecl>(VD))
-        return typeCheckVarDecl(Var, ExcessExprs);
+        return typeCheckVarDecl(Var);
       
       if (isa<OneOfElementDecl>(VD))
         return;  // FIXME: No type checking required for this?
       
-      typeCheckValueDecl(cast<ValueDecl>(VD), ExcessExprs);
+      typeCheckValueDecl(cast<ValueDecl>(VD));
     }
     
     void typeCheckERD(ElementRefDecl *ERD);
-    void typeCheckVarDecl(VarDecl *VD, SmallVectorImpl<Expr*> &ExcessExprs);
-    bool typeCheckValueDecl(ValueDecl *VD,
-                            SmallVectorImpl<Expr*> &ExcessExprs);
+    void typeCheckVarDecl(VarDecl *VD);
+    bool typeCheckValueDecl(ValueDecl *VD);
     
     void validateAttributes(DeclAttributes &Attrs, Type Ty);
     
@@ -74,12 +73,7 @@ namespace {
     /// checkBody - Type check an expression that is used in a top-level
     /// context like a var/func body, or tuple default value.  If DestTy is
     /// specified, the expression is coerced to the requested type.
-    ///
-    /// If the body turns out to be a sequence, this returns the single element
-    /// with the excess in the provided SmallVector.  If the SmallVector is not
-    /// provided, errors are emitted for the excess expressions.
-    void checkBody(Expr *&E, Type DestTy,
-                   SmallVectorImpl<Expr*> *ExcessElements);
+    void checkBody(Expr *&E, Type DestTy);
     
 
     /// convertToType - Do semantic analysis of an expression in a context that
@@ -698,8 +692,6 @@ Expr *SemaExpressionTree::visitSequenceExpr(SequenceExpr *E) {
 
 
 void SemaExpressionTree::PreProcessBraceStmt(BraceStmt *BS) {
-  SmallVector<Expr*, 4> ExcessExprs;
-  
   SmallVector<BraceStmt::ExprStmtOrDecl, 32> NewElements;
   
   // Braces have to manually walk into subtrees for expressions, because we
@@ -708,17 +700,6 @@ void SemaExpressionTree::PreProcessBraceStmt(BraceStmt *BS) {
     if (Expr *SubExpr = BS->Elements[i].dyn_cast<Expr*>()) {
       if ((SubExpr = doIt(SubExpr)) == 0)
         continue;
-      
-      // If the SubStmt is a SequenceExpr, see if we can inline it into our
-      // brace statement.  We can do this when the types of all of the elements
-      // are resolved.  When this happens, the sequence expr itself gets a
-      // resolved type.
-      if (SequenceExpr *SE = dyn_cast<SequenceExpr>(SubExpr))
-        if (!SE->Ty->is<DependentType>()) {
-          for (unsigned i = 0, e = SE->NumElements; i != e; ++i)
-            NewElements.push_back(SE->Elements[i]);
-          continue;
-        }
       
       // Otherwise it is a normal expression or an as-yet-unresolved sequence.
       NewElements.push_back(SubExpr);
@@ -737,15 +718,8 @@ void SemaExpressionTree::PreProcessBraceStmt(BraceStmt *BS) {
     if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D))
       TC.typeCheck(TAD);
 
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
-      ExcessExprs.clear();
-      TC.typeCheck(VD, ExcessExprs);
-      
-      // If we have something like 'var x = 4 foo()', then install foo() as an
-      // expression *after* the VarDecl.
-      for (Expr *Elt : ExcessExprs)
-        NewElements.push_back(Elt);
-    }
+    if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+      TC.typeCheck(VD);
   }
   
   // If any of the elements of the braces has a function type (which indicates
@@ -1448,7 +1422,7 @@ bool TypeChecker::validateType(Type InTy) {
       if (EltInit == 0) continue;
       
       SMLoc InitLoc = EltInit->getLocStart();
-      checkBody(EltInit, EltTy, 0);
+      checkBody(EltInit, EltTy);
       if (EltInit == 0) {
         note(InitLoc, "while converting default tuple value to element type");
         IsInvalid = true;
@@ -1554,31 +1528,10 @@ static Expr *DiagnoseUnresolvedTypes(Expr *E, Expr::WalkOrder Order,
 ///
 /// If the body turns out to be a sequence, this returns the single element
 /// with the excess in the provided smallvector.
-void TypeChecker::checkBody(Expr *&E, Type DestTy,
-                            SmallVectorImpl<Expr*> *ExcessElements) {
+void TypeChecker::checkBody(Expr *&E, Type DestTy) {
   assert(E != 0 && "Can't check a null body!");
   E = SemaExpressionTree::doIt(E, *this);
   if (E == 0) return;
-  
-  // If the top-level expression is a sequence expression, then we have
-  // something like:
-  //   var x = 4 foo()
-  // where the "foo()" portion of this expression is actually executed
-  // separately and independently of the var.  If the user really really wanted
-  // something silly like this, then they should have used parens, as in:
-  //  var x = (4 foo())
-  if (SequenceExpr *SE = dyn_cast<SequenceExpr>(E)) {
-    E = SE->Elements[0];
-    if (ExcessElements)
-      ExcessElements->append(SE->Elements+1, SE->Elements+SE->NumElements);
-    else {
-      // If this context doesn't want any extra expressions, reject them. This
-      // is not the best error message in the world :).
-      for (unsigned i = 1, e = SE->NumElements; i != e; ++i)
-        error(SE->Elements[i]->getLocStart(),
-              "expected a singular expression: this expression is unbound");
-    }
-  }
   
   if (DestTy)
     E = convertToType(E, DestTy);
@@ -1652,10 +1605,9 @@ bool TypeChecker::validateVarName(Type Ty, DeclVarName *Name) {
   return false;
 }
 
-void TypeChecker::typeCheckVarDecl(VarDecl *VD,
-                                   SmallVectorImpl<Expr*> &ExcessExprs) {
+void TypeChecker::typeCheckVarDecl(VarDecl *VD) {
   // Type check the ValueDecl part of a VarDecl.
-  if (typeCheckValueDecl(VD, ExcessExprs))
+  if (typeCheckValueDecl(VD))
     return;
   
   // If the VarDecl had a name specifier, verify that it lines up with the
@@ -1665,8 +1617,7 @@ void TypeChecker::typeCheckVarDecl(VarDecl *VD,
 }
 
 
-bool TypeChecker::typeCheckValueDecl(ValueDecl *VD,
-                                     SmallVectorImpl<Expr*> &ExcessExprs) {
+bool TypeChecker::typeCheckValueDecl(ValueDecl *VD) {
   if (validateType(VD)) {
     VD->Init = 0;
     return true;
@@ -1678,7 +1629,7 @@ bool TypeChecker::typeCheckValueDecl(ValueDecl *VD,
     // was invalid and removed.
     if (VD->Ty->is<DependentType>()) return true;
   } else if (VD->Ty->is<DependentType>()) {
-    checkBody(VD->Init, 0, &ExcessExprs);
+    checkBody(VD->Init, 0);
     if (VD->Init == 0)
       note(VD->getLocStart(),
            "while converting 'var' initializer to declared type");
@@ -1687,7 +1638,7 @@ bool TypeChecker::typeCheckValueDecl(ValueDecl *VD,
   } else {
     // If both a type and an initializer are specified, make sure the
     // initializer's type agrees (or converts) to the redundant type.
-    checkBody(VD->Init, VD->Ty, &ExcessExprs);
+    checkBody(VD->Init, VD->Ty);
     if (VD->Init == 0) {
       if (isa<VarDecl>(VD))
         note(VD->getLocStart(),
