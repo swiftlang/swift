@@ -43,7 +43,6 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
     ArrayTypes(new ArrayTypesMapTy()),
     SourceMgr(sourcemgr),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
-    TheUnresolvedType(new (*this) UnresolvedType()),
     TheDependentType(new (*this) DependentType()),
     TheInt1Type(new (*this) BuiltinType(TypeKind::BuiltinInt1)),
     TheInt8Type(new (*this) BuiltinType(TypeKind::BuiltinInt8)),
@@ -81,7 +80,6 @@ Identifier ASTContext::getIdentifier(StringRef Str) {
 //===----------------------------------------------------------------------===//
 
 // Simple accessors.
-Type UnresolvedType::get(ASTContext &C) { return C.TheUnresolvedType; }
 Type DependentType::get(ASTContext &C) { return C.TheDependentType; }
 Type TupleType::getEmpty(ASTContext &C) { return C.TheEmptyTupleType; }
 

@@ -109,7 +109,6 @@ public:
   
   // Builtin type and simple types that are used frequently.
   const Type TheEmptyTupleType;  /// TheEmptyTupleType - This is "()"
-  const Type TheUnresolvedType;  /// TheUnresolvedType - Not name bound.
   
   /// TheDependentType - Dependent on context.  This is given to an anonymous
   /// closure argument (e.g. $4) and to UnresolvedMemberExprs (e.g. :foo) during

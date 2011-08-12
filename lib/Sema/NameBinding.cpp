@@ -364,8 +364,7 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
   // unit, resolving them with imports.
   for (TypeAliasDecl *TA : TUD->UnresolvedTypesForParser) {
     if (TypeAliasDecl *Result = Binder.lookupTypeName(TA->Name)) {
-      assert(isa<UnresolvedType>(TA->UnderlyingTy.getPointer()) &&
-             "Not an unresolved type");
+      assert(TA->UnderlyingTy.isNull() && "Not an unresolved type");
       // Update the decl we already have to be the correct type.
       TA->TypeAliasLoc = Result->TypeAliasLoc;
       TA->UnderlyingTy = Result->UnderlyingTy;
@@ -374,6 +373,9 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
     
     Binder.error(TA->getLocStart(),
                  "use of undeclared type '" + TA->Name.str() + "'");
+    
+    // FIXME: Need an error type.
+    TA->UnderlyingTy = DependentType::get(Ctx);
   }
 
   // Now that we know the top-level value names, go through and resolve any

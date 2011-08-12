@@ -80,7 +80,7 @@ OneOfType *SemaType::ActOnOneOfType(SMLoc OneOfLoc,
 
   if (PrettyTypeName) {
     // If we have a pretty name for this, complete it to its actual type.
-    assert(isa<UnresolvedType>(PrettyTypeName->UnderlyingTy.getPointer()) &&
+    assert(PrettyTypeName->UnderlyingTy.isNull() &&
            "Not an incomplete decl to complete!");
     PrettyTypeName->UnderlyingTy = Result;
   } else {

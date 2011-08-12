@@ -36,7 +36,6 @@ namespace swift {
     BuiltinInt16,
     BuiltinInt32,
     BuiltinInt64,
-    Unresolved,
     Dependent,
     NameAlias,
     Tuple,
@@ -132,26 +131,6 @@ public:
            T->Kind <= TypeKind::Builtin_Last;
   }
 };
-  
-/// UnresolvedType - This is the type that represents a use of a type that
-/// wasn't forward declared.  This type exists during the parsing phase before
-/// name binding, and can only be the underlying type of a TypeAliasDecl.
-class UnresolvedType : public TypeBase {
-  friend class ASTContext;
-  // The Unresolved type is always canonical.
-  UnresolvedType() : TypeBase(TypeKind::Unresolved, this) {}
-public:
-  static Type get(ASTContext &C);
-  
-  void print(raw_ostream &OS) const;
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const UnresolvedType *) { return true; }
-  static bool classof(const TypeBase *T) {
-    return T->Kind == TypeKind::Unresolved;
-  }
-};
-
   
 /// DependentType - This is a expression type whose actual kind is specified by
 /// context which hasn't been provided yet.

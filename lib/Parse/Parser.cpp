@@ -603,8 +603,7 @@ Decl *Parser::parseDeclOneOf() {
   if (parseIdentifier(OneOfName, "expected identifier in oneof declaration"))
     return 0;
   
-  TypeAliasDecl *TAD = S.decl.ActOnTypeAlias(NameLoc, OneOfName,
-                                             UnresolvedType::get(S.Context));
+  TypeAliasDecl *TAD = S.decl.ActOnTypeAlias(NameLoc, OneOfName, Type());
   if (parseTypeOneOfBody(OneOfLoc, Attributes, OneOfType, TAD))
     return 0;
 

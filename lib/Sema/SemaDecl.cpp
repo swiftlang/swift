@@ -89,7 +89,7 @@ void SemaDecl::handleEndOfTranslationUnit(TranslationUnitDecl *TUD,
     // they get passed in a parent context decl.
 
     // Verify that values have a type specified.
-    if (VD->Ty->is<DependentType>()) {
+    if (false && VD->Ty->is<DependentType>()) {
       error(VD->getLocStart(),
             "top level declarations require a type specifier");
       // FIXME: Should mark the decl as invalid.
@@ -103,7 +103,7 @@ void SemaDecl::handleEndOfTranslationUnit(TranslationUnitDecl *TUD,
   for (TypeAliasDecl *Decl : UnresolvedTypeList) {
     
     // If a type got defined, remove it from the vector.
-    if (!isa<UnresolvedType>(Decl->UnderlyingTy.getPointer()))
+    if (!Decl->UnderlyingTy.isNull())
       continue;
     
     UnresolvedTypeList[Next++] = Decl;
@@ -138,7 +138,7 @@ TypeAliasDecl *SemaDecl::LookupTypeName(Identifier Name, SMLoc Loc) {
   
   // If we don't have a definition for this type, introduce a new TypeAliasDecl
   // with an unresolved underlying type.
-  TAD = new (S.Context) TypeAliasDecl(Loc, Name,UnresolvedType::get(S.Context));
+  TAD = new (S.Context) TypeAliasDecl(Loc, Name, Type());
   getUnresolvedTypesHT(UnresolvedTypes)[Name] = TAD;
   UnresolvedTypeList.push_back(TAD);
   
@@ -280,8 +280,7 @@ void SemaDecl::ActOnStructDecl(SMLoc StructLoc, DeclAttributes &Attrs,
   // Get the TypeAlias for the name that we'll eventually have.  This ensures
   // that the constructors generated have the pretty name for the type instead
   // of the raw oneof.
-  TypeAliasDecl *TAD = S.decl.ActOnTypeAlias(StructLoc, Name,
-                                             UnresolvedType::get(S.Context));
+  TypeAliasDecl *TAD = S.decl.ActOnTypeAlias(StructLoc, Name, Type());
   Decls.push_back(TAD);
   // The 'struct' is syntactically fine, invoke the semantic actions for the
   // syntactically expanded oneof type.  Struct declarations are just sugar for
@@ -318,7 +317,7 @@ TypeAliasDecl *SemaDecl::ActOnTypeAlias(SMLoc TypeAliasLoc,
   
   // If the previous definition was just a use of an undeclared type, complete
   // the type now.
-  if (ExistingDecl->UnderlyingTy->is<UnresolvedType>()) {
+  if (ExistingDecl->UnderlyingTy.isNull()) {
     // Remove the entry for this type from the UnresolvedTypes map.
     getUnresolvedTypesHT(UnresolvedTypes).erase(Name);
     

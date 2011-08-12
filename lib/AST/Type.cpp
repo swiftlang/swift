@@ -40,6 +40,9 @@ bool TypeBase::isEqual(Type Other, ASTContext &Ctx) {
 /// getCanonicalType - Return the canonical version of this type, which has
 /// sugar from all levels stripped off.
 TypeBase *TypeBase::getCanonicalType(ASTContext &Ctx) {
+  assert(this != 0 &&
+         "Cannot call getCanonicalType before name binding is complete");
+
   // If the type is itself canonical or if the canonical type was already
   // computed, just return what we have.
   if (CanonicalType)
@@ -47,8 +50,6 @@ TypeBase *TypeBase::getCanonicalType(ASTContext &Ctx) {
   
   TypeBase *Result = 0;
   switch (Kind) {
-  case TypeKind::Unresolved:
-    assert(0 && "Cannot call getCanonicalType before name binding is complete");
   case TypeKind::BuiltinInt1:
   case TypeKind::BuiltinInt8:
   case TypeKind::BuiltinInt16:
@@ -97,7 +98,6 @@ TypeBase *TypeBase::getCanonicalType(ASTContext &Ctx) {
 TypeBase *TypeBase::getDesugaredType() {
   switch (Kind) {
   case TypeKind::Dependent:
-  case TypeKind::Unresolved:
   case TypeKind::BuiltinInt1:
   case TypeKind::BuiltinInt8:
   case TypeKind::BuiltinInt16:
@@ -236,7 +236,6 @@ void TypeBase::dump() const {
 void TypeBase::print(raw_ostream &OS) const {
   switch (Kind) {
   case TypeKind::Dependent:     return cast<DependentType>(this)->print(OS);
-  case TypeKind::Unresolved:    return cast<UnresolvedType>(this)->print(OS);
   case TypeKind::BuiltinInt1:
   case TypeKind::BuiltinInt8:
   case TypeKind::BuiltinInt16:
@@ -259,10 +258,6 @@ void BuiltinType::print(raw_ostream &OS) const {
   case TypeKind::BuiltinInt32: OS << "__builtin_int32_type"; break;
   case TypeKind::BuiltinInt64: OS << "__builtin_int64_type"; break;
   }
-}
-
-void UnresolvedType::print(raw_ostream &OS) const {
-  OS << "<<unresolved type>>";
 }
 
 void DependentType::print(raw_ostream &OS) const {
