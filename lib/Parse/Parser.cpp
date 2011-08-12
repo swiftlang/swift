@@ -69,6 +69,14 @@ public:
       Value = Arg.get();
   }
   
+  template<typename T2>
+  ParseResult(ParseResult<T2> V) {
+    if (!V.isSuccess())     // Sentinels all have same representation.
+      Value = (T*)V.getSentinelValue();
+    else
+      Value = V.get();      // Let C++ compiler check type compatibility.
+  }
+  
   static ParseResult getSemaError() {
     return ParseResult(NullablePtr<T>());
   }
@@ -89,6 +97,11 @@ public:
   
   T *get() const {
     assert(isSuccess() && "Not a successful parse");
+    return Value;
+  }
+  
+  T *getSentinelValue() const { 
+    assert(!isSuccess() && "Not a sentinel");
     return Value;
   }
 };
@@ -542,14 +555,15 @@ FuncDecl *Parser::parseDeclFunc() {
     
     // Check to see if we have a "{" which is a brace expr.
     if (Tok.is(tok::l_brace)) {
-      BraceStmt *Body = parseStmtBrace();
-      if (Body == 0)
-        return 0;
+      ParseResult<BraceStmt> Body = parseStmtBrace();
+      if (Body.isSuccess())
+        FE->Body = Body.get();
+      else  // FIXME: Should do some sort of error recovery here.
+        FE = 0;
       
-      FE->Body = Body;
     } else {
       // Note, we just discard FE here.  It is bump pointer allocated, so this
-      // is fine (if suboptimal)
+      // is fine (if suboptimal).
       FE = 0;
     }
   }
@@ -1159,16 +1173,14 @@ ParseResult<Expr> Parser::parseExprFunc() {
   Scope FuncBodyScope(S.decl);
   FuncExpr *FE = S.expr.ActOnFuncExprStart(FuncLoc, Ty);
   
-  // Check to see if we have a "{" which is a brace expr.
-  if (Tok.isNot(tok::l_brace)) {
-    error(Tok.getLoc(), "expected '{' in func expression");
-    return true;
-  }
-  
   // Then parse the expression.
-  FE->Body = parseStmtBrace();
-  if (FE->Body == 0) return true;
+  ParseResult<BraceStmt> Body;
+  if ((Body = parseStmtBrace("expected '{' in func expression")))
+    return true;
+  if (Body.isSemaError())
+    return ParseResult<Expr>::getSemaError();
   
+  FE->Body = Body.get();
   return FE;
 }
 
@@ -1194,21 +1206,20 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     // Parse the decl, stmt, or expression.    
     switch (Tok.getKind()) {
     case tok::semi:
-      Entries.push_back(new (S.Context) SemiStmt(Tok.getLoc()));
-      consumeToken(tok::semi);
-      break;
     case tok::l_brace:
-      Entries.push_back(parseStmtBrace());
-      break;
     case tok::kw_return:
-      Entries.push_back(parseStmtReturn());
-      break;
     case tok::kw_if:
-      Entries.push_back(parseStmtIf());
+    case tok::kw_while: {
+      ParseResult<Stmt> Res = parseStmtOtherThanAssignment();
+      if (Res.isParseError()) {
+        NeedParseErrorRecovery = true;
+        break;
+      }
+      
+      if (!Res.isSemaError())
+        Entries.push_back(Res.get());
       break;
-    case tok::kw_while:
-      Entries.push_back(parseStmtWhile());
-      break;
+    }
     case tok::kw_import:
       Entries.push_back(parseDeclImport());
 
@@ -1290,25 +1301,45 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
   return false;
 }
 
+/// parseStmtOtherThanAssignment - Note that this doesn't handle the
+/// "expr '=' expr" production.
+///
+ParseResult<Stmt> Parser::parseStmtOtherThanAssignment() {
+  switch (Tok.getKind()) {
+  default:
+    error(Tok.getLoc(), "expected statement");
+    return true;
+  case tok::semi:      return new (S.Context) SemiStmt(consumeToken(tok::semi));
+  case tok::l_brace:   return parseStmtBrace();
+  case tok::kw_return: return parseStmtReturn();
+  case tok::kw_if:     return parseStmtIf();
+  case tok::kw_while:  return parseStmtWhile();
+  }
+}
+
 /// parseStmtBrace - A brace enclosed expression/statement/decl list.  For
 /// example { 1; 4+5; } or { 1; 2 }.
 ///
 ///   stmt-brace:
 ///     '{' stmt-brace-item* '}'
 ///
-BraceStmt *Parser::parseStmtBrace() {
+ParseResult<BraceStmt> Parser::parseStmtBrace(const char *Message) {
+  if (Tok.isNot(tok::l_brace)) {
+    error(Tok.getLoc(), Message ? Message : "expected '{'");
+    return true;
+  }
   SMLoc LBLoc = consumeToken(tok::l_brace);
   
   SmallVector<ExprStmtOrDecl, 16> Entries;
   
   if (parseBraceItemList(Entries, false /*NotTopLevel*/))
-    return 0;
+    return true;
   
   SMLoc RBLoc = Tok.getLoc();
   if (parseToken(tok::r_brace, "expected '}' at end of brace expression",
                  tok::r_brace)) {
     note(LBLoc, "to match this opening '{'");
-    return 0;
+    return true;
   }
   
   ExprStmtOrDecl *NewElements = 
@@ -1322,25 +1353,23 @@ BraceStmt *Parser::parseStmtBrace() {
 ///   stmt-return:
 ///     return expr?
 ///   
-Stmt *Parser::parseStmtReturn() {
+ParseResult<Stmt> Parser::parseStmtReturn() {
   SMLoc ReturnLoc = consumeToken(tok::kw_return);
 
   // Handle the ambiguity between consuming the expression and allowing the
   // enclosing stmt-brace to get it by eagerly eating it.
-  Expr *Result;
+  ParseResult<Expr> Result;
   if (isStartOfExpr(Tok, peekToken())) {
-    ParseResult<Expr> ResultTmp;
-    if ((ResultTmp = parseExpr("expected expresssion in 'return' statement")) ||
-        // FIXME: Sema errors should be propagated.
-        ResultTmp.isSemaError())
-      return 0;
-    Result = ResultTmp.get();
+    if ((Result = parseExpr("expected expresssion in 'return' statement")))
+      return true;
   } else {
     // Result value defaults to ().
     Result = new (S.Context) TupleExpr(SMLoc(), 0, 0, 0, SMLoc(), false, false);
   }
-  
-  return new (S.Context) ReturnStmt(ReturnLoc, Result);
+
+  if (!Result.isSemaError())
+    return new (S.Context) ReturnStmt(ReturnLoc, Result.get());
+  return ParseResult<Stmt>::getSemaError();
 }
 
 
@@ -1350,73 +1379,61 @@ Stmt *Parser::parseStmtReturn() {
 ///   stmt-if-else:
 ///    'else' stmt-brace
 ///    'else' stmt-if
-Stmt *Parser::parseStmtIf() {
+ParseResult<Stmt> Parser::parseStmtIf() {
   SMLoc IfLoc = consumeToken(tok::kw_if);
 
   ParseResult<Expr> Condition;
-  if ((Condition = parseExpr("expected expresssion in 'if' condition")))
-    return 0;
-  
-  if (Tok.isNot(tok::l_brace)) {
-    error(Tok.getLoc(), "expected '{' after 'if' condition");
-    return 0;
-  }
-  
-  BraceStmt *NormalBody = parseStmtBrace();
-  if (NormalBody == 0) return 0;
-  
-  NullablePtr<Stmt> ElseBody;
+  ParseResult<BraceStmt> NormalBody;
+  if ((Condition = parseExpr("expected expresssion in 'if' condition")) ||
+      (NormalBody = parseStmtBrace("expected '{' after 'if' condition")))
+    return true;
+    
+  ParseResult<Stmt> ElseBody;
   SMLoc ElseLoc = Tok.getLoc();
   if (consumeIf(tok::kw_else)) {
-    if (Tok.is(tok::l_brace))
-      ElseBody = parseStmtBrace();
-    else if (Tok.is(tok::kw_if))
+    if (Tok.is(tok::kw_if))
       ElseBody = parseStmtIf();
-    else {
-      error(Tok.getLoc(), "expected '{' or 'if' after else");
-      ElseLoc = SMLoc();
-    }
+    else
+      ElseBody = parseStmtBrace("expected '{' after 'else'");
+    if (ElseBody.isParseError()) return true;
   } else {
     ElseLoc = SMLoc();
   }
 
   // If our condition and normal expression parsed correctly, build an AST.
-  // FIXME: Sema errors should be propagated.
-  if (Condition.isSemaError())
-    return 0;
+  if (Condition.isSemaError() || NormalBody.isSemaError() ||
+      ElseBody.isSemaError())
+    return ParseResult<Stmt>::getSemaError();
   
   Expr *Cond = S.expr.ActOnCondition(Condition.get());
   
-  return new (S.Context) IfStmt(IfLoc, Cond, NormalBody, ElseLoc,
-                                ElseBody.getPtrOrNull());
+  Stmt *ElseBodyStmt = 0;
+  if (!ElseBody.isAbsent())
+    ElseBodyStmt = ElseBody.get();
+  
+  return new (S.Context) IfStmt(IfLoc, Cond, NormalBody.get(),
+                                ElseLoc, ElseBodyStmt);
 }
 
 /// 
 ///   stmt-while:
 ///     'while' expr stmt-brace
-Stmt *Parser::parseStmtWhile() {
+ParseResult<Stmt> Parser::parseStmtWhile() {
   SMLoc WhileLoc = consumeToken(tok::kw_while);
   
   ParseResult<Expr> Condition;
-  if ((Condition = parseExpr("expected expresssion in 'while' condition")))
-    return 0;
-  
-  if (Tok.isNot(tok::l_brace)) {
-    error(Tok.getLoc(), "expected '{' after 'while' condition");
-    return 0;
-  }
-  
-  BraceStmt *Body = parseStmtBrace();
-  if (Body == 0) return 0;
+  ParseResult<BraceStmt> Body;
+  if ((Condition = parseExpr("expected expresssion in 'while' condition")) ||
+      (Body = parseStmtBrace("expected '{' after 'while' condition")))
+    return true;
   
   // If our condition and normal expression parsed correctly, build an AST.
-  // FIXME: Sema errors should be propagated.
-  if (Condition.isSemaError())
-    return 0;
+  if (Condition.isSemaError() || Body.isSemaError())
+    return ParseResult<Stmt>::getSemaError();
   
   Expr *Cond = S.expr.ActOnCondition(Condition.get());
 
-  return new (S.Context) WhileStmt(WhileLoc, Cond, Body);
+  return new (S.Context) WhileStmt(WhileLoc, Cond, Body.get());
 }
 
 

@@ -146,10 +146,11 @@ private:
   ParseResult<Expr> parseExprFunc();
   
   // Statement Parsing
-  BraceStmt *parseStmtBrace();
-  Stmt *parseStmtReturn();
-  Stmt *parseStmtIf();
-  Stmt *parseStmtWhile();
+  ParseResult<Stmt> parseStmtOtherThanAssignment();
+  ParseResult<BraceStmt> parseStmtBrace(const char *Message = 0);
+  ParseResult<Stmt> parseStmtReturn();
+  ParseResult<Stmt> parseStmtIf();
+  ParseResult<Stmt> parseStmtWhile();
 
 };
   
