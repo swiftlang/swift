@@ -153,10 +153,6 @@
   <h3>Whitespace and Comments</h3>
   <!-- ===================================================================== -->
   
-  <div class="commentary">
-    TODO: /**/ comments will be supported when I get around to it.
-  </div>
-
   <pre class="grammar">
     whitespace ::= ' '
     whitespace ::= '\n'
@@ -164,13 +160,15 @@
     whitespace ::= '\t'
     whitespace ::= '\0'
     comment    ::= //.*[\n\r]
+    comment    ::= /* .... */
   </pre>
 
   <p>Space, newline, tab, and the nul byte are all considered whitespace and are
      discarded.</p>
   
-  <p>Comments follow the BCPL style, starting with a "//" and running to the end
-     of the file.  Comments are ignored as whitespace.</p>
+  <p>Comments may follow the BCPL style, starting with a "//" and running to the
+     end of the line, or may be nested /**/ style comments.  Comments are
+     ignored and treated as whitespace.</p>
   
   <!-- ===================================================================== -->
   <h3>Reserved Punctuation Tokens</h3>

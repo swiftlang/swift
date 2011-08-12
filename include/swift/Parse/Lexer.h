@@ -56,12 +56,14 @@ public:
   bool isPrecededByIdentifier(SMLoc L) const;
   
 private:
+  void note(const char *Loc, const Twine &Message);
   void warning(const char *Loc, const Twine &Message);
   void error(const char *Loc, const Twine &Message);
   void lexImpl();
   void formToken(tok Kind, const char *TokStart);
   
   void skipSlashSlashComment();
+  void skipSlashStarComment();
   void lexIdentifier();
   void lexDollarIdent();
   void lexPunctuationIdentifier();

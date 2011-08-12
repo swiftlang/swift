@@ -35,6 +35,10 @@ Lexer::Lexer(unsigned BufferID, ASTContext &context)
   lexImpl();
 }
 
+void Lexer::note(const char *Loc, const Twine &Message) {
+  SourceMgr.PrintMessage(SMLoc::getFromPointer(Loc), Message, "note");
+}
+
 void Lexer::warning(const char *Loc, const Twine &Message) {
   SourceMgr.PrintMessage(SMLoc::getFromPointer(Loc), Message, "warning");
 }
@@ -56,7 +60,7 @@ void Lexer::formToken(tok Kind, const char *TokStart) {
 
 /// skipSlashSlashComment - Skip to the end of the line of a // comment.
 void Lexer::skipSlashSlashComment() {
-  assert(CurPtr[0] == '/' && CurPtr[-1] == '/' && "Not a // comment");
+  assert(CurPtr[-1] == '/' && CurPtr[0] == '/' && "Not a // comment");
   while (1) {
     switch (*CurPtr++) {
     case '\n':
@@ -79,6 +83,53 @@ void Lexer::skipSlashSlashComment() {
     }
   }
 }
+
+void Lexer::skipSlashStarComment() {
+  const char *StartPtr = CurPtr-1;
+  assert(CurPtr[-1] == '/' && CurPtr[0] == '*' && "Not a /* comment");
+  // Make sure to advance over the * so that we don't incorrectly handle /*/ as
+  // the beginning and end of the comment.
+  ++CurPtr;
+  
+  // /**/ comments can be nested, keep track of how deep we've gone.
+  unsigned Depth = 1;
+  
+  while (1) {
+    switch (*CurPtr++) {
+    case '*':
+      // Check for a '*/'
+      if (*CurPtr == '/') {
+        ++CurPtr;
+        if (--Depth == 0)
+          return;
+      }
+      break;
+    case '/':
+      // Check for a '/*'
+      if (*CurPtr == '*') {
+        ++CurPtr;
+        ++Depth;
+      }
+      break;
+    default:
+      break;   // Otherwise, eat other characters.
+    case 0:
+      // If this is a random nul character in the middle of a buffer, skip it as
+      // whitespace.
+      if (CurPtr-1 != Buffer->getBufferEnd()) {
+        warning(CurPtr-1, "nul character embedded in middle of file");
+        break;
+      }
+      
+      // Otherwise, we have an unterminated /* comment.
+      --CurPtr;
+      error(CurPtr-(CurPtr[-1] == '\n'), "unterminated '/*' comment");
+      note(StartPtr, "comment started here");
+      return;
+    }
+  }
+}
+
 
 /// isPunctuationIdentifierChar - Return true if the specified character is a
 /// valid part of a punctuation identifier.
@@ -239,6 +290,12 @@ Restart:
       skipSlashSlashComment();
       goto Restart;
     }
+      
+    if (CurPtr[0] == '*') { // "/*"
+      skipSlashStarComment();
+      goto Restart;
+    }
+      
     // '/' starts an identifier.
     return lexPunctuationIdentifier();
 
