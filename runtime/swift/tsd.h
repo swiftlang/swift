@@ -12,7 +12,14 @@
 #define __BR_SHIMS_TSD__
 
 #include <pthread.h>
+#if __has_include(<System/pthread_machdep.h>)
 #include <System/pthread_machdep.h>
+#define INLINE_TSD 1
+#else
+#define INLINE_TSD 0
+#endif
+
+#if INLINE_TSD
 
 #ifdef __arm__
 #include <arm/arch.h>
@@ -121,5 +128,12 @@ _br_thread_key_init_np(unsigned long k, void (*d)(void *))
   //br_assert_zero(pthread_key_init_np((int)k, d));
   pthread_key_init_np((int)k, d);
 }
+
+#else
+pthread_key_t _br_alloc_key;
+#define _br_thread_setspecific pthread_setspecific
+#define _br_thread_getspecific pthread_getspecific
+#define _br_thread_key_init_np pthread_key_create
+#endif
 
 #endif
