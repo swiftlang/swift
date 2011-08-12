@@ -50,6 +50,7 @@ TypeBase *TypeBase::getCanonicalType(ASTContext &Ctx) {
   
   TypeBase *Result = 0;
   switch (Kind) {
+  case TypeKind::Error:
   case TypeKind::BuiltinInt1:
   case TypeKind::BuiltinInt8:
   case TypeKind::BuiltinInt16:
@@ -97,6 +98,7 @@ TypeBase *TypeBase::getCanonicalType(ASTContext &Ctx) {
 
 TypeBase *TypeBase::getDesugaredType() {
   switch (Kind) {
+  case TypeKind::Error:
   case TypeKind::Dependent:
   case TypeKind::BuiltinInt1:
   case TypeKind::BuiltinInt8:
@@ -235,6 +237,7 @@ void TypeBase::dump() const {
 
 void TypeBase::print(raw_ostream &OS) const {
   switch (Kind) {
+  case TypeKind::Error:         return cast<ErrorType>(this)->print(OS);
   case TypeKind::Dependent:     return cast<DependentType>(this)->print(OS);
   case TypeKind::BuiltinInt1:
   case TypeKind::BuiltinInt8:
@@ -258,6 +261,10 @@ void BuiltinType::print(raw_ostream &OS) const {
   case TypeKind::BuiltinInt32: OS << "__builtin_int32_type"; break;
   case TypeKind::BuiltinInt64: OS << "__builtin_int64_type"; break;
   }
+}
+
+void ErrorType::print(raw_ostream &OS) const {
+  OS << "<<error type>>";
 }
 
 void DependentType::print(raw_ostream &OS) const {

@@ -30,9 +30,8 @@ Type SemaType::ActOnTypeName(SMLoc Loc, Identifier Name) {
 }
 
 
-Type SemaType::ActOnTupleType(SMLoc LPLoc, 
-                               ArrayRef<TupleTypeElt> Elements,
-                               SMLoc RPLoc) {
+Type SemaType::ActOnTupleType(SMLoc LPLoc, ArrayRef<TupleTypeElt> Elements,
+                              SMLoc RPLoc) {
   return TupleType::get(Elements, S.Context);
 }
 
@@ -113,16 +112,16 @@ Type SemaType::ActOnArrayType(Type BaseTy, SMLoc LSquareLoc, Expr *Size,
   // FIXME: Add real support for evaluating constant expressions for array
   // sizes.
   uint64_t SizeVal;
-  if (IntegerLiteralExpr *IL = dyn_cast<IntegerLiteralExpr>(Size))
+  if (IntegerLiteralExpr *IL = dyn_cast<IntegerLiteralExpr>(Size)) {
     SizeVal = IL->getValue();
-  else {
+  } else {
     error(Size->getLocStart(), "invalid type size, not a constant");
-    SizeVal = 1;
+    return ErrorType::get(S.Context);
   }
   
   if (SizeVal == 0) {
     error(Size->getLocStart(), "array types must be larger than zero elements");
-    SizeVal = 1;
+    return ErrorType::get(S.Context);
   }
   
   return ArrayType::get(BaseTy, SizeVal, S.Context);

@@ -1547,6 +1547,9 @@ bool TypeChecker::validateType(Type &InTy) {
   bool IsValid = true;
   
   switch (T->Kind) {
+  case TypeKind::Error:
+    // Error already diagnosed.
+    return false;
   case TypeKind::BuiltinInt1:
   case TypeKind::BuiltinInt8:
   case TypeKind::BuiltinInt16:
@@ -1624,9 +1627,7 @@ bool TypeChecker::validateType(Type &InTy) {
 
   // If we determined that this type is invalid, erase it in the caller.
   if (!IsValid) {
-    // FIXME: This should set the type to some Error type, which is
-    // distinguishable from unresolved.
-    InTy = DependentType::get(Context);
+    InTy = ErrorType::get(Context);
     return true;
   }
 

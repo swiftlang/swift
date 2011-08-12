@@ -42,6 +42,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
     FunctionTypes(new FunctionTypesMapTy()),
     ArrayTypes(new ArrayTypesMapTy()),
     SourceMgr(sourcemgr),
+    TheErrorType(new (*this) ErrorType()),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheDependentType(new (*this) DependentType()),
     TheInt1Type(new (*this) BuiltinType(TypeKind::BuiltinInt1)),
@@ -80,6 +81,7 @@ Identifier ASTContext::getIdentifier(StringRef Str) {
 //===----------------------------------------------------------------------===//
 
 // Simple accessors.
+Type ErrorType::get(ASTContext &C) { return C.TheErrorType; }
 Type DependentType::get(ASTContext &C) { return C.TheDependentType; }
 Type TupleType::getEmpty(ASTContext &C) { return C.TheEmptyTupleType; }
 

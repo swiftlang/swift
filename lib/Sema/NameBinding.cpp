@@ -374,8 +374,7 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
     Binder.error(TA->getLocStart(),
                  "use of undeclared type '" + TA->Name.str() + "'");
     
-    // FIXME: Need an error type.
-    TA->UnderlyingTy = DependentType::get(Ctx);
+    TA->UnderlyingTy = ErrorType::get(Ctx);
   }
 
   // Now that we know the top-level value names, go through and resolve any

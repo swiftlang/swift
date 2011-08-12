@@ -31,6 +31,7 @@ namespace swift {
   class OneOfElementDecl;
   
   enum class TypeKind {
+    Error,       // An erroneously constructed type.
     BuiltinInt1,
     BuiltinInt8,
     BuiltinInt16,
@@ -114,6 +115,26 @@ public:
   // or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = 8) throw();  
+};
+
+/// ErrorType - This represents a type that was erroneously constructed.  This
+/// is produced when parsing types and when name binding type aliases, and is
+/// installed in declaration that use these erroneous types.  All uses of a
+/// declaration of invalid type should be ignored and not re-diagnosed.
+class ErrorType : public TypeBase {
+  friend class ASTContext;
+  // The Error type is always canonical.
+  ErrorType() : TypeBase(TypeKind::Error, this) {}
+public:
+  static Type get(ASTContext &C);
+  
+  void print(raw_ostream &OS) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ErrorType *) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->Kind == TypeKind::Error;
+  }
 };
 
 /// BuiltinType - Trivial builtin types.
