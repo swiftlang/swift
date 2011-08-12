@@ -176,50 +176,65 @@ static bool SemaCallExpr(CallExpr *E, TypeChecker &TC) {
     return false;
   }
   
+  // Otherwise, the function type must be dependent.  If it is something else,
+  // we have a type error.
+  if (!E1->Ty->is<DependentType>()) {
+    TC.error(E1->getLocStart(), "called expression isn't a function");
+    return true;
+  }
+
+  // Okay, if the argument is also dependent, we can't do anything here.  Just
+  // wait until something gets resolved.
+  if (E2->Ty->is<DependentType>()) {
+    E->Ty = E2->Ty;
+    return false;
+  }
+  
+  // Okay, we have a typed argument and untyped function.  See if we can infer
+  // a type for that function.
+  
   // Otherwise, we must have an application to an overload set.  See if we can
   // resolve which overload member is based on the argument type.
-  if (!E2->Ty->is<DependentType>()) {
-    OverloadSetRefExpr *OS = dyn_cast<OverloadSetRefExpr>(E1);
-    if (!OS) {
-      TC.error(E1->getLocStart(), "called expression isn't a function");
-      return true;
-    }
-
-    int BestCandidateFound = -1;
-    Expr::ConversionRank BestRank = Expr::CR_Invalid;
-    
-    for (unsigned i = 0, e = OS->Decls.size(); i != e; ++i) {
-      Type ArgTy = OS->Decls[i]->Ty->getAs<FunctionType>()->Input;
-      // If we found an exact match, disambiguate the overload set.
-      Expr::ConversionRank Rank =
-        E2->getRankOfConversionTo(ArgTy, TC.Context);
-      
-      // If this conversion is worst than our best candidate, ignore it.
-      if (Rank > BestRank)
-        continue;
-      
-      // If this is better than our previous candidate, use it!
-      if (Rank < BestRank) {
-        BestRank = Rank;
-        BestCandidateFound = i;
-        continue;
-      }
-      
-      // Otherwise, this is a repeat of an existing candidate with the same
-      // rank.  This means that the candidates at this rank are ambiguous with
-      // respect to each other, so none can be used.  If something comes along
-      // with a lower rank we can use it though.
-      BestCandidateFound = -1;
-    }
-    
-    if (BestCandidateFound != -1) {
-      E1 = new (TC.Context) DeclRefExpr(OS->Decls[BestCandidateFound], OS->Loc,
-                                        OS->Decls[BestCandidateFound]->Ty);
-      return SemaCallExpr(E, TC);
-    }
-    
-    // FIXME: Emit an error here if we have an overload resolution failure.
+  OverloadSetRefExpr *OS = dyn_cast<OverloadSetRefExpr>(E1);
+  if (!OS) {
+    TC.error(E1->getLocStart(), "called expression isn't a function");
+    return true;
   }
+
+  int BestCandidateFound = -1;
+  Expr::ConversionRank BestRank = Expr::CR_Invalid;
+  
+  for (unsigned i = 0, e = OS->Decls.size(); i != e; ++i) {
+    Type ArgTy = OS->Decls[i]->Ty->getAs<FunctionType>()->Input;
+    // If we found an exact match, disambiguate the overload set.
+    Expr::ConversionRank Rank =
+      E2->getRankOfConversionTo(ArgTy, TC.Context);
+    
+    // If this conversion is worst than our best candidate, ignore it.
+    if (Rank > BestRank)
+      continue;
+    
+    // If this is better than our previous candidate, use it!
+    if (Rank < BestRank) {
+      BestRank = Rank;
+      BestCandidateFound = i;
+      continue;
+    }
+    
+    // Otherwise, this is a repeat of an existing candidate with the same
+    // rank.  This means that the candidates at this rank are ambiguous with
+    // respect to each other, so none can be used.  If something comes along
+    // with a lower rank we can use it though.
+    BestCandidateFound = -1;
+  }
+  
+  if (BestCandidateFound != -1) {
+    E1 = new (TC.Context) DeclRefExpr(OS->Decls[BestCandidateFound], OS->Loc,
+                                      OS->Decls[BestCandidateFound]->Ty);
+    return SemaCallExpr(E, TC);
+  }
+  
+  // FIXME: Emit an error here if we have an overload resolution failure.
   
   // Otherwise, we can't resolve the argument type yet.
   E->Ty = E2->Ty;
