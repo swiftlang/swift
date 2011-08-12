@@ -1068,8 +1068,10 @@ ParseResult<Expr> Parser::parseExprPrimary(const char *Message) {
     // Note that this cannot be a l_paren_space.
     if (Tok.is(tok::l_paren)) {
       ParseResult<Expr> Arg = parseExprParen();
-      if (Arg.isParseError()) return true;
-      if (Arg.isSemaError()) Result = true;
+      if (Arg.isParseError())
+        return true;
+      if (Arg.isSemaError())
+        Result = ParseResult<Expr>::getSemaError();
       else if (!Result.isSemaError())
         Result = new (S.Context) ApplyExpr(Result.get(), Arg.get(), Type());
       continue;
