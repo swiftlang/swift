@@ -19,7 +19,8 @@ TOOLNAME = swift
 # LINK_COMPONENTS before including Makefile.rules
 include $(SWIFT_LEVEL)/../../Makefile.config
 
-LINK_COMPONENTS := $(TARGETS_TO_BUILD) bitwriter codegen ipo selectiondag
+#LINK_COMPONENTS := $(TARGETS_TO_BUILD) bitwriter codegen ipo selectiondag
+LINK_COMPONENTS := $(TARGETS_TO_BUILD) ipo
 USEDLIBS = swiftIRGen.a swiftParse.a swiftSema.a swiftAST.a
 
 include $(SWIFT_LEVEL)/Makefile
