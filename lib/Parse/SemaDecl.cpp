@@ -16,6 +16,7 @@
 
 #include "SemaDecl.h"
 #include "Sema.h"
+#include "swift/Parse/Parser.h"
 #include "Scope.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -276,7 +277,8 @@ VarDecl *SemaDecl::ActOnVarDecl(SMLoc VarLoc, DeclVarName &Name,
 
 void SemaDecl::ActOnStructDecl(SMLoc StructLoc, DeclAttributes &Attrs,
                                Identifier Name, Type BodyTy,
-                               SmallVectorImpl<ExprStmtOrDecl> &Decls) {
+                               SmallVectorImpl<ExprStmtOrDecl> &Decls,
+                               Parser &P) {
   // Get the TypeAlias for the name that we'll eventually have.  This ensures
   // that the constructors generated have the pretty name for the type instead
   // of the raw oneof.
@@ -285,11 +287,11 @@ void SemaDecl::ActOnStructDecl(SMLoc StructLoc, DeclAttributes &Attrs,
   // The 'struct' is syntactically fine, invoke the semantic actions for the
   // syntactically expanded oneof type.  Struct declarations are just sugar for
   // other existing constructs.
-  SemaType::OneOfElementInfo ElementInfo;
+  Parser::OneOfElementInfo ElementInfo;
   ElementInfo.Name = Name.str();
   ElementInfo.NameLoc = StructLoc;
   ElementInfo.EltType = BodyTy;
-  OneOfType *OneOfTy = S.type.ActOnOneOfType(StructLoc, Attrs, ElementInfo,TAD);
+  OneOfType *OneOfTy = P.actOnOneOfType(StructLoc, Attrs, ElementInfo, TAD);
   assert(OneOfTy->hasSingleElement() && "Somehow isn't a struct?");
   
   // In addition to defining the oneof declaration, structs also inject their

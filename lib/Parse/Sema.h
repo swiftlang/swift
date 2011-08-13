@@ -18,7 +18,6 @@
 #ifndef SWIFT_SEMA_SEMA_H
 #define SWIFT_SEMA_SEMA_H
 
-#include "SemaType.h"
 #include "SemaExpr.h"
 #include "SemaDecl.h"
 
@@ -38,7 +37,6 @@ public:
   // Sema subobjects for handling different subsystems.  These are public for
   // direct access by clients.  They are lower case so they don't shadow the
   // type names they correspond to.
-  SemaType type;
   SemaExpr expr;
   SemaDecl decl;
   

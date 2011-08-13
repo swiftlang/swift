@@ -18,6 +18,7 @@
 #define SWIFT_PARSER_H
 
 #include "swift/Parse/Token.h"
+#include "swift/AST/Type.h"
 
 namespace llvm {
   class SourceMgr;
@@ -39,6 +40,7 @@ namespace swift {
   class FuncDecl;
   class MethDecl;
   class VarDecl;
+  class OneOfType;
   class ASTContext;
   class DeclVarName;
   class TupleTypeElt;
@@ -54,6 +56,8 @@ namespace swift {
   ///
   /// FIXME: This should be moved out to somewhere else.
   void performTypeChecking(TranslationUnitDecl *TUD, ASTContext &Ctx);
+
+  struct OneOfElementInfo;
 
 class Parser {
   llvm::SourceMgr &SourceMgr;
@@ -128,14 +132,28 @@ private:
   bool parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls);
   bool parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls);
   FuncDecl *parseDeclFunc();
+
+public:
+  struct OneOfElementInfo {
+    SMLoc NameLoc;
+    StringRef Name;
+    Type EltType;
+  };
+  
+  OneOfType *actOnOneOfType(SMLoc OneOfLoc, const DeclAttributes &Attrs,
+                            ArrayRef<OneOfElementInfo> Elts,
+                            TypeAliasDecl *PrettyTypeName);
+private:
   
   // Type Parsing
   bool parseType(Type &Result);
   bool parseType(Type &Result, const Twine &Message);
   bool parseTypeTupleBody(SMLoc LPLoc, Type &Result);
+  
   bool parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
                           Type &Result, TypeAliasDecl *TypeName = 0);
-
+  bool parseTypeArray(SMLoc LSquareLoc, Type &Result);
+  
   // Expression Parsing
   ParseResult<Expr> parseSingleExpr(const char *Message = 0);
   ParseResult<Expr> parseExpr(const char *Message = 0);

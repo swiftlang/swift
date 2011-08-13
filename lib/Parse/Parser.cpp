@@ -441,8 +441,8 @@ FuncDecl *Parser::parseDeclFunc() {
   // actual function name.
   if (consumeIf(tok::coloncolon)) {
     // Look up the type name.
-    ReceiverTy = S.type.ActOnTypeName(TypeNameLoc, Name);
-    
+    ReceiverTy = S.decl.LookupTypeName(Name, 
+                                       TypeNameLoc)->getAliasType(S.Context);
     if (parseIdentifier(Name, "expected identifier in 'func' declaration"))
       return 0;
   }
@@ -460,16 +460,16 @@ FuncDecl *Parser::parseDeclFunc() {
   // If the parsed type is not spelled as a function type (i.e., has no '->' in
   // it), then it is implicitly a function that returns ().
   if (!isa<FunctionType>(FuncTy.getPointer()))
-    FuncTy = S.type.ActOnFunctionType(FuncTy, SMLoc(),
-                                      TupleType::getEmpty(S.Context));
+    FuncTy = FunctionType::get(FuncTy, TupleType::getEmpty(S.Context),
+                               S.Context);
   
   // If a receiver type was specified, install the first type as the receiver,
   // as a tuple with element named 'this'.  This turns "int->int" on FooTy into
   // "(this : FooTy)->(int->int)".
   if (!ReceiverTy.isNull()) {
     TupleTypeElt ReceiverElt(ReceiverTy, S.Context.getIdentifier("this"));
-    FuncTy = S.type.ActOnFunctionType(TupleType::get(ReceiverElt, S.Context),
-                                      SMLoc(), FuncTy);
+    FuncTy = FunctionType::get(TupleType::get(ReceiverElt, S.Context),
+                               FuncTy, S.Context);
   }
   
   // Enter the arguments for the function into a new function-body scope.  We
@@ -577,220 +577,10 @@ bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
     return true;
   }
           
-  S.decl.ActOnStructDecl(StructLoc, Attributes, StructName, Ty, Decls);
+  S.decl.ActOnStructDecl(StructLoc, Attributes, StructName, Ty, Decls, *this);
   return false;
 }
 
-
-//===----------------------------------------------------------------------===//
-// Type Parsing
-//===----------------------------------------------------------------------===//
-
-/// parseType
-///   type:
-///     type-simple
-///     type-function
-///     type-array
-///
-///   type-function:
-///     type-simple '->' type 
-///
-///   type-array:
-///     type '[' ']'
-///     type '[' expr ']'
-///
-///   type-simple:
-///     '__builtin_int32_type'
-///     identifier
-///     type-tuple
-///     type-oneof
-///
-///   type-oneof:
-///     'oneof' attribute-list? oneof-body
-///
-bool Parser::parseType(Type &Result, const Twine &Message) {
-  // Parse type-simple first.
-  switch (Tok.getKind()) {
-  case tok::identifier:
-    Result = S.type.ActOnTypeName(Tok.getLoc(),
-                                  S.Context.getIdentifier(Tok.getText()));
-    consumeToken(Tok.getKind());
-    break;
-  case tok::kw___builtin_int1_type:
-    Result = S.Context.TheInt1Type;
-    consumeToken(tok::kw___builtin_int1_type);
-    break;
-  case tok::kw___builtin_int8_type:
-    Result = S.Context.TheInt8Type;
-    consumeToken(tok::kw___builtin_int8_type);
-    break;
-  case tok::kw___builtin_int16_type:
-    Result = S.Context.TheInt16Type;
-    consumeToken(tok::kw___builtin_int16_type);
-    break;
-  case tok::kw___builtin_int32_type:
-    Result = S.Context.TheInt32Type;
-    consumeToken(tok::kw___builtin_int32_type);
-    break;
-  case tok::kw___builtin_int64_type:
-    Result = S.Context.TheInt64Type;
-    consumeToken(tok::kw___builtin_int64_type);
-    break;
-  case tok::l_paren:
-  case tok::l_paren_space: {
-    SMLoc LPLoc = consumeToken();
-    if (parseTypeTupleBody(LPLoc, Result))
-      return true;
-
-    if (parseToken(tok::r_paren, "expected ')' at end of tuple list",
-                   tok::r_paren)) {
-      note(LPLoc, "to match this opening '('");
-      return true;
-    }
-    break;
-  }
-  case tok::kw_oneof: {
-    SMLoc OneOfLoc = consumeToken(tok::kw_oneof);
-      
-    DeclAttributes Attributes;
-    if (Tok.is(tok::l_square))
-      parseAttributeList(Attributes);
-
-    if (parseTypeOneOfBody(OneOfLoc, Attributes, Result))
-      return true;
-    break;
-  }
-  default:
-    error(Tok.getLoc(), Message);
-    return true;
-  }
-  
-  while (1) {
-    // If there is an arrow, parse the rest of the type.
-    SMLoc TokLoc = Tok.getLoc();
-    if (consumeIf(tok::arrow)) {
-      Type SecondHalf;
-      if (parseType(SecondHalf, "expected type in result of function type"))
-        return true;
-      Result = S.type.ActOnFunctionType(Result, TokLoc, SecondHalf);
-      continue;
-    }
-    
-    // If there is a square bracket, we have an array.
-    if (consumeIf(tok::l_square)) {
-      ParseResult<Expr> Size;
-      if (!Tok.is(tok::r_square) &&
-          (Size = parseSingleExpr("expected expression for array type size")))
-        return true;
-      
-      SMLoc RArrayTok = Tok.getLoc();
-      if (parseToken(tok::r_square, "expected ']' in array type")) {
-        note(TokLoc, "to match this '['");
-        return true;
-      }
-      
-      // FIXME: On a semantic error, we're changing what we're parsing here.
-      if (Size.isSuccess())
-        Result = S.type.ActOnArrayType(Result, TokLoc, Size.get(),
-                                       RArrayTok);
-      continue;
-    }
-    
-    break;
-  }
-        
-  
-  return false;
-}
-
-bool Parser::parseType(Type &Result) {
-  return parseType(Result, "expected type");
-}
-
-/// parseTypeTupleBody
-///   type-tuple:
-///     '(' type-tuple-body? ')'
-///   type-tuple-body:
-///     identifier? value-specifier (',' identifier? value-specifier)*
-///
-bool Parser::parseTypeTupleBody(SMLoc LPLoc, Type &Result) {
-  SmallVector<TupleTypeElt, 8> Elements;
-
-  if (Tok.isNot(tok::r_paren) && Tok.isNot(tok::r_brace)) {
-    bool HadError = false;
-    do {
-      Elements.push_back(TupleTypeElt());
-      TupleTypeElt &Result = Elements.back();
-      
-      if (Tok.is(tok::identifier))
-        parseIdentifier(Result.Name, "");
-      
-      NullablePtr<Expr> Init;
-      if ((HadError = parseValueSpecifier(Result.Ty, Init, /*single*/ true)))
-        break;
-      Result.Init = Init.getPtrOrNull();
-    } while (consumeIf(tok::comma));
-    
-    if (HadError) {
-      skipUntil(tok::r_paren);
-      if (Tok.is(tok::r_paren))
-        consumeToken(tok::r_paren);
-      return true;
-    }
-  }
-  
-  SMLoc RPLoc = Tok.getLoc();
-  
-  Result = S.type.ActOnTupleType(LPLoc, Elements, RPLoc);
-  return false;
-}
-
-///   oneof-body:
-///      '{' oneof-element (',' oneof-element)* '}'
-///   oneof-element:
-///      identifier
-///      identifier ':' type
-///
-/// If TypeName is specified, it is the type that the constructors should be
-/// built with, so that they preserve the name of the oneof decl that contains
-/// this.
-bool Parser::parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
-                                Type &Result, TypeAliasDecl *TypeName) {
-  if (parseToken(tok::l_brace, "expected '{' in oneof type"))
-    return true;
-  
-  SmallVector<SemaType::OneOfElementInfo, 8> ElementInfos;
-  
-  // Parse the comma separated list of oneof elements.
-  while (Tok.is(tok::identifier)) {
-    SemaType::OneOfElementInfo ElementInfo;
-    ElementInfo.Name = Tok.getText();
-    ElementInfo.NameLoc = Tok.getLoc();
-    ElementInfo.EltType = 0;
-    
-    consumeToken(tok::identifier);
-    
-    // See if we have a type specifier for this oneof element.  If so, parse it.
-    if (consumeIf(tok::colon) &&
-        parseType(ElementInfo.EltType,
-                  "expected type while parsing oneof element '" +
-                  ElementInfo.Name + "'")) {
-      skipUntil(tok::r_brace);
-      return true;
-    }
-    
-    ElementInfos.push_back(ElementInfo);
-    
-    // Require comma separation.
-    if (!consumeIf(tok::comma))
-      break;
-  }
-  
-  parseToken(tok::r_brace, "expected '}' at end of oneof");
-  
-  Result = S.type.ActOnOneOfType(OneOfLoc, Attrs, ElementInfos, TypeName);
-  return false;
-}
 
 
 //===----------------------------------------------------------------------===//
@@ -1171,7 +961,7 @@ ParseResult<Expr> Parser::parseExprFunc() {
   // If the parsed type is not spelled as a function type (i.e., has no '->' in
   // it), then it is implicitly a function that returns ().
   if (!isa<FunctionType>(Ty.getPointer()))
-    Ty = S.type.ActOnFunctionType(Ty, SMLoc(), TupleType::getEmpty(S.Context));
+    Ty = FunctionType::get(Ty, TupleType::getEmpty(S.Context), S.Context);
 
   // The arguments to the func are defined in their own scope.
   Scope FuncBodyScope(S.decl);

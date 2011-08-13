@@ -42,6 +42,7 @@ namespace swift {
   class Scope;
   class DeclAttributes;
   class DeclVarName;
+  class Parser;
   
 /// SemaDecl - Semantic analysis support for Swift declarations.
 class SemaDecl : public SemaBase {
@@ -102,7 +103,8 @@ public:
 
   void ActOnStructDecl(SMLoc StructLoc, DeclAttributes &Attrs,
                        Identifier Name, Type Ty,
-                       SmallVectorImpl<ExprStmtOrDecl> &Decls);
+                       SmallVectorImpl<ExprStmtOrDecl> &Decls,
+                       Parser &P);
   
   // Name processing.
   
