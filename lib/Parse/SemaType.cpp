@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Sema/SemaType.h"
-#include "swift/Sema/Sema.h"
+#include "swift/Parse/SemaType.h"
+#include "swift/Parse/Sema.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"

@@ -1,4 +1,10 @@
 add_swift_library(swiftParse
   Lexer.cpp
   Parser.cpp
-  DEPENDS swiftSema swiftAST)
+  Scope.cpp
+  Sema.cpp
+  SemaBase.cpp
+  SemaDecl.cpp
+  SemaExpr.cpp
+  SemaType.cpp
+  DEPENDS swiftAST)

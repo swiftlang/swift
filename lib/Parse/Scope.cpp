@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Sema/Scope.h"
-#include "swift/Sema/SemaDecl.h"
+#include "swift/Parse/Scope.h"
+#include "swift/Parse/SemaDecl.h"
 using namespace swift;
 
 Scope::Scope(SemaDecl &S) : SD(S),

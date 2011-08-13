@@ -16,8 +16,8 @@
 
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Sema/Sema.h"
-#include "swift/Sema/Scope.h"
+#include "swift/Parse/Sema.h"
+#include "swift/Parse/Scope.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"

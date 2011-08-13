@@ -18,7 +18,7 @@
 #ifndef SWIFT_SEMA_DECL_H
 #define SWIFT_SEMA_DECL_H
 
-#include "swift/Sema/SemaBase.h"
+#include "swift/Parse/SemaBase.h"
 #include "swift/AST/Identifier.h"
 #include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/SmallVector.h"

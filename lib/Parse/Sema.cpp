@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Sema/Sema.h"
+#include "swift/Parse/Sema.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 using namespace swift;
