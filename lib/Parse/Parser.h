@@ -17,7 +17,7 @@
 #ifndef SWIFT_PARSER_H
 #define SWIFT_PARSER_H
 
-#include "swift/Parse/Token.h"
+#include "Token.h"
 #include "swift/AST/Type.h"
 
 namespace llvm {

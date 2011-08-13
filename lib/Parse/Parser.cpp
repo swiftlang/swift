@@ -15,8 +15,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Subsystems.h"
-#include "swift/Parse/Parser.h"
-#include "swift/Parse/Lexer.h"
+#include "Parser.h"
+#include "Lexer.h"
 #include "Sema.h"
 #include "Scope.h"
 #include "ParseResult.h"

@@ -17,7 +17,7 @@
 #ifndef SWIFT_LEXER_H
 #define SWIFT_LEXER_H
 
-#include "swift/Parse/Token.h"
+#include "Token.h"
 
 namespace llvm {
   class MemoryBuffer;

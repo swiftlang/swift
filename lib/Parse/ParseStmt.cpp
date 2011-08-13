@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Parse/Parser.h"
+#include "Parser.h"
 #include "Scope.h"
 #include "Sema.h"
 #include "ParseResult.h"

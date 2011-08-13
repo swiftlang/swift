@@ -16,7 +16,7 @@
 
 #include "SemaDecl.h"
 #include "Sema.h"
-#include "swift/Parse/Parser.h"
+#include "Parser.h"
 #include "Scope.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
