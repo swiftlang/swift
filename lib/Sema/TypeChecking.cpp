@@ -16,8 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME: Entrypoint declared in Parser.h
-#include "swift/Parse/Parser.h"
+#include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Types.h"

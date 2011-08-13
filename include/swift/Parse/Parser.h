@@ -48,18 +48,6 @@ namespace swift {
   class Identifier;
   template<typename T> class ParseResult;
   
-  /// performNameBinding - Once parsing is complete, this walks the AST to
-  /// resolve names and do other top-level validation.
-  void performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx);
-  
-  /// performTypeChecking - Once parsing and namebinding are complete, this
-  /// walks the AST to resolve types and diagnose problems therein.
-  ///
-  /// FIXME: This should be moved out to somewhere else.
-  void performTypeChecking(TranslationUnitDecl *TUD, ASTContext &Ctx);
-
-  TranslationUnitDecl *parseTranslationUnit(unsigned BufferID, ASTContext &Ctx);
-  
   struct OneOfElementInfo;
 
 class Parser {
