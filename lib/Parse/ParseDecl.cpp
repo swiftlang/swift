@@ -205,24 +205,37 @@ TypeAliasDecl *Parser::parseDeclTypeAlias() {
 /// AddElementNamesForVarDecl - This recursive function walks a name specifier
 /// adding ElementRefDecls for the named subcomponents and checking that types
 /// match up correctly.
-static void AddElementNamesForVarDecl(const DeclVarName *Name,
-                                    SmallVectorImpl<unsigned> &AccessPath,
-                                      VarDecl *VD, SemaDecl &SD,
-                              SmallVectorImpl<Parser::ExprStmtOrDecl> &Decls){
+void Parser::actOnVarDeclName(const DeclVarName *Name,
+                              SmallVectorImpl<unsigned> &AccessPath,
+                              VarDecl *VD,
+                              SmallVectorImpl<Parser::ExprStmtOrDecl> &Decls) {
   if (Name->isSimple()) {
     // If this is a leaf name, ask sema to create a ElementRefDecl for us with 
     // the specified access path.
+    Type Ty = ElementRefDecl::getTypeForPath(VD->Ty, AccessPath);
+    
+    // If the type of the path is obviously invalid, diagnose it now and refuse
+    // to create the decl.  The most common result here is DependentType, which
+    // allows type checking to resolve this later.
+    if (Ty.isNull()) {
+      error(Name->LPLoc, "'" + Name->Name.str() + "' is an invalid index for '"+
+            VD->Ty->getString() + "'");
+      return;
+    }
+    
+    // Create the decl for this name and add it to the current scope.
     ElementRefDecl *ERD =
-      SD.ActOnElementName(Name->Name, Name->LPLoc, VD, AccessPath);
+      new (S.Context) ElementRefDecl(VD, Name->LPLoc, Name->Name,
+                                     S.Context.AllocateCopy(AccessPath), Ty);
     Decls.push_back(ERD);
-    SD.AddToScope(ERD);
+    S.decl.AddToScope(ERD);
     return;
   }
   
   AccessPath.push_back(0);
   for (unsigned i = 0, e = Name->Elements.size(); i != e; ++i) {
     AccessPath.back() = i;
-    AddElementNamesForVarDecl(Name->Elements[i], AccessPath, VD, SD, Decls);
+    actOnVarDeclName(Name->Elements[i], AccessPath, VD, Decls);
   }
   AccessPath.pop_back();
 }
@@ -272,7 +285,7 @@ bool Parser::parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   // through it and synthesize the decls that reference the var elements as
   // appropriate.
   SmallVector<unsigned, 8> AccessPath;
-  AddElementNamesForVarDecl(VD->NestedName, AccessPath, VD, S.decl, Decls);
+  actOnVarDeclName(VD->NestedName, AccessPath, VD, Decls);
   return false;
 }
 

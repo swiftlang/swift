@@ -51,25 +51,26 @@ namespace swift {
   struct OneOfElementInfo;
 
 class Parser {
+  Parser(const Parser&) = delete;
+  void operator=(const Parser&) = delete;
+public:
   llvm::SourceMgr &SourceMgr;
   Lexer &L;
+  ASTContext &Context;
+  Sema &S;
   
   /// Tok - This is the current token being considered by the parser.
   Token Tok;
   
-  Parser(const Parser&) = delete;
-  void operator=(const Parser&) = delete;
-public:
-  ASTContext &Context;
-  Sema &S;
+  typedef llvm::PointerUnion3<Expr*, Stmt*, Decl*> ExprStmtOrDecl;
+
 
   Parser(unsigned BufferID, ASTContext &Ctx);
   ~Parser();
   
-  TranslationUnitDecl *parseTranslationUnit();
+  //===--------------------------------------------------------------------===//
+  // Utilities
   
-  typedef llvm::PointerUnion3<Expr*, Stmt*, Decl*> ExprStmtOrDecl;
-private:
   /// peekToken - Return the next token that will be installed by consumeToken.
   const Token &peekToken();
   
@@ -98,7 +99,9 @@ private:
   void warning(SMLoc Loc, const Twine &Message);
   void error(SMLoc Loc, const Twine &Message);
   
+  //===--------------------------------------------------------------------===//
   // Primitive Parsing
+  
   bool parseIdentifier(Identifier &Result, const Twine &Message);
 
   /// parseToken - The parser expects that 'K' is next in the input.  If so, it
@@ -114,7 +117,10 @@ private:
   bool parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Decls,
                           bool IsTopLevel);
 
+  //===--------------------------------------------------------------------===//
   // Decl Parsing
+  
+  TranslationUnitDecl *parseTranslationUnit();
   TypeAliasDecl *parseDeclTypeAlias();
   void parseAttributeList(DeclAttributes &Attributes);
   bool parseAttribute(DeclAttributes &Attributes);
@@ -126,7 +132,22 @@ private:
   bool parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls);
   FuncDecl *parseDeclFunc();
 
-public:
+  void actOnVarDeclName(const DeclVarName *Name,
+                        SmallVectorImpl<unsigned> &AccessPath,
+                        VarDecl *VD,
+                        SmallVectorImpl<Parser::ExprStmtOrDecl> &Decls);
+                        
+  //===--------------------------------------------------------------------===//
+  // Type Parsing
+  
+  bool parseType(Type &Result);
+  bool parseType(Type &Result, const Twine &Message);
+  bool parseTypeTupleBody(SMLoc LPLoc, Type &Result);
+  
+  bool parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
+                          Type &Result, TypeAliasDecl *TypeName = 0);
+  bool parseTypeArray(SMLoc LSquareLoc, Type &Result);
+  
   struct OneOfElementInfo {
     SMLoc NameLoc;
     StringRef Name;
@@ -136,18 +157,10 @@ public:
   OneOfType *actOnOneOfType(SMLoc OneOfLoc, const DeclAttributes &Attrs,
                             ArrayRef<OneOfElementInfo> Elts,
                             TypeAliasDecl *PrettyTypeName);
-private:
-  
-  // Type Parsing
-  bool parseType(Type &Result);
-  bool parseType(Type &Result, const Twine &Message);
-  bool parseTypeTupleBody(SMLoc LPLoc, Type &Result);
-  
-  bool parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
-                          Type &Result, TypeAliasDecl *TypeName = 0);
-  bool parseTypeArray(SMLoc LSquareLoc, Type &Result);
-  
+
+  //===--------------------------------------------------------------------===//
   // Expression Parsing
+  
   static bool isStartOfExpr(const Token &Tok, const Token &Next);
   ParseResult<Expr> parseSingleExpr(const char *Message = 0);
   ParseResult<Expr> parseExpr(const char *Message = 0);

@@ -93,16 +93,6 @@ public:
   
   TypeAliasDecl *ActOnTypeAlias(SMLoc TypeAliasLoc, Identifier Name,
                                 Type Ty);
-  
-  
-  // Name processing.
-  
-  /// ActOnElementName - Assign a name to an element of D specified by Path.
-  ElementRefDecl *ActOnElementName(Identifier Name, SMLoc NameLoc,
-                                   VarDecl *D, ArrayRef<unsigned> Path);
-  bool CheckAccessPathArity(unsigned NumChildren, SMLoc LPLoc, VarDecl *D,
-                            ArrayRef<unsigned> Path);
-  
 };
   
 } // end namespace swift

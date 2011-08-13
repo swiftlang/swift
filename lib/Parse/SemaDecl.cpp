@@ -219,32 +219,6 @@ void SemaDecl::AddToScope(ValueDecl *D) {
 }
 
 //===----------------------------------------------------------------------===//
-// Name Processing.
-//===----------------------------------------------------------------------===//
-
-/// ActOnElementName - Assign a name to an element of D specified by Path.
-ElementRefDecl *SemaDecl::
-ActOnElementName(Identifier Name, SMLoc NameLoc, VarDecl *D,
-                 ArrayRef<unsigned> Path) {
-  Type Ty = ElementRefDecl::getTypeForPath(D->Ty, Path);
-
-  // If the type of the path is obviously invalid, diagnose it now and refuse to
-  // create the decl.  The most common result here is DependentType, which
-  // allows type checking to resolve this later.
-  if (Ty.isNull()) {
-    error(NameLoc, "'" + Name.str() + "' is an invalid index for '" +
-          D->Ty->getString() + "'");
-    return 0;
-  }
-  
-  // Copy the access path into ASTContext's memory.
-  Path = S.Context.AllocateCopy(Path);
-  
-  // Create the decl for this name and add it to the current scope.
-  return new (S.Context) ElementRefDecl(D, NameLoc, Name, Path, Ty);
-}
-
-//===----------------------------------------------------------------------===//
 // Declaration handling.
 //===----------------------------------------------------------------------===//
 
