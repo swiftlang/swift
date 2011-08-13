@@ -38,6 +38,7 @@ using namespace swift;
 Parser::Parser(unsigned BufferID, ASTContext &Context)
   : SourceMgr(Context.SourceMgr),
     L(*new Lexer(BufferID, Context)),
+    Context(Context),
     S(*new Sema(Context)) {
 }
 

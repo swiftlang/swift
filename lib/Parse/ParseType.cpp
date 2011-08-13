@@ -51,29 +51,29 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
   // Parse type-simple first.
   switch (Tok.getKind()) {
   case tok::identifier: {
-    Identifier Name = S.Context.getIdentifier(Tok.getText());
-    Result = S.decl.LookupTypeName(Name, Tok.getLoc())->getAliasType(S.Context);
+    Identifier Name = Context.getIdentifier(Tok.getText());
+    Result = S.decl.LookupTypeName(Name, Tok.getLoc())->getAliasType(Context);
     consumeToken(tok::identifier);
     break;
   }
   case tok::kw___builtin_int1_type:
-    Result = S.Context.TheInt1Type;
+    Result = Context.TheInt1Type;
     consumeToken(tok::kw___builtin_int1_type);
     break;
   case tok::kw___builtin_int8_type:
-    Result = S.Context.TheInt8Type;
+    Result = Context.TheInt8Type;
     consumeToken(tok::kw___builtin_int8_type);
     break;
   case tok::kw___builtin_int16_type:
-    Result = S.Context.TheInt16Type;
+    Result = Context.TheInt16Type;
     consumeToken(tok::kw___builtin_int16_type);
     break;
   case tok::kw___builtin_int32_type:
-    Result = S.Context.TheInt32Type;
+    Result = Context.TheInt32Type;
     consumeToken(tok::kw___builtin_int32_type);
     break;
   case tok::kw___builtin_int64_type:
-    Result = S.Context.TheInt64Type;
+    Result = Context.TheInt64Type;
     consumeToken(tok::kw___builtin_int64_type);
     break;
   case tok::l_paren:
@@ -112,7 +112,7 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
       Type SecondHalf;
       if (parseType(SecondHalf, "expected type in result of function type"))
         return true;
-      Result = FunctionType::get(Result, SecondHalf, S.Context);
+      Result = FunctionType::get(Result, SecondHalf, Context);
       continue;
     }
     
@@ -162,7 +162,7 @@ bool Parser::parseTypeTupleBody(SMLoc LPLoc, Type &Result) {
     }
   }
   
-  Result = TupleType::get(Elements, S.Context);
+  Result = TupleType::get(Elements, Context);
   return false;
 }
 
@@ -225,12 +225,12 @@ OneOfType *Parser::actOnOneOfType(SMLoc OneOfLoc, const DeclAttributes &Attrs,
   
   // If we have a PrettyTypeName to use, use it.  Otherwise, just assign the
   // constructors a temporary dummy type.
-  Type TmpTy = TupleType::getEmpty(S.Context);
+  Type TmpTy = TupleType::getEmpty(Context);
   if (PrettyTypeName)
-    TmpTy = PrettyTypeName->getAliasType(S.Context);
+    TmpTy = PrettyTypeName->getAliasType(Context);
   
   for (const OneOfElementInfo &Elt : Elts) {
-    Identifier NameI = S.Context.getIdentifier(Elt.Name);
+    Identifier NameI = Context.getIdentifier(Elt.Name);
     
     // If this was multiply defined, reject it.
     if (!SeenSoFar.insert(NameI.get())) {
@@ -244,15 +244,14 @@ OneOfType *Parser::actOnOneOfType(SMLoc OneOfLoc, const DeclAttributes &Attrs,
     Type EltTy = TmpTy;
     if (Type ArgTy = Elt.EltType)
       if (PrettyTypeName)
-        EltTy = FunctionType::get(ArgTy, EltTy, S.Context);
+        EltTy = FunctionType::get(ArgTy, EltTy, Context);
     
     // Create a decl for each element, giving each a temporary type.
-    EltDecls.push_back(
-                       new (S.Context) OneOfElementDecl(Elt.NameLoc, NameI, EltTy,
-                                                        Elt.EltType));
+    EltDecls.push_back(new (Context) OneOfElementDecl(Elt.NameLoc, NameI, EltTy,
+                                                      Elt.EltType));
   }
   
-  OneOfType *Result = OneOfType::getNew(OneOfLoc, EltDecls, S.Context);
+  OneOfType *Result = OneOfType::getNew(OneOfLoc, EltDecls, Context);
   
   if (PrettyTypeName) {
     // If we have a pretty name for this, complete it to its actual type.
@@ -267,7 +266,7 @@ OneOfType *Parser::actOnOneOfType(SMLoc OneOfLoc, const DeclAttributes &Attrs,
       // If the OneOf Element takes a type argument, then it is actually a
       // function that takes the type argument and returns the OneOfType.
       if (Type ArgTy = Elt->ArgumentType)
-        EltTy = FunctionType::get(ArgTy, EltTy, S.Context);
+        EltTy = FunctionType::get(ArgTy, EltTy, Context);
       Elt->Ty = EltTy;
     }
   }
@@ -285,7 +284,7 @@ bool Parser::parseTypeArray(SMLoc LSquareLoc, Type &Result) {
   if (consumeIf(tok::r_square)) {
     if (isa<ErrorType>(Result.getPointer()))
       return Result;
-    return ArrayType::get(Result, 0, S.Context);
+    return ArrayType::get(Result, 0, Context);
   }
   
   ParseResult<Expr> SizeEx;
@@ -301,7 +300,7 @@ bool Parser::parseTypeArray(SMLoc LSquareLoc, Type &Result) {
   // If we had a semantic error on the size or if the base type is invalid,
   // propagate up an error type.
   if (SizeEx.isSemaError() || isa<ErrorType>(Result.getPointer())) {
-    Result = ErrorType::get(S.Context);
+    Result = ErrorType::get(Context);
     return false;
   }
   
@@ -316,14 +315,14 @@ bool Parser::parseTypeArray(SMLoc LSquareLoc, Type &Result) {
     SizeVal = IL->getValue();
   } else {
     error(Size->getLocStart(), "invalid type size, not a constant");
-    return ErrorType::get(S.Context);
+    return ErrorType::get(Context);
   }
   
   if (SizeVal == 0) {
     error(Size->getLocStart(), "array types must be larger than zero elements");
-    return ErrorType::get(S.Context);
+    return ErrorType::get(Context);
   }
   
-  Result = ArrayType::get(Result, SizeVal, S.Context);
+  Result = ArrayType::get(Result, SizeVal, Context);
   return false;
 }

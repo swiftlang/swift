@@ -62,6 +62,7 @@ namespace swift {
 class Parser {
   llvm::SourceMgr &SourceMgr;
   Lexer &L;
+  ASTContext &Context;
   Sema &S;
   
   /// Tok - This is the current token being considered by the parser.
