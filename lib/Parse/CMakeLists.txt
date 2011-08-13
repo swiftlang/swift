@@ -7,5 +7,4 @@ add_swift_library(swiftParse
   SemaBase.cpp
   SemaDecl.cpp
   SemaExpr.cpp
-  SemaType.cpp
   DEPENDS swiftAST)
