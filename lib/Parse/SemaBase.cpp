@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Parse/SemaBase.h"
-#include "swift/Parse/Sema.h"
+#include "SemaBase.h"
+#include "Sema.h"
 #include "swift/AST/ASTContext.h"
 #include "llvm/Support/SourceMgr.h"
 using namespace swift;

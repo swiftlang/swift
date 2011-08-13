@@ -18,7 +18,7 @@
 #ifndef SWIFT_SEMA_EXPR_H
 #define SWIFT_SEMA_EXPR_H
 
-#include "swift/Parse/SemaBase.h"
+#include "SemaBase.h"
 
 namespace llvm {
   template <typename PT1, typename PT2> class PointerUnion;

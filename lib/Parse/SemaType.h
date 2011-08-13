@@ -19,7 +19,7 @@
 #define SWIFT_SEMA_TYPE_H
 
 #include "swift/AST/Type.h"
-#include "swift/Parse/SemaBase.h"
+#include "SemaBase.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/SMLoc.h"

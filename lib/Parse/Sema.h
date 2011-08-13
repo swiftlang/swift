@@ -18,9 +18,9 @@
 #ifndef SWIFT_SEMA_SEMA_H
 #define SWIFT_SEMA_SEMA_H
 
-#include "swift/Parse/SemaType.h"
-#include "swift/Parse/SemaExpr.h"
-#include "swift/Parse/SemaDecl.h"
+#include "SemaType.h"
+#include "SemaExpr.h"
+#include "SemaDecl.h"
 
 namespace swift {
   class VarDecl;

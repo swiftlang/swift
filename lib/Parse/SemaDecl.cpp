@@ -14,9 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Parse/SemaDecl.h"
-#include "swift/Parse/Sema.h"
-#include "swift/Parse/Scope.h"
+#include "SemaDecl.h"
+#include "Sema.h"
+#include "Scope.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
