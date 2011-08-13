@@ -248,58 +248,6 @@ ActOnElementName(Identifier Name, SMLoc NameLoc, VarDecl *D,
 // Declaration handling.
 //===----------------------------------------------------------------------===//
 
-Decl *SemaDecl::ActOnImportDecl(SMLoc ImportLoc,
-                        ArrayRef<std::pair<Identifier, SMLoc>> Path,
-                                DeclAttributes &Attrs) {
-  if (!Attrs.empty())
-    error(Attrs.LSquareLoc, "invalid attributes specified for import");
-  
-  Path = S.Context.AllocateCopy(Path);
-  return new (S.Context) ImportDecl(ImportLoc, Path);
-}
-
-
-/// Note that DeclVarName is sitting on the stack, not copied into the
-/// ASTContext.
-VarDecl *SemaDecl::ActOnVarDecl(SMLoc VarLoc, DeclVarName &Name,
-                                Type Ty, Expr *Init, DeclAttributes &Attrs) {
-  assert((!Ty.isNull() || Init != 0) && "Must have a type or an expr already");
-  if (Ty.isNull())
-    Ty = DependentType::get(S.Context);
-  
-  if (Name.isSimple())
-    return new (S.Context) VarDecl(VarLoc, Name.Name, Ty, Init, Attrs);
-  
-  // Copy the name into the ASTContext heap.
-  DeclVarName *TmpName = new (S.Context) DeclVarName(Name);
-  return new (S.Context) VarDecl(VarLoc, TmpName, Ty, Init, Attrs);
-}
-
-void SemaDecl::ActOnStructDecl(SMLoc StructLoc, DeclAttributes &Attrs,
-                               Identifier Name, Type BodyTy,
-                               SmallVectorImpl<ExprStmtOrDecl> &Decls,
-                               Parser &P) {
-  // Get the TypeAlias for the name that we'll eventually have.  This ensures
-  // that the constructors generated have the pretty name for the type instead
-  // of the raw oneof.
-  TypeAliasDecl *TAD = S.decl.ActOnTypeAlias(StructLoc, Name, Type());
-  Decls.push_back(TAD);
-  // The 'struct' is syntactically fine, invoke the semantic actions for the
-  // syntactically expanded oneof type.  Struct declarations are just sugar for
-  // other existing constructs.
-  Parser::OneOfElementInfo ElementInfo;
-  ElementInfo.Name = Name.str();
-  ElementInfo.NameLoc = StructLoc;
-  ElementInfo.EltType = BodyTy;
-  OneOfType *OneOfTy = P.actOnOneOfType(StructLoc, Attrs, ElementInfo, TAD);
-  assert(OneOfTy->hasSingleElement() && "Somehow isn't a struct?");
-  
-  // In addition to defining the oneof declaration, structs also inject their
-  // constructor into the global scope.
-  assert(OneOfTy->Elements.size() == 1 && "Struct has exactly one element");
-  S.decl.AddToScope(OneOfTy->getElement(0));
-  Decls.push_back(OneOfTy->getElement(0));
-}
 
 
 TypeAliasDecl *SemaDecl::ActOnTypeAlias(SMLoc TypeAliasLoc,

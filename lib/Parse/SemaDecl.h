@@ -94,17 +94,6 @@ public:
   TypeAliasDecl *ActOnTypeAlias(SMLoc TypeAliasLoc, Identifier Name,
                                 Type Ty);
   
-  Decl *ActOnImportDecl(SMLoc ImportLoc,
-                        ArrayRef<std::pair<Identifier,SMLoc>> Path,
-                        DeclAttributes &Attrs);
-  
-  VarDecl *ActOnVarDecl(SMLoc VarLoc, DeclVarName &Name, Type Ty,
-                        Expr *Init, DeclAttributes &Attrs);
-
-  void ActOnStructDecl(SMLoc StructLoc, DeclAttributes &Attrs,
-                       Identifier Name, Type Ty,
-                       SmallVectorImpl<ExprStmtOrDecl> &Decls,
-                       Parser &P);
   
   // Name processing.
   

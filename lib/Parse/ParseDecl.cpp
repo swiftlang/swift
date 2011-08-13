@@ -140,7 +140,10 @@ Decl *Parser::parseDeclImport() {
       return 0;
   }
   
-  return S.decl.ActOnImportDecl(ImportLoc, ImportPath, Attributes);
+  if (!Attributes.empty())
+    error(Attributes.LSquareLoc, "invalid attributes specified for import");
+  
+  return new (Context) ImportDecl(ImportLoc, Context.AllocateCopy(ImportPath));
 }
 
 
@@ -244,25 +247,32 @@ bool Parser::parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   if (parseValueSpecifier(Ty, Init, /*single*/ false))
     return true;
 
-  VarDecl *VD = S.decl.ActOnVarDecl(VarLoc, VarName, Ty, Init.getPtrOrNull(),
-                                    Attributes);
-  if (VD == 0) return true;
+  if (Ty.isNull())
+    Ty = DependentType::get(Context);
+
+  // Note that we enter the declaration into the current scope.  Since var's are
+  // not allowed to be recursive, they are entered after its initializer is
+  // parsed.  This does mean that stuff like this is different than C:
+  //    var x = 1; { var x = x+1; assert(x == 2); }
+  if (VarName.isSimple()) {
+    VarDecl *VD = new (Context) VarDecl(VarLoc, VarName.Name, Ty,
+                                        Init.getPtrOrNull(), Attributes);
+    S.decl.AddToScope(VD);
+    Decls.push_back(VD);
+    return false;
+  }
   
+  // Copy the name into the ASTContext heap.
+  DeclVarName *TmpName = new (S.Context) DeclVarName(VarName);
+  VarDecl *VD = new (Context) VarDecl(VarLoc, TmpName, Ty, Init.getPtrOrNull(),
+                                      Attributes);
   Decls.push_back(VD);
   
-  // Enter the declaration into the current scope.  Since var's are not allowed
-  // to be recursive, they are entered after its initializer is parsed.  This
-  // does mean that stuff like this is different than C:
-  //    var x = 1; { var x = x+1; assert(x == 2); }
-  if (VarName.isSimple())
-    S.decl.AddToScope(VD);
-  else {
-    // If there is a more interesting name presented here, then we need to walk
-    // through it and synthesize the decls that reference the var elements as
-    // appropriate.
-    SmallVector<unsigned, 8> AccessPath;
-    AddElementNamesForVarDecl(VD->NestedName, AccessPath, VD, S.decl, Decls);
-  }
+  // If there is a more interesting name presented here, then we need to walk
+  // through it and synthesize the decls that reference the var elements as
+  // appropriate.
+  SmallVector<unsigned, 8> AccessPath;
+  AddElementNamesForVarDecl(VD->NestedName, AccessPath, VD, S.decl, Decls);
   return false;
 }
 
@@ -412,8 +422,8 @@ bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   if (parseToken(tok::l_brace, "expected '{' in struct"))
     return true;
   
-  Type Ty;
-  if (parseTypeTupleBody(LBLoc, Ty)) return true;
+  Type BodyTy;
+  if (parseTypeTupleBody(LBLoc, BodyTy)) return true;
 
   if (parseToken(tok::r_brace, "expected '{' in struct")) {
     note(LBLoc, "to match this opening '{'");
@@ -421,12 +431,32 @@ bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   }
 
   // The type is required to be syntactically a tuple type.
-  if (!isa<TupleType>(Ty.getPointer())) {
+  if (!isa<TupleType>(BodyTy.getPointer())) {
     error(StructLoc, "element type of struct is not a tuple");
     // FIXME: Should set this as an erroroneous decl.
     return true;
   }
           
-  S.decl.ActOnStructDecl(StructLoc, Attributes, StructName, Ty, Decls, *this);
+  // Get the TypeAlias for the name that we'll eventually have.  This ensures
+  // that the constructors generated have the pretty name for the type instead
+  // of the raw oneof.
+  TypeAliasDecl *TAD = S.decl.ActOnTypeAlias(StructLoc, StructName, Type());
+  Decls.push_back(TAD);
+  
+  // The 'struct' is syntactically fine, invoke the semantic actions for the
+  // syntactically expanded oneof type.  Struct declarations are just sugar for
+  // other existing constructs.
+  Parser::OneOfElementInfo ElementInfo;
+  ElementInfo.Name = StructName.str();
+  ElementInfo.NameLoc = StructLoc;
+  ElementInfo.EltType = BodyTy;
+  OneOfType *OneOfTy = actOnOneOfType(StructLoc, Attributes, ElementInfo, TAD);
+  assert(OneOfTy->hasSingleElement() && "Somehow isn't a struct?");
+  
+  // In addition to defining the oneof declaration, structs also inject their
+  // constructor into the global scope.
+  assert(OneOfTy->Elements.size() == 1 && "Struct has exactly one element");
+  S.decl.AddToScope(OneOfTy->getElement(0));
+  Decls.push_back(OneOfTy->getElement(0));
   return false;
 }
