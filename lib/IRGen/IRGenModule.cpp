@@ -16,5 +16,13 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
-using namespace swift;
 
+#include "swift/IRGen/IRGen.h"
+#include "IRGenModule.h"
+
+using namespace swift;
+using namespace irgen;
+
+void IRGenModule::emitTranslationUnit(TranslationUnitDecl *TU) {
+  // TODO
+}
