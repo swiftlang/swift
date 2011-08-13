@@ -20,7 +20,7 @@
 using namespace swift;
 
 Sema::Sema(ASTContext &context)
-  : Context(context), expr(*this), decl(*this) {
+  : Context(context), decl(*this) {
 }
 
 

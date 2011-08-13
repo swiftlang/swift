@@ -30,6 +30,7 @@ namespace swift {
   class Lexer;
   class Sema;
   class Expr;
+  class FuncExpr;
   class Stmt;
   class BraceStmt;
   class Type;
@@ -62,8 +63,6 @@ namespace swift {
 class Parser {
   llvm::SourceMgr &SourceMgr;
   Lexer &L;
-  ASTContext &Context;
-  Sema &S;
   
   /// Tok - This is the current token being considered by the parser.
   Token Tok;
@@ -71,6 +70,9 @@ class Parser {
   Parser(const Parser&) = delete;
   void operator=(const Parser&) = delete;
 public:
+  ASTContext &Context;
+  Sema &S;
+
   Parser(unsigned BufferID, ASTContext &Ctx);
   ~Parser();
   
@@ -163,16 +165,24 @@ private:
   ParseResult<Expr> parseExprUnary(const char *Message = 0);
   ParseResult<Expr> parseExprIdentifier();
   Expr *parseExprOperator();
+  ParseResult<Expr> parseExprNumericConstant();
   ParseResult<Expr> parseExprDollarIdentifier();
   ParseResult<Expr> parseExprParen();
   ParseResult<Expr> parseExprFunc();
   
+  Expr *actOnIdentifierExpr(Identifier Text, SMLoc Loc);
+  FuncExpr *actOnFuncExprStart(SMLoc FuncLoc, Type FuncTy);
+
   // Statement Parsing
   ParseResult<Stmt> parseStmtOtherThanAssignment();
   ParseResult<BraceStmt> parseStmtBrace(const char *Message = 0);
   ParseResult<Stmt> parseStmtReturn();
   ParseResult<Stmt> parseStmtIf();
   ParseResult<Stmt> parseStmtWhile();
+
+  /// actOnCondition - Handle a condition to an if/while statement, inserting
+  /// the call that will convert to a 1-bit type.
+  Expr *actOnCondition(Expr *Cond);
 
 };
   

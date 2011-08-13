@@ -479,7 +479,7 @@ FuncDecl *Parser::parseDeclFunc() {
   {
     Scope FnBodyScope(S.decl);
     
-    FE = S.expr.ActOnFuncExprStart(FuncLoc, FuncTy);
+    FE = actOnFuncExprStart(FuncLoc, FuncTy);
     
     // Then parse the expression.
     NullablePtr<Stmt> Body;

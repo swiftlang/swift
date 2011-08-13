@@ -18,6 +18,7 @@
 #include "ParseResult.h"
 #include "Scope.h"
 #include "Sema.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/ASTContext.h"
@@ -145,8 +146,7 @@ ParseResult<Expr> Parser::parseExprPrimary(const char *Message) {
   ParseResult<Expr> Result;
   switch (Tok.getKind()) {
   case tok::numeric_constant:
-    Result = S.expr.ActOnNumericConstant(Tok.getText(), Tok.getLoc());
-    consumeToken(tok::numeric_constant);
+    Result = parseExprNumericConstant();
     break;
 
   case tok::dollarident: // $1
@@ -250,6 +250,24 @@ ParseResult<Expr> Parser::parseExprPrimary(const char *Message) {
   return Result;
 }
 
+ParseResult<Expr> Parser::parseExprNumericConstant() {
+  StringRef Text = Tok.getText();
+  SMLoc Loc = consumeToken(tok::numeric_constant);
+
+  // The integer literal must fit in 64-bits.
+  unsigned long long Val;
+  if (Text.getAsInteger(0, Val)) {
+    error(Loc, "invalid immediate for integer literal, value too large");
+    return ParseResult<Expr>::getSemaError();
+  }
+  
+  // The type of an integer literal is always "integer_literal_type", which
+  // should be defined by the library.
+  Identifier TyName = Context.getIdentifier("integer_literal_type");
+  Type Ty = S.decl.LookupTypeName(TyName, Loc)->getAliasType(Context);
+  return new (Context) IntegerLiteralExpr(Text, Loc, Ty);
+}
+
 ///   expr-identifier:
 ///     dollarident
 ParseResult<Expr> Parser::parseExprDollarIdentifier() {
@@ -284,9 +302,7 @@ Expr *Parser::parseExprOperator() {
   Identifier Name;
   parseIdentifier(Name, "");
 
-  ParseResult<Expr> Result = S.expr.ActOnIdentifierExpr(Name, Loc);
-  assert(Result.isSuccess() && "operator reference failed?");
-  return Result.get();
+  return actOnIdentifierExpr(Name, Loc);
 }
 
 /// parseExprIdentifier - Parse an identifier expression:
@@ -301,7 +317,7 @@ ParseResult<Expr> Parser::parseExprIdentifier() {
   parseIdentifier(Name, "");
 
   if (Tok.isNot(tok::coloncolon))
-    return S.expr.ActOnIdentifierExpr(Name, Loc);
+    return actOnIdentifierExpr(Name, Loc);
   
   SMLoc ColonColonLoc = consumeToken(tok::coloncolon);
 
@@ -311,7 +327,23 @@ ParseResult<Expr> Parser::parseExprIdentifier() {
                       "::' expression"))
     return true;
 
-  return S.expr.ActOnScopedIdentifierExpr(Name, Loc, ColonColonLoc, Name2,Loc2);
+  
+  // Note: this is very simplistic support for scoped name lookup, extend when
+  // needed.
+  TypeAliasDecl *TypeScopeDecl = S.decl.LookupTypeName(Name, Loc);
+    
+  return new (Context) UnresolvedScopedIdentifierExpr(TypeScopeDecl, Loc,
+                                                      ColonColonLoc, Loc2,
+                                                      Name2);
+}
+
+Expr *Parser::actOnIdentifierExpr(Identifier Text, SMLoc Loc) {
+  ValueDecl *D = S.decl.LookupValueName(Text);
+  
+  if (D == 0)
+    return new (Context) UnresolvedDeclRefExpr(Text, Loc);
+  
+  return new (Context) DeclRefExpr(D, Loc);
 }
 
 
@@ -370,10 +402,25 @@ ParseResult<Expr> Parser::parseExprParen() {
   if (AnySubExprSemaErrors)
     return ParseResult<Expr>::getSemaError();
 
-  return S.expr.ActOnTupleExpr(LPLoc, SubExprs.data(),
-                               SubExprNames.empty()?0 : SubExprNames.data(),
-                               SubExprs.size(), RPLoc);
+  Expr **NewSubExprs =
+    Context.AllocateCopy<Expr*>(SubExprs.data(),
+                                SubExprs.data()+SubExprs.size());
+  
+  Identifier *NewSubExprsNames = 0;
+  if (!SubExprNames.empty())
+    NewSubExprsNames =
+      Context.AllocateCopy<Identifier>(SubExprNames.data(),
+                                       SubExprNames.data()+SubExprs.size());
+  
+  bool IsGrouping = false;
+  if (SubExprs.size() == 1 &&
+      (SubExprNames.empty() || SubExprNames[0].empty()))
+    IsGrouping = true;
+  
+  return new (Context) TupleExpr(LPLoc, NewSubExprs, NewSubExprsNames,
+                                 SubExprs.size(), RPLoc, IsGrouping);
 }
+
 
 /// parseExprFunc - Parse a func expression.
 ///
@@ -402,7 +449,7 @@ ParseResult<Expr> Parser::parseExprFunc() {
 
   // The arguments to the func are defined in their own scope.
   Scope FuncBodyScope(S.decl);
-  FuncExpr *FE = S.expr.ActOnFuncExprStart(FuncLoc, Ty);
+  FuncExpr *FE = actOnFuncExprStart(FuncLoc, Ty);
   
   // Then parse the expression.
   ParseResult<BraceStmt> Body;
@@ -414,3 +461,98 @@ ParseResult<Expr> Parser::parseExprFunc() {
   FE->Body = Body.get();
   return FE;
 }
+
+
+/// FuncTypePiece - This little enum is used by AddFuncArgumentsToScope to keep
+/// track of where in a function type it is currently looking.  This affects how
+/// the decls are processed and created.
+enum class FuncTypePiece {
+  Function,  // Looking at the initial functiontype itself.
+  Input,     // Looking at the input to the function type
+  Output     // Looking at the output to the function type.
+};
+
+/// AddFuncArgumentsToScope - Walk the type specified for a Func object (which
+/// is known to be a FunctionType on the outer level) creating and adding named
+/// arguments to the current scope.  This causes redefinition errors to be
+/// emitted.
+static void AddFuncArgumentsToScope(Type Ty,
+                                    SmallVectorImpl<unsigned> &AccessPath,
+                                    FuncTypePiece Mode,
+                                    SMLoc FuncLoc, 
+                                    SmallVectorImpl<ArgDecl*> &ArgDecls,
+                                    Parser &P) {
+  // Handle the function case first.
+  if (Mode == FuncTypePiece::Function) {
+    FunctionType *FT = cast<FunctionType>(Ty.getPointer());
+    AccessPath.push_back(0);
+    AddFuncArgumentsToScope(FT->Input, AccessPath, FuncTypePiece::Input,
+                            FuncLoc, ArgDecls, P);
+    
+    AccessPath.back() = 1;
+    
+    // If this is a->b->c then we treat b as an input, not (b->c) as an output.
+    if (isa<FunctionType>(FT->Result.getPointer()))
+      AddFuncArgumentsToScope(FT->Result, AccessPath,
+                              FuncTypePiece::Function, FuncLoc, ArgDecls, P);
+    else    
+      AddFuncArgumentsToScope(FT->Result, AccessPath,
+                              FuncTypePiece::Output, FuncLoc, ArgDecls, P);
+    AccessPath.pop_back();
+    return;
+  }
+  
+  // Otherwise, we're looking at an input or output to the func.  The only type
+  // we currently dive into is the humble tuple, which can be recursive.  This
+  // should dive in syntactically.
+  ///
+  /// Note that we really *do* want dyn_cast here, not getAs, because we do not
+  /// want to look through type aliases or other sugar, we want to see what the
+  /// user wrote in the func declaration.
+  TupleType *TT = dyn_cast<TupleType>(Ty.getPointer());
+  if (TT == 0) return;
+  
+  
+  AccessPath.push_back(0);
+  
+  // For tuples, recursively processes their elements (to handle cases like:
+  //    (x : (a : int, b : int), y : int) -> ...
+  // and create decls for any named elements.
+  for (unsigned i = 0, e = TT->Fields.size(); i != e; ++i) {
+    AccessPath.back() = 1;
+    AddFuncArgumentsToScope(TT->Fields[i].Ty, AccessPath, Mode, FuncLoc,
+                            ArgDecls, P);
+    
+    // If this field is named, create the argument decl for it.
+    Identifier Name = TT->Fields[i].Name;
+    // Ignore unnamed fields.
+    if (Name.get() == 0) continue;
+    
+    
+    // Create the argument decl for this named argument.
+    ArgDecl *AD = new (P.Context) ArgDecl(FuncLoc, Name, TT->Fields[i].Ty);
+    ArgDecls.push_back(AD);
+    
+    // Eventually we should mark the input/outputs as readonly vs writeonly.
+    //bool isInput = Mode == FuncTypePiece::Input;
+    
+    P.S.decl.AddToScope(AD);
+  }
+  
+  AccessPath.pop_back();
+}
+
+
+FuncExpr *Parser::actOnFuncExprStart(SMLoc FuncLoc, Type FuncTy) {
+  SmallVector<unsigned, 8> AccessPath;
+  SmallVector<ArgDecl*, 8> ArgDecls;
+  AddFuncArgumentsToScope(FuncTy, AccessPath, FuncTypePiece::Function,
+                          FuncLoc, ArgDecls, *this);
+  
+  ArrayRef<ArgDecl*> Args = ArgDecls;
+  
+  return new (Context) FuncExpr(FuncLoc, FuncTy, Context.AllocateCopy(Args));
+}
+
+
+

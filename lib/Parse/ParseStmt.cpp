@@ -27,6 +27,18 @@
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
+/// ActOnCondition - Handle a condition to an if/while statement, inserting
+/// the call that will convert to a 1-bit type.
+Expr *Parser::actOnCondition(Expr *Cond) {
+  assert(Cond);
+  
+  // The condition needs to be convertible to a logic value.  Build a call to
+  // "convertToLogicValue" passing in the condition as an argument.
+  Identifier C2LVFuncId = Context.getIdentifier("convertToLogicValue");
+  Expr *C2LVFunc = actOnIdentifierExpr(C2LVFuncId, Cond->getLocStart());
+  
+  return new (Context) CallExpr(C2LVFunc, Cond, Type());
+}
 
 
 ///   stmt-brace-item:
@@ -249,7 +261,7 @@ ParseResult<Stmt> Parser::parseStmtIf() {
       ElseBody.isSemaError())
     return ParseResult<Stmt>::getSemaError();
   
-  Expr *Cond = S.expr.ActOnCondition(Condition.get());
+  Expr *Cond = actOnCondition(Condition.get());
   
   Stmt *ElseBodyStmt = 0;
   if (!ElseBody.isAbsent())
@@ -276,7 +288,7 @@ ParseResult<Stmt> Parser::parseStmtWhile() {
   if (Condition.isSemaError() || Body.isSemaError())
     return ParseResult<Stmt>::getSemaError();
   
-  Expr *Cond = S.expr.ActOnCondition(Condition.get());
+  Expr *Cond = actOnCondition(Condition.get());
 
   return new (Context) WhileStmt(WhileLoc, Cond, Body.get());
 }
