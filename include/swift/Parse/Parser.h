@@ -156,6 +156,7 @@ private:
   bool parseTypeArray(SMLoc LSquareLoc, Type &Result);
   
   // Expression Parsing
+  static bool isStartOfExpr(const Token &Tok, const Token &Next);
   ParseResult<Expr> parseSingleExpr(const char *Message = 0);
   ParseResult<Expr> parseExpr(const char *Message = 0);
   ParseResult<Expr> parseExprPrimary(const char *Message = 0);

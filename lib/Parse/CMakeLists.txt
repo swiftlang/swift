@@ -1,6 +1,7 @@
 add_swift_library(swiftParse
   Lexer.cpp
   Parser.cpp
+  ParseStmt.cpp
   ParseType.cpp
   Scope.cpp
   Sema.cpp
