@@ -22,11 +22,13 @@
 #include "llvm/PassManager.h"
 #include "llvm/Analysis/Verifier.h"
 #include "llvm/Assembly/PrintModulePass.h"
+#include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/Target/TargetData.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetRegistry.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FormattedStream.h"
 
 #include "IRGenModule.h"
@@ -34,6 +36,18 @@
 using namespace swift;
 using namespace irgen;
 using namespace llvm;
+
+static bool isBinaryOutput(OutputKind kind) {
+  switch (kind) {
+  case OutputKind::LLVMAssembly:
+  case OutputKind::NativeAssembly:
+    return false;
+  case OutputKind::LLVMBitcode:
+  case OutputKind::ObjectFile:
+    return true;
+  }
+  llvm_unreachable("bad output kind!");
+}
 
 void swift::performIRGeneration(TranslationUnitDecl *TU, ASTContext &Context,
                                 Options &Opts) {
@@ -82,15 +96,10 @@ void swift::performIRGeneration(TranslationUnitDecl *TU, ASTContext &Context,
   if (Context.hadError()) return;
 
   // Try to open the output file.  Clobbering an existing file is fine.
+  // Open in binary mode if we're doing binary output.
   unsigned OSFlags = 0;
-  switch (Opts.Action) {
-  case CompileAction::Generate:
-  case CompileAction::Compile:
-    break;
-  case CompileAction::Assemble:
+  if (isBinaryOutput(Opts.OutputKind))
     OSFlags |= raw_fd_ostream::F_Binary;
-    break;
-  }
   raw_fd_ostream RawOS(Opts.OutputFilename.c_str(), Error, OSFlags);
   if (RawOS.has_error()) {
     errs() << "error opening '" << Opts.OutputFilename
@@ -99,8 +108,11 @@ void swift::performIRGeneration(TranslationUnitDecl *TU, ASTContext &Context,
     return;
   }
 
+  // Most output kinds want a formatted output stream.  It's not clear
+  // why writing an object file does.
   formatted_raw_ostream FormattedOS;
-  FormattedOS.setStream(RawOS, formatted_raw_ostream::PRESERVE_STREAM);
+  if (Opts.OutputKind != OutputKind::LLVMBitcode)
+    FormattedOS.setStream(RawOS, formatted_raw_ostream::PRESERVE_STREAM);
 
   // Okay, set up a pipeline.
   PassManagerBuilder PMBuilder;
@@ -125,31 +137,31 @@ void swift::performIRGeneration(TranslationUnitDecl *TU, ASTContext &Context,
   ModulePasses.add(new llvm::TargetData(*TargetData));
   PMBuilder.populateModulePassManager(ModulePasses);
 
-  TargetMachine::CodeGenFileType OutputType = TargetMachine::CGFT_Null;
-  switch (Opts.Action) {
-  case CompileAction::Generate:
-    OutputType = TargetMachine::CGFT_Null;
-    break;
-  case CompileAction::Compile:
-    OutputType = TargetMachine::CGFT_AssemblyFile;
-    break;
-  case CompileAction::Assemble:
-    OutputType = TargetMachine::CGFT_ObjectFile;
-    break;
-  }
-
   // Set up the final emission passes.
-  if (OutputType != TargetMachine::CGFT_Null) {
+  switch (Opts.OutputKind) {
+  case OutputKind::LLVMAssembly:
+    ModulePasses.add(createPrintModulePass(&FormattedOS));
+    break;
+  case OutputKind::LLVMBitcode:
+    ModulePasses.add(createBitcodeWriterPass(RawOS));
+    break;
+  case OutputKind::NativeAssembly:
+  case OutputKind::ObjectFile: {
+    TargetMachine::CodeGenFileType FileType;
+    FileType = (Opts.OutputKind == OutputKind::NativeAssembly
+                  ? TargetMachine::CGFT_AssemblyFile
+                  : TargetMachine::CGFT_ObjectFile);
+
     CodeGenOpt::Level OptLevel = static_cast<CodeGenOpt::Level>(Opts.OptLevel);
     if (TargetMachine->addPassesToEmitFile(ModulePasses, FormattedOS,
-                                           OutputType, OptLevel,
+                                           FileType, OptLevel,
                                            !Opts.Verify)) {
       errs() << "cannot initialize code generation passes for target\n";
       Context.setHadError();
       return;
     }
-  } else {
-    ModulePasses.add(createPrintModulePass(&FormattedOS));
+    break;
+  }
   }
 
   // Do it.

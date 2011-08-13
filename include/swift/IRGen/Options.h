@@ -23,15 +23,18 @@
 namespace swift {
 namespace irgen {
 
-enum class CompileAction : unsigned {
-  /// Generate an LLVM module.
-  Generate,
+enum class OutputKind : unsigned {
+  /// Generate an LLVM module and write it out as LLVM assembly.
+  LLVMAssembly,
+
+  /// Generate an LLVM module and write it out as LLVM bitcode.
+  LLVMBitcode,
 
   /// Generate an LLVM module and compile it to assembly.
-  Compile,
+  NativeAssembly,
 
   /// Generate an LLVM module, compile it, and assemble into an object file.
-  Assemble
+  ObjectFile
 };
 
 /// irgen::Options - The set of options support by IR generation.
@@ -41,7 +44,7 @@ public:
   std::string Triple;
 
   /// The kind of compilation we should do.
-  CompileAction Action : 2;
+  OutputKind OutputKind : 2;
 
   /// Should we spend time verifying that the IR we produce is
   /// well-formed?
@@ -50,7 +53,7 @@ public:
   /// The optimization level, as in -O2.
   unsigned OptLevel : 2;
 
-  Options() : Action(CompileAction::Generate), Verify(true), OptLevel(0) {}
+  Options() : OutputKind(OutputKind::LLVMAssembly), Verify(true), OptLevel(0) {}
 };
 
 } // end namespace irgen
