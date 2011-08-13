@@ -56,7 +56,7 @@ void Parser::warning(SMLoc Loc, const Twine &Message) {
 }
 
 void Parser::error(SMLoc Loc, const Twine &Message) {
-  S.Context.setHadError();
+  Context.setHadError();
   SourceMgr.PrintMessage(Loc, Message, "error");
 }
 
@@ -97,7 +97,7 @@ void Parser::skipUntil(tok T) {
 /// Result.  Otherwise, emit an error and return true.
 bool Parser::parseIdentifier(Identifier &Result, const Twine &Message) {
   if (Tok.is(tok::identifier) || Tok.is(tok::oper)) {
-    Result = S.Context.getIdentifier(Tok.getText());
+    Result = Context.getIdentifier(Tok.getText());
     consumeToken();
     return false;
   }
@@ -166,7 +166,7 @@ bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init,
     // FIXME: We really need to distinguish erroneous expr from missing expr in
     // ActOnVarDecl.
     if (Tmp.isSemaError() && Ty.isNull())
-      Ty = S.Context.TheInt32Type;
+      Ty = Context.TheInt32Type;
   }
   
   return false;
@@ -185,7 +185,7 @@ TranslationUnitDecl *Parser::parseTranslationUnit() {
   consumeToken();
   SMLoc FileStartLoc = Tok.getLoc();
   
-  TranslationUnitDecl *Result = new (S.Context) TranslationUnitDecl(S.Context);
+  TranslationUnitDecl *Result = new (Context) TranslationUnitDecl(Context);
   
   // Parse the body of the file.
   SmallVector<ExprStmtOrDecl, 128> Items;
@@ -317,7 +317,7 @@ bool Parser::parseVarName(DeclVarName &Name) {
   
   if (Tok.isNot(tok::r_paren)) {
     do {
-      DeclVarName *Elt = new (S.Context) DeclVarName();
+      DeclVarName *Elt = new (Context) DeclVarName();
       if (parseVarName(*Elt)) return true;
       ChildNames.push_back(Elt);
     } while (consumeIf(tok::comma));
@@ -327,7 +327,7 @@ bool Parser::parseVarName(DeclVarName &Name) {
   if (parseToken(tok::r_paren, "expected ')' at end of var name"))
     note(Name.LPLoc, "to match this '('");
 
-  Name.Elements = S.Context.AllocateCopy(ChildNames);
+  Name.Elements = Context.AllocateCopy(ChildNames);
   return false;
 }
 
@@ -443,7 +443,7 @@ FuncDecl *Parser::parseDeclFunc() {
   if (consumeIf(tok::coloncolon)) {
     // Look up the type name.
     ReceiverTy = S.decl.LookupTypeName(Name, 
-                                       TypeNameLoc)->getAliasType(S.Context);
+                                       TypeNameLoc)->getAliasType(Context);
     if (parseIdentifier(Name, "expected identifier in 'func' declaration"))
       return 0;
   }
@@ -461,16 +461,15 @@ FuncDecl *Parser::parseDeclFunc() {
   // If the parsed type is not spelled as a function type (i.e., has no '->' in
   // it), then it is implicitly a function that returns ().
   if (!isa<FunctionType>(FuncTy.getPointer()))
-    FuncTy = FunctionType::get(FuncTy, TupleType::getEmpty(S.Context),
-                               S.Context);
+    FuncTy = FunctionType::get(FuncTy, TupleType::getEmpty(Context), Context);
   
   // If a receiver type was specified, install the first type as the receiver,
   // as a tuple with element named 'this'.  This turns "int->int" on FooTy into
   // "(this : FooTy)->(int->int)".
   if (!ReceiverTy.isNull()) {
-    TupleTypeElt ReceiverElt(ReceiverTy, S.Context.getIdentifier("this"));
-    FuncTy = FunctionType::get(TupleType::get(ReceiverElt, S.Context),
-                               FuncTy, S.Context);
+    TupleTypeElt ReceiverElt(ReceiverTy, Context.getIdentifier("this"));
+    FuncTy = FunctionType::get(TupleType::get(ReceiverElt, Context),
+                               FuncTy, Context);
   }
   
   // Enter the arguments for the function into a new function-body scope.  We
@@ -501,7 +500,7 @@ FuncDecl *Parser::parseDeclFunc() {
   }
   
   // Create the decl for the func and add it to the parent scope.
-  FuncDecl *FD = new (S.Context) FuncDecl(FuncLoc, Name, FuncTy, FE,Attributes);
+  FuncDecl *FD = new (Context) FuncDecl(FuncLoc, Name, FuncTy, FE,Attributes);
   S.decl.AddToScope(FD);
   return FD;
 }
@@ -670,9 +669,9 @@ ParseResult<Expr> Parser::parseExpr(const char *Message) {
     return SequencedExprs[0];
 
   Expr **NewElements =
-    S.Context.AllocateCopy<Expr*>(SequencedExprs.begin(), SequencedExprs.end());
+    Context.AllocateCopy<Expr*>(SequencedExprs.begin(), SequencedExprs.end());
   
-  return new (S.Context) SequenceExpr(NewElements, SequencedExprs.size());
+  return new (Context) SequenceExpr(NewElements, SequencedExprs.size());
 }
 
 /// parseExprUnary
@@ -728,7 +727,7 @@ ParseResult<Expr> Parser::parseExprPrimary(const char *Message) {
       return true;
     
     // Handle :foo by just making an AST node.
-    Result = new (S.Context) UnresolvedMemberExpr(ColonLoc, NameLoc, Name);
+    Result = new (Context) UnresolvedMemberExpr(ColonLoc, NameLoc, Name);
     break;
   }
 
@@ -765,9 +764,9 @@ ParseResult<Expr> Parser::parseExprPrimary(const char *Message) {
       }
         
       if (!Result.isSemaError()) {
-        Identifier Name = S.Context.getIdentifier(Tok.getText());
-        Result = new (S.Context) UnresolvedDotExpr(Result.get(), TokLoc, Name,
-                                                   Tok.getLoc());
+        Identifier Name = Context.getIdentifier(Tok.getText());
+        Result = new (Context) UnresolvedDotExpr(Result.get(), TokLoc, Name,
+                                                 Tok.getLoc());
       }
       if (Tok.is(tok::identifier))
         consumeToken(tok::identifier);
@@ -785,7 +784,7 @@ ParseResult<Expr> Parser::parseExprPrimary(const char *Message) {
       if (Arg.isSemaError())
         Result = ParseResult<Expr>::getSemaError();
       else if (!Result.isSemaError())
-        Result = new (S.Context) CallExpr(Result.get(), Arg.get(), Type());
+        Result = new (Context) CallExpr(Result.get(), Arg.get(), Type());
       continue;
     }
     
@@ -835,7 +834,7 @@ ParseResult<Expr> Parser::parseExprDollarIdentifier() {
     return ParseResult<Expr>::getSemaError();
   }
   
-  return new (S.Context) AnonClosureArgExpr(ArgNo, Loc);
+  return new (Context) AnonClosureArgExpr(ArgNo, Loc);
 }
 
 
@@ -951,7 +950,7 @@ ParseResult<Expr> Parser::parseExprFunc() {
 
   Type Ty;
   if (Tok.is(tok::l_brace)) {
-    Ty = TupleType::getEmpty(S.Context);
+    Ty = TupleType::getEmpty(Context);
   } else if (!Tok.is(tok::l_paren) && !Tok.is(tok::l_paren_space)) {
     error(Tok.getLoc(), "expected '(' in func expression argument list");
     return true;
@@ -962,7 +961,7 @@ ParseResult<Expr> Parser::parseExprFunc() {
   // If the parsed type is not spelled as a function type (i.e., has no '->' in
   // it), then it is implicitly a function that returns ().
   if (!isa<FunctionType>(Ty.getPointer()))
-    Ty = FunctionType::get(Ty, TupleType::getEmpty(S.Context), S.Context);
+    Ty = FunctionType::get(Ty, TupleType::getEmpty(Context), Context);
 
   // The arguments to the func are defined in their own scope.
   Scope FuncBodyScope(S.decl);
