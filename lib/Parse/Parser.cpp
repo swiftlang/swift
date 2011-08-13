@@ -177,7 +177,14 @@ bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init,
 // Decl Parsing
 //===----------------------------------------------------------------------===//
 
-/// ParseTranslationUnit
+/// parseTranslationUnit - Entrypoint for the parser.
+TranslationUnitDecl *swift::parseTranslationUnit(unsigned BufferID,
+                                                 ASTContext &Ctx) {
+  return Parser(BufferID, Ctx).parseTranslationUnit();  
+}
+
+
+/// parseTranslationUnit - Main entrypoint for the parser.
 ///   translation-unit:
 ///     stmt-brace-item*
 TranslationUnitDecl *Parser::parseTranslationUnit() {

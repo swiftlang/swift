@@ -225,7 +225,7 @@ getReferencedModule(std::pair<Identifier, SMLoc> ModuleID) {
 
   // Parse the translation unit, but don't do name binding or type checking.
   // This can produce new errors etc if the input is erroneous.
-  TranslationUnitDecl *TUD = Parser(BufferID, Context).parseTranslationUnit();
+  TranslationUnitDecl *TUD = parseTranslationUnit(BufferID, Context);
   if (TUD == 0)
     return 0;
   

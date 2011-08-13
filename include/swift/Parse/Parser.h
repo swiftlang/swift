@@ -58,6 +58,8 @@ namespace swift {
   /// FIXME: This should be moved out to somewhere else.
   void performTypeChecking(TranslationUnitDecl *TUD, ASTContext &Ctx);
 
+  TranslationUnitDecl *parseTranslationUnit(unsigned BufferID, ASTContext &Ctx);
+  
   struct OneOfElementInfo;
 
 class Parser {
