@@ -44,7 +44,6 @@ namespace swift {
   class ASTContext;
   class DeclVarName;
   class TupleTypeElt;
-  class Identifier;
   class ScopeInfo;
   template<typename T> class ParseResult;
   

@@ -22,7 +22,6 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 

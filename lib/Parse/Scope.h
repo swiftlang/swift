@@ -47,11 +47,11 @@ private:
   
   /// UnresolvedTypes - This keeps track of all of the unresolved types in the
   /// AST.
-  void *const UnresolvedTypes; // DenseMap<Identifier, TypeAliasDecl *>
+  llvm::DenseMap<Identifier, TypeAliasDecl *> UnresolvedTypes;
   SmallVector<TypeAliasDecl*, 8> UnresolvedTypeList;
 public:
-  ScopeInfo(Parser &TheParser);
-  ~ScopeInfo();
+  ScopeInfo(Parser &TheParser) : TheParser(TheParser), CurScope(0) {}
+  ~ScopeInfo() {}
   
   const SmallVectorImpl<TypeAliasDecl*> &getUnresolvedTypeList() const { 
     return UnresolvedTypeList;

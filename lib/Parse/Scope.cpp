@@ -38,20 +38,6 @@ Scope::Scope(Parser *P) : SI(P->ScopeInfo), ValueHTScope(SI.ValueScopeHT),
 // ScopeInfo Implementation
 //===----------------------------------------------------------------------===//
 
-typedef llvm::DenseMap<Identifier,TypeAliasDecl*> UnresolvedTypesMapTy;
-static UnresolvedTypesMapTy &getUnresolvedTypesHT(void *P){
-  return *(UnresolvedTypesMapTy*)P;
-}
-
-ScopeInfo::ScopeInfo(Parser &TheParser)
-  : TheParser(TheParser), CurScope(0),
-    UnresolvedTypes(new UnresolvedTypesMapTy()) {
-}
-
-ScopeInfo::~ScopeInfo() {
-  delete &getUnresolvedTypesHT(UnresolvedTypes);
-}
-
 /// lookupOrInsertTypeNameDecl - Perform a lexical scope lookup for the
 /// specified name in a type context, returning the decl if found or
 /// installing and returning a new Unresolved one if not.
@@ -64,7 +50,7 @@ TypeAliasDecl *ScopeInfo::lookupOrInsertTypeNameDecl(Identifier Name,
   // If we don't have a definition for this type, introduce a new TypeAliasDecl
   // with an unresolved underlying type.
   TypeAliasDecl *TAD = new (TheParser.Context) TypeAliasDecl(Loc, Name, Type());
-  getUnresolvedTypesHT(UnresolvedTypes)[Name] = TAD;
+  UnresolvedTypes[Name] = TAD;
   UnresolvedTypeList.push_back(TAD);
   
   // Inject this into the outermost scope so that subsequent name lookups of the
@@ -168,7 +154,7 @@ TypeAliasDecl *ScopeInfo::addTypeAliasToScope(SMLoc TypeAliasLoc,
   // the type now.
   if (TAD->UnderlyingTy.isNull()) {
     // Remove the entry for this type from the UnresolvedTypes map.
-    getUnresolvedTypesHT(UnresolvedTypes).erase(Name);
+    UnresolvedTypes.erase(Name);
     
     // This will get removed from UnresolvedTypeList at the end of the TU.
     
