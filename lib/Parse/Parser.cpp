@@ -18,7 +18,6 @@
 #include "Parser.h"
 #include "Lexer.h"
 #include "Sema.h"
-#include "Scope.h"
 #include "ParseResult.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -27,7 +26,6 @@
 #include "swift/AST/Types.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
   
@@ -45,7 +43,8 @@ Parser::Parser(unsigned BufferID, ASTContext &Context)
   : SourceMgr(Context.SourceMgr),
     L(*new Lexer(BufferID, Context)),
     Context(Context),
-    S(*new Sema(Context)) {
+    S(*new Sema(Context)),
+    ScopeInfo(*this) {
 }
 
 Parser::~Parser() {

@@ -52,7 +52,7 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
   switch (Tok.getKind()) {
   case tok::identifier: {
     Identifier Name = Context.getIdentifier(Tok.getText());
-    Result = S.decl.LookupTypeName(Name, Tok.getLoc())->getAliasType(Context);
+    Result = ScopeInfo.lookupOrInsertTypeName(Name, Tok.getLoc());
     consumeToken(tok::identifier);
     break;
   }

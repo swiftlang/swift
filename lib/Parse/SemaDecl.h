@@ -46,20 +46,10 @@ namespace swift {
   
 /// SemaDecl - Semantic analysis support for Swift declarations.
 class SemaDecl : public SemaBase {
-  void *const ValueScopeHT; // ScopedHashTable<Identifier, ValueScopeEntry>
-  void *const TypeScopeHT;  // ScopedHashTable<Identifier, TypeScopeEntry>
-  Scope *CurScope;
-  friend class Scope;
-  
-  /// UnresolvedTypes - This keeps track of all of the unresolved types in the
-  /// AST.
-  void *const UnresolvedTypes; // DenseMap<Identifier, TypeAliasDecl *>
-  
-  SmallVector<TypeAliasDecl*, 8> UnresolvedTypeList;
 public:
 
-  explicit SemaDecl(Sema &S);
-  ~SemaDecl();
+  explicit SemaDecl(Sema &S) : SemaBase(S) {}
+  ~SemaDecl() {}
   
   typedef llvm::PointerUnion3<Expr*, Stmt*, Decl*> ExprStmtOrDecl;
 
@@ -68,31 +58,8 @@ public:
   void handleEndOfTranslationUnit(TranslationUnitDecl *TU,
                                   SMLoc FileStart,
                                   ArrayRef<ExprStmtOrDecl> Items,
-                                  SMLoc FileEnd);
+                                  SMLoc FileEnd, Parser &P);
 
-  //===--------------------------------------------------------------------===//
-  // Name lookup.
-  //===--------------------------------------------------------------------===//
-  
-  /// AddToScope - Register the specified decl as being in the current lexical
-  /// scope.
-  void AddToScope(ValueDecl *D);
-  
-  /// LookupValueName - Perform a lexical scope lookup for the specified name in
-  /// a value context, returning the active decl if found or null if not.
-  ValueDecl *LookupValueName(Identifier Name);
-
-  /// LookupTypeName - Perform a lexical scope lookup for the specified name in
-  /// a type context, returning the decl if found or installing and returning a
-  /// new Unresolved one if not.
-  TypeAliasDecl *LookupTypeName(Identifier Name, SMLoc Loc);
-  
-  //===--------------------------------------------------------------------===//
-  // Declaration handling.
-  //===--------------------------------------------------------------------===//
-  
-  TypeAliasDecl *ActOnTypeAlias(SMLoc TypeAliasLoc, Identifier Name,
-                                Type Ty);
 };
   
 } // end namespace swift

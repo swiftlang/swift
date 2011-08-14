@@ -17,13 +17,13 @@
 #ifndef SWIFT_PARSER_H
 #define SWIFT_PARSER_H
 
+#include "Scope.h"
 #include "Token.h"
 #include "swift/AST/Type.h"
 
 namespace llvm {
   class SourceMgr;
   template <typename PT1, typename PT2, typename PT3> class PointerUnion3;
-  template<class T> class NullablePtr;
 }
 
 namespace swift {
@@ -46,6 +46,7 @@ namespace swift {
   class DeclVarName;
   class TupleTypeElt;
   class Identifier;
+  class ScopeInfo;
   template<typename T> class ParseResult;
   
   struct OneOfElementInfo;
@@ -58,6 +59,7 @@ public:
   Lexer &L;
   ASTContext &Context;
   Sema &S;
+  ScopeInfo ScopeInfo;
   
   /// Tok - This is the current token being considered by the parser.
   Token Tok;

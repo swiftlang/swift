@@ -42,7 +42,8 @@ TranslationUnitDecl *Parser::parseTranslationUnit() {
   parseBraceItemList(Items, true);
   
   // Notify sema about the end of the translation unit.
-  S.decl.handleEndOfTranslationUnit(Result, FileStartLoc, Items, Tok.getLoc());
+  S.decl.handleEndOfTranslationUnit(Result, FileStartLoc, Items, Tok.getLoc(),
+                                    *this);
   
   return Result;
 }
@@ -198,7 +199,7 @@ TypeAliasDecl *Parser::parseDeclTypeAlias() {
       parseType(Ty, "expected type in var declaration"))
     return 0;
 
-  return S.decl.ActOnTypeAlias(TypeAliasLoc, Id, Ty);
+  return ScopeInfo.addTypeAliasToScope(TypeAliasLoc, Id, Ty);
 }
 
 
@@ -228,7 +229,7 @@ void Parser::actOnVarDeclName(const DeclVarName *Name,
       new (S.Context) ElementRefDecl(VD, Name->LPLoc, Name->Name,
                                      S.Context.AllocateCopy(AccessPath), Ty);
     Decls.push_back(ERD);
-    S.decl.AddToScope(ERD);
+    ScopeInfo.addToScope(ERD);
     return;
   }
   
@@ -270,7 +271,7 @@ bool Parser::parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   if (VarName.isSimple()) {
     VarDecl *VD = new (Context) VarDecl(VarLoc, VarName.Name, Ty,
                                         Init.getPtrOrNull(), Attributes);
-    S.decl.AddToScope(VD);
+    ScopeInfo.addToScope(VD);
     Decls.push_back(VD);
     return false;
   }
@@ -315,8 +316,7 @@ FuncDecl *Parser::parseDeclFunc() {
   // actual function name.
   if (consumeIf(tok::coloncolon)) {
     // Look up the type name.
-    ReceiverTy = S.decl.LookupTypeName(Name, 
-                                       TypeNameLoc)->getAliasType(Context);
+    ReceiverTy = ScopeInfo.lookupOrInsertTypeName(Name, TypeNameLoc);
     if (parseIdentifier(Name, "expected identifier in 'func' declaration"))
       return 0;
   }
@@ -350,7 +350,7 @@ FuncDecl *Parser::parseDeclFunc() {
   // duplication.
   FuncExpr *FE = 0;
   {
-    Scope FnBodyScope(S.decl);
+    Scope FnBodyScope(this);
     
     FE = actOnFuncExprStart(FuncLoc, FuncTy);
     
@@ -374,7 +374,7 @@ FuncDecl *Parser::parseDeclFunc() {
   
   // Create the decl for the func and add it to the parent scope.
   FuncDecl *FD = new (Context) FuncDecl(FuncLoc, Name, FuncTy, FE,Attributes);
-  S.decl.AddToScope(FD);
+  ScopeInfo.addToScope(FD);
   return FD;
 }
 
@@ -405,7 +405,7 @@ Decl *Parser::parseDeclOneOf() {
   if (parseIdentifier(OneOfName, "expected identifier in oneof declaration"))
     return 0;
   
-  TypeAliasDecl *TAD = S.decl.ActOnTypeAlias(NameLoc, OneOfName, Type());
+  TypeAliasDecl *TAD = ScopeInfo.addTypeAliasToScope(NameLoc, OneOfName,Type());
   if (parseTypeOneOfBody(OneOfLoc, Attributes, OneOfType, TAD))
     return 0;
 
@@ -453,7 +453,8 @@ bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   // Get the TypeAlias for the name that we'll eventually have.  This ensures
   // that the constructors generated have the pretty name for the type instead
   // of the raw oneof.
-  TypeAliasDecl *TAD = S.decl.ActOnTypeAlias(StructLoc, StructName, Type());
+  TypeAliasDecl *TAD = ScopeInfo.addTypeAliasToScope(StructLoc, StructName,
+                                                     Type());
   Decls.push_back(TAD);
   
   // The 'struct' is syntactically fine, invoke the semantic actions for the
@@ -469,7 +470,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   // In addition to defining the oneof declaration, structs also inject their
   // constructor into the global scope.
   assert(OneOfTy->Elements.size() == 1 && "Struct has exactly one element");
-  S.decl.AddToScope(OneOfTy->getElement(0));
+  ScopeInfo.addToScope(OneOfTy->getElement(0));
   Decls.push_back(OneOfTy->getElement(0));
   return false;
 }

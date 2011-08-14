@@ -264,7 +264,7 @@ ParseResult<Expr> Parser::parseExprNumericConstant() {
   // The type of an integer literal is always "integer_literal_type", which
   // should be defined by the library.
   Identifier TyName = Context.getIdentifier("integer_literal_type");
-  Type Ty = S.decl.LookupTypeName(TyName, Loc)->getAliasType(Context);
+  Type Ty = ScopeInfo.lookupOrInsertTypeName(TyName, Loc);
   return new (Context) IntegerLiteralExpr(Text, Loc, Ty);
 }
 
@@ -330,15 +330,14 @@ ParseResult<Expr> Parser::parseExprIdentifier() {
   
   // Note: this is very simplistic support for scoped name lookup, extend when
   // needed.
-  TypeAliasDecl *TypeScopeDecl = S.decl.LookupTypeName(Name, Loc);
-    
+  TypeAliasDecl *TypeScopeDecl = ScopeInfo.lookupOrInsertTypeNameDecl(Name,Loc);
   return new (Context) UnresolvedScopedIdentifierExpr(TypeScopeDecl, Loc,
                                                       ColonColonLoc, Loc2,
                                                       Name2);
 }
 
 Expr *Parser::actOnIdentifierExpr(Identifier Text, SMLoc Loc) {
-  ValueDecl *D = S.decl.LookupValueName(Text);
+  ValueDecl *D = ScopeInfo.lookupValueName(Text);
   
   if (D == 0)
     return new (Context) UnresolvedDeclRefExpr(Text, Loc);
@@ -448,7 +447,7 @@ ParseResult<Expr> Parser::parseExprFunc() {
     Ty = FunctionType::get(Ty, TupleType::getEmpty(Context), Context);
 
   // The arguments to the func are defined in their own scope.
-  Scope FuncBodyScope(S.decl);
+  Scope FuncBodyScope(this);
   FuncExpr *FE = actOnFuncExprStart(FuncLoc, Ty);
   
   // Then parse the expression.
@@ -536,7 +535,7 @@ static void AddFuncArgumentsToScope(Type Ty,
     // Eventually we should mark the input/outputs as readonly vs writeonly.
     //bool isInput = Mode == FuncTypePiece::Input;
     
-    P.S.decl.AddToScope(AD);
+    P.ScopeInfo.addToScope(AD);
   }
   
   AccessPath.pop_back();

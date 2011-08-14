@@ -54,7 +54,7 @@ Expr *Parser::actOnCondition(Expr *Cond) {
 bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
                                 bool IsTopLevel) {
   // This forms a lexical scope.
-  Scope BraceScope(S.decl);
+  Scope BraceScope(this);
     
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
     bool NeedParseErrorRecovery = false;
