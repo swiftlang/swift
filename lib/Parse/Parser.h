@@ -28,7 +28,6 @@ namespace llvm {
 
 namespace swift {
   class Lexer;
-  class Sema;
   class Expr;
   class FuncExpr;
   class Stmt;
@@ -58,7 +57,6 @@ public:
   llvm::SourceMgr &SourceMgr;
   Lexer &L;
   ASTContext &Context;
-  Sema &S;
   ScopeInfo ScopeInfo;
   
   /// Tok - This is the current token being considered by the parser.

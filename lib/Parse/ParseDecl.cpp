@@ -17,7 +17,6 @@
 #include "Parser.h"
 #include "ParseResult.h"
 #include "Scope.h"
-#include "Sema.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -47,9 +46,9 @@ TranslationUnitDecl *Parser::parseTranslationUnit() {
   
   // First thing, we transform the body into a brace expression.
   ExprStmtOrDecl *NewElements = 
-    S.Context.AllocateCopy<ExprStmtOrDecl>(Items.begin(), Items.end());
-  TUD->Body = new (S.Context) BraceStmt(FileStartLoc, NewElements, Items.size(),
-                                        FileEnd);
+    Context.AllocateCopy<ExprStmtOrDecl>(Items.begin(), Items.end());
+  TUD->Body = new (Context) BraceStmt(FileStartLoc, NewElements, Items.size(),
+                                      FileEnd);
     
   // Do a prepass over the declarations to make sure they have basic sanity and
   // to find the list of top-level value declarations.
@@ -72,7 +71,7 @@ TranslationUnitDecl *Parser::parseTranslationUnit() {
       error(VD->getLocStart(),
             "top level declarations require a type specifier");
       // FIXME: Should mark the decl as invalid.
-      VD->Ty = TupleType::getEmpty(S.Context);
+      VD->Ty = TupleType::getEmpty(Context);
     }
   }
   
@@ -84,8 +83,7 @@ TranslationUnitDecl *Parser::parseTranslationUnit() {
       UnresolvedTypeList.push_back(Decl);
   }
   
-  TUD->UnresolvedTypesForParser = S.Context.AllocateCopy(UnresolvedTypeList);
-  
+  TUD->UnresolvedTypesForParser = Context.AllocateCopy(UnresolvedTypeList);
   return TUD;
 }
 
@@ -252,8 +250,8 @@ void Parser::actOnVarDeclName(const DeclVarName *Name,
                               VarDecl *VD,
                               SmallVectorImpl<Parser::ExprStmtOrDecl> &Decls) {
   if (Name->isSimple()) {
-    // If this is a leaf name, ask sema to create a ElementRefDecl for us with 
-    // the specified access path.
+    // If this is a leaf name, create a ElementRefDecl with  the specified
+    // access path.
     Type Ty = ElementRefDecl::getTypeForPath(VD->Ty, AccessPath);
     
     // If the type of the path is obviously invalid, diagnose it now and refuse
@@ -267,8 +265,8 @@ void Parser::actOnVarDeclName(const DeclVarName *Name,
     
     // Create the decl for this name and add it to the current scope.
     ElementRefDecl *ERD =
-      new (S.Context) ElementRefDecl(VD, Name->LPLoc, Name->Name,
-                                     S.Context.AllocateCopy(AccessPath), Ty);
+      new (Context) ElementRefDecl(VD, Name->LPLoc, Name->Name,
+                                   Context.AllocateCopy(AccessPath), Ty);
     Decls.push_back(ERD);
     ScopeInfo.addToScope(ERD);
     return;
@@ -318,7 +316,7 @@ bool Parser::parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   }
   
   // Copy the name into the ASTContext heap.
-  DeclVarName *TmpName = new (S.Context) DeclVarName(VarName);
+  DeclVarName *TmpName = new (Context) DeclVarName(VarName);
   VarDecl *VD = new (Context) VarDecl(VarLoc, TmpName, Ty, Init.getPtrOrNull(),
                                       Attributes);
   Decls.push_back(VD);

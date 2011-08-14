@@ -16,7 +16,6 @@
 
 #include "Scope.h"
 #include "Parser.h"
-#include "SemaDecl.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/Twine.h"

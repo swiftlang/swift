@@ -17,7 +17,6 @@
 #include "swift/Subsystems.h"
 #include "Parser.h"
 #include "Lexer.h"
-#include "Sema.h"
 #include "ParseResult.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -43,13 +42,11 @@ Parser::Parser(unsigned BufferID, ASTContext &Context)
   : SourceMgr(Context.SourceMgr),
     L(*new Lexer(BufferID, Context)),
     Context(Context),
-    S(*new Sema(Context)),
     ScopeInfo(*this) {
 }
 
 Parser::~Parser() {
   delete &L;
-  delete &S;
 }
 
 void Parser::note(SMLoc Loc, const Twine &Message) {

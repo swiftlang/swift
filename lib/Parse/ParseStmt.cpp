@@ -17,7 +17,6 @@
 #include "Parser.h"
 #include "ParseResult.h"
 #include "Scope.h"
-#include "Sema.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
