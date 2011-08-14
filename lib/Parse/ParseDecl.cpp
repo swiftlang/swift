@@ -21,6 +21,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
@@ -35,17 +36,57 @@ TranslationUnitDecl *Parser::parseTranslationUnit() {
   consumeToken();
   SMLoc FileStartLoc = Tok.getLoc();
   
-  TranslationUnitDecl *Result = new (Context) TranslationUnitDecl(Context);
+  TranslationUnitDecl *TUD = new (Context) TranslationUnitDecl(Context);
   
   // Parse the body of the file.
   SmallVector<ExprStmtOrDecl, 128> Items;
   parseBraceItemList(Items, true);
+
+  // Process the end of the translation unit.
+  SMLoc FileEnd = Tok.getLoc();
   
-  // Notify sema about the end of the translation unit.
-  S.decl.handleEndOfTranslationUnit(Result, FileStartLoc, Items, Tok.getLoc(),
-                                    *this);
+  // First thing, we transform the body into a brace expression.
+  ExprStmtOrDecl *NewElements = 
+    S.Context.AllocateCopy<ExprStmtOrDecl>(Items.begin(), Items.end());
+  TUD->Body = new (S.Context) BraceStmt(FileStartLoc, NewElements, Items.size(),
+                                        FileEnd);
+    
+  // Do a prepass over the declarations to make sure they have basic sanity and
+  // to find the list of top-level value declarations.
+  for (unsigned i = 0, e = TUD->Body->NumElements; i != e; ++i) {
+    if (!TUD->Body->Elements[i].is<Decl*>()) continue;
+    
+    Decl *D = TUD->Body->Elements[i].get<Decl*>();
+    
+    // If any top-level value decl has an unresolved type, then it is erroneous.
+    // It is not valid to have something like "var x = 4" at the top level, all
+    // types must be explicit here.
+    ValueDecl *VD = dyn_cast<ValueDecl>(D);
+    if (VD == 0) continue;
+    
+    // FIXME: This can be better handled in the various ActOnDecl methods when
+    // they get passed in a parent context decl.
+    
+    // Verify that values have a type specified.
+    if (false && VD->Ty->is<DependentType>()) {
+      error(VD->getLocStart(),
+            "top level declarations require a type specifier");
+      // FIXME: Should mark the decl as invalid.
+      VD->Ty = TupleType::getEmpty(S.Context);
+    }
+  }
   
-  return Result;
+  // Verify that any forward declared types were ultimately defined.
+  // TODO: Move this to name binding!
+  SmallVector<TypeAliasDecl*, 8> UnresolvedTypeList;
+  for (TypeAliasDecl *Decl : ScopeInfo.getUnresolvedTypeList()) {
+    if (Decl->UnderlyingTy.isNull())
+      UnresolvedTypeList.push_back(Decl);
+  }
+  
+  TUD->UnresolvedTypesForParser = S.Context.AllocateCopy(UnresolvedTypeList);
+  
+  return TUD;
 }
 
 /// parseAttribute

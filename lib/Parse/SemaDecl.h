@@ -50,16 +50,6 @@ public:
 
   explicit SemaDecl(Sema &S) : SemaBase(S) {}
   ~SemaDecl() {}
-  
-  typedef llvm::PointerUnion3<Expr*, Stmt*, Decl*> ExprStmtOrDecl;
-
-  /// handleEndOfTranslationUnit - This is invoked at the end of the translation
-  /// unit.
-  void handleEndOfTranslationUnit(TranslationUnitDecl *TU,
-                                  SMLoc FileStart,
-                                  ArrayRef<ExprStmtOrDecl> Items,
-                                  SMLoc FileEnd, Parser &P);
-
 };
   
 } // end namespace swift
