@@ -1,0 +1,237 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1038\cocoasubrtf350
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\listtable{\list\listtemplateid1\listhybrid{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{disc\}}{\leveltext\leveltemplateid1\'01\uc0\u8226 ;}{\levelnumbers;}\fi-360\li720\lin720 }{\listname ;}\listid1}
+{\list\listtemplateid2\listhybrid{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{disc\}}{\leveltext\leveltemplateid101\'01\uc0\u8226 ;}{\levelnumbers;}\fi-360\li720\lin720 }{\listname ;}\listid2}
+{\list\listtemplateid3\listhybrid{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{disc\}}{\leveltext\leveltemplateid201\'01\uc0\u8226 ;}{\levelnumbers;}\fi-360\li720\lin720 }{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{hyphen\}}{\leveltext\leveltemplateid202\'01\uc0\u8259 ;}{\levelnumbers;}\fi-360\li1440\lin1440 }{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{hyphen\}}{\leveltext\leveltemplateid203\'01\uc0\u8259 ;}{\levelnumbers;}\fi-360\li2160\lin2160 }{\listname ;}\listid3}}
+{\*\listoverridetable{\listoverride\listid1\listoverridecount0\ls1}{\listoverride\listid2\listoverridecount0\ls2}{\listoverride\listid3\listoverridecount0\ls3}}
+\margl1440\margr1440\vieww23120\viewh15360\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural\pardirnatural
+
+\f0\b\fs24 \cf0 Elimination rules.
+\b0 \
+\
+When type theorists consider a programming language, we break it down like this:\
+\pard\tx220\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li720\fi-720\ql\qnatural\pardirnatural
+\ls1\ilvl0\cf0 {\listtext	\'95	}What are the kinds of fundamental and derived types in the language?\
+{\listtext	\'95	}For each type, what are its 
+\i introduction rules
+\i0 , i.e. how do you get values of that type?\
+{\listtext	\'95	}For each type, what are its 
+\i elimination rules
+\i0 , i.e. how do you use values of that type?\
+\pard\tx560\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural\pardirnatural
+\cf0 \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural\pardirnatural
+\cf0 Swift has a pretty small set of types right now:\
+\pard\tx220\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li720\fi-720\ql\qnatural\pardirnatural
+\ls2\ilvl0\cf0 {\listtext	\'95	}Fundamental types:  currently i1, i8, i16, i32, and i64; eventually float and double; maybe others.\
+\pard\tx220\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li720\fi-720\ql\qnatural\pardirnatural
+\ls2\ilvl0\cf0 {\listtext	\'95	}Functions.\
+\pard\tx220\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li720\fi-720\ql\qnatural\pardirnatural
+\ls2\ilvl0\cf0 {\listtext	\'95	}Tuples.  Heterogenous fixed-length aggregates.   Swift's system provides two basic kinds: positional and labelled.\
+{\listtext	\'95	}Arrays.  Homogenous fixed-length aggregates.\
+{\listtext	\'95	}Algebraic data types (ADTs), introduce by 
+\i oneof
+\i0 .  Closed disjoint unions of heterogenous fixed-length aggregates.\
+\pard\tx560\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural\pardirnatural
+\cf0 Adding generics won't affect this, because "unapplied" generic types aren't first-class, and "applied" generic types are always one of the above (probably always ADTs, but it doesn't matter here).  But adding any other kind of type (vectors seem likely) means we need to consider its intro/elim rules.\
+\
+For most of these, intro rules are just a question of picking syntax, and we don't really need a document for that.  So let's talk elimination.  Generally, an elimination rule is a way at getting back to the information the intro rule(s) wrote into the value.  So what are the specific elimination rules for these types?  How do we use them, other than in type-generic ways like passing them as arguments to calls?\
+\
+
+\b Functions
+\b0  are used by calling them.  This is something of a special case:  some values of function type may carry data, there isn't really a useful model for directly accessing it.  Values of function type are basically completely opaque.\
+
+\b Scalars
+\b0  are used by feeding them to primitive binary operators.  This is also something of a special case, because there's no useful way in which scalars can be decomposed into separate values.\
+
+\b Tuples
+\b0  are used by projecting out their elements.\
+
+\b Arrays
+\b0  are used by projecting out slices and elements.\
+
+\b ADTs
+\b0  are used by projecting out elements of the current alternative, but how we determine the current alternative?\
+\
+
+\b Alternatives for alternatives.
+\b0 \
+\
+I know of three basic designs for determining the current alternative of an ADT:\
+\pard\tx220\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li720\fi-720\ql\qnatural\pardirnatural
+\ls3\ilvl0\cf0 {\listtext	\'95	}Visitor pattern:  there's some way of declaring a method on the full ADT and then implementing it for each individual alternative.  You do this in OO languages mostly because there's no direct language support for 
+\i closed
+\i0  disjoint unions (as opposed to 
+\i open
+\i0  disjoint unions, which is essentially just subclassing).\
+\pard\tx940\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li1440\fi-1440\ql\qnatural\pardirnatural
+\ls3\ilvl1\cf0 {\listtext	\uc0\u8259 	}plus: doesn't require language support\
+{\listtext	\uc0\u8259 	}plus: easy to "overload" and provide different kinds of pattern matching on the same type\
+{\listtext	\uc0\u8259 	}plus: straightforward to add interesting ADT-specific logic, like matching a CallExpr instead of each of its N syntactic forms\
+\pard\tx940\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li1440\fi-1440\ql\qnatural\pardirnatural
+\ls3\ilvl1\cf0 {\listtext	\uc0\u8259 	}plus: simple form of exhaustiveness checking\
+{\listtext	\uc0\u8259 	}minus: cases are separate functions, so data and control flow is awkward\
+\pard\tx940\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li1440\fi-1440\ql\qnatural\pardirnatural
+\ls3\ilvl1\cf0 {\listtext	\uc0\u8259 	}minus: lots of boilerplate to enable\
+{\listtext	\uc0\u8259 	}minus: lots of boilerplate to use\
+{\listtext	\uc0\u8259 	}minus: nested pattern matching is awful\
+\pard\tx220\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li720\fi-720\ql\qnatural\pardirnatural
+\ls3\ilvl0\cf0 {\listtext	\'95	}Query functions:  dynamic_cast, dyn_cast, isa, instanceof\
+\pard\tx940\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li1440\fi-1440\ql\qnatural\pardirnatural
+\ls3\ilvl1\cf0 {\listtext	\uc0\u8259 	}plus: easy to order and mix with other custom conditions\
+{\listtext	\uc0\u8259 	}plus: low syntactic overhead for testing the alternative if you don't need to actually decompose\
+\pard\tx940\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li1440\fi-1440\ql\qnatural\pardirnatural
+\ls3\ilvl1\cf0 {\listtext	\uc0\u8259 	}minus: higher syntactic overhead for decomposition\
+\pard\tx1660\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li2160\fi-2160\ql\qnatural\pardirnatural
+\ls3\ilvl2\cf0 {\listtext	\uc0\u8259 	}isa/instanceof pattern requires either a separate cast or unsafe operations later\
+{\listtext	\uc0\u8259 	}dyn_cast pattern needs a fresh variable declaration, which is very awkward in complex conditions\
+\pard\tx940\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li1440\fi-1440\ql\qnatural\pardirnatural
+\ls3\ilvl1\cf0 {\listtext	\uc0\u8259 	}minus: exhaustiveness checking is basically out the window\
+{\listtext	\uc0\u8259 	}minus: some amount of boilerplate to enable\
+\pard\tx220\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li720\fi-720\ql\qnatural\pardirnatural
+\ls3\ilvl0\cf0 {\listtext	\'95	}Pattern matching\
+\pard\tx940\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li1440\fi-1440\ql\qnatural\pardirnatural
+\ls3\ilvl1\cf0 {\listtext	\uc0\u8259 	}plus: no boilerplate to enable\
+{\listtext	\uc0\u8259 	}plus: hugely reduced syntax to use if you want a full decomposition\
+{\listtext	\uc0\u8259 	}plus: compiler-supported exhaustiveness checking\
+{\listtext	\uc0\u8259 	}plus: nested matching is natural\
+{\listtext	\uc0\u8259 	}plus: with pattern guards, natural mixing of custom conditions\
+{\listtext	\uc0\u8259 	}minus: syntactic overkill to just test for a specific alternative (e.g. to filter it out)\
+{\listtext	\uc0\u8259 	}minus: needs boilerplate to project out a common member across multiple/all alternatives\
+{\listtext	\uc0\u8259 	}minus: awkward to group alternatives (fallthrough is a simple option but has issues)\
+{\listtext	\uc0\u8259 	}minus: traditionally completely autogenerated by compiler and thus not very flexible\
+{\listtext	\uc0\u8259 	}minus: usually a new grammar production that's very ambiguous with the expression grammar\
+{\listtext	\uc0\u8259 	}minus: somewhat fragile against adding extra data to an alternative\
+\pard\tx560\tx1120\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural\pardirnatural
+\cf0 \
+I feel that this strongly points towards using pattern matching as the basic way of consuming ADTs, maybe with special dispensations for querying the alternative and projecting out common members.  I'll ignore that \
+\
+Pattern matching was probably a foregone conclusion, but I wanted to spell out that having ADTs in the language is what really forces our hand because the alternatives are so bad.  Once we need pattern-matching, it makes sense to provide patterns for the other kinds of types as well.\
+\
+
+\b Selection statement.
+\b0 \
+\
+Here's my proposed grammar for the selection statement.  Having a statement is obligatory, and given that, I don't see much merit in also having a switch expression.\
+\
+\pard\tx560\tx1120\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural\pardirnatural
+\cf0   statement ::= 'switch' expr '\{' case-list '\}'\
+  case-list ::= case\
+  case-list ::= case case-list\
+  case ::= pattern-group case-guard? stmt-brace\
+  pattern-group ::= pattern\
+  pattern-group ::= pattern ',' pattern-group\
+  case-guard ::= 'where' expr\
+\pard\tx560\tx1120\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural\pardirnatural
+\cf0 \
+I've used "switch" because it's a familiar keyword.  There's a risk of confusion there, but not much, because the rest of the syntax is so different from C's switch that I don't think users will get caught in that way of thinking.\
+\
+Requiring braces on the sub-statement is consistent with our general design, but it's also crucial for disambiguating the start of a new case.  I think it's kindof a shame that this encourages double-indentation, especially because the switch itself also ends in a brace;  suggestions welcome.\
+\
+Allowing comma-separated groups of patterns seems like pure goodness to me.  We can impose a structural requirement that all cases bind the same names with the same types.\
+\
+My experience has been that guard conditions are really important.  Variables bound by the pattern(s) are in-scope within the guard.  I made a judgement call that guards should apply to the full set of patterns, rather than allowing individual patterns in a group to have their own guards;  I think that's probably the more common desire by a lot, but feel free to dispute that.\
+\
+\pard\tx560\tx1120\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural\pardirnatural
+\cf0 The semantics of pattern-matching are that you proceed down the list of patterns, matching against each pattern in turn and stopping at the first satisfied one.  I know that, naively, that sounds terrible for performance, but it's actually quite easy to optimize.\
+\
+Non-exhaustive matches should be errors.  The only complication is case guards.  The obvious conservatively-safe rule is to say "ignore guarded cases during exhaustiveness checking", but some people really want to write "where x < 10" and "where x >= 10", and I can see their point.  At the same time, we really don't want to go down that road.\
+\
+Patterns come up in 2 or 3 other places in the grammar:\
+\
+
+\b Var bindings.
+\b0 \
+\pard\tx560\tx1120\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural\pardirnatural
+\cf0 \
+\pard\tx220\tx720\tx1120\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li720\fi-720\ql\qnatural\pardirnatural
+\cf0 Variable bindings only have a single pattern, which has to be exhaustive, which also means there's no point in supporting guards here.  I think we just get this:\
+  decl-var ::= 'var' attribute-list? pattern value-specifier\
+\
+
+\b Function parameters
+\b0 .\
+\
+This is an interesting question.  The functional languages all permit you to directly pattern-match in the function declaration.  For example:\
+SML:\
+  fun length nil = 0\
+    | length (a::b) = 1 + length b\
+Haskell:\
+  length [] = 0\
+  length (a:b) = 1 + length b\
+Yes, in Haskell they're just completely separate declarations, and the compiler pieces them together by name.  I think there might at least be a requirement that the clauses be contiguous.\
+\
+Anyway, tis is actually really, really nice, because it's very common in functional style for functions to immediately do case-analysis on their arguments.  Without this, in Swift you would need to do this instead:\
+\
+  func length(list : List) : Int \{\
+    switch (list) \{\
+      :nil \{ return 0 \}\
+      :cons(_,b) \{ return 1 + length(b) \}\
+    \}\
+  \}\
+\
+That adds up to a lot of boilerplate.\
+\
+So I think we should fit this into the 'func' grammar, I'm just not sure how. :)  If not, we basically just use the var binding grammar for the individual elements of argument tuples.\
+\
+
+\b Assignment.
+\b0 \
+\
+This is a bit iffy.  It's a lot like var bindings, but it doesn't have a keyword, so it's really kindof ambiguous given the pattern grammar.\
+\
+Also, l-value patterns are weird.  I can come up with semantics for this, but I don't know what the neighbors will think:\
+  var perimeter : double\
+  :feet(x) += yard.dimensions.height  // returns Feet, which has one constructor, :feet.\
+  :feet(x) += yard.dimensions.width\
+\
+Maybe it's just better to just have l-value tuple expressions.\
+\
+
+\b Pattern grammar.
+\b0 \
+\
+\pard\tx560\tx1120\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural\pardirnatural
+\cf0 The usual syntax rule is that the pattern grammar mirrors the introduction-rule expression grammar, but with 'pattern' instead 'expire'.  This means that, for example, if we add array literal expressions, we should also need a corresponding array literal pattern.  I think that principle is worth keeping;  it's a nice simplification of the model for users.\
+\
+The leaf pattern is a simple variable name.  It matches everything and binds it to a new variable.  It's an error to bind the same variable twice in a single pattern;  I don't think we want to bite off contextually constrained patterns. :)  It is useful to have a special "ignore this" pattern; I suggest adopting the common convention of just assigning special semantics to the identifier '_', where it doesn't actually bind anything.\
+  pattern ::= identifier\
+\
+This pattern is useful for binding an entire aggregate to a name while also matching on specific children.  I'm just using Haskell syntax here, which I think is nice enough.\
+  pattern ::= identifier '@' pattern\
+\
+There's usually a pattern for annotating an arbitrary sub-pattern with a type.  I think that's less important for us because type inference is so much more constrained, but if we need it, it would be:\
+  pattern ::= pattern ':' type\
+This would then affect the parsing of vars and funcs because the (frequently mandatory) type annotations there would be parsed as part of the pattern.\
+\
+We'd also want patterns for matching literals:\
+  pattern ::= numeric_constant\
+  pattern ::= string_constant // when we add it\
+\
+Tuples are interesting because of the labelled / non-labelled distinction.  Especially with labelled elements, it is really nice to be able to ignore all the elements you don't care about.  This grammar permits some prefix or set of labels to be matched and the rest to be ignored.\
+  pattern ::= pattern-tuple\
+  pattern-tuple ::= '(' pattern-tuple-element-list? '...'? ')'\
+  pattern-tuple-element-list ::= pattern-tuple-element\
+  pattern-tuple-element-list ::= pattern-tuple-element ',' pattern-tuple-element-list\
+  pattern-tuple-element ::= pattern\
+  pattern-tuple-element ::= '.' identifier = pattern\
+\
+The final cases are for ADT alternatives:\
+  pattern ::= pattern-ctor-name\
+  pattern ::= pattern-ctor-name pattern-tuple\
+  pattern-ctor-name ::= type-identifier '::' identifier\
+  pattern-ctor-name ::= ':' identifier\
+\
+
+\b Miscellaneous.
+\b0 \
+\
+It would be interesting to allow overloading / customization of pattern-matching.  We may find ourselves needing to do something like this to support non-fragile pattern matching anyway (if there's some set of restrictions that make it reasonable to permit that).  The obvious idea of compiling into the visitor pattern is a bit compelling, although control flow would be tricky \'97 we'd probably need the generated code to throw an exception.  Alternatively, we could let the non-fragile type convert itself into a fragile type for purposes of pattern matching.\
+\
+If we ever allow infix ADT constructors, we'll need to allow them in patterns as well.  Oh joy.\
+\
+If we build regular expressions into the language, we can allow them directly as patterns and even bind grouping expressions into user variables.  That would be pretty cool.  I cannot imagine how this could work without building them into the language, though.\
+\
+John.}
