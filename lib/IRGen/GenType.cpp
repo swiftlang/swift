@@ -14,7 +14,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Type.h"
+#include "IRGenModule.h"
+using namespace swift;
+using namespace irgen;
+
 /// Convert the given type into an LLVM type.
 llvm::Type *IRGenModule::convertType(Type T) {
-  
+  return 0;
 }
