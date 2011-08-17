@@ -1,5 +1,5 @@
 {\rtf1\ansi\ansicpg1252\cocoartf1038\cocoasubrtf350
-{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;\f1\fmodern\fcharset0 CourierNewPSMT;}
 {\colortbl;\red255\green255\blue255;}
 {\*\listtable{\list\listtemplateid1\listhybrid{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{disc\}}{\leveltext\leveltemplateid1\'01\uc0\u8226 ;}{\levelnumbers;}\fi-360\li720\lin720 }{\listname ;}\listid1}
 {\list\listtemplateid2\listhybrid{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{disc\}}{\leveltext\leveltemplateid101\'01\uc0\u8226 ;}{\levelnumbers;}\fi-360\li720\lin720 }{\listname ;}\listid2}
@@ -26,10 +26,8 @@ When type theorists consider a programming language, we break it down like this:
 \cf0 Swift has a pretty small set of types right now:\
 \pard\tx220\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li720\fi-720\ql\qnatural\pardirnatural
 \ls2\ilvl0\cf0 {\listtext	\'95	}Fundamental types:  currently i1, i8, i16, i32, and i64; eventually float and double; maybe others.\
-\pard\tx220\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li720\fi-720\ql\qnatural\pardirnatural
-\ls2\ilvl0\cf0 {\listtext	\'95	}Functions.\
-\pard\tx220\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li720\fi-720\ql\qnatural\pardirnatural
-\ls2\ilvl0\cf0 {\listtext	\'95	}Tuples.  Heterogenous fixed-length aggregates.   Swift's system provides two basic kinds: positional and labelled.\
+{\listtext	\'95	}Functions.\
+{\listtext	\'95	}Tuples.  Heterogenous fixed-length aggregates.   Swift's system provides two basic kinds: positional and labelled.\
 {\listtext	\'95	}Arrays.  Homogenous fixed-length aggregates.\
 {\listtext	\'95	}Algebraic data types (ADTs), introduce by 
 \i oneof
@@ -39,8 +37,9 @@ When type theorists consider a programming language, we break it down like this:
 \
 For most of these, intro rules are just a question of picking syntax, and we don't really need a document for that.  So let's talk elimination.  Generally, an elimination rule is a way at getting back to the information the intro rule(s) wrote into the value.  So what are the specific elimination rules for these types?  How do we use them, other than in type-generic ways like passing them as arguments to calls?\
 \
+\pard\tx560\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural\pardirnatural
 
-\b Functions
+\b \cf0 Functions
 \b0  are used by calling them.  This is something of a special case:  some values of function type may carry data, there isn't really a useful model for directly accessing it.  Values of function type are basically completely opaque.\
 
 \b Scalars
@@ -70,11 +69,9 @@ I know of three basic designs for determining the current alternative of an ADT:
 \ls3\ilvl1\cf0 {\listtext	\uc0\u8259 	}plus: doesn't require language support\
 {\listtext	\uc0\u8259 	}plus: easy to "overload" and provide different kinds of pattern matching on the same type\
 {\listtext	\uc0\u8259 	}plus: straightforward to add interesting ADT-specific logic, like matching a CallExpr instead of each of its N syntactic forms\
-\pard\tx940\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li1440\fi-1440\ql\qnatural\pardirnatural
-\ls3\ilvl1\cf0 {\listtext	\uc0\u8259 	}plus: simple form of exhaustiveness checking\
+{\listtext	\uc0\u8259 	}plus: simple form of exhaustiveness checking\
 {\listtext	\uc0\u8259 	}minus: cases are separate functions, so data and control flow is awkward\
-\pard\tx940\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li1440\fi-1440\ql\qnatural\pardirnatural
-\ls3\ilvl1\cf0 {\listtext	\uc0\u8259 	}minus: lots of boilerplate to enable\
+{\listtext	\uc0\u8259 	}minus: lots of boilerplate to enable\
 {\listtext	\uc0\u8259 	}minus: lots of boilerplate to use\
 {\listtext	\uc0\u8259 	}minus: nested pattern matching is awful\
 \pard\tx220\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li720\fi-720\ql\qnatural\pardirnatural
@@ -82,8 +79,7 @@ I know of three basic designs for determining the current alternative of an ADT:
 \pard\tx940\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li1440\fi-1440\ql\qnatural\pardirnatural
 \ls3\ilvl1\cf0 {\listtext	\uc0\u8259 	}plus: easy to order and mix with other custom conditions\
 {\listtext	\uc0\u8259 	}plus: low syntactic overhead for testing the alternative if you don't need to actually decompose\
-\pard\tx940\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li1440\fi-1440\ql\qnatural\pardirnatural
-\ls3\ilvl1\cf0 {\listtext	\uc0\u8259 	}minus: higher syntactic overhead for decomposition\
+{\listtext	\uc0\u8259 	}minus: higher syntactic overhead for decomposition\
 \pard\tx1660\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li2160\fi-2160\ql\qnatural\pardirnatural
 \ls3\ilvl2\cf0 {\listtext	\uc0\u8259 	}isa/instanceof pattern requires either a separate cast or unsafe operations later\
 {\listtext	\uc0\u8259 	}dyn_cast pattern needs a fresh variable declaration, which is very awkward in complex conditions\
@@ -114,38 +110,55 @@ Pattern matching was probably a foregone conclusion, but I wanted to spell out t
 \b Selection statement.
 \b0 \
 \
-Here's my proposed grammar for the selection statement.  Having a statement is obligatory, and given that, I don't see much merit in also having a switch expression.\
+This is the main way we expect users to employ non-obvious pattern-matching.  We obviously need something with statement children, so this has to be a statement.  That's also fine because this kind of full pattern match is very syntactically heavyweight, and nobody would want to embed it in the middle of an expression.  We also want a low-weight matching expression, though, for relatively simple ADTs.\
 \
-\pard\tx560\tx1120\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural\pardirnatural
-\cf0   statement ::= 'switch' expr '\{' case-list '\}'\
-  case-list ::= case\
-  case-list ::= case case-list\
-  case ::= pattern-group case-guard? stmt-brace\
-  pattern-group ::= pattern\
-  pattern-group ::= pattern ',' pattern-group\
-  case-guard ::= 'where' expr\
-\pard\tx560\tx1120\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural\pardirnatural
-\cf0 \
-I've used "switch" because it's a familiar keyword.  There's a risk of confusion there, but not much, because the rest of the syntax is so different from C's switch that I don't think users will get caught in that way of thinking.\
+  statement ::= 'match' expr '\{' case-group-list '\}'\
+  case-group-list ::= case-group\
+  case-group-list ::= case-group case-group-list\
+  case-group ::= case-pattern+ stmt-brace-item+\
+  case-pattern ::= 'case' expr ':'\
+  case-pattern ::= 'pattern' pattern pattern-guard? ':'\
+  pattern-guard ::= 'where' expr\
 \
-Requiring braces on the sub-statement is consistent with our general design, but it's also crucial for disambiguating the start of a new case.  I think it's kindof a shame that this encourages double-indentation, especially because the switch itself also ends in a brace;  suggestions welcome.\
+We're intentionally not using "switch" here because the syntax is too similar to C but the semantics are a bit different.  This is a bit subtle, but honestly there should be enough other clues.  The keywords here are all up for debate.\
 \
-Allowing comma-separated groups of patterns seems like pure goodness to me.  We can impose a structural requirement that all cases bind the same names with the same types.\
+Despite the lack of grouping braces, the semantics are that the statements in each case-group form their own scope, and falling off the end causes control to resume at the end of the match statement \'97 i.e. "implicit break", not "implicit fallthrough".  Chris seems motivated to eventually add an explicit 'fallthrough' statement.  If we did this, my preference would be to generalize it by allowing the match to be reperformed with a new value.  But I also think having local functions removes a lot of the impetus.\
 \
-My experience has been that guard conditions are really important.  Variables bound by the pattern(s) are in-scope within the guard.  I made a judgement call that guards should apply to the full set of patterns, rather than allowing individual patterns in a group to have their own guards;  I think that's probably the more common desire by a lot, but feel free to dispute that.\
+Syntactically, braces and the choice of case/pattern keywords are all bound together.  The thinking goes as follows.  In Swift, statement scopes are always grouped by braces.  It's natural to group the cases with braces as well.  Doing both lets us avoid a 'case' keyword, but otherwise it leads to ugly style, because either the last case ends in two braces on the same line or cases have to further indented.  Okay, it's easy enough to not require braces on the match, with the grammar saying that cases are just greedily consumed \'97 there's no ambiguity here because the match statement is necessarily within braces.  But that leaves the code without a definitive end to the cases, and the closing braces end up causing a lot of unnecessary vertical whitespace, like so:\
+  match (x)\
+  case :foo \{\
+    \'85\
+  \}\
+  case :bar \{\
+    \'85\
+  \}\
+So instead, let's require the match statement to have braces, and we'll allow the cases to be written without them:\
+  match (x) \{\
+  case :foo:\
+    \'85\
+  case :bar:\
+    \'85\
+  \}\
+That's really a lot prettier, except it breaks the rule about always grouping scopes with braces (we *definitely* want different cases to establish different scopes).  Something has to give, though.\
 \
-\pard\tx560\tx1120\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural\pardirnatural
-\cf0 The semantics of pattern-matching are that you proceed down the list of patterns, matching against each pattern in turn and stopping at the first satisfied one.  I know that, naively, that sounds terrible for performance, but it's actually quite easy to optimize.\
+Also, ":foo:" is pretty unfortunate.  We want to separate the case from its body \'97 it's a huge cue \'97 and as mentioned we'd prefer to do it without requiring open/close punctuation.  Colon seems obvious, since there's precedent in C and it's even roughly the right grammatical function;  it just looks a little silly after ":name".\
 \
-Non-exhaustive matches should be errors.  The only complication is case guards.  The obvious conservatively-safe rule is to say "ignore guarded cases during exhaustiveness checking", but some people really want to write "where x < 10" and "where x >= 10", and I can see their point.  At the same time, we really don't want to go down that road.\
+The semantics of a match-statement are to first evaluate the value operand, then proceed down the list of case-patterns and execute the statements for the first case-pattern that is satisfied by the value.  It is an error if a case-pattern can never trigger because the earlier case-patterns are exhaustive.\
 \
-Patterns come up in 2 or 3 other places in the grammar:\
+A 'case' is satisfied if the value satisfies the evaluated case operand.  The basic behavior will be an equality test, but there will be some point of extension to allow library "patterns" like "4..8".  The case operand does not need to be a "constant expression" \'97 the expression can even have side-effects, although that's obviously poor style.   A 'case' never binds variables.\
+\
+A 'pattern' is satisfied if the pattern is satisfied and the pattern-guard expression (if present) evaluates to true.  The pattern-guard result must be usable as a logic operand.  The guard expression is not evaluated if the pattern is not fully satisfied.  Variables in the pattern are bound before the guard is evaluated.\
+\
+All of the case-patterns in a case-group must bind exactly the same variables with exactly the same types.\
+\
+Since falling out of the match is not unreasonable, there's a colorable argument that non-exhaustive matches should be okay, but I'm inclined to say that they should be errors and people who want non-exhaustive matches can put in catch-all patterns.  The only complication with checking exhaustiveness is pattern guards.  The obvious conservatively-safe rule is to say "ignore guarded cases during exhaustiveness checking", but some people really want to write "where x < 10" and "where x >= 10", and I can see their point.  At the same time, we really don't want to go down that road.\
+\
+Patterns come up (or potentially come up) in a few other places in the grammar:\
 \
 
 \b Var bindings.
 \b0 \
-\pard\tx560\tx1120\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural\pardirnatural
-\cf0 \
+\
 \pard\tx220\tx720\tx1120\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li720\fi-720\ql\qnatural\pardirnatural
 \cf0 Variable bindings only have a single pattern, which has to be exhaustive, which also means there's no point in supporting guards here.  I think we just get this:\
   decl-var ::= 'var' attribute-list? pattern value-specifier\
@@ -154,28 +167,36 @@ Patterns come up in 2 or 3 other places in the grammar:\
 \b Function parameters
 \b0 .\
 \
-This is an interesting question.  The functional languages all permit you to directly pattern-match in the function declaration.  For example:\
-SML:\
-  fun length nil = 0\
+The functional languages all permit you to directly pattern-match in the function declaration, like this example from SML:\
+
+\f1   fun length nil = 0\
     | length (a::b) = 1 + length b\
-Haskell:\
-  length [] = 0\
-  length (a:b) = 1 + length b\
-Yes, in Haskell they're just completely separate declarations, and the compiler pieces them together by name.  I think there might at least be a requirement that the clauses be contiguous.\
+
+\f0 \
+\pard\tx220\tx720\tx1120\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 This is really convenient, but there's probably no reasonable analogue in Swift.  One specific reason:  we want functions to be callable with keyword arguments, but if you don't give all the parameters their own names, that won't work.\
 \
-Anyway, tis is actually really, really nice, because it's very common in functional style for functions to immediately do case-analysis on their arguments.  Without this, in Swift you would need to do this instead:\
-\
-  func length(list : List) : Int \{\
-    switch (list) \{\
-      :nil \{ return 0 \}\
-      :cons(_,b) \{ return 1 + length(b) \}\
+The current Swift approximation is:\
+
+\f1   func length(list : List) : Int \{\
+    match list \{\
+    pattern :nil: return 0\
+    pattern :cons(_,tail): return 1 + length(tail)\
     \}\
   \}\
-\
-That adds up to a lot of boilerplate.\
-\
-So I think we should fit this into the 'func' grammar, I'm just not sure how. :)  If not, we basically just use the var binding grammar for the individual elements of argument tuples.\
-\
+
+\f0 \
+That's quite a bit more syntax, but it's mostly the extra braces from the function body.  We could remove those with something like this:\
+\pard\tx220\tx720\tx1120\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural\pardirnatural
+
+\f1 \cf0   func length(list : List) : Int = match list \{\
+    pattern :nil: return 0\
+    pattern :cons(_,tail): return 1 + length(tail)\
+  \}\
+
+\f0 Anyway, that's easy to add later if we see the need.\
+\pard\tx220\tx720\tx1120\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li720\fi-720\ql\qnatural\pardirnatural
+\cf0 \
 
 \b Assignment.
 \b0 \
@@ -187,14 +208,35 @@ Also, l-value patterns are weird.  I can come up with semantics for this, but I 
   :feet(x) += yard.dimensions.height  // returns Feet, which has one constructor, :feet.\
   :feet(x) += yard.dimensions.width\
 \
-Maybe it's just better to just have l-value tuple expressions.\
+It's probably better to just have l-value tuple expressions and not work in arbitrary patterns.\
+\
+
+\b Pattern-match expression.
+\b0 \
+\
+This is an attempt to provide that dispensation for query functions we were talking about.\
+\
+I think this should bind looser than any binary operators except assignments;  effectively we should have\
+  expr-binary ::= # most of the current expr grammar\
+\
+  expr ::= expr-binary\
+  expr ::= expr-binary 'matches' pattern pattern-guard?\
+\
+\pard\tx220\tx720\tx1120\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural\pardirnatural
+\cf0 The semantics are that this evaluates to true if the pattern and pattern-guard are satisfied.  If the pattern binds variables, it's an error if the expression isn't immediately used as a condition;  otherwise, the variables are in scope in any code dominated by the 'true' edge.  I've intentionally written this in a way that suggests it holds even within complex expressions, but at the very least this should work:\
+  if rect.dimensions matches (.height = h, .width = w) where h >= w \{\
+    \'85\
+  \}\
+\pard\tx220\tx720\tx1120\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\li720\fi-720\ql\qnatural\pardirnatural
+\cf0 \
+The keyword 'matches' is not set in stone.  It's hardly even set in sand.  Clearly we should use =~. :)\
 \
 
 \b Pattern grammar.
 \b0 \
 \
 \pard\tx560\tx1120\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\ql\qnatural\pardirnatural
-\cf0 The usual syntax rule is that the pattern grammar mirrors the introduction-rule expression grammar, but with 'pattern' instead 'expire'.  This means that, for example, if we add array literal expressions, we should also need a corresponding array literal pattern.  I think that principle is worth keeping;  it's a nice simplification of the model for users.\
+\cf0 The usual syntax rule is that the pattern grammar mirrors the introduction-rule expression grammar, but with 'pattern' instead of 'expr'.  This means that, for example, if we add array literal expressions, we should also need a corresponding array literal pattern.  I think that principle is worth keeping, but leaf expressions can (and probably should) just be handled with 'case' instead of 'pattern'.\
 \
 The leaf pattern is a simple variable name.  It matches everything and binds it to a new variable.  It's an error to bind the same variable twice in a single pattern;  I don't think we want to bite off contextually constrained patterns. :)  It is useful to have a special "ignore this" pattern; I suggest adopting the common convention of just assigning special semantics to the identifier '_', where it doesn't actually bind anything.\
   pattern ::= identifier\
@@ -206,7 +248,11 @@ There's usually a pattern for annotating an arbitrary sub-pattern with a type.  
   pattern ::= pattern ':' type\
 This would then affect the parsing of vars and funcs because the (frequently mandatory) type annotations there would be parsed as part of the pattern.\
 \
-We'd also want patterns for matching literals:\
+We almost certainly want a pattern to test a dynamic type (including protocol satisfaction), maybe something like this:\
+  pattern ::= pattern 'instanceof' type\
+This also improves the type information in effect for checking the sub-pattern and any variables bound directly to it.\
+\
+We probably do not need the following patterns for matching leaf literals;  users should just use 'case'.  This is obviously something we can provide excellent recovery for.  But non-leaf literals, like array literals, should still have patterns.\
   pattern ::= numeric_constant\
   pattern ::= string_constant // when we add it\
 \
@@ -224,14 +270,21 @@ The final cases are for ADT alternatives:\
   pattern-ctor-name ::= type-identifier '::' identifier\
   pattern-ctor-name ::= ':' identifier\
 \
+I am inclined to say it should be okay to match an ADT value against the bare name of a constructor for that ADT even if that constructor normally requires an argument;  i.e. this should work:\
+  match (x) \{\
+  case :none: \'85\
+  case :some: \'85\
+  \}\
+This would be particularly convenient in pattern-match expressions.\
+\
 
 \b Miscellaneous.
 \b0 \
 \
 It would be interesting to allow overloading / customization of pattern-matching.  We may find ourselves needing to do something like this to support non-fragile pattern matching anyway (if there's some set of restrictions that make it reasonable to permit that).  The obvious idea of compiling into the visitor pattern is a bit compelling, although control flow would be tricky \'97 we'd probably need the generated code to throw an exception.  Alternatively, we could let the non-fragile type convert itself into a fragile type for purposes of pattern matching.\
 \
-If we ever allow infix ADT constructors, we'll need to allow them in patterns as well.  Oh joy.\
+If we ever allow infix ADT constructors, we'll need to allow them in patterns as well.\
 \
-If we build regular expressions into the language, we can allow them directly as patterns and even bind grouping expressions into user variables.  That would be pretty cool.  I cannot imagine how this could work without building them into the language, though.\
+Eventually, we will build regular expressions into the language, and we will allow them directly as patterns and even bind grouping expressions into user variables.\
 \
 John.}

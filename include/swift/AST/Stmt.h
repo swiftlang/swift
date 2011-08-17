@@ -110,7 +110,7 @@ public:
   unsigned NumElements;
   
   SMLoc RBLoc;
-  
+
   BraceStmt(SMLoc lbloc, ExprStmtOrDecl *elements,
             unsigned numelements, SMLoc rbloc)
   : Stmt(StmtKind::Brace), LBLoc(lbloc), Elements(elements),

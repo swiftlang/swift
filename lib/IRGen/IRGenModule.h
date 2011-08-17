@@ -18,14 +18,25 @@
 #ifndef SWIFT_IRGEN_IRGENMODULE_H
 #define SWIFT_IRGEN_IRGENMODULE_H
 
+#include "llvm/ADT/DenseMap.h"
+
 namespace llvm {
+  class Constant;
+  class Function;
+  class GlobalVariable;
   class Module;
   class TargetData;
+  class Type;
 }
 
 namespace swift {
   class ASTContext;
+  class BraceStmt;
+  class Decl;
+  class FuncDecl;
   class TranslationUnitDecl;
+  class Type;
+  class VarDecl;
 
 namespace irgen {
   class Options;
@@ -39,12 +50,25 @@ public:
   llvm::Module &Module;
   const llvm::TargetData &TargetData;
 
+private:
+  llvm::DenseMap<Decl*, llvm::Constant*> Globals;
+
+  void emitTopLevel(BraceStmt *S);
+  void emitGlobalDecl(Decl *D);
+  void emitGlobalVariable(VarDecl *D);
+  void emitGlobalFunction(FuncDecl *D);
+
+public:
   IRGenModule(ASTContext &Context, Options &Opts, llvm::Module &Module,
               const llvm::TargetData &TargetData)
     : Context(Context), Opts(Opts), Module(Module),
       TargetData(TargetData) {}
 
+  llvm::Type *convertType(Type T);
+
   void emitTranslationUnit(TranslationUnitDecl *TU);
+  llvm::GlobalVariable *getAddrOfGlobalVariable(VarDecl *D);
+  llvm::Function *getAddrOfGlobalFunction(FuncDecl *D);
 };
 
 } // end namespace irgen
