@@ -1002,21 +1002,18 @@
   </div>
 
   <pre class="grammar">
-    expr         ::= expr-unary (operator expr-unary)*
-
-    expr-unary   ::= expr-primary
-    expr-unary   ::= operator expr-unary
-
-    expr-postfix ::= expr-primary
-    expr-postfix ::= <a href="#expr-call">expr-call</a>
-    expr-postfix ::= <a href="#expr-subscript">expr-subscript</a>
-    expr-postfix ::= <a href="#expr-dot">expr-dot</a>
-    
     expr-primary ::= <a href="#expr-literal">expr-literal</a>
     expr-primary ::= <a href="#expr-identifier">expr-identifier</a>
     expr-primary ::= <a href="#expr-paren">expr-paren</a>
     expr-primary ::= <a href="#expr-delayed-identifier">expr-delayed-identifier</a>
     expr-primary ::= <a href="#expr-func">expr-func</a>
+
+    expr-postfix ::= expr-primary
+    expr-postfix ::= <a href="#expr-dot">expr-dot</a>
+    expr-postfix ::= <a href="#expr-subscript">expr-subscript</a>
+    expr-postfix ::= <a href="#expr-call">expr-call</a>
+
+    expr         ::= <a href="#expr-unary">expr-unary</a> <a href="#expr-binary">expr-binary</a>*
   </pre>
 
   <p>At the top level of the expression grammar, expressions are a
@@ -1089,6 +1086,54 @@
   first identifier is looked up as a <a href="#type-identifier">type name</a>.
   </p>
  
+  <!-- ===================================================================== -->
+  <h3 id="expr-paren">Parenthesized Expressions</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    expr-paren      ::= lparen-any ')'
+    expr-paren      ::= lparen-any expr-paren-element (',' expr-paren-element)* ')'
+    expr-paren-element ::= ('.' <a href="#identifier">identifier</a> '=')? <a href="#expr">expr</a>
+  </pre>
+
+  <p>Some enclosing productions restrict the <tt>lparen-any</tt> to a
+     <tt>lparen-unspaced</tt>.</p>
+  
+  <p>Parentheses expressions contain an (optionally empty) list of optionally
+     named values.  Parentheses in an expression context denote one of two
+     things: 1) grouping parentheses, or 2) a tuple literal.</p>
+  
+  <p>Grouping parentheses occur when there is exactly one value in the list and
+     that value does not have a name.  In this case, the type of the parenthesis
+     expression is the type of the single value.</p>
+  
+  <p>All other cases are tuple literals.  The type of the expression is a tuple
+     type whose elements and order match that of the initializer.  If there are
+     any named elements, those elements become names for the tuple type.  A
+     parenthesis expression with no value has a type of the empty tuple.
+  </p>
+  
+  <p>Some examples:</p>
+  
+  <pre class="example">
+    <i>// Simple grouping parenthesis.</i>
+    var a = (4)             <i>// Type = int</i>
+    var b = (4+a)           <i>// Type = int</i>
+    
+    <i>// Tuple literals.</i>
+    var c = ()               <i>// Type = ()</i>
+    var d = (4, 5)           <i>// Type = (:int,:int)</i>
+    var e = (c, d)           <i>// Type = ((), (:int, :int))</i>
+    
+    var f = (.x = 4, .y = 5) <i>// Type = (x : int, y : int)</i>
+    var g = (4, .y = 5, 6)   <i>// Type = (:int, y : int, :int)</i>
+    
+    <i>// Named arguments to functions.</i>
+    func foo(a : int, b : int)
+    foo(.b = 4, .a = 1)
+  </pre>
+
+  
   <!-- ===================================================================== -->
   <h3 id="expr-delayed-identifier">Delayed Identifier Resolution</h3>
   <!-- ===================================================================== -->
@@ -1238,54 +1283,6 @@
   <p>TODO: Eventually support map operations etc.</p> -->
   
   <!-- ===================================================================== -->
-  <h3 id="expr-paren">Parenthesized Expressions</h3>
-  <!-- ===================================================================== -->
-  
-  <pre class="grammar">
-    expr-paren      ::= lparen-any ')'
-    expr-paren      ::= lparen-any expr-paren-element (',' expr-paren-element)* ')'
-    expr-paren-element ::= ('.' <a href="#identifier">identifier</a> '=')? <a href="#expr">expr</a>
-  </pre>
-
-  <p>Some enclosing productions restrict the <tt>lparen-any</tt> to a
-     <tt>lparen-unspaced</tt>.</p>
-  
-  <p>Parentheses expressions contain an (optionally empty) list of optionally
-     named values.  Parentheses in an expression context denote one of two
-     things: 1) grouping parentheses, or 2) a tuple literal.</p>
-  
-  <p>Grouping parentheses occur when there is exactly one value in the list and
-     that value does not have a name.  In this case, the type of the parenthesis
-     expression is the type of the single value.</p>
-  
-  <p>All other cases are tuple literals.  The type of the expression is a tuple
-     type whose elements and order match that of the initializer.  If there are
-     any named elements, those elements become names for the tuple type.  A
-     parenthesis expression with no value has a type of the empty tuple.
-  </p>
-  
-  <p>Some examples:</p>
-  
-  <pre class="example">
-    <i>// Simple grouping parenthesis.</i>
-    var a = (4)             <i>// Type = int</i>
-    var b = (4+a)           <i>// Type = int</i>
-    
-    <i>// Tuple literals.</i>
-    var c = ()               <i>// Type = ()</i>
-    var d = (4, 5)           <i>// Type = (:int,:int)</i>
-    var e = (c, d)           <i>// Type = ((), (:int, :int))</i>
-    
-    var f = (.x = 4, .y = 5) <i>// Type = (x : int, y : int)</i>
-    var g = (4, .y = 5, 6)   <i>// Type = (:int, y : int, :int)</i>
-    
-    <i>// Named arguments to functions.</i>
-    func foo(a : int, b : int)
-    foo(.b = 4, .a = 1)
-  </pre>
-
-  
-  <!-- ===================================================================== -->
   <h3 id="expr-call">Function Application</h3>
   <!-- ===================================================================== -->
   
@@ -1319,12 +1316,29 @@
 
     <i>// Two separate statements</i>
     i()
-    (j <+ 2)()
+    (j &lt;+ 2)()
   </pre>
+
+  <!-- ===================================================================== -->
+  <h3 id="expr-unary">Unary Operators</h3>
+  <!-- ===================================================================== -->
   
+  <pre class="grammar">
+    expr-unary   ::= <a href="#expr">expr-postfix</a>
+    expr-unary   ::= operator <a href="#expr">expr-postfix</a>
+  </pre>
+    
+  <p>If an operator is used as a unary operator, but name resolution
+  does not find at least one function of unary operator type, the
+  expression is ill-formed.</p>
+
   <!-- ===================================================================== -->
   <h3 id="expr-binary">Binary Operators</h3>
   <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    expr-binary ::= operator <a href="#expr-unary">expr-unary</a>
+  </pre>
 
   <p>Infix binary expressions are not formed during parsing.  Instead,
   they are formed after name resolution by building a tree from an
@@ -1337,7 +1351,7 @@
   expression is ill-formed.</p>
 
   <p>TODO: Should this use the expr-identifier production to allow qualified
-    identifiers?  This would allow "foo swift::min bar".  Oneof members cannot
+    identifiers?  This would allow "foo swift::+ bar".  Oneof members cannot
     be declared infix, but future module/namespace scopes seem worth
     accessing, though ADL is probably enough.</p>
 
@@ -1346,14 +1360,6 @@
   <pre class="example">
     4 + 5 * 123
   </pre>
-
-  <!-- ===================================================================== -->
-  <h3 id="expr-unary">Unary Operators</h3>
-  <!-- ===================================================================== -->
-
-  <p>If an operator is used as a unary operator, but name resolution
-  does not find at least one function of unary operator type, the
-  expression is ill-formed.</p>
 
   <!-- ********************************************************************* -->
   <h2 id = "stmt">Statements</h2>

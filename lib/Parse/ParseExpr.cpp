@@ -114,14 +114,17 @@ ParseResult<Expr> Parser::parseExpr(const char *Message) {
 /// parseExprUnary
 ///
 ///   expr-unary:
-///     expr-primary
+///     expr-postfix
 ///     operator expr-unary
 ParseResult<Expr> Parser::parseExprUnary(const char *Message) {
   // TODO: implement
-  return parseExprPrimary(Message);
+  return parseExprPostfix(Message);
 }
 
-/// parseExprPrimary
+/// parseExprPostfix
+///
+///   expr-literal:
+///     numeric_constant
 ///
 ///   expr-primary:
 ///     expr-literal
@@ -129,19 +132,24 @@ ParseResult<Expr> Parser::parseExprUnary(const char *Message) {
 ///     ':' identifier
 ///     expr-paren
 ///     expr-func
-///     expr-dot
-///     expr-subscript
-///
-///   expr-literal:
-///     numeric_constant
 ///
 ///   expr-dot:
-///     expr-primary '.' identifier
-///     expr-primary '.' dollarident
+///     expr-postfix '.' identifier
+///     expr-postfix '.' dollarident
 ///
 ///   expr-subscript:
-///     expr-primary '[' expr ']'
-ParseResult<Expr> Parser::parseExprPrimary(const char *Message) {
+///     expr-postfix '[' expr ']'
+///
+///   expr-call:
+///     expr-postfix expr-paren
+///
+///   expr-postfix:
+///     expr-primary
+///     expr-dot
+///     expr-subscript
+///     expr-call
+///
+ParseResult<Expr> Parser::parseExprPostfix(const char *Message) {
   ParseResult<Expr> Result;
   switch (Tok.getKind()) {
   case tok::numeric_constant:
