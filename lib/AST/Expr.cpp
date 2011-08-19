@@ -66,6 +66,8 @@ SMLoc Expr::getLocStart() const {
     return cast<ClosureExpr>(this)->Input->getLocStart();
   case ExprKind::AnonClosureArg:
     return cast<AnonClosureArgExpr>(this)->Loc;
+  case ExprKind::Unary:
+    return cast<UnaryExpr>(this)->Fn->getLocStart();
   case ExprKind::Binary:
     return cast<BinaryExpr>(this)->LHS->getLocStart();
   }
@@ -404,6 +406,17 @@ namespace {
     
     Expr *visitAnonClosureArgExpr(AnonClosureArgExpr *E) { return E; }
 
+    Expr *visitUnaryExpr(UnaryExpr *E) {
+      Expr *E2 = doIt(E->Fn);
+      if (E2 == 0) return 0;
+      E->Fn = E2;
+      
+      E2 = doIt(E->SubExpr);
+      if (E2 == 0) return 0;
+      E->SubExpr = E2;
+      return E;
+    }
+
     Expr *visitBinaryExpr(BinaryExpr *E) {
       Expr *E2 = doIt(E->LHS);
       if (E2 == 0) return 0;
@@ -684,11 +697,21 @@ public:
     OS.indent(Indent) << "(anon_closure_arg_expr type='" << E->Ty;
     OS << "' ArgNo=" << E->ArgNo << ')';
   }
+  void visitUnaryExpr(UnaryExpr *E) {
+    OS.indent(Indent) << "(unary_expr '";
+    if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->Fn))
+      OS << DRE->D->Name;
+    else if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E->Fn))
+      OS << OO->Decls[0]->Name;
+    else
+      OS << "***UNKNOWN***";
+    OS << "' type='" << E->Ty << "'\n";
+    printRec(E->SubExpr);
+    OS << ')';
+  }
   void visitBinaryExpr(BinaryExpr *E) {
     OS.indent(Indent) << "(binary_expr '";
-    if (!E->Fn)
-      OS << "=";
-    else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->Fn))
+    if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->Fn))
       OS << DRE->D->Name;
     else if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E->Fn))
       OS << OO->Decls[0]->Name;

@@ -50,6 +50,7 @@ enum class ExprKind {
   Func,
   Closure,
   AnonClosureArg,
+  Unary,
   Binary
 };
   
@@ -472,12 +473,23 @@ public:
   }
 };
   
+/// UnaryExpr - Prefix unary expressions like '!y'.
+class UnaryExpr : public Expr {
+public:
+  Expr *Fn, *SubExpr;
+  
+  UnaryExpr(Expr *Fn, Expr *SubExpr, Type Ty = Type())
+    : Expr(ExprKind::Unary, Ty), Fn(Fn), SubExpr(SubExpr) {}
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const UnaryExpr *) { return true; }
+  static bool classof(const Expr *E) { return E->Kind == ExprKind::Unary; }
+};
+  
 /// BinaryExpr - Infix binary expressions like 'x+y'.
 class BinaryExpr : public Expr {
 public:
-  Expr *LHS;
-  Expr *Fn;
-  Expr *RHS;
+  Expr *LHS, *Fn, *RHS;
   
   BinaryExpr(Expr *lhs, Expr *fn, Expr *rhs, Type Ty = Type())
     : Expr(ExprKind::Binary, Ty), LHS(lhs), Fn(fn), RHS(rhs) {}

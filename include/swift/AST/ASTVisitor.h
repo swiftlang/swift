@@ -77,6 +77,7 @@ public:
     DISPATCH(Func);
     DISPATCH(Closure);
     DISPATCH(AnonClosureArg);
+    DISPATCH(Unary);
     DISPATCH(Binary);
 #undef DISPATCH
     }
