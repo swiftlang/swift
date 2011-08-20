@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/IRGen/IRGen.h"
+#include "swift/Subsystems.h"
 #include "swift/IRGen/Options.h"
 #include "swift/AST/ASTContext.h"
 #include "llvm/LLVMContext.h"

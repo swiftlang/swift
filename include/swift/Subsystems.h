@@ -20,6 +20,10 @@
 namespace swift {
   class TranslationUnitDecl;
   class ASTContext;
+
+  namespace irgen {
+    class Options;
+  }
   
   /// parseTranslationUnit - Parse a single buffer as a translation unit and
   /// return the decl.
@@ -34,7 +38,11 @@ namespace swift {
   /// walks the AST to resolve types and diagnose problems therein.
   ///
   void performTypeChecking(TranslationUnitDecl *TUD, ASTContext &Ctx);
-  
+
+  /// performIRGeneration - Turn the given translation unit into
+  /// either LLVM IR or native code.
+  void performIRGeneration(TranslationUnitDecl *TU, ASTContext &Ctx,
+                           irgen::Options &Opts);
   
 } // end namespace swift
 
