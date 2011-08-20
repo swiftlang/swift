@@ -14,12 +14,96 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/Type.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/Types.h"
+#include "llvm/DerivedTypes.h"
+#include "llvm/Support/ErrorHandling.h"
+
+#include "GenType.h"
 #include "IRGenModule.h"
+
 using namespace swift;
 using namespace irgen;
 
-/// Convert the given type into an LLVM type.
-llvm::Type *IRGenModule::convertType(Type T) {
-  return 0;
+namespace {
+  class PrimitiveTypeInfo : public TypeInfo {
+  public:
+    PrimitiveTypeInfo(llvm::Type *Type, unsigned Size, unsigned Alignment)
+      : TypeInfo(Type, Size, Alignment) {}
+  };
+}
+
+void TypeInfo::_anchor() {}
+
+static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
+
+TypeConverter::TypeConverter() : FirstConverted(invalidTypeInfo()) {}
+
+TypeConverter::~TypeConverter() {
+  // Delete all the converted type infos.
+  for (const TypeInfo *I = FirstConverted; I != invalidTypeInfo(); ) {
+    const TypeInfo *Cur = I;
+    I = Cur->NextConverted;
+    delete Cur;
+  }
+}
+
+/// Get the fragile IR type for the given type.
+llvm::Type *IRGenModule::getFragileType(Type T) {
+  return getFragileTypeInfo(T).Type;
+}
+
+/// Get the fragile type information for the given type.
+const TypeInfo &IRGenModule::getFragileTypeInfo(Type T) {
+  return TypeConverter::getFragileTypeInfo(*this, T);
+}
+
+const TypeInfo &TypeConverter::getFragileTypeInfo(IRGenModule &IGM, Type T) {
+  assert(!T.isNull());
+  auto Entry = IGM.Types.Converted.find(T.getPointer());
+  if (Entry != IGM.Types.Converted.end())
+    return *Entry->second;
+
+  const TypeInfo *Result = convertType(IGM, T);
+  IGM.Types.Converted[T.getPointer()] = Result;
+
+  // If the type info hasn't been added to the list of types, do so.
+  if (!Result->NextConverted) {
+    Result->NextConverted = IGM.Types.FirstConverted;
+    IGM.Types.FirstConverted = Result;
+  }
+
+  return *Result;
+}
+
+const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
+  TypeBase *TB = T.getPointer();
+  switch (TB->Kind) {
+  case TypeKind::Error:
+    llvm_unreachable("generating an error type");
+  case TypeKind::Dependent:
+    llvm_unreachable("generating a dependent type");
+  case TypeKind::BuiltinInt1:
+    return new PrimitiveTypeInfo(IGM.Int1Ty, 1, 1);
+  case TypeKind::BuiltinInt8:
+    return new PrimitiveTypeInfo(IGM.Int8Ty, 1, 1);
+  case TypeKind::BuiltinInt16:
+    return new PrimitiveTypeInfo(IGM.Int16Ty, 2, 2);
+  case TypeKind::BuiltinInt32:
+    return new PrimitiveTypeInfo(IGM.Int32Ty, 4, 4);
+  case TypeKind::BuiltinInt64:
+    return new PrimitiveTypeInfo(IGM.Int64Ty, 8, 8);
+  case TypeKind::NameAlias:
+    return &getFragileTypeInfo(IGM,
+                               cast<NameAliasType>(TB)->TheDecl->UnderlyingTy);
+  case TypeKind::Tuple:
+    return convertTupleType(IGM, cast<TupleType>(TB));
+  case TypeKind::OneOf:
+    return convertOneOfType(IGM, cast<OneOfType>(TB));
+  case TypeKind::Function:
+    return convertFunctionType(IGM, cast<FunctionType>(TB));
+  case TypeKind::Array:
+    return convertArrayType(IGM, cast<ArrayType>(TB));
+  }
+  llvm_unreachable("bad type kind");
 }

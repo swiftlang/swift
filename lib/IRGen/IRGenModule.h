@@ -24,6 +24,7 @@ namespace llvm {
   class Constant;
   class Function;
   class GlobalVariable;
+  class LLVMContext;
   class Module;
   class TargetData;
   class Type;
@@ -40,6 +41,8 @@ namespace swift {
 
 namespace irgen {
   class Options;
+  class TypeConverter;
+  class TypeInfo;
 
 /// IRGenModule - Primary class for emitting IR for global declarations.
 /// 
@@ -48,8 +51,25 @@ public:
   ASTContext &Context;
   Options &Opts;
   llvm::Module &Module;
+  llvm::LLVMContext &LLVMContext;
   const llvm::TargetData &TargetData;
 
+  llvm::IntegerType *Int1Ty;
+  llvm::IntegerType *Int8Ty;
+  llvm::IntegerType *Int16Ty;
+  llvm::IntegerType *Int32Ty;
+  llvm::IntegerType *Int64Ty;
+
+//--- Types -----------------------------------------------------------------
+public:
+  const TypeInfo &getFragileTypeInfo(Type T);
+  llvm::Type *getFragileType(Type T);
+
+private:
+  TypeConverter &Types;
+  friend class TypeConverter;
+
+//--- Globals ---------------------------------------------------------------
 private:
   llvm::DenseMap<Decl*, llvm::Constant*> Globals;
 
@@ -60,11 +80,10 @@ private:
 
 public:
   IRGenModule(ASTContext &Context, Options &Opts, llvm::Module &Module,
-              const llvm::TargetData &TargetData)
-    : Context(Context), Opts(Opts), Module(Module),
-      TargetData(TargetData) {}
+              const llvm::TargetData &TargetData);
+  ~IRGenModule();
 
-  llvm::Type *convertType(Type T);
+  llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }
 
   void emitTranslationUnit(TranslationUnitDecl *TU);
   llvm::GlobalVariable *getAddrOfGlobalVariable(VarDecl *D);

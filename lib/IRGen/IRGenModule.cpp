@@ -25,10 +25,29 @@
 #include "llvm/Module.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
+
+#include "GenType.h"
 #include "IRGenModule.h"
 
 using namespace swift;
 using namespace irgen;
+
+IRGenModule::IRGenModule(ASTContext &Context, Options &Opts,
+                         llvm::Module &Module,
+                         const llvm::TargetData &TargetData)
+  : Context(Context), Opts(Opts),
+    Module(Module), LLVMContext(Module.getContext()),
+    TargetData(TargetData), Types(*new TypeConverter()) {
+  Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
+  Int8Ty = llvm::Type::getInt8Ty(getLLVMContext());
+  Int16Ty = llvm::Type::getInt16Ty(getLLVMContext());
+  Int32Ty = llvm::Type::getInt32Ty(getLLVMContext());
+  Int64Ty = llvm::Type::getInt64Ty(getLLVMContext());
+}
+
+IRGenModule::~IRGenModule() {
+  delete &Types;
+}
 
 namespace {
   struct LinkInfo {
@@ -92,35 +111,46 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   }
 }
 
+/// Emit a global variable declaration.
 llvm::GlobalVariable *IRGenModule::getAddrOfGlobalVariable(VarDecl *VD) {
   // Check whether we've cached this.
   llvm::Constant *&Entry = Globals[VD];
   if (Entry) return cast<llvm::GlobalVariable>(Entry);
 
-  llvm::Type *Type = convertType(VD->Ty);
+  const TypeInfo &TInfo = getFragileTypeInfo(VD->Ty);
   LinkInfo Link = computeLinkInfo(VD);
   llvm::GlobalVariable *Addr
-    = new llvm::GlobalVariable(Module, Type, /*constant*/ false,
+    = new llvm::GlobalVariable(Module, TInfo.Type, /*constant*/ false,
                                Link.Linkage, /*initializer*/ nullptr,
                                Link.Name);
   Addr->setVisibility(Link.Visibility);
+  Addr->setAlignment(TInfo.AlignmentInBytes);
 
   Entry = Addr;
   return Addr;
 }
 
+/// Emit a global declaration.
 void IRGenModule::emitGlobalVariable(VarDecl *VD) {
   llvm::GlobalVariable *Addr = getAddrOfGlobalVariable(VD);
+
+  // For now, always give globals null initializers.
+  llvm::Constant *Init =
+    llvm::Constant::getNullValue(cast<llvm::PointerType>(Addr->getType())
+                                   ->getElementType());
+  Addr->setInitializer(Init);
+
   // FIXME: initializer
   (void) Addr;
 }
+
 
 llvm::Function *IRGenModule::getAddrOfGlobalFunction(FuncDecl *FD) {
   // Check whether we've cached this.
   llvm::Constant *&Entry = Globals[FD];
   if (Entry) return cast<llvm::Function>(Entry);
 
-  llvm::FunctionType *Type = cast<llvm::FunctionType>(convertType(FD->Ty));
+  llvm::FunctionType *Type = cast<llvm::FunctionType>(getFragileType(FD->Ty));
 
   LinkInfo Link = computeLinkInfo(FD);
   llvm::Function *Addr
