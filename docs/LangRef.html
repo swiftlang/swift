@@ -653,6 +653,7 @@
     attribute-list ::= '[' attribute (',' attribute)* ']'
     
     attribute      ::= attribute-infix
+    attribute      ::= attribute-unary
   </pre>
   
   <p>An attribute is a (possibly empty) comma separated list of attributes.</p>
@@ -663,15 +664,23 @@
     attribute-infix ::= 'infix' '=' <a href="#numeric_constant">numeric_constant</a>
   </pre>
 
-  <p>The only attribute supported so far is the 'infix' attribute.</p>
-
   <p>The 'infix' attribute may only be applied to the declaration of a
   function of binary operator type whose name is an
   <a href="#identifier"><tt>operator</tt></a>.
   FIXME: Implement these restrictions.</p>
   
-  <p>TODO: Add support for a bunch more attributes.</p>
-
+  <h4 id="attribute-unary">Unary Attribute</h4>
+  
+  <pre class="grammar">
+    attribute-unary ::= 'unary'
+  </pre>
+  
+  <p>The 'unary' attribute may only be applied to the declaration of a
+     function of unary operator type whose name is an <a 
+     href="#identifier"><tt>operator</tt></a>, and that takes a tuple with a 
+     single element.
+  FIXME: Implement these restrictions.</p>
+  
   
   <!-- ********************************************************************* -->
   <h2 id="type">Types</h2>
@@ -1331,6 +1340,12 @@
   <p>If an operator is used as a unary operator, but name resolution
   does not find at least one function of unary operator type, the
   expression is ill-formed.</p>
+
+  <p>Simple examples:</p>
+  
+  <pre class="example">
+    i = -j
+  </pre>
 
   <!-- ===================================================================== -->
   <h3 id="expr-binary">Binary Operators</h3>

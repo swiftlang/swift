@@ -83,12 +83,10 @@ ParseResult<Expr> Parser::parseExpr(const char *Message) {
     }
 
     // If the next token is not an operator, we're done.
-    if (!Tok.is(tok::oper))
+    if (Tok.isNot(tok::oper))
       break;
 
-    // Parse the operator.  If this ever gains the ability to fail, we
-    // probably need to do something to keep the SequenceExpr in a
-    // valid state.
+    // Parse the operator.
     Expr *Operator = parseExprOperator();
     SequencedExprs.push_back(Operator);
 
@@ -117,8 +115,16 @@ ParseResult<Expr> Parser::parseExpr(const char *Message) {
 ///     expr-postfix
 ///     operator expr-unary
 ParseResult<Expr> Parser::parseExprUnary(const char *Message) {
-  // TODO: implement
-  return parseExprPostfix(Message);
+  // If the next token is not an operator, just parse this as expr-postfix
+  if (Tok.isNot(tok::oper))
+    return parseExprPostfix(Message);
+  
+  // Parse the operator.
+  Expr *Operator = parseExprOperator();
+
+  ParseResult<Expr> SubExpr = parseExprUnary(Message);
+  if (!SubExpr.isSuccess()) return SubExpr;
+  return new (Context) UnaryExpr(Operator, SubExpr.get());
 }
 
 /// parseExprPostfix

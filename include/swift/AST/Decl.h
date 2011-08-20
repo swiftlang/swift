@@ -55,11 +55,16 @@ public:
   /// an infix operator with the specified precedence.  Otherwise, it is in the
   /// range of 0-255.
   short InfixPrecedence;
+  
+  /// isUnary - True if this decl has the 'unary' attribute on it.
+  bool isUnary;
 
-  DeclAttributes() : InfixPrecedence(-1) { }
+  DeclAttributes() : InfixPrecedence(-1), isUnary(false) { }
   
   
-  bool empty() const { return InfixPrecedence == -1; }
+  bool empty() const {
+    return InfixPrecedence == -1 && !isUnary;
+  }
   
   /// isInfix - Return true if this is a binary infix operation.
   bool isInfix() const { return InfixPrecedence != -1; }

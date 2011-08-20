@@ -90,7 +90,9 @@ TranslationUnitDecl *Parser::parseTranslationUnit() {
 /// parseAttribute
 ///   attribute:
 ///     'infix' '=' numeric_constant
+///     'unary'
 bool Parser::parseAttribute(DeclAttributes &Attributes) {
+  // Infix attribute.
   if (Tok.is(tok::identifier) && Tok.getText() == "infix") {
     if (Attributes.InfixPrecedence != -1)
       error(Tok.getLoc(), "infix precedence repeatedly specified");
@@ -111,10 +113,22 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
           Attributes.InfixPrecedence = Value;
       }
     }
-    
+
+    if (Attributes.isUnary) {
+      error(Tok.getLoc(), "declaration cannot be both 'infix' and 'unary'");
+      Attributes.InfixPrecedence = -1;
+    }
     return false;
   }
   
+  if (Tok.is(tok::identifier) && Tok.getText() == "unary") {
+    if (Attributes.InfixPrecedence != -1)
+      error(Tok.getLoc(), "declaration cannot be both 'infix' and 'unary'");
+    consumeToken(tok::identifier);
+    Attributes.isUnary = true;
+    return false;
+  }
+
   error(Tok.getLoc(), "unknown declaration attribute");
   skipUntil(tok::r_square);
   return true;

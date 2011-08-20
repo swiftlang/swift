@@ -260,6 +260,20 @@ static bool SemaCallExpr(CallExpr *E, TypeChecker &TC) {
 /// SemaUnaryExpr - Perform semantic analysis of unary expressions.
 static bool SemaUnaryExpr(Expr *&OpFn, Expr *&SubExpr, Type &ResultTy,
                           TypeChecker &TC) {
+  bool isUnary;
+  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(OpFn))
+    isUnary = DRE->D->Attrs.isUnary;
+  else if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(OpFn))
+    isUnary = OO->Decls[0]->Attrs.isUnary;
+  else
+    isUnary = false;
+  
+  if (!isUnary) {
+    TC.error(OpFn->getLocStart(),
+             "use of unary operator without 'unary' attribute specified");
+    return true;
+  }
+  
   // If this is an overloaded operator, try to resolve which candidate
   // is the right one.
   if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(OpFn)) {
@@ -1589,6 +1603,21 @@ bool TypeChecker::validateType(Type InTy) {
 
 /// validateAttributes - Check that the func/var declaration attributes are ok.
 void TypeChecker::validateAttributes(DeclAttributes &Attrs, Type Ty) {
+  // If the decl is a unary operator, then it must be a function whose input is
+  // a single element tuple.
+  if (Attrs.isUnary) {
+    bool IsError = true;
+    if (FunctionType *FT = dyn_cast<FunctionType>(Ty.getPointer()))
+      if (TupleType *TT = dyn_cast<TupleType>(FT->Input.getPointer()))
+        IsError = TT->Fields.size() != 1;
+    if (IsError) {
+      error(Attrs.LSquareLoc, "function with 'unary' specified must take "
+            "a single element tuple as input");
+      Attrs.isUnary = false;
+      // FIXME: Set the 'isError' bit on the decl.
+    }
+  }
+  
   // If the decl has an infix precedence specified, then it must be a function
   // whose input is a two element tuple.
   if (Attrs.InfixPrecedence != -1) {
@@ -1600,6 +1629,7 @@ void TypeChecker::validateAttributes(DeclAttributes &Attrs, Type Ty) {
       error(Attrs.LSquareLoc, "function with 'infix' specified must take "
             "a two element tuple as input");
       Attrs.InfixPrecedence = -1;
+      // FIXME: Set the 'isError' bit on the decl.
     }
   }
 }
