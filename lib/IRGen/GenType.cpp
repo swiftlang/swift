@@ -21,6 +21,8 @@
 
 #include "GenType.h"
 #include "IRGenModule.h"
+#include "LValue.h"
+#include "RValue.h"
 
 using namespace swift;
 using namespace irgen;
@@ -28,8 +30,17 @@ using namespace irgen;
 namespace {
   class PrimitiveTypeInfo : public TypeInfo {
   public:
-    PrimitiveTypeInfo(llvm::Type *Type, unsigned Size, unsigned Alignment)
-      : TypeInfo(Type, Size, Alignment) {}
+    PrimitiveTypeInfo(llvm::Type *Type, Size S, Alignment A)
+      : TypeInfo(Type, S, A) {}
+
+    RValue load(IRGenFunction &IGF, const LValue &LV) const {
+      // FIXME
+      return RValue();
+    }
+
+    void store(IRGenFunction &CGF, const RValue &RV, const LValue &LV) const {
+      // FIXME
+    }
   };
 }
 
@@ -84,15 +95,15 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
   case TypeKind::Dependent:
     llvm_unreachable("generating a dependent type");
   case TypeKind::BuiltinInt1:
-    return new PrimitiveTypeInfo(IGM.Int1Ty, 1, 1);
+    return new PrimitiveTypeInfo(IGM.Int1Ty, Size(1), Alignment(1));
   case TypeKind::BuiltinInt8:
-    return new PrimitiveTypeInfo(IGM.Int8Ty, 1, 1);
+    return new PrimitiveTypeInfo(IGM.Int8Ty, Size(1), Alignment(1));
   case TypeKind::BuiltinInt16:
-    return new PrimitiveTypeInfo(IGM.Int16Ty, 2, 2);
+    return new PrimitiveTypeInfo(IGM.Int16Ty, Size(2), Alignment(2));
   case TypeKind::BuiltinInt32:
-    return new PrimitiveTypeInfo(IGM.Int32Ty, 4, 4);
+    return new PrimitiveTypeInfo(IGM.Int32Ty, Size(4), Alignment(4));
   case TypeKind::BuiltinInt64:
-    return new PrimitiveTypeInfo(IGM.Int64Ty, 8, 8);
+    return new PrimitiveTypeInfo(IGM.Int64Ty, Size(8), Alignment(8));
   case TypeKind::NameAlias:
     return &getFragileTypeInfo(IGM,
                                cast<NameAliasType>(TB)->TheDecl->UnderlyingTy);

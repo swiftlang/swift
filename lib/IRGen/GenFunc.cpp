@@ -22,12 +22,30 @@
 
 #include "GenType.h"
 #include "IRGenModule.h"
+#include "LValue.h"
+#include "RValue.h"
 
 using namespace swift;
 using namespace irgen;
 
+namespace {
+  class FuncTypeInfo : public TypeInfo {
+  public:
+    FuncTypeInfo() : TypeInfo(nullptr, Size(0), Alignment(0)) {}
+
+    RValue load(IRGenFunction &IGF, const LValue &LV) const {
+      // FIXME
+      return RValue();
+    }
+
+    void store(IRGenFunction &CGF, const RValue &RV, const LValue &LV) const {
+      // FIXME
+    }
+  };
+}
+
 const TypeInfo *
 TypeConverter::convertFunctionType(IRGenModule &IGM, FunctionType *T) {
   // FIXME
-  return new TypeInfo(0, 0, 0);
+  return new FuncTypeInfo();
 }

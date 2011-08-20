@@ -5,5 +5,6 @@ add_swift_library(swiftIRGen
   GenTuple.cpp
   GenType.cpp
   IRGen.cpp
+  IRGenFunction.cpp
   IRGenModule.cpp
   DEPENDS swiftAST)

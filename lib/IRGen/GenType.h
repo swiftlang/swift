@@ -21,6 +21,8 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"
 
+#include "IRGen.h"
+
 namespace llvm {
   class Type;
 }
@@ -33,7 +35,10 @@ namespace swift {
   class Type;
 
 namespace irgen {
+  class IRGenFunction;
   class IRGenModule;
+  class LValue;
+  class RValue;
 
 /// Information about the IR representation and generation of the
 /// given type.
@@ -45,9 +50,8 @@ class TypeInfo {
   mutable const TypeInfo *NextConverted;
 
 public:
-  TypeInfo(llvm::Type *Type, unsigned Size, unsigned Alignment)
-    : NextConverted(0), Type(Type), SizeInBytes(Size),
-      AlignmentInBytes(Alignment) {}
+  TypeInfo(llvm::Type *Type, Size S, Alignment A)
+    : NextConverted(0), Type(Type), TypeSize(S), TypeAlignment(A) {}
 
   virtual ~TypeInfo() {}
 
@@ -55,13 +59,20 @@ public:
   llvm::Type *Type;
 
   /// The size of this type in bytes.
-  unsigned SizeInBytes;
+  Size TypeSize;
 
   /// The alignment of this type in bytes.
-  unsigned AlignmentInBytes;
+  Alignment TypeAlignment;
 
   /// Answers whether this type info has been completed.
-  bool isComplete() const { return AlignmentInBytes != 0; }
+  bool isComplete() const { return !TypeAlignment.isZero(); }
+
+  /// Load an r-value from the given address.
+  virtual RValue load(IRGenFunction &IGF, const LValue &LV) const = 0;
+
+  /// Store an r-value to the given address.
+  virtual void store(IRGenFunction &IGF, const RValue &RV,
+                     const LValue &LV) const = 0;
 
 private:
   virtual void _anchor();

@@ -31,9 +31,27 @@
 
 #include "GenType.h"
 #include "IRGenModule.h"
+#include "LValue.h"
+#include "RValue.h"
 
 using namespace swift;
 using namespace irgen;
+
+namespace {
+  class OneOfTypeInfo : public TypeInfo {
+  public:
+    OneOfTypeInfo(llvm::Type *T, Size S, Alignment A) : TypeInfo(T, S, A) {}
+
+    RValue load(IRGenFunction &IGF, const LValue &LV) const {
+      // FIXME
+      return RValue();
+    }
+
+    void store(IRGenFunction &CGF, const RValue &RV, const LValue &LV) const {
+      // FIXME
+    }
+  };
+}
 
 const TypeInfo *
 TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
@@ -41,7 +59,7 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
   llvm::StructType *Converted
     = llvm::StructType::create(IGM.getLLVMContext(), "oneof");
 
-  TypeInfo *TInfo = new TypeInfo(Converted, 0, 0);
+  OneOfTypeInfo *TInfo = new OneOfTypeInfo(Converted, Size(0), Alignment(0));
 
   // They can be recursive -- not structurally, but by anything
   // indirected.
@@ -55,13 +73,13 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
     llvm::Type *Type;
     if (Ty.isNull()) {
       Type = IGM.Int8Ty;
-      TInfo->AlignmentInBytes = 1;
+      TInfo->TypeAlignment = Alignment(1);
     } else {
       const TypeInfo &EltInfo = getFragileTypeInfo(IGM, Ty);
       assert(EltInfo.isComplete());
       Type = EltInfo.Type;
-      TInfo->SizeInBytes = EltInfo.SizeInBytes;
-      TInfo->AlignmentInBytes = EltInfo.AlignmentInBytes;
+      TInfo->TypeSize = EltInfo.TypeSize;
+      TInfo->TypeAlignment = EltInfo.TypeAlignment;
     }
 
     llvm::Type *Body[] = { Type };
@@ -72,23 +90,23 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
 
   // Otherwise, we need a discriminator.
   llvm::Type *DiscriminatorType;
-  uint64_t DiscriminatorSizeInBytes;
+  Size DiscriminatorSize;
   if (T->Elements.size() <= (1 << 8)) {
     DiscriminatorType = IGM.Int8Ty;
-    DiscriminatorSizeInBytes = 1;
+    DiscriminatorSize = Size(1);
   } else if (T->Elements.size() <= (1 << 16)) {
     DiscriminatorType = IGM.Int16Ty;
-    DiscriminatorSizeInBytes = 2;
+    DiscriminatorSize = Size(2);
   } else {
     DiscriminatorType = IGM.Int32Ty;
-    DiscriminatorSizeInBytes = 4;
+    DiscriminatorSize = Size(4);
   }
 
   SmallVector<llvm::Type*, 2> Body;
   Body.push_back(DiscriminatorType);
 
-  unsigned PayloadSizeInBytes = 0;
-  unsigned AlignmentInBytes = 1;
+  Size PayloadSize = Size(0);
+  Alignment TypeAlignment = Alignment(1);
 
   // Figure out how much storage we need for the union.
   for (unsigned I = 0, E = T->Elements.size(); I != E; ++I) {
@@ -100,30 +118,29 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
     // zero-size data.
     const TypeInfo &EltInfo = getFragileTypeInfo(IGM, Ty);
     assert(EltInfo.isComplete());
-    if (EltInfo.SizeInBytes == 0) continue;
+    if (EltInfo.TypeSize.isZero()) continue;
 
     // The required payload size is the amount of padding needed to
     // get up to the element's alignment, plus the actual size.
-    unsigned EltPayloadSizeInBytes = EltInfo.SizeInBytes;
-    if (EltInfo.AlignmentInBytes > DiscriminatorSizeInBytes)
-      EltPayloadSizeInBytes +=
-        (EltInfo.AlignmentInBytes - DiscriminatorSizeInBytes);
+    Size EltPayloadSize = EltInfo.TypeSize;
+    if (EltInfo.TypeAlignment.getValue() > DiscriminatorSize.getValue())
+      EltPayloadSize +=
+        Size(EltInfo.TypeAlignment.getValue() - DiscriminatorSize.getValue());
 
-    PayloadSizeInBytes = std::max(PayloadSizeInBytes, EltPayloadSizeInBytes);
-    AlignmentInBytes = std::max(AlignmentInBytes, EltInfo.AlignmentInBytes);
+    PayloadSize = std::max(PayloadSize, EltPayloadSize);
+    TypeAlignment = std::max(TypeAlignment, EltInfo.TypeAlignment);
   }
 
   // If there's any payload at all, add in the payload array.
-  if (PayloadSizeInBytes) {
-    Body.push_back(llvm::ArrayType::get(IGM.Int8Ty, PayloadSizeInBytes));
+  if (PayloadSize) {
+    Body.push_back(llvm::ArrayType::get(IGM.Int8Ty, PayloadSize.getValue()));
   }
 
-  unsigned SizeInBytes = DiscriminatorSizeInBytes + PayloadSizeInBytes;
-
-  // Should we round SizeInBytes up to a multiple of the alignment?
+  Size TypeSize = DiscriminatorSize + PayloadSize;
+  // Should we round TypeSize up to a multiple of the alignment?
 
   Converted->setBody(Body);
-  TInfo->SizeInBytes = SizeInBytes;
-  TInfo->AlignmentInBytes = AlignmentInBytes;
+  TInfo->TypeSize = TypeSize;
+  TInfo->TypeAlignment = TypeAlignment;
   return TInfo;
 }

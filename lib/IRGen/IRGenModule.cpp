@@ -123,7 +123,7 @@ llvm::GlobalVariable *IRGenModule::getAddrOfGlobalVariable(VarDecl *VD) {
                                Link.Linkage, /*initializer*/ nullptr,
                                Link.Name);
   Addr->setVisibility(Link.Visibility);
-  Addr->setAlignment(TInfo.AlignmentInBytes);
+  Addr->setAlignment(TInfo.TypeAlignment.getValue());
 
   Entry = Addr;
   return Addr;

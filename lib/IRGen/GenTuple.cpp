@@ -25,9 +25,27 @@
 
 #include "GenType.h"
 #include "IRGenModule.h"
+#include "LValue.h"
+#include "RValue.h"
 
 using namespace swift;
 using namespace irgen;
+
+namespace {
+  class TupleTypeInfo : public TypeInfo {
+  public:
+    TupleTypeInfo(llvm::Type *T, Size S, Alignment A) : TypeInfo(T, S, A) {}
+
+    RValue load(IRGenFunction &IGF, const LValue &LV) const {
+      // FIXME
+      return RValue();
+    }
+
+    void store(IRGenFunction &CGF, const RValue &RV, const LValue &LV) const {
+      // FIXME
+    }
+  };
+}
 
 const TypeInfo *
 TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
@@ -35,38 +53,39 @@ TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
   Elts.reserve(T->Fields.size());
 
   unsigned CurFieldNumber = 0;
-  uint64_t TupleSize = 0;
-  unsigned TupleAlignment = 0;
+  Size TupleSize;
+  Alignment TupleAlignment;
   
   // TODO: rearrange the tuple for optimal packing.
   for (const TupleTypeElt &Field : T->Fields) {
     const TypeInfo &FieldInfo = getFragileTypeInfo(IGM, Field.Ty);
-    assert(FieldInfo.AlignmentInBytes);
+    assert(FieldInfo.TypeAlignment);
 
     // Ignore zero-sized fields.
-    if (FieldInfo.SizeInBytes == 0) continue;
+    if (FieldInfo.TypeSize.isZero()) continue;
 
-    TupleAlignment = std::max(TupleAlignment, FieldInfo.AlignmentInBytes);
+    TupleAlignment = std::max(TupleAlignment, FieldInfo.TypeAlignment);
 
     // If the current tuple size isn't a multiple of the tuple
     // alignment, and the field's required alignment is more than its
     // IR preferred alignment, we need padding.
-    if (unsigned OffsetFromAlignment = TupleSize % TupleAlignment) {
-      unsigned FieldIRAlignment =
-        IGM.TargetData.getABITypeAlignment(FieldInfo.Type);
-      assert(FieldIRAlignment <= FieldInfo.AlignmentInBytes);
-      if (FieldIRAlignment != FieldInfo.AlignmentInBytes) {
-        unsigned PaddingRequired = TupleAlignment - OffsetFromAlignment;
+    if (Size OffsetFromAlignment = TupleSize % TupleAlignment) {
+      Alignment FieldIRAlignment(
+          IGM.TargetData.getABITypeAlignment(FieldInfo.Type));
+      assert(FieldIRAlignment <= FieldInfo.TypeAlignment);
+      if (FieldIRAlignment != FieldInfo.TypeAlignment) {
+        unsigned PaddingRequired
+          = TupleAlignment.getValue() - OffsetFromAlignment.getValue();
         Elts.push_back(llvm::ArrayType::get(IGM.Int8Ty, PaddingRequired));
         CurFieldNumber++;
 
-        TupleSize += PaddingRequired;
+        TupleSize += Size(PaddingRequired);
       }
     }
 
     Elts.push_back(FieldInfo.Type);
     CurFieldNumber++;
-    TupleSize += FieldInfo.SizeInBytes;
+    TupleSize += FieldInfo.TypeSize;
     // TODO: remember the field number somewhere so that we can do
     // access into this tuple properly.
   }
@@ -74,13 +93,13 @@ TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
   // If the tuple requires no storage at all, just use i8.  Most
   // clients will just ignore zero-size types, but those that care can
   // have a sensible one-byte type.
-  if (TupleSize == 0) {
-    return new TypeInfo(IGM.Int8Ty, 0, 1);
+  if (TupleSize.isZero()) {
+    return new TupleTypeInfo(IGM.Int8Ty, Size(0), Alignment(1));
   }
 
   // Otherwise, build a new, structural type.
   llvm::StructType *Converted
     = llvm::StructType::get(IGM.getLLVMContext(), Elts);
 
-  return new TypeInfo(Converted, TupleSize, TupleAlignment);
+  return new TupleTypeInfo(Converted, TupleSize, TupleAlignment);
 }
