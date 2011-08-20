@@ -62,7 +62,7 @@ private:
   void skipSlashStarComment();
   void lexIdentifier();
   void lexDollarIdent();
-  void lexPunctuationIdentifier();
+  void lexOperatorIdentifier();
   void lexDigit();
 };
   

@@ -38,8 +38,8 @@ namespace swift {
   class TranslationUnitDecl;
   class TypeAliasDecl;
   class FuncDecl;
-  class MethDecl;
   class VarDecl;
+  class NamedDecl;
   class OneOfType;
   class ASTContext;
   class DeclVarName;
@@ -135,7 +135,8 @@ public:
                         SmallVectorImpl<unsigned> &AccessPath,
                         VarDecl *VD,
                         SmallVectorImpl<Parser::ExprStmtOrDecl> &Decls);
-                        
+  void actOnNamedDecl(NamedDecl *D);
+  
   //===--------------------------------------------------------------------===//
   // Type Parsing
   

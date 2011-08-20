@@ -16,6 +16,7 @@
 
 #include "Lexer.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Identifier.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -165,17 +166,11 @@ void Lexer::lexIdentifier() {
   return formToken(Kind, TokStart);
 }
 
-/// isPunctuationIdentifierChar - Return true if the specified character is a
-/// valid part of a punctuation identifier.
-static bool isPunctuationIdentifierChar(char C) {
-  return strchr("/=-+*%<>!&|^", C) != 0;
-}
-
-/// lexPunctuationIdentifier - Match identifiers formed out of punctuation.
-void Lexer::lexPunctuationIdentifier() {
+/// lexOperatorIdentifier - Match identifiers formed out of punctuation.
+void Lexer::lexOperatorIdentifier() {
   const char *TokStart = CurPtr-1;
 
-  while (isPunctuationIdentifierChar(*CurPtr))
+  while (Identifier::isOperatorChar(*CurPtr))
     ++CurPtr;
   
   // Match various reserved words.
@@ -302,7 +297,7 @@ Restart:
     }
       
     // '/' starts an identifier.
-    return lexPunctuationIdentifier();
+    return lexOperatorIdentifier();
 
   case '=':
   case '-':
@@ -315,7 +310,7 @@ Restart:
   case '&':
   case '|':
   case '^':
-    return lexPunctuationIdentifier();
+    return lexOperatorIdentifier();
 
   case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G':
   case 'H': case 'I': case 'J': case 'K': case 'L': case 'M': case 'N':

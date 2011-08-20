@@ -50,6 +50,18 @@ public:
   
   bool empty() const { return Pointer == 0; }
   
+  /// isOperator - Return true if this identifier is an operator, false if it is
+  /// a normal identifier.
+  bool isOperator() const {
+    return !empty() && isOperatorChar(Pointer[0]);
+  }
+  
+  /// isOperatorChar - Return true if the specified character is a
+  /// valid part of an operator.
+  static bool isOperatorChar(char C) {
+    return strchr("/=-+*%<>!&|^", C) != 0;
+  }
+  
   static Identifier getFromOpaquePointer(void *P) {
     return Identifier((const char*)P);
   }

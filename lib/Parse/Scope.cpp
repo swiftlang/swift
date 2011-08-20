@@ -91,7 +91,9 @@ static void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New, Parser &P) {
 /// D1/D3 are valid overloads and we don't have to check all permutations.
 static bool checkValidOverload(const ValueDecl *D1, const ValueDecl *D2,
                                Parser &P) {
-  if (D1->Attrs.InfixPrecedence != D2->Attrs.InfixPrecedence) {
+  if (D1->Attrs.InfixPrecedence != D2->Attrs.InfixPrecedence &&
+      D1->Attrs.InfixPrecedence != -1 &&
+      D2->Attrs.InfixPrecedence != -1) {
     P.error(D1->getLocStart(),
             "infix precedence of functions in an overload set must match");
     P.note(D2->getLocStart(), "previous declaration here");

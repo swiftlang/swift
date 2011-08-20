@@ -260,20 +260,6 @@ static bool SemaCallExpr(CallExpr *E, TypeChecker &TC) {
 /// SemaUnaryExpr - Perform semantic analysis of unary expressions.
 static bool SemaUnaryExpr(Expr *&OpFn, Expr *&SubExpr, Type &ResultTy,
                           TypeChecker &TC) {
-  bool isUnary;
-  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(OpFn))
-    isUnary = DRE->D->Attrs.isUnary;
-  else if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(OpFn))
-    isUnary = OO->Decls[0]->Attrs.isUnary;
-  else
-    isUnary = false;
-  
-  if (!isUnary) {
-    TC.error(OpFn->getLocStart(),
-             "use of unary operator without 'unary' attribute specified");
-    return true;
-  }
-  
   // If this is an overloaded operator, try to resolve which candidate
   // is the right one.
   if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(OpFn)) {
@@ -283,6 +269,10 @@ static bool SemaUnaryExpr(Expr *&OpFn, Expr *&SubExpr, Type &ResultTy,
     
     for (unsigned i = 0, e = OO->Decls.size(); i != e; ++i) {
       ValueDecl *Fn = OO->Decls[i];
+      
+      // If this isn't a unary operator, filter it out.
+      if (!Fn->Attrs.isUnary)
+        continue;
       
       FunctionType *FnTy = cast<FunctionType>(Fn->Ty.getPointer());
       TupleType *Input = cast<TupleType>(FnTy->Input.getPointer());
@@ -320,6 +310,19 @@ static bool SemaUnaryExpr(Expr *&OpFn, Expr *&SubExpr, Type &ResultTy,
     return false;
   }
   
+  bool isUnary;
+  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(OpFn))
+    isUnary = DRE->D->Attrs.isUnary;
+  else
+    isUnary = false;
+  
+  if (!isUnary) {
+    TC.error(OpFn->getLocStart(),
+             "use of unary operator without 'unary' attribute specified");
+    return true;
+  }
+  
+
   // Parser verified that OpFn is a unary operator.  Sema verified that OpFn
   // takes a 1 element tuple as input.
   FunctionType *FnTy = cast<FunctionType>(OpFn->Ty.getPointer());
@@ -346,11 +349,13 @@ static bool SemaBinaryExpr(Expr *&LHS, Expr *&OpFn, Expr *&RHS, Type &ResultTy,
   // is the right one.
   if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(OpFn)) {
     // Pick the best candidate according to their conversion rank.
-    int BestCandidateFound = -1;
+    ValueDecl *BestCandidateFound = 0;
     Expr::ConversionRank BestRank = Expr::CR_Invalid;
     
-    for (unsigned i = 0, e = OO->Decls.size(); i != e; ++i) {
-      ValueDecl *Fn = OO->Decls[i];
+    for (ValueDecl *Fn : OO->Decls) {
+      // Ignore any infix operators mixed into the overload set.
+      if (Fn->Attrs.InfixPrecedence == -1)
+        continue;
       
       FunctionType *FnTy = cast<FunctionType>(Fn->Ty.getPointer());
       TupleType *Input = cast<TupleType>(FnTy->Input.getPointer());
@@ -369,7 +374,7 @@ static bool SemaBinaryExpr(Expr *&LHS, Expr *&OpFn, Expr *&RHS, Type &ResultTy,
       // If this is better than our previous candidate, use it!
       if (Rank < BestRank) {
         BestRank = Rank;
-        BestCandidateFound = i;
+        BestCandidateFound = Fn;
         continue;
       }
       
@@ -377,18 +382,49 @@ static bool SemaBinaryExpr(Expr *&LHS, Expr *&OpFn, Expr *&RHS, Type &ResultTy,
       // rank.  This means that the candidates at this rank are ambiguous with
       // respect to each other, so none can be used.  If something comes along
       // with a lower rank we can use it though.
-      BestCandidateFound = -1;
+      BestCandidateFound = 0;
     }
     
-    if (BestCandidateFound != -1) {
-      ValueDecl *Fn = OO->Decls[BestCandidateFound];
-      OpFn = new (TC.Context) DeclRefExpr(Fn, OO->Loc, Fn->Ty);
+    if (BestCandidateFound) {
+      OpFn = new (TC.Context) DeclRefExpr(BestCandidateFound, OO->Loc,
+                                          BestCandidateFound->Ty);
       return SemaBinaryExpr(LHS, OpFn, RHS, ResultTy, TC);
     }
+
+    // If we didn't find anything, and one of our operands is dependent, just
+    // wait until it resolves.
+    if (LHS->Ty->is<DependentType>()) {
+      ResultTy = LHS->Ty;
+      return false;
+    }  
+    if (RHS->Ty->is<DependentType>()) {
+      ResultTy = RHS->Ty;
+      return false;
+    }
     
-    // FIXME: Emit an error about overload resolution failure.
-    ResultTy = DependentType::get(TC.Context);
-    return false;
+    // Otherwise we have either an ambiguity between multiple possible
+    // candidates or no candidate at all.
+    if (BestRank == Expr::CR_Invalid)
+      TC.error(OpFn->getLocStart(), "no candidates found for binary operator");
+    else {
+      TC.error(OpFn->getLocStart(), "overloading ambiguity found");
+      
+      // Print out the candidate set.
+      for (auto Fn : OO->Decls) {
+        FunctionType *FnTy = cast<FunctionType>(Fn->Ty.getPointer());
+        TupleType *Input = cast<TupleType>(FnTy->Input.getPointer());
+
+        Expr::ConversionRank Rank =
+            std::max(LHS->getRankOfConversionTo(Input->getElementType(0),
+                                                TC.Context),
+                     RHS->getRankOfConversionTo(Input->getElementType(1),
+                                                TC.Context));
+
+        if (Rank == BestRank)
+          TC.note(Fn->getLocStart(), "found this candidate");
+      }
+    }
+    return true;
   }
   
   // Parser verified that OpFn has an Infix Precedence.  Sema verified that OpFn
@@ -736,14 +772,30 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
 
 /// getBinOp - If the specified expression is an infix binary operator, return
 /// its precedence, otherwise return -1.
-static int getBinOp(Expr *E) {
+static int getBinOp(Expr *E, TypeChecker &TC) {
   if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
     return DRE->D->Attrs.InfixPrecedence;
   
-  // If this is an overload set, the entire overload set is known to have the
+  // If this is an overload set, the entire overload set is required to have the
   // same precedence level.
-  if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E))
-    return OO->Decls[0]->Attrs.InfixPrecedence;
+  if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E)) {
+    int Precedence = -1;
+    for (auto D : OO->Decls) {
+      // It is possible some unary operators got mixed into the overload set.
+      if (D->Attrs.InfixPrecedence == -1)
+        continue;
+    
+      if (Precedence != -1 && Precedence != D->Attrs.InfixPrecedence) {
+        TC.error(E->getLocStart(),
+    "binary operator with multiple overloads of disagreeing precedence found");
+        return -2;
+      }
+      
+      Precedence = D->Attrs.InfixPrecedence;
+    }
+    
+    return Precedence;
+  }
   
   // Not a binary operator.
   return -1;
@@ -761,7 +813,7 @@ static Expr *ReduceBinaryExprs(SequenceExpr *E, unsigned &Elt,
     assert(Elt+2 < E->NumElements);
 
     Expr *LeftOperator = E->Elements[Elt+1];
-    int LeftPrecedence = getBinOp(LeftOperator);
+    int LeftPrecedence = getBinOp(LeftOperator, TC);
     if (LeftPrecedence < (int)MinPrec) {
       if (LeftPrecedence == -1)
         TC.error(LeftOperator->getLocStart(),
@@ -778,7 +830,8 @@ static Expr *ReduceBinaryExprs(SequenceExpr *E, unsigned &Elt,
     if (Elt+1 != E->NumElements) {
       assert(Elt+2 < E->NumElements);
       Expr *RightOperator = E->Elements[Elt+1];
-      int RightPrecedence = getBinOp(RightOperator);
+      int RightPrecedence = getBinOp(RightOperator, TC);
+      if (RightPrecedence == -2) return 0;
     
       // TODO: All operators are left associative at the moment.
     
@@ -1775,12 +1828,11 @@ bool TypeChecker::typeCheckValueDecl(ValueDecl *VD) {
     // If both a type and an initializer are specified, make sure the
     // initializer's type agrees (or converts) to the redundant type.
     checkBody(VD->Init, VD->Ty);
+    
     if (VD->Init == 0) {
       if (isa<VarDecl>(VD))
         note(VD->getLocStart(),
              "while converting 'var' initializer to declared type");
-      else
-        note(VD->getLocStart(), "while converting body to declared type");
     }
   }
   

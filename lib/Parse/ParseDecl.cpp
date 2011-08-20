@@ -168,6 +168,48 @@ void Parser::parseAttributeList(DeclAttributes &Attributes) {
   }
 }
 
+/// actOnNamedDecl - Validate that the attributes and other structure of the
+/// named decl makes sense.
+void Parser::actOnNamedDecl(NamedDecl *D) {
+  
+  if (D->Attrs.isInfix()) {
+    // Only var and func decls can be infix.
+    if (!isa<VarDecl>(D) && !isa<FuncDecl>(D)) {
+      error(D->getLocStart(), "declaration cannot be declared 'infix'");
+      D->Attrs.InfixPrecedence = -1;
+      return actOnNamedDecl(D);
+    }
+
+    if (!D->Name.isOperator()) {
+      error(D->getLocStart(), "only operators may be declared 'infix'");
+      D->Attrs.InfixPrecedence = -1;
+      return actOnNamedDecl(D);
+    }
+  }
+  
+  if (D->Attrs.isUnary) {
+    // Only var and func decls can be unary.
+    if (!isa<VarDecl>(D) && !isa<FuncDecl>(D)) {
+      error(D->getLocStart(), "declaration cannot be declared 'unary'");
+      D->Attrs.isUnary = false;
+      return actOnNamedDecl(D);
+    }
+    
+    if (!D->Name.isOperator()) {
+      error(D->getLocStart(), "only operators may be declared 'unary'");
+      D->Attrs.isUnary = false;
+      return actOnNamedDecl(D);
+    }
+  }
+  
+  if (D->Name.isOperator() && !D->Attrs.isUnary && !D->Attrs.isInfix()) {
+    error(D->getLocStart(), "operators must be declared 'infix' or 'unary'");
+    D->Name = Context.getIdentifier("");
+    return actOnNamedDecl(D);
+  }
+}
+
+
 /// parseDeclImport - Parse an 'import' declaration, returning null (and doing
 /// no token skipping) on error.
 ///
@@ -252,7 +294,9 @@ TypeAliasDecl *Parser::parseDeclTypeAlias() {
       parseType(Ty, "expected type in var declaration"))
     return 0;
 
-  return ScopeInfo.addTypeAliasToScope(TypeAliasLoc, Id, Ty);
+  TypeAliasDecl *TAD = ScopeInfo.addTypeAliasToScope(TypeAliasLoc, Id, Ty);
+  actOnNamedDecl(TAD);
+  return TAD;
 }
 
 
@@ -326,6 +370,7 @@ bool Parser::parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
                                         Init.getPtrOrNull(), Attributes);
     ScopeInfo.addToScope(VD);
     Decls.push_back(VD);
+    actOnNamedDecl(VD);
     return false;
   }
   
@@ -340,6 +385,7 @@ bool Parser::parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   // appropriate.
   SmallVector<unsigned, 8> AccessPath;
   actOnVarDeclName(VD->NestedName, AccessPath, VD, Decls);
+  actOnNamedDecl(VD);
   return false;
 }
 
@@ -426,8 +472,9 @@ FuncDecl *Parser::parseDeclFunc() {
   }
   
   // Create the decl for the func and add it to the parent scope.
-  FuncDecl *FD = new (Context) FuncDecl(FuncLoc, Name, FuncTy, FE,Attributes);
+  FuncDecl *FD = new (Context) FuncDecl(FuncLoc, Name, FuncTy, FE, Attributes);
   ScopeInfo.addToScope(FD);
+  actOnNamedDecl(FD);
   return FD;
 }
 
@@ -462,6 +509,7 @@ Decl *Parser::parseDeclOneOf() {
   if (parseTypeOneOfBody(OneOfLoc, Attributes, OneOfType, TAD))
     return 0;
 
+  actOnNamedDecl(TAD);
   return TAD;
 }
 
@@ -525,5 +573,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   assert(OneOfTy->Elements.size() == 1 && "Struct has exactly one element");
   ScopeInfo.addToScope(OneOfTy->getElement(0));
   Decls.push_back(OneOfTy->getElement(0));
+  
+  actOnNamedDecl(TAD);
   return false;
 }
