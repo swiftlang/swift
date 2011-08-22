@@ -503,14 +503,24 @@ public:
   static bool classof(const Expr *E) { return E->Kind == ExprKind::Unary; }
 };
   
-/// BinaryExpr - Infix binary expressions like 'x+y'.
+/// BinaryExpr - Infix binary expressions like 'x+y'.  The argument is always
+/// an implicit tuple expression of the type expected by the function.
 class BinaryExpr : public ApplyExpr {
 public:
-  Expr *LHS, *RHS;
+  Expr *Arg;
   
-  BinaryExpr(Expr *LHS, Expr *Fn, Expr *RHS, Type Ty = Type())
-    : ApplyExpr(ExprKind::Binary, Fn, Ty), LHS(LHS), RHS(RHS) {}
+  BinaryExpr(Expr *Fn, TupleExpr *Arg, Type Ty = Type())
+    : ApplyExpr(ExprKind::Binary, Fn, Ty), Arg(Arg) {}
 
+  /// getArgTuple - The argument is always a tuple literal.  This accessor
+  /// reinterprets it properly.
+  TupleExpr *getArgTuple() {
+    return cast<TupleExpr>(Arg);
+  }
+  const TupleExpr *getArgTuple() const {
+    return cast<TupleExpr>(Arg);
+  }
+                  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BinaryExpr *) { return true; }
   static bool classof(const Expr *E) { return E->Kind == ExprKind::Binary; }

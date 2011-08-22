@@ -342,8 +342,10 @@ static bool SemaUnaryExpr(Expr *&OpFn, Expr *&SubExpr, Type &ResultTy,
 
 
 /// SemaBinaryExpr - Perform semantic analysis of binary expressions.
-static bool SemaBinaryExpr(Expr *&LHS, Expr *&OpFn, Expr *&RHS, Type &ResultTy,
+static bool SemaBinaryExpr(Expr *&OpFn, Expr *&Arg, Type &ResultTy,
                            TypeChecker &TC) {
+  if (SemaTupleExpr(cast<TupleExpr>(Arg), TC)) return true;
+  
   // If this is an overloaded binary operator, try to resolve which candidate
   // is the right one.
   if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(OpFn)) {
@@ -357,14 +359,9 @@ static bool SemaBinaryExpr(Expr *&LHS, Expr *&OpFn, Expr *&RHS, Type &ResultTy,
         continue;
       
       FunctionType *FnTy = cast<FunctionType>(Fn->Ty.getPointer());
-      TupleType *Input = cast<TupleType>(FnTy->Input.getPointer());
-      assert(Input->Fields.size() == 2 &&"Sema error validating infix fn type");
+      Type Input = FnTy->Input;
 
-      Expr::ConversionRank Rank =
-        std::max(LHS->getRankOfConversionTo(Input->getElementType(0),
-                                            TC.Context),
-                 RHS->getRankOfConversionTo(Input->getElementType(1),
-                                            TC.Context));
+      Expr::ConversionRank Rank = Arg->getRankOfConversionTo(Input, TC.Context);
       
       // If this conversion is worst than our best candidate, ignore it.
       if (Rank > BestRank)
@@ -387,19 +384,15 @@ static bool SemaBinaryExpr(Expr *&LHS, Expr *&OpFn, Expr *&RHS, Type &ResultTy,
     if (BestCandidateFound) {
       OpFn = new (TC.Context) DeclRefExpr(BestCandidateFound, OO->Loc,
                                           BestCandidateFound->Ty);
-      return SemaBinaryExpr(LHS, OpFn, RHS, ResultTy, TC);
+      return SemaBinaryExpr(OpFn, Arg, ResultTy, TC);
     }
 
     // If we didn't find anything, and one of our operands is dependent, just
     // wait until it resolves.
-    if (LHS->Ty->is<DependentType>()) {
-      ResultTy = LHS->Ty;
+    if (Arg->Ty->is<DependentType>()) {
+      ResultTy = Arg->Ty;
       return false;
     }  
-    if (RHS->Ty->is<DependentType>()) {
-      ResultTy = RHS->Ty;
-      return false;
-    }
     
     // Otherwise we have either an ambiguity between multiple possible
     // candidates or no candidate at all.
@@ -411,13 +404,10 @@ static bool SemaBinaryExpr(Expr *&LHS, Expr *&OpFn, Expr *&RHS, Type &ResultTy,
       // Print out the candidate set.
       for (auto Fn : OO->Decls) {
         FunctionType *FnTy = cast<FunctionType>(Fn->Ty.getPointer());
-        TupleType *Input = cast<TupleType>(FnTy->Input.getPointer());
+        Type Input = FnTy->Input;
 
-        Expr::ConversionRank Rank =
-            std::max(LHS->getRankOfConversionTo(Input->getElementType(0),
-                                                TC.Context),
-                     RHS->getRankOfConversionTo(Input->getElementType(1),
-                                                TC.Context));
+        Expr::ConversionRank Rank = 
+          Arg->getRankOfConversionTo(Input, TC.Context);
 
         if (Rank == BestRank)
           TC.note(Fn->getLocStart(), "found this candidate");
@@ -429,23 +419,16 @@ static bool SemaBinaryExpr(Expr *&LHS, Expr *&OpFn, Expr *&RHS, Type &ResultTy,
   // Parser verified that OpFn has an Infix Precedence.  Sema verified that OpFn
   // only has InfixPrecedence if it takes a 2 element tuple as input.
   FunctionType *FnTy = cast<FunctionType>(OpFn->Ty.getPointer());
-  TupleType *Input = cast<TupleType>(FnTy->Input.getPointer());
-  assert(Input->Fields.size() == 2 && "Sema error validating infix fn type");
   
-  // Verify that the LHS/RHS have the right type and do conversions as needed.
-  LHS = TC.convertToType(LHS, Input->getElementType(0));
-  if (LHS == 0) {
+  // Convert the LHS/RHS of the binary operator to the expected function type.
+  Arg = TC.convertToType(Arg, FnTy->Input);
+  if (Arg == 0) {
     TC.note(OpFn->getLocStart(),
             "while converting left side of binary operator to expected type");
     return true;
   }
   
-  RHS = TC.convertToType(RHS, Input->getElementType(1));
-  if (RHS == 0) {
-    TC.note(OpFn->getLocStart(),
-            "while converting right side of binary operator to expected type");
-    return true;
-  }
+  assert(isa<TupleExpr>(Arg) && "Violated the BinaryExpr requirement");
   
   ResultTy = FnTy->Result;
   return false;
@@ -579,7 +562,7 @@ namespace {
     }
 
     Expr *visitBinaryExpr(BinaryExpr *E) {
-      if (SemaBinaryExpr(E->LHS, E->Fn, E->RHS, E->Ty, TC))
+      if (SemaBinaryExpr(E->Fn, E->Arg, E->Ty, TC))
         return 0;
       
       return E;
@@ -848,8 +831,12 @@ static Expr *ReduceBinaryExprs(SequenceExpr *E, unsigned &Elt,
     }
 
     // Okay, we've finished the parse, form the AST node for the binop now.
-    BinaryExpr *RBE = new (TC.Context) BinaryExpr(LHS, LeftOperator, RHS);
-    if (SemaBinaryExpr(RBE->LHS, RBE->Fn, RBE->RHS, RBE->Ty, TC))
+    Expr *ArgElts[] = { LHS, RHS };
+    Expr **ArgElts2 = TC.Context.AllocateCopy<Expr*>(ArgElts, ArgElts+2);
+    TupleExpr *Arg = new (TC.Context) TupleExpr(LHS->getLocStart(), ArgElts2, 0,
+                                                2, SMLoc(), false);
+    BinaryExpr *RBE = new (TC.Context) BinaryExpr(LeftOperator, Arg);
+    if (SemaBinaryExpr(RBE->Fn, RBE->Arg, RBE->Ty, TC))
       return 0;
 
     LHS = RBE;

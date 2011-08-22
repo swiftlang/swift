@@ -69,7 +69,7 @@ SMLoc Expr::getLocStart() const {
   case ExprKind::Unary:
     return cast<UnaryExpr>(this)->Fn->getLocStart();
   case ExprKind::Binary:
-    return cast<BinaryExpr>(this)->LHS->getLocStart();
+    return cast<BinaryExpr>(this)->Arg->getLocStart();
   }
   
   assert(0 && "expression type not handled!");
@@ -418,13 +418,16 @@ namespace {
     }
 
     Expr *visitBinaryExpr(BinaryExpr *E) {
-      Expr *E2 = doIt(E->LHS);
+      // Visit the arguments to the tuple.
+      TupleExpr *Arg = E->getArgTuple();
+      assert(Arg->NumSubExprs == 2);
+      Expr *E2 = doIt(Arg->SubExprs[0]);
       if (E2 == 0) return 0;
-      E->LHS = E2;
+      Arg->SubExprs[0] = E2;
       
-      E2 = doIt(E->RHS);
+      E2 = doIt(Arg->SubExprs[1]);
       if (E2 == 0) return 0;
-      E->RHS = E2;
+      Arg->SubExprs[1] = E2;
       return E;
     }
     
@@ -600,6 +603,8 @@ public:
     Indent -= 2;
   }
   
+  /// FIXME: This should use ExprWalker to print children.
+  
   void printRec(Decl *D) { D->print(OS, Indent+2); }
   void printRec(Stmt *S) { S->print(OS, Indent+2); }
 
@@ -718,9 +723,9 @@ public:
     else
       OS << "***UNKNOWN***";
     OS << "' type='" << E->Ty << "'\n";
-    printRec(E->LHS);
+    printRec(E->getArgTuple()->SubExprs[0]);
     OS << '\n';
-    printRec(E->RHS);
+    printRec(E->getArgTuple()->SubExprs[1]);
     OS << ')';
   }
 };
