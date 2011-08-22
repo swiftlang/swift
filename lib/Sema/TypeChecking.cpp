@@ -160,7 +160,13 @@ static bool SemaTupleExpr(TupleExpr *TE, TypeChecker &TC) {
   return false;
 }
 
-static bool SemaCallExpr(ApplyExpr *E, TypeChecker &TC) {
+static bool SemaApplyExpr(ApplyExpr *E, TypeChecker &TC) {
+  // If we have a BinaryExpr, make sure to recursively check the tuple argument.
+  if (BinaryExpr *BE = dyn_cast<BinaryExpr>(E)) {
+    if (SemaTupleExpr(BE->getArgTuple(), TC))
+      return true;
+  }
+  
   Expr *&E1 = E->Fn;
   Expr *&E2 = E->Arg;
 
@@ -248,120 +254,29 @@ static bool SemaCallExpr(ApplyExpr *E, TypeChecker &TC) {
   if (BestCandidateFound) {
     E1 = new (TC.Context) DeclRefExpr(BestCandidateFound, OS->Loc,
                                       BestCandidateFound->Ty);
-    return SemaCallExpr(E, TC);
+    return SemaApplyExpr(E, TC);
   }
   
   // Otherwise we have either an ambiguity between multiple possible candidates
   // or not candidate at all.
-  if (BestRank == Expr::CR_Invalid)
-    TC.error(E1->getLocStart(), "no candidates found for call");
-  else {
+  if (BestRank != Expr::CR_Invalid)
     TC.error(E1->getLocStart(), "overloading ambiguity found");
+  else if (isa<BinaryExpr>(E))
+    TC.error(E1->getLocStart(), "no candidates found for binary operator");
+  else if (isa<UnaryExpr>(E))
+    TC.error(E1->getLocStart(), "no candidates found for unary operator");
+  else
+    TC.error(E1->getLocStart(), "no candidates found for call");
     
-    // Print out the candidate set.
-    for (auto TheDecl : OS->Decls) {
-      Type ArgTy = TheDecl->Ty->getAs<FunctionType>()->Input;
-      if (E2->getRankOfConversionTo(ArgTy, TC.Context) != BestRank)
-        continue;
-      TC.note(TheDecl->getLocStart(), "found this candidate");
-    }
+  // Print out the candidate set.
+  for (auto TheDecl : OS->Decls) {
+    Type ArgTy = TheDecl->Ty->getAs<FunctionType>()->Input;
+    if (E2->getRankOfConversionTo(ArgTy, TC.Context) != BestRank)
+      continue;
+    TC.note(TheDecl->getLocStart(), "found this candidate");
   }
   return true;
 }
-
-/// SemaBinaryExpr - Perform semantic analysis of binary expressions.
-static bool SemaBinaryExpr(Expr *&OpFn, Expr *&Arg, Type &ResultTy,
-                           TypeChecker &TC) {
-  if (SemaTupleExpr(cast<TupleExpr>(Arg), TC)) return true;
-  
-  // If this is an overloaded binary operator, try to resolve which candidate
-  // is the right one.
-  if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(OpFn)) {
-    // Pick the best candidate according to their conversion rank.
-    ValueDecl *BestCandidateFound = 0;
-    Expr::ConversionRank BestRank = Expr::CR_Invalid;
-    
-    for (ValueDecl *Fn : OO->Decls) {
-      // Ignore any infix operators mixed into the overload set.
-      if (Fn->Attrs.InfixPrecedence == -1)
-        continue;
-      
-      FunctionType *FnTy = cast<FunctionType>(Fn->Ty.getPointer());
-      Type Input = FnTy->Input;
-
-      Expr::ConversionRank Rank = Arg->getRankOfConversionTo(Input, TC.Context);
-      
-      // If this conversion is worst than our best candidate, ignore it.
-      if (Rank > BestRank)
-        continue;
-      
-      // If this is better than our previous candidate, use it!
-      if (Rank < BestRank) {
-        BestRank = Rank;
-        BestCandidateFound = Fn;
-        continue;
-      }
-      
-      // Otherwise, this is a repeat of an existing candidate with the same
-      // rank.  This means that the candidates at this rank are ambiguous with
-      // respect to each other, so none can be used.  If something comes along
-      // with a lower rank we can use it though.
-      BestCandidateFound = 0;
-    }
-    
-    if (BestCandidateFound) {
-      OpFn = new (TC.Context) DeclRefExpr(BestCandidateFound, OO->Loc,
-                                          BestCandidateFound->Ty);
-      return SemaBinaryExpr(OpFn, Arg, ResultTy, TC);
-    }
-
-    // If we didn't find anything, and one of our operands is dependent, just
-    // wait until it resolves.
-    if (Arg->Ty->is<DependentType>()) {
-      ResultTy = Arg->Ty;
-      return false;
-    }  
-    
-    // Otherwise we have either an ambiguity between multiple possible
-    // candidates or no candidate at all.
-    if (BestRank == Expr::CR_Invalid)
-      TC.error(OpFn->getLocStart(), "no candidates found for binary operator");
-    else {
-      TC.error(OpFn->getLocStart(), "overloading ambiguity found");
-      
-      // Print out the candidate set.
-      for (auto Fn : OO->Decls) {
-        FunctionType *FnTy = cast<FunctionType>(Fn->Ty.getPointer());
-        Type Input = FnTy->Input;
-
-        Expr::ConversionRank Rank = 
-          Arg->getRankOfConversionTo(Input, TC.Context);
-
-        if (Rank == BestRank)
-          TC.note(Fn->getLocStart(), "found this candidate");
-      }
-    }
-    return true;
-  }
-  
-  // Parser verified that OpFn has an Infix Precedence.  Sema verified that OpFn
-  // only has InfixPrecedence if it takes a 2 element tuple as input.
-  FunctionType *FnTy = cast<FunctionType>(OpFn->Ty.getPointer());
-  
-  // Convert the LHS/RHS of the binary operator to the expected function type.
-  Arg = TC.convertToType(Arg, FnTy->Input);
-  if (Arg == 0) {
-    TC.note(OpFn->getLocStart(),
-            "while converting left side of binary operator to expected type");
-    return true;
-  }
-  
-  assert(isa<TupleExpr>(Arg) && "Violated the BinaryExpr requirement");
-  
-  ResultTy = FnTy->Result;
-  return false;
-}
-
 
 //===----------------------------------------------------------------------===//
 // Expression Reanalysis - SemaExpressionTree
@@ -478,20 +393,20 @@ namespace {
     }
     
     Expr *visitCallExpr(CallExpr *E) {
-      if (SemaCallExpr(E, TC))
+      if (SemaApplyExpr(E, TC))
         return 0;
       return E;
     }
 
     Expr *visitUnaryExpr(UnaryExpr *E) {
-      if (SemaCallExpr(E, TC))
+      if (SemaApplyExpr(E, TC))
         return 0;
       
       return E;
     }
 
     Expr *visitBinaryExpr(BinaryExpr *E) {
-      if (SemaBinaryExpr(E->Fn, E->Arg, E->Ty, TC))
+      if (SemaApplyExpr(E, TC))
         return 0;
       
       return E;
@@ -666,7 +581,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
                                                 DependentType::get(TC.Context));
 
     CallExpr *Call = new (TC.Context) CallExpr(FnRef, E->SubExpr, Type());
-    if (SemaCallExpr(Call, TC))
+    if (SemaApplyExpr(Call, TC))
       return 0;
     
     return Call;
@@ -765,7 +680,7 @@ static Expr *ReduceBinaryExprs(SequenceExpr *E, unsigned &Elt,
     TupleExpr *Arg = new (TC.Context) TupleExpr(LHS->getLocStart(), ArgElts2, 0,
                                                 2, SMLoc(), false);
     BinaryExpr *RBE = new (TC.Context) BinaryExpr(LeftOperator, Arg);
-    if (SemaBinaryExpr(RBE->Fn, RBE->Arg, RBE->Ty, TC))
+    if (SemaApplyExpr(RBE, TC))
       return 0;
 
     LHS = RBE;
@@ -1020,7 +935,7 @@ namespace {
 
           // FIXME: Preserve source locations.
           E->Fn = new (TC.Context) DeclRefExpr(DED, UME->ColonLoc, DED->Ty);
-          if (SemaCallExpr(E, TC))
+          if (SemaApplyExpr(E, TC))
             return 0;
             
           return E;
