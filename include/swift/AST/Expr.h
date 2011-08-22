@@ -461,9 +461,12 @@ class ApplyExpr : public Expr {
 public:
   /// Fn - The function being called.
   Expr *Fn;
-  
-  ApplyExpr(ExprKind Kind, Expr *Fn, Type Ty = Type())
-    : Expr(Kind, Ty), Fn(Fn) {
+
+  /// Argument - The one argument being passed to it.
+  Expr *Arg;
+
+  ApplyExpr(ExprKind Kind, Expr *Fn, Expr *Arg, Type Ty = Type())
+    : Expr(Kind, Ty), Fn(Fn), Arg(Arg) {
     assert(classof((Expr*)this) && "ApplyExpr::classof out of date");
   }
   
@@ -480,10 +483,8 @@ public:
 /// leading '(' is unspaced.
 class CallExpr : public ApplyExpr {
 public:
-  /// Argument - The one argument being passed to it.
-  Expr *Arg;
   CallExpr(Expr *Fn, Expr *Arg, Type Ty)
-    : ApplyExpr(ExprKind::Call, Fn, Ty), Arg(Arg) {}
+    : ApplyExpr(ExprKind::Call, Fn, Arg, Ty) {}
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const CallExpr *) { return true; }
@@ -493,10 +494,8 @@ public:
 /// UnaryExpr - Prefix unary expressions like '!y'.
 class UnaryExpr : public ApplyExpr {
 public:
-  Expr *SubExpr;
-  
-  UnaryExpr(Expr *Fn, Expr *SubExpr, Type Ty = Type())
-    : ApplyExpr(ExprKind::Unary, Fn, Ty), SubExpr(SubExpr) {}
+  UnaryExpr(Expr *Fn, Expr *Arg, Type Ty = Type())
+    : ApplyExpr(ExprKind::Unary, Fn, Arg, Ty) {}
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnaryExpr *) { return true; }
@@ -507,10 +506,8 @@ public:
 /// an implicit tuple expression of the type expected by the function.
 class BinaryExpr : public ApplyExpr {
 public:
-  Expr *Arg;
-  
   BinaryExpr(Expr *Fn, TupleExpr *Arg, Type Ty = Type())
-    : ApplyExpr(ExprKind::Binary, Fn, Ty), Arg(Arg) {}
+    : ApplyExpr(ExprKind::Binary, Fn, Arg, Ty) {}
 
   /// getArgTuple - The argument is always a tuple literal.  This accessor
   /// reinterprets it properly.

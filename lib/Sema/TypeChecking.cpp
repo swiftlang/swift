@@ -527,11 +527,6 @@ namespace {
       return E;
     }
     
-    Expr *visitCallExpr(CallExpr *E) {
-      if (SemaCallExpr(E, TC))
-        return 0;
-      return E;
-    }
     Expr *visitSequenceExpr(SequenceExpr *E);
     
     void PreProcessBraceStmt(BraceStmt *BS);
@@ -554,8 +549,14 @@ namespace {
       return E;
     }
     
+    Expr *visitCallExpr(CallExpr *E) {
+      if (SemaCallExpr(E, TC))
+        return 0;
+      return E;
+    }
+
     Expr *visitUnaryExpr(UnaryExpr *E) {
-      if (SemaUnaryExpr(E->Fn, E->SubExpr, E->Ty, TC))
+      if (SemaUnaryExpr(E->Fn, E->Arg, E->Ty, TC))
         return 0;
       
       return E;

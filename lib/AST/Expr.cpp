@@ -411,9 +411,9 @@ namespace {
       if (E2 == 0) return 0;
       E->Fn = E2;
       
-      E2 = doIt(E->SubExpr);
+      E2 = doIt(E->Arg);
       if (E2 == 0) return 0;
-      E->SubExpr = E2;
+      E->Arg = E2;
       return E;
     }
 
@@ -711,7 +711,7 @@ public:
     else
       OS << "***UNKNOWN***";
     OS << "' type='" << E->Ty << "'\n";
-    printRec(E->SubExpr);
+    printRec(E->Arg);
     OS << ')';
   }
   void visitBinaryExpr(BinaryExpr *E) {
