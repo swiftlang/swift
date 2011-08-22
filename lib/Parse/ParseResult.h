@@ -42,7 +42,7 @@ public:
   
   /// When constructed from a NullablePtr, we know that this is a Sema result,
   /// so we either have a valid value or a SemaError.
-  ParseResult(NullablePtr<T> Arg) {
+  ParseResult(llvm::NullablePtr<T> Arg) {
     if (Arg.isNull())
       Value = (T*)2;
     else
@@ -58,7 +58,7 @@ public:
   }
   
   static ParseResult getSemaError() {
-    return ParseResult(NullablePtr<T>());
+    return ParseResult(llvm::NullablePtr<T>());
   }
   
   bool isAbsent() const { return Value == 0; }
