@@ -15,12 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "Parser.h"
-#include "ParseResult.h"
-#include "Scope.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
-#include "swift/AST/Types.h"
-#include "swift/AST/ASTContext.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 

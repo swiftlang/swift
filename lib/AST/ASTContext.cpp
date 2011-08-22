@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Types.h"
 #include "llvm/Support/Allocator.h"

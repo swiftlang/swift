@@ -17,9 +17,10 @@
 #ifndef SWIFT_PARSER_H
 #define SWIFT_PARSER_H
 
+#include "ParseResult.h"
 #include "Scope.h"
 #include "Token.h"
-#include "swift/AST/Type.h"
+#include "swift/AST/AST.h"
 
 namespace llvm {
   class SourceMgr;
@@ -28,24 +29,7 @@ namespace llvm {
 
 namespace swift {
   class Lexer;
-  class Expr;
-  class FuncExpr;
-  class Stmt;
-  class BraceStmt;
-  class Type;
-  class Decl;
-  class DeclAttributes;
-  class TranslationUnitDecl;
-  class TypeAliasDecl;
-  class FuncDecl;
-  class VarDecl;
-  class NamedDecl;
-  class OneOfType;
-  class ASTContext;
-  class DeclVarName;
-  class TupleTypeElt;
   class ScopeInfo;
-  template<typename T> class ParseResult;
   
   struct OneOfElementInfo;
 

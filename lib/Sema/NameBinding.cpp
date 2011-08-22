@@ -15,11 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Subsystems.h"
-#include "swift/AST/ASTContext.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
-#include "swift/AST/Stmt.h"
-#include "swift/AST/Types.h"
+#include "swift/AST/AST.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/TinyPtrVector.h"

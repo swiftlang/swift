@@ -17,9 +17,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Subsystems.h"
-#include "swift/AST/ASTContext.h"
+#include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/Types.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/SourceMgr.h"
