@@ -45,13 +45,13 @@ enum class ExprKind {
   UnresolvedDot,
   TupleElement,
   TupleShuffle,
-  Call,
   Sequence,
   Func,
   Closure,
   AnonClosureArg,
+  Call,      First_ApplyExpr = Call,
   Unary,
-  Binary
+  Binary,    Last_ApplyExpr = Binary
 };
   
   
@@ -383,24 +383,6 @@ public:
   }
 };
   
-  
-/// CallExpr - Application of an argument to a function, which occurs
-/// syntactically through juxtaposition with a TupleExpr whose
-/// leading '(' is unspaced.
-class CallExpr : public Expr {
-public:
-  /// Fn - The function being invoked.
-  Expr *Fn;
-  /// Argument - The one argument being passed to it.
-  Expr *Arg;
-  CallExpr(Expr *fn, Expr *arg, Type Ty)
-    : Expr(ExprKind::Call, Ty), Fn(fn), Arg(arg) {}
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const CallExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == ExprKind::Call; }
-};
-
 /// SequenceExpr - a series of expressions which should be evaluated
 /// sequentially, e.g. foo()  bar().
 class SequenceExpr : public Expr {
@@ -473,13 +455,48 @@ public:
   }
 };
   
-/// UnaryExpr - Prefix unary expressions like '!y'.
-class UnaryExpr : public Expr {
+/// ApplyExpr - Superclass of various function calls, which apply an argument to
+/// a function to get a result.
+class ApplyExpr : public Expr {
 public:
-  Expr *Fn, *SubExpr;
+  /// Fn - The function being called.
+  Expr *Fn;
+  
+  ApplyExpr(ExprKind Kind, Expr *Fn, Type Ty = Type())
+    : Expr(Kind, Ty), Fn(Fn) {
+    assert(classof((Expr*)this) && "ApplyExpr::classof out of date");
+  }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ApplyExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->Kind >= ExprKind::First_ApplyExpr &&
+           E->Kind <= ExprKind::Last_ApplyExpr;
+  }
+};
+  
+/// CallExpr - Application of an argument to a function, which occurs
+/// syntactically through juxtaposition with a TupleExpr whose
+/// leading '(' is unspaced.
+class CallExpr : public ApplyExpr {
+public:
+  /// Argument - The one argument being passed to it.
+  Expr *Arg;
+  CallExpr(Expr *Fn, Expr *Arg, Type Ty)
+    : ApplyExpr(ExprKind::Call, Fn, Ty), Arg(Arg) {}
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const CallExpr *) { return true; }
+  static bool classof(const Expr *E) { return E->Kind == ExprKind::Call; }
+};
+  
+/// UnaryExpr - Prefix unary expressions like '!y'.
+class UnaryExpr : public ApplyExpr {
+public:
+  Expr *SubExpr;
   
   UnaryExpr(Expr *Fn, Expr *SubExpr, Type Ty = Type())
-    : Expr(ExprKind::Unary, Ty), Fn(Fn), SubExpr(SubExpr) {}
+    : ApplyExpr(ExprKind::Unary, Fn, Ty), SubExpr(SubExpr) {}
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnaryExpr *) { return true; }
@@ -487,12 +504,12 @@ public:
 };
   
 /// BinaryExpr - Infix binary expressions like 'x+y'.
-class BinaryExpr : public Expr {
+class BinaryExpr : public ApplyExpr {
 public:
-  Expr *LHS, *Fn, *RHS;
+  Expr *LHS, *RHS;
   
-  BinaryExpr(Expr *lhs, Expr *fn, Expr *rhs, Type Ty = Type())
-    : Expr(ExprKind::Binary, Ty), LHS(lhs), Fn(fn), RHS(rhs) {}
+  BinaryExpr(Expr *LHS, Expr *Fn, Expr *RHS, Type Ty = Type())
+    : ApplyExpr(ExprKind::Binary, Fn, Ty), LHS(LHS), RHS(RHS) {}
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BinaryExpr *) { return true; }
