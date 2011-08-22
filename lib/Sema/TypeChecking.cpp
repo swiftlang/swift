@@ -160,12 +160,25 @@ static bool SemaTupleExpr(TupleExpr *TE, TypeChecker &TC) {
   return false;
 }
 
-static bool SemaCallExpr(CallExpr *E, TypeChecker &TC) {
+static bool SemaCallExpr(ApplyExpr *E, TypeChecker &TC) {
   Expr *&E1 = E->Fn;
   Expr *&E2 = E->Arg;
 
   // If we have a concrete function type, then we win.
   if (FunctionType *FT = E1->Ty->getAs<FunctionType>()) {
+    // If this is an operator, make sure that the declaration found was declared
+    // as such.
+    if (isa<UnaryExpr>(E) && !cast<DeclRefExpr>(E1)->D->Attrs.isUnary) {
+      TC.error(E1->getLocStart(),
+               "use of unary operator without 'unary' attribute specified");
+      return true;
+    } else if (isa<BinaryExpr>(E) &&
+               !cast<DeclRefExpr>(E1)->D->Attrs.isInfix()) {
+      TC.error(E1->getLocStart(),
+               "use of unary operator without 'unary' attribute specified");
+      return true;
+    }
+    
     // We have a function application.  Check that the argument type matches the
     // expected type of the function.
     E2 = TC.convertToType(E2, FT->Input);
@@ -173,12 +186,13 @@ static bool SemaCallExpr(CallExpr *E, TypeChecker &TC) {
       TC.note(E1->getLocStart(),
               "while converting function argument to expected type");
       return true;
-    }  
+    }
+    
     E->Ty = FT->Result;
     return false;
   }
   
-  // Otherwise, the function type must be dependent.  If it is something else,
+  // Otherwise, the function's type must be dependent.  If it is something else,
   // we have a type error.
   if (!E1->Ty->is<DependentType>()) {
     TC.error(E1->getLocStart(), "called expression isn't a function");
@@ -203,14 +217,13 @@ static bool SemaCallExpr(CallExpr *E, TypeChecker &TC) {
     return false;
   }
 
-  int BestCandidateFound = -1;
+  ValueDecl *BestCandidateFound = 0;
   Expr::ConversionRank BestRank = Expr::CR_Invalid;
   
-  for (unsigned i = 0, e = OS->Decls.size(); i != e; ++i) {
-    Type ArgTy = OS->Decls[i]->Ty->getAs<FunctionType>()->Input;
+  for (ValueDecl *Fn : OS->Decls) {
+    Type ArgTy = Fn->Ty->getAs<FunctionType>()->Input;
     // If we found an exact match, disambiguate the overload set.
-    Expr::ConversionRank Rank =
-      E2->getRankOfConversionTo(ArgTy, TC.Context);
+    Expr::ConversionRank Rank = E2->getRankOfConversionTo(ArgTy, TC.Context);
     
     // If this conversion is worst than our best candidate, ignore it.
     if (Rank > BestRank)
@@ -219,7 +232,7 @@ static bool SemaCallExpr(CallExpr *E, TypeChecker &TC) {
     // If this is better than our previous candidate, use it!
     if (Rank < BestRank) {
       BestRank = Rank;
-      BestCandidateFound = i;
+      BestCandidateFound = Fn;
       continue;
     }
     
@@ -227,14 +240,14 @@ static bool SemaCallExpr(CallExpr *E, TypeChecker &TC) {
     // rank.  This means that the candidates at this rank are ambiguous with
     // respect to each other, so none can be used.  If something comes along
     // with a lower rank we can use it though.
-    BestCandidateFound = -1;
+    BestCandidateFound = 0;
   }
   
   // If we found a successful match, resolve the overload set to it and continue
   // type checking.
-  if (BestCandidateFound != -1) {
-    E1 = new (TC.Context) DeclRefExpr(OS->Decls[BestCandidateFound], OS->Loc,
-                                      OS->Decls[BestCandidateFound]->Ty);
+  if (BestCandidateFound) {
+    E1 = new (TC.Context) DeclRefExpr(BestCandidateFound, OS->Loc,
+                                      BestCandidateFound->Ty);
     return SemaCallExpr(E, TC);
   }
   
@@ -255,91 +268,6 @@ static bool SemaCallExpr(CallExpr *E, TypeChecker &TC) {
   }
   return true;
 }
-
-/// SemaUnaryExpr - Perform semantic analysis of unary expressions.
-static bool SemaUnaryExpr(Expr *&OpFn, Expr *&SubExpr, Type &ResultTy,
-                          TypeChecker &TC) {
-  // If this is an overloaded operator, try to resolve which candidate
-  // is the right one.
-  if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(OpFn)) {
-    // Pick the best candidate according to their conversion rank.
-    int BestCandidateFound = -1;
-    Expr::ConversionRank BestRank = Expr::CR_Invalid;
-    
-    for (unsigned i = 0, e = OO->Decls.size(); i != e; ++i) {
-      ValueDecl *Fn = OO->Decls[i];
-      
-      // If this isn't a unary operator, filter it out.
-      if (!Fn->Attrs.isUnary)
-        continue;
-      
-      FunctionType *FnTy = cast<FunctionType>(Fn->Ty.getPointer());
-      TupleType *Input = cast<TupleType>(FnTy->Input.getPointer());
-      assert(Input->Fields.size() == 1 &&"Sema error validating unary fn type");
-      
-      Expr::ConversionRank Rank =
-        SubExpr->getRankOfConversionTo(Input->getElementType(0), TC.Context);
-      
-      // If this conversion is worst than our best candidate, ignore it.
-      if (Rank > BestRank)
-        continue;
-      
-      // If this is better than our previous candidate, use it!
-      if (Rank < BestRank) {
-        BestRank = Rank;
-        BestCandidateFound = i;
-        continue;
-      }
-      
-      // Otherwise, this is a repeat of an existing candidate with the same
-      // rank.  This means that the candidates at this rank are ambiguous with
-      // respect to each other, so none can be used.  If something comes along
-      // with a lower rank we can use it though.
-      BestCandidateFound = -1;
-    }
-    
-    if (BestCandidateFound != -1) {
-      ValueDecl *Fn = OO->Decls[BestCandidateFound];
-      OpFn = new (TC.Context) DeclRefExpr(Fn, OO->Loc, Fn->Ty);
-      return SemaUnaryExpr(OpFn, SubExpr, ResultTy, TC);
-    }
-    
-    // FIXME: Emit an error about overload resolution failure.
-    ResultTy = DependentType::get(TC.Context);
-    return false;
-  }
-  
-  bool isUnary;
-  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(OpFn))
-    isUnary = DRE->D->Attrs.isUnary;
-  else
-    isUnary = false;
-  
-  if (!isUnary) {
-    TC.error(OpFn->getLocStart(),
-             "use of unary operator without 'unary' attribute specified");
-    return true;
-  }
-  
-
-  // Parser verified that OpFn is a unary operator.  Sema verified that OpFn
-  // takes a 1 element tuple as input.
-  FunctionType *FnTy = cast<FunctionType>(OpFn->Ty.getPointer());
-  TupleType *Input = cast<TupleType>(FnTy->Input.getPointer());
-  assert(Input->Fields.size() == 1 && "Sema error validating unary fn type");
-  
-  // Verify that the LHS/RHS have the right type and do conversions as needed.
-  SubExpr = TC.convertToType(SubExpr, Input->getElementType(0));
-  if (SubExpr == 0) {
-    TC.note(OpFn->getLocStart(),
-            "while converting operand of unary operator to expected type");
-    return true;
-  }
-    
-  ResultTy = FnTy->Result;
-  return false;
-}
-
 
 /// SemaBinaryExpr - Perform semantic analysis of binary expressions.
 static bool SemaBinaryExpr(Expr *&OpFn, Expr *&Arg, Type &ResultTy,
@@ -556,7 +484,7 @@ namespace {
     }
 
     Expr *visitUnaryExpr(UnaryExpr *E) {
-      if (SemaUnaryExpr(E->Fn, E->Arg, E->Ty, TC))
+      if (SemaCallExpr(E, TC))
         return 0;
       
       return E;
