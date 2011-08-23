@@ -33,6 +33,13 @@ public:
   bool validateType(ValueDecl *VD);
   bool validateType(Type T);
   
+  bool semaApplyExpr(ApplyExpr *E);
+  
+  Expr *typeCheckExpression(Expr *E);
+  void typeCheckTranslationUnit(TranslationUnitDecl *D);
+  
+  
+  
   void typeCheck(TypeAliasDecl *TAD);
   
   void typeCheck(ValueDecl *VD) {
