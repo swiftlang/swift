@@ -40,6 +40,10 @@ public:
   void typeCheckTranslationUnit(TranslationUnitDecl *D);
   
   
+  bool bindAndValidateClosureArgs(Expr *Body, Type FuncInput);
+
+  
+  
   
   void typeCheck(TypeAliasDecl *TAD);
   
