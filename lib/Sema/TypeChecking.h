@@ -33,6 +33,7 @@ public:
   bool validateType(ValueDecl *VD);
   bool validateType(Type T);
   
+  bool semaTupleExpr(TupleExpr *TE);
   bool semaApplyExpr(ApplyExpr *E);
   
   Expr *typeCheckExpression(Expr *E);

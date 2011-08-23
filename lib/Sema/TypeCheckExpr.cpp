@@ -25,7 +25,7 @@ using namespace swift;
 // Expression Semantic Analysis Routines
 //===----------------------------------------------------------------------===//
 
-static bool SemaTupleExpr(TupleExpr *TE, TypeChecker &TC) {
+bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
   // A tuple expr with a single subexpression and no name is just a grouping
   // paren.
   if (TE->isGroupingParen()) {
@@ -67,14 +67,14 @@ static bool SemaTupleExpr(TupleExpr *TE, TypeChecker &TC) {
       ResultTyElts[i].Name = TE->SubExprNames[i];
   }
   
-  TE->Ty = TupleType::get(ResultTyElts, TC.Context);
+  TE->Ty = TupleType::get(ResultTyElts, Context);
   return false;
 }
 
 bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // If we have a BinaryExpr, make sure to recursively check the tuple argument.
   if (BinaryExpr *BE = dyn_cast<BinaryExpr>(E)) {
-    if (SemaTupleExpr(BE->getArgTuple(), *this))
+    if (semaTupleExpr(BE->getArgTuple()))
       return true;
   }
   
@@ -245,7 +245,7 @@ public:
   }
   
   Expr *visitTupleExpr(TupleExpr *E) {
-    if (SemaTupleExpr(E, TC))
+    if (TC.semaTupleExpr(E))
       return 0;
     return E;
   }
