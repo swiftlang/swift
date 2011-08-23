@@ -25,32 +25,6 @@ using namespace swift;
 // Expression Semantic Analysis Routines
 //===----------------------------------------------------------------------===//
 
-// Each expression node has an implementation here, which takes the properties
-// of the expression, validates it and computes a result type.  This is shared
-// logic between the Sema Action implementations and type inferencing code.
-//
-// These each produce diagnostics and return true on error.  On success, they
-// may mutate the input values, then return false.
-
-static bool SemaDeclRefExpr(ValueDecl *D, SMLoc Loc, Type &ResultTy,
-                            TypeChecker &TC) {
-  if (D == 0) {
-    TC.error(Loc, "use of undeclared identifier");
-    return true;
-  }
-  
-  // If the decl had an invalid type, then an error has already been emitted,
-  // just propagate it up.
-  if (D->Ty->is<ErrorType>())
-    return true;
-  
-  // TODO: QOI: If the decl had an "invalid" bit set, then return the error
-  // object to improve error recovery.
-  
-  ResultTy = D->Ty;
-  return false;
-}
-
 static bool SemaTupleExpr(TupleExpr *TE, TypeChecker &TC) {
   // A tuple expr with a single subexpression and no name is just a grouping
   // paren.
@@ -225,7 +199,7 @@ namespace {
 /// SemaExpressionTree - This class implements bottom-up (aka "leaf to root",
 /// analyzing 1 and 4 before the + in "1+4") semantic analysis of an
 /// already-existing expression tree.  This is performed when a closure is
-/// formed and anonymous decls like "_4" get a concrete type associated with
+/// formed and anonymous decls like "$4" get a concrete type associated with
 /// them.  During the initial parse, these decls get a 'dependent' type, which
 /// disables most semantic analysis associated with them.
 ///
@@ -242,7 +216,19 @@ public:
     return E;
   }
   Expr *visitDeclRefExpr(DeclRefExpr *E) {
-    if (SemaDeclRefExpr(E->D, E->Loc, E->Ty, TC)) return 0;
+    if (E->D == 0) {
+      TC.error(E->Loc, "use of undeclared identifier");
+      return 0;
+    }
+    
+    // If the decl had an invalid type, then an error has already been emitted,
+    // just propagate it up.
+    if (E->D->Ty->is<ErrorType>())
+      return 0;
+    
+    // TODO: QOI: If the decl had an "invalid" bit set, then return the error
+    // object to improve error recovery.
+    E->Ty = E->D->Ty;
     return E;
   }
   Expr *visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
