@@ -309,12 +309,10 @@ public:
 };
 
 /// UnresolvedDotExpr - A field access (foo.bar) on an expression with dependent
-/// type.  Before type checking, the SubExpr is null (because we don't know how
-/// much is bound), and during TypeChecking SubExpr may be bound to a
-/// subexpression.
+/// type.
 class UnresolvedDotExpr : public Expr {
 public:
-  Expr *SubExpr;       // Can be null!
+  Expr *SubExpr;
   SMLoc DotLoc;
   Identifier Name;
   SMLoc NameLoc;

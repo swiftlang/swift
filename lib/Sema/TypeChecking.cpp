@@ -392,25 +392,13 @@ namespace {
       return E;
     }
     
-    Expr *visitCallExpr(CallExpr *E) {
-      if (SemaApplyExpr(E, TC))
-        return 0;
-      return E;
+    
+    Expr *visitApplyExpr(ApplyExpr *E) {
+      return SemaApplyExpr(E, TC) ? 0 : E;
     }
-
-    Expr *visitUnaryExpr(UnaryExpr *E) {
-      if (SemaApplyExpr(E, TC))
-        return 0;
-      
-      return E;
-    }
-
-    Expr *visitBinaryExpr(BinaryExpr *E) {
-      if (SemaApplyExpr(E, TC))
-        return 0;
-      
-      return E;
-    }
+    Expr *visitCallExpr(CallExpr *E) { return visitApplyExpr(E); }
+    Expr *visitUnaryExpr(UnaryExpr *E) { return visitApplyExpr(E); }
+    Expr *visitBinaryExpr(BinaryExpr *E) { return visitApplyExpr(E); }
 
     Stmt *visitSemiStmt(SemiStmt *S) {
       return S;
