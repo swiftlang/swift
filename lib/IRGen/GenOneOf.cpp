@@ -176,7 +176,10 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
   // Otherwise, we need a discriminator.
   llvm::Type *DiscriminatorType;
   Size DiscriminatorSize;
-  if (T->Elements.size() <= (1 << 8)) {
+  if (T->Elements.size() == 2) {
+    DiscriminatorType = IGM.Int1Ty;
+    DiscriminatorSize = Size(1);
+  } else if (T->Elements.size() <= (1 << 8)) {
     DiscriminatorType = IGM.Int8Ty;
     DiscriminatorSize = Size(1);
   } else if (T->Elements.size() <= (1 << 16)) {
