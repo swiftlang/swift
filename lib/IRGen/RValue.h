@@ -53,6 +53,12 @@ public:
   }
   bool isAggregate() const { return !isScalar(); }
 
+  /// Answers whether this RValue holds the given number of scalars.
+  bool isScalar(unsigned Count) const {
+    assert(Count <= MaxScalars);
+    return NumScalars == Count;
+  }
+
   ArrayRef<llvm::Value*> getScalars() const {
     assert(isScalar());
     return makeArrayRef(ScalarValues, ScalarValues + NumScalars);
