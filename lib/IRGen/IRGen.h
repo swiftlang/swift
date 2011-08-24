@@ -74,6 +74,17 @@ public:
     return L;
   }
 
+  friend Size operator*(Size L, int_type R) {
+    return Size(L.Value * R);
+  }
+  friend Size operator*(int_type L, Size R) {
+    return Size(L * R.Value);
+  }
+  friend Size &operator*=(Size &L, int_type R) {
+    L.Value *= R;
+    return L;
+  }
+
   explicit operator bool() const { return Value != 0; }
 
   friend bool operator< (Size L, Size R) { return L.Value <  R.Value; }
