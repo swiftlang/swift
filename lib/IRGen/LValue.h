@@ -17,6 +17,8 @@
 #ifndef SWIFT_IRGEN_LVALUE_H
 #define SWIFT_IRGEN_LVALUE_H
 
+#include "IRGen.h"
+
 namespace llvm {
   class Value;
 }
@@ -38,16 +40,23 @@ public:
     return Address;
   }
 
-  static LValue forAddress(llvm::Value *Address) {
+  Alignment getAlignment() const {
+    assert(isValid());
+    return Align;
+  }
+
+  static LValue forAddress(llvm::Value *Address, Alignment Align) {
     assert(Address != nullptr);
 
     LValue LV;
     LV.Address = Address;
+    LV.Align = Align;
     return LV;
   }
 
 private:
   llvm::Value *Address;
+  Alignment Align;
 };
 
 } // end namespace irgen
