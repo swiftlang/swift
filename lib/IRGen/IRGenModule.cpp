@@ -19,7 +19,6 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Type.h"
 #include "llvm/DerivedTypes.h"
-#include "llvm/Function.h"
 #include "llvm/GlobalValue.h"
 #include "llvm/Module.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -42,6 +41,7 @@ IRGenModule::IRGenModule(ASTContext &Context, Options &Opts,
   Int16Ty = llvm::Type::getInt16Ty(getLLVMContext());
   Int32Ty = llvm::Type::getInt32Ty(getLLVMContext());
   Int64Ty = llvm::Type::getInt64Ty(getLLVMContext());
+  Int8PtrTy = llvm::Type::getInt8PtrTy(getLLVMContext());
 }
 
 IRGenModule::~IRGenModule() {
@@ -119,11 +119,11 @@ llvm::GlobalVariable *IRGenModule::getAddrOfGlobalVariable(VarDecl *VD) {
   const TypeInfo &TInfo = getFragileTypeInfo(VD->Ty);
   LinkInfo Link = computeLinkInfo(VD);
   llvm::GlobalVariable *Addr
-    = new llvm::GlobalVariable(Module, TInfo.Type, /*constant*/ false,
+    = new llvm::GlobalVariable(Module, TInfo.StorageType, /*constant*/ false,
                                Link.Linkage, /*initializer*/ nullptr,
                                Link.Name);
   Addr->setVisibility(Link.Visibility);
-  Addr->setAlignment(TInfo.TypeAlignment.getValue());
+  Addr->setAlignment(TInfo.StorageAlignment.getValue());
 
   Entry = Addr;
   return Addr;
@@ -143,13 +143,13 @@ void IRGenModule::emitGlobalVariable(VarDecl *VD) {
   (void) Addr;
 }
 
-
+/// Fetch the declaration of the given global function.
 llvm::Function *IRGenModule::getAddrOfGlobalFunction(FuncDecl *FD) {
   // Check whether we've cached this.
   llvm::Constant *&Entry = Globals[FD];
   if (Entry) return cast<llvm::Function>(Entry);
 
-  llvm::FunctionType *Type = cast<llvm::FunctionType>(getFragileType(FD->Ty));
+  llvm::FunctionType *Type = getFunctionType(FD);
 
   LinkInfo Link = computeLinkInfo(FD);
   llvm::Function *Addr
@@ -161,7 +161,11 @@ llvm::Function *IRGenModule::getAddrOfGlobalFunction(FuncDecl *FD) {
   return Addr;
 }
 
+/// Emit the definition for the given global function.
 void IRGenModule::emitGlobalFunction(FuncDecl *FD) {
+  // Nothing to do if the function has no body.
+  if (!FD->Init) return;
+
   llvm::Function *Addr = getAddrOfGlobalFunction(FD);
   // FIXME: body
   (void) Addr;

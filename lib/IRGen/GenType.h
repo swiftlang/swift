@@ -39,6 +39,7 @@ namespace irgen {
   class IRGenModule;
   class LValue;
   class RValue;
+  class RValueSchema;
 
 /// Information about the IR representation and generation of the
 /// given type.
@@ -51,21 +52,30 @@ class TypeInfo {
 
 public:
   TypeInfo(llvm::Type *Type, Size S, Alignment A)
-    : NextConverted(0), Type(Type), TypeSize(S), TypeAlignment(A) {}
+    : NextConverted(0), StorageType(Type), StorageSize(S),
+      StorageAlignment(A) {}
 
   virtual ~TypeInfo() {}
 
-  /// The LLVM representation of a value of this type.
-  llvm::Type *Type;
+  /// The LLVM representation of a stored value of this type.
+  llvm::Type *StorageType;
 
-  /// The size of this type in bytes.
-  Size TypeSize;
+  /// The storage size of this type in bytes.  This may be zero even
+  /// for well-formed and complete types, such as a trivial oneof or
+  /// tuple.
+  Size StorageSize;
 
-  /// The alignment of this type in bytes.
-  Alignment TypeAlignment;
+  /// The storage alignment of this type in bytes.  This is never zero
+  /// for a completely-converted type.
+  Alignment StorageAlignment;
 
-  /// Answers whether this type info has been completed.
-  bool isComplete() const { return !TypeAlignment.isZero(); }
+  /// Whether this type info has been completely converted.
+  bool isComplete() const { return !StorageAlignment.isZero(); }
+
+  llvm::Type *getStorageType() const { return StorageType; }
+
+  /// Compute a schema for passing around r-values of this type.
+  virtual RValueSchema getSchema() const = 0;
 
   /// Load an r-value from the given address.
   virtual RValue load(IRGenFunction &IGF, const LValue &LV) const = 0;

@@ -20,6 +20,7 @@
 #include "llvm/Support/ErrorHandling.h"
 
 #include "GenType.h"
+#include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LValue.h"
 #include "RValue.h"
@@ -28,18 +29,28 @@ using namespace swift;
 using namespace irgen;
 
 namespace {
+  /// Basic IR generation for primitive types, which are always
+  /// represented as a single scalar.
   class PrimitiveTypeInfo : public TypeInfo {
   public:
     PrimitiveTypeInfo(llvm::Type *Type, Size S, Alignment A)
       : TypeInfo(Type, S, A) {}
 
-    RValue load(IRGenFunction &IGF, const LValue &LV) const {
-      // FIXME
-      return RValue();
+    RValueSchema getSchema() const {
+      return RValueSchema::forScalars(getStorageType());
     }
 
-    void store(IRGenFunction &CGF, const RValue &RV, const LValue &LV) const {
-      // FIXME
+    RValue load(IRGenFunction &IGF, const LValue &LV) const {
+      llvm::Value *Load =
+        IGF.Builder.CreateLoad(LV.getAddress(), LV.getAlignment(),
+                               LV.getAddress()->getName() + ".load");
+      return RValue::forScalars(Load);
+    }
+
+    void store(IRGenFunction &IGF, const RValue &RV, const LValue &LV) const {
+      assert(RV.isScalar() && RV.getScalars().size() == 1);
+      IGF.Builder.CreateStore(RV.getScalars()[0], LV.getAddress(),
+                              LV.getAlignment());
     }
   };
 }
@@ -61,7 +72,7 @@ TypeConverter::~TypeConverter() {
 
 /// Get the fragile IR type for the given type.
 llvm::Type *IRGenModule::getFragileType(Type T) {
-  return getFragileTypeInfo(T).Type;
+  return getFragileTypeInfo(T).StorageType;
 }
 
 /// Get the fragile type information for the given type.

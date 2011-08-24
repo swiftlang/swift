@@ -33,6 +33,11 @@ namespace {
   public:
     ArrayTypeInfo() : TypeInfo(nullptr, Size(0), Alignment(0)) {}
 
+    RValueSchema getSchema() const {
+      // FIXME
+      return RValueSchema();
+    }
+
     RValue load(IRGenFunction &IGF, const LValue &LV) const {
       // FIXME
       return RValue();

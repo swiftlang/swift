@@ -15,6 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/Instructions.h"
+
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 
@@ -22,9 +24,19 @@ using namespace swift;
 using namespace irgen;
 
 IRGenFunction::IRGenFunction(IRGenModule &IGM)
-  : IGM(IGM), Builder(IGM.getLLVMContext()) {
+  : IGM(IGM), Builder(IGM.getLLVMContext()),
+    AllocaIP(nullptr) {
 }
 
-IRGenModule::~IRGenModule() {
-  delete &Types;
+/// Create an alloca whose lifetime is the duration of the current
+/// full-expression.
+llvm::AllocaInst *
+IRGenFunction::createFullExprAlloca(llvm::Type *Ty, Alignment Align,
+                                    const llvm::Twine &Name) {
+  assert(AllocaIP && "alloca insertion point has not been initialized!");
+  llvm::AllocaInst *Alloca = new llvm::AllocaInst(Ty, Name, AllocaIP);
+  Alloca->setAlignment(Align.getValue());
+
+  // TODO: lifetime intrinsics.
+  return Alloca;
 }

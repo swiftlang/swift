@@ -23,6 +23,7 @@
 namespace llvm {
   class Constant;
   class Function;
+  class FunctionType;
   class GlobalVariable;
   class LLVMContext;
   class Module;
@@ -59,6 +60,7 @@ public:
   llvm::IntegerType *Int16Ty;
   llvm::IntegerType *Int32Ty;
   llvm::IntegerType *Int64Ty;
+  llvm::PointerType *Int8PtrTy;
 
 //--- Types -----------------------------------------------------------------
 public:
@@ -77,6 +79,8 @@ private:
   void emitGlobalDecl(Decl *D);
   void emitGlobalVariable(VarDecl *D);
   void emitGlobalFunction(FuncDecl *D);
+
+  llvm::FunctionType *getFunctionType(FuncDecl *D);
 
 public:
   IRGenModule(ASTContext &Context, Options &Opts, llvm::Module &Module,

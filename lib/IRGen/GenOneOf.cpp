@@ -30,6 +30,7 @@
 #include "llvm/DerivedTypes.h"
 
 #include "GenType.h"
+#include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LValue.h"
 #include "RValue.h"
@@ -38,9 +39,14 @@ using namespace swift;
 using namespace irgen;
 
 namespace {
-  class OneOfTypeInfo : public TypeInfo {
+  class OneofTypeInfo : public TypeInfo {
   public:
-    OneOfTypeInfo(llvm::Type *T, Size S, Alignment A) : TypeInfo(T, S, A) {}
+    OneofTypeInfo(llvm::Type *T, Size S, Alignment A) : TypeInfo(T, S, A) {}
+
+    RValueSchema getSchema() const {
+      llvm::StructType *Struct = cast<llvm::StructType>(getStorageType());
+      return RValueSchema::forAggregate(Struct, StorageAlignment);
+    }
 
     RValue load(IRGenFunction &IGF, const LValue &LV) const {
       // FIXME
@@ -51,6 +57,40 @@ namespace {
       // FIXME
     }
   };
+
+  /// A TypeInfo implementation for singleton oneofs.
+  class SingletonOneofTypeInfo : public TypeInfo {
+    static LValue getSingletonLValue(IRGenFunction &IGF, const LValue &LV) {
+      llvm::Value *SingletonAddr =
+        IGF.Builder.CreateStructGEP(LV.getAddress(), 0);
+      return LValue::forAddress(SingletonAddr, LV.getAlignment());
+    }
+
+  public:
+    /// The type info of the singleton member, or null if it carries no data.
+    const TypeInfo *Singleton;
+
+    SingletonOneofTypeInfo(llvm::Type *T, Size S, Alignment A)
+      : TypeInfo(T, S, A), Singleton(nullptr) {}
+
+    RValueSchema getSchema() const {
+      assert(isComplete());
+      if (!Singleton) return RValueSchema::forScalars();
+      return Singleton->getSchema();
+    }
+
+    RValue load(IRGenFunction &IGF, const LValue &LV) const {
+      assert(isComplete());
+      if (!Singleton) return RValue::forScalars();
+      return Singleton->load(IGF, getSingletonLValue(IGF, LV));
+    }
+
+    void store(IRGenFunction &IGF, const RValue &RV, const LValue &LV) const {
+      assert(isComplete());
+      if (!Singleton) return;
+      Singleton->store(IGF, RV, getSingletonLValue(IGF, LV));
+    }
+  };
 }
 
 const TypeInfo *
@@ -59,34 +99,41 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
   llvm::StructType *Converted
     = llvm::StructType::create(IGM.getLLVMContext(), "oneof");
 
-  OneOfTypeInfo *TInfo = new OneOfTypeInfo(Converted, Size(0), Alignment(0));
+  // We don't need a discriminator if this is a singleton ADT.
+  if (T->hasSingleElement()) {
+    SingletonOneofTypeInfo *TInfo =
+      new SingletonOneofTypeInfo(Converted, Size(0), Alignment(0));
+    assert(!IGM.Types.Converted.count(T));
+    IGM.Types.Converted.insert(std::make_pair(T, TInfo));
+
+    Type Ty = T->getElement(0)->ArgumentType;
+
+    llvm::Type *StorageType;
+    if (Ty.isNull()) {
+      StorageType = IGM.Int8Ty;
+      TInfo->StorageAlignment = Alignment(1);
+      TInfo->Singleton = nullptr;
+    } else {
+      const TypeInfo &EltInfo = getFragileTypeInfo(IGM, Ty);
+      assert(EltInfo.isComplete());
+      StorageType = EltInfo.StorageType;
+      TInfo->StorageSize = EltInfo.StorageSize;
+      TInfo->StorageAlignment = EltInfo.StorageAlignment;
+      TInfo->Singleton = &EltInfo;
+    }
+
+    llvm::Type *Body[] = { StorageType };
+    Converted->setBody(Body);
+
+    return TInfo;
+  }
+
+  OneofTypeInfo *TInfo = new OneofTypeInfo(Converted, Size(0), Alignment(0));
 
   // They can be recursive -- not structurally, but by anything
   // indirected.
   assert(!IGM.Types.Converted.count(T));
   IGM.Types.Converted.insert(std::make_pair(T, TInfo));
-
-  // We don't need a discriminator if this is a singleton ADT.
-  if (T->hasSingleElement()) {
-    Type Ty = T->getElement(0)->ArgumentType;
-
-    llvm::Type *Type;
-    if (Ty.isNull()) {
-      Type = IGM.Int8Ty;
-      TInfo->TypeAlignment = Alignment(1);
-    } else {
-      const TypeInfo &EltInfo = getFragileTypeInfo(IGM, Ty);
-      assert(EltInfo.isComplete());
-      Type = EltInfo.Type;
-      TInfo->TypeSize = EltInfo.TypeSize;
-      TInfo->TypeAlignment = EltInfo.TypeAlignment;
-    }
-
-    llvm::Type *Body[] = { Type };
-    Converted->setBody(Body);
-
-    return TInfo;
-  }
 
   // Otherwise, we need a discriminator.
   llvm::Type *DiscriminatorType;
@@ -106,7 +153,7 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
   Body.push_back(DiscriminatorType);
 
   Size PayloadSize = Size(0);
-  Alignment TypeAlignment = Alignment(1);
+  Alignment StorageAlignment = Alignment(1);
 
   // Figure out how much storage we need for the union.
   for (unsigned I = 0, E = T->Elements.size(); I != E; ++I) {
@@ -118,17 +165,17 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
     // zero-size data.
     const TypeInfo &EltInfo = getFragileTypeInfo(IGM, Ty);
     assert(EltInfo.isComplete());
-    if (EltInfo.TypeSize.isZero()) continue;
+    if (EltInfo.StorageSize.isZero()) continue;
 
     // The required payload size is the amount of padding needed to
     // get up to the element's alignment, plus the actual size.
-    Size EltPayloadSize = EltInfo.TypeSize;
-    if (EltInfo.TypeAlignment.getValue() > DiscriminatorSize.getValue())
-      EltPayloadSize +=
-        Size(EltInfo.TypeAlignment.getValue() - DiscriminatorSize.getValue());
+    Size EltPayloadSize = EltInfo.StorageSize;
+    if (EltInfo.StorageAlignment.getValue() > DiscriminatorSize.getValue())
+      EltPayloadSize += Size(EltInfo.StorageAlignment.getValue()
+                               - DiscriminatorSize.getValue());
 
     PayloadSize = std::max(PayloadSize, EltPayloadSize);
-    TypeAlignment = std::max(TypeAlignment, EltInfo.TypeAlignment);
+    StorageAlignment = std::max(StorageAlignment, EltInfo.StorageAlignment);
   }
 
   // If there's any payload at all, add in the payload array.
@@ -136,11 +183,11 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
     Body.push_back(llvm::ArrayType::get(IGM.Int8Ty, PayloadSize.getValue()));
   }
 
-  Size TypeSize = DiscriminatorSize + PayloadSize;
+  Size StorageSize = DiscriminatorSize + PayloadSize;
   // Should we round TypeSize up to a multiple of the alignment?
 
   Converted->setBody(Body);
-  TInfo->TypeSize = TypeSize;
-  TInfo->TypeAlignment = TypeAlignment;
+  TInfo->StorageSize = StorageSize;
+  TInfo->StorageAlignment = StorageAlignment;
   return TInfo;
 }
