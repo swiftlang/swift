@@ -1,4 +1,4 @@
-//===--- GenFunc.cpp - Swift IR Generation for Function Types ------------===//
+//===--- GenFunc.cpp - Swift IR Generation for Function Types -------------===//
 //
 // This source file is part of the Swift.org open source project
 //
