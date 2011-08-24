@@ -134,7 +134,7 @@ TypeConverter::convertFunctionType(IRGenModule &IGM, FunctionType *T) {
   Alignment StructAlign = Alignment(IGM.TargetData.getPointerABIAlignment());
   llvm::Type *Elts[] = { IGM.Int8PtrTy, IGM.Int8PtrTy };
   llvm::StructType *StructType
-    = llvm::StructType::get(IGM.getLLVMContext(), Elts);
+    = llvm::StructType::get(IGM.getLLVMContext(), Elts, /*packed*/ false);
   return new FuncTypeInfo(T, StructType, StructSize, StructAlign);
 }
 
