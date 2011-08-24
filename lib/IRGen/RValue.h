@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// A storage structure for holding r-values in Swift IR.
+// Types relating to the LLVM emission of r-values, including the
+// RValue structure for holding emitted r-values.
 //
 //===----------------------------------------------------------------------===//
 
@@ -18,8 +19,10 @@
 #define SWIFT_IRGEN_RVALUE_H
 
 #include "llvm/ADT/ArrayRef.h"
+#include "IRGen.h"
 
 namespace llvm {
+  class Type;
   class Value;
 }
 
@@ -35,51 +38,160 @@ namespace irgen {
 /// location in memory holding the value.
 class RValue {
 public:
-  enum { MaxScalarValues = 3 };
+  enum { MaxScalars = 3 };
 private:
-  enum { IsAggregate = MaxScalarValues + 1,
-         IsInvalid = MaxScalarValues + 2 };
+  enum { IsAggregate = MaxScalars + 1,
+         IsInvalid = MaxScalars + 2 };
 
 public:
-  RValue() : NumScalarValues(IsInvalid) {}
+  RValue() : NumScalars(IsInvalid) {}
 
-  bool isValid() const { return NumScalarValues != IsInvalid; }
+  bool isValid() const { return NumScalars != IsInvalid; }
   bool isScalar() const {
     assert(isValid());
-    return NumScalarValues != IsAggregate;
+    return NumScalars != IsAggregate;
   }
   bool isAggregate() const { return !isScalar(); }
 
   ArrayRef<llvm::Value*> getScalars() const {
     assert(isScalar());
-    return makeArrayRef(Values, Values + NumScalarValues);
+    return makeArrayRef(ScalarValues, ScalarValues + NumScalars);
   }
 
-  llvm::Value *getAggregateAddr() const {
+  llvm::Value *getAggregateAddress() const {
     assert(isAggregate());
-    return Values[0];
+    return AggregateAddress;
   }
 
   static RValue forScalars(ArrayRef<llvm::Value*> Scalars) {
-    assert(Scalars.size() <= MaxScalarValues);
+    assert(Scalars.size() <= MaxScalars);
 
     RValue RV;
-    RV.NumScalarValues = Scalars.size();
+    RV.NumScalars = Scalars.size();
     for (unsigned I = 0, E = Scalars.size(); I != E; ++I)
-      RV.Values[I] = Scalars[I];
+      RV.ScalarValues[I] = Scalars[I];
     return RV;
+  }
+
+  static RValue forScalars() {
+    return forScalars(ArrayRef<llvm::Value*>());
+  }
+
+  static RValue forScalars(llvm::Value *V) {
+    llvm::Value *Scalars[] = { V };
+    return forScalars(Scalars);
+  }
+
+  static RValue forScalars(llvm::Value *V1, llvm::Value *V2) {
+    llvm::Value *Scalars[] = { V1, V2 };
+    return forScalars(Scalars);
+  }
+
+  static RValue forScalars(llvm::Value *V1, llvm::Value *V2, llvm::Value *V3) {
+    llvm::Value *Scalars[] = { V1, V2, V3 };
+    return forScalars(Scalars);
   }
 
   static RValue forAggregate(llvm::Value *Addr) {
     RValue RV;
-    RV.NumScalarValues = IsAggregate;
-    RV.Values[0] = Addr;
+    RV.NumScalars = IsAggregate;
+    RV.AggregateAddress = Addr;
     return RV;
   }
 
 private:
-  llvm::Value *Values[MaxScalarValues];
-  unsigned char NumScalarValues;
+  union {
+    llvm::Value *ScalarValues[MaxScalars];
+    llvm::Value *AggregateAddress;
+  };
+  unsigned char NumScalars;
+};
+
+/// An r-value schema is a sort of "type" for emitted r-values.  It
+/// indicates whether an conformant r-value will be emitted as
+/// independent scalars, and if so, which LLVM IR types they have, or
+/// if it will be emitted as an aggregate in memory, and if so, the
+/// required type and alignment for that memory.
+class RValueSchema {
+public:
+  enum { MaxScalars = RValue::MaxScalars };
+private:
+  enum { IsAggregate = MaxScalars + 1,
+         IsInvalid = MaxScalars + 2 };
+
+public:
+  RValueSchema() : NumScalars(IsInvalid) {}
+
+  bool isValid() const { return NumScalars != IsInvalid; }
+  bool isScalar() const {
+    assert(isValid());
+    return NumScalars != IsAggregate;
+  }
+  bool isAggregate() const { return !isScalar(); }
+
+  ArrayRef<llvm::Type*> getScalarTypes() const {
+    assert(isScalar());
+    return makeArrayRef(ScalarTypes, ScalarTypes + NumScalars);
+  }
+
+  /// Returns the allocation type of an aggregate value.
+  llvm::StructType *getAggregateType() const {
+    assert(isAggregate());
+    return Aggregate.Type;
+  }
+
+  Alignment getAggregateAlignment() const {
+    assert(isAggregate());
+    return Alignment(Aggregate.Alignment);
+  }
+
+  static RValueSchema forScalars(ArrayRef<llvm::Type*> Scalars) {
+    assert(Scalars.size() <= MaxScalars);
+
+    RValueSchema RV;
+    RV.NumScalars = Scalars.size();
+    for (unsigned I = 0, E = Scalars.size(); I != E; ++I)
+      RV.ScalarTypes[I] = Scalars[I];
+    return RV;
+  }
+
+  static RValueSchema forScalars() {
+    return forScalars(ArrayRef<llvm::Type*>());
+  }
+
+  static RValueSchema forScalars(llvm::Type *Ty) {
+    llvm::Type *Scalars[] = { Ty };
+    return forScalars(Scalars);
+  }
+
+  static RValueSchema forScalars(llvm::Type *Ty1, llvm::Type *Ty2) {
+    llvm::Type *Scalars[] = { Ty1, Ty2 };
+    return forScalars(Scalars);
+  }
+
+  static RValueSchema forScalars(llvm::Type *Ty1, llvm::Type *Ty2,
+                                 llvm::Type *Ty3) {
+    llvm::Type *Scalars[] = { Ty1, Ty2, Ty3 };
+    return forScalars(Scalars);
+  }
+
+  static RValueSchema forAggregate(llvm::StructType *Type, Alignment Align) {
+    RValueSchema RV;
+    RV.NumScalars = IsAggregate;
+    RV.Aggregate.Type = Type;
+    RV.Aggregate.Alignment = Align.getValue();
+    return RV;
+  }
+
+private:
+  union {
+    llvm::Type *ScalarTypes[MaxScalars];
+    struct {
+      llvm::StructType *Type;
+      Alignment::int_type Alignment;
+    } Aggregate;
+  };
+  unsigned char NumScalars;
 };
 
 } // end namespace irgen
