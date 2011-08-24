@@ -69,14 +69,18 @@ namespace {
     mutable llvm::FunctionType *FunctionTypeWithData;
     mutable llvm::FunctionType *FunctionTypeWithoutData;
   public:
-    FuncTypeInfo(FunctionType *Ty, llvm::Type *T, Size S, Alignment A)
+    FuncTypeInfo(FunctionType *Ty, llvm::StructType *T, Size S, Alignment A)
       : TypeInfo(T, S, A), FnTy(Ty),
         FunctionTypeWithData(0), FunctionTypeWithoutData(0) {}
+
+    llvm::StructType *getStorageType() const {
+      return cast<llvm::StructType>(TypeInfo::getStorageType());
+    }
 
     llvm::FunctionType *getFunctionType(IRGenModule &IGM, bool NeedsData) const;
 
     RValueSchema getSchema() const {
-      llvm::StructType *Ty = cast<llvm::StructType>(getStorageType());
+      llvm::StructType *Ty = getStorageType();
       assert(Ty->getNumElements() == 2);
       return RValueSchema::forScalars(Ty->getElementType(0),
                                       Ty->getElementType(1));
