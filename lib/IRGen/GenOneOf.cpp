@@ -39,13 +39,30 @@ using namespace swift;
 using namespace irgen;
 
 namespace {
+  /// An abstract base class for TypeInfo implementations of oneof types.
   class OneofTypeInfo : public TypeInfo {
   public:
-    OneofTypeInfo(llvm::Type *T, Size S, Alignment A) : TypeInfo(T, S, A) {}
+    OneofTypeInfo(llvm::StructType *T, Size S, Alignment A)
+      : TypeInfo(T, S, A) {}
+
+    llvm::StructType *getStorageType() const {
+      return cast<llvm::StructType>(TypeInfo::getStorageType());
+    }
+
+    llvm::IntegerType *getDiscriminatorType() const {
+      llvm::StructType *Struct = getStorageType();
+      return cast<llvm::IntegerType>(Struct->getElementType(0));
+    }
+  };
+
+  /// A TypeInfo implementation which uses an aggregate.
+  class AggregateOneofTypeInfo : public OneofTypeInfo {
+  public:
+    AggregateOneofTypeInfo(llvm::StructType *T, Size S, Alignment A)
+      : OneofTypeInfo(T, S, A) {}
 
     RValueSchema getSchema() const {
-      llvm::StructType *Struct = cast<llvm::StructType>(getStorageType());
-      return RValueSchema::forAggregate(Struct, StorageAlignment);
+      return RValueSchema::forAggregate(getStorageType(), StorageAlignment);
     }
 
     RValue load(IRGenFunction &IGF, const LValue &LV) const {
@@ -59,7 +76,7 @@ namespace {
   };
 
   /// A TypeInfo implementation for singleton oneofs.
-  class SingletonOneofTypeInfo : public TypeInfo {
+  class SingletonOneofTypeInfo : public OneofTypeInfo {
     static LValue getSingletonLValue(IRGenFunction &IGF, const LValue &LV) {
       llvm::Value *SingletonAddr =
         IGF.Builder.CreateStructGEP(LV.getAddress(), 0);
@@ -70,8 +87,8 @@ namespace {
     /// The type info of the singleton member, or null if it carries no data.
     const TypeInfo *Singleton;
 
-    SingletonOneofTypeInfo(llvm::Type *T, Size S, Alignment A)
-      : TypeInfo(T, S, A), Singleton(nullptr) {}
+    SingletonOneofTypeInfo(llvm::StructType *T, Size S, Alignment A)
+      : OneofTypeInfo(T, S, A), Singleton(nullptr) {}
 
     RValueSchema getSchema() const {
       assert(isComplete());
@@ -89,6 +106,34 @@ namespace {
       assert(isComplete());
       if (!Singleton) return;
       Singleton->store(IGF, RV, getSingletonLValue(IGF, LV));
+    }
+  };
+
+  /// A TypeInfo implementation for oneofs with no payload.
+  class EnumTypeInfo : public OneofTypeInfo {
+  public:
+    EnumTypeInfo(llvm::StructType *T, Size S, Alignment A)
+      : OneofTypeInfo(T, S, A) {}
+
+    RValueSchema getSchema() const {
+      assert(isComplete());
+      return RValueSchema::forScalars(getDiscriminatorType());
+    }
+
+    RValue load(IRGenFunction &IGF, const LValue &LV) const {
+      llvm::Value *OneofAddr = LV.getAddress();
+      llvm::Value *Addr = IGF.Builder.CreateStructGEP(OneofAddr, 0);
+      llvm::Value *V = IGF.Builder.CreateLoad(Addr,
+                                              LV.getAlignment(),
+                                              OneofAddr->getName() + ".load");
+      return RValue::forScalars(V);
+    }
+
+    void store(IRGenFunction &IGF, const RValue &RV, const LValue &LV) const {
+      assert(RV.isScalar(1));
+      llvm::Value *OneofAddr = LV.getAddress();
+      llvm::Value *Addr = IGF.Builder.CreateStructGEP(OneofAddr, 0);
+      IGF.Builder.CreateStore(RV.getScalars()[0], Addr, LV.getAlignment());
     }
   };
 }
@@ -127,13 +172,6 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
 
     return TInfo;
   }
-
-  OneofTypeInfo *TInfo = new OneofTypeInfo(Converted, Size(0), Alignment(0));
-
-  // They can be recursive -- not structurally, but by anything
-  // indirected.
-  assert(!IGM.Types.Converted.count(T));
-  IGM.Types.Converted.insert(std::make_pair(T, TInfo));
 
   // Otherwise, we need a discriminator.
   llvm::Type *DiscriminatorType;
@@ -178,16 +216,23 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
     StorageAlignment = std::max(StorageAlignment, EltInfo.StorageAlignment);
   }
 
-  // If there's any payload at all, add in the payload array.
-  if (PayloadSize) {
+  Size StorageSize = DiscriminatorSize + PayloadSize;
+
+  OneofTypeInfo *TInfo;
+
+  // If there's no payload at all, use the enum TypeInfo.
+  if (!PayloadSize) {
+    TInfo = new EnumTypeInfo(Converted, StorageSize, StorageAlignment);
+
+  // Otherwise, add the payload array to the storage.
+  } else {
     Body.push_back(llvm::ArrayType::get(IGM.Int8Ty, PayloadSize.getValue()));
+
+    // TODO: don't always use an aggregate representation.
+    TInfo = new AggregateOneofTypeInfo(Converted, StorageSize,
+                                       StorageAlignment);
   }
 
-  Size StorageSize = DiscriminatorSize + PayloadSize;
-  // Should we round TypeSize up to a multiple of the alignment?
-
   Converted->setBody(Body);
-  TInfo->StorageSize = StorageSize;
-  TInfo->StorageAlignment = StorageAlignment;
   return TInfo;
 }
