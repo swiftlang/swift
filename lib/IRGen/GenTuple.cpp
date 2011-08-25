@@ -24,6 +24,7 @@
 #include "llvm/Target/TargetData.h"
 
 #include "GenType.h"
+#include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LValue.h"
 #include "RValue.h"
@@ -43,6 +44,9 @@ namespace {
     /// The TypeInfo for the field.
     const TypeInfo &FieldInfo;
 
+    /// The offset of this field into the storage type.
+    Size StorageOffset;
+
     /// The index of this field into the storage type, or NoStorage
     /// if the field requires no storage.
     unsigned StorageIndex : 24;
@@ -51,6 +55,18 @@ namespace {
     /// The range of this field within the scalars for the tuple.
     unsigned ScalarBegin : 4;
     unsigned ScalarEnd : 4;
+
+    /// Given an l-value for the base address, produce an l-value for
+    /// this field.
+    /// TODO: this is only actually meaningful for certain possible
+    /// representations of tuples;  a bit-packing representation
+    /// would not be adequate here.
+    LValue getElementPtr(IRGenFunction &IGF, const LValue &LV) const {
+      llvm::Value *Addr =
+        IGF.Builder.CreateStructGEP(LV.getAddress(), StorageIndex);
+      Alignment Alignment = LV.getAlignment().alignmentAtOffset(StorageOffset);
+      return LValue::forAddress(Addr, Alignment);
+    }
   };
 
   /// An abstract base class for tuple types.
@@ -61,9 +77,9 @@ namespace {
     unsigned NumFields : 31;
     unsigned IsAggregate : 1;
 
-    TupleFieldInfo *getFieldInfos();
-    const TupleFieldInfo *getFieldInfos() const {
-      return const_cast<TupleTypeInfo*>(this)->getFieldInfos();
+    TupleFieldInfo *getFieldInfoStorage();
+    const TupleFieldInfo *getFieldInfoStorage() const {
+      return const_cast<TupleTypeInfo*>(this)->getFieldInfoStorage();
     }
 
   public:
@@ -71,9 +87,13 @@ namespace {
                   bool IsAggregate, ArrayRef<TupleFieldInfo> Fields)
       : TypeInfo(T, S, A), NumFields(Fields.size()), IsAggregate(IsAggregate) {
 
-      TupleFieldInfo *FieldStorage = getFieldInfos();
+      TupleFieldInfo *FieldStorage = getFieldInfoStorage();
       for (unsigned I = 0, E = Fields.size(); I != E; ++I)
         new(&FieldStorage[I]) TupleFieldInfo(Fields[I]);
+    }
+
+    ArrayRef<TupleFieldInfo> getFieldInfos() const {
+      return llvm::makeArrayRef(getFieldInfoStorage(), NumFields);
     }
   };
 
@@ -101,12 +121,44 @@ namespace {
     }
 
     RValue load(IRGenFunction &IGF, const LValue &LV) const {
-      // FIXME
-      return RValue();
+      SmallVector<llvm::Value*, RValue::MaxScalars> Scalars;
+
+      // Load by loading the elements.
+      for (const TupleFieldInfo &Field : getFieldInfos()) {
+        assert(Scalars.size() == Field.ScalarBegin);
+
+        // Skip fields that contribute no scalars.
+        if (Field.ScalarBegin == Field.ScalarEnd) continue;
+
+        // Load the field and extract the scalars.
+        LValue FieldLV = Field.getElementPtr(IGF, LV);
+        RValue FieldRV = Field.FieldInfo.load(IGF, FieldLV);
+        Scalars.append(FieldRV.getScalars().begin(),
+                       FieldRV.getScalars().end());
+
+        assert(Scalars.size() == Field.ScalarEnd);
+      }
+
+      return RValue::forScalars(Scalars);
     }
 
-    void store(IRGenFunction &CGF, const RValue &RV, const LValue &LV) const {
-      // FIXME
+    void store(IRGenFunction &IGF, const RValue &RV, const LValue &LV) const {
+      assert(RV.isScalar());
+
+      for (const TupleFieldInfo &Field : getFieldInfos()) {
+        // Skip fields that contribute no scalars.
+        if (Field.ScalarBegin == Field.ScalarEnd) continue;
+
+        // Project out the appropriate r-value.
+        ArrayRef<llvm::Value*> Scalars = 
+          RV.getScalars().slice(Field.ScalarBegin,
+                                Field.ScalarEnd - Field.ScalarBegin);
+        RValue FieldRV = RValue::forScalars(Scalars);
+
+        // Write the extracted r-value into a projected l-value.
+        LValue FieldLV = Field.getElementPtr(IGF, LV);
+        Field.FieldInfo.store(IGF, FieldRV, FieldLV);
+      }
     }
   };
 
@@ -145,7 +197,7 @@ namespace {
   };
 }
 
-TupleFieldInfo *TupleTypeInfo::getFieldInfos() {
+TupleFieldInfo *TupleTypeInfo::getFieldInfoStorage() {
   void *Ptr;
   if (IsAggregate)
     Ptr = static_cast<AggregateTupleTypeInfo*>(this)+1;
@@ -178,6 +230,7 @@ TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
     // Ignore zero-sized fields.
     if (TInfo.StorageSize.isZero()) {
       FieldInfo.StorageIndex = TupleFieldInfo::NoStorage;
+      FieldInfo.ScalarBegin = FieldInfo.ScalarEnd = ScalarTypes.size();
       continue;
     }
 
@@ -196,22 +249,27 @@ TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
     StorageAlignment = std::max(StorageAlignment, TInfo.StorageAlignment);
 
     // If the current tuple size isn't a multiple of the tuple
-    // alignment, and the field's required alignment is more than its
-    // IR preferred alignment, we need padding.
+    // alignment, we need padding.
     if (Size OffsetFromAlignment = StorageSize % StorageAlignment) {
+      unsigned PaddingRequired
+        = StorageAlignment.getValue() - OffsetFromAlignment.getValue();
+
+      // We don't actually need to uglify the IR unless the natural
+      // alignment of the IR type for the field isn't good enough.
       Alignment FieldIRAlignment(
           IGM.TargetData.getABITypeAlignment(TInfo.StorageType));
       assert(FieldIRAlignment <= TInfo.StorageAlignment);
       if (FieldIRAlignment != TInfo.StorageAlignment) {
-        unsigned PaddingRequired
-          = StorageAlignment.getValue() - OffsetFromAlignment.getValue();
         StorageTypes.push_back(llvm::ArrayType::get(IGM.Int8Ty,
                                                     PaddingRequired));
-        StorageSize += Size(PaddingRequired);
       }
+
+      // Regardless, the storage size goes up.
+      StorageSize += Size(PaddingRequired);
     }
 
     FieldInfo.StorageIndex = StorageTypes.size();
+    FieldInfo.StorageOffset = StorageSize;
     StorageTypes.push_back(TInfo.getStorageType());
     StorageSize += TInfo.StorageSize;
   }
