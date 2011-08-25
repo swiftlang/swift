@@ -16,7 +16,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Subsystems.h"
 #include "TypeChecking.h"
 #include "swift/AST/ASTVisitor.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -421,14 +420,3 @@ bool TypeChecker::typeCheckValueDecl(ValueDecl *VD) {
   return false;
 }
 
-/// performTypeChecking - Once parsing and namebinding are complete, these
-/// walks the AST to resolve types and diagnose problems therein.
-///
-/// FIXME: This should be moved out to somewhere else.
-void swift::performTypeChecking(TranslationUnitDecl *TUD, ASTContext &Ctx) {
-  TypeChecker TC(Ctx);
-  
-  // Type check the top-level BraceExpr.  This sorts out any top-level
-  // expressions and recursively processes the rest of the translation unit.
-  TC.typeCheckTranslationUnit(TUD);
-}
