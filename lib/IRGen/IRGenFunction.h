@@ -40,6 +40,9 @@ namespace swift {
   class IfStmt;
   class ReturnStmt;
   class Stmt;
+  class TupleExpr;
+  class TupleElementExpr;
+  class TupleShuffleExpr;
   class Type;
   class ValueDecl;
   class VarDecl;
@@ -82,10 +85,10 @@ private:
 
 //--- Helper methods -----------------------------------------------------------
 public:
-  llvm::AllocaInst *createFullExprAlloca(llvm::Type *Ty, Alignment Align,
-                                         const llvm::Twine &Name);
-  llvm::AllocaInst *createScopeAlloca(llvm::Type *Ty, Alignment Align,
-                                      const llvm::Twine &Name);
+  LValue createFullExprAlloca(llvm::Type *Ty, Alignment Align,
+                              const llvm::Twine &Name);
+  LValue createScopeAlloca(llvm::Type *Ty, Alignment Align,
+                           const llvm::Twine &Name);
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
   const TypeInfo &getFragileTypeInfo(Type T);
 private:
@@ -118,6 +121,9 @@ public:
 private:
   RValue getRValueForGlobalFunction(FuncDecl *Fn);
   RValue emitApplyExpr(ApplyExpr *Apply, const TypeInfo &TInfo);
+  RValue emitTupleExpr(TupleExpr *E, const TypeInfo &TInfo);
+  RValue emitTupleElementExpr(TupleElementExpr *E, const TypeInfo &TInfo);
+  RValue emitTupleShuffleExpr(TupleShuffleExpr *E, const TypeInfo &TInfo);
 
 //--- Declaration emission -----------------------------------------------------
 public:

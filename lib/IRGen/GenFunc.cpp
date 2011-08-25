@@ -290,11 +290,11 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &ResultInfo) {
   // The first argument is the implicit aggregate return slot, if required.
   RValueSchema ResultSchema = ResultInfo.getSchema();
   if (ResultSchema.isAggregate()) {
-    llvm::AllocaInst *ResultSlot =
+    LValue ResultSlot =
       createFullExprAlloca(ResultSchema.getAggregateType(),
                            ResultSchema.getAggregateAlignment(),
                            "call.aggresult");
-    Args.Values.push_back(ResultSlot);
+    Args.Values.push_back(ResultSlot.getAddress());
     Args.Attrs.push_back(llvm::AttributeWithIndex::get(1,
                                 llvm::Attribute::StructRet |
                                 llvm::Attribute::NoAlias));
@@ -364,18 +364,15 @@ void IRGenFunction::emitPrologue() {
   // Set up the result slot.
   const TypeInfo &ResultInfo = IGM.getFragileTypeInfo(FnTy->Result);
   RValueSchema ResultSchema = ResultInfo.getSchema();
-  llvm::Value *ResultAddr;
   if (ResultSchema.isAggregate()) {
-    ResultAddr = CurParm++;
+    ReturnSlot = LValue::forAddress(CurParm++, ResultInfo.StorageAlignment);
   } else if (ResultSchema.isScalar(0)) {
-    ResultAddr = nullptr;
+    assert(!ReturnSlot.isValid());
   } else {
-    ResultAddr = createScopeAlloca(ResultInfo.getStorageType(),
+    ReturnSlot = createScopeAlloca(ResultInfo.getStorageType(),
                                    ResultInfo.StorageAlignment,
                                    "return_value");
   }
-  if (ResultAddr)
-    ReturnSlot = LValue::forAddress(ResultAddr, ResultInfo.StorageAlignment);
 
   // Set up the parameters.  This is syntactically required to be a
   // tuple, I think.
@@ -386,18 +383,15 @@ void IRGenFunction::emitPrologue() {
     const TypeInfo &ParmInfo = IGM.getFragileTypeInfo(Field.Ty);
     RValueSchema ParmSchema = ParmInfo.getSchema();
 
-    // Make an address for the parameter.
-    llvm::Value *ParmAddr;
+    // Make an l-value for the parameter.
+    LValue ParmLV;
     if (ParmSchema.isAggregate()) {
-      ParmAddr = CurParm++;
+      ParmLV = LValue::forAddress(CurParm++, ParmInfo.StorageAlignment);
     } else {
-      ParmAddr = createScopeAlloca(ParmInfo.getStorageType(),
-                                   ParmInfo.StorageAlignment,
-                                   Field.Name.str());
+      ParmLV = createScopeAlloca(ParmInfo.getStorageType(),
+                                 ParmInfo.StorageAlignment,
+                                 Field.Name.str());
     }
-
-    // Turn that into an l-value.
-    LValue ParmLV = LValue::forAddress(ParmAddr, ParmInfo.StorageAlignment);
 
     // If the parameter was scalar, form an r-value from the
     // parameters and store that.

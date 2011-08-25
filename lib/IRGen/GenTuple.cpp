@@ -20,6 +20,7 @@
 
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Target/TargetData.h"
 
@@ -300,4 +301,61 @@ TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
   // and some as scalars.
   return AggregateTupleTypeInfo::create(Converted, StorageSize,
                                         StorageAlignment, FieldInfos);
+}
+
+/// Emit a tuple literal expression.
+RValue IRGenFunction::emitTupleExpr(TupleExpr *Tuple, const TypeInfo &TI) {
+  // Extract information about the tuple.  Note that type-checking
+  // should ensure that the literal's elements are exactly parallel
+  // with the field infos.
+  const TupleTypeInfo &TInfo = static_cast<const TupleTypeInfo&>(TI);
+  ArrayRef<TupleFieldInfo> FieldInfos = TInfo.getFieldInfos();
+  RValueSchema Schema = TInfo.getSchema();
+
+  // Set up for the emission.
+  llvm::SmallVector<llvm::Value*, RValue::MaxScalars> Scalars;
+  LValue Aggregate;
+  if (Schema.isAggregate()) {
+    Aggregate = createFullExprAlloca(Schema.getAggregateType(),
+                                     Schema.getAggregateAlignment(),
+                                     "tuple-literal");
+  }
+
+  // Emit all the sub-expressions.
+  for (unsigned I = 0, E = Tuple->NumSubExprs; I != E; ++I) {
+    const TupleFieldInfo &FieldInfo = FieldInfos[I];
+    RValue Field = emitRValue(Tuple->SubExprs[I], FieldInfo.FieldInfo);
+
+    // If the outer schema is scalar, then all the element schemas
+    // are, too, and we should just their scalars into field scalars.
+    if (Schema.isScalar()) {
+      assert(Field.isScalar());
+      Scalars.append(Field.getScalars().begin(), Field.getScalars().end());
+
+    // The reverse is not necessarily true, so we need to store an
+    // arbitrary r-value into our temporary.
+    } else {
+      LValue FieldLV = FieldInfo.getElementPtr(*this, Aggregate);
+      FieldInfo.FieldInfo.store(*this, Field, FieldLV);
+    }
+  }
+
+  // Finally, construct the temporary.
+  if (Schema.isAggregate()) {
+    return RValue::forAggregate(Aggregate.getAddress());
+  } else {
+    return RValue::forScalars(Scalars);
+  }
+}
+
+RValue IRGenFunction::emitTupleElementExpr(TupleElementExpr *E,
+                                           const TypeInfo &TI) {
+  unimplemented(E->getLocStart(), "tuple elements are unimplemented");
+  return emitFakeRValue(TI);
+}
+
+RValue IRGenFunction::emitTupleShuffleExpr(TupleShuffleExpr *E,
+                                           const TypeInfo &TI) {
+  unimplemented(E->getLocStart(), "tuple shuffles are unimplemented");
+  return emitFakeRValue(TI);
 }

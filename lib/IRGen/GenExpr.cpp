@@ -70,10 +70,14 @@ RValue IRGenFunction::emitRValue(Expr *E, const TypeInfo &TInfo) {
   case ExprKind::IntegerLiteral:
     return emitIntegerLiteralExpr(*this, cast<IntegerLiteralExpr>(E), TInfo);
 
-  case ExprKind::DeclRef:
   case ExprKind::Tuple:
+    return emitTupleExpr(cast<TupleExpr>(E), TInfo);
   case ExprKind::TupleElement:
+    return emitTupleElementExpr(cast<TupleElementExpr>(E), TInfo);
   case ExprKind::TupleShuffle:
+    return emitTupleShuffleExpr(cast<TupleShuffleExpr>(E), TInfo);
+
+  case ExprKind::DeclRef:
   case ExprKind::Func:
   case ExprKind::Closure:
   case ExprKind::AnonClosureArg:
