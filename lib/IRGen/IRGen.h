@@ -27,6 +27,8 @@ namespace llvm {
 namespace swift {
 namespace irgen {
 
+class Size;
+
 /// An alignment value, in eight-bit units.
 class Alignment {
 public:
@@ -39,6 +41,8 @@ public:
 
   bool isOne() const { return Value == 0; }
   bool isZero() const { return Value == 0; }
+
+  Alignment alignmentAtOffset(Size S) const;
 
   explicit operator bool() const { return Value != 0; }
 
@@ -101,6 +105,24 @@ public:
 private:
   int_type Value;
 };
+
+/// Compute the alignment of a pointer which points S bytes after a
+/// pointer with this alignment.
+inline Alignment Alignment::alignmentAtOffset(Size S) const {
+  assert(getValue() && "called on object with zero alignment");
+
+  // If the offset is zero, use the original alignment.
+  Size::int_type V = S.getValue();
+  if (!V) return *this;
+
+  // Find the offset's largest power-of-two factor.
+  V = V & -V;
+
+  // The alignment at the offset is then the min of the two values.
+  if (V < getValue())
+    return Alignment(static_cast<Alignment::int_type>(V));
+  return *this;
+}
 
 } // end namespace irgen
 } // end namespace swift
