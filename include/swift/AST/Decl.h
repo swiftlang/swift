@@ -17,6 +17,7 @@
 #ifndef SWIFT_DECL_H
 #define SWIFT_DECL_H
 
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 #include "llvm/Support/SMLoc.h"
@@ -107,12 +108,16 @@ public:
 class Decl {
   Decl(const Decl&) = delete;
   void operator=(const Decl&) = delete;
+  DeclContext *DC;
 protected:
-  Decl(DeclKind kind) : Kind(kind) {}
+  Decl(DeclKind kind, DeclContext *DC) : DC(DC), Kind(kind) {}
 public:
   const DeclKind Kind;
   
   SMLoc getLocStart() const;
+
+  DeclContext *getDeclContext() const { return DC; }
+  void setDeclContext(DeclContext *DC) { this->DC = DC; }
   
   void dump() const;
   void print(raw_ostream &OS, unsigned Indent = 0) const;
@@ -134,7 +139,7 @@ public:
   
 /// TranslationUnitDecl - This contains information about all of the decls and
 /// external references in a translation unit, which is one file.
-class TranslationUnitDecl : public Decl {
+class TranslationUnitDecl : public Decl, public DeclContext {
 public:
   ASTContext &Ctx;
 
@@ -147,7 +152,9 @@ public:
   ArrayRef<TypeAliasDecl*> UnresolvedTypesForParser;
   
   TranslationUnitDecl(ASTContext &C)
-    : Decl(DeclKind::TranslationUnit), Ctx(C) {
+    : Decl(DeclKind::TranslationUnit, nullptr),
+      DeclContext(DeclContextKind::TranslationUnitDecl, nullptr),
+      Ctx(C) {
   }
 
   SMLoc getLocStart() const;
@@ -155,6 +162,9 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->Kind == DeclKind::TranslationUnit;
+  }
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::TranslationUnitDecl;
   }
   static bool classof(const TranslationUnitDecl *D) { return true; }
 };
@@ -167,9 +177,9 @@ public:
   SMLoc ImportLoc;
   ArrayRef<std::pair<Identifier,SMLoc>> AccessPath;
   
-  ImportDecl(SMLoc importLoc,
+  ImportDecl(DeclContext *DC, SMLoc importLoc,
              ArrayRef<std::pair<Identifier,SMLoc>> path)
-    : Decl(DeclKind::Import), ImportLoc(importLoc), AccessPath(path) {
+    : Decl(DeclKind::Import, DC), ImportLoc(importLoc), AccessPath(path) {
   }
   
   SMLoc getLocStart() const { return ImportLoc; }
@@ -199,9 +209,9 @@ public:
   static bool classof(const NamedDecl *D) { return true; }
   
 protected:
-  NamedDecl(DeclKind K, Identifier name,
+  NamedDecl(DeclKind K, DeclContext *DC, Identifier name,
             const DeclAttributes &attrs = DeclAttributes())
-    : Decl(K), Name(name), Attrs(attrs) {
+    : Decl(K, DC), Name(name), Attrs(attrs) {
   }
 };
   
@@ -216,9 +226,10 @@ public:
   SMLoc TypeAliasLoc;
   Type UnderlyingTy;
   
-  TypeAliasDecl(SMLoc typealiasloc, Identifier name, Type underlyingty,
+  TypeAliasDecl(DeclContext *DC, SMLoc typealiasloc, Identifier name,
+                Type underlyingty,
                 const DeclAttributes &attrs = DeclAttributes())
-    : NamedDecl(DeclKind::TypeAlias, name, attrs), AliasTy(0),
+    : NamedDecl(DeclKind::TypeAlias, DC, name, attrs), AliasTy(0),
       TypeAliasLoc(typealiasloc), UnderlyingTy(underlyingty) {
   }
 
@@ -251,9 +262,9 @@ public:
   static bool classof(const ValueDecl *D) { return true; }
 
 protected:
-  ValueDecl(DeclKind K, Identifier name, Type ty, Expr *init,
+  ValueDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty, Expr *init,
             const DeclAttributes &attrs = DeclAttributes())
-    : NamedDecl(K, name, attrs), Ty(ty), Init(init) {
+    : NamedDecl(K, DC, name, attrs), Ty(ty), Init(init) {
   }
 };  
 
@@ -267,13 +278,13 @@ public:
   /// contains the nested name specifier.
   DeclVarName *NestedName;
   
-  VarDecl(SMLoc varloc, Identifier name, Type ty, Expr *init,
+  VarDecl(DeclContext *DC, SMLoc varloc, Identifier name, Type ty, Expr *init,
           const DeclAttributes &attrs)
-    : ValueDecl(DeclKind::Var, name, ty, init, attrs), VarLoc(varloc),
+    : ValueDecl(DeclKind::Var, DC, name, ty, init, attrs), VarLoc(varloc),
       NestedName(0) {}
-  VarDecl(SMLoc varloc, DeclVarName *name, Type ty, Expr *init,
+  VarDecl(DeclContext *DC, SMLoc varloc, DeclVarName *name, Type ty, Expr *init,
           const DeclAttributes &attrs)
-    : ValueDecl(DeclKind::Var, Identifier(), ty, init, attrs), VarLoc(varloc),
+    : ValueDecl(DeclKind::Var, DC, Identifier(), ty, init, attrs), VarLoc(varloc),
       NestedName(name) {}
 
   
@@ -291,9 +302,9 @@ class FuncDecl : public ValueDecl {
 public:
   SMLoc FuncLoc;    // Location of the 'func' token.
 
-  FuncDecl(SMLoc funcloc, Identifier name, Type ty, Expr *init,
+  FuncDecl(DeclContext *DC, SMLoc funcloc, Identifier name, Type ty, Expr *init,
           const DeclAttributes &attrs)
-    : ValueDecl(DeclKind::Func, name, ty, init, attrs), FuncLoc(funcloc) {}
+    : ValueDecl(DeclKind::Func, DC, name, ty, init, attrs), FuncLoc(funcloc) {}
   
   
   SMLoc getLocStart() const { return FuncLoc; }
@@ -319,8 +330,9 @@ public:
   Type ArgumentType;
   
   
-  OneOfElementDecl(SMLoc identloc, Identifier name, Type ty, Type argtype)
-  : ValueDecl(DeclKind::OneOfElement, name, ty, 0),
+  OneOfElementDecl(DeclContext *DC, SMLoc identloc, Identifier name, Type ty,
+                   Type argtype)
+  : ValueDecl(DeclKind::OneOfElement, DC, name, ty, 0),
     IdentifierLoc(identloc), ArgumentType(argtype) {}
 
   
@@ -347,8 +359,8 @@ public:
   
   // FIXME: Store the access path here.
   
-  ArgDecl(SMLoc funcloc, Identifier name, Type ty)
-    : ValueDecl(DeclKind::Arg, name, ty, 0, DeclAttributes()),
+  ArgDecl(DeclContext *DC, SMLoc funcloc, Identifier name, Type ty)
+    : ValueDecl(DeclKind::Arg, DC, name, ty, 0, DeclAttributes()),
       FuncLoc(funcloc) {}
 
 
@@ -370,10 +382,10 @@ public:
   SMLoc NameLoc;
   ArrayRef<unsigned> AccessPath;
   
-  ElementRefDecl(VarDecl *vd, SMLoc nameloc, Identifier name,
+  ElementRefDecl(DeclContext *DC, VarDecl *vd, SMLoc nameloc, Identifier name,
                  ArrayRef<unsigned> path, Type ty)
-    : ValueDecl(DeclKind::ElementRef, name, ty, 0), VD(vd), NameLoc(nameloc),
-      AccessPath(path) {
+    : ValueDecl(DeclKind::ElementRef, DC, name, ty, 0), VD(vd),
+      NameLoc(nameloc), AccessPath(path) {
   }
 
   /// getTypeForPath - Given a type and an access path into it, return the

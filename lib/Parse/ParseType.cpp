@@ -241,11 +241,14 @@ OneOfType *Parser::actOnOneOfType(SMLoc OneOfLoc, const DeclAttributes &Attrs,
         EltTy = FunctionType::get(ArgTy, EltTy, Context);
     
     // Create a decl for each element, giving each a temporary type.
-    EltDecls.push_back(new (Context) OneOfElementDecl(Elt.NameLoc, NameI, EltTy,
+    EltDecls.push_back(new (Context) OneOfElementDecl(CurContext, Elt.NameLoc,
+                                                      NameI, EltTy,
                                                       Elt.EltType));
   }
   
-  OneOfType *Result = OneOfType::getNew(OneOfLoc, EltDecls, Context);
+  OneOfType *Result = OneOfType::getNew(CurContext, OneOfLoc, EltDecls,
+                                        Context);
+  for (OneOfElementDecl *D : EltDecls) D->setDeclContext(Result);
   
   if (PrettyTypeName) {
     // If we have a pretty name for this, complete it to its actual type.

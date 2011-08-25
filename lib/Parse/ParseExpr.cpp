@@ -456,6 +456,9 @@ ParseResult<Expr> Parser::parseExprFunc() {
   // The arguments to the func are defined in their own scope.
   Scope FuncBodyScope(this);
   FuncExpr *FE = actOnFuncExprStart(FuncLoc, Ty);
+
+  // Establish the new context.
+  ContextChange CC(*this, FE);
   
   // Then parse the expression.
   ParseResult<BraceStmt> Body;
@@ -536,7 +539,8 @@ static void AddFuncArgumentsToScope(Type Ty,
     
     
     // Create the argument decl for this named argument.
-    ArgDecl *AD = new (P.Context) ArgDecl(FuncLoc, Name, TT->Fields[i].Ty);
+    ArgDecl *AD = new (P.Context) ArgDecl(P.CurContext, FuncLoc, Name,
+                                          TT->Fields[i].Ty);
     ArgDecls.push_back(AD);
     
     // Eventually we should mark the input/outputs as readonly vs writeonly.
@@ -557,7 +561,14 @@ FuncExpr *Parser::actOnFuncExprStart(SMLoc FuncLoc, Type FuncTy) {
   
   ArrayRef<ArgDecl*> Args = ArgDecls;
   
-  return new (Context) FuncExpr(FuncLoc, FuncTy, Context.AllocateCopy(Args));
+  FuncExpr *FE = new (Context) FuncExpr(CurContext, FuncLoc, FuncTy,
+                                        Context.AllocateCopy(Args));
+
+  // Reparent all the arguments.
+  for (ArgDecl *Arg : Args)
+    Arg->setDeclContext(FE);
+
+  return FE;
 }
 
 

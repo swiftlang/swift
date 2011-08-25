@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_EXPR_H
 #define SWIFT_AST_EXPR_H
 
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/WalkOrder.h"
@@ -391,21 +392,25 @@ public:
 /// FuncExpr - An explicit unnamed func definition, which can optionally
 /// have named arguments.
 ///    e.g.  func(a : int) -> int { return a+1 }
-class FuncExpr : public Expr {
+class FuncExpr : public Expr, public DeclContext {
 public:
   SMLoc FuncLoc;
   
   ArrayRef<ArgDecl*> NamedArgs;
   BraceStmt *Body;
   
-  FuncExpr(SMLoc FuncLoc, Type FnType,
+  FuncExpr(DeclContext *Parent, SMLoc FuncLoc, Type FnType,
            ArrayRef<ArgDecl*> NamedArgs, BraceStmt *Body = 0)
-    : Expr(ExprKind::Func, FnType), FuncLoc(FuncLoc), NamedArgs(NamedArgs),
-      Body(Body) {}
+    : Expr(ExprKind::Func, FnType),
+      DeclContext(DeclContextKind::FuncExpr, Parent),
+      FuncLoc(FuncLoc), NamedArgs(NamedArgs), Body(Body) {}
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const FuncExpr *) { return true; }
   static bool classof(const Expr *E) { return E->Kind == ExprKind::Func; }
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::FuncExpr;
+  }
 
 };
   

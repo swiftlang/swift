@@ -17,6 +17,7 @@
 #ifndef SWIFT_TYPES_H
 #define SWIFT_TYPES_H
 
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Identifier.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -262,7 +263,7 @@ private:
   
 /// OneOfType - a 'oneof' type.  This represents the oneof type itself, not its
 /// elements (which are OneOfElementDecl's).
-class OneOfType : public TypeBase {
+class OneOfType : public TypeBase, public DeclContext {
 public:
   const SMLoc OneOfLoc;
   const ArrayRef<OneOfElementDecl*> Elements;
@@ -270,7 +271,7 @@ public:
   /// getNew - Return a new instance of oneof type.  These are never uniqued
   /// since each syntactic instance of them is semantically considered to be a
   /// different type.
-  static OneOfType *getNew(SMLoc OneOfLoc,
+  static OneOfType *getNew(DeclContext *Parent, SMLoc OneOfLoc,
                            ArrayRef<OneOfElementDecl*> Elements,
                            ASTContext &C);
  
@@ -296,8 +297,11 @@ public:
   
 private:
   // oneof types are always canonical.
-  OneOfType(SMLoc oneofloc, ArrayRef<OneOfElementDecl*> Elts)
-    : TypeBase(TypeKind::OneOf, this), OneOfLoc(oneofloc), Elements(Elts) {
+  OneOfType(DeclContext *Parent, SMLoc oneofloc,
+            ArrayRef<OneOfElementDecl*> Elts)
+    : TypeBase(TypeKind::OneOf, this),
+      DeclContext(DeclContextKind::OneOfType, Parent),
+      OneOfLoc(oneofloc), Elements(Elts) {
   }
 };
 

@@ -47,7 +47,9 @@ TypeAliasDecl *ScopeInfo::lookupOrInsertTypeNameDecl(Identifier Name,
   
   // If we don't have a definition for this type, introduce a new TypeAliasDecl
   // with an unresolved underlying type.
-  TypeAliasDecl *TAD = new (TheParser.Context) TypeAliasDecl(Loc, Name, Type());
+  TypeAliasDecl *TAD =
+    new (TheParser.Context) TypeAliasDecl(TheParser.CurContext,
+                                          Loc, Name, Type());
   UnresolvedTypes[Name] = TAD;
   UnresolvedTypeList.push_back(TAD);
   
@@ -145,7 +147,8 @@ TypeAliasDecl *ScopeInfo::addTypeAliasToScope(SMLoc TypeAliasLoc,
   // If we have no existing entry, or if the existing entry is at a different
   // scope level then this is a valid insertion.
   if (TAD == 0 || Level != CurScope->getDepth()) {
-    TAD = new (TheParser.Context) TypeAliasDecl(TypeAliasLoc, Name, Ty);
+    TAD = new (TheParser.Context) TypeAliasDecl(TheParser.CurContext,
+                                                TypeAliasLoc, Name, Ty);
     TypeScopeHT.insert(Name, std::make_pair(CurScope->getDepth(), TAD));
     return TAD;
   }

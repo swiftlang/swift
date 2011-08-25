@@ -39,6 +39,7 @@ class Parser {
 public:
   llvm::SourceMgr &SourceMgr;
   Lexer &L;
+  DeclContext *CurContext;
   ASTContext &Context;
   ScopeInfo ScopeInfo;
   
@@ -46,6 +47,27 @@ public:
   Token Tok;
   
   typedef llvm::PointerUnion3<Expr*, Stmt*, Decl*> ExprStmtOrDecl;
+
+  class ContextChange {
+    Parser &P;
+    DeclContext *OldContext;
+  public:
+    ContextChange(Parser &P, DeclContext *DC)
+      : P(P), OldContext(P.CurContext) {
+      assert(DC && "pushing null context?");
+      P.CurContext = DC;
+    }
+
+    void pop() {
+      assert(OldContext && "already popped context!");
+      P.CurContext = OldContext;
+      OldContext = nullptr;
+    }
+
+    ~ContextChange() {
+      if (OldContext) P.CurContext = OldContext;
+    }
+  };
 
 
   Parser(unsigned BufferID, ASTContext &Ctx);
