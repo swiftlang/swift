@@ -38,8 +38,33 @@ RValue IRGenFunction::emitRValue(Expr *E) {
 }
 
 RValue IRGenFunction::emitRValue(Expr *E, const TypeInfo &TInfo) {
-  // FIXME: implement
-  return RValue();
+  switch (E->Kind) {
+  case ExprKind::OverloadSetRef:
+  case ExprKind::Sequence:
+  case ExprKind::UnresolvedDeclRef:
+  case ExprKind::UnresolvedDot:
+  case ExprKind::UnresolvedMember:
+  case ExprKind::UnresolvedScopedIdentifier:
+    llvm_unreachable("these expression kinds should not survive to IR-gen");
+
+  case ExprKind::Call:
+  case ExprKind::Unary:
+  case ExprKind::Binary:
+    return emitApplyExpr(cast<ApplyExpr>(E), TInfo);
+
+  case ExprKind::IntegerLiteral:
+  case ExprKind::DeclRef:
+  case ExprKind::Tuple:
+  case ExprKind::TupleElement:
+  case ExprKind::TupleShuffle:
+  case ExprKind::Func:
+  case ExprKind::Closure:
+  case ExprKind::AnonClosureArg:
+    IGM.unimplemented(E->getLocStart(),
+                      "cannot generate r-values for this expression yet");
+    return emitFakeRValue(TInfo);
+  }
+  llvm_unreachable("bad expression kind!");
 }
 
 LValue IRGenFunction::emitLValue(Expr *E) {
@@ -56,4 +81,29 @@ LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &TInfo) {
 void IRGenFunction::emitIgnored(Expr *E) {
   // For now, just emit it as an r-value.
   emitRValue(E);
+}
+
+/// Emit a fake l-value which obeys the given specification.  This
+/// should only ever be used for error recovery.
+LValue IRGenFunction::emitFakeLValue(const TypeInfo &TInfo) {
+  llvm::Value *FakeAddr =
+    llvm::UndefValue::get(TInfo.getStorageType()->getPointerTo());
+  return LValue::forAddress(FakeAddr, TInfo.StorageAlignment);
+}
+
+/// Emit a fake r-value which obeys the given specification.  This
+/// should only ever be used for error recovery.
+RValue IRGenFunction::emitFakeRValue(const TypeInfo &TInfo) {
+  RValueSchema Schema = TInfo.getSchema();
+  if (Schema.isScalar()) {
+    llvm::SmallVector<llvm::Value*, RValue::MaxScalars> Scalars;
+    for (llvm::Type *T : Schema.getScalarTypes()) {
+      Scalars.push_back(llvm::UndefValue::get(T));
+    }
+    return RValue::forScalars(Scalars);
+  } else {
+    llvm::Value *Addr =
+      llvm::UndefValue::get(Schema.getAggregateType()->getPointerTo());
+    return RValue::forAggregate(Addr);
+  }
 }

@@ -73,6 +73,9 @@ private:
 
 //--- Expression emission ------------------------------------------------------
 public:
+  RValue emitFakeRValue(const TypeInfo &TInfo);
+  LValue emitFakeLValue(const TypeInfo &TInfo);
+
   void emitIgnored(Expr *E);
 
   LValue emitLValue(Expr *E);
