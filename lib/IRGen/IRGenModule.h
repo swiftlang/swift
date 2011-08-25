@@ -27,8 +27,10 @@ namespace llvm {
   class GlobalVariable;
   class LLVMContext;
   class Module;
+  class SMLoc;
   class TargetData;
   class Type;
+  class Twine;
 }
 
 namespace swift {
@@ -61,6 +63,8 @@ public:
   llvm::IntegerType *Int32Ty;
   llvm::IntegerType *Int64Ty;
   llvm::PointerType *Int8PtrTy;
+
+  void unimplemented(llvm::SMLoc, const llvm::Twine &Message);
 
 //--- Types -----------------------------------------------------------------
 public:

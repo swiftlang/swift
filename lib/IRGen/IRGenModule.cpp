@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
@@ -23,6 +24,7 @@
 #include "llvm/Module.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/SourceMgr.h"
 
 #include "GenType.h"
 #include "IRGenModule.h"
@@ -159,4 +161,8 @@ llvm::Function *IRGenModule::getAddrOfGlobalFunction(FuncDecl *FD) {
 
   Entry = Addr;
   return Addr;
+}
+
+void IRGenModule::unimplemented(llvm::SMLoc Loc, const llvm::Twine &Message) {
+  Context.SourceMgr.PrintMessage(Loc, Message, "error");
 }
