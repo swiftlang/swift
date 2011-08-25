@@ -58,7 +58,7 @@ void IRGenFunction::emitBraceStmt(BraceStmt *BS) {
     } else if (Stmt *S = Elt.dyn_cast<Stmt*>()) {
       emitStmt(S);
     } else {
-      //emitLocal(Elt.get<Decl*>());
+      emitLocal(Elt.get<Decl*>());
     }
   }
 }
