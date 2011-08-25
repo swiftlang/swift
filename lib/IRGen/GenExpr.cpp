@@ -51,3 +51,9 @@ LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &TInfo) {
   // FIXME: implement
   return LValue();
 }
+
+/// Emit an expression whose value is being ignored.
+void IRGenFunction::emitIgnored(Expr *E) {
+  // For now, just emit it as an r-value.
+  emitRValue(E);
+}

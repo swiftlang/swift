@@ -337,3 +337,138 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &ResultInfo) {
     return RValue::forScalars(Result);
   }
 }
+
+/// Emit the prologue for the function.
+void IRGenFunction::emitPrologue() {
+  // Set up the IRBuilder.
+  llvm::BasicBlock *EntryBB = createBasicBlock("entry");
+  assert(CurFn->getBasicBlockList().empty() && "prologue already emitted?");
+  CurFn->getBasicBlockList().push_back(EntryBB);
+  Builder.SetInsertPoint(EntryBB);
+
+  // Set up the alloca insertion point.
+  AllocaIP = Builder.CreateAlloca(IGM.Int1Ty, /*array size*/ nullptr,
+                                  "alloca point");
+
+  // Set up the return block and insert it.  This creates a second
+  // insertion point that most blocks should be inserted before.
+  ReturnBB = createBasicBlock("return");
+  CurFn->getBasicBlockList().push_back(ReturnBB);
+
+  FunctionType *FnTy = CurDecl->Ty->getAs<FunctionType>();
+  assert(FnTy && "emitting a declaration that's not a function?");
+
+  llvm::Function::arg_iterator CurParm = CurFn->arg_begin();
+
+  // Set up the result slot.
+  const TypeInfo &ResultInfo = IGM.getFragileTypeInfo(FnTy->Result);
+  RValueSchema ResultSchema = ResultInfo.getSchema();
+  llvm::Value *ResultAddr;
+  if (ResultSchema.isAggregate()) {
+    ResultAddr = CurParm++;
+  } else if (ResultSchema.isScalar(0)) {
+    ResultAddr = nullptr;
+  } else {
+    ResultAddr = createScopeAlloca(ResultInfo.getStorageType(),
+                                   ResultInfo.StorageAlignment,
+                                   "return_value");
+  }
+  if (ResultAddr)
+    ReturnSlot = LValue::forAddress(ResultAddr, ResultInfo.StorageAlignment);
+
+  // Set up the parameters.  This is syntactically required to be a
+  // tuple, I think.
+  TupleType *ParmTupleTy = FnTy->Input->getAs<TupleType>();
+  assert(ParmTupleTy && "parameter type is not a tuple?");
+
+  for (const TupleTypeElt &Field : ParmTupleTy->Fields) {
+    const TypeInfo &ParmInfo = IGM.getFragileTypeInfo(Field.Ty);
+    RValueSchema ParmSchema = ParmInfo.getSchema();
+
+    // Make an address for the parameter.
+    llvm::Value *ParmAddr;
+    if (ParmSchema.isAggregate()) {
+      ParmAddr = CurParm++;
+    } else {
+      ParmAddr = createScopeAlloca(ParmInfo.getStorageType(),
+                                   ParmInfo.StorageAlignment,
+                                   Field.Name.str());
+    }
+
+    // Turn that into an l-value.
+    LValue ParmLV = LValue::forAddress(ParmAddr, ParmInfo.StorageAlignment);
+
+    // If the parameter was scalar, form an r-value from the
+    // parameters and store that.
+    if (ParmSchema.isScalar()) {
+      SmallVector<llvm::Value*, RValue::MaxScalars> Scalars;
+      for (llvm::Type *ParmType : ParmSchema.getScalarTypes()) {
+        llvm::Value *V = CurParm++;
+        assert(V->getType() == ParmType);
+        (void) ParmType;
+        Scalars.push_back(V);
+      }
+
+      RValue ParmRV = RValue::forScalars(Scalars);
+      ParmInfo.store(*this, ParmRV, ParmLV);
+    }
+
+    // Store ParmLV in the locals map somehow?
+  }
+
+  // TODO: data pointer
+
+  assert(CurParm == CurFn->arg_end() && "didn't exhaust all parameters?");
+}
+
+/// Emit the epilogue for the function.
+void IRGenFunction::emitEpilogue() {
+  // Destroy the alloca insertion point.
+  AllocaIP->eraseFromParent();
+
+  // If there are no edges to the return block, we never want to emit it.
+  if (ReturnBB->use_empty()) {
+    ReturnBB->eraseFromParent();
+
+  // Otherwise, branch to it if the current IP is reachable.
+  } else if (Builder.GetInsertPoint()) {
+    Builder.CreateBr(ReturnBB);
+    Builder.SetInsertPoint(ReturnBB);
+  }
+
+  FunctionType *FnTy = CurDecl->Ty->getAs<FunctionType>();
+  assert(FnTy && "emitting a declaration that's not a function?");
+
+  const TypeInfo &ResultInfo = IGM.getFragileTypeInfo(FnTy->Result);
+  RValueSchema ResultSchema = ResultInfo.getSchema();
+  if (ResultSchema.isAggregate()) {
+    assert(isa<llvm::Argument>(ReturnSlot.getAddress()));
+    Builder.CreateRetVoid();
+  } else if (ResultSchema.isScalar(0)) {
+    assert(!ReturnSlot.isValid());
+    Builder.CreateRetVoid();
+  } else {
+    RValue RV = ResultInfo.load(*this, ReturnSlot);
+    if (RV.isScalar(1)) {
+      Builder.CreateRet(RV.getScalars()[0]);
+    } else {
+      llvm::Value *Result = llvm::UndefValue::get(CurFn->getReturnType());
+      for (unsigned I = 0, E = RV.getScalars().size(); I != E; ++I)
+        Result = Builder.CreateInsertValue(Result, RV.getScalars()[I], I);
+      Builder.CreateRet(Result);
+    }
+  }
+}
+
+/// Emit the definition for the given global function.
+void IRGenModule::emitGlobalFunction(FuncDecl *FD) {
+  // Nothing to do if the function has no body.
+  if (!FD->Init) return;
+
+  llvm::Function *Addr = getAddrOfGlobalFunction(FD);
+
+  IRGenFunction IGF(*this, FD, Addr);
+  IGF.emitPrologue();
+  IGF.emitIgnored(FD->Init);
+  IGF.emitEpilogue();
+}

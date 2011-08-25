@@ -160,13 +160,3 @@ llvm::Function *IRGenModule::getAddrOfGlobalFunction(FuncDecl *FD) {
   Entry = Addr;
   return Addr;
 }
-
-/// Emit the definition for the given global function.
-void IRGenModule::emitGlobalFunction(FuncDecl *FD) {
-  // Nothing to do if the function has no body.
-  if (!FD->Init) return;
-
-  llvm::Function *Addr = getAddrOfGlobalFunction(FD);
-  // FIXME: body
-  (void) Addr;
-}

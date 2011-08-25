@@ -23,9 +23,8 @@
 using namespace swift;
 using namespace irgen;
 
-IRGenFunction::IRGenFunction(IRGenModule &IGM)
-  : IGM(IGM), Builder(IGM.getLLVMContext()),
-    AllocaIP(nullptr) {
+IRGenFunction::IRGenFunction(IRGenModule &IGM, FuncDecl *FD, llvm::Function *Fn)
+  : IGM(IGM), Builder(IGM.getLLVMContext()), CurDecl(FD), CurFn(Fn) {
 }
 
 /// Create an alloca whose lifetime is the duration of the current
@@ -39,4 +38,24 @@ IRGenFunction::createFullExprAlloca(llvm::Type *Ty, Alignment Align,
 
   // TODO: lifetime intrinsics.
   return Alloca;
+}
+
+/// Create an alloca whose lifetime is the duration of the current
+/// scope.
+llvm::AllocaInst *
+IRGenFunction::createScopeAlloca(llvm::Type *Ty, Alignment Align,
+                                 const llvm::Twine &Name) {
+  assert(AllocaIP && "alloca insertion point has not been initialized!");
+  llvm::AllocaInst *Alloca = new llvm::AllocaInst(Ty, Name, AllocaIP);
+  Alloca->setAlignment(Align.getValue());
+
+  // TODO: lifetime intrinsics.
+  return Alloca;
+}
+
+/// Create a new basic block with the given name.  The block is not
+/// automatically inserted into the function.
+llvm::BasicBlock *
+IRGenFunction::createBasicBlock(const llvm::Twine &Name) {
+  return llvm::BasicBlock::Create(IGM.getLLVMContext(), Name);
 }
