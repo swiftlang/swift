@@ -49,9 +49,9 @@ struct RewriteAnonArgExpr {
   RewriteAnonArgExpr(Type funcInputTy, TypeChecker &tc)
     : FuncInputTy(funcInputTy), TC(tc) {}
   
-  Expr *WalkFn(Expr *E, Expr::WalkOrder Order) {
+  Expr *WalkFn(Expr *E, WalkOrder Order) {
  
-    if (Order == Expr::WalkOrder::PreOrder) {
+    if (Order == WalkOrder::PreOrder) {
       // If this is a ClosureExpr, don't walk into it.  This would find *its*
       // anonymous closure arguments, not ours.
       if (isa<ClosureExpr>(E)) return 0; // Don't recurse into it.
@@ -107,7 +107,7 @@ bool TypeChecker::bindAndValidateClosureArgs(Expr *Body, Type FuncInput) {
   // Walk the body and rewrite any anonymous arguments.  Note that this
   // isn't a particularly efficient way to handle this, because we walk subtrees
   // even if they have no anonymous arguments.
-  return Body->WalkExpr(^(Expr *E, Expr::WalkOrder Order) {
+  return Body->WalkExpr(^(Expr *E, WalkOrder Order) {
     return RP->WalkFn(E, Order);
   }) == 0;
 }
@@ -294,11 +294,11 @@ void TypeChecker::checkBody(Expr *&E, Type DestTy) {
   
   // Walk all nodes in an expression tree, checking to make sure they don't
   // contain any DependentTypes.
-  E = E->WalkExpr(^(Expr *E, Expr::WalkOrder Order) {
+  E = E->WalkExpr(^(Expr *E, WalkOrder Order) {
     // Ignore the preorder walk.  We'd rather diagnose use of unresolved types
     // during the postorder walk so that the inner most expressions are 
     // diagnosed before the outermost ones.
-    if (Order == Expr::WalkOrder::PreOrder)
+    if (Order == WalkOrder::PreOrder)
       return E;
     
     assert(!isa<SequenceExpr>(E) && "Should have resolved this");

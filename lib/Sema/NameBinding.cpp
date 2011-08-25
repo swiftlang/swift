@@ -291,10 +291,10 @@ void NameBinder::bindValueName(Identifier Name,
   }
 }
 
-static Expr *BindNames(Expr *E, Expr::WalkOrder Order, NameBinder &Binder) {
+static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
   
   // Ignore the preorder walk.
-  if (Order == Expr::WalkOrder::PreOrder)
+  if (Order == WalkOrder::PreOrder)
     return E;
   
   // Process UnresolvedDeclRefExpr.
@@ -372,7 +372,7 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
   }
 
   NameBinder *NBPtr = &Binder;
-  auto BinderBlock = ^(Expr *E, Expr::WalkOrder Order) {
+  auto BinderBlock = ^(Expr *E, WalkOrder Order) {
     return BindNames(E, Order, *NBPtr);
   };
   

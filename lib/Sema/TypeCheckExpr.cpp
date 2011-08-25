@@ -374,9 +374,9 @@ public:
   
 
   Expr *doIt(Expr *E) {
-    return E->WalkExpr(^Expr*(Expr *E, Expr::WalkOrder Order) {
+    return E->WalkExpr(^Expr*(Expr *E, WalkOrder Order) {
       // This is implemented as a postorder walk.
-      if (Order == Expr::WalkOrder::PreOrder) {
+      if (Order == WalkOrder::PreOrder) {
         // Do not walk into ClosureExpr.  Anonexprs within a nested closures
         // will have already been resolved, so we don't need to recurse into it.
         // This also prevents N^2 re-sema activity with lots of nested closures.
@@ -388,9 +388,9 @@ public:
       // Dispatch to the right visitor case in the post-order walk.  We know
       // that the operands have already been processed and are valid.
       return this->visit(E);
-    }, ^Stmt*(Stmt *S, Expr::WalkOrder Order) {
+    }, ^Stmt*(Stmt *S, WalkOrder Order) {
       // This is implemented as a postorder walk.
-      if (Order == Expr::WalkOrder::PreOrder) {
+      if (Order == WalkOrder::PreOrder) {
         // Do not descend into BraceStmt's, because we want to handle the var
         // initializers in a custom way.  Instead, just call visitBraceStmt in
         // the prepass (which itself manually descends) and then tell the walker
@@ -410,9 +410,9 @@ public:
   }
   
   Stmt *doIt(Stmt *S) {
-    return Expr::WalkExpr(S, ^Expr*(Expr *E, Expr::WalkOrder Order) {
+    return Expr::WalkExpr(S, ^Expr*(Expr *E, WalkOrder Order) {
       // This is implemented as a postorder walk.
-      if (Order == Expr::WalkOrder::PreOrder) {
+      if (Order == WalkOrder::PreOrder) {
         // Do not walk into ClosureExpr.  Anonexprs within a nested closures
         // will have already been resolved, so we don't need to recurse into it.
         // This also prevents N^2 re-sema activity with lots of nested closures.
@@ -424,9 +424,9 @@ public:
       // Dispatch to the right visitor case in the post-order walk.  We know
       // that the operands have already been processed and are valid.
       return this->visit(E);
-    }, ^Stmt*(Stmt *S, Expr::WalkOrder Order) {
+    }, ^Stmt*(Stmt *S, WalkOrder Order) {
       // This is implemented as a postorder walk.
-      if (Order == Expr::WalkOrder::PreOrder) {
+      if (Order == WalkOrder::PreOrder) {
         // Do not descend into BraceStmt's, because we want to handle the var
         // initializers in a custom way.  Instead, just call visitBraceStmt in
         // the prepass (which itself manually descends) and then tell the walker
