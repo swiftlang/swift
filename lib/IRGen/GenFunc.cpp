@@ -100,7 +100,7 @@ namespace {
       // base and so may have a lesser alignment.
       // FIXME: retains?
       llvm::Value *DataAddr =
-        IGF.Builder.CreateStructGEP(Addr, 0, Addr->getName() + ".data");
+        IGF.Builder.CreateStructGEP(Addr, 1, Addr->getName() + ".data");
       llvm::Value *Data =
         IGF.Builder.CreateLoad(DataAddr,
                                std::min(LV.getAlignment(), StorageAlignment),
@@ -121,7 +121,7 @@ namespace {
       // Store the data.
       // FIXME: retains?
       llvm::Value *DataAddr =
-        IGF.Builder.CreateStructGEP(Addr, 0, Addr->getName() + ".data");
+        IGF.Builder.CreateStructGEP(Addr, 1, Addr->getName() + ".data");
       IGF.Builder.CreateStore(RV.getScalars()[1], DataAddr,
                               std::min(LV.getAlignment(), StorageAlignment));
     }
