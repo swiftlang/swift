@@ -1,5 +1,6 @@
 add_swift_library(swiftIRGen
   GenArray.cpp
+  GenControl.cpp
   GenExpr.cpp
   GenFunc.cpp
   GenLocal.cpp

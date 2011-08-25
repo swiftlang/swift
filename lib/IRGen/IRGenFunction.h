@@ -40,12 +40,14 @@ namespace swift {
   class IfStmt;
   class ReturnStmt;
   class Stmt;
+  class Type;
   class ValueDecl;
   class VarDecl;
   class WhileStmt;
 
 namespace irgen {
   class IRGenModule;
+  class JumpDest;
   class RValue;
   class TypeInfo;
 
@@ -63,6 +65,10 @@ public:
 
   void unimplemented(llvm::SMLoc Loc, const llvm::Twine &Message);
 
+//--- Control flow -------------------------------------------------------------
+public:
+  void emitBranch(JumpDest D);
+
 //--- Function prologue and epilogue -------------------------------------------
 public:
   void emitFunction();
@@ -72,6 +78,7 @@ private:
 
   LValue ReturnSlot;
   llvm::BasicBlock *ReturnBB;
+  JumpDest getReturnDest();
 
 //--- Helper methods -----------------------------------------------------------
 public:
@@ -80,6 +87,7 @@ public:
   llvm::AllocaInst *createScopeAlloca(llvm::Type *Ty, Alignment Align,
                                       const llvm::Twine &Name);
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
+  const TypeInfo &getFragileTypeInfo(Type T);
 private:
   llvm::Instruction *AllocaIP;
 

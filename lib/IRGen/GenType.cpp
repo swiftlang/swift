@@ -70,6 +70,11 @@ TypeConverter::~TypeConverter() {
   }
 }
 
+/// Get the fragile type information for the given type.
+const TypeInfo &IRGenFunction::getFragileTypeInfo(Type T) {
+  return IGM.getFragileTypeInfo(T);
+}
+
 /// Get the fragile IR type for the given type.
 llvm::Type *IRGenModule::getFragileType(Type T) {
   return getFragileTypeInfo(T).StorageType;

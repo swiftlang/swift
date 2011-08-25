@@ -14,11 +14,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "Cleanup.h"
+#include "GenType.h"
 #include "IRGenFunction.h"
+#include "JumpDest.h"
+#include "RValue.h"
 
 using namespace swift;
 using namespace irgen;
@@ -72,7 +76,25 @@ void IRGenFunction::emitIfStmt(IfStmt *S) {
 }
 
 void IRGenFunction::emitReturnStmt(ReturnStmt *S) {
-  unimplemented(S->getLocStart(), "ReturnStmt is unimplemented");
+  // The expression is evaluated in a full-expression context.
+  FullExpr FullExpr(*this);
+
+  // If this function takes no return value, ignore the result of the
+  // expression.
+  if (!ReturnSlot.isValid()) {
+    emitIgnored(S->Result);
+  } else {
+    const TypeInfo &ResultInfo = getFragileTypeInfo(S->Result->Ty);
+    RValue RV = emitRValue(S->Result, ResultInfo);
+    ResultInfo.store(*this, RV, ReturnSlot);
+  }
+
+  // Leave the full-expression.
+  FullExpr.pop();
+
+  // In either case, branch to the return block.
+  JumpDest ReturnDest(ReturnBB);
+  emitBranch(ReturnDest);
 }
 
 void IRGenFunction::emitWhileStmt(WhileStmt *S) {

@@ -33,6 +33,7 @@ namespace swift {
   class OneOfType;
   class TupleType;
   class Type;
+  class TypeBase;
 
 namespace irgen {
   class IRGenFunction;

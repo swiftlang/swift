@@ -28,6 +28,7 @@ class IRGenFunction;
 class Scope {
 public:
   Scope(IRGenFunction &IGF) {}
+  void pop() {}
 };
 
 /// A FullExpr is a RAII object recording that a full-expression has
@@ -35,6 +36,7 @@ public:
 class FullExpr {
 public:
   FullExpr(IRGenFunction &IGF) {}
+  void pop() {}
 };
 
 } // end namespace irgen
