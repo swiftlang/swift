@@ -472,6 +472,6 @@ void IRGenModule::emitGlobalFunction(FuncDecl *FD) {
 
 void IRGenFunction::emitFunction() {
   emitPrologue();
-  //emitStmt(CurFuncExpr->Body);
+  emitBraceStmt(CurFuncExpr->Body);
   emitEpilogue();
 }

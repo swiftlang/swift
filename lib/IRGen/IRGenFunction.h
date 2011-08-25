@@ -31,9 +31,11 @@ namespace llvm {
 namespace swift {
   class ApplyExpr;
   class BraceStmt;
+  class Decl;
   class Expr;
   class FuncDecl;
   class FuncExpr;
+  class Stmt;
   class ValueDecl;
   class VarDecl;
 
@@ -74,6 +76,13 @@ public:
 private:
   llvm::Instruction *AllocaIP;
 
+//--- Statement emission -------------------------------------------------------
+public:
+  void emitBraceStmt(BraceStmt *S);
+  void emitStmt(Stmt *S);
+
+private:
+
 //--- Expression emission ------------------------------------------------------
 public:
   RValue emitFakeRValue(const TypeInfo &TInfo);
@@ -93,6 +102,7 @@ private:
 
 //--- Declaration emission -----------------------------------------------------
 public:
+  void emitLocal(Decl *D);
   LValue getLocal(VarDecl *D);
 
 private:
