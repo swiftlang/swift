@@ -49,10 +49,8 @@ struct RewriteAnonArgExpr {
   RewriteAnonArgExpr(Type funcInputTy, TypeChecker &tc)
     : FuncInputTy(funcInputTy), TC(tc) {}
   
-  static Expr *WalkFn(Expr *E, Expr::WalkOrder Order, void *rewriter) {
-    RewriteAnonArgExpr &Rewriter = *static_cast<RewriteAnonArgExpr*>(rewriter);
-    Type FuncInputTy = Rewriter.FuncInputTy;
-  
+  Expr *WalkFn(Expr *E, Expr::WalkOrder Order) {
+ 
     if (Order == Expr::WalkOrder::PreOrder) {
       // If this is a ClosureExpr, don't walk into it.  This would find *its*
       // anonymous closure arguments, not ours.
@@ -79,7 +77,7 @@ struct RewriteAnonArgExpr {
     // Verify that the argument number isn't too large, e.g. using $4 when the
     // bound function only has 2 inputs.
     if (A->ArgNo >= NumInputArgs) {
-      Rewriter.TC.error(A->Loc,
+      TC.error(A->Loc,
                "use of invalid anonymous argument, with number higher than"
                " # arguments to bound function");
       return 0;
@@ -104,11 +102,14 @@ struct RewriteAnonArgExpr {
 /// a pointer to the argument to be used for the ClosureExpr.
 bool TypeChecker::bindAndValidateClosureArgs(Expr *Body, Type FuncInput) {  
   RewriteAnonArgExpr Rewriter(FuncInput, *this);
+  RewriteAnonArgExpr *RP = &Rewriter;
   
   // Walk the body and rewrite any anonymous arguments.  Note that this
   // isn't a particularly efficient way to handle this, because we walk subtrees
   // even if they have no anonymous arguments.
-  return Body->WalkExpr(RewriteAnonArgExpr::WalkFn, 0, &Rewriter) == 0;
+  return Body->WalkExpr(^(Expr *E, Expr::WalkOrder Order) {
+    return RP->WalkFn(E, Order);
+  }) == 0;
 }
 
 
@@ -271,29 +272,6 @@ void TypeChecker::validateAttributes(DeclAttributes &Attrs, Type Ty) {
   }
 }
 
-/// DiagnoseUnresolvedTypes - This function is invoked on all nodes in an
-/// expression tree checking to make sure they don't contain any DependentTypes.
-static Expr *DiagnoseUnresolvedTypes(Expr *E, Expr::WalkOrder Order,
-                                     void *Data) {
-  TypeChecker &TC = *(TypeChecker*)Data;
-  
-  // Ignore the preorder walk.  We'd rather diagnose use of unresolved types
-  // during the postorder walk so that the inner most expressions are diagnosed
-  // before the outermost ones.
-  if (Order == Expr::WalkOrder::PreOrder)
-    return E;
-  
-  assert(!isa<SequenceExpr>(E) && "Should have resolved this");
-  
-  // Use is to strip off sugar.
-  if (!E->Ty->is<DependentType>())
-    return E;
-  
-  TC.error(E->getLocStart(),
-           "ambiguous expression was not resolved to a concrete type");
-  return 0;
-}
-
 
 /// checkBody - Type check an expression that is used in a top-level
 /// context like a var/func body, or tuple default value.  If DestTy is
@@ -312,8 +290,27 @@ void TypeChecker::checkBody(Expr *&E, Type DestTy) {
   // Check the initializer/body to make sure that we succeeded in resolving
   // all of the types contained within it.  We should not have any
   // DependentType's left for subexpressions.
-  if (E)
-    E = E->WalkExpr(DiagnoseUnresolvedTypes, 0, this);
+  if (E == 0) return;
+  
+  // Walk all nodes in an expression tree, checking to make sure they don't
+  // contain any DependentTypes.
+  E = E->WalkExpr(^(Expr *E, Expr::WalkOrder Order) {
+    // Ignore the preorder walk.  We'd rather diagnose use of unresolved types
+    // during the postorder walk so that the inner most expressions are 
+    // diagnosed before the outermost ones.
+    if (Order == Expr::WalkOrder::PreOrder)
+      return E;
+    
+    assert(!isa<SequenceExpr>(E) && "Should have resolved this");
+    
+    // Use is to strip off sugar.
+    if (!E->Ty->is<DependentType>())
+      return E;
+    
+    error(E->getLocStart(),
+          "ambiguous expression was not resolved to a concrete type");
+    return 0;
+  });
 }
 
 void TypeChecker::typeCheck(TypeAliasDecl *TAD) {

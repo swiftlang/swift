@@ -78,28 +78,26 @@ public:
   };
 
   /// WalkExpr - This function walks all the subexpressions under this
-  /// expression and invokes the specified function pointer on them.  The
-  /// function pointer is invoked both before and after the children are visted,
+  /// expression and invokes the specified block pointer on them.  The
+  /// block pointer is invoked both before and after the children are visted,
   /// the WalkOrder specifies at each invocation which stage it is.  If the
-  /// function pointer returns a non-NULL value, then the returned expression is
+  /// block pointer returns a non-NULL value, then the returned expression is
   /// spliced back into the AST or returned from WalkExpr if at the top-level.
   ///
-  /// If function pointer returns NULL from a pre-order invocation, then the
-  /// subtree is not visited.  If the function pointer returns NULL from a
+  /// If block pointer returns NULL from a pre-order invocation, then the
+  /// subtree is not visited.  If the block pointer returns NULL from a
   /// post-order invocation, then the walk is terminated and WalkExpr returns
   /// NULL.
   ///
   /// This walker invokes the StmtFn on each statement, just like expressions.
   ///
-  Expr *WalkExpr(Expr *(*ExprFn)(Expr *E, WalkOrder Order, void *Data),
-                 Stmt *(*StmtFn)(Stmt *E, WalkOrder Order, void *Data),
-                 void *Data);
+  Expr *WalkExpr(Expr *(^ExprFn)(Expr *E, WalkOrder Order),
+                 Stmt *(^StmtFn)(Stmt *E, WalkOrder Order) = 0);
   
   /// WalkExpr - This walks all of the expressions contained within a statement.
   static Stmt *WalkExpr(Stmt *S,
-                        Expr *(*Fn)(Expr *E, WalkOrder Order, void *Data),
-                        Stmt *(*StmtFn)(Stmt *E, WalkOrder Order, void *Data),
-                        void *Data);
+                        Expr *(^Fn)(Expr *E, WalkOrder Order),
+                        Stmt *(^StmtFn)(Stmt *E, WalkOrder Order) = 0);
   
   /// ConversionRank - This enum specifies the rank of an implicit conversion
   /// of a value from one type to another.  These are ordered from cheapest to

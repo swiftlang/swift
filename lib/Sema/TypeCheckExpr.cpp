@@ -372,50 +372,78 @@ public:
   
   SemaExpressionTree(TypeChecker &tc) : TC(tc) {}
   
-  static Expr *WalkExprFn(Expr *E, Expr::WalkOrder Order, void *set) {
-    SemaExpressionTree &SET = *static_cast<SemaExpressionTree*>(set);
-    // This is implemented as a postorder walk.
-    if (Order == Expr::WalkOrder::PreOrder) {
-      // Do not walk into ClosureExpr.  Anonexprs within a nested closures
-      // will have already been resolved, so we don't need to recurse into it.
-      // This also prevents N^2 re-sema activity with lots of nested closures.
-      if (isa<ClosureExpr>(E)) return 0;
-      
-      return E;
-    }
-    
-    // Dispatch to the right visitor case in the post-order walk.  We know
-    // that the operands have already been processed and are valid.
-    return SET.visit(E);
-  }
-  
-  static Stmt *WalkStmtFn(Stmt *S, Expr::WalkOrder Order, void *set) {
-    SemaExpressionTree &SET = *static_cast<SemaExpressionTree*>(set);
-    // This is implemented as a postorder walk.
-    if (Order == Expr::WalkOrder::PreOrder) {
-      // Do not descend into BraceStmt's, because we want to handle the var
-      // initializers in a custom way.  Instead, just call visitBraceStmt in
-      // the prepass (which itself manually descends) and then tell the walker
-      // to not dive into it.
-      if (BraceStmt *BS = dyn_cast<BraceStmt>(S)) {
-        SET.PreProcessBraceStmt(BS);
-        return 0;
+
+  Expr *doIt(Expr *E) {
+    return E->WalkExpr(^Expr*(Expr *E, Expr::WalkOrder Order) {
+      // This is implemented as a postorder walk.
+      if (Order == Expr::WalkOrder::PreOrder) {
+        // Do not walk into ClosureExpr.  Anonexprs within a nested closures
+        // will have already been resolved, so we don't need to recurse into it.
+        // This also prevents N^2 re-sema activity with lots of nested closures.
+        if (isa<ClosureExpr>(E)) return 0;
+        
+        return E;
       }
       
-      return S;
-    }
-    
-    // Dispatch to the right visitor case in the post-order walk.  We know
-    // that the operands have already been processed and are valid.
-    return SET.visit(S);
-  }
-  
-  Expr *doIt(Expr *E) {
-    return E->WalkExpr(WalkExprFn, WalkStmtFn, this);
+      // Dispatch to the right visitor case in the post-order walk.  We know
+      // that the operands have already been processed and are valid.
+      return this->visit(E);
+    }, ^Stmt*(Stmt *S, Expr::WalkOrder Order) {
+      // This is implemented as a postorder walk.
+      if (Order == Expr::WalkOrder::PreOrder) {
+        // Do not descend into BraceStmt's, because we want to handle the var
+        // initializers in a custom way.  Instead, just call visitBraceStmt in
+        // the prepass (which itself manually descends) and then tell the walker
+        // to not dive into it.
+        if (BraceStmt *BS = dyn_cast<BraceStmt>(S)) {
+          this->PreProcessBraceStmt(BS);
+          return 0;
+        }
+        
+        return S;
+      }
+      
+      // Dispatch to the right visitor case in the post-order walk.  We know
+      // that the operands have already been processed and are valid.
+      return this->visit(S);
+    });
   }
   
   Stmt *doIt(Stmt *S) {
-    return Expr::WalkExpr(S, WalkExprFn, WalkStmtFn, this);
+    return Expr::WalkExpr(S, ^Expr*(Expr *E, Expr::WalkOrder Order) {
+      // This is implemented as a postorder walk.
+      if (Order == Expr::WalkOrder::PreOrder) {
+        // Do not walk into ClosureExpr.  Anonexprs within a nested closures
+        // will have already been resolved, so we don't need to recurse into it.
+        // This also prevents N^2 re-sema activity with lots of nested closures.
+        if (isa<ClosureExpr>(E)) return 0;
+        
+        return E;
+      }
+      
+      // Dispatch to the right visitor case in the post-order walk.  We know
+      // that the operands have already been processed and are valid.
+      return this->visit(E);
+    }, ^Stmt*(Stmt *S, Expr::WalkOrder Order) {
+      // This is implemented as a postorder walk.
+      if (Order == Expr::WalkOrder::PreOrder) {
+        // Do not descend into BraceStmt's, because we want to handle the var
+        // initializers in a custom way.  Instead, just call visitBraceStmt in
+        // the prepass (which itself manually descends) and then tell the walker
+        // to not dive into it.
+        if (BraceStmt *BS = dyn_cast<BraceStmt>(S)) {
+          this->PreProcessBraceStmt(BS);
+          return 0;
+        }
+        
+        return S;
+      }
+      
+      // Dispatch to the right visitor case in the post-order walk.  We know
+      // that the operands have already been processed and are valid.
+      return this->visit(S);
+    });
+
   }
 };
 } // end anonymous namespace.

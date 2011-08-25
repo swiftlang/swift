@@ -291,8 +291,7 @@ void NameBinder::bindValueName(Identifier Name,
   }
 }
 
-static Expr *BindNames(Expr *E, Expr::WalkOrder Order, void *binder) {
-  NameBinder &Binder = *static_cast<NameBinder*>(binder);
+static Expr *BindNames(Expr *E, Expr::WalkOrder Order, NameBinder &Binder) {
   
   // Ignore the preorder walk.
   if (Order == Expr::WalkOrder::PreOrder)
@@ -372,6 +371,11 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
     TA->UnderlyingTy = ErrorType::get(Ctx);
   }
 
+  NameBinder *NBPtr = &Binder;
+  auto BinderBlock = ^(Expr *E, Expr::WalkOrder Order) {
+    return BindNames(E, Order, *NBPtr);
+  };
+  
   // Now that we know the top-level value names, go through and resolve any
   // UnresolvedDeclRefExprs that exist.
   for (unsigned i = 0, e = TUD->Body->NumElements; i != e; ++i) {
@@ -379,11 +383,11 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
     if (Decl *D = Elt.dyn_cast<Decl*>()) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
         if (VD->Init)
-          VD->Init = VD->Init->WalkExpr(BindNames, 0, &Binder);
+          VD->Init = VD->Init->WalkExpr(BinderBlock);
     } else if (Stmt *S = Elt.dyn_cast<Stmt*>()) {
-      Elt = Expr::WalkExpr(S, BindNames, 0, &Binder);
+      Elt = Expr::WalkExpr(S, BinderBlock);
     } else {
-      Elt = Elt.get<Expr*>()->WalkExpr(BindNames, 0, &Binder);
+      Elt = Elt.get<Expr*>()->WalkExpr(BinderBlock);
     }
     
     // Fill in null results with a dummy expression.

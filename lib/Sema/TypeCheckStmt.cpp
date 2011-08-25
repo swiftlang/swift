@@ -15,5 +15,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecking.h"
+#include "swift/AST/ASTVisitor.h"
+//#include "llvm/ADT/PointerUnion.h"
+//#include "llvm/ADT/Twine.h"
+using namespace swift;
 
-int d;
+
+int x;

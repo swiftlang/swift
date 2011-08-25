@@ -319,9 +319,8 @@ namespace {
   /// pointer returns true the walk is terminated.
   class ExprWalker : public ASTVisitor<ExprWalker, Expr*, Stmt*> {
     friend class ASTVisitor<ExprWalker, Expr*, Stmt*>;
-    Expr *(*ExprFn)(Expr *E, Expr::WalkOrder Order, void *Data);
-    Stmt *(*StmtFn)(Stmt *S, Expr::WalkOrder Order, void *Data);
-    void *Data;
+    Expr *(^ExprFn)(Expr *E, Expr::WalkOrder Order);
+    Stmt *(^StmtFn)(Stmt *S, Expr::WalkOrder Order);
     
     
     Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *E) { return E; }
@@ -520,9 +519,9 @@ namespace {
     }
        
   public:
-    ExprWalker(Expr *(*exprfn)(Expr *E, Expr::WalkOrder Order, void *Data),
-               Stmt *(*stmtfn)(Stmt *S, Expr::WalkOrder Order, void *Data),
-               void *data) : ExprFn(exprfn), StmtFn(stmtfn), Data(data) {
+    ExprWalker(Expr *(^ExprFn)(Expr *E, Expr::WalkOrder Order),
+               Stmt *(^StmtFn)(Stmt *S, Expr::WalkOrder Order))
+      : ExprFn(ExprFn), StmtFn(StmtFn) {
     }
     Expr *doIt(Expr *E) {
       // If no visitor function wants to get called before/after the node, just
@@ -532,11 +531,11 @@ namespace {
       
       // Try the preorder visitation.  If it returns null, we just skip entering
       // subnodes of this tree.
-      Expr *E2 = ExprFn(E, Expr::WalkOrder::PreOrder, Data);
+      Expr *E2 = ExprFn(E, Expr::WalkOrder::PreOrder);
       if (E2 == 0) return E;
       
       if (E) E = visit(E);
-      if (E) E = ExprFn(E, Expr::Expr::WalkOrder::PostOrder, Data);
+      if (E) E = ExprFn(E, Expr::Expr::WalkOrder::PostOrder);
       return E;
     }
     Stmt *doIt(Stmt *S) {
@@ -547,11 +546,11 @@ namespace {
       
       // Try the preorder visitation.  If it returns null, we just skip entering
       // subnodes of this tree.
-      Stmt *S2 = StmtFn(S, Expr::WalkOrder::PreOrder, Data);
+      Stmt *S2 = StmtFn(S, Expr::WalkOrder::PreOrder);
       if (S2 == 0) return S;
       
       if (S) S = visit(S);
-      if (S) S = StmtFn(S, Expr::Expr::WalkOrder::PostOrder, Data);
+      if (S) S = StmtFn(S, Expr::Expr::WalkOrder::PostOrder);
       return S;
     }
   };
@@ -564,18 +563,16 @@ namespace {
 /// function pointer returns true then the walk is terminated and WalkExpr
 /// returns true.
 /// 
-Expr *Expr::WalkExpr(Expr *(*ExprFn)(Expr *E, WalkOrder Order, void *Data),
-                     Stmt *(*StmtFn)(Stmt *S, WalkOrder Order, void *Data),
-                     void *Data) {
-  return ExprWalker(ExprFn, StmtFn, Data).doIt(this);  
+Expr *Expr::WalkExpr(Expr *(^ExprFn)(Expr *E, WalkOrder Order),
+                     Stmt *(^StmtFn)(Stmt *S, WalkOrder Order)) {
+  return ExprWalker(ExprFn, StmtFn).doIt(this);  
 }
 
 /// WalkExpr - This walks all of the expressions contained within a statement.
 Stmt *Expr::WalkExpr(Stmt *S,
-                    Expr *(*ExprFn)(Expr *E, WalkOrder Order, void *Data),
-                    Stmt *(*StmtFn)(Stmt *S, WalkOrder Order, void *Data),
-                    void *Data) {
-  return ExprWalker(ExprFn, StmtFn, Data).doIt(S);  
+                    Expr *(^ExprFn)(Expr *E, WalkOrder Order),
+                    Stmt *(^StmtFn)(Stmt *S, WalkOrder Order)) {
+  return ExprWalker(ExprFn, StmtFn).doIt(S);  
 }
 
 
