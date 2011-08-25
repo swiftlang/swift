@@ -32,6 +32,21 @@
 using namespace swift;
 using namespace irgen;
 
+/// Emit an integer literal expression.
+static RValue emitIntegerLiteralExpr(IRGenFunction &IGF, IntegerLiteralExpr *E,
+                                     const TypeInfo &TInfo) {
+  // We make this work by making some pretty awesome assumptions about
+  // how the type is represented.  Probably there ought to be
+  // something slightly less awesome.
+  RValueSchema Schema = TInfo.getSchema();
+  assert(Schema.isScalar(1));
+  llvm::IntegerType *IntTy =
+    cast<llvm::IntegerType>(Schema.getScalarTypes()[0]);
+
+  llvm::Value *Value = llvm::ConstantInt::get(IntTy, E->getValue());
+  return RValue::forScalars(Value);
+}
+
 RValue IRGenFunction::emitRValue(Expr *E) {
   const TypeInfo &TInfo = IGM.getFragileTypeInfo(E->Ty);
   return emitRValue(E, TInfo);
@@ -53,6 +68,8 @@ RValue IRGenFunction::emitRValue(Expr *E, const TypeInfo &TInfo) {
     return emitApplyExpr(cast<ApplyExpr>(E), TInfo);
 
   case ExprKind::IntegerLiteral:
+    return emitIntegerLiteralExpr(*this, cast<IntegerLiteralExpr>(E), TInfo);
+
   case ExprKind::DeclRef:
   case ExprKind::Tuple:
   case ExprKind::TupleElement:
