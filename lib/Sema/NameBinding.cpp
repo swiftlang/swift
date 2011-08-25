@@ -383,11 +383,11 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
     if (Decl *D = Elt.dyn_cast<Decl*>()) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
         if (VD->Init)
-          VD->Init = VD->Init->WalkExpr(BinderBlock);
+          VD->Init = VD->Init->walk(BinderBlock);
     } else if (Stmt *S = Elt.dyn_cast<Stmt*>()) {
-      Elt = Expr::WalkExpr(S, BinderBlock);
+      Elt = S->walk(BinderBlock);
     } else {
-      Elt = Elt.get<Expr*>()->WalkExpr(BinderBlock);
+      Elt = Elt.get<Expr*>()->walk(BinderBlock);
     }
     
     // Fill in null results with a dummy expression.

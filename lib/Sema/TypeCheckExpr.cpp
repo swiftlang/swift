@@ -374,7 +374,7 @@ public:
   
 
   Expr *doIt(Expr *E) {
-    return E->WalkExpr(^Expr*(Expr *E, WalkOrder Order) {
+    return E->walk(^Expr*(Expr *E, WalkOrder Order) {
       // This is implemented as a postorder walk.
       if (Order == WalkOrder::PreOrder) {
         // Do not walk into ClosureExpr.  Anonexprs within a nested closures
@@ -410,7 +410,7 @@ public:
   }
   
   Stmt *doIt(Stmt *S) {
-    return Expr::WalkExpr(S, ^Expr*(Expr *E, WalkOrder Order) {
+    return S->walk(^Expr*(Expr *E, WalkOrder Order) {
       // This is implemented as a postorder walk.
       if (Order == WalkOrder::PreOrder) {
         // Do not walk into ClosureExpr.  Anonexprs within a nested closures

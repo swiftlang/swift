@@ -556,23 +556,14 @@ namespace {
   };
 } // end anonymous namespace.
 
-/// WalkExpr - This function walks all the subexpressions under this
-/// expression and invokes the specified function pointer on them.  The
-/// function pointer is invoked both before and after the children are visted,
-/// the WalkOrder specifies at each invocation which stage it is.  If the
-/// function pointer returns true then the walk is terminated and WalkExpr
-/// returns true.
-/// 
-Expr *Expr::WalkExpr(Expr *(^ExprFn)(Expr *E, WalkOrder Order),
-                     Stmt *(^StmtFn)(Stmt *S, WalkOrder Order)) {
+Expr *Expr::walk(Expr *(^ExprFn)(Expr *E, WalkOrder Order),
+                 Stmt *(^StmtFn)(Stmt *S, WalkOrder Order)) {
   return ExprWalker(ExprFn, StmtFn).doIt(this);  
 }
 
-/// WalkExpr - This walks all of the expressions contained within a statement.
-Stmt *Expr::WalkExpr(Stmt *S,
-                    Expr *(^ExprFn)(Expr *E, WalkOrder Order),
-                    Stmt *(^StmtFn)(Stmt *S, WalkOrder Order)) {
-  return ExprWalker(ExprFn, StmtFn).doIt(S);  
+Stmt *Stmt::walk(Expr *(^ExprFn)(Expr *E, WalkOrder Order),
+                 Stmt *(^StmtFn)(Stmt *S, WalkOrder Order)) {
+  return ExprWalker(ExprFn, StmtFn).doIt(this);
 }
 
 

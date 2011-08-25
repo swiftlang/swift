@@ -107,7 +107,7 @@ bool TypeChecker::bindAndValidateClosureArgs(Expr *Body, Type FuncInput) {
   // Walk the body and rewrite any anonymous arguments.  Note that this
   // isn't a particularly efficient way to handle this, because we walk subtrees
   // even if they have no anonymous arguments.
-  return Body->WalkExpr(^(Expr *E, WalkOrder Order) {
+  return Body->walk(^(Expr *E, WalkOrder Order) {
     return RP->WalkFn(E, Order);
   }) == 0;
 }
@@ -294,7 +294,7 @@ void TypeChecker::checkBody(Expr *&E, Type DestTy) {
   
   // Walk all nodes in an expression tree, checking to make sure they don't
   // contain any DependentTypes.
-  E = E->WalkExpr(^(Expr *E, WalkOrder Order) {
+  E = E->walk(^(Expr *E, WalkOrder Order) {
     // Ignore the preorder walk.  We'd rather diagnose use of unresolved types
     // during the postorder walk so that the inner most expressions are 
     // diagnosed before the outermost ones.

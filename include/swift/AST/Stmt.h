@@ -18,6 +18,7 @@
 #define SWIFT_AST_STMT_H
 
 #include "swift/AST/LLVM.h"
+#include "swift/AST/WalkOrder.h"
 #include "llvm/Support/SMLoc.h"
 
 namespace llvm {
@@ -51,6 +52,26 @@ public:
   /// getLocStart - Return the location of the start of the expression.
   /// FIXME: QOI: Need to extend this to do full source ranges like Clang.
   SMLoc getLocStart() const;
+  
+  
+  /// walk - This recursively walks all of the statements and expressions
+  /// contained within a statement and invokes the ExprFn and StmtFn blocks on
+  /// each.
+  ///
+  /// The block pointers are invoked both before and after the children are
+  /// visted, with the WalkOrder specifing at each invocation which stage it is.
+  /// If the block pointer returns a non-NULL value, then the returned
+  /// expression or statement is spliced back into the AST or returned from
+  /// 'walk' if at the top-level.
+  ///
+  /// If block pointer returns NULL from a pre-order invocation, then the
+  /// subtree is not visited.  If the block pointer returns NULL from a
+  /// post-order invocation, then the walk is terminated and 'walk returns
+  /// NULL.
+  ///
+  Stmt *walk(Expr *(^ExprFn)(Expr *E, WalkOrder Order),
+             Stmt *(^StmtFn)(Stmt *E, WalkOrder Order) = 0);
+  
   
   void dump() const;
   void print(raw_ostream &OS, unsigned Indent = 0) const;
