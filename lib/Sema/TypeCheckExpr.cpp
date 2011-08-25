@@ -208,7 +208,7 @@ namespace {
 /// intermediate nodes, introduce type coercion etc.  This visitor does this
 /// job.  Each visit method reanalyzes the children of a node, then reanalyzes
 /// the node, and returns true on error.
-class SemaExpressionTree : public ASTVisitor<SemaExpressionTree, Expr*, Stmt*> {
+class SemaExpressionTree : public ExprVisitor<SemaExpressionTree, Expr*> {
 public:
   TypeChecker &TC;
   
@@ -324,52 +324,6 @@ public:
   Expr *visitUnaryExpr(UnaryExpr *E) { return visitApplyExpr(E); }
   Expr *visitBinaryExpr(BinaryExpr *E) { return visitApplyExpr(E); }
   
-  Stmt *visitSemiStmt(SemiStmt *S) {
-    return S;
-  }
-  
-  Stmt *visitAssignStmt(AssignStmt *S) {
-    // Coerce the source to the destination type.
-    S->Src = TC.convertToType(S->Src, S->Dest->Ty);
-    if (S->Src == 0) {
-      TC.note(S->EqualLoc,
-              "while converting assigned value to destination type");
-      return 0;
-    }
-    
-    return S;
-  }
-  
-  Stmt *visitBraceStmt(BraceStmt *BS) {
-    assert(0 && "BraceStmts should be processed in the prepass");
-    return 0;
-  }
-  
-  Stmt *visitReturnStmt(ReturnStmt *RS) {
-    // FIXME: Convert the subexpr to the return type..
-    return RS;
-  }
-  
-  Stmt *visitIfStmt(IfStmt *IS) {
-    // The if condition must have __builtin_int1 type.  This is after the
-    // conversion function is added by sema.
-    IS->Cond = TC.convertToType(IS->Cond, TC.Context.TheInt1Type);
-    if (IS->Cond == 0)
-      return 0;
-    
-    return IS;
-  }
-  
-  Stmt *visitWhileStmt(WhileStmt *WS) {
-    // The if condition must have __builtin_int1 type.  This is after the
-    // conversion function is added by sema.
-    WS->Cond = TC.convertToType(WS->Cond, TC.Context.TheInt1Type);
-    if (WS->Cond == 0)
-      return 0;
-    
-    return WS;
-  }
-  
   SemaExpressionTree(TypeChecker &tc) : TC(tc) {}
   
 
@@ -388,62 +342,7 @@ public:
       // Dispatch to the right visitor case in the post-order walk.  We know
       // that the operands have already been processed and are valid.
       return this->visit(E);
-    }, ^Stmt*(Stmt *S, WalkOrder Order) {
-      // This is implemented as a postorder walk.
-      if (Order == WalkOrder::PreOrder) {
-        // Do not descend into BraceStmt's, because we want to handle the var
-        // initializers in a custom way.  Instead, just call visitBraceStmt in
-        // the prepass (which itself manually descends) and then tell the walker
-        // to not dive into it.
-        if (BraceStmt *BS = dyn_cast<BraceStmt>(S)) {
-          this->PreProcessBraceStmt(BS);
-          return 0;
-        }
-        
-        return S;
-      }
-      
-      // Dispatch to the right visitor case in the post-order walk.  We know
-      // that the operands have already been processed and are valid.
-      return this->visit(S);
     });
-  }
-  
-  Stmt *doIt(Stmt *S) {
-    return S->walk(^Expr*(Expr *E, WalkOrder Order) {
-      // This is implemented as a postorder walk.
-      if (Order == WalkOrder::PreOrder) {
-        // Do not walk into ClosureExpr.  Anonexprs within a nested closures
-        // will have already been resolved, so we don't need to recurse into it.
-        // This also prevents N^2 re-sema activity with lots of nested closures.
-        if (isa<ClosureExpr>(E)) return 0;
-        
-        return E;
-      }
-      
-      // Dispatch to the right visitor case in the post-order walk.  We know
-      // that the operands have already been processed and are valid.
-      return this->visit(E);
-    }, ^Stmt*(Stmt *S, WalkOrder Order) {
-      // This is implemented as a postorder walk.
-      if (Order == WalkOrder::PreOrder) {
-        // Do not descend into BraceStmt's, because we want to handle the var
-        // initializers in a custom way.  Instead, just call visitBraceStmt in
-        // the prepass (which itself manually descends) and then tell the walker
-        // to not dive into it.
-        if (BraceStmt *BS = dyn_cast<BraceStmt>(S)) {
-          this->PreProcessBraceStmt(BS);
-          return 0;
-        }
-        
-        return S;
-      }
-      
-      // Dispatch to the right visitor case in the post-order walk.  We know
-      // that the operands have already been processed and are valid.
-      return this->visit(S);
-    });
-
   }
 };
 } // end anonymous namespace.
@@ -623,68 +522,7 @@ Expr *SemaExpressionTree::visitSequenceExpr(SequenceExpr *E) {
   return ReduceBinaryExprs(E, i, TC);
 }
 
-
-void SemaExpressionTree::PreProcessBraceStmt(BraceStmt *BS) {
-  SmallVector<BraceStmt::ExprStmtOrDecl, 32> NewElements;
-  
-  // Braces have to manually walk into subtrees for expressions, because we
-  // terminate the walk we're in for them (so we can handle decls custom).
-  for (unsigned i = 0, e = BS->NumElements; i != e; ++i) {
-    if (Expr *SubExpr = BS->Elements[i].dyn_cast<Expr*>()) {
-      if ((SubExpr = doIt(SubExpr)) == 0)
-        continue;
-      
-      // Otherwise it is a normal expression or an as-yet-unresolved sequence.
-      NewElements.push_back(SubExpr);
-      continue;
-    }
-    
-    if (Stmt *SubStmt = BS->Elements[i].dyn_cast<Stmt*>()) {
-      if ((SubStmt = doIt(SubStmt)))
-        NewElements.push_back(SubStmt);
-      continue;
-    }
-    
-    Decl *D = BS->Elements[i].get<Decl*>();
-    NewElements.push_back(D);
-    
-    if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D))
-      TC.typeCheck(TAD);
-    
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-      TC.typeCheck(VD);
-  }
-  
-  // If any of the elements of the braces has a function type (which indicates
-  // that a function didn't get called), then produce an error.
-  // TODO: What about tuples which contain functions by-value that are dead?
-  for (unsigned i = 0, e = NewElements.size(); i != e; ++i)
-    if (NewElements[i].is<Expr*>() &&
-        NewElements[i].get<Expr*>()->Ty->is<FunctionType>())
-      // TODO: QOI: Add source range.
-      TC.error(NewElements[i].get<Expr*>()->getLocStart(),
-               "expression resolves to an unevaluated function");
-  
-  // Reinstall the list now that we potentially mutated it.
-  if (NewElements.size() <= BS->NumElements) {
-    memcpy(BS->Elements, NewElements.data(),
-           NewElements.size()*sizeof(BS->Elements[0]));
-    BS->NumElements = NewElements.size();
-  } else {
-    BS->Elements = 
-    TC.Context.AllocateCopy<BraceStmt::ExprStmtOrDecl>(NewElements.begin(),
-                                                       NewElements.end());
-    BS->NumElements = NewElements.size();
-  }
-}
-
-
 Expr *TypeChecker::typeCheckExpression(Expr *E) {
   SemaExpressionTree SET(*this);
   return SET.doIt(E);
-}
-
-void TypeChecker::typeCheckTranslationUnit(TranslationUnitDecl *TUD) {
-  SemaExpressionTree SET(*this);
-  SET.PreProcessBraceStmt(TUD->Body);
 }

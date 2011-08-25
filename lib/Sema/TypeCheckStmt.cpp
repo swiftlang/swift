@@ -191,7 +191,5 @@ void swift::performTypeChecking(TranslationUnitDecl *TUD, ASTContext &Ctx) {
   
   // Type check the top-level BraceExpr.  This sorts out any top-level
   // expressions and recursively processes the rest of the translation unit.
-#if 0 // Not yet, don't recurse into FuncExpr's
   StmtChecker(TC, 0).typeCheckStmt(TUD->Body);
-#endif
 }
