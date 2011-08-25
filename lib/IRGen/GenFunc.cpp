@@ -355,7 +355,7 @@ void IRGenFunction::emitPrologue() {
   ReturnBB = createBasicBlock("return");
   CurFn->getBasicBlockList().push_back(ReturnBB);
 
-  FunctionType *FnTy = CurDecl->Ty->getAs<FunctionType>();
+  FunctionType *FnTy = CurFuncExpr->Ty->getAs<FunctionType>();
   assert(FnTy && "emitting a declaration that's not a function?");
 
   llvm::Function::arg_iterator CurParm = CurFn->arg_begin();
@@ -436,7 +436,7 @@ void IRGenFunction::emitEpilogue() {
     Builder.SetInsertPoint(ReturnBB);
   }
 
-  FunctionType *FnTy = CurDecl->Ty->getAs<FunctionType>();
+  FunctionType *FnTy = CurFuncExpr->Ty->getAs<FunctionType>();
   assert(FnTy && "emitting a declaration that's not a function?");
 
   const TypeInfo &ResultInfo = IGM.getFragileTypeInfo(FnTy->Result);
@@ -467,8 +467,11 @@ void IRGenModule::emitGlobalFunction(FuncDecl *FD) {
 
   llvm::Function *Addr = getAddrOfGlobalFunction(FD);
 
-  IRGenFunction IGF(*this, FD, Addr);
-  IGF.emitPrologue();
-  IGF.emitIgnored(FD->Init);
-  IGF.emitEpilogue();
+  IRGenFunction(*this, cast<FuncExpr>(FD->Init), Addr).emitFunction();
+}
+
+void IRGenFunction::emitFunction() {
+  emitPrologue();
+  //emitStmt(CurFuncExpr->Body);
+  emitEpilogue();
 }

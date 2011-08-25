@@ -33,6 +33,7 @@ namespace swift {
   class BraceStmt;
   class Expr;
   class FuncDecl;
+  class FuncExpr;
   class ValueDecl;
   class VarDecl;
 
@@ -48,16 +49,18 @@ public:
   IRGenModule &IGM;
   IRBuilder Builder;
 
-  FuncDecl *CurDecl;
+  FuncExpr *CurFuncExpr;
   llvm::Function *CurFn;
 
-  IRGenFunction(IRGenModule &IGM, FuncDecl *D, llvm::Function *Fn);
+  IRGenFunction(IRGenModule &IGM, FuncExpr *FE, llvm::Function *Fn);
 
 //--- Function prologue and epilogue -------------------------------------------
 public:
+  void emitFunction();
+private:
   void emitPrologue();
   void emitEpilogue();
-private:
+
   LValue ReturnSlot;
   llvm::BasicBlock *ReturnBB;
 

@@ -23,8 +23,8 @@
 using namespace swift;
 using namespace irgen;
 
-IRGenFunction::IRGenFunction(IRGenModule &IGM, FuncDecl *FD, llvm::Function *Fn)
-  : IGM(IGM), Builder(IGM.getLLVMContext()), CurDecl(FD), CurFn(Fn) {
+IRGenFunction::IRGenFunction(IRGenModule &IGM, FuncExpr *FE, llvm::Function *Fn)
+  : IGM(IGM), Builder(IGM.getLLVMContext()), CurFuncExpr(FE), CurFn(Fn) {
 }
 
 /// Create an alloca whose lifetime is the duration of the current
