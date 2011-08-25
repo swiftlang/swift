@@ -19,8 +19,8 @@
 #ifndef SWIFT_DECLCONTEXT_H
 #define SWIFT_DECLCONTEXT_H
 
-#include <stdint.h>
-#include <assert.h>
+#include "llvm/Support/DataTypes.h"
+#include <cassert>
 
 namespace swift {
   class FuncExpr;
