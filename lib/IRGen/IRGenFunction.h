@@ -25,19 +25,24 @@
 namespace llvm {
   class Constant;
   class Function;
+  class SMLoc;
   class Twine;
 }
 
 namespace swift {
   class ApplyExpr;
+  class AssignStmt;
   class BraceStmt;
   class Decl;
   class Expr;
   class FuncDecl;
   class FuncExpr;
+  class IfStmt;
+  class ReturnStmt;
   class Stmt;
   class ValueDecl;
   class VarDecl;
+  class WhileStmt;
 
 namespace irgen {
   class IRGenModule;
@@ -55,6 +60,8 @@ public:
   llvm::Function *CurFn;
 
   IRGenFunction(IRGenModule &IGM, FuncExpr *FE, llvm::Function *Fn);
+
+  void unimplemented(llvm::SMLoc Loc, const llvm::Twine &Message);
 
 //--- Function prologue and epilogue -------------------------------------------
 public:
@@ -82,6 +89,10 @@ public:
   void emitStmt(Stmt *S);
 
 private:
+  void emitAssignStmt(AssignStmt *S);
+  void emitIfStmt(IfStmt *S);
+  void emitReturnStmt(ReturnStmt *S);
+  void emitWhileStmt(WhileStmt *S);
 
 //--- Expression emission ------------------------------------------------------
 public:

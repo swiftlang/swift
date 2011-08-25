@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Instructions.h"
+#include "llvm/Support/SourceMgr.h"
 
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -58,4 +59,8 @@ IRGenFunction::createScopeAlloca(llvm::Type *Ty, Alignment Align,
 llvm::BasicBlock *
 IRGenFunction::createBasicBlock(const llvm::Twine &Name) {
   return llvm::BasicBlock::Create(IGM.getLLVMContext(), Name);
+}
+
+void IRGenFunction::unimplemented(llvm::SMLoc Loc, const llvm::Twine &Message) {
+  return IGM.unimplemented(Loc, Message);
 }

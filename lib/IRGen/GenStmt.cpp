@@ -16,6 +16,7 @@
 
 #include "swift/AST/Stmt.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "Cleanup.h"
 #include "IRGenFunction.h"
 
@@ -23,7 +24,27 @@ using namespace swift;
 using namespace irgen;
 
 void IRGenFunction::emitStmt(Stmt *S) {
-  // FIXME: implement
+  switch (S->Kind) {
+  case StmtKind::Semi:
+    // Nothing to do.
+    return;
+
+  case StmtKind::Assign:
+    return emitAssignStmt(cast<AssignStmt>(S));
+
+  case StmtKind::Brace:
+    return emitBraceStmt(cast<BraceStmt>(S));
+
+  case StmtKind::Return:
+    return emitReturnStmt(cast<ReturnStmt>(S));
+
+  case StmtKind::If:
+    return emitIfStmt(cast<IfStmt>(S));
+
+  case StmtKind::While:
+    return emitWhileStmt(cast<WhileStmt>(S));
+  }
+  llvm_unreachable("bad statement kind!");
 }
 
 void IRGenFunction::emitBraceStmt(BraceStmt *BS) {
@@ -40,4 +61,20 @@ void IRGenFunction::emitBraceStmt(BraceStmt *BS) {
       //emitLocal(Elt.get<Decl*>());
     }
   }
+}
+
+void IRGenFunction::emitAssignStmt(AssignStmt *S) {
+  unimplemented(S->getLocStart(), "AssignStmt is unimplemented");
+}
+
+void IRGenFunction::emitIfStmt(IfStmt *S) {
+  unimplemented(S->getLocStart(), "IfStmt is unimplemented");
+}
+
+void IRGenFunction::emitReturnStmt(ReturnStmt *S) {
+  unimplemented(S->getLocStart(), "ReturnStmt is unimplemented");
+}
+
+void IRGenFunction::emitWhileStmt(WhileStmt *S) {
+  unimplemented(S->getLocStart(), "WhileStmt is unimplemented");
 }
