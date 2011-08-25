@@ -248,7 +248,8 @@ OneOfType *Parser::actOnOneOfType(SMLoc OneOfLoc, const DeclAttributes &Attrs,
   
   OneOfType *Result = OneOfType::getNew(CurContext, OneOfLoc, EltDecls,
                                         Context);
-  for (OneOfElementDecl *D : EltDecls) D->setDeclContext(Result);
+  for (OneOfElementDecl *D : EltDecls)
+    D->Context = Result;
   
   if (PrettyTypeName) {
     // If we have a pretty name for this, complete it to its actual type.

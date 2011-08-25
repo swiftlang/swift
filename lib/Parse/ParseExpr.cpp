@@ -566,7 +566,7 @@ FuncExpr *Parser::actOnFuncExprStart(SMLoc FuncLoc, Type FuncTy) {
 
   // Reparent all the arguments.
   for (ArgDecl *Arg : Args)
-    Arg->setDeclContext(FE);
+    Arg->Context = FE;
 
   return FE;
 }

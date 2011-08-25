@@ -108,17 +108,14 @@ public:
 class Decl {
   Decl(const Decl&) = delete;
   void operator=(const Decl&) = delete;
-  DeclContext *DC;
 protected:
-  Decl(DeclKind kind, DeclContext *DC) : DC(DC), Kind(kind) {}
+  Decl(DeclKind kind, DeclContext *DC) : Kind(kind), Context(DC) {}
 public:
   const DeclKind Kind;
+  DeclContext *Context;
   
   SMLoc getLocStart() const;
-
-  DeclContext *getDeclContext() const { return DC; }
-  void setDeclContext(DeclContext *DC) { this->DC = DC; }
-  
+ 
   void dump() const;
   void print(raw_ostream &OS, unsigned Indent = 0) const;
   
