@@ -165,4 +165,5 @@ llvm::Function *IRGenModule::getAddrOfGlobalFunction(FuncDecl *FD) {
 
 void IRGenModule::unimplemented(llvm::SMLoc Loc, const llvm::Twine &Message) {
   Context.SourceMgr.PrintMessage(Loc, Message, "error");
+  Context.setHadError();
 }
