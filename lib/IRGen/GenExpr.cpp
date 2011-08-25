@@ -47,6 +47,58 @@ static RValue emitIntegerLiteralExpr(IRGenFunction &IGF, IntegerLiteralExpr *E,
   return RValue::forScalars(Value);
 }
 
+static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
+                                const TypeInfo &TInfo) {
+  ValueDecl *D = E->D;
+  switch (D->Kind) {
+  case DeclKind::TranslationUnit:
+  case DeclKind::Import:
+  case DeclKind::TypeAlias:
+    llvm_unreachable("decl is not a value decl");
+
+  case DeclKind::Func:
+    llvm_unreachable("decl cannot be emitted as an l-value");
+
+  case DeclKind::Var:
+    // FIXME: This always assumes global.  How to distinguish locals?
+    return IGF.getGlobal(cast<VarDecl>(D), TInfo);
+
+  case DeclKind::Arg:
+    return IGF.getLocal(D);
+
+  case DeclKind::ElementRef:
+  case DeclKind::OneOfElement:
+    IGF.unimplemented(E->getLocStart(),
+                      "emitting this decl as an l-value is unimplemented");
+    return IGF.emitFakeLValue(TInfo);
+  }
+  llvm_unreachable("bad decl kind");
+}
+
+/// Emit a declaration reference as an r-value.
+static RValue emitDeclRefRValue(IRGenFunction &IGF, DeclRefExpr *E,
+                                const TypeInfo &TInfo) {
+  ValueDecl *D = E->D;
+  switch (D->Kind) {
+  case DeclKind::TranslationUnit:
+  case DeclKind::Import:
+  case DeclKind::TypeAlias:
+    llvm_unreachable("decl is not a value decl");
+
+  case DeclKind::Arg:
+  case DeclKind::Var:
+    return TInfo.load(IGF, emitDeclRefLValue(IGF, E, TInfo));
+    
+  case DeclKind::ElementRef:
+  case DeclKind::Func:
+  case DeclKind::OneOfElement:
+    IGF.unimplemented(E->getLocStart(),
+                      "emitting this decl as an r-value is unimplemented");
+    return IGF.emitFakeRValue(TInfo);
+  }
+  llvm_unreachable("bad decl kind");
+}
+
 RValue IRGenFunction::emitRValue(Expr *E) {
   const TypeInfo &TInfo = IGM.getFragileTypeInfo(E->Ty);
   return emitRValue(E, TInfo);
@@ -78,6 +130,8 @@ RValue IRGenFunction::emitRValue(Expr *E, const TypeInfo &TInfo) {
     return emitTupleShuffleExpr(cast<TupleShuffleExpr>(E), TInfo);
 
   case ExprKind::DeclRef:
+    return emitDeclRefRValue(*this, cast<DeclRefExpr>(E), TInfo);
+
   case ExprKind::Func:
   case ExprKind::Closure:
   case ExprKind::AnonClosureArg:

@@ -23,3 +23,9 @@ using namespace irgen;
 void IRGenFunction::emitLocal(Decl *D) {
   unimplemented(D->getLocStart(), "local decl emission is unimplemented");
 }
+
+LValue IRGenFunction::getLocal(ValueDecl *D) {
+  auto I = Locals.find(D);
+  assert(I != Locals.end() && "no entry in local map!");
+  return I->second;
+}

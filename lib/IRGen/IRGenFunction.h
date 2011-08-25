@@ -128,7 +128,8 @@ private:
 //--- Declaration emission -----------------------------------------------------
 public:
   void emitLocal(Decl *D);
-  LValue getLocal(VarDecl *D);
+  LValue getLocal(ValueDecl *D);
+  LValue getGlobal(VarDecl *D, const TypeInfo &TInfo);
 
 private:
   llvm::DenseMap<ValueDecl*, LValue> Locals;

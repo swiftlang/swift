@@ -25,6 +25,7 @@ namespace llvm {
   class Function;
   class FunctionType;
   class GlobalVariable;
+  class IntegerType;
   class LLVMContext;
   class Module;
   class SMLoc;

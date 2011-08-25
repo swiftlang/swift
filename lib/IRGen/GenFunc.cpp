@@ -374,13 +374,9 @@ void IRGenFunction::emitPrologue() {
                                    "return_value");
   }
 
-  // Set up the parameters.  This is syntactically required to be a
-  // tuple, I think.
-  TupleType *ParmTupleTy = FnTy->Input->getAs<TupleType>();
-  assert(ParmTupleTy && "parameter type is not a tuple?");
-
-  for (const TupleTypeElt &Field : ParmTupleTy->Fields) {
-    const TypeInfo &ParmInfo = IGM.getFragileTypeInfo(Field.Ty);
+  // Set up the parameters.
+  for (ArgDecl *Parm : CurFuncExpr->NamedArgs) {
+    const TypeInfo &ParmInfo = IGM.getFragileTypeInfo(Parm->Ty);
     RValueSchema ParmSchema = ParmInfo.getSchema();
 
     // Make an l-value for the parameter.
@@ -390,7 +386,7 @@ void IRGenFunction::emitPrologue() {
     } else {
       ParmLV = createScopeAlloca(ParmInfo.getStorageType(),
                                  ParmInfo.StorageAlignment,
-                                 Field.Name.str());
+                                 Parm->Name.str());
     }
 
     // If the parameter was scalar, form an r-value from the
@@ -408,7 +404,8 @@ void IRGenFunction::emitPrologue() {
       ParmInfo.store(*this, ParmRV, ParmLV);
     }
 
-    // Store ParmLV in the locals map somehow?
+    assert(!Locals.count(Parm));
+    Locals.insert(std::make_pair(Parm, ParmLV));
   }
 
   // TODO: data pointer
