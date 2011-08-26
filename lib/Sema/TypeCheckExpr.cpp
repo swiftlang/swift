@@ -529,7 +529,36 @@ Expr *TypeChecker::typeCheckExpression(Expr *E, Type ConvertType) {
   SemaExpressionTree SET(*this);
   E = SET.doIt(E);
   
+  // If our context specifies a type, apply it to the expression.
   if (E && ConvertType)
     E = convertToType(E, ConvertType);
+  
+  if (E == 0) return 0;
+  
+  // Check the initializer/body to make sure that we succeeded in resolving
+  // all of the types contained within it.  We should not have any
+  // DependentType's left for subexpressions.
+  E = E->walk(^(Expr *E, WalkOrder Order) {
+    // Ignore the preorder walk.  We'd rather diagnose use of unresolved types
+    // during the postorder walk so that the inner most expressions are 
+    // diagnosed before the outermost ones.
+    if (Order == WalkOrder::PreOrder)
+      return E;
+    
+    assert(!isa<SequenceExpr>(E) && "Should have resolved this");
+    
+    // Use is to strip off sugar.
+    if (!E->Ty->is<DependentType>())
+      return E;
+    
+    error(E->getLocStart(),
+          "ambiguous expression was not resolved to a concrete type");
+    return 0;
+  }, ^Stmt*(Stmt *S, WalkOrder Order) {
+    // Never recurse into statements.
+    return 0;
+  });
+
+  
   return E;
 }
