@@ -136,18 +136,11 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
     if (Stmt *SubStmt = BS->Elements[i].dyn_cast<Stmt*>()) {
       if (!typeCheckStmt(SubStmt))
         NewElements.push_back(SubStmt);
-      continue;
+    } else {
+      Decl *D = BS->Elements[i].get<Decl*>();
+      TC.typeCheckDecl(D);
+      NewElements.push_back(D);
     }
-
-    // FIXME: Temporary for compatibility.
-    Decl *D = BS->Elements[i].get<Decl*>();
-    NewElements.push_back(D);
-    
-    if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D))
-      TC.typeCheck(TAD);
-    
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-      TC.typeCheck(VD);
   }
   
   // Reinstall the list now that we potentially mutated it.

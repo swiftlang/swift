@@ -37,7 +37,8 @@ public:
   bool semaApplyExpr(ApplyExpr *E);
   
   bool typeCheckExpression(Expr *&E, Type ConvertType = Type());
-  
+  void typeCheckDecl(Decl *D);
+
   
   bool bindAndValidateClosureArgs(Expr *Body, Type FuncInput);
 
