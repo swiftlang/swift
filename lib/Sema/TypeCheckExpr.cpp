@@ -334,7 +334,7 @@ public:
         // Do not walk into ClosureExpr.  Anonexprs within a nested closures
         // will have already been resolved, so we don't need to recurse into it.
         // This also prevents N^2 re-sema activity with lots of nested closures.
-        if (isa<ClosureExpr>(E)) return 0;
+        if (isa<ClosureExpr>(E) || isa<FuncExpr>(E)) return 0;
         
         return E;
       }
@@ -342,6 +342,9 @@ public:
       // Dispatch to the right visitor case in the post-order walk.  We know
       // that the operands have already been processed and are valid.
       return this->visit(E);
+    }, ^Stmt*(Stmt *S, WalkOrder Order) {
+      // Never recurse into statements.
+      return 0;
     });
   }
 };
@@ -373,8 +376,8 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     int FieldNo = TT->getNamedElementId(E->Name);
     if (FieldNo != -1)
       return new (TC.Context) 
-      TupleElementExpr(E->SubExpr, E->DotLoc, FieldNo, E->NameLoc,
-                       TT->getElementType(FieldNo));
+        TupleElementExpr(E->SubExpr, E->DotLoc, FieldNo, E->NameLoc,
+                         TT->getElementType(FieldNo));
     
     // Okay, the field name was invalid.  If this is a dollarident like $4,
     // process it as a field index.

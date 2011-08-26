@@ -195,15 +195,15 @@ void swift::performTypeChecking(TranslationUnitDecl *TUD, ASTContext &Ctx) {
         FuncExprsP->push_back(FE);
     return E;
   });
-  
+
+  // Type check the top-level BraceExpr.  This sorts out any top-level
+  // expressions and variable decls.
+  StmtChecker(TC, 0).typeCheckStmt(TUD->Body);
+
   // Type check the body of each of the FuncExpr in turn.
   for (FuncExpr *FE : FuncExprs) {
     if (!FE->Body) continue;
     
     StmtChecker(TC, FE).typeCheckStmt(FE->Body);
   }
-  
-  // Type check the top-level BraceExpr.  This sorts out any top-level
-  // expressions and recursively processes the rest of the translation unit.
-  StmtChecker(TC, 0).typeCheckStmt(TUD->Body);
 }

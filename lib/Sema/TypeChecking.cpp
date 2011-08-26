@@ -188,6 +188,9 @@ void TypeChecker::checkBody(Expr *&E, Type DestTy) {
     error(E->getLocStart(),
           "ambiguous expression was not resolved to a concrete type");
     return 0;
+  }, ^Stmt*(Stmt *S, WalkOrder Order) {
+    // Never recurse into statements.
+    return 0;
   });
 }
 
