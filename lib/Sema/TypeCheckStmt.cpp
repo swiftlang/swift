@@ -39,10 +39,7 @@ public:
   //===--------------------------------------------------------------------===//
   
   bool typeCheckExpr(Expr *&E, Type DestTy = Type()) {
-    Expr *E2 = TC.typeCheckExpression(E, DestTy);
-    if (E2 == 0) return true;
-    E = E2;
-    return false;
+    return TC.typeCheckExpression(E, DestTy);
   }
 
   template<typename StmtTy>

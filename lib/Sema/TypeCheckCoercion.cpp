@@ -520,8 +520,7 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
   
     // Now that the AnonClosureArgExpr's potentially have a type, redo semantic
     // analysis from the leaves of the expression tree up.
-    ERes = TC.typeCheckExpression(ERes);
-    if (ERes == 0)
+    if (TC.typeCheckExpression(ERes))
       return 0;
     
     return new (TC.Context) ClosureExpr(ERes, DestTy);

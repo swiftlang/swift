@@ -525,7 +525,7 @@ Expr *SemaExpressionTree::visitSequenceExpr(SequenceExpr *E) {
   return ReduceBinaryExprs(E, i, TC);
 }
 
-Expr *TypeChecker::typeCheckExpression(Expr *E, Type ConvertType) {
+bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
   SemaExpressionTree SET(*this);
   E = SET.doIt(E);
   
@@ -533,7 +533,7 @@ Expr *TypeChecker::typeCheckExpression(Expr *E, Type ConvertType) {
   if (E && ConvertType)
     E = convertToType(E, ConvertType);
   
-  if (E == 0) return 0;
+  if (E == 0) return true;
   
   // Check the initializer/body to make sure that we succeeded in resolving
   // all of the types contained within it.  We should not have any
@@ -560,5 +560,5 @@ Expr *TypeChecker::typeCheckExpression(Expr *E, Type ConvertType) {
   });
 
   
-  return E;
+  return E == 0;
 }

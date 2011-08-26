@@ -36,7 +36,7 @@ public:
   bool semaTupleExpr(TupleExpr *TE);
   bool semaApplyExpr(ApplyExpr *E);
   
-  Expr *typeCheckExpression(Expr *E, Type ConvertType = Type());
+  bool typeCheckExpression(Expr *&E, Type ConvertType = Type());
   
   
   bool bindAndValidateClosureArgs(Expr *Body, Type FuncInput);
@@ -66,12 +66,6 @@ public:
   void validateAttributes(DeclAttributes &Attrs, Type Ty);
   
   bool validateVarName(Type Ty, DeclVarName *Name);
-  
-  /// checkBody - Type check an expression that is used in a top-level
-  /// context like a var/func body, or tuple default value.  If DestTy is
-  /// specified, the expression is coerced to the requested type.
-  void checkBody(Expr *&E, Type DestTy);
-  
   
   /// convertToType - Do semantic analysis of an expression in a context that
   /// expects a particular type.  This performs a conversion to that type if

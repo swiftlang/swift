@@ -89,8 +89,7 @@ bool TypeChecker::validateType(Type InTy) {
       if (EltInit == 0) continue;
       
       SMLoc InitLoc = EltInit->getLocStart();
-      checkBody(EltInit, EltTy);
-      if (EltInit == 0) {
+      if (typeCheckExpression(EltInit, EltTy)) {
         note(InitLoc, "while converting default tuple value to element type");
         IsInvalid = true;
         break;

@@ -150,18 +150,6 @@ void TypeChecker::validateAttributes(DeclAttributes &Attrs, Type Ty) {
   }
 }
 
-
-/// checkBody - Type check an expression that is used in a top-level
-/// context like a var/func body, or tuple default value.  If DestTy is
-/// specified, the expression is coerced to the requested type.
-///
-/// If the body turns out to be a sequence, this returns the single element
-/// with the excess in the provided smallvector.
-void TypeChecker::checkBody(Expr *&E, Type DestTy) {
-  assert(E != 0 && "Can't check a null body!");
-  E = typeCheckExpression(E, DestTy);
-}
-
 void TypeChecker::typeCheck(TypeAliasDecl *TAD) {
   validateType(TAD->getAliasType(Context));
 }
@@ -246,24 +234,17 @@ bool TypeChecker::typeCheckValueDecl(ValueDecl *VD) {
   if (VD->Init == 0) {
     // If we have no initializer and the type is dependent, then the initializer
     // was invalid and removed.
-    if (VD->Ty->is<DependentType>()) return true;
-  } else if (VD->Ty->is<DependentType>()) {
-    checkBody(VD->Init, 0);
-    if (VD->Init == 0)
+    if (VD->Ty->is<DependentType>())
+      return true;
+  } else {
+    Type DestTy = VD->Ty;
+    if (DestTy->is<DependentType>())
+      DestTy = Type();
+    if (!typeCheckExpression(VD->Init, DestTy))
+      VD->Ty = VD->Init->Ty;
+    else if (isa<VarDecl>(VD))
       note(VD->getLocStart(),
            "while converting 'var' initializer to declared type");
-    else
-      VD->Ty = VD->Init->Ty;
-  } else {
-    // If both a type and an initializer are specified, make sure the
-    // initializer's type agrees (or converts) to the redundant type.
-    checkBody(VD->Init, VD->Ty);
-    
-    if (VD->Init == 0) {
-      if (isa<VarDecl>(VD))
-        note(VD->getLocStart(),
-             "while converting 'var' initializer to declared type");
-    }
   }
   
   validateAttributes(VD->Attrs, VD->Ty);
