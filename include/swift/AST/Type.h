@@ -21,9 +21,6 @@
 #include "swift/AST/LLVM.h"
 #include <string>
 
-namespace llvm {
-  class raw_ostream;
-}
 namespace swift {
   class TypeBase;
   

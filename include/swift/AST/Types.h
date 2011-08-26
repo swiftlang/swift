@@ -96,6 +96,12 @@ public:
     return isa<T>(getDesugaredType());
   }
   
+  template <typename T>
+  T *castTo() {
+    return cast<T>(getDesugaredType());
+  }
+
+  
   /// getString - Return the name of the type as a string, for use in
   /// diagnostics only.
   std::string getString() const;

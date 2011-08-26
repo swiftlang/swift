@@ -54,6 +54,7 @@ bool TypeChecker::validateType(Type InTy) {
   case TypeKind::BuiltinInt32:
   case TypeKind::BuiltinInt64:
   case TypeKind::Dependent:
+    // These types are already canonical anyway.
     return false;
   case TypeKind::OneOf:
     for (OneOfElementDecl *Elt : cast<OneOfType>(T)->Elements) {

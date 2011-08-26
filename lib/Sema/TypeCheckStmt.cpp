@@ -52,6 +52,14 @@ public:
     S = S2;
     return false;
   }
+ 
+  bool typeCheckConversion(Expr *&E, Type T) {
+    Expr *E2 = TC.convertToType(E, T);
+    if (E2 == 0) return true;
+    E = E2;
+    return false;
+  }
+  
   
   //===--------------------------------------------------------------------===//
   // Visit Methods.
@@ -66,8 +74,7 @@ public:
       return 0;
     
     // Coerce the source to the destination type.
-    S->Src = TC.convertToType(S->Src, S->Dest->Ty);
-    if (S->Src == 0) {
+    if (typeCheckConversion(S->Src, S->Dest->Ty)) {
       TC.note(S->EqualLoc,
               "while converting assigned value to destination type");
       return 0;
@@ -82,9 +89,18 @@ public:
     if (typeCheckExpr(RS->Result))
       return 0;
     
-    // If TheFunc == 0 error.
+    if (TheFunc == 0) {
+      TC.error(RS->ReturnLoc, "return invalid outside of a func");
+      return 0;
+    }
     
-    // FIXME: Convert the subexpr to the return type of TheFunc.
+    if (typeCheckConversion(RS->Result,
+                            TheFunc->Ty->castTo<FunctionType>()->Result)) {
+      TC.note(RS->ReturnLoc,
+              "while converting return value to result type");
+      return 0;
+    }
+
     return RS;
   }
   
@@ -95,8 +111,7 @@ public:
     
     // The if condition must have __builtin_int1 type.  This is after the
     // conversion function is added by sema.
-    IS->Cond = TC.convertToType(IS->Cond, TC.Context.TheInt1Type);
-    if (IS->Cond == 0)
+    if (typeCheckConversion(IS->Cond, TC.Context.TheInt1Type))
       return 0;
     
     return IS;
@@ -108,8 +123,7 @@ public:
     
     // The if condition must have __builtin_int1 type.  This is after the
     // conversion function is added by sema.
-    WS->Cond = TC.convertToType(WS->Cond, TC.Context.TheInt1Type);
-    if (WS->Cond == 0)
+    if (typeCheckConversion(WS->Cond, TC.Context.TheInt1Type))
       return 0;
     
     return WS;
