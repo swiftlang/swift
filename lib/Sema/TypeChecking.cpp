@@ -159,16 +159,12 @@ void TypeChecker::validateAttributes(DeclAttributes &Attrs, Type Ty) {
 /// with the excess in the provided smallvector.
 void TypeChecker::checkBody(Expr *&E, Type DestTy) {
   assert(E != 0 && "Can't check a null body!");
-  E = typeCheckExpression(E);
+  E = typeCheckExpression(E, DestTy);
   if (E == 0) return;
-  
-  if (DestTy)
-    E = convertToType(E, DestTy);
   
   // Check the initializer/body to make sure that we succeeded in resolving
   // all of the types contained within it.  We should not have any
   // DependentType's left for subexpressions.
-  if (E == 0) return;
   
   // Walk all nodes in an expression tree, checking to make sure they don't
   // contain any DependentTypes.

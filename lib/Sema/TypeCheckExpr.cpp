@@ -525,7 +525,11 @@ Expr *SemaExpressionTree::visitSequenceExpr(SequenceExpr *E) {
   return ReduceBinaryExprs(E, i, TC);
 }
 
-Expr *TypeChecker::typeCheckExpression(Expr *E) {
+Expr *TypeChecker::typeCheckExpression(Expr *E, Type ConvertType) {
   SemaExpressionTree SET(*this);
-  return SET.doIt(E);
+  E = SET.doIt(E);
+  
+  if (E && ConvertType)
+    E = convertToType(E, ConvertType);
+  return E;
 }

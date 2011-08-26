@@ -38,8 +38,8 @@ public:
   // Helper Functions.
   //===--------------------------------------------------------------------===//
   
-  bool typeCheckExpr(Expr *&E) {
-    Expr *E2 = TC.typeCheckExpression(E);
+  bool typeCheckExpr(Expr *&E, Type DestTy = Type()) {
+    Expr *E2 = TC.typeCheckExpression(E, DestTy);
     if (E2 == 0) return true;
     E = E2;
     return false;
@@ -70,15 +70,9 @@ public:
   }
 
   Stmt *visitAssignStmt(AssignStmt *S) {
-    if (typeCheckExpr(S->Src) || typeCheckExpr(S->Dest))
+    if (typeCheckExpr(S->Dest) ||
+        typeCheckExpr(S->Src, S->Dest->Ty))
       return 0;
-    
-    // Coerce the source to the destination type.
-    if (typeCheckConversion(S->Src, S->Dest->Ty)) {
-      TC.note(S->EqualLoc,
-              "while converting assigned value to destination type");
-      return 0;
-    }
     
     return S;
   }
@@ -86,44 +80,33 @@ public:
   Stmt *visitBraceStmt(BraceStmt *BS);
   
   Stmt *visitReturnStmt(ReturnStmt *RS) {
-    if (typeCheckExpr(RS->Result))
-      return 0;
-    
     if (TheFunc == 0) {
       TC.error(RS->ReturnLoc, "return invalid outside of a func");
       return 0;
     }
-    
-    if (typeCheckConversion(RS->Result,
-                            TheFunc->Ty->castTo<FunctionType>()->Result)) {
-      TC.note(RS->ReturnLoc,
-              "while converting return value to result type");
+
+    if (typeCheckExpr(RS->Result, TheFunc->Ty->castTo<FunctionType>()->Result))
       return 0;
-    }
 
     return RS;
   }
   
   Stmt *visitIfStmt(IfStmt *IS) {
-    if (typeCheckExpr(IS->Cond) || typeCheckStmt(IS->Then) ||
-        (IS->Else && typeCheckStmt(IS->Else)))
-      return 0;
-    
     // The if condition must have __builtin_int1 type.  This is after the
     // conversion function is added by sema.
-    if (typeCheckConversion(IS->Cond, TC.Context.TheInt1Type))
+    if (typeCheckExpr(IS->Cond, TC.Context.TheInt1Type) ||
+        typeCheckStmt(IS->Then) ||
+        (IS->Else && typeCheckStmt(IS->Else)))
       return 0;
     
     return IS;
   }
   
   Stmt *visitWhileStmt(WhileStmt *WS) {
-    if (typeCheckExpr(WS->Cond) || typeCheckStmt(WS->Body))
-      return 0;
-    
     // The if condition must have __builtin_int1 type.  This is after the
     // conversion function is added by sema.
-    if (typeCheckConversion(WS->Cond, TC.Context.TheInt1Type))
+    if (typeCheckExpr(WS->Cond, TC.Context.TheInt1Type) ||
+        typeCheckStmt(WS->Body))
       return 0;
     
     return WS;
