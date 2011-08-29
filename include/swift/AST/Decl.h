@@ -78,19 +78,51 @@ public:
 /// example:  var ((a, b), c) = foo();
 ///
 class DeclVarName {
-public:
   /// LPLoc/RPLoc - This is the location of the '(' and ')' if this is a complex
   /// name, or both contain the same location if this is simple.
   SMLoc LPLoc, RPLoc;
   
-  // If this is a simple name like "a", this contains the identifier.
-  Identifier Name;
+  union {
+    void *Name; //< Storage for a simple variable name
+    struct {
+      DeclVarName * const *Start;
+      unsigned Length;
+    } Elements; //< Storage for a parenthesized list of variable names
+  };
   
-  ArrayRef<DeclVarName*> Elements;
-  
+public:
   DeclVarName() {}
+  
+  DeclVarName(Identifier Name, SMLoc NameLoc)
+    : LPLoc(NameLoc), RPLoc(NameLoc), Name(Name.getAsOpaquePointer()) { }
+  
+  DeclVarName(SMLoc LPLoc, ArrayRef<DeclVarName *> Elements, SMLoc RPLoc)
+    : LPLoc(LPLoc), RPLoc(RPLoc) 
+  {
+    this->Elements.Start = Elements.data();
+    this->Elements.Length = Elements.size();
+  }
+  
+  SMLoc getLocation() const { return LPLoc; }
+  
+  Identifier getIdentifier() const {
+    assert(isSimple() && 
+           "Cannot retrieve an identifier for a non-simple name");
+    return Identifier::getFromOpaquePointer(Name);
+  }
+  
+  ArrayRef<DeclVarName *> getElements() const {
+    assert(!isSimple() && "Cannot retrieve elements for a simple name");
+    return ArrayRef<DeclVarName *>(Elements.Start, Elements.Length);
+  }
+   
   bool isSimple() const { return LPLoc == RPLoc; }
 
+  // FIXME: We need an SMRange type!
+  std::pair<SMLoc, SMLoc> getSourceRange() {
+    return std::make_pair(LPLoc, RPLoc);
+  }
+  
 private:
   // Make placement new and vanilla new/delete illegal for DeclVarNames.
   void *operator new(size_t Bytes) throw() = delete;

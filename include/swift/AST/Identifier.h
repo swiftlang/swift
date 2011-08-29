@@ -62,6 +62,8 @@ public:
     return strchr("/=-+*%<>!&|^", C) != 0;
   }
   
+  void *getAsOpaquePointer() const { return (void *)Pointer; }
+  
   static Identifier getFromOpaquePointer(void *P) {
     return Identifier((const char*)P);
   }

@@ -246,8 +246,10 @@ Decl *Parser::parseDeclImport() {
 bool Parser::parseVarName(DeclVarName &Name) {
   // Single name case.
   if (Tok.is(tok::identifier) || Tok.is(tok::oper)) {
-    Name.LPLoc = Name.RPLoc = Tok.getLoc();
-    parseIdentifier(Name.Name, "");
+    SMLoc IdLoc = Tok.getLoc();
+    Identifier Id;
+    parseIdentifier(Id, "");
+    Name = DeclVarName(Id, IdLoc);
     return false;
   }
   
@@ -255,7 +257,8 @@ bool Parser::parseVarName(DeclVarName &Name) {
     error(Tok.getLoc(), "expected identifier or '(' in var name");
     return true;
   }
-  Name.LPLoc = consumeToken();
+  
+  SMLoc LPLoc = consumeToken();
   
   SmallVector<DeclVarName*, 8> ChildNames;
   
@@ -267,11 +270,11 @@ bool Parser::parseVarName(DeclVarName &Name) {
     } while (consumeIf(tok::comma));
   }
 
-  Name.RPLoc = Tok.getLoc();
+  SMLoc RPLoc = Tok.getLoc();
   if (parseToken(tok::r_paren, "expected ')' at end of var name"))
-    note(Name.LPLoc, "to match this '('");
+    note(LPLoc, "to match this '('");
 
-  Name.Elements = Context.AllocateCopy(ChildNames);
+  Name = DeclVarName(LPLoc, Context.AllocateCopy(ChildNames), RPLoc);
   return false;
 }
 
@@ -311,14 +314,15 @@ void Parser::actOnVarDeclName(const DeclVarName *Name,
     // to create the decl.  The most common result here is DependentType, which
     // allows type checking to resolve this later.
     if (Ty.isNull()) {
-      error(Name->LPLoc, "'" + Name->Name.str() + "' is an invalid index for '"+
-            VD->Ty->getString() + "'");
+      error(Name->getLocation(), "'" + Name->getIdentifier().str() + 
+            "' is an invalid index for '" + VD->Ty->getString() + "'");
       return;
     }
     
     // Create the decl for this name and add it to the current scope.
     ElementRefDecl *ERD =
-      new (Context) ElementRefDecl(CurContext, VD, Name->LPLoc, Name->Name,
+      new (Context) ElementRefDecl(CurContext, VD, Name->getLocation(),
+                                   Name->getIdentifier(),
                                    Context.AllocateCopy(AccessPath), Ty);
     Decls.push_back(ERD);
     ScopeInfo.addToScope(ERD);
@@ -326,9 +330,10 @@ void Parser::actOnVarDeclName(const DeclVarName *Name,
   }
   
   AccessPath.push_back(0);
-  for (unsigned i = 0, e = Name->Elements.size(); i != e; ++i) {
-    AccessPath.back() = i;
-    actOnVarDeclName(Name->Elements[i], AccessPath, VD, Decls);
+  unsigned Index = 0;
+  for (auto Element : Name->getElements()) {
+    AccessPath.back() = Index++;
+    actOnVarDeclName(Element, AccessPath, VD, Decls);
   }
   AccessPath.pop_back();
 }
@@ -361,7 +366,8 @@ bool Parser::parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   // parsed.  This does mean that stuff like this is different than C:
   //    var x = 1; { var x = x+1; assert(x == 2); }
   if (VarName.isSimple()) {
-    VarDecl *VD = new (Context) VarDecl(CurContext, VarLoc, VarName.Name, Ty,
+    VarDecl *VD = new (Context) VarDecl(CurContext, VarLoc, 
+                                        VarName.getIdentifier(), Ty,
                                         Init.getPtrOrNull(), Attributes);
     ScopeInfo.addToScope(VD);
     Decls.push_back(VD);

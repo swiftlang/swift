@@ -101,22 +101,25 @@ bool TypeChecker::validateVarName(Type Ty, DeclVarName *Name) {
   // have the correct number of elements.
   TupleType *AccessedTuple = Ty->getAs<TupleType>();
   if (AccessedTuple == 0) {
-    error(Name->LPLoc, "name specifier matches '" + Ty->getString() +
+    error(Name->getLocation(), 
+          "name specifier matches '" + Ty->getString() + 
           "' which is not a tuple");
     return true;
   }
   
   // Verify the # elements line up.
-  if (Name->Elements.size() != AccessedTuple->Fields.size()) {
-    error(Name->LPLoc, "name specifier matches '" + Ty->getString() +
+  ArrayRef<DeclVarName *> Elements = Name->getElements();
+  if (Elements.size() != AccessedTuple->Fields.size()) {
+    error(Name->getLocation(), 
+          "name specifier matches '" + Ty->getString() +
           "' which requires " + Twine(AccessedTuple->Fields.size()) +
-          " names, but has " + Twine(Name->Elements.size()));
+          " names, but has " + Twine(Elements.size()));
     return true;
   }
   
   // Okay, everything looks good at this level, recurse.
-  for (unsigned i = 0, e = Name->Elements.size(); i != e; ++i) {
-    if (validateVarName(AccessedTuple->Fields[i].Ty, Name->Elements[i]))
+  for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
+    if (validateVarName(AccessedTuple->Fields[i].Ty, Elements[i]))
       return true;
   }
   
