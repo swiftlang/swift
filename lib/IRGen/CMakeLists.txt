@@ -3,6 +3,7 @@ add_swift_library(swiftIRGen
   GenControl.cpp
   GenExpr.cpp
   GenFunc.cpp
+  GenGlobal.cpp
   GenLocal.cpp
   GenOneOf.cpp
   GenStmt.cpp
