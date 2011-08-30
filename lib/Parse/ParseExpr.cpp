@@ -486,7 +486,6 @@ enum class FuncTypePiece {
 /// arguments to the current scope.  This causes redefinition errors to be
 /// emitted.
 static void AddFuncArgumentsToScope(Type Ty,
-                                    SmallVectorImpl<unsigned> &AccessPath,
                                     FuncTypePiece Mode,
                                     SMLoc FuncLoc, 
                                     SmallVectorImpl<ArgDecl*> &ArgDecls,
@@ -494,20 +493,16 @@ static void AddFuncArgumentsToScope(Type Ty,
   // Handle the function case first.
   if (Mode == FuncTypePiece::Function) {
     FunctionType *FT = cast<FunctionType>(Ty.getPointer());
-    AccessPath.push_back(0);
-    AddFuncArgumentsToScope(FT->Input, AccessPath, FuncTypePiece::Input,
+    AddFuncArgumentsToScope(FT->Input, FuncTypePiece::Input,
                             FuncLoc, ArgDecls, P);
-    
-    AccessPath.back() = 1;
     
     // If this is a->b->c then we treat b as an input, not (b->c) as an output.
     if (isa<FunctionType>(FT->Result.getPointer()))
-      AddFuncArgumentsToScope(FT->Result, AccessPath,
-                              FuncTypePiece::Function, FuncLoc, ArgDecls, P);
+      AddFuncArgumentsToScope(FT->Result, FuncTypePiece::Function, FuncLoc,
+                              ArgDecls, P);
     else    
-      AddFuncArgumentsToScope(FT->Result, AccessPath,
-                              FuncTypePiece::Output, FuncLoc, ArgDecls, P);
-    AccessPath.pop_back();
+      AddFuncArgumentsToScope(FT->Result, FuncTypePiece::Output, FuncLoc,
+                              ArgDecls, P);
     return;
   }
   
@@ -522,15 +517,11 @@ static void AddFuncArgumentsToScope(Type Ty,
   if (TT == 0) return;
   
   
-  AccessPath.push_back(0);
-  
   // For tuples, recursively processes their elements (to handle cases like:
   //    (x : (a : int, b : int), y : int) -> ...
   // and create decls for any named elements.
   for (unsigned i = 0, e = TT->Fields.size(); i != e; ++i) {
-    AccessPath.back() = 1;
-    AddFuncArgumentsToScope(TT->Fields[i].Ty, AccessPath, Mode, FuncLoc,
-                            ArgDecls, P);
+    AddFuncArgumentsToScope(TT->Fields[i].Ty, Mode, FuncLoc, ArgDecls, P);
     
     // If this field is named, create the argument decl for it.
     Identifier Name = TT->Fields[i].Name;
@@ -548,15 +539,12 @@ static void AddFuncArgumentsToScope(Type Ty,
     
     P.ScopeInfo.addToScope(AD);
   }
-  
-  AccessPath.pop_back();
 }
 
 
 FuncExpr *Parser::actOnFuncExprStart(SMLoc FuncLoc, Type FuncTy) {
-  SmallVector<unsigned, 8> AccessPath;
   SmallVector<ArgDecl*, 8> ArgDecls;
-  AddFuncArgumentsToScope(FuncTy, AccessPath, FuncTypePiece::Function,
+  AddFuncArgumentsToScope(FuncTy, FuncTypePiece::Function,
                           FuncLoc, ArgDecls, *this);
   
   ArrayRef<ArgDecl*> Args = ArgDecls;
