@@ -81,8 +81,7 @@ public:
     else {
       TC.error(ERD->getLocStart(), "'" + ERD->Name.str() +
                "' is an invalid index for '" + ERD->VD->Ty->getString() + "'");
-      // FIXME: This should be "invalid"
-      ERD->Ty = TupleType::getEmpty(TC.Context);
+      ERD->Ty = ErrorType::get(TC.Context);
     }
   }
 };
