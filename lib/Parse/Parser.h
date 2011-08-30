@@ -39,7 +39,7 @@ class Parser {
 public:
   llvm::SourceMgr &SourceMgr;
   Lexer &L;
-  DeclContext *CurContext;
+  DeclContext *CurDeclContext;
   ASTContext &Context;
   ScopeInfo ScopeInfo;
   
@@ -53,19 +53,19 @@ public:
     DeclContext *OldContext;
   public:
     ContextChange(Parser &P, DeclContext *DC)
-      : P(P), OldContext(P.CurContext) {
+      : P(P), OldContext(P.CurDeclContext) {
       assert(DC && "pushing null context?");
-      P.CurContext = DC;
+      P.CurDeclContext = DC;
     }
 
     void pop() {
       assert(OldContext && "already popped context!");
-      P.CurContext = OldContext;
+      P.CurDeclContext = OldContext;
       OldContext = nullptr;
     }
 
     ~ContextChange() {
-      if (OldContext) P.CurContext = OldContext;
+      if (OldContext) P.CurDeclContext = OldContext;
     }
   };
 

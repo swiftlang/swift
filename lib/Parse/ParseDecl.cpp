@@ -29,7 +29,7 @@ TranslationUnitDecl *Parser::parseTranslationUnit() {
   SMLoc FileStartLoc = Tok.getLoc();
   
   TranslationUnitDecl *TUD = new (Context) TranslationUnitDecl(Context);
-  CurContext = TUD;
+  CurDeclContext = TUD;
   
   // Parse the body of the file.
   SmallVector<ExprStmtOrDecl, 128> Items;
@@ -233,7 +233,7 @@ Decl *Parser::parseDeclImport() {
   if (!Attributes.empty())
     error(Attributes.LSquareLoc, "invalid attributes specified for import");
   
-  return new (Context) ImportDecl(CurContext, ImportLoc,
+  return new (Context) ImportDecl(CurDeclContext, ImportLoc,
                                   Context.AllocateCopy(ImportPath));
 }
 
@@ -321,7 +321,7 @@ void Parser::actOnVarDeclName(const DeclVarName *Name,
     
     // Create the decl for this name and add it to the current scope.
     ElementRefDecl *ERD =
-      new (Context) ElementRefDecl(CurContext, VD, Name->getLocation(),
+      new (Context) ElementRefDecl(CurDeclContext, VD, Name->getLocation(),
                                    Name->getIdentifier(),
                                    Context.AllocateCopy(AccessPath), Ty);
     Decls.push_back(ERD);
@@ -366,7 +366,7 @@ bool Parser::parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   // parsed.  This does mean that stuff like this is different than C:
   //    var x = 1; { var x = x+1; assert(x == 2); }
   if (VarName.isSimple()) {
-    VarDecl *VD = new (Context) VarDecl(CurContext, VarLoc, 
+    VarDecl *VD = new (Context) VarDecl(CurDeclContext, VarLoc, 
                                         VarName.getIdentifier(), Ty,
                                         Init.getPtrOrNull(), Attributes);
     ScopeInfo.addToScope(VD);
@@ -377,7 +377,7 @@ bool Parser::parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   
   // Copy the name into the ASTContext heap.
   DeclVarName *TmpName = new (Context) DeclVarName(VarName);
-  VarDecl *VD = new (Context) VarDecl(CurContext, VarLoc, TmpName, Ty,
+  VarDecl *VD = new (Context) VarDecl(CurDeclContext, VarLoc, TmpName, Ty,
                                       Init.getPtrOrNull(), Attributes);
   Decls.push_back(VD);
   
@@ -473,7 +473,7 @@ FuncDecl *Parser::parseDeclFunc() {
   }
   
   // Create the decl for the func and add it to the parent scope.
-  FuncDecl *FD = new (Context) FuncDecl(CurContext, FuncLoc, Name, FuncTy,
+  FuncDecl *FD = new (Context) FuncDecl(CurDeclContext, FuncLoc, Name, FuncTy,
                                         FE, Attributes);
   ScopeInfo.addToScope(FD);
   actOnNamedDecl(FD);
