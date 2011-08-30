@@ -19,7 +19,7 @@
 #ifndef SWIFT_DECLCONTEXT_H
 #define SWIFT_DECLCONTEXT_H
 
-#include "llvm/Support/DataTypes.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include <cassert>
 
 namespace swift {
@@ -33,25 +33,20 @@ enum class DeclContextKind {
 };
 
 class DeclContext {
-  /// This is essentially a customized PointerUnion where we want to
-  /// use DeclContextKind as the discriminator.
-  enum : uintptr_t { KindMask = 0x3 };
-  uintptr_t ParentAndKind;
+  llvm::PointerIntPair<DeclContext*, 2, unsigned> ParentAndKind;
 
 public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
-    : ParentAndKind(reinterpret_cast<uintptr_t>(Parent) |
-                    static_cast<uintptr_t>(Kind)) {
-    assert(!(reinterpret_cast<uintptr_t>(Parent) & KindMask));
+    : ParentAndKind(Parent, static_cast<unsigned>(Kind)) {
     assert(Parent || Kind == DeclContextKind::TranslationUnitDecl);
   }
 
   DeclContextKind getContextKind() const {
-    return static_cast<DeclContextKind>(ParentAndKind & KindMask);
+    return DeclContextKind(ParentAndKind.getInt());
   }
 
   DeclContext *getParent() const {
-    return reinterpret_cast<DeclContext*>(ParentAndKind & ~KindMask);
+    return ParentAndKind.getPointer();
   }
 };
   
