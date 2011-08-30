@@ -42,8 +42,6 @@ public:
   
   bool bindAndValidateClosureArgs(Expr *Body, Type FuncInput);
 
-  void validateAttributes(DeclAttributes &Attrs, Type Ty);
-  
   /// convertToType - Do semantic analysis of an expression in a context that
   /// expects a particular type.  This performs a conversion to that type if
   /// the types don't match and diagnoses cases where the conversion cannot be
