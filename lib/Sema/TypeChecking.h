@@ -42,31 +42,7 @@ public:
   
   bool bindAndValidateClosureArgs(Expr *Body, Type FuncInput);
 
-  
-  
-  
-  void typeCheck(TypeAliasDecl *TAD);
-  
-  void typeCheck(ValueDecl *VD) {
-    // No types to resolved for a ElementRefDecl.
-    if (ElementRefDecl *ERD = dyn_cast<ElementRefDecl>(VD))
-      return typeCheckERD(ERD);
-    if (VarDecl *Var = dyn_cast<VarDecl>(VD))
-      return typeCheckVarDecl(Var);
-    
-    if (isa<OneOfElementDecl>(VD))
-      return;  // FIXME: No type checking required for this?
-    
-    typeCheckValueDecl(cast<ValueDecl>(VD));
-  }
-  
-  void typeCheckERD(ElementRefDecl *ERD);
-  void typeCheckVarDecl(VarDecl *VD);
-  bool typeCheckValueDecl(ValueDecl *VD);
-  
   void validateAttributes(DeclAttributes &Attrs, Type Ty);
-  
-  bool validateVarName(Type Ty, DeclVarName *Name);
   
   /// convertToType - Do semantic analysis of an expression in a context that
   /// expects a particular type.  This performs a conversion to that type if

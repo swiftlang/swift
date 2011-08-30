@@ -15,21 +15,114 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecking.h"
+#include "swift/AST/ASTVisitor.h"
 #include "llvm/ADT/Twine.h"
-
 using namespace swift;
 
-void TypeChecker::typeCheckDecl(Decl *D) {
-  if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D))
-    typeCheck(TAD);
+namespace {
+class DeclChecker : public DeclVisitor<DeclChecker> {
+public:
+  TypeChecker &TC;
+  
+  DeclChecker(TypeChecker &TC) : TC(TC) {}
 
-  if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-    typeCheck(VD);
+  //===--------------------------------------------------------------------===//
+  // Helper Functions.
+  //===--------------------------------------------------------------------===//
+
+  bool visitValueDecl(ValueDecl *VD);
+  bool validateVarName(Type Ty, DeclVarName *Name);
+  void validateAttributes(DeclAttributes &Attrs, Type Ty);
+
+  //===--------------------------------------------------------------------===//
+  // Visit Methods.
+  //===--------------------------------------------------------------------===//
+  
+  void visitTranslationUnitDecl(TranslationUnitDecl *TUD) {
+    // Nothing to do.
+  }
+  
+  void visitImportDecl(ImportDecl *ID) {
+    // Nothing to do.
+  }
+  
+  void visitTypeAliasDecl(TypeAliasDecl *TAD) {
+    TC.validateType(TAD->getAliasType(TC.Context));
+  }
+
+  void visitVarDecl(VarDecl *VD) {
+    // Type check the ValueDecl part of a VarDecl.
+    if (visitValueDecl(VD))
+      return;
+    
+    // If the VarDecl had a name specifier, verify that it lines up with the
+    // actual type of the VarDecl.
+    if (VD->NestedName && validateVarName(VD->Ty, VD->NestedName))
+      VD->NestedName = 0;
+  }
+  
+  void visitFuncDecl(FuncDecl *FD) {
+    visitValueDecl(FD);
+  }
+  void visitOneOfElementDecl(OneOfElementDecl *OOED) {
+    // No type checking required?
+  }
+  void visitArgDecl(ArgDecl *AD) {
+    assert(0 && "Shouldn't reach this, doesn't exist in a statement");
+  }
+  
+  void visitElementRefDecl(ElementRefDecl *ERD) {
+    // If the type is already resolved we're done.  ElementRefDecls are
+    // simple.
+    if (!ERD->Ty->is<DependentType>()) return;
+    
+    if (Type T = ElementRefDecl::getTypeForPath(ERD->VD->Ty, ERD->AccessPath))
+      ERD->Ty = T;
+    else {
+      TC.error(ERD->getLocStart(), "'" + ERD->Name.str() +
+               "' is an invalid index for '" + ERD->VD->Ty->getString() + "'");
+      // FIXME: This should be "invalid"
+      ERD->Ty = TupleType::getEmpty(TC.Context);
+    }
+  }
+};
+}; // end anonymous namespace.
+
+
+void TypeChecker::typeCheckDecl(Decl *D) {
+  DeclChecker(*this).visit(D);
+}
+
+bool DeclChecker::visitValueDecl(ValueDecl *VD) {
+  if (TC.validateType(VD)) {
+    VD->Init = 0;
+    return true;
+  }
+  
+  // Validate that the initializers type matches the expected type.
+  if (VD->Init == 0) {
+    // If we have no initializer and the type is dependent, then the initializer
+    // was invalid and removed.
+    if (VD->Ty->is<DependentType>())
+      return true;
+  } else {
+    Type DestTy = VD->Ty;
+    if (DestTy->is<DependentType>())
+      DestTy = Type();
+    if (!TC.typeCheckExpression(VD->Init, DestTy))
+      VD->Ty = VD->Init->Ty;
+    else if (isa<VarDecl>(VD))
+      TC.note(VD->getLocStart(),
+              "while converting 'var' initializer to declared type");
+  }
+  
+  validateAttributes(VD->Attrs, VD->Ty);
+  return false;
 }
 
 
 /// validateAttributes - Check that the func/var declaration attributes are ok.
-void TypeChecker::validateAttributes(DeclAttributes &Attrs, Type Ty) {
+void DeclChecker::validateAttributes(DeclAttributes &Attrs, Type Ty) {
   // If the decl is a unary operator, then it must be a function whose input is
   // a single element tuple.
   if (Attrs.isUnary) {
@@ -38,8 +131,8 @@ void TypeChecker::validateAttributes(DeclAttributes &Attrs, Type Ty) {
       if (TupleType *TT = dyn_cast<TupleType>(FT->Input.getPointer()))
         IsError = TT->Fields.size() != 1;
     if (IsError) {
-      error(Attrs.LSquareLoc, "function with 'unary' specified must take "
-            "a single element tuple as input");
+      TC.error(Attrs.LSquareLoc, "function with 'unary' specified must take "
+               "a single element tuple as input");
       Attrs.isUnary = false;
       // FIXME: Set the 'isError' bit on the decl.
     }
@@ -53,34 +146,15 @@ void TypeChecker::validateAttributes(DeclAttributes &Attrs, Type Ty) {
       if (TupleType *TT = dyn_cast<TupleType>(FT->Input.getPointer()))
         IsError = TT->Fields.size() != 2;
     if (IsError) {
-      error(Attrs.LSquareLoc, "function with 'infix' specified must take "
-            "a two element tuple as input");
+      TC.error(Attrs.LSquareLoc, "function with 'infix' specified must take "
+               "a two element tuple as input");
       Attrs.InfixPrecedence = -1;
       // FIXME: Set the 'isError' bit on the decl.
     }
   }
 }
 
-void TypeChecker::typeCheck(TypeAliasDecl *TAD) {
-  validateType(TAD->getAliasType(Context));
-}
-
-void TypeChecker::typeCheckERD(ElementRefDecl *ERD) {
-  // If the type is already resolved we're done.  ElementRefDecls are simple.
-  if (!ERD->Ty->is<DependentType>()) return;
-  
-  if (Type T = ElementRefDecl::getTypeForPath(ERD->VD->Ty, ERD->AccessPath))
-    ERD->Ty = T;
-  else {
-    error(ERD->getLocStart(), "'" + ERD->Name.str() +
-          "' is an invalid index for '" + ERD->VD->Ty->getString() +
-          "'");
-    // FIXME: This should be "invalid"
-    ERD->Ty = TupleType::getEmpty(Context);
-  }
-}
-
-bool TypeChecker::validateVarName(Type Ty, DeclVarName *Name) {
+bool DeclChecker::validateVarName(Type Ty, DeclVarName *Name) {
   // Check for a type specifier mismatch on this level.
   assert(Ty && "This lookup should never fail");
   
@@ -101,19 +175,18 @@ bool TypeChecker::validateVarName(Type Ty, DeclVarName *Name) {
   // have the correct number of elements.
   TupleType *AccessedTuple = Ty->getAs<TupleType>();
   if (AccessedTuple == 0) {
-    error(Name->getLocation(), 
-          "name specifier matches '" + Ty->getString() + 
-          "' which is not a tuple");
+    TC.error(Name->getLocation(), "name specifier matches '" + Ty->getString() +
+             "' which is not a tuple");
     return true;
   }
   
   // Verify the # elements line up.
   ArrayRef<DeclVarName *> Elements = Name->getElements();
   if (Elements.size() != AccessedTuple->Fields.size()) {
-    error(Name->getLocation(), 
-          "name specifier matches '" + Ty->getString() +
-          "' which requires " + Twine(AccessedTuple->Fields.size()) +
-          " names, but has " + Twine(Elements.size()));
+    TC.error(Name->getLocation(), 
+             "name specifier matches '" + Ty->getString() +
+             "' which requires " + Twine(AccessedTuple->Fields.size()) +
+             " names, but has " + Twine(Elements.size()));
     return true;
   }
   
@@ -126,41 +199,3 @@ bool TypeChecker::validateVarName(Type Ty, DeclVarName *Name) {
   return false;
 }
 
-void TypeChecker::typeCheckVarDecl(VarDecl *VD) {
-  // Type check the ValueDecl part of a VarDecl.
-  if (typeCheckValueDecl(VD))
-    return;
-  
-  // If the VarDecl had a name specifier, verify that it lines up with the
-  // actual type of the VarDecl.
-  if (VD->NestedName && validateVarName(VD->Ty, VD->NestedName))
-    VD->NestedName = 0;
-}
-
-
-bool TypeChecker::typeCheckValueDecl(ValueDecl *VD) {
-  if (validateType(VD)) {
-    VD->Init = 0;
-    return true;
-  }
-  
-  // Validate that the initializers type matches the expected type.
-  if (VD->Init == 0) {
-    // If we have no initializer and the type is dependent, then the initializer
-    // was invalid and removed.
-    if (VD->Ty->is<DependentType>())
-      return true;
-  } else {
-    Type DestTy = VD->Ty;
-    if (DestTy->is<DependentType>())
-      DestTy = Type();
-    if (!typeCheckExpression(VD->Init, DestTy))
-      VD->Ty = VD->Init->Ty;
-    else if (isa<VarDecl>(VD))
-      note(VD->getLocStart(),
-           "while converting 'var' initializer to declared type");
-  }
-  
-  validateAttributes(VD->Attrs, VD->Ty);
-  return false;
-}
