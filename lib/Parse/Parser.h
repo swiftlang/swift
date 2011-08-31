@@ -136,6 +136,7 @@ public:
   bool parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls);
   bool parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls);
   FuncDecl *parseDeclFunc();
+  Decl *parseDeclProtocol();
 
   void actOnVarDeclName(const DeclVarName *Name,
                         SmallVectorImpl<unsigned> &AccessPath,
@@ -154,6 +155,8 @@ public:
                           Type &Result, TypeAliasDecl *TypeName = 0);
   bool parseTypeArray(SMLoc LSquareLoc, Type &Result);
   bool parseTypeProtocol(Type &Result);
+  bool parseTypeProtocolBody(SMLoc ProtocolLoc, const DeclAttributes &Attrs,
+                             Type &Result, TypeAliasDecl *TypeName = 0);
   
   struct OneOfElementInfo {
     SMLoc NameLoc;

@@ -370,11 +370,7 @@ bool Parser::parseTypeArray(SMLoc LSquareLoc, Type &Result) {
 }
 
 ///   type-protocol:
-///      'protocol' attribute-list? '{'
-///          protocol-element (',' protocol-element)*
-///          '}'
-///   protocol-element:
-///      TODO.
+///      'protocol' attribute-list? protocol-body
 ///
 bool Parser::parseTypeProtocol(Type &Result) {
   SMLoc ProtocolLoc = consumeToken(tok::kw_protocol);
@@ -383,13 +379,30 @@ bool Parser::parseTypeProtocol(Type &Result) {
   if (Tok.is(tok::l_square))
     parseAttributeList(Attributes);
 
+  return parseTypeProtocolBody(ProtocolLoc, Attributes, Result);
+}
+
+///   protocol-body:
+///      '{' protocol-element (',' protocol-element)* '}'
+///   protocol-element:
+///      TODO.
+///
+bool Parser::parseTypeProtocolBody(SMLoc ProtocolLoc, 
+                                   const DeclAttributes &Attributes,
+                                   Type &Result, TypeAliasDecl *TypeName) {
   if (!Attributes.empty())
     error(Attributes.LSquareLoc,
           "protocol types are not allowed to have attributes yet");
-
+  
   Result = ProtocolType::get(Context);
+  
+  
+  if (TypeName) {
+    // If we have a pretty name for this, complete it to its actual type.
+    assert(TypeName->UnderlyingTy.isNull() &&
+           "Not an incomplete decl to complete!");
+    TypeName->UnderlyingTy = Result;
+  }
+
   return false;
 }
-
-
-

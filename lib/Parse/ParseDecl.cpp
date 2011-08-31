@@ -426,14 +426,6 @@ FuncDecl *Parser::parseDeclFunc() {
 ///
 ///   decl-oneof:
 ///      'oneof' attribute-list? identifier oneof-body
-///   oneof-body:
-///      '{' oneof-element-list '}'
-///   oneof-element-list:
-///      oneof-element ','?
-///      oneof-element ',' oneof-element-list
-///   oneof-element:
-///      identifier
-///      identifier ':' type
 ///      
 Decl *Parser::parseDeclOneOf() {
   SMLoc OneOfLoc = consumeToken(tok::kw_oneof);
@@ -516,3 +508,32 @@ bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   Decls.push_back(OneOfTy->getElement(0));
   return false;
 }
+
+
+/// parseDeclProtocol - Parse a 'protocol' declaration, returning null (and
+/// doing no token skipping) on error.
+///
+///   decl-protocol:
+///      'protocol' attribute-list? identifier protocol-body
+///      
+Decl *Parser::parseDeclProtocol() {
+  SMLoc ProtocolLoc = consumeToken(tok::kw_protocol);
+  
+  DeclAttributes Attributes;
+  if (Tok.is(tok::l_square))
+    parseAttributeList(Attributes);
+  
+  SMLoc NameLoc = Tok.getLoc();
+  Identifier ProtocolName;
+  if (parseIdentifier(ProtocolName,
+                      "expected identifier in protocol declaration"))
+    return 0;
+  
+  TypeAliasDecl *TAD = ScopeInfo.addTypeAliasToScope(NameLoc, ProtocolName,
+                                                     Type());
+  Type ProtocolType;
+  if (parseTypeProtocolBody(ProtocolLoc, Attributes, ProtocolType, TAD))
+    return 0;
+  return TAD;
+}
+

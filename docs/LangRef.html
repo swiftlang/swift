@@ -300,6 +300,7 @@
     decl ::= <a href="#decl-typealias">decl-typealias</a>
     decl ::= <a href="#decl-oneof">decl-oneof</a>
     decl ::= <a href="#decl-struct">decl-struct</a>
+    decl ::= <a href="#decl-protocol">decl-protocol</a>
   </pre>
   
   
@@ -643,6 +644,32 @@
     }
   </pre>    
   
+  <!-- ===================================================================== -->
+  <h3 id="decl-protocol">Protocol Declarations</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    decl-protocol ::= 'protocol' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> <a href="#type-protocol">protocol-body</a>
+  </pre>
+  
+  <p>A protocol declaration is a convenient way to declare a type and name it at
+  the same time, as it is simple syntactic sugar for a <a 
+     href="#type-protocol">protocol</a> type and a <a
+     href="#decl-typealias">typealias</a> declaration.  Please see <a
+    href="#type-protocol">Protocol Types</a> for more information about their
+    capabilities.  Here are two exactly equivalent declarations for
+    intuition:</p>
+
+  <pre class="example">
+    <i>// Declare discriminated union with typealias + oneof type.</i>
+    typealias Document : protocol {
+      func title() -&gt; string
+    }
+    <i>// Declare discriminated union with oneof decl (preferred).</i>
+    protocol Document {
+      func title() -&gt; string
+    }
+  </pre>
   
   <!-- ===================================================================== -->
   <h3 id="attribute-list">Attribute Lists</h3>
@@ -985,7 +1012,8 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    type-protocol    ::= 'protocol' <a href="#attribute-list">attribute-list</a>? '{' protocol-element (',' protocol-element)* '}'
+    type-protocol    ::= 'protocol' <a href="#attribute-list">attribute-list</a>? protocol-body
+    protocol-body    ::= '{' protocol-element (',' protocol-element)* '}'
     protocol-element ::= /* TODO */
   </pre>
   

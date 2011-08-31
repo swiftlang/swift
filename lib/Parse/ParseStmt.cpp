@@ -43,6 +43,13 @@ Expr *Parser::actOnCondition(Expr *Cond) {
 ///     stmt-brace
 ///     stmt-return
 ///     stmt-if
+///   decl:
+///     decl-typealias
+///     decl-var
+///     decl-func
+///     decl-oneof
+///     decl-struct
+///
 bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
                                 bool IsTopLevel) {
   // This forms a lexical scope.
@@ -89,6 +96,9 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       break;
     case tok::kw_struct:
       parseDeclStruct(Entries);
+      break;
+    case tok::kw_protocol:
+      Entries.push_back(parseDeclProtocol());
       break;
     case tok::kw_func:
       // "func identifier" and "func [attribute]" is a func declaration,
