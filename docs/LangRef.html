@@ -225,9 +225,9 @@
     don't need to sprinkle attributes everywhere, OTOH, it makes it harder to 
     remember (like not having a naming convention).<br><br>
     
-    Enumerating the integer types is expedient, but silly and unneeded.  There
-    isn't a good reason to expose an i13 LLVM IR type, but i128 would be
-    reasonable.
+    Enumerating the integer and floating-point types is expedient, but silly
+    and unneeded.  There isn't a good reason to expose an i13 LLVM IR type, but
+    i128 would be reasonable.
   </div>
 
   <pre class="grammar">
@@ -236,6 +236,8 @@
     keyword ::= '__builtin_int16_type'
     keyword ::= '__builtin_int32_type'
     keyword ::= '__builtin_int64_type'
+    keyword ::= '__builtin_float32_type'
+    keyword ::= '__builtin_float64_type'
     keyword ::= 'import'
     keyword ::= 'oneof'
     keyword ::= 'struct'
@@ -721,7 +723,7 @@
   </p>
 
   <!-- ===================================================================== -->
-  <h3 id="type-builtin">Builtin Primitive Types</h3>
+  <h3 id="type-builtin">Builtin Primitive Integer Types</h3>
   <!-- ===================================================================== -->
 
   <pre class="grammar">
@@ -737,7 +739,20 @@
   assigned to them (e.g. signed vs unsigned arithmetic) because there are no
   operations on them built into the language.</p>
 
-  <p>TODO: Support builtin float and double.</p>
+
+  <!-- ===================================================================== -->
+  <h3 id="type-builtin">Builtin Primitive Floating-Point Types</h3>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    type-builtin ::= '__builtin_float32_type'
+    type-builtin ::= '__builtin_float64_type'
+  </pre>
+  
+  <p>'__builtin_float*_type's are the name of the floating-point types of the
+  corresponding size.  These types specify a storage, but they have no
+  semantics assigned to them (IEEE or otherwise) because there are no
+  operations on them built into the language.</p>
 
   
   <!-- ===================================================================== -->
