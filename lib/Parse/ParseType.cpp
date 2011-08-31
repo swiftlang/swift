@@ -383,7 +383,7 @@ bool Parser::parseTypeProtocol(Type &Result) {
 }
 
 ///   protocol-body:
-///      '{' protocol-element (',' protocol-element)* '}'
+///      '{' protocol-element* '}'
 ///   protocol-element:
 ///      TODO.
 ///
