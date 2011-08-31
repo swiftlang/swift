@@ -51,8 +51,8 @@ TypeBase *TypeBase::getCanonicalType(ASTContext &Ctx) {
   TypeBase *Result = 0;
   switch (Kind) {
   case TypeKind::Error:
-  case TypeKind::BuiltinDouble:
-  case TypeKind::BuiltinFloat:
+  case TypeKind::BuiltinFloat32:
+  case TypeKind::BuiltinFloat64:
   case TypeKind::BuiltinInt1:
   case TypeKind::BuiltinInt8:
   case TypeKind::BuiltinInt16:
@@ -103,8 +103,8 @@ TypeBase *TypeBase::getDesugaredType() {
   switch (Kind) {
   case TypeKind::Error:
   case TypeKind::Dependent:
-  case TypeKind::BuiltinDouble:
-  case TypeKind::BuiltinFloat:
+  case TypeKind::BuiltinFloat32:
+  case TypeKind::BuiltinFloat64:
   case TypeKind::BuiltinInt1:
   case TypeKind::BuiltinInt8:
   case TypeKind::BuiltinInt16:
@@ -245,8 +245,8 @@ void TypeBase::print(raw_ostream &OS) const {
   switch (Kind) {
   case TypeKind::Error:         return cast<ErrorType>(this)->print(OS);
   case TypeKind::Dependent:     return cast<DependentType>(this)->print(OS);
-  case TypeKind::BuiltinDouble:
-  case TypeKind::BuiltinFloat:
+  case TypeKind::BuiltinFloat32:
+  case TypeKind::BuiltinFloat64:
   case TypeKind::BuiltinInt1:
   case TypeKind::BuiltinInt8:
   case TypeKind::BuiltinInt16:
@@ -264,8 +264,8 @@ void TypeBase::print(raw_ostream &OS) const {
 void BuiltinType::print(raw_ostream &OS) const {
   switch (Kind) {
   default: assert(0 && "Unknown builtin type");
-  case TypeKind::BuiltinDouble:OS << "__builtin_double_type"; break;
-  case TypeKind::BuiltinFloat: OS << "__builtin_float_type"; break;
+  case TypeKind::BuiltinFloat32: OS << "__builtin_float32_type"; break;
+  case TypeKind::BuiltinFloat64: OS << "__builtin_float64_type"; break;
   case TypeKind::BuiltinInt1:  OS << "__builtin_int1_type"; break;
   case TypeKind::BuiltinInt8:  OS << "__builtin_int8_type"; break;
   case TypeKind::BuiltinInt16: OS << "__builtin_int16_type"; break;

@@ -35,8 +35,8 @@ enum class tok {
   // Types.  No uint version should be added here, these should always be
   // wrapped with UDT's that have the operations.  These correspond to LLVM IR
   // types.
-  KEYWORD(__builtin_double_type)
-  KEYWORD(__builtin_float_type)
+  KEYWORD(__builtin_float32_type)
+  KEYWORD(__builtin_float64_type)
   KEYWORD(__builtin_int1_type)
   KEYWORD(__builtin_int8_type)
   KEYWORD(__builtin_int16_type)
