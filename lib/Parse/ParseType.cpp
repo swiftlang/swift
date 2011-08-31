@@ -215,7 +215,7 @@ bool Parser::parseTypeOneOf(Type &Result) {
 /// this.
 bool Parser::parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
                                 Type &Result, TypeAliasDecl *TypeName) {
-  if (parseToken(tok::l_brace, "expected '{' in oneof type"))
+  if (parseToken(tok::l_brace, "expected '{' in oneof"))
     return true;
   
   SmallVector<OneOfElementInfo, 8> ElementInfos;
@@ -385,18 +385,35 @@ bool Parser::parseTypeProtocol(Type &Result) {
 ///   protocol-body:
 ///      '{' protocol-element* '}'
 ///   protocol-element:
-///      TODO.
 ///
 bool Parser::parseTypeProtocolBody(SMLoc ProtocolLoc, 
                                    const DeclAttributes &Attributes,
                                    Type &Result, TypeAliasDecl *TypeName) {
+  // Parse the body.
+  if (parseToken(tok::l_brace, "expected '{' in protocol"))
+    return true;
+  
+  // Parse the list of protocol elements.
+  do {
+    switch (Tok.getKind()) {
+    default:
+      error(Tok.getLoc(), "unexpected token in protocol body");
+      return true;
+    case tok::r_brace:  // End of protocol body.
+      break;
+    }
+  } while (Tok.isNot(tok::r_brace));
+  
+  consumeToken(tok::r_brace);
+
+  
+  // Act on what we've parsed.
   if (!Attributes.empty())
     error(Attributes.LSquareLoc,
           "protocol types are not allowed to have attributes yet");
   
   Result = ProtocolType::get(Context);
-  
-  
+    
   if (TypeName) {
     // If we have a pretty name for this, complete it to its actual type.
     assert(TypeName->UnderlyingTy.isNull() &&
