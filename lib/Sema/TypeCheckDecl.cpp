@@ -125,20 +125,28 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
   DeclAttributes &Attrs = VD->Attrs;
   Type Ty = VD->Ty;
   
+  // Get the number of lexical arguments, for semantic checks below.
+  int NumArguments = -1;
+  if (FunctionType *FT = dyn_cast<FunctionType>(Ty.getPointer()))
+    if (TupleType *TT = dyn_cast<TupleType>(FT->Input.getPointer()))
+      NumArguments = TT->Fields.size();
+  
+  if (VD->Name.isOperator() && 
+      (NumArguments == 0 || NumArguments > 2)) {
+    TC.error(VD->getLocStart(), "operators must have one or two arguments");
+    VD->Name = TC.Context.getIdentifier("");
+    Attrs.InfixPrecedence = -1;
+    // FIXME: Set the 'isError' bit on the decl.
+  }
+  
   // If the decl has an infix precedence specified, then it must be a function
   // whose input is a two element tuple.
-  if (Attrs.isInfix()) {
-    bool IsError = true;
-    if (FunctionType *FT = dyn_cast<FunctionType>(Ty.getPointer()))
-      if (TupleType *TT = dyn_cast<TupleType>(FT->Input.getPointer()))
-        IsError = TT->Fields.size() != 2;
-    if (IsError) {
-      TC.error(Attrs.LSquareLoc,
-               "function with 'infix_left' specified must take "
-               "a two element tuple as input");
-      Attrs.InfixPrecedence = -1;
-      // FIXME: Set the 'isError' bit on the decl.
-    }
+  if (Attrs.isInfix() && NumArguments != 2) {
+    TC.error(Attrs.LSquareLoc,
+             "function with 'infix_left' specified must take "
+             "a two element tuple as input");
+    Attrs.InfixPrecedence = -1;
+    // FIXME: Set the 'isError' bit on the decl.
   }
 
   if (Attrs.isInfix() && !VD->Name.isOperator()) {
@@ -153,15 +161,10 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     Attrs.InfixPrecedence = -1;
   }
 
-  if (VD->Name.isOperator() && !VD->Attrs.isInfix()) {
-    bool IsError = true;
-    if (FunctionType *FT = dyn_cast<FunctionType>(Ty.getPointer()))
-      if (TupleType *TT = dyn_cast<TupleType>(FT->Input.getPointer()))
-        IsError = TT->Fields.size() != 1;
-    if (IsError) {
-      TC.error(VD->getLocStart(), "operators must be declared 'infix_left'");
-      VD->Name = TC.Context.getIdentifier("");
-    }
+  if (VD->Name.isOperator() && !VD->Attrs.isInfix() && NumArguments != 1) {
+    TC.error(VD->getLocStart(),
+             "binary operators must be declared 'infix_left'");
+    VD->Name = TC.Context.getIdentifier("");
   }
 }
 
