@@ -530,8 +530,8 @@ static void AddFuncArgumentsToScope(Type Ty,
     
     
     // Create the argument decl for this named argument.
-    ArgDecl *AD = new (P.Context) ArgDecl(P.CurDeclContext, FuncLoc, Name,
-                                          TT->Fields[i].Ty);
+    ArgDecl *AD = new (P.Context) ArgDecl(FuncLoc, Name, TT->Fields[i].Ty,
+                                          P.CurDeclContext);
     ArgDecls.push_back(AD);
     
     // Eventually we should mark the input/outputs as readonly vs writeonly.
@@ -549,8 +549,9 @@ FuncExpr *Parser::actOnFuncExprStart(SMLoc FuncLoc, Type FuncTy) {
   
   ArrayRef<ArgDecl*> Args = ArgDecls;
   
-  FuncExpr *FE = new (Context) FuncExpr(CurDeclContext, FuncLoc, FuncTy,
-                                        Context.AllocateCopy(Args));
+  FuncExpr *FE = new (Context) FuncExpr(FuncLoc, FuncTy,
+                                        Context.AllocateCopy(Args), 0,
+                                        CurDeclContext);
 
   // Reparent all the arguments.
   for (ArgDecl *Arg : Args)

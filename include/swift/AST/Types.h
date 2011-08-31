@@ -280,9 +280,8 @@ public:
   /// getNew - Return a new instance of oneof type.  These are never uniqued
   /// since each syntactic instance of them is semantically considered to be a
   /// different type.
-  static OneOfType *getNew(DeclContext *Parent, SMLoc OneOfLoc,
-                           ArrayRef<OneOfElementDecl*> Elements,
-                           ASTContext &C);
+  static OneOfType *getNew(SMLoc OneOfLoc, ArrayRef<OneOfElementDecl*> Elements,
+                           DeclContext *Parent, ASTContext &C);
  
   SMLoc getLocStart() const { return OneOfLoc; }
   OneOfElementDecl *getElement(unsigned i) const {
@@ -306,8 +305,8 @@ public:
   
 private:
   // oneof types are always canonical.
-  OneOfType(DeclContext *Parent, SMLoc oneofloc,
-            ArrayRef<OneOfElementDecl*> Elts)
+  OneOfType(SMLoc oneofloc, ArrayRef<OneOfElementDecl*> Elts,
+            DeclContext *Parent)
     : TypeBase(TypeKind::OneOf, this),
       DeclContext(DeclContextKind::OneOfType, Parent),
       OneOfLoc(oneofloc), Elements(Elts) {
@@ -376,7 +375,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ArrayType *) { return true; }
   static bool classof(const TypeBase *T) {return T->Kind == TypeKind::Protocol;}
-  
+
 private:
   ProtocolType();
 };

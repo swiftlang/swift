@@ -399,8 +399,8 @@ public:
   ArrayRef<ArgDecl*> NamedArgs;
   BraceStmt *Body;
   
-  FuncExpr(DeclContext *Parent, SMLoc FuncLoc, Type FnType,
-           ArrayRef<ArgDecl*> NamedArgs, BraceStmt *Body = 0)
+  FuncExpr(SMLoc FuncLoc, Type FnType, ArrayRef<ArgDecl*> NamedArgs, 
+           BraceStmt *Body, DeclContext *Parent)
     : Expr(ExprKind::Func, FnType),
       DeclContext(DeclContextKind::FuncExpr, Parent),
       FuncLoc(FuncLoc), NamedArgs(NamedArgs), Body(Body) {}
