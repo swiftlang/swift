@@ -39,9 +39,6 @@ bool Parser::parseType(Type &Result) {
 ///     type-oneof
 ///     type-protocol
 ///
-///   type-oneof:
-///     'oneof' attribute-list? oneof-body
-///
 bool Parser::parseType(Type &Result, const Twine &Message) {
   // Parse type-simple first.
   switch (Tok.getKind()) {
@@ -92,17 +89,9 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
     }
     break;
   }
-  case tok::kw_oneof: {
-    SMLoc OneOfLoc = consumeToken(tok::kw_oneof);
-      
-    DeclAttributes Attributes;
-    if (Tok.is(tok::l_square))
-      parseAttributeList(Attributes);
-
-    if (parseTypeOneOfBody(OneOfLoc, Attributes, Result))
-      return true;
+  case tok::kw_oneof:
+    if (parseTypeOneOf(Result)) return true;
     break;
-  }
   case tok::kw_protocol:
     if (parseTypeProtocol(Result))
       return true;
@@ -200,6 +189,20 @@ bool Parser::parseTypeTupleBody(SMLoc LPLoc, Type &Result) {
   Result = TupleType::get(Elements, Context);
   return false;
 }
+
+///   type-oneof:
+///     'oneof' attribute-list? oneof-body
+///
+bool Parser::parseTypeOneOf(Type &Result) {
+  SMLoc OneOfLoc = consumeToken(tok::kw_oneof);
+  
+  DeclAttributes Attributes;
+  if (Tok.is(tok::l_square))
+    parseAttributeList(Attributes);
+  
+  return parseTypeOneOfBody(OneOfLoc, Attributes, Result);
+}
+
 
 ///   oneof-body:
 ///      '{' oneof-element (',' oneof-element)* '}'

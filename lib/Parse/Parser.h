@@ -149,6 +149,7 @@ public:
   bool parseType(Type &Result, const Twine &Message);
   bool parseTypeTupleBody(SMLoc LPLoc, Type &Result);
   
+  bool parseTypeOneOf(Type &Result);
   bool parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
                           Type &Result, TypeAliasDecl *TypeName = 0);
   bool parseTypeArray(SMLoc LSquareLoc, Type &Result);
