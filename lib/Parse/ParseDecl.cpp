@@ -83,23 +83,23 @@ TranslationUnitDecl *Parser::parseTranslationUnit() {
 
 /// parseAttribute
 ///   attribute:
-///     'infix' '=' numeric_constant
+///     'infix_left' '=' numeric_constant
 ///     'unary'
 bool Parser::parseAttribute(DeclAttributes &Attributes) {
-  // Infix attribute.
-  if (Tok.is(tok::identifier) && Tok.getText() == "infix") {
+  // infix_left attribute.
+  if (Tok.is(tok::identifier) && Tok.getText() == "infix_left") {
     if (Attributes.InfixPrecedence != -1)
-      error(Tok.getLoc(), "infix precedence repeatedly specified");
+      error(Tok.getLoc(), "infix_left precedence repeatedly specified");
     consumeToken(tok::identifier);
 
-    // The default infix precedence is 100.
+    // The default infix_left precedence is 100.
     Attributes.InfixPrecedence = 100;
     
     if (consumeIf(tok::equal)) {
       SMLoc PrecLoc = Tok.getLoc();
       StringRef Text = Tok.getText();
       if (!parseToken(tok::numeric_constant,
-                      "expected precedence number in 'infix' attribute")) {
+                      "expected precedence number in 'infix_left' attribute")) {
         long long Value;
         if (Text.getAsInteger(10, Value) || Value > 255 || Value < 0)
           error(PrecLoc, "invalid precedence: value must be between 0 and 255");

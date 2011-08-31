@@ -133,7 +133,8 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
       if (TupleType *TT = dyn_cast<TupleType>(FT->Input.getPointer()))
         IsError = TT->Fields.size() != 2;
     if (IsError) {
-      TC.error(Attrs.LSquareLoc, "function with 'infix' specified must take "
+      TC.error(Attrs.LSquareLoc,
+               "function with 'infix_left' specified must take "
                "a two element tuple as input");
       Attrs.InfixPrecedence = -1;
       // FIXME: Set the 'isError' bit on the decl.
@@ -141,14 +142,14 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
   }
 
   if (Attrs.isInfix() && !VD->Name.isOperator()) {
-    TC.error(VD->getLocStart(), "only operators may be declared 'infix'");
+    TC.error(VD->getLocStart(), "only operators may be declared 'infix_left'");
     Attrs.InfixPrecedence = -1;
     // FIXME: Set the 'isError' bit on the decl.
   }
 
   // Only var and func decls can be infix.
   if (Attrs.isInfix() && !isa<VarDecl>(VD) && !isa<FuncDecl>(VD)) {
-    TC.error(VD->getLocStart(), "declaration cannot be declared 'infix'");
+    TC.error(VD->getLocStart(), "declaration cannot be declared 'infix_left'");
     Attrs.InfixPrecedence = -1;
   }
 
@@ -158,7 +159,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
       if (TupleType *TT = dyn_cast<TupleType>(FT->Input.getPointer()))
         IsError = TT->Fields.size() != 1;
     if (IsError) {
-      TC.error(VD->getLocStart(), "operators must be declared 'infix'");
+      TC.error(VD->getLocStart(), "operators must be declared 'infix_left'");
       VD->Name = TC.Context.getIdentifier("");
     }
   }

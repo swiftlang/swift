@@ -401,7 +401,7 @@
     <i>// Declaring a function like value with 'var', using an attribute.</i>
     <i>// The name here is "==", the type is a function that takes a tuple</i>
     <i>// and returns an int.</i>
-    var [infix=120] == : (lhs : int, rhs : int) -&gt; int
+    var [infix_left=120] == : (lhs : int, rhs : int) -&gt; int
     
     <i>// This decodes the tuple return value into independently named parts</i>
     <i>// and both 'val' and 'err' are in scope after this line.</i>
@@ -470,7 +470,7 @@
     func c(arg : int) -&gt; int { return arg+4 }
 
     <i>// Simple operator.</i>
-    func [infix=120] + (lhs: int, rhs: int) -&gt; int
+    func [infix_left=120] + (lhs: int, rhs: int) -&gt; int
 
     <i>// Function with multiple return values:</i>
     func d(a : int) -&gt; (b : int) -&gt; (res1 : int, res2 : int)
@@ -660,10 +660,10 @@
   <h4 id="attribute-infix">Infix Attribute</h4>
     
   <pre class="grammar">
-    attribute-infix ::= 'infix' '=' <a href="#numeric_constant">numeric_constant</a>
+    attribute-infix ::= 'infix_left' '=' <a href="#numeric_constant">numeric_constant</a>
   </pre>
 
-  <p>The 'infix' attribute may only be applied to the declaration of a
+  <p>The 'infix_left' attribute may only be applied to the declaration of a
   function of binary operator type whose name is an
   <a href="#identifier"><tt>operator</tt></a>.
   FIXME: Implement these restrictions.</p>
@@ -1693,31 +1693,31 @@
   
   <pre class="stdlib">
     <i>// Simple binary operators, following the same precedence as C.</i>
-    func [infix=200] * (lhs: int, rhs: int) -&gt; int
-    func [infix=200] / (lhs: int, rhs: int) -&gt; int
-    func [infix=200] % (lhs: int, rhs: int) -&gt; int
-    func [infix=190] + (lhs: int, rhs: int) -&gt; int
-    func [infix=190] - (lhs: int, rhs: int) -&gt; int
+    func [infix_left=200] * (lhs: int, rhs: int) -&gt; int
+    func [infix_left=200] / (lhs: int, rhs: int) -&gt; int
+    func [infix_left=200] % (lhs: int, rhs: int) -&gt; int
+    func [infix_left=190] + (lhs: int, rhs: int) -&gt; int
+    func [infix_left=190] - (lhs: int, rhs: int) -&gt; int
     <i>// In C, &lt;&lt;, &gt;&gt; is 180.</i>
   </pre>
 
   <h4 id="stdlib-comparison">Relational and Equality Operators</h4>
 
   <pre class="stdlib">
-    var [infix=170] &lt;  : (lhs : int, rhs : int) -&gt; bool
-    var [infix=170] &gt;  : (lhs : int, rhs : int) -&gt; bool
-    var [infix=170] &lt;= : (lhs : int, rhs : int) -&gt; bool
-    var [infix=170] &gt;= : (lhs : int, rhs : int) -&gt; bool
-    var [infix=160] == : (lhs : int, rhs : int) -&gt; bool
-    var [infix=160] != : (lhs : int, rhs : int) -&gt; bool
+    var [infix_left=170] &lt;  : (lhs : int, rhs : int) -&gt; bool
+    var [infix_left=170] &gt;  : (lhs : int, rhs : int) -&gt; bool
+    var [infix_left=170] &lt;= : (lhs : int, rhs : int) -&gt; bool
+    var [infix_left=170] &gt;= : (lhs : int, rhs : int) -&gt; bool
+    var [infix_left=160] == : (lhs : int, rhs : int) -&gt; bool
+    var [infix_left=160] != : (lhs : int, rhs : int) -&gt; bool
     <i>// In C, bitwise logical operators are 130,140,150.</i>
   </pre>
 
   <h4 id="stdlib-short-circuit-logical">Short Circuiting Logical Operators</h4>
   
   <pre class="stdlib">
-    func [infix=120] &amp;&amp; (lhs: bool, rhs: ()-&gt;bool) -&gt; bool
-    func [infix=110] || (lhs: bool, rhs: ()-&gt;bool) -&gt; bool
+    func [infix_left=120] &amp;&amp; (lhs: bool, rhs: ()-&gt;bool) -&gt; bool
+    func [infix_left=110] || (lhs: bool, rhs: ()-&gt;bool) -&gt; bool
     <i>// In C, 100 is ?:</i>
     <i>// In C, 90 is =, *=, += etc.</i>
   </pre>
