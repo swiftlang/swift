@@ -30,7 +30,8 @@ namespace swift {
 enum class DeclContextKind {
   TranslationUnitDecl,
   FuncExpr,
-  OneOfType
+  OneOfType,
+  ProtocolType
 };
 
 /// A DeclContext is an AST object which acts as a semantic container

@@ -30,6 +30,7 @@ namespace swift {
   class Identifier;
   class TypeAliasDecl;
   class OneOfElementDecl;
+  class ProtocolFuncElementDecl;
   
   enum class TypeKind {
     Error,       // An erroneously constructed type.
@@ -363,12 +364,18 @@ private:
   
 /// ProtocolType - A protocol type describes an abstract interface implemented
 /// by another type.
-class ProtocolType : public TypeBase {
+class ProtocolType : public TypeBase, public DeclContext {
 public:
-  // TODO.
-  
-  /// 'Constructor' Factory Function.
-  static ProtocolType *get(ASTContext &C);
+  SMLoc ProtocolLoc;
+
+  const ArrayRef<ProtocolFuncElementDecl*> Elements;
+
+  /// getNew - Return a new instance of a protocol type.  These are never
+  /// uniqued since each syntactic instance of them is semantically considered
+  /// to be a different type.
+  static ProtocolType *getNew(SMLoc ProtocolLoc,
+                              ArrayRef<ProtocolFuncElementDecl*> Elts,
+                              DeclContext *Parent);
   
   void print(raw_ostream &OS) const;
   
@@ -377,10 +384,14 @@ public:
   static bool classof(const TypeBase *T) {return T->Kind == TypeKind::Protocol;}
 
 private:
-  ProtocolType();
+  ProtocolType(SMLoc ProtocolLoc,
+               ArrayRef<ProtocolFuncElementDecl*> Elts,
+               DeclContext *Parent)
+  : TypeBase(TypeKind::Protocol, this),
+    DeclContext(DeclContextKind::ProtocolType, Parent),
+    ProtocolLoc(ProtocolLoc), Elements(Elts) {
+  }
 };
-
-
 
 } // end namespace swift
 

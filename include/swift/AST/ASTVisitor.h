@@ -48,6 +48,7 @@ public:
       DISPATCH(OneOfElement);
       DISPATCH(Arg);
       DISPATCH(ElementRef);
+      DISPATCH(ProtocolFuncElement);
 #undef DISPATCH
     }
     assert(0 && "Not reachable, all cases handled");

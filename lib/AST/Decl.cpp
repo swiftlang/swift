@@ -59,6 +59,8 @@ SMLoc Decl::getLocStart() const {
     return cast<OneOfElementDecl>(this)->getLocStart();
   case DeclKind::Arg:        return cast<ArgDecl>(this)->getLocStart();
   case DeclKind::ElementRef: return cast<ElementRefDecl>(this)->getLocStart();
+  case DeclKind::ProtocolFuncElement:
+    return cast<ProtocolFuncElementDecl>(this)->getLocStart();  
   }
 
   assert(0 && "Unknown decl kind");
@@ -182,27 +184,27 @@ namespace {
     
     
     void visitVarDecl(VarDecl *VD) {
-      printCommon(VD, "vardecl");
+      printCommon(VD, "var_decl");
       OS << ')';
     }
     
     void visitFuncDecl(FuncDecl *FD) {
-      printCommon(FD, "funcdecl");
+      printCommon(FD, "func_decl");
       OS << ')';
     }
     
     void visitOneOfElementDecl(OneOfElementDecl *OOED) {
-      printCommon(OOED, "oneofelementdecl");
+      printCommon(OOED, "oneof_element_decl");
       OS << ')';
     }
     
     void visitArgDecl(ArgDecl *AD) {
-      printCommon(AD, "argdecl");
+      printCommon(AD, "arg_decl");
       OS << ')';
     }
 
     void visitElementRefDecl(ElementRefDecl *ERD) {
-      printCommon(ERD, "elementrefdecl");
+      printCommon(ERD, "element_ref_decl");
       OS << '\n';
       OS.indent(Indent+2);
       OS << "(accesspath ";
@@ -213,7 +215,10 @@ namespace {
       OS << "))";
     }
     
-
+    void visitProtocolFuncElementDecl(ProtocolFuncElementDecl *PFED) {
+      printCommon(PFED, "protocol_element_func_decl");
+      OS << ')';
+    }
   };
 } // end anonymous namespace.
 

@@ -84,6 +84,10 @@ public:
       ERD->Ty = ErrorType::get(TC.Context);
     }
   }
+  
+  void visitProtocolFuncElementDecl(ProtocolFuncElementDecl *PFED) {
+    assert(0 && "These never exist in statement context");
+  }
 };
 }; // end anonymous namespace.
 

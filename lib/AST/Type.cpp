@@ -326,6 +326,9 @@ void ArrayType::print(raw_ostream &OS) const {
 }
 
 void ProtocolType::print(raw_ostream &OS) const {
-  OS << "protocol {}";
+  OS << "protocol {";
+  for (Decl *D : Elements)
+    D->print(OS);
+  OS << '}';
 }
 

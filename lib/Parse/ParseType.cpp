@@ -384,6 +384,8 @@ bool Parser::parseTypeProtocol(Type &Result) {
 ///   protocol-body:
 ///      '{' protocol-element* '}'
 ///   protocol-element:
+///      'func' attribute-list? identifier arg-list-type
+///      // 'typealias' identifier
 ///
 bool Parser::parseTypeProtocolBody(SMLoc ProtocolLoc, 
                                    const DeclAttributes &Attributes,
@@ -391,6 +393,8 @@ bool Parser::parseTypeProtocolBody(SMLoc ProtocolLoc,
   // Parse the body.
   if (parseToken(tok::l_brace, "expected '{' in protocol"))
     return true;
+  
+  SmallVector<ProtocolFuncElementDecl*, 8> Elements;
   
   // Parse the list of protocol elements.
   do {
@@ -400,6 +404,9 @@ bool Parser::parseTypeProtocolBody(SMLoc ProtocolLoc,
       return true;
     case tok::r_brace:  // End of protocol body.
       break;
+        
+      //case tok::kw_func:
+        //break;  
     }
   } while (Tok.isNot(tok::r_brace));
   
@@ -411,7 +418,7 @@ bool Parser::parseTypeProtocolBody(SMLoc ProtocolLoc,
     error(Attributes.LSquareLoc,
           "protocol types are not allowed to have attributes yet");
   
-  Result = ProtocolType::get(Context);
+  Result = ProtocolType::getNew(ProtocolLoc, Elements, CurDeclContext);
     
   if (TypeName) {
     // If we have a pretty name for this, complete it to its actual type.
