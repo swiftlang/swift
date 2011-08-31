@@ -32,6 +32,11 @@ enum class DeclContextKind {
   OneOfType
 };
 
+/// A DeclContext is an AST object which acts as a semantic container
+/// for declarations.  As a policy matter, we currently define
+/// contexts broadly: a lambda expression in a function is a new
+/// DeclContext, but a new brace statement is not.  There's no
+/// particular mandate for this, though.
 class DeclContext {
   llvm::PointerIntPair<DeclContext*, 2, unsigned> ParentAndKind;
 
@@ -41,10 +46,20 @@ public:
     assert(Parent || Kind == DeclContextKind::TranslationUnitDecl);
   }
 
+  /// Returns the kind of context this is.
   DeclContextKind getContextKind() const {
     return DeclContextKind(ParentAndKind.getInt());
   }
 
+  /// Determines whether this context is itself a local scope in a
+  /// code block.  A context that appears in such a scope, like a
+  /// local type declaration, does not itself become a local context.
+  bool isLocalContext() const {
+    return getContextKind() == DeclContextKind::FuncExpr;
+  }
+
+  /// Returns the semantic parent of this context.  A context has a
+  /// parent if and only if it is not a translation unit context.
   DeclContext *getParent() const {
     return ParentAndKind.getPointer();
   }
