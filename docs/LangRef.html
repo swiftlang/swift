@@ -735,7 +735,9 @@
   
   <pre class="grammar">
     type-tuple ::= lparen-any type-tuple-body? ')'
-    type-tuple-body ::= identifier? <a href="#value-specifier">value-specifier</a> (',' identifier? <a href="#value-specifier">value-specifier</a>)* 
+    type-tuple-body ::= type-tuple-element (',' type-tuple-element)*
+    type-tuple-element ::= identifier <a href="#value-specifier">value-specifier</a>
+    type-tuple-element ::= type ('=' <a href="#expr">expr</a>)?
   </pre>
 
   <p>Syntactically, tuple types are simply a (possibly empty) list of

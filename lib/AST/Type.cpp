@@ -296,9 +296,9 @@ void TupleType::print(raw_ostream &OS) const {
     const TupleTypeElt &TD = Fields[i];
     
     if (!TD.Name.empty())
-      OS << TD.Name << ' ';
+      OS << TD.Name << " : ";
     
-    OS << ": " << TD.Ty;
+    OS << TD.Ty;
   }
   OS << ')';
 }

@@ -128,8 +128,10 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
 ///   type-tuple:
 ///     '(' type-tuple-body? ')'
 ///   type-tuple-body:
-///     identifier? value-specifier (',' identifier? value-specifier)*
-///
+///     type-tuple-element (',' type-tuple-element)*
+///   type-tuple-element:
+///     identifier value-specifier
+///     type ('=' expr)?
 bool Parser::parseTypeTupleBody(SMLoc LPLoc, Type &Result) {
   SmallVector<TupleTypeElt, 8> Elements;
 
@@ -138,14 +140,40 @@ bool Parser::parseTypeTupleBody(SMLoc LPLoc, Type &Result) {
     do {
       Elements.push_back(TupleTypeElt());
       TupleTypeElt &Result = Elements.back();
-      
-      if (Tok.is(tok::identifier))
+
+      // If the tuple element starts with "ident :" or "ident =", then
+      // the identifier is an element tag, and it is followed by a
+      // value-specifier.
+      if (Tok.is(tok::identifier) &&
+          (peekToken().is(tok::colon) || peekToken().is(tok::equal))) {
         parseIdentifier(Result.Name, "");
-      
-      NullablePtr<Expr> Init;
-      if ((HadError = parseValueSpecifier(Result.Ty, Init, /*single*/ true)))
+
+        NullablePtr<Expr> Init;
+        if ((HadError = parseValueSpecifier(Result.Ty, Init, /*single*/ true)))
+          break;
+        Result.Init = Init.getPtrOrNull();
+        continue;
+      }
+
+      // Otherwise, this has to be a type.
+      if ((HadError = parseType(Result.Ty)))
         break;
-      Result.Init = Init.getPtrOrNull();
+
+      // Parse the optional default value expression.
+      if (Tok.is(tok::colon)) {
+        ParseResult<Expr> Init =
+          parseSingleExpr("expected initializer expression after '='");
+
+        // Die if there was a parse error.
+        if (Init) {
+          HadError = true;
+          break;
+        }
+
+        if (!Init.isSemaError()) {
+          Result.Init = Init.get();
+        }
+      }
     } while (consumeIf(tok::comma));
     
     if (HadError) {
