@@ -1029,23 +1029,41 @@
   <pre class="grammar">
     type-protocol    ::= 'protocol' <a href="#attribute-list">attribute-list</a>? protocol-body
     protocol-body    ::= '{' protocol-element* '}'
-    protocol-element ::= /* TODO */
   </pre>
   
   <p>A protocol type describes an abstract interface implemented by another
   type.  It consists of a comma-separated list of elements, each of which are
   members that instances of the protocol are guaranteed to have.</p>
   
-  <p>Here are some examples of oneof types:</p>
+  <p>Here are some examples of protocol types:</p>
   
   <pre class="example">
     protocol Document {
-      <i>//func title() -> string</i>
+      func title() -&gt; string
     }
     protocol VersionedDocument <i>/*: Document*/</i> {
-      <i>//func version() -> int</i>
+      func version() -&gt; int
     }
   </pre>
+  
+  <!-- _____________________________________________________________________ -->
+  <h4 id="protocol-element-func">'func' protocol elements</h4>
+  
+  <pre class="grammar">
+    protocol-element ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> <a href="#type">type</a>
+  </pre>
+
+  <p>'func' members of a protocol define a value of function type that may be
+     accessed with dot syntax on a value of the protocol's type.</p>
+  
+  <p>If the type is not syntactically a function type (i.e., has no -&gt; in it
+  at top-level), then the return value is implicitly inferred to be "()".  All
+  of the argument and return value names are injected into the
+  <a href="#namebind_scope">scope</a> of the function body.</p>
+  
+
+  <p>TODO: var members and typealias members</p>
+  
   
   <!-- ********************************************************************* -->
   <h2 id="expr">Expressions</h2>

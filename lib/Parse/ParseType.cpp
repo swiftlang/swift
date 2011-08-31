@@ -385,6 +385,7 @@ bool Parser::parseTypeProtocol(Type &Result) {
 ///      '{' protocol-element* '}'
 ///   protocol-element:
 ///      'func' attribute-list? identifier arg-list-type
+///      // 'var' identifier ':' type
 ///      // 'typealias' identifier
 ///
 bool Parser::parseTypeProtocolBody(SMLoc ProtocolLoc, 
