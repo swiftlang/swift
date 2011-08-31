@@ -48,6 +48,7 @@ public:
   
   typedef llvm::PointerUnion3<Expr*, Stmt*, Decl*> ExprStmtOrDecl;
 
+  /// A RAII object for temporarily changing CurDeclContext.
   class ContextChange {
     Parser &P;
     DeclContext *OldContext;
@@ -58,6 +59,8 @@ public:
       P.CurDeclContext = DC;
     }
 
+    /// Prematurely pop the DeclContext installed by the constructor.
+    /// Makes the destructor a no-op.
     void pop() {
       assert(OldContext && "already popped context!");
       P.CurDeclContext = OldContext;
