@@ -115,6 +115,8 @@ public:
   /// closure argument (e.g. $4) and to UnresolvedMemberExprs (e.g. :foo) during
   /// type checking until they are resolved to something with concrete type.
   const Type TheDependentType;
+  const Type TheDoubleType;      /// TheDoubleType- 64-bit IEEE floating point.
+  const Type TheFloatType;       /// TheFloatType - 32-bit IEEE floating point.
   const Type TheInt1Type;        /// TheInt1Type  - 1-bit integer.
   const Type TheInt8Type;        /// TheInt8Type  - 8-bit integer.
   const Type TheInt16Type;       /// TheInt16Type - 16-bit integer.

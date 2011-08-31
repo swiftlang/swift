@@ -33,6 +33,8 @@ namespace swift {
   
   enum class TypeKind {
     Error,       // An erroneously constructed type.
+    BuiltinDouble,
+    BuiltinFloat,
     BuiltinInt1,
     BuiltinInt8,
     BuiltinInt16,

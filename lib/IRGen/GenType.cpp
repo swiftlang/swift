@@ -110,6 +110,12 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
     llvm_unreachable("generating an error type");
   case TypeKind::Dependent:
     llvm_unreachable("generating a dependent type");
+  case TypeKind::BuiltinDouble:
+    return new PrimitiveTypeInfo(llvm::Type::getDoubleTy(IGM.getLLVMContext()),
+                                 Size(8), Alignment(8));
+  case TypeKind::BuiltinFloat:
+    return new PrimitiveTypeInfo(llvm::Type::getFloatTy(IGM.getLLVMContext()),
+                                 Size(4), Alignment(4));
   case TypeKind::BuiltinInt1:
     return new PrimitiveTypeInfo(IGM.Int1Ty, Size(1), Alignment(1));
   case TypeKind::BuiltinInt8:

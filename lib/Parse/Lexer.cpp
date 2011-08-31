@@ -143,6 +143,8 @@ void Lexer::lexIdentifier() {
   
   tok Kind =
   llvm::StringSwitch<tok>(StringRef(TokStart, CurPtr-TokStart))
+    .Case("__builtin_double_type",tok::kw___builtin_double_type)
+    .Case("__builtin_float_type", tok::kw___builtin_float_type)
     .Case("__builtin_int1_type",  tok::kw___builtin_int1_type)
     .Case("__builtin_int8_type",  tok::kw___builtin_int8_type)
     .Case("__builtin_int16_type", tok::kw___builtin_int16_type)

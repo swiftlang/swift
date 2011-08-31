@@ -50,6 +50,14 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
     consumeToken(tok::identifier);
     break;
   }
+  case tok::kw___builtin_double_type:
+    Result = Context.TheDoubleType;
+    consumeToken(tok::kw___builtin_double_type);
+    break;
+  case tok::kw___builtin_float_type:
+    Result = Context.TheFloatType;
+    consumeToken(tok::kw___builtin_float_type);
+    break;
   case tok::kw___builtin_int1_type:
     Result = Context.TheInt1Type;
     consumeToken(tok::kw___builtin_int1_type);

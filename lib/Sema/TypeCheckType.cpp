@@ -48,6 +48,8 @@ bool TypeChecker::validateType(Type InTy) {
   case TypeKind::Error:
     // Error already diagnosed.
     return true;
+  case TypeKind::BuiltinDouble:
+  case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinInt1:
   case TypeKind::BuiltinInt8:
   case TypeKind::BuiltinInt16:

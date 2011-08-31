@@ -44,6 +44,8 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
     TheErrorType(new (*this) ErrorType()),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheDependentType(new (*this) DependentType()),
+    TheDoubleType(new (*this) BuiltinType(TypeKind::BuiltinDouble)),
+    TheFloatType(new (*this) BuiltinType(TypeKind::BuiltinFloat)),
     TheInt1Type(new (*this) BuiltinType(TypeKind::BuiltinInt1)),
     TheInt8Type(new (*this) BuiltinType(TypeKind::BuiltinInt8)),
     TheInt16Type(new (*this) BuiltinType(TypeKind::BuiltinInt16)),
