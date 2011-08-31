@@ -32,7 +32,7 @@ public:
 
   bool visitValueDecl(ValueDecl *VD);
   bool validateVarName(Type Ty, DeclVarName *Name);
-  void validateAttributes(DeclAttributes &Attrs, Type Ty);
+  void validateAttributes(ValueDecl *VD);
 
   //===--------------------------------------------------------------------===//
   // Visit Methods.
@@ -115,31 +115,19 @@ bool DeclChecker::visitValueDecl(ValueDecl *VD) {
               "while converting 'var' initializer to declared type");
   }
   
-  validateAttributes(VD->Attrs, VD->Ty);
+  validateAttributes(VD);
   return false;
 }
 
 
 /// validateAttributes - Check that the func/var declaration attributes are ok.
-void DeclChecker::validateAttributes(DeclAttributes &Attrs, Type Ty) {
-  // If the decl is a unary operator, then it must be a function whose input is
-  // a single element tuple.
-  if (Attrs.isUnary) {
-    bool IsError = true;
-    if (FunctionType *FT = dyn_cast<FunctionType>(Ty.getPointer()))
-      if (TupleType *TT = dyn_cast<TupleType>(FT->Input.getPointer()))
-        IsError = TT->Fields.size() != 1;
-    if (IsError) {
-      TC.error(Attrs.LSquareLoc, "function with 'unary' specified must take "
-               "a single element tuple as input");
-      Attrs.isUnary = false;
-      // FIXME: Set the 'isError' bit on the decl.
-    }
-  }
+void DeclChecker::validateAttributes(ValueDecl *VD) {
+  DeclAttributes &Attrs = VD->Attrs;
+  Type Ty = VD->Ty;
   
   // If the decl has an infix precedence specified, then it must be a function
   // whose input is a two element tuple.
-  if (Attrs.InfixPrecedence != -1) {
+  if (Attrs.isInfix()) {
     bool IsError = true;
     if (FunctionType *FT = dyn_cast<FunctionType>(Ty.getPointer()))
       if (TupleType *TT = dyn_cast<TupleType>(FT->Input.getPointer()))
@@ -149,6 +137,29 @@ void DeclChecker::validateAttributes(DeclAttributes &Attrs, Type Ty) {
                "a two element tuple as input");
       Attrs.InfixPrecedence = -1;
       // FIXME: Set the 'isError' bit on the decl.
+    }
+  }
+
+  if (Attrs.isInfix() && !VD->Name.isOperator()) {
+    TC.error(VD->getLocStart(), "only operators may be declared 'infix'");
+    Attrs.InfixPrecedence = -1;
+    // FIXME: Set the 'isError' bit on the decl.
+  }
+
+  // Only var and func decls can be infix.
+  if (Attrs.isInfix() && !isa<VarDecl>(VD) && !isa<FuncDecl>(VD)) {
+    TC.error(VD->getLocStart(), "declaration cannot be declared 'infix'");
+    Attrs.InfixPrecedence = -1;
+  }
+
+  if (VD->Name.isOperator() && !VD->Attrs.isInfix()) {
+    bool IsError = true;
+    if (FunctionType *FT = dyn_cast<FunctionType>(Ty.getPointer()))
+      if (TupleType *TT = dyn_cast<TupleType>(FT->Input.getPointer()))
+        IsError = TT->Fields.size() != 1;
+    if (IsError) {
+      TC.error(VD->getLocStart(), "operators must be declared 'infix'");
+      VD->Name = TC.Context.getIdentifier("");
     }
   }
 }

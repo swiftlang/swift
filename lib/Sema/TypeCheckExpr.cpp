@@ -85,7 +85,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   if (FunctionType *FT = E1->Ty->getAs<FunctionType>()) {
     // If this is an operator, make sure that the declaration found was declared
     // as such.
-    if (isa<UnaryExpr>(E) && !cast<DeclRefExpr>(E1)->D->Attrs.isUnary) {
+    if (isa<UnaryExpr>(E) && !cast<DeclRefExpr>(E1)->D->Name.isOperator()) {
       error(E1->getLocStart(),
             "use of unary operator without 'unary' attribute specified");
       return true;

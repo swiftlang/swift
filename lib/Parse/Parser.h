@@ -141,7 +141,6 @@ public:
                         SmallVectorImpl<unsigned> &AccessPath,
                         VarDecl *VD,
                         SmallVectorImpl<Parser::ExprStmtOrDecl> &Decls);
-  void actOnNamedDecl(NamedDecl *D);
   
   //===--------------------------------------------------------------------===//
   // Type Parsing

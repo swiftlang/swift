@@ -57,14 +57,11 @@ public:
   /// range of 0-255.
   short InfixPrecedence;
   
-  /// isUnary - True if this decl has the 'unary' attribute on it.
-  bool isUnary;
-
-  DeclAttributes() : InfixPrecedence(-1), isUnary(false) { }
+  DeclAttributes() : InfixPrecedence(-1) { }
   
   
   bool empty() const {
-    return InfixPrecedence == -1 && !isUnary;
+    return InfixPrecedence == -1;
   }
   
   /// isInfix - Return true if this is a binary infix operation.

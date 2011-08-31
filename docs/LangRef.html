@@ -653,7 +653,6 @@
     attribute-list ::= '[' attribute (',' attribute)* ']'
     
     attribute      ::= attribute-infix
-    attribute      ::= attribute-unary
   </pre>
   
   <p>An attribute is a (possibly empty) comma separated list of attributes.</p>
@@ -668,19 +667,6 @@
   function of binary operator type whose name is an
   <a href="#identifier"><tt>operator</tt></a>.
   FIXME: Implement these restrictions.</p>
-  
-  <h4 id="attribute-unary">Unary Attribute</h4>
-  
-  <pre class="grammar">
-    attribute-unary ::= 'unary'
-  </pre>
-  
-  <p>The 'unary' attribute may only be applied to the declaration of a
-     function of unary operator type whose name is an <a 
-     href="#identifier"><tt>operator</tt></a>, and that takes a tuple with a 
-     single element.
-  FIXME: Implement these restrictions.</p>
-  
   
   <!-- ********************************************************************* -->
   <h2 id="type">Types</h2>
@@ -1338,7 +1324,7 @@
   </pre>
     
   <p>If an operator is used as a unary operator, but name resolution
-  does not find at least one function of unary operator type, the
+  does not find at least one function that takes a single argument, the
   expression is ill-formed.</p>
 
   <p>Simple examples:</p>
