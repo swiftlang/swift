@@ -132,7 +132,8 @@ TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
 /// getNewOneOfType - Return a new instance of oneof type.  These are never
 /// uniqued because the loc is generally different.
 OneOfType *OneOfType::getNew(SMLoc OneOfLoc, ArrayRef<OneOfElementDecl*> InElts,
-                             DeclContext *Parent, ASTContext &C) {
+                             DeclContext *Parent) {
+  ASTContext &C = Parent->getASTContext();
   
   OneOfElementDecl **NewElements =
     C.AllocateCopy<OneOfElementDecl*>(InElts.begin(), InElts.end());

@@ -281,7 +281,7 @@ public:
   /// since each syntactic instance of them is semantically considered to be a
   /// different type.
   static OneOfType *getNew(SMLoc OneOfLoc, ArrayRef<OneOfElementDecl*> Elements,
-                           DeclContext *Parent, ASTContext &C);
+                           DeclContext *Parent);
  
   SMLoc getLocStart() const { return OneOfLoc; }
   OneOfElementDecl *getElement(unsigned i) const {

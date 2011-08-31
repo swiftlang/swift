@@ -290,8 +290,7 @@ OneOfType *Parser::actOnOneOfType(SMLoc OneOfLoc, const DeclAttributes &Attrs,
                                                       CurDeclContext));
   }
   
-  OneOfType *Result = OneOfType::getNew(OneOfLoc, EltDecls,
-                                        CurDeclContext, Context);
+  OneOfType *Result = OneOfType::getNew(OneOfLoc, EltDecls, CurDeclContext);
   for (OneOfElementDecl *D : EltDecls)
     D->Context = Result;
   
