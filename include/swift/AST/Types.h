@@ -46,6 +46,7 @@ namespace swift {
     OneOf,
     Function,
     Array,
+    Protocol,
     
     Builtin_First = BuiltinInt1,
     Builtin_Last = BuiltinInt64
@@ -360,6 +361,27 @@ public:
 private:
   ArrayType(Type base, uint64_t size);
 };
+  
+/// ProtocolType - A protocol type describes an abstract interface implemented
+/// by another type.
+class ProtocolType : public TypeBase {
+public:
+  // TODO.
+  
+  /// 'Constructor' Factory Function.
+  static ProtocolType *get(ASTContext &C);
+  
+  void print(raw_ostream &OS) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ArrayType *) { return true; }
+  static bool classof(const TypeBase *T) {return T->Kind == TypeKind::Protocol;}
+  
+private:
+  ProtocolType();
+};
+
+
 
 } // end namespace swift
 

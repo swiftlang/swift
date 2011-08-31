@@ -152,6 +152,7 @@ public:
   bool parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
                           Type &Result, TypeAliasDecl *TypeName = 0);
   bool parseTypeArray(SMLoc LSquareLoc, Type &Result);
+  bool parseTypeProtocol(Type &Result);
   
   struct OneOfElementInfo {
     SMLoc NameLoc;

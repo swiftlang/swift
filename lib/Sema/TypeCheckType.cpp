@@ -112,10 +112,15 @@ bool TypeChecker::validateType(Type InTy) {
     IsInvalid = validateType(FT->Input) || validateType(FT->Result);
     break;
   }
-  case TypeKind::Array:
+  case TypeKind::Array: {
     ArrayType *AT = cast<ArrayType>(T);
     IsInvalid = validateType(AT->Base);
     // FIXME: We need to check AT->Size! (It also has to be convertible to int).
+    break;
+  }
+      
+  case TypeKind::Protocol:
+    // TODO: Validate Protocol types.
     break;
   }
 

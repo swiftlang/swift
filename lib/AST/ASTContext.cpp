@@ -175,3 +175,12 @@ ArrayType::ArrayType(Type base, uint64_t size)
     Base(base), Size(size) {}
 
 
+
+ProtocolType *ProtocolType::get(ASTContext &C) {
+  return new (C) ProtocolType();
+}
+
+ProtocolType::ProtocolType()
+  : TypeBase(TypeKind::Protocol, this) {}
+
+

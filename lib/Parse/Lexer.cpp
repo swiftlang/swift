@@ -150,13 +150,15 @@ void Lexer::lexIdentifier() {
     .Case("__builtin_int16_type", tok::kw___builtin_int16_type)
     .Case("__builtin_int32_type", tok::kw___builtin_int32_type)
     .Case("__builtin_int64_type", tok::kw___builtin_int64_type)
+  
     // decl and type keywords
     .Case("import", tok::kw_import)
-    .Case("oneof", tok::kw_oneof)
-    .Case("struct", tok::kw_struct)
-    .Case("var", tok::kw_var)
     .Case("func", tok::kw_func)
+    .Case("oneof", tok::kw_oneof)
+    .Case("protocol", tok::kw_protocol)
+    .Case("struct", tok::kw_struct)
     .Case("typealias", tok::kw_typealias)
+    .Case("var", tok::kw_var)
   
     // Statements
     .Case("if", tok::kw_if)

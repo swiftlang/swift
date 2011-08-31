@@ -47,11 +47,12 @@ enum class tok {
 
   // Deck and type keywords.
   KEYWORD(import)
-  KEYWORD(oneof)
-  KEYWORD(struct)
   KEYWORD(func)
-  KEYWORD(var)
+  KEYWORD(oneof)
+  KEYWORD(protocol)
+  KEYWORD(struct)
   KEYWORD(typealias)
+  KEYWORD(var)
   
   // Statements
   KEYWORD(if)

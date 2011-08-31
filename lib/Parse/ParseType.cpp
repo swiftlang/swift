@@ -37,6 +37,7 @@ bool Parser::parseType(Type &Result) {
 ///     identifier
 ///     type-tuple
 ///     type-oneof
+///     type-protocol
 ///
 ///   type-oneof:
 ///     'oneof' attribute-list? oneof-body
@@ -102,6 +103,10 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
       return true;
     break;
   }
+  case tok::kw_protocol:
+    if (parseTypeProtocol(Result))
+      return true;
+    break;
   default:
     error(Tok.getLoc(), Message);
     return true;
@@ -360,3 +365,28 @@ bool Parser::parseTypeArray(SMLoc LSquareLoc, Type &Result) {
   Result = ArrayType::get(Result, SizeVal, Context);
   return false;
 }
+
+///   type-protocol:
+///      'protocol' attribute-list? '{'
+///          protocol-element (',' protocol-element)*
+///          '}'
+///   protocol-element:
+///      TODO.
+///
+bool Parser::parseTypeProtocol(Type &Result) {
+  SMLoc ProtocolLoc = consumeToken(tok::kw_protocol);
+  
+  DeclAttributes Attributes;
+  if (Tok.is(tok::l_square))
+    parseAttributeList(Attributes);
+
+  if (!Attributes.empty())
+    error(Attributes.LSquareLoc,
+          "protocol types are not allowed to have attributes yet");
+
+  Result = ProtocolType::get(Context);
+  return false;
+}
+
+
+

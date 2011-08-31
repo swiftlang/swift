@@ -60,6 +60,7 @@ TypeBase *TypeBase::getCanonicalType(ASTContext &Ctx) {
   case TypeKind::BuiltinInt64:
   case TypeKind::Dependent:
   case TypeKind::OneOf:
+  case TypeKind::Protocol:
     assert(0 && "These are always canonical");
   case TypeKind::NameAlias:
     Result = cast<NameAliasType>(this)->
@@ -113,6 +114,7 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::Tuple:
   case TypeKind::Function:
   case TypeKind::Array:
+  case TypeKind::Protocol:
     // None of these types have sugar at the outer level.
     return this;
   case TypeKind::NameAlias:
@@ -255,6 +257,7 @@ void TypeBase::print(raw_ostream &OS) const {
   case TypeKind::Tuple:         return cast<TupleType>(this)->print(OS);
   case TypeKind::Function:      return cast<FunctionType>(this)->print(OS);
   case TypeKind::Array:         return cast<ArrayType>(this)->print(OS);
+  case TypeKind::Protocol:      return cast<ProtocolType>(this)->print(OS);
   }
 }
 
@@ -321,3 +324,8 @@ void ArrayType::print(raw_ostream &OS) const {
     OS << Size;
   OS << ']';
 }
+
+void ProtocolType::print(raw_ostream &OS) const {
+  OS << "protocol {}";
+}
+

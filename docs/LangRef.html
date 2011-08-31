@@ -680,7 +680,8 @@
     type-simple ::= <a href="#type-builtin">type-builtin</a>
     type-simple ::= <a href="#type-identifier">type-identifier</a>
     type-simple ::= <a href="#type-tuple">type-tuple</a>
-    type-simple ::= <a href="#type-oneof">oneof Types</a>
+    type-simple ::= <a href="#type-oneof">type-oneof</a>
+    type-simple ::= <a href="#type-protocol">type-protocol</a>
   </pre>
 
   <p>Swift has a small collection of core datatypes that are built into the
@@ -978,6 +979,30 @@
     Oneof decls should implicitly define these for their types.
   TODO: Need pattern matching and element extraction.
   </p>
+  
+  <!-- ===================================================================== -->
+  <h3 id="type-protocol">Protocol Types</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    type-protocol    ::= 'protocol' <a href="#attribute-list">attribute-list</a>? '{' protocol-element (',' protocol-element)* '}'
+    protocol-element ::= /* TODO */
+  </pre>
+  
+  <p>A protocol type describes an abstract interface implemented by another
+  type.  It consists of a comma-separated list of elements, each of which are
+  members that instances of the protocol are guaranteed to have.</p>
+  
+  <p>Here are some examples of oneof types:</p>
+  
+  <pre class="example">
+    protocol Document {
+      <i>//func title() -> string</i>
+    }
+    protocol VersionedDocument <i>/*: Document*/</i> {
+      <i>//func version() -> int</i>
+    }
+  </pre>
   
   <!-- ********************************************************************* -->
   <h2 id="expr">Expressions</h2>
