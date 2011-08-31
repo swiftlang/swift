@@ -23,6 +23,7 @@
 #include <cassert>
 
 namespace swift {
+  class ASTContext;
   class FuncExpr;
   class TranslationUnitDecl;
 
@@ -63,6 +64,10 @@ public:
   DeclContext *getParent() const {
     return ParentAndKind.getPointer();
   }
+  
+  /// getASTContext - Return the ASTContext for a specified DeclContetx by
+  /// walking up to the translation unit and returning its ASTContext.
+  ASTContext &getASTContext();
 };
   
 } // end namespace swift

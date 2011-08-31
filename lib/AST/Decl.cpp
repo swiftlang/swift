@@ -21,6 +21,15 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
+/// getASTContext - Return the ASTContext for a specified DeclContetx by
+/// walking up to the translation unit and returning its ASTContext.
+ASTContext &DeclContext::getASTContext() {
+  if (TranslationUnitDecl *TUD = dyn_cast<TranslationUnitDecl>(this))
+    return TUD->Ctx;
+  
+  return getParent()->getASTContext();
+}
+
 // Only allow allocation of Decls using the allocator in ASTContext.
 void *DeclVarName::operator new(size_t Bytes, ASTContext &C,
                                 unsigned Alignment) throw() {
