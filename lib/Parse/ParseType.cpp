@@ -384,7 +384,7 @@ bool Parser::parseTypeProtocol(Type &Result) {
 ///      '{' protocol-element* '}'
 ///   protocol-element:
 ///      decl-func
-///      // 'var' identifier ':' type
+///      decl-var-simple
 ///      // 'typealias' identifier
 ///
 bool Parser::parseTypeProtocolBody(SMLoc ProtocolLoc, 
@@ -394,7 +394,7 @@ bool Parser::parseTypeProtocolBody(SMLoc ProtocolLoc,
   if (parseToken(tok::l_brace, "expected '{' in protocol"))
     return true;
   
-  SmallVector<FuncDecl*, 8> Elements;
+  SmallVector<Decl*, 8> Elements;
   
   // Parse the list of protocol elements.
   do {
@@ -407,6 +407,10 @@ bool Parser::parseTypeProtocolBody(SMLoc ProtocolLoc,
         
     case tok::kw_func:
       Elements.push_back(parseDeclFunc(false));
+      if (Elements.back() == 0) return true;
+      break;
+    case tok::kw_var:
+      Elements.push_back(parseDeclVarSimple());
       if (Elements.back() == 0) return true;
       break;
     }

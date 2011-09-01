@@ -334,6 +334,24 @@ bool Parser::parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   return false;
 }
 
+/// parseDeclVarSimple - This just parses a reduced case of decl-var.
+///
+///   decl-var-simple:
+///      'var' attribute-list? any-identifier value-specifier
+VarDecl *Parser::parseDeclVarSimple() {
+  SMLoc CurLoc = Tok.getLoc();
+  SmallVector<ExprStmtOrDecl, 2> Decls;
+  if (parseDeclVar(Decls)) return 0;
+  
+  if (Decls.size() == 1 && Decls[0].is<Decl*>())
+    if (Decl *D = Decls[0].get<Decl*>())
+      if (VarDecl *VD = dyn_cast<VarDecl>(D))
+        return VD;
+  
+  error(CurLoc, "complex 'var' declaration not allowed here");
+  return 0;
+}
+
 
 /// parseDeclFunc - Parse a 'func' declaration, returning null on error.  The
 /// caller handles this case and does recovery as appropriate.  If AllowScoped

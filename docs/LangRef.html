@@ -352,7 +352,8 @@
   </div>
   
   <pre id="value-specifier" class="grammar">
-    decl-var ::= 'var' <a href="#attribute-list">attribute-list</a> var-name <a href="#value-specifier">value-specifier</a>
+    decl-var-simple ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#identifier">any-identifier</a> <a href="#value-specifier">value-specifier</a>
+    decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> var-name <a href="#value-specifier">value-specifier</a>
     
     value-specifier ::= ':' <a href="#type">type</a>
     value-specifier ::= ':' <a href="#type">type</a> '=' <a href="#expr">expr</a>
@@ -1061,7 +1062,21 @@
      gets an implicit "this" argument of the protocol type.</p>
   
   <p>TODO: var members and typealias members</p>
+
+  <!-- _____________________________________________________________________ -->
+  <h4 id="protocol-element-var">'var' protocol elements</h4>
   
+  <pre class="grammar">
+    protocol-element ::= <a href="#decl-var">decl-var-simple</a>
+  </pre>
+  
+  <p>'var' members of a protocol define "property" values that may be accessed
+  with dot syntax on a value of the protocol's type.  The declaration itself has
+  function type, where the argument is an implicit "this" argument of the
+  protocol type.</p>
+ 
+  <p>TODO: typealias members</p>
+
   
   <!-- ********************************************************************* -->
   <h2 id="expr">Expressions</h2>
