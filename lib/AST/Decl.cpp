@@ -59,8 +59,6 @@ SMLoc Decl::getLocStart() const {
     return cast<OneOfElementDecl>(this)->getLocStart();
   case DeclKind::Arg:        return cast<ArgDecl>(this)->getLocStart();
   case DeclKind::ElementRef: return cast<ElementRefDecl>(this)->getLocStart();
-  case DeclKind::ProtocolFuncElement:
-    return cast<ProtocolFuncElementDecl>(this)->getLocStart();  
   }
 
   assert(0 && "Unknown decl kind");
@@ -213,11 +211,6 @@ namespace {
         OS << ", " << ERD->AccessPath[i];
       
       OS << "))";
-    }
-    
-    void visitProtocolFuncElementDecl(ProtocolFuncElementDecl *PFED) {
-      printCommon(PFED, "protocol_element_func_decl");
-      OS << ')';
     }
   };
 } // end anonymous namespace.

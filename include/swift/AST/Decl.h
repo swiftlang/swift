@@ -41,8 +41,7 @@ enum class DeclKind {
   Func,
   OneOfElement,
   Arg,
-  ElementRef,
-  ProtocolFuncElement
+  ElementRef
 };
   
 /// DeclAttributes - These are attributes that may be applied to declarations.
@@ -428,29 +427,6 @@ public:
   }
   static bool classof(const ElementRefDecl *D) { return true; }
 };
-
-  
-/// ProtocolFuncElementDecl - This is a decl created for a func in a protocol,
-/// e.g. protocol foo { func bonk() -> int }
-///
-class ProtocolFuncElementDecl : public ValueDecl {
-public:
-  SMLoc FuncLoc;
-
-  ProtocolFuncElementDecl(DeclContext *DC, SMLoc FuncLoc, Identifier Name,
-                          Type Ty, const DeclAttributes &Attrs)
-  : ValueDecl(DeclKind::ProtocolFuncElement, DC, Name, Ty, 0, Attrs),
-     FuncLoc(FuncLoc) {}
-
-  SMLoc getLocStart() const { return FuncLoc; }
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) {
-    return D->Kind == DeclKind::ProtocolFuncElement;
-  }
-  static bool classof(const ProtocolFuncElementDecl *D) { return true; }
-};
-  
   
 } // end namespace swift
 

@@ -384,7 +384,7 @@ bool Parser::parseTypeProtocol(Type &Result) {
 ///   protocol-element:
 ///      'func' attribute-list identifier type
 ///
-static ProtocolFuncElementDecl *parseProtocolFuncElement(Parser &P) {
+static FuncDecl *parseProtocolFuncElement(Parser &P) {
   SMLoc FuncLoc = P.consumeToken(tok::kw_func);
   
   DeclAttributes Attributes;
@@ -410,8 +410,7 @@ static ProtocolFuncElementDecl *parseProtocolFuncElement(Parser &P) {
     FuncTy = FunctionType::get(FuncTy, TupleType::getEmpty(P.Context),
                                P.Context);
 
-  return new (P.Context) ProtocolFuncElementDecl(0, FuncLoc, Name,
-                                                 FuncTy, Attributes);
+  return new (P.Context) FuncDecl(FuncLoc, Name, FuncTy, 0, Attributes, 0);
 }
 
 ///   protocol-body:
@@ -426,7 +425,7 @@ bool Parser::parseTypeProtocolBody(SMLoc ProtocolLoc,
   if (parseToken(tok::l_brace, "expected '{' in protocol"))
     return true;
   
-  SmallVector<ProtocolFuncElementDecl*, 8> Elements;
+  SmallVector<FuncDecl*, 8> Elements;
   
   // Parse the list of protocol elements.
   do {
