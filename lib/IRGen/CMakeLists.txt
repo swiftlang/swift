@@ -12,4 +12,5 @@ add_swift_library(swiftIRGen
   IRGen.cpp
   IRGenFunction.cpp
   IRGenModule.cpp
+  Mangle.cpp
   DEPENDS swiftAST)

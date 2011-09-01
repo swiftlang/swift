@@ -17,6 +17,8 @@
 #include "swift/AST/Decl.h"
 #include "llvm/GlobalValue.h"
 #include "llvm/Module.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "GenType.h"
 #include "IRGenFunction.h"
@@ -25,20 +27,21 @@
 using namespace swift;
 using namespace irgen;
 
-namespace {
-  struct LinkInfo {
-    std::string Name;
-    llvm::GlobalValue::LinkageTypes Linkage;
-    llvm::GlobalValue::VisibilityTypes Visibility;
-  };
-}
+/// Encapsulated information about linking information.
+class IRGenModule::LinkInfo {
+public:
+  llvm::SmallString<32> Name;
+  llvm::GlobalValue::LinkageTypes Linkage;
+  llvm::GlobalValue::VisibilityTypes Visibility;
+};
 
-static LinkInfo computeLinkInfo(NamedDecl *D) {
+IRGenModule::LinkInfo IRGenModule::getLinkInfo(NamedDecl *D) {
   LinkInfo Link;
 
+  llvm::raw_svector_ostream NameStream(Link.Name);
+  mangle(NameStream, D);
+  
   // TODO, obviously.
-
-  Link.Name = D->Name.str();
   Link.Linkage = llvm::GlobalValue::ExternalLinkage;
   Link.Visibility = llvm::GlobalValue::DefaultVisibility;
 
@@ -77,11 +80,11 @@ llvm::GlobalVariable *IRGenModule::getAddrOfGlobalVariable(VarDecl *VD) {
   if (Entry) return cast<llvm::GlobalVariable>(Entry);
 
   const TypeInfo &TInfo = getFragileTypeInfo(VD->Ty);
-  LinkInfo Link = computeLinkInfo(VD);
+  LinkInfo Link = getLinkInfo(VD);
   llvm::GlobalVariable *Addr
     = new llvm::GlobalVariable(Module, TInfo.StorageType, /*constant*/ false,
                                Link.Linkage, /*initializer*/ nullptr,
-                               Link.Name);
+                               Link.Name.str());
   Addr->setVisibility(Link.Visibility);
   Addr->setAlignment(TInfo.StorageAlignment.getValue());
 
@@ -111,9 +114,9 @@ llvm::Function *IRGenModule::getAddrOfGlobalFunction(FuncDecl *FD) {
 
   llvm::FunctionType *Type = getFunctionType(FD);
 
-  LinkInfo Link = computeLinkInfo(FD);
+  LinkInfo Link = getLinkInfo(FD);
   llvm::Function *Addr
-    = cast<llvm::Function>(Module.getOrInsertFunction(Link.Name, Type));
+    = cast<llvm::Function>(Module.getOrInsertFunction(Link.Name.str(), Type));
   Addr->setLinkage(Link.Linkage);
   Addr->setVisibility(Link.Visibility);
 

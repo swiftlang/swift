@@ -18,6 +18,7 @@
 #ifndef SWIFT_IRGEN_IRGENMODULE_H
 #define SWIFT_IRGEN_IRGENMODULE_H
 
+#include "swift/AST/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
 
 namespace llvm {
@@ -28,10 +29,9 @@ namespace llvm {
   class IntegerType;
   class LLVMContext;
   class Module;
-  class SMLoc;
+  class PointerType;
   class TargetData;
   class Type;
-  class Twine;
 }
 
 namespace swift {
@@ -39,6 +39,7 @@ namespace swift {
   class BraceStmt;
   class Decl;
   class FuncDecl;
+  class NamedDecl;
   class TranslationUnitDecl;
   class Type;
   class VarDecl;
@@ -84,6 +85,10 @@ private:
   void emitGlobalDecl(Decl *D);
   void emitGlobalVariable(VarDecl *D);
   void emitGlobalFunction(FuncDecl *D);
+  void mangle(raw_ostream &Mangled, NamedDecl *D);
+
+  class LinkInfo;
+  LinkInfo getLinkInfo(NamedDecl *D);
 
   llvm::FunctionType *getFunctionType(FuncDecl *D);
 
