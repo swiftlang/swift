@@ -191,14 +191,13 @@ bool Parser::parseTypeTupleBody(SMLoc LPLoc, Type &Result) {
 }
 
 ///   type-oneof:
-///     'oneof' attribute-list? oneof-body
+///     'oneof' attribute-list oneof-body
 ///
 bool Parser::parseTypeOneOf(Type &Result) {
   SMLoc OneOfLoc = consumeToken(tok::kw_oneof);
   
   DeclAttributes Attributes;
-  if (Tok.is(tok::l_square))
-    parseAttributeList(Attributes);
+  parseAttributeList(Attributes);
   
   return parseTypeOneOfBody(OneOfLoc, Attributes, Result);
 }
@@ -369,14 +368,13 @@ bool Parser::parseTypeArray(SMLoc LSquareLoc, Type &Result) {
 }
 
 ///   type-protocol:
-///      'protocol' attribute-list? protocol-body
+///      'protocol' attribute-list protocol-body
 ///
 bool Parser::parseTypeProtocol(Type &Result) {
   SMLoc ProtocolLoc = consumeToken(tok::kw_protocol);
   
   DeclAttributes Attributes;
-  if (Tok.is(tok::l_square))
-    parseAttributeList(Attributes);
+  parseAttributeList(Attributes);
 
   return parseTypeProtocolBody(ProtocolLoc, Attributes, Result);
 }
@@ -384,14 +382,13 @@ bool Parser::parseTypeProtocol(Type &Result) {
 
 
 ///   protocol-element:
-///      'func' attribute-list? identifier type
+///      'func' attribute-list identifier type
 ///
 static ProtocolFuncElementDecl *parseProtocolFuncElement(Parser &P) {
   SMLoc FuncLoc = P.consumeToken(tok::kw_func);
   
   DeclAttributes Attributes;
-  if (P.Tok.is(tok::l_square))
-    P.parseAttributeList(Attributes);
+  P.parseAttributeList(Attributes);
 
   Identifier Name;
   Type FuncTy;

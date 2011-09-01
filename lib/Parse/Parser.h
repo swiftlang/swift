@@ -130,7 +130,11 @@ public:
   
   TranslationUnitDecl *parseTranslationUnit();
   TypeAliasDecl *parseDeclTypeAlias();
-  void parseAttributeList(DeclAttributes &Attributes);
+  void parseAttributeList(DeclAttributes &Attributes) {
+    if (Tok.is(tok::l_square))
+      parseAttributeListPresent(Attributes);
+  }
+  void parseAttributeListPresent(DeclAttributes &Attributes);
   bool parseAttribute(DeclAttributes &Attributes);
   bool parseVarName(DeclVarName &Name);
   

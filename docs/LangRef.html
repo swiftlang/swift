@@ -311,7 +311,7 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-import ::= 'import' attribute-list? any-identifier ('.' any-identifier)*
+    decl-import ::= 'import' attribute-list any-identifier ('.' any-identifier)*
   </pre>  
   
   <p>'import' declarations allow named values and types to be accessed with
@@ -351,7 +351,7 @@
   </div>
   
   <pre id="value-specifier" class="grammar">
-    decl-var ::= 'var' <a href="#attribute-list">attribute-list</a>? var-name <a href="#value-specifier">value-specifier</a>
+    decl-var ::= 'var' <a href="#attribute-list">attribute-list</a> var-name <a href="#value-specifier">value-specifier</a>
     
     value-specifier ::= ':' <a href="#type">type</a>
     value-specifier ::= ':' <a href="#type">type</a> '=' <a href="#expr">expr</a>
@@ -421,8 +421,8 @@
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">any-identifier</a> <a href="#type">type</a> <a href="#stmt-brace">stmt-brace</a>?
-    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#type-identifier">type-identifier</a> '::' <a href="#identifier">any-identifier</a> <a href="#type">type</a> <a href="#stmt-brace">stmt-brace</a>?
+    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a> <a href="#identifier">any-identifier</a> <a href="#type">type</a> <a href="#stmt-brace">stmt-brace</a>?
+    decl-func ::= 'func' <a href="#attribute-list">attribute-list</a> <a href="#type-identifier">type-identifier</a> '::' <a href="#identifier">any-identifier</a> <a href="#type">type</a> <a href="#stmt-brace">stmt-brace</a>?
   </pre>
   
   <div class="commentary">
@@ -529,7 +529,7 @@
   </div>
   
   <pre class="grammar">
-    decl-oneof ::= 'oneof' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> <a href="#type-oneof">oneof-body</a>
+    decl-oneof ::= 'oneof' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#type-oneof">oneof-body</a>
   </pre>
   
   <p>A oneof declaration is a convenient way to declare a type and name it at
@@ -602,7 +602,7 @@
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-struct ::= 'struct' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> { <a href="#type-tuple">type-tuple-body? </a> }
+    decl-struct ::= 'struct' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> { <a href="#type-tuple">type-tuple-body? </a> }
   </pre>
 
   <p>A struct declaration is syntactic sugar for a oneof declaration of a single
@@ -651,7 +651,7 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-protocol ::= 'protocol' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> <a href="#type-protocol">protocol-body</a>
+    decl-protocol ::= 'protocol' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#type-protocol">protocol-body</a>
   </pre>
   
   <p>A protocol declaration is a convenient way to declare a type and name it at
@@ -678,10 +678,12 @@
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    attribute-list ::= '[' ']'
-    attribute-list ::= '[' attribute (',' attribute)* ']'
+    attribute-list         ::= attribute-list-present?
     
-    attribute      ::= attribute-infix
+    attribute-list-present ::= '[' ']'
+    attribute-list-present ::= '[' attribute (',' attribute)* ']'
+    
+    attribute              ::= attribute-infix
   </pre>
   
   <p>An attribute is a (possibly empty) comma separated list of attributes.</p>
@@ -957,7 +959,7 @@
   </div>
   
   <pre class="grammar">
-    type-oneof         ::= 'oneof' <a href="#attribute-list">attribute-list</a>? oneof-body
+    type-oneof         ::= 'oneof' <a href="#attribute-list">attribute-list</a> oneof-body
     oneof-body         ::= '{' oneof-element (',' oneof-element)* '}'
     
     oneof-element      ::= <a href="#identifier">identifier</a>
@@ -1027,7 +1029,7 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    type-protocol    ::= 'protocol' <a href="#attribute-list">attribute-list</a>? protocol-body
+    type-protocol    ::= 'protocol' <a href="#attribute-list">attribute-list</a> protocol-body
     protocol-body    ::= '{' protocol-element* '}'
   </pre>
   
@@ -1050,7 +1052,7 @@
   <h4 id="protocol-element-func">'func' protocol elements</h4>
   
   <pre class="grammar">
-    protocol-element ::= 'func' <a href="#attribute-list">attribute-list</a>? <a href="#identifier">identifier</a> <a href="#type">type</a>
+    protocol-element ::= 'func' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#type">type</a>
   </pre>
 
   <p>'func' members of a protocol define a value of function type that may be

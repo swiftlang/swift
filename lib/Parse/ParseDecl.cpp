@@ -116,11 +116,14 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
   return true;
 }
 
-/// parseAttributeList
+/// parsePresentAttributeList
 ///   attribute-list:
+///     attribute-list-present?
+///
+///   attribute-list-present:
 ///     '[' ']'
 ///     '[' attribute (',' attribute)* ']'
-void Parser::parseAttributeList(DeclAttributes &Attributes) {
+void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
   Attributes.LSquareLoc = consumeToken(tok::l_square);
   
   // If this is an empty attribute list, consume it and return.
@@ -160,8 +163,7 @@ Decl *Parser::parseDeclImport() {
   SMLoc ImportLoc = consumeToken(tok::kw_import);
   
   DeclAttributes Attributes;
-  if (Tok.is(tok::l_square))
-    parseAttributeList(Attributes);
+  parseAttributeList(Attributes);
   
   SmallVector<std::pair<Identifier, SMLoc>, 8> ImportPath(1);
   ImportPath.back().second = Tok.getLoc();
@@ -292,8 +294,7 @@ bool Parser::parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   SMLoc VarLoc = consumeToken(tok::kw_var);
   
   DeclAttributes Attributes;
-  if (Tok.is(tok::l_square))
-    parseAttributeList(Attributes);
+  parseAttributeList(Attributes);
 
   DeclVarName VarName;
   if (parseVarName(VarName)) return true;
@@ -345,8 +346,7 @@ FuncDecl *Parser::parseDeclFunc() {
 
   DeclAttributes Attributes;
   // FIXME: Implicitly add immutable attribute.
-  if (Tok.is(tok::l_square))
-    parseAttributeList(Attributes);
+  parseAttributeList(Attributes);
 
   Type ReceiverTy;
   Identifier Name;
@@ -425,14 +425,13 @@ FuncDecl *Parser::parseDeclFunc() {
 /// token skipping) on error.
 ///
 ///   decl-oneof:
-///      'oneof' attribute-list? identifier oneof-body
+///      'oneof' attribute-list identifier oneof-body
 ///      
 Decl *Parser::parseDeclOneOf() {
   SMLoc OneOfLoc = consumeToken(tok::kw_oneof);
 
   DeclAttributes Attributes;
-  if (Tok.is(tok::l_square))
-    parseAttributeList(Attributes);
+  parseAttributeList(Attributes);
   
   SMLoc NameLoc = Tok.getLoc();
   Identifier OneOfName;
@@ -452,14 +451,13 @@ Decl *Parser::parseDeclOneOf() {
 /// with a single element.
 ///
 ///   decl-struct:
-///      'struct' attribute-list? identifier { type-tuple-body? }
+///      'struct' attribute-list identifier { type-tuple-body? }
 ///
 bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   SMLoc StructLoc = consumeToken(tok::kw_struct);
   
   DeclAttributes Attributes;
-  if (Tok.is(tok::l_square))
-    parseAttributeList(Attributes);
+  parseAttributeList(Attributes);
   
   Identifier StructName;
   if (parseIdentifier(StructName, "expected identifier in struct declaration"))
@@ -514,14 +512,13 @@ bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
 /// doing no token skipping) on error.
 ///
 ///   decl-protocol:
-///      'protocol' attribute-list? identifier protocol-body
+///      'protocol' attribute-list identifier protocol-body
 ///      
 Decl *Parser::parseDeclProtocol() {
   SMLoc ProtocolLoc = consumeToken(tok::kw_protocol);
   
   DeclAttributes Attributes;
-  if (Tok.is(tok::l_square))
-    parseAttributeList(Attributes);
+  parseAttributeList(Attributes);
   
   SMLoc NameLoc = Tok.getLoc();
   Identifier ProtocolName;
