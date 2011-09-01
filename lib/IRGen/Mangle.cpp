@@ -90,8 +90,8 @@ void IRGenModule::mangle(raw_ostream &buffer, NamedDecl *D) {
     return;
   }
 
-  // Otherwise, add the suffix.
-  buffer << "_T";
+  // Otherwise, add the prefix.
+  buffer << "_T"; // T is for Tigger
 
   // TODO: mangle enclosing contexts here.
 
