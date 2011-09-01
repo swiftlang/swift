@@ -424,14 +424,33 @@ bool Parser::parseTypeProtocolBody(SMLoc ProtocolLoc,
     error(Attributes.LSquareLoc,
           "protocol types are not allowed to have attributes yet");
   
-  Result = ProtocolType::getNew(ProtocolLoc, Elements, CurDeclContext);
+  ProtocolType *NewProto = ProtocolType::getNew(ProtocolLoc, Elements,
+                                                CurDeclContext);
+  
+  TupleTypeElt ThisElt(NewProto, Context.getIdentifier("this"));
+  TupleType *ThisTy = TupleType::get(ThisElt, Context);
+  
+  // Install all of the members of protocol into the protocol's DeclContext, and
+  // give each ValueDecl member an implicit "this" argument.
+  // FIXME: This isn't quite right, 'this' should be found by name lookup when
+  // parsing the body of each of these.
+  for (Decl *D : Elements) {
+    // Install the right DeclContext.
+    D->Context = NewProto;
+    
+    // Change the type of the value decls to be functions that return whatever
+    // they were declared as.
+    if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+      VD->Ty = FunctionType::get(ThisTy, VD->Ty, Context);
+  }
     
   if (TypeName) {
     // If we have a pretty name for this, complete it to its actual type.
     assert(TypeName->UnderlyingTy.isNull() &&
            "Not an incomplete decl to complete!");
-    TypeName->UnderlyingTy = Result;
+    TypeName->UnderlyingTy = NewProto;
   }
 
+  Result = NewProto;
   return false;
 }
