@@ -380,41 +380,10 @@ bool Parser::parseTypeProtocol(Type &Result) {
 }
 
 
-
-///   protocol-element:
-///      'func' attribute-list identifier type
-///
-static FuncDecl *parseProtocolFuncElement(Parser &P) {
-  SMLoc FuncLoc = P.consumeToken(tok::kw_func);
-  
-  DeclAttributes Attributes;
-  P.parseAttributeList(Attributes);
-
-  Identifier Name;
-  Type FuncTy;
-  if (P.parseIdentifier(Name, "expected identifier in 'func' member"))
-    return 0;
-  
-  // We force first type of a func declaration to be a tuple for consistency.
-  if (P.Tok.isNot(tok::l_paren) && P.Tok.isNot(tok::l_paren_space)) {
-    P.error(P.Tok.getLoc(),"expected '(' in argument list of func declaration");
-    return 0;
-  }
-
-  if (P.parseType(FuncTy))
-    return 0;
-  
-  // If the parsed type is not spelled as a function type (i.e., has no '->' in
-  // it), then it is implicitly a function that returns ().
-  if (!isa<FunctionType>(FuncTy.getPointer()))
-    FuncTy = FunctionType::get(FuncTy, TupleType::getEmpty(P.Context),
-                               P.Context);
-
-  return new (P.Context) FuncDecl(FuncLoc, Name, FuncTy, 0, Attributes, 0);
-}
-
 ///   protocol-body:
 ///      '{' protocol-element* '}'
+///   protocol-element:
+///      decl-func
 ///      // 'var' identifier ':' type
 ///      // 'typealias' identifier
 ///
@@ -437,7 +406,7 @@ bool Parser::parseTypeProtocolBody(SMLoc ProtocolLoc,
       break;
         
     case tok::kw_func:
-      Elements.push_back(parseProtocolFuncElement(*this));
+      Elements.push_back(parseDeclFunc(false));
       if (Elements.back() == 0) return true;
       break;
     }

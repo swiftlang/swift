@@ -107,7 +107,7 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       if (peekToken().is(tok::identifier) ||
           peekToken().is(tok::oper) ||
           peekToken().is(tok::l_square)) {
-        Entries.push_back(parseDeclFunc());
+        Entries.push_back(parseDeclFunc(true));
         break;
       }
       // FALL THROUGH into expression case.

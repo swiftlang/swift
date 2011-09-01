@@ -142,7 +142,7 @@ public:
   Decl *parseDeclOneOf();
   bool parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls);
   bool parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls);
-  FuncDecl *parseDeclFunc();
+  FuncDecl *parseDeclFunc(bool AllowScoped);
   Decl *parseDeclProtocol();
 
   void actOnVarDeclName(const DeclVarName *Name,

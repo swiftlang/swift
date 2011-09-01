@@ -336,13 +336,15 @@ bool Parser::parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
 
 
 /// parseDeclFunc - Parse a 'func' declaration, returning null on error.  The
-/// caller handles this case and does recovery as appropriate.
+/// caller handles this case and does recovery as appropriate.  If AllowScoped
+/// is true, we parse both productions.
 ///
 ///   decl-func:
 ///     'func' attribute-list? identifier type stmt-brace?
 ///   decl-func-scoped:
 ///     'func' attribute-list? type-identifier '::' identifier type stmt-brace?
-FuncDecl *Parser::parseDeclFunc() {
+///
+FuncDecl *Parser::parseDeclFunc(bool AllowScoped) {
   SMLoc FuncLoc = consumeToken(tok::kw_func);
 
   DeclAttributes Attributes;
@@ -357,7 +359,7 @@ FuncDecl *Parser::parseDeclFunc() {
 
   // If this is method syntax, the first name is the receiver type.  Parse the
   // actual function name.
-  if (consumeIf(tok::coloncolon)) {
+  if (AllowScoped && consumeIf(tok::coloncolon)) {
     // Look up the type name.
     ReceiverTy = ScopeInfo.lookupOrInsertTypeName(Name, TypeNameLoc);
     if (parseIdentifier(Name, "expected identifier in 'func' declaration"))

@@ -1053,18 +1053,13 @@
   <h4 id="protocol-element-func">'func' protocol elements</h4>
   
   <pre class="grammar">
-    protocol-element ::= 'func' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#type">type</a>
+    protocol-element ::= <a href="#decl-func">decl-func</a>
   </pre>
 
   <p>'func' members of a protocol define a value of function type that may be
-     accessed with dot syntax on a value of the protocol's type.</p>
+     accessed with dot syntax on a value of the protocol's type.  The function
+     gets an implicit "this" argument of the protocol type.</p>
   
-  <p>If the type is not syntactically a function type (i.e., has no -&gt; in it
-  at top-level), then the return value is implicitly inferred to be "()".  All
-  of the argument and return value names are injected into the
-  <a href="#namebind_scope">scope</a> of the function body.</p>
-  
-
   <p>TODO: var members and typealias members</p>
   
   
