@@ -34,6 +34,7 @@ namespace swift {
   class AssignStmt;
   class BraceStmt;
   class Decl;
+  class DeclRefExpr;
   class Expr;
   class FuncDecl;
   class FuncExpr;
@@ -119,8 +120,9 @@ public:
   RValue emitRValue(Expr *E, const TypeInfo &TInfo);
 
 private:
-  RValue getRValueForGlobalFunction(FuncDecl *Fn);
+  RValue emitRValueForFunction(FuncDecl *Fn);
   RValue emitApplyExpr(ApplyExpr *Apply, const TypeInfo &TInfo);
+  RValue emitDeclRefRValue(DeclRefExpr *DeclRef, const TypeInfo &TInfo);
   RValue emitTupleExpr(TupleExpr *E, const TypeInfo &TInfo);
   RValue emitTupleElementExpr(TupleElementExpr *E, const TypeInfo &TInfo);
   RValue emitTupleShuffleExpr(TupleShuffleExpr *E, const TypeInfo &TInfo);

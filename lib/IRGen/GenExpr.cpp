@@ -76,8 +76,7 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
 }
 
 /// Emit a declaration reference as an r-value.
-static RValue emitDeclRefRValue(IRGenFunction &IGF, DeclRefExpr *E,
-                                const TypeInfo &TInfo) {
+RValue IRGenFunction::emitDeclRefRValue(DeclRefExpr *E, const TypeInfo &TInfo) {
   ValueDecl *D = E->D;
   switch (D->Kind) {
   case DeclKind::TranslationUnit:
@@ -87,14 +86,16 @@ static RValue emitDeclRefRValue(IRGenFunction &IGF, DeclRefExpr *E,
 
   case DeclKind::Arg:
   case DeclKind::Var:
-    return TInfo.load(IGF, emitDeclRefLValue(IGF, E, TInfo));
+    return TInfo.load(*this, emitDeclRefLValue(*this, E, TInfo));
+
+  case DeclKind::Func:
+    return emitRValueForFunction(cast<FuncDecl>(D));
     
   case DeclKind::ElementRef:
-  case DeclKind::Func:
   case DeclKind::OneOfElement:
-    IGF.unimplemented(E->getLocStart(),
-                      "emitting this decl as an r-value is unimplemented");
-    return IGF.emitFakeRValue(TInfo);
+    unimplemented(E->getLocStart(),
+                  "emitting this decl as an r-value is unimplemented");
+    return emitFakeRValue(TInfo);
   }
   llvm_unreachable("bad decl kind");
 }
@@ -130,7 +131,7 @@ RValue IRGenFunction::emitRValue(Expr *E, const TypeInfo &TInfo) {
     return emitTupleShuffleExpr(cast<TupleShuffleExpr>(E), TInfo);
 
   case ExprKind::DeclRef:
-    return emitDeclRefRValue(*this, cast<DeclRefExpr>(E), TInfo);
+    return emitDeclRefRValue(cast<DeclRefExpr>(E), TInfo);
 
   case ExprKind::Func:
   case ExprKind::Closure:

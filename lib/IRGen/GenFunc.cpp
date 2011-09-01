@@ -213,11 +213,17 @@ FuncTypeInfo::getFunctionType(IRGenModule &IGM, bool NeedsData) const {
 }
 
 /// Form an r-value which refers to the given global function.
-RValue IRGenFunction::getRValueForGlobalFunction(FuncDecl *Fn) {
-  // FIXME: descriptor?
-  llvm::Function *Function = IGM.getAddrOfGlobalFunction(Fn);
-  llvm::Value *Data = llvm::UndefValue::get(IGM.Int8PtrTy);
-  return RValue::forScalars(Function, Data);
+RValue IRGenFunction::emitRValueForFunction(FuncDecl *Fn) {
+  if (!Fn->Context->isLocalContext()) {
+    llvm::Function *Function = IGM.getAddrOfGlobalFunction(Fn);
+    llvm::Value *Data = llvm::UndefValue::get(IGM.Int8PtrTy);
+    return RValue::forScalars(Function, Data);
+  }
+
+  unimplemented(Fn->getLocStart(),
+                "local function emission is not yet implemented");
+  llvm::Value *Undef = llvm::UndefValue::get(IGM.Int8PtrTy);
+  return RValue::forScalars(Undef, Undef);
 }
 
 llvm::FunctionType *IRGenModule::getFunctionType(FuncDecl *Fn) {
@@ -315,7 +321,8 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &ResultInfo) {
   }
   llvm::FunctionType *FnType = FnInfo.getFunctionType(IGM, NeedsData);
 
-  llvm::Value *CastFn = Builder.CreateBitCast(Fn, FnType, "fn.cast");
+  llvm::Value *CastFn = Builder.CreateBitCast(Fn, FnType->getPointerTo(),
+                                              "fn.cast");
 
   // TODO: exceptions, calling conventions
   llvm::CallInst *Call =
