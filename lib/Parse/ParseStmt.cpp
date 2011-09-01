@@ -47,6 +47,7 @@ Expr *Parser::actOnCondition(Expr *Cond) {
 ///     decl-typealias
 ///     decl-var
 ///     decl-func
+///     decl-func-scoped
 ///     decl-oneof
 ///     decl-struct
 ///

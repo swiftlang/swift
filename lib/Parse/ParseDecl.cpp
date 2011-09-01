@@ -340,6 +340,7 @@ bool Parser::parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
 ///
 ///   decl-func:
 ///     'func' attribute-list? identifier type stmt-brace?
+///   decl-func-scoped:
 ///     'func' attribute-list? type-identifier '::' identifier type stmt-brace?
 FuncDecl *Parser::parseDeclFunc() {
   SMLoc FuncLoc = consumeToken(tok::kw_func);
