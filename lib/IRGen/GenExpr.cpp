@@ -60,8 +60,11 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
     llvm_unreachable("decl cannot be emitted as an l-value");
 
   case DeclKind::Var:
-    // FIXME: This always assumes global.  How to distinguish locals?
-    return IGF.getGlobal(cast<VarDecl>(D), TInfo);
+    if (D->Context->isLocalContext()) {
+      return IGF.getLocal(D);
+    } else {
+      return IGF.getGlobal(cast<VarDecl>(D), TInfo);
+    }
 
   case DeclKind::Arg:
     return IGF.getLocal(D);
@@ -126,7 +129,7 @@ RValue IRGenFunction::emitRValue(Expr *E, const TypeInfo &TInfo) {
   case ExprKind::Tuple:
     return emitTupleExpr(cast<TupleExpr>(E), TInfo);
   case ExprKind::TupleElement:
-    return emitTupleElementExpr(cast<TupleElementExpr>(E), TInfo);
+    return emitTupleElementRValue(cast<TupleElementExpr>(E), TInfo);
   case ExprKind::TupleShuffle:
     return emitTupleShuffleExpr(cast<TupleShuffleExpr>(E), TInfo);
 
@@ -149,8 +152,38 @@ LValue IRGenFunction::emitLValue(Expr *E) {
 }
 
 LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &TInfo) {
-  // FIXME: implement
-  return LValue();
+  switch (E->Kind) {
+  case ExprKind::OverloadSetRef:
+  case ExprKind::Sequence:
+  case ExprKind::UnresolvedDeclRef:
+  case ExprKind::UnresolvedDot:
+  case ExprKind::UnresolvedMember:
+  case ExprKind::UnresolvedScopedIdentifier:
+    llvm_unreachable("these expression kinds should not survive to IR-gen");
+
+  case ExprKind::Call:
+  case ExprKind::Unary:
+  case ExprKind::Binary:
+  case ExprKind::IntegerLiteral:
+  case ExprKind::TupleShuffle:
+  case ExprKind::Func:
+  case ExprKind::Closure:
+  case ExprKind::AnonClosureArg:
+    llvm_unreachable("these expression kinds should never be l-values");
+
+  case ExprKind::Tuple: {
+    TupleExpr *TE = cast<TupleExpr>(E);
+    assert(TE->isGroupingParen() && "emitting non-grouping tuple as l-value");
+    return emitLValue(TE->SubExprs[0], TInfo);
+  }
+
+  case ExprKind::TupleElement:
+    return emitTupleElementLValue(cast<TupleElementExpr>(E), TInfo);
+
+  case ExprKind::DeclRef:
+    return emitDeclRefLValue(*this, cast<DeclRefExpr>(E), TInfo);
+  }
+  llvm_unreachable("bad expression kind!");
 }
 
 /// Emit an expression whose value is being ignored.

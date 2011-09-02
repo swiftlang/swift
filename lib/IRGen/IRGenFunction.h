@@ -124,7 +124,8 @@ private:
   RValue emitApplyExpr(ApplyExpr *Apply, const TypeInfo &TInfo);
   RValue emitDeclRefRValue(DeclRefExpr *DeclRef, const TypeInfo &TInfo);
   RValue emitTupleExpr(TupleExpr *E, const TypeInfo &TInfo);
-  RValue emitTupleElementExpr(TupleElementExpr *E, const TypeInfo &TInfo);
+  RValue emitTupleElementRValue(TupleElementExpr *E, const TypeInfo &TInfo);
+  LValue emitTupleElementLValue(TupleElementExpr *E, const TypeInfo &TInfo);
   RValue emitTupleShuffleExpr(TupleShuffleExpr *E, const TypeInfo &TInfo);
 
 //--- Declaration emission -----------------------------------------------------

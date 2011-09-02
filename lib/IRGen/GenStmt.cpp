@@ -22,6 +22,7 @@
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "JumpDest.h"
+#include "LValue.h"
 #include "RValue.h"
 
 using namespace swift;
@@ -68,10 +69,19 @@ void IRGenFunction::emitBraceStmt(BraceStmt *BS) {
 }
 
 void IRGenFunction::emitAssignStmt(AssignStmt *S) {
-  unimplemented(S->getLocStart(), "AssignStmt is unimplemented");
+  // Emit the LHS.
+  const TypeInfo &TInfo = getFragileTypeInfo(S->Dest->Ty);
+  LValue LV = emitLValue(S->Dest, TInfo);
+
+  // Emit the RHS.
+  RValue RV = emitRValue(S->Src);
+
+  // Do the store.
+  TInfo.store(*this, RV, LV);
 }
 
 void IRGenFunction::emitIfStmt(IfStmt *S) {
+  
   unimplemented(S->getLocStart(), "IfStmt is unimplemented");
 }
 

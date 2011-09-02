@@ -348,10 +348,16 @@ RValue IRGenFunction::emitTupleExpr(TupleExpr *Tuple, const TypeInfo &TI) {
   }
 }
 
-RValue IRGenFunction::emitTupleElementExpr(TupleElementExpr *E,
-                                           const TypeInfo &TI) {
+RValue IRGenFunction::emitTupleElementRValue(TupleElementExpr *E,
+                                             const TypeInfo &TI) {
   unimplemented(E->getLocStart(), "tuple elements are unimplemented");
   return emitFakeRValue(TI);
+}
+
+LValue IRGenFunction::emitTupleElementLValue(TupleElementExpr *E,
+                                             const TypeInfo &TI) {
+  unimplemented(E->getLocStart(), "tuple elements are unimplemented");
+  return emitFakeLValue(TI);
 }
 
 RValue IRGenFunction::emitTupleShuffleExpr(TupleShuffleExpr *E,
