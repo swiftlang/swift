@@ -176,7 +176,7 @@ ArrayType::ArrayType(Type base, uint64_t size)
 /// getNew - Return a new instance of a protocol type.  These are never
 /// uniqued since each syntactic instance of them is semantically considered
 /// to be a different type.
-ProtocolType *ProtocolType::getNew(SMLoc ProtocolLoc, ArrayRef<Decl*> Elts,
+ProtocolType *ProtocolType::getNew(SMLoc ProtocolLoc, ArrayRef<NamedDecl*> Elts,
                                    DeclContext *Parent) {
   ASTContext &C = Parent->getASTContext();
   return new (C) ProtocolType(ProtocolLoc, C.AllocateCopy(Elts), Parent);

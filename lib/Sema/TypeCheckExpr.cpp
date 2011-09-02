@@ -390,10 +390,16 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
         }
         
         return new (TC.Context) 
-        TupleElementExpr(E->SubExpr, E->DotLoc, FieldNo, E->NameLoc,
-                         TT->getElementType(Value));
+          TupleElementExpr(E->SubExpr, E->DotLoc, FieldNo, E->NameLoc,
+                           TT->getElementType(Value));
       }
     }
+  }
+  
+  // Check in the context of a protocol.
+  if (ProtocolType *PT = SubExprTy->getAs<ProtocolType>()) {
+    (void)PT;
+    
   }
   
   // Next, check to see if "a.f" is actually being used as sugar for "f a",
@@ -409,7 +415,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
                                            E->ResolvedDecls[0]->Ty);
     else
       FnRef = new (TC.Context) OverloadSetRefExpr(E->ResolvedDecls, E->NameLoc,
-                                                  DependentType::get(TC.Context));
+                                                DependentType::get(TC.Context));
     
     CallExpr *Call = new (TC.Context) CallExpr(FnRef, E->SubExpr, Type());
     if (TC.semaApplyExpr(Call))
@@ -444,7 +450,8 @@ static int getBinOp(Expr *E, TypeChecker &TC) {
       
       if (Precedence != -1 && Precedence != D->Attrs.InfixPrecedence) {
         TC.error(E->getLocStart(),
-                 "binary operator with multiple overloads of disagreeing precedence found");
+                 "binary operator with multiple overloads of disagreeing "
+                 "precedence found");
         return -2;
       }
       

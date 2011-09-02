@@ -338,6 +338,7 @@ bool Parser::parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
 ///
 ///   decl-var-simple:
 ///      'var' attribute-list? any-identifier value-specifier
+///
 VarDecl *Parser::parseDeclVarSimple() {
   SMLoc CurLoc = Tok.getLoc();
   SmallVector<ExprStmtOrDecl, 2> Decls;

@@ -394,7 +394,7 @@ bool Parser::parseTypeProtocolBody(SMLoc ProtocolLoc,
   if (parseToken(tok::l_brace, "expected '{' in protocol"))
     return true;
   
-  SmallVector<Decl*, 8> Elements;
+  SmallVector<NamedDecl*, 8> Elements;
   
   // Parse the list of protocol elements.
   do {
