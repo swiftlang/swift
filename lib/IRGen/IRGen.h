@@ -19,6 +19,7 @@
 #define SWIFT_IRGEN_IRGEN_H
 
 #include "llvm/Support/DataTypes.h"
+#include <cassert>
 
 namespace llvm {
   class Value;

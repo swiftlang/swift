@@ -429,9 +429,28 @@ void IRGenFunction::emitEpilogue() {
   if (ReturnBB->use_empty()) {
     ReturnBB->eraseFromParent();
 
+    // Normally this means that we'll just insert the epilogue in the
+    // current block, but if the current IP is unreachable then so is
+    // the entire epilogue.
+    if (!Builder.hasValidIP()) return;
+
   // Otherwise, branch to it if the current IP is reachable.
-  } else if (Builder.GetInsertPoint()) {
+  } else if (Builder.hasValidIP()) {
     Builder.CreateBr(ReturnBB);
+    Builder.SetInsertPoint(ReturnBB);
+
+  // Otherwise, if there is exactly one use of the return block, merge
+  // it into its predecessor.
+  } else if (ReturnBB->hasOneUse()) {
+    // return statements are never emitted as conditional branches.
+    llvm::BranchInst *Br = cast<llvm::BranchInst>(*ReturnBB->use_begin());
+    assert(Br->isUnconditional());
+    Builder.SetInsertPoint(Br->getParent());
+    Br->eraseFromParent();
+    ReturnBB->eraseFromParent();
+
+  // Otherwise, just move the IP to the return block.
+  } else {
     Builder.SetInsertPoint(ReturnBB);
   }
 

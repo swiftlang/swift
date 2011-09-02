@@ -29,8 +29,31 @@ class IRBuilder : public IRBuilderBase {
   // Without this, it keeps resolving to llvm::IRBuilderBase because
   // of the injected class name.
   typedef irgen::IRBuilderBase IRBuilderBase;
+
+  /// The block containing the insertion point when the insertion
+  /// point was last cleared.  Used only for preserving block
+  /// ordering.
+  llvm::BasicBlock *ClearedIP;
+
 public:
-  IRBuilder(llvm::LLVMContext &Context) : IRBuilderBase(Context) {}
+  IRBuilder(llvm::LLVMContext &Context)
+    : IRBuilderBase(Context), ClearedIP(nullptr) {}
+
+  bool hasValidIP() const { return GetInsertBlock() != nullptr; }
+
+  void ClearInsertionPoint() {
+    assert(hasValidIP() && "clearing invalid insertion point!");
+    assert(ClearedIP == nullptr);
+
+    /// Whenever we clear the insertion point, remember where we were.
+    ClearedIP = GetInsertBlock();
+    IRBuilderBase::ClearInsertionPoint();
+  }
+
+  void SetInsertPoint(llvm::BasicBlock *BB) {
+    ClearedIP = nullptr;
+    IRBuilderBase::SetInsertPoint(BB);
+  }
 
   using IRBuilderBase::CreateLoad;
   llvm::LoadInst *CreateLoad(llvm::Value *Addr, Alignment A,
@@ -47,6 +70,15 @@ public:
     Store->setAlignment(A.getValue());
     return Store;
   }
+
+  /// Insert the given basic block after the IP block and move the
+  /// insertion point to it.  Only valid if the IP is valid.
+  void emitBlock(llvm::BasicBlock *BB);
+
+  /// Insert the given basic block "anywhere".  The IP may be invalid,
+  /// in which case the block will be inserted after the block which
+  /// contained the IP before the IP was invalidated.
+  void emitBlockAnywhere(llvm::BasicBlock *BB);
 };
 
 } // end namespace irgen

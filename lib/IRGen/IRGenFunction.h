@@ -50,6 +50,7 @@ namespace swift {
   class WhileStmt;
 
 namespace irgen {
+  class Condition;
   class IRGenModule;
   class JumpDest;
   class RValue;
@@ -127,6 +128,7 @@ private:
   RValue emitTupleElementRValue(TupleElementExpr *E, const TypeInfo &TInfo);
   LValue emitTupleElementLValue(TupleElementExpr *E, const TypeInfo &TInfo);
   RValue emitTupleShuffleExpr(TupleShuffleExpr *E, const TypeInfo &TInfo);
+  Condition emitCondition(Expr *E, bool hasFalseCode);
 
 //--- Declaration emission -----------------------------------------------------
 public:

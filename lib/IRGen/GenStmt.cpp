@@ -19,6 +19,7 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "Cleanup.h"
+#include "Condition.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "JumpDest.h"
@@ -57,11 +58,17 @@ void IRGenFunction::emitBraceStmt(BraceStmt *BS) {
   Scope BraceScope(*this);
 
   for (unsigned I = 0, E = BS->NumElements; I != E; ++I) {
+    assert(Builder.hasValidIP());
+
     BraceStmt::ExprStmtOrDecl Elt = BS->Elements[I];
     if (Expr *E = Elt.dyn_cast<Expr*>()) {
       emitIgnored(E);
     } else if (Stmt *S = Elt.dyn_cast<Stmt*>()) {
       emitStmt(S);
+
+      // If we ever reach an unreachable point, stop emitting statements.
+      // This will need revision if we ever add goto.
+      if (!Builder.hasValidIP()) return;
     } else {
       emitLocal(Elt.get<Decl*>());
     }
@@ -81,8 +88,21 @@ void IRGenFunction::emitAssignStmt(AssignStmt *S) {
 }
 
 void IRGenFunction::emitIfStmt(IfStmt *S) {
-  
-  unimplemented(S->getLocStart(), "IfStmt is unimplemented");
+  Condition cond = emitCondition(S->Cond, S->Else != nullptr);
+  if (cond.hasTrue()) {
+    cond.enterTrue(*this);
+    emitStmt(S->Then);
+    cond.exitTrue(*this);
+  }
+
+  if (cond.hasFalse()) {
+    assert(S->Else);
+    cond.enterFalse(*this);
+    emitStmt(S->Else);
+    cond.exitFalse(*this);
+  }
+
+  cond.complete(*this);
 }
 
 void IRGenFunction::emitReturnStmt(ReturnStmt *S) {
@@ -105,8 +125,30 @@ void IRGenFunction::emitReturnStmt(ReturnStmt *S) {
   // In either case, branch to the return block.
   JumpDest ReturnDest(ReturnBB);
   emitBranch(ReturnDest);
+  Builder.ClearInsertionPoint();
 }
 
 void IRGenFunction::emitWhileStmt(WhileStmt *S) {
-  unimplemented(S->getLocStart(), "WhileStmt is unimplemented");
+  // Create a new basic block and jump into it.
+  llvm::BasicBlock *loopBB = createBasicBlock("while");
+  Builder.CreateBr(loopBB);
+  Builder.emitBlock(loopBB);
+
+  // Evaluate the condition with the false edge leading directly
+  // to the continuation block.
+  Condition cond = emitCondition(S->Cond, /*hasFalseCode*/ false);
+
+  // If there's a true edge, emit the body in it.
+  if (cond.hasTrue()) {
+    cond.enterTrue(*this);
+    emitStmt(S->Body);
+    if (Builder.hasValidIP()) {
+      Builder.CreateBr(loopBB);
+      Builder.ClearInsertionPoint();
+    }
+    cond.exitTrue(*this);
+  }
+
+  // Complete the conditional execution.
+  cond.complete(*this);
 }
