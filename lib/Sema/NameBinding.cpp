@@ -24,6 +24,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/system_error.h"
 #include "llvm/Support/Path.h"
+#include "Builtin.h"
 using namespace swift;
 
 /// NLKind - This is the kind of name lookup we're performing.
@@ -64,6 +65,18 @@ namespace {
 
     /// lookupValue - Resolve a reference to a value name that found this module
     /// through the specified import declaration.
+    void lookupValue(ImportDecl *ID, Identifier Name,
+                     SmallVectorImpl<ValueDecl*> &Result,
+                     NLKind LookupKind) override;
+  };
+
+  /// An implementation of ModuleProvider for builtin types and functions.
+  class BuiltinModule : public ModuleProvider {
+    ASTContext &Context;
+    llvm::DenseMap<Identifier, NamedDecl*> Cache;
+  public:
+    BuiltinModule(ASTContext &Context) : Context(Context) {}
+    TypeAliasDecl *lookupType(ImportDecl *ID, Identifier Name) override;
     void lookupValue(ImportDecl *ID, Identifier Name,
                      SmallVectorImpl<ValueDecl*> &Result,
                      NLKind LookupKind) override;
@@ -158,6 +171,7 @@ namespace {
     }
     
     void addImport(ImportDecl *ID);
+    void addBuiltinImport(ImportDecl *ID);
 
     BoundScope bindScopeName(TypeAliasDecl *TypeFromScope,
                              Identifier Name, SMLoc NameLoc);
@@ -263,6 +277,11 @@ void NameBinder::addImport(ImportDecl *ID) {
     return error(ID->AccessPath[2].second,
                  "invalid declaration referenced in import");
   
+  Imports.push_back(std::make_pair(ID, MP));
+}
+
+void NameBinder::addBuiltinImport(ImportDecl *ID) {
+  ModuleProvider *MP = new BuiltinModule(Context);
   Imports.push_back(std::make_pair(ID, MP));
 }
 
@@ -443,6 +462,12 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
 /// well.  This handles import directives and forward references.
 void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
   NameBinder Binder(Ctx);
+
+  std::pair<Identifier,SMLoc> BuiltinPath[] {
+    std::make_pair(Ctx.getIdentifier("Builtin"), SMLoc())
+  };
+  ImportDecl BuiltinImport(SMLoc(), BuiltinPath, nullptr);
+  Binder.addBuiltinImport(&BuiltinImport);
   
   // Do a prepass over the declarations to find the list of top-level value
   // declarations.
@@ -522,4 +547,38 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
       Elt = new (Ctx) TupleExpr(SMLoc(), 0, 0, 0, SMLoc(), false,
                                 TupleType::getEmpty(Ctx));
   }
+}
+
+TypeAliasDecl *
+BuiltinModule::lookupType(ImportDecl *ID, Identifier Name) {
+  auto I = Cache.find(Name);
+  if (I != Cache.end())
+    return dyn_cast<TypeAliasDecl>(I->second);
+
+  Type Ty = getBuiltinType(Context, Name);
+  if (!Ty) return nullptr;
+
+  TypeAliasDecl *Alias
+    = new (Context) TypeAliasDecl(SMLoc(), Name, Ty,
+                                  DeclAttributes(),
+                                  nullptr);
+  Cache.insert(std::make_pair(Name, Alias));
+  return Alias;
+}
+
+void BuiltinModule::lookupValue(ImportDecl *ID, Identifier Name,
+                                SmallVectorImpl<ValueDecl*> &Result,
+                                NLKind LookupKind) {
+  auto I = Cache.find(Name);
+  if (I != Cache.end()) {
+    if (ValueDecl *V = dyn_cast<ValueDecl>(I->second))
+      Result.push_back(V);
+    return;
+  }
+
+  ValueDecl *V = getBuiltinValue(Context, Name);
+  if (!V) return;
+
+  Cache.insert(std::make_pair(Name, V));
+  Result.push_back(V);
 }

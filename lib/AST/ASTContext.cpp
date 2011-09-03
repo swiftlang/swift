@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Types.h"
 #include "llvm/Support/Allocator.h"
@@ -41,6 +42,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
     FunctionTypes(new FunctionTypesMapTy()),
     ArrayTypes(new ArrayTypesMapTy()),
     SourceMgr(sourcemgr),
+    BuiltinModule(new (*this) ModuleDecl(*this)),
     TheErrorType(new (*this) ErrorType()),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheDependentType(new (*this) DependentType()),
