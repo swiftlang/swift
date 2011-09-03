@@ -33,7 +33,19 @@ enum class NLKind {
 };
 
 namespace {
-  class ReferencedModule {
+  /// An abstract class for something that provides module data.
+  class ModuleProvider {
+  public:
+    virtual ~ModuleProvider() {}
+    virtual TypeAliasDecl *lookupType(ImportDecl *ID, Identifier Name) = 0;
+    virtual void lookupValue(ImportDecl *ID, Identifier Name,
+                             SmallVectorImpl<ValueDecl*> &Result,
+                             NLKind LookupKind) = 0;
+  };
+
+  /// A concrete implementation of ModuleProvider which holds a
+  /// fully-loaded module.
+  class InMemoryModule : public ModuleProvider {
     // FIXME: A module can be more than one translation unit eventually.
     TranslationUnitDecl *TUD;
     
@@ -41,27 +53,27 @@ namespace {
     llvm::DenseMap<Identifier, TypeAliasDecl *> TopLevelTypes;
 
   public:
-    ReferencedModule(TranslationUnitDecl *tud) : TUD(tud) {}
-    ~ReferencedModule() {
+    InMemoryModule(TranslationUnitDecl *tud) : TUD(tud) {}
+    ~InMemoryModule() {
       // Nothing to destroy here, TU is ASTContext allocated.
     }
 
     /// lookupType - Resolve a reference to a type name that found this module
     /// with the specified import declaration.
-    TypeAliasDecl *lookupType(ImportDecl *ID, Identifier Name);
+    TypeAliasDecl *lookupType(ImportDecl *ID, Identifier Name) override;
 
     /// lookupValue - Resolve a reference to a value name that found this module
     /// through the specified import declaration.
     void lookupValue(ImportDecl *ID, Identifier Name,
                      SmallVectorImpl<ValueDecl*> &Result,
-                     NLKind LookupKind);
+                     NLKind LookupKind) override;
   };
 } // end anonymous namespace.
 
 
 /// lookupType - Resolve a reference to a type name that found this module
 /// with the specified import declaration.
-TypeAliasDecl *ReferencedModule::lookupType(ImportDecl *ID, Identifier Name) {
+TypeAliasDecl *InMemoryModule::lookupType(ImportDecl *ID, Identifier Name) {
   assert(ID->AccessPath.size() <= 2 && "Don't handle this yet");
   
   // If this import is specific to some named type or decl ("import swift.int")
@@ -83,9 +95,9 @@ TypeAliasDecl *ReferencedModule::lookupType(ImportDecl *ID, Identifier Name) {
 
 /// lookupValue - Resolve a reference to a value name that found this module
 /// through the specified import declaration.
-void ReferencedModule::lookupValue(ImportDecl *ID, Identifier Name,
-                                   SmallVectorImpl<ValueDecl*> &Result,
-                                   NLKind LookupKind) {
+void InMemoryModule::lookupValue(ImportDecl *ID, Identifier Name,
+                                 SmallVectorImpl<ValueDecl*> &Result,
+                                 NLKind LookupKind) {
   // TODO: ImportDecls cannot specified namespaces or individual entities
   // yet, so everything is just a lookup at the top-level.
   assert(ID->AccessPath.size() <= 2 && "Don't handle this yet");
@@ -118,12 +130,12 @@ void ReferencedModule::lookupValue(ImportDecl *ID, Identifier Name,
 }
 
 
-typedef std::pair<ImportDecl*, ReferencedModule*> Import;
+typedef std::pair<ImportDecl*, ModuleProvider*> Import;
 typedef llvm::PointerUnion<Import*, OneOfType*> BoundScope;
 
 namespace {  
   class NameBinder {
-    std::vector<ReferencedModule *> LoadedModules;
+    std::vector<ModuleProvider *> LoadedModules;
     
     /// TopLevelValues - This is the list of top-level declarations we have.
     llvm::DenseMap<Identifier, llvm::TinyPtrVector<ValueDecl*>> TopLevelValues;
@@ -137,7 +149,7 @@ namespace {
     ASTContext &Context;
     NameBinder(ASTContext &C) : Context(C) {}
     ~NameBinder() {
-      for (ReferencedModule *M : LoadedModules)
+      for (ModuleProvider *M : LoadedModules)
         delete M;
     }
     
@@ -166,10 +178,10 @@ namespace {
       Context.SourceMgr.PrintMessage(Loc, Message, "error");
     }
   private:
-    /// getReferencedModule - Load a module referenced by an import statement,
+    /// getModuleProvider - Load a module referenced by an import statement,
     /// emitting an error at the specified location and returning null on
     /// failure.
-    ReferencedModule *getReferencedModule(std::pair<Identifier,SMLoc> ModuleID);
+    ModuleProvider *getModuleProvider(std::pair<Identifier,SMLoc> ModuleID);
   };
 }
 
@@ -205,8 +217,8 @@ llvm::error_code NameBinder::findModule(StringRef Module,
   return Err;
 }
 
-ReferencedModule *NameBinder::
-getReferencedModule(std::pair<Identifier, SMLoc> ModuleID) {
+ModuleProvider *NameBinder::
+getModuleProvider(std::pair<Identifier, SMLoc> ModuleID) {
   // TODO: We currently just recursively parse referenced modules.  This works
   // fine for now since they are each a single file.  Ultimately we'll want a
   // compiled form of AST's like clang's that support lazy deserialization.
@@ -235,15 +247,15 @@ getReferencedModule(std::pair<Identifier, SMLoc> ModuleID) {
   // dumps of the code instead of reparsing though.
   //performNameBinding(TUD, Context);
   
-  ReferencedModule *RM = new ReferencedModule(TUD);
-  LoadedModules.push_back(RM);
-  return RM;
+  ModuleProvider *MP = new InMemoryModule(TUD);
+  LoadedModules.push_back(MP);
+  return MP;
 }
 
 
 void NameBinder::addImport(ImportDecl *ID) {
-  ReferencedModule *RM = getReferencedModule(ID->AccessPath[0]);
-  if (RM == 0) return;
+  ModuleProvider *MP = getModuleProvider(ID->AccessPath[0]);
+  if (MP == 0) return;
   
   // FIXME: Validate the access path against the module.  Reject things like
   // import swift.aslkdfja
@@ -251,7 +263,7 @@ void NameBinder::addImport(ImportDecl *ID) {
     return error(ID->AccessPath[2].second,
                  "invalid declaration referenced in import");
   
-  Imports.push_back(std::make_pair(ID, RM));
+  Imports.push_back(std::make_pair(ID, MP));
 }
 
 /// lookupTypeName - Lookup the specified type name in imports.  We know that it
