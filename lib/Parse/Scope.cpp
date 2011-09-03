@@ -85,6 +85,16 @@ Type ScopeInfo::lookupOrInsertTypeName(Identifier Name, SMLoc Loc) {
   return lookupOrInsertTypeNameDecl(Name, Loc)->getAliasType(TheParser.Context);
 }
 
+Type ScopeInfo::getQualifiedTypeName(Identifier BaseName, SMLoc BaseNameLoc,
+                                     Identifier Name, SMLoc NameLoc) {
+  TypeAliasDecl *BaseType = lookupScopeName(BaseName, BaseNameLoc);
+  TypeAliasDecl *NestedType =
+    new (TheParser.Context) TypeAliasDecl(NameLoc, Name, Type(),
+                                          DeclAttributes(),
+                                          TheParser.CurDeclContext);
+  UnresolvedScopedTypeList.push_back(std::make_pair(BaseType, NestedType));
+  return NestedType->getAliasType(TheParser.Context);
+}
 
 
 static void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New, Parser &P) {

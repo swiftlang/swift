@@ -56,6 +56,11 @@ private:
   /// were used in a way that absolutely requires a type.
   SmallVector<TypeAliasDecl*, 8> UnresolvedTypeList;
 
+  /// UnresolvedScopedTypeList - The list of all scope-qualified types
+  /// which couldn't be resolved.
+  SmallVector<std::pair<TypeAliasDecl*, TypeAliasDecl*>, 8>
+    UnresolvedScopedTypeList;
+
   TypeAliasDecl *lookupTypeNameInternal(Identifier Name, SMLoc Loc,
                                         bool AsType);
 public:
@@ -64,6 +69,11 @@ public:
   
   const SmallVectorImpl<TypeAliasDecl*> &getUnresolvedTypeList() const { 
     return UnresolvedTypeList;
+  }
+
+  const SmallVectorImpl<std::pair<TypeAliasDecl*,TypeAliasDecl*> >&
+  getUnresolvedScopedTypeList() const {
+    return UnresolvedScopedTypeList;
   }
 
   ValueDecl *lookupValueName(Identifier Name) {
@@ -98,6 +108,9 @@ public:
     Level = Entry->Level;
     return Entry->Decl;
   }
+
+  Type getQualifiedTypeName(Identifier BaseName, SMLoc BaseNameLoc,
+                            Identifier Name, SMLoc NameLoc);
 
   /// addToScope - Register the specified decl as being in the current lexical
   /// scope.

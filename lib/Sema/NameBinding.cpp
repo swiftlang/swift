@@ -461,6 +461,31 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
     TA->UnderlyingTy = ErrorType::get(Ctx);
   }
 
+  // Loop over all the unresolved scoped types in the translation
+  // unit, resolving them if possible.
+  for (auto BaseAndType : TUD->UnresolvedScopedTypesForParser) {
+    BoundScope Scope = Binder.bindScopeName(BaseAndType.first,
+                                            BaseAndType.first->Name,
+                                            BaseAndType.first->TypeAliasLoc);
+    if (!Scope) continue;
+
+    Identifier Name = BaseAndType.second->Name;
+    SMLoc NameLoc = BaseAndType.second->TypeAliasLoc;
+
+    TypeAliasDecl *Alias = nullptr;
+
+    if (Import *Module = Scope.dyn_cast<Import*>()) {
+      Alias = Module->second->lookupType(Module->first, Name);
+    }
+    if (Alias) {
+      BaseAndType.second->UnderlyingTy = Alias->getAliasType(Binder.Context);
+    } else {
+      Binder.error(NameLoc, "'" + Name.str() + "' is not a member type of '" +
+                   BaseAndType.first->Name.str() + "'");
+      BaseAndType.second->UnderlyingTy = Binder.Context.TheErrorType;
+    }
+  }
+
   NameBinder *NBPtr = &Binder;
   auto BinderBlock = ^(Expr *E, WalkOrder Order) {
     return BindNames(E, Order, *NBPtr);

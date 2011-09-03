@@ -44,8 +44,22 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
   switch (Tok.getKind()) {
   case tok::identifier: {
     Identifier Name = Context.getIdentifier(Tok.getText());
-    Result = ScopeInfo.lookupOrInsertTypeName(Name, Tok.getLoc());
+    SMLoc NameLoc = Tok.getLoc();
     consumeToken(tok::identifier);
+
+    if (Tok.isNot(tok::coloncolon)) {
+      Result = ScopeInfo.lookupOrInsertTypeName(Name, NameLoc);
+    } else {
+      consumeToken(tok::coloncolon);
+      SMLoc Loc2 = Tok.getLoc();
+      Identifier Name2;
+      if (parseIdentifier(Name2, "expected identifier after '" +
+                          Name.str() + "' type"))
+        return true;
+
+      Result = ScopeInfo.getQualifiedTypeName(Name, NameLoc, Name2, Loc2);
+    }
+
     break;
   }
   case tok::kw___builtin_float32_type:

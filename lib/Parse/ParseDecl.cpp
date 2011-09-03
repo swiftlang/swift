@@ -78,6 +78,8 @@ TranslationUnitDecl *Parser::parseTranslationUnit() {
   }
   
   TUD->UnresolvedTypesForParser = Context.AllocateCopy(UnresolvedTypeList);
+  TUD->UnresolvedScopedTypesForParser =
+    Context.AllocateCopy(ScopeInfo.getUnresolvedScopedTypeList());
   return TUD;
 }
 

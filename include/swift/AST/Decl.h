@@ -209,6 +209,12 @@ public:
   /// UnresolvedTypes - This is a list of types that were unresolved at the end
   /// of the translation unit's parse phase.
   ArrayRef<TypeAliasDecl*> UnresolvedTypesForParser;
+
+  /// UnresolvedScopedTypes - This is a list of scope-qualified types
+  /// that were unresolved at the end of the translation unit's parse
+  /// phase.
+  ArrayRef<std::pair<TypeAliasDecl*,TypeAliasDecl*> >
+    UnresolvedScopedTypesForParser;
   
   TranslationUnitDecl(ASTContext &C)
     : ModuleDecl(DeclKind::TranslationUnit, C) {
