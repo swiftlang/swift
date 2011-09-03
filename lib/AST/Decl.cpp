@@ -42,6 +42,12 @@ void *Decl::operator new(size_t Bytes, ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
+SMLoc ModuleDecl::getLocStart() const {
+  if (const TranslationUnitDecl *TU = dyn_cast<TranslationUnitDecl>(this))
+    return TU->getLocStart();
+  return SMLoc();
+}
+
 SMLoc TranslationUnitDecl::getLocStart() const {
   return Body ? Body->getLocStart() : SMLoc();
 }
@@ -49,6 +55,7 @@ SMLoc TranslationUnitDecl::getLocStart() const {
 
 SMLoc Decl::getLocStart() const {
   switch (Kind) {
+  case DeclKind::Module:     return cast<ModuleDecl>(this)->getLocStart();
   case DeclKind::TranslationUnit:
     return cast<TranslationUnitDecl>(this)->getLocStart();
   case DeclKind::Import: return cast<ImportDecl>(this)->getLocStart();
@@ -139,6 +146,8 @@ namespace {
         OS.indent(Indent+2) << "(null body!)";
       OS << ')';
     }
+
+    void visitModuleDecl(ModuleDecl *MD) {}
 
     void visitImportDecl(ImportDecl *ID) {
       printCommon(ID, "import_decl");

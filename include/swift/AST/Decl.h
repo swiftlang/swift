@@ -21,6 +21,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 #include "llvm/Support/SMLoc.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/ADT/ArrayRef.h"
 #include <cstddef>
 
@@ -35,6 +36,7 @@ namespace swift {
   
 enum class DeclKind {
   TranslationUnit,
+  Module,
   Import,
   TypeAlias,
   Var,
@@ -162,13 +164,44 @@ public:
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = 8) throw();  
 };
-  
-/// TranslationUnitDecl - This contains information about all of the decls and
-/// external references in a translation unit, which is one file.
-class TranslationUnitDecl : public Decl, public DeclContext {
+
+/// ModuleDecl - A unit of modularity.  The current translation unit
+/// is a module, as is an imported module.  Modules don't appear in
+/// arbitrary positions in an AST.
+class ModuleDecl : public Decl, public DeclContext {
 public:
   ASTContext &Ctx;
 
+protected:
+  ModuleDecl(DeclKind Kind, ASTContext &Ctx)
+    : Decl(Kind, nullptr),
+      DeclContext(DeclContextKind::ModuleDecl, nullptr),
+      Ctx(Ctx) {
+  }
+
+public:
+  ModuleDecl(ASTContext &Ctx)
+    : Decl(DeclKind::Module, nullptr),
+      DeclContext(DeclContextKind::ModuleDecl, nullptr),
+      Ctx(Ctx) {
+  }
+
+  SMLoc getLocStart() const;
+
+  static bool classof(const Decl *D) {
+    return D->Kind == DeclKind::TranslationUnit ||
+           D->Kind == DeclKind::Module;
+  }
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::ModuleDecl;
+  }
+  static bool classof(const ModuleDecl *D) { return true; }
+};
+  
+/// TranslationUnitDecl - This contains information about all of the decls and
+/// external references in a translation unit, which is one file.
+class TranslationUnitDecl : public ModuleDecl {
+public:
   /// Body - This is a synthesized BraceStmt that holds the top level
   /// expressions and declarations for a translation unit.
   BraceStmt *Body;
@@ -178,9 +211,7 @@ public:
   ArrayRef<TypeAliasDecl*> UnresolvedTypesForParser;
   
   TranslationUnitDecl(ASTContext &C)
-    : Decl(DeclKind::TranslationUnit, nullptr),
-      DeclContext(DeclContextKind::TranslationUnitDecl, nullptr),
-      Ctx(C) {
+    : ModuleDecl(DeclKind::TranslationUnit, C) {
   }
 
   SMLoc getLocStart() const;
@@ -189,8 +220,13 @@ public:
   static bool classof(const Decl *D) {
     return D->Kind == DeclKind::TranslationUnit;
   }
+  static bool classof(const ModuleDecl *D) {
+    return D->Kind == DeclKind::TranslationUnit;
+  }
   static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::TranslationUnitDecl;
+    if (const ModuleDecl *M = dyn_cast<ModuleDecl>(DC))
+      return isa<TranslationUnitDecl>(M);
+    return false;
   }
   static bool classof(const TranslationUnitDecl *D) { return true; }
 };
@@ -218,7 +254,7 @@ public:
 };
 
   
-/// NamedDecl - The common base class between TypeAliasDecl and ValueDecl.
+/// NamedDecl - An abstract base class for declarations with names.
 class NamedDecl : public Decl {
 public:
   Identifier Name;
@@ -226,11 +262,21 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return (D->Kind == DeclKind::Var || D->Kind == DeclKind::Func ||
-            D->Kind == DeclKind::OneOfElement ||
-            D->Kind == DeclKind::Arg || 
-            D->Kind == DeclKind::ElementRef ||
-            D->Kind == DeclKind::TypeAlias);
+    switch (D->Kind) {
+    case DeclKind::Var:
+    case DeclKind::Func:
+    case DeclKind::OneOfElement:
+    case DeclKind::Arg:
+    case DeclKind::ElementRef:
+    case DeclKind::TypeAlias:
+      return true;
+
+    case DeclKind::Module:
+    case DeclKind::TranslationUnit:
+    case DeclKind::Import:
+      return false;
+    }
+    llvm_unreachable("bad decl kind");
   }
   static bool classof(const NamedDecl *D) { return true; }
   
@@ -240,7 +286,7 @@ protected:
     : Decl(K, DC), Name(name), Attrs(attrs) {
   }
 };
-  
+
 /// TypeAliasDecl - This is a declaration of a typealias, for example:
 ///
 ///    typealias foo : int

@@ -333,14 +333,12 @@ ParseResult<Expr> Parser::parseExprIdentifier() {
   if (parseIdentifier(Name2, "expected identifier after '" + Name.str() +
                       "::' expression"))
     return true;
-
   
-  // Note: this is very simplistic support for scoped name lookup, extend when
-  // needed.
-  TypeAliasDecl *TypeScopeDecl = ScopeInfo.lookupOrInsertTypeNameDecl(Name,Loc);
-  return new (Context) UnresolvedScopedIdentifierExpr(TypeScopeDecl, Loc,
-                                                      ColonColonLoc, Loc2,
-                                                      Name2);
+  TypeAliasDecl *TypeDeclFromScope = ScopeInfo.lookupScopeName(Name, Loc);
+  return new (Context) UnresolvedScopedIdentifierExpr(TypeDeclFromScope,
+                                                      Name, Loc,
+                                                      ColonColonLoc,
+                                                      Name2, Loc2);
 }
 
 Expr *Parser::actOnIdentifierExpr(Identifier Text, SMLoc Loc) {

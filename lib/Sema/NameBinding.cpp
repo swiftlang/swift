@@ -118,13 +118,16 @@ void ReferencedModule::lookupValue(ImportDecl *ID, Identifier Name,
 }
 
 
+typedef std::pair<ImportDecl*, ReferencedModule*> Import;
+typedef llvm::PointerUnion<Import*, OneOfType*> BoundScope;
+
 namespace {  
   class NameBinder {
     std::vector<ReferencedModule *> LoadedModules;
     
     /// TopLevelValues - This is the list of top-level declarations we have.
     llvm::DenseMap<Identifier, llvm::TinyPtrVector<ValueDecl*>> TopLevelValues;
-    SmallVector<std::pair<ImportDecl*, ReferencedModule*>, 4> Imports;
+    SmallVector<Import, 4> Imports;
     
     llvm::error_code findModule(StringRef Module, 
                                 SMLoc ImportLoc,
@@ -143,6 +146,9 @@ namespace {
     }
     
     void addImport(ImportDecl *ID);
+
+    BoundScope bindScopeName(TypeAliasDecl *TypeFromScope,
+                             Identifier Name, SMLoc NameLoc);
 
     void bindValueName(Identifier I, SmallVectorImpl<ValueDecl*> &Result,
                        NLKind LookupKind);
@@ -291,30 +297,63 @@ void NameBinder::bindValueName(Identifier Name,
   }
 }
 
+/// Try to bind an unqualified name into something usable as a scope.
+BoundScope NameBinder::bindScopeName(TypeAliasDecl *TypeFromScope,
+                                     Identifier Name, SMLoc NameLoc) {
+  // Check whether the "optimistic" type from scope is still
+  // undefined.  If not, use that as the actual type; otherwise we'll
+  // need to do a lookup from the imports.
+  TypeAliasDecl *Type;
+  if (!TypeFromScope->UnderlyingTy.isNull()) {
+    Type = TypeFromScope;
+  } else {
+    Type = lookupTypeName(Name);
+  }
+
+  // If that failed, look for a module name.
+  if (!Type) {
+    for (Import &ImpEntry : Imports)
+      if (ImpEntry.first->AccessPath.back().first == Name)
+        return &ImpEntry;
+    
+    error(NameLoc, "no such module or type");
+    return BoundScope();
+  }
+
+  // Otherwise, at least cache the type we found.
+  assert(!Type->UnderlyingTy.isNull());
+  if (TypeFromScope->UnderlyingTy.isNull()) {
+    TypeFromScope->UnderlyingTy = Type->UnderlyingTy;
+  }
+
+  // Try to convert that to a type scope.
+  TypeBase *Ty = Type->UnderlyingTy->getCanonicalType(Context);
+
+  // Silently fail if we have an error type.
+  if (isa<ErrorType>(Ty)) return BoundScope();
+    
+  // Reject things like int::x.
+  OneOfType *DT = dyn_cast<OneOfType>(Ty);
+  if (DT == 0) {
+    error(NameLoc, "invalid type '" + Name.str() + "' for scoped access");
+    return BoundScope();
+  }
+    
+  if (DT->Elements.empty()) {
+    error(NameLoc, "oneof '" + Name.str() +
+          "' is not complete or has no elements");
+    return BoundScope();
+  }
+
+  return DT;
+}
+
 static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
   
   // Ignore the preorder walk.
   if (Order == WalkOrder::PreOrder)
     return E;
-  
-  // Process UnresolvedDeclRefExpr.
-  if (UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
-    SmallVector<ValueDecl*, 4> Decls;
-    Binder.bindValueName(UDRE->Name, Decls, NLKind::UnqualifiedLookup);
-    if (Decls.empty()) {
-      Binder.error(UDRE->Loc, "use of unresolved identifier '" +
-                   UDRE->Name.str() + "'");
-      return 0;
-    }
-    if (Decls.size() == 1)
-      return new (Binder.Context) DeclRefExpr(Decls[0], UDRE->Loc);
-    
-    // Copy the overload set into ASTContext memory.
-    ArrayRef<ValueDecl*> DeclList = Binder.Context.AllocateCopy(Decls);
-    
-    return new (Binder.Context) OverloadSetRefExpr(DeclList, UDRE->Loc);
-  }
-  
+
   // A reference to foo.bar may be an application ("bar foo"), so look up bar.
   // It may also be a tuple field reference, so don't report an error here if we
   // don't find anything juicy.
@@ -329,8 +368,59 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
     return UDE;
   }
   
+  Identifier Name;
+  SMLoc Loc;
+  SmallVector<ValueDecl*, 4> Decls;
+  // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
+  if (UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
+    Name = UDRE->Name;
+    Loc = UDRE->Loc;
+    Binder.bindValueName(Name, Decls, NLKind::UnqualifiedLookup);
+
+  // Process UnresolvedScopedIdentifierExpr by doing a qualified lookup.
+  } else if (UnresolvedScopedIdentifierExpr *USIE =
+               dyn_cast<UnresolvedScopedIdentifierExpr>(E)) {
+    Name = USIE->Name;
+    Loc = USIE->NameLoc;
+
+    Identifier BaseName = USIE->BaseName;
+    SMLoc BaseNameLoc = USIE->BaseNameLoc;
+    BoundScope Scope =
+      Binder.bindScopeName(USIE->BaseTypeFromScope, BaseName, BaseNameLoc);
+    if (!Scope) return nullptr;
+
+    if (OneOfType *Ty = Scope.dyn_cast<OneOfType*>()) {
+      OneOfElementDecl *Elt = Ty->getElement(Name);
+      if (Elt == 0) {
+        Binder.error(Loc, "'" + Name.str() + "' is not a member of '" +
+                     BaseName.str() + "'");
+        return 0;
+      }
+      Decls.push_back(Elt);
+    } else {
+      Import *Module = Scope.get<Import*>();
+      Module->second->lookupValue(Module->first, Name, Decls,
+                                  NLKind::UnqualifiedLookup);
+    }
+
   // Otherwise, not something that needs name binding.
-  return E;
+  } else {
+    return E;
+  }
+
+  if (Decls.empty()) {
+    Binder.error(Loc, "use of unresolved identifier '" + Name.str() + "'");
+    return 0;
+  }
+
+  if (Decls.size() == 1) {
+    return new (Binder.Context) DeclRefExpr(Decls[0], Loc);
+  }
+    
+  // Copy the overload set into ASTContext memory.
+  ArrayRef<ValueDecl*> DeclList = Binder.Context.AllocateCopy(Decls);
+    
+  return new (Binder.Context) OverloadSetRefExpr(DeclList, Loc);
 }
 
 /// performNameBinding - Once parsing is complete, this walks the AST to

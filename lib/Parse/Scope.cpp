@@ -36,31 +36,46 @@ Scope::Scope(Parser *P) : SI(P->ScopeInfo), ValueHTScope(SI.ValueScopeHT),
 // ScopeInfo Implementation
 //===----------------------------------------------------------------------===//
 
+TypeAliasDecl *ScopeInfo::lookupScopeName(Identifier Name, SMLoc Loc) {
+  return lookupTypeNameInternal(Name, Loc, /*as type*/ false);
+}
+
 /// lookupOrInsertTypeNameDecl - Perform a lexical scope lookup for the
 /// specified name in a type context, returning the decl if found or
 /// installing and returning a new Unresolved one if not.
 TypeAliasDecl *ScopeInfo::lookupOrInsertTypeNameDecl(Identifier Name,
                                                      SMLoc Loc) {
-  unsigned Level = 0;
-  if (TypeAliasDecl *TAD = lookupTypeNameAndLevel(Name, Level))
-    return TAD;
-  
-  // If we don't have a definition for this type, introduce a new TypeAliasDecl
-  // with an unresolved underlying type.
+  return lookupTypeNameInternal(Name, Loc, /*as type*/ true);
+}
+
+TypeAliasDecl *ScopeInfo::lookupTypeNameInternal(Identifier Name, SMLoc Loc,
+                                                 bool AsType) {
+  // Check whether we already have an entry for this name.
+  auto I = TypeScopeHT.begin(Name);
+  if (I != TypeScopeHT.end()) {
+    TypeScopeEntry &Entry = *I;
+    if (AsType && !Entry.IsUsedAsType) {
+      Entry.IsUsedAsType = true;
+      UnresolvedTypeList.push_back(Entry.Decl);
+    }
+    return Entry.Decl;
+  }
+
+  // If not, create a new tentative entry.
   TypeAliasDecl *TAD =
     new (TheParser.Context) TypeAliasDecl(Loc, Name, Type(), DeclAttributes(),
                                           TheParser.CurDeclContext);
-  UnresolvedTypes[Name] = TAD;
-  UnresolvedTypeList.push_back(TAD);
-  
-  // Inject this into the outermost scope so that subsequent name lookups of the
-  // same type will find it.
+
   llvm::ScopedHashTableScope<Identifier, TypeScopeEntry> *S =
     TypeScopeHT.getCurScope();
   while (S->getParentScope())
     S = S->getParentScope();
-  
-  TypeScopeHT.insertIntoScope(S, Name, std::make_pair(0, TAD));
+
+  if (AsType) {
+    UnresolvedTypeList.push_back(TAD);
+  }
+
+  TypeScopeHT.insertIntoScope(S, Name, TypeScopeEntry(TAD, 0, AsType));
   return TAD;
 }
 
@@ -149,16 +164,13 @@ TypeAliasDecl *ScopeInfo::addTypeAliasToScope(SMLoc TypeAliasLoc,
     TAD = new (TheParser.Context) TypeAliasDecl(TypeAliasLoc, Name, Ty,
                                                 DeclAttributes(),
                                                 TheParser.CurDeclContext);
-    TypeScopeHT.insert(Name, std::make_pair(CurScope->getDepth(), TAD));
+    TypeScopeHT.insert(Name, TypeScopeEntry(TAD, CurScope->getDepth(), true));
     return TAD;
   }
   
   // If the previous definition was just a use of an undeclared type, complete
   // the type now.
   if (TAD->UnderlyingTy.isNull()) {
-    // Remove the entry for this type from the UnresolvedTypes map.
-    UnresolvedTypes.erase(Name);
-    
     // This will get removed from UnresolvedTypeList at the end of the TU.
     
     // Update the decl we already have to be the correct type.

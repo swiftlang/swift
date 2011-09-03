@@ -230,16 +230,18 @@ public:
 /// reference to a type foo and a member bar within it.
 class UnresolvedScopedIdentifierExpr : public Expr {
 public:
-  TypeAliasDecl *TypeDecl;
-  SMLoc TypeDeclLoc, ColonColonLoc, NameLoc;
+  TypeAliasDecl *BaseTypeFromScope;
+  Identifier BaseName;
   Identifier Name;
+  SMLoc BaseNameLoc, ColonColonLoc, NameLoc;
   
-  UnresolvedScopedIdentifierExpr(TypeAliasDecl *typeDecl,
-                                 SMLoc typeDeclLoc, SMLoc colonLoc,
-                                 SMLoc nameLoc, Identifier name)
-  : Expr(ExprKind::UnresolvedScopedIdentifier), TypeDecl(typeDecl),
-    TypeDeclLoc(typeDeclLoc), ColonColonLoc(colonLoc), NameLoc(nameLoc),
-    Name(name) {
+  UnresolvedScopedIdentifierExpr(TypeAliasDecl *baseTypeFromScope,
+                                 Identifier baseName, SMLoc baseNameLoc,
+                                 SMLoc colonLoc,
+                                 Identifier name, SMLoc nameLoc)
+  : Expr(ExprKind::UnresolvedScopedIdentifier),
+    BaseTypeFromScope(baseTypeFromScope), BaseName(baseName), Name(name),
+    BaseNameLoc(baseNameLoc), ColonColonLoc(colonLoc), NameLoc(nameLoc) {
   }
   
   // Implement isa/cast/dyncast/etc.

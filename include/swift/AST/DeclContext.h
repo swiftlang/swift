@@ -24,11 +24,9 @@
 
 namespace swift {
   class ASTContext;
-  class FuncExpr;
-  class TranslationUnitDecl;
 
 enum class DeclContextKind {
-  TranslationUnitDecl,
+  ModuleDecl,
   FuncExpr,
   OneOfType,
   ProtocolType
@@ -45,7 +43,7 @@ class DeclContext {
 public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
     : ParentAndKind(Parent, static_cast<unsigned>(Kind)) {
-    assert(Parent || Kind == DeclContextKind::TranslationUnitDecl);
+    assert(Parent || Kind == DeclContextKind::ModuleDecl);
   }
 
   /// Returns the kind of context this is.

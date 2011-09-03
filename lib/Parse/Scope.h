@@ -35,7 +35,13 @@ class ScopeInfo {
   friend class Scope;
 public:
   typedef std::pair<unsigned, ValueDecl*> ValueScopeEntry;
-  typedef std::pair<unsigned, TypeAliasDecl*> TypeScopeEntry;
+  struct TypeScopeEntry {
+    TypeAliasDecl *Decl;
+    unsigned Level;
+    bool IsUsedAsType;
+    TypeScopeEntry(TypeAliasDecl *D, unsigned Level, bool IsUsedAsType)
+      : Decl(D), Level(Level), IsUsedAsType(IsUsedAsType) {}
+  };
   
   typedef llvm::ScopedHashTable<Identifier, ValueScopeEntry> ValueScopeHTTy;
   typedef llvm::ScopedHashTable<Identifier, TypeScopeEntry> TypeScopeHTTy;
@@ -44,11 +50,14 @@ private:
   ValueScopeHTTy ValueScopeHT;
   TypeScopeHTTy TypeScopeHT;
   Scope *CurScope;
-  
-  /// UnresolvedTypes - This keeps track of all of the unresolved types in the
-  /// AST.
-  llvm::DenseMap<Identifier, TypeAliasDecl *> UnresolvedTypes;
+
+  /// UnresolvedTypeList - The list of all types which were unresolved
+  /// at some point and that, at some point during being unresolved,
+  /// were used in a way that absolutely requires a type.
   SmallVector<TypeAliasDecl*, 8> UnresolvedTypeList;
+
+  TypeAliasDecl *lookupTypeNameInternal(Identifier Name, SMLoc Loc,
+                                        bool AsType);
 public:
   ScopeInfo(Parser &TheParser) : TheParser(TheParser), CurScope(0) {}
   ~ScopeInfo() {}
@@ -65,6 +74,11 @@ public:
     if (Res.first == 0) return 0;
     return Res.second;
   }
+
+  /// lookupScopeName - Perform a lexical scope lookup for the
+  /// specified name in a scope context, returning the decl if found or
+  /// a forward-declared type if not.
+  TypeAliasDecl *lookupScopeName(Identifier Name, SMLoc Loc);
   
   /// lookupOrInsertTypeNameDecl - Perform a lexical scope lookup for the
   /// specified name in a type context, returning the decl if found or
@@ -78,11 +92,11 @@ public:
   /// lookupTypeNameAndLevel - Lookup the specified type name, returning the
   /// level it is at as well.
   TypeAliasDecl *lookupTypeNameAndLevel(Identifier Name, unsigned &Level) {
-    std::pair<unsigned, TypeAliasDecl*> Entry = TypeScopeHT.lookup(Name);
-    if (Entry.second == 0)
+    auto Entry = TypeScopeHT.begin(Name);
+    if (Entry == TypeScopeHT.end())
       return 0;
-    Level = Entry.first;
-    return Entry.second;
+    Level = Entry->Level;
+    return Entry->Decl;
   }
 
   /// addToScope - Register the specified decl as being in the current lexical

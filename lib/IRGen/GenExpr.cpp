@@ -51,6 +51,7 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
                                 const TypeInfo &TInfo) {
   ValueDecl *D = E->D;
   switch (D->Kind) {
+  case DeclKind::Module:
   case DeclKind::TranslationUnit:
   case DeclKind::Import:
   case DeclKind::TypeAlias:
@@ -82,6 +83,7 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
 RValue IRGenFunction::emitDeclRefRValue(DeclRefExpr *E, const TypeInfo &TInfo) {
   ValueDecl *D = E->D;
   switch (D->Kind) {
+  case DeclKind::Module:
   case DeclKind::TranslationUnit:
   case DeclKind::Import:
   case DeclKind::TypeAlias:

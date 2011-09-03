@@ -47,7 +47,7 @@ SMLoc Expr::getLocStart() const {
   case ExprKind::UnresolvedMember:
     return cast<UnresolvedMemberExpr>(this)->ColonLoc;
   case ExprKind::UnresolvedScopedIdentifier:
-    return cast<UnresolvedScopedIdentifierExpr>(this)->TypeDeclLoc;
+    return cast<UnresolvedScopedIdentifierExpr>(this)->BaseNameLoc;
   case ExprKind::Tuple:
     return cast<TupleExpr>(this)->LParenLoc;
   case ExprKind::UnresolvedDot:
@@ -617,9 +617,8 @@ public:
     OS << "\' name='" << E->Name << "')";
   }
   void visitUnresolvedScopedIdentifierExpr(UnresolvedScopedIdentifierExpr *E) {
-    OS.indent(Indent) << "(unresolved_scoped_identifier_expr type='"
-      << E->TypeDecl->Name;
-    OS << "\' name='" << E->Name << "')";
+    OS.indent(Indent) << "(unresolved_scoped_identifier_expr base='"
+      << E->BaseTypeFromScope->Name << "\' name='" << E->Name << "')";
   }
   void visitTupleExpr(TupleExpr *E) {
     OS.indent(Indent) << "(tuple_expr type='" << E->Ty << '\'';
