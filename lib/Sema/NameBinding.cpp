@@ -30,6 +30,7 @@ using namespace swift;
 /// NLKind - This is the kind of name lookup we're performing.
 enum class NLKind {
   UnqualifiedLookup,
+  QualifiedLookup,
   DotLookup
 };
 
@@ -38,7 +39,8 @@ namespace {
   class ModuleProvider {
   public:
     virtual ~ModuleProvider() {}
-    virtual TypeAliasDecl *lookupType(ImportDecl *ID, Identifier Name) = 0;
+    virtual TypeAliasDecl *lookupType(ImportDecl *ID, Identifier Name,
+                                      NLKind LookupKind) = 0;
     virtual void lookupValue(ImportDecl *ID, Identifier Name,
                              SmallVectorImpl<ValueDecl*> &Result,
                              NLKind LookupKind) = 0;
@@ -61,7 +63,8 @@ namespace {
 
     /// lookupType - Resolve a reference to a type name that found this module
     /// with the specified import declaration.
-    TypeAliasDecl *lookupType(ImportDecl *ID, Identifier Name) override;
+    TypeAliasDecl *lookupType(ImportDecl *ID, Identifier Name,
+                              NLKind LookupKind) override;
 
     /// lookupValue - Resolve a reference to a value name that found this module
     /// through the specified import declaration.
@@ -76,7 +79,8 @@ namespace {
     llvm::DenseMap<Identifier, NamedDecl*> Cache;
   public:
     BuiltinModule(ASTContext &Context) : Context(Context) {}
-    TypeAliasDecl *lookupType(ImportDecl *ID, Identifier Name) override;
+    TypeAliasDecl *lookupType(ImportDecl *ID, Identifier Name,
+                              NLKind LookupKind) override;
     void lookupValue(ImportDecl *ID, Identifier Name,
                      SmallVectorImpl<ValueDecl*> &Result,
                      NLKind LookupKind) override;
@@ -86,7 +90,8 @@ namespace {
 
 /// lookupType - Resolve a reference to a type name that found this module
 /// with the specified import declaration.
-TypeAliasDecl *InMemoryModule::lookupType(ImportDecl *ID, Identifier Name) {
+TypeAliasDecl *InMemoryModule::lookupType(ImportDecl *ID, Identifier Name,
+                                          NLKind LookupKind) {
   assert(ID->AccessPath.size() <= 2 && "Don't handle this yet");
   
   // If this import is specific to some named type or decl ("import swift.int")
@@ -259,7 +264,7 @@ getModuleProvider(std::pair<Identifier, SMLoc> ModuleID) {
   // We have to do name binding on it to ensure that types are fully resolved.
   // This should eventually be eliminated by having actual fully resolved binary
   // dumps of the code instead of reparsing though.
-  //performNameBinding(TUD, Context);
+  performNameBinding(TUD, Context);
   
   ModuleProvider *MP = new InMemoryModule(TUD);
   LoadedModules.push_back(MP);
@@ -290,7 +295,8 @@ void NameBinder::addBuiltinImport(ImportDecl *ID) {
 /// null if there is no match found.
 TypeAliasDecl *NameBinder::lookupTypeName(Identifier Name) {
   for (auto &ImpEntry : Imports)
-    if (TypeAliasDecl *D = ImpEntry.second->lookupType(ImpEntry.first, Name))
+    if (TypeAliasDecl *D = ImpEntry.second->lookupType(ImpEntry.first, Name,
+                                                  NLKind::UnqualifiedLookup))
       return D;
 
   return 0;
@@ -512,7 +518,8 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
     TypeAliasDecl *Alias = nullptr;
 
     if (Import *Module = Scope.dyn_cast<Import*>()) {
-      Alias = Module->second->lookupType(Module->first, Name);
+      Alias = Module->second->lookupType(Module->first, Name,
+                                         NLKind::QualifiedLookup);
     }
     if (Alias) {
       BaseAndType.second->UnderlyingTy = Alias->getAliasType(Binder.Context);
@@ -550,7 +557,10 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
 }
 
 TypeAliasDecl *
-BuiltinModule::lookupType(ImportDecl *ID, Identifier Name) {
+BuiltinModule::lookupType(ImportDecl *ID, Identifier Name, NLKind LookupKind) {
+  // Only qualified lookup ever finds anything in the builtin module.
+  if (LookupKind != NLKind::QualifiedLookup) return nullptr;
+
   auto I = Cache.find(Name);
   if (I != Cache.end())
     return dyn_cast<TypeAliasDecl>(I->second);
@@ -569,6 +579,9 @@ BuiltinModule::lookupType(ImportDecl *ID, Identifier Name) {
 void BuiltinModule::lookupValue(ImportDecl *ID, Identifier Name,
                                 SmallVectorImpl<ValueDecl*> &Result,
                                 NLKind LookupKind) {
+  // Only qualified lookup ever finds anything in the builtin module.
+  if (LookupKind != NLKind::QualifiedLookup) return;
+
   auto I = Cache.find(Name);
   if (I != Cache.end()) {
     if (ValueDecl *V = dyn_cast<ValueDecl>(I->second))
