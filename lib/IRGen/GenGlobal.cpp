@@ -53,13 +53,13 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   switch (D->Kind) {
   case DeclKind::Module:
   case DeclKind::TranslationUnit:
-  case DeclKind::OneOfElement:
   case DeclKind::Arg:
   case DeclKind::ElementRef:
     llvm_unreachable("cannot encounter this decl here");
     break;
   
   // These declarations don't require IR-gen support.
+  case DeclKind::OneOfElement:
   case DeclKind::Import:
   case DeclKind::TypeAlias:
     break;
