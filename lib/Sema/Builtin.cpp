@@ -22,7 +22,23 @@
 
 using namespace swift;
 
-Type swift::getBuiltinType(ASTContext &Context, Identifier Name) {
+Type swift::getBuiltinType(ASTContext &Context, Identifier Id) {
+  llvm::StringRef Name = Id.str();
+  if (Name == "int1") {
+    return Context.TheInt1Type;
+  } else if (Name == "int8") {
+    return Context.TheInt8Type;
+  } else if (Name == "int16") {
+    return Context.TheInt16Type;
+  } else if (Name == "int32") {
+    return Context.TheInt32Type;
+  } else if (Name == "int64") {
+    return Context.TheInt64Type;
+  } else if (Name == "float32") {
+    return Context.TheFloat32Type;
+  } else if (Name == "float64") {
+    return Context.TheFloat64Type;
+  }
   return Type();
 }
 

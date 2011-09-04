@@ -33,7 +33,6 @@ bool Parser::parseType(Type &Result) {
 ///     type-simple '->' type 
 ///
 ///   type-simple:
-///     '__builtin_int32_type'
 ///     identifier
 ///     type-tuple
 ///     type-oneof
@@ -62,34 +61,6 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
 
     break;
   }
-  case tok::kw___builtin_float32_type:
-    Result = Context.TheFloat32Type;
-    consumeToken(tok::kw___builtin_float32_type);
-    break;
-  case tok::kw___builtin_float64_type:
-    Result = Context.TheFloat64Type;
-    consumeToken(tok::kw___builtin_float64_type);
-    break;
-  case tok::kw___builtin_int1_type:
-    Result = Context.TheInt1Type;
-    consumeToken(tok::kw___builtin_int1_type);
-    break;
-  case tok::kw___builtin_int8_type:
-    Result = Context.TheInt8Type;
-    consumeToken(tok::kw___builtin_int8_type);
-    break;
-  case tok::kw___builtin_int16_type:
-    Result = Context.TheInt16Type;
-    consumeToken(tok::kw___builtin_int16_type);
-    break;
-  case tok::kw___builtin_int32_type:
-    Result = Context.TheInt32Type;
-    consumeToken(tok::kw___builtin_int32_type);
-    break;
-  case tok::kw___builtin_int64_type:
-    Result = Context.TheInt64Type;
-    consumeToken(tok::kw___builtin_int64_type);
-    break;
   case tok::l_paren:
   case tok::l_paren_space: {
     SMLoc LPLoc = consumeToken();

@@ -224,20 +224,9 @@
     "foo"? In the code you immediately know whether something is exported, and
     don't need to sprinkle attributes everywhere, OTOH, it makes it harder to 
     remember (like not having a naming convention).<br><br>
-    
-    Enumerating the integer and floating-point types is expedient, but silly
-    and unneeded.  There isn't a good reason to expose an i13 LLVM IR type, but
-    i128 would be reasonable.
   </div>
 
   <pre class="grammar">
-    keyword ::= '__builtin_int1_type'
-    keyword ::= '__builtin_int8_type'
-    keyword ::= '__builtin_int16_type'
-    keyword ::= '__builtin_int32_type'
-    keyword ::= '__builtin_int64_type'
-    keyword ::= '__builtin_float32_type'
-    keyword ::= '__builtin_float64_type'
     keyword ::= 'import'
     keyword ::= 'oneof'
     keyword ::= 'struct'
@@ -710,7 +699,6 @@
     type ::= <a href="#type-function">type-function</a>
     type ::= <a href="#type-array">type-array</a>
     
-    type-simple ::= <a href="#type-builtin">type-builtin</a>
     type-simple ::= <a href="#type-identifier">type-identifier</a>
     type-simple ::= <a href="#type-tuple">type-tuple</a>
     type-simple ::= <a href="#type-oneof">type-oneof</a>
@@ -730,33 +718,37 @@
   <h3 id="type-builtin">Builtin Primitive Integer Types</h3>
   <!-- ===================================================================== -->
 
-  <pre class="grammar">
-    type-builtin ::= '__builtin_int1_type'
-    type-builtin ::= '__builtin_int8_type'
-    type-builtin ::= '__builtin_int16_type'
-    type-builtin ::= '__builtin_int32_type'
-    type-builtin ::= '__builtin_int64_type'
-  </pre>
-  
-  <p>'__builtin_int*_type's are the name of the integer types of the
-  corresponding size.  These types specify a storage, but they have no semantics
-  assigned to them (e.g. signed vs unsigned arithmetic) because there are no
-  operations on them built into the language.</p>
+  <p>The <a href="#builtin"><tt>Builtin</tt></a> module has the following
+  type members:</p>
+
+  <ul>
+    <li><tt>int1</tt></li>
+    <li><tt>int8</tt></li>
+    <li><tt>int16</tt></li>
+    <li><tt>int32</tt></li>
+    <li><tt>int64</tt></li>
+  </ul>
+
+  <p>These types specify a storage, but they have no semantics
+  assigned to them (e.g. signed vs unsigned arithmetic) because there
+  are no operations on them built into the language.</p>
 
 
   <!-- ===================================================================== -->
   <h3 id="type-builtin">Builtin Primitive Floating-Point Types</h3>
   <!-- ===================================================================== -->
 
-  <pre class="grammar">
-    type-builtin ::= '__builtin_float32_type'
-    type-builtin ::= '__builtin_float64_type'
-  </pre>
-  
-  <p>'__builtin_float*_type's are the name of the floating-point types of the
-  corresponding size.  These types specify a storage, but they have no
-  semantics assigned to them (IEEE or otherwise) because there are no
-  operations on them built into the language.</p>
+  <p>The <a href="#builtin"><tt>Builtin</tt></a> module has the following
+  type members:</p>
+
+  <ul>
+    <li><tt>float32</tt></li>
+    <li><tt>float64</tt></li>
+  </ul>
+
+  <p>These types specify a storage, but they have no semantics
+  assigned to them (IEEE or otherwise) because there are no operations
+  on them built into the language.</p>
 
   
   <!-- ===================================================================== -->
@@ -765,6 +757,7 @@
   
   <pre class="grammar">
     type-identifier ::= <a href="#identifier">identifier</a>
+    type-identifier ::= <a href="#scope-qualifier">scope-qualifier</a> <a href="#identifier">identifier</a>
   </pre>
 
   <p>Named types may be used simply by using their name.  Named types are
@@ -1174,14 +1167,35 @@
   context</a>.  All other dollar identifiers are invalid.</p>
   
   <pre class="grammar">
-    expr-identifier ::= <a href="#type-identifier">type-identifier</a> '::' <a href="#identifier">any-identifier</a>
+    expr-identifier ::= <a href="#scope-qualifier">scope-qualifier</a> <a href="#identifier">any-identifier</a>
   </pre>
 
-  <p>Qualified identifiers look up a constructor member of a <a
-    href="type-oneof">oneof</a> type (and eventually into namespaces).  The
-  first identifier is looked up as a <a href="#type-identifier">type name</a>.
-  </p>
- 
+  <p>Qualified identifiers look up value members of explicitly-identifier scopes.</p>
+
+  <!-- FIXME: there's no good reason for this to be in the expr section -->
+  <!-- ===================================================================== -->
+  <h3 id="scope-qualifier">Scope Qualifiers</h3>
+  <!-- ===================================================================== -->
+
+  <div class="commentary">
+    TODO: This grammar should be extended to allow arbitrary-length
+    chains of qualifiers and global qualification.  Maybe global
+    qualification should only find names from the current translation
+    unit?
+  </div>
+  
+  <pre class="grammar">
+    scope-qualifier ::= <a href="#identifier">identifier</a> '::'
+  </pre>
+  
+  <p>A scope qualifier allows a name to be looked up in a specific
+    scope.  The identifier must name a type, or failing that, an
+    imported module.</p>
+
+  <p>As usual, when lookup is done for a scope-qualified name, only
+    types are found in a type context, and only values are found in an
+    expression context.</p>
+
   <!-- ===================================================================== -->
   <h3 id="expr-paren">Parenthesized Expressions</h3>
   <!-- ===================================================================== -->
@@ -1712,6 +1726,15 @@
   
   <h3 id="typecheck_anon">Anonymous Argument Resolution</h3>
   <h3 id="typecheck_context">Context Sensitive Type Resolution</h3>
+
+  <!-- ********************************************************************* -->
+  <h2 id="builtin">Builtin Module</h2>
+  <!-- ********************************************************************* -->
+
+  <p>A module named <tt>Builtin</tt> is imported into every file.  Its
+     declarations can only be found by <a href="#scope-qualifier">qualified
+     lookup</a>.  It provides access to a small number of primitive
+     representation types and operations defined over them.</p>
 
   <!-- ********************************************************************* -->
   <h2 id="stdlib">Standard Library</h2>
