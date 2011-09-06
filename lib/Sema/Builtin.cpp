@@ -16,10 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Builtin.h"
-#include "swift/AST/ASTContext.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/Types.h"
-
+#include "swift/AST/AST.h"
 using namespace swift;
 
 Type swift::getBuiltinType(ASTContext &Context, Identifier Id) {
