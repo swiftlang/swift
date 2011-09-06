@@ -26,7 +26,7 @@ namespace swift {
   class ASTContext;
 
 enum class DeclContextKind {
-  ModuleDecl,
+  Module,
   FuncExpr,
   OneOfType,
   ProtocolType
@@ -43,7 +43,7 @@ class DeclContext {
 public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
     : ParentAndKind(Parent, static_cast<unsigned>(Kind)) {
-    assert(Parent || Kind == DeclContextKind::ModuleDecl);
+    assert(Parent || Kind == DeclContextKind::Module);
   }
 
   /// Returns the kind of context this is.
@@ -59,13 +59,13 @@ public:
   }
 
   /// Returns the semantic parent of this context.  A context has a
-  /// parent if and only if it is not a translation unit context.
+  /// parent if and only if it is not a module context.
   DeclContext *getParent() const {
     return ParentAndKind.getPointer();
   }
   
-  /// getASTContext - Return the ASTContext for a specified DeclContetx by
-  /// walking up to the translation unit and returning its ASTContext.
+  /// getASTContext - Return the ASTContext for a specified DeclContext by
+  /// walking up to the enclosing module and returning its ASTContext.
   ASTContext &getASTContext();
 };
   

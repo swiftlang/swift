@@ -18,7 +18,7 @@
 #define SWIFT_SUBSYSTEMS_H
 
 namespace swift {
-  class TranslationUnitDecl;
+  class TranslationUnit;
   class ASTContext;
 
   namespace irgen {
@@ -27,21 +27,21 @@ namespace swift {
   
   /// parseTranslationUnit - Parse a single buffer as a translation unit and
   /// return the decl.
-  TranslationUnitDecl *parseTranslationUnit(unsigned BufferID, ASTContext &Ctx);
+  TranslationUnit *parseTranslationUnit(unsigned BufferID, ASTContext &Ctx);
   
 
   /// performNameBinding - Once parsing is complete, this walks the AST to
   /// resolve names and do other top-level validation.
-  void performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx);
+  void performNameBinding(TranslationUnit *TU, ASTContext &Ctx);
   
   /// performTypeChecking - Once parsing and namebinding are complete, this
   /// walks the AST to resolve types and diagnose problems therein.
   ///
-  void performTypeChecking(TranslationUnitDecl *TUD, ASTContext &Ctx);
+  void performTypeChecking(TranslationUnit *TU, ASTContext &Ctx);
 
   /// performIRGeneration - Turn the given translation unit into
   /// either LLVM IR or native code.
-  void performIRGeneration(TranslationUnitDecl *TU, ASTContext &Ctx,
+  void performIRGeneration(TranslationUnit *TU, ASTContext &Ctx,
                            irgen::Options &Opts);
   
 } // end namespace swift

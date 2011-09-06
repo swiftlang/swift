@@ -51,8 +51,6 @@ IRGenModule::LinkInfo IRGenModule::getLinkInfo(NamedDecl *D) {
 /// Emit a global declaration.
 void IRGenModule::emitGlobalDecl(Decl *D) {
   switch (D->Kind) {
-  case DeclKind::Module:
-  case DeclKind::TranslationUnit:
   case DeclKind::Arg:
   case DeclKind::ElementRef:
     llvm_unreachable("cannot encounter this decl here");

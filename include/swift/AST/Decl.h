@@ -38,8 +38,6 @@ enum class DeclKind {
   // The indentation of the members of this enum describe the inheritance
   // hierarchy.  Commented out members are abstract classes.  This formation
   // allows for range checks in classof.
-  Module,
-    TranslationUnit,
   Import,
 //Named
     TypeAlias,
@@ -137,7 +135,7 @@ private:
   void operator delete(void *Data) throw() = delete;
   void *operator new(size_t Bytes, void *Mem) throw() = delete;
 public:
-  // Only allow allocation of Types using the allocator in ASTContext
+  // Only allow allocation of DeclVarNames using the allocator in ASTContext
   // or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = 8) throw();  
@@ -168,82 +166,10 @@ private:
   void operator delete(void *Data) throw() = delete;
   void *operator new(size_t Bytes, void *Mem) throw() = delete;
 public:
-  // Only allow allocation of Types using the allocator in ASTContext
+  // Only allow allocation of Decls using the allocator in ASTContext
   // or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = 8) throw();  
-};
-
-/// ModuleDecl - A unit of modularity.  The current translation unit
-/// is a module, as is an imported module.  Modules don't appear in
-/// arbitrary positions in an AST.
-class ModuleDecl : public Decl, public DeclContext {
-public:
-  ASTContext &Ctx;
-
-protected:
-  ModuleDecl(DeclKind Kind, ASTContext &Ctx)
-    : Decl(Kind, nullptr),
-      DeclContext(DeclContextKind::ModuleDecl, nullptr),
-      Ctx(Ctx) {
-  }
-
-public:
-  ModuleDecl(ASTContext &Ctx)
-    : Decl(DeclKind::Module, nullptr),
-      DeclContext(DeclContextKind::ModuleDecl, nullptr),
-      Ctx(Ctx) {
-  }
-
-  SMLoc getLocStart() const;
-
-  static bool classof(const Decl *D) {
-    return D->Kind == DeclKind::TranslationUnit ||
-           D->Kind == DeclKind::Module;
-  }
-  static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::ModuleDecl;
-  }
-  static bool classof(const ModuleDecl *D) { return true; }
-};
-  
-/// TranslationUnitDecl - This contains information about all of the decls and
-/// external references in a translation unit, which is one file.
-class TranslationUnitDecl : public ModuleDecl {
-public:
-  /// Body - This is a synthesized BraceStmt that holds the top level
-  /// expressions and declarations for a translation unit.
-  BraceStmt *Body;
-  
-  /// UnresolvedTypes - This is a list of types that were unresolved at the end
-  /// of the translation unit's parse phase.
-  ArrayRef<TypeAliasDecl*> UnresolvedTypesForParser;
-
-  /// UnresolvedScopedTypes - This is a list of scope-qualified types
-  /// that were unresolved at the end of the translation unit's parse
-  /// phase.
-  ArrayRef<std::pair<TypeAliasDecl*,TypeAliasDecl*> >
-    UnresolvedScopedTypesForParser;
-  
-  TranslationUnitDecl(ASTContext &C)
-    : ModuleDecl(DeclKind::TranslationUnit, C) {
-  }
-
-  SMLoc getLocStart() const;
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) {
-    return D->Kind == DeclKind::TranslationUnit;
-  }
-  static bool classof(const ModuleDecl *D) {
-    return D->Kind == DeclKind::TranslationUnit;
-  }
-  static bool classof(const DeclContext *DC) {
-    if (const ModuleDecl *M = dyn_cast<ModuleDecl>(DC))
-      return isa<TranslationUnitDecl>(M);
-    return false;
-  }
-  static bool classof(const TranslationUnitDecl *D) { return true; }
 };
 
 /// ImportDecl - This represents a single import declaration, e.g.:

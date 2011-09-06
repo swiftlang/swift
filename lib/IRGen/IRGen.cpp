@@ -49,13 +49,13 @@ static bool isBinaryOutput(OutputKind kind) {
   llvm_unreachable("bad output kind!");
 }
 
-void swift::performIRGeneration(TranslationUnitDecl *TU, ASTContext &Context,
+void swift::performIRGeneration(TranslationUnit *TU, ASTContext &Context,
                                 Options &Opts) {
   assert(!Context.hadError());
 
   // Create the module.
   LLVMContext LLVMContext;
-  Module Module(Opts.OutputFilename, LLVMContext);
+  llvm::Module Module(Opts.OutputFilename, LLVMContext);
   Module.setTargetTriple(Opts.Triple);
 
   std::string Error;
@@ -127,7 +127,7 @@ void swift::performIRGeneration(TranslationUnitDecl *TU, ASTContext &Context,
 
   // Run the function passes.
   FunctionPasses.doInitialization();
-  for (Module::iterator I = Module.begin(), E = Module.end(); I != E; ++I)
+  for (auto I = Module.begin(), E = Module.end(); I != E; ++I)
     if (!I->isDeclaration())
       FunctionPasses.run(*I);
   FunctionPasses.doFinalization();

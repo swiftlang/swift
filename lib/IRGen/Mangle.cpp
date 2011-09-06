@@ -16,6 +16,7 @@
 
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -74,7 +75,7 @@ static void mangleIdentifier(raw_ostream &buffer, Identifier ident) {
 
 static bool shouldMangle(NamedDecl *D) {
   // Everything not declared in global context needs to be mangled.
-  if (!isa<TranslationUnitDecl>(D->Context)) return true;
+  if (!isa<Module>(D->Context)) return true;
 
   // Don't mangle a function named main.
   if (isa<FuncDecl>(D) && D->Name.str() == "main")

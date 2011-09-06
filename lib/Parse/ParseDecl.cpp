@@ -23,13 +23,13 @@ using namespace swift;
 /// parseTranslationUnit - Main entrypoint for the parser.
 ///   translation-unit:
 ///     stmt-brace-item*
-TranslationUnitDecl *Parser::parseTranslationUnit() {
+TranslationUnit *Parser::parseTranslationUnit() {
   // Prime the lexer.
   consumeToken();
   SMLoc FileStartLoc = Tok.getLoc();
   
-  TranslationUnitDecl *TUD = new (Context) TranslationUnitDecl(Context);
-  CurDeclContext = TUD;
+  TranslationUnit *TU = new (Context) TranslationUnit(Context);
+  CurDeclContext = TU;
   
   // Parse the body of the file.
   SmallVector<ExprStmtOrDecl, 128> Items;
@@ -41,15 +41,15 @@ TranslationUnitDecl *Parser::parseTranslationUnit() {
   // First thing, we transform the body into a brace expression.
   ExprStmtOrDecl *NewElements = 
     Context.AllocateCopy<ExprStmtOrDecl>(Items.begin(), Items.end());
-  TUD->Body = new (Context) BraceStmt(FileStartLoc, NewElements, Items.size(),
-                                      FileEnd);
+  TU->Body = new (Context) BraceStmt(FileStartLoc, NewElements, Items.size(),
+                                     FileEnd);
     
   // Do a prepass over the declarations to make sure they have basic sanity and
   // to find the list of top-level value declarations.
-  for (unsigned i = 0, e = TUD->Body->NumElements; i != e; ++i) {
-    if (!TUD->Body->Elements[i].is<Decl*>()) continue;
+  for (unsigned i = 0, e = TU->Body->NumElements; i != e; ++i) {
+    if (!TU->Body->Elements[i].is<Decl*>()) continue;
     
-    Decl *D = TUD->Body->Elements[i].get<Decl*>();
+    Decl *D = TU->Body->Elements[i].get<Decl*>();
     
     // If any top-level value decl has an unresolved type, then it is erroneous.
     // It is not valid to have something like "var x = 4" at the top level, all
@@ -77,10 +77,10 @@ TranslationUnitDecl *Parser::parseTranslationUnit() {
       UnresolvedTypeList.push_back(Decl);
   }
   
-  TUD->UnresolvedTypesForParser = Context.AllocateCopy(UnresolvedTypeList);
-  TUD->UnresolvedScopedTypesForParser =
+  TU->UnresolvedTypesForParser = Context.AllocateCopy(UnresolvedTypeList);
+  TU->UnresolvedScopedTypesForParser =
     Context.AllocateCopy(ScopeInfo.getUnresolvedScopedTypeList());
-  return TUD;
+  return TU;
 }
 
 /// parseAttribute

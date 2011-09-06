@@ -128,7 +128,7 @@ public:
   //===--------------------------------------------------------------------===//
   // Decl Parsing
   
-  TranslationUnitDecl *parseTranslationUnit();
+  TranslationUnit *parseTranslationUnit();
   TypeAliasDecl *parseDeclTypeAlias();
   void parseAttributeList(DeclAttributes &Attributes) {
     if (Tok.is(tok::l_square))

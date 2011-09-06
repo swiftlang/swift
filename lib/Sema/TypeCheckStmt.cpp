@@ -156,13 +156,13 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 /// walks the AST to resolve types and diagnose problems therein.
 ///
 /// FIXME: This should be moved out to somewhere else.
-void swift::performTypeChecking(TranslationUnitDecl *TUD, ASTContext &Ctx) {
+void swift::performTypeChecking(TranslationUnit *TU, ASTContext &Ctx) {
   TypeChecker TC(Ctx);
   
   // Find all the FuncExprs in the translation unit.
   std::vector<FuncExpr*> FuncExprs;
   auto FuncExprsP = &FuncExprs;            // Blocks are annoying.
-  TUD->Body->walk(^(Expr *E, WalkOrder Order) {
+  TU->Body->walk(^(Expr *E, WalkOrder Order) {
     if (Order == WalkOrder::PreOrder)
       if (FuncExpr *FE = dyn_cast<FuncExpr>(E))
         FuncExprsP->push_back(FE);
@@ -171,7 +171,7 @@ void swift::performTypeChecking(TranslationUnitDecl *TUD, ASTContext &Ctx) {
 
   // Type check the top-level BraceExpr.  This sorts out any top-level
   // expressions and variable decls.
-  StmtChecker(TC, 0).typeCheckStmt(TUD->Body);
+  StmtChecker(TC, 0).typeCheckStmt(TU->Body);
 
   // Type check the body of each of the FuncExpr in turn.
   for (FuncExpr *FE : FuncExprs) {

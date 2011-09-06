@@ -20,6 +20,7 @@
 #include "ASTContext.h"
 #include "Decl.h"
 #include "Expr.h"
+#include "Module.h"
 #include "Stmt.h"
 #include "Types.h"
 

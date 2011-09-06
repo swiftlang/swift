@@ -23,8 +23,8 @@
 using namespace swift;
   
 /// parseTranslationUnit - Entrypoint for the parser.
-TranslationUnitDecl *swift::parseTranslationUnit(unsigned BufferID,
-                                                 ASTContext &Ctx) {
+TranslationUnit *swift::parseTranslationUnit(unsigned BufferID,
+                                             ASTContext &Ctx) {
   return Parser(BufferID, Ctx).parseTranslationUnit();  
 }
   

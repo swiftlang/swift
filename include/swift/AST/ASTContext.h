@@ -35,7 +35,7 @@ namespace swift {
   class FunctionType;
   class ArrayType;
   class Identifier;
-  class ModuleDecl;
+  class Module;
   class TupleTypeElt;
   class OneOfElementDecl;
 
@@ -61,7 +61,7 @@ public:
   llvm::SourceMgr &SourceMgr;
 
   /// BuiltinModule - The builtin module.
-  ModuleDecl * const BuiltinModule;
+  Module * const BuiltinModule;
 
   /// Allocate - Allocate memory from the ASTContext bump pointer.
   void *Allocate(unsigned long Bytes, unsigned Alignment);

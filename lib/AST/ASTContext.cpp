@@ -40,7 +40,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
     FunctionTypes(new FunctionTypesMapTy()),
     ArrayTypes(new ArrayTypesMapTy()),
     SourceMgr(sourcemgr),
-    BuiltinModule(new (*this) ModuleDecl(*this)),
+    BuiltinModule(new (*this) Module(*this)),
     TheErrorType(new (*this) ErrorType()),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheDependentType(new (*this) DependentType()),

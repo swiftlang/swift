@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Types.h"
@@ -24,8 +25,8 @@ using namespace swift;
 /// getASTContext - Return the ASTContext for a specified DeclContetx by
 /// walking up to the translation unit and returning its ASTContext.
 ASTContext &DeclContext::getASTContext() {
-  if (TranslationUnitDecl *TUD = dyn_cast<TranslationUnitDecl>(this))
-    return TUD->Ctx;
+  if (Module *M = dyn_cast<Module>(this))
+    return M->Ctx;
   
   return getParent()->getASTContext();
 }
@@ -42,22 +43,15 @@ void *Decl::operator new(size_t Bytes, ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
-SMLoc ModuleDecl::getLocStart() const {
-  if (const TranslationUnitDecl *TU = dyn_cast<TranslationUnitDecl>(this))
-    return TU->getLocStart();
-  return SMLoc();
-}
-
-SMLoc TranslationUnitDecl::getLocStart() const {
-  return Body ? Body->getLocStart() : SMLoc();
+// Only allow allocation of Modules using the allocator in ASTContext.
+void *Module::operator new(size_t Bytes, ASTContext &C,
+                           unsigned Alignment) throw() {
+  return C.Allocate(Bytes, Alignment);
 }
 
 
 SMLoc Decl::getLocStart() const {
   switch (Kind) {
-  case DeclKind::Module:     return cast<ModuleDecl>(this)->getLocStart();
-  case DeclKind::TranslationUnit:
-    return cast<TranslationUnitDecl>(this)->getLocStart();
   case DeclKind::Import: return cast<ImportDecl>(this)->getLocStart();
   case DeclKind::TypeAlias:  return cast<TypeAliasDecl>(this)->getLocStart(); 
   case DeclKind::Var:        return cast<VarDecl>(this)->getLocStart();
@@ -137,18 +131,6 @@ namespace {
       OS.indent(Indent) << "(" << Name;
     }
 
-    void visitTranslationUnitDecl(TranslationUnitDecl *TUD) {
-      printCommon(TUD, "translation_unit");
-      OS << '\n';
-      if (TUD->Body)
-        printRec(TUD->Body);
-      else
-        OS.indent(Indent+2) << "(null body!)";
-      OS << ')';
-    }
-
-    void visitModuleDecl(ModuleDecl *MD) {}
-
     void visitImportDecl(ImportDecl *ID) {
       printCommon(ID, "import_decl");
       OS << " '" << ID->AccessPath[0].first;
@@ -187,6 +169,16 @@ namespace {
         OS << '\n';
         printRec(VD->Init);
       }
+    }
+
+
+    void visitTranslationUnit(const TranslationUnit *TU) {
+      OS.indent(Indent) << "(translation_unit\n";
+      if (TU->Body)
+        printRec(TU->Body);
+      else
+        OS.indent(Indent+2) << "(null body!)";
+      OS << ')';
     }
     
     
@@ -232,5 +224,10 @@ void Decl::print(raw_ostream &OS, unsigned Indent) const {
 
 void Decl::dump() const {
   print(llvm::errs());
+  llvm::errs() << '\n';
+}
+
+void TranslationUnit::dump() const {
+  PrintDecl(llvm::errs(), 0).visitTranslationUnit(this);
   llvm::errs() << '\n';
 }

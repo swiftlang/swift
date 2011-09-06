@@ -50,13 +50,13 @@ namespace {
   /// fully-loaded module.
   class InMemoryModule : public ModuleProvider {
     // FIXME: A module can be more than one translation unit eventually.
-    TranslationUnitDecl *TUD;
+    TranslationUnit *TU;
     
     llvm::DenseMap<Identifier, llvm::TinyPtrVector<ValueDecl*>> TopLevelValues;
     llvm::DenseMap<Identifier, TypeAliasDecl *> TopLevelTypes;
 
   public:
-    InMemoryModule(TranslationUnitDecl *tud) : TUD(tud) {}
+    InMemoryModule(TranslationUnit *tu) : TU(tu) {}
     ~InMemoryModule() {
       // Nothing to destroy here, TU is ASTContext allocated.
     }
@@ -100,8 +100,8 @@ TypeAliasDecl *InMemoryModule::lookupType(ImportDecl *ID, Identifier Name,
     return 0;
   
   if (TopLevelTypes.empty()) {
-    for (unsigned i = 0, e = TUD->Body->NumElements; i != e; ++i)
-      if (Decl *D = TUD->Body->Elements[i].dyn_cast<Decl*>())
+    for (unsigned i = 0, e = TU->Body->NumElements; i != e; ++i)
+      if (Decl *D = TU->Body->Elements[i].dyn_cast<Decl*>())
         if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D))
           if (!TAD->Name.empty())
             TopLevelTypes[TAD->Name] = TAD;
@@ -127,8 +127,8 @@ void InMemoryModule::lookupValue(ImportDecl *ID, Identifier Name,
     
   // If we haven't built a map of the top-level values, do so now.
   if (TopLevelValues.empty()) {
-    for (unsigned i = 0, e = TUD->Body->NumElements; i != e; ++i)
-      if (Decl *D = TUD->Body->Elements[i].dyn_cast<Decl*>())
+    for (unsigned i = 0, e = TU->Body->NumElements; i != e; ++i)
+      if (Decl *D = TU->Body->Elements[i].dyn_cast<Decl*>())
         if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
           if (!VD->Name.empty())
             TopLevelValues[VD->Name].push_back(VD);
@@ -257,16 +257,16 @@ getModuleProvider(std::pair<Identifier, SMLoc> ModuleID) {
 
   // Parse the translation unit, but don't do name binding or type checking.
   // This can produce new errors etc if the input is erroneous.
-  TranslationUnitDecl *TUD = parseTranslationUnit(BufferID, Context);
-  if (TUD == 0)
+  TranslationUnit *TU = parseTranslationUnit(BufferID, Context);
+  if (TU == 0)
     return 0;
   
   // We have to do name binding on it to ensure that types are fully resolved.
   // This should eventually be eliminated by having actual fully resolved binary
   // dumps of the code instead of reparsing though.
-  performNameBinding(TUD, Context);
+  performNameBinding(TU, Context);
   
-  ModuleProvider *MP = new InMemoryModule(TUD);
+  ModuleProvider *MP = new InMemoryModule(TU);
   LoadedModules.push_back(MP);
   return MP;
 }
@@ -466,7 +466,7 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
 /// At this parsing has been performed, but we still have UnresolvedDeclRefExpr
 /// nodes for unresolved value names, and we may have unresolved type names as
 /// well.  This handles import directives and forward references.
-void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
+void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
   NameBinder Binder(Ctx);
 
   std::pair<Identifier,SMLoc> BuiltinPath[] {
@@ -477,8 +477,8 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
   
   // Do a prepass over the declarations to find the list of top-level value
   // declarations.
-  for (unsigned i = 0, e = TUD->Body->NumElements; i != e; ++i)
-    if (Decl *D = TUD->Body->Elements[i].dyn_cast<Decl*>()) {
+  for (unsigned i = 0, e = TU->Body->NumElements; i != e; ++i)
+    if (Decl *D = TU->Body->Elements[i].dyn_cast<Decl*>()) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
         if (!VD->Name.empty())
           Binder.addNamedTopLevelDecl(VD);
@@ -489,7 +489,7 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
   
   // Type binding.  Loop over all of the unresolved types in the translation
   // unit, resolving them with imports.
-  for (TypeAliasDecl *TA : TUD->UnresolvedTypesForParser) {
+  for (TypeAliasDecl *TA : TU->UnresolvedTypesForParser) {
     if (TypeAliasDecl *Result = Binder.lookupTypeName(TA->Name)) {
       assert(TA->UnderlyingTy.isNull() && "Not an unresolved type");
       // Update the decl we already have to be the correct type.
@@ -506,7 +506,7 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
 
   // Loop over all the unresolved scoped types in the translation
   // unit, resolving them if possible.
-  for (auto BaseAndType : TUD->UnresolvedScopedTypesForParser) {
+  for (auto BaseAndType : TU->UnresolvedScopedTypesForParser) {
     BoundScope Scope = Binder.bindScopeName(BaseAndType.first,
                                             BaseAndType.first->Name,
                                             BaseAndType.first->TypeAliasLoc);
@@ -537,8 +537,8 @@ void swift::performNameBinding(TranslationUnitDecl *TUD, ASTContext &Ctx) {
   
   // Now that we know the top-level value names, go through and resolve any
   // UnresolvedDeclRefExprs that exist.
-  for (unsigned i = 0, e = TUD->Body->NumElements; i != e; ++i) {
-    BraceStmt::ExprStmtOrDecl &Elt = TUD->Body->Elements[i];
+  for (unsigned i = 0, e = TU->Body->NumElements; i != e; ++i) {
+    BraceStmt::ExprStmtOrDecl &Elt = TU->Body->Elements[i];
     if (Decl *D = Elt.dyn_cast<Decl*>()) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
         if (VD->Init)

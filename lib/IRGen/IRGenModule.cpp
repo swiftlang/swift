@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
 #include "llvm/Module.h"
 #include "llvm/Type.h"
@@ -58,7 +58,7 @@ void IRGenModule::emitTopLevel(BraceStmt *Body) {
 }
 
 /// Emit all the top-level code in the translation unit.
-void IRGenModule::emitTranslationUnit(TranslationUnitDecl *TU) {
+void IRGenModule::emitTranslationUnit(TranslationUnit *TU) {
   // The semantics of the top-level BraceStmt are a bit different from
   // the normal semantics.
   emitTopLevel(TU->Body);

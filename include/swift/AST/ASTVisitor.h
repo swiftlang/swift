@@ -40,8 +40,6 @@ public:
   return static_cast<ImplClass*>(this)->visit ## CLASS ## \
     Decl(static_cast<CLASS##Decl*>(D))
 
-      DISPATCH(Module);
-      DISPATCH(TranslationUnit);
       DISPATCH(Import);
       DISPATCH(TypeAlias);
       DISPATCH(Var);

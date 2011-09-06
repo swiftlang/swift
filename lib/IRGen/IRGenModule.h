@@ -40,7 +40,7 @@ namespace swift {
   class Decl;
   class FuncDecl;
   class NamedDecl;
-  class TranslationUnitDecl;
+  class TranslationUnit;
   class Type;
   class VarDecl;
 
@@ -99,7 +99,7 @@ public:
 
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }
 
-  void emitTranslationUnit(TranslationUnitDecl *TU);
+  void emitTranslationUnit(TranslationUnit *TU);
   llvm::GlobalVariable *getAddrOfGlobalVariable(VarDecl *D);
   llvm::Function *getAddrOfGlobalFunction(FuncDecl *D);
 };

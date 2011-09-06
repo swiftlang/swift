@@ -38,14 +38,6 @@ public:
   // Visit Methods.
   //===--------------------------------------------------------------------===//
 
-  void visitModuleDecl(ModuleDecl *MD) {
-    // Nothing to do.
-  }
-  
-  void visitTranslationUnitDecl(TranslationUnitDecl *TUD) {
-    // Nothing to do.
-  }
-  
   void visitImportDecl(ImportDecl *ID) {
     // Nothing to do.
   }
