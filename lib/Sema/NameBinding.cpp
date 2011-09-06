@@ -76,6 +76,11 @@ namespace {
   /// An implementation of ModuleProvider for builtin types and functions.
   class BuiltinModule : public ModuleProvider {
     ASTContext &Context;
+
+    /// The cache of identifiers we've already looked up.  We use a
+    /// single hashtable for both types and values as a minor
+    /// optimization; this prevents us from having both a builtin type
+    /// and a builtin value with the same name, but that's okay.
     llvm::DenseMap<Identifier, NamedDecl*> Cache;
   public:
     BuiltinModule(ASTContext &Context) : Context(Context) {}
