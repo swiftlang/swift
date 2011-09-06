@@ -33,10 +33,14 @@ bool Parser::parseType(Type &Result) {
 ///     type-simple '->' type 
 ///
 ///   type-simple:
-///     identifier
+///     type-identifier
 ///     type-tuple
 ///     type-oneof
 ///     type-protocol
+///
+///   type-identifier:
+///     identifier
+///     scope-qualifier identifier
 ///
 bool Parser::parseType(Type &Result, const Twine &Message) {
   // Parse type-simple first.

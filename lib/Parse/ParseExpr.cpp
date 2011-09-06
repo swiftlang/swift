@@ -316,7 +316,7 @@ Expr *Parser::parseExprOperator() {
 ///
 ///   expr-identifier:
 ///     identifier
-///     identifier '::' identifier
+///     scope-qualifier identifier
 ParseResult<Expr> Parser::parseExprIdentifier() {
   assert(Tok.is(tok::identifier));
   SMLoc Loc = Tok.getLoc();
