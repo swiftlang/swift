@@ -32,11 +32,7 @@ enum class tok {
   numeric_constant,
   
 #define KEYWORD(X) kw_ ## X,
-  // Types.  No uint version should be added here, these should always be
-  // wrapped with UDT's that have the operations.  These correspond to LLVM IR
-  // types.
-
-  // Deck and type keywords.
+  // Decl and type keywords.
   KEYWORD(import)
   KEYWORD(func)
   KEYWORD(oneof)
