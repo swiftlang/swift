@@ -35,15 +35,25 @@ namespace swift {
   class TypeAliasDecl;
   
 enum class DeclKind {
-  TranslationUnit,
+  // The indentation of the members of this enum describe the inheritance
+  // hierarchy.  Commented out members are abstract classes.  This formation
+  // allows for range checks in classof.
   Module,
+    TranslationUnit,
   Import,
-  TypeAlias,
-  Var,
-  Func,
-  OneOfElement,
-  Arg,
-  ElementRef
+//Named
+    TypeAlias,
+  //Value
+      Var,
+      Func,
+      OneOfElement,
+      Arg,
+      ElementRef,
+  
+  FirstNamed = TypeAlias,
+  LastNamed = ElementRef,
+  FirstValue = Var,
+  LastValue = ElementRef
 };
   
 /// DeclAttributes - These are attributes that may be applied to declarations.
@@ -96,8 +106,7 @@ public:
     : LPLoc(NameLoc), RPLoc(NameLoc), Name(Name.getAsOpaquePointer()) { }
   
   DeclVarName(SMLoc LPLoc, ArrayRef<DeclVarName *> Elements, SMLoc RPLoc)
-    : LPLoc(LPLoc), RPLoc(RPLoc) 
-  {
+    : LPLoc(LPLoc), RPLoc(RPLoc) {
     this->Elements.Start = Elements.data();
     this->Elements.Length = Elements.size();
   }
@@ -268,21 +277,7 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    switch (D->Kind) {
-    case DeclKind::Var:
-    case DeclKind::Func:
-    case DeclKind::OneOfElement:
-    case DeclKind::Arg:
-    case DeclKind::ElementRef:
-    case DeclKind::TypeAlias:
-      return true;
-
-    case DeclKind::Module:
-    case DeclKind::TranslationUnit:
-    case DeclKind::Import:
-      return false;
-    }
-    llvm_unreachable("bad decl kind");
+    return D->Kind >= DeclKind::FirstNamed && D->Kind <= DeclKind::LastNamed;
   }
   static bool classof(const NamedDecl *D) { return true; }
   
@@ -331,10 +326,7 @@ public:
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return (D->Kind == DeclKind::Var || D->Kind == DeclKind::Func ||
-            D->Kind == DeclKind::OneOfElement ||
-            D->Kind == DeclKind::Arg ||
-            D->Kind == DeclKind::ElementRef);
+    return D->Kind >= DeclKind::FirstValue && D->Kind <= DeclKind::LastValue;
   }
   static bool classof(const ValueDecl *D) { return true; }
 
