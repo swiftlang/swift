@@ -24,8 +24,6 @@
 namespace llvm {
   class BumpPtrAllocator;
   class SourceMgr;
-  template <typename T> class FoldingSet;
-  template <typename T> class ArrayRef;
 }
 
 namespace swift {
@@ -62,6 +60,9 @@ public:
 
   /// BuiltinModule - The builtin module.
   Module * const BuiltinModule;
+
+  /// ImportSearchPaths - The paths to search for imports in.
+  ArrayRef<StringRef> ImportSearchPaths;
 
   /// Allocate - Allocate memory from the ASTContext bump pointer.
   void *Allocate(unsigned long Bytes, unsigned Alignment);

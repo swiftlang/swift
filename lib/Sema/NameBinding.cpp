@@ -237,6 +237,14 @@ llvm::error_code NameBinder::findModule(StringRef Module,
   if (!Err)
     return Err;
 
+  for (auto Path : Context.ImportSearchPaths) {
+    llvm::SmallString<128> InputFilename(Path);
+    llvm::sys::path::append(InputFilename, ModuleFilename);
+    Err = llvm::MemoryBuffer::getFile(InputFilename, Buffer);
+    if (!Err)
+      return Err;    
+  }
+
   // FIXME: Search in the include directories.
   return Err;
 }
