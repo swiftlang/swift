@@ -47,9 +47,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/Types.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/Types.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
 #include "llvm/Target/TargetData.h"
@@ -283,8 +286,95 @@ static void emitExpanded(IRGenFunction &IGF, Expr *Arg, ArgList &Args) {
   emitArg(IGF, Arg, Args);
 }
 
+/// emitBuiltinCall - Emit a call to a builtin function.
+static RValue emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn, Expr *Arg,
+                              const TypeInfo &ResultInfo) {
+  assert(ResultInfo.getSchema().isScalar() && "builtin type with agg return");
+
+  // Emit the arguments.  Maybe we'll get builtins that are more
+  // complex than this.
+  ArgList Args;
+  emitExpanded(IGF, Arg, Args);
+
+  BuiltinTypeKind TypeArg;
+  switch (isBuiltinValue(Fn->Name.str(), TypeArg)) {
+  case BuiltinValueKind::None: llvm_unreachable("not a builtin after all!");
+
+/// A macro which expands to the emission of a simple unary operation
+/// or predicate.
+#define UNARY_OPERATION(Op)                                                 \
+    assert(Args.Values.size() == 1 && "wrong operands to unary operation"); \
+    return RValue::forScalars(IGF.Builder.Create##Op(Args.Values[0]));      \
+
+/// A macro which expands to the emission of a simple binary operation
+/// or predicate.
+#define BINARY_OPERATION(Op)                                                \
+    assert(Args.Values.size() == 2 && "wrong operands to binary operation");\
+    return RValue::forScalars(IGF.Builder.Create##Op(Args.Values[0],        \
+                                                     Args.Values[1]));      \
+
+/// A macro which expands to the emission of a simple binary operation
+/// or predicate defined over both floating-point and integer types.
+#define BINARY_ARITHMETIC_OPERATION(IntOp, FPOp)                            \
+    assert(Args.Values.size() == 2 && "wrong operands to binary operation");\
+    if (Args.Values[0]->getType()->isFloatingPointTy()) {                   \
+      return RValue::forScalars(IGF.Builder.Create##FPOp(Args.Values[0],    \
+                                                         Args.Values[1]));  \
+    } else {                                                                \
+      return RValue::forScalars(IGF.Builder.Create##IntOp(Args.Values[0],   \
+                                                          Args.Values[1])); \
+    }
+
+  case BuiltinValueKind::Neg:       UNARY_OPERATION(Neg)
+  case BuiltinValueKind::Not:       UNARY_OPERATION(Not)
+  case BuiltinValueKind::Add:       BINARY_ARITHMETIC_OPERATION(Add, FAdd)
+  case BuiltinValueKind::And:       BINARY_OPERATION(And)
+  case BuiltinValueKind::FDiv:      BINARY_OPERATION(FDiv)
+  case BuiltinValueKind::Mul:       BINARY_ARITHMETIC_OPERATION(Mul, FMul)
+  case BuiltinValueKind::Or:        BINARY_OPERATION(Or)
+  case BuiltinValueKind::SDiv:      BINARY_OPERATION(SDiv)
+  case BuiltinValueKind::SDivExact: BINARY_OPERATION(ExactSDiv)
+  case BuiltinValueKind::SRem:      BINARY_OPERATION(SRem)
+  case BuiltinValueKind::Sub:       BINARY_ARITHMETIC_OPERATION(Sub, FSub)
+  case BuiltinValueKind::UDiv:      BINARY_OPERATION(UDiv)
+  case BuiltinValueKind::UDivExact: BINARY_OPERATION(ExactUDiv)
+  case BuiltinValueKind::URem:      BINARY_OPERATION(URem)
+  case BuiltinValueKind::Xor:       BINARY_OPERATION(Xor)
+  case BuiltinValueKind::CmpEQ:     BINARY_OPERATION(ICmpEQ)
+  case BuiltinValueKind::CmpNE:     BINARY_OPERATION(ICmpNE)
+  case BuiltinValueKind::CmpSLE:    BINARY_OPERATION(ICmpSLE)
+  case BuiltinValueKind::CmpSLT:    BINARY_OPERATION(ICmpSLT)
+  case BuiltinValueKind::CmpSGE:    BINARY_OPERATION(ICmpSGE)
+  case BuiltinValueKind::CmpSGT:    BINARY_OPERATION(ICmpSGT)
+  case BuiltinValueKind::CmpULE:    BINARY_OPERATION(ICmpULE)
+  case BuiltinValueKind::CmpULT:    BINARY_OPERATION(ICmpULT)
+  case BuiltinValueKind::CmpUGE:    BINARY_OPERATION(ICmpUGE)
+  case BuiltinValueKind::CmpUGT:    BINARY_OPERATION(ICmpUGT)
+  case BuiltinValueKind::FCmpOEQ:   BINARY_OPERATION(FCmpOEQ)
+  case BuiltinValueKind::FCmpOGT:   BINARY_OPERATION(FCmpOGT)
+  case BuiltinValueKind::FCmpOGE:   BINARY_OPERATION(FCmpOGE)
+  case BuiltinValueKind::FCmpOLT:   BINARY_OPERATION(FCmpOLT)
+  case BuiltinValueKind::FCmpOLE:   BINARY_OPERATION(FCmpOLE)
+  case BuiltinValueKind::FCmpONE:   BINARY_OPERATION(FCmpONE)
+  case BuiltinValueKind::FCmpORD:   BINARY_OPERATION(FCmpORD)
+  case BuiltinValueKind::FCmpUEQ:   BINARY_OPERATION(FCmpUEQ)
+  case BuiltinValueKind::FCmpUGT:   BINARY_OPERATION(FCmpUGT)
+  case BuiltinValueKind::FCmpUGE:   BINARY_OPERATION(FCmpUGE)
+  case BuiltinValueKind::FCmpULT:   BINARY_OPERATION(FCmpULT)
+  case BuiltinValueKind::FCmpULE:   BINARY_OPERATION(FCmpULE)
+  case BuiltinValueKind::FCmpUNE:   BINARY_OPERATION(FCmpUNE)
+  case BuiltinValueKind::FCmpUNO:   BINARY_OPERATION(FCmpUNO)
+  }
+  llvm_unreachable("bad builtin kind!");
+}
+
 /// Emit a function call.
 RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &ResultInfo) {
+  // Check for a call to a builtin.
+  if (ValueDecl *Fn = E->getCalledValue())
+    if (Fn->Context == IGM.Context.BuiltinModule)
+      return emitBuiltinCall(*this, cast<FuncDecl>(Fn), E->Arg, ResultInfo);
+
   const FuncTypeInfo &FnInfo =
     static_cast<const FuncTypeInfo &>(IGM.getFragileTypeInfo(E->Fn->Ty));
 

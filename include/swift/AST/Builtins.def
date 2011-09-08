@@ -1,0 +1,79 @@
+//===--- Builtins.def - Builtins Macro Metaprogramming Database -*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines the database of builtin functions.
+//
+// BUILTIN(Id, Name)
+//   - Id is an identifier suitable for use in C++
+//   - Name is a string literal for the name to which the builtin should be
+//     bound in Swift
+//
+//===----------------------------------------------------------------------===//
+
+/// Unary operations have type T -> T.
+#ifndef BUILTIN_UNARY_OPERATION
+#define BUILTIN_UNARY_OPERATION(Id, Name, Overload) BUILTIN(Id, Name)
+#endif
+BUILTIN_UNARY_OPERATION(Neg,      "neg",      OverloadedBuiltinKind::Arithmetic)
+BUILTIN_UNARY_OPERATION(Not,      "not",      OverloadedBuiltinKind::Integer)
+#undef BUILTIN_UNARY_OPERATION
+
+/// Binary operations have type (T,T) -> T.
+#ifndef BUILTIN_BINARY_OPERATION
+#define BUILTIN_BINARY_OPERATION(Id, Name, Overload) BUILTIN(Id, Name)
+#endif
+BUILTIN_BINARY_OPERATION(Add,     "add",      OverloadedBuiltinKind::Arithmetic)
+BUILTIN_BINARY_OPERATION(And,     "and",      OverloadedBuiltinKind::Integer)
+BUILTIN_BINARY_OPERATION(Or,      "or",       OverloadedBuiltinKind::Integer)
+BUILTIN_BINARY_OPERATION(FDiv,    "fdiv",     OverloadedBuiltinKind::Float)
+BUILTIN_BINARY_OPERATION(Mul,     "mul",      OverloadedBuiltinKind::Arithmetic)
+BUILTIN_BINARY_OPERATION(SDiv,    "sdiv",     OverloadedBuiltinKind::Integer)
+BUILTIN_BINARY_OPERATION(SDivExact, "sdiv_exact", OverloadedBuiltinKind::Integer)
+BUILTIN_BINARY_OPERATION(SRem,    "srem",     OverloadedBuiltinKind::Integer)
+BUILTIN_BINARY_OPERATION(Sub,     "sub",      OverloadedBuiltinKind::Arithmetic)
+BUILTIN_BINARY_OPERATION(UDiv,    "udiv",     OverloadedBuiltinKind::Integer)
+BUILTIN_BINARY_OPERATION(UDivExact, "udiv_exact", OverloadedBuiltinKind::Integer)
+BUILTIN_BINARY_OPERATION(URem,    "urem",     OverloadedBuiltinKind::Integer)
+BUILTIN_BINARY_OPERATION(Xor,     "xor",      OverloadedBuiltinKind::Integer)
+#undef BUILTIN_BINARY_OPERATION
+
+/// Binary predicates have type (T,T) -> i1
+#ifndef BUILTIN_BINARY_PREDICATE
+#define BUILTIN_BINARY_PREDICATE(Id, Name, Overload) BUILTIN(Id, Name)
+#endif
+BUILTIN_BINARY_PREDICATE(CmpEQ,   "cmp_eq",   OverloadedBuiltinKind::Integer)
+BUILTIN_BINARY_PREDICATE(CmpNE,   "cmp_ne",   OverloadedBuiltinKind::Integer)
+BUILTIN_BINARY_PREDICATE(CmpSLE,  "cmp_sle",  OverloadedBuiltinKind::Integer)
+BUILTIN_BINARY_PREDICATE(CmpSLT,  "cmp_slt",  OverloadedBuiltinKind::Integer)
+BUILTIN_BINARY_PREDICATE(CmpSGE,  "cmp_sge",  OverloadedBuiltinKind::Integer)
+BUILTIN_BINARY_PREDICATE(CmpSGT,  "cmp_sgt",  OverloadedBuiltinKind::Integer)
+BUILTIN_BINARY_PREDICATE(CmpULE,  "cmp_ule",  OverloadedBuiltinKind::Integer)
+BUILTIN_BINARY_PREDICATE(CmpULT,  "cmp_ult",  OverloadedBuiltinKind::Integer)
+BUILTIN_BINARY_PREDICATE(CmpUGE,  "cmp_uge",  OverloadedBuiltinKind::Integer)
+BUILTIN_BINARY_PREDICATE(CmpUGT,  "cmp_ugt",  OverloadedBuiltinKind::Integer)
+BUILTIN_BINARY_PREDICATE(FCmpOEQ, "fcmp_oeq", OverloadedBuiltinKind::Float)
+BUILTIN_BINARY_PREDICATE(FCmpOGT, "fcmp_ogt", OverloadedBuiltinKind::Float)
+BUILTIN_BINARY_PREDICATE(FCmpOGE, "fcmp_oge", OverloadedBuiltinKind::Float)
+BUILTIN_BINARY_PREDICATE(FCmpOLT, "fcmp_olt", OverloadedBuiltinKind::Float)
+BUILTIN_BINARY_PREDICATE(FCmpOLE, "fcmp_ole", OverloadedBuiltinKind::Float)
+BUILTIN_BINARY_PREDICATE(FCmpONE, "fcmp_one", OverloadedBuiltinKind::Float)
+BUILTIN_BINARY_PREDICATE(FCmpORD, "fcmp_ord", OverloadedBuiltinKind::Float)
+BUILTIN_BINARY_PREDICATE(FCmpUEQ, "fcmp_ueq", OverloadedBuiltinKind::Float)
+BUILTIN_BINARY_PREDICATE(FCmpUGT, "fcmp_ugt", OverloadedBuiltinKind::Float)
+BUILTIN_BINARY_PREDICATE(FCmpUGE, "fcmp_uge", OverloadedBuiltinKind::Float)
+BUILTIN_BINARY_PREDICATE(FCmpULT, "fcmp_ult", OverloadedBuiltinKind::Float)
+BUILTIN_BINARY_PREDICATE(FCmpULE, "fcmp_ule", OverloadedBuiltinKind::Float)
+BUILTIN_BINARY_PREDICATE(FCmpUNE, "fcmp_une", OverloadedBuiltinKind::Float)
+BUILTIN_BINARY_PREDICATE(FCmpUNO, "fcmp_uno", OverloadedBuiltinKind::Float)
+#undef BUILTIN_BINARY_PREDICATE
+
+#undef BUILTIN

@@ -97,6 +97,21 @@ uint64_t IntegerLiteralExpr::getValue() const {
   return IntVal;
 }
 
+static ValueDecl *getCalledValue(Expr *E) {
+  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
+    return DRE->D;
+
+  if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
+    if (TE->isGroupingParen())
+      return getCalledValue(TE->SubExprs[0]);
+
+  return nullptr;
+}
+
+ValueDecl *ApplyExpr::getCalledValue() const {
+  return ::getCalledValue(Fn);
+}
+
 //===----------------------------------------------------------------------===//
 //  Type Conversion Ranking
 //===----------------------------------------------------------------------===//

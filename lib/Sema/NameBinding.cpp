@@ -16,6 +16,7 @@
 
 #include "swift/Subsystems.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/Builtins.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -24,7 +25,6 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/system_error.h"
 #include "llvm/Support/Path.h"
-#include "Builtin.h"
 using namespace swift;
 
 /// NLKind - This is the kind of name lookup we're performing.
@@ -450,7 +450,7 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
     } else {
       Import *Module = Scope.get<Import*>();
       Module->second->lookupValue(Module->first, Name, Decls,
-                                  NLKind::UnqualifiedLookup);
+                                  NLKind::QualifiedLookup);
     }
 
   // Otherwise, not something that needs name binding.
