@@ -14,11 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/Module.h"
-#include "swift/AST/Types.h"
+#include "swift/AST/AST.h"
 #include "llvm/ADT/StringSwitch.h"
 using namespace swift;
 

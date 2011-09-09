@@ -26,6 +26,7 @@ namespace llvm {
 
 namespace swift {
   class ASTContext;
+  class Identifier;
   class Type;
   class ValueDecl;
 
