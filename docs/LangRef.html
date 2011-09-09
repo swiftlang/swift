@@ -241,10 +241,6 @@
   <p>These are the builtin keywords.  Swift intentionally tries to reduce the
      number of keywords where possible.</p>
 
-  <p>FIXME: __ should be considered the compiler/languages reserved namespace,
-  any use of an unknown identifier here should be an error.</p>
-
-  
   <!-- ===================================================================== -->
   <h3 id="numeric_constant">Numeric Constant</h3>
   <!-- ===================================================================== -->
@@ -713,42 +709,6 @@
   <p>
   FIXME: Why is array a type instead of type-simple?
   </p>
-
-  <!-- ===================================================================== -->
-  <h3 id="type-builtin">Builtin Primitive Integer Types</h3>
-  <!-- ===================================================================== -->
-
-  <p>The <a href="#builtin"><tt>Builtin</tt></a> module has the following
-  type members:</p>
-
-  <ul>
-    <li><tt>int1</tt></li>
-    <li><tt>int8</tt></li>
-    <li><tt>int16</tt></li>
-    <li><tt>int32</tt></li>
-    <li><tt>int64</tt></li>
-  </ul>
-
-  <p>These types specify a storage, but they have no semantics
-  assigned to them (e.g. signed vs unsigned arithmetic) because there
-  are no operations on them built into the language.</p>
-
-
-  <!-- ===================================================================== -->
-  <h3 id="type-builtin">Builtin Primitive Floating-Point Types</h3>
-  <!-- ===================================================================== -->
-
-  <p>The <a href="#builtin"><tt>Builtin</tt></a> module has the following
-  type members:</p>
-
-  <ul>
-    <li><tt>float32</tt></li>
-    <li><tt>float64</tt></li>
-  </ul>
-
-  <p>These types specify a storage, but they have no semantics
-  assigned to them (IEEE or otherwise) because there are no operations
-  on them built into the language.</p>
 
   
   <!-- ===================================================================== -->
@@ -1728,15 +1688,6 @@
   <h3 id="typecheck_context">Context Sensitive Type Resolution</h3>
 
   <!-- ********************************************************************* -->
-  <h2 id="builtin">Builtin Module</h2>
-  <!-- ********************************************************************* -->
-
-  <p>A module named <tt>Builtin</tt> is imported into every file.  Its
-     declarations can only be found by <a href="#scope-qualifier">qualified
-     lookup</a>.  It provides access to a small number of primitive
-     representation types and operations defined over them.</p>
-
-  <!-- ********************************************************************* -->
   <h2 id="stdlib">Standard Library</h2>
   <!-- ********************************************************************* -->
 
@@ -1758,6 +1709,26 @@
      behavior.</p>
   
   <!-- ===================================================================== -->
+  <h3 id="builtin">Builtin Module</h3>
+  <!-- ===================================================================== -->
+  
+  <p>In the initial Swift implementation, a module named <tt>Builtin</tt> is
+     imported into every file.  Its declarations can only be found by <a 
+    href="#scope-qualifier">qualified lookup</a>.  It provides access to a small
+    number of primitive representation types and operations defined over them
+    that map directly to LLVM IR.</p>
+  
+  <p>The existance of and details of this module are a private implementation
+     detail used by our implementation of the standard library.  Swift code
+     outside the standard library should not be aware of this library, and an
+     independent implementation of the swift standard library should be
+     allowed to be implemented without the builtin library if it desires.</p>
+  
+  <p>For reference below, the description of the standard library uses the
+     Builtin:: namespace to refer to this module, but independent
+     implementations could use another implementation if they so desire.</p>
+  
+  <!-- ===================================================================== -->
   <h3 id="stdlib-simple-types">Simple Types</h3>
   <!-- ===================================================================== -->
   
@@ -1768,13 +1739,32 @@
     typealias void : ()
   </pre>
   
+  <div class="commentary">
+    Having a single standardized integer type that can be used by default
+    everywhere is important.  One advantage Swift has is that by the time it is
+    in widespread use, 64-bit architectures will be pervasive, and the LLVM
+    optimizer should grow to be good at shrinking 64-bit integers to 32-bit in
+    many cases for those 32-bit architectures that persist.
+  </div>
+
+  <h4 id="stdlib-int">int, int8, int16, int32, int64</h4>
   
-  <h4 id="stdlib-int">int</h4>
   <pre class="stdlib">
-    <i>// int is just a wrapper around the 64-bit integer type.</i>
-    struct int { value : __builtin_int64_type }
+    <i>// Fixed size types are simple structs of the right size.</i>
+    struct int8  { value : Builtin::int8 }
+    struct int16 { value : Builtin::int16 }
+    struct int32 { value : Builtin::int32 }
+    struct int64 { value : Builtin::int64 }
+
+    <i>// int is just an alias for the 64-bit integer type.</i>
+    typealias int : int64
   </pre>
 
+  <h4 id="stdlib-int">int, int8, int16, int32, int64</h4>
+  <pre class="stdlib">
+    struct float  { value : Builtin::float32 }
+    struct double { value : Builtin::float64 }
+  </pre>
 
   <h4 id="stdlib-bool">bool, true, false</h4>
   
@@ -1788,10 +1778,6 @@
     var true = bool::true
     var false = bool::false
   </pre>
-  
-  <!-- ===================================================================== -->
-  <h3 id="stdlib-logic-value">Logic Value Evalution For Control Flow</h3>
-  <!-- ===================================================================== -->
   
   <h4 id="stdlib-void">void</h4>
   
