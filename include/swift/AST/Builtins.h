@@ -17,12 +17,8 @@
 #ifndef SWIFT_AST_BUILTINS_H
 #define SWIFT_AST_BUILTINS_H
 
+#include "swift/AST/LLVM.h"
 #include "llvm/Support/ErrorHandling.h"
-#include <cassert>
-
-namespace llvm {
-  class StringRef;
-}
 
 namespace swift {
   class ASTContext;
@@ -43,7 +39,7 @@ enum class BuiltinTypeKind {
 };
 
 /// Determine whether a name corresponds to a builtin type.
-BuiltinTypeKind isBuiltinType(llvm::StringRef Name);
+BuiltinTypeKind isBuiltinType(StringRef Name);
 
 /// Get the builtin type for the given name.
 ///
@@ -95,7 +91,7 @@ enum class BuiltinValueKind {
 /// isBuiltinValue - Finds the builtin value with this name.
 ///
 /// \param Type - Set to the overloaded type parameter of the builtin.
-BuiltinValueKind isBuiltinValue(llvm::StringRef Name, BuiltinTypeKind &Type);
+BuiltinValueKind isBuiltinValue(StringRef Name, BuiltinTypeKind &Type);
 
 /// getBuiltinValue - Finds the builtin value with the given name.
 ///
