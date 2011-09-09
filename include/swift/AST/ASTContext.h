@@ -18,8 +18,8 @@
 #define SWIFT_AST_ASTCONTEXT_H
 
 #include "llvm/Support/DataTypes.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "swift/AST/Type.h"
+#include <vector>
 
 namespace llvm {
   class BumpPtrAllocator;
@@ -62,7 +62,7 @@ public:
   Module * const BuiltinModule;
 
   /// ImportSearchPaths - The paths to search for imports in.
-  ArrayRef<StringRef> ImportSearchPaths;
+  std::vector<std::string> ImportSearchPaths;
 
   /// Allocate - Allocate memory from the ASTContext bump pointer.
   void *Allocate(unsigned long Bytes, unsigned Alignment);
