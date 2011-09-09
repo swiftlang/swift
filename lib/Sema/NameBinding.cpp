@@ -214,6 +214,8 @@ llvm::error_code NameBinder::findModule(StringRef Module,
                                 llvm::OwningPtr<llvm::MemoryBuffer> &Buffer) {
   std::string ModuleFilename = Module.str() + std::string(".swift");
   
+  llvm::SmallString<128> InputFilename;
+  
   // First, search in the directory corresponding to the import location.
   // FIXME: This screams for a proper FileManager abstraction.
   llvm::SourceMgr &SourceMgr = Context.SourceMgr;
@@ -224,7 +226,7 @@ llvm::error_code NameBinder::findModule(StringRef Module,
     StringRef CurrentDirectory 
       = llvm::sys::path::parent_path(ImportingBuffer->getBufferIdentifier());
     if (!CurrentDirectory.empty()) {
-      llvm::SmallString<128> InputFilename(CurrentDirectory);
+      InputFilename = CurrentDirectory;
       llvm::sys::path::append(InputFilename, ModuleFilename);
       llvm::error_code Err = llvm::MemoryBuffer::getFile(InputFilename, Buffer);
       if (!Err)
@@ -237,15 +239,15 @@ llvm::error_code NameBinder::findModule(StringRef Module,
   if (!Err)
     return Err;
 
+  // If we fail, search each import search path.
   for (auto Path : Context.ImportSearchPaths) {
-    llvm::SmallString<128> InputFilename(Path);
+    InputFilename = Path;
     llvm::sys::path::append(InputFilename, ModuleFilename);
     Err = llvm::MemoryBuffer::getFile(InputFilename, Buffer);
     if (!Err)
-      return Err;    
+      return Err;
   }
 
-  // FIXME: Search in the include directories.
   return Err;
 }
 
