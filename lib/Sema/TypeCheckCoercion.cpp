@@ -94,7 +94,7 @@ public:
   (UnresolvedScopedIdentifierExpr *E) {
     assert(0 && "This node should be resolved already!");
   }
-  
+
   Expr *visitTupleElementExpr(TupleElementExpr *E) {
     // TupleElementExpr is fully resolved.
     assert(0 && "This node doesn't exist for dependent types");
@@ -168,6 +168,10 @@ public:
     // TODO: If the function is an overload set and the result type that we're
     // coercing onto the binop is completely incompatible with some elements
     // of the overload set, trim them out.      
+    return E;
+  }
+  
+  Expr *visitProtocolElementExpr(ProtocolElementExpr *E) {
     return E;
   }
   

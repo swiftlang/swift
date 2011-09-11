@@ -53,7 +53,8 @@ enum class ExprKind {
   AnonClosureArg,
   Call,      First_ApplyExpr = Call,
   Unary,
-  Binary,    Last_ApplyExpr = Binary
+  Binary,    
+  ProtocolElement, Last_ApplyExpr = ProtocolElement
 };
   
   
@@ -519,6 +520,27 @@ public:
   static bool classof(const BinaryExpr *) { return true; }
   static bool classof(const Expr *E) { return E->Kind == ExprKind::Binary; }
 };
+
+/// ProtocolElementExpr - Refer to an element of a protocol, e.g. P.x.  'x' is
+/// modeled as a DeclRefExpr on the field's decl.
+///
+class ProtocolElementExpr : public ApplyExpr {
+public:
+  SMLoc DotLoc;
+  
+  ProtocolElementExpr(Expr *FnExpr, SMLoc DotLoc, Expr *BaseExpr,
+                      Type Ty = Type())
+  : ApplyExpr(ExprKind::ProtocolElement, FnExpr, BaseExpr, Ty), DotLoc(DotLoc) {
+  }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ProtocolElementExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->Kind == ExprKind::ProtocolElement;
+  }
+};
+
+
   
 } // end namespace swift
 

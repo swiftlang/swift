@@ -70,6 +70,8 @@ SMLoc Expr::getLocStart() const {
     return cast<UnaryExpr>(this)->Fn->getLocStart();
   case ExprKind::Binary:
     return cast<BinaryExpr>(this)->Arg->getLocStart();
+  case ExprKind::ProtocolElement:
+    return cast<ProtocolElementExpr>(this)->Arg->getLocStart();
   }
   
   assert(0 && "expression type not handled!");
@@ -367,6 +369,7 @@ namespace {
       }
       return 0;
     }
+    
     Expr *visitTupleElementExpr(TupleElementExpr *E) {
       if (Expr *E2 = doIt(E->SubExpr)) {
         E->SubExpr = E2;
@@ -383,16 +386,6 @@ namespace {
       return 0;
     }
     
-    Expr *visitCallExpr(CallExpr *E) {
-      Expr *E2 = doIt(E->Fn);
-      if (E2 == 0) return 0;
-      E->Fn = E2;
-      
-      E2 = doIt(E->Arg);
-      if (E2 == 0) return 0;
-      E->Arg = E2;
-      return E;
-    }
     Expr *visitSequenceExpr(SequenceExpr *E) {
       for (unsigned i = 0, e = E->NumElements; i != e; ++i)
         if (Expr *Elt = doIt(E->Elements[i]))
@@ -420,7 +413,7 @@ namespace {
     
     Expr *visitAnonClosureArgExpr(AnonClosureArgExpr *E) { return E; }
 
-    Expr *visitUnaryExpr(UnaryExpr *E) {
+    Expr *visitApplyExpr(ApplyExpr *E) {
       Expr *E2 = doIt(E->Fn);
       if (E2 == 0) return 0;
       E->Fn = E2;
@@ -428,7 +421,15 @@ namespace {
       E2 = doIt(E->Arg);
       if (E2 == 0) return 0;
       E->Arg = E2;
-      return E;
+      return E;      
+    }
+
+    Expr *visitCallExpr(CallExpr *E) {
+      return visitApplyExpr(E);
+    }
+
+    Expr *visitUnaryExpr(UnaryExpr *E) {
+      return visitApplyExpr(E);
     }
 
     Expr *visitBinaryExpr(BinaryExpr *E) {
@@ -445,6 +446,11 @@ namespace {
       return E;
     }
     
+    Expr *visitProtocolElementExpr(ProtocolElementExpr *E) {
+      return visitApplyExpr(E);
+    }
+    
+
     Stmt *visitSemiStmt(SemiStmt *SS) {
       return SS;
     }
@@ -674,13 +680,6 @@ public:
     OS << ')';
   }
 
-  void visitCallExpr(CallExpr *E) {
-    OS.indent(Indent) << "(call_expr type='" << E->Ty << "'\n";
-    printRec(E->Fn);
-    OS << '\n';
-    printRec(E->Arg);
-    OS << ')';
-  }
   void visitSequenceExpr(SequenceExpr *E) {
     OS.indent(Indent) << "(sequence_expr type='" << E->Ty << '\'';
     for (unsigned i = 0, e = E->NumElements; i != e; ++i) {
@@ -703,6 +702,14 @@ public:
   void visitAnonClosureArgExpr(AnonClosureArgExpr *E) {
     OS.indent(Indent) << "(anon_closure_arg_expr type='" << E->Ty;
     OS << "' ArgNo=" << E->ArgNo << ')';
+  }
+  
+  void visitCallExpr(CallExpr *E) {
+    OS.indent(Indent) << "(call_expr type='" << E->Ty << "'\n";
+    printRec(E->Fn);
+    OS << '\n';
+    printRec(E->Arg);
+    OS << ')';
   }
   void visitUnaryExpr(UnaryExpr *E) {
     OS.indent(Indent) << "(unary_expr '";
@@ -728,6 +735,14 @@ public:
     printRec(E->getArgTuple()->SubExprs[0]);
     OS << '\n';
     printRec(E->getArgTuple()->SubExprs[1]);
+    OS << ')';
+  }
+  
+  void visitProtocolElementExpr(ProtocolElementExpr *E) {
+    OS.indent(Indent) << "(protocol_element_expr type='" << E->Ty << "'\n";
+    printRec(E->Fn);
+    OS << '\n';
+    printRec(E->Arg);
     OS << ')';
   }
 };

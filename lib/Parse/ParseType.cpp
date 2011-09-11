@@ -383,7 +383,7 @@ bool Parser::parseTypeProtocolBody(SMLoc ProtocolLoc,
   if (parseToken(tok::l_brace, "expected '{' in protocol"))
     return true;
   
-  SmallVector<NamedDecl*, 8> Elements;
+  SmallVector<ValueDecl*, 8> Elements;
   
   // Parse the list of protocol elements.
   do {
@@ -417,6 +417,7 @@ bool Parser::parseTypeProtocolBody(SMLoc ProtocolLoc,
                                                 CurDeclContext);
   
   TupleTypeElt ThisElt(NewProto, Context.getIdentifier("this"));
+  if (TypeName) ThisElt.Ty = TypeName->getAliasType(Context);
   TupleType *ThisTy = TupleType::get(ThisElt, Context);
   
   // Install all of the members of protocol into the protocol's DeclContext, and

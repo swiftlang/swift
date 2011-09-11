@@ -30,7 +30,7 @@ namespace swift {
   class Identifier;
   class TypeAliasDecl;
   class OneOfElementDecl;
-  class NamedDecl;
+  class ValueDecl;
   
   enum class TypeKind {
     Error,       // An erroneously constructed type.
@@ -368,12 +368,12 @@ class ProtocolType : public TypeBase, public DeclContext {
 public:
   SMLoc ProtocolLoc;
 
-  const ArrayRef<NamedDecl*> Elements;
+  const ArrayRef<ValueDecl*> Elements;
 
   /// getNew - Return a new instance of a protocol type.  These are never
   /// uniqued since each syntactic instance of them is semantically considered
   /// to be a different type.
-  static ProtocolType *getNew(SMLoc ProtocolLoc, ArrayRef<NamedDecl*> Elts,
+  static ProtocolType *getNew(SMLoc ProtocolLoc, ArrayRef<ValueDecl*> Elts,
                               DeclContext *Parent);
   
   void print(raw_ostream &OS) const;
@@ -383,7 +383,7 @@ public:
   static bool classof(const TypeBase *T) {return T->Kind == TypeKind::Protocol;}
 
 private:
-  ProtocolType(SMLoc ProtocolLoc, ArrayRef<NamedDecl*> Elts,
+  ProtocolType(SMLoc ProtocolLoc, ArrayRef<ValueDecl*> Elts,
                DeclContext *Parent)
   : TypeBase(TypeKind::Protocol, this),
     DeclContext(DeclContextKind::ProtocolType, Parent),

@@ -256,7 +256,7 @@ public:
     llvm_unreachable("UnresolvedScopedIdentifierExpr should be resolved "
                      "by name binding!");
   }
-  
+
   Expr *visitTupleElementExpr(TupleElementExpr *E) {
     // TupleElementExpr is fully resolved.
     assert(!E->Ty->is<DependentType>());
@@ -298,6 +298,10 @@ public:
   Expr *visitCallExpr(CallExpr *E) { return visitApplyExpr(E); }
   Expr *visitUnaryExpr(UnaryExpr *E) { return visitApplyExpr(E); }
   Expr *visitBinaryExpr(BinaryExpr *E) { return visitApplyExpr(E); }
+  Expr *visitProtocolElementExpr(ProtocolElementExpr *E) {
+    return visitApplyExpr(E);
+  }
+
   
   SemaExpressionTree(TypeChecker &tc) : TC(tc) {}
   
@@ -373,8 +377,18 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   
   // Check in the context of a protocol.
   if (ProtocolType *PT = SubExprTy->getAs<ProtocolType>()) {
-    (void)PT;
-    
+    for (ValueDecl *VD : PT->Elements) {
+      if (VD->Name == E->Name) {
+        // The protocol value is applied via a DeclRefExpr.
+        Expr *Fn = new (TC.Context) DeclRefExpr(VD, E->NameLoc, VD->Ty);
+        
+        ApplyExpr *Call = new (TC.Context) 
+          ProtocolElementExpr(Fn, E->DotLoc, E->SubExpr);
+        if (TC.semaApplyExpr(Call))
+          return 0;
+        return Call;
+      }
+    }
   }
   
   // Next, check to see if "a.f" is actually being used as sugar for "f a",

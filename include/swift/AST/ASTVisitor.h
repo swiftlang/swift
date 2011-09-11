@@ -78,6 +78,7 @@ public:
     DISPATCH(AnonClosureArg);
     DISPATCH(Unary);
     DISPATCH(Binary);
+    DISPATCH(ProtocolElement);
 #undef DISPATCH
     }
     assert(0 && "Not reachable, all cases handled");
