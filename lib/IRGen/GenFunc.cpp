@@ -416,7 +416,7 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &ResultInfo) {
 
   // TODO: exceptions, calling conventions
   llvm::CallInst *Call =
-    Builder.CreateCall(CastFn, Args.Values, Fn->getName() + ".call");
+    Builder.CreateCall(CastFn, Args.Values);
   Call->setAttributes(llvm::AttrListPtr::get(Args.Attrs.data(),
                                              Args.Attrs.size()));
 
