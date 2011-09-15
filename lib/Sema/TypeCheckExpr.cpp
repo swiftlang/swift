@@ -215,6 +215,9 @@ public:
   Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
     return E;
   }
+  Expr *visitFloatLiteralExpr(FloatLiteralExpr *E) {
+    return E;
+  }
   Expr *visitDeclRefExpr(DeclRefExpr *E) {
     if (E->D == 0) {
       TC.error(E->Loc, "use of undeclared identifier");

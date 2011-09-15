@@ -62,6 +62,7 @@ public:
     Expr(static_cast<CLASS##Expr*>(E))
         
     DISPATCH(IntegerLiteral);
+    DISPATCH(FloatLiteral);
     DISPATCH(DeclRef);
     DISPATCH(OverloadSetRef);
     DISPATCH(UnresolvedDeclRef);

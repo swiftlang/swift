@@ -311,7 +311,7 @@ ParseResult<Expr> Parser::parseExprNumericConstant() {
   // should be defined by the library.
   Identifier TyName = Context.getIdentifier("float_literal_type");
   Type Ty = ScopeInfo.lookupOrInsertTypeName(TyName, Loc);
-  return new (Context) IntegerLiteralExpr("0", Loc, Ty);
+  return new (Context) FloatLiteralExpr(Val.convertToDouble(), Loc, Ty);
 }
 
 ///   expr-identifier:

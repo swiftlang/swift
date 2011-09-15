@@ -40,6 +40,10 @@ public:
     assert(0 && "Integer literals never have dependent type!");
     return 0;
   }
+  Expr *visitFloatLiteralExpr(FloatLiteralExpr *E) {
+    assert(0 && "Float literals never have dependent type!");
+    return 0;
+  }
   Expr *visitDeclRefExpr(DeclRefExpr *E) {
     return E;
   }

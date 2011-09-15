@@ -38,6 +38,8 @@ SMLoc Expr::getLocStart() const {
   switch (Kind) {
   case ExprKind::IntegerLiteral:
     return cast<IntegerLiteralExpr>(this)->Loc;
+  case ExprKind::FloatLiteral:
+    return cast<FloatLiteralExpr>(this)->Loc;
   case ExprKind::DeclRef:
     return cast<DeclRefExpr>(this)->Loc;
   case ExprKind::OverloadSetRef:
@@ -341,6 +343,7 @@ namespace {
     
     
     Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *E) { return E; }
+    Expr *visitFloatLiteralExpr(FloatLiteralExpr *E) { return E; }
     Expr *visitDeclRefExpr(DeclRefExpr *E) { return E; }
     Expr *visitOverloadSetRefExpr(OverloadSetRefExpr *E) { return E; }
     Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) { return E; }
@@ -619,6 +622,10 @@ public:
 
   void visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
     OS.indent(Indent) << "(integer_literal_expr type='" << E->Ty;
+    OS << "' value=" << E->Val << ')';
+  }
+  void visitFloatLiteralExpr(FloatLiteralExpr *E) {
+    OS.indent(Indent) << "(float_literal_expr type='" << E->Ty;
     OS << "' value=" << E->Val << ')';
   }
   void visitDeclRefExpr(DeclRefExpr *E) {

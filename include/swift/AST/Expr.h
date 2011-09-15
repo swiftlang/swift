@@ -38,6 +38,7 @@ namespace swift {
   
 enum class ExprKind {
   IntegerLiteral,
+  FloatLiteral,
   DeclRef,
   OverloadSetRef,
   UnresolvedDeclRef,
@@ -140,8 +141,8 @@ public:
   StringRef Val;  // Use StringRef instead of APInt, APInt leaks.
   SMLoc Loc;
   
-  IntegerLiteralExpr(StringRef V, SMLoc L, Type Ty)
-    : Expr(ExprKind::IntegerLiteral, Ty), Val(V), Loc(L) {}
+  IntegerLiteralExpr(StringRef Val, SMLoc Loc, Type Ty)
+    : Expr(ExprKind::IntegerLiteral, Ty), Val(Val), Loc(Loc) {}
   
   uint64_t getValue() const;
   
@@ -152,14 +153,32 @@ public:
   }
 };
 
+/// FloatLiteralExpr - Floating point literal, like '4.0'.
+class FloatLiteralExpr : public Expr {
+public:
+  // FIXME: Right now all floating point literals are doubles.  We should
+  // generalize this when we support float.
+  double Val;
+  SMLoc Loc;
+  
+  FloatLiteralExpr(double Val, SMLoc Loc, Type Ty)
+    : Expr(ExprKind::FloatLiteral, Ty), Val(Val), Loc(Loc) {}
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const FloatLiteralExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->Kind == ExprKind::FloatLiteral;
+  }
+};
+
 /// DeclRefExpr - A reference to a value, "x".
 class DeclRefExpr : public Expr {
 public:
   ValueDecl *D;
   SMLoc Loc;
   
-  DeclRefExpr(ValueDecl *d, SMLoc L, Type Ty = Type())
-    : Expr(ExprKind::DeclRef, Ty), D(d), Loc(L) {}
+  DeclRefExpr(ValueDecl *D, SMLoc Loc, Type Ty = Type())
+    : Expr(ExprKind::DeclRef, Ty), D(D), Loc(Loc) {}
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const DeclRefExpr *) { return true; }
