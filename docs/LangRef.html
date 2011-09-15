@@ -245,12 +245,18 @@
   <h3 id="numeric_constant">Numeric Constant</h3>
   <!-- ===================================================================== -->
   
+  <div class="commentary">
+    We require a digit after a dot to allow lexing "4.km" as "4 . km" instead of
+    "4. km".  This regex can be generalized to support exponents, hex, octal,
+    and binary in the future as desired.  Octal should be 0o123 not 0123.
+  </div>
+
   <pre class="grammar">
-    numeric_constant ::= [0-9]+
+    numeric_constant ::= ([0-9]|[.][0-9])*
   </pre>
 
-  <p>Numeric constant tokens represent simple integer values.</p>
-  <p>TODO: Obviously need a floating point constant when we have a fp type.</p>
+  <p>Numeric constant tokens represent simple integer and floating point
+     values.</p>
 
   <!-- ===================================================================== -->
   <h3 id="identifier">Identifier Tokens</h3>
@@ -1081,12 +1087,12 @@
   </pre>
   
   <!-- ===================================================================== -->
-  <h3 id="expr-literal">Simple Literals</h3>
+  <h3 id="expr-literal">Numeric Literals</h3>
   <!-- ===================================================================== -->
   
   <div class="commentary">
-    Consider treating literal numbers like go's arbitrary precision integers
-    that are resolved to a type later.  It would be really great for x+4.0 to
+    We should handle literal numbers as arbitrary precision integers
+    that are resolved to a type later.  This would allow x+4.0 to
     work if x is a float, not a double.  Likewise when we have multiple
     different width integers floating around.  This is somewhat easy (just give
     numbers dependent type) but we would needs some magic to make "var x = 4"
@@ -1097,10 +1103,17 @@
     expr-literal ::= <a href="#numeric_constant">numeric_constant</a>
   </pre>
   
-  <p>The only literal currently supported are integer constants.  These are
-     given 'integer_literal_type' type, which must be defined by the library.
-     If an integer literal is used and integer_literal_type is not defined, then
+  <p>Numeric literals are either integer or floating point depending on whether
+     there is a '.' in the literal value.  Integer values are typed as
+     'integer_literal_type' type and floating point values have type
+     'float_literal_type', both of which must be defined by the library.
+     If a literal is used and these types are not defined, then
      the code is malformed.</p>
+  
+  <p>
+  TODO: This is a completely broken model, we should switch to infinite
+  precision values whose types are resolved during type checking.
+  </p>
 
   <!-- ===================================================================== -->
   <h3 id="expr-identifier">Identifiers</h3>

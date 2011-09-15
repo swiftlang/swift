@@ -15,7 +15,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "Parser.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/ADT/APFloat.h"
 using namespace swift;
 
 bool Parser::isStartOfExpr(const Token &Tok, const Token &Next) {
@@ -261,18 +263,55 @@ ParseResult<Expr> Parser::parseExprNumericConstant() {
   StringRef Text = Tok.getText();
   SMLoc Loc = consumeToken(tok::numeric_constant);
 
-  // The integer literal must fit in 64-bits.
-  unsigned long long Val;
-  if (Text.getAsInteger(0, Val)) {
-    error(Loc, "invalid immediate for integer literal, value too large");
+  // Check to see if we have an integer constant.
+  size_t DotPos = Text.find('.');
+  if (DotPos == StringRef::npos) {
+    // The integer literal must fit in 64-bits.
+    unsigned long long Val;
+    if (Text.getAsInteger(0, Val)) {
+      error(Loc, "invalid immediate for integer literal, value too large");
+      return ParseResult<Expr>::getSemaError();
+    }
+    
+    // The type of an integer literal is always "integer_literal_type", which
+    // should be defined by the library.
+    Identifier TyName = Context.getIdentifier("integer_literal_type");
+    Type Ty = ScopeInfo.lookupOrInsertTypeName(TyName, Loc);
+    return new (Context) IntegerLiteralExpr(Text, Loc, Ty);
+  }
+  
+  // Okay, we have a floating point constant.  Verify we have a single dot.
+  DotPos = Text.find('.', DotPos+1);
+  if (DotPos != StringRef::npos) {
+    error(SMLoc::getFromPointer(Loc.getPointer()+DotPos),
+          "multiple decimal points found in floating point constant");
     return ParseResult<Expr>::getSemaError();
   }
   
-  // The type of an integer literal is always "integer_literal_type", which
+  llvm::APFloat Val(llvm::APFloat::IEEEdouble);
+  switch (Val.convertFromString(Text, llvm::APFloat::rmNearestTiesToEven)) {
+  default: break;
+  case llvm::APFloat::opOverflow: {
+    llvm::SmallString<20> Buffer;
+    llvm::APFloat::getLargest(Val.getSemantics()).toString(Buffer);
+    warning(Loc, "floating point constant overflowed to " + Buffer.str());
+    break;
+  }
+  case llvm::APFloat::opUnderflow: {
+    // Denormals are ok, but reported as underflow by APFloat.
+    if (!Val.isZero()) break;
+    llvm::SmallString<20> Buffer;
+    llvm::APFloat::getSmallest(Val.getSemantics()).toString(Buffer);
+    warning(Loc, "floating point constant underflowed beyond " + Buffer.str());
+    break;
+  }
+  }
+  
+  // The type of a float literal is always "float_literal_type", which
   // should be defined by the library.
-  Identifier TyName = Context.getIdentifier("integer_literal_type");
+  Identifier TyName = Context.getIdentifier("float_literal_type");
   Type Ty = ScopeInfo.lookupOrInsertTypeName(TyName, Loc);
-  return new (Context) IntegerLiteralExpr(Text, Loc, Ty);
+  return new (Context) IntegerLiteralExpr("0", Loc, Ty);
 }
 
 ///   expr-identifier:

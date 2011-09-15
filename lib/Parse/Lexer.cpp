@@ -197,14 +197,19 @@ void Lexer::lexDollarIdent() {
 }
 
 
-/// lexDigit - Match [0-9]+
-void Lexer::lexDigit() {
+/// lexNumber - Match ([0-9]|[.][0-9])*
+void Lexer::lexNumber() {
   const char *TokStart = CurPtr-1;
-  assert(isdigit(*TokStart) && "Unexpected start");
+  assert((isdigit(*TokStart) || *TokStart == '.') && "Unexpected start");
 
-  // Lex [0-9]*
-  while (isdigit(*CurPtr))
-    ++CurPtr;
+  while (1) {
+    if (isdigit(*CurPtr))
+      ++CurPtr;
+    else if (*CurPtr == '.' && isdigit(CurPtr[1]))
+      CurPtr += 2;
+    else
+      break;
+  }
   
   return formToken(tok::numeric_constant, TokStart);
 }
@@ -270,7 +275,11 @@ Restart:
   case '[': return formToken(tok::l_square, TokStart);
   case ']': return formToken(tok::r_square, TokStart);
 
-  case '.': return formToken(tok::period,   TokStart);
+  case '.':
+    if (isdigit(CurPtr[0]))   // .42
+      return lexNumber();
+      
+    return formToken(tok::period, TokStart);
   case ',': return formToken(tok::comma,    TokStart);
   case ';': return formToken(tok::semi,     TokStart);
       
@@ -324,7 +333,7 @@ Restart:
       
   case '0': case '1': case '2': case '3': case '4':
   case '5': case '6': case '7': case '8': case '9':
-    return lexDigit();
+    return lexNumber();
   }
 }
 

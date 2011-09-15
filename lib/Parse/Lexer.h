@@ -63,7 +63,7 @@ private:
   void lexIdentifier();
   void lexDollarIdent();
   void lexOperatorIdentifier();
-  void lexDigit();
+  void lexNumber();
 };
   
   
