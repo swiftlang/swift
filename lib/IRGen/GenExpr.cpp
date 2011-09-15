@@ -47,6 +47,21 @@ static RValue emitIntegerLiteralExpr(IRGenFunction &IGF, IntegerLiteralExpr *E,
   return RValue::forScalars(Value);
 }
 
+/// Emit an float literal expression.
+static RValue emitFloatLiteralExpr(IRGenFunction &IGF, FloatLiteralExpr *E,
+                                   const TypeInfo &TInfo) {
+  // We make this work by making some pretty awesome assumptions about
+  // how the type is represented.  Probably there ought to be
+  // something slightly less awesome.
+  RValueSchema Schema = TInfo.getSchema();
+  assert(Schema.isScalar(1));
+  llvm::Type *FPTy = Schema.getScalarTypes()[0];
+  assert(FPTy->isDoubleTy());
+  
+  llvm::Value *Value = llvm::ConstantFP::get(FPTy, E->Val);
+  return RValue::forScalars(Value);
+}
+
 static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
                                 const TypeInfo &TInfo) {
   ValueDecl *D = E->D;
@@ -123,6 +138,8 @@ RValue IRGenFunction::emitRValue(Expr *E, const TypeInfo &TInfo) {
 
   case ExprKind::IntegerLiteral:
     return emitIntegerLiteralExpr(*this, cast<IntegerLiteralExpr>(E), TInfo);
+  case ExprKind::FloatLiteral:
+    return emitFloatLiteralExpr(*this, cast<FloatLiteralExpr>(E), TInfo);
 
   case ExprKind::Tuple:
     return emitTupleExpr(cast<TupleExpr>(E), TInfo);
@@ -163,6 +180,7 @@ LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &TInfo) {
   case ExprKind::Unary:
   case ExprKind::Binary:
   case ExprKind::IntegerLiteral:
+  case ExprKind::FloatLiteral:
   case ExprKind::TupleShuffle:
   case ExprKind::Func:
   case ExprKind::Closure:
