@@ -419,6 +419,9 @@ FuncDecl *Parser::parseDeclFunc(bool AllowScoped) {
     Scope FnBodyScope(this);
     
     FE = actOnFuncExprStart(FuncLoc, FuncTy);
+
+    // Establish the new context.
+    ContextChange CC(*this, FE);
     
     // Then parse the expression.
     NullablePtr<Stmt> Body;
