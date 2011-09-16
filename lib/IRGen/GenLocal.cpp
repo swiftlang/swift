@@ -15,14 +15,48 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
+#include "GenType.h"
 #include "IRGenFunction.h"
 
 using namespace swift;
 using namespace irgen;
 
 void IRGenFunction::emitLocal(Decl *D) {
-  unimplemented(D->getLocStart(), "local decl emission is unimplemented");
+  switch (D->Kind) {
+  case DeclKind::Import:
+  case DeclKind::Arg:
+  case DeclKind::ElementRef:
+    llvm_unreachable("declaration cannot appear in local scope");
+
+  case DeclKind::TypeAlias:
+  case DeclKind::OneOfElement:
+    // no IR generation support required.
+    break;
+
+  case DeclKind::Var:
+    emitLocalVar(cast<VarDecl>(D));
+    break;
+
+  case DeclKind::Func:
+    unimplemented(D->getLocStart(), "local function emission is unimplemented");
+    break;
+  }
 }
+
+/// emitLocalVar - Emit a local variable.
+void IRGenFunction::emitLocalVar(VarDecl *var) {
+  const TypeInfo &typeInfo = getFragileTypeInfo(var->Ty);
+  LValue lvalue = createScopeAlloca(typeInfo.getStorageType(),
+                                    typeInfo.StorageAlignment,
+                                    var->Name.str());
+  Locals.insert(std::make_pair(var, lvalue));
+
+  if (Expr *init = var->Init) {
+    emitInit(lvalue, init, typeInfo);
+  } else {
+    emitZeroInit(lvalue, typeInfo);
+  }
+};
 
 LValue IRGenFunction::getLocal(ValueDecl *D) {
   auto I = Locals.find(D);

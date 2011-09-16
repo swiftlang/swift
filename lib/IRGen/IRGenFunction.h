@@ -120,6 +120,9 @@ public:
   RValue emitRValue(Expr *E);
   RValue emitRValue(Expr *E, const TypeInfo &TInfo);
 
+  void emitInit(const LValue &LV, Expr *E, const TypeInfo &TInfo);
+  void emitZeroInit(const LValue &LV, const TypeInfo &TInfo);
+
 private:
   RValue emitRValueForFunction(FuncDecl *Fn);
   RValue emitApplyExpr(ApplyExpr *Apply, const TypeInfo &TInfo);
@@ -137,6 +140,7 @@ public:
   LValue getGlobal(VarDecl *D, const TypeInfo &TInfo);
 
 private:
+  void emitLocalVar(VarDecl *D);
   llvm::DenseMap<ValueDecl*, LValue> Locals;
 };
 

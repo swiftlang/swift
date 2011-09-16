@@ -202,6 +202,36 @@ LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &TInfo) {
   llvm_unreachable("bad expression kind!");
 }
 
+/// Emit an expression as an initializer for the given l-value.
+void IRGenFunction::emitInit(const LValue &LV, Expr *E, const TypeInfo &TInfo) {
+  // TODO: we can do better than this.
+  RValue RV = emitRValue(E);
+  TInfo.store(*this, RV, LV);
+}
+
+/// Zero-initializer the given l-value.
+void IRGenFunction::emitZeroInit(const LValue &LV, const TypeInfo &TInfo) {
+  RValueSchema Schema = TInfo.getSchema();
+
+  // If the schema is scalar, just store a bunch of values into it.
+  // This makes for better IR than a memset.
+  if (Schema.isScalar()) {
+    llvm::SmallVector<llvm::Value*, RValue::MaxScalars> Scalars;
+    for (llvm::Type *T : Schema.getScalarTypes()) {
+      Scalars.push_back(llvm::Constant::getNullValue(T));
+    }
+    TInfo.store(*this, RValue::forScalars(Scalars), LV);
+    return;
+  }
+
+  // Otherwise, since the schema is aggregate, do a memset.
+  llvm::Value *Addr = Builder.CreateBitCast(LV.getAddress(), IGM.Int8PtrTy);
+  Builder.CreateMemSet(Addr, Builder.getInt8(0),
+                       Builder.getInt64(TInfo.StorageSize.getValue()),
+                       TInfo.StorageAlignment.getValue(),
+                       /*volatile*/ false);
+}
+
 /// Emit an expression whose value is being ignored.
 void IRGenFunction::emitIgnored(Expr *E) {
   // For now, just emit it as an r-value.
