@@ -18,6 +18,7 @@
 #define SWIFT_MODULE_H
 
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/Identifier.h"
 #include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
@@ -41,17 +42,18 @@ class Module : public DeclContext {
 public:
   ASTContext &Ctx;
   ModuleKind Kind;
+  Identifier Name;
 
 protected:
-  Module(ModuleKind Kind, ASTContext &Ctx)
+  Module(ModuleKind Kind, Identifier Name, ASTContext &Ctx)
     : DeclContext(DeclContextKind::Module, nullptr),
-      Ctx(Ctx), Kind(Kind) {
+      Ctx(Ctx), Kind(Kind), Name(Name) {
   }
 
 public:
-  Module(ASTContext &Ctx)
+  Module(Identifier Name, ASTContext &Ctx)
     : DeclContext(DeclContextKind::Module, nullptr),
-      Ctx(Ctx), Kind(ModuleKind::Module) {
+      Ctx(Ctx), Kind(ModuleKind::Module), Name(Name) {
   }
 
   static bool classof(const Module *M) {
@@ -91,8 +93,8 @@ public:
   ArrayRef<std::pair<TypeAliasDecl*,TypeAliasDecl*> >
     UnresolvedScopedTypesForParser;
   
-  TranslationUnit(ASTContext &C)
-    : Module(ModuleKind::TranslationUnit, C) {
+  TranslationUnit(Identifier Name, ASTContext &C)
+    : Module(ModuleKind::TranslationUnit, Name, C) {
   }
 
   void dump() const;

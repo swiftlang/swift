@@ -17,6 +17,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -47,8 +48,27 @@ static char mangleOperatorChar(char op) {
   }
 }
 
+namespace {
+  /// A class for mangling declarations.
+  class Mangler {
+    raw_ostream &Buffer;
+    llvm::DenseMap<void*, unsigned> Substitutions;
+
+  public:
+    Mangler(raw_ostream &buffer) : Buffer(buffer) {}
+    void mangleDeclName(NamedDecl *decl);
+    void mangleType(Type type);
+
+  private:
+    void mangleDeclContext(DeclContext *ctx);
+    void mangleIdentifier(Identifier ident);
+    bool tryMangleSubstitution(void *ptr);
+    void addSubstitution(void *ptr);
+  };
+}
+
 /// Mangle an identifier into the buffer.
-static void mangleIdentifier(raw_ostream &buffer, Identifier ident) {
+void Mangler::mangleIdentifier(Identifier ident) {
   StringRef str = ident.str();
   assert(!str.empty() && "mangling an empty identifier!");
 
@@ -57,7 +77,7 @@ static void mangleIdentifier(raw_ostream &buffer, Identifier ident) {
   // where the count is the number of characters in the identifier,
   // and where individual identifier characters represent themselves.
   if (!ident.isOperator()) {
-    buffer << str.size() << str;
+    Buffer << str.size() << str;
     return;
   }
 
@@ -65,17 +85,167 @@ static void mangleIdentifier(raw_ostream &buffer, Identifier ident) {
   //   'op' count operator-char+
   // where the count is the number of characters in the operator,
   // and where the individual operator characters are translated.
-  buffer << "op";
+  Buffer << "op";
 
-  buffer << str.size();
+  Buffer << str.size();
   for (unsigned i = 0, e = str.size(); i != e; ++i) {
-    buffer << mangleOperatorChar(str[i]);
+    Buffer << mangleOperatorChar(str[i]);
   }
+}
+
+bool Mangler::tryMangleSubstitution(void *ptr) {
+  auto ir = Substitutions.find(ptr);
+  if (ir == Substitutions.end()) return false;
+
+  // substitution ::= 'S' integer? '_'
+
+  unsigned index = ir->second;
+  Buffer << 'S';
+  if (index) Buffer << (index - 1);
+  Buffer << '_';
+  return true;
+}
+
+void Mangler::addSubstitution(void *ptr) {
+  Substitutions.insert(std::make_pair(ptr, Substitutions.size()));
+}
+
+void Mangler::mangleDeclContext(DeclContext *ctx) {
+  assert(isa<Module>(ctx) && "can't yet mangle non-module contexts!");
+  Module *module = cast<Module>(ctx);
+
+  // Try the special 'swift' substitution.
+  // context ::= Ss
+  if (!module->getParent() && module->Name.str() == "swift") {
+    Buffer << "Ss";
+    return;
+  }
+
+  // context ::= substitution identifier*
+  // context ::= identifier+
+
+  if (tryMangleSubstitution(module)) return;
+
+  if (DeclContext *parent = module->getParent())
+    mangleDeclContext(parent);
+
+  mangleIdentifier(module->Name);
+  addSubstitution(module);
+}
+
+void Mangler::mangleDeclName(NamedDecl *decl) {
+  // decl ::= context identifier
+  mangleDeclContext(decl->Context);
+  mangleIdentifier(decl->Name);
+}
+
+/// Mangle a type into the buffer.
+void Mangler::mangleType(Type type) {
+  TypeBase *base = type.getPointer();
+
+  switch (base->Kind) {
+  case TypeKind::Error:
+    llvm_unreachable("mangling error type");
+  case TypeKind::Dependent:
+    llvm_unreachable("mangling dependent type");
+
+  // We don't care about these types being a bit verbose because we
+  // don't expect them to come up that often in API names.
+  case TypeKind::BuiltinFloat32:
+    Buffer << "f32"; return;
+  case TypeKind::BuiltinFloat64:
+    Buffer << "f64"; return;
+  case TypeKind::BuiltinInt1:
+    Buffer << "i1"; return;
+  case TypeKind::BuiltinInt8:
+    Buffer << "i8"; return;
+  case TypeKind::BuiltinInt16:
+    Buffer << "i16"; return;
+  case TypeKind::BuiltinInt32:
+    Buffer << "i32"; return;
+  case TypeKind::BuiltinInt64:
+    Buffer << "i64"; return;
+
+  case TypeKind::NameAlias: {
+    // TODO: convince Chris that anonymous nominal types are silly.
+    TypeAliasDecl *alias = cast<NameAliasType>(base)->TheDecl;
+
+    // Mangle a direct alias of a oneof type using the alias.
+    if (isa<OneOfType>(alias->UnderlyingTy.getPointer())) {
+      // Try to mangle the entire name as a substitution.
+      // type ::= substitution
+      if (tryMangleSubstitution(alias))
+        return;
+
+      // type ::= 'N' decl
+      Buffer << 'N';
+      mangleDeclName(alias);
+
+      addSubstitution(alias);
+
+    // Otherwise, mangle the type as its underlying type.
+    } else {
+      mangleType(alias->UnderlyingTy);
+    }
+    return;
+  }
+
+  case TypeKind::Tuple: {
+    TupleType *tuple = cast<TupleType>(base);
+    // Look through simple parentheses.
+    if (tuple->Fields.size() == 1 && tuple->Fields[0].Name.empty())
+      return mangleType(tuple->Fields[0].Ty);
+
+    // type ::= 'T' tuple-field+ '_'
+    // tuple-field ::= identifier? type
+    Buffer << 'T';
+    for (auto &field : tuple->Fields) {
+      if (!field.Name.empty())
+        mangleIdentifier(field.Name);
+      mangleType(field.Ty);
+    }
+    Buffer << '_';
+    return;
+  }
+
+  case TypeKind::OneOf: {
+    // FIXME: what to do with an anonymous oneof type in a global decl?
+    Buffer << 'O';
+    return;
+  }
+
+  case TypeKind::Function: {
+    // type ::= 'F' type type
+    FunctionType *fn = cast<FunctionType>(base);
+    Buffer << 'F';
+    mangleType(fn->Input);
+    mangleType(fn->Result);
+    return;
+  }
+
+  case TypeKind::Array: {
+    // type ::= 'A' integer type
+    ArrayType *array = cast<ArrayType>(base);
+    Buffer << 'A';
+    Buffer << array->Size;
+    mangleType(array->Base);
+    return;
+  };
+
+  case TypeKind::Protocol: {
+    // FIXME: mangle protocol elements?
+    // type ::= 'P'
+    Buffer << 'P';
+    return;
+  }
+
+  }
+  llvm_unreachable("bad type kind");
 }
 
 static bool shouldMangle(NamedDecl *D) {
   // Everything not declared in global context needs to be mangled.
-  if (!isa<Module>(D->Context)) return true;
+  if (!isa<TranslationUnit>(D->Context)) return true;
 
   // Don't mangle a function named main.
   if (isa<FuncDecl>(D) && D->Name.str() == "main")
@@ -84,19 +254,27 @@ static bool shouldMangle(NamedDecl *D) {
   return true;
 }
 
-void IRGenModule::mangle(raw_ostream &buffer, NamedDecl *D) {
+void IRGenModule::mangle(raw_ostream &buffer, NamedDecl *decl) {
   // Check for declarations which should not be mangled.
-  if (!shouldMangle(D)) {
-    buffer << D->Name.str();
+  if (!shouldMangle(decl)) {
+    buffer << decl->Name.str();
     return;
   }
+
+  // mangled-name ::= '_T' identifier+ type?
 
   // Otherwise, add the prefix.
   buffer << "_T"; // T is for Tigger
 
-  // TODO: mangle enclosing contexts here.
+  Mangler mangler(buffer);
 
-  mangleIdentifier(buffer, D->Name);
+  mangler.mangleDeclName(decl);
 
-  // TODO: mangle overload and generics information here.
+  // Mangle in a type as well.  Note that we have to mangle the type
+  // on all kinds of declarations, even variables, because at the
+  // moment they can *all* be overloaded.
+  if (ValueDecl *valueDecl = dyn_cast<ValueDecl>(decl))
+    mangler.mangleType(valueDecl->Ty);
+
+  // TODO: mangle generics information here.
 }

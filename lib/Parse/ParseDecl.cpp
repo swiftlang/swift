@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Lexer.h"
 #include "Parser.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
@@ -27,8 +28,9 @@ TranslationUnit *Parser::parseTranslationUnit() {
   // Prime the lexer.
   consumeToken();
   SMLoc FileStartLoc = Tok.getLoc();
-  
-  TranslationUnit *TU = new (Context) TranslationUnit(Context);
+
+  TranslationUnit *TU =
+    new (Context) TranslationUnit(L.getModuleName(), Context);
   CurDeclContext = TU;
   
   // Parse the body of the file.

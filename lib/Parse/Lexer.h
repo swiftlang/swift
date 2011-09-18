@@ -27,6 +27,7 @@ namespace llvm {
 namespace swift {
   class Token;
   class ASTContext;
+  class Identifier;
 
 class Lexer {
   llvm::SourceMgr &SourceMgr;
@@ -50,6 +51,8 @@ public:
   /// peekNextToken - Return the next token to be returned by Lex without
   /// actually lexing it.
   const Token &peekNextToken() const { return NextToken; }
+
+  Identifier getModuleName() const;
   
 private:
   void note(const char *Loc, const Twine &Message);

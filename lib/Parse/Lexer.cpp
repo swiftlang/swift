@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Identifier.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/PathV2.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
@@ -337,3 +338,7 @@ Restart:
   }
 }
 
+Identifier Lexer::getModuleName() const {
+  StringRef Stem = llvm::sys::path::stem(Buffer->getBufferIdentifier());
+  return Context.getIdentifier(Stem);
+}
