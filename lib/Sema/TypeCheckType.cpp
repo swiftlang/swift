@@ -99,8 +99,8 @@ bool TypeChecker::validateType(Type InTy) {
         
       // If both a type and an initializer are specified, make sure the
       // initializer's type agrees with the (redundant) type.
-      assert(EltTy.isNull() || EltTy->isEqual(EltInit->Ty, Context));
-      EltTy = EltInit->Ty;
+      assert(EltTy.isNull() || EltTy->isEqual(EltInit->getType(), Context));
+      EltTy = EltInit->getType();
 
       TT->updateInitializedElementType(i, EltTy, EltInit);
     }

@@ -267,7 +267,7 @@ static void emitExpanded(IRGenFunction &IGF, Expr *Arg, ArgList &Args) {
   }
 
   // It's not a tuple literal.  If it has tuple type, evaluate and expand.
-  if (Arg->Ty->is<TupleType>()) {
+  if (Arg->getType()->is<TupleType>()) {
     // TODO: if it's a load from a tuple l-value, we should just emit
     // the l-value and extract scalars from that instead of potentially
     // copying into a temporary and then extracting from it.
@@ -376,7 +376,7 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &ResultInfo) {
       return emitBuiltinCall(*this, cast<FuncDecl>(Fn), E->Arg, ResultInfo);
 
   const FuncTypeInfo &FnInfo =
-    static_cast<const FuncTypeInfo &>(IGM.getFragileTypeInfo(E->Fn->Ty));
+    static_cast<const FuncTypeInfo &>(IGM.getFragileTypeInfo(E->Fn->getType()));
 
   RValue FnRValue = emitRValue(E->Fn, FnInfo);
   assert(FnRValue.isScalar() && FnRValue.getScalars().size() == 2);
@@ -453,7 +453,7 @@ void IRGenFunction::emitPrologue() {
   ReturnBB = createBasicBlock("return");
   CurFn->getBasicBlockList().push_back(ReturnBB);
 
-  FunctionType *FnTy = CurFuncExpr->Ty->getAs<FunctionType>();
+  FunctionType *FnTy = CurFuncExpr->getType()->getAs<FunctionType>();
   assert(FnTy && "emitting a declaration that's not a function?");
 
   llvm::Function::arg_iterator CurParm = CurFn->arg_begin();
@@ -544,7 +544,7 @@ void IRGenFunction::emitEpilogue() {
     Builder.SetInsertPoint(ReturnBB);
   }
 
-  FunctionType *FnTy = CurFuncExpr->Ty->getAs<FunctionType>();
+  FunctionType *FnTy = CurFuncExpr->getType()->getAs<FunctionType>();
   assert(FnTy && "emitting a declaration that's not a function?");
 
   const TypeInfo &ResultInfo = IGM.getFragileTypeInfo(FnTy->Result);

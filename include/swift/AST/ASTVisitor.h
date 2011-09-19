@@ -54,7 +54,7 @@ public:
   }
   
   ExprRetTy visit(Expr *E) {
-    switch (E->Kind) {
+    switch (E->getKind()) {
 
 #define DISPATCH(CLASS) \
   case ExprKind::CLASS: \

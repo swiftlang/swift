@@ -105,7 +105,7 @@ bool DeclChecker::visitValueDecl(ValueDecl *VD) {
     if (DestTy->is<DependentType>())
       DestTy = Type();
     if (!TC.typeCheckExpression(VD->Init, DestTy))
-      VD->Ty = VD->Init->Ty;
+      VD->Ty = VD->Init->getType();
     else if (isa<VarDecl>(VD))
       TC.note(VD->getLocStart(),
               "while converting 'var' initializer to declared type");

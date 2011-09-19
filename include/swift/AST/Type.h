@@ -59,6 +59,16 @@ namespace llvm {
     Ty.print(OS);
     return OS;
   }
+
+  // A Type casts like a TypeBase*.
+  template<> struct simplify_type<const ::swift::Type> {
+    typedef ::swift::TypeBase *SimpleType;
+    static SimpleType getSimplifiedValue(const ::swift::Type &Val) {
+      return Val.getPointer();
+    }
+  };
+  template<> struct simplify_type< ::swift::Type>
+    : public simplify_type<const ::swift::Type> {};
     
   // Type hashes just like pointers.
   template<> struct DenseMapInfo<swift::Type> {

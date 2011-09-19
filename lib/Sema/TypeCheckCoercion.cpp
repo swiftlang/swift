@@ -208,7 +208,7 @@ Expr *SemaCoerce::visitTupleExpr(TupleExpr *E) {
     E->SubExprs[0] = convertToType(E->SubExprs[0], DestTy, true, TC);
     if (E->SubExprs[0] == 0) return 0;
     
-    E->Ty = E->SubExprs[0]->Ty;
+    E->setType(E->SubExprs[0]->getType());
     return E;
   }
   
@@ -240,7 +240,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   SmallVector<bool, 16> UsedElements(NumExprElements);
   SmallVector<int, 16>  DestElementSources(DestTy->Fields.size(), -1);
 
-  if (TupleType *ETy = E->Ty->getAs<TupleType>()) {
+  if (TupleType *ETy = E->getType()->getAs<TupleType>()) {
     assert(ETy->Fields.size() == NumExprElements && "Expr #elements mismatch!");
     for (unsigned i = 0, e = ETy->Fields.size(); i != e; ++i)
       IdentList[i] = ETy->Fields[i].Name;
@@ -306,11 +306,11 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       if (DestTy->Fields[i].Name.empty())
         TC.error(ErrorLoc, "no value to initialize tuple element #" +
                  Twine(i) + " in expression of type '" +
-                 E->Ty->getString() + "'");
+                 E->getType()->getString() + "'");
       else
         TC.error(ErrorLoc, "no value to initialize tuple element '" +
                  DestTy->Fields[i].Name.str() + "' (#" + Twine(i) +
-                 ") in expression of type '" + E->Ty->getString() + "'");
+                 ") in expression of type '" + E->getType()->getString() + "'");
       return 0;
     }
     
@@ -381,14 +381,14 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     }
     
     // Okay, we updated the tuple in place.
-    E->Ty = DestTy;
+    E->setType(DestTy);
     return E;
   }
   
   // Otherwise, if it isn't a tuple literal, we unpack the source elementwise so
   // we can do elementwise conversions as needed, then rebuild a new TupleExpr
   // of the right destination type.
-  TupleType *ETy = E->Ty->getAs<TupleType>();
+  TupleType *ETy = E->getType()->getAs<TupleType>();
   SmallVector<int, 16> NewElements(DestTy->Fields.size());
   
   for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
@@ -468,7 +468,7 @@ Expr *SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
 Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
                                 bool IgnoreAnonDecls, TypeChecker &TC) {
   // If we have an exact match, we're done.
-  if (E->Ty->getCanonicalType(TC.Context) ==
+  if (E->getType()->getCanonicalType(TC.Context) ==
          DestTy->getCanonicalType(TC.Context))
     return E;
   
@@ -482,7 +482,7 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
       TE->SubExprs[0] = convertToType(TE->SubExprs[0], DestTy,
                                       IgnoreAnonDecls, TC);
       if (TE->SubExprs[0] == 0) return 0;
-      TE->Ty = TE->SubExprs[0]->Ty;
+      TE->setType(TE->SubExprs[0]->getType());
       return TE;
     }
   
@@ -505,7 +505,7 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
     
     // If the input is a tuple and the output is a tuple, see if we can convert
     // each element.
-    if (TupleType *ETy = E->Ty->getAs<TupleType>())
+    if (TupleType *ETy = E->getType()->getAs<TupleType>())
       return convertTupleToTupleType(E, ETy->Fields.size(), TT, TC);
   }
   
@@ -539,12 +539,12 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
   // context, second, this could be a context sensitive expression value like
   // :foo.  If this is a context sensitive expression, propagate the type down
   // into the subexpression.
-  if (E->Ty->is<DependentType>())
+  if (E->getType()->is<DependentType>())
     return SemaCoerce(TC, DestTy).doIt(E);
   
   // Could not do the conversion.
   TC.error(E->getLocStart(), "invalid conversion from type '" +
-           E->Ty->getString() + "' to '" + DestTy->getString() + "'");
+           E->getType()->getString() + "' to '" + DestTy->getString() + "'");
   return 0;
 }
 

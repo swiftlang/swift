@@ -87,7 +87,7 @@ SMLoc Expr::getLocStart() const {
 /// getNumArgs - Return the number of arguments that this closure expr takes.
 /// This is the length of the ArgList.
 unsigned ClosureExpr::getNumArgs() const {
-  Type Input = Ty->getAs<FunctionType>()->Input;
+  Type Input = getType()->getAs<FunctionType>()->Input;
   
   if (TupleType *TT = Input->getAs<TupleType>())
     return TT->Fields.size();
@@ -143,7 +143,7 @@ getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
   SmallVector<bool, 16> UsedElements(NumExprElements);
   SmallVector<int, 16>  DestElementSources(DestTy->Fields.size(), -1);
 
-  if (TupleType *ETy = E->Ty->getAs<TupleType>()) {
+  if (TupleType *ETy = E->getType()->getAs<TupleType>()) {
     assert(ETy->Fields.size() == NumExprElements && "Expr #elements mismatch!");
     { unsigned i = 0;
     for (const TupleTypeElt &Elt : ETy->Fields)
@@ -245,7 +245,7 @@ getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
   
   // A tuple-to-tuple conversion of a non-parenthesized tuple is allowed to
   // permute the elements, but cannot perform conversions of each value.
-  TupleType *ETy = E->Ty->getAs<TupleType>();
+  TupleType *ETy = E->getType()->getAs<TupleType>();
   for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
     // Extract the input element corresponding to this destination element.
     unsigned SrcField = DestElementSources[i];
@@ -277,7 +277,7 @@ getConversionRank(const Expr *E, Type DestTy, ASTContext &Ctx) {
          "Result of conversion can't be dependent");
 
   // Exact matches are identity conversions.
-  if (E->Ty->getCanonicalType(Ctx) == DestTy->getCanonicalType(Ctx))
+  if (E->getType()->getCanonicalType(Ctx) == DestTy->getCanonicalType(Ctx))
     return Expr::CR_Identity;
   
   // If the expression is a grouping parenthesis, then it is an identity
@@ -301,7 +301,7 @@ getConversionRank(const Expr *E, Type DestTy, ASTContext &Ctx) {
     
     // If the input is a tuple and the output is a tuple, see if we can convert
     // each element.
-    if (TupleType *ETy = E->Ty->getAs<TupleType>())
+    if (TupleType *ETy = E->getType()->getAs<TupleType>())
       return getTupleToTupleTypeConversionRank(E, ETy->Fields.size(), TT, Ctx);
   }
 
@@ -621,27 +621,27 @@ public:
   void printRec(Stmt *S) { S->print(OS, Indent+2); }
 
   void visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
-    OS.indent(Indent) << "(integer_literal_expr type='" << E->Ty;
+    OS.indent(Indent) << "(integer_literal_expr type='" << E->getType();
     OS << "' value=" << E->Val << ')';
   }
   void visitFloatLiteralExpr(FloatLiteralExpr *E) {
-    OS.indent(Indent) << "(float_literal_expr type='" << E->Ty;
+    OS.indent(Indent) << "(float_literal_expr type='" << E->getType();
     OS << "' value=" << E->Val << ')';
   }
   void visitDeclRefExpr(DeclRefExpr *E) {
-    OS.indent(Indent) << "(declref_expr type='" << E->Ty;
+    OS.indent(Indent) << "(declref_expr type='" << E->getType();
     OS << "' decl=" << E->D->Name << ')';
   }
   void visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
-    OS.indent(Indent) << "(overloadsetref_expr type='" << E->Ty;
+    OS.indent(Indent) << "(overloadsetref_expr type='" << E->getType();
     OS << "' decl=" << E->Decls[0]->Name << ')';
   }
   void visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
-    OS.indent(Indent) << "(unresolved_decl_ref_expr type='" << E->Ty;
+    OS.indent(Indent) << "(unresolved_decl_ref_expr type='" << E->getType();
     OS << "' name=" << E->Name << ')';
   }
   void visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
-    OS.indent(Indent) << "(unresolved_member_expr type='" << E->Ty;
+    OS.indent(Indent) << "(unresolved_member_expr type='" << E->getType();
     OS << "\' name='" << E->Name << "')";
   }
   void visitUnresolvedScopedIdentifierExpr(UnresolvedScopedIdentifierExpr *E) {
@@ -649,7 +649,7 @@ public:
       << E->BaseTypeFromScope->Name << "\' name='" << E->Name << "')";
   }
   void visitTupleExpr(TupleExpr *E) {
-    OS.indent(Indent) << "(tuple_expr type='" << E->Ty << '\'';
+    OS.indent(Indent) << "(tuple_expr type='" << E->getType() << '\'';
     for (unsigned i = 0, e = E->NumSubExprs; i != e; ++i) {
       OS << '\n';
       if (E->SubExprs[i])
@@ -660,7 +660,7 @@ public:
     OS << ')';
   }
   void visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
-    OS.indent(Indent) << "(unresolved_dot_expr type='" << E->Ty;
+    OS.indent(Indent) << "(unresolved_dot_expr type='" << E->getType();
     OS << "\' field '" << E->Name.get() << "'";
     if (!E->ResolvedDecls.empty())
       OS << " decl resolved to " << E->ResolvedDecls.size() << " candidate(s)!";
@@ -671,13 +671,14 @@ public:
     OS << ')';
   }
   void visitTupleElementExpr(TupleElementExpr *E) {
-    OS.indent(Indent) << "(tuple_element_expr type='" << E->Ty;
+    OS.indent(Indent) << "(tuple_element_expr type='" << E->getType();
     OS << "\' field #" << E->FieldNo << "\n";
     printRec(E->SubExpr);
     OS << ')';
   }
   void visitTupleShuffleExpr(TupleShuffleExpr *E) {
-    OS.indent(Indent) << "(tuple_shuffle type='" << E->Ty << "' Elements=[";
+    OS.indent(Indent) << "(tuple_shuffle type='" << E->getType();
+    OS << "' Elements=[";
     for (unsigned i = 0, e = E->ElementMapping.size(); i != e; ++i) {
       if (i) OS << ", ";
       OS << E->ElementMapping[i];
@@ -688,7 +689,7 @@ public:
   }
 
   void visitSequenceExpr(SequenceExpr *E) {
-    OS.indent(Indent) << "(sequence_expr type='" << E->Ty << '\'';
+    OS.indent(Indent) << "(sequence_expr type='" << E->getType() << '\'';
     for (unsigned i = 0, e = E->NumElements; i != e; ++i) {
       OS << '\n';
       printRec(E->Elements[i]);
@@ -696,23 +697,23 @@ public:
     OS << ')';
   }
   void visitFuncExpr(FuncExpr *E) {
-    OS.indent(Indent) << "(func_expr type='" << E->Ty << "'\n";
+    OS.indent(Indent) << "(func_expr type='" << E->getType() << "'\n";
     printRec(E->Body);
     OS << ')';
   }
   void visitClosureExpr(ClosureExpr *E) {
-    OS.indent(Indent) << "(closure_expr type='" << E->Ty << "'\n";
+    OS.indent(Indent) << "(closure_expr type='" << E->getType() << "'\n";
     printRec(E->Input);
     OS << ')';
   }
   
   void visitAnonClosureArgExpr(AnonClosureArgExpr *E) {
-    OS.indent(Indent) << "(anon_closure_arg_expr type='" << E->Ty;
+    OS.indent(Indent) << "(anon_closure_arg_expr type='" << E->getType();
     OS << "' ArgNo=" << E->ArgNo << ')';
   }
   
   void visitCallExpr(CallExpr *E) {
-    OS.indent(Indent) << "(call_expr type='" << E->Ty << "'\n";
+    OS.indent(Indent) << "(call_expr type='" << E->getType() << "'\n";
     printRec(E->Fn);
     OS << '\n';
     printRec(E->Arg);
@@ -726,7 +727,7 @@ public:
       OS << OO->Decls[0]->Name;
     else
       OS << "***UNKNOWN***";
-    OS << "' type='" << E->Ty << "'\n";
+    OS << "' type='" << E->getType() << "'\n";
     printRec(E->Arg);
     OS << ')';
   }
@@ -738,7 +739,7 @@ public:
       OS << OO->Decls[0]->Name;
     else
       OS << "***UNKNOWN***";
-    OS << "' type='" << E->Ty << "'\n";
+    OS << "' type='" << E->getType() << "'\n";
     printRec(E->getArgTuple()->SubExprs[0]);
     OS << '\n';
     printRec(E->getArgTuple()->SubExprs[1]);
@@ -746,7 +747,8 @@ public:
   }
   
   void visitProtocolElementExpr(ProtocolElementExpr *E) {
-    OS.indent(Indent) << "(protocol_element_expr type='" << E->Ty << "'\n";
+    OS.indent(Indent) << "(protocol_element_expr type='"
+                      << E->getType() << "'\n";
     printRec(E->Fn);
     OS << '\n';
     printRec(E->Arg);

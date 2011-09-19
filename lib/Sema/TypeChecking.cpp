@@ -71,7 +71,7 @@ struct RewriteAnonArgExpr {
     if (TupleType *TT = dyn_cast<TupleType>(FuncInputTy.getPointer()))
       NumInputArgs = TT->Fields.size();
     
-    assert(A->Ty->is<DependentType>() && "Anon arg already has a type?");
+    assert(A->getType()->is<DependentType>() && "Anon arg already has a type?");
     
     // Verify that the argument number isn't too large, e.g. using $4 when the
     // bound function only has 2 inputs.
@@ -85,10 +85,10 @@ struct RewriteAnonArgExpr {
     // Assign the AnonDecls their actual concrete types now that we know the
     // context they are being used in.
     if (TupleType *TT = dyn_cast<TupleType>(FuncInputTy.getPointer())) {
-      A->Ty = TT->getElementType(A->ArgNo);
+      A->setType(TT->getElementType(A->ArgNo));
     } else {
       assert(NumInputArgs == 1 && "Must have unary case");
-      A->Ty = FuncInputTy;
+      A->setType(FuncInputTy);
     }
     return A;
   }

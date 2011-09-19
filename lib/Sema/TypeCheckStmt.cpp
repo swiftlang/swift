@@ -68,7 +68,7 @@ public:
 
   Stmt *visitAssignStmt(AssignStmt *S) {
     if (typeCheckExpr(S->Dest) ||
-        typeCheckExpr(S->Src, S->Dest->Ty))
+        typeCheckExpr(S->Src, S->Dest->getType()))
       return 0;
     
     return S;
@@ -82,7 +82,8 @@ public:
       return 0;
     }
 
-    if (typeCheckExpr(RS->Result, TheFunc->Ty->castTo<FunctionType>()->Result))
+    if (typeCheckExpr(RS->Result,
+                      TheFunc->getType()->castTo<FunctionType>()->Result))
       return 0;
 
     return RS;
@@ -125,7 +126,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
       // TODO: What about tuples which contain functions by-value that are
       // dead?
       // TODO: QOI: Add source range.
-      if (SubExpr->Ty->is<FunctionType>())
+      if (SubExpr->getType()->is<FunctionType>())
         TC.error(SubExpr->getLocStart(),
                  "expression resolves to an unevaluated function");
       

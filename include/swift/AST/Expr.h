@@ -63,14 +63,25 @@ enum class ExprKind : uint8_t {
 class Expr {
   Expr(const Expr&) = delete;
   void operator=(const Expr&) = delete;
-public:
+
   /// Kind - The subclass of Expr that this is.
   const ExprKind Kind;
 
   /// Ty - This is the type of the expression.
   Type Ty;
-  
+
+public:
   Expr(ExprKind kind, Type ty = Type()) : Kind(kind), Ty(ty) {}
+
+  /// getKind - Return the kind of this expression.
+  ExprKind getKind() const { return Kind; }
+
+  /// getType - Return the type of this expression.
+  Type getType() const { return Ty; }
+
+  /// setType - Sets the type of this expression.  If we add
+  /// l-valueness to the type judgement, this should take that, too.
+  void setType(Type T) { Ty = T; }
 
   /// getLocStart - Return the location of the start of the expression.
   /// FIXME: QOI: Need to extend this to do full source ranges like Clang.
@@ -149,7 +160,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const IntegerLiteralExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->Kind == ExprKind::IntegerLiteral;
+    return E->getKind() == ExprKind::IntegerLiteral;
   }
 };
 
@@ -167,7 +178,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const FloatLiteralExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->Kind == ExprKind::FloatLiteral;
+    return E->getKind() == ExprKind::FloatLiteral;
   }
 };
 
@@ -182,7 +193,9 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const DeclRefExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == ExprKind::DeclRef; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::DeclRef;
+  }
 };
 
 /// OverloadSetRefExpr - A reference to an overloaded set of values with a
@@ -199,7 +212,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const OverloadSetRefExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->Kind == ExprKind::OverloadSetRef;
+    return E->getKind() == ExprKind::OverloadSetRef;
   }
 };
   
@@ -220,7 +233,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedDeclRefExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->Kind == ExprKind::UnresolvedDeclRef;
+    return E->getKind() == ExprKind::UnresolvedDeclRef;
   }
 };
 
@@ -242,7 +255,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedMemberExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->Kind == ExprKind::UnresolvedMember;
+    return E->getKind() == ExprKind::UnresolvedMember;
   }
 };
   
@@ -267,7 +280,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedScopedIdentifierExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->Kind == ExprKind::UnresolvedScopedIdentifier;
+    return E->getKind() == ExprKind::UnresolvedScopedIdentifier;
   }
 };
   
@@ -318,7 +331,7 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TupleExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == ExprKind::Tuple; }
+  static bool classof(const Expr *E) { return E->getKind() == ExprKind::Tuple; }
 };
 
 /// UnresolvedDotExpr - A field access (foo.bar) on an expression with dependent
@@ -346,7 +359,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedDotExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->Kind == ExprKind::UnresolvedDot;
+    return E->getKind() == ExprKind::UnresolvedDot;
   }
 };
 
@@ -366,7 +379,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TupleElementExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->Kind == ExprKind::TupleElement;
+    return E->getKind() == ExprKind::TupleElement;
   }
 };
 
@@ -390,7 +403,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TupleShuffleExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->Kind == ExprKind::TupleShuffle;
+    return E->getKind() == ExprKind::TupleShuffle;
   }
 };
   
@@ -408,7 +421,7 @@ public:
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const SequenceExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == ExprKind::Sequence; }
+  static bool classof(const Expr *E) { return E->getKind() == ExprKind::Sequence; }
 };
 
 /// FuncExpr - An explicit unnamed func definition, which can optionally
@@ -429,7 +442,7 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const FuncExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == ExprKind::Func; }
+  static bool classof(const Expr *E) { return E->getKind() == ExprKind::Func; }
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::FuncExpr;
   }
@@ -452,7 +465,7 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ClosureExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == ExprKind::Closure; }
+  static bool classof(const Expr *E) { return E->getKind() == ExprKind::Closure; }
 };
   
 class AnonClosureArgExpr : public Expr {
@@ -466,7 +479,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const AnonClosureArgExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->Kind == ExprKind::AnonClosureArg;
+    return E->getKind() == ExprKind::AnonClosureArg;
   }
 };
   
@@ -490,8 +503,8 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ApplyExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->Kind >= ExprKind::First_ApplyExpr &&
-           E->Kind <= ExprKind::Last_ApplyExpr;
+    return E->getKind() >= ExprKind::First_ApplyExpr &&
+           E->getKind() <= ExprKind::Last_ApplyExpr;
   }
 };
   
@@ -505,7 +518,7 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const CallExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == ExprKind::Call; }
+  static bool classof(const Expr *E) { return E->getKind() == ExprKind::Call; }
 };
   
 /// UnaryExpr - Prefix unary expressions like '!y'.
@@ -516,7 +529,7 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnaryExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == ExprKind::Unary; }
+  static bool classof(const Expr *E) { return E->getKind() == ExprKind::Unary; }
 };
   
 /// BinaryExpr - Infix binary expressions like 'x+y'.  The argument is always
@@ -537,7 +550,7 @@ public:
                   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BinaryExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->Kind == ExprKind::Binary; }
+  static bool classof(const Expr *E) { return E->getKind() == ExprKind::Binary; }
 };
 
 /// ProtocolElementExpr - Refer to an element of a protocol, e.g. P.x.  'x' is
@@ -555,7 +568,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ProtocolElementExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->Kind == ExprKind::ProtocolElement;
+    return E->getKind() == ExprKind::ProtocolElement;
   }
 };
 

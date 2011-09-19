@@ -117,12 +117,12 @@ RValue IRGenFunction::emitDeclRefRValue(DeclRefExpr *E, const TypeInfo &TInfo) {
 }
 
 RValue IRGenFunction::emitRValue(Expr *E) {
-  const TypeInfo &TInfo = IGM.getFragileTypeInfo(E->Ty);
+  const TypeInfo &TInfo = IGM.getFragileTypeInfo(E->getType());
   return emitRValue(E, TInfo);
 }
 
 RValue IRGenFunction::emitRValue(Expr *E, const TypeInfo &TInfo) {
-  switch (E->Kind) {
+  switch (E->getKind()) {
   case ExprKind::OverloadSetRef:
   case ExprKind::Sequence:
   case ExprKind::UnresolvedDeclRef:
@@ -163,12 +163,12 @@ RValue IRGenFunction::emitRValue(Expr *E, const TypeInfo &TInfo) {
 }
 
 LValue IRGenFunction::emitLValue(Expr *E) {
-  const TypeInfo &TInfo = IGM.getFragileTypeInfo(E->Ty);
+  const TypeInfo &TInfo = IGM.getFragileTypeInfo(E->getType());
   return emitLValue(E, TInfo);
 }
 
 LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &TInfo) {
-  switch (E->Kind) {
+  switch (E->getKind()) {
   case ExprKind::OverloadSetRef:
   case ExprKind::Sequence:
   case ExprKind::UnresolvedDeclRef:

@@ -77,7 +77,7 @@ void IRGenFunction::emitBraceStmt(BraceStmt *BS) {
 
 void IRGenFunction::emitAssignStmt(AssignStmt *S) {
   // Emit the LHS.
-  const TypeInfo &TInfo = getFragileTypeInfo(S->Dest->Ty);
+  const TypeInfo &TInfo = getFragileTypeInfo(S->Dest->getType());
   LValue LV = emitLValue(S->Dest, TInfo);
 
   // Emit the RHS.
@@ -114,7 +114,7 @@ void IRGenFunction::emitReturnStmt(ReturnStmt *S) {
   if (!ReturnSlot.isValid()) {
     emitIgnored(S->Result);
   } else {
-    const TypeInfo &ResultInfo = getFragileTypeInfo(S->Result->Ty);
+    const TypeInfo &ResultInfo = getFragileTypeInfo(S->Result->getType());
     RValue RV = emitRValue(S->Result, ResultInfo);
     ResultInfo.store(*this, RV, ReturnSlot);
   }

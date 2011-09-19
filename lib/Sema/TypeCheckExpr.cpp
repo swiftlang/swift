@@ -29,7 +29,7 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
   // A tuple expr with a single subexpression and no name is just a grouping
   // paren.
   if (TE->isGroupingParen()) {
-    TE->Ty = TE->SubExprs[0]->Ty;
+    TE->setType(TE->SubExprs[0]->getType());
     return false;
   }
   
@@ -40,26 +40,26 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
     // If the element value is missing, it has the value of the default
     // expression of the result type, which must be known.
     if (TE->SubExprs[i] == 0) {
-      assert(TE->Ty && isa<TupleType>(TE->Ty.getPointer()) && 
+      assert(TE->getType() && isa<TupleType>(TE->getType()) && 
              "Can't have default value without a result type");
       
       ResultTyElts[i].Ty =
-      cast<TupleType>(TE->Ty.getPointer())->getElementType(i);
+        cast<TupleType>(TE->getType())->getElementType(i);
       
       // FIXME: What about a default value that is dependent?
       if (ResultTyElts[i].Ty->is<DependentType>()) {
-        TE->Ty = ResultTyElts[i].Ty;
+        TE->setType(ResultTyElts[i].Ty);
         return false;
       }
     } else {
       // If any of the tuple element types is dependent, the whole tuple should
       // have dependent type.
-      if (TE->SubExprs[i]->Ty->is<DependentType>()) {
-        TE->Ty = TE->SubExprs[i]->Ty;
+      if (TE->SubExprs[i]->getType()->is<DependentType>()) {
+        TE->setType(TE->SubExprs[i]->getType());
         return false;
       }
       
-      ResultTyElts[i].Ty = TE->SubExprs[i]->Ty;
+      ResultTyElts[i].Ty = TE->SubExprs[i]->getType();
     }
     
     // If a name was specified for this element, use it.
@@ -67,7 +67,7 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
       ResultTyElts[i].Name = TE->SubExprNames[i];
   }
   
-  TE->Ty = TupleType::get(ResultTyElts, Context);
+  TE->setType(TupleType::get(ResultTyElts, Context));
   return false;
 }
 
@@ -82,7 +82,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   Expr *&E2 = E->Arg;
   
   // If we have a concrete function type, then we win.
-  if (FunctionType *FT = E1->Ty->getAs<FunctionType>()) {
+  if (FunctionType *FT = E1->getType()->getAs<FunctionType>()) {
     // If this is an operator, make sure that the declaration found was declared
     // as such.
     if (isa<UnaryExpr>(E) && !cast<DeclRefExpr>(E1)->D->Name.isOperator()) {
@@ -107,21 +107,21 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
       return true;
     }
     
-    E->Ty = FT->Result;
+    E->setType(FT->Result);
     return false;
   }
   
   // Otherwise, the function's type must be dependent.  If it is something else,
   // we have a type error.
-  if (!E1->Ty->is<DependentType>()) {
+  if (!E1->getType()->is<DependentType>()) {
     error(E1->getLocStart(), "called expression isn't a function");
     return true;
   }
   
   // Okay, if the argument is also dependent, we can't do anything here.  Just
   // wait until something gets resolved.
-  if (E2->Ty->is<DependentType>()) {
-    E->Ty = E2->Ty;
+  if (E2->getType()->is<DependentType>()) {
+    E->setType(E2->getType());
     return false;
   }
   
@@ -132,7 +132,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // resolve which overload member is based on the argument type.
   OverloadSetRefExpr *OS = dyn_cast<OverloadSetRefExpr>(E1);
   if (!OS) {
-    E->Ty = E1->Ty;
+    E->setType(E1->getType());
     return false;
   }
   
@@ -231,19 +231,19 @@ public:
     
     // TODO: QOI: If the decl had an "invalid" bit set, then return the error
     // object to improve error recovery.
-    E->Ty = E->D->Ty;
+    E->setType(E->D->Ty);
     return E;
   }
   Expr *visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
-    E->Ty = DependentType::get(TC.Context);
+    E->setType(DependentType::get(TC.Context));
     return E;
   }
   Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
-    assert(0 && "UnresolvedDeclRefExpr should be resolved by name binding!");
+    llvm_unreachable("name binding should resolve all UnresolvedDeclRefExprs!");
     return 0;
   }
   Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
-    E->Ty = DependentType::get(TC.Context);
+    E->setType(DependentType::get(TC.Context));
     return E;
   }
   
@@ -262,13 +262,13 @@ public:
 
   Expr *visitTupleElementExpr(TupleElementExpr *E) {
     // TupleElementExpr is fully resolved.
-    assert(!E->Ty->is<DependentType>());
+    assert(!E->getType()->is<DependentType>());
     return E;
   }
   
   Expr *visitTupleShuffleExpr(TupleShuffleExpr *E) {
     // TupleShuffleExpr is fully resolved.
-    assert(!E->Ty->is<DependentType>());
+    assert(!E->getType()->is<DependentType>());
     return E;
   }
   
@@ -289,8 +289,8 @@ public:
     // Nothing we can do here.  These remain as resolved or unresolved as they
     // always were.  If no type is assigned, we give them a dependent type so
     // that we get resolution later.
-    if (E->Ty.isNull())
-      E->Ty = DependentType::get(TC.Context);
+    if (E->getType().isNull())
+      E->setType(DependentType::get(TC.Context));
     return E;
   }
   
@@ -336,11 +336,11 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   // If the base expression hasn't been found yet, then we can't process this
   // value.
   if (E->SubExpr == 0) {
-    E->Ty = DependentType::get(TC.Context);
+    E->setType(DependentType::get(TC.Context));
     return E;
   }
   
-  Type SubExprTy = E->SubExpr->Ty;
+  Type SubExprTy = E->SubExpr->getType();
   if (SubExprTy->is<DependentType>())
     return E;
   
@@ -547,7 +547,7 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
     assert(!isa<SequenceExpr>(E) && "Should have resolved this");
     
     // Use is to strip off sugar.
-    if (!E->Ty->is<DependentType>())
+    if (!E->getType()->is<DependentType>())
       return E;
     
     error(E->getLocStart(),
