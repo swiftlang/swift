@@ -154,6 +154,7 @@ RValue IRGenFunction::emitRValue(Expr *E, const TypeInfo &TInfo) {
   case ExprKind::Func:
   case ExprKind::Closure:
   case ExprKind::AnonClosureArg:
+  case ExprKind::ProtocolElement:
     IGM.unimplemented(E->getLocStart(),
                       "cannot generate r-values for this expression yet");
     return emitFakeRValue(TInfo);
@@ -186,6 +187,11 @@ LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &TInfo) {
   case ExprKind::Closure:
   case ExprKind::AnonClosureArg:
     llvm_unreachable("these expression kinds should never be l-values");
+
+  case ExprKind::ProtocolElement:
+    IGM.unimplemented(E->getLocStart(),
+                      "cannot generate l-values for this expression yet");
+    return emitFakeLValue(TInfo);
 
   case ExprKind::Tuple: {
     TupleExpr *TE = cast<TupleExpr>(E);
