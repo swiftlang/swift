@@ -36,7 +36,7 @@ namespace swift {
   class BraceStmt;
   class TypeAliasDecl;
   
-enum class ExprKind {
+enum class ExprKind : uint8_t {
   IntegerLiteral,
   FloatLiteral,
   DeclRef,
