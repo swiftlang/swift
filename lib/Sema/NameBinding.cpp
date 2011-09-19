@@ -412,11 +412,11 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
   if (UnresolvedDotExpr *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
     SmallVector<ValueDecl*, 4> Decls;
     // Perform .-style name lookup.
-    Binder.bindValueName(UDE->Name, Decls, NLKind::DotLookup);
+    Binder.bindValueName(UDE->getName(), Decls, NLKind::DotLookup);
 
     // Copy the overload set into ASTContext memory.
     if (!Decls.empty())
-      UDE->ResolvedDecls = Binder.Context.AllocateCopy(Decls);
+      UDE->setResolvedDecls(Binder.Context.AllocateCopy(Decls));
     return UDE;
   }
   
@@ -432,13 +432,13 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
   // Process UnresolvedScopedIdentifierExpr by doing a qualified lookup.
   } else if (UnresolvedScopedIdentifierExpr *USIE =
                dyn_cast<UnresolvedScopedIdentifierExpr>(E)) {
-    Name = USIE->Name;
-    Loc = USIE->NameLoc;
+    Name = USIE->getName();
+    Loc = USIE->getNameLoc();
 
-    Identifier BaseName = USIE->BaseName;
-    SMLoc BaseNameLoc = USIE->BaseNameLoc;
+    Identifier BaseName = USIE->getBaseName();
+    SMLoc BaseNameLoc = USIE->getBaseNameLoc();
     BoundScope Scope =
-      Binder.bindScopeName(USIE->BaseTypeFromScope, BaseName, BaseNameLoc);
+      Binder.bindScopeName(USIE->getBaseTypeFromScope(), BaseName, BaseNameLoc);
     if (!Scope) return nullptr;
 
     if (OneOfType *Ty = Scope.dyn_cast<OneOfType*>()) {

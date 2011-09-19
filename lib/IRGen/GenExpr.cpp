@@ -196,7 +196,7 @@ LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &TInfo) {
   case ExprKind::Tuple: {
     TupleExpr *TE = cast<TupleExpr>(E);
     assert(TE->isGroupingParen() && "emitting non-grouping tuple as l-value");
-    return emitLValue(TE->SubExprs[0], TInfo);
+    return emitLValue(TE->getElement(0), TInfo);
   }
 
   case ExprKind::TupleElement:

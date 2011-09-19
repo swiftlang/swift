@@ -29,17 +29,17 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
   // A tuple expr with a single subexpression and no name is just a grouping
   // paren.
   if (TE->isGroupingParen()) {
-    TE->setType(TE->SubExprs[0]->getType());
+    TE->setType(TE->getElement(0)->getType());
     return false;
   }
   
   // Compute the result type.
-  SmallVector<TupleTypeElt, 8> ResultTyElts(TE->NumSubExprs);
+  SmallVector<TupleTypeElt, 8> ResultTyElts(TE->getNumElements());
   
-  for (unsigned i = 0, e = TE->NumSubExprs; i != e; ++i) {
+  for (unsigned i = 0, e = TE->getNumElements(); i != e; ++i) {
     // If the element value is missing, it has the value of the default
     // expression of the result type, which must be known.
-    if (TE->SubExprs[i] == 0) {
+    if (TE->getElement(i) == 0) {
       assert(TE->getType() && isa<TupleType>(TE->getType()) && 
              "Can't have default value without a result type");
       
@@ -54,17 +54,16 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
     } else {
       // If any of the tuple element types is dependent, the whole tuple should
       // have dependent type.
-      if (TE->SubExprs[i]->getType()->is<DependentType>()) {
-        TE->setType(TE->SubExprs[i]->getType());
+      if (TE->getElement(i)->getType()->is<DependentType>()) {
+        TE->setType(TE->getElement(i)->getType());
         return false;
       }
       
-      ResultTyElts[i].Ty = TE->SubExprs[i]->getType();
+      ResultTyElts[i].Ty = TE->getElement(i)->getType();
     }
     
     // If a name was specified for this element, use it.
-    if (TE->SubExprNames)
-      ResultTyElts[i].Name = TE->SubExprNames[i];
+    ResultTyElts[i].Name = TE->getElementName(i);
   }
   
   TE->setType(TupleType::get(ResultTyElts, Context));
@@ -336,12 +335,12 @@ public:
 Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   // If the base expression hasn't been found yet, then we can't process this
   // value.
-  if (E->SubExpr == 0) {
+  if (E->getBase() == 0) {
     E->setType(DependentType::get(TC.Context));
     return E;
   }
   
-  Type SubExprTy = E->SubExpr->getType();
+  Type SubExprTy = E->getBase()->getType();
   if (SubExprTy->is<DependentType>())
     return E;
   
@@ -356,25 +355,25 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   
   if (TupleType *TT = SubExprTy->getAs<TupleType>()) {
     // If the field name exists, we win.
-    int FieldNo = TT->getNamedElementId(E->Name);
+    int FieldNo = TT->getNamedElementId(E->getName());
     if (FieldNo != -1)
       return new (TC.Context) 
-        TupleElementExpr(E->SubExpr, E->DotLoc, FieldNo, E->NameLoc,
-                         TT->getElementType(FieldNo));
+        TupleElementExpr(E->getBase(), E->getDotLoc(), FieldNo,
+                         E->getNameLoc(), TT->getElementType(FieldNo));
     
     // Okay, the field name was invalid.  If this is a dollarident like $4,
     // process it as a field index.
-    if (E->Name.str().startswith("$")) {
+    if (E->getName().str().startswith("$")) {
       unsigned Value = 0;
-      if (!E->Name.str().substr(1).getAsInteger(10, Value)) {
+      if (!E->getName().str().substr(1).getAsInteger(10, Value)) {
         if (Value >= TT->Fields.size()) {
-          TC.error(E->NameLoc, "field number is too large for tuple");
+          TC.error(E->getNameLoc(), "field number is too large for tuple");
           return 0;
         }
         
         return new (TC.Context) 
-          TupleElementExpr(E->SubExpr, E->DotLoc, FieldNo, E->NameLoc,
-                           TT->getElementType(Value));
+          TupleElementExpr(E->getBase(), E->getDotLoc(), FieldNo,
+                           E->getNameLoc(), TT->getElementType(Value));
       }
     }
   }
@@ -382,12 +381,12 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   // Check in the context of a protocol.
   if (ProtocolType *PT = SubExprTy->getAs<ProtocolType>()) {
     for (ValueDecl *VD : PT->Elements) {
-      if (VD->Name == E->Name) {
+      if (VD->Name == E->getName()) {
         // The protocol value is applied via a DeclRefExpr.
-        Expr *Fn = new (TC.Context) DeclRefExpr(VD, E->NameLoc, VD->Ty);
+        Expr *Fn = new (TC.Context) DeclRefExpr(VD, E->getNameLoc(), VD->Ty);
         
         ApplyExpr *Call = new (TC.Context) 
-          ProtocolElementExpr(Fn, E->DotLoc, E->SubExpr);
+          ProtocolElementExpr(Fn, E->getDotLoc(), E->getBase());
         if (TC.semaApplyExpr(Call))
           return 0;
         return Call;
@@ -397,20 +396,22 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   
   // Next, check to see if "a.f" is actually being used as sugar for "f a",
   // which is a function application of 'a' to 'f'.
-  if (!E->ResolvedDecls.empty()) {
-    assert(E->ResolvedDecls[0]->Ty->is<FunctionType>() &&
+  if (!E->getResolvedDecls().empty()) {
+    assert(E->getResolvedDecls()[0]->Ty->is<FunctionType>() &&
            "Should have only bound to functions");
     Expr *FnRef;
     // Apply the base value to the function there is a single candidate in the
     // set then this is directly resolved, otherwise it is an overload case..
-    if (E->ResolvedDecls.size() == 1)
-      FnRef = new (TC.Context) DeclRefExpr(E->ResolvedDecls[0], E->NameLoc,
-                                           E->ResolvedDecls[0]->Ty);
+    if (E->getResolvedDecls().size() == 1)
+      FnRef = new (TC.Context) DeclRefExpr(E->getResolvedDecls()[0],
+                                           E->getNameLoc(),
+                                           E->getResolvedDecls()[0]->Ty);
     else
-      FnRef = new (TC.Context) OverloadSetRefExpr(E->ResolvedDecls, E->NameLoc,
+      FnRef = new (TC.Context) OverloadSetRefExpr(E->getResolvedDecls(),
+                                                  E->getNameLoc(),
                                                 DependentType::get(TC.Context));
     
-    CallExpr *Call = new (TC.Context) CallExpr(FnRef, E->SubExpr, Type());
+    CallExpr *Call = new (TC.Context) CallExpr(FnRef, E->getBase(), Type());
     if (TC.semaApplyExpr(Call))
       return 0;
     
@@ -420,7 +421,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   // TODO: Otherwise, do an argument dependent lookup in the namespace of the
   // base type.
   
-  TC.error(E->DotLoc, "base type '" + SubExprTy->getString() + 
+  TC.error(E->getDotLoc(), "base type '" + SubExprTy->getString() + 
            "' has no valid '.' expression for this field");
   return 0;
 }

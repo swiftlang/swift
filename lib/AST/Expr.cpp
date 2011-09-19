@@ -37,27 +37,27 @@ void *Expr::operator new(size_t Bytes, ASTContext &C,
 SMLoc Expr::getStartLoc() const {
   switch (Kind) {
   case ExprKind::IntegerLiteral:
-    return cast<IntegerLiteralExpr>(this)->getLoc();
+    return cast<IntegerLiteralExpr>(this)->getStartLoc();
   case ExprKind::FloatLiteral:
-    return cast<FloatLiteralExpr>(this)->getLoc();
+    return cast<FloatLiteralExpr>(this)->getStartLoc();
   case ExprKind::DeclRef:
-    return cast<DeclRefExpr>(this)->getLoc();
+    return cast<DeclRefExpr>(this)->getStartLoc();
   case ExprKind::OverloadSetRef:
-    return cast<OverloadSetRefExpr>(this)->getLoc();
+    return cast<OverloadSetRefExpr>(this)->getStartLoc();
   case ExprKind::UnresolvedDeclRef:
-    return cast<UnresolvedDeclRefExpr>(this)->getLoc();
+    return cast<UnresolvedDeclRefExpr>(this)->getStartLoc();
   case ExprKind::UnresolvedMember:
-    return cast<UnresolvedMemberExpr>(this)->getColonLoc();
+    return cast<UnresolvedMemberExpr>(this)->getStartLoc();
   case ExprKind::UnresolvedScopedIdentifier:
-    return cast<UnresolvedScopedIdentifierExpr>(this)->BaseNameLoc;
+    return cast<UnresolvedScopedIdentifierExpr>(this)->getStartLoc();
   case ExprKind::Tuple:
-    return cast<TupleExpr>(this)->LParenLoc;
+    return cast<TupleExpr>(this)->getStartLoc();
   case ExprKind::UnresolvedDot:
     return cast<UnresolvedDotExpr>(this)->getStartLoc();
   case ExprKind::TupleElement:
-    return cast<TupleElementExpr>(this)->SubExpr->getStartLoc();
+    return cast<TupleElementExpr>(this)->getStartLoc();
   case ExprKind::TupleShuffle:
-    return cast<TupleShuffleExpr>(this)->SubExpr->getStartLoc();
+    return cast<TupleShuffleExpr>(this)->getStartLoc();
   case ExprKind::Call:
     return cast<CallExpr>(this)->Fn->getStartLoc();
   case ExprKind::Sequence:
@@ -95,15 +95,15 @@ SMLoc Expr::getLoc() const {
   case ExprKind::UnresolvedMember:
     return cast<UnresolvedMemberExpr>(this)->getLoc();
   case ExprKind::UnresolvedScopedIdentifier:
-    return cast<UnresolvedScopedIdentifierExpr>(this)->BaseNameLoc;
+    return cast<UnresolvedScopedIdentifierExpr>(this)->getLoc();
   case ExprKind::Tuple:
-    return cast<TupleExpr>(this)->LParenLoc;
+    return cast<TupleExpr>(this)->getLoc();
   case ExprKind::UnresolvedDot:
-    return cast<UnresolvedDotExpr>(this)->DotLoc;
+    return cast<UnresolvedDotExpr>(this)->getLoc();
   case ExprKind::TupleElement:
-    return cast<TupleElementExpr>(this)->DotLoc;
+    return cast<TupleElementExpr>(this)->getLoc();
   case ExprKind::TupleShuffle:
-    return cast<TupleShuffleExpr>(this)->SubExpr->getLoc();
+    return cast<TupleShuffleExpr>(this)->getLoc();
   case ExprKind::Call:
     return cast<CallExpr>(this)->Arg->getStartLoc();
   case ExprKind::Sequence:
@@ -152,7 +152,7 @@ static ValueDecl *getCalledValue(Expr *E) {
 
   if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
     if (TE->isGroupingParen())
-      return getCalledValue(TE->SubExprs[0]);
+      return getCalledValue(TE->getElement(0));
 
   return nullptr;
 }
@@ -263,7 +263,8 @@ getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
   // either agree or can be converted.  If the expression is a TupleExpr, we do
   // this conversion in place.
   const TupleExpr *TE = dyn_cast<TupleExpr>(E);
-  if (TE && TE->NumSubExprs != 1 && TE->NumSubExprs == DestTy->Fields.size()) {
+  if (TE && TE->getNumElements() != 1 &&
+      TE->getNumElements() == DestTy->Fields.size()) {
     Expr::ConversionRank CurRank = Expr::CR_Identity;
     
     // The conversion rank of the tuple is the worst case of the conversion rank
@@ -280,7 +281,7 @@ getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
      
       // Check to see if the src value can be converted to the destination
       // element type.
-      Expr *Elt = TE->SubExprs[SrcField];
+      Expr *Elt = TE->getElement(SrcField);
       CurRank = std::max(CurRank,
                          Elt->getRankOfConversionTo(DestTy->getElementType(i),
                                                     Ctx));
@@ -329,11 +330,12 @@ getConversionRank(const Expr *E, Type DestTy, ASTContext &Ctx) {
   // conversion of the underlying expression.
   if (const TupleExpr *TE = dyn_cast<TupleExpr>(E))
     if (TE->isGroupingParen())
-      return getConversionRank(TE->SubExprs[0], DestTy, Ctx);
+      return getConversionRank(TE->getElement(0), DestTy, Ctx);
   
   if (TupleType *TT = DestTy->getAs<TupleType>()) {
     if (const TupleExpr *TE = dyn_cast<TupleExpr>(E))
-      return getTupleToTupleTypeConversionRank(TE, TE->NumSubExprs, TT, Ctx);
+      return getTupleToTupleTypeConversionRank(TE, TE->getNumElements(),
+                                               TT, Ctx);
     
     // If the is a scalar to tuple conversion, form the tuple and return it.
     int ScalarFieldNo = TT->getFieldForScalarInit();
@@ -398,37 +400,37 @@ namespace {
     }
     
     Expr *visitTupleExpr(TupleExpr *E) {
-      for (unsigned i = 0, e = E->NumSubExprs; i != e; ++i)
-        if (E->SubExprs[i]) {
-          if (Expr *Elt = doIt(E->SubExprs[i]))
-            E->SubExprs[i] = Elt;
+      for (unsigned i = 0, e = E->getNumElements(); i != e; ++i)
+        if (E->getElement(i)) {
+          if (Expr *Elt = doIt(E->getElement(i)))
+            E->setElement(i, Elt);
           else
             return 0;
         }
       return E;
     }
     Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
-      if (!E->SubExpr)
+      if (!E->getBase())
         return E;
       
-      if (Expr *E2 = doIt(E->SubExpr)) {
-        E->SubExpr = E2;
+      if (Expr *E2 = doIt(E->getBase())) {
+        E->setBase(E2);
         return E;
       }
       return 0;
     }
     
     Expr *visitTupleElementExpr(TupleElementExpr *E) {
-      if (Expr *E2 = doIt(E->SubExpr)) {
-        E->SubExpr = E2;
+      if (Expr *E2 = doIt(E->getBase())) {
+        E->setBase(E2);
         return E;
       }
       return 0;
     }
     
     Expr *visitTupleShuffleExpr(TupleShuffleExpr *E) {
-      if (Expr *E2 = doIt(E->SubExpr)) {
-        E->SubExpr = E2;
+      if (Expr *E2 = doIt(E->getSubExpr())) {
+        E->setSubExpr(E2);
         return E;
       }
       return 0;
@@ -483,14 +485,14 @@ namespace {
     Expr *visitBinaryExpr(BinaryExpr *E) {
       // Visit the arguments to the tuple.
       TupleExpr *Arg = E->getArgTuple();
-      assert(Arg->NumSubExprs == 2);
-      Expr *E2 = doIt(Arg->SubExprs[0]);
+      assert(Arg->getNumElements() == 2);
+      Expr *E2 = doIt(Arg->getElement(0));
       if (E2 == 0) return 0;
-      Arg->SubExprs[0] = E2;
+      Arg->setElement(0, E2);
       
-      E2 = doIt(Arg->SubExprs[1]);
+      E2 = doIt(Arg->getElement(1));
       if (E2 == 0) return 0;
-      Arg->SubExprs[1] = E2;
+      Arg->setElement(1, E2);
       return E;
     }
     
@@ -691,14 +693,14 @@ public:
   }
   void visitUnresolvedScopedIdentifierExpr(UnresolvedScopedIdentifierExpr *E) {
     OS.indent(Indent) << "(unresolved_scoped_identifier_expr base='"
-      << E->BaseTypeFromScope->Name << "\' name='" << E->Name << "')";
+      << E->getBaseTypeFromScope()->Name << "\' name='" << E->getName() << "')";
   }
   void visitTupleExpr(TupleExpr *E) {
     OS.indent(Indent) << "(tuple_expr type='" << E->getType() << '\'';
-    for (unsigned i = 0, e = E->NumSubExprs; i != e; ++i) {
+    for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
       OS << '\n';
-      if (E->SubExprs[i])
-        printRec(E->SubExprs[i]);
+      if (E->getElement(i))
+        printRec(E->getElement(i));
       else
         OS.indent(Indent+2) << "<<tuple element default value>>";
     }
@@ -706,30 +708,31 @@ public:
   }
   void visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     OS.indent(Indent) << "(unresolved_dot_expr type='" << E->getType();
-    OS << "\' field '" << E->Name.get() << "'";
-    if (!E->ResolvedDecls.empty())
-      OS << " decl resolved to " << E->ResolvedDecls.size() << " candidate(s)!";
-    if (E->SubExpr) {
+    OS << "\' field '" << E->getName().str() << "'";
+    if (!E->getResolvedDecls().empty())
+      OS << " decl resolved to " << E->getResolvedDecls().size()
+         << " candidate(s)!";
+    if (E->getBase()) {
       OS << '\n';
-      printRec(E->SubExpr);
+      printRec(E->getBase());
     }
     OS << ')';
   }
   void visitTupleElementExpr(TupleElementExpr *E) {
     OS.indent(Indent) << "(tuple_element_expr type='" << E->getType();
-    OS << "\' field #" << E->FieldNo << "\n";
-    printRec(E->SubExpr);
+    OS << "\' field #" << E->getFieldNumber() << "\n";
+    printRec(E->getBase());
     OS << ')';
   }
   void visitTupleShuffleExpr(TupleShuffleExpr *E) {
     OS.indent(Indent) << "(tuple_shuffle type='" << E->getType();
     OS << "' Elements=[";
-    for (unsigned i = 0, e = E->ElementMapping.size(); i != e; ++i) {
+    for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
       if (i) OS << ", ";
-      OS << E->ElementMapping[i];
+      OS << E->getElementMapping()[i];
     }
     OS << "]\n";
-    printRec(E->SubExpr);
+    printRec(E->getSubExpr());
     OS << ')';
   }
 
@@ -785,9 +788,9 @@ public:
     else
       OS << "***UNKNOWN***";
     OS << "' type='" << E->getType() << "'\n";
-    printRec(E->getArgTuple()->SubExprs[0]);
+    printRec(E->getArgTuple()->getElement(0));
     OS << '\n';
-    printRec(E->getArgTuple()->SubExprs[1]);
+    printRec(E->getArgTuple()->getElement(1));
     OS << ')';
   }
   

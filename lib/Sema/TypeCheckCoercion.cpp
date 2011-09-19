@@ -205,10 +205,11 @@ Expr *SemaCoerce::visitTupleExpr(TupleExpr *E) {
   // type is not a tuple type, then this just recursively forces the scalar
   // type into the single element.
   if (E->isGroupingParen()) {
-    E->SubExprs[0] = convertToType(E->SubExprs[0], DestTy, true, TC);
-    if (E->SubExprs[0] == 0) return 0;
-    
-    E->setType(E->SubExprs[0]->getType());
+    Expr *Sub = convertToType(E->getElement(0), DestTy, true, TC);
+    if (Sub == 0) return 0;
+
+    E->setElement(0, Sub);    
+    E->setType(Sub->getType());
     return E;
   }
   
@@ -301,7 +302,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       // the element we care about.
       SMLoc ErrorLoc = E->getStartLoc();
       if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
-        ErrorLoc = TE->RParenLoc;
+        ErrorLoc = TE->getRParenLoc();
       
       if (DestTy->Fields[i].Name.empty())
         TC.error(ErrorLoc, "no value to initialize tuple element #" +
@@ -326,7 +327,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       // the element we care about.
       SMLoc ErrorLoc = E->getLoc();
       if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
-        if (Expr *SubExp = TE->SubExprs[i])
+        if (Expr *SubExp = TE->getElement(i))
           ErrorLoc = SubExp->getLoc();
       
     if (IdentList[i].empty())
@@ -344,9 +345,10 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   // either agree or can be converted.  If the expression is a TupleExpr, we do
   // this conversion in place.
   TupleExpr *TE = dyn_cast<TupleExpr>(E);
-  if (TE && TE->NumSubExprs != 1 && TE->NumSubExprs == DestTy->Fields.size()) {
-    SmallVector<Expr*, 8> OrigElts(TE->SubExprs,
-                                         TE->SubExprs+TE->NumSubExprs);
+  if (TE && TE->getNumElements() != 1 &&
+      TE->getNumElements() == DestTy->Fields.size()) {
+    SmallVector<Expr*, 8> OrigElts(TE->getElements().begin(),
+                                   TE->getElements().end());
     
     for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
       // Extract the input element corresponding to this destination element.
@@ -356,7 +358,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       // If SrcField is -2, then the destination element should use its default
       // value.
       if (SrcField == -2U) {
-        TE->SubExprs[i] = 0;
+        TE->setElement(i, 0);
         continue;
       }
       
@@ -367,17 +369,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       Elt = convertToType(Elt, DestTy->getElementType(i), true, TC);
       // TODO: QOI: Include a note about this failure!
       if (Elt == 0) return 0;
-      TE->SubExprs[i] = Elt;
-      
-      if (DestTy->Fields[i].Name.get()) {
-        // Allocate the array on the first element with a name.
-        if (TE->SubExprNames == 0)
-          TE->SubExprNames =
-          TC.Context.Allocate<Identifier>(DestTy->Fields.size());
-        
-        TE->SubExprNames[i] = DestTy->Fields[i].Name;
-      } else if (TE->SubExprNames)
-        TE->SubExprNames[i] = Identifier();
+      TE->setElement(i, Elt);
     }
     
     // Okay, we updated the tuple in place.
@@ -479,10 +471,10 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
   // just force the type through it, regardless of what DestTy is.
   if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
     if (TE->isGroupingParen()) {
-      TE->SubExprs[0] = convertToType(TE->SubExprs[0], DestTy,
-                                      IgnoreAnonDecls, TC);
-      if (TE->SubExprs[0] == 0) return 0;
-      TE->setType(TE->SubExprs[0]->getType());
+      TE->setElement(0, convertToType(TE->getElement(0), DestTy,
+                                      IgnoreAnonDecls, TC));
+      if (TE->getElement(0) == 0) return 0;
+      TE->setType(TE->getElement(0)->getType());
       return TE;
     }
   
@@ -496,7 +488,7 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
     // If the element of the tuple has dependent type and is a TupleExpr, try to
     // convert it.
     if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
-      return convertTupleToTupleType(TE, TE->NumSubExprs, TT,TC);
+      return convertTupleToTupleType(TE, TE->getNumElements(), TT,TC);
 
     // If the is a scalar to tuple conversion, form the tuple and return it.
     int ScalarFieldNo = TT->getFieldForScalarInit();

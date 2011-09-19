@@ -322,9 +322,9 @@ RValue IRGenFunction::emitTupleExpr(TupleExpr *Tuple, const TypeInfo &TI) {
   }
 
   // Emit all the sub-expressions.
-  for (unsigned I = 0, E = Tuple->NumSubExprs; I != E; ++I) {
+  for (unsigned I = 0, E = Tuple->getNumElements(); I != E; ++I) {
     const TupleFieldInfo &FieldInfo = FieldInfos[I];
-    RValue Field = emitRValue(Tuple->SubExprs[I], FieldInfo.FieldInfo);
+    RValue Field = emitRValue(Tuple->getElement(I), FieldInfo.FieldInfo);
 
     // If the outer schema is scalar, then all the element schemas
     // are, too, and we should just their scalars into field scalars.

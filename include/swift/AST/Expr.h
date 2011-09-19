@@ -159,7 +159,9 @@ public:
     : Expr(ExprKind::IntegerLiteral, Ty), Val(Val), Loc(Loc) {}
   
   uint64_t getValue() const;
+
   SMLoc getLoc() const { return Loc; }
+  SMLoc getStartLoc() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const IntegerLiteralExpr *) { return true; }
@@ -180,7 +182,9 @@ public:
     : Expr(ExprKind::FloatLiteral, Ty), Val(Val), Loc(Loc) {}
 
   double getValue() const { return Val; }
+
   SMLoc getLoc() const { return Loc; }
+  SMLoc getStartLoc() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const FloatLiteralExpr *) { return true; }
@@ -199,7 +203,9 @@ public:
     : Expr(ExprKind::DeclRef, Ty), D(D), Loc(Loc) {}
 
   ValueDecl *getDecl() const { return D; }
+
   SMLoc getLoc() const { return Loc; }  
+  SMLoc getStartLoc() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const DeclRefExpr *) { return true; }
@@ -220,7 +226,9 @@ public:
   : Expr(ExprKind::OverloadSetRef, Ty), Decls(decls), Loc(L) {}
 
   ArrayRef<ValueDecl*> getDecls() const { return Decls; }
+
   SMLoc getLoc() const { return Loc; }
+  SMLoc getStartLoc() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const OverloadSetRefExpr *) { return true; }
@@ -244,7 +252,9 @@ public:
   }
   
   Identifier getName() const { return Name; }
+
   SMLoc getLoc() const { return Loc; }
+  SMLoc getStartLoc() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedDeclRefExpr *) { return true; }
@@ -269,9 +279,11 @@ public:
   }
 
   Identifier getName() const { return Name; }
-  SMLoc getLoc() const { return NameLoc; }
   SMLoc getNameLoc() const { return NameLoc; }
   SMLoc getColonLoc() const { return ColonLoc; }
+
+  SMLoc getLoc() const { return NameLoc; }
+  SMLoc getStartLoc() const { return ColonLoc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedMemberExpr *) { return true; }
@@ -283,12 +295,12 @@ public:
 /// UnresolvedScopedIdentifierExpr - This represents "foo::bar", an unresolved
 /// reference to a type foo and a member bar within it.
 class UnresolvedScopedIdentifierExpr : public Expr {
-public:
   TypeAliasDecl *BaseTypeFromScope;
   Identifier BaseName;
   Identifier Name;
   SMLoc BaseNameLoc, ColonColonLoc, NameLoc;
   
+public:
   UnresolvedScopedIdentifierExpr(TypeAliasDecl *baseTypeFromScope,
                                  Identifier baseName, SMLoc baseNameLoc,
                                  SMLoc colonLoc,
@@ -297,6 +309,16 @@ public:
     BaseTypeFromScope(baseTypeFromScope), BaseName(baseName), Name(name),
     BaseNameLoc(baseNameLoc), ColonColonLoc(colonLoc), NameLoc(nameLoc) {
   }
+
+  TypeAliasDecl *getBaseTypeFromScope() const { return BaseTypeFromScope; }
+  Identifier getBaseName() const { return BaseName; }
+  Identifier getName() const { return Name; }
+  SMLoc getBaseNameLoc() const { return BaseNameLoc; }
+  SMLoc getColonColonLoc() const { return ColonColonLoc; }
+  SMLoc getNameLoc() const { return NameLoc; }
+
+  SMLoc getLoc() const { return NameLoc; }
+  SMLoc getStartLoc() const { return BaseNameLoc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedScopedIdentifierExpr *) { return true; }
@@ -313,7 +335,6 @@ public:
 /// When a tuple element is formed with a default value for the type, the
 /// corresponding SubExpr element will be null.
 class TupleExpr : public Expr {
-public:
   SMLoc LParenLoc;
   /// SubExprs - Elements of these can be set to null to get the default init
   /// value for the tuple element.
@@ -327,7 +348,9 @@ public:
   /// source and result types are the same.  This is only true for
   /// single-element tuples with no element name.
   bool IsGrouping;
-  
+
+  Expr **getSubExprs() const { return SubExprs; }  
+public:
   TupleExpr(SMLoc lparenloc, Expr **subexprs, Identifier *subexprnames,
             unsigned numsubexprs, SMLoc rparenloc, bool isGrouping,
             Type Ty = Type())
@@ -338,6 +361,29 @@ public:
             (NumSubExprs == 1 && getElementName(0).empty() && SubExprs[0])) &&
            "Invalid grouping paren");
   }
+
+  SMLoc getLParenLoc() const { return LParenLoc; }
+  SMLoc getRParenLoc() const { return RParenLoc; }
+
+  SMLoc getLoc() const { return LParenLoc; }
+  SMLoc getStartLoc() const { return LParenLoc; }
+  SMLoc getEndLoc() const { return RParenLoc; }
+
+  unsigned getNumElements() const { return NumSubExprs; }
+
+  ArrayRef<Expr*> getElements() const {
+    return ArrayRef<Expr*>(SubExprs, NumSubExprs);
+  }
+  Expr *getElement(unsigned i) const {
+    assert(i < NumSubExprs && "Invalid element index");
+    return getSubExprs()[i];
+  }
+  void setElement(unsigned i, Expr *e) {
+    assert(i < NumSubExprs && "Invalid element index");
+    getSubExprs()[i] = e;
+  }
+
+  bool hasElementNames() const { return SubExprNames; }
 
   Identifier getElementName(unsigned i) const {
     assert(i < NumSubExprs && "Invalid element index");
@@ -358,7 +404,6 @@ public:
 /// UnresolvedDotExpr - A field access (foo.bar) on an expression with dependent
 /// type.
 class UnresolvedDotExpr : public Expr {
-public:
   Expr *SubExpr;
   SMLoc DotLoc;
   Identifier Name;
@@ -367,14 +412,30 @@ public:
   /// ResolvedDecl - If the name refers to any local or top-level declarations,
   /// the name binder fills them in here.
   ArrayRef<ValueDecl*> ResolvedDecls;
-  
+
+public:
   UnresolvedDotExpr(Expr *subexpr, SMLoc dotloc, Identifier name,
                     SMLoc nameloc)
   : Expr(ExprKind::UnresolvedDot), SubExpr(subexpr), DotLoc(dotloc),
     Name(name), NameLoc(nameloc) {}
   
+  SMLoc getLoc() const { return DotLoc; }
   SMLoc getStartLoc() const {
     return SubExpr ? SubExpr->getStartLoc() : DotLoc;
+  }
+  SMLoc getEndLoc() const { return NameLoc; }
+
+  SMLoc getDotLoc() const { return DotLoc; }
+  Expr *getBase() const { return SubExpr; }
+  void setBase(Expr *e) { SubExpr = e; }
+
+  Identifier getName() const { return Name; }
+  SMLoc getNameLoc() const { return NameLoc; }
+
+  ArrayRef<ValueDecl*> getResolvedDecls() const { return ResolvedDecls; }
+  void setResolvedDecls(ArrayRef<ValueDecl*> Decls) {
+    assert(ResolvedDecls.empty());
+    ResolvedDecls = Decls;
   }
   
   // Implement isa/cast/dyncast/etc.
@@ -386,16 +447,25 @@ public:
 
 /// TupleElementExpr - Refer to an element of a tuple, e.g. "(1,2).field0".
 class TupleElementExpr : public Expr {
-public:
   Expr *SubExpr;
   SMLoc DotLoc;
   unsigned FieldNo;
   SMLoc NameLoc;
   
+public:
   TupleElementExpr(Expr *subexpr, SMLoc dotloc, unsigned fieldno,
                    SMLoc nameloc, Type ty = Type())
   : Expr(ExprKind::TupleElement, ty), SubExpr(subexpr), DotLoc(dotloc),
     FieldNo(fieldno), NameLoc(nameloc) {}
+
+  SMLoc getStartLoc() const { return SubExpr->getStartLoc(); }
+  SMLoc getDotLoc() const { return DotLoc; }
+  SMLoc getLoc() const { return DotLoc; }
+  Expr *getBase() const { return SubExpr; }
+  void setBase(Expr *e) { SubExpr = e; }
+
+  unsigned getFieldNumber() const { return FieldNo; }
+  SMLoc getNameLoc() const { return NameLoc; }  
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TupleElementExpr *) { return true; }
@@ -408,7 +478,6 @@ public:
 /// tuple type.  The expression's type is known to be a tuple type and the
 /// subexpression is known to have a tuple type as well.
 class TupleShuffleExpr : public Expr {
-public:
   Expr *SubExpr;
   
   /// This contains an entry for each element in the Expr type.  Each element
@@ -417,9 +486,14 @@ public:
   /// initializer for that tuple element value.
   ArrayRef<int> ElementMapping;
   
+public:
   TupleShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping, Type Ty)
     : Expr(ExprKind::TupleShuffle, Ty), SubExpr(subExpr),
       ElementMapping(elementMapping) {}
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *e) { SubExpr = e; }
+  ArrayRef<int> getElementMapping() const { return ElementMapping; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TupleShuffleExpr *) { return true; }

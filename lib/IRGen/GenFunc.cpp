@@ -257,12 +257,12 @@ static void emitExpanded(IRGenFunction &IGF, Expr *Arg, ArgList &Args) {
   if (TupleExpr *ArgTuple = dyn_cast<TupleExpr>(Arg)) {
     // But ignore grouping parens.
     if (ArgTuple->isGroupingParen()) {
-      return emitExpanded(IGF, ArgTuple->SubExprs[0], Args);
+      return emitExpanded(IGF, ArgTuple->getElement(0), Args);
     }
 
     // TODO: we might need to change the order of the arguments here.
-    for (unsigned I = 0, E = ArgTuple->NumSubExprs; I != E; ++I)
-      emitArg(IGF, ArgTuple->SubExprs[I], Args);
+    for (auto elt : ArgTuple->getElements())
+      emitArg(IGF, elt, Args);
     return;
   }
 
