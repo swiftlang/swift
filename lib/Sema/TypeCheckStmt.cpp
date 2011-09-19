@@ -127,7 +127,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
       // dead?
       // TODO: QOI: Add source range.
       if (SubExpr->getType()->is<FunctionType>())
-        TC.error(SubExpr->getLocStart(),
+        TC.error(SubExpr->getLoc(),
                  "expression resolves to an unevaluated function");
       
       NewElements.push_back(SubExpr);

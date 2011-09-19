@@ -343,12 +343,12 @@ bool Parser::parseTypeArray(SMLoc LSquareLoc, Type &Result) {
   if (IntegerLiteralExpr *IL = dyn_cast<IntegerLiteralExpr>(Size)) {
     SizeVal = IL->getValue();
   } else {
-    error(Size->getLocStart(), "invalid type size, not a constant");
+    error(Size->getLoc(), "invalid type size, not a constant");
     return ErrorType::get(Context);
   }
   
   if (SizeVal == 0) {
-    error(Size->getLocStart(), "array types must be larger than zero elements");
+    error(Size->getLoc(), "array types must be larger than zero elements");
     return ErrorType::get(Context);
   }
   

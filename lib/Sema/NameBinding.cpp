@@ -425,8 +425,8 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
   SmallVector<ValueDecl*, 4> Decls;
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
   if (UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
-    Name = UDRE->Name;
-    Loc = UDRE->Loc;
+    Name = UDRE->getName();
+    Loc = UDRE->getLoc();
     Binder.bindValueName(Name, Decls, NLKind::UnqualifiedLookup);
 
   // Process UnresolvedScopedIdentifierExpr by doing a qualified lookup.

@@ -34,50 +34,95 @@ void *Expr::operator new(size_t Bytes, ASTContext &C,
 
 /// getLocStart - Return the location of the start of the expression.
 /// FIXME: Need to extend this to do full source ranges like Clang.
-SMLoc Expr::getLocStart() const {
+SMLoc Expr::getStartLoc() const {
   switch (Kind) {
   case ExprKind::IntegerLiteral:
-    return cast<IntegerLiteralExpr>(this)->Loc;
+    return cast<IntegerLiteralExpr>(this)->getLoc();
   case ExprKind::FloatLiteral:
-    return cast<FloatLiteralExpr>(this)->Loc;
+    return cast<FloatLiteralExpr>(this)->getLoc();
   case ExprKind::DeclRef:
-    return cast<DeclRefExpr>(this)->Loc;
+    return cast<DeclRefExpr>(this)->getLoc();
   case ExprKind::OverloadSetRef:
-    return cast<OverloadSetRefExpr>(this)->Loc;
+    return cast<OverloadSetRefExpr>(this)->getLoc();
   case ExprKind::UnresolvedDeclRef:
-    return cast<UnresolvedDeclRefExpr>(this)->Loc;
+    return cast<UnresolvedDeclRefExpr>(this)->getLoc();
   case ExprKind::UnresolvedMember:
-    return cast<UnresolvedMemberExpr>(this)->ColonLoc;
+    return cast<UnresolvedMemberExpr>(this)->getColonLoc();
   case ExprKind::UnresolvedScopedIdentifier:
     return cast<UnresolvedScopedIdentifierExpr>(this)->BaseNameLoc;
   case ExprKind::Tuple:
     return cast<TupleExpr>(this)->LParenLoc;
   case ExprKind::UnresolvedDot:
-    return cast<UnresolvedDotExpr>(this)->getLocStart();
+    return cast<UnresolvedDotExpr>(this)->getStartLoc();
   case ExprKind::TupleElement:
-    return cast<TupleElementExpr>(this)->SubExpr->getLocStart();
+    return cast<TupleElementExpr>(this)->SubExpr->getStartLoc();
   case ExprKind::TupleShuffle:
-    return cast<TupleShuffleExpr>(this)->SubExpr->getLocStart();
+    return cast<TupleShuffleExpr>(this)->SubExpr->getStartLoc();
   case ExprKind::Call:
-    return cast<CallExpr>(this)->Fn->getLocStart();
+    return cast<CallExpr>(this)->Fn->getStartLoc();
   case ExprKind::Sequence:
-    return cast<SequenceExpr>(this)->Elements[0]->getLocStart();
+    return cast<SequenceExpr>(this)->Elements[0]->getStartLoc();
   case ExprKind::Func:
     return cast<FuncExpr>(this)->FuncLoc;
   case ExprKind::Closure:
-    return cast<ClosureExpr>(this)->Input->getLocStart();
+    return cast<ClosureExpr>(this)->Input->getStartLoc();
   case ExprKind::AnonClosureArg:
     return cast<AnonClosureArgExpr>(this)->Loc;
   case ExprKind::Unary:
-    return cast<UnaryExpr>(this)->Fn->getLocStart();
+    return cast<UnaryExpr>(this)->Fn->getStartLoc();
   case ExprKind::Binary:
-    return cast<BinaryExpr>(this)->Arg->getLocStart();
+    return cast<BinaryExpr>(this)->Arg->getStartLoc();
   case ExprKind::ProtocolElement:
-    return cast<ProtocolElementExpr>(this)->Arg->getLocStart();
+    return cast<ProtocolElementExpr>(this)->Arg->getStartLoc();
   }
   
-  assert(0 && "expression type not handled!");
-  abort();
+  llvm_unreachable("expression type not handled!");
+}
+
+/// getLoc - Return the caret location of the expression.
+SMLoc Expr::getLoc() const {
+  switch (Kind) {
+  case ExprKind::IntegerLiteral:
+    return cast<IntegerLiteralExpr>(this)->getLoc();
+  case ExprKind::FloatLiteral:
+    return cast<FloatLiteralExpr>(this)->getLoc();
+  case ExprKind::DeclRef:
+    return cast<DeclRefExpr>(this)->getLoc();
+  case ExprKind::OverloadSetRef:
+    return cast<OverloadSetRefExpr>(this)->getLoc();
+  case ExprKind::UnresolvedDeclRef:
+    return cast<UnresolvedDeclRefExpr>(this)->getLoc();
+  case ExprKind::UnresolvedMember:
+    return cast<UnresolvedMemberExpr>(this)->getLoc();
+  case ExprKind::UnresolvedScopedIdentifier:
+    return cast<UnresolvedScopedIdentifierExpr>(this)->BaseNameLoc;
+  case ExprKind::Tuple:
+    return cast<TupleExpr>(this)->LParenLoc;
+  case ExprKind::UnresolvedDot:
+    return cast<UnresolvedDotExpr>(this)->DotLoc;
+  case ExprKind::TupleElement:
+    return cast<TupleElementExpr>(this)->DotLoc;
+  case ExprKind::TupleShuffle:
+    return cast<TupleShuffleExpr>(this)->SubExpr->getLoc();
+  case ExprKind::Call:
+    return cast<CallExpr>(this)->Arg->getStartLoc();
+  case ExprKind::Sequence:
+    return cast<SequenceExpr>(this)->Elements[0]->getLoc();
+  case ExprKind::Func:
+    return cast<FuncExpr>(this)->FuncLoc;
+  case ExprKind::Closure:
+    return cast<ClosureExpr>(this)->Input->getLoc();
+  case ExprKind::AnonClosureArg:
+    return cast<AnonClosureArgExpr>(this)->Loc;
+  case ExprKind::Unary:
+    return cast<UnaryExpr>(this)->Fn->getLoc();
+  case ExprKind::Binary:
+    return cast<BinaryExpr>(this)->Fn->getLoc();
+  case ExprKind::ProtocolElement:
+    return cast<ProtocolElementExpr>(this)->DotLoc;
+  }
+  
+  llvm_unreachable("expression type not handled!");
 }
 
 //===----------------------------------------------------------------------===//
@@ -103,7 +148,7 @@ uint64_t IntegerLiteralExpr::getValue() const {
 
 static ValueDecl *getCalledValue(Expr *E) {
   if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
-    return DRE->D;
+    return DRE->getDecl();
 
   if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
     if (TE->isGroupingParen())
@@ -622,27 +667,27 @@ public:
 
   void visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
     OS.indent(Indent) << "(integer_literal_expr type='" << E->getType();
-    OS << "' value=" << E->Val << ')';
+    OS << "' value=" << E->getValue() << ')';
   }
   void visitFloatLiteralExpr(FloatLiteralExpr *E) {
     OS.indent(Indent) << "(float_literal_expr type='" << E->getType();
-    OS << "' value=" << E->Val << ')';
+    OS << "' value=" << E->getValue() << ')';
   }
   void visitDeclRefExpr(DeclRefExpr *E) {
     OS.indent(Indent) << "(declref_expr type='" << E->getType();
-    OS << "' decl=" << E->D->Name << ')';
+    OS << "' decl=" << E->getDecl()->Name << ')';
   }
   void visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
     OS.indent(Indent) << "(overloadsetref_expr type='" << E->getType();
-    OS << "' decl=" << E->Decls[0]->Name << ')';
+    OS << "' decl=" << E->getDecls()[0]->Name << ')';
   }
   void visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
     OS.indent(Indent) << "(unresolved_decl_ref_expr type='" << E->getType();
-    OS << "' name=" << E->Name << ')';
+    OS << "' name=" << E->getName() << ')';
   }
   void visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     OS.indent(Indent) << "(unresolved_member_expr type='" << E->getType();
-    OS << "\' name='" << E->Name << "')";
+    OS << "\' name='" << E->getName() << "')";
   }
   void visitUnresolvedScopedIdentifierExpr(UnresolvedScopedIdentifierExpr *E) {
     OS.indent(Indent) << "(unresolved_scoped_identifier_expr base='"
@@ -722,9 +767,9 @@ public:
   void visitUnaryExpr(UnaryExpr *E) {
     OS.indent(Indent) << "(unary_expr '";
     if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->Fn))
-      OS << DRE->D->Name;
+      OS << DRE->getDecl()->Name;
     else if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E->Fn))
-      OS << OO->Decls[0]->Name;
+      OS << OO->getDecls()[0]->Name;
     else
       OS << "***UNKNOWN***";
     OS << "' type='" << E->getType() << "'\n";
@@ -734,9 +779,9 @@ public:
   void visitBinaryExpr(BinaryExpr *E) {
     OS.indent(Indent) << "(binary_expr '";
     if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->Fn))
-      OS << DRE->D->Name;
+      OS << DRE->getDecl()->Name;
     else if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E->Fn))
-      OS << OO->Decls[0]->Name;
+      OS << OO->getDecls()[0]->Name;
     else
       OS << "***UNKNOWN***";
     OS << "' type='" << E->getType() << "'\n";

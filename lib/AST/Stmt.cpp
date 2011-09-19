@@ -38,7 +38,7 @@ SMLoc Stmt::getLocStart() const {
   case StmtKind::Semi:
     return cast<SemiStmt>(this)->Loc;
   case StmtKind::Assign:
-    return cast<AssignStmt>(this)->Dest->getLocStart();
+    return cast<AssignStmt>(this)->Dest->getStartLoc();
   case StmtKind::Brace:
     return cast<BraceStmt>(this)->LBLoc;
   case StmtKind::Return:

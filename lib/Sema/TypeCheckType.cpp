@@ -90,9 +90,10 @@ bool TypeChecker::validateType(Type InTy) {
       Expr *EltInit = TT->Fields[i].Init;
       if (EltInit == 0) continue;
       
-      SMLoc InitLoc = EltInit->getLocStart();
+      Expr *OldInit = EltInit;
       if (typeCheckExpression(EltInit, EltTy)) {
-        note(InitLoc, "while converting default tuple value to element type");
+        note(OldInit->getLoc(),
+             "while converting default tuple value to element type");
         IsInvalid = true;
         break;
       }

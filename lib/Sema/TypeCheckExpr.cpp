@@ -85,15 +85,16 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   if (FunctionType *FT = E1->getType()->getAs<FunctionType>()) {
     // If this is an operator, make sure that the declaration found was declared
     // as such.
-    if (isa<UnaryExpr>(E) && !cast<DeclRefExpr>(E1)->D->Name.isOperator()) {
-      error(E1->getLocStart(),
+    if (isa<UnaryExpr>(E) &&
+               !cast<DeclRefExpr>(E1)->getDecl()->Name.isOperator()) {
+      error(E1->getLoc(),
             "use of unary operator without 'unary' attribute specified");
       return true;
     }
     
     if (isa<BinaryExpr>(E) &&
-               !cast<DeclRefExpr>(E1)->D->Attrs.isInfix()) {
-      error(E1->getLocStart(),
+               !cast<DeclRefExpr>(E1)->getDecl()->Attrs.isInfix()) {
+      error(E1->getLoc(),
             "use of unary operator without 'unary' attribute specified");
       return true;
     }
@@ -102,7 +103,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // expected type of the function.
     E2 = convertToType(E2, FT->Input);
     if (E2 == 0) {
-      note(E1->getLocStart(),
+      note(E1->getLoc(),
            "while converting function argument to expected type");
       return true;
     }
@@ -114,7 +115,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // Otherwise, the function's type must be dependent.  If it is something else,
   // we have a type error.
   if (!E1->getType()->is<DependentType>()) {
-    error(E1->getLocStart(), "called expression isn't a function");
+    error(E1->getLoc(), "called expression isn't a function");
     return true;
   }
   
@@ -165,7 +166,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // If we found a successful match, resolve the overload set to it and continue
   // type checking.
   if (BestCandidateFound) {
-    E1 = new (Context) DeclRefExpr(BestCandidateFound, OS->Loc,
+    E1 = new (Context) DeclRefExpr(BestCandidateFound, OS->getLoc(),
                                    BestCandidateFound->Ty);
     return semaApplyExpr(E);
   }
@@ -173,13 +174,13 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // Otherwise we have either an ambiguity between multiple possible candidates
   // or not candidate at all.
   if (BestRank != Expr::CR_Invalid)
-    error(E1->getLocStart(), "overloading ambiguity found");
+    error(E1->getLoc(), "overloading ambiguity found");
   else if (isa<BinaryExpr>(E))
-    error(E1->getLocStart(), "no candidates found for binary operator");
+    error(E1->getLoc(), "no candidates found for binary operator");
   else if (isa<UnaryExpr>(E))
-    error(E1->getLocStart(), "no candidates found for unary operator");
+    error(E1->getLoc(), "no candidates found for unary operator");
   else
-    error(E1->getLocStart(), "no candidates found for call");
+    error(E1->getLoc(), "no candidates found for call");
   
   // Print out the candidate set.
   for (auto TheDecl : OS->Decls) {
@@ -219,19 +220,19 @@ public:
     return E;
   }
   Expr *visitDeclRefExpr(DeclRefExpr *E) {
-    if (E->D == 0) {
-      TC.error(E->Loc, "use of undeclared identifier");
+    if (E->getDecl() == 0) {
+      TC.error(E->getLoc(), "use of undeclared identifier");
       return 0;
     }
     
     // If the decl had an invalid type, then an error has already been emitted,
     // just propagate it up.
-    if (E->D->Ty->is<ErrorType>())
+    if (E->getDecl()->Ty->is<ErrorType>())
       return 0;
     
     // TODO: QOI: If the decl had an "invalid" bit set, then return the error
     // object to improve error recovery.
-    E->setType(E->D->Ty);
+    E->setType(E->getDecl()->Ty);
     return E;
   }
   Expr *visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
@@ -429,7 +430,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
 /// its precedence, otherwise return -1.
 static int getBinOp(Expr *E, TypeChecker &TC) {
   if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
-    return DRE->D->Attrs.InfixPrecedence;
+    return DRE->getDecl()->Attrs.InfixPrecedence;
   
   // If this is an overload set, the entire overload set is required to have the
   // same precedence level.
@@ -441,7 +442,7 @@ static int getBinOp(Expr *E, TypeChecker &TC) {
         continue;
       
       if (Precedence != -1 && Precedence != D->Attrs.InfixPrecedence) {
-        TC.error(E->getLocStart(),
+        TC.error(OO->getLoc(),
                  "binary operator with multiple overloads of disagreeing "
                  "precedence found");
         return -2;
@@ -472,8 +473,7 @@ static Expr *ReduceBinaryExprs(SequenceExpr *E, unsigned &Elt,
     int LeftPrecedence = getBinOp(LeftOperator, TC);
     if (LeftPrecedence < (int)MinPrec) {
       if (LeftPrecedence == -1)
-        TC.error(LeftOperator->getLocStart(),
-                 "operator is not a binary operator");
+        TC.error(LeftOperator->getLoc(), "operator is not a binary operator");
       return 0;
     }
     
@@ -499,15 +499,14 @@ static Expr *ReduceBinaryExprs(SequenceExpr *E, unsigned &Elt,
         RHS = ReduceBinaryExprs(E, Elt, TC, (unsigned) (LeftPrecedence+1));
         if (!RHS) return 0;
       } else if (RightPrecedence == -1) {
-        TC.error(RightOperator->getLocStart(),
-                 "operator is not a binary operator");
+        TC.error(RightOperator->getLoc(), "operator is not a binary operator");
       }
     }
     
     // Okay, we've finished the parse, form the AST node for the binop now.
     Expr *ArgElts[] = { LHS, RHS };
     Expr **ArgElts2 = TC.Context.AllocateCopy<Expr*>(ArgElts, ArgElts+2);
-    TupleExpr *Arg = new (TC.Context) TupleExpr(LHS->getLocStart(), ArgElts2, 0,
+    TupleExpr *Arg = new (TC.Context) TupleExpr(LHS->getStartLoc(), ArgElts2, 0,
                                                 2, SMLoc(), false);
     BinaryExpr *RBE = new (TC.Context) BinaryExpr(LeftOperator, Arg);
     if (TC.semaApplyExpr(RBE))
@@ -550,7 +549,7 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
     if (!E->getType()->is<DependentType>())
       return E;
     
-    error(E->getLocStart(),
+    error(E->getStartLoc(),
           "ambiguous expression was not resolved to a concrete type");
     return 0;
   }, ^Stmt*(Stmt *S, WalkOrder Order) {

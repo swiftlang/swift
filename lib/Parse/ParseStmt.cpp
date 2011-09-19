@@ -27,7 +27,7 @@ Expr *Parser::actOnCondition(Expr *Cond) {
   // The condition needs to be convertible to a logic value.  Build a call to
   // "convertToLogicValue" passing in the condition as an argument.
   Identifier C2LVFuncId = Context.getIdentifier("convertToLogicValue");
-  Expr *C2LVFunc = actOnIdentifierExpr(C2LVFuncId, Cond->getLocStart());
+  Expr *C2LVFunc = actOnIdentifierExpr(C2LVFuncId, Cond->getLoc());
   
   return new (Context) CallExpr(C2LVFunc, Cond, Type());
 }

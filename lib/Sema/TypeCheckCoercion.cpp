@@ -54,7 +54,7 @@ public:
     // FIXME: Conversion ranking.
     for (ValueDecl *VD : E->Decls) {
       if (VD->Ty->isEqual(DestTy, TC.Context))
-        return new (TC.Context) DeclRefExpr(VD, E->Loc, VD->Ty);
+        return new (TC.Context) DeclRefExpr(VD, E->getLoc(), VD->Ty);
     }
     return E;
   }
@@ -65,24 +65,24 @@ public:
     // The only valid type for an UME is a OneOfType.
     OneOfType *DT = DestTy->getAs<OneOfType>();
     if (DT == 0) {
-      TC.error(UME->getLocStart(),
-               "dependent reference to member '" + UME->Name.str() +
+      TC.error(UME->getLoc(),
+               "dependent reference to member '" + UME->getName().str() +
                "' cannot convert to '" + DestTy->getString() + "'");
       return 0;
     }
     
     // The oneof type must have an element of the specified name.
-    OneOfElementDecl *DED = DT->getElement(UME->Name);
+    OneOfElementDecl *DED = DT->getElement(UME->getName());
     if (DED == 0) {
-      TC.error(UME->getLocStart(),
+      TC.error(UME->getLoc(),
                "type '" + DestTy->getString() + "' has no member named '" +
-               UME->Name.str() + "'");
+               UME->getName().str() + "'");
       TC.note(DT->OneOfLoc, "type declared here");
       return 0;
     }
     
     // If it does, then everything is good, resolve the reference.
-    return new (TC.Context) DeclRefExpr(DED, UME->ColonLoc, DED->Ty);
+    return new (TC.Context) DeclRefExpr(DED, UME->getColonLoc(), DED->Ty);
   }  
   
   Expr *visitTupleExpr(TupleExpr *E);
@@ -120,15 +120,15 @@ public:
           dyn_cast<UnresolvedMemberExpr>(E->Fn)) {
       if (OneOfType *DT = DestTy->getAs<OneOfType>()) {
         // The oneof type must have an element of the specified name.
-        OneOfElementDecl *DED = DT->getElement(UME->Name);
+        OneOfElementDecl *DED = DT->getElement(UME->getName());
         if (DED == 0 || !DED->Ty->is<FunctionType>()) {
-          TC.error(UME->getLocStart(), "invalid type '" +
+          TC.error(UME->getLoc(), "invalid type '" +
                    DestTy->getString() + "' to initialize member");
           return 0;
         }
 
         // FIXME: Preserve source locations.
-        E->Fn = new (TC.Context) DeclRefExpr(DED, UME->ColonLoc, DED->Ty);
+        E->Fn = new (TC.Context) DeclRefExpr(DED, UME->getColonLoc(), DED->Ty);
         if (TC.semaApplyExpr(E))
           return 0;
           
@@ -299,7 +299,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
      
       // If this is a TupleExpr (common case) get a more precise location for
       // the element we care about.
-      SMLoc ErrorLoc = E->getLocStart();
+      SMLoc ErrorLoc = E->getStartLoc();
       if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
         ErrorLoc = TE->RParenLoc;
       
@@ -324,10 +324,10 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     if (!UsedElements[i]) {
       // If this is a TupleExpr (common case) get a more precise location for
       // the element we care about.
-      SMLoc ErrorLoc = E->getLocStart();
+      SMLoc ErrorLoc = E->getLoc();
       if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
         if (Expr *SubExp = TE->SubExprs[i])
-          ErrorLoc = SubExp->getLocStart();
+          ErrorLoc = SubExp->getLoc();
       
     if (IdentList[i].empty())
       TC.error(ErrorLoc, "element #" + Twine(i) +
@@ -404,7 +404,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     
     if (ETy->getElementType(SrcField)->getCanonicalType(TC.Context) !=
         DestTy->getElementType(i)->getCanonicalType(TC.Context)) {
-      TC.error(E->getLocStart(), "element #" + Twine(i) +
+      TC.error(E->getLoc(), "element #" + Twine(i) +
                " of tuple value has type '" +
                ETy->getElementType(SrcField)->getString() +
                "', but expected type '" + 
@@ -456,7 +456,7 @@ Expr *SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
       NewName[i] = DestTy->Fields[i].Name;
   }
   
-  return new (TC.Context) TupleExpr(E->getLocStart(), NewSE, NewName,
+  return new (TC.Context) TupleExpr(E->getStartLoc(), NewSE, NewName,
                                     NumFields, SMLoc(), false, DestTy);
 }
 
@@ -543,7 +543,7 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
     return SemaCoerce(TC, DestTy).doIt(E);
   
   // Could not do the conversion.
-  TC.error(E->getLocStart(), "invalid conversion from type '" +
+  TC.error(E->getLoc(), "invalid conversion from type '" +
            E->getType()->getString() + "' to '" + DestTy->getString() + "'");
   return 0;
 }

@@ -58,13 +58,13 @@ static RValue emitFloatLiteralExpr(IRGenFunction &IGF, FloatLiteralExpr *E,
   llvm::Type *FPTy = Schema.getScalarTypes()[0];
   assert(FPTy->isDoubleTy());
   
-  llvm::Value *Value = llvm::ConstantFP::get(FPTy, E->Val);
+  llvm::Value *Value = llvm::ConstantFP::get(FPTy, E->getValue());
   return RValue::forScalars(Value);
 }
 
 static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
                                 const TypeInfo &TInfo) {
-  ValueDecl *D = E->D;
+  ValueDecl *D = E->getDecl();
   switch (D->Kind) {
   case DeclKind::Import:
   case DeclKind::TypeAlias:
@@ -85,7 +85,7 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
 
   case DeclKind::ElementRef:
   case DeclKind::OneOfElement:
-    IGF.unimplemented(E->getLocStart(),
+    IGF.unimplemented(E->getLoc(),
                       "emitting this decl as an l-value is unimplemented");
     return IGF.emitFakeLValue(TInfo);
   }
@@ -94,7 +94,7 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
 
 /// Emit a declaration reference as an r-value.
 RValue IRGenFunction::emitDeclRefRValue(DeclRefExpr *E, const TypeInfo &TInfo) {
-  ValueDecl *D = E->D;
+  ValueDecl *D = E->getDecl();
   switch (D->Kind) {
   case DeclKind::Import:
   case DeclKind::TypeAlias:
@@ -109,7 +109,7 @@ RValue IRGenFunction::emitDeclRefRValue(DeclRefExpr *E, const TypeInfo &TInfo) {
     
   case DeclKind::ElementRef:
   case DeclKind::OneOfElement:
-    unimplemented(E->getLocStart(),
+    unimplemented(E->getLoc(),
                   "emitting this decl as an r-value is unimplemented");
     return emitFakeRValue(TInfo);
   }
@@ -155,7 +155,7 @@ RValue IRGenFunction::emitRValue(Expr *E, const TypeInfo &TInfo) {
   case ExprKind::Closure:
   case ExprKind::AnonClosureArg:
   case ExprKind::ProtocolElement:
-    IGM.unimplemented(E->getLocStart(),
+    IGM.unimplemented(E->getLoc(),
                       "cannot generate r-values for this expression yet");
     return emitFakeRValue(TInfo);
   }
@@ -189,7 +189,7 @@ LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &TInfo) {
     llvm_unreachable("these expression kinds should never be l-values");
 
   case ExprKind::ProtocolElement:
-    IGM.unimplemented(E->getLocStart(),
+    IGM.unimplemented(E->getLoc(),
                       "cannot generate l-values for this expression yet");
     return emitFakeLValue(TInfo);
 

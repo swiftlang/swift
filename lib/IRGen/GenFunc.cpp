@@ -275,7 +275,7 @@ static void emitExpanded(IRGenFunction &IGF, Expr *Arg, ArgList &Args) {
     if (RV.isScalar()) {
       Args.Values.append(RV.getScalars().begin(), RV.getScalars().end());
     } else {
-      IGF.unimplemented(Arg->getLocStart(),
+      IGF.unimplemented(Arg->getLoc(),
                         "expansion of aggregate-valued tuple as argument");
     }
     return;

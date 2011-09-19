@@ -83,9 +83,12 @@ public:
   /// l-valueness to the type judgement, this should take that, too.
   void setType(Type T) { Ty = T; }
 
-  /// getLocStart - Return the location of the start of the expression.
+  /// getStartLoc - Return the location of the start of the expression.
   /// FIXME: QOI: Need to extend this to do full source ranges like Clang.
-  SMLoc getLocStart() const;
+  SMLoc getStartLoc() const;
+
+  /// getExprLoc - Return the caret location of this expression.
+  SMLoc getLoc() const;
 
   /// walk - This recursively walks all of the statements and expressions
   /// contained within a statement and invokes the ExprFn and StmtFn blocks on
@@ -148,14 +151,15 @@ public:
 
 /// IntegerLiteralExpr - Integer literal, like '4'.
 class IntegerLiteralExpr : public Expr {
-public:
   StringRef Val;  // Use StringRef instead of APInt, APInt leaks.
   SMLoc Loc;
-  
+
+public:
   IntegerLiteralExpr(StringRef Val, SMLoc Loc, Type Ty)
     : Expr(ExprKind::IntegerLiteral, Ty), Val(Val), Loc(Loc) {}
   
   uint64_t getValue() const;
+  SMLoc getLoc() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const IntegerLiteralExpr *) { return true; }
@@ -166,14 +170,17 @@ public:
 
 /// FloatLiteralExpr - Floating point literal, like '4.0'.
 class FloatLiteralExpr : public Expr {
-public:
   // FIXME: Right now all floating point literals are doubles.  We should
   // generalize this when we support float.
   double Val;
   SMLoc Loc;
-  
+
+public:
   FloatLiteralExpr(double Val, SMLoc Loc, Type Ty)
     : Expr(ExprKind::FloatLiteral, Ty), Val(Val), Loc(Loc) {}
+
+  double getValue() const { return Val; }
+  SMLoc getLoc() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const FloatLiteralExpr *) { return true; }
@@ -184,12 +191,15 @@ public:
 
 /// DeclRefExpr - A reference to a value, "x".
 class DeclRefExpr : public Expr {
-public:
   ValueDecl *D;
   SMLoc Loc;
-  
+
+public:
   DeclRefExpr(ValueDecl *D, SMLoc Loc, Type Ty = Type())
     : Expr(ExprKind::DeclRef, Ty), D(D), Loc(Loc) {}
+
+  ValueDecl *getDecl() const { return D; }
+  SMLoc getLoc() const { return Loc; }  
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const DeclRefExpr *) { return true; }
@@ -201,13 +211,16 @@ public:
 /// OverloadSetRefExpr - A reference to an overloaded set of values with a
 /// single name.
 class OverloadSetRefExpr : public Expr {
-public:
   ArrayRef<ValueDecl*> Decls;
   SMLoc Loc;
-  
+
+public:
   OverloadSetRefExpr(ArrayRef<ValueDecl*> decls, SMLoc L,
                      Type Ty = Type())
   : Expr(ExprKind::OverloadSetRef, Ty), Decls(decls), Loc(L) {}
+
+  ArrayRef<ValueDecl*> getDecls() const { return Decls; }
+  SMLoc getLoc() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const OverloadSetRefExpr *) { return true; }
@@ -222,13 +235,16 @@ public:
 /// sema), or may just be a use of an unknown identifier.
 ///
 class UnresolvedDeclRefExpr : public Expr {
-public:
   Identifier Name;
   SMLoc Loc;
-  
+
+public:
   UnresolvedDeclRefExpr(Identifier name, SMLoc loc)
     : Expr(ExprKind::UnresolvedDeclRef), Name(name), Loc(loc) {
   }
+  
+  Identifier getName() const { return Name; }
+  SMLoc getLoc() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedDeclRefExpr *) { return true; }
@@ -241,16 +257,21 @@ public:
 /// member, which is to be resolved with context sensitive type information into
 /// bar::foo.  These always have dependent type.
 class UnresolvedMemberExpr : public Expr {
-public:
   SMLoc ColonLoc;
   SMLoc NameLoc;
   Identifier Name;
-  
+
+public:  
   UnresolvedMemberExpr(SMLoc colonLoc, SMLoc nameLoc,
                        Identifier name)
     : Expr(ExprKind::UnresolvedMember),
       ColonLoc(colonLoc), NameLoc(nameLoc), Name(name) {
   }
+
+  Identifier getName() const { return Name; }
+  SMLoc getLoc() const { return NameLoc; }
+  SMLoc getNameLoc() const { return NameLoc; }
+  SMLoc getColonLoc() const { return ColonLoc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedMemberExpr *) { return true; }
@@ -352,8 +373,8 @@ public:
   : Expr(ExprKind::UnresolvedDot), SubExpr(subexpr), DotLoc(dotloc),
     Name(name), NameLoc(nameloc) {}
   
-  SMLoc getLocStart() const {
-    return SubExpr ? SubExpr->getLocStart() : DotLoc;
+  SMLoc getStartLoc() const {
+    return SubExpr ? SubExpr->getStartLoc() : DotLoc;
   }
   
   // Implement isa/cast/dyncast/etc.
