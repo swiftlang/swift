@@ -105,8 +105,8 @@ TypeAliasDecl *InMemoryModule::lookupType(ImportDecl *ID, Identifier Name,
     return 0;
   
   if (TopLevelTypes.empty()) {
-    for (unsigned i = 0, e = TU->Body->NumElements; i != e; ++i)
-      if (Decl *D = TU->Body->Elements[i].dyn_cast<Decl*>())
+    for (auto Elt : TU->Body->getElements())
+      if (Decl *D = Elt.dyn_cast<Decl*>())
         if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D))
           if (!TAD->Name.empty())
             TopLevelTypes[TAD->Name] = TAD;
@@ -132,8 +132,8 @@ void InMemoryModule::lookupValue(ImportDecl *ID, Identifier Name,
     
   // If we haven't built a map of the top-level values, do so now.
   if (TopLevelValues.empty()) {
-    for (unsigned i = 0, e = TU->Body->NumElements; i != e; ++i)
-      if (Decl *D = TU->Body->Elements[i].dyn_cast<Decl*>())
+    for (auto Elt : TU->Body->getElements())
+      if (Decl *D = Elt.dyn_cast<Decl*>())
         if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
           if (!VD->Name.empty())
             TopLevelValues[VD->Name].push_back(VD);
@@ -492,8 +492,8 @@ void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
   
   // Do a prepass over the declarations to find the list of top-level value
   // declarations.
-  for (unsigned i = 0, e = TU->Body->NumElements; i != e; ++i)
-    if (Decl *D = TU->Body->Elements[i].dyn_cast<Decl*>()) {
+  for (auto Elt : TU->Body->getElements())
+    if (Decl *D = Elt.dyn_cast<Decl*>()) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
         if (!VD->Name.empty())
           Binder.addNamedTopLevelDecl(VD);
@@ -552,8 +552,8 @@ void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
   
   // Now that we know the top-level value names, go through and resolve any
   // UnresolvedDeclRefExprs that exist.
-  for (unsigned i = 0, e = TU->Body->NumElements; i != e; ++i) {
-    BraceStmt::ExprStmtOrDecl &Elt = TU->Body->Elements[i];
+  for (unsigned i = 0, e = TU->Body->getNumElements(); i != e; ++i) {
+    BraceStmt::ExprStmtOrDecl Elt = TU->Body->getElement(i);
     if (Decl *D = Elt.dyn_cast<Decl*>()) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
         if (VD->Init)
@@ -568,6 +568,7 @@ void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
     if (Elt.isNull())
       Elt = new (Ctx) TupleExpr(SMLoc(), 0, 0, 0, SMLoc(), false,
                                 TupleType::getEmpty(Ctx));
+    TU->Body->setElement(i, Elt);
   }
 }
 

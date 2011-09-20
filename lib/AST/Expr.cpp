@@ -513,36 +513,36 @@ namespace {
     }
     
     Stmt *visitAssignStmt(AssignStmt *AS) {
-      if (Expr *E = doIt(AS->Dest))
-        AS->Dest = E;
+      if (Expr *E = doIt(AS->getDest()))
+        AS->setDest(E);
       else
         return 0;
 
-      if (Expr *E = doIt(AS->Src))
-        AS->Src = E;
+      if (Expr *E = doIt(AS->getSrc()))
+        AS->setSrc(E);
       else
         return 0;
       return AS;
     }
     
     Stmt *visitBraceStmt(BraceStmt *BS) {
-      for (unsigned i = 0, e = BS->NumElements; i != e; ++i) {
-        if (Expr *SubExpr = BS->Elements[i].dyn_cast<Expr*>()) {
+      for (unsigned i = 0, e = BS->getNumElements(); i != e; ++i) {
+        if (Expr *SubExpr = BS->getElement(i).dyn_cast<Expr*>()) {
           if (Expr *E2 = doIt(SubExpr))
-            BS->Elements[i] = E2;
+            BS->setElement(i, E2);
           else
             return 0;
           continue;
         }
         
-        if (Stmt *S = BS->Elements[i].dyn_cast<Stmt*>()) {
+        if (Stmt *S = BS->getElement(i).dyn_cast<Stmt*>()) {
           if (Stmt *S2 = doIt(S))
-            BS->Elements[i] = S2;
+            BS->setElement(i, S2);
           else
             return 0;
           continue;
         }
-        Decl *D = BS->Elements[i].get<Decl*>();
+        Decl *D = BS->getElement(i).get<Decl*>();
         if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
           if (Expr *Init = VD->Init) {
             if (Expr *E2 = doIt(Init))
@@ -556,27 +556,27 @@ namespace {
     }
 
     Stmt *visitReturnStmt(ReturnStmt *RS) {
-      if (Expr *E = doIt(RS->Result))
-        RS->Result = E;
+      if (Expr *E = doIt(RS->getResult()))
+        RS->setResult(E);
       else
         return 0;
       return RS;
     }
     
     Stmt *visitIfStmt(IfStmt *IS) {
-      if (Expr *E2 = doIt(IS->Cond))
-        IS->Cond = E2;
+      if (Expr *E2 = doIt(IS->getCond()))
+        IS->setCond(E2);
       else
         return 0;
       
-      if (Stmt *S2 = doIt(IS->Then))
-        IS->Then = S2;
+      if (Stmt *S2 = doIt(IS->getThenStmt()))
+        IS->setThenStmt(S2);
       else
         return 0;
       
-      if (IS->Else) {
-        if (Stmt *S2 = doIt(IS->Else))
-          IS->Else = S2;
+      if (IS->getElseStmt()) {
+        if (Stmt *S2 = doIt(IS->getElseStmt()))
+          IS->setElseStmt(S2);
         else
           return 0;
       }
@@ -584,13 +584,13 @@ namespace {
     }
     
     Stmt *visitWhileStmt(WhileStmt *WS) {
-      if (Expr *E2 = doIt(WS->Cond))
-        WS->Cond = E2;
+      if (Expr *E2 = doIt(WS->getCond()))
+        WS->setCond(E2);
       else
         return 0;
       
-      if (Stmt *S2 = doIt(WS->Body))
-        WS->Body = S2;
+      if (Stmt *S2 = doIt(WS->getBody()))
+        WS->setBody(S2);
       else
         return 0;
       return WS;

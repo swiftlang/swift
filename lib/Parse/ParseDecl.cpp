@@ -41,17 +41,14 @@ TranslationUnit *Parser::parseTranslationUnit() {
   SMLoc FileEnd = Tok.getLoc();
   
   // First thing, we transform the body into a brace expression.
-  ExprStmtOrDecl *NewElements = 
-    Context.AllocateCopy<ExprStmtOrDecl>(Items.begin(), Items.end());
-  TU->Body = new (Context) BraceStmt(FileStartLoc, NewElements, Items.size(),
-                                     FileEnd);
+  TU->Body = BraceStmt::create(Context, FileStartLoc, Items, FileEnd);
     
   // Do a prepass over the declarations to make sure they have basic sanity and
   // to find the list of top-level value declarations.
-  for (unsigned i = 0, e = TU->Body->NumElements; i != e; ++i) {
-    if (!TU->Body->Elements[i].is<Decl*>()) continue;
+  for (auto Elt : TU->Body->getElements()) {
+    if (!Elt.is<Decl*>()) continue;
     
-    Decl *D = TU->Body->Elements[i].get<Decl*>();
+    Decl *D = Elt.get<Decl*>();
     
     // If any top-level value decl has an unresolved type, then it is erroneous.
     // It is not valid to have something like "var x = 4" at the top level, all

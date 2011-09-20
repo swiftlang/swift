@@ -201,10 +201,7 @@ ParseResult<BraceStmt> Parser::parseStmtBrace(const char *Message) {
     return true;
   }
   
-  ExprStmtOrDecl *NewElements = 
-    Context.AllocateCopy<ExprStmtOrDecl>(Entries.begin(), Entries.end());
-  
-  return new (Context) BraceStmt(LBLoc, NewElements, Entries.size(), RBLoc);
+  return BraceStmt::create(Context, LBLoc, Entries, RBLoc);
 }
 
 /// parseStmtReturn

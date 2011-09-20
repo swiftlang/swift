@@ -33,25 +33,43 @@ void *Stmt::operator new(size_t Bytes, ASTContext &C,
 
 /// getLocStart - Return the location of the start of the expression.
 /// FIXME: Need to extend this to do full source ranges like Clang.
-SMLoc Stmt::getLocStart() const {
+SMLoc Stmt::getStartLoc() const {
   switch (Kind) {
   case StmtKind::Semi:
-    return cast<SemiStmt>(this)->Loc;
+    return cast<SemiStmt>(this)->getStartLoc();
   case StmtKind::Assign:
-    return cast<AssignStmt>(this)->Dest->getStartLoc();
+    return cast<AssignStmt>(this)->getStartLoc();
   case StmtKind::Brace:
-    return cast<BraceStmt>(this)->LBLoc;
+    return cast<BraceStmt>(this)->getStartLoc();
   case StmtKind::Return:
-    return cast<ReturnStmt>(this)->ReturnLoc;
+    return cast<ReturnStmt>(this)->getStartLoc();
   case StmtKind::If:
-    return cast<IfStmt>(this)->IfLoc;
+    return cast<IfStmt>(this)->getStartLoc();
   case StmtKind::While:
-    return cast<WhileStmt>(this)->WhileLoc;
+    return cast<WhileStmt>(this)->getStartLoc();
   }
   
-  assert(0 && "Not reachable, all cases handled");
-  abort();
+  llvm_unreachable("Not reachable, all cases handled");
 }
+
+SMLoc AssignStmt::getStartLoc() const {
+  return getDest()->getStartLoc();
+}
+
+BraceStmt::BraceStmt(SMLoc lbloc, ArrayRef<ExprStmtOrDecl> elts, SMLoc rbloc)
+  : Stmt(StmtKind::Brace), NumElements(elts.size()), LBLoc(lbloc), RBLoc(rbloc){
+  memcpy(getElementsStorage(), elts.data(),
+         elts.size() * sizeof(ExprStmtOrDecl));
+}
+
+BraceStmt *BraceStmt::create(ASTContext &ctx, SMLoc lbloc,
+                             ArrayRef<ExprStmtOrDecl> elts, SMLoc rbloc) {
+  void *Buffer = ctx.Allocate(sizeof(BraceStmt)
+                                + elts.size() * sizeof(ExprStmtOrDecl),
+                              Stmt::Alignment);
+  return ::new(Buffer) BraceStmt(lbloc, elts, rbloc);
+}
+
 
 //===----------------------------------------------------------------------===//
 // Printing for Stmt and all subclasses.
@@ -85,48 +103,48 @@ public:
 
   void visitAssignStmt(AssignStmt *S) {
     OS.indent(Indent) << "(assign_stmt\n";
-    printRec(S->Dest);
+    printRec(S->getDest());
     OS << '\n';
-    printRec(S->Src);
+    printRec(S->getSrc());
     OS << ')';
   }
 
   void visitBraceStmt(BraceStmt *S) {
     OS.indent(Indent) << "(brace_stmt";
-    for (unsigned i = 0, e = S->NumElements; i != e; ++i) {
+    for (auto Elt : S->getElements()) {
       OS << '\n';
-      if (Expr *SubExpr = S->Elements[i].dyn_cast<Expr*>())
+      if (Expr *SubExpr = Elt.dyn_cast<Expr*>())
         printRec(SubExpr);
-      else if (Stmt *SubStmt = S->Elements[i].dyn_cast<Stmt*>())
+      else if (Stmt *SubStmt = Elt.dyn_cast<Stmt*>())
         printRec(SubStmt);
       else
-        printRec(S->Elements[i].get<Decl*>());
+        printRec(Elt.get<Decl*>());
     }
     OS << ')';
   }
   
   void visitReturnStmt(ReturnStmt *S) {
     OS.indent(Indent) << "(return_stmt\n";
-    printRec(S->Result);
+    printRec(S->getResult());
     OS << ')';
   }
   
   void visitIfStmt(IfStmt *S) {
     OS.indent(Indent) << "(if_stmt\n";
-    printRec(S->Cond);
+    printRec(S->getCond());
     OS << '\n';
-    printRec(S->Then);
-    if (S->Else) {
+    printRec(S->getThenStmt());
+    if (S->getElseStmt()) {
       OS << '\n';
-      printRec(S->Else);
+      printRec(S->getElseStmt());
     }
     OS << ')';
   }
   void visitWhileStmt(WhileStmt *S) {
     OS.indent(Indent) << "(while_stmt\n";
-    printRec(S->Cond);
+    printRec(S->getCond());
     OS << '\n';
-    printRec(S->Body);
+    printRec(S->getBody());
     OS << ')';
   }
 };

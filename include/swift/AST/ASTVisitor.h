@@ -87,7 +87,7 @@ public:
   }
   
   StmtRetTy visit(Stmt *S) {
-    switch (S->Kind) {
+    switch (S->getKind()) {
 
 #define DISPATCH(CLASS) \
   case StmtKind::CLASS: \

@@ -67,9 +67,13 @@ public:
   }
 
   Stmt *visitAssignStmt(AssignStmt *S) {
-    if (typeCheckExpr(S->Dest) ||
-        typeCheckExpr(S->Src, S->Dest->getType()))
-      return 0;
+    Expr *E = S->getDest();
+    if (typeCheckExpr(E)) return 0;
+    S->setDest(E);
+
+    E = S->getSrc();
+    if (typeCheckExpr(E, S->getDest()->getType())) return 0;
+    S->setSrc(E);
     
     return S;
   }
@@ -78,13 +82,14 @@ public:
   
   Stmt *visitReturnStmt(ReturnStmt *RS) {
     if (TheFunc == 0) {
-      TC.error(RS->ReturnLoc, "return invalid outside of a func");
+      TC.error(RS->getReturnLoc(), "return invalid outside of a func");
       return 0;
     }
 
-    if (typeCheckExpr(RS->Result,
-                      TheFunc->getType()->castTo<FunctionType>()->Result))
+    Expr *E = RS->getResult();
+    if (typeCheckExpr(E, TheFunc->getType()->castTo<FunctionType>()->Result))
       return 0;
+    RS->setResult(E);
 
     return RS;
   }
@@ -92,10 +97,18 @@ public:
   Stmt *visitIfStmt(IfStmt *IS) {
     // The if condition must have __builtin_int1 type.  This is after the
     // conversion function is added by sema.
-    if (typeCheckExpr(IS->Cond, TC.Context.TheInt1Type) ||
-        typeCheckStmt(IS->Then) ||
-        (IS->Else && typeCheckStmt(IS->Else)))
-      return 0;
+    Expr *E = IS->getCond();
+    if (typeCheckExpr(E, TC.Context.TheInt1Type)) return 0;
+    IS->setCond(E);
+
+    Stmt *S = IS->getThenStmt();
+    if (typeCheckStmt(S)) return 0;
+    IS->setThenStmt(S);
+
+    if ((S = IS->getElseStmt())) {
+      if (typeCheckStmt(S)) return 0;
+      IS->setElseStmt(S);
+    }
     
     return IS;
   }
@@ -103,9 +116,13 @@ public:
   Stmt *visitWhileStmt(WhileStmt *WS) {
     // The if condition must have __builtin_int1 type.  This is after the
     // conversion function is added by sema.
-    if (typeCheckExpr(WS->Cond, TC.Context.TheInt1Type) ||
-        typeCheckStmt(WS->Body))
-      return 0;
+    Expr *E = WS->getCond();
+    if (typeCheckExpr(E, TC.Context.TheInt1Type)) return 0;
+    WS->setCond(E);
+
+    Stmt *S = WS->getBody();
+    if (typeCheckStmt(S)) return 0;
+    WS->setBody(S);
     
     return WS;
   }
@@ -117,8 +134,8 @@ public:
 Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   SmallVector<BraceStmt::ExprStmtOrDecl, 32> NewElements;
   
-  for (unsigned i = 0, e = BS->NumElements; i != e; ++i) {
-    if (Expr *SubExpr = BS->Elements[i].dyn_cast<Expr*>()) {
+  for (unsigned i = 0, e = BS->getNumElements(); i != e; ++i) {
+    if (Expr *SubExpr = BS->getElement(i).dyn_cast<Expr*>()) {
       if (typeCheckExpr(SubExpr)) continue;
         
       // If any of the elements of the braces has a function type (which
@@ -130,25 +147,20 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
         TC.error(SubExpr->getLoc(),
                  "expression resolves to an unevaluated function");
       
-      NewElements.push_back(SubExpr);
+      BS->setElement(i, SubExpr);
       continue;
     }
     
-    if (Stmt *SubStmt = BS->Elements[i].dyn_cast<Stmt*>()) {
+    if (Stmt *SubStmt = BS->getElement(i).dyn_cast<Stmt*>()) {
       if (!typeCheckStmt(SubStmt))
-        NewElements.push_back(SubStmt);
+        BS->setElement(i, SubStmt);
     } else {
-      Decl *D = BS->Elements[i].get<Decl*>();
+      Decl *D = BS->getElement(i).get<Decl*>();
       TC.typeCheckDecl(D);
       NewElements.push_back(D);
     }
   }
   
-  // Reinstall the list now that we potentially mutated it.
-  assert(NewElements.size() <= BS->NumElements);
-  memcpy(BS->Elements, NewElements.data(),
-         NewElements.size()*sizeof(BS->Elements[0]));
-  BS->NumElements = NewElements.size();
   return BS;
 }
 

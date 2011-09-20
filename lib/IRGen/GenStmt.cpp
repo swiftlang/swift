@@ -30,7 +30,7 @@ using namespace swift;
 using namespace irgen;
 
 void IRGenFunction::emitStmt(Stmt *S) {
-  switch (S->Kind) {
+  switch (S->getKind()) {
   case StmtKind::Semi:
     // Nothing to do.
     return;
@@ -57,10 +57,9 @@ void IRGenFunction::emitBraceStmt(BraceStmt *BS) {
   // Enter a new scope.
   Scope BraceScope(*this);
 
-  for (unsigned I = 0, E = BS->NumElements; I != E; ++I) {
+  for (auto Elt : BS->getElements()) {
     assert(Builder.hasValidIP());
 
-    BraceStmt::ExprStmtOrDecl Elt = BS->Elements[I];
     if (Expr *E = Elt.dyn_cast<Expr*>()) {
       emitIgnored(E);
     } else if (Stmt *S = Elt.dyn_cast<Stmt*>()) {
@@ -77,28 +76,28 @@ void IRGenFunction::emitBraceStmt(BraceStmt *BS) {
 
 void IRGenFunction::emitAssignStmt(AssignStmt *S) {
   // Emit the LHS.
-  const TypeInfo &TInfo = getFragileTypeInfo(S->Dest->getType());
-  LValue LV = emitLValue(S->Dest, TInfo);
+  const TypeInfo &TInfo = getFragileTypeInfo(S->getDest()->getType());
+  LValue LV = emitLValue(S->getDest(), TInfo);
 
   // Emit the RHS.
-  RValue RV = emitRValue(S->Src);
+  RValue RV = emitRValue(S->getSrc(), TInfo);
 
   // Do the store.
   TInfo.store(*this, RV, LV);
 }
 
 void IRGenFunction::emitIfStmt(IfStmt *S) {
-  Condition cond = emitCondition(S->Cond, S->Else != nullptr);
+  Condition cond = emitCondition(S->getCond(), S->getElseStmt() != nullptr);
   if (cond.hasTrue()) {
     cond.enterTrue(*this);
-    emitStmt(S->Then);
+    emitStmt(S->getThenStmt());
     cond.exitTrue(*this);
   }
 
   if (cond.hasFalse()) {
-    assert(S->Else);
+    assert(S->getElseStmt());
     cond.enterFalse(*this);
-    emitStmt(S->Else);
+    emitStmt(S->getElseStmt());
     cond.exitFalse(*this);
   }
 
@@ -112,10 +111,10 @@ void IRGenFunction::emitReturnStmt(ReturnStmt *S) {
   // If this function takes no return value, ignore the result of the
   // expression.
   if (!ReturnSlot.isValid()) {
-    emitIgnored(S->Result);
+    emitIgnored(S->getResult());
   } else {
-    const TypeInfo &ResultInfo = getFragileTypeInfo(S->Result->getType());
-    RValue RV = emitRValue(S->Result, ResultInfo);
+    const TypeInfo &ResultInfo = getFragileTypeInfo(S->getResult()->getType());
+    RValue RV = emitRValue(S->getResult(), ResultInfo);
     ResultInfo.store(*this, RV, ReturnSlot);
   }
 
@@ -136,12 +135,12 @@ void IRGenFunction::emitWhileStmt(WhileStmt *S) {
 
   // Evaluate the condition with the false edge leading directly
   // to the continuation block.
-  Condition cond = emitCondition(S->Cond, /*hasFalseCode*/ false);
+  Condition cond = emitCondition(S->getCond(), /*hasFalseCode*/ false);
 
   // If there's a true edge, emit the body in it.
   if (cond.hasTrue()) {
     cond.enterTrue(*this);
-    emitStmt(S->Body);
+    emitStmt(S->getBody());
     if (Builder.hasValidIP()) {
       Builder.CreateBr(loopBB);
       Builder.ClearInsertionPoint();

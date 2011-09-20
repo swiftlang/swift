@@ -49,8 +49,7 @@ IRGenModule::~IRGenModule() {
 
 /// Emit a top-level context.
 void IRGenModule::emitTopLevel(BraceStmt *Body) {
-  for (unsigned I = 0, E = Body->NumElements; I != E; ++I) {
-    BraceStmt::ExprStmtOrDecl Elt = Body->Elements[I];
+  for (auto Elt : Body->getElements()) {
     if (Decl *D = Elt.dyn_cast<Decl*>())
       emitGlobalDecl(D);
     // TODO: handle top-level statements and expressions.
