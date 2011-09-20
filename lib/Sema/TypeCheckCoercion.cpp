@@ -117,7 +117,7 @@ public:
     // :f must be an element constructor for the oneof value.  Note that
     // handling this syntactically causes us to reject "(:f) x" as ambiguous.
     if (UnresolvedMemberExpr *UME =
-          dyn_cast<UnresolvedMemberExpr>(E->Fn)) {
+          dyn_cast<UnresolvedMemberExpr>(E->getFn())) {
       if (OneOfType *DT = DestTy->getAs<OneOfType>()) {
         // The oneof type must have an element of the specified name.
         OneOfElementDecl *DED = DT->getElement(UME->getName());
@@ -128,7 +128,7 @@ public:
         }
 
         // FIXME: Preserve source locations.
-        E->Fn = new (TC.Context) DeclRefExpr(DED, UME->getColonLoc(), DED->Ty);
+        E->setFn(new (TC.Context) DeclRefExpr(DED, UME->getColonLoc(), DED->Ty));
         if (TC.semaApplyExpr(E))
           return 0;
           

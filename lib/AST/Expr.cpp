@@ -59,21 +59,21 @@ SMLoc Expr::getStartLoc() const {
   case ExprKind::TupleShuffle:
     return cast<TupleShuffleExpr>(this)->getStartLoc();
   case ExprKind::Call:
-    return cast<CallExpr>(this)->Fn->getStartLoc();
+    return cast<CallExpr>(this)->getStartLoc();
   case ExprKind::Sequence:
-    return cast<SequenceExpr>(this)->Elements[0]->getStartLoc();
+    return cast<SequenceExpr>(this)->getStartLoc();
   case ExprKind::Func:
-    return cast<FuncExpr>(this)->FuncLoc;
+    return cast<FuncExpr>(this)->getStartLoc();
   case ExprKind::Closure:
-    return cast<ClosureExpr>(this)->Input->getStartLoc();
+    return cast<ClosureExpr>(this)->getStartLoc();
   case ExprKind::AnonClosureArg:
-    return cast<AnonClosureArgExpr>(this)->Loc;
+    return cast<AnonClosureArgExpr>(this)->getStartLoc();
   case ExprKind::Unary:
-    return cast<UnaryExpr>(this)->Fn->getStartLoc();
+    return cast<UnaryExpr>(this)->getStartLoc();
   case ExprKind::Binary:
-    return cast<BinaryExpr>(this)->Arg->getStartLoc();
+    return cast<BinaryExpr>(this)->getStartLoc();
   case ExprKind::ProtocolElement:
-    return cast<ProtocolElementExpr>(this)->Arg->getStartLoc();
+    return cast<ProtocolElementExpr>(this)->getStartLoc();
   }
   
   llvm_unreachable("expression type not handled!");
@@ -105,21 +105,21 @@ SMLoc Expr::getLoc() const {
   case ExprKind::TupleShuffle:
     return cast<TupleShuffleExpr>(this)->getLoc();
   case ExprKind::Call:
-    return cast<CallExpr>(this)->Arg->getStartLoc();
+    return cast<CallExpr>(this)->getLoc();
   case ExprKind::Sequence:
-    return cast<SequenceExpr>(this)->Elements[0]->getLoc();
+    return cast<SequenceExpr>(this)->getLoc();
   case ExprKind::Func:
-    return cast<FuncExpr>(this)->FuncLoc;
+    return cast<FuncExpr>(this)->getLoc();
   case ExprKind::Closure:
-    return cast<ClosureExpr>(this)->Input->getLoc();
+    return cast<ClosureExpr>(this)->getLoc();
   case ExprKind::AnonClosureArg:
-    return cast<AnonClosureArgExpr>(this)->Loc;
+    return cast<AnonClosureArgExpr>(this)->getLoc();
   case ExprKind::Unary:
-    return cast<UnaryExpr>(this)->Fn->getLoc();
+    return cast<UnaryExpr>(this)->getLoc();
   case ExprKind::Binary:
-    return cast<BinaryExpr>(this)->Fn->getLoc();
+    return cast<BinaryExpr>(this)->getLoc();
   case ExprKind::ProtocolElement:
-    return cast<ProtocolElementExpr>(this)->DotLoc;
+    return cast<ProtocolElementExpr>(this)->getLoc();
   }
   
   llvm_unreachable("expression type not handled!");
@@ -144,6 +144,13 @@ uint64_t IntegerLiteralExpr::getValue() const {
   bool Error = Val.getAsInteger(0, IntVal);
   assert(!Error && "Invalid IntegerLiteral formed"); (void)Error;
   return IntVal;
+}
+
+SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
+  void *Buffer = ctx.Allocate(sizeof(SequenceExpr) +
+                              elements.size() * sizeof(Expr*),
+                              Expr::Alignment);
+  return ::new(Buffer) SequenceExpr(elements);
 }
 
 static ValueDecl *getCalledValue(Expr *E) {
@@ -437,25 +444,25 @@ namespace {
     }
     
     Expr *visitSequenceExpr(SequenceExpr *E) {
-      for (unsigned i = 0, e = E->NumElements; i != e; ++i)
-        if (Expr *Elt = doIt(E->Elements[i]))
-          E->Elements[i] = Elt;
+      for (unsigned i = 0, e = E->getNumElements(); i != e; ++i)
+        if (Expr *Elt = doIt(E->getElement(i)))
+          E->setElement(i, Elt);
         else
           return 0;
       return E;
     }
     
     Expr *visitFuncExpr(FuncExpr *E) {
-      if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(E->Body))) {
-        E->Body = S;
+      if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(E->getBody()))) {
+        E->setBody(S);
         return E;
       }
       return 0;
     }
     
     Expr *visitClosureExpr(ClosureExpr *E) {
-      if (Expr *E2 = doIt(E->Input)) {
-        E->Input = E2;
+      if (Expr *E2 = doIt(E->getInput())) {
+        E->setInput(E2);
         return E;
       }
       return 0;
@@ -464,13 +471,13 @@ namespace {
     Expr *visitAnonClosureArgExpr(AnonClosureArgExpr *E) { return E; }
 
     Expr *visitApplyExpr(ApplyExpr *E) {
-      Expr *E2 = doIt(E->Fn);
+      Expr *E2 = doIt(E->getFn());
       if (E2 == 0) return 0;
-      E->Fn = E2;
+      E->setFn(E2);
       
-      E2 = doIt(E->Arg);
+      E2 = doIt(E->getArg());
       if (E2 == 0) return 0;
-      E->Arg = E2;
+      E->setArg(E2);
       return E;      
     }
 
@@ -738,52 +745,52 @@ public:
 
   void visitSequenceExpr(SequenceExpr *E) {
     OS.indent(Indent) << "(sequence_expr type='" << E->getType() << '\'';
-    for (unsigned i = 0, e = E->NumElements; i != e; ++i) {
+    for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
       OS << '\n';
-      printRec(E->Elements[i]);
+      printRec(E->getElement(i));
     }
     OS << ')';
   }
   void visitFuncExpr(FuncExpr *E) {
     OS.indent(Indent) << "(func_expr type='" << E->getType() << "'\n";
-    printRec(E->Body);
+    printRec(E->getBody());
     OS << ')';
   }
   void visitClosureExpr(ClosureExpr *E) {
     OS.indent(Indent) << "(closure_expr type='" << E->getType() << "'\n";
-    printRec(E->Input);
+    printRec(E->getInput());
     OS << ')';
   }
   
   void visitAnonClosureArgExpr(AnonClosureArgExpr *E) {
     OS.indent(Indent) << "(anon_closure_arg_expr type='" << E->getType();
-    OS << "' ArgNo=" << E->ArgNo << ')';
+    OS << "' ArgNo=" << E->getArgNumber() << ')';
   }
   
   void visitCallExpr(CallExpr *E) {
     OS.indent(Indent) << "(call_expr type='" << E->getType() << "'\n";
-    printRec(E->Fn);
+    printRec(E->getFn());
     OS << '\n';
-    printRec(E->Arg);
+    printRec(E->getArg());
     OS << ')';
   }
   void visitUnaryExpr(UnaryExpr *E) {
     OS.indent(Indent) << "(unary_expr '";
-    if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->Fn))
+    if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->getFn()))
       OS << DRE->getDecl()->Name;
-    else if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E->Fn))
+    else if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E->getFn()))
       OS << OO->getDecls()[0]->Name;
     else
       OS << "***UNKNOWN***";
     OS << "' type='" << E->getType() << "'\n";
-    printRec(E->Arg);
+    printRec(E->getArg());
     OS << ')';
   }
   void visitBinaryExpr(BinaryExpr *E) {
     OS.indent(Indent) << "(binary_expr '";
-    if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->Fn))
+    if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->getFn()))
       OS << DRE->getDecl()->Name;
-    else if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E->Fn))
+    else if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E->getFn()))
       OS << OO->getDecls()[0]->Name;
     else
       OS << "***UNKNOWN***";
@@ -797,9 +804,9 @@ public:
   void visitProtocolElementExpr(ProtocolElementExpr *E) {
     OS.indent(Indent) << "(protocol_element_expr type='"
                       << E->getType() << "'\n";
-    printRec(E->Fn);
+    printRec(E->getFn());
     OS << '\n';
-    printRec(E->Arg);
+    printRec(E->getArg());
     OS << ')';
   }
 };

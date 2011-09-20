@@ -137,10 +137,12 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Expr *) { return true; }
 
+  enum { Alignment = 8U };
+
   // Only allow allocation of Exprs using the allocator in ASTContext
   // or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = 8) throw();  
+                     unsigned Alignment = Expr::Alignment) throw();  
 
   // Make placement new and vanilla new/delete illegal for Exprs.
   void *operator new(size_t Bytes) throw() = delete;
@@ -505,13 +507,38 @@ public:
 /// SequenceExpr - a series of expressions which should be evaluated
 /// sequentially, e.g. foo()  bar().
 class SequenceExpr : public Expr {
-public:
-  // FIXME: Switch to MutableArrayRef.
-  Expr **Elements;
   unsigned NumElements;
-  
-  SequenceExpr(Expr **elements, unsigned numElements)
-    : Expr(ExprKind::Sequence), Elements(elements), NumElements(numElements) {
+
+  Expr **getSubExprs() { return reinterpret_cast<Expr **>(this + 1); }
+  Expr * const *getSubExprs() const {
+    return const_cast<SequenceExpr*>(this)->getSubExprs();
+  }
+
+  SequenceExpr(ArrayRef<Expr*> elements)
+    : Expr(ExprKind::Sequence), NumElements(elements.size()) {
+    assert(NumElements > 0 && "zero-length sequence!");
+    memcpy(getSubExprs(), elements.data(), elements.size() * sizeof(Expr*));
+  }
+
+public:
+  static SequenceExpr *create(ASTContext &ctx, ArrayRef<Expr*> elements);
+
+  SMLoc getStartLoc() const { return getElements()[0]->getStartLoc(); }
+  SMLoc getLoc() const { return getElements()[0]->getLoc(); }
+
+  unsigned getNumElements() const { return NumElements; }
+
+  ArrayRef<Expr*> getElements() const {
+    return ArrayRef<Expr*>(getSubExprs(), NumElements);
+  }
+
+  Expr *getElement(unsigned i) const {
+    assert(i < NumElements);
+    return getSubExprs()[i];
+  }
+  void setElement(unsigned i, Expr *e) {
+    assert(i < NumElements);
+    getSubExprs()[i] = e;
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -523,17 +550,27 @@ public:
 /// have named arguments.
 ///    e.g.  func(a : int) -> int { return a+1 }
 class FuncExpr : public Expr, public DeclContext {
-public:
   SMLoc FuncLoc;
   
   ArrayRef<ArgDecl*> NamedArgs;
   BraceStmt *Body;
   
+public:
   FuncExpr(SMLoc FuncLoc, Type FnType, ArrayRef<ArgDecl*> NamedArgs, 
            BraceStmt *Body, DeclContext *Parent)
     : Expr(ExprKind::Func, FnType),
       DeclContext(DeclContextKind::FuncExpr, Parent),
       FuncLoc(FuncLoc), NamedArgs(NamedArgs), Body(Body) {}
+
+  SMLoc getStartLoc() const { return FuncLoc; }
+  SMLoc getLoc() const { return FuncLoc; }
+
+  /// Returns the location of the 'func' keyword.
+  SMLoc getFuncLoc() const { return FuncLoc; }
+
+  ArrayRef<ArgDecl*> getNamedArgs() const { return NamedArgs; }
+  BraceStmt *getBody() const { return Body; }
+  void setBody(BraceStmt *S) { Body = S; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const FuncExpr *) { return true; }
@@ -549,11 +586,14 @@ public:
 /// result of the function.  The Decl list indicates which decls the formal
 /// arguments are bound to.
 class ClosureExpr : public Expr {
-public:
   Expr *Input;
   
+public:
   ClosureExpr(Expr *input, Type ResultTy)
     : Expr(ExprKind::Closure, ResultTy), Input(input) {}
+
+  Expr *getInput() const { return Input; }
+  void setInput(Expr *e) { Input = e; }
 
   /// getNumArgs - Return the number of arguments that this closure expr takes.
   unsigned getNumArgs() const;
@@ -564,12 +604,17 @@ public:
 };
   
 class AnonClosureArgExpr : public Expr {
-public:
   unsigned ArgNo;
   SMLoc Loc;
   
+public:
   AnonClosureArgExpr(unsigned argNo, SMLoc loc)
     : Expr(ExprKind::AnonClosureArg), ArgNo(argNo), Loc(loc) {}
+
+  SMLoc getLoc() const { return Loc; }
+  SMLoc getStartLoc() const { return Loc; }
+
+  unsigned getArgNumber() const { return ArgNo; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const AnonClosureArgExpr *) { return true; }
@@ -581,17 +626,24 @@ public:
 /// ApplyExpr - Superclass of various function calls, which apply an argument to
 /// a function to get a result.
 class ApplyExpr : public Expr {
-public:
   /// Fn - The function being called.
   Expr *Fn;
 
   /// Argument - The one argument being passed to it.
   Expr *Arg;
 
+protected:
   ApplyExpr(ExprKind Kind, Expr *Fn, Expr *Arg, Type Ty = Type())
     : Expr(Kind, Ty), Fn(Fn), Arg(Arg) {
     assert(classof((Expr*)this) && "ApplyExpr::classof out of date");
   }
+
+public:
+  Expr *getFn() const { return Fn; }
+  void setFn(Expr *e) { Fn = e; }
+
+  Expr *getArg() const { return Arg; }
+  void setArg(Expr *e) { Arg = e; }
 
   ValueDecl *getCalledValue() const;
   
@@ -610,6 +662,9 @@ class CallExpr : public ApplyExpr {
 public:
   CallExpr(Expr *Fn, Expr *Arg, Type Ty)
     : ApplyExpr(ExprKind::Call, Fn, Arg, Ty) {}
+
+  SMLoc getStartLoc() const { return getFn()->getStartLoc(); }
+  SMLoc getLoc() const { return getArg()->getStartLoc(); }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const CallExpr *) { return true; }
@@ -621,6 +676,9 @@ class UnaryExpr : public ApplyExpr {
 public:
   UnaryExpr(Expr *Fn, Expr *Arg, Type Ty = Type())
     : ApplyExpr(ExprKind::Unary, Fn, Arg, Ty) {}
+
+  SMLoc getStartLoc() const { return getFn()->getStartLoc(); }
+  SMLoc getLoc() const { return getFn()->getStartLoc(); }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnaryExpr *) { return true; }
@@ -636,12 +694,12 @@ public:
 
   /// getArgTuple - The argument is always a tuple literal.  This accessor
   /// reinterprets it properly.
-  TupleExpr *getArgTuple() {
-    return cast<TupleExpr>(Arg);
+  TupleExpr *getArgTuple() const {
+    return cast<TupleExpr>(getArg());
   }
-  const TupleExpr *getArgTuple() const {
-    return cast<TupleExpr>(Arg);
-  }
+
+  SMLoc getLoc() const { return getFn()->getLoc(); }
+  SMLoc getStartLoc() const { return getArgTuple()->getStartLoc(); }
                   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BinaryExpr *) { return true; }
@@ -652,13 +710,17 @@ public:
 /// modeled as a DeclRefExpr on the field's decl.
 ///
 class ProtocolElementExpr : public ApplyExpr {
-public:
   SMLoc DotLoc;
   
+public:
   ProtocolElementExpr(Expr *FnExpr, SMLoc DotLoc, Expr *BaseExpr,
                       Type Ty = Type())
   : ApplyExpr(ExprKind::ProtocolElement, FnExpr, BaseExpr, Ty), DotLoc(DotLoc) {
   }
+
+  SMLoc getDotLoc() const { return DotLoc; }
+  SMLoc getLoc() const { return DotLoc; }
+  SMLoc getStartLoc() const { return getArg()->getStartLoc(); }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ProtocolElementExpr *) { return true; }

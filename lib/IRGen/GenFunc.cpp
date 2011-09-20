@@ -373,12 +373,14 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &ResultInfo) {
   // Check for a call to a builtin.
   if (ValueDecl *Fn = E->getCalledValue())
     if (Fn->Context == IGM.Context.BuiltinModule)
-      return emitBuiltinCall(*this, cast<FuncDecl>(Fn), E->Arg, ResultInfo);
+      return emitBuiltinCall(*this, cast<FuncDecl>(Fn), E->getArg(),
+                             ResultInfo);
 
   const FuncTypeInfo &FnInfo =
-    static_cast<const FuncTypeInfo &>(IGM.getFragileTypeInfo(E->Fn->getType()));
+    static_cast<const FuncTypeInfo &>(
+                              IGM.getFragileTypeInfo(E->getFn()->getType()));
 
-  RValue FnRValue = emitRValue(E->Fn, FnInfo);
+  RValue FnRValue = emitRValue(E->getFn(), FnInfo);
   assert(FnRValue.isScalar() && FnRValue.getScalars().size() == 2);
 
   ArgList Args;
@@ -398,7 +400,7 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &ResultInfo) {
 
   // Emit the arguments, drilling into the first level of tuple, if
   // present.
-  emitExpanded(*this, E->Arg, Args);
+  emitExpanded(*this, E->getArg(), Args);
 
   llvm::Value *Fn = FnRValue.getScalars()[0];
   llvm::Value *Data = FnRValue.getScalars()[1];
@@ -580,6 +582,6 @@ void IRGenModule::emitGlobalFunction(FuncDecl *FD) {
 
 void IRGenFunction::emitFunction() {
   emitPrologue();
-  emitBraceStmt(CurFuncExpr->Body);
+  emitBraceStmt(CurFuncExpr->getBody());
   emitEpilogue();
 }

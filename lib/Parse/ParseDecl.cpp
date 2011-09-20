@@ -432,7 +432,7 @@ FuncDecl *Parser::parseDeclFunc(bool AllowScoped) {
     if (Tok.is(tok::l_brace)) {
       ParseResult<BraceStmt> Body = parseStmtBrace();
       if (Body.isSuccess())
-        FE->Body = Body.get();
+        FE->setBody(Body.get());
       else  // FIXME: Should do some sort of error recovery here.
         FE = 0;
       

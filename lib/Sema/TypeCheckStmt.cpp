@@ -176,8 +176,10 @@ void swift::performTypeChecking(TranslationUnit *TU, ASTContext &Ctx) {
 
   // Type check the body of each of the FuncExpr in turn.
   for (FuncExpr *FE : FuncExprs) {
-    if (!FE->Body) continue;
+    if (!FE->getBody()) continue;
     
-    StmtChecker(TC, FE).typeCheckStmt(FE->Body);
+    BraceStmt *S = FE->getBody();
+    StmtChecker(TC, FE).typeCheckStmt(S);
+    FE->setBody(S);
   }
 }

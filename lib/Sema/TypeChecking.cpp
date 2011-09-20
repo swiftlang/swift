@@ -75,8 +75,8 @@ struct RewriteAnonArgExpr {
     
     // Verify that the argument number isn't too large, e.g. using $4 when the
     // bound function only has 2 inputs.
-    if (A->ArgNo >= NumInputArgs) {
-      TC.error(A->Loc,
+    if (A->getArgNumber() >= NumInputArgs) {
+      TC.error(A->getLoc(),
                "use of invalid anonymous argument, with number higher than"
                " # arguments to bound function");
       return 0;
@@ -85,7 +85,7 @@ struct RewriteAnonArgExpr {
     // Assign the AnonDecls their actual concrete types now that we know the
     // context they are being used in.
     if (TupleType *TT = dyn_cast<TupleType>(FuncInputTy.getPointer())) {
-      A->setType(TT->getElementType(A->ArgNo));
+      A->setType(TT->getElementType(A->getArgNumber()));
     } else {
       assert(NumInputArgs == 1 && "Must have unary case");
       A->setType(FuncInputTy);

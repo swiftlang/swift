@@ -99,10 +99,7 @@ ParseResult<Expr> Parser::parseExpr(const char *Message) {
   if (SequencedExprs.size() == 1)
     return SequencedExprs[0];
 
-  Expr **NewElements =
-    Context.AllocateCopy<Expr*>(SequencedExprs.begin(), SequencedExprs.end());
-  
-  return new (Context) SequenceExpr(NewElements, SequencedExprs.size());
+  return SequenceExpr::create(Context, SequencedExprs);
 }
 
 /// parseExprUnary
@@ -504,7 +501,7 @@ ParseResult<Expr> Parser::parseExprFunc() {
   if (Body.isSemaError())
     return ParseResult<Expr>::getSemaError();
   
-  FE->Body = Body.get();
+  FE->setBody(Body.get());
   return FE;
 }
 

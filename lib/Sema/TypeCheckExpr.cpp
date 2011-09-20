@@ -77,8 +77,8 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
       return true;
   }
   
-  Expr *&E1 = E->Fn;
-  Expr *&E2 = E->Arg;
+  Expr *E1 = E->getFn();
+  Expr *E2 = E->getArg();
   
   // If we have a concrete function type, then we win.
   if (FunctionType *FT = E1->getType()->getAs<FunctionType>()) {
@@ -107,6 +107,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
       return true;
     }
     
+    E->setArg(E2);
     E->setType(FT->Result);
     return false;
   }
@@ -167,6 +168,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   if (BestCandidateFound) {
     E1 = new (Context) DeclRefExpr(BestCandidateFound, OS->getLoc(),
                                    BestCandidateFound->Ty);
+    E->setFn(E1);
     return semaApplyExpr(E);
   }
   
@@ -463,14 +465,14 @@ static int getBinOp(Expr *E, TypeChecker &TC) {
 /// it, using binary precedence rules, into a sequence of binary operators.
 static Expr *ReduceBinaryExprs(SequenceExpr *E, unsigned &Elt,
                                TypeChecker &TC, unsigned MinPrec = 0) {
-  Expr *LHS = E->Elements[Elt];
+  Expr *LHS = E->getElement(Elt);
   
   // The parser only produces well-formed sequences.
   
-  while (Elt+1 != E->NumElements) {
-    assert(Elt+2 < E->NumElements);
+  while (Elt+1 != E->getNumElements()) {
+    assert(Elt+2 < E->getNumElements());
     
-    Expr *LeftOperator = E->Elements[Elt+1];
+    Expr *LeftOperator = E->getElement(Elt+1);
     int LeftPrecedence = getBinOp(LeftOperator, TC);
     if (LeftPrecedence < (int)MinPrec) {
       if (LeftPrecedence == -1)
@@ -479,14 +481,14 @@ static Expr *ReduceBinaryExprs(SequenceExpr *E, unsigned &Elt,
     }
     
     Elt += 2;
-    Expr *RHS = E->Elements[Elt];
+    Expr *RHS = E->getElement(Elt);
     
     // Get the precedence of the operator immediately to the right of the RHS
     // of the RHS of the binop (if present).  This is looking for the multiply
     // in "x+y*z".
-    if (Elt+1 != E->NumElements) {
-      assert(Elt+2 < E->NumElements);
-      Expr *RightOperator = E->Elements[Elt+1];
+    if (Elt+1 != E->getNumElements()) {
+      assert(Elt+2 < E->getNumElements());
+      Expr *RightOperator = E->getElement(Elt+1);
       int RightPrecedence = getBinOp(RightOperator, TC);
       if (RightPrecedence == -2) return 0;
       
