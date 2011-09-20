@@ -350,14 +350,40 @@ RValue IRGenFunction::emitTupleExpr(TupleExpr *Tuple, const TypeInfo &TI) {
 
 RValue IRGenFunction::emitTupleElementRValue(TupleElementExpr *E,
                                              const TypeInfo &TI) {
+  // TODO: if the base expression can reasonably be emitted as an
+  // l-value, do so and then project out.
   unimplemented(E->getLoc(), "tuple elements are unimplemented");
   return emitFakeRValue(TI);
 }
 
 LValue IRGenFunction::emitTupleElementLValue(TupleElementExpr *E,
                                              const TypeInfo &TI) {
-  unimplemented(E->getLoc(), "tuple elements are unimplemented");
-  return emitFakeLValue(TI);
+  // Emit the base l-value.
+  Expr *base = E->getBase();
+  const TupleTypeInfo &baseTInfo =
+    static_cast<const TupleTypeInfo&>(getFragileTypeInfo(base->getType()));
+  LValue lvalue = emitLValue(base, baseTInfo);
+
+  // Project.
+  const TupleFieldInfo &fieldInfo =
+    baseTInfo.getFieldInfos()[E->getFieldNumber()];
+
+  // If the field requires no storage, there's nothing to do.
+  if (fieldInfo.StorageIndex == TupleFieldInfo::NoStorage) {
+    return lvalue; // as good as anything
+  }
+
+  // Compute the address.
+  llvm::Value *addr = lvalue.getAddress();
+  addr = Builder.CreateStructGEP(addr, fieldInfo.StorageIndex,
+                                 addr->getName() + "."
+                                   + fieldInfo.Field.Name.str());
+
+  // Compute the adjusted alignment.
+  Alignment align =
+    lvalue.getAlignment().alignmentAtOffset(fieldInfo.StorageOffset);
+
+  return LValue::forAddress(addr, align);
 }
 
 RValue IRGenFunction::emitTupleShuffleExpr(TupleShuffleExpr *E,
