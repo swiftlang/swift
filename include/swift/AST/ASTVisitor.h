@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
+#include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
   
@@ -56,34 +57,14 @@ public:
   ExprRetTy visit(Expr *E) {
     switch (E->getKind()) {
 
-#define DISPATCH(CLASS) \
-  case ExprKind::CLASS: \
-  return static_cast<ImplClass*>(this)->visit ## CLASS ## \
-    Expr(static_cast<CLASS##Expr*>(E))
-        
-    DISPATCH(IntegerLiteral);
-    DISPATCH(FloatLiteral);
-    DISPATCH(DeclRef);
-    DISPATCH(OverloadSetRef);
-    DISPATCH(UnresolvedDeclRef);
-    DISPATCH(UnresolvedMember);
-    DISPATCH(UnresolvedScopedIdentifier);
-    DISPATCH(Tuple);
-    DISPATCH(UnresolvedDot);
-    DISPATCH(TupleElement);
-    DISPATCH(TupleShuffle);
-    DISPATCH(Call);
-    DISPATCH(Sequence);
-    DISPATCH(Func);
-    DISPATCH(Closure);
-    DISPATCH(AnonClosureArg);
-    DISPATCH(Unary);
-    DISPATCH(Binary);
-    DISPATCH(ProtocolElement);
-#undef DISPATCH
+#define EXPR(CLASS, PARENT) \
+    case ExprKind::CLASS: \
+      return static_cast<ImplClass*>(this) \
+        ->visit##CLASS##Expr(static_cast<CLASS##Expr*>(E));
+#include "swift/AST/ExprNodes.def"
+
     }
-    assert(0 && "Not reachable, all cases handled");
-    abort();
+    llvm_unreachable("Not reachable, all cases handled");
   }
   
   StmtRetTy visit(Stmt *S) {
