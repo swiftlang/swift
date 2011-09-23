@@ -123,12 +123,9 @@ RValue IRGenFunction::emitRValue(Expr *E) {
 
 RValue IRGenFunction::emitRValue(Expr *E, const TypeInfo &TInfo) {
   switch (E->getKind()) {
-  case ExprKind::OverloadSetRef:
-  case ExprKind::Sequence:
-  case ExprKind::UnresolvedDeclRef:
-  case ExprKind::UnresolvedDot:
-  case ExprKind::UnresolvedMember:
-  case ExprKind::UnresolvedScopedIdentifier:
+#define EXPR(Id, Parent)
+#define UNCHECKED_EXPR(Id, Parent) case ExprKind::Id:
+#include "swift/AST/ExprNodes.def"
     llvm_unreachable("these expression kinds should not survive to IR-gen");
 
   case ExprKind::Call:
@@ -169,12 +166,9 @@ LValue IRGenFunction::emitLValue(Expr *E) {
 
 LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &TInfo) {
   switch (E->getKind()) {
-  case ExprKind::OverloadSetRef:
-  case ExprKind::Sequence:
-  case ExprKind::UnresolvedDeclRef:
-  case ExprKind::UnresolvedDot:
-  case ExprKind::UnresolvedMember:
-  case ExprKind::UnresolvedScopedIdentifier:
+#define EXPR(Id, Parent)
+#define UNCHECKED_EXPR(Id, Parent) case ExprKind::Id:
+#include "swift/AST/ExprNodes.def"
     llvm_unreachable("these expression kinds should not survive to IR-gen");
 
   case ExprKind::Call:
