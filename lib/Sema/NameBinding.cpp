@@ -17,6 +17,7 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/Verifier.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -482,6 +483,8 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
 /// nodes for unresolved value names, and we may have unresolved type names as
 /// well.  This handles import directives and forward references.
 void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
+  verify(TU, VerificationKind::Parsed);
+
   NameBinder Binder(Ctx);
 
   std::pair<Identifier,SMLoc> BuiltinPath[] {

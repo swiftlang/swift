@@ -5,5 +5,6 @@ add_swift_library(swiftAST
   Expr.cpp
   Identifier.cpp
   Stmt.cpp
-  Type.cpp)
+  Type.cpp
+  Verifier.cpp)
 

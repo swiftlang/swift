@@ -17,6 +17,7 @@
 #include "swift/Subsystems.h"
 #include "TypeChecking.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/Verifier.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
@@ -170,6 +171,8 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 ///
 /// FIXME: This should be moved out to somewhere else.
 void swift::performTypeChecking(TranslationUnit *TU, ASTContext &Ctx) {
+  verify(TU, VerificationKind::BoundNames);
+
   TypeChecker TC(Ctx);
   
   // Find all the FuncExprs in the translation unit.
