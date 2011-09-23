@@ -50,8 +50,7 @@ public:
       DISPATCH(ElementRef);
 #undef DISPATCH
     }
-    assert(0 && "Not reachable, all cases handled");
-    abort();
+    llvm_unreachable("Not reachable, all cases handled");
   }
   
   ExprRetTy visit(Expr *E) {
@@ -83,8 +82,7 @@ public:
     DISPATCH(While);
 #undef DISPATCH
     }
-    assert(0 && "Not reachable, all cases handled");
-    abort();
+    llvm_unreachable("Not reachable, all cases handled");
   }
 };
   
