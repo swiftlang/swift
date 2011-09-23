@@ -37,25 +37,10 @@ namespace swift {
   class TypeAliasDecl;
   
 enum class ExprKind : uint8_t {
-  IntegerLiteral,
-  FloatLiteral,
-  DeclRef,
-  OverloadSetRef,
-  UnresolvedDeclRef,
-  UnresolvedMember,
-  UnresolvedScopedIdentifier,
-  Tuple,
-  UnresolvedDot,
-  TupleElement,
-  TupleShuffle,
-  Sequence,
-  Func,
-  Closure,
-  AnonClosureArg,
-  Call,      First_ApplyExpr = Call,
-  Unary,
-  Binary,    
-  ProtocolElement, Last_ApplyExpr = ProtocolElement
+#define EXPR(Id, Parent) Id,
+#define EXPR_RANGE(Id, FirstId, LastId) \
+  First_##Id##Expr = FirstId, Last_##Id##Expr = LastId,
+#include "swift/AST/ExprNodes.def"
 };
   
   

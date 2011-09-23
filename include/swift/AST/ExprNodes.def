@@ -1,0 +1,80 @@
+//===--- ExprNodes.def - Swift Expression AST Metaprogramming ---*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for macro-metaprogramming with expressions.
+//
+//===----------------------------------------------------------------------===//
+
+/// EXPR(Id, Parent)
+///   If the expression node is not abstract, its enumerator value is
+///   ExprKind::Id.  The node's class name is Id##Expr, and the name of
+///   its base class (in the Expr hierarchy) is Parent.
+
+/// An abstract expression node is an abstract base class in the hierarchy;
+/// it is never a most-derived type, and it does not have an enumerator in
+/// ExprKind.
+///
+/// Most metaprograms do not care about abstract expressions, so the default
+/// is to ignore them.
+#ifndef ABSTRACT_EXPR
+#define ABSTRACT_EXPR(Id, Parent)
+#endif
+
+/// An "unchecked" expression node is removed from valid code by the end
+/// of the type-checking phase.
+///
+/// By default, these are treated like any other expression.
+#ifndef UNCHECKED_EXPR
+#define UNCHECKED_EXPR(Id, Parent) EXPR(Id, Parent)
+#endif
+
+/// An "unbound" expression node is removed from valid code by the end
+/// of the name-binding phase.
+///
+/// By default, these are treated the same as unchecked expressions.
+#ifndef UNBOUND_EXPR
+#define UNBOUND_EXPR(Id, Parent) UNCHECKED_EXPR(Id, Parent)
+#endif
+
+/// A convenience for determining the range of expressions.  These will always
+/// appear immediately after the last
+#ifndef EXPR_RANGE
+#define EXPR_RANGE(Id, First, Last)
+#endif
+
+EXPR(IntegerLiteral, Expr)
+EXPR(FloatLiteral, Expr)
+EXPR(DeclRef, Expr)
+UNCHECKED_EXPR(OverloadSetRef, Expr)
+UNBOUND_EXPR(UnresolvedDeclRef, Expr)
+UNBOUND_EXPR(UnresolvedMember, Expr)
+UNBOUND_EXPR(UnresolvedScopedIdentifier, Expr)
+UNBOUND_EXPR(UnresolvedDot, Expr)
+UNBOUND_EXPR(Sequence, Expr)
+EXPR(Tuple, Expr)
+EXPR(TupleElement, Expr)
+EXPR(TupleShuffle, Expr)
+EXPR(Func, Expr)
+EXPR(Closure, Expr)
+EXPR(AnonClosureArg, Expr)
+ABSTRACT_EXPR(Apply, Expr)
+  EXPR(Call, ApplyExpr)
+  EXPR(Unary, ApplyExpr)
+  EXPR(Binary, ApplyExpr)
+  EXPR(ProtocolElement, ApplyExpr)
+  EXPR_RANGE(Apply, Call, ProtocolElement)
+
+#undef EXPR_RANGE
+#undef UNBOUND_EXPR
+#undef UNCHECKED_EXPR
+#undef ABSTRACT_EXPR
+#undef EXPR
