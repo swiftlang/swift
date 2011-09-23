@@ -29,12 +29,8 @@ namespace swift {
   class Expr;
 
 enum class StmtKind {
-  Semi,
-  Assign,
-  Brace,
-  Return,
-  If,
-  While
+#define STMT(ID, PARENT) ID,
+#include "swift/AST/StmtNodes.def"
 };
 
 /// Stmt - Base class for all statements in swift.

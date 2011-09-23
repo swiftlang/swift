@@ -69,18 +69,12 @@ public:
   StmtRetTy visit(Stmt *S) {
     switch (S->getKind()) {
 
-#define DISPATCH(CLASS) \
-  case StmtKind::CLASS: \
-  return static_cast<ImplClass*>(this)->visit ## CLASS ## \
-    Stmt(static_cast<CLASS##Stmt*>(S))
-        
-    DISPATCH(Semi);
-    DISPATCH(Assign);
-    DISPATCH(Brace);
-    DISPATCH(Return);
-    DISPATCH(If);
-    DISPATCH(While);
-#undef DISPATCH
+#define STMT(CLASS, PARENT) \
+    case StmtKind::CLASS: \
+      return static_cast<ImplClass*>(this) \
+        ->visit##CLASS##Stmt(static_cast<CLASS##Stmt*>(S));
+#include "swift/AST/StmtNodes.def"
+
     }
     llvm_unreachable("Not reachable, all cases handled");
   }

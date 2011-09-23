@@ -1,0 +1,40 @@
+//===--- StmtNodes.def - Swift Statement AST Metaprogramming ----*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for macro-metaprogramming with statements.
+//
+//===----------------------------------------------------------------------===//
+
+/// STMT(Id, Parent)
+///   If the statement node is not abstract, its enumerator value is
+///   StmtKind::Id.  The node's class name is Id##Stmt, and the name of
+///   its base class (in the Stmt hierarchy) is Parent.
+
+/// An abstract statement node is an abstract base class in the hierarchy;
+/// it is never a most-derived type, and it does not have an enumerator in
+/// StmtKind.
+///
+/// Most metaprograms do not care about abstract statements, so the default
+/// is to ignore them.
+#ifndef ABSTRACT_STMT
+#define ABSTRACT_STMT(Id, Parent)
+#endif
+
+STMT(Semi, Stmt)
+STMT(Assign, Stmt)
+STMT(Brace, Stmt)
+STMT(Return, Stmt)
+STMT(If, Stmt)
+STMT(While, Stmt)
+
+#undef ABSTRACT_STMT
+#undef STMT
