@@ -124,6 +124,9 @@ namespace {
 }
 
 void swift::verify(TranslationUnit *TUnit, VerificationKind Stage) {
+  // For now, punt if there are errors in the translation unit.
+  if (TUnit->Ctx.hadError()) return;
+
   // Make a verifier object, and then capture it by reference.
   Verifier VObject(TUnit->Ctx, Stage);
   Verifier *V = &VObject;
