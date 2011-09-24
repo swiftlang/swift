@@ -17,6 +17,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Verifier.h"
+#include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
 namespace {
@@ -25,44 +26,100 @@ namespace {
   class Verifier {
     ASTContext &Context;
     VerificationKind Stage;
+    llvm::raw_ostream &Out;
+
   public:
     Verifier(ASTContext &Context, VerificationKind Stage)
-      : Context(Context), Stage(Stage) {}
+      : Context(Context), Stage(Stage), Out(llvm::errs()) {}
 
-    Expr *dispatch(Expr *E, WalkOrder Ord) {
+    Expr *dispatch(Expr *E, WalkOrder ord) {
       switch (E->getKind()) {
-#define DISPATCH(ID) visit(static_cast<ID##Expr*>(E), Ord);
+#define DISPATCH(ID) return dispatchVisit(static_cast<ID##Expr*>(E), ord)
 #define EXPR(ID, PARENT) \
       case ExprKind::ID: \
-        return DISPATCH(ID);
+        DISPATCH(ID);
 #define UNCHECKED_EXPR(ID, PARENT) \
       case ExprKind::ID: \
         assert(Stage < VerificationKind::CheckedTypes && #ID "in wrong phase"); \
-        return DISPATCH(ID);
+        DISPATCH(ID);
 #define UNBOUND_EXPR(ID, PARENT) \
       case ExprKind::ID: \
         assert(Stage < VerificationKind::BoundNames && #ID "in wrong phase"); \
-        return DISPATCH(ID);
+        DISPATCH(ID);
 #include "swift/AST/ExprNodes.def"
 #undef DISPATCH
       }
       llvm_unreachable("not all cases handled!");
     }
 
-    Stmt *dispatch(Stmt *S, WalkOrder Ord) {
+    Stmt *dispatch(Stmt *S, WalkOrder ord) {
       switch (S->getKind()) {
-#define DISPATCH(ID) visit(static_cast<ID##Stmt*>(S), Ord);
+#define DISPATCH(ID) return dispatchVisit(static_cast<ID##Stmt*>(S), ord)
 #define STMT(ID, PARENT) \
       case StmtKind::ID: \
-        return DISPATCH(ID);
+        DISPATCH(ID);
 #include "swift/AST/StmtNodes.def"
 #undef DISPATCH
       }
       llvm_unreachable("not all cases handled!");
     }
 
-    Expr *visit(Expr *E, WalkOrder Ord) { return E; }
-    Stmt *visit(Stmt *S, WalkOrder Ord) { return S; }
+  private:
+    /// Helper template for dispatching visitation.
+    template <class T> T dispatchVisit(T node, WalkOrder ord) {
+      // If we're visiting in pre-order, don't validate the node yet;
+      // just check whether we should stop further descent.
+      if (ord == WalkOrder::PreOrder)
+        return (shouldVerify(node) ? node : T());
+
+      // Otherwise, actually verify the node.
+
+      // Always verify the node as a parsed node.
+      verifyParsed(node);
+
+      // If we've bound names already, verify as a bound node.
+      if (Stage >= VerificationKind::BoundNames)
+        verifyBound(node);
+
+      // If we've checked types already, do some extra verification.
+      if (Stage >= VerificationKind::CheckedTypes)
+        verifyChecked(node);
+
+      // Always continue.
+      return node;
+    }
+
+    // Default cases for whether we should verify within the given subtree.
+    bool shouldVerify(Expr *E) { return true; }
+    bool shouldVerify(Stmt *S) { return true; }
+
+    // Base cases for the various stages of verification.
+    void verifyParsed(Expr *E) {}
+    void verifyParsed(Stmt *S) {}
+    void verifyBound(Expr *E) {}
+    void verifyBound(Stmt *S) {}
+    void verifyChecked(Expr *E) {}
+    void verifyChecked(Stmt *S) {}
+
+    // Specialized verifiers.
+
+    void verifyChecked(AssignStmt *S) {
+      checkSameType(S->getDest()->getType(), S->getSrc()->getType(),
+                    "assignment operands");
+    }
+
+    // Verification utilities.
+    void checkSameType(Type T0, Type T1, const char *what) {
+      if (T0->getCanonicalType(Context) == T1->getCanonicalType(Context))
+        return;
+
+      Out << "different types for " << what << ": ";
+      T0.print(Out);
+      Out << " vs. ";
+      T1.print(Out);
+      Out << "\n";
+      abort();
+    }
   };
 }
 
