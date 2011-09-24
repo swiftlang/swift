@@ -81,6 +81,10 @@ Identifier ASTContext::getIdentifier(StringRef Str) {
 // Type manipulation routines.
 //===----------------------------------------------------------------------===//
 
+bool ASTContext::isSameType(Type L, Type R) {
+  return L->getCanonicalType(*this) == R->getCanonicalType(*this);
+}
+
 // Simple accessors.
 Type ErrorType::get(ASTContext &C) { return C.TheErrorType; }
 Type DependentType::get(ASTContext &C) { return C.TheDependentType; }

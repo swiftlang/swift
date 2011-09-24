@@ -107,6 +107,9 @@ public:
   bool hadError() const {
     return HadError;
   }
+
+  /// Checks whether the given two types are canonically the same.
+  bool isSameType(Type L, Type R);
   
   //===--------------------------------------------------------------------===//
   // Type manipulation routines.
