@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Subsystems.h"
+#include "swift/AST/Verifier.h"
 #include "Parser.h"
 #include "Lexer.h"
 #include "llvm/Support/SourceMgr.h"
@@ -25,7 +26,9 @@ using namespace swift;
 /// parseTranslationUnit - Entrypoint for the parser.
 TranslationUnit *swift::parseTranslationUnit(unsigned BufferID,
                                              ASTContext &Ctx) {
-  return Parser(BufferID, Ctx).parseTranslationUnit();  
+  TranslationUnit *TU = Parser(BufferID, Ctx).parseTranslationUnit();
+  if (TU) verify(TU, VerificationKind::Parsed);
+  return TU;
 }
   
 //===----------------------------------------------------------------------===//

@@ -171,8 +171,6 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 ///
 /// FIXME: This should be moved out to somewhere else.
 void swift::performTypeChecking(TranslationUnit *TU, ASTContext &Ctx) {
-  verify(TU, VerificationKind::BoundNames);
-
   TypeChecker TC(Ctx);
   
   // Find all the FuncExprs in the translation unit.
@@ -197,4 +195,7 @@ void swift::performTypeChecking(TranslationUnit *TU, ASTContext &Ctx) {
     StmtChecker(TC, FE).typeCheckStmt(S);
     FE->setBody(S);
   }
+
+  // Verify that we've checked types correctly.
+  verify(TU, VerificationKind::CheckedTypes);
 }

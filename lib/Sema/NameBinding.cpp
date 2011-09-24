@@ -483,8 +483,6 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
 /// nodes for unresolved value names, and we may have unresolved type names as
 /// well.  This handles import directives and forward references.
 void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
-  verify(TU, VerificationKind::Parsed);
-
   NameBinder Binder(Ctx);
 
   std::pair<Identifier,SMLoc> BuiltinPath[] {
@@ -573,6 +571,8 @@ void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
                                 TupleType::getEmpty(Ctx));
     TU->Body->setElement(i, Elt);
   }
+
+  verify(TU, VerificationKind::BoundNames);
 }
 
 TypeAliasDecl *

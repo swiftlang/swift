@@ -17,7 +17,6 @@
 #include "swift/Subsystems.h"
 #include "swift/IRGen/Options.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Verifier.h"
 #include "llvm/LLVMContext.h"
 #include "llvm/Module.h"
 #include "llvm/PassManager.h"
@@ -53,8 +52,6 @@ static bool isBinaryOutput(OutputKind kind) {
 void swift::performIRGeneration(TranslationUnit *TU, ASTContext &Context,
                                 Options &Opts) {
   assert(!Context.hadError());
-
-  verify(TU, VerificationKind::CheckedTypes);
 
   // Create the module.
   LLVMContext LLVMContext;
