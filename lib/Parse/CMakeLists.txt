@@ -6,4 +6,4 @@ add_swift_library(swiftParse
   ParseStmt.cpp
   ParseType.cpp
   Scope.cpp
-  DEPENDS swiftAST)
+  DEPENDS swiftBasic swiftAST)

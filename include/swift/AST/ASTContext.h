@@ -36,7 +36,8 @@ namespace swift {
   class Module;
   class TupleTypeElt;
   class OneOfElementDecl;
-
+  class DiagnosticEngine;
+  
 /// ASTContext - This object creates and owns the AST objects.
 class ASTContext {
   ASTContext(const ASTContext&) = delete;
@@ -52,12 +53,15 @@ public:
 
 public:
   
-  ASTContext(llvm::SourceMgr &SourceMgr);
+  ASTContext(llvm::SourceMgr &SourceMgr, DiagnosticEngine &Diags);
   ~ASTContext();
   
   /// SourceMgr - The source manager object.
   llvm::SourceMgr &SourceMgr;
 
+  /// \Diags - The diagnostics engine.
+  DiagnosticEngine &Diags;
+  
   /// BuiltinModule - The builtin module.
   Module * const BuiltinModule;
 

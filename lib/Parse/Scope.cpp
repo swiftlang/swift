@@ -16,6 +16,7 @@
 
 #include "Scope.h"
 #include "Parser.h"
+#include "swift/Basic/Diagnostics.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
@@ -118,9 +119,10 @@ static bool checkValidOverload(const ValueDecl *D1, const ValueDecl *D2,
                                Parser &P) {
   if (D1->Attrs.InfixPrecedence != D2->Attrs.InfixPrecedence &&
       D1->Attrs.InfixPrecedence != -1 && D2->Attrs.InfixPrecedence != -1) {
-    P.error(D1->getLocStart(),
-            "infix precedence of functions in an overload set must match");
-    P.note(D2->getLocStart(), "previous declaration here");
+    P.diagnose(D1->getLocStart(), diags::precedence_overload);
+    // FIXME: Pass identifier through, when the diagnostics system can handle
+    // it.
+    P.diagnose(D2->getLocStart(), diags::previous_declaration, D2->Name.str());
     return true;
   }
   
@@ -191,8 +193,9 @@ TypeAliasDecl *ScopeInfo::addTypeAliasToScope(SMLoc TypeAliasLoc,
   
   // Otherwise, we have a redefinition: two definitions in the same scope with
   // the same name.
-  TheParser.error(TypeAliasLoc,
-                  "redefinition of type named '" + StringRef(Name.get()) + "'");
-  TheParser.warning(TAD->getLocStart(), "previous declaration here");
+  // FIXME: Pass the identifier through, when the diagnostics system can handle
+  // it.
+  TheParser.diagnose(TypeAliasLoc, diags::type_redefinition, Name.str());
+  TheParser.diagnose(TAD->getLocStart(), diags::previous_definition, Name.str());
   return TAD;
 }

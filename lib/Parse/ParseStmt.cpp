@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Parser.h"
+#include "swift/Basic/Diagnostics.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
@@ -77,12 +78,13 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       break;
     }
     case tok::kw_import:
-      Entries.push_back(parseDeclImport());
-
-      if (Entries.back() && !IsTopLevel) {
-        error(Entries.back().get<Decl*>()->getLocStart(),
-              "import is only valid at file scope");
-        Entries.pop_back();
+      if (Decl *Import = parseDeclImport()) {
+        if (!IsTopLevel) {
+          diagnose(Import->getLocStart(), diags::import_inner_scope);
+          // FIXME: Mark declaration invalid, so we can still push it.
+        } else {
+          Entries.push_back(Import);
+        }
       }
       break;
 
@@ -166,7 +168,7 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
 ParseResult<Stmt> Parser::parseStmtOtherThanAssignment() {
   switch (Tok.getKind()) {
   default:
-    error(Tok.getLoc(), "expected statement");
+    diagnose(Tok, diags::expected_stmt);
     return true;
   case tok::semi:      return new (Context) SemiStmt(consumeToken(tok::semi));
   case tok::l_brace:   return parseStmtBrace();
@@ -197,7 +199,7 @@ ParseResult<BraceStmt> Parser::parseStmtBrace(const char *Message) {
   SMLoc RBLoc = Tok.getLoc();
   if (parseToken(tok::r_brace, "expected '}' at end of brace expression",
                  tok::r_brace)) {
-    note(LBLoc, "to match this opening '{'");
+    diagnose(LBLoc, diags::opening_brace);
     return true;
   }
   

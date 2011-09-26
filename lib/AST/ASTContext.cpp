@@ -33,13 +33,14 @@ typedef llvm::DenseMap<std::pair<Type,Type>, FunctionType*> FunctionTypesMapTy;
 /// ArrayTypesMapTy - This is the actual type underlying 'ArrayTypes'.
 typedef llvm::DenseMap<std::pair<Type, uint64_t>, ArrayType*> ArrayTypesMapTy;
 
-ASTContext::ASTContext(llvm::SourceMgr &sourcemgr)
+ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
   : Allocator(new llvm::BumpPtrAllocator()),
     IdentifierTable(new IdentifierTableMapTy(*Allocator)),
     TupleTypes(new TupleTypesMapTy()),
     FunctionTypes(new FunctionTypesMapTy()),
     ArrayTypes(new ArrayTypesMapTy()),
     SourceMgr(sourcemgr),
+    Diags(Diags),
     BuiltinModule(new (*this) Module(getIdentifier("Builtin"), *this)),
     TheErrorType(new (*this) ErrorType()),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),

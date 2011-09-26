@@ -1,0 +1,141 @@
+//===- Diagnostics.def - Diagnostics Text -----------------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This file defines all of the diagnostics that can be emitted by
+//  Swift. Each diagnostic is described using one of three
+//  kinds--error, warning, or note--along with a unique identifier, category, 
+//  options, and text, and is followed by a signature describing the diagnostic
+//  argument kinds, e.g., string, identifier, string
+//
+//===----------------------------------------------------------------------===//
+
+#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE)))
+#  error Must define either DIAG or the set {ERROR,WARNING,NOTE}
+#endif
+
+#ifndef ERROR
+#  define ERROR(ID,Category,Options,Text,...)   \
+  DIAG(ERROR,ID,Category,Options,Text, ##__VA_ARGS__)
+#endif
+
+#ifndef WARNING
+#  define WARNING(ID,Category,Options,Text,...) \
+  DIAG(WARNING,ID,Category,Options,Text, ##__VA_ARGS__)
+#endif
+
+#ifndef NOTE
+#  define NOTE(ID,Category,Options,Text,...) \
+  DIAG(NOTE,ID,Category,Options,Text, ##__VA_ARGS__)
+#endif
+
+//------------------------------------------------------------------------------
+// Parsing diagnostics
+//------------------------------------------------------------------------------
+NOTE(opening_brace,parsing,none,
+     "to match this opening '{'")
+NOTE(opening_bracket,parsing,none,
+     "to match this opening '['")
+NOTE(opening_paren,parsing,none,
+     "to match this opening '('")
+NOTE(previous_declaration,parsing,none,
+     "previous declaration of '%0' is here", StringRef)
+NOTE(previous_definition,parsing,none,
+     "previous definition of '%0' is here", StringRef)
+    
+//------------------------------------------------------------------------------
+// Declaration parsing diagnostics
+//------------------------------------------------------------------------------
+ERROR(top_level_decl_without_type,decl_parsing,none,
+      "top-level declarations require a type specifier")
+ERROR(expected_type_or_init,decl_parsing,none,
+      "expected a type or an initializer")
+ERROR(import_inner_scope,decl_parsing,none,
+      "import is only valid at file scope")
+ERROR(expected_lparen_var_name,decl_parsing,none,
+      "expected identifier or '(' in var name")
+ERROR(non_simple_var,decl_parsing,none,
+      "complex 'var' declaration not allowed here")
+ERROR(func_decl_without_paren,decl_parsing,none,
+      "expected '(' in argument list of func declaration")
+ERROR(struct_not_tuple,decl_parsing,none,
+      "element type of struct is not a tuple")
+ERROR(precedence_overload,decl_parsing,none,
+      "infix precedence of functions in an overload set must match")
+      
+//------------------------------------------------------------------------------
+// Type parsing diagnostics
+//------------------------------------------------------------------------------
+ERROR(duplicate_oneof_element,type_parsing,none,
+      "duplicate definition of element '%0'", StringRef)
+ERROR(non_constant_array,type_parsing,none,
+      "array has non-constant size")
+ERROR(zero_length_array,type_parsing,none,
+      "array has length zero")
+ERROR(expected_protocol_member,type_parsing,none,
+      "expected a function or variable declaration in protocol")
+ERROR(type_redefinition,type_parsing,none,
+      "redefinition of type '%0'", StringRef)
+      
+//------------------------------------------------------------------------------
+// Statement parsing diagnostics
+//------------------------------------------------------------------------------
+ERROR(expected_stmt,stmt_parsing,none,
+      "expected statement")
+
+//------------------------------------------------------------------------------
+// Expression parsing diagnostics
+//------------------------------------------------------------------------------
+ERROR(expected_single_expr,expr_parsing,none,
+      "expected a singular expression")
+ERROR(expected_field_name,expr_parsing,none,
+      "expected field name following '.'")
+ERROR(expected_dollar_numeric,expr_parsing,none,
+      "expected numeric value following '$'")
+ERROR(dollar_numeric_too_large,expr_parsing,none,
+      "numeric value following '$' is too large")
+
+//------------------------------------------------------------------------------
+// Literal parsing diagnostics
+//------------------------------------------------------------------------------
+ERROR(int_literal_too_large,literal_parsing,none,
+      "integer constant too large")
+ERROR(float_literal_multi_decimal,literal_parsing,none,
+      "floating point constant contains multiple decimal points")
+WARNING(float_literal_overflow,literal_parsing,none,
+        "floating point constant overflowed to %0", StringRef)
+WARNING(float_literal_underflow,literal_parsing,none,
+        "floating point constant underflowed to %0", StringRef)
+      
+//------------------------------------------------------------------------------
+// Attribute-parsing diagnostics
+//------------------------------------------------------------------------------
+ERROR(expected_attribute_name,attribute_parsing,none,
+      "expected an attribute name")
+ERROR(unknown_attribute,attribute_parsing,none,
+      "unknown attribute '%0'", StringRef)
+ERROR(duplicate_attribute,attribute_parsing,none,
+      "duplicate '%0' attribute", StringRef)
+ERROR(invalid_precedence,attribute_parsing,none,
+      "precedence '%0' is not an integer between 0 and 255", StringRef)
+ERROR(import_attributes,attribute_parsing,none,
+      "invalid attributes specified for import")
+ERROR(oneof_attributes,attribute_parsing,none,
+      "oneof types are not allowed to have attributes")
+ERROR(protocol_attributes,attribute_parsing,none,
+      "protocol types are not allowed to have attributes")
+
+#if defined(DIAG)
+#  undef DIAG
+#endif
+#undef NOTE
+#undef WARNING
+#undef ERROR

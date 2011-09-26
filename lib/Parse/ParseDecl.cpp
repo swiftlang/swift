@@ -16,6 +16,7 @@
 
 #include "Lexer.h"
 #include "Parser.h"
+#include "swift/Basic/Diagnostics.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
@@ -61,8 +62,7 @@ TranslationUnit *Parser::parseTranslationUnit() {
     
     // Verify that values have a type specified.
     if (false && VD->Ty->is<DependentType>()) {
-      error(VD->getLocStart(),
-            "top level declarations require a type specifier");
+      diagnose(VD->getLocStart(), diags::top_level_decl_without_type);
       // FIXME: Should mark the decl as invalid.
       VD->Ty = TupleType::getEmpty(Context);
     }
@@ -90,7 +90,7 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
   // infix_left attribute.
   if (Tok.is(tok::identifier) && Tok.getText() == "infix_left") {
     if (Attributes.InfixPrecedence != -1)
-      error(Tok.getLoc(), "infix_left precedence repeatedly specified");
+      diagnose(Tok, diags::duplicate_attribute, Tok.getText());
     consumeToken(tok::identifier);
 
     // The default infix_left precedence is 100.
@@ -103,16 +103,23 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
                       "expected precedence number in 'infix_left' attribute")) {
         long long Value;
         if (Text.getAsInteger(10, Value) || Value > 255 || Value < 0)
-          error(PrecLoc, "invalid precedence: value must be between 0 and 255");
+          diagnose(PrecLoc, diags::invalid_precedence, Text);
         else
           Attributes.InfixPrecedence = Value;
+      } else {
+        // FIXME: I'd far rather that we describe this in terms of some
+        // list structure in the caller. This feels too ad hoc.
+        skipUntil(tok::r_square, tok::comma);
       }
     }
 
     return false;
   }
-  
-  error(Tok.getLoc(), "unknown declaration attribute");
+
+  if (Tok.is(tok::identifier))   
+    diagnose(Tok, diags::unknown_attribute, Tok.getText());
+  else
+    diagnose(Tok, diags::expected_attribute_name);
   skipUntil(tok::r_square);
   return true;
 }
@@ -180,7 +187,7 @@ Decl *Parser::parseDeclImport() {
   }
   
   if (!Attributes.empty())
-    error(Attributes.LSquareLoc, "invalid attributes specified for import");
+    diagnose(Attributes.LSquareLoc, diags::import_attributes);
   
   return new (Context) ImportDecl(ImportLoc, Context.AllocateCopy(ImportPath),
                                   CurDeclContext);
@@ -203,7 +210,7 @@ bool Parser::parseVarName(DeclVarName &Name) {
   }
   
   if (Tok.isNot(tok::l_paren) && Tok.isNot(tok::l_paren_space)) {
-    error(Tok.getLoc(), "expected identifier or '(' in var name");
+    diagnose(Tok, diags::expected_lparen_var_name);
     return true;
   }
   
@@ -221,7 +228,7 @@ bool Parser::parseVarName(DeclVarName &Name) {
 
   SMLoc RPLoc = Tok.getLoc();
   if (parseToken(tok::r_paren, "expected ')' at end of var name"))
-    note(LPLoc, "to match this '('");
+    diagnose(LPLoc, diags::opening_paren);
 
   Name = DeclVarName(LPLoc, Context.AllocateCopy(ChildNames), RPLoc);
   return false;
@@ -253,7 +260,7 @@ void Parser::actOnVarDeclName(const DeclVarName *Name,
                               VarDecl *VD,
                               SmallVectorImpl<Parser::ExprStmtOrDecl> &Decls) {
   if (Name->isSimple()) {
-    // If this is a leaf name, create a ElementRefDecl with  the specified
+    // If this is a leaf name, create a ElementRefDecl with the specified
     // access path.
     Type Ty = ElementRefDecl::getTypeForPath(VD->Ty, AccessPath);
     
@@ -350,7 +357,8 @@ VarDecl *Parser::parseDeclVarSimple() {
       if (VarDecl *VD = dyn_cast<VarDecl>(D))
         return VD;
   
-  error(CurLoc, "complex 'var' declaration not allowed here");
+  // FIXME: "here" requires a lot more context.
+  diagnose(CurLoc, diags::non_simple_var);
   return 0;
 }
 
@@ -388,7 +396,7 @@ FuncDecl *Parser::parseDeclFunc(bool AllowScoped) {
   
   // We force first type of a func declaration to be a tuple for consistency.
   if (Tok.isNot(tok::l_paren) && Tok.isNot(tok::l_paren_space)) {
-    error(Tok.getLoc(), "expected '(' in argument list of func declaration");
+    diagnose(Tok, diags::func_decl_without_paren);
     return 0;
   }
     
@@ -497,13 +505,14 @@ bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   if (parseTypeTupleBody(LBLoc, BodyTy)) return true;
 
   if (parseToken(tok::r_brace, "expected '{' in struct")) {
-    note(LBLoc, "to match this opening '{'");
+    diagnose(LBLoc, diags::opening_brace);
     return true;
   }
 
   // The type is required to be syntactically a tuple type.
   if (!isa<TupleType>(BodyTy.getPointer())) {
-    error(StructLoc, "element type of struct is not a tuple");
+    // FIXME: Fairly unfriendly diagnostic, here.
+    diagnose(StructLoc, diags::struct_not_tuple);
     // FIXME: Should set this as an erroroneous decl.
     return true;
   }

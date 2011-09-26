@@ -21,6 +21,7 @@
 #include "Scope.h"
 #include "Token.h"
 #include "swift/AST/AST.h"
+#include "swift/Basic/DiagnosticEngine.h"
 
 namespace llvm {
   class SourceMgr;
@@ -30,6 +31,7 @@ namespace llvm {
 namespace swift {
   class Lexer;
   class ScopeInfo;
+  class DiagnosticEngine;
   
   struct OneOfElementInfo;
 
@@ -38,6 +40,7 @@ class Parser {
   void operator=(const Parser&) = delete;
 public:
   llvm::SourceMgr &SourceMgr;
+  DiagnosticEngine &Diags;
   Lexer &L;
   DeclContext *CurDeclContext;
   ASTContext &Context;
@@ -97,15 +100,28 @@ public:
     return true;
   }
   
-  /// skipUntil - Read tokens until we get to the specified token, then return
-  /// without consuming it.  Because we cannot guarantee that the token will
-  /// ever occur, this skips to some likely good stopping point.
+  /// skipUntil - Read tokens until we get to one of the specified tokens, then
+  /// return without consuming it.  Because we cannot guarantee that the token 
+  /// will ever occur, this skips to some likely good stopping point.
   ///
-  void skipUntil(tok T);
+  void skipUntil(tok T1, tok T2 = tok::unknown);
   
-  void note(SMLoc Loc, const Twine &Message);
-  void warning(SMLoc Loc, const Twine &Message);
-  void error(SMLoc Loc, const Twine &Message);
+  template<typename ...ArgTypes>
+  void diagnose(SMLoc Loc, Diag<ArgTypes...> ID,
+                typename detail::PassArgument<ArgTypes>::type... Args) {
+    Diags.diagnose(Loc, ID, Args...);
+  }
+
+  /// \brief Emit a diagnostic at the given source location.
+  template<typename ...ArgTypes>
+  void diagnose(Token Tok, Diag<ArgTypes...> ID,
+                typename detail::PassArgument<ArgTypes>::type... Args) {
+    Diags.diagnose(Tok.getLoc(), ID, Args...);
+  }
+
+  void note(SMLoc Loc, const Twine &Message) __attribute__((deprecated));
+  void warning(SMLoc Loc, const Twine &Message) __attribute__((deprecated));
+  void error(SMLoc Loc, const Twine &Message) __attribute__((deprecated));
   
   //===--------------------------------------------------------------------===//
   // Primitive Parsing

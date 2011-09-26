@@ -16,6 +16,7 @@
 
 #include "swift/Subsystems.h"
 #include "swift/AST/Verifier.h"
+#include "swift/Basic/Diagnostics.h"
 #include "Parser.h"
 #include "Lexer.h"
 #include "llvm/Support/SourceMgr.h"
@@ -37,6 +38,7 @@ TranslationUnit *swift::parseTranslationUnit(unsigned BufferID,
 
 Parser::Parser(unsigned BufferID, ASTContext &Context)
   : SourceMgr(Context.SourceMgr),
+    Diags(Context.Diags),
     L(*new Lexer(BufferID, Context)),
     Context(Context),
     ScopeInfo(*this) {
@@ -75,11 +77,11 @@ SMLoc Parser::consumeToken() {
 /// Because we cannot guarantee that the token will ever occur, this skips to
 /// some likely good stopping point.
 ///
-void Parser::skipUntil(tok T) {
+void Parser::skipUntil(tok T1, tok T2) {
   // tok::unknown is a sentinel that means "don't skip".
-  if (T == tok::unknown) return;
+  if (T1 == tok::unknown && T2 == tok::unknown) return;
   
-  while (Tok.isNot(tok::eof) && Tok.isNot(T)) {
+  while (Tok.isNot(tok::eof) && Tok.isNot(T1) && Tok.isNot(T2)) {
     switch (Tok.getKind()) {
     default: consumeToken(); break;
     // TODO: Handle paren/brace/bracket recovery.
@@ -135,7 +137,7 @@ bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init,
                                  bool SingleInit) {
   // Diagnose when we don't have a type or an expression.
   if (Tok.isNot(tok::colon) && Tok.isNot(tok::equal)) {
-    error(Tok.getLoc(), "expected a type or an initializer");
+    diagnose(Tok, diags::expected_type_or_init);
     // TODO: Recover better by still creating var, but making it have
     // 'invalid' type so that uses of the identifier are not errors.
     return true;

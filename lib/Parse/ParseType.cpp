@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Parser.h"
+#include "swift/Basic/Diagnostics.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
@@ -73,7 +74,7 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
 
     if (parseToken(tok::r_paren, "expected ')' at end of tuple list",
                    tok::r_paren)) {
-      note(LPLoc, "to match this opening '('");
+      diagnose(LPLoc, diags::opening_paren);
       return true;
     }
     break;
@@ -244,7 +245,7 @@ OneOfType *Parser::actOnOneOfType(SMLoc OneOfLoc, const DeclAttributes &Attrs,
                                   TypeAliasDecl *PrettyTypeName) {
   // No attributes are valid on oneof types at this time.
   if (!Attrs.empty())
-    error(Attrs.LSquareLoc, "oneof types are not allowed to have attributes");
+    diagnose(Attrs.LSquareLoc, diags::oneof_attributes);
   
   llvm::SmallPtrSet<const char *, 16> SeenSoFar;
   SmallVector<OneOfElementDecl *, 16> EltDecls;
@@ -260,10 +261,18 @@ OneOfType *Parser::actOnOneOfType(SMLoc OneOfLoc, const DeclAttributes &Attrs,
     
     // If this was multiply defined, reject it.
     if (!SeenSoFar.insert(NameI.get())) {
-      error(Elt.NameLoc, "element named '" + Elt.Name +
-            "' defined multiple times");
+      diagnose(Elt.NameLoc, diags::duplicate_oneof_element, Elt.Name);
+      
+      // FIXME: Do we care enough to make this efficient?
+      for (unsigned I = 0, N = EltDecls.size(); I != N; ++I) {
+        if (EltDecls[I]->Name == NameI) {
+          diagnose(EltDecls[I]->getLocStart(), diags::previous_definition,
+                   Elt.Name);
+          break;
+        }
+      }
+      
       // Don't copy this element into NewElements.
-      // TODO: QoI: add note for previous definition.
       continue;
     }
     
@@ -322,7 +331,7 @@ bool Parser::parseTypeArray(SMLoc LSquareLoc, Type &Result) {
   
   SMLoc RArrayTok = Tok.getLoc();
   if (parseToken(tok::r_square, "expected ']' in array type")) {
-    note(LSquareLoc, "to match this '['");
+    diagnose(LSquareLoc, diags::opening_bracket);
     return true;
   }
   
@@ -343,12 +352,12 @@ bool Parser::parseTypeArray(SMLoc LSquareLoc, Type &Result) {
   if (IntegerLiteralExpr *IL = dyn_cast<IntegerLiteralExpr>(Size)) {
     SizeVal = IL->getValue();
   } else {
-    error(Size->getLoc(), "invalid type size, not a constant");
+    diagnose(Size->getLoc(), diags::non_constant_array);
     return ErrorType::get(Context);
   }
   
   if (SizeVal == 0) {
-    error(Size->getLoc(), "array types must be larger than zero elements");
+    diagnose(Size->getLoc(), diags::zero_length_array);
     return ErrorType::get(Context);
   }
   
@@ -389,7 +398,7 @@ bool Parser::parseTypeProtocolBody(SMLoc ProtocolLoc,
   do {
     switch (Tok.getKind()) {
     default:
-      error(Tok.getLoc(), "unexpected token in protocol body");
+      diagnose(Tok, diags::expected_protocol_member);
       return true;
     case tok::r_brace:  // End of protocol body.
       break;
@@ -410,8 +419,7 @@ bool Parser::parseTypeProtocolBody(SMLoc ProtocolLoc,
   
   // Act on what we've parsed.
   if (!Attributes.empty())
-    error(Attributes.LSquareLoc,
-          "protocol types are not allowed to have attributes yet");
+    diagnose(Attributes.LSquareLoc, diags::protocol_attributes);
   
   ProtocolType *NewProto = ProtocolType::getNew(ProtocolLoc, Elements,
                                                 CurDeclContext);

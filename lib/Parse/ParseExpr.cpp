@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Parser.h"
+#include "swift/Basic/Diagnostics.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/ADT/APFloat.h"
@@ -44,7 +45,7 @@ ParseResult<Expr> Parser::parseSingleExpr(const char *Message) {
   // Kill all the following expressions.  This is not necessarily
   // good for certain kinds of recovery.
   if (isStartOfExpr(Tok, peekToken())) {
-    error(Tok.getLoc(), "expected a singular expression");
+    diagnose(Tok, diags::expected_single_expr);
     do {
       ParseResult<Expr> Extra = parseExpr(Message);
       if (Extra) break;
@@ -202,7 +203,7 @@ ParseResult<Expr> Parser::parseExprPostfix(const char *Message) {
     
     if (consumeIf(tok::period)) {
       if (Tok.isNot(tok::identifier) && Tok.isNot(tok::dollarident)) {
-        error(Tok.getLoc(), "expected field name");
+        diagnose(Tok, diags::expected_field_name);
         return true;
       }
         
@@ -239,7 +240,7 @@ ParseResult<Expr> Parser::parseExprPostfix(const char *Message) {
       
       SMLoc RLoc = Tok.getLoc();
       if (parseToken(tok::r_square, "expected ']'")) {
-        note(TokLoc, "to match this '['");
+        diagnose(TokLoc, diags::opening_bracket);
         return true;        
       }
       
@@ -266,7 +267,7 @@ ParseResult<Expr> Parser::parseExprNumericConstant() {
     // The integer literal must fit in 64-bits.
     unsigned long long Val;
     if (Text.getAsInteger(0, Val)) {
-      error(Loc, "invalid immediate for integer literal, value too large");
+      diagnose(Loc, diags::int_literal_too_large);
       return ParseResult<Expr>::getSemaError();
     }
     
@@ -280,8 +281,8 @@ ParseResult<Expr> Parser::parseExprNumericConstant() {
   // Okay, we have a floating point constant.  Verify we have a single dot.
   DotPos = Text.find('.', DotPos+1);
   if (DotPos != StringRef::npos) {
-    error(SMLoc::getFromPointer(Loc.getPointer()+DotPos),
-          "multiple decimal points found in floating point constant");
+    diagnose(SMLoc::getFromPointer(Loc.getPointer()+DotPos),
+             diags::float_literal_multi_decimal);
     return ParseResult<Expr>::getSemaError();
   }
   
@@ -291,7 +292,7 @@ ParseResult<Expr> Parser::parseExprNumericConstant() {
   case llvm::APFloat::opOverflow: {
     llvm::SmallString<20> Buffer;
     llvm::APFloat::getLargest(Val.getSemantics()).toString(Buffer);
-    warning(Loc, "floating point constant overflowed to " + Buffer.str());
+    diagnose(Loc, diags::float_literal_overflow, Buffer);
     break;
   }
   case llvm::APFloat::opUnderflow: {
@@ -299,7 +300,7 @@ ParseResult<Expr> Parser::parseExprNumericConstant() {
     if (!Val.isZero()) break;
     llvm::SmallString<20> Buffer;
     llvm::APFloat::getSmallest(Val.getSemantics()).toString(Buffer);
-    warning(Loc, "floating point constant underflowed beyond " + Buffer.str());
+    diagnose(Loc, diags::float_literal_underflow, Buffer);
     break;
   }
   }
@@ -322,13 +323,15 @@ ParseResult<Expr> Parser::parseExprDollarIdentifier() {
     AllNumeric &= isdigit(Name[i]);
   
   if (Name.size() == 1 || !AllNumeric) {
-    error(Loc, "invalid identifier, expected expression");
+    diagnose(SMLoc::getFromPointer(Loc.getPointer() + 1), 
+             diags::expected_dollar_numeric);
     return ParseResult<Expr>::getSemaError();
   }
   
   unsigned ArgNo = 0;
   if (Name.substr(1).getAsInteger(10, ArgNo)) {
-    error(Loc, "invalid name in $ expression");
+    diagnose(SMLoc::getFromPointer(Loc.getPointer() + 1),
+             diags::dollar_numeric_too_large);
     return ParseResult<Expr>::getSemaError();
   }
   
@@ -435,7 +438,7 @@ ParseResult<Expr> Parser::parseExprParen() {
   
   SMLoc RPLoc = Tok.getLoc();  
   if (parseToken(tok::r_paren, "expected ')' in parenthesis expression")) {
-    note(LPLoc, "to match this opening '('");
+    diagnose(LPLoc, diags::opening_paren);
     return true;
   }
 
@@ -476,7 +479,7 @@ ParseResult<Expr> Parser::parseExprFunc() {
   if (Tok.is(tok::l_brace)) {
     Ty = TupleType::getEmpty(Context);
   } else if (!Tok.is(tok::l_paren) && !Tok.is(tok::l_paren_space)) {
-    error(Tok.getLoc(), "expected '(' in func expression argument list");
+    diagnose(Tok, diags::func_decl_without_paren);
     return true;
   } else if (parseType(Ty)) {
     return true;
