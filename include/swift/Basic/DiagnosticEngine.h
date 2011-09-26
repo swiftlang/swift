@@ -152,6 +152,16 @@ namespace swift {
     /// must ensure that the diagnostic arguments have the appropriate type.
     void diagnose(SMLoc Loc, DiagID ID, ArrayRef<DiagnosticArgument> Args);
 
+    /// \brief Emit a diagnostic with no arguments.
+    ///
+    /// \param Loc The location to which the diagnostic refers in the source
+    /// code.
+    ///
+    /// \param ID The diagnostic to be emitted.
+    void diagnose(SMLoc Loc, Diag<> ID) {
+      diagnose(Loc, ID.ID, ArrayRef<DiagnosticArgument>());
+    }    
+
     /// \brief Emit a diagnostic with the given set of diagnostic arguments.
     ///
     /// \param Loc The location to which the diagnostic refers in the source
@@ -167,8 +177,7 @@ namespace swift {
       DiagnosticArgument DiagArgs[] = { Args... };
       diagnose(Loc, ID.ID, 
                ArrayRef<DiagnosticArgument>(DiagArgs, sizeof...(Args)));
-    }
-    
+    }    
   };
 } // end namespace swift
 
