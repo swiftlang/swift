@@ -100,15 +100,9 @@ Type ScopeInfo::getQualifiedTypeName(Identifier BaseName, SMLoc BaseNameLoc,
 
 static void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New, Parser &P) {
   assert(New != Prev && "Cannot conflict with self");
-  if (New->Init)
-    P.error(New->getLocStart(), "definition conflicts with previous value");
-  else
-    P.error(New->getLocStart(), "declaration conflicts with previous value");
-  
-  if (Prev->Init)
-    P.note(Prev->getLocStart(), "previous definition here");
-  else
-    P.note(Prev->getLocStart(), "previous declaration here");
+  P.diagnose(New->getLocStart(), diags::decl_redefinition, New->Init != 0);
+  P.diagnose(Prev->getLocStart(), diags::previous_decldef, Prev->Init != 0,
+             Prev->Name.str());
 }
 
 /// checkValidOverload - Check whether it is ok for D1 and D2 to be declared at

@@ -46,6 +46,9 @@ NOTE(opening_bracket,parsing,none,
      "to match this opening '['", ())
 NOTE(opening_paren,parsing,none,
      "to match this opening '('", ())
+NOTE(previous_decldef,parsing,none,
+     "previous %select{declaration|definition}0 of '%1' is here", 
+     (bool, StringRef))
 NOTE(previous_declaration,parsing,none,
      "previous declaration of '%0' is here", (StringRef))
 NOTE(previous_definition,parsing,none,
@@ -70,7 +73,10 @@ ERROR(struct_not_tuple,decl_parsing,none,
       "element type of struct is not a tuple", ())
 ERROR(precedence_overload,decl_parsing,none,
       "infix precedence of functions in an overload set must match", ())
-      
+ERROR(decl_redefinition,decl_parsing,none,
+      "%select{declaration|definition}0 conflicts with previous value", 
+      (bool))
+
 //------------------------------------------------------------------------------
 // Type parsing diagnostics
 //------------------------------------------------------------------------------

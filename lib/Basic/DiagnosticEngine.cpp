@@ -45,7 +45,60 @@ static DiagnosticInfo DiagnosticInfos[] = {
   { DiagnosticKind::Error, "<not a diagnostic>" }
 };
 
-/// \brief Format a single diagnostic argumentand write it to the given stream.
+/// \brief Skip forward to one of the given delimiters.
+///
+/// \param Text The text to search through, which will be updated to point
+/// just after the delimiter.
+///
+/// \param Delim1 The first character delimiter to search for.
+///
+/// \param Delim2 The second character delimiter to search for.
+///
+/// \returns The string leading up to the delimiter, or the empty string
+/// if no delimiter is found.
+static StringRef 
+skipToDelimiter(StringRef &Text, char Delim1, char Delim2 = 0) {
+  unsigned Depth = 0;
+
+  unsigned I = 0;
+  for (unsigned N = Text.size(); I != N; ++I) {
+    if (Depth == 0 && Text[I] == '{') {
+      ++Depth;
+      continue;
+    }
+    if (Depth > 0 && Text[I] == '}') {
+      --Depth;
+      continue;
+    }
+    
+    if (Text[I] == Delim1 || Text[I] == Delim2)
+      break;
+  }
+
+  assert(Depth == 0 && "Unbalanced {} set in diagnostic text");
+  StringRef Result = Text.substr(0, I);
+  Text = Text.substr(I + 1);
+  return Result;
+}
+
+/// \brief Format a selection argument and write it to the given stream.
+static void formatSelectionArgument(StringRef ModifierArguments,
+                                    ArrayRef<DiagnosticArgument> Args,
+                                    unsigned SelectedIndex,
+                                    llvm::raw_ostream &Out) {
+  do {
+    StringRef Text = skipToDelimiter(ModifierArguments, '|');
+    if (SelectedIndex == 0) {
+      Out << Text;
+      break;
+    }
+    --SelectedIndex;
+  } while (true);
+  
+}
+
+/// \brief Format a single diagnostic argument and write it to the given
+/// stream.
 static void formatDiagnosticArgument(StringRef Modifier, 
                                      StringRef ModifierArguments,
                                      ArrayRef<DiagnosticArgument> Args,
@@ -54,14 +107,28 @@ static void formatDiagnosticArgument(StringRef Modifier,
   const DiagnosticArgument &Arg = Args[ArgIndex];
   switch (Arg.getKind()) {
   case DiagnosticArgumentKind::Integer:
-    Out << Arg.getAsInteger();
+    if (Modifier == "select") {
+      assert(Arg.getAsInteger() >= 0 && "Negative selection index");
+      formatSelectionArgument(ModifierArguments, Args, Arg.getAsInteger(), 
+                              Out);
+    } else {
+      assert(Modifier.empty() && "Improper modifier for integer argument");
+      Out << Arg.getAsInteger();
+    }
     break;
 
   case DiagnosticArgumentKind::Unsigned:
-    Out << Arg.getAsUnsigned();
+    if (Modifier == "select") {
+      formatSelectionArgument(ModifierArguments, Args, Arg.getAsUnsigned(), 
+                              Out);
+    } else {
+      assert(Modifier.empty() && "Improper modifier for unsigned argument");
+      Out << Arg.getAsUnsigned();
+    }
     break;
 
   case DiagnosticArgumentKind::String:
+    assert(Modifier.empty() && "Improper modifier for string argument");
     Out << Arg.getAsString();
     break;
   }
@@ -104,14 +171,10 @@ static void formatDiagnosticText(StringRef InText,
     }
     
     // Parse the optional argument list for a modifier, which is brace-enclosed.
-    StringRef ModifierArguments; 
+    StringRef ModifierArguments;
     if (InText[0] == '{') {
-      // FIXME: Actually do this properly when we need it for something.
-      unsigned Length = 1;
-      while (InText[Length] != '}')
-        ++Length;
-      ModifierArguments = InText.substr(1, Length - 1);
-      InText = InText.substr(Length + 1);
+      InText = InText.substr(1);
+      ModifierArguments = skipToDelimiter(InText, '}');
     }
     
     // Find the digit sequence.
