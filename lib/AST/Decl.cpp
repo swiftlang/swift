@@ -109,6 +109,25 @@ Type ElementRefDecl::getTypeForPath(Type InTy, ArrayRef<unsigned> Path) {
   return 0;
 }
 
+/// getTypeJudgement - Return the full type judgement for a non-member
+/// reference to this value.
+TypeJudgement ValueDecl::getTypeJudgement() const {
+  switch (Kind) {
+  case DeclKind::Import:
+  case DeclKind::TypeAlias:
+    llvm_unreachable("non-value decls don't have type judgements");
+
+  case DeclKind::Var:
+  case DeclKind::Arg:
+  case DeclKind::ElementRef:
+    return TypeJudgement(Ty, ValueKind::LValue);
+
+  case DeclKind::Func:
+  case DeclKind::OneOfElement:
+    return TypeJudgement(Ty, ValueKind::RValue);
+  }
+}
+
 
 //===----------------------------------------------------------------------===//
 //  Decl printing.

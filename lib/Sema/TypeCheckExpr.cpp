@@ -25,48 +25,79 @@ using namespace swift;
 // Expression Semantic Analysis Routines
 //===----------------------------------------------------------------------===//
 
+Expr *TypeChecker::convertToRValue(Expr *E) {
+  // Fast path: already an r-value.
+  if (E->getValueKind() == ValueKind::RValue) return E;
+
+  // FIXME: add AST for this.
+  return E;
+}
+
 bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
   // A tuple expr with a single subexpression and no name is just a grouping
   // paren.
   if (TE->isGroupingParen()) {
-    TE->setType(TE->getElement(0)->getType());
+    TE->setType(TE->getElement(0)->getTypeJudgement());
     return false;
   }
   
   // Compute the result type.
   SmallVector<TupleTypeElt, 8> ResultTyElts(TE->getNumElements());
+
+  bool ResultIsRValue = false;
   
   for (unsigned i = 0, e = TE->getNumElements(); i != e; ++i) {
+    bool EltIsRValue;
+    
     // If the element value is missing, it has the value of the default
     // expression of the result type, which must be known.
-    if (TE->getElement(i) == 0) {
+    Expr *Elt = TE->getElement(i);
+    if (Elt == 0) {
       assert(TE->getType() && isa<TupleType>(TE->getType()) && 
              "Can't have default value without a result type");
       
       ResultTyElts[i].Ty =
         cast<TupleType>(TE->getType())->getElementType(i);
+
+      // Default values are always r-values.
+      EltIsRValue = true;
       
       // FIXME: What about a default value that is dependent?
       if (ResultTyElts[i].Ty->is<DependentType>()) {
-        TE->setType(ResultTyElts[i].Ty);
+        TE->setDependentType(ResultTyElts[i].Ty);
         return false;
       }
     } else {
       // If any of the tuple element types is dependent, the whole tuple should
       // have dependent type.
-      if (TE->getElement(i)->getType()->is<DependentType>()) {
-        TE->setType(TE->getElement(i)->getType());
+      if (Elt->getType()->is<DependentType>()) {
+        TE->setDependentType(Elt->getType());
         return false;
       }
       
-      ResultTyElts[i].Ty = TE->getElement(i)->getType();
+      ResultTyElts[i].Ty = Elt->getType();
+      EltIsRValue = (Elt->getValueKind() == ValueKind::RValue);
     }
-    
+
+    // If we're known to be building an r-value, and the element is an
+    // l-value, convert it.
+    if (ResultIsRValue && !EltIsRValue) {
+      TE->setElement(i, convertToRValue(Elt));
+
+    // If we thought we were building an l-value, and the element is
+    // an r-value, convert all the previous elements.
+    } else if (!ResultIsRValue && EltIsRValue) {
+      ResultIsRValue = true;
+      for (unsigned j = 0; j != i; ++j)
+        TE->setElement(j, convertToRValue(TE->getElement(j)));
+    }
+
     // If a name was specified for this element, use it.
     ResultTyElts[i].Name = TE->getElementName(i);
   }
   
-  TE->setType(TupleType::get(ResultTyElts, Context));
+  TE->setType(TupleType::get(ResultTyElts, Context),
+              ResultIsRValue ? ValueKind::RValue : ValueKind::LValue);
   return false;
 }
 
@@ -108,7 +139,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
     }
     
     E->setArg(E2);
-    E->setType(FT->Result);
+    E->setType(FT->Result, ValueKind::RValue);
     return false;
   }
   
@@ -122,7 +153,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // Okay, if the argument is also dependent, we can't do anything here.  Just
   // wait until something gets resolved.
   if (E2->getType()->is<DependentType>()) {
-    E->setType(E2->getType());
+    E->setDependentType(E2->getType());
     return false;
   }
   
@@ -133,7 +164,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // resolve which overload member is based on the argument type.
   OverloadSetRefExpr *OS = dyn_cast<OverloadSetRefExpr>(E1);
   if (!OS) {
-    E->setType(E1->getType());
+    E->setType(E1->getType(), ValueKind::RValue);
     return false;
   }
   
@@ -167,7 +198,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // type checking.
   if (BestCandidateFound) {
     E1 = new (Context) DeclRefExpr(BestCandidateFound, OS->getLoc(),
-                                   BestCandidateFound->Ty);
+                                   BestCandidateFound->getTypeJudgement());
     E->setFn(E1);
     return semaApplyExpr(E);
   }
@@ -233,11 +264,11 @@ public:
     
     // TODO: QOI: If the decl had an "invalid" bit set, then return the error
     // object to improve error recovery.
-    E->setType(E->getDecl()->Ty);
+    E->setType(E->getDecl()->getTypeJudgement());
     return E;
   }
   Expr *visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
-    E->setType(DependentType::get(TC.Context));
+    E->setDependentType(DependentType::get(TC.Context));
     return E;
   }
   Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
@@ -245,7 +276,7 @@ public:
     return 0;
   }
   Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
-    E->setType(DependentType::get(TC.Context));
+    E->setDependentType(DependentType::get(TC.Context));
     return E;
   }
   
@@ -292,7 +323,7 @@ public:
     // always were.  If no type is assigned, we give them a dependent type so
     // that we get resolution later.
     if (E->getType().isNull())
-      E->setType(DependentType::get(TC.Context));
+      E->setDependentType(DependentType::get(TC.Context));
     return E;
   }
   
@@ -338,7 +369,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   // If the base expression hasn't been found yet, then we can't process this
   // value.
   if (E->getBase() == 0) {
-    E->setType(DependentType::get(TC.Context));
+    E->setDependentType(DependentType::get(TC.Context));
     return E;
   }
   
@@ -361,7 +392,9 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     if (FieldNo != -1)
       return new (TC.Context) 
         TupleElementExpr(E->getBase(), E->getDotLoc(), FieldNo,
-                         E->getNameLoc(), TT->getElementType(FieldNo));
+                         E->getNameLoc(),
+                         TypeJudgement(TT->getElementType(FieldNo),
+                                       E->getBase()->getValueKind()));
     
     // Okay, the field name was invalid.  If this is a dollarident like $4,
     // process it as a field index.
@@ -375,7 +408,9 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
         
         return new (TC.Context) 
           TupleElementExpr(E->getBase(), E->getDotLoc(), FieldNo,
-                           E->getNameLoc(), TT->getElementType(Value));
+                           E->getNameLoc(),
+                           TypeJudgement(TT->getElementType(Value),
+                                         E->getBase()->getValueKind()));
       }
     }
   }
@@ -385,7 +420,8 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     for (ValueDecl *VD : PT->Elements) {
       if (VD->Name == E->getName()) {
         // The protocol value is applied via a DeclRefExpr.
-        Expr *Fn = new (TC.Context) DeclRefExpr(VD, E->getNameLoc(), VD->Ty);
+        Expr *Fn = new (TC.Context) DeclRefExpr(VD, E->getNameLoc(),
+                                                VD->getTypeJudgement());
         
         ApplyExpr *Call = new (TC.Context) 
           ProtocolElementExpr(Fn, E->getDotLoc(), E->getBase());
@@ -407,13 +443,15 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     if (E->getResolvedDecls().size() == 1)
       FnRef = new (TC.Context) DeclRefExpr(E->getResolvedDecls()[0],
                                            E->getNameLoc(),
-                                           E->getResolvedDecls()[0]->Ty);
-    else
+                                 E->getResolvedDecls()[0]->getTypeJudgement());
+    else {
       FnRef = new (TC.Context) OverloadSetRefExpr(E->getResolvedDecls(),
-                                                  E->getNameLoc(),
-                                                DependentType::get(TC.Context));
+                                                  E->getNameLoc());
+      FnRef->setDependentType(DependentType::get(TC.Context));
+    }
     
-    CallExpr *Call = new (TC.Context) CallExpr(FnRef, E->getBase(), Type());
+    CallExpr *Call = new (TC.Context) CallExpr(FnRef, E->getBase(),
+                                               TypeJudgement());
     if (TC.semaApplyExpr(Call))
       return 0;
     

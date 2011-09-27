@@ -30,7 +30,7 @@ Expr *Parser::actOnCondition(Expr *Cond) {
   Identifier C2LVFuncId = Context.getIdentifier("convertToLogicValue");
   Expr *C2LVFunc = actOnIdentifierExpr(C2LVFuncId, Cond->getLoc());
   
-  return new (Context) CallExpr(C2LVFunc, Cond, Type());
+  return new (Context) CallExpr(C2LVFunc, Cond, TypeJudgement());
 }
 
 

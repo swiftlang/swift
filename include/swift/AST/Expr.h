@@ -35,14 +35,13 @@ namespace swift {
   class Stmt;
   class BraceStmt;
   class TypeAliasDecl;
-  
+
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
 #define EXPR_RANGE(Id, FirstId, LastId) \
   First_##Id##Expr = FirstId, Last_##Id##Expr = LastId,
 #include "swift/AST/ExprNodes.def"
 };
-  
   
 /// Expr - Base class for all expressions in swift.
 class Expr {
@@ -53,20 +52,34 @@ class Expr {
   const ExprKind Kind;
 
   /// Ty - This is the type of the expression.
-  Type Ty;
+  TypeJudgement Ty;
 
 public:
-  Expr(ExprKind kind, Type ty = Type()) : Kind(kind), Ty(ty) {}
+  Expr(ExprKind kind, TypeJudgement ty = TypeJudgement())
+    : Kind(kind), Ty(ty) {}
 
   /// getKind - Return the kind of this expression.
   ExprKind getKind() const { return Kind; }
 
-  /// getType - Return the type of this expression.
-  Type getType() const { return Ty; }
+  /// getValueKind - Return the value kind of this expression.
+  ValueKind getValueKind() const { return Ty.getValueKind(); }
 
-  /// setType - Sets the type of this expression.  If we add
-  /// l-valueness to the type judgement, this should take that, too.
-  void setType(Type T) { Ty = T; }
+  /// getType - Return the type of this expression.
+  Type getType() const { return Ty.getType(); }
+
+  /// getTypeJudgement - Returns the full type judgement of this expression.
+  TypeJudgement getTypeJudgement() const { return Ty; }
+
+  /// setType - Sets the type of this expression.
+  void setType(TypeJudgement T) { Ty = T; }
+
+  /// setType - Sets the type of this expression.
+  void setType(Type T, ValueKind VK) { setType(TypeJudgement(T, VK)); }
+
+  /// setDependentType - Sets this expression to have the given
+  /// dependent type.  This is just like setType except more
+  /// self-documenting.
+  void setDependentType(Type T) { setType(T, ValueKind::RValue); }
 
   /// getStartLoc - Return the location of the start of the expression.
   /// FIXME: QOI: Need to extend this to do full source ranges like Clang.
@@ -143,7 +156,8 @@ class IntegerLiteralExpr : public Expr {
 
 public:
   IntegerLiteralExpr(StringRef Val, SMLoc Loc, Type Ty)
-    : Expr(ExprKind::IntegerLiteral, Ty), Val(Val), Loc(Loc) {}
+    : Expr(ExprKind::IntegerLiteral, TypeJudgement(Ty, ValueKind::RValue)),
+      Val(Val), Loc(Loc) {}
   
   uint64_t getValue() const;
 
@@ -166,7 +180,8 @@ class FloatLiteralExpr : public Expr {
 
 public:
   FloatLiteralExpr(double Val, SMLoc Loc, Type Ty)
-    : Expr(ExprKind::FloatLiteral, Ty), Val(Val), Loc(Loc) {}
+    : Expr(ExprKind::FloatLiteral, TypeJudgement(Ty, ValueKind::RValue)),
+      Val(Val), Loc(Loc) {}
 
   double getValue() const { return Val; }
 
@@ -186,7 +201,7 @@ class DeclRefExpr : public Expr {
   SMLoc Loc;
 
 public:
-  DeclRefExpr(ValueDecl *D, SMLoc Loc, Type Ty = Type())
+  DeclRefExpr(ValueDecl *D, SMLoc Loc, TypeJudgement Ty = TypeJudgement())
     : Expr(ExprKind::DeclRef, Ty), D(D), Loc(Loc) {}
 
   ValueDecl *getDecl() const { return D; }
@@ -208,9 +223,8 @@ class OverloadSetRefExpr : public Expr {
   SMLoc Loc;
 
 public:
-  OverloadSetRefExpr(ArrayRef<ValueDecl*> decls, SMLoc L,
-                     Type Ty = Type())
-  : Expr(ExprKind::OverloadSetRef, Ty), Decls(decls), Loc(L) {}
+  OverloadSetRefExpr(ArrayRef<ValueDecl*> decls, SMLoc L)
+  : Expr(ExprKind::OverloadSetRef), Decls(decls), Loc(L) {}
 
   ArrayRef<ValueDecl*> getDecls() const { return Decls; }
 
@@ -340,7 +354,7 @@ class TupleExpr : public Expr {
 public:
   TupleExpr(SMLoc lparenloc, Expr **subexprs, Identifier *subexprnames,
             unsigned numsubexprs, SMLoc rparenloc, bool isGrouping,
-            Type Ty = Type())
+            TypeJudgement Ty = TypeJudgement())
     : Expr(ExprKind::Tuple, Ty), LParenLoc(lparenloc), SubExprs(subexprs),
       SubExprNames(subexprnames), NumSubExprs(numsubexprs),
       RParenLoc(rparenloc), IsGrouping(isGrouping) {
@@ -441,7 +455,7 @@ class TupleElementExpr : public Expr {
   
 public:
   TupleElementExpr(Expr *subexpr, SMLoc dotloc, unsigned fieldno,
-                   SMLoc nameloc, Type ty = Type())
+                   SMLoc nameloc, TypeJudgement ty = TypeJudgement())
   : Expr(ExprKind::TupleElement, ty), SubExpr(subexpr), DotLoc(dotloc),
     FieldNo(fieldno), NameLoc(nameloc) {}
 
@@ -475,8 +489,8 @@ class TupleShuffleExpr : public Expr {
   
 public:
   TupleShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping, Type Ty)
-    : Expr(ExprKind::TupleShuffle, Ty), SubExpr(subExpr),
-      ElementMapping(elementMapping) {}
+    : Expr(ExprKind::TupleShuffle, TypeJudgement(Ty, ValueKind::RValue)),
+      SubExpr(subExpr), ElementMapping(elementMapping) {}
 
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *e) { SubExpr = e; }
@@ -543,7 +557,7 @@ class FuncExpr : public Expr, public DeclContext {
 public:
   FuncExpr(SMLoc FuncLoc, Type FnType, ArrayRef<ArgDecl*> NamedArgs, 
            BraceStmt *Body, DeclContext *Parent)
-    : Expr(ExprKind::Func, FnType),
+    : Expr(ExprKind::Func, TypeJudgement(FnType, ValueKind::RValue)),
       DeclContext(DeclContextKind::FuncExpr, Parent),
       FuncLoc(FuncLoc), NamedArgs(NamedArgs), Body(Body) {}
 
@@ -575,7 +589,8 @@ class ClosureExpr : public Expr {
   
 public:
   ClosureExpr(Expr *input, Type ResultTy)
-    : Expr(ExprKind::Closure, ResultTy), Input(input) {}
+    : Expr(ExprKind::Closure, TypeJudgement(ResultTy, ValueKind::RValue)),
+      Input(input) {}
 
   Expr *getInput() const { return Input; }
   void setInput(Expr *e) { Input = e; }
@@ -618,7 +633,8 @@ class ApplyExpr : public Expr {
   Expr *Arg;
 
 protected:
-  ApplyExpr(ExprKind Kind, Expr *Fn, Expr *Arg, Type Ty = Type())
+  ApplyExpr(ExprKind Kind, Expr *Fn, Expr *Arg,
+            TypeJudgement Ty = TypeJudgement())
     : Expr(Kind, Ty), Fn(Fn), Arg(Arg) {
     assert(classof((Expr*)this) && "ApplyExpr::classof out of date");
   }
@@ -645,7 +661,7 @@ public:
 /// leading '(' is unspaced.
 class CallExpr : public ApplyExpr {
 public:
-  CallExpr(Expr *Fn, Expr *Arg, Type Ty)
+  CallExpr(Expr *Fn, Expr *Arg, TypeJudgement Ty)
     : ApplyExpr(ExprKind::Call, Fn, Arg, Ty) {}
 
   SMLoc getStartLoc() const { return getFn()->getStartLoc(); }
@@ -659,7 +675,7 @@ public:
 /// UnaryExpr - Prefix unary expressions like '!y'.
 class UnaryExpr : public ApplyExpr {
 public:
-  UnaryExpr(Expr *Fn, Expr *Arg, Type Ty = Type())
+  UnaryExpr(Expr *Fn, Expr *Arg, TypeJudgement Ty = TypeJudgement())
     : ApplyExpr(ExprKind::Unary, Fn, Arg, Ty) {}
 
   SMLoc getStartLoc() const { return getFn()->getStartLoc(); }
@@ -674,7 +690,7 @@ public:
 /// an implicit tuple expression of the type expected by the function.
 class BinaryExpr : public ApplyExpr {
 public:
-  BinaryExpr(Expr *Fn, TupleExpr *Arg, Type Ty = Type())
+  BinaryExpr(Expr *Fn, TupleExpr *Arg, TypeJudgement Ty = TypeJudgement())
     : ApplyExpr(ExprKind::Binary, Fn, Arg, Ty) {}
 
   /// getArgTuple - The argument is always a tuple literal.  This accessor
@@ -699,7 +715,7 @@ class ProtocolElementExpr : public ApplyExpr {
   
 public:
   ProtocolElementExpr(Expr *FnExpr, SMLoc DotLoc, Expr *BaseExpr,
-                      Type Ty = Type())
+                      TypeJudgement Ty = TypeJudgement())
   : ApplyExpr(ExprKind::ProtocolElement, FnExpr, BaseExpr, Ty), DotLoc(DotLoc) {
   }
 

@@ -49,6 +49,8 @@ public:
   ///
   /// This emits a diagnostic and returns null on error.
   Expr *convertToType(Expr *E, Type Ty);
+
+  Expr *convertToRValue(Expr *E);
 };
 
   

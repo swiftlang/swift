@@ -568,7 +568,8 @@ void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
     // Fill in null results with a dummy expression.
     if (Elt.isNull())
       Elt = new (Ctx) TupleExpr(SMLoc(), 0, 0, 0, SMLoc(), false,
-                                TupleType::getEmpty(Ctx));
+                                TypeJudgement(TupleType::getEmpty(Ctx),
+                                              ValueKind::RValue));
     TU->Body->setElement(i, Elt);
   }
 

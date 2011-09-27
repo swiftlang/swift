@@ -256,6 +256,8 @@ public:
   }
   static bool classof(const ValueDecl *D) { return true; }
 
+  TypeJudgement getTypeJudgement() const;
+
 protected:
   ValueDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty, Expr *init,
             const DeclAttributes &attrs = DeclAttributes())

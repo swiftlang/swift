@@ -54,7 +54,8 @@ public:
     // FIXME: Conversion ranking.
     for (ValueDecl *VD : E->Decls) {
       if (VD->Ty->isEqual(DestTy, TC.Context))
-        return new (TC.Context) DeclRefExpr(VD, E->getLoc(), VD->Ty);
+        return new (TC.Context) DeclRefExpr(VD, E->getLoc(),
+                                            VD->getTypeJudgement());
     }
     return E;
   }
@@ -82,7 +83,8 @@ public:
     }
     
     // If it does, then everything is good, resolve the reference.
-    return new (TC.Context) DeclRefExpr(DED, UME->getColonLoc(), DED->Ty);
+    return new (TC.Context) DeclRefExpr(DED, UME->getColonLoc(),
+                                  TypeJudgement(DED->Ty, ValueKind::RValue));
   }  
   
   Expr *visitTupleExpr(TupleExpr *E);
@@ -128,7 +130,8 @@ public:
         }
 
         // FIXME: Preserve source locations.
-        E->setFn(new (TC.Context) DeclRefExpr(DED, UME->getColonLoc(), DED->Ty));
+        E->setFn(new (TC.Context) DeclRefExpr(DED, UME->getColonLoc(),
+                                 TypeJudgement(DED->Ty, ValueKind::RValue)));
         if (TC.semaApplyExpr(E))
           return 0;
           
@@ -145,8 +148,7 @@ public:
     return E;
   }
   Expr *visitSequenceExpr(SequenceExpr *E) {
-    assert(0 && "SequenceExprs should all be resolved by this pass");
-    return 0;
+    llvm_unreachable("SequenceExprs should all be resolved by this pass");
   }
 
   Expr *visitFuncExpr(FuncExpr *E) {
@@ -209,7 +211,7 @@ Expr *SemaCoerce::visitTupleExpr(TupleExpr *E) {
     if (Sub == 0) return 0;
 
     E->setElement(0, Sub);    
-    E->setType(Sub->getType());
+    E->setType(Sub->getTypeJudgement());
     return E;
   }
   
@@ -373,7 +375,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     }
     
     // Okay, we updated the tuple in place.
-    E->setType(DestTy);
+    E->setType(DestTy, /*FIXME*/ ValueKind::RValue);
     return E;
   }
   
@@ -449,7 +451,8 @@ Expr *SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   }
   
   return new (TC.Context) TupleExpr(E->getStartLoc(), NewSE, NewName,
-                                    NumFields, SMLoc(), false, DestTy);
+                                    NumFields, SMLoc(), false,
+                                    TypeJudgement(DestTy, ValueKind::RValue));
 }
 
 /// convertToType - This is the recursive implementation of
@@ -474,7 +477,7 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
       TE->setElement(0, convertToType(TE->getElement(0), DestTy,
                                       IgnoreAnonDecls, TC));
       if (TE->getElement(0) == 0) return 0;
-      TE->setType(TE->getElement(0)->getType());
+      TE->setType(TE->getElement(0)->getTypeJudgement());
       return TE;
     }
   

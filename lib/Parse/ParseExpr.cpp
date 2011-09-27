@@ -228,7 +228,8 @@ ParseResult<Expr> Parser::parseExprPostfix(const char *Message) {
       if (Arg.isSemaError())
         Result = ParseResult<Expr>::getSemaError();
       else if (!Result.isSemaError())
-        Result = new (Context) CallExpr(Result.get(), Arg.get(), Type());
+        Result = new (Context) CallExpr(Result.get(), Arg.get(),
+                                        TypeJudgement());
       continue;
     }
     
