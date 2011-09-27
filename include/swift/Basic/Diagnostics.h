@@ -26,10 +26,20 @@ namespace llvm {
 namespace swift {
   using llvm::StringRef;
   
+  namespace detail {
+    template<typename T>
+    struct DiagWithArguments;
+    
+    template<typename ...ArgTypes>
+    struct DiagWithArguments<void(ArgTypes...)> {
+      typedef Diag<ArgTypes...> type;
+    };
+  }
+  
   namespace diags {
   // Declare all of the diagnostics objects with their appropriate types.
-#define DIAG(KIND,ID,Category,Options,Text,...) \
-  extern Diag<__VA_ARGS__> ID;
+#define DIAG(KIND,ID,Category,Options,Text,Signature) \
+  extern detail::DiagWithArguments<void Signature>::type ID;
 #include "Diagnostics.def"  
   }
 }

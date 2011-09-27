@@ -35,11 +35,11 @@ struct DiagnosticInfo {
 };
 
 static DiagnosticInfo DiagnosticInfos[] = {
-#define ERROR(ID,Category,Options,Text,...) \
+#define ERROR(ID,Category,Options,Text,Signature) \
   { DiagnosticKind::Error, Text },
-#define WARNING(ID,Category,Options,Text,...) \
+#define WARNING(ID,Category,Options,Text,Signature) \
   { DiagnosticKind::Warning, Text },
-#define NOTE(ID,Category,Options,Text,...) \
+#define NOTE(ID,Category,Options,Text,Signature) \
   { DiagnosticKind::Note, Text },
 #include "swift/Basic/Diagnostics.def"
   { DiagnosticKind::Error, "<not a diagnostic>" }

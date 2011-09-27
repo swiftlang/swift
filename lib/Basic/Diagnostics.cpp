@@ -17,7 +17,9 @@
 
 using namespace swift;
 
-// \brief Define all of the 
-#define DIAG(KIND,ID,Category,Options,Text,...) \
-  Diag<__VA_ARGS__> swift::diags::ID = { DiagID::ID };
+// Define all of the diagnostic objects and initialize them with their 
+// diagnostic IDs.
+#define DIAG(KIND,ID,Category,Options,Text,Signature) \
+  detail::DiagWithArguments<void Signature>::type swift::diags::ID \
+    = { DiagID::ID };
 #include "swift/Basic/Diagnostics.def"  

@@ -38,7 +38,7 @@ namespace swift {
   /// Each of the diagnostics described in Diagnostics.def has an entry in
   /// this enumeration type that uniquely identifies it.
   enum class DiagID : unsigned {
-#define DIAG(KIND,ID,Category,Options,Text,...) ID,
+#define DIAG(KIND,ID,Category,Options,Text,Signature) ID,
   #include "Diagnostics.def"
   };
 
