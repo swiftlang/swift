@@ -24,17 +24,17 @@
 
 #ifndef ERROR
 #  define ERROR(ID,Category,Options,Text,...)   \
-  DIAG(ERROR,ID,Category,Options,Text, ##__VA_ARGS__)
+  DIAG(ERROR,ID,Category,Options,Text, __VA_ARGS__)
 #endif
 
 #ifndef WARNING
 #  define WARNING(ID,Category,Options,Text,...) \
-  DIAG(WARNING,ID,Category,Options,Text, ##__VA_ARGS__)
+  DIAG(WARNING,ID,Category,Options,Text, __VA_ARGS__)
 #endif
 
 #ifndef NOTE
 #  define NOTE(ID,Category,Options,Text,...) \
-  DIAG(NOTE,ID,Category,Options,Text, ##__VA_ARGS__)
+  DIAG(NOTE,ID,Category,Options,Text, __VA_ARGS__)
 #endif
 
 //------------------------------------------------------------------------------
