@@ -502,6 +502,27 @@ public:
     return E->getKind() == ExprKind::TupleShuffle;
   }
 };
+
+/// LoadExpr - An implicitly-emitted lvalue-to-rvalue conversion.
+class LoadExpr : public Expr {
+  Expr *SubExpr;
+
+public:
+  LoadExpr(Expr *SubExpr)
+    : Expr(ExprKind::Load,
+           TypeJudgement(SubExpr->getType(), ValueKind::RValue)),
+      SubExpr(SubExpr) {}
+
+  SMLoc getStartLoc() const { return SubExpr->getStartLoc(); }
+  SMLoc getLoc() const { return SubExpr->getLoc(); }
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *E) { SubExpr = E; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const LoadExpr *) { return true; }
+  static bool classof(const Expr *E) { return E->getKind() == ExprKind::Load; }
+};
   
 /// SequenceExpr - a series of expressions which should be evaluated
 /// sequentially, e.g. foo()  bar().

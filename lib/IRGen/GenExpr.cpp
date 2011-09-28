@@ -128,6 +128,9 @@ RValue IRGenFunction::emitRValue(Expr *E, const TypeInfo &TInfo) {
 #include "swift/AST/ExprNodes.def"
     llvm_unreachable("these expression kinds should not survive to IR-gen");
 
+  case ExprKind::Load:
+    return emitRValue(cast<LoadExpr>(E)->getSubExpr(), TInfo);
+
   case ExprKind::Call:
   case ExprKind::Unary:
   case ExprKind::Binary:
@@ -165,6 +168,8 @@ LValue IRGenFunction::emitLValue(Expr *E) {
 }
 
 LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &TInfo) {
+  assert(E->getValueKind() == ValueKind::LValue);
+
   switch (E->getKind()) {
 #define EXPR(Id, Parent)
 #define UNCHECKED_EXPR(Id, Parent) case ExprKind::Id:
@@ -180,6 +185,7 @@ LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &TInfo) {
   case ExprKind::Func:
   case ExprKind::Closure:
   case ExprKind::AnonClosureArg:
+  case ExprKind::Load:
     llvm_unreachable("these expression kinds should never be l-values");
 
   case ExprKind::ProtocolElement:

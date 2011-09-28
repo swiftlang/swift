@@ -375,6 +375,14 @@ namespace {
       return 0;
     }
     
+    Expr *visitLoadExpr(LoadExpr *E) {
+      if (Expr *E2 = doIt(E->getSubExpr())) {
+        E->setSubExpr(E2);
+        return E;
+      }
+      return 0;
+    }
+  
     Expr *visitSequenceExpr(SequenceExpr *E) {
       for (unsigned i = 0, e = E->getNumElements(); i != e; ++i)
         if (Expr *Elt = doIt(E->getElement(i)))
@@ -673,6 +681,10 @@ public:
     OS << "]\n";
     printRec(E->getSubExpr());
     OS << ')';
+  }
+
+  void visitLoadExpr(LoadExpr *E) {
+    visit(E->getSubExpr());
   }
 
   void visitSequenceExpr(SequenceExpr *E) {

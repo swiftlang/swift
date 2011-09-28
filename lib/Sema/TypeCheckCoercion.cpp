@@ -180,6 +180,10 @@ public:
   Expr *visitProtocolElementExpr(ProtocolElementExpr *E) {
     return E;
   }
+
+  Expr *visitLoadExpr(LoadExpr *E) {
+    return E;
+  }
   
   SemaCoerce(TypeChecker &TC, Type DestTy) : TC(TC), DestTy(DestTy) {
     assert(!DestTy->is<DependentType>());

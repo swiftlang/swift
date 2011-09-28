@@ -26,11 +26,12 @@ using namespace swift;
 //===----------------------------------------------------------------------===//
 
 Expr *TypeChecker::convertToRValue(Expr *E) {
+  assert(E && "no expression to load!");
+
   // Fast path: already an r-value.
   if (E->getValueKind() == ValueKind::RValue) return E;
 
-  // FIXME: add AST for this.
-  return E;
+  return new (Context) LoadExpr(E);
 }
 
 bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
@@ -44,7 +45,9 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
   // Compute the result type.
   SmallVector<TupleTypeElt, 8> ResultTyElts(TE->getNumElements());
 
-  bool ResultIsRValue = false;
+  // A tuple is an r-value if any sub-expression is an r-value or
+  // if there are no sub-expressions at all.
+  bool ResultIsRValue = (TE->getNumElements() == 0);
   
   for (unsigned i = 0, e = TE->getNumElements(); i != e; ++i) {
     bool EltIsRValue;
@@ -88,8 +91,10 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
     // an r-value, convert all the previous elements.
     } else if (!ResultIsRValue && EltIsRValue) {
       ResultIsRValue = true;
-      for (unsigned j = 0; j != i; ++j)
-        TE->setElement(j, convertToRValue(TE->getElement(j)));
+      for (unsigned j = 0; j != i; ++j) {
+        Expr *E = TE->getElement(j);
+        if (E) TE->setElement(j, convertToRValue(E));
+      }
     }
 
     // If a name was specified for this element, use it.
@@ -302,6 +307,11 @@ public:
   Expr *visitTupleShuffleExpr(TupleShuffleExpr *E) {
     // TupleShuffleExpr is fully resolved.
     assert(!E->getType()->is<DependentType>());
+    return E;
+  }
+
+  Expr *visitLoadExpr(LoadExpr *E) {
+    // LoadExpr is fully checked.
     return E;
   }
   
