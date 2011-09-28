@@ -36,44 +36,10 @@ void *Expr::operator new(size_t Bytes, ASTContext &C,
 /// FIXME: Need to extend this to do full source ranges like Clang.
 SMLoc Expr::getStartLoc() const {
   switch (Kind) {
-  case ExprKind::IntegerLiteral:
-    return cast<IntegerLiteralExpr>(this)->getStartLoc();
-  case ExprKind::FloatLiteral:
-    return cast<FloatLiteralExpr>(this)->getStartLoc();
-  case ExprKind::DeclRef:
-    return cast<DeclRefExpr>(this)->getStartLoc();
-  case ExprKind::OverloadSetRef:
-    return cast<OverloadSetRefExpr>(this)->getStartLoc();
-  case ExprKind::UnresolvedDeclRef:
-    return cast<UnresolvedDeclRefExpr>(this)->getStartLoc();
-  case ExprKind::UnresolvedMember:
-    return cast<UnresolvedMemberExpr>(this)->getStartLoc();
-  case ExprKind::UnresolvedScopedIdentifier:
-    return cast<UnresolvedScopedIdentifierExpr>(this)->getStartLoc();
-  case ExprKind::Tuple:
-    return cast<TupleExpr>(this)->getStartLoc();
-  case ExprKind::UnresolvedDot:
-    return cast<UnresolvedDotExpr>(this)->getStartLoc();
-  case ExprKind::TupleElement:
-    return cast<TupleElementExpr>(this)->getStartLoc();
-  case ExprKind::TupleShuffle:
-    return cast<TupleShuffleExpr>(this)->getStartLoc();
-  case ExprKind::Call:
-    return cast<CallExpr>(this)->getStartLoc();
-  case ExprKind::Sequence:
-    return cast<SequenceExpr>(this)->getStartLoc();
-  case ExprKind::Func:
-    return cast<FuncExpr>(this)->getStartLoc();
-  case ExprKind::Closure:
-    return cast<ClosureExpr>(this)->getStartLoc();
-  case ExprKind::AnonClosureArg:
-    return cast<AnonClosureArgExpr>(this)->getStartLoc();
-  case ExprKind::Unary:
-    return cast<UnaryExpr>(this)->getStartLoc();
-  case ExprKind::Binary:
-    return cast<BinaryExpr>(this)->getStartLoc();
-  case ExprKind::ProtocolElement:
-    return cast<ProtocolElementExpr>(this)->getStartLoc();
+#define EXPR(ID, PARENT) \
+  case ExprKind::ID: \
+    return cast<ID##Expr>(this)->getStartLoc();
+#include "swift/AST/ExprNodes.def"
   }
   
   llvm_unreachable("expression type not handled!");
@@ -82,44 +48,10 @@ SMLoc Expr::getStartLoc() const {
 /// getLoc - Return the caret location of the expression.
 SMLoc Expr::getLoc() const {
   switch (Kind) {
-  case ExprKind::IntegerLiteral:
-    return cast<IntegerLiteralExpr>(this)->getLoc();
-  case ExprKind::FloatLiteral:
-    return cast<FloatLiteralExpr>(this)->getLoc();
-  case ExprKind::DeclRef:
-    return cast<DeclRefExpr>(this)->getLoc();
-  case ExprKind::OverloadSetRef:
-    return cast<OverloadSetRefExpr>(this)->getLoc();
-  case ExprKind::UnresolvedDeclRef:
-    return cast<UnresolvedDeclRefExpr>(this)->getLoc();
-  case ExprKind::UnresolvedMember:
-    return cast<UnresolvedMemberExpr>(this)->getLoc();
-  case ExprKind::UnresolvedScopedIdentifier:
-    return cast<UnresolvedScopedIdentifierExpr>(this)->getLoc();
-  case ExprKind::Tuple:
-    return cast<TupleExpr>(this)->getLoc();
-  case ExprKind::UnresolvedDot:
-    return cast<UnresolvedDotExpr>(this)->getLoc();
-  case ExprKind::TupleElement:
-    return cast<TupleElementExpr>(this)->getLoc();
-  case ExprKind::TupleShuffle:
-    return cast<TupleShuffleExpr>(this)->getLoc();
-  case ExprKind::Call:
-    return cast<CallExpr>(this)->getLoc();
-  case ExprKind::Sequence:
-    return cast<SequenceExpr>(this)->getLoc();
-  case ExprKind::Func:
-    return cast<FuncExpr>(this)->getLoc();
-  case ExprKind::Closure:
-    return cast<ClosureExpr>(this)->getLoc();
-  case ExprKind::AnonClosureArg:
-    return cast<AnonClosureArgExpr>(this)->getLoc();
-  case ExprKind::Unary:
-    return cast<UnaryExpr>(this)->getLoc();
-  case ExprKind::Binary:
-    return cast<BinaryExpr>(this)->getLoc();
-  case ExprKind::ProtocolElement:
-    return cast<ProtocolElementExpr>(this)->getLoc();
+#define EXPR(ID, PARENT) \
+  case ExprKind::ID: \
+    return cast<ID##Expr>(this)->getLoc();
+#include "swift/AST/ExprNodes.def"
   }
   
   llvm_unreachable("expression type not handled!");
