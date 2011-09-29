@@ -51,6 +51,8 @@ public:
   Expr *convertToType(Expr *E, Type Ty);
 
   Expr *convertToRValue(Expr *E);
+
+  Expr *foldSequence(SequenceExpr *E);
 };
 
   

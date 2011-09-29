@@ -131,7 +131,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
       (NumArguments == 0 || NumArguments > 2)) {
     TC.error(VD->getLocStart(), "operators must have one or two arguments");
     VD->Name = TC.Context.getIdentifier("");
-    Attrs.InfixPrecedence = -1;
+    Attrs.Infix = InfixData();
     // FIXME: Set the 'isError' bit on the decl.
   }
   
@@ -141,20 +141,20 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     TC.error(Attrs.LSquareLoc,
              "function with 'infix_left' specified must take "
              "a two element tuple as input");
-    Attrs.InfixPrecedence = -1;
+    Attrs.Infix = InfixData();
     // FIXME: Set the 'isError' bit on the decl.
   }
 
   if (Attrs.isInfix() && !VD->Name.isOperator()) {
     TC.error(VD->getLocStart(), "only operators may be declared 'infix_left'");
-    Attrs.InfixPrecedence = -1;
+    Attrs.Infix = InfixData();
     // FIXME: Set the 'isError' bit on the decl.
   }
 
   // Only var and func decls can be infix.
   if (Attrs.isInfix() && !isa<VarDecl>(VD) && !isa<FuncDecl>(VD)) {
     TC.error(VD->getLocStart(), "declaration cannot be declared 'infix_left'");
-    Attrs.InfixPrecedence = -1;
+    Attrs.Infix = InfixData();
   }
 
   if (VD->Name.isOperator() && !VD->Attrs.isInfix() && NumArguments != 1) {

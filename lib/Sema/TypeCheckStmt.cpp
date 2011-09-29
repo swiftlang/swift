@@ -165,7 +165,6 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   return BS;
 }
 
-
 /// performTypeChecking - Once parsing and namebinding are complete, these
 /// walks the AST to resolve types and diagnose problems therein.
 ///
@@ -173,13 +172,19 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 void swift::performTypeChecking(TranslationUnit *TU, ASTContext &Ctx) {
   TypeChecker TC(Ctx);
   
-  // Find all the FuncExprs in the translation unit.
+  // Find all the FuncExprs in the translation unit and collapse all
+  // the sequences.
   std::vector<FuncExpr*> FuncExprs;
-  auto FuncExprsP = &FuncExprs;            // Blocks are annoying.
+  auto FuncExprs_ptr = &FuncExprs;            // Blocks are annoying.
+  auto TC_ptr = &TC;                          // Again.
   TU->Body->walk(^(Expr *E, WalkOrder Order) {
-    if (Order == WalkOrder::PreOrder)
+    if (Order == WalkOrder::PreOrder) {
       if (FuncExpr *FE = dyn_cast<FuncExpr>(E))
-        FuncExprsP->push_back(FE);
+        FuncExprs_ptr->push_back(FE);
+    } else {
+      if (SequenceExpr *SE = dyn_cast<SequenceExpr>(E))
+        return TC_ptr->foldSequence(SE);
+    }
     return E;
   });
 

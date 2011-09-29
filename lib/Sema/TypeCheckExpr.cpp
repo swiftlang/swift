@@ -107,12 +107,6 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
 }
 
 bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
-  // If we have a BinaryExpr, make sure to recursively check the tuple argument.
-  if (BinaryExpr *BE = dyn_cast<BinaryExpr>(E)) {
-    if (semaTupleExpr(BE->getArgTuple()))
-      return true;
-  }
-  
   Expr *E1 = E->getFn();
   Expr *E2 = E->getArg();
   
@@ -343,7 +337,13 @@ public:
   }
   Expr *visitCallExpr(CallExpr *E) { return visitApplyExpr(E); }
   Expr *visitUnaryExpr(UnaryExpr *E) { return visitApplyExpr(E); }
-  Expr *visitBinaryExpr(BinaryExpr *E) { return visitApplyExpr(E); }
+  Expr *visitBinaryExpr(BinaryExpr *E) {
+    // This is necessary because ExprWalker doesn't visit the
+    // TupleExpr right now.
+    if (TC.semaTupleExpr(E->getArgTuple()))
+      return 0;
+    return visitApplyExpr(E);
+  }
   Expr *visitProtocolElementExpr(ProtocolElementExpr *E) {
     return visitApplyExpr(E);
   }
@@ -477,101 +477,177 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
 }
 
 
-/// getBinOp - If the specified expression is an infix binary operator, return
-/// its precedence, otherwise return -1.
-static int getBinOp(Expr *E, TypeChecker &TC) {
-  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
-    return DRE->getDecl()->Attrs.InfixPrecedence;
-  
-  // If this is an overload set, the entire overload set is required to have the
-  // same precedence level.
-  if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E)) {
-    int Precedence = -1;
+/// getInfixData - If the specified expression is an infix binary
+/// operator, return its precedence.
+static InfixData getInfixData(TypeChecker &TC, Expr *E) {
+  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
+    if (DRE->getDecl()->Attrs.isInfix())
+      return DRE->getDecl()->Attrs.getInfixData();
+
+    TC.error(DRE->getLoc(), "binary operator has no infix attribute");
+
+  // If this is an overload set, the entire overload set is required
+  // to have the same infix data.
+  } else if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E)) {
+
+    ValueDecl *FirstDecl = nullptr;
+    InfixData Infix;
     for (auto D : OO->Decls) {
       // It is possible some unary operators got mixed into the overload set.
-      if (D->Attrs.InfixPrecedence == -1)
+      if (!D->Attrs.isInfix())
         continue;
       
-      if (Precedence != -1 && Precedence != D->Attrs.InfixPrecedence) {
+      if (Infix.isValid() && Infix != D->Attrs.getInfixData()) {
         TC.error(OO->getLoc(),
-                 "binary operator with multiple overloads of disagreeing "
-                 "precedence found");
-        return -2;
+                 "binary operator has overloads with "
+                 "incompatible infixity");
+        TC.note(FirstDecl->getLocStart(), "first declaration");
+        TC.note(D->getLocStart(), "second declaration");
+        return Infix;
       }
       
-      Precedence = D->Attrs.InfixPrecedence;
+      Infix = D->Attrs.getInfixData();
+      FirstDecl = D;
     }
-    
-    return Precedence;
+
+    if (Infix.isValid())
+      return Infix;
+
+    TC.error(OO->getLoc(), "operator is not overloaded as a binary operator");
+
+  // Otherwise, complain.
+  } else {
+    TC.error(E->getLoc(), "operator is not a known binary operator");
   }
   
-  // Not a binary operator.
-  return -1;
+  // Recover with an infinite-precedence left-associative operator.
+  return InfixData(~0U, Associativity::Left);
 }
 
-/// ReduceBinaryExprs - We have a sequence of unary expressions;  parse
-/// it, using binary precedence rules, into a sequence of binary operators.
-static Expr *ReduceBinaryExprs(SequenceExpr *E, unsigned &Elt,
-                               TypeChecker &TC, unsigned MinPrec = 0) {
-  Expr *LHS = E->getElement(Elt);
-  
-  // The parser only produces well-formed sequences.
-  
-  while (Elt+1 != E->getNumElements()) {
-    assert(Elt+2 < E->getNumElements());
-    
-    Expr *LeftOperator = E->getElement(Elt+1);
-    int LeftPrecedence = getBinOp(LeftOperator, TC);
-    if (LeftPrecedence < (int)MinPrec) {
-      if (LeftPrecedence == -1)
-        TC.error(LeftOperator->getLoc(), "operator is not a binary operator");
-      return 0;
+static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS) {
+  Expr *ArgElts[] = { LHS, RHS };
+  Expr **ArgElts2 = TC.Context.AllocateCopy<Expr*>(ArgElts, ArgElts+2);
+  TupleExpr *Arg = new (TC.Context) TupleExpr(LHS->getStartLoc(),
+                                              ArgElts2, 0, 2, SMLoc(),
+                                              false);
+  return new (TC.Context) BinaryExpr(Op, Arg);
+}
+
+/// foldSequence - Take a sequence of expressions and fold a prefix of
+/// it into a tree of BinaryExprs using precedence parsing.
+static Expr *foldSequence(TypeChecker &TC, Expr *LHS, ArrayRef<Expr*> &S,
+                          unsigned MinPrecedence) {
+  // Invariant: S is even-sized.
+  // Invariant: All elements at even indices are operator references.
+  assert(!S.empty());
+  assert((S.size() & 1) == 0);
+
+  // Extract out the first operator.  If its precedence is lower
+  // than the minimum, stop here.
+  Expr *Op1 = S[0];
+  InfixData Op1Info = getInfixData(TC, Op1);
+  if (Op1Info.getPrecedence() < MinPrecedence) return LHS;
+
+  // We will definitely be consuming at least one operator.
+  // Pull out the prospective RHS and slice off the first two elements.
+  Expr *RHS = S[1];
+  S = S.slice(2);
+
+  while (!S.empty()) {
+    assert(!S.empty());
+    assert((S.size() & 1) == 0);
+    assert(Op1Info.getPrecedence() >= MinPrecedence);
+
+    // Pull out the next binary operator.
+    Expr *Op2 = S[0];
+    InfixData Op2Info = getInfixData(TC, Op2);
+
+    // If the second operator's precedence is lower than the min
+    // precedence, break out of the loop.
+    if (Op2Info.getPrecedence() < MinPrecedence) break;
+
+    // If the first operator's precedence is higher than the second
+    // operator's precedence, or they have matching precedence and are
+    // both left-associative, fold LHS and RHS immediately.
+    if (Op1Info.getPrecedence() > Op2Info.getPrecedence() ||
+        (Op1Info == Op2Info && Op1Info.isLeftAssociative())) {
+      LHS = makeBinOp(TC, Op1, LHS, RHS);
+      Op1 = Op2;
+      Op1Info = Op2Info;
+      S = S.slice(2);
+      continue;
+    }
+
+    // If the first operator's precedence is lower than the second
+    // operator's precedence, recursively fold all such
+    // higher-precedence operators starting from this point, then
+    // repeat.
+    if (Op1Info.getPrecedence() < Op2Info.getPrecedence()) {
+      RHS = foldSequence(TC, RHS, S, Op1Info.getPrecedence() + 1);
+      continue;
+    }
+
+    // If the first operator's precedence is the same as the second
+    // operator's precedence, and they're both right-associative,
+    // recursively fold operators starting from this point, then
+    // immediately fold LHS and RHS.
+    if (Op1Info == Op2Info && Op1Info.isRightAssociative()) {
+      RHS = foldSequence(TC, RHS, S, Op1Info.getPrecedence());
+      LHS = makeBinOp(TC, Op1, LHS, RHS);
+
+      // If we've drained the entire sequence, we're done.
+      if (S.empty()) return LHS;
+
+      // Otherwise, start all over with our new LHS.
+      return foldSequence(TC, LHS, S, MinPrecedence);
+    }
+
+    // If we ended up here, it's because we have two operators
+    // with mismatched or no associativity.
+    assert(Op1Info.getPrecedence() == Op2Info.getPrecedence());
+    assert(Op1Info.getAssociativity() != Op2Info.getAssociativity() ||
+           Op1Info.isNonAssociative());
+
+    if (Op1Info.isNonAssociative()) {
+      TC.error(Op1->getLoc(),
+               "non-associative operator is adjacent to operator"
+               " of same precedence");
+    } else if (Op2Info.isNonAssociative()) {
+      TC.error(Op2->getLoc(),
+               "non-associative operator is adjacent to operator"
+               " of same precedence");
+    } else {
+      TC.error(Op1->getLoc(),
+               "operator is adjacent to operator of same precedence"
+               " but incompatible associativity");
     }
     
-    Elt += 2;
-    Expr *RHS = E->getElement(Elt);
-    
-    // Get the precedence of the operator immediately to the right of the RHS
-    // of the RHS of the binop (if present).  This is looking for the multiply
-    // in "x+y*z".
-    if (Elt+1 != E->getNumElements()) {
-      assert(Elt+2 < E->getNumElements());
-      Expr *RightOperator = E->getElement(Elt+1);
-      int RightPrecedence = getBinOp(RightOperator, TC);
-      if (RightPrecedence == -2) return 0;
-      
-      // TODO: All operators are left associative at the moment.
-      
-      // If the next operator binds more tightly with RHS than we do,
-      // evaluate the RHS as a complete subexpression first.  This
-      // happens with "x+y*z", where we want to reduce y*z to a single
-      // sub-expression of the add.
-      if (LeftPrecedence < RightPrecedence) {
-        RHS = ReduceBinaryExprs(E, Elt, TC, (unsigned) (LeftPrecedence+1));
-        if (!RHS) return 0;
-      } else if (RightPrecedence == -1) {
-        TC.error(RightOperator->getLoc(), "operator is not a binary operator");
-      }
-    }
-    
-    // Okay, we've finished the parse, form the AST node for the binop now.
-    Expr *ArgElts[] = { LHS, RHS };
-    Expr **ArgElts2 = TC.Context.AllocateCopy<Expr*>(ArgElts, ArgElts+2);
-    TupleExpr *Arg = new (TC.Context) TupleExpr(LHS->getStartLoc(), ArgElts2, 0,
-                                                2, SMLoc(), false);
-    BinaryExpr *RBE = new (TC.Context) BinaryExpr(LeftOperator, Arg);
-    if (TC.semaApplyExpr(RBE))
-      return 0;
-    
-    LHS = RBE;
+    // Recover by arbitrarily binding the first two.
+    LHS = makeBinOp(TC, Op1, LHS, RHS);
+    return foldSequence(TC, LHS, S, MinPrecedence);
   }
-  
-  return LHS;
+
+  // Fold LHS and RHS together and declare completion.
+  return makeBinOp(TC, Op1, LHS, RHS);
+}
+
+/// foldSequence - Take a SequenceExpr and fold it into a tree of
+/// BinaryExprs using precedence parsing.
+Expr *TypeChecker::foldSequence(SequenceExpr *E) {
+  ArrayRef<Expr*> Elts = E->getElements();
+  assert(Elts.size() > 1 && "inadequate number of elements in sequence");
+  assert((Elts.size() & 1) == 1 && "even number of elements in sequence");
+
+  Expr *LHS = Elts[0];
+  Elts = Elts.slice(1);
+
+  Expr *Result = ::foldSequence(*this, LHS, Elts, /*min precedence*/ 0);
+  assert(Elts.empty());
+  return Result;
 }
 
 Expr *SemaExpressionTree::visitSequenceExpr(SequenceExpr *E) {
-  unsigned i = 0;
-  return ReduceBinaryExprs(E, i, TC);
+  llvm_unreachable("visiting sequence expression during normal type-checking!");
 }
 
 bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {

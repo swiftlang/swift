@@ -430,12 +430,17 @@ namespace {
     }
 
     Expr *visitBinaryExpr(BinaryExpr *E) {
-      // Visit the arguments to the tuple.
+      // Visit the arguments to the tuple, but visit the operator in
+      // infix order.
       TupleExpr *Arg = E->getArgTuple();
       assert(Arg->getNumElements() == 2);
       Expr *E2 = doIt(Arg->getElement(0));
       if (E2 == 0) return 0;
       Arg->setElement(0, E2);
+
+      E2 = doIt(E->getFn());
+      if (E2 == 0) return 0;
+      E->setFn(E2);
       
       E2 = doIt(Arg->getElement(1));
       if (E2 == 0) return 0;

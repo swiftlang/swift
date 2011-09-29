@@ -684,10 +684,12 @@
   <h4 id="attribute-infix">Infix Attribute</h4>
     
   <pre class="grammar">
-    attribute-infix ::= 'infix_left' '=' <a href="#numeric_constant">numeric_constant</a>
+    attribute-infix ::= 'infix_left'  '=' <a href="#numeric_constant">numeric_constant</a>
+    attribute-infix ::= 'infix_right' '=' <a href="#numeric_constant">numeric_constant</a>
+    attribute-infix ::= 'infix        '=' <a href="#numeric_constant">numeric_constant</a>
   </pre>
 
-  <p>The 'infix_left' attribute may only be applied to the declaration of a
+  <p>The infix attributes may only be applied to the declaration of a
   function of binary operator type whose name is an
   <a href="#identifier"><tt>operator</tt></a>.
   FIXME: Implement these restrictions.</p>

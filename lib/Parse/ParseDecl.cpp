@@ -82,30 +82,48 @@ TranslationUnit *Parser::parseTranslationUnit() {
   return TU;
 }
 
+static bool isInfixAttr(Token &Tok, Associativity &Assoc) {
+  if (Tok.getText() == "infix_left") {
+    Assoc = Associativity::Left;
+    return true;
+  } else if (Tok.getText() == "infix_right") {
+    Assoc = Associativity::Right;
+    return true;
+  } else if (Tok.getText() == "infix") {
+    Assoc = Associativity::None;
+    return true;
+  } else {
+    return false;
+  }
+}
+
 /// parseAttribute
 ///   attribute:
+///     'infix' '=' numeric_constant
 ///     'infix_left' '=' numeric_constant
+///     'infix_right' '=' numeric_constant
 ///     'unary'
 bool Parser::parseAttribute(DeclAttributes &Attributes) {
-  // infix_left attribute.
-  if (Tok.is(tok::identifier) && Tok.getText() == "infix_left") {
-    if (Attributes.InfixPrecedence != -1)
+  // infix attributes.
+  Associativity Assoc;
+  if (Tok.is(tok::identifier) && isInfixAttr(Tok, Assoc)) {
+    if (Attributes.isInfix())
       diagnose(Tok, diags::duplicate_attribute, Tok.getText());
     consumeToken(tok::identifier);
 
-    // The default infix_left precedence is 100.
-    Attributes.InfixPrecedence = 100;
+    // The default precedence is 100.
+    Attributes.Infix = InfixData(100, Assoc);
     
     if (consumeIf(tok::equal)) {
       SMLoc PrecLoc = Tok.getLoc();
       StringRef Text = Tok.getText();
       if (!parseToken(tok::numeric_constant,
-                      "expected precedence number in 'infix_left' attribute")) {
+                      "expected precedence number in infix attribute")) {
         long long Value;
         if (Text.getAsInteger(10, Value) || Value > 255 || Value < 0)
           diagnose(PrecLoc, diags::invalid_precedence, Text);
         else
-          Attributes.InfixPrecedence = Value;
+          Attributes.Infix = InfixData(Value, Assoc);
       } else {
         // FIXME: I'd far rather that we describe this in terms of some
         // list structure in the caller. This feels too ad hoc.

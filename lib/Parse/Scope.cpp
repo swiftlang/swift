@@ -111,8 +111,8 @@ static void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New, Parser &P) {
 /// D1/D3 are valid overloads and we don't have to check all permutations.
 static bool checkValidOverload(const ValueDecl *D1, const ValueDecl *D2,
                                Parser &P) {
-  if (D1->Attrs.InfixPrecedence != D2->Attrs.InfixPrecedence &&
-      D1->Attrs.InfixPrecedence != -1 && D2->Attrs.InfixPrecedence != -1) {
+  if (D1->Attrs.isInfix() && D2->Attrs.isInfix() &&
+      D1->Attrs.getInfixData() != D2->Attrs.getInfixData()) {
     P.diagnose(D1->getLocStart(), diags::precedence_overload);
     // FIXME: Pass identifier through, when the diagnostics system can handle
     // it.
