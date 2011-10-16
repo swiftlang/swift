@@ -24,14 +24,14 @@
 using namespace swift;
 
 void TypeChecker::note(SMLoc Loc, const Twine &Message) {
-  Context.SourceMgr.PrintMessage(Loc, Message, "note");
+  Context.SourceMgr.PrintMessage(Loc, llvm::SourceMgr::DK_Note, Message);
 }
 void TypeChecker::warning(SMLoc Loc, const Twine &Message) {
-  Context.SourceMgr.PrintMessage(Loc, Message, "warning");
+  Context.SourceMgr.PrintMessage(Loc, llvm::SourceMgr::DK_Warning, Message);
 }
 void TypeChecker::error(SMLoc Loc, const Twine &Message) {
   Context.setHadError();
-  Context.SourceMgr.PrintMessage(Loc, Message, "error");
+  Context.SourceMgr.PrintMessage(Loc, llvm::SourceMgr::DK_Error, Message);
 }
 
 

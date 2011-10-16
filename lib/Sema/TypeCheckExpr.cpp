@@ -387,7 +387,8 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   if (SubExprTy->is<DependentType>())
     return E;
   
-  // First, check to see if this is a reference to a field in the type.
+  // First, check to see if this is a reference to a field in the type or
+  // protocol.
   
   // If this is a member access to a oneof with a single element constructor,
   // allow direct access to the type underlying the single element.  This

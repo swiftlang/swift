@@ -64,6 +64,6 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *TU) {
 }
 
 void IRGenModule::unimplemented(llvm::SMLoc Loc, const llvm::Twine &Message) {
-  Context.SourceMgr.PrintMessage(Loc, Message, "error");
+  Context.SourceMgr.PrintMessage(Loc, llvm::SourceMgr::DK_Error, Message);
   Context.setHadError();
 }

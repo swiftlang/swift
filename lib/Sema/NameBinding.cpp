@@ -193,14 +193,14 @@ namespace {
     TypeAliasDecl *lookupTypeName(Identifier I);
     
     void note(SMLoc Loc, const Twine &Message) {
-      Context.SourceMgr.PrintMessage(Loc, Message, "note");
+      Context.SourceMgr.PrintMessage(Loc, llvm::SourceMgr::DK_Note, Message);
     }
     void warning(SMLoc Loc, const Twine &Message) {
-      Context.SourceMgr.PrintMessage(Loc, Message, "warning");
+      Context.SourceMgr.PrintMessage(Loc, llvm::SourceMgr::DK_Warning, Message);
     }
     void error(SMLoc Loc, const Twine &Message) {
       Context.setHadError();
-      Context.SourceMgr.PrintMessage(Loc, Message, "error");
+      Context.SourceMgr.PrintMessage(Loc, llvm::SourceMgr::DK_Error, Message);
     }
   private:
     /// getModuleProvider - Load a module referenced by an import statement,

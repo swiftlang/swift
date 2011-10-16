@@ -49,16 +49,16 @@ Parser::~Parser() {
 }
 
 void Parser::note(SMLoc Loc, const Twine &Message) {
-  SourceMgr.PrintMessage(Loc, Message, "note");
+  SourceMgr.PrintMessage(Loc, llvm::SourceMgr::DK_Note, Message);
 }
 
 void Parser::warning(SMLoc Loc, const Twine &Message) {
-  SourceMgr.PrintMessage(Loc, Message, "warning");
+  SourceMgr.PrintMessage(Loc, llvm::SourceMgr::DK_Warning, Message);
 }
 
 void Parser::error(SMLoc Loc, const Twine &Message) {
   Context.setHadError();
-  SourceMgr.PrintMessage(Loc, Message, "error");
+  SourceMgr.PrintMessage(Loc, llvm::SourceMgr::DK_Error, Message);
 }
 
 /// peekToken - Return the next token that will be installed by consumeToken.

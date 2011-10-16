@@ -202,11 +202,11 @@ void DiagnosticEngine::diagnose(SMLoc Loc, DiagID ID,
   const DiagnosticInfo &Info = DiagnosticInfos[(unsigned)ID];
   
   // Determine what kind of diagnostic we're emitting.
-  const char *Kind;
+  llvm::SourceMgr::DiagKind Kind;
   switch (Info.Kind) {
-  case DiagnosticKind::Error: Kind = "error"; break;
-  case DiagnosticKind::Warning: Kind = "warning"; break;
-  case DiagnosticKind::Note: Kind = "note"; break;
+  case DiagnosticKind::Error: Kind = llvm::SourceMgr::DK_Error; break;
+  case DiagnosticKind::Warning: Kind = llvm::SourceMgr::DK_Warning; break;
+  case DiagnosticKind::Note: Kind = llvm::SourceMgr::DK_Note; break;
   }
   
   // Actually substitute the diagnostic arguments into the diagnostic text.
@@ -214,5 +214,5 @@ void DiagnosticEngine::diagnose(SMLoc Loc, DiagID ID,
   formatDiagnosticText(Info.Text, Args, Text);
   
   // Display the diagnostic.
-  SourceMgr.PrintMessage(Loc, StringRef(Text), Kind);
+  SourceMgr.PrintMessage(Loc, Kind, StringRef(Text));
 }
