@@ -112,7 +112,7 @@ ValueDecl *ApplyExpr::getCalledValue() const {
 /// type to convert to, which is known to be a TupleType.
 static Expr::ConversionRank 
 getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
-                                  TupleType *DestTy, ASTContext &Ctx) {
+                                  TupleType *DestTy) {
   // If the tuple expression or destination type have named elements, we
   // have to match them up to handle the swizzle case for when:
   //   (.y = 4, .x = 3)
@@ -222,8 +222,7 @@ getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
       // element type.
       Expr *Elt = TE->getElement(SrcField);
       CurRank = std::max(CurRank,
-                         Elt->getRankOfConversionTo(DestTy->getElementType(i),
-                                                    Ctx));
+                         Elt->getRankOfConversionTo(DestTy->getElementType(i)));
     }
     return CurRank;
   }
@@ -242,8 +241,8 @@ getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
       continue;
 
     // The element types must match up exactly.
-    if (ETy->getElementType(SrcField)->getCanonicalType(Ctx) !=
-        DestTy->getElementType(i)->getCanonicalType(Ctx))
+    if (ETy->getElementType(SrcField)->getCanonicalType() !=
+        DestTy->getElementType(i)->getCanonicalType())
       return Expr::CR_Invalid;
   }
 
@@ -257,24 +256,24 @@ getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
 /// Note that this code needs to be kept carefully in synch with
 /// SemaCoerceBottomUp::convertToType.
 static Expr::ConversionRank 
-getConversionRank(const Expr *E, Type DestTy, ASTContext &Ctx) {
+getConversionRank(const Expr *E, Type DestTy) {
   assert(!DestTy->is<DependentType>() &&
          "Result of conversion can't be dependent");
 
   // Exact matches are identity conversions.
-  if (E->getType()->getCanonicalType(Ctx) == DestTy->getCanonicalType(Ctx))
+  if (E->getType()->getCanonicalType() == DestTy->getCanonicalType())
     return Expr::CR_Identity;
   
   // If the expression is a grouping parenthesis, then it is an identity
   // conversion of the underlying expression.
   if (const TupleExpr *TE = dyn_cast<TupleExpr>(E))
     if (TE->isGroupingParen())
-      return getConversionRank(TE->getElement(0), DestTy, Ctx);
+      return getConversionRank(TE->getElement(0), DestTy);
   
   if (TupleType *TT = DestTy->getAs<TupleType>()) {
     if (const TupleExpr *TE = dyn_cast<TupleExpr>(E))
       return getTupleToTupleTypeConversionRank(TE, TE->getNumElements(),
-                                               TT, Ctx);
+                                               TT);
     
     // If the is a scalar to tuple conversion, form the tuple and return it.
     int ScalarFieldNo = TT->getFieldForScalarInit();
@@ -282,20 +281,20 @@ getConversionRank(const Expr *E, Type DestTy, ASTContext &Ctx) {
       // If the destination is a tuple type with at most one element that has no
       // default value, see if the expression's type is convertable to the
       // element type.  This handles assigning 4 to "(a = 4, b : int)".
-      return getConversionRank(E, TT->getElementType(ScalarFieldNo), Ctx);
+      return getConversionRank(E, TT->getElementType(ScalarFieldNo));
     }
     
     // If the input is a tuple and the output is a tuple, see if we can convert
     // each element.
     if (TupleType *ETy = E->getType()->getAs<TupleType>())
-      return getTupleToTupleTypeConversionRank(E, ETy->Fields.size(), TT, Ctx);
+      return getTupleToTupleTypeConversionRank(E, ETy->Fields.size(), TT);
   }
 
   // Otherwise, check to see if this is an auto-closure case.  This case happens
   // when we convert an expression E to a function type whose result is E's
   // type.
   if (FunctionType *FT = DestTy->getAs<FunctionType>()) {
-    if (getConversionRank(E, FT->Result, Ctx) == Expr::CR_Invalid)
+    if (getConversionRank(E, FT->Result) == Expr::CR_Invalid)
       return Expr::CR_Invalid;
     
     return Expr::CR_AutoClosure;
@@ -307,9 +306,8 @@ getConversionRank(const Expr *E, Type DestTy, ASTContext &Ctx) {
 
 /// getRankOfConversionTo - Return the rank of a conversion from the current
 /// type to the specified type.
-Expr::ConversionRank 
-Expr::getRankOfConversionTo(Type DestTy, ASTContext &Ctx) const {
-  return getConversionRank(this, DestTy, Ctx);
+Expr::ConversionRank Expr::getRankOfConversionTo(Type DestTy) const {
+  return getConversionRank(this, DestTy);
 }
 
 

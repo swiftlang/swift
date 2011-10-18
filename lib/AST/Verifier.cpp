@@ -24,13 +24,12 @@ namespace {
   enum ShouldHalt { Continue, Halt };
 
   class Verifier {
-    ASTContext &Context;
     VerificationKind Stage;
     llvm::raw_ostream &Out;
 
   public:
-    Verifier(ASTContext &Context, VerificationKind Stage)
-      : Context(Context), Stage(Stage), Out(llvm::errs()) {}
+    Verifier(VerificationKind Stage)
+      : Stage(Stage), Out(llvm::errs()) {}
 
     Expr *dispatch(Expr *E, WalkOrder ord) {
       switch (E->getKind()) {
@@ -110,7 +109,7 @@ namespace {
 
     // Verification utilities.
     void checkSameType(Type T0, Type T1, const char *what) {
-      if (T0->getCanonicalType(Context) == T1->getCanonicalType(Context))
+      if (T0->getCanonicalType() == T1->getCanonicalType())
         return;
 
       Out << "different types for " << what << ": ";
@@ -128,7 +127,7 @@ void swift::verify(TranslationUnit *TUnit, VerificationKind Stage) {
   if (TUnit->Ctx.hadError()) return;
 
   // Make a verifier object, and then capture it by reference.
-  Verifier VObject(TUnit->Ctx, Stage);
+  Verifier VObject(Stage);
   Verifier *V = &VObject;
 
   TUnit->Body->walk(^(Expr *E, WalkOrder Ord) { return V->dispatch(E, Ord); },

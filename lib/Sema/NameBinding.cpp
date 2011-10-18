@@ -380,7 +380,7 @@ BoundScope NameBinder::bindScopeName(TypeAliasDecl *TypeFromScope,
   }
 
   // Try to convert that to a type scope.
-  TypeBase *Ty = Type->UnderlyingTy->getCanonicalType(Context);
+  TypeBase *Ty = Type->UnderlyingTy->getCanonicalType();
 
   // Silently fail if we have an error type.
   if (isa<ErrorType>(Ty)) return BoundScope();

@@ -127,7 +127,7 @@ public:
   
   /// getRankOfConversionTo - Return the rank of a conversion from the current
   /// type to the specified type.
-  ConversionRank getRankOfConversionTo(Type DestTy, ASTContext &Ctx) const;
+  ConversionRank getRankOfConversionTo(Type DestTy) const;
 
   void dump() const;
   void print(raw_ostream &OS, unsigned Indent = 0) const;

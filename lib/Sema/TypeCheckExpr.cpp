@@ -173,7 +173,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   for (ValueDecl *Fn : OS->Decls) {
     Type ArgTy = Fn->Ty->getAs<FunctionType>()->Input;
     // If we found an exact match, disambiguate the overload set.
-    Expr::ConversionRank Rank = E2->getRankOfConversionTo(ArgTy, Context);
+    Expr::ConversionRank Rank = E2->getRankOfConversionTo(ArgTy);
     
     // If this conversion is worst than our best candidate, ignore it.
     if (Rank > BestRank)
@@ -216,7 +216,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // Print out the candidate set.
   for (auto TheDecl : OS->Decls) {
     Type ArgTy = TheDecl->Ty->getAs<FunctionType>()->Input;
-    if (E2->getRankOfConversionTo(ArgTy, Context) != BestRank)
+    if (E2->getRankOfConversionTo(ArgTy) != BestRank)
       continue;
     note(TheDecl->getLocStart(), "found this candidate");
   }

@@ -84,9 +84,6 @@ public:
   
   /// getCanonicalType - Return the canonical version of this type, which has
   /// sugar from all levels stripped off.
-  TypeBase *getCanonicalType(ASTContext &Ctx) {
-    return getCanonicalType();
-  }
   TypeBase *getCanonicalType();
   
   /// getASTContext - Return the ASTContext that this type belongs to.
@@ -99,7 +96,7 @@ public:
   }
   
   /// isEqual - Return true if these two types are equal, ignoring sugar.
-  bool isEqual(Type Other, ASTContext &Ctx);
+  bool isEqual(Type Other);
   
   /// getDesugaredType - If this type is a sugared type, remove all levels of
   /// sugar until we get down to a non-sugar type.

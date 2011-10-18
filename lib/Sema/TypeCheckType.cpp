@@ -100,7 +100,7 @@ bool TypeChecker::validateType(Type InTy) {
         
       // If both a type and an initializer are specified, make sure the
       // initializer's type agrees with the (redundant) type.
-      assert(EltTy.isNull() || EltTy->isEqual(EltInit->getType(), Context));
+      assert(EltTy.isNull() || EltTy->isEqual(EltInit->getType()));
       EltTy = EltInit->getType();
 
       TT->updateInitializedElementType(i, EltTy, EltInit);
@@ -135,7 +135,7 @@ bool TypeChecker::validateType(Type InTy) {
   // that we never reanalyze it again.
   // If it is ever a performance win to avoid computing canonical types, we can
   // just keep a SmallPtrSet of analyzed Types in TypeChecker.
-  InTy->getCanonicalType(Context);
+  InTy->getCanonicalType();
   
   // FIXME: This isn't good enough: top-level stuff can have these as well and
   // their types need to be resolved at the end of name binding.  Perhaps we

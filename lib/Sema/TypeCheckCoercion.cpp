@@ -53,7 +53,7 @@ public:
     // type, then select it.
     // FIXME: Conversion ranking.
     for (ValueDecl *VD : E->Decls) {
-      if (VD->Ty->isEqual(DestTy, TC.Context))
+      if (VD->Ty->isEqual(DestTy))
         return new (TC.Context) DeclRefExpr(VD, E->getLoc(),
                                             VD->getTypeJudgement());
     }
@@ -400,8 +400,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       continue;
     }
     
-    if (ETy->getElementType(SrcField)->getCanonicalType(TC.Context) !=
-        DestTy->getElementType(i)->getCanonicalType(TC.Context)) {
+    if (!ETy->getElementType(SrcField)->isEqual(DestTy->getElementType(i))) {
       TC.error(E->getLoc(), "element #" + Twine(i) +
                " of tuple value has type '" +
                ETy->getElementType(SrcField)->getString() +
@@ -467,8 +466,7 @@ Expr *SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
 Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
                                 bool IgnoreAnonDecls, TypeChecker &TC) {
   // If we have an exact match, we're done.
-  if (E->getType()->getCanonicalType(TC.Context) ==
-         DestTy->getCanonicalType(TC.Context))
+  if (E->getType()->isEqual(DestTy))
     return E;
   
   assert(!DestTy->is<DependentType>() &&
