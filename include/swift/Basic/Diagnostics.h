@@ -17,15 +17,10 @@
 #ifndef SWIFT_DIAGNOSTICS_H
 #define SWIFT_DIAGNOSTICS_H
 
+#include "swift/AST/LLVM.h"
 #include "swift/Basic/DiagnosticEngine.h"
 
-namespace llvm {
-  class StringRef;
-}
-
 namespace swift {
-  using llvm::StringRef;
-  
   namespace detail {
     template<typename T>
     struct DiagWithArguments;
