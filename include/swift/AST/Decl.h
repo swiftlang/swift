@@ -202,6 +202,12 @@ protected:
 public:
   const DeclKind Kind;
   DeclContext *Context;
+
+  /// getASTContext - Return the ASTContext that this decl lives in.
+  ASTContext &getASTContext() const {
+    assert(Context && "Decl doesn't have an assigned context");
+    return Context->getASTContext();
+  }
   
   SourceLoc getLocStart() const;
  
