@@ -125,9 +125,6 @@ public:
   // Type manipulation routines.
   //===--------------------------------------------------------------------===//
 
-  /// Checks whether the given two types are canonically the same.
-  bool isSameType(Type L, Type R);
-
   // Builtin type and simple types that are used frequently.
   const Type TheErrorType;       /// TheErrorType - This is the error singleton.
   const Type TheEmptyTupleType;  /// TheEmptyTupleType - This is "()"
