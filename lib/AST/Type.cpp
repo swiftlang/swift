@@ -35,19 +35,20 @@ bool TypeBase::isEqual(Type Other, ASTContext &Ctx) {
   return getCanonicalType(Ctx) == Other.getPointer()->getCanonicalType(Ctx);
 }
 
-
-
 /// getCanonicalType - Return the canonical version of this type, which has
 /// sugar from all levels stripped off.
-TypeBase *TypeBase::getCanonicalType(ASTContext &Ctx) {
+TypeBase *TypeBase::getCanonicalType() {
   assert(this != 0 &&
          "Cannot call getCanonicalType before name binding is complete");
 
-  // If the type is itself canonical or if the canonical type was already
-  // computed, just return what we have.
-  if (CanonicalType)
-    return CanonicalType;
+  // If the type is itself canonical, return it.
+  if (CanonicalType.is<ASTContext*>())
+    return this;
+  // If the canonical type was already computed, just return what we have.
+  if (TypeBase *CT = CanonicalType.get<TypeBase*>())
+    return CT;
   
+  // Otherwise, compute and cache it.
   TypeBase *Result = 0;
   switch (Kind) {
   case TypeKind::Error:
@@ -64,7 +65,7 @@ TypeBase *TypeBase::getCanonicalType(ASTContext &Ctx) {
     assert(0 && "These are always canonical");
   case TypeKind::NameAlias:
     Result = cast<NameAliasType>(this)->
-                  getDesugaredType()->getCanonicalType(Ctx);
+                  getDesugaredType()->getCanonicalType();
     break;
   case TypeKind::Tuple: {
     SmallVector<TupleTypeElt, 8> CanElts;
@@ -74,27 +75,31 @@ TypeBase *TypeBase::getCanonicalType(ASTContext &Ctx) {
       CanElts[i].Name = TT->Fields[i].Name;
       assert(!TT->Fields[i].Ty.isNull() &&
              "Cannot get canonical type of TypeChecked TupleType!");
-      CanElts[i].Ty = TT->Fields[i].Ty->getCanonicalType(Ctx);
+      CanElts[i].Ty = TT->Fields[i].Ty->getCanonicalType();
     }
     
-    Result = TupleType::get(CanElts, Ctx);
+    assert(!TT->Fields.empty() && "Empty tuples are always canonical");
+    Result = TupleType::get(CanElts, CanElts[0].Ty->getASTContext());
     break;
   }
     
   case TypeKind::Function: {
     FunctionType *FT = cast<FunctionType>(this);
-    Type In = FT->Input->getCanonicalType(Ctx);
-    Type Out = FT->Result->getCanonicalType(Ctx);
-    Result = FunctionType::get(In, Out, Ctx);
+    Type In = FT->Input->getCanonicalType();
+    Type Out = FT->Result->getCanonicalType();
+    Result = FunctionType::get(In, Out, In->getASTContext());
     break;
   }
   case TypeKind::Array:
     ArrayType *AT = cast<ArrayType>(this);
-    Type EltTy = AT->Base->getCanonicalType(Ctx);
-    Result = ArrayType::get(EltTy, AT->Size, Ctx);
+    Type EltTy = AT->Base->getCanonicalType();
+    Result = ArrayType::get(EltTy, AT->Size, EltTy->getASTContext());
     break;
   }
+  
+  // Cache the canonical type for future queries.
   assert(Result && "Case not implemented!");
+  CanonicalType = Result;
   return Result;
 }
 
@@ -118,6 +123,7 @@ TypeBase *TypeBase::getDesugaredType() {
     // None of these types have sugar at the outer level.
     return this;
   case TypeKind::NameAlias:
+    assert(&cast<NameAliasType>(this)->TheDecl->getASTContext() != 0);
     return cast<NameAliasType>(this)->TheDecl->UnderlyingTy->getDesugaredType();
   }
 

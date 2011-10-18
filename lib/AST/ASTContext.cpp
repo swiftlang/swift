@@ -43,16 +43,16 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
     SourceMgr(sourcemgr),
     Diags(Diags),
     BuiltinModule(new (*this) Module(getIdentifier("Builtin"), *this)),
-    TheErrorType(new (*this) ErrorType()),
+    TheErrorType(new (*this) ErrorType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
-    TheDependentType(new (*this) DependentType()),
-    TheFloat32Type(new (*this) BuiltinType(TypeKind::BuiltinFloat32)),
-    TheFloat64Type(new (*this) BuiltinType(TypeKind::BuiltinFloat64)),
-    TheInt1Type(new (*this) BuiltinType(TypeKind::BuiltinInt1)),
-    TheInt8Type(new (*this) BuiltinType(TypeKind::BuiltinInt8)),
-    TheInt16Type(new (*this) BuiltinType(TypeKind::BuiltinInt16)),
-    TheInt32Type(new (*this) BuiltinType(TypeKind::BuiltinInt32)),
-    TheInt64Type(new (*this) BuiltinType(TypeKind::BuiltinInt64)) {
+    TheDependentType(new (*this) DependentType(*this)),
+    TheFloat32Type(new (*this) BuiltinType(TypeKind::BuiltinFloat32, *this)),
+    TheFloat64Type(new (*this) BuiltinType(TypeKind::BuiltinFloat64, *this)),
+    TheInt1Type(new (*this) BuiltinType(TypeKind::BuiltinInt1, *this)),
+    TheInt8Type(new (*this) BuiltinType(TypeKind::BuiltinInt8, *this)),
+    TheInt16Type(new (*this) BuiltinType(TypeKind::BuiltinInt16, *this)),
+    TheInt32Type(new (*this) BuiltinType(TypeKind::BuiltinInt32, *this)),
+    TheInt64Type(new (*this) BuiltinType(TypeKind::BuiltinInt64, *this)) {
   HadError = false;
 }
 
@@ -138,7 +138,7 @@ TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
 
   Fields = ArrayRef<TupleTypeElt>(FieldsCopy, Fields.size());
   
-  TupleType *New = new (C) TupleType(Fields, IsCanonical);
+  TupleType *New = new (C) TupleType(Fields, IsCanonical ? &C : 0);
   TupleTypesMap.InsertNode(New, InsertPos);
 
   return New;
@@ -168,7 +168,8 @@ FunctionType *FunctionType::get(Type Input, Type Result, ASTContext &C) {
 // If the input and result types are canonical, then so is the result.
 FunctionType::FunctionType(Type input, Type result)
   : TypeBase(TypeKind::Function,
-             (input->isCanonical() && result->isCanonical()) ? this : 0),
+             (input->isCanonical() && result->isCanonical()) ?
+               &input->getASTContext() : 0),
     Input(input), Result(result) {
 }
 
@@ -184,7 +185,7 @@ ArrayType *ArrayType::get(Type BaseType, uint64_t Size, ASTContext &C) {
 }
 
 ArrayType::ArrayType(Type base, uint64_t size)
-  : TypeBase(TypeKind::Array, base->isCanonical() ? this : 0),
+  : TypeBase(TypeKind::Array, base->isCanonical() ? &base->getASTContext() : 0),
     Base(base), Size(size) {}
 
 

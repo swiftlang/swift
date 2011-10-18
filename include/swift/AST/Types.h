@@ -21,8 +21,9 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/SourceLoc.h"
-#include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/FoldingSet.h"
+#include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
   class ASTContext;
@@ -59,27 +60,43 @@ class TypeBase {
   TypeBase(const TypeBase&) = delete;
   void operator=(const TypeBase&) = delete;
   
-  /// CanonicalType - This field is always set to 'this' for canonical types,
-  /// and is otherwise lazily populated by ASTContext when the canonical form of
-  /// a non-canonical type is requested.
-  TypeBase *CanonicalType;
+  /// CanonicalType - This field is always set to the ASTContext for canonical
+  /// types, and is otherwise lazily populated by ASTContext when the canonical
+  /// form of a non-canonical type is requested.
+  llvm::PointerUnion<TypeBase *, ASTContext*> CanonicalType;
 protected:
-  TypeBase(TypeKind kind, TypeBase *CanType = 0)
-    : CanonicalType(CanType), Kind(kind) {}
+  TypeBase(TypeKind kind, ASTContext *CanTypeCtx = 0)
+    : CanonicalType((TypeBase*)nullptr), Kind(kind) {
+    // If this type is canonical, switch the CanonicalType union to ASTContext.
+    if (CanTypeCtx)
+      CanonicalType = CanTypeCtx;
+  }
 public:
   /// Kind - The discriminator that indicates what subclass of type this is.
   const TypeKind Kind;
 
   /// isCanonical - Return true if this is a canonical type.
-  bool isCanonical() const { return CanonicalType == this; }
+  bool isCanonical() const { return CanonicalType.is<ASTContext*>(); }
   
   /// hasCanonicalTypeComputed - Return true if we've already computed a
   /// canonical version of this type.
-  bool hasCanonicalTypeComputed() const { return CanonicalType != 0; }
+  bool hasCanonicalTypeComputed() const { return !CanonicalType.isNull(); }
   
   /// getCanonicalType - Return the canonical version of this type, which has
   /// sugar from all levels stripped off.
-  TypeBase *getCanonicalType(ASTContext &Ctx);
+  TypeBase *getCanonicalType(ASTContext &Ctx) {
+    return getCanonicalType();
+  }
+  TypeBase *getCanonicalType();
+  
+  /// getASTContext - Return the ASTContext that this type belongs to.
+  ASTContext &getASTContext() {
+    // If this type is canonical, it has the ASTContext in it.
+    if (CanonicalType.is<ASTContext*>())
+      return *CanonicalType.get<ASTContext*>();
+    // If not, canonicalize it to get the Context.
+    return *getCanonicalType()->CanonicalType.get<ASTContext*>();
+  }
   
   /// isEqual - Return true if these two types are equal, ignoring sugar.
   bool isEqual(Type Other, ASTContext &Ctx);
@@ -135,7 +152,7 @@ public:
 class ErrorType : public TypeBase {
   friend class ASTContext;
   // The Error type is always canonical.
-  ErrorType() : TypeBase(TypeKind::Error, this) {}
+  ErrorType(ASTContext &C) : TypeBase(TypeKind::Error, &C) {}
 public:
   static Type get(ASTContext &C);
   
@@ -152,7 +169,7 @@ public:
 class BuiltinType : public TypeBase {
   friend class ASTContext;
   // Builtin types are always canonical.
-  BuiltinType(TypeKind kind) : TypeBase(kind, this) {}
+  BuiltinType(TypeKind kind, ASTContext &C) : TypeBase(kind, &C) {}
 public:
   void print(raw_ostream &OS) const;
 
@@ -169,7 +186,7 @@ public:
 class DependentType : public TypeBase {
   friend class ASTContext;
   // The Dependent type is always canonical.
-  DependentType() : TypeBase(TypeKind::Dependent, this) {}
+  DependentType(ASTContext &C) : TypeBase(TypeKind::Dependent, &C) {}
 public:
   static Type get(ASTContext &C);
 
@@ -267,8 +284,8 @@ public:
                       ArrayRef<TupleTypeElt> Fields);
   
 private:
-  TupleType(ArrayRef<TupleTypeElt> fields, bool isCanonical)
-    : TypeBase(TypeKind::Tuple, isCanonical ? this : 0), Fields(fields) {}
+  TupleType(ArrayRef<TupleTypeElt> fields, ASTContext *CanCtx)
+    : TypeBase(TypeKind::Tuple, CanCtx), Fields(fields) {}
 };
   
 /// OneOfType - a 'oneof' type.  This represents the oneof type itself, not its
@@ -307,11 +324,11 @@ public:
   
 private:
   // oneof types are always canonical.
-  OneOfType(SourceLoc oneofloc, ArrayRef<OneOfElementDecl*> Elts,
+  OneOfType(SourceLoc OneOfLoc, ArrayRef<OneOfElementDecl*> Elts,
             DeclContext *Parent)
-    : TypeBase(TypeKind::OneOf, this),
+    : TypeBase(TypeKind::OneOf, &Parent->getASTContext()),
       DeclContext(DeclContextKind::OneOfType, Parent),
-      OneOfLoc(oneofloc), Elements(Elts) {
+      OneOfLoc(OneOfLoc), Elements(Elts) {
   }
 };
 
@@ -335,7 +352,7 @@ public:
   }
   
 private:
-  FunctionType(Type input, Type result);
+  FunctionType(Type Input, Type Result);
 };
   
   
@@ -360,7 +377,7 @@ public:
   static bool classof(const TypeBase *T) { return T->Kind == TypeKind::Array; }
   
 private:
-  ArrayType(Type base, uint64_t size);
+  ArrayType(Type Base, uint64_t Size);
 };
   
 /// ProtocolType - A protocol type describes an abstract interface implemented
@@ -386,7 +403,7 @@ public:
 private:
   ProtocolType(SourceLoc ProtocolLoc, ArrayRef<ValueDecl*> Elts,
                DeclContext *Parent)
-  : TypeBase(TypeKind::Protocol, this),
+  : TypeBase(TypeKind::Protocol, &Parent->getASTContext()),
     DeclContext(DeclContextKind::ProtocolType, Parent),
     ProtocolLoc(ProtocolLoc), Elements(Elts) {
   }
