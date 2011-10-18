@@ -123,7 +123,6 @@ TypeBase *TypeBase::getDesugaredType() {
     // None of these types have sugar at the outer level.
     return this;
   case TypeKind::NameAlias:
-    assert(&cast<NameAliasType>(this)->TheDecl->getASTContext() != 0);
     return cast<NameAliasType>(this)->TheDecl->UnderlyingTy->getDesugaredType();
   }
 
