@@ -176,9 +176,8 @@ public:
    
   bool isSimple() const { return LPLoc == RPLoc; }
 
-  // FIXME: We need an SMRange type!
-  std::pair<SourceLoc, SourceLoc> getSourceRange() {
-    return std::make_pair(LPLoc, RPLoc);
+  SourceRange getSourceRange() {
+    return SourceRange(LPLoc, RPLoc);
   }
   
 private:
