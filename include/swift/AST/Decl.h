@@ -20,7 +20,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
-#include "llvm/Support/SMLoc.h"
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/ADT/ArrayRef.h"
 #include <cstddef>
@@ -116,7 +116,7 @@ public:
   /// LSquareLoc/RSquareLoc - This is the location of the '[' and ']' in the
   /// attribute specifier.  If this is an empty attribute specifier, then these
   /// will be invalid locs.
-  SMLoc LSquareLoc, RSquareLoc;
+  SourceLoc LSquareLoc, RSquareLoc;
 
   InfixData Infix;
 
@@ -139,7 +139,7 @@ public:
 class DeclVarName {
   /// LPLoc/RPLoc - This is the location of the '(' and ')' if this is a complex
   /// name, or both contain the same location if this is simple.
-  SMLoc LPLoc, RPLoc;
+  SourceLoc LPLoc, RPLoc;
   
   union {
     void *Name; //< Storage for a simple variable name
@@ -152,16 +152,16 @@ class DeclVarName {
 public:
   DeclVarName() {}
   
-  DeclVarName(Identifier Name, SMLoc NameLoc)
+  DeclVarName(Identifier Name, SourceLoc NameLoc)
     : LPLoc(NameLoc), RPLoc(NameLoc), Name(Name.getAsOpaquePointer()) { }
   
-  DeclVarName(SMLoc LPLoc, ArrayRef<DeclVarName *> Elements, SMLoc RPLoc)
-    : LPLoc(LPLoc), RPLoc(RPLoc) {
+  DeclVarName(SourceLoc LPLoc, ArrayRef<DeclVarName *> Elements,
+              SourceLoc RPLoc) : LPLoc(LPLoc), RPLoc(RPLoc) {
     this->Elements.Start = Elements.data();
     this->Elements.Length = Elements.size();
   }
   
-  SMLoc getLocation() const { return LPLoc; }
+  SourceLoc getLocation() const { return LPLoc; }
   
   Identifier getIdentifier() const {
     assert(isSimple() && 
@@ -177,7 +177,7 @@ public:
   bool isSimple() const { return LPLoc == RPLoc; }
 
   // FIXME: We need an SMRange type!
-  std::pair<SMLoc, SMLoc> getSourceRange() {
+  std::pair<SourceLoc, SourceLoc> getSourceRange() {
     return std::make_pair(LPLoc, RPLoc);
   }
   
@@ -204,7 +204,7 @@ public:
   const DeclKind Kind;
   DeclContext *Context;
   
-  SMLoc getLocStart() const;
+  SourceLoc getLocStart() const;
  
   void dump() const;
   void print(raw_ostream &OS, unsigned Indent = 0) const;
@@ -229,15 +229,15 @@ public:
 ///   import swift.int
 class ImportDecl : public Decl {
 public:
-  SMLoc ImportLoc;
-  ArrayRef<std::pair<Identifier,SMLoc>> AccessPath;
+  SourceLoc ImportLoc;
+  ArrayRef<std::pair<Identifier, SourceLoc>> AccessPath;
   
-  ImportDecl(SMLoc ImportLoc, ArrayRef<std::pair<Identifier,SMLoc>> Path,
-             DeclContext *DC)
+  ImportDecl(SourceLoc ImportLoc,
+             ArrayRef<std::pair<Identifier,SourceLoc>> Path, DeclContext *DC)
     : Decl(DeclKind::Import, DC), ImportLoc(ImportLoc), AccessPath(Path) {
   }
   
-  SMLoc getLocStart() const { return ImportLoc; }
+  SourceLoc getLocStart() const { return ImportLoc; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -274,16 +274,16 @@ class TypeAliasDecl : public NamedDecl {
   /// The type that represents this (sugared) name alias.
   mutable NameAliasType *AliasTy;
 public:
-  SMLoc TypeAliasLoc;
+  SourceLoc TypeAliasLoc;
   Type UnderlyingTy;
   
-  TypeAliasDecl(SMLoc TypeAliasLoc, Identifier Name,
+  TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                 Type underlyingty, const DeclAttributes &Attrs, DeclContext *DC)
     : NamedDecl(DeclKind::TypeAlias, DC, Name, Attrs), AliasTy(0),
       TypeAliasLoc(TypeAliasLoc), UnderlyingTy(underlyingty) {
   }
 
-  SMLoc getLocStart() const { return TypeAliasLoc; }
+  SourceLoc getLocStart() const { return TypeAliasLoc; }
 
   /// getAliasType - Return the sugared version of this decl as a Type.
   NameAliasType *getAliasType(ASTContext &C) const;
@@ -320,24 +320,24 @@ protected:
 /// VarDecl - 'var' declaration.
 class VarDecl : public ValueDecl {
 public:
-  SMLoc VarLoc;    // Location of the 'var' token.
+  SourceLoc VarLoc;    // Location of the 'var' token.
 
   /// NestedName - If this is a simple var definition, the name is stored in the
   /// name identifier.  If the varname is complex, Name is empty and this
   /// contains the nested name specifier.
   DeclVarName *NestedName;
   
-  VarDecl(SMLoc VarLoc, Identifier Name, Type Ty, Expr *Init,
+  VarDecl(SourceLoc VarLoc, Identifier Name, Type Ty, Expr *Init,
           const DeclAttributes &Attrs, DeclContext *DC)
     : ValueDecl(DeclKind::Var, DC, Name, Ty, Init, Attrs), VarLoc(VarLoc),
       NestedName(0) {}
-  VarDecl(SMLoc VarLoc, DeclVarName *Name, Type Ty, Expr *Init,
+  VarDecl(SourceLoc VarLoc, DeclVarName *Name, Type Ty, Expr *Init,
           const DeclAttributes &Attrs, DeclContext *DC)
     : ValueDecl(DeclKind::Var, DC, Identifier(), Ty, Init, Attrs),
       VarLoc(VarLoc), NestedName(Name) {}
 
   
-  SMLoc getLocStart() const { return VarLoc; }
+  SourceLoc getLocStart() const { return VarLoc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->Kind == DeclKind::Var; }
@@ -349,13 +349,13 @@ public:
 /// FuncDecl - 'func' declaration.
 class FuncDecl : public ValueDecl {
 public:
-  SMLoc FuncLoc;    // Location of the 'func' token.
+  SourceLoc FuncLoc;    // Location of the 'func' token.
 
-  FuncDecl(SMLoc FuncLoc, Identifier Name, Type Ty, Expr *Init,
-          const DeclAttributes &Attrs, DeclContext *DC)
+  FuncDecl(SourceLoc FuncLoc, Identifier Name, Type Ty, Expr *Init,
+           const DeclAttributes &Attrs, DeclContext *DC)
     : ValueDecl(DeclKind::Func, DC, Name, Ty, Init, Attrs), FuncLoc(FuncLoc) {}
     
-  SMLoc getLocStart() const { return FuncLoc; }
+  SourceLoc getLocStart() const { return FuncLoc; }
 
   
   // Implement isa/cast/dyncast/etc.
@@ -370,7 +370,7 @@ public:
 /// oneof.
 class OneOfElementDecl : public ValueDecl {
 public:
-  SMLoc IdentifierLoc;
+  SourceLoc IdentifierLoc;
   
   /// ArgumentType - This is the type specified with the oneof element.  For
   /// example 'int' in the Y example above.  This is null if there is no type
@@ -378,13 +378,13 @@ public:
   Type ArgumentType;
   
   
-  OneOfElementDecl(SMLoc IdentifierLoc, Identifier Name, Type Ty,
+  OneOfElementDecl(SourceLoc IdentifierLoc, Identifier Name, Type Ty,
                    Type ArgumentType, DeclContext *DC)
   : ValueDecl(DeclKind::OneOfElement, DC, Name, Ty, 0),
     IdentifierLoc(IdentifierLoc), ArgumentType(ArgumentType) {}
 
   
-  SMLoc getLocStart() const { return IdentifierLoc; }
+  SourceLoc getLocStart() const { return IdentifierLoc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -403,16 +403,16 @@ class ArgDecl : public ValueDecl {
 public:
   // FIXME: We don't have good location information for the function argument
   // declaration.
-  SMLoc FuncLoc;
+  SourceLoc FuncLoc;
   
   // FIXME: Store the access path here.
   
-  ArgDecl(SMLoc FuncLoc, Identifier Name, Type Ty, DeclContext *DC)
+  ArgDecl(SourceLoc FuncLoc, Identifier Name, Type Ty, DeclContext *DC)
     : ValueDecl(DeclKind::Arg, DC, Name, Ty, 0, DeclAttributes()),
       FuncLoc(FuncLoc) {}
 
 
-  SMLoc getLocStart() const { return FuncLoc; }
+  SourceLoc getLocStart() const { return FuncLoc; }
  
   
   // Implement isa/cast/dyncast/etc.
@@ -427,10 +427,10 @@ public:
 class ElementRefDecl : public ValueDecl {
 public:
   VarDecl *VD;
-  SMLoc NameLoc;
+  SourceLoc NameLoc;
   ArrayRef<unsigned> AccessPath;
   
-  ElementRefDecl(VarDecl *VD, SMLoc NameLoc, Identifier Name,
+  ElementRefDecl(VarDecl *VD, SourceLoc NameLoc, Identifier Name,
                  ArrayRef<unsigned> Path, Type Ty, DeclContext *DC)
     : ValueDecl(DeclKind::ElementRef, DC, Name, Ty, 0), VD(VD),
       NameLoc(NameLoc), AccessPath(Path) {
@@ -443,7 +443,7 @@ public:
   static Type getTypeForPath(Type Ty, ArrayRef<unsigned> Path);
   
   
-  SMLoc getLocStart() const { return NameLoc; }
+  SourceLoc getLocStart() const { return NameLoc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

@@ -50,7 +50,7 @@ void *Module::operator new(size_t Bytes, ASTContext &C,
 }
 
 
-SMLoc Decl::getLocStart() const {
+SourceLoc Decl::getLocStart() const {
   switch (Kind) {
   case DeclKind::Import: return cast<ImportDecl>(this)->getLocStart();
   case DeclKind::TypeAlias:  return cast<TypeAliasDecl>(this)->getLocStart(); 
@@ -63,7 +63,7 @@ SMLoc Decl::getLocStart() const {
   }
 
   assert(0 && "Unknown decl kind");
-  return SMLoc();
+  return SourceLoc();
 }
 
 /// getAliasType - Return the sugared version of this decl as a Type.

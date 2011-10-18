@@ -23,6 +23,7 @@
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {
+  class SourceLoc;
   class ValueDecl;
   class TypeAliasDecl;
   class Parser;
@@ -61,7 +62,7 @@ private:
   SmallVector<std::pair<TypeAliasDecl*, TypeAliasDecl*>, 8>
     UnresolvedScopedTypeList;
 
-  TypeAliasDecl *lookupTypeNameInternal(Identifier Name, SMLoc Loc,
+  TypeAliasDecl *lookupTypeNameInternal(Identifier Name, SourceLoc Loc,
                                         bool AsType);
 public:
   ScopeInfo(Parser &TheParser) : TheParser(TheParser), CurScope(0) {}
@@ -88,16 +89,16 @@ public:
   /// lookupScopeName - Perform a lexical scope lookup for the
   /// specified name in a scope context, returning the decl if found or
   /// a forward-declared type if not.
-  TypeAliasDecl *lookupScopeName(Identifier Name, SMLoc Loc);
+  TypeAliasDecl *lookupScopeName(Identifier Name, SourceLoc Loc);
   
   /// lookupOrInsertTypeNameDecl - Perform a lexical scope lookup for the
   /// specified name in a type context, returning the decl if found or
   /// installing and returning a new Unresolved one if not.
-  TypeAliasDecl *lookupOrInsertTypeNameDecl(Identifier Name, SMLoc Loc);
+  TypeAliasDecl *lookupOrInsertTypeNameDecl(Identifier Name, SourceLoc Loc);
 
   /// lookupOrInsertTypeName - This is the same as lookupOrInsertTypeNameDecl,
   /// but returns the alias as a type.
-  Type lookupOrInsertTypeName(Identifier Name, SMLoc Loc);
+  Type lookupOrInsertTypeName(Identifier Name, SourceLoc Loc);
 
   /// lookupTypeNameAndLevel - Lookup the specified type name, returning the
   /// level it is at as well.
@@ -109,8 +110,8 @@ public:
     return Entry->Decl;
   }
 
-  Type getQualifiedTypeName(Identifier BaseName, SMLoc BaseNameLoc,
-                            Identifier Name, SMLoc NameLoc);
+  Type getQualifiedTypeName(Identifier BaseName, SourceLoc BaseNameLoc,
+                            Identifier Name, SourceLoc NameLoc);
 
   /// addToScope - Register the specified decl as being in the current lexical
   /// scope.
@@ -118,7 +119,7 @@ public:
   
   /// addTypeAliasToScope - Add a type alias to the current scope, diagnosing
   /// redefinitions as required.
-  TypeAliasDecl *addTypeAliasToScope(SMLoc TypeAliasLoc, Identifier Name,
+  TypeAliasDecl *addTypeAliasToScope(SourceLoc TypeAliasLoc, Identifier Name,
                                      Type Ty);
 };
 

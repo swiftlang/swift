@@ -17,9 +17,9 @@
 #ifndef SWIFT_TOKEN_H
 #define SWIFT_TOKEN_H
 
-#include "llvm/Support/SMLoc.h"
-#include "llvm/ADT/StringRef.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/AST/LLVM.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace swift {
 
@@ -96,8 +96,8 @@ public:
   
   /// getLoc - Return a source location identifier for the specified
   /// offset in the current file.
-  SMLoc getLoc() const {
-    return SMLoc::getFromPointer(Text.begin());
+  SourceLoc getLoc() const {
+    return SourceLoc(llvm::SMLoc::getFromPointer(Text.begin()));
   }
 
   StringRef getText() const { return Text; }

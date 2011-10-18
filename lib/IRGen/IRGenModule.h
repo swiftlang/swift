@@ -40,6 +40,7 @@ namespace swift {
   class Decl;
   class FuncDecl;
   class NamedDecl;
+  class SourceLoc;
   class TranslationUnit;
   class Type;
   class VarDecl;
@@ -66,7 +67,7 @@ public:
   llvm::IntegerType *Int64Ty;
   llvm::PointerType *Int8PtrTy;
 
-  void unimplemented(llvm::SMLoc, const llvm::Twine &Message);
+  void unimplemented(SourceLoc, const llvm::Twine &Message);
 
 //--- Types -----------------------------------------------------------------
 public:

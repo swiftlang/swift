@@ -19,7 +19,7 @@
 
 #include "swift/AST/LLVM.h"
 #include "swift/AST/WalkOrder.h"
-#include "llvm/Support/SMLoc.h"
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 
@@ -48,7 +48,7 @@ public:
 
   /// getLocStart - Return the location of the start of the expression.
   /// FIXME: QOI: Need to extend this to do full source ranges like Clang.
-  SMLoc getStartLoc() const;
+  SourceLoc getStartLoc() const;
   
   
   /// walk - This recursively walks all of the statements and expressions
@@ -92,13 +92,13 @@ public:
 
 /// SemiStmt - A semicolon, the noop statement: ";"
 class SemiStmt : public Stmt {
-  SMLoc Loc;
+  SourceLoc Loc;
   
 public:
-  SemiStmt(SMLoc Loc) : Stmt(StmtKind::Semi), Loc(Loc) {}
+  SemiStmt(SourceLoc Loc) : Stmt(StmtKind::Semi), Loc(Loc) {}
 
-  SMLoc getLoc() const { return Loc; }
-  SMLoc getStartLoc() const { return Loc; }
+  SourceLoc getLoc() const { return Loc; }
+  SourceLoc getStartLoc() const { return Loc; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const SemiStmt *) { return true; }
@@ -109,10 +109,10 @@ public:
 class AssignStmt : public Stmt {
   Expr *Dest;
   Expr *Src;
-  SMLoc EqualLoc;
+  SourceLoc EqualLoc;
 
 public:  
-  AssignStmt(Expr *Dest, SMLoc EqualLoc, Expr *Src)
+  AssignStmt(Expr *Dest, SourceLoc EqualLoc, Expr *Src)
     : Stmt(StmtKind::Assign), Dest(Dest), Src(Src), EqualLoc(EqualLoc) {}
 
   Expr *getDest() const { return Dest; }
@@ -120,8 +120,8 @@ public:
   Expr *getSrc() const { return Src; }
   void setSrc(Expr *e) { Src = e; }
   
-  SMLoc getEqualLoc() const { return EqualLoc; }
-  SMLoc getStartLoc() const;
+  SourceLoc getEqualLoc() const { return EqualLoc; }
+  SourceLoc getStartLoc() const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const AssignStmt *) { return true; }
@@ -138,10 +138,10 @@ public:
 private:
   unsigned NumElements;
   
-  SMLoc LBLoc;
-  SMLoc RBLoc;
+  SourceLoc LBLoc;
+  SourceLoc RBLoc;
 
-  BraceStmt(SMLoc lbloc, ArrayRef<ExprStmtOrDecl> elements, SMLoc rbloc);
+  BraceStmt(SourceLoc lbloc, ArrayRef<ExprStmtOrDecl> elements,SourceLoc rbloc);
   ExprStmtOrDecl *getElementsStorage() {
     return reinterpret_cast<ExprStmtOrDecl*>(this + 1);
   }
@@ -150,13 +150,13 @@ private:
   }
 
 public:
-  static BraceStmt *create(ASTContext &ctx, SMLoc lbloc,
+  static BraceStmt *create(ASTContext &ctx, SourceLoc lbloc,
                            ArrayRef<ExprStmtOrDecl> elements,
-                           SMLoc rbloc);
+                           SourceLoc rbloc);
 
-  SMLoc getLBraceLoc() const { return LBLoc; }
-  SMLoc getRBraceLoc() const { return RBLoc; }
-  SMLoc getStartLoc() const { return LBLoc; }
+  SourceLoc getLBraceLoc() const { return LBLoc; }
+  SourceLoc getRBraceLoc() const { return RBLoc; }
+  SourceLoc getStartLoc() const { return LBLoc; }
 
   unsigned getNumElements() const { return NumElements; }
   ArrayRef<ExprStmtOrDecl> getElements() const {
@@ -180,15 +180,15 @@ public:
 /// subexpression are expanded into a return of the empty tuple in the parser.
 ///    return 42
 class ReturnStmt : public Stmt {
-  SMLoc ReturnLoc;
+  SourceLoc ReturnLoc;
   Expr *Result;
   
 public:
-  ReturnStmt(SMLoc ReturnLoc, Expr *Result)
+  ReturnStmt(SourceLoc ReturnLoc, Expr *Result)
     : Stmt(StmtKind::Return), ReturnLoc(ReturnLoc), Result(Result) {}
 
-  SMLoc getStartLoc() const { return ReturnLoc; }
-  SMLoc getReturnLoc() const { return ReturnLoc; }
+  SourceLoc getStartLoc() const { return ReturnLoc; }
+  SourceLoc getReturnLoc() const { return ReturnLoc; }
 
   Expr *getResult() const { return Result; }
   void setResult(Expr *e) { Result = e; }
@@ -202,21 +202,21 @@ public:
 /// ElseLoc location is not specified and the Else statement is null.  The
 /// condition of the 'if' is required to have a __builtin_int1 type.
 class IfStmt : public Stmt {
-  SMLoc IfLoc;
-  SMLoc ElseLoc;
+  SourceLoc IfLoc;
+  SourceLoc ElseLoc;
   Expr *Cond;
   Stmt *Then;
   Stmt *Else;
   
 public:
-  IfStmt(SMLoc IfLoc, Expr *Cond, Stmt *Then, SMLoc ElseLoc,
+  IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
          Stmt *Else)
   : Stmt(StmtKind::If),
     IfLoc(IfLoc), ElseLoc(ElseLoc), Cond(Cond), Then(Then), Else(Else) {}
 
-  SMLoc getStartLoc() const { return IfLoc; }
-  SMLoc getIfLoc() const { return IfLoc; }
-  SMLoc getElseLoc() const { return ElseLoc; }
+  SourceLoc getStartLoc() const { return IfLoc; }
+  SourceLoc getIfLoc() const { return IfLoc; }
+  SourceLoc getElseLoc() const { return ElseLoc; }
 
   Expr *getCond() const { return Cond; }
   void setCond(Expr *e) { Cond = e; }
@@ -235,16 +235,16 @@ public:
 /// WhileStmt - while statement.  The condition is required to have a
 /// __builtin_int1 type.
 class WhileStmt : public Stmt {
-  SMLoc WhileLoc;
+  SourceLoc WhileLoc;
   Expr *Cond;
   Stmt *Body;
   
 public:
-  WhileStmt(SMLoc WhileLoc, Expr *Cond, Stmt *Body)
+  WhileStmt(SourceLoc WhileLoc, Expr *Cond, Stmt *Body)
   : Stmt(StmtKind::While),
     WhileLoc(WhileLoc), Cond(Cond), Body(Body) {}
 
-  SMLoc getStartLoc() const { return WhileLoc; }
+  SourceLoc getStartLoc() const { return WhileLoc; }
 
   Expr *getCond() const { return Cond; }
   void setCond(Expr *e) { Cond = e; }

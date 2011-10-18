@@ -306,7 +306,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
      
       // If this is a TupleExpr (common case) get a more precise location for
       // the element we care about.
-      SMLoc ErrorLoc = E->getStartLoc();
+      SourceLoc ErrorLoc = E->getStartLoc();
       if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
         ErrorLoc = TE->getRParenLoc();
       
@@ -331,7 +331,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     if (!UsedElements[i]) {
       // If this is a TupleExpr (common case) get a more precise location for
       // the element we care about.
-      SMLoc ErrorLoc = E->getLoc();
+      SourceLoc ErrorLoc = E->getLoc();
       if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
         if (Expr *SubExp = TE->getElement(i))
           ErrorLoc = SubExp->getLoc();
@@ -455,7 +455,7 @@ Expr *SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   }
   
   return new (TC.Context) TupleExpr(E->getStartLoc(), NewSE, NewName,
-                                    NumFields, SMLoc(), false,
+                                    NumFields, SourceLoc(), false,
                                     TypeJudgement(DestTy, ValueKind::RValue));
 }
 

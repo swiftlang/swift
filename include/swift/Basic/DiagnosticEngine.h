@@ -18,7 +18,8 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICENGINE_H
 #define SWIFT_BASIC_DIAGNOSTICENGINE_H
 
-#include "llvm/Support/SMLoc.h"
+#include "swift/AST/LLVM.h"
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include <string>
@@ -29,7 +30,6 @@ namespace llvm {
 }
 
 namespace swift {
-  using llvm::SMLoc;
   using llvm::ArrayRef;
   using llvm::StringRef;
   
@@ -150,7 +150,7 @@ namespace swift {
     ///
     /// \param Args The preformatted set of diagnostic arguments. The caller
     /// must ensure that the diagnostic arguments have the appropriate type.
-    void diagnose(SMLoc Loc, DiagID ID, ArrayRef<DiagnosticArgument> Args);
+    void diagnose(SourceLoc Loc, DiagID ID, ArrayRef<DiagnosticArgument> Args);
 
     /// \brief Emit a diagnostic with no arguments.
     ///
@@ -158,7 +158,7 @@ namespace swift {
     /// code.
     ///
     /// \param ID The diagnostic to be emitted.
-    void diagnose(SMLoc Loc, Diag<> ID) {
+    void diagnose(SourceLoc Loc, Diag<> ID) {
       diagnose(Loc, ID.ID, ArrayRef<DiagnosticArgument>());
     }    
 
@@ -172,7 +172,7 @@ namespace swift {
     /// \param Args The diagnostic arguments, which will be converted to
     /// the types expected by the diagnostic \p ID.
     template<typename ...ArgTypes>
-    void diagnose(SMLoc Loc, Diag<ArgTypes...> ID,
+    void diagnose(SourceLoc Loc, Diag<ArgTypes...> ID,
                   typename detail::PassArgument<ArgTypes>::type... Args) {
       DiagnosticArgument DiagArgs[] = { Args... };
       diagnose(Loc, ID.ID, 

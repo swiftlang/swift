@@ -86,8 +86,8 @@ public:
   const Token &peekToken();
   
   // Utilities.
-  SMLoc consumeToken();
-  SMLoc consumeToken(tok K) {
+  SourceLoc consumeToken();
+  SourceLoc consumeToken(tok K) {
     assert(Tok.is(K) && "Consuming wrong token kind");
     return consumeToken();
   }
@@ -107,7 +107,7 @@ public:
   void skipUntil(tok T1, tok T2 = tok::unknown);
   
   template<typename ...ArgTypes>
-  void diagnose(SMLoc Loc, Diag<ArgTypes...> ID,
+  void diagnose(SourceLoc Loc, Diag<ArgTypes...> ID,
                 typename detail::PassArgument<ArgTypes>::type... Args) {
     Diags.diagnose(Loc, ID, Args...);
   }
@@ -119,9 +119,15 @@ public:
     Diags.diagnose(Tok.getLoc(), ID, Args...);
   }
 
-  void note(SMLoc Loc, const Twine &Message) __attribute__((deprecated));
-  void warning(SMLoc Loc, const Twine &Message) __attribute__((deprecated));
-  void error(SMLoc Loc, const Twine &Message) __attribute__((deprecated));
+  void note(SourceLoc Loc, const Twine &Message) __attribute__((deprecated)) {
+    Context.note(Loc, Message);
+  }
+  void warning(SourceLoc Loc, const Twine &Message) __attribute__((deprecated)){
+    Context.warning(Loc, Message);
+  }
+  void error(SourceLoc Loc, const Twine &Message) __attribute__((deprecated)) {
+    Context.error(Loc, Message);
+  }
   
   //===--------------------------------------------------------------------===//
   // Primitive Parsing
@@ -172,23 +178,23 @@ public:
   
   bool parseType(Type &Result);
   bool parseType(Type &Result, const Twine &Message);
-  bool parseTypeTupleBody(SMLoc LPLoc, Type &Result);
+  bool parseTypeTupleBody(SourceLoc LPLoc, Type &Result);
   
   bool parseTypeOneOf(Type &Result);
-  bool parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
+  bool parseTypeOneOfBody(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
                           Type &Result, TypeAliasDecl *TypeName = 0);
-  bool parseTypeArray(SMLoc LSquareLoc, Type &Result);
+  bool parseTypeArray(SourceLoc LSquareLoc, Type &Result);
   bool parseTypeProtocol(Type &Result);
-  bool parseTypeProtocolBody(SMLoc ProtocolLoc, const DeclAttributes &Attrs,
+  bool parseTypeProtocolBody(SourceLoc ProtocolLoc, const DeclAttributes &Attrs,
                              Type &Result, TypeAliasDecl *TypeName = 0);
   
   struct OneOfElementInfo {
-    SMLoc NameLoc;
+    SourceLoc NameLoc;
     StringRef Name;
     Type EltType;
   };
   
-  OneOfType *actOnOneOfType(SMLoc OneOfLoc, const DeclAttributes &Attrs,
+  OneOfType *actOnOneOfType(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
                             ArrayRef<OneOfElementInfo> Elts,
                             TypeAliasDecl *PrettyTypeName);
 
@@ -207,8 +213,8 @@ public:
   ParseResult<Expr> parseExprParen();
   ParseResult<Expr> parseExprFunc();
   
-  Expr *actOnIdentifierExpr(Identifier Text, SMLoc Loc);
-  FuncExpr *actOnFuncExprStart(SMLoc FuncLoc, Type FuncTy);
+  Expr *actOnIdentifierExpr(Identifier Text, SourceLoc Loc);
+  FuncExpr *actOnFuncExprStart(SourceLoc FuncLoc, Type FuncTy);
 
   // Statement Parsing
   ParseResult<Stmt> parseStmtOtherThanAssignment();

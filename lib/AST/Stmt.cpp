@@ -33,7 +33,7 @@ void *Stmt::operator new(size_t Bytes, ASTContext &C,
 
 /// getLocStart - Return the location of the start of the expression.
 /// FIXME: Need to extend this to do full source ranges like Clang.
-SMLoc Stmt::getStartLoc() const {
+SourceLoc Stmt::getStartLoc() const {
   switch (Kind) {
   case StmtKind::Semi:
     return cast<SemiStmt>(this)->getStartLoc();
@@ -52,18 +52,19 @@ SMLoc Stmt::getStartLoc() const {
   llvm_unreachable("Not reachable, all cases handled");
 }
 
-SMLoc AssignStmt::getStartLoc() const {
+SourceLoc AssignStmt::getStartLoc() const {
   return getDest()->getStartLoc();
 }
 
-BraceStmt::BraceStmt(SMLoc lbloc, ArrayRef<ExprStmtOrDecl> elts, SMLoc rbloc)
+BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ExprStmtOrDecl> elts,
+                     SourceLoc rbloc)
   : Stmt(StmtKind::Brace), NumElements(elts.size()), LBLoc(lbloc), RBLoc(rbloc){
   memcpy(getElementsStorage(), elts.data(),
          elts.size() * sizeof(ExprStmtOrDecl));
 }
 
-BraceStmt *BraceStmt::create(ASTContext &ctx, SMLoc lbloc,
-                             ArrayRef<ExprStmtOrDecl> elts, SMLoc rbloc) {
+BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
+                             ArrayRef<ExprStmtOrDecl> elts, SourceLoc rbloc) {
   void *Buffer = ctx.Allocate(sizeof(BraceStmt)
                                 + elts.size() * sizeof(ExprStmtOrDecl),
                               Stmt::Alignment);

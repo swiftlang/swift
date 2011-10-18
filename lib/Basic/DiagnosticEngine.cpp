@@ -197,7 +197,7 @@ static void formatDiagnosticText(StringRef InText,
   }
 }
                              
-void DiagnosticEngine::diagnose(SMLoc Loc, DiagID ID, 
+void DiagnosticEngine::diagnose(SourceLoc Loc, DiagID ID, 
                                 ArrayRef<DiagnosticArgument> Args) {
   const DiagnosticInfo &Info = DiagnosticInfos[(unsigned)ID];
   
@@ -214,5 +214,5 @@ void DiagnosticEngine::diagnose(SMLoc Loc, DiagID ID,
   formatDiagnosticText(Info.Text, Args, Text);
   
   // Display the diagnostic.
-  SourceMgr.PrintMessage(Loc, Kind, StringRef(Text));
+  SourceMgr.PrintMessage(Loc.Value, Kind, StringRef(Text));
 }

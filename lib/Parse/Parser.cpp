@@ -48,26 +48,13 @@ Parser::~Parser() {
   delete &L;
 }
 
-void Parser::note(SMLoc Loc, const Twine &Message) {
-  SourceMgr.PrintMessage(Loc, llvm::SourceMgr::DK_Note, Message);
-}
-
-void Parser::warning(SMLoc Loc, const Twine &Message) {
-  SourceMgr.PrintMessage(Loc, llvm::SourceMgr::DK_Warning, Message);
-}
-
-void Parser::error(SMLoc Loc, const Twine &Message) {
-  Context.setHadError();
-  SourceMgr.PrintMessage(Loc, llvm::SourceMgr::DK_Error, Message);
-}
-
 /// peekToken - Return the next token that will be installed by consumeToken.
 const Token &Parser::peekToken() {
   return L.peekNextToken();
 }
 
-SMLoc Parser::consumeToken() {
-  SMLoc Loc = Tok.getLoc();
+SourceLoc Parser::consumeToken() {
+  SourceLoc Loc = Tok.getLoc();
   assert(Tok.isNot(tok::eof) && "Lexing past eof!");
   L.lex(Tok);
   return Loc;

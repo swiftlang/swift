@@ -28,7 +28,7 @@ using namespace swift;
 TranslationUnit *Parser::parseTranslationUnit() {
   // Prime the lexer.
   consumeToken();
-  SMLoc FileStartLoc = Tok.getLoc();
+  SourceLoc FileStartLoc = Tok.getLoc();
 
   TranslationUnit *TU =
     new (Context) TranslationUnit(L.getModuleName(), Context);
@@ -39,7 +39,7 @@ TranslationUnit *Parser::parseTranslationUnit() {
   parseBraceItemList(Items, true);
 
   // Process the end of the translation unit.
-  SMLoc FileEnd = Tok.getLoc();
+  SourceLoc FileEnd = Tok.getLoc();
   
   // First thing, we transform the body into a brace expression.
   TU->Body = BraceStmt::create(Context, FileStartLoc, Items, FileEnd);
@@ -115,7 +115,7 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     Attributes.Infix = InfixData(100, Assoc);
     
     if (consumeIf(tok::equal)) {
-      SMLoc PrecLoc = Tok.getLoc();
+      SourceLoc PrecLoc = Tok.getLoc();
       StringRef Text = Tok.getText();
       if (!parseToken(tok::numeric_constant,
                       "expected precedence number in infix attribute")) {
@@ -186,12 +186,12 @@ void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
 ///      'import' attribute-list? identifier ('.' identifier)*
 ///
 Decl *Parser::parseDeclImport() {
-  SMLoc ImportLoc = consumeToken(tok::kw_import);
+  SourceLoc ImportLoc = consumeToken(tok::kw_import);
   
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
   
-  SmallVector<std::pair<Identifier, SMLoc>, 8> ImportPath(1);
+  SmallVector<std::pair<Identifier, SourceLoc>, 8> ImportPath(1);
   ImportPath.back().second = Tok.getLoc();
   if (parseIdentifier(ImportPath.back().first,
                       "expected module name in import declaration"))
@@ -220,7 +220,7 @@ Decl *Parser::parseDeclImport() {
 bool Parser::parseVarName(DeclVarName &Name) {
   // Single name case.
   if (Tok.is(tok::identifier) || Tok.is(tok::oper)) {
-    SMLoc IdLoc = Tok.getLoc();
+    SourceLoc IdLoc = Tok.getLoc();
     Identifier Id;
     parseIdentifier(Id, "");
     Name = DeclVarName(Id, IdLoc);
@@ -232,7 +232,7 @@ bool Parser::parseVarName(DeclVarName &Name) {
     return true;
   }
   
-  SMLoc LPLoc = consumeToken();
+  SourceLoc LPLoc = consumeToken();
   
   SmallVector<DeclVarName*, 8> ChildNames;
   
@@ -244,7 +244,7 @@ bool Parser::parseVarName(DeclVarName &Name) {
     } while (consumeIf(tok::comma));
   }
 
-  SMLoc RPLoc = Tok.getLoc();
+  SourceLoc RPLoc = Tok.getLoc();
   if (parseToken(tok::r_paren, "expected ')' at end of var name"))
     diagnose(LPLoc, diags::opening_paren);
 
@@ -257,7 +257,7 @@ bool Parser::parseVarName(DeclVarName &Name) {
 ///   decl-typealias:
 ///     'typealias' identifier ':' type
 TypeAliasDecl *Parser::parseDeclTypeAlias() {
-  SMLoc TypeAliasLoc = consumeToken(tok::kw_typealias);
+  SourceLoc TypeAliasLoc = consumeToken(tok::kw_typealias);
   
   Identifier Id;
   Type Ty;
@@ -317,7 +317,7 @@ void Parser::actOnVarDeclName(const DeclVarName *Name,
 ///   decl-var:
 ///      'var' attribute-list? var-name value-specifier
 bool Parser::parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
-  SMLoc VarLoc = consumeToken(tok::kw_var);
+  SourceLoc VarLoc = consumeToken(tok::kw_var);
   
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
@@ -366,7 +366,7 @@ bool Parser::parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
 ///      'var' attribute-list? any-identifier value-specifier
 ///
 VarDecl *Parser::parseDeclVarSimple() {
-  SMLoc CurLoc = Tok.getLoc();
+  SourceLoc CurLoc = Tok.getLoc();
   SmallVector<ExprStmtOrDecl, 2> Decls;
   if (parseDeclVar(Decls)) return 0;
   
@@ -391,7 +391,7 @@ VarDecl *Parser::parseDeclVarSimple() {
 ///     'func' attribute-list? type-identifier '::' identifier type stmt-brace?
 ///
 FuncDecl *Parser::parseDeclFunc(bool AllowScoped) {
-  SMLoc FuncLoc = consumeToken(tok::kw_func);
+  SourceLoc FuncLoc = consumeToken(tok::kw_func);
 
   DeclAttributes Attributes;
   // FIXME: Implicitly add immutable attribute.
@@ -399,7 +399,7 @@ FuncDecl *Parser::parseDeclFunc(bool AllowScoped) {
 
   Type ReceiverTy;
   Identifier Name;
-  SMLoc TypeNameLoc = Tok.getLoc();
+  SourceLoc TypeNameLoc = Tok.getLoc();
   if (parseIdentifier(Name, "expected identifier in func declaration"))
     return 0;
 
@@ -480,12 +480,12 @@ FuncDecl *Parser::parseDeclFunc(bool AllowScoped) {
 ///      'oneof' attribute-list identifier oneof-body
 ///      
 Decl *Parser::parseDeclOneOf() {
-  SMLoc OneOfLoc = consumeToken(tok::kw_oneof);
+  SourceLoc OneOfLoc = consumeToken(tok::kw_oneof);
 
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
   
-  SMLoc NameLoc = Tok.getLoc();
+  SourceLoc NameLoc = Tok.getLoc();
   Identifier OneOfName;
   Type OneOfType;
   if (parseIdentifier(OneOfName, "expected identifier in oneof declaration"))
@@ -506,7 +506,7 @@ Decl *Parser::parseDeclOneOf() {
 ///      'struct' attribute-list identifier { type-tuple-body? }
 ///
 bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
-  SMLoc StructLoc = consumeToken(tok::kw_struct);
+  SourceLoc StructLoc = consumeToken(tok::kw_struct);
   
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
@@ -515,7 +515,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   if (parseIdentifier(StructName, "expected identifier in struct declaration"))
     return true;
 
-  SMLoc LBLoc = Tok.getLoc();
+  SourceLoc LBLoc = Tok.getLoc();
   if (parseToken(tok::l_brace, "expected '{' in struct"))
     return true;
   
@@ -568,12 +568,12 @@ bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
 ///      'protocol' attribute-list identifier protocol-body
 ///      
 Decl *Parser::parseDeclProtocol() {
-  SMLoc ProtocolLoc = consumeToken(tok::kw_protocol);
+  SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
   
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
   
-  SMLoc NameLoc = Tok.getLoc();
+  SourceLoc NameLoc = Tok.getLoc();
   Identifier ProtocolName;
   if (parseIdentifier(ProtocolName,
                       "expected identifier in protocol declaration"))

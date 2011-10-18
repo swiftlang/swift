@@ -27,6 +27,7 @@ namespace llvm {
 }
 
 namespace swift {
+  class SourceLoc;
   class Type;
   class OneOfType;
   class TupleType;
@@ -102,6 +103,14 @@ public:
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
   Identifier getIdentifier(StringRef Str);
+
+  //===--------------------------------------------------------------------===//
+  // Diagnostics Helper functions
+  //===--------------------------------------------------------------------===//
+
+  void note(SourceLoc Loc, const Twine &Message);
+  void warning(SourceLoc Loc, const Twine &Message);
+  void error(SourceLoc Loc, const Twine &Message);
   
   /// setHadError - This is called when an error message is emitted.
   void setHadError() {
@@ -112,13 +121,13 @@ public:
     return HadError;
   }
 
-  /// Checks whether the given two types are canonically the same.
-  bool isSameType(Type L, Type R);
-  
   //===--------------------------------------------------------------------===//
   // Type manipulation routines.
   //===--------------------------------------------------------------------===//
-  
+
+  /// Checks whether the given two types are canonically the same.
+  bool isSameType(Type L, Type R);
+
   // Builtin type and simple types that are used frequently.
   const Type TheErrorType;       /// TheErrorType - This is the error singleton.
   const Type TheEmptyTupleType;  /// TheEmptyTupleType - This is "()"

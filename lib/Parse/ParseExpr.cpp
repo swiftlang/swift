@@ -164,9 +164,9 @@ ParseResult<Expr> Parser::parseExprPostfix(const char *Message) {
     break;
 
   case tok::colon: {     // :foo
-    SMLoc ColonLoc = consumeToken(tok::colon);
+    SourceLoc ColonLoc = consumeToken(tok::colon);
     Identifier Name;
-    SMLoc NameLoc = Tok.getLoc();
+    SourceLoc NameLoc = Tok.getLoc();
     if (parseIdentifier(Name, "expected identifier after ':' expression"))
       return true;
     
@@ -199,7 +199,7 @@ ParseResult<Expr> Parser::parseExprPostfix(const char *Message) {
   // Handle suffix expressions.
   while (1) {
     // Check for a .foo suffix.
-    SMLoc TokLoc = Tok.getLoc();
+    SourceLoc TokLoc = Tok.getLoc();
     
     if (consumeIf(tok::period)) {
       if (Tok.isNot(tok::identifier) && Tok.isNot(tok::dollarident)) {
@@ -239,7 +239,7 @@ ParseResult<Expr> Parser::parseExprPostfix(const char *Message) {
       if ((Idx = parseSingleExpr("expected expression parsing array index")))
         return true;
       
-      SMLoc RLoc = Tok.getLoc();
+      SourceLoc RLoc = Tok.getLoc();
       if (parseToken(tok::r_square, "expected ']'")) {
         diagnose(TokLoc, diags::opening_bracket);
         return true;        
@@ -260,7 +260,7 @@ ParseResult<Expr> Parser::parseExprPostfix(const char *Message) {
 
 ParseResult<Expr> Parser::parseExprNumericConstant() {
   StringRef Text = Tok.getText();
-  SMLoc Loc = consumeToken(tok::numeric_constant);
+  SourceLoc Loc = consumeToken(tok::numeric_constant);
 
   // Check to see if we have an integer constant.
   size_t DotPos = Text.find('.');
@@ -282,8 +282,7 @@ ParseResult<Expr> Parser::parseExprNumericConstant() {
   // Okay, we have a floating point constant.  Verify we have a single dot.
   DotPos = Text.find('.', DotPos+1);
   if (DotPos != StringRef::npos) {
-    diagnose(SMLoc::getFromPointer(Loc.getPointer()+DotPos),
-             diags::float_literal_multi_decimal);
+    diagnose(Loc.getAdvancedLoc(DotPos), diags::float_literal_multi_decimal);
     return ParseResult<Expr>::getSemaError();
   }
   
@@ -317,22 +316,20 @@ ParseResult<Expr> Parser::parseExprNumericConstant() {
 ///     dollarident
 ParseResult<Expr> Parser::parseExprDollarIdentifier() {
   StringRef Name = Tok.getText();
-  SMLoc Loc = consumeToken(tok::dollarident);
+  SourceLoc Loc = consumeToken(tok::dollarident);
   assert(Name[0] == '$' && "Not a dollarident");
   bool AllNumeric = true;
   for (unsigned i = 1, e = Name.size(); i != e; ++i)
     AllNumeric &= isdigit(Name[i]);
   
   if (Name.size() == 1 || !AllNumeric) {
-    diagnose(SMLoc::getFromPointer(Loc.getPointer() + 1), 
-             diags::expected_dollar_numeric);
+    diagnose(Loc.getAdvancedLoc(1), diags::expected_dollar_numeric);
     return ParseResult<Expr>::getSemaError();
   }
   
   unsigned ArgNo = 0;
   if (Name.substr(1).getAsInteger(10, ArgNo)) {
-    diagnose(SMLoc::getFromPointer(Loc.getPointer() + 1),
-             diags::dollar_numeric_too_large);
+    diagnose(Loc.getAdvancedLoc(1), diags::dollar_numeric_too_large);
     return ParseResult<Expr>::getSemaError();
   }
   
@@ -345,7 +342,7 @@ ParseResult<Expr> Parser::parseExprDollarIdentifier() {
 /// SequenceExprs.
 Expr *Parser::parseExprOperator() {
   assert(Tok.is(tok::oper));
-  SMLoc Loc = Tok.getLoc();
+  SourceLoc Loc = Tok.getLoc();
   Identifier Name;
   parseIdentifier(Name, "");
 
@@ -359,16 +356,16 @@ Expr *Parser::parseExprOperator() {
 ///     scope-qualifier identifier
 ParseResult<Expr> Parser::parseExprIdentifier() {
   assert(Tok.is(tok::identifier));
-  SMLoc Loc = Tok.getLoc();
+  SourceLoc Loc = Tok.getLoc();
   Identifier Name;
   parseIdentifier(Name, "");
 
   if (Tok.isNot(tok::coloncolon))
     return actOnIdentifierExpr(Name, Loc);
   
-  SMLoc ColonColonLoc = consumeToken(tok::coloncolon);
+  SourceLoc ColonColonLoc = consumeToken(tok::coloncolon);
 
-  SMLoc Loc2 = Tok.getLoc();
+  SourceLoc Loc2 = Tok.getLoc();
   Identifier Name2;
   if (parseIdentifier(Name2, "expected identifier after '" + Name.str() +
                       "::' expression"))
@@ -381,7 +378,7 @@ ParseResult<Expr> Parser::parseExprIdentifier() {
                                                       Name2, Loc2);
 }
 
-Expr *Parser::actOnIdentifierExpr(Identifier Text, SMLoc Loc) {
+Expr *Parser::actOnIdentifierExpr(Identifier Text, SourceLoc Loc) {
   ValueDecl *D = ScopeInfo.lookupValueName(Text);
   
   if (D == 0)
@@ -401,7 +398,7 @@ Expr *Parser::actOnIdentifierExpr(Identifier Text, SMLoc Loc) {
 ///     ('.' identifier '=')? expr
 ///
 ParseResult<Expr> Parser::parseExprParen() {
-  SMLoc LPLoc = consumeToken();
+  SourceLoc LPLoc = consumeToken();
   
   SmallVector<Expr*, 8> SubExprs;
   SmallVector<Identifier, 8> SubExprNames; 
@@ -437,7 +434,7 @@ ParseResult<Expr> Parser::parseExprParen() {
     } while (consumeIf(tok::comma));
   }
   
-  SMLoc RPLoc = Tok.getLoc();  
+  SourceLoc RPLoc = Tok.getLoc();  
   if (parseToken(tok::r_paren, "expected ')' in parenthesis expression")) {
     diagnose(LPLoc, diags::opening_paren);
     return true;
@@ -474,7 +471,7 @@ ParseResult<Expr> Parser::parseExprParen() {
 /// The type must start with '(' if present.
 ///
 ParseResult<Expr> Parser::parseExprFunc() {
-  SMLoc FuncLoc = consumeToken(tok::kw_func);
+  SourceLoc FuncLoc = consumeToken(tok::kw_func);
 
   Type Ty;
   if (Tok.is(tok::l_brace)) {
@@ -525,7 +522,7 @@ enum class FuncTypePiece {
 /// emitted.
 static void AddFuncArgumentsToScope(Type Ty,
                                     FuncTypePiece Mode,
-                                    SMLoc FuncLoc, 
+                                    SourceLoc FuncLoc, 
                                     SmallVectorImpl<ArgDecl*> &ArgDecls,
                                     Parser &P) {
   // Handle the function case first.
@@ -580,7 +577,7 @@ static void AddFuncArgumentsToScope(Type Ty,
 }
 
 
-FuncExpr *Parser::actOnFuncExprStart(SMLoc FuncLoc, Type FuncTy) {
+FuncExpr *Parser::actOnFuncExprStart(SourceLoc FuncLoc, Type FuncTy) {
   SmallVector<ArgDecl*, 8> ArgDecls;
   AddFuncArgumentsToScope(FuncTy, FuncTypePiece::Function,
                           FuncLoc, ArgDecls, *this);

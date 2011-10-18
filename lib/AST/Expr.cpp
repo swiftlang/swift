@@ -34,7 +34,7 @@ void *Expr::operator new(size_t Bytes, ASTContext &C,
 
 /// getLocStart - Return the location of the start of the expression.
 /// FIXME: Need to extend this to do full source ranges like Clang.
-SMLoc Expr::getStartLoc() const {
+SourceLoc Expr::getStartLoc() const {
   switch (Kind) {
 #define EXPR(ID, PARENT) \
   case ExprKind::ID: \
@@ -46,7 +46,7 @@ SMLoc Expr::getStartLoc() const {
 }
 
 /// getLoc - Return the caret location of the expression.
-SMLoc Expr::getLoc() const {
+SourceLoc Expr::getLoc() const {
   switch (Kind) {
 #define EXPR(ID, PARENT) \
   case ExprKind::ID: \

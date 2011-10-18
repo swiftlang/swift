@@ -128,7 +128,7 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
         break;
       }
         
-      SMLoc EqualLoc = consumeToken();
+      SourceLoc EqualLoc = consumeToken();
       ParseResult<Expr> RHSExpr;
       if ((RHSExpr = parseExpr("expected expression in assignment"))) {
         NeedParseErrorRecovery = true;
@@ -189,14 +189,14 @@ ParseResult<BraceStmt> Parser::parseStmtBrace(const char *Message) {
     error(Tok.getLoc(), Message ? Message : "expected '{'");
     return true;
   }
-  SMLoc LBLoc = consumeToken(tok::l_brace);
+  SourceLoc LBLoc = consumeToken(tok::l_brace);
   
   SmallVector<ExprStmtOrDecl, 16> Entries;
   
   if (parseBraceItemList(Entries, false /*NotTopLevel*/))
     return true;
   
-  SMLoc RBLoc = Tok.getLoc();
+  SourceLoc RBLoc = Tok.getLoc();
   if (parseToken(tok::r_brace, "expected '}' at end of brace expression",
                  tok::r_brace)) {
     diagnose(LBLoc, diags::opening_brace);
@@ -212,7 +212,7 @@ ParseResult<BraceStmt> Parser::parseStmtBrace(const char *Message) {
 ///     return expr?
 ///   
 ParseResult<Stmt> Parser::parseStmtReturn() {
-  SMLoc ReturnLoc = consumeToken(tok::kw_return);
+  SourceLoc ReturnLoc = consumeToken(tok::kw_return);
 
   // Handle the ambiguity between consuming the expression and allowing the
   // enclosing stmt-brace to get it by eagerly eating it.
@@ -222,7 +222,7 @@ ParseResult<Stmt> Parser::parseStmtReturn() {
       return true;
   } else {
     // Result value defaults to ().
-    Result = new (Context) TupleExpr(SMLoc(), 0, 0, 0, SMLoc(), false);
+    Result = new (Context) TupleExpr(SourceLoc(), 0, 0, 0, SourceLoc(), false);
   }
 
   if (!Result.isSemaError())
@@ -238,7 +238,7 @@ ParseResult<Stmt> Parser::parseStmtReturn() {
 ///    'else' stmt-brace
 ///    'else' stmt-if
 ParseResult<Stmt> Parser::parseStmtIf() {
-  SMLoc IfLoc = consumeToken(tok::kw_if);
+  SourceLoc IfLoc = consumeToken(tok::kw_if);
 
   ParseResult<Expr> Condition;
   ParseResult<BraceStmt> NormalBody;
@@ -247,7 +247,7 @@ ParseResult<Stmt> Parser::parseStmtIf() {
     return true;
     
   ParseResult<Stmt> ElseBody;
-  SMLoc ElseLoc = Tok.getLoc();
+  SourceLoc ElseLoc = Tok.getLoc();
   if (consumeIf(tok::kw_else)) {
     if (Tok.is(tok::kw_if))
       ElseBody = parseStmtIf();
@@ -255,7 +255,7 @@ ParseResult<Stmt> Parser::parseStmtIf() {
       ElseBody = parseStmtBrace("expected '{' after 'else'");
     if (ElseBody.isParseError()) return true;
   } else {
-    ElseLoc = SMLoc();
+    ElseLoc = SourceLoc();
   }
 
   // If our condition and normal expression parsed correctly, build an AST.
@@ -277,7 +277,7 @@ ParseResult<Stmt> Parser::parseStmtIf() {
 ///   stmt-while:
 ///     'while' expr stmt-brace
 ParseResult<Stmt> Parser::parseStmtWhile() {
-  SMLoc WhileLoc = consumeToken(tok::kw_while);
+  SourceLoc WhileLoc = consumeToken(tok::kw_while);
   
   ParseResult<Expr> Condition;
   ParseResult<BraceStmt> Body;

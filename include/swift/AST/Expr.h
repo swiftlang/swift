@@ -21,7 +21,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/WalkOrder.h"
-#include "llvm/Support/SMLoc.h"
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
@@ -83,10 +83,10 @@ public:
 
   /// getStartLoc - Return the location of the start of the expression.
   /// FIXME: QOI: Need to extend this to do full source ranges like Clang.
-  SMLoc getStartLoc() const;
+  SourceLoc getStartLoc() const;
 
   /// getExprLoc - Return the caret location of this expression.
-  SMLoc getLoc() const;
+  SourceLoc getLoc() const;
 
   /// walk - This recursively walks all of the statements and expressions
   /// contained within a statement and invokes the ExprFn and StmtFn blocks on
@@ -152,17 +152,17 @@ public:
 /// IntegerLiteralExpr - Integer literal, like '4'.
 class IntegerLiteralExpr : public Expr {
   StringRef Val;  // Use StringRef instead of APInt, APInt leaks.
-  SMLoc Loc;
+  SourceLoc Loc;
 
 public:
-  IntegerLiteralExpr(StringRef Val, SMLoc Loc, Type Ty)
+  IntegerLiteralExpr(StringRef Val, SourceLoc Loc, Type Ty)
     : Expr(ExprKind::IntegerLiteral, TypeJudgement(Ty, ValueKind::RValue)),
       Val(Val), Loc(Loc) {}
   
   uint64_t getValue() const;
 
-  SMLoc getLoc() const { return Loc; }
-  SMLoc getStartLoc() const { return Loc; }
+  SourceLoc getLoc() const { return Loc; }
+  SourceLoc getStartLoc() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const IntegerLiteralExpr *) { return true; }
@@ -176,17 +176,17 @@ class FloatLiteralExpr : public Expr {
   // FIXME: Right now all floating point literals are doubles.  We should
   // generalize this when we support float.
   double Val;
-  SMLoc Loc;
+  SourceLoc Loc;
 
 public:
-  FloatLiteralExpr(double Val, SMLoc Loc, Type Ty)
+  FloatLiteralExpr(double Val, SourceLoc Loc, Type Ty)
     : Expr(ExprKind::FloatLiteral, TypeJudgement(Ty, ValueKind::RValue)),
       Val(Val), Loc(Loc) {}
 
   double getValue() const { return Val; }
 
-  SMLoc getLoc() const { return Loc; }
-  SMLoc getStartLoc() const { return Loc; }
+  SourceLoc getLoc() const { return Loc; }
+  SourceLoc getStartLoc() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const FloatLiteralExpr *) { return true; }
@@ -198,16 +198,16 @@ public:
 /// DeclRefExpr - A reference to a value, "x".
 class DeclRefExpr : public Expr {
   ValueDecl *D;
-  SMLoc Loc;
+  SourceLoc Loc;
 
 public:
-  DeclRefExpr(ValueDecl *D, SMLoc Loc, TypeJudgement Ty = TypeJudgement())
+  DeclRefExpr(ValueDecl *D, SourceLoc Loc, TypeJudgement Ty = TypeJudgement())
     : Expr(ExprKind::DeclRef, Ty), D(D), Loc(Loc) {}
 
   ValueDecl *getDecl() const { return D; }
 
-  SMLoc getLoc() const { return Loc; }  
-  SMLoc getStartLoc() const { return Loc; }
+  SourceLoc getLoc() const { return Loc; }  
+  SourceLoc getStartLoc() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const DeclRefExpr *) { return true; }
@@ -220,16 +220,16 @@ public:
 /// single name.
 class OverloadSetRefExpr : public Expr {
   ArrayRef<ValueDecl*> Decls;
-  SMLoc Loc;
+  SourceLoc Loc;
 
 public:
-  OverloadSetRefExpr(ArrayRef<ValueDecl*> decls, SMLoc L)
+  OverloadSetRefExpr(ArrayRef<ValueDecl*> decls, SourceLoc L)
   : Expr(ExprKind::OverloadSetRef), Decls(decls), Loc(L) {}
 
   ArrayRef<ValueDecl*> getDecls() const { return Decls; }
 
-  SMLoc getLoc() const { return Loc; }
-  SMLoc getStartLoc() const { return Loc; }
+  SourceLoc getLoc() const { return Loc; }
+  SourceLoc getStartLoc() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const OverloadSetRefExpr *) { return true; }
@@ -245,17 +245,17 @@ public:
 ///
 class UnresolvedDeclRefExpr : public Expr {
   Identifier Name;
-  SMLoc Loc;
+  SourceLoc Loc;
 
 public:
-  UnresolvedDeclRefExpr(Identifier name, SMLoc loc)
+  UnresolvedDeclRefExpr(Identifier name, SourceLoc loc)
     : Expr(ExprKind::UnresolvedDeclRef), Name(name), Loc(loc) {
   }
   
   Identifier getName() const { return Name; }
 
-  SMLoc getLoc() const { return Loc; }
-  SMLoc getStartLoc() const { return Loc; }
+  SourceLoc getLoc() const { return Loc; }
+  SourceLoc getStartLoc() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedDeclRefExpr *) { return true; }
@@ -268,23 +268,23 @@ public:
 /// member, which is to be resolved with context sensitive type information into
 /// bar::foo.  These always have dependent type.
 class UnresolvedMemberExpr : public Expr {
-  SMLoc ColonLoc;
-  SMLoc NameLoc;
+  SourceLoc ColonLoc;
+  SourceLoc NameLoc;
   Identifier Name;
 
 public:  
-  UnresolvedMemberExpr(SMLoc colonLoc, SMLoc nameLoc,
+  UnresolvedMemberExpr(SourceLoc colonLoc, SourceLoc nameLoc,
                        Identifier name)
     : Expr(ExprKind::UnresolvedMember),
       ColonLoc(colonLoc), NameLoc(nameLoc), Name(name) {
   }
 
   Identifier getName() const { return Name; }
-  SMLoc getNameLoc() const { return NameLoc; }
-  SMLoc getColonLoc() const { return ColonLoc; }
+  SourceLoc getNameLoc() const { return NameLoc; }
+  SourceLoc getColonLoc() const { return ColonLoc; }
 
-  SMLoc getLoc() const { return NameLoc; }
-  SMLoc getStartLoc() const { return ColonLoc; }
+  SourceLoc getLoc() const { return NameLoc; }
+  SourceLoc getStartLoc() const { return ColonLoc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedMemberExpr *) { return true; }
@@ -299,13 +299,13 @@ class UnresolvedScopedIdentifierExpr : public Expr {
   TypeAliasDecl *BaseTypeFromScope;
   Identifier BaseName;
   Identifier Name;
-  SMLoc BaseNameLoc, ColonColonLoc, NameLoc;
+  SourceLoc BaseNameLoc, ColonColonLoc, NameLoc;
   
 public:
   UnresolvedScopedIdentifierExpr(TypeAliasDecl *baseTypeFromScope,
-                                 Identifier baseName, SMLoc baseNameLoc,
-                                 SMLoc colonLoc,
-                                 Identifier name, SMLoc nameLoc)
+                                 Identifier baseName, SourceLoc baseNameLoc,
+                                 SourceLoc colonLoc,
+                                 Identifier name, SourceLoc nameLoc)
   : Expr(ExprKind::UnresolvedScopedIdentifier),
     BaseTypeFromScope(baseTypeFromScope), BaseName(baseName), Name(name),
     BaseNameLoc(baseNameLoc), ColonColonLoc(colonLoc), NameLoc(nameLoc) {
@@ -314,12 +314,12 @@ public:
   TypeAliasDecl *getBaseTypeFromScope() const { return BaseTypeFromScope; }
   Identifier getBaseName() const { return BaseName; }
   Identifier getName() const { return Name; }
-  SMLoc getBaseNameLoc() const { return BaseNameLoc; }
-  SMLoc getColonColonLoc() const { return ColonColonLoc; }
-  SMLoc getNameLoc() const { return NameLoc; }
+  SourceLoc getBaseNameLoc() const { return BaseNameLoc; }
+  SourceLoc getColonColonLoc() const { return ColonColonLoc; }
+  SourceLoc getNameLoc() const { return NameLoc; }
 
-  SMLoc getLoc() const { return NameLoc; }
-  SMLoc getStartLoc() const { return BaseNameLoc; }
+  SourceLoc getLoc() const { return NameLoc; }
+  SourceLoc getStartLoc() const { return BaseNameLoc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedScopedIdentifierExpr *) { return true; }
@@ -336,14 +336,14 @@ public:
 /// When a tuple element is formed with a default value for the type, the
 /// corresponding SubExpr element will be null.
 class TupleExpr : public Expr {
-  SMLoc LParenLoc;
+  SourceLoc LParenLoc;
   /// SubExprs - Elements of these can be set to null to get the default init
   /// value for the tuple element.
   // FIXME: Switch to MutableArrayRef.
   Expr **SubExprs;
   Identifier *SubExprNames;  // Can be null if no names.
   unsigned NumSubExprs;
-  SMLoc RParenLoc;
+  SourceLoc RParenLoc;
   
   /// IsGrouping - True if this is a syntactic grouping expression where the
   /// source and result types are the same.  This is only true for
@@ -352,8 +352,8 @@ class TupleExpr : public Expr {
 
   Expr **getSubExprs() const { return SubExprs; }  
 public:
-  TupleExpr(SMLoc lparenloc, Expr **subexprs, Identifier *subexprnames,
-            unsigned numsubexprs, SMLoc rparenloc, bool isGrouping,
+  TupleExpr(SourceLoc lparenloc, Expr **subexprs, Identifier *subexprnames,
+            unsigned numsubexprs, SourceLoc rparenloc, bool isGrouping,
             TypeJudgement Ty = TypeJudgement())
     : Expr(ExprKind::Tuple, Ty), LParenLoc(lparenloc), SubExprs(subexprs),
       SubExprNames(subexprnames), NumSubExprs(numsubexprs),
@@ -363,12 +363,12 @@ public:
            "Invalid grouping paren");
   }
 
-  SMLoc getLParenLoc() const { return LParenLoc; }
-  SMLoc getRParenLoc() const { return RParenLoc; }
+  SourceLoc getLParenLoc() const { return LParenLoc; }
+  SourceLoc getRParenLoc() const { return RParenLoc; }
 
-  SMLoc getLoc() const { return LParenLoc; }
-  SMLoc getStartLoc() const { return LParenLoc; }
-  SMLoc getEndLoc() const { return RParenLoc; }
+  SourceLoc getLoc() const { return LParenLoc; }
+  SourceLoc getStartLoc() const { return LParenLoc; }
+  SourceLoc getEndLoc() const { return RParenLoc; }
 
   unsigned getNumElements() const { return NumSubExprs; }
 
@@ -406,32 +406,32 @@ public:
 /// type.
 class UnresolvedDotExpr : public Expr {
   Expr *SubExpr;
-  SMLoc DotLoc;
+  SourceLoc DotLoc;
   Identifier Name;
-  SMLoc NameLoc;
+  SourceLoc NameLoc;
   
   /// ResolvedDecl - If the name refers to any local or top-level declarations,
   /// the name binder fills them in here.
   ArrayRef<ValueDecl*> ResolvedDecls;
 
 public:
-  UnresolvedDotExpr(Expr *subexpr, SMLoc dotloc, Identifier name,
-                    SMLoc nameloc)
+  UnresolvedDotExpr(Expr *subexpr, SourceLoc dotloc, Identifier name,
+                    SourceLoc nameloc)
   : Expr(ExprKind::UnresolvedDot), SubExpr(subexpr), DotLoc(dotloc),
     Name(name), NameLoc(nameloc) {}
   
-  SMLoc getLoc() const { return DotLoc; }
-  SMLoc getStartLoc() const {
+  SourceLoc getLoc() const { return DotLoc; }
+  SourceLoc getStartLoc() const {
     return SubExpr ? SubExpr->getStartLoc() : DotLoc;
   }
-  SMLoc getEndLoc() const { return NameLoc; }
+  SourceLoc getEndLoc() const { return NameLoc; }
 
-  SMLoc getDotLoc() const { return DotLoc; }
+  SourceLoc getDotLoc() const { return DotLoc; }
   Expr *getBase() const { return SubExpr; }
   void setBase(Expr *e) { SubExpr = e; }
 
   Identifier getName() const { return Name; }
-  SMLoc getNameLoc() const { return NameLoc; }
+  SourceLoc getNameLoc() const { return NameLoc; }
 
   ArrayRef<ValueDecl*> getResolvedDecls() const { return ResolvedDecls; }
   void setResolvedDecls(ArrayRef<ValueDecl*> Decls) {
@@ -449,24 +449,24 @@ public:
 /// TupleElementExpr - Refer to an element of a tuple, e.g. "(1,2).field0".
 class TupleElementExpr : public Expr {
   Expr *SubExpr;
-  SMLoc DotLoc;
+  SourceLoc DotLoc;
   unsigned FieldNo;
-  SMLoc NameLoc;
+  SourceLoc NameLoc;
   
 public:
-  TupleElementExpr(Expr *subexpr, SMLoc dotloc, unsigned fieldno,
-                   SMLoc nameloc, TypeJudgement ty = TypeJudgement())
+  TupleElementExpr(Expr *subexpr, SourceLoc dotloc, unsigned fieldno,
+                   SourceLoc nameloc, TypeJudgement ty = TypeJudgement())
   : Expr(ExprKind::TupleElement, ty), SubExpr(subexpr), DotLoc(dotloc),
     FieldNo(fieldno), NameLoc(nameloc) {}
 
-  SMLoc getStartLoc() const { return SubExpr->getStartLoc(); }
-  SMLoc getDotLoc() const { return DotLoc; }
-  SMLoc getLoc() const { return DotLoc; }
+  SourceLoc getStartLoc() const { return SubExpr->getStartLoc(); }
+  SourceLoc getDotLoc() const { return DotLoc; }
+  SourceLoc getLoc() const { return DotLoc; }
   Expr *getBase() const { return SubExpr; }
   void setBase(Expr *e) { SubExpr = e; }
 
   unsigned getFieldNumber() const { return FieldNo; }
-  SMLoc getNameLoc() const { return NameLoc; }  
+  SourceLoc getNameLoc() const { return NameLoc; }  
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TupleElementExpr *) { return true; }
@@ -513,8 +513,8 @@ public:
            TypeJudgement(SubExpr->getType(), ValueKind::RValue)),
       SubExpr(SubExpr) {}
 
-  SMLoc getStartLoc() const { return SubExpr->getStartLoc(); }
-  SMLoc getLoc() const { return SubExpr->getLoc(); }
+  SourceLoc getStartLoc() const { return SubExpr->getStartLoc(); }
+  SourceLoc getLoc() const { return SubExpr->getLoc(); }
 
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *E) { SubExpr = E; }
@@ -543,8 +543,8 @@ class SequenceExpr : public Expr {
 public:
   static SequenceExpr *create(ASTContext &ctx, ArrayRef<Expr*> elements);
 
-  SMLoc getStartLoc() const { return getElements()[0]->getStartLoc(); }
-  SMLoc getLoc() const { return getElements()[0]->getLoc(); }
+  SourceLoc getStartLoc() const { return getElements()[0]->getStartLoc(); }
+  SourceLoc getLoc() const { return getElements()[0]->getLoc(); }
 
   unsigned getNumElements() const { return NumElements; }
 
@@ -570,23 +570,23 @@ public:
 /// have named arguments.
 ///    e.g.  func(a : int) -> int { return a+1 }
 class FuncExpr : public Expr, public DeclContext {
-  SMLoc FuncLoc;
+  SourceLoc FuncLoc;
   
   ArrayRef<ArgDecl*> NamedArgs;
   BraceStmt *Body;
   
 public:
-  FuncExpr(SMLoc FuncLoc, Type FnType, ArrayRef<ArgDecl*> NamedArgs, 
+  FuncExpr(SourceLoc FuncLoc, Type FnType, ArrayRef<ArgDecl*> NamedArgs, 
            BraceStmt *Body, DeclContext *Parent)
     : Expr(ExprKind::Func, TypeJudgement(FnType, ValueKind::RValue)),
       DeclContext(DeclContextKind::FuncExpr, Parent),
       FuncLoc(FuncLoc), NamedArgs(NamedArgs), Body(Body) {}
 
-  SMLoc getStartLoc() const { return FuncLoc; }
-  SMLoc getLoc() const { return FuncLoc; }
+  SourceLoc getStartLoc() const { return FuncLoc; }
+  SourceLoc getLoc() const { return FuncLoc; }
 
   /// Returns the location of the 'func' keyword.
-  SMLoc getFuncLoc() const { return FuncLoc; }
+  SourceLoc getFuncLoc() const { return FuncLoc; }
 
   ArrayRef<ArgDecl*> getNamedArgs() const { return NamedArgs; }
   BraceStmt *getBody() const { return Body; }
@@ -626,14 +626,14 @@ public:
   
 class AnonClosureArgExpr : public Expr {
   unsigned ArgNo;
-  SMLoc Loc;
+  SourceLoc Loc;
   
 public:
-  AnonClosureArgExpr(unsigned argNo, SMLoc loc)
+  AnonClosureArgExpr(unsigned argNo, SourceLoc loc)
     : Expr(ExprKind::AnonClosureArg), ArgNo(argNo), Loc(loc) {}
 
-  SMLoc getLoc() const { return Loc; }
-  SMLoc getStartLoc() const { return Loc; }
+  SourceLoc getLoc() const { return Loc; }
+  SourceLoc getStartLoc() const { return Loc; }
 
   unsigned getArgNumber() const { return ArgNo; }
   
@@ -685,8 +685,8 @@ public:
   CallExpr(Expr *Fn, Expr *Arg, TypeJudgement Ty)
     : ApplyExpr(ExprKind::Call, Fn, Arg, Ty) {}
 
-  SMLoc getStartLoc() const { return getFn()->getStartLoc(); }
-  SMLoc getLoc() const { return getArg()->getStartLoc(); }
+  SourceLoc getStartLoc() const { return getFn()->getStartLoc(); }
+  SourceLoc getLoc() const { return getArg()->getStartLoc(); }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const CallExpr *) { return true; }
@@ -699,8 +699,8 @@ public:
   UnaryExpr(Expr *Fn, Expr *Arg, TypeJudgement Ty = TypeJudgement())
     : ApplyExpr(ExprKind::Unary, Fn, Arg, Ty) {}
 
-  SMLoc getStartLoc() const { return getFn()->getStartLoc(); }
-  SMLoc getLoc() const { return getFn()->getStartLoc(); }
+  SourceLoc getStartLoc() const { return getFn()->getStartLoc(); }
+  SourceLoc getLoc() const { return getFn()->getStartLoc(); }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnaryExpr *) { return true; }
@@ -720,8 +720,8 @@ public:
     return cast<TupleExpr>(getArg());
   }
 
-  SMLoc getLoc() const { return getFn()->getLoc(); }
-  SMLoc getStartLoc() const { return getArgTuple()->getStartLoc(); }
+  SourceLoc getLoc() const { return getFn()->getLoc(); }
+  SourceLoc getStartLoc() const { return getArgTuple()->getStartLoc(); }
                   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BinaryExpr *) { return true; }
@@ -732,17 +732,17 @@ public:
 /// modeled as a DeclRefExpr on the field's decl.
 ///
 class ProtocolElementExpr : public ApplyExpr {
-  SMLoc DotLoc;
+  SourceLoc DotLoc;
   
 public:
-  ProtocolElementExpr(Expr *FnExpr, SMLoc DotLoc, Expr *BaseExpr,
+  ProtocolElementExpr(Expr *FnExpr, SourceLoc DotLoc, Expr *BaseExpr,
                       TypeJudgement Ty = TypeJudgement())
   : ApplyExpr(ExprKind::ProtocolElement, FnExpr, BaseExpr, Ty), DotLoc(DotLoc) {
   }
 
-  SMLoc getDotLoc() const { return DotLoc; }
-  SMLoc getLoc() const { return DotLoc; }
-  SMLoc getStartLoc() const { return getArg()->getStartLoc(); }
+  SourceLoc getDotLoc() const { return DotLoc; }
+  SourceLoc getLoc() const { return DotLoc; }
+  SourceLoc getStartLoc() const { return getArg()->getStartLoc(); }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ProtocolElementExpr *) { return true; }

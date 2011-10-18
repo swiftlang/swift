@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AST.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 using namespace swift;
@@ -77,6 +78,19 @@ Identifier ASTContext::getIdentifier(StringRef Str) {
   return Identifier(Table.GetOrCreateValue(Str).getKeyData());
 }
 
+void ASTContext::note(SourceLoc Loc, const Twine &Message) {
+  SourceMgr.PrintMessage(Loc.Value, llvm::SourceMgr::DK_Note, Message);
+}
+
+void ASTContext::warning(SourceLoc Loc, const Twine &Message) {
+  SourceMgr.PrintMessage(Loc.Value, llvm::SourceMgr::DK_Warning, Message);
+}
+void ASTContext::error(SourceLoc Loc, const Twine &Message) {
+  SourceMgr.PrintMessage(Loc.Value, llvm::SourceMgr::DK_Error, Message);
+  setHadError();
+}
+
+
 
 //===----------------------------------------------------------------------===//
 // Type manipulation routines.
@@ -136,7 +150,8 @@ TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
 
 /// getNewOneOfType - Return a new instance of oneof type.  These are never
 /// uniqued because the loc is generally different.
-OneOfType *OneOfType::getNew(SMLoc OneOfLoc, ArrayRef<OneOfElementDecl*> InElts,
+OneOfType *OneOfType::getNew(SourceLoc OneOfLoc,
+                             ArrayRef<OneOfElementDecl*> InElts,
                              DeclContext *Parent) {
   ASTContext &C = Parent->getASTContext();
   
@@ -181,7 +196,8 @@ ArrayType::ArrayType(Type base, uint64_t size)
 /// getNew - Return a new instance of a protocol type.  These are never
 /// uniqued since each syntactic instance of them is semantically considered
 /// to be a different type.
-ProtocolType *ProtocolType::getNew(SMLoc ProtocolLoc, ArrayRef<ValueDecl*> Elts,
+ProtocolType *ProtocolType::getNew(SourceLoc ProtocolLoc,
+                                   ArrayRef<ValueDecl*> Elts,
                                    DeclContext *Parent) {
   ASTContext &C = Parent->getASTContext();
   return new (C) ProtocolType(ProtocolLoc, C.AllocateCopy(Elts), Parent);

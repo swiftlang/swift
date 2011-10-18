@@ -38,19 +38,15 @@ Lexer::Lexer(unsigned BufferID, ASTContext &context)
 }
 
 void Lexer::note(const char *Loc, const Twine &Message) {
-  SourceMgr.PrintMessage(SMLoc::getFromPointer(Loc), llvm::SourceMgr::DK_Note,
-                         Message);
+  Context.note(getSourceLoc(Loc), Message);
 }
 
 void Lexer::warning(const char *Loc, const Twine &Message) {
-  SourceMgr.PrintMessage(SMLoc::getFromPointer(Loc),llvm::SourceMgr::DK_Warning,
-                         Message);
+  Context.warning(getSourceLoc(Loc), Message);
 }
 
 void Lexer::error(const char *Loc, const Twine &Message) {
-  Context.setHadError();
-  SourceMgr.PrintMessage(SMLoc::getFromPointer(Loc), llvm::SourceMgr::DK_Error,
-                         Message);
+  Context.error(getSourceLoc(Loc), Message);
 }
 
 

@@ -166,7 +166,7 @@ namespace {
     SmallVector<Import, 4> Imports;
     
     llvm::error_code findModule(StringRef Module, 
-                                SMLoc ImportLoc,
+                                SourceLoc ImportLoc,
                                 llvm::OwningPtr<llvm::MemoryBuffer> &Buffer);
     
   public:
@@ -185,33 +185,32 @@ namespace {
     void addBuiltinImport(ImportDecl *ID);
 
     BoundScope bindScopeName(TypeAliasDecl *TypeFromScope,
-                             Identifier Name, SMLoc NameLoc);
+                             Identifier Name, SourceLoc NameLoc);
 
     void bindValueName(Identifier I, SmallVectorImpl<ValueDecl*> &Result,
                        NLKind LookupKind);
     
     TypeAliasDecl *lookupTypeName(Identifier I);
     
-    void note(SMLoc Loc, const Twine &Message) {
-      Context.SourceMgr.PrintMessage(Loc, llvm::SourceMgr::DK_Note, Message);
+    void note(SourceLoc Loc, const Twine &Message) {
+      Context.note(Loc, Message);
     }
-    void warning(SMLoc Loc, const Twine &Message) {
-      Context.SourceMgr.PrintMessage(Loc, llvm::SourceMgr::DK_Warning, Message);
+    void warning(SourceLoc Loc, const Twine &Message) {
+      Context.warning(Loc, Message);
     }
-    void error(SMLoc Loc, const Twine &Message) {
-      Context.setHadError();
-      Context.SourceMgr.PrintMessage(Loc, llvm::SourceMgr::DK_Error, Message);
+    void error(SourceLoc Loc, const Twine &Message) {
+      Context.error(Loc, Message);
     }
   private:
     /// getModuleProvider - Load a module referenced by an import statement,
     /// emitting an error at the specified location and returning null on
     /// failure.
-    ModuleProvider *getModuleProvider(std::pair<Identifier,SMLoc> ModuleID);
+    ModuleProvider *getModuleProvider(std::pair<Identifier,SourceLoc> ModuleID);
   };
 }
 
 llvm::error_code NameBinder::findModule(StringRef Module, 
-                                        SMLoc ImportLoc,
+                                        SourceLoc ImportLoc,
                                 llvm::OwningPtr<llvm::MemoryBuffer> &Buffer) {
   std::string ModuleFilename = Module.str() + std::string(".swift");
   
@@ -220,7 +219,7 @@ llvm::error_code NameBinder::findModule(StringRef Module,
   // First, search in the directory corresponding to the import location.
   // FIXME: This screams for a proper FileManager abstraction.
   llvm::SourceMgr &SourceMgr = Context.SourceMgr;
-  int CurrentBufferID = SourceMgr.FindBufferContainingLoc(ImportLoc);
+  int CurrentBufferID = SourceMgr.FindBufferContainingLoc(ImportLoc.Value);
   if (CurrentBufferID >= 0) {
     const llvm::MemoryBuffer *ImportingBuffer 
       = SourceMgr.getBufferInfo(CurrentBufferID).Buffer;
@@ -253,7 +252,7 @@ llvm::error_code NameBinder::findModule(StringRef Module,
 }
 
 ModuleProvider *NameBinder::
-getModuleProvider(std::pair<Identifier, SMLoc> ModuleID) {
+getModuleProvider(std::pair<Identifier, SourceLoc> ModuleID) {
   // TODO: We currently just recursively parse referenced modules.  This works
   // fine for now since they are each a single file.  Ultimately we'll want a
   // compiled form of AST's like clang's that support lazy deserialization.
@@ -269,7 +268,8 @@ getModuleProvider(std::pair<Identifier, SMLoc> ModuleID) {
   }
 
   unsigned BufferID =
-    Context.SourceMgr.AddNewSourceBuffer(InputFile.take(), ModuleID.second);
+    Context.SourceMgr.AddNewSourceBuffer(InputFile.take(),
+                                         ModuleID.second.Value);
 
   // Parse the translation unit, but don't do name binding or type checking.
   // This can produce new errors etc if the input is erroneous.
@@ -352,7 +352,7 @@ void NameBinder::bindValueName(Identifier Name,
 
 /// Try to bind an unqualified name into something usable as a scope.
 BoundScope NameBinder::bindScopeName(TypeAliasDecl *TypeFromScope,
-                                     Identifier Name, SMLoc NameLoc) {
+                                     Identifier Name, SourceLoc NameLoc) {
   // Check whether the "optimistic" type from scope is still
   // undefined.  If not, use that as the actual type; otherwise we'll
   // need to do a lookup from the imports.
@@ -422,7 +422,7 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
   }
   
   Identifier Name;
-  SMLoc Loc;
+  SourceLoc Loc;
   SmallVector<ValueDecl*, 4> Decls;
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
   if (UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
@@ -437,7 +437,7 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
     Loc = USIE->getNameLoc();
 
     Identifier BaseName = USIE->getBaseName();
-    SMLoc BaseNameLoc = USIE->getBaseNameLoc();
+    SourceLoc BaseNameLoc = USIE->getBaseNameLoc();
     BoundScope Scope =
       Binder.bindScopeName(USIE->getBaseTypeFromScope(), BaseName, BaseNameLoc);
     if (!Scope) return nullptr;
@@ -485,10 +485,10 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
 void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
   NameBinder Binder(Ctx);
 
-  std::pair<Identifier,SMLoc> BuiltinPath[] {
-    std::make_pair(Ctx.getIdentifier("Builtin"), SMLoc())
+  std::pair<Identifier,SourceLoc> BuiltinPath[] {
+    std::make_pair(Ctx.getIdentifier("Builtin"), SourceLoc())
   };
-  ImportDecl BuiltinImport(SMLoc(), BuiltinPath, nullptr);
+  ImportDecl BuiltinImport(SourceLoc(), BuiltinPath, nullptr);
   Binder.addBuiltinImport(&BuiltinImport);
   
   // Do a prepass over the declarations to find the list of top-level value
@@ -529,7 +529,7 @@ void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
     if (!Scope) continue;
 
     Identifier Name = BaseAndType.second->Name;
-    SMLoc NameLoc = BaseAndType.second->TypeAliasLoc;
+    SourceLoc NameLoc = BaseAndType.second->TypeAliasLoc;
 
     TypeAliasDecl *Alias = nullptr;
 
@@ -567,7 +567,7 @@ void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
     
     // Fill in null results with a dummy expression.
     if (Elt.isNull())
-      Elt = new (Ctx) TupleExpr(SMLoc(), 0, 0, 0, SMLoc(), false,
+      Elt = new (Ctx) TupleExpr(SourceLoc(), 0, 0, 0, SourceLoc(), false,
                                 TypeJudgement(TupleType::getEmpty(Ctx),
                                               ValueKind::RValue));
     TU->Body->setElement(i, Elt);
@@ -589,8 +589,7 @@ BuiltinModule::lookupType(ImportDecl *ID, Identifier Name, NLKind LookupKind) {
   if (!Ty) return nullptr;
 
   TypeAliasDecl *Alias
-    = new (Context) TypeAliasDecl(SMLoc(), Name, Ty,
-                                  DeclAttributes(),
+    = new (Context) TypeAliasDecl(SourceLoc(), Name, Ty, DeclAttributes(),
                                   nullptr);
   Cache.insert(std::make_pair(Name, Alias));
   return Alias;

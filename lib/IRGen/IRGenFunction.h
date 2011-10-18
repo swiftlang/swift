@@ -18,6 +18,7 @@
 #ifndef SWIFT_IRGEN_IRGENFUNCTION_H
 #define SWIFT_IRGEN_IRGENFUNCTION_H
 
+#include "swift/AST/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
 #include "IRBuilder.h"
 #include "LValue.h"
@@ -25,8 +26,6 @@
 namespace llvm {
   class Constant;
   class Function;
-  class SMLoc;
-  class Twine;
 }
 
 namespace swift {
@@ -40,6 +39,7 @@ namespace swift {
   class FuncExpr;
   class IfStmt;
   class ReturnStmt;
+  class SourceLoc;
   class Stmt;
   class TupleExpr;
   class TupleElementExpr;
@@ -68,7 +68,7 @@ public:
 
   IRGenFunction(IRGenModule &IGM, FuncExpr *FE, llvm::Function *Fn);
 
-  void unimplemented(llvm::SMLoc Loc, const llvm::Twine &Message);
+  void unimplemented(SourceLoc Loc, const llvm::Twine &Message);
 
 //--- Control flow -------------------------------------------------------------
 public:

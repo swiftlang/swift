@@ -26,9 +26,15 @@ public:
   ASTContext &Context;
   TypeChecker(ASTContext &C) : Context(C) {}
   
-  void note(SMLoc Loc, const Twine &Message);
-  void warning(SMLoc Loc, const Twine &Message);
-  void error(SMLoc Loc, const Twine &Message);
+  void note(SourceLoc Loc, const Twine &Message) {
+    Context.note(Loc, Message);
+  }
+  void warning(SourceLoc Loc, const Twine &Message) {
+    Context.warning(Loc, Message);
+  }
+  void error(SourceLoc Loc, const Twine &Message) {
+    Context.error(Loc, Message);
+  }
   
   bool validateType(ValueDecl *VD);
   bool validateType(Type T);

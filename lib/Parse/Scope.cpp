@@ -37,7 +37,7 @@ Scope::Scope(Parser *P) : SI(P->ScopeInfo), ValueHTScope(SI.ValueScopeHT),
 // ScopeInfo Implementation
 //===----------------------------------------------------------------------===//
 
-TypeAliasDecl *ScopeInfo::lookupScopeName(Identifier Name, SMLoc Loc) {
+TypeAliasDecl *ScopeInfo::lookupScopeName(Identifier Name, SourceLoc Loc) {
   return lookupTypeNameInternal(Name, Loc, /*as type*/ false);
 }
 
@@ -45,11 +45,11 @@ TypeAliasDecl *ScopeInfo::lookupScopeName(Identifier Name, SMLoc Loc) {
 /// specified name in a type context, returning the decl if found or
 /// installing and returning a new Unresolved one if not.
 TypeAliasDecl *ScopeInfo::lookupOrInsertTypeNameDecl(Identifier Name,
-                                                     SMLoc Loc) {
+                                                     SourceLoc Loc) {
   return lookupTypeNameInternal(Name, Loc, /*as type*/ true);
 }
 
-TypeAliasDecl *ScopeInfo::lookupTypeNameInternal(Identifier Name, SMLoc Loc,
+TypeAliasDecl *ScopeInfo::lookupTypeNameInternal(Identifier Name, SourceLoc Loc,
                                                  bool AsType) {
   // Check whether we already have an entry for this name.
   auto I = TypeScopeHT.begin(Name);
@@ -82,12 +82,12 @@ TypeAliasDecl *ScopeInfo::lookupTypeNameInternal(Identifier Name, SMLoc Loc,
 
 /// lookupOrInsertTypeName - This is the same as lookupOrInsertTypeNameDecl,
 /// but returns the alias as a type.
-Type ScopeInfo::lookupOrInsertTypeName(Identifier Name, SMLoc Loc) {
+Type ScopeInfo::lookupOrInsertTypeName(Identifier Name, SourceLoc Loc) {
   return lookupOrInsertTypeNameDecl(Name, Loc)->getAliasType(TheParser.Context);
 }
 
-Type ScopeInfo::getQualifiedTypeName(Identifier BaseName, SMLoc BaseNameLoc,
-                                     Identifier Name, SMLoc NameLoc) {
+Type ScopeInfo::getQualifiedTypeName(Identifier BaseName, SourceLoc BaseNameLoc,
+                                     Identifier Name, SourceLoc NameLoc) {
   TypeAliasDecl *BaseType = lookupScopeName(BaseName, BaseNameLoc);
   TypeAliasDecl *NestedType =
     new (TheParser.Context) TypeAliasDecl(NameLoc, Name, Type(),
@@ -159,7 +159,7 @@ void ScopeInfo::addToScope(ValueDecl *D) {
 
 /// addTypeAliasToScope - Add a type alias to the current scope, diagnosing
 /// redefinitions as required.
-TypeAliasDecl *ScopeInfo::addTypeAliasToScope(SMLoc TypeAliasLoc,
+TypeAliasDecl *ScopeInfo::addTypeAliasToScope(SourceLoc TypeAliasLoc,
                                               Identifier Name, Type Ty) {
   unsigned Level;
   TypeAliasDecl *TAD = lookupTypeNameAndLevel(Name, Level);

@@ -17,6 +17,7 @@
 
 #include "llvm/Instructions.h"
 #include "llvm/Support/SourceMgr.h"
+#include "swift/Basic/SourceLoc.h"
 
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -54,6 +55,6 @@ LValue IRGenFunction::createScopeAlloca(llvm::Type *Ty, Alignment Align,
   return LValue::forAddress(Alloca, Align);
 }
 
-void IRGenFunction::unimplemented(llvm::SMLoc Loc, const llvm::Twine &Message) {
+void IRGenFunction::unimplemented(SourceLoc Loc, const llvm::Twine &Message) {
   return IGM.unimplemented(Loc, Message);
 }

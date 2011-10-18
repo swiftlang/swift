@@ -20,9 +20,9 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Identifier.h"
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/Support/SMLoc.h"
 
 namespace swift {
   class ASTContext;
@@ -275,16 +275,17 @@ private:
 /// elements (which are OneOfElementDecl's).
 class OneOfType : public TypeBase, public DeclContext {
 public:
-  const SMLoc OneOfLoc;
+  const SourceLoc OneOfLoc;
   const ArrayRef<OneOfElementDecl*> Elements;
   
   /// getNew - Return a new instance of oneof type.  These are never uniqued
   /// since each syntactic instance of them is semantically considered to be a
   /// different type.
-  static OneOfType *getNew(SMLoc OneOfLoc, ArrayRef<OneOfElementDecl*> Elements,
+  static OneOfType *getNew(SourceLoc OneOfLoc,
+                           ArrayRef<OneOfElementDecl*> Elements,
                            DeclContext *Parent);
  
-  SMLoc getLocStart() const { return OneOfLoc; }
+  SourceLoc getLocStart() const { return OneOfLoc; }
   OneOfElementDecl *getElement(unsigned i) const {
     assert(i < Elements.size() && "Invalid index");
     return Elements[i];
@@ -306,7 +307,7 @@ public:
   
 private:
   // oneof types are always canonical.
-  OneOfType(SMLoc oneofloc, ArrayRef<OneOfElementDecl*> Elts,
+  OneOfType(SourceLoc oneofloc, ArrayRef<OneOfElementDecl*> Elts,
             DeclContext *Parent)
     : TypeBase(TypeKind::OneOf, this),
       DeclContext(DeclContextKind::OneOfType, Parent),
@@ -366,14 +367,14 @@ private:
 /// by another type.
 class ProtocolType : public TypeBase, public DeclContext {
 public:
-  SMLoc ProtocolLoc;
+  SourceLoc ProtocolLoc;
 
   const ArrayRef<ValueDecl*> Elements;
 
   /// getNew - Return a new instance of a protocol type.  These are never
   /// uniqued since each syntactic instance of them is semantically considered
   /// to be a different type.
-  static ProtocolType *getNew(SMLoc ProtocolLoc, ArrayRef<ValueDecl*> Elts,
+  static ProtocolType *getNew(SourceLoc ProtocolLoc, ArrayRef<ValueDecl*> Elts,
                               DeclContext *Parent);
   
   void print(raw_ostream &OS) const;
@@ -383,7 +384,7 @@ public:
   static bool classof(const TypeBase *T) {return T->Kind == TypeKind::Protocol;}
 
 private:
-  ProtocolType(SMLoc ProtocolLoc, ArrayRef<ValueDecl*> Elts,
+  ProtocolType(SourceLoc ProtocolLoc, ArrayRef<ValueDecl*> Elts,
                DeclContext *Parent)
   : TypeBase(TypeKind::Protocol, this),
     DeclContext(DeclContextKind::ProtocolType, Parent),

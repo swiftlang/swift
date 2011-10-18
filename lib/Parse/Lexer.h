@@ -55,6 +55,9 @@ public:
   Identifier getModuleName() const;
   
 private:
+  static SourceLoc getSourceLoc(const char *Loc) {
+    return SourceLoc(llvm::SMLoc::getFromPointer(Loc));
+  }
   void note(const char *Loc, const Twine &Message);
   void warning(const char *Loc, const Twine &Message);
   void error(const char *Loc, const Twine &Message);

@@ -31,7 +31,6 @@ namespace llvm {
   template<class T> class NullablePtr;
  
   // Other common classes.
-  class SMLoc;
   class raw_ostream;
 } // end namespace llvm;
 
@@ -53,7 +52,6 @@ namespace swift {
   using llvm::NullablePtr;
 
   // Other common classes.
-  using llvm::SMLoc;
   using llvm::raw_ostream;
   
 } // end namespace swift

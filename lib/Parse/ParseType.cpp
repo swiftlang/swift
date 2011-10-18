@@ -48,14 +48,14 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
   switch (Tok.getKind()) {
   case tok::identifier: {
     Identifier Name = Context.getIdentifier(Tok.getText());
-    SMLoc NameLoc = Tok.getLoc();
+    SourceLoc NameLoc = Tok.getLoc();
     consumeToken(tok::identifier);
 
     if (Tok.isNot(tok::coloncolon)) {
       Result = ScopeInfo.lookupOrInsertTypeName(Name, NameLoc);
     } else {
       consumeToken(tok::coloncolon);
-      SMLoc Loc2 = Tok.getLoc();
+      SourceLoc Loc2 = Tok.getLoc();
       Identifier Name2;
       if (parseIdentifier(Name2, "expected identifier after '" +
                           Name.str() + "' type"))
@@ -68,7 +68,7 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
   }
   case tok::l_paren:
   case tok::l_paren_space: {
-    SMLoc LPLoc = consumeToken();
+    SourceLoc LPLoc = consumeToken();
     if (parseTypeTupleBody(LPLoc, Result))
       return true;
 
@@ -93,7 +93,7 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
   
   while (1) {
     // If there is an arrow, parse the rest of the type.
-    SMLoc TokLoc = Tok.getLoc();
+    SourceLoc TokLoc = Tok.getLoc();
     if (consumeIf(tok::arrow)) {
       Type SecondHalf;
       if (parseType(SecondHalf, "expected type in result of function type"))
@@ -124,7 +124,7 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
 ///   type-tuple-element:
 ///     identifier value-specifier
 ///     type ('=' expr)?
-bool Parser::parseTypeTupleBody(SMLoc LPLoc, Type &Result) {
+bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
   SmallVector<TupleTypeElt, 8> Elements;
 
   if (Tok.isNot(tok::r_paren) && Tok.isNot(tok::r_brace)) {
@@ -184,7 +184,7 @@ bool Parser::parseTypeTupleBody(SMLoc LPLoc, Type &Result) {
 ///     'oneof' attribute-list oneof-body
 ///
 bool Parser::parseTypeOneOf(Type &Result) {
-  SMLoc OneOfLoc = consumeToken(tok::kw_oneof);
+  SourceLoc OneOfLoc = consumeToken(tok::kw_oneof);
   
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
@@ -202,7 +202,7 @@ bool Parser::parseTypeOneOf(Type &Result) {
 /// If TypeName is specified, it is the type that the constructors should be
 /// built with, so that they preserve the name of the oneof decl that contains
 /// this.
-bool Parser::parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
+bool Parser::parseTypeOneOfBody(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
                                 Type &Result, TypeAliasDecl *TypeName) {
   if (parseToken(tok::l_brace, "expected '{' in oneof"))
     return true;
@@ -240,7 +240,8 @@ bool Parser::parseTypeOneOfBody(SMLoc OneOfLoc, const DeclAttributes &Attrs,
   return false;
 }
 
-OneOfType *Parser::actOnOneOfType(SMLoc OneOfLoc, const DeclAttributes &Attrs,
+OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
+                                  const DeclAttributes &Attrs,
                                   ArrayRef<OneOfElementInfo> Elts,
                                   TypeAliasDecl *PrettyTypeName) {
   // No attributes are valid on oneof types at this time.
@@ -317,7 +318,7 @@ OneOfType *Parser::actOnOneOfType(SMLoc OneOfLoc, const DeclAttributes &Attrs,
 ///     type '[' ']'
 ///     type '[' expr ']'
 ///
-bool Parser::parseTypeArray(SMLoc LSquareLoc, Type &Result) {
+bool Parser::parseTypeArray(SourceLoc LSquareLoc, Type &Result) {
   // Handle the [] production, and unsized array.
   if (consumeIf(tok::r_square)) {
     if (isa<ErrorType>(Result.getPointer()))
@@ -329,7 +330,7 @@ bool Parser::parseTypeArray(SMLoc LSquareLoc, Type &Result) {
   if ((SizeEx = parseSingleExpr("expected expression for array type size")))
     return true;
   
-  SMLoc RArrayTok = Tok.getLoc();
+  SourceLoc RArrayTok = Tok.getLoc();
   if (parseToken(tok::r_square, "expected ']' in array type")) {
     diagnose(LSquareLoc, diags::opening_bracket);
     return true;
@@ -369,7 +370,7 @@ bool Parser::parseTypeArray(SMLoc LSquareLoc, Type &Result) {
 ///      'protocol' attribute-list protocol-body
 ///
 bool Parser::parseTypeProtocol(Type &Result) {
-  SMLoc ProtocolLoc = consumeToken(tok::kw_protocol);
+  SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
   
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
@@ -385,7 +386,7 @@ bool Parser::parseTypeProtocol(Type &Result) {
 ///      decl-var-simple
 ///      // 'typealias' identifier
 ///
-bool Parser::parseTypeProtocolBody(SMLoc ProtocolLoc, 
+bool Parser::parseTypeProtocolBody(SourceLoc ProtocolLoc, 
                                    const DeclAttributes &Attributes,
                                    Type &Result, TypeAliasDecl *TypeName) {
   // Parse the body.
