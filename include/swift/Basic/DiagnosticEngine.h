@@ -19,6 +19,7 @@
 #define SWIFT_BASIC_DIAGNOSTICENGINE_H
 
 #include "swift/AST/LLVM.h"
+#include "swift/AST/Identifier.h"    // FIXME: Layering violation.
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
@@ -110,6 +111,8 @@ namespace swift {
     DiagnosticArgument(unsigned I) 
       : Kind(DiagnosticArgumentKind::Unsigned),
         UnsignedVal(I) { }
+
+    DiagnosticArgument(Identifier I) : DiagnosticArgument(I.str()) {}
 
     DiagnosticArgumentKind getKind() const { return Kind; }
 
