@@ -167,7 +167,7 @@ ParseResult<Expr> Parser::parseExprPostfix(const char *Message) {
     SourceLoc ColonLoc = consumeToken(tok::colon);
     Identifier Name;
     SourceLoc NameLoc = Tok.getLoc();
-    if (parseIdentifier(Name, "expected identifier after ':' expression"))
+    if (parseIdentifier(Name, diags::expected_identifier_after_colon_expr))
       return true;
     
     // Handle :foo by just making an AST node.
@@ -343,8 +343,8 @@ ParseResult<Expr> Parser::parseExprDollarIdentifier() {
 Expr *Parser::parseExprOperator() {
   assert(Tok.is(tok::oper));
   SourceLoc Loc = Tok.getLoc();
-  Identifier Name;
-  parseIdentifier(Name, "");
+  Identifier Name = Context.getIdentifier(Tok.getText());
+  consumeToken(tok::oper);
 
   return actOnIdentifierExpr(Name, Loc);
 }
@@ -357,8 +357,8 @@ Expr *Parser::parseExprOperator() {
 ParseResult<Expr> Parser::parseExprIdentifier() {
   assert(Tok.is(tok::identifier));
   SourceLoc Loc = Tok.getLoc();
-  Identifier Name;
-  parseIdentifier(Name, "");
+  Identifier Name = Context.getIdentifier(Tok.getText());
+  consumeToken(tok::identifier);
 
   if (Tok.isNot(tok::coloncolon))
     return actOnIdentifierExpr(Name, Loc);
@@ -367,8 +367,8 @@ ParseResult<Expr> Parser::parseExprIdentifier() {
 
   SourceLoc Loc2 = Tok.getLoc();
   Identifier Name2;
-  if (parseIdentifier(Name2, "expected identifier after '" + Name.str() +
-                      "::' expression"))
+  if (parseIdentifier(Name2, diags::expected_identifier_after_coloncolon_expr,
+                      Name))
     return true;
   
   TypeAliasDecl *TypeDeclFromScope = ScopeInfo.lookupScopeName(Name, Loc);
@@ -410,7 +410,7 @@ ParseResult<Expr> Parser::parseExprParen() {
       // Check to see if there is a field specifier.
       if (consumeIf(tok::period)) {
         if (parseIdentifier(FieldName,
-                          "expected field specifier name in tuple expression")||
+                            diags::expected_field_spec_name_tuple_expr) ||
             parseToken(tok::equal, "expected '=' in tuple expression"))
           return true;
       }

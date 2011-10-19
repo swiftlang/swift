@@ -57,8 +57,8 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
       consumeToken(tok::coloncolon);
       SourceLoc Loc2 = Tok.getLoc();
       Identifier Name2;
-      if (parseIdentifier(Name2, "expected identifier after '" +
-                          Name.str() + "' type"))
+      if (parseIdentifier(Name2,
+                      diags::expected_identifier_after_coloncolon_type, Name))
         return true;
 
       Result = ScopeInfo.getQualifiedTypeName(Name, NameLoc, Name2, Loc2);
@@ -138,7 +138,8 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
       // value-specifier.
       if (Tok.is(tok::identifier) &&
           (peekToken().is(tok::colon) || peekToken().is(tok::equal))) {
-        parseIdentifier(Result.Name, "");
+        Result.Name = Context.getIdentifier(Tok.getText());
+        consumeToken(tok::identifier);
 
         NullablePtr<Expr> Init;
         if ((HadError = parseValueSpecifier(Result.Ty, Init, /*single*/ true)))

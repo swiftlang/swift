@@ -193,14 +193,13 @@ Decl *Parser::parseDeclImport() {
   
   SmallVector<std::pair<Identifier, SourceLoc>, 8> ImportPath(1);
   ImportPath.back().second = Tok.getLoc();
-  if (parseIdentifier(ImportPath.back().first,
-                      "expected module name in import declaration"))
+  if (parseIdentifier(ImportPath.back().first,diags::decl_expected_module_name))
     return 0;
   
   while (consumeIf(tok::period)) {
     ImportPath.push_back(std::make_pair(Identifier(), Tok.getLoc()));
     if (parseIdentifier(ImportPath.back().first,
-                        "expected name in import declaration"))
+                        diags::expected_identifier_in_decl, "import"))
       return 0;
   }
   
@@ -221,8 +220,8 @@ bool Parser::parseVarName(DeclVarName &Name) {
   // Single name case.
   if (Tok.is(tok::identifier) || Tok.is(tok::oper)) {
     SourceLoc IdLoc = Tok.getLoc();
-    Identifier Id;
-    parseIdentifier(Id, "");
+    Identifier Id = Context.getIdentifier(Tok.getText());
+    consumeToken();
     Name = DeclVarName(Id, IdLoc);
     return false;
   }
@@ -261,7 +260,7 @@ TypeAliasDecl *Parser::parseDeclTypeAlias() {
   
   Identifier Id;
   Type Ty;
-  if (parseIdentifier(Id, "expected identifier in var declaration") ||
+  if (parseIdentifier(Id, diags::expected_identifier_in_decl, "typealias") ||
       parseToken(tok::colon, "expected ':' in typealias declaration") ||
       parseType(Ty, "expected type in var declaration"))
     return 0;
@@ -400,7 +399,7 @@ FuncDecl *Parser::parseDeclFunc(bool AllowScoped) {
   Type ReceiverTy;
   Identifier Name;
   SourceLoc TypeNameLoc = Tok.getLoc();
-  if (parseIdentifier(Name, "expected identifier in func declaration"))
+  if (parseIdentifier(Name, diags::expected_identifier_in_decl, "func"))
     return 0;
 
   // If this is method syntax, the first name is the receiver type.  Parse the
@@ -408,7 +407,7 @@ FuncDecl *Parser::parseDeclFunc(bool AllowScoped) {
   if (AllowScoped && consumeIf(tok::coloncolon)) {
     // Look up the type name.
     ReceiverTy = ScopeInfo.lookupOrInsertTypeName(Name, TypeNameLoc);
-    if (parseIdentifier(Name, "expected identifier in 'func' declaration"))
+    if (parseIdentifier(Name, diags::expected_identifier_in_decl, "func"))
       return 0;
   }
   
@@ -488,7 +487,7 @@ Decl *Parser::parseDeclOneOf() {
   SourceLoc NameLoc = Tok.getLoc();
   Identifier OneOfName;
   Type OneOfType;
-  if (parseIdentifier(OneOfName, "expected identifier in oneof declaration"))
+  if (parseIdentifier(OneOfName, diags::expected_identifier_in_decl, "oneof"))
     return 0;
   
   TypeAliasDecl *TAD = ScopeInfo.addTypeAliasToScope(NameLoc, OneOfName,Type());
@@ -512,7 +511,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   parseAttributeList(Attributes);
   
   Identifier StructName;
-  if (parseIdentifier(StructName, "expected identifier in struct declaration"))
+  if (parseIdentifier(StructName, diags::expected_identifier_in_decl, "struct"))
     return true;
 
   SourceLoc LBLoc = Tok.getLoc();
@@ -576,7 +575,7 @@ Decl *Parser::parseDeclProtocol() {
   SourceLoc NameLoc = Tok.getLoc();
   Identifier ProtocolName;
   if (parseIdentifier(ProtocolName,
-                      "expected identifier in protocol declaration"))
+                      diags::expected_identifier_in_decl, "protocol"))
     return 0;
   
   TypeAliasDecl *TAD = ScopeInfo.addTypeAliasToScope(NameLoc, ProtocolName,

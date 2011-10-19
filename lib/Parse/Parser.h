@@ -132,7 +132,19 @@ public:
   //===--------------------------------------------------------------------===//
   // Primitive Parsing
   
-  bool parseIdentifier(Identifier &Result, const Twine &Message);
+  bool parseIdentifier(Identifier &Result, DiagID ID,
+                       ArrayRef<DiagnosticArgument> Args);
+
+  bool parseIdentifier(Identifier &Result, Diag<> ID) {
+    return parseIdentifier(Result, ID.ID, ArrayRef<DiagnosticArgument>());
+  }
+  
+  template<typename ...ArgTypes>
+  bool parseIdentifier(Identifier &Result, Diag<ArgTypes...> ID,
+                       typename detail::PassArgument<ArgTypes>::type... Args) {
+    DiagnosticArgument DiagArgs[] = { Args... };
+    return parseIdentifier(Result, ID.ID, DiagArgs);
+  }
 
   /// parseToken - The parser expects that 'K' is next in the input.  If so, it
   /// is consumed and false is returned.
