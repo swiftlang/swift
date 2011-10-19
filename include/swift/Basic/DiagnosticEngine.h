@@ -79,6 +79,7 @@ namespace swift {
   ///
   enum class DiagnosticArgumentKind {
     String,
+    UserString,  // A string from the user's code, printed in quotes.
     Integer,
     Unsigned
   };
@@ -112,12 +113,15 @@ namespace swift {
       : Kind(DiagnosticArgumentKind::Unsigned),
         UnsignedVal(I) { }
 
-    DiagnosticArgument(Identifier I) : DiagnosticArgument(I.str()) {}
+    DiagnosticArgument(Identifier I) : DiagnosticArgument(I.str()) {
+      Kind = DiagnosticArgumentKind::UserString;
+    }
 
     DiagnosticArgumentKind getKind() const { return Kind; }
 
     StringRef getAsString() const {
-      assert(Kind == DiagnosticArgumentKind::String);
+      assert(Kind == DiagnosticArgumentKind::String ||
+             Kind == DiagnosticArgumentKind::UserString);
       return StringRef(StringVal.Data, StringVal.Length);
     }
 

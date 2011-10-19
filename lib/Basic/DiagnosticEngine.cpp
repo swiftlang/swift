@@ -131,6 +131,11 @@ static void formatDiagnosticArgument(StringRef Modifier,
     assert(Modifier.empty() && "Improper modifier for string argument");
     Out << Arg.getAsString();
     break;
+
+  case DiagnosticArgumentKind::UserString:
+    assert(Modifier.empty() && "Improper modifier for string argument");
+    Out << '\'' << Arg.getAsString() << '\'';
+    break;
   }
 }
 

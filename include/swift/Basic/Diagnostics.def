@@ -77,7 +77,7 @@ ERROR(decl_redefinition,decl_parsing,none,
 ERROR(expected_lparen_var_name,decl_parsing,none,
       "expected identifier or '(' in var name", ())
 ERROR(invalid_index_in_var_name_path,decl_parsing,none,
-      "'%0' is an invalid index for '%1'", (Identifier, StringRef))
+      "%0 is an invalid index for '%1'", (Identifier, StringRef))
       
 // Import
 ERROR(import_inner_scope,decl_parsing,none,
@@ -113,7 +113,7 @@ ERROR(expected_protocol_member,type_parsing,none,
 ERROR(type_redefinition,type_parsing,none,
       "redefinition of type '%0'", (StringRef))
 ERROR(expected_identifier_after_coloncolon_type,expr_parsing,none,
-      "expected identifier after '%0::' type", (Identifier))
+      "expected identifier after %0 type", (Identifier))
 
 //------------------------------------------------------------------------------
 // Statement parsing diagnostics
@@ -139,7 +139,7 @@ ERROR(dollar_numeric_too_large,expr_parsing,none,
 ERROR(expected_identifier_after_colon_expr,expr_parsing,none,
       "expected identifier after ':' expression", ())
 ERROR(expected_identifier_after_coloncolon_expr,expr_parsing,none,
-      "expected identifier after '%0::' expression", (Identifier))
+      "expected identifier after %0' expression", (Identifier))
 ERROR(expected_field_spec_name_tuple_expr,expr_parsing,none,
       "expected field specifier name in tuple expression", ())    
 
