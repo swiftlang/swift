@@ -61,22 +61,23 @@ NOTE(previous_definition,parsing,none,
 
 ERROR(top_level_decl_without_type,decl_parsing,none,
       "top-level declarations require a type specifier", ())
+ERROR(expected_identifier_in_decl,decl_parsing,none,
+      "expected identifier in %0 declaration", (StringRef))
 ERROR(expected_type_or_init,decl_parsing,none,
       "expected a type or an initializer", ())
-ERROR(expected_lparen_var_name,decl_parsing,none,
-      "expected identifier or '(' in var name", ())
 ERROR(non_simple_var,decl_parsing,none,
       "complex 'var' declaration not allowed here", ())
-ERROR(func_decl_without_paren,decl_parsing,none,
-      "expected '(' in argument list of func declaration", ())
 ERROR(precedence_overload,decl_parsing,none,
       "infix precedence of functions in an overload set must match", ())
 ERROR(decl_redefinition,decl_parsing,none,
       "%select{declaration|definition}0 conflicts with previous value", 
       (bool))
 
-ERROR(expected_identifier_in_decl,decl_parsing,none,
-      "expected identifier in %0 declaration", (StringRef))
+// Var Name
+ERROR(expected_lparen_var_name,decl_parsing,none,
+      "expected identifier or '(' in var name", ())
+ERROR(invalid_index_in_var_name_path,decl_parsing,none,
+      "'%0' is an invalid index for '%1'", (Identifier, StringRef))
       
 // Import
 ERROR(import_inner_scope,decl_parsing,none,
@@ -87,6 +88,8 @@ ERROR(decl_expected_module_name,decl_parsing,none,
 // TypeAlias
 
 // Func
+ERROR(func_decl_without_paren,decl_parsing,none,
+      "expected '(' in argument list of func declaration", ())
 
 // OneOf
 

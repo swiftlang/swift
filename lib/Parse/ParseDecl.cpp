@@ -285,8 +285,8 @@ void Parser::actOnVarDeclName(const DeclVarName *Name,
     // to create the decl.  The most common result here is DependentType, which
     // allows type checking to resolve this later.
     if (Ty.isNull()) {
-      error(Name->getLocation(), "'" + Name->getIdentifier().str() + 
-            "' is an invalid index for '" + VD->Ty->getString() + "'");
+      diagnose(Name->getLocation(), diags::invalid_index_in_var_name_path,
+               Name->getIdentifier(), VD->Ty->getString());
       return;
     }
     
