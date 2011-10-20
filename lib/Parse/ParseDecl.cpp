@@ -262,7 +262,7 @@ TypeAliasDecl *Parser::parseDeclTypeAlias() {
   Type Ty;
   if (parseIdentifier(Id, diags::expected_identifier_in_decl, "typealias") ||
       parseToken(tok::colon, "expected ':' in typealias declaration") ||
-      parseType(Ty, "expected type in var declaration"))
+      parseType(Ty, diags::expected_type_in_typealias))
     return 0;
 
   return ScopeInfo.addTypeAliasToScope(TypeAliasLoc, Id, Ty);

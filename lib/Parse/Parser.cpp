@@ -133,7 +133,7 @@ bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init,
   
   // Parse the type if present.
   if (consumeIf(tok::colon) &&
-      parseType(Ty, "expected type in var declaration"))
+      parseType(Ty, diags::expected_type))
     return true;
   
   // Parse the initializer, if present.

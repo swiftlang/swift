@@ -86,6 +86,8 @@ ERROR(decl_expected_module_name,decl_parsing,none,
       "expected module name in import declaration", ())
 
 // TypeAlias
+ERROR(expected_type_in_typealias,decl_parsing,none,
+      "expected type in var declaration", ())
 
 // Func
 ERROR(func_decl_without_paren,decl_parsing,none,
@@ -102,12 +104,24 @@ ERROR(struct_not_tuple,decl_parsing,none,
 //------------------------------------------------------------------------------
 // Type parsing diagnostics
 //------------------------------------------------------------------------------
+
+ERROR(expected_type,type_parsing,none,
+      "expected type", ())
+ERROR(expected_type_function_result,type_parsing,none,
+      "expected type for function result", ())
+
+// oneof Types      
 ERROR(duplicate_oneof_element,type_parsing,none,
       "duplicate definition of element '%0'", (StringRef))
+ERROR(expected_type_oneof_element,type_parsing,none,
+      "expected type while parsing oneof element", ())
+
+// Array Types      
 ERROR(non_constant_array,type_parsing,none,
       "array has non-constant size", ())
 ERROR(zero_length_array,type_parsing,none,
       "array has length zero", ())
+      
 ERROR(expected_protocol_member,type_parsing,none,
       "expected a function or variable declaration in protocol", ())
 ERROR(type_redefinition,type_parsing,none,

@@ -21,7 +21,7 @@
 using namespace swift;
 
 bool Parser::parseType(Type &Result) {
-  return parseType(Result, "expected type");
+  return parseType(Result, diags::expected_type);
 }
 
 /// parseType
@@ -43,7 +43,7 @@ bool Parser::parseType(Type &Result) {
 ///     identifier
 ///     scope-qualifier identifier
 ///
-bool Parser::parseType(Type &Result, const Twine &Message) {
+bool Parser::parseType(Type &Result, Diag<> MessageID) {
   // Parse type-simple first.
   switch (Tok.getKind()) {
   case tok::identifier: {
@@ -87,7 +87,7 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
       return true;
     break;
   default:
-    error(Tok.getLoc(), Message);
+    diagnose(Tok.getLoc(), MessageID);
     return true;
   }
   
@@ -96,7 +96,7 @@ bool Parser::parseType(Type &Result, const Twine &Message) {
     SourceLoc TokLoc = Tok.getLoc();
     if (consumeIf(tok::arrow)) {
       Type SecondHalf;
-      if (parseType(SecondHalf, "expected type in result of function type"))
+      if (parseType(SecondHalf, diags::expected_type_function_result))
         return true;
       Result = FunctionType::get(Result, SecondHalf, Context);
       continue;
@@ -221,9 +221,7 @@ bool Parser::parseTypeOneOfBody(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
     
     // See if we have a type specifier for this oneof element.  If so, parse it.
     if (consumeIf(tok::colon) &&
-        parseType(ElementInfo.EltType,
-                  "expected type while parsing oneof element '" +
-                  ElementInfo.Name + "'")) {
+        parseType(ElementInfo.EltType, diags::expected_type_oneof_element)) {
       skipUntil(tok::r_brace);
       return true;
     }

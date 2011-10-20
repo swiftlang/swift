@@ -189,7 +189,7 @@ public:
   // Type Parsing
   
   bool parseType(Type &Result);
-  bool parseType(Type &Result, const Twine &Message);
+  bool parseType(Type &Result, Diag<> ID);
   bool parseTypeTupleBody(SourceLoc LPLoc, Type &Result);
   
   bool parseTypeOneOf(Type &Result);
