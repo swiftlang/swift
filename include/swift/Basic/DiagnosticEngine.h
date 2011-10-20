@@ -52,7 +52,7 @@ namespace swift {
   template<typename ...ArgTypes>
   struct Diag {
     /// \brief The diagnostic ID corresponding to this diagnostic.
-    const DiagID ID;
+    DiagID ID;
   };
 
   namespace detail {
