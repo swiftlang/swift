@@ -17,6 +17,8 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
+#include "swift/Basic/DiagnosticEngine.h"
+#include "swift/Basic/Diagnostics.h"
 #include "llvm/Module.h"
 #include "llvm/Type.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -63,6 +65,6 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *TU) {
   emitTopLevel(TU->Body);
 }
 
-void IRGenModule::unimplemented(SourceLoc Loc, const llvm::Twine &Message) {
-  Context.error(Loc, Message);
+void IRGenModule::unimplemented(SourceLoc Loc, StringRef Message) {
+  Context.Diags.diagnose(Loc, diags::irgen_unimplemented, Message);
 }

@@ -68,7 +68,7 @@ public:
 
   IRGenFunction(IRGenModule &IGM, FuncExpr *FE, llvm::Function *Fn);
 
-  void unimplemented(SourceLoc Loc, const llvm::Twine &Message);
+  void unimplemented(SourceLoc Loc, StringRef Message);
 
 //--- Control flow -------------------------------------------------------------
 public:

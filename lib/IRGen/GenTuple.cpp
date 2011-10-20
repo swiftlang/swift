@@ -352,7 +352,7 @@ RValue IRGenFunction::emitTupleElementRValue(TupleElementExpr *E,
                                              const TypeInfo &TI) {
   // TODO: if the base expression can reasonably be emitted as an
   // l-value, do so and then project out.
-  unimplemented(E->getLoc(), "tuple elements are unimplemented");
+  unimplemented(E->getLoc(), "tuple elements");
   return emitFakeRValue(TI);
 }
 
@@ -388,6 +388,6 @@ LValue IRGenFunction::emitTupleElementLValue(TupleElementExpr *E,
 
 RValue IRGenFunction::emitTupleShuffleExpr(TupleShuffleExpr *E,
                                            const TypeInfo &TI) {
-  unimplemented(E->getLoc(), "tuple shuffles are unimplemented");
+  unimplemented(E->getLoc(), "tuple shuffles");
   return emitFakeRValue(TI);
 }

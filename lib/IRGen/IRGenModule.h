@@ -67,7 +67,7 @@ public:
   llvm::IntegerType *Int64Ty;
   llvm::PointerType *Int8PtrTy;
 
-  void unimplemented(SourceLoc, const llvm::Twine &Message);
+  void unimplemented(SourceLoc, StringRef Message);
 
 //--- Types -----------------------------------------------------------------
 public:

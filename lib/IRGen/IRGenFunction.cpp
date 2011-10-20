@@ -55,6 +55,6 @@ LValue IRGenFunction::createScopeAlloca(llvm::Type *Ty, Alignment Align,
   return LValue::forAddress(Alloca, Align);
 }
 
-void IRGenFunction::unimplemented(SourceLoc Loc, const llvm::Twine &Message) {
+void IRGenFunction::unimplemented(SourceLoc Loc, StringRef Message) {
   return IGM.unimplemented(Loc, Message);
 }

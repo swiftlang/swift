@@ -85,8 +85,7 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
 
   case DeclKind::ElementRef:
   case DeclKind::OneOfElement:
-    IGF.unimplemented(E->getLoc(),
-                      "emitting this decl as an l-value is unimplemented");
+    IGF.unimplemented(E->getLoc(), "emitting this decl as an l-value");
     return IGF.emitFakeLValue(TInfo);
   }
   llvm_unreachable("bad decl kind");
@@ -109,8 +108,7 @@ RValue IRGenFunction::emitDeclRefRValue(DeclRefExpr *E, const TypeInfo &TInfo) {
     
   case DeclKind::ElementRef:
   case DeclKind::OneOfElement:
-    unimplemented(E->getLoc(),
-                  "emitting this decl as an r-value is unimplemented");
+    unimplemented(E->getLoc(), "emitting this decl as an r-value");
     return emitFakeRValue(TInfo);
   }
   llvm_unreachable("bad decl kind");

@@ -38,7 +38,7 @@ void IRGenFunction::emitLocal(Decl *D) {
     break;
 
   case DeclKind::Func:
-    unimplemented(D->getLocStart(), "local function emission is unimplemented");
+    unimplemented(D->getLocStart(), "local function emission");
     break;
   }
 }

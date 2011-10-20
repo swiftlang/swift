@@ -37,9 +37,9 @@
   DIAG(NOTE,ID,Category,Options,Text,Signature)
 #endif
 
-//------------------------------------------------------------------------------
+//==============================================================================
 // Parsing diagnostics
-//------------------------------------------------------------------------------
+//==============================================================================
 
 ERROR(invalid_diagnostic,parsing,none,
       "INTERNAL ERROR: this diagnostic should not be produced", ())
@@ -275,6 +275,14 @@ ERROR(oneof_attributes,attribute_parsing,none,
       "oneof types are not allowed to have attributes", ())
 ERROR(protocol_attributes,attribute_parsing,none,
       "protocol types are not allowed to have attributes", ())
+
+
+//==============================================================================
+// IR Generation diagnostics
+//==============================================================================
+
+ERROR(irgen_unimplemented,irgen,none,
+      "unimplemented IR generation feature %0", (StringRef))
 
 #if defined(DIAG)
 #  undef DIAG

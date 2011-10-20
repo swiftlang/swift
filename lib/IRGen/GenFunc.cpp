@@ -223,8 +223,7 @@ RValue IRGenFunction::emitRValueForFunction(FuncDecl *Fn) {
     return RValue::forScalars(Function, Data);
   }
 
-  unimplemented(Fn->getLocStart(),
-                "local function emission is not yet implemented");
+  unimplemented(Fn->getLocStart(), "local function emission");
   llvm::Value *Undef = llvm::UndefValue::get(IGM.Int8PtrTy);
   return RValue::forScalars(Undef, Undef);
 }
