@@ -498,7 +498,7 @@ ParseResult<Expr> Parser::parseExprFunc() {
   
   // Then parse the expression.
   ParseResult<BraceStmt> Body;
-  if ((Body = parseStmtBrace("expected '{' in func expression")))
+  if ((Body = parseStmtBrace(diags::expected_lbrace_func_expr)))
     return true;
   if (Body.isSemaError())
     return ParseResult<Expr>::getSemaError();

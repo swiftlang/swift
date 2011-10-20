@@ -450,7 +450,7 @@ FuncDecl *Parser::parseDeclFunc(bool AllowScoped) {
     
     // Check to see if we have a "{" which is a brace expr.
     if (Tok.is(tok::l_brace)) {
-      ParseResult<BraceStmt> Body = parseStmtBrace();
+      ParseResult<BraceStmt> Body = parseStmtBrace(diags::invalid_diagnostic);
       if (Body.isSuccess())
         FE->setBody(Body.get());
       else  // FIXME: Should do some sort of error recovery here.

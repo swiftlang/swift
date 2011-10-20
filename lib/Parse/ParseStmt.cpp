@@ -171,7 +171,7 @@ ParseResult<Stmt> Parser::parseStmtOtherThanAssignment() {
     diagnose(Tok, diags::expected_stmt);
     return true;
   case tok::semi:      return new (Context) SemiStmt(consumeToken(tok::semi));
-  case tok::l_brace:   return parseStmtBrace();
+  case tok::l_brace:   return parseStmtBrace(diags::invalid_diagnostic);
   case tok::kw_return: return parseStmtReturn();
   case tok::kw_if:     return parseStmtIf();
   case tok::kw_while:  return parseStmtWhile();
@@ -184,9 +184,9 @@ ParseResult<Stmt> Parser::parseStmtOtherThanAssignment() {
 ///   stmt-brace:
 ///     '{' stmt-brace-item* '}'
 ///
-ParseResult<BraceStmt> Parser::parseStmtBrace(const char *Message) {
+ParseResult<BraceStmt> Parser::parseStmtBrace(Diag<> ID) {
   if (Tok.isNot(tok::l_brace)) {
-    error(Tok.getLoc(), Message ? Message : "expected '{'");
+    diagnose(Tok.getLoc(), ID);
     return true;
   }
   SourceLoc LBLoc = consumeToken(tok::l_brace);
@@ -243,7 +243,7 @@ ParseResult<Stmt> Parser::parseStmtIf() {
   ParseResult<Expr> Condition;
   ParseResult<BraceStmt> NormalBody;
   if ((Condition = parseSingleExpr("expected expresssion in 'if' condition")) ||
-      (NormalBody = parseStmtBrace("expected '{' after 'if' condition")))
+      (NormalBody = parseStmtBrace(diags::expected_lbrace_after_if)))
     return true;
     
   ParseResult<Stmt> ElseBody;
@@ -252,7 +252,7 @@ ParseResult<Stmt> Parser::parseStmtIf() {
     if (Tok.is(tok::kw_if))
       ElseBody = parseStmtIf();
     else
-      ElseBody = parseStmtBrace("expected '{' after 'else'");
+      ElseBody = parseStmtBrace(diags::expected_lbrace_after_else);
     if (ElseBody.isParseError()) return true;
   } else {
     ElseLoc = SourceLoc();
@@ -283,7 +283,7 @@ ParseResult<Stmt> Parser::parseStmtWhile() {
   ParseResult<BraceStmt> Body;
   if ((Condition
          = parseSingleExpr("expected expresssion in 'while' condition")) ||
-      (Body = parseStmtBrace("expected '{' after 'while' condition")))
+      (Body = parseStmtBrace(diags::expected_lbrace_after_while)))
     return true;
   
   // If our condition and normal expression parsed correctly, build an AST.

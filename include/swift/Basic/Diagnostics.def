@@ -41,6 +41,12 @@
 // Parsing diagnostics
 //------------------------------------------------------------------------------
 
+ERROR(invalid_diagnostic,parsing,none,
+      "INTERNAL ERROR: this diagnostic should not be produced", ())
+
+ERROR(expected_lbrace,parsing,none,
+     "to match this opening '{'", ())
+
 NOTE(opening_brace,parsing,none,
      "to match this opening '{'", ())
 NOTE(opening_bracket,parsing,none,
@@ -158,8 +164,21 @@ ERROR(expected_protocol_member,type_parsing,none,
 ERROR(expected_stmt,stmt_parsing,none,
       "expected statement", ())
 
+// Brace Statement
 ERROR(expected_rbrace_in_brace_stmt,stmt_parsing,none,
       "expected '}' at end of brace statement", ())
+
+// Return Statement
+
+// If Statement
+ERROR(expected_lbrace_after_if,stmt_parsing,none,
+      "expected '{' after 'if' condition", ())
+ERROR(expected_lbrace_after_else,stmt_parsing,none,
+      "expected '{' after 'else'", ())
+
+// While Statement
+ERROR(expected_lbrace_after_while,stmt_parsing,none,
+      "expected '{' after 'while' condition", ())
 
 //------------------------------------------------------------------------------
 // Expression parsing diagnostics
@@ -190,6 +209,11 @@ ERROR(expected_equal_in_tuple_expr,expr_parsing,none,
       "expected '=' in tuple expression", ())
 ERROR(expected_rparen_parenthesis_expr,expr_parsing,none,
       "expected ')' in parenthesis expression", ())
+
+// Func expressions
+ERROR(expected_lbrace_func_expr,decl_parsing,none,
+      "expected '{' in func expression", ())
+
 
 //------------------------------------------------------------------------------
 // Literal parsing diagnostics
