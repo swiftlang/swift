@@ -119,16 +119,6 @@ public:
     Diags.diagnose(Tok.getLoc(), ID, Args...);
   }
 
-  void note(SourceLoc Loc, const Twine &Message) __attribute__((deprecated)) {
-    Context.note(Loc, Message);
-  }
-  void warning(SourceLoc Loc, const Twine &Message) __attribute__((deprecated)){
-    Context.warning(Loc, Message);
-  }
-  void error(SourceLoc Loc, const Twine &Message) __attribute__((deprecated)) {
-    Context.error(Loc, Message);
-  }
-  
   //===--------------------------------------------------------------------===//
   // Primitive Parsing
   
