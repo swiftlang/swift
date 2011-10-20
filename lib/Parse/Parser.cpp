@@ -140,9 +140,9 @@ bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init,
   if (consumeIf(tok::equal)) {
     ParseResult<Expr> Tmp;
     if (SingleInit) {
-      Tmp = parseSingleExpr("expected expression in value specifier");
+      Tmp = parseSingleExpr(diags::expected_initializer_expr);
     } else {
-      Tmp = parseExpr("expected expression in value specifier");
+      Tmp = parseExpr(diags::expected_initializer_expr);
     }
     if (Tmp)
       return true;

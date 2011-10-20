@@ -155,7 +155,7 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
       // Parse the optional default value expression.
       if (Tok.is(tok::colon)) {
         ParseResult<Expr> Init =
-          parseSingleExpr("expected initializer expression after '='");
+          parseSingleExpr(diags::expected_initializer_expr);
 
         // Die if there was a parse error.
         if (Init) {
@@ -329,7 +329,7 @@ bool Parser::parseTypeArray(SourceLoc LSquareLoc, Type &Result) {
   }
   
   ParseResult<Expr> SizeEx;
-  if ((SizeEx = parseSingleExpr("expected expression for array type size")))
+  if ((SizeEx = parseSingleExpr(diags::expected_expr_array_type)))
     return true;
   
   SourceLoc RArrayTok = Tok.getLoc();

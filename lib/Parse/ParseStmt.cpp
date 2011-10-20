@@ -115,7 +115,7 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       // FALL THROUGH into expression case.
     default:
       ParseResult<Expr> ResultExpr;
-      if ((ResultExpr = parseExpr())) {
+      if ((ResultExpr = parseExpr(diags::expected_expr))) {
         NeedParseErrorRecovery = true;
         break;
       }
@@ -130,7 +130,7 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
         
       SourceLoc EqualLoc = consumeToken();
       ParseResult<Expr> RHSExpr;
-      if ((RHSExpr = parseExpr("expected expression in assignment"))) {
+      if ((RHSExpr = parseExpr(diags::expected_expr_assignment))) {
         NeedParseErrorRecovery = true;
         break;
       }
@@ -218,7 +218,7 @@ ParseResult<Stmt> Parser::parseStmtReturn() {
   // enclosing stmt-brace to get it by eagerly eating it.
   ParseResult<Expr> Result;
   if (isStartOfExpr(Tok, peekToken())) {
-    if ((Result = parseExpr("expected expresssion in 'return' statement")))
+    if ((Result = parseExpr(diags::expected_expr_return)))
       return true;
   } else {
     // Result value defaults to ().
@@ -242,7 +242,7 @@ ParseResult<Stmt> Parser::parseStmtIf() {
 
   ParseResult<Expr> Condition;
   ParseResult<BraceStmt> NormalBody;
-  if ((Condition = parseSingleExpr("expected expresssion in 'if' condition")) ||
+  if ((Condition = parseSingleExpr(diags::expected_expr_if)) ||
       (NormalBody = parseStmtBrace(diags::expected_lbrace_after_if)))
     return true;
     
@@ -281,8 +281,7 @@ ParseResult<Stmt> Parser::parseStmtWhile() {
   
   ParseResult<Expr> Condition;
   ParseResult<BraceStmt> Body;
-  if ((Condition
-         = parseSingleExpr("expected expresssion in 'while' condition")) ||
+  if ((Condition = parseSingleExpr(diags::expected_expr_while)) ||
       (Body = parseStmtBrace(diags::expected_lbrace_after_while)))
     return true;
   

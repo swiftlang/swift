@@ -38,7 +38,7 @@ bool Parser::isStartOfExpr(const Token &Tok, const Token &Next) {
 /// parseSingleExpr
 ///
 /// Parse an expression in a context that requires a single expression.
-ParseResult<Expr> Parser::parseSingleExpr(const char *Message) {
+ParseResult<Expr> Parser::parseSingleExpr(Diag<> Message) {
   ParseResult<Expr> Result = parseExpr(Message);
   if (Result) return true;
 
@@ -62,7 +62,7 @@ ParseResult<Expr> Parser::parseSingleExpr(const char *Message) {
 ///
 /// The sequencing here is not structural, i.e. binary operators are
 /// not inherently right-associative.
-ParseResult<Expr> Parser::parseExpr(const char *Message) {
+ParseResult<Expr> Parser::parseExpr(Diag<> Message) {
   SmallVector<Expr*, 8> SequencedExprs;
 
   bool HasSemaError = false;
@@ -88,7 +88,7 @@ ParseResult<Expr> Parser::parseExpr(const char *Message) {
     SequencedExprs.push_back(Operator);
 
     // The message is only valid for the first subexpr.
-    Message = "expected expression after operator";
+    Message = diags::expected_expr_after_operator;
   }
 
   // If we had semantic errors, just fail here.
@@ -108,7 +108,7 @@ ParseResult<Expr> Parser::parseExpr(const char *Message) {
 ///   expr-unary:
 ///     expr-postfix
 ///     operator expr-unary
-ParseResult<Expr> Parser::parseExprUnary(const char *Message) {
+ParseResult<Expr> Parser::parseExprUnary(Diag<> Message) {
   // If the next token is not an operator, just parse this as expr-postfix
   if (Tok.isNot(tok::oper))
     return parseExprPostfix(Message);
@@ -149,7 +149,7 @@ ParseResult<Expr> Parser::parseExprUnary(const char *Message) {
 ///     expr-subscript
 ///     expr-call
 ///
-ParseResult<Expr> Parser::parseExprPostfix(const char *Message) {
+ParseResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
   ParseResult<Expr> Result;
   switch (Tok.getKind()) {
   case tok::numeric_constant:
@@ -187,7 +187,7 @@ ParseResult<Expr> Parser::parseExprPostfix(const char *Message) {
     break;
       
   default:
-    error(Tok.getLoc(), Message ? Message : "expected expression");
+    diagnose(Tok.getLoc(), ID);
     return true;
   }
   
@@ -236,7 +236,7 @@ ParseResult<Expr> Parser::parseExprPostfix(const char *Message) {
     // Check for a [expr] suffix.
     if (consumeIf(tok::l_square)) {
       ParseResult<Expr> Idx;
-      if ((Idx = parseSingleExpr("expected expression parsing array index")))
+      if ((Idx = parseSingleExpr(diags::expected_expr_subscript_value)))
         return true;
       
       SourceLoc RLoc = Tok.getLoc();
@@ -424,7 +424,7 @@ ParseResult<Expr> Parser::parseExprParen() {
       }
       
       ParseResult<Expr> SubExpr;
-      if ((SubExpr = parseSingleExpr("expected expression in parentheses")))
+      if ((SubExpr = parseSingleExpr(diags::expected_expr_parentheses)))
         return true;
       
       if (SubExpr.isSemaError())

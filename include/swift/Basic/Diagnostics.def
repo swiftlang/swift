@@ -126,6 +126,9 @@ ERROR(type_redefinition,type_parsing,none,
 ERROR(expected_identifier_after_coloncolon_type,expr_parsing,none,
       "expected identifier after %0 type", (Identifier))
 
+ERROR(expected_initializer_expr,expr_parsing,none,
+      "expected initializer expression after '='", ())
+
 // Function types
 ERROR(expected_type_function_result,type_parsing,none,
       "expected type for function result", ())
@@ -141,6 +144,8 @@ ERROR(expected_type_oneof_element,type_parsing,none,
       "expected type while parsing oneof element", ())
 
 // Array Types      
+ERROR(expected_expr_array_type,expr_parsing,none,
+      "expected expression for size of array type", ())
 ERROR(non_constant_array,type_parsing,none,
       "array has non-constant size", ())
 ERROR(zero_length_array,type_parsing,none,
@@ -164,19 +169,29 @@ ERROR(expected_protocol_member,type_parsing,none,
 ERROR(expected_stmt,stmt_parsing,none,
       "expected statement", ())
 
+// Assignment statement
+ERROR(expected_expr_assignment,stmt_parsing,none,
+      "expected expression in assignment", ())
+
 // Brace Statement
 ERROR(expected_rbrace_in_brace_stmt,stmt_parsing,none,
       "expected '}' at end of brace statement", ())
 
 // Return Statement
+ERROR(expected_expr_return,stmt_parsing,none,
+      "expected expresssion in 'return' statement", ())
 
 // If Statement
+ERROR(expected_expr_if,stmt_parsing,none,
+      "expected expresssion in 'if' condition", ())
 ERROR(expected_lbrace_after_if,stmt_parsing,none,
       "expected '{' after 'if' condition", ())
 ERROR(expected_lbrace_after_else,stmt_parsing,none,
       "expected '{' after 'else'", ())
 
 // While Statement
+ERROR(expected_expr_while,stmt_parsing,none,
+      "expected expresssion in 'while' condition", ())
 ERROR(expected_lbrace_after_while,stmt_parsing,none,
       "expected '{' after 'while' condition", ())
 
@@ -184,8 +199,11 @@ ERROR(expected_lbrace_after_while,stmt_parsing,none,
 // Expression parsing diagnostics
 //------------------------------------------------------------------------------
 
-//ERROR(expected_expr,expr_parsing,none,
-//      "expected expression", ())
+ERROR(expected_expr,expr_parsing,none,
+      "expected expression", ())
+
+ERROR(expected_expr_after_operator,expr_parsing,none,
+      "expected expression after operator", ())
 
 ERROR(expected_single_expr,expr_parsing,none,
       "expected a singular expression", ())
@@ -202,9 +220,15 @@ ERROR(expected_identifier_after_coloncolon_expr,expr_parsing,none,
 ERROR(expected_field_spec_name_tuple_expr,expr_parsing,none,
       "expected field specifier name in tuple expression", ())    
 
+// Subscript expressions
+ERROR(expected_expr_subscript_value,expr_parsing,none,
+      "expected expression for subscript value", ())
 ERROR(expected_bracket_array_subscript,expr_parsing,none,
       "expected ']' in subscript expression", ())
 
+// Tuples and parenthesized expressions
+ERROR(expected_expr_parentheses,expr_parsing,none,
+      "expected subexpression in parentheses", ())
 ERROR(expected_equal_in_tuple_expr,expr_parsing,none,
       "expected '=' in tuple expression", ())
 ERROR(expected_rparen_parenthesis_expr,expr_parsing,none,
