@@ -117,8 +117,7 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     if (consumeIf(tok::equal)) {
       SourceLoc PrecLoc = Tok.getLoc();
       StringRef Text = Tok.getText();
-      if (!parseToken(tok::numeric_constant,
-                      "expected precedence number in infix attribute")) {
+      if (!parseToken(tok::numeric_constant, diags::expected_precedence_value)){
         long long Value;
         if (Text.getAsInteger(10, Value) || Value > 255 || Value < 0)
           diagnose(PrecLoc, diags::invalid_precedence, Text);
@@ -171,8 +170,7 @@ void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
   // Otherwise, there was an error parsing the attribute list.  If we already
   // reported an error, skip to a ], otherwise report the error.
   if (!HadError)
-    parseToken(tok::r_square, "expected ']' or ',' in attribute list",
-               tok::r_square);
+    parseToken(tok::r_square, diags::expected_in_attribute_list, tok::r_square);
   else {
     skipUntil(tok::r_square);
     consumeIf(tok::r_square);
@@ -244,7 +242,7 @@ bool Parser::parseVarName(DeclVarName &Name) {
   }
 
   SourceLoc RPLoc = Tok.getLoc();
-  if (parseToken(tok::r_paren, "expected ')' at end of var name"))
+  if (parseToken(tok::r_paren, diags::expected_rparen_var_name))
     diagnose(LPLoc, diags::opening_paren);
 
   Name = DeclVarName(LPLoc, Context.AllocateCopy(ChildNames), RPLoc);
@@ -261,7 +259,7 @@ TypeAliasDecl *Parser::parseDeclTypeAlias() {
   Identifier Id;
   Type Ty;
   if (parseIdentifier(Id, diags::expected_identifier_in_decl, "typealias") ||
-      parseToken(tok::colon, "expected ':' in typealias declaration") ||
+      parseToken(tok::colon, diags::expected_colon_in_typealias) ||
       parseType(Ty, diags::expected_type_in_typealias))
     return 0;
 
@@ -515,13 +513,13 @@ bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
     return true;
 
   SourceLoc LBLoc = Tok.getLoc();
-  if (parseToken(tok::l_brace, "expected '{' in struct"))
-    return true;
-  
   Type BodyTy;
-  if (parseTypeTupleBody(LBLoc, BodyTy)) return true;
+  if (parseToken(tok::l_brace, diags::expected_lbrace_struct) ||
+      parseTypeTupleBody(LBLoc, BodyTy))
+    return true;
 
-  if (parseToken(tok::r_brace, "expected '{' in struct")) {
+  // FIXME: add helper for matching punctuation.
+  if (parseToken(tok::r_brace, diags::expected_rbrace_struct)) {
     diagnose(LBLoc, diags::opening_brace);
     return true;
   }

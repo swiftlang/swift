@@ -76,6 +76,8 @@ ERROR(decl_redefinition,decl_parsing,none,
 // Var Name
 ERROR(expected_lparen_var_name,decl_parsing,none,
       "expected identifier or '(' in var name", ())
+ERROR(expected_rparen_var_name,decl_parsing,none,
+      "expected ')' at end of var name", ())
 ERROR(invalid_index_in_var_name_path,decl_parsing,none,
       "%0 is an invalid index for '%1'", (Identifier, StringRef))
       
@@ -86,6 +88,8 @@ ERROR(decl_expected_module_name,decl_parsing,none,
       "expected module name in import declaration", ())
 
 // TypeAlias
+ERROR(expected_colon_in_typealias,decl_parsing,none,
+      "expected ':' in typealias declaration", ())
 ERROR(expected_type_in_typealias,decl_parsing,none,
       "expected type in var declaration", ())
 
@@ -96,6 +100,10 @@ ERROR(func_decl_without_paren,decl_parsing,none,
 // OneOf
 
 // Struct
+ERROR(expected_lbrace_struct,decl_parsing,none,
+      "expected '{' in struct", ())
+ERROR(expected_rbrace_struct,decl_parsing,none,
+      "expected '}' in struct", ())
 ERROR(struct_not_tuple,decl_parsing,none,
       "element type of struct is not a tuple", ())
 
@@ -107,10 +115,20 @@ ERROR(struct_not_tuple,decl_parsing,none,
 
 ERROR(expected_type,type_parsing,none,
       "expected type", ())
+ERROR(type_redefinition,type_parsing,none,
+      "redefinition of type '%0'", (StringRef))
+ERROR(expected_identifier_after_coloncolon_type,expr_parsing,none,
+      "expected identifier after %0 type", (Identifier))
+
+// Function types
 ERROR(expected_type_function_result,type_parsing,none,
       "expected type for function result", ())
 
-// oneof Types      
+// OneOf Types
+ERROR(expected_lbrace_oneof_type,type_parsing,none,
+      "expected '{' in oneof", ())
+ERROR(expected_rbrace_oneof_type,type_parsing,none,
+      "expected '}' at end of oneof", ())
 ERROR(duplicate_oneof_element,type_parsing,none,
       "duplicate definition of element '%0'", (StringRef))
 ERROR(expected_type_oneof_element,type_parsing,none,
@@ -121,19 +139,27 @@ ERROR(non_constant_array,type_parsing,none,
       "array has non-constant size", ())
 ERROR(zero_length_array,type_parsing,none,
       "array has length zero", ())
+ERROR(expected_rbracket_array_type,type_parsing,none,
+      "expected ']' in array type", ())
       
+// Tuple Types
+ERROR(expected_rparen_tuple_type_list,type_parsing,none,
+      "expected ')' at end of tuple list", ())
+
+// Protocol Types
+ERROR(expected_lbrace_protocol_type,type_parsing,none,
+      "expected '{' in protocol type", ())
 ERROR(expected_protocol_member,type_parsing,none,
       "expected a function or variable declaration in protocol", ())
-ERROR(type_redefinition,type_parsing,none,
-      "redefinition of type '%0'", (StringRef))
-ERROR(expected_identifier_after_coloncolon_type,expr_parsing,none,
-      "expected identifier after %0 type", (Identifier))
 
 //------------------------------------------------------------------------------
 // Statement parsing diagnostics
 //------------------------------------------------------------------------------
 ERROR(expected_stmt,stmt_parsing,none,
       "expected statement", ())
+
+ERROR(expected_rbrace_in_brace_stmt,stmt_parsing,none,
+      "expected '}' at end of brace statement", ())
 
 //------------------------------------------------------------------------------
 // Expression parsing diagnostics
@@ -157,8 +183,13 @@ ERROR(expected_identifier_after_coloncolon_expr,expr_parsing,none,
 ERROR(expected_field_spec_name_tuple_expr,expr_parsing,none,
       "expected field specifier name in tuple expression", ())    
 
-//ERROR(expected_equal_in_tuple_expr,expr_parsing,none,
-//      "expected '=' in tuple expression", ())
+ERROR(expected_bracket_array_subscript,expr_parsing,none,
+      "expected ']' in subscript expression", ())
+
+ERROR(expected_equal_in_tuple_expr,expr_parsing,none,
+      "expected '=' in tuple expression", ())
+ERROR(expected_rparen_parenthesis_expr,expr_parsing,none,
+      "expected ')' in parenthesis expression", ())
 
 //------------------------------------------------------------------------------
 // Literal parsing diagnostics
@@ -181,8 +212,15 @@ ERROR(unknown_attribute,attribute_parsing,none,
       "unknown attribute '%0'", (StringRef))
 ERROR(duplicate_attribute,attribute_parsing,none,
       "duplicate '%0' attribute", (StringRef))
+ERROR(expected_in_attribute_list,attribute_parsing,none,
+      "expected ']' or ',' in attribute list", ())
+
+// infix and unary      
+ERROR(expected_precedence_value,attribute_parsing,none,
+      "expected precedence number in infix attribute", ())
 ERROR(invalid_precedence,attribute_parsing,none,
       "precedence '%0' is not an integer between 0 and 255", (StringRef))
+
 ERROR(import_attributes,attribute_parsing,none,
       "invalid attributes specified for import", ())
 ERROR(oneof_attributes,attribute_parsing,none,

@@ -197,7 +197,7 @@ ParseResult<BraceStmt> Parser::parseStmtBrace(const char *Message) {
     return true;
   
   SourceLoc RBLoc = Tok.getLoc();
-  if (parseToken(tok::r_brace, "expected '}' at end of brace expression",
+  if (parseToken(tok::r_brace, diags::expected_rbrace_in_brace_stmt,
                  tok::r_brace)) {
     diagnose(LBLoc, diags::opening_brace);
     return true;

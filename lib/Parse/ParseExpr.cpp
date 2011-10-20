@@ -240,7 +240,8 @@ ParseResult<Expr> Parser::parseExprPostfix(const char *Message) {
         return true;
       
       SourceLoc RLoc = Tok.getLoc();
-      if (parseToken(tok::r_square, "expected ']'")) {
+      // FIXME: helper for matching punctuation.
+      if (parseToken(tok::r_square, diags::expected_bracket_array_subscript)) {
         diagnose(TokLoc, diags::opening_bracket);
         return true;        
       }
@@ -411,7 +412,7 @@ ParseResult<Expr> Parser::parseExprParen() {
       if (consumeIf(tok::period)) {
         if (parseIdentifier(FieldName,
                             diags::expected_field_spec_name_tuple_expr) ||
-            parseToken(tok::equal, "expected '=' in tuple expression"))
+            parseToken(tok::equal, diags::expected_equal_in_tuple_expr))
           return true;
       }
       
@@ -435,7 +436,7 @@ ParseResult<Expr> Parser::parseExprParen() {
   }
   
   SourceLoc RPLoc = Tok.getLoc();  
-  if (parseToken(tok::r_paren, "expected ')' in parenthesis expression")) {
+  if (parseToken(tok::r_paren, diags::expected_rparen_parenthesis_expr)) {
     diagnose(LPLoc, diags::opening_paren);
     return true;
   }

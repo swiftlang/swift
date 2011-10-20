@@ -72,7 +72,7 @@ bool Parser::parseType(Type &Result, Diag<> MessageID) {
     if (parseTypeTupleBody(LPLoc, Result))
       return true;
 
-    if (parseToken(tok::r_paren, "expected ')' at end of tuple list",
+    if (parseToken(tok::r_paren, diags::expected_rparen_tuple_type_list,
                    tok::r_paren)) {
       diagnose(LPLoc, diags::opening_paren);
       return true;
@@ -205,7 +205,8 @@ bool Parser::parseTypeOneOf(Type &Result) {
 /// this.
 bool Parser::parseTypeOneOfBody(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
                                 Type &Result, TypeAliasDecl *TypeName) {
-  if (parseToken(tok::l_brace, "expected '{' in oneof"))
+  SourceLoc LBLoc = Tok.getLoc();
+  if (parseToken(tok::l_brace, diags::expected_lbrace_oneof_type))
     return true;
   
   SmallVector<OneOfElementInfo, 8> ElementInfos;
@@ -233,7 +234,9 @@ bool Parser::parseTypeOneOfBody(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
       break;
   }
   
-  parseToken(tok::r_brace, "expected '}' at end of oneof");
+  // FIXME: Helper for matching punctuation.
+  if (parseToken(tok::r_brace, diags::expected_rbrace_oneof_type))
+    diagnose(LBLoc, diags::opening_brace);
   
   Result = actOnOneOfType(OneOfLoc, Attrs, ElementInfos, TypeName);
   return false;
@@ -330,7 +333,7 @@ bool Parser::parseTypeArray(SourceLoc LSquareLoc, Type &Result) {
     return true;
   
   SourceLoc RArrayTok = Tok.getLoc();
-  if (parseToken(tok::r_square, "expected ']' in array type")) {
+  if (parseToken(tok::r_square, diags::expected_rbracket_array_type)) {
     diagnose(LSquareLoc, diags::opening_bracket);
     return true;
   }
@@ -389,7 +392,7 @@ bool Parser::parseTypeProtocolBody(SourceLoc ProtocolLoc,
                                    const DeclAttributes &Attributes,
                                    Type &Result, TypeAliasDecl *TypeName) {
   // Parse the body.
-  if (parseToken(tok::l_brace, "expected '{' in protocol"))
+  if (parseToken(tok::l_brace, diags::expected_lbrace_protocol_type))
     return true;
   
   SmallVector<ValueDecl*, 8> Elements;
