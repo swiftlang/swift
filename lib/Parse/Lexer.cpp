@@ -17,6 +17,7 @@
 #include "Lexer.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Identifier.h"
+#include "swift/Basic/Diagnostics.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PathV2.h"
 #include "llvm/Support/SourceMgr.h"
@@ -37,18 +38,9 @@ Lexer::Lexer(unsigned BufferID, ASTContext &context)
   lexImpl();
 }
 
-void Lexer::note(const char *Loc, const Twine &Message) {
-  Context.note(getSourceLoc(Loc), Message);
+void Lexer::diagnose(const char *Loc, Diag<> ID) {
+  Context.Diags.diagnose(getSourceLoc(Loc), ID);
 }
-
-void Lexer::warning(const char *Loc, const Twine &Message) {
-  Context.warning(getSourceLoc(Loc), Message);
-}
-
-void Lexer::error(const char *Loc, const Twine &Message) {
-  Context.error(getSourceLoc(Loc), Message);
-}
-
 
 void Lexer::formToken(tok Kind, const char *TokStart) {
   NextToken.setToken(Kind, StringRef(TokStart, CurPtr-TokStart));
@@ -72,13 +64,12 @@ void Lexer::skipSlashSlashComment() {
       // If this is a random nul character in the middle of a buffer, skip it as
       // whitespace.
       if (CurPtr-1 != Buffer->getBufferEnd()) {
-        warning(CurPtr-1, "nul character embedded in middle of file");
+        diagnose(CurPtr-1, diags::lex_nul_character);
         break;
       }
         
-      // Otherwise, we have a // comment at end of file, warn and return.
+      // Otherwise, we have a // comment at end of file.
       --CurPtr;
-      warning(CurPtr-1, "no newline at end of // comment");
       return;
     }
   }
@@ -117,14 +108,15 @@ void Lexer::skipSlashStarComment() {
       // If this is a random nul character in the middle of a buffer, skip it as
       // whitespace.
       if (CurPtr-1 != Buffer->getBufferEnd()) {
-        warning(CurPtr-1, "nul character embedded in middle of file");
+        diagnose(CurPtr-1, diags::lex_nul_character);
         break;
       }
       
       // Otherwise, we have an unterminated /* comment.
       --CurPtr;
-      error(CurPtr-(CurPtr[-1] == '\n'), "unterminated '/*' comment");
-      note(StartPtr, "comment started here");
+      diagnose(CurPtr-(CurPtr[-1] == '\n'),
+               diags::lex_unterminated_block_comment);
+      diagnose(StartPtr, diags::lex_comment_start);
       return;
     }
   }
@@ -228,7 +220,7 @@ Restart:
   
   switch (*CurPtr++) {
   default:
-    error(CurPtr-1, "invalid character in source file");
+    diagnose(CurPtr-1, diags::lex_invalid_character);
     return formToken(tok::unknown, TokStart);
 
   case ' ':
@@ -240,7 +232,7 @@ Restart:
     // If this is a random nul character in the middle of a buffer, skip it as
     // whitespace.
     if (CurPtr-1 != Buffer->getBufferEnd()) {
-      warning(CurPtr-1, "nul character embedded in middle of file");
+      diagnose(CurPtr-1, diags::lex_nul_character);
       goto Restart;
     }
       

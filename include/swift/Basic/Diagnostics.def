@@ -38,7 +38,7 @@
 #endif
 
 //==============================================================================
-// Parsing diagnostics
+// Lexing and Parsing diagnostics
 //==============================================================================
 
 ERROR(invalid_diagnostic,parsing,none,
@@ -60,6 +60,21 @@ NOTE(previous_declaration,parsing,none,
      "previous declaration of '%0' is here", (StringRef))
 NOTE(previous_definition,parsing,none,
      "previous definition of '%0' is here", (StringRef))
+
+//------------------------------------------------------------------------------
+// Lexer diagnostics
+//------------------------------------------------------------------------------
+
+WARNING(lex_nul_character,lexing,none,
+        "nul character embedded in middle of file", ())
+
+ERROR(lex_unterminated_block_comment,lexing,none,
+      "unterminated '/*' comment", ())
+NOTE(lex_comment_start,lexing,none,
+     "comment started here", ())
+
+ERROR(lex_invalid_character,lexing,none,
+       "invalid character in source file", ())
 
 //------------------------------------------------------------------------------
 // Declaration parsing diagnostics

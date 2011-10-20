@@ -28,6 +28,8 @@ namespace swift {
   class Token;
   class ASTContext;
   class Identifier;
+  template<typename ...T>
+  struct Diag;
 
 class Lexer {
   llvm::SourceMgr &SourceMgr;
@@ -58,9 +60,7 @@ private:
   static SourceLoc getSourceLoc(const char *Loc) {
     return SourceLoc(llvm::SMLoc::getFromPointer(Loc));
   }
-  void note(const char *Loc, const Twine &Message);
-  void warning(const char *Loc, const Twine &Message);
-  void error(const char *Loc, const Twine &Message);
+  void diagnose(const char *Loc, Diag<> ID);
   void lexImpl();
   void formToken(tok Kind, const char *TokStart);
   
