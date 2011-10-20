@@ -112,15 +112,9 @@ public:
   void warning(SourceLoc Loc, const Twine &Message);
   void error(SourceLoc Loc, const Twine &Message);
   
-  /// setHadError - This is called when an error message is emitted.
-  void setHadError() {
-    HadError = true;
-  }
+  bool hadError() const;
+  void setHadError() { HadError = true; }
   
-  bool hadError() const {
-    return HadError;
-  }
-
   //===--------------------------------------------------------------------===//
   // Type manipulation routines.
   //===--------------------------------------------------------------------===//

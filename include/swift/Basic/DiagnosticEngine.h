@@ -143,10 +143,18 @@ namespace swift {
     /// display diagnostics.
     llvm::SourceMgr &SourceMgr;
 
+    /// HadAnyError - True if any error diagnostics have been emitted.
+    bool HadAnyError;
+
   public:
     explicit DiagnosticEngine(llvm::SourceMgr &SourceMgr)
-      : SourceMgr(SourceMgr) { }
+      : SourceMgr(SourceMgr), HadAnyError(false) { }
 
+    /// hadAnyError - return true if any *error* diagnostics have been emitted.
+    bool hadAnyError() const {
+      return HadAnyError;
+    }
+    
     /// \brief Emit a diagnostic using a preformatted array of diagnostic
     /// arguments.
     ///

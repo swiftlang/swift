@@ -16,6 +16,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AST.h"
+#include "swift/Basic/DiagnosticEngine.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/DenseMap.h"
@@ -87,9 +88,14 @@ void ASTContext::warning(SourceLoc Loc, const Twine &Message) {
 }
 void ASTContext::error(SourceLoc Loc, const Twine &Message) {
   SourceMgr.PrintMessage(Loc.Value, llvm::SourceMgr::DK_Error, Message);
-  setHadError();
+  HadError = true;
+  // FIXME: When this goes away, remove ASTContext::hadError!
 }
 
+bool ASTContext::hadError() const {
+  // FIXME: When this goes away, remove ASTContext::hadError!
+  return HadError || Diags.hadAnyError();
+}
 
 
 //===----------------------------------------------------------------------===//

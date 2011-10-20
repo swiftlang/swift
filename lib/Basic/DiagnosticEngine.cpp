@@ -209,7 +209,10 @@ void DiagnosticEngine::diagnose(SourceLoc Loc, DiagID ID,
   // Determine what kind of diagnostic we're emitting.
   llvm::SourceMgr::DiagKind Kind;
   switch (Info.Kind) {
-  case DiagnosticKind::Error: Kind = llvm::SourceMgr::DK_Error; break;
+  case DiagnosticKind::Error:
+    HadAnyError = true;
+    Kind = llvm::SourceMgr::DK_Error;
+    break;
   case DiagnosticKind::Warning: Kind = llvm::SourceMgr::DK_Warning; break;
   case DiagnosticKind::Note: Kind = llvm::SourceMgr::DK_Note; break;
   }
