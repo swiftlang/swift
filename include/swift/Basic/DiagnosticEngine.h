@@ -20,6 +20,7 @@
 
 #include "swift/AST/LLVM.h"
 #include "swift/AST/Identifier.h"    // FIXME: Layering violation.
+#include "swift/AST/Type.h"          // FIXME: Layering violation.
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
@@ -81,7 +82,8 @@ namespace swift {
     String,
     UserString,  // A string from the user's code, printed in quotes.
     Integer,
-    Unsigned
+    Unsigned,
+    Type
   };
 
   /// \brief Variant type that holds a single diagnostic argument of a known
@@ -97,6 +99,7 @@ namespace swift {
         const char *Data;
         size_t Length;
       } StringVal;
+      Type TypeVal;
     };
     
   public:
@@ -117,6 +120,10 @@ namespace swift {
       Kind = DiagnosticArgumentKind::UserString;
     }
 
+    DiagnosticArgument(Type T)
+      : Kind(DiagnosticArgumentKind::Type), TypeVal(T) {
+    }
+
     DiagnosticArgumentKind getKind() const { return Kind; }
 
     StringRef getAsString() const {
@@ -133,6 +140,11 @@ namespace swift {
     unsigned getAsUnsigned() const {
       assert(Kind == DiagnosticArgumentKind::Unsigned);
       return UnsignedVal;
+    }
+    
+    Type getAsType() const {
+      assert(Kind == DiagnosticArgumentKind::Type);
+      return TypeVal;
     }
   };
   

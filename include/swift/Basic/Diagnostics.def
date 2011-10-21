@@ -349,7 +349,7 @@ ERROR(tuple_element_type_mismatch,sema_tcc,none,
       "element #%0 of tuple value has type '%1', but expected type '%2'",
       (unsigned, StringRef, StringRef))
 ERROR(invalid_conversion,sema_tcc,none,
-      "invalid conversion from type '%0' to '%1'", (StringRef, StringRef))
+      "invalid conversion from type %0 to %1", (Type, Type))
 
 
 //==============================================================================

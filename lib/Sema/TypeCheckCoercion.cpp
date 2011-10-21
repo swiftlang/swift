@@ -532,8 +532,7 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
     return SemaCoerce(TC, DestTy).doIt(E);
   
   // Could not do the conversion.
-  TC.error(E->getLoc(), "invalid conversion from type '" +
-           E->getType()->getString() + "' to '" + DestTy->getString() + "'");
+  TC.diagnose(E->getLoc(), diags::invalid_conversion, E->getType(), DestTy);
   return 0;
 }
 

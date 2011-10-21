@@ -14,6 +14,7 @@
 //  emitted by Swift.
 //
 //===----------------------------------------------------------------------===//
+
 #include "swift/Basic/DiagnosticEngine.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/SmallString.h"
@@ -135,6 +136,10 @@ static void formatDiagnosticArgument(StringRef Modifier,
   case DiagnosticArgumentKind::UserString:
     assert(Modifier.empty() && "Improper modifier for string argument");
     Out << '\'' << Arg.getAsString() << '\'';
+    break;
+  case DiagnosticArgumentKind::Type:
+    assert(Modifier.empty() && "Improper modifier for Type argument");
+    Out << '\'' << Arg.getAsType().getString() << '\'';
     break;
   }
 }
