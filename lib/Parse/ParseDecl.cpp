@@ -284,7 +284,7 @@ void Parser::actOnVarDeclName(const DeclVarName *Name,
     // allows type checking to resolve this later.
     if (Ty.isNull()) {
       diagnose(Name->getLocation(), diags::invalid_index_in_var_name_path,
-               Name->getIdentifier(), VD->Ty->getString());
+               Name->getIdentifier(), VD->Ty);
       return;
     }
     

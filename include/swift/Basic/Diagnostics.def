@@ -54,12 +54,12 @@ NOTE(opening_bracket,parsing,none,
 NOTE(opening_paren,parsing,none,
      "to match this opening '('", ())
 NOTE(previous_decldef,parsing,none,
-     "previous %select{declaration|definition}0 of '%1' is here", 
-     (bool, StringRef))
+     "previous %select{declaration|definition}0 of %1 is here", 
+     (bool, Identifier))
 NOTE(previous_declaration,parsing,none,
-     "previous declaration of '%0' is here", (StringRef))
+     "previous declaration of %0 is here", (Identifier))
 NOTE(previous_definition,parsing,none,
-     "previous definition of '%0' is here", (StringRef))
+     "previous definition of %0 is here", (Identifier))
 
 //------------------------------------------------------------------------------
 // Lexer diagnostics
@@ -100,7 +100,7 @@ ERROR(expected_lparen_var_name,decl_parsing,none,
 ERROR(expected_rparen_var_name,decl_parsing,none,
       "expected ')' at end of var name", ())
 ERROR(invalid_index_in_var_name_path,decl_parsing,none,
-      "%0 is an invalid index for '%1'", (Identifier, StringRef))
+      "%0 is an invalid index for %1", (Identifier, Type))
       
 // Import
 ERROR(import_inner_scope,decl_parsing,none,
@@ -137,7 +137,7 @@ ERROR(struct_not_tuple,decl_parsing,none,
 ERROR(expected_type,type_parsing,none,
       "expected type", ())
 ERROR(type_redefinition,type_parsing,none,
-      "redefinition of type '%0'", (StringRef))
+      "redefinition of type %0", (Identifier))
 ERROR(expected_identifier_after_coloncolon_type,expr_parsing,none,
       "expected identifier after %0 type", (Identifier))
 
@@ -231,7 +231,7 @@ ERROR(dollar_numeric_too_large,expr_parsing,none,
 ERROR(expected_identifier_after_colon_expr,expr_parsing,none,
       "expected identifier after ':' expression", ())
 ERROR(expected_identifier_after_coloncolon_expr,expr_parsing,none,
-      "expected identifier after %0' expression", (Identifier))
+      "expected identifier after %0 expression", (Identifier))
 ERROR(expected_field_spec_name_tuple_expr,expr_parsing,none,
       "expected field specifier name in tuple expression", ())    
 
@@ -327,27 +327,27 @@ ERROR(use_undeclared_type,sema_nb,none,
 //------------------------------------------------------------------------------
 
 ERROR(cannot_convert_dependent_reference,sema_tcc,none,
-      "dependent reference to member %0 cannot convert to '%1'",
-      (Identifier,StringRef))
+      "dependent reference to member %0 cannot convert to %1",
+      (Identifier,Type))
 ERROR(invalid_member_in_type,sema_tcc,none,
-      "type '%0' has no member named %1", (StringRef, Identifier))
+      "type %0 has no member named %1", (Type, Identifier))
 ERROR(invalid_type_to_initialize_member,sema_tcc,none,
-      "invalid type '%0' to initialize member", (StringRef))
+      "invalid type %0 to initialize member", (Type))
 ERROR(not_initialized_tuple_element,sema_tcc,none,
-      "no value to initialize tuple element #%0 in expression of type '%1'",
-      (unsigned, StringRef))
+      "no value to initialize tuple element #%0 in expression of type %1",
+      (unsigned, Type))
 ERROR(not_initialized_named_tuple_element,sema_tcc,none,
-     "no value to initialize tuple element %0 (#%1) in expression of type '%2'",
-      (Identifier, unsigned, StringRef))
+     "no value to initialize tuple element %0 (#%1) in expression of type %2",
+      (Identifier, unsigned, Type))
 ERROR(tuple_element_not_used,sema_tcc,none,
-      "element #%0 of tuple value not used when converting to type '%1'",
-      (unsigned, StringRef))
+      "element #%0 of tuple value not used when converting to type %1",
+      (unsigned, Type))
 ERROR(named_tuple_element_not_used,sema_tcc,none,
-      "element %0 (#%1) of tuple value not used when converting to type '%1'",
-      (Identifier, unsigned, StringRef))
+      "element %0 (#%1) of tuple value not used when converting to type %2",
+      (Identifier, unsigned, Type))
 ERROR(tuple_element_type_mismatch,sema_tcc,none,
-      "element #%0 of tuple value has type '%1', but expected type '%2'",
-      (unsigned, StringRef, StringRef))
+      "element #%0 of tuple value has type %1, but expected type %2",
+      (unsigned, Type, Type))
 ERROR(invalid_conversion,sema_tcc,none,
       "invalid conversion from type %0 to %1", (Type, Type))
 

@@ -68,7 +68,7 @@ public:
     OneOfType *DT = DestTy->getAs<OneOfType>();
     if (DT == 0) {
       TC.diagnose(UME->getLoc(), diags::cannot_convert_dependent_reference,
-                  UME->getName(), DestTy->getString());
+                  UME->getName(), DestTy);
       return 0;
     }
     
@@ -76,7 +76,7 @@ public:
     OneOfElementDecl *DED = DT->getElement(UME->getName());
     if (DED == 0) {
       TC.diagnose(UME->getLoc(), diags::invalid_member_in_type,
-                  DestTy->getString(), UME->getName());
+                  DestTy, UME->getName());
       TC.diagnose(DT->OneOfLoc, diags::type_declared_here);
       return 0;
     }
@@ -124,7 +124,7 @@ public:
         OneOfElementDecl *DED = DT->getElement(UME->getName());
         if (DED == 0 || !DED->Ty->is<FunctionType>()) {
           TC.diagnose(UME->getLoc(), diags::invalid_type_to_initialize_member,
-                      DestTy->getString());
+                      DestTy);
           return 0;
         }
 
@@ -311,10 +311,10 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       
       if (DestTy->Fields[i].Name.empty())
         TC.diagnose(ErrorLoc, diags::not_initialized_tuple_element, i,
-                    E->getType()->getString());
+                    E->getType());
       else
         TC.diagnose(ErrorLoc, diags::not_initialized_named_tuple_element,
-                    DestTy->Fields[i].Name, i, E->getType()->getString());
+                    DestTy->Fields[i].Name, i, E->getType());
       return 0;
     }
     
@@ -334,10 +334,10 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
           ErrorLoc = SubExp->getLoc();
       
     if (IdentList[i].empty())
-      TC.diagnose(ErrorLoc, diags::tuple_element_not_used, i, DestTy->getString());
+      TC.diagnose(ErrorLoc, diags::tuple_element_not_used, i, DestTy);
     else
       TC.diagnose(ErrorLoc, diags::named_tuple_element_not_used, IdentList[i],
-                  i, DestTy->getString());
+                  i, DestTy);
       return 0;
     }
   
@@ -396,8 +396,8 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     
     if (!ETy->getElementType(SrcField)->isEqual(DestTy->getElementType(i))) {
       TC.diagnose(E->getLoc(), diags::tuple_element_type_mismatch, i,
-                  ETy->getElementType(SrcField)->getString(),
-                  DestTy->getElementType(i)->getString());
+                  ETy->getElementType(SrcField),
+                  DestTy->getElementType(i));
       return 0;
     }
     

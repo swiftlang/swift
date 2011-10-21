@@ -270,7 +270,7 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
       for (unsigned I = 0, N = EltDecls.size(); I != N; ++I) {
         if (EltDecls[I]->Name == NameI) {
           diagnose(EltDecls[I]->getLocStart(), diags::previous_definition,
-                   Elt.Name);
+                   NameI);
           break;
         }
       }

@@ -102,7 +102,7 @@ static void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New, Parser &P) {
   assert(New != Prev && "Cannot conflict with self");
   P.diagnose(New->getLocStart(), diags::decl_redefinition, New->Init != 0);
   P.diagnose(Prev->getLocStart(), diags::previous_decldef, Prev->Init != 0,
-             Prev->Name.str());
+             Prev->Name);
 }
 
 /// checkValidOverload - Check whether it is ok for D1 and D2 to be declared at
@@ -116,7 +116,7 @@ static bool checkValidOverload(const ValueDecl *D1, const ValueDecl *D2,
     P.diagnose(D1->getLocStart(), diags::precedence_overload);
     // FIXME: Pass identifier through, when the diagnostics system can handle
     // it.
-    P.diagnose(D2->getLocStart(), diags::previous_declaration, D2->Name.str());
+    P.diagnose(D2->getLocStart(), diags::previous_declaration, D2->Name);
     return true;
   }
   
@@ -189,7 +189,7 @@ TypeAliasDecl *ScopeInfo::addTypeAliasToScope(SourceLoc TypeAliasLoc,
   // the same name.
   // FIXME: Pass the identifier through, when the diagnostics system can handle
   // it.
-  TheParser.diagnose(TypeAliasLoc, diags::type_redefinition, Name.str());
-  TheParser.diagnose(TAD->getLocStart(), diags::previous_definition, Name.str());
+  TheParser.diagnose(TypeAliasLoc, diags::type_redefinition, Name);
+  TheParser.diagnose(TAD->getLocStart(), diags::previous_definition, Name);
   return TAD;
 }
