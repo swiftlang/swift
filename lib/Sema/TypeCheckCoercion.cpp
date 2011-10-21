@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecking.h"
+#include "swift/Basic/Diagnostics.h"
 #include "swift/AST/ASTVisitor.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
@@ -66,19 +67,17 @@ public:
     // The only valid type for an UME is a OneOfType.
     OneOfType *DT = DestTy->getAs<OneOfType>();
     if (DT == 0) {
-      TC.error(UME->getLoc(),
-               "dependent reference to member '" + UME->getName().str() +
-               "' cannot convert to '" + DestTy->getString() + "'");
+      TC.diagnose(UME->getLoc(), diags::cannot_convert_dependent_reference,
+                  UME->getName(), DestTy->getString());
       return 0;
     }
     
     // The oneof type must have an element of the specified name.
     OneOfElementDecl *DED = DT->getElement(UME->getName());
     if (DED == 0) {
-      TC.error(UME->getLoc(),
-               "type '" + DestTy->getString() + "' has no member named '" +
-               UME->getName().str() + "'");
-      TC.note(DT->OneOfLoc, "type declared here");
+      TC.diagnose(UME->getLoc(), diags::invalid_member_in_type,
+                  DestTy->getString(), UME->getName());
+      TC.diagnose(DT->OneOfLoc, diags::type_declared_here);
       return 0;
     }
     
@@ -124,8 +123,8 @@ public:
         // The oneof type must have an element of the specified name.
         OneOfElementDecl *DED = DT->getElement(UME->getName());
         if (DED == 0 || !DED->Ty->is<FunctionType>()) {
-          TC.error(UME->getLoc(), "invalid type '" +
-                   DestTy->getString() + "' to initialize member");
+          TC.diagnose(UME->getLoc(), diags::invalid_type_to_initialize_member,
+                      DestTy->getString());
           return 0;
         }
 
@@ -311,13 +310,11 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
         ErrorLoc = TE->getRParenLoc();
       
       if (DestTy->Fields[i].Name.empty())
-        TC.error(ErrorLoc, "no value to initialize tuple element #" +
-                 Twine(i) + " in expression of type '" +
-                 E->getType()->getString() + "'");
+        TC.diagnose(ErrorLoc, diags::not_initialized_tuple_element, i,
+                    E->getType()->getString());
       else
-        TC.error(ErrorLoc, "no value to initialize tuple element '" +
-                 DestTy->Fields[i].Name.str() + "' (#" + Twine(i) +
-                 ") in expression of type '" + E->getType()->getString() + "'");
+        TC.diagnose(ErrorLoc, diags::not_initialized_named_tuple_element,
+                    DestTy->Fields[i].Name, i, E->getType()->getString());
       return 0;
     }
     
@@ -337,13 +334,10 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
           ErrorLoc = SubExp->getLoc();
       
     if (IdentList[i].empty())
-      TC.error(ErrorLoc, "element #" + Twine(i) +
-               " of tuple value not used when converting to type '" +
-               DestTy->getString() + "'");
+      TC.diagnose(ErrorLoc, diags::tuple_element_not_used, i, DestTy->getString());
     else
-      TC.error(ErrorLoc, "tuple element '" + IdentList[i].str() +
-               "' (#" + Twine(i) + ") of tuple value not used when "
-               "converting to type '" + DestTy->getString() + "'");
+      TC.diagnose(ErrorLoc, diags::named_tuple_element_not_used, IdentList[i],
+                  i, DestTy->getString());
       return 0;
     }
   
@@ -401,11 +395,9 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     }
     
     if (!ETy->getElementType(SrcField)->isEqual(DestTy->getElementType(i))) {
-      TC.error(E->getLoc(), "element #" + Twine(i) +
-               " of tuple value has type '" +
-               ETy->getElementType(SrcField)->getString() +
-               "', but expected type '" + 
-               DestTy->getElementType(i)->getString() + "'");
+      TC.diagnose(E->getLoc(), diags::tuple_element_type_mismatch, i,
+                  ETy->getElementType(SrcField)->getString(),
+                  DestTy->getElementType(i)->getString());
       return 0;
     }
     

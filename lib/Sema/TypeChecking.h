@@ -18,6 +18,7 @@
 #define TYPECHECKING_H
 
 #include "swift/AST/AST.h"
+#include "swift/Basic/DiagnosticEngine.h"
 
 namespace swift {
 
@@ -26,13 +27,18 @@ public:
   ASTContext &Context;
   TypeChecker(ASTContext &C) : Context(C) {}
   
-  void note(SourceLoc Loc, const Twine &Message) {
+  template<typename ...ArgTypes>
+  void diagnose(ArgTypes... Args) {
+    Context.Diags.diagnose(Args...);
+  }
+
+  void note(SourceLoc Loc, const Twine &Message) __attribute__((deprecated)) {
     Context.note(Loc, Message);
   }
-  void warning(SourceLoc Loc, const Twine &Message) {
+  void warning(SourceLoc Loc, const Twine &Message) __attribute__((deprecated)){
     Context.warning(Loc, Message);
   }
-  void error(SourceLoc Loc, const Twine &Message) {
+  void error(SourceLoc Loc, const Twine &Message) __attribute__((deprecated)) {
     Context.error(Loc, Message);
   }
   
