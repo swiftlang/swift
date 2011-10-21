@@ -18,6 +18,8 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Verifier.h"
+#include "swift/Basic/DiagnosticEngine.h"
+#include "swift/Basic/Diagnostics.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -177,6 +179,11 @@ namespace {
         delete M;
     }
     
+    template<typename ...ArgTypes>
+    void diagnose(ArgTypes... Args) {
+      Context.Diags.diagnose(Args...);
+    }
+    
     void addNamedTopLevelDecl(ValueDecl *VD) {
       TopLevelValues[VD->Name].push_back(VD);
     }
@@ -192,15 +199,6 @@ namespace {
     
     TypeAliasDecl *lookupTypeName(Identifier I);
     
-    void note(SourceLoc Loc, const Twine &Message) {
-      Context.note(Loc, Message);
-    }
-    void warning(SourceLoc Loc, const Twine &Message) {
-      Context.warning(Loc, Message);
-    }
-    void error(SourceLoc Loc, const Twine &Message) {
-      Context.error(Loc, Message);
-    }
   private:
     /// getModuleProvider - Load a module referenced by an import statement,
     /// emitting an error at the specified location and returning null on
@@ -261,9 +259,8 @@ getModuleProvider(std::pair<Identifier, SourceLoc> ModuleID) {
   llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
   if (llvm::error_code Err = findModule(ModuleID.first.str(), ModuleID.second,
                                         InputFile)) {
-    error(ModuleID.second,
-          "opening import file '" + ModuleID.first.str() + ".swift': " 
-          + Err.message());
+    diagnose(ModuleID.second, diags::sema_opening_import,
+             ModuleID.first.str(), Err.message());
     return 0;
   }
 
@@ -294,9 +291,10 @@ void NameBinder::addImport(ImportDecl *ID) {
   
   // FIXME: Validate the access path against the module.  Reject things like
   // import swift.aslkdfja
-  if (ID->AccessPath.size() > 2)
-    return error(ID->AccessPath[2].second,
-                 "invalid declaration referenced in import");
+  if (ID->AccessPath.size() > 2) {
+    diagnose(ID->AccessPath[2].second, diags::invalid_declaration_imported);
+    return;
+  }
   
   Imports.push_back(std::make_pair(ID, MP));
 }
@@ -369,7 +367,7 @@ BoundScope NameBinder::bindScopeName(TypeAliasDecl *TypeFromScope,
       if (ImpEntry.first->AccessPath.back().first == Name)
         return &ImpEntry;
     
-    error(NameLoc, "no such module or type");
+    diagnose(NameLoc, diags::no_module_or_type);
     return BoundScope();
   }
 
@@ -388,13 +386,12 @@ BoundScope NameBinder::bindScopeName(TypeAliasDecl *TypeFromScope,
   // Reject things like int::x.
   OneOfType *DT = dyn_cast<OneOfType>(Ty);
   if (DT == 0) {
-    error(NameLoc, "invalid type '" + Name.str() + "' for scoped access");
+    diagnose(NameLoc, diags::invalid_type_scoped_access, Name);
     return BoundScope();
   }
     
   if (DT->Elements.empty()) {
-    error(NameLoc, "oneof '" + Name.str() +
-          "' is not complete or has no elements");
+    diagnose(NameLoc, diags::incomplete_or_empty_oneof, Name);
     return BoundScope();
   }
 
@@ -445,8 +442,7 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
     if (OneOfType *Ty = Scope.dyn_cast<OneOfType*>()) {
       OneOfElementDecl *Elt = Ty->getElement(Name);
       if (Elt == 0) {
-        Binder.error(Loc, "'" + Name.str() + "' is not a member of '" +
-                     BaseName.str() + "'");
+        Binder.diagnose(Loc, diags::invalid_member, Name, BaseName);
         return 0;
       }
       Decls.push_back(Elt);
@@ -462,7 +458,7 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
   }
 
   if (Decls.empty()) {
-    Binder.error(Loc, "use of unresolved identifier '" + Name.str() + "'");
+    Binder.diagnose(Loc, diags::use_unresolved_identifier, Name);
     return 0;
   }
 
@@ -514,8 +510,7 @@ void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
       continue;
     }
     
-    Binder.error(TA->getLocStart(),
-                 "use of undeclared type '" + TA->Name.str() + "'");
+    Binder.diagnose(TA->getLocStart(), diags::use_undeclared_type, TA->Name);
     
     TA->UnderlyingTy = ErrorType::get(Ctx);
   }
@@ -540,8 +535,8 @@ void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
     if (Alias) {
       BaseAndType.second->UnderlyingTy = Alias->getAliasType(Binder.Context);
     } else {
-      Binder.error(NameLoc, "'" + Name.str() + "' is not a member type of '" +
-                   BaseAndType.first->Name.str() + "'");
+      Binder.diagnose(NameLoc, diags::invalid_member_type,
+                      Name, BaseAndType.first->Name);
       BaseAndType.second->UnderlyingTy = Binder.Context.TheErrorType;
     }
   }

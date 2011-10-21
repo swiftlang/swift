@@ -291,9 +291,36 @@ ERROR(oneof_attributes,attribute_parsing,none,
 ERROR(protocol_attributes,attribute_parsing,none,
       "protocol types are not allowed to have attributes", ())
 
+//==============================================================================
+// Semantic Analysis Diagnostics
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// Name Binding
+//------------------------------------------------------------------------------
+
+ERROR(sema_opening_import,sema_nb,none,
+      "opening import file '%0.swift': %1", (StringRef, StringRef))
+ERROR(invalid_declaration_imported,sema_nb,none,
+      "invalid declaration referenced in import", ())
+
+ERROR(no_module_or_type,sema_nb,none,
+      "no such module or type", ())
+ERROR(invalid_type_scoped_access,sema_nb,none,
+      "invalid type %0 for scoped access", (Identifier))
+ERROR(incomplete_or_empty_oneof,sema_nb,none,
+      "oneof %0 is not complete or has no elements", (Identifier))
+ERROR(invalid_member,sema_nb,none,
+      "%0 is not a member of %1", (Identifier, Identifier))
+ERROR(invalid_member_type,sema_nb,none,
+      "%0 is not a member type of %1", (Identifier, Identifier))
+ERROR(use_unresolved_identifier,sema_nb,none,
+      "use of unresolved identifier %0", (Identifier))
+ERROR(use_undeclared_type,sema_nb,none,
+      "use of undeclared type %0", (Identifier))
 
 //==============================================================================
-// IR Generation diagnostics
+// IR Generation Diagnostics
 //==============================================================================
 
 ERROR(irgen_unimplemented,irgen,none,
