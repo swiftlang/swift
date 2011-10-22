@@ -95,18 +95,14 @@ namespace swift {
     union {
       int IntegerVal;
       unsigned UnsignedVal;
-      struct {
-        const char *Data;
-        size_t Length;
-      } StringVal;
+      StringRef StringVal;
       Identifier IdentifierVal;
       Type TypeVal;
     };
     
   public:
-    DiagnosticArgument(StringRef S) : Kind(DiagnosticArgumentKind::String) {
-      StringVal.Data = S.data();
-      StringVal.Length = S.size();
+    DiagnosticArgument(StringRef S)
+      : Kind(DiagnosticArgumentKind::String), StringVal(S) {
     }
 
     DiagnosticArgument(int I) 
@@ -129,7 +125,7 @@ namespace swift {
 
     StringRef getAsString() const {
       assert(Kind == DiagnosticArgumentKind::String);
-      return StringRef(StringVal.Data, StringVal.Length);
+      return StringVal;
     }
 
     int getAsInteger() const {
