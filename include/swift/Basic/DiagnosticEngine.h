@@ -80,9 +80,9 @@ namespace swift {
   ///
   enum class DiagnosticArgumentKind {
     String,
-    UserString,  // A string from the user's code, printed in quotes.
     Integer,
     Unsigned,
+    Identifier,
     Type
   };
 
@@ -99,6 +99,7 @@ namespace swift {
         const char *Data;
         size_t Length;
       } StringVal;
+      Identifier IdentifierVal;
       Type TypeVal;
     };
     
@@ -109,15 +110,15 @@ namespace swift {
     }
 
     DiagnosticArgument(int I) 
-      : Kind(DiagnosticArgumentKind::Integer),
-        IntegerVal(I) { }
+      : Kind(DiagnosticArgumentKind::Integer), IntegerVal(I) {
+    }
 
     DiagnosticArgument(unsigned I) 
-      : Kind(DiagnosticArgumentKind::Unsigned),
-        UnsignedVal(I) { }
+      : Kind(DiagnosticArgumentKind::Unsigned), UnsignedVal(I) {
+    }
 
-    DiagnosticArgument(Identifier I) : DiagnosticArgument(I.str()) {
-      Kind = DiagnosticArgumentKind::UserString;
+    DiagnosticArgument(Identifier I)
+      : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(I) {
     }
 
     DiagnosticArgument(Type T)
@@ -127,8 +128,7 @@ namespace swift {
     DiagnosticArgumentKind getKind() const { return Kind; }
 
     StringRef getAsString() const {
-      assert(Kind == DiagnosticArgumentKind::String ||
-             Kind == DiagnosticArgumentKind::UserString);
+      assert(Kind == DiagnosticArgumentKind::String);
       return StringRef(StringVal.Data, StringVal.Length);
     }
 
@@ -141,7 +141,12 @@ namespace swift {
       assert(Kind == DiagnosticArgumentKind::Unsigned);
       return UnsignedVal;
     }
-    
+
+    Identifier getAsIdentifier() const {
+      assert(Kind == DiagnosticArgumentKind::Identifier);
+      return IdentifierVal;
+    }
+
     Type getAsType() const {
       assert(Kind == DiagnosticArgumentKind::Type);
       return TypeVal;

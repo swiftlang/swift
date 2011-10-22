@@ -133,9 +133,9 @@ static void formatDiagnosticArgument(StringRef Modifier,
     Out << Arg.getAsString();
     break;
 
-  case DiagnosticArgumentKind::UserString:
-    assert(Modifier.empty() && "Improper modifier for string argument");
-    Out << '\'' << Arg.getAsString() << '\'';
+  case DiagnosticArgumentKind::Identifier:
+    assert(Modifier.empty() && "Improper modifier for identifier argument");
+    Out << '\'' << Arg.getAsIdentifier() << '\'';
     break;
   case DiagnosticArgumentKind::Type:
     assert(Modifier.empty() && "Improper modifier for Type argument");
