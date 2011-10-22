@@ -18,8 +18,7 @@
 #define TYPECHECKING_H
 
 #include "swift/AST/AST.h"
-#include "swift/Basic/Diagnostics.h"
-#include "swift/Basic/DiagnosticEngine.h"
+#include "swift/AST/Diagnostics.h"
 
 namespace swift {
 

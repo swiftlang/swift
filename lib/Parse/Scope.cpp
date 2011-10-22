@@ -16,7 +16,6 @@
 
 #include "Scope.h"
 #include "Parser.h"
-#include "swift/Basic/Diagnostics.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 

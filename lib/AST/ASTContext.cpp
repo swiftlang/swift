@@ -16,7 +16,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AST.h"
-#include "swift/Basic/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/DenseMap.h"

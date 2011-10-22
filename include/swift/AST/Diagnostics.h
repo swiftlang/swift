@@ -18,7 +18,7 @@
 #define SWIFT_DIAGNOSTICS_H
 
 #include "swift/AST/LLVM.h"
-#include "swift/Basic/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticEngine.h"
 
 namespace swift {
   namespace detail {

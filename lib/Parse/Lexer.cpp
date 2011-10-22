@@ -16,8 +16,8 @@
 
 #include "Lexer.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Diagnostics.h"
 #include "swift/AST/Identifier.h"
-#include "swift/Basic/Diagnostics.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PathV2.h"
 #include "llvm/Support/SourceMgr.h"

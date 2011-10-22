@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Parser.h"
-#include "swift/Basic/Diagnostics.h"
+#include "swift/AST/Diagnostics.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/ADT/APFloat.h"

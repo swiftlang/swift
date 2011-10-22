@@ -13,7 +13,8 @@
 //  This file defines all of the diagnostics emitted by Swift.
 //
 //===----------------------------------------------------------------------===//
-#include "swift/Basic/Diagnostics.h"
+
+#include "swift/AST/Diagnostics.h"
 
 using namespace swift;
 
@@ -22,4 +23,4 @@ using namespace swift;
 #define DIAG(KIND,ID,Category,Options,Text,Signature) \
   detail::DiagWithArguments<void Signature>::type swift::diag::ID \
     = { DiagID::ID };
-#include "swift/Basic/Diagnostics.def"  
+#include "swift/AST/Diagnostics.def"  

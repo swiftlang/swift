@@ -16,7 +16,7 @@
 
 #include "swift/Subsystems.h"
 #include "swift/AST/Verifier.h"
-#include "swift/Basic/Diagnostics.h"
+#include "swift/AST/Diagnostics.h"
 #include "Parser.h"
 #include "Lexer.h"
 #include "llvm/Support/SourceMgr.h"

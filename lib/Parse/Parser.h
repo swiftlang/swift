@@ -21,7 +21,7 @@
 #include "Scope.h"
 #include "Token.h"
 #include "swift/AST/AST.h"
-#include "swift/Basic/DiagnosticEngine.h"
+#include "swift/AST/Diagnostics.h"
 
 namespace llvm {
   class SourceMgr;

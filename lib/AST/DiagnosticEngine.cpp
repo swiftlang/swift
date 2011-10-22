@@ -15,15 +15,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/raw_ostream.h"
-
 using namespace swift;
-
-
 
 struct DiagnosticInfo {
   /// \brief The kind of diagnostic we're dealing with.
@@ -42,7 +39,7 @@ static DiagnosticInfo DiagnosticInfos[] = {
   { DiagnosticKind::Warning, Text },
 #define NOTE(ID,Category,Options,Text,Signature) \
   { DiagnosticKind::Note, Text },
-#include "swift/Basic/Diagnostics.def"
+#include "swift/AST/Diagnostics.def"
   { DiagnosticKind::Error, "<not a diagnostic>" }
 };
 
