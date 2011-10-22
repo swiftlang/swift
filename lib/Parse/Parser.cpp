@@ -83,15 +83,14 @@ void Parser::skipUntil(tok T1, tok T2) {
 
 /// parseIdentifier - Consume an identifier if present and return its name in
 /// Result.  Otherwise, emit an error and return true.
-bool Parser::parseIdentifier(Identifier &Result, DiagID Message,
-                             ArrayRef<DiagnosticArgument> Args) {
+bool Parser::parseIdentifier(Identifier &Result, const Diagnostic &D) {
   if (Tok.is(tok::identifier) || Tok.is(tok::oper)) {
     Result = Context.getIdentifier(Tok.getText());
     consumeToken();
     return false;
   }
   
-  Diags.diagnose(Tok.getLoc(), Message, Args);
+  Diags.diagnose(Tok.getLoc(), D);
   return true;
 }
 
