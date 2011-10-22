@@ -79,19 +79,6 @@ Identifier ASTContext::getIdentifier(StringRef Str) {
   return Identifier(Table.GetOrCreateValue(Str).getKeyData());
 }
 
-void ASTContext::note(SourceLoc Loc, const Twine &Message) {
-  SourceMgr.PrintMessage(Loc.Value, llvm::SourceMgr::DK_Note, Message);
-}
-
-void ASTContext::warning(SourceLoc Loc, const Twine &Message) {
-  SourceMgr.PrintMessage(Loc.Value, llvm::SourceMgr::DK_Warning, Message);
-}
-void ASTContext::error(SourceLoc Loc, const Twine &Message) {
-  SourceMgr.PrintMessage(Loc.Value, llvm::SourceMgr::DK_Error, Message);
-  HadError = true;
-  // FIXME: When this goes away, remove ASTContext::hadError!
-}
-
 bool ASTContext::hadError() const {
   // FIXME: When this goes away, remove ASTContext::hadError!
   return HadError || Diags.hadAnyError();

@@ -108,10 +108,6 @@ public:
   // Diagnostics Helper functions
   //===--------------------------------------------------------------------===//
 
-  void note(SourceLoc Loc, const Twine &Message) __attribute__((deprecated));
-  void warning(SourceLoc Loc, const Twine &Message) __attribute__((deprecated));
-  void error(SourceLoc Loc, const Twine &Message) __attribute__((deprecated));
-  
   bool hadError() const;
   void setHadError() { HadError = true; }
   
