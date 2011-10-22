@@ -80,7 +80,7 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     case tok::kw_import:
       if (Decl *Import = parseDeclImport()) {
         if (!IsTopLevel) {
-          diagnose(Import->getLocStart(), diags::import_inner_scope);
+          diagnose(Import->getLocStart(), diag::import_inner_scope);
           // FIXME: Mark declaration invalid, so we can still push it.
         } else {
           Entries.push_back(Import);
@@ -115,7 +115,7 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       // FALL THROUGH into expression case.
     default:
       ParseResult<Expr> ResultExpr;
-      if ((ResultExpr = parseExpr(diags::expected_expr))) {
+      if ((ResultExpr = parseExpr(diag::expected_expr))) {
         NeedParseErrorRecovery = true;
         break;
       }
@@ -130,7 +130,7 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
         
       SourceLoc EqualLoc = consumeToken();
       ParseResult<Expr> RHSExpr;
-      if ((RHSExpr = parseExpr(diags::expected_expr_assignment))) {
+      if ((RHSExpr = parseExpr(diag::expected_expr_assignment))) {
         NeedParseErrorRecovery = true;
         break;
       }
@@ -168,10 +168,10 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
 ParseResult<Stmt> Parser::parseStmtOtherThanAssignment() {
   switch (Tok.getKind()) {
   default:
-    diagnose(Tok, diags::expected_stmt);
+    diagnose(Tok, diag::expected_stmt);
     return true;
   case tok::semi:      return new (Context) SemiStmt(consumeToken(tok::semi));
-  case tok::l_brace:   return parseStmtBrace(diags::invalid_diagnostic);
+  case tok::l_brace:   return parseStmtBrace(diag::invalid_diagnostic);
   case tok::kw_return: return parseStmtReturn();
   case tok::kw_if:     return parseStmtIf();
   case tok::kw_while:  return parseStmtWhile();
@@ -197,9 +197,9 @@ ParseResult<BraceStmt> Parser::parseStmtBrace(Diag<> ID) {
     return true;
   
   SourceLoc RBLoc = Tok.getLoc();
-  if (parseToken(tok::r_brace, diags::expected_rbrace_in_brace_stmt,
+  if (parseToken(tok::r_brace, diag::expected_rbrace_in_brace_stmt,
                  tok::r_brace)) {
-    diagnose(LBLoc, diags::opening_brace);
+    diagnose(LBLoc, diag::opening_brace);
     return true;
   }
   
@@ -218,7 +218,7 @@ ParseResult<Stmt> Parser::parseStmtReturn() {
   // enclosing stmt-brace to get it by eagerly eating it.
   ParseResult<Expr> Result;
   if (isStartOfExpr(Tok, peekToken())) {
-    if ((Result = parseExpr(diags::expected_expr_return)))
+    if ((Result = parseExpr(diag::expected_expr_return)))
       return true;
   } else {
     // Result value defaults to ().
@@ -242,8 +242,8 @@ ParseResult<Stmt> Parser::parseStmtIf() {
 
   ParseResult<Expr> Condition;
   ParseResult<BraceStmt> NormalBody;
-  if ((Condition = parseSingleExpr(diags::expected_expr_if)) ||
-      (NormalBody = parseStmtBrace(diags::expected_lbrace_after_if)))
+  if ((Condition = parseSingleExpr(diag::expected_expr_if)) ||
+      (NormalBody = parseStmtBrace(diag::expected_lbrace_after_if)))
     return true;
     
   ParseResult<Stmt> ElseBody;
@@ -252,7 +252,7 @@ ParseResult<Stmt> Parser::parseStmtIf() {
     if (Tok.is(tok::kw_if))
       ElseBody = parseStmtIf();
     else
-      ElseBody = parseStmtBrace(diags::expected_lbrace_after_else);
+      ElseBody = parseStmtBrace(diag::expected_lbrace_after_else);
     if (ElseBody.isParseError()) return true;
   } else {
     ElseLoc = SourceLoc();
@@ -281,8 +281,8 @@ ParseResult<Stmt> Parser::parseStmtWhile() {
   
   ParseResult<Expr> Condition;
   ParseResult<BraceStmt> Body;
-  if ((Condition = parseSingleExpr(diags::expected_expr_while)) ||
-      (Body = parseStmtBrace(diags::expected_lbrace_after_while)))
+  if ((Condition = parseSingleExpr(diag::expected_expr_while)) ||
+      (Body = parseStmtBrace(diag::expected_lbrace_after_while)))
     return true;
   
   // If our condition and normal expression parsed correctly, build an AST.

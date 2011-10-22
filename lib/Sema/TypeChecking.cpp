@@ -65,7 +65,7 @@ struct RewriteAnonArgExpr {
     // Verify that the argument number isn't too large, e.g. using $4 when the
     // bound function only has 2 inputs.
     if (A->getArgNumber() >= NumInputArgs) {
-      TC.diagnose(A->getLoc(), diags::invalid_anonymous_argument,
+      TC.diagnose(A->getLoc(), diag::invalid_anonymous_argument,
                   A->getArgNumber(), NumInputArgs);
       return 0;
     }

@@ -83,7 +83,7 @@ public:
   
   Stmt *visitReturnStmt(ReturnStmt *RS) {
     if (TheFunc == 0) {
-      TC.diagnose(RS->getReturnLoc(), diags::return_invalid_outside_func);
+      TC.diagnose(RS->getReturnLoc(), diag::return_invalid_outside_func);
       return 0;
     }
 
@@ -145,7 +145,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
       // dead?
       // FIXME: TODO: QOI: Add source range.
       if (SubExpr->getType()->is<FunctionType>())
-        TC.diagnose(SubExpr->getLoc(), diags::expression_unresolved_function);
+        TC.diagnose(SubExpr->getLoc(), diag::expression_unresolved_function);
       
       BS->setElement(i, SubExpr);
       continue;

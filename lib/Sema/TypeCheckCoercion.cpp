@@ -66,7 +66,7 @@ public:
     // The only valid type for an UME is a OneOfType.
     OneOfType *DT = DestTy->getAs<OneOfType>();
     if (DT == 0) {
-      TC.diagnose(UME->getLoc(), diags::cannot_convert_dependent_reference,
+      TC.diagnose(UME->getLoc(), diag::cannot_convert_dependent_reference,
                   UME->getName(), DestTy);
       return 0;
     }
@@ -74,9 +74,9 @@ public:
     // The oneof type must have an element of the specified name.
     OneOfElementDecl *DED = DT->getElement(UME->getName());
     if (DED == 0) {
-      TC.diagnose(UME->getLoc(), diags::invalid_member_in_type,
+      TC.diagnose(UME->getLoc(), diag::invalid_member_in_type,
                   DestTy, UME->getName());
-      TC.diagnose(DT->OneOfLoc, diags::type_declared_here);
+      TC.diagnose(DT->OneOfLoc, diag::type_declared_here);
       return 0;
     }
     
@@ -122,7 +122,7 @@ public:
         // The oneof type must have an element of the specified name.
         OneOfElementDecl *DED = DT->getElement(UME->getName());
         if (DED == 0 || !DED->Ty->is<FunctionType>()) {
-          TC.diagnose(UME->getLoc(), diags::invalid_type_to_initialize_member,
+          TC.diagnose(UME->getLoc(), diag::invalid_type_to_initialize_member,
                       DestTy);
           return 0;
         }
@@ -309,10 +309,10 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
         ErrorLoc = TE->getRParenLoc();
       
       if (DestTy->Fields[i].Name.empty())
-        TC.diagnose(ErrorLoc, diags::not_initialized_tuple_element, i,
+        TC.diagnose(ErrorLoc, diag::not_initialized_tuple_element, i,
                     E->getType());
       else
-        TC.diagnose(ErrorLoc, diags::not_initialized_named_tuple_element,
+        TC.diagnose(ErrorLoc, diag::not_initialized_named_tuple_element,
                     DestTy->Fields[i].Name, i, E->getType());
       return 0;
     }
@@ -333,9 +333,9 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
           ErrorLoc = SubExp->getLoc();
       
     if (IdentList[i].empty())
-      TC.diagnose(ErrorLoc, diags::tuple_element_not_used, i, DestTy);
+      TC.diagnose(ErrorLoc, diag::tuple_element_not_used, i, DestTy);
     else
-      TC.diagnose(ErrorLoc, diags::named_tuple_element_not_used, IdentList[i],
+      TC.diagnose(ErrorLoc, diag::named_tuple_element_not_used, IdentList[i],
                   i, DestTy);
       return 0;
     }
@@ -394,7 +394,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     }
     
     if (!ETy->getElementType(SrcField)->isEqual(DestTy->getElementType(i))) {
-      TC.diagnose(E->getLoc(), diags::tuple_element_type_mismatch, i,
+      TC.diagnose(E->getLoc(), diag::tuple_element_type_mismatch, i,
                   ETy->getElementType(SrcField),
                   DestTy->getElementType(i));
       return 0;
@@ -531,7 +531,7 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
     return SemaCoerce(TC, DestTy).doIt(E);
   
   // Could not do the conversion.
-  TC.diagnose(E->getLoc(), diags::invalid_conversion, E->getType(), DestTy);
+  TC.diagnose(E->getLoc(), diag::invalid_conversion, E->getType(), DestTy);
   return 0;
 }
 

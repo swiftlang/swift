@@ -92,7 +92,7 @@ bool TypeChecker::validateType(Type InTy) {
       
       Expr *OldInit = EltInit;
       if (typeCheckExpression(EltInit, EltTy)) {
-        diagnose(OldInit->getLoc(),diags::while_converting_default_tuple_value);
+        diagnose(OldInit->getLoc(),diag::while_converting_default_tuple_value);
         IsInvalid = true;
         break;
       }

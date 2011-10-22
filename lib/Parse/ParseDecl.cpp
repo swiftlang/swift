@@ -62,7 +62,7 @@ TranslationUnit *Parser::parseTranslationUnit() {
     
     // Verify that values have a type specified.
     if (false && VD->Ty->is<DependentType>()) {
-      diagnose(VD->getLocStart(), diags::top_level_decl_without_type);
+      diagnose(VD->getLocStart(), diag::top_level_decl_without_type);
       // FIXME: Should mark the decl as invalid.
       VD->Ty = TupleType::getEmpty(Context);
     }
@@ -108,7 +108,7 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
   Associativity Assoc;
   if (Tok.is(tok::identifier) && isInfixAttr(Tok, Assoc)) {
     if (Attributes.isInfix())
-      diagnose(Tok, diags::duplicate_attribute, Tok.getText());
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
     consumeToken(tok::identifier);
 
     // The default precedence is 100.
@@ -117,10 +117,10 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     if (consumeIf(tok::equal)) {
       SourceLoc PrecLoc = Tok.getLoc();
       StringRef Text = Tok.getText();
-      if (!parseToken(tok::numeric_constant, diags::expected_precedence_value)){
+      if (!parseToken(tok::numeric_constant, diag::expected_precedence_value)){
         long long Value;
         if (Text.getAsInteger(10, Value) || Value > 255 || Value < 0)
-          diagnose(PrecLoc, diags::invalid_precedence, Text);
+          diagnose(PrecLoc, diag::invalid_precedence, Text);
         else
           Attributes.Infix = InfixData(Value, Assoc);
       } else {
@@ -134,9 +134,9 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
   }
 
   if (Tok.is(tok::identifier))   
-    diagnose(Tok, diags::unknown_attribute, Tok.getText());
+    diagnose(Tok, diag::unknown_attribute, Tok.getText());
   else
-    diagnose(Tok, diags::expected_attribute_name);
+    diagnose(Tok, diag::expected_attribute_name);
   skipUntil(tok::r_square);
   return true;
 }
@@ -170,7 +170,7 @@ void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
   // Otherwise, there was an error parsing the attribute list.  If we already
   // reported an error, skip to a ], otherwise report the error.
   if (!HadError)
-    parseToken(tok::r_square, diags::expected_in_attribute_list, tok::r_square);
+    parseToken(tok::r_square, diag::expected_in_attribute_list, tok::r_square);
   else {
     skipUntil(tok::r_square);
     consumeIf(tok::r_square);
@@ -191,18 +191,18 @@ Decl *Parser::parseDeclImport() {
   
   SmallVector<std::pair<Identifier, SourceLoc>, 8> ImportPath(1);
   ImportPath.back().second = Tok.getLoc();
-  if (parseIdentifier(ImportPath.back().first,diags::decl_expected_module_name))
+  if (parseIdentifier(ImportPath.back().first,diag::decl_expected_module_name))
     return 0;
   
   while (consumeIf(tok::period)) {
     ImportPath.push_back(std::make_pair(Identifier(), Tok.getLoc()));
     if (parseIdentifier(ImportPath.back().first,
-                        diags::expected_identifier_in_decl, "import"))
+                        diag::expected_identifier_in_decl, "import"))
       return 0;
   }
   
   if (!Attributes.empty())
-    diagnose(Attributes.LSquareLoc, diags::import_attributes);
+    diagnose(Attributes.LSquareLoc, diag::import_attributes);
   
   return new (Context) ImportDecl(ImportLoc, Context.AllocateCopy(ImportPath),
                                   CurDeclContext);
@@ -225,7 +225,7 @@ bool Parser::parseVarName(DeclVarName &Name) {
   }
   
   if (Tok.isNot(tok::l_paren) && Tok.isNot(tok::l_paren_space)) {
-    diagnose(Tok, diags::expected_lparen_var_name);
+    diagnose(Tok, diag::expected_lparen_var_name);
     return true;
   }
   
@@ -242,8 +242,8 @@ bool Parser::parseVarName(DeclVarName &Name) {
   }
 
   SourceLoc RPLoc = Tok.getLoc();
-  if (parseToken(tok::r_paren, diags::expected_rparen_var_name))
-    diagnose(LPLoc, diags::opening_paren);
+  if (parseToken(tok::r_paren, diag::expected_rparen_var_name))
+    diagnose(LPLoc, diag::opening_paren);
 
   Name = DeclVarName(LPLoc, Context.AllocateCopy(ChildNames), RPLoc);
   return false;
@@ -258,9 +258,9 @@ TypeAliasDecl *Parser::parseDeclTypeAlias() {
   
   Identifier Id;
   Type Ty;
-  if (parseIdentifier(Id, diags::expected_identifier_in_decl, "typealias") ||
-      parseToken(tok::colon, diags::expected_colon_in_typealias) ||
-      parseType(Ty, diags::expected_type_in_typealias))
+  if (parseIdentifier(Id, diag::expected_identifier_in_decl, "typealias") ||
+      parseToken(tok::colon, diag::expected_colon_in_typealias) ||
+      parseType(Ty, diag::expected_type_in_typealias))
     return 0;
 
   return ScopeInfo.addTypeAliasToScope(TypeAliasLoc, Id, Ty);
@@ -283,7 +283,7 @@ void Parser::actOnVarDeclName(const DeclVarName *Name,
     // to create the decl.  The most common result here is DependentType, which
     // allows type checking to resolve this later.
     if (Ty.isNull()) {
-      diagnose(Name->getLocation(), diags::invalid_index_in_var_name_path,
+      diagnose(Name->getLocation(), diag::invalid_index_in_var_name_path,
                Name->getIdentifier(), VD->Ty);
       return;
     }
@@ -373,7 +373,7 @@ VarDecl *Parser::parseDeclVarSimple() {
         return VD;
   
   // FIXME: "here" requires a lot more context.
-  diagnose(CurLoc, diags::non_simple_var);
+  diagnose(CurLoc, diag::non_simple_var);
   return 0;
 }
 
@@ -397,7 +397,7 @@ FuncDecl *Parser::parseDeclFunc(bool AllowScoped) {
   Type ReceiverTy;
   Identifier Name;
   SourceLoc TypeNameLoc = Tok.getLoc();
-  if (parseIdentifier(Name, diags::expected_identifier_in_decl, "func"))
+  if (parseIdentifier(Name, diag::expected_identifier_in_decl, "func"))
     return 0;
 
   // If this is method syntax, the first name is the receiver type.  Parse the
@@ -405,13 +405,13 @@ FuncDecl *Parser::parseDeclFunc(bool AllowScoped) {
   if (AllowScoped && consumeIf(tok::coloncolon)) {
     // Look up the type name.
     ReceiverTy = ScopeInfo.lookupOrInsertTypeName(Name, TypeNameLoc);
-    if (parseIdentifier(Name, diags::expected_identifier_in_decl, "func"))
+    if (parseIdentifier(Name, diag::expected_identifier_in_decl, "func"))
       return 0;
   }
   
   // We force first type of a func declaration to be a tuple for consistency.
   if (Tok.isNot(tok::l_paren) && Tok.isNot(tok::l_paren_space)) {
-    diagnose(Tok, diags::func_decl_without_paren);
+    diagnose(Tok, diag::func_decl_without_paren);
     return 0;
   }
     
@@ -450,7 +450,7 @@ FuncDecl *Parser::parseDeclFunc(bool AllowScoped) {
     
     // Check to see if we have a "{" which is a brace expr.
     if (Tok.is(tok::l_brace)) {
-      ParseResult<BraceStmt> Body = parseStmtBrace(diags::invalid_diagnostic);
+      ParseResult<BraceStmt> Body = parseStmtBrace(diag::invalid_diagnostic);
       if (Body.isSuccess())
         FE->setBody(Body.get());
       else  // FIXME: Should do some sort of error recovery here.
@@ -485,7 +485,7 @@ Decl *Parser::parseDeclOneOf() {
   SourceLoc NameLoc = Tok.getLoc();
   Identifier OneOfName;
   Type OneOfType;
-  if (parseIdentifier(OneOfName, diags::expected_identifier_in_decl, "oneof"))
+  if (parseIdentifier(OneOfName, diag::expected_identifier_in_decl, "oneof"))
     return 0;
   
   TypeAliasDecl *TAD = ScopeInfo.addTypeAliasToScope(NameLoc, OneOfName,Type());
@@ -509,25 +509,25 @@ bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   parseAttributeList(Attributes);
   
   Identifier StructName;
-  if (parseIdentifier(StructName, diags::expected_identifier_in_decl, "struct"))
+  if (parseIdentifier(StructName, diag::expected_identifier_in_decl, "struct"))
     return true;
 
   SourceLoc LBLoc = Tok.getLoc();
   Type BodyTy;
-  if (parseToken(tok::l_brace, diags::expected_lbrace_struct) ||
+  if (parseToken(tok::l_brace, diag::expected_lbrace_struct) ||
       parseTypeTupleBody(LBLoc, BodyTy))
     return true;
 
   // FIXME: add helper for matching punctuation.
-  if (parseToken(tok::r_brace, diags::expected_rbrace_struct)) {
-    diagnose(LBLoc, diags::opening_brace);
+  if (parseToken(tok::r_brace, diag::expected_rbrace_struct)) {
+    diagnose(LBLoc, diag::opening_brace);
     return true;
   }
 
   // The type is required to be syntactically a tuple type.
   if (!isa<TupleType>(BodyTy.getPointer())) {
     // FIXME: Fairly unfriendly diagnostic, here.
-    diagnose(StructLoc, diags::struct_not_tuple);
+    diagnose(StructLoc, diag::struct_not_tuple);
     // FIXME: Should set this as an erroroneous decl.
     return true;
   }
@@ -573,7 +573,7 @@ Decl *Parser::parseDeclProtocol() {
   SourceLoc NameLoc = Tok.getLoc();
   Identifier ProtocolName;
   if (parseIdentifier(ProtocolName,
-                      diags::expected_identifier_in_decl, "protocol"))
+                      diag::expected_identifier_in_decl, "protocol"))
     return 0;
   
   TypeAliasDecl *TAD = ScopeInfo.addTypeAliasToScope(NameLoc, ProtocolName,

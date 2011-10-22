@@ -259,7 +259,7 @@ getModuleProvider(std::pair<Identifier, SourceLoc> ModuleID) {
   llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
   if (llvm::error_code Err = findModule(ModuleID.first.str(), ModuleID.second,
                                         InputFile)) {
-    diagnose(ModuleID.second, diags::sema_opening_import,
+    diagnose(ModuleID.second, diag::sema_opening_import,
              ModuleID.first.str(), Err.message());
     return 0;
   }
@@ -292,7 +292,7 @@ void NameBinder::addImport(ImportDecl *ID) {
   // FIXME: Validate the access path against the module.  Reject things like
   // import swift.aslkdfja
   if (ID->AccessPath.size() > 2) {
-    diagnose(ID->AccessPath[2].second, diags::invalid_declaration_imported);
+    diagnose(ID->AccessPath[2].second, diag::invalid_declaration_imported);
     return;
   }
   
@@ -367,7 +367,7 @@ BoundScope NameBinder::bindScopeName(TypeAliasDecl *TypeFromScope,
       if (ImpEntry.first->AccessPath.back().first == Name)
         return &ImpEntry;
     
-    diagnose(NameLoc, diags::no_module_or_type);
+    diagnose(NameLoc, diag::no_module_or_type);
     return BoundScope();
   }
 
@@ -386,12 +386,12 @@ BoundScope NameBinder::bindScopeName(TypeAliasDecl *TypeFromScope,
   // Reject things like int::x.
   OneOfType *DT = dyn_cast<OneOfType>(Ty);
   if (DT == 0) {
-    diagnose(NameLoc, diags::invalid_type_scoped_access, Name);
+    diagnose(NameLoc, diag::invalid_type_scoped_access, Name);
     return BoundScope();
   }
     
   if (DT->Elements.empty()) {
-    diagnose(NameLoc, diags::incomplete_or_empty_oneof, Name);
+    diagnose(NameLoc, diag::incomplete_or_empty_oneof, Name);
     return BoundScope();
   }
 
@@ -442,7 +442,7 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
     if (OneOfType *Ty = Scope.dyn_cast<OneOfType*>()) {
       OneOfElementDecl *Elt = Ty->getElement(Name);
       if (Elt == 0) {
-        Binder.diagnose(Loc, diags::invalid_member, Name, BaseName);
+        Binder.diagnose(Loc, diag::invalid_member, Name, BaseName);
         return 0;
       }
       Decls.push_back(Elt);
@@ -458,7 +458,7 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
   }
 
   if (Decls.empty()) {
-    Binder.diagnose(Loc, diags::use_unresolved_identifier, Name);
+    Binder.diagnose(Loc, diag::use_unresolved_identifier, Name);
     return 0;
   }
 
@@ -510,7 +510,7 @@ void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
       continue;
     }
     
-    Binder.diagnose(TA->getLocStart(), diags::use_undeclared_type, TA->Name);
+    Binder.diagnose(TA->getLocStart(), diag::use_undeclared_type, TA->Name);
     
     TA->UnderlyingTy = ErrorType::get(Ctx);
   }
@@ -535,7 +535,7 @@ void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
     if (Alias) {
       BaseAndType.second->UnderlyingTy = Alias->getAliasType(Binder.Context);
     } else {
-      Binder.diagnose(NameLoc, diags::invalid_member_type,
+      Binder.diagnose(NameLoc, diag::invalid_member_type,
                       Name, BaseAndType.first->Name);
       BaseAndType.second->UnderlyingTy = Binder.Context.TheErrorType;
     }

@@ -100,8 +100,8 @@ Type ScopeInfo::getQualifiedTypeName(Identifier BaseName, SourceLoc BaseNameLoc,
 
 static void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New, Parser &P) {
   assert(New != Prev && "Cannot conflict with self");
-  P.diagnose(New->getLocStart(), diags::decl_redefinition, New->Init != 0);
-  P.diagnose(Prev->getLocStart(), diags::previous_decldef, Prev->Init != 0,
+  P.diagnose(New->getLocStart(), diag::decl_redefinition, New->Init != 0);
+  P.diagnose(Prev->getLocStart(), diag::previous_decldef, Prev->Init != 0,
              Prev->Name);
 }
 
@@ -113,10 +113,10 @@ static bool checkValidOverload(const ValueDecl *D1, const ValueDecl *D2,
                                Parser &P) {
   if (D1->Attrs.isInfix() && D2->Attrs.isInfix() &&
       D1->Attrs.getInfixData() != D2->Attrs.getInfixData()) {
-    P.diagnose(D1->getLocStart(), diags::precedence_overload);
+    P.diagnose(D1->getLocStart(), diag::precedence_overload);
     // FIXME: Pass identifier through, when the diagnostics system can handle
     // it.
-    P.diagnose(D2->getLocStart(), diags::previous_declaration, D2->Name);
+    P.diagnose(D2->getLocStart(), diag::previous_declaration, D2->Name);
     return true;
   }
   
@@ -189,7 +189,7 @@ TypeAliasDecl *ScopeInfo::addTypeAliasToScope(SourceLoc TypeAliasLoc,
   // the same name.
   // FIXME: Pass the identifier through, when the diagnostics system can handle
   // it.
-  TheParser.diagnose(TypeAliasLoc, diags::type_redefinition, Name);
-  TheParser.diagnose(TAD->getLocStart(), diags::previous_definition, Name);
+  TheParser.diagnose(TypeAliasLoc, diag::type_redefinition, Name);
+  TheParser.diagnose(TAD->getLocStart(), diag::previous_definition, Name);
   return TAD;
 }

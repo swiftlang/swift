@@ -125,7 +125,7 @@ bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init,
                                  bool SingleInit) {
   // Diagnose when we don't have a type or an expression.
   if (Tok.isNot(tok::colon) && Tok.isNot(tok::equal)) {
-    diagnose(Tok, diags::expected_type_or_init);
+    diagnose(Tok, diag::expected_type_or_init);
     // TODO: Recover better by still creating var, but making it have
     // 'invalid' type so that uses of the identifier are not errors.
     return true;
@@ -133,16 +133,16 @@ bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init,
   
   // Parse the type if present.
   if (consumeIf(tok::colon) &&
-      parseType(Ty, diags::expected_type))
+      parseType(Ty, diag::expected_type))
     return true;
   
   // Parse the initializer, if present.
   if (consumeIf(tok::equal)) {
     ParseResult<Expr> Tmp;
     if (SingleInit) {
-      Tmp = parseSingleExpr(diags::expected_initializer_expr);
+      Tmp = parseSingleExpr(diag::expected_initializer_expr);
     } else {
-      Tmp = parseExpr(diags::expected_initializer_expr);
+      Tmp = parseExpr(diag::expected_initializer_expr);
     }
     if (Tmp)
       return true;

@@ -21,7 +21,7 @@
 using namespace swift;
 
 bool Parser::parseType(Type &Result) {
-  return parseType(Result, diags::expected_type);
+  return parseType(Result, diag::expected_type);
 }
 
 /// parseType
@@ -58,7 +58,7 @@ bool Parser::parseType(Type &Result, Diag<> MessageID) {
       SourceLoc Loc2 = Tok.getLoc();
       Identifier Name2;
       if (parseIdentifier(Name2,
-                      diags::expected_identifier_after_coloncolon_type, Name))
+                      diag::expected_identifier_after_coloncolon_type, Name))
         return true;
 
       Result = ScopeInfo.getQualifiedTypeName(Name, NameLoc, Name2, Loc2);
@@ -72,9 +72,9 @@ bool Parser::parseType(Type &Result, Diag<> MessageID) {
     if (parseTypeTupleBody(LPLoc, Result))
       return true;
 
-    if (parseToken(tok::r_paren, diags::expected_rparen_tuple_type_list,
+    if (parseToken(tok::r_paren, diag::expected_rparen_tuple_type_list,
                    tok::r_paren)) {
-      diagnose(LPLoc, diags::opening_paren);
+      diagnose(LPLoc, diag::opening_paren);
       return true;
     }
     break;
@@ -96,7 +96,7 @@ bool Parser::parseType(Type &Result, Diag<> MessageID) {
     SourceLoc TokLoc = Tok.getLoc();
     if (consumeIf(tok::arrow)) {
       Type SecondHalf;
-      if (parseType(SecondHalf, diags::expected_type_function_result))
+      if (parseType(SecondHalf, diag::expected_type_function_result))
         return true;
       Result = FunctionType::get(Result, SecondHalf, Context);
       continue;
@@ -155,7 +155,7 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
       // Parse the optional default value expression.
       if (Tok.is(tok::colon)) {
         ParseResult<Expr> Init =
-          parseSingleExpr(diags::expected_initializer_expr);
+          parseSingleExpr(diag::expected_initializer_expr);
 
         // Die if there was a parse error.
         if (Init) {
@@ -206,7 +206,7 @@ bool Parser::parseTypeOneOf(Type &Result) {
 bool Parser::parseTypeOneOfBody(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
                                 Type &Result, TypeAliasDecl *TypeName) {
   SourceLoc LBLoc = Tok.getLoc();
-  if (parseToken(tok::l_brace, diags::expected_lbrace_oneof_type))
+  if (parseToken(tok::l_brace, diag::expected_lbrace_oneof_type))
     return true;
   
   SmallVector<OneOfElementInfo, 8> ElementInfos;
@@ -222,7 +222,7 @@ bool Parser::parseTypeOneOfBody(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
     
     // See if we have a type specifier for this oneof element.  If so, parse it.
     if (consumeIf(tok::colon) &&
-        parseType(ElementInfo.EltType, diags::expected_type_oneof_element)) {
+        parseType(ElementInfo.EltType, diag::expected_type_oneof_element)) {
       skipUntil(tok::r_brace);
       return true;
     }
@@ -235,8 +235,8 @@ bool Parser::parseTypeOneOfBody(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
   }
   
   // FIXME: Helper for matching punctuation.
-  if (parseToken(tok::r_brace, diags::expected_rbrace_oneof_type))
-    diagnose(LBLoc, diags::opening_brace);
+  if (parseToken(tok::r_brace, diag::expected_rbrace_oneof_type))
+    diagnose(LBLoc, diag::opening_brace);
   
   Result = actOnOneOfType(OneOfLoc, Attrs, ElementInfos, TypeName);
   return false;
@@ -248,7 +248,7 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
                                   TypeAliasDecl *PrettyTypeName) {
   // No attributes are valid on oneof types at this time.
   if (!Attrs.empty())
-    diagnose(Attrs.LSquareLoc, diags::oneof_attributes);
+    diagnose(Attrs.LSquareLoc, diag::oneof_attributes);
   
   llvm::SmallPtrSet<const char *, 16> SeenSoFar;
   SmallVector<OneOfElementDecl *, 16> EltDecls;
@@ -264,12 +264,12 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
     
     // If this was multiply defined, reject it.
     if (!SeenSoFar.insert(NameI.get())) {
-      diagnose(Elt.NameLoc, diags::duplicate_oneof_element, Elt.Name);
+      diagnose(Elt.NameLoc, diag::duplicate_oneof_element, Elt.Name);
       
       // FIXME: Do we care enough to make this efficient?
       for (unsigned I = 0, N = EltDecls.size(); I != N; ++I) {
         if (EltDecls[I]->Name == NameI) {
-          diagnose(EltDecls[I]->getLocStart(), diags::previous_definition,
+          diagnose(EltDecls[I]->getLocStart(), diag::previous_definition,
                    NameI);
           break;
         }
@@ -329,12 +329,12 @@ bool Parser::parseTypeArray(SourceLoc LSquareLoc, Type &Result) {
   }
   
   ParseResult<Expr> SizeEx;
-  if ((SizeEx = parseSingleExpr(diags::expected_expr_array_type)))
+  if ((SizeEx = parseSingleExpr(diag::expected_expr_array_type)))
     return true;
   
   SourceLoc RArrayTok = Tok.getLoc();
-  if (parseToken(tok::r_square, diags::expected_rbracket_array_type)) {
-    diagnose(LSquareLoc, diags::opening_bracket);
+  if (parseToken(tok::r_square, diag::expected_rbracket_array_type)) {
+    diagnose(LSquareLoc, diag::opening_bracket);
     return true;
   }
   
@@ -355,12 +355,12 @@ bool Parser::parseTypeArray(SourceLoc LSquareLoc, Type &Result) {
   if (IntegerLiteralExpr *IL = dyn_cast<IntegerLiteralExpr>(Size)) {
     SizeVal = IL->getValue();
   } else {
-    diagnose(Size->getLoc(), diags::non_constant_array);
+    diagnose(Size->getLoc(), diag::non_constant_array);
     return ErrorType::get(Context);
   }
   
   if (SizeVal == 0) {
-    diagnose(Size->getLoc(), diags::zero_length_array);
+    diagnose(Size->getLoc(), diag::zero_length_array);
     return ErrorType::get(Context);
   }
   
@@ -392,7 +392,7 @@ bool Parser::parseTypeProtocolBody(SourceLoc ProtocolLoc,
                                    const DeclAttributes &Attributes,
                                    Type &Result, TypeAliasDecl *TypeName) {
   // Parse the body.
-  if (parseToken(tok::l_brace, diags::expected_lbrace_protocol_type))
+  if (parseToken(tok::l_brace, diag::expected_lbrace_protocol_type))
     return true;
   
   SmallVector<ValueDecl*, 8> Elements;
@@ -401,7 +401,7 @@ bool Parser::parseTypeProtocolBody(SourceLoc ProtocolLoc,
   do {
     switch (Tok.getKind()) {
     default:
-      diagnose(Tok, diags::expected_protocol_member);
+      diagnose(Tok, diag::expected_protocol_member);
       return true;
     case tok::r_brace:  // End of protocol body.
       break;
@@ -422,7 +422,7 @@ bool Parser::parseTypeProtocolBody(SourceLoc ProtocolLoc,
   
   // Act on what we've parsed.
   if (!Attributes.empty())
-    diagnose(Attributes.LSquareLoc, diags::protocol_attributes);
+    diagnose(Attributes.LSquareLoc, diag::protocol_attributes);
   
   ProtocolType *NewProto = ProtocolType::getNew(ProtocolLoc, Elements,
                                                 CurDeclContext);

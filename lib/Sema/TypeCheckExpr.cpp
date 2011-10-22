@@ -116,13 +116,13 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // as such.
     if (isa<UnaryExpr>(E) &&
                !cast<DeclRefExpr>(E1)->getDecl()->Name.isOperator()) {
-      diagnose(E1->getLoc(), diags::unary_op_without_attribute);
+      diagnose(E1->getLoc(), diag::unary_op_without_attribute);
       return true;
     }
     
     if (isa<BinaryExpr>(E) &&
                !cast<DeclRefExpr>(E1)->getDecl()->Attrs.isInfix()) {
-      diagnose(E1->getLoc(), diags::binary_op_without_attribute);
+      diagnose(E1->getLoc(), diag::binary_op_without_attribute);
       return true;
     }
     
@@ -130,7 +130,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // expected type of the function.
     E2 = convertToType(E2, FT->Input);
     if (E2 == 0) {
-      diagnose(E1->getLoc(), diags::while_converting_function_argument);
+      diagnose(E1->getLoc(), diag::while_converting_function_argument);
       return true;
     }
     
@@ -142,7 +142,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // Otherwise, the function's type must be dependent.  If it is something else,
   // we have a type error.
   if (!E1->getType()->is<DependentType>()) {
-    diagnose(E1->getLoc(), diags::called_expr_isnt_function);
+    diagnose(E1->getLoc(), diag::called_expr_isnt_function);
     return true;
   }
   
@@ -202,20 +202,20 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // Otherwise we have either an ambiguity between multiple possible candidates
   // or not candidate at all.
   if (BestRank != Expr::CR_Invalid)
-    diagnose(E1->getLoc(), diags::overloading_ambiguity);
+    diagnose(E1->getLoc(), diag::overloading_ambiguity);
   else if (isa<BinaryExpr>(E))
-    diagnose(E1->getLoc(), diags::no_candidates, 0);
+    diagnose(E1->getLoc(), diag::no_candidates, 0);
   else if (isa<UnaryExpr>(E))
-    diagnose(E1->getLoc(), diags::no_candidates, 1);
+    diagnose(E1->getLoc(), diag::no_candidates, 1);
   else
-    diagnose(E1->getLoc(), diags::no_candidates, 2);
+    diagnose(E1->getLoc(), diag::no_candidates, 2);
   
   // Print out the candidate set.
   for (auto TheDecl : OS->Decls) {
     Type ArgTy = TheDecl->Ty->getAs<FunctionType>()->Input;
     if (E2->getRankOfConversionTo(ArgTy) != BestRank)
       continue;
-    diagnose(TheDecl->getLocStart(), diags::found_candidate);
+    diagnose(TheDecl->getLocStart(), diag::found_candidate);
   }
   return true;
 }
@@ -249,7 +249,7 @@ public:
   }
   Expr *visitDeclRefExpr(DeclRefExpr *E) {
     if (E->getDecl() == 0) {
-      TC.diagnose(E->getLoc(), diags::use_undeclared_identifier);
+      TC.diagnose(E->getLoc(), diag::use_undeclared_identifier);
       return 0;
     }
     
@@ -410,7 +410,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
       unsigned Value = 0;
       if (!E->getName().str().substr(1).getAsInteger(10, Value)) {
         if (Value >= TT->Fields.size()) {
-          TC.diagnose(E->getNameLoc(), diags::field_number_too_large);
+          TC.diagnose(E->getNameLoc(), diag::field_number_too_large);
           return 0;
         }
         
@@ -469,7 +469,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   // TODO: Otherwise, do an argument dependent lookup in the namespace of the
   // base type.
   
-  TC.diagnose(E->getDotLoc(), diags::no_valid_dot_expression, SubExprTy);
+  TC.diagnose(E->getDotLoc(), diag::no_valid_dot_expression, SubExprTy);
   return 0;
 }
 
@@ -481,7 +481,7 @@ static InfixData getInfixData(TypeChecker &TC, Expr *E) {
     if (DRE->getDecl()->Attrs.isInfix())
       return DRE->getDecl()->Attrs.getInfixData();
 
-    TC.diagnose(DRE->getLoc(), diags::binop_not_infix);
+    TC.diagnose(DRE->getLoc(), diag::binop_not_infix);
 
   // If this is an overload set, the entire overload set is required
   // to have the same infix data.
@@ -495,9 +495,9 @@ static InfixData getInfixData(TypeChecker &TC, Expr *E) {
         continue;
       
       if (Infix.isValid() && Infix != D->Attrs.getInfixData()) {
-        TC.diagnose(OO->getLoc(), diags::binop_mismatched_infix);
-        TC.diagnose(FirstDecl->getLocStart(), diags::first_declaration);
-        TC.diagnose(D->getLocStart(), diags::second_declaration);
+        TC.diagnose(OO->getLoc(), diag::binop_mismatched_infix);
+        TC.diagnose(FirstDecl->getLocStart(), diag::first_declaration);
+        TC.diagnose(D->getLocStart(), diag::second_declaration);
         return Infix;
       }
       
@@ -508,11 +508,11 @@ static InfixData getInfixData(TypeChecker &TC, Expr *E) {
     if (Infix.isValid())
       return Infix;
 
-    TC.diagnose(OO->getLoc(), diags::binop_not_overloaded);
+    TC.diagnose(OO->getLoc(), diag::binop_not_overloaded);
 
   // Otherwise, complain.
   } else {
-    TC.diagnose(E->getLoc(), diags::unknown_binop);
+    TC.diagnose(E->getLoc(), diag::unknown_binop);
   }
   
   // Recover with an infinite-precedence left-associative operator.
@@ -605,11 +605,11 @@ static Expr *foldSequence(TypeChecker &TC, Expr *LHS, ArrayRef<Expr*> &S,
 
     if (Op1Info.isNonAssociative()) {
       // FIXME: QoI ranges
-      TC.diagnose(Op1->getLoc(), diags::non_assoc_adjacent);
+      TC.diagnose(Op1->getLoc(), diag::non_assoc_adjacent);
     } else if (Op2Info.isNonAssociative()) {
-      TC.diagnose(Op2->getLoc(), diags::non_assoc_adjacent);
+      TC.diagnose(Op2->getLoc(), diag::non_assoc_adjacent);
     } else {
-      TC.diagnose(Op1->getLoc(), diags::incompatible_assoc);
+      TC.diagnose(Op1->getLoc(), diag::incompatible_assoc);
     }
     
     // Recover by arbitrarily binding the first two.
@@ -667,7 +667,7 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
       return E;
     
     // FIXME: QoI ranges.
-    diagnose(E->getStartLoc(), diags::ambiguous_expression_unresolved);
+    diagnose(E->getStartLoc(), diag::ambiguous_expression_unresolved);
     return 0;
   }, ^Stmt*(Stmt *S, WalkOrder Order) {
     // Never recurse into statements.

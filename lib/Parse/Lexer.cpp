@@ -64,7 +64,7 @@ void Lexer::skipSlashSlashComment() {
       // If this is a random nul character in the middle of a buffer, skip it as
       // whitespace.
       if (CurPtr-1 != Buffer->getBufferEnd()) {
-        diagnose(CurPtr-1, diags::lex_nul_character);
+        diagnose(CurPtr-1, diag::lex_nul_character);
         break;
       }
         
@@ -108,15 +108,15 @@ void Lexer::skipSlashStarComment() {
       // If this is a random nul character in the middle of a buffer, skip it as
       // whitespace.
       if (CurPtr-1 != Buffer->getBufferEnd()) {
-        diagnose(CurPtr-1, diags::lex_nul_character);
+        diagnose(CurPtr-1, diag::lex_nul_character);
         break;
       }
       
       // Otherwise, we have an unterminated /* comment.
       --CurPtr;
       diagnose(CurPtr-(CurPtr[-1] == '\n'),
-               diags::lex_unterminated_block_comment);
-      diagnose(StartPtr, diags::lex_comment_start);
+               diag::lex_unterminated_block_comment);
+      diagnose(StartPtr, diag::lex_comment_start);
       return;
     }
   }
@@ -220,7 +220,7 @@ Restart:
   
   switch (*CurPtr++) {
   default:
-    diagnose(CurPtr-1, diags::lex_invalid_character);
+    diagnose(CurPtr-1, diag::lex_invalid_character);
     return formToken(tok::unknown, TokStart);
 
   case ' ':
@@ -232,7 +232,7 @@ Restart:
     // If this is a random nul character in the middle of a buffer, skip it as
     // whitespace.
     if (CurPtr-1 != Buffer->getBufferEnd()) {
-      diagnose(CurPtr-1, diags::lex_nul_character);
+      diagnose(CurPtr-1, diag::lex_nul_character);
       goto Restart;
     }
       

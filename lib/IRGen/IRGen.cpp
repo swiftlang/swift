@@ -63,7 +63,7 @@ void swift::performIRGeneration(TranslationUnit *TU, ASTContext &Context,
   const Target *Target =
     TargetRegistry::lookupTarget(Opts.Triple, Error);
   if (!Target) {
-    Context.Diags.diagnose(SourceLoc(), diags::no_llvm_target,
+    Context.Diags.diagnose(SourceLoc(), diag::no_llvm_target,
                            Opts.Triple, Error);
     return;
   }
@@ -77,7 +77,7 @@ void swift::performIRGeneration(TranslationUnit *TU, ASTContext &Context,
   TargetMachine *TargetMachine
     = Target->createTargetMachine(Opts.Triple, /*cpu*/ "", /*features*/ "");
   if (!TargetMachine) {
-    Context.Diags.diagnose(SourceLoc(), diags::no_llvm_target,
+    Context.Diags.diagnose(SourceLoc(), diag::no_llvm_target,
                            Opts.Triple, "no LLVM target machine");
     return;
   }
@@ -101,7 +101,7 @@ void swift::performIRGeneration(TranslationUnit *TU, ASTContext &Context,
     OSFlags |= raw_fd_ostream::F_Binary;
   raw_fd_ostream RawOS(Opts.OutputFilename.c_str(), Error, OSFlags);
   if (RawOS.has_error()) {
-    Context.Diags.diagnose(SourceLoc(), diags::error_opening_output,
+    Context.Diags.diagnose(SourceLoc(), diag::error_opening_output,
                            Opts.OutputFilename, Error);
     return;
   }
@@ -154,7 +154,7 @@ void swift::performIRGeneration(TranslationUnit *TU, ASTContext &Context,
     if (TargetMachine->addPassesToEmitFile(ModulePasses, FormattedOS,
                                            FileType, OptLevel,
                                            !Opts.Verify)) {
-      Context.Diags.diagnose(SourceLoc(), diags::error_codegen_init_fail);
+      Context.Diags.diagnose(SourceLoc(), diag::error_codegen_init_fail);
       return;
     }
     break;

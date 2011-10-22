@@ -31,7 +31,7 @@ namespace swift {
     };
   }
   
-  namespace diags {
+  namespace diag {
   // Declare all of the diagnostics objects with their appropriate types.
 #define DIAG(KIND,ID,Category,Options,Text,Signature) \
   extern detail::DiagWithArguments<void Signature>::type ID;

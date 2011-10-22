@@ -66,5 +66,5 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *TU) {
 }
 
 void IRGenModule::unimplemented(SourceLoc Loc, StringRef Message) {
-  Context.Diags.diagnose(Loc, diags::irgen_unimplemented, Message);
+  Context.Diags.diagnose(Loc, diag::irgen_unimplemented, Message);
 }

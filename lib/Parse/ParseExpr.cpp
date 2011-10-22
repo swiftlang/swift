@@ -45,7 +45,7 @@ ParseResult<Expr> Parser::parseSingleExpr(Diag<> Message) {
   // Kill all the following expressions.  This is not necessarily
   // good for certain kinds of recovery.
   if (isStartOfExpr(Tok, peekToken())) {
-    diagnose(Tok, diags::expected_single_expr);
+    diagnose(Tok, diag::expected_single_expr);
     do {
       ParseResult<Expr> Extra = parseExpr(Message);
       if (Extra) break;
@@ -88,7 +88,7 @@ ParseResult<Expr> Parser::parseExpr(Diag<> Message) {
     SequencedExprs.push_back(Operator);
 
     // The message is only valid for the first subexpr.
-    Message = diags::expected_expr_after_operator;
+    Message = diag::expected_expr_after_operator;
   }
 
   // If we had semantic errors, just fail here.
@@ -167,7 +167,7 @@ ParseResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
     SourceLoc ColonLoc = consumeToken(tok::colon);
     Identifier Name;
     SourceLoc NameLoc = Tok.getLoc();
-    if (parseIdentifier(Name, diags::expected_identifier_after_colon_expr))
+    if (parseIdentifier(Name, diag::expected_identifier_after_colon_expr))
       return true;
     
     // Handle :foo by just making an AST node.
@@ -203,7 +203,7 @@ ParseResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
     
     if (consumeIf(tok::period)) {
       if (Tok.isNot(tok::identifier) && Tok.isNot(tok::dollarident)) {
-        diagnose(Tok, diags::expected_field_name);
+        diagnose(Tok, diag::expected_field_name);
         return true;
       }
         
@@ -236,13 +236,13 @@ ParseResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
     // Check for a [expr] suffix.
     if (consumeIf(tok::l_square)) {
       ParseResult<Expr> Idx;
-      if ((Idx = parseSingleExpr(diags::expected_expr_subscript_value)))
+      if ((Idx = parseSingleExpr(diag::expected_expr_subscript_value)))
         return true;
       
       SourceLoc RLoc = Tok.getLoc();
       // FIXME: helper for matching punctuation.
-      if (parseToken(tok::r_square, diags::expected_bracket_array_subscript)) {
-        diagnose(TokLoc, diags::opening_bracket);
+      if (parseToken(tok::r_square, diag::expected_bracket_array_subscript)) {
+        diagnose(TokLoc, diag::opening_bracket);
         return true;        
       }
       
@@ -269,7 +269,7 @@ ParseResult<Expr> Parser::parseExprNumericConstant() {
     // The integer literal must fit in 64-bits.
     unsigned long long Val;
     if (Text.getAsInteger(0, Val)) {
-      diagnose(Loc, diags::int_literal_too_large);
+      diagnose(Loc, diag::int_literal_too_large);
       return ParseResult<Expr>::getSemaError();
     }
     
@@ -283,7 +283,7 @@ ParseResult<Expr> Parser::parseExprNumericConstant() {
   // Okay, we have a floating point constant.  Verify we have a single dot.
   DotPos = Text.find('.', DotPos+1);
   if (DotPos != StringRef::npos) {
-    diagnose(Loc.getAdvancedLoc(DotPos), diags::float_literal_multi_decimal);
+    diagnose(Loc.getAdvancedLoc(DotPos), diag::float_literal_multi_decimal);
     return ParseResult<Expr>::getSemaError();
   }
   
@@ -293,7 +293,7 @@ ParseResult<Expr> Parser::parseExprNumericConstant() {
   case llvm::APFloat::opOverflow: {
     llvm::SmallString<20> Buffer;
     llvm::APFloat::getLargest(Val.getSemantics()).toString(Buffer);
-    diagnose(Loc, diags::float_literal_overflow, Buffer);
+    diagnose(Loc, diag::float_literal_overflow, Buffer);
     break;
   }
   case llvm::APFloat::opUnderflow: {
@@ -301,7 +301,7 @@ ParseResult<Expr> Parser::parseExprNumericConstant() {
     if (!Val.isZero()) break;
     llvm::SmallString<20> Buffer;
     llvm::APFloat::getSmallest(Val.getSemantics()).toString(Buffer);
-    diagnose(Loc, diags::float_literal_underflow, Buffer);
+    diagnose(Loc, diag::float_literal_underflow, Buffer);
     break;
   }
   }
@@ -324,13 +324,13 @@ ParseResult<Expr> Parser::parseExprDollarIdentifier() {
     AllNumeric &= isdigit(Name[i]);
   
   if (Name.size() == 1 || !AllNumeric) {
-    diagnose(Loc.getAdvancedLoc(1), diags::expected_dollar_numeric);
+    diagnose(Loc.getAdvancedLoc(1), diag::expected_dollar_numeric);
     return ParseResult<Expr>::getSemaError();
   }
   
   unsigned ArgNo = 0;
   if (Name.substr(1).getAsInteger(10, ArgNo)) {
-    diagnose(Loc.getAdvancedLoc(1), diags::dollar_numeric_too_large);
+    diagnose(Loc.getAdvancedLoc(1), diag::dollar_numeric_too_large);
     return ParseResult<Expr>::getSemaError();
   }
   
@@ -368,7 +368,7 @@ ParseResult<Expr> Parser::parseExprIdentifier() {
 
   SourceLoc Loc2 = Tok.getLoc();
   Identifier Name2;
-  if (parseIdentifier(Name2, diags::expected_identifier_after_coloncolon_expr,
+  if (parseIdentifier(Name2, diag::expected_identifier_after_coloncolon_expr,
                       Name))
     return true;
   
@@ -411,8 +411,8 @@ ParseResult<Expr> Parser::parseExprParen() {
       // Check to see if there is a field specifier.
       if (consumeIf(tok::period)) {
         if (parseIdentifier(FieldName,
-                            diags::expected_field_spec_name_tuple_expr) ||
-            parseToken(tok::equal, diags::expected_equal_in_tuple_expr))
+                            diag::expected_field_spec_name_tuple_expr) ||
+            parseToken(tok::equal, diag::expected_equal_in_tuple_expr))
           return true;
       }
       
@@ -424,7 +424,7 @@ ParseResult<Expr> Parser::parseExprParen() {
       }
       
       ParseResult<Expr> SubExpr;
-      if ((SubExpr = parseSingleExpr(diags::expected_expr_parentheses)))
+      if ((SubExpr = parseSingleExpr(diag::expected_expr_parentheses)))
         return true;
       
       if (SubExpr.isSemaError())
@@ -436,8 +436,8 @@ ParseResult<Expr> Parser::parseExprParen() {
   }
   
   SourceLoc RPLoc = Tok.getLoc();  
-  if (parseToken(tok::r_paren, diags::expected_rparen_parenthesis_expr)) {
-    diagnose(LPLoc, diags::opening_paren);
+  if (parseToken(tok::r_paren, diag::expected_rparen_parenthesis_expr)) {
+    diagnose(LPLoc, diag::opening_paren);
     return true;
   }
 
@@ -478,7 +478,7 @@ ParseResult<Expr> Parser::parseExprFunc() {
   if (Tok.is(tok::l_brace)) {
     Ty = TupleType::getEmpty(Context);
   } else if (!Tok.is(tok::l_paren) && !Tok.is(tok::l_paren_space)) {
-    diagnose(Tok, diags::func_decl_without_paren);
+    diagnose(Tok, diag::func_decl_without_paren);
     return true;
   } else if (parseType(Ty)) {
     return true;
@@ -498,7 +498,7 @@ ParseResult<Expr> Parser::parseExprFunc() {
   
   // Then parse the expression.
   ParseResult<BraceStmt> Body;
-  if ((Body = parseStmtBrace(diags::expected_lbrace_func_expr)))
+  if ((Body = parseStmtBrace(diag::expected_lbrace_func_expr)))
     return true;
   if (Body.isSemaError())
     return ParseResult<Expr>::getSemaError();
