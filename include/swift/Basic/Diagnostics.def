@@ -448,6 +448,13 @@ ERROR(expression_unresolved_function,sema_tcs,none,
 // IR Generation Diagnostics
 //==============================================================================
 
+ERROR(no_llvm_target,irgen,none,
+      "error loading LLVM target for triple '%0': %1", (StringRef, StringRef))
+ERROR(error_opening_output,irgen,none,
+      "error opening '%0' for output: %1", (StringRef, StringRef))
+ERROR(error_codegen_init_fail,irgen,none,
+      "cannot initialize code generation passes for target", ())
+
 ERROR(irgen_unimplemented,irgen,none,
       "unimplemented IR generation feature %0", (StringRef))
 

@@ -17,6 +17,8 @@
 #include "swift/Subsystems.h"
 #include "swift/IRGen/Options.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/Basic/DiagnosticEngine.h"
+#include "swift/Basic/Diagnostics.h"
 #include "llvm/LLVMContext.h"
 #include "llvm/Module.h"
 #include "llvm/PassManager.h"
@@ -62,9 +64,8 @@ void swift::performIRGeneration(TranslationUnit *TU, ASTContext &Context,
   const Target *Target =
     TargetRegistry::lookupTarget(Opts.Triple, Error);
   if (!Target) {
-    errs() << "error loading LLVM target for triple '"
-                 << Opts.Triple << "': " << Error << "\n";
-    Context.setHadError();
+    Context.Diags.diagnose(SourceLoc(), diags::no_llvm_target,
+                           Opts.Triple, Error);
     return;
   }
 
@@ -77,9 +78,8 @@ void swift::performIRGeneration(TranslationUnit *TU, ASTContext &Context,
   TargetMachine *TargetMachine
     = Target->createTargetMachine(Opts.Triple, /*cpu*/ "", /*features*/ "");
   if (!TargetMachine) {
-    errs() << "no LLVM target machine for triple '"
-                 << Opts.Triple << "'\n";
-    Context.setHadError();
+    Context.Diags.diagnose(SourceLoc(), diags::no_llvm_target,
+                           Opts.Triple, "no LLVM target machine");
     return;
   }
 
@@ -102,9 +102,8 @@ void swift::performIRGeneration(TranslationUnit *TU, ASTContext &Context,
     OSFlags |= raw_fd_ostream::F_Binary;
   raw_fd_ostream RawOS(Opts.OutputFilename.c_str(), Error, OSFlags);
   if (RawOS.has_error()) {
-    errs() << "error opening '" << Opts.OutputFilename
-                 << "' for output: " << Error << "\n";
-    Context.setHadError();
+    Context.Diags.diagnose(SourceLoc(), diags::error_opening_output,
+                           Opts.OutputFilename, Error);
     return;
   }
 
@@ -156,8 +155,7 @@ void swift::performIRGeneration(TranslationUnit *TU, ASTContext &Context,
     if (TargetMachine->addPassesToEmitFile(ModulePasses, FormattedOS,
                                            FileType, OptLevel,
                                            !Opts.Verify)) {
-      errs() << "cannot initialize code generation passes for target\n";
-      Context.setHadError();
+      Context.Diags.diagnose(SourceLoc(), diags::error_codegen_init_fail);
       return;
     }
     break;
