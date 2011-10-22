@@ -298,6 +298,17 @@ ERROR(protocol_attributes,attribute_parsing,none,
 NOTE(type_declared_here,sema,none,
      "type declared here", ())
 
+NOTE(while_converting_var_init,sema,none,
+     "while converting 'var' initializer to declared type", ())
+NOTE(while_converting_default_tuple_value,sema,none,
+     "while converting default tuple value to element type", ())
+NOTE(while_converting_function_argument,sema,none,
+     "while converting function argument to expected type", ())
+
+ERROR(invalid_anonymous_argument,sema,none,
+      "use of invalid anonymous argument, %0 is larger than"
+      " # arguments to bound function (%1)", (unsigned, unsigned))
+
 //------------------------------------------------------------------------------
 // Name Binding
 //------------------------------------------------------------------------------
@@ -351,6 +362,87 @@ ERROR(tuple_element_type_mismatch,sema_tcc,none,
 ERROR(invalid_conversion,sema_tcc,none,
       "invalid conversion from type %0 to %1", (Type, Type))
 
+//------------------------------------------------------------------------------
+// Type Check Declarations
+//------------------------------------------------------------------------------
+
+ERROR(invalid_index_in_element_ref,sema_tcd,none,
+      "%0 is an invalid index for %1", (Identifier, Type))
+ERROR(name_matches_nontuple,sema_tcd,none,
+      "name specifier matches %0 which is not a tuple", (Type))
+ERROR(varname_element_count_mismatch,sema_tcd,none,
+      "name specifier matches %0 which requires %1 names, but has %2",
+      (Type, unsigned, unsigned))
+
+// Attributes
+ERROR(invalid_arg_count_for_operator,sema_tcd,none,
+      "operators must have one or two arguments", ())
+ERROR(invalid_infix_left_input,sema_tcd,none,
+  "function with 'infix_left' specified must take a two element tuple as input",
+     ())
+ERROR(infix_left_not_an_operator,sema_tcd,none,
+      "only operators may be declared 'infix_left'", ())
+ERROR(infix_left_invalid_on_decls,sema_tcd,none,
+      "declaration cannot be declared 'infix_left'", ())
+ERROR(binops_infix_left,sema_tcd,none,
+      "binary operators must be declared 'infix_left'", ())
+
+//------------------------------------------------------------------------------
+// Type Check Expressions
+//------------------------------------------------------------------------------
+
+NOTE(found_candidate,sema_tce,none,
+     "found this candidate", ())
+NOTE(first_declaration,sema_tce,none,
+     "first declaration", ())
+NOTE(second_declaration,sema_tce,none,
+     "second declaration", ())
+
+ERROR(ambiguous_expression_unresolved,sema_tce,none,
+      "ambiguous expression was not resolved to a concrete type", ())
+
+ERROR(unary_op_without_attribute,sema_tce,none,
+      "use of unary operator without 'unary' attribute specified", ())
+ERROR(binary_op_without_attribute,sema_tce,none,
+      "use of binary operator without 'infix' attribute specified", ())
+ERROR(called_expr_isnt_function,sema_tce,none,
+      "called expression isn't a function", ())
+ERROR(overloading_ambiguity,sema_tce,none,
+      "overloading ambiguity found", ())
+ERROR(no_candidates,sema_tce,none,
+      "no candidates found for %select{binary operator|unary operator|call}0",
+      (unsigned))
+ERROR(use_undeclared_identifier,sema_tce,none,
+      "use of undeclared identifier", ())
+ERROR(field_number_too_large,sema_tce,none,
+      "field number is too large for tuple", ())
+ERROR(no_valid_dot_expression,sema_tce,none,
+      "base type %0 has no valid '.' expression for this field", (Type))
+      
+// Operators
+ERROR(binop_not_infix,sema_tce,none,
+      "binary operator has no infix attribute", ())
+ERROR(binop_mismatched_infix,sema_tce,none,
+      "binary operator has overloads with incompatible infixity", ())
+
+ERROR(binop_not_overloaded,sema_tce,none,
+      "operator is not overloaded as a binary operator", ())
+ERROR(unknown_binop,sema_tce,none,
+       "operator is not a known binary operator", ())
+ERROR(non_assoc_adjacent,sema_tce,none,
+      "non-associative operator is adjacent to operator of same precedence", ())
+ERROR(incompatible_assoc,sema_tce,none,
+      "operator is adjacent to operator of same precedence"
+      " but incompatible associativity", ())
+
+//------------------------------------------------------------------------------
+// Type Check Statements
+//------------------------------------------------------------------------------
+
+ERROR(return_invalid_outside_func,sema_tcs,none,
+      "return invalid outside of a func", ())
+ERROR(expression_unresolved_function,sema_tcs,none,
+      "expression resolves to an unevaluated function", ())
 
 //==============================================================================
 // IR Generation Diagnostics

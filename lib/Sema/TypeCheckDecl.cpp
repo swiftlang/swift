@@ -75,8 +75,8 @@ public:
     if (Type T = ElementRefDecl::getTypeForPath(ERD->VD->Ty, ERD->AccessPath))
       ERD->Ty = T;
     else {
-      TC.error(ERD->getLocStart(), "'" + ERD->Name.str() +
-               "' is an invalid index for '" + ERD->VD->Ty->getString() + "'");
+      TC.diagnose(ERD->getLocStart(), diags::invalid_index_in_element_ref,
+                  ERD->Name, ERD->VD->Ty);
       ERD->Ty = ErrorType::get(TC.Context);
     }
   }
@@ -107,8 +107,7 @@ bool DeclChecker::visitValueDecl(ValueDecl *VD) {
     if (!TC.typeCheckExpression(VD->Init, DestTy))
       VD->Ty = VD->Init->getType();
     else if (isa<VarDecl>(VD))
-      TC.note(VD->getLocStart(),
-              "while converting 'var' initializer to declared type");
+      TC.diagnose(VD->getLocStart(), diags::while_converting_var_init);
   }
   
   validateAttributes(VD);
@@ -129,7 +128,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
   
   if (VD->Name.isOperator() && 
       (NumArguments == 0 || NumArguments > 2)) {
-    TC.error(VD->getLocStart(), "operators must have one or two arguments");
+    TC.diagnose(VD->getLocStart(), diags::invalid_arg_count_for_operator);
     VD->Name = TC.Context.getIdentifier("");
     Attrs.Infix = InfixData();
     // FIXME: Set the 'isError' bit on the decl.
@@ -138,28 +137,25 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
   // If the decl has an infix precedence specified, then it must be a function
   // whose input is a two element tuple.
   if (Attrs.isInfix() && NumArguments != 2) {
-    TC.error(Attrs.LSquareLoc,
-             "function with 'infix_left' specified must take "
-             "a two element tuple as input");
+    TC.diagnose(Attrs.LSquareLoc, diags::invalid_infix_left_input);
     Attrs.Infix = InfixData();
     // FIXME: Set the 'isError' bit on the decl.
   }
 
   if (Attrs.isInfix() && !VD->Name.isOperator()) {
-    TC.error(VD->getLocStart(), "only operators may be declared 'infix_left'");
+    TC.diagnose(VD->getLocStart(), diags::infix_left_not_an_operator);
     Attrs.Infix = InfixData();
     // FIXME: Set the 'isError' bit on the decl.
   }
 
   // Only var and func decls can be infix.
   if (Attrs.isInfix() && !isa<VarDecl>(VD) && !isa<FuncDecl>(VD)) {
-    TC.error(VD->getLocStart(), "declaration cannot be declared 'infix_left'");
+    TC.diagnose(VD->getLocStart(), diags::infix_left_invalid_on_decls);
     Attrs.Infix = InfixData();
   }
 
   if (VD->Name.isOperator() && !VD->Attrs.isInfix() && NumArguments != 1) {
-    TC.error(VD->getLocStart(),
-             "binary operators must be declared 'infix_left'");
+    TC.diagnose(VD->getLocStart(), diags::binops_infix_left);
     VD->Name = TC.Context.getIdentifier("");
   }
 }
@@ -185,18 +181,15 @@ bool DeclChecker::validateVarName(Type Ty, DeclVarName *Name) {
   // have the correct number of elements.
   TupleType *AccessedTuple = Ty->getAs<TupleType>();
   if (AccessedTuple == 0) {
-    TC.error(Name->getLocation(), "name specifier matches '" + Ty->getString() +
-             "' which is not a tuple");
+    TC.diagnose(Name->getLocation(), diags::name_matches_nontuple, Ty);
     return true;
   }
   
   // Verify the # elements line up.
   ArrayRef<DeclVarName *> Elements = Name->getElements();
   if (Elements.size() != AccessedTuple->Fields.size()) {
-    TC.error(Name->getLocation(), 
-             "name specifier matches '" + Ty->getString() +
-             "' which requires " + Twine(AccessedTuple->Fields.size()) +
-             " names, but has " + Twine(Elements.size()));
+    TC.diagnose(Name->getLocation(), diags::varname_element_count_mismatch,
+                Ty, AccessedTuple->Fields.size(), Elements.size());
     return true;
   }
   

@@ -92,8 +92,7 @@ bool TypeChecker::validateType(Type InTy) {
       
       Expr *OldInit = EltInit;
       if (typeCheckExpression(EltInit, EltTy)) {
-        note(OldInit->getLoc(),
-             "while converting default tuple value to element type");
+        diagnose(OldInit->getLoc(),diags::while_converting_default_tuple_value);
         IsInvalid = true;
         break;
       }

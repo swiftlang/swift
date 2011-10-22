@@ -116,15 +116,13 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // as such.
     if (isa<UnaryExpr>(E) &&
                !cast<DeclRefExpr>(E1)->getDecl()->Name.isOperator()) {
-      error(E1->getLoc(),
-            "use of unary operator without 'unary' attribute specified");
+      diagnose(E1->getLoc(), diags::unary_op_without_attribute);
       return true;
     }
     
     if (isa<BinaryExpr>(E) &&
                !cast<DeclRefExpr>(E1)->getDecl()->Attrs.isInfix()) {
-      error(E1->getLoc(),
-            "use of unary operator without 'unary' attribute specified");
+      diagnose(E1->getLoc(), diags::binary_op_without_attribute);
       return true;
     }
     
@@ -132,8 +130,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // expected type of the function.
     E2 = convertToType(E2, FT->Input);
     if (E2 == 0) {
-      note(E1->getLoc(),
-           "while converting function argument to expected type");
+      diagnose(E1->getLoc(), diags::while_converting_function_argument);
       return true;
     }
     
@@ -145,7 +142,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // Otherwise, the function's type must be dependent.  If it is something else,
   // we have a type error.
   if (!E1->getType()->is<DependentType>()) {
-    error(E1->getLoc(), "called expression isn't a function");
+    diagnose(E1->getLoc(), diags::called_expr_isnt_function);
     return true;
   }
   
@@ -205,20 +202,20 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // Otherwise we have either an ambiguity between multiple possible candidates
   // or not candidate at all.
   if (BestRank != Expr::CR_Invalid)
-    error(E1->getLoc(), "overloading ambiguity found");
+    diagnose(E1->getLoc(), diags::overloading_ambiguity);
   else if (isa<BinaryExpr>(E))
-    error(E1->getLoc(), "no candidates found for binary operator");
+    diagnose(E1->getLoc(), diags::no_candidates, 0);
   else if (isa<UnaryExpr>(E))
-    error(E1->getLoc(), "no candidates found for unary operator");
+    diagnose(E1->getLoc(), diags::no_candidates, 1);
   else
-    error(E1->getLoc(), "no candidates found for call");
+    diagnose(E1->getLoc(), diags::no_candidates, 2);
   
   // Print out the candidate set.
   for (auto TheDecl : OS->Decls) {
     Type ArgTy = TheDecl->Ty->getAs<FunctionType>()->Input;
     if (E2->getRankOfConversionTo(ArgTy) != BestRank)
       continue;
-    note(TheDecl->getLocStart(), "found this candidate");
+    diagnose(TheDecl->getLocStart(), diags::found_candidate);
   }
   return true;
 }
@@ -252,7 +249,7 @@ public:
   }
   Expr *visitDeclRefExpr(DeclRefExpr *E) {
     if (E->getDecl() == 0) {
-      TC.error(E->getLoc(), "use of undeclared identifier");
+      TC.diagnose(E->getLoc(), diags::use_undeclared_identifier);
       return 0;
     }
     
@@ -413,7 +410,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
       unsigned Value = 0;
       if (!E->getName().str().substr(1).getAsInteger(10, Value)) {
         if (Value >= TT->Fields.size()) {
-          TC.error(E->getNameLoc(), "field number is too large for tuple");
+          TC.diagnose(E->getNameLoc(), diags::field_number_too_large);
           return 0;
         }
         
@@ -472,8 +469,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   // TODO: Otherwise, do an argument dependent lookup in the namespace of the
   // base type.
   
-  TC.error(E->getDotLoc(), "base type '" + SubExprTy->getString() + 
-           "' has no valid '.' expression for this field");
+  TC.diagnose(E->getDotLoc(), diags::no_valid_dot_expression, SubExprTy);
   return 0;
 }
 
@@ -485,7 +481,7 @@ static InfixData getInfixData(TypeChecker &TC, Expr *E) {
     if (DRE->getDecl()->Attrs.isInfix())
       return DRE->getDecl()->Attrs.getInfixData();
 
-    TC.error(DRE->getLoc(), "binary operator has no infix attribute");
+    TC.diagnose(DRE->getLoc(), diags::binop_not_infix);
 
   // If this is an overload set, the entire overload set is required
   // to have the same infix data.
@@ -499,11 +495,9 @@ static InfixData getInfixData(TypeChecker &TC, Expr *E) {
         continue;
       
       if (Infix.isValid() && Infix != D->Attrs.getInfixData()) {
-        TC.error(OO->getLoc(),
-                 "binary operator has overloads with "
-                 "incompatible infixity");
-        TC.note(FirstDecl->getLocStart(), "first declaration");
-        TC.note(D->getLocStart(), "second declaration");
+        TC.diagnose(OO->getLoc(), diags::binop_mismatched_infix);
+        TC.diagnose(FirstDecl->getLocStart(), diags::first_declaration);
+        TC.diagnose(D->getLocStart(), diags::second_declaration);
         return Infix;
       }
       
@@ -514,11 +508,11 @@ static InfixData getInfixData(TypeChecker &TC, Expr *E) {
     if (Infix.isValid())
       return Infix;
 
-    TC.error(OO->getLoc(), "operator is not overloaded as a binary operator");
+    TC.diagnose(OO->getLoc(), diags::binop_not_overloaded);
 
   // Otherwise, complain.
   } else {
-    TC.error(E->getLoc(), "operator is not a known binary operator");
+    TC.diagnose(E->getLoc(), diags::unknown_binop);
   }
   
   // Recover with an infinite-precedence left-associative operator.
@@ -610,17 +604,12 @@ static Expr *foldSequence(TypeChecker &TC, Expr *LHS, ArrayRef<Expr*> &S,
            Op1Info.isNonAssociative());
 
     if (Op1Info.isNonAssociative()) {
-      TC.error(Op1->getLoc(),
-               "non-associative operator is adjacent to operator"
-               " of same precedence");
+      // FIXME: QoI ranges
+      TC.diagnose(Op1->getLoc(), diags::non_assoc_adjacent);
     } else if (Op2Info.isNonAssociative()) {
-      TC.error(Op2->getLoc(),
-               "non-associative operator is adjacent to operator"
-               " of same precedence");
+      TC.diagnose(Op2->getLoc(), diags::non_assoc_adjacent);
     } else {
-      TC.error(Op1->getLoc(),
-               "operator is adjacent to operator of same precedence"
-               " but incompatible associativity");
+      TC.diagnose(Op1->getLoc(), diags::incompatible_assoc);
     }
     
     // Recover by arbitrarily binding the first two.
@@ -677,8 +666,8 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
     if (!E->getType()->is<DependentType>())
       return E;
     
-    error(E->getStartLoc(),
-          "ambiguous expression was not resolved to a concrete type");
+    // FIXME: QoI ranges.
+    diagnose(E->getStartLoc(), diags::ambiguous_expression_unresolved);
     return 0;
   }, ^Stmt*(Stmt *S, WalkOrder Order) {
     // Never recurse into statements.

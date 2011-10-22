@@ -83,7 +83,7 @@ public:
   
   Stmt *visitReturnStmt(ReturnStmt *RS) {
     if (TheFunc == 0) {
-      TC.error(RS->getReturnLoc(), "return invalid outside of a func");
+      TC.diagnose(RS->getReturnLoc(), diags::return_invalid_outside_func);
       return 0;
     }
 
@@ -143,10 +143,9 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
       // indicates that a function didn't get called), then produce an error.
       // TODO: What about tuples which contain functions by-value that are
       // dead?
-      // TODO: QOI: Add source range.
+      // FIXME: TODO: QOI: Add source range.
       if (SubExpr->getType()->is<FunctionType>())
-        TC.error(SubExpr->getLoc(),
-                 "expression resolves to an unevaluated function");
+        TC.diagnose(SubExpr->getLoc(), diags::expression_unresolved_function);
       
       BS->setElement(i, SubExpr);
       continue;
