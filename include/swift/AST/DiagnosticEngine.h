@@ -149,6 +149,31 @@ namespace swift {
     }
   };
   
+  /// Diagnostic - This is a specific instance of a diagnostic along with all of
+  /// the DiagnosticArguments that it requires. 
+  class Diagnostic {
+    DiagID ID;
+    SmallVector<DiagnosticArgument, 3> Args;
+  public:
+    // All constructors are intentionally implicit.
+    Diagnostic(Diag<> ID) : ID(ID.ID) {}
+        
+    template<typename ...ArgTypes>
+    Diagnostic(Diag<ArgTypes...> ID,
+               typename detail::PassArgument<ArgTypes>::type... VArgs)
+      : ID(ID.ID) {
+      DiagnosticArgument DiagArgs[] = { VArgs... };
+      Args.append(DiagArgs, DiagArgs+sizeof(DiagArgs)/sizeof(DiagArgs[0]));
+    }
+
+    /*implicit*/Diagnostic(DiagID ID, ArrayRef<DiagnosticArgument> Args)
+      : ID(ID), Args(Args.begin(), Args.end()) {}
+    
+    // Accessors.
+    DiagID getID() const { return ID; }
+    ArrayRef<DiagnosticArgument> getArgs() const { return Args; }
+  };
+  
   /// \brief Class responsible for formatting diagnostics and presenting them
   /// to the user.
   class DiagnosticEngine {
@@ -180,6 +205,10 @@ namespace swift {
     /// must ensure that the diagnostic arguments have the appropriate type.
     void diagnose(SourceLoc Loc, DiagID ID, ArrayRef<DiagnosticArgument> Args);
 
+    void diagnose(SourceLoc Loc, const Diagnostic &D) {
+      diagnose(Loc, D.getID(), D.getArgs());
+    }
+    
     /// \brief Emit a diagnostic with no arguments.
     ///
     /// \param Loc The location to which the diagnostic refers in the source

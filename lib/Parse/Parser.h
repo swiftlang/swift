@@ -107,18 +107,14 @@ public:
   void skipUntil(tok T1, tok T2 = tok::unknown);
   
   template<typename ...ArgTypes>
-  void diagnose(SourceLoc Loc, Diag<ArgTypes...> ID,
-                typename detail::PassArgument<ArgTypes>::type... Args) {
-    Diags.diagnose(Loc, ID, Args...);
+  void diagnose(SourceLoc Loc, ArgTypes... Args) {
+    Diags.diagnose(Loc, Diagnostic(Args...));
   }
-
-  /// \brief Emit a diagnostic at the given source location.
   template<typename ...ArgTypes>
-  void diagnose(Token Tok, Diag<ArgTypes...> ID,
-                typename detail::PassArgument<ArgTypes>::type... Args) {
-    Diags.diagnose(Tok.getLoc(), ID, Args...);
+  void diagnose(Token Tok, ArgTypes... Args) {
+    Diags.diagnose(Tok.getLoc(), Diagnostic(Args...));
   }
-
+                   
   //===--------------------------------------------------------------------===//
   // Primitive Parsing
   
