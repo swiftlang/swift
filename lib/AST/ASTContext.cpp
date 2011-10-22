@@ -54,7 +54,6 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
     TheInt16Type(new (*this) BuiltinType(TypeKind::BuiltinInt16, *this)),
     TheInt32Type(new (*this) BuiltinType(TypeKind::BuiltinInt32, *this)),
     TheInt64Type(new (*this) BuiltinType(TypeKind::BuiltinInt64, *this)) {
-  HadError = false;
 }
 
 ASTContext::~ASTContext() {
@@ -80,8 +79,7 @@ Identifier ASTContext::getIdentifier(StringRef Str) {
 }
 
 bool ASTContext::hadError() const {
-  // FIXME: When this goes away, remove ASTContext::hadError!
-  return HadError || Diags.hadAnyError();
+  return Diags.hadAnyError();
 }
 
 

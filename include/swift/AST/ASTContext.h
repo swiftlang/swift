@@ -44,7 +44,6 @@ class ASTContext {
   ASTContext(const ASTContext&) = delete;
   void operator=(const ASTContext&) = delete;
   llvm::BumpPtrAllocator *Allocator;
-  bool HadError;
 public:
   // Members that should only be used by ASTContext.cpp.
   void *IdentifierTable; // llvm::StringMap<char>
@@ -109,7 +108,6 @@ public:
   //===--------------------------------------------------------------------===//
 
   bool hadError() const;
-  void setHadError() { HadError = true; }
   
   //===--------------------------------------------------------------------===//
   // Type manipulation routines.
