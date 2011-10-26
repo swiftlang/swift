@@ -1,4 +1,4 @@
-//===--- TypeChecking.cpp - Type Checking ---------------------------------===//
+//===--- TypeChecker.cpp - Type Checking ----------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

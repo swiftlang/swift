@@ -1,4 +1,4 @@
-//===--- TypeChecking.h - Type Checking Class -------------------*- C++ -*-===//
+//===--- TypeChecker.h - Type Checking Class --------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
