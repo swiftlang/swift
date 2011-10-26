@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecking.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"

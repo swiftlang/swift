@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecking.h"
+#include "TypeChecker.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
