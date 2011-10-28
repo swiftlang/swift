@@ -37,8 +37,11 @@ public:
   Type DestTy;
   
   Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
-    assert(0 && "Integer literals never have dependent type!");
-    return 0;
+    // FIXME: Name lookup on integer to get conversion function.
+    assert(E->getType()->is<DependentType>() &&
+           "should only be called on dependent integers");
+    E->setType(DestTy, ValueKind::RValue);
+    return E;
   }
   Expr *visitFloatLiteralExpr(FloatLiteralExpr *E) {
     assert(0 && "Float literals never have dependent type!");
@@ -393,7 +396,9 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       continue;
     }
     
-    if (!ETy->getElementType(SrcField)->isEqual(DestTy->getElementType(i))) {
+    Type DestEltTy = DestTy->getElementType(i);
+    
+    if (ETy && !ETy->getElementType(SrcField)->isEqual(DestEltTy)) {
       TC.diagnose(E->getLoc(), diag::tuple_element_type_mismatch, i,
                   ETy->getElementType(SrcField),
                   DestTy->getElementType(i));

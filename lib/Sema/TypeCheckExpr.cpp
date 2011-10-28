@@ -242,6 +242,8 @@ public:
   TypeChecker &TC;
   
   Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
+    if (E->getType().isNull())
+      E->setDependentType(DependentType::get(TC.Context));
     return E;
   }
   Expr *visitFloatLiteralExpr(FloatLiteralExpr *E) {
@@ -381,8 +383,10 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   }
   
   Type SubExprTy = E->getBase()->getType();
-  if (SubExprTy->is<DependentType>())
+  if (SubExprTy->is<DependentType>()) {
+    E->setDependentType(SubExprTy);
     return E;
+  }
   
   // First, check to see if this is a reference to a field in the type or
   // protocol.
