@@ -376,11 +376,7 @@ public:
 
 Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   Type SubExprTy = E->getBase()->getType();
-  if (SubExprTy->is<DependentType>()) {
-    E->setDependentType(SubExprTy);
-    return E;
-  }
-  
+   
   // First, check to see if this is a reference to a field in the type or
   // protocol.
   
@@ -465,6 +461,12 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   
   // TODO: Otherwise, do an argument dependent lookup in the namespace of the
   // base type.
+  
+  if (SubExprTy->is<DependentType>()) {
+    E->setDependentType(SubExprTy);
+    return E;
+  }
+
   
   TC.diagnose(E->getDotLoc(), diag::no_valid_dot_expression, SubExprTy);
   return 0;
