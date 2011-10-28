@@ -375,13 +375,6 @@ public:
 } // end anonymous namespace.
 
 Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
-  // If the base expression hasn't been found yet, then we can't process this
-  // value.
-  if (E->getBase() == 0) {
-    E->setDependentType(DependentType::get(TC.Context));
-    return E;
-  }
-  
   Type SubExprTy = E->getBase()->getType();
   if (SubExprTy->is<DependentType>()) {
     E->setDependentType(SubExprTy);
