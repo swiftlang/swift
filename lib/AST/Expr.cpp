@@ -255,8 +255,7 @@ getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
 ///
 /// Note that this code needs to be kept carefully in synch with
 /// SemaCoerceBottomUp::convertToType.
-static Expr::ConversionRank 
-getConversionRank(const Expr *E, Type DestTy) {
+static Expr::ConversionRank getConversionRank(const Expr *E, Type DestTy) {
   assert(!DestTy->is<DependentType>() &&
          "Result of conversion can't be dependent");
 

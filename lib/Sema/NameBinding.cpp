@@ -45,7 +45,8 @@ namespace {
     TranslationUnit *TU;
     ASTContext &Context;
     
-    NameBinder(TranslationUnit *TU);
+    NameBinder(TranslationUnit *TU) : TU(TU), Context(TU->Ctx) {
+    }
     ~NameBinder() {
     }
     
@@ -66,10 +67,6 @@ namespace {
     Module *getModule(std::pair<Identifier,SourceLoc> ModuleID);
   };
 }
-
-NameBinder::NameBinder(TranslationUnit *TU) : TU(TU), Context(TU->Ctx) {
-}
-
 
 llvm::error_code NameBinder::findModule(StringRef Module, 
                                         SourceLoc ImportLoc,
