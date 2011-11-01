@@ -43,7 +43,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
     ArrayTypes(new ArrayTypesMapTy()),
     SourceMgr(sourcemgr),
     Diags(Diags),
-    BuiltinModule(new (*this) Module(getIdentifier("Builtin"), *this)),
+    BuiltinModule(new (*this) swift::BuiltinModule(getIdentifier("Builtin"), *this)),
     TheErrorType(new (*this) ErrorType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheDependentType(new (*this) DependentType(*this)),

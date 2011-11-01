@@ -47,10 +47,14 @@ namespace swift {
 // hierarchy.  Commented out members are abstract classes.  This formation
 // allows for range checks in classof.
 enum class DeclContextKind {
-  Module,
+  //Module,
+    TranslationUnit,
+    BuiltinModule,
   FuncExpr,
   OneOfType,
-  ProtocolType
+  ProtocolType,
+  
+  First_Module = TranslationUnit, Last_Module = BuiltinModule
 };
   
 /// A DeclContext is an AST object which acts as a semantic container
@@ -64,7 +68,9 @@ class DeclContext {
 public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
     : ParentAndKind(Parent, static_cast<unsigned>(Kind)) {
-    assert(Parent || Kind == DeclContextKind::Module);
+    assert(Parent ||
+           (Kind >= DeclContextKind::First_Module &&
+            Kind <= DeclContextKind::Last_Module));
   }
 
   /// Returns the kind of context this is.

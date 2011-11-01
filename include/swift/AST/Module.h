@@ -28,40 +28,26 @@ namespace swift {
   class NameAliasType;
   class TypeAliasDecl;
   
-enum class ModuleKind {
-  // The indentation of the members of this enum describe the inheritance
-  // hierarchy.  Commented out members are abstract classes.  This formation
-  // allows for range checks in classof.
-  Module,
-    TranslationUnit
-};
-  
 /// Module - A unit of modularity.  The current translation unit is a
 /// module, as is an imported module.
 class Module : public DeclContext {
 public:
   ASTContext &Ctx;
-  ModuleKind Kind;
   Identifier Name;
 
 protected:
-  Module(ModuleKind Kind, Identifier Name, ASTContext &Ctx)
-    : DeclContext(DeclContextKind::Module, nullptr),
-      Ctx(Ctx), Kind(Kind), Name(Name) {
+  Module(DeclContextKind Kind, Identifier Name, ASTContext &Ctx)
+    : DeclContext(Kind, nullptr), Ctx(Ctx), Name(Name) {
   }
 
 public:
-  Module(Identifier Name, ASTContext &Ctx)
-    : DeclContext(DeclContextKind::Module, nullptr),
-      Ctx(Ctx), Kind(ModuleKind::Module), Name(Name) {
-  }
 
-  
   static bool classof(const Module *M) {
     return true;
   }
   static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::Module;
+    return DC->getContextKind() >= DeclContextKind::First_Module &&
+           DC->getContextKind() <= DeclContextKind::Last_Module;
   }
 
 private:
@@ -95,20 +81,31 @@ public:
     UnresolvedScopedTypesForParser;
   
   TranslationUnit(Identifier Name, ASTContext &C)
-    : Module(ModuleKind::TranslationUnit, Name, C) {
+    : Module(DeclContextKind::TranslationUnit, Name, C) {
   }
 
   void dump() const;
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const Module *M) {
-    return M->Kind == ModuleKind::TranslationUnit;
-  }
   static bool classof(const TranslationUnit *TU) { return true; }
   static bool classof(const DeclContext *DC) {
-    if (const Module *M = dyn_cast<Module>(DC))
-      return isa<TranslationUnit>(M);
-    return false;
+    return DC->getContextKind() == DeclContextKind::TranslationUnit;
+  }
+};
+
+  
+/// BuiltinModule - This module represents the compiler's implicitly generated
+/// declarations in the builtin module.
+class BuiltinModule : public Module {
+public:
+  BuiltinModule(Identifier Name, ASTContext &Ctx)
+    : Module(DeclContextKind::BuiltinModule, Name, Ctx) {
+  }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const BuiltinModule *TU) { return true; }
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::BuiltinModule;
   }
 };
   

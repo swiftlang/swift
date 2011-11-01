@@ -150,12 +150,12 @@ void InMemoryModule::lookupValue(ImportDecl *ID, Identifier Name,
 
 
 //===----------------------------------------------------------------------===//
-// BuiltinModule
+// BuiltinModuleX
 //===----------------------------------------------------------------------===//
 
 namespace {
   /// An implementation of ModuleProvider for builtin types and functions.
-  class BuiltinModule : public ModuleProvider {
+  class BuiltinModuleX : public ModuleProvider {
     ASTContext &Context;
 
     /// The cache of identifiers we've already looked up.  We use a
@@ -164,7 +164,7 @@ namespace {
     /// and a builtin value with the same name, but that's okay.
     llvm::DenseMap<Identifier, NamedDecl*> Cache;
   public:
-    BuiltinModule(ASTContext &Context) : Context(Context) {}
+    BuiltinModuleX(ASTContext &Context) : Context(Context) {}
     TypeAliasDecl *lookupType(ImportDecl *ID, Identifier Name,
                               NLKind LookupKind) override;
     void lookupValue(ImportDecl *ID, Identifier Name,
@@ -174,7 +174,7 @@ namespace {
 } // end anonymous namespace.
 
 TypeAliasDecl *
-BuiltinModule::lookupType(ImportDecl *ID, Identifier Name, NLKind LookupKind) {
+BuiltinModuleX::lookupType(ImportDecl *ID, Identifier Name, NLKind LookupKind) {
   // Only qualified lookup ever finds anything in the builtin module.
   if (LookupKind != NLKind::QualifiedLookup) return nullptr;
   
@@ -192,7 +192,7 @@ BuiltinModule::lookupType(ImportDecl *ID, Identifier Name, NLKind LookupKind) {
   return Alias;
 }
 
-void BuiltinModule::lookupValue(ImportDecl *ID, Identifier Name,
+void BuiltinModuleX::lookupValue(ImportDecl *ID, Identifier Name,
                                 SmallVectorImpl<ValueDecl*> &Result,
                                 NLKind LookupKind) {
   // Only qualified lookup ever finds anything in the builtin module.
@@ -274,7 +274,7 @@ NameBinder::NameBinder(ASTContext &C) : Context(C) {
   auto ID = new (C) ImportDecl(SourceLoc(),
                                C.AllocateCopy(llvm::makeArrayRef(BuiltinPath)),
                                /*No DeclContext?*/ nullptr);
-  Imports.push_back(std::make_pair(ID, new BuiltinModule(C)));
+  Imports.push_back(std::make_pair(ID, new BuiltinModuleX(C)));
   
   // FIXME: Import swift.swift implicitly.  We need a way for swift.swift itself
   // to not recursively import itself though.
