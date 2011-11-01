@@ -244,7 +244,7 @@ BoundScope NameBinder::bindScopeName(TypeAliasDecl *TypeFromScope,
   // If that failed, look for a module name.
   if (!Type) {
     for (Import &ImpEntry : Imports)
-      if (ImpEntry.first->AccessPath.back().first == Name)
+      if (ImpEntry.second->Name == Name)
         return &ImpEntry;
     
     diagnose(NameLoc, diag::no_module_or_type);
