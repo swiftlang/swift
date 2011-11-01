@@ -1109,15 +1109,14 @@
   </pre>
   
   <p>Numeric literals are either integer or floating point depending on whether
-     there is a '.' in the literal value.  Integer values are typed as
-     'integer_literal_type' type and floating point values have type
-     'float_literal_type', both of which must be defined by the library.
-     If a literal is used and these types are not defined, then
-     the code is malformed.</p>
+     there is a '.' in the literal value.  The type of the literal is inferred
+     based on its context.  If there is no contextual type information for an
+     expression, all unresolved types are inferred to 'integer_literal_type'
+     type and floating point values to 'float_literal_type'.  If a literal is
+     used and these types are not defined, then the code is malformed.</p>
   
   <p>
-  TODO: This is a completely broken model, we should switch to infinite
-  precision values whose types are resolved during type checking.
+  TODO: Need to nail down the interface that this requires.
   </p>
 
   <!-- ===================================================================== -->

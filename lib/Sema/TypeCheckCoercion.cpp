@@ -37,7 +37,7 @@ public:
   Type DestTy;
   
   Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
-    // FIXME: Name lookup on integer to get conversion function.
+     // FIXME: Name lookup on integer to get conversion function.
     assert(E->getType()->is<DependentType>() &&
            "should only be called on dependent integers");
     E->setType(DestTy, ValueKind::RValue);

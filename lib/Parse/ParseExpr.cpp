@@ -273,11 +273,7 @@ ParseResult<Expr> Parser::parseExprNumericConstant() {
       return ParseResult<Expr>::getSemaError();
     }
     
-    // The type of an integer literal is always "integer_literal_type", which
-    // should be defined by the library.
-    Identifier TyName = Context.getIdentifier("integer_literal_type");
-    Type Ty = ScopeInfo.lookupOrInsertTypeName(TyName, Loc);
-    return new (Context) IntegerLiteralExpr(Text, Loc, Ty);
+    return new (Context) IntegerLiteralExpr(Text, Loc);
   }
   
   // Okay, we have a floating point constant.  Verify we have a single dot.

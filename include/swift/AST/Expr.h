@@ -155,9 +155,8 @@ class IntegerLiteralExpr : public Expr {
   SourceLoc Loc;
 
 public:
-  IntegerLiteralExpr(StringRef Val, SourceLoc Loc, Type Ty)
-    : Expr(ExprKind::IntegerLiteral, TypeJudgement(Ty, ValueKind::RValue)),
-      Val(Val), Loc(Loc) {}
+  IntegerLiteralExpr(StringRef Val, SourceLoc Loc)
+    : Expr(ExprKind::IntegerLiteral), Val(Val), Loc(Loc) {}
   
   uint64_t getValue() const;
 

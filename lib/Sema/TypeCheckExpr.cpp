@@ -160,6 +160,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // resolve which overload member is based on the argument type.
   OverloadSetRefExpr *OS = dyn_cast<OverloadSetRefExpr>(E1);
   if (!OS) {
+    // If not, just use the dependent type.
     E->setType(E1->getType(), ValueKind::RValue);
     return false;
   }
@@ -642,16 +643,22 @@ Expr *SemaExpressionTree::visitSequenceExpr(SequenceExpr *E) {
 bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
   SemaExpressionTree SET(*this);
   E = SET.doIt(E);
-  
-  // If our context specifies a type, apply it to the expression.
-  if (E && ConvertType)
-    E = convertToType(E, ConvertType);
-  
+
   if (E == 0) return true;
+
+  // If our context specifies a type, apply it to the expression.
+  if (ConvertType) {
+    E = convertToType(E, ConvertType);
+    if (E == 0) return true;
+  }
   
   // Check the initializer/body to make sure that we succeeded in resolving
-  // all of the types contained within it.  We should not have any
-  // DependentType's left for subexpressions.
+  // all of the types contained within it.  If we've resolved everything, then
+  // we're done processing the expression.  While we're doing the walk, keep
+  // track of whether we have any literals without a resolved type.
+  __block Expr *OneDependentExpr = 0;
+  __block SmallVector<IntegerLiteralExpr*, 4> DependentLiterals;
+  
   E = E->walk(^(Expr *E, WalkOrder Order) {
     // Ignore the preorder walk.  We'd rather diagnose use of unresolved types
     // during the postorder walk so that the inner most expressions are 
@@ -661,18 +668,68 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
     
     assert(!isa<SequenceExpr>(E) && "Should have resolved this");
     
-    // Use is to strip off sugar.
-    if (!E->getType()->is<DependentType>())
-      return E;
-    
-    // FIXME: QoI ranges.
-    diagnose(E->getStartLoc(), diag::ambiguous_expression_unresolved);
-    return 0;
+    if (E->getType()->is<DependentType>()) {
+      // Remember the first dependent expression we come across.
+      if (OneDependentExpr == 0)
+        OneDependentExpr = E;
+
+      // Remember all of the literals with dependent type that we come across.
+      if (IntegerLiteralExpr *ILE = dyn_cast<IntegerLiteralExpr>(E))
+        DependentLiterals.push_back(ILE);
+    }
+    return E;
   }, ^Stmt*(Stmt *S, WalkOrder Order) {
     // Never recurse into statements.
     return 0;
   });
 
+  // If we found any dependent literals, then force them to the library
+  // specified default integer type (usually int64).
+  if (!DependentLiterals.empty()) {
+    // Lookup the "integer_literal_type" which is what all the unresolved
+    // literals get implicitly coerced to.
+    TypeAliasDecl *TAD = TU.lookupGlobalType(
+                                  Context.getIdentifier("integer_literal_type"),
+                                              NLKind::UnqualifiedLookup);
+    if (TAD == 0) {
+      diagnose(DependentLiterals[0]->getStartLoc(),
+               diag::no_integer_literal_type_found);
+      E = 0;
+      return true;
+    }
+
+    Type IntLiteralType = TAD->getAliasType(Context);
+    
+    // FIXME: Validate that the type applied is "valid" (has conversion) and no
+    // truncation for each literal.  Same code as in coercing logic.
+    for (IntegerLiteralExpr *ILE : DependentLiterals)
+      ILE->setType(IntLiteralType, ValueKind::RValue);
+    
+    // Now that we've added some types to the mix, re-type-check the expression
+    // tree and recheck for dependent types.
+    OneDependentExpr = 0;
+    E = SET.doIt(E);
+    if (E == 0) return true;
+    
+    E = E->walk(^(Expr *E, WalkOrder Order) {
+      // Remember the first dependent expression we come across.
+      if (Order != WalkOrder::PreOrder && E->getType()->is<DependentType>() &&
+          OneDependentExpr == 0)
+        OneDependentExpr = E;
+      return E;
+    }, ^Stmt*(Stmt *S, WalkOrder Order) {
+      // Never recurse into statements.
+      return 0;
+    });
+  }
   
-  return E == 0;
+  // If there are no dependent expressions, then we're done.
+  if (OneDependentExpr == 0) return false;
+
+  // Otherwise, emit an error about the ambiguity.
+  // FIXME: QoI ranges.
+  diagnose(OneDependentExpr->getStartLoc(),
+           diag::ambiguous_expression_unresolved);
+  E = 0;
+  return true;
 }
