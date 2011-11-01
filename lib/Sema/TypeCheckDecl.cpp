@@ -43,7 +43,7 @@ public:
   }
   
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    TC.validateType(TAD->getAliasType(TC.Context));
+    TC.validateType(TAD->getAliasType());
   }
 
   void visitVarDecl(VarDecl *VD) {

@@ -82,7 +82,7 @@ TypeAliasDecl *ScopeInfo::lookupTypeNameInternal(Identifier Name, SourceLoc Loc,
 /// lookupOrInsertTypeName - This is the same as lookupOrInsertTypeNameDecl,
 /// but returns the alias as a type.
 Type ScopeInfo::lookupOrInsertTypeName(Identifier Name, SourceLoc Loc) {
-  return lookupOrInsertTypeNameDecl(Name, Loc)->getAliasType(TheParser.Context);
+  return lookupOrInsertTypeNameDecl(Name, Loc)->getAliasType();
 }
 
 Type ScopeInfo::getQualifiedTypeName(Identifier BaseName, SourceLoc BaseNameLoc,
@@ -93,7 +93,7 @@ Type ScopeInfo::getQualifiedTypeName(Identifier BaseName, SourceLoc BaseNameLoc,
                                           DeclAttributes(),
                                           TheParser.CurDeclContext);
   UnresolvedScopedTypeList.push_back(std::make_pair(BaseType, NestedType));
-  return NestedType->getAliasType(TheParser.Context);
+  return NestedType->getAliasType();
 }
 
 

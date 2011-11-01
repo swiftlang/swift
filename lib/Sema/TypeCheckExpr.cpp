@@ -698,7 +698,7 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
       return true;
     }
 
-    Type IntLiteralType = TAD->getAliasType(Context);
+    Type IntLiteralType = TAD->getAliasType();
     
     // FIXME: Validate that the type applied is "valid" (has conversion) and no
     // truncation for each literal.  Same code as in coercing logic.

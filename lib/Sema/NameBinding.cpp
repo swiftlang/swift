@@ -350,7 +350,7 @@ void swift::performNameBinding(TranslationUnit *TU) {
                                          NLKind::QualifiedLookup);
     }
     if (Alias) {
-      BaseAndType.second->UnderlyingTy = Alias->getAliasType(Binder.Context);
+      BaseAndType.second->UnderlyingTy = Alias->getAliasType();
     } else {
       Binder.diagnose(NameLoc, diag::invalid_member_type,
                       Name, BaseAndType.first->Name);

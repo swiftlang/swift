@@ -294,7 +294,7 @@ public:
   SourceLoc getLocStart() const { return TypeAliasLoc; }
 
   /// getAliasType - Return the sugared version of this decl as a Type.
-  NameAliasType *getAliasType(ASTContext &C) const;
+  NameAliasType *getAliasType() const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

@@ -67,10 +67,11 @@ SourceLoc Decl::getLocStart() const {
 }
 
 /// getAliasType - Return the sugared version of this decl as a Type.
-NameAliasType *TypeAliasDecl::getAliasType(ASTContext &C) const {
+NameAliasType *TypeAliasDecl::getAliasType() const {
   // Lazily create AliasTy. 
   if (AliasTy == 0)
-    AliasTy = new (C) NameAliasType(const_cast<TypeAliasDecl*>(this));
+    AliasTy = new (getASTContext()) NameAliasType(
+                                            const_cast<TypeAliasDecl*>(this));
    
   return AliasTy;
 }

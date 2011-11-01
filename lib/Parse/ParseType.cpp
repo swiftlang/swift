@@ -256,7 +256,7 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
   // constructors a temporary dummy type.
   Type TmpTy = TupleType::getEmpty(Context);
   if (PrettyTypeName)
-    TmpTy = PrettyTypeName->getAliasType(Context);
+    TmpTy = PrettyTypeName->getAliasType();
   
   for (const OneOfElementInfo &Elt : Elts) {
     Identifier NameI = Context.getIdentifier(Elt.Name);
@@ -427,7 +427,7 @@ bool Parser::parseTypeProtocolBody(SourceLoc ProtocolLoc,
                                                 CurDeclContext);
   
   TupleTypeElt ThisElt(NewProto, Context.getIdentifier("this"));
-  if (TypeName) ThisElt.Ty = TypeName->getAliasType(Context);
+  if (TypeName) ThisElt.Ty = TypeName->getAliasType();
   TupleType *ThisTy = TupleType::get(ThisElt, Context);
   
   // Install all of the members of protocol into the protocol's DeclContext, and
