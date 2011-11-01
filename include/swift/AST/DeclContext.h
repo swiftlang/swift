@@ -24,21 +24,42 @@
 
 namespace swift {
   class ASTContext;
+  class DeclContext;
+}
 
+namespace llvm {
+  template<>
+  class PointerLikeTypeTraits<swift::DeclContext*> {
+  public:
+    static void *getAsVoidPointer(swift::DeclContext* P) {
+      return (void*)P;
+    }
+    static swift::DeclContext *getFromVoidPointer(void *P) {
+      return (swift::DeclContext*)P;
+    }
+    enum { NumLowBitsAvailable = 3 };
+  };
+}
+
+namespace swift {
+
+// The indentation of the members of this enum describe the inheritance
+// hierarchy.  Commented out members are abstract classes.  This formation
+// allows for range checks in classof.
 enum class DeclContextKind {
   Module,
   FuncExpr,
   OneOfType,
   ProtocolType
 };
-
+  
 /// A DeclContext is an AST object which acts as a semantic container
 /// for declarations.  As a policy matter, we currently define
 /// contexts broadly: a lambda expression in a function is a new
 /// DeclContext, but a new brace statement is not.  There's no
 /// particular mandate for this, though.
 class DeclContext {
-  llvm::PointerIntPair<DeclContext*, 2, unsigned> ParentAndKind;
+  llvm::PointerIntPair<DeclContext*, 3, unsigned> ParentAndKind;
 
 public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
