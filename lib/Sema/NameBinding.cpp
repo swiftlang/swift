@@ -61,8 +61,8 @@ namespace {
     BoundScope bindScopeName(TypeAliasDecl *TypeFromScope,
                              Identifier Name, SourceLoc NameLoc);
 
-    void bindValueName(Identifier I, SmallVectorImpl<ValueDecl*> &Result,
-                       NLKind LookupKind);
+    void lookupGlobalValue(Identifier I, NLKind LookupKind,
+                           SmallVectorImpl<ValueDecl*> &Result);
     
     TypeAliasDecl *lookupTypeName(Identifier I);
     
@@ -190,12 +190,10 @@ TypeAliasDecl *NameBinder::lookupTypeName(Identifier Name) {
 
 
 
-/// bindValueName - This is invoked for each name reference in the AST, and
-/// returns a decl if found or null if not.  If OnlyReturnFunctions is true,
-/// then this will only return a decl if it has function type.
-void NameBinder::bindValueName(Identifier Name, 
-                               SmallVectorImpl<ValueDecl*> &Result,
-                               NLKind LookupKind) {
+/// lookupGlobalValue - Perform a name lookup from within the context of the
+/// current module.
+void NameBinder::lookupGlobalValue(Identifier Name, NLKind LookupKind,
+                                   SmallVectorImpl<ValueDecl*> &Result) {
   // Look in the current module.
   TU->lookupValue(Module::AccessPathTy(), Name, LookupKind, Result);
   if (!Result.empty())
@@ -275,7 +273,7 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
   if (UnresolvedDotExpr *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
     SmallVector<ValueDecl*, 4> Decls;
     // Perform .-style name lookup.
-    Binder.bindValueName(UDE->getName(), Decls, NLKind::DotLookup);
+    Binder.lookupGlobalValue(UDE->getName(), NLKind::DotLookup, Decls);
 
     // Copy the overload set into ASTContext memory.
     if (!Decls.empty())
@@ -290,7 +288,7 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
   if (UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
     Name = UDRE->getName();
     Loc = UDRE->getLoc();
-    Binder.bindValueName(Name, Decls, NLKind::UnqualifiedLookup);
+    Binder.lookupGlobalValue(Name, NLKind::UnqualifiedLookup, Decls);
 
   // Process UnresolvedScopedIdentifierExpr by doing a qualified lookup.
   } else if (UnresolvedScopedIdentifierExpr *USIE =
