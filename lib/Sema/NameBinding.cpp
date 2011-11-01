@@ -137,7 +137,7 @@ Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
   // We have to do name binding on it to ensure that types are fully resolved.
   // This should eventually be eliminated by having actual fully resolved binary
   // dumps of the code instead of reparsing though.
-  performNameBinding(TU, Context);
+  performNameBinding(TU);
   
   return TU;
 }
@@ -291,7 +291,7 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
 /// At this parsing has been performed, but we still have UnresolvedDeclRefExpr
 /// nodes for unresolved value names, and we may have unresolved type names as
 /// well.  This handles import directives and forward references.
-void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
+void swift::performNameBinding(TranslationUnit *TU) {
   NameBinder Binder(TU);
 
   SmallVector<ImportedModule, 8> ImportedModules;
@@ -300,7 +300,7 @@ void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
   // FIXME: This should only happen for translation units in the standard
   // library.
   ImportedModules.push_back(std::make_pair(Module::AccessPathTy(),
-                                           Ctx.TheBuiltinModule));
+                                           TU->Ctx.TheBuiltinModule));
   
   // FIXME: For translation units not in the standard library, we should import
   // swift.swift implicitly.  We need a way for swift.swift itself to not
@@ -313,7 +313,7 @@ void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
         Binder.addImport(ID, ImportedModules);
     }
   
-  TU->ImportedModules = Ctx.AllocateCopy(ImportedModules);
+  TU->ImportedModules = TU->Ctx.AllocateCopy(ImportedModules);
   
   // Type binding.  Loop over all of the unresolved types in the translation
   // unit, resolving them with imports.
@@ -329,7 +329,7 @@ void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
     
     Binder.diagnose(TA->getLocStart(), diag::use_undeclared_type, TA->Name);
     
-    TA->UnderlyingTy = ErrorType::get(Ctx);
+    TA->UnderlyingTy = ErrorType::get(TU->Ctx);
   }
 
   // Loop over all the unresolved scoped types in the translation
@@ -379,9 +379,9 @@ void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
     
     // Fill in null results with a dummy expression.
     if (Elt.isNull())
-      Elt = new (Ctx) TupleExpr(SourceLoc(), 0, 0, 0, SourceLoc(), false,
-                                TypeJudgement(TupleType::getEmpty(Ctx),
-                                              ValueKind::RValue));
+      Elt = new (TU->Ctx) TupleExpr(SourceLoc(), 0, 0, 0, SourceLoc(), false,
+                                    TypeJudgement(TupleType::getEmpty(TU->Ctx),
+                                                  ValueKind::RValue));
     TU->Body->setElement(i, Elt);
   }
 

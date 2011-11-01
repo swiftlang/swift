@@ -32,17 +32,16 @@ namespace swift {
 
   /// performNameBinding - Once parsing is complete, this walks the AST to
   /// resolve names and do other top-level validation.
-  void performNameBinding(TranslationUnit *TU, ASTContext &Ctx);
+  void performNameBinding(TranslationUnit *TU);
   
   /// performTypeChecking - Once parsing and namebinding are complete, this
   /// walks the AST to resolve types and diagnose problems therein.
   ///
-  void performTypeChecking(TranslationUnit *TU, ASTContext &Ctx);
+  void performTypeChecking(TranslationUnit *TU);
 
   /// performIRGeneration - Turn the given translation unit into
   /// either LLVM IR or native code.
-  void performIRGeneration(TranslationUnit *TU, ASTContext &Ctx,
-                           irgen::Options &Opts);
+  void performIRGeneration(TranslationUnit *TU, irgen::Options &Opts);
   
 } // end namespace swift
 

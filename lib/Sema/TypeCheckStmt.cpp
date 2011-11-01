@@ -168,7 +168,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 /// walks the AST to resolve types and diagnose problems therein.
 ///
 /// FIXME: This should be moved out to somewhere else.
-void swift::performTypeChecking(TranslationUnit *TU, ASTContext &Ctx) {
+void swift::performTypeChecking(TranslationUnit *TU) {
   TypeChecker TC(*TU);
   
   // Find all the FuncExprs in the translation unit and collapse all
