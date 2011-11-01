@@ -233,7 +233,7 @@ namespace {
     
   public:
     ASTContext &Context;
-    NameBinder(ASTContext &C) : Context(C) {}
+    NameBinder(ASTContext &C);
     ~NameBinder() {
       for (ModuleProvider *M : LoadedModules)
         delete M;
@@ -266,6 +266,21 @@ namespace {
     ModuleProvider *getModuleProvider(std::pair<Identifier,SourceLoc> ModuleID);
   };
 }
+
+NameBinder::NameBinder(ASTContext &C) : Context(C) {
+  // Allocate the builtin import and add it to our list of things to search.
+  std::pair<Identifier,SourceLoc> BuiltinPath(C.getIdentifier("Builtin"),
+                                              SourceLoc());
+  
+  auto ID = new (C) ImportDecl(SourceLoc(),
+                               C.AllocateCopy(llvm::makeArrayRef(BuiltinPath)),
+                               /*No DeclContext?*/ nullptr);
+  addBuiltinImport(ID);
+  
+  // FIXME: Import swift.swift implicitly.  We need a way for swift.swift itself
+  // to not recursively import itself though.
+}
+
 
 llvm::error_code NameBinder::findModule(StringRef Module, 
                                         SourceLoc ImportLoc,
@@ -544,12 +559,6 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
 void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
   NameBinder Binder(Ctx);
 
-  std::pair<Identifier,SourceLoc> BuiltinPath[] {
-    std::make_pair(Ctx.getIdentifier("Builtin"), SourceLoc())
-  };
-  ImportDecl BuiltinImport(SourceLoc(), BuiltinPath, nullptr);
-  Binder.addBuiltinImport(&BuiltinImport);
-  
   // Do a prepass over the declarations to find the list of top-level value
   // declarations.
   for (auto Elt : TU->Body->getElements())
