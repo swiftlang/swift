@@ -46,8 +46,10 @@ namespace {
                                 llvm::OwningPtr<llvm::MemoryBuffer> &Buffer);
     
   public:
+    TranslationUnit *TU;
     ASTContext &Context;
-    NameBinder(ASTContext &C);
+    
+    NameBinder(TranslationUnit *TU);
     ~NameBinder() {
     }
     
@@ -78,18 +80,23 @@ namespace {
   };
 }
 
-NameBinder::NameBinder(ASTContext &C) : Context(C) {
+NameBinder::NameBinder(TranslationUnit *TU) : TU(TU), Context(TU->Ctx) {
+  // Import the builtin library as an implicit import.
+  // FIXME: This should only happen for translation units in the standard
+  // library.
+  
   // Allocate the builtin import and add it to our list of things to search.
-  std::pair<Identifier,SourceLoc> BuiltinPath(C.getIdentifier("Builtin"),
+  std::pair<Identifier,SourceLoc> BuiltinPath(Context.getIdentifier("Builtin"),
                                               SourceLoc());
   
-  auto ID = new (C) ImportDecl(SourceLoc(),
-                               C.AllocateCopy(llvm::makeArrayRef(BuiltinPath)),
-                               /*No DeclContext?*/ nullptr);
-  Imports.push_back(std::make_pair(ID, C.TheBuiltinModule));
-  
-  // FIXME: Import swift.swift implicitly.  We need a way for swift.swift itself
-  // to not recursively import itself though.
+  auto ID = new (Context) ImportDecl(SourceLoc(),
+                          Context.AllocateCopy(llvm::makeArrayRef(BuiltinPath)),
+                                     /*No DeclContext?*/ nullptr);
+  Imports.push_back(std::make_pair(ID, Context.TheBuiltinModule));
+
+  // FIXME: For translation units not in the standard library, we should import
+  // swift.swift implicitly.  We need a way for swift.swift itself to not
+  // recursively import itself though.
 }
 
 
@@ -362,7 +369,7 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
 /// nodes for unresolved value names, and we may have unresolved type names as
 /// well.  This handles import directives and forward references.
 void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
-  NameBinder Binder(Ctx);
+  NameBinder Binder(TU);
 
   // Do a prepass over the declarations to find the list of top-level value
   // declarations.
