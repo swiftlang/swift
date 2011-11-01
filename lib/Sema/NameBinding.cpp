@@ -16,7 +16,6 @@
 
 #include "swift/Subsystems.h"
 #include "swift/AST/AST.h"
-#include "swift/AST/Builtins.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/Verifier.h"
 #include "llvm/ADT/DenseMap.h"
@@ -30,198 +29,14 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
-// ModuleProvider
-//===----------------------------------------------------------------------===//
-
-typedef ArrayRef<std::pair<Identifier, SourceLoc>> AccessPathTy;
-
-namespace {
-  /// An abstract class for something that provides module data.
-  class ModuleProvider {
-  public:
-    virtual ~ModuleProvider() {}
-    
-    /// lookupType - Look up a type at top-level scope within the current
-    /// module. This does a simple local lookup, not looking through imports.  
-    virtual TypeAliasDecl *lookupType(AccessPathTy AccessPath, Identifier Name,
-                                      NLKind LookupKind) = 0;
-    virtual void lookupValue(AccessPathTy AccessPath, Identifier Name,
-                             SmallVectorImpl<ValueDecl*> &Result,
-                             NLKind LookupKind) = 0;
-  };
-} // end anonymous namespace 
-
-
-//===----------------------------------------------------------------------===//
-// InMemoryModule
-//===----------------------------------------------------------------------===//
-
-namespace {
-  /// A concrete implementation of ModuleProvider which holds a
-  /// fully-loaded module.
-  class InMemoryModule : public ModuleProvider {
-    // FIXME: A module can be more than one translation unit eventually.
-    TranslationUnit *TU;
-    
-    llvm::DenseMap<Identifier, llvm::TinyPtrVector<ValueDecl*>> TopLevelValues;
-    llvm::DenseMap<Identifier, TypeAliasDecl *> TopLevelTypes;
-
-  public:
-    InMemoryModule(TranslationUnit *tu) : TU(tu) {}
-    ~InMemoryModule() {
-      // Nothing to destroy here, TU is ASTContext allocated.
-    }
-
-    /// lookupType - Resolve a reference to a type name that found this module
-    /// with the specified import declaration.
-    TypeAliasDecl *lookupType(AccessPathTy AccessPath, Identifier Name,
-                              NLKind LookupKind) override;
-
-    /// lookupValue - Resolve a reference to a value name that found this module
-    /// through the specified import declaration.
-    void lookupValue(AccessPathTy AccessPath, Identifier Name,
-                     SmallVectorImpl<ValueDecl*> &Result,
-                     NLKind LookupKind) override;
-  };
-} // end anonymous namespace 
-
-
-
-/// lookupType - Resolve a reference to a type name that found this module
-/// with the specified import declaration.
-TypeAliasDecl *InMemoryModule::lookupType(AccessPathTy AccessPath,
-                                          Identifier Name, NLKind LookupKind) {
-  assert(AccessPath.size() <= 1 && "Don't handle this yet");
-  
-  // If this import is specific to some named type or decl ("import swift.int")
-  // then filter out any lookups that don't match.
-  if (AccessPath.size() == 1 && AccessPath[0].first != Name)
-    return 0;
-  
-  if (TopLevelTypes.empty()) {
-    for (auto Elt : TU->Body->getElements())
-      if (Decl *D = Elt.dyn_cast<Decl*>())
-        if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D))
-          if (!TAD->Name.empty())
-            TopLevelTypes[TAD->Name] = TAD;
-  }
-  
-  auto I = TopLevelTypes.find(Name);
-  return I != TopLevelTypes.end() ? I->second : 0;
-}
-
-/// lookupValue - Resolve a reference to a value name that found this module
-/// through the specified import declaration.
-void InMemoryModule::lookupValue(AccessPathTy AccessPath, Identifier Name,
-                                 SmallVectorImpl<ValueDecl*> &Result,
-                                 NLKind LookupKind) {
-  // TODO: ImportDecls cannot specified namespaces or individual entities
-  // yet, so everything is just a lookup at the top-level.
-  assert(AccessPath.size() <= 1 && "Don't handle this yet");
-  
-  // If this import is specific to some named type or decl ("import swift.int")
-  // then filter out any lookups that don't match.
-  if (AccessPath.size() == 1 && AccessPath[0].first != Name)
-    return;
-  
-  // If we haven't built a map of the top-level values, do so now.
-  if (TopLevelValues.empty()) {
-    for (auto Elt : TU->Body->getElements())
-      if (Decl *D = Elt.dyn_cast<Decl*>())
-        if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-          if (!VD->Name.empty())
-            TopLevelValues[VD->Name].push_back(VD);
-  }
-  
-  auto I = TopLevelValues.find(Name);
-  if (I == TopLevelValues.end()) return;
-  
-  Result.reserve(I->second.size());
-  for (ValueDecl *Elt : I->second) {
-    // Dot Lookup ignores values with non-function types.
-    if (LookupKind == NLKind::DotLookup && !Elt->Ty->is<FunctionType>())
-      continue;
-    
-    Result.push_back(Elt);
-  }
-}
-
-
-//===----------------------------------------------------------------------===//
-// BuiltinModuleX
-//===----------------------------------------------------------------------===//
-
-namespace {
-  /// An implementation of ModuleProvider for builtin types and functions.
-  class BuiltinModuleX : public ModuleProvider {
-    ASTContext &Context;
-
-    /// The cache of identifiers we've already looked up.  We use a
-    /// single hashtable for both types and values as a minor
-    /// optimization; this prevents us from having both a builtin type
-    /// and a builtin value with the same name, but that's okay.
-    llvm::DenseMap<Identifier, NamedDecl*> Cache;
-  public:
-    BuiltinModuleX(ASTContext &Context) : Context(Context) {}
-    TypeAliasDecl *lookupType(AccessPathTy AccessPath, Identifier Name,
-                              NLKind LookupKind) override;
-    void lookupValue(AccessPathTy AccessPath, Identifier Name,
-                     SmallVectorImpl<ValueDecl*> &Result,
-                     NLKind LookupKind) override;
-  };
-} // end anonymous namespace.
-
-TypeAliasDecl *
-BuiltinModuleX::lookupType(AccessPathTy AccessPath, Identifier Name,
-                           NLKind LookupKind) {
-  // Only qualified lookup ever finds anything in the builtin module.
-  if (LookupKind != NLKind::QualifiedLookup) return nullptr;
-  
-  auto I = Cache.find(Name);
-  if (I != Cache.end())
-    return dyn_cast<TypeAliasDecl>(I->second);
-  
-  Type Ty = getBuiltinType(Context, Name);
-  if (!Ty) return nullptr;
-  
-  TypeAliasDecl *Alias
-    = new (Context) TypeAliasDecl(SourceLoc(), Name, Ty, DeclAttributes(),
-                                  Context.TheBuiltinModule);
-  Cache.insert(std::make_pair(Name, Alias));
-  return Alias;
-}
-
-void BuiltinModuleX::lookupValue(AccessPathTy AccessPath, Identifier Name,
-                                 SmallVectorImpl<ValueDecl*> &Result,
-                                 NLKind LookupKind) {
-  // Only qualified lookup ever finds anything in the builtin module.
-  if (LookupKind != NLKind::QualifiedLookup) return;
-  
-  auto I = Cache.find(Name);
-  if (I != Cache.end()) {
-    if (ValueDecl *V = dyn_cast<ValueDecl>(I->second))
-      Result.push_back(V);
-    return;
-  }
-  
-  ValueDecl *V = getBuiltinValue(Context, Name);
-  if (!V) return;
-  
-  Cache.insert(std::make_pair(Name, V));
-  Result.push_back(V);
-}
-
-//===----------------------------------------------------------------------===//
 // NameBinder
 //===----------------------------------------------------------------------===//
 
-typedef std::pair<ImportDecl*, ModuleProvider*> Import;
+typedef std::pair<ImportDecl*, Module*> Import;
 typedef llvm::PointerUnion<Import*, OneOfType*> BoundScope;
 
 namespace {  
   class NameBinder {
-    std::vector<ModuleProvider *> LoadedModules;
-    
     /// TopLevelValues - This is the list of top-level declarations we have.
     llvm::DenseMap<Identifier, llvm::TinyPtrVector<ValueDecl*>> TopLevelValues;
     SmallVector<Import, 4> Imports;
@@ -234,8 +49,6 @@ namespace {
     ASTContext &Context;
     NameBinder(ASTContext &C);
     ~NameBinder() {
-      for (ModuleProvider *M : LoadedModules)
-        delete M;
     }
     
     template<typename ...ArgTypes>
@@ -258,10 +71,10 @@ namespace {
     TypeAliasDecl *lookupTypeName(Identifier I);
     
   private:
-    /// getModuleProvider - Load a module referenced by an import statement,
+    /// getModule - Load a module referenced by an import statement,
     /// emitting an error at the specified location and returning null on
     /// failure.
-    ModuleProvider *getModuleProvider(std::pair<Identifier,SourceLoc> ModuleID);
+    Module *getModule(std::pair<Identifier,SourceLoc> ModuleID);
   };
 }
 
@@ -273,7 +86,7 @@ NameBinder::NameBinder(ASTContext &C) : Context(C) {
   auto ID = new (C) ImportDecl(SourceLoc(),
                                C.AllocateCopy(llvm::makeArrayRef(BuiltinPath)),
                                /*No DeclContext?*/ nullptr);
-  Imports.push_back(std::make_pair(ID, new BuiltinModuleX(C)));
+  Imports.push_back(std::make_pair(ID, C.TheBuiltinModule));
   
   // FIXME: Import swift.swift implicitly.  We need a way for swift.swift itself
   // to not recursively import itself though.
@@ -322,8 +135,7 @@ llvm::error_code NameBinder::findModule(StringRef Module,
   return Err;
 }
 
-ModuleProvider *NameBinder::
-getModuleProvider(std::pair<Identifier, SourceLoc> ModuleID) {
+Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
   // TODO: We currently just recursively parse referenced modules.  This works
   // fine for now since they are each a single file.  Ultimately we'll want a
   // compiled form of AST's like clang's that support lazy deserialization.
@@ -352,15 +164,13 @@ getModuleProvider(std::pair<Identifier, SourceLoc> ModuleID) {
   // dumps of the code instead of reparsing though.
   performNameBinding(TU, Context);
   
-  ModuleProvider *MP = new InMemoryModule(TU);
-  LoadedModules.push_back(MP);
-  return MP;
+  return TU;
 }
 
 
 void NameBinder::addImport(ImportDecl *ID) {
-  ModuleProvider *MP = getModuleProvider(ID->AccessPath[0]);
-  if (MP == 0) return;
+  Module *M = getModule(ID->AccessPath[0]);
+  if (M == 0) return;
   
   // FIXME: Validate the access path against the module.  Reject things like
   // import swift.aslkdfja
@@ -369,7 +179,7 @@ void NameBinder::addImport(ImportDecl *ID) {
     return;
   }
   
-  Imports.push_back(std::make_pair(ID, MP));
+  Imports.push_back(std::make_pair(ID, M));
 }
 
 /// lookupTypeName - Lookup the specified type name in imports.  We know that it
@@ -413,7 +223,7 @@ void NameBinder::bindValueName(Identifier Name,
   // first match of the name.
   for (auto &ImpEntry : Imports) {
     ImpEntry.second->lookupValue(ImpEntry.first->AccessPath.slice(1), Name,
-                                 Result, LookupKind);
+                                 LookupKind, Result);
     if (!Result.empty()) return;  // If we found a match, return the decls.
   }
 }
@@ -523,7 +333,7 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
     } else {
       Import *Module = Scope.get<Import*>();
       Module->second->lookupValue(Module->first->AccessPath.slice(1), Name,
-                                  Decls, NLKind::QualifiedLookup);
+                                  NLKind::QualifiedLookup, Decls);
     }
 
   // Otherwise, not something that needs name binding.

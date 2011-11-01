@@ -6,6 +6,7 @@ add_swift_library(swiftAST
   DiagnosticEngine.cpp
   Expr.cpp
   Identifier.cpp
+  Module.cpp
   Stmt.cpp
   Type.cpp
   Verifier.cpp)

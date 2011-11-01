@@ -18,6 +18,7 @@
 #define SWIFT_AST_H
 
 #include "ASTContext.h"
+#include "Builtins.h"
 #include "Decl.h"
 #include "Expr.h"
 #include "Module.h"

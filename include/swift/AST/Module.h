@@ -19,6 +19,7 @@
 
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
@@ -28,6 +29,7 @@ namespace swift {
   class NameAliasType;
   class TypeAliasDecl;
   class LookupCache;
+  class ValueDecl;
   
   /// NLKind - This is a specifier for the kind of name lookup being performed
   /// by various query methods.
@@ -40,15 +42,32 @@ namespace swift {
 /// Module - A unit of modularity.  The current translation unit is a
 /// module, as is an imported module.
 class Module : public DeclContext {
+  void *LookupCachePimpl;
 public:
   ASTContext &Ctx;
   Identifier Name;
 protected:
   Module(DeclContextKind Kind, Identifier Name, ASTContext &Ctx)
-    : DeclContext(Kind, nullptr), Ctx(Ctx), Name(Name) {
+    : DeclContext(Kind, nullptr), LookupCachePimpl(0), Ctx(Ctx), Name(Name) {
   }
 
 public:
+  typedef ArrayRef<std::pair<Identifier, SourceLoc>> AccessPathTy;
+
+  /// lookupType - Look up a type at top-level scope (but with the specified 
+  /// access path, which may come from an import decl) within the current
+  /// module. This does a simple local lookup, not recursively looking  through
+  /// imports.  
+  TypeAliasDecl *lookupType(AccessPathTy AccessPath, Identifier Name,
+                            NLKind LookupKind);
+  
+  /// lookupValue - Look up a (possibly overloaded) value set at top-level scope
+  /// (but with the specified access path, which may come from an import decl)
+  /// within the current module. This does a simple local lookup, not
+  /// recursively looking through imports.  
+  void lookupValue(AccessPathTy AccessPath, Identifier Name, NLKind LookupKind, 
+                   SmallVectorImpl<ValueDecl*> &Result);
+
 
   static bool classof(const Module *M) {
     return true;
@@ -92,7 +111,7 @@ public:
   }
 
   void dump() const;
-
+  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TranslationUnit *TU) { return true; }
   static bool classof(const DeclContext *DC) {
