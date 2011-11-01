@@ -69,6 +69,12 @@ public:
                    SmallVectorImpl<ValueDecl*> &Result);
 
 
+  /// lookupGlobalValue - Perform a value lookup within the current Module.
+  /// Unlike lookupValue, this does look through import declarations to resolve
+  /// the name.
+  void lookupGlobalValue(Identifier Name, NLKind LookupKind, 
+                         SmallVectorImpl<ValueDecl*> &Result);
+  
   static bool classof(const Module *M) {
     return true;
   }

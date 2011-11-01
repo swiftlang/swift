@@ -210,3 +210,26 @@ void Module::lookupValue(AccessPathTy AccessPath, Identifier Name,
     .lookupValue(AccessPath, Name, LookupKind, TU, Result);
 }
 
+
+/// lookupGlobalValue - Perform a value lookup within the current Module.
+/// Unlike lookupValue, this does look through import declarations to resolve
+/// the name.
+void Module::lookupGlobalValue(Identifier Name, NLKind LookupKind, 
+                               SmallVectorImpl<ValueDecl*> &Result) {
+  // Do a local lookup within the current module.
+  lookupValue(AccessPathTy(), Name, LookupKind, Result);
+
+  // If we get any hits, we're done.  Also, the builtin module never has
+  // imports, so it is always done at this point.
+  if (!Result.empty() || isa<BuiltinModule>(this)) return;
+  
+  TranslationUnit &TU = *cast<TranslationUnit>(this);
+
+  // If we still haven't found it, scrape through all of the imports, taking the
+  // first match of the name.
+  for (auto &ImpEntry : TU.ImportedModules) {
+    ImpEntry.second->lookupValue(ImpEntry.first, Name, LookupKind, Result);
+    if (!Result.empty()) return;  // If we found a match, return the decls.
+  }
+}
+
