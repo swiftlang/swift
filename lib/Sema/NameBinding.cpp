@@ -29,26 +29,23 @@
 #include "llvm/Support/Path.h"
 using namespace swift;
 
-/// NLKind - This is a specifier for the kind of name lookup being performed
-/// by various query methods.
-enum class NLKind {
-  UnqualifiedLookup,
-  QualifiedLookup,
-  DotLookup
-};
-
 //===----------------------------------------------------------------------===//
 // ModuleProvider
 //===----------------------------------------------------------------------===//
+
+typedef ArrayRef<std::pair<Identifier, SourceLoc>> AccessPathTy;
 
 namespace {
   /// An abstract class for something that provides module data.
   class ModuleProvider {
   public:
     virtual ~ModuleProvider() {}
-    virtual TypeAliasDecl *lookupType(ImportDecl *ID, Identifier Name,
+    
+    /// lookupType - Look up a type at top-level scope within the current
+    /// module. This does a simple local lookup, not looking through imports.  
+    virtual TypeAliasDecl *lookupType(AccessPathTy AccessPath, Identifier Name,
                                       NLKind LookupKind) = 0;
-    virtual void lookupValue(ImportDecl *ID, Identifier Name,
+    virtual void lookupValue(AccessPathTy AccessPath, Identifier Name,
                              SmallVectorImpl<ValueDecl*> &Result,
                              NLKind LookupKind) = 0;
   };
@@ -77,12 +74,12 @@ namespace {
 
     /// lookupType - Resolve a reference to a type name that found this module
     /// with the specified import declaration.
-    TypeAliasDecl *lookupType(ImportDecl *ID, Identifier Name,
+    TypeAliasDecl *lookupType(AccessPathTy AccessPath, Identifier Name,
                               NLKind LookupKind) override;
 
     /// lookupValue - Resolve a reference to a value name that found this module
     /// through the specified import declaration.
-    void lookupValue(ImportDecl *ID, Identifier Name,
+    void lookupValue(AccessPathTy AccessPath, Identifier Name,
                      SmallVectorImpl<ValueDecl*> &Result,
                      NLKind LookupKind) override;
   };
@@ -92,13 +89,13 @@ namespace {
 
 /// lookupType - Resolve a reference to a type name that found this module
 /// with the specified import declaration.
-TypeAliasDecl *InMemoryModule::lookupType(ImportDecl *ID, Identifier Name,
-                                          NLKind LookupKind) {
-  assert(ID->AccessPath.size() <= 2 && "Don't handle this yet");
+TypeAliasDecl *InMemoryModule::lookupType(AccessPathTy AccessPath,
+                                          Identifier Name, NLKind LookupKind) {
+  assert(AccessPath.size() <= 1 && "Don't handle this yet");
   
   // If this import is specific to some named type or decl ("import swift.int")
   // then filter out any lookups that don't match.
-  if (ID->AccessPath.size() == 2 && ID->AccessPath[1].first != Name)
+  if (AccessPath.size() == 1 && AccessPath[0].first != Name)
     return 0;
   
   if (TopLevelTypes.empty()) {
@@ -115,16 +112,16 @@ TypeAliasDecl *InMemoryModule::lookupType(ImportDecl *ID, Identifier Name,
 
 /// lookupValue - Resolve a reference to a value name that found this module
 /// through the specified import declaration.
-void InMemoryModule::lookupValue(ImportDecl *ID, Identifier Name,
+void InMemoryModule::lookupValue(AccessPathTy AccessPath, Identifier Name,
                                  SmallVectorImpl<ValueDecl*> &Result,
                                  NLKind LookupKind) {
   // TODO: ImportDecls cannot specified namespaces or individual entities
   // yet, so everything is just a lookup at the top-level.
-  assert(ID->AccessPath.size() <= 2 && "Don't handle this yet");
+  assert(AccessPath.size() <= 1 && "Don't handle this yet");
   
   // If this import is specific to some named type or decl ("import swift.int")
   // then filter out any lookups that don't match.
-  if (ID->AccessPath.size() == 2 && ID->AccessPath[1].first != Name)
+  if (AccessPath.size() == 1 && AccessPath[0].first != Name)
     return;
   
   // If we haven't built a map of the top-level values, do so now.
@@ -166,16 +163,17 @@ namespace {
     llvm::DenseMap<Identifier, NamedDecl*> Cache;
   public:
     BuiltinModuleX(ASTContext &Context) : Context(Context) {}
-    TypeAliasDecl *lookupType(ImportDecl *ID, Identifier Name,
+    TypeAliasDecl *lookupType(AccessPathTy AccessPath, Identifier Name,
                               NLKind LookupKind) override;
-    void lookupValue(ImportDecl *ID, Identifier Name,
+    void lookupValue(AccessPathTy AccessPath, Identifier Name,
                      SmallVectorImpl<ValueDecl*> &Result,
                      NLKind LookupKind) override;
   };
 } // end anonymous namespace.
 
 TypeAliasDecl *
-BuiltinModuleX::lookupType(ImportDecl *ID, Identifier Name, NLKind LookupKind) {
+BuiltinModuleX::lookupType(AccessPathTy AccessPath, Identifier Name,
+                           NLKind LookupKind) {
   // Only qualified lookup ever finds anything in the builtin module.
   if (LookupKind != NLKind::QualifiedLookup) return nullptr;
   
@@ -187,15 +185,15 @@ BuiltinModuleX::lookupType(ImportDecl *ID, Identifier Name, NLKind LookupKind) {
   if (!Ty) return nullptr;
   
   TypeAliasDecl *Alias
-  = new (Context) TypeAliasDecl(SourceLoc(), Name, Ty, DeclAttributes(),
-                                Context.TheBuiltinModule);
+    = new (Context) TypeAliasDecl(SourceLoc(), Name, Ty, DeclAttributes(),
+                                  Context.TheBuiltinModule);
   Cache.insert(std::make_pair(Name, Alias));
   return Alias;
 }
 
-void BuiltinModuleX::lookupValue(ImportDecl *ID, Identifier Name,
-                                SmallVectorImpl<ValueDecl*> &Result,
-                                NLKind LookupKind) {
+void BuiltinModuleX::lookupValue(AccessPathTy AccessPath, Identifier Name,
+                                 SmallVectorImpl<ValueDecl*> &Result,
+                                 NLKind LookupKind) {
   // Only qualified lookup ever finds anything in the builtin module.
   if (LookupKind != NLKind::QualifiedLookup) return;
   
@@ -379,8 +377,9 @@ void NameBinder::addImport(ImportDecl *ID) {
 /// null if there is no match found.
 TypeAliasDecl *NameBinder::lookupTypeName(Identifier Name) {
   for (auto &ImpEntry : Imports)
-    if (TypeAliasDecl *D = ImpEntry.second->lookupType(ImpEntry.first, Name,
-                                                  NLKind::UnqualifiedLookup))
+    if (TypeAliasDecl *D = ImpEntry.second->lookupType(
+                              ImpEntry.first->AccessPath.slice(1), Name,
+                                                    NLKind::UnqualifiedLookup))
       return D;
 
   return 0;
@@ -413,7 +412,8 @@ void NameBinder::bindValueName(Identifier Name,
   // If we still haven't found it, scrape through all of the imports, taking the
   // first match of the name.
   for (auto &ImpEntry : Imports) {
-    ImpEntry.second->lookupValue(ImpEntry.first, Name, Result, LookupKind);
+    ImpEntry.second->lookupValue(ImpEntry.first->AccessPath.slice(1), Name,
+                                 Result, LookupKind);
     if (!Result.empty()) return;  // If we found a match, return the decls.
   }
 }
@@ -522,8 +522,8 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
       Decls.push_back(Elt);
     } else {
       Import *Module = Scope.get<Import*>();
-      Module->second->lookupValue(Module->first, Name, Decls,
-                                  NLKind::QualifiedLookup);
+      Module->second->lookupValue(Module->first->AccessPath.slice(1), Name,
+                                  Decls, NLKind::QualifiedLookup);
     }
 
   // Otherwise, not something that needs name binding.
@@ -596,8 +596,8 @@ void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
     TypeAliasDecl *Alias = nullptr;
 
     if (Import *Module = Scope.dyn_cast<Import*>()) {
-      Alias = Module->second->lookupType(Module->first, Name,
-                                         NLKind::QualifiedLookup);
+      Alias = Module->second->lookupType(Module->first->AccessPath.slice(1),
+                                         Name, NLKind::QualifiedLookup);
     }
     if (Alias) {
       BaseAndType.second->UnderlyingTy = Alias->getAliasType(Binder.Context);

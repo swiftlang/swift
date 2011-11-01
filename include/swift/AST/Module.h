@@ -27,7 +27,15 @@ namespace swift {
   class OneOfElementDecl;
   class NameAliasType;
   class TypeAliasDecl;
+  class LookupCache;
   
+  /// NLKind - This is a specifier for the kind of name lookup being performed
+  /// by various query methods.
+  enum class NLKind {
+    UnqualifiedLookup,
+    QualifiedLookup,
+    DotLookup
+  };
  
 /// Module - A unit of modularity.  The current translation unit is a
 /// module, as is an imported module.
@@ -35,7 +43,6 @@ class Module : public DeclContext {
 public:
   ASTContext &Ctx;
   Identifier Name;
-
 protected:
   Module(DeclContextKind Kind, Identifier Name, ASTContext &Ctx)
     : DeclContext(Kind, nullptr), Ctx(Ctx), Name(Name) {

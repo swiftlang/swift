@@ -235,6 +235,9 @@ public:
 class ImportDecl : public Decl {
 public:
   SourceLoc ImportLoc;
+  
+  /// AccessPath - This is the sequence of identifiers for the import decl. This
+  /// always has at least one element in it.
   ArrayRef<std::pair<Identifier, SourceLoc>> AccessPath;
   
   ImportDecl(SourceLoc ImportLoc,
