@@ -1180,7 +1180,7 @@
   <pre class="grammar">
     expr-paren      ::= lparen-any ')'
     expr-paren      ::= lparen-any expr-paren-element (',' expr-paren-element)* ')'
-    expr-paren-element ::= ('.' <a href="#identifier">identifier</a> '=')? <a href="#expr">expr</a>
+    expr-paren-element ::= ('.'? <a href="#identifier">identifier</a> '=')? <a href="#expr">expr</a>
   </pre>
 
   <p>Some enclosing productions restrict the <tt>lparen-any</tt> to a
@@ -1212,7 +1212,7 @@
     var d = (4, 5)           <i>// Type = (:int,:int)</i>
     var e = (c, d)           <i>// Type = ((), (:int, :int))</i>
     
-    var f = (.x = 4, .y = 5) <i>// Type = (x : int, y : int)</i>
+    var f = (.x = 4, y = 5)  <i>// Type = (x : int, y : int)</i>
     var g = (4, .y = 5, 6)   <i>// Type = (:int, y : int, :int)</i>
     
     <i>// Named arguments to functions.</i>
