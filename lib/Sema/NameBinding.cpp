@@ -32,13 +32,11 @@ using namespace swift;
 // NameBinder
 //===----------------------------------------------------------------------===//
 
-typedef std::pair<Module::AccessPathTy, Module*> Import;
-typedef llvm::PointerUnion<Import*, OneOfType*> BoundScope;
+typedef TranslationUnit::ImportedModule ImportedModule;
+typedef llvm::PointerUnion<const ImportedModule*, OneOfType*> BoundScope;
 
 namespace {  
   class NameBinder {
-    SmallVector<Import, 4> Imports;
-    
     llvm::error_code findModule(StringRef Module, 
                                 SourceLoc ImportLoc,
                                 llvm::OwningPtr<llvm::MemoryBuffer> &Buffer);
@@ -56,7 +54,7 @@ namespace {
       Context.Diags.diagnose(Args...);
     }
     
-    void addImport(ImportDecl *ID);
+    void addImport(ImportDecl *ID, SmallVectorImpl<ImportedModule> &Result);
 
     BoundScope bindScopeName(TypeAliasDecl *TypeFromScope,
                              Identifier Name, SourceLoc NameLoc);
@@ -75,15 +73,6 @@ namespace {
 }
 
 NameBinder::NameBinder(TranslationUnit *TU) : TU(TU), Context(TU->Ctx) {
-  // Import the builtin library as an implicit import.
-  // FIXME: This should only happen for translation units in the standard
-  // library.
-  Imports.push_back(std::make_pair(Module::AccessPathTy(),
-                                   Context.TheBuiltinModule));
-
-  // FIXME: For translation units not in the standard library, we should import
-  // swift.swift implicitly.  We need a way for swift.swift itself to not
-  // recursively import itself though.
 }
 
 
@@ -162,7 +151,8 @@ Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
 }
 
 
-void NameBinder::addImport(ImportDecl *ID) {
+void NameBinder::addImport(ImportDecl *ID, 
+                           SmallVectorImpl<ImportedModule> &Result) {
   Module *M = getModule(ID->AccessPath[0]);
   if (M == 0) return;
   
@@ -173,14 +163,14 @@ void NameBinder::addImport(ImportDecl *ID) {
     return;
   }
   
-  Imports.push_back(std::make_pair(ID->AccessPath.slice(1), M));
+  Result.push_back(std::make_pair(ID->AccessPath.slice(1), M));
 }
 
 /// lookupTypeName - Lookup the specified type name in imports.  We know that it
 /// has already been resolved within the current translation unit.  This returns
 /// null if there is no match found.
 TypeAliasDecl *NameBinder::lookupTypeName(Identifier Name) {
-  for (auto &ImpEntry : Imports)
+  for (auto &ImpEntry : TU->ImportedModules)
     if (TypeAliasDecl *D = ImpEntry.second->lookupType(
                               ImpEntry.first, Name, NLKind::UnqualifiedLookup))
       return D;
@@ -201,7 +191,7 @@ void NameBinder::lookupGlobalValue(Identifier Name, NLKind LookupKind,
 
   // If we still haven't found it, scrape through all of the imports, taking the
   // first match of the name.
-  for (auto &ImpEntry : Imports) {
+  for (auto &ImpEntry : TU->ImportedModules) {
     ImpEntry.second->lookupValue(ImpEntry.first, Name, LookupKind, Result);
     if (!Result.empty()) return;  // If we found a match, return the decls.
   }
@@ -222,7 +212,7 @@ BoundScope NameBinder::bindScopeName(TypeAliasDecl *TypeFromScope,
 
   // If that failed, look for a module name.
   if (!Type) {
-    for (Import &ImpEntry : Imports)
+    for (const ImportedModule &ImpEntry : TU->ImportedModules)
       if (ImpEntry.second->Name == Name)
         return &ImpEntry;
     
@@ -310,7 +300,7 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
       }
       Decls.push_back(Elt);
     } else {
-      Import *Module = Scope.get<Import*>();
+      auto Module = Scope.get<const ImportedModule*>();
       Module->second->lookupValue(Module->first, Name,
                                   NLKind::QualifiedLookup, Decls);
     }
@@ -343,13 +333,26 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
 void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
   NameBinder Binder(TU);
 
-  // Do a prepass over the declarations to find the list of top-level value
-  // declarations.
+  SmallVector<ImportedModule, 8> ImportedModules;
+  
+  // Import the builtin library as an implicit import.
+  // FIXME: This should only happen for translation units in the standard
+  // library.
+  ImportedModules.push_back(std::make_pair(Module::AccessPathTy(),
+                                           Ctx.TheBuiltinModule));
+  
+  // FIXME: For translation units not in the standard library, we should import
+  // swift.swift implicitly.  We need a way for swift.swift itself to not
+  // recursively import itself though.
+
+  // Do a prepass over the declarations to find and load the imported modules.
   for (auto Elt : TU->Body->getElements())
     if (Decl *D = Elt.dyn_cast<Decl*>()) {
       if (ImportDecl *ID = dyn_cast<ImportDecl>(D))
-        Binder.addImport(ID);
+        Binder.addImport(ID, ImportedModules);
     }
+  
+  TU->ImportedModules = Ctx.AllocateCopy(ImportedModules);
   
   // Type binding.  Loop over all of the unresolved types in the translation
   // unit, resolving them with imports.
@@ -380,7 +383,7 @@ void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
 
     TypeAliasDecl *Alias = nullptr;
 
-    if (Import *Module = Scope.dyn_cast<Import*>()) {
+    if (auto Module = Scope.dyn_cast<const ImportedModule*>()) {
       Alias = Module->second->lookupType(Module->first, Name,
                                          NLKind::QualifiedLookup);
     }

@@ -94,6 +94,8 @@ namespace {
   public:
     typedef Module::AccessPathTy AccessPathTy;
     
+    TUModuleCache(TranslationUnit &TU);
+    
     TypeAliasDecl *lookupType(AccessPathTy AccessPath, Identifier Name,
                               NLKind LookupKind, TranslationUnit &TU);
     void lookupValue(AccessPathTy AccessPath, Identifier Name, 
@@ -102,13 +104,28 @@ namespace {
   };
 } // end anonymous namespace.
 
-static TUModuleCache &getTUCachePimpl(void *&Ptr) {
+static TUModuleCache &getTUCachePimpl(void *&Ptr, TranslationUnit &TU) {
   // FIXME: This leaks.  Sticking this into ASTContext isn't enough because then
   // the DenseMap will leak.
   if (Ptr == 0)
-    Ptr = new TUModuleCache();
+    Ptr = new TUModuleCache(TU);
   return *(TUModuleCache*)Ptr;
 }
+
+
+/// Populate our cache on the first name lookup.
+TUModuleCache::TUModuleCache(TranslationUnit &TU) {
+  for (auto Elt : TU.Body->getElements())
+    if (Decl *D = Elt.dyn_cast<Decl*>()) {
+      if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D))
+        if (!TAD->Name.empty())
+          TopLevelTypes[TAD->Name] = TAD;
+      if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+        if (!VD->Name.empty())
+          TopLevelValues[VD->Name].push_back(VD);
+    }
+}
+
 
 TypeAliasDecl *TUModuleCache::lookupType(AccessPathTy AccessPath,
                                          Identifier Name, NLKind LookupKind,
@@ -119,14 +136,6 @@ TypeAliasDecl *TUModuleCache::lookupType(AccessPathTy AccessPath,
   // then filter out any lookups that don't match.
   if (AccessPath.size() == 1 && AccessPath[0].first != Name)
     return 0;
-  
-  if (TopLevelTypes.empty()) {
-    for (auto Elt : TU.Body->getElements())
-      if (Decl *D = Elt.dyn_cast<Decl*>())
-        if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D))
-          if (!TAD->Name.empty())
-            TopLevelTypes[TAD->Name] = TAD;
-  }
   
   auto I = TopLevelTypes.find(Name);
   return I != TopLevelTypes.end() ? I->second : 0;
@@ -143,15 +152,6 @@ void TUModuleCache::lookupValue(AccessPathTy AccessPath, Identifier Name,
   // then filter out any lookups that don't match.
   if (AccessPath.size() == 1 && AccessPath[0].first != Name)
     return;
-  
-  // If we haven't built a map of the top-level values, do so now.
-  if (TopLevelValues.empty()) {
-    for (auto Elt : TU.Body->getElements())
-      if (Decl *D = Elt.dyn_cast<Decl*>())
-        if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-          if (!VD->Name.empty())
-            TopLevelValues[VD->Name].push_back(VD);
-  }
   
   auto I = TopLevelValues.find(Name);
   if (I == TopLevelValues.end()) return;
@@ -185,8 +185,9 @@ TypeAliasDecl *Module::lookupType(AccessPathTy AccessPath, Identifier Name,
   
   // Otherwise must be TranslationUnit.  Someday we should generalize this to
   // allow modules with multiple translation units.
-  return getTUCachePimpl(LookupCachePimpl)
-    .lookupType(AccessPath, Name, LookupKind, *cast<TranslationUnit>(this));
+  TranslationUnit &TU = *cast<TranslationUnit>(this);
+  return getTUCachePimpl(LookupCachePimpl, TU)
+    .lookupType(AccessPath, Name, LookupKind, TU);
 }
 
 /// lookupValue - Look up a (possibly overloaded) value set at top-level scope
@@ -204,7 +205,8 @@ void Module::lookupValue(AccessPathTy AccessPath, Identifier Name,
   
   // Otherwise must be TranslationUnit.  Someday we should generalize this to
   // allow modules with multiple translation units.
-  return getTUCachePimpl(LookupCachePimpl)
-    .lookupValue(AccessPath, Name, LookupKind, *cast<TranslationUnit>(this),
-                 Result);
+  TranslationUnit &TU = *cast<TranslationUnit>(this);
+  return getTUCachePimpl(LookupCachePimpl, TU)
+    .lookupValue(AccessPath, Name, LookupKind, TU, Result);
 }
+

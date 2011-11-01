@@ -106,6 +106,11 @@ public:
   ArrayRef<std::pair<TypeAliasDecl*,TypeAliasDecl*> >
     UnresolvedScopedTypesForParser;
   
+  /// ImportedModules - This is the list of modules that are imported by this
+  /// module.  This is filled in by the Name Binding phase.
+  typedef std::pair<Module::AccessPathTy, Module*> ImportedModule;
+  ArrayRef<ImportedModule> ImportedModules;
+  
   TranslationUnit(Identifier Name, ASTContext &C)
     : Module(DeclContextKind::TranslationUnit, Name, C) {
   }
