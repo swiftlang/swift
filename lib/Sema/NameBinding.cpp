@@ -32,7 +32,7 @@ using namespace swift;
 // NameBinder
 //===----------------------------------------------------------------------===//
 
-typedef std::pair<ImportDecl*, Module*> Import;
+typedef std::pair<Module::AccessPathTy, Module*> Import;
 typedef llvm::PointerUnion<Import*, OneOfType*> BoundScope;
 
 namespace {  
@@ -78,15 +78,8 @@ NameBinder::NameBinder(TranslationUnit *TU) : TU(TU), Context(TU->Ctx) {
   // Import the builtin library as an implicit import.
   // FIXME: This should only happen for translation units in the standard
   // library.
-  
-  // Allocate the builtin import and add it to our list of things to search.
-  std::pair<Identifier,SourceLoc> BuiltinPath(Context.getIdentifier("Builtin"),
-                                              SourceLoc());
-  
-  auto ID = new (Context) ImportDecl(SourceLoc(),
-                          Context.AllocateCopy(llvm::makeArrayRef(BuiltinPath)),
-                                     /*No DeclContext?*/ nullptr);
-  Imports.push_back(std::make_pair(ID, Context.TheBuiltinModule));
+  Imports.push_back(std::make_pair(Module::AccessPathTy(),
+                                   Context.TheBuiltinModule));
 
   // FIXME: For translation units not in the standard library, we should import
   // swift.swift implicitly.  We need a way for swift.swift itself to not
@@ -180,7 +173,7 @@ void NameBinder::addImport(ImportDecl *ID) {
     return;
   }
   
-  Imports.push_back(std::make_pair(ID, M));
+  Imports.push_back(std::make_pair(ID->AccessPath.slice(1), M));
 }
 
 /// lookupTypeName - Lookup the specified type name in imports.  We know that it
@@ -189,8 +182,7 @@ void NameBinder::addImport(ImportDecl *ID) {
 TypeAliasDecl *NameBinder::lookupTypeName(Identifier Name) {
   for (auto &ImpEntry : Imports)
     if (TypeAliasDecl *D = ImpEntry.second->lookupType(
-                              ImpEntry.first->AccessPath.slice(1), Name,
-                                                    NLKind::UnqualifiedLookup))
+                              ImpEntry.first, Name, NLKind::UnqualifiedLookup))
       return D;
 
   return 0;
@@ -212,8 +204,7 @@ void NameBinder::bindValueName(Identifier Name,
   // If we still haven't found it, scrape through all of the imports, taking the
   // first match of the name.
   for (auto &ImpEntry : Imports) {
-    ImpEntry.second->lookupValue(ImpEntry.first->AccessPath.slice(1), Name,
-                                 LookupKind, Result);
+    ImpEntry.second->lookupValue(ImpEntry.first, Name, LookupKind, Result);
     if (!Result.empty()) return;  // If we found a match, return the decls.
   }
 }
@@ -322,7 +313,7 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
       Decls.push_back(Elt);
     } else {
       Import *Module = Scope.get<Import*>();
-      Module->second->lookupValue(Module->first->AccessPath.slice(1), Name,
+      Module->second->lookupValue(Module->first, Name,
                                   NLKind::QualifiedLookup, Decls);
     }
 
@@ -392,8 +383,8 @@ void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
     TypeAliasDecl *Alias = nullptr;
 
     if (Import *Module = Scope.dyn_cast<Import*>()) {
-      Alias = Module->second->lookupType(Module->first->AccessPath.slice(1),
-                                         Name, NLKind::QualifiedLookup);
+      Alias = Module->second->lookupType(Module->first, Name,
+                                         NLKind::QualifiedLookup);
     }
     if (Alias) {
       BaseAndType.second->UnderlyingTy = Alias->getAliasType(Binder.Context);
