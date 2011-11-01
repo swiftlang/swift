@@ -169,7 +169,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 ///
 /// FIXME: This should be moved out to somewhere else.
 void swift::performTypeChecking(TranslationUnit *TU, ASTContext &Ctx) {
-  TypeChecker TC(Ctx);
+  TypeChecker TC(*TU);
   
   // Find all the FuncExprs in the translation unit and collapse all
   // the sequences.

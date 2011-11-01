@@ -24,8 +24,9 @@ namespace swift {
 
 class TypeChecker {
 public:
+  TranslationUnit &TU;
   ASTContext &Context;
-  TypeChecker(ASTContext &C) : Context(C) {}
+  TypeChecker(TranslationUnit &TU) : TU(TU), Context(TU.Ctx) {}
   
   template<typename ...ArgTypes>
   void diagnose(ArgTypes... Args) {
