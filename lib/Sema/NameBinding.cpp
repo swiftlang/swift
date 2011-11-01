@@ -59,8 +59,6 @@ namespace {
     BoundScope bindScopeName(TypeAliasDecl *TypeFromScope,
                              Identifier Name, SourceLoc NameLoc);
 
-    TypeAliasDecl *lookupTypeName(Identifier I);
-    
   private:
     /// getModule - Load a module referenced by an import statement,
     /// emitting an error at the specified location and returning null on
@@ -163,20 +161,6 @@ void NameBinder::addImport(ImportDecl *ID,
   Result.push_back(std::make_pair(ID->AccessPath.slice(1), M));
 }
 
-/// lookupTypeName - Lookup the specified type name in imports.  We know that it
-/// has already been resolved within the current translation unit.  This returns
-/// null if there is no match found.
-TypeAliasDecl *NameBinder::lookupTypeName(Identifier Name) {
-  for (auto &ImpEntry : TU->ImportedModules)
-    if (TypeAliasDecl *D = ImpEntry.second->lookupType(
-                              ImpEntry.first, Name, NLKind::UnqualifiedLookup))
-      return D;
-
-  return 0;
-}
-
-
-
 /// Try to bind an unqualified name into something usable as a scope.
 BoundScope NameBinder::bindScopeName(TypeAliasDecl *TypeFromScope,
                                      Identifier Name, SourceLoc NameLoc) {
@@ -187,7 +171,7 @@ BoundScope NameBinder::bindScopeName(TypeAliasDecl *TypeFromScope,
   if (!TypeFromScope->UnderlyingTy.isNull()) {
     Type = TypeFromScope;
   } else {
-    Type = lookupTypeName(Name);
+    Type = TU->lookupGlobalType(Name, NLKind::UnqualifiedLookup);
   }
 
   // If that failed, look for a module name.
@@ -337,7 +321,8 @@ void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
   // Type binding.  Loop over all of the unresolved types in the translation
   // unit, resolving them with imports.
   for (TypeAliasDecl *TA : TU->UnresolvedTypesForParser) {
-    if (TypeAliasDecl *Result = Binder.lookupTypeName(TA->Name)) {
+    if (TypeAliasDecl *Result =
+          Binder.TU->lookupGlobalType(TA->Name, NLKind::UnqualifiedLookup)) {
       assert(TA->UnderlyingTy.isNull() && "Not an unresolved type");
       // Update the decl we already have to be the correct type.
       TA->TypeAliasLoc = Result->TypeAliasLoc;

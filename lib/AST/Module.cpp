@@ -211,6 +211,28 @@ void Module::lookupValue(AccessPathTy AccessPath, Identifier Name,
 }
 
 
+/// lookupGlobalType - Perform a type lookup within the current Module.
+/// Unlike lookupType, this does look through import declarations to resolve
+/// the name.
+TypeAliasDecl *Module::lookupGlobalType(Identifier Name, NLKind LookupKind) {
+  // Do a local lookup within the current module.
+  TypeAliasDecl *TAD = lookupType(AccessPathTy(), Name, LookupKind);
+  
+  // If we get a hit, we're done.  Also, the builtin module never has
+  // imports, so it is always done at this point.
+  if (TAD || isa<BuiltinModule>(this)) return TAD;
+  
+  TranslationUnit &TU = *cast<TranslationUnit>(this);
+  
+  // If we still haven't found it, scrape through all of the imports, taking the
+  // first match of the name.
+  for (auto &ImpEntry : TU.ImportedModules) {
+    TAD = ImpEntry.second->lookupType(ImpEntry.first, Name, LookupKind);
+    if (TAD) return TAD;  // If we found a match, return the decl.
+  }
+  return 0;
+}
+
 /// lookupGlobalValue - Perform a value lookup within the current Module.
 /// Unlike lookupValue, this does look through import declarations to resolve
 /// the name.
