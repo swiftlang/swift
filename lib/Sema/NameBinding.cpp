@@ -29,7 +29,8 @@
 #include "llvm/Support/Path.h"
 using namespace swift;
 
-/// NLKind - This is the kind of name lookup we're performing.
+/// NLKind - This is a specifier for the kind of name lookup being performed
+/// by various query methods.
 enum class NLKind {
   UnqualifiedLookup,
   QualifiedLookup,

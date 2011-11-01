@@ -68,9 +68,8 @@ class DeclContext {
 public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
     : ParentAndKind(Parent, static_cast<unsigned>(Kind)) {
-    assert(Parent ||
-           (Kind >= DeclContextKind::First_Module &&
-            Kind <= DeclContextKind::Last_Module));
+    assert((Parent != 0 || isModuleContext()) &&
+           "DeclContext must have a parent unless it is a module!");
   }
 
   /// Returns the kind of context this is.
@@ -83,6 +82,12 @@ public:
   /// local type declaration, does not itself become a local context.
   bool isLocalContext() const {
     return getContextKind() == DeclContextKind::FuncExpr;
+  }
+  
+  /// isModuleContext - Return true if this is a subclass of Module.
+  bool isModuleContext() const {
+    return getContextKind() >= DeclContextKind::First_Module &&
+           getContextKind() <= DeclContextKind::Last_Module;
   }
 
   /// Returns the semantic parent of this context.  A context has a

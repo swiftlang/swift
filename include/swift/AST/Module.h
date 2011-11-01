@@ -28,6 +28,7 @@ namespace swift {
   class NameAliasType;
   class TypeAliasDecl;
   
+ 
 /// Module - A unit of modularity.  The current translation unit is a
 /// module, as is an imported module.
 class Module : public DeclContext {
@@ -46,8 +47,7 @@ public:
     return true;
   }
   static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() >= DeclContextKind::First_Module &&
-           DC->getContextKind() <= DeclContextKind::Last_Module;
+    return DC->isModuleContext();
   }
 
 private:
