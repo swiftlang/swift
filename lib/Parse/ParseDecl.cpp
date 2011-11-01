@@ -18,6 +18,7 @@
 #include "Parser.h"
 #include "swift/AST/Diagnostics.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
@@ -489,9 +490,131 @@ Decl *Parser::parseDeclOneOf() {
     return 0;
   
   TypeAliasDecl *TAD = ScopeInfo.addTypeAliasToScope(NameLoc, OneOfName,Type());
-  if (parseTypeOneOfBody(OneOfLoc, Attributes, OneOfType, TAD))
+  if (parseDeclOneOfBody(OneOfLoc, Attributes, OneOfType, TAD))
     return 0;
   return TAD;
+}
+
+
+///   oneof-body:
+///      '{' oneof-element (',' oneof-element)* '}'
+///   oneof-element:
+///      identifier
+///      identifier ':' type
+///
+/// If TypeName is specified, it is the type that the constructors should be
+/// built with, so that they preserve the name of the oneof decl that contains
+/// this.
+bool Parser::parseDeclOneOfBody(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
+                                Type &Result, TypeAliasDecl *TypeName) {
+  SourceLoc LBLoc = Tok.getLoc();
+  if (parseToken(tok::l_brace, diag::expected_lbrace_oneof_type))
+    return true;
+  
+  SmallVector<OneOfElementInfo, 8> ElementInfos;
+  
+  // Parse the comma separated list of oneof elements.
+  while (Tok.is(tok::identifier)) {
+    OneOfElementInfo ElementInfo;
+    ElementInfo.Name = Tok.getText();
+    ElementInfo.NameLoc = Tok.getLoc();
+    ElementInfo.EltType = 0;
+    
+    consumeToken(tok::identifier);
+    
+    // See if we have a type specifier for this oneof element.  If so, parse it.
+    if (consumeIf(tok::colon) &&
+        parseType(ElementInfo.EltType, diag::expected_type_oneof_element)) {
+      skipUntil(tok::r_brace);
+      return true;
+    }
+    
+    ElementInfos.push_back(ElementInfo);
+    
+    // Require comma separation.
+    if (!consumeIf(tok::comma))
+      break;
+  }
+  
+  // FIXME: Helper for matching punctuation.
+  if (parseToken(tok::r_brace, diag::expected_rbrace_oneof_type))
+    diagnose(LBLoc, diag::opening_brace);
+  
+  Result = actOnOneOfType(OneOfLoc, Attrs, ElementInfos, TypeName);
+  return false;
+}
+
+OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
+                                  const DeclAttributes &Attrs,
+                                  ArrayRef<OneOfElementInfo> Elts,
+                                  TypeAliasDecl *PrettyTypeName) {
+  // No attributes are valid on oneof types at this time.
+  if (!Attrs.empty())
+    diagnose(Attrs.LSquareLoc, diag::oneof_attributes);
+  
+  llvm::SmallPtrSet<const char *, 16> SeenSoFar;
+  SmallVector<OneOfElementDecl *, 16> EltDecls;
+  
+  // If we have a PrettyTypeName to use, use it.  Otherwise, just assign the
+  // constructors a temporary dummy type.
+  Type TmpTy = TupleType::getEmpty(Context);
+  if (PrettyTypeName)
+    TmpTy = PrettyTypeName->getAliasType();
+  
+  for (const OneOfElementInfo &Elt : Elts) {
+    Identifier NameI = Context.getIdentifier(Elt.Name);
+    
+    // If this was multiply defined, reject it.
+    if (!SeenSoFar.insert(NameI.get())) {
+      diagnose(Elt.NameLoc, diag::duplicate_oneof_element, Elt.Name);
+      
+      // FIXME: Do we care enough to make this efficient?
+      for (unsigned I = 0, N = EltDecls.size(); I != N; ++I) {
+        if (EltDecls[I]->Name == NameI) {
+          diagnose(EltDecls[I]->getLocStart(), diag::previous_definition,
+                   NameI);
+          break;
+        }
+      }
+      
+      // Don't copy this element into NewElements.
+      continue;
+    }
+    
+    Type EltTy = TmpTy;
+    if (Type ArgTy = Elt.EltType)
+      if (PrettyTypeName)
+        EltTy = FunctionType::get(ArgTy, EltTy, Context);
+    
+    // Create a decl for each element, giving each a temporary type.
+    EltDecls.push_back(new (Context) OneOfElementDecl(Elt.NameLoc, NameI,
+                                                      EltTy, Elt.EltType,
+                                                      CurDeclContext));
+  }
+  
+  OneOfType *Result = OneOfType::getNew(OneOfLoc, EltDecls, CurDeclContext);
+  for (OneOfElementDecl *D : EltDecls)
+    D->Context = Result;
+  
+  if (PrettyTypeName) {
+    // If we have a pretty name for this, complete it to its actual type.
+    assert(PrettyTypeName->UnderlyingTy.isNull() &&
+           "Not an incomplete decl to complete!");
+    PrettyTypeName->UnderlyingTy = Result;
+  } else {
+    // Now that the oneof type is created, we can go back and give proper types
+    // to each element decl.
+    for (OneOfElementDecl *Elt : EltDecls) {
+      Type EltTy = Result;
+      // If the OneOf Element takes a type argument, then it is actually a
+      // function that takes the type argument and returns the OneOfType.
+      if (Type ArgTy = Elt->ArgumentType)
+        EltTy = FunctionType::get(ArgTy, EltTy, Context);
+      Elt->Ty = EltTy;
+    }
+  }
+  
+  return Result;
 }
 
 

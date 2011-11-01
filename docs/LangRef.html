@@ -383,7 +383,7 @@
      structure of the name is required to match up with the type being matched.
      An single identifier is always valid to capture the entire value
      (potentially as an aggregate).  Parenthesized values match up against tuple
-     types and against single element oneof types.
+     types and against single element oneof's.
   </p>
   
   <p>Here are some examples of var declarations:</p>
@@ -507,8 +507,8 @@
   </pre>
 
   <p>'typealias' is the core semantic model for all named types.  For example, a
-  <a  href="#decl-oneof">oneof decl</a> is just syntactic sugar for a <a
-  href="#type-oneof">oneof type</a> and a 'typealias'.</p>
+  <a  href="#decl-oneof">oneof decl</a> is just a <a
+  href="#type-oneof">oneof type</a> wrapped by a 'typealias'.</p>
   
   <!-- ===================================================================== -->
   <h3 id="decl-oneof">oneof Declarations</h3>
@@ -525,32 +525,22 @@
     decl-oneof ::= 'oneof' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#type-oneof">oneof-body</a>
   </pre>
   
-  <p>A oneof declaration is a convenient way to declare a type and name it at
-  the same time, as it is simple syntactic sugar for a <a 
-     href="#type-oneof">oneof</a> type and a <a
-     href="#decl-typealias">typealias</a> declaration.  Please see <a
-    href="#type-oneof">oneof types</a> for more information about their
-    capabilities.  Here are two exactly equivalent declarations for
-    intuition:</p>
+  <p>A oneof declaration provides direct access to <a 
+     href="#type-oneof">oneof</a> types with a <a
+     href="#decl-typealias">typealias</a> declaration specifying a name.  Please
+    see <a href="#type-oneof">oneof types</a> for more information about their
+    capabilities.</p>
 
+  <p>Here are some examples of oneof declarations:</p>
+  
   <pre class="example">
-    <i>// Declare discriminated union with typealias + oneof type.</i>
-    typealias SomeInts : oneof {
-      None,
-      One : int,
-      Two : (:int, :int)
-    }
-    <i>// Declare discriminated union with oneof decl (preferred).</i>
+    <i>// Declare discriminated union with oneof decl.</i>
     oneof SomeInts {
       None,
       One : int,
       Two : (:int, :int)
     }
-  </pre>
-  
-  <p>Here are some more examples of oneof declarations:</p>
-  
-  <pre class="example">
+    
     <i>// Declares three "enums".</i>
     oneof DataSearchFlags {
       None, Backward, Anchored
@@ -708,7 +698,6 @@
     
     type-simple ::= <a href="#type-identifier">type-identifier</a>
     type-simple ::= <a href="#type-tuple">type-tuple</a>
-    type-simple ::= <a href="#type-oneof">type-oneof</a>
     type-simple ::= <a href="#type-protocol">type-protocol</a>
   </pre>
 
@@ -911,32 +900,17 @@
   <!-- ===================================================================== -->
   
   <div class="commentary">
-    In actual practice, we expect explicit oneof types to be rare, used mainly
-    as a replacement for "bool" arguments.  It will be much more common to use
-    oneof decls for "enums" and "struct" decls for data declarations.  The use
-    of "oneof" for discriminated unions will be much less common (but is still
-    very important) than its use for "enums".  In any case, the decl form of
-    this is important syntactic sugar for the type version of oneof.<br><br>
-    
     'oneof' types are known as <a 
       href="http://en.wikipedia.org/wiki/Algebraic_data_type">algebraic data
       types</a> by the broader programming language community.  The name 'oneof'
     comes from CLU.
   </div>
   
-  <pre class="grammar">
-    type-oneof         ::= 'oneof' <a href="#attribute-list">attribute-list</a> oneof-body
-    oneof-body         ::= '{' oneof-element (',' oneof-element)* '}'
-    
-    oneof-element      ::= <a href="#identifier">identifier</a>
-    oneof-element      ::= <a href="#identifier">identifier</a> ':' <a href="#type">type</a>
-    
-  </pre>
-  
-  <p>A oneof type consists of a comma-separated list of elements,
-  which are each either an identifier or an identifier with a type.  The runtime
-  representation of a value of oneof type only has one of the specified oneof
-  elements at a time: a oneof value is a simple discriminated union.</p>
+  <p>oneof types are not expressible directly in swift, they are only created
+  by using a <a href="#decl-oneof">oneof decl</a> which produces a typealias and
+  a oneof type together.  The runtime representation of a value of oneof type
+  only has one of the specified oneof elements at a time: a oneof value is a
+  simple discriminated union.</p>
   
   <p>A oneof type declares two things: 1) the type itself as an anonymous type,
   and 2) each of the oneof elements declares a constructor value which creates a
@@ -955,34 +929,6 @@
   
   <p>A default initialized value of oneof type is initialized to the first
   element type in the list, with the default value for its element type.</p>
-  
-  <p>Here are some examples of oneof types:</p>
-  
-  <pre class="example">
-    <i>// Declares three "enums" using a oneof type.  Better and easier with a
-    // <a href="#decl-oneof">oneof declaration</a> though.</i>
-    typealias DataSearchFlags : oneof {
-      None, Backward, Anchored
-    }
-    
-    func f1(searchpolicy : DataSearchFlags)
-    func test1() {
-      f1(DataSearchFlags::None)  <i>// Use of constructor with qualified identifier</i>
-      f1(:None)                  <i>// Use of constructor with context sensitive type inference</i> 
-    
-      <i>// "None" has no type argument, so the constructor's type is "DataSearchFlags".</i> 
-      var a : DataSearchFlags = :None
-    }
-    
-    <i>// A more typical use case, anonymous argument for flags, death to
-    // content-free bools in function arguments.</i> 
-    func search(val : int, direction : oneof { Up, Down })
-    
-    func test2() {
-      search(42, :Up)
-      search(17, :Down)
-    }
-  </pre>
   
   <p>TODO: Should attributes be allowed on oneof elements?
   TODO: Eventually, with generics we'll have equality and inequality operators.
@@ -1237,13 +1183,11 @@
   <p>A delayed identifier expression refers to a constructor of a <a 
     href="type-oneof">oneof</a> type, without knowing which type it is referring
     to.  The expression is resolved to a constructor of a concrete type through
-    context sensitive type inference.  Delayed identifier resolution is actually
-    more powerful than qualified identifier resolution, because it can find
-    constructors of anonymous types.</p>
+    context sensitive type inference.</p>
   
   <pre class="example">
-    <i>// A function with an argument that has an anonymous type.</i> 
-    func search(val : int, direction : oneof { Up, Down })
+    oneof Direction { Up, Down }
+    func search(val : int, direction : Direction)
     
     func f() {
       search(42, :Up)

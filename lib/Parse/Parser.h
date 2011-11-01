@@ -152,6 +152,9 @@ public:
   
   Decl *parseDeclImport();
   Decl *parseDeclOneOf();
+  bool parseDeclOneOfBody(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
+                          Type &Result, TypeAliasDecl *TypeName = 0);
+
   bool parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls);
   bool parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls);
   VarDecl *parseDeclVarSimple();
@@ -163,21 +166,6 @@ public:
                         VarDecl *VD,
                         SmallVectorImpl<Parser::ExprStmtOrDecl> &Decls);
   
-  //===--------------------------------------------------------------------===//
-  // Type Parsing
-  
-  bool parseType(Type &Result);
-  bool parseType(Type &Result, Diag<> ID);
-  bool parseTypeTupleBody(SourceLoc LPLoc, Type &Result);
-  
-  bool parseTypeOneOf(Type &Result);
-  bool parseTypeOneOfBody(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
-                          Type &Result, TypeAliasDecl *TypeName = 0);
-  bool parseTypeArray(SourceLoc LSquareLoc, Type &Result);
-  bool parseTypeProtocol(Type &Result);
-  bool parseTypeProtocolBody(SourceLoc ProtocolLoc, const DeclAttributes &Attrs,
-                             Type &Result, TypeAliasDecl *TypeName = 0);
-  
   struct OneOfElementInfo {
     SourceLoc NameLoc;
     StringRef Name;
@@ -188,6 +176,18 @@ public:
                             ArrayRef<OneOfElementInfo> Elts,
                             TypeAliasDecl *PrettyTypeName);
 
+  //===--------------------------------------------------------------------===//
+  // Type Parsing
+  
+  bool parseType(Type &Result);
+  bool parseType(Type &Result, Diag<> ID);
+  bool parseTypeTupleBody(SourceLoc LPLoc, Type &Result);
+  
+  bool parseTypeArray(SourceLoc LSquareLoc, Type &Result);
+  bool parseTypeProtocol(Type &Result);
+  bool parseTypeProtocolBody(SourceLoc ProtocolLoc, const DeclAttributes &Attrs,
+                             Type &Result, TypeAliasDecl *TypeName = 0);
+  
   //===--------------------------------------------------------------------===//
   // Expression Parsing
   
