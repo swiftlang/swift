@@ -37,8 +37,6 @@ typedef llvm::PointerUnion<Import*, OneOfType*> BoundScope;
 
 namespace {  
   class NameBinder {
-    /// TopLevelValues - This is the list of top-level declarations we have.
-    llvm::DenseMap<Identifier, llvm::TinyPtrVector<ValueDecl*>> TopLevelValues;
     SmallVector<Import, 4> Imports;
     
     llvm::error_code findModule(StringRef Module, 
@@ -56,10 +54,6 @@ namespace {
     template<typename ...ArgTypes>
     void diagnose(ArgTypes... Args) {
       Context.Diags.diagnose(Args...);
-    }
-    
-    void addNamedTopLevelDecl(ValueDecl *VD) {
-      TopLevelValues[VD->Name].push_back(VD);
     }
     
     void addImport(ImportDecl *ID);
@@ -210,21 +204,10 @@ TypeAliasDecl *NameBinder::lookupTypeName(Identifier Name) {
 void NameBinder::bindValueName(Identifier Name, 
                                SmallVectorImpl<ValueDecl*> &Result,
                                NLKind LookupKind) {
-  // Resolve forward references defined within the module.
-  auto I = TopLevelValues.find(Name);
-  // If we found a match, return the decls.
-  if (I != TopLevelValues.end()) {
-    Result.reserve(I->second.size());
-    for (ValueDecl *VD : I->second) {
-      // Dot Lookup ignores values with non-function types.
-      if (LookupKind == NLKind::DotLookup && !VD->Ty->is<FunctionType>())
-        continue;
-
-      Result.push_back(VD);
-    }
-    if (!Result.empty())
-      return;
-  }
+  // Look in the current module.
+  TU->lookupValue(Module::AccessPathTy(), Name, LookupKind, Result);
+  if (!Result.empty())
+    return;
 
   // If we still haven't found it, scrape through all of the imports, taking the
   // first match of the name.
@@ -375,10 +358,6 @@ void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
   // declarations.
   for (auto Elt : TU->Body->getElements())
     if (Decl *D = Elt.dyn_cast<Decl*>()) {
-      if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-        if (!VD->Name.empty())
-          Binder.addNamedTopLevelDecl(VD);
-    
       if (ImportDecl *ID = dyn_cast<ImportDecl>(D))
         Binder.addImport(ID);
     }
