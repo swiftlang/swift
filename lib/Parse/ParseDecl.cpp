@@ -702,8 +702,83 @@ Decl *Parser::parseDeclProtocol() {
   TypeAliasDecl *TAD = ScopeInfo.addTypeAliasToScope(NameLoc, ProtocolName,
                                                      Type());
   Type ProtocolType;
-  if (parseTypeProtocolBody(ProtocolLoc, Attributes, ProtocolType, TAD))
+  if (parseProtocolBody(ProtocolLoc, Attributes, ProtocolType, TAD))
     return 0;
   return TAD;
+}
+
+///   protocol-body:
+///      '{' protocol-element* '}'
+///   protocol-element:
+///      decl-func
+///      decl-var-simple
+///      // 'typealias' identifier
+///
+bool Parser::parseProtocolBody(SourceLoc ProtocolLoc, 
+                               const DeclAttributes &Attributes,
+                               Type &Result, TypeAliasDecl *TypeName) {
+  // Parse the body.
+  if (parseToken(tok::l_brace, diag::expected_lbrace_protocol_type))
+    return true;
+  
+  SmallVector<ValueDecl*, 8> Elements;
+  
+  // Parse the list of protocol elements.
+  do {
+    switch (Tok.getKind()) {
+      default:
+        diagnose(Tok, diag::expected_protocol_member);
+        return true;
+      case tok::r_brace:  // End of protocol body.
+        break;
+        
+      case tok::kw_func:
+        Elements.push_back(parseDeclFunc(false));
+        if (Elements.back() == 0) return true;
+        break;
+      case tok::kw_var:
+        Elements.push_back(parseDeclVarSimple());
+        if (Elements.back() == 0) return true;
+        break;
+    }
+  } while (Tok.isNot(tok::r_brace));
+  
+  consumeToken(tok::r_brace);
+  
+  
+  // Act on what we've parsed.
+  if (!Attributes.empty())
+    diagnose(Attributes.LSquareLoc, diag::protocol_attributes);
+  
+  ProtocolType *NewProto = ProtocolType::getNew(ProtocolLoc, Elements,
+                                                CurDeclContext);
+  
+  TupleTypeElt ThisElt(NewProto, Context.getIdentifier("this"));
+  if (TypeName) ThisElt.Ty = TypeName->getAliasType();
+  TupleType *ThisTy = TupleType::get(ThisElt, Context);
+  
+  // Install all of the members of protocol into the protocol's DeclContext, and
+  // give each ValueDecl member an implicit "this" argument.
+  // FIXME: This isn't quite right, 'this' should be found by name lookup when
+  // parsing the body of each of these.
+  for (Decl *D : Elements) {
+    // Install the right DeclContext.
+    D->Context = NewProto;
+    
+    // Change the type of the value decls to be functions that return whatever
+    // they were declared as.
+    if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+      VD->Ty = FunctionType::get(ThisTy, VD->Ty, Context);
+  }
+  
+  if (TypeName) {
+    // If we have a pretty name for this, complete it to its actual type.
+    assert(TypeName->UnderlyingTy.isNull() &&
+           "Not an incomplete decl to complete!");
+    TypeName->UnderlyingTy = NewProto;
+  }
+  
+  Result = NewProto;
+  return false;
 }
 

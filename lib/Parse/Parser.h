@@ -160,6 +160,8 @@ public:
   VarDecl *parseDeclVarSimple();
   FuncDecl *parseDeclFunc(bool AllowScoped);
   Decl *parseDeclProtocol();
+  bool parseProtocolBody(SourceLoc ProtocolLoc, const DeclAttributes &Attrs,
+                         Type &Result, TypeAliasDecl *TypeName = 0);
 
   void actOnVarDeclName(const DeclVarName *Name,
                         SmallVectorImpl<unsigned> &AccessPath,
@@ -184,9 +186,6 @@ public:
   bool parseTypeTupleBody(SourceLoc LPLoc, Type &Result);
   
   bool parseTypeArray(SourceLoc LSquareLoc, Type &Result);
-  bool parseTypeProtocol(Type &Result);
-  bool parseTypeProtocolBody(SourceLoc ProtocolLoc, const DeclAttributes &Attrs,
-                             Type &Result, TypeAliasDecl *TypeName = 0);
   
   //===--------------------------------------------------------------------===//
   // Expression Parsing

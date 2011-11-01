@@ -634,27 +634,54 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-protocol ::= 'protocol' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#type-protocol">protocol-body</a>
+    decl-protocol ::= 'protocol' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> '{' protocol-element* '}'
   </pre>
   
-  <p>A protocol declaration is a convenient way to declare a type and name it at
-  the same time, as it is simple syntactic sugar for a <a 
-     href="#type-protocol">protocol</a> type and a <a
-     href="#decl-typealias">typealias</a> declaration.  Please see <a
-    href="#type-protocol">Protocol Types</a> for more information about their
-    capabilities.  Here are two exactly equivalent declarations for
-    intuition:</p>
-
+  <p>A protocol declaration describes an abstract interface implemented by
+     another type.  It consists of a comma-separated list of elements, each of
+     which are members that instances of the protocol are guaranteed to have.
+  Internally, protocol declarations are modelled as a <a
+    href="#decl-typealias">typealias</a> that wraps a protocol type.</p>
+  
+  <p>Here are some examples of protocols:</p>
+  
   <pre class="example">
-    <i>// Declare discriminated union with typealias + oneof type.</i>
-    typealias Document : protocol {
-      func title() -&gt; string
-    }
-    <i>// Declare discriminated union with oneof decl (preferred).</i>
     protocol Document {
       func title() -&gt; string
     }
+    protocol VersionedDocument <i>/*: Document*/</i> {
+      func version() -&gt; int
+    }
   </pre>
+  
+  <!-- _____________________________________________________________________ -->
+  <h4 id="protocol-element-func">'func' protocol elements</h4>
+  
+  <pre class="grammar">
+    protocol-element ::= <a href="#decl-func">decl-func</a>
+  </pre>
+  
+  <p>'func' members of a protocol define a value of function type that may be
+  accessed with dot syntax on a value of the protocol's type.  The function
+  gets an implicit "this" argument of the protocol type.</p>
+  
+  <p>TODO: var members and typealias members</p>
+  
+  <!-- _____________________________________________________________________ -->
+  <h4 id="protocol-element-var">'var' protocol elements</h4>
+  
+  <pre class="grammar">
+    protocol-element ::= <a href="#decl-var">decl-var-simple</a>
+  </pre>
+  
+  <p>'var' members of a protocol define "property" values that may be accessed
+  with dot syntax on a value of the protocol's type.  The declaration itself has
+  function type, where the argument is an implicit "this" argument of the
+  protocol type.</p>
+  
+  <p>TODO: typealias members</p>
+  
+
   
   <!-- ===================================================================== -->
   <h3 id="attribute-list">Attribute Lists</h3>
@@ -698,7 +725,6 @@
     
     type-simple ::= <a href="#type-identifier">type-identifier</a>
     type-simple ::= <a href="#type-tuple">type-tuple</a>
-    type-simple ::= <a href="#type-protocol">type-protocol</a>
   </pre>
 
   <p>Swift has a small collection of core datatypes that are built into the
@@ -936,57 +962,6 @@
   TODO: Need pattern matching and element extraction.
   </p>
   
-  <!-- ===================================================================== -->
-  <h3 id="type-protocol">Protocol Types</h3>
-  <!-- ===================================================================== -->
-  
-  <pre class="grammar">
-    type-protocol    ::= 'protocol' <a href="#attribute-list">attribute-list</a> protocol-body
-    protocol-body    ::= '{' protocol-element* '}'
-  </pre>
-  
-  <p>A protocol type describes an abstract interface implemented by another
-  type.  It consists of a comma-separated list of elements, each of which are
-  members that instances of the protocol are guaranteed to have.</p>
-  
-  <p>Here are some examples of protocol types:</p>
-  
-  <pre class="example">
-    protocol Document {
-      func title() -&gt; string
-    }
-    protocol VersionedDocument <i>/*: Document*/</i> {
-      func version() -&gt; int
-    }
-  </pre>
-  
-  <!-- _____________________________________________________________________ -->
-  <h4 id="protocol-element-func">'func' protocol elements</h4>
-  
-  <pre class="grammar">
-    protocol-element ::= <a href="#decl-func">decl-func</a>
-  </pre>
-
-  <p>'func' members of a protocol define a value of function type that may be
-     accessed with dot syntax on a value of the protocol's type.  The function
-     gets an implicit "this" argument of the protocol type.</p>
-  
-  <p>TODO: var members and typealias members</p>
-
-  <!-- _____________________________________________________________________ -->
-  <h4 id="protocol-element-var">'var' protocol elements</h4>
-  
-  <pre class="grammar">
-    protocol-element ::= <a href="#decl-var">decl-var-simple</a>
-  </pre>
-  
-  <p>'var' members of a protocol define "property" values that may be accessed
-  with dot syntax on a value of the protocol's type.  The declaration itself has
-  function type, where the argument is an implicit "this" argument of the
-  protocol type.</p>
- 
-  <p>TODO: typealias members</p>
-
   
   <!-- ********************************************************************* -->
   <h2 id="expr">Expressions</h2>
