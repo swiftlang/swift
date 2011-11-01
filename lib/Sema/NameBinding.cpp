@@ -36,6 +36,10 @@ enum class NLKind {
   DotLookup
 };
 
+//===----------------------------------------------------------------------===//
+// ModuleProvider
+//===----------------------------------------------------------------------===//
+
 namespace {
   /// An abstract class for something that provides module data.
   class ModuleProvider {
@@ -47,7 +51,14 @@ namespace {
                              SmallVectorImpl<ValueDecl*> &Result,
                              NLKind LookupKind) = 0;
   };
+} // end anonymous namespace 
 
+
+//===----------------------------------------------------------------------===//
+// InMemoryModule
+//===----------------------------------------------------------------------===//
+
+namespace {
   /// A concrete implementation of ModuleProvider which holds a
   /// fully-loaded module.
   class InMemoryModule : public ModuleProvider {
@@ -74,25 +85,8 @@ namespace {
                      SmallVectorImpl<ValueDecl*> &Result,
                      NLKind LookupKind) override;
   };
+} // end anonymous namespace 
 
-  /// An implementation of ModuleProvider for builtin types and functions.
-  class BuiltinModule : public ModuleProvider {
-    ASTContext &Context;
-
-    /// The cache of identifiers we've already looked up.  We use a
-    /// single hashtable for both types and values as a minor
-    /// optimization; this prevents us from having both a builtin type
-    /// and a builtin value with the same name, but that's okay.
-    llvm::DenseMap<Identifier, NamedDecl*> Cache;
-  public:
-    BuiltinModule(ASTContext &Context) : Context(Context) {}
-    TypeAliasDecl *lookupType(ImportDecl *ID, Identifier Name,
-                              NLKind LookupKind) override;
-    void lookupValue(ImportDecl *ID, Identifier Name,
-                     SmallVectorImpl<ValueDecl*> &Result,
-                     NLKind LookupKind) override;
-  };
-} // end anonymous namespace.
 
 
 /// lookupType - Resolve a reference to a type name that found this module
@@ -126,12 +120,12 @@ void InMemoryModule::lookupValue(ImportDecl *ID, Identifier Name,
   // TODO: ImportDecls cannot specified namespaces or individual entities
   // yet, so everything is just a lookup at the top-level.
   assert(ID->AccessPath.size() <= 2 && "Don't handle this yet");
-
+  
   // If this import is specific to some named type or decl ("import swift.int")
   // then filter out any lookups that don't match.
   if (ID->AccessPath.size() == 2 && ID->AccessPath[1].first != Name)
     return;
-    
+  
   // If we haven't built a map of the top-level values, do so now.
   if (TopLevelValues.empty()) {
     for (auto Elt : TU->Body->getElements())
@@ -140,7 +134,7 @@ void InMemoryModule::lookupValue(ImportDecl *ID, Identifier Name,
           if (!VD->Name.empty())
             TopLevelValues[VD->Name].push_back(VD);
   }
-   
+  
   auto I = TopLevelValues.find(Name);
   if (I == TopLevelValues.end()) return;
   
@@ -154,6 +148,73 @@ void InMemoryModule::lookupValue(ImportDecl *ID, Identifier Name,
   }
 }
 
+
+//===----------------------------------------------------------------------===//
+// BuiltinModule
+//===----------------------------------------------------------------------===//
+
+namespace {
+  /// An implementation of ModuleProvider for builtin types and functions.
+  class BuiltinModule : public ModuleProvider {
+    ASTContext &Context;
+
+    /// The cache of identifiers we've already looked up.  We use a
+    /// single hashtable for both types and values as a minor
+    /// optimization; this prevents us from having both a builtin type
+    /// and a builtin value with the same name, but that's okay.
+    llvm::DenseMap<Identifier, NamedDecl*> Cache;
+  public:
+    BuiltinModule(ASTContext &Context) : Context(Context) {}
+    TypeAliasDecl *lookupType(ImportDecl *ID, Identifier Name,
+                              NLKind LookupKind) override;
+    void lookupValue(ImportDecl *ID, Identifier Name,
+                     SmallVectorImpl<ValueDecl*> &Result,
+                     NLKind LookupKind) override;
+  };
+} // end anonymous namespace.
+
+TypeAliasDecl *
+BuiltinModule::lookupType(ImportDecl *ID, Identifier Name, NLKind LookupKind) {
+  // Only qualified lookup ever finds anything in the builtin module.
+  if (LookupKind != NLKind::QualifiedLookup) return nullptr;
+  
+  auto I = Cache.find(Name);
+  if (I != Cache.end())
+    return dyn_cast<TypeAliasDecl>(I->second);
+  
+  Type Ty = getBuiltinType(Context, Name);
+  if (!Ty) return nullptr;
+  
+  TypeAliasDecl *Alias
+  = new (Context) TypeAliasDecl(SourceLoc(), Name, Ty, DeclAttributes(),
+                                Context.BuiltinModule);
+  Cache.insert(std::make_pair(Name, Alias));
+  return Alias;
+}
+
+void BuiltinModule::lookupValue(ImportDecl *ID, Identifier Name,
+                                SmallVectorImpl<ValueDecl*> &Result,
+                                NLKind LookupKind) {
+  // Only qualified lookup ever finds anything in the builtin module.
+  if (LookupKind != NLKind::QualifiedLookup) return;
+  
+  auto I = Cache.find(Name);
+  if (I != Cache.end()) {
+    if (ValueDecl *V = dyn_cast<ValueDecl>(I->second))
+      Result.push_back(V);
+    return;
+  }
+  
+  ValueDecl *V = getBuiltinValue(Context, Name);
+  if (!V) return;
+  
+  Cache.insert(std::make_pair(Name, V));
+  Result.push_back(V);
+}
+
+//===----------------------------------------------------------------------===//
+// NameBinder
+//===----------------------------------------------------------------------===//
 
 typedef std::pair<ImportDecl*, ModuleProvider*> Import;
 typedef llvm::PointerUnion<Import*, OneOfType*> BoundScope;
@@ -397,6 +458,10 @@ BoundScope NameBinder::bindScopeName(TypeAliasDecl *TypeFromScope,
   return DT;
 }
 
+//===----------------------------------------------------------------------===//
+// performNameBinding
+//===----------------------------------------------------------------------===//
+
 static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
   
   // Ignore the preorder walk.
@@ -461,9 +526,8 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
     return 0;
   }
 
-  if (Decls.size() == 1) {
+  if (Decls.size() == 1)
     return new (Binder.Context) DeclRefExpr(Decls[0], Loc);
-  }
     
   // Copy the overload set into ASTContext memory.
   ArrayRef<ValueDecl*> DeclList = Binder.Context.AllocateCopy(Decls);
@@ -570,41 +634,3 @@ void swift::performNameBinding(TranslationUnit *TU, ASTContext &Ctx) {
   verify(TU, VerificationKind::BoundNames);
 }
 
-TypeAliasDecl *
-BuiltinModule::lookupType(ImportDecl *ID, Identifier Name, NLKind LookupKind) {
-  // Only qualified lookup ever finds anything in the builtin module.
-  if (LookupKind != NLKind::QualifiedLookup) return nullptr;
-
-  auto I = Cache.find(Name);
-  if (I != Cache.end())
-    return dyn_cast<TypeAliasDecl>(I->second);
-
-  Type Ty = getBuiltinType(Context, Name);
-  if (!Ty) return nullptr;
-
-  TypeAliasDecl *Alias
-    = new (Context) TypeAliasDecl(SourceLoc(), Name, Ty, DeclAttributes(),
-                                  Context.BuiltinModule);
-  Cache.insert(std::make_pair(Name, Alias));
-  return Alias;
-}
-
-void BuiltinModule::lookupValue(ImportDecl *ID, Identifier Name,
-                                SmallVectorImpl<ValueDecl*> &Result,
-                                NLKind LookupKind) {
-  // Only qualified lookup ever finds anything in the builtin module.
-  if (LookupKind != NLKind::QualifiedLookup) return;
-
-  auto I = Cache.find(Name);
-  if (I != Cache.end()) {
-    if (ValueDecl *V = dyn_cast<ValueDecl>(I->second))
-      Result.push_back(V);
-    return;
-  }
-
-  ValueDecl *V = getBuiltinValue(Context, Name);
-  if (!V) return;
-
-  Cache.insert(std::make_pair(Name, V));
-  Result.push_back(V);
-}
