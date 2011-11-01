@@ -249,7 +249,6 @@ namespace {
     }
     
     void addImport(ImportDecl *ID);
-    void addBuiltinImport(ImportDecl *ID);
 
     BoundScope bindScopeName(TypeAliasDecl *TypeFromScope,
                              Identifier Name, SourceLoc NameLoc);
@@ -275,7 +274,7 @@ NameBinder::NameBinder(ASTContext &C) : Context(C) {
   auto ID = new (C) ImportDecl(SourceLoc(),
                                C.AllocateCopy(llvm::makeArrayRef(BuiltinPath)),
                                /*No DeclContext?*/ nullptr);
-  addBuiltinImport(ID);
+  Imports.push_back(std::make_pair(ID, new BuiltinModule(C)));
   
   // FIXME: Import swift.swift implicitly.  We need a way for swift.swift itself
   // to not recursively import itself though.
@@ -371,11 +370,6 @@ void NameBinder::addImport(ImportDecl *ID) {
     return;
   }
   
-  Imports.push_back(std::make_pair(ID, MP));
-}
-
-void NameBinder::addBuiltinImport(ImportDecl *ID) {
-  ModuleProvider *MP = new BuiltinModule(Context);
   Imports.push_back(std::make_pair(ID, MP));
 }
 
