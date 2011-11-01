@@ -62,8 +62,8 @@ public:
   /// \Diags - The diagnostics engine.
   DiagnosticEngine &Diags;
   
-  /// BuiltinModule - The builtin module.
-  Module * const BuiltinModule;
+  /// TheBuiltinModule - The builtin module.
+  Module * const TheBuiltinModule;
 
   /// ImportSearchPaths - The paths to search for imports in.
   std::vector<std::string> ImportSearchPaths;

@@ -371,7 +371,7 @@ static RValue emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn, Expr *Arg,
 RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &ResultInfo) {
   // Check for a call to a builtin.
   if (ValueDecl *Fn = E->getCalledValue())
-    if (Fn->Context == IGM.Context.BuiltinModule)
+    if (Fn->Context == IGM.Context.TheBuiltinModule)
       return emitBuiltinCall(*this, cast<FuncDecl>(Fn), E->getArg(),
                              ResultInfo);
 

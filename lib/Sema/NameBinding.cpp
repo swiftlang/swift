@@ -187,7 +187,7 @@ BuiltinModuleX::lookupType(ImportDecl *ID, Identifier Name, NLKind LookupKind) {
   
   TypeAliasDecl *Alias
   = new (Context) TypeAliasDecl(SourceLoc(), Name, Ty, DeclAttributes(),
-                                Context.BuiltinModule);
+                                Context.TheBuiltinModule);
   Cache.insert(std::make_pair(Name, Alias));
   return Alias;
 }
