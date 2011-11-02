@@ -318,6 +318,9 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const OneOfType *D) { return true; }
   static bool classof(const TypeBase *T) { return T->Kind == TypeKind::OneOf; }
+  static bool classof(const DeclContext *C) {
+    return C->getContextKind() == DeclContextKind::OneOfType;
+  }
   
 private:
   // oneof types are always canonical.
