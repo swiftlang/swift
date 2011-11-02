@@ -522,7 +522,11 @@
   </div>
   
   <pre class="grammar">
-    decl-oneof ::= 'oneof' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#type-oneof">oneof-body</a>
+    decl-oneof ::= 'oneof' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> oneof-body
+    oneof-body         ::= '{' oneof-element (',' oneof-element)* '}'
+    
+    oneof-element      ::= <a href="#identifier">identifier</a>
+    oneof-element      ::= <a href="#identifier">identifier</a> ':' <a href="#type">type</a>
   </pre>
   
   <p>A oneof declaration provides direct access to <a 
