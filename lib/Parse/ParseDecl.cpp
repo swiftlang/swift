@@ -622,7 +622,13 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
 /// with a single element.
 ///
 ///   decl-struct:
-///      'struct' attribute-list identifier { type-tuple-body? }
+///      'struct' attribute-list identifier { decl-struct-body }
+///   decl-struct-body:
+///      type-tuple-body?
+///      decl-struct-member+
+///   decl-struct-member:
+///      decl-func
+///      decl-var-simple
 ///
 bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   SourceLoc StructLoc = consumeToken(tok::kw_struct);
@@ -635,30 +641,62 @@ bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
     return true;
 
   SourceLoc LBLoc = Tok.getLoc();
-  Type BodyTy;
-  if (parseToken(tok::l_brace, diag::expected_lbrace_struct) ||
-      parseTypeTupleBody(LBLoc, BodyTy))
+  if (parseToken(tok::l_brace, diag::expected_lbrace_struct))
     return true;
+
+  // Get the TypeAlias for the name that we'll eventually have.  This ensures
+  // that the constructors generated have the pretty name for the type instead
+  // of the raw oneof.
+  TypeAliasDecl *TAD = ScopeInfo.addTypeAliasToScope(StructLoc, StructName,
+                                                     Type());
+  Type StructTy = TAD->getAliasType();
+  
+  Type BodyTy;
+  SmallVector<ValueDecl*, 8> MemberDecls;
+  
+  if (Tok.isNot(tok::kw_func) && Tok.isNot(tok::kw_var)) {
+    // Parse the body as a tuple body.
+    if (parseTypeTupleBody(LBLoc, BodyTy))
+      return true;
+    assert(isa<TupleType>(BodyTy.getPointer()));
+    
+    // FIXME: Reject unnamed members.
+  } else {
+    // Parse the body as a series of decls.
+    SmallVector<TupleTypeElt, 8> TupleElts;
+    do {
+      switch (Tok.getKind()) {
+      default:
+        diagnose(Tok, diag::expected_struct_member);
+        return true;
+      case tok::r_brace:  // End of protocol body.
+        break;
+        
+      case tok::kw_func:
+        MemberDecls.push_back(parseDeclFunc(StructTy));
+        if (MemberDecls.back() == 0) return true;
+        break;
+      case tok::kw_var:
+        if (VarDecl *VD = parseDeclVarSimple()) {
+          MemberDecls.push_back(VD);
+          TupleElts.push_back(TupleTypeElt(VD->Ty, VD->Name, VD->Init));
+        } else {
+          return true;
+        }
+        break;
+      }
+    } while (Tok.isNot(tok::r_brace));
+   
+    // Build the tuple.
+    BodyTy = TupleType::get(TupleElts, Context);
+  }
 
   // FIXME: add helper for matching punctuation.
   if (parseToken(tok::r_brace, diag::expected_rbrace_struct)) {
     diagnose(LBLoc, diag::opening_brace);
     return true;
   }
-
-  // The type is required to be syntactically a tuple type.
-  if (!isa<TupleType>(BodyTy.getPointer())) {
-    // FIXME: Fairly unfriendly diagnostic, here.
-    diagnose(StructLoc, diag::struct_not_tuple);
-    // FIXME: Should set this as an erroroneous decl.
-    return true;
-  }
           
-  // Get the TypeAlias for the name that we'll eventually have.  This ensures
-  // that the constructors generated have the pretty name for the type instead
-  // of the raw oneof.
-  TypeAliasDecl *TAD = ScopeInfo.addTypeAliasToScope(StructLoc, StructName,
-                                                     Type());
   Decls.push_back(TAD);
   
   // The 'struct' is syntactically fine, invoke the semantic actions for the

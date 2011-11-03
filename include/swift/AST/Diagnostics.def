@@ -125,8 +125,8 @@ ERROR(expected_lbrace_struct,decl_parsing,none,
       "expected '{' in struct", ())
 ERROR(expected_rbrace_struct,decl_parsing,none,
       "expected '}' in struct", ())
-ERROR(struct_not_tuple,decl_parsing,none,
-      "element type of struct is not a tuple", ())
+ERROR(expected_struct_member,type_parsing,none,
+      "expected a function or variable declaration in protocol", ())
 
 // Protocol
 
