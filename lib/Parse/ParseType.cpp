@@ -112,7 +112,7 @@ bool Parser::parseType(Type &Result, Diag<> MessageID) {
 ///     type-tuple-element (',' type-tuple-element)*
 ///   type-tuple-element:
 ///     identifier value-specifier
-///     type ('=' expr)?
+///     type
 bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
   SmallVector<TupleTypeElt, 8> Elements;
 
