@@ -388,14 +388,13 @@ VarDecl *Parser::parseDeclVarSimple() {
 ///   decl-func-scoped:
 ///     'func' attribute-list? type-identifier '::' identifier type stmt-brace?
 ///
-FuncDecl *Parser::parseDeclFunc(bool AllowScoped) {
+FuncDecl *Parser::parseDeclFunc(Type ReceiverTy) {
   SourceLoc FuncLoc = consumeToken(tok::kw_func);
 
   DeclAttributes Attributes;
   // FIXME: Implicitly add immutable attribute.
   parseAttributeList(Attributes);
 
-  Type ReceiverTy;
   Identifier Name;
   SourceLoc TypeNameLoc = Tok.getLoc();
   if (parseIdentifier(Name, diag::expected_identifier_in_decl, "func"))
@@ -403,7 +402,7 @@ FuncDecl *Parser::parseDeclFunc(bool AllowScoped) {
 
   // If this is method syntax, the first name is the receiver type.  Parse the
   // actual function name.
-  if (AllowScoped && consumeIf(tok::coloncolon)) {
+  if (ReceiverTy.isNull() && consumeIf(tok::coloncolon)) {
     // Look up the type name.
     ReceiverTy = ScopeInfo.lookupOrInsertTypeName(Name, TypeNameLoc);
     if (parseIdentifier(Name, diag::expected_identifier_in_decl, "func"))
@@ -721,25 +720,26 @@ bool Parser::parseProtocolBody(SourceLoc ProtocolLoc,
   if (parseToken(tok::l_brace, diag::expected_lbrace_protocol_type))
     return true;
   
-  SmallVector<ValueDecl*, 8> Elements;
+  Type ThisType = TypeName->getAliasType();
   
   // Parse the list of protocol elements.
+  SmallVector<ValueDecl*, 8> Elements;
   do {
     switch (Tok.getKind()) {
-      default:
-        diagnose(Tok, diag::expected_protocol_member);
-        return true;
-      case tok::r_brace:  // End of protocol body.
-        break;
-        
-      case tok::kw_func:
-        Elements.push_back(parseDeclFunc(false));
-        if (Elements.back() == 0) return true;
-        break;
-      case tok::kw_var:
-        Elements.push_back(parseDeclVarSimple());
-        if (Elements.back() == 0) return true;
-        break;
+    default:
+      diagnose(Tok, diag::expected_protocol_member);
+      return true;
+    case tok::r_brace:  // End of protocol body.
+      break;
+      
+    case tok::kw_func:
+      Elements.push_back(parseDeclFunc(ThisType));
+      if (Elements.back() == 0) return true;
+      break;
+    case tok::kw_var:
+      Elements.push_back(parseDeclVarSimple());
+      if (Elements.back() == 0) return true;
+      break;
     }
   } while (Tok.isNot(tok::r_brace));
   
@@ -753,30 +753,14 @@ bool Parser::parseProtocolBody(SourceLoc ProtocolLoc,
   ProtocolType *NewProto = ProtocolType::getNew(ProtocolLoc, Elements,
                                                 CurDeclContext);
   
-  TupleTypeElt ThisElt(NewProto, Context.getIdentifier("this"));
-  if (TypeName) ThisElt.Ty = TypeName->getAliasType();
-  TupleType *ThisTy = TupleType::get(ThisElt, Context);
-  
-  // Install all of the members of protocol into the protocol's DeclContext, and
-  // give each ValueDecl member an implicit "this" argument.
-  // FIXME: This isn't quite right, 'this' should be found by name lookup when
-  // parsing the body of each of these.
-  for (Decl *D : Elements) {
-    // Install the right DeclContext.
+  // Install all of the members of protocol into the protocol's DeclContext.
+  for (Decl *D : Elements)
     D->Context = NewProto;
-    
-    // Change the type of the value decls to be functions that return whatever
-    // they were declared as.
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-      VD->Ty = FunctionType::get(ThisTy, VD->Ty, Context);
-  }
   
-  if (TypeName) {
-    // If we have a pretty name for this, complete it to its actual type.
-    assert(TypeName->UnderlyingTy.isNull() &&
-           "Not an incomplete decl to complete!");
-    TypeName->UnderlyingTy = NewProto;
-  }
+  // Complete the pretty name for this type.
+  assert(TypeName->UnderlyingTy.isNull() &&
+         "Not an incomplete decl to complete!");
+  TypeName->UnderlyingTy = NewProto;
   
   Result = NewProto;
   return false;

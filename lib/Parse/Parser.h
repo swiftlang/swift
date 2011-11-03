@@ -158,7 +158,7 @@ public:
   bool parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls);
   bool parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls);
   VarDecl *parseDeclVarSimple();
-  FuncDecl *parseDeclFunc(bool AllowScoped);
+  FuncDecl *parseDeclFunc(Type ThisType = Type());
   Decl *parseDeclProtocol();
   bool parseProtocolBody(SourceLoc ProtocolLoc, const DeclAttributes &Attrs,
                          Type &Result, TypeAliasDecl *TypeName = 0);
