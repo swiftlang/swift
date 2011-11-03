@@ -286,7 +286,8 @@ private:
 };
   
 /// OneOfType - a 'oneof' type.  This represents the oneof type itself, not its
-/// elements (which are OneOfElementDecl's).
+/// elements (which are OneOfElementDecl's).  This is a DeclContext because it
+/// owns its OneOfElementDecl's.
 class OneOfType : public TypeBase, public DeclContext {
 public:
   const SourceLoc OneOfLoc;
