@@ -590,10 +590,8 @@
 
   <pre class="grammar">
     decl-struct ::= 'struct' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> { decl-struct-body }
-    decl-struct-body ::= <a href="#type-tuple">type-tuple-body</a>?
-    decl-struct-body ::= decl-struct-member+
+    decl-struct-body ::= <a href="#type-tuple">type-tuple-body</a>? decl-struct-member*
     decl-struct-member ::= <a href="#decl-func">decl-func</a>
-    decl-struct-member ::= <a href="#decl-var">decl-var-simple</a>
   </pre>
 
   <p>A struct declaration is syntactic sugar for a oneof declaration of a single
@@ -624,8 +622,8 @@
   <pre class="example">
     struct S3a { x = 4, y : int }
     struct S3b {
-      var x = 4
-      var y : int
+      x = 4
+      y : int
     }
   </pre>
   
@@ -634,11 +632,11 @@
   
   <pre class="example">
     struct S4a {
-      var x : int
+      x : int
       func doStuff() { ... }
     }
     struct S4b {
-      var x : int
+      x : int
     }
     extension S4b {
       func doStuff() { ... }
@@ -651,8 +649,8 @@
     struct Point { x : int, y : int }
     struct Size { width : int, height : int }
     struct Rect {
-      var origin : Point
-      var size : Size
+      origin : Point,
+      size : Size
       func area() -> int { return size.width*size.height }
     }
     

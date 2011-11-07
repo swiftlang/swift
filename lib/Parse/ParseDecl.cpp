@@ -624,11 +624,9 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
 ///   decl-struct:
 ///      'struct' attribute-list identifier { decl-struct-body }
 ///   decl-struct-body:
-///      type-tuple-body?
-///      decl-struct-member+
+///      type-tuple-body? decl-struct-member*
 ///   decl-struct-member:
 ///      decl-func
-///      decl-var-simple
 ///
 bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   SourceLoc StructLoc = consumeToken(tok::kw_struct);
@@ -653,43 +651,31 @@ bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   
   Type BodyTy;
   SmallVector<ValueDecl*, 8> MemberDecls;
+
+  // Parse elements of the body as a tuple body.
+  if (parseTypeTupleBody(LBLoc, BodyTy))
+    return true;
+  assert(isa<TupleType>(BodyTy.getPointer()));
   
-  if (Tok.isNot(tok::kw_func) && Tok.isNot(tok::kw_var)) {
-    // Parse the body as a tuple body.
-    if (parseTypeTupleBody(LBLoc, BodyTy))
+  // FIXME: Reject unnamed members.
+
+  
+  // Parse the body as a series of decls.
+  SmallVector<TupleTypeElt, 8> TupleElts;
+  do {
+    switch (Tok.getKind()) {
+    default:
+      diagnose(Tok, diag::expected_struct_member);
       return true;
-    assert(isa<TupleType>(BodyTy.getPointer()));
-    
-    // FIXME: Reject unnamed members.
-  } else {
-    // Parse the body as a series of decls.
-    SmallVector<TupleTypeElt, 8> TupleElts;
-    do {
-      switch (Tok.getKind()) {
-      default:
-        diagnose(Tok, diag::expected_struct_member);
-        return true;
-      case tok::r_brace:  // End of protocol body.
-        break;
-        
-      case tok::kw_func:
-        MemberDecls.push_back(parseDeclFunc(StructTy));
-        if (MemberDecls.back() == 0) return true;
-        break;
-      case tok::kw_var:
-        if (VarDecl *VD = parseDeclVarSimple()) {
-          MemberDecls.push_back(VD);
-          TupleElts.push_back(TupleTypeElt(VD->Ty, VD->Name, VD->Init));
-        } else {
-          return true;
-        }
-        break;
-      }
-    } while (Tok.isNot(tok::r_brace));
-   
-    // Build the tuple.
-    BodyTy = TupleType::get(TupleElts, Context);
-  }
+    case tok::r_brace:  // End of struct body.
+      break;
+      
+    case tok::kw_func:
+      MemberDecls.push_back(parseDeclFunc(StructTy));
+      if (MemberDecls.back() == 0) return true;
+      break;
+    }
+  } while (Tok.isNot(tok::r_brace));
 
   // FIXME: add helper for matching punctuation.
   if (parseToken(tok::r_brace, diag::expected_rbrace_struct)) {
