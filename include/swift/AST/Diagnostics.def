@@ -93,6 +93,8 @@ ERROR(precedence_overload,decl_parsing,none,
 ERROR(decl_redefinition,decl_parsing,none,
       "%select{declaration|definition}0 conflicts with previous value", 
       (bool))
+ERROR(operator_in_decl,decl_parsing,none,
+      "operator cannot be declared in %0", (StringRef))
 
 // Var Name
 ERROR(expected_lparen_var_name,decl_parsing,none,

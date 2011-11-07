@@ -670,10 +670,18 @@ bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
     case tok::r_brace:  // End of struct body.
       break;
       
-    case tok::kw_func:
-      MemberDecls.push_back(parseDeclFunc(StructTy));
-      if (MemberDecls.back() == 0) return true;
+    case tok::kw_func: {
+      FuncDecl *FD = parseDeclFunc(StructTy);
+      if (FD == 0) return true;
+      
+      if (FD->Name.isOperator()) {
+        // FIXME: Mark decl erroneous.
+        diagnose(FD->getLocStart(), diag::operator_in_decl, "struct");
+      }
+      
+      MemberDecls.push_back(FD);
       break;
+    }
     }
   } while (Tok.isNot(tok::r_brace));
 
