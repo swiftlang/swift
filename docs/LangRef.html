@@ -592,6 +592,7 @@
     decl-struct ::= 'struct' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> { decl-struct-body }
     decl-struct-body ::= <a href="#type-tuple">type-tuple-body</a>? decl-struct-member*
     decl-struct-member ::= <a href="#decl-func">decl-func</a>
+    decl-struct-member ::= <a href="#decl-typealias">decl-typealias</a>
   </pre>
 
   <p>A struct declaration is syntactic sugar for a oneof declaration of a single
@@ -651,6 +652,9 @@
     struct Rect {
       origin : Point,
       size : Size
+
+      typealias CoordinateType : int
+    
       func area() -> int { return size.width*size.height }
     }
     

@@ -649,10 +649,8 @@ bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
                                                      Type());
   Type StructTy = TAD->getAliasType();
   
-  Type BodyTy;
-  SmallVector<ValueDecl*, 8> MemberDecls;
-
   // Parse elements of the body as a tuple body.
+  Type BodyTy;
   if (parseTypeTupleBody(LBLoc, BodyTy))
     return true;
   assert(isa<TupleType>(BodyTy.getPointer()));
@@ -661,7 +659,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
 
   
   // Parse the body as a series of decls.
-  SmallVector<TupleTypeElt, 8> TupleElts;
+  SmallVector<Decl*, 8> MemberDecls;
   do {
     switch (Tok.getKind()) {
     default:
@@ -682,6 +680,13 @@ bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
       MemberDecls.push_back(FD);
       break;
     }
+        
+    case tok::kw_typealias:
+      if (TypeAliasDecl *TAD = parseDeclTypeAlias())
+        MemberDecls.push_back(TAD);
+      else
+        return true;
+      break;
     }
   } while (Tok.isNot(tok::r_brace));
 
@@ -702,6 +707,10 @@ bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
   ElementInfo.EltType = BodyTy;
   OneOfType *OneOfTy = actOnOneOfType(StructLoc, Attributes, ElementInfo, TAD);
   assert(OneOfTy->hasSingleElement() && "Somehow isn't a struct?");
+  
+  // Install all of the members of protocol into the protocol's DeclContext.
+  for (Decl *D : MemberDecls)
+    D->Context = OneOfTy;
   
   // In addition to defining the oneof declaration, structs also inject their
   // constructor into the global scope.
