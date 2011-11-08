@@ -76,6 +76,35 @@ void Parser::skipUntil(tok T1, tok T2) {
   }
 }
 
+/// skipUntilDeclRBrace - Skip to the next decl or '}'.
+void Parser::skipUntilDeclRBrace() {
+  while (1) {
+    // Found the start of a decl, we're done.
+    if (Tok.is(tok::eof) ||
+        isStartOfDecl(Tok, peekToken()))
+      return;
+    
+    // Otherwise, if it is a random token that we don't know about, keep
+    // eating.
+    consumeToken();
+  }
+}
+
+/// skipUntilDeclStmtRBrace - Skip to the next decl, statement or '}'.
+void Parser::skipUntilDeclStmtRBrace() {
+  while (1) {
+    // Found the start of a statement or decl, we're done.
+    if (Tok.is(tok::eof) ||
+        isStartOfStmtOtherThanAssignment(Tok) ||
+        isStartOfDecl(Tok, peekToken()))
+      return;
+    
+    // Otherwise, if it is a random token that we don't know about, keep
+    // eating.
+    consumeToken();
+  }
+}
+
 
 //===----------------------------------------------------------------------===//
 // Primitive Parsing

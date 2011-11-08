@@ -106,6 +106,12 @@ public:
   ///
   void skipUntil(tok T1, tok T2 = tok::unknown);
   
+  /// skipUntilDeclStmtRBrace - Skip to the next decl or '}'.
+  void skipUntilDeclRBrace();
+
+  /// skipUntilDeclStmtRBrace - Skip to the next decl, statement or '}'.
+  void skipUntilDeclStmtRBrace();
+  
   template<typename ...ArgTypes>
   void diagnose(SourceLoc Loc, ArgTypes... Args) {
     Diags.diagnose(Loc, Diagnostic(Args...));
@@ -142,7 +148,7 @@ public:
   static bool isStartOfDecl(const Token &Tok, const Token &Tok2);
 
   TranslationUnit *parseTranslationUnit();
-  void parseDecl(SmallVectorImpl<Decl*> &Entries, bool AllowImportDecl);
+  bool parseDecl(SmallVectorImpl<Decl*> &Entries, bool AllowImportDecl);
   
   TypeAliasDecl *parseDeclTypeAlias();
   void parseAttributeList(DeclAttributes &Attributes) {

@@ -182,7 +182,7 @@ void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
 /// ASTs.  This can return multiple results for var decls that bind to multiple
 /// values, structs that define a struct decl and a constructor, etc.
 ///
-/// Note that this method does error recovery, so it returns void.
+/// This method returns true on a parser error that requires recovery.
 ///
 ///   decl:
 ///     decl-typealias
@@ -193,7 +193,7 @@ void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
 ///     decl-struct
 ///     decl-import  [[Only if AllowImportDecl = true]]
 ///
-void Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, bool AllowImportDecl) {
+bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, bool AllowImportDecl) {
   bool HadParseError = false;
   switch (Tok.getKind()) {
   default:
@@ -231,22 +231,7 @@ void Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, bool AllowImportDecl) {
     HadParseError = true;
   }
 
-  // If no parse errors occurred, return success.
-  if (!HadParseError)
-    return;
-
-  // Otherwise, skip to the next decl, statement or '}'.
-  while (1) {
-    // Found the start of a statement or decl, we're done.
-    if (Tok.is(tok::eof) ||
-        isStartOfStmtOtherThanAssignment(Tok) ||
-        isStartOfDecl(Tok, peekToken()))
-      return;
-    
-    // Otherwise, if it is a random token that we don't know about, keep
-    // eating.
-    consumeToken();
-  }
+  return HadParseError;
 }
 
 
@@ -734,7 +719,8 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   SmallVector<Decl*, 8> MemberDecls;
   unsigned LastVerified = 0;
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-    parseDecl(MemberDecls, false /*No Import*/);
+    if (parseDecl(MemberDecls, false /*No Import*/))
+      skipUntilDeclRBrace();
     
     // Verify any parsed decls.
     while (LastVerified != MemberDecls.size()) {
