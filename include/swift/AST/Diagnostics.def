@@ -96,7 +96,9 @@ ERROR(decl_redefinition,decl_parsing,none,
       "%select{declaration|definition}0 conflicts with previous value", 
       (bool))
 ERROR(operator_in_decl,decl_parsing,none,
-      "operator cannot be declared in %0", (StringRef))
+      "operator cannot be declared here, declare them at global scope", ())
+ERROR(disallowed_var_decl,decl_parsing,none,
+      "'var' declarations not allowed here, use data members instead", ())
 
 // Var Name
 ERROR(expected_lparen_var_name,decl_parsing,none,
@@ -133,8 +135,6 @@ ERROR(expected_struct_member,decl_parsing,none,
       "expected a function or variable declaration in protocol", ())
 ERROR(struct_unnamed_member,decl_parsing,none,
       "unnamed members invalid in structs", ())
-ERROR(var_decl_in_struct,decl_parsing,none,
-      "'var' declarations not allowed in structs, use data members instead", ())
 
 // Protocol
 

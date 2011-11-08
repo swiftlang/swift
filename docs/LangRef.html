@@ -542,7 +542,7 @@
   
   <pre class="grammar">
     decl-oneof ::= 'oneof' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> '{' oneof-body '}'
-    oneof-body         ::= (oneof-element (',' oneof-element)*)? decl-struct-member*
+    oneof-body         ::= (oneof-element (',' oneof-element)*)? decl*
     
     oneof-element      ::= <a href="#identifier">identifier</a>
     oneof-element      ::= <a href="#identifier">identifier</a> ':' <a href="#type">type</a>
@@ -553,6 +553,10 @@
      href="#decl-typealias">typealias</a> declaration specifying a name.  Please
     see <a href="#type-oneof">oneof types</a> for more information about their
     capabilities.</p>
+  
+  <p>A 'oneof' can include a list of decls after its member types.  '<a 
+    href="#decl-var">var</a>' decls are not allowed in a oneof, data members
+  should be used instead.</p>  
 
   <p>Here are some examples of oneof declarations:</p>
   
@@ -619,7 +623,7 @@
   constructor value of the same name as the struct.  Unlike tuple elements, all
   members of the struct must be named.</p>
 
-  <p>A struct contains a list of decls after its member types.  '<a 
+  <p>A struct may include a list of decls after its member types.  '<a 
   href="#decl-var">var</a>' decls are not allowed in a struct, data members
   should be used instead.</p>  
 

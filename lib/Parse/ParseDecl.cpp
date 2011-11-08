@@ -193,7 +193,8 @@ void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
 ///     decl-struct
 ///     decl-import  [[Only if AllowImportDecl = true]]
 ///
-bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, bool AllowImportDecl) {
+bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
+  unsigned EntryStart = Entries.size();
   bool HadParseError = false;
   switch (Tok.getKind()) {
   default:
@@ -202,8 +203,6 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, bool AllowImportDecl) {
     break;
   case tok::kw_import:
     Entries.push_back(parseDeclImport());
-    if (Entries.back() && !AllowImportDecl)
-      diagnose(Entries.back()->getLocStart(), diag::import_inner_scope);
     break;
   case tok::kw_var:
     HadParseError = parseDeclVar(Entries);
@@ -231,6 +230,21 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, bool AllowImportDecl) {
     HadParseError = true;
   }
 
+  // Validate the new entries.
+  for (unsigned i = EntryStart, e = Entries.size(); i != e; ++i) {
+    Decl *D = Entries[i];
+
+    // FIXME: Mark decls erroneous.
+    if (isa<ImportDecl>(D) && !(Flags & PD_AllowImport))
+      diagnose(D->getLocStart(), diag::import_inner_scope);
+    if (isa<VarDecl>(D) && (Flags & PD_DisallowVar)) {
+      diagnose(D->getLocStart(), diag::disallowed_var_decl);
+    } else if (NamedDecl *ND = dyn_cast<NamedDecl>(D)) {
+      if (ND->Name.isOperator() && (Flags & PD_DisallowOperators))
+        diagnose(ND->getLocStart(), diag::operator_in_decl);
+    }
+  }
+  
   return HadParseError;
 }
 
@@ -551,7 +565,7 @@ Decl *Parser::parseDeclOneOf() {
 
 
 ///   oneof-body:
-///      '{' oneof-element (',' oneof-element)* '}'
+///      '{' oneof-element (',' oneof-element)* decl* '}'
 ///   oneof-element:
 ///      identifier
 ///      identifier ':' type
@@ -590,17 +604,25 @@ bool Parser::parseDeclOneOfBody(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
       break;
   }
   
+  // Parse the body as a series of decls.
+  SmallVector<Decl*, 8> MemberDecls;
+  while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
+    if (parseDecl(MemberDecls, PD_DisallowVar|PD_DisallowOperators))
+      skipUntilDeclRBrace();
+  }
+  
   // FIXME: Helper for matching punctuation.
   if (parseToken(tok::r_brace, diag::expected_rbrace_oneof_type))
     diagnose(LBLoc, diag::opening_brace);
   
-  Result = actOnOneOfType(OneOfLoc, Attrs, ElementInfos, TypeName);
+  Result = actOnOneOfType(OneOfLoc, Attrs, ElementInfos, MemberDecls, TypeName);
   return false;
 }
 
 OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
                                   const DeclAttributes &Attrs,
                                   ArrayRef<OneOfElementInfo> Elts,
+                                  ArrayRef<Decl*> MemberDecls,
                                   TypeAliasDecl *PrettyTypeName) {
   // No attributes are valid on oneof types at this time.
   if (!Attrs.empty())
@@ -648,6 +670,10 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
   
   OneOfType *Result = OneOfType::getNew(OneOfLoc, EltDecls, CurDeclContext);
   for (OneOfElementDecl *D : EltDecls)
+    D->Context = Result;
+  
+  // Install all of the members into the OneOf's DeclContext.
+  for (Decl *D : MemberDecls)
     D->Context = Result;
   
   if (PrettyTypeName) {
@@ -717,26 +743,9 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   
   // Parse the body as a series of decls.
   SmallVector<Decl*, 8> MemberDecls;
-  unsigned LastVerified = 0;
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-    if (parseDecl(MemberDecls, false /*No Import*/))
+    if (parseDecl(MemberDecls, PD_DisallowVar|PD_DisallowOperators))
       skipUntilDeclRBrace();
-    
-    // Verify any parsed decls.
-    while (LastVerified != MemberDecls.size()) {
-      Decl *D = MemberDecls[LastVerified++];
-      
-      // Reject vardecls in structs.
-      if (isa<VarDecl>(D)) {
-        // FIXME: Mark decl erroneous.
-        diagnose(D->getLocStart(), diag::var_decl_in_struct);
-      } else if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
-        if (FD->Name.isOperator()) {
-          // FIXME: Mark decl erroneous.
-          diagnose(FD->getLocStart(), diag::operator_in_decl, "struct");
-        }
-      }
-    }
   }
   
   // FIXME: add helper for matching punctuation.
@@ -754,12 +763,9 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   ElementInfo.Name = StructName.str();
   ElementInfo.NameLoc = StructLoc;
   ElementInfo.EltType = BodyTy;
-  OneOfType *OneOfTy = actOnOneOfType(StructLoc, Attributes, ElementInfo, TAD);
+  OneOfType *OneOfTy = actOnOneOfType(StructLoc, Attributes, ElementInfo, 
+                                      MemberDecls, TAD);
   assert(OneOfTy->hasSingleElement() && "Somehow isn't a struct?");
-  
-  // Install all of the members of protocol into the protocol's DeclContext.
-  for (Decl *D : MemberDecls)
-    D->Context = OneOfTy;
   
   // In addition to defining the oneof declaration, structs also inject their
   // constructor into the global scope.

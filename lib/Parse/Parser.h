@@ -148,7 +148,13 @@ public:
   static bool isStartOfDecl(const Token &Tok, const Token &Tok2);
 
   TranslationUnit *parseTranslationUnit();
-  bool parseDecl(SmallVectorImpl<Decl*> &Entries, bool AllowImportDecl);
+  bool parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags);
+  enum {
+    PD_Default           = 0,
+    PD_AllowImport       = 1 << 1,
+    PD_DisallowVar       = 1 << 2,
+    PD_DisallowOperators = 1 << 3
+  };
   
   TypeAliasDecl *parseDeclTypeAlias();
   void parseAttributeList(DeclAttributes &Attributes) {
@@ -185,6 +191,7 @@ public:
   
   OneOfType *actOnOneOfType(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
                             ArrayRef<OneOfElementInfo> Elts,
+                            ArrayRef<Decl*> MemberDecls,
                             TypeAliasDecl *PrettyTypeName);
 
   //===--------------------------------------------------------------------===//
