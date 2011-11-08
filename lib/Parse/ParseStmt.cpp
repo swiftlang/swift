@@ -46,6 +46,16 @@ bool Parser::isStartOfStmtOtherThanAssignment(const Token &Tok) {
   }
 }
 
+/// isFuncExpr - Return true if this two token sequence is the start of a func
+/// expression (i.e. not a func *decl* or something else).
+static bool isFuncExpr(const Token &Tok1, const Token &Tok2) {
+  if (Tok1.isNot(tok::kw_func)) return false;
+  
+  // "func identifier" and "func [attribute]" is a func declaration,
+  // otherwise we have a func expression.
+  return Tok2.isNot(tok::identifier) && Tok2.isNot(tok::oper) &&
+         Tok2.isNot(tok::l_square);
+}
 
 ///   stmt-brace-item:
 ///     decl
@@ -87,9 +97,7 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     case tok::kw_func:
       // "func identifier" and "func [attribute]" is a func declaration,
       // otherwise we have a func expression.
-      if (peekToken().isNot(tok::identifier) &&
-          peekToken().isNot(tok::oper) &&
-          peekToken().isNot(tok::l_square))
+      if (isFuncExpr(Tok, peekToken()))
         goto Expression;
       // Otherwise, FALL THROUGH.
     case tok::kw_var:
