@@ -655,7 +655,13 @@ bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
     return true;
   assert(isa<TupleType>(BodyTy.getPointer()));
   
-  // FIXME: Reject unnamed members.
+  // Reject any unnamed members.
+  for (auto Elt : BodyTy->castTo<TupleType>()->Fields)
+    if (Elt.Name.empty()) {
+      // FIXME: Mark erroneous, terrible location info.  Probably should just
+      // have custom parsing logic instead of reusing type-tuple-body.
+      diagnose(LBLoc, diag::struct_unnamed_member);
+    }
 
   
   // Parse the body as a series of decls.
