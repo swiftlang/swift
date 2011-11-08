@@ -104,16 +104,16 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     if (isStartOfStmtOtherThanAssignment(Tok)) {
       ParseResult<Stmt> Res = parseStmtOtherThanAssignment();
       if (Res.isParseError())
-        // FIXME: Better error recovery!
         NeedParseErrorRecovery = true;
       else if (!Res.isSemaError())
         Entries.push_back(Res.get());
     } else if (isStartOfDecl(Tok, peekToken())) {
       if (parseDecl(TmpDecls, IsTopLevel))
-        skipUntilDeclStmtRBrace();
-      
-      for (Decl *D : TmpDecls)
-        Entries.push_back(D);
+        NeedParseErrorRecovery = true;
+      else {
+        for (Decl *D : TmpDecls)
+          Entries.push_back(D);
+      }
 
       TmpDecls.clear();
     } else {
@@ -126,7 +126,7 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
         SourceLoc EqualLoc = consumeToken();
         ParseResult<Expr> RHSExpr;
         if ((RHSExpr = parseExpr(diag::expected_expr_assignment))) {
-          NeedParseErrorRecovery = true;
+          NeedParseErrorRecovery = true;  // Error.
         } else if (!ResultExpr.isSemaError() && !RHSExpr.isSemaError())
           Entries.push_back(new (Context) AssignStmt(ResultExpr.get(),
                                                      EqualLoc, RHSExpr.get()));
@@ -134,19 +134,13 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
         Entries.push_back(ResultExpr.get());
       }
     }
-    
-    if (NeedParseErrorRecovery) {
-      if (Tok.is(tok::semi))
-        continue;  // Consume the ';' and keep going.
-      
-      // FIXME: QOI: Improve error recovery.
-      if (Tok.isNot(tok::r_brace))
-        skipUntil(tok::r_brace, tok::semi);
-      
-      // If we ran out of stuff to parse, exit.
-      if (Tok.is(tok::eof) || Tok.is(tok::r_brace))
-        return true;
-    }
+   
+    // If we had a parse error, skip to the start of the next stmt or decl.  It
+    // would be ideal to stop at the start of the next expression (e.g. "X = 4")
+    // but distinguishing the start of an expression from the middle of one is
+    // "hard".
+    if (NeedParseErrorRecovery)
+      skipUntilDeclStmtRBrace();
   }
 
   return false;

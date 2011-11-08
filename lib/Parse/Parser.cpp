@@ -84,6 +84,8 @@ void Parser::skipUntilDeclRBrace() {
         isStartOfDecl(Tok, peekToken()))
       return;
     
+    // FIXME: Should match nested paren/brace/bracket's.
+    
     // Otherwise, if it is a random token that we don't know about, keep
     // eating.
     consumeToken();
@@ -99,6 +101,8 @@ void Parser::skipUntilDeclStmtRBrace() {
         isStartOfDecl(Tok, peekToken()))
       return;
     
+    // FIXME: Should match nested paren/brace/bracket's.
+
     // Otherwise, if it is a random token that we don't know about, keep
     // eating.
     consumeToken();
