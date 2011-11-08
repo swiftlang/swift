@@ -57,6 +57,29 @@ static bool isFuncExpr(const Token &Tok1, const Token &Tok2) {
          Tok2.isNot(tok::l_square);
 }
 
+/// isStartOfDecl - Return true if this is the start of a decl or decl-import.
+bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
+  switch (Tok.getKind()) {
+  case tok::kw_func:
+    // "func identifier" and "func [attribute]" is a func declaration,
+    // otherwise we have a func expression.
+    if (isFuncExpr(Tok, Tok2))
+      return false;
+    // Otherwise, FALL THROUGH.
+  case tok::kw_var:
+  case tok::kw_typealias:
+  case tok::kw_oneof:
+  case tok::kw_struct:
+  case tok::kw_protocol:
+  case tok::kw_import:
+    return true;
+  default:
+    return false;
+  }
+}
+
+
+
 ///   stmt-brace-item:
 ///     decl
 ///     expr
@@ -78,75 +101,37 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     bool NeedParseErrorRecovery = false;
     
     // Parse the decl, stmt, or expression.    
-    switch (Tok.getKind()) {
-    case tok::semi:
-    case tok::l_brace:
-    case tok::kw_return:
-    case tok::kw_if:
-    case tok::kw_while: {
+    if (isStartOfStmtOtherThanAssignment(Tok)) {
       ParseResult<Stmt> Res = parseStmtOtherThanAssignment();
-      if (Res.isParseError()) {
+      if (Res.isParseError())
+        // FIXME: Better error recovery!
         NeedParseErrorRecovery = true;
-        break;
-      }
-      
-      if (!Res.isSemaError())
+      else if (!Res.isSemaError())
         Entries.push_back(Res.get());
-      break;
-    }
-    case tok::kw_func:
-      // "func identifier" and "func [attribute]" is a func declaration,
-      // otherwise we have a func expression.
-      if (isFuncExpr(Tok, peekToken()))
-        goto Expression;
-      // Otherwise, FALL THROUGH.
-    case tok::kw_var:
-    case tok::kw_typealias:
-    case tok::kw_oneof:
-    case tok::kw_struct:
-    case tok::kw_protocol:
-    case tok::kw_import: {
+    } else if (isStartOfDecl(Tok, peekToken())) {
       parseDecl(TmpDecls, IsTopLevel);
       
       for (Decl *D : TmpDecls)
         Entries.push_back(D);
 
       TmpDecls.clear();
-      break;
-    }
-    default:
-    Expression:
+    } else {
       ParseResult<Expr> ResultExpr;
       if ((ResultExpr = parseExpr(diag::expected_expr))) {
         NeedParseErrorRecovery = true;
-        break;
+      } else if (Tok.is(tok::equal)) {
+        // Check for assignment.  If we don't have it, then we just have a
+        // simple expression.
+        SourceLoc EqualLoc = consumeToken();
+        ParseResult<Expr> RHSExpr;
+        if ((RHSExpr = parseExpr(diag::expected_expr_assignment))) {
+          NeedParseErrorRecovery = true;
+        } else if (!ResultExpr.isSemaError() && !RHSExpr.isSemaError())
+          Entries.push_back(new (Context) AssignStmt(ResultExpr.get(),
+                                                     EqualLoc, RHSExpr.get()));
+      } else if (!ResultExpr.isSemaError()) {
+        Entries.push_back(ResultExpr.get());
       }
-      
-      // Check for assignment.  If we don't have it, then we just have a simple
-      // expression.
-      if (Tok.isNot(tok::equal)) {
-        if (!ResultExpr.isSemaError())
-          Entries.push_back(ResultExpr.get());
-        break;
-      }
-        
-      SourceLoc EqualLoc = consumeToken();
-      ParseResult<Expr> RHSExpr;
-      if ((RHSExpr = parseExpr(diag::expected_expr_assignment))) {
-        NeedParseErrorRecovery = true;
-        break;
-      }
-      
-      if (!ResultExpr.isSemaError() && !RHSExpr.isSemaError())
-        Entries.push_back(new (Context) AssignStmt(ResultExpr.get(),
-                                                   EqualLoc, RHSExpr.get()));
-      break;
-    }
-    
-    // FIXME: This is a hack.
-    if (!Entries.empty() && Entries.back().isNull()) {
-      Entries.pop_back();
-      NeedParseErrorRecovery = true;
     }
     
     if (NeedParseErrorRecovery) {

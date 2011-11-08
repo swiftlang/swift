@@ -237,27 +237,15 @@ void Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, bool AllowImportDecl) {
 
   // Otherwise, skip to the next decl, statement or '}'.
   while (1) {
-    // Found the start of a statement, we're done.
-    if (isStartOfStmtOtherThanAssignment(Tok))
+    // Found the start of a statement or decl, we're done.
+    if (Tok.is(tok::eof) ||
+        isStartOfStmtOtherThanAssignment(Tok) ||
+        isStartOfDecl(Tok, peekToken()))
       return;
     
-    switch (Tok.getKind()) {
-    case tok::eof:
-    case tok::r_brace:
-    case tok::kw_import:
-    case tok::kw_var:
-    case tok::kw_typealias:
-    case tok::kw_oneof:
-    case tok::kw_struct:
-    case tok::kw_protocol:
-    case tok::kw_func:
-      return;
-    default:
-      // Otherwise, if it is a random token that we don't know about, keep
-      // eating.
-      consumeToken();
-      break;
-    }
+    // Otherwise, if it is a random token that we don't know about, keep
+    // eating.
+    consumeToken();
   }
 }
 

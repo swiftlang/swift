@@ -139,7 +139,8 @@ public:
 
   //===--------------------------------------------------------------------===//
   // Decl Parsing
-  
+  static bool isStartOfDecl(const Token &Tok, const Token &Tok2);
+
   TranslationUnit *parseTranslationUnit();
   void parseDecl(SmallVectorImpl<Decl*> &Entries, bool AllowImportDecl);
   
