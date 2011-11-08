@@ -80,6 +80,8 @@ ERROR(lex_invalid_character,lexing,none,
 // Declaration parsing diagnostics
 //------------------------------------------------------------------------------
 
+ERROR(expected_decl,decl_parsing,none,
+      "expected declaration", ())
 ERROR(top_level_decl_without_type,decl_parsing,none,
       "top-level declarations require a type specifier", ())
 ERROR(expected_identifier_in_decl,decl_parsing,none,

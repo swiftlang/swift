@@ -150,13 +150,15 @@ public:
   bool parseAttribute(DeclAttributes &Attributes);
   bool parseVarName(DeclVarName &Name);
   
+  bool parseDecl(SmallVectorImpl<Decl*> &Entries, bool AllowImportDecl);
+  
   Decl *parseDeclImport();
   Decl *parseDeclOneOf();
   bool parseDeclOneOfBody(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
                           Type &Result, TypeAliasDecl *TypeName = 0);
 
-  bool parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls);
-  bool parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls);
+  bool parseDeclStruct(SmallVectorImpl<Decl*> &Decls);
+  bool parseDeclVar(SmallVectorImpl<Decl*> &Decls);
   VarDecl *parseDeclVarSimple();
   FuncDecl *parseDeclFunc(Type ThisType = Type());
   Decl *parseDeclProtocol();
@@ -166,7 +168,7 @@ public:
   void actOnVarDeclName(const DeclVarName *Name,
                         SmallVectorImpl<unsigned> &AccessPath,
                         VarDecl *VD,
-                        SmallVectorImpl<Parser::ExprStmtOrDecl> &Decls);
+                        SmallVectorImpl<Decl*> &Decls);
   
   struct OneOfElementInfo {
     SourceLoc NameLoc;

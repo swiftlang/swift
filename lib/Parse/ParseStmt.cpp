@@ -43,19 +43,13 @@ Expr *Parser::actOnCondition(Expr *Cond) {
 ///     stmt-brace
 ///     stmt-return
 ///     stmt-if
-///   decl:
-///     decl-typealias
-///     decl-var
-///     decl-func
-///     decl-func-scoped
-///     decl-oneof
-///     decl-struct
-///
 bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
                                 bool IsTopLevel) {
   // This forms a lexical scope.
   Scope BraceScope(this);
     
+  SmallVector<Decl*, 8> TmpDecls;
+  
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
     bool NeedParseErrorRecovery = false;
     
@@ -76,43 +70,30 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
         Entries.push_back(Res.get());
       break;
     }
-    case tok::kw_import:
-      if (Decl *Import = parseDeclImport()) {
-        if (!IsTopLevel) {
-          diagnose(Import->getLocStart(), diag::import_inner_scope);
-          // FIXME: Mark declaration invalid, so we can still push it.
-        } else {
-          Entries.push_back(Import);
-        }
-      }
-      break;
-
-    case tok::kw_var:
-      parseDeclVar(Entries);
-      break;
-    case tok::kw_typealias:
-      Entries.push_back(parseDeclTypeAlias());
-      break;
-    case tok::kw_oneof:
-      Entries.push_back(parseDeclOneOf());
-      break;
-    case tok::kw_struct:
-      parseDeclStruct(Entries);
-      break;
-    case tok::kw_protocol:
-      Entries.push_back(parseDeclProtocol());
-      break;
     case tok::kw_func:
       // "func identifier" and "func [attribute]" is a func declaration,
       // otherwise we have a func expression.
-      if (peekToken().is(tok::identifier) ||
-          peekToken().is(tok::oper) ||
-          peekToken().is(tok::l_square)) {
-        Entries.push_back(parseDeclFunc());
-        break;
-      }
-      // FALL THROUGH into expression case.
+      if (peekToken().isNot(tok::identifier) &&
+          peekToken().isNot(tok::oper) &&
+          peekToken().isNot(tok::l_square))
+        goto Expression;
+      // Otherwise, FALL THROUGH.
+    case tok::kw_var:
+    case tok::kw_typealias:
+    case tok::kw_oneof:
+    case tok::kw_struct:
+    case tok::kw_protocol:
+    case tok::kw_import: {
+      parseDecl(TmpDecls, IsTopLevel);
+      
+      for (Decl *D : TmpDecls)
+        Entries.push_back(D);
+
+      TmpDecls.clear();
+      break;
+    }
     default:
+    Expression:
       ParseResult<Expr> ResultExpr;
       if ((ResultExpr = parseExpr(diag::expected_expr))) {
         NeedParseErrorRecovery = true;
@@ -152,9 +133,11 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       
       // FIXME: QOI: Improve error recovery.
       if (Tok.isNot(tok::r_brace))
-        skipUntil(tok::r_brace);
-      consumeIf(tok::r_brace);
-      return true;
+        skipUntil(tok::r_brace, tok::semi);
+      
+      // If we ran out of stuff to parse, exit.
+      if (Tok.is(tok::eof) || Tok.is(tok::r_brace))
+        return true;
     }
   }
 

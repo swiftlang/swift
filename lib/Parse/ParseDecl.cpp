@@ -178,6 +178,62 @@ void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
   }
 }
 
+/// parseDecl - Parse a single syntactic declaration and return a list of decl
+/// ASTs.  This can return multiple results for var decls that bind to multiple
+/// values, structs that define a struct decl and a constructor, etc.
+///
+///   decl:
+///     decl-typealias
+///     decl-var
+///     decl-func
+///     decl-func-scoped
+///     decl-oneof
+///     decl-struct
+///     decl-import  [[Only if AllowImportDecl = true]]
+///
+bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, bool AllowImportDecl) {
+  switch (Tok.getKind()) {
+  default:
+    diagnose(Tok, diag::expected_decl);
+    return true;
+  case tok::kw_import:
+    if (Decl *Import = parseDeclImport()) {
+      if (!AllowImportDecl) {
+        diagnose(Import->getLocStart(), diag::import_inner_scope);
+        // FIXME: Mark declaration invalid, so we can still push it.
+      } else {
+        Entries.push_back(Import);
+      }
+      return false;
+    }
+    return true;
+    
+  case tok::kw_var:
+    return parseDeclVar(Entries);
+  case tok::kw_typealias:
+    Entries.push_back(parseDeclTypeAlias());
+    break;
+  case tok::kw_oneof:
+    Entries.push_back(parseDeclOneOf());
+    break;
+  case tok::kw_struct:
+    return parseDeclStruct(Entries);
+  case tok::kw_protocol:
+    Entries.push_back(parseDeclProtocol());
+    break;
+  case tok::kw_func:
+    Entries.push_back(parseDeclFunc());
+    break;
+  }
+  
+  if (Entries.back())
+    return false;
+  
+  Entries.pop_back();
+  return true;
+}
+
+
 /// parseDeclImport - Parse an 'import' declaration, returning null (and doing
 /// no token skipping) on error.
 ///
@@ -273,8 +329,7 @@ TypeAliasDecl *Parser::parseDeclTypeAlias() {
 /// match up correctly.
 void Parser::actOnVarDeclName(const DeclVarName *Name,
                               SmallVectorImpl<unsigned> &AccessPath,
-                              VarDecl *VD,
-                              SmallVectorImpl<Parser::ExprStmtOrDecl> &Decls) {
+                              VarDecl *VD, SmallVectorImpl<Decl*> &Decls) {
   if (Name->isSimple()) {
     // If this is a leaf name, create a ElementRefDecl with the specified
     // access path.
@@ -314,7 +369,7 @@ void Parser::actOnVarDeclName(const DeclVarName *Name,
 ///
 ///   decl-var:
 ///      'var' attribute-list? var-name value-specifier
-bool Parser::parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
+bool Parser::parseDeclVar(SmallVectorImpl<Decl*> &Decls) {
   SourceLoc VarLoc = consumeToken(tok::kw_var);
   
   DeclAttributes Attributes;
@@ -365,13 +420,12 @@ bool Parser::parseDeclVar(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
 ///
 VarDecl *Parser::parseDeclVarSimple() {
   SourceLoc CurLoc = Tok.getLoc();
-  SmallVector<ExprStmtOrDecl, 2> Decls;
+  SmallVector<Decl*, 2> Decls;
   if (parseDeclVar(Decls)) return 0;
   
-  if (Decls.size() == 1 && Decls[0].is<Decl*>())
-    if (Decl *D = Decls[0].get<Decl*>())
-      if (VarDecl *VD = dyn_cast<VarDecl>(D))
-        return VD;
+  if (Decls.size() == 1)
+    if (VarDecl *VD = dyn_cast_or_null<VarDecl>(Decls[0]))
+      return VD;
   
   // FIXME: "here" requires a lot more context.
   diagnose(CurLoc, diag::non_simple_var);
@@ -628,7 +682,7 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
 ///   decl-struct-member:
 ///      decl-func
 ///
-bool Parser::parseDeclStruct(SmallVectorImpl<ExprStmtOrDecl> &Decls) {
+bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   SourceLoc StructLoc = consumeToken(tok::kw_struct);
   
   DeclAttributes Attributes;

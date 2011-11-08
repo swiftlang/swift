@@ -287,7 +287,6 @@
   <!-- ********************************************************************* -->
   
   <pre class="grammar">
-    decl ::= <a href="#decl-import">decl-import</a>
     decl ::= <a href="#decl-var">decl-var</a>
     decl ::= <a href="#decl-func">decl-func</a>
     decl ::= <a href="#decl-func">decl-func-scoped</a>
@@ -296,7 +295,27 @@
     decl ::= <a href="#decl-struct">decl-struct</a>
     decl ::= <a href="#decl-protocol">decl-protocol</a>
   </pre>
+
+  In addition to these declarations, there is also <a 
+  href="#decl-import">decl-import</a> which is only valid at the top level of a
+  translation unit.
+
+  <!-- ===================================================================== -->
+  <h3 id="decl-translation-unit">Translation Unit</h3>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    decl-expr-stmt ::= <a href="#decl">decl</a>
+    decl-expr-stmt ::= <a href="#expr">expr</a>
+    decl-expr-stmt ::= <a href="#stmt">stmt</a>
+    
+    translation-unit ::= (<a href="#stmt-brace">decl-expr-stmt</a> | <a href="#decl-import">decl-import</a>)*
+  </pre>
   
+  <p>The top level of a swift source file is grammatically identical to the
+  contents of a <a href="#stmt-brace">brace statement</a>, except that it also
+  allows <a href="#decl-import">imports</a>.
+  </p>
   
   <!-- ===================================================================== -->
   <h3 id="decl-import">import Declarations</h3>
@@ -522,8 +541,8 @@
   </div>
   
   <pre class="grammar">
-    decl-oneof ::= 'oneof' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> oneof-body
-    oneof-body         ::= '{' oneof-element (',' oneof-element)* '}'
+    decl-oneof ::= 'oneof' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> '{' oneof-body '}'
+    oneof-body         ::= (oneof-element (',' oneof-element)*)? decl-struct-member*
     
     oneof-element      ::= <a href="#identifier">identifier</a>
     oneof-element      ::= <a href="#identifier">identifier</a> ':' <a href="#type">type</a>
@@ -589,7 +608,7 @@
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-struct ::= 'struct' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> { decl-struct-body }
+    decl-struct ::= 'struct' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> '{' decl-struct-body '}'
     decl-struct-body ::= <a href="#type-tuple">type-tuple-body</a>? decl-struct-member*
     decl-struct-member ::= <a href="#decl-func">decl-func</a>
     decl-struct-member ::= <a href="#decl-typealias">decl-typealias</a>
@@ -1477,17 +1496,11 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    stmt-brace      ::= '{' stmt-brace-item* '}'
-    stmt-brace-item ::= <a href="#decl">decl</a>
-    stmt-brace-item ::= <a href="#expr">expr</a>
-    stmt-brace-item ::= <a href="#stmt">stmt</a>
-    
-    translation-unit ::= <a href="#stmt-brace">stmt-brace-item</a>*
+    stmt-brace      ::= '{' <a href="#decl-translation-unit">decl-expr-stmt</a>* '}'
   </pre>
   
   <p>The brace statement provides a sequencing operation which evaluates the
-     members of its body in order.  The top level of a swift source file is
-     grammatically identical to a brace statement without the braces.
+     members of its body in order.
   </p>
 
   <!-- ===================================================================== -->
