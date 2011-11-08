@@ -228,6 +228,7 @@
 
   <pre class="grammar">
     keyword ::= 'import'
+    keyword ::= 'extension'
     keyword ::= 'oneof'
     keyword ::= 'struct'
     keyword ::= 'var'
@@ -287,6 +288,7 @@
   <!-- ********************************************************************* -->
   
   <pre class="grammar">
+    decl ::= <a href="#decl-extension">decl-extension</a>
     decl ::= <a href="#decl-var">decl-var</a>
     decl ::= <a href="#decl-func">decl-func</a>
     decl ::= <a href="#decl-func">decl-func-scoped</a>
@@ -352,6 +354,31 @@
     import swift.io.bufferedstream
   </pre>
 
+  <!-- ===================================================================== -->
+  <h3 id="decl-extension">extension Declarations</h3>
+  <!-- ===================================================================== -->
+  
+  <div class="commentary">
+    Eventually allow extending classes, even adding data members.
+  </div>
+
+  <pre class="grammar">
+    decl-extension ::= 'extension' <a href="#type-identifier">type-identifier</a> '{' <a href="#decl">decl</a>* '}'
+  </pre>
+
+  <p>'extension' declarations allow adding member declarations to existing
+     types, even in other translation units and ownership domains.  'extension's
+     may be declared on the following kinds of declarations:
+  </p>
+  
+  <!-- _____________________________________________________________________ -->
+  <h4 id="decl-extension-oneof-struct"><a href="#decl-oneof">oneof</a> and <a
+    href="#decl-struct">struct</a> declarations</h4>
+
+  <p>'<a href="#decl-var">var</a>' decls are not allowed in a oneof or struct,
+  data members should be used instead.</p>
+  
+  
   <!-- ===================================================================== -->
   <h3 id="decl-var">var Declarations</h3>
   <!-- ===================================================================== -->
@@ -554,9 +581,11 @@
     see <a href="#type-oneof">oneof types</a> for more information about their
     capabilities.</p>
   
-  <p>A 'oneof' can include a list of decls after its member types.  '<a 
-    href="#decl-var">var</a>' decls are not allowed in a oneof, data members
-  should be used instead.</p>  
+  <p>A 'oneof' may include a list of decls after its member types, which is
+     syntactic sugar for defining an <a href="#decl-extension">extension</a> of
+     the type.  The limitations of an <a 
+        href="#decl-extension-oneof-struct">oneof extensions</a> apply here as
+     well.</p>  
 
   <p>Here are some examples of oneof declarations:</p>
   
@@ -623,9 +652,11 @@
   constructor value of the same name as the struct.  Unlike tuple elements, all
   members of the struct must be named.</p>
 
-  <p>A struct may include a list of decls after its member types.  '<a 
-  href="#decl-var">var</a>' decls are not allowed in a struct, data members
-  should be used instead.</p>  
+  <p>A 'struct' may include a list of decls after its member types, which is
+     syntactic sugar for defining an <a href="#decl-extension">extension</a> of
+     the type.  The limitations of an <a 
+        href="#decl-extension-oneof-struct">struct extensions</a> apply here as
+     well.</p>  
 
   <p>Note that unlike <a href="#decl-oneof">oneof</a>, 'struct' <em>does</em>
   inject its single constructor value into the containing scope. This means that
@@ -653,8 +684,9 @@
     }
   </pre>
   
-  Likewise, <a href="#decl-func">func</a>'s declared in the struct are
-  equivalent to declaring an extension containing the func's.
+  Likewise, a <a href="#decl-func">func</a> declared in the struct are
+  equivalent to declaring an <a href="#decl-extension">extension</a> containing
+  the func.
   
   <pre class="example">
     struct S4a {
