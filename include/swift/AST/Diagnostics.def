@@ -133,6 +133,8 @@ ERROR(expected_struct_member,decl_parsing,none,
       "expected a function or variable declaration in protocol", ())
 ERROR(struct_unnamed_member,decl_parsing,none,
       "unnamed members invalid in structs", ())
+ERROR(var_decl_in_struct,decl_parsing,none,
+      "'var' declarations not allowed in structs, use data members instead", ())
 
 // Protocol
 

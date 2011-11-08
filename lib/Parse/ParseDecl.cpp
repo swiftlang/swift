@@ -676,11 +676,7 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
 /// with a single element.
 ///
 ///   decl-struct:
-///      'struct' attribute-list identifier { decl-struct-body }
-///   decl-struct-body:
-///      type-tuple-body? decl-struct-member*
-///   decl-struct-member:
-///      decl-func
+///      'struct' attribute-list identifier { type-tuple-body? decl* }
 ///
 bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   SourceLoc StructLoc = consumeToken(tok::kw_struct);
@@ -720,36 +716,28 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   
   // Parse the body as a series of decls.
   SmallVector<Decl*, 8> MemberDecls;
-  do {
-    switch (Tok.getKind()) {
-    default:
-      diagnose(Tok, diag::expected_struct_member);
-      return true;
-    case tok::r_brace:  // End of struct body.
-      break;
+  unsigned LastVerified = 0;
+  while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
+    // FIXME: Need error recovery in parseDecl.
+    parseDecl(MemberDecls, false /*No Import*/);
+    
+    // Verify any parsed decls.
+    while (LastVerified != MemberDecls.size()) {
+      Decl *D = MemberDecls[LastVerified++];
       
-    case tok::kw_func: {
-      FuncDecl *FD = parseDeclFunc(StructTy);
-      if (FD == 0) return true;
-      
-      if (FD->Name.isOperator()) {
+      // Reject vardecls in structs.
+      if (isa<VarDecl>(D)) {
         // FIXME: Mark decl erroneous.
-        diagnose(FD->getLocStart(), diag::operator_in_decl, "struct");
+        diagnose(D->getLocStart(), diag::var_decl_in_struct);
+      } else if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
+        if (FD->Name.isOperator()) {
+          // FIXME: Mark decl erroneous.
+          diagnose(FD->getLocStart(), diag::operator_in_decl, "struct");
+        }
       }
-      
-      MemberDecls.push_back(FD);
-      break;
     }
-        
-    case tok::kw_typealias:
-      if (TypeAliasDecl *TAD = parseDeclTypeAlias())
-        MemberDecls.push_back(TAD);
-      else
-        return true;
-      break;
-    }
-  } while (Tok.isNot(tok::r_brace));
-
+  }
+  
   // FIXME: add helper for matching punctuation.
   if (parseToken(tok::r_brace, diag::expected_rbrace_struct)) {
     diagnose(LBLoc, diag::opening_brace);
