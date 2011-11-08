@@ -182,6 +182,8 @@ void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
 /// ASTs.  This can return multiple results for var decls that bind to multiple
 /// values, structs that define a struct decl and a constructor, etc.
 ///
+/// Note that this method does error recovery, so it returns void.
+///
 ///   decl:
 ///     decl-typealias
 ///     decl-var
@@ -191,25 +193,21 @@ void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
 ///     decl-struct
 ///     decl-import  [[Only if AllowImportDecl = true]]
 ///
-bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, bool AllowImportDecl) {
+void Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, bool AllowImportDecl) {
+  bool HadParseError = false;
   switch (Tok.getKind()) {
   default:
     diagnose(Tok, diag::expected_decl);
-    return true;
+    HadParseError = true;
+    break;
   case tok::kw_import:
-    if (Decl *Import = parseDeclImport()) {
-      if (!AllowImportDecl) {
-        diagnose(Import->getLocStart(), diag::import_inner_scope);
-        // FIXME: Mark declaration invalid, so we can still push it.
-      } else {
-        Entries.push_back(Import);
-      }
-      return false;
-    }
-    return true;
-    
+    Entries.push_back(parseDeclImport());
+    if (Entries.back() && !AllowImportDecl)
+      diagnose(Entries.back()->getLocStart(), diag::import_inner_scope);
+    break;
   case tok::kw_var:
-    return parseDeclVar(Entries);
+    HadParseError = parseDeclVar(Entries);
+    break;
   case tok::kw_typealias:
     Entries.push_back(parseDeclTypeAlias());
     break;
@@ -217,7 +215,8 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, bool AllowImportDecl) {
     Entries.push_back(parseDeclOneOf());
     break;
   case tok::kw_struct:
-    return parseDeclStruct(Entries);
+    HadParseError = parseDeclStruct(Entries);
+    break;
   case tok::kw_protocol:
     Entries.push_back(parseDeclProtocol());
     break;
@@ -226,11 +225,40 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, bool AllowImportDecl) {
     break;
   }
   
-  if (Entries.back())
-    return false;
-  
-  Entries.pop_back();
-  return true;
+  // If we got back a null pointer, then a parse error happened.
+  if (Entries.back() == 0) {
+    Entries.pop_back();
+    HadParseError = true;
+  }
+
+  // If no parse errors occurred, return success.
+  if (!HadParseError)
+    return;
+
+  // Otherwise, skip to the next decl, statement or '}'.
+  while (1) {
+    // Found the start of a statement, we're done.
+    if (isStartOfStmtOtherThanAssignment(Tok))
+      return;
+    
+    switch (Tok.getKind()) {
+    case tok::eof:
+    case tok::r_brace:
+    case tok::kw_import:
+    case tok::kw_var:
+    case tok::kw_typealias:
+    case tok::kw_oneof:
+    case tok::kw_struct:
+    case tok::kw_protocol:
+    case tok::kw_func:
+      return;
+    default:
+      // Otherwise, if it is a random token that we don't know about, keep
+      // eating.
+      consumeToken();
+      break;
+    }
+  }
 }
 
 
@@ -718,7 +746,6 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   SmallVector<Decl*, 8> MemberDecls;
   unsigned LastVerified = 0;
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-    // FIXME: Need error recovery in parseDecl.
     parseDecl(MemberDecls, false /*No Import*/);
     
     // Verify any parsed decls.

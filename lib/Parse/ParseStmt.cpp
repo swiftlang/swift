@@ -32,6 +32,20 @@ Expr *Parser::actOnCondition(Expr *Cond) {
   return new (Context) CallExpr(C2LVFunc, Cond, TypeJudgement());
 }
 
+/// isStartOfStmtOtherThanAssignment - Return true if the specified token starts
+/// a statement (other than assignment, which starts looking like an expr).
+bool Parser::isStartOfStmtOtherThanAssignment(const Token &Tok) {
+  switch (Tok.getKind()) {
+  default: return false;
+  case tok::semi:
+  case tok::l_brace:
+  case tok::kw_return:
+  case tok::kw_if:
+  case tok::kw_while:
+    return true;
+  }
+}
+
 
 ///   stmt-brace-item:
 ///     decl

@@ -141,6 +141,8 @@ public:
   // Decl Parsing
   
   TranslationUnit *parseTranslationUnit();
+  void parseDecl(SmallVectorImpl<Decl*> &Entries, bool AllowImportDecl);
+  
   TypeAliasDecl *parseDeclTypeAlias();
   void parseAttributeList(DeclAttributes &Attributes) {
     if (Tok.is(tok::l_square))
@@ -149,8 +151,6 @@ public:
   void parseAttributeListPresent(DeclAttributes &Attributes);
   bool parseAttribute(DeclAttributes &Attributes);
   bool parseVarName(DeclVarName &Name);
-  
-  bool parseDecl(SmallVectorImpl<Decl*> &Entries, bool AllowImportDecl);
   
   Decl *parseDeclImport();
   Decl *parseDeclOneOf();
@@ -207,7 +207,10 @@ public:
   Expr *actOnIdentifierExpr(Identifier Text, SourceLoc Loc);
   FuncExpr *actOnFuncExprStart(SourceLoc FuncLoc, Type FuncTy);
 
+  //===--------------------------------------------------------------------===//
   // Statement Parsing
+  
+  static bool isStartOfStmtOtherThanAssignment(const Token &Tok);
   ParseResult<Stmt> parseStmtOtherThanAssignment();
   ParseResult<BraceStmt> parseStmtBrace(Diag<> ID);
   ParseResult<Stmt> parseStmtReturn();
