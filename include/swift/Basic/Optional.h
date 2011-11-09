@@ -123,7 +123,9 @@ namespace swift {
     explicit operator bool() const { return HasValue; }
     
     const T* operator->() const { return getPointer(); }
+          T* operator->()       { return getPointer(); }
     const T& operator*() const { return getValue(); }
+          T& operator*()       { return getValue(); }
   };
 }
 
