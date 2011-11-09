@@ -468,8 +468,10 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     return E;
   }
 
-  
-  TC.diagnose(E->getDotLoc(), diag::no_valid_dot_expression, SubExprTy);
+  // FIXME: This diagnostic is a bit painful. Plus, fix the source range when
+  // expressions actually have source ranges.
+  TC.diagnose(E->getNameLoc(), diag::no_valid_dot_expression, SubExprTy)
+    << SourceRange(E->getBase()->getStartLoc(), E->getDotLoc());
   return 0;
 }
 

@@ -38,8 +38,8 @@ Lexer::Lexer(unsigned BufferID, ASTContext &context)
   lexImpl();
 }
 
-void Lexer::diagnose(const char *Loc, Diag<> ID) {
-  Context.Diags.diagnose(getSourceLoc(Loc), ID);
+InFlightDiagnostic Lexer::diagnose(const char *Loc, Diag<> ID) {
+  return Context.Diags.diagnose(getSourceLoc(Loc), ID);
 }
 
 void Lexer::formToken(tok Kind, const char *TokStart) {

@@ -232,8 +232,17 @@ void DiagnosticEngine::flushActiveDiagnostic() {
   llvm::SmallString<256> Text;
   formatDiagnosticText(Info.Text, ActiveDiagnostic->getArgs(), Text);
   
+  // Translate ranges.
+  SmallVector<llvm::SMRange, 2> Ranges;
+  for (SourceRange R : ActiveDiagnostic->getRanges()) {
+    // FIXME: Actually use the lexer to find the end of the current
+    // token.
+    Ranges.push_back(llvm::SMRange(R.Start.Value, R.End.Value));
+  }
+  
   // Display the diagnostic.
-  SourceMgr.PrintMessage(ActiveDiagnosticLoc.Value, Kind, StringRef(Text));
+  SourceMgr.PrintMessage(ActiveDiagnosticLoc.Value, Kind, StringRef(Text),
+                         Ranges);
   
   // Reset the active diagnostic.
   ActiveDiagnostic.reset();

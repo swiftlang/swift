@@ -51,8 +51,8 @@ namespace {
     }
     
     template<typename ...ArgTypes>
-    void diagnose(ArgTypes... Args) {
-      Context.Diags.diagnose(Args...);
+    InFlightDiagnostic diagnose(ArgTypes... Args) {
+      return Context.Diags.diagnose(Args...);
     }
     
     void addImport(ImportDecl *ID, SmallVectorImpl<ImportedModule> &Result);
@@ -256,7 +256,8 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
     if (OneOfType *Ty = Scope.dyn_cast<OneOfType*>()) {
       OneOfElementDecl *Elt = Ty->getElement(Name);
       if (Elt == 0) {
-        Binder.diagnose(Loc, diag::invalid_member, Name, BaseName);
+        Binder.diagnose(Loc, diag::invalid_member, Name, BaseName)
+          << SourceRange(USIE->getBaseNameLoc(), USIE->getBaseNameLoc());
         return 0;
       }
       Decls.push_back(Elt);

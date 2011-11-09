@@ -156,6 +156,7 @@ namespace swift {
   class Diagnostic {
     DiagID ID;
     SmallVector<DiagnosticArgument, 3> Args;
+    SmallVector<SourceRange, 2> Ranges;
     
   public:
     // All constructors are intentionally implicit.
@@ -175,6 +176,12 @@ namespace swift {
     // Accessors.
     DiagID getID() const { return ID; }
     ArrayRef<DiagnosticArgument> getArgs() const { return Args; }
+    ArrayRef<SourceRange> getRanges() const { return Ranges; }
+    
+    Diagnostic &operator<<(SourceRange R) {
+      Ranges.push_back(R);
+      return *this;
+    }
   };
   
   /// \brief Describes an in-flight diagnostic, which is currently active
@@ -215,6 +222,9 @@ namespace swift {
     
     /// \brief Flush the active diagnostic to the diagnostic output engine.
     void flush();
+    
+    /// \brief Add a source range to the currently-active diagnostic.
+    InFlightDiagnostic &operator<<(SourceRange R);
   };
     
   /// \brief Class responsible for formatting diagnostics and presenting them
@@ -304,7 +314,17 @@ namespace swift {
   private:
     /// \brief Flush the active diagnostic.
     void flushActiveDiagnostic();
+    
+    /// \brief Retrieve the active diagnostic.
+    Diagnostic &getActiveDiagnostic() { return *ActiveDiagnostic; }
   };
+  
+  inline InFlightDiagnostic &InFlightDiagnostic::operator<<(SourceRange R) {
+    assert(IsActive && "Cannot modify an inactive diagnostic");
+    Engine.getActiveDiagnostic() << R;
+    return *this;
+  }
+
 } // end namespace swift
 
 #endif
