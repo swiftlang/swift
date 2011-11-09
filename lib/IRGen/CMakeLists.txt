@@ -1,4 +1,6 @@
 add_swift_library(swiftIRGen
+  Cleanup.h
+  Condition.h
   GenArray.cpp
   GenControl.cpp
   GenExpr.cpp
@@ -9,8 +11,15 @@ add_swift_library(swiftIRGen
   GenStmt.cpp
   GenTuple.cpp
   GenType.cpp
+  GenType.h
   IRGen.cpp
+  IRGen.h
   IRGenFunction.cpp
+  IRGenFunction.h
   IRGenModule.cpp
+  IRGenModule.h
+  JumpDest.h
+  LValue.h
   Mangle.cpp
+  RValue.h
   DEPENDS swiftAST)
