@@ -187,20 +187,27 @@ namespace swift {
   class InFlightDiagnostic {
     friend class DiagnosticEngine;
     
-    DiagnosticEngine &Engine;
+    DiagnosticEngine *Engine;
     bool IsActive;
     
     /// \brief Create a new in-flight diagnostic. 
     ///
     /// This constructor is only available to the DiagnosticEngine.
     InFlightDiagnostic(DiagnosticEngine &Engine)
-      : Engine(Engine), IsActive(true) { }
+      : Engine(&Engine), IsActive(true) { }
     
     InFlightDiagnostic(const InFlightDiagnostic &) = delete;
     InFlightDiagnostic &operator=(const InFlightDiagnostic &) = delete;
     InFlightDiagnostic &operator=(InFlightDiagnostic &&) = delete;
 
   public:
+    /// \brief Create an active but unattached in-flight diagnostic.
+    /// 
+    /// The resulting diagnostic can be used as a dummy, accepting the
+    /// syntax to add additional information to a diagnostic without
+    /// actually emitting a diagnostic.
+    InFlightDiagnostic() : Engine(0), IsActive(true) { }
+    
     /// \brief Transfer an in-flight diagnostic to a new object, which is
     /// typically used when returning in-flight diagnostics.
     InFlightDiagnostic(InFlightDiagnostic &&Other)
@@ -320,7 +327,8 @@ namespace swift {
   
   inline InFlightDiagnostic &InFlightDiagnostic::operator<<(SourceRange R) {
     assert(IsActive && "Cannot modify an inactive diagnostic");
-    Engine.getActiveDiagnostic() << R;
+    if (Engine)
+      Engine->getActiveDiagnostic() << R;
     return *this;
   }
 

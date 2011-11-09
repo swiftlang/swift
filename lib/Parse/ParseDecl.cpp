@@ -17,6 +17,8 @@
 #include "swift/Parse/Lexer.h"
 #include "Parser.h"
 #include "swift/AST/Diagnostics.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/PathV2.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/Twine.h"
@@ -31,8 +33,11 @@ TranslationUnit *Parser::parseTranslationUnit() {
   consumeToken();
   SourceLoc FileStartLoc = Tok.getLoc();
 
+  StringRef ModuleName
+    = llvm::sys::path::stem(Buffer->getBufferIdentifier());
   TranslationUnit *TU =
-    new (Context) TranslationUnit(L.getModuleName(), Context);
+    new (Context) TranslationUnit(Context.getIdentifier(ModuleName),
+                                  Context);
   CurDeclContext = TU;
   
   // Parse the body of the file.

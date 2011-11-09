@@ -24,6 +24,7 @@
 #include "swift/AST/Diagnostics.h"
 
 namespace llvm {
+  class MemoryBuffer;
   class SourceMgr;
   template <typename PT1, typename PT2, typename PT3> class PointerUnion3;
 }
@@ -41,10 +42,12 @@ class Parser {
 public:
   llvm::SourceMgr &SourceMgr;
   DiagnosticEngine &Diags;
+  const llvm::MemoryBuffer *Buffer;
   Lexer &L;
   DeclContext *CurDeclContext;
   ASTContext &Context;
   ScopeInfo ScopeInfo;
+
   
   /// Tok - This is the current token being considered by the parser.
   Token Tok;

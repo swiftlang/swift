@@ -19,6 +19,7 @@
 #include "swift/AST/Diagnostics.h"
 #include "Parser.h"
 #include "swift/Parse/Lexer.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
@@ -39,7 +40,8 @@ TranslationUnit *swift::parseTranslationUnit(unsigned BufferID,
 Parser::Parser(unsigned BufferID, ASTContext &Context)
   : SourceMgr(Context.SourceMgr),
     Diags(Context.Diags),
-    L(*new Lexer(BufferID, Context)),
+    Buffer(SourceMgr.getMemoryBuffer(BufferID)),
+    L(*new Lexer(Buffer->getBuffer(), SourceMgr, &Diags)),
     Context(Context),
     ScopeInfo(*this) {
 }

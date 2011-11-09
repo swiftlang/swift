@@ -48,7 +48,8 @@ void InFlightDiagnostic::flush() {
     return;
   
   IsActive = false;
-  Engine.flushActiveDiagnostic();
+  if (Engine)
+    Engine->flushActiveDiagnostic();
 }
 
 /// \brief Skip forward to one of the given delimiters.

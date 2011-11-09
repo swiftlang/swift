@@ -19,7 +19,6 @@
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/Identifier.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/PathV2.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
@@ -29,17 +28,24 @@ using namespace swift;
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
-Lexer::Lexer(unsigned BufferID, ASTContext &context)
-  : SourceMgr(context.SourceMgr), Context(context) {
-  Buffer = SourceMgr.getMemoryBuffer(BufferID);
-  CurPtr = Buffer->getBufferStart();
+Lexer::Lexer(StringRef Buffer, llvm::SourceMgr &SourceMgr,
+             DiagnosticEngine *Diags, const char *CurrentPosition)
+  : SourceMgr(SourceMgr), Diags(Diags) {
+  BufferStart = Buffer.begin();
+  BufferEnd = Buffer.end();
+  CurPtr = CurrentPosition;
+  assert(CurPtr >= BufferStart && CurPtr <= BufferEnd &&
+         "Current position is out-of-range");
     
   // Prime the lexer.
   lexImpl();
 }
 
 InFlightDiagnostic Lexer::diagnose(const char *Loc, Diag<> ID) {
-  return Context.Diags.diagnose(getSourceLoc(Loc), ID);
+  if (Diags)
+    Diags->diagnose(getSourceLoc(Loc), ID);
+  
+  return InFlightDiagnostic();
 }
 
 void Lexer::formToken(tok Kind, const char *TokStart) {
@@ -63,7 +69,7 @@ void Lexer::skipSlashSlashComment() {
     case 0:
       // If this is a random nul character in the middle of a buffer, skip it as
       // whitespace.
-      if (CurPtr-1 != Buffer->getBufferEnd()) {
+      if (CurPtr-1 != BufferEnd) {
         diagnose(CurPtr-1, diag::lex_nul_character);
         break;
       }
@@ -107,7 +113,7 @@ void Lexer::skipSlashStarComment() {
     case 0:
       // If this is a random nul character in the middle of a buffer, skip it as
       // whitespace.
-      if (CurPtr-1 != Buffer->getBufferEnd()) {
+      if (CurPtr-1 != BufferEnd) {
         diagnose(CurPtr-1, diag::lex_nul_character);
         break;
       }
@@ -212,8 +218,8 @@ void Lexer::lexNumber() {
 //===----------------------------------------------------------------------===//
 
 void Lexer::lexImpl() {
-  assert(CurPtr >= Buffer->getBufferStart() &&
-         CurPtr <= Buffer->getBufferEnd() && "Cur Char Pointer out of range!");
+  assert(CurPtr >= BufferStart &&
+         CurPtr <= BufferEnd && "Cur Char Pointer out of range!");
   
 Restart:
   // Remember the start of the token so we can form the text range.
@@ -232,7 +238,7 @@ Restart:
   case 0:
     // If this is a random nul character in the middle of a buffer, skip it as
     // whitespace.
-    if (CurPtr-1 != Buffer->getBufferEnd()) {
+    if (CurPtr-1 != BufferEnd) {
       diagnose(CurPtr-1, diag::lex_nul_character);
       goto Restart;
     }
@@ -247,7 +253,7 @@ Restart:
 
     // For these purposes, the start of the file is considered to be
     // preceeded by infinite whitespace.
-    if (CurPtr - 1 == Buffer->getBufferStart()) {
+    if (CurPtr - 1 == BufferStart) {
       PrecededBySpace = true;
 
     // Otherwise, our list of whitespace characters is pretty short.
@@ -327,9 +333,4 @@ Restart:
   case '5': case '6': case '7': case '8': case '9':
     return lexNumber();
   }
-}
-
-Identifier Lexer::getModuleName() const {
-  StringRef Stem = llvm::sys::path::stem(Buffer->getBufferIdentifier());
-  return Context.getIdentifier(Stem);
 }

@@ -20,13 +20,11 @@
 #include "Token.h"
 
 namespace llvm {
-  class MemoryBuffer;
   class SourceMgr;
 }
 
 namespace swift {
-  class Token;
-  class ASTContext;
+  class DiagnosticEngine;
   class Identifier;
   class InFlightDiagnostic;
   
@@ -34,17 +32,25 @@ namespace swift {
 
 class Lexer {
   llvm::SourceMgr &SourceMgr;
-  const llvm::MemoryBuffer *Buffer;
+  DiagnosticEngine *Diags;
+  
+  const char *BufferStart;
+  const char *BufferEnd;
   const char *CurPtr;
-  ASTContext &Context;
 
   Token NextToken;
   
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
 public:
-  Lexer(unsigned BufferID, ASTContext &Context);
-  
+  Lexer(llvm::StringRef Buffer, llvm::SourceMgr &SourceMgr,
+        DiagnosticEngine *Diags)
+    : Lexer(Buffer, SourceMgr, Diags, Buffer.begin()) { }
+
+  Lexer(llvm::StringRef Buffer, llvm::SourceMgr &SourceMgr,
+        DiagnosticEngine *Diags, 
+        const char *CurrentPosition);
+
   void lex(Token &Result) {
     Result = NextToken;
     if (Result.isNot(tok::eof))
@@ -55,8 +61,6 @@ public:
   /// actually lexing it.
   const Token &peekNextToken() const { return NextToken; }
 
-  Identifier getModuleName() const;
-  
 private:
   static SourceLoc getSourceLoc(const char *Loc) {
     return SourceLoc(llvm::SMLoc::getFromPointer(Loc));
