@@ -156,14 +156,12 @@ namespace swift {
     SmallVector<DiagnosticArgument, 3> Args;
   public:
     // All constructors are intentionally implicit.
-    Diagnostic(Diag<> ID) : ID(ID.ID) {}
-        
     template<typename ...ArgTypes>
     Diagnostic(Diag<ArgTypes...> ID,
                typename detail::PassArgument<ArgTypes>::type... VArgs)
       : ID(ID.ID) {
-      DiagnosticArgument DiagArgs[] = { VArgs... };
-      Args.append(DiagArgs, DiagArgs+sizeof(DiagArgs)/sizeof(DiagArgs[0]));
+      DiagnosticArgument DiagArgs[] = { DiagnosticArgument(0), VArgs... };
+        Args.append(DiagArgs + 1, DiagArgs + 1 + sizeof...(VArgs));
     }
 
     /*implicit*/Diagnostic(DiagID ID, ArrayRef<DiagnosticArgument> Args)
@@ -209,16 +207,6 @@ namespace swift {
       diagnose(Loc, D.getID(), D.getArgs());
     }
     
-    /// \brief Emit a diagnostic with no arguments.
-    ///
-    /// \param Loc The location to which the diagnostic refers in the source
-    /// code.
-    ///
-    /// \param ID The diagnostic to be emitted.
-    void diagnose(SourceLoc Loc, Diag<> ID) {
-      diagnose(Loc, ID.ID, ArrayRef<DiagnosticArgument>());
-    }    
-
     /// \brief Emit a diagnostic with the given set of diagnostic arguments.
     ///
     /// \param Loc The location to which the diagnostic refers in the source
@@ -231,9 +219,9 @@ namespace swift {
     template<typename ...ArgTypes>
     void diagnose(SourceLoc Loc, Diag<ArgTypes...> ID,
                   typename detail::PassArgument<ArgTypes>::type... Args) {
-      DiagnosticArgument DiagArgs[] = { Args... };
+      DiagnosticArgument DiagArgs[] = { DiagnosticArgument(0),  Args... };
       diagnose(Loc, ID.ID, 
-               ArrayRef<DiagnosticArgument>(DiagArgs, sizeof...(Args)));
+               ArrayRef<DiagnosticArgument>(DiagArgs + 1, sizeof...(Args)));
     }    
   };
 } // end namespace swift
