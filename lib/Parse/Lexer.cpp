@@ -334,3 +334,23 @@ Restart:
     return lexNumber();
   }
 }
+
+SourceLoc Lexer::getLocForEndOfToken(llvm::SourceMgr &SM, SourceLoc Loc) {
+  // Don't try to do anything with an invalid location.
+  if (!Loc.isValid())
+    return Loc;
+
+  // Figure out which buffer contains this location.
+  int BufferID = SM.FindBufferContainingLoc(Loc.Value);
+  if (BufferID < 0)
+    return SourceLoc();
+  
+  const llvm::MemoryBuffer *Buffer = SM.getMemoryBuffer(BufferID);
+  if (!Buffer)
+    return SourceLoc();
+  
+  Lexer L(Buffer->getBuffer(), SM, 0, Loc.Value.getPointer());
+  unsigned Length = L.peekNextToken().getLength();
+  return Loc.getAdvancedLoc(Length);
+}
+

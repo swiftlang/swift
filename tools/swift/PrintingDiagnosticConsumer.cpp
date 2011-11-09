@@ -16,6 +16,7 @@
 
 #include "PrintingDiagnosticConsumer.h"
 #include "swift/AST/LLVM.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/SourceMgr.h"
@@ -45,9 +46,8 @@ PrintingDiagnosticConsumer::handleDiagnostic(llvm::SourceMgr &SM, SourceLoc Loc,
   // Translate ranges.
   SmallVector<llvm::SMRange, 2> Ranges;
   for (SourceRange R : Info.Ranges) {
-    // FIXME: Use the lexer to adjust the end location to the end of the
-    // token.
-    Ranges.push_back(llvm::SMRange(R.Start.Value, R.End.Value));
+    SourceLoc End = Lexer::getLocForEndOfToken(SM, R.End);
+    Ranges.push_back(llvm::SMRange(R.Start.Value, End.Value));
   }
   
   // Display the diagnostic.

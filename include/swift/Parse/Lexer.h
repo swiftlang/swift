@@ -61,6 +61,15 @@ public:
   /// actually lexing it.
   const Token &peekNextToken() const { return NextToken; }
 
+  /// \brief Retrieve the source location that points just past the
+  /// end of the token refered to by \c Loc.
+  ///
+  /// \param SM The source manager in which the given source location
+  /// resides.
+  ///
+  /// \param Loc The source location of the beginning of a token.
+  static SourceLoc getLocForEndOfToken(llvm::SourceMgr &SM, SourceLoc Loc);
+  
 private:
   static SourceLoc getSourceLoc(const char *Loc) {
     return SourceLoc(llvm::SMLoc::getFromPointer(Loc));
