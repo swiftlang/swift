@@ -9,5 +9,6 @@ add_swift_library(swiftAST
   Module.cpp
   Stmt.cpp
   Type.cpp
-  Verifier.cpp)
+  Verifier.cpp
+  DEPENDS swiftBasic)
 

@@ -22,7 +22,7 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
-struct DiagnosticInfo {
+struct StoredDiagnosticInfo {
   /// \brief The kind of diagnostic we're dealing with.
   DiagnosticKind Kind;
   
@@ -32,7 +32,7 @@ struct DiagnosticInfo {
   const char *Text;
 };
 
-static DiagnosticInfo DiagnosticInfos[] = {
+static StoredDiagnosticInfo StoredDiagnosticInfos[] = {
 #define ERROR(ID,Category,Options,Text,Signature) \
   { DiagnosticKind::Error, Text },
 #define WARNING(ID,Category,Options,Text,Signature) \
@@ -214,35 +214,29 @@ static void formatDiagnosticText(StringRef InText,
                              
 void DiagnosticEngine::flushActiveDiagnostic() {
   assert(ActiveDiagnostic && "No active diagnostic to flush");
-  const DiagnosticInfo &Info
-    = DiagnosticInfos[(unsigned)ActiveDiagnostic->getID()];
-  
-  // Determine what kind of diagnostic we're emitting.
-  llvm::SourceMgr::DiagKind Kind;
-  switch (Info.Kind) {
+  const StoredDiagnosticInfo &StoredInfo
+    = StoredDiagnosticInfos[(unsigned)ActiveDiagnostic->getID()];
+
+  // Check whether this is an error.
+  switch (StoredInfo.Kind) {
   case DiagnosticKind::Error:
     HadAnyError = true;
-    Kind = llvm::SourceMgr::DK_Error;
     break;
-  case DiagnosticKind::Warning: Kind = llvm::SourceMgr::DK_Warning; break;
-  case DiagnosticKind::Note: Kind = llvm::SourceMgr::DK_Note; break;
+    
+  case DiagnosticKind::Note:
+  case DiagnosticKind::Warning:
+    break;
   }
   
   // Actually substitute the diagnostic arguments into the diagnostic text.
   llvm::SmallString<256> Text;
-  formatDiagnosticText(Info.Text, ActiveDiagnostic->getArgs(), Text);
+  formatDiagnosticText(StoredInfo.Text, ActiveDiagnostic->getArgs(), Text);
   
-  // Translate ranges.
-  SmallVector<llvm::SMRange, 2> Ranges;
-  for (SourceRange R : ActiveDiagnostic->getRanges()) {
-    // FIXME: Actually use the lexer to find the end of the current
-    // token.
-    Ranges.push_back(llvm::SMRange(R.Start.Value, R.End.Value));
-  }
-  
-  // Display the diagnostic.
-  SourceMgr.PrintMessage(ActiveDiagnosticLoc.Value, Kind, StringRef(Text),
-                         Ranges);
+  // Pass the diagnostic off to the consumer.
+  DiagnosticInfo Info;
+  Info.Ranges = ActiveDiagnostic->getRanges();
+  Consumer.handleDiagnostic(SourceMgr, ActiveDiagnosticLoc, StoredInfo.Kind,
+                            Text, Info);
   
   // Reset the active diagnostic.
   ActiveDiagnostic.reset();

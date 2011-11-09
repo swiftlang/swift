@@ -19,8 +19,9 @@
 #define SWIFT_BASIC_DIAGNOSTICENGINE_H
 
 #include "swift/AST/LLVM.h"
-#include "swift/AST/Identifier.h"    // FIXME: Layering violation.
-#include "swift/AST/Type.h"          // FIXME: Layering violation.
+#include "swift/AST/Identifier.h"
+#include "swift/AST/Type.h"
+#include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -69,15 +70,7 @@ namespace swift {
       typedef T type;
     };
   }
-  
-  /// \brief Describes the kind of diagnostic.
-  ///
-  enum class DiagnosticKind {
-    Error,
-    Warning,
-    Note
-  };
-  
+    
   /// \brief Describes the kind of diagnostic argument we're storing.
   ///
   enum class DiagnosticArgumentKind {
@@ -234,6 +227,10 @@ namespace swift {
     /// display diagnostics.
     llvm::SourceMgr &SourceMgr;
 
+    /// \brief The diagnostic consumer that will be responsible for actually
+    /// emitting diagnostics.
+    DiagnosticConsumer &Consumer;
+    
     /// HadAnyError - True if any error diagnostics have been emitted.
     bool HadAnyError;
 
@@ -247,8 +244,10 @@ namespace swift {
     friend class InFlightDiagnostic;
     
   public:
-    explicit DiagnosticEngine(llvm::SourceMgr &SourceMgr)
-      : SourceMgr(SourceMgr), HadAnyError(false), ActiveDiagnostic() { }
+    explicit DiagnosticEngine(llvm::SourceMgr &SourceMgr, 
+                              DiagnosticConsumer &Consumer)
+      : SourceMgr(SourceMgr), Consumer(Consumer), HadAnyError(false), 
+        ActiveDiagnostic() { }
 
     /// hadAnyError - return true if any *error* diagnostics have been emitted.
     bool hadAnyError() const {
