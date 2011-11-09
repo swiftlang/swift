@@ -43,6 +43,14 @@ static DiagnosticInfo DiagnosticInfos[] = {
   { DiagnosticKind::Error, "<not a diagnostic>" }
 };
 
+void InFlightDiagnostic::flush() {
+  if (!IsActive)
+    return;
+  
+  IsActive = false;
+  Engine.flushActiveDiagnostic();
+}
+
 /// \brief Skip forward to one of the given delimiters.
 ///
 /// \param Text The text to search through, which will be updated to point
@@ -204,9 +212,10 @@ static void formatDiagnosticText(StringRef InText,
   }
 }
                              
-void DiagnosticEngine::diagnose(SourceLoc Loc, DiagID ID, 
-                                ArrayRef<DiagnosticArgument> Args) {
-  const DiagnosticInfo &Info = DiagnosticInfos[(unsigned)ID];
+void DiagnosticEngine::flushActiveDiagnostic() {
+  assert(ActiveDiagnostic && "No active diagnostic to flush");
+  const DiagnosticInfo &Info
+    = DiagnosticInfos[(unsigned)ActiveDiagnostic->getID()];
   
   // Determine what kind of diagnostic we're emitting.
   llvm::SourceMgr::DiagKind Kind;
@@ -221,8 +230,13 @@ void DiagnosticEngine::diagnose(SourceLoc Loc, DiagID ID,
   
   // Actually substitute the diagnostic arguments into the diagnostic text.
   llvm::SmallString<256> Text;
-  formatDiagnosticText(Info.Text, Args, Text);
+  formatDiagnosticText(Info.Text, ActiveDiagnostic->getArgs(), Text);
   
   // Display the diagnostic.
-  SourceMgr.PrintMessage(Loc.Value, Kind, StringRef(Text));
+  SourceMgr.PrintMessage(ActiveDiagnosticLoc.Value, Kind, StringRef(Text));
+  
+  // Reset the active diagnostic.
+  ActiveDiagnostic.reset();
 }
+
+

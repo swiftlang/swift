@@ -21,6 +21,7 @@
 #include "swift/AST/LLVM.h"
 #include "swift/AST/Identifier.h"    // FIXME: Layering violation.
 #include "swift/AST/Type.h"          // FIXME: Layering violation.
+#include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
@@ -34,6 +35,7 @@ namespace llvm {
 namespace swift {
   using llvm::ArrayRef;
   using llvm::StringRef;
+  class DiagnosticEngine;
   
   /// \brief Enumeration describing all of possible diagnostics.
   ///
@@ -154,14 +156,17 @@ namespace swift {
   class Diagnostic {
     DiagID ID;
     SmallVector<DiagnosticArgument, 3> Args;
+    
   public:
     // All constructors are intentionally implicit.
     template<typename ...ArgTypes>
     Diagnostic(Diag<ArgTypes...> ID,
                typename detail::PassArgument<ArgTypes>::type... VArgs)
       : ID(ID.ID) {
-      DiagnosticArgument DiagArgs[] = { DiagnosticArgument(0), VArgs... };
-        Args.append(DiagArgs + 1, DiagArgs + 1 + sizeof...(VArgs));
+      DiagnosticArgument DiagArgs[] = { 
+        DiagnosticArgument(0), std::move(VArgs)... 
+      };
+      Args.append(DiagArgs + 1, DiagArgs + 1 + sizeof...(VArgs));
     }
 
     /*implicit*/Diagnostic(DiagID ID, ArrayRef<DiagnosticArgument> Args)
@@ -172,6 +177,46 @@ namespace swift {
     ArrayRef<DiagnosticArgument> getArgs() const { return Args; }
   };
   
+  /// \brief Describes an in-flight diagnostic, which is currently active
+  /// within the diagnostic engine and can be augmented within additional
+  /// information (source ranges, Fix-Its, etc.).
+  ///
+  /// Only a single in-flight diagnostic can be active at one time, and all
+  /// additional information must be emitted through the active in-flight
+  /// diagnostic.
+  class InFlightDiagnostic {
+    friend class DiagnosticEngine;
+    
+    DiagnosticEngine &Engine;
+    bool IsActive;
+    
+    /// \brief Create a new in-flight diagnostic. 
+    ///
+    /// This constructor is only available to the DiagnosticEngine.
+    InFlightDiagnostic(DiagnosticEngine &Engine)
+      : Engine(Engine), IsActive(true) { }
+    
+    InFlightDiagnostic(const InFlightDiagnostic &) = delete;
+    InFlightDiagnostic &operator=(const InFlightDiagnostic &) = delete;
+    InFlightDiagnostic &operator=(InFlightDiagnostic &&) = delete;
+
+  public:
+    /// \brief Transfer an in-flight diagnostic to a new object, which is
+    /// typically used when returning in-flight diagnostics.
+    InFlightDiagnostic(InFlightDiagnostic &&Other)
+      : Engine(Other.Engine), IsActive(Other.IsActive) {
+      Other.IsActive = false;
+    }
+    
+    ~InFlightDiagnostic() {
+      if (IsActive)
+        flush();
+    }
+    
+    /// \brief Flush the active diagnostic to the diagnostic output engine.
+    void flush();
+  };
+    
   /// \brief Class responsible for formatting diagnostics and presenting them
   /// to the user.
   class DiagnosticEngine {
@@ -182,9 +227,18 @@ namespace swift {
     /// HadAnyError - True if any error diagnostics have been emitted.
     bool HadAnyError;
 
+    /// \brief The source location of the currently active diagnostic, if there
+    /// is one.
+    SourceLoc ActiveDiagnosticLoc;
+    
+    /// \brief The currently active diagnostic, if there is one.
+    Optional<Diagnostic> ActiveDiagnostic;
+    
+    friend class InFlightDiagnostic;
+    
   public:
     explicit DiagnosticEngine(llvm::SourceMgr &SourceMgr)
-      : SourceMgr(SourceMgr), HadAnyError(false) { }
+      : SourceMgr(SourceMgr), HadAnyError(false), ActiveDiagnostic() { }
 
     /// hadAnyError - return true if any *error* diagnostics have been emitted.
     bool hadAnyError() const {
@@ -201,10 +255,31 @@ namespace swift {
     ///
     /// \param Args The preformatted set of diagnostic arguments. The caller
     /// must ensure that the diagnostic arguments have the appropriate type.
-    void diagnose(SourceLoc Loc, DiagID ID, ArrayRef<DiagnosticArgument> Args);
+    ///
+    /// \returns An in-flight diagnostic, to which additional information can
+    /// be attached.
+    InFlightDiagnostic diagnose(SourceLoc Loc, DiagID ID, 
+                                ArrayRef<DiagnosticArgument> Args) {
+      assert(!ActiveDiagnostic && "Already have an active diagnostic");
+      ActiveDiagnosticLoc = Loc;
+      ActiveDiagnostic = Diagnostic(ID, Args);
+      return InFlightDiagnostic(*this);
+    }
 
-    void diagnose(SourceLoc Loc, const Diagnostic &D) {
-      diagnose(Loc, D.getID(), D.getArgs());
+    /// \brief Emit an already-constructed diagnostic at the given location.
+    ///
+    /// \param Loc The location to which the diagnostic refers in the source
+    /// code.
+    ///
+    /// \param D The diagnostic.
+    ///
+    /// \returns An in-flight diagnostic, to which additional information can
+    /// be attached.
+    InFlightDiagnostic diagnose(SourceLoc Loc, const Diagnostic &D) {
+      assert(!ActiveDiagnostic && "Already have an active diagnostic");
+      ActiveDiagnosticLoc = Loc;
+      ActiveDiagnostic = D;
+      return InFlightDiagnostic(*this);
     }
     
     /// \brief Emit a diagnostic with the given set of diagnostic arguments.
@@ -217,12 +292,18 @@ namespace swift {
     /// \param Args The diagnostic arguments, which will be converted to
     /// the types expected by the diagnostic \p ID.
     template<typename ...ArgTypes>
-    void diagnose(SourceLoc Loc, Diag<ArgTypes...> ID,
-                  typename detail::PassArgument<ArgTypes>::type... Args) {
-      DiagnosticArgument DiagArgs[] = { DiagnosticArgument(0),  Args... };
-      diagnose(Loc, ID.ID, 
-               ArrayRef<DiagnosticArgument>(DiagArgs + 1, sizeof...(Args)));
-    }    
+    InFlightDiagnostic 
+    diagnose(SourceLoc Loc, Diag<ArgTypes...> ID,
+             typename detail::PassArgument<ArgTypes>::type... Args) {
+      assert(!ActiveDiagnostic && "Already have an active diagnostic");
+      ActiveDiagnosticLoc = Loc;
+      ActiveDiagnostic = Diagnostic(ID, std::move(Args)...);
+      return InFlightDiagnostic(*this);
+    }  
+    
+  private:
+    /// \brief Flush the active diagnostic.
+    void flushActiveDiagnostic();
   };
 } // end namespace swift
 
