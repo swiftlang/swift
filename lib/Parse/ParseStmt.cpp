@@ -60,12 +60,11 @@ static bool isFuncExpr(const Token &Tok1, const Token &Tok2) {
 /// isStartOfDecl - Return true if this is the start of a decl or decl-import.
 bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
   switch (Tok.getKind()) {
+  case tok::kw_extension:
   case tok::kw_func:
     // "func identifier" and "func [attribute]" is a func declaration,
     // otherwise we have a func expression.
-    if (isFuncExpr(Tok, Tok2))
-      return false;
-    // Otherwise, FALL THROUGH.
+    return !isFuncExpr(Tok, Tok2);
   case tok::kw_var:
   case tok::kw_typealias:
   case tok::kw_oneof:

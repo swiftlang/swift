@@ -114,6 +114,10 @@ ERROR(import_inner_scope,decl_parsing,none,
 ERROR(decl_expected_module_name,decl_parsing,none,
       "expected module name in import declaration", ())
 
+// Extension
+ERROR(expected_rbrace_extension,type_parsing,none,
+      "expected '}' at end of extension", ())
+
 // TypeAlias
 ERROR(expected_colon_in_typealias,decl_parsing,none,
       "expected ':' in typealias declaration", ())
@@ -148,6 +152,8 @@ ERROR(type_redefinition,type_parsing,none,
       "redefinition of type %0", (Identifier))
 ERROR(expected_identifier_after_coloncolon_type,expr_parsing,none,
       "expected identifier after %0 type", (Identifier))
+ERROR(expected_identifier_for_type,expr_parsing,none,
+      "expected identifier for type name", ())
 
 ERROR(expected_initializer_expr,expr_parsing,none,
       "expected initializer expression after '='", ())

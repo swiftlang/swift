@@ -166,6 +166,7 @@ public:
   bool parseVarName(DeclVarName &Name);
   
   Decl *parseDeclImport();
+  Decl *parseDeclExtension();
   Decl *parseDeclOneOf();
   bool parseDeclOneOfBody(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
                           Type &Result, TypeAliasDecl *TypeName = 0);
@@ -199,6 +200,7 @@ public:
   
   bool parseType(Type &Result);
   bool parseType(Type &Result, Diag<> ID);
+  bool parseTypeIdentifier(Type &Result);
   bool parseTypeTupleBody(SourceLoc LPLoc, Type &Result);
   
   bool parseTypeArray(SourceLoc LSquareLoc, Type &Result);

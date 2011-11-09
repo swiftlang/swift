@@ -186,6 +186,7 @@ void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
 ///
 ///   decl:
 ///     decl-typealias
+///     decl-extension
 ///     decl-var
 ///     decl-func
 ///     decl-func-scoped
@@ -203,6 +204,9 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     break;
   case tok::kw_import:
     Entries.push_back(parseDeclImport());
+    break;
+  case tok::kw_extension:
+    Entries.push_back(parseDeclExtension());
     break;
   case tok::kw_var:
     HadParseError = parseDeclVar(Entries);
@@ -280,6 +284,27 @@ Decl *Parser::parseDeclImport() {
                                   CurDeclContext);
 }
 
+
+/// parseDeclExtension - Parse an 'extension' declaration.
+///   extension:
+///    'extension' type-identifier '{' decl* '}'
+///
+Decl *Parser::parseDeclExtension() {
+  SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
+
+  Type Ty;
+  if (parseTypeIdentifier(Ty)) return 0;
+  
+  SourceLoc LBLoc = Tok.getLoc();
+  if (parseToken(tok::l_brace, diag::expected_lbrace_oneof_type))
+    return 0;
+
+  // FIXME: Helper for matching punctuation.
+  if (parseToken(tok::r_brace, diag::expected_rbrace_extension))
+    diagnose(LBLoc, diag::opening_brace);
+
+  return 0;
+}
 
 /// parseVarName
 ///   var-name:

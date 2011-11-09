@@ -35,33 +35,13 @@ bool Parser::parseType(Type &Result) {
 ///     type-identifier
 ///     type-tuple
 ///
-///   type-identifier:
-///     identifier
-///     scope-qualifier identifier
-///
 bool Parser::parseType(Type &Result, Diag<> MessageID) {
   // Parse type-simple first.
   switch (Tok.getKind()) {
-  case tok::identifier: {
-    Identifier Name = Context.getIdentifier(Tok.getText());
-    SourceLoc NameLoc = Tok.getLoc();
-    consumeToken(tok::identifier);
-
-    if (Tok.isNot(tok::coloncolon)) {
-      Result = ScopeInfo.lookupOrInsertTypeName(Name, NameLoc);
-    } else {
-      consumeToken(tok::coloncolon);
-      SourceLoc Loc2 = Tok.getLoc();
-      Identifier Name2;
-      if (parseIdentifier(Name2,
-                      diag::expected_identifier_after_coloncolon_type, Name))
-        return true;
-
-      Result = ScopeInfo.getQualifiedTypeName(Name, NameLoc, Name2, Loc2);
-    }
-
+  case tok::identifier:
+    if (parseTypeIdentifier(Result))
+      return true;
     break;
-  }
   case tok::l_paren:
   case tok::l_paren_space: {
     SourceLoc LPLoc = consumeToken();
@@ -103,6 +83,39 @@ bool Parser::parseType(Type &Result, Diag<> MessageID) {
   
   return false;
 }
+
+/// parseTypeIdentifier
+///   
+///   type-identifier:
+///     identifier
+///     scope-qualifier identifier
+///
+bool Parser::parseTypeIdentifier(Type &Result) {
+  if (Tok.isNot(tok::identifier)) {
+    diagnose(Tok.getLoc(), diag::expected_identifier_for_type);
+    return true;
+  }
+  
+  Identifier Name = Context.getIdentifier(Tok.getText());
+  SourceLoc NameLoc = Tok.getLoc();
+  consumeToken(tok::identifier);
+  
+  if (Tok.isNot(tok::coloncolon)) {
+    Result = ScopeInfo.lookupOrInsertTypeName(Name, NameLoc);
+    return false;
+  }
+  
+  consumeToken(tok::coloncolon);
+  SourceLoc Loc2 = Tok.getLoc();
+  Identifier Name2;
+  if (parseIdentifier(Name2,
+                      diag::expected_identifier_after_coloncolon_type, Name))
+    return true;
+    
+  Result = ScopeInfo.getQualifiedTypeName(Name, NameLoc, Name2, Loc2);
+  return false;
+}
+
 
 
 /// parseTypeTupleBody
