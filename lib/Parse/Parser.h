@@ -113,12 +113,12 @@ public:
   void skipUntilDeclStmtRBrace();
   
   template<typename ...ArgTypes>
-  void diagnose(SourceLoc Loc, ArgTypes... Args) {
-    Diags.diagnose(Loc, Diagnostic(Args...));
+  InFlightDiagnostic diagnose(SourceLoc Loc, ArgTypes... Args) {
+    return Diags.diagnose(Loc, Diagnostic(Args...));
   }
   template<typename ...ArgTypes>
-  void diagnose(Token Tok, ArgTypes... Args) {
-    Diags.diagnose(Tok.getLoc(), Diagnostic(Args...));
+  InFlightDiagnostic diagnose(Token Tok, ArgTypes... Args) {
+    return Diags.diagnose(Tok.getLoc(), Diagnostic(Args...));
   }
                    
   //===--------------------------------------------------------------------===//

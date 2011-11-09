@@ -28,8 +28,9 @@ namespace swift {
   class Token;
   class ASTContext;
   class Identifier;
-  template<typename ...T>
-  struct Diag;
+  class InFlightDiagnostic;
+  
+  template<typename ...T> struct Diag;
 
 class Lexer {
   llvm::SourceMgr &SourceMgr;
@@ -60,7 +61,7 @@ private:
   static SourceLoc getSourceLoc(const char *Loc) {
     return SourceLoc(llvm::SMLoc::getFromPointer(Loc));
   }
-  void diagnose(const char *Loc, Diag<> ID);
+  InFlightDiagnostic diagnose(const char *Loc, Diag<> ID);
   void lexImpl();
   void formToken(tok Kind, const char *TokStart);
   

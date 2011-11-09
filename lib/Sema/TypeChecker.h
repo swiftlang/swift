@@ -29,8 +29,8 @@ public:
   TypeChecker(TranslationUnit &TU) : TU(TU), Context(TU.Ctx) {}
   
   template<typename ...ArgTypes>
-  void diagnose(ArgTypes... Args) {
-    Context.Diags.diagnose(Args...);
+  InFlightDiagnostic diagnose(ArgTypes... Args) {
+    return Context.Diags.diagnose(Args...);
   }
   
   bool validateType(ValueDecl *VD);
