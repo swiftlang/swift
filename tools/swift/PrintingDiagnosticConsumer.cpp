@@ -47,6 +47,13 @@ PrintingDiagnosticConsumer::handleDiagnostic(llvm::SourceMgr &SM, SourceLoc Loc,
   SmallVector<llvm::SMRange, 2> Ranges;
   for (SourceRange R : Info.Ranges) {
     SourceLoc End = Lexer::getLocForEndOfToken(SM, R.End);
+    
+    // FIXME: SMRange is an inclusive range [start, end), so step the
+    // end location back by one to get SourceMgr to highlight ranges
+    // properly.
+    if (R.Start != End)
+      End = End.getAdvancedLoc(-1);
+    
     Ranges.push_back(llvm::SMRange(R.Start.Value, End.Value));
   }
   

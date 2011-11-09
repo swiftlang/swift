@@ -39,7 +39,7 @@ public:
   
   /// getAdvanced - Return a source location advanced a specified number of
   /// characters.
-  SourceLoc getAdvancedLoc(unsigned NumCharacters) const {
+  SourceLoc getAdvancedLoc(int NumCharacters) const {
     assert(isValid() && "Can't advance an invalid location");
     return SourceLoc(llvm::SMLoc::getFromPointer(Value.getPointer() +
                                                  NumCharacters));
