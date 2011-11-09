@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Lexer.h"
+#include "swift/Parse/Lexer.h"
 #include "Parser.h"
 #include "swift/AST/Diagnostics.h"
 #include "llvm/ADT/PointerUnion.h"

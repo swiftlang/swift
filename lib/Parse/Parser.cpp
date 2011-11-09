@@ -18,7 +18,7 @@
 #include "swift/AST/Verifier.h"
 #include "swift/AST/Diagnostics.h"
 #include "Parser.h"
-#include "Lexer.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"

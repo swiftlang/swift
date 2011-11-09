@@ -1,6 +1,5 @@
 add_swift_library(swiftParse
   Lexer.cpp
-  Lexer.h
   Parser.cpp
   Parser.h
   ParseDecl.cpp
@@ -10,5 +9,4 @@ add_swift_library(swiftParse
   ParseType.cpp
   Scope.cpp
   Scope.h
-  Token.h
   DEPENDS swiftAST)

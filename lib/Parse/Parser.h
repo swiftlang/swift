@@ -19,7 +19,7 @@
 
 #include "ParseResult.h"
 #include "Scope.h"
-#include "Token.h"
+#include "swift/Parse/Token.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Diagnostics.h"
 
