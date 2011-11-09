@@ -293,10 +293,9 @@ Decl *Parser::parseDeclExtension() {
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
 
   Type Ty;
-  if (parseTypeIdentifier(Ty)) return 0;
-  
-  SourceLoc LBLoc = Tok.getLoc();
-  if (parseToken(tok::l_brace, diag::expected_lbrace_oneof_type))
+  SourceLoc LBLoc;
+  if (parseTypeIdentifier(Ty) ||
+      parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_oneof_type))
     return 0;
 
   // FIXME: Helper for matching punctuation.
@@ -338,8 +337,8 @@ bool Parser::parseVarName(DeclVarName &Name) {
     } while (consumeIf(tok::comma));
   }
 
-  SourceLoc RPLoc = Tok.getLoc();
-  if (parseToken(tok::r_paren, diag::expected_rparen_var_name))
+  SourceLoc RPLoc;
+  if (parseToken(tok::r_paren, RPLoc, diag::expected_rparen_var_name))
     diagnose(LPLoc, diag::opening_paren);
 
   Name = DeclVarName(LPLoc, Context.AllocateCopy(ChildNames), RPLoc);
@@ -600,8 +599,8 @@ Decl *Parser::parseDeclOneOf() {
 /// this.
 bool Parser::parseDeclOneOfBody(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
                                 Type &Result, TypeAliasDecl *TypeName) {
-  SourceLoc LBLoc = Tok.getLoc();
-  if (parseToken(tok::l_brace, diag::expected_lbrace_oneof_type))
+  SourceLoc LBLoc;
+  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_oneof_type))
     return true;
   
   SmallVector<OneOfElementInfo, 8> ElementInfos;
@@ -737,11 +736,9 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   parseAttributeList(Attributes);
   
   Identifier StructName;
-  if (parseIdentifier(StructName, diag::expected_identifier_in_decl, "struct"))
-    return true;
-
-  SourceLoc LBLoc = Tok.getLoc();
-  if (parseToken(tok::l_brace, diag::expected_lbrace_struct))
+  SourceLoc LBLoc;
+  if (parseIdentifier(StructName, diag::expected_identifier_in_decl, "struct")||
+      parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct))
     return true;
 
   // Get the TypeAlias for the name that we'll eventually have.  This ensures

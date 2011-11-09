@@ -136,7 +136,12 @@ public:
   /// If the input is malformed, this emits the specified error diagnostic.
   /// Next, if SkipToTok is specified, it calls skipUntil(SkipToTok).  Finally,
   /// true is returned.
-  bool parseToken(tok K, Diag<>, tok SkipToTok = tok::unknown);
+  bool parseToken(tok K, Diag<> D, tok SkipToTok = tok::unknown) {
+    SourceLoc L;
+    return parseToken(K, L, D, SkipToTok);
+  }
+  bool parseToken(tok K, SourceLoc &TokLoc, Diag<> D,
+                  tok SkipToTok = tok::unknown);
   
   bool parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init, bool Single);
 

@@ -133,9 +133,9 @@ bool Parser::parseIdentifier(Identifier &Result, const Diagnostic &D) {
 /// If the input is malformed, this emits the specified error diagnostic.
 /// Next, if SkipToTok is specified, it calls skipUntil(SkipToTok).  Finally,
 /// true is returned.
-bool Parser::parseToken(tok K, Diag<> ID, tok SkipToTok) {
+bool Parser::parseToken(tok K, SourceLoc &TokLoc, Diag<> ID, tok SkipToTok) {
   if (Tok.is(K)) {
-    consumeToken(K);
+    TokLoc = consumeToken(K);
     return false;
   }
   

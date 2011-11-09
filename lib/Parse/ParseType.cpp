@@ -47,7 +47,7 @@ bool Parser::parseType(Type &Result, Diag<> MessageID) {
     SourceLoc LPLoc = consumeToken();
     if (parseTypeTupleBody(LPLoc, Result))
       return true;
-
+    // FIXME: matching.
     if (parseToken(tok::r_paren, diag::expected_rparen_tuple_type_list,
                    tok::r_paren)) {
       diagnose(LPLoc, diag::opening_paren);
@@ -202,7 +202,8 @@ bool Parser::parseTypeArray(SourceLoc LSquareLoc, Type &Result) {
     return true;
   
   SourceLoc RArrayTok = Tok.getLoc();
-  if (parseToken(tok::r_square, diag::expected_rbracket_array_type)) {
+  if (parseToken(tok::r_square, RArrayTok, diag::expected_rbracket_array_type)){
+    // FIXME: matching
     diagnose(LSquareLoc, diag::opening_bracket);
     return true;
   }

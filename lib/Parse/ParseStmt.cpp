@@ -179,8 +179,9 @@ ParseResult<BraceStmt> Parser::parseStmtBrace(Diag<> ID) {
   if (parseBraceItemList(Entries, false /*NotTopLevel*/))
     return true;
   
-  SourceLoc RBLoc = Tok.getLoc();
-  if (parseToken(tok::r_brace, diag::expected_rbrace_in_brace_stmt,
+  // FIXME: matching
+  SourceLoc RBLoc;
+  if (parseToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_brace_stmt,
                  tok::r_brace)) {
     diagnose(LBLoc, diag::opening_brace);
     return true;

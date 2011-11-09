@@ -236,12 +236,13 @@ ParseResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
     // Check for a [expr] suffix.
     if (consumeIf(tok::l_square)) {
       ParseResult<Expr> Idx;
+      SourceLoc RLoc;
       if ((Idx = parseSingleExpr(diag::expected_expr_subscript_value)))
         return true;
       
-      SourceLoc RLoc = Tok.getLoc();
       // FIXME: helper for matching punctuation.
-      if (parseToken(tok::r_square, diag::expected_bracket_array_subscript)) {
+      if (parseToken(tok::r_square, RLoc,
+                     diag::expected_bracket_array_subscript)) {
         diagnose(TokLoc, diag::opening_bracket);
         return true;        
       }
@@ -433,8 +434,8 @@ ParseResult<Expr> Parser::parseExprParen() {
     } while (consumeIf(tok::comma));
   }
   
-  SourceLoc RPLoc = Tok.getLoc();  
-  if (parseToken(tok::r_paren, diag::expected_rparen_parenthesis_expr)) {
+  SourceLoc RPLoc;
+  if (parseToken(tok::r_paren, RPLoc, diag::expected_rparen_parenthesis_expr)) {
     diagnose(LPLoc, diag::opening_paren);
     return true;
   }
