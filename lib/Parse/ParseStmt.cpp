@@ -175,17 +175,13 @@ ParseResult<BraceStmt> Parser::parseStmtBrace(Diag<> ID) {
   SourceLoc LBLoc = consumeToken(tok::l_brace);
   
   SmallVector<ExprStmtOrDecl, 16> Entries;
-  
-  if (parseBraceItemList(Entries, false /*NotTopLevel*/))
-    return true;
-  
-  // FIXME: matching
   SourceLoc RBLoc;
-  if (parseToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_brace_stmt,
-                 tok::r_brace)) {
-    diagnose(LBLoc, diag::opening_brace);
+  
+  if (parseBraceItemList(Entries, false /*NotTopLevel*/) ||
+      parseMatchingToken(tok::r_brace, RBLoc,
+                         diag::expected_rbrace_in_brace_stmt,
+                         LBLoc, diag::opening_brace))
     return true;
-  }
   
   return BraceStmt::create(Context, LBLoc, Entries, RBLoc);
 }

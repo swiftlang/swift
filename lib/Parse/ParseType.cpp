@@ -44,15 +44,14 @@ bool Parser::parseType(Type &Result, Diag<> MessageID) {
     break;
   case tok::l_paren:
   case tok::l_paren_space: {
-    SourceLoc LPLoc = consumeToken();
+    SourceLoc LPLoc = consumeToken(), RPLoc;
     if (parseTypeTupleBody(LPLoc, Result))
       return true;
     // FIXME: matching.
-    if (parseToken(tok::r_paren, diag::expected_rparen_tuple_type_list,
-                   tok::r_paren)) {
-      diagnose(LPLoc, diag::opening_paren);
+    if (parseMatchingToken(tok::r_paren, RPLoc,
+                           diag::expected_rparen_tuple_type_list,
+                           LPLoc, diag::opening_paren))
       return true;
-    }
     break;
   }
   default:
@@ -198,15 +197,12 @@ bool Parser::parseTypeArray(SourceLoc LSquareLoc, Type &Result) {
   }
   
   ParseResult<Expr> SizeEx;
-  if ((SizeEx = parseSingleExpr(diag::expected_expr_array_type)))
+  SourceLoc RArrayTok;
+  if ((SizeEx = parseSingleExpr(diag::expected_expr_array_type)) ||
+      parseMatchingToken(tok::r_square, RArrayTok,
+                         diag::expected_rbracket_array_type,
+                         LSquareLoc, diag::opening_bracket))
     return true;
-  
-  SourceLoc RArrayTok = Tok.getLoc();
-  if (parseToken(tok::r_square, RArrayTok, diag::expected_rbracket_array_type)){
-    // FIXME: matching
-    diagnose(LSquareLoc, diag::opening_bracket);
-    return true;
-  }
   
   // If we had a semantic error on the size or if the base type is invalid,
   // propagate up an error type.

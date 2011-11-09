@@ -143,6 +143,13 @@ public:
   bool parseToken(tok K, SourceLoc &TokLoc, Diag<> D,
                   tok SkipToTok = tok::unknown);
   
+  /// parseMatchingToken - Parse the specified expected token and return its
+  /// location on success.  On failure, emit the specified error diagnostic, and
+  /// a note at the specified note location.
+  bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
+                          SourceLoc OtherLoc, Diag<> OtherNote,
+                          tok SkipToTok = tok::unknown);
+  
   bool parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init, bool Single);
 
   bool parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Decls,

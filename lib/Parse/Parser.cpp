@@ -149,6 +149,22 @@ bool Parser::parseToken(tok K, SourceLoc &TokLoc, Diag<> ID, tok SkipToTok) {
   return true;
 }
 
+/// parseMatchingToken - Parse the specified expected token and return its
+/// location on success.  On failure, emit the specified error diagnostic, and a
+/// note at the specified note location.
+bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
+                                SourceLoc OtherLoc, Diag<> OtherNote,
+                                tok SkipToTok) {
+  if (parseToken(K, TokLoc, ErrorDiag, SkipToTok)) {
+    diagnose(OtherLoc, OtherNote);
+    return true;
+  }
+
+  return false;
+}
+
+
+
 /// value-specifier:
 ///   ':' type
 ///   ':' type '=' expr

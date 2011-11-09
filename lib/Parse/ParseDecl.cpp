@@ -171,11 +171,11 @@ void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
   // Otherwise, there was an error parsing the attribute list.  If we already
   // reported an error, skip to a ], otherwise report the error.
   if (!HadError)
-    parseToken(tok::r_square, diag::expected_in_attribute_list, tok::r_square);
-  else {
-    skipUntil(tok::r_square);
-    consumeIf(tok::r_square);
-  }
+    parseMatchingToken(tok::r_square, Attributes.RSquareLoc,
+                       diag::expected_in_attribute_list, 
+                       Attributes.LSquareLoc, diag::opening_bracket);
+  skipUntil(tok::r_square);
+  consumeIf(tok::r_square);
 }
 
 /// parseDecl - Parse a single syntactic declaration and return a list of decl
@@ -293,14 +293,13 @@ Decl *Parser::parseDeclExtension() {
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
 
   Type Ty;
-  SourceLoc LBLoc;
+  SourceLoc LBLoc, RBLoc;
   if (parseTypeIdentifier(Ty) ||
       parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_oneof_type))
     return 0;
 
-  // FIXME: Helper for matching punctuation.
-  if (parseToken(tok::r_brace, diag::expected_rbrace_extension))
-    diagnose(LBLoc, diag::opening_brace);
+  parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_extension,
+                     LBLoc, diag::opening_brace);
 
   return 0;
 }
@@ -338,8 +337,8 @@ bool Parser::parseVarName(DeclVarName &Name) {
   }
 
   SourceLoc RPLoc;
-  if (parseToken(tok::r_paren, RPLoc, diag::expected_rparen_var_name))
-    diagnose(LPLoc, diag::opening_paren);
+  parseMatchingToken(tok::r_paren, RPLoc, diag::expected_rparen_var_name,
+                     LPLoc, diag::opening_paren);
 
   Name = DeclVarName(LPLoc, Context.AllocateCopy(ChildNames), RPLoc);
   return false;
@@ -599,7 +598,7 @@ Decl *Parser::parseDeclOneOf() {
 /// this.
 bool Parser::parseDeclOneOfBody(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
                                 Type &Result, TypeAliasDecl *TypeName) {
-  SourceLoc LBLoc;
+  SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_oneof_type))
     return true;
   
@@ -635,9 +634,8 @@ bool Parser::parseDeclOneOfBody(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
       skipUntilDeclRBrace();
   }
   
-  // FIXME: Helper for matching punctuation.
-  if (parseToken(tok::r_brace, diag::expected_rbrace_oneof_type))
-    diagnose(LBLoc, diag::opening_brace);
+  parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_oneof_type,
+                     LBLoc, diag::opening_brace);
   
   Result = actOnOneOfType(OneOfLoc, Attrs, ElementInfos, MemberDecls, TypeName);
   return false;
@@ -736,7 +734,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   parseAttributeList(Attributes);
   
   Identifier StructName;
-  SourceLoc LBLoc;
+  SourceLoc LBLoc, RBLoc;
   if (parseIdentifier(StructName, diag::expected_identifier_in_decl, "struct")||
       parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct))
     return true;
@@ -770,11 +768,9 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
       skipUntilDeclRBrace();
   }
   
-  // FIXME: add helper for matching punctuation.
-  if (parseToken(tok::r_brace, diag::expected_rbrace_struct)) {
-    diagnose(LBLoc, diag::opening_brace);
+  if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_struct,
+                         LBLoc, diag::opening_brace))
     return true;
-  }
           
   Decls.push_back(TAD);
   
@@ -850,6 +846,8 @@ bool Parser::parseProtocolBody(SourceLoc ProtocolLoc,
     case tok::r_brace:  // End of protocol body.
       break;
       
+      // FIXME: use standard parseDecl loop.
+        
     case tok::kw_func:
       Elements.push_back(parseDeclFunc(ThisType));
       if (Elements.back() == 0) return true;

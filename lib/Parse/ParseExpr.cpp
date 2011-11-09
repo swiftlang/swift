@@ -237,15 +237,11 @@ ParseResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
     if (consumeIf(tok::l_square)) {
       ParseResult<Expr> Idx;
       SourceLoc RLoc;
-      if ((Idx = parseSingleExpr(diag::expected_expr_subscript_value)))
+      if ((Idx = parseSingleExpr(diag::expected_expr_subscript_value)) ||
+          parseMatchingToken(tok::r_square, RLoc,
+                             diag::expected_bracket_array_subscript,
+                             TokLoc, diag::opening_bracket))
         return true;
-      
-      // FIXME: helper for matching punctuation.
-      if (parseToken(tok::r_square, RLoc,
-                     diag::expected_bracket_array_subscript)) {
-        diagnose(TokLoc, diag::opening_bracket);
-        return true;        
-      }
       
       if (!Result.isSemaError() && !Idx.isSemaError()) {
         // FIXME: Implement.  This should modify Result like the cases
@@ -435,10 +431,10 @@ ParseResult<Expr> Parser::parseExprParen() {
   }
   
   SourceLoc RPLoc;
-  if (parseToken(tok::r_paren, RPLoc, diag::expected_rparen_parenthesis_expr)) {
-    diagnose(LPLoc, diag::opening_paren);
+  if (parseMatchingToken(tok::r_paren, RPLoc,
+                         diag::expected_rparen_parenthesis_expr,
+                         LPLoc, diag::opening_paren))
     return true;
-  }
 
   if (AnySubExprSemaErrors)
     return ParseResult<Expr>::getSemaError();
