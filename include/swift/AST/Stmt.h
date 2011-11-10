@@ -18,7 +18,7 @@
 #define SWIFT_AST_STMT_H
 
 #include "swift/AST/LLVM.h"
-#include "swift/AST/WalkOrder.h"
+#include "swift/AST/Walk.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -69,8 +69,7 @@ public:
   /// post-order invocation, then the walk is terminated and 'walk returns
   /// NULL.
   ///
-  Stmt *walk(Expr *(^ExprFn)(Expr *E, WalkOrder Order),
-             Stmt *(^StmtFn)(Stmt *E, WalkOrder Order) = 0);
+  Stmt *walk(WalkExprType ^ExprFn, WalkStmtType ^StmtFn = 0);
   
   
   void dump() const;

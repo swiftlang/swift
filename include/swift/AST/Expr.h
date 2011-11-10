@@ -20,7 +20,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
-#include "swift/AST/WalkOrder.h"
+#include "swift/AST/Walk.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -94,7 +94,7 @@ public:
   SourceLoc getLoc() const;
 
   /// walk - This recursively walks all of the statements and expressions
-  /// contained within a statement and invokes the ExprFn and StmtFn blocks on
+  /// contained within an expression and invokes the ExprFn and StmtFn blocks on
   /// each.
   ///
   /// The block pointers are invoked both before and after the children are
@@ -108,8 +108,7 @@ public:
   /// post-order invocation, then the walk is terminated and 'walk returns
   /// NULL.
   ///
-  Expr *walk(Expr *(^ExprFn)(Expr *E, WalkOrder Order),
-             Stmt *(^StmtFn)(Stmt *E, WalkOrder Order) = 0);
+  Expr *walk(WalkExprType ^ExprFn, WalkStmtType ^StmtFn = 0);
   
   /// ConversionRank - This enum specifies the rank of an implicit conversion
   /// of a value from one type to another.  These are ordered from cheapest to

@@ -603,13 +603,11 @@ namespace {
   };
 } // end anonymous namespace.
 
-Expr *Expr::walk(Expr *(^ExprFn)(Expr *E, WalkOrder Order),
-                 Stmt *(^StmtFn)(Stmt *S, WalkOrder Order)) {
+Expr *Expr::walk(WalkExprType ^ExprFn, WalkStmtType ^StmtFn) {
   return ExprWalker(ExprFn, StmtFn).doIt(this);  
 }
 
-Stmt *Stmt::walk(Expr *(^ExprFn)(Expr *E, WalkOrder Order),
-                 Stmt *(^StmtFn)(Stmt *S, WalkOrder Order)) {
+Stmt *Stmt::walk(WalkExprType ^ExprFn, WalkStmtType ^StmtFn) {
   return ExprWalker(ExprFn, StmtFn).doIt(this);
 }
 

@@ -1,4 +1,4 @@
-//===--- WalkOrder.h - WalkOrder enum ---------------------------*- C++ -*-===//
+//===--- Walk.h - Support structures for walking the AST --------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,16 +10,25 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_AST_WALKORDER_H
-#define SWIFT_AST_WALKORDER_H
+#ifndef SWIFT_AST_WALK_H
+#define SWIFT_AST_WALK_H
 
 namespace swift {
 
+class Expr;
+class Stmt;
+  
 /// This enum is used in AST traversals.
 enum class WalkOrder {
   PreOrder,
   PostOrder
 };
+
+/// \brief Function type used to describe a callback for walking an expression.
+typedef Expr *WalkExprType(Expr *E, WalkOrder Order);
+
+/// \brief Function type used to describe a callback for walking a statement.
+typedef Stmt *WalkStmtType(Stmt *S, WalkOrder Order);
 
 } // end namespace swift
 
