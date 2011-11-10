@@ -241,7 +241,6 @@ public:
   static bool classof(const ImportDecl *D) { return true; }
 };
 
-  
 /// NamedDecl - An abstract base class for declarations with names.
 class NamedDecl : public Decl {
 public:
@@ -274,9 +273,9 @@ public:
   Type UnderlyingTy;
   
   TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
-                Type underlyingty, const DeclAttributes &Attrs, DeclContext *DC)
+                Type Underlyingty, const DeclAttributes &Attrs, DeclContext *DC)
     : NamedDecl(DeclKind::TypeAlias, DC, Name, Attrs), AliasTy(0),
-      TypeAliasLoc(TypeAliasLoc), UnderlyingTy(underlyingty) {
+      TypeAliasLoc(TypeAliasLoc), UnderlyingTy(Underlyingty) {
   }
 
   SourceLoc getLocStart() const { return TypeAliasLoc; }
