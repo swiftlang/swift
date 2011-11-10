@@ -453,6 +453,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     }
     
     CallExpr *Call = new (TC.Context) CallExpr(FnRef, E->getBase(),
+                                               /*DotSyntax=*/true,
                                                TypeJudgement());
     if (TC.semaApplyExpr(Call))
       return 0;

@@ -696,14 +696,24 @@ public:
 /// syntactically through juxtaposition with a TupleExpr whose
 /// leading '(' is unspaced.
 class CallExpr : public ApplyExpr {
+  /// \brief Whether this call actually used dot syntax, e.g.,
+  /// \c x.f.
+  /// FIXME: This should probably have its own node kind, if it persists.
+  bool DotSyntax : 1;
+  
 public:
-  CallExpr(Expr *Fn, Expr *Arg, TypeJudgement Ty)
-    : ApplyExpr(ExprKind::Call, Fn, Arg, Ty) {}
+  CallExpr(Expr *Fn, Expr *Arg, bool DotSyntax, TypeJudgement Ty)
+    : ApplyExpr(ExprKind::Call, Fn, Arg, Ty), DotSyntax(DotSyntax) {}
 
   SourceRange getSourceRange() const {
+    if (isDotSyntax())
+      return SourceRange(getArg()->getStartLoc(), getFn()->getEndLoc()); 
+
     return SourceRange(getFn()->getStartLoc(), getArg()->getEndLoc()); 
-  }  
+  }
+  
   SourceLoc getLoc() const { return getArg()->getStartLoc(); }
+  bool isDotSyntax() const { return DotSyntax; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const CallExpr *) { return true; }
@@ -767,7 +777,7 @@ public:
   SourceLoc getLoc() const { return getArg()->getStartLoc(); }
   
   SourceRange getSourceRange() const {
-    return SourceRange(getFn()->getStartLoc(), getArg()->getEndLoc());
+    return SourceRange(getArg()->getStartLoc(), getFn()->getEndLoc());
   }
   
   // Implement isa/cast/dyncast/etc.
