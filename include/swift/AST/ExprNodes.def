@@ -46,7 +46,7 @@
 #endif
 
 /// A convenience for determining the range of expressions.  These will always
-/// appear immediately after the last
+/// appear immediately after the last member.
 #ifndef EXPR_RANGE
 #define EXPR_RANGE(Id, First, Last)
 #endif

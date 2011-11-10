@@ -35,23 +35,10 @@ namespace swift {
   class TypeAliasDecl;
   
 enum class DeclKind {
-  // The indentation of the members of this enum describe the inheritance
-  // hierarchy.  Commented out members are abstract classes.  This formation
-  // allows for range checks in classof.
-  Import,
-//Named
-    TypeAlias,
-  //Value
-      Var,
-      Func,
-      OneOfElement,
-      Arg,
-      ElementRef,
-  
-  FirstNamed = TypeAlias,
-  LastNamed = ElementRef,
-  FirstValue = Var,
-  LastValue = ElementRef
+#define DECL(Id, Parent) Id,
+#define DECL_RANGE(Id, FirstId, LastId) \
+  First_##Id##Decl = FirstId, Last_##Id##Decl = LastId,
+#include "swift/AST/DeclNodes.def"
 };
 
 /// The associativity of a binary operator.
@@ -263,7 +250,8 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->Kind >= DeclKind::FirstNamed && D->Kind <= DeclKind::LastNamed;
+    return D->Kind >= DeclKind::First_NamedDecl &&
+           D->Kind <= DeclKind::Last_NamedDecl;
   }
   static bool classof(const NamedDecl *D) { return true; }
   
@@ -312,7 +300,8 @@ public:
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->Kind >= DeclKind::FirstValue && D->Kind <= DeclKind::LastValue;
+    return D->Kind >= DeclKind::First_ValueDecl &&
+           D->Kind <= DeclKind::Last_ValueDecl;
   }
   static bool classof(const ValueDecl *D) { return true; }
 

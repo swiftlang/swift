@@ -52,14 +52,9 @@ void *Module::operator new(size_t Bytes, ASTContext &C,
 
 SourceLoc Decl::getLocStart() const {
   switch (Kind) {
-  case DeclKind::Import: return cast<ImportDecl>(this)->getLocStart();
-  case DeclKind::TypeAlias:  return cast<TypeAliasDecl>(this)->getLocStart(); 
-  case DeclKind::Var:        return cast<VarDecl>(this)->getLocStart();
-  case DeclKind::Func:       return cast<FuncDecl>(this)->getLocStart();
-  case DeclKind::OneOfElement:
-    return cast<OneOfElementDecl>(this)->getLocStart();
-  case DeclKind::Arg:        return cast<ArgDecl>(this)->getLocStart();
-  case DeclKind::ElementRef: return cast<ElementRefDecl>(this)->getLocStart();
+#define DECL(NAME, X) \
+  case DeclKind::NAME: return cast<NAME##Decl>(this)->getLocStart();
+#include "swift/AST/DeclNodes.def"
   }
 
   assert(0 && "Unknown decl kind");

@@ -35,20 +35,11 @@ public:
 
   DeclRetTy visit(Decl *D) {
     switch (D->Kind) {
-        
-#define DISPATCH(CLASS) \
-  case DeclKind::CLASS: \
-  return static_cast<ImplClass*>(this)->visit ## CLASS ## \
-    Decl(static_cast<CLASS##Decl*>(D))
-
-      DISPATCH(Import);
-      DISPATCH(TypeAlias);
-      DISPATCH(Var);
-      DISPATCH(Func);
-      DISPATCH(OneOfElement);
-      DISPATCH(Arg);
-      DISPATCH(ElementRef);
-#undef DISPATCH
+#define DECL(CLASS, PARENT) \
+    case DeclKind::CLASS: \
+      return static_cast<ImplClass*>(this) \
+        ->visit##CLASS##Decl(static_cast<CLASS##Decl*>(D));
+#include "swift/AST/DeclNodes.def"
     }
     llvm_unreachable("Not reachable, all cases handled");
   }
