@@ -524,7 +524,7 @@ static InfixData getInfixData(TypeChecker &TC, Expr *E) {
 static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS) {
   Expr *ArgElts[] = { LHS, RHS };
   Expr **ArgElts2 = TC.Context.AllocateCopy<Expr*>(ArgElts, ArgElts+2);
-  TupleExpr *Arg = new (TC.Context) TupleExpr(LHS->getStartLoc(),
+  TupleExpr *Arg = new (TC.Context) TupleExpr(SourceLoc(), 
                                               ArgElts2, 0, 2, SourceLoc(),
                                               false);
   return new (TC.Context) BinaryExpr(Op, Arg);

@@ -32,13 +32,25 @@ void *Expr::operator new(size_t Bytes, ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
-/// getLocStart - Return the location of the start of the expression.
-/// FIXME: Need to extend this to do full source ranges like Clang.
-SourceLoc Expr::getStartLoc() const {
+namespace  {
+  // Helper functions to verify statically whether the getSourceRange()
+  // function has been overridden.
+  typedef const char (&TwoChars)[2];
+  
+  template<typename Class> 
+  inline char checkSourceRangeType(SourceRange (Class::*)() const);
+  
+  __attribute__((used))
+  inline TwoChars checkSourceRangeType(SourceRange (Expr::*)() const);
+}
+
+SourceRange Expr::getSourceRange() const {
   switch (Kind) {
 #define EXPR(ID, PARENT) \
-  case ExprKind::ID: \
-    return cast<ID##Expr>(this)->getStartLoc();
+case ExprKind::ID: \
+static_assert(sizeof(checkSourceRangeType(&ID##Expr::getSourceRange)) == 1, \
+              #ID "Expr is missing getSourceRange()"); \
+return cast<ID##Expr>(this)->getSourceRange();
 #include "swift/AST/ExprNodes.def"
   }
   
@@ -83,6 +95,23 @@ SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
                               elements.size() * sizeof(Expr*),
                               Expr::Alignment);
   return ::new(Buffer) SequenceExpr(elements);
+}
+
+SourceRange TupleExpr::getSourceRange() const {
+  SourceLoc Start = LParenLoc;
+  if (!Start.isValid())
+    Start = getElement(0)->getStartLoc();
+
+  SourceLoc End = RParenLoc;
+  if (!End.isValid())
+    End = getElement(getNumElements() - 1)->getEndLoc();
+  
+  return SourceRange(Start, End);
+}
+
+SourceRange FuncExpr::getSourceRange() const {
+  // FIXME: Fix end location
+  return SourceRange(FuncLoc, Body->getStartLoc());
 }
 
 static ValueDecl *getCalledValue(Expr *E) {

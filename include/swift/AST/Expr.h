@@ -81,10 +81,15 @@ public:
   /// self-documenting.
   void setDependentType(Type T) { setType(T, ValueKind::RValue); }
 
+  /// \brief Return the source range of the expression.
+  SourceRange getSourceRange() const;
+  
   /// getStartLoc - Return the location of the start of the expression.
-  /// FIXME: QOI: Need to extend this to do full source ranges like Clang.
-  SourceLoc getStartLoc() const;
+  SourceLoc getStartLoc() const { return getSourceRange().Start; }
 
+  /// \brief Retrieve the location of the end of the expression.
+  SourceLoc getEndLoc() const { return getSourceRange().End; }
+  
   /// getExprLoc - Return the caret location of this expression.
   SourceLoc getLoc() const;
 
@@ -161,7 +166,7 @@ public:
   uint64_t getValue() const;
 
   SourceLoc getLoc() const { return Loc; }
-  SourceLoc getStartLoc() const { return Loc; }
+  SourceRange getSourceRange() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const IntegerLiteralExpr *) { return true; }
@@ -185,7 +190,7 @@ public:
   double getValue() const { return Val; }
 
   SourceLoc getLoc() const { return Loc; }
-  SourceLoc getStartLoc() const { return Loc; }
+  SourceRange getSourceRange() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const FloatLiteralExpr *) { return true; }
@@ -206,7 +211,7 @@ public:
   ValueDecl *getDecl() const { return D; }
 
   SourceLoc getLoc() const { return Loc; }  
-  SourceLoc getStartLoc() const { return Loc; }
+  SourceRange getSourceRange() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const DeclRefExpr *) { return true; }
@@ -228,7 +233,7 @@ public:
   ArrayRef<ValueDecl*> getDecls() const { return Decls; }
 
   SourceLoc getLoc() const { return Loc; }
-  SourceLoc getStartLoc() const { return Loc; }
+  SourceRange getSourceRange() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const OverloadSetRefExpr *) { return true; }
@@ -254,7 +259,7 @@ public:
   Identifier getName() const { return Name; }
 
   SourceLoc getLoc() const { return Loc; }
-  SourceLoc getStartLoc() const { return Loc; }
+  SourceRange getSourceRange() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedDeclRefExpr *) { return true; }
@@ -283,7 +288,9 @@ public:
   SourceLoc getColonLoc() const { return ColonLoc; }
 
   SourceLoc getLoc() const { return NameLoc; }
-  SourceLoc getStartLoc() const { return ColonLoc; }
+  SourceRange getSourceRange() const { 
+    return SourceRange(ColonLoc, NameLoc); 
+  }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedMemberExpr *) { return true; }
@@ -318,7 +325,9 @@ public:
   SourceLoc getNameLoc() const { return NameLoc; }
 
   SourceLoc getLoc() const { return NameLoc; }
-  SourceLoc getStartLoc() const { return BaseNameLoc; }
+  SourceRange getSourceRange() const { 
+    return SourceRange(BaseNameLoc, NameLoc); 
+  }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedScopedIdentifierExpr *) { return true; }
@@ -360,14 +369,16 @@ public:
     assert((!isGrouping ||
             (NumSubExprs == 1 && getElementName(0).empty() && SubExprs[0])) &&
            "Invalid grouping paren");
+    assert(lparenloc.isValid() == rparenloc.isValid() &&
+           "Mismatched parenthesis location information validity");
   }
 
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
 
   SourceLoc getLoc() const { return LParenLoc; }
-  SourceLoc getStartLoc() const { return LParenLoc; }
-  SourceLoc getEndLoc() const { return RParenLoc; }
+  
+  SourceRange getSourceRange() const;
 
   unsigned getNumElements() const { return NumSubExprs; }
 
@@ -420,11 +431,17 @@ public:
     Name(name), NameLoc(nameloc) {}
   
   SourceLoc getLoc() const { return DotLoc; }
-  SourceLoc getStartLoc() const {
-    return SubExpr ? SubExpr->getStartLoc() : DotLoc;
+  
+  SourceRange getSourceRange() const {
+    SourceLoc Start;
+    if (SubExpr)
+      Start = SubExpr->getStartLoc();
+    else
+      Start = DotLoc;
+    
+    return SourceRange(Start, NameLoc);
   }
-  SourceLoc getEndLoc() const { return NameLoc; }
-
+  
   SourceLoc getDotLoc() const { return DotLoc; }
   Expr *getBase() const { return SubExpr; }
   void setBase(Expr *e) { SubExpr = e; }
@@ -458,7 +475,10 @@ public:
   : Expr(ExprKind::TupleElement, ty), SubExpr(subexpr), DotLoc(dotloc),
     FieldNo(fieldno), NameLoc(nameloc) {}
 
-  SourceLoc getStartLoc() const { return SubExpr->getStartLoc(); }
+  SourceRange getSourceRange() const { 
+    return SourceRange(SubExpr->getStartLoc(), NameLoc);
+  }
+  
   SourceLoc getDotLoc() const { return DotLoc; }
   SourceLoc getLoc() const { return DotLoc; }
   Expr *getBase() const { return SubExpr; }
@@ -491,6 +511,8 @@ public:
     : Expr(ExprKind::TupleShuffle, TypeJudgement(Ty, ValueKind::RValue)),
       SubExpr(subExpr), ElementMapping(elementMapping) {}
 
+  SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
+  
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *e) { SubExpr = e; }
   ArrayRef<int> getElementMapping() const { return ElementMapping; }
@@ -512,7 +534,7 @@ public:
            TypeJudgement(SubExpr->getType(), ValueKind::RValue)),
       SubExpr(SubExpr) {}
 
-  SourceLoc getStartLoc() const { return SubExpr->getStartLoc(); }
+  SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
   SourceLoc getLoc() const { return SubExpr->getLoc(); }
 
   Expr *getSubExpr() const { return SubExpr; }
@@ -542,7 +564,11 @@ class SequenceExpr : public Expr {
 public:
   static SequenceExpr *create(ASTContext &ctx, ArrayRef<Expr*> elements);
 
-  SourceLoc getStartLoc() const { return getElements()[0]->getStartLoc(); }
+  SourceRange getSourceRange() const { 
+    return SourceRange(getElements()[0]->getStartLoc(),
+                       getElements()[getNumElements() - 1]->getEndLoc());
+  }
+  
   SourceLoc getLoc() const { return getElements()[0]->getLoc(); }
 
   unsigned getNumElements() const { return NumElements; }
@@ -581,7 +607,7 @@ public:
       DeclContext(DeclContextKind::FuncExpr, Parent),
       FuncLoc(FuncLoc), NamedArgs(NamedArgs), Body(Body) {}
 
-  SourceLoc getStartLoc() const { return FuncLoc; }
+  SourceRange getSourceRange() const;
   SourceLoc getLoc() const { return FuncLoc; }
 
   /// Returns the location of the 'func' keyword.
@@ -615,6 +641,8 @@ public:
   Expr *getInput() const { return Input; }
   void setInput(Expr *e) { Input = e; }
 
+  SourceRange getSourceRange() const { return Input->getSourceRange(); }
+  
   /// getNumArgs - Return the number of arguments that this closure expr takes.
   unsigned getNumArgs() const;
   
@@ -632,7 +660,7 @@ public:
     : Expr(ExprKind::AnonClosureArg), ArgNo(argNo), Loc(loc) {}
 
   SourceLoc getLoc() const { return Loc; }
-  SourceLoc getStartLoc() const { return Loc; }
+  SourceRange getSourceRange() const { return Loc; }
 
   unsigned getArgNumber() const { return ArgNo; }
   
@@ -667,7 +695,7 @@ public:
   void setArg(Expr *e) { Arg = e; }
 
   ValueDecl *getCalledValue() const;
-  
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ApplyExpr *) { return true; }
   static bool classof(const Expr *E) {
@@ -684,7 +712,9 @@ public:
   CallExpr(Expr *Fn, Expr *Arg, TypeJudgement Ty)
     : ApplyExpr(ExprKind::Call, Fn, Arg, Ty) {}
 
-  SourceLoc getStartLoc() const { return getFn()->getStartLoc(); }
+  SourceRange getSourceRange() const {
+    return SourceRange(getFn()->getStartLoc(), getArg()->getEndLoc()); 
+  }  
   SourceLoc getLoc() const { return getArg()->getStartLoc(); }
   
   // Implement isa/cast/dyncast/etc.
@@ -698,9 +728,12 @@ public:
   UnaryExpr(Expr *Fn, Expr *Arg, TypeJudgement Ty = TypeJudgement())
     : ApplyExpr(ExprKind::Unary, Fn, Arg, Ty) {}
 
-  SourceLoc getStartLoc() const { return getFn()->getStartLoc(); }
   SourceLoc getLoc() const { return getFn()->getStartLoc(); }
   
+  SourceRange getSourceRange() const {
+    return SourceRange(getFn()->getStartLoc(), getArg()->getEndLoc()); 
+  }  
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnaryExpr *) { return true; }
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Unary; }
@@ -720,8 +753,12 @@ public:
   }
 
   SourceLoc getLoc() const { return getFn()->getLoc(); }
-  SourceLoc getStartLoc() const { return getArgTuple()->getStartLoc(); }
-                  
+                 
+  SourceRange getSourceRange() const {
+    return SourceRange(getArgTuple()->getStartLoc(), 
+                       getArgTuple()->getEndLoc()); 
+  }  
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BinaryExpr *) { return true; }
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Binary; }
@@ -741,7 +778,10 @@ public:
 
   SourceLoc getDotLoc() const { return DotLoc; }
   SourceLoc getLoc() const { return DotLoc; }
-  SourceLoc getStartLoc() const { return getArg()->getStartLoc(); }
+  
+  SourceRange getSourceRange() const {
+    return SourceRange(getFn()->getStartLoc(), getArg()->getEndLoc());
+  }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ProtocolElementExpr *) { return true; }

@@ -55,6 +55,7 @@ public:
   SourceLoc Start, End;
 
   SourceRange() {}
+  SourceRange(SourceLoc Loc) : Start(Loc), End(Loc) { }
   SourceRange(SourceLoc Start, SourceLoc End) : Start(Start), End(End) {
     assert(Start.isValid() == End.isValid() &&
            "Start and end should either both be valid or both be invalid!");

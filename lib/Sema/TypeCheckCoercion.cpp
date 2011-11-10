@@ -449,7 +449,7 @@ Expr *SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
       NewName[i] = DestTy->Fields[i].Name;
   }
   
-  return new (TC.Context) TupleExpr(E->getStartLoc(), NewSE, NewName,
+  return new (TC.Context) TupleExpr(SourceLoc(), NewSE, NewName,
                                     NumFields, SourceLoc(), false,
                                     TypeJudgement(DestTy, ValueKind::RValue));
 }
