@@ -96,12 +96,24 @@ namespace {
     bool shouldVerify(Stmt *S) { return true; }
 
     // Base cases for the various stages of verification.
-    void verifyParsed(Expr *E, WalkContext const& WalkCtx) {}
-    void verifyParsed(Stmt *S, WalkContext const& WalkCtx) {}
-    void verifyBound(Expr *E, WalkContext const& WalkCtx) {}
-    void verifyBound(Stmt *S, WalkContext const& WalkCtx) {}
-    void verifyChecked(Expr *E, WalkContext const& WalkCtx) {}
-    void verifyChecked(Stmt *S, WalkContext const& WalkCtx) {}
+    void verifyParsed(Expr *E, WalkContext const& WalkCtx) {
+      checkSourceRanges(E, WalkCtx);
+    }
+    void verifyParsed(Stmt *S, WalkContext const& WalkCtx) {
+      checkSourceRanges(S, WalkCtx);
+    }
+    void verifyBound(Expr *E, WalkContext const& WalkCtx) {
+      checkSourceRanges(E, WalkCtx);
+    }
+    void verifyBound(Stmt *S, WalkContext const& WalkCtx) {
+      checkSourceRanges(S, WalkCtx);
+    }
+    void verifyChecked(Expr *E, WalkContext const& WalkCtx) {
+      checkSourceRanges(E, WalkCtx);
+    }
+    void verifyChecked(Stmt *S, WalkContext const& WalkCtx) {
+      checkSourceRanges(S, WalkCtx);
+    }
 
     // Specialized verifiers.
 
@@ -123,6 +135,53 @@ namespace {
       Out << "\n";
       abort();
     }
+    
+    void checkSourceRanges(Expr *E, WalkContext const& WalkCtx) {
+      if (!E->getSourceRange().isValid()) {
+        Out << "invalid source range for expression: ";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+      checkSourceRanges(E->getSourceRange(), WalkCtx.Parent,
+                        ^ { E->print(Out); } );
+    }
+    
+    void checkSourceRanges(Stmt *S, WalkContext const &WalkCtx) {
+      if (!S->getSourceRange().isValid()) {
+        Out << "invalid source range for statement: ";
+        S->print(Out);
+        Out << "\n";
+        abort();
+      }
+      checkSourceRanges(S->getSourceRange(), WalkCtx.Parent,
+                        ^ { S->print(Out); });
+    }
+    
+    /// \brief Verify that the given source ranges is contained within the
+    /// parent's source range.
+    void checkSourceRanges(SourceRange Current, 
+                           llvm::PointerUnion<Expr *, Stmt *> Parent,
+                           void (^printEntity)()) {
+      SourceRange Enclosing;
+      if (Stmt *S = Parent.dyn_cast<Stmt *>())
+        Enclosing = S->getSourceRange();
+      else if (Expr *E = Parent.dyn_cast<Expr *>())
+        Enclosing = E->getSourceRange();
+      else // no parent
+        return;
+      
+      // FIXME: This is a very ugly way to check inclusion.
+      if (Enclosing.Start.Value.getPointer() > Current.Start.Value.getPointer()
+          || Enclosing.End.Value.getPointer() < Current.End.Value.getPointer()) 
+      {
+        Out << "child source range not contained within its parent: ";
+        printEntity();
+        Out << "\n";
+        abort();
+      }
+    }
+    
   };
 }
 
