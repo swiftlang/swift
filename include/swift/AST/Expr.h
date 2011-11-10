@@ -90,7 +90,7 @@ public:
   /// \brief Retrieve the location of the end of the expression.
   SourceLoc getEndLoc() const { return getSourceRange().End; }
   
-  /// getExprLoc - Return the caret location of this expression.
+  /// getLoc - Return the caret location of this expression.
   SourceLoc getLoc() const;
 
   /// walk - This recursively walks all of the statements and expressions
@@ -165,7 +165,6 @@ public:
   
   uint64_t getValue() const;
 
-  SourceLoc getLoc() const { return Loc; }
   SourceRange getSourceRange() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
@@ -189,7 +188,6 @@ public:
 
   double getValue() const { return Val; }
 
-  SourceLoc getLoc() const { return Loc; }
   SourceRange getSourceRange() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
@@ -210,7 +208,6 @@ public:
 
   ValueDecl *getDecl() const { return D; }
 
-  SourceLoc getLoc() const { return Loc; }  
   SourceRange getSourceRange() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
@@ -232,7 +229,6 @@ public:
 
   ArrayRef<ValueDecl*> getDecls() const { return Decls; }
 
-  SourceLoc getLoc() const { return Loc; }
   SourceRange getSourceRange() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
@@ -258,7 +254,6 @@ public:
   
   Identifier getName() const { return Name; }
 
-  SourceLoc getLoc() const { return Loc; }
   SourceRange getSourceRange() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.
@@ -376,8 +371,6 @@ public:
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
 
-  SourceLoc getLoc() const { return LParenLoc; }
-  
   SourceRange getSourceRange() const;
 
   unsigned getNumElements() const { return NumSubExprs; }
@@ -430,7 +423,7 @@ public:
   : Expr(ExprKind::UnresolvedDot), SubExpr(subexpr), DotLoc(dotloc),
     Name(name), NameLoc(nameloc) {}
   
-  SourceLoc getLoc() const { return DotLoc; }
+  SourceLoc getLoc() const { return NameLoc; }
   
   SourceRange getSourceRange() const {
     SourceLoc Start;
@@ -480,7 +473,7 @@ public:
   }
   
   SourceLoc getDotLoc() const { return DotLoc; }
-  SourceLoc getLoc() const { return DotLoc; }
+  SourceLoc getLoc() const { return NameLoc; }
   Expr *getBase() const { return SubExpr; }
   void setBase(Expr *e) { SubExpr = e; }
 
@@ -535,7 +528,6 @@ public:
       SubExpr(SubExpr) {}
 
   SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
-  SourceLoc getLoc() const { return SubExpr->getLoc(); }
 
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *E) { SubExpr = E; }
@@ -569,8 +561,6 @@ public:
                        getElements()[getNumElements() - 1]->getEndLoc());
   }
   
-  SourceLoc getLoc() const { return getElements()[0]->getLoc(); }
-
   unsigned getNumElements() const { return NumElements; }
 
   ArrayRef<Expr*> getElements() const {
@@ -659,7 +649,6 @@ public:
   AnonClosureArgExpr(unsigned argNo, SourceLoc loc)
     : Expr(ExprKind::AnonClosureArg), ArgNo(argNo), Loc(loc) {}
 
-  SourceLoc getLoc() const { return Loc; }
   SourceRange getSourceRange() const { return Loc; }
 
   unsigned getArgNumber() const { return ArgNo; }
@@ -755,8 +744,7 @@ public:
   SourceLoc getLoc() const { return getFn()->getLoc(); }
                  
   SourceRange getSourceRange() const {
-    return SourceRange(getArgTuple()->getStartLoc(), 
-                       getArgTuple()->getEndLoc()); 
+    return getArgTuple()->getSourceRange();
   }  
 
   // Implement isa/cast/dyncast/etc.
@@ -777,7 +765,7 @@ public:
   }
 
   SourceLoc getDotLoc() const { return DotLoc; }
-  SourceLoc getLoc() const { return DotLoc; }
+  SourceLoc getLoc() const { return getArg()->getStartLoc(); }
   
   SourceRange getSourceRange() const {
     return SourceRange(getFn()->getStartLoc(), getArg()->getEndLoc());

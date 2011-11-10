@@ -32,17 +32,14 @@ void *Expr::operator new(size_t Bytes, ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
-namespace  {
-  // Helper functions to verify statically whether the getSourceRange()
-  // function has been overridden.
-  typedef const char (&TwoChars)[2];
-  
-  template<typename Class> 
-  inline char checkSourceRangeType(SourceRange (Class::*)() const);
-  
-  __attribute__((used))
-  inline TwoChars checkSourceRangeType(SourceRange (Expr::*)() const);
-}
+// Helper functions to verify statically whether the getSourceRange()
+// function has been overridden.
+typedef const char (&TwoChars)[2];
+
+template<typename Class> 
+inline char checkSourceRangeType(SourceRange (Class::*)() const);
+
+inline TwoChars checkSourceRangeType(SourceRange (Expr::*)() const);
 
 SourceRange Expr::getSourceRange() const {
   switch (Kind) {
@@ -62,11 +59,13 @@ SourceLoc Expr::getLoc() const {
   switch (Kind) {
 #define EXPR(ID, PARENT) \
   case ExprKind::ID: \
-    return cast<ID##Expr>(this)->getLoc();
+    if (&Expr::getLoc != &ID##Expr::getLoc) \
+      return cast<ID##Expr>(this)->getLoc(); \
+    break;
 #include "swift/AST/ExprNodes.def"
   }
-  
-  llvm_unreachable("expression type not handled!");
+
+  return getStartLoc();
 }
 
 //===----------------------------------------------------------------------===//
