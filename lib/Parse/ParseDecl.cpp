@@ -302,6 +302,14 @@ Decl *Parser::parseDeclExtension() {
   if (parseTypeIdentifier(Ty) ||
       parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_oneof_type))
     return 0;
+  
+  // Parse the body as a series of decls.
+  // FIXME: Need to diagnose invalid members at Sema time!
+  SmallVector<Decl*, 8> MemberDecls;
+  while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
+    if (parseDecl(MemberDecls, PD_Default))
+      skipUntilDeclRBrace();
+  }
 
   parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_extension,
                      LBLoc, diag::opening_brace);
