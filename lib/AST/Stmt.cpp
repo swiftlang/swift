@@ -31,29 +31,30 @@ void *Stmt::operator new(size_t Bytes, ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
-/// getLocStart - Return the location of the start of the expression.
-/// FIXME: Need to extend this to do full source ranges like Clang.
-SourceLoc Stmt::getStartLoc() const {
+// Helper functions to verify statically whether the getSourceRange()
+// function has been overridden.
+typedef const char (&TwoChars)[2];
+
+template<typename Class> 
+inline char checkSourceRangeType(SourceRange (Class::*)() const);
+
+inline TwoChars checkSourceRangeType(SourceRange (Stmt::*)() const);
+
+SourceRange Stmt::getSourceRange() const {
   switch (Kind) {
-  case StmtKind::Semi:
-    return cast<SemiStmt>(this)->getStartLoc();
-  case StmtKind::Assign:
-    return cast<AssignStmt>(this)->getStartLoc();
-  case StmtKind::Brace:
-    return cast<BraceStmt>(this)->getStartLoc();
-  case StmtKind::Return:
-    return cast<ReturnStmt>(this)->getStartLoc();
-  case StmtKind::If:
-    return cast<IfStmt>(this)->getStartLoc();
-  case StmtKind::While:
-    return cast<WhileStmt>(this)->getStartLoc();
+#define STMT(ID, PARENT) \
+case StmtKind::ID: \
+static_assert(sizeof(checkSourceRangeType(&ID##Stmt::getSourceRange)) == 1, \
+              #ID "Stmt is missing getSourceRange()"); \
+return cast<ID##Stmt>(this)->getSourceRange();
+#include "swift/AST/StmtNodes.def"
   }
   
-  llvm_unreachable("Not reachable, all cases handled");
+  llvm_unreachable("statement type not handled!");
 }
 
-SourceLoc AssignStmt::getStartLoc() const {
-  return getDest()->getStartLoc();
+SourceRange AssignStmt::getSourceRange() const {
+  return SourceRange(Dest->getStartLoc(), Src->getEndLoc());
 }
 
 BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ExprStmtOrDecl> elts,
@@ -71,6 +72,24 @@ BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
   return ::new(Buffer) BraceStmt(lbloc, elts, rbloc);
 }
 
+SourceRange ReturnStmt::getSourceRange() const {
+  SourceLoc End = ReturnLoc;
+  if (Result)
+    End = Result->getEndLoc();
+  
+  return SourceRange(ReturnLoc, End);
+}
+
+SourceRange IfStmt::getSourceRange() const {
+  SourceLoc End = Then->getEndLoc();
+  if (Else)
+    End = Else->getEndLoc();
+  return SourceRange(IfLoc, End);
+}
+
+SourceRange WhileStmt::getSourceRange() const {
+  return SourceRange(WhileLoc, Body->getEndLoc());
+}
 
 //===----------------------------------------------------------------------===//
 // Printing for Stmt and all subclasses.

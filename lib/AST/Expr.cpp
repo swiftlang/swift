@@ -109,8 +109,7 @@ SourceRange TupleExpr::getSourceRange() const {
 }
 
 SourceRange FuncExpr::getSourceRange() const {
-  // FIXME: Fix end location
-  return SourceRange(FuncLoc, Body->getStartLoc());
+  return SourceRange(FuncLoc, Body->getEndLoc());
 }
 
 static ValueDecl *getCalledValue(Expr *E) {

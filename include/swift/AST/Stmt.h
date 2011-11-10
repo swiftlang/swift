@@ -46,10 +46,13 @@ public:
 
   StmtKind getKind() const { return Kind; }
 
-  /// getLocStart - Return the location of the start of the expression.
-  /// FIXME: QOI: Need to extend this to do full source ranges like Clang.
-  SourceLoc getStartLoc() const;
+  /// \brief Return the location of the start of the statement.
+  SourceLoc getStartLoc() const { return getSourceRange().Start; }
   
+  /// \brief Return the location of the end of the statement.
+  SourceLoc getEndLoc() const { return getSourceRange().End; }
+  
+  SourceRange getSourceRange() const;
   
   /// walk - This recursively walks all of the statements and expressions
   /// contained within a statement and invokes the ExprFn and StmtFn blocks on
@@ -98,7 +101,8 @@ public:
   SemiStmt(SourceLoc Loc) : Stmt(StmtKind::Semi), Loc(Loc) {}
 
   SourceLoc getLoc() const { return Loc; }
-  SourceLoc getStartLoc() const { return Loc; }
+  
+  SourceRange getSourceRange() const { return Loc; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const SemiStmt *) { return true; }
@@ -121,7 +125,8 @@ public:
   void setSrc(Expr *e) { Src = e; }
   
   SourceLoc getEqualLoc() const { return EqualLoc; }
-  SourceLoc getStartLoc() const;
+  
+  SourceRange getSourceRange() const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const AssignStmt *) { return true; }
@@ -156,7 +161,8 @@ public:
 
   SourceLoc getLBraceLoc() const { return LBLoc; }
   SourceLoc getRBraceLoc() const { return RBLoc; }
-  SourceLoc getStartLoc() const { return LBLoc; }
+  
+  SourceRange getSourceRange() const { return SourceRange(LBLoc, RBLoc); }
 
   unsigned getNumElements() const { return NumElements; }
   ArrayRef<ExprStmtOrDecl> getElements() const {
@@ -187,7 +193,7 @@ public:
   ReturnStmt(SourceLoc ReturnLoc, Expr *Result)
     : Stmt(StmtKind::Return), ReturnLoc(ReturnLoc), Result(Result) {}
 
-  SourceLoc getStartLoc() const { return ReturnLoc; }
+  SourceRange getSourceRange() const;
   SourceLoc getReturnLoc() const { return ReturnLoc; }
 
   Expr *getResult() const { return Result; }
@@ -214,9 +220,10 @@ public:
   : Stmt(StmtKind::If),
     IfLoc(IfLoc), ElseLoc(ElseLoc), Cond(Cond), Then(Then), Else(Else) {}
 
-  SourceLoc getStartLoc() const { return IfLoc; }
   SourceLoc getIfLoc() const { return IfLoc; }
   SourceLoc getElseLoc() const { return ElseLoc; }
+
+  SourceRange getSourceRange() const;
 
   Expr *getCond() const { return Cond; }
   void setCond(Expr *e) { Cond = e; }
@@ -244,7 +251,7 @@ public:
   : Stmt(StmtKind::While),
     WhileLoc(WhileLoc), Cond(Cond), Body(Body) {}
 
-  SourceLoc getStartLoc() const { return WhileLoc; }
+  SourceRange getSourceRange() const;
 
   Expr *getCond() const { return Cond; }
   void setCond(Expr *e) { Cond = e; }
