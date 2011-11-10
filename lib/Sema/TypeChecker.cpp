@@ -95,7 +95,7 @@ bool TypeChecker::bindAndValidateClosureArgs(Expr *Body, Type FuncInput) {
   // Walk the body and rewrite any anonymous arguments.  Note that this
   // isn't a particularly efficient way to handle this, because we walk subtrees
   // even if they have no anonymous arguments.
-  return Body->walk(^(Expr *E, WalkOrder Order) {
+  return Body->walk(^(Expr *E, WalkOrder Order, WalkContext const&) {
     return RP->WalkFn(E, Order);
   }) == 0;
 }

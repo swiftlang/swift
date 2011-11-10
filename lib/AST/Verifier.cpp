@@ -31,9 +31,10 @@ namespace {
     Verifier(VerificationKind Stage)
       : Stage(Stage), Out(llvm::errs()) {}
 
-    Expr *dispatch(Expr *E, WalkOrder ord) {
+    Expr *dispatch(Expr *E, WalkOrder ord, WalkContext const& WalkCtx) {
       switch (E->getKind()) {
-#define DISPATCH(ID) return dispatchVisit(static_cast<ID##Expr*>(E), ord)
+#define DISPATCH(ID) return dispatchVisit(static_cast<ID##Expr*>(E), ord, \
+                                          WalkCtx)
 #define EXPR(ID, PARENT) \
       case ExprKind::ID: \
         DISPATCH(ID);
@@ -51,9 +52,10 @@ namespace {
       llvm_unreachable("not all cases handled!");
     }
 
-    Stmt *dispatch(Stmt *S, WalkOrder ord) {
+    Stmt *dispatch(Stmt *S, WalkOrder ord, WalkContext const& WalkCtx) {
       switch (S->getKind()) {
-#define DISPATCH(ID) return dispatchVisit(static_cast<ID##Stmt*>(S), ord)
+#define DISPATCH(ID) return dispatchVisit(static_cast<ID##Stmt*>(S), ord, \
+                                          WalkCtx)
 #define STMT(ID, PARENT) \
       case StmtKind::ID: \
         DISPATCH(ID);
@@ -65,7 +67,8 @@ namespace {
 
   private:
     /// Helper template for dispatching visitation.
-    template <class T> T dispatchVisit(T node, WalkOrder ord) {
+    template <class T> T dispatchVisit(T node, WalkOrder ord, 
+                                       WalkContext const& WalkCtx) {
       // If we're visiting in pre-order, don't validate the node yet;
       // just check whether we should stop further descent.
       if (ord == WalkOrder::PreOrder)
@@ -74,15 +77,15 @@ namespace {
       // Otherwise, actually verify the node.
 
       // Always verify the node as a parsed node.
-      verifyParsed(node);
+      verifyParsed(node, WalkCtx);
 
       // If we've bound names already, verify as a bound node.
       if (Stage >= VerificationKind::BoundNames)
-        verifyBound(node);
+        verifyBound(node, WalkCtx);
 
       // If we've checked types already, do some extra verification.
       if (Stage >= VerificationKind::CheckedTypes)
-        verifyChecked(node);
+        verifyChecked(node, WalkCtx);
 
       // Always continue.
       return node;
@@ -93,16 +96,17 @@ namespace {
     bool shouldVerify(Stmt *S) { return true; }
 
     // Base cases for the various stages of verification.
-    void verifyParsed(Expr *E) {}
-    void verifyParsed(Stmt *S) {}
-    void verifyBound(Expr *E) {}
-    void verifyBound(Stmt *S) {}
-    void verifyChecked(Expr *E) {}
-    void verifyChecked(Stmt *S) {}
+    void verifyParsed(Expr *E, WalkContext const& WalkCtx) {}
+    void verifyParsed(Stmt *S, WalkContext const& WalkCtx) {}
+    void verifyBound(Expr *E, WalkContext const& WalkCtx) {}
+    void verifyBound(Stmt *S, WalkContext const& WalkCtx) {}
+    void verifyChecked(Expr *E, WalkContext const& WalkCtx) {}
+    void verifyChecked(Stmt *S, WalkContext const& WalkCtx) {}
 
     // Specialized verifiers.
 
-    void verifyChecked(AssignStmt *S) {
+    void verifyChecked(AssignStmt *S, WalkContext const& WalkCtx) {
+      verifyChecked(static_cast<Stmt *>(S), WalkCtx);
       checkSameType(S->getDest()->getType(), S->getSrc()->getType(),
                     "assignment operands");
     }
@@ -130,6 +134,10 @@ void swift::verify(TranslationUnit *TUnit, VerificationKind Stage) {
   Verifier VObject(Stage);
   Verifier *V = &VObject;
 
-  TUnit->Body->walk(^(Expr *E, WalkOrder Ord) { return V->dispatch(E, Ord); },
-                    ^(Stmt *S, WalkOrder Ord) { return V->dispatch(S, Ord); });
+  TUnit->Body->walk(^(Expr *E, WalkOrder Ord, WalkContext const &WalkCtx) { 
+                        return V->dispatch(E, Ord, WalkCtx); 
+                    },
+                    ^(Stmt *S, WalkOrder Ord, WalkContext const &WalkCtx) { 
+                        return V->dispatch(S, Ord, WalkCtx); 
+                    });
 }

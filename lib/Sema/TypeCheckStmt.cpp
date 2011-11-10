@@ -176,7 +176,7 @@ void swift::performTypeChecking(TranslationUnit *TU) {
   std::vector<FuncExpr*> FuncExprs;
   auto FuncExprs_ptr = &FuncExprs;            // Blocks are annoying.
   auto TC_ptr = &TC;                          // Again.
-  TU->Body->walk(^(Expr *E, WalkOrder Order) {
+  TU->Body->walk(^(Expr *E, WalkOrder Order, WalkContext const&) {
     if (Order == WalkOrder::PreOrder) {
       if (FuncExpr *FE = dyn_cast<FuncExpr>(E))
         FuncExprs_ptr->push_back(FE);

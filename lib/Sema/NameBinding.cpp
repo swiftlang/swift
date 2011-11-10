@@ -360,7 +360,7 @@ void swift::performNameBinding(TranslationUnit *TU) {
   }
 
   NameBinder *NBPtr = &Binder;
-  auto BinderBlock = ^(Expr *E, WalkOrder Order) {
+  auto BinderBlock = ^(Expr *E, WalkOrder Order, WalkContext const&) {
     return BindNames(E, Order, *NBPtr);
   };
   

@@ -13,6 +13,8 @@
 #ifndef SWIFT_AST_WALK_H
 #define SWIFT_AST_WALK_H
 
+#include "llvm/ADT/PointerUnion.h"
+
 namespace swift {
 
 class Expr;
@@ -24,11 +26,20 @@ enum class WalkOrder {
   PostOrder
 };
 
+/// \brief Provides additional information about the context of an AST
+/// walk.
+struct WalkContext {
+  /// \brief The parent of the node we are visiting.
+  llvm::PointerUnion<Expr *, Stmt *> Parent;
+};
+
 /// \brief Function type used to describe a callback for walking an expression.
-typedef Expr *WalkExprType(Expr *E, WalkOrder Order);
+typedef Expr *WalkExprType(Expr *E, WalkOrder Order, 
+                           WalkContext const& WalkCtx);
 
 /// \brief Function type used to describe a callback for walking a statement.
-typedef Stmt *WalkStmtType(Stmt *S, WalkOrder Order);
+typedef Stmt *WalkStmtType(Stmt *S, WalkOrder Order,
+                           WalkContext const &WalkCtx);
 
 } // end namespace swift
 

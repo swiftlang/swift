@@ -353,7 +353,7 @@ public:
   
 
   Expr *doIt(Expr *E) {
-    return E->walk(^Expr*(Expr *E, WalkOrder Order) {
+    return E->walk(^Expr*(Expr *E, WalkOrder Order, WalkContext const&) {
       // This is implemented as a postorder walk.
       if (Order == WalkOrder::PreOrder) {
         // Do not walk into ClosureExpr.  Anonexprs within a nested closures
@@ -367,7 +367,7 @@ public:
       // Dispatch to the right visitor case in the post-order walk.  We know
       // that the operands have already been processed and are valid.
       return this->visit(E);
-    }, ^Stmt*(Stmt *S, WalkOrder Order) {
+    }, ^Stmt*(Stmt *S, WalkOrder Order, WalkContext const& WalkCtx) {
       // Never recurse into statements.
       return 0;
     });
@@ -661,7 +661,7 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
   __block Expr *OneDependentExpr = 0;
   __block SmallVector<IntegerLiteralExpr*, 4> DependentLiterals;
   
-  E = E->walk(^(Expr *E, WalkOrder Order) {
+  E = E->walk(^(Expr *E, WalkOrder Order, WalkContext const&) {
     // Ignore the preorder walk.  We'd rather diagnose use of unresolved types
     // during the postorder walk so that the inner most expressions are 
     // diagnosed before the outermost ones.
@@ -680,7 +680,7 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
         DependentLiterals.push_back(ILE);
     }
     return E;
-  }, ^Stmt*(Stmt *S, WalkOrder Order) {
+  }, ^Stmt*(Stmt *S, WalkOrder Order, WalkContext const&) {
     // Never recurse into statements.
     return 0;
   });
@@ -713,13 +713,13 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
     E = SET.doIt(E);
     if (E == 0) return true;
     
-    E = E->walk(^(Expr *E, WalkOrder Order) {
+    E = E->walk(^(Expr *E, WalkOrder Order, WalkContext const&) {
       // Remember the first dependent expression we come across.
       if (Order != WalkOrder::PreOrder && E->getType()->is<DependentType>() &&
           OneDependentExpr == 0)
         OneDependentExpr = E;
       return E;
-    }, ^Stmt*(Stmt *S, WalkOrder Order) {
+    }, ^Stmt*(Stmt *S, WalkOrder Order, WalkContext const& WalkCtx) {
       // Never recurse into statements.
       return 0;
     });

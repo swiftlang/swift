@@ -348,9 +348,41 @@ namespace {
   /// pointer returns true the walk is terminated.
   class ExprWalker : public ASTVisitor<ExprWalker, Expr*, Stmt*> {
     friend class ASTVisitor<ExprWalker, Expr*, Stmt*>;
-    Expr *(^ExprFn)(Expr *E, WalkOrder Order);
-    Stmt *(^StmtFn)(Stmt *S, WalkOrder Order);
     
+    typedef ASTVisitor<ExprWalker, Expr*, Stmt*> inherited;
+    
+    WalkExprType ^ExprFn;
+    WalkStmtType ^StmtFn;
+    WalkContext WalkCtx;
+    
+    /// \brief RAII object that sets the parent of the walk context 
+    /// appropriately.
+    class SetParentRAII {
+      WalkContext &WalkCtx;
+      llvm::PointerUnion<Expr *, Stmt *> PriorParent;
+      
+    public:
+      template<typename T>
+      SetParentRAII(WalkContext &WalkCtx, T *NewParent)
+        : WalkCtx(WalkCtx), PriorParent(WalkCtx.Parent) 
+      {
+        WalkCtx.Parent = NewParent;
+      }
+      
+      ~SetParentRAII() {
+        WalkCtx.Parent = PriorParent;
+      }
+    };
+    
+    Expr *visit(Expr *E) {
+      SetParentRAII SetParent(WalkCtx, E);
+      return inherited::visit(E);
+    }
+
+    Stmt *visit(Stmt *S) {
+      SetParentRAII SetParent(WalkCtx, S);
+      return inherited::visit(S);
+    }
     
     Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *E) { return E; }
     Expr *visitFloatLiteralExpr(FloatLiteralExpr *E) { return E; }
@@ -566,8 +598,7 @@ namespace {
     }
        
   public:
-    ExprWalker(Expr *(^ExprFn)(Expr *E, WalkOrder Order),
-               Stmt *(^StmtFn)(Stmt *S, WalkOrder Order))
+    ExprWalker(WalkExprType ^ExprFn, WalkStmtType ^StmtFn)
       : ExprFn(ExprFn), StmtFn(StmtFn) {
     }
     Expr *doIt(Expr *E) {
@@ -578,11 +609,11 @@ namespace {
       
       // Try the preorder visitation.  If it returns null, we just skip entering
       // subnodes of this tree.
-      Expr *E2 = ExprFn(E, WalkOrder::PreOrder);
+      Expr *E2 = ExprFn(E, WalkOrder::PreOrder, WalkCtx);
       if (E2 == 0) return E;
       
       if (E) E = visit(E);
-      if (E) E = ExprFn(E, WalkOrder::PostOrder);
+      if (E) E = ExprFn(E, WalkOrder::PostOrder, WalkCtx);
       return E;
     }
     Stmt *doIt(Stmt *S) {
@@ -593,11 +624,11 @@ namespace {
       
       // Try the preorder visitation.  If it returns null, we just skip entering
       // subnodes of this tree.
-      Stmt *S2 = StmtFn(S, WalkOrder::PreOrder);
+      Stmt *S2 = StmtFn(S, WalkOrder::PreOrder, WalkCtx);
       if (S2 == 0) return S;
       
       if (S) S = visit(S);
-      if (S) S = StmtFn(S, WalkOrder::PostOrder);
+      if (S) S = StmtFn(S, WalkOrder::PostOrder, WalkCtx);
       return S;
     }
   };
