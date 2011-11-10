@@ -20,7 +20,6 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/SourceMgr.h"
-
 using namespace swift;
 
 void 
@@ -60,3 +59,4 @@ PrintingDiagnosticConsumer::handleDiagnostic(llvm::SourceMgr &SM, SourceLoc Loc,
   // Display the diagnostic.
   SM.PrintMessage(Loc.Value, SMKind, StringRef(Text), Ranges);
 }
+
