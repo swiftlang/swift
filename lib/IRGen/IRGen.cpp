@@ -66,6 +66,9 @@ void swift::performIRGeneration(TranslationUnit *TU, Options &Opts) {
     return;
   }
 
+  // The integer values 0-3 map exactly to the values of this enum.
+  CodeGenOpt::Level OptLevel = static_cast<CodeGenOpt::Level>(Opts.OptLevel);
+
   // Create a target machine.
   // Things that maybe we should collect from the command line:
   //   - CPU
@@ -73,7 +76,9 @@ void swift::performIRGeneration(TranslationUnit *TU, Options &Opts) {
   //   - relocation model
   //   - code model
   TargetMachine *TargetMachine
-    = Target->createTargetMachine(Opts.Triple, /*cpu*/ "", /*features*/ "");
+    = Target->createTargetMachine(Opts.Triple, /*cpu*/ "", /*features*/ "",
+                                  Reloc::Default, CodeModel::Default,
+                                  OptLevel);
   if (!TargetMachine) {
     TU->Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target,
                            Opts.Triple, "no LLVM target machine");
@@ -148,10 +153,8 @@ void swift::performIRGeneration(TranslationUnit *TU, Options &Opts) {
                   ? TargetMachine::CGFT_AssemblyFile
                   : TargetMachine::CGFT_ObjectFile);
 
-    CodeGenOpt::Level OptLevel = static_cast<CodeGenOpt::Level>(Opts.OptLevel);
     if (TargetMachine->addPassesToEmitFile(ModulePasses, FormattedOS,
-                                           FileType, OptLevel,
-                                           !Opts.Verify)) {
+                                           FileType, !Opts.Verify)) {
       TU->Ctx.Diags.diagnose(SourceLoc(), diag::error_codegen_init_fail);
       return;
     }
