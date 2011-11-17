@@ -21,6 +21,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/Basic/Optional.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Target/TargetData.h"
 
@@ -32,6 +33,12 @@
 
 using namespace swift;
 using namespace irgen;
+
+static StringRef getFieldName(const TupleTypeElt &field) {
+  if (!field.Name.empty())
+    return field.Name.str();
+  return "elt";
+}
 
 namespace {
   /// A class describing the IR layout for a particular field.
@@ -96,6 +103,24 @@ namespace {
     ArrayRef<TupleFieldInfo> getFieldInfos() const {
       return llvm::makeArrayRef(getFieldInfoStorage(), NumFields);
     }
+
+    /// Perform an l-value projection of a member of this tuple.
+    LValue project(IRGenFunction &IGF, const LValue &tuple,
+                   const TupleFieldInfo &field) const {
+      llvm::Value *addr = tuple.getAddress();
+      addr = IGF.Builder.CreateStructGEP(addr, field.StorageIndex,
+                     addr->getName() + "." + getFieldName(field.Field));
+
+      // Compute the adjusted alignment.
+      Alignment align =
+        tuple.getAlignment().alignmentAtOffset(field.StorageOffset);
+
+      return LValue::forAddress(addr, align);
+    }
+
+    /// Perform an r-value projection of a member of this tuple.
+    virtual RValue project(IRGenFunction &IGF, const RValue &tuple,
+                           const TupleFieldInfo &field) const = 0;
   };
 
   /// A TypeInfo implementation for tuples that are broken down into scalars.
@@ -119,6 +144,13 @@ namespace {
 
     RValueSchema getSchema() const {
       return Schema;
+    }
+
+    RValue project(IRGenFunction &IGF, const RValue &tuple,
+                   const TupleFieldInfo &field) const {
+      ArrayRef<llvm::Value*> scalars = tuple.getScalars();
+      return RValue::forScalars(scalars.slice(field.ScalarBegin,
+                                       field.ScalarEnd - field.ScalarBegin));
     }
 
     RValue load(IRGenFunction &IGF, const LValue &LV) const {
@@ -185,6 +217,24 @@ namespace {
 
     RValueSchema getSchema() const {
       return RValueSchema::forAggregate(getStorageType(), StorageAlignment);
+    }
+
+    /// Given an r-value of this type, form an l-value referring to
+    /// the temporary.
+    LValue getLValueForAggregateRValue(const RValue &rvalue) const {
+      assert(rvalue.isAggregate());
+
+      // The alignment of a temporary is always the alignment of the type.
+      return LValue::forAddress(rvalue.getAggregateAddress(),
+                                StorageAlignment);
+    }
+
+    using TupleTypeInfo::project;
+    RValue project(IRGenFunction &IGF, const RValue &tuple,
+                   const TupleFieldInfo &field) const {
+      assert(tuple.isAggregate());
+      LValue tupleLV = getLValueForAggregateRValue(tuple);
+      return field.FieldInfo.load(IGF, project(IGF, tupleLV, field));
     }
 
     RValue load(IRGenFunction &IGF, const LValue &LV) const {
@@ -348,42 +398,56 @@ RValue IRGenFunction::emitTupleExpr(TupleExpr *Tuple, const TypeInfo &TI) {
   }
 }
 
+#include "llvm/Support/raw_ostream.h"
+
 RValue IRGenFunction::emitTupleElementRValue(TupleElementExpr *E,
-                                             const TypeInfo &TI) {
-  // TODO: if the base expression can reasonably be emitted as an
-  // l-value, do so and then project out.
-  unimplemented(E->getLoc(), "tuple elements");
-  return emitFakeRValue(TI);
+                                             const TypeInfo &fieldType) {
+  Expr *tuple = E->getBase();
+  const TupleTypeInfo &tupleType =
+    static_cast<const TupleTypeInfo&>(getFragileTypeInfo(tuple->getType()));
+
+  llvm::errs() << E->getFieldNumber() << "\n";
+
+  const TupleFieldInfo &field =
+    tupleType.getFieldInfos()[E->getFieldNumber()];
+
+  // If the field requires no storage, there's nothing to do.
+  if (field.StorageIndex == TupleFieldInfo::NoStorage) {
+    // Emit the base in case it has side-effects.
+    emitIgnored(tuple);
+    return emitFakeRValue(field.FieldInfo);
+  }
+
+  // If we can emit the base as an l-value, we can avoid a lot
+  // of unnecessary work.
+  if (Optional<LValue> tupleLV = tryEmitAsLValue(tuple, tupleType)) {
+    LValue fieldLV = tupleType.project(*this, tupleLV.getValue(), field);
+    return field.FieldInfo.load(*this, fieldLV);
+  }
+
+  // Otherwise, emit the base as an r-value and project.
+  RValue tupleRV = emitRValue(tuple, tupleType);
+  return tupleType.project(*this, tupleRV, field);
 }
 
 LValue IRGenFunction::emitTupleElementLValue(TupleElementExpr *E,
-                                             const TypeInfo &TI) {
+                                             const TypeInfo &fieldType) {
   // Emit the base l-value.
-  Expr *base = E->getBase();
-  const TupleTypeInfo &baseTInfo =
-    static_cast<const TupleTypeInfo&>(getFragileTypeInfo(base->getType()));
-  LValue lvalue = emitLValue(base, baseTInfo);
+  Expr *tuple = E->getBase();
+  const TupleTypeInfo &tupleType =
+    static_cast<const TupleTypeInfo&>(getFragileTypeInfo(tuple->getType()));
+  LValue tupleLV = emitLValue(tuple, tupleType);
 
-  // Project.
-  const TupleFieldInfo &fieldInfo =
-    baseTInfo.getFieldInfos()[E->getFieldNumber()];
+  const TupleFieldInfo &field =
+    tupleType.getFieldInfos()[E->getFieldNumber()];
 
   // If the field requires no storage, there's nothing to do.
-  if (fieldInfo.StorageIndex == TupleFieldInfo::NoStorage) {
-    return lvalue; // as good as anything
+  if (field.StorageIndex == TupleFieldInfo::NoStorage) {
+    return tupleLV; // as good as anything
   }
 
-  // Compute the address.
-  llvm::Value *addr = lvalue.getAddress();
-  addr = Builder.CreateStructGEP(addr, fieldInfo.StorageIndex,
-                                 addr->getName() + "."
-                                   + fieldInfo.Field.Name.str());
-
-  // Compute the adjusted alignment.
-  Alignment align =
-    lvalue.getAlignment().alignmentAtOffset(fieldInfo.StorageOffset);
-
-  return LValue::forAddress(addr, align);
+  // Project.
+  return tupleType.project(*this, tupleLV, field);
 }
 
 RValue IRGenFunction::emitTupleShuffleExpr(TupleShuffleExpr *E,
