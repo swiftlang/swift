@@ -415,6 +415,14 @@ namespace {
       return 0;
     }
     
+    Expr *visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
+      if (Expr *E2 = doIt(E->getSubExpr())) {
+        E->setSubExpr(E2);
+        return E;
+      }
+      return 0;
+    }
+    
     Expr *visitTupleElementExpr(TupleElementExpr *E) {
       if (Expr *E2 = doIt(E->getBase())) {
         E->setBase(E2);
@@ -721,6 +729,12 @@ public:
       OS << '\n';
       printRec(E->getBase());
     }
+    OS << ')';
+  }
+  void visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
+    OS.indent(Indent) << "(look_throguh_oneof_expr type='" << E->getType();
+    OS << "\'\n";
+    printRec(E->getSubExpr());
     OS << ')';
   }
   void visitTupleElementExpr(TupleElementExpr *E) {

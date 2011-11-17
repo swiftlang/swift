@@ -292,6 +292,10 @@ public:
                      "by name binding!");
   }
 
+  Expr *visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
+    llvm_unreachable("type-checking LookThroughOneofExpr?");
+  }
+
   Expr *visitTupleElementExpr(TupleElementExpr *E) {
     // TupleElementExpr is fully resolved.
     assert(!E->getType()->is<DependentType>());
@@ -348,6 +352,12 @@ public:
     return visitApplyExpr(E);
   }
 
+  Expr *lookThroughOneofs(Expr *E) {
+    OneOfType *oneof = E->getType()->castTo<OneOfType>();
+    assert(oneof->hasSingleElement());
+    TypeJudgement TJ(oneof->Elements[0]->ArgumentType, E->getValueKind());
+    return new (TC.Context) LookThroughOneofExpr(E, TJ);
+  }
   
   SemaExpressionTree(TypeChecker &tc) : TC(tc) {}
   
@@ -376,27 +386,35 @@ public:
 } // end anonymous namespace.
 
 Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
-  Type SubExprTy = E->getBase()->getType();
-   
-  // First, check to see if this is a reference to a field in the type or
-  // protocol.
-  
+  Expr *Base = E->getBase();
+
   // If this is a member access to a oneof with a single element constructor,
   // allow direct access to the type underlying the single element.  This
   // allows element access on structs, for example.
-  if (OneOfType *DT = SubExprTy->getAs<OneOfType>())
-    if (DT->hasSingleElement())
-      SubExprTy = DT->Elements[0]->ArgumentType;
-  
+  Type SubExprTy = Base->getType();
+  bool LookedThroughOneofs = false;
+  if (OneOfType *oneof = SubExprTy->getAs<OneOfType>())
+    if (oneof->hasSingleElement()) {
+      SubExprTy = oneof->Elements[0]->ArgumentType;
+      LookedThroughOneofs = true;
+    }
+   
+  // First, check to see if this is a reference to a field in the type or
+  // protocol.
+
   if (TupleType *TT = SubExprTy->getAs<TupleType>()) {
     // If the field name exists, we win.
     int FieldNo = TT->getNamedElementId(E->getName());
-    if (FieldNo != -1)
+    if (FieldNo != -1) {
+      if (LookedThroughOneofs)
+        Base = lookThroughOneofs(Base);
+
       return new (TC.Context) 
-        TupleElementExpr(E->getBase(), E->getDotLoc(), (unsigned) FieldNo,
+        TupleElementExpr(Base, E->getDotLoc(), (unsigned) FieldNo,
                          E->getNameLoc(),
                          TypeJudgement(TT->getElementType(FieldNo),
-                                       E->getBase()->getValueKind()));
+                                       Base->getValueKind()));
+    }
     
     // Okay, the field name was invalid.  If this is a dollarident like $4,
     // process it as a field index.
@@ -407,12 +425,15 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
           TC.diagnose(E->getNameLoc(), diag::field_number_too_large);
           return 0;
         }
+
+        if (LookedThroughOneofs)
+          Base = lookThroughOneofs(Base);
         
         return new (TC.Context) 
-          TupleElementExpr(E->getBase(), E->getDotLoc(), Value,
+          TupleElementExpr(Base, E->getDotLoc(), Value,
                            E->getNameLoc(),
                            TypeJudgement(TT->getElementType(Value),
-                                         E->getBase()->getValueKind()));
+                                         Base->getValueKind()));
       }
     }
   }
@@ -421,12 +442,15 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   if (ProtocolType *PT = SubExprTy->getAs<ProtocolType>()) {
     for (ValueDecl *VD : PT->Elements) {
       if (VD->Name == E->getName()) {
+        if (LookedThroughOneofs)
+          Base = lookThroughOneofs(Base);
+
         // The protocol value is applied via a DeclRefExpr.
         Expr *Fn = new (TC.Context) DeclRefExpr(VD, E->getNameLoc(),
                                                 VD->getTypeJudgement());
         
         ApplyExpr *Call = new (TC.Context) 
-          ProtocolElementExpr(Fn, E->getDotLoc(), E->getBase());
+          ProtocolElementExpr(Fn, E->getDotLoc(), Base);
         if (TC.semaApplyExpr(Call))
           return 0;
         return Call;
@@ -452,7 +476,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
       FnRef->setDependentType(DependentType::get(TC.Context));
     }
     
-    CallExpr *Call = new (TC.Context) CallExpr(FnRef, E->getBase(),
+    CallExpr *Call = new (TC.Context) CallExpr(FnRef, Base,
                                                /*DotSyntax=*/true,
                                                TypeJudgement());
     if (TC.semaApplyExpr(Call))
@@ -472,7 +496,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   // FIXME: This diagnostic is a bit painful. Plus, fix the source range when
   // expressions actually have source ranges.
   TC.diagnose(E->getNameLoc(), diag::no_valid_dot_expression, SubExprTy)
-    << SourceRange(E->getBase()->getStartLoc(), E->getBase()->getStartLoc());
+    << Base->getSourceRange();
   return 0;
 }
 

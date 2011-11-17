@@ -38,6 +38,7 @@ namespace swift {
   class FuncDecl;
   class FuncExpr;
   class IfStmt;
+  class LookThroughOneofExpr;
   template<typename T> class Optional;
   class ReturnStmt;
   class SourceLoc;
@@ -132,6 +133,8 @@ private:
   RValue emitRValueForFunction(FuncDecl *Fn);
   RValue emitApplyExpr(ApplyExpr *Apply, const TypeInfo &TInfo);
   RValue emitDeclRefRValue(DeclRefExpr *DeclRef, const TypeInfo &TInfo);
+  RValue emitLookThroughOneofRValue(LookThroughOneofExpr *E);
+  LValue emitLookThroughOneofLValue(LookThroughOneofExpr *E);
   RValue emitTupleExpr(TupleExpr *E, const TypeInfo &TInfo);
   RValue emitTupleElementRValue(TupleElementExpr *E, const TypeInfo &TInfo);
   LValue emitTupleElementLValue(TupleElementExpr *E, const TypeInfo &TInfo);

@@ -27,6 +27,7 @@
 
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "llvm/DerivedTypes.h"
 
 #include "GenType.h"
@@ -238,4 +239,18 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
 
   Converted->setBody(Body);
   return TInfo;
+}
+
+LValue IRGenFunction::emitLookThroughOneofLValue(LookThroughOneofExpr *E) {
+  LValue oneofLV = emitLValue(E->getSubExpr());
+  llvm::Value *addr = Builder.CreateStructGEP(oneofLV.getAddress(), 0);
+  return LValue::forAddress(addr, oneofLV.getAlignment());
+}
+
+RValue IRGenFunction::emitLookThroughOneofRValue(LookThroughOneofExpr *E) {
+  RValue oneofRV = emitRValue(E->getSubExpr());
+  if (oneofRV.isScalar()) return oneofRV;
+
+  llvm::Value *addr = Builder.CreateStructGEP(oneofRV.getAggregateAddress(), 0);
+  return RValue::forAggregate(addr);
 }

@@ -118,11 +118,7 @@ namespace {
     }
 
     void verifyChecked(TupleElementExpr *E, WalkContext const &WalkCtx) {
-      Type baseType = E->getBase()->getType();
-      while (OneOfType *oneof = baseType->getAs<OneOfType>())
-        if (oneof->hasSingleElement())
-          baseType = oneof->Elements[0]->ArgumentType;
-      TupleType *tupleType = baseType->getAs<TupleType>();
+      TupleType *tupleType = E->getBase()->getType()->getAs<TupleType>();
       if (!tupleType) {
         Out << "base of TupleElementExpr does not have tuple type: ";
         E->getBase()->getType().print(Out);
@@ -139,6 +135,26 @@ namespace {
 
       checkSameType(E->getType(), tupleType->getElementType(E->getFieldNumber()),
                     "TupleElementExpr and the corresponding tuple element");
+    }
+
+    void verifyChecked(LookThroughOneofExpr *E, WalkContext const &WalkCtx) {
+      OneOfType *oneof = E->getSubExpr()->getType()->getAs<OneOfType>();
+      if (!oneof) {
+        Out << "sub-expression of LookThroughOneofExpr does not have oneof type: ";
+        E->getSubExpr()->getType().print(Out);
+        Out << "\n";
+        abort();
+      }
+
+      if (!oneof->hasSingleElement()) {
+        Out << "looking through a oneof with multiple elements: ";
+        E->getSubExpr()->getType().print(Out);
+        Out << "\n";
+        abort();
+      }
+
+      checkSameType(E->getType(), oneof->Elements[0]->ArgumentType,
+                    "result of LookThroughOneofExpr and single element of oneof");
     }
 
     // Verification utilities.

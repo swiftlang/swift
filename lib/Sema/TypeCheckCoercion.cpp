@@ -96,6 +96,10 @@ public:
   Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     return E;
   }
+
+  Expr *visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
+    llvm_unreachable("coercing an expression already looked through");
+  }
   
   Expr *visitUnresolvedScopedIdentifierExpr
   (UnresolvedScopedIdentifierExpr *E) {

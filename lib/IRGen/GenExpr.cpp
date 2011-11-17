@@ -149,6 +149,9 @@ RValue IRGenFunction::emitRValue(Expr *E, const TypeInfo &TInfo) {
   case ExprKind::TupleShuffle:
     return emitTupleShuffleExpr(cast<TupleShuffleExpr>(E), TInfo);
 
+  case ExprKind::LookThroughOneof:
+    return emitLookThroughOneofRValue(cast<LookThroughOneofExpr>(E));
+
   case ExprKind::DeclRef:
     return emitDeclRefRValue(cast<DeclRefExpr>(E), TInfo);
 
@@ -206,6 +209,9 @@ LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &TInfo) {
   case ExprKind::TupleElement:
     return emitTupleElementLValue(cast<TupleElementExpr>(E), TInfo);
 
+  case ExprKind::LookThroughOneof:
+    return emitLookThroughOneofLValue(cast<LookThroughOneofExpr>(E));
+
   case ExprKind::DeclRef:
     return emitDeclRefLValue(*this, cast<DeclRefExpr>(E), TInfo);
   }
@@ -251,8 +257,9 @@ Optional<LValue> IRGenFunction::tryEmitAsLValue(Expr *E,
 
   case ExprKind::TupleElement:
   case ExprKind::TupleShuffle:
-    // These could theoretically be usefully emitted as l-values in
-    // some cases, but we haven't bothered implementing that yet.
+  case ExprKind::LookThroughOneof:
+    // These could all be usefully emitted as l-values in some cases,
+    // but we haven't bothered implementing that yet.
     return Nothing;
   }
   llvm_unreachable("bad expression kind!");

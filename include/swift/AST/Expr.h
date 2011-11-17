@@ -454,6 +454,27 @@ public:
   }
 };
 
+/// LookThroughOneofExpr - Implicitly look through a 'oneof' type with
+/// one enumerator.
+class LookThroughOneofExpr : public Expr {
+  Expr *SubExpr;
+
+public:
+  LookThroughOneofExpr(Expr *subexpr, TypeJudgement ty)
+    : Expr(ExprKind::LookThroughOneof, ty), SubExpr(subexpr) {}
+
+  SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
+  SourceLoc getLoc() const { return SubExpr->getLoc(); }
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *E) { SubExpr = E; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const LookThroughOneofExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::LookThroughOneof;
+  }
+};
+
 /// TupleElementExpr - Refer to an element of a tuple, e.g. "(1,2).field0".
 class TupleElementExpr : public Expr {
   Expr *SubExpr;
