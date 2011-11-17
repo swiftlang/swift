@@ -28,6 +28,12 @@
 #define SWIFT_BASIC_OPTIONAL_H
 
 namespace swift {
+  /// An enum whose purpose is to make it easier to initialize an
+  /// empty optional.
+  enum Nothing_t {
+    Nothing
+  };
+
   template<typename T>
   class Optional {
     union {
@@ -39,6 +45,9 @@ namespace swift {
   public:
     /// \brief Construct an empty instance.
     Optional() : HasValue(false) { }
+
+    /// \brief Construct an empty instance.
+    Optional(Nothing_t _) : HasValue(false) { }
     
     /// \brief Construct an instance containing a value of type \c T
     /// constructed with the given arguments.
