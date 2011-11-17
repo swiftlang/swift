@@ -393,7 +393,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     int FieldNo = TT->getNamedElementId(E->getName());
     if (FieldNo != -1)
       return new (TC.Context) 
-        TupleElementExpr(E->getBase(), E->getDotLoc(), FieldNo,
+        TupleElementExpr(E->getBase(), E->getDotLoc(), (unsigned) FieldNo,
                          E->getNameLoc(),
                          TypeJudgement(TT->getElementType(FieldNo),
                                        E->getBase()->getValueKind()));
@@ -409,7 +409,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
         }
         
         return new (TC.Context) 
-          TupleElementExpr(E->getBase(), E->getDotLoc(), FieldNo,
+          TupleElementExpr(E->getBase(), E->getDotLoc(), Value,
                            E->getNameLoc(),
                            TypeJudgement(TT->getElementType(Value),
                                          E->getBase()->getValueKind()));
