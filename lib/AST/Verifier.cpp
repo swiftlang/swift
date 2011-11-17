@@ -80,6 +80,9 @@ namespace {
 
       // Otherwise, actually verify the node.
 
+      // We always verify source ranges.
+      checkSourceRanges(node, WalkCtx);
+
       // Always verify the node as a parsed node.
       verifyParsed(node, WalkCtx);
 
@@ -100,31 +103,38 @@ namespace {
     bool shouldVerify(Stmt *S) { return true; }
 
     // Base cases for the various stages of verification.
-    void verifyParsed(Expr *E, WalkContext const& WalkCtx) {
-      checkSourceRanges(E, WalkCtx);
-    }
-    void verifyParsed(Stmt *S, WalkContext const& WalkCtx) {
-      checkSourceRanges(S, WalkCtx);
-    }
-    void verifyBound(Expr *E, WalkContext const& WalkCtx) {
-      checkSourceRanges(E, WalkCtx);
-    }
-    void verifyBound(Stmt *S, WalkContext const& WalkCtx) {
-      checkSourceRanges(S, WalkCtx);
-    }
-    void verifyChecked(Expr *E, WalkContext const& WalkCtx) {
-      checkSourceRanges(E, WalkCtx);
-    }
-    void verifyChecked(Stmt *S, WalkContext const& WalkCtx) {
-      checkSourceRanges(S, WalkCtx);
-    }
+    void verifyParsed(Expr *E, WalkContext const& WalkCtx) {}
+    void verifyParsed(Stmt *S, WalkContext const& WalkCtx) {}
+    void verifyBound(Expr *E, WalkContext const& WalkCtx) {}
+    void verifyBound(Stmt *S, WalkContext const& WalkCtx) {}
+    void verifyChecked(Expr *E, WalkContext const& WalkCtx) {}
+    void verifyChecked(Stmt *S, WalkContext const& WalkCtx) {}
 
     // Specialized verifiers.
 
     void verifyChecked(AssignStmt *S, WalkContext const& WalkCtx) {
-      verifyChecked(static_cast<Stmt *>(S), WalkCtx);
       checkSameType(S->getDest()->getType(), S->getSrc()->getType(),
                     "assignment operands");
+    }
+
+    void verifyChecked(TupleElementExpr *E, WalkContext const &WalkCtx) {
+      TupleType *tupleType = E->getBase()->getType()->getAs<TupleType>();
+      if (!tupleType) {
+        Out << "base of TupleElementExpr does not have tuple type: ";
+        E->getBase()->getType().print(Out);
+        Out << "\n";
+        abort();
+      }
+
+      if (E->getFieldNumber() >= tupleType->Fields.size()) {
+        Out << "field index " << E->getFieldNumber()
+            << " for TupleElementExpr is out of range [0,"
+            << tupleType->Fields.size() << ")\n";
+        abort();
+      }
+
+      checkSameType(E->getType(), tupleType->getElementType(E->getFieldNumber()),
+                    "TupleElementExpr and the corresponding tuple element");
     }
 
     // Verification utilities.
