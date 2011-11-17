@@ -19,6 +19,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/Basic/Optional.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
 #include "llvm/Target/TargetData.h"
@@ -119,6 +120,8 @@ RValue IRGenFunction::emitRValue(Expr *E) {
   return emitRValue(E, TInfo);
 }
 
+/// Emit the given expression as an r-value.  The expression need not
+/// actually have r-value kind.
 RValue IRGenFunction::emitRValue(Expr *E, const TypeInfo &TInfo) {
   switch (E->getKind()) {
 #define EXPR(Id, Parent)
@@ -165,6 +168,9 @@ LValue IRGenFunction::emitLValue(Expr *E) {
   return emitLValue(E, TInfo);
 }
 
+/// Emit the given expression as an l-value.  The expression must
+/// actually have l-value kind; to try to emit an expression as an
+/// l-value as an aggressive local optimization, use tryEmitAsLValue.
 LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &TInfo) {
   assert(E->getValueKind() == ValueKind::LValue);
 
@@ -202,6 +208,52 @@ LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &TInfo) {
 
   case ExprKind::DeclRef:
     return emitDeclRefLValue(*this, cast<DeclRefExpr>(E), TInfo);
+  }
+  llvm_unreachable("bad expression kind!");
+}
+
+/// Try to emit the given expression as an underlying l-value.
+Optional<LValue> IRGenFunction::tryEmitAsLValue(Expr *E,
+                                                const TypeInfo &type) {
+  // If it *is* an l-value, then go ahead.
+  if (E->getValueKind() == ValueKind::LValue)
+    return emitLValue(E, type);
+
+  switch (E->getKind()) {
+#define EXPR(Id, Parent)
+#define UNCHECKED_EXPR(Id, Parent) case ExprKind::Id:
+#include "swift/AST/ExprNodes.def"
+    llvm_unreachable("these expression kinds should not survive to IR-gen");
+
+  case ExprKind::Load:
+    return emitLValue(cast<LoadExpr>(E)->getSubExpr(), type);
+
+  case ExprKind::Call:
+  case ExprKind::Unary:
+  case ExprKind::Binary:
+  case ExprKind::IntegerLiteral:
+  case ExprKind::FloatLiteral:
+  case ExprKind::DeclRef:
+  case ExprKind::Func:
+  case ExprKind::Closure:
+  case ExprKind::AnonClosureArg:
+  case ExprKind::ProtocolElement:
+    // These can never be usefully emitted as l-values, if they
+    // weren't l-values before.
+    return Nothing;
+
+  case ExprKind::Tuple: {
+    TupleExpr *tuple = cast<TupleExpr>(E);
+    if (tuple->isGroupingParen())
+      return tryEmitAsLValue(tuple->getElement(0), type);
+    return Nothing;
+  }
+
+  case ExprKind::TupleElement:
+  case ExprKind::TupleShuffle:
+    // These could theoretically be usefully emitted as l-values in
+    // some cases, but we haven't bothered implementing that yet.
+    return Nothing;
   }
   llvm_unreachable("bad expression kind!");
 }

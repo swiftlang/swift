@@ -38,6 +38,7 @@ namespace swift {
   class FuncDecl;
   class FuncExpr;
   class IfStmt;
+  template<typename T> class Optional;
   class ReturnStmt;
   class SourceLoc;
   class Stmt;
@@ -116,6 +117,8 @@ public:
 
   LValue emitLValue(Expr *E);
   LValue emitLValue(Expr *E, const TypeInfo &TInfo);
+
+  Optional<LValue> tryEmitAsLValue(Expr *E, const TypeInfo &TInfo);
 
   RValue emitRValue(Expr *E);
   RValue emitRValue(Expr *E, const TypeInfo &TInfo);
