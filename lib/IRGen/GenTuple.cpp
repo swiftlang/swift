@@ -247,11 +247,11 @@ namespace {
       return RValue::forAggregate(temp.getAddress());
     }
 
-    void store(IRGenFunction &CGF, const RValue &RV, const LValue &LV) const {
+    void store(IRGenFunction &IGF, const RValue &RV, const LValue &LV) const {
       // FIXME: a memcpy isn't right if any of the fields require
       // special logic for loads or stores.
       IGF.emitMemCpy(LV.getAddress(), RV.getAggregateAddress(), StorageSize,
-                     std::min(StorageAlignment, LV.getAlignment());
+                     std::min(StorageAlignment, LV.getAlignment()));
     }
   };
 }
