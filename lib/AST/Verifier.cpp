@@ -118,7 +118,11 @@ namespace {
     }
 
     void verifyChecked(TupleElementExpr *E, WalkContext const &WalkCtx) {
-      TupleType *tupleType = E->getBase()->getType()->getAs<TupleType>();
+      Type baseType = E->getBase()->getType();
+      while (OneOfType *oneof = baseType->getAs<OneOfType>())
+        if (oneof->hasSingleElement())
+          baseType = oneof->Elements[0]->ArgumentType;
+      TupleType *tupleType = baseType->getAs<TupleType>();
       if (!tupleType) {
         Out << "base of TupleElementExpr does not have tuple type: ";
         E->getBase()->getType().print(Out);
