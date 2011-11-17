@@ -570,6 +570,7 @@ static Expr *foldSequence(TypeChecker &TC, Expr *LHS, ArrayRef<Expr*> &S,
     if (Op1Info.getPrecedence() > Op2Info.getPrecedence() ||
         (Op1Info == Op2Info && Op1Info.isLeftAssociative())) {
       LHS = makeBinOp(TC, Op1, LHS, RHS);
+      RHS = S[1];
       Op1 = Op2;
       Op1Info = Op2Info;
       S = S.slice(2);
