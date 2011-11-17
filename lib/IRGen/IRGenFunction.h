@@ -94,6 +94,8 @@ public:
                            const llvm::Twine &Name);
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
   const TypeInfo &getFragileTypeInfo(Type T);
+  void emitMemCpy(llvm::Value *dest, llvm::Value *src,
+                  Size size, Alignment align);
 private:
   llvm::Instruction *AllocaIP;
 

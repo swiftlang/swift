@@ -18,11 +18,14 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Diagnostics.h"
+#include "llvm/DerivedTypes.h"
+#include "llvm/Intrinsics.h"
 #include "llvm/Module.h"
 #include "llvm/Type.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Target/TargetData.h"
 
 #include "GenType.h"
 #include "IRGenModule.h"
@@ -42,10 +45,21 @@ IRGenModule::IRGenModule(ASTContext &Context, Options &Opts,
   Int32Ty = llvm::Type::getInt32Ty(getLLVMContext());
   Int64Ty = llvm::Type::getInt64Ty(getLLVMContext());
   Int8PtrTy = llvm::Type::getInt8PtrTy(getLLVMContext());
+  SizeTy = TargetData.getIntPtrType(getLLVMContext());
+  MemCpyFn = nullptr;
 }
 
 IRGenModule::~IRGenModule() {
   delete &Types;
+}
+
+llvm::Constant *IRGenModule::getMemCpyFn() {
+  if (MemCpyFn) return MemCpyFn;
+
+  llvm::Type *types[] = { SizeTy };
+  MemCpyFn = llvm::Intrinsic::getDeclaration(&Module, llvm::Intrinsic::memcpy,
+                                             types);
+  return MemCpyFn;
 }
 
 /// Emit a top-level context.

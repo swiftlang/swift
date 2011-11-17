@@ -42,6 +42,24 @@ LValue IRGenFunction::createFullExprAlloca(llvm::Type *Ty, Alignment Align,
   return LValue::forAddress(Alloca, Align);
 }
 
+/// Call the llvm.memcpy intrinsic.  The arguments need not already
+/// be of i8* type.
+void IRGenFunction::emitMemCpy(llvm::Value *dest, llvm::Value *src,
+                               Size size, Alignment align) {
+  dest = Builder.CreateBitCast(dest, IGM.Int8PtrTy);
+  src = Builder.CreateBitCast(src, IGM.Int8PtrTy);
+
+  llvm::Value *args[] = {
+    dest,
+    src,
+    llvm::ConstantInt::get(IGM.SizeTy, size.getValue()),
+    llvm::ConstantInt::get(IGM.SizeTy, align.getValue()),
+    Builder.getFalse() // volatile
+  };
+
+  Builder.CreateCall(IGM.getMemCpyFn(), args);
+}                               
+
 /// Create an alloca whose lifetime is the duration of the current
 /// scope.
 LValue IRGenFunction::createScopeAlloca(llvm::Type *Ty, Alignment Align,

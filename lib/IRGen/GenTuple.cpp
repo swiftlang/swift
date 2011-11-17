@@ -238,12 +238,20 @@ namespace {
     }
 
     RValue load(IRGenFunction &IGF, const LValue &LV) const {
-      // FIXME
-      return RValue();
+      LValue temp = IGF.createFullExprAlloca(StorageType, StorageAlignment,
+                                             "lvalue-load");
+      // FIXME: a memcpy isn't right if any of the fields require
+      // special logic for loads or stores.
+      IGF.emitMemCpy(temp.getAddress(), LV.getAddress(), StorageSize,
+                     std::min(StorageAlignment, LV.getAlignment()));
+      return RValue::forAggregate(temp.getAddress());
     }
 
     void store(IRGenFunction &CGF, const RValue &RV, const LValue &LV) const {
-      // FIXME
+      // FIXME: a memcpy isn't right if any of the fields require
+      // special logic for loads or stores.
+      IGF.emitMemCpy(LV.getAddress(), RV.getAggregateAddress(), StorageSize,
+                     std::min(StorageAlignment, LV.getAlignment());
     }
   };
 }

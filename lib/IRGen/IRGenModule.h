@@ -65,9 +65,15 @@ public:
   llvm::IntegerType *Int16Ty;
   llvm::IntegerType *Int32Ty;
   llvm::IntegerType *Int64Ty;
+  llvm::IntegerType *SizeTy;
   llvm::PointerType *Int8PtrTy;
+  llvm::Constant *getMemCpyFn();
 
   void unimplemented(SourceLoc, StringRef Message);
+
+private:
+  llvm::Function *MemCpyFn;
+
 
 //--- Types -----------------------------------------------------------------
 public:
