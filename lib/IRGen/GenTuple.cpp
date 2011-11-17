@@ -406,15 +406,11 @@ RValue IRGenFunction::emitTupleExpr(TupleExpr *Tuple, const TypeInfo &TI) {
   }
 }
 
-#include "llvm/Support/raw_ostream.h"
-
 RValue IRGenFunction::emitTupleElementRValue(TupleElementExpr *E,
                                              const TypeInfo &fieldType) {
   Expr *tuple = E->getBase();
   const TupleTypeInfo &tupleType =
     static_cast<const TupleTypeInfo&>(getFragileTypeInfo(tuple->getType()));
-
-  llvm::errs() << E->getFieldNumber() << "\n";
 
   const TupleFieldInfo &field =
     tupleType.getFieldInfos()[E->getFieldNumber()];
