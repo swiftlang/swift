@@ -17,19 +17,23 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Verifier.h"
+#include "swift/Parse/Lexer.h" // bad dependency!
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SourceMgr.h"
 using namespace swift;
 
 namespace {
   enum ShouldHalt { Continue, Halt };
 
   class Verifier {
+    ASTContext &Ctx;
     VerificationKind Stage;
     llvm::raw_ostream &Out;
 
   public:
-    Verifier(VerificationKind Stage)
-      : Stage(Stage), Out(llvm::errs()) {}
+    Verifier(ASTContext &Ctx, VerificationKind Stage)
+      : Ctx(Ctx), Stage(Stage), Out(llvm::errs()) {}
 
     Expr *dispatch(Expr *E, WalkOrder ord, WalkContext const& WalkCtx) {
       switch (E->getKind()) {
@@ -177,9 +181,43 @@ namespace {
       {
         Out << "child source range not contained within its parent: ";
         printEntity();
+        Out << "\n  parent range: ";
+        printRange(Enclosing);
+        Out << "\n  child range: ";
+        printRange(Current);
         Out << "\n";
         abort();
       }
+    }
+
+    void printRange(SourceRange R) {
+      SourceLoc Begin = R.Start, End = R.End;
+
+      // If either of those locations is invalid, fall back on printing pointers.
+      if (!Begin.isValid() || !End.isValid()) {
+        Out << "[" << (void*) Begin.Value.getPointer()
+            << "," << (void*) End.Value.getPointer()
+            << "]";
+        return;
+      }
+
+      // Otherwise, advance the end token.
+      End = Lexer::getLocForEndOfToken(Ctx.SourceMgr, R.End);
+
+      int BufferIndex = Ctx.SourceMgr.FindBufferContainingLoc(Begin.Value);
+      if (BufferIndex != -1) {
+        const llvm::MemoryBuffer *Buffer =
+          Ctx.SourceMgr.getMemoryBuffer((unsigned) BufferIndex);
+        const char *BufferStart = Buffer->getBufferStart();
+        Out << Buffer->getBufferIdentifier() 
+            << ':' << (Begin.Value.getPointer() - BufferStart)
+            << '-' << (End.Value.getPointer() - BufferStart)
+            << ' ';
+      }
+
+      llvm::StringRef Text(Begin.Value.getPointer(),
+                           End.Value.getPointer() - Begin.Value.getPointer());
+      Out << '"' << Text << '"';
     }
     
   };
@@ -190,7 +228,7 @@ void swift::verify(TranslationUnit *TUnit, VerificationKind Stage) {
   if (TUnit->Ctx.hadError()) return;
 
   // Make a verifier object, and then capture it by reference.
-  Verifier VObject(Stage);
+  Verifier VObject(TUnit->Ctx, Stage);
   Verifier *V = &VObject;
 
   TUnit->Body->walk(^(Expr *E, WalkOrder Ord, WalkContext const &WalkCtx) { 
