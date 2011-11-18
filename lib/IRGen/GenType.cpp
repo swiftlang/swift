@@ -128,7 +128,7 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
     return new PrimitiveTypeInfo(IGM.Int64Ty, Size(8), Alignment(8));
   case TypeKind::NameAlias:
     return &getFragileTypeInfo(IGM,
-                               cast<NameAliasType>(TB)->TheDecl->UnderlyingTy);
+                      cast<NameAliasType>(TB)->TheDecl->getUnderlyingType());
   case TypeKind::Tuple:
     return convertTupleType(IGM, cast<TupleType>(TB));
   case TypeKind::OneOf:

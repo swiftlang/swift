@@ -78,7 +78,7 @@ TranslationUnit *Parser::parseTranslationUnit() {
   // TODO: Move this to name binding!
   SmallVector<TypeAliasDecl*, 8> UnresolvedTypeList;
   for (TypeAliasDecl *Decl : ScopeInfo.getUnresolvedTypeList()) {
-    if (Decl->UnderlyingTy.isNull())
+    if (!Decl->hasUnderlyingType())
       UnresolvedTypeList.push_back(Decl);
   }
   
@@ -712,9 +712,7 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
   
   if (PrettyTypeName) {
     // If we have a pretty name for this, complete it to its actual type.
-    assert(PrettyTypeName->UnderlyingTy.isNull() &&
-           "Not an incomplete decl to complete!");
-    PrettyTypeName->UnderlyingTy = Result;
+    PrettyTypeName->setUnderlyingType(Result);
   } else {
     // Now that the oneof type is created, we can go back and give proper types
     // to each element decl.
@@ -886,9 +884,7 @@ bool Parser::parseProtocolBody(SourceLoc ProtocolLoc,
     D->setDeclContext(NewProto);
   
   // Complete the pretty name for this type.
-  assert(TypeName->UnderlyingTy.isNull() &&
-         "Not an incomplete decl to complete!");
-  TypeName->UnderlyingTy = NewProto;
+  TypeName->setUnderlyingType(NewProto);
   
   Result = NewProto;
   return false;

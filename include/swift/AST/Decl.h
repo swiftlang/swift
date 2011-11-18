@@ -299,14 +299,44 @@ public:
 class TypeAliasDecl : public NamedDecl {
   /// The type that represents this (sugared) name alias.
   mutable NameAliasType *AliasTy;
-public:
+
   SourceLoc TypeAliasLoc;
   Type UnderlyingTy;
   
+public:
   TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                 Type Underlyingty, const DeclAttributes &Attrs, DeclContext *DC)
     : NamedDecl(DeclKind::TypeAlias, DC, Name, Attrs), AliasTy(0),
       TypeAliasLoc(TypeAliasLoc), UnderlyingTy(Underlyingty) {
+  }
+
+  SourceLoc getTypeAliasLoc() const { return TypeAliasLoc; }
+  void setTypeAliasLoc(SourceLoc loc) { TypeAliasLoc = loc; }
+
+  /// hasUnderlyingType - Returns whether the underlying type has been set.
+  bool hasUnderlyingType() const {
+    return !UnderlyingTy.isNull();
+  }
+
+  /// getUnderlyingType - Returns the underlying type, which is
+  /// assumed to have been set.
+  Type getUnderlyingType() const {
+    assert(!UnderlyingTy.isNull() && "getting invalid underlying type");
+    return UnderlyingTy;
+  }
+
+  /// setUnderlyingType - Set the underlying type.  This is meant to
+  /// be used when resolving an unresolved type name during name-binding.
+  void setUnderlyingType(Type T) {
+    assert(UnderlyingTy.isNull() && "changing underlying type of type-alias");
+    UnderlyingTy = T;
+  }
+
+  /// overwriteUnderlyingType - Actually change the underlying type.
+  /// Typically it is overwritten to an error type.  It's possible for
+  /// type canonicalization to not see these changes.
+  void overwriteUnderlyingType(Type T) {
+    UnderlyingTy = T;
   }
 
   SourceLoc getLocStart() const { return TypeAliasLoc; }

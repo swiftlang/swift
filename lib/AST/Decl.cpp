@@ -185,7 +185,7 @@ namespace {
     void visitTypeAliasDecl(TypeAliasDecl *TAD) {
       printCommon(TAD, "typealias");
       OS << " type='";
-      TAD->UnderlyingTy->print(OS);
+      TAD->getUnderlyingType()->print(OS);
       OS << "')";
     }
 

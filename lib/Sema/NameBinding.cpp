@@ -166,7 +166,7 @@ BoundScope NameBinder::bindScopeName(TypeAliasDecl *TypeFromScope,
   // undefined.  If not, use that as the actual type; otherwise we'll
   // need to do a lookup from the imports.
   TypeAliasDecl *Type;
-  if (!TypeFromScope->UnderlyingTy.isNull()) {
+  if (TypeFromScope->hasUnderlyingType()) {
     Type = TypeFromScope;
   } else {
     Type = TU->lookupGlobalType(Name, NLKind::UnqualifiedLookup);
@@ -183,13 +183,13 @@ BoundScope NameBinder::bindScopeName(TypeAliasDecl *TypeFromScope,
   }
 
   // Otherwise, at least cache the type we found.
-  assert(!Type->UnderlyingTy.isNull());
-  if (TypeFromScope->UnderlyingTy.isNull()) {
-    TypeFromScope->UnderlyingTy = Type->UnderlyingTy;
+  assert(Type->hasUnderlyingType());
+  if (!TypeFromScope->hasUnderlyingType()) {
+    TypeFromScope->setUnderlyingType(Type->getUnderlyingType());
   }
 
   // Try to convert that to a type scope.
-  TypeBase *Ty = Type->UnderlyingTy->getCanonicalType();
+  TypeBase *Ty = Type->getUnderlyingType()->getCanonicalType();
 
   // Silently fail if we have an error type.
   if (isa<ErrorType>(Ty)) return BoundScope();
@@ -323,17 +323,17 @@ void swift::performNameBinding(TranslationUnit *TU) {
     if (TypeAliasDecl *Result =
           Binder.TU->lookupGlobalType(TA->getName(),
                                       NLKind::UnqualifiedLookup)) {
-      assert(TA->UnderlyingTy.isNull() && "Not an unresolved type");
+      assert(!TA->hasUnderlyingType() && "Not an unresolved type");
       // Update the decl we already have to be the correct type.
-      TA->TypeAliasLoc = Result->TypeAliasLoc;
-      TA->UnderlyingTy = Result->UnderlyingTy;
+      TA->setTypeAliasLoc(Result->getTypeAliasLoc());
+      TA->setUnderlyingType(Result->getUnderlyingType());
       continue;
     }
     
     Binder.diagnose(TA->getLocStart(), diag::use_undeclared_type,
                     TA->getName());
     
-    TA->UnderlyingTy = ErrorType::get(TU->Ctx);
+    TA->setUnderlyingType(ErrorType::get(TU->Ctx));
   }
 
   // Loop over all the unresolved scoped types in the translation
@@ -341,11 +341,11 @@ void swift::performNameBinding(TranslationUnit *TU) {
   for (auto BaseAndType : TU->UnresolvedScopedTypesForParser) {
     BoundScope Scope = Binder.bindScopeName(BaseAndType.first,
                                             BaseAndType.first->getName(),
-                                            BaseAndType.first->TypeAliasLoc);
+                                        BaseAndType.first->getTypeAliasLoc());
     if (!Scope) continue;
 
     Identifier Name = BaseAndType.second->getName();
-    SourceLoc NameLoc = BaseAndType.second->TypeAliasLoc;
+    SourceLoc NameLoc = BaseAndType.second->getTypeAliasLoc();
 
     TypeAliasDecl *Alias = nullptr;
 
@@ -354,11 +354,11 @@ void swift::performNameBinding(TranslationUnit *TU) {
                                          NLKind::QualifiedLookup);
     }
     if (Alias) {
-      BaseAndType.second->UnderlyingTy = Alias->getAliasType();
+      BaseAndType.second->setUnderlyingType(Alias->getAliasType());
     } else {
       Binder.diagnose(NameLoc, diag::invalid_member_type,
                       Name, BaseAndType.first->getName());
-      BaseAndType.second->UnderlyingTy = Binder.Context.TheErrorType;
+      BaseAndType.second->setUnderlyingType(Binder.Context.TheErrorType);
     }
   }
 

@@ -69,9 +69,11 @@ bool TypeChecker::validateType(Type InTy) {
     }
     break;
   case TypeKind::NameAlias:
-    IsInvalid = validateType(cast<NameAliasType>(T)->TheDecl->UnderlyingTy);
+    IsInvalid = validateType(cast<NameAliasType>(T)->TheDecl
+                               ->getUnderlyingType());
     if (IsInvalid)
-      cast<NameAliasType>(T)->TheDecl->UnderlyingTy = ErrorType::get(Context);
+      cast<NameAliasType>(T)->TheDecl
+        ->overwriteUnderlyingType(ErrorType::get(Context));
     break;
   case TypeKind::Tuple: {
     TupleType *TT = cast<TupleType>(T);

@@ -171,7 +171,7 @@ void Mangler::mangleType(Type type) {
     TypeAliasDecl *alias = cast<NameAliasType>(base)->TheDecl;
 
     // Mangle a direct alias of a oneof type using the alias.
-    if (isa<OneOfType>(alias->UnderlyingTy.getPointer())) {
+    if (isa<OneOfType>(alias->getUnderlyingType().getPointer())) {
       // Try to mangle the entire name as a substitution.
       // type ::= substitution
       if (tryMangleSubstitution(alias))
@@ -185,7 +185,7 @@ void Mangler::mangleType(Type type) {
 
     // Otherwise, mangle the type as its underlying type.
     } else {
-      mangleType(alias->UnderlyingTy);
+      mangleType(alias->getUnderlyingType());
     }
     return;
   }

@@ -123,7 +123,8 @@ TypeBase *TypeBase::getDesugaredType() {
     // None of these types have sugar at the outer level.
     return this;
   case TypeKind::NameAlias:
-    return cast<NameAliasType>(this)->TheDecl->UnderlyingTy->getDesugaredType();
+    return cast<NameAliasType>(this)->TheDecl->getUnderlyingType()
+             ->getDesugaredType();
   }
 
   assert(0 && "Unknown type kind");

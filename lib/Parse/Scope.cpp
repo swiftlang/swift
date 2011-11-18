@@ -175,12 +175,12 @@ TypeAliasDecl *ScopeInfo::addTypeAliasToScope(SourceLoc TypeAliasLoc,
   
   // If the previous definition was just a use of an undeclared type, complete
   // the type now.
-  if (TAD->UnderlyingTy.isNull()) {
+  if (!TAD->hasUnderlyingType()) {
     // This will get removed from UnresolvedTypeList at the end of the TU.
     
     // Update the decl we already have to be the correct type.
-    TAD->TypeAliasLoc = TypeAliasLoc;
-    TAD->UnderlyingTy = Ty;
+    TAD->setTypeAliasLoc(TypeAliasLoc);
+    TAD->setUnderlyingType(Ty);
     return TAD;
   }
   
