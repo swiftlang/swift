@@ -72,12 +72,12 @@ public:
     // simple.
     if (!ERD->getType()->is<DependentType>()) return;
     
-    if (Type T = ElementRefDecl::getTypeForPath(ERD->VD->getType(),
-                                                ERD->AccessPath)) {
+    if (Type T = ElementRefDecl::getTypeForPath(ERD->getVarDecl()->getType(),
+                                                ERD->getAccessPath())) {
       ERD->overwriteType(T);
     } else {
       TC.diagnose(ERD->getLocStart(), diag::invalid_index_in_element_ref,
-                  ERD->getName(), ERD->VD->getType());
+                  ERD->getName(), ERD->getVarDecl()->getType());
       ERD->overwriteType(ErrorType::get(TC.Context));
     }
   }

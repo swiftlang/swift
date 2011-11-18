@@ -490,20 +490,19 @@ public:
 ///
 /// TODO: Should this be a special case of ElementRefDecl?
 class ArgDecl : public ValueDecl {
-public:
   // FIXME: We don't have good location information for the function argument
   // declaration.
   SourceLoc FuncLoc;
   
   // FIXME: Store the access path here.
   
+public:
   ArgDecl(SourceLoc FuncLoc, Identifier Name, Type Ty, DeclContext *DC)
     : ValueDecl(DeclKind::Arg, DC, Name, Ty, 0, DeclAttributes()),
       FuncLoc(FuncLoc) {}
 
-
-  SourceLoc getLocStart() const { return FuncLoc; }
- 
+  SourceLoc getFuncLoc() const { return FuncLoc; }
+  SourceLoc getLocStart() const { return FuncLoc; } 
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Arg; }
@@ -515,16 +514,20 @@ public:
 /// with no name and two ElementRefDecls (named A and B) referring to elements
 /// of the nameless vardecl.
 class ElementRefDecl : public ValueDecl {
-public:
   VarDecl *VD;
   SourceLoc NameLoc;
   ArrayRef<unsigned> AccessPath;
   
+public:
   ElementRefDecl(VarDecl *VD, SourceLoc NameLoc, Identifier Name,
                  ArrayRef<unsigned> Path, Type Ty, DeclContext *DC)
     : ValueDecl(DeclKind::ElementRef, DC, Name, Ty, 0), VD(VD),
       NameLoc(NameLoc), AccessPath(Path) {
   }
+
+  VarDecl *getVarDecl() const { return VD; }
+
+  ArrayRef<unsigned> getAccessPath() const { return AccessPath; }
 
   /// getTypeForPath - Given a type and an access path into it, return the
   /// referenced element type.  If the access path is invalid for the specified
@@ -532,7 +535,7 @@ public:
   /// part of the type, this returns DependentType.
   static Type getTypeForPath(Type Ty, ArrayRef<unsigned> Path);
   
-  
+  SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLocStart() const { return NameLoc; }
   
   // Implement isa/cast/dyncast/etc.

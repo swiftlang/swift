@@ -237,9 +237,9 @@ namespace {
       OS << '\n';
       OS.indent(Indent+2);
       OS << "(accesspath ";
-      printDeclName(ERD->VD);
-      for (unsigned i = 0, e = ERD->AccessPath.size(); i != e; ++i)
-        OS << ", " << ERD->AccessPath[i];
+      printDeclName(ERD->getVarDecl());
+      for (unsigned i = 0, e = ERD->getAccessPath().size(); i != e; ++i)
+        OS << ", " << ERD->getAccessPath()[i];
       
       OS << "))";
     }
