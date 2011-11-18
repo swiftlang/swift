@@ -129,6 +129,8 @@ public:
   void emitInit(const LValue &LV, Expr *E, const TypeInfo &TInfo);
   void emitZeroInit(const LValue &LV, const TypeInfo &TInfo);
 
+  void emitExplodedTuple(Expr *E, SmallVectorImpl<RValue> &elements);
+
 private:
   RValue emitRValueForFunction(FuncDecl *Fn);
   RValue emitApplyExpr(ApplyExpr *Apply, const TypeInfo &TInfo);

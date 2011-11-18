@@ -63,18 +63,6 @@ namespace {
     /// The range of this field within the scalars for the tuple.
     unsigned ScalarBegin : 4;
     unsigned ScalarEnd : 4;
-
-    /// Given an l-value for the base address, produce an l-value for
-    /// this field.
-    /// TODO: this is only actually meaningful for certain possible
-    /// representations of tuples;  a bit-packing representation
-    /// would not be adequate here.
-    LValue getElementPtr(IRGenFunction &IGF, const LValue &LV) const {
-      llvm::Value *Addr =
-        IGF.Builder.CreateStructGEP(LV.getAddress(), StorageIndex);
-      Alignment Alignment = LV.getAlignment().alignmentAtOffset(StorageOffset);
-      return LValue::forAddress(Addr, Alignment);
-    }
   };
 
   /// An abstract base class for tuple types.
@@ -105,8 +93,11 @@ namespace {
     }
 
     /// Perform an l-value projection of a member of this tuple.
-    LValue project(IRGenFunction &IGF, const LValue &tuple,
-                   const TupleFieldInfo &field) const {
+    static LValue projectLValue(IRGenFunction &IGF, const LValue &tuple,
+                                const TupleFieldInfo &field) {
+      if (field.StorageIndex == TupleFieldInfo::NoStorage)
+        return tuple;
+
       llvm::Value *addr = tuple.getAddress();
       addr = IGF.Builder.CreateStructGEP(addr, field.StorageIndex,
                      addr->getName() + "." + getFieldName(field.Field));
@@ -119,8 +110,12 @@ namespace {
     }
 
     /// Perform an r-value projection of a member of this tuple.
-    virtual RValue project(IRGenFunction &IGF, const RValue &tuple,
-                           const TupleFieldInfo &field) const = 0;
+    virtual RValue projectRValue(IRGenFunction &IGF, const RValue &tuple,
+                                 const TupleFieldInfo &field) const = 0;
+
+    /// Form a tuple from a bunch of r-values.
+    virtual RValue implode(IRGenFunction &IGF,
+                           const SmallVectorImpl<RValue> &elements) const = 0;
   };
 
   /// A TypeInfo implementation for tuples that are broken down into scalars.
@@ -146,11 +141,24 @@ namespace {
       return Schema;
     }
 
-    RValue project(IRGenFunction &IGF, const RValue &tuple,
-                   const TupleFieldInfo &field) const {
+    RValue projectRValue(IRGenFunction &IGF, const RValue &tuple,
+                         const TupleFieldInfo &field) const {
       ArrayRef<llvm::Value*> scalars = tuple.getScalars();
       return RValue::forScalars(scalars.slice(field.ScalarBegin,
                                        field.ScalarEnd - field.ScalarBegin));
+    }
+
+    RValue implode(IRGenFunction &IGF,
+                   const SmallVectorImpl<RValue> &elements) const {
+      // Set up for the emission.
+      SmallVector<llvm::Value*, RValue::MaxScalars> scalars;
+
+      for (const RValue &elt : elements) {
+        assert(elt.isScalar());
+        scalars.append(elt.getScalars().begin(), elt.getScalars().end());
+      }
+
+      return RValue::forScalars(scalars);
     }
 
     RValue load(IRGenFunction &IGF, const LValue &LV) const {
@@ -164,7 +172,7 @@ namespace {
         if (Field.ScalarBegin == Field.ScalarEnd) continue;
 
         // Load the field and extract the scalars.
-        LValue FieldLV = Field.getElementPtr(IGF, LV);
+        LValue FieldLV = projectLValue(IGF, LV, Field);
         RValue FieldRV = Field.FieldInfo.load(IGF, FieldLV);
         Scalars.append(FieldRV.getScalars().begin(),
                        FieldRV.getScalars().end());
@@ -189,7 +197,7 @@ namespace {
         RValue FieldRV = RValue::forScalars(Scalars);
 
         // Write the extracted r-value into a projected l-value.
-        LValue FieldLV = Field.getElementPtr(IGF, LV);
+        LValue FieldLV = projectLValue(IGF, LV, Field);
         Field.FieldInfo.store(IGF, FieldRV, FieldLV);
       }
     }
@@ -229,12 +237,35 @@ namespace {
                                 StorageAlignment);
     }
 
-    using TupleTypeInfo::project;
-    RValue project(IRGenFunction &IGF, const RValue &tuple,
-                   const TupleFieldInfo &field) const {
+    RValue projectRValue(IRGenFunction &IGF, const RValue &tuple,
+                         const TupleFieldInfo &field) const {
       assert(tuple.isAggregate());
       LValue tupleLV = getLValueForAggregateRValue(tuple);
-      return field.FieldInfo.load(IGF, project(IGF, tupleLV, field));
+      LValue fieldLV = projectLValue(IGF, tupleLV, field);
+
+      // If we need an aggregate, we've already got one.
+      if (field.FieldInfo.getSchema().isAggregate()) {
+        assert(field.FieldInfo.StorageAlignment <= fieldLV.getAlignment());
+        return RValue::forAggregate(fieldLV.getAddress());
+      }
+
+      // Otherwise, we need to load the scalars out.
+      return field.FieldInfo.load(IGF, fieldLV);
+    }
+
+    RValue implode(IRGenFunction &IGF,
+                   const SmallVectorImpl<RValue> &elements) const {
+      LValue temp = IGF.createFullExprAlloca(StorageType, StorageAlignment,
+                                             "tuple-implode");
+
+      auto fieldIterator = getFieldInfos().begin();
+      for (const RValue &fieldRV : elements) {
+        const TupleFieldInfo &field = *fieldIterator++;
+        LValue fieldLV = projectLValue(IGF, temp, field);
+        field.FieldInfo.store(IGF, fieldRV, fieldLV);
+      }
+
+      return RValue::forAggregate(temp.getAddress());
     }
 
     RValue load(IRGenFunction &IGF, const LValue &LV) const {
@@ -362,48 +393,24 @@ TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
 }
 
 /// Emit a tuple literal expression.
-RValue IRGenFunction::emitTupleExpr(TupleExpr *Tuple, const TypeInfo &TI) {
+RValue IRGenFunction::emitTupleExpr(TupleExpr *E, const TypeInfo &TI) {
   // Extract information about the tuple.  Note that type-checking
   // should ensure that the literal's elements are exactly parallel
   // with the field infos.
-  const TupleTypeInfo &TInfo = static_cast<const TupleTypeInfo&>(TI);
-  ArrayRef<TupleFieldInfo> FieldInfos = TInfo.getFieldInfos();
-  RValueSchema Schema = TInfo.getSchema();
+  const TupleTypeInfo &tupleType = static_cast<const TupleTypeInfo&>(TI);
+  ArrayRef<TupleFieldInfo> fields = tupleType.getFieldInfos();
 
-  // Set up for the emission.
-  llvm::SmallVector<llvm::Value*, RValue::MaxScalars> Scalars;
-  LValue Aggregate;
-  if (Schema.isAggregate()) {
-    Aggregate = createFullExprAlloca(Schema.getAggregateType(),
-                                     Schema.getAggregateAlignment(),
-                                     "tuple-literal");
-  }
+  SmallVector<RValue, 8> elements;
+  elements.reserve(E->getNumElements());
 
   // Emit all the sub-expressions.
-  for (unsigned I = 0, E = Tuple->getNumElements(); I != E; ++I) {
-    const TupleFieldInfo &FieldInfo = FieldInfos[I];
-    RValue Field = emitRValue(Tuple->getElement(I), FieldInfo.FieldInfo);
-
-    // If the outer schema is scalar, then all the element schemas
-    // are, too, and we should just their scalars into field scalars.
-    if (Schema.isScalar()) {
-      assert(Field.isScalar());
-      Scalars.append(Field.getScalars().begin(), Field.getScalars().end());
-
-    // The reverse is not necessarily true, so we need to store an
-    // arbitrary r-value into our temporary.
-    } else {
-      LValue FieldLV = FieldInfo.getElementPtr(*this, Aggregate);
-      FieldInfo.FieldInfo.store(*this, Field, FieldLV);
-    }
+  for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
+    const TupleFieldInfo &field = fields[i];
+    RValue fieldRV = emitRValue(E->getElement(i), field.FieldInfo);
+    elements.push_back(fieldRV);
   }
 
-  // Finally, construct the temporary.
-  if (Schema.isAggregate()) {
-    return RValue::forAggregate(Aggregate.getAddress());
-  } else {
-    return RValue::forScalars(Scalars);
-  }
+  return tupleType.implode(*this, elements);
 }
 
 RValue IRGenFunction::emitTupleElementRValue(TupleElementExpr *E,
@@ -425,13 +432,13 @@ RValue IRGenFunction::emitTupleElementRValue(TupleElementExpr *E,
   // If we can emit the base as an l-value, we can avoid a lot
   // of unnecessary work.
   if (Optional<LValue> tupleLV = tryEmitAsLValue(tuple, tupleType)) {
-    LValue fieldLV = tupleType.project(*this, tupleLV.getValue(), field);
+    LValue fieldLV = tupleType.projectLValue(*this, tupleLV.getValue(), field);
     return field.FieldInfo.load(*this, fieldLV);
   }
 
   // Otherwise, emit the base as an r-value and project.
   RValue tupleRV = emitRValue(tuple, tupleType);
-  return tupleType.project(*this, tupleRV, field);
+  return tupleType.projectRValue(*this, tupleRV, field);
 }
 
 LValue IRGenFunction::emitTupleElementLValue(TupleElementExpr *E,
@@ -451,11 +458,96 @@ LValue IRGenFunction::emitTupleElementLValue(TupleElementExpr *E,
   }
 
   // Project.
-  return tupleType.project(*this, tupleLV, field);
+  return tupleType.projectLValue(*this, tupleLV, field);
 }
 
 RValue IRGenFunction::emitTupleShuffleExpr(TupleShuffleExpr *E,
                                            const TypeInfo &TI) {
-  unimplemented(E->getLoc(), "tuple shuffles");
-  return emitFakeRValue(TI);
+  const TupleTypeInfo &outerTupleType = static_cast<const TupleTypeInfo&>(TI);
+
+  Expr *innerTuple = E->getSubExpr();
+  const TupleTypeInfo &innerTupleType =
+    static_cast<const TupleTypeInfo&>(getFragileTypeInfo(E->getType()));
+
+  // Emit the inner tuple.  We prefer to emit it as an l-value.
+  Optional<LValue> innerTupleLV = tryEmitAsLValue(innerTuple, innerTupleType);
+  RValue innerTupleRV;
+  if (!innerTupleLV)
+    innerTupleRV = emitRValue(innerTuple, innerTupleType);
+
+  SmallVector<RValue, 8> outerElements;
+  outerElements.reserve(outerTupleType.getFieldInfos().size());
+
+  auto shuffleIndexIterator = E->getElementMapping().begin();
+  for (const TupleFieldInfo &outerField : outerTupleType.getFieldInfos()) {
+    int shuffleIndex = *shuffleIndexIterator++;
+
+    // If the shuffle index is -1, we're supposed to use the default value.
+    if (shuffleIndex == -1) {
+      assert(outerField.Field.Init && "no default initializer for field!");
+      outerElements.push_back(emitRValue(outerField.Field.Init,
+                                         outerField.FieldInfo));
+      continue;
+    }
+
+    // Otherwise, we need to map from a different tuple.
+    assert(shuffleIndex >= 0 &&
+           (unsigned) shuffleIndex < outerTupleType.getFieldInfos().size());
+
+    const TupleFieldInfo &innerField
+      = innerTupleType.getFieldInfos()[(unsigned) shuffleIndex];
+
+    // If we're loading from an l-value, project from that.
+    if (innerTupleLV) {
+      LValue elementLV = innerTupleType.projectLValue(*this,
+                                                      innerTupleLV.getValue(),
+                                                      innerField);
+      outerElements.push_back(innerField.FieldInfo.load(*this, elementLV));
+
+    // Otherwise, project the r-value down.
+    } else {
+      outerElements.push_back(innerTupleType.projectRValue(*this, innerTupleRV,
+                                                           innerField));
+    }
+  }
+
+  return outerTupleType.implode(*this, outerElements);
+}
+
+/// emitExplodedTuple - Emit a tuple expression "exploded", i.e. with
+/// all of the tuple arguments split into individual rvalues.
+void IRGenFunction::emitExplodedTuple(Expr *E, SmallVectorImpl<RValue> &elts) {
+  assert(E->getType()->is<TupleType>());
+
+  // If it's a tuple literal, we want to expand it directly.
+  if (TupleExpr *tuple = dyn_cast<TupleExpr>(E)) {
+    // Look through grouping parens.
+    if (tuple->isGroupingParen())
+      return emitExplodedTuple(tuple->getElement(0), elts);
+
+    for (Expr *element : tuple->getElements())
+      elts.push_back(emitRValue(element));
+
+    return;
+  }
+
+  // It's not a tuple literal.
+  const TupleTypeInfo &tupleType =
+    static_cast<const TupleTypeInfo&>(getFragileTypeInfo(E->getType()));
+
+  // If it's emittable as an l-value, do so and load from projections
+  // down to the fields.
+  if (Optional<LValue> tupleLV = tryEmitAsLValue(E, tupleType)) {
+    for (const TupleFieldInfo &field : tupleType.getFieldInfos()) {
+      LValue fieldLV =
+        tupleType.projectLValue(*this, tupleLV.getValue(), field);
+      elts.push_back(field.FieldInfo.load(*this, fieldLV));
+    }
+    return;
+  }
+
+  // Emit as an r-value and do r-value projections.
+  RValue tupleRV = emitRValue(E, tupleType);
+  for (const TupleFieldInfo &field : tupleType.getFieldInfos())
+    elts.push_back(tupleType.projectRValue(*this, tupleRV, field));
 }

@@ -238,51 +238,28 @@ namespace {
   struct ArgList {
     llvm::SmallVector<llvm::Value *, 16> Values;
     llvm::SmallVector<llvm::AttributeWithIndex, 4> Attrs;
+
+    void addArg(const RValue &arg) {
+      if (arg.isScalar()) {
+        Values.append(arg.getScalars().begin(), arg.getScalars().end());
+      } else {
+        Values.push_back(arg.getAggregateAddress());
+      }
+    }
   };
 }
 
-static void emitArg(IRGenFunction &IGF, Expr *Arg, ArgList &Args) {
-  RValue RV = IGF.emitRValue(Arg);
-  if (RV.isScalar()) {
-    Args.Values.append(RV.getScalars().begin(), RV.getScalars().end());
-  } else {
-    Args.Values.push_back(RV.getAggregateAddress());
-  }
-}
-
 /// Emit the given expression as an expanded tuple, if possible.
-static void emitExpanded(IRGenFunction &IGF, Expr *Arg, ArgList &Args) {
-  // If it's a tuple literal, we want to expand it directly.
-  if (TupleExpr *ArgTuple = dyn_cast<TupleExpr>(Arg)) {
-    // But ignore grouping parens.
-    if (ArgTuple->isGroupingParen()) {
-      return emitExpanded(IGF, ArgTuple->getElement(0), Args);
-    }
+static void emitExpanded(IRGenFunction &IGF, Expr *E, ArgList &args) {
+  // If the argument's not of tuple type, evaluate it straight.
+  if (!E->getType()->is<TupleType>())
+    return args.addArg(IGF.emitRValue(E));
 
-    // TODO: we might need to change the order of the arguments here.
-    for (auto elt : ArgTuple->getElements())
-      emitArg(IGF, elt, Args);
-    return;
-  }
-
-  // It's not a tuple literal.  If it has tuple type, evaluate and expand.
-  if (Arg->getType()->is<TupleType>()) {
-    // TODO: if it's a load from a tuple l-value, we should just emit
-    // the l-value and extract scalars from that instead of potentially
-    // copying into a temporary and then extracting from it.
-    RValue RV = IGF.emitRValue(Arg);
-    if (RV.isScalar()) {
-      Args.Values.append(RV.getScalars().begin(), RV.getScalars().end());
-    } else {
-      IGF.unimplemented(Arg->getLoc(),
-                        "expansion of aggregate-valued tuple as argument");
-    }
-    return;
-  }
-
-  // Otherwise it's a single, non-tuple argument, which we should
-  // evaluate straight.
-  emitArg(IGF, Arg, Args);
+  // Otherwise, explode it.
+  SmallVector<RValue, 8> explodedTuple;
+  IGF.emitExplodedTuple(E, explodedTuple);
+  for (const RValue &arg : explodedTuple)
+    args.addArg(arg);
 }
 
 /// emitBuiltinCall - Emit a call to a builtin function.
