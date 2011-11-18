@@ -431,21 +431,21 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Var; }
   static bool classof(const VarDecl *D) { return true; }
-
 };
   
 
 /// FuncDecl - 'func' declaration.
 class FuncDecl : public ValueDecl {
-public:
   SourceLoc FuncLoc;    // Location of the 'func' token.
 
+public:
   FuncDecl(SourceLoc FuncLoc, Identifier Name, Type Ty, Expr *Init,
            const DeclAttributes &Attrs, DeclContext *DC)
     : ValueDecl(DeclKind::Func, DC, Name, Ty, Init, Attrs), FuncLoc(FuncLoc) {}
+
+  SourceLoc getFuncLoc() const { return FuncLoc; }
     
   SourceLoc getLocStart() const { return FuncLoc; }
-
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
@@ -458,21 +458,22 @@ public:
 /// The type of a OneOfElementDecl is always the OneOfType for the containing
 /// oneof.
 class OneOfElementDecl : public ValueDecl {
-public:
   SourceLoc IdentifierLoc;
   
   /// ArgumentType - This is the type specified with the oneof element.  For
   /// example 'int' in the Y example above.  This is null if there is no type
   /// associated with this element (such as in the Z example).
   Type ArgumentType;
-  
-  
+    
+public:
   OneOfElementDecl(SourceLoc IdentifierLoc, Identifier Name, Type Ty,
                    Type ArgumentType, DeclContext *DC)
   : ValueDecl(DeclKind::OneOfElement, DC, Name, Ty, 0),
     IdentifierLoc(IdentifierLoc), ArgumentType(ArgumentType) {}
 
-  
+  Type getArgumentType() const { return ArgumentType; }
+
+  SourceLoc getIdentifierLoc() const { return IdentifierLoc; }
   SourceLoc getLocStart() const { return IdentifierLoc; }
   
   // Implement isa/cast/dyncast/etc.

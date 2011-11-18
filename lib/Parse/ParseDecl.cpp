@@ -713,7 +713,7 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
       Type EltTy = Result;
       // If the OneOf Element takes a type argument, then it is actually a
       // function that takes the type argument and returns the OneOfType.
-      if (Type ArgTy = Elt->ArgumentType)
+      if (Type ArgTy = Elt->getArgumentType())
         EltTy = FunctionType::get(ArgTy, EltTy, Context);
       Elt->setType(EltTy);
     }

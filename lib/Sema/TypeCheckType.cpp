@@ -61,7 +61,7 @@ bool TypeChecker::validateType(Type InTy) {
   case TypeKind::OneOf:
     for (OneOfElementDecl *Elt : cast<OneOfType>(T)->Elements) {
       // Ignore element decls that have no associated type.
-      if (Elt->ArgumentType.isNull())
+      if (Elt->getArgumentType().isNull())
         continue;
       
       IsInvalid = validateType(Elt);

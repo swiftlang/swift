@@ -152,7 +152,7 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
     assert(!IGM.Types.Converted.count(T));
     IGM.Types.Converted.insert(std::make_pair(T, TInfo));
 
-    Type Ty = T->getElement(0)->ArgumentType;
+    Type Ty = T->getElement(0)->getArgumentType();
 
     llvm::Type *StorageType;
     if (Ty.isNull()) {
@@ -200,7 +200,7 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
   // Figure out how much storage we need for the union.
   for (unsigned I = 0, E = T->Elements.size(); I != E; ++I) {
     // Ignore variants that carry no data.
-    Type Ty = T->getElement(I)->ArgumentType;
+    Type Ty = T->getElement(I)->getArgumentType();
     if (Ty.isNull()) continue;
 
     // Compute layout for the type, and ignore variants with

@@ -204,7 +204,7 @@ OneOfElementDecl *OneOfType::getElement(Identifier Name) const {
 /// 'struct'.  Since it is unambiguous which slice is being referenced,
 /// various syntactic forms are allowed for these, like direct "foo.x" syntax.
 bool OneOfType::hasSingleElement() const {
-  return Elements.size() == 1 && !Elements[0]->ArgumentType.isNull();
+  return Elements.size() == 1 && !Elements[0]->getArgumentType().isNull();
 }
 
 //===----------------------------------------------------------------------===//
@@ -298,8 +298,8 @@ void OneOfType::print(raw_ostream &OS) const {
   for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
     if (i) OS << ", ";
     OS << Elements[i]->getName();
-    if (!Elements[i]->ArgumentType.isNull())
-      OS << " : " << Elements[i]->ArgumentType;
+    if (!Elements[i]->getArgumentType().isNull())
+      OS << " : " << Elements[i]->getArgumentType();
   }
   
   OS << '}';

@@ -153,7 +153,7 @@ namespace {
         abort();
       }
 
-      checkSameType(E->getType(), oneof->Elements[0]->ArgumentType,
+      checkSameType(E->getType(), oneof->Elements[0]->getArgumentType(),
                     "result of LookThroughOneofExpr and single element of oneof");
     }
 

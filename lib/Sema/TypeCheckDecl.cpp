@@ -174,7 +174,7 @@ bool DeclChecker::validateVarName(Type Ty, DeclVarName *Name) {
   // the struct elements with the tuple syntax.
   if (OneOfType *OOT = Ty->getAs<OneOfType>())
     if (OOT->hasSingleElement())
-      Ty = OOT->getElement(0)->ArgumentType;
+      Ty = OOT->getElement(0)->getArgumentType();
   
   // If we have a complex case, Ty must be a tuple and the name specifier must
   // have the correct number of elements.

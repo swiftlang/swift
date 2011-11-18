@@ -89,7 +89,7 @@ Type ElementRefDecl::getTypeForPath(Type InTy, ArrayRef<unsigned> Path) {
   // the struct elements with the tuple syntax.
   if (OneOfType *OOT = Ty->getAs<OneOfType>())
     if (OOT->hasSingleElement())
-      Ty = OOT->getElement(0)->ArgumentType->getDesugaredType();
+      Ty = OOT->getElement(0)->getArgumentType()->getDesugaredType();
   
   // Right now, you can only dive into syntactic tuples.  Eventually this should 
   // handle oneof's etc.
