@@ -135,7 +135,7 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
 
 void Mangler::mangleDeclName(NamedDecl *decl) {
   // decl ::= context identifier
-  mangleDeclContext(decl->Context);
+  mangleDeclContext(decl->getDeclContext());
   mangleIdentifier(decl->Name);
 }
 
@@ -245,7 +245,7 @@ void Mangler::mangleType(Type type) {
 
 static bool shouldMangle(NamedDecl *D) {
   // Everything not declared in global context needs to be mangled.
-  if (!isa<TranslationUnit>(D->Context)) return true;
+  if (!isa<TranslationUnit>(D->getDeclContext())) return true;
 
   // Don't mangle a function named main.
   if (isa<FuncDecl>(D) && D->Name.str() == "main")

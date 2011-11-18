@@ -217,7 +217,7 @@ FuncTypeInfo::getFunctionType(IRGenModule &IGM, bool NeedsData) const {
 
 /// Form an r-value which refers to the given global function.
 RValue IRGenFunction::emitRValueForFunction(FuncDecl *Fn) {
-  if (!Fn->Context->isLocalContext()) {
+  if (!Fn->getDeclContext()->isLocalContext()) {
     llvm::Function *Function = IGM.getAddrOfGlobalFunction(Fn);
     llvm::Value *Data = llvm::UndefValue::get(IGM.Int8PtrTy);
     return RValue::forScalars(Function, Data);
@@ -371,7 +371,7 @@ static RValue emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn, Expr *Arg,
 RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &ResultInfo) {
   // Check for a call to a builtin.
   if (ValueDecl *Fn = E->getCalledValue())
-    if (Fn->Context == IGM.Context.TheBuiltinModule)
+    if (Fn->getDeclContext() == IGM.Context.TheBuiltinModule)
       return emitBuiltinCall(*this, cast<FuncDecl>(Fn), E->getArg(),
                              ResultInfo);
 

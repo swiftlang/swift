@@ -285,8 +285,7 @@ Decl *Parser::parseDeclImport() {
   if (!Attributes.empty())
     diagnose(Attributes.LSquareLoc, diag::import_attributes);
   
-  return new (Context) ImportDecl(ImportLoc, Context.AllocateCopy(ImportPath),
-                                  CurDeclContext);
+  return ImportDecl::create(Context, CurDeclContext, ImportLoc, ImportPath);
 }
 
 
@@ -460,7 +459,7 @@ bool Parser::parseDeclVar(SmallVectorImpl<Decl*> &Decls) {
   // through it and synthesize the decls that reference the var elements as
   // appropriate.
   SmallVector<unsigned, 8> AccessPath;
-  actOnVarDeclName(VD->NestedName, AccessPath, VD, Decls);
+  actOnVarDeclName(VD->getNestedName(), AccessPath, VD, Decls);
   return false;
 }
 
@@ -705,11 +704,11 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
   
   OneOfType *Result = OneOfType::getNew(OneOfLoc, EltDecls, CurDeclContext);
   for (OneOfElementDecl *D : EltDecls)
-    D->Context = Result;
+    D->setDeclContext(Result);
   
   // Install all of the members into the OneOf's DeclContext.
   for (Decl *D : MemberDecls)
-    D->Context = Result;
+    D->setDeclContext(Result);
   
   if (PrettyTypeName) {
     // If we have a pretty name for this, complete it to its actual type.
@@ -884,7 +883,7 @@ bool Parser::parseProtocolBody(SourceLoc ProtocolLoc,
   
   // Install all of the members of protocol into the protocol's DeclContext.
   for (Decl *D : Elements)
-    D->Context = NewProto;
+    D->setDeclContext(NewProto);
   
   // Complete the pretty name for this type.
   assert(TypeName->UnderlyingTy.isNull() &&

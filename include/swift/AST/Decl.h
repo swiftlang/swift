@@ -182,13 +182,23 @@ public:
 
 /// Decl - Base class for all declarations in Swift.
 class Decl {
-  Decl(const Decl&) = delete;
-  void operator=(const Decl&) = delete;
-protected:
-  Decl(DeclKind kind, DeclContext *DC) : Kind(kind), Context(DC) {}
-public:
   const DeclKind Kind;
   DeclContext *Context;
+
+  Decl(const Decl&) = delete;
+  void operator=(const Decl&) = delete;
+
+protected:
+  Decl(DeclKind kind, DeclContext *DC) : Kind(kind), Context(DC) {}
+
+public:
+  /// Alignment - The required alignment of Decl objects.
+  enum { Alignment = 8 };
+
+  DeclKind getKind() const { return Kind; }
+
+  DeclContext *getDeclContext() const { return Context; }
+  void setDeclContext(DeclContext *DC) { Context = DC; }
 
   /// getASTContext - Return the ASTContext that this decl lives in.
   ASTContext &getASTContext() const {
@@ -204,16 +214,15 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *) { return true; }
   
-private:
-  // Make placement new and vanilla new/delete illegal for Decls.
-  void *operator new(size_t Bytes) throw() = delete;
-  void operator delete(void *Data) throw() = delete;
-  void *operator new(size_t Bytes, void *Mem) throw() = delete;
-public:
+  // Make vanilla new/delete illegal for Decls.
+  void *operator new(size_t Bytes) = delete;
+  void operator delete(void *Data) = delete;
+
   // Only allow allocation of Decls using the allocator in ASTContext
   // or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = 8) throw();  
+                     unsigned Alignment = Decl::Alignment);
+  void *operator new(size_t Bytes, void *Mem) { assert(Mem); return Mem; }
 };
 
 /// ImportDecl - This represents a single import declaration, e.g.:
@@ -221,22 +230,38 @@ public:
 ///   import swift.int
 class ImportDecl : public Decl {
 public:
+  typedef std::pair<Identifier, SourceLoc> AccessPathElement;
+
+private:
   SourceLoc ImportLoc;
+
+  /// The number of elements in this path.
+  unsigned NumPathElements;
+
+  AccessPathElement *getPathBuffer() {
+    return reinterpret_cast<AccessPathElement*>(this+1);
+  }
+  const AccessPathElement *getPathBuffer() const {
+    return reinterpret_cast<const AccessPathElement*>(this+1);
+  }
   
-  /// AccessPath - This is the sequence of identifiers for the import decl. This
-  /// always has at least one element in it.
-  ArrayRef<std::pair<Identifier, SourceLoc>> AccessPath;
-  
-  ImportDecl(SourceLoc ImportLoc,
-             ArrayRef<std::pair<Identifier,SourceLoc>> Path, DeclContext *DC)
-    : Decl(DeclKind::Import, DC), ImportLoc(ImportLoc), AccessPath(Path) {
+  ImportDecl(DeclContext *DC, SourceLoc ImportLoc,
+             ArrayRef<AccessPathElement> Path);
+
+public:
+  static ImportDecl *create(ASTContext &C, DeclContext *DC,
+                            SourceLoc ImportLoc,
+                            ArrayRef<AccessPathElement> Path);
+
+  ArrayRef<AccessPathElement> getAccessPath() const {
+    return ArrayRef<AccessPathElement>(getPathBuffer(), NumPathElements);
   }
   
   SourceLoc getLocStart() const { return ImportLoc; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->Kind == DeclKind::Import;
+    return D->getKind() == DeclKind::Import;
   }
   static bool classof(const ImportDecl *D) { return true; }
 };
@@ -249,8 +274,8 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->Kind >= DeclKind::First_NamedDecl &&
-           D->Kind <= DeclKind::Last_NamedDecl;
+    return D->getKind() >= DeclKind::First_NamedDecl &&
+           D->getKind() <= DeclKind::Last_NamedDecl;
   }
   static bool classof(const NamedDecl *D) { return true; }
   
@@ -285,7 +310,7 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->Kind == DeclKind::TypeAlias;
+    return D->getKind() == DeclKind::TypeAlias;
   }
   static bool classof(const TypeAliasDecl *D) { return true; }
 };
@@ -299,8 +324,8 @@ public:
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->Kind >= DeclKind::First_ValueDecl &&
-           D->Kind <= DeclKind::Last_ValueDecl;
+    return D->getKind() >= DeclKind::First_ValueDecl &&
+           D->getKind() <= DeclKind::Last_ValueDecl;
   }
   static bool classof(const ValueDecl *D) { return true; }
 
@@ -315,7 +340,7 @@ protected:
 
 /// VarDecl - 'var' declaration.
 class VarDecl : public ValueDecl {
-public:
+private:
   SourceLoc VarLoc;    // Location of the 'var' token.
 
   /// NestedName - If this is a simple var definition, the name is stored in the
@@ -323,6 +348,7 @@ public:
   /// contains the nested name specifier.
   DeclVarName *NestedName;
   
+public:
   VarDecl(SourceLoc VarLoc, Identifier Name, Type Ty, Expr *Init,
           const DeclAttributes &Attrs, DeclContext *DC)
     : ValueDecl(DeclKind::Var, DC, Name, Ty, Init, Attrs), VarLoc(VarLoc),
@@ -332,11 +358,18 @@ public:
     : ValueDecl(DeclKind::Var, DC, Identifier(), Ty, Init, Attrs),
       VarLoc(VarLoc), NestedName(Name) {}
 
+  /// getVarLoc - The location of the 'var' token.
+  SourceLoc getVarLoc() const { return VarLoc; }
+
+  /// getNestedName - Returns the nested-name-specifier of this
+  /// variable, if it has one.
+  DeclVarName *getNestedName() const { return NestedName; }
+  void setNestedName(DeclVarName *name) { NestedName = name; }
   
   SourceLoc getLocStart() const { return VarLoc; }
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) { return D->Kind == DeclKind::Var; }
+  static bool classof(const Decl *D) { return D->getKind() == DeclKind::Var; }
   static bool classof(const VarDecl *D) { return true; }
 
 };
@@ -355,7 +388,7 @@ public:
 
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) { return D->Kind == DeclKind::Func; }
+  static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
   static bool classof(const FuncDecl *D) { return true; }
 };
 
@@ -384,7 +417,7 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->Kind == DeclKind::OneOfElement;
+    return D->getKind() == DeclKind::OneOfElement;
   }
   static bool classof(const OneOfElementDecl *D) { return true; }
  
@@ -412,7 +445,7 @@ public:
  
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) { return D->Kind == DeclKind::Arg; }
+  static bool classof(const Decl *D) { return D->getKind() == DeclKind::Arg; }
   static bool classof(const ArgDecl *D) { return true; }
 };
 
@@ -443,7 +476,7 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->Kind == DeclKind::ElementRef;
+    return D->getKind() == DeclKind::ElementRef;
   }
   static bool classof(const ElementRefDecl *D) { return true; }
 };

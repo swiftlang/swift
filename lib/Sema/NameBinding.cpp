@@ -145,17 +145,18 @@ Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
 
 void NameBinder::addImport(ImportDecl *ID, 
                            SmallVectorImpl<ImportedModule> &Result) {
-  Module *M = getModule(ID->AccessPath[0]);
+  ArrayRef<ImportDecl::AccessPathElement> Path = ID->getAccessPath();
+  Module *M = getModule(Path[0]);
   if (M == 0) return;
   
   // FIXME: Validate the access path against the module.  Reject things like
   // import swift.aslkdfja
-  if (ID->AccessPath.size() > 2) {
-    diagnose(ID->AccessPath[2].second, diag::invalid_declaration_imported);
+  if (Path.size() > 2) {
+    diagnose(Path[2].second, diag::invalid_declaration_imported);
     return;
   }
   
-  Result.push_back(std::make_pair(ID->AccessPath.slice(1), M));
+  Result.push_back(std::make_pair(Path.slice(1), M));
 }
 
 /// Try to bind an unqualified name into something usable as a scope.

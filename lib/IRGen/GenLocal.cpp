@@ -22,7 +22,7 @@ using namespace swift;
 using namespace irgen;
 
 void IRGenFunction::emitLocal(Decl *D) {
-  switch (D->Kind) {
+  switch (D->getKind()) {
   case DeclKind::Import:
   case DeclKind::Arg:
   case DeclKind::ElementRef:

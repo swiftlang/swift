@@ -66,7 +66,7 @@ static RValue emitFloatLiteralExpr(IRGenFunction &IGF, FloatLiteralExpr *E,
 static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
                                 const TypeInfo &TInfo) {
   ValueDecl *D = E->getDecl();
-  switch (D->Kind) {
+  switch (D->getKind()) {
   case DeclKind::Import:
   case DeclKind::TypeAlias:
     llvm_unreachable("decl is not a value decl");
@@ -75,7 +75,7 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
     llvm_unreachable("decl cannot be emitted as an l-value");
 
   case DeclKind::Var:
-    if (D->Context->isLocalContext()) {
+    if (D->getDeclContext()->isLocalContext()) {
       return IGF.getLocal(D);
     } else {
       return IGF.getGlobal(cast<VarDecl>(D), TInfo);
@@ -95,7 +95,7 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
 /// Emit a declaration reference as an r-value.
 RValue IRGenFunction::emitDeclRefRValue(DeclRefExpr *E, const TypeInfo &TInfo) {
   ValueDecl *D = E->getDecl();
-  switch (D->Kind) {
+  switch (D->getKind()) {
   case DeclKind::Import:
   case DeclKind::TypeAlias:
     llvm_unreachable("decl is not a value decl");

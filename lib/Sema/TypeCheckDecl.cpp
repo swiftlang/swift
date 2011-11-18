@@ -53,8 +53,8 @@ public:
     
     // If the VarDecl had a name specifier, verify that it lines up with the
     // actual type of the VarDecl.
-    if (VD->NestedName && validateVarName(VD->Ty, VD->NestedName))
-      VD->NestedName = 0;
+    if (VD->getNestedName() && validateVarName(VD->Ty, VD->getNestedName()))
+      VD->setNestedName(nullptr);
   }
   
   void visitFuncDecl(FuncDecl *FD) {
@@ -64,7 +64,7 @@ public:
     // No type checking required?
   }
   void visitArgDecl(ArgDecl *AD) {
-    assert(0 && "Shouldn't reach this, doesn't exist in a statement");
+    llvm_unreachable("ArgDecls should never exist in a statement");
   }
   
   void visitElementRefDecl(ElementRefDecl *ERD) {

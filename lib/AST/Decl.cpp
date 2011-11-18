@@ -57,8 +57,7 @@ SourceLoc Decl::getLocStart() const {
 #include "swift/AST/DeclNodes.def"
   }
 
-  assert(0 && "Unknown decl kind");
-  return SourceLoc();
+  llvm_unreachable("Unknown decl kind");
 }
 
 /// getAliasType - Return the sugared version of this decl as a Type.
@@ -105,10 +104,26 @@ Type ElementRefDecl::getTypeForPath(Type InTy, ArrayRef<unsigned> Path) {
   return 0;
 }
 
+ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
+                               SourceLoc ImportLoc,
+                               ArrayRef<AccessPathElement> Path) {
+  void *buffer = Ctx.Allocate(sizeof(ImportDecl) +
+                              Path.size() * sizeof(AccessPathElement),
+                              Decl::Alignment);
+  return new (buffer) ImportDecl(DC, ImportLoc, Path);
+}
+
+ImportDecl::ImportDecl(DeclContext *DC, SourceLoc ImportLoc,
+                       ArrayRef<AccessPathElement> Path)
+  : Decl(DeclKind::Import, DC), ImportLoc(ImportLoc),
+    NumPathElements(Path.size()) {
+  memcpy(getPathBuffer(), Path.data(), Path.size() * sizeof(AccessPathElement));
+}
+
 /// getTypeJudgement - Return the full type judgement for a non-member
 /// reference to this value.
 TypeJudgement ValueDecl::getTypeJudgement() const {
-  switch (Kind) {
+  switch (getKind()) {
   case DeclKind::Import:
   case DeclKind::TypeAlias:
     llvm_unreachable("non-value decls don't have type judgements");
@@ -148,9 +163,9 @@ namespace {
 
     void visitImportDecl(ImportDecl *ID) {
       printCommon(ID, "import_decl");
-      OS << " '" << ID->AccessPath[0].first;
-      for (unsigned i = 1, e = ID->AccessPath.size(); i != e; ++i)
-        OS << "." << ID->AccessPath[i].first;
+      OS << " '" << ID->getAccessPath()[0].first;
+      for (unsigned i = 1, e = ID->getAccessPath().size(); i != e; ++i)
+        OS << "." << ID->getAccessPath()[i].first;
       OS << "')";
     }
 

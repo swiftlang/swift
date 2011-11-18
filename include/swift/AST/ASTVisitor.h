@@ -34,7 +34,7 @@ class ASTVisitor {
 public:
 
   DeclRetTy visit(Decl *D) {
-    switch (D->Kind) {
+    switch (D->getKind()) {
 #define DECL(CLASS, PARENT) \
     case DeclKind::CLASS: \
       return static_cast<ImplClass*>(this) \
