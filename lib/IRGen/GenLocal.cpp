@@ -45,13 +45,13 @@ void IRGenFunction::emitLocal(Decl *D) {
 
 /// emitLocalVar - Emit a local variable.
 void IRGenFunction::emitLocalVar(VarDecl *var) {
-  const TypeInfo &typeInfo = getFragileTypeInfo(var->Ty);
+  const TypeInfo &typeInfo = getFragileTypeInfo(var->getType());
   LValue lvalue = createScopeAlloca(typeInfo.getStorageType(),
                                     typeInfo.StorageAlignment,
                                     var->getName().str());
   Locals.insert(std::make_pair(var, lvalue));
 
-  if (Expr *init = var->Init) {
+  if (Expr *init = var->getInit()) {
     emitInit(lvalue, init, typeInfo);
   } else {
     emitZeroInit(lvalue, typeInfo);

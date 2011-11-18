@@ -230,7 +230,7 @@ RValue IRGenFunction::emitRValueForFunction(FuncDecl *Fn) {
 
 llvm::FunctionType *IRGenModule::getFunctionType(FuncDecl *Fn) {
   const FuncTypeInfo &TypeInfo =
-    static_cast<const FuncTypeInfo &>(getFragileTypeInfo(Fn->Ty));
+    static_cast<const FuncTypeInfo &>(getFragileTypeInfo(Fn->getType()));
   return TypeInfo.getFunctionType(*this, /*data*/ false);
 }
 
@@ -474,7 +474,7 @@ void IRGenFunction::emitPrologue() {
 
   // Set up the parameters.
   for (ArgDecl *Parm : CurFuncExpr->NamedArgs) {
-    const TypeInfo &ParmInfo = IGM.getFragileTypeInfo(Parm->Ty);
+    const TypeInfo &ParmInfo = IGM.getFragileTypeInfo(Parm->getType());
     RValueSchema ParmSchema = ParmInfo.getSchema();
 
     // Make an l-value for the parameter.
@@ -572,11 +572,11 @@ void IRGenFunction::emitEpilogue() {
 /// Emit the definition for the given global function.
 void IRGenModule::emitGlobalFunction(FuncDecl *FD) {
   // Nothing to do if the function has no body.
-  if (!FD->Init) return;
+  if (!FD->getInit()) return;
 
   llvm::Function *Addr = getAddrOfGlobalFunction(FD);
 
-  IRGenFunction(*this, cast<FuncExpr>(FD->Init), Addr).emitFunction();
+  IRGenFunction(*this, cast<FuncExpr>(FD->getInit()), Addr).emitFunction();
 }
 
 void IRGenFunction::emitFunction() {

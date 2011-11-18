@@ -192,12 +192,12 @@ namespace {
     void printCommon(ValueDecl *VD, const char *Name) {
       printCommon((NamedDecl*)VD, Name);
       OS << " type='";
-      VD->Ty->print(OS);
+      VD->getType()->print(OS);
       OS << "'";
       
-      if (VD->Init) {
+      if (VD->getInit()) {
         OS << '\n';
-        printRec(VD->Init);
+        printRec(VD->getInit());
       }
     }
 

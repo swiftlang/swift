@@ -99,8 +99,8 @@ Type ScopeInfo::getQualifiedTypeName(Identifier BaseName, SourceLoc BaseNameLoc,
 
 static void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New, Parser &P) {
   assert(New != Prev && "Cannot conflict with self");
-  P.diagnose(New->getLocStart(), diag::decl_redefinition, New->Init != 0);
-  P.diagnose(Prev->getLocStart(), diag::previous_decldef, Prev->Init != 0,
+  P.diagnose(New->getLocStart(), diag::decl_redefinition, New->getInit() != 0);
+  P.diagnose(Prev->getLocStart(), diag::previous_decldef, Prev->getInit() != 0,
              Prev->getName());
 }
 

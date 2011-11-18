@@ -56,7 +56,7 @@ public:
     // type, then select it.
     // FIXME: Conversion ranking.
     for (ValueDecl *VD : E->Decls) {
-      if (VD->Ty->isEqual(DestTy))
+      if (VD->getType()->isEqual(DestTy))
         return new (TC.Context) DeclRefExpr(VD, E->getLoc(),
                                             VD->getTypeJudgement());
     }
@@ -85,7 +85,8 @@ public:
     
     // If it does, then everything is good, resolve the reference.
     return new (TC.Context) DeclRefExpr(DED, UME->getColonLoc(),
-                                  TypeJudgement(DED->Ty, ValueKind::RValue));
+                                        TypeJudgement(DED->getType(),
+                                                      ValueKind::RValue));
   }  
   
   Expr *visitTupleExpr(TupleExpr *E);
@@ -128,7 +129,7 @@ public:
       if (OneOfType *DT = DestTy->getAs<OneOfType>()) {
         // The oneof type must have an element of the specified name.
         OneOfElementDecl *DED = DT->getElement(UME->getName());
-        if (DED == 0 || !DED->Ty->is<FunctionType>()) {
+        if (DED == 0 || !DED->getType()->is<FunctionType>()) {
           TC.diagnose(UME->getLoc(), diag::invalid_type_to_initialize_member,
                       DestTy);
           return 0;
@@ -136,7 +137,7 @@ public:
 
         // FIXME: Preserve source locations.
         E->setFn(new (TC.Context) DeclRefExpr(DED, UME->getColonLoc(),
-                                 TypeJudgement(DED->Ty, ValueKind::RValue)));
+                            TypeJudgement(DED->getType(), ValueKind::RValue)));
         if (TC.semaApplyExpr(E))
           return 0;
           

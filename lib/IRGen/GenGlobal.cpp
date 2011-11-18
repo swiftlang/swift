@@ -78,7 +78,7 @@ llvm::GlobalVariable *IRGenModule::getAddrOfGlobalVariable(VarDecl *VD) {
   llvm::Constant *&Entry = Globals[VD];
   if (Entry) return cast<llvm::GlobalVariable>(Entry);
 
-  const TypeInfo &TInfo = getFragileTypeInfo(VD->Ty);
+  const TypeInfo &TInfo = getFragileTypeInfo(VD->getType());
   LinkInfo Link = getLinkInfo(VD);
   llvm::GlobalVariable *Addr
     = new llvm::GlobalVariable(Module, TInfo.StorageType, /*constant*/ false,

@@ -553,9 +553,9 @@ namespace {
         }
         Decl *D = BS->getElement(i).get<Decl*>();
         if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-          if (Expr *Init = VD->Init) {
+          if (Expr *Init = VD->getInit()) {
             if (Expr *E2 = doIt(Init))
-              VD->Init = E2;
+              VD->setInit(E2);
             else
               return 0;
           }

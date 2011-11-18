@@ -169,7 +169,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   Expr::ConversionRank BestRank = Expr::CR_Invalid;
   
   for (ValueDecl *Fn : OS->Decls) {
-    Type ArgTy = Fn->Ty->getAs<FunctionType>()->Input;
+    Type ArgTy = Fn->getType()->castTo<FunctionType>()->Input;
     // If we found an exact match, disambiguate the overload set.
     Expr::ConversionRank Rank = E2->getRankOfConversionTo(ArgTy);
     
@@ -213,7 +213,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   
   // Print out the candidate set.
   for (auto TheDecl : OS->Decls) {
-    Type ArgTy = TheDecl->Ty->getAs<FunctionType>()->Input;
+    Type ArgTy = TheDecl->getType()->castTo<FunctionType>()->Input;
     if (E2->getRankOfConversionTo(ArgTy) != BestRank)
       continue;
     diagnose(TheDecl->getLocStart(), diag::found_candidate);
@@ -258,7 +258,7 @@ public:
     
     // If the decl had an invalid type, then an error has already been emitted,
     // just propagate it up.
-    if (E->getDecl()->Ty->is<ErrorType>())
+    if (E->getDecl()->getType()->is<ErrorType>())
       return 0;
     
     // TODO: QOI: If the decl had an "invalid" bit set, then return the error
@@ -461,7 +461,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   // Next, check to see if "a.f" is actually being used as sugar for "f a",
   // which is a function application of 'a' to 'f'.
   if (!E->getResolvedDecls().empty()) {
-    assert(E->getResolvedDecls()[0]->Ty->is<FunctionType>() &&
+    assert(E->getResolvedDecls()[0]->getType()->is<FunctionType>() &&
            "Should have only bound to functions");
     Expr *FnRef;
     // Apply the base value to the function there is a single candidate in the

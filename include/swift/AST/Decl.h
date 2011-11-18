@@ -354,9 +354,41 @@ public:
 /// ValueDecl - All named decls that are values in the language.  These can
 /// have an initializer, type, etc.
 class ValueDecl : public NamedDecl {
-public:
   Type Ty;
   Expr *Init;
+
+protected:
+  ValueDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty, Expr *init,
+            const DeclAttributes &attrs = DeclAttributes())
+    : NamedDecl(K, DC, name, attrs), Ty(ty), Init(init) {
+  }
+
+public:
+
+  Expr *getInit() const { return Init; }
+  void setInit(Expr *init) { Init = init; }
+  Expr *&getInitRef() { return Init; }
+
+  bool hasType() const { return !Ty.isNull(); }
+  Type getType() const {
+    assert(!Ty.isNull() && "declaration has no type set yet");
+    return Ty;
+  }
+
+  /// Set the type of this declaration for the first time.
+  void setType(Type T) {
+    assert(Ty.isNull() && "changing type of declaration");
+    Ty = T;
+  }
+
+  /// Overwrite the type of this declaration.
+  void overwriteType(Type T) {
+    Ty = T;
+  }
+
+  /// getTypeJudgement - Returns the type judgement that should arise
+  /// from a normal reference to this declaration.
+  TypeJudgement getTypeJudgement() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -364,14 +396,6 @@ public:
            D->getKind() <= DeclKind::Last_ValueDecl;
   }
   static bool classof(const ValueDecl *D) { return true; }
-
-  TypeJudgement getTypeJudgement() const;
-
-protected:
-  ValueDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty, Expr *init,
-            const DeclAttributes &attrs = DeclAttributes())
-    : NamedDecl(K, DC, name, attrs), Ty(ty), Init(init) {
-  }
 };  
 
 /// VarDecl - 'var' declaration.

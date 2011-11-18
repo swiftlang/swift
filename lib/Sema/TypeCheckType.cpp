@@ -22,9 +22,9 @@ using namespace swift;
 /// validateType - Recursively check to see if the type of a decl is valid.  If
 /// not, diagnose the problem and collapse it to an ErrorType.
 bool TypeChecker::validateType(ValueDecl *VD) {
-  if (!validateType(VD->Ty)) return false;
+  if (!validateType(VD->getType())) return false;
   
-  VD->Ty = ErrorType::get(Context);
+  VD->overwriteType(ErrorType::get(Context));
   return true;
 }
 

@@ -53,7 +53,7 @@ public:
     
     // If the VarDecl had a name specifier, verify that it lines up with the
     // actual type of the VarDecl.
-    if (VD->getNestedName() && validateVarName(VD->Ty, VD->getNestedName()))
+    if (VD->getNestedName() && validateVarName(VD->getType(), VD->getNestedName()))
       VD->setNestedName(nullptr);
   }
   
@@ -70,14 +70,15 @@ public:
   void visitElementRefDecl(ElementRefDecl *ERD) {
     // If the type is already resolved we're done.  ElementRefDecls are
     // simple.
-    if (!ERD->Ty->is<DependentType>()) return;
+    if (!ERD->getType()->is<DependentType>()) return;
     
-    if (Type T = ElementRefDecl::getTypeForPath(ERD->VD->Ty, ERD->AccessPath))
-      ERD->Ty = T;
-    else {
+    if (Type T = ElementRefDecl::getTypeForPath(ERD->VD->getType(),
+                                                ERD->AccessPath)) {
+      ERD->overwriteType(T);
+    } else {
       TC.diagnose(ERD->getLocStart(), diag::invalid_index_in_element_ref,
-                  ERD->getName(), ERD->VD->Ty);
-      ERD->Ty = ErrorType::get(TC.Context);
+                  ERD->getName(), ERD->VD->getType());
+      ERD->overwriteType(ErrorType::get(TC.Context));
     }
   }
 };
@@ -90,22 +91,22 @@ void TypeChecker::typeCheckDecl(Decl *D) {
 
 bool DeclChecker::visitValueDecl(ValueDecl *VD) {
   if (TC.validateType(VD)) {
-    VD->Init = 0;
+    VD->setInit(nullptr);
     return true;
   }
   
   // Validate that the initializers type matches the expected type.
-  if (VD->Init == 0) {
+  if (!VD->getInit()) {
     // If we have no initializer and the type is dependent, then the initializer
     // was invalid and removed.
-    if (VD->Ty->is<DependentType>())
+    if (VD->getType()->is<DependentType>())
       return true;
   } else {
-    Type DestTy = VD->Ty;
+    Type DestTy = VD->getType();
     if (DestTy->is<DependentType>())
       DestTy = Type();
-    if (!TC.typeCheckExpression(VD->Init, DestTy))
-      VD->Ty = VD->Init->getType();
+    if (!TC.typeCheckExpression(VD->getInitRef(), DestTy))
+      VD->overwriteType(VD->getInit()->getType());
     else if (isa<VarDecl>(VD))
       TC.diagnose(VD->getLocStart(), diag::while_converting_var_init);
   }
@@ -118,7 +119,7 @@ bool DeclChecker::visitValueDecl(ValueDecl *VD) {
 /// validateAttributes - Check that the func/var declaration attributes are ok.
 void DeclChecker::validateAttributes(ValueDecl *VD) {
   DeclAttributes &Attrs = VD->getAttrs();
-  Type Ty = VD->Ty;
+  Type Ty = VD->getType();
   
   // Get the number of lexical arguments, for semantic checks below.
   int NumArguments = -1;

@@ -65,13 +65,6 @@ TranslationUnit *Parser::parseTranslationUnit() {
     
     // FIXME: This can be better handled in the various ActOnDecl methods when
     // they get passed in a parent context decl.
-    
-    // Verify that values have a type specified.
-    if (false && VD->Ty->is<DependentType>()) {
-      diagnose(VD->getLocStart(), diag::top_level_decl_without_type);
-      // FIXME: Should mark the decl as invalid.
-      VD->Ty = TupleType::getEmpty(Context);
-    }
   }
   
   // Verify that any forward declared types were ultimately defined.
@@ -383,14 +376,14 @@ void Parser::actOnVarDeclName(const DeclVarName *Name,
   if (Name->isSimple()) {
     // If this is a leaf name, create a ElementRefDecl with the specified
     // access path.
-    Type Ty = ElementRefDecl::getTypeForPath(VD->Ty, AccessPath);
+    Type Ty = ElementRefDecl::getTypeForPath(VD->getType(), AccessPath);
     
     // If the type of the path is obviously invalid, diagnose it now and refuse
     // to create the decl.  The most common result here is DependentType, which
     // allows type checking to resolve this later.
     if (Ty.isNull()) {
       diagnose(Name->getLocation(), diag::invalid_index_in_var_name_path,
-               Name->getIdentifier(), VD->Ty);
+               Name->getIdentifier(), VD->getType());
       return;
     }
     
@@ -722,7 +715,7 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
       // function that takes the type argument and returns the OneOfType.
       if (Type ArgTy = Elt->ArgumentType)
         EltTy = FunctionType::get(ArgTy, EltTy, Context);
-      Elt->Ty = EltTy;
+      Elt->setType(EltTy);
     }
   }
   

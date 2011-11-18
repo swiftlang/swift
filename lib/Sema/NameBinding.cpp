@@ -373,8 +373,8 @@ void swift::performNameBinding(TranslationUnit *TU) {
     BraceStmt::ExprStmtOrDecl Elt = TU->Body->getElement(i);
     if (Decl *D = Elt.dyn_cast<Decl*>()) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-        if (VD->Init)
-          VD->Init = VD->Init->walk(BinderBlock);
+        if (VD->getInit())
+          VD->setInit(VD->getInit()->walk(BinderBlock));
     } else if (Stmt *S = Elt.dyn_cast<Stmt*>()) {
       Elt = S->walk(BinderBlock);
     } else {
