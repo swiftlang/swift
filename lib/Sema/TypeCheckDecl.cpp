@@ -76,7 +76,7 @@ public:
       ERD->Ty = T;
     else {
       TC.diagnose(ERD->getLocStart(), diag::invalid_index_in_element_ref,
-                  ERD->Name, ERD->VD->Ty);
+                  ERD->getName(), ERD->VD->Ty);
       ERD->Ty = ErrorType::get(TC.Context);
     }
   }
@@ -117,7 +117,7 @@ bool DeclChecker::visitValueDecl(ValueDecl *VD) {
 
 /// validateAttributes - Check that the func/var declaration attributes are ok.
 void DeclChecker::validateAttributes(ValueDecl *VD) {
-  DeclAttributes &Attrs = VD->Attrs;
+  DeclAttributes &Attrs = VD->getAttrs();
   Type Ty = VD->Ty;
   
   // Get the number of lexical arguments, for semantic checks below.
@@ -126,12 +126,11 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     if (TupleType *TT = dyn_cast<TupleType>(FT->Input.getPointer()))
       NumArguments = TT->Fields.size();
   
-  if (VD->Name.isOperator() && 
-      (NumArguments == 0 || NumArguments > 2)) {
+  if (VD->isOperator() && (NumArguments == 0 || NumArguments > 2)) {
     TC.diagnose(VD->getLocStart(), diag::invalid_arg_count_for_operator);
-    VD->Name = TC.Context.getIdentifier("");
     Attrs.Infix = InfixData();
     // FIXME: Set the 'isError' bit on the decl.
+    return;
   }
   
   // If the decl has an infix precedence specified, then it must be a function
@@ -142,7 +141,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     // FIXME: Set the 'isError' bit on the decl.
   }
 
-  if (Attrs.isInfix() && !VD->Name.isOperator()) {
+  if (Attrs.isInfix() && !VD->isOperator()) {
     TC.diagnose(VD->getLocStart(), diag::infix_left_not_an_operator);
     Attrs.Infix = InfixData();
     // FIXME: Set the 'isError' bit on the decl.
@@ -154,9 +153,8 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     Attrs.Infix = InfixData();
   }
 
-  if (VD->Name.isOperator() && !VD->Attrs.isInfix() && NumArguments != 1) {
+  if (VD->isOperator() && !VD->getAttrs().isInfix() && NumArguments != 1) {
     TC.diagnose(VD->getLocStart(), diag::binops_infix_left);
-    VD->Name = TC.Context.getIdentifier("");
   }
 }
 

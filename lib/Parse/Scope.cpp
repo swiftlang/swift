@@ -101,7 +101,7 @@ static void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New, Parser &P) {
   assert(New != Prev && "Cannot conflict with self");
   P.diagnose(New->getLocStart(), diag::decl_redefinition, New->Init != 0);
   P.diagnose(Prev->getLocStart(), diag::previous_decldef, Prev->Init != 0,
-             Prev->Name);
+             Prev->getName());
 }
 
 /// checkValidOverload - Check whether it is ok for D1 and D2 to be declared at
@@ -110,12 +110,12 @@ static void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New, Parser &P) {
 /// D1/D3 are valid overloads and we don't have to check all permutations.
 static bool checkValidOverload(const ValueDecl *D1, const ValueDecl *D2,
                                Parser &P) {
-  if (D1->Attrs.isInfix() && D2->Attrs.isInfix() &&
-      D1->Attrs.getInfixData() != D2->Attrs.getInfixData()) {
+  if (D1->getAttrs().isInfix() && D2->getAttrs().isInfix() &&
+      D1->getAttrs().getInfixData() != D2->getAttrs().getInfixData()) {
     P.diagnose(D1->getLocStart(), diag::precedence_overload);
     // FIXME: Pass identifier through, when the diagnostics system can handle
     // it.
-    P.diagnose(D2->getLocStart(), diag::previous_declaration, D2->Name);
+    P.diagnose(D2->getLocStart(), diag::previous_declaration, D2->getName());
     return true;
   }
   
@@ -129,7 +129,7 @@ static bool checkValidOverload(const ValueDecl *D1, const ValueDecl *D2,
 void ScopeInfo::addToScope(ValueDecl *D) {
   // If we have a shadowed variable definition, check to see if we have a
   // redefinition: two definitions in the same scope with the same name.
-  ValueScopeHTTy::iterator EntryI = ValueScopeHT.begin(D->Name);
+  ValueScopeHTTy::iterator EntryI = ValueScopeHT.begin(D->getName());
   
   // A redefinition is a hit in the scoped table at the same depth.
   if (EntryI != ValueScopeHT.end() && EntryI->first == CurScope->getDepth()) {
@@ -153,7 +153,7 @@ void ScopeInfo::addToScope(ValueDecl *D) {
     // different argument types.  This is checked later.
   }
   
-  ValueScopeHT.insert(D->Name, std::make_pair(CurScope->getDepth(), D));
+  ValueScopeHT.insert(D->getName(), std::make_pair(CurScope->getDepth(), D));
 }
 
 /// addTypeAliasToScope - Add a type alias to the current scope, diagnosing

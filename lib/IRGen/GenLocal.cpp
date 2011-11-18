@@ -48,7 +48,7 @@ void IRGenFunction::emitLocalVar(VarDecl *var) {
   const TypeInfo &typeInfo = getFragileTypeInfo(var->Ty);
   LValue lvalue = createScopeAlloca(typeInfo.getStorageType(),
                                     typeInfo.StorageAlignment,
-                                    var->Name.str());
+                                    var->getName().str());
   Locals.insert(std::make_pair(var, lvalue));
 
   if (Expr *init = var->Init) {

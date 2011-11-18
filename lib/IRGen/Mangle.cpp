@@ -136,7 +136,7 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
 void Mangler::mangleDeclName(NamedDecl *decl) {
   // decl ::= context identifier
   mangleDeclContext(decl->getDeclContext());
-  mangleIdentifier(decl->Name);
+  mangleIdentifier(decl->getName());
 }
 
 /// Mangle a type into the buffer.
@@ -248,7 +248,7 @@ static bool shouldMangle(NamedDecl *D) {
   if (!isa<TranslationUnit>(D->getDeclContext())) return true;
 
   // Don't mangle a function named main.
-  if (isa<FuncDecl>(D) && D->Name.str() == "main")
+  if (isa<FuncDecl>(D) && D->getName().str() == "main")
     return false;
 
   return true;
@@ -257,7 +257,7 @@ static bool shouldMangle(NamedDecl *D) {
 void IRGenModule::mangle(raw_ostream &buffer, NamedDecl *decl) {
   // Check for declarations which should not be mangled.
   if (!shouldMangle(decl)) {
-    buffer << decl->Name.str();
+    buffer << decl->getName().str();
     return;
   }
 

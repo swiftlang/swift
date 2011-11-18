@@ -193,7 +193,7 @@ void TupleType::updateInitializedElementType(unsigned EltNo, Type NewTy,
 OneOfElementDecl *OneOfType::getElement(Identifier Name) const {
   // FIXME: Linear search is not great for large oneof decls.
   for (OneOfElementDecl *Elt : Elements)
-    if (Elt->Name == Name)
+    if (Elt->getName() == Name)
       return Elt;
   return 0;
 }
@@ -288,7 +288,7 @@ void DependentType::print(raw_ostream &OS) const {
 }
 
 void NameAliasType::print(raw_ostream &OS) const {
-  OS << TheDecl->Name.get();
+  OS << TheDecl->getName().get();
 }
 
 void OneOfType::print(raw_ostream &OS) const {
@@ -296,7 +296,7 @@ void OneOfType::print(raw_ostream &OS) const {
     
   for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
     if (i) OS << ", ";
-    OS << Elements[i]->Name;
+    OS << Elements[i]->getName();
     if (!Elements[i]->ArgumentType.isNull())
       OS << " : " << Elements[i]->ArgumentType;
   }

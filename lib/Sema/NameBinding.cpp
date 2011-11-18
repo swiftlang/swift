@@ -321,7 +321,8 @@ void swift::performNameBinding(TranslationUnit *TU) {
   // unit, resolving them with imports.
   for (TypeAliasDecl *TA : TU->UnresolvedTypesForParser) {
     if (TypeAliasDecl *Result =
-          Binder.TU->lookupGlobalType(TA->Name, NLKind::UnqualifiedLookup)) {
+          Binder.TU->lookupGlobalType(TA->getName(),
+                                      NLKind::UnqualifiedLookup)) {
       assert(TA->UnderlyingTy.isNull() && "Not an unresolved type");
       // Update the decl we already have to be the correct type.
       TA->TypeAliasLoc = Result->TypeAliasLoc;
@@ -329,7 +330,8 @@ void swift::performNameBinding(TranslationUnit *TU) {
       continue;
     }
     
-    Binder.diagnose(TA->getLocStart(), diag::use_undeclared_type, TA->Name);
+    Binder.diagnose(TA->getLocStart(), diag::use_undeclared_type,
+                    TA->getName());
     
     TA->UnderlyingTy = ErrorType::get(TU->Ctx);
   }
@@ -338,11 +340,11 @@ void swift::performNameBinding(TranslationUnit *TU) {
   // unit, resolving them if possible.
   for (auto BaseAndType : TU->UnresolvedScopedTypesForParser) {
     BoundScope Scope = Binder.bindScopeName(BaseAndType.first,
-                                            BaseAndType.first->Name,
+                                            BaseAndType.first->getName(),
                                             BaseAndType.first->TypeAliasLoc);
     if (!Scope) continue;
 
-    Identifier Name = BaseAndType.second->Name;
+    Identifier Name = BaseAndType.second->getName();
     SourceLoc NameLoc = BaseAndType.second->TypeAliasLoc;
 
     TypeAliasDecl *Alias = nullptr;
@@ -355,7 +357,7 @@ void swift::performNameBinding(TranslationUnit *TU) {
       BaseAndType.second->UnderlyingTy = Alias->getAliasType();
     } else {
       Binder.diagnose(NameLoc, diag::invalid_member_type,
-                      Name, BaseAndType.first->Name);
+                      Name, BaseAndType.first->getName());
       BaseAndType.second->UnderlyingTy = Binder.Context.TheErrorType;
     }
   }

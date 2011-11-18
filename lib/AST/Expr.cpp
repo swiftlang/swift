@@ -690,11 +690,11 @@ public:
   }
   void visitDeclRefExpr(DeclRefExpr *E) {
     OS.indent(Indent) << "(declref_expr type='" << E->getType();
-    OS << "' decl=" << E->getDecl()->Name << ')';
+    OS << "' decl=" << E->getDecl()->getName() << ')';
   }
   void visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
     OS.indent(Indent) << "(overloadsetref_expr type='" << E->getType();
-    OS << "' decl=" << E->getDecls()[0]->Name << ')';
+    OS << "' decl=" << E->getDecls()[0]->getName() << ')';
   }
   void visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
     OS.indent(Indent) << "(unresolved_decl_ref_expr type='" << E->getType();
@@ -706,7 +706,8 @@ public:
   }
   void visitUnresolvedScopedIdentifierExpr(UnresolvedScopedIdentifierExpr *E) {
     OS.indent(Indent) << "(unresolved_scoped_identifier_expr base='"
-      << E->getBaseTypeFromScope()->Name << "\' name='" << E->getName() << "')";
+      << E->getBaseTypeFromScope()->getName() << "\' name='"
+      << E->getName() << "')";
   }
   void visitTupleExpr(TupleExpr *E) {
     OS.indent(Indent) << "(tuple_expr type='" << E->getType() << '\'';
@@ -793,9 +794,9 @@ public:
   void visitUnaryExpr(UnaryExpr *E) {
     OS.indent(Indent) << "(unary_expr '";
     if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->getFn()))
-      OS << DRE->getDecl()->Name;
+      OS << DRE->getDecl()->getName();
     else if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E->getFn()))
-      OS << OO->getDecls()[0]->Name;
+      OS << OO->getDecls()[0]->getName();
     else
       OS << "***UNKNOWN***";
     OS << "' type='" << E->getType() << "'\n";
@@ -805,9 +806,9 @@ public:
   void visitBinaryExpr(BinaryExpr *E) {
     OS.indent(Indent) << "(binary_expr '";
     if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->getFn()))
-      OS << DRE->getDecl()->Name;
+      OS << DRE->getDecl()->getName();
     else if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E->getFn()))
-      OS << OO->getDecls()[0]->Name;
+      OS << OO->getDecls()[0]->getName();
     else
       OS << "***UNKNOWN***";
     OS << "' type='" << E->getType() << "'\n";

@@ -170,8 +170,8 @@ namespace {
     }
 
     void printDeclName(NamedDecl *D) {
-      if (D->Name.get())
-        OS << '\'' << D->Name << '\'';
+      if (D->getName().get())
+        OS << '\'' << D->getName() << '\'';
       else
         OS << "'anonname=" << (const void*)D << '\'';
     }

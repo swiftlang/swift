@@ -268,22 +268,28 @@ public:
 
 /// NamedDecl - An abstract base class for declarations with names.
 class NamedDecl : public Decl {
-public:
   Identifier Name;
   DeclAttributes Attrs;
+
+protected:
+  NamedDecl(DeclKind K, DeclContext *DC, Identifier name,
+            const DeclAttributes &attrs = DeclAttributes())
+    : Decl(K, DC), Name(name), Attrs(attrs) {
+  }
   
+public:
+  Identifier getName() const { return Name; }
+  bool isOperator() const { return Name.isOperator(); }
+
+  DeclAttributes &getAttrs() { return Attrs; }
+  const DeclAttributes &getAttrs() const { return Attrs; }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_NamedDecl &&
            D->getKind() <= DeclKind::Last_NamedDecl;
   }
   static bool classof(const NamedDecl *D) { return true; }
-  
-protected:
-  NamedDecl(DeclKind K, DeclContext *DC, Identifier name,
-            const DeclAttributes &attrs = DeclAttributes())
-    : Decl(K, DC), Name(name), Attrs(attrs) {
-  }
 };
 
 /// TypeAliasDecl - This is a declaration of a typealias, for example:

@@ -296,7 +296,7 @@ static RValue emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn, Expr *Arg,
   emitExpanded(IGF, Arg, Args);
 
   BuiltinTypeKind TypeArg;
-  switch (isBuiltinValue(Fn->Name.str(), TypeArg)) {
+  switch (isBuiltinValue(Fn->getName().str(), TypeArg)) {
   case BuiltinValueKind::None: llvm_unreachable("not a builtin after all!");
 
 /// A macro which expands to the emission of a simple unary operation
@@ -484,7 +484,7 @@ void IRGenFunction::emitPrologue() {
     } else {
       ParmLV = createScopeAlloca(ParmInfo.getStorageType(),
                                  ParmInfo.StorageAlignment,
-                                 Parm->Name.str());
+                                 Parm->getName().str());
     }
 
     // If the parameter was scalar, form an r-value from the

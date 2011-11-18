@@ -115,13 +115,13 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // If this is an operator, make sure that the declaration found was declared
     // as such.
     if (isa<UnaryExpr>(E) &&
-               !cast<DeclRefExpr>(E1)->getDecl()->Name.isOperator()) {
+        !cast<DeclRefExpr>(E1)->getDecl()->isOperator()) {
       diagnose(E1->getLoc(), diag::unary_op_without_attribute);
       return true;
     }
     
     if (isa<BinaryExpr>(E) &&
-               !cast<DeclRefExpr>(E1)->getDecl()->Attrs.isInfix()) {
+        !cast<DeclRefExpr>(E1)->getDecl()->getAttrs().isInfix()) {
       diagnose(E1->getLoc(), diag::binary_op_without_attribute);
       return true;
     }
@@ -441,7 +441,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   // Check in the context of a protocol.
   if (ProtocolType *PT = SubExprTy->getAs<ProtocolType>()) {
     for (ValueDecl *VD : PT->Elements) {
-      if (VD->Name == E->getName()) {
+      if (VD->getName() == E->getName()) {
         if (LookedThroughOneofs)
           Base = lookThroughOneofs(Base);
 
@@ -505,8 +505,8 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
 /// operator, return its precedence.
 static InfixData getInfixData(TypeChecker &TC, Expr *E) {
   if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
-    if (DRE->getDecl()->Attrs.isInfix())
-      return DRE->getDecl()->Attrs.getInfixData();
+    if (DRE->getDecl()->getAttrs().isInfix())
+      return DRE->getDecl()->getAttrs().getInfixData();
 
     TC.diagnose(DRE->getLoc(), diag::binop_not_infix);
 
@@ -518,17 +518,17 @@ static InfixData getInfixData(TypeChecker &TC, Expr *E) {
     InfixData Infix;
     for (auto D : OO->Decls) {
       // It is possible some unary operators got mixed into the overload set.
-      if (!D->Attrs.isInfix())
+      if (!D->getAttrs().isInfix())
         continue;
       
-      if (Infix.isValid() && Infix != D->Attrs.getInfixData()) {
+      if (Infix.isValid() && Infix != D->getAttrs().getInfixData()) {
         TC.diagnose(OO->getLoc(), diag::binop_mismatched_infix);
         TC.diagnose(FirstDecl->getLocStart(), diag::first_declaration);
         TC.diagnose(D->getLocStart(), diag::second_declaration);
         return Infix;
       }
       
-      Infix = D->Attrs.getInfixData();
+      Infix = D->getAttrs().getInfixData();
       FirstDecl = D;
     }
 

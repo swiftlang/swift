@@ -249,7 +249,7 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     if (isa<VarDecl>(D) && (Flags & PD_DisallowVar)) {
       diagnose(D->getLocStart(), diag::disallowed_var_decl);
     } else if (NamedDecl *ND = dyn_cast<NamedDecl>(D)) {
-      if (ND->Name.isOperator() && (Flags & PD_DisallowOperators))
+      if (ND->isOperator() && (Flags & PD_DisallowOperators))
         diagnose(ND->getLocStart(), diag::operator_in_decl);
     }
   }
@@ -680,7 +680,7 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
       
       // FIXME: Do we care enough to make this efficient?
       for (unsigned I = 0, N = EltDecls.size(); I != N; ++I) {
-        if (EltDecls[I]->Name == NameI) {
+        if (EltDecls[I]->getName() == NameI) {
           diagnose(EltDecls[I]->getLocStart(), diag::previous_definition,
                    NameI);
           break;

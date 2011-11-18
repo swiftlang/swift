@@ -118,11 +118,11 @@ TUModuleCache::TUModuleCache(TranslationUnit &TU) {
   for (auto Elt : TU.Body->getElements())
     if (Decl *D = Elt.dyn_cast<Decl*>()) {
       if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D))
-        if (!TAD->Name.empty())
-          TopLevelTypes[TAD->Name] = TAD;
+        if (!TAD->getName().empty())
+          TopLevelTypes[TAD->getName()] = TAD;
       if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-        if (!VD->Name.empty())
-          TopLevelValues[VD->Name].push_back(VD);
+        if (!VD->getName().empty())
+          TopLevelValues[VD->getName()].push_back(VD);
     }
 }
 
