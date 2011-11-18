@@ -287,6 +287,20 @@ namespace {
   };
 }
 
+static const TupleTypeInfo &getAsTupleTypeInfo(const TypeInfo &typeInfo) {
+  // It'd be nice to get some better verification than this.
+#ifdef __GXX_RTTI
+  assert(dynamic_cast<const TupleTypeInfo*>(&typeInfo));
+#endif
+
+  return static_cast<const TupleTypeInfo&>(typeInfo);
+}
+
+static const TupleTypeInfo &getAsTupleTypeInfo(IRGenFunction &IGF, Type type) {
+  assert(type->is<TupleType>());
+  return getAsTupleTypeInfo(IGF.getFragileTypeInfo(type));
+}
+
 TupleFieldInfo *TupleTypeInfo::getFieldInfoStorage() {
   void *Ptr;
   if (IsAggregate)
@@ -392,23 +406,29 @@ TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
                                         StorageAlignment, FieldInfos);
 }
 
-/// Emit a tuple literal expression.
-RValue IRGenFunction::emitTupleExpr(TupleExpr *E, const TypeInfo &TI) {
-  // Extract information about the tuple.  Note that type-checking
-  // should ensure that the literal's elements are exactly parallel
-  // with the field infos.
-  const TupleTypeInfo &tupleType = static_cast<const TupleTypeInfo&>(TI);
+static void emitExplodedTupleLiteral(IRGenFunction &IGF, TupleExpr *E,
+                                     const TupleTypeInfo &tupleType,
+                                     SmallVectorImpl<RValue> &elements) {
+  // Type-checking should ensure that the literal's elements are
+  // exactly parallel with the field infos.
   ArrayRef<TupleFieldInfo> fields = tupleType.getFieldInfos();
-
-  SmallVector<RValue, 8> elements;
-  elements.reserve(E->getNumElements());
 
   // Emit all the sub-expressions.
   for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
     const TupleFieldInfo &field = fields[i];
-    RValue fieldRV = emitRValue(E->getElement(i), field.FieldInfo);
+    RValue fieldRV = IGF.emitRValue(E->getElement(i), field.FieldInfo);
     elements.push_back(fieldRV);
   }
+}
+
+/// Emit a tuple literal expression.
+RValue IRGenFunction::emitTupleExpr(TupleExpr *E, const TypeInfo &TI) {
+  const TupleTypeInfo &tupleType = getAsTupleTypeInfo(TI);
+
+  SmallVector<RValue, 8> elements;
+  elements.reserve(E->getNumElements());
+
+  emitExplodedTupleLiteral(*this, E, tupleType, elements);
 
   return tupleType.implode(*this, elements);
 }
@@ -416,8 +436,7 @@ RValue IRGenFunction::emitTupleExpr(TupleExpr *E, const TypeInfo &TI) {
 RValue IRGenFunction::emitTupleElementRValue(TupleElementExpr *E,
                                              const TypeInfo &fieldType) {
   Expr *tuple = E->getBase();
-  const TupleTypeInfo &tupleType =
-    static_cast<const TupleTypeInfo&>(getFragileTypeInfo(tuple->getType()));
+  const TupleTypeInfo &tupleType = getAsTupleTypeInfo(*this, tuple->getType());
 
   const TupleFieldInfo &field =
     tupleType.getFieldInfos()[E->getFieldNumber()];
@@ -445,8 +464,7 @@ LValue IRGenFunction::emitTupleElementLValue(TupleElementExpr *E,
                                              const TypeInfo &fieldType) {
   // Emit the base l-value.
   Expr *tuple = E->getBase();
-  const TupleTypeInfo &tupleType =
-    static_cast<const TupleTypeInfo&>(getFragileTypeInfo(tuple->getType()));
+  const TupleTypeInfo &tupleType = getAsTupleTypeInfo(*this, tuple->getType());
   LValue tupleLV = emitLValue(tuple, tupleType);
 
   const TupleFieldInfo &field =
@@ -461,22 +479,20 @@ LValue IRGenFunction::emitTupleElementLValue(TupleElementExpr *E,
   return tupleType.projectLValue(*this, tupleLV, field);
 }
 
-RValue IRGenFunction::emitTupleShuffleExpr(TupleShuffleExpr *E,
-                                           const TypeInfo &TI) {
-  const TupleTypeInfo &outerTupleType = static_cast<const TupleTypeInfo&>(TI);
-
+/// Emit a tuple shuffle in exploded form.
+static void emitExplodedTupleShuffle(IRGenFunction &IGF, TupleShuffleExpr *E,
+                                     const TupleTypeInfo &outerTupleType,
+                                     SmallVectorImpl<RValue> &outerElements) {
   Expr *innerTuple = E->getSubExpr();
   const TupleTypeInfo &innerTupleType =
-    static_cast<const TupleTypeInfo&>(getFragileTypeInfo(E->getType()));
+    getAsTupleTypeInfo(IGF, innerTuple->getType());
 
   // Emit the inner tuple.  We prefer to emit it as an l-value.
-  Optional<LValue> innerTupleLV = tryEmitAsLValue(innerTuple, innerTupleType);
+  Optional<LValue> innerTupleLV
+    = IGF.tryEmitAsLValue(innerTuple, innerTupleType);
   RValue innerTupleRV;
   if (!innerTupleLV)
-    innerTupleRV = emitRValue(innerTuple, innerTupleType);
-
-  SmallVector<RValue, 8> outerElements;
-  outerElements.reserve(outerTupleType.getFieldInfos().size());
+    innerTupleRV = IGF.emitRValue(innerTuple, innerTupleType);
 
   auto shuffleIndexIterator = E->getElementMapping().begin();
   for (const TupleFieldInfo &outerField : outerTupleType.getFieldInfos()) {
@@ -485,8 +501,8 @@ RValue IRGenFunction::emitTupleShuffleExpr(TupleShuffleExpr *E,
     // If the shuffle index is -1, we're supposed to use the default value.
     if (shuffleIndex == -1) {
       assert(outerField.Field.Init && "no default initializer for field!");
-      outerElements.push_back(emitRValue(outerField.Field.Init,
-                                         outerField.FieldInfo));
+      outerElements.push_back(IGF.emitRValue(outerField.Field.Init,
+                                             outerField.FieldInfo));
       continue;
     }
 
@@ -499,17 +515,29 @@ RValue IRGenFunction::emitTupleShuffleExpr(TupleShuffleExpr *E,
 
     // If we're loading from an l-value, project from that.
     if (innerTupleLV) {
-      LValue elementLV = innerTupleType.projectLValue(*this,
+      LValue elementLV = innerTupleType.projectLValue(IGF,
                                                       innerTupleLV.getValue(),
                                                       innerField);
-      outerElements.push_back(innerField.FieldInfo.load(*this, elementLV));
+      outerElements.push_back(innerField.FieldInfo.load(IGF, elementLV));
 
     // Otherwise, project the r-value down.
     } else {
-      outerElements.push_back(innerTupleType.projectRValue(*this, innerTupleRV,
+      outerElements.push_back(innerTupleType.projectRValue(IGF, innerTupleRV,
                                                            innerField));
     }
   }
+}
+
+/// emitTupleShuffleExpr - Emit a tuple-shuffle expression.
+/// Tuple-shuffles are always r-values.
+RValue IRGenFunction::emitTupleShuffleExpr(TupleShuffleExpr *E,
+                                           const TypeInfo &TI) {
+  const TupleTypeInfo &outerTupleType = getAsTupleTypeInfo(TI);
+
+  SmallVector<RValue, 8> outerElements;
+  outerElements.reserve(outerTupleType.getFieldInfos().size());
+
+  emitExplodedTupleShuffle(*this, E, outerTupleType, outerElements);
 
   return outerTupleType.implode(*this, outerElements);
 }
@@ -517,23 +545,25 @@ RValue IRGenFunction::emitTupleShuffleExpr(TupleShuffleExpr *E,
 /// emitExplodedTuple - Emit a tuple expression "exploded", i.e. with
 /// all of the tuple arguments split into individual rvalues.
 void IRGenFunction::emitExplodedTuple(Expr *E, SmallVectorImpl<RValue> &elts) {
-  assert(E->getType()->is<TupleType>());
+  const TupleTypeInfo &tupleType = getAsTupleTypeInfo(*this, E->getType());
 
-  // If it's a tuple literal, we want to expand it directly.
+  // If it's a tuple literal, we want to explode it directly.
   if (TupleExpr *tuple = dyn_cast<TupleExpr>(E)) {
-    // Look through grouping parens.
+    // Look through grouping parens.  This should really be its own AST node.
     if (tuple->isGroupingParen())
       return emitExplodedTuple(tuple->getElement(0), elts);
 
-    for (Expr *element : tuple->getElements())
-      elts.push_back(emitRValue(element));
-
+    emitExplodedTupleLiteral(*this, tuple, tupleType, elts);
     return;
   }
 
   // It's not a tuple literal.
-  const TupleTypeInfo &tupleType =
-    static_cast<const TupleTypeInfo&>(getFragileTypeInfo(E->getType()));
+
+  // If it's a tuple shuffle, explode it.
+  if (TupleShuffleExpr *shuffle = dyn_cast<TupleShuffleExpr>(E)) {
+    emitExplodedTupleShuffle(*this, shuffle, tupleType, elts);
+    return;
+  }
 
   // If it's emittable as an l-value, do so and load from projections
   // down to the fields.
