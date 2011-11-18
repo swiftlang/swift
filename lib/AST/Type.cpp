@@ -199,12 +199,14 @@ OneOfElementDecl *OneOfType::getElement(Identifier Name) const {
   return 0;
 }
 
-/// hasSingleElement - Return true if this is a single element oneof that has
-/// an argument type.  These are typically (but not necessarily) made with
-/// 'struct'.  Since it is unambiguous which slice is being referenced,
-/// various syntactic forms are allowed for these, like direct "foo.x" syntax.
-bool OneOfType::hasSingleElement() const {
+bool OneOfType::isTransparentType() const {
   return Elements.size() == 1 && !Elements[0]->getArgumentType().isNull();
+}
+
+Type OneOfType::getTransparentType() const {
+  assert(Elements.size() == 1);
+  assert(!Elements[0]->getArgumentType().isNull());
+  return Elements[0]->getArgumentType();
 }
 
 //===----------------------------------------------------------------------===//

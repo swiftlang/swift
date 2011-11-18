@@ -354,8 +354,8 @@ public:
 
   Expr *lookThroughOneofs(Expr *E) {
     OneOfType *oneof = E->getType()->castTo<OneOfType>();
-    assert(oneof->hasSingleElement());
-    TypeJudgement TJ(oneof->Elements[0]->getArgumentType(), E->getValueKind());
+    assert(oneof->isTransparentType());
+    TypeJudgement TJ(oneof->getTransparentType(), E->getValueKind());
     return new (TC.Context) LookThroughOneofExpr(E, TJ);
   }
   
@@ -394,8 +394,8 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   Type SubExprTy = Base->getType();
   bool LookedThroughOneofs = false;
   if (OneOfType *oneof = SubExprTy->getAs<OneOfType>())
-    if (oneof->hasSingleElement()) {
-      SubExprTy = oneof->Elements[0]->getArgumentType();
+    if (oneof->isTransparentType()) {
+      SubExprTy = oneof->getTransparentType();
       LookedThroughOneofs = true;
     }
    

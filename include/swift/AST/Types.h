@@ -308,11 +308,15 @@ public:
   
   OneOfElementDecl *getElement(Identifier Name) const;
   
-  /// hasSingleElement - Return true if this is a single element oneof that has
-  /// an argument type.  These are typically (but not necessarily) made with
-  /// 'struct'.  Since it is unambiguous which slice is being referenced,
-  /// various syntactic forms are allowed for these, like direct "foo.x" syntax.
-  bool hasSingleElement() const;
+  /// isTransparentType - Return true if this 'oneof' is transparent
+  /// and be treated exactly like some other type.  This is true if
+  /// this is a single element oneof whose one element has an explicit
+  /// argument type.  These are typically (but not necessarily) made
+  /// with 'struct'.  Since it is unambiguous which slice is being
+  /// referenced, various syntactic forms are allowed for these, like
+  /// direct "foo.x" syntax.
+  bool isTransparentType() const;
+  Type getTransparentType() const;
   
   void print(raw_ostream &O) const;
   

@@ -88,8 +88,8 @@ Type ElementRefDecl::getTypeForPath(Type InTy, ArrayRef<unsigned> Path) {
   // If we have a single-element oneof (like a struct) then we allow matching
   // the struct elements with the tuple syntax.
   if (OneOfType *OOT = Ty->getAs<OneOfType>())
-    if (OOT->hasSingleElement())
-      Ty = OOT->getElement(0)->getArgumentType()->getDesugaredType();
+    if (OOT->isTransparentType())
+      Ty = OOT->getTransparentType().getPointer();
   
   // Right now, you can only dive into syntactic tuples.  Eventually this should 
   // handle oneof's etc.

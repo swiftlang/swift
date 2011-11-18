@@ -146,7 +146,7 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
     = llvm::StructType::create(IGM.getLLVMContext(), "oneof");
 
   // We don't need a discriminator if this is a singleton ADT.
-  if (T->hasSingleElement()) {
+  if (T->Elements.size() == 1) {
     SingletonOneofTypeInfo *TInfo =
       new SingletonOneofTypeInfo(Converted, Size(0), Alignment(0));
     assert(!IGM.Types.Converted.count(T));

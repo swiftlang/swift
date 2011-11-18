@@ -786,7 +786,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   ElementInfo.EltType = BodyTy;
   OneOfType *OneOfTy = actOnOneOfType(StructLoc, Attributes, ElementInfo, 
                                       MemberDecls, TAD);
-  assert(OneOfTy->hasSingleElement() && "Somehow isn't a struct?");
+  assert(OneOfTy->isTransparentType() && "Somehow isn't a struct?");
   
   // In addition to defining the oneof declaration, structs also inject their
   // constructor into the global scope.
