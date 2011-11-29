@@ -38,6 +38,7 @@
 #endif
 
 DECL(Import, Decl)
+DECL(Extension, Decl)
 ABSTRACT_DECL(Named, Decl)
   DECL(TypeAlias, Decl)
   ABSTRACT_DECL(Value, Named)

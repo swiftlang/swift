@@ -64,9 +64,12 @@ public:
     // No type checking required?
   }
   void visitArgDecl(ArgDecl *AD) {
-    llvm_unreachable("ArgDecls should never exist in a statement");
+    assert(0 && "ArgDecls should never exist in a statement");
   }
-  
+  void visitExtensionDecl(ExtensionDecl *ED) {
+    assert(0 && "ExtensionDecls should never exist in a statement");
+  }
+
   void visitElementRefDecl(ElementRefDecl *ERD) {
     // If the type is already resolved we're done.  ElementRefDecls are
     // simple.

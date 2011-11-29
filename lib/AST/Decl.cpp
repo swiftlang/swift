@@ -125,6 +125,7 @@ ImportDecl::ImportDecl(DeclContext *DC, SourceLoc ImportLoc,
 TypeJudgement ValueDecl::getTypeJudgement() const {
   switch (getKind()) {
   case DeclKind::Import:
+  case DeclKind::Extension:
   case DeclKind::TypeAlias:
     llvm_unreachable("non-value decls don't have type judgements");
 
@@ -154,6 +155,7 @@ namespace {
     PrintDecl(raw_ostream &os, unsigned indent) : OS(os), Indent(indent) {
     }
     
+    void printRec(Decl *D) { D->print(OS, Indent+2); }
     void printRec(Expr *E) { E->print(OS, Indent+2); }
     void printRec(Stmt *S) { S->print(OS, Indent+2); }
 
@@ -166,6 +168,16 @@ namespace {
       OS << " '" << ID->getAccessPath()[0].first;
       for (unsigned i = 1, e = ID->getAccessPath().size(); i != e; ++i)
         OS << "." << ID->getAccessPath()[i].first;
+      OS << "')";
+    }
+
+    void visitExtensionDecl(ExtensionDecl *ED) {
+      printCommon(ED, "extension_decl");
+      OS << ' ';
+      ED->ExtendedType->print(OS);
+      OS << '\n';
+      for (Decl *Member : ED->Members)
+        printRec(Member);
       OS << "')";
     }
 

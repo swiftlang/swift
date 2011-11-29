@@ -266,6 +266,35 @@ public:
   static bool classof(const ImportDecl *D) { return true; }
 };
 
+/// ExtensionDecl - This represents a type extension containing methods
+/// associated with the type.  This is not a ValueDecl and has no Type because
+/// there are no runtime values of the Extension's type.  
+class ExtensionDecl : public Decl {
+public:
+  SourceLoc ExtensionLoc;  // Location of 'extension' keyword.
+  
+  /// ExtendedType - The type being extended.
+  Type ExtendedType;
+  ArrayRef<Decl*> Members;
+
+  ExtensionDecl(SourceLoc ExtensionLoc, Type ExtendedType,
+                ArrayRef<Decl*> Members, DeclContext *DC)
+    : Decl(DeclKind::Extension, DC), ExtensionLoc(ExtensionLoc),
+      ExtendedType(ExtendedType), Members(Members) {
+  }
+                
+  
+  SourceLoc getLocStart() const { return ExtensionLoc; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::Extension;
+  }
+  static bool classof(const ExtensionDecl *D) { return true; }
+};
+  
+  
+  
 /// NamedDecl - An abstract base class for declarations with names.
 class NamedDecl : public Decl {
   Identifier Name;
