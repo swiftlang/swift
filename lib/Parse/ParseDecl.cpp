@@ -306,7 +306,9 @@ Decl *Parser::parseDeclExtension() {
   parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_extension,
                      LBLoc, diag::opening_brace);
 
-  return 0;
+  return new (Context) ExtensionDecl(ExtensionLoc, Ty,
+                                     Context.AllocateCopy(MemberDecls),
+                                     CurDeclContext);
 }
 
 /// parseVarName
