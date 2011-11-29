@@ -174,9 +174,9 @@ namespace {
     void visitExtensionDecl(ExtensionDecl *ED) {
       printCommon(ED, "extension_decl");
       OS << ' ';
-      ED->ExtendedType->print(OS);
+      ED->getExtendedType()->print(OS);
       OS << '\n';
-      for (Decl *Member : ED->Members)
+      for (Decl *Member : ED->getMembers())
         printRec(Member);
       OS << "')";
     }

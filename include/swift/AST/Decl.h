@@ -270,21 +270,23 @@ public:
 /// associated with the type.  This is not a ValueDecl and has no Type because
 /// there are no runtime values of the Extension's type.  
 class ExtensionDecl : public Decl {
-public:
   SourceLoc ExtensionLoc;  // Location of 'extension' keyword.
   
   /// ExtendedType - The type being extended.
   Type ExtendedType;
   ArrayRef<Decl*> Members;
+public:
 
   ExtensionDecl(SourceLoc ExtensionLoc, Type ExtendedType,
                 ArrayRef<Decl*> Members, DeclContext *DC)
     : Decl(DeclKind::Extension, DC), ExtensionLoc(ExtensionLoc),
       ExtendedType(ExtendedType), Members(Members) {
   }
-                
   
+  SourceLoc getExtensionLoc() const { return ExtensionLoc; }
   SourceLoc getLocStart() const { return ExtensionLoc; }
+  Type getExtendedType() const { return ExtendedType; }
+  ArrayRef<Decl*> getMembers() const { return Members; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

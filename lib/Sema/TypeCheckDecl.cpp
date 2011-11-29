@@ -67,9 +67,9 @@ public:
     assert(0 && "ArgDecls should never exist in a statement");
   }
   void visitExtensionDecl(ExtensionDecl *ED) {
-    TC.validateType(ED->ExtendedType);
+    TC.validateType(ED->getExtendedType());
 
-    for (Decl *Member : ED->Members) {
+    for (Decl *Member : ED->getMembers()) {
       // First recursively type check each thing in the extension.
       visit(Member);
       
