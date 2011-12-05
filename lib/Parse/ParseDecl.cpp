@@ -296,10 +296,9 @@ Decl *Parser::parseDeclExtension() {
     return 0;
   
   // Parse the body as a series of decls.
-  // FIXME: Need to diagnose invalid members at Sema time!
   SmallVector<Decl*, 8> MemberDecls;
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-    if (parseDecl(MemberDecls, PD_Default))
+    if (parseDecl(MemberDecls, PD_DisallowVar|PD_DisallowOperators))
       skipUntilDeclRBrace();
   }
 
