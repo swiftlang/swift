@@ -69,15 +69,18 @@ void swift::performIRGeneration(TranslationUnit *TU, Options &Opts) {
   // The integer values 0-3 map exactly to the values of this enum.
   CodeGenOpt::Level OptLevel = static_cast<CodeGenOpt::Level>(Opts.OptLevel);
 
-  // Create a target machine.
+  // Set up TargetOptions.
   // Things that maybe we should collect from the command line:
   //   - CPU
   //   - features
   //   - relocation model
   //   - code model
+  TargetOptions Options;
+  
+  // Create a target machine.
   TargetMachine *TargetMachine
     = Target->createTargetMachine(Opts.Triple, /*cpu*/ "", /*features*/ "",
-                                  Reloc::Default, CodeModel::Default,
+                                  Options, Reloc::Default, CodeModel::Default,
                                   OptLevel);
   if (!TargetMachine) {
     TU->Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target,
