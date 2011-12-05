@@ -213,7 +213,7 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     Entries.push_back(parseDeclTypeAlias());
     break;
   case tok::kw_oneof:
-    Entries.push_back(parseDeclOneOf());
+    HadParseError = parseDeclOneOf(Entries);
     break;
   case tok::kw_struct:
     HadParseError = parseDeclStruct(Entries);
@@ -310,6 +310,9 @@ Decl *Parser::parseDeclExtension() {
   return actOnDeclExtension(ExtensionLoc, Ty, MemberDecls);
 }
 
+/// actOnDeclExtension - Given a list of declarations in an 'extension',
+/// 'struct', 'oneof', etc, create an ExtensionDecl and register them as
+/// members.
 Decl *Parser::actOnDeclExtension(SourceLoc ExtensionLoc, Type Ty,
                                  ArrayRef<Decl*> MemberDecls) {
   ExtensionDecl *ED = new (Context) ExtensionDecl(ExtensionLoc, Ty,
@@ -581,13 +584,18 @@ FuncDecl *Parser::parseDeclFunc(Type ReceiverTy) {
   return FD;
 }
 
-/// parseDeclOneOf - Parse a 'oneof' declaration, returning null (and doing no
+/// parseDeclOneOf - Parse a 'oneof' declaration, returning true (and doing no
 /// token skipping) on error.
 ///
 ///   decl-oneof:
 ///      'oneof' attribute-list identifier oneof-body
+///   oneof-body:
+///      '{' oneof-element (',' oneof-element)* decl* '}'
+///   oneof-element:
+///      identifier
+///      identifier ':' type
 ///      
-Decl *Parser::parseDeclOneOf() {
+bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
   SourceLoc OneOfLoc = consumeToken(tok::kw_oneof);
 
   DeclAttributes Attributes;
@@ -595,28 +603,12 @@ Decl *Parser::parseDeclOneOf() {
   
   SourceLoc NameLoc = Tok.getLoc();
   Identifier OneOfName;
-  Type OneOfType;
   if (parseIdentifier(OneOfName, diag::expected_identifier_in_decl, "oneof"))
-    return 0;
+    return true;
   
   TypeAliasDecl *TAD = ScopeInfo.addTypeAliasToScope(NameLoc, OneOfName,Type());
-  if (parseDeclOneOfBody(OneOfLoc, Attributes, OneOfType, TAD))
-    return 0;
-  return TAD;
-}
+  Decls.push_back(TAD);
 
-
-///   oneof-body:
-///      '{' oneof-element (',' oneof-element)* decl* '}'
-///   oneof-element:
-///      identifier
-///      identifier ':' type
-///
-/// If TypeName is specified, it is the type that the constructors should be
-/// built with, so that they preserve the name of the oneof decl that contains
-/// this.
-bool Parser::parseDeclOneOfBody(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
-                                Type &Result, TypeAliasDecl *TypeName) {
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_oneof_type))
     return true;
@@ -656,14 +648,18 @@ bool Parser::parseDeclOneOfBody(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
   parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_oneof_type,
                      LBLoc, diag::opening_brace);
   
-  Result = actOnOneOfType(OneOfLoc, Attrs, ElementInfos, MemberDecls, TypeName);
+  OneOfType *Result = actOnOneOfType(OneOfLoc, Attributes, ElementInfos, TAD);
+  
+  // If there were members, create an 'extension' to hold them.
+  if (!MemberDecls.empty())
+    Decls.push_back(actOnDeclExtension(SourceLoc(), Result, MemberDecls));
+  
   return false;
 }
 
 OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
                                   const DeclAttributes &Attrs,
                                   ArrayRef<OneOfElementInfo> Elts,
-                                  ArrayRef<Decl*> MemberDecls,
                                   TypeAliasDecl *PrettyTypeName) {
   // No attributes are valid on oneof types at this time.
   if (!Attrs.empty())
@@ -711,10 +707,6 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
   
   OneOfType *Result = OneOfType::getNew(OneOfLoc, EltDecls, CurDeclContext);
   for (OneOfElementDecl *D : EltDecls)
-    D->setDeclContext(Result);
-  
-  // Install all of the members into the OneOf's DeclContext.
-  for (Decl *D : MemberDecls)
     D->setDeclContext(Result);
   
   if (PrettyTypeName) {
@@ -798,9 +790,12 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   ElementInfo.Name = StructName.str();
   ElementInfo.NameLoc = StructLoc;
   ElementInfo.EltType = BodyTy;
-  OneOfType *OneOfTy = actOnOneOfType(StructLoc, Attributes, ElementInfo, 
-                                      MemberDecls, TAD);
+  OneOfType *OneOfTy = actOnOneOfType(StructLoc, Attributes, ElementInfo, TAD);
   assert(OneOfTy->isTransparentType() && "Somehow isn't a struct?");
+  
+  // If there were members, create an 'extension' to hold them.
+  if (!MemberDecls.empty())
+    Decls.push_back(actOnDeclExtension(SourceLoc(), OneOfTy, MemberDecls));
   
   // In addition to defining the oneof declaration, structs also inject their
   // constructor into the global scope.

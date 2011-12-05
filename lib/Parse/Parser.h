@@ -184,9 +184,7 @@ public:
   Decl *parseDeclExtension();
   Decl *actOnDeclExtension(SourceLoc ExtensionLoc, Type Ty,
                            ArrayRef<Decl*> MemberDecls);
-  Decl *parseDeclOneOf();
-  bool parseDeclOneOfBody(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
-                          Type &Result, TypeAliasDecl *TypeName = 0);
+  bool parseDeclOneOf(SmallVectorImpl<Decl*> &Decls);
 
   bool parseDeclStruct(SmallVectorImpl<Decl*> &Decls);
   bool parseDeclVar(SmallVectorImpl<Decl*> &Decls);
@@ -209,7 +207,6 @@ public:
   
   OneOfType *actOnOneOfType(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
                             ArrayRef<OneOfElementInfo> Elts,
-                            ArrayRef<Decl*> MemberDecls,
                             TypeAliasDecl *PrettyTypeName);
 
   //===--------------------------------------------------------------------===//
