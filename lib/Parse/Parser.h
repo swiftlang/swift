@@ -182,6 +182,8 @@ public:
   
   Decl *parseDeclImport();
   Decl *parseDeclExtension();
+  Decl *actOnDeclExtension(SourceLoc ExtensionLoc, Type Ty,
+                           ArrayRef<Decl*> MemberDecls);
   Decl *parseDeclOneOf();
   bool parseDeclOneOfBody(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
                           Type &Result, TypeAliasDecl *TypeName = 0);

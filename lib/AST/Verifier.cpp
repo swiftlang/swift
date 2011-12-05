@@ -44,7 +44,7 @@ namespace {
         DISPATCH(ID);
 #define UNCHECKED_EXPR(ID, PARENT) \
       case ExprKind::ID: \
-        assert(Stage < VerificationKind::CheckedTypes && #ID "in wrong phase"); \
+        assert(Stage < VerificationKind::CheckedTypes && #ID "in wrong phase");\
         DISPATCH(ID);
 #define UNBOUND_EXPR(ID, PARENT) \
       case ExprKind::ID: \

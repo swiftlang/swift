@@ -52,6 +52,7 @@ enum class DeclContextKind {
     BuiltinModule,
   FuncExpr,
   OneOfType,
+  ExtensionDecl,
   ProtocolType,
   
   First_Module = TranslationUnit, Last_Module = BuiltinModule

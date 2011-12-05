@@ -269,7 +269,7 @@ public:
 /// ExtensionDecl - This represents a type extension containing methods
 /// associated with the type.  This is not a ValueDecl and has no Type because
 /// there are no runtime values of the Extension's type.  
-class ExtensionDecl : public Decl {
+class ExtensionDecl : public Decl, public DeclContext {
   SourceLoc ExtensionLoc;  // Location of 'extension' keyword.
   
   /// ExtendedType - The type being extended.
@@ -278,8 +278,10 @@ class ExtensionDecl : public Decl {
 public:
 
   ExtensionDecl(SourceLoc ExtensionLoc, Type ExtendedType,
-                ArrayRef<Decl*> Members, DeclContext *DC)
-    : Decl(DeclKind::Extension, DC), ExtensionLoc(ExtensionLoc),
+                ArrayRef<Decl*> Members, DeclContext *Parent)
+    : Decl(DeclKind::Extension, Parent),
+      DeclContext(DeclContextKind::ExtensionDecl, Parent),
+      ExtensionLoc(ExtensionLoc),
       ExtendedType(ExtendedType), Members(Members) {
   }
   
@@ -291,6 +293,9 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Extension;
+  }
+  static bool classof(const DeclContext *C) {
+    return C->getContextKind() == DeclContextKind::ExtensionDecl;
   }
   static bool classof(const ExtensionDecl *D) { return true; }
 };

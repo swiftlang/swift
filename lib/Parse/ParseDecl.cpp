@@ -306,10 +306,22 @@ Decl *Parser::parseDeclExtension() {
   parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_extension,
                      LBLoc, diag::opening_brace);
 
-  return new (Context) ExtensionDecl(ExtensionLoc, Ty,
-                                     Context.AllocateCopy(MemberDecls),
-                                     CurDeclContext);
+  
+  return actOnDeclExtension(ExtensionLoc, Ty, MemberDecls);
 }
+
+Decl *Parser::actOnDeclExtension(SourceLoc ExtensionLoc, Type Ty,
+                                 ArrayRef<Decl*> MemberDecls) {
+  ExtensionDecl *ED = new (Context) ExtensionDecl(ExtensionLoc, Ty,
+                                              Context.AllocateCopy(MemberDecls),
+                                                  CurDeclContext);
+  // Install all of the members into the Extension's DeclContext.
+  for (Decl *D : MemberDecls)
+    D->setDeclContext(ED);
+  
+  return ED;
+}
+
 
 /// parseVarName
 ///   var-name:
