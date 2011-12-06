@@ -175,10 +175,11 @@ namespace {
       printCommon(ED, "extension_decl");
       OS << ' ';
       ED->getExtendedType()->print(OS);
-      OS << '\n';
-      for (Decl *Member : ED->getMembers())
+      for (Decl *Member : ED->getMembers()) {
+        OS << '\n';
         printRec(Member);
-      OS << "')";
+      }
+      OS << ")";
     }
 
     void printDeclName(NamedDecl *D) {
