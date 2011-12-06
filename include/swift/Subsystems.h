@@ -24,7 +24,12 @@ namespace swift {
   namespace irgen {
     class Options;
   }
-  
+
+  /// verify - Check that the translation unit is well formed (i.e. following
+  /// the invariants of the AST, not that the code written by the user makes
+  /// sense), aborting and spewing errors if not.
+  void verify(TranslationUnit *TUnit);
+
   /// parseTranslationUnit - Parse a single buffer as a translation unit and
   /// return the decl.
   TranslationUnit *parseTranslationUnit(unsigned BufferID, ASTContext &Ctx);

@@ -17,7 +17,6 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Diagnostics.h"
-#include "swift/AST/Verifier.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/TinyPtrVector.h"

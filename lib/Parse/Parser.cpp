@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Subsystems.h"
-#include "swift/AST/Verifier.h"
 #include "swift/AST/Diagnostics.h"
 #include "Parser.h"
 #include "swift/Parse/Lexer.h"
