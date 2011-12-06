@@ -163,7 +163,8 @@ public:
   static bool isStartOfDecl(const Token &Tok, const Token &Tok2);
 
   TranslationUnit *parseTranslationUnit();
-  bool parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags);
+  bool parseDecl(SmallVectorImpl<Decl*> &Entries, Type ThisType,
+                 unsigned Flags);
   enum {
     PD_Default           = 0,
     PD_AllowTopLevel     = 1 << 1,

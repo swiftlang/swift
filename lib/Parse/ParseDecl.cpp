@@ -197,7 +197,8 @@ void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
 ///     decl-struct
 ///     decl-import  [[Only if AllowImportDecl = true]]
 ///
-bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
+bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, Type ThisType,
+                       unsigned Flags) {
   unsigned EntryStart = Entries.size();
   bool HadParseError = false;
   switch (Tok.getKind()) {
@@ -227,7 +228,7 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     Entries.push_back(parseDeclProtocol());
     break;
   case tok::kw_func:
-    Entries.push_back(parseDeclFunc());
+    Entries.push_back(parseDeclFunc(ThisType));
     break;
   }
   
@@ -304,7 +305,7 @@ Decl *Parser::parseDeclExtension() {
   // Parse the body as a series of decls.
   SmallVector<Decl*, 8> MemberDecls;
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-    if (parseDecl(MemberDecls, PD_DisallowVar|PD_DisallowOperators))
+    if (parseDecl(MemberDecls, Ty, PD_DisallowVar|PD_DisallowOperators))
       skipUntilDeclRBrace();
   }
 
@@ -642,18 +643,18 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
     if (!consumeIf(tok::comma))
       break;
   }
-  
+
+  OneOfType *Result = actOnOneOfType(OneOfLoc, Attributes, ElementInfos, TAD);
+
   // Parse the body as a series of decls.
   SmallVector<Decl*, 8> MemberDecls;
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-    if (parseDecl(MemberDecls, PD_DisallowVar|PD_DisallowOperators))
+    if (parseDecl(MemberDecls, Result, PD_DisallowVar|PD_DisallowOperators))
       skipUntilDeclRBrace();
   }
   
   parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_oneof_type,
                      LBLoc, diag::opening_brace);
-  
-  OneOfType *Result = actOnOneOfType(OneOfLoc, Attributes, ElementInfos, TAD);
   
   // If there were members, create an 'extension' to hold them.
   if (!MemberDecls.empty())
@@ -778,7 +779,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   // Parse the body as a series of decls.
   SmallVector<Decl*, 8> MemberDecls;
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-    if (parseDecl(MemberDecls, PD_DisallowVar|PD_DisallowOperators))
+    if (parseDecl(MemberDecls, StructTy, PD_DisallowVar|PD_DisallowOperators))
       skipUntilDeclRBrace();
   }
   
