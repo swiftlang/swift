@@ -166,6 +166,64 @@ void TUModuleCache::lookupValue(AccessPathTy AccessPath, Identifier Name,
   }
 }
 
+//===----------------------------------------------------------------------===//
+// Module Extension Name Lookup
+//===----------------------------------------------------------------------===//
+
+namespace {
+  class TUExtensionCache {
+    llvm::DenseMap<TypeBase*, llvm::TinyPtrVector<ExtensionDecl*>> Extensions;
+  public:
+
+    TUExtensionCache(TranslationUnit &TU);
+    
+    ArrayRef<ExtensionDecl*> getExtensions(TypeBase *T) const{
+      assert(T->isCanonical());
+      auto I = Extensions.find(T);
+      if (I == Extensions.end())
+        return ArrayRef<ExtensionDecl*>();
+      return I->second;
+    }
+  };
+}
+
+static TUExtensionCache &getTUExtensionCachePimpl(void *&Ptr,
+                                                  TranslationUnit &TU) {
+  // FIXME: This leaks.  Sticking this into ASTContext isn't enough because then
+  // the DenseMap will leak.
+  if (Ptr == 0)
+    Ptr = new TUExtensionCache(TU);
+  return *(TUExtensionCache*)Ptr;
+}
+
+TUExtensionCache::TUExtensionCache(TranslationUnit &TU) {
+  for (auto Elt : TU.Body->getElements()) {
+    if (Decl *D = Elt.dyn_cast<Decl*>()) {
+      if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
+        // Ignore failed name lookups.
+        if (ED->getExtendedType()->is<ErrorType>()) continue;
+        
+        Extensions[ED->getExtendedType()->getCanonicalType()].push_back(ED);
+      }
+    }
+  }
+}
+
+
+/// lookupExtensions - Look up all of the extensions in the module that are
+/// extending the specified type and return a list of them.
+ArrayRef<ExtensionDecl*> Module::lookupExtensions(Type T) {
+  assert(ASTStage >= Parsed &&
+         "Extensions should only be looked up after name binding is underway");
+  
+  // The builtin module just has free functions, not extensions.
+  if (isa<BuiltinModule>(this)) return ArrayRef<ExtensionDecl*>();
+  
+  TUExtensionCache &Cache =
+    getTUExtensionCachePimpl(ExtensionCachePimpl, *cast<TranslationUnit>(this));
+  
+  return Cache.getExtensions(T->getCanonicalType());
+}
 
 //===----------------------------------------------------------------------===//
 // Module Implementation

@@ -25,8 +25,10 @@
 namespace swift {
   class ASTContext;
   class BraceStmt;
+  class ExtensionDecl;
   class OneOfElementDecl;
   class NameAliasType;
+  class Type;
   class TypeAliasDecl;
   class LookupCache;
   class ValueDecl;
@@ -43,6 +45,7 @@ namespace swift {
 /// module, as is an imported module.
 class Module : public DeclContext {
   void *LookupCachePimpl;
+  void *ExtensionCachePimpl;
 public:
   ASTContext &Ctx;
   Identifier Name;
@@ -88,7 +91,10 @@ public:
   void lookupValue(AccessPathTy AccessPath, Identifier Name, NLKind LookupKind, 
                    SmallVectorImpl<ValueDecl*> &Result);
 
-
+  /// lookupExtensions - Look up all of the extensions in the module that are
+  /// extending the specified type and return a list of them.
+  ArrayRef<ExtensionDecl*> lookupExtensions(Type T);
+  
   /// lookupGlobalType - Perform a type lookup within the current Module.
   /// Unlike lookupType, this does look through import declarations to resolve
   /// the name.
