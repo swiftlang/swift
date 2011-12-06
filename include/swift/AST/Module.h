@@ -46,9 +46,29 @@ class Module : public DeclContext {
 public:
   ASTContext &Ctx;
   Identifier Name;
+  
+  //===--------------------------------------------------------------------===//
+  // AST Phase of Translation
+  //===--------------------------------------------------------------------===//
+  
+  /// ASTStage - Defines what phases of parsing and semantic analysis are
+  /// complete for the given AST.  This should only be used for assertions and
+  /// verification purposes.
+  enum {
+    /// Parsing is underway.
+    Parsing,
+    /// Parsing has completed.
+    Parsed,
+    /// Name binding has completed.
+    NameBound,
+    /// Type checking has completed.
+    TypeChecked
+  } ASTStage;
+
 protected:
   Module(DeclContextKind Kind, Identifier Name, ASTContext &Ctx)
-    : DeclContext(Kind, nullptr), LookupCachePimpl(0), Ctx(Ctx), Name(Name) {
+  : DeclContext(Kind, nullptr), LookupCachePimpl(0), Ctx(Ctx), Name(Name),
+    ASTStage(Parsing) {
   }
 
 public:
@@ -120,31 +140,13 @@ private:
   ArrayRef<ImportedModule> ImportedModules;
 
 public:
-  //===--------------------------------------------------------------------===//
-  // AST Phase of Translation
-  //===--------------------------------------------------------------------===//
-  
-  /// ASTStage - Defines what phases of parsing and semantic analysis are
-  /// complete for the given AST.  This should only be used for assertions and
-  /// verification purposes.
-  enum {
-    /// Parsing is underway.
-    Parsing,
-    /// Parsing has completed.
-    Parsed,
-    /// Name binding has completed.
-    NameBound,
-    /// Type checking has completed.
-    TypeChecked
-  } ASTStage;
 
   /// Body - This is a synthesized BraceStmt that holds the top level
   /// expressions and declarations for a translation unit.
   BraceStmt *Body;
   
   TranslationUnit(Identifier Name, ASTContext &C)
-    : Module(DeclContextKind::TranslationUnit, Name, C),
-      ASTStage(Parsing) {
+    : Module(DeclContextKind::TranslationUnit, Name, C) {
   }
 
   ArrayRef<TypeAliasDecl*> getUnresolvedTypes() const {
@@ -198,6 +200,8 @@ class BuiltinModule : public Module {
 public:
   BuiltinModule(Identifier Name, ASTContext &Ctx)
     : Module(DeclContextKind::BuiltinModule, Name, Ctx) {
+    // The Builtin module is always well formed.
+    ASTStage = TypeChecked;
   }
 
   // Implement isa/cast/dyncast/etc.
