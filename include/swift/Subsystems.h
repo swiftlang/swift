@@ -20,6 +20,7 @@
 namespace swift {
   class TranslationUnit;
   class ASTContext;
+  class Component;
 
   namespace irgen {
     class Options;
@@ -46,7 +47,8 @@ namespace swift {
 
   /// performIRGeneration - Turn the given translation unit into
   /// either LLVM IR or native code.
-  void performIRGeneration(TranslationUnit *TU, irgen::Options &Opts);
+  void performIRGeneration(TranslationUnit *TU, Component *C,
+			   irgen::Options &Opts);
   
 } // end namespace swift
 
