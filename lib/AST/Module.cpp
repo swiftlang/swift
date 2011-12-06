@@ -172,7 +172,7 @@ void TUModuleCache::lookupValue(AccessPathTy AccessPath, Identifier Name,
 
 namespace {
   class TUExtensionCache {
-    llvm::DenseMap<TypeBase*, llvm::TinyPtrVector<ExtensionDecl*>> Extensions;
+    llvm::DenseMap<TypeBase*, TinyPtrVector<ExtensionDecl*>> Extensions;
   public:
 
     TUExtensionCache(TranslationUnit &TU);
