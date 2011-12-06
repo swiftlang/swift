@@ -387,7 +387,7 @@ void swift::performNameBinding(TranslationUnit *TU) {
     TU->Body->setElement(i, Elt);
   }
 
-  TU->Ctx.ASTStage = ASTContext::NameBound;
+  TU->ASTStage = TranslationUnit::NameBound;
   verify(TU);
 }
 

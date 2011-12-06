@@ -16,6 +16,7 @@
 
 #include "swift/Parse/Lexer.h"
 #include "Parser.h"
+#include "swift/Subsystems.h"
 #include "swift/AST/Diagnostics.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PathV2.h"
@@ -78,6 +79,10 @@ TranslationUnit *Parser::parseTranslationUnit() {
   TU->UnresolvedTypesForParser = Context.AllocateCopy(UnresolvedTypeList);
   TU->UnresolvedScopedTypesForParser =
     Context.AllocateCopy(ScopeInfo.getUnresolvedScopedTypeList());
+
+  // Note that the translation unit is fully parsed and verify it.
+  TU->ASTStage = TranslationUnit::Parsed;
+  verify(TU);
   return TU;
 }
 

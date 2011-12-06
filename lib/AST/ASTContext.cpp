@@ -44,7 +44,6 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
     SourceMgr(sourcemgr),
     Diags(Diags),
     TheBuiltinModule(new (*this) BuiltinModule(getIdentifier("Builtin"),*this)),
-    ASTStage(Parsing),
     TheErrorType(new (*this) ErrorType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheDependentType(new (*this) DependentType(*this)),

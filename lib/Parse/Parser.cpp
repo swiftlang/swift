@@ -27,12 +27,7 @@ using namespace swift;
 /// parseTranslationUnit - Entrypoint for the parser.
 TranslationUnit *swift::parseTranslationUnit(unsigned BufferID,
                                              ASTContext &Ctx) {
-  TranslationUnit *TU = Parser(BufferID, Ctx).parseTranslationUnit();
-  if (TU) {
-    Ctx.ASTStage = ASTContext::Parsed;
-    verify(TU);
-  }
-  return TU;
+  return Parser(BufferID, Ctx).parseTranslationUnit();
 }
   
 //===----------------------------------------------------------------------===//

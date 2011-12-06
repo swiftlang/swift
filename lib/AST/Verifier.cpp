@@ -27,11 +27,12 @@ namespace {
   enum ShouldHalt { Continue, Halt };
 
   class Verifier {
+    TranslationUnit *TU;
     ASTContext &Ctx;
     llvm::raw_ostream &Out;
 
   public:
-    Verifier(ASTContext &Ctx) : Ctx(Ctx), Out(llvm::errs()) {}
+    Verifier(TranslationUnit *TU) : TU(TU), Ctx(TU->Ctx), Out(llvm::errs()) {}
 
     Expr *dispatch(Expr *E, WalkOrder ord, WalkContext const& WalkCtx) {
       switch (E->getKind()) {
@@ -42,11 +43,13 @@ namespace {
         DISPATCH(ID);
 #define UNCHECKED_EXPR(ID, PARENT) \
       case ExprKind::ID: \
-        assert(Ctx.ASTStage < ASTContext::TypeChecked && #ID "in wrong phase");\
+        assert(TU->ASTStage < TranslationUnit::TypeChecked && \
+               #ID "in wrong phase");\
         DISPATCH(ID);
 #define UNBOUND_EXPR(ID, PARENT) \
       case ExprKind::ID: \
-        assert(Ctx.ASTStage < ASTContext::NameBound && #ID "in wrong phase"); \
+        assert(TU->ASTStage < TranslationUnit::NameBound && \
+               #ID "in wrong phase"); \
         DISPATCH(ID);
 #include "swift/AST/ExprNodes.def"
 #undef DISPATCH
@@ -85,11 +88,11 @@ namespace {
       verifyParsed(node, WalkCtx);
 
       // If we've bound names already, verify as a bound node.
-      if (Ctx.ASTStage >= ASTContext::NameBound)
+      if (TU->ASTStage >= TranslationUnit::NameBound)
         verifyBound(node, WalkCtx);
 
       // If we've checked types already, do some extra verification.
-      if (Ctx.ASTStage >= ASTContext::TypeChecked)
+      if (TU->ASTStage >= TranslationUnit::TypeChecked)
         verifyChecked(node, WalkCtx);
 
       // Always continue.
@@ -256,7 +259,7 @@ void swift::verify(TranslationUnit *TUnit) {
   if (TUnit->Ctx.hadError()) return;
 
   // Make a verifier object, and then capture it by reference.
-  Verifier VObject(TUnit->Ctx);
+  Verifier VObject(TUnit);
   Verifier *V = &VObject;
 
   TUnit->Body->walk(^(Expr *E, WalkOrder Ord, WalkContext const &WalkCtx) { 

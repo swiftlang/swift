@@ -103,6 +103,24 @@ public:
 /// external references in a translation unit, which is one file.
 class TranslationUnit : public Module {
 public:
+  //===--------------------------------------------------------------------===//
+  // AST Stage
+  //===--------------------------------------------------------------------===//
+  
+  /// ASTStage - Defines what phases of parsing and semantic analysis are
+  /// complete for the given AST.  This should only be used for assertions and
+  /// verification purposes.
+  enum {
+    /// Parsing is underway.
+    Parsing,
+    /// Parsing has completed.
+    Parsed,
+    /// Name binding has completed.
+    NameBound,
+    /// Type checking has completed.
+    TypeChecked
+  } ASTStage;
+
   /// Body - This is a synthesized BraceStmt that holds the top level
   /// expressions and declarations for a translation unit.
   BraceStmt *Body;
@@ -123,7 +141,8 @@ public:
   ArrayRef<ImportedModule> ImportedModules;
   
   TranslationUnit(Identifier Name, ASTContext &C)
-    : Module(DeclContextKind::TranslationUnit, Name, C) {
+    : Module(DeclContextKind::TranslationUnit, Name, C),
+      ASTStage(Parsing) {
   }
 
   void dump() const;
