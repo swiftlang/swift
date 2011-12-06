@@ -28,7 +28,8 @@ namespace llvm {
   template <typename T> class SmallVectorImpl;
   template <typename T, unsigned N> class SmallVector;
   template<typename T> class ArrayRef;
-  template<class T> class NullablePtr;
+  template<typename T> class NullablePtr;
+  template<typename T> class TinyPtrVector;
  
   // Other common classes.
   class raw_ostream;
@@ -50,6 +51,7 @@ namespace swift {
   using llvm::SmallVector;
   using llvm::ArrayRef;
   using llvm::NullablePtr;
+  using llvm::TinyPtrVector;
 
   // Other common classes.
   using llvm::raw_ostream;

@@ -89,7 +89,7 @@ namespace {
   /// This is lazily created on its first use an hangs off
   /// Module::LookupCachePimpl.
   class TUModuleCache {
-    llvm::DenseMap<Identifier, llvm::TinyPtrVector<ValueDecl*>> TopLevelValues;
+    llvm::DenseMap<Identifier, TinyPtrVector<ValueDecl*>> TopLevelValues;
     llvm::DenseMap<Identifier, TypeAliasDecl *> TopLevelTypes;
   public:
     typedef Module::AccessPathTy AccessPathTy;
