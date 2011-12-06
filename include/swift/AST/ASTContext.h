@@ -104,6 +104,24 @@ public:
   Identifier getIdentifier(StringRef Str);
 
   //===--------------------------------------------------------------------===//
+  // AST Stage
+  //===--------------------------------------------------------------------===//
+
+  /// ASTStage - Defines what phases of parsing and semantic analysis are
+  /// complete for the given AST.  This should only be used for assertions and
+  /// verification purposes.
+  enum {
+    /// Parsing is underway.
+    Parsing,
+    /// Parsing has completed.
+    Parsed,
+    /// Name binding has completed.
+    NameBound,
+    /// Type checking has completed.
+    TypeChecked
+  } ASTStage;
+
+  //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
   //===--------------------------------------------------------------------===//
 

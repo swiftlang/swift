@@ -201,5 +201,6 @@ void swift::performTypeChecking(TranslationUnit *TU) {
   }
 
   // Verify that we've checked types correctly.
-  verify(TU, VerificationKind::CheckedTypes);
+  TU->Ctx.ASTStage = ASTContext::TypeChecked;
+  verify(TU);
 }

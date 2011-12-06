@@ -20,23 +20,7 @@
 namespace swift {
   class TranslationUnit;
   
-/// VerificationKind - Defines the kind of verification we should do.
-/// There are different invariants in place at different phases of
-/// compilation.
-enum class VerificationKind {
-  /// Verify that the AST corresponds to the result of parsing the
-  /// file.
-  Parsed,
-
-  /// Verify that the AST corresponds to the result of binding global
-  /// names.
-  BoundNames,
-
-  /// Verify that the AST corresponds to the result of checking types.
-  CheckedTypes
-};
-
-void verify(TranslationUnit *TUnit, VerificationKind K);
+  void verify(TranslationUnit *TUnit);
   
 } // end namespace swift
 

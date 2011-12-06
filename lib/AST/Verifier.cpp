@@ -28,12 +28,10 @@ namespace {
 
   class Verifier {
     ASTContext &Ctx;
-    VerificationKind Stage;
     llvm::raw_ostream &Out;
 
   public:
-    Verifier(ASTContext &Ctx, VerificationKind Stage)
-      : Ctx(Ctx), Stage(Stage), Out(llvm::errs()) {}
+    Verifier(ASTContext &Ctx) : Ctx(Ctx), Out(llvm::errs()) {}
 
     Expr *dispatch(Expr *E, WalkOrder ord, WalkContext const& WalkCtx) {
       switch (E->getKind()) {
@@ -44,11 +42,11 @@ namespace {
         DISPATCH(ID);
 #define UNCHECKED_EXPR(ID, PARENT) \
       case ExprKind::ID: \
-        assert(Stage < VerificationKind::CheckedTypes && #ID "in wrong phase");\
+        assert(Ctx.ASTStage < ASTContext::TypeChecked && #ID "in wrong phase");\
         DISPATCH(ID);
 #define UNBOUND_EXPR(ID, PARENT) \
       case ExprKind::ID: \
-        assert(Stage < VerificationKind::BoundNames && #ID "in wrong phase"); \
+        assert(Ctx.ASTStage < ASTContext::NameBound && #ID "in wrong phase"); \
         DISPATCH(ID);
 #include "swift/AST/ExprNodes.def"
 #undef DISPATCH
@@ -87,11 +85,11 @@ namespace {
       verifyParsed(node, WalkCtx);
 
       // If we've bound names already, verify as a bound node.
-      if (Stage >= VerificationKind::BoundNames)
+      if (Ctx.ASTStage >= ASTContext::NameBound)
         verifyBound(node, WalkCtx);
 
       // If we've checked types already, do some extra verification.
-      if (Stage >= VerificationKind::CheckedTypes)
+      if (Ctx.ASTStage >= ASTContext::TypeChecked)
         verifyChecked(node, WalkCtx);
 
       // Always continue.
@@ -253,12 +251,12 @@ namespace {
   };
 }
 
-void swift::verify(TranslationUnit *TUnit, VerificationKind Stage) {
+void swift::verify(TranslationUnit *TUnit) {
   // FIXME: For now, punt if there are errors in the translation unit.
   if (TUnit->Ctx.hadError()) return;
 
   // Make a verifier object, and then capture it by reference.
-  Verifier VObject(TUnit->Ctx, Stage);
+  Verifier VObject(TUnit->Ctx);
   Verifier *V = &VObject;
 
   TUnit->Body->walk(^(Expr *E, WalkOrder Ord, WalkContext const &WalkCtx) { 

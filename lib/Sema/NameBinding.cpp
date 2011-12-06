@@ -348,11 +348,10 @@ void swift::performNameBinding(TranslationUnit *TU) {
     SourceLoc NameLoc = BaseAndType.second->getTypeAliasLoc();
 
     TypeAliasDecl *Alias = nullptr;
-
-    if (auto Module = Scope.dyn_cast<const ImportedModule*>()) {
+    if (auto Module = Scope.dyn_cast<const ImportedModule*>())
       Alias = Module->second->lookupType(Module->first, Name,
                                          NLKind::QualifiedLookup);
-    }
+
     if (Alias) {
       BaseAndType.second->setUnderlyingType(Alias->getAliasType());
     } else {
@@ -389,6 +388,7 @@ void swift::performNameBinding(TranslationUnit *TU) {
     TU->Body->setElement(i, Elt);
   }
 
-  verify(TU, VerificationKind::BoundNames);
+  TU->Ctx.ASTStage = ASTContext::NameBound;
+  verify(TU);
 }
 

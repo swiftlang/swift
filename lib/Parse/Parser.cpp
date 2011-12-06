@@ -29,7 +29,10 @@ using namespace swift;
 TranslationUnit *swift::parseTranslationUnit(unsigned BufferID,
                                              ASTContext &Ctx) {
   TranslationUnit *TU = Parser(BufferID, Ctx).parseTranslationUnit();
-  if (TU) verify(TU, VerificationKind::Parsed);
+  if (TU) {
+    Ctx.ASTStage = ASTContext::Parsed;
+    verify(TU);
+  }
   return TU;
 }
   
