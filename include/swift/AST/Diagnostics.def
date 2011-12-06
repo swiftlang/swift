@@ -99,6 +99,8 @@ ERROR(operator_in_decl,decl_parsing,none,
       "operator cannot be declared here, declare them at global scope", ())
 ERROR(disallowed_var_decl,decl_parsing,none,
       "'var' declarations not allowed here, use data members instead", ())
+ERROR(decl_inner_scope,decl_parsing,none,
+      "declaration is only valid at file scope", ())
 
 // Var Name
 ERROR(expected_lparen_var_name,decl_parsing,none,
@@ -109,8 +111,6 @@ ERROR(invalid_index_in_var_name_path,decl_parsing,none,
       "%0 is an invalid index for %1", (Identifier, Type))
       
 // Import
-ERROR(import_inner_scope,decl_parsing,none,
-      "import is only valid at file scope", ())
 ERROR(decl_expected_module_name,decl_parsing,none,
       "expected module name in import declaration", ())
 

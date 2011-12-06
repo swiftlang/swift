@@ -237,8 +237,9 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     Decl *D = Entries[i];
 
     // FIXME: Mark decls erroneous.
-    if (isa<ImportDecl>(D) && !(Flags & PD_AllowImport))
-      diagnose(D->getLocStart(), diag::import_inner_scope);
+    if ((isa<ImportDecl>(D) || isa<ExtensionDecl>(D)) &&
+        !(Flags & PD_AllowTopLevel))
+      diagnose(D->getLocStart(), diag::decl_inner_scope);
     if (isa<VarDecl>(D) && (Flags & PD_DisallowVar)) {
       diagnose(D->getLocStart(), diag::disallowed_var_decl);
     } else if (NamedDecl *ND = dyn_cast<NamedDecl>(D)) {

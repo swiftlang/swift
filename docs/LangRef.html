@@ -288,7 +288,6 @@
   <!-- ********************************************************************* -->
   
   <pre class="grammar">
-    decl ::= <a href="#decl-extension">decl-extension</a>
     decl ::= <a href="#decl-var">decl-var</a>
     decl ::= <a href="#decl-func">decl-func</a>
     decl ::= <a href="#decl-func">decl-func-scoped</a>
@@ -296,10 +295,12 @@
     decl ::= <a href="#decl-oneof">decl-oneof</a>
     decl ::= <a href="#decl-struct">decl-struct</a>
     decl ::= <a href="#decl-protocol">decl-protocol</a>
+    
+    decl-top-level ::= <a href="#decl-import">decl-import
+    decl-top-level ::= <a href="#decl-extension">decl-extension</a>
   </pre>
 
-  In addition to these declarations, there is also <a 
-  href="#decl-import">decl-import</a> which is only valid at the top level of a
+  The "decl-top-level" productions are only valid at the top level of a
   translation unit.
 
   <!-- ===================================================================== -->
@@ -311,12 +312,12 @@
     decl-expr-stmt ::= <a href="#expr">expr</a>
     decl-expr-stmt ::= <a href="#stmt">stmt</a>
     
-    translation-unit ::= (<a href="#stmt-brace">decl-expr-stmt</a> | <a href="#decl-import">decl-import</a>)*
+    translation-unit ::= (<a href="#stmt-brace">decl-expr-stmt</a> | <a href="#decl">decl-top-level</a>)*
   </pre>
   
   <p>The top level of a swift source file is grammatically identical to the
   contents of a <a href="#stmt-brace">brace statement</a>, except that it also
-  allows <a href="#decl-import">imports</a>.
+  allows extra <a href="#decl">decl-top-level</a> productions.
   </p>
   
   <!-- ===================================================================== -->

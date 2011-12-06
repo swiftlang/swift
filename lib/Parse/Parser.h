@@ -166,7 +166,7 @@ public:
   bool parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags);
   enum {
     PD_Default           = 0,
-    PD_AllowImport       = 1 << 1,
+    PD_AllowTopLevel     = 1 << 1,
     PD_DisallowVar       = 1 << 2,
     PD_DisallowOperators = 1 << 3
   };
