@@ -314,11 +314,11 @@ void swift::performNameBinding(TranslationUnit *TU) {
         Binder.addImport(ID, ImportedModules);
     }
   
-  TU->ImportedModules = TU->Ctx.AllocateCopy(ImportedModules);
+  TU->setImportedModules(TU->Ctx.AllocateCopy(ImportedModules));
   
   // Type binding.  Loop over all of the unresolved types in the translation
   // unit, resolving them with imports.
-  for (TypeAliasDecl *TA : TU->UnresolvedTypesForParser) {
+  for (TypeAliasDecl *TA : TU->getUnresolvedTypes()) {
     if (TypeAliasDecl *Result =
           Binder.TU->lookupGlobalType(TA->getName(),
                                       NLKind::UnqualifiedLookup)) {
@@ -337,7 +337,7 @@ void swift::performNameBinding(TranslationUnit *TU) {
 
   // Loop over all the unresolved scoped types in the translation
   // unit, resolving them if possible.
-  for (auto BaseAndType : TU->UnresolvedScopedTypesForParser) {
+  for (auto BaseAndType : TU->getUnresolvedScopedTypes()) {
     BoundScope Scope = Binder.bindScopeName(BaseAndType.first,
                                             BaseAndType.first->getName(),
                                         BaseAndType.first->getTypeAliasLoc());

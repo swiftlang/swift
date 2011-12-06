@@ -103,8 +103,25 @@ public:
 /// external references in a translation unit, which is one file.
 class TranslationUnit : public Module {
 public:
+  typedef std::pair<Module::AccessPathTy, Module*> ImportedModule;
+private:
+  /// UnresolvedTypes - This is a list of types that were unresolved at the end
+  /// of the translation unit's parse phase.
+  ArrayRef<TypeAliasDecl*> UnresolvedTypes;
+  
+  /// UnresolvedScopedTypes - This is a list of scope-qualified types
+  /// that were unresolved at the end of the translation unit's parse
+  /// phase.
+  ArrayRef<std::pair<TypeAliasDecl*,TypeAliasDecl*> >
+  UnresolvedScopedTypes;
+  
+  /// ImportedModules - This is the list of modules that are imported by this
+  /// module.  This is filled in by the Name Binding phase.
+  ArrayRef<ImportedModule> ImportedModules;
+
+public:
   //===--------------------------------------------------------------------===//
-  // AST Stage
+  // AST Phase of Translation
   //===--------------------------------------------------------------------===//
   
   /// ASTStage - Defines what phases of parsing and semantic analysis are
@@ -125,26 +142,46 @@ public:
   /// expressions and declarations for a translation unit.
   BraceStmt *Body;
   
-  /// UnresolvedTypes - This is a list of types that were unresolved at the end
-  /// of the translation unit's parse phase.
-  ArrayRef<TypeAliasDecl*> UnresolvedTypesForParser;
-
-  /// UnresolvedScopedTypes - This is a list of scope-qualified types
-  /// that were unresolved at the end of the translation unit's parse
-  /// phase.
-  ArrayRef<std::pair<TypeAliasDecl*,TypeAliasDecl*> >
-    UnresolvedScopedTypesForParser;
-  
-  /// ImportedModules - This is the list of modules that are imported by this
-  /// module.  This is filled in by the Name Binding phase.
-  typedef std::pair<Module::AccessPathTy, Module*> ImportedModule;
-  ArrayRef<ImportedModule> ImportedModules;
-  
   TranslationUnit(Identifier Name, ASTContext &C)
     : Module(DeclContextKind::TranslationUnit, Name, C),
       ASTStage(Parsing) {
   }
 
+  ArrayRef<TypeAliasDecl*> getUnresolvedTypes() const {
+    assert(ASTStage == Parsed);
+    return UnresolvedTypes;
+  }
+  void setUnresolvedTypes(ArrayRef<TypeAliasDecl*> UT) {
+    assert(ASTStage == Parsing);
+    UnresolvedTypes = UT;
+  }
+  
+  /// UnresolvedScopedTypes - This is a list of scope-qualified types
+  /// that were unresolved at the end of the translation unit's parse
+  /// phase.
+  ArrayRef<std::pair<TypeAliasDecl*,TypeAliasDecl*> >
+  getUnresolvedScopedTypes() const {
+    assert(ASTStage == Parsed);
+    return UnresolvedScopedTypes;
+  }
+  void setUnresolvedScopedTypes(ArrayRef<std::pair<TypeAliasDecl*,
+                                                   TypeAliasDecl*> > T) {
+    assert(ASTStage == Parsing);
+    UnresolvedScopedTypes = T;
+  }
+
+  /// ImportedModules - This is the list of modules that are imported by this
+  /// module.  This is filled in by the Name Binding phase.
+  ArrayRef<ImportedModule> getImportedModules() const {
+    assert(ASTStage >= NameBound);
+    return ImportedModules;
+  }
+  void setImportedModules(ArrayRef<ImportedModule> IM) {
+    assert(ASTStage == Parsed);
+    ImportedModules = IM;
+  }
+
+  
   void dump() const;
   
   // Implement isa/cast/dyncast/etc.
