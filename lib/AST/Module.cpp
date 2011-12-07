@@ -296,6 +296,9 @@ TypeAliasDecl *Module::lookupGlobalType(Identifier Name, NLKind LookupKind) {
 /// the name.
 void Module::lookupGlobalValue(Identifier Name, NLKind LookupKind, 
                                SmallVectorImpl<ValueDecl*> &Result) {
+  assert(Result.empty() &&
+         "This expects that the input list is empty, could be generalized");
+  
   // Do a local lookup within the current module.
   lookupValue(AccessPathTy(), Name, LookupKind, Result);
 
@@ -310,6 +313,42 @@ void Module::lookupGlobalValue(Identifier Name, NLKind LookupKind,
   for (auto &ImpEntry : TU.ImportedModules) {
     ImpEntry.second->lookupValue(ImpEntry.first, Name, LookupKind, Result);
     if (!Result.empty()) return;  // If we found a match, return the decls.
+  }
+}
+
+/// lookupGlobalExtensionMethods - Lookup the extensions members for the
+/// specified BaseType with the specified type, and return them in Result.
+void Module::lookupGlobalExtensionMethods(Type BaseType, Identifier Name,
+                                          SmallVectorImpl<ValueDecl*> &Result) {
+  assert(Result.empty() &&
+         "This expects that the input list is empty, could be generalized");
+  
+  // Find all extensions in this module.
+  for (ExtensionDecl *ED : lookupExtensions(BaseType)) {
+    for (Decl *Member : ED->getMembers()) {
+      if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
+        if (VD->getName() == Name)
+          Result.push_back(VD);
+    }
+  }
+
+  // If we found anything in local extensions, they shadow imports.
+  if (!Result.empty() || isa<BuiltinModule>(this)) return;
+
+  TranslationUnit &TU = *cast<TranslationUnit>(this);
+
+  // Otherwise, check our imported extensions as well.
+  for (auto &ImpEntry : TU.ImportedModules) {
+    for (ExtensionDecl *ED : ImpEntry.second->lookupExtensions(BaseType)) {
+      for (Decl *Member : ED->getMembers()) {
+        if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
+          if (VD->getName() == Name)
+            Result.push_back(VD);
+      }
+    }
+    
+    // If we found something in an imported module, it wins.
+    if (!Result.empty()) return;
   }
 }
 

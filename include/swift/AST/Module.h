@@ -70,8 +70,8 @@ public:
 
 protected:
   Module(DeclContextKind Kind, Identifier Name, ASTContext &Ctx)
-  : DeclContext(Kind, nullptr), LookupCachePimpl(0), Ctx(Ctx), Name(Name),
-    ASTStage(Parsing) {
+  : DeclContext(Kind, nullptr), LookupCachePimpl(0), ExtensionCachePimpl(0),
+    Ctx(Ctx), Name(Name), ASTStage(Parsing) {
   }
 
 public:
@@ -105,6 +105,11 @@ public:
   /// the name.
   void lookupGlobalValue(Identifier Name, NLKind LookupKind, 
                          SmallVectorImpl<ValueDecl*> &Result);
+
+  /// lookupGlobalExtensionMethods - Lookup the extensions members for the
+  /// specified BaseType with the specified type, and return them in Result.
+  void lookupGlobalExtensionMethods(Type BaseType, Identifier Name,
+                                    SmallVectorImpl<ValueDecl*> &Result);
 
   static bool classof(const Module *M) {
     return true;

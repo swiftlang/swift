@@ -393,9 +393,9 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   // allows element access on structs, for example.
   Type SubExprTy = Base->getType();
   bool LookedThroughOneofs = false;
-  if (OneOfType *oneof = SubExprTy->getAs<OneOfType>())
-    if (oneof->isTransparentType()) {
-      SubExprTy = oneof->getTransparentType();
+  if (OneOfType *OneOf = SubExprTy->getAs<OneOfType>())
+    if (OneOf->isTransparentType()) {
+      SubExprTy = OneOf->getTransparentType();
       LookedThroughOneofs = true;
     }
    
@@ -441,21 +441,56 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   // Check in the context of a protocol.
   if (ProtocolType *PT = SubExprTy->getAs<ProtocolType>()) {
     for (ValueDecl *VD : PT->Elements) {
-      if (VD->getName() == E->getName()) {
-        if (LookedThroughOneofs)
-          Base = lookThroughOneofs(Base);
+      if (VD->getName() != E->getName()) continue;
+      
+      if (LookedThroughOneofs)
+        Base = lookThroughOneofs(Base);
 
-        // The protocol value is applied via a DeclRefExpr.
-        Expr *Fn = new (TC.Context) DeclRefExpr(VD, E->getNameLoc(),
-                                                VD->getTypeJudgement());
-        
-        ApplyExpr *Call = new (TC.Context) 
-          ProtocolElementExpr(Fn, E->getDotLoc(), Base);
-        if (TC.semaApplyExpr(Call))
-          return 0;
-        return Call;
-      }
+      // The protocol value is applied via a DeclRefExpr.
+      Expr *Fn = new (TC.Context) DeclRefExpr(VD, E->getNameLoc(),
+                                              VD->getTypeJudgement());
+      
+      ApplyExpr *Call = new (TC.Context) 
+        ProtocolElementExpr(Fn, E->getDotLoc(), Base);
+      if (TC.semaApplyExpr(Call))
+        return 0;
+      return Call;
     }
+  }
+  
+  SubExprTy = Base->getType();
+  
+  // Look in any extensions that add methods to the base type.
+  SmallVector<ValueDecl*, 8> ExtensionMethods;
+  TC.TU.lookupGlobalExtensionMethods(SubExprTy, E->getName(),ExtensionMethods);
+  
+  Expr *FnRef = 0;
+  switch (ExtensionMethods.size()) {
+  case 0: break;
+  case 1:
+    // Apply the base value to the function there is a single candidate in the
+    // set then this is directly resolved.
+    FnRef = new (TC.Context) DeclRefExpr(ExtensionMethods[0],
+                                         E->getNameLoc(),
+                                       ExtensionMethods[0]->getTypeJudgement());
+    break;
+  default:
+    // Otherwise it is an overload case.  
+    FnRef = new (TC.Context) OverloadSetRefExpr(
+                                    TC.Context.AllocateCopy(ExtensionMethods),
+                                                E->getNameLoc());
+    FnRef->setDependentType(DependentType::get(TC.Context));
+    break;
+  }
+  
+  if (FnRef) {
+    CallExpr *Call = new (TC.Context) CallExpr(FnRef, Base,
+                                               /*DotSyntax=*/true,
+                                               TypeJudgement());
+    if (TC.semaApplyExpr(Call))
+      return 0;
+    
+    return Call;
   }
   
   // Next, check to see if "a.f" is actually being used as sugar for "f a",
@@ -465,7 +500,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
            "Should have only bound to functions");
     Expr *FnRef;
     // Apply the base value to the function there is a single candidate in the
-    // set then this is directly resolved, otherwise it is an overload case..
+    // set then this is directly resolved, otherwise it is an overload case.
     if (E->getResolvedDecls().size() == 1)
       FnRef = new (TC.Context) DeclRefExpr(E->getResolvedDecls()[0],
                                            E->getNameLoc(),
