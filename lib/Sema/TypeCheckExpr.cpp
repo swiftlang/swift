@@ -387,65 +387,13 @@ public:
 
 Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   Expr *Base = E->getBase();
-
-  // If this is a member access to a oneof with a single element constructor,
-  // allow direct access to the type underlying the single element.  This
-  // allows element access on structs, for example.
   Type SubExprTy = Base->getType();
-  bool LookedThroughOneofs = false;
-  if (OneOfType *OneOf = SubExprTy->getAs<OneOfType>())
-    if (OneOf->isTransparentType()) {
-      SubExprTy = OneOf->getTransparentType();
-      LookedThroughOneofs = true;
-    }
    
-  // First, check to see if this is a reference to a field in the type or
-  // protocol.
-
-  if (TupleType *TT = SubExprTy->getAs<TupleType>()) {
-    // If the field name exists, we win.
-    int FieldNo = TT->getNamedElementId(E->getName());
-    if (FieldNo != -1) {
-      if (LookedThroughOneofs)
-        Base = lookThroughOneofs(Base);
-
-      return new (TC.Context) 
-        TupleElementExpr(Base, E->getDotLoc(), (unsigned) FieldNo,
-                         E->getNameLoc(),
-                         TypeJudgement(TT->getElementType(FieldNo),
-                                       Base->getValueKind()));
-    }
-    
-    // Okay, the field name was invalid.  If this is a dollarident like $4,
-    // process it as a field index.
-    if (E->getName().str().startswith("$")) {
-      unsigned Value = 0;
-      if (!E->getName().str().substr(1).getAsInteger(10, Value)) {
-        if (Value >= TT->Fields.size()) {
-          TC.diagnose(E->getNameLoc(), diag::field_number_too_large);
-          return 0;
-        }
-
-        if (LookedThroughOneofs)
-          Base = lookThroughOneofs(Base);
-        
-        return new (TC.Context) 
-          TupleElementExpr(Base, E->getDotLoc(), Value,
-                           E->getNameLoc(),
-                           TypeJudgement(TT->getElementType(Value),
-                                         Base->getValueKind()));
-      }
-    }
-  }
-  
   // Check in the context of a protocol.
   if (ProtocolType *PT = SubExprTy->getAs<ProtocolType>()) {
     for (ValueDecl *VD : PT->Elements) {
       if (VD->getName() != E->getName()) continue;
       
-      if (LookedThroughOneofs)
-        Base = lookThroughOneofs(Base);
-
       // The protocol value is applied via a DeclRefExpr.
       Expr *Fn = new (TC.Context) DeclRefExpr(VD, E->getNameLoc(),
                                               VD->getTypeJudgement());
@@ -457,8 +405,6 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
       return Call;
     }
   }
-  
-  SubExprTy = Base->getType();
   
   // Look in any extensions that add methods to the base type.
   SmallVector<ValueDecl*, 8> ExtensionMethods;
@@ -520,8 +466,52 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     return Call;
   }
   
-  // TODO: Otherwise, do an argument dependent lookup in the namespace of the
-  // base type.
+  // If this is a member access to a oneof with a single element constructor
+  // (e.g. a struct), allow direct access to the type underlying the single
+  // element.
+  bool LookedThroughOneofs = false;
+  if (OneOfType *OneOf = SubExprTy->getAs<OneOfType>())
+    if (OneOf->isTransparentType()) {
+      SubExprTy = OneOf->getTransparentType();
+      LookedThroughOneofs = true;
+    }
+  
+  // Check to see if this is a reference to a tuple field.
+  if (TupleType *TT = SubExprTy->getAs<TupleType>()) {
+    // If the field name exists, we win.
+    int FieldNo = TT->getNamedElementId(E->getName());
+    if (FieldNo != -1) {
+      if (LookedThroughOneofs)
+        Base = lookThroughOneofs(Base);
+      
+      return new (TC.Context) 
+        TupleElementExpr(Base, E->getDotLoc(), (unsigned) FieldNo,
+                         E->getNameLoc(),
+                         TypeJudgement(TT->getElementType(FieldNo),
+                                       Base->getValueKind()));
+    }
+    
+    // Okay, the field name was invalid.  If this is a dollarident like $4,
+    // process it as a field index.
+    if (E->getName().str().startswith("$")) {
+      unsigned Value = 0;
+      if (!E->getName().str().substr(1).getAsInteger(10, Value)) {
+        if (Value >= TT->Fields.size()) {
+          TC.diagnose(E->getNameLoc(), diag::field_number_too_large);
+          return 0;
+        }
+        
+        if (LookedThroughOneofs)
+          Base = lookThroughOneofs(Base);
+        
+        return new (TC.Context) 
+          TupleElementExpr(Base, E->getDotLoc(), Value,
+                           E->getNameLoc(),
+                           TypeJudgement(TT->getElementType(Value),
+                                         Base->getValueKind()));
+      }
+    }
+  }
   
   if (SubExprTy->is<DependentType>()) {
     E->setDependentType(SubExprTy);
