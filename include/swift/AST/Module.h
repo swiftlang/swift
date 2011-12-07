@@ -37,8 +37,7 @@ namespace swift {
   /// by various query methods.
   enum class NLKind {
     UnqualifiedLookup,
-    QualifiedLookup,
-    DotLookup
+    QualifiedLookup
   };
  
 /// Module - A unit of modularity.  The current translation unit is a

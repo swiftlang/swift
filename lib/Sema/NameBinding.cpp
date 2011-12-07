@@ -217,23 +217,10 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
   if (Order == WalkOrder::PreOrder)
     return E;
 
-  // A reference to foo.bar may be an application ("bar foo"), so look up bar.
-  // It may also be a tuple field reference, so don't report an error here if we
-  // don't find anything juicy.
-  if (UnresolvedDotExpr *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
-    SmallVector<ValueDecl*, 4> Decls;
-    // Perform .-style name lookup.
-    Binder.TU->lookupGlobalValue(UDE->getName(), NLKind::DotLookup, Decls);
-
-    // Copy the overload set into ASTContext memory.
-    if (!Decls.empty())
-      UDE->setResolvedDecls(Binder.Context.AllocateCopy(Decls));
-    return UDE;
-  }
-  
   Identifier Name;
   SourceLoc Loc;
   SmallVector<ValueDecl*, 4> Decls;
+  
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
   if (UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
     Name = UDRE->getName();

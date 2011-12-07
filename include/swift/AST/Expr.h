@@ -411,11 +411,6 @@ class UnresolvedDotExpr : public Expr {
   SourceLoc DotLoc;
   Identifier Name;
   SourceLoc NameLoc;
-  
-  /// ResolvedDecl - If the name refers to any local or top-level declarations,
-  /// the name binder fills them in here.
-  ArrayRef<ValueDecl*> ResolvedDecls;
-
 public:
   UnresolvedDotExpr(Expr *subexpr, SourceLoc dotloc, Identifier name,
                     SourceLoc nameloc)
@@ -441,12 +436,6 @@ public:
   Identifier getName() const { return Name; }
   SourceLoc getNameLoc() const { return NameLoc; }
 
-  ArrayRef<ValueDecl*> getResolvedDecls() const { return ResolvedDecls; }
-  void setResolvedDecls(ArrayRef<ValueDecl*> Decls) {
-    assert(ResolvedDecls.empty());
-    ResolvedDecls = Decls;
-  }
-  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const UnresolvedDotExpr *) { return true; }
   static bool classof(const Expr *E) {

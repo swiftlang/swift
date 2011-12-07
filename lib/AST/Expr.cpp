@@ -723,9 +723,6 @@ public:
   void visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     OS.indent(Indent) << "(unresolved_dot_expr type='" << E->getType();
     OS << "\' field '" << E->getName().str() << "'";
-    if (!E->getResolvedDecls().empty())
-      OS << " decl resolved to " << E->getResolvedDecls().size()
-         << " candidate(s)!";
     if (E->getBase()) {
       OS << '\n';
       printRec(E->getBase());

@@ -439,33 +439,6 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     return Call;
   }
   
-  // Next, check to see if "a.f" is actually being used as sugar for "f a",
-  // which is a function application of 'a' to 'f'.
-  if (!E->getResolvedDecls().empty()) {
-    assert(E->getResolvedDecls()[0]->getType()->is<FunctionType>() &&
-           "Should have only bound to functions");
-    Expr *FnRef;
-    // Apply the base value to the function there is a single candidate in the
-    // set then this is directly resolved, otherwise it is an overload case.
-    if (E->getResolvedDecls().size() == 1)
-      FnRef = new (TC.Context) DeclRefExpr(E->getResolvedDecls()[0],
-                                           E->getNameLoc(),
-                                 E->getResolvedDecls()[0]->getTypeJudgement());
-    else {
-      FnRef = new (TC.Context) OverloadSetRefExpr(E->getResolvedDecls(),
-                                                  E->getNameLoc());
-      FnRef->setDependentType(DependentType::get(TC.Context));
-    }
-    
-    CallExpr *Call = new (TC.Context) CallExpr(FnRef, Base,
-                                               /*DotSyntax=*/true,
-                                               TypeJudgement());
-    if (TC.semaApplyExpr(Call))
-      return 0;
-    
-    return Call;
-  }
-  
   // If this is a member access to a oneof with a single element constructor
   // (e.g. a struct), allow direct access to the type underlying the single
   // element.

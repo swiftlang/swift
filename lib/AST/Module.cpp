@@ -157,13 +157,8 @@ void TUModuleCache::lookupValue(AccessPathTy AccessPath, Identifier Name,
   if (I == TopLevelValues.end()) return;
   
   Result.reserve(I->second.size());
-  for (ValueDecl *Elt : I->second) {
-    // Dot Lookup ignores values with non-function types.
-    if (LookupKind == NLKind::DotLookup && !Elt->getType()->is<FunctionType>())
-      continue;
-    
+  for (ValueDecl *Elt : I->second)
     Result.push_back(Elt);
-  }
 }
 
 //===----------------------------------------------------------------------===//
