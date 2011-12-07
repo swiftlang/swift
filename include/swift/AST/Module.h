@@ -25,6 +25,7 @@
 namespace swift {
   class ASTContext;
   class BraceStmt;
+  class Component;
   class ExtensionDecl;
   class OneOfElementDecl;
   class NameAliasType;
@@ -45,6 +46,7 @@ namespace swift {
 class Module : public DeclContext {
   void *LookupCachePimpl;
   void *ExtensionCachePimpl;
+  Component *Comp;
 public:
   ASTContext &Ctx;
   Identifier Name;
@@ -68,13 +70,19 @@ public:
   } ASTStage;
 
 protected:
-  Module(DeclContextKind Kind, Identifier Name, ASTContext &Ctx)
+  Module(DeclContextKind Kind, Identifier Name, Component *C, ASTContext &Ctx)
   : DeclContext(Kind, nullptr), LookupCachePimpl(0), ExtensionCachePimpl(0),
-    Ctx(Ctx), Name(Name), ASTStage(Parsing) {
+    Comp(C), Ctx(Ctx), Name(Name), ASTStage(Parsing) {
+    assert(Comp != nullptr || Kind == DeclContextKind::BuiltinModule);
   }
 
 public:
   typedef ArrayRef<std::pair<Identifier, SourceLoc>> AccessPathTy;
+
+  Component *getComponent() const {
+    assert(Comp && "fetching component for the builtin module");
+    return Comp;
+  }
 
   /// lookupType - Look up a type at top-level scope (but with the specified 
   /// access path, which may come from an import decl) within the current
@@ -155,8 +163,8 @@ public:
   /// expressions and declarations for a translation unit.
   BraceStmt *Body;
   
-  TranslationUnit(Identifier Name, ASTContext &C)
-    : Module(DeclContextKind::TranslationUnit, Name, C) {
+  TranslationUnit(Identifier Name, Component *Comp, ASTContext &C)
+    : Module(DeclContextKind::TranslationUnit, Name, Comp, C) {
   }
 
   ArrayRef<TypeAliasDecl*> getUnresolvedTypes() const {
@@ -209,7 +217,7 @@ public:
 class BuiltinModule : public Module {
 public:
   BuiltinModule(Identifier Name, ASTContext &Ctx)
-    : Module(DeclContextKind::BuiltinModule, Name, Ctx) {
+    : Module(DeclContextKind::BuiltinModule, Name, nullptr, Ctx) {
     // The Builtin module is always well formed.
     ASTStage = TypeChecked;
   }

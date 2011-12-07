@@ -37,7 +37,6 @@ namespace llvm {
 namespace swift {
   class ASTContext;
   class BraceStmt;
-  class Component;
   class Decl;
   class FuncDecl;
   class NamedDecl;
@@ -57,7 +56,6 @@ class IRGenModule {
 public:
   ASTContext &Context;
   Options &Opts;
-  swift::Component *Component;
   llvm::Module &Module;
   llvm::LLVMContext &LLVMContext;
   const llvm::TargetData &TargetData;
@@ -102,8 +100,7 @@ private:
   llvm::FunctionType *getFunctionType(FuncDecl *D);
 
 public:
-  IRGenModule(ASTContext &Context, swift::Component *Component,
-	      Options &Opts, llvm::Module &Module,
+  IRGenModule(ASTContext &Context, Options &Opts, llvm::Module &Module,
               const llvm::TargetData &TargetData);
   ~IRGenModule();
 

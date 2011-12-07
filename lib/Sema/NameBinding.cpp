@@ -16,6 +16,7 @@
 
 #include "swift/Subsystems.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/Component.h"
 #include "swift/AST/Diagnostics.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"
@@ -126,9 +127,12 @@ Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
     Context.SourceMgr.AddNewSourceBuffer(InputFile.take(),
                                          ModuleID.second.Value);
 
+  // For now, treat all separate modules as unique components.
+  Component *Comp = new (Context.Allocate<Component>(1)) Component();
+
   // Parse the translation unit, but don't do name binding or type checking.
   // This can produce new errors etc if the input is erroneous.
-  TranslationUnit *TU = parseTranslationUnit(BufferID, Context);
+  TranslationUnit *TU = parseTranslationUnit(BufferID, Comp, Context);
   if (TU == 0)
     return 0;
   

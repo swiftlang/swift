@@ -33,10 +33,10 @@
 using namespace swift;
 using namespace irgen;
 
-IRGenModule::IRGenModule(ASTContext &Context, swift::Component *Component,
+IRGenModule::IRGenModule(ASTContext &Context,
 			 Options &Opts, llvm::Module &Module,
                          const llvm::TargetData &TargetData)
-  : Context(Context), Opts(Opts), Component(Component),
+  : Context(Context), Opts(Opts),
     Module(Module), LLVMContext(Module.getContext()),
     TargetData(TargetData), Types(*new TypeConverter()) {
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());

@@ -24,6 +24,7 @@
 #include "swift/AST/Diagnostics.h"
 
 namespace llvm {
+  class Component;
   class MemoryBuffer;
   class SourceMgr;
   template <typename PT1, typename PT2, typename PT3> class PointerUnion3;
@@ -45,6 +46,7 @@ public:
   const llvm::MemoryBuffer *Buffer;
   Lexer &L;
   DeclContext *CurDeclContext;
+  swift::Component *Component;
   ASTContext &Context;
   ScopeInfo ScopeInfo;
 
@@ -79,7 +81,7 @@ public:
   };
 
 
-  Parser(unsigned BufferID, ASTContext &Ctx);
+  Parser(unsigned BufferID, swift::Component *Component, ASTContext &Ctx);
   ~Parser();
   
   //===--------------------------------------------------------------------===//

@@ -49,8 +49,7 @@ static bool isBinaryOutput(OutputKind kind) {
   llvm_unreachable("bad output kind!");
 }
 
-void swift::performIRGeneration(TranslationUnit *TU, Component *C,
-				Options &Opts) {
+void swift::performIRGeneration(TranslationUnit *TU, Options &Opts) {
   assert(!TU->Ctx.hadError());
 
   // Create the module.
@@ -95,7 +94,7 @@ void swift::performIRGeneration(TranslationUnit *TU, Component *C,
   Module.setDataLayout(TargetData->getStringRepresentation());
 
   // Emit the translation unit.
-  IRGenModule IRM(TU->Ctx, C, Opts, Module, *TargetData);
+  IRGenModule IRM(TU->Ctx, Opts, Module, *TargetData);
   IRM.emitTranslationUnit(TU);
 
   // Bail out if there are any errors.

@@ -38,7 +38,7 @@ TranslationUnit *Parser::parseTranslationUnit() {
     = llvm::sys::path::stem(Buffer->getBufferIdentifier());
   TranslationUnit *TU =
     new (Context) TranslationUnit(Context.getIdentifier(ModuleName),
-                                  Context);
+                                  Component, Context);
   CurDeclContext = TU;
   
   // Parse the body of the file.

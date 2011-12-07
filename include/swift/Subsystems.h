@@ -31,10 +31,10 @@ namespace swift {
   /// sense), aborting and spewing errors if not.
   void verify(TranslationUnit *TUnit);
 
-  /// parseTranslationUnit - Parse a single buffer as a translation unit and
-  /// return the decl.
-  TranslationUnit *parseTranslationUnit(unsigned BufferID, ASTContext &Ctx);
-  
+  /// parseTranslationUnit - Parse a single buffer as a translation unit
+  /// in the given component and return the decl.
+  TranslationUnit *parseTranslationUnit(unsigned BufferID, Component *Comp,
+                                        ASTContext &Ctx);
 
   /// performNameBinding - Once parsing is complete, this walks the AST to
   /// resolve names and do other top-level validation.
@@ -47,8 +47,7 @@ namespace swift {
 
   /// performIRGeneration - Turn the given translation unit into
   /// either LLVM IR or native code.
-  void performIRGeneration(TranslationUnit *TU, Component *C,
-			   irgen::Options &Opts);
+  void performIRGeneration(TranslationUnit *TU, irgen::Options &Opts);
   
 } // end namespace swift
 

@@ -26,19 +26,21 @@ using namespace swift;
   
 /// parseTranslationUnit - Entrypoint for the parser.
 TranslationUnit *swift::parseTranslationUnit(unsigned BufferID,
+                                             Component *Comp,
                                              ASTContext &Ctx) {
-  return Parser(BufferID, Ctx).parseTranslationUnit();
+  return Parser(BufferID, Comp, Ctx).parseTranslationUnit();
 }
   
 //===----------------------------------------------------------------------===//
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
-Parser::Parser(unsigned BufferID, ASTContext &Context)
+Parser::Parser(unsigned BufferID, swift::Component *Comp, ASTContext &Context)
   : SourceMgr(Context.SourceMgr),
     Diags(Context.Diags),
     Buffer(SourceMgr.getMemoryBuffer(BufferID)),
     L(*new Lexer(Buffer->getBuffer(), SourceMgr, &Diags)),
+    Component(Comp),
     Context(Context),
     ScopeInfo(*this) {
 }
