@@ -17,6 +17,7 @@
 #include "swift/Parse/Lexer.h"
 #include "Parser.h"
 #include "swift/Subsystems.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/Diagnostics.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PathV2.h"
@@ -458,8 +459,9 @@ bool Parser::parseDeclVar(SmallVectorImpl<Decl*> &Decls) {
   //    var x = 1; { var x = x+1; assert(x == 2); }
   if (VarName.isSimple()) {
     VarDecl *VD = new (Context) VarDecl(VarLoc,  VarName.getIdentifier(), Ty,
-                                        Init.getPtrOrNull(), Attributes,
-                                        CurDeclContext);
+                                        Init.getPtrOrNull(), CurDeclContext);
+    if (Attributes.isValid())
+      VD->getMutableAttrs() = Attributes;
     ScopeInfo.addToScope(VD);
     Decls.push_back(VD);
     return false;
@@ -468,7 +470,9 @@ bool Parser::parseDeclVar(SmallVectorImpl<Decl*> &Decls) {
   // Copy the name into the ASTContext heap.
   DeclVarName *TmpName = new (Context) DeclVarName(VarName);
   VarDecl *VD = new (Context) VarDecl(VarLoc, TmpName, Ty, Init.getPtrOrNull(),
-                                      Attributes, CurDeclContext);
+                                      CurDeclContext);
+  if (Attributes.isValid())
+    VD->getMutableAttrs() = Attributes;
   Decls.push_back(VD);
   
   // If there is a more interesting name presented here, then we need to walk
@@ -584,8 +588,9 @@ FuncDecl *Parser::parseDeclFunc(Type ReceiverTy) {
   }
   
   // Create the decl for the func and add it to the parent scope.
-  FuncDecl *FD = new (Context) FuncDecl(FuncLoc, Name, FuncTy, FE, Attributes,
+  FuncDecl *FD = new (Context) FuncDecl(FuncLoc, Name, FuncTy, FE,
                                         CurDeclContext);
+  if (Attributes.isValid()) FD->getMutableAttrs() = Attributes;
   ScopeInfo.addToScope(FD);
   return FD;
 }

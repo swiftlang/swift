@@ -89,6 +89,8 @@ public:
 
   DeclAttributes() { }
 
+  bool isValid() const { return LSquareLoc.isValid(); }
+
   bool isInfix() const { return Infix.isValid(); }
   InfixData getInfixData() const { return Infix; }
     

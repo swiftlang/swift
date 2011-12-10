@@ -16,6 +16,7 @@
 
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/Attr.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
@@ -129,7 +130,7 @@ bool DeclChecker::visitValueDecl(ValueDecl *VD) {
 
 /// validateAttributes - Check that the func/var declaration attributes are ok.
 void DeclChecker::validateAttributes(ValueDecl *VD) {
-  DeclAttributes &Attrs = VD->getAttrs();
+  const DeclAttributes &Attrs = VD->getAttrs();
   Type Ty = VD->getType();
   
   // Get the number of lexical arguments, for semantic checks below.
@@ -140,7 +141,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
   
   if (VD->isOperator() && (NumArguments == 0 || NumArguments > 2)) {
     TC.diagnose(VD->getLocStart(), diag::invalid_arg_count_for_operator);
-    Attrs.Infix = InfixData();
+    VD->getMutableAttrs().Infix = InfixData();
     // FIXME: Set the 'isError' bit on the decl.
     return;
   }
@@ -149,20 +150,22 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
   // whose input is a two element tuple.
   if (Attrs.isInfix() && NumArguments != 2) {
     TC.diagnose(Attrs.LSquareLoc, diag::invalid_infix_left_input);
-    Attrs.Infix = InfixData();
+    VD->getMutableAttrs().Infix = InfixData();
     // FIXME: Set the 'isError' bit on the decl.
+    return;
   }
 
   if (Attrs.isInfix() && !VD->isOperator()) {
     TC.diagnose(VD->getLocStart(), diag::infix_left_not_an_operator);
-    Attrs.Infix = InfixData();
+    VD->getMutableAttrs().Infix = InfixData();
     // FIXME: Set the 'isError' bit on the decl.
+    return;
   }
 
   // Only var and func decls can be infix.
   if (Attrs.isInfix() && !isa<VarDecl>(VD) && !isa<FuncDecl>(VD)) {
     TC.diagnose(VD->getLocStart(), diag::infix_left_invalid_on_decls);
-    Attrs.Infix = InfixData();
+    VD->getMutableAttrs().Infix = InfixData();
   }
 
   if (VD->isOperator() && !VD->getAttrs().isInfix() && NumArguments != 1) {

@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Attr.h"
 #include "Scope.h"
 #include "Parser.h"
 #include "llvm/ADT/Twine.h"
@@ -63,7 +64,7 @@ TypeAliasDecl *ScopeInfo::lookupTypeNameInternal(Identifier Name, SourceLoc Loc,
 
   // If not, create a new tentative entry.
   TypeAliasDecl *TAD =
-    new (TheParser.Context) TypeAliasDecl(Loc, Name, Type(), DeclAttributes(),
+    new (TheParser.Context) TypeAliasDecl(Loc, Name, Type(),
                                           TheParser.CurDeclContext);
 
   llvm::ScopedHashTableScope<Identifier, TypeScopeEntry> *S =
@@ -90,7 +91,6 @@ Type ScopeInfo::getQualifiedTypeName(Identifier BaseName, SourceLoc BaseNameLoc,
   TypeAliasDecl *BaseType = lookupScopeName(BaseName, BaseNameLoc);
   TypeAliasDecl *NestedType =
     new (TheParser.Context) TypeAliasDecl(NameLoc, Name, Type(),
-                                          DeclAttributes(),
                                           TheParser.CurDeclContext);
   UnresolvedScopedTypeList.push_back(std::make_pair(BaseType, NestedType));
   return NestedType->getAliasType();
@@ -167,7 +167,6 @@ TypeAliasDecl *ScopeInfo::addTypeAliasToScope(SourceLoc TypeAliasLoc,
   // scope level then this is a valid insertion.
   if (TAD == 0 || Level != CurScope->getDepth()) {
     TAD = new (TheParser.Context) TypeAliasDecl(TypeAliasLoc, Name, Ty,
-                                                DeclAttributes(),
                                                 TheParser.CurDeclContext);
     TypeScopeHT.insert(Name, TypeScopeEntry(TAD, CurScope->getDepth(), true));
     return TAD;

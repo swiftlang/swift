@@ -17,7 +17,6 @@
 #ifndef SWIFT_DECL_H
 #define SWIFT_DECL_H
 
-#include "swift/AST/Attr.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
@@ -31,6 +30,7 @@ namespace swift {
   class Type;
   class Expr;
   class BraceStmt;
+  class DeclAttributes;
   class OneOfElementDecl;
   class NameAliasType;
   class TypeAliasDecl;
@@ -229,20 +229,20 @@ public:
 /// NamedDecl - An abstract base class for declarations with names.
 class NamedDecl : public Decl {
   Identifier Name;
-  DeclAttributes Attrs;
+  const DeclAttributes *Attrs;
+  static const DeclAttributes EmptyAttrs;
 
 protected:
-  NamedDecl(DeclKind K, DeclContext *DC, Identifier name,
-            const DeclAttributes &attrs = DeclAttributes())
-    : Decl(K, DC), Name(name), Attrs(attrs) {
+  NamedDecl(DeclKind K, DeclContext *DC, Identifier name)
+    : Decl(K, DC), Name(name), Attrs(&EmptyAttrs) {
   }
   
 public:
   Identifier getName() const { return Name; }
   bool isOperator() const { return Name.isOperator(); }
 
-  DeclAttributes &getAttrs() { return Attrs; }
-  const DeclAttributes &getAttrs() const { return Attrs; }
+  DeclAttributes &getMutableAttrs();
+  const DeclAttributes &getAttrs() const { return *Attrs; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -265,8 +265,8 @@ class TypeAliasDecl : public NamedDecl {
   
 public:
   TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
-                Type Underlyingty, const DeclAttributes &Attrs, DeclContext *DC)
-    : NamedDecl(DeclKind::TypeAlias, DC, Name, Attrs), AliasTy(0),
+                Type Underlyingty, DeclContext *DC)
+    : NamedDecl(DeclKind::TypeAlias, DC, Name), AliasTy(0),
       TypeAliasLoc(TypeAliasLoc), UnderlyingTy(Underlyingty) {
   }
 
@@ -318,9 +318,8 @@ class ValueDecl : public NamedDecl {
   Expr *Init;
 
 protected:
-  ValueDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty, Expr *init,
-            const DeclAttributes &attrs = DeclAttributes())
-    : NamedDecl(K, DC, name, attrs), Ty(ty), Init(init) {
+  ValueDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty, Expr *init)
+    : NamedDecl(K, DC, name), Ty(ty), Init(init) {
   }
 
 public:
@@ -370,12 +369,12 @@ private:
   
 public:
   VarDecl(SourceLoc VarLoc, Identifier Name, Type Ty, Expr *Init,
-          const DeclAttributes &Attrs, DeclContext *DC)
-    : ValueDecl(DeclKind::Var, DC, Name, Ty, Init, Attrs), VarLoc(VarLoc),
+          DeclContext *DC)
+    : ValueDecl(DeclKind::Var, DC, Name, Ty, Init), VarLoc(VarLoc),
       NestedName(0) {}
   VarDecl(SourceLoc VarLoc, DeclVarName *Name, Type Ty, Expr *Init,
-          const DeclAttributes &Attrs, DeclContext *DC)
-    : ValueDecl(DeclKind::Var, DC, Identifier(), Ty, Init, Attrs),
+          DeclContext *DC)
+    : ValueDecl(DeclKind::Var, DC, Identifier(), Ty, Init),
       VarLoc(VarLoc), NestedName(Name) {}
 
   /// getVarLoc - The location of the 'var' token.
@@ -400,8 +399,8 @@ class FuncDecl : public ValueDecl {
 
 public:
   FuncDecl(SourceLoc FuncLoc, Identifier Name, Type Ty, Expr *Init,
-           const DeclAttributes &Attrs, DeclContext *DC)
-    : ValueDecl(DeclKind::Func, DC, Name, Ty, Init, Attrs), FuncLoc(FuncLoc) {}
+           DeclContext *DC)
+    : ValueDecl(DeclKind::Func, DC, Name, Ty, Init), FuncLoc(FuncLoc) {}
 
   SourceLoc getFuncLoc() const { return FuncLoc; }
     
@@ -458,7 +457,7 @@ class ArgDecl : public ValueDecl {
   
 public:
   ArgDecl(SourceLoc FuncLoc, Identifier Name, Type Ty, DeclContext *DC)
-    : ValueDecl(DeclKind::Arg, DC, Name, Ty, 0, DeclAttributes()),
+    : ValueDecl(DeclKind::Arg, DC, Name, Ty, 0),
       FuncLoc(FuncLoc) {}
 
   SourceLoc getFuncLoc() const { return FuncLoc; }
