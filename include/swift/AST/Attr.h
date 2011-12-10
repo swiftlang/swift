@@ -76,6 +76,54 @@ public:
     return !operator==(L, R);
   }
 };
+
+/// ABI resilience.  Language structures are resilient if the details
+/// of their implementation may be changed without requiring
+/// associated code to be reprocessed.  Different structures are resilient
+/// in different ways.  For example:
+///   - A resilient type does not have a statically fixed size or layout.
+///   - A resilient field must be accessed with getters and setters, even if
+///     none are defined for it now.
+///   - A resilient function may not be inlined.
+///
+/// In general, resilience is inherited from the lexical context.  For
+/// example, a field declared in a fragile struct is implicitly fragile.
+///
+/// Some language structures, like tuples, are never themselves
+/// resilient (although they may be defined in terms of resilient
+/// types).  Additionally, code distributed with the component
+/// defining a resilient structure need not actually use resilience
+/// boundaries.
+enum Resilience {
+  /// Inherently fragile language structures are not only resilient,
+  /// but they have never been exposed as resilient.  This permits
+  /// certain kinds of optimizations that are not otherwise possible
+  /// because of the need for backward compatibility.
+  InherentlyFragile,
+
+  /// Fragile language structures are non-resilient.  They may have
+  /// been resilient at some point in the past, however.
+  Fragile,
+
+  /// Everything else is resilient.  Resilience means different things
+  /// on different kinds of objects.
+  Resilient
+};
+
+class ResilienceData {
+  unsigned Valid : 1;
+  unsigned Kind : 2;
+
+public:
+  ResilienceData() : Valid(false) {}
+  ResilienceData(Resilience resil) : Valid(true), Kind(unsigned(resil)) {}
+
+  bool isValid() const { return Valid; }
+  Resilience getResilience() const {
+    assert(Valid);
+    return Resilience(Kind);
+  }
+};
   
 /// DeclAttributes - These are attributes that may be applied to declarations.
 class DeclAttributes {
@@ -86,6 +134,7 @@ public:
   SourceLoc LSquareLoc, RSquareLoc;
 
   InfixData Infix;
+  ResilienceData Resilience;
 
   DeclAttributes() { }
 
@@ -93,6 +142,7 @@ public:
 
   bool isInfix() const { return Infix.isValid(); }
   InfixData getInfixData() const { return Infix; }
+  ResilienceData getResilienceData() const { return Resilience; }
     
   bool empty() const {
     return !isInfix();

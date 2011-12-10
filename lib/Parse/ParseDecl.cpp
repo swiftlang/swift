@@ -23,6 +23,7 @@
 #include "llvm/Support/PathV2.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
@@ -87,18 +88,44 @@ TranslationUnit *Parser::parseTranslationUnit() {
   return TU;
 }
 
-static bool isInfixAttr(Token &Tok, Associativity &Assoc) {
-  if (Tok.getText() == "infix_left") {
-    Assoc = Associativity::Left;
-    return true;
-  } else if (Tok.getText() == "infix_right") {
-    Assoc = Associativity::Right;
-    return true;
-  } else if (Tok.getText() == "infix") {
-    Assoc = Associativity::None;
-    return true;
-  } else {
-    return false;
+#define FORALL_ATTRS(MACRO) \
+  MACRO(infix_left) \
+  MACRO(infix_right) \
+  MACRO(infix) \
+  MACRO(resilient) \
+  MACRO(fragile) \
+  MACRO(born_fragile)
+
+namespace {
+#define MAKE_ENUMERATOR(id) id,
+  enum class AttrName {
+    none,
+    FORALL_ATTRS(MAKE_ENUMERATOR)
+  };
+}
+
+static AttrName getAttrName(StringRef text) {
+  return llvm::StringSwitch<AttrName>(text)
+#define MAKE_SWITCH_CASE(id) .Case(#id, AttrName::id)
+    FORALL_ATTRS(MAKE_SWITCH_CASE)
+    .Default(AttrName::none);
+}
+
+static Associativity getAssociativity(AttrName attr) {
+  switch (attr) {
+  case AttrName::infix: return Associativity::None;
+  case AttrName::infix_left: return Associativity::Left;
+  case AttrName::infix_right: return Associativity::Right;
+  default: llvm_unreachable("bad associativity");
+  }
+}
+
+static Resilience getResilience(AttrName attr) {
+  switch (attr) {
+  case AttrName::resilient: return Resilience::Resilient;
+  case AttrName::fragile: return Resilience::Fragile;
+  case AttrName::born_fragile: return Resilience::InherentlyFragile;
+  default: llvm_unreachable("bad resilience");
   }
 }
 
@@ -109,12 +136,27 @@ static bool isInfixAttr(Token &Tok, Associativity &Assoc) {
 ///     'infix_right' '=' numeric_constant
 ///     'unary'
 bool Parser::parseAttribute(DeclAttributes &Attributes) {
-  // infix attributes.
-  Associativity Assoc;
-  if (Tok.is(tok::identifier) && isInfixAttr(Tok, Assoc)) {
+  if (!Tok.is(tok::identifier)) {
+    diagnose(Tok, diag::expected_attribute_name);
+    skipUntil(tok::r_square);
+    return true;
+  }
+
+  switch (AttrName attr = getAttrName(Tok.getText())) {
+  case AttrName::none:
+    diagnose(Tok, diag::unknown_attribute, Tok.getText());
+    skipUntil(tok::r_square);
+    return true;
+
+  // Infix attributes.
+  case AttrName::infix:
+  case AttrName::infix_left:
+  case AttrName::infix_right: {
     if (Attributes.isInfix())
       diagnose(Tok, diag::duplicate_attribute, Tok.getText());
     consumeToken(tok::identifier);
+
+    Associativity Assoc = getAssociativity(attr);
 
     // The default precedence is 100.
     Attributes.Infix = InfixData(100, Assoc);
@@ -138,12 +180,23 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     return false;
   }
 
-  if (Tok.is(tok::identifier))   
-    diagnose(Tok, diag::unknown_attribute, Tok.getText());
-  else
-    diagnose(Tok, diag::expected_attribute_name);
-  skipUntil(tok::r_square);
-  return true;
+  // Resilience attributes.
+  case AttrName::resilient:
+  case AttrName::fragile:
+  case AttrName::born_fragile: {
+    if (Attributes.Resilience.isValid())
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+    consumeToken(tok::identifier);
+
+    Resilience resil = getResilience(attr);
+    
+    // TODO: 'fragile' should allow deployment versioning.
+    Attributes.Resilience = ResilienceData(resil);
+    return false;
+  }
+
+  }
+  llvm_unreachable("bad attribute kind");
 }
 
 /// parsePresentAttributeList
