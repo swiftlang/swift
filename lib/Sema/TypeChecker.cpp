@@ -101,3 +101,4 @@ bool TypeChecker::bindAndValidateClosureArgs(Expr *Body, Type FuncInput) {
 }
 
 
+

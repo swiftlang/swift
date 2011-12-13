@@ -164,6 +164,8 @@ public:
   
   uint64_t getValue() const;
 
+  StringRef getText() const { return Val; }
+  
   SourceRange getSourceRange() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.

@@ -263,16 +263,8 @@ ParseResult<Expr> Parser::parseExprNumericConstant() {
 
   // Check to see if we have an integer constant.
   size_t DotPos = Text.find('.');
-  if (DotPos == StringRef::npos) {
-    // The integer literal must fit in 64-bits.
-    unsigned long long Val;
-    if (Text.getAsInteger(0, Val)) {
-      diagnose(Loc, diag::int_literal_too_large);
-      return ParseResult<Expr>::getSemaError();
-    }
-    
+  if (DotPos == StringRef::npos)
     return new (Context) IntegerLiteralExpr(Text, Loc);
-  }
   
   // Okay, we have a floating point constant.  Verify we have a single dot.
   DotPos = Text.find('.', DotPos+1);

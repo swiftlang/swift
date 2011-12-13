@@ -56,6 +56,11 @@ public:
   Expr *convertToRValue(Expr *E);
 
   Expr *foldSequence(SequenceExpr *E);
+  
+  /// applyTypeToInteger - Apply the specified type to the integer literal
+  /// expression (which is known to have dependent type), performing semantic
+  /// analysis and returning true on a semantic error.
+  bool applyTypeToInteger(IntegerLiteralExpr *E, Type Ty);
 };
 
   

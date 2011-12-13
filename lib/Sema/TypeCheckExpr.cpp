@@ -22,6 +22,26 @@
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
+/// applyTypeToInteger - Apply the specified type to the integer literal
+/// expression (which is known to have dependent type), performing semantic
+/// analysis and returning true on a semantic error.
+bool TypeChecker::applyTypeToInteger(IntegerLiteralExpr *E, Type DestTy) {
+  assert(E->getType()->is<DependentType>() &&
+         "should only be called on dependent integers");
+
+  // FIXME: Name lookup on type to get conversion function.
+  
+  // The integer literal must fit in 64-bits.
+  unsigned long long Val;
+  if (E->getText().getAsInteger(0, Val)) {
+    diagnose(E->getStartLoc(), diag::int_literal_too_large);
+    return true;
+  }
+  
+  E->setType(DestTy, ValueKind::RValue);
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 // Expression Semantic Analysis Routines
 //===----------------------------------------------------------------------===//
@@ -730,7 +750,8 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
     // FIXME: Validate that the type applied is "valid" (has conversion) and no
     // truncation for each literal.  Same code as in coercing logic.
     for (IntegerLiteralExpr *ILE : DependentLiterals)
-      ILE->setType(IntLiteralType, ValueKind::RValue);
+      if (applyTypeToInteger(ILE, IntLiteralType))
+        return true;
     
     // Now that we've added some types to the mix, re-type-check the expression
     // tree and recheck for dependent types.
