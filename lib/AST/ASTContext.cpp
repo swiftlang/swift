@@ -139,10 +139,18 @@ TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
 /// uniqued because the loc is generally different.
 OneOfType *OneOfType::getNew(SourceLoc OneOfLoc,
                              ArrayRef<OneOfElementDecl*> InElts,
-                             DeclContext *Parent) {
-  ASTContext &C = Parent->getASTContext();
+                             TypeAliasDecl *TheDecl) {
+  ASTContext &C = TheDecl->getASTContext();
   
-  return new (C) OneOfType(OneOfLoc, C.AllocateCopy(InElts), Parent);
+  return new (C) OneOfType(OneOfLoc, C.AllocateCopy(InElts), TheDecl);
+}
+
+// oneof types are always canonical.
+OneOfType::OneOfType(SourceLoc OneOfLoc, ArrayRef<OneOfElementDecl*> Elts,
+                     TypeAliasDecl *TheDecl)
+  : TypeBase(TypeKind::OneOf, &TheDecl->getASTContext()),
+    DeclContext(DeclContextKind::OneOfType, TheDecl->getDeclContext()),
+    OneOfLoc(OneOfLoc), Elements(Elts), TheDecl(TheDecl) {
 }
 
 

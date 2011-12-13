@@ -734,9 +734,7 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
   
   // If we have a PrettyTypeName to use, use it.  Otherwise, just assign the
   // constructors a temporary dummy type.
-  Type TmpTy = TupleType::getEmpty(Context);
-  if (PrettyTypeName)
-    TmpTy = PrettyTypeName->getAliasType();
+  Type AliasTy = PrettyTypeName->getAliasType();
   
   for (const OneOfElementInfo &Elt : Elts) {
     Identifier NameI = Context.getIdentifier(Elt.Name);
@@ -758,10 +756,9 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
       continue;
     }
     
-    Type EltTy = TmpTy;
+    Type EltTy = AliasTy;
     if (Type ArgTy = Elt.EltType)
-      if (PrettyTypeName)
-        EltTy = FunctionType::get(ArgTy, EltTy, Context);
+      EltTy = FunctionType::get(ArgTy, EltTy, Context);
     
     // Create a decl for each element, giving each a temporary type.
     EltDecls.push_back(new (Context) OneOfElementDecl(Elt.NameLoc, NameI,
@@ -769,26 +766,12 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
                                                       CurDeclContext));
   }
   
-  OneOfType *Result = OneOfType::getNew(OneOfLoc, EltDecls, CurDeclContext);
+  OneOfType *Result = OneOfType::getNew(OneOfLoc, EltDecls, PrettyTypeName);
   for (OneOfElementDecl *D : EltDecls)
     D->setDeclContext(Result);
   
-  if (PrettyTypeName) {
-    // If we have a pretty name for this, complete it to its actual type.
-    PrettyTypeName->setUnderlyingType(Result);
-  } else {
-    // Now that the oneof type is created, we can go back and give proper types
-    // to each element decl.
-    for (OneOfElementDecl *Elt : EltDecls) {
-      Type EltTy = Result;
-      // If the OneOf Element takes a type argument, then it is actually a
-      // function that takes the type argument and returns the OneOfType.
-      if (Type ArgTy = Elt->getArgumentType())
-        EltTy = FunctionType::get(ArgTy, EltTy, Context);
-      Elt->setType(EltTy);
-    }
-  }
-  
+  // Complete the type alias to its actual type.
+  PrettyTypeName->setUnderlyingType(Result);
   return Result;
 }
 

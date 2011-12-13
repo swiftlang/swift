@@ -293,12 +293,16 @@ public:
   const SourceLoc OneOfLoc;
   const ArrayRef<OneOfElementDecl*> Elements;
   
+  /// TheDecl - This is the TypeAlias that the oneof was declared with.  It
+  /// specifies the name and other useful information about this type.
+  TypeAliasDecl * const TheDecl;
+  
   /// getNew - Return a new instance of oneof type.  These are never uniqued
   /// since each syntactic instance of them is semantically considered to be a
   /// different type.
   static OneOfType *getNew(SourceLoc OneOfLoc,
                            ArrayRef<OneOfElementDecl*> Elements,
-                           DeclContext *Parent);
+                           TypeAliasDecl *TheDecl);
  
   SourceLoc getLocStart() const { return OneOfLoc; }
   OneOfElementDecl *getElement(unsigned i) const {
@@ -330,11 +334,7 @@ public:
 private:
   // oneof types are always canonical.
   OneOfType(SourceLoc OneOfLoc, ArrayRef<OneOfElementDecl*> Elts,
-            DeclContext *Parent)
-    : TypeBase(TypeKind::OneOf, &Parent->getASTContext()),
-      DeclContext(DeclContextKind::OneOfType, Parent),
-      OneOfLoc(OneOfLoc), Elements(Elts) {
-  }
+            TypeAliasDecl *TheDecl);
 };
 
   
