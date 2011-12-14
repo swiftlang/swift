@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
@@ -32,11 +33,36 @@ bool TypeChecker::applyTypeToInteger(IntegerLiteralExpr *E, Type DestTy) {
   // FIXME: Name lookup on type to get conversion function.
   
   // The integer literal must fit in 64-bits.
-  unsigned long long Val;
-  if (E->getText().getAsInteger(0, Val)) {
-    diagnose(E->getStartLoc(), diag::int_literal_too_large);
+  llvm::APInt Value(1, 0);
+  bool Failure = E->getText().getAsInteger(0, Value);  (void)Failure;
+  assert(!Failure && "Lexer should have verified a reasonable type!");
+  
+  
+  // Look up the convert_from_integer_literal method on the type.  If it is
+  // missing, then the type isn't compatible with integer literals.  If it is
+  // present, it must have a single argument of builtin integer type specifying
+  // the bitwidth of the allowed value.
+  SmallVector<ValueDecl*, 8> Methods;
+  TU.lookupGlobalExtensionMethods(DestTy, 
+                          Context.getIdentifier("convert_from_integer_literal"),
+                                  Methods);
+  
+  if (Methods.empty()) {
+    diagnose(E->getLoc(), diag::type_not_compatible_int_literal, DestTy);
     return true;
   }
+  
+  
+  
+  //
+  // TODO: In the future, allow transitive "integer literal" types that
+  // themselves can be converted from an integer, so that user code is defined
+  // in terms int16 instead of builtin types (which they have no access to).
+  
+  //if () {
+  //  diagnose(E->getLoc(), diag::int_literal_too_large);
+  //  return true;
+  // }
   
   E->setType(DestTy, ValueKind::RValue);
   return false;
