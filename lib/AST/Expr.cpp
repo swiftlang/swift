@@ -730,7 +730,7 @@ public:
     OS << ')';
   }
   void visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
-    OS.indent(Indent) << "(look_throguh_oneof_expr type='" << E->getType();
+    OS.indent(Indent) << "(look_through_oneof_expr type='" << E->getType();
     OS << "\'\n";
     printRec(E->getSubExpr());
     OS << ')';
