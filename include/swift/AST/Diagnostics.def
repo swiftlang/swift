@@ -271,10 +271,17 @@ ERROR(expected_lbrace_func_expr,decl_parsing,none,
 //------------------------------------------------------------------------------
 // Literal parsing diagnostics
 //------------------------------------------------------------------------------
+
+NOTE(while_converting_int_literal,sema,none,
+     "while converting literal to %0", (Type))
+
 ERROR(type_not_compatible_int_literal,literal_parsing,none,
       "%0 is not compatible with integer literals", (Type))
 ERROR(type_ambiguous_int_literal_conversion,literal_parsing,none,
       "%0 has multiple 'convert_from_integer_literal' methods", (Type))
+ERROR(type_integer_conversion_defined_wrong,literal_parsing,none,
+      "'convert_from_integer_literal' method in %0 defined wrong", (Type))
+
 ERROR(int_literal_too_large,literal_parsing,none,
       "integer constant too large", ())
       
@@ -284,7 +291,8 @@ WARNING(float_literal_overflow,literal_parsing,none,
         "floating point constant overflowed to %0", (StringRef))
 WARNING(float_literal_underflow,literal_parsing,none,
         "floating point constant underflowed to %0", (StringRef))
-      
+
+
 //------------------------------------------------------------------------------
 // Attribute-parsing diagnostics
 //------------------------------------------------------------------------------

@@ -23,6 +23,30 @@
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
+/// getFirstArgumentType - If the specified type is a method on the type that
+/// takes a single value as an argument and returns (), return the first
+/// argument.  Otherwise, return a null Type.
+///
+static Type getFirstArgumentType(Type T) {
+  // The standard type we want is "T -> S -> ()", where we return S.
+  FunctionType *FT = T->getAs<FunctionType>();
+  if (FT) FT = FT->Result->getAs<FunctionType>();
+  if (FT == 0) return Type();
+
+  // The return type must be ().
+  TupleType *TT = FT->Result->getAs<TupleType>();
+  if (TT == 0 || !TT->Fields.empty())
+    return Type();
+  
+  // Look through single element tuples.
+  Type ArgTy = FT->Input;
+  if ((TT = ArgTy->getAs<TupleType>()))
+    if (TT->Fields.size() == 1)
+      ArgTy = TT->Fields[0].Ty;
+  
+  return ArgTy;
+}
+
 /// applyTypeToInteger - Apply the specified type to the integer literal
 /// expression (which is known to have dependent type), performing semantic
 /// analysis and returning true on a semantic error.
@@ -59,10 +83,21 @@ bool TypeChecker::applyTypeToInteger(IntegerLiteralExpr *E, Type DestTy) {
     return true;
   }
   
-  //
+  ValueDecl *Method = Methods[0];
+  
+  Type ArgType = getFirstArgumentType(Method->getType());
+  if (ArgType.isNull() || !ArgType->is<BuiltinIntegerType>()) {
+    diagnose(Method->getLocStart(), diag::type_integer_conversion_defined_wrong,
+             DestTy);
+    diagnose(E->getLoc(), diag::while_converting_int_literal, DestTy);
+    return true;
+  }
+    
   // TODO: In the future, allow transitive "integer literal" types that
   // themselves can be converted from an integer, so that user code is defined
   // in terms int16 instead of builtin types (which they have no access to).
+  
+  
   
   //if () {
   //  diagnose(E->getLoc(), diag::int_literal_too_large);
