@@ -187,6 +187,17 @@ class BuiltinIntegerType : public BuiltinType {
   BuiltinIntegerType(TypeKind kind, ASTContext &C) : BuiltinType(kind, C) {}
 public:
   
+  unsigned getBitWidth() const {
+    switch (Kind) {
+    default: assert(0 && "Not an integer type");
+    case TypeKind::BuiltinInt1:  return 1;
+    case TypeKind::BuiltinInt8:  return 8;
+    case TypeKind::BuiltinInt16: return 16;
+    case TypeKind::BuiltinInt32: return 32;
+    case TypeKind::BuiltinInt64: return 64;
+    }
+  }
+  
   static bool classof(const BuiltinType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->Kind >= TypeKind::BuiltinInteger_First &&

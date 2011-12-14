@@ -54,8 +54,6 @@ bool TypeChecker::applyTypeToInteger(IntegerLiteralExpr *E, Type DestTy) {
   assert(E->getType()->is<DependentType>() &&
          "should only be called on dependent integers");
 
-  // FIXME: Name lookup on type to get conversion function.
-  
   // The integer literal must fit in 64-bits.
   llvm::APInt Value(1, 0);
   bool Failure = E->getText().getAsInteger(0, Value);  (void)Failure;
@@ -84,8 +82,13 @@ bool TypeChecker::applyTypeToInteger(IntegerLiteralExpr *E, Type DestTy) {
   }
   
   ValueDecl *Method = Methods[0];
-  
+
+  // Check that the type of the 'convert_from_integer_literal' method makes
+  // sense.
   Type ArgType = getFirstArgumentType(Method->getType());
+  // TODO: In the future, allow transitive "integer literal" types that
+  // themselves can be converted from an integer, so that user code is defined
+  // in terms int16 instead of builtin types (which they have no access to).
   if (ArgType.isNull() || !ArgType->is<BuiltinIntegerType>()) {
     diagnose(Method->getLocStart(), diag::type_integer_conversion_defined_wrong,
              DestTy);
@@ -93,16 +96,12 @@ bool TypeChecker::applyTypeToInteger(IntegerLiteralExpr *E, Type DestTy) {
     return true;
   }
     
-  // TODO: In the future, allow transitive "integer literal" types that
-  // themselves can be converted from an integer, so that user code is defined
-  // in terms int16 instead of builtin types (which they have no access to).
-  
-  
-  
-  //if () {
-  //  diagnose(E->getLoc(), diag::int_literal_too_large);
-  //  return true;
-  // }
+  unsigned BitWidth = ArgType->getAs<BuiltinIntegerType>()->getBitWidth();
+  if (Value.getBitWidth() > BitWidth) {
+    diagnose(E->getLoc(), diag::int_literal_too_large, Value.getBitWidth(),
+             DestTy);
+    return true;
+  }
   
   E->setType(DestTy, ValueKind::RValue);
   return false;

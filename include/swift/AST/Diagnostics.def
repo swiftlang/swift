@@ -283,7 +283,8 @@ ERROR(type_integer_conversion_defined_wrong,literal_parsing,none,
       "'convert_from_integer_literal' method in %0 defined wrong", (Type))
 
 ERROR(int_literal_too_large,literal_parsing,none,
-      "integer constant too large", ())
+      "integer constant too large (%0 bits) for %1",
+      (unsigned, Type))
       
 ERROR(float_literal_multi_decimal,literal_parsing,none,
       "floating point constant contains multiple decimal points", ())
