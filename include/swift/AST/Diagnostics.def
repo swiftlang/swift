@@ -273,6 +273,8 @@ ERROR(expected_lbrace_func_expr,decl_parsing,none,
 //------------------------------------------------------------------------------
 ERROR(type_not_compatible_int_literal,literal_parsing,none,
       "%0 is not compatible with integer literals", (Type))
+ERROR(type_ambiguous_int_literal_conversion,literal_parsing,none,
+      "%0 has multiple 'convert_from_integer_literal' methods", (Type))
 ERROR(int_literal_too_large,literal_parsing,none,
       "integer constant too large", ())
       

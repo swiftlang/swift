@@ -52,7 +52,12 @@ bool TypeChecker::applyTypeToInteger(IntegerLiteralExpr *E, Type DestTy) {
     return true;
   }
   
-  
+  if (Methods.size() != 1) {
+    diagnose(E->getLoc(), diag::type_ambiguous_int_literal_conversion, DestTy);
+    for (ValueDecl *D : Methods)
+      diagnose(D->getLocStart(), diag::found_candidate);
+    return true;
+  }
   
   //
   // TODO: In the future, allow transitive "integer literal" types that
