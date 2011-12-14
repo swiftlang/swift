@@ -272,13 +272,13 @@ void TypeBase::print(raw_ostream &OS) const {
 void BuiltinType::print(raw_ostream &OS) const {
   switch (Kind) {
   default: assert(0 && "Unknown builtin type");
-  case TypeKind::BuiltinFloat32: OS << "__builtin_float32_type"; break;
-  case TypeKind::BuiltinFloat64: OS << "__builtin_float64_type"; break;
-  case TypeKind::BuiltinInt1:  OS << "__builtin_int1_type"; break;
-  case TypeKind::BuiltinInt8:  OS << "__builtin_int8_type"; break;
-  case TypeKind::BuiltinInt16: OS << "__builtin_int16_type"; break;
-  case TypeKind::BuiltinInt32: OS << "__builtin_int32_type"; break;
-  case TypeKind::BuiltinInt64: OS << "__builtin_int64_type"; break;
+  case TypeKind::BuiltinFloat32: OS << "Builtin::float32"; break;
+  case TypeKind::BuiltinFloat64: OS << "Builtin::float64"; break;
+  case TypeKind::BuiltinInt1:  OS << "Builtin::int1"; break;
+  case TypeKind::BuiltinInt8:  OS << "Builtin::int8"; break;
+  case TypeKind::BuiltinInt16: OS << "Builtin::int16"; break;
+  case TypeKind::BuiltinInt32: OS << "Builtin::int32"; break;
+  case TypeKind::BuiltinInt64: OS << "Builtin::int64"; break;
   }
 }
 

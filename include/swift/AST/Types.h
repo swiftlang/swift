@@ -50,8 +50,10 @@ namespace swift {
     Array,
     Protocol,
     
-    Builtin_First = BuiltinInt1,
-    Builtin_Last = BuiltinInt64
+    Builtin_First = BuiltinFloat32,
+    Builtin_Last = BuiltinInt64,
+    BuiltinInteger_First = BuiltinInt1,
+    BuiltinInteger_Last  = BuiltinInt64,
   };
   
 /// TypeBase - Base class for all types in Swift.
@@ -164,6 +166,7 @@ public:
 
 /// BuiltinType - Trivial builtin types.
 class BuiltinType : public TypeBase {
+protected:
   friend class ASTContext;
   // Builtin types are always canonical.
   BuiltinType(TypeKind kind, ASTContext &C) : TypeBase(kind, &C) {}
@@ -175,6 +178,19 @@ public:
   static bool classof(const TypeBase *T) {
     return T->Kind >= TypeKind::Builtin_First &&
            T->Kind <= TypeKind::Builtin_Last;
+  }
+};
+  
+/// BuiltinIntegerType - The builtin integer types.
+class BuiltinIntegerType : public BuiltinType {
+  friend class ASTContext;
+  BuiltinIntegerType(TypeKind kind, ASTContext &C) : BuiltinType(kind, C) {}
+public:
+  
+  static bool classof(const BuiltinType *) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->Kind >= TypeKind::BuiltinInteger_First &&
+           T->Kind <= TypeKind::BuiltinInteger_Last;
   }
 };
   
