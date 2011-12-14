@@ -128,7 +128,8 @@ bool Parser::parseTypeIdentifier(Type &Result) {
 bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
   SmallVector<TupleTypeElt, 8> Elements;
 
-  if (Tok.isNot(tok::r_paren) && Tok.isNot(tok::r_brace)) {
+  if (Tok.isNot(tok::r_paren) && Tok.isNot(tok::r_brace) &&
+      !isStartOfDecl(Tok, peekToken())) {
     bool HadError = false;
     do {
       Elements.push_back(TupleTypeElt());
