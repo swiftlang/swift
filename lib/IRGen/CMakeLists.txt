@@ -1,6 +1,7 @@
 add_swift_library(swiftIRGen
   Cleanup.h
   Condition.h
+  DiverseStack.cpp
   GenArray.cpp
   GenControl.cpp
   GenExpr.cpp
