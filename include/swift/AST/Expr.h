@@ -709,24 +709,15 @@ public:
 /// syntactically through juxtaposition with a TupleExpr whose
 /// leading '(' is unspaced.
 class CallExpr : public ApplyExpr {
-  /// \brief Whether this call actually used dot syntax, e.g.,
-  /// \c x.f.
-  /// FIXME: This should probably have its own node kind, if it persists.
-  bool DotSyntax : 1;
-  
 public:
-  CallExpr(Expr *Fn, Expr *Arg, bool DotSyntax, TypeJudgement Ty)
-    : ApplyExpr(ExprKind::Call, Fn, Arg, Ty), DotSyntax(DotSyntax) {}
+  CallExpr(Expr *Fn, Expr *Arg, TypeJudgement Ty)
+    : ApplyExpr(ExprKind::Call, Fn, Arg, Ty) {}
 
   SourceRange getSourceRange() const {
-    if (isDotSyntax())
-      return SourceRange(getArg()->getStartLoc(), getFn()->getEndLoc()); 
-
     return SourceRange(getFn()->getStartLoc(), getArg()->getEndLoc()); 
   }
   
   SourceLoc getLoc() const { return getArg()->getStartLoc(); }
-  bool isDotSyntax() const { return DotSyntax; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const CallExpr *) { return true; }
@@ -771,19 +762,20 @@ public:
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BinaryExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->getKind() == ExprKind::Binary; }
+  static bool classof(const Expr *E) { return E->getKind() == ExprKind::Binary;}
 };
 
-/// ProtocolElementExpr - Refer to an element of a protocol, e.g. P.x.  'x' is
-/// modeled as a DeclRefExpr on the field's decl.
+/// DotSyntaxCallExpr - Refer to an element or method of a type, e.g. P.x.  'x'
+/// is modeled as a DeclRefExpr or OverloadSetRefExpr on the field's decl.
 ///
-class ProtocolElementExpr : public ApplyExpr {
+class DotSyntaxCallExpr : public ApplyExpr {
   SourceLoc DotLoc;
   
 public:
-  ProtocolElementExpr(Expr *FnExpr, SourceLoc DotLoc, Expr *BaseExpr,
-                      TypeJudgement Ty = TypeJudgement())
-  : ApplyExpr(ExprKind::ProtocolElement, FnExpr, BaseExpr, Ty), DotLoc(DotLoc) {
+  DotSyntaxCallExpr(Expr *FnExpr, SourceLoc DotLoc, Expr *BaseExpr,
+                    TypeJudgement Ty = TypeJudgement())
+    : ApplyExpr(ExprKind::DotSyntaxCall, FnExpr, BaseExpr, Ty),
+      DotLoc(DotLoc) {
   }
 
   SourceLoc getDotLoc() const { return DotLoc; }
@@ -794,9 +786,9 @@ public:
   }
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const ProtocolElementExpr *) { return true; }
+  static bool classof(const DotSyntaxCallExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ProtocolElement;
+    return E->getKind() == ExprKind::DotSyntaxCall;
   }
 };
 

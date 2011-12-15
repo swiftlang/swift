@@ -158,7 +158,7 @@ RValue IRGenFunction::emitRValue(Expr *E, const TypeInfo &TInfo) {
   case ExprKind::Func:
   case ExprKind::Closure:
   case ExprKind::AnonClosureArg:
-  case ExprKind::ProtocolElement:
+  case ExprKind::DotSyntaxCall:
     IGM.unimplemented(E->getLoc(),
                       "cannot generate r-values for this expression yet");
     return emitFakeRValue(TInfo);
@@ -195,7 +195,7 @@ LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &TInfo) {
   case ExprKind::Load:
     llvm_unreachable("these expression kinds should never be l-values");
 
-  case ExprKind::ProtocolElement:
+  case ExprKind::DotSyntaxCall:
     IGM.unimplemented(E->getLoc(),
                       "cannot generate l-values for this expression yet");
     return emitFakeLValue(TInfo);
@@ -243,7 +243,7 @@ Optional<LValue> IRGenFunction::tryEmitAsLValue(Expr *E,
   case ExprKind::Func:
   case ExprKind::Closure:
   case ExprKind::AnonClosureArg:
-  case ExprKind::ProtocolElement:
+  case ExprKind::DotSyntaxCall:
     // These can never be usefully emitted as l-values, if they
     // weren't l-values before.
     return Nothing;

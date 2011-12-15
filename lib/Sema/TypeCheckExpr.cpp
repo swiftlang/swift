@@ -434,7 +434,7 @@ public:
       return 0;
     return visitApplyExpr(E);
   }
-  Expr *visitProtocolElementExpr(ProtocolElementExpr *E) {
+  Expr *visitDotSyntaxCallExpr(DotSyntaxCallExpr *E) {
     return visitApplyExpr(E);
   }
 
@@ -485,7 +485,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
                                               VD->getTypeJudgement());
       
       ApplyExpr *Call = new (TC.Context) 
-        ProtocolElementExpr(Fn, E->getDotLoc(), Base);
+        DotSyntaxCallExpr(Fn, E->getDotLoc(), Base);
       if (TC.semaApplyExpr(Call))
         return 0;
       return Call;
@@ -516,9 +516,8 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   }
   
   if (FnRef) {
-    CallExpr *Call = new (TC.Context) CallExpr(FnRef, Base,
-                                               /*DotSyntax=*/true,
-                                               TypeJudgement());
+    ApplyExpr *Call = new (TC.Context) DotSyntaxCallExpr(FnRef, E->getDotLoc(),
+                                                         Base);
     if (TC.semaApplyExpr(Call))
       return 0;
     

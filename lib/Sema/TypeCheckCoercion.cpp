@@ -181,7 +181,7 @@ public:
     return E;
   }
   
-  Expr *visitProtocolElementExpr(ProtocolElementExpr *E) {
+  Expr *visitDotSyntaxCallExpr(DotSyntaxCallExpr *E) {
     return E;
   }
 

@@ -512,7 +512,7 @@ namespace {
       return E;
     }
     
-    Expr *visitProtocolElementExpr(ProtocolElementExpr *E) {
+    Expr *visitDotSyntaxCallExpr(DotSyntaxCallExpr *E) {
       return visitApplyExpr(E);
     }
     
@@ -815,8 +815,8 @@ public:
     OS << ')';
   }
   
-  void visitProtocolElementExpr(ProtocolElementExpr *E) {
-    OS.indent(Indent) << "(protocol_element_expr type='"
+  void visitDotSyntaxCallExpr(DotSyntaxCallExpr *E) {
+    OS.indent(Indent) << "(dot_syntax_call_expr type='"
                       << E->getType() << "'\n";
     printRec(E->getFn());
     OS << '\n';

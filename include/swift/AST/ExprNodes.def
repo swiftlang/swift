@@ -72,8 +72,8 @@ ABSTRACT_EXPR(Apply, Expr)
   EXPR(Call, ApplyExpr)
   EXPR(Unary, ApplyExpr)
   EXPR(Binary, ApplyExpr)
-  EXPR(ProtocolElement, ApplyExpr)
-  EXPR_RANGE(Apply, Call, ProtocolElement)
+  EXPR(DotSyntaxCall, ApplyExpr)
+  EXPR_RANGE(Apply, Call, DotSyntaxCall)
 
 #undef EXPR_RANGE
 #undef UNBOUND_EXPR
