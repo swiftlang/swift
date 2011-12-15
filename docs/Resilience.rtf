@@ -168,13 +168,14 @@ A type has a
 \
 A type has a 
 \i universally fragile representation
-\i0  if there is no deployment of the target platform for which the type exists and is not fragilely represented.  It is a theorem that all components agree on whether a type has a universal fragile representation and, if so, what the size and alignment of that type is.\
+\i0  if there is no deployment of the target platform for which the type exists and is not fragilely represented.  It is a theorem that all components agree on whether a type has a universal fragile representation and, if so, what the size, unpadded size, and alignment of that type is.\
 \
 Swift's struct layout algorithm takes as input a list of fields, and does the following:\
 1.  The fields are ranked:\
   - The universally fragile fields rank higher than the others.\
   - If two fields A and B are both universally fragile, \
   - If no other condition applies, fields that appear earlier in the original sequence have higher rank.\
+2.  The size of the structure is initially 0.  \
 \
 representations and A's type is more aligned than B's type, or otherwise if A appears before B in the original ordering.\
 2.  \

@@ -106,9 +106,15 @@ RValue IRGenFunction::emitDeclRefRValue(DeclRefExpr *E, const TypeInfo &TInfo) {
 
   case DeclKind::Func:
     return emitRValueForFunction(cast<FuncDecl>(D));
+
+  case DeclKind::OneOfElement: {
+    llvm::Value *fn =
+      IGM.getAddrOfInjectionFunction(cast<OneOfElementDecl>(D));
+    llvm::Value *data = llvm::UndefValue::get(IGM.Int8PtrTy);
+    return RValue::forScalars(fn, data);
+  }
     
   case DeclKind::ElementRef:
-  case DeclKind::OneOfElement:
     unimplemented(E->getLoc(), "emitting this decl as an r-value");
     return emitFakeRValue(TInfo);
   }

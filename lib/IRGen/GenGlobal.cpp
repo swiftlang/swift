@@ -55,11 +55,21 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::ElementRef:
     llvm_unreachable("cannot encounter this decl here");
     break;
-  
-  // These declarations don't require IR-gen support.
+
+  // oneof elements can be found at the top level because of struct
+  // "constructor" injection.  Just ignore them here; we'll get them
+  // as part of the struct.
   case DeclKind::OneOfElement:
-  case DeclKind::Import:
+    break;
+
+  // Type aliases require IR-gen support if they're really a struct/oneof
+  // declaration.
   case DeclKind::TypeAlias:
+    // TODO
+    break;
+
+  // These declarations don't require IR-gen support.
+  case DeclKind::Import:
     break;
 
   case DeclKind::Var:
@@ -108,19 +118,38 @@ void IRGenModule::emitGlobalVariable(VarDecl *VD) {
 /// Fetch the declaration of the given global function.
 llvm::Function *IRGenModule::getAddrOfGlobalFunction(FuncDecl *FD) {
   // Check whether we've cached this.
-  llvm::Constant *&Entry = Globals[FD];
-  if (Entry) return cast<llvm::Function>(Entry);
+  llvm::Constant *&entry = Globals[FD];
+  if (entry) return cast<llvm::Function>(entry);
 
-  llvm::FunctionType *Type = getFunctionType(FD);
+  llvm::FunctionType *fnType = getFunctionType(FD->getType(), /*data*/ false);
 
-  LinkInfo Link = getLinkInfo(FD);
-  llvm::Function *Addr
-    = cast<llvm::Function>(Module.getOrInsertFunction(Link.Name.str(), Type));
-  Addr->setLinkage(Link.Linkage);
-  Addr->setVisibility(Link.Visibility);
+  LinkInfo link = getLinkInfo(FD);
+  llvm::Function *addr
+    = cast<llvm::Function>(Module.getOrInsertFunction(link.Name.str(), fnType));
+  addr->setLinkage(link.Linkage);
+  addr->setVisibility(link.Visibility);
 
-  Entry = Addr;
-  return Addr;
+  entry = addr;
+  return addr;
+}
+
+/// getAddrOfInjectionFunction - Get the address of the function to
+/// perform a particular injection into a oneof type.
+llvm::Function *
+IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
+  llvm::Constant *&entry = Globals[D];
+  if (entry) return cast<llvm::Function>(entry);
+
+  llvm::FunctionType *fnType = getFunctionType(D->getType(), /*data*/ false);
+
+  LinkInfo link = getLinkInfo(D);
+  llvm::Function *addr
+    = cast<llvm::Function>(Module.getOrInsertFunction(link.Name.str(), fnType));
+  addr->setLinkage(link.Linkage);
+  addr->setVisibility(link.Visibility);
+
+  entry = addr;
+  return addr;
 }
 
 LValue IRGenFunction::getGlobal(VarDecl *D, const TypeInfo &TInfo) {

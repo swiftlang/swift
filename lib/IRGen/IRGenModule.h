@@ -40,6 +40,7 @@ namespace swift {
   class Decl;
   class FuncDecl;
   class NamedDecl;
+  class OneOfElementDecl;
   class SourceLoc;
   class TranslationUnit;
   class Type;
@@ -97,7 +98,7 @@ private:
   class LinkInfo;
   LinkInfo getLinkInfo(NamedDecl *D);
 
-  llvm::FunctionType *getFunctionType(FuncDecl *D);
+  llvm::FunctionType *getFunctionType(Type fnType, bool withData);
 
 public:
   IRGenModule(ASTContext &Context, Options &Opts, llvm::Module &Module,
@@ -109,6 +110,7 @@ public:
   void emitTranslationUnit(TranslationUnit *TU);
   llvm::GlobalVariable *getAddrOfGlobalVariable(VarDecl *D);
   llvm::Function *getAddrOfGlobalFunction(FuncDecl *D);
+  llvm::Function *getAddrOfInjectionFunction(OneOfElementDecl *D);
 };
 
 } // end namespace irgen

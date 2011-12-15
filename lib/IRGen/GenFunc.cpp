@@ -228,10 +228,9 @@ RValue IRGenFunction::emitRValueForFunction(FuncDecl *Fn) {
   return RValue::forScalars(Undef, Undef);
 }
 
-llvm::FunctionType *IRGenModule::getFunctionType(FuncDecl *Fn) {
-  const FuncTypeInfo &TypeInfo =
-    static_cast<const FuncTypeInfo &>(getFragileTypeInfo(Fn->getType()));
-  return TypeInfo.getFunctionType(*this, /*data*/ false);
+llvm::FunctionType *IRGenModule::getFunctionType(Type type, bool withData) {
+  const FuncTypeInfo &fnTypeInfo = getFragileTypeInfo(type).as<FuncTypeInfo>();
+  return fnTypeInfo.getFunctionType(*this, withData);
 }
 
 namespace {

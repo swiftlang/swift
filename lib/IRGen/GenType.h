@@ -58,6 +58,12 @@ public:
 
   virtual ~TypeInfo() {}
 
+  /// Unsafely cast this to the given subtype.
+  template <class T> const T &as() const {
+    // FIXME: maybe do an assert somehow if we have RTTI enabled.
+    return static_cast<const T &>(*this);
+  }
+
   /// The LLVM representation of a stored value of this type.
   llvm::Type *StorageType;
 

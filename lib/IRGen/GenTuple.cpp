@@ -293,7 +293,7 @@ static const TupleTypeInfo &getAsTupleTypeInfo(const TypeInfo &typeInfo) {
   assert(dynamic_cast<const TupleTypeInfo*>(&typeInfo));
 #endif
 
-  return static_cast<const TupleTypeInfo&>(typeInfo);
+  return typeInfo.as<TupleTypeInfo>();
 }
 
 static const TupleTypeInfo &getAsTupleTypeInfo(IRGenFunction &IGF, Type type) {
@@ -423,7 +423,10 @@ static void emitExplodedTupleLiteral(IRGenFunction &IGF, TupleExpr *E,
 
 /// Emit a tuple literal expression.
 RValue IRGenFunction::emitTupleExpr(TupleExpr *E, const TypeInfo &TI) {
-  const TupleTypeInfo &tupleType = getAsTupleTypeInfo(TI);
+  if (E->isGroupingParen())
+    return emitRValue(E->getElement(0), TI);
+
+  const TupleTypeInfo &tupleType = TI.as<TupleTypeInfo>();
 
   SmallVector<RValue, 8> elements;
   elements.reserve(E->getNumElements());
@@ -532,7 +535,7 @@ static void emitExplodedTupleShuffle(IRGenFunction &IGF, TupleShuffleExpr *E,
 /// Tuple-shuffles are always r-values.
 RValue IRGenFunction::emitTupleShuffleExpr(TupleShuffleExpr *E,
                                            const TypeInfo &TI) {
-  const TupleTypeInfo &outerTupleType = getAsTupleTypeInfo(TI);
+  const TupleTypeInfo &outerTupleType = TI.as<TupleTypeInfo>();
 
   SmallVector<RValue, 8> outerElements;
   outerElements.reserve(outerTupleType.getFieldInfos().size());
