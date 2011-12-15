@@ -111,26 +111,58 @@ void Mangler::addSubstitution(void *ptr) {
 }
 
 void Mangler::mangleDeclContext(DeclContext *ctx) {
-  assert(isa<Module>(ctx) && "can't yet mangle non-module contexts!");
-  Module *module = cast<Module>(ctx);
+  switch (ctx->getContextKind()) {
+  case DeclContextKind::BuiltinModule:
+    llvm_unreachable("mangling member of builtin module!");
 
-  // Try the special 'swift' substitution.
-  // context ::= Ss
-  if (!module->getParent() && module->Name.str() == "swift") {
-    Buffer << "Ss";
+  case DeclContextKind::TranslationUnit: {
+    Module *module = cast<Module>(ctx);
+
+    // Try the special 'swift' substitution.
+    // context ::= Ss
+    if (!module->getParent() && module->Name.str() == "swift") {
+      Buffer << "Ss";
+      return;
+    }
+
+    // context ::= substitution identifier*
+    // context ::= identifier+
+
+    if (tryMangleSubstitution(module)) return;
+
+    if (DeclContext *parent = module->getParent())
+      mangleDeclContext(parent);
+
+    mangleIdentifier(module->Name);
+    addSubstitution(module);
     return;
   }
 
-  // context ::= substitution identifier*
-  // context ::= identifier+
+  case DeclContextKind::OneOfType: {
+    OneOfType *oneof = cast<OneOfType>(ctx);
 
-  if (tryMangleSubstitution(module)) return;
+    if (tryMangleSubstitution(oneof)) return;
+    mangleDeclContext(ctx->getParent());
+    mangleIdentifier(oneof->TheDecl->getName());
+    addSubstitution(oneof);
+    return;
+  }
 
-  if (DeclContext *parent = module->getParent())
-    mangleDeclContext(parent);
+  case DeclContextKind::ExtensionDecl:
+    // FIXME: unimplemented
+    llvm_unreachable("unimplemented: mangling for extensions");
 
-  mangleIdentifier(module->Name);
-  addSubstitution(module);
+  case DeclContextKind::FuncExpr:
+    // FIXME: we don't need to agree about these across components, but
+    // that's no excuse for not mangling *something* in here.
+    break;
+
+  case DeclContextKind::ProtocolType:
+    // It's not clear what members would be here that need to be mangled.
+    llvm_unreachable("reference to member of protocol?");
+  }
+
+  llvm_unreachable("bad decl context");
 }
 
 void Mangler::mangleDeclName(NamedDecl *decl) {
@@ -167,26 +199,8 @@ void Mangler::mangleType(Type type) {
     Buffer << "i64"; return;
 
   case TypeKind::NameAlias: {
-    // TODO: convince Chris that anonymous nominal types are silly.
     TypeAliasDecl *alias = cast<NameAliasType>(base)->TheDecl;
-
-    // Mangle a direct alias of a oneof type using the alias.
-    if (isa<OneOfType>(alias->getUnderlyingType().getPointer())) {
-      // Try to mangle the entire name as a substitution.
-      // type ::= substitution
-      if (tryMangleSubstitution(alias))
-        return;
-
-      // type ::= 'N' decl
-      Buffer << 'N';
-      mangleDeclName(alias);
-
-      addSubstitution(alias);
-
-    // Otherwise, mangle the type as its underlying type.
-    } else {
-      mangleType(alias->getUnderlyingType());
-    }
+    mangleType(alias->getUnderlyingType());
     return;
   }
 
@@ -209,8 +223,16 @@ void Mangler::mangleType(Type type) {
   }
 
   case TypeKind::OneOf: {
-    // FIXME: what to do with an anonymous oneof type in a global decl?
-    Buffer << 'O';
+    // Try to mangle the entire name as a substitution.
+    // type ::= substitution
+    if (tryMangleSubstitution(base))
+      return;
+
+    // type ::= 'N' decl
+    Buffer << 'N';
+    mangleDeclName(cast<OneOfType>(base)->TheDecl);
+
+    addSubstitution(base);
     return;
   }
 
