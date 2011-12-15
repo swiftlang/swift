@@ -137,6 +137,8 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
     return convertFunctionType(IGM, cast<FunctionType>(TB));
   case TypeKind::Array:
     return convertArrayType(IGM, cast<ArrayType>(TB));
+  case TypeKind::Protocol:
+    llvm_unreachable("protocol not handled in IRGen yet");
   }
   llvm_unreachable("bad type kind");
 }
