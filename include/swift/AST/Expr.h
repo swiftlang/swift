@@ -456,7 +456,8 @@ public:
 
   SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
   SourceLoc getLoc() const { return SubExpr->getLoc(); }
-  Expr *getSubExpr() const { return SubExpr; }
+  const Expr *getSubExpr() const { return SubExpr; }
+  Expr *getSubExpr() { return SubExpr; }
   void setSubExpr(Expr *E) { SubExpr = E; }
 
   // Implement isa/cast/dyncast/etc.

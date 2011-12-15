@@ -187,6 +187,7 @@ class BuiltinIntegerType : public BuiltinType {
   BuiltinIntegerType(TypeKind kind, ASTContext &C) : BuiltinType(kind, C) {}
 public:
   
+  /// getBitWidth - Return the bitwidth of the integer.
   unsigned getBitWidth() const {
     switch (Kind) {
     default: assert(0 && "Not an integer type");
