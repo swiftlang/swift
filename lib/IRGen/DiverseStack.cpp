@@ -1,4 +1,4 @@
-//===--- IRGen.cpp - Out-of-line code for the heterogenous stack ----------===//
+//===--- DiverseStack.cpp - Out-of-line code for the heterogenous stack ---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,9 +15,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <DiverseStack.h>
+#include "DiverseStack.h"
+using namespace swift;
+using namespace irgen;
 
-void swift::irgen::DiverseStackBase::pushNewStorageSlow(std::size_t needed) {
+void DiverseStackBase::pushNewStorageSlow(std::size_t needed) {
   bool wasInline = isAllocatedInline();
 
   std::size_t capacity = End - Allocated;
