@@ -30,9 +30,11 @@ namespace swift {
   class Type;
   class Expr;
   class BraceStmt;
+  class Component;
   class DeclAttributes;
   class OneOfElementDecl;
   class NameAliasType;
+  enum class Resilience : unsigned char;
   class TypeAliasDecl;
   
 enum class DeclKind {
@@ -243,6 +245,8 @@ public:
 
   DeclAttributes &getMutableAttrs();
   const DeclAttributes &getAttrs() const { return *Attrs; }
+
+  Resilience getResilienceFrom(Component *C) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

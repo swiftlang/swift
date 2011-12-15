@@ -23,6 +23,7 @@ namespace swift {
   
 /// Component - A unit of distribution.
 class Component {
+public:
   /// isResilient - Must arbitrary declarations from the given module
   /// be made resilient when evaluated as part of this component?
   bool isResilient(Module *M) { return true; }

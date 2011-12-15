@@ -94,7 +94,7 @@ public:
 /// types).  Additionally, code distributed with the component
 /// defining a resilient structure need not actually use resilience
 /// boundaries.
-enum Resilience {
+enum class Resilience : unsigned char {
   /// Inherently fragile language structures are not only resilient,
   /// but they have never been exposed as resilient.  This permits
   /// certain kinds of optimizations that are not otherwise possible
