@@ -254,3 +254,11 @@ RValue IRGenFunction::emitLookThroughOneofRValue(LookThroughOneofExpr *E) {
   llvm::Value *addr = Builder.CreateStructGEP(oneofRV.getAggregateAddress(), 0);
   return RValue::forAggregate(addr);
 }
+
+/// emitOneOfType - Emit all the declarations associated with this oneof type.
+void IRGenModule::emitOneOfType(OneOfType *oneof) {
+  const OneofTypeInfo &typeInfo = getFragileTypeInfo(oneof).as<OneofTypeInfo>();
+  for (auto elt : oneof->Elements) {
+    //typeInfo.emitInjectionFunction(*this, elt);
+  }
+}

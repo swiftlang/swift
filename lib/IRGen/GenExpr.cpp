@@ -67,6 +67,7 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
                                 const TypeInfo &TInfo) {
   ValueDecl *D = E->getDecl();
   switch (D->getKind()) {
+  case DeclKind::Extension:
   case DeclKind::Import:
   case DeclKind::TypeAlias:
     llvm_unreachable("decl is not a value decl");
@@ -96,6 +97,7 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
 RValue IRGenFunction::emitDeclRefRValue(DeclRefExpr *E, const TypeInfo &TInfo) {
   ValueDecl *D = E->getDecl();
   switch (D->getKind()) {
+  case DeclKind::Extension:
   case DeclKind::Import:
   case DeclKind::TypeAlias:
     llvm_unreachable("decl is not a value decl");
@@ -113,7 +115,7 @@ RValue IRGenFunction::emitDeclRefRValue(DeclRefExpr *E, const TypeInfo &TInfo) {
     llvm::Value *data = llvm::UndefValue::get(IGM.Int8PtrTy);
     return RValue::forScalars(fn, data);
   }
-    
+
   case DeclKind::ElementRef:
     unimplemented(E->getLoc(), "emitting this decl as an r-value");
     return emitFakeRValue(TInfo);

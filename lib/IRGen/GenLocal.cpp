@@ -17,6 +17,7 @@
 #include "swift/AST/Decl.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
+#include "IRGenModule.h"
 
 using namespace swift;
 using namespace irgen;
@@ -28,19 +29,27 @@ void IRGenFunction::emitLocal(Decl *D) {
   case DeclKind::ElementRef:
     llvm_unreachable("declaration cannot appear in local scope");
 
+  // Type aliases require IR-gen support if they're really
+  // struct/oneof declarations.
   case DeclKind::TypeAlias:
+    return IGM.emitTypeAlias(cast<TypeAliasDecl>(D)->getUnderlyingType());
+
   case DeclKind::OneOfElement:
     // no IR generation support required.
-    break;
+    return;
 
   case DeclKind::Var:
-    emitLocalVar(cast<VarDecl>(D));
-    break;
+    return emitLocalVar(cast<VarDecl>(D));
+
+  case DeclKind::Extension:
+    unimplemented(D->getLocStart(), "local extension emission");
+    return;
 
   case DeclKind::Func:
     unimplemented(D->getLocStart(), "local function emission");
-    break;
+    return;
   }
+  llvm_unreachable("bad declaration kind!");
 }
 
 /// emitLocalVar - Emit a local variable.

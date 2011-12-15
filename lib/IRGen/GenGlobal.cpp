@@ -54,32 +54,33 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::Arg:
   case DeclKind::ElementRef:
     llvm_unreachable("cannot encounter this decl here");
-    break;
+
+  case DeclKind::Extension:
+    // FIXME: implement.
+    return;
 
   // oneof elements can be found at the top level because of struct
   // "constructor" injection.  Just ignore them here; we'll get them
   // as part of the struct.
   case DeclKind::OneOfElement:
-    break;
+    return;
 
   // Type aliases require IR-gen support if they're really a struct/oneof
   // declaration.
   case DeclKind::TypeAlias:
-    // TODO
-    break;
+    return emitTypeAlias(cast<TypeAliasDecl>(D)->getUnderlyingType());
 
   // These declarations don't require IR-gen support.
   case DeclKind::Import:
-    break;
+    return;
 
   case DeclKind::Var:
-    emitGlobalVariable(cast<VarDecl>(D));
-    break;
+    return emitGlobalVariable(cast<VarDecl>(D));
 
   case DeclKind::Func:
-    emitGlobalFunction(cast<FuncDecl>(D));
-    break;
+    return emitGlobalFunction(cast<FuncDecl>(D));
   }
+  llvm_unreachable("bad decl kind!");
 }
 
 /// Emit a global variable declaration.

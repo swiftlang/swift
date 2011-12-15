@@ -41,6 +41,7 @@ namespace swift {
   class FuncDecl;
   class NamedDecl;
   class OneOfElementDecl;
+  class OneOfType;
   class SourceLoc;
   class TranslationUnit;
   class Type;
@@ -80,6 +81,7 @@ private:
 public:
   const TypeInfo &getFragileTypeInfo(Type T);
   llvm::Type *getFragileType(Type T);
+  void emitTypeAlias(Type T);
 
 private:
   TypeConverter &Types;
@@ -106,6 +108,8 @@ public:
   ~IRGenModule();
 
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }
+
+  void emitOneOfType(OneOfType *type);
 
   void emitTranslationUnit(TranslationUnit *TU);
   llvm::GlobalVariable *getAddrOfGlobalVariable(VarDecl *D);
