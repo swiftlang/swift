@@ -70,8 +70,8 @@ BuiltinValueKind swift::isBuiltinValue(StringRef Name, BuiltinTypeKind &Parm) {
 
 /// Build a builtin function declarations.
 static FuncDecl *getBuiltinFunction(ASTContext &Context, Identifier Id, Type T){
-  return new (Context) FuncDecl(SourceLoc(), Id, T, /*init*/ nullptr,
-                                Context.TheBuiltinModule);
+  return new (Context) FuncDecl(SourceLoc(), SourceLoc(), Id, T,
+                                /*init*/ nullptr, Context.TheBuiltinModule);
 }
 
 /// Build a unary operation declaration.

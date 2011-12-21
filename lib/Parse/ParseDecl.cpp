@@ -256,6 +256,7 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, Type ThisType,
   bool HadParseError = false;
   switch (Tok.getKind()) {
   default:
+  ParseError:
     diagnose(Tok, diag::expected_decl);
     HadParseError = true;
     break;
@@ -280,6 +281,10 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, Type ThisType,
   case tok::kw_protocol:
     Entries.push_back(parseDeclProtocol());
     break;
+  case tok::kw_plus:
+    if (peekToken().isNot(tok::kw_func))
+      goto ParseError;
+    // FALL THROUGH.
   case tok::kw_func:
     Entries.push_back(parseDeclFunc(ThisType));
     break;
@@ -560,9 +565,23 @@ VarDecl *Parser::parseDeclVarSimple() {
 /// is true, we parse both productions.
 ///
 ///   decl-func:
-///     'func' attribute-list? identifier type stmt-brace?
+///     'plus'? 'func' attribute-list? identifier type stmt-brace?
+///
+/// NOTE: The caller of this method must ensure that the token sequence is
+/// either 'func' or 'plus' 'func'.
 ///
 FuncDecl *Parser::parseDeclFunc(Type ReceiverTy) {
+  SourceLoc PlusLoc;
+  if (Tok.is(tok::kw_plus)) {
+    PlusLoc = consumeToken(tok::kw_plus);
+
+    // Reject 'plus' functions at global scope.
+    if (ReceiverTy.isNull()) {
+      diagnose(Tok, diag::plus_func_decl_global_scope);
+      PlusLoc = SourceLoc();
+    }
+  }
+  
   SourceLoc FuncLoc = consumeToken(tok::kw_func);
 
   DeclAttributes Attributes;
@@ -589,10 +608,10 @@ FuncDecl *Parser::parseDeclFunc(Type ReceiverTy) {
   if (!isa<FunctionType>(FuncTy.getPointer()))
     FuncTy = FunctionType::get(FuncTy, TupleType::getEmpty(Context), Context);
   
-  // If a receiver type was specified, install the first type as the receiver,
-  // as a tuple with element named 'this'.  This turns "int->int" on FooTy into
-  // "(this : FooTy)->(int->int)".
-  if (!ReceiverTy.isNull()) {
+  // If a receiver type was specified and this isn't a plus method, install the
+  // first type as the receiver, as a tuple with element named 'this'.  This
+  // turns "int->int" on FooTy into "(this : FooTy)->(int->int)".
+  if (!ReceiverTy.isNull() && !PlusLoc.isValid()) {
     TupleTypeElt ReceiverElt(ReceiverTy, Context.getIdentifier("this"));
     FuncTy = FunctionType::get(TupleType::get(ReceiverElt, Context),
                                FuncTy, Context);
@@ -629,7 +648,7 @@ FuncDecl *Parser::parseDeclFunc(Type ReceiverTy) {
   }
   
   // Create the decl for the func and add it to the parent scope.
-  FuncDecl *FD = new (Context) FuncDecl(FuncLoc, Name, FuncTy, FE,
+  FuncDecl *FD = new (Context) FuncDecl(PlusLoc, FuncLoc, Name, FuncTy, FE,
                                         CurDeclContext);
   if (Attributes.isValid()) FD->getMutableAttrs() = Attributes;
   ScopeInfo.addToScope(FD);
@@ -894,7 +913,7 @@ bool Parser::parseProtocolBody(SourceLoc ProtocolLoc,
       break;
       
       // FIXME: use standard parseDecl loop.
-        
+    case tok::kw_plus:
     case tok::kw_func:
       Elements.push_back(parseDeclFunc(ThisType));
       if (Elements.back() == 0) return true;

@@ -398,16 +398,22 @@ public:
 
 /// FuncDecl - 'func' declaration.
 class FuncDecl : public ValueDecl {
+  SourceLoc PlusLoc;    // Location of the 'plus' token or invalid if not 'plus'
   SourceLoc FuncLoc;    // Location of the 'func' token.
 
 public:
-  FuncDecl(SourceLoc FuncLoc, Identifier Name, Type Ty, Expr *Init,
-           DeclContext *DC)
-    : ValueDecl(DeclKind::Func, DC, Name, Ty, Init), FuncLoc(FuncLoc) {}
+  FuncDecl(SourceLoc PlusLoc, SourceLoc FuncLoc, Identifier Name,
+           Type Ty, Expr *Init, DeclContext *DC)
+    : ValueDecl(DeclKind::Func, DC, Name, Ty, Init), PlusLoc(PlusLoc),
+      FuncLoc(FuncLoc) {
+  }
 
+  SourceLoc getPlusLoc() const { return PlusLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }
     
-  SourceLoc getLocStart() const { return FuncLoc; }
+  SourceLoc getLocStart() const {
+    return PlusLoc.isValid() ? PlusLoc : FuncLoc;
+  }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
