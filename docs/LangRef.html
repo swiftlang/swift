@@ -234,6 +234,7 @@
     keyword ::= 'var'
     keyword ::= 'func'
     keyword ::= 'typealias'
+    keyword ::= 'plus'
 
     keyword ::= 'if'
     keyword ::= 'else'
@@ -290,7 +291,6 @@
   <pre class="grammar">
     decl ::= <a href="#decl-var">decl-var</a>
     decl ::= <a href="#decl-func">decl-func</a>
-    decl ::= <a href="#decl-func">decl-func-scoped</a>
     decl ::= <a href="#decl-typealias">decl-typealias</a>
     decl ::= <a href="#decl-oneof">decl-oneof</a>
     decl ::= <a href="#decl-struct">decl-struct</a>
@@ -462,7 +462,6 @@
 
   <pre class="grammar">
     decl-func        ::= 'func' <a href="#attribute-list">attribute-list</a> <a href="#identifier">any-identifier</a> <a href="#type">type</a> <a href="#stmt-brace">stmt-brace</a>?
-    decl-func-scoped ::= 'func' <a href="#attribute-list">attribute-list</a> <a href="#type-identifier">type-identifier</a> '::' <a href="#identifier">any-identifier</a> <a href="#type">type</a> <a href="#stmt-brace">stmt-brace</a>?
   </pre>
   
   <div class="commentary">

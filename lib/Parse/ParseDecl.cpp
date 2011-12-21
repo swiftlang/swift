@@ -246,7 +246,6 @@ void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
 ///     decl-extension
 ///     decl-var
 ///     decl-func
-///     decl-func-scoped
 ///     decl-oneof
 ///     decl-struct
 ///     decl-import  [[Only if AllowImportDecl = true]]
@@ -562,8 +561,6 @@ VarDecl *Parser::parseDeclVarSimple() {
 ///
 ///   decl-func:
 ///     'func' attribute-list? identifier type stmt-brace?
-///   decl-func-scoped:
-///     'func' attribute-list? type-identifier '::' identifier type stmt-brace?
 ///
 FuncDecl *Parser::parseDeclFunc(Type ReceiverTy) {
   SourceLoc FuncLoc = consumeToken(tok::kw_func);
@@ -577,15 +574,6 @@ FuncDecl *Parser::parseDeclFunc(Type ReceiverTy) {
   if (parseIdentifier(Name, diag::expected_identifier_in_decl, "func"))
     return 0;
 
-  // If this is method syntax, the first name is the receiver type.  Parse the
-  // actual function name.
-  if (ReceiverTy.isNull() && consumeIf(tok::coloncolon)) {
-    // Look up the type name.
-    ReceiverTy = ScopeInfo.lookupOrInsertTypeName(Name, TypeNameLoc);
-    if (parseIdentifier(Name, diag::expected_identifier_in_decl, "func"))
-      return 0;
-  }
-  
   // We force first type of a func declaration to be a tuple for consistency.
   if (Tok.isNot(tok::l_paren) && Tok.isNot(tok::l_paren_space)) {
     diagnose(Tok, diag::func_decl_without_paren);
