@@ -117,10 +117,13 @@ bool DeclChecker::visitValueDecl(ValueDecl *VD) {
     Type DestTy = VD->getType();
     if (DestTy->is<DependentType>())
       DestTy = Type();
-    if (!TC.typeCheckExpression(VD->getInitRef(), DestTy))
-      VD->overwriteType(VD->getInit()->getType());
-    else if (isa<VarDecl>(VD))
+    Expr *Init = VD->getInit();
+    if (!TC.typeCheckExpression(Init, DestTy)) {
+      VD->setInit(Init);
+      VD->overwriteType(Init->getType());
+    } else if (isa<VarDecl>(VD)) {
       TC.diagnose(VD->getLocStart(), diag::while_converting_var_init);
+    }
   }
   
   validateAttributes(VD);

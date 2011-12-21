@@ -330,7 +330,6 @@ public:
 
   Expr *getInit() const { return Init; }
   void setInit(Expr *init) { Init = init; }
-  Expr *&getInitRef() { return Init; }
 
   bool hasType() const { return !Ty.isNull(); }
   Type getType() const {
