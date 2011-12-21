@@ -41,6 +41,7 @@ enum class tok {
   KEYWORD(struct)
   KEYWORD(typealias)
   KEYWORD(var)
+  KEYWORD(plus)
   
   // Statements
   KEYWORD(if)

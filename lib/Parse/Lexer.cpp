@@ -149,6 +149,7 @@ void Lexer::lexIdentifier() {
     .Case("struct", tok::kw_struct)
     .Case("typealias", tok::kw_typealias)
     .Case("var", tok::kw_var)
+    .Case("plus", tok::kw_plus)
   
     // Statements
     .Case("if", tok::kw_if)
