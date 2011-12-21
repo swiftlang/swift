@@ -184,6 +184,10 @@ public:
   Expr *visitDotSyntaxCallExpr(DotSyntaxCallExpr *E) {
     return E;
   }
+  
+  Expr *visitDotSyntaxPlusFuncUseExpr(DotSyntaxPlusFuncUseExpr *E) {
+    return E;
+  }
 
   Expr *visitLoadExpr(LoadExpr *E) {
     return E;

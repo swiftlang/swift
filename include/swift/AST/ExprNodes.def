@@ -74,6 +74,7 @@ ABSTRACT_EXPR(Apply, Expr)
   EXPR(Binary, ApplyExpr)
   EXPR(DotSyntaxCall, ApplyExpr)
   EXPR_RANGE(Apply, Call, DotSyntaxCall)
+EXPR(DotSyntaxPlusFuncUse, Expr)
 
 #undef EXPR_RANGE
 #undef UNBOUND_EXPR

@@ -407,6 +407,8 @@ public:
     : ValueDecl(DeclKind::Func, DC, Name, Ty, Init), PlusLoc(PlusLoc),
       FuncLoc(FuncLoc) {
   }
+  
+  bool isPlus() const { return PlusLoc.isValid(); }
 
   SourceLoc getPlusLoc() const { return PlusLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }

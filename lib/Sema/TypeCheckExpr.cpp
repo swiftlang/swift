@@ -393,6 +393,11 @@ public:
     assert(!E->getType()->is<DependentType>());
     return E;
   }
+  
+  Expr *visitDotSyntaxPlusFuncUseExpr(DotSyntaxPlusFuncUseExpr *E) {
+    // DotSyntaxPlusFuncUseExpr is fully type checked.
+    return E;
+  }
 
   Expr *visitLoadExpr(LoadExpr *E) {
     // LoadExpr is fully checked.
@@ -481,8 +486,13 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
       if (VD->getName() != E->getName()) continue;
       
       // The protocol value is applied via a DeclRefExpr.
-      Expr *Fn = new (TC.Context) DeclRefExpr(VD, E->getNameLoc(),
-                                              VD->getTypeJudgement());
+      DeclRefExpr *Fn = new (TC.Context) DeclRefExpr(VD, E->getNameLoc(),
+                                                     VD->getTypeJudgement());
+      
+      if (FuncDecl *FD = dyn_cast<FuncDecl>(VD))
+        if (FD->isPlus())
+          return new (TC.Context) DotSyntaxPlusFuncUseExpr(Base, E->getDotLoc(),
+                                                           Fn);
       
       ApplyExpr *Call = new (TC.Context) 
         DotSyntaxCallExpr(Fn, E->getDotLoc(), Base);
@@ -505,6 +515,11 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     FnRef = new (TC.Context) DeclRefExpr(ExtensionMethods[0],
                                          E->getNameLoc(),
                                        ExtensionMethods[0]->getTypeJudgement());
+      
+    if (FuncDecl *FD = dyn_cast<FuncDecl>(ExtensionMethods[0]))
+      if (FD->isPlus())
+        return new (TC.Context) DotSyntaxPlusFuncUseExpr(Base, E->getDotLoc(),
+                                                      cast<DeclRefExpr>(FnRef));
     break;
   default:
     // Otherwise it is an overload case.  

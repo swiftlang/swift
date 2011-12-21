@@ -792,7 +792,38 @@ public:
   }
 };
 
+  
+/// DotSyntaxPlusFuncUseExpr - When a.b resolves to a 'plus' function on A's
+/// type, then 'a' is evaluated and discarded.  'b' is evaluated and returned as
+/// the result of the expression.
+class DotSyntaxPlusFuncUseExpr : public Expr {
+  Expr *BaseExpr;
+  SourceLoc DotLoc;
+  DeclRefExpr *PlusFuncExpr;
+public:
+  DotSyntaxPlusFuncUseExpr(Expr *BaseExpr, SourceLoc DotLoc, 
+                           DeclRefExpr *PlusFuncExpr)
+    : Expr(ExprKind::DotSyntaxPlusFuncUse, PlusFuncExpr->getTypeJudgement()),
+      BaseExpr(BaseExpr), DotLoc(DotLoc), PlusFuncExpr(PlusFuncExpr) {
+  }
+  
+  Expr *getBaseExpr() { return BaseExpr; }
+  void setBaseExpr(Expr *E) { BaseExpr = E; }
+  SourceLoc getDotLoc() const { return DotLoc; }
+  DeclRefExpr *getPlusFuncExpr() { return PlusFuncExpr; }
+  void setPlusFuncExpr(DeclRefExpr *DRE) { PlusFuncExpr = DRE; }
 
+  SourceRange getSourceRange() const {
+    return SourceRange(BaseExpr->getStartLoc(), PlusFuncExpr->getEndLoc());
+  }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const DotSyntaxPlusFuncUseExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::DotSyntaxPlusFuncUse;
+  }
+
+};
   
 } // end namespace swift
 

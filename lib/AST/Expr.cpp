@@ -516,6 +516,16 @@ namespace {
       return visitApplyExpr(E);
     }
     
+    Expr *visitDotSyntaxPlusFuncUseExpr(DotSyntaxPlusFuncUseExpr *E) {
+      Expr *E2 = doIt(E->getBaseExpr());
+      if (E2 == 0) return 0;
+      E->setBaseExpr(E2);
+      
+      E2 = doIt(E->getPlusFuncExpr());
+      if (E2 == 0) return 0;
+      E->setPlusFuncExpr(cast<DeclRefExpr>(E2));
+      return E;      
+    }    
 
     Stmt *visitSemiStmt(SemiStmt *SS) {
       return SS;
@@ -823,6 +833,14 @@ public:
     printRec(E->getArg());
     OS << ')';
   }
+  void visitDotSyntaxPlusFuncUseExpr(DotSyntaxPlusFuncUseExpr *E) {
+    OS.indent(Indent) << "(dot_syntax_plus_func_use type='"
+       << E->getType() << "'\n";
+    printRec(E->getBaseExpr());
+    OS << '\n';
+    printRec(E->getPlusFuncExpr());
+    OS << ')';
+  }    
 };
 
 } // end anonymous namespace.
