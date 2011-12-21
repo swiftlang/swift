@@ -464,11 +464,6 @@
     decl-func        ::= 'func' <a href="#attribute-list">attribute-list</a> <a href="#identifier">any-identifier</a> <a href="#type">type</a> <a href="#stmt-brace">stmt-brace</a>?
   </pre>
   
-  <div class="commentary">
-    The second form is shorthand for defining a function that can be used with
-    dot syntax on the receiver type.
-  </div>
-  
   <p>A 'func' declaration is syntactic sugar for a 'var' to be used in the
   (extremely) common case of a declaring a function.  The argument list and
   optional return value are specified by the type production of the function,
@@ -480,21 +475,12 @@
   of the argument and return value names are injected into the
   <a href="#namebind_scope">scope</a> of the function body.</p>
   
-  <p>When the second form is used, the underlying declaration is defined to take
-  an implicit 'this' parameter of the specified type-identifier, and injects
-  members of the type into the scope of the body so they can be found with
-  normal name lookup.  This allows convenient syntax for declaring a function on
-  an existing type.</p>
-  
   <p>TODO: Func should be an immutable name binding, it should implicitly add
      an attribute immutable when it exists.</p>
 
   <p>TODO: Incoming arguments should be readonly, result should be implicitly
      writeonly when we have these attributes.</p>
 
-  <p>TODO: Should generalize the second form to take something like a
-     nested-name specifier when we have namespaces.</p>
-  
 
   <p>Here are some examples of func definitions:</p>
   
@@ -516,12 +502,6 @@
 
     <i>// Function with multiple return values:</i>
     func d(a : int) -&gt; (b : int) -&gt; (res1 : int, res2 : int)
-    
-    <i>// Same as: func e(this : sometype) -&gt; (a : int) -&gt; int</i>
-    func sometype::e(a : int) -&gt; int
-
-    <i>// Same as: func f(this : sometype) -&gt; (a : int) -&gt; ()</i>
-    func sometype::f(a : int)
     
     <i>// A more realistic example on a trivial type.</i>
     struct bankaccount { amount : int }
