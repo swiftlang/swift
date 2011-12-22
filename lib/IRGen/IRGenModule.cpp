@@ -62,22 +62,6 @@ llvm::Constant *IRGenModule::getMemCpyFn() {
   return MemCpyFn;
 }
 
-/// Emit a top-level context.
-void IRGenModule::emitTopLevel(BraceStmt *Body) {
-  for (auto Elt : Body->getElements()) {
-    if (Decl *D = Elt.dyn_cast<Decl*>())
-      emitGlobalDecl(D);
-    // TODO: handle top-level statements and expressions.
-  }
-}
-
-/// Emit all the top-level code in the translation unit.
-void IRGenModule::emitTranslationUnit(TranslationUnit *TU) {
-  // The semantics of the top-level BraceStmt are a bit different from
-  // the normal semantics.
-  emitTopLevel(TU->Body);
-}
-
 void IRGenModule::unimplemented(SourceLoc Loc, StringRef Message) {
   Context.Diags.diagnose(Loc, diag::irgen_unimplemented, Message);
 }

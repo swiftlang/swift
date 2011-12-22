@@ -27,6 +27,11 @@ using namespace irgen;
 
 IRGenFunction::IRGenFunction(IRGenModule &IGM, FuncExpr *FE, llvm::Function *Fn)
   : IGM(IGM), Builder(IGM.getLLVMContext()), CurFuncExpr(FE), CurFn(Fn) {
+  emitPrologue();
+}
+
+IRGenFunction::~IRGenFunction() {
+  emitEpilogue();
 }
 
 /// Create an alloca whose lifetime is the duration of the current

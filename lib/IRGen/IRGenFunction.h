@@ -69,6 +69,7 @@ public:
   llvm::Function *CurFn;
 
   IRGenFunction(IRGenModule &IGM, FuncExpr *FE, llvm::Function *Fn);
+  ~IRGenFunction();
 
   void unimplemented(SourceLoc Loc, StringRef Message);
 
@@ -78,7 +79,7 @@ public:
 
 //--- Function prologue and epilogue -------------------------------------------
 public:
-  void emitFunction();
+  void emitFunctionTopLevel(BraceStmt *S);
 private:
   void emitPrologue();
   void emitEpilogue();
@@ -102,10 +103,10 @@ private:
 
 //--- Statement emission -------------------------------------------------------
 public:
-  void emitBraceStmt(BraceStmt *S);
   void emitStmt(Stmt *S);
 
 private:
+  void emitBraceStmt(BraceStmt *S);
   void emitAssignStmt(AssignStmt *S);
   void emitIfStmt(IfStmt *S);
   void emitReturnStmt(ReturnStmt *S);
@@ -157,6 +158,14 @@ public:
 private:
   void emitLocalVar(VarDecl *D);
   llvm::DenseMap<ValueDecl*, Address> Locals;
+
+//--- Global context emission --------------------------------------------------
+public:
+  void emitGlobalTopLevel(BraceStmt *S);
+private:
+  void emitGlobalDecl(Decl *D);
+  void emitGlobalVariable(VarDecl *D);
+  void emitGlobalFunction(FuncDecl *D);
 };
 
 } // end namespace irgen

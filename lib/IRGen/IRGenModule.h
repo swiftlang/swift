@@ -50,6 +50,7 @@ namespace swift {
   class VarDecl;
 
 namespace irgen {
+  class Address;
   class Options;
   class TypeConverter;
   class TypeInfo;
@@ -94,11 +95,8 @@ private:
 private:
   llvm::DenseMap<Decl*, llvm::Constant*> Globals;
 
-  void emitTopLevel(BraceStmt *S);
-  void emitGlobalDecl(Decl *D);
-  void emitGlobalVariable(VarDecl *D);
-  void emitGlobalFunction(FuncDecl *D);
-  void mangle(raw_ostream &Mangled, NamedDecl *D);
+  void mangle(raw_ostream &buffer, NamedDecl *D);
+  void mangleGlobalInitializer(raw_ostream &buffer, TranslationUnit *D);
 
   class LinkInfo;
   LinkInfo getLinkInfo(NamedDecl *D);
@@ -115,7 +113,7 @@ public:
   void emitOneOfType(OneOfType *type);
 
   void emitTranslationUnit(TranslationUnit *TU);
-  llvm::GlobalVariable *getAddrOfGlobalVariable(VarDecl *D);
+  Address getAddrOfGlobalVariable(VarDecl *D, const TypeInfo &type);
   llvm::Function *getAddrOfGlobalFunction(FuncDecl *D);
   llvm::Function *getAddrOfInjectionFunction(OneOfElementDecl *D);
 };

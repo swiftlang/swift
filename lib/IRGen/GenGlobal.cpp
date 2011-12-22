@@ -10,11 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file implements IR generation for global declarations in Swift.
+//  This file implements IR generation for Swift's global context.
 //
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/Stmt.h"
+#include "swift/AST/Types.h"
 #include "llvm/GlobalValue.h"
 #include "llvm/Module.h"
 #include "llvm/ADT/SmallString.h"
@@ -27,6 +31,77 @@
 
 using namespace swift;
 using namespace irgen;
+
+/// Create the global initializer function for a translation unit.
+static llvm::Function *createGlobalInitFunction(IRGenModule &IGM,
+                                                TranslationUnit *tunit) {
+  llvm::SmallString<32> name;
+  llvm::raw_svector_ostream nameStream(name);
+  nameStream << tunit->Name.str() << '.' << "init";
+
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(llvm::Type::getVoidTy(IGM.LLVMContext), false);
+  return llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
+                                nameStream.str(), &IGM.Module);
+}
+
+static bool isTrivialGlobalInit(llvm::Function *fn) {
+  // Must be exactly one basic block.
+  if (next(fn->begin()) != fn->end()) return false;
+
+  // Basic block must have exactly one instruction.
+  llvm::BasicBlock *entry = &fn->getEntryBlock();
+  if (next(entry->begin()) != entry->end()) return false;
+
+  // That instruction is necessarily a 'ret' instruction.
+  assert(isa<llvm::ReturnInst>(entry->front()));
+  return true;
+}
+
+/// Emit all the top-level code in the translation unit.
+void IRGenModule::emitTranslationUnit(TranslationUnit *tunit) {
+  Type emptyTuple = TupleType::getEmpty(Context);
+  FunctionType *unitToUnit = FunctionType::get(emptyTuple, emptyTuple, Context);
+  FuncExpr func(SourceLoc(), unitToUnit, llvm::ArrayRef<ArgDecl*>(),
+                nullptr, tunit);
+
+  llvm::Function *fn = createGlobalInitFunction(*this, tunit);
+  IRGenFunction(*this, &func, fn).emitGlobalTopLevel(tunit->Body);
+
+  // Not all translation units need a global initialization function.
+  if (isTrivialGlobalInit(fn)) {
+    fn->eraseFromParent();
+    return;
+  }
+
+  // Build the initializer for the global variable.
+  llvm::Constant *initAndPriority[] = {
+    llvm::ConstantInt::get(Int32Ty, 0),
+    fn
+  };
+  llvm::Constant *allInits[] = {
+    llvm::ConstantStruct::getAnon(LLVMContext, initAndPriority)
+  };
+  llvm::Constant *globalInits =
+    llvm::ConstantArray::get(llvm::ArrayType::get(allInits[0]->getType(), 1),
+                             allInits);
+
+  // Add this as a global initializer.
+  (void) new llvm::GlobalVariable(Module,
+                                  globalInits->getType(),
+                                  /*is constant*/ true,
+                                  llvm::GlobalValue::AppendingLinkage,
+                                  globalInits,
+                                  "llvm.global_ctors");
+}
+
+void IRGenFunction::emitGlobalTopLevel(BraceStmt *body) {
+  for (auto elt : body->getElements()) {
+    if (Decl *D = elt.dyn_cast<Decl*>())
+      emitGlobalDecl(D);
+    // TODO: handle top-level statements and expressions.
+  }
+}
 
 /// Encapsulated information about linking information.
 class IRGenModule::LinkInfo {
@@ -50,7 +125,7 @@ IRGenModule::LinkInfo IRGenModule::getLinkInfo(NamedDecl *D) {
 }
 
 /// Emit a global declaration.
-void IRGenModule::emitGlobalDecl(Decl *D) {
+void IRGenFunction::emitGlobalDecl(Decl *D) {
   switch (D->getKind()) {
   case DeclKind::Arg:
   case DeclKind::ElementRef:
@@ -69,7 +144,7 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   // Type aliases require IR-gen support if they're really a struct/oneof
   // declaration.
   case DeclKind::TypeAlias:
-    return emitTypeAlias(cast<TypeAliasDecl>(D)->getUnderlyingType());
+    return IGM.emitTypeAlias(cast<TypeAliasDecl>(D)->getUnderlyingType());
 
   // These declarations don't require IR-gen support.
   case DeclKind::Import:
@@ -84,37 +159,45 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   llvm_unreachable("bad decl kind!");
 }
 
-/// Emit a global variable declaration.
-llvm::GlobalVariable *IRGenModule::getAddrOfGlobalVariable(VarDecl *VD) {
+/// Find the address of a (fragile, constant-size) global variable
+/// declaration.  The address value is always an llvm::GlobalVariable*.
+Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var,
+                                             const TypeInfo &type) {
   // Check whether we've cached this.
-  llvm::Constant *&Entry = Globals[VD];
-  if (Entry) return cast<llvm::GlobalVariable>(Entry);
+  llvm::Constant *&entry = Globals[var];
+  if (entry) {
+    llvm::GlobalVariable *gv = cast<llvm::GlobalVariable>(entry);
+    return Address(gv, Alignment(gv->getAlignment()));
+  }
 
-  const TypeInfo &TInfo = getFragileTypeInfo(VD->getType());
-  LinkInfo Link = getLinkInfo(VD);
-  llvm::GlobalVariable *Addr
-    = new llvm::GlobalVariable(Module, TInfo.StorageType, /*constant*/ false,
-                               Link.Linkage, /*initializer*/ nullptr,
-                               Link.Name.str());
-  Addr->setVisibility(Link.Visibility);
-  Addr->setAlignment(TInfo.StorageAlignment.getValue());
+  // Okay, we need to rebuild it.
+  LinkInfo link = getLinkInfo(var);
+  llvm::GlobalVariable *addr
+    = new llvm::GlobalVariable(Module, type.StorageType, /*constant*/ false,
+                               link.Linkage, /*initializer*/ nullptr,
+                               link.Name.str());
+  addr->setVisibility(link.Visibility);
 
-  Entry = Addr;
-  return Addr;
+  Alignment align = type.StorageAlignment;
+  addr->setAlignment(align.getValue());
+
+  entry = addr;
+  return Address(addr, align);
 }
 
-/// Emit a global declaration.
-void IRGenModule::emitGlobalVariable(VarDecl *VD) {
-  llvm::GlobalVariable *Addr = getAddrOfGlobalVariable(VD);
+/// Emit a global variable declaration.  The IGF is for the
+/// global-initializer function.
+void IRGenFunction::emitGlobalVariable(VarDecl *var) {
+  const TypeInfo &type = IGM.getFragileTypeInfo(var->getType());
+  Address addr = IGM.getAddrOfGlobalVariable(var, type);
 
-  // For now, always give globals null initializers.
-  llvm::Constant *Init =
-    llvm::Constant::getNullValue(cast<llvm::PointerType>(Addr->getType())
-                                   ->getElementType());
-  Addr->setInitializer(Init);
+  // Always zero-initialize globals.
+  llvm::GlobalVariable *gvar = cast<llvm::GlobalVariable>(addr.getAddress());
+  gvar->setInitializer(llvm::Constant::getNullValue(type.StorageType));
 
-  // FIXME: initializer
-  (void) Addr;
+  // Also emit the initializer as a global constructor if necessary.
+  if (Expr *init = var->getInit())
+    emitInit(addr, init, type);
 }
 
 /// Fetch the declaration of the given global function.
@@ -155,7 +238,5 @@ IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
 }
 
 LValue IRGenFunction::getGlobal(VarDecl *var, const TypeInfo &type) {
-  // TODO: fragile globals
-  llvm::Value *addr = IGM.getAddrOfGlobalVariable(var);
-  return emitAddressLValue(Address(addr, type.StorageAlignment));
+  return emitAddressLValue(IGM.getAddrOfGlobalVariable(var, type));
 }
