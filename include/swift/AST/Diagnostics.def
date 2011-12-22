@@ -281,6 +281,9 @@ ERROR(type_not_compatible_int_literal,literal_parsing,none,
       "%0 is not compatible with integer literals", (Type))
 ERROR(type_ambiguous_int_literal_conversion,literal_parsing,none,
       "%0 has multiple 'convert_from_integer_literal' methods", (Type))
+ERROR(type_integer_conversion_not_plus,literal_parsing,none,
+      "'convert_from_integer_literal' method in %0 must be a plus method",
+      (Type))
 ERROR(type_integer_conversion_defined_wrong,literal_parsing,none,
       "'convert_from_integer_literal' method in %0 defined wrong", (Type))
 

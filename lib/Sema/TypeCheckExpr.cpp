@@ -23,30 +23,6 @@
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
-/// getFirstArgumentType - If the specified type is a method on the type that
-/// takes a single value as an argument and returns (), return the first
-/// argument.  Otherwise, return a null Type.
-///
-static Type getFirstArgumentType(Type T) {
-  // The standard type we want is "T -> S -> ()", where we return S.
-  FunctionType *FT = T->getAs<FunctionType>();
-  if (FT) FT = FT->Result->getAs<FunctionType>();
-  if (FT == 0) return Type();
-
-  // The return type must be ().
-  TupleType *TT = FT->Result->getAs<TupleType>();
-  if (TT == 0 || !TT->Fields.empty())
-    return Type();
-  
-  // Look through single element tuples.
-  Type ArgTy = FT->Input;
-  if ((TT = ArgTy->getAs<TupleType>()))
-    if (TT->Fields.size() == 1)
-      ArgTy = TT->Fields[0].Ty;
-  
-  return ArgTy;
-}
-
 /// applyTypeToInteger - Apply the specified type to the integer literal
 /// expression (which is known to have dependent type), performing semantic
 /// analysis and returning true on a semantic error.
@@ -82,14 +58,33 @@ bool TypeChecker::applyTypeToInteger(IntegerLiteralExpr *E, Type DestTy) {
   }
   
   ValueDecl *Method = Methods[0];
+  
+  if (!isa<FuncDecl>(Method) || !cast<FuncDecl>(Method)->isPlus()) {
+    diagnose(Method->getLocStart(), diag::type_integer_conversion_not_plus,
+             DestTy);
+    return true;
+  }
 
   // Check that the type of the 'convert_from_integer_literal' method makes
-  // sense.
-  Type ArgType = getFirstArgumentType(Method->getType());
-  // TODO: In the future, allow transitive "integer literal" types that
-  // themselves can be converted from an integer, so that user code is defined
-  // in terms int16 instead of builtin types (which they have no access to).
-  if (ArgType.isNull() || !ArgType->is<BuiltinIntegerType>()) {
+  // sense.  We want a type of "S -> DestTy" where S is an integer type.
+  FunctionType *FT = Method->getType()->getAs<FunctionType>();
+  Type ArgType;
+  
+  if (FT) {
+    ArgType = FT->Input;
+
+    // Look through single element tuples.
+    if (TupleType *TT = ArgType->getAs<TupleType>())
+      if (TT->Fields.size() == 1)
+        ArgType = TT->Fields[0].Ty;
+  }
+  
+  if (ArgType.isNull() || !FT->Result->isEqual(DestTy) ||
+      !ArgType->is<BuiltinIntegerType>()) {
+    
+    // TODO: In the future, allow transitive "integer literal" types that
+    // themselves can be converted from an integer, so that user code is defined
+    // in terms int16 instead of builtin types (which they have no access to).
     diagnose(Method->getLocStart(), diag::type_integer_conversion_defined_wrong,
              DestTy);
     diagnose(E->getLoc(), diag::while_converting_int_literal, DestTy);
