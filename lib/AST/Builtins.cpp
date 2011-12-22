@@ -19,10 +19,6 @@
 #include "llvm/ADT/StringSwitch.h"
 using namespace swift;
 
-#if 0
-bool isBuiltinType(ASTContext &Context, StringRef Name);
-#endif
-
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
   if (Name == "float32")
     return Context.TheFloat32Type;
