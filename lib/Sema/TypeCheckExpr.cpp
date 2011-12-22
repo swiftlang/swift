@@ -99,8 +99,19 @@ Expr *TypeChecker::applyTypeToInteger(IntegerLiteralExpr *E, Type DestTy) {
     return 0;
   }
   
-  E->setType(DestTy, ValueKind::RValue);
-  return E;
+  // Give the integer literal the builtin integer type.
+  E->setType(ArgType, ValueKind::RValue);
+  
+  DeclRefExpr *DRE =
+    new (Context) DeclRefExpr(Method,
+                              // FIXME: This location is a hack!
+                              E->getStartLoc(),
+                              Method->getTypeJudgement());
+  
+  // Return a new call of the conversion function, passing in the integer
+  // literal.
+  return new (Context) CallExpr(DRE, E,
+                                TypeJudgement(DestTy, ValueKind::RValue));
 }
 
 //===----------------------------------------------------------------------===//
