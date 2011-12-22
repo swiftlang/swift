@@ -66,22 +66,22 @@ namespace {
       return RValueSchema::forAggregate(getStorageType(), StorageAlignment);
     }
 
-    RValue load(IRGenFunction &IGF, const LValue &LV) const {
+    RValue load(IRGenFunction &IGF, Address addr) const {
       // FIXME
       return RValue();
     }
 
-    void store(IRGenFunction &CGF, const RValue &RV, const LValue &LV) const {
+    void store(IRGenFunction &CGF, const RValue &RV, Address addr) const {
       // FIXME
     }
   };
 
   /// A TypeInfo implementation for singleton oneofs.
   class SingletonOneofTypeInfo : public OneofTypeInfo {
-    static LValue getSingletonLValue(IRGenFunction &IGF, const LValue &LV) {
-      llvm::Value *SingletonAddr =
-        IGF.Builder.CreateStructGEP(LV.getAddress(), 0);
-      return LValue::forAddress(SingletonAddr, LV.getAlignment());
+    static Address getSingletonAddress(IRGenFunction &IGF, Address addr) {
+      llvm::Value *singletonAddr =
+        IGF.Builder.CreateStructGEP(addr.getAddress(), 0);
+      return Address(singletonAddr, addr.getAlignment());
     }
 
   public:
@@ -97,16 +97,16 @@ namespace {
       return Singleton->getSchema();
     }
 
-    RValue load(IRGenFunction &IGF, const LValue &LV) const {
+    RValue load(IRGenFunction &IGF, Address addr) const {
       assert(isComplete());
       if (!Singleton) return RValue::forScalars();
-      return Singleton->load(IGF, getSingletonLValue(IGF, LV));
+      return Singleton->load(IGF, getSingletonAddress(IGF, addr));
     }
 
-    void store(IRGenFunction &IGF, const RValue &RV, const LValue &LV) const {
+    void store(IRGenFunction &IGF, const RValue &RV, Address addr) const {
       assert(isComplete());
       if (!Singleton) return;
-      Singleton->store(IGF, RV, getSingletonLValue(IGF, LV));
+      Singleton->store(IGF, RV, getSingletonAddress(IGF, addr));
     }
   };
 
@@ -121,20 +121,20 @@ namespace {
       return RValueSchema::forScalars(getDiscriminatorType());
     }
 
-    RValue load(IRGenFunction &IGF, const LValue &LV) const {
-      llvm::Value *OneofAddr = LV.getAddress();
-      llvm::Value *Addr = IGF.Builder.CreateStructGEP(OneofAddr, 0);
-      llvm::Value *V = IGF.Builder.CreateLoad(Addr,
-                                              LV.getAlignment(),
-                                              OneofAddr->getName() + ".load");
-      return RValue::forScalars(V);
+    RValue load(IRGenFunction &IGF, Address addr) const {
+      llvm::Value *oneofAddr = addr.getAddress();
+      llvm::Value *enumAddr = IGF.Builder.CreateStructGEP(oneofAddr, 0);
+      llvm::Value *v = IGF.Builder.CreateLoad(enumAddr,
+                                              addr.getAlignment(),
+                                              oneofAddr->getName() + ".load");
+      return RValue::forScalars(v);
     }
 
-    void store(IRGenFunction &IGF, const RValue &RV, const LValue &LV) const {
+    void store(IRGenFunction &IGF, const RValue &RV, Address addr) const {
       assert(RV.isScalar(1));
-      llvm::Value *OneofAddr = LV.getAddress();
-      llvm::Value *Addr = IGF.Builder.CreateStructGEP(OneofAddr, 0);
-      IGF.Builder.CreateStore(RV.getScalars()[0], Addr, LV.getAlignment());
+      llvm::Value *oneofAddr = addr.getAddress();
+      llvm::Value *enumAddr = IGF.Builder.CreateStructGEP(oneofAddr, 0);
+      IGF.Builder.CreateStore(RV.getScalars()[0], enumAddr, addr.getAlignment());
     }
   };
 }
@@ -241,10 +241,22 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
   return TInfo;
 }
 
+namespace {
+  class LookThroughOneof : public PhysicalPathComponent {
+  public:
+    LookThroughOneof() : PhysicalPathComponent(sizeof(LookThroughOneof)) {}
+
+    Address offset(IRGenFunction &IGF, Address addr) const {
+      llvm::Value *gep = IGF.Builder.CreateStructGEP(addr.getAddress(), 0);
+      return Address(gep, addr.getAlignment());
+    }
+  };
+}
+
 LValue IRGenFunction::emitLookThroughOneofLValue(LookThroughOneofExpr *E) {
   LValue oneofLV = emitLValue(E->getSubExpr());
-  llvm::Value *addr = Builder.CreateStructGEP(oneofLV.getAddress(), 0);
-  return LValue::forAddress(addr, oneofLV.getAlignment());
+  oneofLV.push<LookThroughOneof>();
+  return oneofLV;
 }
 
 RValue IRGenFunction::emitLookThroughOneofRValue(LookThroughOneofExpr *E) {

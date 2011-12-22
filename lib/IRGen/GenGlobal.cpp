@@ -23,6 +23,7 @@
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "LValue.h"
 
 using namespace swift;
 using namespace irgen;
@@ -153,7 +154,8 @@ IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
   return addr;
 }
 
-LValue IRGenFunction::getGlobal(VarDecl *D, const TypeInfo &TInfo) {
-  llvm::Value *Addr = IGM.getAddrOfGlobalVariable(D);
-  return LValue::forAddress(Addr, TInfo.StorageAlignment);
+LValue IRGenFunction::getGlobal(VarDecl *var, const TypeInfo &type) {
+  // TODO: fragile globals
+  llvm::Value *addr = IGM.getAddrOfGlobalVariable(var);
+  return emitAddressLValue(Address(addr, type.StorageAlignment));
 }

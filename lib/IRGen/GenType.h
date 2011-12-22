@@ -38,7 +38,7 @@ namespace swift {
 namespace irgen {
   class IRGenFunction;
   class IRGenModule;
-  class LValue;
+  class Address;
   class RValue;
   class RValueSchema;
 
@@ -85,11 +85,11 @@ public:
   virtual RValueSchema getSchema() const = 0;
 
   /// Load an r-value from the given address.
-  virtual RValue load(IRGenFunction &IGF, const LValue &LV) const = 0;
+  virtual RValue load(IRGenFunction &IGF, Address addr) const = 0;
 
   /// Store an r-value to the given address.
   virtual void store(IRGenFunction &IGF, const RValue &RV,
-                     const LValue &LV) const = 0;
+                     Address addr) const = 0;
 
 private:
   virtual void _anchor();

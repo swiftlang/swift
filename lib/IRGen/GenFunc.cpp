@@ -89,44 +89,46 @@ namespace {
                                       Ty->getElementType(1));
     }
 
-    RValue load(IRGenFunction &IGF, const LValue &LV) const {
-      llvm::Value *Addr = LV.getAddress();
+    RValue load(IRGenFunction &IGF, Address address) const {
+      llvm::Value *addr = address.getAddress();
 
       // Load the function.
-      llvm::Value *FnAddr =
-        IGF.Builder.CreateStructGEP(Addr, 0, Addr->getName() + ".fn");
-      llvm::LoadInst *Fn =
-        IGF.Builder.CreateLoad(FnAddr, LV.getAlignment(),
-                               FnAddr->getName() + ".load");
+      llvm::Value *fnAddr =
+        IGF.Builder.CreateStructGEP(addr, 0, addr->getName() + ".fn");
+      llvm::LoadInst *fn =
+        IGF.Builder.CreateLoad(fnAddr, address.getAlignment(),
+                               fnAddr->getName() + ".load");
 
       // Load the data.  This load is offset by sizeof(void*) from the
       // base and so may have a lesser alignment.
       // FIXME: retains?
-      llvm::Value *DataAddr =
-        IGF.Builder.CreateStructGEP(Addr, 1, Addr->getName() + ".data");
-      llvm::Value *Data =
-        IGF.Builder.CreateLoad(DataAddr,
-                               std::min(LV.getAlignment(), StorageAlignment),
-                               DataAddr->getName() + ".load");
+      llvm::Value *dataAddr =
+        IGF.Builder.CreateStructGEP(addr, 1, addr->getName() + ".data");
+      llvm::Value *data =
+        IGF.Builder.CreateLoad(dataAddr,
+                            std::min(address.getAlignment(), StorageAlignment),
+                               dataAddr->getName() + ".load");
 
-      return RValue::forScalars(Fn, Data);
+      return RValue::forScalars(fn, data);
     }
 
-    void store(IRGenFunction &IGF, const RValue &RV, const LValue &LV) const {
+    void store(IRGenFunction &IGF, const RValue &RV, Address address) const {
       assert(RV.isScalar() && RV.getScalars().size() == 2);
-      llvm::Value *Addr = LV.getAddress();
+      llvm::Value *addr = address.getAddress();
 
       // Store the function pointer.
-      llvm::Value *FnAddr =
-        IGF.Builder.CreateStructGEP(Addr, 0, Addr->getName() + ".fn");
-      IGF.Builder.CreateStore(RV.getScalars()[0], FnAddr, LV.getAlignment());
+      llvm::Value *fnAddr =
+        IGF.Builder.CreateStructGEP(addr, 0, addr->getName() + ".fn");
+      IGF.Builder.CreateStore(RV.getScalars()[0], fnAddr,
+                              address.getAlignment());
 
       // Store the data.
       // FIXME: retains?
-      llvm::Value *DataAddr =
-        IGF.Builder.CreateStructGEP(Addr, 1, Addr->getName() + ".data");
-      IGF.Builder.CreateStore(RV.getScalars()[1], DataAddr,
-                              std::min(LV.getAlignment(), StorageAlignment));
+      llvm::Value *dataAddr =
+        IGF.Builder.CreateStructGEP(addr, 1, addr->getName() + ".data");
+      IGF.Builder.CreateStore(RV.getScalars()[1], dataAddr,
+                              std::min(address.getAlignment(),
+                                       StorageAlignment));
     }
   };
 }
@@ -363,11 +365,11 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &ResultInfo) {
   // The first argument is the implicit aggregate return slot, if required.
   RValueSchema ResultSchema = ResultInfo.getSchema();
   if (ResultSchema.isAggregate()) {
-    LValue ResultSlot =
+    Address resultSlot =
       createFullExprAlloca(ResultSchema.getAggregateType(),
                            ResultSchema.getAggregateAlignment(),
                            "call.aggresult");
-    Args.Values.push_back(ResultSlot.getAddress());
+    Args.Values.push_back(resultSlot.getAddress());
     Args.Attrs.push_back(llvm::AttributeWithIndex::get(1,
                                 llvm::Attribute::StructRet |
                                 llvm::Attribute::NoAlias));
@@ -436,15 +438,15 @@ void IRGenFunction::emitPrologue() {
   llvm::Function::arg_iterator CurParm = CurFn->arg_begin();
 
   // Set up the result slot.
-  const TypeInfo &ResultInfo = IGM.getFragileTypeInfo(FnTy->Result);
-  RValueSchema ResultSchema = ResultInfo.getSchema();
-  if (ResultSchema.isAggregate()) {
-    ReturnSlot = LValue::forAddress(CurParm++, ResultInfo.StorageAlignment);
-  } else if (ResultSchema.isScalar(0)) {
+  const TypeInfo &resultType = IGM.getFragileTypeInfo(FnTy->Result);
+  RValueSchema resultSchema = resultType.getSchema();
+  if (resultSchema.isAggregate()) {
+    ReturnSlot = Address(CurParm++, resultType.StorageAlignment);
+  } else if (resultSchema.isScalar(0)) {
     assert(!ReturnSlot.isValid());
   } else {
-    ReturnSlot = createScopeAlloca(ResultInfo.getStorageType(),
-                                   ResultInfo.StorageAlignment,
+    ReturnSlot = createScopeAlloca(resultType.getStorageType(),
+                                   resultType.StorageAlignment,
                                    "return_value");
   }
 
@@ -454,13 +456,13 @@ void IRGenFunction::emitPrologue() {
     RValueSchema ParmSchema = ParmInfo.getSchema();
 
     // Make an l-value for the parameter.
-    LValue ParmLV;
+    Address parmAddr;
     if (ParmSchema.isAggregate()) {
-      ParmLV = LValue::forAddress(CurParm++, ParmInfo.StorageAlignment);
+      parmAddr = Address(CurParm++, ParmInfo.StorageAlignment);
     } else {
-      ParmLV = createScopeAlloca(ParmInfo.getStorageType(),
-                                 ParmInfo.StorageAlignment,
-                                 Parm->getName().str());
+      parmAddr = createScopeAlloca(ParmInfo.getStorageType(),
+                                   ParmInfo.StorageAlignment,
+                                   Parm->getName().str());
     }
 
     // If the parameter was scalar, form an r-value from the
@@ -475,11 +477,11 @@ void IRGenFunction::emitPrologue() {
       }
 
       RValue ParmRV = RValue::forScalars(Scalars);
-      ParmInfo.store(*this, ParmRV, ParmLV);
+      ParmInfo.store(*this, ParmRV, parmAddr);
     }
 
     assert(!Locals.count(Parm));
-    Locals.insert(std::make_pair(Parm, ParmLV));
+    Locals.insert(std::make_pair(Parm, parmAddr));
   }
 
   // TODO: data pointer

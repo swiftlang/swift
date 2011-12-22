@@ -93,8 +93,8 @@ namespace {
     }
 
     /// Perform an l-value projection of a member of this tuple.
-    static LValue projectLValue(IRGenFunction &IGF, const LValue &tuple,
-                                const TupleFieldInfo &field) {
+    static Address projectLValue(IRGenFunction &IGF, Address tuple,
+                                 const TupleFieldInfo &field) {
       if (field.StorageIndex == TupleFieldInfo::NoStorage)
         return tuple;
 
@@ -106,7 +106,7 @@ namespace {
       Alignment align =
         tuple.getAlignment().alignmentAtOffset(field.StorageOffset);
 
-      return LValue::forAddress(addr, align);
+      return Address(addr, align);
     }
 
     /// Perform an r-value projection of a member of this tuple.
@@ -161,44 +161,44 @@ namespace {
       return RValue::forScalars(scalars);
     }
 
-    RValue load(IRGenFunction &IGF, const LValue &LV) const {
-      SmallVector<llvm::Value*, RValue::MaxScalars> Scalars;
+    RValue load(IRGenFunction &IGF, Address addr) const {
+      SmallVector<llvm::Value*, RValue::MaxScalars> scalars;
 
       // Load by loading the elements.
-      for (const TupleFieldInfo &Field : getFieldInfos()) {
-        assert(Scalars.size() == Field.ScalarBegin);
+      for (const TupleFieldInfo &field : getFieldInfos()) {
+        assert(scalars.size() == field.ScalarBegin);
 
         // Skip fields that contribute no scalars.
-        if (Field.ScalarBegin == Field.ScalarEnd) continue;
+        if (field.ScalarBegin == field.ScalarEnd) continue;
 
         // Load the field and extract the scalars.
-        LValue FieldLV = projectLValue(IGF, LV, Field);
-        RValue FieldRV = Field.FieldInfo.load(IGF, FieldLV);
-        Scalars.append(FieldRV.getScalars().begin(),
-                       FieldRV.getScalars().end());
+        Address fieldAddr = projectLValue(IGF, addr, field);
+        RValue fieldRV = field.FieldInfo.load(IGF, fieldAddr);
+        scalars.append(fieldRV.getScalars().begin(),
+                       fieldRV.getScalars().end());
 
-        assert(Scalars.size() == Field.ScalarEnd);
+        assert(scalars.size() == field.ScalarEnd);
       }
 
-      return RValue::forScalars(Scalars);
+      return RValue::forScalars(scalars);
     }
 
-    void store(IRGenFunction &IGF, const RValue &RV, const LValue &LV) const {
+    void store(IRGenFunction &IGF, const RValue &RV, Address addr) const {
       assert(RV.isScalar());
 
-      for (const TupleFieldInfo &Field : getFieldInfos()) {
+      for (const TupleFieldInfo &field : getFieldInfos()) {
         // Skip fields that contribute no scalars.
-        if (Field.ScalarBegin == Field.ScalarEnd) continue;
+        if (field.ScalarBegin == field.ScalarEnd) continue;
 
         // Project out the appropriate r-value.
-        ArrayRef<llvm::Value*> Scalars = 
-          RV.getScalars().slice(Field.ScalarBegin,
-                                Field.ScalarEnd - Field.ScalarBegin);
-        RValue FieldRV = RValue::forScalars(Scalars);
+        ArrayRef<llvm::Value*> scalars = 
+          RV.getScalars().slice(field.ScalarBegin,
+                                field.ScalarEnd - field.ScalarBegin);
+        RValue fieldRV = RValue::forScalars(scalars);
 
         // Write the extracted r-value into a projected l-value.
-        LValue FieldLV = projectLValue(IGF, LV, Field);
-        Field.FieldInfo.store(IGF, FieldRV, FieldLV);
+        Address fieldAddr = projectLValue(IGF, addr, field);
+        field.FieldInfo.store(IGF, fieldRV, fieldAddr);
       }
     }
   };
@@ -227,62 +227,61 @@ namespace {
       return RValueSchema::forAggregate(getStorageType(), StorageAlignment);
     }
 
-    /// Given an r-value of this type, form an l-value referring to
+    /// Given an r-value of this type, form an address referring to
     /// the temporary.
-    LValue getLValueForAggregateRValue(const RValue &rvalue) const {
+    Address getAddressForAggregateRValue(const RValue &rvalue) const {
       assert(rvalue.isAggregate());
 
       // The alignment of a temporary is always the alignment of the type.
-      return LValue::forAddress(rvalue.getAggregateAddress(),
-                                StorageAlignment);
+      return Address(rvalue.getAggregateAddress(), StorageAlignment);
     }
 
     RValue projectRValue(IRGenFunction &IGF, const RValue &tuple,
                          const TupleFieldInfo &field) const {
       assert(tuple.isAggregate());
-      LValue tupleLV = getLValueForAggregateRValue(tuple);
-      LValue fieldLV = projectLValue(IGF, tupleLV, field);
+      Address tupleAddr = getAddressForAggregateRValue(tuple);
+      Address fieldAddr = projectLValue(IGF, tupleAddr, field);
 
       // If we need an aggregate, we've already got one.
       if (field.FieldInfo.getSchema().isAggregate()) {
-        assert(field.FieldInfo.StorageAlignment <= fieldLV.getAlignment());
-        return RValue::forAggregate(fieldLV.getAddress());
+        assert(field.FieldInfo.StorageAlignment <= fieldAddr.getAlignment());
+        return RValue::forAggregate(fieldAddr.getAddress());
       }
 
       // Otherwise, we need to load the scalars out.
-      return field.FieldInfo.load(IGF, fieldLV);
+      return field.FieldInfo.load(IGF, fieldAddr);
     }
 
     RValue implode(IRGenFunction &IGF,
                    const SmallVectorImpl<RValue> &elements) const {
-      LValue temp = IGF.createFullExprAlloca(StorageType, StorageAlignment,
-                                             "tuple-implode");
+      Address temp = IGF.createFullExprAlloca(StorageType, StorageAlignment,
+                                              "tuple-implode");
 
       auto fieldIterator = getFieldInfos().begin();
       for (const RValue &fieldRV : elements) {
         const TupleFieldInfo &field = *fieldIterator++;
-        LValue fieldLV = projectLValue(IGF, temp, field);
-        field.FieldInfo.store(IGF, fieldRV, fieldLV);
+        Address fieldAddr = projectLValue(IGF, temp, field);
+        field.FieldInfo.store(IGF, fieldRV, fieldAddr);
       }
 
       return RValue::forAggregate(temp.getAddress());
     }
 
-    RValue load(IRGenFunction &IGF, const LValue &LV) const {
-      LValue temp = IGF.createFullExprAlloca(StorageType, StorageAlignment,
+    RValue load(IRGenFunction &IGF, Address addr) const {
+      Address temp = IGF.createFullExprAlloca(StorageType, StorageAlignment,
                                              "lvalue-load");
       // FIXME: a memcpy isn't right if any of the fields require
       // special logic for loads or stores.
-      IGF.emitMemCpy(temp.getAddress(), LV.getAddress(), StorageSize,
-                     std::min(StorageAlignment, LV.getAlignment()));
+      IGF.emitMemCpy(temp.getAddress(), addr.getAddress(), StorageSize,
+                     std::min(StorageAlignment, addr.getAlignment()));
       return RValue::forAggregate(temp.getAddress());
     }
 
-    void store(IRGenFunction &IGF, const RValue &RV, const LValue &LV) const {
+    void store(IRGenFunction &IGF, const RValue &RV, Address addr) const {
       // FIXME: a memcpy isn't right if any of the fields require
       // special logic for loads or stores.
-      IGF.emitMemCpy(LV.getAddress(), RV.getAggregateAddress(), StorageSize,
-                     std::min(StorageAlignment, LV.getAlignment()));
+      IGF.emitMemCpy(addr.getAddress(), RV.getAggregateAddress(), StorageSize,
+                     std::min(StorageAlignment, addr.getAlignment()));
     }
   };
 }
@@ -436,6 +435,20 @@ RValue IRGenFunction::emitTupleExpr(TupleExpr *E, const TypeInfo &TI) {
   return tupleType.implode(*this, elements);
 }
 
+namespace {
+  class TupleElement : public PhysicalPathComponent {
+    const TupleFieldInfo &Field;
+
+  public:
+    TupleElement(const TupleFieldInfo &field)
+      : PhysicalPathComponent(sizeof(TupleElement)), Field(field) {}
+
+    Address offset(IRGenFunction &IGF, Address addr) const {
+      return TupleTypeInfo::projectLValue(IGF, addr, Field);
+    }
+  };
+}
+
 RValue IRGenFunction::emitTupleElementRValue(TupleElementExpr *E,
                                              const TypeInfo &fieldType) {
   Expr *tuple = E->getBase();
@@ -454,8 +467,8 @@ RValue IRGenFunction::emitTupleElementRValue(TupleElementExpr *E,
   // If we can emit the base as an l-value, we can avoid a lot
   // of unnecessary work.
   if (Optional<LValue> tupleLV = tryEmitAsLValue(tuple, tupleType)) {
-    LValue fieldLV = tupleType.projectLValue(*this, tupleLV.getValue(), field);
-    return field.FieldInfo.load(*this, fieldLV);
+    tupleLV.getValue().push<TupleElement>(field);
+    return emitLoad(tupleLV.getValue(), field.FieldInfo);
   }
 
   // Otherwise, emit the base as an r-value and project.
@@ -479,7 +492,8 @@ LValue IRGenFunction::emitTupleElementLValue(TupleElementExpr *E,
   }
 
   // Project.
-  return tupleType.projectLValue(*this, tupleLV, field);
+  tupleLV.push<TupleElement>(field);
+  return tupleLV;
 }
 
 /// Emit a tuple shuffle in exploded form.
@@ -491,11 +505,18 @@ static void emitExplodedTupleShuffle(IRGenFunction &IGF, TupleShuffleExpr *E,
     getAsTupleTypeInfo(IGF, innerTuple->getType());
 
   // Emit the inner tuple.  We prefer to emit it as an l-value.
-  Optional<LValue> innerTupleLV
-    = IGF.tryEmitAsLValue(innerTuple, innerTupleType);
+  Address innerTupleAddr;
   RValue innerTupleRV;
-  if (!innerTupleLV)
+  if (Optional<LValue> innerTupleLV
+        = IGF.tryEmitAsLValue(innerTuple, innerTupleType)) {
+    if (innerTupleLV.getValue().isPhysical()) {
+      innerTupleAddr = IGF.emitAddressForPhysicalLValue(innerTupleLV.getValue());
+    } else {
+      innerTupleRV = IGF.emitLoad(innerTupleLV.getValue(), innerTupleType);
+    }
+  } else {
     innerTupleRV = IGF.emitRValue(innerTuple, innerTupleType);
+  }
 
   auto shuffleIndexIterator = E->getElementMapping().begin();
   for (const TupleFieldInfo &outerField : outerTupleType.getFieldInfos()) {
@@ -517,11 +538,10 @@ static void emitExplodedTupleShuffle(IRGenFunction &IGF, TupleShuffleExpr *E,
       = innerTupleType.getFieldInfos()[(unsigned) shuffleIndex];
 
     // If we're loading from an l-value, project from that.
-    if (innerTupleLV) {
-      LValue elementLV = innerTupleType.projectLValue(IGF,
-                                                      innerTupleLV.getValue(),
-                                                      innerField);
-      outerElements.push_back(innerField.FieldInfo.load(IGF, elementLV));
+    if (innerTupleAddr.isValid()) {
+      Address elementAddr = innerTupleType.projectLValue(IGF, innerTupleAddr,
+                                                         innerField);
+      outerElements.push_back(innerField.FieldInfo.load(IGF, elementAddr));
 
     // Otherwise, project the r-value down.
     } else {
@@ -568,19 +588,25 @@ void IRGenFunction::emitExplodedTuple(Expr *E, SmallVectorImpl<RValue> &elts) {
     return;
   }
 
-  // If it's emittable as an l-value, do so and load from projections
-  // down to the fields.
+  // If it's emittable as a physical l-value, do so and load from
+  // projections down to the fields.  Otherwise, emit as an r-value and
+  // do r-value projections.
+  RValue tupleRV;
   if (Optional<LValue> tupleLV = tryEmitAsLValue(E, tupleType)) {
-    for (const TupleFieldInfo &field : tupleType.getFieldInfos()) {
-      LValue fieldLV =
-        tupleType.projectLValue(*this, tupleLV.getValue(), field);
-      elts.push_back(field.FieldInfo.load(*this, fieldLV));
+    if (tupleLV.getValue().isPhysical()) {
+      Address tupleAddr = emitAddressForPhysicalLValue(tupleLV.getValue());
+      for (const TupleFieldInfo &field : tupleType.getFieldInfos()) {
+        Address fieldAddr = tupleType.projectLValue(*this, tupleAddr, field);
+        elts.push_back(field.FieldInfo.load(*this, fieldAddr));
+      }
+      return;
     }
-    return;
+    tupleRV = emitLoad(tupleLV.getValue(), tupleType);
+  } else {
+    tupleRV = emitRValue(E, tupleType);
   }
 
-  // Emit as an r-value and do r-value projections.
-  RValue tupleRV = emitRValue(E, tupleType);
+  // Do r-value projections.
   for (const TupleFieldInfo &field : tupleType.getFieldInfos())
     elts.push_back(tupleType.projectRValue(*this, tupleRV, field));
 }

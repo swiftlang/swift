@@ -76,14 +76,14 @@ void IRGenFunction::emitBraceStmt(BraceStmt *BS) {
 
 void IRGenFunction::emitAssignStmt(AssignStmt *S) {
   // Emit the LHS.
-  const TypeInfo &TInfo = getFragileTypeInfo(S->getDest()->getType());
-  LValue LV = emitLValue(S->getDest(), TInfo);
+  const TypeInfo &type = getFragileTypeInfo(S->getDest()->getType());
+  LValue LV = emitLValue(S->getDest(), type);
 
   // Emit the RHS.
-  RValue RV = emitRValue(S->getSrc(), TInfo);
+  RValue RV = emitRValue(S->getSrc(), type);
 
   // Do the store.
-  TInfo.store(*this, RV, LV);
+  emitStore(RV, LV, type);
 }
 
 void IRGenFunction::emitIfStmt(IfStmt *S) {

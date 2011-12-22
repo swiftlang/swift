@@ -55,19 +55,19 @@ void IRGenFunction::emitLocal(Decl *D) {
 /// emitLocalVar - Emit a local variable.
 void IRGenFunction::emitLocalVar(VarDecl *var) {
   const TypeInfo &typeInfo = getFragileTypeInfo(var->getType());
-  LValue lvalue = createScopeAlloca(typeInfo.getStorageType(),
-                                    typeInfo.StorageAlignment,
-                                    var->getName().str());
-  Locals.insert(std::make_pair(var, lvalue));
+  Address addr = createScopeAlloca(typeInfo.getStorageType(),
+                                   typeInfo.StorageAlignment,
+                                   var->getName().str());
+  Locals.insert(std::make_pair(var, addr));
 
   if (Expr *init = var->getInit()) {
-    emitInit(lvalue, init, typeInfo);
+    emitInit(addr, init, typeInfo);
   } else {
-    emitZeroInit(lvalue, typeInfo);
+    emitZeroInit(addr, typeInfo);
   }
 };
 
-LValue IRGenFunction::getLocal(ValueDecl *D) {
+Address IRGenFunction::getLocal(ValueDecl *D) {
   auto I = Locals.find(D);
   assert(I != Locals.end() && "no entry in local map!");
   return I->second;

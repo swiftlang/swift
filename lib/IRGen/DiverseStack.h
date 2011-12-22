@@ -22,7 +22,6 @@
 
 #include <cassert>
 #include <cstring>
-#include <type_traits>
 #include <utility>
 
 namespace swift {
@@ -121,13 +120,6 @@ template <class T> class DiverseStackImpl : private DiverseStackBase {
   DiverseStackImpl(const DiverseStackImpl<T> &other) = delete;
   DiverseStackImpl(DiverseStackImpl<T> &&other) = delete;
 
-  static_assert(std::is_trivially_destructible<T>::value,
-                "element base type must be trivially destructible");
-  static_assert(std::is_trivially_move_constructible<T>::value,
-                "element base type must be trivially moveable");
-  static_assert(std::is_trivially_copy_constructible<T>::value,
-                "element base type msut be trivially copyable");
-
 protected:
   DiverseStackImpl(char *end) {
     initialize(end);
@@ -150,7 +142,7 @@ protected:
     Begin = other.Begin;
     End = other.End;
     Allocated = other.Allocated;
-    other.Begin = other.End = other.Allocated = other + 1;
+    other.Begin = other.End = other.Allocated = (char*) (&other + 1);
     assert(other.isAllocatedInline());
   }
 
@@ -161,9 +153,23 @@ public:
       delete[] Allocated;
   }
 
-  bool empty() const { checkValid(); return Begin == End; }
-  T *top() { assert(!empty()); return static_cast<T*>(Begin); }
-  const T *top() const { assert(!empty()); return static_cast<T*>(Begin); }
+  /// Query whether the stack is empty.
+  bool empty() const {
+    checkValid();
+    return Begin == End;
+  }
+
+  /// Return a reference to the top element on the stack.
+  T &top() {
+    assert(!empty());
+    return *reinterpret_cast<T*>(Begin);
+  }
+
+  /// Return a reference to the top element on the stack.
+  const T &top() const {
+    assert(!empty());
+    return *reinterpret_cast<const T*>(Begin);
+  }
 
   class const_iterator;
   class iterator {
@@ -171,11 +177,12 @@ public:
     friend class DiverseStackImpl;
     friend class const_iterator;
     iterator(char *ptr) : Ptr(ptr) {}
+
   public:
     iterator() = default;
 
-    T &operator*() const { return *static_cast<T*>(Ptr); }
-    T *operator->() const { return static_cast<T*>(Ptr); }
+    T &operator*() const { return *reinterpret_cast<T*>(Ptr); }
+    T *operator->() const { return reinterpret_cast<T*>(Ptr); }
     iterator &operator++() {
       Ptr += (*this)->allocated_size();
       return *this;
@@ -217,8 +224,8 @@ public:
     const_iterator() = default;
     const_iterator(iterator it) : Ptr(it.Ptr) {}
 
-    const T &operator*() const { return *static_cast<const T*>(Ptr); }
-    const T *operator->() const { return static_cast<const T*>(Ptr); }
+    const T &operator*() const { return *reinterpret_cast<const T*>(Ptr); }
+    const T *operator->() const { return reinterpret_cast<const T*>(Ptr); }
     const_iterator &operator++() {
       Ptr += (*this)->allocated_size();
       return *this;
@@ -257,16 +264,9 @@ public:
   }
 
   /// Push a new object onto the stack.
-  template <class U, class... A> U *push(A && ...args) {
-    static_assert(std::is_trivially_destructible<U>::value,
-                  "pushed type must be trivially destructible");
-    static_assert(std::is_trivially_move_constructible<U>::value,
-                  "pushed type must be trivially moveable");
-    static_assert(std::is_trivially_copy_constructible<U>::value,
-                  "pushed type must be trivially copyable");
-
+  template <class U, class... A> U &push(A && ...args) {
     pushNewStorage(sizeof(U));
-    return ::new (Begin) U(::std::forward<A>(args)...);
+    return *::new (Begin) U(::std::forward<A>(args)...);
   }
 
   /// Pop an object off the stack.

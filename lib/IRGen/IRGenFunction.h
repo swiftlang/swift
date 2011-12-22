@@ -21,7 +21,6 @@
 #include "swift/AST/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
 #include "IRBuilder.h"
-#include "LValue.h"
 
 namespace llvm {
   class Constant;
@@ -55,6 +54,7 @@ namespace irgen {
   class Condition;
   class IRGenModule;
   class JumpDest;
+  class LValue;
   class RValue;
   class TypeInfo;
 
@@ -83,16 +83,16 @@ private:
   void emitPrologue();
   void emitEpilogue();
 
-  LValue ReturnSlot;
+  Address ReturnSlot;
   llvm::BasicBlock *ReturnBB;
   JumpDest getReturnDest();
 
 //--- Helper methods -----------------------------------------------------------
 public:
-  LValue createFullExprAlloca(llvm::Type *Ty, Alignment Align,
-                              const llvm::Twine &Name);
-  LValue createScopeAlloca(llvm::Type *Ty, Alignment Align,
-                           const llvm::Twine &Name);
+  Address createFullExprAlloca(llvm::Type *Ty, Alignment Align,
+                               const llvm::Twine &Name);
+  Address createScopeAlloca(llvm::Type *Ty, Alignment Align,
+                            const llvm::Twine &Name);
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
   const TypeInfo &getFragileTypeInfo(Type T);
   void emitMemCpy(llvm::Value *dest, llvm::Value *src,
@@ -119,15 +119,20 @@ public:
   void emitIgnored(Expr *E);
 
   LValue emitLValue(Expr *E);
-  LValue emitLValue(Expr *E, const TypeInfo &TInfo);
-
-  Optional<LValue> tryEmitAsLValue(Expr *E, const TypeInfo &TInfo);
+  LValue emitLValue(Expr *E, const TypeInfo &type);
+  Optional<LValue> tryEmitAsLValue(Expr *E, const TypeInfo &type);
+  LValue emitAddressLValue(Address addr);
+  Address emitAddressForPhysicalLValue(const LValue &lvalue);
 
   RValue emitRValue(Expr *E);
   RValue emitRValue(Expr *E, const TypeInfo &TInfo);
 
-  void emitInit(const LValue &LV, Expr *E, const TypeInfo &TInfo);
-  void emitZeroInit(const LValue &LV, const TypeInfo &TInfo);
+  RValue emitLoad(const LValue &lvalue, const TypeInfo &type);
+  void emitStore(const RValue &rvalue, const LValue &lvalue,
+                 const TypeInfo &type);
+
+  void emitInit(Address addr, Expr *E, const TypeInfo &type);
+  void emitZeroInit(Address addr, const TypeInfo &type);
 
   void emitExplodedTuple(Expr *E, SmallVectorImpl<RValue> &elements);
 
@@ -146,12 +151,12 @@ private:
 //--- Declaration emission -----------------------------------------------------
 public:
   void emitLocal(Decl *D);
-  LValue getLocal(ValueDecl *D);
+  Address getLocal(ValueDecl *D);
   LValue getGlobal(VarDecl *D, const TypeInfo &TInfo);
 
 private:
   void emitLocalVar(VarDecl *D);
-  llvm::DenseMap<ValueDecl*, LValue> Locals;
+  llvm::DenseMap<ValueDecl*, Address> Locals;
 };
 
 } // end namespace irgen

@@ -22,7 +22,7 @@
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "LValue.h"
+#include "Address.h"
 #include "RValue.h"
 
 using namespace swift;
@@ -40,17 +40,13 @@ namespace {
       return RValueSchema::forScalars(getStorageType());
     }
 
-    RValue load(IRGenFunction &IGF, const LValue &LV) const {
-      llvm::Value *Load =
-        IGF.Builder.CreateLoad(LV.getAddress(), LV.getAlignment(),
-                               LV.getAddress()->getName() + ".load");
-      return RValue::forScalars(Load);
+    RValue load(IRGenFunction &IGF, Address addr) const {
+      return RValue::forScalars(IGF.Builder.CreateLoad(addr));
     }
 
-    void store(IRGenFunction &IGF, const RValue &RV, const LValue &LV) const {
+    void store(IRGenFunction &IGF, const RValue &RV, Address addr) const {
       assert(RV.isScalar() && RV.getScalars().size() == 1);
-      IGF.Builder.CreateStore(RV.getScalars()[0], LV.getAddress(),
-                              LV.getAlignment());
+      IGF.Builder.CreateStore(RV.getScalars()[0], addr);
     }
   };
 }

@@ -31,15 +31,15 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM, FuncExpr *FE, llvm::Function *Fn)
 
 /// Create an alloca whose lifetime is the duration of the current
 /// full-expression.
-LValue IRGenFunction::createFullExprAlloca(llvm::Type *Ty, Alignment Align,
-                                           const llvm::Twine &Name) {
+Address IRGenFunction::createFullExprAlloca(llvm::Type *ty, Alignment align,
+                                            const llvm::Twine &name) {
   assert(AllocaIP && "alloca insertion point has not been initialized!");
-  llvm::AllocaInst *Alloca = new llvm::AllocaInst(Ty, Name, AllocaIP);
-  Alloca->setAlignment(Align.getValue());
+  llvm::AllocaInst *alloca = new llvm::AllocaInst(ty, name, AllocaIP);
+  alloca->setAlignment(align.getValue());
 
   // TODO: lifetime intrinsics.
 
-  return LValue::forAddress(Alloca, Align);
+  return Address(alloca, align);
 }
 
 /// Call the llvm.memcpy intrinsic.  The arguments need not already
@@ -62,15 +62,15 @@ void IRGenFunction::emitMemCpy(llvm::Value *dest, llvm::Value *src,
 
 /// Create an alloca whose lifetime is the duration of the current
 /// scope.
-LValue IRGenFunction::createScopeAlloca(llvm::Type *Ty, Alignment Align,
-                                        const llvm::Twine &Name) {
+Address IRGenFunction::createScopeAlloca(llvm::Type *ty, Alignment align,
+                                         const llvm::Twine &name) {
   assert(AllocaIP && "alloca insertion point has not been initialized!");
-  llvm::AllocaInst *Alloca = new llvm::AllocaInst(Ty, Name, AllocaIP);
-  Alloca->setAlignment(Align.getValue());
+  llvm::AllocaInst *alloca = new llvm::AllocaInst(ty, name, AllocaIP);
+  alloca->setAlignment(align.getValue());
 
   // TODO: lifetime intrinsics.
 
-  return LValue::forAddress(Alloca, Align);
+  return Address(alloca, align);
 }
 
 void IRGenFunction::unimplemented(SourceLoc Loc, StringRef Message) {

@@ -20,9 +20,9 @@
 #include "swift/AST/Decl.h"
 #include "llvm/DerivedTypes.h"
 
+#include "Address.h"
 #include "GenType.h"
 #include "IRGenModule.h"
-#include "LValue.h"
 #include "RValue.h"
 
 using namespace swift;
@@ -38,12 +38,12 @@ namespace {
       return RValueSchema();
     }
 
-    RValue load(IRGenFunction &IGF, const LValue &LV) const {
+    RValue load(IRGenFunction &IGF, Address addr) const {
       // FIXME
       return RValue();
     }
 
-    void store(IRGenFunction &CGF, const RValue &RV, const LValue &LV) const {
+    void store(IRGenFunction &CGF, const RValue &rvalue, Address addr) const {
       // FIXME
     }
   };

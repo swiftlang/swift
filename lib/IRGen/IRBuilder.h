@@ -18,6 +18,7 @@
 #define SWIFT_IRGEN_IRBUILDER_H
 
 #include "llvm/Support/IRBuilder.h"
+#include "Address.h"
 #include "IRGen.h"
 
 namespace swift {
@@ -56,19 +57,25 @@ public:
   }
 
   using IRBuilderBase::CreateLoad;
-  llvm::LoadInst *CreateLoad(llvm::Value *Addr, Alignment A,
-                             const llvm::Twine &Name = "") {
-    llvm::LoadInst *Load = CreateLoad(Addr, Name);
-    Load->setAlignment(A.getValue());
-    return Load;
+  llvm::LoadInst *CreateLoad(llvm::Value *addr, Alignment align,
+                             const llvm::Twine &name = "") {
+    llvm::LoadInst *load = CreateLoad(addr, name);
+    load->setAlignment(align.getValue());
+    return load;
+  }
+  llvm::LoadInst *CreateLoad(Address addr) {
+    return CreateLoad(addr.getAddress(), addr.getAlignment());
   }
 
   using IRBuilderBase::CreateStore;
-  llvm::StoreInst *CreateStore(llvm::Value *V, llvm::Value *Addr,
-                               Alignment A) {
-    llvm::StoreInst *Store = CreateStore(V, Addr);
-    Store->setAlignment(A.getValue());
-    return Store;
+  llvm::StoreInst *CreateStore(llvm::Value *value, llvm::Value *addr,
+                               Alignment align) {
+    llvm::StoreInst *store = CreateStore(value, addr);
+    store->setAlignment(align.getValue());
+    return store;
+  }
+  llvm::StoreInst *CreateStore(llvm::Value *value, Address addr) {
+    return CreateStore(value, addr.getAddress(), addr.getAlignment());
   }
 
   /// Insert the given basic block after the IP block and move the

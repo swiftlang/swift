@@ -77,13 +77,13 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
 
   case DeclKind::Var:
     if (D->getDeclContext()->isLocalContext()) {
-      return IGF.getLocal(D);
+      return IGF.emitAddressLValue(IGF.getLocal(D));
     } else {
       return IGF.getGlobal(cast<VarDecl>(D), TInfo);
     }
 
   case DeclKind::Arg:
-    return IGF.getLocal(D);
+    return IGF.emitAddressLValue(IGF.getLocal(D));
 
   case DeclKind::ElementRef:
   case DeclKind::OneOfElement:
@@ -104,7 +104,7 @@ RValue IRGenFunction::emitDeclRefRValue(DeclRefExpr *E, const TypeInfo &TInfo) {
 
   case DeclKind::Arg:
   case DeclKind::Var:
-    return TInfo.load(*this, emitDeclRefLValue(*this, E, TInfo));
+    return emitLoad(emitDeclRefLValue(*this, E, TInfo), TInfo);
 
   case DeclKind::Func:
     return emitRValueForFunction(cast<FuncDecl>(D));
@@ -274,32 +274,32 @@ Optional<LValue> IRGenFunction::tryEmitAsLValue(Expr *E,
 }
 
 /// Emit an expression as an initializer for the given l-value.
-void IRGenFunction::emitInit(const LValue &LV, Expr *E, const TypeInfo &TInfo) {
+void IRGenFunction::emitInit(Address addr, Expr *E, const TypeInfo &TInfo) {
   // TODO: we can do better than this.
   RValue RV = emitRValue(E);
-  TInfo.store(*this, RV, LV);
+  TInfo.store(*this, RV, addr);
 }
 
 /// Zero-initializer the given l-value.
-void IRGenFunction::emitZeroInit(const LValue &LV, const TypeInfo &TInfo) {
-  RValueSchema Schema = TInfo.getSchema();
+void IRGenFunction::emitZeroInit(Address addr, const TypeInfo &type) {
+  RValueSchema schema = type.getSchema();
 
   // If the schema is scalar, just store a bunch of values into it.
   // This makes for better IR than a memset.
-  if (Schema.isScalar()) {
-    llvm::SmallVector<llvm::Value*, RValue::MaxScalars> Scalars;
-    for (llvm::Type *T : Schema.getScalarTypes()) {
-      Scalars.push_back(llvm::Constant::getNullValue(T));
+  if (schema.isScalar()) {
+    SmallVector<llvm::Value*, RValue::MaxScalars> scalars;
+    for (llvm::Type *ty : schema.getScalarTypes()) {
+      scalars.push_back(llvm::Constant::getNullValue(ty));
     }
-    TInfo.store(*this, RValue::forScalars(Scalars), LV);
+    type.store(*this, RValue::forScalars(scalars), addr);
     return;
   }
 
   // Otherwise, since the schema is aggregate, do a memset.
-  llvm::Value *Addr = Builder.CreateBitCast(LV.getAddress(), IGM.Int8PtrTy);
-  Builder.CreateMemSet(Addr, Builder.getInt8(0),
-                       Builder.getInt64(TInfo.StorageSize.getValue()),
-                       TInfo.StorageAlignment.getValue(),
+  Builder.CreateMemSet(Builder.CreateBitCast(addr.getAddress(), IGM.Int8PtrTy),
+                       Builder.getInt8(0),
+                       Builder.getInt64(type.StorageSize.getValue()),
+                       addr.getAlignment().getValue(),
                        /*volatile*/ false);
 }
 
@@ -311,10 +311,10 @@ void IRGenFunction::emitIgnored(Expr *E) {
 
 /// Emit a fake l-value which obeys the given specification.  This
 /// should only ever be used for error recovery.
-LValue IRGenFunction::emitFakeLValue(const TypeInfo &TInfo) {
-  llvm::Value *FakeAddr =
-    llvm::UndefValue::get(TInfo.getStorageType()->getPointerTo());
-  return LValue::forAddress(FakeAddr, TInfo.StorageAlignment);
+LValue IRGenFunction::emitFakeLValue(const TypeInfo &type) {
+  llvm::Value *fakeAddr =
+    llvm::UndefValue::get(type.getStorageType()->getPointerTo());
+  return emitAddressLValue(Address(fakeAddr, type.StorageAlignment));
 }
 
 /// Emit a fake r-value which obeys the given specification.  This
