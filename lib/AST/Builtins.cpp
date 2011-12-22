@@ -19,44 +19,37 @@
 #include "llvm/ADT/StringSwitch.h"
 using namespace swift;
 
-BuiltinTypeKind swift::isBuiltinType(StringRef Name) {
-  return llvm::StringSwitch<BuiltinTypeKind>(Name)
-    .Case("int1",    BuiltinTypeKind::int1)
-    .Case("int8",    BuiltinTypeKind::int8)
-    .Case("int16",   BuiltinTypeKind::int16)
-    .Case("int32",   BuiltinTypeKind::int32)
-    .Case("int64",   BuiltinTypeKind::int64)
-    .Case("float32", BuiltinTypeKind::float32)
-    .Case("float64", BuiltinTypeKind::float64)
-    .Default(BuiltinTypeKind::None);
-}
+#if 0
+bool isBuiltinType(ASTContext &Context, StringRef Name);
+#endif
 
-Type swift::getBuiltinType(ASTContext &Context, BuiltinTypeKind T) {
-  switch (T) {
-  case BuiltinTypeKind::None:    return Type();
-  case BuiltinTypeKind::int1:    return BuiltinIntegerType::get(1, Context);
-  case BuiltinTypeKind::int8:    return BuiltinIntegerType::get(8, Context);
-  case BuiltinTypeKind::int16:   return BuiltinIntegerType::get(16, Context);
-  case BuiltinTypeKind::int32:   return BuiltinIntegerType::get(32, Context);
-  case BuiltinTypeKind::int64:   return BuiltinIntegerType::get(64, Context);
-  case BuiltinTypeKind::float32: return Context.TheFloat32Type;
-  case BuiltinTypeKind::float64: return Context.TheFloat64Type;
+Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
+  if (Name == "float32")
+    return Context.TheFloat32Type;
+  if (Name == "float64")
+    return Context.TheFloat64Type;
+
+  // Handle 'int8' and friends.
+  if (Name.substr(0, 3) == "int") {
+    unsigned BitWidth;
+    if (!Name.substr(3).getAsInteger(10, BitWidth) &&
+        BitWidth <= 1024)  // Cap to prevent insane things.
+      return BuiltinIntegerType::get(BitWidth, Context);
   }
+  
+  return Type();
 }
 
-Type swift::getBuiltinType(ASTContext &Context, Identifier Id) {
-  return getBuiltinType(Context, isBuiltinType(Id.str()));
-}
-
-BuiltinValueKind swift::isBuiltinValue(StringRef Name, BuiltinTypeKind &Parm) {
+BuiltinValueKind swift::isBuiltinValue(ASTContext &C, StringRef Name, Type &Ty){
   // builtin-id ::= operation-id '_' type-id
   // This will almost certainly get more sophisticated.
   StringRef::size_type Underscore = Name.find_last_of('_');
   if (Underscore == StringRef::npos) return BuiltinValueKind::None;
 
-  // Check that the type parameter is well-formed.
-  Parm = isBuiltinType(Name.substr(Underscore + 1));
-  if (Parm == BuiltinTypeKind::None) return BuiltinValueKind::None;
+  // Check that the type parameter is well-formed and set it up for returning.
+  Ty = getBuiltinType(C, Name.substr(Underscore + 1));
+  if (Ty.isNull())
+    return BuiltinValueKind::None;
 
   // Check that the operation name is well-formed.
   StringRef OperationName = Name.substr(0, Underscore);
@@ -76,29 +69,24 @@ static FuncDecl *getBuiltinFunction(ASTContext &Context, Identifier Id, Type T){
 
 /// Build a unary operation declaration.
 static ValueDecl *getUnaryOperation(ASTContext &Context, Identifier Id,
-                                    BuiltinValueKind BV, BuiltinTypeKind BT) {
-  Type T = getBuiltinType(Context, BT);
-  Type FnTy = FunctionType::get(T, T, Context);
+                                    Type ArgType) {
+  Type FnTy = FunctionType::get(ArgType, ArgType, Context);
   return getBuiltinFunction(Context, Id, FnTy);
 }
 
 /// Build a binary operation declaration.
 static ValueDecl *getBinaryOperation(ASTContext &Context, Identifier Id,
-                                     BuiltinValueKind BV, BuiltinTypeKind BT) {
-  Type T = getBuiltinType(Context, BT);
-
-  TupleTypeElt ArgElts[] = { TupleTypeElt(T), TupleTypeElt(T) };
+                                     Type ArgType) {
+  TupleTypeElt ArgElts[] = { TupleTypeElt(ArgType), TupleTypeElt(ArgType) };
   Type Arg = TupleType::get(ArgElts, Context);
-  Type FnTy = FunctionType::get(Arg, T, Context);
+  Type FnTy = FunctionType::get(Arg, ArgType, Context);
   return getBuiltinFunction(Context, Id, FnTy);
 }
 
 /// Build a binary predicate declaration.
 static ValueDecl *getBinaryPredicate(ASTContext &Context, Identifier Id,
-                                     BuiltinValueKind BV, BuiltinTypeKind BT) {
-  Type T = getBuiltinType(Context, BT);
-
-  TupleTypeElt ArgElts[] = { TupleTypeElt(T), TupleTypeElt(T) };
+                                     Type ArgType) {
+  TupleTypeElt ArgElts[] = { TupleTypeElt(ArgType), TupleTypeElt(ArgType) };
   Type Arg = TupleType::get(ArgElts, Context);
   Type FnTy = FunctionType::get(Arg, BuiltinIntegerType::get(1, Context),
                                 Context);
@@ -117,14 +105,32 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
 #include "swift/AST/Builtins.def"
 };
 
+/// Determines if a builtin type falls within the given category.
+/// The category cannot be OverloadedBuiltinKind::None.
+inline bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
+  switch (OK) {
+  case OverloadedBuiltinKind::None:
+    break; // invalid 
+  case OverloadedBuiltinKind::Integer:
+    return T->is<BuiltinIntegerType>();
+  case OverloadedBuiltinKind::Float:
+    return T->Kind == TypeKind::BuiltinFloat32 ||
+           T->Kind == TypeKind::BuiltinFloat64;
+  case OverloadedBuiltinKind::Arithmetic:
+    return true;
+  }
+  llvm_unreachable("bad overloaded builtin kind");
+}
+
+
 ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
-  BuiltinTypeKind BT;
-  BuiltinValueKind BV = isBuiltinValue(Id.str(), BT);
+  Type ArgType;
+  BuiltinValueKind BV = isBuiltinValue(Context, Id.str(), ArgType);
 
   // Filter out inappropriate overloads.
   OverloadedBuiltinKind OBK = OverloadedBuiltinKinds[unsigned(BV)];
   if (OBK != OverloadedBuiltinKind::None &&
-      !isBuiltinTypeOverloaded(BT, OBK))
+      !isBuiltinTypeOverloaded(ArgType, OBK))
     return nullptr;
 
   switch (BV) {
@@ -133,17 +139,17 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
 #define BUILTIN(id, name)
 #define BUILTIN_UNARY_OPERATION(id, name, overload)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-    return getUnaryOperation(Context, Id, BV, BT);
+    return getUnaryOperation(Context, Id, ArgType);
 
 #define BUILTIN(id, name)
 #define BUILTIN_BINARY_OPERATION(id, name, overload)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-    return getBinaryOperation(Context, Id, BV, BT);
+    return getBinaryOperation(Context, Id, ArgType);
 
 #define BUILTIN(id, name)
 #define BUILTIN_BINARY_PREDICATE(id, name, overload)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-    return getBinaryPredicate(Context, Id, BV, BT);
+    return getBinaryPredicate(Context, Id, ArgType);
   }
   llvm_unreachable("bad builtin value!");
 }

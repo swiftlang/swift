@@ -59,7 +59,7 @@ TypeAliasDecl *BuiltinModuleCache::lookupType(Identifier Name,
   
   NamedDecl *&Entry = Cache[Name];
   if (Entry == 0)
-    if (Type Ty = getBuiltinType(M.Ctx, Name))
+    if (Type Ty = getBuiltinType(M.Ctx, Name.str()))
       Entry = new (M.Ctx) TypeAliasDecl(SourceLoc(), Name, Ty,
                                         M.Ctx.TheBuiltinModule);
     

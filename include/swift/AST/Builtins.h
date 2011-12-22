@@ -26,30 +26,10 @@ namespace swift {
   class Type;
   class ValueDecl;
 
-/// BuiltinTypeKind - The set of builtin types.
-enum class BuiltinTypeKind {
-  None,
-  int1,
-  int8,
-  int16,
-  int32,
-  int64,
-  float32,
-  float64
-};
-
-/// Determine whether a name corresponds to a builtin type.
-BuiltinTypeKind isBuiltinType(StringRef Name);
-
-/// Get the builtin type for the given name.
-///
-/// Returns a null type if the type is BuiltinType::None.
-Type getBuiltinType(ASTContext &Context, BuiltinTypeKind T);
-
 /// Get the builtin type for the given name.
 ///
 /// Returns a null type if the name is not a known builtin type name.
-Type getBuiltinType(ASTContext &Context, Identifier Name);
+Type getBuiltinType(ASTContext &Context, StringRef Name);
 
 /// OverloadedBuiltinKind - Whether and how a builtin is overloaded.
 enum class OverloadedBuiltinKind : unsigned char {
@@ -66,19 +46,6 @@ enum class OverloadedBuiltinKind : unsigned char {
   Arithmetic
 };
 
-/// Determines if a builtin type falls within the given category.
-/// The category cannot be OverloadedBuiltinKind::None.
-inline bool isBuiltinTypeOverloaded(BuiltinTypeKind T,
-                                    OverloadedBuiltinKind OK) {
-  assert(T != BuiltinTypeKind::None);
-  switch (OK) {
-  case OverloadedBuiltinKind::None:       break; // invalid 
-  case OverloadedBuiltinKind::Integer:    return T <= BuiltinTypeKind::int64;
-  case OverloadedBuiltinKind::Float:      return BuiltinTypeKind::float32 <= T;
-  case OverloadedBuiltinKind::Arithmetic: return true;
-  }
-  llvm_unreachable("bad overloaded builtin kind");
-}
 
 /// BuiltinValueKind - The set of (possibly overloaded) builtin functions.
 enum class BuiltinValueKind {
@@ -91,7 +58,7 @@ enum class BuiltinValueKind {
 /// isBuiltinValue - Finds the builtin value with this name.
 ///
 /// \param Type - Set to the overloaded type parameter of the builtin.
-BuiltinValueKind isBuiltinValue(StringRef Name, BuiltinTypeKind &Type);
+BuiltinValueKind isBuiltinValue(ASTContext &C, StringRef Name, Type &Ty);
 
 /// getBuiltinValue - Finds the builtin value with the given name.
 ///

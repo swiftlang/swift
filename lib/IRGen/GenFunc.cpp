@@ -273,8 +273,8 @@ static RValue emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn, Expr *Arg,
   ArgList Args;
   emitExpanded(IGF, Arg, Args);
 
-  BuiltinTypeKind TypeArg;
-  switch (isBuiltinValue(Fn->getName().str(), TypeArg)) {
+  Type BuiltinType;
+  switch (isBuiltinValue(IGF.IGM.Context, Fn->getName().str(), BuiltinType)) {
   case BuiltinValueKind::None: llvm_unreachable("not a builtin after all!");
 
 /// A macro which expands to the emission of a simple unary operation
