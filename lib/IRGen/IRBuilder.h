@@ -40,7 +40,22 @@ public:
   IRBuilder(llvm::LLVMContext &Context)
     : IRBuilderBase(Context), ClearedIP(nullptr) {}
 
+  /// Determines if the current location is apparently reachable.  The
+  /// invariant we maintain is that the insertion point of the builder
+  /// always points within a block unless the current location is
+  /// logically unreachable.  All the low-level routines which emit
+  /// branches leave the insertion point in the original block, just
+  /// after the branch.  High-level routines may then indicate
+  /// unreachability by clearing the insertion point.
   bool hasValidIP() const { return GetInsertBlock() != nullptr; }
+
+  /// Determines whether we're currently inserting after a terminator.
+  /// This is really just there for asserts.
+  bool hasPostTerminatorIP() const {
+    return GetInsertBlock() != nullptr &&
+           !GetInsertBlock()->empty() &&
+           isa<llvm::TerminatorInst>(GetInsertBlock()->back());
+  }
 
   void ClearInsertionPoint() {
     assert(hasValidIP() && "clearing invalid insertion point!");

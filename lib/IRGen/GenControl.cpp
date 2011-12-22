@@ -121,47 +121,77 @@ void Condition::enterTrue(IRGenFunction &IGF) {
   assert(TrueBB);
   assert(IGF.Builder.hasValidIP());
 
-  // We only need a separate branch if there's a continuation block.
+  // TrueBB has already been inserted somewhere unless there's a
+  // continuation block.
   if (!ContBB) return;
 
   IGF.Builder.emitBlock(TrueBB);
 }
 
 void Condition::exitTrue(IRGenFunction &IGF) {
-  // Nothing to do if there's no continuation block.
-  if (!ContBB) return;
-  assert(FalseBB);
+  // If there's no continuation block, it's because the condition was
+  // folded to true.  In that case, we just continue emitting code as
+  // if we were still in the true case, and we're unreachable iff the
+  // end of the true case is unreachable.  In other words, there's
+  // nothing to do.
+  if (!ContBB) {
+    assert(!FalseBB && "no continuation");
+    return;
+  }
 
-  // It's quite possible for this point to be unreachable, in which
-  // case there's nothing to do.
-  if (!IGF.Builder.hasValidIP()) return;
+  // If there is a continuation block, we should branch to it if the
+  // current point is not unreachable.
+  if (!IGF.Builder.hasValidIP()) {
+    // If there is no false code, the continuation block has a use
+    // because the main condition jumps directly to it.
+    assert(ContBB->use_empty() || !FalseBB);
+    return;
+  }
 
-  // Otherwise, resume into the continuation block.
+  // Otherwise, resume into the continuation block.  This branch might
+  // be folded by exitFalse if it turns out that that point is
+  // unreachable.
   IGF.Builder.CreateBr(ContBB);
+
+  // Coming out of exitTrue, we can be in one of three states:
+  //   - a valid non-terminal IP, but only if there is no continuation
+  //     block, which is only possible if there is no false block;
+  //   - a valid terminal IP, if the end of the true block was reachable; or
+  //   - a cleared IP, if the end of the true block was not reachable.
 }
 
 void Condition::enterFalse(IRGenFunction &IGF) {
-  assert(FalseBB);
+  assert(FalseBB && "entering the false branch when it was not valid");
 
-  // We only need a separate branch if there's a continuation block.
+  // FalseBB has already been inserted somewhere unless there's a
+  // continuation block.
   if (!ContBB) return;
 
-  // It's possible to have no insertion point here because the end of
-  // the continuation block was unreachable.
+  // It's possible to have no insertion point here if the end of the
+  // true case was unreachable.
   IGF.Builder.emitBlockAnywhere(FalseBB);
 }
 
 void Condition::exitFalse(IRGenFunction &IGF) {
-  // Nothing to do if there's no continuation block.
+  // If there's no continuation block, it's because the condition was
+  // folded to false.  In that case, we just continue emitting code as
+  // if we were still in the false case, and we're unreachable iff the
+  // end of the false case is unreachable.  In other words, there's
+  // nothing to do.
   if (!ContBB) return;
 
-  // If there are no uses of the continuation block, bypass it.
-  // We'll just emit continuation code directly after this, if
-  // we even have an insertion point.
+  // If the true case didn't need the continuation block, then
+  // we don't either, regardless of whether the current location
+  // is reachable.  Just keep inserting / being unreachable
+  // right where we are.
   if (ContBB->use_empty()) {
 
-  // Otherwise, if there's no insertion point, merge the continuation
-  // block back into its single predecessor and move the IP there.
+  // If the true case did need the continuation block, but the false
+  // case doesn't, just merge the continuation block back into its
+  // single predecessor and move the IP there.
+  //
+  // Note that doing this tends to strand the false code after
+  // everything else in the function, so maybe it's not a great idea.
   } else if (!IGF.Builder.hasValidIP()) {
     assert(ContBB->hasOneUse());
     llvm::BranchInst *Br = cast<llvm::BranchInst>(*ContBB->use_begin());
@@ -178,29 +208,29 @@ void Condition::exitFalse(IRGenFunction &IGF) {
 }
 
 void Condition::complete(IRGenFunction &IGF) {
-  // The invariants coming in here are strong but complex.
-
-  // The only situation where we don't have an insertion point is when
-  // the continuation block is totally unreachable.
-  assert(IGF.Builder.hasValidIP() || !ContBB || ContBB->use_empty());
-
-  // Either the continuation block is unreachable or the insertion
-  // point immediately follows a terminator, but not both.
-  assert((!ContBB || ContBB->use_empty()) !=
-         (IGF.Builder.hasValidIP() &&
-          isa<llvm::TerminatorInst>(IGF.Builder.GetInsertBlock()->back())));
-
-  // If there is no continuation block, there is nothing to do.
-  if (!ContBB) return;
-
-  // If the continuation block has no uses, just destroy it and leave
-  // the insertion point wherever it currently lies.
-  if (ContBB->use_empty()) {
-    delete ContBB;
-
-  // Otherwise, we need to insert the continuation block.  We know we
-  // have an insertion point.
-  } else {
-    IGF.Builder.emitBlock(ContBB);
+  // If there is no continuation block, it's because we
+  // constant-folded the branch.  The case-exit will have left us in a
+  // normal insertion state (i.e. not a post-terminator IP) with
+  // nothing to clean up after.
+  if (!ContBB) {
+    assert(!IGF.Builder.hasPostTerminatorIP());
+    return;
   }
+
+  // Kill the continuation block if it's not being used.  Case-exits
+  // only leave themselves post-terminator if they use the
+  // continuation block, so we're in an acceptable insertion state.
+  if (ContBB->use_empty()) {
+    assert(!IGF.Builder.hasPostTerminatorIP());
+    delete ContBB;
+    return;
+  }
+
+  // Okay, we need to insert the continuation block.  Usually we'll be
+  // post-terminator here, but we might not be if there is no false
+  // case and the end of the true case is unreachable.
+  assert(IGF.Builder.hasPostTerminatorIP() ||
+         (!FalseBB && !IGF.Builder.hasValidIP()));
+
+  IGF.Builder.emitBlockAnywhere(ContBB);
 }
