@@ -95,10 +95,10 @@ public:
   }
   
   Stmt *visitIfStmt(IfStmt *IS) {
-    // The if condition must have __builtin_int1 type.  This is after the
+    // The if condition must have Builtin::int1 type.  This is after the
     // conversion function is added by sema.
     Expr *E = IS->getCond();
-    if (typeCheckExpr(E, TC.Context.TheInt1Type)) return 0;
+    if (typeCheckExpr(E, BuiltinIntegerType::get(1, TC.Context))) return 0;
     IS->setCond(E);
 
     Stmt *S = IS->getThenStmt();
@@ -114,10 +114,10 @@ public:
   }
   
   Stmt *visitWhileStmt(WhileStmt *WS) {
-    // The if condition must have __builtin_int1 type.  This is after the
+    // The if condition must have Builtin::int1 type.  This is after the
     // conversion function is added by sema.
     Expr *E = WS->getCond();
-    if (typeCheckExpr(E, TC.Context.TheInt1Type)) return 0;
+    if (typeCheckExpr(E, BuiltinIntegerType::get(1, TC.Context))) return 0;
     WS->setCond(E);
 
     Stmt *S = WS->getBody();

@@ -35,12 +35,15 @@ typedef llvm::DenseMap<std::pair<Type,Type>, FunctionType*> FunctionTypesMapTy;
 /// ArrayTypesMapTy - This is the actual type underlying 'ArrayTypes'.
 typedef llvm::DenseMap<std::pair<Type, uint64_t>, ArrayType*> ArrayTypesMapTy;
 
+typedef llvm::DenseMap<unsigned, BuiltinIntegerType*> IntegerTypesMapTy;
+
 ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
   : Allocator(new llvm::BumpPtrAllocator()),
     IdentifierTable(new IdentifierTableMapTy(*Allocator)),
     TupleTypes(new TupleTypesMapTy()),
     FunctionTypes(new FunctionTypesMapTy()),
     ArrayTypes(new ArrayTypesMapTy()),
+    IntegerTypes(new IntegerTypesMapTy()),
     SourceMgr(sourcemgr),
     Diags(Diags),
     TheBuiltinModule(new (*this) BuiltinModule(getIdentifier("Builtin"),*this)),
@@ -48,12 +51,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheDependentType(new (*this) DependentType(*this)),
     TheFloat32Type(new (*this) BuiltinType(TypeKind::BuiltinFloat32, *this)),
-    TheFloat64Type(new (*this) BuiltinType(TypeKind::BuiltinFloat64, *this)),
-    TheInt1Type(new (*this) BuiltinIntegerType(1, *this)),
-    TheInt8Type(new (*this) BuiltinIntegerType(8, *this)),
-    TheInt16Type(new (*this) BuiltinIntegerType(16, *this)),
-    TheInt32Type(new (*this) BuiltinIntegerType(32, *this)),
-    TheInt64Type(new (*this) BuiltinIntegerType(64, *this)) {
+    TheFloat64Type(new (*this) BuiltinType(TypeKind::BuiltinFloat64, *this)) {
 }
 
 ASTContext::~ASTContext() {
@@ -61,6 +59,7 @@ ASTContext::~ASTContext() {
   delete (FunctionTypesMapTy*)FunctionTypes; FunctionTypes = 0;
   delete (ArrayTypesMapTy*)ArrayTypes; ArrayTypes = 0;
   delete (IdentifierTableMapTy*)IdentifierTable; IdentifierTable = 0;
+  delete (IntegerTypesMapTy*)IntegerTypes; IntegerTypes = 0;
   delete Allocator; Allocator = 0;
 }
 
@@ -90,6 +89,17 @@ bool ASTContext::hadError() const {
 // Simple accessors.
 Type ErrorType::get(ASTContext &C) { return C.TheErrorType; }
 Type DependentType::get(ASTContext &C) { return C.TheDependentType; }
+
+
+BuiltinIntegerType *BuiltinIntegerType::get(unsigned BitWidth, ASTContext &C) {
+  IntegerTypesMapTy &IntegerTypesMap = *(IntegerTypesMapTy*)C.IntegerTypes;
+  BuiltinIntegerType *&Result = IntegerTypesMap[BitWidth];
+  if (Result == 0)
+    Result = new (C) BuiltinIntegerType(BitWidth, C);
+  return Result;
+}
+
+
 Type TupleType::getEmpty(ASTContext &C) { return C.TheEmptyTupleType; }
 
 void TupleType::Profile(llvm::FoldingSetNodeID &ID,

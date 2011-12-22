@@ -34,11 +34,11 @@ BuiltinTypeKind swift::isBuiltinType(StringRef Name) {
 Type swift::getBuiltinType(ASTContext &Context, BuiltinTypeKind T) {
   switch (T) {
   case BuiltinTypeKind::None:    return Type();
-  case BuiltinTypeKind::int1:    return Context.TheInt1Type;
-  case BuiltinTypeKind::int8:    return Context.TheInt8Type;
-  case BuiltinTypeKind::int16:   return Context.TheInt16Type;
-  case BuiltinTypeKind::int32:   return Context.TheInt32Type;
-  case BuiltinTypeKind::int64:   return Context.TheInt64Type;
+  case BuiltinTypeKind::int1:    return BuiltinIntegerType::get(1, Context);
+  case BuiltinTypeKind::int8:    return BuiltinIntegerType::get(8, Context);
+  case BuiltinTypeKind::int16:   return BuiltinIntegerType::get(16, Context);
+  case BuiltinTypeKind::int32:   return BuiltinIntegerType::get(32, Context);
+  case BuiltinTypeKind::int64:   return BuiltinIntegerType::get(64, Context);
   case BuiltinTypeKind::float32: return Context.TheFloat32Type;
   case BuiltinTypeKind::float64: return Context.TheFloat64Type;
   }
@@ -100,7 +100,8 @@ static ValueDecl *getBinaryPredicate(ASTContext &Context, Identifier Id,
 
   TupleTypeElt ArgElts[] = { TupleTypeElt(T), TupleTypeElt(T) };
   Type Arg = TupleType::get(ArgElts, Context);
-  Type FnTy = FunctionType::get(Arg, Context.TheInt1Type, Context);
+  Type FnTy = FunctionType::get(Arg, BuiltinIntegerType::get(1, Context),
+                                Context);
   return getBuiltinFunction(Context, Id, FnTy);
 }
 

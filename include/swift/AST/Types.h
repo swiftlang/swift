@@ -183,6 +183,8 @@ class BuiltinIntegerType : public BuiltinType {
     : BuiltinType(TypeKind::BuiltinInteger, C), BitWidth(BitWidth) {}
 public:
   
+  static BuiltinIntegerType *get(unsigned BitWidth, ASTContext &C);
+  
   /// getBitWidth - Return the bitwidth of the integer.
   unsigned getBitWidth() const {
     return BitWidth;

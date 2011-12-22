@@ -50,7 +50,7 @@ public:
   void *TupleTypes;      // llvm::FoldingSet<TupleType>
   void *FunctionTypes;   // DenseMap<std::pair<Type*, Type*>, FunctionType*>
   void *ArrayTypes;      // DenseMap<std::pair<Type*, uint64_t>, ArrayType*>
-
+  void *IntegerTypes;    // DenseMap<unsigned, BuiltinIntegerType>
 public:
   
   ASTContext(llvm::SourceMgr &SourceMgr, DiagnosticEngine &Diags);
@@ -123,11 +123,6 @@ public:
   const Type TheDependentType;
   const Type TheFloat32Type;     /// TheFloat32Type - 32-bit IEEE floating point
   const Type TheFloat64Type;     /// TheFloat64Type - 64-bit IEEE floating point
-  const Type TheInt1Type;        /// TheInt1Type  - 1-bit integer.
-  const Type TheInt8Type;        /// TheInt8Type  - 8-bit integer.
-  const Type TheInt16Type;       /// TheInt16Type - 16-bit integer.
-  const Type TheInt32Type;       /// TheInt32Type - 32-bit integer.
-  const Type TheInt64Type;       /// TheInt64Type - 64-bit integer.
 };
   
 } // end namespace swift
