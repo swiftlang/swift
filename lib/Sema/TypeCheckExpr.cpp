@@ -110,7 +110,7 @@ Expr *TypeChecker::applyTypeToInteger(IntegerLiteralExpr *E, Type DestTy) {
     bool Failure = E->getText().getAsInteger(0, Value);  (void)Failure;
     assert(!Failure && "Lexer should have verified a reasonable type!");
     
-    if (Value.getBitWidth() > BIT->getBitWidth()) {
+    if (Value.getActiveBits() > BIT->getBitWidth()) {
       diagnose(E->getLoc(), diag::int_literal_too_large, Value.getBitWidth(),
                DestTy);
       return 0;
