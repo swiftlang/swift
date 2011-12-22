@@ -267,7 +267,8 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // expected type of the function.
     E2 = convertToType(E2, FT->Input);
     if (E2 == 0) {
-      diagnose(E1->getLoc(), diag::while_converting_function_argument);
+      diagnose(E1->getLoc(), diag::while_converting_function_argument,
+               FT->Input);
       return true;
     }
     

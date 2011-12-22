@@ -337,11 +337,11 @@ NOTE(type_declared_here,sema,none,
      "type declared here", ())
 
 NOTE(while_converting_var_init,sema,none,
-     "while converting 'var' initializer to declared type", ())
+     "while converting 'var' initializer to declared type %0", (Type))
 NOTE(while_converting_default_tuple_value,sema,none,
-     "while converting default tuple value to element type", ())
+     "while converting default tuple value to element type %0", (Type))
 NOTE(while_converting_function_argument,sema,none,
-     "while converting function argument to expected type", ())
+     "while converting function argument to expected type %0", (Type))
 
 ERROR(invalid_anonymous_argument,sema,none,
       "use of invalid anonymous argument, %0 is larger than"

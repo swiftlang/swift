@@ -122,7 +122,7 @@ bool DeclChecker::visitValueDecl(ValueDecl *VD) {
       VD->setInit(Init);
       VD->overwriteType(Init->getType());
     } else if (isa<VarDecl>(VD)) {
-      TC.diagnose(VD->getLocStart(), diag::while_converting_var_init);
+      TC.diagnose(VD->getLocStart(), diag::while_converting_var_init, DestTy);
     }
   }
   
