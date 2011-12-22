@@ -23,6 +23,69 @@
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
+/// isIntLiteralCompatibleType - Check to see if the specified type has a
+/// properly defined integer literal conversion function, emiting an error and
+/// returning null if not.  If everything looks kosher, return the conversion
+/// function and the argument type that it expects.
+static std::pair<FuncDecl*, Type> isIntLiteralCompatibleType(Type IntTy,
+                                                             SourceLoc Loc,
+                                                             TypeChecker *TC) {
+  // Look up the convert_from_integer_literal method on the type.  If it is
+  // missing, then the type isn't compatible with integer literals.  If it is
+  // present, it must have a single argument of builtin integer type specifying
+  // the bitwidth of the allowed value.
+  SmallVector<ValueDecl*, 8> Methods;
+  TC->TU.lookupGlobalExtensionMethods(IntTy, 
+                      TC->Context.getIdentifier("convert_from_integer_literal"),
+                                      Methods);
+  
+  if (Methods.empty()) {
+    TC->diagnose(Loc, diag::type_not_compatible_int_literal, IntTy);
+    return std::pair<FuncDecl*, Type>();
+  }
+  
+  if (Methods.size() != 1) {
+    TC->diagnose(Loc, diag::type_ambiguous_int_literal_conversion, IntTy);
+    for (ValueDecl *D : Methods)
+      TC->diagnose(D->getLocStart(), diag::found_candidate);
+    return std::pair<FuncDecl*, Type>();
+  }
+  
+  FuncDecl *Method = dyn_cast<FuncDecl>(Methods[0]);
+  
+  if (Method == 0 || !Method->isPlus()) {
+    TC->diagnose(Method->getLocStart(), diag::type_integer_conversion_not_plus,
+                 IntTy);
+    return std::pair<FuncDecl*, Type>();
+  }
+  
+  // Check that the type of the 'convert_from_integer_literal' method makes
+  // sense.  We want a type of "S -> DestTy" where S is an integer type.
+  FunctionType *FT = Method->getType()->castTo<FunctionType>();
+  
+  // The result of the convert function must be the destination type.
+  if (!FT->Result->isEqual(IntTy))
+    FT = 0;
+  
+  // Get the argument type, ignoring single element tuples.
+  Type ArgType;
+  if (FT) {
+    ArgType = FT->Input;
+    
+    // Look through single element tuples.
+    if (TupleType *TT = ArgType->getAs<TupleType>())
+      if (TT->Fields.size() == 1)
+        ArgType = TT->Fields[0].Ty;
+  } else {
+    TC->diagnose(Method->getLocStart(), 
+                 diag::type_integer_conversion_defined_wrong, IntTy);
+    TC->diagnose(Loc, diag::while_converting_int_literal, IntTy);
+    return std::pair<FuncDecl*, Type>();
+  }
+  
+  return std::pair<FuncDecl*, Type>(Method, ArgType);
+}
+
 /// applyTypeToInteger - Apply the specified type to the integer literal
 /// expression (which is known to have dependent type), performing semantic
 /// analysis and returning null on a semantic error or the new AST to use on
@@ -31,86 +94,70 @@ Expr *TypeChecker::applyTypeToInteger(IntegerLiteralExpr *E, Type DestTy) {
   assert(E->getType()->is<DependentType>() &&
          "should only be called on dependent integers");
 
-  // The integer literal must fit in 64-bits.
-  llvm::APInt Value(1, 0);
-  bool Failure = E->getText().getAsInteger(0, Value);  (void)Failure;
-  assert(!Failure && "Lexer should have verified a reasonable type!");
+   // Check the destination type to see if it is compatible with integer
+  // literals, diagnosing the failure if not.
+  std::pair<FuncDecl*, Type> IntInfo =
+    isIntLiteralCompatibleType(DestTy, E->getLoc(), this);
+  FuncDecl *Method = IntInfo.first;
+  Type ArgType = IntInfo.second;
+  if (Method == 0) return 0;
   
-  
-  // Look up the convert_from_integer_literal method on the type.  If it is
-  // missing, then the type isn't compatible with integer literals.  If it is
-  // present, it must have a single argument of builtin integer type specifying
-  // the bitwidth of the allowed value.
-  SmallVector<ValueDecl*, 8> Methods;
-  TU.lookupGlobalExtensionMethods(DestTy, 
-                          Context.getIdentifier("convert_from_integer_literal"),
-                                  Methods);
-  
-  if (Methods.empty()) {
-    diagnose(E->getLoc(), diag::type_not_compatible_int_literal, DestTy);
-    return 0;
-  }
-  
-  if (Methods.size() != 1) {
-    diagnose(E->getLoc(), diag::type_ambiguous_int_literal_conversion, DestTy);
-    for (ValueDecl *D : Methods)
-      diagnose(D->getLocStart(), diag::found_candidate);
-    return 0;
-  }
-  
-  ValueDecl *Method = Methods[0];
-  
-  if (!isa<FuncDecl>(Method) || !cast<FuncDecl>(Method)->isPlus()) {
-    diagnose(Method->getLocStart(), diag::type_integer_conversion_not_plus,
-             DestTy);
-    return 0;
-  }
-
-  // Check that the type of the 'convert_from_integer_literal' method makes
-  // sense.  We want a type of "S -> DestTy" where S is an integer type.
-  FunctionType *FT = Method->getType()->getAs<FunctionType>();
-  Type ArgType;
-  
-  if (FT) {
-    ArgType = FT->Input;
-
-    // Look through single element tuples.
-    if (TupleType *TT = ArgType->getAs<TupleType>())
-      if (TT->Fields.size() == 1)
-        ArgType = TT->Fields[0].Ty;
-  }
-  
-  if (ArgType.isNull() || !FT->Result->isEqual(DestTy) ||
-      !ArgType->is<BuiltinIntegerType>()) {
+  // The argument type must either be a Builtin:: integer type (in which case
+  // this is an integer type in the standard library) or some other type that
+  // itself has a conversion function from a builtin integer type (in which case
+  // we have "chaining", and an implicit conversion through that type).
+  Expr *Intermediate;  
+  if (BuiltinIntegerType *BIT = ArgType->getAs<BuiltinIntegerType>()) {
+    // If this is a direct use of the builtin integer type, use the integer size
+    // to diagnose excess precision issues.
+    llvm::APInt Value(1, 0);
+    bool Failure = E->getText().getAsInteger(0, Value);  (void)Failure;
+    assert(!Failure && "Lexer should have verified a reasonable type!");
     
-    // TODO: In the future, allow transitive "integer literal" types that
-    // themselves can be converted from an integer, so that user code is defined
-    // in terms int16 instead of builtin types (which they have no access to).
-    diagnose(Method->getLocStart(), diag::type_integer_conversion_defined_wrong,
-             DestTy);
-    diagnose(E->getLoc(), diag::while_converting_int_literal, DestTy);
-    return 0;
-  }
+    if (Value.getBitWidth() > BIT->getBitWidth()) {
+      diagnose(E->getLoc(), diag::int_literal_too_large, Value.getBitWidth(),
+               DestTy);
+      return 0;
+    }
     
-  unsigned BitWidth = ArgType->getAs<BuiltinIntegerType>()->getBitWidth();
-  if (Value.getBitWidth() > BitWidth) {
-    diagnose(E->getLoc(), diag::int_literal_too_large, Value.getBitWidth(),
-             DestTy);
-    return 0;
+    // Give the integer literal the builtin integer type.
+    E->setType(ArgType, ValueKind::RValue);
+    Intermediate = E;
+  } else {
+    // Check to see if this is the chaining case, where ArgType itself has a
+    // conversion from a Builtin integer type.
+    IntInfo = isIntLiteralCompatibleType(ArgType, E->getLoc(), this);
+    if (IntInfo.first == 0) {
+      // NOTE: While converting blah.
+      return 0;
+    }
+    
+    if (!IntInfo.second->is<BuiltinIntegerType>()) {
+      diagnose(Method->getLocStart(),
+               diag::type_integer_conversion_defined_wrong, DestTy);
+      diagnose(E->getLoc(), diag::while_converting_int_literal, DestTy);
+      return 0;
+    }
+    
+    // If this a 'chaining' case, recursively convert the integer literal to the
+    // intermediate type, then use our conversion function to finish the
+    // translation.
+    Intermediate = applyTypeToInteger(E, ArgType);
+    if (Intermediate == 0) return 0;
+    
+    // Okay, now Intermediate is known to have type 'ArgType' so we can use a
+    // call to our conversion function to finish things off.
   }
-  
-  // Give the integer literal the builtin integer type.
-  E->setType(ArgType, ValueKind::RValue);
-  
+      
   DeclRefExpr *DRE =
     new (Context) DeclRefExpr(Method,
                               // FIXME: This location is a hack!
-                              E->getStartLoc(),
+                              Intermediate->getStartLoc(),
                               Method->getTypeJudgement());
   
   // Return a new call of the conversion function, passing in the integer
   // literal.
-  return new (Context) CallExpr(DRE, E,
+  return new (Context) CallExpr(DRE, Intermediate,
                                 TypeJudgement(DestTy, ValueKind::RValue));
 }
 
