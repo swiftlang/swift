@@ -141,9 +141,7 @@ namespace {
 
 const TypeInfo *
 TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
-  // Every oneof type is a unique type.
-  llvm::StructType *Converted
-    = llvm::StructType::create(IGM.getLLVMContext(), "oneof");
+  llvm::StructType *Converted = IGM.createNominalType(T->TheDecl);
 
   // We don't need a discriminator if this is a singleton ADT.
   if (T->Elements.size() == 1) {

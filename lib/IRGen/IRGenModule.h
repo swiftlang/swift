@@ -30,6 +30,7 @@ namespace llvm {
   class LLVMContext;
   class Module;
   class PointerType;
+  class StructType;
   class TargetData;
   class Type;
 }
@@ -45,6 +46,7 @@ namespace swift {
   class SourceLoc;
   class TranslationUnit;
   class Type;
+  class TypeAliasDecl;
   class VarDecl;
 
 namespace irgen {
@@ -81,6 +83,7 @@ private:
 public:
   const TypeInfo &getFragileTypeInfo(Type T);
   llvm::Type *getFragileType(Type T);
+  llvm::StructType *createNominalType(TypeAliasDecl *D);
   void emitTypeAlias(Type T);
 
 private:

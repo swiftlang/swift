@@ -17,6 +17,8 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 #include "llvm/DerivedTypes.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/ErrorHandling.h"
 
 #include "GenType.h"
@@ -145,4 +147,13 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
 void IRGenModule::emitTypeAlias(Type underlyingType) {
   if (OneOfType *oneof = dyn_cast<OneOfType>(underlyingType))
     return emitOneOfType(oneof);
+}
+
+/// createNominalType - Create a new nominal type.
+llvm::StructType *IRGenModule::createNominalType(TypeAliasDecl *alias) {
+  llvm::SmallString<32> typeName;
+  llvm::raw_svector_ostream nameStream(typeName);
+  mangle(nameStream, alias);
+  
+  return llvm::StructType::create(getLLVMContext(), nameStream.str());
 }
