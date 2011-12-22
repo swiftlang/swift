@@ -200,11 +200,11 @@ bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init,
       Init = Tmp.get();
     
     // If there was an expression, but it had a parse error, give the var decl
-    // an artificial int type to avoid chained errors.
+    // an error type to avoid chained errors.
     // FIXME: We really need to distinguish erroneous expr from missing expr in
     // ActOnVarDecl.
     if (Tmp.isSemaError() && Ty.isNull())
-      Ty = Context.TheInt32Type;
+      Ty = Context.TheErrorType;
   }
   
   return false;
