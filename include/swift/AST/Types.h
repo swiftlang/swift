@@ -193,10 +193,6 @@ private:
     : TypeBase(TypeKind::BuiltinFloatingPoint, &C), Kind(Kind) {}
 public:
   
-#if 0
-  static BuiltinFloatingPointType *get(FPKind Kind, ASTContext &C);
-#endif
-  
   /// getFPKind - Get the 
   FPKind getFPKind() const {
     return Kind;
