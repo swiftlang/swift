@@ -117,6 +117,9 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
   case TypeKind::BuiltinInteger: {
     unsigned BitWidth = cast<BuiltinIntegerType>(T)->getBitWidth();
     unsigned ByteSize = (BitWidth+7U)/8U;
+    // Round up the memory size and alignment to a power of 2. 
+    if (!llvm::isPowerOf2_32(ByteSize))
+      ByteSize = llvm::NextPowerOf2(ByteSize);
     
     return new PrimitiveTypeInfo(llvm::IntegerType::get(IGM.getLLVMContext(),
                                                         BitWidth),
