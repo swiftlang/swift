@@ -149,8 +149,9 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
   }
 
   case DeclContextKind::ExtensionDecl:
-    // FIXME: unimplemented
-    llvm_unreachable("unimplemented: mangling for extensions");
+    // Mandle the extension as the original type.
+    mangleType(cast<ExtensionDecl>(ctx)->getExtendedType());
+    return;
 
   case DeclContextKind::FuncExpr:
     // FIXME: we don't need to agree about these across components, but
