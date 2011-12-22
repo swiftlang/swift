@@ -188,16 +188,9 @@ void Mangler::mangleType(Type type) {
     Buffer << "f32"; return;
   case TypeKind::BuiltinFloat64:
     Buffer << "f64"; return;
-  case TypeKind::BuiltinInt1:
-    Buffer << "i1"; return;
-  case TypeKind::BuiltinInt8:
-    Buffer << "i8"; return;
-  case TypeKind::BuiltinInt16:
-    Buffer << "i16"; return;
-  case TypeKind::BuiltinInt32:
-    Buffer << "i32"; return;
-  case TypeKind::BuiltinInt64:
-    Buffer << "i64"; return;
+  case TypeKind::BuiltinInteger:
+    Buffer << "i" << cast<BuiltinIntegerType>(type)->getBitWidth();
+    return;
 
   case TypeKind::NameAlias: {
     TypeAliasDecl *alias = cast<NameAliasType>(base)->TheDecl;

@@ -37,11 +37,7 @@ namespace swift {
     Error,       // An erroneously constructed type.
     BuiltinFloat32,
     BuiltinFloat64,
-    BuiltinInt1,
-    BuiltinInt8,
-    BuiltinInt16,
-    BuiltinInt32,
-    BuiltinInt64,
+    BuiltinInteger,
     Dependent,
     NameAlias,
     Tuple,
@@ -51,9 +47,7 @@ namespace swift {
     Protocol,
     
     Builtin_First = BuiltinFloat32,
-    Builtin_Last = BuiltinInt64,
-    BuiltinInteger_First = BuiltinInt1,
-    BuiltinInteger_Last  = BuiltinInt64,
+    Builtin_Last = BuiltinInteger
   };
   
 /// TypeBase - Base class for all types in Swift.
@@ -184,25 +178,19 @@ public:
 /// BuiltinIntegerType - The builtin integer types.
 class BuiltinIntegerType : public BuiltinType {
   friend class ASTContext;
-  BuiltinIntegerType(TypeKind kind, ASTContext &C) : BuiltinType(kind, C) {}
+  unsigned BitWidth;
+  BuiltinIntegerType(unsigned BitWidth, ASTContext &C)
+    : BuiltinType(TypeKind::BuiltinInteger, C), BitWidth(BitWidth) {}
 public:
   
   /// getBitWidth - Return the bitwidth of the integer.
   unsigned getBitWidth() const {
-    switch (Kind) {
-    default: assert(0 && "Not an integer type");
-    case TypeKind::BuiltinInt1:  return 1;
-    case TypeKind::BuiltinInt8:  return 8;
-    case TypeKind::BuiltinInt16: return 16;
-    case TypeKind::BuiltinInt32: return 32;
-    case TypeKind::BuiltinInt64: return 64;
-    }
+    return BitWidth;
   }
   
   static bool classof(const BuiltinType *) { return true; }
   static bool classof(const TypeBase *T) {
-    return T->Kind >= TypeKind::BuiltinInteger_First &&
-           T->Kind <= TypeKind::BuiltinInteger_Last;
+    return T->Kind == TypeKind::BuiltinInteger;
   }
 };
   

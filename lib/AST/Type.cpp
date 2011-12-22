@@ -54,11 +54,7 @@ TypeBase *TypeBase::getCanonicalType() {
   case TypeKind::Error:
   case TypeKind::BuiltinFloat32:
   case TypeKind::BuiltinFloat64:
-  case TypeKind::BuiltinInt1:
-  case TypeKind::BuiltinInt8:
-  case TypeKind::BuiltinInt16:
-  case TypeKind::BuiltinInt32:
-  case TypeKind::BuiltinInt64:
+  case TypeKind::BuiltinInteger:
   case TypeKind::Dependent:
   case TypeKind::OneOf:
   case TypeKind::Protocol:
@@ -110,11 +106,7 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::Dependent:
   case TypeKind::BuiltinFloat32:
   case TypeKind::BuiltinFloat64:
-  case TypeKind::BuiltinInt1:
-  case TypeKind::BuiltinInt8:
-  case TypeKind::BuiltinInt16:
-  case TypeKind::BuiltinInt32:
-  case TypeKind::BuiltinInt64:
+  case TypeKind::BuiltinInteger:
   case TypeKind::OneOf:
   case TypeKind::Tuple:
   case TypeKind::Function:
@@ -255,11 +247,7 @@ void TypeBase::print(raw_ostream &OS) const {
   case TypeKind::Dependent:     return cast<DependentType>(this)->print(OS);
   case TypeKind::BuiltinFloat32:
   case TypeKind::BuiltinFloat64:
-  case TypeKind::BuiltinInt1:
-  case TypeKind::BuiltinInt8:
-  case TypeKind::BuiltinInt16:
-  case TypeKind::BuiltinInt32:
-  case TypeKind::BuiltinInt64:  return cast<BuiltinType>(this)->print(OS);
+  case TypeKind::BuiltinInteger:return cast<BuiltinType>(this)->print(OS);
   case TypeKind::NameAlias:     return cast<NameAliasType>(this)->print(OS);
   case TypeKind::OneOf:         return cast<OneOfType>(this)->print(OS);
   case TypeKind::Tuple:         return cast<TupleType>(this)->print(OS);
@@ -274,11 +262,9 @@ void BuiltinType::print(raw_ostream &OS) const {
   default: assert(0 && "Unknown builtin type");
   case TypeKind::BuiltinFloat32: OS << "Builtin::float32"; break;
   case TypeKind::BuiltinFloat64: OS << "Builtin::float64"; break;
-  case TypeKind::BuiltinInt1:  OS << "Builtin::int1"; break;
-  case TypeKind::BuiltinInt8:  OS << "Builtin::int8"; break;
-  case TypeKind::BuiltinInt16: OS << "Builtin::int16"; break;
-  case TypeKind::BuiltinInt32: OS << "Builtin::int32"; break;
-  case TypeKind::BuiltinInt64: OS << "Builtin::int64"; break;
+  case TypeKind::BuiltinInteger:
+    OS << "Builtin::int" << cast<BuiltinIntegerType>(this)->getBitWidth();
+    break;
   }
 }
 

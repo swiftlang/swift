@@ -114,16 +114,14 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
   case TypeKind::BuiltinFloat64:
     return new PrimitiveTypeInfo(llvm::Type::getDoubleTy(IGM.getLLVMContext()),
                                  Size(8), Alignment(8));
-  case TypeKind::BuiltinInt1:
-    return new PrimitiveTypeInfo(IGM.Int1Ty, Size(1), Alignment(1));
-  case TypeKind::BuiltinInt8:
-    return new PrimitiveTypeInfo(IGM.Int8Ty, Size(1), Alignment(1));
-  case TypeKind::BuiltinInt16:
-    return new PrimitiveTypeInfo(IGM.Int16Ty, Size(2), Alignment(2));
-  case TypeKind::BuiltinInt32:
-    return new PrimitiveTypeInfo(IGM.Int32Ty, Size(4), Alignment(4));
-  case TypeKind::BuiltinInt64:
-    return new PrimitiveTypeInfo(IGM.Int64Ty, Size(8), Alignment(8));
+  case TypeKind::BuiltinInteger: {
+    unsigned BitWidth = cast<BuiltinIntegerType>(T)->getBitWidth();
+    unsigned ByteSize = (BitWidth+7U)/8U;
+    
+    return new PrimitiveTypeInfo(llvm::IntegerType::get(IGM.getLLVMContext(),
+                                                        BitWidth),
+                                 Size(ByteSize), Alignment(ByteSize));
+  }
   case TypeKind::NameAlias:
     return &getFragileTypeInfo(IGM,
                       cast<NameAliasType>(TB)->TheDecl->getUnderlyingType());

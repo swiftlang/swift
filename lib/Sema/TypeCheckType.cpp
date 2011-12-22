@@ -50,11 +50,7 @@ bool TypeChecker::validateType(Type InTy) {
     return true;
   case TypeKind::BuiltinFloat32:
   case TypeKind::BuiltinFloat64:
-  case TypeKind::BuiltinInt1:
-  case TypeKind::BuiltinInt8:
-  case TypeKind::BuiltinInt16:
-  case TypeKind::BuiltinInt32:
-  case TypeKind::BuiltinInt64:
+  case TypeKind::BuiltinInteger:
   case TypeKind::Dependent:
     // These types are already canonical anyway.
     return false;

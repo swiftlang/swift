@@ -49,11 +49,11 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
     TheDependentType(new (*this) DependentType(*this)),
     TheFloat32Type(new (*this) BuiltinType(TypeKind::BuiltinFloat32, *this)),
     TheFloat64Type(new (*this) BuiltinType(TypeKind::BuiltinFloat64, *this)),
-    TheInt1Type(new (*this) BuiltinIntegerType(TypeKind::BuiltinInt1, *this)),
-    TheInt8Type(new (*this) BuiltinIntegerType(TypeKind::BuiltinInt8, *this)),
-    TheInt16Type(new (*this) BuiltinIntegerType(TypeKind::BuiltinInt16, *this)),
-    TheInt32Type(new (*this) BuiltinIntegerType(TypeKind::BuiltinInt32, *this)),
-    TheInt64Type(new (*this) BuiltinIntegerType(TypeKind::BuiltinInt64, *this)){
+    TheInt1Type(new (*this) BuiltinIntegerType(1, *this)),
+    TheInt8Type(new (*this) BuiltinIntegerType(8, *this)),
+    TheInt16Type(new (*this) BuiltinIntegerType(16, *this)),
+    TheInt32Type(new (*this) BuiltinIntegerType(32, *this)),
+    TheInt64Type(new (*this) BuiltinIntegerType(64, *this)) {
 }
 
 ASTContext::~ASTContext() {
