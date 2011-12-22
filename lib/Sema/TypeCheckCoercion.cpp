@@ -37,9 +37,7 @@ public:
   Type DestTy;
   
   Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
-    if (TC.applyTypeToInteger(E, DestTy))
-      return 0;
-    return E;
+    return TC.applyTypeToInteger(E, DestTy);
   }
   Expr *visitFloatLiteralExpr(FloatLiteralExpr *E) {
     assert(0 && "Float literals never have dependent type!");

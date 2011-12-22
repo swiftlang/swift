@@ -59,8 +59,9 @@ public:
   
   /// applyTypeToInteger - Apply the specified type to the integer literal
   /// expression (which is known to have dependent type), performing semantic
-  /// analysis and returning true on a semantic error.
-  bool applyTypeToInteger(IntegerLiteralExpr *E, Type Ty);
+  /// analysis and returning null on a semantic error or the new AST to use on
+  /// success.
+  Expr *applyTypeToInteger(IntegerLiteralExpr *E, Type Ty);
 };
 
   

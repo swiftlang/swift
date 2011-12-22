@@ -25,8 +25,9 @@ using namespace swift;
 
 /// applyTypeToInteger - Apply the specified type to the integer literal
 /// expression (which is known to have dependent type), performing semantic
-/// analysis and returning true on a semantic error.
-bool TypeChecker::applyTypeToInteger(IntegerLiteralExpr *E, Type DestTy) {
+/// analysis and returning null on a semantic error or the new AST to use on
+/// success.
+Expr *TypeChecker::applyTypeToInteger(IntegerLiteralExpr *E, Type DestTy) {
   assert(E->getType()->is<DependentType>() &&
          "should only be called on dependent integers");
 
@@ -47,14 +48,14 @@ bool TypeChecker::applyTypeToInteger(IntegerLiteralExpr *E, Type DestTy) {
   
   if (Methods.empty()) {
     diagnose(E->getLoc(), diag::type_not_compatible_int_literal, DestTy);
-    return true;
+    return 0;
   }
   
   if (Methods.size() != 1) {
     diagnose(E->getLoc(), diag::type_ambiguous_int_literal_conversion, DestTy);
     for (ValueDecl *D : Methods)
       diagnose(D->getLocStart(), diag::found_candidate);
-    return true;
+    return 0;
   }
   
   ValueDecl *Method = Methods[0];
@@ -62,7 +63,7 @@ bool TypeChecker::applyTypeToInteger(IntegerLiteralExpr *E, Type DestTy) {
   if (!isa<FuncDecl>(Method) || !cast<FuncDecl>(Method)->isPlus()) {
     diagnose(Method->getLocStart(), diag::type_integer_conversion_not_plus,
              DestTy);
-    return true;
+    return 0;
   }
 
   // Check that the type of the 'convert_from_integer_literal' method makes
@@ -88,18 +89,18 @@ bool TypeChecker::applyTypeToInteger(IntegerLiteralExpr *E, Type DestTy) {
     diagnose(Method->getLocStart(), diag::type_integer_conversion_defined_wrong,
              DestTy);
     diagnose(E->getLoc(), diag::while_converting_int_literal, DestTy);
-    return true;
+    return 0;
   }
     
   unsigned BitWidth = ArgType->getAs<BuiltinIntegerType>()->getBitWidth();
   if (Value.getBitWidth() > BitWidth) {
     diagnose(E->getLoc(), diag::int_literal_too_large, Value.getBitWidth(),
              DestTy);
-    return true;
+    return 0;
   }
   
   E->setType(DestTy, ValueKind::RValue);
-  return false;
+  return E;
 }
 
 //===----------------------------------------------------------------------===//
@@ -778,7 +779,7 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
   // we're done processing the expression.  While we're doing the walk, keep
   // track of whether we have any literals without a resolved type.
   __block Expr *OneDependentExpr = 0;
-  __block SmallVector<IntegerLiteralExpr*, 4> DependentLiterals;
+  __block SourceLoc HasDependentLiterals;
   
   E = E->walk(^(Expr *E, WalkOrder Order, WalkContext const&) {
     // Ignore the preorder walk.  We'd rather diagnose use of unresolved types
@@ -794,9 +795,9 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
       if (OneDependentExpr == 0)
         OneDependentExpr = E;
 
-      // Remember all of the literals with dependent type that we come across.
-      if (IntegerLiteralExpr *ILE = dyn_cast<IntegerLiteralExpr>(E))
-        DependentLiterals.push_back(ILE);
+      // If we have literals with dependent types, remember this.
+      if (isa<IntegerLiteralExpr>(E) && !HasDependentLiterals.isValid())
+        HasDependentLiterals = E->getStartLoc();
     }
     return E;
   }, ^Stmt*(Stmt *S, WalkOrder Order, WalkContext const&) {
@@ -806,26 +807,38 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
 
   // If we found any dependent literals, then force them to the library
   // specified default integer type (usually int64).
-  if (!DependentLiterals.empty()) {
+  if (HasDependentLiterals.isValid()) {
     // Lookup the "integer_literal_type" which is what all the unresolved
     // literals get implicitly coerced to.
     TypeAliasDecl *TAD = TU.lookupGlobalType(
                                   Context.getIdentifier("integer_literal_type"),
                                               NLKind::UnqualifiedLookup);
     if (TAD == 0) {
-      diagnose(DependentLiterals[0]->getStartLoc(),
-               diag::no_integer_literal_type_found);
+      diagnose(HasDependentLiterals, diag::no_integer_literal_type_found);
       E = 0;
       return true;
     }
 
     Type IntLiteralType = TAD->getAliasType();
-    
-    // FIXME: Validate that the type applied is "valid" (has conversion) and no
-    // truncation for each literal.  Same code as in coercing logic.
-    for (IntegerLiteralExpr *ILE : DependentLiterals)
-      if (applyTypeToInteger(ILE, IntLiteralType))
-        return true;
+
+    // Walk the tree again to update all the entries.
+    E = E->walk(^(Expr *E, WalkOrder Order, WalkContext const&) {
+      // Ignore the preorder walk.
+      if (Order == WalkOrder::PreOrder)
+        return E;
+
+      // Process dependent IntegerLiteralExprs.
+      if (IntegerLiteralExpr *ILE = dyn_cast<IntegerLiteralExpr>(E))
+        if (E->getType()->is<DependentType>())
+          return applyTypeToInteger(ILE, IntLiteralType);
+      return E;
+    }, ^Stmt*(Stmt *S, WalkOrder Order, WalkContext const&) {
+      // Never recurse into statements.
+      return 0;
+    });
+
+    if (E == 0)
+      return true;
     
     // Now that we've added some types to the mix, re-type-check the expression
     // tree and recheck for dependent types.
