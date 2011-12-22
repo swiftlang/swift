@@ -153,7 +153,8 @@ public:
 };
 
 
-/// IntegerLiteralExpr - Integer literal, like '4'.
+/// IntegerLiteralExpr - Integer literal, like '4'.  After semantic analysis
+/// assigns types, this is guaranteed to only have a BuiltinIntegerType.
 class IntegerLiteralExpr : public Expr {
   StringRef Val;  // Use StringRef instead of APInt, APInt leaks.
   SourceLoc Loc;
@@ -162,6 +163,7 @@ public:
   IntegerLiteralExpr(StringRef Val, SourceLoc Loc)
     : Expr(ExprKind::IntegerLiteral), Val(Val), Loc(Loc) {}
   
+  // FIXME: Convert to APInt return.
   uint64_t getValue() const;
 
   StringRef getText() const { return Val; }
@@ -175,20 +177,20 @@ public:
   }
 };
 
-/// FloatLiteralExpr - Floating point literal, like '4.0'.
+/// FloatLiteralExpr - Floating point literal, like '4.0'.  After semantic
+/// analysis assigns types, this is guaranteed to only have a
+/// BuiltinFloatingPointType.
 class FloatLiteralExpr : public Expr {
-  // FIXME: Right now all floating point literals are doubles.  We should
-  // generalize this when we support float.
-  double Val;
+  StringRef Val; // Use StringRef instead of APFloat, APFloat leaks.
   SourceLoc Loc;
 
 public:
-  FloatLiteralExpr(double Val, SourceLoc Loc, Type Ty)
-    : Expr(ExprKind::FloatLiteral, TypeJudgement(Ty, ValueKind::RValue)),
-      Val(Val), Loc(Loc) {}
+  FloatLiteralExpr(StringRef Val, SourceLoc Loc)
+    : Expr(ExprKind::FloatLiteral), Val(Val), Loc(Loc) {}
 
-  double getValue() const { return Val; }
+  APFloat getValue() const;
 
+  StringRef getText() const { return Val; }
   SourceRange getSourceRange() const { return Loc; }
   
   // Implement isa/cast/dyncast/etc.

@@ -18,34 +18,36 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
+#include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
-/// isIntLiteralCompatibleType - Check to see if the specified type has a
-/// properly defined integer literal conversion function, emiting an error and
-/// returning null if not.  If everything looks kosher, return the conversion
-/// function and the argument type that it expects.
-static std::pair<FuncDecl*, Type> isIntLiteralCompatibleType(Type IntTy,
-                                                             SourceLoc Loc,
-                                                             TypeChecker *TC) {
-  // Look up the convert_from_integer_literal method on the type.  If it is
-  // missing, then the type isn't compatible with integer literals.  If it is
-  // present, it must have a single argument of builtin integer type specifying
-  // the bitwidth of the allowed value.
+/// isLiteralCompatibleType - Check to see if the specified type has a properly
+/// defined literal conversion function, emiting an error and returning null if
+/// not.  If everything looks kosher, return the conversion function and the
+/// argument type that it expects.
+static std::pair<FuncDecl*, Type> 
+isLiteralCompatibleType(Type Ty, SourceLoc Loc, bool isInt, TypeChecker *TC) {
+  
+  // Look up the convert_from_*_literal method on the type.  If it is missing,
+  // then the type isn't compatible with literals.  If it is present, it must
+  // have a single argument.
   SmallVector<ValueDecl*, 8> Methods;
-  TC->TU.lookupGlobalExtensionMethods(IntTy, 
-                      TC->Context.getIdentifier("convert_from_integer_literal"),
+  const char *MethodName =
+    isInt ? "convert_from_integer_literal" : "convert_from_float_literal";
+  TC->TU.lookupGlobalExtensionMethods(Ty, TC->Context.getIdentifier(MethodName),
                                       Methods);
   
   if (Methods.empty()) {
-    TC->diagnose(Loc, diag::type_not_compatible_int_literal, IntTy);
+    TC->diagnose(Loc, diag::type_not_compatible_literal, Ty);
     return std::pair<FuncDecl*, Type>();
   }
   
   if (Methods.size() != 1) {
-    TC->diagnose(Loc, diag::type_ambiguous_int_literal_conversion, IntTy);
+    TC->diagnose(Loc, diag::type_ambiguous_literal_conversion, Ty, MethodName);
     for (ValueDecl *D : Methods)
       TC->diagnose(D->getLocStart(), diag::found_candidate);
     return std::pair<FuncDecl*, Type>();
@@ -54,20 +56,20 @@ static std::pair<FuncDecl*, Type> isIntLiteralCompatibleType(Type IntTy,
   // Verify that the implementation is a metatype 'plus' func.
   FuncDecl *Method = dyn_cast<FuncDecl>(Methods[0]);
   if (Method == 0 || !Method->isPlus()) {
-    TC->diagnose(Method->getLocStart(), diag::type_integer_conversion_not_plus,
-                 IntTy);
+    TC->diagnose(Method->getLocStart(), diag::type_literal_conversion_not_plus,
+                 Ty, MethodName);
     return std::pair<FuncDecl*, Type>();
   }
   
-  // Check that the type of the 'convert_from_integer_literal' method makes
-  // sense.  We want a type of "S -> DestTy" where S is an integer type.
+  // Check that the type of the 'convert_from_*_literal' method makes
+  // sense.  We want a type of "S -> DestTy" where S is the expected type.
   FunctionType *FT = Method->getType()->castTo<FunctionType>();
   
   // The result of the convert function must be the destination type.
-  if (!FT->Result->isEqual(IntTy)) {
+  if (!FT->Result->isEqual(Ty)) {
     TC->diagnose(Method->getLocStart(), 
-                 diag::integer_conversion_wrong_return_type, IntTy);
-    TC->diagnose(Loc, diag::while_converting_int_literal, IntTy);
+                 diag::literal_conversion_wrong_return_type, Ty, MethodName);
+    TC->diagnose(Loc, diag::while_converting_literal, Ty);
     return std::pair<FuncDecl*, Type>();
   }
   
@@ -82,33 +84,37 @@ static std::pair<FuncDecl*, Type> isIntLiteralCompatibleType(Type IntTy,
   return std::pair<FuncDecl*, Type>(Method, ArgType);
 }
 
-/// applyTypeToInteger - Apply the specified type to the integer literal
-/// expression (which is known to have dependent type), performing semantic
-/// analysis and returning null on a semantic error or the new AST to use on
-/// success.
-Expr *TypeChecker::applyTypeToInteger(IntegerLiteralExpr *E, Type DestTy) {
+/// applyTypeToLiteral - Apply the specified type to the literal expression
+/// (which is known to have dependent type), performing semantic analysis and
+/// returning null on a semantic error or the new AST to use on success.
+Expr *TypeChecker::applyTypeToLiteral(Expr *E, Type DestTy) {
   assert(E->getType()->is<DependentType>() &&
          "should only be called on dependent integers");
-
-   // Check the destination type to see if it is compatible with integer
-  // literals, diagnosing the failure if not.
-  std::pair<FuncDecl*, Type> IntInfo =
-    isIntLiteralCompatibleType(DestTy, E->getLoc(), this);
-  FuncDecl *Method = IntInfo.first;
-  Type ArgType = IntInfo.second;
+  bool isInt = isa<IntegerLiteralExpr>(E);
+  assert((isInt || isa<FloatLiteralExpr>(E)) && "Unknown literal kind");
+  
+  // Check the destination type to see if it is compatible with literals,
+  // diagnosing the failure if not.
+  std::pair<FuncDecl*, Type> LiteralInfo =
+    isLiteralCompatibleType(DestTy, E->getLoc(), isInt, this);
+  FuncDecl *Method = LiteralInfo.first;
+  Type ArgType = LiteralInfo.second;
   if (Method == 0) return 0;
   
-  // The argument type must either be a Builtin:: integer type (in which case
-  // this is an integer type in the standard library) or some other type that
-  // itself has a conversion function from a builtin integer type (in which case
-  // we have "chaining", and an implicit conversion through that type).
-  Expr *Intermediate;  
-  if (BuiltinIntegerType *BIT = ArgType->getAs<BuiltinIntegerType>()) {
+  // The argument type must either be a Builtin:: integer/fp type (in which case
+  // this is a type in the standard library) or some other type that itself has
+  // a conversion function from a builtin type (in which case we have
+  // "chaining", and an implicit conversion through that type).
+  Expr *Intermediate;
+  BuiltinIntegerType *BIT;
+  BuiltinFloatingPointType *BFT;
+  if (isInt && (BIT = ArgType->getAs<BuiltinIntegerType>())) {
     // If this is a direct use of the builtin integer type, use the integer size
     // to diagnose excess precision issues.
     llvm::APInt Value(1, 0);
-    bool Failure = E->getText().getAsInteger(0, Value);  (void)Failure;
+    bool Failure = cast<IntegerLiteralExpr>(E)->getText().getAsInteger(0,Value);
     assert(!Failure && "Lexer should have verified a reasonable type!");
+    (void)Failure;
     
     if (Value.getActiveBits() > BIT->getBitWidth()) {
       diagnose(E->getLoc(), diag::int_literal_too_large, Value.getBitWidth(),
@@ -119,27 +125,56 @@ Expr *TypeChecker::applyTypeToInteger(IntegerLiteralExpr *E, Type DestTy) {
     // Give the integer literal the builtin integer type.
     E->setType(ArgType, ValueKind::RValue);
     Intermediate = E;
+  } else if (!isInt && (BFT = ArgType->getAs<BuiltinFloatingPointType>())) {
+    // If this is a direct use of a builtin floating point type, use the
+    // floating point type to do the syntax verification.
+    llvm::APFloat Val(BFT->getAPFloatSemantics());
+    switch (Val.convertFromString(cast<FloatLiteralExpr>(E)->getText(),
+                                  llvm::APFloat::rmNearestTiesToEven)) {
+    default: break;
+    case llvm::APFloat::opOverflow: {
+      llvm::SmallString<20> Buffer;
+      llvm::APFloat::getLargest(Val.getSemantics()).toString(Buffer);
+      diagnose(E->getLoc(), diag::float_literal_overflow, Buffer);
+      break;
+    }
+    case llvm::APFloat::opUnderflow: {
+      // Denormals are ok, but reported as underflow by APFloat.
+      if (!Val.isZero()) break;
+      llvm::SmallString<20> Buffer;
+      llvm::APFloat::getSmallest(Val.getSemantics()).toString(Buffer);
+      diagnose(E->getLoc(), diag::float_literal_underflow, Buffer);
+      break;
+    }
+    }
+    
+    E->setType(ArgType, ValueKind::RValue);
+    Intermediate = E;
   } else {
     // Check to see if this is the chaining case, where ArgType itself has a
-    // conversion from a Builtin integer type.
-    IntInfo = isIntLiteralCompatibleType(ArgType, E->getLoc(), this);
-    if (IntInfo.first == 0) {
+    // conversion from a Builtin type.
+    LiteralInfo = isLiteralCompatibleType(ArgType, E->getLoc(), isInt, this);
+    if (LiteralInfo.first == 0) {
       diagnose(Method->getLocStart(),
                diag::while_processing_literal_conversion_function, DestTy);
       return 0;
     }
     
-    if (!IntInfo.second->is<BuiltinIntegerType>()) {
+    if (isInt && LiteralInfo.second->is<BuiltinIntegerType>()) {
+      // ok.
+    } else if (!isInt && LiteralInfo.second->is<BuiltinFloatingPointType>()) {
+      // ok.
+    } else {
       diagnose(Method->getLocStart(),
-               diag::type_integer_conversion_defined_wrong, DestTy);
-      diagnose(E->getLoc(), diag::while_converting_int_literal, DestTy);
+               diag::type_literal_conversion_defined_wrong, DestTy);
+      diagnose(E->getLoc(), diag::while_converting_literal, DestTy);
       return 0;
     }
     
-    // If this a 'chaining' case, recursively convert the integer literal to the
+    // If this a 'chaining' case, recursively convert the literal to the
     // intermediate type, then use our conversion function to finish the
     // translation.
-    Intermediate = applyTypeToInteger(E, ArgType);
+    Intermediate = applyTypeToLiteral(E, ArgType);
     if (Intermediate == 0) return 0;
     
     // Okay, now Intermediate is known to have type 'ArgType' so we can use a
@@ -386,6 +421,8 @@ public:
     return E;
   }
   Expr *visitFloatLiteralExpr(FloatLiteralExpr *E) {
+    if (E->getType().isNull())
+      E->setDependentType(DependentType::get(TC.Context));
     return E;
   }
   Expr *visitDeclRefExpr(DeclRefExpr *E) {
@@ -852,7 +889,8 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
         OneDependentExpr = E;
 
       // If we have literals with dependent types, remember this.
-      if (isa<IntegerLiteralExpr>(E) && !HasDependentLiterals.isValid())
+      if ((isa<IntegerLiteralExpr>(E) || isa<FloatLiteralExpr>(E)) &&
+          !HasDependentLiterals.isValid())
         HasDependentLiterals = E->getStartLoc();
     }
     return E;
@@ -866,9 +904,9 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
   if (HasDependentLiterals.isValid()) {
     // Lookup the "integer_literal_type" which is what all the unresolved
     // literals get implicitly coerced to.
-    TypeAliasDecl *TAD = TU.lookupGlobalType(
-                                  Context.getIdentifier("integer_literal_type"),
-                                              NLKind::UnqualifiedLookup);
+    TypeAliasDecl *TAD;
+    TAD = TU.lookupGlobalType(Context.getIdentifier("integer_literal_type"),
+                              NLKind::UnqualifiedLookup);
     if (TAD == 0) {
       diagnose(HasDependentLiterals, diag::no_integer_literal_type_found);
       E = 0;
@@ -877,16 +915,30 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
 
     Type IntLiteralType = TAD->getAliasType();
 
+    // Lookup "float_literal_type" for all the unresolved fp literals.
+    TAD = TU.lookupGlobalType(Context.getIdentifier("float_literal_type"),
+                              NLKind::UnqualifiedLookup);
+    if (TAD == 0) {
+      diagnose(HasDependentLiterals, diag::no_float_literal_type_found);
+      E = 0;
+      return true;
+    }
+    Type FloatLiteralType = TAD->getAliasType();
+    
+
     // Walk the tree again to update all the entries.
     E = E->walk(^(Expr *E, WalkOrder Order, WalkContext const&) {
       // Ignore the preorder walk.
       if (Order == WalkOrder::PreOrder)
         return E;
 
-      // Process dependent IntegerLiteralExprs.
-      if (IntegerLiteralExpr *ILE = dyn_cast<IntegerLiteralExpr>(E))
-        if (E->getType()->is<DependentType>())
-          return applyTypeToInteger(ILE, IntLiteralType);
+      // Process dependent literals.
+      if (E->getType()->is<DependentType>()) {
+        if (isa<IntegerLiteralExpr>(E))
+          return applyTypeToLiteral(E, IntLiteralType);
+        if (isa<FloatLiteralExpr>(E))
+          return applyTypeToLiteral(E, FloatLiteralType);
+      }
       return E;
     }, ^Stmt*(Stmt *S, WalkOrder Order, WalkContext const&) {
       // Never recurse into statements.

@@ -274,23 +274,24 @@ ERROR(expected_lbrace_func_expr,decl_parsing,none,
 // Literal parsing diagnostics
 //------------------------------------------------------------------------------
 
-NOTE(while_converting_int_literal,sema,none,
+NOTE(while_converting_literal,sema,none,
      "while converting literal to %0", (Type))
 NOTE(while_processing_literal_conversion_function,sema,none,
      "while processing argument of conversion function to inferred type %0",
       (Type))
 
-ERROR(type_not_compatible_int_literal,literal_parsing,none,
-      "inferred type %0 is not compatible with integer literals", (Type))
-ERROR(type_ambiguous_int_literal_conversion,literal_parsing,none,
-      "%0 has multiple 'convert_from_integer_literal' methods", (Type))
-ERROR(type_integer_conversion_not_plus,literal_parsing,none,
-      "'convert_from_integer_literal' method in %0 must be a plus method",
-      (Type))
-ERROR(integer_conversion_wrong_return_type,literal_parsing,none,
-      "'convert_from_integer_literal' should return %0", (Type))
-ERROR(type_integer_conversion_defined_wrong,literal_parsing,none,
-      "'convert_from_integer_literal' method in %0 defined wrong", (Type))
+ERROR(type_not_compatible_literal,literal_parsing,none,
+      "inferred type %0 is not compatible with literal", (Type))
+ERROR(type_ambiguous_literal_conversion,literal_parsing,none,
+      "%0 has multiple '%1' methods", (Type, StringRef))
+ERROR(type_literal_conversion_not_plus,literal_parsing,none,
+      "'%1' method in %0 must be a plus method",
+      (Type, StringRef))
+ERROR(literal_conversion_wrong_return_type,literal_parsing,none,
+      "'%1' should return %0", (Type, StringRef))
+ERROR(type_literal_conversion_defined_wrong,literal_parsing,none,
+      "conversion method in %0 not defined in terms of standard library type",
+       (Type))
 
 ERROR(int_literal_too_large,literal_parsing,none,
       "integer constant too large (%0 bits) for %1",
@@ -438,6 +439,8 @@ NOTE(second_declaration,sema_tce,none,
 
 ERROR(no_integer_literal_type_found,sema_tce,none,
       "standard library error: integer_literal_type not defined", ())
+ERROR(no_float_literal_type_found,sema_tce,none,
+      "standard library error: float_literal_type not defined", ())
 
 ERROR(ambiguous_expression_unresolved,sema_tce,none,
       "ambiguous expression was not resolved to a concrete type", ())

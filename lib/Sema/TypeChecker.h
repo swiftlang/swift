@@ -57,11 +57,11 @@ public:
 
   Expr *foldSequence(SequenceExpr *E);
   
-  /// applyTypeToInteger - Apply the specified type to the integer literal
-  /// expression (which is known to have dependent type), performing semantic
-  /// analysis and returning null on a semantic error or the new AST to use on
-  /// success.
-  Expr *applyTypeToInteger(IntegerLiteralExpr *E, Type Ty);
+  /// applyTypeToLiteral - Apply the specified type to the integer or float
+  /// literal expression (which is known to have dependent type), performing
+  /// semantic analysis and returning null on a semantic error or the new AST to
+  /// use on success.
+  Expr *applyTypeToLiteral(Expr *E, Type Ty);
 };
 
   

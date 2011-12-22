@@ -17,6 +17,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "llvm/ADT/APFloat.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
@@ -120,6 +121,20 @@ TypeBase *TypeBase::getDesugaredType() {
   assert(0 && "Unknown type kind");
   return 0;
 }
+
+const llvm::fltSemantics &BuiltinFloatingPointType::getAPFloatSemantics() const{
+  switch (getFPKind()) {
+    case BuiltinFloatingPointType::IEEE16:  return APFloat::IEEEhalf;
+    case BuiltinFloatingPointType::IEEE32:  return APFloat::IEEEsingle;
+    case BuiltinFloatingPointType::IEEE64:  return APFloat::IEEEdouble;
+    case BuiltinFloatingPointType::IEEE80:  return APFloat::x87DoubleExtended;
+    case BuiltinFloatingPointType::IEEE128: return APFloat::IEEEquad;
+    case BuiltinFloatingPointType::PPC128:  return APFloat::PPCDoubleDouble;
+  }
+  assert(0 && "Unknown FP semantics");
+  return APFloat::IEEEhalf;
+}
+
 
 /// hasAnyDefaultValues - Return true if any of our elements has a default
 /// value.

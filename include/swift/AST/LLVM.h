@@ -33,6 +33,8 @@ namespace llvm {
  
   // Other common classes.
   class raw_ostream;
+  class APInt;
+  class APFloat;
 } // end namespace llvm;
 
 
@@ -55,7 +57,8 @@ namespace swift {
 
   // Other common classes.
   using llvm::raw_ostream;
-  
+  using llvm::APInt;
+  using llvm::APFloat;
 } // end namespace swift
 
 #endif

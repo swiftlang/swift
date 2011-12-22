@@ -25,6 +25,9 @@
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
 
+namespace llvm {
+  struct fltSemantics;
+}
 namespace swift {
   class ASTContext;
   class Expr;
@@ -197,6 +200,8 @@ public:
   FPKind getFPKind() const {
     return Kind;
   }
+  
+  const llvm::fltSemantics &getAPFloatSemantics() const;
   
   void print(raw_ostream &OS) const;
 

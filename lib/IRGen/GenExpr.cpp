@@ -36,31 +36,24 @@ using namespace irgen;
 /// Emit an integer literal expression.
 static RValue emitIntegerLiteralExpr(IRGenFunction &IGF, IntegerLiteralExpr *E,
                                      const TypeInfo &TInfo) {
-  // We make this work by making some pretty awesome assumptions about
-  // how the type is represented.  Probably there ought to be
-  // something slightly less awesome.
+  // We know that the integer literal type has a BuiltinIntegerType.
   RValueSchema Schema = TInfo.getSchema();
   assert(Schema.isScalar(1));
-  llvm::IntegerType *IntTy =
-    cast<llvm::IntegerType>(Schema.getScalarTypes()[0]);
+  llvm::IntegerType *IntTy =cast<llvm::IntegerType>(Schema.getScalarTypes()[0]);
 
-  llvm::Value *Value = llvm::ConstantInt::get(IntTy, E->getValue());
-  return RValue::forScalars(Value);
+  // FIXME!
+  return RValue::forScalars(llvm::ConstantInt::get(IntTy, E->getValue()));
 }
 
 /// Emit an float literal expression.
 static RValue emitFloatLiteralExpr(IRGenFunction &IGF, FloatLiteralExpr *E,
                                    const TypeInfo &TInfo) {
-  // We make this work by making some pretty awesome assumptions about
-  // how the type is represented.  Probably there ought to be
-  // something slightly less awesome.
-  RValueSchema Schema = TInfo.getSchema();
-  assert(Schema.isScalar(1));
-  llvm::Type *FPTy = Schema.getScalarTypes()[0];
-  assert(FPTy->isDoubleTy());
+  // We know that the integer literal type has a BuiltinFloatingPointType.
+  assert(TInfo.getSchema().isScalar(1));
+  assert(TInfo.getSchema().getScalarTypes()[0]->isFloatingPointTy());
   
-  llvm::Value *Value = llvm::ConstantFP::get(FPTy, E->getValue());
-  return RValue::forScalars(Value);
+  return RValue::forScalars(llvm::ConstantFP::get(IGF.IGM.LLVMContext,
+                                                  E->getValue()));
 }
 
 static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
@@ -76,11 +69,9 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
     llvm_unreachable("decl cannot be emitted as an l-value");
 
   case DeclKind::Var:
-    if (D->getDeclContext()->isLocalContext()) {
+    if (D->getDeclContext()->isLocalContext())
       return IGF.emitAddressLValue(IGF.getLocal(D));
-    } else {
-      return IGF.getGlobal(cast<VarDecl>(D), TInfo);
-    }
+    return IGF.getGlobal(cast<VarDecl>(D), TInfo);
 
   case DeclKind::Arg:
     return IGF.emitAddressLValue(IGF.getLocal(D));

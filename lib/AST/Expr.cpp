@@ -18,6 +18,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/ASTContext.h"
+#include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
@@ -87,6 +88,17 @@ uint64_t IntegerLiteralExpr::getValue() const {
   bool Error = Val.getAsInteger(0, IntVal);
   assert(!Error && "Invalid IntegerLiteral formed"); (void)Error;
   return IntVal;
+}
+
+llvm::APFloat FloatLiteralExpr::getValue() const {
+  assert(!getType().isNull() && "Semantic analysis has not completed");
+  
+  APFloat Val(getType()->castTo<BuiltinFloatingPointType>()->getAPFloatSemantics());
+  APFloat::opStatus Res =
+    Val.convertFromString(getText(), llvm::APFloat::rmNearestTiesToEven);
+  assert(Res != APFloat::opInvalidOp && "Sema didn't reject invalid number");
+  (void)Res;
+  return Val;
 }
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
@@ -696,7 +708,7 @@ public:
   }
   void visitFloatLiteralExpr(FloatLiteralExpr *E) {
     OS.indent(Indent) << "(float_literal_expr type='" << E->getType();
-    OS << "' value=" << E->getValue() << ')';
+    OS << "' value=" << E->getText() << ')';
   }
   void visitDeclRefExpr(DeclRefExpr *E) {
     OS.indent(Indent) << "(declref_expr type='" << E->getType();

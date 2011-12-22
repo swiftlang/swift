@@ -16,9 +16,7 @@
 
 #include "Parser.h"
 #include "swift/AST/Diagnostics.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/ADT/APFloat.h"
 using namespace swift;
 
 bool Parser::isStartOfExpr(const Token &Tok, const Token &Next) {
@@ -272,30 +270,7 @@ ParseResult<Expr> Parser::parseExprNumericConstant() {
     return ParseResult<Expr>::getSemaError();
   }
   
-  llvm::APFloat Val(llvm::APFloat::IEEEdouble);
-  switch (Val.convertFromString(Text, llvm::APFloat::rmNearestTiesToEven)) {
-  default: break;
-  case llvm::APFloat::opOverflow: {
-    llvm::SmallString<20> Buffer;
-    llvm::APFloat::getLargest(Val.getSemantics()).toString(Buffer);
-    diagnose(Loc, diag::float_literal_overflow, Buffer);
-    break;
-  }
-  case llvm::APFloat::opUnderflow: {
-    // Denormals are ok, but reported as underflow by APFloat.
-    if (!Val.isZero()) break;
-    llvm::SmallString<20> Buffer;
-    llvm::APFloat::getSmallest(Val.getSemantics()).toString(Buffer);
-    diagnose(Loc, diag::float_literal_underflow, Buffer);
-    break;
-  }
-  }
-  
-  // The type of a float literal is always "float_literal_type", which
-  // should be defined by the library.
-  Identifier TyName = Context.getIdentifier("float_literal_type");
-  Type Ty = ScopeInfo.lookupOrInsertTypeName(TyName, Loc);
-  return new (Context) FloatLiteralExpr(Val.convertToDouble(), Loc, Ty);
+  return new (Context) FloatLiteralExpr(Text, Loc);
 }
 
 ///   expr-identifier:
