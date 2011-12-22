@@ -284,6 +284,8 @@ ERROR(type_ambiguous_int_literal_conversion,literal_parsing,none,
 ERROR(type_integer_conversion_not_plus,literal_parsing,none,
       "'convert_from_integer_literal' method in %0 must be a plus method",
       (Type))
+ERROR(integer_conversion_wrong_return_type,literal_parsing,none,
+      "'convert_from_integer_literal' should return %0", (Type))
 ERROR(type_integer_conversion_defined_wrong,literal_parsing,none,
       "'convert_from_integer_literal' method in %0 defined wrong", (Type))
 

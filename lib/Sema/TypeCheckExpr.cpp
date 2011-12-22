@@ -50,9 +50,9 @@ static std::pair<FuncDecl*, Type> isIntLiteralCompatibleType(Type IntTy,
       TC->diagnose(D->getLocStart(), diag::found_candidate);
     return std::pair<FuncDecl*, Type>();
   }
-  
+
+  // Verify that the implementation is a metatype 'plus' func.
   FuncDecl *Method = dyn_cast<FuncDecl>(Methods[0]);
-  
   if (Method == 0 || !Method->isPlus()) {
     TC->diagnose(Method->getLocStart(), diag::type_integer_conversion_not_plus,
                  IntTy);
@@ -64,24 +64,20 @@ static std::pair<FuncDecl*, Type> isIntLiteralCompatibleType(Type IntTy,
   FunctionType *FT = Method->getType()->castTo<FunctionType>();
   
   // The result of the convert function must be the destination type.
-  if (!FT->Result->isEqual(IntTy))
-    FT = 0;
-  
-  // Get the argument type, ignoring single element tuples.
-  Type ArgType;
-  if (FT) {
-    ArgType = FT->Input;
-    
-    // Look through single element tuples.
-    if (TupleType *TT = ArgType->getAs<TupleType>())
-      if (TT->Fields.size() == 1)
-        ArgType = TT->Fields[0].Ty;
-  } else {
+  if (!FT->Result->isEqual(IntTy)) {
     TC->diagnose(Method->getLocStart(), 
-                 diag::type_integer_conversion_defined_wrong, IntTy);
+                 diag::integer_conversion_wrong_return_type, IntTy);
     TC->diagnose(Loc, diag::while_converting_int_literal, IntTy);
     return std::pair<FuncDecl*, Type>();
   }
+  
+  // Get the argument type, ignoring single element tuples.
+  Type ArgType = FT->Input;
+    
+  // Look through single element tuples.
+  if (TupleType *TT = ArgType->getAs<TupleType>())
+    if (TT->Fields.size() == 1)
+      ArgType = TT->Fields[0].Ty;
   
   return std::pair<FuncDecl*, Type>(Method, ArgType);
 }
