@@ -106,7 +106,8 @@ namespace {
         IGF.Builder.CreateStructGEP(addr, 1, addr->getName() + ".data");
       llvm::Value *data =
         IGF.Builder.CreateLoad(dataAddr,
-                            std::min(address.getAlignment(), StorageAlignment),
+                               address.getAlignment().alignmentAtOffset(
+                                          Size(StorageAlignment.getValue())),
                                dataAddr->getName() + ".load");
 
       return RValue::forScalars(fn, data);
@@ -127,8 +128,8 @@ namespace {
       llvm::Value *dataAddr =
         IGF.Builder.CreateStructGEP(addr, 1, addr->getName() + ".data");
       IGF.Builder.CreateStore(RV.getScalars()[1], dataAddr,
-                              std::min(address.getAlignment(),
-                                       StorageAlignment));
+                              address.getAlignment().alignmentAtOffset(
+                                         Size(StorageAlignment.getValue())));
     }
   };
 }
