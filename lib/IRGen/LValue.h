@@ -144,7 +144,9 @@ class LValue {
 public:
   LValue() = default;
   LValue(const LValue &other) = default;
+#if  __has_feature(cxx_defaulted_functions) 
   LValue(LValue &&other) = default;
+#endif
 
   bool isValid() const { return !Path.empty(); }
 
