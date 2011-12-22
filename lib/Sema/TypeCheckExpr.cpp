@@ -124,7 +124,8 @@ Expr *TypeChecker::applyTypeToInteger(IntegerLiteralExpr *E, Type DestTy) {
     // conversion from a Builtin integer type.
     IntInfo = isIntLiteralCompatibleType(ArgType, E->getLoc(), this);
     if (IntInfo.first == 0) {
-      // NOTE: While converting blah.
+      diagnose(Method->getLocStart(),
+               diag::while_processing_literal_conversion_function, DestTy);
       return 0;
     }
     
