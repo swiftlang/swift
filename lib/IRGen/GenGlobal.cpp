@@ -97,9 +97,15 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit) {
 
 void IRGenFunction::emitGlobalTopLevel(BraceStmt *body) {
   for (auto elt : body->getElements()) {
-    if (Decl *D = elt.dyn_cast<Decl*>())
+    assert(Builder.hasValidIP());
+    if (Decl *D = elt.dyn_cast<Decl*>()) {
       emitGlobalDecl(D);
-    // TODO: handle top-level statements and expressions.
+    } else if (Expr *E = elt.dyn_cast<Expr*>()) {
+      emitIgnored(E);
+    } else {
+      Stmt *S = elt.get<Stmt*>();
+      unimplemented(S->getStartLoc(), "statement emission at global scope");
+    }
   }
 }
 
