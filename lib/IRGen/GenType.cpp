@@ -102,18 +102,35 @@ const TypeInfo &TypeConverter::getFragileTypeInfo(IRGenModule &IGM, Type T) {
 }
 
 const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
+  llvm::LLVMContext &Ctx = IGM.getLLVMContext();
   TypeBase *TB = T.getPointer();
   switch (TB->Kind) {
   case TypeKind::Error:
     llvm_unreachable("generating an error type");
   case TypeKind::Dependent:
     llvm_unreachable("generating a dependent type");
-  case TypeKind::BuiltinFloat32:
-    return new PrimitiveTypeInfo(llvm::Type::getFloatTy(IGM.getLLVMContext()),
-                                 Size(4), Alignment(4));
-  case TypeKind::BuiltinFloat64:
-    return new PrimitiveTypeInfo(llvm::Type::getDoubleTy(IGM.getLLVMContext()),
-                                 Size(8), Alignment(8));
+  case TypeKind::BuiltinFloatingPoint:
+    switch (cast<BuiltinFloatingPointType>(T)->getFPKind()) {
+    case BuiltinFloatingPointType::IEEE16:
+      return new PrimitiveTypeInfo(llvm::Type::getHalfTy(Ctx),
+                                   Size(2), Alignment(2));
+    case BuiltinFloatingPointType::IEEE32:
+      return new PrimitiveTypeInfo(llvm::Type::getFloatTy(Ctx),
+                                   Size(4), Alignment(4));
+    case BuiltinFloatingPointType::IEEE64:
+      return new PrimitiveTypeInfo(llvm::Type::getDoubleTy(Ctx),
+                                   Size(8), Alignment(8));
+    case BuiltinFloatingPointType::IEEE80:
+      return new PrimitiveTypeInfo(llvm::Type::getX86_FP80Ty(Ctx),
+                                   Size(10), Alignment(16));
+    case BuiltinFloatingPointType::IEEE128:
+      return new PrimitiveTypeInfo(llvm::Type::getFP128Ty(Ctx),
+                                   Size(16), Alignment(16));
+    case BuiltinFloatingPointType::PPC128:
+      return new PrimitiveTypeInfo(llvm::Type::getPPC_FP128Ty(Ctx),
+                                   Size(16), Alignment(16));
+    }
+    assert(0 && "Unreachable");
   case TypeKind::BuiltinInteger: {
     unsigned BitWidth = cast<BuiltinIntegerType>(T)->getBitWidth();
     unsigned ByteSize = (BitWidth+7U)/8U;
@@ -121,8 +138,7 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
     if (!llvm::isPowerOf2_32(ByteSize))
       ByteSize = llvm::NextPowerOf2(ByteSize);
     
-    return new PrimitiveTypeInfo(llvm::IntegerType::get(IGM.getLLVMContext(),
-                                                        BitWidth),
+    return new PrimitiveTypeInfo(llvm::IntegerType::get(Ctx, BitWidth),
                                  Size(ByteSize), Alignment(ByteSize));
   }
   case TypeKind::NameAlias:

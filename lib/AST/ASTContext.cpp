@@ -50,8 +50,18 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
     TheErrorType(new (*this) ErrorType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheDependentType(new (*this) DependentType(*this)),
-    TheFloat32Type(new (*this) BuiltinType(TypeKind::BuiltinFloat32, *this)),
-    TheFloat64Type(new (*this) BuiltinType(TypeKind::BuiltinFloat64, *this)) {
+    TheIEEE32Type(new (*this) BuiltinFloatingPointType(
+                                    BuiltinFloatingPointType::IEEE32, *this)),
+    TheIEEE64Type(new (*this) BuiltinFloatingPointType(
+                                    BuiltinFloatingPointType::IEEE64, *this)),
+    TheIEEE16Type(new (*this) BuiltinFloatingPointType(
+                                      BuiltinFloatingPointType::IEEE16, *this)),
+    TheIEEE80Type(new (*this) BuiltinFloatingPointType(
+                                      BuiltinFloatingPointType::IEEE80, *this)),
+    TheIEEE128Type(new (*this) BuiltinFloatingPointType(
+                                     BuiltinFloatingPointType::IEEE128, *this)),
+    ThePPC128Type(new (*this) BuiltinFloatingPointType(
+                                     BuiltinFloatingPointType::PPC128, *this)) {
 }
 
 ASTContext::~ASTContext() {

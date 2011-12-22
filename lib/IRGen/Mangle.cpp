@@ -184,10 +184,16 @@ void Mangler::mangleType(Type type) {
 
   // We don't care about these types being a bit verbose because we
   // don't expect them to come up that often in API names.
-  case TypeKind::BuiltinFloat32:
-    Buffer << "f32"; return;
-  case TypeKind::BuiltinFloat64:
-    Buffer << "f64"; return;
+  case TypeKind::BuiltinFloatingPoint:
+    switch (cast<BuiltinFloatingPointType>(type)->getFPKind()) {
+      case BuiltinFloatingPointType::IEEE16: Buffer << "f16"; return;
+      case BuiltinFloatingPointType::IEEE32: Buffer << "f32"; return;
+      case BuiltinFloatingPointType::IEEE64: Buffer << "f64"; return;
+      case BuiltinFloatingPointType::IEEE80: Buffer << "f80"; return;
+      case BuiltinFloatingPointType::IEEE128: Buffer << "f128"; return;
+      case BuiltinFloatingPointType::PPC128: assert(0 && "Unimplemented");
+    }
+    assert(0 && "Unreachable");
   case TypeKind::BuiltinInteger:
     Buffer << "i" << cast<BuiltinIntegerType>(type)->getBitWidth();
     return;

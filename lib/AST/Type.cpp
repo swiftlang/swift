@@ -52,8 +52,7 @@ TypeBase *TypeBase::getCanonicalType() {
   TypeBase *Result = 0;
   switch (Kind) {
   case TypeKind::Error:
-  case TypeKind::BuiltinFloat32:
-  case TypeKind::BuiltinFloat64:
+  case TypeKind::BuiltinFloatingPoint:
   case TypeKind::BuiltinInteger:
   case TypeKind::Dependent:
   case TypeKind::OneOf:
@@ -104,8 +103,7 @@ TypeBase *TypeBase::getDesugaredType() {
   switch (Kind) {
   case TypeKind::Error:
   case TypeKind::Dependent:
-  case TypeKind::BuiltinFloat32:
-  case TypeKind::BuiltinFloat64:
+  case TypeKind::BuiltinFloatingPoint:
   case TypeKind::BuiltinInteger:
   case TypeKind::OneOf:
   case TypeKind::Tuple:
@@ -245,9 +243,10 @@ void TypeBase::print(raw_ostream &OS) const {
   switch (Kind) {
   case TypeKind::Error:         return cast<ErrorType>(this)->print(OS);
   case TypeKind::Dependent:     return cast<DependentType>(this)->print(OS);
-  case TypeKind::BuiltinFloat32:
-  case TypeKind::BuiltinFloat64:
-  case TypeKind::BuiltinInteger:return cast<BuiltinType>(this)->print(OS);
+  case TypeKind::BuiltinFloatingPoint:
+    return cast<BuiltinFloatingPointType>(this)->print(OS);
+  case TypeKind::BuiltinInteger:
+    return cast<BuiltinIntegerType>(this)->print(OS);
   case TypeKind::NameAlias:     return cast<NameAliasType>(this)->print(OS);
   case TypeKind::OneOf:         return cast<OneOfType>(this)->print(OS);
   case TypeKind::Tuple:         return cast<TupleType>(this)->print(OS);
@@ -257,14 +256,18 @@ void TypeBase::print(raw_ostream &OS) const {
   }
 }
 
-void BuiltinType::print(raw_ostream &OS) const {
+void BuiltinIntegerType::print(raw_ostream &OS) const {
+  OS << "Builtin::int" << cast<BuiltinIntegerType>(this)->getBitWidth();
+}
+
+void BuiltinFloatingPointType::print(raw_ostream &OS) const {
   switch (Kind) {
-  default: assert(0 && "Unknown builtin type");
-  case TypeKind::BuiltinFloat32: OS << "Builtin::float32"; break;
-  case TypeKind::BuiltinFloat64: OS << "Builtin::float64"; break;
-  case TypeKind::BuiltinInteger:
-    OS << "Builtin::int" << cast<BuiltinIntegerType>(this)->getBitWidth();
-    break;
+  case IEEE16:  OS << "Builtin::FP_IEEE16"; return;
+  case IEEE32:  OS << "Builtin::FP_IEEE32"; return;
+  case IEEE64:  OS << "Builtin::FP_IEEE64"; return;
+  case IEEE80:  OS << "Builtin::FP_IEEE80"; return;
+  case IEEE128: OS << "Builtin::FP_IEEE128"; return;
+  case PPC128:  OS << "Builtin::FP_PPC128"; return;
   }
 }
 

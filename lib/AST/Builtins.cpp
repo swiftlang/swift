@@ -20,18 +20,28 @@
 using namespace swift;
 
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
-  if (Name == "float32")
-    return Context.TheFloat32Type;
-  if (Name == "float64")
-    return Context.TheFloat64Type;
+  if (Name == "FP_IEEE32")
+    return Context.TheIEEE32Type;
+  if (Name == "FP_IEEE64")
+    return Context.TheIEEE64Type;
 
   // Handle 'int8' and friends.
   if (Name.substr(0, 3) == "int") {
     unsigned BitWidth;
     if (!Name.substr(3).getAsInteger(10, BitWidth) &&
-        BitWidth <= 1024)  // Cap to prevent insane things.
+        BitWidth <= 1024 && BitWidth != 0)  // Cap to prevent insane things.
       return BuiltinIntegerType::get(BitWidth, Context);
   }
+  
+  // Target specific FP types.
+  if (Name == "FP_IEEE16")
+    return Context.TheIEEE16Type;
+  if (Name == "FP_IEEE80")
+    return Context.TheIEEE80Type;
+  if (Name == "FP_IEEE128")
+    return Context.TheIEEE128Type;
+  if (Name == "FP_PPC128")
+    return Context.ThePPC128Type;
   
   return Type();
 }
@@ -110,8 +120,7 @@ inline bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
   case OverloadedBuiltinKind::Integer:
     return T->is<BuiltinIntegerType>();
   case OverloadedBuiltinKind::Float:
-    return T->Kind == TypeKind::BuiltinFloat32 ||
-           T->Kind == TypeKind::BuiltinFloat64;
+    return T->is<BuiltinFloatingPointType>();
   case OverloadedBuiltinKind::Arithmetic:
     return true;
   }

@@ -35,19 +35,15 @@ namespace swift {
   
   enum class TypeKind {
     Error,       // An erroneously constructed type.
-    BuiltinFloat32,
-    BuiltinFloat64,
     BuiltinInteger,
+    BuiltinFloatingPoint,
     Dependent,
     NameAlias,
     Tuple,
     OneOf,
     Function,
     Array,
-    Protocol,
-    
-    Builtin_First = BuiltinFloat32,
-    Builtin_Last = BuiltinInteger
+    Protocol
   };
   
 /// TypeBase - Base class for all types in Swift.
@@ -158,29 +154,14 @@ public:
   }
 };
 
-/// BuiltinType - Trivial builtin types.
-class BuiltinType : public TypeBase {
-protected:
-  friend class ASTContext;
-  // Builtin types are always canonical.
-  BuiltinType(TypeKind kind, ASTContext &C) : TypeBase(kind, &C) {}
-public:
-  void print(raw_ostream &OS) const;
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const BuiltinType *) { return true; }
-  static bool classof(const TypeBase *T) {
-    return T->Kind >= TypeKind::Builtin_First &&
-           T->Kind <= TypeKind::Builtin_Last;
-  }
-};
-  
-/// BuiltinIntegerType - The builtin integer types.
-class BuiltinIntegerType : public BuiltinType {
+/// BuiltinIntegerType - The builtin integer types.  These directly correspond
+/// to LLVM IR integer types.  They lack signedness and have an arbitrary
+/// bitwidth.
+class BuiltinIntegerType : public TypeBase {
   friend class ASTContext;
   unsigned BitWidth;
   BuiltinIntegerType(unsigned BitWidth, ASTContext &C)
-    : BuiltinType(TypeKind::BuiltinInteger, C), BitWidth(BitWidth) {}
+    : TypeBase(TypeKind::BuiltinInteger, &C), BitWidth(BitWidth) {}
 public:
   
   static BuiltinIntegerType *get(unsigned BitWidth, ASTContext &C);
@@ -189,10 +170,43 @@ public:
   unsigned getBitWidth() const {
     return BitWidth;
   }
-  
-  static bool classof(const BuiltinType *) { return true; }
+
+  void print(raw_ostream &OS) const;
+
+  static bool classof(const BuiltinIntegerType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->Kind == TypeKind::BuiltinInteger;
+  }
+};
+  
+class BuiltinFloatingPointType : public TypeBase {
+  friend class ASTContext;
+public:
+  enum FPKind {
+    IEEE16, IEEE32, IEEE64, IEEE80, IEEE128, /// IEEE floating point types.
+    PPC128   /// PowerPC "double double" type.
+  };
+private:
+  FPKind Kind;
+  
+  BuiltinFloatingPointType(FPKind Kind, ASTContext &C)
+    : TypeBase(TypeKind::BuiltinFloatingPoint, &C), Kind(Kind) {}
+public:
+  
+#if 0
+  static BuiltinFloatingPointType *get(FPKind Kind, ASTContext &C);
+#endif
+  
+  /// getFPKind - Get the 
+  FPKind getFPKind() const {
+    return Kind;
+  }
+  
+  void print(raw_ostream &OS) const;
+
+  static bool classof(const BuiltinFloatingPointType *) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->Kind == TypeKind::BuiltinFloatingPoint;
   }
 };
   

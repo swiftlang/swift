@@ -48,8 +48,7 @@ bool TypeChecker::validateType(Type InTy) {
   case TypeKind::Error:
     // Error already diagnosed.
     return true;
-  case TypeKind::BuiltinFloat32:
-  case TypeKind::BuiltinFloat64:
+  case TypeKind::BuiltinFloatingPoint:
   case TypeKind::BuiltinInteger:
   case TypeKind::Dependent:
     // These types are already canonical anyway.

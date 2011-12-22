@@ -121,8 +121,14 @@ public:
   /// closure argument (e.g. $4) and to UnresolvedMemberExprs (e.g. :foo) during
   /// type checking until they are resolved to something with concrete type.
   const Type TheDependentType;
-  const Type TheFloat32Type;     /// TheFloat32Type - 32-bit IEEE floating point
-  const Type TheFloat64Type;     /// TheFloat64Type - 64-bit IEEE floating point
+  const Type TheIEEE32Type;     /// TheIEEE32Type  - 32-bit IEEE floating point
+  const Type TheIEEE64Type;     /// TheIEEE64Type  - 64-bit IEEE floating point
+  
+  // Target specific types.
+  const Type TheIEEE16Type;     /// TheIEEE16Type  - 16-bit IEEE floating point
+  const Type TheIEEE80Type;     /// TheIEEE80Type  - 80-bit IEEE floating point
+  const Type TheIEEE128Type;    /// TheIEEE128Type - 128-bit IEEE floating point
+  const Type ThePPC128Type;     /// ThePPC128Type  - 128-bit PowerPC 2xDouble
 };
   
 } // end namespace swift
