@@ -18,6 +18,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/raw_ostream.h"
@@ -632,6 +633,9 @@ namespace {
     bool visitDecl(Decl *D) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
         if (Expr *Init = VD->getInit()) {
+#ifndef NDEBUG
+          PrettyStackTraceDecl debugStack("walking into initializer", VD);
+#endif
           if (Expr *E2 = doIt(Init))
             VD->setInit(E2);
           else

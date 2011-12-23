@@ -7,6 +7,7 @@ add_swift_library(swiftAST
   Expr.cpp
   Identifier.cpp
   Module.cpp
+  PrettyStackTrace.cpp
   Stmt.cpp
   Type.cpp
   Verifier.cpp
