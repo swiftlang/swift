@@ -17,6 +17,7 @@
 #include "swift/Subsystems.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
@@ -190,7 +191,9 @@ void swift::performTypeChecking(TranslationUnit *TU) {
   // Type check the body of each of the FuncExpr in turn.
   for (FuncExpr *FE : FuncExprs) {
     if (!FE->getBody()) continue;
-    
+
+    PrettyStackTraceExpr StackEntry(TC.Context, "type-checking", FE);
+
     BraceStmt *S = FE->getBody();
     StmtChecker(TC, FE).typeCheckStmt(S);
     FE->setBody(S);

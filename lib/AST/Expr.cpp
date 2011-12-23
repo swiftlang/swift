@@ -634,7 +634,7 @@ namespace {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
         if (Expr *Init = VD->getInit()) {
 #ifndef NDEBUG
-          PrettyStackTraceDecl debugStack("walking into initializer", VD);
+          PrettyStackTraceDecl debugStack("walking into initializer for", VD);
 #endif
           if (Expr *E2 = doIt(Init))
             VD->setInit(E2);
