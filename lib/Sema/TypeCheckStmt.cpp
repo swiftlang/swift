@@ -132,8 +132,6 @@ public:
   
   
 Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
-  SmallVector<BraceStmt::ExprStmtOrDecl, 32> NewElements;
-  
   for (unsigned i = 0, e = BS->getNumElements(); i != e; ++i) {
     if (Expr *SubExpr = BS->getElement(i).dyn_cast<Expr*>()) {
       if (typeCheckExpr(SubExpr)) continue;
@@ -156,7 +154,6 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
     } else {
       Decl *D = BS->getElement(i).get<Decl*>();
       TC.typeCheckDecl(D);
-      NewElements.push_back(D);
     }
   }
   
