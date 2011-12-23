@@ -163,8 +163,7 @@ public:
   IntegerLiteralExpr(StringRef Val, SourceLoc Loc)
     : Expr(ExprKind::IntegerLiteral), Val(Val), Loc(Loc) {}
   
-  // FIXME: Convert to APInt return.
-  uint64_t getValue() const;
+  APInt getValue() const;
 
   StringRef getText() const { return Val; }
   

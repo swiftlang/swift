@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Parser.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
@@ -220,7 +221,7 @@ bool Parser::parseTypeArray(SourceLoc LSquareLoc, Type &Result) {
   // sizes.
   uint64_t SizeVal;
   if (IntegerLiteralExpr *IL = dyn_cast<IntegerLiteralExpr>(Size)) {
-    SizeVal = IL->getValue();
+    SizeVal = IL->getValue().getZExtValue() /*hack*/;
   } else {
     diagnose(Size->getLoc(), diag::non_constant_array);
     return ErrorType::get(Context);

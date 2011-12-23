@@ -83,11 +83,17 @@ unsigned ClosureExpr::getNumArgs() const {
   return 1;  
 }
 
-uint64_t IntegerLiteralExpr::getValue() const {
-  unsigned long long IntVal;
-  bool Error = Val.getAsInteger(0, IntVal);
+APInt IntegerLiteralExpr::getValue() const {
+  assert(!getType().isNull() && "Semantic analysis has not completed");
+  unsigned BitWidth = getType()->castTo<BuiltinIntegerType>()->getBitWidth();
+  
+  llvm::APInt Value(BitWidth, 0);
+  bool Error = getText().getAsInteger(0, Value);
   assert(!Error && "Invalid IntegerLiteral formed"); (void)Error;
-  return IntVal;
+  assert(Value.getActiveBits() <= BitWidth && "Value too large for size");
+  if (Value.getBitWidth() != BitWidth)
+    Value = Value.zextOrTrunc(BitWidth);
+  return Value;
 }
 
 llvm::APFloat FloatLiteralExpr::getValue() const {

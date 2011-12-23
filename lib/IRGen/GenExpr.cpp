@@ -37,12 +37,10 @@ using namespace irgen;
 static RValue emitIntegerLiteralExpr(IRGenFunction &IGF, IntegerLiteralExpr *E,
                                      const TypeInfo &TInfo) {
   // We know that the integer literal type has a BuiltinIntegerType.
-  RValueSchema Schema = TInfo.getSchema();
-  assert(Schema.isScalar(1));
-  llvm::IntegerType *IntTy =cast<llvm::IntegerType>(Schema.getScalarTypes()[0]);
-
-  // FIXME!
-  return RValue::forScalars(llvm::ConstantInt::get(IntTy, E->getValue()));
+  assert(TInfo.getSchema().isScalar(1));
+  assert(isa<llvm::IntegerType>(TInfo.getSchema().getScalarTypes()[0]));
+  return RValue::forScalars(llvm::ConstantInt::get(IGF.IGM.LLVMContext,
+                                                   E->getValue()));
 }
 
 /// Emit an float literal expression.
