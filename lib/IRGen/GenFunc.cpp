@@ -549,14 +549,14 @@ void IRGenFunction::emitEpilogue() {
 }
 
 /// Emit the definition for the given global function.
-void IRGenFunction::emitGlobalFunction(FuncDecl *FD) {
+void IRGenModule::emitGlobalFunction(FuncDecl *FD) {
   // Nothing to do if the function has no body.
   if (!FD->getInit()) return;
 
-  llvm::Function *addr = IGM.getAddrOfGlobalFunction(FD);
+  llvm::Function *addr = getAddrOfGlobalFunction(FD);
 
   FuncExpr *func = cast<FuncExpr>(FD->getInit());
-  IRGenFunction(IGM, func, addr).emitFunctionTopLevel(func->getBody());
+  IRGenFunction(*this, func, addr).emitFunctionTopLevel(func->getBody());
 }
 
 void IRGenFunction::emitFunctionTopLevel(BraceStmt *S) {

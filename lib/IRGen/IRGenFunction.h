@@ -165,7 +165,6 @@ public:
 private:
   void emitGlobalDecl(Decl *D);
   void emitGlobalVariable(VarDecl *D);
-  void emitGlobalFunction(FuncDecl *D);
 };
 
 } // end namespace irgen

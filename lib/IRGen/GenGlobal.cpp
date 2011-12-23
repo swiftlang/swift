@@ -138,7 +138,7 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
     llvm_unreachable("cannot encounter this decl here");
 
   case DeclKind::Extension:
-    // FIXME: implement.
+    IGM.emitExtension(cast<ExtensionDecl>(D));
     return;
 
   // oneof elements can be found at the top level because of struct
@@ -160,7 +160,7 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
     return emitGlobalVariable(cast<VarDecl>(D));
 
   case DeclKind::Func:
-    return emitGlobalFunction(cast<FuncDecl>(D));
+    return IGM.emitGlobalFunction(cast<FuncDecl>(D));
   }
   llvm_unreachable("bad decl kind!");
 }
@@ -245,4 +245,30 @@ IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
 
 LValue IRGenFunction::getGlobal(VarDecl *var, const TypeInfo &type) {
   return emitAddressLValue(IGM.getAddrOfGlobalVariable(var, type));
+}
+
+/// Emit a type extension.
+void IRGenModule::emitExtension(ExtensionDecl *ext) {
+  for (Decl *member : ext->getMembers()) {
+    switch (member->getKind()) {
+    case DeclKind::Import:
+    case DeclKind::Arg:
+    case DeclKind::OneOfElement:
+    case DeclKind::ElementRef:
+      llvm_unreachable("decl not allowed in extension!");
+    case DeclKind::Extension:
+      emitExtension(cast<ExtensionDecl>(member));
+      continue;
+    case DeclKind::TypeAlias:
+      emitTypeAlias(cast<TypeAliasDecl>(member)->getUnderlyingType());
+      continue;
+    case DeclKind::Var:
+      unimplemented(member->getLocStart(), "var decl in extension");
+      continue;
+    case DeclKind::Func:
+      unimplemented(member->getLocStart(), "func decl in extension");
+      continue;
+    }
+    llvm_unreachable("bad extension member kind");
+  }
 }

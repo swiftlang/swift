@@ -39,6 +39,7 @@ namespace swift {
   class ASTContext;
   class BraceStmt;
   class Decl;
+  class ExtensionDecl;
   class FuncDecl;
   class NamedDecl;
   class OneOfElementDecl;
@@ -110,9 +111,12 @@ public:
 
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }
 
-  void emitOneOfType(OneOfType *type);
-
   void emitTranslationUnit(TranslationUnit *TU);
+
+  void emitOneOfType(OneOfType *type);
+  void emitExtension(ExtensionDecl *D);
+  void emitGlobalFunction(FuncDecl *D);  
+
   Address getAddrOfGlobalVariable(VarDecl *D, const TypeInfo &type);
   llvm::Function *getAddrOfGlobalFunction(FuncDecl *D);
   llvm::Function *getAddrOfInjectionFunction(OneOfElementDecl *D);
