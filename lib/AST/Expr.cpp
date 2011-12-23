@@ -579,14 +579,9 @@ namespace {
             return 0;
           continue;
         }
-        Decl *D = BS->getElement(i).get<Decl*>();
-        if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-          if (Expr *Init = VD->getInit()) {
-            if (Expr *E2 = doIt(Init))
-              VD->setInit(E2);
-            else
-              return 0;
-          }
+
+        if (visitDecl(BS->getElement(i).get<Decl*>()))
+          return 0;
       }
       
       return BS;
@@ -631,6 +626,24 @@ namespace {
       else
         return 0;
       return WS;
+    }
+
+    /// Returns true on failure.
+    bool visitDecl(Decl *D) {
+      if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
+        if (Expr *Init = VD->getInit()) {
+          if (Expr *E2 = doIt(Init))
+            VD->setInit(E2);
+          else
+            return true;
+        }
+      } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
+        for (Decl *M : ED->getMembers()) {
+          if (visitDecl(M))
+            return true;
+        }
+      }
+      return false;
     }
        
   public:
