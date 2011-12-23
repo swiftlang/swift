@@ -276,6 +276,17 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
   return new (Binder.Context) OverloadSetRefExpr(DeclList, Loc);
 }
 
+static void bindNamesInDecl(Decl *D, WalkExprType ^BinderBlock) {
+  if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
+    if (VD->getInit())
+      VD->setInit(VD->getInit()->walk(BinderBlock));
+  } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
+    for (Decl *Member : ED->getMembers()) {
+      bindNamesInDecl(Member, BinderBlock);
+    }
+  }
+}
+
 /// performNameBinding - Once parsing is complete, this walks the AST to
 /// resolve names and do other top-level validation.
 ///
@@ -360,9 +371,7 @@ void swift::performNameBinding(TranslationUnit *TU) {
   for (unsigned i = 0, e = TU->Body->getNumElements(); i != e; ++i) {
     BraceStmt::ExprStmtOrDecl Elt = TU->Body->getElement(i);
     if (Decl *D = Elt.dyn_cast<Decl*>()) {
-      if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-        if (VD->getInit())
-          VD->setInit(VD->getInit()->walk(BinderBlock));
+      bindNamesInDecl(D, BinderBlock);
     } else if (Stmt *S = Elt.dyn_cast<Stmt*>()) {
       Elt = S->walk(BinderBlock);
     } else {
