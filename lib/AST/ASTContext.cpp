@@ -50,18 +50,13 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
     TheErrorType(new (*this) ErrorType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheDependentType(new (*this) DependentType(*this)),
-    TheIEEE32Type(new (*this) BuiltinFloatingPointType(
-                                    BuiltinFloatingPointType::IEEE32, *this)),
-    TheIEEE64Type(new (*this) BuiltinFloatingPointType(
-                                    BuiltinFloatingPointType::IEEE64, *this)),
-    TheIEEE16Type(new (*this) BuiltinFloatingPointType(
-                                      BuiltinFloatingPointType::IEEE16, *this)),
-    TheIEEE80Type(new (*this) BuiltinFloatingPointType(
-                                      BuiltinFloatingPointType::IEEE80, *this)),
-    TheIEEE128Type(new (*this) BuiltinFloatingPointType(
-                                     BuiltinFloatingPointType::IEEE128, *this)),
-    ThePPC128Type(new (*this) BuiltinFloatingPointType(
-                                     BuiltinFloatingPointType::PPC128, *this)) {
+    TheIEEE32Type(new (*this) BuiltinFloatType(BuiltinFloatType::IEEE32,*this)),
+    TheIEEE64Type(new (*this) BuiltinFloatType(BuiltinFloatType::IEEE64,*this)),
+    TheIEEE16Type(new (*this) BuiltinFloatType(BuiltinFloatType::IEEE16,*this)),
+    TheIEEE80Type(new (*this) BuiltinFloatType(BuiltinFloatType::IEEE80,*this)),
+    TheIEEE128Type(new (*this) BuiltinFloatType(BuiltinFloatType::IEEE128,
+                                                *this)),
+    ThePPC128Type(new (*this) BuiltinFloatType(BuiltinFloatType::PPC128,*this)){
 }
 
 ASTContext::~ASTContext() {

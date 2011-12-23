@@ -99,7 +99,7 @@ APInt IntegerLiteralExpr::getValue() const {
 llvm::APFloat FloatLiteralExpr::getValue() const {
   assert(!getType().isNull() && "Semantic analysis has not completed");
   
-  APFloat Val(getType()->castTo<BuiltinFloatingPointType>()->getAPFloatSemantics());
+  APFloat Val(getType()->castTo<BuiltinFloatType>()->getAPFloatSemantics());
   APFloat::opStatus Res =
     Val.convertFromString(getText(), llvm::APFloat::rmNearestTiesToEven);
   assert(Res != APFloat::opInvalidOp && "Sema didn't reject invalid number");

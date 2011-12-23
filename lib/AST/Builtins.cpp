@@ -120,7 +120,7 @@ inline bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
   case OverloadedBuiltinKind::Integer:
     return T->is<BuiltinIntegerType>();
   case OverloadedBuiltinKind::Float:
-    return T->is<BuiltinFloatingPointType>();
+    return T->is<BuiltinFloatType>();
   case OverloadedBuiltinKind::Arithmetic:
     return true;
   }

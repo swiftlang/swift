@@ -39,7 +39,7 @@ namespace swift {
   enum class TypeKind {
     Error,       // An erroneously constructed type.
     BuiltinInteger,
-    BuiltinFloatingPoint,
+    BuiltinFloat,
     Dependent,
     NameAlias,
     Tuple,
@@ -182,7 +182,7 @@ public:
   }
 };
   
-class BuiltinFloatingPointType : public TypeBase {
+class BuiltinFloatType : public TypeBase {
   friend class ASTContext;
 public:
   enum FPKind {
@@ -192,8 +192,8 @@ public:
 private:
   FPKind Kind;
   
-  BuiltinFloatingPointType(FPKind Kind, ASTContext &C)
-    : TypeBase(TypeKind::BuiltinFloatingPoint, &C), Kind(Kind) {}
+  BuiltinFloatType(FPKind Kind, ASTContext &C)
+    : TypeBase(TypeKind::BuiltinFloat, &C), Kind(Kind) {}
 public:
   
   /// getFPKind - Get the 
@@ -205,9 +205,9 @@ public:
   
   void print(raw_ostream &OS) const;
 
-  static bool classof(const BuiltinFloatingPointType *) { return true; }
+  static bool classof(const BuiltinFloatType *) { return true; }
   static bool classof(const TypeBase *T) {
-    return T->Kind == TypeKind::BuiltinFloatingPoint;
+    return T->Kind == TypeKind::BuiltinFloat;
   }
 };
   

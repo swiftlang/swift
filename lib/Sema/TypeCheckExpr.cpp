@@ -107,7 +107,7 @@ Expr *TypeChecker::applyTypeToLiteral(Expr *E, Type DestTy) {
   // "chaining", and an implicit conversion through that type).
   Expr *Intermediate;
   BuiltinIntegerType *BIT;
-  BuiltinFloatingPointType *BFT;
+  BuiltinFloatType *BFT;
   if (isInt && (BIT = ArgType->getAs<BuiltinIntegerType>())) {
     // If this is a direct use of the builtin integer type, use the integer size
     // to diagnose excess precision issues.
@@ -125,7 +125,7 @@ Expr *TypeChecker::applyTypeToLiteral(Expr *E, Type DestTy) {
     // Give the integer literal the builtin integer type.
     E->setType(ArgType, ValueKind::RValue);
     Intermediate = E;
-  } else if (!isInt && (BFT = ArgType->getAs<BuiltinFloatingPointType>())) {
+  } else if (!isInt && (BFT = ArgType->getAs<BuiltinFloatType>())) {
     // If this is a direct use of a builtin floating point type, use the
     // floating point type to do the syntax verification.
     llvm::APFloat Val(BFT->getAPFloatSemantics());
@@ -162,7 +162,7 @@ Expr *TypeChecker::applyTypeToLiteral(Expr *E, Type DestTy) {
     
     if (isInt && LiteralInfo.second->is<BuiltinIntegerType>()) {
       // ok.
-    } else if (!isInt && LiteralInfo.second->is<BuiltinFloatingPointType>()) {
+    } else if (!isInt && LiteralInfo.second->is<BuiltinFloatType>()) {
       // ok.
     } else {
       diagnose(Method->getLocStart(),

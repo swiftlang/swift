@@ -109,24 +109,24 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
     llvm_unreachable("generating an error type");
   case TypeKind::Dependent:
     llvm_unreachable("generating a dependent type");
-  case TypeKind::BuiltinFloatingPoint:
-    switch (cast<BuiltinFloatingPointType>(T)->getFPKind()) {
-    case BuiltinFloatingPointType::IEEE16:
+  case TypeKind::BuiltinFloat:
+    switch (cast<BuiltinFloatType>(T)->getFPKind()) {
+    case BuiltinFloatType::IEEE16:
       return new PrimitiveTypeInfo(llvm::Type::getHalfTy(Ctx),
                                    Size(2), Alignment(2));
-    case BuiltinFloatingPointType::IEEE32:
+    case BuiltinFloatType::IEEE32:
       return new PrimitiveTypeInfo(llvm::Type::getFloatTy(Ctx),
                                    Size(4), Alignment(4));
-    case BuiltinFloatingPointType::IEEE64:
+    case BuiltinFloatType::IEEE64:
       return new PrimitiveTypeInfo(llvm::Type::getDoubleTy(Ctx),
                                    Size(8), Alignment(8));
-    case BuiltinFloatingPointType::IEEE80:
+    case BuiltinFloatType::IEEE80:
       return new PrimitiveTypeInfo(llvm::Type::getX86_FP80Ty(Ctx),
                                    Size(10), Alignment(16));
-    case BuiltinFloatingPointType::IEEE128:
+    case BuiltinFloatType::IEEE128:
       return new PrimitiveTypeInfo(llvm::Type::getFP128Ty(Ctx),
                                    Size(16), Alignment(16));
-    case BuiltinFloatingPointType::PPC128:
+    case BuiltinFloatType::PPC128:
       return new PrimitiveTypeInfo(llvm::Type::getPPC_FP128Ty(Ctx),
                                    Size(16), Alignment(16));
     }

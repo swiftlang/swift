@@ -53,7 +53,7 @@ TypeBase *TypeBase::getCanonicalType() {
   TypeBase *Result = 0;
   switch (Kind) {
   case TypeKind::Error:
-  case TypeKind::BuiltinFloatingPoint:
+  case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinInteger:
   case TypeKind::Dependent:
   case TypeKind::OneOf:
@@ -104,7 +104,7 @@ TypeBase *TypeBase::getDesugaredType() {
   switch (Kind) {
   case TypeKind::Error:
   case TypeKind::Dependent:
-  case TypeKind::BuiltinFloatingPoint:
+  case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinInteger:
   case TypeKind::OneOf:
   case TypeKind::Tuple:
@@ -122,14 +122,14 @@ TypeBase *TypeBase::getDesugaredType() {
   return 0;
 }
 
-const llvm::fltSemantics &BuiltinFloatingPointType::getAPFloatSemantics() const{
+const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {
   switch (getFPKind()) {
-    case BuiltinFloatingPointType::IEEE16:  return APFloat::IEEEhalf;
-    case BuiltinFloatingPointType::IEEE32:  return APFloat::IEEEsingle;
-    case BuiltinFloatingPointType::IEEE64:  return APFloat::IEEEdouble;
-    case BuiltinFloatingPointType::IEEE80:  return APFloat::x87DoubleExtended;
-    case BuiltinFloatingPointType::IEEE128: return APFloat::IEEEquad;
-    case BuiltinFloatingPointType::PPC128:  return APFloat::PPCDoubleDouble;
+    case BuiltinFloatType::IEEE16:  return APFloat::IEEEhalf;
+    case BuiltinFloatType::IEEE32:  return APFloat::IEEEsingle;
+    case BuiltinFloatType::IEEE64:  return APFloat::IEEEdouble;
+    case BuiltinFloatType::IEEE80:  return APFloat::x87DoubleExtended;
+    case BuiltinFloatType::IEEE128: return APFloat::IEEEquad;
+    case BuiltinFloatType::PPC128:  return APFloat::PPCDoubleDouble;
   }
   assert(0 && "Unknown FP semantics");
   return APFloat::IEEEhalf;
@@ -258,8 +258,7 @@ void TypeBase::print(raw_ostream &OS) const {
   switch (Kind) {
   case TypeKind::Error:         return cast<ErrorType>(this)->print(OS);
   case TypeKind::Dependent:     return cast<DependentType>(this)->print(OS);
-  case TypeKind::BuiltinFloatingPoint:
-    return cast<BuiltinFloatingPointType>(this)->print(OS);
+  case TypeKind::BuiltinFloat:  return cast<BuiltinFloatType>(this)->print(OS);
   case TypeKind::BuiltinInteger:
     return cast<BuiltinIntegerType>(this)->print(OS);
   case TypeKind::NameAlias:     return cast<NameAliasType>(this)->print(OS);
@@ -275,7 +274,7 @@ void BuiltinIntegerType::print(raw_ostream &OS) const {
   OS << "Builtin::int" << cast<BuiltinIntegerType>(this)->getBitWidth();
 }
 
-void BuiltinFloatingPointType::print(raw_ostream &OS) const {
+void BuiltinFloatType::print(raw_ostream &OS) const {
   switch (Kind) {
   case IEEE16:  OS << "Builtin::FP_IEEE16"; return;
   case IEEE32:  OS << "Builtin::FP_IEEE32"; return;
