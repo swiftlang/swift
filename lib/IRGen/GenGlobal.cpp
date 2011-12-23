@@ -265,9 +265,16 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     case DeclKind::Var:
       unimplemented(member->getLocStart(), "var decl in extension");
       continue;
-    case DeclKind::Func:
-      unimplemented(member->getLocStart(), "func decl in extension");
+    case DeclKind::Func: {
+      FuncDecl *func = cast<FuncDecl>(member);
+      if (func->isPlus()) {
+        // Eventually this won't always be the right thing.
+        emitGlobalFunction(func);
+      } else {
+        unimplemented(member->getLocStart(), "non-plus FuncDecl in extension");
+      }
       continue;
+      }
     }
     llvm_unreachable("bad extension member kind");
   }
