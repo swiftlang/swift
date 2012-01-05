@@ -426,11 +426,15 @@ public:
 
   const ArrayRef<ValueDecl*> Elements;
 
+  /// TheDecl - This is the TypeAlias that the oneof was declared with.  It
+  /// specifies the name and other useful information about this type.
+  TypeAliasDecl * const TheDecl;
+
   /// getNew - Return a new instance of a protocol type.  These are never
   /// uniqued since each syntactic instance of them is semantically considered
   /// to be a different type.
   static ProtocolType *getNew(SourceLoc ProtocolLoc, ArrayRef<ValueDecl*> Elts,
-                              DeclContext *Parent);
+                              TypeAliasDecl *TheDecl);
   
   void print(raw_ostream &OS) const;
   
@@ -440,11 +444,7 @@ public:
 
 private:
   ProtocolType(SourceLoc ProtocolLoc, ArrayRef<ValueDecl*> Elts,
-               DeclContext *Parent)
-  : TypeBase(TypeKind::Protocol, &Parent->getASTContext()),
-    DeclContext(DeclContextKind::ProtocolType, Parent),
-    ProtocolLoc(ProtocolLoc), Elements(Elts) {
-  }
+               TypeAliasDecl *TheDecl);
 };
 
 } // end namespace swift

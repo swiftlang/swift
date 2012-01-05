@@ -880,8 +880,7 @@ Decl *Parser::parseDeclProtocol() {
   
   TypeAliasDecl *TAD = ScopeInfo.addTypeAliasToScope(NameLoc, ProtocolName,
                                                      Type());
-  Type ProtocolType;
-  if (parseProtocolBody(ProtocolLoc, Attributes, ProtocolType, TAD))
+  if (parseProtocolBody(ProtocolLoc, Attributes, TAD))
     return 0;
   return TAD;
 }
@@ -895,7 +894,7 @@ Decl *Parser::parseDeclProtocol() {
 ///
 bool Parser::parseProtocolBody(SourceLoc ProtocolLoc, 
                                const DeclAttributes &Attributes,
-                               Type &Result, TypeAliasDecl *TypeName) {
+                               TypeAliasDecl *TypeName) {
   // Parse the body.
   if (parseToken(tok::l_brace, diag::expected_lbrace_protocol_type))
     return true;
@@ -932,8 +931,7 @@ bool Parser::parseProtocolBody(SourceLoc ProtocolLoc,
   if (!Attributes.empty())
     diagnose(Attributes.LSquareLoc, diag::protocol_attributes);
   
-  ProtocolType *NewProto = ProtocolType::getNew(ProtocolLoc, Elements,
-                                                CurDeclContext);
+  ProtocolType *NewProto = ProtocolType::getNew(ProtocolLoc, Elements,TypeName);
   
   // Install all of the members of protocol into the protocol's DeclContext.
   for (Decl *D : Elements)
@@ -942,7 +940,6 @@ bool Parser::parseProtocolBody(SourceLoc ProtocolLoc,
   // Complete the pretty name for this type.
   TypeName->setUnderlyingType(NewProto);
   
-  Result = NewProto;
   return false;
 }
 

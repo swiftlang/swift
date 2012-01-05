@@ -209,9 +209,15 @@ ArrayType::ArrayType(Type base, uint64_t size)
 /// to be a different type.
 ProtocolType *ProtocolType::getNew(SourceLoc ProtocolLoc,
                                    ArrayRef<ValueDecl*> Elts,
-                                   DeclContext *Parent) {
-  ASTContext &C = Parent->getASTContext();
-  return new (C) ProtocolType(ProtocolLoc, C.AllocateCopy(Elts), Parent);
+                                   TypeAliasDecl *TheDecl) {
+  ASTContext &C = TheDecl->getASTContext();
+  return new (C) ProtocolType(ProtocolLoc, C.AllocateCopy(Elts), TheDecl);
 }
 
+ProtocolType::ProtocolType(SourceLoc ProtocolLoc, ArrayRef<ValueDecl*> Elts,
+                           TypeAliasDecl *TheDecl)
+  : TypeBase(TypeKind::Protocol, &TheDecl->getASTContext()),
+    DeclContext(DeclContextKind::ProtocolType, TheDecl->getDeclContext()),
+    ProtocolLoc(ProtocolLoc), Elements(Elts), TheDecl(TheDecl) {
+}
 

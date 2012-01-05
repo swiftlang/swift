@@ -195,7 +195,7 @@ public:
   FuncDecl *parseDeclFunc(Type ThisType = Type());
   Decl *parseDeclProtocol();
   bool parseProtocolBody(SourceLoc ProtocolLoc, const DeclAttributes &Attrs,
-                         Type &Result, TypeAliasDecl *TypeName = 0);
+                         TypeAliasDecl *TypeName = 0);
 
   void actOnVarDeclName(const DeclVarName *Name,
                         SmallVectorImpl<unsigned> &AccessPath,
