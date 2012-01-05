@@ -487,6 +487,8 @@ ERROR(return_invalid_outside_func,sema_tcs,none,
       "return invalid outside of a func", ())
 ERROR(expression_unresolved_function,sema_tcs,none,
       "expression resolves to an unevaluated function", ())
+ERROR(assignment_lhs_not_lvalue,sema_tcs,none,
+      "cannot assign to the result of this expression", ())
 
 //==============================================================================
 // IR Generation Diagnostics

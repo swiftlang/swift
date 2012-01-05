@@ -72,6 +72,9 @@ public:
     if (typeCheckExpr(E)) return 0;
     S->setDest(E);
 
+    if (E->getValueKind() != ValueKind::LValue)
+      TC.diagnose(E->getLoc(), diag::assignment_lhs_not_lvalue);
+
     E = S->getSrc();
     if (typeCheckExpr(E, S->getDest()->getType())) return 0;
     S->setSrc(E);
