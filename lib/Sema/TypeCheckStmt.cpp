@@ -91,7 +91,10 @@ public:
     }
 
     Expr *E = RS->getResult();
-    if (typeCheckExpr(E, TheFunc->getType()->castTo<FunctionType>()->Result))
+    Type ResultTy = TheFunc->getType()->castTo<FunctionType>()->Result;
+    while (FunctionType *Fn = ResultTy->getAs<FunctionType>())
+      ResultTy = Fn->Result;
+    if (typeCheckExpr(E, ResultTy))
       return 0;
     RS->setResult(E);
 
@@ -173,7 +176,7 @@ void swift::performTypeChecking(TranslationUnit *TU) {
   
   // Find all the FuncExprs in the translation unit and collapse all
   // the sequences.
-  std::vector<FuncExpr*> FuncExprs;
+  SmallVector<FuncExpr*, 32> FuncExprs;
   auto FuncExprs_ptr = &FuncExprs;            // Blocks are annoying.
   auto TC_ptr = &TC;                          // Again.
   TU->Body->walk(^(Expr *E, WalkOrder Order, WalkContext const&) {
