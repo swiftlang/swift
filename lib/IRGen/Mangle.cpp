@@ -203,6 +203,9 @@ void Mangler::mangleType(Type type) {
     mangleType(alias->getUnderlyingType());
     return;
   }
+  case TypeKind::Paren:
+    mangleType(cast<ParenType>(base)->getUnderlyingType());
+    return;
 
   case TypeKind::Tuple: {
     TupleType *tuple = cast<TupleType>(base);

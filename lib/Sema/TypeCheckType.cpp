@@ -70,6 +70,8 @@ bool TypeChecker::validateType(Type InTy) {
       cast<NameAliasType>(T)->TheDecl
         ->overwriteUnderlyingType(ErrorType::get(Context));
     break;
+  case TypeKind::Paren:
+    return validateType(cast<ParenType>(T)->getUnderlyingType());
   case TypeKind::Tuple: {
     TupleType *TT = cast<TupleType>(T);
     
