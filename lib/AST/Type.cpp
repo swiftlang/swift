@@ -56,6 +56,7 @@ TypeBase *TypeBase::getCanonicalType() {
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinInteger:
   case TypeKind::Dependent:
+  case TypeKind::MetaType:
   case TypeKind::OneOf:
   case TypeKind::Protocol:
     assert(0 && "These are always canonical");
@@ -110,6 +111,7 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinInteger:
   case TypeKind::OneOf:
+  case TypeKind::MetaType:
   case TypeKind::Tuple:
   case TypeKind::Function:
   case TypeKind::Array:
@@ -268,6 +270,7 @@ void TypeBase::print(raw_ostream &OS) const {
   case TypeKind::Paren:         return cast<ParenType>(this)->print(OS);
   case TypeKind::NameAlias:     return cast<NameAliasType>(this)->print(OS);
   case TypeKind::OneOf:         return cast<OneOfType>(this)->print(OS);
+  case TypeKind::MetaType:      return cast<MetaTypeType>(this)->print(OS);
   case TypeKind::Tuple:         return cast<TupleType>(this)->print(OS);
   case TypeKind::Function:      return cast<FunctionType>(this)->print(OS);
   case TypeKind::Array:         return cast<ArrayType>(this)->print(OS);
@@ -320,6 +323,11 @@ void OneOfType::print(raw_ostream &OS) const {
   
   OS << '}';
 }
+
+void MetaTypeType::print(raw_ostream &OS) const {
+  OS << "metatype<" << TheType->TheDecl->getName() << '>';
+}
+
 
 void TupleType::print(raw_ostream &OS) const {
   OS << "(";

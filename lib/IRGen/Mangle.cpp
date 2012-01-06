@@ -182,6 +182,9 @@ void Mangler::mangleType(Type type) {
   case TypeKind::Dependent:
     llvm_unreachable("mangling dependent type");
 
+  case TypeKind::MetaType:
+    llvm_unreachable("Cannot mangle metatype yet");
+      
   // We don't care about these types being a bit verbose because we
   // don't expect them to come up that often in API names.
   case TypeKind::BuiltinFloat:

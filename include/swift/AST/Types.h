@@ -45,6 +45,7 @@ namespace swift {
     Paren,
     Tuple,
     OneOf,
+    MetaType,
     Function,
     Array,
     Protocol
@@ -387,11 +388,36 @@ public:
   }
   
 private:
-  // oneof types are always canonical.
   OneOfType(SourceLoc OneOfLoc, ArrayRef<OneOfElementDecl*> Elts,
             TypeAliasDecl *TheDecl);
 };
 
+/// MetaTypeType - This is the type given to a metatype value.  When a type is
+/// declared, a 'metatype' value is injected into the value namespace to
+/// resolve references to the type.  An example:
+///
+///  struct x { ... }  // declares type 'x' and metatype 'x'.
+///  x.a()             // use of the metatype value since its a value context.
+///
+/// MetaTypeType is typically given to MetaTypeDecl, and can also exist on
+/// DeclRefExpr, ParenExpr, etc.
+class MetaTypeType : public TypeBase {
+public:
+  /// TODO: Eventually this should handle protocols etc as well.
+  OneOfType *const TheType;
+  
+  /// getNew - Return the MetaTypeType for the specified type.
+  static MetaTypeType *get(OneOfType *Type);
+
+  void print(raw_ostream &O) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const MetaTypeType *D) { return true; }
+  static bool classof(const TypeBase *T) {return T->Kind == TypeKind::MetaType;}
+  
+private:
+  MetaTypeType(OneOfType *Type);
+};
   
 /// FunctionType - A function type has a single input and result, e.g.
 /// "int -> int" or (var a : int, var b : int) -> (int, int).

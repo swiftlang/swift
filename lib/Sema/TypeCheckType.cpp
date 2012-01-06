@@ -63,6 +63,11 @@ bool TypeChecker::validateType(Type InTy) {
       if (IsInvalid) break;
     }
     break;
+      
+  case TypeKind::MetaType:
+    // Nothing to validate for metatypes.
+    break;
+
   case TypeKind::NameAlias:
     IsInvalid = validateType(cast<NameAliasType>(T)->TheDecl
                                ->getUnderlyingType());
