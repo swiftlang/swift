@@ -490,7 +490,7 @@ static void AddFuncArgumentsToScope(Type Ty,
                                     Parser &P) {
   // Handle the function case first.
   if (Mode == FuncTypePiece::Function) {
-    FunctionType *FT = cast<FunctionType>(Ty.getPointer());
+    FunctionType *FT = cast<FunctionType>(Ty);
     AddFuncArgumentsToScope(FT->Input, FuncTypePiece::Input,
                             FuncLoc, ArgDecls, P);
     

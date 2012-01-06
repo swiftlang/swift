@@ -179,6 +179,12 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
       return true;
     }
   }
+
+  // A "tuple" with one anonymous element is actually not a tuple.
+  if (Elements.size() == 1 && Elements.back().Name.empty()) {
+    Result = ParenType::get(Context, Elements.back().Ty);
+    return false;
+  }
   
   Result = TupleType::get(Elements, Context);
   return false;

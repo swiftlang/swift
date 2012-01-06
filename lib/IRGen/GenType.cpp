@@ -130,7 +130,7 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
       return new PrimitiveTypeInfo(llvm::Type::getPPC_FP128Ty(Ctx),
                                    Size(16), Alignment(16));
     }
-    assert(0 && "Unreachable");
+    llvm_unreachable("bad builtin floating-point type kind");
   case TypeKind::BuiltinInteger: {
     unsigned BitWidth = cast<BuiltinIntegerType>(T)->getBitWidth();
     unsigned ByteSize = (BitWidth+7U)/8U;
@@ -141,6 +141,8 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
     return new PrimitiveTypeInfo(llvm::IntegerType::get(Ctx, BitWidth),
                                  Size(ByteSize), Alignment(ByteSize));
   }
+  case TypeKind::Paren:
+    return &getFragileTypeInfo(IGM, cast<ParenType>(TB)->getUnderlyingType());
   case TypeKind::NameAlias:
     return &getFragileTypeInfo(IGM,
                       cast<NameAliasType>(TB)->TheDecl->getUnderlyingType());

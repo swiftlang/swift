@@ -59,6 +59,9 @@ TypeBase *TypeBase::getCanonicalType() {
   case TypeKind::OneOf:
   case TypeKind::Protocol:
     assert(0 && "These are always canonical");
+  case TypeKind::Paren:
+    Result = cast<ParenType>(this)->getUnderlyingType()->getCanonicalType();
+    break;
   case TypeKind::NameAlias:
     Result = cast<NameAliasType>(this)->
                   getDesugaredType()->getCanonicalType();
@@ -113,13 +116,14 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::Protocol:
     // None of these types have sugar at the outer level.
     return this;
+  case TypeKind::Paren:
+    return cast<ParenType>(this)->getUnderlyingType()->getDesugaredType();
   case TypeKind::NameAlias:
     return cast<NameAliasType>(this)->TheDecl->getUnderlyingType()
              ->getDesugaredType();
   }
 
-  assert(0 && "Unknown type kind");
-  return 0;
+  llvm_unreachable("Unknown type kind");
 }
 
 const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {
@@ -261,6 +265,7 @@ void TypeBase::print(raw_ostream &OS) const {
   case TypeKind::BuiltinFloat:  return cast<BuiltinFloatType>(this)->print(OS);
   case TypeKind::BuiltinInteger:
     return cast<BuiltinIntegerType>(this)->print(OS);
+  case TypeKind::Paren:         return cast<ParenType>(this)->print(OS);
   case TypeKind::NameAlias:     return cast<NameAliasType>(this)->print(OS);
   case TypeKind::OneOf:         return cast<OneOfType>(this)->print(OS);
   case TypeKind::Tuple:         return cast<TupleType>(this)->print(OS);
@@ -291,6 +296,12 @@ void ErrorType::print(raw_ostream &OS) const {
 
 void DependentType::print(raw_ostream &OS) const {
   OS << "<<dependent type>>";
+}
+
+void ParenType::print(raw_ostream &OS) const {
+  OS << '(';
+  UnderlyingType->print(OS);
+  OS << ')';
 }
 
 void NameAliasType::print(raw_ostream &OS) const {

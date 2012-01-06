@@ -51,6 +51,7 @@ public:
   void *FunctionTypes;   // DenseMap<std::pair<Type*, Type*>, FunctionType*>
   void *ArrayTypes;      // DenseMap<std::pair<Type*, uint64_t>, ArrayType*>
   void *IntegerTypes;    // DenseMap<unsigned, BuiltinIntegerType>
+  void *ParenTypes;      // DenseMap<Type*, ParenType*>
 public:
   
   ASTContext(llvm::SourceMgr &SourceMgr, DiagnosticEngine &Diags);

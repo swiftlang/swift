@@ -619,6 +619,8 @@ public:
   ArrayRef<ArgDecl*> getNamedArgs() const { return NamedArgs; }
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *S) { Body = S; }
+
+  Type getBodyResultType() const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const FuncExpr *) { return true; }

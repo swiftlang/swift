@@ -131,6 +131,24 @@ SourceRange FuncExpr::getSourceRange() const {
   return SourceRange(FuncLoc, Body->getEndLoc());
 }
 
+/// Returns the result type of the function defined by the body.  For
+/// an uncurried function, this is just the normal result type; for a
+/// curried function, however, this is the result type of the
+/// uncurried part.
+///
+/// Examples:
+///   func(x : int) -> ((y : int) -> (int -> int))
+///     The body result type is '((y : int) -> (int -> int))'.
+///   func(x : int) -> (y : int) -> (int -> int)
+///     The body result type is '(int -> int)'.
+Type FuncExpr::getBodyResultType() const {
+  Type ty = cast<FunctionType>(getType())->Result;
+  while (FunctionType *fn = dyn_cast<FunctionType>(ty)) {
+    ty = fn->Result;
+  }
+  return ty;
+}
+
 static ValueDecl *getCalledValue(Expr *E) {
   if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
     return DRE->getDecl();

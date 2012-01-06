@@ -42,6 +42,7 @@ namespace swift {
     BuiltinFloat,
     Dependent,
     NameAlias,
+    Paren,
     Tuple,
     OneOf,
     Function,
@@ -244,6 +245,27 @@ public:
   static bool classof(const NameAliasType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->Kind == TypeKind::NameAlias;
+  }
+};
+
+/// ParenType - A paren type is a type that's been written in parentheses.
+class ParenType : public TypeBase {
+  Type UnderlyingType;
+
+  friend class ASTContext;
+  ParenType(Type underlying)
+    : TypeBase(TypeKind::Paren), UnderlyingType(underlying) {}
+public:
+  Type getUnderlyingType() const { return UnderlyingType; }
+
+  static ParenType *get(ASTContext &C, Type underlying);
+   
+  void print(raw_ostream &OS) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ParenType *) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->Kind == TypeKind::Paren;
   }
 };
 

@@ -35,7 +35,11 @@ typedef llvm::DenseMap<std::pair<Type,Type>, FunctionType*> FunctionTypesMapTy;
 /// ArrayTypesMapTy - This is the actual type underlying 'ArrayTypes'.
 typedef llvm::DenseMap<std::pair<Type, uint64_t>, ArrayType*> ArrayTypesMapTy;
 
+/// IntegerTypesMapTy - This is the actual type underlying 'IntegerTypes'.
 typedef llvm::DenseMap<unsigned, BuiltinIntegerType*> IntegerTypesMapTy;
+
+/// ParenTypesMapTy - This is the actual type underlying 'ParenTypes'.
+typedef llvm::DenseMap<Type, ParenType*> ParenTypesMapTy;
 
 ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
   : Allocator(new llvm::BumpPtrAllocator()),
@@ -44,6 +48,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
     FunctionTypes(new FunctionTypesMapTy()),
     ArrayTypes(new ArrayTypesMapTy()),
     IntegerTypes(new IntegerTypesMapTy()),
+    ParenTypes(new ParenTypesMapTy()),
     SourceMgr(sourcemgr),
     Diags(Diags),
     TheBuiltinModule(new (*this) BuiltinModule(getIdentifier("Builtin"),*this)),
@@ -104,6 +109,13 @@ BuiltinIntegerType *BuiltinIntegerType::get(unsigned BitWidth, ASTContext &C) {
   return Result;
 }
 
+ParenType *ParenType::get(ASTContext &C, Type underlying) {
+  ParenTypesMapTy &ParenTypesMap = *(ParenTypesMapTy*) C.ParenTypes;
+  ParenType *&Result = ParenTypesMap[underlying];
+  if (Result == 0)
+    Result = new (C) ParenType(underlying);
+  return Result;
+}
 
 Type TupleType::getEmpty(ASTContext &C) { return C.TheEmptyTupleType; }
 

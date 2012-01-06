@@ -91,10 +91,7 @@ public:
     }
 
     Expr *E = RS->getResult();
-    Type ResultTy = TheFunc->getType()->castTo<FunctionType>()->Result;
-    while (FunctionType *Fn = ResultTy->getAs<FunctionType>())
-      ResultTy = Fn->Result;
-    if (typeCheckExpr(E, ResultTy))
+    if (typeCheckExpr(E, TheFunc->getBodyResultType()))
       return 0;
     RS->setResult(E);
 
