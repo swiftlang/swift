@@ -728,6 +728,9 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
   return false;
 }
 
+/// actOnOneOfType - Generate a oneof type and wire it into the scope tree.
+/// This is functionality shared by the different sugared forms of oneof types.
+///
 OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
                                   const DeclAttributes &Attrs,
                                   ArrayRef<OneOfElementInfo> Elts,
