@@ -135,6 +135,7 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
   switch (D->getKind()) {
   case DeclKind::Arg:
   case DeclKind::ElementRef:
+  case DeclKind::MetaType:
     llvm_unreachable("cannot encounter this decl here");
 
   case DeclKind::Extension:
@@ -255,6 +256,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     case DeclKind::Arg:
     case DeclKind::OneOfElement:
     case DeclKind::ElementRef:
+    case DeclKind::MetaType:
       llvm_unreachable("decl not allowed in extension!");
     case DeclKind::Extension:
       emitExtension(cast<ExtensionDecl>(member));

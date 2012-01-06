@@ -27,6 +27,7 @@ void IRGenFunction::emitLocal(Decl *D) {
   case DeclKind::Import:
   case DeclKind::Arg:
   case DeclKind::ElementRef:
+  case DeclKind::MetaType:
     llvm_unreachable("declaration cannot appear in local scope");
 
   // Type aliases require IR-gen support if they're really

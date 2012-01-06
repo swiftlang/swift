@@ -128,6 +128,8 @@ TypeJudgement ValueDecl::getTypeJudgement() const {
   case DeclKind::Extension:
   case DeclKind::TypeAlias:
     llvm_unreachable("non-value decls don't have type judgements");
+  case DeclKind::MetaType:
+    llvm_unreachable("metatype's don't have a runtime representation");
 
   case DeclKind::Var:
   case DeclKind::Arg:
@@ -139,6 +141,10 @@ TypeJudgement ValueDecl::getTypeJudgement() const {
     return TypeJudgement(Ty, ValueKind::RValue);
   }
 }
+
+MetaTypeDecl::MetaTypeDecl(MetaTypeType *Ty, DeclContext *DC)
+  : ValueDecl(DeclKind::MetaType, DC, Ty->TheType->TheDecl->getName(), Ty, 0) {}
+
 
 
 //===----------------------------------------------------------------------===//
@@ -242,6 +248,11 @@ namespace {
     
     void visitArgDecl(ArgDecl *AD) {
       printCommon(AD, "arg_decl");
+      OS << ')';
+    }
+
+    void visitMetaTypeDecl(MetaTypeDecl *MTD) {
+      printCommon(MTD, "meta_type_decl");
       OS << ')';
     }
 

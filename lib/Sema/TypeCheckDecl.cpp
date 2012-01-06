@@ -67,6 +67,10 @@ public:
   void visitArgDecl(ArgDecl *AD) {
     assert(0 && "ArgDecls should never exist in a statement");
   }
+  
+  void visitMetaTypeDecl(MetaTypeDecl *MTD) {
+    // Meta type references are always ok.
+  }
   void visitExtensionDecl(ExtensionDecl *ED) {
     TC.validateType(ED->getExtendedType());
 
