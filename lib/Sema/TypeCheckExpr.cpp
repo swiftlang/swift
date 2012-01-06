@@ -468,7 +468,9 @@ public:
   }
 
   Expr *visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
-    llvm_unreachable("type-checking LookThroughOneofExpr?");
+    // LookThroughOneofExpr is fully resolved.
+    assert(!E->getType()->is<DependentType>());
+    return E;
   }
 
   Expr *visitTupleElementExpr(TupleElementExpr *E) {
