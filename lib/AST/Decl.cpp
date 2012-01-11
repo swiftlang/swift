@@ -126,7 +126,6 @@ TypeJudgement ValueDecl::getTypeJudgement() const {
   switch (getKind()) {
   case DeclKind::Import:
   case DeclKind::Extension:
-  case DeclKind::TypeAlias:
     llvm_unreachable("non-value decls don't have type judgements");
 
   case DeclKind::Var:
@@ -136,6 +135,7 @@ TypeJudgement ValueDecl::getTypeJudgement() const {
 
   case DeclKind::Func:
   case DeclKind::OneOfElement:
+  case DeclKind::TypeAlias:
     return TypeJudgement(Ty, ValueKind::RValue);
   }
 }
