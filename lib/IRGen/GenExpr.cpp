@@ -64,7 +64,6 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
     llvm_unreachable("decl is not a value decl");
 
   case DeclKind::Func:
-  case DeclKind::MetaType:
     llvm_unreachable("decl cannot be emitted as an l-value");
 
   case DeclKind::Var:
@@ -91,9 +90,6 @@ RValue IRGenFunction::emitDeclRefRValue(DeclRefExpr *E, const TypeInfo &TInfo) {
   case DeclKind::Import:
   case DeclKind::TypeAlias:
     llvm_unreachable("decl is not a value decl");
-
-  case DeclKind::MetaType:
-    llvm_unreachable("metatype has no run-time representation");
 
   case DeclKind::Arg:
   case DeclKind::Var:

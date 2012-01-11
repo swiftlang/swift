@@ -33,7 +33,6 @@ namespace swift {
   class Component;
   class DeclAttributes;
   class OneOfElementDecl;
-  class MetaTypeType;
   class NameAliasType;
   enum class Resilience : unsigned char;
   class TypeAliasDecl;
@@ -479,18 +478,6 @@ public:
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Arg; }
   static bool classof(const ArgDecl *D) { return true; }
 };
-  
-/// MetaTypeDecl - A declaration representing the metatype for a declared type.
-/// The type of this decl is always a MetaTypeType.
-class MetaTypeDecl : public ValueDecl {
-public:
-  MetaTypeDecl(MetaTypeType *Ty, DeclContext *DC);
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) { return D->getKind()==DeclKind::MetaType;}
-  static bool classof(const MetaTypeDecl *D) { return true; }
-};
-
 
 /// ElementRefDecl - A reference to the element of another decl which is formed
 /// through name binding.  For example, in "var (a,b) = f();" there is a VarDecl
