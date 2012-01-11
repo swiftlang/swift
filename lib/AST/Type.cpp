@@ -325,7 +325,7 @@ void OneOfType::print(raw_ostream &OS) const {
 }
 
 void MetaTypeType::print(raw_ostream &OS) const {
-  OS << "metatype<" << TheType->TheDecl->getName() << '>';
+  OS << "metatype<" << TheType->getName() << '>';
 }
 
 

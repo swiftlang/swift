@@ -399,15 +399,14 @@ private:
 ///  struct x { ... }  // declares type 'x' and metatype 'x'.
 ///  x.a()             // use of the metatype value since its a value context.
 ///
-/// MetaTypeType is typically given to MetaTypeDecl, and can also exist on
+/// MetaTypeType is typically given to TypeAliasDecl, and can also exist on
 /// DeclRefExpr, ParenExpr, etc.
 class MetaTypeType : public TypeBase {
 public:
-  /// TODO: Eventually this should handle protocols etc as well.
-  OneOfType *const TheType;
+  TypeAliasDecl *const TheType;
   
   /// getNew - Return the MetaTypeType for the specified type.
-  static MetaTypeType *get(OneOfType *Type);
+  static MetaTypeType *get(TypeAliasDecl *Type);
 
   void print(raw_ostream &O) const;
   
@@ -416,7 +415,7 @@ public:
   static bool classof(const TypeBase *T) {return T->Kind == TypeKind::MetaType;}
   
 private:
-  MetaTypeType(OneOfType *Type);
+  MetaTypeType(TypeAliasDecl *Type);
 };
   
 /// FunctionType - A function type has a single input and result, e.g.

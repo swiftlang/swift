@@ -72,9 +72,8 @@ TypeAliasDecl *ScopeInfo::lookupTypeNameInternal(Identifier Name, SourceLoc Loc,
   while (S->getParentScope())
     S = S->getParentScope();
 
-  if (AsType) {
+  if (AsType)
     UnresolvedTypeList.push_back(TAD);
-  }
 
   TypeScopeHT.insertIntoScope(S, Name, TypeScopeEntry(TAD, 0, AsType));
   return TAD;
