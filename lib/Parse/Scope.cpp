@@ -162,32 +162,37 @@ TypeAliasDecl *ScopeInfo::addTypeAliasToScope(SourceLoc TypeAliasLoc,
                                               Identifier Name, Type Ty) {
   unsigned Level;
   TypeAliasDecl *TAD = lookupTypeNameAndLevel(Name, Level);
+  bool isRedefinition = false;
   
-  // If we have no existing entry, or if the existing entry is at a different
-  // scope level then this is a valid insertion.
-  if (TAD == 0 || Level != CurScope->getDepth()) {
-    TAD = new (TheParser.Context) TypeAliasDecl(TypeAliasLoc, Name, Ty,
-                                                TheParser.CurDeclContext);
-    TypeScopeHT.insert(Name, TypeScopeEntry(TAD, CurScope->getDepth(), true));
-    return TAD;
-  }
-  
-  // If the previous definition was just a use of an undeclared type, complete
-  // the type now.
-  if (!TAD->hasUnderlyingType()) {
-    // This will get removed from UnresolvedTypeList at the end of the TU.
+  // If we have a previous "declaration" (really just a use of an undeclared
+  // type) at this scope level, then complete it.
+  if (TAD && Level == CurScope->getDepth()) {
     
-    // Update the decl we already have to be the correct type.
-    TAD->setTypeAliasLoc(TypeAliasLoc);
-    TAD->setUnderlyingType(Ty);
-    return TAD;
+    if (!TAD->hasUnderlyingType()) {
+      // This will get removed from UnresolvedTypeList at the end of the TU.
+    
+      // Update the decl we already have to be the correct type.
+      TAD->setTypeAliasLoc(TypeAliasLoc);
+      TAD->setUnderlyingType(Ty);
+      return TAD;
+    }
+    
+    // Otherwise, we have a redefinition: two definitions in the same scope with
+    // the same name.
+    // FIXME: Pass the identifier through to be more specific.
+    TheParser.diagnose(TypeAliasLoc, diag::type_redefinition, Name);
+    TheParser.diagnose(TAD->getLocStart(), diag::previous_definition, Name);
+    isRedefinition = true;
   }
-  
-  // Otherwise, we have a redefinition: two definitions in the same scope with
-  // the same name.
-  // FIXME: Pass the identifier through, when the diagnostics system can handle
-  // it.
-  TheParser.diagnose(TypeAliasLoc, diag::type_redefinition, Name);
-  TheParser.diagnose(TAD->getLocStart(), diag::previous_definition, Name);
+
+  // Create and return a new type.  Even in the case of our redefinition, the
+  // caller expects to be able to fill in the returned decl.
+  TAD = new (TheParser.Context) TypeAliasDecl(TypeAliasLoc, Name, Ty,
+                                              TheParser.CurDeclContext);
+  if (isRedefinition) {
+    // FIXME: TAD->setErroneous()
+  } else {
+    TypeScopeHT.insert(Name, TypeScopeEntry(TAD, CurScope->getDepth(), true));
+  }
   return TAD;
 }
