@@ -29,6 +29,9 @@ typedef llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTableMapTy;
 /// TupleTypesMapTy - This is the actual type underlying ASTContext::TupleTypes.
 typedef llvm::FoldingSet<TupleType> TupleTypesMapTy;
 
+/// MetatypeTypesMapTy - This is the underlying type of MetaTypeTypes.
+typedef llvm::DenseMap<TypeAliasDecl*, MetaTypeType*> MetaTypeTypesMapTy;
+
 /// FunctionTypesMapTy - This is the actual type underlying 'FunctionTypes'.
 typedef llvm::DenseMap<std::pair<Type,Type>, FunctionType*> FunctionTypesMapTy;
 
@@ -45,6 +48,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
   : Allocator(new llvm::BumpPtrAllocator()),
     IdentifierTable(new IdentifierTableMapTy(*Allocator)),
     TupleTypes(new TupleTypesMapTy()),
+    MetaTypeTypes(new MetaTypeTypesMapTy()),
     FunctionTypes(new FunctionTypesMapTy()),
     ArrayTypes(new ArrayTypesMapTy()),
     IntegerTypes(new IntegerTypesMapTy()),
@@ -67,9 +71,11 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
 ASTContext::~ASTContext() {
   delete (TupleTypesMapTy*)TupleTypes; TupleTypes = 0;
   delete (FunctionTypesMapTy*)FunctionTypes; FunctionTypes = 0;
+  delete (MetaTypeTypesMapTy*)MetaTypeTypes; MetaTypeTypes = 0;
   delete (ArrayTypesMapTy*)ArrayTypes; ArrayTypes = 0;
   delete (IdentifierTableMapTy*)IdentifierTable; IdentifierTable = 0;
   delete (IntegerTypesMapTy*)IntegerTypes; IntegerTypes = 0;
+  delete (ParenTypesMapTy*)ParenTypes; ParenTypes = 0;
   delete Allocator; Allocator = 0;
 }
 
@@ -180,6 +186,14 @@ OneOfType::OneOfType(SourceLoc OneOfLoc, ArrayRef<OneOfElementDecl*> Elts,
     OneOfLoc(OneOfLoc), Elements(Elts), TheDecl(TheDecl) {
 }
 
+MetaTypeType *MetaTypeType::get(TypeAliasDecl *Type) {
+  ASTContext &C = Type->getASTContext();
+
+  MetaTypeType *&Entry = (*(MetaTypeTypesMapTy*)C.MetaTypeTypes)[Type];
+  if (Entry) return Entry;
+  
+  return Entry = new (C) MetaTypeType(Type, C);
+}
 
 /// FunctionType::get - Return a uniqued function type with the specified
 /// input and result.

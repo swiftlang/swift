@@ -415,7 +415,10 @@ public:
   static bool classof(const TypeBase *T) {return T->Kind == TypeKind::MetaType;}
   
 private:
-  MetaTypeType(TypeAliasDecl *Type);
+  MetaTypeType(TypeAliasDecl *Type, ASTContext &Ctx)
+    : TypeBase(TypeKind::MetaType, &Ctx), // Always canonical
+      TheType(Type) {
+  }
 };
   
 /// FunctionType - A function type has a single input and result, e.g.
