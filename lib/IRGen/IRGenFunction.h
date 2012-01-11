@@ -52,6 +52,7 @@ namespace swift {
 
 namespace irgen {
   class Condition;
+  class Explosion;
   class IRGenModule;
   class JumpDest;
   class LValue;
@@ -127,6 +128,7 @@ public:
 
   RValue emitRValue(Expr *E);
   RValue emitRValue(Expr *E, const TypeInfo &TInfo);
+  void emitExplosion(Expr *E, Explosion &explosion);
 
   RValue emitLoad(const LValue &lvalue, const TypeInfo &type);
   void emitStore(const RValue &rvalue, const LValue &lvalue,

@@ -30,6 +30,7 @@
 #include "IRGenModule.h"
 #include "LValue.h"
 #include "RValue.h"
+#include "Explosion.h"
 
 using namespace swift;
 using namespace irgen;
@@ -59,6 +60,8 @@ namespace {
     /// if the field requires no storage.
     unsigned StorageIndex : 24;
     enum : unsigned { NoStorage = 0xFFFFFFU };
+
+    bool hasStorage() const { return StorageIndex != NoStorage; }
 
     /// The range of this field within the scalars for the tuple.
     unsigned ScalarBegin : 4;
@@ -95,7 +98,7 @@ namespace {
     /// Perform an l-value projection of a member of this tuple.
     static Address projectLValue(IRGenFunction &IGF, Address tuple,
                                  const TupleFieldInfo &field) {
-      if (field.StorageIndex == TupleFieldInfo::NoStorage)
+      if (!field.hasStorage())
         return tuple;
 
       llvm::Value *addr = tuple.getAddress();
@@ -116,6 +119,32 @@ namespace {
     /// Form a tuple from a bunch of r-values.
     virtual RValue implode(IRGenFunction &IGF,
                            const SmallVectorImpl<RValue> &elements) const = 0;
+
+    void getExplosionSchema(ExplosionSchema &schema) const {
+      for (auto &fieldInfo : getFieldInfos()) {
+        fieldInfo.FieldInfo.getExplosionSchema(schema);
+      }
+    }
+
+    void loadExplosion(IRGenFunction &IGF, Address addr, Explosion &e) const {
+      for (auto &field : getFieldInfos()) {
+        // Ignore fields that don't have storage.
+        if (!field.hasStorage()) continue;
+
+        Address fieldAddr = projectLValue(IGF, addr, field);
+        field.FieldInfo.loadExplosion(IGF, fieldAddr, e);
+      }
+    }
+
+    void storeExplosion(IRGenFunction &IGF, Explosion &e, Address addr) const {
+      for (auto &field : getFieldInfos()) {
+        // Ignore fields that don't have storage.
+        if (!field.hasStorage()) continue;
+
+        Address fieldAddr = projectLValue(IGF, addr, field);
+        field.FieldInfo.storeExplosion(IGF, e, fieldAddr);
+      }
+    }
   };
 
   /// A TypeInfo implementation for tuples that are broken down into scalars.
@@ -458,7 +487,7 @@ RValue IRGenFunction::emitTupleElementRValue(TupleElementExpr *E,
     tupleType.getFieldInfos()[E->getFieldNumber()];
 
   // If the field requires no storage, there's nothing to do.
-  if (field.StorageIndex == TupleFieldInfo::NoStorage) {
+  if (!field.hasStorage()) {
     // Emit the base in case it has side-effects.
     emitIgnored(tuple);
     return emitFakeRValue(field.FieldInfo);
@@ -487,7 +516,7 @@ LValue IRGenFunction::emitTupleElementLValue(TupleElementExpr *E,
     tupleType.getFieldInfos()[E->getFieldNumber()];
 
   // If the field requires no storage, there's nothing to do.
-  if (field.StorageIndex == TupleFieldInfo::NoStorage) {
+  if (!field.hasStorage()) {
     return tupleLV; // as good as anything
   }
 

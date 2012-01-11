@@ -39,6 +39,8 @@ namespace irgen {
   class IRGenFunction;
   class IRGenModule;
   class Address;
+  class Explosion;
+  class ExplosionSchema;
   class RValue;
   class RValueSchema;
 
@@ -84,12 +86,25 @@ public:
   /// Compute a schema for passing around r-values of this type.
   virtual RValueSchema getSchema() const = 0;
 
+  /// Add the information for exploding values of this type to the
+  /// given schema.
+  virtual void getExplosionSchema(ExplosionSchema &schema) const = 0;
+
   /// Load an r-value from the given address.
   virtual RValue load(IRGenFunction &IGF, Address addr) const = 0;
+
+  /// Load a list of exploded values from an address.
+  virtual void loadExplosion(IRGenFunction &IGF, Address addr,
+                             Explosion &explosion) const = 0;
 
   /// Store an r-value to the given address.
   virtual void store(IRGenFunction &IGF, const RValue &RV,
                      Address addr) const = 0;
+
+  /// Store a set of exploded values to an address.  The values are
+  /// consumed out of the explosion.
+  virtual void storeExplosion(IRGenFunction &IGF, Explosion &explosion,
+                              Address addr) const = 0;
 
 private:
   virtual void _anchor();

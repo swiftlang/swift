@@ -38,12 +38,24 @@ namespace {
       return RValueSchema();
     }
 
+    void getExplosionSchema(ExplosionSchema &schema) const {
+      // FIXME
+    }
+
     RValue load(IRGenFunction &IGF, Address addr) const {
       // FIXME
       return RValue();
     }
 
     void store(IRGenFunction &CGF, const RValue &rvalue, Address addr) const {
+      // FIXME
+    }
+
+    void loadExplosion(IRGenFunction &IGF, Address addr, Explosion &explosion) const {
+      // FIXME
+    }
+
+    void storeExplosion(IRGenFunction &IGF, Explosion &explosion, Address addr) const {
       // FIXME
     }
   };

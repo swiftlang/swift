@@ -26,6 +26,7 @@
 #include "IRGenModule.h"
 #include "Address.h"
 #include "RValue.h"
+#include "Explosion.h"
 
 using namespace swift;
 using namespace irgen;
@@ -42,13 +43,25 @@ namespace {
       return RValueSchema::forScalars(getStorageType());
     }
 
+    void getExplosionSchema(ExplosionSchema &schema) const {
+      schema.add(ExplosionSchema::Element::forScalar(getStorageType()));
+    }
+
     RValue load(IRGenFunction &IGF, Address addr) const {
       return RValue::forScalars(IGF.Builder.CreateLoad(addr));
+    }
+
+    void loadExplosion(IRGenFunction &IGF, Address addr, Explosion &e) const {
+      e.add(IGF.Builder.CreateLoad(addr));
     }
 
     void store(IRGenFunction &IGF, const RValue &RV, Address addr) const {
       assert(RV.isScalar() && RV.getScalars().size() == 1);
       IGF.Builder.CreateStore(RV.getScalars()[0], addr);
+    }
+
+    void storeExplosion(IRGenFunction &IGF, Explosion &e, Address addr) const {
+      IGF.Builder.CreateStore(e.claimNext(), addr);
     }
   };
 }

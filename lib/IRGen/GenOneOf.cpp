@@ -35,6 +35,7 @@
 #include "IRGenModule.h"
 #include "LValue.h"
 #include "RValue.h"
+#include "Explosion.h"
 
 using namespace swift;
 using namespace irgen;
@@ -66,12 +67,25 @@ namespace {
       return RValueSchema::forAggregate(getStorageType(), StorageAlignment);
     }
 
+    void getExplosionSchema(ExplosionSchema &schema) const {
+      schema.add(ExplosionSchema::Element::forAggregate(getStorageType(),
+                                                        StorageAlignment));
+    }
+
     RValue load(IRGenFunction &IGF, Address addr) const {
       // FIXME
       return RValue();
     }
 
     void store(IRGenFunction &CGF, const RValue &RV, Address addr) const {
+      // FIXME
+    }
+
+    void loadExplosion(IRGenFunction &IGF, Address addr, Explosion &e) const {
+      // FIXME
+    }
+
+    void storeExplosion(IRGenFunction &IGF, Explosion &e, Address addr) const {
       // FIXME
     }
   };
@@ -97,6 +111,11 @@ namespace {
       return Singleton->getSchema();
     }
 
+    void getExplosionSchema(ExplosionSchema &schema) const {
+      assert(isComplete());
+      if (Singleton) Singleton->getExplosionSchema(schema);
+    }
+
     RValue load(IRGenFunction &IGF, Address addr) const {
       assert(isComplete());
       if (!Singleton) return RValue::forScalars();
@@ -104,9 +123,18 @@ namespace {
     }
 
     void store(IRGenFunction &IGF, const RValue &RV, Address addr) const {
-      assert(isComplete());
       if (!Singleton) return;
       Singleton->store(IGF, RV, getSingletonAddress(IGF, addr));
+    }
+
+    void loadExplosion(IRGenFunction &IGF, Address addr, Explosion &e) const {
+      if (!Singleton) return;
+      Singleton->loadExplosion(IGF, addr, e);
+    }
+
+    void storeExplosion(IRGenFunction &IGF, Explosion &e, Address addr) const {
+      if (!Singleton) return;
+      Singleton->storeExplosion(IGF, e, addr);
     }
   };
 
@@ -119,6 +147,11 @@ namespace {
     RValueSchema getSchema() const {
       assert(isComplete());
       return RValueSchema::forScalars(getDiscriminatorType());
+    }
+
+    void getExplosionSchema(ExplosionSchema &schema) const {
+      assert(isComplete());
+      schema.add(ExplosionSchema::Element::forScalar(getDiscriminatorType()));
     }
 
     RValue load(IRGenFunction &IGF, Address addr) const {
@@ -135,6 +168,20 @@ namespace {
       llvm::Value *oneofAddr = addr.getAddress();
       llvm::Value *enumAddr = IGF.Builder.CreateStructGEP(oneofAddr, 0);
       IGF.Builder.CreateStore(RV.getScalars()[0], enumAddr, addr.getAlignment());
+    }
+
+    void loadExplosion(IRGenFunction &IGF, Address addr, Explosion &e) const {
+      assert(isComplete());
+      e.add(IGF.Builder.CreateLoad(IGF.Builder.CreateStructGEP(addr.getAddress(), 0),
+                                   addr.getAlignment(),
+                                   addr.getAddress()->getName() + ".load"));
+    }
+
+    void storeExplosion(IRGenFunction &IGF, Explosion &e, Address addr) const {
+      assert(isComplete());
+      IGF.Builder.CreateStore(e.claimNext(),
+                              IGF.Builder.CreateStructGEP(addr.getAddress(), 0),
+                              addr.getAlignment());
     }
   };
 }
