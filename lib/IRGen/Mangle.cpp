@@ -302,7 +302,8 @@ void IRGenModule::mangle(raw_ostream &buffer, NamedDecl *decl) {
   // on all kinds of declarations, even variables, because at the
   // moment they can *all* be overloaded.
   if (ValueDecl *valueDecl = dyn_cast<ValueDecl>(decl))
-    mangler.mangleType(valueDecl->getType());
+    if (!isa<TypeAliasDecl>(decl))
+      mangler.mangleType(valueDecl->getType());
 
   // TODO: mangle generics information here.
 }

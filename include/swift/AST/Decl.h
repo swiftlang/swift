@@ -256,65 +256,6 @@ public:
   static bool classof(const NamedDecl *D) { return true; }
 };
 
-/// TypeAliasDecl - This is a declaration of a typealias, for example:
-///
-///    typealias foo : int
-///
-class TypeAliasDecl : public NamedDecl {
-  /// The type that represents this (sugared) name alias.
-  mutable NameAliasType *AliasTy;
-
-  SourceLoc TypeAliasLoc;
-  Type UnderlyingTy;
-  
-public:
-  TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
-                Type Underlyingty, DeclContext *DC)
-    : NamedDecl(DeclKind::TypeAlias, DC, Name), AliasTy(0),
-      TypeAliasLoc(TypeAliasLoc), UnderlyingTy(Underlyingty) {
-  }
-
-  SourceLoc getTypeAliasLoc() const { return TypeAliasLoc; }
-  void setTypeAliasLoc(SourceLoc loc) { TypeAliasLoc = loc; }
-
-  /// hasUnderlyingType - Returns whether the underlying type has been set.
-  bool hasUnderlyingType() const {
-    return !UnderlyingTy.isNull();
-  }
-
-  /// getUnderlyingType - Returns the underlying type, which is
-  /// assumed to have been set.
-  Type getUnderlyingType() const {
-    assert(!UnderlyingTy.isNull() && "getting invalid underlying type");
-    return UnderlyingTy;
-  }
-
-  /// setUnderlyingType - Set the underlying type.  This is meant to
-  /// be used when resolving an unresolved type name during name-binding.
-  void setUnderlyingType(Type T) {
-    assert(UnderlyingTy.isNull() && "changing underlying type of type-alias");
-    UnderlyingTy = T;
-  }
-
-  /// overwriteUnderlyingType - Actually change the underlying type.
-  /// Typically it is overwritten to an error type.  It's possible for
-  /// type canonicalization to not see these changes.
-  void overwriteUnderlyingType(Type T) {
-    UnderlyingTy = T;
-  }
-
-  SourceLoc getLocStart() const { return TypeAliasLoc; }
-
-  /// getAliasType - Return the sugared version of this decl as a Type.
-  NameAliasType *getAliasType() const;
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::TypeAlias;
-  }
-  static bool classof(const TypeAliasDecl *D) { return true; }
-};
-  
 /// ValueDecl - All named decls that are values in the language.  These can
 /// have an initializer, type, etc.
 class ValueDecl : public NamedDecl {
@@ -359,6 +300,65 @@ public:
   }
   static bool classof(const ValueDecl *D) { return true; }
 };  
+
+/// TypeAliasDecl - This is a declaration of a typealias, for example:
+///
+///    typealias foo : int
+///
+/// TypeAliasDecl's always have 'MetaTypeType' type.
+///
+class TypeAliasDecl : public ValueDecl {
+  /// The type that represents this (sugared) name alias.
+  mutable NameAliasType *AliasTy;
+
+  SourceLoc TypeAliasLoc;
+  Type UnderlyingTy;
+  
+public:
+  TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
+                Type Underlyingty, DeclContext *DC);
+  
+  SourceLoc getTypeAliasLoc() const { return TypeAliasLoc; }
+  void setTypeAliasLoc(SourceLoc loc) { TypeAliasLoc = loc; }
+
+  /// hasUnderlyingType - Returns whether the underlying type has been set.
+  bool hasUnderlyingType() const {
+    return !UnderlyingTy.isNull();
+  }
+
+  /// getUnderlyingType - Returns the underlying type, which is
+  /// assumed to have been set.
+  Type getUnderlyingType() const {
+    assert(!UnderlyingTy.isNull() && "getting invalid underlying type");
+    return UnderlyingTy;
+  }
+
+  /// setUnderlyingType - Set the underlying type.  This is meant to
+  /// be used when resolving an unresolved type name during name-binding.
+  void setUnderlyingType(Type T) {
+    assert(UnderlyingTy.isNull() && "changing underlying type of type-alias");
+    UnderlyingTy = T;
+  }
+
+  /// overwriteUnderlyingType - Actually change the underlying type.
+  /// Typically it is overwritten to an error type.  It's possible for
+  /// type canonicalization to not see these changes.
+  void overwriteUnderlyingType(Type T) {
+    UnderlyingTy = T;
+  }
+
+  SourceLoc getLocStart() const { return TypeAliasLoc; }
+
+  /// getAliasType - Return the sugared version of this decl as a Type.
+  NameAliasType *getAliasType() const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::TypeAlias;
+  }
+  static bool classof(const TypeAliasDecl *D) { return true; }
+};
+  
 
 /// VarDecl - 'var' declaration.
 class VarDecl : public ValueDecl {

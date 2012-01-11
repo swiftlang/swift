@@ -342,7 +342,11 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   Expr::ConversionRank BestRank = Expr::CR_Invalid;
   
   for (ValueDecl *Fn : OS->Decls) {
-    Type ArgTy = Fn->getType()->castTo<FunctionType>()->Input;
+    // Verify we found a function.
+    FunctionType *FnTy = Fn->getType()->getAs<FunctionType>();
+    if (FnTy == 0) continue;
+    
+    Type ArgTy = FnTy->Input;
     // If we found an exact match, disambiguate the overload set.
     Expr::ConversionRank Rank = E2->getRankOfConversionTo(ArgTy);
     

@@ -140,6 +140,15 @@ TypeJudgement ValueDecl::getTypeJudgement() const {
   }
 }
 
+TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
+                             Type Underlyingty, DeclContext *DC)
+  : ValueDecl(DeclKind::TypeAlias, DC, Name, Type(), 0), AliasTy(0),
+    TypeAliasLoc(TypeAliasLoc), UnderlyingTy(Underlyingty) {
+  // Set the type of the TypeAlias to the right MetaTypeType.
+  setType(MetaTypeType::get(this));
+}
+
+
 
 //===----------------------------------------------------------------------===//
 //  Decl printing.
