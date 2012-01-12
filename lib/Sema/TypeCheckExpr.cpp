@@ -659,16 +659,9 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
 
     if (OneOfType *OOTy = Ty->getAs<OneOfType>()) {
       OneOfElementDecl *Elt = OOTy->getElement(MemberName);
-      if (Elt == 0) {
-        TC.diagnose(E->getDotLoc(), diag::invalid_member, MemberName,
-                    OOTy->TheDecl->getName())
-          << SourceRange(E->getNameLoc(), E->getNameLoc());
-        return 0;
-      }
-      
-      // FIXME: This throws away syntactic information from the AST.
-      return new (TC.Context) DeclRefExpr(Elt, E->getNameLoc(),
-                                          Elt->getTypeJudgement());
+      if (Elt)  // FIXME: This throws away syntactic information from the AST.
+        return new (TC.Context) DeclRefExpr(Elt, E->getNameLoc(),
+                                            Elt->getTypeJudgement());
     }
 #if 0  // Module references.
     else {
@@ -677,6 +670,30 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
                                   NLKind::QualifiedLookup, Decls);
     }
 #endif
+    
+    // Look up references in extension methods.
+    // Look in any extensions that add methods to the base type.
+    SmallVector<ValueDecl*, 8> ExtensionMethods;
+    TC.TU.lookupGlobalExtensionMethods(Ty, MemberName, ExtensionMethods);
+
+    switch (ExtensionMethods.size()) {
+    case 0:
+      TC.diagnose(E->getDotLoc(), diag::invalid_member, MemberName, Ty)
+        << Base->getSourceRange() << SourceRange(E->getNameLoc(), E->getNameLoc());
+      return 0;
+    case 1:
+      // Apply the base value to the function there is a single candidate in the
+      // set then this is directly resolved.
+      return new (TC.Context) DeclRefExpr(ExtensionMethods[0],
+                                          E->getNameLoc(),
+                                        ExtensionMethods[0]->getTypeJudgement());
+      break;
+    default:
+      // Otherwise it is an overload case.  
+      return visit(new (TC.Context) OverloadSetRefExpr(
+                                     TC.Context.AllocateCopy(ExtensionMethods),
+                                                 E->getNameLoc()));
+    }
   }
   
   // Look in any extensions that add methods to the base type.
@@ -767,8 +784,8 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
 
   // FIXME: This diagnostic is a bit painful. Plus, fix the source range when
   // expressions actually have source ranges.
-  TC.diagnose(E->getNameLoc(), diag::no_valid_dot_expression, SubExprTy)
-    << Base->getSourceRange();
+  TC.diagnose(E->getDotLoc(), diag::no_valid_dot_expression, SubExprTy)
+    << Base->getSourceRange() << SourceRange(E->getNameLoc(), E->getNameLoc());
   return 0;
 }
 

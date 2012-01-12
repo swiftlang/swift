@@ -363,8 +363,6 @@ ERROR(invalid_type_scoped_access,sema_nb,none,
       "invalid type %0 for scoped access", (Identifier))
 ERROR(incomplete_or_empty_oneof,sema_nb,none,
       "oneof %0 is not complete or has no elements", (Identifier))
-ERROR(invalid_member,sema_nb,none,
-      "%0 is not a member of %1", (Identifier, Identifier))
 ERROR(invalid_member_type,sema_nb,none,
       "%0 is not a member type of %1", (Identifier, Identifier))
 ERROR(use_unresolved_identifier,sema_nb,none,
@@ -444,6 +442,9 @@ ERROR(no_float_literal_type_found,sema_tce,none,
 
 ERROR(ambiguous_expression_unresolved,sema_tce,none,
       "ambiguous expression was not resolved to a concrete type", ())
+
+ERROR(invalid_member,sema_tce,none,
+      "%0 is not a member of %1", (Identifier, Type))
 
 ERROR(unary_op_without_attribute,sema_tce,none,
       "use of unary operator without 'unary' attribute specified", ())
