@@ -641,6 +641,44 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     }
   }
   
+  // Type check metatype references, as in "some_type.some_member".
+  if (MetaTypeType *MTT = SubExprTy->getAs<MetaTypeType>()) {
+    // The metatype represents an arbitrary named type: dig through the
+    // TypeAlias to see what we're dealing with.  If the typealias was erroneous
+    // then silently squish this erroneous subexpression.
+#if 0
+    if (!MTT->TheType->hasUnderlyingType())
+      return 0;  // FIXME: This should check for the error bit on the decl?
+#endif
+    
+    Type Ty = MTT->TheType->getUnderlyingType();
+    if (Ty->is<ErrorType>())
+      return 0;  // Squelch an erroneous subexpression.
+        
+    Identifier MemberName = E->getName();
+
+    if (OneOfType *OOTy = Ty->getAs<OneOfType>()) {
+      OneOfElementDecl *Elt = OOTy->getElement(MemberName);
+      if (Elt == 0) {
+        TC.diagnose(E->getDotLoc(), diag::invalid_member, MemberName,
+                    OOTy->TheDecl->getName())
+          << SourceRange(E->getNameLoc(), E->getNameLoc());
+        return 0;
+      }
+      
+      // FIXME: This throws away syntactic information from the AST.
+      return new (TC.Context) DeclRefExpr(Elt, E->getNameLoc(),
+                                          Elt->getTypeJudgement());
+    }
+#if 0  // Module references.
+    else {
+      auto Module = Scope.get<const ImportedModule*>();
+      Module->second->lookupValue(Module->first, Name,
+                                  NLKind::QualifiedLookup, Decls);
+    }
+#endif
+  }
+  
   // Look in any extensions that add methods to the base type.
   SmallVector<ValueDecl*, 8> ExtensionMethods;
   TC.TU.lookupGlobalExtensionMethods(SubExprTy, E->getName(),ExtensionMethods);
