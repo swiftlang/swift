@@ -44,14 +44,14 @@ static StringRef getFieldName(const TupleTypeElt &field) {
 namespace {
   /// A class describing the IR layout for a particular field.
   struct TupleFieldInfo {
-    TupleFieldInfo(const TupleTypeElt &Field, const TypeInfo &FieldInfo)
-      : Field(Field), FieldInfo(FieldInfo) {}
+    TupleFieldInfo(const TupleTypeElt &field, const TypeInfo &type)
+      : Field(field), Type(type) {}
 
     /// The field.
     const TupleTypeElt &Field;
 
     /// The TypeInfo for the field.
-    const TypeInfo &FieldInfo;
+    const TypeInfo &Type;
 
     /// The offset of this field into the storage type.
     Size StorageOffset;
@@ -141,7 +141,7 @@ namespace {
 
     void getExplosionSchema(ExplosionSchema &schema) const {
       for (auto &fieldInfo : getFieldInfos()) {
-        fieldInfo.FieldInfo.getExplosionSchema(schema);
+        fieldInfo.Type.getExplosionSchema(schema);
       }
     }
 
@@ -151,7 +151,7 @@ namespace {
         if (!field.hasStorage()) continue;
 
         Address fieldAddr = projectAddress(IGF, addr, field);
-        field.FieldInfo.loadExplosion(IGF, fieldAddr, e);
+        field.Type.loadExplosion(IGF, fieldAddr, e);
       }
     }
 
@@ -161,7 +161,7 @@ namespace {
         if (!field.hasStorage()) continue;
 
         Address fieldAddr = projectAddress(IGF, addr, field);
-        field.FieldInfo.storeExplosion(IGF, e, fieldAddr);
+        field.Type.storeExplosion(IGF, e, fieldAddr);
       }
     }
   };
@@ -220,7 +220,7 @@ namespace {
 
         // Load the field and extract the scalars.
         Address fieldAddr = projectAddress(IGF, addr, field);
-        RValue fieldRV = field.FieldInfo.load(IGF, fieldAddr);
+        RValue fieldRV = field.Type.load(IGF, fieldAddr);
         scalars.append(fieldRV.getScalars().begin(),
                        fieldRV.getScalars().end());
 
@@ -245,7 +245,7 @@ namespace {
 
         // Write the extracted r-value into a projected l-value.
         Address fieldAddr = projectAddress(IGF, addr, field);
-        field.FieldInfo.store(IGF, fieldRV, fieldAddr);
+        field.Type.store(IGF, fieldRV, fieldAddr);
       }
     }
   };
@@ -310,13 +310,13 @@ namespace {
       Address fieldAddr = projectAddress(IGF, tupleAddr, field);
 
       // If we need an aggregate, we've already got one.
-      if (field.FieldInfo.getSchema().isAggregate()) {
-        assert(field.FieldInfo.StorageAlignment <= fieldAddr.getAlignment());
+      if (field.Type.getSchema().isAggregate()) {
+        assert(field.Type.StorageAlignment <= fieldAddr.getAlignment());
         return RValue::forAggregate(fieldAddr.getAddress());
       }
 
       // Otherwise, we need to load the scalars out.
-      return field.FieldInfo.load(IGF, fieldAddr);
+      return field.Type.load(IGF, fieldAddr);
     }
 
     RValue implode(IRGenFunction &IGF, Explosion &explosion) const {
@@ -325,7 +325,7 @@ namespace {
 
       for (const TupleFieldInfo &field : getFieldInfos()) {
         Address fieldAddr = projectAddress(IGF, temp, field);
-        field.FieldInfo.storeExplosion(IGF, explosion, fieldAddr);
+        field.Type.storeExplosion(IGF, explosion, fieldAddr);
       }
 
       return RValue::forAggregate(temp.getAddress());
@@ -517,14 +517,14 @@ void IRGenFunction::emitExplodedTupleElement(TupleElementExpr *E,
   if (!field.hasStorage()) {
     // Emit the base in case it has side-effects.
     emitIgnored(tuple);
-    return emitFakeExplosion(field.FieldInfo, explosion);
+    return emitFakeExplosion(field.Type, explosion);
   }
 
   // If we can emit the base as an l-value, we can avoid a lot
   // of unnecessary work.
   if (Optional<Address> tupleAddr = tryEmitAsAddress(tuple, tupleType)) {
     Address addr = tupleType.projectAddress(*this, tupleAddr.getValue(), field);
-    return field.FieldInfo.loadExplosion(*this, addr, explosion);
+    return field.Type.loadExplosion(*this, addr, explosion);
   }
 
   // Otherwise, emit the base as an r-value and project.
@@ -615,8 +615,7 @@ void IRGenFunction::emitExplodedTupleShuffle(TupleShuffleExpr *E,
     if (innerTupleAddr.isValid()) {
       Address elementAddr = innerTupleType.projectAddress(*this, innerTupleAddr,
                                                           innerField);
-      innerField.FieldInfo.loadExplosion(*this, elementAddr,
-                                         outerTupleExplosion);
+      innerField.Type.loadExplosion(*this, elementAddr, outerTupleExplosion);
 
     // Otherwise, project the r-value down.
     } else {
