@@ -353,10 +353,14 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
       }
       
       if (FnRef) {
-        ApplyExpr *Call = new (Context) ConstructorCallExpr(FnRef, E2);
-        if (semaApplyExpr(Call))
-          return 0;
-        return Call;
+        E->setFn(FnRef);
+        return semaApplyExpr(E);
+#if 0 // FIXME: We should be able to return a new node!
+        //ApplyExpr *Call = new (Context) ConstructorCallExpr(FnRef, E2);
+        //if (semaApplyExpr(Call))
+        //  return 0;
+        //return Call;
+#endif
       }
     }
   }
@@ -1011,7 +1015,13 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
     OneDependentExpr = 0;
     E = SET.doIt(E);
     if (E == 0) return true;
-    
+
+    // If our context specifies a type, apply it to the expression.
+    if (ConvertType) {
+      E = convertToType(E, ConvertType);
+      if (E == 0) return true;
+    }
+
     E = E->walk(^(Expr *E, WalkOrder Order, WalkContext const&) {
       // Remember the first dependent expression we come across.
       if (Order != WalkOrder::PreOrder && E->getType()->is<DependentType>() &&
@@ -1022,12 +1032,6 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
       // Never recurse into statements.
       return 0;
     });
-    
-    // If our context specifies a type, apply it to the expression.
-    if (ConvertType) {
-      E = convertToType(E, ConvertType);
-      if (E == 0) return true;
-    }
   }
   
   // If there are no dependent expressions, then we're done.
