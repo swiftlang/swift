@@ -445,13 +445,7 @@ public:
   SourceLoc getLoc() const { return NameLoc; }
   
   SourceRange getSourceRange() const {
-    SourceLoc Start;
-    if (SubExpr)
-      Start = SubExpr->getStartLoc();
-    else
-      Start = DotLoc;
-    
-    return SourceRange(Start, NameLoc);
+    return SourceRange(SubExpr->getStartLoc(), NameLoc);
   }
   
   SourceLoc getDotLoc() const { return DotLoc; }
