@@ -66,6 +66,10 @@ namespace {
     /// The range of this field within the scalars for the tuple.
     unsigned ScalarBegin : 4;
     unsigned ScalarEnd : 4;
+    unsigned MaximalBegin : 16;
+    unsigned MaximalEnd : 16;
+    unsigned MinimalBegin : 16;
+    unsigned MinimalEnd : 16;
   };
 
   /// An abstract base class for tuple types.
@@ -112,13 +116,28 @@ namespace {
       return Address(addr, align);
     }
 
+    /// Perform an exploded r-value projection.
+    static void projectExplosion(Explosion &inner, const TupleFieldInfo &field,
+                                 Explosion &outer) {
+      assert(inner.getKind() == outer.getKind());
+      switch (inner.getKind()) {
+      case ExplosionKind::Maximal:
+        outer.add(inner.getRange(field.MaximalBegin, field.MaximalEnd));
+        return;
+
+      case ExplosionKind::Minimal:
+        outer.add(inner.getRange(field.MinimalBegin, field.MinimalEnd));
+        return;
+      }
+      llvm_unreachable("bad explosion kind");
+    }
+
     /// Perform an r-value projection of a member of this tuple.
     virtual RValue projectRValue(IRGenFunction &IGF, const RValue &tuple,
                                  const TupleFieldInfo &field) const = 0;
 
     /// Form a tuple from a bunch of r-values.
-    virtual RValue implode(IRGenFunction &IGF,
-                           const SmallVectorImpl<RValue> &elements) const = 0;
+    virtual RValue implode(IRGenFunction &IGF, Explosion &explosion) const = 0;
 
     void getExplosionSchema(ExplosionSchema &schema) const {
       for (auto &fieldInfo : getFieldInfos()) {
@@ -166,6 +185,14 @@ namespace {
                                RValueSchema::forScalars(ScalarTypes));
     }
 
+    unsigned getNumScalars() const {
+      return Schema.getScalarTypes().size();
+    }
+
+    unsigned getExplosionSize(ExplosionKind kind) const {
+      return getNumScalars();
+    }
+
     RValueSchema getSchema() const {
       return Schema;
     }
@@ -177,17 +204,8 @@ namespace {
                                        field.ScalarEnd - field.ScalarBegin));
     }
 
-    RValue implode(IRGenFunction &IGF,
-                   const SmallVectorImpl<RValue> &elements) const {
-      // Set up for the emission.
-      SmallVector<llvm::Value*, RValue::MaxScalars> scalars;
-
-      for (const RValue &elt : elements) {
-        assert(elt.isScalar());
-        scalars.append(elt.getScalars().begin(), elt.getScalars().end());
-      }
-
-      return RValue::forScalars(scalars);
+    RValue implode(IRGenFunction &IGF, Explosion &elements) const {
+      return RValue::forScalars(elements.claim(getNumScalars()));
     }
 
     RValue load(IRGenFunction &IGF, Address addr) const {
@@ -235,17 +253,37 @@ namespace {
   /// A TypeInfo implementation for tuples that are passed around as
   /// aggregates.
   class AggregateTupleTypeInfo : public TupleTypeInfo {
+    unsigned MaximalExplosionSize;
+    unsigned MinimalExplosionSize;
+
     AggregateTupleTypeInfo(llvm::Type *T, Size S, Alignment A,
-                           ArrayRef<TupleFieldInfo> Fields)
-      : TupleTypeInfo(T, S, A, /*agg*/ true, Fields) {}
+                           ArrayRef<TupleFieldInfo> Fields,
+                           unsigned maximalExplosionSize,
+                           unsigned minimalExplosionSize)
+      : TupleTypeInfo(T, S, A, /*agg*/ true, Fields),
+        MaximalExplosionSize(maximalExplosionSize),
+        MinimalExplosionSize(minimalExplosionSize) {
+    }
 
   public:
     static AggregateTupleTypeInfo *create(llvm::StructType *T,
                                           Size S, Alignment A,
-                                          ArrayRef<TupleFieldInfo> FieldInfos) {
+                                          ArrayRef<TupleFieldInfo> FieldInfos,
+                                          unsigned maximalExplosionSize,
+                                          unsigned minimalExplosionSize) {
       void *Storage = operator new(sizeof(AggregateTupleTypeInfo) +
                                    sizeof(TupleFieldInfo) * FieldInfos.size());
-      return new(Storage) AggregateTupleTypeInfo(T, S, A, FieldInfos);
+      return new(Storage) AggregateTupleTypeInfo(T, S, A, FieldInfos,
+                                                 maximalExplosionSize,
+                                                 minimalExplosionSize);
+    }
+
+    unsigned getExplosionSize(ExplosionKind kind) const {
+      switch (kind) {
+      case ExplosionKind::Maximal: return MaximalExplosionSize;
+      case ExplosionKind::Minimal: return MinimalExplosionSize;
+      }
+      llvm_unreachable("bad explosion kind");
     }
 
     llvm::StructType *getStorageType() const {
@@ -281,16 +319,13 @@ namespace {
       return field.FieldInfo.load(IGF, fieldAddr);
     }
 
-    RValue implode(IRGenFunction &IGF,
-                   const SmallVectorImpl<RValue> &elements) const {
+    RValue implode(IRGenFunction &IGF, Explosion &explosion) const {
       Address temp = IGF.createFullExprAlloca(StorageType, StorageAlignment,
                                               "tuple-implode");
 
-      auto fieldIterator = getFieldInfos().begin();
-      for (const RValue &fieldRV : elements) {
-        const TupleFieldInfo &field = *fieldIterator++;
+      for (const TupleFieldInfo &field : getFieldInfos()) {
         Address fieldAddr = projectLValue(IGF, temp, field);
-        field.FieldInfo.store(IGF, fieldRV, fieldAddr);
+        field.FieldInfo.storeExplosion(IGF, explosion, fieldAddr);
       }
 
       return RValue::forAggregate(temp.getAddress());
@@ -346,6 +381,8 @@ TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
   FieldInfos.reserve(T->Fields.size());
   StorageTypes.reserve(T->Fields.size());
 
+  unsigned maximalExplosionSize = 0, minimalExplosionSize = 0;
+
   bool HasAggregateField = false;
 
   Size StorageSize;
@@ -358,6 +395,14 @@ TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
 
     FieldInfos.push_back(TupleFieldInfo(Field, TInfo));
     TupleFieldInfo &FieldInfo = FieldInfos.back();
+
+    FieldInfo.MaximalBegin = maximalExplosionSize;
+    maximalExplosionSize += TInfo.getExplosionSize(ExplosionKind::Maximal);
+    FieldInfo.MaximalEnd = maximalExplosionSize;
+
+    FieldInfo.MinimalBegin = minimalExplosionSize;
+    minimalExplosionSize += TInfo.getExplosionSize(ExplosionKind::Minimal);
+    FieldInfo.MinimalEnd = minimalExplosionSize;
 
     // Ignore zero-sized fields.
     if (TInfo.StorageSize.isZero()) {
@@ -423,6 +468,8 @@ TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
   // If the tuple has no aggregate fields, and the number of scalars
   // doesn't exceed the maximum, pass it as scalars.
   if (!HasAggregateField && ScalarTypes.size() <= RValueSchema::MaxScalars) {
+    assert(ScalarTypes.size() == maximalExplosionSize);
+    assert(ScalarTypes.size() == minimalExplosionSize);
     return ScalarTupleTypeInfo::create(Converted, StorageSize, StorageAlignment,
                                        ScalarTypes, FieldInfos);
   }
@@ -431,21 +478,16 @@ TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
   // wasteful; we could really pass some of the fields as aggregates
   // and some as scalars.
   return AggregateTupleTypeInfo::create(Converted, StorageSize,
-                                        StorageAlignment, FieldInfos);
+                                        StorageAlignment, FieldInfos,
+                                        maximalExplosionSize,
+                                        minimalExplosionSize);
 }
 
-static void emitExplodedTupleLiteral(IRGenFunction &IGF, TupleExpr *E,
-                                     const TupleTypeInfo &tupleType,
-                                     SmallVectorImpl<RValue> &elements) {
-  // Type-checking should ensure that the literal's elements are
-  // exactly parallel with the field infos.
-  ArrayRef<TupleFieldInfo> fields = tupleType.getFieldInfos();
-
+void IRGenFunction::emitExplodedTupleLiteral(TupleExpr *E,
+                                             Explosion &explosion) {
   // Emit all the sub-expressions.
-  for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
-    const TupleFieldInfo &field = fields[i];
-    RValue fieldRV = IGF.emitRValue(E->getElement(i), field.FieldInfo);
-    elements.push_back(fieldRV);
+  for (Expr *elt : E->getElements()) {
+    emitExplodedRValue(elt, explosion);
   }
 }
 
@@ -454,14 +496,11 @@ RValue IRGenFunction::emitTupleExpr(TupleExpr *E, const TypeInfo &TI) {
   if (E->isGroupingParen())
     return emitRValue(E->getElement(0), TI);
 
+  Explosion explosion(ExplosionKind::Maximal);
+  emitExplodedTupleLiteral(E, explosion);
+
   const TupleTypeInfo &tupleType = TI.as<TupleTypeInfo>();
-
-  SmallVector<RValue, 8> elements;
-  elements.reserve(E->getNumElements());
-
-  emitExplodedTupleLiteral(*this, E, tupleType, elements);
-
-  return tupleType.implode(*this, elements);
+  return tupleType.implode(*this, explosion);
 }
 
 namespace {
@@ -476,6 +515,12 @@ namespace {
       return TupleTypeInfo::projectLValue(IGF, addr, Field);
     }
   };
+}
+
+void IRGenFunction::emitExplodedTupleElement(TupleElementExpr *E,
+                                             Explosion &explosion) {
+  const TypeInfo &type = getFragileTypeInfo(E->getType());
+  return type.explode(*this, emitTupleElementRValue(E, type), explosion);
 }
 
 RValue IRGenFunction::emitTupleElementRValue(TupleElementExpr *E,
@@ -526,56 +571,61 @@ LValue IRGenFunction::emitTupleElementLValue(TupleElementExpr *E,
 }
 
 /// Emit a tuple shuffle in exploded form.
-static void emitExplodedTupleShuffle(IRGenFunction &IGF, TupleShuffleExpr *E,
-                                     const TupleTypeInfo &outerTupleType,
-                                     SmallVectorImpl<RValue> &outerElements) {
+/// emitExplodedTupleShuffleExpr - Emit a tuple-shuffle expression
+/// as an exploded r-value.
+void IRGenFunction::emitExplodedTupleShuffle(TupleShuffleExpr *E,
+                                             Explosion &outerTupleExplosion) {
   Expr *innerTuple = E->getSubExpr();
   const TupleTypeInfo &innerTupleType =
-    getAsTupleTypeInfo(IGF, innerTuple->getType());
+    getAsTupleTypeInfo(*this, innerTuple->getType());
 
   // Emit the inner tuple.  We prefer to emit it as an l-value.
   Address innerTupleAddr;
-  RValue innerTupleRV;
+  Explosion innerTupleExplosion(outerTupleExplosion.getKind());
   if (Optional<LValue> innerTupleLV
-        = IGF.tryEmitAsLValue(innerTuple, innerTupleType)) {
+        = tryEmitAsLValue(innerTuple, innerTupleType)) {
     if (innerTupleLV.getValue().isPhysical()) {
-      innerTupleAddr = IGF.emitAddressForPhysicalLValue(innerTupleLV.getValue());
+      innerTupleAddr = emitAddressForPhysicalLValue(innerTupleLV.getValue());
     } else {
-      innerTupleRV = IGF.emitLoad(innerTupleLV.getValue(), innerTupleType);
+      emitExplodedLoad(innerTupleLV.getValue(), innerTupleType,
+                       innerTupleExplosion);
     }
   } else {
-    innerTupleRV = IGF.emitRValue(innerTuple, innerTupleType);
+    emitExplodedRValue(innerTuple, innerTupleExplosion);
   }
 
+  llvm::ArrayRef<TupleTypeElt> outerFields =
+    E->getType()->castTo<TupleType>()->Fields;
+
   auto shuffleIndexIterator = E->getElementMapping().begin();
-  for (const TupleFieldInfo &outerField : outerTupleType.getFieldInfos()) {
+  for (const TupleTypeElt &outerField : outerFields) {
     int shuffleIndex = *shuffleIndexIterator++;
 
     // If the shuffle index is -1, we're supposed to use the default value.
     if (shuffleIndex == -1) {
-      assert(outerField.Field.Init && "no default initializer for field!");
-      outerElements.push_back(IGF.emitRValue(outerField.Field.Init,
-                                             outerField.FieldInfo));
+      assert(outerField.Init && "no default initializer for field!");
+      emitExplodedRValue(outerField.Init, outerTupleExplosion);
       continue;
     }
 
     // Otherwise, we need to map from a different tuple.
     assert(shuffleIndex >= 0 &&
-           (unsigned) shuffleIndex < outerTupleType.getFieldInfos().size());
+           (unsigned) shuffleIndex < outerFields.size());
 
     const TupleFieldInfo &innerField
       = innerTupleType.getFieldInfos()[(unsigned) shuffleIndex];
 
     // If we're loading from an l-value, project from that.
     if (innerTupleAddr.isValid()) {
-      Address elementAddr = innerTupleType.projectLValue(IGF, innerTupleAddr,
+      Address elementAddr = innerTupleType.projectLValue(*this, innerTupleAddr,
                                                          innerField);
-      outerElements.push_back(innerField.FieldInfo.load(IGF, elementAddr));
+      innerField.FieldInfo.loadExplosion(*this, elementAddr,
+                                         outerTupleExplosion);
 
     // Otherwise, project the r-value down.
     } else {
-      outerElements.push_back(innerTupleType.projectRValue(IGF, innerTupleRV,
-                                                           innerField));
+      innerTupleType.projectExplosion(innerTupleExplosion, innerField,
+                                      outerTupleExplosion);
     }
   }
 }
@@ -583,59 +633,10 @@ static void emitExplodedTupleShuffle(IRGenFunction &IGF, TupleShuffleExpr *E,
 /// emitTupleShuffleExpr - Emit a tuple-shuffle expression.
 /// Tuple-shuffles are always r-values.
 RValue IRGenFunction::emitTupleShuffleExpr(TupleShuffleExpr *E,
-                                           const TypeInfo &TI) {
-  const TupleTypeInfo &outerTupleType = TI.as<TupleTypeInfo>();
+                                           const TypeInfo &type) {
+  Explosion explosion(ExplosionKind::Maximal);
+  emitExplodedTupleShuffle(E, explosion);
 
-  SmallVector<RValue, 8> outerElements;
-  outerElements.reserve(outerTupleType.getFieldInfos().size());
-
-  emitExplodedTupleShuffle(*this, E, outerTupleType, outerElements);
-
-  return outerTupleType.implode(*this, outerElements);
-}
-
-/// emitExplodedTuple - Emit a tuple expression "exploded", i.e. with
-/// all of the tuple arguments split into individual rvalues.
-void IRGenFunction::emitExplodedTuple(Expr *E, SmallVectorImpl<RValue> &elts) {
-  const TupleTypeInfo &tupleType = getAsTupleTypeInfo(*this, E->getType());
-
-  // If it's a tuple literal, we want to explode it directly.
-  if (TupleExpr *tuple = dyn_cast<TupleExpr>(E)) {
-    // Look through grouping parens.  This should really be its own AST node.
-    if (tuple->isGroupingParen())
-      return emitExplodedTuple(tuple->getElement(0), elts);
-
-    emitExplodedTupleLiteral(*this, tuple, tupleType, elts);
-    return;
-  }
-
-  // It's not a tuple literal.
-
-  // If it's a tuple shuffle, explode it.
-  if (TupleShuffleExpr *shuffle = dyn_cast<TupleShuffleExpr>(E)) {
-    emitExplodedTupleShuffle(*this, shuffle, tupleType, elts);
-    return;
-  }
-
-  // If it's emittable as a physical l-value, do so and load from
-  // projections down to the fields.  Otherwise, emit as an r-value and
-  // do r-value projections.
-  RValue tupleRV;
-  if (Optional<LValue> tupleLV = tryEmitAsLValue(E, tupleType)) {
-    if (tupleLV.getValue().isPhysical()) {
-      Address tupleAddr = emitAddressForPhysicalLValue(tupleLV.getValue());
-      for (const TupleFieldInfo &field : tupleType.getFieldInfos()) {
-        Address fieldAddr = tupleType.projectLValue(*this, tupleAddr, field);
-        elts.push_back(field.FieldInfo.load(*this, fieldAddr));
-      }
-      return;
-    }
-    tupleRV = emitLoad(tupleLV.getValue(), tupleType);
-  } else {
-    tupleRV = emitRValue(E, tupleType);
-  }
-
-  // Do r-value projections.
-  for (const TupleFieldInfo &field : tupleType.getFieldInfos())
-    elts.push_back(tupleType.projectRValue(*this, tupleRV, field));
+  const TupleTypeInfo &outerTupleType = type.as<TupleTypeInfo>();
+  return outerTupleType.implode(*this, explosion);
 }

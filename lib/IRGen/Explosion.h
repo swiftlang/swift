@@ -84,17 +84,38 @@ public:
     Values.append(values.begin(), values.end());
   }
 
-  /// Claim the next value in this explosion.
+  /// Return an array containing the given range of values.  The values
+  /// are not claimed.
+  llvm::ArrayRef<llvm::Value *> getRange(unsigned from, unsigned to) const {
+    assert(from <= to);
+    assert(to <= Values.size());
+    return llvm::makeArrayRef(begin() + from, to - from);
+  }
+
+  /// Return an array containing all of the remaining values.  The values
+  /// are not claimed.
+  llvm::ArrayRef<llvm::Value*> getAll() {
+    return llvm::makeArrayRef(begin(), Values.size() - NextValue);
+  }
+
+  /// Claim and return the next value in this explosion.
   llvm::Value *claimNext() {
     assert(NextValue < Values.size());
     return Values[NextValue++];
   }
 
-  /// Claim the next N values in this explosion.
+  /// Claim and return the next N values in this explosion.
   llvm::ArrayRef<llvm::Value*> claim(unsigned n) {
     assert(NextValue + n <= Values.size());
     auto array = llvm::makeArrayRef(begin(), n);
     NextValue += n;
+    return array;
+  }
+
+  /// Claim and return all the remaining values in this explosion.
+  llvm::ArrayRef<llvm::Value*> claimAll() {
+    auto array = llvm::makeArrayRef(begin(), Values.size() - NextValue);
+    NextValue = Values.size();
     return array;
   }
 

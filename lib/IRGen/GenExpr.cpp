@@ -29,29 +29,23 @@
 #include "IRGenModule.h"
 #include "LValue.h"
 #include "RValue.h"
+#include "Explosion.h"
 
 using namespace swift;
 using namespace irgen;
 
 /// Emit an integer literal expression.
-static RValue emitIntegerLiteralExpr(IRGenFunction &IGF, IntegerLiteralExpr *E,
-                                     const TypeInfo &TInfo) {
-  // We know that the integer literal type has a BuiltinIntegerType.
-  assert(TInfo.getSchema().isScalar(1));
-  assert(isa<llvm::IntegerType>(TInfo.getSchema().getScalarTypes()[0]));
-  return RValue::forScalars(llvm::ConstantInt::get(IGF.IGM.LLVMContext,
-                                                   E->getValue()));
+static llvm::Value *emitIntegerLiteralExpr(IRGenFunction &IGF,
+                                           IntegerLiteralExpr *E) {
+  assert(E->getType()->is<BuiltinIntegerType>());
+  return llvm::ConstantInt::get(IGF.IGM.LLVMContext, E->getValue());
 }
 
 /// Emit an float literal expression.
-static RValue emitFloatLiteralExpr(IRGenFunction &IGF, FloatLiteralExpr *E,
-                                   const TypeInfo &TInfo) {
-  // We know that the integer literal type has a BuiltinFloatingPointType.
-  assert(TInfo.getSchema().isScalar(1));
-  assert(TInfo.getSchema().getScalarTypes()[0]->isFloatingPointTy());
-  
-  return RValue::forScalars(llvm::ConstantFP::get(IGF.IGM.LLVMContext,
-                                                  E->getValue()));
+static llvm::Value *emitFloatLiteralExpr(IRGenFunction &IGF,
+                                         FloatLiteralExpr *E) {
+  assert(E->getType()->is<BuiltinFloatType>());
+  return llvm::ConstantFP::get(IGF.IGM.LLVMContext, E->getValue());
 }
 
 static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
@@ -80,6 +74,12 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
     return IGF.emitFakeLValue(TInfo);
   }
   llvm_unreachable("bad decl kind");
+}
+
+/// Emit a declaration reference as an exploded r-value.
+void IRGenFunction::emitExplodedDeclRef(DeclRefExpr *E, Explosion &explosion) {
+  const TypeInfo &type = getFragileTypeInfo(E->getType());
+  return type.explode(*this, emitDeclRefRValue(E, type), explosion);
 }
 
 /// Emit a declaration reference as an r-value.
@@ -113,8 +113,8 @@ RValue IRGenFunction::emitDeclRefRValue(DeclRefExpr *E, const TypeInfo &TInfo) {
 }
 
 RValue IRGenFunction::emitRValue(Expr *E) {
-  const TypeInfo &TInfo = IGM.getFragileTypeInfo(E->getType());
-  return emitRValue(E, TInfo);
+  const TypeInfo &type = IGM.getFragileTypeInfo(E->getType());
+  return emitRValue(E, type);
 }
 
 /// Emit the given expression as an r-value.  The expression need not
@@ -137,9 +137,9 @@ RValue IRGenFunction::emitRValue(Expr *E, const TypeInfo &TInfo) {
     return emitApplyExpr(cast<ApplyExpr>(E), TInfo);
 
   case ExprKind::IntegerLiteral:
-    return emitIntegerLiteralExpr(*this, cast<IntegerLiteralExpr>(E), TInfo);
+    return RValue::forScalars(emitIntegerLiteralExpr(*this, cast<IntegerLiteralExpr>(E)));
   case ExprKind::FloatLiteral:
-    return emitFloatLiteralExpr(*this, cast<FloatLiteralExpr>(E), TInfo);
+    return RValue::forScalars(emitFloatLiteralExpr(*this, cast<FloatLiteralExpr>(E)));
 
   case ExprKind::Tuple:
     return emitTupleExpr(cast<TupleExpr>(E), TInfo);
@@ -160,6 +160,67 @@ RValue IRGenFunction::emitRValue(Expr *E, const TypeInfo &TInfo) {
     IGM.unimplemented(E->getLoc(),
                       "cannot generate r-values for this expression yet");
     return emitFakeRValue(TInfo);
+  }
+  llvm_unreachable("bad expression kind!");
+}
+
+/// Emit the given expression, which must have primitive scalar type,
+/// as that primitive scalar value.  This is just a convenience method
+/// for not needing to construct and destroy an Explosion.
+llvm::Value *IRGenFunction::emitAsPrimitiveScalar(Expr *E) {
+  Explosion explosion(ExplosionKind::Minimal);
+  emitExplodedRValue(E, explosion);
+
+  llvm::Value *result = explosion.claimNext();
+  assert(explosion.empty());
+  return result;
+}
+
+void IRGenFunction::emitExplodedRValue(Expr *E, Explosion &explosion) {
+  switch (E->getKind()) {
+#define EXPR(Id, Parent)
+#define UNCHECKED_EXPR(Id, Parent) case ExprKind::Id:
+#include "swift/AST/ExprNodes.def"
+    llvm_unreachable("these expression kinds should not survive to IR-gen");
+
+  case ExprKind::Load:
+    return emitExplodedRValue(cast<LoadExpr>(E)->getSubExpr(), explosion);
+
+  case ExprKind::Tuple:
+    if (cast<TupleExpr>(E)->isGroupingParen())
+      return emitExplodedRValue(cast<TupleExpr>(E)->getElement(0), explosion);
+    return emitExplodedTupleLiteral(cast<TupleExpr>(E), explosion);
+
+  case ExprKind::TupleShuffle:
+    return emitExplodedTupleShuffle(cast<TupleShuffleExpr>(E), explosion);
+
+  case ExprKind::TupleElement:
+    return emitExplodedTupleElement(cast<TupleElementExpr>(E), explosion);
+
+  case ExprKind::Call:
+  case ExprKind::Unary:
+  case ExprKind::Binary:
+    return emitExplodedApplyExpr(cast<ApplyExpr>(E), explosion);
+
+  case ExprKind::IntegerLiteral:
+    return explosion.add(emitIntegerLiteralExpr(*this, cast<IntegerLiteralExpr>(E)));
+  case ExprKind::FloatLiteral:
+    return explosion.add(emitFloatLiteralExpr(*this, cast<FloatLiteralExpr>(E)));
+
+  case ExprKind::LookThroughOneof:
+    return emitExplodedRValue(cast<LookThroughOneofExpr>(E)->getSubExpr(),
+                              explosion);
+
+  case ExprKind::DeclRef:
+    return emitExplodedDeclRef(cast<DeclRefExpr>(E), explosion);
+
+  case ExprKind::Func:
+  case ExprKind::Closure:
+  case ExprKind::AnonClosureArg:
+  case ExprKind::DotSyntaxCall:
+    IGM.unimplemented(E->getLoc(),
+                      "cannot explode r-values for this expression yet");
+    return emitFakeExplosion(getFragileTypeInfo(E->getType()), explosion);
   }
   llvm_unreachable("bad expression kind!");
 }
@@ -266,10 +327,15 @@ Optional<LValue> IRGenFunction::tryEmitAsLValue(Expr *E,
 }
 
 /// Emit an expression as an initializer for the given l-value.
-void IRGenFunction::emitInit(Address addr, Expr *E, const TypeInfo &TInfo) {
-  // TODO: we can do better than this.
-  RValue RV = emitRValue(E);
-  TInfo.store(*this, RV, addr);
+void IRGenFunction::emitInit(Address addr, Expr *E, const TypeInfo &type) {
+  emitRValueToMemory(E, addr, type);
+}
+
+/// Emit an r-value directly into memory.
+void IRGenFunction::emitRValueToMemory(Expr *E, Address addr,
+                                       const TypeInfo &type) {
+  RValue RV = emitRValue(E, type);
+  type.store(*this, RV, addr);
 }
 
 /// Zero-initializer the given l-value.
@@ -323,5 +389,20 @@ RValue IRGenFunction::emitFakeRValue(const TypeInfo &TInfo) {
     llvm::Value *Addr =
       llvm::UndefValue::get(Schema.getAggregateType()->getPointerTo());
     return RValue::forAggregate(Addr);
+  }
+}
+
+void IRGenFunction::emitFakeExplosion(const TypeInfo &type, Explosion &explosion) {
+  ExplosionSchema schema(explosion.getKind());
+  type.getExplosionSchema(schema);
+  for (auto &element : schema) {
+    llvm::Type *elementType;
+    if (element.isAggregate()) {
+      elementType = element.getAggregateType()->getPointerTo();
+    } else {
+      elementType = element.getScalarType();
+    }
+
+    explosion.add(llvm::UndefValue::get(elementType));
   }
 }

@@ -43,6 +43,10 @@ namespace {
       return RValueSchema::forScalars(getStorageType());
     }
 
+    unsigned getExplosionSize(ExplosionKind kind) const {
+      return 1;
+    }
+
     void getExplosionSchema(ExplosionSchema &schema) const {
       schema.add(ExplosionSchema::Element::forScalar(getStorageType()));
     }
@@ -67,6 +71,15 @@ namespace {
 }
 
 void TypeInfo::_anchor() {}
+
+void TypeInfo::explode(IRGenFunction &IGF, const RValue &rvalue,
+                       Explosion &explosion) const {
+  if (rvalue.isScalar())
+    return explosion.add(rvalue.getScalars());
+
+  Address addr(rvalue.getAggregateAddress(), StorageAlignment);
+  loadExplosion(IGF, addr, explosion);
+}
 
 static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
 

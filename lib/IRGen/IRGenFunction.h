@@ -115,8 +115,9 @@ private:
 
 //--- Expression emission ------------------------------------------------------
 public:
-  RValue emitFakeRValue(const TypeInfo &TInfo);
-  LValue emitFakeLValue(const TypeInfo &TInfo);
+  void emitFakeExplosion(const TypeInfo &type, Explosion &explosion);
+  RValue emitFakeRValue(const TypeInfo &type);
+  LValue emitFakeLValue(const TypeInfo &type);
 
   void emitIgnored(Expr *E);
 
@@ -127,9 +128,14 @@ public:
   Address emitAddressForPhysicalLValue(const LValue &lvalue);
 
   RValue emitRValue(Expr *E);
-  RValue emitRValue(Expr *E, const TypeInfo &TInfo);
-  void emitExplosion(Expr *E, Explosion &explosion);
+  RValue emitRValue(Expr *E, const TypeInfo &type);
+  void emitRValueToMemory(Expr *E, Address addr, const TypeInfo &type);
+  void emitExplodedRValue(Expr *E, Explosion &explosion);
 
+  llvm::Value *emitAsPrimitiveScalar(Expr *E);
+
+  void emitExplodedLoad(const LValue &lvalue, const TypeInfo &type,
+                        Explosion &explosion);
   RValue emitLoad(const LValue &lvalue, const TypeInfo &type);
   void emitStore(const RValue &rvalue, const LValue &lvalue,
                  const TypeInfo &type);
@@ -137,18 +143,22 @@ public:
   void emitInit(Address addr, Expr *E, const TypeInfo &type);
   void emitZeroInit(Address addr, const TypeInfo &type);
 
-  void emitExplodedTuple(Expr *E, SmallVectorImpl<RValue> &elements);
-
 private:
   RValue emitRValueForFunction(FuncDecl *Fn);
+  void emitExplodedApplyExpr(ApplyExpr *apply, Explosion &explosion);
   RValue emitApplyExpr(ApplyExpr *Apply, const TypeInfo &TInfo);
   RValue emitDeclRefRValue(DeclRefExpr *DeclRef, const TypeInfo &TInfo);
+  void emitExplodedDeclRef(DeclRefExpr *DeclRef, Explosion &explosion);
+  void emitExplodedLookThroughOneof(LookThroughOneofExpr *E, Explosion &expl);
   RValue emitLookThroughOneofRValue(LookThroughOneofExpr *E);
   LValue emitLookThroughOneofLValue(LookThroughOneofExpr *E);
   RValue emitTupleExpr(TupleExpr *E, const TypeInfo &TInfo);
   RValue emitTupleElementRValue(TupleElementExpr *E, const TypeInfo &TInfo);
   LValue emitTupleElementLValue(TupleElementExpr *E, const TypeInfo &TInfo);
   RValue emitTupleShuffleExpr(TupleShuffleExpr *E, const TypeInfo &TInfo);
+  void emitExplodedTupleLiteral(TupleExpr *E, Explosion &explosion);
+  void emitExplodedTupleElement(TupleElementExpr *E, Explosion &explosion);
+  void emitExplodedTupleShuffle(TupleShuffleExpr *E, Explosion &explosion);
   Condition emitCondition(Expr *E, bool hasFalseCode);
 
 //--- Declaration emission -----------------------------------------------------

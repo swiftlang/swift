@@ -50,6 +50,12 @@ LValue IRGenFunction::emitAddressLValue(Address address) {
   return lvalue;
 }
 
+/// Load this l-value to create an exploded r-value.
+void IRGenFunction::emitExplodedLoad(const LValue &lvalue, const TypeInfo &type,
+                                     Explosion &explosion) {
+  return type.explode(*this, emitLoad(lvalue, type), explosion);
+}
+
 RValue IRGenFunction::emitLoad(const LValue &lvalue, const TypeInfo &type) {
   // Find the addresses of the components of the stack so that we can
   // efficiently walk backwards.  This is basically just flattening

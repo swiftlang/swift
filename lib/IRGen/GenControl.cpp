@@ -70,12 +70,9 @@ IRGenFunction::createBasicBlock(const llvm::Twine &Name) {
 Condition IRGenFunction::emitCondition(Expr *E, bool hasFalseCode) {
   assert(Builder.hasValidIP() && "emitting condition at unreachable point");
 
+  // Sema forces conditions to have Builtin.i1 type, which guarantees this.
   // TODO: special-case interesting condition expressions.
-  RValue RV = emitRValue(E);
-
-  // FIXME: hard-coding this is not ideal.
-  assert(RV.isScalar(1) && "r-value has unexpected form!");
-  llvm::Value *V = RV.getScalars()[0];
+  llvm::Value *V = emitAsPrimitiveScalar(E);
   assert(V->getType()->isIntegerTy(1));
 
   llvm::BasicBlock *trueBB, *falseBB, *contBB;

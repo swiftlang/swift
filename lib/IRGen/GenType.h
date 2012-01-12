@@ -40,6 +40,7 @@ namespace irgen {
   class IRGenModule;
   class Address;
   class Explosion;
+  enum class ExplosionKind : unsigned;
   class ExplosionSchema;
   class RValue;
   class RValueSchema;
@@ -90,6 +91,9 @@ public:
   /// given schema.
   virtual void getExplosionSchema(ExplosionSchema &schema) const = 0;
 
+  /// Return the number of elements in an explosion of this type.
+  virtual unsigned getExplosionSize(ExplosionKind kind) const = 0;
+
   /// Load an r-value from the given address.
   virtual RValue load(IRGenFunction &IGF, Address addr) const = 0;
 
@@ -105,6 +109,9 @@ public:
   /// consumed out of the explosion.
   virtual void storeExplosion(IRGenFunction &IGF, Explosion &explosion,
                               Address addr) const = 0;
+
+  /// Given an r-value of this type, explode it.
+  void explode(IRGenFunction &IGF, const RValue &RV, Explosion &expl) const;
 
 private:
   virtual void _anchor();

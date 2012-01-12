@@ -133,6 +133,10 @@ namespace {
                                          Size(StorageAlignment.getValue())));
     }
 
+    unsigned getExplosionSize(ExplosionKind kind) const {
+      return 2;
+    }
+
     void getExplosionSchema(ExplosionSchema &schema) const {
       llvm::StructType *Ty = getStorageType();
       assert(Ty->getNumElements() == 2);
@@ -257,41 +261,30 @@ llvm::FunctionType *IRGenModule::getFunctionType(Type type, bool withData) {
 
 namespace {
   struct ArgList {
-    llvm::SmallVector<llvm::Value *, 16> Values;
+    ArgList(ExplosionKind kind) : Values(kind) {}
+
+    Explosion Values;
     llvm::SmallVector<llvm::AttributeWithIndex, 4> Attrs;
 
     void addArg(const RValue &arg) {
       if (arg.isScalar()) {
-        Values.append(arg.getScalars().begin(), arg.getScalars().end());
+        Values.add(arg.getScalars());
       } else {
-        Values.push_back(arg.getAggregateAddress());
+        Values.add(arg.getAggregateAddress());
       }
     }
   };
 }
 
-/// Emit the given expression as an expanded tuple, if possible.
-static void emitExpanded(IRGenFunction &IGF, Expr *E, ArgList &args) {
-  // If the argument's not of tuple type, evaluate it straight.
-  if (!E->getType()->is<TupleType>())
-    return args.addArg(IGF.emitRValue(E));
-
-  // Otherwise, explode it.
-  SmallVector<RValue, 8> explodedTuple;
-  IGF.emitExplodedTuple(E, explodedTuple);
-  for (const RValue &arg : explodedTuple)
-    args.addArg(arg);
-}
-
 /// emitBuiltinCall - Emit a call to a builtin function.
 static RValue emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn, Expr *Arg,
-                              const TypeInfo &ResultInfo) {
-  assert(ResultInfo.getSchema().isScalar() && "builtin type with agg return");
+                              const TypeInfo &resultType) {
+  assert(resultType.getSchema().isScalar() && "builtin type with agg return");
 
   // Emit the arguments.  Maybe we'll get builtins that are more
   // complex than this.
-  ArgList Args;
-  emitExpanded(IGF, Arg, Args);
+  ArgList args(ExplosionKind::Minimal);
+  IGF.emitExplodedRValue(Arg, args.Values);
 
   Type BuiltinType;
   switch (isBuiltinValue(IGF.IGM.Context, Fn->getName().str(), BuiltinType)) {
@@ -299,28 +292,33 @@ static RValue emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn, Expr *Arg,
 
 /// A macro which expands to the emission of a simple unary operation
 /// or predicate.
-#define UNARY_OPERATION(Op)                                                 \
-    assert(Args.Values.size() == 1 && "wrong operands to unary operation"); \
-    return RValue::forScalars(IGF.Builder.Create##Op(Args.Values[0]));      \
+#define UNARY_OPERATION(Op) {                                               \
+    llvm::Value *op = args.Values.claimNext();                              \
+    assert(args.Values.empty() && "wrong operands to unary operation");     \
+    return RValue::forScalars(IGF.Builder.Create##Op(op));                  \
+  }
 
 /// A macro which expands to the emission of a simple binary operation
 /// or predicate.
-#define BINARY_OPERATION(Op)                                                \
-    assert(Args.Values.size() == 2 && "wrong operands to binary operation");\
-    return RValue::forScalars(IGF.Builder.Create##Op(Args.Values[0],        \
-                                                     Args.Values[1]));      \
+#define BINARY_OPERATION(Op) {                                              \
+    llvm::Value *lhs = args.Values.claimNext();                             \
+    llvm::Value *rhs = args.Values.claimNext();                             \
+    assert(args.Values.empty() && "wrong operands to binary operation");    \
+    return RValue::forScalars(IGF.Builder.Create##Op(lhs, rhs));            \
+  }
 
 /// A macro which expands to the emission of a simple binary operation
 /// or predicate defined over both floating-point and integer types.
-#define BINARY_ARITHMETIC_OPERATION(IntOp, FPOp)                            \
-    assert(Args.Values.size() == 2 && "wrong operands to binary operation");\
-    if (Args.Values[0]->getType()->isFloatingPointTy()) {                   \
-      return RValue::forScalars(IGF.Builder.Create##FPOp(Args.Values[0],    \
-                                                         Args.Values[1]));  \
+#define BINARY_ARITHMETIC_OPERATION(IntOp, FPOp) {                          \
+    llvm::Value *lhs = args.Values.claimNext();                             \
+    llvm::Value *rhs = args.Values.claimNext();                             \
+    assert(args.Values.empty() && "wrong operands to binary operation");    \
+    if (lhs->getType()->isFloatingPointTy()) {                              \
+      return RValue::forScalars(IGF.Builder.Create##FPOp(lhs, rhs));        \
     } else {                                                                \
-      return RValue::forScalars(IGF.Builder.Create##IntOp(Args.Values[0],   \
-                                                          Args.Values[1])); \
-    }
+      return RValue::forScalars(IGF.Builder.Create##IntOp(lhs, rhs));       \
+    }                                                                       \
+  }
 
   case BuiltinValueKind::Neg:       UNARY_OPERATION(Neg)
   case BuiltinValueKind::Not:       UNARY_OPERATION(Not)
@@ -365,13 +363,19 @@ static RValue emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn, Expr *Arg,
   llvm_unreachable("bad builtin kind!");
 }
 
+void IRGenFunction::emitExplodedApplyExpr(ApplyExpr *E, Explosion &explosion) {
+  const TypeInfo &type = getFragileTypeInfo(E->getType());
+  RValue rvalue = emitApplyExpr(E, type);
+  return type.explode(*this, rvalue, explosion);
+}
+
 /// Emit a function call.
-RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &ResultInfo) {
+RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &resultType) {
   // Check for a call to a builtin.
   if (ValueDecl *Fn = E->getCalledValue())
     if (Fn->getDeclContext() == IGM.Context.TheBuiltinModule)
       return emitBuiltinCall(*this, cast<FuncDecl>(Fn), E->getArg(),
-                             ResultInfo);
+                             resultType);
 
   const FuncTypeInfo &FnInfo =
     static_cast<const FuncTypeInfo &>(
@@ -380,24 +384,26 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &ResultInfo) {
   RValue FnRValue = emitRValue(E->getFn(), FnInfo);
   assert(FnRValue.isScalar() && FnRValue.getScalars().size() == 2);
 
-  ArgList Args;
+  // Unless special-cased, calls are done with minimal explosion.
+  // TODO: detect special cases.
+  ArgList args(ExplosionKind::Minimal);
 
   // The first argument is the implicit aggregate return slot, if required.
-  RValueSchema ResultSchema = ResultInfo.getSchema();
-  if (ResultSchema.isAggregate()) {
+  RValueSchema resultSchema = resultType.getSchema();
+  if (resultSchema.isAggregate()) {
     Address resultSlot =
-      createFullExprAlloca(ResultSchema.getAggregateType(),
-                           ResultSchema.getAggregateAlignment(),
+      createFullExprAlloca(resultSchema.getAggregateType(),
+                           resultSchema.getAggregateAlignment(),
                            "call.aggresult");
-    Args.Values.push_back(resultSlot.getAddress());
-    Args.Attrs.push_back(llvm::AttributeWithIndex::get(1,
+    args.Values.add(resultSlot.getAddress());
+    args.Attrs.push_back(llvm::AttributeWithIndex::get(1,
                                 llvm::Attribute::StructRet |
                                 llvm::Attribute::NoAlias));
   }
 
   // Emit the arguments, drilling into the first level of tuple, if
   // present.
-  emitExpanded(*this, E->getArg(), Args);
+  emitExplodedRValue(E->getArg(), args.Values);
 
   llvm::Value *Fn = FnRValue.getScalars()[0];
   llvm::Value *Data = FnRValue.getScalars()[1];
@@ -406,7 +412,7 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &ResultInfo) {
   // undefined.
   bool NeedsData = !isa<llvm::UndefValue>(Data);
   if (NeedsData) {
-    Args.Values.push_back(Data);
+    args.Values.add(Data);
   }
   llvm::FunctionType *FnType = FnInfo.getFunctionType(IGM, NeedsData);
 
@@ -414,22 +420,21 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &ResultInfo) {
                                               "fn.cast");
 
   // TODO: exceptions, calling conventions
-  llvm::CallInst *Call =
-    Builder.CreateCall(CastFn, Args.Values);
-  Call->setAttributes(llvm::AttrListPtr::get(Args.Attrs.data(),
-                                             Args.Attrs.size()));
+  llvm::CallInst *call = Builder.CreateCall(CastFn, args.Values.getAll());
+  call->setAttributes(llvm::AttrListPtr::get(args.Attrs.data(),
+                                             args.Attrs.size()));
 
   // Build an RValue result.
-  if (ResultSchema.isAggregate()) {
-    return RValue::forAggregate(Args.Values[0]);
-  } else if (ResultSchema.getScalarTypes().size() == 1) {
-    return RValue::forScalars(Call);
+  if (resultSchema.isAggregate()) {
+    return RValue::forAggregate(args.Values.claimNext());
+  } else if (resultSchema.getScalarTypes().size() == 1) {
+    return RValue::forScalars(call);
   } else {
     // This does the right thing for void returns as well.
     llvm::SmallVector<llvm::Value*, RValue::MaxScalars> Result;
-    for (unsigned I = 0, E = ResultSchema.getScalarTypes().size(); I != E; ++I){
-      llvm::Value *Scalar = Builder.CreateExtractValue(Call, I);
-      Result.push_back(Scalar);
+    for (unsigned I = 0, E = resultSchema.getScalarTypes().size(); I != E; ++I){
+      llvm::Value *scalar = Builder.CreateExtractValue(call, I);
+      Result.push_back(scalar);
     }
     return RValue::forScalars(Result);
   }
@@ -546,16 +551,16 @@ void IRGenFunction::emitEpilogue() {
   FunctionType *FnTy = CurFuncExpr->getType()->getAs<FunctionType>();
   assert(FnTy && "emitting a declaration that's not a function?");
 
-  const TypeInfo &ResultInfo = IGM.getFragileTypeInfo(FnTy->Result);
-  RValueSchema ResultSchema = ResultInfo.getSchema();
-  if (ResultSchema.isAggregate()) {
+  const TypeInfo &resultType = IGM.getFragileTypeInfo(FnTy->Result);
+  RValueSchema resultSchema = resultType.getSchema();
+  if (resultSchema.isAggregate()) {
     assert(isa<llvm::Argument>(ReturnSlot.getAddress()));
     Builder.CreateRetVoid();
-  } else if (ResultSchema.isScalar(0)) {
+  } else if (resultSchema.isScalar(0)) {
     assert(!ReturnSlot.isValid());
     Builder.CreateRetVoid();
   } else {
-    RValue RV = ResultInfo.load(*this, ReturnSlot);
+    RValue RV = resultType.load(*this, ReturnSlot);
     if (RV.isScalar(1)) {
       Builder.CreateRet(RV.getScalars()[0]);
     } else {

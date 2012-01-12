@@ -72,6 +72,10 @@ namespace {
                                                         StorageAlignment));
     }
 
+    unsigned getExplosionSize(ExplosionKind kind) const {
+      return 1;
+    }
+
     RValue load(IRGenFunction &IGF, Address addr) const {
       // FIXME
       return RValue();
@@ -116,6 +120,12 @@ namespace {
       if (Singleton) Singleton->getExplosionSchema(schema);
     }
 
+    unsigned getExplosionSize(ExplosionKind kind) const {
+      assert(isComplete());
+      if (!Singleton) return 0;
+      return Singleton->getExplosionSize(kind);
+    }
+
     RValue load(IRGenFunction &IGF, Address addr) const {
       assert(isComplete());
       if (!Singleton) return RValue::forScalars();
@@ -129,12 +139,12 @@ namespace {
 
     void loadExplosion(IRGenFunction &IGF, Address addr, Explosion &e) const {
       if (!Singleton) return;
-      Singleton->loadExplosion(IGF, addr, e);
+      Singleton->loadExplosion(IGF, getSingletonAddress(IGF, addr), e);
     }
 
     void storeExplosion(IRGenFunction &IGF, Explosion &e, Address addr) const {
       if (!Singleton) return;
-      Singleton->storeExplosion(IGF, e, addr);
+      Singleton->storeExplosion(IGF, e, getSingletonAddress(IGF, addr));
     }
   };
 
@@ -147,6 +157,11 @@ namespace {
     RValueSchema getSchema() const {
       assert(isComplete());
       return RValueSchema::forScalars(getDiscriminatorType());
+    }
+
+    unsigned getExplosionSize(ExplosionKind kind) const {
+      assert(isComplete());
+      return 1;
     }
 
     void getExplosionSchema(ExplosionSchema &schema) const {

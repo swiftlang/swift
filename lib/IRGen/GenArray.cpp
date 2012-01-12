@@ -38,6 +38,10 @@ namespace {
       return RValueSchema();
     }
 
+    unsigned getExplosionSize(ExplosionKind kind) const {
+      return 1;
+    }
+
     void getExplosionSchema(ExplosionSchema &schema) const {
       // FIXME
     }
