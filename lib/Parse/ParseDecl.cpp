@@ -782,6 +782,11 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
   
   // Complete the type alias to its actual type.
   PrettyTypeName->setUnderlyingType(Result);
+  
+  // Inject the type name into the containing scope so that it can be found as a
+  // metatype.
+  ScopeInfo.addToScope(PrettyTypeName);
+
   return Result;
 }
 
@@ -854,10 +859,6 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   if (!MemberDecls.empty())
     Decls.push_back(actOnDeclExtension(SourceLoc(), OneOfTy, MemberDecls));
   
-  // In addition to defining the oneof declaration, structs also inject their
-  // constructor into the global scope.
-  assert(OneOfTy->Elements.size() == 1 && "Struct has exactly one element");
-  ScopeInfo.addToScope(OneOfTy->getElement(0));
   Decls.push_back(OneOfTy->getElement(0));
   return false;
 }
