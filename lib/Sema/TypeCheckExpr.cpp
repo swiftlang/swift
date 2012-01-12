@@ -1022,6 +1022,12 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
       // Never recurse into statements.
       return 0;
     });
+    
+    // If our context specifies a type, apply it to the expression.
+    if (ConvertType) {
+      E = convertToType(E, ConvertType);
+      if (E == 0) return true;
+    }
   }
   
   // If there are no dependent expressions, then we're done.

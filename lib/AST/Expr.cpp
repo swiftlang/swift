@@ -766,7 +766,8 @@ public:
   }
   void visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
     OS.indent(Indent) << "(overloadsetref_expr type='" << E->getType();
-    OS << "' decl=" << E->getDecls()[0]->getName() << ')';
+    OS << "' decl=" << E->getDecls()[0]->getName() << " #decls="
+       << E->getDecls().size() << ')';
   }
   void visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
     OS.indent(Indent) << "(unresolved_decl_ref_expr type='" << E->getType();
