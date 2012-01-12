@@ -858,8 +858,6 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   // If there were members, create an 'extension' to hold them.
   if (!MemberDecls.empty())
     Decls.push_back(actOnDeclExtension(SourceLoc(), OneOfTy, MemberDecls));
-  
-  Decls.push_back(OneOfTy->getElement(0));
   return false;
 }
 
