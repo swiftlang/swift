@@ -145,7 +145,7 @@ private:
   void emitExplodedRValueForFunction(FuncDecl *Fn, Explosion &explosion);
 
   void emitExplodedApplyExpr(ApplyExpr *apply, Explosion &explosion);
-  Optional<Address> tryEmitApplyAsAddress(ApplyExpr *apply, const TypeInfo &type);
+  Optional<Address> tryEmitApplyAsAddress(ApplyExpr *apply, const TypeInfo &);
   RValue emitApplyExpr(ApplyExpr *apply, const TypeInfo &type);
 
   void emitExplodedDeclRef(DeclRefExpr *DeclRef, Explosion &explosion);

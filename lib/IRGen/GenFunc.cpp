@@ -246,7 +246,8 @@ FuncTypeInfo::getFunctionType(IRGenModule &IGM, bool NeedsData) const {
 void IRGenFunction::emitExplodedRValueForFunction(FuncDecl *Fn,
                                                   Explosion &explosion) {
   if (!Fn->getDeclContext()->isLocalContext()) {
-    explosion.add(IGM.getAddrOfGlobalFunction(Fn));
+    explosion.add(llvm::ConstantExpr::getBitCast(
+                              IGM.getAddrOfGlobalFunction(Fn), IGM.Int8PtrTy));
     explosion.add(llvm::UndefValue::get(IGM.Int8PtrTy));
     return;
   }

@@ -141,6 +141,12 @@ void IRGenFunction::emitExplodedRValue(Expr *E, Explosion &explosion) {
   case ExprKind::TupleElement:
     return emitExplodedTupleElement(cast<TupleElementExpr>(E), explosion);
 
+  case ExprKind::DotSyntaxPlusFuncUse: {
+    DotSyntaxPlusFuncUseExpr *DE = cast<DotSyntaxPlusFuncUseExpr>(E);
+    emitIgnored(DE->getBaseExpr());
+    return emitExplodedDeclRef(DE->getPlusFuncExpr(), explosion);
+  }
+
   case ExprKind::Call:
   case ExprKind::Unary:
   case ExprKind::Binary:
@@ -199,6 +205,7 @@ LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &type) {
   case ExprKind::AnonClosureArg:
   case ExprKind::Load:
   case ExprKind::Tuple:
+  case ExprKind::DotSyntaxPlusFuncUse:
     llvm_unreachable("these expression kinds should never be l-values");
 
   case ExprKind::ConstructorCall:
@@ -299,6 +306,7 @@ IRGenFunction::tryEmitAsAddress(Expr *E, const TypeInfo &type) {
   case ExprKind::TupleShuffle:
   case ExprKind::Func:
   case ExprKind::Closure:
+  case ExprKind::DotSyntaxPlusFuncUse:
     return Nothing;
   }
   llvm_unreachable("bad expression kind!");
