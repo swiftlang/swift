@@ -132,13 +132,6 @@ namespace {
       llvm_unreachable("bad explosion kind");
     }
 
-    /// Perform an r-value projection of a member of this tuple.
-    virtual RValue projectRValue(IRGenFunction &IGF, const RValue &tuple,
-                                 const TupleFieldInfo &field) const = 0;
-
-    /// Form a tuple from a bunch of r-values.
-    virtual RValue implode(IRGenFunction &IGF, Explosion &explosion) const = 0;
-
     void getExplosionSchema(ExplosionSchema &schema) const {
       for (auto &fieldInfo : getFieldInfos()) {
         fieldInfo.Type.getExplosionSchema(schema);
@@ -195,17 +188,6 @@ namespace {
 
     RValueSchema getSchema() const {
       return Schema;
-    }
-
-    RValue projectRValue(IRGenFunction &IGF, const RValue &tuple,
-                         const TupleFieldInfo &field) const {
-      ArrayRef<llvm::Value*> scalars = tuple.getScalars();
-      return RValue::forScalars(scalars.slice(field.ScalarBegin,
-                                       field.ScalarEnd - field.ScalarBegin));
-    }
-
-    RValue implode(IRGenFunction &IGF, Explosion &elements) const {
-      return RValue::forScalars(elements.claim(getNumScalars()));
     }
 
     RValue load(IRGenFunction &IGF, Address addr) const {
@@ -301,34 +283,6 @@ namespace {
 
       // The alignment of a temporary is always the alignment of the type.
       return Address(rvalue.getAggregateAddress(), StorageAlignment);
-    }
-
-    RValue projectRValue(IRGenFunction &IGF, const RValue &tuple,
-                         const TupleFieldInfo &field) const {
-      assert(tuple.isAggregate());
-      Address tupleAddr = getAddressForAggregateRValue(tuple);
-      Address fieldAddr = projectAddress(IGF, tupleAddr, field);
-
-      // If we need an aggregate, we've already got one.
-      if (field.Type.getSchema().isAggregate()) {
-        assert(field.Type.StorageAlignment <= fieldAddr.getAlignment());
-        return RValue::forAggregate(fieldAddr.getAddress());
-      }
-
-      // Otherwise, we need to load the scalars out.
-      return field.Type.load(IGF, fieldAddr);
-    }
-
-    RValue implode(IRGenFunction &IGF, Explosion &explosion) const {
-      Address temp = IGF.createFullExprAlloca(StorageType, StorageAlignment,
-                                              "tuple-implode");
-
-      for (const TupleFieldInfo &field : getFieldInfos()) {
-        Address fieldAddr = projectAddress(IGF, temp, field);
-        field.Type.storeExplosion(IGF, explosion, fieldAddr);
-      }
-
-      return RValue::forAggregate(temp.getAddress());
     }
 
     RValue load(IRGenFunction &IGF, Address addr) const {
