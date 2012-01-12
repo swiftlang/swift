@@ -200,6 +200,8 @@ void IRGenFunction::emitExplodedRValue(Expr *E, Explosion &explosion) {
   case ExprKind::Call:
   case ExprKind::Unary:
   case ExprKind::Binary:
+  case ExprKind::ConstructorCall:
+  case ExprKind::DotSyntaxCall:
     return emitExplodedApplyExpr(cast<ApplyExpr>(E), explosion);
 
   case ExprKind::IntegerLiteral:
@@ -217,7 +219,6 @@ void IRGenFunction::emitExplodedRValue(Expr *E, Explosion &explosion) {
   case ExprKind::Func:
   case ExprKind::Closure:
   case ExprKind::AnonClosureArg:
-  case ExprKind::DotSyntaxCall:
     IGM.unimplemented(E->getLoc(),
                       "cannot explode r-values for this expression yet");
     return emitFakeExplosion(getFragileTypeInfo(E->getType()), explosion);
