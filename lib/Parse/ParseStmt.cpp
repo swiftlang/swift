@@ -27,7 +27,7 @@ Expr *Parser::actOnCondition(Expr *Cond) {
   // The condition needs to be convertible to a logic value.  Build a call to
   // "convertToLogicValue" passing in the condition as an argument.
   Identifier C2LVFuncId = Context.getIdentifier("convertToLogicValue");
-  Expr *C2LVFunc = actOnIdentifierExpr(C2LVFuncId, Cond->getLoc());
+  Expr *C2LVFunc = actOnIdentifierExpr(C2LVFuncId, Cond->getStartLoc());
   
   return new (Context) CallExpr(C2LVFunc, Cond, TypeJudgement());
 }
@@ -205,8 +205,7 @@ ParseResult<Stmt> Parser::parseStmtReturn() {
       return true;
   } else {
     // Result value defaults to ().
-    Result = new (Context) TupleExpr(SourceLoc(), 0, 0, 0, SourceLoc(),
-                                     false);
+    Result = new (Context) TupleExpr(SourceLoc(), 0, 0, 0, SourceLoc());
   }
 
   if (!Result.isSemaError())

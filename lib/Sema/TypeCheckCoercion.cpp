@@ -84,6 +84,7 @@ public:
                                                       ValueKind::RValue));
   }  
   
+  Expr *visitParenExpr(ParenExpr *E);
   Expr *visitTupleExpr(TupleExpr *E);
   
   Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
@@ -104,13 +105,13 @@ public:
 
   Expr *visitTupleElementExpr(TupleElementExpr *E) {
     // TupleElementExpr is fully resolved.
-    assert(0 && "This node doesn't exist for dependent types");
+    llvm_unreachable("This node doesn't exist for dependent types");
     return 0;
   }
   
   Expr *visitTupleShuffleExpr(TupleShuffleExpr *E) {
     // TupleElementExpr is fully resolved.
-    assert(0 && "This node doesn't exist for dependent types");
+    llvm_unreachable("This node doesn't exist for dependent types");
     return 0;
   }
 
@@ -213,21 +214,16 @@ public:
 };
 } // end anonymous namespace.
 
+Expr *SemaCoerce::visitParenExpr(ParenExpr *E) {
+  Expr *Sub = convertToType(E->getSubExpr(), DestTy, true, TC);
+  if (Sub == 0) return 0;
+
+  E->setSubExpr(Sub);    
+  E->setType(Sub->getTypeJudgement());
+  return E;
+}
 
 Expr *SemaCoerce::visitTupleExpr(TupleExpr *E) {
-  // If we're providing a type for a tuple expr, we have a couple of
-  // different cases.  If the tuple has a single element and the destination
-  // type is not a tuple type, then this just recursively forces the scalar
-  // type into the single element.
-  if (E->isGroupingParen()) {
-    Expr *Sub = convertToType(E->getElement(0), DestTy, true, TC);
-    if (Sub == 0) return 0;
-
-    E->setElement(0, Sub);    
-    E->setType(Sub->getTypeJudgement());
-    return E;
-  }
-  
   return convertToType(E, DestTy, true, TC);
 }
 
@@ -458,7 +454,7 @@ Expr *SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   }
   
   return new (TC.Context) TupleExpr(SourceLoc(), NewSE, NewName,
-                                    NumFields, SourceLoc(), false,
+                                    NumFields, SourceLoc(),
                                     TypeJudgement(DestTy, ValueKind::RValue));
 }
 
@@ -478,14 +474,13 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
 
   // If the expression is a grouping parenthesis and it has a dependent type,
   // just force the type through it, regardless of what DestTy is.
-  if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
-    if (TE->isGroupingParen()) {
-      TE->setElement(0, convertToType(TE->getElement(0), DestTy,
-                                      IgnoreAnonDecls, TC));
-      if (TE->getElement(0) == 0) return 0;
-      TE->setType(TE->getElement(0)->getTypeJudgement());
-      return TE;
-    }
+  if (ParenExpr *PE = dyn_cast<ParenExpr>(E)) {
+    PE->setSubExpr(convertToType(PE->getSubExpr(), DestTy,
+                                 IgnoreAnonDecls, TC));
+    if (PE->getSubExpr() == 0) return 0;
+    PE->setType(PE->getSubExpr()->getTypeJudgement());
+    return PE;
+  }
   
   if (TupleType *TT = DestTy->getAs<TupleType>()) {
     // Type conversions are carefully ranked so that they "do the right thing",

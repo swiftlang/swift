@@ -129,9 +129,10 @@ void IRGenFunction::emitExplodedRValue(Expr *E, Explosion &explosion) {
   case ExprKind::Load:
     return emitExplodedRValue(cast<LoadExpr>(E)->getSubExpr(), explosion);
 
+  case ExprKind::Paren:
+    return emitExplodedRValue(cast<ParenExpr>(E)->getSubExpr(), explosion);
+
   case ExprKind::Tuple:
-    if (cast<TupleExpr>(E)->isGroupingParen())
-      return emitExplodedRValue(cast<TupleExpr>(E)->getElement(0), explosion);
     return emitExplodedTupleLiteral(cast<TupleExpr>(E), explosion);
 
   case ExprKind::TupleShuffle:
@@ -178,7 +179,7 @@ LValue IRGenFunction::emitLValue(Expr *E) {
 /// actually have l-value kind; to try to find an address for an
 /// expression as an aggressive local optimization, use
 /// tryEmitAsAddress.
-LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &TInfo) {
+LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &type) {
   assert(E->getValueKind() == ValueKind::LValue);
 
   switch (E->getKind()) {
@@ -197,28 +198,26 @@ LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &TInfo) {
   case ExprKind::Closure:
   case ExprKind::AnonClosureArg:
   case ExprKind::Load:
+  case ExprKind::Tuple:
     llvm_unreachable("these expression kinds should never be l-values");
 
   case ExprKind::ConstructorCall:
   case ExprKind::DotSyntaxCall:
     IGM.unimplemented(E->getLoc(),
                       "cannot generate l-values for this expression yet");
-    return emitFakeLValue(TInfo);
+    return emitFakeLValue(type);
 
-  case ExprKind::Tuple: {
-    TupleExpr *TE = cast<TupleExpr>(E);
-    assert(TE->isGroupingParen() && "emitting non-grouping tuple as l-value");
-    return emitLValue(TE->getElement(0), TInfo);
-  }
+  case ExprKind::Paren:
+    return emitLValue(cast<ParenExpr>(E)->getSubExpr(), type);
 
   case ExprKind::TupleElement:
-    return emitTupleElementLValue(cast<TupleElementExpr>(E), TInfo);
+    return emitTupleElementLValue(cast<TupleElementExpr>(E), type);
 
   case ExprKind::LookThroughOneof:
     return emitLookThroughOneofLValue(cast<LookThroughOneofExpr>(E));
 
   case ExprKind::DeclRef:
-    return emitDeclRefLValue(*this, cast<DeclRefExpr>(E), TInfo);
+    return emitDeclRefLValue(*this, cast<DeclRefExpr>(E), type);
   }
   llvm_unreachable("bad expression kind!");
 }
@@ -277,10 +276,8 @@ IRGenFunction::tryEmitAsAddress(Expr *E, const TypeInfo &type) {
     return tryEmitApplyAsAddress(cast<ApplyExpr>(E), type);
 
   // Look through parens.
-  case ExprKind::Tuple:
-    if (cast<TupleExpr>(E)->isGroupingParen())
-      return tryEmitAsAddress(cast<TupleExpr>(E)->getElement(0), type);
-    return Nothing;
+  case ExprKind::Paren:
+    return tryEmitAsAddress(cast<ParenExpr>(E)->getSubExpr(), type);
 
   // We can locate a oneof payload if we can locate the oneof.
   case ExprKind::LookThroughOneof:
@@ -296,6 +293,7 @@ IRGenFunction::tryEmitAsAddress(Expr *E, const TypeInfo &type) {
     return Nothing;
 
   // These expressions aren't naturally placed in memory.
+  case ExprKind::Tuple:
   case ExprKind::IntegerLiteral:
   case ExprKind::FloatLiteral:
   case ExprKind::TupleShuffle:

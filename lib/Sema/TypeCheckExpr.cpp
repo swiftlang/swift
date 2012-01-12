@@ -207,13 +207,6 @@ Expr *TypeChecker::convertToRValue(Expr *E) {
 }
 
 bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
-  // A tuple expr with a single subexpression and no name is just a grouping
-  // paren.
-  if (TE->isGroupingParen()) {
-    TE->setType(TE->getElement(0)->getTypeJudgement());
-    return false;
-  }
-  
   // Compute the result type.
   SmallVector<TupleTypeElt, 8> ResultTyElts(TE->getNumElements());
 
@@ -510,6 +503,11 @@ public:
     E->setDependentType(DependentType::get(TC.Context));
     return E;
   }
+
+  Expr *visitParenExpr(ParenExpr *E) {
+    E->setType(E->getSubExpr()->getTypeJudgement());
+    return E;
+  }
   
   Expr *visitTupleExpr(TupleExpr *E) {
     if (TC.semaTupleExpr(E))
@@ -799,8 +797,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS) {
   Expr *ArgElts[] = { LHS, RHS };
   Expr **ArgElts2 = TC.Context.AllocateCopy<Expr*>(ArgElts, ArgElts+2);
   TupleExpr *Arg = new (TC.Context) TupleExpr(SourceLoc(), 
-                                              ArgElts2, 0, 2, SourceLoc(),
-                                              false);
+                                              ArgElts2, 0, 2, SourceLoc());
   return new (TC.Context) BinaryExpr(Op, Arg);
 }
 

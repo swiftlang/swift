@@ -416,13 +416,14 @@ ParseResult<Expr> Parser::parseExprParen() {
       Context.AllocateCopy<Identifier>(SubExprNames.data(),
                                        SubExprNames.data()+SubExprs.size());
   
-  bool IsGrouping = false;
+  // A tuple with a single, unlabelled element is just parentheses.
   if (SubExprs.size() == 1 &&
-      (SubExprNames.empty() || SubExprNames[0].empty()))
-    IsGrouping = true;
+      (SubExprNames.empty() || SubExprNames[0].empty())) {
+    return new (Context) ParenExpr(LPLoc, SubExprs[0], RPLoc);
+  }
   
   return new (Context) TupleExpr(LPLoc, NewSubExprs, NewSubExprsNames,
-                                 SubExprs.size(), RPLoc, IsGrouping);
+                                 SubExprs.size(), RPLoc);
 }
 
 

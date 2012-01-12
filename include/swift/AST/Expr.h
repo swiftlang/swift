@@ -333,8 +333,43 @@ public:
     return E->getKind() == ExprKind::UnresolvedScopedIdentifier;
   }
 };
+
+/// ParenExpr - A parenthesized expression like '(x+x)'.  Syntactically,
+/// this is just a TupleExpr with exactly one element that has no label.
+/// Semantically, however, it serves only as grouping parentheses and
+/// does not form an expression of tuple type (unless the sub-expression
+/// has tuple type, of course).
+class ParenExpr : public Expr {
+  SourceLoc LParenLoc, RParenLoc;
+  Expr *SubExpr;
+
+public:
+  ParenExpr(SourceLoc lploc, Expr *subExpr, SourceLoc rploc,
+            TypeJudgement ty = TypeJudgement())
+    : Expr(ExprKind::Paren, ty), LParenLoc(lploc), RParenLoc(rploc),
+      SubExpr(subExpr) {
+    // We just assert that these are always valid; it's not clear why
+    // you'd ever construct something where that's not true.
+    assert(lploc.isValid() && rploc.isValid());
+  }
+
+  SourceLoc getLParenLoc() const { return LParenLoc; }
+  SourceLoc getRParenLoc() const { return RParenLoc; }
+
+  SourceLoc getLoc() const { return SubExpr->getLoc(); }
+  SourceRange getSourceRange() const {
+    return SourceRange(LParenLoc, RParenLoc);
+  }
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *E) { SubExpr = E; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ParenExpr *) { return true; }
+  static bool classof(const Expr *E) { return E->getKind() == ExprKind::Paren; }
+};
   
-/// TupleExpr - Parenthesized expressions like '(x+x)' and '(x, y, 4)'.  Tuple
+/// TupleExpr - Parenthesized expressions like '(a=x+x)' and '(x, y, 4)'.  Tuple
 /// types automatically decay if they have a single element, this means that
 /// single element tuple literals, such as "(4)", will exist in the AST, but
 /// have a result type that is the same as the input operand type.
@@ -351,22 +386,14 @@ class TupleExpr : public Expr {
   unsigned NumSubExprs;
   SourceLoc RParenLoc;
   
-  /// IsGrouping - True if this is a syntactic grouping expression where the
-  /// source and result types are the same.  This is only true for
-  /// single-element tuples with no element name.
-  bool IsGrouping;
-
   Expr **getSubExprs() const { return SubExprs; }  
 public:
   TupleExpr(SourceLoc lparenloc, Expr **subexprs, Identifier *subexprnames,
-            unsigned numsubexprs, SourceLoc rparenloc, bool isGrouping,
+            unsigned numsubexprs, SourceLoc rparenloc,
             TypeJudgement Ty = TypeJudgement())
     : Expr(ExprKind::Tuple, Ty), LParenLoc(lparenloc), SubExprs(subexprs),
       SubExprNames(subexprnames), NumSubExprs(numsubexprs),
-      RParenLoc(rparenloc), IsGrouping(isGrouping) {
-    assert((!isGrouping ||
-            (NumSubExprs == 1 && getElementName(0).empty() && SubExprs[0])) &&
-           "Invalid grouping paren");
+      RParenLoc(rparenloc) {
     assert(lparenloc.isValid() == rparenloc.isValid() &&
            "Mismatched parenthesis location information validity");
   }
@@ -395,12 +422,6 @@ public:
   Identifier getElementName(unsigned i) const {
     assert(i < NumSubExprs && "Invalid element index");
     return SubExprNames ? SubExprNames[i] : Identifier();
-  }
-  
-  /// isGroupingParen - Return true if this is a grouping parenthesis, in which
-  /// the input and result types are the same.
-  bool isGroupingParen() const {
-    return IsGrouping;
   }
   
   // Implement isa/cast/dyncast/etc.

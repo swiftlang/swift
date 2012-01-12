@@ -153,9 +153,8 @@ static ValueDecl *getCalledValue(Expr *E) {
   if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
     return DRE->getDecl();
 
-  if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
-    if (TE->isGroupingParen())
-      return getCalledValue(TE->getElement(0));
+  if (ParenExpr *PE = dyn_cast<ParenExpr>(E))
+    return getCalledValue(PE->getSubExpr());
 
   return nullptr;
 }
@@ -327,11 +326,9 @@ static Expr::ConversionRank getConversionRank(const Expr *E, Type DestTy) {
   if (E->getType()->getCanonicalType() == DestTy->getCanonicalType())
     return Expr::CR_Identity;
   
-  // If the expression is a grouping parenthesis, then it is an identity
-  // conversion of the underlying expression.
-  if (const TupleExpr *TE = dyn_cast<TupleExpr>(E))
-    if (TE->isGroupingParen())
-      return getConversionRank(TE->getElement(0), DestTy);
+  // Look through parentheses.
+  if (const ParenExpr *PE = dyn_cast<ParenExpr>(E))
+    return getConversionRank(PE->getSubExpr(), DestTy);
   
   if (TupleType *TT = DestTy->getAs<TupleType>()) {
     if (const TupleExpr *TE = dyn_cast<TupleExpr>(E))
@@ -430,7 +427,14 @@ namespace {
     Expr *visitUnresolvedScopedIdentifierExpr(UnresolvedScopedIdentifierExpr*E){
       return E;
     }
-    
+
+    Expr *visitParenExpr(ParenExpr *E) {
+      if (Expr *subExpr = doIt(E->getSubExpr())) {
+        E->setSubExpr(subExpr);
+        return E;
+      }
+      return 0;
+    }
     Expr *visitTupleExpr(TupleExpr *E) {
       for (unsigned i = 0, e = E->getNumElements(); i != e; ++i)
         if (E->getElement(i)) {
@@ -781,6 +785,11 @@ public:
     OS.indent(Indent) << "(unresolved_scoped_identifier_expr base='"
       << E->getBaseTypeFromScope()->getName() << "\' name='"
       << E->getName() << "')";
+  }
+  void visitParenExpr(ParenExpr *E) {
+    OS.indent(Indent) << "(paren_expr type='" << E->getType() << "'\n";
+    printRec(E->getSubExpr());
+    OS << ')';
   }
   void visitTupleExpr(TupleExpr *E) {
     OS.indent(Indent) << "(tuple_expr type='" << E->getType() << '\'';
