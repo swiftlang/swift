@@ -243,19 +243,9 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
       Binder.bindScopeName(USIE->getBaseTypeFromScope(), BaseName, BaseNameLoc);
     if (!Scope) return nullptr;
 
-    if (OneOfType *Ty = Scope.dyn_cast<OneOfType*>()) {
-      OneOfElementDecl *Elt = Ty->getElement(Name);
-      if (Elt == 0) {
-        Binder.diagnose(Loc, diag::invalid_member, Name, BaseName)
-          << SourceRange(USIE->getBaseNameLoc(), USIE->getBaseNameLoc());
-        return 0;
-      }
-      Decls.push_back(Elt);
-    } else {
-      auto Module = Scope.get<const ImportedModule*>();
-      Module->second->lookupValue(Module->first, Name,
-                                  NLKind::QualifiedLookup, Decls);
-    }
+    auto Module = Scope.get<const ImportedModule*>();
+    Module->second->lookupValue(Module->first, Name,
+                                NLKind::QualifiedLookup, Decls);
 
   // Otherwise, not something that needs name binding.
   } else {
