@@ -17,6 +17,7 @@
 
 #include "GenType.h"
 #include "IRGenFunction.h"
+#include "Explosion.h"
 #include "LValue.h"
 #include "RValue.h"
 
@@ -51,12 +52,9 @@ LValue IRGenFunction::emitAddressLValue(Address address) {
 }
 
 /// Load this l-value to create an exploded r-value.
-void IRGenFunction::emitExplodedLoad(const LValue &lvalue, const TypeInfo &type,
+void IRGenFunction::emitExplodedLoad(const LValue &lvalue,
+                                     const TypeInfo &type,
                                      Explosion &explosion) {
-  return type.explode(*this, emitLoad(lvalue, type), explosion);
-}
-
-RValue IRGenFunction::emitLoad(const LValue &lvalue, const TypeInfo &type) {
   // Find the addresses of the components of the stack so that we can
   // efficiently walk backwards.  This is basically just flattening
   // the recursion.  Maybe our stack should be optimized to make this
@@ -82,13 +80,13 @@ RValue IRGenFunction::emitLoad(const LValue &lvalue, const TypeInfo &type) {
 
     // If this is the last component, load it and return that as the result.
     if (i + 1 == e)
-      return component.asLogical().load(*this, address);
+      return component.asLogical().loadExplosion(*this, address, explosion);
 
     // Otherwise, load and materialize the result into memory.
     address = component.asLogical().loadAndMaterialize(*this, address);
   }
 
-  return type.load(*this, address);
+  return type.loadExplosion(*this, address, explosion);
 }
 
 typedef std::reverse_iterator<LValue::const_iterator*> path_iterator;
@@ -97,7 +95,7 @@ typedef std::reverse_iterator<LValue::const_iterator*> path_iterator;
 /// component.
 static void emitStoreRecursive(IRGenFunction &IGF, Address base,
                                const TypeInfo &finalType,
-                               const RValue &finalValue,
+                               Explosion &finalValue,
                                path_iterator pathStart,
                                path_iterator pathEnd) {
   // Drill into any physical components.
@@ -110,7 +108,7 @@ static void emitStoreRecursive(IRGenFunction &IGF, Address base,
 
     // If we reach the end, do a simple store and we're done.
     if (++pathStart == pathEnd) {
-      return finalType.store(IGF, finalValue, base);
+      return finalType.storeExplosion(IGF, finalValue, base);
     }
   }
 
@@ -120,7 +118,7 @@ static void emitStoreRecursive(IRGenFunction &IGF, Address base,
   
   // If this is the final component, just do a logical store.
   if (pathStart + 1 == pathEnd) {
-    return component.store(IGF, base, finalValue);
+    return component.storeExplosion(IGF, finalValue, base);
   }
 
   // Otherwise, load and materialize into a temporary.
@@ -130,11 +128,11 @@ static void emitStoreRecursive(IRGenFunction &IGF, Address base,
   emitStoreRecursive(IGF, temp, finalType, finalValue, pathStart + 1, pathEnd);
 
   // Store the temporary back.
-  component.storeFromMaterialized(IGF, base, temp);
+  component.storeMaterialized(IGF, temp, base);
 }
                            
 
-void IRGenFunction::emitStore(const RValue &rvalue, const LValue &lvalue,
+void IRGenFunction::emitStore(Explosion &rvalue, const LValue &lvalue,
                               const TypeInfo &type) {
 
   // Find the addresses of the components of the stack so that we can
@@ -162,4 +160,13 @@ Address IRGenFunction::emitAddressForPhysicalLValue(const LValue &lvalue) {
     address = (*i)->asPhysical().offset(*this, address);
   }
   return address;
+}
+
+void IRGenFunction::emitAssignment(Expr *rhs, const LValue &lhs,
+                                   const TypeInfo &type) {
+  // We don't expect that l-value emission is generally going to admit
+  // maximally-exploded calls.
+  Explosion explosion(ExplosionKind::Minimal);
+  emitExplodedRValue(rhs, explosion);
+  emitStore(explosion, lhs, type);
 }

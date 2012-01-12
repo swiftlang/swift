@@ -74,16 +74,11 @@ void IRGenFunction::emitBraceStmt(BraceStmt *BS) {
   }
 }
 
+/// Emit an assignment statement.
 void IRGenFunction::emitAssignStmt(AssignStmt *S) {
-  // Emit the LHS.
   const TypeInfo &type = getFragileTypeInfo(S->getDest()->getType());
   LValue LV = emitLValue(S->getDest(), type);
-
-  // Emit the RHS.
-  RValue RV = emitRValue(S->getSrc(), type);
-
-  // Do the store.
-  emitStore(RV, LV, type);
+  emitAssignment(S->getSrc(), LV, type);
 }
 
 void IRGenFunction::emitIfStmt(IfStmt *S) {
@@ -106,24 +101,23 @@ void IRGenFunction::emitIfStmt(IfStmt *S) {
 
 void IRGenFunction::emitReturnStmt(ReturnStmt *S) {
   // The expression is evaluated in a full-expression context.
-  FullExpr FullExpr(*this);
+  FullExpr fullExpr(*this);
 
   // If this function takes no return value, ignore the result of the
   // expression.
   if (!ReturnSlot.isValid()) {
     emitIgnored(S->getResult());
   } else {
-    const TypeInfo &ResultInfo = getFragileTypeInfo(S->getResult()->getType());
-    RValue RV = emitRValue(S->getResult(), ResultInfo);
-    ResultInfo.store(*this, RV, ReturnSlot);
+    const TypeInfo &resultType = getFragileTypeInfo(S->getResult()->getType());
+    emitRValueToMemory(S->getResult(), ReturnSlot, resultType);
   }
 
   // Leave the full-expression.
-  FullExpr.pop();
+  fullExpr.pop();
 
   // In either case, branch to the return block.
-  JumpDest ReturnDest(ReturnBB);
-  emitBranch(ReturnDest);
+  JumpDest returnDest(ReturnBB);
+  emitBranch(returnDest);
   Builder.ClearInsertionPoint();
 }
 

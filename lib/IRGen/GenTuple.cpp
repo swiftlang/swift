@@ -491,18 +491,6 @@ void IRGenFunction::emitExplodedTupleLiteral(TupleExpr *E,
   }
 }
 
-/// Emit a tuple literal expression.
-RValue IRGenFunction::emitTupleExpr(TupleExpr *E, const TypeInfo &TI) {
-  if (E->isGroupingParen())
-    return emitRValue(E->getElement(0), TI);
-
-  Explosion explosion(ExplosionKind::Maximal);
-  emitExplodedTupleLiteral(E, explosion);
-
-  const TupleTypeInfo &tupleType = TI.as<TupleTypeInfo>();
-  return tupleType.implode(*this, explosion);
-}
-
 namespace {
   class TupleElement : public PhysicalPathComponent {
     const TupleFieldInfo &Field;
@@ -519,12 +507,6 @@ namespace {
 
 void IRGenFunction::emitExplodedTupleElement(TupleElementExpr *E,
                                              Explosion &explosion) {
-  const TypeInfo &type = getFragileTypeInfo(E->getType());
-  return type.explode(*this, emitTupleElementRValue(E, type), explosion);
-}
-
-RValue IRGenFunction::emitTupleElementRValue(TupleElementExpr *E,
-                                             const TypeInfo &fieldType) {
   Expr *tuple = E->getBase();
   const TupleTypeInfo &tupleType = getAsTupleTypeInfo(*this, tuple->getType());
 
@@ -535,19 +517,39 @@ RValue IRGenFunction::emitTupleElementRValue(TupleElementExpr *E,
   if (!field.hasStorage()) {
     // Emit the base in case it has side-effects.
     emitIgnored(tuple);
-    return emitFakeRValue(field.FieldInfo);
+    return emitFakeExplosion(field.FieldInfo, explosion);
   }
 
   // If we can emit the base as an l-value, we can avoid a lot
   // of unnecessary work.
-  if (Optional<LValue> tupleLV = tryEmitAsLValue(tuple, tupleType)) {
-    tupleLV.getValue().push<TupleElement>(field);
-    return emitLoad(tupleLV.getValue(), field.FieldInfo);
+  if (Optional<Address> tupleAddr = tryEmitAsAddress(tuple, tupleType)) {
+    Address addr = tupleType.projectLValue(*this, tupleAddr.getValue(), field);
+    return field.FieldInfo.loadExplosion(*this, addr, explosion);
   }
 
   // Otherwise, emit the base as an r-value and project.
-  RValue tupleRV = emitRValue(tuple, tupleType);
-  return tupleType.projectRValue(*this, tupleRV, field);
+  Explosion tupleExplosion(explosion.getKind());
+  emitExplodedRValue(tuple, tupleExplosion);
+  return tupleType.projectExplosion(tupleExplosion, field, explosion);
+}
+
+/// Try to emit a tuple-element reference expression as an address.
+Optional<Address>
+IRGenFunction::tryEmitTupleElementAsAddress(TupleElementExpr *E) {
+  Expr *tuple = E->getBase();
+  const TupleTypeInfo &tupleType = getAsTupleTypeInfo(*this, tuple->getType());
+
+  // This is contigent exclusively on whether we can emit an address
+  // for the tuple.
+  Optional<Address> tupleAddr = tryEmitAsAddress(tuple, tupleType);
+  if (!tupleAddr) return Nothing;
+
+  // We succeeded;  now just GEP down.
+  const TupleFieldInfo &field =
+    tupleType.getFieldInfos()[E->getFieldNumber()];
+  if (!field.hasStorage()) return Address();
+
+  return tupleType.projectLValue(*this, tupleAddr.getValue(), field);
 }
 
 LValue IRGenFunction::emitTupleElementLValue(TupleElementExpr *E,
@@ -579,17 +581,11 @@ void IRGenFunction::emitExplodedTupleShuffle(TupleShuffleExpr *E,
   const TupleTypeInfo &innerTupleType =
     getAsTupleTypeInfo(*this, innerTuple->getType());
 
-  // Emit the inner tuple.  We prefer to emit it as an l-value.
-  Address innerTupleAddr;
+  // Emit the inner tuple.  We prefer to emit it as an address.
   Explosion innerTupleExplosion(outerTupleExplosion.getKind());
-  if (Optional<LValue> innerTupleLV
-        = tryEmitAsLValue(innerTuple, innerTupleType)) {
-    if (innerTupleLV.getValue().isPhysical()) {
-      innerTupleAddr = emitAddressForPhysicalLValue(innerTupleLV.getValue());
-    } else {
-      emitExplodedLoad(innerTupleLV.getValue(), innerTupleType,
-                       innerTupleExplosion);
-    }
+  Address innerTupleAddr;
+  if (Optional<Address> addr = tryEmitAsAddress(innerTuple, innerTupleType)) {
+    innerTupleAddr = addr.getValue();
   } else {
     emitExplodedRValue(innerTuple, innerTupleExplosion);
   }
@@ -628,15 +624,4 @@ void IRGenFunction::emitExplodedTupleShuffle(TupleShuffleExpr *E,
                                       outerTupleExplosion);
     }
   }
-}
-
-/// emitTupleShuffleExpr - Emit a tuple-shuffle expression.
-/// Tuple-shuffles are always r-values.
-RValue IRGenFunction::emitTupleShuffleExpr(TupleShuffleExpr *E,
-                                           const TypeInfo &type) {
-  Explosion explosion(ExplosionKind::Maximal);
-  emitExplodedTupleShuffle(E, explosion);
-
-  const TupleTypeInfo &outerTupleType = type.as<TupleTypeInfo>();
-  return outerTupleType.implode(*this, explosion);
 }

@@ -53,6 +53,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Optional.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
 #include "llvm/Target/TargetData.h"
@@ -242,16 +243,19 @@ FuncTypeInfo::getFunctionType(IRGenModule &IGM, bool NeedsData) const {
 }
 
 /// Form an r-value which refers to the given global function.
-RValue IRGenFunction::emitRValueForFunction(FuncDecl *Fn) {
+void IRGenFunction::emitExplodedRValueForFunction(FuncDecl *Fn,
+                                                  Explosion &explosion) {
   if (!Fn->getDeclContext()->isLocalContext()) {
-    llvm::Function *Function = IGM.getAddrOfGlobalFunction(Fn);
-    llvm::Value *Data = llvm::UndefValue::get(IGM.Int8PtrTy);
-    return RValue::forScalars(Function, Data);
+    explosion.add(IGM.getAddrOfGlobalFunction(Fn));
+    explosion.add(llvm::UndefValue::get(IGM.Int8PtrTy));
+    return;
   }
 
   unimplemented(Fn->getLocStart(), "local function emission");
-  llvm::Value *Undef = llvm::UndefValue::get(IGM.Int8PtrTy);
-  return RValue::forScalars(Undef, Undef);
+  llvm::Value *undef = llvm::UndefValue::get(IGM.Int8PtrTy);
+  explosion.add(undef);
+  explosion.add(undef);
+  return;
 }
 
 llvm::FunctionType *IRGenModule::getFunctionType(Type type, bool withData) {
@@ -369,6 +373,17 @@ void IRGenFunction::emitExplodedApplyExpr(ApplyExpr *E, Explosion &explosion) {
   return type.explode(*this, rvalue, explosion);
 }
 
+Optional<Address>
+IRGenFunction::tryEmitApplyAsAddress(ApplyExpr *E, const TypeInfo &resultType) {
+  RValueSchema resultSchema = resultType.getSchema();
+  if (!resultSchema.isAggregate())
+    return Nothing;
+
+  RValue result = emitApplyExpr(E, resultType);
+  assert(result.isAggregate());
+  return Address(result.getAggregateAddress(), resultType.StorageAlignment);
+}
+
 /// Emit a function call.
 RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &resultType) {
   // Check for a call to a builtin.
@@ -377,12 +392,11 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &resultType) {
       return emitBuiltinCall(*this, cast<FuncDecl>(Fn), E->getArg(),
                              resultType);
 
-  const FuncTypeInfo &FnInfo =
-    static_cast<const FuncTypeInfo &>(
-                              IGM.getFragileTypeInfo(E->getFn()->getType()));
-
-  RValue FnRValue = emitRValue(E->getFn(), FnInfo);
-  assert(FnRValue.isScalar() && FnRValue.getScalars().size() == 2);
+  Explosion fnValues(ExplosionKind::Maximal);
+  emitExplodedRValue(E->getFn(), fnValues);
+  llvm::Value *fn = fnValues.claimNext();
+  llvm::Value *data = fnValues.claimNext();
+  assert(fnValues.empty());
 
   // Unless special-cased, calls are done with minimal explosion.
   // TODO: detect special cases.
@@ -405,22 +419,19 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &resultType) {
   // present.
   emitExplodedRValue(E->getArg(), args.Values);
 
-  llvm::Value *Fn = FnRValue.getScalars()[0];
-  llvm::Value *Data = FnRValue.getScalars()[1];
-
   // Don't bother passing a data argument if the r-value says it's
   // undefined.
-  bool NeedsData = !isa<llvm::UndefValue>(Data);
-  if (NeedsData) {
-    args.Values.add(Data);
-  }
-  llvm::FunctionType *FnType = FnInfo.getFunctionType(IGM, NeedsData);
+  bool needsData = !isa<llvm::UndefValue>(data);
+  if (needsData) args.Values.add(data);
 
-  llvm::Value *CastFn = Builder.CreateBitCast(Fn, FnType->getPointerTo(),
-                                              "fn.cast");
+  const FuncTypeInfo &fnType =
+    IGM.getFragileTypeInfo(E->getFn()->getType()).as<FuncTypeInfo>();
+  llvm::FunctionType *fnLLVMType = fnType.getFunctionType(IGM, needsData);
+
+  fn = Builder.CreateBitCast(fn, fnLLVMType->getPointerTo(), "fn.cast");
 
   // TODO: exceptions, calling conventions
-  llvm::CallInst *call = Builder.CreateCall(CastFn, args.Values.getAll());
+  llvm::CallInst *call = Builder.CreateCall(fn, args.Values.getAll());
   call->setAttributes(llvm::AttrListPtr::get(args.Attrs.data(),
                                              args.Attrs.size()));
 
@@ -431,12 +442,12 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &resultType) {
     return RValue::forScalars(call);
   } else {
     // This does the right thing for void returns as well.
-    llvm::SmallVector<llvm::Value*, RValue::MaxScalars> Result;
+    llvm::SmallVector<llvm::Value*, RValue::MaxScalars> result;
     for (unsigned I = 0, E = resultSchema.getScalarTypes().size(); I != E; ++I){
       llvm::Value *scalar = Builder.CreateExtractValue(call, I);
-      Result.push_back(scalar);
+      result.push_back(scalar);
     }
-    return RValue::forScalars(Result);
+    return RValue::forScalars(result);
   }
 }
 

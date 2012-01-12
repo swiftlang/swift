@@ -31,6 +31,20 @@
 #define ABSTRACT_DECL(Id, Parent)
 #endif
 
+/// NAMED_DECL(Id, Parent)
+///   Used for subclasses of NamedDecl.  The default behavior is to do
+///   the same as for Decl.
+#ifndef NAMED_DECL
+#define NAMED_DECL(Id, Parent) DECL(Id, Parent)
+#endif
+
+/// VALUE_DECL(Id, Parent)
+///   Used for subclasses of ValueDecl.  The default behavior is to do
+///   the same as for NamedDecl.
+#ifndef VALUE_DECL
+#define VALUE_DECL(Id, Parent) NAMED_DECL(Id, Parent)
+#endif
+
 /// A convenience for determining the range of declarations.  These will always
 /// appear immediately after the last member.
 #ifndef DECL_RANGE
@@ -41,15 +55,17 @@ DECL(Import, Decl)
 DECL(Extension, Decl)
 ABSTRACT_DECL(Named, Decl)
   ABSTRACT_DECL(Value, Named)
-    DECL(TypeAlias, Decl)
-    DECL(Var, Value)
-    DECL(Func, Value)
-    DECL(OneOfElement, Value)
-    DECL(Arg, Value)
-    DECL(ElementRef, Value)
+    VALUE_DECL(TypeAlias, Decl)
+    VALUE_DECL(Var, Value)
+    VALUE_DECL(Func, Value)
+    VALUE_DECL(OneOfElement, Value)
+    VALUE_DECL(Arg, Value)
+    VALUE_DECL(ElementRef, Value)
     DECL_RANGE(Value, TypeAlias, ElementRef)
   DECL_RANGE(Named, TypeAlias, ElementRef)
 
+#undef VALUE_DECL
+#undef NAMED_DECL
 #undef DECL_RANGE
 #undef ABSTRACT_DECL
 #undef DECL

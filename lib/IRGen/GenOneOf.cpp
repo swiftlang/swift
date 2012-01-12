@@ -28,6 +28,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/Basic/Optional.h"
 #include "llvm/DerivedTypes.h"
 
 #include "GenType.h"
@@ -96,13 +97,13 @@ namespace {
 
   /// A TypeInfo implementation for singleton oneofs.
   class SingletonOneofTypeInfo : public OneofTypeInfo {
+  public:
     static Address getSingletonAddress(IRGenFunction &IGF, Address addr) {
       llvm::Value *singletonAddr =
         IGF.Builder.CreateStructGEP(addr.getAddress(), 0);
       return Address(singletonAddr, addr.getAlignment());
     }
 
-  public:
     /// The type info of the singleton member, or null if it carries no data.
     const TypeInfo *Singleton;
 
@@ -307,8 +308,7 @@ namespace {
     LookThroughOneof() : PhysicalPathComponent(sizeof(LookThroughOneof)) {}
 
     Address offset(IRGenFunction &IGF, Address addr) const {
-      llvm::Value *gep = IGF.Builder.CreateStructGEP(addr.getAddress(), 0);
-      return Address(gep, addr.getAlignment());
+      return SingletonOneofTypeInfo::getSingletonAddress(IGF, addr);
     }
   };
 }
@@ -319,12 +319,14 @@ LValue IRGenFunction::emitLookThroughOneofLValue(LookThroughOneofExpr *E) {
   return oneofLV;
 }
 
-RValue IRGenFunction::emitLookThroughOneofRValue(LookThroughOneofExpr *E) {
-  RValue oneofRV = emitRValue(E->getSubExpr());
-  if (oneofRV.isScalar()) return oneofRV;
+Optional<Address>
+IRGenFunction::tryEmitLookThroughOneofAsAddress(LookThroughOneofExpr *E) {
+  Expr *oneof = E->getSubExpr();
+  Optional<Address> oneofAddr =
+    tryEmitAsAddress(oneof, getFragileTypeInfo(oneof->getType()));
+  if (!oneofAddr) return Nothing;
 
-  llvm::Value *addr = Builder.CreateStructGEP(oneofRV.getAggregateAddress(), 0);
-  return RValue::forAggregate(addr);
+  return SingletonOneofTypeInfo::getSingletonAddress(*this, oneofAddr.getValue());
 }
 
 /// emitOneOfType - Emit all the declarations associated with this oneof type.

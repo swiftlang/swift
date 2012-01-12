@@ -78,12 +78,6 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
 
 /// Emit a declaration reference as an exploded r-value.
 void IRGenFunction::emitExplodedDeclRef(DeclRefExpr *E, Explosion &explosion) {
-  const TypeInfo &type = getFragileTypeInfo(E->getType());
-  return type.explode(*this, emitDeclRefRValue(E, type), explosion);
-}
-
-/// Emit a declaration reference as an r-value.
-RValue IRGenFunction::emitDeclRefRValue(DeclRefExpr *E, const TypeInfo &TInfo) {
   ValueDecl *D = E->getDecl();
   switch (D->getKind()) {
   case DeclKind::Extension:
@@ -92,76 +86,25 @@ RValue IRGenFunction::emitDeclRefRValue(DeclRefExpr *E, const TypeInfo &TInfo) {
     llvm_unreachable("decl is not a value decl");
 
   case DeclKind::Arg:
-  case DeclKind::Var:
-    return emitLoad(emitDeclRefLValue(*this, E, TInfo), TInfo);
+  case DeclKind::Var: {
+    const TypeInfo &type = getFragileTypeInfo(E->getType());
+    return emitExplodedLoad(emitDeclRefLValue(*this, E, type), type, explosion);
+  }
 
   case DeclKind::Func:
-    return emitRValueForFunction(cast<FuncDecl>(D));
+    emitExplodedRValueForFunction(cast<FuncDecl>(D), explosion);
+    return;
 
-  case DeclKind::OneOfElement: {
-    llvm::Value *fn =
-      IGM.getAddrOfInjectionFunction(cast<OneOfElementDecl>(D));
-    llvm::Value *data = llvm::UndefValue::get(IGM.Int8PtrTy);
-    return RValue::forScalars(fn, data);
-  }
+  case DeclKind::OneOfElement:
+    explosion.add(IGM.getAddrOfInjectionFunction(cast<OneOfElementDecl>(D)));
+    explosion.add(llvm::UndefValue::get(IGM.Int8PtrTy));
+    return;
 
   case DeclKind::ElementRef:
     unimplemented(E->getLoc(), "emitting this decl as an r-value");
-    return emitFakeRValue(TInfo);
+    return emitFakeExplosion(getFragileTypeInfo(E->getType()), explosion);
   }
   llvm_unreachable("bad decl kind");
-}
-
-RValue IRGenFunction::emitRValue(Expr *E) {
-  const TypeInfo &type = IGM.getFragileTypeInfo(E->getType());
-  return emitRValue(E, type);
-}
-
-/// Emit the given expression as an r-value.  The expression need not
-/// actually have r-value kind.
-RValue IRGenFunction::emitRValue(Expr *E, const TypeInfo &TInfo) {
-  switch (E->getKind()) {
-#define EXPR(Id, Parent)
-#define UNCHECKED_EXPR(Id, Parent) case ExprKind::Id:
-#include "swift/AST/ExprNodes.def"
-    llvm_unreachable("these expression kinds should not survive to IR-gen");
-
-  case ExprKind::Load:
-    return emitRValue(cast<LoadExpr>(E)->getSubExpr(), TInfo);
-
-  case ExprKind::Call:
-  case ExprKind::Unary:
-  case ExprKind::Binary:
-  case ExprKind::ConstructorCall:
-  case ExprKind::DotSyntaxCall:
-    return emitApplyExpr(cast<ApplyExpr>(E), TInfo);
-
-  case ExprKind::IntegerLiteral:
-    return RValue::forScalars(emitIntegerLiteralExpr(*this, cast<IntegerLiteralExpr>(E)));
-  case ExprKind::FloatLiteral:
-    return RValue::forScalars(emitFloatLiteralExpr(*this, cast<FloatLiteralExpr>(E)));
-
-  case ExprKind::Tuple:
-    return emitTupleExpr(cast<TupleExpr>(E), TInfo);
-  case ExprKind::TupleElement:
-    return emitTupleElementRValue(cast<TupleElementExpr>(E), TInfo);
-  case ExprKind::TupleShuffle:
-    return emitTupleShuffleExpr(cast<TupleShuffleExpr>(E), TInfo);
-
-  case ExprKind::LookThroughOneof:
-    return emitLookThroughOneofRValue(cast<LookThroughOneofExpr>(E));
-
-  case ExprKind::DeclRef:
-    return emitDeclRefRValue(cast<DeclRefExpr>(E), TInfo);
-
-  case ExprKind::Func:
-  case ExprKind::Closure:
-  case ExprKind::AnonClosureArg:
-    IGM.unimplemented(E->getLoc(),
-                      "cannot generate r-values for this expression yet");
-    return emitFakeRValue(TInfo);
-  }
-  llvm_unreachable("bad expression kind!");
 }
 
 /// Emit the given expression, which must have primitive scalar type,
@@ -232,8 +175,9 @@ LValue IRGenFunction::emitLValue(Expr *E) {
 }
 
 /// Emit the given expression as an l-value.  The expression must
-/// actually have l-value kind; to try to emit an expression as an
-/// l-value as an aggressive local optimization, use tryEmitAsLValue.
+/// actually have l-value kind; to try to find an address for an
+/// expression as an aggressive local optimization, use
+/// tryEmitAsAddress.
 LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &TInfo) {
   assert(E->getValueKind() == ValueKind::LValue);
 
@@ -279,49 +223,84 @@ LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &TInfo) {
   llvm_unreachable("bad expression kind!");
 }
 
-/// Try to emit the given expression as an underlying l-value.
-Optional<LValue> IRGenFunction::tryEmitAsLValue(Expr *E,
-                                                const TypeInfo &type) {
-  // If it *is* an l-value, then go ahead.
-  if (E->getValueKind() == ValueKind::LValue)
-    return emitLValue(E, type);
-
+/// Try to emit the given expression as an entity with an address.
+/// This is useful for local optimizations.
+Optional<Address>
+IRGenFunction::tryEmitAsAddress(Expr *E, const TypeInfo &type) {
   switch (E->getKind()) {
 #define EXPR(Id, Parent)
 #define UNCHECKED_EXPR(Id, Parent) case ExprKind::Id:
 #include "swift/AST/ExprNodes.def"
     llvm_unreachable("these expression kinds should not survive to IR-gen");
 
+  // Look through loads without further ado.
   case ExprKind::Load:
-    return emitLValue(cast<LoadExpr>(E)->getSubExpr(), type);
+    return tryEmitAsAddress(cast<LoadExpr>(E)->getSubExpr(), type);
 
+  // We can find addresses for some locals.
+  case ExprKind::DeclRef: {
+    ValueDecl *D = cast<DeclRefExpr>(E)->getDecl();
+    switch (D->getKind()) {
+#define DECL(Id, Parent) case DeclKind::Id:
+#define VALUE_DECL(Id, Parent)
+#include "swift/AST/DeclNodes.def"
+      llvm_unreachable("not a value decl!");
+
+    // These are r-values.
+    case DeclKind::Func:
+    case DeclKind::OneOfElement:
+      return Nothing;
+
+    // These are potentially supportable.
+    case DeclKind::TypeAlias:
+    case DeclKind::ElementRef:
+      return Nothing;
+
+    // These we support.
+    case DeclKind::Var:
+    case DeclKind::Arg:
+      // For now, only bother with locals.
+      if (!D->getDeclContext()->isLocalContext())
+        return Nothing;
+
+      return getLocal(D);
+    }
+    llvm_unreachable("bad declaration kind!");
+  }
+
+  // Some call results will naturally come back in memory.
   case ExprKind::Call:
   case ExprKind::Unary:
   case ExprKind::Binary:
-  case ExprKind::IntegerLiteral:
-  case ExprKind::FloatLiteral:
-  case ExprKind::DeclRef:
-  case ExprKind::Func:
-  case ExprKind::Closure:
-  case ExprKind::AnonClosureArg:
   case ExprKind::DotSyntaxCall:
   case ExprKind::ConstructorCall:
-    // These can never be usefully emitted as l-values, if they
-    // weren't l-values before.
+    return tryEmitApplyAsAddress(cast<ApplyExpr>(E), type);
+
+  // Look through parens.
+  case ExprKind::Tuple:
+    if (cast<TupleExpr>(E)->isGroupingParen())
+      return tryEmitAsAddress(cast<TupleExpr>(E)->getElement(0), type);
     return Nothing;
 
-  case ExprKind::Tuple: {
-    TupleExpr *tuple = cast<TupleExpr>(E);
-    if (tuple->isGroupingParen())
-      return tryEmitAsLValue(tuple->getElement(0), type);
-    return Nothing;
-  }
-
-  case ExprKind::TupleElement:
-  case ExprKind::TupleShuffle:
+  // We can locate a oneof payload if we can locate the oneof.
   case ExprKind::LookThroughOneof:
-    // These could all be usefully emitted as l-values in some cases,
-    // but we haven't bothered implementing that yet.
+    return tryEmitLookThroughOneofAsAddress(cast<LookThroughOneofExpr>(E));
+
+  // We can locate a tuple element if we can locate the tuple.
+  case ExprKind::TupleElement:
+    return tryEmitTupleElementAsAddress(cast<TupleElementExpr>(E));
+
+  // These expressions may be in memory in some cases, but we haven't
+  // gotten around to applying this optimization to them yet.
+  case ExprKind::AnonClosureArg:
+    return Nothing;
+
+  // These expressions aren't naturally placed in memory.
+  case ExprKind::IntegerLiteral:
+  case ExprKind::FloatLiteral:
+  case ExprKind::TupleShuffle:
+  case ExprKind::Func:
+  case ExprKind::Closure:
     return Nothing;
   }
   llvm_unreachable("bad expression kind!");
@@ -335,8 +314,9 @@ void IRGenFunction::emitInit(Address addr, Expr *E, const TypeInfo &type) {
 /// Emit an r-value directly into memory.
 void IRGenFunction::emitRValueToMemory(Expr *E, Address addr,
                                        const TypeInfo &type) {
-  RValue RV = emitRValue(E, type);
-  type.store(*this, RV, addr);
+  Explosion explosion(ExplosionKind::Maximal);
+  emitExplodedRValue(E, explosion);
+  type.storeExplosion(*this, explosion, addr);
 }
 
 /// Zero-initializer the given l-value.
@@ -365,7 +345,8 @@ void IRGenFunction::emitZeroInit(Address addr, const TypeInfo &type) {
 /// Emit an expression whose value is being ignored.
 void IRGenFunction::emitIgnored(Expr *E) {
   // For now, just emit it as an r-value.
-  emitRValue(E);
+  Explosion explosion(ExplosionKind::Maximal);
+  emitExplodedRValue(E, explosion);
 }
 
 /// Emit a fake l-value which obeys the given specification.  This

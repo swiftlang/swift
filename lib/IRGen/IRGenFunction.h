@@ -123,12 +123,10 @@ public:
 
   LValue emitLValue(Expr *E);
   LValue emitLValue(Expr *E, const TypeInfo &type);
-  Optional<LValue> tryEmitAsLValue(Expr *E, const TypeInfo &type);
+  Optional<Address> tryEmitAsAddress(Expr *E, const TypeInfo &type);
   LValue emitAddressLValue(Address addr);
   Address emitAddressForPhysicalLValue(const LValue &lvalue);
 
-  RValue emitRValue(Expr *E);
-  RValue emitRValue(Expr *E, const TypeInfo &type);
   void emitRValueToMemory(Expr *E, Address addr, const TypeInfo &type);
   void emitExplodedRValue(Expr *E, Explosion &explosion);
 
@@ -136,28 +134,31 @@ public:
 
   void emitExplodedLoad(const LValue &lvalue, const TypeInfo &type,
                         Explosion &explosion);
-  RValue emitLoad(const LValue &lvalue, const TypeInfo &type);
-  void emitStore(const RValue &rvalue, const LValue &lvalue,
+  void emitStore(Explosion &rvalue, const LValue &lvalue,
                  const TypeInfo &type);
+  void emitAssignment(Expr *E, const LValue &lvalue, const TypeInfo &type);
 
   void emitInit(Address addr, Expr *E, const TypeInfo &type);
   void emitZeroInit(Address addr, const TypeInfo &type);
 
 private:
-  RValue emitRValueForFunction(FuncDecl *Fn);
+  void emitExplodedRValueForFunction(FuncDecl *Fn, Explosion &explosion);
+
   void emitExplodedApplyExpr(ApplyExpr *apply, Explosion &explosion);
-  RValue emitApplyExpr(ApplyExpr *Apply, const TypeInfo &TInfo);
-  RValue emitDeclRefRValue(DeclRefExpr *DeclRef, const TypeInfo &TInfo);
+  Optional<Address> tryEmitApplyAsAddress(ApplyExpr *apply, const TypeInfo &type);
+  RValue emitApplyExpr(ApplyExpr *apply, const TypeInfo &type);
+
   void emitExplodedDeclRef(DeclRefExpr *DeclRef, Explosion &explosion);
+
   void emitExplodedLookThroughOneof(LookThroughOneofExpr *E, Explosion &expl);
-  RValue emitLookThroughOneofRValue(LookThroughOneofExpr *E);
+  Optional<Address> tryEmitLookThroughOneofAsAddress(LookThroughOneofExpr *E);
   LValue emitLookThroughOneofLValue(LookThroughOneofExpr *E);
-  RValue emitTupleExpr(TupleExpr *E, const TypeInfo &TInfo);
-  RValue emitTupleElementRValue(TupleElementExpr *E, const TypeInfo &TInfo);
-  LValue emitTupleElementLValue(TupleElementExpr *E, const TypeInfo &TInfo);
-  RValue emitTupleShuffleExpr(TupleShuffleExpr *E, const TypeInfo &TInfo);
-  void emitExplodedTupleLiteral(TupleExpr *E, Explosion &explosion);
+
   void emitExplodedTupleElement(TupleElementExpr *E, Explosion &explosion);
+  Optional<Address> tryEmitTupleElementAsAddress(TupleElementExpr *E);
+  LValue emitTupleElementLValue(TupleElementExpr *E, const TypeInfo &type);
+
+  void emitExplodedTupleLiteral(TupleExpr *E, Explosion &explosion);
   void emitExplodedTupleShuffle(TupleShuffleExpr *E, Explosion &explosion);
   Condition emitCondition(Expr *E, bool hasFalseCode);
 

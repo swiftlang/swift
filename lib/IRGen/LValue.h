@@ -118,12 +118,16 @@ protected:
   LogicalPathComponent(size_t size) : PathComponent(size, false) {}
 
 public:
-  virtual void store(IRGenFunction &IGF, Address base,
-                     const RValue &rvalue) const = 0;
-  virtual void storeFromMaterialized(IRGenFunction &IGF, Address base,
-                                     Address temp) const = 0;
-  virtual RValue load(IRGenFunction &IGF, Address base) const = 0;
-  virtual Address loadAndMaterialize(IRGenFunction &IGF, Address base) const = 0;
+  virtual void storeExplosion(IRGenFunction &IGF, Explosion &rvalue,
+                              Address base) const = 0;
+  virtual void storeMaterialized(IRGenFunction &IGF, Address temp,
+                                 Address base) const = 0;
+  virtual void loadExplosion(IRGenFunction &IGF, Address base,
+                             Explosion &exp) const = 0;
+  virtual void loadMaterialized(IRGenFunction &IGF, Address base,
+                                Address temp) const = 0;
+  virtual Address loadAndMaterialize(IRGenFunction &IGF,
+                                     Address base) const = 0;
 };
 
 inline LogicalPathComponent &PathComponent::asLogical() {
