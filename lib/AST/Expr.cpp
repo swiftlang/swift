@@ -749,7 +749,12 @@ public:
 
   void visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
     OS.indent(Indent) << "(integer_literal_expr type='" << E->getType();
-    OS << "' value=" << E->getValue() << ')';
+    OS << "' value=";
+    if (E->getType()->is<DependentType>())
+      OS << E->getText();
+    else
+      OS << E->getValue();
+    OS << ')';
   }
   void visitFloatLiteralExpr(FloatLiteralExpr *E) {
     OS.indent(Indent) << "(float_literal_expr type='" << E->getType();
