@@ -1,5 +1,6 @@
 add_swift_library(swiftAST
   ASTContext.cpp
+  Attr.cpp
   Builtins.cpp
   Decl.cpp
   Diagnostics.cpp
