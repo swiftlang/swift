@@ -768,6 +768,30 @@ public:
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Binary;}
 };
 
+/// ConstructorCallExpr - This is the application of an argument to a metatype,
+/// which resolves to construction of the type.  For example, "SomeType(1,2,3)".
+/// The function in the application is known to be one of the plus methods to
+/// construct the type.  This is formed by Sema, and is just a sugared form of
+/// ApplyExpr.
+class ConstructorCallExpr : public ApplyExpr {
+public:
+  ConstructorCallExpr(Expr *FnExpr, Expr *ArgExpr,
+                      TypeJudgement Ty = TypeJudgement())
+    : ApplyExpr(ExprKind::ConstructorCall, FnExpr, ArgExpr, Ty) {
+  }
+
+  SourceRange getSourceRange() const {
+    return SourceRange(getFn()->getStartLoc(), getArg()->getEndLoc());
+  }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ConstructorCallExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ConstructorCall;
+  }
+};
+  
+  
 /// DotSyntaxCallExpr - Refer to an element or method of a type, e.g. P.x.  'x'
 /// is modeled as a DeclRefExpr or OverloadSetRefExpr on the field's decl.
 ///

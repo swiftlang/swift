@@ -177,7 +177,11 @@ public:
     // of the overload set, trim them out.      
     return E;
   }
-  
+
+  Expr *visitConstructorCallExpr(ConstructorCallExpr *E) {
+    return E;
+  }
+
   Expr *visitDotSyntaxCallExpr(DotSyntaxCallExpr *E) {
     return E;
   }

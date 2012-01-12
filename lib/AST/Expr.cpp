@@ -548,7 +548,11 @@ namespace {
       Arg->setElement(1, E2);
       return E;
     }
-    
+
+    Expr *visitConstructorCallExpr(ConstructorCallExpr *E) {
+      return visitApplyExpr(E);
+    }
+
     Expr *visitDotSyntaxCallExpr(DotSyntaxCallExpr *E) {
       return visitApplyExpr(E);
     }
@@ -844,47 +848,36 @@ public:
     OS << "' ArgNo=" << E->getArgNumber() << ')';
   }
   
-  void visitCallExpr(CallExpr *E) {
-    OS.indent(Indent) << "(call_expr type='" << E->getType() << "'\n";
-    printRec(E->getFn());
+  void visitApplyExpr(ApplyExpr *E, const char *NodeName) {
+    OS.indent(Indent) << '(' << NodeName << " type='" << E->getType() << '\'';
+    if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->getFn()))
+      OS << "name=" << DRE->getDecl()->getName();
+    else if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E->getFn()))
+      OS << "name=" << OO->getDecls()[0]->getName()
+         << "[#overloads=" << OO->getDecls().size() << ']';
+    else {
+      OS << '\n';
+      printRec(E->getFn());
+    }
     OS << '\n';
     printRec(E->getArg());
-    OS << ')';
-  }
-  void visitUnaryExpr(UnaryExpr *E) {
-    OS.indent(Indent) << "(unary_expr '";
-    if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->getFn()))
-      OS << DRE->getDecl()->getName();
-    else if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E->getFn()))
-      OS << OO->getDecls()[0]->getName();
-    else
-      OS << "***UNKNOWN***";
-    OS << "' type='" << E->getType() << "'\n";
-    printRec(E->getArg());
-    OS << ')';
-  }
-  void visitBinaryExpr(BinaryExpr *E) {
-    OS.indent(Indent) << "(binary_expr '";
-    if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->getFn()))
-      OS << DRE->getDecl()->getName();
-    else if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E->getFn()))
-      OS << OO->getDecls()[0]->getName();
-    else
-      OS << "***UNKNOWN***";
-    OS << "' type='" << E->getType() << "'\n";
-    printRec(E->getArgTuple()->getElement(0));
-    OS << '\n';
-    printRec(E->getArgTuple()->getElement(1));
     OS << ')';
   }
   
+  void visitCallExpr(CallExpr *E) {
+    visitApplyExpr(E, "call_expr");
+  }
+  void visitUnaryExpr(UnaryExpr *E) {
+    visitApplyExpr(E, "unary_expr");
+  }
+  void visitBinaryExpr(BinaryExpr *E) {
+    visitApplyExpr(E, "binary_expr");
+  }
+  void visitConstructorCallExpr(ConstructorCallExpr *E) {
+    visitApplyExpr(E, "constructor_call_expr");
+  }
   void visitDotSyntaxCallExpr(DotSyntaxCallExpr *E) {
-    OS.indent(Indent) << "(dot_syntax_call_expr type='"
-                      << E->getType() << "'\n";
-    printRec(E->getFn());
-    OS << '\n';
-    printRec(E->getArg());
-    OS << ')';
+    visitApplyExpr(E, "dot_syntax_call_expr");
   }
   void visitDotSyntaxPlusFuncUseExpr(DotSyntaxPlusFuncUseExpr *E) {
     OS.indent(Indent) << "(dot_syntax_plus_func_use type='"

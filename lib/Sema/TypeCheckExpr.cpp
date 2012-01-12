@@ -534,6 +534,9 @@ public:
       return 0;
     return visitApplyExpr(E);
   }
+  Expr *visitConstructorCallExpr(ConstructorCallExpr *E) {
+    return visitApplyExpr(E);
+  }
   Expr *visitDotSyntaxCallExpr(DotSyntaxCallExpr *E) {
     return visitApplyExpr(E);
   }
