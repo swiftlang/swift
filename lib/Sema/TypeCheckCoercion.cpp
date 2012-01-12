@@ -134,10 +134,7 @@ public:
         // FIXME: Preserve source locations.
         E->setFn(new (TC.Context) DeclRefExpr(DED, UME->getColonLoc(),
                             TypeJudgement(DED->getType(), ValueKind::RValue)));
-        if (TC.semaApplyExpr(E))
-          return 0;
-          
-        return E;
+        return TC.semaApplyExpr(E);
       }
     }
     

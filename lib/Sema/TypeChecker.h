@@ -37,7 +37,7 @@ public:
   bool validateType(Type T);
   
   bool semaTupleExpr(TupleExpr *TE);
-  bool semaApplyExpr(ApplyExpr *E);
+  Expr *semaApplyExpr(ApplyExpr *E);
   
   bool typeCheckExpression(Expr *&E, Type ConvertType = Type());
   void typeCheckDecl(Decl *D);

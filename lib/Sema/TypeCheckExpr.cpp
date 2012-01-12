@@ -271,7 +271,7 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
   return false;
 }
 
-bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
+Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   Expr *E1 = E->getFn();
   Expr *E2 = E->getArg();
   
@@ -282,13 +282,13 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
     if (isa<UnaryExpr>(E) &&
         !cast<DeclRefExpr>(E1)->getDecl()->isOperator()) {
       diagnose(E1->getLoc(), diag::unary_op_without_attribute);
-      return true;
+      return 0;
     }
     
     if (isa<BinaryExpr>(E) &&
         !cast<DeclRefExpr>(E1)->getDecl()->getAttrs().isInfix()) {
       diagnose(E1->getLoc(), diag::binary_op_without_attribute);
-      return true;
+      return 0;
     }
     
     // We have a function application.  Check that the argument type matches the
@@ -297,12 +297,12 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
     if (E2 == 0) {
       diagnose(E1->getLoc(), diag::while_converting_function_argument,
                FT->Input);
-      return true;
+      return 0;
     }
     
     E->setArg(E2);
     E->setType(FT->Result, ValueKind::RValue);
-    return false;
+    return E;
   }
   
   // If the "function" is actually a type (i.e. its type is 'metatype'), then we
@@ -313,11 +313,11 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // TypeAlias to see what we're dealing with.  If the typealias was erroneous
     // then silently squish this erroneous subexpression.
     if (!MT->TheType->hasUnderlyingType())
-      return true;  // FIXME: This should check for the error bit on the decl?
+      return 0;  // FIXME: This should check for the error bit on the decl?
 
     Type Ty = MT->TheType->getUnderlyingType();
     if (Ty->is<ErrorType>())
-      return true;  // Squelch an erroneous subexpression.
+      return 0;  // Squelch an erroneous subexpression.
 
     // The only well formed version of this is a oneof (or sugar for one) that
     // is constructed.
@@ -345,16 +345,8 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
         break;
       }
       
-      if (FnRef) {
-        E->setFn(FnRef);
-        return semaApplyExpr(E);
-#if 0 // FIXME: We should be able to return a new node!
-        //ApplyExpr *Call = new (Context) ConstructorCallExpr(FnRef, E2);
-        //if (semaApplyExpr(Call))
-        //  return 0;
-        //return Call;
-#endif
-      }
+      if (FnRef)
+        return semaApplyExpr(new (Context) ConstructorCallExpr(FnRef, E2));
     }
   }
   
@@ -362,14 +354,14 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // we have a type error.
   if (!E1->getType()->is<DependentType>()) {
     diagnose(E1->getLoc(), diag::called_expr_isnt_function);
-    return true;
+    return 0;
   }
   
   // Okay, if the argument is also dependent, we can't do anything here.  Just
   // wait until something gets resolved.
   if (E2->getType()->is<DependentType>()) {
     E->setDependentType(E2->getType());
-    return false;
+    return E;
   }
   
   // Okay, we have a typed argument and untyped function.  See if we can infer
@@ -381,7 +373,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
   if (!OS) {
     // If not, just use the dependent type.
     E->setType(E1->getType(), ValueKind::RValue);
-    return false;
+    return E;
   }
   
   ValueDecl *BestCandidateFound = 0;
@@ -441,7 +433,7 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
       continue;
     diagnose(TheDecl->getLocStart(), diag::found_candidate);
   }
-  return true;
+  return 0;
 }
 
 //===----------------------------------------------------------------------===//
@@ -574,7 +566,7 @@ public:
   
   
   Expr *visitApplyExpr(ApplyExpr *E) {
-    return TC.semaApplyExpr(E) ? 0 : E;
+    return TC.semaApplyExpr(E);
   }
   Expr *visitCallExpr(CallExpr *E) { return visitApplyExpr(E); }
   Expr *visitUnaryExpr(UnaryExpr *E) { return visitApplyExpr(E); }
@@ -645,9 +637,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
       
       ApplyExpr *Call = new (TC.Context) 
         DotSyntaxCallExpr(Fn, E->getDotLoc(), Base);
-      if (TC.semaApplyExpr(Call))
-        return 0;
-      return Call;
+      return TC.semaApplyExpr(Call);
     }
   }
   
@@ -682,10 +672,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   if (FnRef) {
     ApplyExpr *Call = new (TC.Context) DotSyntaxCallExpr(FnRef, E->getDotLoc(),
                                                          Base);
-    if (TC.semaApplyExpr(Call))
-      return 0;
-    
-    return Call;
+    return TC.semaApplyExpr(Call);
   }
   
   // If this is a member access to a oneof with a single element constructor
