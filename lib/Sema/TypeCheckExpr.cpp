@@ -312,6 +312,55 @@ bool TypeChecker::semaApplyExpr(ApplyExpr *E) {
     return false;
   }
   
+  // If the "function" is actually a type (i.e. its type is 'metatype'), then we
+  // have an argument list applied to a type, which is construction of the
+  // type.
+  if (MetaTypeType *MT = E1->getType()->getAs<MetaTypeType>()) {
+    // The metatype represents an arbitrary named type: dig through the
+    // TypeAlias to see what we're dealing with.  If the typealias was erroneous
+    // then silently squish this erroneous subexpression.
+    if (!MT->TheType->hasUnderlyingType())
+      return true;  // FIXME: This should check for the error bit on the decl?
+
+    Type Ty = MT->TheType->getUnderlyingType();
+    if (Ty->is<ErrorType>())
+      return true;  // Squelch an erroneous subexpression.
+
+    // The only well formed version of this is a oneof (or sugar for one) that
+    // is constructed.
+    // TODO: It might make sense to be able to "default construct" protocols if
+    // they have a construction member.
+    // TODO: We could allow constructing a tuple this way, though it is somewhat
+    // silly and pointless to do so.
+    if (OneOfType *OOT = Ty->getAs<OneOfType>()) {
+      Expr *FnRef = 0;
+      switch (OOT->Elements.size()) {
+      case 0: break;
+      case 1:
+        FnRef = new (Context) DeclRefExpr(OOT->Elements[0],
+                                          E1->getStartLoc(),
+                                          OOT->Elements[0]->getTypeJudgement());
+        break;
+      default:
+        // Otherwise it is an overload case.
+        SmallVector<ValueDecl*, 4> Cases(OOT->Elements.begin(),
+                                         OOT->Elements.end());
+        
+        FnRef = new (Context) OverloadSetRefExpr(Context.AllocateCopy(Cases),
+                                                 E1->getStartLoc());
+        FnRef->setDependentType(DependentType::get(Context));
+        break;
+      }
+      
+      if (FnRef) {
+        ApplyExpr *Call = new (Context) ConstructorCallExpr(FnRef, E2);
+        if (semaApplyExpr(Call))
+          return 0;
+        return Call;
+      }
+    }
+  }
+  
   // Otherwise, the function's type must be dependent.  If it is something else,
   // we have a type error.
   if (!E1->getType()->is<DependentType>()) {

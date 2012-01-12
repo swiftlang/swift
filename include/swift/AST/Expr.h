@@ -226,8 +226,9 @@ class OverloadSetRefExpr : public Expr {
   SourceLoc Loc;
 
 public:
-  OverloadSetRefExpr(ArrayRef<ValueDecl*> decls, SourceLoc L)
-  : Expr(ExprKind::OverloadSetRef), Decls(decls), Loc(L) {}
+  OverloadSetRefExpr(ArrayRef<ValueDecl*> decls, SourceLoc Loc,
+                     TypeJudgement Ty = TypeJudgement())
+  : Expr(ExprKind::OverloadSetRef, Ty), Decls(decls), Loc(Loc) {}
 
   ArrayRef<ValueDecl*> getDecls() const { return Decls; }
 
