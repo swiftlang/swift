@@ -849,16 +849,8 @@ public:
   }
   
   void visitApplyExpr(ApplyExpr *E, const char *NodeName) {
-    OS.indent(Indent) << '(' << NodeName << " type='" << E->getType() << '\'';
-    if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->getFn()))
-      OS << "name=" << DRE->getDecl()->getName();
-    else if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E->getFn()))
-      OS << "name=" << OO->getDecls()[0]->getName()
-         << "[#overloads=" << OO->getDecls().size() << ']';
-    else {
-      OS << '\n';
-      printRec(E->getFn());
-    }
+    OS.indent(Indent) << '(' << NodeName << " type='" << E->getType() << "\'\n";
+    printRec(E->getFn());
     OS << '\n';
     printRec(E->getArg());
     OS << ')';
