@@ -152,7 +152,7 @@ ERROR(expected_type,type_parsing,none,
       "expected type", ())
 ERROR(type_redefinition,type_parsing,none,
       "redefinition of type %0", (Identifier))
-ERROR(expected_identifier_after_coloncolon_type,expr_parsing,none,
+ERROR(expected_identifier_after_dot_type,expr_parsing,none,
       "expected identifier after %0 type", (Identifier))
 ERROR(expected_identifier_for_type,expr_parsing,none,
       "expected identifier for type name", ())

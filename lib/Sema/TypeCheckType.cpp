@@ -70,7 +70,8 @@ bool TypeChecker::validateType(Type InTy) {
     break;
 
   case TypeKind::NameAlias:
-    IsInvalid = validateType(cast<NameAliasType>(T)->TheDecl
+    IsInvalid = !cast<NameAliasType>(T)->TheDecl->hasUnderlyingType() ||
+                  validateType(cast<NameAliasType>(T)->TheDecl
                                ->getUnderlyingType());
     if (IsInvalid)
       cast<NameAliasType>(T)->TheDecl

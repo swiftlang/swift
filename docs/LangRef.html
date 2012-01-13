@@ -1173,8 +1173,10 @@
   </div>
   
   <pre class="grammar">
-    scope-qualifier ::= <a href="#identifier">identifier</a> '::'
+    scope-qualifier ::= <a href="#identifier">identifier</a> '.'
   </pre>
+  
+  <p>FIXME: This is all wrong now with metatypes.</p>
   
   <p>A scope qualifier allows a name to be looked up in a specific
     scope.  The identifier must name a type, or failing that, an

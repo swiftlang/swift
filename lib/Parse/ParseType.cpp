@@ -88,7 +88,7 @@ bool Parser::parseType(Type &Result, Diag<> MessageID) {
 ///   
 ///   type-identifier:
 ///     identifier
-///     scope-qualifier identifier
+///     identifier '.' identifier
 ///
 bool Parser::parseTypeIdentifier(Type &Result) {
   if (Tok.isNot(tok::identifier)) {
@@ -100,16 +100,15 @@ bool Parser::parseTypeIdentifier(Type &Result) {
   SourceLoc NameLoc = Tok.getLoc();
   consumeToken(tok::identifier);
   
-  if (Tok.isNot(tok::coloncolon)) {
+  if (Tok.isNot(tok::period)) {
     Result = ScopeInfo.lookupOrInsertTypeName(Name, NameLoc);
     return false;
   }
   
-  consumeToken(tok::coloncolon);
+  consumeToken(tok::period);
   SourceLoc Loc2 = Tok.getLoc();
   Identifier Name2;
-  if (parseIdentifier(Name2,
-                      diag::expected_identifier_after_coloncolon_type, Name))
+  if (parseIdentifier(Name2, diag::expected_identifier_after_dot_type, Name))
     return true;
     
   Result = ScopeInfo.getQualifiedTypeName(Name, NameLoc, Name2, Loc2);
