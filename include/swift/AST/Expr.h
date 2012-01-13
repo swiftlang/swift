@@ -93,6 +93,21 @@ public:
   /// getLoc - Return the caret location of this expression.
   SourceLoc getLoc() const;
 
+  /// getSemanticsProvidingExpr - Find the smallest subexpression
+  /// which obeys the property that evaluating it is exactly
+  /// equivalent to evaluating this expression.
+  ///
+  /// Looks through parentheses.  Would not look through something
+  /// like '(foo(), x:bar(), baz()).x'.
+  Expr *getSemanticsProvidingExpr();
+
+  /// getValueProvidingExpr - Find the smallest subexpression which is
+  /// responsible for generating the value of this expression.
+  /// Evaluating the result is not necessarily equivalent to
+  /// evaluating this expression because of potential missing
+  /// side-effects (which may influence the returned value).
+  Expr *getValueProvidingExpr();
+
   /// walk - This recursively walks all of the statements and expressions
   /// contained within an expression and invokes the ExprFn and StmtFn blocks on
   /// each.

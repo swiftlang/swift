@@ -70,6 +70,19 @@ SourceLoc Expr::getLoc() const {
   return getStartLoc();
 }
 
+Expr *Expr::getSemanticsProvidingExpr() {
+  if (ParenExpr *parens = dyn_cast<ParenExpr>(this))
+    return parens->getSubExpr()->getSemanticsProvidingExpr();
+  return this;
+}
+
+Expr *Expr::getValueProvidingExpr() {
+  // For now, this is totally equivalent to the above.
+  // TODO:
+  //   - tuple literal projection, which may become interestingly idiomatic
+  return getSemanticsProvidingExpr();
+}
+
 //===----------------------------------------------------------------------===//
 // Support methods for Exprs.
 //===----------------------------------------------------------------------===//
@@ -153,9 +166,8 @@ static ValueDecl *getCalledValue(Expr *E) {
   if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
     return DRE->getDecl();
 
-  if (ParenExpr *PE = dyn_cast<ParenExpr>(E))
-    return getCalledValue(PE->getSubExpr());
-
+  Expr *E2 = E->getValueProvidingExpr();
+  if (E != E2) return getCalledValue(E2);
   return nullptr;
 }
 
