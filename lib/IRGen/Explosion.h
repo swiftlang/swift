@@ -30,22 +30,6 @@ namespace llvm {
 namespace swift {
 namespace irgen {
 
-/// Different places in the model require specific explosion
-/// semantics.
-enum class ExplosionKind : unsigned {
-  /// A minimal explosion does not explode types that do not have a
-  /// universally fragile representation.
-  ///
-  /// This is the explosion used for calls through function pointers,
-  /// because we cannot assume that all the types are fragile in the
-  /// component providing the function.
-  Minimal,
-
-  /// A maximal explosion explodes all types with fragile
-  /// representation, even when they're not universally fragile.
-  Maximal
-};
-
 /// The representation for an explosion is just a list of raw LLVM
 /// values.  The meaning of these values is imposed externally by the
 /// type infos, except that it is expected that they will be passed

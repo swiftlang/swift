@@ -28,7 +28,6 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LValue.h"
-#include "Explosion.h"
 
 using namespace swift;
 using namespace irgen;
