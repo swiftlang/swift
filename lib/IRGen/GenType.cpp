@@ -136,7 +136,8 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
   case TypeKind::Dependent:
     llvm_unreachable("generating a dependent type");
   case TypeKind::MetaType:
-    llvm_unreachable("cannot codegen metatype yet - no runtime representation");
+  case TypeKind::Module:
+    llvm_unreachable("cannot codegen this type - no runtime representation");
   case TypeKind::BuiltinFloat:
     switch (cast<BuiltinFloatType>(T)->getFPKind()) {
     case BuiltinFloatType::IEEE16:

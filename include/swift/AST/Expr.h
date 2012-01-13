@@ -483,6 +483,26 @@ public:
     return E->getKind() == ExprKind::LookThroughOneof;
   }
 };
+  
+/// ModuleExpr - Reference a module by name.  The module being referenced is
+/// captured in the type of the expression, which is always a ModuleType.
+class ModuleExpr : public Expr {
+  SourceLoc Loc;
+  
+public:
+  ModuleExpr(SourceLoc Loc, TypeJudgement Ty)
+  : Expr(ExprKind::Module, Ty), Loc(Loc) {}
+  
+  SourceRange getSourceRange() const { return SourceRange(Loc, Loc); }
+  SourceLoc getLoc() const { return Loc; }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ModuleExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Module;
+  }
+};
+
 
 /// TupleElementExpr - Refer to an element of a tuple, e.g. "(1,2).field0".
 class TupleElementExpr : public Expr {

@@ -158,6 +158,10 @@ public:
     return E;      
   }
   
+  Expr *visitModuleExpr(ModuleExpr *E) {
+    return E;
+  }
+  
   Expr *visitAnonClosureArgExpr(AnonClosureArgExpr *E) {
     return E;
   }

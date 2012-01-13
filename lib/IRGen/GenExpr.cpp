@@ -169,6 +169,7 @@ void IRGenFunction::emitExplodedRValue(Expr *E, Explosion &explosion) {
   case ExprKind::Func:
   case ExprKind::Closure:
   case ExprKind::AnonClosureArg:
+  case ExprKind::Module:
     IGM.unimplemented(E->getLoc(),
                       "cannot explode r-values for this expression yet");
     return emitFakeExplosion(getFragileTypeInfo(E->getType()), explosion);
@@ -210,6 +211,7 @@ LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &type) {
 
   case ExprKind::ConstructorCall:
   case ExprKind::DotSyntaxCall:
+  case ExprKind::Module:
     IGM.unimplemented(E->getLoc(),
                       "cannot generate l-values for this expression yet");
     return emitFakeLValue(type);
@@ -307,6 +309,7 @@ IRGenFunction::tryEmitAsAddress(Expr *E, const TypeInfo &type) {
   case ExprKind::Func:
   case ExprKind::Closure:
   case ExprKind::DotSyntaxPlusFuncUse:
+  case ExprKind::Module:
     return Nothing;
   }
   llvm_unreachable("bad expression kind!");

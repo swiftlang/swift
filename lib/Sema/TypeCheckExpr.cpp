@@ -550,6 +550,12 @@ public:
     return E;
   }
   
+  Expr *visitModuleExpr(ModuleExpr *E) {
+    // ModuleExpr is fully resolved.
+    assert(!E->getType()->is<DependentType>());
+    return E;
+  }
+
   Expr *visitClosureExpr(ClosureExpr *E) {
     assert(0 && "Should not walk into ClosureExprs!");
     return 0;

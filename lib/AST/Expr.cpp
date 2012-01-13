@@ -398,8 +398,7 @@ namespace {
     public:
       template<typename T>
       SetParentRAII(WalkContext &WalkCtx, T *NewParent)
-        : WalkCtx(WalkCtx), PriorParent(WalkCtx.Parent) 
-      {
+        : WalkCtx(WalkCtx), PriorParent(WalkCtx.Parent) {
         WalkCtx.Parent = NewParent;
       }
       
@@ -514,6 +513,8 @@ namespace {
     }
     
     Expr *visitAnonClosureArgExpr(AnonClosureArgExpr *E) { return E; }
+    
+    Expr *visitModuleExpr(ModuleExpr *E) { return E; }
 
     Expr *visitApplyExpr(ApplyExpr *E) {
       Expr *E2 = doIt(E->getFn());
@@ -820,6 +821,9 @@ public:
     OS << "\'\n";
     printRec(E->getSubExpr());
     OS << ')';
+  }
+  void visitModuleExpr(ModuleExpr *E) {
+    OS.indent(Indent) << "(module_expr type='" << E->getType() << "')";
   }
   void visitTupleElementExpr(TupleElementExpr *E) {
     OS.indent(Indent) << "(tuple_element_expr type='" << E->getType();
