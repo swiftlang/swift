@@ -35,6 +35,7 @@ namespace swift {
   class TypeAliasDecl;
   class OneOfElementDecl;
   class ValueDecl;
+  class Module;
   
   enum class TypeKind {
     Error,       // An erroneously constructed type.
@@ -46,6 +47,7 @@ namespace swift {
     Tuple,
     OneOf,
     MetaType,
+    Module,
     Function,
     Array,
     Protocol
@@ -405,7 +407,7 @@ class MetaTypeType : public TypeBase {
 public:
   TypeAliasDecl *const TheType;
   
-  /// getNew - Return the MetaTypeType for the specified type.
+  /// get - Return the MetaTypeType for the specified type.
   static MetaTypeType *get(TypeAliasDecl *Type);
 
   void print(raw_ostream &O) const;
@@ -418,6 +420,29 @@ private:
   MetaTypeType(TypeAliasDecl *Type, ASTContext &Ctx)
     : TypeBase(TypeKind::MetaType, &Ctx), // Always canonical
       TheType(Type) {
+  }
+};
+  
+/// ModuleType - This is the type given to a module value, e.g. the "Builtin" in
+/// "Builtin.int".  This is typically given to a ModuleExpr, but can also exist
+/// on ParenExpr, for example.
+class ModuleType : public TypeBase {
+public:
+  Module *const TheModule;
+  
+  /// get - Return the ModuleType for the specified module.
+  static ModuleType *get(Module *M);
+  
+  void print(raw_ostream &O) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ModuleType *D) { return true; }
+  static bool classof(const TypeBase *T) {return  T->Kind == TypeKind::Module; }
+  
+private:
+  ModuleType(Module *M, ASTContext &Ctx)
+    : TypeBase(TypeKind::Module, &Ctx), // Always canonical
+      TheModule(M) {
   }
 };
   

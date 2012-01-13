@@ -65,7 +65,8 @@ bool TypeChecker::validateType(Type InTy) {
     break;
       
   case TypeKind::MetaType:
-    // Nothing to validate for metatypes.
+  case TypeKind::Module:
+    // Nothing to validate.
     break;
 
   case TypeKind::NameAlias:

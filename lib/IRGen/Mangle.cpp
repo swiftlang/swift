@@ -184,6 +184,8 @@ void Mangler::mangleType(Type type) {
 
   case TypeKind::MetaType:
     llvm_unreachable("Cannot mangle metatype yet");
+  case TypeKind::Module:
+    llvm_unreachable("Cannot mangle module type yet");
       
   // We don't care about these types being a bit verbose because we
   // don't expect them to come up that often in API names.
