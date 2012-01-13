@@ -68,21 +68,115 @@
 using namespace swift;
 using namespace irgen;
 
-namespace {
-  class FuncTypeInfo : public TypeInfo {
-    FunctionType *FnTy;
-    mutable llvm::FunctionType *FunctionTypeWithData;
-    mutable llvm::FunctionType *FunctionTypeWithoutData;
-  public:
-    FuncTypeInfo(FunctionType *Ty, llvm::StructType *T, Size S, Alignment A)
-      : TypeInfo(T, S, A), FnTy(Ty),
-        FunctionTypeWithData(0), FunctionTypeWithoutData(0) {}
+/// Return the number of potential curries of this function type.
+/// This is equal to the number of "straight-line" arrows in the type.
+static unsigned getNumCurries(FunctionType *type) {
+  unsigned count = 0;
+  do {
+    count++;
+    type = type->Result->getAs<FunctionType>();
+  } while (type);
 
+  return count;
+}
+
+/// Return the natural level at which to uncurry this function.  This
+/// is the number of additional parameter clauses that are uncurried
+/// in the function body.
+static unsigned getNaturalUncurryLevel(FuncDecl *func) {
+  FunctionType *type = func->getType()->castTo<FunctionType>();
+  unsigned count = 0;
+  do {
+    count++;
+    type = dyn_cast<FunctionType>(type->Result);
+  } while (type);
+
+  assert(count <= getNumCurries(func->getType()->castTo<FunctionType>()));
+  return count - 1;
+}
+
+namespace {
+  /// A signature represents something which can actually be called.
+  class Signature {
+    llvm::PointerIntPair<llvm::FunctionType*, 1, bool> TypeAndHasIndirectReturn;
+
+  public:
+    bool isValid() const {
+      return TypeAndHasIndirectReturn.getPointer() != nullptr;
+    }
+
+    void set(llvm::FunctionType *type, bool hasIndirectReturn) {
+      TypeAndHasIndirectReturn.setPointer(type);
+      TypeAndHasIndirectReturn.setInt(hasIndirectReturn);
+      assert(isValid());
+    }
+
+    llvm::FunctionType *getType() const {
+      assert(isValid());
+      return TypeAndHasIndirectReturn.getPointer();
+    }
+
+    bool hasIndirectReturn() const {
+      assert(isValid());
+      return TypeAndHasIndirectReturn.getInt();
+    }
+  };
+
+  /// The type-info class
+  class FuncTypeInfo : public TypeInfo {
+    /// Each possible currying of a function type has different function
+    /// type variants along each of two orthogonal axes:
+    ///   - the explosion kind desired
+    ///   - whether a data pointer argument is required
+    struct Currying {
+      Signature Signatures[2][2];
+
+      Signature &select(ExplosionKind kind, bool needsData) {
+        return Signatures[unsigned(kind)][unsigned(needsData)];
+      }
+    };
+
+    /// The Swift function type being represented.
+    FunctionType * const FormalType;
+
+    /// An array of Curryings is stored immediately after the FuncTypeInfo.
+    /// A Currying is a cache, so the entire thing is effective mutable.
+    Currying *getCurryingsBuffer() const {
+      return const_cast<Currying*>(reinterpret_cast<const Currying*>(this+1));
+    }
+
+    FuncTypeInfo(FunctionType *formalType, llvm::StructType *storageType,
+                 Size size, Alignment align, unsigned numCurries)
+      : TypeInfo(storageType, size, align), FormalType(formalType) {
+      
+      // Initialize the curryings.
+      for (unsigned i = 0; i != numCurries; ++i) {
+        new (&getCurryingsBuffer()[i]) Currying();
+      }
+    }
+
+  public:
+    static const FuncTypeInfo *create(FunctionType *formalType,
+                                      llvm::StructType *storageType,
+                                      Size size, Alignment align) {
+      unsigned numCurries = getNumCurries(formalType);
+      void *buffer = new char[sizeof(FuncTypeInfo)
+                                + numCurries * sizeof(Currying)];
+      return new (buffer) FuncTypeInfo(formalType, storageType, size, align,
+                                       numCurries);
+    }
+
+    /// The storage type of a function is always just a pair of i8*s:
+    /// a function pointer and a retainable pointer.  We have to use
+    /// i8* instead of an appropriate function-pointer type because we
+    /// might be in the midst of recursively defining one of the types
+    /// used as a parameter.
     llvm::StructType *getStorageType() const {
       return cast<llvm::StructType>(TypeInfo::getStorageType());
     }
 
-    llvm::FunctionType *getFunctionType(IRGenModule &IGM, bool NeedsData) const;
+    Signature getSignature(IRGenModule &IGM, ExplosionKind explosionKind,
+                           unsigned currying, bool needsData) const;
 
     RValueSchema getSchema() const {
       llvm::StructType *Ty = getStorageType();
@@ -165,103 +259,228 @@ TypeConverter::convertFunctionType(IRGenModule &IGM, FunctionType *T) {
   llvm::Type *Elts[] = { IGM.Int8PtrTy, IGM.Int8PtrTy };
   llvm::StructType *StructType
     = llvm::StructType::get(IGM.getLLVMContext(), Elts, /*packed*/ false);
-  return new FuncTypeInfo(T, StructType, StructSize, StructAlign);
+  return FuncTypeInfo::create(T, StructType, StructSize, StructAlign);
 }
 
-/// Accumulate an argument of the given type.
-static void addArgType(IRGenModule &IGM, Type Ty,
-                       SmallVectorImpl<llvm::Type*> &ArgTypes) {
-  RValueSchema Schema = IGM.getFragileTypeInfo(Ty).getSchema();
-  if (Schema.isScalar()) {
-    for (llvm::Type *Arg : Schema.getScalarTypes())
-      ArgTypes.push_back(Arg);
-  } else {
-    ArgTypes.push_back(Schema.getAggregateType()->getPointerTo());
+/// Given the explosion schema for the result type of a function, does
+/// it require an aggregate result?
+static bool requiresAggregateResult(const ExplosionSchema &schema) {
+  if (schema.size() > RValue::MaxScalars) return true;
+  for (auto &elt : schema)
+    if (elt.isAggregate())
+      return true;
+  return false;
+}
+
+/// Decompose a function type into its exploded parameter types
+/// and its formal result type.
+///
+/// When dealing with non-trivial uncurryings, parameter clusters
+/// are added in reverse order.  For example:
+///   formal type:  (A, B) -> (C, D, E) -> F -> G
+///   curry 0:      (A, B) -> ((C, D, E) -> F -> G)
+///   curry 1:      (C, D, E, A, B) -> (F -> G)
+///   curry 2:      (F, C, D, E, A, B) -> G
+/// This is so that currying stubs can load their stored arguments
+/// into position without disturbing their formal arguments.
+/// This also interacts well with closures that save a single
+/// retainable pointer which becomes the only curried argument
+/// (and therefore the final argument) to a method call.
+///
+/// This is all somewhat optimized for register-passing CCs; it
+/// probably makes extra work when the stack gets involved.
+static Type decomposeFunctionType(IRGenModule &IGM, FunctionType *fn,
+                                  ExplosionKind explosionKind,
+                                  unsigned uncurryLevel,
+                                  SmallVectorImpl<llvm::Type*> &argTypes) {
+  // Save up the formal parameter types in reverse order.
+  llvm::SmallVector<Type, 8> formalArgTypes(uncurryLevel + 1);
+  formalArgTypes[uncurryLevel] = fn->Input;
+  while (uncurryLevel--) {
+    fn = fn->Result->castTo<FunctionType>();
+    formalArgTypes[uncurryLevel] = fn->Input;
   }
+
+  // Explode the argument clusters in that reversed order.
+  for (Type type : formalArgTypes) {
+    ExplosionSchema schema(explosionKind);
+    IGM.getExplosionSchema(type, schema);
+
+    for (ExplosionSchema::Element &elt : schema) {
+      if (elt.isAggregate())
+        argTypes.push_back(elt.getAggregateType()->getPointerTo());
+      else
+        argTypes.push_back(elt.getScalarType());
+    }
+  }
+
+  return fn->Result;
+}
+
+Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
+                                     ExplosionKind explosionKind,
+                                     unsigned uncurryLevel,
+                                     bool needsData) const {
+  // Compute a reference to the appropriate signature cache.
+  assert(uncurryLevel < getNumCurries(FormalType));
+  Currying &currying = getCurryingsBuffer()[uncurryLevel];
+  Signature &signature = currying.select(explosionKind, needsData);
+
+  // If it's already been filled in, we're done.
+  if (signature.isValid())
+    return signature;
+
+  // The argument types.
+  // Save a slot for the aggregate return.
+  SmallVector<llvm::Type*, 16> argTypes;
+  argTypes.push_back(nullptr);
+
+  Type formalResultType = decomposeFunctionType(IGM, FormalType, explosionKind,
+                                                uncurryLevel, argTypes);
+
+  // Compute the result type.
+  llvm::Type *resultType;
+  bool hasAggregateResult;
+  {
+    ExplosionSchema schema(explosionKind);
+    IGM.getExplosionSchema(formalResultType, schema);
+
+    hasAggregateResult = requiresAggregateResult(schema);
+    if (hasAggregateResult) {
+      const TypeInfo &info = IGM.getFragileTypeInfo(formalResultType);
+      argTypes[0] = info.StorageType->getPointerTo();
+      resultType = llvm::Type::getVoidTy(IGM.getLLVMContext());
+    } else if (schema.size() == 0) {
+      resultType = llvm::Type::getVoidTy(IGM.getLLVMContext());
+    } else if (schema.size() == 1) {
+      resultType = schema.begin()->getScalarType();
+    } else {
+      llvm::SmallVector<llvm::Type*, RValue::MaxScalars> elts;
+      for (auto &elt : schema) elts.push_back(elt.getScalarType());
+      resultType = llvm::StructType::get(IGM.getLLVMContext(), elts);
+    }
+  }
+
+  // Data arguments are last.
+  // See the comment in this file's header comment.
+  if (needsData)
+    argTypes.push_back(IGM.Int8PtrTy);
+
+  // Ignore the first element of the array unless we have an aggregate result.
+  llvm::ArrayRef<llvm::Type*> realArgTypes = argTypes;
+  if (!hasAggregateResult)
+    realArgTypes = realArgTypes.slice(1);
+
+  // Create the appropriate LLVM type.
+  llvm::FunctionType *llvmType =
+    llvm::FunctionType::get(resultType, realArgTypes, /*variadic*/ false);
+
+  // Update the cache and return.
+  signature.set(llvmType, hasAggregateResult);
+  return signature;
 }
 
 llvm::FunctionType *
-FuncTypeInfo::getFunctionType(IRGenModule &IGM, bool NeedsData) const {
-  if (NeedsData && FunctionTypeWithData)
-    return FunctionTypeWithData;
-  if (!NeedsData && FunctionTypeWithoutData)
-    return FunctionTypeWithoutData;
+IRGenModule::getFunctionType(Type type, ExplosionKind explosionKind,
+                             unsigned curryingLevel, bool withData) {
+  assert(type->is<FunctionType>());
+  const FuncTypeInfo &fnTypeInfo = getFragileTypeInfo(type).as<FuncTypeInfo>();
+  Signature sig = fnTypeInfo.getSignature(*this, explosionKind,
+                                          curryingLevel, withData);
+  return sig.getType();
+}
 
-  SmallVector<llvm::Type*, 16> ArgTypes;
-  llvm::Type *ResultType;
+namespace {
+  struct Callee {
+    /// The explosion level of the function to call.
+    ExplosionKind ExplosionLevel;
 
-  // Compute the result-type information.
-  RValueSchema ResultSchema = IGM.getFragileTypeInfo(FnTy->Result).getSchema();
+    /// The uncurry level of the function to call.
+    unsigned UncurryLevel;
 
-  // If this is an aggregate return, return indirectly.
-  if (ResultSchema.isAggregate()) {
-    ResultType = llvm::Type::getVoidTy(IGM.getLLVMContext());
-    ArgTypes.push_back(ResultSchema.getAggregateType()->getPointerTo());
+  private:
+    /// The function to call.
+    llvm::Value *FnPtr;
 
-  // If there are no results, return void.
-  } else if (ResultSchema.getScalarTypes().empty()) {
-    ResultType = llvm::Type::getVoidTy(IGM.getLLVMContext());
+    /// The data pointer to pass, if required.  Null otherwise.
+    llvm::Value *DataPtr;
 
-  // If there is exactly one result, return it.
-  } else if (ResultSchema.getScalarTypes().size() == 1) {
-    ResultType = ResultSchema.getScalarTypes()[0];
+  public:
+    void set(llvm::Value *fnPtr, llvm::Value *dataPtr) {
+      assert(fnPtr->getType()->getContainedType(0)->isFunctionTy() ||
+             fnPtr->getType()->getContainedType(0)->isIntegerTy(8));
+      assert(dataPtr == nullptr ||
+             dataPtr->getType()->getContainedType(0)->isIntegerTy(8));
+      assert(dataPtr == nullptr || !isa<llvm::UndefValue>(dataPtr));
 
-  // Otherwise, return a first-class aggregate.
-  } else {
-    ResultType = llvm::StructType::get(IGM.getLLVMContext(),
-                                       ResultSchema.getScalarTypes());
-  }
-
-  // Drill into the first level of tuple, if present.
-  if (TupleType *Tuple = FnTy->Input->getAs<TupleType>()) {
-    for (const TupleTypeElt &Field : Tuple->Fields) {
-      addArgType(IGM, Field.Ty, ArgTypes);
+      FnPtr = fnPtr;
+      DataPtr = dataPtr;
     }
 
-  // Otherwise, just add the argument type.
+    llvm::Value *getOpaqueFunctionPointer(IRGenFunction &IGF) const {
+      return IGF.Builder.CreateBitCast(FnPtr, IGF.IGM.Int8PtrTy);
+    }
+
+    llvm::Type *getFunctionPointerType(IRGenModule &IGM, Type type) const {
+      return IGM.getFunctionType(type, ExplosionLevel, UncurryLevel,
+                                 hasDataPointer())->getPointerTo();
+    }
+
+    llvm::Value *getFunctionPointer(IRGenFunction &IGF, Type type) const {
+      if (FnPtr->getType() != IGF.IGM.Int8PtrTy) {
+        assert(FnPtr->getType() == getFunctionPointerType(IGF.IGM, type));
+        return FnPtr;
+      }
+      return IGF.Builder.CreateBitCast(FnPtr,
+                                       getFunctionPointerType(IGF.IGM, type));
+    }
+
+    bool hasDataPointer() const { return DataPtr != nullptr; }
+
+    llvm::Value *getDataPointer(IRGenModule &IGM) const {
+      if (DataPtr) return DataPtr;
+      return llvm::UndefValue::get(IGM.Int8PtrTy);
+    }
+  };
+}
+
+/// Emit a reference to a function, using the best parameters possible
+/// up to given limits.
+static Callee emitCallee(IRGenFunction &IGF, FuncDecl *fn,
+                         ExplosionKind bestExplosion, unsigned bestUncurry) {
+  // Use the apparent natural uncurrying level of a function as a
+  // maximum on the uncurrying to do.
+  if (bestUncurry != 0)
+    bestUncurry = std::min(bestUncurry, getNaturalUncurryLevel(fn));
+
+  // TODO: be less conservative
+  bestExplosion = ExplosionKind::Minimal;
+
+  Callee callee;
+  callee.UncurryLevel = bestUncurry;
+  callee.ExplosionLevel = bestExplosion;
+
+  if (!fn->getDeclContext()->isLocalContext()) {
+    callee.set(IGF.IGM.getAddrOfGlobalFunction(fn, bestExplosion, bestUncurry),
+               nullptr);
   } else {
-    addArgType(IGM, FnTy->Input, ArgTypes);
+    IGF.unimplemented(fn->getLocStart(), "local function emission");
+    llvm::Value *undef = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
+    callee.set(undef, nullptr);
   }
 
-  // If we need a data argument, add it in last.
-  // See the discussion in the header comment, above.
-  if (NeedsData) {
-    ArgTypes.push_back(IGM.Int8PtrTy);
-  }
-
-  // Create the appropriate LLVM type.
-  llvm::FunctionType *IRType =
-    llvm::FunctionType::get(ResultType, ArgTypes, /*variadic*/ false);
-
-  // Cache the type.
-  if (NeedsData)
-    FunctionTypeWithData = IRType;
-  else
-    FunctionTypeWithoutData = IRType;
-
-  return IRType;
+  return callee;
 }
 
-/// Form an r-value which refers to the given global function.
-void IRGenFunction::emitExplodedRValueForFunction(FuncDecl *Fn,
+/// Emit a reference to the given function as a generic function pointer.
+void IRGenFunction::emitExplodedRValueForFunction(FuncDecl *fn,
                                                   Explosion &explosion) {
-  if (!Fn->getDeclContext()->isLocalContext()) {
-    explosion.add(llvm::ConstantExpr::getBitCast(
-                              IGM.getAddrOfGlobalFunction(Fn), IGM.Int8PtrTy));
-    explosion.add(llvm::UndefValue::get(IGM.Int8PtrTy));
-    return;
-  }
-
-  unimplemented(Fn->getLocStart(), "local function emission");
-  llvm::Value *undef = llvm::UndefValue::get(IGM.Int8PtrTy);
-  explosion.add(undef);
-  explosion.add(undef);
-  return;
-}
-
-llvm::FunctionType *IRGenModule::getFunctionType(Type type, bool withData) {
-  const FuncTypeInfo &fnTypeInfo = getFragileTypeInfo(type).as<FuncTypeInfo>();
-  return fnTypeInfo.getFunctionType(*this, withData);
+  // Function pointers are always fully curried and use ExplosionKind::Minimal.
+  Callee callee = emitCallee(*this, fn, ExplosionKind::Minimal, 0);
+  assert(callee.ExplosionLevel == ExplosionKind::Minimal);
+  assert(callee.UncurryLevel == 0);
+  explosion.add(callee.getOpaqueFunctionPointer(*this));
+  explosion.add(callee.getDataPointer(IGM));
 }
 
 namespace {
@@ -270,14 +489,6 @@ namespace {
 
     Explosion Values;
     llvm::SmallVector<llvm::AttributeWithIndex, 4> Attrs;
-
-    void addArg(const RValue &arg) {
-      if (arg.isScalar()) {
-        Values.add(arg.getScalars());
-      } else {
-        Values.add(arg.getAggregateAddress());
-      }
-    }
   };
 }
 
@@ -385,70 +596,159 @@ IRGenFunction::tryEmitApplyAsAddress(ApplyExpr *E, const TypeInfo &resultType) {
   return Address(result.getAggregateAddress(), resultType.StorageAlignment);
 }
 
+namespace {
+  struct CallSite {
+    CallSite(Expr *arg, Type fnType) : Arg(arg), FnType(fnType) {}
+
+    Expr *Arg;
+    Type FnType;
+  };
+}
+
+/// Given a function application, try to form an uncurried call.  If
+/// successful, argExprs contains all the arguments applied, but in
+/// reversed order.
+static Expr *uncurry(ApplyExpr *E, SmallVectorImpl<CallSite> &callSites) {
+  callSites.push_back(CallSite(E->getArg(),  E->getFn()->getType()));
+  Expr *fnExpr = E->getFn()->getSemanticsProvidingExpr();
+  if (ApplyExpr *fnApply = dyn_cast<ApplyExpr>(fnExpr))
+    return uncurry(fnApply, callSites);
+  return fnExpr;
+}
+
+/// Emit the given expression, trying to tie it down to a known
+/// function.
+static FuncDecl *emitAsKnownFunctionReference(IRGenFunction &IGF, Expr *E) {
+  E = E->getSemanticsProvidingExpr();
+  if (DeclRefExpr *declRef = dyn_cast<DeclRefExpr>(E))
+    return dyn_cast<FuncDecl>(declRef->getDecl());
+  return nullptr;
+}
+
 /// Emit a function call.
 RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &resultType) {
-  // Check for a call to a builtin.
-  if (ValueDecl *Fn = E->getCalledValue())
-    if (Fn->getDeclContext() == IGM.Context.TheBuiltinModule)
-      return emitBuiltinCall(*this, cast<FuncDecl>(Fn), E->getArg(),
+  // 1.  Try to uncurry the source expression.  Note that the argument
+  // expressions will appear in reverse order.
+  llvm::SmallVector<CallSite, 8> callSites;
+  Expr *fnExpr = uncurry(E, callSites);
+
+  // 2.  Emit the function expression.
+  Callee callee;
+
+  // We can do a lot if we know we're calling a known function.
+  if (FuncDecl *fn = emitAsKnownFunctionReference(*this, fnExpr)) {
+    // Handle calls to builtin functions.
+    if (isa<BuiltinModule>(fn->getDeclContext())) {
+      assert(callSites.size() == 1);
+      return emitBuiltinCall(*this, cast<FuncDecl>(fn), callSites[0].Arg,
                              resultType);
+    }
 
-  Explosion fnValues(ExplosionKind::Maximal);
-  emitExplodedRValue(E->getFn(), fnValues);
-  llvm::Value *fn = fnValues.claimNext();
-  llvm::Value *data = fnValues.claimNext();
-  assert(fnValues.empty());
+    // Otherwise, compute information about the function we're calling.
+    callee = emitCallee(*this, fn, ExplosionKind::Maximal, callSites.size()-1);
 
-  // Unless special-cased, calls are done with minimal explosion.
-  // TODO: detect special cases.
-  ArgList args(ExplosionKind::Minimal);
-
-  // The first argument is the implicit aggregate return slot, if required.
-  RValueSchema resultSchema = resultType.getSchema();
-  if (resultSchema.isAggregate()) {
-    Address resultSlot =
-      createFullExprAlloca(resultSchema.getAggregateType(),
-                           resultSchema.getAggregateAlignment(),
-                           "call.aggresult");
-    args.Values.add(resultSlot.getAddress());
-    args.Attrs.push_back(llvm::AttributeWithIndex::get(1,
-                                llvm::Attribute::StructRet |
-                                llvm::Attribute::NoAlias));
+  // Otherwise, emit as a function pointer and use the pessimistic
+  // rules for calling such.
+  } else {
+    Explosion fnValues(ExplosionKind::Maximal);
+    emitExplodedRValue(fnExpr, fnValues);
+    callee.ExplosionLevel = ExplosionKind::Minimal;
+    callee.UncurryLevel = 0;
+    llvm::Value *fnPtr = fnValues.claimNext();
+    llvm::Value *dataPtr = fnValues.claimNext();
+    callee.set(fnPtr, isa<llvm::UndefValue>(dataPtr) ? nullptr : dataPtr);
   }
 
-  // Emit the arguments, drilling into the first level of tuple, if
-  // present.
-  emitExplodedRValue(E->getArg(), args.Values);
+  // 3. Emit arguments and call.
+  while (true) {
+    assert(callee.UncurryLevel < callSites.size());
 
-  // Don't bother passing a data argument if the r-value says it's
-  // undefined.
-  bool needsData = !isa<llvm::UndefValue>(data);
-  if (needsData) args.Values.add(data);
+    // Find the formal type we're calling.
+    unsigned calleeIndex = callSites.size() - callee.UncurryLevel - 1;
+    Type calleeFormalType = callSites[calleeIndex].FnType;
+    llvm::Value *fnPtr =
+      callee.getFunctionPointer(*this, calleeFormalType);
+    llvm::FunctionType *calleeType = 
+      cast<llvm::FunctionType>(cast<llvm::PointerType>(fnPtr->getType())
+                                 ->getElementType());
 
-  const FuncTypeInfo &fnType =
-    IGM.getFragileTypeInfo(E->getFn()->getType()).as<FuncTypeInfo>();
-  llvm::FunctionType *fnLLVMType = fnType.getFunctionType(IGM, needsData);
+    SmallVector<llvm::Value*, 16> args(calleeType->getNumParams());
+    unsigned lastArgWritten = calleeType->getNumParams();
 
-  fn = Builder.CreateBitCast(fn, fnLLVMType->getPointerTo(), "fn.cast");
+    // Add the data pointer in.
+    if (callee.hasDataPointer())
+      args[--lastArgWritten] = callee.getDataPointer(IGM);
 
-  // TODO: exceptions, calling conventions
-  llvm::CallInst *call = Builder.CreateCall(fn, args.Values.getAll());
-  call->setAttributes(llvm::AttrListPtr::get(args.Attrs.data(),
-                                             args.Attrs.size()));
+    // Emit all of the arguments we need to pass here.
+    for (unsigned i = callee.UncurryLevel + 1; i != 0; --i) {
+      Expr *arg = callSites.back().Arg;
+      callSites.pop_back();
 
-  // Build an RValue result.
-  if (resultSchema.isAggregate()) {
-    return RValue::forAggregate(args.Values.claimNext());
-  } else if (resultSchema.getScalarTypes().size() == 1) {
-    return RValue::forScalars(call);
-  } else {
-    // This does the right thing for void returns as well.
-    llvm::SmallVector<llvm::Value*, RValue::MaxScalars> result;
-    for (unsigned I = 0, E = resultSchema.getScalarTypes().size(); I != E; ++I){
-      llvm::Value *scalar = Builder.CreateExtractValue(call, I);
-      result.push_back(scalar);
+      // Emit the argument, exploded at the appropriate level.
+      Explosion argExplosion(callee.ExplosionLevel);
+      emitExplodedRValue(arg, argExplosion);
+
+      assert(lastArgWritten >= argExplosion.size());
+      lastArgWritten -= argExplosion.size();
+
+      // Now copy that into place in the argument list.
+      std::copy(argExplosion.begin(), argExplosion.end(),
+                args.begin() + lastArgWritten);
     }
-    return RValue::forScalars(result);
+
+    // Emit and insert the result type if required.
+    Address resultAddress;
+    assert(lastArgWritten == 0 || lastArgWritten == 1);
+    bool isAggregateResult = (lastArgWritten != 0);
+    if (isAggregateResult) {
+      assert(callSites.empty() && "aggregate result on non-final call?");
+      Type formalResultType = calleeFormalType->castTo<FunctionType>()->Result;
+      const TypeInfo &type = IGM.getFragileTypeInfo(formalResultType);
+
+      resultAddress = createFullExprAlloca(type.StorageType,
+                                           type.StorageAlignment,
+                                           "call.aggresult");
+      args[0] = resultAddress.getAddress();
+    }
+
+    // TODO: exceptions, calling conventions
+    llvm::CallInst *call = Builder.CreateCall(fnPtr, args);
+    
+    // If we have an aggregate result, set the sret and noalias
+    // attributes on the agg return slot, then return, since agg
+    // results can only be final.
+    if (isAggregateResult) {
+      llvm::SmallVector<llvm::AttributeWithIndex, 1> attrs;
+      attrs.push_back(llvm::AttributeWithIndex::get(1,
+                                llvm::Attribute::StructRet |
+                                llvm::Attribute::NoAlias));
+      call->setAttributes(llvm::AttrListPtr::get(attrs.data(), attrs.size()));
+
+      return RValue::forAggregate(resultAddress.getAddress());
+    }
+
+    // Extract out the scalar results.
+    llvm::SmallVector<llvm::Value*, RValue::MaxScalars> scalars;
+    if (llvm::StructType *structType
+        = dyn_cast<llvm::StructType>(call->getType())) {
+      for (unsigned i = 0, e = structType->getNumElements(); i != e; ++i) {
+        llvm::Value *scalar = Builder.CreateExtractValue(call, i);
+        scalars.push_back(scalar);
+      }
+    } else if (!call->getType()->isVoidTy()) {
+      scalars.push_back(call);
+    }
+
+    // If this is the end of the call sites, we're done.
+    if (callSites.empty())
+      return RValue::forScalars(scalars);
+
+    // Otherwise, we must have gotten a function back.  Set ourselves
+    // up to call it, then continue emitting calls.
+    assert(scalars.size() == 2);
+    callee.ExplosionLevel = ExplosionKind::Minimal;
+    callee.UncurryLevel = 0;
+    callee.set(scalars[0], scalars[1]);
   }
 }
 
@@ -469,61 +769,66 @@ void IRGenFunction::emitPrologue() {
   ReturnBB = createBasicBlock("return");
   CurFn->getBasicBlockList().push_back(ReturnBB);
 
-  FunctionType *FnTy = CurFuncExpr->getType()->getAs<FunctionType>();
-  assert(FnTy && "emitting a declaration that's not a function?");
+  // Copy over the arguments as an Explosion.
+  Explosion args(ExplosionKind::Minimal);
+  for (auto i = CurFn->arg_begin(), e = CurFn->arg_end(); i != e; ++i) {
+    args.add(i);
+  }
 
-  llvm::Function::arg_iterator CurParm = CurFn->arg_begin();
+  // Set up the return slot, stealing the first argument if necessary.
+  {
+    // Find the 'code' result type of this function.
+    FunctionType *fnType = CurFuncExpr->getType()->castTo<FunctionType>();
+    while (FunctionType *fnResult = dyn_cast<FunctionType>(fnType->Result))
+      fnType = fnResult;
+    const TypeInfo &resultType = IGM.getFragileTypeInfo(fnType->Result);
 
-  // Set up the result slot.
-  const TypeInfo &resultType = IGM.getFragileTypeInfo(FnTy->Result);
-  RValueSchema resultSchema = resultType.getSchema();
-  if (resultSchema.isAggregate()) {
-    ReturnSlot = Address(CurParm++, resultType.StorageAlignment);
-  } else if (resultSchema.isScalar(0)) {
-    assert(!ReturnSlot.isValid());
-  } else {
-    ReturnSlot = createScopeAlloca(resultType.getStorageType(),
-                                   resultType.StorageAlignment,
-                                   "return_value");
+    ExplosionSchema resultSchema(args.getKind());
+    resultType.getExplosionSchema(resultSchema);
+
+    if (requiresAggregateResult(resultSchema)) {
+      ReturnSlot = Address(args.claimNext(), resultType.StorageAlignment);
+    } else if (resultSchema.empty()) {
+      assert(!ReturnSlot.isValid());
+    } else {
+      ReturnSlot = createScopeAlloca(resultType.getStorageType(),
+                                     resultType.StorageAlignment,
+                                     "return_value");
+    }
   }
 
   // Set up the parameters.
-  for (ArgDecl *Parm : CurFuncExpr->NamedArgs) {
-    const TypeInfo &ParmInfo = IGM.getFragileTypeInfo(Parm->getType());
-    RValueSchema ParmSchema = ParmInfo.getSchema();
+  for (ArgDecl *parm : CurFuncExpr->NamedArgs) {
+    const TypeInfo &parmType = IGM.getFragileTypeInfo(parm->getType());
 
-    // Make an l-value for the parameter.
+    ExplosionSchema parmSchema(args.getKind());
+    parmType.getExplosionSchema(parmSchema);
+
+    // If the schema contains a single aggregate, assume we can
+    // just treat the next parameter as that type.
     Address parmAddr;
-    if (ParmSchema.isAggregate()) {
-      parmAddr = Address(CurParm++, ParmInfo.StorageAlignment);
+    if (parmSchema.size() == 1 && parmSchema.begin()->isAggregate()) {
+      llvm::Value *addr = args.claimNext();
+      addr = Builder.CreateBitCast(addr,
+                     parmSchema.begin()->getAggregateType()->getPointerTo());
+      parmAddr = Address(addr, parmType.StorageAlignment);
+
+    // Otherwise, make an alloca and load into it.
     } else {
-      parmAddr = createScopeAlloca(ParmInfo.getStorageType(),
-                                   ParmInfo.StorageAlignment,
-                                   Parm->getName().str());
+      parmAddr = createScopeAlloca(parmType.getStorageType(),
+                                   parmType.StorageAlignment,
+                                   parm->getName().str());
+
+      parmType.storeExplosion(*this, args, parmAddr);
     }
 
-    // If the parameter was scalar, form an r-value from the
-    // parameters and store that.
-    if (ParmSchema.isScalar()) {
-      SmallVector<llvm::Value*, RValue::MaxScalars> Scalars;
-      for (llvm::Type *ParmType : ParmSchema.getScalarTypes()) {
-        llvm::Value *V = CurParm++;
-        assert(V->getType() == ParmType);
-        (void) ParmType;
-        Scalars.push_back(V);
-      }
-
-      RValue ParmRV = RValue::forScalars(Scalars);
-      ParmInfo.store(*this, ParmRV, parmAddr);
-    }
-
-    assert(!Locals.count(Parm));
-    Locals.insert(std::make_pair(Parm, parmAddr));
+    assert(!Locals.count(parm));
+    Locals.insert(std::make_pair(parm, parmAddr));
   }
 
   // TODO: data pointer
 
-  assert(CurParm == CurFn->arg_end() && "didn't exhaust all parameters?");
+  assert(args.empty() && "didn't exhaust all parameters?");
 }
 
 /// Emit the epilogue for the function.
@@ -560,7 +865,7 @@ void IRGenFunction::emitEpilogue() {
     Builder.SetInsertPoint(ReturnBB);
   }
 
-  FunctionType *FnTy = CurFuncExpr->getType()->getAs<FunctionType>();
+  FunctionType *FnTy = CurFuncExpr->getType()->castTo<FunctionType>();
   assert(FnTy && "emitting a declaration that's not a function?");
 
   const TypeInfo &resultType = IGM.getFragileTypeInfo(FnTy->Result);
@@ -585,14 +890,18 @@ void IRGenFunction::emitEpilogue() {
 }
 
 /// Emit the definition for the given global function.
-void IRGenModule::emitGlobalFunction(FuncDecl *FD) {
+void IRGenModule::emitGlobalFunction(FuncDecl *func) {
   // Nothing to do if the function has no body.
-  if (!FD->getInit()) return;
+  if (!func->getInit()) return;
 
-  llvm::Function *addr = getAddrOfGlobalFunction(FD);
+  // FIXME: variant currying levels!
+  // FIXME: also emit entrypoints with maximal explosion when all types are known!
 
-  FuncExpr *func = cast<FuncExpr>(FD->getInit());
-  IRGenFunction(*this, func, addr).emitFunctionTopLevel(func->getBody());
+  llvm::Function *addr = getAddrOfGlobalFunction(func, ExplosionKind::Minimal,
+                                                 getNaturalUncurryLevel(func));
+
+  FuncExpr *funcExpr = cast<FuncExpr>(func->getInit());
+  IRGenFunction(*this, funcExpr, addr).emitFunctionTopLevel(funcExpr->getBody());
 }
 
 void IRGenFunction::emitFunctionTopLevel(BraceStmt *S) {

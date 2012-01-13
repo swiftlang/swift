@@ -14,7 +14,9 @@
 //  includes creating the IR type as  well as emitting the primitive access
 //  operations.
 //
-//  Currently we do no optimization of tuples.
+//  It is assumed in several places in IR-generation that the
+//  explosion schema of a tuple type is always equal to the appended
+//  explosion schemas of the component types.
 //
 //===----------------------------------------------------------------------===//
 
@@ -274,15 +276,6 @@ namespace {
 
     RValueSchema getSchema() const {
       return RValueSchema::forAggregate(getStorageType(), StorageAlignment);
-    }
-
-    /// Given an r-value of this type, form an address referring to
-    /// the temporary.
-    Address getAddressForAggregateRValue(const RValue &rvalue) const {
-      assert(rvalue.isAggregate());
-
-      // The alignment of a temporary is always the alignment of the type.
-      return Address(rvalue.getAggregateAddress(), StorageAlignment);
     }
 
     RValue load(IRGenFunction &IGF, Address addr) const {

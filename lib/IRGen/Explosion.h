@@ -65,6 +65,10 @@ public:
     return NextValue == Values.size();
   }
 
+  size_t size() const {
+    return Values.size() - NextValue;
+  }
+
   typedef llvm::Value **iterator;
   iterator begin() { return Values.begin() + NextValue; }
   iterator end() { return Values.end(); }
@@ -172,13 +176,17 @@ public:
 
   ExplosionKind getKind() const { return Kind; }
 
+  /// Return the number of elements in this schema.
+  unsigned size() const { return Elements.size(); }
+  bool empty() const { return Elements.empty(); }
+
   typedef llvm::SmallVectorImpl<Element>::iterator iterator;
   typedef llvm::SmallVectorImpl<Element>::const_iterator const_iterator;
   
   iterator begin() { return Elements.begin(); }
   iterator end() { return Elements.end(); }
   const_iterator begin() const { return Elements.begin(); }
-  const_iterator end() const { return Elements.begin(); }
+  const_iterator end() const { return Elements.end(); }
 
   void add(Element e) { Elements.push_back(e); }
 };

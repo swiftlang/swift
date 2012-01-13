@@ -52,6 +52,8 @@ namespace swift {
 
 namespace irgen {
   class Address;
+  enum class ExplosionKind : unsigned;
+  class ExplosionSchema;
   class Options;
   class TypeConverter;
   class TypeInfo;
@@ -87,6 +89,7 @@ public:
   llvm::Type *getFragileType(Type T);
   llvm::StructType *createNominalType(TypeAliasDecl *D);
   void emitTypeAlias(Type T);
+  void getExplosionSchema(Type T, ExplosionSchema &schema);
 
 private:
   TypeConverter &Types;
@@ -102,8 +105,6 @@ private:
   class LinkInfo;
   LinkInfo getLinkInfo(NamedDecl *D);
 
-  llvm::FunctionType *getFunctionType(Type fnType, bool withData);
-
 public:
   IRGenModule(ASTContext &Context, Options &Opts, llvm::Module &Module,
               const llvm::TargetData &TargetData);
@@ -117,8 +118,12 @@ public:
   void emitExtension(ExtensionDecl *D);
   void emitGlobalFunction(FuncDecl *D);  
 
+  llvm::FunctionType *getFunctionType(Type fnType, ExplosionKind kind,
+                                      unsigned curryingLevel, bool withData);
+
   Address getAddrOfGlobalVariable(VarDecl *D, const TypeInfo &type);
-  llvm::Function *getAddrOfGlobalFunction(FuncDecl *D);
+  llvm::Function *getAddrOfGlobalFunction(FuncDecl *D, ExplosionKind kind,
+                                          unsigned curryingLevel);
   llvm::Function *getAddrOfInjectionFunction(OneOfElementDecl *D);
 };
 

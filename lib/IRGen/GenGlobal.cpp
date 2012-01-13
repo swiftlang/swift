@@ -28,6 +28,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LValue.h"
+#include "Explosion.h"
 
 using namespace swift;
 using namespace irgen;
@@ -207,14 +208,18 @@ void IRGenFunction::emitGlobalVariable(VarDecl *var) {
 }
 
 /// Fetch the declaration of the given global function.
-llvm::Function *IRGenModule::getAddrOfGlobalFunction(FuncDecl *FD) {
+llvm::Function *IRGenModule::getAddrOfGlobalFunction(FuncDecl *func,
+                                                     ExplosionKind kind,
+                                                     unsigned uncurryLevel) {
   // Check whether we've cached this.
-  llvm::Constant *&entry = Globals[FD];
+  llvm::Constant *&entry = Globals[func];
   if (entry) return cast<llvm::Function>(entry);
 
-  llvm::FunctionType *fnType = getFunctionType(FD->getType(), /*data*/ false);
+  llvm::FunctionType *fnType =
+    getFunctionType(func->getType(), kind, uncurryLevel, /*data*/ false);
 
-  LinkInfo link = getLinkInfo(FD);
+  // FIXME: explosion kind, uncurrying level should play a part in link info.
+  LinkInfo link = getLinkInfo(func);
   llvm::Function *addr
     = cast<llvm::Function>(Module.getOrInsertFunction(link.Name.str(), fnType));
   addr->setLinkage(link.Linkage);
@@ -231,7 +236,10 @@ IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
   llvm::Constant *&entry = Globals[D];
   if (entry) return cast<llvm::Function>(entry);
 
-  llvm::FunctionType *fnType = getFunctionType(D->getType(), /*data*/ false);
+  // FIXME: pick the explosion kind better!
+  llvm::FunctionType *fnType =
+    getFunctionType(D->getType(), ExplosionKind::Minimal, /*uncurry*/ 0,
+                    /*data*/ false);
 
   LinkInfo link = getLinkInfo(D);
   llvm::Function *addr

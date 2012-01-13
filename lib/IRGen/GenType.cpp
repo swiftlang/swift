@@ -205,3 +205,19 @@ llvm::StructType *IRGenModule::createNominalType(TypeAliasDecl *alias) {
   
   return llvm::StructType::create(getLLVMContext(), nameStream.str());
 }
+
+/// Compute the explosion schema for the given type.
+void IRGenModule::getExplosionSchema(Type type, ExplosionSchema &schema) {
+  // As an optimization, avoid actually building a TypeInfo for any
+  // obvious TupleTypes.  This assumes that a TupleType's explosion
+  // schema is always the concatenation of its components schemata.
+  if (TupleType *tuple = dyn_cast<TupleType>(type)) {
+    for (const TupleTypeElt &field : tuple->Fields)
+      getExplosionSchema(field.Ty, schema);
+    return;
+  }
+
+  // Okay, that didn't work;  just do the general thing.
+  getFragileTypeInfo(type).getExplosionSchema(schema);
+}
+
