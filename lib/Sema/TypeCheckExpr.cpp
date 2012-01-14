@@ -644,25 +644,14 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     SmallVector<ValueDecl*, 8> ExtensionMethods;
     TC.TU.lookupGlobalExtensionMethods(Ty, MemberName, ExtensionMethods);
 
-    switch (ExtensionMethods.size()) {
-    case 0:
+    if (ExtensionMethods.empty()) {
       TC.diagnose(E->getDotLoc(), diag::invalid_member, MemberName, Ty)
         << Base->getSourceRange()
         << SourceRange(E->getNameLoc(), E->getNameLoc());
       return 0;
-    case 1:
-      // Apply the base value to the function there is a single candidate in the
-      // set then this is directly resolved.
-      return new (TC.Context) DeclRefExpr(ExtensionMethods[0],
-                                          E->getNameLoc(),
-                                        ExtensionMethods[0]->getTypeJudgement());
-      break;
-    default:
-      // Otherwise it is an overload case.  
-      return visit(new (TC.Context) OverloadSetRefExpr(
-                                     TC.Context.AllocateCopy(ExtensionMethods),
-                                                 E->getNameLoc()));
     }
+    
+    return OverloadSetRefExpr::createWithCopy(ExtensionMethods,E->getNameLoc());
   }
 
   // Type check module type references, as on some_module.some_member".
@@ -671,26 +660,14 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     MT->TheModule->lookupValue(Module::AccessPathTy(), MemberName,
                                NLKind::QualifiedLookup, Decls);
 
-    switch (Decls.size()) {
-    case 0:
+    if (Decls.empty()) {
       TC.diagnose(E->getDotLoc(), diag::invalid_module_member, MemberName,
                   MT->TheModule->Name)
         << Base->getSourceRange()
         << SourceRange(E->getNameLoc(), E->getNameLoc());
       return 0;
-    case 1:
-      // Apply the base value to the function there is a single candidate in the
-      // set then this is directly resolved.
-      return new (TC.Context) DeclRefExpr(Decls[0],
-                                          E->getNameLoc(),
-                                          Decls[0]->getTypeJudgement());
-      break;
-    default:
-      // Otherwise it is an overload case.  
-      return visit(new (TC.Context) OverloadSetRefExpr(
-                                                 TC.Context.AllocateCopy(Decls),
-                                                       E->getNameLoc()));
     }
+    return OverloadSetRefExpr::createWithCopy(Decls, E->getNameLoc());
   }
 
   
@@ -698,31 +675,16 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   SmallVector<ValueDecl*, 8> ExtensionMethods;
   TC.TU.lookupGlobalExtensionMethods(SubExprTy, MemberName, ExtensionMethods);
   
-  Expr *FnRef = 0;
-  switch (ExtensionMethods.size()) {
-  case 0: break;
-  case 1:
-    // Apply the base value to the function there is a single candidate in the
-    // set then this is directly resolved.
-    FnRef = new (TC.Context) DeclRefExpr(ExtensionMethods[0],
-                                         E->getNameLoc(),
-                                       ExtensionMethods[0]->getTypeJudgement());
-      
-    if (FuncDecl *FD = dyn_cast<FuncDecl>(ExtensionMethods[0]))
-      if (FD->isPlus())
-        return new (TC.Context) DotSyntaxPlusFuncUseExpr(Base, E->getDotLoc(),
-                                                      cast<DeclRefExpr>(FnRef));
-    break;
-  default:
-    // Otherwise it is an overload case.  
-    FnRef = new (TC.Context) OverloadSetRefExpr(
-                                    TC.Context.AllocateCopy(ExtensionMethods),
-                                                E->getNameLoc());
-    FnRef->setDependentType(DependentType::get(TC.Context));
-    break;
-  }
-  
-  if (FnRef) {
+  if (!ExtensionMethods.empty()) {
+    Expr *FnRef = OverloadSetRefExpr::createWithCopy(ExtensionMethods,
+                                                     E->getNameLoc());
+    // Handle "plus" methods.
+    if (ExtensionMethods.size() == 1)
+      if (FuncDecl *FD = dyn_cast<FuncDecl>(ExtensionMethods[0]))
+        if (FD->isPlus())
+          return new (TC.Context) DotSyntaxPlusFuncUseExpr(Base, E->getDotLoc(),
+                                                     cast<DeclRefExpr>(FnRef));
+
     ApplyExpr *Call = new (TC.Context) DotSyntaxCallExpr(FnRef, E->getDotLoc(),
                                                          Base);
     return TC.semaApplyExpr(Call);
