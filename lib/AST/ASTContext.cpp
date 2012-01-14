@@ -32,6 +32,9 @@ typedef llvm::FoldingSet<TupleType> TupleTypesMapTy;
 /// MetatypeTypesMapTy - This is the underlying type of MetaTypeTypes.
 typedef llvm::DenseMap<TypeAliasDecl*, MetaTypeType*> MetaTypeTypesMapTy;
 
+/// ModuleTypesMapTy - This is the underlying type of ModuleTypes.
+typedef llvm::DenseMap<Module*, ModuleType*> ModuleTypesMapTy;
+
 /// FunctionTypesMapTy - This is the actual type underlying 'FunctionTypes'.
 typedef llvm::DenseMap<std::pair<Type,Type>, FunctionType*> FunctionTypesMapTy;
 
@@ -49,6 +52,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
     IdentifierTable(new IdentifierTableMapTy(*Allocator)),
     TupleTypes(new TupleTypesMapTy()),
     MetaTypeTypes(new MetaTypeTypesMapTy()),
+    ModuleTypes(new ModuleTypesMapTy()),
     FunctionTypes(new FunctionTypesMapTy()),
     ArrayTypes(new ArrayTypesMapTy()),
     IntegerTypes(new IntegerTypesMapTy()),
@@ -72,6 +76,7 @@ ASTContext::~ASTContext() {
   delete (TupleTypesMapTy*)TupleTypes; TupleTypes = 0;
   delete (FunctionTypesMapTy*)FunctionTypes; FunctionTypes = 0;
   delete (MetaTypeTypesMapTy*)MetaTypeTypes; MetaTypeTypes = 0;
+  delete (ModuleTypesMapTy*)ModuleTypes; ModuleTypes = 0;
   delete (ArrayTypesMapTy*)ArrayTypes; ArrayTypes = 0;
   delete (IdentifierTableMapTy*)IdentifierTable; IdentifierTable = 0;
   delete (IntegerTypesMapTy*)IntegerTypes; IntegerTypes = 0;
@@ -193,6 +198,15 @@ MetaTypeType *MetaTypeType::get(TypeAliasDecl *Type) {
   if (Entry) return Entry;
   
   return Entry = new (C) MetaTypeType(Type, C);
+}
+
+ModuleType *ModuleType::get(Module *M) {
+  ASTContext &C = M->getASTContext();
+  
+  ModuleType *&Entry = (*(ModuleTypesMapTy*)C.ModuleTypes)[M];
+  if (Entry) return Entry;
+  
+  return Entry = new (C) ModuleType(M, C);
 }
 
 /// FunctionType::get - Return a uniqued function type with the specified

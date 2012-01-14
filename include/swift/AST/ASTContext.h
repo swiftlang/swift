@@ -49,6 +49,7 @@ public:
   void *IdentifierTable; // llvm::StringMap<char>
   void *TupleTypes;      // llvm::FoldingSet<TupleType>
   void *MetaTypeTypes;   // DenseMap<TypeAliasDecl*, MetaTypeType*>
+  void *ModuleTypes;     // DenseMap<Module*, ModuleType*>
   void *FunctionTypes;   // DenseMap<std::pair<Type*, Type*>, FunctionType*>
   void *ArrayTypes;      // DenseMap<std::pair<Type*, uint64_t>, ArrayType*>
   void *IntegerTypes;    // DenseMap<unsigned, BuiltinIntegerType>
