@@ -229,8 +229,19 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
   if (UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
     Name = UDRE->getName();
     Loc = UDRE->getLoc();
+    // Perform standard value name lookup.
     Binder.TU->lookupGlobalValue(Name, NLKind::UnqualifiedLookup, Decls);
 
+    // If that fails, this may be the name of a module, try looking that up.
+    if (Decls.empty()) {
+      for (const ImportedModule &ImpEntry : Binder.TU->ImportedModules)
+        if (ImpEntry.second->Name == Name) {
+          ModuleType *MT = ModuleType::get(ImpEntry.second);
+          return new (Binder.Context) ModuleExpr(Loc, 
+                                        TypeJudgement(MT, ValueKind::RValue));
+        }      
+    }
+    
   // Process UnresolvedScopedIdentifierExpr by doing a qualified lookup.
   } else if (UnresolvedScopedIdentifierExpr *USIE =
                dyn_cast<UnresolvedScopedIdentifierExpr>(E)) {
