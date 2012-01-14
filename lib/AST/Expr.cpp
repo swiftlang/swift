@@ -121,6 +121,25 @@ llvm::APFloat FloatLiteralExpr::getValue() const {
   return Val;
 }
 
+/// createWithCopy - Create and return a new OverloadSetRefExpr or a new
+/// DeclRefExpr (if the list of decls has a single entry) from the specified
+/// (non-empty) list of decls.  If we end up creating an overload set, this
+/// method handles copying the list of decls into ASTContext memory.
+Expr *OverloadSetRefExpr::createWithCopy(ArrayRef<ValueDecl*> Decls,
+                                         SourceLoc Loc) {
+  assert(!Decls.empty() &&
+         "Cannot create a decl ref with an empty list of decls");
+  ASTContext &C = Decls[0]->getASTContext();
+  if (Decls.size() == 1)
+    return new (C) DeclRefExpr(Decls[0], Loc, Decls[0]->getTypeJudgement());
+  
+  // Otherwise, copy the overload set into ASTContext memory and return the
+  // overload set.
+  return new (C) OverloadSetRefExpr(C.AllocateCopy(Decls), Loc,
+                                    TypeJudgement(DependentType::get(C),
+                                                  ValueKind::RValue));
+}
+
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
   void *Buffer = ctx.Allocate(sizeof(SequenceExpr) +
                               elements.size() * sizeof(Expr*),

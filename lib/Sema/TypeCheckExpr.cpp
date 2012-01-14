@@ -323,27 +323,11 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // TODO: We could allow constructing a tuple this way, though it is somewhat
     // silly and pointless to do so.
     if (OneOfType *OOT = Ty->getAs<OneOfType>()) {
-      Expr *FnRef = 0;
-      switch (OOT->Elements.size()) {
-      case 0: break;
-      case 1:
-        FnRef = new (Context) DeclRefExpr(OOT->Elements[0],
-                                          E1->getStartLoc(),
-                                          OOT->Elements[0]->getTypeJudgement());
-        break;
-      default:
-        // Otherwise it is an overload case.
-        SmallVector<ValueDecl*, 4> Cases(OOT->Elements.begin(),
-                                         OOT->Elements.end());
-        
-        FnRef = new (Context) OverloadSetRefExpr(Context.AllocateCopy(Cases),
-                                                 E1->getStartLoc());
-        FnRef->setDependentType(DependentType::get(Context));
-        break;
-      }
-      
-      if (FnRef)
+      if (!OOT->Elements.empty()) {
+        Expr *FnRef = OverloadSetRefExpr::createWithCopy(OOT->Elements,
+                                                         E1->getStartLoc());
         return semaApplyExpr(new (Context) ConstructorCallExpr(FnRef, E2));
+      }
     }
   }
   

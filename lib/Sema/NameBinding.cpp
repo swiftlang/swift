@@ -246,13 +246,7 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
     return 0;
   }
 
-  if (Decls.size() == 1)
-    return new (Binder.Context) DeclRefExpr(Decls[0], Loc);
-    
-  // Copy the overload set into ASTContext memory.
-  ArrayRef<ValueDecl*> DeclList = Binder.Context.AllocateCopy(Decls);
-    
-  return new (Binder.Context) OverloadSetRefExpr(DeclList, Loc);
+  return OverloadSetRefExpr::createWithCopy(Decls, Loc);
 }
 
 static void bindNamesInDecl(Decl *D, WalkExprType ^BinderBlock) {

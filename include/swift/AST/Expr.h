@@ -249,6 +249,20 @@ public:
 
   SourceRange getSourceRange() const { return Loc; }
   
+  /// createWithCopy - Create and return a new OverloadSetRefExpr or a new
+  /// DeclRefExpr (if the list of decls has a single entry) from the specified
+  /// (non-empty) list of decls.  If we end up creating an overload set, this
+  /// method handles copying the list of decls into ASTContext memory.
+  static Expr *createWithCopy(ArrayRef<ValueDecl*> Decls, SourceLoc Loc);
+  
+  template <typename T>
+  static Expr *createWithCopy(ArrayRef<T*> Decls, SourceLoc Loc) {
+    llvm::SmallVector<ValueDecl*, 4> ValueDecls(Decls.begin(), Decls.end());
+    return createWithCopy(ValueDecls, Loc);
+  }
+  
+  
+  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const OverloadSetRefExpr *) { return true; }
   static bool classof(const Expr *E) {
