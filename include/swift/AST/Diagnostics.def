@@ -246,8 +246,6 @@ ERROR(dollar_numeric_too_large,expr_parsing,none,
       "numeric value following '$' is too large", ())
 ERROR(expected_identifier_after_colon_expr,expr_parsing,none,
       "expected identifier after ':' expression", ())
-ERROR(expected_identifier_after_coloncolon_expr,expr_parsing,none,
-      "expected identifier after %0 expression", (Identifier))
 ERROR(expected_field_spec_name_tuple_expr,expr_parsing,none,
       "expected field specifier name in tuple expression", ())    
 

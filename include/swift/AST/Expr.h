@@ -312,43 +312,6 @@ public:
   }
 };
   
-/// UnresolvedScopedIdentifierExpr - This represents "foo::bar", an unresolved
-/// reference to a type foo and a member bar within it.
-class UnresolvedScopedIdentifierExpr : public Expr {
-  TypeAliasDecl *BaseTypeFromScope;
-  Identifier BaseName;
-  Identifier Name;
-  SourceLoc BaseNameLoc, ColonColonLoc, NameLoc;
-  
-public:
-  UnresolvedScopedIdentifierExpr(TypeAliasDecl *baseTypeFromScope,
-                                 Identifier baseName, SourceLoc baseNameLoc,
-                                 SourceLoc colonLoc,
-                                 Identifier name, SourceLoc nameLoc)
-  : Expr(ExprKind::UnresolvedScopedIdentifier),
-    BaseTypeFromScope(baseTypeFromScope), BaseName(baseName), Name(name),
-    BaseNameLoc(baseNameLoc), ColonColonLoc(colonLoc), NameLoc(nameLoc) {
-  }
-
-  TypeAliasDecl *getBaseTypeFromScope() const { return BaseTypeFromScope; }
-  Identifier getBaseName() const { return BaseName; }
-  Identifier getName() const { return Name; }
-  SourceLoc getBaseNameLoc() const { return BaseNameLoc; }
-  SourceLoc getColonColonLoc() const { return ColonColonLoc; }
-  SourceLoc getNameLoc() const { return NameLoc; }
-
-  SourceLoc getLoc() const { return NameLoc; }
-  SourceRange getSourceRange() const { 
-    return SourceRange(BaseNameLoc, NameLoc); 
-  }
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const UnresolvedScopedIdentifierExpr *) { return true; }
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::UnresolvedScopedIdentifier;
-  }
-};
-
 /// ParenExpr - A parenthesized expression like '(x+x)'.  Syntactically,
 /// this is just a TupleExpr with exactly one element that has no label.
 /// Semantically, however, it serves only as grouping parentheses and

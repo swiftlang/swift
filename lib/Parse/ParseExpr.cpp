@@ -157,7 +157,7 @@ ParseResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
   case tok::dollarident: // $1
     Result = parseExprDollarIdentifier();
     break;
-  case tok::identifier:  // foo   and  foo::bar
+  case tok::identifier:  // foo
     Result = parseExprIdentifier();
     break;
 
@@ -314,29 +314,12 @@ Expr *Parser::parseExprOperator() {
 ///
 ///   expr-identifier:
 ///     identifier
-///     scope-qualifier identifier
 ParseResult<Expr> Parser::parseExprIdentifier() {
   assert(Tok.is(tok::identifier));
   SourceLoc Loc = Tok.getLoc();
   Identifier Name = Context.getIdentifier(Tok.getText());
   consumeToken(tok::identifier);
-
-  if (Tok.isNot(tok::coloncolon))
-    return actOnIdentifierExpr(Name, Loc);
-  
-  SourceLoc ColonColonLoc = consumeToken(tok::coloncolon);
-
-  SourceLoc Loc2 = Tok.getLoc();
-  Identifier Name2;
-  if (parseIdentifier(Name2, diag::expected_identifier_after_coloncolon_expr,
-                      Name))
-    return true;
-  
-  TypeAliasDecl *TypeDeclFromScope = ScopeInfo.lookupScopeName(Name, Loc);
-  return new (Context) UnresolvedScopedIdentifierExpr(TypeDeclFromScope,
-                                                      Name, Loc,
-                                                      ColonColonLoc,
-                                                      Name2, Loc2);
+  return actOnIdentifierExpr(Name, Loc);
 }
 
 Expr *Parser::actOnIdentifierExpr(Identifier Text, SourceLoc Loc) {

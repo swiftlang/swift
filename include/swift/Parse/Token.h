@@ -62,7 +62,6 @@ enum class tok {
   PUNCTUATOR(period,      ".")
   PUNCTUATOR(comma,       ",")
   PUNCTUATOR(colon,       ":")
-  PUNCTUATOR(coloncolon,  "::")
   PUNCTUATOR(semi,        ";")
   PUNCTUATOR(equal,       "=")
   

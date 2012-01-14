@@ -505,12 +505,6 @@ public:
   }
   Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *E);
   
-  Expr *visitUnresolvedScopedIdentifierExpr
-  (UnresolvedScopedIdentifierExpr *E) {
-    llvm_unreachable("UnresolvedScopedIdentifierExpr should be resolved "
-                     "by name binding!");
-  }
-
   Expr *visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
     // LookThroughOneofExpr is fully resolved.
     assert(!E->getType()->is<DependentType>());

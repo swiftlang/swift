@@ -221,46 +221,24 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
   if (Order == WalkOrder::PreOrder)
     return E;
 
-  Identifier Name;
-  SourceLoc Loc;
-  SmallVector<ValueDecl*, 4> Decls;
+  UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E);
+  if (UDRE == 0) return E;
   
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
-  if (UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
-    Name = UDRE->getName();
-    Loc = UDRE->getLoc();
-    // Perform standard value name lookup.
-    Binder.TU->lookupGlobalValue(Name, NLKind::UnqualifiedLookup, Decls);
+  Identifier Name = UDRE->getName();
+  SourceLoc Loc = UDRE->getLoc();
+  SmallVector<ValueDecl*, 4> Decls;
+  // Perform standard value name lookup.
+  Binder.TU->lookupGlobalValue(Name, NLKind::UnqualifiedLookup, Decls);
 
-    // If that fails, this may be the name of a module, try looking that up.
-    if (Decls.empty()) {
-      for (const ImportedModule &ImpEntry : Binder.TU->ImportedModules)
-        if (ImpEntry.second->Name == Name) {
-          ModuleType *MT = ModuleType::get(ImpEntry.second);
-          return new (Binder.Context) ModuleExpr(Loc, 
-                                        TypeJudgement(MT, ValueKind::RValue));
-        }      
-    }
-    
-  // Process UnresolvedScopedIdentifierExpr by doing a qualified lookup.
-  } else if (UnresolvedScopedIdentifierExpr *USIE =
-               dyn_cast<UnresolvedScopedIdentifierExpr>(E)) {
-    Name = USIE->getName();
-    Loc = USIE->getNameLoc();
-
-    Identifier BaseName = USIE->getBaseName();
-    SourceLoc BaseNameLoc = USIE->getBaseNameLoc();
-    BoundScope Scope =
-      Binder.bindScopeName(USIE->getBaseTypeFromScope(), BaseName, BaseNameLoc);
-    if (!Scope) return nullptr;
-
-    auto Module = Scope.get<const ImportedModule*>();
-    Module->second->lookupValue(Module->first, Name,
-                                NLKind::QualifiedLookup, Decls);
-
-  // Otherwise, not something that needs name binding.
-  } else {
-    return E;
+  // If that fails, this may be the name of a module, try looking that up.
+  if (Decls.empty()) {
+    for (const ImportedModule &ImpEntry : Binder.TU->ImportedModules)
+      if (ImpEntry.second->Name == Name) {
+        ModuleType *MT = ModuleType::get(ImpEntry.second);
+        return new (Binder.Context) ModuleExpr(Loc, 
+                                      TypeJudgement(MT, ValueKind::RValue));
+      }      
   }
 
   if (Decls.empty()) {

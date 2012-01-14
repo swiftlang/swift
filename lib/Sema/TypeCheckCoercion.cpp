@@ -98,11 +98,6 @@ public:
     llvm_unreachable("coercing an expression already looked through");
   }
   
-  Expr *visitUnresolvedScopedIdentifierExpr
-  (UnresolvedScopedIdentifierExpr *E) {
-    assert(0 && "This node should be resolved already!");
-  }
-
   Expr *visitTupleElementExpr(TupleElementExpr *E) {
     // TupleElementExpr is fully resolved.
     llvm_unreachable("This node doesn't exist for dependent types");

@@ -435,9 +435,6 @@ namespace {
     Expr *visitOverloadSetRefExpr(OverloadSetRefExpr *E) { return E; }
     Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) { return E; }
     Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) { return E; }
-    Expr *visitUnresolvedScopedIdentifierExpr(UnresolvedScopedIdentifierExpr*E){
-      return E;
-    }
 
     Expr *visitParenExpr(ParenExpr *E) {
       if (Expr *subExpr = doIt(E->getSubExpr())) {
@@ -797,11 +794,6 @@ public:
   void visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     OS.indent(Indent) << "(unresolved_member_expr type='" << E->getType();
     OS << "\' name='" << E->getName() << "')";
-  }
-  void visitUnresolvedScopedIdentifierExpr(UnresolvedScopedIdentifierExpr *E) {
-    OS.indent(Indent) << "(unresolved_scoped_identifier_expr base='"
-      << E->getBaseTypeFromScope()->getName() << "\' name='"
-      << E->getName() << "')";
   }
   void visitParenExpr(ParenExpr *E) {
     OS.indent(Indent) << "(paren_expr type='" << E->getType() << "'\n";
