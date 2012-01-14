@@ -445,6 +445,8 @@ ERROR(ambiguous_expression_unresolved,sema_tce,none,
 
 ERROR(invalid_member,sema_tce,none,
       "%0 is not a member of %1", (Identifier, Type))
+ERROR(invalid_module_member,sema_tce,none,
+      "%0 is not a member of %1 module", (Identifier, Identifier))
 
 ERROR(unary_op_without_attribute,sema_tce,none,
       "use of unary operator without 'unary' attribute specified", ())

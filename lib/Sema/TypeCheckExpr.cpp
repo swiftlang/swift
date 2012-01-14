@@ -312,9 +312,6 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // The metatype represents an arbitrary named type: dig through the
     // TypeAlias to see what we're dealing with.  If the typealias was erroneous
     // then silently squish this erroneous subexpression.
-    if (!MT->TheType->hasUnderlyingType())
-      return 0;  // FIXME: This should check for the error bit on the decl?
-
     Type Ty = MT->TheType->getUnderlyingType();
     if (Ty->is<ErrorType>())
       return 0;  // Squelch an erroneous subexpression.
@@ -626,11 +623,12 @@ public:
 Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   Expr *Base = E->getBase();
   Type SubExprTy = Base->getType();
-   
+  Identifier MemberName = E->getName();
+
   // Check in the context of a protocol.
   if (ProtocolType *PT = SubExprTy->getAs<ProtocolType>()) {
     for (ValueDecl *VD : PT->Elements) {
-      if (VD->getName() != E->getName()) continue;
+      if (VD->getName() != MemberName) continue;
       
       // The protocol value is applied via a DeclRefExpr.
       DeclRefExpr *Fn = new (TC.Context) DeclRefExpr(VD, E->getNameLoc(),
@@ -652,30 +650,16 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     // The metatype represents an arbitrary named type: dig through the
     // TypeAlias to see what we're dealing with.  If the typealias was erroneous
     // then silently squish this erroneous subexpression.
-#if 0
-    if (!MTT->TheType->hasUnderlyingType())
-      return 0;  // FIXME: This should check for the error bit on the decl?
-#endif
-    
     Type Ty = MTT->TheType->getUnderlyingType();
     if (Ty->is<ErrorType>())
       return 0;  // Squelch an erroneous subexpression.
         
-    Identifier MemberName = E->getName();
-
     if (OneOfType *OOTy = Ty->getAs<OneOfType>()) {
       OneOfElementDecl *Elt = OOTy->getElement(MemberName);
       if (Elt)  // FIXME: This throws away syntactic information from the AST.
         return new (TC.Context) DeclRefExpr(Elt, E->getNameLoc(),
                                             Elt->getTypeJudgement());
     }
-#if 0  // Module references.
-    else {
-      auto Module = Scope.get<const ImportedModule*>();
-      Module->second->lookupValue(Module->first, Name,
-                                  NLKind::QualifiedLookup, Decls);
-    }
-#endif
     
     // Look up references in extension methods.
     // Look in any extensions that add methods to the base type.
@@ -685,7 +669,8 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     switch (ExtensionMethods.size()) {
     case 0:
       TC.diagnose(E->getDotLoc(), diag::invalid_member, MemberName, Ty)
-        << Base->getSourceRange() << SourceRange(E->getNameLoc(), E->getNameLoc());
+        << Base->getSourceRange()
+        << SourceRange(E->getNameLoc(), E->getNameLoc());
       return 0;
     case 1:
       // Apply the base value to the function there is a single candidate in the
@@ -701,10 +686,39 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
                                                  E->getNameLoc()));
     }
   }
+
+  // Type check module type references, as on some_module.some_member".
+  if (ModuleType *MT = SubExprTy->getAs<ModuleType>()) {
+    SmallVector<ValueDecl*, 8> Decls;
+    MT->TheModule->lookupValue(Module::AccessPathTy(), MemberName,
+                               NLKind::QualifiedLookup, Decls);
+
+    switch (Decls.size()) {
+    case 0:
+      TC.diagnose(E->getDotLoc(), diag::invalid_module_member, MemberName,
+                  MT->TheModule->Name)
+        << Base->getSourceRange()
+        << SourceRange(E->getNameLoc(), E->getNameLoc());
+      return 0;
+    case 1:
+      // Apply the base value to the function there is a single candidate in the
+      // set then this is directly resolved.
+      return new (TC.Context) DeclRefExpr(Decls[0],
+                                          E->getNameLoc(),
+                                          Decls[0]->getTypeJudgement());
+      break;
+    default:
+      // Otherwise it is an overload case.  
+      return visit(new (TC.Context) OverloadSetRefExpr(
+                                                 TC.Context.AllocateCopy(Decls),
+                                                       E->getNameLoc()));
+    }
+  }
+
   
   // Look in any extensions that add methods to the base type.
   SmallVector<ValueDecl*, 8> ExtensionMethods;
-  TC.TU.lookupGlobalExtensionMethods(SubExprTy, E->getName(),ExtensionMethods);
+  TC.TU.lookupGlobalExtensionMethods(SubExprTy, MemberName, ExtensionMethods);
   
   Expr *FnRef = 0;
   switch (ExtensionMethods.size()) {
@@ -749,7 +763,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   // Check to see if this is a reference to a tuple field.
   if (TupleType *TT = SubExprTy->getAs<TupleType>()) {
     // If the field name exists, we win.
-    int FieldNo = TT->getNamedElementId(E->getName());
+    int FieldNo = TT->getNamedElementId(MemberName);
     if (FieldNo != -1) {
       if (LookedThroughOneofs)
         Base = lookThroughOneofs(Base);
@@ -763,9 +777,9 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     
     // Okay, the field name was invalid.  If this is a dollarident like $4,
     // process it as a field index.
-    if (E->getName().str().startswith("$")) {
+    if (MemberName.str().startswith("$")) {
       unsigned Value = 0;
-      if (!E->getName().str().substr(1).getAsInteger(10, Value)) {
+      if (!MemberName.str().substr(1).getAsInteger(10, Value)) {
         if (Value >= TT->Fields.size()) {
           TC.diagnose(E->getNameLoc(), diag::field_number_too_large);
           return 0;
