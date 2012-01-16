@@ -23,7 +23,6 @@
 #include "llvm/Support/ErrorHandling.h"
 
 #include "IRGenModule.h"
-#include "Linking.h"
 
 using namespace swift;
 using namespace irgen;
@@ -285,10 +284,10 @@ static bool shouldMangle(NamedDecl *D) {
   return true;
 }
 
-void LinkEntity::mangle(raw_ostream &buffer) const {
+void IRGenModule::mangle(raw_ostream &buffer, NamedDecl *decl) {
   // Check for declarations which should not be mangled.
-  if (!shouldMangle(TheDecl)) {
-    buffer << TheDecl->getName().str();
+  if (!shouldMangle(decl)) {
+    buffer << decl->getName().str();
     return;
   }
 
@@ -299,13 +298,13 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 
   Mangler mangler(buffer);
 
-  mangler.mangleDeclName(TheDecl);
+  mangler.mangleDeclName(decl);
 
   // Mangle in a type as well.  Note that we have to mangle the type
   // on all kinds of declarations, even variables, because at the
   // moment they can *all* be overloaded.
-  if (ValueDecl *valueDecl = dyn_cast<ValueDecl>(TheDecl))
-    if (!isa<TypeAliasDecl>(TheDecl))
+  if (ValueDecl *valueDecl = dyn_cast<ValueDecl>(decl))
+    if (!isa<TypeAliasDecl>(decl))
       mangler.mangleType(valueDecl->getType());
 
   // TODO: mangle generics information here.

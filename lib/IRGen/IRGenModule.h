@@ -54,7 +54,6 @@ namespace irgen {
   class Address;
   enum class ExplosionKind : unsigned;
   class ExplosionSchema;
-  class LinkEntity;
   class Options;
   class TypeConverter;
   class TypeInfo;
@@ -100,7 +99,11 @@ private:
 private:
   llvm::DenseMap<Decl*, llvm::Constant*> Globals;
 
+  void mangle(raw_ostream &buffer, NamedDecl *D);
   void mangleGlobalInitializer(raw_ostream &buffer, TranslationUnit *D);
+
+  class LinkInfo;
+  LinkInfo getLinkInfo(NamedDecl *D);
 
 public:
   IRGenModule(ASTContext &Context, Options &Opts, llvm::Module &Module,
@@ -116,7 +119,7 @@ public:
   void emitGlobalFunction(FuncDecl *D);  
 
   llvm::FunctionType *getFunctionType(Type fnType, ExplosionKind kind,
-                                      unsigned uncurryLevel, bool withData);
+                                      unsigned curryingLevel, bool withData);
 
   Address getAddrOfGlobalVariable(VarDecl *D, const TypeInfo &type);
   llvm::Function *getAddrOfGlobalFunction(FuncDecl *D, ExplosionKind kind,
