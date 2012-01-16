@@ -27,6 +27,7 @@
 #include "Address.h"
 #include "RValue.h"
 #include "Explosion.h"
+#include "Linking.h"
 
 using namespace swift;
 using namespace irgen;
@@ -201,7 +202,7 @@ void IRGenModule::emitTypeAlias(Type underlyingType) {
 llvm::StructType *IRGenModule::createNominalType(TypeAliasDecl *alias) {
   llvm::SmallString<32> typeName;
   llvm::raw_svector_ostream nameStream(typeName);
-  mangle(nameStream, alias);
+  LinkEntity::forNonFunction(alias).mangle(nameStream);
   
   return llvm::StructType::create(getLLVMContext(), nameStream.str());
 }

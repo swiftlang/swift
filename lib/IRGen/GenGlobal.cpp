@@ -19,7 +19,6 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
-#include "llvm/GlobalValue.h"
 #include "llvm/Module.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
@@ -27,6 +26,7 @@
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "Linking.h"
 #include "LValue.h"
 
 using namespace swift;
@@ -109,25 +109,16 @@ void IRGenFunction::emitGlobalTopLevel(BraceStmt *body) {
   }
 }
 
-/// Encapsulated information about linking information.
-class IRGenModule::LinkInfo {
-public:
-  llvm::SmallString<32> Name;
-  llvm::GlobalValue::LinkageTypes Linkage;
-  llvm::GlobalValue::VisibilityTypes Visibility;
-};
+LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity) {
+  LinkInfo result;
 
-IRGenModule::LinkInfo IRGenModule::getLinkInfo(NamedDecl *D) {
-  LinkInfo Link;
-
-  llvm::raw_svector_ostream NameStream(Link.Name);
-  mangle(NameStream, D);
+  llvm::raw_svector_ostream nameStream(result.Name);
+  entity.mangle(nameStream);
   
   // TODO, obviously.
-  Link.Linkage = llvm::GlobalValue::ExternalLinkage;
-  Link.Visibility = llvm::GlobalValue::DefaultVisibility;
-
-  return Link;
+  result.Linkage = llvm::GlobalValue::ExternalLinkage;
+  result.Visibility = llvm::GlobalValue::DefaultVisibility;
+  return result;
 }
 
 /// Emit a global declaration.
@@ -177,12 +168,12 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var,
   }
 
   // Okay, we need to rebuild it.
-  LinkInfo link = getLinkInfo(var);
+  LinkInfo link = LinkInfo::get(*this, LinkEntity::forNonFunction(var));
   llvm::GlobalVariable *addr
     = new llvm::GlobalVariable(Module, type.StorageType, /*constant*/ false,
-                               link.Linkage, /*initializer*/ nullptr,
-                               link.Name.str());
-  addr->setVisibility(link.Visibility);
+                               link.getLinkage(), /*initializer*/ nullptr,
+                               link.getName());
+  addr->setVisibility(link.getVisibility());
 
   Alignment align = type.StorageAlignment;
   addr->setAlignment(align.getValue());
@@ -217,12 +208,12 @@ llvm::Function *IRGenModule::getAddrOfGlobalFunction(FuncDecl *func,
   llvm::FunctionType *fnType =
     getFunctionType(func->getType(), kind, uncurryLevel, /*data*/ false);
 
-  // FIXME: explosion kind, uncurrying level should play a part in link info.
-  LinkInfo link = getLinkInfo(func);
+  LinkEntity entity = LinkEntity::forFunction(func, kind, uncurryLevel);
+  LinkInfo link = LinkInfo::get(*this, entity);
   llvm::Function *addr
-    = cast<llvm::Function>(Module.getOrInsertFunction(link.Name.str(), fnType));
-  addr->setLinkage(link.Linkage);
-  addr->setVisibility(link.Visibility);
+    = cast<llvm::Function>(Module.getOrInsertFunction(link.getName(), fnType));
+  addr->setLinkage(link.getLinkage());
+  addr->setVisibility(link.getVisibility());
 
   entry = addr;
   return addr;
@@ -240,11 +231,12 @@ IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
     getFunctionType(D->getType(), ExplosionKind::Minimal, /*uncurry*/ 0,
                     /*data*/ false);
 
-  LinkInfo link = getLinkInfo(D);
+  LinkEntity entity = LinkEntity::forFunction(D, ExplosionKind::Minimal, 0);
+  LinkInfo link = LinkInfo::get(*this, entity);
   llvm::Function *addr
-    = cast<llvm::Function>(Module.getOrInsertFunction(link.Name.str(), fnType));
-  addr->setLinkage(link.Linkage);
-  addr->setVisibility(link.Visibility);
+    = cast<llvm::Function>(Module.getOrInsertFunction(link.getName(), fnType));
+  addr->setLinkage(link.getLinkage());
+  addr->setVisibility(link.getVisibility());
 
   entry = addr;
   return addr;
