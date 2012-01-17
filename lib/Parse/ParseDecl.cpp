@@ -444,7 +444,9 @@ TypeAliasDecl *Parser::parseDeclTypeAlias() {
       parseType(Ty, diag::expected_type_in_typealias))
     return 0;
 
-  return ScopeInfo.addTypeAliasToScope(TypeAliasLoc, Id, Ty);
+  TypeAliasDecl *TAD = ScopeInfo.addTypeAliasToScope(TypeAliasLoc, Id, Ty);
+  ScopeInfo.addToScope(TAD);
+  return TAD;
 }
 
 
