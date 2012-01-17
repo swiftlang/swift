@@ -87,8 +87,7 @@ bool Parser::parseType(Type &Result, Diag<> MessageID) {
 /// parseTypeIdentifier
 ///   
 ///   type-identifier:
-///     identifier
-///     identifier '.' identifier
+///     identifier ('.' identifier)*
 ///
 bool Parser::parseTypeIdentifier(Type &Result) {
   if (Tok.isNot(tok::identifier)) {
@@ -96,22 +95,37 @@ bool Parser::parseTypeIdentifier(Type &Result) {
     return true;
   }
   
-  Identifier Name = Context.getIdentifier(Tok.getText());
-  SourceLoc NameLoc = Tok.getLoc();
+  SmallVector<DottedNameType::Component, 4> Components;
+  Components.push_back(DottedNameType::Component(Tok.getLoc(),
+                                     Context.getIdentifier(Tok.getText())));
   consumeToken(tok::identifier);
   
-  if (Tok.isNot(tok::period)) {
-    Result = ScopeInfo.lookupOrInsertTypeName(Name, NameLoc);
+  while (consumeIf(tok::period)) {
+    SourceLoc Loc = Tok.getLoc();
+    Identifier Name;
+    if (parseIdentifier(Name, diag::expected_identifier_in_dotted_type))
+      return true;
+    Components.push_back(DottedNameType::Component(Loc, Name));
+  }
+
+  // If there is only a single identifier, handle it as a normal unqualified
+  // type reference.
+  if (Components.size() == 1) {
+    Result = ScopeInfo.lookupOrInsertTypeName(Components[0].Id,
+                                              Components[0].Loc);
     return false;
   }
   
-  consumeToken(tok::period);
-  SourceLoc Loc2 = Tok.getLoc();
-  Identifier Name2;
-  if (parseIdentifier(Name2, diag::expected_identifier_after_dot_type, Name))
-    return true;
-    
+  // Otherwise, this is a qualified lookup.  Lookup element #0 through our
+  // current scope chains in case it is some thing local (this returns null if
+  // nothing is found).
+  Components[0].Value = ScopeInfo.lookupValueName(Components[0].Id);
+  auto Ty = DottedNameType::getNew(Context, Components);
+  UnresolvedDottedTypes.push_back(Ty);
+  Result = Ty;
+#if 0
   Result = ScopeInfo.getQualifiedTypeName(Name, NameLoc, Name2, Loc2);
+#endif
   return false;
 }
 

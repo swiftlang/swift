@@ -79,8 +79,8 @@ TranslationUnit *Parser::parseTranslationUnit() {
   }
   
   TU->setUnresolvedTypes(Context.AllocateCopy(UnresolvedTypeList));
-  TU->setUnresolvedScopedTypes(
-    Context.AllocateCopy(ScopeInfo.getUnresolvedScopedTypeList()));
+  TU->setUnresolvedDottedTypes(
+                  Context.AllocateCopy<DottedNameType*>(UnresolvedDottedTypes));
 
   // Note that the translation unit is fully parsed and verify it.
   TU->ASTStage = TranslationUnit::Parsed;

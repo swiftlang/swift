@@ -49,7 +49,7 @@ public:
   swift::Component *Component;
   ASTContext &Context;
   ScopeInfo ScopeInfo;
-
+  std::vector<DottedNameType*> UnresolvedDottedTypes;
   
   /// Tok - This is the current token being considered by the parser.
   Token Tok;

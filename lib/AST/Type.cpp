@@ -161,7 +161,7 @@ const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {
 Type DottedNameType::getMappedType() {
   assert(!Components.back().Value.isNull() &&
          "Name binding haven't resolved this to a type yet");
-  return Components.back().Value;
+  return Components.back().Value.get<TypeBase*>();
 }
 
 /// hasAnyDefaultValues - Return true if any of our elements has a default

@@ -56,9 +56,17 @@ namespace {
     
     void addImport(ImportDecl *ID, SmallVectorImpl<ImportedModule> &Result);
 
+#if 0
     BoundScope bindScopeName(TypeAliasDecl *TypeFromScope,
                              Identifier Name, SourceLoc NameLoc);
+#endif
 
+    /// resolveDottedNameType - Perform name binding for a DottedNameType,
+    /// resolving it or diagnosing the error as appropriate and return true on
+    /// failure.  On failure, this leaves DottedNameType alone, otherwise it
+    /// fills in the Components.
+    bool resolveDottedNameType(DottedNameType *DNT);
+    
   private:
     /// getModule - Load a module referenced by an import statement,
     /// emitting an error at the specified location and returning null on
@@ -161,6 +169,7 @@ void NameBinder::addImport(ImportDecl *ID,
   Result.push_back(std::make_pair(Path.slice(1), M));
 }
 
+#if 0
 /// Try to bind an unqualified name into something usable as a scope.
 BoundScope NameBinder::bindScopeName(TypeAliasDecl *TypeFromScope,
                                      Identifier Name, SourceLoc NameLoc) {
@@ -210,6 +219,121 @@ BoundScope NameBinder::bindScopeName(TypeAliasDecl *TypeFromScope,
 
   return DT;
 }
+#endif
+
+/// resolveDottedNameType - Perform name binding for a DottedNameType,
+/// resolving it or diagnosing the error as appropriate and return true on
+/// failure.  On failure, this leaves DottedNameType alone, otherwise it fills
+/// in the Components.
+bool NameBinder::resolveDottedNameType(DottedNameType *DNT) {
+  // FIXME: we really want a MutableArrayRef.
+  auto Components =
+    const_cast<DottedNameType::Component*>(DNT->Components.data());
+  
+  // If name lookup for the base of the type didn't get resolved in the
+  // parsing phase, do a global lookup for it.
+  if (Components[0].Value.isNull()) {
+    Identifier Name = Components[0].Id;
+    SourceLoc Loc = Components[0].Loc;
+    
+    // Perform an unqualified lookup.
+    SmallVector<ValueDecl*, 4> Decls;
+    TU->lookupGlobalValue(Name, NLKind::UnqualifiedLookup, Decls);
+    
+    // If we find multiple results, we have an ambiguity error.
+    // FIXME: This should be reevaluated and probably turned into a new NLKind.
+    // Certain matches (e.g. of a function) should just be filtered out/ignored.
+    if (Decls.size() > 1) {
+      diagnose(Loc, diag::abiguous_type_base, Name)
+        << SourceRange(Loc, DNT->Components.back().Loc);
+      for (ValueDecl *D : Decls)
+        diagnose(D->getLocStart(), diag::found_candidate);
+      return true;
+    }
+    
+    if (!Decls.empty()) {
+      Components[0].Value = Decls[0];
+    } else {
+      // If that fails, this may be the name of a module, try looking that up.
+      for (const ImportedModule &ImpEntry : TU->ImportedModules)
+        if (ImpEntry.second->Name == Name) {
+          Components[0].Value = ImpEntry.second;
+          break;
+        }
+    
+      // If we still don't have anything, we fail.
+      if (Components[0].Value.isNull()) {
+        diagnose(Loc, diag::unknown_name_in_type, Name)
+          << SourceRange(Loc, DNT->Components.back().Loc);
+        return true;
+      }
+    }
+  }
+  
+  assert(!DNT->Components[0].Value.isNull() && "Failed to get a base");
+  
+  // Now that we have a base, iteratively resolve subsequent member entries.
+  for (unsigned i = 1, e = DNT->Components.size(); i != e; ++i) {
+    auto &LastOne = Components[i-1];
+    auto &C = Components[i];
+    
+    // TODO: Only support digging into modules so far.
+    if (auto M = LastOne.Value.dyn_cast<Module*>()) {
+#if 0
+      // FIXME: Why is this lookupType instead of lookupValue?  How are they
+      // different?
+#endif
+      C.Value = M->lookupType(Module::AccessPathTy(), C.Id, 
+                              NLKind::QualifiedLookup);
+    } else {
+      diagnose(C.Loc, diag::unknown_dotted_type_base, LastOne.Id)
+        << SourceRange(Components[0].Loc, DNT->Components.back().Loc);
+      return true;
+    }
+    
+    if (C.Value.isNull()) {
+      diagnose(C.Loc, diag::invalid_member_type, C.Id, LastOne.Id)
+      << SourceRange(Components[0].Loc, DNT->Components.back().Loc);
+      return true;
+    }
+  }
+  
+  // Finally, sanity check that the last value is a type.
+  if (ValueDecl *Last = DNT->Components.back().Value.dyn_cast<ValueDecl*>())
+    if (auto TAD = dyn_cast<TypeAliasDecl>(Last)) {
+      Components[DNT->Components.size()-1].Value = TAD->getAliasType();
+      return false;
+    }
+
+  diagnose(DNT->Components.back().Loc, diag::dotted_reference_not_type)
+    << SourceRange(Components[0].Loc, DNT->Components.back().Loc);
+  return true;
+#if 0
+  
+  BoundScope Scope = Binder.bindScopeName(BaseAndType.first,
+                                          BaseAndType.first->getName(),
+                                          BaseAndType.first->getTypeAliasLoc());
+  if (!Scope) continue;
+  
+  Identifier Name = BaseAndType.second->getName();
+  SourceLoc NameLoc = BaseAndType.second->getTypeAliasLoc();
+  
+  TypeAliasDecl *Alias = nullptr;
+  if (auto Module = Scope.dyn_cast<const ImportedModule*>())
+    Alias = Module->second->lookupType(Module->first, Name,
+                                       NLKind::QualifiedLookup);
+  
+  if (Alias) {
+    BaseAndType.second->setUnderlyingType(Alias->getAliasType());
+  } else {
+    Binder.diagnose(NameLoc, diag::invalid_member_type,
+                    Name, BaseAndType.first->getName());
+    BaseAndType.second->setUnderlyingType(Binder.Context.TheErrorType);
+  }
+#endif
+
+}
+
 
 //===----------------------------------------------------------------------===//
 // performNameBinding
@@ -309,28 +433,16 @@ void swift::performNameBinding(TranslationUnit *TU) {
     TA->setUnderlyingType(ErrorType::get(TU->Ctx));
   }
 
-  // Loop over all the unresolved scoped types in the translation
-  // unit, resolving them if possible.
-  for (auto BaseAndType : TU->getUnresolvedScopedTypes()) {
-    BoundScope Scope = Binder.bindScopeName(BaseAndType.first,
-                                            BaseAndType.first->getName(),
-                                        BaseAndType.first->getTypeAliasLoc());
-    if (!Scope) continue;
+  // Loop over all the unresolved dotted types in the translation unit,
+  // resolving them if possible.
+  for (DottedNameType *DNT : TU->getUnresolvedDottedTypes()) {
+    if (Binder.resolveDottedNameType(DNT)) {
+      TypeBase *Error = ErrorType::get(TU->getASTContext()).getPointer();
 
-    Identifier Name = BaseAndType.second->getName();
-    SourceLoc NameLoc = BaseAndType.second->getTypeAliasLoc();
-
-    TypeAliasDecl *Alias = nullptr;
-    if (auto Module = Scope.dyn_cast<const ImportedModule*>())
-      Alias = Module->second->lookupType(Module->first, Name,
-                                         NLKind::QualifiedLookup);
-
-    if (Alias) {
-      BaseAndType.second->setUnderlyingType(Alias->getAliasType());
-    } else {
-      Binder.diagnose(NameLoc, diag::invalid_member_type,
-                      Name, BaseAndType.first->getName());
-      BaseAndType.second->setUnderlyingType(Binder.Context.TheErrorType);
+      // This DottedNameType resolved to the error type.
+      for (auto &C : DNT->Components)
+        // FIXME: Want MutableArrayRef
+        const_cast<DottedNameType::Component&>(C).Value = Error;
     }
   }
 

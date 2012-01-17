@@ -266,8 +266,10 @@ public:
   public:
     SourceLoc Loc;
     Identifier Id;
-    // TODO: PointerUnion of a type, module, etc that this component refers to.
-    Type Value;
+    
+    /// Value is the decl or module that this refers to.  After name binding,
+    /// the last entry in the component list is known to be a TypeBase*.
+    llvm::PointerUnion3<ValueDecl*, TypeBase*, Module*> Value;
     Component(SourceLoc Loc, Identifier Id) : Loc(Loc), Id(Id) {}
   };
   
@@ -277,7 +279,8 @@ private:
     : TypeBase(TypeKind::DottedName), Components(Components) {}
 public:
   
-  // The components that make this up.
+  /// The components that make this up.
+  /// FIXME: This should be a MutableArrayRef when we have it someday.
   ArrayRef<Component> Components;
 
   
