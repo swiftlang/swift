@@ -37,15 +37,14 @@ Scope::Scope(Parser *P) : SI(P->ScopeInfo), ValueHTScope(SI.ValueScopeHT),
 // ScopeInfo Implementation
 //===----------------------------------------------------------------------===//
 
-/// lookupOrInsertTypeNameDecl - Perform a lexical scope lookup for the
+/// lookupOrInsertTypeName - Perform a lexical scope lookup for the
 /// specified name in a type context, returning the decl if found or
 /// installing and returning a new Unresolved one if not.
-TypeAliasDecl *ScopeInfo::lookupOrInsertTypeNameDecl(Identifier Name,
-                                                     SourceLoc Loc) {
+Type ScopeInfo::lookupOrInsertTypeName(Identifier Name, SourceLoc Loc) {
   // Check whether we already have an entry for this name.
   auto I = TypeScopeHT.begin(Name);
   if (I != TypeScopeHT.end())
-    return I->Decl;
+    return I->Decl->getAliasType();
 
   // If not, create a new tentative entry.
   TypeAliasDecl *TAD =
@@ -59,13 +58,7 @@ TypeAliasDecl *ScopeInfo::lookupOrInsertTypeNameDecl(Identifier Name,
 
   UnresolvedTypeList.push_back(TAD);
   TypeScopeHT.insertIntoScope(S, Name, TypeScopeEntry(TAD, 0));
-  return TAD;
-}
-
-/// lookupOrInsertTypeName - This is the same as lookupOrInsertTypeNameDecl,
-/// but returns the alias as a type.
-Type ScopeInfo::lookupOrInsertTypeName(Identifier Name, SourceLoc Loc) {
-  return lookupOrInsertTypeNameDecl(Name, Loc)->getAliasType();
+  return TAD->getAliasType();
 }
 
 

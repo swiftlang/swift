@@ -72,13 +72,9 @@ public:
     return Res.second;
   }
 
-  /// lookupOrInsertTypeNameDecl - Perform a lexical scope lookup for the
+  /// lookupOrInsertTypeName - Perform a lexical scope lookup for the
   /// specified name in a type context, returning the decl if found or
   /// installing and returning a new Unresolved one if not.
-  TypeAliasDecl *lookupOrInsertTypeNameDecl(Identifier Name, SourceLoc Loc);
-
-  /// lookupOrInsertTypeName - This is the same as lookupOrInsertTypeNameDecl,
-  /// but returns the alias as a type.
   Type lookupOrInsertTypeName(Identifier Name, SourceLoc Loc);
 
   /// lookupTypeNameAndLevel - Lookup the specified type name, returning the
