@@ -44,10 +44,12 @@ public:
     : DiverseStackImpl<T>(other, InlineStorage + InlineCapacity) {}
   DiverseStack(const DiverseStackImpl<T> &other)
     : DiverseStackImpl<T>(other, InlineStorage + InlineCapacity) {}
+#if 0
   DiverseStack(DiverseStack<T, InlineCapacity> &&other)
     : DiverseStackImpl<T>(std::move(other), InlineStorage + InlineCapacity) {}
   DiverseStack(DiverseStackImpl<T> &&other)
     : DiverseStackImpl<T>(std::move(other), InlineStorage + InlineCapacity) {}
+#endif
 };
 
 /// A base class for DiverseStackImpl.
@@ -129,7 +131,7 @@ protected:
     initialize(end);
     copyFrom(other);
   }
-
+#if 0
   DiverseStackImpl(DiverseStackImpl<T> &&other, char *end) {
     // If the other is allocated inline, just initialize and copy.
     if (other.isAllocatedInline()) {
@@ -145,6 +147,8 @@ protected:
     other.Begin = other.End = other.Allocated = (char*) (&other + 1);
     assert(other.isAllocatedInline());
   }
+  
+#endif
 
 public:
   ~DiverseStackImpl() {

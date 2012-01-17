@@ -43,6 +43,7 @@ namespace swift {
     BuiltinFloat,
     Dependent,
     NameAlias,
+    DottedName,
     Paren,
     Tuple,
     OneOf,
@@ -242,6 +243,10 @@ class NameAliasType : public TypeBase {
 public:
   TypeAliasDecl *const TheDecl;
    
+  /// getDesugaredType - If this type is a sugared type, remove all levels of
+  /// sugar until we get down to a non-sugar type.
+  TypeBase *getDesugaredType();
+
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
@@ -251,18 +256,68 @@ public:
   }
 };
 
+    
+/// DottedNameType - A reference to a type through a dotted name, like a.b.c,
+/// where each dotted name is resolved during name binding.  These are never
+/// canonical and never uniqued.
+class DottedNameType : public TypeBase {
+public:
+  class Component {
+  public:
+    SourceLoc Loc;
+    Identifier Id;
+    // TODO: PointerUnion of a type, module, etc that this component refers to.
+    Type Value;
+    Component(SourceLoc Loc, Identifier Id) : Loc(Loc), Id(Id) {}
+  };
+  
+private:
+  // DottedNameType are never canonical.
+  DottedNameType(ArrayRef<Component> Components)
+    : TypeBase(TypeKind::DottedName), Components(Components) {}
+public:
+  
+  // The components that make this up.
+  ArrayRef<Component> Components;
+
+  
+  /// getNew - Return a new DottedNameType with the specified Component
+  /// information.
+  static DottedNameType *getNew(ASTContext &C, ArrayRef<Component> Components);
+
+  /// getMappedType - After name binding is complete, this indicates what type
+  /// this refers to (without removing any other sugar).
+  Type getMappedType();
+  
+  /// getDesugaredType - If this type is a sugared type, remove all levels of
+  /// sugar until we get down to a non-sugar type.
+  TypeBase *getDesugaredType();
+
+  void print(raw_ostream &OS) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const DottedNameType *) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->Kind == TypeKind::DottedName;
+  }
+};
+
 /// ParenType - A paren type is a type that's been written in parentheses.
 class ParenType : public TypeBase {
   Type UnderlyingType;
 
   friend class ASTContext;
-  ParenType(Type underlying)
-    : TypeBase(TypeKind::Paren), UnderlyingType(underlying) {}
+  ParenType(Type UnderlyingType)
+    : TypeBase(TypeKind::Paren), UnderlyingType(UnderlyingType) {}
 public:
   Type getUnderlyingType() const { return UnderlyingType; }
 
   static ParenType *get(ASTContext &C, Type underlying);
    
+  /// getDesugaredType - If this type is a sugared type, remove all levels of
+  /// sugar until we get down to a non-sugar type.
+  TypeBase *getDesugaredType();
+
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.

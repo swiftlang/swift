@@ -64,8 +64,10 @@ TypeBase *TypeBase::getCanonicalType() {
     Result = cast<ParenType>(this)->getUnderlyingType()->getCanonicalType();
     break;
   case TypeKind::NameAlias:
-    Result = cast<NameAliasType>(this)->
-                  getDesugaredType()->getCanonicalType();
+    Result = cast<NameAliasType>(this)->getDesugaredType()->getCanonicalType();
+    break;
+  case TypeKind::DottedName:
+    Result = cast<DottedNameType>(this)->getDesugaredType()->getCanonicalType();
     break;
   case TypeKind::Tuple: {
     SmallVector<TupleTypeElt, 8> CanElts;
@@ -120,28 +122,47 @@ TypeBase *TypeBase::getDesugaredType() {
     // None of these types have sugar at the outer level.
     return this;
   case TypeKind::Paren:
-    return cast<ParenType>(this)->getUnderlyingType()->getDesugaredType();
+    return cast<ParenType>(this)->getDesugaredType();
+  case TypeKind::DottedName:
+    return cast<DottedNameType>(this)->getDesugaredType();
   case TypeKind::NameAlias:
-    return cast<NameAliasType>(this)->TheDecl->getUnderlyingType()
-             ->getDesugaredType();
+    return cast<NameAliasType>(this)->getDesugaredType();
   }
 
   llvm_unreachable("Unknown type kind");
 }
 
+TypeBase *ParenType::getDesugaredType() {
+  return getUnderlyingType()->getDesugaredType();
+}
+
+TypeBase *NameAliasType::getDesugaredType() {
+  return TheDecl->getUnderlyingType()->getDesugaredType();
+}
+
+TypeBase *DottedNameType::getDesugaredType() {
+  return getMappedType()->getDesugaredType();
+}
+
+
 const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {
   switch (getFPKind()) {
-    case BuiltinFloatType::IEEE16:  return APFloat::IEEEhalf;
-    case BuiltinFloatType::IEEE32:  return APFloat::IEEEsingle;
-    case BuiltinFloatType::IEEE64:  return APFloat::IEEEdouble;
-    case BuiltinFloatType::IEEE80:  return APFloat::x87DoubleExtended;
-    case BuiltinFloatType::IEEE128: return APFloat::IEEEquad;
-    case BuiltinFloatType::PPC128:  return APFloat::PPCDoubleDouble;
+  case BuiltinFloatType::IEEE16:  return APFloat::IEEEhalf;
+  case BuiltinFloatType::IEEE32:  return APFloat::IEEEsingle;
+  case BuiltinFloatType::IEEE64:  return APFloat::IEEEdouble;
+  case BuiltinFloatType::IEEE80:  return APFloat::x87DoubleExtended;
+  case BuiltinFloatType::IEEE128: return APFloat::IEEEquad;
+  case BuiltinFloatType::PPC128:  return APFloat::PPCDoubleDouble;
   }
   assert(0 && "Unknown FP semantics");
   return APFloat::IEEEhalf;
 }
 
+Type DottedNameType::getMappedType() {
+  assert(!Components.back().Value.isNull() &&
+         "Name binding haven't resolved this to a type yet");
+  return Components.back().Value;
+}
 
 /// hasAnyDefaultValues - Return true if any of our elements has a default
 /// value.
@@ -270,6 +291,7 @@ void TypeBase::print(raw_ostream &OS) const {
     return cast<BuiltinIntegerType>(this)->print(OS);
   case TypeKind::Paren:         return cast<ParenType>(this)->print(OS);
   case TypeKind::NameAlias:     return cast<NameAliasType>(this)->print(OS);
+  case TypeKind::DottedName:    return cast<DottedNameType>(this)->print(OS);
   case TypeKind::OneOf:         return cast<OneOfType>(this)->print(OS);
   case TypeKind::MetaType:      return cast<MetaTypeType>(this)->print(OS);
   case TypeKind::Module:        return cast<ModuleType>(this)->print(OS);
@@ -311,6 +333,13 @@ void ParenType::print(raw_ostream &OS) const {
 
 void NameAliasType::print(raw_ostream &OS) const {
   OS << TheDecl->getName().get();
+}
+
+void DottedNameType::print(raw_ostream &OS) const {
+  OS << Components[0].Id.get();
+
+  for (const Component &C : Components.slice(1, Components.size()-1))
+    OS << '.' << C.Id.get();
 }
 
 void OneOfType::print(raw_ostream &OS) const {

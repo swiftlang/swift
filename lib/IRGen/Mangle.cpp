@@ -204,14 +204,12 @@ void Mangler::mangleType(Type type) {
     Buffer << "i" << cast<BuiltinIntegerType>(type)->getBitWidth();
     return;
 
-  case TypeKind::NameAlias: {
-    TypeAliasDecl *alias = cast<NameAliasType>(base)->TheDecl;
-    mangleType(alias->getUnderlyingType());
-    return;
-  }
+  case TypeKind::NameAlias:
+    return mangleType(cast<NameAliasType>(base)->TheDecl->getUnderlyingType());
+  case TypeKind::DottedName:
+    return mangleType(cast<DottedNameType>(base)->getMappedType());
   case TypeKind::Paren:
-    mangleType(cast<ParenType>(base)->getUnderlyingType());
-    return;
+    return mangleType(cast<ParenType>(base)->getUnderlyingType());
 
   case TypeKind::Tuple: {
     TupleType *tuple = cast<TupleType>(base);

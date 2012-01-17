@@ -191,6 +191,13 @@ OneOfType::OneOfType(SourceLoc OneOfLoc, ArrayRef<OneOfElementDecl*> Elts,
     OneOfLoc(OneOfLoc), Elements(Elts), TheDecl(TheDecl) {
 }
 
+DottedNameType *DottedNameType::getNew(ASTContext &C,
+                                       ArrayRef<Component> Components) {
+  Components = C.AllocateCopy(Components);
+  return new (C) DottedNameType(Components);
+}
+
+
 MetaTypeType *MetaTypeType::get(TypeAliasDecl *Type) {
   ASTContext &C = Type->getASTContext();
 
