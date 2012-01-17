@@ -73,7 +73,7 @@ TranslationUnit *Parser::parseTranslationUnit() {
   // Verify that any forward declared types were ultimately defined.
   // TODO: Move this to name binding!
   SmallVector<TypeAliasDecl*, 8> UnresolvedTypeList;
-  for (TypeAliasDecl *Decl : ScopeInfo.getUnresolvedTypeList()) {
+  for (TypeAliasDecl *Decl : UnresolvedTypeNames) {
     if (!Decl->hasUnderlyingType())
       UnresolvedTypeList.push_back(Decl);
   }
@@ -81,6 +81,9 @@ TranslationUnit *Parser::parseTranslationUnit() {
   TU->setUnresolvedTypes(Context.AllocateCopy(UnresolvedTypeList));
   TU->setUnresolvedDottedTypes(
                   Context.AllocateCopy<DottedNameType*>(UnresolvedDottedTypes));
+
+  UnresolvedTypeNames.clear();
+  UnresolvedDottedTypes.clear();
 
   // Note that the translation unit is fully parsed and verify it.
   TU->ASTStage = TranslationUnit::Parsed;

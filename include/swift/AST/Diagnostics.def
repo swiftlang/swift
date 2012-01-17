@@ -152,13 +152,16 @@ ERROR(expected_type,type_parsing,none,
       "expected type", ())
 ERROR(type_redefinition,type_parsing,none,
       "redefinition of type %0", (Identifier))
+ERROR(expected_initializer_expr,expr_parsing,none,
+      "expected initializer expression after '='", ())
+
+// Named types
 ERROR(expected_identifier_in_dotted_type,expr_parsing,none,
       "expected identifier in dotted type", ())
 ERROR(expected_identifier_for_type,expr_parsing,none,
       "expected identifier for type name", ())
-
-ERROR(expected_initializer_expr,expr_parsing,none,
-      "expected initializer expression after '='", ())
+ERROR(named_definition_isnt_type,expr_parsing,none,
+      "%0 does not name a type", (Identifier))
 
 // Function types
 ERROR(expected_type_function_result,type_parsing,none,

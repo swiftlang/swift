@@ -37,6 +37,7 @@ Scope::Scope(Parser *P) : SI(P->ScopeInfo), ValueHTScope(SI.ValueScopeHT),
 // ScopeInfo Implementation
 //===----------------------------------------------------------------------===//
 
+#if 0
 /// lookupOrInsertTypeName - Perform a lexical scope lookup for the
 /// specified name in a type context, returning the decl if found or
 /// installing and returning a new Unresolved one if not.
@@ -60,6 +61,7 @@ Type ScopeInfo::lookupOrInsertTypeName(Identifier Name, SourceLoc Loc) {
   TypeScopeHT.insertIntoScope(S, Name, TypeScopeEntry(TAD, 0));
   return TAD->getAliasType();
 }
+#endif
 
 
 static void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New, Parser &P) {
@@ -125,8 +127,15 @@ void ScopeInfo::addToScope(ValueDecl *D) {
 /// redefinitions as required.
 TypeAliasDecl *ScopeInfo::addTypeAliasToScope(SourceLoc TypeAliasLoc,
                                               Identifier Name, Type Ty) {
-  unsigned Level;
-  TypeAliasDecl *TAD = lookupTypeNameAndLevel(Name, Level);
+  unsigned Level = 0;
+  TypeAliasDecl *TAD = 0;
+   
+  auto Entry = TypeScopeHT.begin(Name);
+  if (Entry != TypeScopeHT.end()) {
+    Level = Entry->Level;
+    TAD = Entry->Decl;
+  }
+
   bool isRedefinition = false;
   
   // If we have a previous "declaration" (really just a use of an undeclared

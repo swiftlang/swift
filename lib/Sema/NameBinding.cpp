@@ -206,7 +206,8 @@ bool NameBinder::resolveDottedNameType(DottedNameType *DNT) {
     
       // If we still don't have anything, we fail.
       if (Components[0].Value.isNull()) {
-        diagnose(Loc, diag::unknown_name_in_type, Name)
+        diagnose(Loc, DNT->Components.size() == 1 ? 
+                   diag::use_undeclared_type : diag::unknown_name_in_type, Name)
           << SourceRange(Loc, DNT->Components.back().Loc);
         return true;
       }

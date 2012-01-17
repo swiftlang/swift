@@ -50,19 +50,10 @@ private:
   TypeScopeHTTy TypeScopeHT;
   Scope *CurScope;
 
-  /// UnresolvedTypeList - The list of all types which were unresolved
-  /// at some point and that, at some point during being unresolved,
-  /// were used in a way that absolutely requires a type.
-  SmallVector<TypeAliasDecl*, 8> UnresolvedTypeList;
-
 public:
   ScopeInfo(Parser &TheParser) : TheParser(TheParser), CurScope(0) {}
   ~ScopeInfo() {}
   
-  const SmallVectorImpl<TypeAliasDecl*> &getUnresolvedTypeList() const { 
-    return UnresolvedTypeList;
-  }
-
   ValueDecl *lookupValueName(Identifier Name) {
     // If we found nothing, or we found a decl at the top-level, return nothing.
     // We ignore results at the top-level because we may have overloading that
@@ -70,21 +61,6 @@ public:
     std::pair<unsigned, ValueDecl*> Res = ValueScopeHT.lookup(Name);
     if (Res.first == 0) return 0;
     return Res.second;
-  }
-
-  /// lookupOrInsertTypeName - Perform a lexical scope lookup for the
-  /// specified name in a type context, returning the decl if found or
-  /// installing and returning a new Unresolved one if not.
-  Type lookupOrInsertTypeName(Identifier Name, SourceLoc Loc);
-
-  /// lookupTypeNameAndLevel - Lookup the specified type name, returning the
-  /// level it is at as well.
-  TypeAliasDecl *lookupTypeNameAndLevel(Identifier Name, unsigned &Level) {
-    auto Entry = TypeScopeHT.begin(Name);
-    if (Entry == TypeScopeHT.end())
-      return 0;
-    Level = Entry->Level;
-    return Entry->Decl;
   }
 
   /// addToScope - Register the specified decl as being in the current lexical

@@ -108,18 +108,30 @@ bool Parser::parseTypeIdentifier(Type &Result) {
     Components.push_back(DottedNameType::Component(Loc, Name));
   }
 
-  // If there is only a single identifier, handle it as a normal unqualified
-  // type reference.
-  if (Components.size() == 1) {
-    Result = ScopeInfo.lookupOrInsertTypeName(Components[0].Id,
-                                              Components[0].Loc);
-    return false;
-  }
-  
   // Otherwise, this is a qualified lookup.  Lookup element #0 through our
   // current scope chains in case it is some thing local (this returns null if
   // nothing is found).
   Components[0].Value = ScopeInfo.lookupValueName(Components[0].Id);
+
+  // If there is only a single identifier and we had a hit, return the looked up
+  // type.
+  if (Components.size() == 1 && !Components[0].Value.isNull()) {
+    ValueDecl *VD = Components[0].Value.get<ValueDecl*>();
+    
+    // If we found something, and it is a TypeAlias, use it.
+    if (auto TAD = dyn_cast<TypeAliasDecl>(VD)) {
+      Result = TAD->getAliasType();
+      return false;
+    }
+      
+    // Otherwise we're using a value in a type context.  Diagnose the error.
+    diagnose(Components[0].Loc, diag::named_definition_isnt_type,
+             Components[0].Id);
+    diagnose(VD->getLocStart(), diag::found_candidate);
+    Result = Context.TheErrorType;
+    return false;  // Sema error, not a parse error.
+  }
+  
   auto Ty = DottedNameType::getNew(Context, Components);
   UnresolvedDottedTypes.push_back(Ty);
   Result = Ty;
