@@ -25,8 +25,11 @@
 using namespace swift;
 using namespace irgen;
 
-IRGenFunction::IRGenFunction(IRGenModule &IGM, FuncExpr *FE, llvm::Function *Fn)
-  : IGM(IGM), Builder(IGM.getLLVMContext()), CurFuncExpr(FE), CurFn(Fn) {
+IRGenFunction::IRGenFunction(IRGenModule &IGM, FuncExpr *FE,
+                             ExplosionKind explosionLevel,
+                             unsigned uncurryLevel, llvm::Function *Fn)
+  : IGM(IGM), Builder(IGM.getLLVMContext()), CurFuncExpr(FE), CurFn(Fn),
+    CurExplosionLevel(explosionLevel), CurUncurryLevel(uncurryLevel) {
   emitPrologue();
 }
 

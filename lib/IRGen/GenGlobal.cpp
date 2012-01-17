@@ -66,7 +66,8 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit) {
                 nullptr, tunit);
 
   llvm::Function *fn = createGlobalInitFunction(*this, tunit);
-  IRGenFunction(*this, &func, fn).emitGlobalTopLevel(tunit->Body);
+  IRGenFunction(*this, &func, ExplosionKind::Minimal, /*uncurry*/ 0, fn)
+    .emitGlobalTopLevel(tunit->Body);
 
   // Not all translation units need a global initialization function.
   if (isTrivialGlobalInit(fn)) {

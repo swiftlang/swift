@@ -53,6 +53,7 @@ namespace swift {
 namespace irgen {
   class Condition;
   class Explosion;
+  enum class ExplosionKind : unsigned;
   class IRGenModule;
   class JumpDest;
   class LValue;
@@ -68,8 +69,11 @@ public:
 
   FuncExpr *CurFuncExpr;
   llvm::Function *CurFn;
+  ExplosionKind CurExplosionLevel;
+  unsigned CurUncurryLevel;
 
-  IRGenFunction(IRGenModule &IGM, FuncExpr *FE, llvm::Function *Fn);
+  IRGenFunction(IRGenModule &IGM, FuncExpr *FE, ExplosionKind explosion,
+                unsigned uncurryLevel, llvm::Function *fn);
   ~IRGenFunction();
 
   void unimplemented(SourceLoc Loc, StringRef Message);
@@ -88,6 +92,7 @@ private:
   Address ReturnSlot;
   llvm::BasicBlock *ReturnBB;
   JumpDest getReturnDest();
+  const TypeInfo &getResultTypeInfo() const;
 
 //--- Helper methods -----------------------------------------------------------
 public:

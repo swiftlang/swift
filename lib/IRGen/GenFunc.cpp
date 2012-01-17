@@ -95,6 +95,20 @@ static unsigned getNaturalUncurryLevel(FuncDecl *func) {
   return count - 1;
 }
 
+/// Given a function type, return the formal result type at the given
+/// uncurrying level.  For 'a -> b -> c', this is 'b' at 0 and 'c' at 1.
+static Type getResultType(Type type, unsigned uncurryLevel) {
+  do {
+    type = type->castTo<FunctionType>()->Result;
+  } while (uncurryLevel--);
+  return type;
+}
+
+const TypeInfo &IRGenFunction::getResultTypeInfo() const {
+  Type resultType = getResultType(CurFuncExpr->getType(), CurUncurryLevel);
+  return IGM.getFragileTypeInfo(resultType);
+}
+
 namespace {
   /// A signature represents something which can actually be called.
   class Signature {
@@ -770,7 +784,7 @@ void IRGenFunction::emitPrologue() {
   CurFn->getBasicBlockList().push_back(ReturnBB);
 
   // Copy over the arguments as an Explosion.
-  Explosion args(ExplosionKind::Minimal);
+  Explosion args(CurExplosionLevel);
   for (auto i = CurFn->arg_begin(), e = CurFn->arg_end(); i != e; ++i) {
     args.add(i);
   }
@@ -778,12 +792,9 @@ void IRGenFunction::emitPrologue() {
   // Set up the return slot, stealing the first argument if necessary.
   {
     // Find the 'code' result type of this function.
-    FunctionType *fnType = CurFuncExpr->getType()->castTo<FunctionType>();
-    while (FunctionType *fnResult = dyn_cast<FunctionType>(fnType->Result))
-      fnType = fnResult;
-    const TypeInfo &resultType = IGM.getFragileTypeInfo(fnType->Result);
+    const TypeInfo &resultType = getResultTypeInfo();
 
-    ExplosionSchema resultSchema(args.getKind());
+    ExplosionSchema resultSchema(CurExplosionLevel);
     resultType.getExplosionSchema(resultSchema);
 
     if (requiresAggregateResult(resultSchema)) {
@@ -865,26 +876,26 @@ void IRGenFunction::emitEpilogue() {
     Builder.SetInsertPoint(ReturnBB);
   }
 
-  FunctionType *FnTy = CurFuncExpr->getType()->castTo<FunctionType>();
-  assert(FnTy && "emitting a declaration that's not a function?");
+  const TypeInfo &resultType = getResultTypeInfo();
+  ExplosionSchema resultSchema(CurExplosionLevel);
+  resultType.getExplosionSchema(resultSchema);
 
-  const TypeInfo &resultType = IGM.getFragileTypeInfo(FnTy->Result);
-  RValueSchema resultSchema = resultType.getSchema();
-  if (resultSchema.isAggregate()) {
+  if (requiresAggregateResult(resultSchema)) {
     assert(isa<llvm::Argument>(ReturnSlot.getAddress()));
     Builder.CreateRetVoid();
-  } else if (resultSchema.isScalar(0)) {
+  } else if (resultSchema.empty()) {
     assert(!ReturnSlot.isValid());
     Builder.CreateRetVoid();
   } else {
-    RValue RV = resultType.load(*this, ReturnSlot);
-    if (RV.isScalar(1)) {
-      Builder.CreateRet(RV.getScalars()[0]);
+    Explosion result(CurExplosionLevel);
+    resultType.loadExplosion(*this, ReturnSlot, result);
+    if (result.size() == 1) {
+      Builder.CreateRet(result.claimNext());
     } else {
-      llvm::Value *Result = llvm::UndefValue::get(CurFn->getReturnType());
-      for (unsigned I = 0, E = RV.getScalars().size(); I != E; ++I)
-        Result = Builder.CreateInsertValue(Result, RV.getScalars()[I], I);
-      Builder.CreateRet(Result);
+      llvm::Value *resultAgg = llvm::UndefValue::get(CurFn->getReturnType());
+      for (unsigned i = 0, e = result.size(); i != e; ++i)
+        resultAgg = Builder.CreateInsertValue(resultAgg, result.claimNext(), i);
+      Builder.CreateRet(resultAgg);
     }
   }
 }
@@ -896,12 +907,15 @@ void IRGenModule::emitGlobalFunction(FuncDecl *func) {
 
   // FIXME: variant currying levels!
   // FIXME: also emit entrypoints with maximal explosion when all types are known!
+  unsigned uncurryLevel = getNaturalUncurryLevel(func);
+  ExplosionKind explosionLevel = ExplosionKind::Minimal;
 
-  llvm::Function *addr = getAddrOfGlobalFunction(func, ExplosionKind::Minimal,
-                                                 getNaturalUncurryLevel(func));
+  llvm::Function *addr =
+    getAddrOfGlobalFunction(func, explosionLevel, uncurryLevel);
 
   FuncExpr *funcExpr = cast<FuncExpr>(func->getInit());
-  IRGenFunction(*this, funcExpr, addr).emitFunctionTopLevel(funcExpr->getBody());
+  IRGenFunction(*this, funcExpr, explosionLevel, uncurryLevel, addr)
+    .emitFunctionTopLevel(funcExpr->getBody());
 }
 
 void IRGenFunction::emitFunctionTopLevel(BraceStmt *S) {

@@ -24,6 +24,7 @@
 
 #include "IRGenModule.h"
 #include "Linking.h"
+#include "IRGen.h"
 
 using namespace swift;
 using namespace irgen;
@@ -58,7 +59,7 @@ namespace {
   public:
     Mangler(raw_ostream &buffer) : Buffer(buffer) {}
     void mangleDeclName(NamedDecl *decl);
-    void mangleType(Type type);
+    void mangleType(Type type, ExplosionKind kind, unsigned uncurryingLevel);
 
   private:
     void mangleDeclContext(DeclContext *ctx);
@@ -151,7 +152,8 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
 
   case DeclContextKind::ExtensionDecl:
     // Mandle the extension as the original type.
-    mangleType(cast<ExtensionDecl>(ctx)->getExtendedType());
+    mangleType(cast<ExtensionDecl>(ctx)->getExtendedType(),
+               ExplosionKind::Minimal, 0);
     return;
 
   case DeclContextKind::FuncExpr:
@@ -174,7 +176,8 @@ void Mangler::mangleDeclName(NamedDecl *decl) {
 }
 
 /// Mangle a type into the buffer.
-void Mangler::mangleType(Type type) {
+void Mangler::mangleType(Type type, ExplosionKind explosion,
+                         unsigned uncurryLevel) {
   TypeBase *base = type.getPointer();
 
   switch (base->Kind) {
@@ -197,33 +200,32 @@ void Mangler::mangleType(Type type) {
     case BuiltinFloatType::IEEE64: Buffer << "f64"; return;
     case BuiltinFloatType::IEEE80: Buffer << "f80"; return;
     case BuiltinFloatType::IEEE128: Buffer << "f128"; return;
-    case BuiltinFloatType::PPC128: assert(0 && "Unimplemented");
+    case BuiltinFloatType::PPC128: llvm_unreachable("ppc128 not supported");
     }
-    assert(0 && "Unreachable");
+    llvm_unreachable("bad floating-point kind");
   case TypeKind::BuiltinInteger:
     Buffer << "i" << cast<BuiltinIntegerType>(type)->getBitWidth();
     return;
 
   case TypeKind::NameAlias:
-    return mangleType(cast<NameAliasType>(base)->TheDecl->getUnderlyingType());
+    return mangleType(cast<NameAliasType>(base)->TheDecl->getUnderlyingType(),
+                      explosion, uncurryLevel);
   case TypeKind::DottedName:
-    return mangleType(cast<DottedNameType>(base)->getMappedType());
+    return mangleType(cast<DottedNameType>(base)->getMappedType(),
+                      explosion, uncurryLevel);
   case TypeKind::Paren:
-    return mangleType(cast<ParenType>(base)->getUnderlyingType());
+    return mangleType(cast<ParenType>(base)->getUnderlyingType(),
+                      explosion, uncurryLevel);
 
   case TypeKind::Tuple: {
     TupleType *tuple = cast<TupleType>(base);
-    // Look through simple parentheses.
-    if (tuple->Fields.size() == 1 && tuple->Fields[0].Name.empty())
-      return mangleType(tuple->Fields[0].Ty);
-
     // type ::= 'T' tuple-field+ '_'
     // tuple-field ::= identifier? type
     Buffer << 'T';
     for (auto &field : tuple->Fields) {
       if (!field.Name.empty())
         mangleIdentifier(field.Name);
-      mangleType(field.Ty);
+      mangleType(field.Ty, explosion, 0);
     }
     Buffer << '_';
     return;
@@ -244,11 +246,13 @@ void Mangler::mangleType(Type type) {
   }
 
   case TypeKind::Function: {
-    // type ::= 'F' type type
+    // type ::= 'F' type type (curried)
+    // type ::= 'f' type type (uncurried)
     FunctionType *fn = cast<FunctionType>(base);
-    Buffer << 'F';
-    mangleType(fn->Input);
-    mangleType(fn->Result);
+    Buffer << (uncurryLevel > 0 ? 'f' : 'F');
+    mangleType(fn->Input, explosion, 0);
+    mangleType(fn->Result, explosion,
+               (uncurryLevel > 0 ? uncurryLevel - 1 : 0));
     return;
   }
 
@@ -257,7 +261,7 @@ void Mangler::mangleType(Type type) {
     ArrayType *array = cast<ArrayType>(base);
     Buffer << 'A';
     Buffer << array->Size;
-    mangleType(array->Base);
+    mangleType(array->Base, ExplosionKind::Minimal, 0);
     return;
   };
 
@@ -304,7 +308,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   // moment they can *all* be overloaded.
   if (ValueDecl *valueDecl = dyn_cast<ValueDecl>(TheDecl))
     if (!isa<TypeAliasDecl>(TheDecl))
-      mangler.mangleType(valueDecl->getType());
+      mangler.mangleType(valueDecl->getType(), Explosion, UncurryLevel);
 
   // TODO: mangle generics information here.
 }
