@@ -37,25 +37,16 @@ Scope::Scope(Parser *P) : SI(P->ScopeInfo), ValueHTScope(SI.ValueScopeHT),
 // ScopeInfo Implementation
 //===----------------------------------------------------------------------===//
 
-TypeAliasDecl *ScopeInfo::lookupScopeName(Identifier Name, SourceLoc Loc) {
-  return lookupTypeNameInternal(Name, Loc, /*as type*/ false);
-}
-
 /// lookupOrInsertTypeNameDecl - Perform a lexical scope lookup for the
 /// specified name in a type context, returning the decl if found or
 /// installing and returning a new Unresolved one if not.
 TypeAliasDecl *ScopeInfo::lookupOrInsertTypeNameDecl(Identifier Name,
                                                      SourceLoc Loc) {
-  return lookupTypeNameInternal(Name, Loc, /*as type*/ true);
-}
-
-TypeAliasDecl *ScopeInfo::lookupTypeNameInternal(Identifier Name, SourceLoc Loc,
-                                                 bool AsType) {
   // Check whether we already have an entry for this name.
   auto I = TypeScopeHT.begin(Name);
   if (I != TypeScopeHT.end()) {
     TypeScopeEntry &Entry = *I;
-    if (AsType && !Entry.IsUsedAsType) {
+    if (!Entry.IsUsedAsType) {
       Entry.IsUsedAsType = true;
       UnresolvedTypeList.push_back(Entry.Decl);
     }
@@ -72,10 +63,8 @@ TypeAliasDecl *ScopeInfo::lookupTypeNameInternal(Identifier Name, SourceLoc Loc,
   while (S->getParentScope())
     S = S->getParentScope();
 
-  if (AsType)
-    UnresolvedTypeList.push_back(TAD);
-
-  TypeScopeHT.insertIntoScope(S, Name, TypeScopeEntry(TAD, 0, AsType));
+  UnresolvedTypeList.push_back(TAD);
+  TypeScopeHT.insertIntoScope(S, Name, TypeScopeEntry(TAD, 0, true));
   return TAD;
 }
 
@@ -83,16 +72,6 @@ TypeAliasDecl *ScopeInfo::lookupTypeNameInternal(Identifier Name, SourceLoc Loc,
 /// but returns the alias as a type.
 Type ScopeInfo::lookupOrInsertTypeName(Identifier Name, SourceLoc Loc) {
   return lookupOrInsertTypeNameDecl(Name, Loc)->getAliasType();
-}
-
-Type ScopeInfo::getQualifiedTypeName(Identifier BaseName, SourceLoc BaseNameLoc,
-                                     Identifier Name, SourceLoc NameLoc) {
-  TypeAliasDecl *BaseType = lookupScopeName(BaseName, BaseNameLoc);
-  TypeAliasDecl *NestedType =
-    new (TheParser.Context) TypeAliasDecl(NameLoc, Name, Type(),
-                                          TheParser.CurDeclContext);
-  UnresolvedScopedTypeList.push_back(std::make_pair(BaseType, NestedType));
-  return NestedType->getAliasType();
 }
 
 

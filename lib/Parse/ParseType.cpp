@@ -123,9 +123,6 @@ bool Parser::parseTypeIdentifier(Type &Result) {
   auto Ty = DottedNameType::getNew(Context, Components);
   UnresolvedDottedTypes.push_back(Ty);
   Result = Ty;
-#if 0
-  Result = ScopeInfo.getQualifiedTypeName(Name, NameLoc, Name2, Loc2);
-#endif
   return false;
 }
 

@@ -57,24 +57,12 @@ private:
   /// were used in a way that absolutely requires a type.
   SmallVector<TypeAliasDecl*, 8> UnresolvedTypeList;
 
-  /// UnresolvedScopedTypeList - The list of all scope-qualified types
-  /// which couldn't be resolved.
-  SmallVector<std::pair<TypeAliasDecl*, TypeAliasDecl*>, 8>
-    UnresolvedScopedTypeList;
-
-  TypeAliasDecl *lookupTypeNameInternal(Identifier Name, SourceLoc Loc,
-                                        bool AsType);
 public:
   ScopeInfo(Parser &TheParser) : TheParser(TheParser), CurScope(0) {}
   ~ScopeInfo() {}
   
   const SmallVectorImpl<TypeAliasDecl*> &getUnresolvedTypeList() const { 
     return UnresolvedTypeList;
-  }
-
-  const SmallVectorImpl<std::pair<TypeAliasDecl*,TypeAliasDecl*> >&
-  getUnresolvedScopedTypeList() const {
-    return UnresolvedScopedTypeList;
   }
 
   ValueDecl *lookupValueName(Identifier Name) {
@@ -86,11 +74,6 @@ public:
     return Res.second;
   }
 
-  /// lookupScopeName - Perform a lexical scope lookup for the
-  /// specified name in a scope context, returning the decl if found or
-  /// a forward-declared type if not.
-  TypeAliasDecl *lookupScopeName(Identifier Name, SourceLoc Loc);
-  
   /// lookupOrInsertTypeNameDecl - Perform a lexical scope lookup for the
   /// specified name in a type context, returning the decl if found or
   /// installing and returning a new Unresolved one if not.
@@ -109,9 +92,6 @@ public:
     Level = Entry->Level;
     return Entry->Decl;
   }
-
-  Type getQualifiedTypeName(Identifier BaseName, SourceLoc BaseNameLoc,
-                            Identifier Name, SourceLoc NameLoc);
 
   /// addToScope - Register the specified decl as being in the current lexical
   /// scope.
