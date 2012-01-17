@@ -44,14 +44,8 @@ TypeAliasDecl *ScopeInfo::lookupOrInsertTypeNameDecl(Identifier Name,
                                                      SourceLoc Loc) {
   // Check whether we already have an entry for this name.
   auto I = TypeScopeHT.begin(Name);
-  if (I != TypeScopeHT.end()) {
-    TypeScopeEntry &Entry = *I;
-    if (!Entry.IsUsedAsType) {
-      Entry.IsUsedAsType = true;
-      UnresolvedTypeList.push_back(Entry.Decl);
-    }
-    return Entry.Decl;
-  }
+  if (I != TypeScopeHT.end())
+    return I->Decl;
 
   // If not, create a new tentative entry.
   TypeAliasDecl *TAD =
@@ -64,7 +58,7 @@ TypeAliasDecl *ScopeInfo::lookupOrInsertTypeNameDecl(Identifier Name,
     S = S->getParentScope();
 
   UnresolvedTypeList.push_back(TAD);
-  TypeScopeHT.insertIntoScope(S, Name, TypeScopeEntry(TAD, 0, true));
+  TypeScopeHT.insertIntoScope(S, Name, TypeScopeEntry(TAD, 0));
   return TAD;
 }
 
@@ -170,7 +164,7 @@ TypeAliasDecl *ScopeInfo::addTypeAliasToScope(SourceLoc TypeAliasLoc,
   if (isRedefinition) {
     // FIXME: TAD->setErroneous()
   } else {
-    TypeScopeHT.insert(Name, TypeScopeEntry(TAD, CurScope->getDepth(), true));
+    TypeScopeHT.insert(Name, TypeScopeEntry(TAD, CurScope->getDepth()));
   }
   return TAD;
 }

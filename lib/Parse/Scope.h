@@ -39,9 +39,7 @@ public:
   struct TypeScopeEntry {
     TypeAliasDecl *Decl;
     unsigned Level;
-    bool IsUsedAsType;
-    TypeScopeEntry(TypeAliasDecl *D, unsigned Level, bool IsUsedAsType)
-      : Decl(D), Level(Level), IsUsedAsType(IsUsedAsType) {}
+    TypeScopeEntry(TypeAliasDecl *D, unsigned Level) : Decl(D), Level(Level) {}
   };
   
   typedef llvm::ScopedHashTable<Identifier, ValueScopeEntry> ValueScopeHTTy;
