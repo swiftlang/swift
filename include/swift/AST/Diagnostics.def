@@ -365,12 +365,8 @@ ERROR(dotted_reference_not_type,sema_nb,none,
 
 ERROR(no_module_or_type,sema_nb,none,
       "no such module or type", ())
-ERROR(invalid_type_scoped_access,sema_nb,none,
-      "invalid type %0 for scoped access", (Identifier))
 ERROR(abiguous_type_base,sema_nb,none,
       "%0 is ambiguous for type look up in this context", (Identifier))
-ERROR(incomplete_or_empty_oneof,sema_nb,none,
-      "oneof %0 is not complete or has no elements", (Identifier))
 ERROR(invalid_member_type,sema_nb,none,
       "%0 is not a member type of %1", (Identifier, Identifier))
 ERROR(use_unresolved_identifier,sema_nb,none,

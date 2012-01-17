@@ -56,11 +56,6 @@ namespace {
     
     void addImport(ImportDecl *ID, SmallVectorImpl<ImportedModule> &Result);
 
-#if 0
-    BoundScope bindScopeName(TypeAliasDecl *TypeFromScope,
-                             Identifier Name, SourceLoc NameLoc);
-#endif
-
     /// resolveDottedNameType - Perform name binding for a DottedNameType,
     /// resolving it or diagnosing the error as appropriate and return true on
     /// failure.  On failure, this leaves DottedNameType alone, otherwise it
@@ -169,58 +164,6 @@ void NameBinder::addImport(ImportDecl *ID,
   Result.push_back(std::make_pair(Path.slice(1), M));
 }
 
-#if 0
-/// Try to bind an unqualified name into something usable as a scope.
-BoundScope NameBinder::bindScopeName(TypeAliasDecl *TypeFromScope,
-                                     Identifier Name, SourceLoc NameLoc) {
-  // Check whether the "optimistic" type from scope is still
-  // undefined.  If not, use that as the actual type; otherwise we'll
-  // need to do a lookup from the imports.
-  TypeAliasDecl *Type;
-  if (TypeFromScope->hasUnderlyingType()) {
-    Type = TypeFromScope;
-  } else {
-    Type = TU->lookupGlobalType(Name, NLKind::UnqualifiedLookup);
-  }
-
-  // If that failed, look for a module name.
-  if (!Type) {
-    for (const ImportedModule &ImpEntry : TU->ImportedModules)
-      if (ImpEntry.second->Name == Name)
-        return &ImpEntry;
-    
-    diagnose(NameLoc, diag::no_module_or_type);
-    return BoundScope();
-  }
-
-  // Otherwise, at least cache the type we found.
-  assert(Type->hasUnderlyingType());
-  if (!TypeFromScope->hasUnderlyingType()) {
-    TypeFromScope->setUnderlyingType(Type->getUnderlyingType());
-  }
-
-  // Try to convert that to a type scope.
-  TypeBase *Ty = Type->getUnderlyingType()->getCanonicalType();
-
-  // Silently fail if we have an error type.
-  if (isa<ErrorType>(Ty)) return BoundScope();
-    
-  // Reject things like int::x.
-  OneOfType *DT = dyn_cast<OneOfType>(Ty);
-  if (DT == 0) {
-    diagnose(NameLoc, diag::invalid_type_scoped_access, Name);
-    return BoundScope();
-  }
-    
-  if (DT->Elements.empty()) {
-    diagnose(NameLoc, diag::incomplete_or_empty_oneof, Name);
-    return BoundScope();
-  }
-
-  return DT;
-}
-#endif
-
 /// resolveDottedNameType - Perform name binding for a DottedNameType,
 /// resolving it or diagnosing the error as appropriate and return true on
 /// failure.  On failure, this leaves DottedNameType alone, otherwise it fills
@@ -308,30 +251,6 @@ bool NameBinder::resolveDottedNameType(DottedNameType *DNT) {
   diagnose(DNT->Components.back().Loc, diag::dotted_reference_not_type)
     << SourceRange(Components[0].Loc, DNT->Components.back().Loc);
   return true;
-#if 0
-  
-  BoundScope Scope = Binder.bindScopeName(BaseAndType.first,
-                                          BaseAndType.first->getName(),
-                                          BaseAndType.first->getTypeAliasLoc());
-  if (!Scope) continue;
-  
-  Identifier Name = BaseAndType.second->getName();
-  SourceLoc NameLoc = BaseAndType.second->getTypeAliasLoc();
-  
-  TypeAliasDecl *Alias = nullptr;
-  if (auto Module = Scope.dyn_cast<const ImportedModule*>())
-    Alias = Module->second->lookupType(Module->first, Name,
-                                       NLKind::QualifiedLookup);
-  
-  if (Alias) {
-    BaseAndType.second->setUnderlyingType(Alias->getAliasType());
-  } else {
-    Binder.diagnose(NameLoc, diag::invalid_member_type,
-                    Name, BaseAndType.first->getName());
-    BaseAndType.second->setUnderlyingType(Binder.Context.TheErrorType);
-  }
-#endif
-
 }
 
 
@@ -430,14 +349,14 @@ void swift::performNameBinding(TranslationUnit *TU) {
     Binder.diagnose(TA->getLocStart(), diag::use_undeclared_type,
                     TA->getName());
     
-    TA->setUnderlyingType(ErrorType::get(TU->Ctx));
+    TA->setUnderlyingType(TU->Ctx.TheErrorType);
   }
 
   // Loop over all the unresolved dotted types in the translation unit,
   // resolving them if possible.
   for (DottedNameType *DNT : TU->getUnresolvedDottedTypes()) {
     if (Binder.resolveDottedNameType(DNT)) {
-      TypeBase *Error = ErrorType::get(TU->getASTContext()).getPointer();
+      TypeBase *Error = TU->Ctx.TheErrorType.getPointer();
 
       // This DottedNameType resolved to the error type.
       for (auto &C : DNT->Components)
