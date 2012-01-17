@@ -447,7 +447,8 @@ TypeAliasDecl *Parser::parseDeclTypeAlias() {
       parseType(Ty, diag::expected_type_in_typealias))
     return 0;
 
-  TypeAliasDecl *TAD = ScopeInfo.addTypeAliasToScope(TypeAliasLoc, Id, Ty);
+  TypeAliasDecl *TAD =
+    new (Context) TypeAliasDecl(TypeAliasLoc, Id, Ty, CurDeclContext);
   ScopeInfo.addToScope(TAD);
   return TAD;
 }
@@ -682,7 +683,8 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
   if (parseIdentifier(OneOfName, diag::expected_identifier_in_decl, "oneof"))
     return true;
   
-  TypeAliasDecl *TAD = ScopeInfo.addTypeAliasToScope(NameLoc, OneOfName,Type());
+  TypeAliasDecl *TAD =
+    new (Context) TypeAliasDecl(NameLoc, OneOfName, Type(), CurDeclContext);
   Decls.push_back(TAD);
 
   SourceLoc LBLoc, RBLoc;
@@ -815,11 +817,10 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
       parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct))
     return true;
 
-  // Get the TypeAlias for the name that we'll eventually have.  This ensures
-  // that the constructors generated have the pretty name for the type instead
-  // of the raw oneof.
-  TypeAliasDecl *TAD = ScopeInfo.addTypeAliasToScope(StructLoc, StructName,
-                                                     Type());
+  // Get the TypeAlias for the name that we'll eventually have.
+  TypeAliasDecl *TAD =
+    new (Context) TypeAliasDecl(StructLoc, StructName, Type(), CurDeclContext);
+
   Type StructTy = TAD->getAliasType();
   
   // Parse elements of the body as a tuple body.
@@ -885,8 +886,8 @@ Decl *Parser::parseDeclProtocol() {
                       diag::expected_identifier_in_decl, "protocol"))
     return 0;
   
-  TypeAliasDecl *TAD = ScopeInfo.addTypeAliasToScope(NameLoc, ProtocolName,
-                                                     Type());
+  TypeAliasDecl *TAD =
+    new (Context) TypeAliasDecl(NameLoc, ProtocolName, Type(), CurDeclContext);
   if (parseProtocolBody(ProtocolLoc, Attributes, TAD))
     return 0;
   return TAD;

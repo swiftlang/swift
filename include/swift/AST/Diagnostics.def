@@ -150,8 +150,6 @@ ERROR(struct_unnamed_member,decl_parsing,none,
 
 ERROR(expected_type,type_parsing,none,
       "expected type", ())
-ERROR(type_redefinition,type_parsing,none,
-      "redefinition of type %0", (Identifier))
 ERROR(expected_initializer_expr,expr_parsing,none,
       "expected initializer expression after '='", ())
 

@@ -25,7 +25,7 @@ using namespace swift;
 //===----------------------------------------------------------------------===//
 
 Scope::Scope(Parser *P) : SI(P->ScopeInfo), ValueHTScope(SI.ValueScopeHT),
-                          TypeHTScope(SI.TypeScopeHT), PrevScope(SI.CurScope) {
+                          PrevScope(SI.CurScope) {
   if (SI.CurScope)
     Depth = SI.CurScope->Depth+1;
   else
@@ -36,33 +36,6 @@ Scope::Scope(Parser *P) : SI(P->ScopeInfo), ValueHTScope(SI.ValueScopeHT),
 //===----------------------------------------------------------------------===//
 // ScopeInfo Implementation
 //===----------------------------------------------------------------------===//
-
-#if 0
-/// lookupOrInsertTypeName - Perform a lexical scope lookup for the
-/// specified name in a type context, returning the decl if found or
-/// installing and returning a new Unresolved one if not.
-Type ScopeInfo::lookupOrInsertTypeName(Identifier Name, SourceLoc Loc) {
-  // Check whether we already have an entry for this name.
-  auto I = TypeScopeHT.begin(Name);
-  if (I != TypeScopeHT.end())
-    return I->Decl->getAliasType();
-
-  // If not, create a new tentative entry.
-  TypeAliasDecl *TAD =
-    new (TheParser.Context) TypeAliasDecl(Loc, Name, Type(),
-                                          TheParser.CurDeclContext);
-
-  llvm::ScopedHashTableScope<Identifier, TypeScopeEntry> *S =
-    TypeScopeHT.getCurScope();
-  while (S->getParentScope())
-    S = S->getParentScope();
-
-  UnresolvedTypeList.push_back(TAD);
-  TypeScopeHT.insertIntoScope(S, Name, TypeScopeEntry(TAD, 0));
-  return TAD->getAliasType();
-}
-#endif
-
 
 static void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New, Parser &P) {
   assert(New != Prev && "Cannot conflict with self");
@@ -121,52 +94,4 @@ void ScopeInfo::addToScope(ValueDecl *D) {
   }
   
   ValueScopeHT.insert(D->getName(), std::make_pair(CurScope->getDepth(), D));
-}
-
-/// addTypeAliasToScope - Add a type alias to the current scope, diagnosing
-/// redefinitions as required.
-TypeAliasDecl *ScopeInfo::addTypeAliasToScope(SourceLoc TypeAliasLoc,
-                                              Identifier Name, Type Ty) {
-  unsigned Level = 0;
-  TypeAliasDecl *TAD = 0;
-   
-  auto Entry = TypeScopeHT.begin(Name);
-  if (Entry != TypeScopeHT.end()) {
-    Level = Entry->Level;
-    TAD = Entry->Decl;
-  }
-
-  bool isRedefinition = false;
-  
-  // If we have a previous "declaration" (really just a use of an undeclared
-  // type) at this scope level, then complete it.
-  if (TAD && Level == CurScope->getDepth()) {
-    
-    if (!TAD->hasUnderlyingType()) {
-      // This will get removed from UnresolvedTypeList at the end of the TU.
-    
-      // Update the decl we already have to be the correct type.
-      TAD->setTypeAliasLoc(TypeAliasLoc);
-      TAD->setUnderlyingType(Ty);
-      return TAD;
-    }
-    
-    // Otherwise, we have a redefinition: two definitions in the same scope with
-    // the same name.
-    // FIXME: Pass the identifier through to be more specific.
-    TheParser.diagnose(TypeAliasLoc, diag::type_redefinition, Name);
-    TheParser.diagnose(TAD->getLocStart(), diag::previous_definition, Name);
-    isRedefinition = true;
-  }
-
-  // Create and return a new type.  Even in the case of our redefinition, the
-  // caller expects to be able to fill in the returned decl.
-  TAD = new (TheParser.Context) TypeAliasDecl(TypeAliasLoc, Name, Ty,
-                                              TheParser.CurDeclContext);
-  if (isRedefinition) {
-    // FIXME: TAD->setErroneous()
-  } else {
-    TypeScopeHT.insert(Name, TypeScopeEntry(TAD, CurScope->getDepth()));
-  }
-  return TAD;
 }

@@ -36,18 +36,11 @@ class ScopeInfo {
   friend class Scope;
 public:
   typedef std::pair<unsigned, ValueDecl*> ValueScopeEntry;
-  struct TypeScopeEntry {
-    TypeAliasDecl *Decl;
-    unsigned Level;
-    TypeScopeEntry(TypeAliasDecl *D, unsigned Level) : Decl(D), Level(Level) {}
-  };
   
   typedef llvm::ScopedHashTable<Identifier, ValueScopeEntry> ValueScopeHTTy;
-  typedef llvm::ScopedHashTable<Identifier, TypeScopeEntry> TypeScopeHTTy;
 private:
   Parser &TheParser;
   ValueScopeHTTy ValueScopeHT;
-  TypeScopeHTTy TypeScopeHT;
   Scope *CurScope;
 
 public:
@@ -66,11 +59,6 @@ public:
   /// addToScope - Register the specified decl as being in the current lexical
   /// scope.
   void addToScope(ValueDecl *D);  
-  
-  /// addTypeAliasToScope - Add a type alias to the current scope, diagnosing
-  /// redefinitions as required.
-  TypeAliasDecl *addTypeAliasToScope(SourceLoc TypeAliasLoc, Identifier Name,
-                                     Type Ty);
 };
 
 
@@ -84,7 +72,6 @@ class Scope {
   ScopeInfo &SI;
   llvm::ScopedHashTableScope<Identifier, 
                              ScopeInfo::ValueScopeEntry> ValueHTScope;
-  llvm::ScopedHashTableScope<Identifier, ScopeInfo::TypeScopeEntry> TypeHTScope;
 
   Scope *PrevScope;
   unsigned Depth;
