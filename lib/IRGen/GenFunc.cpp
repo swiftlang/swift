@@ -809,7 +809,7 @@ void IRGenFunction::emitPrologue() {
   }
 
   // Set up the parameters.
-  for (ArgDecl *parm : CurFuncExpr->NamedArgs) {
+  for (ArgDecl *parm : CurFuncExpr->getNamedArgs()) {
     const TypeInfo &parmType = IGM.getFragileTypeInfo(parm->getType());
 
     ExplosionSchema parmSchema(args.getKind());

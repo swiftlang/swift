@@ -513,6 +513,10 @@ static void AddFuncArgumentsToScope(Type Ty,
     ArgDecl *AD = new (P.Context) ArgDecl(FuncLoc, Field.getName(),
                                           Field.getType(), P.CurDeclContext);
     ArgDecls.push_back(AD);
+
+    // Modify the TupleType in-place.  This is okay, as we're
+    // essentially still processing it.
+    const_cast<TupleTypeElt&>(Field).setArgDecl(AD);
     
     // Eventually we should mark the input/outputs as readonly vs writeonly.
     //bool isInput = Mode == FuncTypePiece::Input;
