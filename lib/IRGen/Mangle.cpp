@@ -223,9 +223,9 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     // tuple-field ::= identifier? type
     Buffer << 'T';
     for (auto &field : tuple->Fields) {
-      if (!field.Name.empty())
-        mangleIdentifier(field.Name);
-      mangleType(field.Ty, explosion, 0);
+      if (field.hasName())
+        mangleIdentifier(field.getName());
+      mangleType(field.getType(), explosion, 0);
     }
     Buffer << '_';
     return;

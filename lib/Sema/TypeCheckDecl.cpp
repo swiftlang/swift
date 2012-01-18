@@ -211,7 +211,7 @@ bool DeclChecker::validateVarName(Type Ty, DeclVarName *Name) {
   
   // Okay, everything looks good at this level, recurse.
   for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
-    if (validateVarName(AccessedTuple->Fields[i].Ty, Elements[i]))
+    if (validateVarName(AccessedTuple->Fields[i].getType(), Elements[i]))
       return true;
   }
   

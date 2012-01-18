@@ -38,8 +38,8 @@ using namespace swift;
 using namespace irgen;
 
 static StringRef getFieldName(const TupleTypeElt &field) {
-  if (!field.Name.empty())
-    return field.Name.str();
+  if (field.hasName())
+    return field.getName().str();
   return "elt";
 }
 
@@ -337,7 +337,7 @@ TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
 
   // TODO: rearrange the tuple for optimal packing.
   for (const TupleTypeElt &Field : T->Fields) {
-    const TypeInfo &TInfo = getFragileTypeInfo(IGM, Field.Ty);
+    const TypeInfo &TInfo = getFragileTypeInfo(IGM, Field.getType());
     assert(TInfo.isComplete());
 
     FieldInfos.push_back(TupleFieldInfo(Field, TInfo));
@@ -546,8 +546,8 @@ void IRGenFunction::emitExplodedTupleShuffle(TupleShuffleExpr *E,
 
     // If the shuffle index is -1, we're supposed to use the default value.
     if (shuffleIndex == -1) {
-      assert(outerField.Init && "no default initializer for field!");
-      emitExplodedRValue(outerField.Init, outerTupleExplosion);
+      assert(outerField.hasInit() && "no default initializer for field!");
+      emitExplodedRValue(outerField.getInit(), outerTupleExplosion);
       continue;
     }
 

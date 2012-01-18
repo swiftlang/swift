@@ -136,43 +136,48 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
       !isStartOfDecl(Tok, peekToken())) {
     bool HadError = false;
     do {
-      Elements.push_back(TupleTypeElt());
-      TupleTypeElt &Result = Elements.back();
+      Type type;
+      Identifier name;
 
       // If the tuple element starts with "ident :" or "ident =", then
       // the identifier is an element tag, and it is followed by a
       // value-specifier.
       if (Tok.is(tok::identifier) &&
           (peekToken().is(tok::colon) || peekToken().is(tok::equal))) {
-        Result.Name = Context.getIdentifier(Tok.getText());
+        name = Context.getIdentifier(Tok.getText());
         consumeToken(tok::identifier);
 
-        NullablePtr<Expr> Init;
-        if ((HadError = parseValueSpecifier(Result.Ty, Init, /*single*/ true)))
+        NullablePtr<Expr> init;
+        if ((HadError = parseValueSpecifier(type, init, /*single*/ true)))
           break;
-        Result.Init = Init.getPtrOrNull();
+
+        Elements.push_back(TupleTypeElt(type, name, init.getPtrOrNull()));
         continue;
       }
 
       // Otherwise, this has to be a type.
-      if ((HadError = parseType(Result.Ty)))
+      if ((HadError = parseType(type)))
         break;
+
+      Expr *init = nullptr;
 
       // Parse the optional default value expression.
       if (Tok.is(tok::colon)) {
-        ParseResult<Expr> Init =
+        ParseResult<Expr> initResult =
           parseSingleExpr(diag::expected_initializer_expr);
 
         // Die if there was a parse error.
-        if (Init) {
+        if (initResult) {
           HadError = true;
           break;
         }
 
-        if (!Init.isSemaError()) {
-          Result.Init = Init.get();
+        if (!initResult.isSemaError()) {
+          init = initResult.get();
         }
       }
+
+      Elements.push_back(TupleTypeElt(type, name, init));
     } while (consumeIf(tok::comma));
     
     if (HadError) {
@@ -184,8 +189,8 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
   }
 
   // A "tuple" with one anonymous element is actually not a tuple.
-  if (Elements.size() == 1 && Elements.back().Name.empty()) {
-    Result = ParenType::get(Context, Elements.back().Ty);
+  if (Elements.size() == 1 && !Elements.back().hasName()) {
+    Result = ParenType::get(Context, Elements.back().getType());
     return false;
   }
   

@@ -89,13 +89,13 @@ bool TypeChecker::validateType(Type InTy) {
     for (unsigned i = 0, e = TT->Fields.size(); i != e; ++i) {
       // The element has *at least* a type or an initializer, so we start by
       // verifying each individually.
-      Type EltTy = TT->Fields[i].Ty;
+      Type EltTy = TT->Fields[i].getType();
       if (EltTy && validateType(EltTy)) {
         IsInvalid = true;
         break;
       }
 
-      Expr *EltInit = TT->Fields[i].Init;
+      Expr *EltInit = TT->Fields[i].getInit();
       if (EltInit == 0) continue;
       
       Expr *OldInit = EltInit;

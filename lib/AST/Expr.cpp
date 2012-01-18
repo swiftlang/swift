@@ -225,7 +225,7 @@ getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
     assert(ETy->Fields.size() == NumExprElements && "Expr #elements mismatch!");
     { unsigned i = 0;
     for (const TupleTypeElt &Elt : ETy->Fields)
-      IdentList[i++] = Elt.Name;
+      IdentList[i++] = Elt.getName();
     }
   
     // First off, see if we can resolve any named values from matching named
@@ -234,11 +234,11 @@ getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
       const TupleTypeElt &DestElt = DestTy->Fields[i];
       // If this destination field is named, first check for a matching named
       // element in the input, from any position.
-      if (DestElt.Name.empty()) continue;
+      if (!DestElt.hasName()) continue;
       
       int InputElement = -1;
       for (unsigned j = 0; j != NumExprElements; ++j)
-        if (IdentList[j] == DestElt.Name) {
+        if (IdentList[j] == DestElt.getName()) {
           InputElement = j;
           break;
         }
@@ -273,7 +273,7 @@ getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
     // fill the dest (as in when assigning (1,2) to (int,int,int), or we ran out
     // and default values should be used.
     if (NextInputValue == NumExprElements) {
-      if (DestTy->Fields[i].Init == 0)
+      if (!DestTy->Fields[i].hasInit())
         return Expr::CR_Invalid;
         
       // If the default initializer should be used, leave the

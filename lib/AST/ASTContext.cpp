@@ -134,9 +134,9 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
                         ArrayRef<TupleTypeElt> Fields) {
   ID.AddInteger(Fields.size());
   for (const TupleTypeElt &Elt : Fields) {
-    ID.AddPointer(Elt.Ty.getPointer());
-    ID.AddPointer(Elt.Name.get());
-    ID.AddPointer(Elt.Init);
+    ID.AddPointer(Elt.getType().getPointer());
+    ID.AddPointer(Elt.getName().get());
+    ID.AddPointer(Elt.getInit());
   }
 }
 
@@ -162,8 +162,12 @@ TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
     C.AllocateCopy<TupleTypeElt>(Fields.begin(), Fields.end());
   
   bool IsCanonical = true;   // All canonical elts means this is canonical.
-  for (const TupleTypeElt &Elt : Fields)
-    IsCanonical &= Elt.Ty.isNull() ? false : Elt.Ty->isCanonical();
+  for (const TupleTypeElt &Elt : Fields) {
+    if (Elt.getType().isNull() || !Elt.getType()->isCanonical()) {
+      IsCanonical = false;
+      break;
+    }
+  }
 
   Fields = ArrayRef<TupleTypeElt>(FieldsCopy, Fields.size());
   

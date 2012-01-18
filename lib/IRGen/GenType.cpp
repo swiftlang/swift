@@ -216,7 +216,7 @@ void IRGenModule::getExplosionSchema(Type type, ExplosionSchema &schema) {
   // schema is always the concatenation of its components schemata.
   if (TupleType *tuple = dyn_cast<TupleType>(type)) {
     for (const TupleTypeElt &field : tuple->Fields)
-      getExplosionSchema(field.Ty, schema);
+      getExplosionSchema(field.getType(), schema);
     return;
   }
 

@@ -79,7 +79,7 @@ isLiteralCompatibleType(Type Ty, SourceLoc Loc, bool isInt, TypeChecker *TC) {
   // Look through single element tuples.
   if (TupleType *TT = ArgType->getAs<TupleType>())
     if (TT->Fields.size() == 1)
-      ArgType = TT->Fields[0].Ty;
+      ArgType = TT->Fields[0].getType();
   
   return std::pair<FuncDecl*, Type>(Method, ArgType);
 }
@@ -215,6 +215,7 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
   bool ResultIsRValue = (TE->getNumElements() == 0);
   
   for (unsigned i = 0, e = TE->getNumElements(); i != e; ++i) {
+    Type EltTy;
     bool EltIsRValue;
     
     // If the element value is missing, it has the value of the default
@@ -223,28 +224,22 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
     if (Elt == 0) {
       assert(TE->getType() && isa<TupleType>(TE->getType()) && 
              "Can't have default value without a result type");
-      
-      ResultTyElts[i].Ty =
-        cast<TupleType>(TE->getType())->getElementType(i);
 
       // Default values are always r-values.
-      EltIsRValue = true;
-      
       // FIXME: What about a default value that is dependent?
-      if (ResultTyElts[i].Ty->is<DependentType>()) {
-        TE->setDependentType(ResultTyElts[i].Ty);
-        return false;
-      }
-    } else {
-      // If any of the tuple element types is dependent, the whole tuple should
-      // have dependent type.
-      if (Elt->getType()->is<DependentType>()) {
-        TE->setDependentType(Elt->getType());
-        return false;
-      }
       
-      ResultTyElts[i].Ty = Elt->getType();
+      EltTy = cast<TupleType>(TE->getType())->getElementType(i);
+      EltIsRValue = true;
+    } else {
+      EltTy = Elt->getType();
       EltIsRValue = (Elt->getValueKind() == ValueKind::RValue);
+    }
+
+    // If any of the tuple element types is dependent, the whole tuple should
+    // have dependent type.
+    if (EltTy->is<DependentType>()) {
+      TE->setDependentType(Elt->getType());
+      return false;
     }
 
     // If we're known to be building an r-value, and the element is an
@@ -263,7 +258,8 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
     }
 
     // If a name was specified for this element, use it.
-    ResultTyElts[i].Name = TE->getElementName(i);
+    Identifier Name = TE->getElementName(i);
+    ResultTyElts[i] = TupleTypeElt(EltTy, Name);
   }
   
   TE->setType(TupleType::get(ResultTyElts, Context),

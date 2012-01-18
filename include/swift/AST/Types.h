@@ -332,7 +332,6 @@ public:
 
 /// TupleTypeElt - This represents a single element of a tuple.
 class TupleTypeElt {
-public:
   /// Name - An optional name for the field.
   Identifier Name;
 
@@ -343,8 +342,18 @@ public:
   /// value is not specified.
   Expr *Init;
   
+public:
   TupleTypeElt(Type ty = Type(), Identifier name = Identifier(), Expr *init = 0)
     : Name(name), Ty(ty), Init(init) { }
+
+  bool hasName() const { return !Name.empty(); }
+  Identifier getName() const { return Name; }
+
+  Type getType() const { return Ty; }
+
+  bool hasInit() const { return Init != nullptr; }
+  Expr *getInit() const { return Init; }
+  void setInit(Expr *E) { Init = E; }
 };
   
 /// TupleType - A tuple is a parenthesized list of types where each name has an
@@ -362,7 +371,7 @@ public:
   
   /// getElementType - Return the type of the specified field.
   Type getElementType(unsigned FieldNo) const {
-    return Fields[FieldNo].Ty;
+    return Fields[FieldNo].getType();
   }
   
   /// getNamedElementId - If this tuple has a field with the specified name,

@@ -502,18 +502,16 @@ static void AddFuncArgumentsToScope(Type Ty,
   // For tuples, recursively processes their elements (to handle cases like:
   //    (x : (a : int, b : int), y : int) -> ...
   // and create decls for any named elements.
-  for (unsigned i = 0, e = TT->Fields.size(); i != e; ++i) {
-    AddFuncArgumentsToScope(TT->Fields[i].Ty, Mode, FuncLoc, ArgDecls, P);
+  for (const TupleTypeElt &Field : TT->Fields) {
+    AddFuncArgumentsToScope(Field.getType(), Mode, FuncLoc, ArgDecls, P);
     
     // If this field is named, create the argument decl for it.
-    Identifier Name = TT->Fields[i].Name;
-    // Ignore unnamed fields.
-    if (Name.get() == 0) continue;
-    
-    
+    // Otherwise, ignore unnamed fields.
+    if (!Field.hasName()) continue;
+
     // Create the argument decl for this named argument.
-    ArgDecl *AD = new (P.Context) ArgDecl(FuncLoc, Name, TT->Fields[i].Ty,
-                                          P.CurDeclContext);
+    ArgDecl *AD = new (P.Context) ArgDecl(FuncLoc, Field.getName(),
+                                          Field.getType(), P.CurDeclContext);
     ArgDecls.push_back(AD);
     
     // Eventually we should mark the input/outputs as readonly vs writeonly.

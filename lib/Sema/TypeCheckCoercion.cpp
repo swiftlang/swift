@@ -251,7 +251,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   if (TupleType *ETy = E->getType()->getAs<TupleType>()) {
     assert(ETy->Fields.size() == NumExprElements && "Expr #elements mismatch!");
     for (unsigned i = 0, e = ETy->Fields.size(); i != e; ++i)
-      IdentList[i] = ETy->Fields[i].Name;
+      IdentList[i] = ETy->Fields[i].getName();
     
     // First off, see if we can resolve any named values from matching named
     // inputs.
@@ -259,11 +259,11 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       const TupleTypeElt &DestElt = DestTy->Fields[i];
       // If this destination field is named, first check for a matching named
       // element in the input, from any position.
-      if (DestElt.Name.empty()) continue;
-      
+      if (!DestElt.hasName()) continue;
+
       int InputElement = -1;
       for (unsigned j = 0; j != NumExprElements; ++j)
-        if (IdentList[j] == DestElt.Name) {
+        if (IdentList[j] == DestElt.getName()) {
           InputElement = j;
           break;
         }
@@ -298,7 +298,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     // fill the dest (as in when assigning (1,2) to (int,int,int), or we ran out
     // and default values should be used.
     if (NextInputValue == NumExprElements) {
-      if (DestTy->Fields[i].Init != 0) {
+      if (DestTy->Fields[i].hasInit()) {
         // If the default initializer should be used, leave the
         // DestElementSources field set to -2.
         DestElementSources[i] = -2;
@@ -311,12 +311,12 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
         ErrorLoc = TE->getRParenLoc();
       
-      if (DestTy->Fields[i].Name.empty())
+      if (!DestTy->Fields[i].hasName())
         TC.diagnose(ErrorLoc, diag::not_initialized_tuple_element, i,
                     E->getType());
       else
         TC.diagnose(ErrorLoc, diag::not_initialized_named_tuple_element,
-                    DestTy->Fields[i].Name, i, E->getType());
+                    DestTy->Fields[i].getName(), i, E->getType());
       return 0;
     }
     
@@ -438,7 +438,7 @@ Expr *SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
     else
       NewSE[i] = 0;
     
-    NeedsNames |= DestTy->Fields[i].Name != Identifier();
+    NeedsNames |= DestTy->Fields[i].hasName();
   }
   
   // Handle the name if the element is named.
@@ -446,7 +446,7 @@ Expr *SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   if (NeedsNames) {
     NewName = TC.Context.Allocate<Identifier>(NumFields);
     for (unsigned i = 0, e = NumFields; i != e; ++i)
-      NewName[i] = DestTy->Fields[i].Name;
+      NewName[i] = DestTy->Fields[i].getName();
   }
   
   return new (TC.Context) TupleExpr(SourceLoc(), NewSE, NewName,

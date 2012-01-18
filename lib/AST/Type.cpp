@@ -59,7 +59,7 @@ TypeBase *TypeBase::getCanonicalType() {
   case TypeKind::Module:
   case TypeKind::OneOf:
   case TypeKind::Protocol:
-    assert(0 && "These are always canonical");
+    llvm_unreachable("These are always canonical");
   case TypeKind::Paren:
     Result = cast<ParenType>(this)->getUnderlyingType()->getCanonicalType();
     break;
@@ -70,18 +70,19 @@ TypeBase *TypeBase::getCanonicalType() {
     Result = cast<IdentifierType>(this)->getDesugaredType()->getCanonicalType();
     break;
   case TypeKind::Tuple: {
-    SmallVector<TupleTypeElt, 8> CanElts;
     TupleType *TT = cast<TupleType>(this);
-    CanElts.resize(TT->Fields.size());
-    for (unsigned i = 0, e = TT->Fields.size(); i != e; ++i) {
-      CanElts[i].Name = TT->Fields[i].Name;
-      assert(!TT->Fields[i].Ty.isNull() &&
-             "Cannot get canonical type of TypeChecked TupleType!");
-      CanElts[i].Ty = TT->Fields[i].Ty->getCanonicalType();
+    assert(!TT->Fields.empty() && "Empty tuples are always canonical");
+
+    SmallVector<TupleTypeElt, 8> CanElts;
+    CanElts.reserve(TT->Fields.size());
+    for (const TupleTypeElt &field : TT->Fields) {
+      assert(!field.getType().isNull() &&
+             "Cannot get canonical type of un-typechecked TupleType!");
+      CanElts.push_back(TupleTypeElt(field.getType()->getCanonicalType(),
+                                     field.getName()));
     }
     
-    assert(!TT->Fields.empty() && "Empty tuples are always canonical");
-    Result = TupleType::get(CanElts, CanElts[0].Ty->getASTContext());
+    Result = TupleType::get(CanElts, CanElts[0].getType()->getASTContext());
     break;
   }
     
@@ -168,7 +169,7 @@ Type IdentifierType::getMappedType() {
 /// value.
 bool TupleType::hasAnyDefaultValues() const {
   for (const TupleTypeElt &Elt : Fields)
-    if (Elt.Init)
+    if (Elt.hasInit())
       return true;
   return false;
 }
@@ -177,7 +178,7 @@ bool TupleType::hasAnyDefaultValues() const {
 /// return the field index, otherwise return -1.
 int TupleType::getNamedElementId(Identifier I) const {
   for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
-    if (Fields[i].Name == I)
+    if (Fields[i].getName() == I)
       return i;
   }
 
@@ -194,7 +195,7 @@ int TupleType::getFieldForScalarInit() const {
   int FieldWithoutDefault = -1;
   for (unsigned i = 0, e = Fields.size(); i != e; ++i) {
     // Ignore fields with a default value.
-    if (Fields[i].Init) continue;
+    if (Fields[i].hasInit()) continue;
     
     // If we already saw a field missing a default value, then we cannot assign
     // a scalar to this tuple.
@@ -219,9 +220,8 @@ void TupleType::updateInitializedElementType(unsigned EltNo, Type NewTy,
   assert(!hasCanonicalTypeComputed() &&
          "Cannot munge an already canonicalized type!");
   TupleTypeElt &Elt = const_cast<TupleTypeElt&>(Fields[EltNo]);
-  assert(Elt.Init && "Can only update elements with default values");
-  Elt.Ty = NewTy;
-  Elt.Init = NewInit;
+  assert(Elt.hasInit() && "Can only update elements with default values");
+  Elt = TupleTypeElt(NewTy, Elt.getName(), NewInit);
 }
 
 OneOfElementDecl *OneOfType::getElement(Identifier Name) const {
@@ -371,10 +371,10 @@ void TupleType::print(raw_ostream &OS) const {
     if (i) OS << ", ";
     const TupleTypeElt &TD = Fields[i];
     
-    if (!TD.Name.empty())
-      OS << TD.Name << " : ";
+    if (TD.hasName())
+      OS << TD.getName() << " : ";
     
-    OS << TD.Ty;
+    OS << TD.getType();
   }
   OS << ')';
 }
