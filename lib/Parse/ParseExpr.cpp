@@ -469,22 +469,18 @@ enum class FuncTypePiece {
 /// emitted.
 static void AddFuncArgumentsToScope(Type Ty,
                                     FuncTypePiece Mode,
-                                    SourceLoc FuncLoc, 
-                                    SmallVectorImpl<ArgDecl*> &ArgDecls,
+                                    FuncExpr *FE,
                                     Parser &P) {
   // Handle the function case first.
   if (Mode == FuncTypePiece::Function) {
     FunctionType *FT = cast<FunctionType>(Ty);
-    AddFuncArgumentsToScope(FT->Input, FuncTypePiece::Input,
-                            FuncLoc, ArgDecls, P);
+    AddFuncArgumentsToScope(FT->Input, FuncTypePiece::Input, FE, P);
     
     // If this is a->b->c then we treat b as an input, not (b->c) as an output.
     if (isa<FunctionType>(FT->Result.getPointer()))
-      AddFuncArgumentsToScope(FT->Result, FuncTypePiece::Function, FuncLoc,
-                              ArgDecls, P);
+      AddFuncArgumentsToScope(FT->Result, FuncTypePiece::Function, FE, P);
     else    
-      AddFuncArgumentsToScope(FT->Result, FuncTypePiece::Output, FuncLoc,
-                              ArgDecls, P);
+      AddFuncArgumentsToScope(FT->Result, FuncTypePiece::Output, FE, P);
     return;
   }
   
@@ -498,21 +494,19 @@ static void AddFuncArgumentsToScope(Type Ty,
   TupleType *TT = dyn_cast<TupleType>(Ty.getPointer());
   if (TT == 0) return;
   
-  
   // For tuples, recursively processes their elements (to handle cases like:
   //    (x : (a : int, b : int), y : int) -> ...
   // and create decls for any named elements.
   for (const TupleTypeElt &Field : TT->Fields) {
-    AddFuncArgumentsToScope(Field.getType(), Mode, FuncLoc, ArgDecls, P);
+    AddFuncArgumentsToScope(Field.getType(), Mode, FE, P);
     
     // If this field is named, create the argument decl for it.
     // Otherwise, ignore unnamed fields.
     if (!Field.hasName()) continue;
 
     // Create the argument decl for this named argument.
-    ArgDecl *AD = new (P.Context) ArgDecl(FuncLoc, Field.getName(),
-                                          Field.getType(), P.CurDeclContext);
-    ArgDecls.push_back(AD);
+    ArgDecl *AD = new (P.Context) ArgDecl(FE->getFuncLoc(), Field.getName(),
+                                          Field.getType(), FE);
 
     // Modify the TupleType in-place.  This is okay, as we're
     // essentially still processing it.
@@ -527,20 +521,10 @@ static void AddFuncArgumentsToScope(Type Ty,
 
 
 FuncExpr *Parser::actOnFuncExprStart(SourceLoc FuncLoc, Type FuncTy) {
-  SmallVector<ArgDecl*, 8> ArgDecls;
-  AddFuncArgumentsToScope(FuncTy, FuncTypePiece::Function,
-                          FuncLoc, ArgDecls, *this);
-  
-  ArrayRef<ArgDecl*> Args = ArgDecls;
-  
-  FuncExpr *FE = new (Context) FuncExpr(FuncLoc, FuncTy,
-                                        Context.AllocateCopy(Args), 0,
-                                        CurDeclContext);
+  FuncExpr *FE = new (Context) FuncExpr(FuncLoc, FuncTy, 0, CurDeclContext);
 
-  // Reparent all the arguments.
-  for (ArgDecl *Arg : Args)
-    Arg->setDeclContext(FE);
-
+  AddFuncArgumentsToScope(FuncTy, FuncTypePiece::Function, FE, *this);
+  
   return FE;
 }
 

@@ -62,8 +62,7 @@ static bool isTrivialGlobalInit(llvm::Function *fn) {
 void IRGenModule::emitTranslationUnit(TranslationUnit *tunit) {
   Type emptyTuple = TupleType::getEmpty(Context);
   FunctionType *unitToUnit = FunctionType::get(emptyTuple, emptyTuple, Context);
-  FuncExpr func(SourceLoc(), unitToUnit, llvm::ArrayRef<ArgDecl*>(),
-                nullptr, tunit);
+  FuncExpr func(SourceLoc(), unitToUnit, nullptr, tunit);
 
   llvm::Function *fn = createGlobalInitFunction(*this, tunit);
   IRGenFunction(*this, &func, ExplosionKind::Minimal, /*uncurry*/ 0, fn)

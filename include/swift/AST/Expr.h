@@ -646,15 +646,13 @@ public:
 class FuncExpr : public Expr, public DeclContext {
   SourceLoc FuncLoc;
   
-  ArrayRef<ArgDecl*> NamedArgs;
   BraceStmt *Body;
   
 public:
-  FuncExpr(SourceLoc FuncLoc, Type FnType, ArrayRef<ArgDecl*> NamedArgs, 
-           BraceStmt *Body, DeclContext *Parent)
+  FuncExpr(SourceLoc FuncLoc, Type FnType, BraceStmt *Body, DeclContext *Parent)
     : Expr(ExprKind::Func, TypeJudgement(FnType, ValueKind::RValue)),
       DeclContext(DeclContextKind::FuncExpr, Parent),
-      FuncLoc(FuncLoc), NamedArgs(NamedArgs), Body(Body) {}
+      FuncLoc(FuncLoc), Body(Body) {}
 
   SourceRange getSourceRange() const;
   SourceLoc getLoc() const { return FuncLoc; }
@@ -662,7 +660,6 @@ public:
   /// Returns the location of the 'func' keyword.
   SourceLoc getFuncLoc() const { return FuncLoc; }
 
-  ArrayRef<ArgDecl*> getNamedArgs() const { return NamedArgs; }
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *S) { Body = S; }
 
