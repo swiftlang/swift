@@ -83,7 +83,10 @@ static ValueDecl *getUnaryOperation(ASTContext &Context, Identifier Id,
 /// Build a binary operation declaration.
 static ValueDecl *getBinaryOperation(ASTContext &Context, Identifier Id,
                                      Type ArgType) {
-  TupleTypeElt ArgElts[] = { TupleTypeElt(ArgType), TupleTypeElt(ArgType) };
+  TupleTypeElt ArgElts[] = {
+    TupleTypeElt(ArgType, Identifier()),
+    TupleTypeElt(ArgType, Identifier())
+  };
   Type Arg = TupleType::get(ArgElts, Context);
   Type FnTy = FunctionType::get(Arg, ArgType, Context);
   return getBuiltinFunction(Context, Id, FnTy);
@@ -92,7 +95,10 @@ static ValueDecl *getBinaryOperation(ASTContext &Context, Identifier Id,
 /// Build a binary predicate declaration.
 static ValueDecl *getBinaryPredicate(ASTContext &Context, Identifier Id,
                                      Type ArgType) {
-  TupleTypeElt ArgElts[] = { TupleTypeElt(ArgType), TupleTypeElt(ArgType) };
+  TupleTypeElt ArgElts[] = {
+    TupleTypeElt(ArgType, Identifier()),
+    TupleTypeElt(ArgType, Identifier())
+  };
   Type Arg = TupleType::get(ArgElts, Context);
   Type FnTy = FunctionType::get(Arg, BuiltinIntegerType::get(1, Context),
                                 Context);
