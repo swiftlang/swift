@@ -448,6 +448,7 @@ namespace {
       return inherited::visit(S);
     }
     
+    Expr *visitErrorExpr(ErrorExpr *E) { return E; }
     Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *E) { return E; }
     Expr *visitFloatLiteralExpr(FloatLiteralExpr *E) { return E; }
     Expr *visitDeclRefExpr(DeclRefExpr *E) { return E; }
@@ -790,6 +791,10 @@ public:
   
   void printRec(Decl *D) { D->print(OS, Indent+2); }
   void printRec(Stmt *S) { S->print(OS, Indent+2); }
+
+  void visitErrorExpr(ErrorExpr *E) {
+    OS.indent(Indent) << "(error_expr type='" << E->getType() << "')";
+  }
 
   void visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
     OS.indent(Indent) << "(integer_literal_expr type='" << E->getType();

@@ -434,6 +434,12 @@ class SemaExpressionTree : public ExprVisitor<SemaExpressionTree, Expr*> {
 public:
   TypeChecker &TC;
   
+  Expr *visitErrorExpr(ErrorExpr *E) {
+    if (E->getType().isNull())
+      E->setType(TC.Context.TheErrorType, ValueKind::RValue);
+    return E;
+  }
+
   Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
     if (E->getType().isNull())
       E->setDependentType(DependentType::get(TC.Context));

@@ -124,6 +124,7 @@ void IRGenFunction::emitExplodedRValue(Expr *E, Explosion &explosion) {
 #define EXPR(Id, Parent)
 #define UNCHECKED_EXPR(Id, Parent) case ExprKind::Id:
 #include "swift/AST/ExprNodes.def"
+  case ExprKind::Error:
     llvm_unreachable("these expression kinds should not survive to IR-gen");
 
   case ExprKind::Load:
@@ -193,6 +194,7 @@ LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &type) {
 #define EXPR(Id, Parent)
 #define UNCHECKED_EXPR(Id, Parent) case ExprKind::Id:
 #include "swift/AST/ExprNodes.def"
+  case ExprKind::Error:
     llvm_unreachable("these expression kinds should not survive to IR-gen");
 
   case ExprKind::Call:
@@ -239,6 +241,7 @@ IRGenFunction::tryEmitAsAddress(Expr *E, const TypeInfo &type) {
 #define EXPR(Id, Parent)
 #define UNCHECKED_EXPR(Id, Parent) case ExprKind::Id:
 #include "swift/AST/ExprNodes.def"
+  case ExprKind::Error:
     llvm_unreachable("these expression kinds should not survive to IR-gen");
 
   // Look through loads without further ado.

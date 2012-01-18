@@ -36,6 +36,10 @@ public:
   TypeChecker &TC;
   Type DestTy;
   
+  Expr *visitErrorExpr(ErrorExpr *E) {
+    return E;
+  }
+  
   Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
     return TC.applyTypeToLiteral(E, DestTy);
   }

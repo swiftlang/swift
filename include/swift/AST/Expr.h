@@ -167,6 +167,24 @@ public:
   void *operator new(size_t Bytes, void *Mem) throw() = delete;
 };
 
+  
+/// ErrorExpr - Represents a semantically erroneous subexpression in the AST,
+/// typically this will have an ErrorType.
+class ErrorExpr : public Expr {
+  SourceRange Range;
+public:
+  ErrorExpr(SourceRange Range, TypeJudgement Ty = TypeJudgement())
+    : Expr(ExprKind::Error, Ty), Range(Range) {}
+
+  SourceRange getSourceRange() const { return Range; }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ErrorExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Error;
+  }
+};
+  
 
 /// IntegerLiteralExpr - Integer literal, like '4'.  After semantic analysis
 /// assigns types, this is guaranteed to only have a BuiltinIntegerType.

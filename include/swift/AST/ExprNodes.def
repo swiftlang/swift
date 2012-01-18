@@ -51,6 +51,7 @@
 #define EXPR_RANGE(Id, First, Last)
 #endif
 
+EXPR(Error, Expr)
 EXPR(IntegerLiteral, Expr)
 EXPR(FloatLiteral, Expr)
 EXPR(DeclRef, Expr)

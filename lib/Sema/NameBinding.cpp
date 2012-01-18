@@ -284,7 +284,7 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
         ModuleType *MT = ModuleType::get(ImpEntry.second);
         return new (Binder.Context) ModuleExpr(Loc, 
                                       TypeJudgement(MT, ValueKind::RValue));
-      }      
+      }
   }
 
   if (Decls.empty()) {
