@@ -386,10 +386,7 @@ void swift::performNameBinding(TranslationUnit *TU) {
     }
     
     // Fill in null results with a dummy expression.
-    if (Elt.isNull())
-      Elt = new (TU->Ctx) TupleExpr(SourceLoc(), 0, 0, 0, SourceLoc(),
-                                    TypeJudgement(TupleType::getEmpty(TU->Ctx),
-                                                  ValueKind::RValue));
+    assert(!Elt.isNull());
     TU->Body->setElement(i, Elt);
   }
 
