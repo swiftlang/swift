@@ -270,6 +270,12 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
 Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   Expr *E1 = E->getFn();
   Expr *E2 = E->getArg();
+
+  // If the callee was erroneous, silently propagate the error up.
+  if (E1->getType()->is<ErrorType>()) {
+    E->setType(E1->getType(), ValueKind::RValue);
+    return E;
+  }
   
   // If we have a concrete function type, then we win.
   if (FunctionType *FT = E1->getType()->getAs<FunctionType>()) {

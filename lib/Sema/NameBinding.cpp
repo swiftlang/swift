@@ -289,7 +289,7 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
 
   if (Decls.empty()) {
     Binder.diagnose(Loc, diag::use_unresolved_identifier, Name);
-    return 0;
+    return new (Binder.Context) ErrorExpr(Loc);
   }
 
   return OverloadSetRefExpr::createWithCopy(Decls, Loc);
