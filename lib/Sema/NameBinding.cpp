@@ -261,15 +261,7 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT) {
 // performNameBinding
 //===----------------------------------------------------------------------===//
 
-static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
-  
-  // Ignore the preorder walk.
-  if (Order == WalkOrder::PreOrder)
-    return E;
-
-  UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E);
-  if (UDRE == 0) return E;
-  
+static Expr *BindName(UnresolvedDeclRefExpr *UDRE, NameBinder &Binder) {
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
   Identifier Name = UDRE->getName();
   SourceLoc Loc = UDRE->getLoc();
@@ -364,7 +356,11 @@ void swift::performNameBinding(TranslationUnit *TU) {
   // UnresolvedDeclRefExprs that exist.
   TU->Body = cast<BraceStmt>(TU->Body->walk(^(Expr *E, WalkOrder Order,
                                               WalkContext const &) {
-    return BindNames(E, Order, *NBPtr);
+    // Ignore the preorder walk.
+    if (Order != WalkOrder::PreOrder)
+      if (UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E))
+        return BindName(UDRE, *NBPtr);
+    return E;
   }));
 
   TU->ASTStage = TranslationUnit::NameBound;
