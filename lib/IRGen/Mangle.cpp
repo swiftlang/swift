@@ -210,8 +210,8 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
   case TypeKind::NameAlias:
     return mangleType(cast<NameAliasType>(base)->TheDecl->getUnderlyingType(),
                       explosion, uncurryLevel);
-  case TypeKind::DottedName:
-    return mangleType(cast<DottedNameType>(base)->getMappedType(),
+  case TypeKind::Identifier:
+    return mangleType(cast<IdentifierType>(base)->getMappedType(),
                       explosion, uncurryLevel);
   case TypeKind::Paren:
     return mangleType(cast<ParenType>(base)->getUnderlyingType(),

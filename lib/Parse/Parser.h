@@ -50,7 +50,7 @@ public:
   ASTContext &Context;
   ScopeInfo ScopeInfo;
   std::vector<TypeAliasDecl*> UnresolvedTypeNames;
-  std::vector<DottedNameType*> UnresolvedDottedTypes;
+  std::vector<IdentifierType*> UnresolvedIdentifierTypes;
   
   /// Tok - This is the current token being considered by the parser.
   Token Tok;

@@ -95,8 +95,8 @@ bool Parser::parseTypeIdentifier(Type &Result) {
     return true;
   }
   
-  SmallVector<DottedNameType::Component, 4> Components;
-  Components.push_back(DottedNameType::Component(Tok.getLoc(),
+  SmallVector<IdentifierType::Component, 4> Components;
+  Components.push_back(IdentifierType::Component(Tok.getLoc(),
                                      Context.getIdentifier(Tok.getText())));
   consumeToken(tok::identifier);
   
@@ -105,7 +105,7 @@ bool Parser::parseTypeIdentifier(Type &Result) {
     Identifier Name;
     if (parseIdentifier(Name, diag::expected_identifier_in_dotted_type))
       return true;
-    Components.push_back(DottedNameType::Component(Loc, Name));
+    Components.push_back(IdentifierType::Component(Loc, Name));
   }
 
   // Otherwise, this is a qualified lookup.  Lookup element #0 through our
@@ -132,8 +132,8 @@ bool Parser::parseTypeIdentifier(Type &Result) {
     return false;  // Sema error, not a parse error.
   }
   
-  auto Ty = DottedNameType::getNew(Context, Components);
-  UnresolvedDottedTypes.push_back(Ty);
+  auto Ty = IdentifierType::getNew(Context, Components);
+  UnresolvedIdentifierTypes.push_back(Ty);
   Result = Ty;
   return false;
 }

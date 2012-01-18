@@ -56,11 +56,11 @@ namespace {
     
     void addImport(ImportDecl *ID, SmallVectorImpl<ImportedModule> &Result);
 
-    /// resolveDottedNameType - Perform name binding for a DottedNameType,
+    /// resolveIdentifierType - Perform name binding for a IdentifierType,
     /// resolving it or diagnosing the error as appropriate and return true on
-    /// failure.  On failure, this leaves DottedNameType alone, otherwise it
+    /// failure.  On failure, this leaves IdentifierType alone, otherwise it
     /// fills in the Components.
-    bool resolveDottedNameType(DottedNameType *DNT);
+    bool resolveIdentifierType(IdentifierType *DNT);
     
   private:
     /// getModule - Load a module referenced by an import statement,
@@ -164,14 +164,14 @@ void NameBinder::addImport(ImportDecl *ID,
   Result.push_back(std::make_pair(Path.slice(1), M));
 }
 
-/// resolveDottedNameType - Perform name binding for a DottedNameType,
+/// resolveIdentifierType - Perform name binding for a IdentifierType,
 /// resolving it or diagnosing the error as appropriate and return true on
-/// failure.  On failure, this leaves DottedNameType alone, otherwise it fills
+/// failure.  On failure, this leaves IdentifierType alone, otherwise it fills
 /// in the Components.
-bool NameBinder::resolveDottedNameType(DottedNameType *DNT) {
+bool NameBinder::resolveIdentifierType(IdentifierType *DNT) {
   // FIXME: we really want a MutableArrayRef.
   auto Components =
-    const_cast<DottedNameType::Component*>(DNT->Components.data());
+    const_cast<IdentifierType::Component*>(DNT->Components.data());
   
   // If name lookup for the base of the type didn't get resolved in the
   // parsing phase, do a global lookup for it.
@@ -355,14 +355,14 @@ void swift::performNameBinding(TranslationUnit *TU) {
 
   // Loop over all the unresolved dotted types in the translation unit,
   // resolving them if possible.
-  for (DottedNameType *DNT : TU->getUnresolvedDottedTypes()) {
-    if (Binder.resolveDottedNameType(DNT)) {
+  for (IdentifierType *DNT : TU->getUnresolvedDottedTypes()) {
+    if (Binder.resolveIdentifierType(DNT)) {
       TypeBase *Error = TU->Ctx.TheErrorType.getPointer();
 
-      // This DottedNameType resolved to the error type.
+      // This IdentifierType resolved to the error type.
       for (auto &C : DNT->Components)
         // FIXME: Want MutableArrayRef
-        const_cast<DottedNameType::Component&>(C).Value = Error;
+        const_cast<IdentifierType::Component&>(C).Value = Error;
     }
   }
 

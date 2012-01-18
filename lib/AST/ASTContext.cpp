@@ -191,10 +191,10 @@ OneOfType::OneOfType(SourceLoc OneOfLoc, ArrayRef<OneOfElementDecl*> Elts,
     OneOfLoc(OneOfLoc), Elements(Elts), TheDecl(TheDecl) {
 }
 
-DottedNameType *DottedNameType::getNew(ASTContext &C,
+IdentifierType *IdentifierType::getNew(ASTContext &C,
                                        ArrayRef<Component> Components) {
   Components = C.AllocateCopy(Components);
-  return new (C) DottedNameType(Components);
+  return new (C) IdentifierType(Components);
 }
 
 

@@ -43,7 +43,7 @@ namespace swift {
     BuiltinFloat,
     Dependent,
     NameAlias,
-    DottedName,
+    Identifier,
     Paren,
     Tuple,
     OneOf,
@@ -257,10 +257,10 @@ public:
 };
 
     
-/// DottedNameType - A reference to a type through a dotted name, like a.b.c,
-/// where each dotted name is resolved during name binding.  These are never
-/// canonical and never uniqued.
-class DottedNameType : public TypeBase {
+/// IdentifierType - A use of a type through a (possibly dotted) name, like
+/// "foo" or "a.b.c".  These are never canonical and never uniqued, as they
+/// carry location info for each identifier.
+class IdentifierType : public TypeBase {
 public:
   class Component {
   public:
@@ -274,9 +274,9 @@ public:
   };
   
 private:
-  // DottedNameType are never canonical.
-  DottedNameType(ArrayRef<Component> Components)
-    : TypeBase(TypeKind::DottedName), Components(Components) {}
+  // IdentifierType are never canonical.
+  IdentifierType(ArrayRef<Component> Components)
+    : TypeBase(TypeKind::Identifier), Components(Components) {}
 public:
   
   /// The components that make this up.
@@ -284,9 +284,9 @@ public:
   ArrayRef<Component> Components;
 
   
-  /// getNew - Return a new DottedNameType with the specified Component
+  /// getNew - Return a new IdentifierType with the specified Component
   /// information.
-  static DottedNameType *getNew(ASTContext &C, ArrayRef<Component> Components);
+  static IdentifierType *getNew(ASTContext &C, ArrayRef<Component> Components);
 
   /// getMappedType - After name binding is complete, this indicates what type
   /// this refers to (without removing any other sugar).
@@ -299,9 +299,9 @@ public:
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const DottedNameType *) { return true; }
+  static bool classof(const IdentifierType *) { return true; }
   static bool classof(const TypeBase *T) {
-    return T->Kind == TypeKind::DottedName;
+    return T->Kind == TypeKind::Identifier;
   }
 };
 

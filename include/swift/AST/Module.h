@@ -33,7 +33,7 @@ namespace swift {
   class TypeAliasDecl;
   class LookupCache;
   class ValueDecl;
-  class DottedNameType;
+  class IdentifierType;
   
   /// NLKind - This is a specifier for the kind of name lookup being performed
   /// by various query methods.
@@ -148,10 +148,10 @@ private:
   /// of the translation unit's parse phase.
   ArrayRef<TypeAliasDecl*> UnresolvedTypes;
   
-  /// UnresolvedDottedTypes - This is a list of scope-qualified dotted types
+  /// UnresolvedIdentifierTypes - This is a list of scope-qualified dotted types
   /// that were unresolved at the end of the translation unit's parse
   /// phase.
-  ArrayRef<DottedNameType*> UnresolvedDottedTypes;
+  ArrayRef<IdentifierType*> UnresolvedIdentifierTypes;
   
   /// ImportedModules - This is the list of modules that are imported by this
   /// module.  This is filled in by the Name Binding phase.
@@ -176,16 +176,16 @@ public:
     UnresolvedTypes = UT;
   }
   
-  /// UnresolvedScopedTypes - This is a list of scope-qualified types
+  /// getUnresolvedIdentifierTypes - This is a list of scope-qualified types
   /// that were unresolved at the end of the translation unit's parse
   /// phase.
-  ArrayRef<DottedNameType*> getUnresolvedDottedTypes() const {
+  ArrayRef<IdentifierType*> getUnresolvedIdentifierTypes() const {
     assert(ASTStage == Parsed);
-    return UnresolvedDottedTypes;
+    return UnresolvedIdentifierTypes;
   }
-  void setUnresolvedDottedTypes(ArrayRef<DottedNameType*> T) {
+  void setUnresolvedIdentifierTypes(ArrayRef<IdentifierType*> T) {
     assert(ASTStage == Parsing);
-    UnresolvedDottedTypes = T;
+    UnresolvedIdentifierTypes = T;
   }
 
   /// ImportedModules - This is the list of modules that are imported by this

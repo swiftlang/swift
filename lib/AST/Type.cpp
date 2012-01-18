@@ -66,8 +66,8 @@ TypeBase *TypeBase::getCanonicalType() {
   case TypeKind::NameAlias:
     Result = cast<NameAliasType>(this)->getDesugaredType()->getCanonicalType();
     break;
-  case TypeKind::DottedName:
-    Result = cast<DottedNameType>(this)->getDesugaredType()->getCanonicalType();
+  case TypeKind::Identifier:
+    Result = cast<IdentifierType>(this)->getDesugaredType()->getCanonicalType();
     break;
   case TypeKind::Tuple: {
     SmallVector<TupleTypeElt, 8> CanElts;
@@ -123,8 +123,8 @@ TypeBase *TypeBase::getDesugaredType() {
     return this;
   case TypeKind::Paren:
     return cast<ParenType>(this)->getDesugaredType();
-  case TypeKind::DottedName:
-    return cast<DottedNameType>(this)->getDesugaredType();
+  case TypeKind::Identifier:
+    return cast<IdentifierType>(this)->getDesugaredType();
   case TypeKind::NameAlias:
     return cast<NameAliasType>(this)->getDesugaredType();
   }
@@ -140,7 +140,7 @@ TypeBase *NameAliasType::getDesugaredType() {
   return TheDecl->getUnderlyingType()->getDesugaredType();
 }
 
-TypeBase *DottedNameType::getDesugaredType() {
+TypeBase *IdentifierType::getDesugaredType() {
   return getMappedType()->getDesugaredType();
 }
 
@@ -158,7 +158,7 @@ const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {
   return APFloat::IEEEhalf;
 }
 
-Type DottedNameType::getMappedType() {
+Type IdentifierType::getMappedType() {
   assert(!Components.back().Value.isNull() &&
          "Name binding haven't resolved this to a type yet");
   return Components.back().Value.get<TypeBase*>();
@@ -291,7 +291,7 @@ void TypeBase::print(raw_ostream &OS) const {
     return cast<BuiltinIntegerType>(this)->print(OS);
   case TypeKind::Paren:         return cast<ParenType>(this)->print(OS);
   case TypeKind::NameAlias:     return cast<NameAliasType>(this)->print(OS);
-  case TypeKind::DottedName:    return cast<DottedNameType>(this)->print(OS);
+  case TypeKind::Identifier:    return cast<IdentifierType>(this)->print(OS);
   case TypeKind::OneOf:         return cast<OneOfType>(this)->print(OS);
   case TypeKind::MetaType:      return cast<MetaTypeType>(this)->print(OS);
   case TypeKind::Module:        return cast<ModuleType>(this)->print(OS);
@@ -335,7 +335,7 @@ void NameAliasType::print(raw_ostream &OS) const {
   OS << TheDecl->getName().get();
 }
 
-void DottedNameType::print(raw_ostream &OS) const {
+void IdentifierType::print(raw_ostream &OS) const {
   OS << Components[0].Id.get();
 
   for (const Component &C : Components.slice(1, Components.size()-1))

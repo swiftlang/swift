@@ -77,8 +77,8 @@ bool TypeChecker::validateType(Type InTy) {
       cast<NameAliasType>(T)->TheDecl
         ->overwriteUnderlyingType(ErrorType::get(Context));
     break;
-  case TypeKind::DottedName:
-    return validateType(cast<DottedNameType>(T)->getMappedType());
+  case TypeKind::Identifier:
+    return validateType(cast<IdentifierType>(T)->getMappedType());
   case TypeKind::Paren:
     return validateType(cast<ParenType>(T)->getUnderlyingType());
   case TypeKind::Tuple: {
