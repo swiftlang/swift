@@ -249,7 +249,9 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT) {
       return false;
     }
 
-  diagnose(DNT->Components.back().Loc, diag::dotted_reference_not_type)
+  diagnose(DNT->Components.back().Loc,
+           DNT->Components.size() == 1 ? diag::named_definition_isnt_type :
+             diag::dotted_reference_not_type, DNT->Components.back().Id)
     << SourceRange(Components[0].Loc, DNT->Components.back().Loc);
   return true;
 }
@@ -355,7 +357,7 @@ void swift::performNameBinding(TranslationUnit *TU) {
 
   // Loop over all the unresolved dotted types in the translation unit,
   // resolving them if possible.
-  for (IdentifierType *DNT : TU->getUnresolvedDottedTypes()) {
+  for (IdentifierType *DNT : TU->getUnresolvedIdentifierTypes()) {
     if (Binder.resolveIdentifierType(DNT)) {
       TypeBase *Error = TU->Ctx.TheErrorType.getPointer();
 

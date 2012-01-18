@@ -361,7 +361,7 @@ ERROR(unknown_name_in_type,sema_nb,none,
 ERROR(unknown_dotted_type_base,sema_nb,none,
       "type references cannot access elements of %0", (Identifier))
 ERROR(dotted_reference_not_type,sema_nb,none,
-      "dotted reference does not resolve to a type", ())
+      "dotted reference to %0 does not resolve to a type", (Identifier))
 
 
 ERROR(no_module_or_type,sema_nb,none,
