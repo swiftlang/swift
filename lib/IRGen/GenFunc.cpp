@@ -903,7 +903,7 @@ void IRGenFunction::emitEpilogue() {
 /// Emit the definition for the given global function.
 void IRGenModule::emitGlobalFunction(FuncDecl *func) {
   // Nothing to do if the function has no body.
-  if (!func->getInit()) return;
+  if (!func->getBody()) return;
 
   // FIXME: variant currying levels!
   // FIXME: also emit entrypoints with maximal explosion when all types are known!
@@ -913,7 +913,7 @@ void IRGenModule::emitGlobalFunction(FuncDecl *func) {
   llvm::Function *addr =
     getAddrOfGlobalFunction(func, explosionLevel, uncurryLevel);
 
-  FuncExpr *funcExpr = cast<FuncExpr>(func->getInit());
+  FuncExpr *funcExpr = func->getBody();
   IRGenFunction(*this, funcExpr, explosionLevel, uncurryLevel, addr)
     .emitFunctionTopLevel(funcExpr->getBody());
 }

@@ -29,6 +29,7 @@ namespace swift {
   class ASTContext;
   class Type;
   class Expr;
+  class FuncExpr;
   class BraceStmt;
   class Component;
   class DeclAttributes;
@@ -418,8 +419,8 @@ public:
   
   bool isPlus() const { return PlusLoc.isValid(); }
 
-  Expr *getBody() const { return getInit(); }
-  void setBody(Expr *Body) { setInit(Body); }
+  FuncExpr *getBody() const { return (FuncExpr*)getInit(); }
+  void setBody(FuncExpr *Body) { setInit((Expr*)Body); }
 
   
   SourceLoc getPlusLoc() const { return PlusLoc; }

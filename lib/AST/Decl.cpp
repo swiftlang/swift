@@ -239,11 +239,6 @@ namespace {
       OS << " type='";
       VD->getType()->print(OS);
       OS << "'";
-      
-      if (VD->getInit()) {
-        OS << '\n';
-        printRec(VD->getInit());
-      }
     }
 
 
@@ -259,11 +254,20 @@ namespace {
     
     void visitVarDecl(VarDecl *VD) {
       printCommon(VD, "var_decl");
+      if (VD->getInit()) {
+        OS << '\n';
+        printRec(VD->getInit());
+      }
+
       OS << ')';
     }
     
     void visitFuncDecl(FuncDecl *FD) {
       printCommon(FD, "func_decl");
+      if (FuncExpr *E = FD->getBody()) {
+        OS << '\n';
+        printRec(E);
+      }
       OS << ')';
     }
     
