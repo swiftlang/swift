@@ -295,16 +295,6 @@ static Expr *BindNames(Expr *E, WalkOrder Order, NameBinder &Binder) {
   return OverloadSetRefExpr::createWithCopy(Decls, Loc);
 }
 
-static void bindNamesInDecl(Decl *D, WalkExprType ^BinderBlock) {
-  if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
-    if (VD->getInit())
-      VD->setInit(VD->getInit()->walk(BinderBlock));
-  } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
-    for (Decl *Member : ED->getMembers()) {
-      bindNamesInDecl(Member, BinderBlock);
-    }
-  }
-}
 
 /// performNameBinding - Once parsing is complete, this walks the AST to
 /// resolve names and do other top-level validation.
@@ -368,27 +358,14 @@ void swift::performNameBinding(TranslationUnit *TU) {
     }
   }
 
-  NameBinder *NBPtr = &Binder;
-  auto BinderBlock = ^(Expr *E, WalkOrder Order, WalkContext const&) {
-    return BindNames(E, Order, *NBPtr);
-  };
+  NameBinder *NBPtr = &Binder;  // FIXME: Lambda's would be nice.
   
   // Now that we know the top-level value names, go through and resolve any
   // UnresolvedDeclRefExprs that exist.
-  for (unsigned i = 0, e = TU->Body->getNumElements(); i != e; ++i) {
-    BraceStmt::ExprStmtOrDecl Elt = TU->Body->getElement(i);
-    if (Decl *D = Elt.dyn_cast<Decl*>()) {
-      bindNamesInDecl(D, BinderBlock);
-    } else if (Stmt *S = Elt.dyn_cast<Stmt*>()) {
-      Elt = S->walk(BinderBlock);
-    } else {
-      Elt = Elt.get<Expr*>()->walk(BinderBlock);
-    }
-    
-    // Fill in null results with a dummy expression.
-    assert(!Elt.isNull());
-    TU->Body->setElement(i, Elt);
-  }
+  TU->Body = cast<BraceStmt>(TU->Body->walk(^(Expr *E, WalkOrder Order,
+                                              WalkContext const &) {
+    return BindNames(E, Order, *NBPtr);
+  }));
 
   TU->ASTStage = TranslationUnit::NameBound;
   verify(TU);
