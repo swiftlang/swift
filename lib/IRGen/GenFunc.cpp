@@ -52,6 +52,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/DerivedTypes.h"
@@ -912,6 +913,8 @@ void IRGenModule::emitGlobalFunction(FuncDecl *func) {
 
   llvm::Function *addr =
     getAddrOfGlobalFunction(func, explosionLevel, uncurryLevel);
+
+  PrettyStackTraceDecl stackTrace("emitting IR for", func);
 
   FuncExpr *funcExpr = func->getBody();
   IRGenFunction(*this, funcExpr, explosionLevel, uncurryLevel, addr)
