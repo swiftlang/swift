@@ -138,10 +138,8 @@ void TypeChecker::typeCheckDecl(Decl *D) {
 }
 
 bool DeclChecker::visitValueDecl(ValueDecl *VD) {
-  if (TC.validateType(VD)) {
-    VD->setInit(nullptr);
+  if (TC.validateType(VD))
     return true;
-  }
   
   validateAttributes(VD);
   return false;

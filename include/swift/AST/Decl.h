@@ -264,17 +264,13 @@ public:
 /// have an initializer, type, etc.
 class ValueDecl : public NamedDecl {
   Type Ty;
-  Expr *Init;
 
 protected:
-  ValueDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty, Expr *init)
-    : NamedDecl(K, DC, name), Ty(ty), Init(init) {
+  ValueDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty)
+    : NamedDecl(K, DC, name), Ty(ty) {
   }
 
 public:
-
-  Expr *getInit() const { return Init; }
-  void setInit(Expr *init) { Init = init; }
 
   /// isDefinition - Return true if this is a definition of a decl, not a
   /// forward declaration (e.g. of a function) that is implemented outside of
@@ -373,6 +369,7 @@ public:
 class VarDecl : public ValueDecl {
 private:
   SourceLoc VarLoc;    // Location of the 'var' token.
+  Expr *Init;
 
   /// NestedName - If this is a simple var definition, the name is stored in the
   /// name identifier.  If the varname is complex, Name is empty and this
@@ -382,12 +379,15 @@ private:
 public:
   VarDecl(SourceLoc VarLoc, Identifier Name, Type Ty, Expr *Init,
           DeclContext *DC)
-    : ValueDecl(DeclKind::Var, DC, Name, Ty, Init), VarLoc(VarLoc),
+    : ValueDecl(DeclKind::Var, DC, Name, Ty), VarLoc(VarLoc), Init(Init),
       NestedName(0) {}
   VarDecl(SourceLoc VarLoc, DeclVarName *Name, Type Ty, Expr *Init,
           DeclContext *DC)
-    : ValueDecl(DeclKind::Var, DC, Identifier(), Ty, Init),
-      VarLoc(VarLoc), NestedName(Name) {}
+    : ValueDecl(DeclKind::Var, DC, Identifier(), Ty),
+      VarLoc(VarLoc), Init(Init), NestedName(Name) {}
+
+  Expr *getInit() const { return Init; }
+  void setInit(Expr *init) { Init = init; }
 
   /// getVarLoc - The location of the 'var' token.
   SourceLoc getVarLoc() const { return VarLoc; }
@@ -409,18 +409,18 @@ public:
 class FuncDecl : public ValueDecl {
   SourceLoc PlusLoc;    // Location of the 'plus' token or invalid if not 'plus'
   SourceLoc FuncLoc;    // Location of the 'func' token.
-
+  FuncExpr *Body;
 public:
   FuncDecl(SourceLoc PlusLoc, SourceLoc FuncLoc, Identifier Name,
-           Type Ty, Expr *Init, DeclContext *DC)
-    : ValueDecl(DeclKind::Func, DC, Name, Ty, Init), PlusLoc(PlusLoc),
-      FuncLoc(FuncLoc) {
+           Type Ty, FuncExpr *Body, DeclContext *DC)
+    : ValueDecl(DeclKind::Func, DC, Name, Ty), PlusLoc(PlusLoc),
+      FuncLoc(FuncLoc), Body(Body) {
   }
   
   bool isPlus() const { return PlusLoc.isValid(); }
 
-  FuncExpr *getBody() const { return (FuncExpr*)getInit(); }
-  void setBody(FuncExpr *Body) { setInit((Expr*)Body); }
+  FuncExpr *getBody() const { return Body; }
+  void setBody(FuncExpr *NewBody) { Body = NewBody; }
 
   
   SourceLoc getPlusLoc() const { return PlusLoc; }
@@ -451,7 +451,7 @@ class OneOfElementDecl : public ValueDecl {
 public:
   OneOfElementDecl(SourceLoc IdentifierLoc, Identifier Name, Type Ty,
                    Type ArgumentType, DeclContext *DC)
-  : ValueDecl(DeclKind::OneOfElement, DC, Name, Ty, 0),
+  : ValueDecl(DeclKind::OneOfElement, DC, Name, Ty),
     IdentifierLoc(IdentifierLoc), ArgumentType(ArgumentType) {}
 
   Type getArgumentType() const { return ArgumentType; }
@@ -481,7 +481,7 @@ class ArgDecl : public ValueDecl {
   
 public:
   ArgDecl(SourceLoc FuncLoc, Identifier Name, Type Ty, DeclContext *DC)
-    : ValueDecl(DeclKind::Arg, DC, Name, Ty, 0),
+    : ValueDecl(DeclKind::Arg, DC, Name, Ty),
       FuncLoc(FuncLoc) {}
 
   SourceLoc getFuncLoc() const { return FuncLoc; }
@@ -504,7 +504,7 @@ class ElementRefDecl : public ValueDecl {
 public:
   ElementRefDecl(VarDecl *VD, SourceLoc NameLoc, Identifier Name,
                  ArrayRef<unsigned> Path, Type Ty, DeclContext *DC)
-    : ValueDecl(DeclKind::ElementRef, DC, Name, Ty, 0), VD(VD),
+    : ValueDecl(DeclKind::ElementRef, DC, Name, Ty), VD(VD),
       NameLoc(NameLoc), AccessPath(Path) {
   }
 
