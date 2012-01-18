@@ -33,26 +33,6 @@ bool Parser::isStartOfExpr(const Token &Tok, const Token &Next) {
   return false;
 }
 
-/// parseSingleExpr
-///
-/// Parse an expression in a context that requires a single expression.
-ParseResult<Expr> Parser::parseSingleExpr(Diag<> Message) {
-  ParseResult<Expr> Result = parseExpr(Message);
-  if (Result) return true;
-
-  // Kill all the following expressions.  This is not necessarily
-  // good for certain kinds of recovery.
-  if (isStartOfExpr(Tok, peekToken())) {
-    diagnose(Tok, diag::expected_single_expr);
-    do {
-      ParseResult<Expr> Extra = parseExpr(Message);
-      if (Extra) break;
-    } while (isStartOfExpr(Tok, peekToken()));
-  }
-
-  return Result;
-}
-
 /// parseExpr
 ///   expr:
 ///     expr-unary
@@ -235,7 +215,7 @@ ParseResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
     if (consumeIf(tok::l_square)) {
       ParseResult<Expr> Idx;
       SourceLoc RLoc;
-      if ((Idx = parseSingleExpr(diag::expected_expr_subscript_value)) ||
+      if ((Idx = parseExpr(diag::expected_expr_subscript_value)) ||
           parseMatchingToken(tok::r_square, RLoc,
                              diag::expected_bracket_array_subscript,
                              TokLoc, diag::opening_bracket))
@@ -369,7 +349,7 @@ ParseResult<Expr> Parser::parseExprParen() {
       }
       
       ParseResult<Expr> SubExpr;
-      if ((SubExpr = parseSingleExpr(diag::expected_expr_parentheses)))
+      if ((SubExpr = parseExpr(diag::expected_expr_parentheses)))
         return true;
       
       if (SubExpr.isSemaError())

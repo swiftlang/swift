@@ -225,7 +225,7 @@ ParseResult<Stmt> Parser::parseStmtIf() {
 
   ParseResult<Expr> Condition;
   ParseResult<BraceStmt> NormalBody;
-  if ((Condition = parseSingleExpr(diag::expected_expr_if)) ||
+  if ((Condition = parseExpr(diag::expected_expr_if)) ||
       (NormalBody = parseStmtBrace(diag::expected_lbrace_after_if)))
     return true;
     
@@ -264,7 +264,7 @@ ParseResult<Stmt> Parser::parseStmtWhile() {
   
   ParseResult<Expr> Condition;
   ParseResult<BraceStmt> Body;
-  if ((Condition = parseSingleExpr(diag::expected_expr_while)) ||
+  if ((Condition = parseExpr(diag::expected_expr_while)) ||
       (Body = parseStmtBrace(diag::expected_lbrace_after_while)))
     return true;
   

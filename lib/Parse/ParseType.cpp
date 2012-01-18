@@ -164,7 +164,7 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
       // Parse the optional default value expression.
       if (Tok.is(tok::colon)) {
         ParseResult<Expr> initResult =
-          parseSingleExpr(diag::expected_initializer_expr);
+          parseExpr(diag::expected_initializer_expr);
 
         // Die if there was a parse error.
         if (initResult) {
@@ -214,7 +214,7 @@ bool Parser::parseTypeArray(SourceLoc LSquareLoc, Type &Result) {
   
   ParseResult<Expr> SizeEx;
   SourceLoc RArrayTok;
-  if ((SizeEx = parseSingleExpr(diag::expected_expr_array_type)) ||
+  if ((SizeEx = parseExpr(diag::expected_expr_array_type)) ||
       parseMatchingToken(tok::r_square, RArrayTok,
                          diag::expected_rbracket_array_type,
                          LSquareLoc, diag::opening_bracket))

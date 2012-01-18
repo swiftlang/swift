@@ -227,7 +227,6 @@ public:
   // Expression Parsing
   
   static bool isStartOfExpr(const Token &Tok, const Token &Next);
-  ParseResult<Expr> parseSingleExpr(Diag<> ID);
   ParseResult<Expr> parseExpr(Diag<> ID);
   ParseResult<Expr> parseExprPostfix(Diag<> ID);
   ParseResult<Expr> parseExprUnary(Diag<> ID);
