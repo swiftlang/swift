@@ -72,3 +72,8 @@ Address IRGenFunction::getLocal(ValueDecl *D) {
   assert(I != Locals.end() && "no entry in local map!");
   return I->second;
 }
+
+void IRGenFunction::setLocal(ValueDecl *D, Address addr) {
+  assert(!Locals.count(D));
+  Locals.insert(std::make_pair(D, addr));
+}

@@ -172,6 +172,7 @@ public:
   void emitLocal(Decl *D);
   Address getLocal(ValueDecl *D);
   LValue getGlobal(VarDecl *D, const TypeInfo &TInfo);
+  void setLocal(ValueDecl *D, Address addr);
 
 private:
   void emitLocalVar(VarDecl *D);

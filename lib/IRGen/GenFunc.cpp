@@ -767,6 +767,87 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &resultType) {
   }
 }
 
+/// Emit a specific parameter.
+static void emitParameter(IRGenFunction &IGF, ArgDecl *param,
+                          Explosion &paramValues) {
+  const TypeInfo &paramType = IGF.IGM.getFragileTypeInfo(param->getType());
+
+  ExplosionSchema paramSchema(paramValues.getKind());
+  paramType.getExplosionSchema(paramSchema);
+
+  // If the schema contains a single aggregate, assume we can
+  // just treat the next parameter as that type.
+  Address paramAddr;
+  if (paramSchema.size() == 1 && paramSchema.begin()->isAggregate()) {
+    llvm::Value *addr = paramValues.claimNext();
+    addr = IGF.Builder.CreateBitCast(addr,
+                    paramSchema.begin()->getAggregateType()->getPointerTo());
+    paramAddr = Address(addr, paramType.StorageAlignment);
+
+  // Otherwise, make an alloca and load into it.
+  } else {
+    paramAddr = IGF.createScopeAlloca(paramType.getStorageType(),
+                                      paramType.StorageAlignment,
+                                      param->getName().str());
+
+    paramType.storeExplosion(IGF, paramValues, paramAddr);
+  }
+
+  IGF.setLocal(param, paramAddr);
+}
+
+/// Emit a specific parameter clause by walking into any literal tuple
+/// types and matching 
+static void emitParameterClause(IRGenFunction &IGF, Type paramType,
+                                Explosion &paramValues) {
+  // Walk into tuple types.
+  if (TupleType *tuple = dyn_cast<TupleType>(paramType)) {
+    for (const TupleTypeElt &field : tuple->Fields) {
+      // If this element is bound to a name (i.e. has an ArgDecl), load it
+      // into a variable and map that as as local declaration.
+      if (ArgDecl *param = field.getArgDecl()) {
+        emitParameter(IGF, param, paramValues);
+        // TODO: bind sub-elements when necessary.
+
+      // Otherwise, recurse on the type in case it's a tuple and
+      // provides its own ArgDecls.
+      } else {
+        emitParameterClause(IGF, field.getType(), paramValues);
+      }
+    }
+    return;
+  }
+
+  // Look through paren types.
+  if (ParenType *paren = dyn_cast<ParenType>(paramType)) {
+    return emitParameterClause(IGF, paren->getUnderlyingType(), paramValues);
+  }
+
+  // Otherwise, we're ignoring this argument, but we still need to
+  // consume the right number of values.
+  ExplosionSchema paramSchema(paramValues.getKind());
+  IGF.IGM.getExplosionSchema(paramType, paramSchema);
+  paramValues.claim(paramSchema.size());
+}
+
+/// Emit all the parameter clauses of the given function type.  This
+/// is basically making sure that we have mappings for all the
+/// ArgDecls.
+static void emitParameterClauses(IRGenFunction &IGF, Type fnType,
+                                 unsigned uncurryLevel,
+                                 Explosion &paramValues) {
+  // We never uncurry into something that's not written immediately as
+  // a function type.
+  FunctionType *fn = cast<FunctionType>(fnType);
+
+  // When uncurrying, later argument clauses are emitted first.
+  if (uncurryLevel)
+    emitParameterClauses(IGF, fn->Result, uncurryLevel - 1, paramValues);
+
+  // Finally, emit this clause.
+  emitParameterClause(IGF, fn->Input, paramValues);
+}
+
 /// Emit the prologue for the function.
 void IRGenFunction::emitPrologue() {
   // Set up the IRBuilder.
@@ -784,10 +865,10 @@ void IRGenFunction::emitPrologue() {
   ReturnBB = createBasicBlock("return");
   CurFn->getBasicBlockList().push_back(ReturnBB);
 
-  // Copy over the arguments as an Explosion.
-  Explosion args(CurExplosionLevel);
+  // List out the parameter values in an Explosion.
+  Explosion values(CurExplosionLevel);
   for (auto i = CurFn->arg_begin(), e = CurFn->arg_end(); i != e; ++i) {
-    args.add(i);
+    values.add(i);
   }
 
   // Set up the return slot, stealing the first argument if necessary.
@@ -799,7 +880,7 @@ void IRGenFunction::emitPrologue() {
     resultType.getExplosionSchema(resultSchema);
 
     if (requiresAggregateResult(resultSchema)) {
-      ReturnSlot = Address(args.claimNext(), resultType.StorageAlignment);
+      ReturnSlot = Address(values.claimNext(), resultType.StorageAlignment);
     } else if (resultSchema.empty()) {
       assert(!ReturnSlot.isValid());
     } else {
@@ -810,37 +891,11 @@ void IRGenFunction::emitPrologue() {
   }
 
   // Set up the parameters.
-  for (ArgDecl *parm : CurFuncExpr->getNamedArgs()) {
-    const TypeInfo &parmType = IGM.getFragileTypeInfo(parm->getType());
+  emitParameterClauses(*this, CurFuncExpr->getType(), CurUncurryLevel, values);
 
-    ExplosionSchema parmSchema(args.getKind());
-    parmType.getExplosionSchema(parmSchema);
+  // TODO: set up the data pointer.
 
-    // If the schema contains a single aggregate, assume we can
-    // just treat the next parameter as that type.
-    Address parmAddr;
-    if (parmSchema.size() == 1 && parmSchema.begin()->isAggregate()) {
-      llvm::Value *addr = args.claimNext();
-      addr = Builder.CreateBitCast(addr,
-                     parmSchema.begin()->getAggregateType()->getPointerTo());
-      parmAddr = Address(addr, parmType.StorageAlignment);
-
-    // Otherwise, make an alloca and load into it.
-    } else {
-      parmAddr = createScopeAlloca(parmType.getStorageType(),
-                                   parmType.StorageAlignment,
-                                   parm->getName().str());
-
-      parmType.storeExplosion(*this, args, parmAddr);
-    }
-
-    assert(!Locals.count(parm));
-    Locals.insert(std::make_pair(parm, parmAddr));
-  }
-
-  // TODO: data pointer
-
-  assert(args.empty() && "didn't exhaust all parameters?");
+  assert(values.empty() && "didn't exhaust all parameters?");
 }
 
 /// Emit the epilogue for the function.
