@@ -510,7 +510,7 @@ bool Parser::parseDeclVar(SmallVectorImpl<Decl*> &Decls) {
   
   Type Ty;
   NullablePtr<Expr> Init;
-  if (parseValueSpecifier(Ty, Init, /*single*/ false))
+  if (parseValueSpecifier(Ty, Init))
     return true;
 
   if (Ty.isNull())

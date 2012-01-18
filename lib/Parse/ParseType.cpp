@@ -148,7 +148,7 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
         consumeToken(tok::identifier);
 
         NullablePtr<Expr> init;
-        if ((HadError = parseValueSpecifier(type, init, /*single*/ true)))
+        if ((HadError = parseValueSpecifier(type, init)))
           break;
 
         Elements.push_back(TupleTypeElt(type, name, init.getPtrOrNull()));

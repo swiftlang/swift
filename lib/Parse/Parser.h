@@ -156,7 +156,7 @@ public:
                           SourceLoc OtherLoc, Diag<> OtherNote,
                           tok SkipToTok = tok::unknown);
   
-  bool parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init, bool Single);
+  bool parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init);
 
   bool parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Decls,
                           bool IsTopLevel);

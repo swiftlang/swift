@@ -170,8 +170,7 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
 ///   ':' type
 ///   ':' type '=' expr
 ///   '=' expr
-bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init,
-                                 bool SingleInit) {
+bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init) {
   // Diagnose when we don't have a type or an expression.
   if (Tok.isNot(tok::colon) && Tok.isNot(tok::equal)) {
     diagnose(Tok, diag::expected_type_or_init);
@@ -187,12 +186,7 @@ bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init,
   
   // Parse the initializer, if present.
   if (consumeIf(tok::equal)) {
-    ParseResult<Expr> Tmp;
-    if (SingleInit) {
-      Tmp = parseSingleExpr(diag::expected_initializer_expr);
-    } else {
-      Tmp = parseExpr(diag::expected_initializer_expr);
-    }
+    ParseResult<Expr> Tmp = parseExpr(diag::expected_initializer_expr);
     if (Tmp)
       return true;
     
