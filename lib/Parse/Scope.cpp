@@ -39,8 +39,8 @@ Scope::Scope(Parser *P) : SI(P->ScopeInfo), ValueHTScope(SI.ValueScopeHT),
 
 static void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New, Parser &P) {
   assert(New != Prev && "Cannot conflict with self");
-  P.diagnose(New->getLocStart(), diag::decl_redefinition, New->getInit() != 0);
-  P.diagnose(Prev->getLocStart(), diag::previous_decldef, Prev->getInit() != 0,
+  P.diagnose(New->getLocStart(), diag::decl_redefinition, New->isDefinition());
+  P.diagnose(Prev->getLocStart(), diag::previous_decldef, Prev->isDefinition(),
              Prev->getName());
 }
 

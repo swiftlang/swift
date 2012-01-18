@@ -140,6 +140,29 @@ TypeJudgement ValueDecl::getTypeJudgement() const {
   }
 }
 
+/// isDefinition - Return true if this is a definition of a decl, not a
+/// forward declaration (e.g. of a function) that is implemented outside of
+/// the swift code.
+bool ValueDecl::isDefinition() const {
+  switch (getKind()) {
+  case DeclKind::Import:
+  case DeclKind::Extension:
+    llvm_unreachable("non-value decls shouldn't get here");
+      
+  case DeclKind::Var:
+    return cast<VarDecl>(this)->getInit() != 0;
+  case DeclKind::Func:
+    return cast<FuncDecl>(this)->getBody() != 0;
+
+  case DeclKind::Arg:
+  case DeclKind::ElementRef:
+  case DeclKind::OneOfElement:
+  case DeclKind::TypeAlias:
+    return true;
+  }
+}
+
+
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                              Type Underlyingty, DeclContext *DC)
   : ValueDecl(DeclKind::TypeAlias, DC, Name, Type(), 0), AliasTy(0),

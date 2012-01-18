@@ -275,6 +275,11 @@ public:
   Expr *getInit() const { return Init; }
   void setInit(Expr *init) { Init = init; }
 
+  /// isDefinition - Return true if this is a definition of a decl, not a
+  /// forward declaration (e.g. of a function) that is implemented outside of
+  /// the swift code.
+  bool isDefinition() const;
+  
   bool hasType() const { return !Ty.isNull(); }
   Type getType() const {
     assert(!Ty.isNull() && "declaration has no type set yet");
@@ -413,6 +418,10 @@ public:
   
   bool isPlus() const { return PlusLoc.isValid(); }
 
+  Expr *getBody() const { return getInit(); }
+  void setBody(Expr *Body) { setInit(Body); }
+
+  
   SourceLoc getPlusLoc() const { return PlusLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }
     
