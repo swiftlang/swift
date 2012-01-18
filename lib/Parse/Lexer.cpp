@@ -81,6 +81,8 @@ void Lexer::skipSlashSlashComment() {
   }
 }
 
+/// skipSlashStarComment - /**/ comments are skipped (treated as whitespace).
+/// Note that (unlike in C) block comments can be nested.
 void Lexer::skipSlashStarComment() {
   const char *StartPtr = CurPtr-1;
   assert(CurPtr[-1] == '/' && CurPtr[0] == '*' && "Not a /* comment");
@@ -295,7 +297,7 @@ Restart:
       goto Restart;
     }
       
-    // '/' starts an identifier.
+    // '/' starts an operator identifier.
     return lexOperatorIdentifier();
 
   case '=':

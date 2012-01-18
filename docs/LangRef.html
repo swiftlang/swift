@@ -98,14 +98,14 @@
   <!-- ********************************************************************* -->
 
   <div class="commentary">
-    The careful factoring of the grammar allows forward referencing of
-    types and values and allows parsing without resolution of import
-    declarations.
+    Because Swift doesn't rely on a C-style "lexer hack" to know what is a type
+    and what is a value, it is possible to fully parse a file without resolving
+    import declarations.
   </div>
 
   <p>Swift has a strict separation between its phases of translation, and the
-  grammar is carefully factored so that there is never ambiguity about whether
-  an identifier refers to a type of a value. The phases of translation are:</p>
+     compiler follows a conceptually simple design.  The phases of translation
+     are:</p>
   
   <ul>
   <li><a href="#lexical">Lexing</a>: A translation unit is broken into tokens
@@ -117,7 +117,7 @@
     translation unit (and eventually namespace) scope are bound.
   </li>
   <li><a href="#namebind">Name Binding</a>: At this phase, references to
-    non-local types and values are bound, and <a href="#decl-import">import
+      non-local types and values are bound, and <a href="#decl-import">import
       directives</a> are both validated and searched.  Name binding can cause
       recursive compilation of modules that are referenced but not yet built.
   </li>
@@ -125,12 +125,13 @@
     resolved within value definitions, <a href="#expr-call">function
     application</a> and <a href="#expr-infix">binary expressions</a> are found
     and formed, and overloaded functions are resolved.</li>
-  <li>Code Generation</li>
-  <li>Linking</li>
+  <li>Code Generation: The AST is converted the LLVM IR, optimizations are
+      performed, and machine code generated.</li>
+    <li>Linking: runtime libraries and referenced modules are linked in.</li>
   </ul>
   
   <p>
-  TODO: "import swift" implicitly added as the last import in translation unit.
+  FIXME: "import swift" implicitly added as the last import in translation unit.
   </p>
   
   <!-- ********************************************************************* -->
@@ -153,6 +154,10 @@
   <h3>Whitespace and Comments</h3>
   <!-- ===================================================================== -->
   
+  <div class="commentary">
+    Nested block comments are useful, because we don't have the nestable "#if 0"
+    hack from C to rely on.
+  </div>
   <pre class="grammar">
     whitespace ::= ' '
     whitespace ::= '\n'
@@ -170,8 +175,8 @@
      A '(' at the beginning of a file is spaced.</p>
   
   <p>Comments may follow the BCPL style, starting with a "//" and running to the
-     end of the line, or may be nested /**/ style comments.  Comments are
-     ignored and treated as whitespace.</p>
+     end of the line, or may be recursively nested /**/ style comments. Comments
+     are ignored and treated as whitespace.</p>
   
   <!-- ===================================================================== -->
   <h3>Reserved Punctuation Tokens</h3>
@@ -217,12 +222,6 @@
     The number of keywords is reduced by pushing most functionality
     into the library.  This allows us to add new stuff to the library in
     the future without worrying about conflicting with the user's namespace.
-    <br><br>
-
-    Idea: Should _foo be "private" and "foo" be public, how about "Foo" vs
-    "foo"? In the code you immediately know whether something is exported, and
-    don't need to sprinkle attributes everywhere, OTOH, it makes it harder to 
-    remember (like not having a naming convention).<br><br>
   </div>
 
   <pre class="grammar">
@@ -233,14 +232,16 @@
     keyword ::= 'var'
     keyword ::= 'func'
     keyword ::= 'typealias'
+    keyword ::= 'protocol'
     keyword ::= 'plus'
 
     keyword ::= 'if'
     keyword ::= 'else'
+    keyword ::= 'while'
+    keyword ::= 'return'
   </pre>
 
-  <p>These are the builtin keywords.  Swift intentionally tries to reduce the
-     number of keywords where possible.</p>
+  <p>These are the builtin keywords.</p>
 
   <!-- ===================================================================== -->
   <h3 id="numeric_constant">Numeric Constant</h3>
@@ -248,8 +249,7 @@
   
   <div class="commentary">
     We require a digit after a dot to allow lexing "4.km" as "4 . km" instead of
-    "4. km".  This regex can be generalized to support exponents, hex, octal,
-    and binary in the future as desired.  Octal should be 0o123 not 0123.
+    "4. km".  This regex can be generalized to support exponents someday.
   </div>
 
   <pre class="grammar">
