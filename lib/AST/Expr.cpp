@@ -686,7 +686,7 @@ namespace {
 
     /// Returns true on failure.
     bool visitDecl(Decl *D) {
-      if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
+      if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
         if (Expr *Init = VD->getInit()) {
 #ifndef NDEBUG
           PrettyStackTraceDecl debugStack("walking into initializer for", VD);
@@ -696,6 +696,17 @@ namespace {
           else
             return true;
         }
+      } else if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
+        if (FuncExpr *Body = FD->getBody()) {
+#ifndef NDEBUG
+          PrettyStackTraceDecl debugStack("walking into body of", FD);
+#endif
+          if (FuncExpr *E2 = cast_or_null<FuncExpr>(doIt(Body)))
+            FD->setBody(E2);
+          else
+            return true;
+        }
+
       } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
         for (Decl *M : ED->getMembers()) {
           if (visitDecl(M))
