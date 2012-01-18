@@ -52,6 +52,25 @@ public:
     if (visitValueDecl(VD))
       return;
     
+    // Validate that the initializers type matches the expected type.
+    if (VD->getInit() == 0) {
+      // If we have no initializer and the type is dependent, then the
+      // initializer was invalid and removed.
+      if (VD->getType()->is<DependentType>())
+        return;
+    } else {
+      Type DestTy = VD->getType();
+      if (DestTy->is<DependentType>())
+        DestTy = Type();
+      Expr *Init = VD->getInit();
+      if (!TC.typeCheckExpression(Init, DestTy)) {
+        VD->setInit(Init);
+        VD->overwriteType(Init->getType());
+      } else if (!DestTy.isNull()) {
+        TC.diagnose(VD->getLocStart(), diag::while_converting_var_init, DestTy);
+      }
+    }
+    
     // If the VarDecl had a name specifier, verify that it lines up with the
     // actual type of the VarDecl.
     if (VD->getNestedName() && validateVarName(VD->getType(), VD->getNestedName()))
@@ -60,6 +79,23 @@ public:
   
   void visitFuncDecl(FuncDecl *FD) {
     visitValueDecl(FD);
+    
+    // Validate that the initializers type matches the expected type.
+    if (FD->getBody() == 0) {
+      // If we have no initializer and the type is dependent, then the
+      // initializer was invalid and removed.
+      if (FD->getType()->is<DependentType>())
+        return;
+    } else {
+      Type DestTy = FD->getType();
+      if (DestTy->is<DependentType>())
+        DestTy = Type();
+      Expr *Body = FD->getBody();
+      if (!TC.typeCheckExpression(Body, DestTy)) {
+        FD->setBody(cast<FuncExpr>(Body));
+        FD->overwriteType(Body->getType());
+      }
+    }
   }
   void visitOneOfElementDecl(OneOfElementDecl *OOED) {
     // No type checking required?
@@ -105,25 +141,6 @@ bool DeclChecker::visitValueDecl(ValueDecl *VD) {
   if (TC.validateType(VD)) {
     VD->setInit(nullptr);
     return true;
-  }
-  
-  // Validate that the initializers type matches the expected type.
-  if (!VD->getInit()) {
-    // If we have no initializer and the type is dependent, then the initializer
-    // was invalid and removed.
-    if (VD->getType()->is<DependentType>())
-      return true;
-  } else {
-    Type DestTy = VD->getType();
-    if (DestTy->is<DependentType>())
-      DestTy = Type();
-    Expr *Init = VD->getInit();
-    if (!TC.typeCheckExpression(Init, DestTy)) {
-      VD->setInit(Init);
-      VD->overwriteType(Init->getType());
-    } else if (isa<VarDecl>(VD) && !DestTy.isNull()) {
-      TC.diagnose(VD->getLocStart(), diag::while_converting_var_init, DestTy);
-    }
   }
   
   validateAttributes(VD);
