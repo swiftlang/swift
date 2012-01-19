@@ -36,8 +36,7 @@ TranslationUnit *Parser::parseTranslationUnit() {
   consumeToken();
   SourceLoc FileStartLoc = Tok.getLoc();
 
-  StringRef ModuleName
-    = llvm::sys::path::stem(Buffer->getBufferIdentifier());
+  StringRef ModuleName = llvm::sys::path::stem(Buffer->getBufferIdentifier());
   TranslationUnit *TU =
     new (Context) TranslationUnit(Context.getIdentifier(ModuleName),
                                   Component, Context);
@@ -52,26 +51,9 @@ TranslationUnit *Parser::parseTranslationUnit() {
   
   // First thing, we transform the body into a brace expression.
   TU->Body = BraceStmt::create(Context, FileStartLoc, Items, FileEnd);
-    
-  // Do a prepass over the declarations to make sure they have basic sanity and
-  // to find the list of top-level value declarations.
-  for (auto Elt : TU->Body->getElements()) {
-    if (!Elt.is<Decl*>()) continue;
-    
-    Decl *D = Elt.get<Decl*>();
-    
-    // If any top-level value decl has an unresolved type, then it is erroneous.
-    // It is not valid to have something like "var x = 4" at the top level, all
-    // types must be explicit here.
-    ValueDecl *VD = dyn_cast<ValueDecl>(D);
-    if (VD == 0) continue;
-    
-    // FIXME: This can be better handled in the various ActOnDecl methods when
-    // they get passed in a parent context decl.
-  }
   
-  // Verify that any forward declared types were ultimately defined.
-  // TODO: Move this to name binding!
+  // Turn our little catalog of unresolved types and identifier types into a
+  // list on the TranslationUnit, so NameBinding can bind them.
   SmallVector<TypeAliasDecl*, 8> UnresolvedTypeList;
   for (TypeAliasDecl *Decl : UnresolvedTypeNames) {
     if (!Decl->hasUnderlyingType())

@@ -192,6 +192,7 @@ bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init) {
     
     if (!Tmp.isSemaError())
       Init = Tmp.get();
+    // FIXME: Create an ErrorExpr here.
     
     // If there was an expression, but it had a parse error, give the var decl
     // an error type to avoid chained errors.

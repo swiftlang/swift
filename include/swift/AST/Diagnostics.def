@@ -237,8 +237,6 @@ ERROR(expected_expr,expr_parsing,none,
 ERROR(expected_expr_after_operator,expr_parsing,none,
       "expected expression after operator", ())
 
-ERROR(expected_single_expr,expr_parsing,none,
-      "expected a singular expression", ())
 ERROR(expected_field_name,expr_parsing,none,
       "expected field name following '.'", ())
 ERROR(expected_dollar_numeric,expr_parsing,none,
