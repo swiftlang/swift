@@ -215,10 +215,8 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT) {
   assert(!Components[0].Value.isNull() && "Failed to get a base");
   
   // Now that we have a base, iteratively resolve subsequent member entries.
-  for (unsigned i = 1, e = Components.size(); i != e; ++i) {
-    auto &LastOne = Components[i-1];
-    auto &C = Components[i];
-    
+  auto LastOne = Components[0];
+  for (auto &C : Components.slice(1, Components.size()-1)) {
     // TODO: Only support digging into modules so far.
     if (auto M = LastOne.Value.dyn_cast<Module*>()) {
 #if 0
@@ -238,6 +236,8 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT) {
       << SourceRange(Components[0].Loc, Components.back().Loc);
       return true;
     }
+    
+    LastOne = C;
   }
   
   // Finally, sanity check that the last value is a type.
