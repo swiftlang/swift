@@ -276,18 +276,18 @@ public:
   
 private:
   // IdentifierType are never canonical.
-  IdentifierType(ArrayRef<Component> Components)
+  IdentifierType(MutableArrayRef<Component> Components)
     : TypeBase(TypeKind::Identifier), Components(Components) {}
 public:
   
   /// The components that make this up.
-  /// FIXME: This should be a MutableArrayRef when we have it someday.
-  ArrayRef<Component> Components;
+  const MutableArrayRef<Component> Components;
 
   
   /// getNew - Return a new IdentifierType with the specified Component
   /// information.
-  static IdentifierType *getNew(ASTContext &C, ArrayRef<Component> Components);
+  static IdentifierType *getNew(ASTContext &C,
+                                MutableArrayRef<Component> Components);
 
   /// getMappedType - After name binding is complete, this indicates what type
   /// this refers to (without removing any other sugar).

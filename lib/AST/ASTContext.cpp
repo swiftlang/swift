@@ -196,7 +196,7 @@ OneOfType::OneOfType(SourceLoc OneOfLoc, ArrayRef<OneOfElementDecl*> Elts,
 }
 
 IdentifierType *IdentifierType::getNew(ASTContext &C,
-                                       ArrayRef<Component> Components) {
+                                       MutableArrayRef<Component> Components) {
   Components = C.AllocateCopy(Components);
   return new (C) IdentifierType(Components);
 }

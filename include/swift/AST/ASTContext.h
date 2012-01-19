@@ -95,6 +95,13 @@ public:
     return ArrayRef<T>(AllocateCopy<T>(Arr.begin(), Arr.end()),
                              Arr.size());
   }
+  
+  template<typename T>
+  MutableArrayRef<T> AllocateCopy(MutableArrayRef<T> Arr) {
+    return MutableArrayRef<T>(AllocateCopy<T>(Arr.begin(), Arr.end()),
+                       Arr.size());
+  }
+
 
   template<typename T>
   ArrayRef<T> AllocateCopy(const SmallVectorImpl<T> &Vec) {

@@ -169,9 +169,7 @@ void NameBinder::addImport(ImportDecl *ID,
 /// failure.  On failure, this leaves IdentifierType alone, otherwise it fills
 /// in the Components.
 bool NameBinder::resolveIdentifierType(IdentifierType *DNT) {
-  // FIXME: we really want a MutableArrayRef.
-  auto Components =
-    const_cast<IdentifierType::Component*>(DNT->Components.data());
+  const MutableArrayRef<IdentifierType::Component> &Components =DNT->Components;
   
   // If name lookup for the base of the type didn't get resolved in the
   // parsing phase, do a global lookup for it.
@@ -188,7 +186,7 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT) {
     // Certain matches (e.g. of a function) should just be filtered out/ignored.
     if (Decls.size() > 1) {
       diagnose(Loc, diag::abiguous_type_base, Name)
-        << SourceRange(Loc, DNT->Components.back().Loc);
+        << SourceRange(Loc, Components.back().Loc);
       for (ValueDecl *D : Decls)
         diagnose(D->getLocStart(), diag::found_candidate);
       return true;
@@ -206,18 +204,18 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT) {
     
       // If we still don't have anything, we fail.
       if (Components[0].Value.isNull()) {
-        diagnose(Loc, DNT->Components.size() == 1 ? 
+        diagnose(Loc, Components.size() == 1 ? 
                    diag::use_undeclared_type : diag::unknown_name_in_type, Name)
-          << SourceRange(Loc, DNT->Components.back().Loc);
+          << SourceRange(Loc, Components.back().Loc);
         return true;
       }
     }
   }
   
-  assert(!DNT->Components[0].Value.isNull() && "Failed to get a base");
+  assert(!Components[0].Value.isNull() && "Failed to get a base");
   
   // Now that we have a base, iteratively resolve subsequent member entries.
-  for (unsigned i = 1, e = DNT->Components.size(); i != e; ++i) {
+  for (unsigned i = 1, e = Components.size(); i != e; ++i) {
     auto &LastOne = Components[i-1];
     auto &C = Components[i];
     
@@ -231,28 +229,28 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT) {
                               NLKind::QualifiedLookup);
     } else {
       diagnose(C.Loc, diag::unknown_dotted_type_base, LastOne.Id)
-        << SourceRange(Components[0].Loc, DNT->Components.back().Loc);
+        << SourceRange(Components[0].Loc, Components.back().Loc);
       return true;
     }
     
     if (C.Value.isNull()) {
       diagnose(C.Loc, diag::invalid_member_type, C.Id, LastOne.Id)
-      << SourceRange(Components[0].Loc, DNT->Components.back().Loc);
+      << SourceRange(Components[0].Loc, Components.back().Loc);
       return true;
     }
   }
   
   // Finally, sanity check that the last value is a type.
-  if (ValueDecl *Last = DNT->Components.back().Value.dyn_cast<ValueDecl*>())
+  if (ValueDecl *Last = Components.back().Value.dyn_cast<ValueDecl*>())
     if (auto TAD = dyn_cast<TypeAliasDecl>(Last)) {
-      Components[DNT->Components.size()-1].Value = TAD->getAliasType();
+      Components[Components.size()-1].Value = TAD->getAliasType();
       return false;
     }
 
-  diagnose(DNT->Components.back().Loc,
-           DNT->Components.size() == 1 ? diag::named_definition_isnt_type :
-             diag::dotted_reference_not_type, DNT->Components.back().Id)
-    << SourceRange(Components[0].Loc, DNT->Components.back().Loc);
+  diagnose(Components.back().Loc,
+           Components.size() == 1 ? diag::named_definition_isnt_type :
+             diag::dotted_reference_not_type, Components.back().Id)
+    << SourceRange(Components[0].Loc, Components.back().Loc);
   return true;
 }
 

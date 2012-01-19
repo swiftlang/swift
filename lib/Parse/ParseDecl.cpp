@@ -62,7 +62,7 @@ TranslationUnit *Parser::parseTranslationUnit() {
   
   TU->setUnresolvedTypes(Context.AllocateCopy(UnresolvedTypeList));
   TU->setUnresolvedIdentifierTypes(
-              Context.AllocateCopy<IdentifierType*>(UnresolvedIdentifierTypes));
+          Context.AllocateCopy(llvm::makeArrayRef(UnresolvedIdentifierTypes)));
 
   UnresolvedTypeNames.clear();
   UnresolvedIdentifierTypes.clear();
