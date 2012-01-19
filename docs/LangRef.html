@@ -74,6 +74,15 @@
   <h3>Basic Approach</h3>
   <!-- ===================================================================== -->
   
+  <div class="commentary">
+    Pushing as much of the language as realistic out of the compiler and into
+    the library is generally good for a few reasons: 1) we end up with a smaller
+    core language.  2) we force the language that is left to be highly
+    expressive and extensible.  3) this highly expressive language core can then
+    be used to build a lot of other great libraries, hopefully many we can't
+    even anticipate at this point.
+  </div>
+    
   <p>The basic approach in designing and implementing the Swift prototype was to
      start at the very bottom of the stack (simple expressions and the trivial
      bits of the type system) and incrementally build things up one brick at a
@@ -83,15 +92,11 @@
      situations.</p>
   
   <p>One major aspect that dovetails with expressivity, learnability, and focus
-     on API development is that much of the language is implemented in a
-     standard library (inspired by the Haskell Standard Prelude).  By pushing
-     much of the boring parts of the language out of the compiler into the
-     library, we end up with a smaller core language and we force the language
-     that is left to be highly expressive and extensible, which we hope will
-     allow for great libraries to be built on top of it.
+     on API development is that much of the language is implemented in a <a
+     href="#stdlib">standard library</a> (inspired in part by the Haskell
+     Standard Prelude).  This means that things like 'int' and 'void' are not
+     part of the language itself, but are instead part of the standard library.
   </p>
-  
-  <p>More later.</p>
   
   <!-- ********************************************************************* -->
   <h2>Phases of Translation</h2>
@@ -396,10 +401,6 @@
     value-specifier ::= ':' <a href="#type">type</a> '=' <a href="#expr">expr</a>
     value-specifier ::= '=' <a href="#expr">expr</a>
   </pre>
-  <!-- 
-   Note that the initializer can't be expr-singular.  If it were we would fail
-   to handle dependent cases like "var x : somestruct  = :foo(4)
-   -->
   
 
   <p>'var' declarations form the backbone of value declarations in Swift and
