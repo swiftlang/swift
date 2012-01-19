@@ -433,7 +433,7 @@ Expr *SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   unsigned NumFields = DestTy->Fields.size();
   
   // Must allocate space for the AST node.
-  Expr **NewSE = TC.Context.Allocate<Expr*>(NumFields);
+  MutableArrayRef<Expr*> NewSE(TC.Context.Allocate<Expr*>(NumFields),NumFields);
   
   bool NeedsNames = false;
   for (unsigned i = 0, e = NumFields; i != e; ++i) {
@@ -453,8 +453,7 @@ Expr *SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
       NewName[i] = DestTy->Fields[i].getName();
   }
   
-  return new (TC.Context) TupleExpr(SourceLoc(), NewSE, NewName,
-                                    NumFields, SourceLoc(),
+  return new (TC.Context) TupleExpr(SourceLoc(), NewSE, NewName, SourceLoc(),
                                     TypeJudgement(DestTy, ValueKind::RValue));
 }
 

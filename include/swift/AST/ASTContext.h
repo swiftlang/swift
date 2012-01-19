@@ -108,6 +108,11 @@ public:
     return AllocateCopy(ArrayRef<T>(Vec));
   }
 
+  template<typename T>
+  MutableArrayRef<T> AllocateCopy(SmallVectorImpl<T> &Vec) {
+    return AllocateCopy(MutableArrayRef<T>(Vec));
+  }
+
   
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.

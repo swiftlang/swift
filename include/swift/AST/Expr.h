@@ -390,21 +390,18 @@ class TupleExpr : public Expr {
   SourceLoc LParenLoc;
   /// SubExprs - Elements of these can be set to null to get the default init
   /// value for the tuple element.
-  // FIXME: Switch to MutableArrayRef.
-  Expr **SubExprs;
-  Identifier *SubExprNames;  // Can be null if no names.
-  unsigned NumSubExprs;
+  MutableArrayRef<Expr *> SubExprs;
+  /// SubExprNames - Can be null if no names.  Otherwise length = SubExpr.size()
+  Identifier *SubExprNames;
   SourceLoc RParenLoc;
   
-  Expr **getSubExprs() const { return SubExprs; }  
 public:
-  TupleExpr(SourceLoc lparenloc, Expr **subexprs, Identifier *subexprnames,
-            unsigned numsubexprs, SourceLoc rparenloc,
+  TupleExpr(SourceLoc LParenLoc, MutableArrayRef<Expr *> SubExprs,
+            Identifier *SubExprNames, SourceLoc RParenLoc,
             TypeJudgement Ty = TypeJudgement())
-    : Expr(ExprKind::Tuple, Ty), LParenLoc(lparenloc), SubExprs(subexprs),
-      SubExprNames(subexprnames), NumSubExprs(numsubexprs),
-      RParenLoc(rparenloc) {
-    assert(lparenloc.isValid() == rparenloc.isValid() &&
+    : Expr(ExprKind::Tuple, Ty), LParenLoc(LParenLoc), SubExprs(SubExprs),
+      SubExprNames(SubExprNames), RParenLoc(RParenLoc) {
+    assert(LParenLoc.isValid() == RParenLoc.isValid() &&
            "Mismatched parenthesis location information validity");
   }
 
@@ -413,24 +410,28 @@ public:
 
   SourceRange getSourceRange() const;
 
-  unsigned getNumElements() const { return NumSubExprs; }
+  //unsigned getNumElements() const { return NumSubExprs; }
+
+  MutableArrayRef<Expr*> getElements() {
+    return SubExprs;
+  }
 
   ArrayRef<Expr*> getElements() const {
-    return ArrayRef<Expr*>(SubExprs, NumSubExprs);
+    return SubExprs;
   }
+  
+  unsigned getNumElements() const { return SubExprs.size(); }
+  
   Expr *getElement(unsigned i) const {
-    assert(i < NumSubExprs && "Invalid element index");
-    return getSubExprs()[i];
+    return SubExprs[i];
   }
   void setElement(unsigned i, Expr *e) {
-    assert(i < NumSubExprs && "Invalid element index");
-    getSubExprs()[i] = e;
+    SubExprs[i] = e;
   }
 
   bool hasElementNames() const { return SubExprNames; }
 
   Identifier getElementName(unsigned i) const {
-    assert(i < NumSubExprs && "Invalid element index");
     return SubExprNames ? SubExprNames[i] : Identifier();
   }
   

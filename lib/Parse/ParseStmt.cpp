@@ -205,7 +205,8 @@ ParseResult<Stmt> Parser::parseStmtReturn() {
       return true;
   } else {
     // Result value defaults to ().
-    Result = new (Context) TupleExpr(SourceLoc(), 0, 0, 0, SourceLoc());
+    Result = new (Context) TupleExpr(SourceLoc(), MutableArrayRef<Expr*>(), 0,
+                                     SourceLoc());
   }
 
   if (!Result.isSemaError())

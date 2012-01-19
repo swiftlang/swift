@@ -369,9 +369,7 @@ ParseResult<Expr> Parser::parseExprParen() {
   if (AnySubExprSemaErrors)
     return ParseResult<Expr>::getSemaError();
 
-  Expr **NewSubExprs =
-    Context.AllocateCopy<Expr*>(SubExprs.data(),
-                                SubExprs.data()+SubExprs.size());
+  MutableArrayRef<Expr *> NewSubExprs = Context.AllocateCopy(SubExprs);
   
   Identifier *NewSubExprsNames = 0;
   if (!SubExprNames.empty())
@@ -385,8 +383,7 @@ ParseResult<Expr> Parser::parseExprParen() {
     return new (Context) ParenExpr(LPLoc, SubExprs[0], RPLoc);
   }
   
-  return new (Context) TupleExpr(LPLoc, NewSubExprs, NewSubExprsNames,
-                                 SubExprs.size(), RPLoc);
+  return new (Context) TupleExpr(LPLoc, NewSubExprs, NewSubExprsNames, RPLoc);
 }
 
 
