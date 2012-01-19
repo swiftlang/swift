@@ -107,6 +107,20 @@ public:
     return array;
   }
 
+  /// Take and remove the last item in the array.  Unlike the 'claim'
+  /// methods, the item is gone forever.
+  llvm::Value *takeLast() {
+    assert(!empty());
+    auto result = Values.back();
+    Values.pop_back();
+    return result;
+  }
+
+  /// Reset the current claim point on this explosion.
+  void resetClaim(unsigned index = 0) {
+    NextValue = index;
+  }
+
   /// Reset this explosion.
   void reset() {
     NextValue = 0;

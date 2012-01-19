@@ -29,6 +29,7 @@
 
 #include "GenType.h"
 #include "IRGenModule.h"
+#include "Linking.h"
 
 using namespace swift;
 using namespace irgen;
@@ -47,6 +48,10 @@ IRGenModule::IRGenModule(ASTContext &Context,
   Int8PtrTy = llvm::Type::getInt8PtrTy(getLLVMContext());
   SizeTy = TargetData.getIntPtrType(getLLVMContext());
   MemCpyFn = nullptr;
+  AllocFn = nullptr;
+
+  llvm::Type *elts[] = { Int8PtrTy, Int8PtrTy };
+  Int8PtrPairTy = llvm::StructType::get(LLVMContext, elts, /*packed*/ false);
 }
 
 IRGenModule::~IRGenModule() {
@@ -60,6 +65,15 @@ llvm::Constant *IRGenModule::getMemCpyFn() {
   MemCpyFn = llvm::Intrinsic::getDeclaration(&Module, llvm::Intrinsic::memcpy,
                                              types);
   return MemCpyFn;
+}
+
+llvm::Constant *IRGenModule::getAllocationFunction() {
+  if (AllocFn) return AllocFn;
+
+  llvm::Type *types[] = { SizeTy };
+  llvm::FunctionType *fnType = llvm::FunctionType::get(Int8PtrTy, types, false);
+  AllocFn = Module.getOrInsertFunction("malloc", fnType);
+  return AllocFn;
 }
 
 void IRGenModule::unimplemented(SourceLoc Loc, StringRef Message) {

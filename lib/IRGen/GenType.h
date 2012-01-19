@@ -82,6 +82,9 @@ public:
   /// Whether this type info has been completely converted.
   bool isComplete() const { return !StorageAlignment.isZero(); }
 
+  /// Whether this type info is for an empty type.
+  bool isEmpty() const { return StorageSize.isZero(); }
+
   llvm::Type *getStorageType() const { return StorageType; }
 
   /// Compute a schema for passing around r-values of this type.

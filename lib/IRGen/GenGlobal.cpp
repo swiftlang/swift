@@ -161,7 +161,7 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
 Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var,
                                              const TypeInfo &type) {
   // Check whether we've cached this.
-  llvm::Constant *&entry = Globals[var];
+  llvm::GlobalVariable *&entry = GlobalVars[var];
   if (entry) {
     llvm::GlobalVariable *gv = cast<llvm::GlobalVariable>(entry);
     return Address(gv, Alignment(gv->getAlignment()));
@@ -201,14 +201,15 @@ void IRGenFunction::emitGlobalVariable(VarDecl *var) {
 llvm::Function *IRGenModule::getAddrOfGlobalFunction(FuncDecl *func,
                                                      ExplosionKind kind,
                                                      unsigned uncurryLevel) {
+  LinkEntity entity = LinkEntity::forFunction(func, kind, uncurryLevel);
+
   // Check whether we've cached this.
-  llvm::Constant *&entry = Globals[func];
+  llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return cast<llvm::Function>(entry);
 
   llvm::FunctionType *fnType =
     getFunctionType(func->getType(), kind, uncurryLevel, /*data*/ false);
 
-  LinkEntity entity = LinkEntity::forFunction(func, kind, uncurryLevel);
   LinkInfo link = LinkInfo::get(*this, entity);
   llvm::Function *addr
     = cast<llvm::Function>(Module.getOrInsertFunction(link.getName(), fnType));
@@ -223,7 +224,9 @@ llvm::Function *IRGenModule::getAddrOfGlobalFunction(FuncDecl *func,
 /// perform a particular injection into a oneof type.
 llvm::Function *
 IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
-  llvm::Constant *&entry = Globals[D];
+  LinkEntity entity = LinkEntity::forFunction(D, ExplosionKind::Minimal, 0);
+
+  llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return cast<llvm::Function>(entry);
 
   // FIXME: pick the explosion kind better!
@@ -231,7 +234,6 @@ IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
     getFunctionType(D->getType(), ExplosionKind::Minimal, /*uncurry*/ 0,
                     /*data*/ false);
 
-  LinkEntity entity = LinkEntity::forFunction(D, ExplosionKind::Minimal, 0);
   LinkInfo link = LinkInfo::get(*this, entity);
   llvm::Function *addr
     = cast<llvm::Function>(Module.getOrInsertFunction(link.getName(), fnType));

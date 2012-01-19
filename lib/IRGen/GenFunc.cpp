@@ -57,6 +57,7 @@
 #include "swift/Basic/Optional.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
+#include "llvm/Module.h"
 #include "llvm/Target/TargetData.h"
 
 #include "GenType.h"
@@ -65,6 +66,7 @@
 #include "LValue.h"
 #include "RValue.h"
 #include "Explosion.h"
+#include "StructLayout.h"
 
 using namespace swift;
 using namespace irgen;
@@ -271,10 +273,7 @@ const TypeInfo *
 TypeConverter::convertFunctionType(IRGenModule &IGM, FunctionType *T) {
   Size StructSize = Size(IGM.TargetData.getPointerSize()) * 2;
   Alignment StructAlign = Alignment(IGM.TargetData.getPointerABIAlignment());
-  llvm::Type *Elts[] = { IGM.Int8PtrTy, IGM.Int8PtrTy };
-  llvm::StructType *StructType
-    = llvm::StructType::get(IGM.getLLVMContext(), Elts, /*packed*/ false);
-  return FuncTypeInfo::create(T, StructType, StructSize, StructAlign);
+  return FuncTypeInfo::create(T, IGM.Int8PtrPairTy, StructSize, StructAlign);
 }
 
 /// Given the explosion schema for the result type of a function, does
@@ -767,6 +766,14 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &resultType) {
   }
 }
 
+/// Initialize an Explosion with the parameters of the current function.
+static Explosion collectParameters(IRGenFunction &IGF) {
+  Explosion params(IGF.CurExplosionLevel);
+  for (auto i = IGF.CurFn->arg_begin(), e = IGF.CurFn->arg_end(); i != e; ++i)
+    params.add(i);
+  return params;
+}
+
 /// Emit a specific parameter.
 static void emitParameter(IRGenFunction &IGF, ArgDecl *param,
                           Explosion &paramValues) {
@@ -860,16 +867,17 @@ void IRGenFunction::emitPrologue() {
   AllocaIP = Builder.CreateAlloca(IGM.Int1Ty, /*array size*/ nullptr,
                                   "alloca point");
 
+  // That's it for the 'bare' prologue.
+  if (CurPrologue != Prologue::Standard)
+    return;
+
   // Set up the return block and insert it.  This creates a second
   // insertion point that most blocks should be inserted before.
   ReturnBB = createBasicBlock("return");
   CurFn->getBasicBlockList().push_back(ReturnBB);
 
   // List out the parameter values in an Explosion.
-  Explosion values(CurExplosionLevel);
-  for (auto i = CurFn->arg_begin(), e = CurFn->arg_end(); i != e; ++i) {
-    values.add(i);
-  }
+  Explosion values = collectParameters(*this);
 
   // Set up the return slot, stealing the first argument if necessary.
   {
@@ -902,6 +910,10 @@ void IRGenFunction::emitPrologue() {
 void IRGenFunction::emitEpilogue() {
   // Destroy the alloca insertion point.
   AllocaIP->eraseFromParent();
+
+  // That's it for the 'bare' epilogue.
+  if (CurPrologue != Prologue::Standard)
+    return;
 
   // If there are no edges to the return block, we never want to emit it.
   if (ReturnBB->use_empty()) {
@@ -956,26 +968,281 @@ void IRGenFunction::emitEpilogue() {
   }
 }
 
+namespace {
+  class CurriedData {
+    IRGenModule &IGM;
+    FuncExpr *Func;
+    ExplosionKind ExplosionLevel;
+    unsigned CurClause;
+
+    /// The TypeInfos for all the parameters, in the standard
+    /// reversed-clause order.  To make certain optimizations easier,
+    /// only non-empty types are listed.  Concatenating the explosion
+    /// schemas of these types would give us the signature of the
+    /// function.
+    llvm::SmallVector<const TypeInfo *, 8> AllDataTypes;
+
+    struct Clause {
+      unsigned DataTypesBeginIndex;
+      Type ForwardingFnType;
+    };
+
+    /// The clauses of the function that we're actually going to curry.
+    llvm::SmallVector<Clause, 4> Clauses;
+
+  public:
+    CurriedData(IRGenModule &IGM, FuncExpr *funcExpr,
+                ExplosionKind explosionLevel,
+                unsigned maxUncurryLevel)
+      : IGM(IGM), Func(funcExpr), ExplosionLevel(explosionLevel), CurClause(0) {
+      accumulateClauses(funcExpr->getType(), maxUncurryLevel);
+    }
+
+    void emitCurriedEntrypoint(llvm::Function *entrypoint,
+                               llvm::Function *nextEntrypoint) {
+      // We need to fill in a function of this type:
+      //   (A) -> (B -> C)
+      // Therefore we need to store all the values in A (no matter how
+      // many uncurried arguments they came from) and return a pointer
+      // to a function which will expand them back out.
+
+      // TODO: future optimization: if we have an intermediate
+      // currying which adds no data, re-use the old data pointer
+      // instead of unpacking and repacking.
+
+      // TODO: future optimization: if the only data value is a a
+      // single retainable object pointer, don't do a layout.
+
+      // Compute the layout of the data we have now.
+      llvm::ArrayRef<const TypeInfo *> dataTypes = AllDataTypes;
+      dataTypes = dataTypes.slice(Clauses[CurClause].DataTypesBeginIndex);
+      StructLayout layout(IGM, LayoutStrategy::Optimal, dataTypes);
+
+      // Create an internal function to serve as the forwarding
+      // function (B -> C).
+      llvm::Function *forwarder =
+        getAddrOfForwardingStub(nextEntrypoint, /*hasData*/ !layout.empty());
+
+      // Emit the curried entrypoint.
+      emitCurriedEntrypointBody(entrypoint, forwarder, dataTypes, layout);
+
+      // Emit the forwarding stub.
+      emitCurriedForwarderBody(forwarder, nextEntrypoint, dataTypes, layout);
+
+      CurClause++;
+    }
+
+  private:
+    /// Decompose all the argument types in the proper order.
+    /// This leaves AllDataTypes containing all the types in
+    /// the fully-uncurried function type in clause-reversed
+    /// order and DataTypesStart containing a reversed stack of
+    /// indexes at which to start.
+    /// 
+    /// For example, for these inputs:
+    ///   fnType = (A, B) -> (C, D) -> (E) -> (F) -> G
+    ///   maxUncurryLevel = 2
+    /// we will have these results:
+    ///   AllDataTypes = [E, C, D, A, B]
+    ///   DataTypesStart = [ 0, 2, 3 ]
+    void accumulateClauses(Type fnType, unsigned maxUncurryLevel) {
+      if (maxUncurryLevel == 0) return;
+
+      unsigned clauseIndex = Clauses.size();
+      Clauses.push_back(Clause());
+
+      FunctionType *fn = cast<FunctionType>(fnType);
+      accumulateClauses(fn->Result, maxUncurryLevel - 1);
+
+      Clauses[clauseIndex].DataTypesBeginIndex = AllDataTypes.size();
+      Clauses[clauseIndex].ForwardingFnType = fn->Result;
+
+      accumulateParameterDataTypes(fn->Input);
+    }
+
+    /// Accumulate the given parameter type.
+    void accumulateParameterDataTypes(Type ty) {
+      // As an optimization, expand tuples instead of grabbing their TypeInfo.
+      if (TupleType *tuple = ty->getAs<TupleType>()) {
+        for (const TupleTypeElt &field : tuple->Fields)
+          accumulateParameterDataTypes(field.getType());
+        return;
+      }
+
+      const TypeInfo &type = IGM.getFragileTypeInfo(ty);
+      if (!type.isEmpty()) AllDataTypes.push_back(&type);
+    }
+
+    /// Create a forwarding stub.
+    llvm::Function *getAddrOfForwardingStub(llvm::Function *nextEntrypoint,
+                                            bool hasData) {
+      llvm::FunctionType *fnType =
+        IGM.getFunctionType(Clauses[CurClause].ForwardingFnType,
+                            ExplosionLevel, /*uncurry*/ 0, hasData);
+
+      // Create the function and place it immediately before the next stub.
+      llvm::Function *forwarder =
+        llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
+                               nextEntrypoint->getName() + ".curry");
+      IGM.Module.getFunctionList().insert(nextEntrypoint, forwarder);
+
+      return forwarder;
+    }
+
+    /// Emit the body of a curried entrypoint, a function of type:
+    ///   (A, B) -> (C -> D)
+    /// which returns a function of type (C -> D) by allocating
+    /// an AB_stored_t, copying its parameters into that, and returning
+    /// a function value consisting of the pointer to the forwarder
+    /// stub and the allocated data.
+    void emitCurriedEntrypointBody(llvm::Function *entrypoint,
+                                   llvm::Function *forwarder,
+                                   llvm::ArrayRef<const TypeInfo *> dataTypes,
+                                   const StructLayout &layout) {
+      PrettyStackTraceExpr stackTrace(IGM.Context,
+                                      "emitting IR for curried entrypoint to",
+                                      Func);
+
+      IRGenFunction IGF(IGM, Func, ExplosionLevel, CurClause, entrypoint,
+                        Prologue::Bare);
+
+      Explosion params = collectParameters(IGF);
+
+      // We're returning a function, so no need to worry about an
+      // aggregate return slot.
+
+      // Compute a data object.
+      llvm::Value *data = nullptr;
+      if (!layout.empty()) {
+        // Allocate a new object.  FIXME: refcounting, exceptions.
+        llvm::Value *size = llvm::ConstantInt::get(IGM.SizeTy,
+                                                   layout.getSize().getValue());
+        llvm::CallInst *call =
+          IGF.Builder.CreateCall(IGM.getAllocationFunction(), size);
+        call->setDoesNotThrow();
+        data = call;
+
+        // Cast to the appropriate struct type.
+        llvm::Value *addr =
+          IGF.Builder.CreateBitCast(data, layout.getType()->getPointerTo());
+
+        // Perform the store.
+        for (unsigned i = 0, e = dataTypes.size(); i != e; ++i) {
+          auto &fieldLayout = layout.getElements()[i];
+          llvm::Value *fieldAddr =
+            IGF.Builder.CreateStructGEP(addr, fieldLayout.StructIndex);
+          Alignment fieldAlign =
+            layout.getAlignment().alignmentAtOffset(fieldLayout.ByteOffset);
+          dataTypes[i]->storeExplosion(IGF, params,
+                                       Address(fieldAddr, fieldAlign));
+        }
+
+        // Reset the cursor in the explosion.
+        params.resetClaim();
+      }
+
+      // Build the function result.
+      llvm::Value *result = llvm::UndefValue::get(IGM.Int8PtrPairTy);
+      result = IGF.Builder.CreateInsertValue(result,
+                      llvm::ConstantExpr::getBitCast(forwarder, IGM.Int8PtrTy),
+                                             0);
+      if (!layout.empty())
+        result = IGF.Builder.CreateInsertValue(result, data, 1);
+
+      // Return that.
+      IGF.Builder.CreateRet(result);
+    }
+
+    /// Emit the body of a forwarder stub, a function of type:
+    ///   (C -> D)
+    /// which accepts an implicit extra data parameter holding
+    /// all the previous parameters, and which produces a D by
+    /// adding all those parameters to the C parameters just
+    /// receiver, then tail-calling the next entrypoint in
+    /// the sequence.
+    void emitCurriedForwarderBody(llvm::Function *forwarder,
+                                  llvm::Function *nextEntrypoint,
+                                  llvm::ArrayRef<const TypeInfo *> dataTypes,
+                                  const StructLayout &layout) {
+      PrettyStackTraceExpr stackTrace(IGM.Context,
+                                      "emitting IR for currying forwarder of",
+                                      Func);
+
+      IRGenFunction IGF(IGM, Func, ExplosionLevel, CurClause, forwarder,
+                        Prologue::Bare);
+
+      // Accumulate the function's immediate parameters.
+      Explosion params = collectParameters(IGF);
+
+      // If there's a data pointer required, grab it (it's always the
+      // last parameter) and load out the extra, previously-curried
+      // parameters.
+      if (!layout.empty()) {
+        llvm::Value *data = params.takeLast();
+        data = IGF.Builder.CreateBitCast(data, layout.getType()->getPointerTo());
+
+        // Perform the loads.
+        for (unsigned i = 0, e = dataTypes.size(); i != e; ++i) {
+          auto &fieldLayout = layout.getElements()[i];
+          llvm::Value *fieldAddr =
+            IGF.Builder.CreateStructGEP(data, fieldLayout.StructIndex);
+          Alignment fieldAlign =
+            layout.getAlignment().alignmentAtOffset(fieldLayout.ByteOffset);
+          dataTypes[i]->loadExplosion(IGF, Address(fieldAddr, fieldAlign),
+                                      params);
+        }
+      }
+
+      llvm::CallInst *call =
+        IGF.Builder.CreateCall(nextEntrypoint, params.claimAll());
+      call->setTailCall();
+
+      if (call->getType()->isVoidTy()) {
+        IGF.Builder.CreateRetVoid();
+      } else {
+        IGF.Builder.CreateRet(call);
+      }
+    }
+  };
+}
+
 /// Emit the definition for the given global function.
 void IRGenModule::emitGlobalFunction(FuncDecl *func) {
   // Nothing to do if the function has no body.
   if (!func->getBody()) return;
+  FuncExpr *funcExpr = func->getBody();
 
   // FIXME: variant currying levels!
   // FIXME: also emit entrypoints with maximal explosion when all types are known!
-  unsigned uncurryLevel = getNaturalUncurryLevel(func);
+  unsigned naturalUncurryLevel = getNaturalUncurryLevel(func);
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
 
-  llvm::Function *addr =
-    getAddrOfGlobalFunction(func, explosionLevel, uncurryLevel);
+  // Get the address of the first entrypoint we're going to emit.
+  llvm::Function *entrypoint =
+    getAddrOfGlobalFunction(func, explosionLevel, /*uncurryLevel*/ 0);
 
+  CurriedData curriedData(*this, funcExpr, explosionLevel, naturalUncurryLevel);
+
+  // Emit the curried entrypoints.  At the end of each iteration,
+  // fnAddr will point to the next entrypoint in the currying sequence.
+  for (unsigned uncurryLevel = 0; uncurryLevel != naturalUncurryLevel;
+         ++uncurryLevel) {
+    llvm::Function *nextEntrypoint =
+      getAddrOfGlobalFunction(func, explosionLevel, uncurryLevel + 1);
+
+    curriedData.emitCurriedEntrypoint(entrypoint, nextEntrypoint);
+
+    entrypoint = nextEntrypoint;
+  }
+
+  // Finally, emit the uncurried entrypoint.
   PrettyStackTraceDecl stackTrace("emitting IR for", func);
-
-  FuncExpr *funcExpr = func->getBody();
-  IRGenFunction(*this, funcExpr, explosionLevel, uncurryLevel, addr)
+  IRGenFunction(*this, funcExpr, explosionLevel,
+                naturalUncurryLevel, entrypoint)
     .emitFunctionTopLevel(funcExpr->getBody());
 }
 
+/// Emit the code for the top-level of a function.
 void IRGenFunction::emitFunctionTopLevel(BraceStmt *S) {
   emitBraceStmt(S);
 }

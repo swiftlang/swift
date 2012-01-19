@@ -20,8 +20,10 @@
 #define SWIFT_IRGEN_LINKING_H
 
 #include "swift/AST/Decl.h"
+#include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/GlobalValue.h"
+#include "IRGen.h"
 
 namespace llvm {
   class Value;
@@ -48,6 +50,8 @@ class LinkEntity {
   // These are only meaningful for function entities.
   ExplosionKind Explosion;
   unsigned UncurryLevel;
+
+  friend struct llvm::DenseMapInfo<LinkEntity>;
 
   static bool isFunction(NamedDecl *decl) {
     return (isa<FuncDecl>(decl) || isa<OneOfElementDecl>(decl));
@@ -106,5 +110,33 @@ public:
 
 } // end namespace irgen
 } // end namespace swift
+
+/// Allow LinkEntity to be used as a key for a DenseMap.
+template <> struct llvm::DenseMapInfo<swift::irgen::LinkEntity> {
+  typedef swift::irgen::LinkEntity LinkEntity;
+  static LinkEntity getEmptyKey() {
+    LinkEntity entity;
+    entity.TheDecl = nullptr;
+    entity.Explosion = swift::irgen::ExplosionKind::Minimal;
+    entity.UncurryLevel = 0;
+    return entity;
+  }
+  static LinkEntity getTombstoneKey() {
+    LinkEntity entity;
+    entity.TheDecl = nullptr;
+    entity.Explosion = swift::irgen::ExplosionKind::Minimal;
+    entity.UncurryLevel = 1;
+    return entity;
+  }
+  static unsigned getHashValue(const LinkEntity &entity) {
+    return DenseMapInfo<swift::NamedDecl*>::getHashValue(entity.TheDecl)
+         + unsigned(entity.Explosion) + entity.UncurryLevel;
+  }
+  static bool isEqual(const LinkEntity &LHS, const LinkEntity &RHS) {
+    return LHS.TheDecl == RHS.TheDecl
+        && LHS.Explosion == RHS.Explosion
+        && LHS.UncurryLevel == RHS.UncurryLevel;
+  }
+};
 
 #endif

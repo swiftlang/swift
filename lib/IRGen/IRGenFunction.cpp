@@ -27,9 +27,11 @@ using namespace irgen;
 
 IRGenFunction::IRGenFunction(IRGenModule &IGM, FuncExpr *FE,
                              ExplosionKind explosionLevel,
-                             unsigned uncurryLevel, llvm::Function *Fn)
+                             unsigned uncurryLevel, llvm::Function *Fn,
+                             Prologue prologue)
   : IGM(IGM), Builder(IGM.getLLVMContext()), CurFuncExpr(FE), CurFn(Fn),
-    CurExplosionLevel(explosionLevel), CurUncurryLevel(uncurryLevel) {
+    CurExplosionLevel(explosionLevel), CurUncurryLevel(uncurryLevel),
+    CurPrologue(prologue) {
   emitPrologue();
 }
 

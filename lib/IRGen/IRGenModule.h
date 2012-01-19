@@ -76,13 +76,9 @@ public:
   llvm::IntegerType *Int64Ty;
   llvm::IntegerType *SizeTy;
   llvm::PointerType *Int8PtrTy;
-  llvm::Constant *getMemCpyFn();
+  llvm::StructType *Int8PtrPairTy;
 
   void unimplemented(SourceLoc, StringRef Message);
-
-private:
-  llvm::Function *MemCpyFn;
-
 
 //--- Types -----------------------------------------------------------------
 public:
@@ -98,10 +94,21 @@ private:
 
 //--- Globals ---------------------------------------------------------------
 private:
-  llvm::DenseMap<Decl*, llvm::Constant*> Globals;
+  llvm::DenseMap<Decl*, llvm::GlobalVariable*> GlobalVars;
+  llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
 
   void mangleGlobalInitializer(raw_ostream &buffer, TranslationUnit *D);
 
+//--- Runtime ---------------------------------------------------------------
+public:
+  llvm::Constant *getMemCpyFn();
+  llvm::Constant *getAllocationFunction();
+
+private:
+  llvm::Function *MemCpyFn;
+  llvm::Constant *AllocFn;
+
+//--- Generic ---------------------------------------------------------------
 public:
   IRGenModule(ASTContext &Context, Options &Opts, llvm::Module &Module,
               const llvm::TargetData &TargetData);
