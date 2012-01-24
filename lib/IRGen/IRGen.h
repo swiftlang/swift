@@ -30,6 +30,31 @@ namespace irgen {
 
 class Size;
 
+/// ResilienceScope - The compiler is often able to pursue
+/// optimizations based on its knowledge of the implementation of some
+/// language structure.  However, optimizations which affect
+/// cross-component interfaces are not necessarily sound in the face
+/// of differing compiler versions and API changes that make types
+/// fragile.  The "resilience scope" is the breadth of the code
+/// affected by the answer to a question being asked.
+///
+/// TODO: maybe deployment versions should factor in here.  If a
+/// question is being asked vis-a-vis the implementation of a subject
+/// structure that is unavailable in any revision for which the object
+/// structure is resilient, is there any reason not to answer as if
+/// the subject structure were universally fragile?
+enum class ResilienceScope {
+  /// Component scope means the decision has to be consistent within
+  /// the current component.  We currently don't describe any tighter
+  /// scopes than this because the build model is for the entire
+  /// component to be compiled in one pass.
+  Component,
+
+  /// Program scope means the decision has to be consistent across all
+  /// components.
+  Program
+};
+
 /// ExplosionKind - A policy for choosing what types should be
 /// exploded, as informed by the resilience model.
 enum class ExplosionKind : unsigned {
