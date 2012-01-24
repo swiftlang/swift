@@ -116,8 +116,11 @@ public:
   /// Given an r-value of this type, explode it.
   void explode(IRGenFunction &IGF, const RValue &RV, Explosion &expl) const;
 
-private:
-  virtual void _anchor();
+  /// Should optimizations be enabled which rely on the representation
+  /// for this type being a single retainable object pointer?
+  ///
+  /// \return false by default
+  virtual bool isSingleRetainablePointer(ResilienceScope scope) const;
 };
 
 /// The hepler class for generating types.

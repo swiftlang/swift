@@ -71,7 +71,9 @@ namespace {
   };
 }
 
-void TypeInfo::_anchor() {}
+bool TypeInfo::isSingleRetainablePointer(ResilienceScope scope) const {
+  return false;
+}
 
 void TypeInfo::explode(IRGenFunction &IGF, const RValue &rvalue,
                        Explosion &explosion) const {
