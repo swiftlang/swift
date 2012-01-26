@@ -16,19 +16,38 @@
 
 #include "swift/Subsystems.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "Parser.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
+
+namespace {
+  /// To assist debugging parser crashes, tell us the location of the
+  /// current token.
+  class PrettyStackTraceParser : public llvm::PrettyStackTraceEntry {
+    Parser &P;
+  public:
+    PrettyStackTraceParser(Parser &P) : P(P) {}
+    void print(llvm::raw_ostream &out) const {
+      out << "With parser at source location: ";
+      printSourceLoc(out, P.Tok.getLoc(), P.Context);
+      out << '\n';
+    }
+  };
+}
   
 /// parseTranslationUnit - Entrypoint for the parser.
 TranslationUnit *swift::parseTranslationUnit(unsigned BufferID,
                                              Component *Comp,
                                              ASTContext &Ctx) {
-  return Parser(BufferID, Comp, Ctx).parseTranslationUnit();
+  Parser P(BufferID, Comp, Ctx);
+  PrettyStackTraceParser stackTrace(P);
+  return P.parseTranslationUnit();
 }
   
 //===----------------------------------------------------------------------===//
@@ -204,5 +223,4 @@ bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init) {
   
   return false;
 }
-
 
