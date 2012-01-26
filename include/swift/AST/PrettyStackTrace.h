@@ -26,6 +26,22 @@ namespace swift {
   class Expr;
   class Stmt;
 
+/// printSourceLoc - Print a debugging view of the given source location
+/// to an output stream.
+void printSourceLoc(llvm::raw_ostream &OS, SourceLoc loc, ASTContext &C);
+
+/// PrettyStackTraceLocation - Observe that we are doing some
+/// processing starting at a fixed location.
+class PrettyStackTraceLocation : public llvm::PrettyStackTraceEntry {
+  ASTContext &Context;
+  SourceLoc Loc;
+  const char *Action;
+public:
+  PrettyStackTraceLocation(ASTContext &C, const char *action, SourceLoc loc)
+    : Context(C), Loc(loc), Action(action) {}
+  virtual void print(llvm::raw_ostream &OS) const;
+};
+
 /// PrettyStackTraceDecl - Observe that we are processing a specific
 /// declaration.
 class PrettyStackTraceDecl : public llvm::PrettyStackTraceEntry {

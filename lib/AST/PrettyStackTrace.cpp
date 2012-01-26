@@ -65,8 +65,8 @@ static void printDecomposedLoc(llvm::raw_ostream &out,
   return printDecomposedLoc(out, loc.getValue());
 }
 
-static void printSourceLoc(llvm::raw_ostream &out, SourceLoc loc,
-                           ASTContext &Context) {  
+void swift::printSourceLoc(llvm::raw_ostream &out, SourceLoc loc,
+                           ASTContext &Context) {
   printDecomposedLoc(out, decompose(Context.SourceMgr, loc));
 }
 
@@ -143,4 +143,9 @@ void PrettyStackTraceStmt::print(llvm::raw_ostream &out) const {
   out << "statement at ";
   printSourceRange(out, TheStmt->getSourceRange(), Context);
   out << '\n';
+}
+
+void PrettyStackTraceLocation::print(llvm::raw_ostream &out) const {
+  out << "While " << Action << " starting at ";
+  printSourceLoc(out, Loc, Context);
 }
