@@ -173,26 +173,33 @@ void swift::performTypeChecking(TranslationUnit *TU) {
   
   // Find all the FuncExprs in the translation unit and collapse all
   // the sequences.
-  SmallVector<FuncExpr*, 32> FuncExprs;
-  auto FuncExprs_ptr = &FuncExprs;            // Blocks are annoying.
-  auto TC_ptr = &TC;                          // Again.
-  TU->Body->walk(^(Expr *E, WalkOrder Order, WalkContext const&) {
-    if (Order == WalkOrder::PreOrder) {
+  struct PrePassWalker : Walker {
+    TypeChecker &TC;
+    SmallVector<FuncExpr*, 32> FuncExprs;
+
+    PrePassWalker(TypeChecker &TC) : TC(TC) {}
+
+    bool walkToExprPre(Expr *E) {
       if (FuncExpr *FE = dyn_cast<FuncExpr>(E))
-        FuncExprs_ptr->push_back(FE);
-    } else {
-      if (SequenceExpr *SE = dyn_cast<SequenceExpr>(E))
-        return TC_ptr->foldSequence(SE);
+        FuncExprs.push_back(FE);
+      return true;
     }
-    return E;
-  });
+
+    Expr *walkToExprPost(Expr *E) {
+      if (SequenceExpr *SE = dyn_cast<SequenceExpr>(E))
+        return TC.foldSequence(SE);
+      return E;
+    }
+  };
+  PrePassWalker prePass(TC);
+  TU->Body->walk(prePass);
 
   // Type check the top-level BraceExpr.  This sorts out any top-level
   // expressions and variable decls.
   StmtChecker(TC, 0).typeCheckStmt(TU->Body);
 
   // Type check the body of each of the FuncExpr in turn.
-  for (FuncExpr *FE : FuncExprs) {
+  for (FuncExpr *FE : prePass.FuncExprs) {
     TC.semaFunctionSignature(FE);
 
     PrettyStackTraceExpr StackEntry(TC.Context, "type-checking", FE);

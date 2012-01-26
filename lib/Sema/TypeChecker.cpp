@@ -30,25 +30,24 @@ using namespace swift;
 //===----------------------------------------------------------------------===//
 
 namespace {
-struct RewriteAnonArgExpr {
+struct RewriteAnonArgExpr : Walker {
   Type FuncInputTy;
   TypeChecker &TC;
   
   RewriteAnonArgExpr(Type funcInputTy, TypeChecker &tc)
     : FuncInputTy(funcInputTy), TC(tc) {}
   
-  Expr *WalkFn(Expr *E, WalkOrder Order) {
- 
-    if (Order == WalkOrder::PreOrder) {
-      // If this is a ClosureExpr, don't walk into it.  This would find *its*
-      // anonymous closure arguments, not ours.
-      if (isa<ClosureExpr>(E)) return 0; // Don't recurse into it.
+  bool walkToExprPre(Expr *E) {
+    // If this is a ClosureExpr, don't walk into it.  This would find *its*
+    // anonymous closure arguments, not ours.
+    if (isa<ClosureExpr>(E)) return false; // Don't recurse into it.
       
-      // Otherwise, do recurse into it.  We handle anon args in the postorder
-      // visitation.
-      return E;
-    }
-  
+    // Otherwise, do recurse into it.  We handle anon args in the postorder
+    // visitation.
+    return true;
+  }
+
+  Expr *walkToExprPost(Expr *E) {
     // If we found a closure argument, process it.
     AnonClosureArgExpr *A = dyn_cast<AnonClosureArgExpr>(E);
     if (A == 0) return E;  
@@ -90,14 +89,11 @@ struct RewriteAnonArgExpr {
 /// a pointer to the argument to be used for the ClosureExpr.
 bool TypeChecker::bindAndValidateClosureArgs(Expr *Body, Type FuncInput) {  
   RewriteAnonArgExpr Rewriter(FuncInput, *this);
-  RewriteAnonArgExpr *RP = &Rewriter;
   
   // Walk the body and rewrite any anonymous arguments.  Note that this
   // isn't a particularly efficient way to handle this, because we walk subtrees
   // even if they have no anonymous arguments.
-  return Body->walk(^(Expr *E, WalkOrder Order, WalkContext const&) {
-    return RP->WalkFn(E, Order);
-  }) == 0;
+  return Body->walk(Rewriter) == nullptr;
 }
 
 

@@ -108,22 +108,9 @@ public:
   /// side-effects (which may influence the returned value).
   Expr *getValueProvidingExpr();
 
-  /// walk - This recursively walks all of the statements and expressions
-  /// contained within an expression and invokes the ExprFn and StmtFn blocks on
-  /// each.
-  ///
-  /// The block pointers are invoked both before and after the children are
-  /// visted, with the WalkOrder specifing at each invocation which stage it is.
-  /// If the block pointer returns a non-NULL value, then the returned
-  /// expression or statement is spliced back into the AST or returned from
-  /// 'walk' if at the top-level.
-  ///
-  /// If block pointer returns NULL from a pre-order invocation, then the
-  /// subtree is not visited.  If the block pointer returns NULL from a
-  /// post-order invocation, then the walk is terminated and 'walk returns
-  /// NULL.
-  ///
-  Expr *walk(WalkExprType ^ExprFn, WalkStmtType ^StmtFn = 0);
+  /// walk - This recursively walks the AST rooted at this expression.
+  Expr *walk(Walker &walker);
+  Expr *walk(Walker &&walker) { return walk(walker); }
   
   /// ConversionRank - This enum specifies the rank of an implicit conversion
   /// of a value from one type to another.  These are ordered from cheapest to

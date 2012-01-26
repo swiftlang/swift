@@ -26,7 +26,7 @@ using namespace swift;
 namespace {
   enum ShouldHalt { Continue, Halt };
 
-  class Verifier {
+  class Verifier : public Walker {
     TranslationUnit *TU;
     ASTContext &Ctx;
     llvm::raw_ostream &Out;
@@ -34,10 +34,9 @@ namespace {
   public:
     Verifier(TranslationUnit *TU) : TU(TU), Ctx(TU->Ctx), Out(llvm::errs()) {}
 
-    Expr *dispatch(Expr *E, WalkOrder ord, WalkContext const& WalkCtx) {
+    bool walkToExprPre(Expr *E) {
       switch (E->getKind()) {
-#define DISPATCH(ID) return dispatchVisit(static_cast<ID##Expr*>(E), ord, \
-                                          WalkCtx)
+#define DISPATCH(ID) return dispatchVisitPre(static_cast<ID##Expr*>(E))
 #define EXPR(ID, PARENT) \
       case ExprKind::ID: \
         DISPATCH(ID);
@@ -57,10 +56,43 @@ namespace {
       llvm_unreachable("not all cases handled!");
     }
 
-    Stmt *dispatch(Stmt *S, WalkOrder ord, WalkContext const& WalkCtx) {
+    Expr *walkToExprPost(Expr *E) {
+      switch (E->getKind()) {
+#define DISPATCH(ID) return dispatchVisitPost(static_cast<ID##Expr*>(E))
+#define EXPR(ID, PARENT) \
+      case ExprKind::ID: \
+        DISPATCH(ID);
+#define UNCHECKED_EXPR(ID, PARENT) \
+      case ExprKind::ID: \
+        assert(TU->ASTStage < TranslationUnit::TypeChecked && \
+               #ID "in wrong phase");\
+        DISPATCH(ID);
+#define UNBOUND_EXPR(ID, PARENT) \
+      case ExprKind::ID: \
+        assert(TU->ASTStage < TranslationUnit::NameBound && \
+               #ID "in wrong phase"); \
+        DISPATCH(ID);
+#include "swift/AST/ExprNodes.def"
+#undef DISPATCH
+      }
+      llvm_unreachable("not all cases handled!");
+    }
+
+    bool walkToStmtPre(Stmt *S) {
       switch (S->getKind()) {
-#define DISPATCH(ID) return dispatchVisit(static_cast<ID##Stmt*>(S), ord, \
-                                          WalkCtx)
+#define DISPATCH(ID) return dispatchVisitPre(static_cast<ID##Stmt*>(S))
+#define STMT(ID, PARENT) \
+      case StmtKind::ID: \
+        DISPATCH(ID);
+#include "swift/AST/StmtNodes.def"
+#undef DISPATCH
+      }
+      llvm_unreachable("not all cases handled!");
+    }
+
+    Stmt *walkToStmtPost(Stmt *S) {
+      switch (S->getKind()) {
+#define DISPATCH(ID) return dispatchVisitPost(static_cast<ID##Stmt*>(S))
 #define STMT(ID, PARENT) \
       case StmtKind::ID: \
         DISPATCH(ID);
@@ -71,29 +103,28 @@ namespace {
     }
 
   private:
-    /// Helper template for dispatching visitation.
-    template <class T> T dispatchVisit(T node, WalkOrder ord, 
-                                       WalkContext const& WalkCtx) {
-      // If we're visiting in pre-order, don't validate the node yet;
-      // just check whether we should stop further descent.
-      if (ord == WalkOrder::PreOrder)
-        return (shouldVerify(node) ? node : T());
+    /// Helper template for dispatching pre-visitation.
+    /// If we're visiting in pre-order, don't validate the node yet;
+    /// just check whether we should stop further descent.
+    template <class T> bool dispatchVisitPre(T node) {
+      return shouldVerify(node);
+    }
 
-      // Otherwise, actually verify the node.
-
+    /// Helper template for dispatching post-visitation.
+    template <class T> T dispatchVisitPost(T node) {
       // We always verify source ranges.
-      checkSourceRanges(node, WalkCtx);
+      checkSourceRanges(node);
 
       // Always verify the node as a parsed node.
-      verifyParsed(node, WalkCtx);
+      verifyParsed(node);
 
       // If we've bound names already, verify as a bound node.
       if (TU->ASTStage >= TranslationUnit::NameBound)
-        verifyBound(node, WalkCtx);
+        verifyBound(node);
 
       // If we've checked types already, do some extra verification.
       if (TU->ASTStage >= TranslationUnit::TypeChecked)
-        verifyChecked(node, WalkCtx);
+        verifyChecked(node);
 
       // Always continue.
       return node;
@@ -104,21 +135,21 @@ namespace {
     bool shouldVerify(Stmt *S) { return true; }
 
     // Base cases for the various stages of verification.
-    void verifyParsed(Expr *E, WalkContext const& WalkCtx) {}
-    void verifyParsed(Stmt *S, WalkContext const& WalkCtx) {}
-    void verifyBound(Expr *E, WalkContext const& WalkCtx) {}
-    void verifyBound(Stmt *S, WalkContext const& WalkCtx) {}
-    void verifyChecked(Expr *E, WalkContext const& WalkCtx) {}
-    void verifyChecked(Stmt *S, WalkContext const& WalkCtx) {}
+    void verifyParsed(Expr *E) {}
+    void verifyParsed(Stmt *S) {}
+    void verifyBound(Expr *E) {}
+    void verifyBound(Stmt *S) {}
+    void verifyChecked(Expr *E) {}
+    void verifyChecked(Stmt *S) {}
 
     // Specialized verifiers.
 
-    void verifyChecked(AssignStmt *S, WalkContext const& WalkCtx) {
+    void verifyChecked(AssignStmt *S) {
       checkSameType(S->getDest()->getType(), S->getSrc()->getType(),
                     "assignment operands");
     }
 
-    void verifyChecked(TupleElementExpr *E, WalkContext const &WalkCtx) {
+    void verifyChecked(TupleElementExpr *E) {
       TupleType *tupleType = E->getBase()->getType()->getAs<TupleType>();
       if (!tupleType) {
         Out << "base of TupleElementExpr does not have tuple type: ";
@@ -138,7 +169,7 @@ namespace {
                     "TupleElementExpr and the corresponding tuple element");
     }
 
-    void verifyChecked(LookThroughOneofExpr *E, WalkContext const &WalkCtx) {
+    void verifyChecked(LookThroughOneofExpr *E) {
       OneOfType *oneof = E->getSubExpr()->getType()->getAs<OneOfType>();
       if (!oneof) {
         Out << "sub-expression of LookThroughOneofExpr does not have oneof type: ";
@@ -171,31 +202,31 @@ namespace {
       abort();
     }
     
-    void checkSourceRanges(Expr *E, WalkContext const& WalkCtx) {
+    void checkSourceRanges(Expr *E) {
       if (!E->getSourceRange().isValid()) {
         Out << "invalid source range for expression: ";
         E->print(Out);
         Out << "\n";
         abort();
       }
-      checkSourceRanges(E->getSourceRange(), WalkCtx.Parent,
+      checkSourceRanges(E->getSourceRange(), Parent,
                         ^ { E->print(Out); } );
     }
     
-    void checkSourceRanges(Stmt *S, WalkContext const &WalkCtx) {
+    void checkSourceRanges(Stmt *S) {
       if (!S->getSourceRange().isValid()) {
         Out << "invalid source range for statement: ";
         S->print(Out);
         Out << "\n";
         abort();
       }
-      checkSourceRanges(S->getSourceRange(), WalkCtx.Parent,
+      checkSourceRanges(S->getSourceRange(), Parent,
                         ^ { S->print(Out); });
     }
     
     /// \brief Verify that the given source ranges is contained within the
     /// parent's source range.
-    void checkSourceRanges(SourceRange Current, 
+    void checkSourceRanges(SourceRange Current,
                            llvm::PointerUnion<Expr *, Stmt *> Parent,
                            void (^printEntity)()) {
       SourceRange Enclosing;
@@ -258,14 +289,6 @@ void swift::verify(TranslationUnit *TUnit) {
   // FIXME: For now, punt if there are errors in the translation unit.
   if (TUnit->Ctx.hadError()) return;
 
-  // Make a verifier object, and then capture it by reference.
-  Verifier VObject(TUnit);
-  Verifier *V = &VObject;
-
-  TUnit->Body->walk(^(Expr *E, WalkOrder Ord, WalkContext const &WalkCtx) { 
-                        return V->dispatch(E, Ord, WalkCtx); 
-                    },
-                    ^(Stmt *S, WalkOrder Ord, WalkContext const &WalkCtx) { 
-                        return V->dispatch(S, Ord, WalkCtx); 
-                    });
+  Verifier verifier(TUnit);
+  TUnit->Body->walk(verifier);
 }

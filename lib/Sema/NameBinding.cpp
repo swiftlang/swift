@@ -348,18 +348,21 @@ void swift::performNameBinding(TranslationUnit *TU) {
     }
   }
 
-  NameBinder *NBPtr = &Binder;  // FIXME: Lambda's would be nice.
+  struct NameBindingWalker : Walker {
+    NameBinder &Binder;
+    NameBindingWalker(NameBinder &binder) : Binder(binder) {}
+    
+    Expr *walkToExprPost(Expr *E) {
+      if (UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E))
+        return BindName(UDRE, Binder);
+      return E;
+    }
+  };
+  NameBindingWalker walker(Binder);
   
   // Now that we know the top-level value names, go through and resolve any
   // UnresolvedDeclRefExprs that exist.
-  TU->Body = cast<BraceStmt>(TU->Body->walk(^(Expr *E, WalkOrder Order,
-                                              WalkContext const &) {
-    // Ignore the preorder walk.
-    if (Order != WalkOrder::PreOrder)
-      if (UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E))
-        return BindName(UDRE, *NBPtr);
-    return E;
-  }));
+  TU->Body = cast<BraceStmt>(TU->Body->walk(walker));
 
   TU->ASTStage = TranslationUnit::NameBound;
   verify(TU);

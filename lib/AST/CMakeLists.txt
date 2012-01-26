@@ -13,5 +13,6 @@ add_swift_library(swiftAST
   Stmt.cpp
   Type.cpp
   Verifier.cpp
+  Walk.cpp
   DEPENDS swiftBasic)
 

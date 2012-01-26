@@ -436,7 +436,7 @@ namespace {
 /// intermediate nodes, introduce type coercion etc.  This visitor does this
 /// job.  Each visit method reanalyzes the children of a node, then reanalyzes
 /// the node, and returns true on error.
-class SemaExpressionTree : public ExprVisitor<SemaExpressionTree, Expr*> {
+class SemaExpressionTree : public Walker, public ExprVisitor<SemaExpressionTree, Expr*> {
 public:
   TypeChecker &TC;
   
@@ -584,24 +584,25 @@ public:
   
 
   Expr *doIt(Expr *E) {
-    return E->walk(^Expr*(Expr *E, WalkOrder Order, WalkContext const&) {
-      // This is implemented as a postorder walk.
-      if (Order == WalkOrder::PreOrder) {
-        // Do not walk into ClosureExpr.  Anonexprs within a nested closures
-        // will have already been resolved, so we don't need to recurse into it.
-        // This also prevents N^2 re-sema activity with lots of nested closures.
-        if (isa<ClosureExpr>(E) || isa<FuncExpr>(E)) return 0;
-        
-        return E;
-      }
-      
-      // Dispatch to the right visitor case in the post-order walk.  We know
-      // that the operands have already been processed and are valid.
-      return this->visit(E);
-    }, ^Stmt*(Stmt *S, WalkOrder Order, WalkContext const& WalkCtx) {
-      // Never recurse into statements.
-      return 0;
-    });
+    return E->walk(*this);
+  }
+
+  bool walkToExprPre(Expr *E) {
+    // Do not walk into ClosureExpr.  Anonexprs within a nested closures
+    // will have already been resolved, so we don't need to recurse into it.
+    // This also prevents N^2 re-sema activity with lots of nested closures.
+    return !(isa<ClosureExpr>(E) || isa<FuncExpr>(E));
+  }
+
+  Expr *walkToExprPost(Expr *E) {
+    // Dispatch to the right visitor case in the post-order walk.  We know
+    // that the operands have already been processed and are valid.
+    return this->visit(E);
+  }
+
+  bool walkToStmtPre(Stmt *S) {
+    // Never recurse into statements.
+    return false;
   }
 };
 } // end anonymous namespace.
@@ -940,86 +941,114 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
   // all of the types contained within it.  If we've resolved everything, then
   // we're done processing the expression.  While we're doing the walk, keep
   // track of whether we have any literals without a resolved type.
-  __block Expr *OneDependentExpr = 0;
-  __block SourceLoc HasDependentLiterals;
-  
-  E = E->walk(^(Expr *E, WalkOrder Order, WalkContext const&) {
-    // Ignore the preorder walk.  We'd rather diagnose use of unresolved types
-    // during the postorder walk so that the inner most expressions are 
-    // diagnosed before the outermost ones.
-    if (Order == WalkOrder::PreOrder)
-      return E;
-    
-    assert(!isa<SequenceExpr>(E) && "Should have resolved this");
-    
-    if (E->getType()->is<DependentType>()) {
-      // Remember the first dependent expression we come across.
-      if (OneDependentExpr == 0)
-        OneDependentExpr = E;
+  struct DependenceWalker : Walker {
+    DependenceWalker() { reset(); }
 
-      // If we have literals with dependent types, remember this.
-      if ((isa<IntegerLiteralExpr>(E) || isa<FloatLiteralExpr>(E)) &&
-          !HasDependentLiterals.isValid())
-        HasDependentLiterals = E->getStartLoc();
-    }
-    return E;
-  }, ^Stmt*(Stmt *S, WalkOrder Order, WalkContext const&) {
-    // Never recurse into statements.
-    return 0;
-  });
-
-  // If we found any dependent literals, then force them to the library
-  // specified default integer type (usually int64).
-  if (HasDependentLiterals.isValid()) {
-    // Lookup the "integer_literal_type" which is what all the unresolved
-    // literals get implicitly coerced to.
-    TypeAliasDecl *TAD;
-    TAD = TU.lookupGlobalType(Context.getIdentifier("integer_literal_type"),
-                              NLKind::UnqualifiedLookup);
-    if (TAD == 0) {
-      diagnose(HasDependentLiterals, diag::no_integer_literal_type_found);
-      E = 0;
-      return true;
+    void reset() {
+      OneDependentExpr = nullptr;
+      HasDependentLiterals = false;
     }
 
-    Type IntLiteralType = TAD->getAliasType();
-
-    // Lookup "float_literal_type" for all the unresolved fp literals.
-    TAD = TU.lookupGlobalType(Context.getIdentifier("float_literal_type"),
-                              NLKind::UnqualifiedLookup);
-    if (TAD == 0) {
-      diagnose(HasDependentLiterals, diag::no_float_literal_type_found);
-      E = 0;
-      return true;
-    }
-    Type FloatLiteralType = TAD->getAliasType();
+    Expr *walkToExprPost(Expr *E) {    
+      assert(!isa<SequenceExpr>(E) && "Should have resolved this");
     
-
-    // Walk the tree again to update all the entries.
-    E = E->walk(^(Expr *E, WalkOrder Order, WalkContext const&) {
-      // Ignore the preorder walk.
-      if (Order == WalkOrder::PreOrder)
-        return E;
-
-      // Process dependent literals.
       if (E->getType()->is<DependentType>()) {
-        if (isa<IntegerLiteralExpr>(E))
-          return applyTypeToLiteral(E, IntLiteralType);
-        if (isa<FloatLiteralExpr>(E))
-          return applyTypeToLiteral(E, FloatLiteralType);
+        // Remember the first dependent expression we come across.
+        if (OneDependentExpr == 0)
+          OneDependentExpr = E;
+
+        // Also remember if we see any literals with dependent types.
+        if ((isa<IntegerLiteralExpr>(E) || isa<FloatLiteralExpr>(E)))
+          HasDependentLiterals = true;
       }
       return E;
-    }, ^Stmt*(Stmt *S, WalkOrder Order, WalkContext const&) {
-      // Never recurse into statements.
-      return 0;
-    });
+    }
 
-    if (E == 0)
-      return true;
+    bool walkToStmtPre(Stmt *S) {
+      // Never recurse into statements.
+      return false;
+    }
+
+    Expr *OneDependentExpr;
+    bool HasDependentLiterals;
+  };
+  DependenceWalker dependence;
+  E->walk(dependence);
+
+  // Fast path: if we found nothing dependent, we're done.
+  if (!dependence.OneDependentExpr)
+    return false;
+
+  // Otherwise, if we found any dependent literals, then force them to
+  // the library specified default type for the appropriate literal kind.
+  if (dependence.HasDependentLiterals) {
+    struct UpdateWalker : Walker {
+      UpdateWalker(TypeChecker &TC) : TC(TC) {}
+
+      Expr *walkToExprPost(Expr *E) {
+        // Process dependent literals.
+        if (E->getType()->is<DependentType>()) {
+          if (IntegerLiteralExpr *lit = dyn_cast<IntegerLiteralExpr>(E)) {
+            Type type = getIntLiteralType(lit->getLoc());
+            if (type.isNull()) return nullptr;
+            return TC.applyTypeToLiteral(lit, type);
+          }
+
+          if (FloatLiteralExpr *lit = dyn_cast<FloatLiteralExpr>(E)) {
+            Type type = getFloatLiteralType(lit->getLoc());
+            if (type.isNull()) return nullptr;
+            return TC.applyTypeToLiteral(lit, type);
+          }
+        }
+        return E;
+      }
+
+      bool walkToStmtPre(Stmt *S) {
+        // Never recurse into statements.
+        return false;
+      }
+
+    private:
+      Type lookupGlobalType(StringRef name) {
+        TypeAliasDecl *TAD =
+          TC.TU.lookupGlobalType(TC.Context.getIdentifier(name),
+                                 NLKind::UnqualifiedLookup);
+        return (TAD ? TAD->getAliasType() : nullptr);
+      }
+
+      Type getIntLiteralType(SourceLoc loc) {
+        if (IntLiteralType.isNull()) {
+          IntLiteralType = lookupGlobalType("integer_literal_type");
+          if (IntLiteralType.isNull()) {
+            TC.diagnose(loc, diag::no_integer_literal_type_found);
+            IntLiteralType = BuiltinIntegerType::get(32, TC.Context);
+          }
+        }
+        return IntLiteralType;
+      }
+
+      Type getFloatLiteralType(SourceLoc loc) {
+        if (FloatLiteralType.isNull()) {
+          FloatLiteralType = lookupGlobalType("float_literal_type");
+          if (FloatLiteralType.isNull()) {
+            TC.diagnose(loc, diag::no_float_literal_type_found);
+            FloatLiteralType = TC.Context.TheIEEE32Type;
+          }
+        }
+        return FloatLiteralType;
+      }
+
+      TypeChecker &TC;
+      Type IntLiteralType;
+      Type FloatLiteralType;
+    };
+
+    // Walk the tree again to update all the entries.  If this fails, give up.
+    E = E->walk(UpdateWalker(*this));
+    if (E == 0) return true;
     
     // Now that we've added some types to the mix, re-type-check the expression
     // tree and recheck for dependent types.
-    OneDependentExpr = 0;
     E = SET.doIt(E);
     if (E == 0) return true;
 
@@ -1029,25 +1058,17 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
       if (E == 0) return true;
     }
 
-    E = E->walk(^(Expr *E, WalkOrder Order, WalkContext const&) {
-      // Remember the first dependent expression we come across.
-      if (Order != WalkOrder::PreOrder && E->getType()->is<DependentType>() &&
-          OneDependentExpr == 0)
-        OneDependentExpr = E;
-      return E;
-    }, ^Stmt*(Stmt *S, WalkOrder Order, WalkContext const& WalkCtx) {
-      // Never recurse into statements.
-      return 0;
-    });
+    dependence.reset();
+    E->walk(dependence);
   }
   
   // If there are no dependent expressions, then we're done.
-  if (OneDependentExpr == 0) return false;
+  if (dependence.OneDependentExpr == 0) return false;
 
   // Otherwise, emit an error about the ambiguity.
-  // FIXME: QoI ranges.
-  diagnose(OneDependentExpr->getStartLoc(),
-           diag::ambiguous_expression_unresolved);
+  diagnose(dependence.OneDependentExpr->getLoc(),
+           diag::ambiguous_expression_unresolved)
+    << dependence.OneDependentExpr->getSourceRange();
   E = 0;
   return true;
 }
