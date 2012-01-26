@@ -594,9 +594,9 @@ FuncDecl *Parser::parseDeclFunc(Type ReceiverTy) {
   // element named 'this'.  This turns "int->int" on FooTy into
   // "(this : FooTy)->(int->int)".
   if (!ReceiverTy.isNull() && !PlusLoc.isValid()) {
-    ArgDecl *D =
-      new (Context) ArgDecl(SourceLoc(), Context.getIdentifier("this"),
-                            ReceiverTy, CurDeclContext);
+    VarDecl *D =
+      new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
+                            ReceiverTy, nullptr, CurDeclContext);
     Pattern *P = new (Context) NamedPattern(D);
     P = new (Context) TypedPattern(P, ReceiverTy);
     Params.push_back(P);

@@ -468,30 +468,6 @@ public:
 };
 
   
-/// ArgDecl - A declaration representing a named function argument, in a func
-/// declaration.  For example, in "func x(a : int);", 'a' is an ArgDecl.
-///
-/// TODO: Should this be a special case of ElementRefDecl?
-class ArgDecl : public ValueDecl {
-  // FIXME: We don't have good location information for the function argument
-  // declaration.
-  SourceLoc FuncLoc;
-  
-  // FIXME: Store the access path here.
-  
-public:
-  ArgDecl(SourceLoc FuncLoc, Identifier Name, Type Ty, DeclContext *DC)
-    : ValueDecl(DeclKind::Arg, DC, Name, Ty),
-      FuncLoc(FuncLoc) {}
-
-  SourceLoc getFuncLoc() const { return FuncLoc; }
-  SourceLoc getLocStart() const { return FuncLoc; } 
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) { return D->getKind() == DeclKind::Arg; }
-  static bool classof(const ArgDecl *D) { return true; }
-};
-
 /// ElementRefDecl - A reference to the element of another decl which is formed
 /// through name binding.  For example, in "var (a,b) = f();" there is a VarDecl
 /// with no name and two ElementRefDecls (named A and B) referring to elements

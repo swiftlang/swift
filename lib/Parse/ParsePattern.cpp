@@ -146,8 +146,9 @@ ParseResult<Pattern> Parser::parsePatternAtom() {
       return new (Context) AnyPattern(loc);
     } else {
       Identifier ident = Context.getIdentifier(text);
-      ArgDecl *arg = new (Context) ArgDecl(loc, ident, Type(), CurDeclContext);
-      return new (Context) NamedPattern(arg);
+      VarDecl *var = new (Context) VarDecl(loc, ident, Type(), nullptr,
+                                           CurDeclContext);
+      return new (Context) NamedPattern(var);
     }
   }
 

@@ -100,9 +100,6 @@ public:
   void visitOneOfElementDecl(OneOfElementDecl *OOED) {
     // No type checking required?
   }
-  void visitArgDecl(ArgDecl *AD) {
-    llvm_unreachable("ArgDecls should never exist in a statement");
-  }
   void visitExtensionDecl(ExtensionDecl *ED) {
     TC.validateType(ED->getExtendedType());
 

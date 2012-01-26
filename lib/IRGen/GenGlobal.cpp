@@ -130,7 +130,6 @@ LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity) {
 /// Emit a global declaration.
 void IRGenFunction::emitGlobalDecl(Decl *D) {
   switch (D->getKind()) {
-  case DeclKind::Arg:
   case DeclKind::ElementRef:
     llvm_unreachable("cannot encounter this decl here");
 
@@ -259,7 +258,6 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
   for (Decl *member : ext->getMembers()) {
     switch (member->getKind()) {
     case DeclKind::Import:
-    case DeclKind::Arg:
     case DeclKind::OneOfElement:
     case DeclKind::ElementRef:
       llvm_unreachable("decl not allowed in extension!");

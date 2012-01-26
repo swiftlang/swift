@@ -29,7 +29,6 @@ namespace llvm {
   struct fltSemantics;
 }
 namespace swift {
-  class ArgDecl;
   class ASTContext;
   class Expr;
   class Identifier;

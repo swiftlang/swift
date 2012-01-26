@@ -183,16 +183,15 @@ public:
 
 /// A pattern which binds a name to an arbitrary value of its type.
 class NamedPattern : public Pattern {
-  ValueDecl *const TheDecl;
+  VarDecl *const Var;
 
 public:
-  NamedPattern(ValueDecl *D)
-    : Pattern(PatternKind::Named), TheDecl(D) {}
+  NamedPattern(VarDecl *var) : Pattern(PatternKind::Named), Var(var) {}
 
-  ValueDecl *getDecl() const { return TheDecl; }
-  Identifier getBoundName() const { return TheDecl->getName(); }
+  VarDecl *getDecl() const { return Var; }
+  Identifier getBoundName() const { return Var->getName(); }
 
-  SourceLoc getLoc() const { return TheDecl->getLocStart(); }
+  SourceLoc getLoc() const { return Var->getLocStart(); }
   SourceRange getSourceRange() const { return getLoc(); }
 
   static bool classof(const Pattern *P) {

@@ -25,7 +25,6 @@ using namespace irgen;
 void IRGenFunction::emitLocal(Decl *D) {
   switch (D->getKind()) {
   case DeclKind::Import:
-  case DeclKind::Arg:
   case DeclKind::ElementRef:
     llvm_unreachable("declaration cannot appear in local scope");
 

@@ -66,7 +66,7 @@ enum class Prologue : unsigned char {
   /// The standard prologue/epilogue is useful for emitting normal
   /// function bodies consisting of statements and expressions.  It implies:
   ///   - everything from Prologue::Bare, plus
-  ///   - materializing the ArgDecls and mapping them in Locals,
+  ///   - materializing the argument variables and mapping them in Locals,
   ///   - creating and managing ReturnBB, and
   ///   - initializing ReturnSlot and extracting the return value from it.
   Standard,

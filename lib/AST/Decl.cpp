@@ -129,7 +129,6 @@ TypeJudgement ValueDecl::getTypeJudgement() const {
     llvm_unreachable("non-value decls don't have type judgements");
 
   case DeclKind::Var:
-  case DeclKind::Arg:
   case DeclKind::ElementRef:
     return TypeJudgement(Ty, ValueKind::LValue);
 
@@ -154,7 +153,6 @@ bool ValueDecl::isDefinition() const {
   case DeclKind::Func:
     return cast<FuncDecl>(this)->getBody() != 0;
 
-  case DeclKind::Arg:
   case DeclKind::ElementRef:
   case DeclKind::OneOfElement:
   case DeclKind::TypeAlias:
@@ -276,11 +274,6 @@ namespace {
       OS << ')';
     }
     
-    void visitArgDecl(ArgDecl *AD) {
-      printCommon(AD, "arg_decl");
-      OS << ')';
-    }
-
     void visitElementRefDecl(ElementRefDecl *ERD) {
       printCommon(ERD, "element_ref_decl");
       OS << '\n';

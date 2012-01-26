@@ -779,7 +779,7 @@ static Explosion collectParameters(IRGenFunction &IGF) {
 }
 
 /// Emit a specific parameter.
-static void emitParameter(IRGenFunction &IGF, ArgDecl *param,
+static void emitParameter(IRGenFunction &IGF, VarDecl *param,
                           Explosion &paramValues) {
   const TypeInfo &paramType = IGF.IGM.getFragileTypeInfo(param->getType());
 
@@ -828,8 +828,7 @@ static void emitParameterClause(IRGenFunction &IGF, Pattern *param,
 
   // Bind names.
   case PatternKind::Named:
-    emitParameter(IGF, cast<ArgDecl>(cast<NamedPattern>(param)->getDecl()),
-                  paramValues);
+    emitParameter(IGF, cast<NamedPattern>(param)->getDecl(), paramValues);
     return;
 
   // Ignore ignored parameters by consuming the right number of values.
@@ -845,7 +844,7 @@ static void emitParameterClause(IRGenFunction &IGF, Pattern *param,
 
 /// Emit all the parameter clauses of the given function type.  This
 /// is basically making sure that we have mappings for all the
-/// ArgDecls.
+/// VarDecls bound by the pattern.
 static void emitParameterClauses(IRGenFunction &IGF,
                                  llvm::ArrayRef<Pattern*> params,
                                  Explosion &paramValues) {

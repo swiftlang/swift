@@ -439,9 +439,9 @@ static void AddFuncArgumentsToScope(Pattern *pat, FuncExpr *FE, Parser &P) {
   switch (pat->getKind()) {
   case PatternKind::Named: {
     // Reparent the decl and add it to the scope.
-    ArgDecl *AD = cast<ArgDecl>(cast<NamedPattern>(pat)->getDecl());
-    AD->setDeclContext(FE);
-    P.ScopeInfo.addToScope(AD);
+    VarDecl *var = cast<NamedPattern>(pat)->getDecl();
+    var->setDeclContext(FE);
+    P.ScopeInfo.addToScope(var);
     return;
   }
 

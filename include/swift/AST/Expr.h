@@ -29,7 +29,6 @@
 namespace swift {
   class ASTContext;
   class Type;
-  class ArgDecl;
   class ValueDecl;
   class Decl;
   class Pattern;

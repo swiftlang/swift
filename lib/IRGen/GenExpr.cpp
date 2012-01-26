@@ -65,9 +65,6 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
       return IGF.emitAddressLValue(IGF.getLocal(D));
     return IGF.getGlobal(cast<VarDecl>(D), TInfo);
 
-  case DeclKind::Arg:
-    return IGF.emitAddressLValue(IGF.getLocal(D));
-
   case DeclKind::ElementRef:
   case DeclKind::OneOfElement:
     IGF.unimplemented(E->getLoc(), "emitting this decl as an l-value");
@@ -85,7 +82,6 @@ void IRGenFunction::emitExplodedDeclRef(DeclRefExpr *E, Explosion &explosion) {
   case DeclKind::TypeAlias:
     llvm_unreachable("decl is not a value decl");
 
-  case DeclKind::Arg:
   case DeclKind::Var: {
     const TypeInfo &type = getFragileTypeInfo(E->getType());
     return emitExplodedLoad(emitDeclRefLValue(*this, E, type), type, explosion);
@@ -269,7 +265,6 @@ IRGenFunction::tryEmitAsAddress(Expr *E, const TypeInfo &type) {
 
     // These we support.
     case DeclKind::Var:
-    case DeclKind::Arg:
       // For now, only bother with locals.
       if (!D->getDeclContext()->isLocalContext())
         return Nothing;
