@@ -159,6 +159,18 @@ SourceRange TupleExpr::getSourceRange() const {
   return SourceRange(Start, End);
 }
 
+FuncExpr *FuncExpr::create(ASTContext &C, SourceLoc funcLoc,
+                           ArrayRef<Pattern*> params, Type fnType,
+                           BraceStmt *body, DeclContext *parent) {
+  unsigned nParams = params.size();
+  void *buf = C.Allocate(sizeof(FuncExpr) + nParams * sizeof(Pattern*),
+                         Expr::Alignment);
+  FuncExpr *fn = ::new(buf) FuncExpr(funcLoc, nParams, fnType, body, parent);
+  for (unsigned i = 0; i != nParams; ++i)
+    fn->getParamsBuffer()[i] = params[i];
+  return fn;
+}
+
 SourceRange FuncExpr::getSourceRange() const {
   return SourceRange(FuncLoc, Body->getEndLoc());
 }
@@ -174,10 +186,11 @@ SourceRange FuncExpr::getSourceRange() const {
 ///   func(x : int) -> (y : int) -> (int -> int)
 ///     The body result type is '(int -> int)'.
 Type FuncExpr::getBodyResultType() const {
-  Type ty = cast<FunctionType>(getType())->Result;
-  while (FunctionType *fn = dyn_cast<FunctionType>(ty)) {
-    ty = fn->Result;
-  }
+  unsigned n = getParamPatterns().size();
+  Type ty = getType();
+  do {
+    ty = cast<FunctionType>(ty)->Result;
+  } while (--n);
   return ty;
 }
 

@@ -74,14 +74,27 @@ void *Pattern::operator new(size_t numBytes, ASTContext &C) throw() {
   return C.Allocate(numBytes, Pattern::Alignment);
 }
 
+/// Find the name directly bound by this pattern.  When used as a
+/// tuple element in a function signature, such names become part of
+/// the type.
+Identifier Pattern::getBoundName() const {
+  const Pattern *P = this;
+  if (const TypedPattern *TP = dyn_cast<TypedPattern>(P))
+    P = TP->getSubPattern();
+
+  if (const NamedPattern *NP = dyn_cast<NamedPattern>(P))
+    return NP->getBoundName();
+  return Identifier();
+}
+
 /// Allocate a new pattern that matches a tuple.
 TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
-                                   ArrayRef<Pattern*> patterns, SourceLoc rp) {
-  unsigned n = patterns.size();
-  void *buffer = C.Allocate(sizeof(TuplePattern) + n * sizeof(Pattern*),
+                                   ArrayRef<TuplePatternElt> elts,
+                                   SourceLoc rp) {
+  unsigned n = elts.size();
+  void *buffer = C.Allocate(sizeof(TuplePattern) + n * sizeof(TuplePatternElt),
                             Pattern::Alignment);
   TuplePattern *pattern = ::new(buffer) TuplePattern(lp, n, rp);
-  for (unsigned i = 0; i != n; ++i)
-    pattern->getElementsBuffer()[i] = patterns[i];
+  memcpy(pattern->getFieldsBuffer(), elts.data(), n * sizeof(TuplePatternElt));
   return pattern;
 }

@@ -23,7 +23,8 @@
 
 PATTERN(Paren, Pattern)
 PATTERN(Tuple, Pattern)
-PATTERN(Var, Pattern)
-PATTERN(ElementRef, Pattern)
+PATTERN(Named, Pattern)
+PATTERN(Any, Pattern)
+PATTERN(Typed, Pattern)
 
 #undef PATTERN

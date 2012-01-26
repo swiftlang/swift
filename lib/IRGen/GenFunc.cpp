@@ -52,6 +52,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Optional.h"
@@ -87,6 +88,9 @@ static unsigned getNumCurries(FunctionType *type) {
 /// is the number of additional parameter clauses that are uncurried
 /// in the function body.
 static unsigned getNaturalUncurryLevel(FuncDecl *func) {
+  if (func->getBody())
+    return func->getBody()->getParamPatterns().size() - 1;
+
   FunctionType *type = func->getType()->castTo<FunctionType>();
   unsigned count = 0;
   do {
@@ -805,54 +809,54 @@ static void emitParameter(IRGenFunction &IGF, ArgDecl *param,
 
 /// Emit a specific parameter clause by walking into any literal tuple
 /// types and matching 
-static void emitParameterClause(IRGenFunction &IGF, Type paramType,
+static void emitParameterClause(IRGenFunction &IGF, Pattern *param,
                                 Explosion &paramValues) {
-  // Walk into tuple types.
-  if (TupleType *tuple = dyn_cast<TupleType>(paramType)) {
-    for (const TupleTypeElt &field : tuple->Fields) {
-      // If this element is bound to a name (i.e. has an ArgDecl), load it
-      // into a variable and map that as as local declaration.
-      if (ArgDecl *param = field.getArgDecl()) {
-        emitParameter(IGF, param, paramValues);
-        // TODO: bind sub-elements when necessary.
+  switch (param->getKind()) {
+  // Explode tuple patterns.
+  case PatternKind::Tuple:
+    for (auto &field : cast<TuplePattern>(param)->getFields())
+      emitParameterClause(IGF, field.getPattern(), paramValues);
+    return;
 
-      // Otherwise, recurse on the type in case it's a tuple and
-      // provides its own ArgDecls.
-      } else {
-        emitParameterClause(IGF, field.getType(), paramValues);
-      }
-    }
+  // Look through a couple kinds of patterns.
+  case PatternKind::Paren:
+    return emitParameterClause(IGF, cast<ParenPattern>(param)->getSubPattern(),
+                               paramValues);
+  case PatternKind::Typed:
+    return emitParameterClause(IGF, cast<TypedPattern>(param)->getSubPattern(),
+                               paramValues);
+
+  // Bind names.
+  case PatternKind::Named:
+    emitParameter(IGF, cast<ArgDecl>(cast<NamedPattern>(param)->getDecl()),
+                  paramValues);
+    return;
+
+  // Ignore ignored parameters by consuming the right number of values.
+  case PatternKind::Any: {
+    ExplosionSchema paramSchema(paramValues.getKind());
+    IGF.IGM.getExplosionSchema(param->getType(), paramSchema);
+    paramValues.claim(paramSchema.size());
     return;
   }
-
-  // Look through paren types.
-  if (ParenType *paren = dyn_cast<ParenType>(paramType)) {
-    return emitParameterClause(IGF, paren->getUnderlyingType(), paramValues);
   }
-
-  // Otherwise, we're ignoring this argument, but we still need to
-  // consume the right number of values.
-  ExplosionSchema paramSchema(paramValues.getKind());
-  IGF.IGM.getExplosionSchema(paramType, paramSchema);
-  paramValues.claim(paramSchema.size());
+  llvm_unreachable("bad pattern kind!");
 }
 
 /// Emit all the parameter clauses of the given function type.  This
 /// is basically making sure that we have mappings for all the
 /// ArgDecls.
-static void emitParameterClauses(IRGenFunction &IGF, Type fnType,
-                                 unsigned uncurryLevel,
+static void emitParameterClauses(IRGenFunction &IGF,
+                                 llvm::ArrayRef<Pattern*> params,
                                  Explosion &paramValues) {
-  // We never uncurry into something that's not written immediately as
-  // a function type.
-  FunctionType *fn = cast<FunctionType>(fnType);
+  assert(!params.empty());
 
   // When uncurrying, later argument clauses are emitted first.
-  if (uncurryLevel)
-    emitParameterClauses(IGF, fn->Result, uncurryLevel - 1, paramValues);
+  if (params.size() != 1)
+    emitParameterClauses(IGF, params.slice(1), paramValues);
 
   // Finally, emit this clause.
-  emitParameterClause(IGF, fn->Input, paramValues);
+  emitParameterClause(IGF, params[0], paramValues);
 }
 
 /// Emit the prologue for the function.
@@ -899,7 +903,8 @@ void IRGenFunction::emitPrologue() {
   }
 
   // Set up the parameters.
-  emitParameterClauses(*this, CurFuncExpr->getType(), CurUncurryLevel, values);
+  auto params = CurFuncExpr->getParamPatterns().slice(0, CurUncurryLevel + 1);
+  emitParameterClauses(*this, params, values);
 
   // TODO: set up the data pointer.
 

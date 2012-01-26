@@ -32,6 +32,7 @@ namespace swift {
   class ArgDecl;
   class ValueDecl;
   class Decl;
+  class Pattern;
   class Stmt;
   class BraceStmt;
   class TypeAliasDecl;
@@ -646,17 +647,33 @@ public:
 ///    e.g.  func(a : int) -> int { return a+1 }
 class FuncExpr : public Expr, public DeclContext {
   SourceLoc FuncLoc;
+  unsigned NumPatterns;
   
   BraceStmt *Body;
+
+  Pattern **getParamsBuffer() {
+    return reinterpret_cast<Pattern**>(this+1);
+  }
+  Pattern * const *getParamsBuffer() const {
+    return reinterpret_cast<Pattern*const*>(this+1);
+  }
   
-public:
-  FuncExpr(SourceLoc FuncLoc, Type FnType, BraceStmt *Body, DeclContext *Parent)
+  FuncExpr(SourceLoc FuncLoc, unsigned NumPatterns, Type FnType,
+           BraceStmt *Body, DeclContext *Parent)
     : Expr(ExprKind::Func, TypeJudgement(FnType, ValueKind::RValue)),
       DeclContext(DeclContextKind::FuncExpr, Parent),
-      FuncLoc(FuncLoc), Body(Body) {}
+      FuncLoc(FuncLoc), NumPatterns(NumPatterns), Body(Body) {}
+public:
+  static FuncExpr *create(ASTContext &Context, SourceLoc FuncLoc,
+                          ArrayRef<Pattern*> Params, Type FnType,
+                          BraceStmt *Body, DeclContext *Parent);
 
   SourceRange getSourceRange() const;
   SourceLoc getLoc() const { return FuncLoc; }
+
+  ArrayRef<Pattern*> getParamPatterns() const {
+    return ArrayRef<Pattern*>(getParamsBuffer(), NumPatterns);
+  }
 
   /// Returns the location of the 'func' keyword.
   SourceLoc getFuncLoc() const { return FuncLoc; }

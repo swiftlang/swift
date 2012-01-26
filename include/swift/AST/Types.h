@@ -343,14 +343,10 @@ class TupleTypeElt {
   /// value is not specified.
   Expr *Init;
 
-  /// Arg - The argument declaration formed from this tuple element.
-  /// This is only meaningful in the parameter clause of a function type.
-  ArgDecl *Arg;
-  
 public:
   TupleTypeElt() = default;
   TupleTypeElt(Type ty, Identifier name, Expr *init = nullptr)
-    : Name(name), Ty(ty), Init(init), Arg(nullptr) { }
+    : Name(name), Ty(ty), Init(init) { }
 
   bool hasName() const { return !Name.empty(); }
   Identifier getName() const { return Name; }
@@ -360,9 +356,6 @@ public:
   bool hasInit() const { return Init != nullptr; }
   Expr *getInit() const { return Init; }
   void setInit(Expr *E) { Init = E; }
-
-  ArgDecl *getArgDecl() const { return Arg; }
-  void setArgDecl(ArgDecl *arg) { Arg = arg; }
 };
   
 /// TupleType - A tuple is a parenthesized list of types where each name has an

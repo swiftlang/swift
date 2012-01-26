@@ -35,13 +35,15 @@ public:
   
   bool validateType(ValueDecl *VD);
   bool validateType(Type T);
-  
+
+  bool semaFunctionSignature(FuncExpr *FE);
   bool semaTupleExpr(TupleExpr *TE);
   Expr *semaApplyExpr(ApplyExpr *E);
   
   bool typeCheckExpression(Expr *&E, Type ConvertType = Type());
   void typeCheckDecl(Decl *D);
-
+  bool typeCheckPattern(Pattern *P);
+  bool convertToType(Pattern *P, Type Ty);
   
   bool bindAndValidateClosureArgs(Expr *Body, Type FuncInput);
 

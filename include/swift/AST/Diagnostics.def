@@ -196,6 +196,17 @@ ERROR(expected_protocol_member,type_parsing,none,
       "expected a function or variable declaration in protocol", ())
 
 //------------------------------------------------------------------------------
+// Pattern parsing diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(expected_pattern,pattern_parsing,none,
+      "expected pattern", ())
+ERROR(untyped_pattern_in_function_signature,pattern_parsing,none,
+      "function parameter must have an explicit type", ())
+ERROR(expected_rparen_tuple_pattern_list,pattern_parsing,non,
+      "expected ')' at end of tuple pattern", ())
+
+//------------------------------------------------------------------------------
 // Statement parsing diagnostics
 //------------------------------------------------------------------------------
 ERROR(expected_stmt,stmt_parsing,none,
@@ -495,6 +506,21 @@ ERROR(expression_unresolved_function,sema_tcs,none,
       "expression resolves to an unevaluated function", ())
 ERROR(assignment_lhs_not_lvalue,sema_tcs,none,
       "cannot assign to the result of this expression", ())
+
+//------------------------------------------------------------------------------
+// Type Check Patterns
+//------------------------------------------------------------------------------
+
+ERROR(cannot_infer_type_for_pattern,sema_tcp,none,
+      "cannot infer a type for this pattern", ())
+ERROR(pattern_type_mismatch_context,sema_tcp,none,
+      "type annotation does not match contextual type %0", (Type))
+ERROR(tuple_pattern_in_non_tuple_context,sema_tcp,none,
+      "tuple pattern cannot match values of the non-tuple type %0", (Type))
+ERROR(tuple_pattern_length_mismatch,sema_tcp,none,
+      "tuple pattern has the wrong length for tuple type %0", (Type))
+ERROR(coerced_tuple_pattern_has_init,sema_tcp,none,
+      "tuple element in pattern cannot have a default initializer", ())
 
 //==============================================================================
 // IR Generation Diagnostics

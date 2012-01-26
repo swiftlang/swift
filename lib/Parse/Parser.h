@@ -222,6 +222,14 @@ public:
   bool parseTypeTupleBody(SourceLoc LPLoc, Type &Result);
   
   bool parseTypeArray(SourceLoc LSquareLoc, Type &Result);
+
+  //===--------------------------------------------------------------------===//
+  // Pattern Parsing
+
+  bool parseFunctionSignature(SmallVectorImpl<Pattern*> &params, Type &type);
+  ParseResult<Pattern> parsePattern();
+  ParseResult<Pattern> parsePatternTuple();
+  ParseResult<Pattern> parsePatternAtom();
   
   //===--------------------------------------------------------------------===//
   // Expression Parsing
@@ -238,7 +246,8 @@ public:
   ParseResult<Expr> parseExprFunc();
   
   Expr *actOnIdentifierExpr(Identifier Text, SourceLoc Loc);
-  FuncExpr *actOnFuncExprStart(SourceLoc FuncLoc, Type FuncTy);
+  FuncExpr *actOnFuncExprStart(SourceLoc FuncLoc, Type FuncTy,
+                               ArrayRef<Pattern*> Patterns);
 
   //===--------------------------------------------------------------------===//
   // Statement Parsing
@@ -255,7 +264,7 @@ public:
   Expr *actOnCondition(Expr *Cond);
 
 };
-  
+
 } // end namespace swift
 
 #endif

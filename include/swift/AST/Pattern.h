@@ -44,7 +44,7 @@ class Pattern {
   class TuplePatternBitfields {
     friend class TuplePattern;
     unsigned : NumPatternBits;
-    unsigned NumElements : NumBitsAllocated - NumPatternBits;
+    unsigned NumFields : NumBitsAllocated - NumPatternBits;
   };
 
 protected:
@@ -75,6 +75,10 @@ public:
   /// type-checked.
   void setType(Type ty) { assert(!hasType()); Ty = ty; }
 
+  /// Returns the name directly bound by this pattern, or the null
+  /// identifier if the pattern does not bind a name directly.
+  Identifier getBoundName() const;
+
   SourceRange getSourceRange() const;
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
   SourceLoc getEndLoc() const { return getSourceRange().End; }
@@ -104,12 +108,12 @@ public:
     : Pattern(PatternKind::Paren, type),
       LPLoc(lp), RPLoc(rp), SubPattern(sub) {}
 
+  Pattern *getSubPattern() const { return SubPattern; }
+
   SourceLoc getLParenLoc() const { return LPLoc; }
   SourceLoc getRParenLoc() const { return RPLoc; }
   SourceRange getSourceRange() const { return SourceRange(LPLoc, RPLoc); }
-  SourceLoc getLoc() const { return LPLoc; }
-
-  Pattern *getSubPattern() const { return SubPattern; }
+  SourceLoc getLoc() const { return SubPattern->getLoc(); }
 
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Paren;
@@ -117,39 +121,59 @@ public:
   static bool classof(const ParenPattern *P) { return true; }
 };
 
+/// An element of a tuple pattern.
+class TuplePatternElt {
+  Pattern *ThePattern;
+  Expr *Init;
+
+public:
+  TuplePatternElt() = default;
+  explicit TuplePatternElt(Pattern *P, Expr *init = nullptr)
+    : ThePattern(P), Init(init) {}
+
+  Pattern *getPattern() const { return ThePattern; }
+  Expr *getInit() const { return Init; }
+  void setInit(Expr *E) { Init = E; }
+};
+
 /// A pattern consisting of a tuple of patterns.
 class TuplePattern : public Pattern {
   SourceLoc LPLoc, RPLoc;
-  // TuplePatternBits.NumElements
+  // TuplePatternBits.NumFields
 
-  Pattern **getElementsBuffer() {
-    return reinterpret_cast<Pattern**>(this+1);
+  TuplePatternElt *getFieldsBuffer() {
+    return reinterpret_cast<TuplePatternElt *>(this+1);
   }
-  Pattern * const *getElementsBuffer() const {
-    return reinterpret_cast<Pattern * const *>(this + 1);
+  const TuplePatternElt *getFieldsBuffer() const {
+    return reinterpret_cast<const TuplePatternElt *>(this + 1);
   }
 
-  TuplePattern(SourceLoc lp, unsigned numElements, SourceLoc rp)
+  TuplePattern(SourceLoc lp, unsigned numFields, SourceLoc rp)
       : Pattern(PatternKind::Tuple), LPLoc(lp), RPLoc(rp) {
-    TuplePatternBits.NumElements = numElements;
+    TuplePatternBits.NumFields = numFields;
   }
 
 public:
-  TuplePattern *create(ASTContext &C, SourceLoc lp,
-                       ArrayRef<Pattern*> elements, SourceLoc rp);
+  static TuplePattern *create(ASTContext &C, SourceLoc lp,
+                              ArrayRef<TuplePatternElt> elements,
+                              SourceLoc rp);
+
+  unsigned getNumFields() const {
+    return TuplePatternBits.NumFields;
+  }
+
+  MutableArrayRef<TuplePatternElt> getFields() {
+    return MutableArrayRef<TuplePatternElt>(getFieldsBuffer(),
+                                            getNumFields());
+  }
+  ArrayRef<TuplePatternElt> getFields() const {
+    return ArrayRef<TuplePatternElt>(getFieldsBuffer(), getNumFields());
+  }
 
   SourceLoc getLParenLoc() const { return LPLoc; }
   SourceLoc getRParenLoc() const { return RPLoc; }
   SourceRange getSourceRange() const { return SourceRange(LPLoc, RPLoc); }
   SourceLoc getLoc() const { return LPLoc; }
-
-  unsigned getNumElements() const {
-    return TuplePatternBits.NumElements;
-  }
-
-  ArrayRef<Pattern*> getElements() const {
-    return ArrayRef<Pattern*>(getElementsBuffer(), getNumElements());
-  }
 
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Tuple;
@@ -157,44 +181,64 @@ public:
   static bool classof(const TuplePattern *P) { return true; }
 };
 
-/// A pattern which binds a top-level name.  That is, this pattern
-/// binds a name and is not contained within a pattern that also binds
-/// a name.  It may still be contained within a pattern that does not
-/// bind a name.
-class VarPattern : public Pattern {
-  VarDecl *const Var;
+/// A pattern which binds a name to an arbitrary value of its type.
+class NamedPattern : public Pattern {
+  ValueDecl *const TheDecl;
 
 public:
-  VarPattern(VarDecl *var) : Pattern(PatternKind::Var), Var(var) {}
+  NamedPattern(ValueDecl *D)
+    : Pattern(PatternKind::Named), TheDecl(D) {}
 
-  SourceLoc getLoc() const { return Var->getLocStart(); }
+  ValueDecl *getDecl() const { return TheDecl; }
+  Identifier getBoundName() const { return TheDecl->getName(); }
+
+  SourceLoc getLoc() const { return TheDecl->getLocStart(); }
   SourceRange getSourceRange() const { return getLoc(); }
 
-  VarDecl *getDecl() const { return Var; }
-
   static bool classof(const Pattern *P) {
-    return P->getKind() == PatternKind::Var;
+    return P->getKind() == PatternKind::Named;
   }
-  static bool classof(const VarPattern *P) { return true; }
+  static bool classof(const NamedPattern *P) { return true; }
 };
 
-/// A pattern which binds a name other than at the top-level.
-class ElementRefPattern : public Pattern {
-  ElementRefDecl *const ElementRef;
+/// A pattern which matches an arbitrary value of a type, but does not
+/// bind a name to it.
+class AnyPattern : public Pattern {
+  SourceLoc Loc;
 
 public:
-  ElementRefPattern(ElementRefDecl *elementRef)
-    : Pattern(PatternKind::ElementRef), ElementRef(elementRef) {}
+  AnyPattern(SourceLoc loc) : Pattern(PatternKind::Any), Loc(loc) {}
 
-  SourceLoc getLoc() const { return ElementRef->getLocStart(); }
-  SourceRange getSourceRange() const { return getLoc(); }
-
-  ElementRefDecl *getDecl() const { return ElementRef; }
+  SourceLoc getLoc() const { return Loc; }
+  SourceRange getSourceRange() const { return Loc; }
 
   static bool classof(const Pattern *P) {
-    return P->getKind() == PatternKind::ElementRef;
+    return P->getKind() == PatternKind::Any;
   }
-  static bool classof(const ElementRefPattern *P) { return true; }
+  static bool classof(const AnyPattern *P) { return true; }
+};
+
+/// A pattern which matches a sub-pattern and annotates it with a
+/// type.
+class TypedPattern : public Pattern {
+  Pattern *SubPattern;
+
+public:
+  TypedPattern(Pattern *pattern, Type type)
+    : Pattern(PatternKind::Typed, type), SubPattern(pattern) {}
+
+  Pattern *getSubPattern() const { return SubPattern; }
+
+  SourceLoc getLoc() const { return SubPattern->getLoc(); }
+  SourceRange getSourceRange() const {
+    // FIXME: end location for type!
+    return SubPattern->getSourceRange();
+  }
+
+  static bool classof(const Pattern *P) {
+    return P->getKind() == PatternKind::Typed;
+  }
+  static bool classof(const TypedPattern *P) { return true; }
 };
 
 } // end namespace swift

@@ -17,6 +17,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "llvm/Module.h"
@@ -62,10 +63,15 @@ static bool isTrivialGlobalInit(llvm::Function *fn) {
 void IRGenModule::emitTranslationUnit(TranslationUnit *tunit) {
   Type emptyTuple = TupleType::getEmpty(Context);
   FunctionType *unitToUnit = FunctionType::get(emptyTuple, emptyTuple, Context);
-  FuncExpr func(SourceLoc(), unitToUnit, nullptr, tunit);
+  Pattern *params[] = {
+    TuplePattern::create(Context, SourceLoc(),
+                         llvm::ArrayRef<TuplePatternElt>(), SourceLoc())
+  };
+  FuncExpr *func = FuncExpr::create(Context, SourceLoc(), params,
+                                    unitToUnit, nullptr, tunit);
 
   llvm::Function *fn = createGlobalInitFunction(*this, tunit);
-  IRGenFunction(*this, &func, ExplosionKind::Minimal, /*uncurry*/ 0, fn)
+  IRGenFunction(*this, func, ExplosionKind::Minimal, /*uncurry*/ 0, fn)
     .emitGlobalTopLevel(tunit->Body);
 
   // Not all translation units need a global initialization function.

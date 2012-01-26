@@ -193,7 +193,7 @@ void swift::performTypeChecking(TranslationUnit *TU) {
 
   // Type check the body of each of the FuncExpr in turn.
   for (FuncExpr *FE : FuncExprs) {
-    if (!FE->getBody()) continue;
+    TC.semaFunctionSignature(FE);
 
     PrettyStackTraceExpr StackEntry(TC.Context, "type-checking", FE);
 

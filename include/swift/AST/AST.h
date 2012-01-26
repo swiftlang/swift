@@ -22,6 +22,7 @@
 #include "Decl.h"
 #include "Expr.h"
 #include "Module.h"
+#include "Pattern.h"
 #include "Stmt.h"
 #include "Types.h"
 

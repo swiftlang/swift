@@ -1051,3 +1051,15 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
   E = 0;
   return true;
 }
+
+bool TypeChecker::semaFunctionSignature(FuncExpr *FE) {
+  bool hadError = false;
+  for (unsigned i = FE->getParamPatterns().size(); i != 0; --i) {
+    Pattern *pattern = FE->getParamPatterns()[i - 1];
+    if (typeCheckPattern(pattern)) {
+      hadError = true;
+      continue;
+    }
+  }
+  return hadError;
+}

@@ -586,24 +586,26 @@ FuncDecl *Parser::parseDeclFunc(Type ReceiverTy) {
     diagnose(Tok, diag::func_decl_without_paren);
     return 0;
   }
-    
-  Type FuncTy;
-  if (parseType(FuncTy))
-    return 0;
-  
-  // If the parsed type is not spelled as a function type (i.e., has no '->' in
-  // it), then it is implicitly a function that returns ().
-  if (!isa<FunctionType>(FuncTy.getPointer()))
-    FuncTy = FunctionType::get(FuncTy, TupleType::getEmpty(Context), Context);
-  
-  // If a receiver type was specified and this isn't a plus method, install the
-  // first type as the receiver, as a tuple with element named 'this'.  This
-  // turns "int->int" on FooTy into "(this : FooTy)->(int->int)".
+
+  SmallVector<Pattern*, 8> Params;
+
+  // If a receiver type was specified and this isn't a plus method,
+  // add an implicit first pattern to match the receiver type as an
+  // element named 'this'.  This turns "int->int" on FooTy into
+  // "(this : FooTy)->(int->int)".
   if (!ReceiverTy.isNull() && !PlusLoc.isValid()) {
-    TupleTypeElt ReceiverElt(ReceiverTy, Context.getIdentifier("this"));
-    FuncTy = FunctionType::get(TupleType::get(ReceiverElt, Context),
-                               FuncTy, Context);
+    ArgDecl *D =
+      new (Context) ArgDecl(SourceLoc(), Context.getIdentifier("this"),
+                            ReceiverTy, CurDeclContext);
+    Pattern *P = new (Context) NamedPattern(D);
+    P = new (Context) TypedPattern(P, ReceiverTy);
+    Params.push_back(P);
   }
+  
+
+  Type FuncTy;
+  if (parseFunctionSignature(Params, FuncTy))
+    return 0;
   
   // Enter the arguments for the function into a new function-body scope.  We
   // need this even if there is no function body to detect argument name
@@ -612,7 +614,7 @@ FuncDecl *Parser::parseDeclFunc(Type ReceiverTy) {
   {
     Scope FnBodyScope(this);
     
-    FE = actOnFuncExprStart(FuncLoc, FuncTy);
+    FE = actOnFuncExprStart(FuncLoc, FuncTy, Params);
 
     // Establish the new context.
     ContextChange CC(*this, FE);
@@ -620,7 +622,7 @@ FuncDecl *Parser::parseDeclFunc(Type ReceiverTy) {
     // Then parse the expression.
     NullablePtr<Stmt> Body;
     
-    // Check to see if we have a "{" which is a brace expr.
+    // Check to see if we have a "{" to start a brace statement.
     if (Tok.is(tok::l_brace)) {
       ParseResult<BraceStmt> Body = parseStmtBrace(diag::invalid_diagnostic);
       if (Body.isSuccess())
@@ -636,8 +638,8 @@ FuncDecl *Parser::parseDeclFunc(Type ReceiverTy) {
   }
   
   // Create the decl for the func and add it to the parent scope.
-  FuncDecl *FD = new (Context) FuncDecl(PlusLoc, FuncLoc, Name, FuncTy, FE,
-                                        CurDeclContext);
+  FuncDecl *FD = new (Context) FuncDecl(PlusLoc, FuncLoc, Name,
+                                        FuncTy, FE, CurDeclContext);
   if (Attributes.isValid()) FD->getMutableAttrs() = Attributes;
   ScopeInfo.addToScope(FD);
   return FD;

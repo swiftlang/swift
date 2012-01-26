@@ -397,24 +397,24 @@ ParseResult<Expr> Parser::parseExprParen() {
 ParseResult<Expr> Parser::parseExprFunc() {
   SourceLoc FuncLoc = consumeToken(tok::kw_func);
 
+  SmallVector<Pattern*, 4> Params;
   Type Ty;
   if (Tok.is(tok::l_brace)) {
+    Params.push_back(TuplePattern::create(Context, SourceLoc(),
+                                          llvm::ArrayRef<TuplePatternElt>(),
+                                          SourceLoc()));
     Ty = TupleType::getEmpty(Context);
+    Ty = FunctionType::get(Ty, Ty, Context);
   } else if (!Tok.is(tok::l_paren) && !Tok.is(tok::l_paren_space)) {
     diagnose(Tok, diag::func_decl_without_paren);
     return true;
-  } else if (parseType(Ty)) {
+  } else if (parseFunctionSignature(Params, Ty)) {
     return true;
   }
   
-  // If the parsed type is not spelled as a function type (i.e., has no '->' in
-  // it), then it is implicitly a function that returns ().
-  if (!isa<FunctionType>(Ty.getPointer()))
-    Ty = FunctionType::get(Ty, TupleType::getEmpty(Context), Context);
-
   // The arguments to the func are defined in their own scope.
   Scope FuncBodyScope(this);
-  FuncExpr *FE = actOnFuncExprStart(FuncLoc, Ty);
+  FuncExpr *FE = actOnFuncExprStart(FuncLoc, Ty, Params);
 
   // Establish the new context.
   ContextChange CC(*this, FE);
@@ -431,79 +431,46 @@ ParseResult<Expr> Parser::parseExprFunc() {
 }
 
 
-/// FuncTypePiece - This little enum is used by AddFuncArgumentsToScope to keep
-/// track of where in a function type it is currently looking.  This affects how
-/// the decls are processed and created.
-enum class FuncTypePiece {
-  Function,  // Looking at the initial functiontype itself.
-  Input,     // Looking at the input to the function type
-  Output     // Looking at the output to the function type.
-};
-
 /// AddFuncArgumentsToScope - Walk the type specified for a Func object (which
 /// is known to be a FunctionType on the outer level) creating and adding named
 /// arguments to the current scope.  This causes redefinition errors to be
 /// emitted.
-static void AddFuncArgumentsToScope(Type Ty,
-                                    FuncTypePiece Mode,
-                                    FuncExpr *FE,
-                                    Parser &P) {
-  // Handle the function case first.
-  if (Mode == FuncTypePiece::Function) {
-    FunctionType *FT = cast<FunctionType>(Ty);
-    AddFuncArgumentsToScope(FT->Input, FuncTypePiece::Input, FE, P);
-    
-    // If this is a->b->c then we treat b as an input, not (b->c) as an output.
-    if (isa<FunctionType>(FT->Result.getPointer()))
-      AddFuncArgumentsToScope(FT->Result, FuncTypePiece::Function, FE, P);
-    else    
-      AddFuncArgumentsToScope(FT->Result, FuncTypePiece::Output, FE, P);
+static void AddFuncArgumentsToScope(Pattern *pat, FuncExpr *FE, Parser &P) {
+  switch (pat->getKind()) {
+  case PatternKind::Named: {
+    // Reparent the decl and add it to the scope.
+    ArgDecl *AD = cast<ArgDecl>(cast<NamedPattern>(pat)->getDecl());
+    AD->setDeclContext(FE);
+    P.ScopeInfo.addToScope(AD);
     return;
   }
-  
-  // Otherwise, we're looking at an input or output to the func.  The only type
-  // we currently dive into is the humble tuple, which can be recursive.  This
-  // should dive in syntactically.
-  ///
-  /// Note that we really *do* want dyn_cast here, not getAs, because we do not
-  /// want to look through type aliases or other sugar, we want to see what the
-  /// user wrote in the func declaration.
-  TupleType *TT = dyn_cast<TupleType>(Ty.getPointer());
-  if (TT == 0) return;
-  
-  // For tuples, recursively processes their elements (to handle cases like:
-  //    (x : (a : int, b : int), y : int) -> ...
-  // and create decls for any named elements.
-  for (const TupleTypeElt &Field : TT->Fields) {
-    AddFuncArgumentsToScope(Field.getType(), Mode, FE, P);
-    
-    // If this field is named, create the argument decl for it.
-    // Otherwise, ignore unnamed fields.
-    if (!Field.hasName()) continue;
 
-    // Create the argument decl for this named argument.
-    ArgDecl *AD = new (P.Context) ArgDecl(FE->getFuncLoc(), Field.getName(),
-                                          Field.getType(), FE);
+  case PatternKind::Any:
+    return;
 
-    // Modify the TupleType in-place.  This is okay, as we're
-    // essentially still processing it.
-    const_cast<TupleTypeElt&>(Field).setArgDecl(AD);
-    
-    // Eventually we should mark the input/outputs as readonly vs writeonly.
-    //bool isInput = Mode == FuncTypePiece::Input;
-    
-    P.ScopeInfo.addToScope(AD);
+  case PatternKind::Paren:
+    AddFuncArgumentsToScope(cast<ParenPattern>(pat)->getSubPattern(), FE, P);
+    return;
+
+  case PatternKind::Typed:
+    AddFuncArgumentsToScope(cast<TypedPattern>(pat)->getSubPattern(), FE, P);
+    return;
+
+  case PatternKind::Tuple:
+    for (const TuplePatternElt &field : cast<TuplePattern>(pat)->getFields())
+      AddFuncArgumentsToScope(field.getPattern(), FE, P);
+    return;
   }
+  llvm_unreachable("bad pattern kind!");
 }
 
+FuncExpr *Parser::actOnFuncExprStart(SourceLoc FuncLoc, Type FuncTy,
+                                     ArrayRef<Pattern*> Params) {
+  FuncExpr *FE = FuncExpr::create(Context, FuncLoc, Params, FuncTy, 0,
+                                  CurDeclContext);
 
-FuncExpr *Parser::actOnFuncExprStart(SourceLoc FuncLoc, Type FuncTy) {
-  FuncExpr *FE = new (Context) FuncExpr(FuncLoc, FuncTy, 0, CurDeclContext);
-
-  AddFuncArgumentsToScope(FuncTy, FuncTypePiece::Function, FE, *this);
+  for (Pattern *P : Params)
+    AddFuncArgumentsToScope(P, FE, *this);
   
   return FE;
 }
-
-
-
