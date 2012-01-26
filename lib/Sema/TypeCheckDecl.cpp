@@ -101,7 +101,7 @@ public:
     // No type checking required?
   }
   void visitArgDecl(ArgDecl *AD) {
-    assert(0 && "ArgDecls should never exist in a statement");
+    llvm_unreachable("ArgDecls should never exist in a statement");
   }
   void visitExtensionDecl(ExtensionDecl *ED) {
     TC.validateType(ED->getExtendedType());
