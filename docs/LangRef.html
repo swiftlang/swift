@@ -1051,7 +1051,112 @@
     Oneof decls should implicitly define these for their types.
   TODO: Need pattern matching and element extraction.
   </p>
-  
+
+
+  <!-- ********************************************************************* -->
+  <h2 id="pattern">Patterns</h2>
+  <!-- ********************************************************************* -->
+
+  <div class="commentary">
+    We intend to have a pattern-matching statement eventually, and
+    probably a pattern-matching predicate expression.  There are several
+    other places in the language, however, which can also be usefully
+    expressed in terms of patterns.  This has the benefit of allowing
+    uniform decomposition of tuples.<br><br>
+
+    The pattern grammar mirrors the expression grammar, or to be more
+    specific, the grammar of literals.  This is because the conceptual
+    algorithm for matching a value against a pattern is to try to find
+    an assignment of values to variables which makes the pattern equal
+    the value.  So every expression form which can be used to build a
+    value directly should generally have a corresponding pattern form.
+    <br><br>
+
+    For now, however, we do not include literals in the pattern grammar.
+  </div>
+
+  <pre class="grammar">
+    pattern-atom ::= <a href="#pattern-identifier">pattern-identifier</a>
+    pattern-atom ::= <a href="#pattern-tuple">pattern-tuple</a>
+
+    pattern      ::= pattern-atom
+    pattern      ::= <a href="#pattern-typed">pattern-typed</a>
+  </pre>
+
+  <p>The basic pattern grammar is a literal "atom" followed by an
+    optional type annotation.  Type annotations are useful for
+    documentation, as well as for coercing a matched expression to a
+    particular kind.  They are also required when patterns are used in
+    a <a href="#func-signature">function signature</a>.</p>
+
+  <p>A pattern has a type.  A pattern may be "fully-typed", meaning
+    informally that its type is fully determined by the type
+    annotations it contains.  Some patterns may also derive a type
+    from their context, be it an enclosing pattern or the way it is
+    used;  this set of situations is not yet fully determined.</p>
+
+  <p>A pattern may be "irrefutable", meaning informally that it
+    matches all values of its type.  Patterns in some contexts are
+    required to be irrefutable.</p>
+
+  <!-- ********************************************************************* -->
+  <h3 id="pattern-typed">Typed Patterns</h3>
+  <!-- ********************************************************************* -->
+
+  <pre class="grammar">
+    pattern-typed ::= pattern-atom ':' <a href="#type">type</a>
+  </pre>
+
+  <p>A type annotation constrains a pattern to have a specific type.
+    An annotated pattern is always fully-typed.  It is irrefutable
+    if and only if its subpattern is irrefutable.</p>
+
+  <!-- ********************************************************************* -->
+  <h3 id="pattern-identifier">Identifier Patterns</h3>
+  <!-- ********************************************************************* -->
+
+  <pre class="grammar">
+    pattern-identifier ::= <a href="#identifier">identifier</a>
+  </pre>
+
+  <p>An identifier pattern binds a value to a particular name, which is
+    then a legal variable of the pattern's type within its scope.  It is
+    irrefutable.  It is not fully-typed;  the type must be inferred from
+    context.</p>
+
+  <p>As a special case, if the identifier is <tt>_</tt> then no variable
+    comes into scope, and the value matched is lost.  An identifier pattern
+    which does not fall into this case is called a "named pattern".</p>
+
+  <!-- ********************************************************************* -->
+  <h3 id="pattern-tuple">Tuple Patterns</h3>
+  <!-- ********************************************************************* -->
+
+  <pre class="grammar">
+    pattern-tuple ::= '(' pattern-tuple-body? ')'
+    pattern-tuple-body ::= pattern-tuple-element
+    pattern-tuple-body ::= pattern-tuple-element ',' pattern-tuple-body
+    pattern-tuple-element ::= pattern
+    pattern-tuple-element ::= pattern '=' <a href="#expr">expr</a>
+  </pre>
+
+  <p>A tuple pattern is a list of zero or more patterns.  Within a
+    function signature, patterns may also be given a default-value
+    expression.</p>
+
+  <p>A tuple pattern is irrefutable if all its sub-patterns are
+    irrefutable.</p>
+
+  <p>A tuple pattern is fully-typed if all its sub-patterns are
+    fully-typed, in which case its type is the corresponding tuple
+    type, where each <tt>tuple-type-element</tt> has the type,
+    label, and default value of the corresponding <tt>pattern-tuple-element</tt>.
+    A <tt>pattern-tuple-element</tt> has a label if it is a named
+    pattern or a type annotation of a named pattern.</p>
+
+  <p>As a special case, a tuple pattern with one element that lacks
+    both a label and default value does not have a tuple type; it has
+    the type of its constituent pattern.</p>
   
   <!-- ********************************************************************* -->
   <h2 id="expr">Expressions</h2>
@@ -1274,7 +1379,7 @@
   </div>
   
   <pre class="grammar">
-    expr-func ::= 'func' <a href="#type">type</a>? <a href="#stmt-brace">stmt-brace</a>
+    expr-func ::= 'func' <a href="#func-signature">func-signature</a>? <a href="#stmt-brace">stmt-brace</a>
   </pre>
 
   <p>A func expression is an anonymous (unnamed) function literal definition,
@@ -1283,14 +1388,9 @@
   
   <p>A func expression captures a reference to any values in parent scopes that
      are used.</p>
-  
-  <p>If a type is specified in the func expression, it specifies the signature
-     of the anonymous function.  The first element of the type must be a tuple
-     type (thus it must start with '(').  If the entire type is not lexically a
-     function type, it is made into one by declaring a function type that takes
-     the specified type and returns ().  If no type is specified, the type of
-     the func is "<tt>()-&gt;()</tt>".</p>
 
+  <p>If the function signature is omitted, it is implicitly <tt>() -> ()</tt>.</p>
+  
   <p>TODO: Allow attributes on funcs when useful.</p>
 
   <pre class="example">
@@ -1304,6 +1404,39 @@
     }
   </pre>
 
+  <!-- ===================================================================== -->
+  <h4 id="func-signature">Function signatures</h4>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    func-signature ::= <a href="#pattern-tuple">pattern-tuple</a>+ func-signature-result?
+    func-signature-result ::= '-&gt;' <a href="#type">type</a>
+  </pre>
+
+  <p>A function signature specifies one or more sets of parameter
+    patterns, plus an optional result type.</p>
+
+  <p>When a result type is not written, it is implicitly the empty tuple type,
+    <tt>()</tt>.</p>
+
+  <p>In the body of the function described by a particular signature,
+    all the variables bound by all of the parameter patterns are in
+    scope, and the function must return a value of the result type.</p>
+
+  <p>An outermost pattern in a function signature must be fully-typed
+    and irrefutable.</p>
+
+  <p>The type of a function with signature <tt>(P<sub>0</sub>)(P<sub>1</sub>)..(P<sub><i>n</i></sub>) -&gt; R</tt>
+    is <tt>T<sub>0</sub> -&gt; T<sub>1</sub> -&gt; .. -&gt; T<sub><i>n</i></sub> -&gt; R</tt>,
+    where <tt>T<sub><i>i</i></sub></tt> is the bottom-up type of the pattern
+    <tt>P<sub><i>i</i></sub></tt>.  This is called "currying".  The
+    behavior of all the intermediate functions (those which do not
+    return <tt>R</tt>) is to capture their arguments, plus any
+    arguments from prior patterns, and returns a function which takes
+    the next set of arguments.  When the "uncurried" function is
+    called (the one taking <tt>T<sub><i>n</i></sub></tt> and returning
+    <tt>R</tt>), all of the arguments are then available and the
+    function body is finally evaluated as normal.</p>
   
   <!-- ===================================================================== -->
   <h3 id="expr-dot">Dot Expressions</h3>
