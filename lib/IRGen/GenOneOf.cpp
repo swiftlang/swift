@@ -204,102 +204,103 @@ namespace {
 
 const TypeInfo *
 TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
-  llvm::StructType *Converted = IGM.createNominalType(T->TheDecl);
+  llvm::StructType *convertedStruct = IGM.createNominalType(T->getDecl());
 
   // We don't need a discriminator if this is a singleton ADT.
-  if (T->Elements.size() == 1) {
-    SingletonOneofTypeInfo *TInfo =
-      new SingletonOneofTypeInfo(Converted, Size(0), Alignment(0));
+  if (T->getElements().size() == 1) {
+    SingletonOneofTypeInfo *convertedTInfo =
+      new SingletonOneofTypeInfo(convertedStruct, Size(0), Alignment(0));
     assert(!IGM.Types.Converted.count(T));
-    IGM.Types.Converted.insert(std::make_pair(T, TInfo));
+    IGM.Types.Converted.insert(std::make_pair(T, convertedTInfo));
 
-    Type Ty = T->getElement(0)->getArgumentType();
+    Type eltType = T->getElement(0)->getArgumentType();
 
-    llvm::Type *StorageType;
-    if (Ty.isNull()) {
-      StorageType = IGM.Int8Ty;
-      TInfo->StorageAlignment = Alignment(1);
-      TInfo->Singleton = nullptr;
+    llvm::Type *storageType;
+    if (eltType.isNull()) {
+      storageType = IGM.Int8Ty;
+      convertedTInfo->StorageAlignment = Alignment(1);
+      convertedTInfo->Singleton = nullptr;
     } else {
-      const TypeInfo &EltInfo = getFragileTypeInfo(IGM, Ty);
-      assert(EltInfo.isComplete());
-      StorageType = EltInfo.StorageType;
-      TInfo->StorageSize = EltInfo.StorageSize;
-      TInfo->StorageAlignment = EltInfo.StorageAlignment;
-      TInfo->Singleton = &EltInfo;
+      const TypeInfo &eltTInfo = getFragileTypeInfo(IGM, eltType);
+      assert(eltTInfo.isComplete());
+      storageType = eltTInfo.StorageType;
+      convertedTInfo->StorageSize = eltTInfo.StorageSize;
+      convertedTInfo->StorageAlignment = eltTInfo.StorageAlignment;
+      convertedTInfo->Singleton = &eltTInfo;
     }
 
-    llvm::Type *Body[] = { StorageType };
-    Converted->setBody(Body);
+    llvm::Type *body[] = { storageType };
+    convertedStruct->setBody(body);
 
-    return TInfo;
+    return convertedTInfo;
   }
 
   // Otherwise, we need a discriminator.
-  llvm::Type *DiscriminatorType;
-  Size DiscriminatorSize;
-  if (T->Elements.size() == 2) {
-    DiscriminatorType = IGM.Int1Ty;
-    DiscriminatorSize = Size(1);
-  } else if (T->Elements.size() <= (1 << 8)) {
-    DiscriminatorType = IGM.Int8Ty;
-    DiscriminatorSize = Size(1);
-  } else if (T->Elements.size() <= (1 << 16)) {
-    DiscriminatorType = IGM.Int16Ty;
-    DiscriminatorSize = Size(2);
+  llvm::Type *discriminatorType;
+  Size discriminatorSize;
+  if (T->getElements().size() == 2) {
+    discriminatorType = IGM.Int1Ty;
+    discriminatorSize = Size(1);
+  } else if (T->getElements().size() <= (1 << 8)) {
+    discriminatorType = IGM.Int8Ty;
+    discriminatorSize = Size(1);
+  } else if (T->getElements().size() <= (1 << 16)) {
+    discriminatorType = IGM.Int16Ty;
+    discriminatorSize = Size(2);
   } else {
-    DiscriminatorType = IGM.Int32Ty;
-    DiscriminatorSize = Size(4);
+    discriminatorType = IGM.Int32Ty;
+    discriminatorSize = Size(4);
   }
 
-  SmallVector<llvm::Type*, 2> Body;
-  Body.push_back(DiscriminatorType);
+  SmallVector<llvm::Type*, 2> body;
+  body.push_back(discriminatorType);
 
-  Size PayloadSize = Size(0);
-  Alignment StorageAlignment = Alignment(1);
+  Size payloadSize = Size(0);
+  Alignment storageAlignment = Alignment(1);
 
   // Figure out how much storage we need for the union.
-  for (unsigned I = 0, E = T->Elements.size(); I != E; ++I) {
+  for (auto &elt : T->getElements()) {
     // Ignore variants that carry no data.
-    Type Ty = T->getElement(I)->getArgumentType();
-    if (Ty.isNull()) continue;
+    Type eltType = elt->getArgumentType();
+    if (eltType.isNull()) continue;
 
     // Compute layout for the type, and ignore variants with
     // zero-size data.
-    const TypeInfo &EltInfo = getFragileTypeInfo(IGM, Ty);
-    assert(EltInfo.isComplete());
-    if (EltInfo.StorageSize.isZero()) continue;
+    const TypeInfo &eltTInfo = getFragileTypeInfo(IGM, eltType);
+    assert(eltTInfo.isComplete());
+    if (eltTInfo.isEmpty()) continue;
 
     // The required payload size is the amount of padding needed to
     // get up to the element's alignment, plus the actual size.
-    Size EltPayloadSize = EltInfo.StorageSize;
-    if (EltInfo.StorageAlignment.getValue() > DiscriminatorSize.getValue())
-      EltPayloadSize += Size(EltInfo.StorageAlignment.getValue()
-                               - DiscriminatorSize.getValue());
+    Size eltPayloadSize = eltTInfo.StorageSize;
+    if (eltTInfo.StorageAlignment.getValue() > discriminatorSize.getValue())
+      eltPayloadSize += Size(eltTInfo.StorageAlignment.getValue()
+                               - discriminatorSize.getValue());
 
-    PayloadSize = std::max(PayloadSize, EltPayloadSize);
-    StorageAlignment = std::max(StorageAlignment, EltInfo.StorageAlignment);
+    payloadSize = std::max(payloadSize, eltPayloadSize);
+    storageAlignment = std::max(storageAlignment, eltTInfo.StorageAlignment);
   }
 
-  Size StorageSize = DiscriminatorSize + PayloadSize;
+  Size storageSize = discriminatorSize + payloadSize;
 
-  OneofTypeInfo *TInfo;
+  OneofTypeInfo *convertedTInfo;
 
   // If there's no payload at all, use the enum TypeInfo.
-  if (!PayloadSize) {
-    TInfo = new EnumTypeInfo(Converted, StorageSize, StorageAlignment);
+  if (!payloadSize) {
+    convertedTInfo = new EnumTypeInfo(convertedStruct, storageSize,
+                                      storageAlignment);
 
   // Otherwise, add the payload array to the storage.
   } else {
-    Body.push_back(llvm::ArrayType::get(IGM.Int8Ty, PayloadSize.getValue()));
+    body.push_back(llvm::ArrayType::get(IGM.Int8Ty, payloadSize.getValue()));
 
     // TODO: don't always use an aggregate representation.
-    TInfo = new AggregateOneofTypeInfo(Converted, StorageSize,
-                                       StorageAlignment);
+    convertedTInfo = new AggregateOneofTypeInfo(convertedStruct, storageSize,
+                                                storageAlignment);
   }
 
-  Converted->setBody(Body);
-  return TInfo;
+  convertedStruct->setBody(body);
+  return convertedTInfo;
 }
 
 namespace {

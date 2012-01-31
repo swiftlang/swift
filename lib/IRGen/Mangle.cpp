@@ -145,7 +145,7 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
 
     if (tryMangleSubstitution(oneof)) return;
     mangleDeclContext(ctx->getParent());
-    mangleIdentifier(oneof->TheDecl->getName());
+    mangleIdentifier(oneof->getDecl()->getName());
     addSubstitution(oneof);
     return;
   }
@@ -180,7 +180,7 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
                          unsigned uncurryLevel) {
   TypeBase *base = type.getPointer();
 
-  switch (base->Kind) {
+  switch (base->getKind()) {
   case TypeKind::Error:
     llvm_unreachable("mangling error type");
   case TypeKind::Dependent:
@@ -208,7 +208,7 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     return;
 
   case TypeKind::NameAlias:
-    return mangleType(cast<NameAliasType>(base)->TheDecl->getUnderlyingType(),
+    return mangleType(cast<NameAliasType>(base)->getDecl()->getUnderlyingType(),
                       explosion, uncurryLevel);
   case TypeKind::Identifier:
     return mangleType(cast<IdentifierType>(base)->getMappedType(),
@@ -222,7 +222,7 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     // type ::= 'T' tuple-field+ '_'
     // tuple-field ::= identifier? type
     Buffer << 'T';
-    for (auto &field : tuple->Fields) {
+    for (auto &field : tuple->getFields()) {
       if (field.hasName())
         mangleIdentifier(field.getName());
       mangleType(field.getType(), explosion, 0);
@@ -239,7 +239,7 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
 
     // type ::= 'N' decl
     Buffer << 'N';
-    mangleDeclName(cast<OneOfType>(base)->TheDecl);
+    mangleDeclName(cast<OneOfType>(base)->getDecl());
 
     addSubstitution(base);
     return;
@@ -250,8 +250,8 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     // type ::= 'f' type type (uncurried)
     FunctionType *fn = cast<FunctionType>(base);
     Buffer << (uncurryLevel > 0 ? 'f' : 'F');
-    mangleType(fn->Input, explosion, 0);
-    mangleType(fn->Result, explosion,
+    mangleType(fn->getInput(), explosion, 0);
+    mangleType(fn->getResult(), explosion,
                (uncurryLevel > 0 ? uncurryLevel - 1 : 0));
     return;
   }
@@ -260,8 +260,8 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     // type ::= 'A' integer type
     ArrayType *array = cast<ArrayType>(base);
     Buffer << 'A';
-    Buffer << array->Size;
-    mangleType(array->Base, ExplosionKind::Minimal, 0);
+    Buffer << array->getSize();
+    mangleType(array->getBaseType(), ExplosionKind::Minimal, 0);
     return;
   };
 

@@ -150,9 +150,9 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
   
   // Get the number of lexical arguments, for semantic checks below.
   int NumArguments = -1;
-  if (FunctionType *FT = dyn_cast<FunctionType>(Ty.getPointer()))
-    if (TupleType *TT = dyn_cast<TupleType>(FT->Input.getPointer()))
-      NumArguments = TT->Fields.size();
+  if (FunctionType *FT = dyn_cast<FunctionType>(Ty))
+    if (TupleType *TT = dyn_cast<TupleType>(FT->getInput()))
+      NumArguments = TT->getFields().size();
   
   if (VD->isOperator() && (NumArguments == 0 || NumArguments > 2)) {
     TC.diagnose(VD->getLocStart(), diag::invalid_arg_count_for_operator);
@@ -215,15 +215,15 @@ bool DeclChecker::validateVarName(Type Ty, DeclVarName *Name) {
   
   // Verify the # elements line up.
   ArrayRef<DeclVarName *> Elements = Name->getElements();
-  if (Elements.size() != AccessedTuple->Fields.size()) {
+  if (Elements.size() != AccessedTuple->getFields().size()) {
     TC.diagnose(Name->getLocation(), diag::varname_element_count_mismatch,
-                Ty, AccessedTuple->Fields.size(), Elements.size());
+                Ty, AccessedTuple->getFields().size(), Elements.size());
     return true;
   }
   
   // Okay, everything looks good at this level, recurse.
   for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
-    if (validateVarName(AccessedTuple->Fields[i].getType(), Elements[i]))
+    if (validateVarName(AccessedTuple->getFields()[i].getType(), Elements[i]))
       return true;
   }
   

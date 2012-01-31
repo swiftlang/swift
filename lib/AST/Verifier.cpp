@@ -158,10 +158,10 @@ namespace {
         abort();
       }
 
-      if (E->getFieldNumber() >= tupleType->Fields.size()) {
+      if (E->getFieldNumber() >= tupleType->getFields().size()) {
         Out << "field index " << E->getFieldNumber()
             << " for TupleElementExpr is out of range [0,"
-            << tupleType->Fields.size() << ")\n";
+            << tupleType->getFields().size() << ")\n";
         abort();
       }
 

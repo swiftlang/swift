@@ -66,7 +66,7 @@ isLiteralCompatibleType(Type Ty, SourceLoc Loc, bool isInt, TypeChecker *TC) {
   FunctionType *FT = Method->getType()->castTo<FunctionType>();
   
   // The result of the convert function must be the destination type.
-  if (!FT->Result->isEqual(Ty)) {
+  if (!FT->getResult()->isEqual(Ty)) {
     TC->diagnose(Method->getLocStart(), 
                  diag::literal_conversion_wrong_return_type, Ty, MethodName);
     TC->diagnose(Loc, diag::while_converting_literal, Ty);
@@ -74,12 +74,12 @@ isLiteralCompatibleType(Type Ty, SourceLoc Loc, bool isInt, TypeChecker *TC) {
   }
   
   // Get the argument type, ignoring single element tuples.
-  Type ArgType = FT->Input;
+  Type ArgType = FT->getInput();
     
   // Look through single element tuples.
   if (TupleType *TT = ArgType->getAs<TupleType>())
-    if (TT->Fields.size() == 1)
-      ArgType = TT->Fields[0].getType();
+    if (TT->getFields().size() == 1)
+      ArgType = TT->getFields()[0].getType();
   
   return std::pair<FuncDecl*, Type>(Method, ArgType);
 }
@@ -295,15 +295,15 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     
     // We have a function application.  Check that the argument type matches the
     // expected type of the function.
-    E2 = convertToType(E2, FT->Input);
+    E2 = convertToType(E2, FT->getInput());
     if (E2 == 0) {
       diagnose(E1->getLoc(), diag::while_converting_function_argument,
-               FT->Input);
+               FT->getInput());
       return 0;
     }
     
     E->setArg(E2);
-    E->setType(FT->Result, ValueKind::RValue);
+    E->setType(FT->getResult(), ValueKind::RValue);
     return E;
   }
   
@@ -314,7 +314,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // The metatype represents an arbitrary named type: dig through the
     // TypeAlias to see what we're dealing with.  If the typealias was erroneous
     // then silently squish this erroneous subexpression.
-    Type Ty = MT->TheType->getUnderlyingType();
+    Type Ty = MT->getTypeDecl()->getUnderlyingType();
     if (Ty->is<ErrorType>())
       return 0;  // Squelch an erroneous subexpression.
 
@@ -325,8 +325,8 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // TODO: We could allow constructing a tuple this way, though it is somewhat
     // silly and pointless to do so.
     if (OneOfType *OOT = Ty->getAs<OneOfType>()) {
-      if (!OOT->Elements.empty()) {
-        Expr *FnRef = OverloadSetRefExpr::createWithCopy(OOT->Elements,
+      if (!OOT->getElements().empty()) {
+        Expr *FnRef = OverloadSetRefExpr::createWithCopy(OOT->getElements(),
                                                          E1->getStartLoc());
         return semaApplyExpr(new (Context) ConstructorCallExpr(FnRef, E2));
       }
@@ -367,7 +367,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     FunctionType *FnTy = Fn->getType()->getAs<FunctionType>();
     if (FnTy == 0) continue;
     
-    Type ArgTy = FnTy->Input;
+    Type ArgTy = FnTy->getInput();
     // If we found an exact match, disambiguate the overload set.
     Expr::ConversionRank Rank = E2->getRankOfConversionTo(ArgTy);
     
@@ -411,7 +411,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   
   // Print out the candidate set.
   for (auto TheDecl : OS->Decls) {
-    Type ArgTy = TheDecl->getType()->castTo<FunctionType>()->Input;
+    Type ArgTy = TheDecl->getType()->castTo<FunctionType>()->getInput();
     if (E2->getRankOfConversionTo(ArgTy) != BestRank)
       continue;
     diagnose(TheDecl->getLocStart(), diag::found_candidate);
@@ -637,7 +637,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     // The metatype represents an arbitrary named type: dig through the
     // TypeAlias to see what we're dealing with.  If the typealias was erroneous
     // then silently squish this erroneous subexpression.
-    Type Ty = MTT->TheType->getUnderlyingType();
+    Type Ty = MTT->getTypeDecl()->getUnderlyingType();
     if (Ty->is<ErrorType>())
       return 0;  // Squelch an erroneous subexpression.
         
@@ -666,12 +666,12 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   // Type check module type references, as on some_module.some_member".
   if (ModuleType *MT = SubExprTy->getAs<ModuleType>()) {
     SmallVector<ValueDecl*, 8> Decls;
-    MT->TheModule->lookupValue(Module::AccessPathTy(), MemberName,
-                               NLKind::QualifiedLookup, Decls);
+    MT->getModule()->lookupValue(Module::AccessPathTy(), MemberName,
+                                 NLKind::QualifiedLookup, Decls);
 
     if (Decls.empty()) {
       TC.diagnose(E->getDotLoc(), diag::invalid_module_member, MemberName,
-                  MT->TheModule->Name)
+                  MT->getModule()->Name)
         << Base->getSourceRange()
         << SourceRange(E->getNameLoc(), E->getNameLoc());
       return 0;
@@ -729,7 +729,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     if (MemberName.str().startswith("$")) {
       unsigned Value = 0;
       if (!MemberName.str().substr(1).getAsInteger(10, Value)) {
-        if (Value >= TT->Fields.size()) {
+        if (Value >= TT->getFields().size()) {
           TC.diagnose(E->getNameLoc(), diag::field_number_too_large);
           return 0;
         }

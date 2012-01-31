@@ -78,7 +78,7 @@ static unsigned getNumCurries(FunctionType *type) {
   unsigned count = 0;
   do {
     count++;
-    type = type->Result->getAs<FunctionType>();
+    type = type->getResult()->getAs<FunctionType>();
   } while (type);
 
   return count;
@@ -95,7 +95,7 @@ static unsigned getNaturalUncurryLevel(FuncDecl *func) {
   unsigned count = 0;
   do {
     count++;
-    type = dyn_cast<FunctionType>(type->Result);
+    type = dyn_cast<FunctionType>(type->getResult());
   } while (type);
 
   assert(count <= getNumCurries(func->getType()->castTo<FunctionType>()));
@@ -106,7 +106,7 @@ static unsigned getNaturalUncurryLevel(FuncDecl *func) {
 /// uncurrying level.  For 'a -> b -> c', this is 'b' at 0 and 'c' at 1.
 static Type getResultType(Type type, unsigned uncurryLevel) {
   do {
-    type = type->castTo<FunctionType>()->Result;
+    type = type->castTo<FunctionType>()->getResult();
   } while (uncurryLevel--);
   return type;
 }
@@ -313,10 +313,10 @@ static Type decomposeFunctionType(IRGenModule &IGM, FunctionType *fn,
                                   SmallVectorImpl<llvm::Type*> &argTypes) {
   // Save up the formal parameter types in reverse order.
   llvm::SmallVector<Type, 8> formalArgTypes(uncurryLevel + 1);
-  formalArgTypes[uncurryLevel] = fn->Input;
+  formalArgTypes[uncurryLevel] = fn->getInput();
   while (uncurryLevel--) {
-    fn = fn->Result->castTo<FunctionType>();
-    formalArgTypes[uncurryLevel] = fn->Input;
+    fn = fn->getResult()->castTo<FunctionType>();
+    formalArgTypes[uncurryLevel] = fn->getInput();
   }
 
   // Explode the argument clusters in that reversed order.
@@ -332,7 +332,7 @@ static Type decomposeFunctionType(IRGenModule &IGM, FunctionType *fn,
     }
   }
 
-  return fn->Result;
+  return fn->getResult();
 }
 
 Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
@@ -720,7 +720,8 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &resultType) {
     bool isAggregateResult = (lastArgWritten != 0);
     if (isAggregateResult) {
       assert(callSites.empty() && "aggregate result on non-final call?");
-      Type formalResultType = calleeFormalType->castTo<FunctionType>()->Result;
+      Type formalResultType =
+        calleeFormalType->castTo<FunctionType>()->getResult();
       const TypeInfo &type = IGM.getFragileTypeInfo(formalResultType);
 
       resultAddress = createFullExprAlloca(type.StorageType,
@@ -1056,12 +1057,12 @@ namespace {
       Clauses.push_back(Clause());
 
       FunctionType *fn = cast<FunctionType>(fnType);
-      accumulateClauses(fn->Result, maxUncurryLevel - 1);
+      accumulateClauses(fn->getResult(), maxUncurryLevel - 1);
 
       Clauses[clauseIndex].DataTypesBeginIndex = AllDataTypes.size();
-      Clauses[clauseIndex].ForwardingFnType = fn->Result;
+      Clauses[clauseIndex].ForwardingFnType = fn->getResult();
 
-      accumulateParameterDataTypes(fn->Input);
+      accumulateParameterDataTypes(fn->getInput());
     }
 
     /// Accumulate the given parameter type.

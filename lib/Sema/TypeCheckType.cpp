@@ -44,7 +44,7 @@ bool TypeChecker::validateType(Type InTy) {
 
   bool IsInvalid = false;
   
-  switch (T->Kind) {
+  switch (T->getKind()) {
   case TypeKind::Error:
     // Error already diagnosed.
     return true;
@@ -69,14 +69,13 @@ bool TypeChecker::validateType(Type InTy) {
     // Nothing to validate.
     break;
 
-  case TypeKind::NameAlias:
-    IsInvalid = !cast<NameAliasType>(T)->TheDecl->hasUnderlyingType() ||
-                  validateType(cast<NameAliasType>(T)->TheDecl
-                               ->getUnderlyingType());
+  case TypeKind::NameAlias: {
+    TypeAliasDecl *D = cast<NameAliasType>(T)->getDecl();
+    IsInvalid = !D->hasUnderlyingType() || validateType(D->getUnderlyingType());
     if (IsInvalid)
-      cast<NameAliasType>(T)->TheDecl
-        ->overwriteUnderlyingType(ErrorType::get(Context));
+      D->overwriteUnderlyingType(ErrorType::get(Context));
     break;
+  }
   case TypeKind::Identifier:
     return validateType(cast<IdentifierType>(T)->getMappedType());
   case TypeKind::Paren:
@@ -86,16 +85,16 @@ bool TypeChecker::validateType(Type InTy) {
     
     // Okay, we found an uncanonicalized tuple type, which might have default
     // values.  If so, we'll potentially have to update it.
-    for (unsigned i = 0, e = TT->Fields.size(); i != e; ++i) {
+    for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i) {
       // The element has *at least* a type or an initializer, so we start by
       // verifying each individually.
-      Type EltTy = TT->Fields[i].getType();
+      Type EltTy = TT->getFields()[i].getType();
       if (EltTy && validateType(EltTy)) {
         IsInvalid = true;
         break;
       }
 
-      Expr *EltInit = TT->Fields[i].getInit();
+      Expr *EltInit = TT->getFields()[i].getInit();
       if (EltInit == 0) continue;
       
       Expr *OldInit = EltInit;
@@ -118,12 +117,12 @@ bool TypeChecker::validateType(Type InTy) {
       
   case TypeKind::Function: {
     FunctionType *FT = cast<FunctionType>(T);
-    IsInvalid = validateType(FT->Input) || validateType(FT->Result);
+    IsInvalid = validateType(FT->getInput()) || validateType(FT->getResult());
     break;
   }
   case TypeKind::Array: {
     ArrayType *AT = cast<ArrayType>(T);
-    IsInvalid = validateType(AT->Base);
+    IsInvalid = validateType(AT->getBaseType());
     // FIXME: We need to check AT->Size! (It also has to be convertible to int).
     break;
   }

@@ -95,7 +95,7 @@ Type ElementRefDecl::getTypeForPath(Type InTy, ArrayRef<unsigned> Path) {
   // handle oneof's etc.
   if (TupleType *TT = dyn_cast<TupleType>(Ty)) {
     // Reject invalid indices.
-    if (Path[0] >= TT->Fields.size())
+    if (Path[0] >= TT->getFields().size())
       return 0;
   
     return getTypeForPath(TT->getElementType(Path[0]), Path.slice(1));

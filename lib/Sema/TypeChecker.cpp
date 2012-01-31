@@ -57,7 +57,7 @@ struct RewriteAnonArgExpr : Walker {
     // tuple.
     unsigned NumInputArgs = 1;
     if (TupleType *TT = dyn_cast<TupleType>(FuncInputTy.getPointer()))
-      NumInputArgs = TT->Fields.size();
+      NumInputArgs = TT->getFields().size();
     
     assert(A->getType()->is<DependentType>() && "Anon arg already has a type?");
     

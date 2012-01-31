@@ -64,6 +64,10 @@ class TypeBase {
   /// types, and is otherwise lazily populated by ASTContext when the canonical
   /// form of a non-canonical type is requested.
   llvm::PointerUnion<TypeBase *, ASTContext*> CanonicalType;
+
+  /// Kind - The discriminator that indicates what subclass of type this is.
+  const TypeKind Kind;
+
 protected:
   TypeBase(TypeKind kind, ASTContext *CanTypeCtx = 0)
     : CanonicalType((TypeBase*)nullptr), Kind(kind) {
@@ -71,9 +75,10 @@ protected:
     if (CanTypeCtx)
       CanonicalType = CanTypeCtx;
   }
+
 public:
-  /// Kind - The discriminator that indicates what subclass of type this is.
-  const TypeKind Kind;
+  /// getKind - Return what kind of type this is.
+  TypeKind getKind() const { return Kind; }
 
   /// isCanonical - Return true if this is a canonical type.
   bool isCanonical() const { return CanonicalType.is<ASTContext*>(); }
@@ -158,7 +163,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ErrorType *) { return true; }
   static bool classof(const TypeBase *T) {
-    return T->Kind == TypeKind::Error;
+    return T->getKind() == TypeKind::Error;
   }
 };
 
@@ -183,7 +188,7 @@ public:
 
   static bool classof(const BuiltinIntegerType *) { return true; }
   static bool classof(const TypeBase *T) {
-    return T->Kind == TypeKind::BuiltinInteger;
+    return T->getKind() == TypeKind::BuiltinInteger;
   }
 };
   
@@ -212,7 +217,7 @@ public:
 
   static bool classof(const BuiltinFloatType *) { return true; }
   static bool classof(const TypeBase *T) {
-    return T->Kind == TypeKind::BuiltinFloat;
+    return T->getKind() == TypeKind::BuiltinFloat;
   }
 };
   
@@ -230,7 +235,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const DependentType *) { return true; }
   static bool classof(const TypeBase *T) {
-    return T->Kind == TypeKind::Dependent;
+    return T->getKind() == TypeKind::Dependent;
   }
 };
 
@@ -240,8 +245,10 @@ class NameAliasType : public TypeBase {
   friend class TypeAliasDecl;
   // NameAliasType are never canonical.
   NameAliasType(TypeAliasDecl *d) : TypeBase(TypeKind::NameAlias), TheDecl(d) {}
-public:
   TypeAliasDecl *const TheDecl;
+
+public:
+  TypeAliasDecl *getDecl() const { return TheDecl; }
    
   /// getDesugaredType - If this type is a sugared type, remove all levels of
   /// sugar until we get down to a non-sugar type.
@@ -252,7 +259,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const NameAliasType *) { return true; }
   static bool classof(const TypeBase *T) {
-    return T->Kind == TypeKind::NameAlias;
+    return T->getKind() == TypeKind::NameAlias;
   }
 };
 
@@ -301,7 +308,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const IdentifierType *) { return true; }
   static bool classof(const TypeBase *T) {
-    return T->Kind == TypeKind::Identifier;
+    return T->getKind() == TypeKind::Identifier;
   }
 };
 
@@ -326,7 +333,7 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ParenType *) { return true; }
   static bool classof(const TypeBase *T) {
-    return T->Kind == TypeKind::Paren;
+    return T->getKind() == TypeKind::Paren;
   }
 };
 
@@ -361,14 +368,17 @@ public:
 /// optional name.
 ///
 class TupleType : public TypeBase, public llvm::FoldingSetNode {
-public:
   const ArrayRef<TupleTypeElt> Fields;
   
+public:
   /// get - Return the uniqued tuple type with the specified elements.
   static TupleType *get(ArrayRef<TupleTypeElt> Fields, ASTContext &C);
 
   /// getEmpty - Return the empty tuple type '()'.
   static Type getEmpty(ASTContext &C);
+
+  /// getFields - Return the fields of this tuple.
+  ArrayRef<TupleTypeElt> getFields() const { return Fields; }
   
   /// getElementType - Return the type of the specified field.
   Type getElementType(unsigned FieldNo) const {
@@ -398,7 +408,9 @@ public:
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TupleType *) { return true; }
-  static bool classof(const TypeBase *T) { return T->Kind == TypeKind::Tuple; }
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Tuple;
+  }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, Fields);
@@ -415,7 +427,6 @@ private:
 /// elements (which are OneOfElementDecl's).  This is a DeclContext because it
 /// owns its OneOfElementDecl's.
 class OneOfType : public TypeBase, public DeclContext {
-public:
   const SourceLoc OneOfLoc;
   const ArrayRef<OneOfElementDecl*> Elements;
   
@@ -423,12 +434,22 @@ public:
   /// specifies the name and other useful information about this type.
   TypeAliasDecl * const TheDecl;
   
+public:
   /// getNew - Return a new instance of oneof type.  These are never uniqued
   /// since each syntactic instance of them is semantically considered to be a
   /// different type.
   static OneOfType *getNew(SourceLoc OneOfLoc,
                            ArrayRef<OneOfElementDecl*> Elements,
                            TypeAliasDecl *TheDecl);
+
+  /// getOneOfLoc() - Returns the location of the 'oneof' keyword.
+  SourceLoc getOneOfLoc() const { return OneOfLoc; }
+
+  /// getElements() - Returns the elements of the type.
+  ArrayRef<OneOfElementDecl*> getElements() const { return Elements; }
+
+  /// getDecl() - Returns the alias declaration for this 'oneof'.
+  TypeAliasDecl *getDecl() const { return TheDecl; }
  
   SourceLoc getLocStart() const { return OneOfLoc; }
   OneOfElementDecl *getElement(unsigned i) const {
@@ -452,7 +473,9 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const OneOfType *D) { return true; }
-  static bool classof(const TypeBase *T) { return T->Kind == TypeKind::OneOf; }
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::OneOf;
+  }
   static bool classof(const DeclContext *C) {
     return C->getContextKind() == DeclContextKind::OneOfType;
   }
@@ -472,17 +495,21 @@ private:
 /// MetaTypeType is typically given to TypeAliasDecl, and can also exist on
 /// DeclRefExpr, ParenExpr, etc.
 class MetaTypeType : public TypeBase {
-public:
   TypeAliasDecl *const TheType;
   
+public:
   /// get - Return the MetaTypeType for the specified type.
   static MetaTypeType *get(TypeAliasDecl *Type);
+
+  TypeAliasDecl *getTypeDecl() const { return TheType; }
 
   void print(raw_ostream &O) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const MetaTypeType *D) { return true; }
-  static bool classof(const TypeBase *T) {return T->Kind == TypeKind::MetaType;}
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::MetaType;
+  }
   
 private:
   MetaTypeType(TypeAliasDecl *Type, ASTContext &Ctx)
@@ -495,17 +522,21 @@ private:
 /// "Builtin.int".  This is typically given to a ModuleExpr, but can also exist
 /// on ParenExpr, for example.
 class ModuleType : public TypeBase {
-public:
   Module *const TheModule;
   
+public:
   /// get - Return the ModuleType for the specified module.
   static ModuleType *get(Module *M);
+
+  Module *getModule() const { return TheModule; }
   
   void print(raw_ostream &O) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ModuleType *D) { return true; }
-  static bool classof(const TypeBase *T) {return  T->Kind == TypeKind::Module; }
+  static bool classof(const TypeBase *T) {
+    return  T->getKind() == TypeKind::Module;
+  }
   
 private:
   ModuleType(Module *M, ASTContext &Ctx)
@@ -517,19 +548,22 @@ private:
 /// FunctionType - A function type has a single input and result, e.g.
 /// "int -> int" or (var a : int, var b : int) -> (int, int).
 class FunctionType : public TypeBase {
-public:
   const Type Input;
   const Type Result;
   
+public:
   /// 'Constructor' Factory Function
   static FunctionType *get(Type Input, Type Result, ASTContext &C);
+
+  Type getInput() const { return Input; }
+  Type getResult() const { return Result; }
   
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const FunctionType *) { return true; }
   static bool classof(const TypeBase *T) {
-    return T->Kind == TypeKind::Function;
+    return T->getKind() == TypeKind::Function;
   }
   
 private:
@@ -541,21 +575,26 @@ private:
 /// constant size.  For example "int[]" and "int[4]".  Array types cannot have
 /// size = 0.
 class ArrayType : public TypeBase {
-public:
   const Type Base;
   
   /// Size - When this is zero it indicates an unsized array like "int[]".
   uint64_t Size;
   
+public:
   /// 'Constructor' Factory Function.
   /// Size=0 indicates an unspecified size array.
   static ArrayType *get(Type BaseType, uint64_t Size, ASTContext &C);
+
+  Type getBaseType() const { return Base; }
+  uint64_t getSize() const { return Size; }
   
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ArrayType *) { return true; }
-  static bool classof(const TypeBase *T) { return T->Kind == TypeKind::Array; }
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Array;
+  }
   
 private:
   ArrayType(Type Base, uint64_t Size);
@@ -583,7 +622,9 @@ public:
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ArrayType *) { return true; }
-  static bool classof(const TypeBase *T) {return T->Kind == TypeKind::Protocol;}
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Protocol;
+  }
 
 private:
   ProtocolType(SourceLoc ProtocolLoc, ArrayRef<ValueDecl*> Elts,

@@ -325,8 +325,8 @@ TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
   SmallVector<TupleFieldInfo, 8> FieldInfos;
   SmallVector<llvm::Type*, 8> ScalarTypes;
   SmallVector<llvm::Type*, 8> StorageTypes;
-  FieldInfos.reserve(T->Fields.size());
-  StorageTypes.reserve(T->Fields.size());
+  FieldInfos.reserve(T->getFields().size());
+  StorageTypes.reserve(T->getFields().size());
 
   unsigned maximalExplosionSize = 0, minimalExplosionSize = 0;
 
@@ -336,7 +336,7 @@ TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
   Alignment StorageAlignment;
 
   // TODO: rearrange the tuple for optimal packing.
-  for (const TupleTypeElt &Field : T->Fields) {
+  for (const TupleTypeElt &Field : T->getFields()) {
     const TypeInfo &TInfo = getFragileTypeInfo(IGM, Field.getType());
     assert(TInfo.isComplete());
 
@@ -538,7 +538,7 @@ void IRGenFunction::emitExplodedTupleShuffle(TupleShuffleExpr *E,
   }
 
   llvm::ArrayRef<TupleTypeElt> outerFields =
-    E->getType()->castTo<TupleType>()->Fields;
+    E->getType()->castTo<TupleType>()->getFields();
 
   auto shuffleIndexIterator = E->getElementMapping().begin();
   for (const TupleTypeElt &outerField : outerFields) {

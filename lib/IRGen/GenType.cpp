@@ -133,7 +133,7 @@ const TypeInfo &TypeConverter::getFragileTypeInfo(IRGenModule &IGM, Type T) {
 const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
   llvm::LLVMContext &Ctx = IGM.getLLVMContext();
   TypeBase *TB = T.getPointer();
-  switch (TB->Kind) {
+  switch (TB->getKind()) {
   case TypeKind::Error:
     llvm_unreachable("generating an error type");
   case TypeKind::Dependent:
@@ -177,7 +177,7 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
     return &getFragileTypeInfo(IGM, cast<ParenType>(TB)->getUnderlyingType());
   case TypeKind::NameAlias:
     return &getFragileTypeInfo(IGM,
-                      cast<NameAliasType>(TB)->TheDecl->getUnderlyingType());
+                     cast<NameAliasType>(TB)->getDecl()->getUnderlyingType());
   case TypeKind::Identifier:
     return convertType(IGM, cast<IdentifierType>(TB)->getMappedType());
   case TypeKind::Tuple:
@@ -217,7 +217,7 @@ void IRGenModule::getExplosionSchema(Type type, ExplosionSchema &schema) {
   // obvious TupleTypes.  This assumes that a TupleType's explosion
   // schema is always the concatenation of its components schemata.
   if (TupleType *tuple = dyn_cast<TupleType>(type)) {
-    for (const TupleTypeElt &field : tuple->Fields)
+    for (const TupleTypeElt &field : tuple->getFields())
       getExplosionSchema(field.getType(), schema);
     return;
   }

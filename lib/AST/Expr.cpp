@@ -90,10 +90,10 @@ Expr *Expr::getValueProvidingExpr() {
 /// getNumArgs - Return the number of arguments that this closure expr takes.
 /// This is the length of the ArgList.
 unsigned ClosureExpr::getNumArgs() const {
-  Type Input = getType()->getAs<FunctionType>()->Input;
+  Type Input = getType()->getAs<FunctionType>()->getInput();
   
   if (TupleType *TT = Input->getAs<TupleType>())
-    return TT->Fields.size();
+    return TT->getFields().size();
   return 1;  
 }
 
@@ -189,7 +189,7 @@ Type FuncExpr::getBodyResultType() const {
   unsigned n = getParamPatterns().size();
   Type ty = getType();
   do {
-    ty = cast<FunctionType>(ty)->Result;
+    ty = cast<FunctionType>(ty)->getResult();
   } while (--n);
   return ty;
 }
@@ -232,19 +232,19 @@ getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
   
   // Keep track of which input elements are used.
   SmallVector<bool, 16> UsedElements(NumExprElements);
-  SmallVector<int, 16>  DestElementSources(DestTy->Fields.size(), -1);
+  SmallVector<int, 16>  DestElementSources(DestTy->getFields().size(), -1);
 
   if (TupleType *ETy = E->getType()->getAs<TupleType>()) {
-    assert(ETy->Fields.size() == NumExprElements && "Expr #elements mismatch!");
+    assert(ETy->getFields().size() == NumExprElements && "Expr #elements mismatch!");
     { unsigned i = 0;
-    for (const TupleTypeElt &Elt : ETy->Fields)
+    for (const TupleTypeElt &Elt : ETy->getFields())
       IdentList[i++] = Elt.getName();
     }
   
     // First off, see if we can resolve any named values from matching named
     // inputs.
-    for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
-      const TupleTypeElt &DestElt = DestTy->Fields[i];
+    for (unsigned i = 0, e = DestTy->getFields().size(); i != e; ++i) {
+      const TupleTypeElt &DestElt = DestTy->getFields()[i];
       // If this destination field is named, first check for a matching named
       // element in the input, from any position.
       if (!DestElt.hasName()) continue;
@@ -265,7 +265,7 @@ getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
   // Next step, resolve (in order) unmatched named results and unnamed results
   // to any left-over unnamed input.
   unsigned NextInputValue = 0;
-  for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
+  for (unsigned i = 0, e = DestTy->getFields().size(); i != e; ++i) {
     // If we already found an input to satisfy this output, we're done.
     if (DestElementSources[i] != -1) continue;
     
@@ -286,7 +286,7 @@ getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
     // fill the dest (as in when assigning (1,2) to (int,int,int), or we ran out
     // and default values should be used.
     if (NextInputValue == NumExprElements) {
-      if (!DestTy->Fields[i].hasInit())
+      if (!DestTy->getFields()[i].hasInit())
         return Expr::CR_Invalid;
         
       // If the default initializer should be used, leave the
@@ -310,12 +310,12 @@ getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
   // this conversion in place.
   const TupleExpr *TE = dyn_cast<TupleExpr>(E);
   if (TE && TE->getNumElements() != 1 &&
-      TE->getNumElements() == DestTy->Fields.size()) {
+      TE->getNumElements() == DestTy->getFields().size()) {
     Expr::ConversionRank CurRank = Expr::CR_Identity;
     
     // The conversion rank of the tuple is the worst case of the conversion rank
     // of each of its elements.
-    for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
+    for (unsigned i = 0, e = DestTy->getFields().size(); i != e; ++i) {
       // Extract the input element corresponding to this destination element.
       unsigned SrcField = DestElementSources[i];
       assert(SrcField != ~0U && "dest field not found?");
@@ -337,7 +337,7 @@ getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
   // A tuple-to-tuple conversion of a non-parenthesized tuple is allowed to
   // permute the elements, but cannot perform conversions of each value.
   TupleType *ETy = E->getType()->getAs<TupleType>();
-  for (unsigned i = 0, e = DestTy->Fields.size(); i != e; ++i) {
+  for (unsigned i = 0, e = DestTy->getFields().size(); i != e; ++i) {
     // Extract the input element corresponding to this destination element.
     unsigned SrcField = DestElementSources[i];
     assert(SrcField != ~0U && "dest field not found?");
@@ -391,14 +391,14 @@ static Expr::ConversionRank getConversionRank(const Expr *E, Type DestTy) {
     // If the input is a tuple and the output is a tuple, see if we can convert
     // each element.
     if (TupleType *ETy = E->getType()->getAs<TupleType>())
-      return getTupleToTupleTypeConversionRank(E, ETy->Fields.size(), TT);
+      return getTupleToTupleTypeConversionRank(E, ETy->getFields().size(), TT);
   }
 
   // Otherwise, check to see if this is an auto-closure case.  This case happens
   // when we convert an expression E to a function type whose result is E's
   // type.
   if (FunctionType *FT = DestTy->getAs<FunctionType>()) {
-    if (getConversionRank(E, FT->Result) == Expr::CR_Invalid)
+    if (getConversionRank(E, FT->getResult()) == Expr::CR_Invalid)
       return Expr::CR_Invalid;
     
     return Expr::CR_AutoClosure;

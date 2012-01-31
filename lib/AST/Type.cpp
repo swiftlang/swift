@@ -50,7 +50,7 @@ TypeBase *TypeBase::getCanonicalType() {
   
   // Otherwise, compute and cache it.
   TypeBase *Result = 0;
-  switch (Kind) {
+  switch (getKind()) {
   case TypeKind::Error:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinInteger:
@@ -71,11 +71,11 @@ TypeBase *TypeBase::getCanonicalType() {
     break;
   case TypeKind::Tuple: {
     TupleType *TT = cast<TupleType>(this);
-    assert(!TT->Fields.empty() && "Empty tuples are always canonical");
+    assert(!TT->getFields().empty() && "Empty tuples are always canonical");
 
     SmallVector<TupleTypeElt, 8> CanElts;
-    CanElts.reserve(TT->Fields.size());
-    for (const TupleTypeElt &field : TT->Fields) {
+    CanElts.reserve(TT->getFields().size());
+    for (const TupleTypeElt &field : TT->getFields()) {
       assert(!field.getType().isNull() &&
              "Cannot get canonical type of un-typechecked TupleType!");
       CanElts.push_back(TupleTypeElt(field.getType()->getCanonicalType(),
@@ -88,15 +88,15 @@ TypeBase *TypeBase::getCanonicalType() {
     
   case TypeKind::Function: {
     FunctionType *FT = cast<FunctionType>(this);
-    Type In = FT->Input->getCanonicalType();
-    Type Out = FT->Result->getCanonicalType();
+    Type In = FT->getInput()->getCanonicalType();
+    Type Out = FT->getResult()->getCanonicalType();
     Result = FunctionType::get(In, Out, In->getASTContext());
     break;
   }
   case TypeKind::Array:
     ArrayType *AT = cast<ArrayType>(this);
-    Type EltTy = AT->Base->getCanonicalType();
-    Result = ArrayType::get(EltTy, AT->Size, EltTy->getASTContext());
+    Type EltTy = AT->getBaseType()->getCanonicalType();
+    Result = ArrayType::get(EltTy, AT->getSize(), EltTy->getASTContext());
     break;
   }
   
@@ -108,7 +108,7 @@ TypeBase *TypeBase::getCanonicalType() {
 
 
 TypeBase *TypeBase::getDesugaredType() {
-  switch (Kind) {
+  switch (getKind()) {
   case TypeKind::Error:
   case TypeKind::Dependent:
   case TypeKind::BuiltinFloat:
@@ -283,7 +283,7 @@ void TypeBase::dump() const {
 }
 
 void TypeBase::print(raw_ostream &OS) const {
-  switch (Kind) {
+  switch (getKind()) {
   case TypeKind::Error:         return cast<ErrorType>(this)->print(OS);
   case TypeKind::Dependent:     return cast<DependentType>(this)->print(OS);
   case TypeKind::BuiltinFloat:  return cast<BuiltinFloatType>(this)->print(OS);
@@ -307,7 +307,7 @@ void BuiltinIntegerType::print(raw_ostream &OS) const {
 }
 
 void BuiltinFloatType::print(raw_ostream &OS) const {
-  switch (Kind) {
+  switch (getFPKind()) {
   case IEEE16:  OS << "Builtin::FP_IEEE16"; return;
   case IEEE32:  OS << "Builtin::FP_IEEE32"; return;
   case IEEE64:  OS << "Builtin::FP_IEEE64"; return;

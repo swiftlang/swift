@@ -61,7 +61,7 @@ Resilience NamedDecl::getResilienceFrom(Component *C) const {
 
     // For oneofs, we walk out through the oneof decl.
     case DeclContextKind::OneOfType:
-      D = cast<OneOfType>(DC)->TheDecl;
+      D = cast<OneOfType>(DC)->getDecl();
       goto HandleDecl;
 
     case DeclContextKind::ExtensionDecl:
