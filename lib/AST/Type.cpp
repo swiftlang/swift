@@ -51,24 +51,19 @@ TypeBase *TypeBase::getCanonicalType() {
   // Otherwise, compute and cache it.
   TypeBase *Result = 0;
   switch (getKind()) {
-  case TypeKind::Error:
-  case TypeKind::BuiltinFloat:
-  case TypeKind::BuiltinInteger:
-  case TypeKind::Dependent:
-  case TypeKind::MetaType:
-  case TypeKind::Module:
-  case TypeKind::OneOf:
-  case TypeKind::Protocol:
-    llvm_unreachable("These are always canonical");
-  case TypeKind::Paren:
-    Result = cast<ParenType>(this)->getUnderlyingType()->getCanonicalType();
+#define ALWAYS_CANONICAL_TYPE(id, parent) case TypeKind::id:
+#define UNCHECKED_TYPE(id, parent) case TypeKind::id:
+#define TYPE(id, parent)
+#include "swift/AST/TypeNodes.def"
+    llvm_unreachable("these types are always canonical");
+
+#define SUGARED_TYPE(id, parent) \
+  case TypeKind::id: \
+    Result = cast<id##Type>(this)->getDesugaredType()->getCanonicalType(); \
     break;
-  case TypeKind::NameAlias:
-    Result = cast<NameAliasType>(this)->getDesugaredType()->getCanonicalType();
-    break;
-  case TypeKind::Identifier:
-    Result = cast<IdentifierType>(this)->getDesugaredType()->getCanonicalType();
-    break;
+#define TYPE(id, parent)
+#include "swift/AST/TypeNodes.def"
+
   case TypeKind::Tuple: {
     TupleType *TT = cast<TupleType>(this);
     assert(!TT->getFields().empty() && "Empty tuples are always canonical");
@@ -109,17 +104,13 @@ TypeBase *TypeBase::getCanonicalType() {
 
 TypeBase *TypeBase::getDesugaredType() {
   switch (getKind()) {
-  case TypeKind::Error:
-  case TypeKind::Dependent:
-  case TypeKind::BuiltinFloat:
-  case TypeKind::BuiltinInteger:
-  case TypeKind::OneOf:
-  case TypeKind::MetaType:
-  case TypeKind::Module:
+#define ALWAYS_CANONICAL_TYPE(id, parent) case TypeKind::id:
+#define UNCHECKED_TYPE(id, parent) case TypeKind::id:
+#define TYPE(id, parent)
+#include "swift/AST/TypeNodes.def"
   case TypeKind::Tuple:
   case TypeKind::Function:
   case TypeKind::Array:
-  case TypeKind::Protocol:
     // None of these types have sugar at the outer level.
     return this;
   case TypeKind::Paren:
@@ -138,7 +129,7 @@ TypeBase *ParenType::getDesugaredType() {
 }
 
 TypeBase *NameAliasType::getDesugaredType() {
-  return TheDecl->getUnderlyingType()->getDesugaredType();
+  return getDecl()->getUnderlyingType()->getDesugaredType();
 }
 
 TypeBase *IdentifierType::getDesugaredType() {
@@ -284,22 +275,11 @@ void TypeBase::dump() const {
 
 void TypeBase::print(raw_ostream &OS) const {
   switch (getKind()) {
-  case TypeKind::Error:         return cast<ErrorType>(this)->print(OS);
-  case TypeKind::Dependent:     return cast<DependentType>(this)->print(OS);
-  case TypeKind::BuiltinFloat:  return cast<BuiltinFloatType>(this)->print(OS);
-  case TypeKind::BuiltinInteger:
-    return cast<BuiltinIntegerType>(this)->print(OS);
-  case TypeKind::Paren:         return cast<ParenType>(this)->print(OS);
-  case TypeKind::NameAlias:     return cast<NameAliasType>(this)->print(OS);
-  case TypeKind::Identifier:    return cast<IdentifierType>(this)->print(OS);
-  case TypeKind::OneOf:         return cast<OneOfType>(this)->print(OS);
-  case TypeKind::MetaType:      return cast<MetaTypeType>(this)->print(OS);
-  case TypeKind::Module:        return cast<ModuleType>(this)->print(OS);
-  case TypeKind::Tuple:         return cast<TupleType>(this)->print(OS);
-  case TypeKind::Function:      return cast<FunctionType>(this)->print(OS);
-  case TypeKind::Array:         return cast<ArrayType>(this)->print(OS);
-  case TypeKind::Protocol:      return cast<ProtocolType>(this)->print(OS);
+#define TYPE(id, parent) \
+  case TypeKind::id:            return cast<id##Type>(this)->print(OS);
+#include "swift/AST/TypeNodes.def"
   }
+  llvm_unreachable("bad type kind!");
 }
 
 void BuiltinIntegerType::print(raw_ostream &OS) const {

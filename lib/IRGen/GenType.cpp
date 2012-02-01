@@ -134,10 +134,14 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
   llvm::LLVMContext &Ctx = IGM.getLLVMContext();
   TypeBase *TB = T.getPointer();
   switch (TB->getKind()) {
-  case TypeKind::Error:
-    llvm_unreachable("generating an error type");
-  case TypeKind::Dependent:
-    llvm_unreachable("generating a dependent type");
+#define UNCHECKED_TYPE(id, parent) \
+  case TypeKind::id: \
+    llvm_unreachable("generating an " #id "Type");
+#define SUGARED_TYPE(id, parent) \
+  case TypeKind::id: \
+    return &getFragileTypeInfo(IGM, cast<id##Type>(TB)->getDesugaredType());
+#define TYPE(id, parent)
+#include "swift/AST/TypeNodes.def"
   case TypeKind::MetaType:
   case TypeKind::Module:
     llvm_unreachable("cannot codegen this type - no runtime representation");
@@ -173,13 +177,6 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
     return new PrimitiveTypeInfo(llvm::IntegerType::get(Ctx, BitWidth),
                                  Size(ByteSize), Alignment(ByteSize));
   }
-  case TypeKind::Paren:
-    return &getFragileTypeInfo(IGM, cast<ParenType>(TB)->getUnderlyingType());
-  case TypeKind::NameAlias:
-    return &getFragileTypeInfo(IGM,
-                     cast<NameAliasType>(TB)->getDecl()->getUnderlyingType());
-  case TypeKind::Identifier:
-    return convertType(IGM, cast<IdentifierType>(TB)->getMappedType());
   case TypeKind::Tuple:
     return convertTupleType(IGM, cast<TupleType>(TB));
   case TypeKind::OneOf:

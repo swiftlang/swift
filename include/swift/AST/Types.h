@@ -38,20 +38,8 @@ namespace swift {
   class Module;
   
   enum class TypeKind {
-    Error,       // An erroneously constructed type.
-    BuiltinInteger,
-    BuiltinFloat,
-    Dependent,
-    NameAlias,
-    Identifier,
-    Paren,
-    Tuple,
-    OneOf,
-    MetaType,
-    Module,
-    Function,
-    Array,
-    Protocol
+#define TYPE(id, parent) id,
+#include "swift/AST/TypeNodes.def"
   };
   
 /// TypeBase - Base class for all types in Swift.

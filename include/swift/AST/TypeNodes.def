@@ -1,0 +1,66 @@
+//===--- TypeNodes.def - Swift Type AST Metaprogramming ---------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for macro-metaprogramming with types.
+//
+//===----------------------------------------------------------------------===//
+
+/// TYPE(id, parent)
+///   If the type node is not abstract, its enumerator value is
+///   TypeKind::id.  The node's class name is 'id##Type', and the name of
+///   its base class (in the Type hierarchy) is 'parent' (including
+///   the 'Type' suffix).
+
+/// ALWAYS_CANONICAL_TYPE(id, parent)
+///   This type is always canonical.  The default behavior is TYPE(id, parent).
+
+/// SUGARED_TYPE(id, parent)
+///   This type is never canonical.  It provides an efficient accessor,
+///   getDesugaredType(), which removes one level of sugar.  This process
+///   does not necessarily converge to the canonical type, however.
+///   The default behavior is TYPE(id, parent).
+
+/// UNCHECKED_TYPE(id, parent)
+///   This type is not present in valid, type-checked programs.
+///   The default behavior is TYPE(id, parent).
+
+#ifndef ALWAYS_CANONICAL_TYPE
+#define ALWAYS_CANONICAL_TYPE(id, parent) TYPE(id, parent)
+#endif
+
+#ifndef SUGARED_TYPE
+#define SUGARED_TYPE(id, parent) TYPE(id, parent)
+#endif
+
+#ifndef UNCHECKED_TYPE
+#define UNCHECKED_TYPE(id, parent) TYPE(id, parent)
+#endif
+
+UNCHECKED_TYPE(Error, Type)
+ALWAYS_CANONICAL_TYPE(BuiltinInteger, Type)
+ALWAYS_CANONICAL_TYPE(BuiltinFloat, Type)
+UNCHECKED_TYPE(Dependent, Type)
+SUGARED_TYPE(NameAlias, Type)
+SUGARED_TYPE(Identifier, Type)
+SUGARED_TYPE(Paren, Type)
+TYPE(Tuple, Type)
+ALWAYS_CANONICAL_TYPE(OneOf, Type)
+ALWAYS_CANONICAL_TYPE(MetaType, Type)
+ALWAYS_CANONICAL_TYPE(Module, Type)
+TYPE(Function, Type)
+TYPE(Array, Type)
+ALWAYS_CANONICAL_TYPE(Protocol, Type)
+
+#undef UNCHECKED_TYPE
+#undef SUGARED_TYPE
+#undef ALWAYS_CANONICAL_TYPE
+#undef TYPE
