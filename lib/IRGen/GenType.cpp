@@ -20,6 +20,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Target/TargetData.h"
 
 #include "GenType.h"
 #include "IRGenFunction.h"
@@ -177,6 +178,8 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
     return new PrimitiveTypeInfo(llvm::IntegerType::get(Ctx, BitWidth),
                                  Size(ByteSize), Alignment(ByteSize));
   }
+  case TypeKind::LValue:
+    return convertLValueType(IGM, cast<LValueType>(TB));
   case TypeKind::Tuple:
     return convertTupleType(IGM, cast<TupleType>(TB));
   case TypeKind::OneOf:
@@ -189,6 +192,14 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
     llvm_unreachable("protocol not handled in IRGen yet");
   }
   llvm_unreachable("bad type kind");
+}
+
+const TypeInfo *TypeConverter::convertLValueType(IRGenModule &IGM,
+                                                 LValueType *T) {
+  const TypeInfo &objectTI = IGM.getFragileTypeInfo(T->getObjectType());
+  return new PrimitiveTypeInfo(objectTI.StorageType->getPointerTo(),
+                               Size(IGM.TargetData.getPointerSize()),
+                          Alignment(IGM.TargetData.getPointerABIAlignment()));
 }
 
 /// emitTypeAlias - Emit a type alias.  You wouldn't think that these
@@ -222,4 +233,3 @@ void IRGenModule::getExplosionSchema(Type type, ExplosionSchema &schema) {
   // Okay, that didn't work;  just do the general thing.
   getFragileTypeInfo(type).getExplosionSchema(schema);
 }
-

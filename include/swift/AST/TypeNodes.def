@@ -59,6 +59,7 @@ ALWAYS_CANONICAL_TYPE(Module, Type)
 TYPE(Function, Type)
 TYPE(Array, Type)
 ALWAYS_CANONICAL_TYPE(Protocol, Type)
+TYPE(LValue, Type)
 
 #undef UNCHECKED_TYPE
 #undef SUGARED_TYPE

@@ -30,6 +30,7 @@ namespace llvm {
 namespace swift {
   class ArrayType;
   class FunctionType;
+  class LValueType;
   class OneOfType;
   class TupleType;
   class Type;
@@ -133,6 +134,7 @@ class TypeConverter {
   static const TypeInfo *convertOneOfType(IRGenModule &IGM, OneOfType *T);
   static const TypeInfo *convertFunctionType(IRGenModule &IGM, FunctionType *T);
   static const TypeInfo *convertArrayType(IRGenModule &IGM, ArrayType *T);
+  static const TypeInfo *convertLValueType(IRGenModule &IGM, LValueType *T);
 
  public:
   TypeConverter();

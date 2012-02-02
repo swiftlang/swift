@@ -207,15 +207,17 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     Buffer << "i" << cast<BuiltinIntegerType>(type)->getBitWidth();
     return;
 
-  case TypeKind::NameAlias:
-    return mangleType(cast<NameAliasType>(base)->getDecl()->getUnderlyingType(),
+#define SUGARED_TYPE(id, parent) \
+  case TypeKind::id: \
+    return mangleType(cast<id##Type>(base)->getDesugaredType(), \
                       explosion, uncurryLevel);
-  case TypeKind::Identifier:
-    return mangleType(cast<IdentifierType>(base)->getMappedType(),
-                      explosion, uncurryLevel);
-  case TypeKind::Paren:
-    return mangleType(cast<ParenType>(base)->getUnderlyingType(),
-                      explosion, uncurryLevel);
+#define TYPE(id, parent)
+#include "swift/AST/TypeNodes.def"
+
+  case TypeKind::LValue:
+    Buffer << 'R';
+    return mangleType(cast<LValueType>(base)->getObjectType(),
+                      ExplosionKind::Minimal, 0);
 
   case TypeKind::Tuple: {
     TupleType *tuple = cast<TupleType>(base);

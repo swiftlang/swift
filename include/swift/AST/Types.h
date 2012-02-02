@@ -619,6 +619,46 @@ private:
                TypeAliasDecl *TheDecl);
 };
 
+/// LValueType - An l-value is a handle to a physical object.  The
+/// type of that object uniquely determines the type of an l-value
+/// for it.
+///
+/// L-values are not fully first-class in Swift:
+///
+///  A type is said to "carry" an l-value if
+///   - it is an l-value type or
+///   - it is a tuple and at least one of its element types
+///     carries an l-value.
+///
+/// The type of a function argument may carry an l-value.  This
+/// is done by annotating the bound variable with the [byref]
+/// attribute.
+///
+/// The type of a return value, local variable, or field may not
+/// carry an l-value.
+///
+/// When inferring a value type from an expression whose type
+/// carries an l-value, the carried l-value types are converted
+/// to their object type.
+class LValueType : public TypeBase {
+  Type ObjectTy;
+
+  LValueType(Type objectTy) : TypeBase(TypeKind::LValue), ObjectTy(objectTy) {}
+
+public:
+  static LValueType *get(Type type, ASTContext &C);
+
+  Type getObjectType() const { return ObjectTy; }
+
+  void print(raw_ostream &OS) const;
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const LValueType *type) { return true; }
+  static bool classof(const TypeBase *type) {
+    return type->getKind() == TypeKind::LValue;
+  }
+};
+
 } // end namespace swift
 
 #endif

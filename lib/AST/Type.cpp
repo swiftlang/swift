@@ -81,6 +81,12 @@ TypeBase *TypeBase::getCanonicalType() {
     break;
   }
     
+  case TypeKind::LValue: {
+    Type objectType = cast<LValueType>(this)->getObjectType();
+    objectType = objectType->getCanonicalType();
+    Result = LValueType::get(objectType, objectType->getASTContext());
+    break;
+  }
   case TypeKind::Function: {
     FunctionType *FT = cast<FunctionType>(this);
     Type In = FT->getInput()->getCanonicalType();
@@ -94,6 +100,7 @@ TypeBase *TypeBase::getCanonicalType() {
     Result = ArrayType::get(EltTy, AT->getSize(), EltTy->getASTContext());
     break;
   }
+    
   
   // Cache the canonical type for future queries.
   assert(Result && "Case not implemented!");
@@ -111,6 +118,7 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::Tuple:
   case TypeKind::Function:
   case TypeKind::Array:
+  case TypeKind::LValue:
     // None of these types have sugar at the outer level.
     return this;
   case TypeKind::Paren:
@@ -377,3 +385,7 @@ void ProtocolType::print(raw_ostream &OS) const {
   OS << '}';
 }
 
+void LValueType::print(raw_ostream &OS) const {
+  OS << "[byref] ";
+  getObjectType()->print(OS);
+}

@@ -47,6 +47,9 @@ typedef llvm::DenseMap<unsigned, BuiltinIntegerType*> IntegerTypesMapTy;
 /// ParenTypesMapTy - This is the actual type underlying 'ParenTypes'.
 typedef llvm::DenseMap<Type, ParenType*> ParenTypesMapTy;
 
+/// LValueTypesMapTy - This is the actual type underlying 'LValueTypes'.
+typedef llvm::DenseMap<Type, LValueType*> LValueTypesMapTy;
+
 ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
   : Allocator(new llvm::BumpPtrAllocator()),
     IdentifierTable(new IdentifierTableMapTy(*Allocator)),
@@ -57,6 +60,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
     ArrayTypes(new ArrayTypesMapTy()),
     IntegerTypes(new IntegerTypesMapTy()),
     ParenTypes(new ParenTypesMapTy()),
+    LValueTypes(new LValueTypesMapTy()),
     SourceMgr(sourcemgr),
     Diags(Diags),
     TheBuiltinModule(new (*this) BuiltinModule(getIdentifier("Builtin"),*this)),
@@ -81,6 +85,7 @@ ASTContext::~ASTContext() {
   delete (IdentifierTableMapTy*)IdentifierTable; IdentifierTable = 0;
   delete (IntegerTypesMapTy*)IntegerTypes; IntegerTypes = 0;
   delete (ParenTypesMapTy*)ParenTypes; ParenTypes = 0;
+  delete (LValueTypesMapTy*)LValueTypes; LValueTypes = 0;
   delete Allocator; Allocator = 0;
 }
 
@@ -272,3 +277,8 @@ ProtocolType::ProtocolType(SourceLoc ProtocolLoc, ArrayRef<ValueDecl*> Elts,
     ProtocolLoc(ProtocolLoc), Elements(Elts), TheDecl(TheDecl) {
 }
 
+LValueType *LValueType::get(Type objectTy, ASTContext &C) {
+  LValueType *&entry = (*(LValueTypesMapTy*)C.LValueTypes)[objectTy];
+  if (!entry) entry = new (C) LValueType(objectTy);
+  return entry;
+}

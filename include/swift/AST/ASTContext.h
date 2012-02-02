@@ -50,10 +50,11 @@ public:
   void *TupleTypes;      // llvm::FoldingSet<TupleType>
   void *MetaTypeTypes;   // DenseMap<TypeAliasDecl*, MetaTypeType*>
   void *ModuleTypes;     // DenseMap<Module*, ModuleType*>
-  void *FunctionTypes;   // DenseMap<std::pair<Type*, Type*>, FunctionType*>
-  void *ArrayTypes;      // DenseMap<std::pair<Type*, uint64_t>, ArrayType*>
+  void *FunctionTypes;   // DenseMap<std::pair<Type, Type>, FunctionType*>
+  void *ArrayTypes;      // DenseMap<std::pair<Type, uint64_t>, ArrayType*>
   void *IntegerTypes;    // DenseMap<unsigned, BuiltinIntegerType>
-  void *ParenTypes;      // DenseMap<Type*, ParenType*>
+  void *ParenTypes;      // DenseMap<Type, ParenType*>
+  void *LValueTypes;     // DenseMap<Type, LValueType*>
 public:
   
   ASTContext(llvm::SourceMgr &SourceMgr, DiagnosticEngine &Diags);
