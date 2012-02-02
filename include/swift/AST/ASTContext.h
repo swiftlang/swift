@@ -22,7 +22,6 @@
 #include <vector>
 
 namespace llvm {
-  class BumpPtrAllocator;
   class SourceMgr;
 }
 
@@ -43,18 +42,11 @@ namespace swift {
 class ASTContext {
   ASTContext(const ASTContext&) = delete;
   void operator=(const ASTContext&) = delete;
-  llvm::BumpPtrAllocator *Allocator;
+
 public:
   // Members that should only be used by ASTContext.cpp.
-  void *IdentifierTable; // llvm::StringMap<char>
-  void *TupleTypes;      // llvm::FoldingSet<TupleType>
-  void *MetaTypeTypes;   // DenseMap<TypeAliasDecl*, MetaTypeType*>
-  void *ModuleTypes;     // DenseMap<Module*, ModuleType*>
-  void *FunctionTypes;   // DenseMap<std::pair<Type, Type>, FunctionType*>
-  void *ArrayTypes;      // DenseMap<std::pair<Type, uint64_t>, ArrayType*>
-  void *IntegerTypes;    // DenseMap<unsigned, BuiltinIntegerType>
-  void *ParenTypes;      // DenseMap<Type, ParenType*>
-  void *LValueTypes;     // DenseMap<Type, LValueType*>
+  struct Implementation;
+  Implementation &Impl;
 public:
   
   ASTContext(llvm::SourceMgr &SourceMgr, DiagnosticEngine &Diags);

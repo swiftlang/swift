@@ -23,44 +23,27 @@
 #include "llvm/ADT/StringMap.h"
 using namespace swift;
 
-/// IdentifierTableMapTy - This is the type underlying IdentifierTable.
-typedef llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTableMapTy;
+struct ASTContext::Implementation {
+  Implementation();
+  ~Implementation();
 
-/// TupleTypesMapTy - This is the actual type underlying ASTContext::TupleTypes.
-typedef llvm::FoldingSet<TupleType> TupleTypesMapTy;
-
-/// MetatypeTypesMapTy - This is the underlying type of MetaTypeTypes.
-typedef llvm::DenseMap<TypeAliasDecl*, MetaTypeType*> MetaTypeTypesMapTy;
-
-/// ModuleTypesMapTy - This is the underlying type of ModuleTypes.
-typedef llvm::DenseMap<Module*, ModuleType*> ModuleTypesMapTy;
-
-/// FunctionTypesMapTy - This is the actual type underlying 'FunctionTypes'.
-typedef llvm::DenseMap<std::pair<Type,Type>, FunctionType*> FunctionTypesMapTy;
-
-/// ArrayTypesMapTy - This is the actual type underlying 'ArrayTypes'.
-typedef llvm::DenseMap<std::pair<Type, uint64_t>, ArrayType*> ArrayTypesMapTy;
-
-/// IntegerTypesMapTy - This is the actual type underlying 'IntegerTypes'.
-typedef llvm::DenseMap<unsigned, BuiltinIntegerType*> IntegerTypesMapTy;
-
-/// ParenTypesMapTy - This is the actual type underlying 'ParenTypes'.
-typedef llvm::DenseMap<Type, ParenType*> ParenTypesMapTy;
-
-/// LValueTypesMapTy - This is the actual type underlying 'LValueTypes'.
-typedef llvm::DenseMap<Type, LValueType*> LValueTypesMapTy;
+  llvm::BumpPtrAllocator Allocator; // used in later initializations
+  llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTable;
+  llvm::FoldingSet<TupleType> TupleTypes;
+  llvm::DenseMap<TypeAliasDecl*, MetaTypeType*> MetaTypeTypes;
+  llvm::DenseMap<Module*, ModuleType*> ModuleTypes;
+  llvm::DenseMap<std::pair<Type,Type>, FunctionType*> FunctionTypes;
+  llvm::DenseMap<std::pair<Type, uint64_t>, ArrayType*> ArrayTypes;
+  llvm::DenseMap<unsigned, BuiltinIntegerType*> IntegerTypes;
+  llvm::DenseMap<Type, ParenType*> ParenTypes;
+  llvm::DenseMap<Type, LValueType*> LValueTypes;
+};
+ASTContext::Implementation::Implementation()
+ : IdentifierTable(Allocator) {}
+ASTContext::Implementation::~Implementation() {}
 
 ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
-  : Allocator(new llvm::BumpPtrAllocator()),
-    IdentifierTable(new IdentifierTableMapTy(*Allocator)),
-    TupleTypes(new TupleTypesMapTy()),
-    MetaTypeTypes(new MetaTypeTypesMapTy()),
-    ModuleTypes(new ModuleTypesMapTy()),
-    FunctionTypes(new FunctionTypesMapTy()),
-    ArrayTypes(new ArrayTypesMapTy()),
-    IntegerTypes(new IntegerTypesMapTy()),
-    ParenTypes(new ParenTypesMapTy()),
-    LValueTypes(new LValueTypesMapTy()),
+  : Impl(*new Implementation()),
     SourceMgr(sourcemgr),
     Diags(Diags),
     TheBuiltinModule(new (*this) BuiltinModule(getIdentifier("Builtin"),*this)),
@@ -77,20 +60,11 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
 }
 
 ASTContext::~ASTContext() {
-  delete (TupleTypesMapTy*)TupleTypes; TupleTypes = 0;
-  delete (FunctionTypesMapTy*)FunctionTypes; FunctionTypes = 0;
-  delete (MetaTypeTypesMapTy*)MetaTypeTypes; MetaTypeTypes = 0;
-  delete (ModuleTypesMapTy*)ModuleTypes; ModuleTypes = 0;
-  delete (ArrayTypesMapTy*)ArrayTypes; ArrayTypes = 0;
-  delete (IdentifierTableMapTy*)IdentifierTable; IdentifierTable = 0;
-  delete (IntegerTypesMapTy*)IntegerTypes; IntegerTypes = 0;
-  delete (ParenTypesMapTy*)ParenTypes; ParenTypes = 0;
-  delete (LValueTypesMapTy*)LValueTypes; LValueTypes = 0;
-  delete Allocator; Allocator = 0;
+  delete &Impl;
 }
 
 void *ASTContext::Allocate(unsigned long Bytes, unsigned Alignment) {
-  return Allocator->Allocate(Bytes, Alignment);
+  return Impl.Allocator.Allocate(Bytes, Alignment);
 }
 
 /// getIdentifier - Return the uniqued and AST-Context-owned version of the
@@ -99,8 +73,7 @@ Identifier ASTContext::getIdentifier(StringRef Str) {
   // Make sure null pointers stay null.
   if (Str.empty()) return Identifier(0);
   
-  IdentifierTableMapTy &Table = *((IdentifierTableMapTy*)IdentifierTable);
-  return Identifier(Table.GetOrCreateValue(Str).getKeyData());
+  return Identifier(Impl.IdentifierTable.GetOrCreateValue(Str).getKeyData());
 }
 
 bool ASTContext::hadError() const {
@@ -118,16 +91,14 @@ Type DependentType::get(ASTContext &C) { return C.TheDependentType; }
 
 
 BuiltinIntegerType *BuiltinIntegerType::get(unsigned BitWidth, ASTContext &C) {
-  IntegerTypesMapTy &IntegerTypesMap = *(IntegerTypesMapTy*)C.IntegerTypes;
-  BuiltinIntegerType *&Result = IntegerTypesMap[BitWidth];
+  BuiltinIntegerType *&Result = C.Impl.IntegerTypes[BitWidth];
   if (Result == 0)
     Result = new (C) BuiltinIntegerType(BitWidth, C);
   return Result;
 }
 
 ParenType *ParenType::get(ASTContext &C, Type underlying) {
-  ParenTypesMapTy &ParenTypesMap = *(ParenTypesMapTy*) C.ParenTypes;
-  ParenType *&Result = ParenTypesMap[underlying];
+  ParenType *&Result = C.Impl.ParenTypes[underlying];
   if (Result == 0)
     Result = new (C) ParenType(underlying);
   return Result;
@@ -151,14 +122,12 @@ TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
   llvm::FoldingSetNodeID ID;
   TupleType::Profile(ID, Fields);
   
-  TupleTypesMapTy &TupleTypesMap = *(TupleTypesMapTy*)C.TupleTypes;
-  
   // FIXME: This is pointless for types with named fields.  The ValueDecl fields
   // themselves are not unique'd so they all get their own addresses, which
   // means that we'll never get a hit here.  This should unique all-type tuples
   // though.  Likewise with default values.
   void *InsertPos = 0;
-  if (TupleType *TT = TupleTypesMap.FindNodeOrInsertPos(ID, InsertPos))
+  if (TupleType *TT = C.Impl.TupleTypes.FindNodeOrInsertPos(ID, InsertPos))
     return TT;
   
   // Okay, we didn't find one.  Make a copy of the fields list into ASTContext
@@ -177,7 +146,7 @@ TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
   Fields = ArrayRef<TupleTypeElt>(FieldsCopy, Fields.size());
   
   TupleType *New = new (C) TupleType(Fields, IsCanonical ? &C : 0);
-  TupleTypesMap.InsertNode(New, InsertPos);
+  C.Impl.TupleTypes.InsertNode(New, InsertPos);
 
   return New;
 }
@@ -210,7 +179,7 @@ IdentifierType *IdentifierType::getNew(ASTContext &C,
 MetaTypeType *MetaTypeType::get(TypeAliasDecl *Type) {
   ASTContext &C = Type->getASTContext();
 
-  MetaTypeType *&Entry = (*(MetaTypeTypesMapTy*)C.MetaTypeTypes)[Type];
+  MetaTypeType *&Entry = C.Impl.MetaTypeTypes[Type];
   if (Entry) return Entry;
   
   return Entry = new (C) MetaTypeType(Type, C);
@@ -219,7 +188,7 @@ MetaTypeType *MetaTypeType::get(TypeAliasDecl *Type) {
 ModuleType *ModuleType::get(Module *M) {
   ASTContext &C = M->getASTContext();
   
-  ModuleType *&Entry = (*(ModuleTypesMapTy*)C.ModuleTypes)[M];
+  ModuleType *&Entry = C.Impl.ModuleTypes[M];
   if (Entry) return Entry;
   
   return Entry = new (C) ModuleType(M, C);
@@ -228,8 +197,7 @@ ModuleType *ModuleType::get(Module *M) {
 /// FunctionType::get - Return a uniqued function type with the specified
 /// input and result.
 FunctionType *FunctionType::get(Type Input, Type Result, ASTContext &C) {
-  FunctionType *&Entry =
-    (*(FunctionTypesMapTy*)C.FunctionTypes)[std::make_pair(Input, Result)];
+  FunctionType *&Entry = C.Impl.FunctionTypes[std::make_pair(Input, Result)];
   if (Entry) return Entry;
   
   return Entry = new (C) FunctionType(Input, Result);
@@ -247,8 +215,7 @@ FunctionType::FunctionType(Type input, Type result)
 /// getArrayType - Return a uniqued array type with the specified base type
 /// and the specified size.  Size=0 indicates an unspecified size array.
 ArrayType *ArrayType::get(Type BaseType, uint64_t Size, ASTContext &C) {
-  ArrayType *&Entry =
-    (*(ArrayTypesMapTy*)C.ArrayTypes)[std::make_pair(BaseType, Size)];
+  ArrayType *&Entry = C.Impl.ArrayTypes[std::make_pair(BaseType, Size)];
   if (Entry) return Entry;
 
   return Entry = new (C) ArrayType(BaseType, Size);
@@ -278,7 +245,7 @@ ProtocolType::ProtocolType(SourceLoc ProtocolLoc, ArrayRef<ValueDecl*> Elts,
 }
 
 LValueType *LValueType::get(Type objectTy, ASTContext &C) {
-  LValueType *&entry = (*(LValueTypesMapTy*)C.LValueTypes)[objectTy];
+  LValueType *&entry = C.Impl.LValueTypes[objectTy];
   if (!entry) entry = new (C) LValueType(objectTy);
   return entry;
 }
