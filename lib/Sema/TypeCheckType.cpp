@@ -114,6 +114,10 @@ bool TypeChecker::validateType(Type InTy) {
     }
     break;
   }
+
+  case TypeKind::LValue:
+    IsInvalid = validateType(cast<LValueType>(T)->getObjectType());
+    break;
       
   case TypeKind::Function: {
     FunctionType *FT = cast<FunctionType>(T);

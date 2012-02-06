@@ -643,7 +643,8 @@ private:
 class LValueType : public TypeBase {
   Type ObjectTy;
 
-  LValueType(Type objectTy) : TypeBase(TypeKind::LValue), ObjectTy(objectTy) {}
+  LValueType(Type objectTy, ASTContext *canonicalContext)
+    : TypeBase(TypeKind::LValue, canonicalContext), ObjectTy(objectTy) {}
 
 public:
   static LValueType *get(Type type, ASTContext &C);

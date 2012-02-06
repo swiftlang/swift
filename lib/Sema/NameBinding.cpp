@@ -272,8 +272,7 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, NameBinder &Binder) {
     for (const ImportedModule &ImpEntry : Binder.TU->ImportedModules)
       if (ImpEntry.second->Name == Name) {
         ModuleType *MT = ModuleType::get(ImpEntry.second);
-        return new (Binder.Context) ModuleExpr(Loc, 
-                                      TypeJudgement(MT, ValueKind::RValue));
+        return new (Binder.Context) ModuleExpr(Loc, MT);
       }
   }
 

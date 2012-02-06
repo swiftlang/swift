@@ -412,6 +412,12 @@ ERROR(tuple_element_type_mismatch,sema_tcc,none,
       (unsigned, Type, Type))
 ERROR(invalid_conversion,sema_tcc,none,
       "invalid conversion from type %0 to %1", (Type, Type))
+ERROR(invalid_conversion_of_lvalue,sema_tcc,none,
+      "passing %0 variable by reference as %1 variable",
+      (Type, Type))
+ERROR(invalid_conversion_to_lvalue,sema_tcc,none,
+      "passing %0 value by reference as %1 variable",
+      (Type, Type))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations
@@ -502,8 +508,10 @@ ERROR(incompatible_assoc,sema_tce,none,
 
 ERROR(return_invalid_outside_func,sema_tcs,none,
       "return invalid outside of a func", ())
-ERROR(expression_unresolved_function,sema_tcs,none,
-      "expression resolves to an unevaluated function", ())
+ERROR(expression_unused_function,sema_tcs,none,
+      "expression resolves to an unused function", ())
+ERROR(expression_unused_lvalue,sema_tcs,none,
+      "expression resolves to an unused l-value", ())
 ERROR(assignment_lhs_not_lvalue,sema_tcs,none,
       "cannot assign to the result of this expression", ())
 

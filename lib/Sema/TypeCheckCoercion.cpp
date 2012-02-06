@@ -49,15 +49,35 @@ public:
   Expr *visitDeclRefExpr(DeclRefExpr *E) {
     return E;
   }
+
+  static bool isMatchForLValue(ValueDecl *val, LValueType *lv) {
+    return val->isReferencedAsLValue()
+        && val->getType()->isEqual(lv->getObjectType());
+  }
+
+  Expr *coerceOverloadToLValue(OverloadSetRefExpr *E, LValueType *lv) {
+    for (ValueDecl *val : E->Decls) {
+      if (isMatchForLValue(val, lv))
+        return new (TC.Context) DeclRefExpr(val, E->getLoc(), lv);
+    }
+    return E;
+  }
   
   Expr *visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
-    // If any decl that is in the overload set exactly matches the expected
-    // type, then select it.
-    // FIXME: Conversion ranking.
-    for (ValueDecl *VD : E->Decls) {
-      if (VD->getType()->isEqual(DestTy))
-        return new (TC.Context) DeclRefExpr(VD, E->getLoc(),
-                                            VD->getTypeJudgement());
+    // If we're looking for an lvalue type, we need an exact match
+    // to the target object type.
+    if (LValueType *lv = DestTy->getAs<LValueType>())
+      return coerceOverloadToLValue(E, lv);
+
+    // Otherwise, we can at the very least do lvalue-to-rvalue conversions
+    // on the value.
+    // FIXME: and other conversions as well; really this should consider
+    //   conversion rank
+    // FIXME: diagnose ambiguity
+    for (ValueDecl *val : E->Decls) {
+      Type srcTy = val->getType();
+      if (!srcTy->isEqual(DestTy)) continue;
+      return TC.buildDeclRefRValue(val, E->getLoc());
     }
     return E;
   }
@@ -84,8 +104,7 @@ public:
     
     // If it does, then everything is good, resolve the reference.
     return new (TC.Context) DeclRefExpr(DED, UME->getColonLoc(),
-                                        TypeJudgement(DED->getType(),
-                                                      ValueKind::RValue));
+                                        DED->getType());
   }  
   
   Expr *visitParenExpr(ParenExpr *E);
@@ -105,20 +124,18 @@ public:
   Expr *visitTupleElementExpr(TupleElementExpr *E) {
     // TupleElementExpr is fully resolved.
     llvm_unreachable("This node doesn't exist for dependent types");
-    return 0;
   }
   
   Expr *visitTupleShuffleExpr(TupleShuffleExpr *E) {
     // TupleElementExpr is fully resolved.
     llvm_unreachable("This node doesn't exist for dependent types");
-    return 0;
   }
 
   
   Expr *visitCallExpr(CallExpr *E) {
     // If we have ":f(x)" and the result type of the call is a OneOfType, then
     // :f must be an element constructor for the oneof value.  Note that
-    // handling this syntactically causes us to reject "(:f) x" as ambiguous.
+    // handling this syntactically causes us to reject "(:f)(x)" as ambiguous.
     if (UnresolvedMemberExpr *UME =
           dyn_cast<UnresolvedMemberExpr>(E->getFn())) {
       if (OneOfType *DT = DestTy->getAs<OneOfType>()) {
@@ -132,7 +149,7 @@ public:
 
         // FIXME: Preserve source locations.
         E->setFn(new (TC.Context) DeclRefExpr(DED, UME->getColonLoc(),
-                            TypeJudgement(DED->getType(), ValueKind::RValue)));
+                                              DED->getType()));
         return TC.semaApplyExpr(E);
       }
     }
@@ -219,7 +236,7 @@ Expr *SemaCoerce::visitParenExpr(ParenExpr *E) {
   if (Sub == 0) return 0;
 
   E->setSubExpr(Sub);    
-  E->setType(Sub->getTypeJudgement());
+  E->setType(Sub->getType());
   return E;
 }
 
@@ -379,7 +396,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     }
     
     // Okay, we updated the tuple in place.
-    E->setType(DestTy, /*FIXME*/ ValueKind::RValue);
+    E->setType(DestTy);
     return E;
   }
   
@@ -454,7 +471,7 @@ Expr *SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   }
   
   return new (TC.Context) TupleExpr(SourceLoc(), NewSE, NewName, SourceLoc(),
-                                    TypeJudgement(DestTy, ValueKind::RValue));
+                                    DestTy);
 }
 
 /// convertToType - This is the recursive implementation of
@@ -477,8 +494,22 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
     PE->setSubExpr(convertToType(PE->getSubExpr(), DestTy,
                                  IgnoreAnonDecls, TC));
     if (PE->getSubExpr() == 0) return 0;
-    PE->setType(PE->getSubExpr()->getTypeJudgement());
+    PE->setType(PE->getSubExpr()->getType());
     return PE;
+  }
+
+  // If the source type is an l-value, load and recurse.
+  if (LValueType *LT = E->getType()->getAs<LValueType>()) {
+    // But just complain if we're trying to make an l-value.
+    if (LValueType *DestLT = DestTy->getAs<LValueType>()) {
+      TC.diagnose(E->getLoc(), diag::invalid_conversion_of_lvalue,
+                  LT->getObjectType(), DestLT->getObjectType())
+        << E->getSourceRange();
+      return nullptr;
+    }
+
+    return convertToType(new (TC.Context) LoadExpr(E, LT->getObjectType()),
+                         DestTy, IgnoreAnonDecls, TC);
   }
   
   if (TupleType *TT = DestTy->getAs<TupleType>()) {
@@ -536,10 +567,18 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
   // into the subexpression.
   if (E->getType()->is<DependentType>())
     return SemaCoerce(TC, DestTy).doIt(E);
-  
+
   // Could not do the conversion.
+
+  // Use a special diagnostic for conversions to l-value type.
+  if (LValueType *LT = DestTy->getAs<LValueType>()) {
+    TC.diagnose(E->getLoc(), diag::invalid_conversion_to_lvalue,
+                E->getType(), LT->getObjectType());
+    return nullptr;
+  }
+
   TC.diagnose(E->getLoc(), diag::invalid_conversion, E->getType(), DestTy);
-  return 0;
+  return nullptr;
 }
 
 

@@ -246,6 +246,9 @@ ProtocolType::ProtocolType(SourceLoc ProtocolLoc, ArrayRef<ValueDecl*> Elts,
 
 LValueType *LValueType::get(Type objectTy, ASTContext &C) {
   LValueType *&entry = C.Impl.LValueTypes[objectTy];
-  if (!entry) entry = new (C) LValueType(objectTy);
+  if (!entry) {
+    ASTContext *canonicalContext = (objectTy->isCanonical() ? &C : nullptr);
+    entry = new (C) LValueType(objectTy, canonicalContext);
+  }
   return entry;
 }

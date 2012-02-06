@@ -52,34 +52,25 @@ class Expr {
   const ExprKind Kind;
 
   /// Ty - This is the type of the expression.
-  TypeJudgement Ty;
+  Type Ty;
 
 public:
-  Expr(ExprKind kind, TypeJudgement ty = TypeJudgement())
+  Expr(ExprKind kind, Type ty = Type())
     : Kind(kind), Ty(ty) {}
 
   /// getKind - Return the kind of this expression.
   ExprKind getKind() const { return Kind; }
 
-  /// getValueKind - Return the value kind of this expression.
-  ValueKind getValueKind() const { return Ty.getValueKind(); }
-
   /// getType - Return the type of this expression.
-  Type getType() const { return Ty.getType(); }
-
-  /// getTypeJudgement - Returns the full type judgement of this expression.
-  TypeJudgement getTypeJudgement() const { return Ty; }
+  Type getType() const { return Ty; }
 
   /// setType - Sets the type of this expression.
-  void setType(TypeJudgement T) { Ty = T; }
-
-  /// setType - Sets the type of this expression.
-  void setType(Type T, ValueKind VK) { setType(TypeJudgement(T, VK)); }
+  void setType(Type T) { Ty = T; }
 
   /// setDependentType - Sets this expression to have the given
   /// dependent type.  This is just like setType except more
   /// self-documenting.
-  void setDependentType(Type T) { setType(T, ValueKind::RValue); }
+  void setDependentType(Type T) { setType(T); }
 
   /// \brief Return the source range of the expression.
   SourceRange getSourceRange() const;
@@ -160,7 +151,7 @@ public:
 class ErrorExpr : public Expr {
   SourceRange Range;
 public:
-  ErrorExpr(SourceRange Range, TypeJudgement Ty = TypeJudgement())
+  ErrorExpr(SourceRange Range, Type Ty = Type())
     : Expr(ExprKind::Error, Ty), Range(Range) {}
 
   SourceRange getSourceRange() const { return Range; }
@@ -225,7 +216,7 @@ class DeclRefExpr : public Expr {
   SourceLoc Loc;
 
 public:
-  DeclRefExpr(ValueDecl *D, SourceLoc Loc, TypeJudgement Ty = TypeJudgement())
+  DeclRefExpr(ValueDecl *D, SourceLoc Loc, Type Ty = Type())
     : Expr(ExprKind::DeclRef, Ty), D(D), Loc(Loc) {}
 
   ValueDecl *getDecl() const { return D; }
@@ -247,7 +238,7 @@ class OverloadSetRefExpr : public Expr {
 
 public:
   OverloadSetRefExpr(ArrayRef<ValueDecl*> decls, SourceLoc Loc,
-                     TypeJudgement Ty = TypeJudgement())
+                     Type Ty = Type())
   : Expr(ExprKind::OverloadSetRef, Ty), Decls(decls), Loc(Loc) {}
 
   ArrayRef<ValueDecl*> getDecls() const { return Decls; }
@@ -342,7 +333,7 @@ class ParenExpr : public Expr {
 
 public:
   ParenExpr(SourceLoc lploc, Expr *subExpr, SourceLoc rploc,
-            TypeJudgement ty = TypeJudgement())
+            Type ty = Type())
     : Expr(ExprKind::Paren, ty), LParenLoc(lploc), RParenLoc(rploc),
       SubExpr(subExpr) {
     // We just assert that these are always valid; it's not clear why
@@ -385,7 +376,7 @@ class TupleExpr : public Expr {
 public:
   TupleExpr(SourceLoc LParenLoc, MutableArrayRef<Expr *> SubExprs,
             Identifier *SubExprNames, SourceLoc RParenLoc,
-            TypeJudgement Ty = TypeJudgement())
+            Type Ty = Type())
     : Expr(ExprKind::Tuple, Ty), LParenLoc(LParenLoc), SubExprs(SubExprs),
       SubExprNames(SubExprNames), RParenLoc(RParenLoc) {
     assert(LParenLoc.isValid() == RParenLoc.isValid() &&
@@ -463,17 +454,19 @@ public:
 /// LookThroughOneofExpr - Implicitly look through a 'oneof' type with
 /// one enumerator.
 class LookThroughOneofExpr : public Expr {
-  Expr *SubExpr;
+  llvm::PointerIntPair<Expr*, 1, bool> SubExprAndIsLValue;
 
 public:
-  LookThroughOneofExpr(Expr *subexpr, TypeJudgement ty)
-    : Expr(ExprKind::LookThroughOneof, ty), SubExpr(subexpr) {}
+  LookThroughOneofExpr(Expr *subexpr, Type ty, bool isLValue)
+    : Expr(ExprKind::LookThroughOneof, ty),
+      SubExprAndIsLValue(subexpr, isLValue) {}
 
-  SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
-  SourceLoc getLoc() const { return SubExpr->getLoc(); }
-  const Expr *getSubExpr() const { return SubExpr; }
-  Expr *getSubExpr() { return SubExpr; }
-  void setSubExpr(Expr *E) { SubExpr = E; }
+  SourceRange getSourceRange() const { return getSubExpr()->getSourceRange(); }
+  SourceLoc getLoc() const { return getSubExpr()->getLoc(); }
+  const Expr *getSubExpr() const { return SubExprAndIsLValue.getPointer(); }
+  Expr *getSubExpr() { return SubExprAndIsLValue.getPointer(); }
+  void setSubExpr(Expr *E) { SubExprAndIsLValue.setPointer(E); }
+  bool isLValueProjection() const { return SubExprAndIsLValue.getInt(); }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const LookThroughOneofExpr *) { return true; }
@@ -488,7 +481,7 @@ class ModuleExpr : public Expr {
   SourceLoc Loc;
   
 public:
-  ModuleExpr(SourceLoc Loc, TypeJudgement Ty)
+  ModuleExpr(SourceLoc Loc, Type Ty)
   : Expr(ExprKind::Module, Ty), Loc(Loc) {}
   
   SourceRange getSourceRange() const { return SourceRange(Loc, Loc); }
@@ -506,14 +499,15 @@ public:
 class TupleElementExpr : public Expr {
   Expr *SubExpr;
   SourceLoc DotLoc;
-  unsigned FieldNo;
   SourceLoc NameLoc;
+  unsigned FieldNo : 31;
+  unsigned IsLValue : 1;
   
 public:
   TupleElementExpr(Expr *subexpr, SourceLoc dotloc, unsigned fieldno,
-                   SourceLoc nameloc, TypeJudgement ty = TypeJudgement())
+                   SourceLoc nameloc, Type ty, bool isLValue)
   : Expr(ExprKind::TupleElement, ty), SubExpr(subexpr), DotLoc(dotloc),
-    FieldNo(fieldno), NameLoc(nameloc) {}
+    NameLoc(nameloc), FieldNo(fieldno), IsLValue(isLValue) {}
 
   SourceRange getSourceRange() const { 
     return SourceRange(SubExpr->getStartLoc(), NameLoc);
@@ -523,6 +517,8 @@ public:
   SourceLoc getLoc() const { return NameLoc; }
   Expr *getBase() const { return SubExpr; }
   void setBase(Expr *e) { SubExpr = e; }
+
+  bool isLValueProjection() const { return IsLValue; }
 
   unsigned getFieldNumber() const { return FieldNo; }
   SourceLoc getNameLoc() const { return NameLoc; }  
@@ -548,7 +544,7 @@ class TupleShuffleExpr : public Expr {
   
 public:
   TupleShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping, Type Ty)
-    : Expr(ExprKind::TupleShuffle, TypeJudgement(Ty, ValueKind::RValue)),
+    : Expr(ExprKind::TupleShuffle, Ty),
       SubExpr(subExpr), ElementMapping(elementMapping) {}
 
   SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
@@ -569,10 +565,8 @@ class LoadExpr : public Expr {
   Expr *SubExpr;
 
 public:
-  LoadExpr(Expr *SubExpr)
-    : Expr(ExprKind::Load,
-           TypeJudgement(SubExpr->getType(), ValueKind::RValue)),
-      SubExpr(SubExpr) {}
+  LoadExpr(Expr *SubExpr, Type type)
+    : Expr(ExprKind::Load, type), SubExpr(SubExpr) {}
 
   SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
 
@@ -646,7 +640,7 @@ class FuncExpr : public Expr, public DeclContext {
   
   FuncExpr(SourceLoc FuncLoc, unsigned NumPatterns, Type FnType,
            BraceStmt *Body, DeclContext *Parent)
-    : Expr(ExprKind::Func, TypeJudgement(FnType, ValueKind::RValue)),
+    : Expr(ExprKind::Func, FnType),
       DeclContext(DeclContextKind::FuncExpr, Parent),
       FuncLoc(FuncLoc), NumPatterns(NumPatterns), Body(Body) {}
 public:
@@ -687,7 +681,7 @@ class ClosureExpr : public Expr {
   
 public:
   ClosureExpr(Expr *input, Type ResultTy)
-    : Expr(ExprKind::Closure, TypeJudgement(ResultTy, ValueKind::RValue)),
+    : Expr(ExprKind::Closure, ResultTy),
       Input(input) {}
 
   Expr *getInput() const { return Input; }
@@ -732,8 +726,7 @@ class ApplyExpr : public Expr {
   Expr *Arg;
 
 protected:
-  ApplyExpr(ExprKind Kind, Expr *Fn, Expr *Arg,
-            TypeJudgement Ty = TypeJudgement())
+  ApplyExpr(ExprKind Kind, Expr *Fn, Expr *Arg, Type Ty = Type())
     : Expr(Kind, Ty), Fn(Fn), Arg(Arg) {
     assert(classof((Expr*)this) && "ApplyExpr::classof out of date");
   }
@@ -760,8 +753,8 @@ public:
 /// leading '(' is unspaced.
 class CallExpr : public ApplyExpr {
 public:
-  CallExpr(Expr *Fn, Expr *Arg, TypeJudgement Ty)
-    : ApplyExpr(ExprKind::Call, Fn, Arg, Ty) {}
+  CallExpr(Expr *fn, Expr *arg, Type ty = Type())
+    : ApplyExpr(ExprKind::Call, fn, arg, ty) {}
 
   SourceRange getSourceRange() const {
     return SourceRange(getFn()->getStartLoc(), getArg()->getEndLoc()); 
@@ -777,7 +770,7 @@ public:
 /// UnaryExpr - Prefix unary expressions like '!y'.
 class UnaryExpr : public ApplyExpr {
 public:
-  UnaryExpr(Expr *Fn, Expr *Arg, TypeJudgement Ty = TypeJudgement())
+  UnaryExpr(Expr *Fn, Expr *Arg, Type Ty = Type())
     : ApplyExpr(ExprKind::Unary, Fn, Arg, Ty) {}
 
   SourceLoc getLoc() const { return getFn()->getStartLoc(); }
@@ -795,7 +788,7 @@ public:
 /// an implicit tuple expression of the type expected by the function.
 class BinaryExpr : public ApplyExpr {
 public:
-  BinaryExpr(Expr *Fn, TupleExpr *Arg, TypeJudgement Ty = TypeJudgement())
+  BinaryExpr(Expr *Fn, TupleExpr *Arg, Type Ty = Type())
     : ApplyExpr(ExprKind::Binary, Fn, Arg, Ty) {}
 
   /// getArgTuple - The argument is always a tuple literal.  This accessor
@@ -822,8 +815,7 @@ public:
 /// ApplyExpr.
 class ConstructorCallExpr : public ApplyExpr {
 public:
-  ConstructorCallExpr(Expr *FnExpr, Expr *ArgExpr,
-                      TypeJudgement Ty = TypeJudgement())
+  ConstructorCallExpr(Expr *FnExpr, Expr *ArgExpr, Type Ty = Type())
     : ApplyExpr(ExprKind::ConstructorCall, FnExpr, ArgExpr, Ty) {
   }
 
@@ -847,7 +839,7 @@ class DotSyntaxCallExpr : public ApplyExpr {
   
 public:
   DotSyntaxCallExpr(Expr *FnExpr, SourceLoc DotLoc, Expr *BaseExpr,
-                    TypeJudgement Ty = TypeJudgement())
+                    Type Ty = Type())
     : ApplyExpr(ExprKind::DotSyntaxCall, FnExpr, BaseExpr, Ty),
       DotLoc(DotLoc) {
   }
@@ -873,19 +865,19 @@ public:
 class DotSyntaxPlusFuncUseExpr : public Expr {
   Expr *BaseExpr;
   SourceLoc DotLoc;
-  DeclRefExpr *PlusFuncExpr;
+  Expr *PlusFuncExpr;
 public:
   DotSyntaxPlusFuncUseExpr(Expr *BaseExpr, SourceLoc DotLoc, 
-                           DeclRefExpr *PlusFuncExpr)
-    : Expr(ExprKind::DotSyntaxPlusFuncUse, PlusFuncExpr->getTypeJudgement()),
+                           Expr *PlusFuncExpr)
+    : Expr(ExprKind::DotSyntaxPlusFuncUse, PlusFuncExpr->getType()),
       BaseExpr(BaseExpr), DotLoc(DotLoc), PlusFuncExpr(PlusFuncExpr) {
   }
   
   Expr *getBaseExpr() { return BaseExpr; }
   void setBaseExpr(Expr *E) { BaseExpr = E; }
   SourceLoc getDotLoc() const { return DotLoc; }
-  DeclRefExpr *getPlusFuncExpr() { return PlusFuncExpr; }
-  void setPlusFuncExpr(DeclRefExpr *DRE) { PlusFuncExpr = DRE; }
+  Expr *getPlusFuncExpr() { return PlusFuncExpr; }
+  void setPlusFuncExpr(Expr *DRE) { PlusFuncExpr = DRE; }
 
   SourceRange getSourceRange() const {
     return SourceRange(BaseExpr->getStartLoc(), PlusFuncExpr->getEndLoc());

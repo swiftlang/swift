@@ -145,12 +145,17 @@ namespace {
     // Specialized verifiers.
 
     void verifyChecked(AssignStmt *S) {
-      checkSameType(S->getDest()->getType(), S->getSrc()->getType(),
-                    "assignment operands");
+      Type lhsTy = checkLValue(S->getDest()->getType(), "LHS of assignment");
+      checkSameType(lhsTy, S->getSrc()->getType(), "assignment operands");
     }
 
     void verifyChecked(TupleElementExpr *E) {
-      TupleType *tupleType = E->getBase()->getType()->getAs<TupleType>();
+      Type resultType = E->getType();
+      Type baseType = E->getBase()->getType();
+      checkSameLValueness(baseType, resultType, E->isLValueProjection(),
+                          "base and result of TupleElementExpr");
+
+      TupleType *tupleType = baseType->getAs<TupleType>();
       if (!tupleType) {
         Out << "base of TupleElementExpr does not have tuple type: ";
         E->getBase()->getType().print(Out);
@@ -165,14 +170,22 @@ namespace {
         abort();
       }
 
-      checkSameType(E->getType(), tupleType->getElementType(E->getFieldNumber()),
+      checkSameType(resultType, tupleType->getElementType(E->getFieldNumber()),
                     "TupleElementExpr and the corresponding tuple element");
     }
 
+    /// LookThroughOneofExpr:
+    ///   lvalue-ness of operand equals lvalue-ness of result
+    ///   ignoring lvalue-ness, result is transparent type of operand
     void verifyChecked(LookThroughOneofExpr *E) {
-      OneOfType *oneof = E->getSubExpr()->getType()->getAs<OneOfType>();
+      Type operandType = E->getSubExpr()->getType();
+      Type resultType = E->getType();
+      checkSameLValueness(operandType, resultType, E->isLValueProjection(),
+                          "operand and result of LookThroughOneofExpr");
+
+      OneOfType *oneof = operandType->getAs<OneOfType>();
       if (!oneof) {
-        Out << "sub-expression of LookThroughOneofExpr does not have oneof type: ";
+        Out << "operand of LookThroughOneofExpr does not have oneof type: ";
         E->getSubExpr()->getType().print(Out);
         Out << "\n";
         abort();
@@ -185,8 +198,62 @@ namespace {
         abort();
       }
 
-      checkSameType(E->getType(), oneof->getTransparentType(),
+      checkSameType(resultType, oneof->getTransparentType(),
                     "result of LookThroughOneofExpr and single element of oneof");
+    }
+
+    /// Look through a possible l-value type, returning true if it was
+    /// an l-value.
+    bool lookThroughLValue(Type &type) {
+      if (LValueType *lv = type->getAs<LValueType>()) {
+        Type objectType = lv->getObjectType();
+        if (objectType->is<LValueType>()) {
+          Out << "type is an lvalue of lvalue type: ";
+          type.print(Out);
+          Out << "\n";
+        }
+        type = objectType;
+        return true;
+      }
+      return false;
+    }
+
+    /// The two types are required to either both be l-values or
+    /// both not be l-values.  They are adjusted to not be l-values.
+    /// Returns true if they are both l-values.
+    bool checkSameLValueness(Type &T0, Type &T1, const char *what) {
+      bool isLValue0 = lookThroughLValue(T0);
+      bool isLValue1 = lookThroughLValue(T1);
+      
+      if (isLValue0 == isLValue1)
+        return isLValue0;
+
+      Out << "lvalue-ness of " << what << " do not match: "
+          << isLValue0 << ", " << isLValue1 << ")\n";
+      abort();
+    }
+
+    /// The two types are required to either both be l-values or
+    /// both not be l-values, and one or the other is expected.
+    /// They are adjusted to not be l-values.
+    void checkSameLValueness(Type &T0, Type &T1, bool expected,
+                             const char *what) {
+      if (checkSameLValueness(T0, T1, what) == expected)
+        return;
+
+      Out << "lvalue-ness of " << what << " does not match expectation of "
+          << expected << "\n";
+      abort();
+    }
+
+    Type checkLValue(Type T, const char *what) {
+      LValueType *LV = T->getAs<LValueType>();
+      if (LV) return LV->getObjectType();
+
+      Out << "type is not an l-value in " << what << ": ";
+      T.print(Out);
+      Out << "\n";
+      abort();
     }
 
     // Verification utilities.

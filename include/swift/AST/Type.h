@@ -25,14 +25,6 @@
 namespace swift {
   class TypeBase;
 
-/// ValueKind - The classification of different kinds of expression
-/// value.  Currently, we only have l-values and r-values.  Eventually
-/// we may want "computed" l-values or something like it for dealing
-/// with things like generalized property access.
-enum class ValueKind : uint8_t {
-  RValue, LValue
-};
-  
 /// Type - This is a simple value object that contains a pointer to a type
 /// class.  This is potentially sugared.
 class Type {
@@ -60,22 +52,6 @@ private:
   void operator!=(Type T) const = delete;
 };
 
-/// TypeJudgement - The "type judgement" is the result of fully
-/// type-checking an expression.  In an imperative language, it
-/// includes both the formal type of an expression and whether it
-/// yields an assignable result.
-class TypeJudgement {
-  llvm::PointerIntPair<TypeBase*, 1> Data;
-
-public:
-  TypeJudgement() {}
-  TypeJudgement(Type Ty, ValueKind VK)
-    : Data(Ty.getPointer(), unsigned(VK)) {}
-
-  Type getType() const { return Data.getPointer(); }
-  ValueKind getValueKind() const { return ValueKind(Data.getInt()); }
-};
-  
 } // end namespace swift
 
 namespace llvm {

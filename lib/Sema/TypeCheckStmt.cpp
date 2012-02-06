@@ -72,11 +72,15 @@ public:
     if (typeCheckExpr(E)) return 0;
     S->setDest(E);
 
-    if (E->getValueKind() != ValueKind::LValue)
+    Type lhsTy = E->getType();
+    if (LValueType *lvalueTy = dyn_cast<LValueType>(lhsTy)) {
+      lhsTy = lvalueTy->getObjectType();
+    } else {
       TC.diagnose(E->getLoc(), diag::assignment_lhs_not_lvalue);
+    }
 
     E = S->getSrc();
-    if (typeCheckExpr(E, S->getDest()->getType())) return 0;
+    if (typeCheckExpr(E, lhsTy)) return 0;
     S->setSrc(E);
     
     return S;
@@ -139,15 +143,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   for (unsigned i = 0, e = BS->getNumElements(); i != e; ++i) {
     if (Expr *SubExpr = BS->getElement(i).dyn_cast<Expr*>()) {
       if (typeCheckExpr(SubExpr)) continue;
-        
-      // If any of the elements of the braces has a function type (which
-      // indicates that a function didn't get called), then produce an error.
-      // TODO: What about tuples which contain functions by-value that are
-      // dead?
-      // FIXME: TODO: QOI: Add source range.
-      if (SubExpr->getType()->is<FunctionType>())
-        TC.diagnose(SubExpr->getLoc(), diag::expression_unresolved_function);
-      
+      TC.typeCheckIgnoredExpr(SubExpr);
       BS->setElement(i, SubExpr);
       continue;
     }
@@ -162,6 +158,25 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   }
   
   return BS;
+}
+
+/// Check an expression whose result is not being used at all.
+void TypeChecker::typeCheckIgnoredExpr(Expr *E) {
+  // Complain about l-values that are neither loaded nor stored.
+  if (E->getType()->is<LValueType>()) {
+    diagnose(E->getLoc(), diag::expression_unused_lvalue)
+      << E->getSourceRange();
+    return;
+  }
+
+  // Complain about functions that aren't called.
+  // TODO: What about tuples which contain functions by-value that are
+  // dead?
+  if (E->getType()->is<FunctionType>()) {
+    diagnose(E->getLoc(), diag::expression_unused_function)
+      << E->getSourceRange();
+    return;
+  }
 }
 
 /// performTypeChecking - Once parsing and namebinding are complete, these

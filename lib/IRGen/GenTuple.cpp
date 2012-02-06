@@ -454,6 +454,10 @@ namespace {
 
 void IRGenFunction::emitExplodedTupleElement(TupleElementExpr *E,
                                              Explosion &explosion) {
+  // If we're doing an l-value projection, this is straightforward.
+  if (E->isLValueProjection())
+    return emitLValueAsScalar(emitTupleElementLValue(E), explosion);
+
   Expr *tuple = E->getBase();
   const TupleTypeInfo &tupleType = getAsTupleTypeInfo(*this, tuple->getType());
 
@@ -499,15 +503,17 @@ IRGenFunction::tryEmitTupleElementAsAddress(TupleElementExpr *E) {
   return tupleType.projectAddress(*this, tupleAddr.getValue(), field);
 }
 
-LValue IRGenFunction::emitTupleElementLValue(TupleElementExpr *E,
-                                             const TypeInfo &fieldType) {
+LValue IRGenFunction::emitTupleElementLValue(TupleElementExpr *E) {
+  assert(E->isLValueProjection());
+
   // Emit the base l-value.
   Expr *tuple = E->getBase();
-  const TupleTypeInfo &tupleType = getAsTupleTypeInfo(*this, tuple->getType());
-  LValue tupleLV = emitLValue(tuple, tupleType);
+  LValue tupleLV = emitLValue(tuple);
 
+  Type tupleType = tuple->getType()->castTo<LValueType>()->getObjectType();
+  const TupleTypeInfo &tupleTI = getAsTupleTypeInfo(*this, tupleType);
   const TupleFieldInfo &field =
-    tupleType.getFieldInfos()[E->getFieldNumber()];
+    tupleTI.getFieldInfos()[E->getFieldNumber()];
 
   // If the field requires no storage, there's nothing to do.
   if (!field.hasStorage()) {

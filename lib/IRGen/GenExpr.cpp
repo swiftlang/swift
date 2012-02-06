@@ -48,8 +48,7 @@ static llvm::Value *emitFloatLiteralExpr(IRGenFunction &IGF,
   return llvm::ConstantFP::get(IGF.IGM.LLVMContext, E->getValue());
 }
 
-static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
-                                const TypeInfo &TInfo) {
+static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E) {
   ValueDecl *D = E->getDecl();
   switch (D->getKind()) {
   case DeclKind::Extension:
@@ -63,12 +62,12 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E,
   case DeclKind::Var:
     if (D->getDeclContext()->isLocalContext())
       return IGF.emitAddressLValue(IGF.getLocal(D));
-    return IGF.getGlobal(cast<VarDecl>(D), TInfo);
+    return IGF.getGlobal(cast<VarDecl>(D));
 
   case DeclKind::ElementRef:
   case DeclKind::OneOfElement:
     IGF.unimplemented(E->getLoc(), "emitting this decl as an l-value");
-    return IGF.emitFakeLValue(TInfo);
+    return IGF.emitFakeLValue(IGF.getFragileTypeInfo(D->getType()));
   }
   llvm_unreachable("bad decl kind");
 }
@@ -83,8 +82,8 @@ void IRGenFunction::emitExplodedDeclRef(DeclRefExpr *E, Explosion &explosion) {
     llvm_unreachable("decl is not a value decl");
 
   case DeclKind::Var: {
-    const TypeInfo &type = getFragileTypeInfo(E->getType());
-    return emitExplodedLoad(emitDeclRefLValue(*this, E, type), type, explosion);
+    const TypeInfo &type = getFragileTypeInfo(D->getType());
+    return emitExplodedLoad(emitDeclRefLValue(*this, E), type, explosion);
   }
 
   case DeclKind::Func:
@@ -123,8 +122,11 @@ void IRGenFunction::emitExplodedRValue(Expr *E, Explosion &explosion) {
   case ExprKind::Error:
     llvm_unreachable("these expression kinds should not survive to IR-gen");
 
-  case ExprKind::Load:
-    return emitExplodedRValue(cast<LoadExpr>(E)->getSubExpr(), explosion);
+  case ExprKind::Load: {
+    const TypeInfo &type = getFragileTypeInfo(E->getType());
+    return emitExplodedLoad(emitLValue(cast<LoadExpr>(E)->getSubExpr()),
+                            type, explosion);
+  }
 
   case ExprKind::Paren:
     return emitExplodedRValue(cast<ParenExpr>(E)->getSubExpr(), explosion);
@@ -141,7 +143,7 @@ void IRGenFunction::emitExplodedRValue(Expr *E, Explosion &explosion) {
   case ExprKind::DotSyntaxPlusFuncUse: {
     DotSyntaxPlusFuncUseExpr *DE = cast<DotSyntaxPlusFuncUseExpr>(E);
     emitIgnored(DE->getBaseExpr());
-    return emitExplodedDeclRef(DE->getPlusFuncExpr(), explosion);
+    return emitExplodedRValue(DE->getPlusFuncExpr(), explosion);
   }
 
   case ExprKind::Call:
@@ -174,17 +176,12 @@ void IRGenFunction::emitExplodedRValue(Expr *E, Explosion &explosion) {
   llvm_unreachable("bad expression kind!");
 }
 
-LValue IRGenFunction::emitLValue(Expr *E) {
-  const TypeInfo &TInfo = IGM.getFragileTypeInfo(E->getType());
-  return emitLValue(E, TInfo);
-}
-
 /// Emit the given expression as an l-value.  The expression must
 /// actually have l-value kind; to try to find an address for an
 /// expression as an aggressive local optimization, use
 /// tryEmitAsAddress.
-LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &type) {
-  assert(E->getValueKind() == ValueKind::LValue);
+LValue IRGenFunction::emitLValue(Expr *E) {
+  assert(E->getType()->is<LValueType>());
 
   switch (E->getKind()) {
 #define EXPR(Id, Parent)
@@ -205,26 +202,22 @@ LValue IRGenFunction::emitLValue(Expr *E, const TypeInfo &type) {
   case ExprKind::Load:
   case ExprKind::Tuple:
   case ExprKind::DotSyntaxPlusFuncUse:
-    llvm_unreachable("these expression kinds should never be l-values");
-
+  case ExprKind::Module:
   case ExprKind::ConstructorCall:
   case ExprKind::DotSyntaxCall:
-  case ExprKind::Module:
-    IGM.unimplemented(E->getLoc(),
-                      "cannot generate l-values for this expression yet");
-    return emitFakeLValue(type);
+    llvm_unreachable("these expression kinds should never be l-values");
 
   case ExprKind::Paren:
-    return emitLValue(cast<ParenExpr>(E)->getSubExpr(), type);
+    return emitLValue(cast<ParenExpr>(E)->getSubExpr());
 
   case ExprKind::TupleElement:
-    return emitTupleElementLValue(cast<TupleElementExpr>(E), type);
+    return emitTupleElementLValue(cast<TupleElementExpr>(E));
 
   case ExprKind::LookThroughOneof:
     return emitLookThroughOneofLValue(cast<LookThroughOneofExpr>(E));
 
   case ExprKind::DeclRef:
-    return emitDeclRefLValue(*this, cast<DeclRefExpr>(E), type);
+    return emitDeclRefLValue(*this, cast<DeclRefExpr>(E));
   }
   llvm_unreachable("bad expression kind!");
 }

@@ -163,14 +163,15 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
 
 /// Find the address of a (fragile, constant-size) global variable
 /// declaration.  The address value is always an llvm::GlobalVariable*.
-Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var,
-                                             const TypeInfo &type) {
+Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var) {
   // Check whether we've cached this.
   llvm::GlobalVariable *&entry = GlobalVars[var];
   if (entry) {
     llvm::GlobalVariable *gv = cast<llvm::GlobalVariable>(entry);
     return Address(gv, Alignment(gv->getAlignment()));
   }
+
+  const TypeInfo &type = getFragileTypeInfo(var->getType());
 
   // Okay, we need to rebuild it.
   LinkInfo link = LinkInfo::get(*this, LinkEntity::forNonFunction(var));
@@ -190,16 +191,17 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var,
 /// Emit a global variable declaration.  The IGF is for the
 /// global-initializer function.
 void IRGenFunction::emitGlobalVariable(VarDecl *var) {
+  Address addr = IGM.getAddrOfGlobalVariable(var);
   const TypeInfo &type = IGM.getFragileTypeInfo(var->getType());
-  Address addr = IGM.getAddrOfGlobalVariable(var, type);
 
   // Always zero-initialize globals.
   llvm::GlobalVariable *gvar = cast<llvm::GlobalVariable>(addr.getAddress());
   gvar->setInitializer(llvm::Constant::getNullValue(type.StorageType));
 
   // Also emit the initializer as a global constructor if necessary.
-  if (Expr *init = var->getInit())
+  if (Expr *init = var->getInit()) {
     emitInit(addr, init, type);
+  }
 }
 
 /// Fetch the declaration of the given global function.
@@ -249,8 +251,8 @@ IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
   return addr;
 }
 
-LValue IRGenFunction::getGlobal(VarDecl *var, const TypeInfo &type) {
-  return emitAddressLValue(IGM.getAddrOfGlobalVariable(var, type));
+LValue IRGenFunction::getGlobal(VarDecl *var) {
+  return emitAddressLValue(IGM.getAddrOfGlobalVariable(var));
 }
 
 /// Emit a type extension.

@@ -72,11 +72,11 @@ struct RewriteAnonArgExpr : Walker {
     // Assign the AnonDecls their actual concrete types now that we know the
     // context they are being used in.
     if (TupleType *TT = dyn_cast<TupleType>(FuncInputTy.getPointer())) {
-      A->setType(TT->getElementType(A->getArgNumber()),
-                 ValueKind::LValue);
+      A->setType(LValueType::get(TT->getElementType(A->getArgNumber()),
+                                 TC.Context));
     } else {
       assert(NumInputArgs == 1 && "Must have unary case");
-      A->setType(FuncInputTy, ValueKind::LValue);
+      A->setType(LValueType::get(FuncInputTy, TC.Context));
     }
     return A;
   }

@@ -294,9 +294,15 @@ public:
     Ty = T;
   }
 
-  /// getTypeJudgement - Returns the type judgement that should arise
-  /// from a normal reference to this declaration.
-  TypeJudgement getTypeJudgement() const;
+  /// getTypeOfReference - Returns the type that would arise from a
+  /// normal reference to this declaration.
+  Type getTypeOfReference() const;
+
+  /// isReferencedAsLValue - Returns 'true' if references to this
+  /// declaration are l-values.
+  bool isReferencedAsLValue() const {
+    return getKind() == DeclKind::Var || getKind() == DeclKind::ElementRef;
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

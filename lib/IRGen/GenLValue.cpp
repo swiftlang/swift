@@ -162,6 +162,26 @@ Address IRGenFunction::emitAddressForPhysicalLValue(const LValue &lvalue) {
   return address;
 }
 
+void IRGenFunction::emitLValueAsScalar(const LValue &lvalue,
+                                       Explosion &explosion) {
+  SmallVector<LValue::const_iterator, 16> components;
+  for (auto i = lvalue.begin(), e = lvalue.end(); i != e; ++i) {
+    components.push_back(i);
+  }
+
+  Address address;
+  for (auto i = components.rbegin(), e = components.rend(); i != e; ++i) {
+    if ((*i)->isLogical())
+      address = (*i)->asLogical().loadAndMaterialize(*this, address);
+    else
+      address = (*i)->asPhysical().offset(*this, address);
+  }
+
+  // FIXME: writebacks
+  // FIXME: rematerialize if inadequate alignment
+  explosion.add(address.getAddress());
+}
+
 void IRGenFunction::emitAssignment(Expr *rhs, const LValue &lhs,
                                    const TypeInfo &type) {
   // We don't expect that l-value emission is generally going to admit

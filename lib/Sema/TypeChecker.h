@@ -39,6 +39,7 @@ public:
   bool semaFunctionSignature(FuncExpr *FE);
   bool semaTupleExpr(TupleExpr *TE);
   Expr *semaApplyExpr(ApplyExpr *E);
+  void typeCheckIgnoredExpr(Expr *E);
   
   bool typeCheckExpression(Expr *&E, Type ConvertType = Type());
   void typeCheckDecl(Decl *D);
@@ -55,6 +56,7 @@ public:
   /// This emits a diagnostic and returns null on error.
   Expr *convertToType(Expr *E, Type Ty);
 
+  Expr *buildDeclRefRValue(ValueDecl *D, SourceLoc loc);
   Expr *convertToRValue(Expr *E);
 
   Expr *foldSequence(SequenceExpr *E);

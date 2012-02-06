@@ -131,13 +131,12 @@ Expr *OverloadSetRefExpr::createWithCopy(ArrayRef<ValueDecl*> Decls,
          "Cannot create a decl ref with an empty list of decls");
   ASTContext &C = Decls[0]->getASTContext();
   if (Decls.size() == 1)
-    return new (C) DeclRefExpr(Decls[0], Loc, Decls[0]->getTypeJudgement());
+    return new (C) DeclRefExpr(Decls[0], Loc, Decls[0]->getTypeOfReference());
   
   // Otherwise, copy the overload set into ASTContext memory and return the
   // overload set.
   return new (C) OverloadSetRefExpr(C.AllocateCopy(Decls), Loc,
-                                    TypeJudgement(DependentType::get(C),
-                                                  ValueKind::RValue));
+                                    DependentType::get(C));
 }
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
@@ -336,7 +335,7 @@ getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
   
   // A tuple-to-tuple conversion of a non-parenthesized tuple is allowed to
   // permute the elements, but cannot perform conversions of each value.
-  TupleType *ETy = E->getType()->getAs<TupleType>();
+  TupleType *ETy = E->getType()->castTo<TupleType>();
   for (unsigned i = 0, e = DestTy->getFields().size(); i != e; ++i) {
     // Extract the input element corresponding to this destination element.
     unsigned SrcField = DestElementSources[i];
@@ -373,6 +372,16 @@ static Expr::ConversionRank getConversionRank(const Expr *E, Type DestTy) {
   // Look through parentheses.
   if (const ParenExpr *PE = dyn_cast<ParenExpr>(E))
     return getConversionRank(PE->getSubExpr(), DestTy);
+
+  // Permit lvalue-to-rvalue conversion.
+  if (LValueType *LT = E->getType()->getAs<LValueType>()) {
+    // Rule out lvalue-to-lvalue conversion.
+    if (DestTy->is<LValueType>())
+      return Expr::CR_Invalid;
+
+    LoadExpr load(const_cast<Expr*>(E), LT->getObjectType());
+    return getConversionRank(&load, DestTy);
+  }
   
   if (TupleType *TT = DestTy->getAs<TupleType>()) {
     if (const TupleExpr *TE = dyn_cast<TupleExpr>(E))

@@ -149,10 +149,10 @@ public:
   void emitIgnored(Expr *E);
 
   LValue emitLValue(Expr *E);
-  LValue emitLValue(Expr *E, const TypeInfo &type);
   Optional<Address> tryEmitAsAddress(Expr *E, const TypeInfo &type);
   LValue emitAddressLValue(Address addr);
   Address emitAddressForPhysicalLValue(const LValue &lvalue);
+  void emitLValueAsScalar(const LValue &lvalue, Explosion &explosion);
 
   void emitRValueToMemory(Expr *E, Address addr, const TypeInfo &type);
   void emitExplodedRValue(Expr *E, Explosion &explosion);
@@ -183,7 +183,7 @@ private:
 
   void emitExplodedTupleElement(TupleElementExpr *E, Explosion &explosion);
   Optional<Address> tryEmitTupleElementAsAddress(TupleElementExpr *E);
-  LValue emitTupleElementLValue(TupleElementExpr *E, const TypeInfo &type);
+  LValue emitTupleElementLValue(TupleElementExpr *E);
 
   void emitExplodedTupleLiteral(TupleExpr *E, Explosion &explosion);
   void emitExplodedTupleShuffle(TupleShuffleExpr *E, Explosion &explosion);
@@ -193,7 +193,7 @@ private:
 public:
   void emitLocal(Decl *D);
   Address getLocal(ValueDecl *D);
-  LValue getGlobal(VarDecl *D, const TypeInfo &TInfo);
+  LValue getGlobal(VarDecl *D);
   void setLocal(ValueDecl *D, Address addr);
 
 private:

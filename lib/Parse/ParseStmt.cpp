@@ -29,7 +29,7 @@ Expr *Parser::actOnCondition(Expr *Cond) {
   Identifier C2LVFuncId = Context.getIdentifier("convertToLogicValue");
   Expr *C2LVFunc = actOnIdentifierExpr(C2LVFuncId, Cond->getStartLoc());
   
-  return new (Context) CallExpr(C2LVFunc, Cond, TypeJudgement());
+  return new (Context) CallExpr(C2LVFunc, Cond, Type());
 }
 
 /// isStartOfStmtOtherThanAssignment - Return true if the specified token starts

@@ -123,7 +123,7 @@ Expr *TypeChecker::applyTypeToLiteral(Expr *E, Type DestTy) {
     }
     
     // Give the integer literal the builtin integer type.
-    E->setType(ArgType, ValueKind::RValue);
+    E->setType(ArgType);
     Intermediate = E;
   } else if (!isInt && (BFT = ArgType->getAs<BuiltinFloatType>())) {
     // If this is a direct use of a builtin floating point type, use the
@@ -148,7 +148,7 @@ Expr *TypeChecker::applyTypeToLiteral(Expr *E, Type DestTy) {
     }
     }
     
-    E->setType(ArgType, ValueKind::RValue);
+    E->setType(ArgType);
     Intermediate = E;
   } else {
     // Check to see if this is the chaining case, where ArgType itself has a
@@ -185,38 +185,43 @@ Expr *TypeChecker::applyTypeToLiteral(Expr *E, Type DestTy) {
     new (Context) DeclRefExpr(Method,
                               // FIXME: This location is a hack!
                               Intermediate->getStartLoc(),
-                              Method->getTypeJudgement());
+                              Method->getType());
   
   // Return a new call of the conversion function, passing in the integer
   // literal.
-  return new (Context) CallExpr(DRE, Intermediate,
-                                TypeJudgement(DestTy, ValueKind::RValue));
+  return new (Context) CallExpr(DRE, Intermediate, DestTy);
 }
 
 //===----------------------------------------------------------------------===//
 // Expression Semantic Analysis Routines
 //===----------------------------------------------------------------------===//
 
+/// Build a reference to the given declaration as an r-value.
+Expr *TypeChecker::buildDeclRefRValue(ValueDecl *val, SourceLoc loc) {
+  if (!val->isReferencedAsLValue()) {
+    return new (Context) DeclRefExpr(val, loc, val->getType());
+  }
+
+  Type lvalueType = LValueType::get(val->getType(), Context);
+  Expr *E = new (Context) DeclRefExpr(val, loc, lvalueType);
+  return new (Context) LoadExpr(E, val->getType());
+}
+
 Expr *TypeChecker::convertToRValue(Expr *E) {
   assert(E && "no expression to load!");
 
-  // Fast path: already an r-value.
-  if (E->getValueKind() == ValueKind::RValue) return E;
+  if (LValueType *lv = E->getType()->getAs<LValueType>())
+    return new (Context) LoadExpr(E, lv->getObjectType());
 
-  return new (Context) LoadExpr(E);
+  return E;
 }
 
 bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
   // Compute the result type.
   SmallVector<TupleTypeElt, 8> ResultTyElts(TE->getNumElements());
 
-  // A tuple is an r-value if any sub-expression is an r-value or
-  // if there are no sub-expressions at all.
-  bool ResultIsRValue = (TE->getNumElements() == 0);
-  
   for (unsigned i = 0, e = TE->getNumElements(); i != e; ++i) {
     Type EltTy;
-    bool EltIsRValue;
     
     // If the element value is missing, it has the value of the default
     // expression of the result type, which must be known.
@@ -224,15 +229,9 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
     if (Elt == 0) {
       assert(TE->getType() && isa<TupleType>(TE->getType()) && 
              "Can't have default value without a result type");
-
-      // Default values are always r-values.
-      // FIXME: What about a default value that is dependent?
-      
       EltTy = cast<TupleType>(TE->getType())->getElementType(i);
-      EltIsRValue = true;
     } else {
       EltTy = Elt->getType();
-      EltIsRValue = (Elt->getValueKind() == ValueKind::RValue);
     }
 
     // If any of the tuple element types is dependent, the whole tuple should
@@ -242,28 +241,12 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
       return false;
     }
 
-    // If we're known to be building an r-value, and the element is an
-    // l-value, convert it.
-    if (ResultIsRValue && !EltIsRValue) {
-      TE->setElement(i, convertToRValue(Elt));
-
-    // If we thought we were building an l-value, and the element is
-    // an r-value, convert all the previous elements.
-    } else if (!ResultIsRValue && EltIsRValue) {
-      ResultIsRValue = true;
-      for (unsigned j = 0; j != i; ++j) {
-        Expr *E = TE->getElement(j);
-        if (E) TE->setElement(j, convertToRValue(E));
-      }
-    }
-
     // If a name was specified for this element, use it.
     Identifier Name = TE->getElementName(i);
     ResultTyElts[i] = TupleTypeElt(EltTy, Name);
   }
   
-  TE->setType(TupleType::get(ResultTyElts, Context),
-              ResultIsRValue ? ValueKind::RValue : ValueKind::LValue);
+  TE->setType(TupleType::get(ResultTyElts, Context));
   return false;
 }
 
@@ -273,9 +256,13 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
 
   // If the callee was erroneous, silently propagate the error up.
   if (E1->getType()->is<ErrorType>()) {
-    E->setType(E1->getType(), ValueKind::RValue);
+    E->setType(E1->getType());
     return E;
   }
+
+  // Perform lvalue-to-rvalue conversion on the function.
+  if (LValueType *LT = E1->getType()->getAs<LValueType>())
+    E1 = new (Context) LoadExpr(E1, LT->getObjectType());
   
   // If we have a concrete function type, then we win.
   if (FunctionType *FT = E1->getType()->getAs<FunctionType>()) {
@@ -303,7 +290,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     }
     
     E->setArg(E2);
-    E->setType(FT->getResult(), ValueKind::RValue);
+    E->setType(FT->getResult());
     return E;
   }
   
@@ -355,7 +342,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   OverloadSetRefExpr *OS = dyn_cast<OverloadSetRefExpr>(E1);
   if (!OS) {
     // If not, just use the dependent type.
-    E->setType(E1->getType(), ValueKind::RValue);
+    E->setType(E1->getType());
     return E;
   }
   
@@ -363,11 +350,11 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   Expr::ConversionRank BestRank = Expr::CR_Invalid;
   
   for (ValueDecl *Fn : OS->Decls) {
-    // Verify we found a function.
-    FunctionType *FnTy = Fn->getType()->getAs<FunctionType>();
-    if (FnTy == 0) continue;
+    // Verify we found a declaration of function type.
+    FunctionType *fnTy = Fn->getType()->getAs<FunctionType>();
+    if (!fnTy) continue;
     
-    Type ArgTy = FnTy->getInput();
+    Type ArgTy = fnTy->getInput();
     // If we found an exact match, disambiguate the overload set.
     Expr::ConversionRank Rank = E2->getRankOfConversionTo(ArgTy);
     
@@ -392,8 +379,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // If we found a successful match, resolve the overload set to it and continue
   // type checking.
   if (BestCandidateFound) {
-    E1 = new (Context) DeclRefExpr(BestCandidateFound, OS->getLoc(),
-                                   BestCandidateFound->getTypeJudgement());
+    E1 = buildDeclRefRValue(BestCandidateFound, OS->getLoc());
     E->setFn(E1);
     return semaApplyExpr(E);
   }
@@ -442,7 +428,7 @@ public:
   
   Expr *visitErrorExpr(ErrorExpr *E) {
     if (E->getType().isNull())
-      E->setType(TC.Context.TheErrorType, ValueKind::RValue);
+      E->setType(TC.Context.TheErrorType);
     return E;
   }
 
@@ -469,7 +455,7 @@ public:
     
     // TODO: QOI: If the decl had an "invalid" bit set, then return the error
     // object to improve error recovery.
-    E->setType(E->getDecl()->getTypeJudgement());
+    E->setType(E->getDecl()->getTypeOfReference());
     return E;
   }
   Expr *visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
@@ -486,7 +472,7 @@ public:
   }
 
   Expr *visitParenExpr(ParenExpr *E) {
-    E->setType(E->getSubExpr()->getTypeJudgement());
+    E->setType(E->getSubExpr()->getType());
     return E;
   }
   
@@ -573,11 +559,34 @@ public:
     return visitApplyExpr(E);
   }
 
-  Expr *lookThroughOneofs(Expr *E) {
-    OneOfType *oneof = E->getType()->castTo<OneOfType>();
+  Expr *lookThroughOneofs(Expr *E, bool isLValue) {
+    assert(isLValue == E->getType()->is<LValueType>());
+
+    Type baseType = E->getType();
+    if (isLValue) baseType = cast<LValueType>(baseType)->getObjectType();
+
+    OneOfType *oneof = baseType->castTo<OneOfType>();
     assert(oneof->isTransparentType());
-    TypeJudgement TJ(oneof->getTransparentType(), E->getValueKind());
-    return new (TC.Context) LookThroughOneofExpr(E, TJ);
+
+    Type resultType = oneof->getTransparentType();
+    if (isLValue) resultType = LValueType::get(resultType, TC.Context);
+    return new (TC.Context) LookThroughOneofExpr(E, resultType, isLValue);
+  }
+
+  Expr *buildTupleElementExpr(Expr *base, UnresolvedDotExpr *syntax,
+                              TupleType *baseType, unsigned fieldIndex,
+                              bool baseIsLValue, bool baseIsOneof) {
+    assert(baseIsLValue == base->getType()->is<LValueType>());
+
+    if (baseIsOneof)
+      base = lookThroughOneofs(base, baseIsLValue);
+
+    Type fieldType = baseType->getElementType(fieldIndex);
+    if (baseIsLValue) fieldType = LValueType::get(fieldType, TC.Context);
+      
+    return new (TC.Context) TupleElementExpr(base, syntax->getDotLoc(),
+                                             fieldIndex, syntax->getNameLoc(),
+                                             fieldType, baseIsLValue);
   }
   
   SemaExpressionTree(TypeChecker &tc) : TC(tc) {}
@@ -612,22 +621,27 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
   Type SubExprTy = Base->getType();
   Identifier MemberName = E->getName();
 
+  bool wasLValue = false;
+  if (LValueType *LV = SubExprTy->getAs<LValueType>()) {
+    wasLValue = true;
+    SubExprTy = LV->getObjectType();
+  }
+
   // Check in the context of a protocol.
   if (ProtocolType *PT = SubExprTy->getAs<ProtocolType>()) {
     for (ValueDecl *VD : PT->Elements) {
       if (VD->getName() != MemberName) continue;
       
       // The protocol value is applied via a DeclRefExpr.
-      DeclRefExpr *Fn = new (TC.Context) DeclRefExpr(VD, E->getNameLoc(),
-                                                     VD->getTypeJudgement());
+      Expr *fn = TC.buildDeclRefRValue(VD, E->getNameLoc());
       
       if (FuncDecl *FD = dyn_cast<FuncDecl>(VD))
         if (FD->isPlus())
           return new (TC.Context) DotSyntaxPlusFuncUseExpr(Base, E->getDotLoc(),
-                                                           Fn);
+                                                           fn);
       
       ApplyExpr *Call = new (TC.Context) 
-        DotSyntaxCallExpr(Fn, E->getDotLoc(), Base);
+        DotSyntaxCallExpr(fn, E->getDotLoc(), Base);
       return TC.semaApplyExpr(Call);
     }
   }
@@ -645,7 +659,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
       OneOfElementDecl *Elt = OOTy->getElement(MemberName);
       if (Elt)  // FIXME: This throws away syntactic information from the AST.
         return new (TC.Context) DeclRefExpr(Elt, E->getNameLoc(),
-                                            Elt->getTypeJudgement());
+                                            Elt->getTypeOfReference());
     }
     
     // Look up references in extension methods.
@@ -679,7 +693,6 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     return OverloadSetRefExpr::createWithCopy(Decls, E->getNameLoc());
   }
 
-  
   // Look in any extensions that add methods to the base type.
   SmallVector<ValueDecl*, 8> ExtensionMethods;
   TC.TU.lookupGlobalExtensionMethods(SubExprTy, MemberName, ExtensionMethods);
@@ -698,50 +711,36 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
                                                          Base);
     return TC.semaApplyExpr(Call);
   }
-  
+
   // If this is a member access to a oneof with a single element constructor
   // (e.g. a struct), allow direct access to the type underlying the single
   // element.
-  bool LookedThroughOneofs = false;
+  bool wasOneof = false;
   if (OneOfType *OneOf = SubExprTy->getAs<OneOfType>())
     if (OneOf->isTransparentType()) {
       SubExprTy = OneOf->getTransparentType();
-      LookedThroughOneofs = true;
+      wasOneof = true;
     }
   
   // Check to see if this is a reference to a tuple field.
   if (TupleType *TT = SubExprTy->getAs<TupleType>()) {
-    // If the field name exists, we win.
-    int FieldNo = TT->getNamedElementId(MemberName);
-    if (FieldNo != -1) {
-      if (LookedThroughOneofs)
-        Base = lookThroughOneofs(Base);
-      
-      return new (TC.Context) 
-        TupleElementExpr(Base, E->getDotLoc(), (unsigned) FieldNo,
-                         E->getNameLoc(),
-                         TypeJudgement(TT->getElementType(FieldNo),
-                                       Base->getValueKind()));
-    }
-    
-    // Okay, the field name was invalid.  If this is a dollarident like $4,
-    // process it as a field index.
-    if (MemberName.str().startswith("$")) {
+    // If the field name exists, we win.  Otherwise, if the field
+    // name is a dollarident like $4, process it as a field index.
+    int fieldIndex = TT->getNamedElementId(MemberName);
+    if (fieldIndex != -1)
+      return buildTupleElementExpr(Base, E, TT, (unsigned) fieldIndex,
+                                   wasLValue, wasOneof);
+
+    StringRef name = MemberName.str();
+    if (name.startswith("$")) {
       unsigned Value = 0;
-      if (!MemberName.str().substr(1).getAsInteger(10, Value)) {
+      if (!name.substr(1).getAsInteger(10, Value)) {
         if (Value >= TT->getFields().size()) {
           TC.diagnose(E->getNameLoc(), diag::field_number_too_large);
           return 0;
         }
-        
-        if (LookedThroughOneofs)
-          Base = lookThroughOneofs(Base);
-        
-        return new (TC.Context) 
-          TupleElementExpr(Base, E->getDotLoc(), Value,
-                           E->getNameLoc(),
-                           TypeJudgement(TT->getElementType(Value),
-                                         Base->getValueKind()));
+
+        return buildTupleElementExpr(Base, E, TT, Value, wasLValue, wasOneof);
       }
     }
   }

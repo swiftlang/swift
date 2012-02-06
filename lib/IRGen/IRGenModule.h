@@ -125,7 +125,7 @@ public:
   llvm::FunctionType *getFunctionType(Type fnType, ExplosionKind kind,
                                       unsigned uncurryLevel, bool withData);
 
-  Address getAddrOfGlobalVariable(VarDecl *D, const TypeInfo &type);
+  Address getAddrOfGlobalVariable(VarDecl *D);
   llvm::Function *getAddrOfGlobalFunction(FuncDecl *D, ExplosionKind kind,
                                           unsigned curryingLevel);
   llvm::Function *getAddrOfInjectionFunction(OneOfElementDecl *D);

@@ -76,8 +76,8 @@ void IRGenFunction::emitBraceStmt(BraceStmt *BS) {
 
 /// Emit an assignment statement.
 void IRGenFunction::emitAssignStmt(AssignStmt *S) {
-  const TypeInfo &type = getFragileTypeInfo(S->getDest()->getType());
-  LValue LV = emitLValue(S->getDest(), type);
+  const TypeInfo &type = getFragileTypeInfo(S->getSrc()->getType());
+  LValue LV = emitLValue(S->getDest());
   emitAssignment(S->getSrc(), LV, type);
 }
 

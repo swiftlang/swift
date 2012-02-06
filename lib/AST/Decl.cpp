@@ -120,22 +120,13 @@ ImportDecl::ImportDecl(DeclContext *DC, SourceLoc ImportLoc,
   memcpy(getPathBuffer(), Path.data(), Path.size() * sizeof(AccessPathElement));
 }
 
-/// getTypeJudgement - Return the full type judgement for a non-member
+/// getTypeOfReference - Return the full type judgement for a non-member
 /// reference to this value.
-TypeJudgement ValueDecl::getTypeJudgement() const {
-  switch (getKind()) {
-  case DeclKind::Import:
-  case DeclKind::Extension:
-    llvm_unreachable("non-value decls don't have type judgements");
-
-  case DeclKind::Var:
-  case DeclKind::ElementRef:
-    return TypeJudgement(Ty, ValueKind::LValue);
-
-  case DeclKind::Func:
-  case DeclKind::OneOfElement:
-  case DeclKind::TypeAlias:
-    return TypeJudgement(Ty, ValueKind::RValue);
+Type ValueDecl::getTypeOfReference() const {
+  if (isReferencedAsLValue()) {
+    return LValueType::get(Ty, getASTContext());
+  } else {
+    return Ty;
   }
 }
 
