@@ -430,6 +430,8 @@ ERROR(name_matches_nontuple,sema_tcd,none,
 ERROR(varname_element_count_mismatch,sema_tcd,none,
       "name specifier matches %0 which requires %1 names, but has %2",
       (Type, unsigned, unsigned))
+ERROR(operator_not_func,sema_tcd,none,
+      "operators must be declared with 'func'", ())
 
 // Attributes
 ERROR(invalid_arg_count_for_operator,sema_tcd,none,

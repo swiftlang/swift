@@ -153,6 +153,13 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
   if (FunctionType *FT = dyn_cast<FunctionType>(Ty))
     if (TupleType *TT = dyn_cast<TupleType>(FT->getInput()))
       NumArguments = TT->getFields().size();
+
+  // Operators must be declared with 'func', not 'var'.
+  if (VD->isOperator() && !isa<FuncDecl>(VD)) {
+    TC.diagnose(VD->getLocStart(), diag::operator_not_func);
+    // FIXME: Set the 'isError' bit on the decl.
+    return;
+  }
   
   if (VD->isOperator() && (NumArguments == 0 || NumArguments > 2)) {
     TC.diagnose(VD->getLocStart(), diag::invalid_arg_count_for_operator);
