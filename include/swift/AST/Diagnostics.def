@@ -188,6 +188,8 @@ ERROR(expected_rbracket_array_type,type_parsing,none,
 // Tuple Types
 ERROR(expected_rparen_tuple_type_list,type_parsing,none,
       "expected ')' at end of tuple list", ())
+ERROR(untyped_tuple_elt_in_function_signature,type_parsing,none,
+      "tuple elements in function signatures must have an explicit type", ())
 
 // Protocol Types
 ERROR(expected_lbrace_protocol_type,type_parsing,none,

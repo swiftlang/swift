@@ -821,6 +821,15 @@
       compiler.  Most datatypes that the user is exposed are defined by the
       <a href="#stdlib">standard library</a> or declared as a user defined
       types.</p>
+
+  <p>A type may be <i>fully-typed</i>.  A type is fully-typed unless
+    it is 1) a function type whose result or input type is not
+    fully-typed or 2) a tuple type with an element that is not
+    fully-typed.  A tuple element is fully-typed unless it has no
+    explicit type (which is permitted for defaultable elements) or its
+    explicit type is not fully-typed.  In other words, a type is
+    fully-typed unless it syntactically contains a tuple element with
+    no explicit type annotation.</p>
   
   <p>
   FIXME: Why is array a type instead of type-simple?
@@ -857,7 +866,8 @@
   </pre>
 
   <p>Syntactically, tuple types are simply a (possibly empty) list of
-  elements.</p>
+  elements.  A tuple type with a single, anonymous, undefaulted
+  element is exactly that type.</p>
 
   <p>Tuples are the primary form of data aggregation in Swift, and are used as
   the building block of <a href="#type-function">function</a> argument lists,
@@ -867,10 +877,10 @@
   transformation is uniform and powerful.</p>
 
   <p>Each element of a tuple contains an optional name followed by a type and/or
-  and default value expression, whose type conversion rules work like those in a
+  a default value expression, whose type conversion rules work like those in a
   var declaration.  The name affects swizzling of elements in the tuple when <a
   href="#typecheck_conversions">tuple conversions</a> are performed.</p>
-  
+
   <pre class="example">
   <i>// Variable definitions.</i>
   var a : ()
@@ -1108,8 +1118,9 @@
   </pre>
 
   <p>A type annotation constrains a pattern to have a specific type.
-    An annotated pattern is always fully-typed.  It is irrefutable
-    if and only if its subpattern is irrefutable.</p>
+    An annotated pattern is fully-typed if its annotation type is
+    fully-typed.  It is irrefutable if and only if its subpattern is
+    irrefutable.</p>
 
   <!-- ********************************************************************* -->
   <h3 id="pattern-identifier">Identifier Patterns</h3>
@@ -1149,7 +1160,7 @@
 
   <p>A tuple pattern is fully-typed if all its sub-patterns are
     fully-typed, in which case its type is the corresponding tuple
-    type, where each <tt>tuple-type-element</tt> has the type,
+    type, where each <tt>type-tuple-element</tt> has the type,
     label, and default value of the corresponding <tt>pattern-tuple-element</tt>.
     A <tt>pattern-tuple-element</tt> has a label if it is a named
     pattern or a type annotation of a named pattern.</p>
@@ -1424,7 +1435,8 @@
     scope, and the function must return a value of the result type.</p>
 
   <p>An outermost pattern in a function signature must be fully-typed
-    and irrefutable.</p>
+    and irrefutable.  If a result type is given, it must also be
+    fully-typed.</p>
 
   <p>The type of a function with signature <tt>(P<sub>0</sub>)(P<sub>1</sub>)..(P<sub><i>n</i></sub>) -&gt; R</tt>
     is <tt>T<sub>0</sub> -&gt; T<sub>1</sub> -&gt; .. -&gt; T<sub><i>n</i></sub> -&gt; R</tt>,

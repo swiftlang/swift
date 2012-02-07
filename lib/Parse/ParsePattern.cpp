@@ -17,12 +17,67 @@
 #include "Parser.h"
 using namespace swift;
 
+/// Check that the given type is fully-typed.
+/// FIXME: this is *terrible* for source locations.
+static bool checkFullyTyped(Parser &P, Type type) {
+  switch (type->getKind()) {
+  // Any sort of non-structural type can be ignored here.
+  // Many of these are not actually possible to encounter in the
+  // parser, but it's okay.
+  case TypeKind::Error:
+  case TypeKind::BuiltinInteger:
+  case TypeKind::BuiltinFloat:
+  case TypeKind::NameAlias: // FIXME: underlying type could be non-fully-typed!
+  case TypeKind::Identifier:
+  case TypeKind::Protocol:
+  case TypeKind::OneOf:
+  case TypeKind::MetaType:
+  case TypeKind::Module:
+  case TypeKind::Dependent:
+    return false;
+
+  case TypeKind::Paren:
+    return checkFullyTyped(P, cast<ParenType>(type)->getUnderlyingType());
+
+  case TypeKind::LValue:
+    return checkFullyTyped(P, cast<LValueType>(type)->getObjectType());
+
+  case TypeKind::Array:
+    return checkFullyTyped(P, cast<ArrayType>(type)->getBaseType());
+
+  case TypeKind::Function: {
+    FunctionType *fn = cast<FunctionType>(type);
+    return checkFullyTyped(P, fn->getInput())
+         | checkFullyTyped(P, fn->getResult());
+  }
+
+  case TypeKind::Tuple: {
+    TupleType *tuple = cast<TupleType>(type);
+    bool isInvalid = false;
+    for (auto &elt : tuple->getFields()) {
+      if (elt.getType().isNull()) {
+        assert(elt.hasInit());
+        P.diagnose(elt.getInit()->getLoc(),
+                   diag::untyped_tuple_elt_in_function_signature)
+          << elt.getInit()->getSourceRange();
+        isInvalid = true;
+      } else {
+        isInvalid |= checkFullyTyped(P, elt.getType());
+      }
+    }
+    return isInvalid;
+  }
+  }
+  llvm_unreachable("bad type kind");
+}
+
 /// Check that the given pattern is fully-typed.
 static bool checkFullyTyped(Parser &P, Pattern *pattern) {
   switch (pattern->getKind()) {
-  // Any type with an explicit annotation is okay.
+  // Any type with an explicit annotation is okay, as long as the
+  // annotation is fully-typed.
   case PatternKind::Typed:
-    return false;
+    return checkFullyTyped(P, pattern->getType());
 
   // Paren types depend on their parenthesized pattern.
   case PatternKind::Paren: {
@@ -79,6 +134,8 @@ bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &params,
   if (consumeIf(tok::arrow)) {
     if (parseType(type))
       return true;
+
+    checkFullyTyped(*this, type);
 
   // Otherwise, we implicitly return ().
   } else {
