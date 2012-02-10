@@ -35,6 +35,20 @@ bool TypeBase::isEqual(Type Other) {
   return getCanonicalType() == Other.getPointer()->getCanonicalType();
 }
 
+/// isMaterializable - Is this type 'materializable' according to the
+/// rules of the language?  Basically, does it not contain any l-value
+/// types?
+bool TypeBase::isMaterializable() {
+  if (TupleType *tuple = getAs<TupleType>()) {
+    for (auto &field : tuple->getFields())
+      if (!field.getType()->isMaterializable())
+        return false;
+    return true;
+  }
+
+  return !is<LValueType>();
+}
+
 /// getCanonicalType - Return the canonical version of this type, which has
 /// sugar from all levels stripped off.
 TypeBase *TypeBase::getCanonicalType() {

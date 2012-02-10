@@ -64,11 +64,20 @@ public:
         DestTy = Type();
       Expr *Init = VD->getInit();
       if (!TC.typeCheckExpression(Init, DestTy)) {
+        // Always infer a materializable type, and do the loads
+        // necessary to make that happen.
+        if (!DestTy) Init = TC.convertToMaterializable(Init);
         VD->setInit(Init);
         VD->overwriteType(Init->getType());
       } else if (!DestTy.isNull()) {
         TC.diagnose(VD->getLocStart(), diag::while_converting_var_init, DestTy);
       }
+    }
+
+    // Verify that the type is materializable.
+    if (!VD->getType()->isMaterializable()) {
+      TC.diagnose(VD->getLocStart(), diag::var_type_not_materializable,
+                  VD->getType());
     }
     
     // If the VarDecl had a name specifier, verify that it lines up with the
@@ -192,6 +201,11 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
 
   if (VD->isOperator() && !VD->getAttrs().isInfix() && NumArguments != 1) {
     TC.diagnose(VD->getLocStart(), diag::binops_infix_left);
+  }
+
+  if (Attrs.isByref()) {
+    TC.diagnose(VD->getLocStart(), diag::byref_decl);
+    VD->getMutableAttrs().Byref = false;
   }
 }
 

@@ -79,7 +79,8 @@ TranslationUnit *Parser::parseTranslationUnit() {
   MACRO(infix) \
   MACRO(resilient) \
   MACRO(fragile) \
-  MACRO(born_fragile)
+  MACRO(born_fragile) \
+  MACRO(byref)
 
 namespace {
 #define MAKE_ENUMERATOR(id) id,
@@ -180,6 +181,15 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     return false;
   }
 
+  // 'byref' attribute.
+  // FIXME: only permit this in specific contexts.
+  case AttrName::byref:
+    if (Attributes.Byref)
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+    consumeToken(tok::identifier);
+
+    Attributes.Byref = true;
+    return false;
   }
   llvm_unreachable("bad attribute kind");
 }
@@ -688,7 +698,8 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
     
     // See if we have a type specifier for this oneof element.  If so, parse it.
     if (consumeIf(tok::colon) &&
-        parseType(ElementInfo.EltType, diag::expected_type_oneof_element)) {
+        parseTypeAnnotation(ElementInfo.EltType,
+                            diag::expected_type_oneof_element)) {
       skipUntil(tok::r_brace);
       return true;
     }

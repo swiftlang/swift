@@ -81,10 +81,8 @@ void IRGenFunction::emitExplodedDeclRef(DeclRefExpr *E, Explosion &explosion) {
   case DeclKind::TypeAlias:
     llvm_unreachable("decl is not a value decl");
 
-  case DeclKind::Var: {
-    const TypeInfo &type = getFragileTypeInfo(D->getType());
-    return emitExplodedLoad(emitDeclRefLValue(*this, E), type, explosion);
-  }
+  case DeclKind::Var:
+    return emitLValueAsScalar(emitDeclRefLValue(*this, E), explosion);
 
   case DeclKind::Func:
     emitExplodedRValueForFunction(cast<FuncDecl>(D), explosion);

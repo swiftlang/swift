@@ -152,6 +152,8 @@ ERROR(expected_type,type_parsing,none,
       "expected type", ())
 ERROR(expected_initializer_expr,expr_parsing,none,
       "expected initializer expression after '='", ())
+ERROR(attribute_does_not_apply_to_type,type_parsing,none,
+      "attribute does not apply to type", ())
 
 // Named types
 ERROR(expected_identifier_in_dotted_type,expr_parsing,none,
@@ -434,6 +436,10 @@ ERROR(varname_element_count_mismatch,sema_tcd,none,
       (Type, unsigned, unsigned))
 ERROR(operator_not_func,sema_tcd,none,
       "operators must be declared with 'func'", ())
+ERROR(var_type_not_materializable,sema_tcd,none,
+      "type %0 of variable is not materializable", (Type))
+ERROR(oneof_element_not_materializable,sema_tcd,none,
+      "type of oneof element is not materializable", ())
 
 // Attributes
 ERROR(invalid_arg_count_for_operator,sema_tcd,none,
@@ -447,6 +453,7 @@ ERROR(infix_left_invalid_on_decls,sema_tcd,none,
       "declaration cannot be declared 'infix_left'", ())
 ERROR(binops_infix_left,sema_tcd,none,
       "binary operators must be declared 'infix_left'", ())
+ERROR(byref_decl,sema_tcd,none, "declaration cannot be declared 'byref'", ())
 
 //------------------------------------------------------------------------------
 // Type Check Expressions
@@ -533,6 +540,8 @@ ERROR(tuple_pattern_length_mismatch,sema_tcp,none,
       "tuple pattern has the wrong length for tuple type %0", (Type))
 ERROR(coerced_tuple_pattern_has_init,sema_tcp,none,
       "tuple element in pattern cannot have a default initializer", ())
+ERROR(named_pattern_not_materializable,sema_tcp,none,
+      "type %0 of named pattern is not materializable", (Type))
 
 //==============================================================================
 // IR Generation Diagnostics

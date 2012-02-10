@@ -481,12 +481,23 @@ Expr *SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
 ///
 Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
                                 bool IgnoreAnonDecls, TypeChecker &TC) {
+  assert(!DestTy->is<DependentType>() &&
+         "Result of conversion can't be dependent");
+
   // If we have an exact match, we're done.
   if (E->getType()->isEqual(DestTy))
     return E;
   
-  assert(!DestTy->is<DependentType>() &&
-         "Result of conversion can't be dependent");
+  // If we have an exact match except for an l-value to r-value
+  // conversion, we're done.
+  Type SrcTy = E->getType();
+  bool WasLValue = false;
+  if (LValueType *LV = SrcTy->getAs<LValueType>()) {
+    SrcTy = LV->getObjectType();
+    if (SrcTy->isEqual(DestTy))
+      return new (TC.Context) LoadExpr(E, DestTy);
+    WasLValue = true;
+  }
 
   // If the expression is a grouping parenthesis and it has a dependent type,
   // just force the type through it, regardless of what DestTy is.
@@ -498,20 +509,6 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
     return PE;
   }
 
-  // If the source type is an l-value, load and recurse.
-  if (LValueType *LT = E->getType()->getAs<LValueType>()) {
-    // But just complain if we're trying to make an l-value.
-    if (LValueType *DestLT = DestTy->getAs<LValueType>()) {
-      TC.diagnose(E->getLoc(), diag::invalid_conversion_of_lvalue,
-                  LT->getObjectType(), DestLT->getObjectType())
-        << E->getSourceRange();
-      return nullptr;
-    }
-
-    return convertToType(new (TC.Context) LoadExpr(E, LT->getObjectType()),
-                         DestTy, IgnoreAnonDecls, TC);
-  }
-  
   if (TupleType *TT = DestTy->getAs<TupleType>()) {
     // Type conversions are carefully ranked so that they "do the right thing",
     // because they can be highly ambiguous.  For example, consider something
@@ -531,10 +528,12 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
     
     // If the input is a tuple and the output is a tuple, see if we can convert
     // each element.
-    if (TupleType *ETy = E->getType()->getAs<TupleType>())
+    if (TupleType *ETy = SrcTy->getAs<TupleType>()) {
+      if (WasLValue) E = new (TC.Context) LoadExpr(E, SrcTy);
       return convertTupleToTupleType(E, ETy->getFields().size(), TT, TC);
+    }
   }
-  
+
   // Otherwise, check to see if this is an auto-closure case.  This case happens
   // when we convert an expression E to a function type whose result is E's
   // type.
@@ -572,12 +571,21 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
 
   // Use a special diagnostic for conversions to l-value type.
   if (LValueType *LT = DestTy->getAs<LValueType>()) {
+    // Use an even more special one for mismatched l-values.
+    if (WasLValue) {
+      TC.diagnose(E->getLoc(), diag::invalid_conversion_of_lvalue,
+                  SrcTy, LT->getObjectType())
+        << E->getSourceRange();
+      return nullptr;
+    }
+
     TC.diagnose(E->getLoc(), diag::invalid_conversion_to_lvalue,
-                E->getType(), LT->getObjectType());
+                SrcTy, LT->getObjectType());
     return nullptr;
   }
 
-  TC.diagnose(E->getLoc(), diag::invalid_conversion, E->getType(), DestTy);
+  // When diagnosing a failed conversion, ignore l-values on the source type.
+  TC.diagnose(E->getLoc(), diag::invalid_conversion, SrcTy, DestTy);
   return nullptr;
 }
 

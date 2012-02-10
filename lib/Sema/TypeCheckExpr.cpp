@@ -216,6 +216,47 @@ Expr *TypeChecker::convertToRValue(Expr *E) {
   return E;
 }
 
+/// Perform in-place adjustments on expressions which might be
+/// carrying un-materializable types internally.
+static void convertToMaterializableHelper(TypeChecker &TC, Expr *E) {
+  if (ParenExpr *PE = dyn_cast<ParenExpr>(E)) {
+    convertToMaterializableHelper(TC, PE->getSubExpr());
+    PE->setType(PE->getSubExpr()->getType());
+  } else if (TupleExpr *TE = dyn_cast<TupleExpr>(E)) {
+    bool anyChange = false;
+    for (Expr *&eltRef : TE->getElements()) {
+      Type oldType = eltRef->getType();
+      Expr *newElt = TC.convertToMaterializable(eltRef);
+
+      // Remember if the type changed at all.  A superficial test is fine.
+      if (newElt->getType().getPointer() != oldType.getPointer()) {
+        eltRef = newElt;
+        anyChange = true;
+      }
+    }
+
+    // If we did anything, recreate the type.
+    if (anyChange) TC.semaTupleExpr(TE);
+  }
+
+  // For now, those are the only expression kinds which can carry
+  // internal l-values that affect the type.
+}
+
+/// Make the given expression have a materializable type if it doesn't
+/// already.
+///
+/// At the moment, this cannot fail.
+Expr *TypeChecker::convertToMaterializable(Expr *E) {
+  // Load l-values.
+  if (LValueType *lv = E->getType()->getAs<LValueType>())
+    return new (Context) LoadExpr(E, lv->getObjectType());
+
+  // Recursively walk into tuples and parens, performing loads.
+  convertToMaterializableHelper(*this, E);
+  return E;
+}
+
 bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
   // Compute the result type.
   SmallVector<TupleTypeElt, 8> ResultTyElts(TE->getNumElements());

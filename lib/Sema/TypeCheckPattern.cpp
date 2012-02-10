@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "swift/AST/Attr.h"
 using namespace swift;
 
 static bool hasExplicitType(Pattern *P) {
@@ -140,9 +141,19 @@ bool TypeChecker::convertToType(Pattern *P, Type type) {
   }
 
   // For wildcard and name patterns, just set the type.
-  case PatternKind::Named:
-    cast<NamedPattern>(P)->getDecl()->overwriteType(type);
+  case PatternKind::Named: {
+    NamedPattern *NP = cast<NamedPattern>(P);
+    if (LValueType *lv = type->getAs<LValueType>()) {
+      NP->getDecl()->overwriteType(lv->getObjectType());
+      NP->getDecl()->getMutableAttrs().Byref = true;
+    } else {
+      NP->getDecl()->overwriteType(type);
+
+      if (!type->isMaterializable())
+        diagnose(NP->getLoc(), diag::named_pattern_not_materializable, type);
+    }
     // fallthrough
+  }
   case PatternKind::Any:
     P->setType(type);
     return false;

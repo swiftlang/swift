@@ -218,6 +218,8 @@ public:
   
   bool parseType(Type &Result);
   bool parseType(Type &Result, Diag<> ID);
+  bool parseTypeAnnotation(Type &Result);
+  bool parseTypeAnnotation(Type &Result, Diag<> ID);
   bool parseTypeIdentifier(Type &Result);
   bool parseTypeTupleBody(SourceLoc LPLoc, Type &Result);
   

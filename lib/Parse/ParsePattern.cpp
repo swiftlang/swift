@@ -163,7 +163,7 @@ bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &params,
 
 /// Parse a pattern.
 ///   pattern ::= pattern-atom
-///   pattern ::= pattern-atom ':' type
+///   pattern ::= pattern-atom ':' type-annotation
 ParseResult<Pattern> Parser::parsePattern() {
   // First, parse the pattern atom.
   ParseResult<Pattern> pattern = parsePatternAtom();
@@ -172,7 +172,7 @@ ParseResult<Pattern> Parser::parsePattern() {
   // Now parse an optional type annotation.
   if (consumeIf(tok::colon)) {
     Type type;
-    if (parseType(type))
+    if (parseTypeAnnotation(type))
       return true;
 
     if (!pattern.isSemaError())

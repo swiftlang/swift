@@ -116,7 +116,12 @@ public:
   /// getString - Return the name of the type as a string, for use in
   /// diagnostics only.
   std::string getString() const;
-  
+
+  /// isMaterializable - Is this type 'materializable' according to
+  /// the rules of the language?  Basically, does it not contain any
+  /// l-value types?
+  bool isMaterializable();
+    
   void dump() const;
   void print(raw_ostream &OS) const;
   

@@ -48,6 +48,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -787,10 +788,17 @@ static void emitParameter(IRGenFunction &IGF, VarDecl *param,
   ExplosionSchema paramSchema(paramValues.getKind());
   paramType.getExplosionSchema(paramSchema);
 
+  Address paramAddr;
+
+  // If the parameter is byref, the next parameter is the value we
+  // should use.
+  if (param->getAttrs().isByref()) {
+    llvm::Value *addr = paramValues.claimNext();
+    paramAddr = Address(addr, paramType.StorageAlignment);
+    
   // If the schema contains a single aggregate, assume we can
   // just treat the next parameter as that type.
-  Address paramAddr;
-  if (paramSchema.size() == 1 && paramSchema.begin()->isAggregate()) {
+  } else if (paramSchema.size() == 1 && paramSchema.begin()->isAggregate()) {
     llvm::Value *addr = paramValues.claimNext();
     addr = IGF.Builder.CreateBitCast(addr,
                     paramSchema.begin()->getAggregateType()->getPointerTo());

@@ -135,17 +135,21 @@ public:
 
   InfixData Infix;
   ResilienceData Resilience;
+  bool Byref;
 
-  DeclAttributes() { }
+  DeclAttributes() : Byref(false) { }
 
   bool isValid() const { return LSquareLoc.isValid(); }
 
   bool isInfix() const { return Infix.isValid(); }
   InfixData getInfixData() const { return Infix; }
   ResilienceData getResilienceData() const { return Resilience; }
+  bool isByref() const { return Byref; }
     
   bool empty() const {
-    return !isInfix();
+    return !isInfix()
+        && !getResilienceData().isValid()
+        && !isByref();
   }
 };
   

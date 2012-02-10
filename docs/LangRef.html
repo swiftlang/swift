@@ -432,6 +432,9 @@
      (potentially as an aggregate).  Parenthesized values match up against tuple
      types and against single element oneof's.
   </p>
+
+  <p>The type of a variable must be
+    <a href="#materializable"><i>materializable</i></a>.</p>
   
   <p>Here are some examples of var declarations:</p>
   
@@ -563,7 +566,7 @@
     oneof-body         ::= (oneof-element (',' oneof-element)*)? decl*
     
     oneof-element      ::= <a href="#identifier">identifier</a>
-    oneof-element      ::= <a href="#identifier">identifier</a> ':' <a href="#type">type</a>
+    oneof-element      ::= <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a>
   </pre>
   
   <p>A oneof declaration provides direct access to <a 
@@ -642,6 +645,10 @@
   body is specified in curly braces), and declares a oneof with a single
   constructor value of the same name as the struct.  Unlike tuple elements, all
   members of the struct must be named.</p>
+
+  <p>Since the element types of a oneof must
+    be <a href="#materializable">materializable</a>, it follows that
+    all the struct field types must be as well.</p>
 
   <p>A 'struct' may include a list of decls after its member types, which is
      syntactic sugar for defining an <a href="#decl-extension">extension</a> of
@@ -784,6 +791,8 @@
     attribute-list-present ::= '[' attribute (',' attribute)* ']'
     
     attribute              ::= attribute-infix
+    attribute              ::= attribute-resilience
+    attribute              ::= attribute-byref
   </pre>
   
   <p>An attribute is a (possibly empty) comma separated list of attributes.</p>
@@ -803,6 +812,40 @@
   non-associative.</p>
   
   <p>FIXME: Implement these restrictions.</p>
+
+  <h4 id="attribute-resilence">Resilience Attribute</h4>
+
+  <pre class="grammar">
+    attribute-resilience ::= 'resilient'
+    attribute-resilience ::= 'fragile'
+    attribute-resilience ::= 'born_fragile'
+  </pre>
+
+  <p>See the resilience design.</p>
+  
+  <h4 id="attribute-byref">By-Reference Attribute</h4>
+
+  <pre class="grammar">
+    attribute-byref ::= 'byref'
+  </pre>
+
+  <p><tt>byref</tt> is only valid in a <tt>type-annotation</tt> that
+    appears within either a <a href="#pattern"><tt>pattern</tt></a> of
+    a <tt>function-signature</tt> or the input type of a function
+    type.
+  </p>
+
+  <p><tt>byref</tt> indicates that the argument will be passed "by
+    reference": the bound variable will be an l-value.</p>
+
+  <p>The type being annotated must be <a href="#materializable">materializable</a>.
+    The type after annotation is never materializable.</tt>
+
+  <p>FIXME: we probably need a const-like variant, which permits
+    r-values (and avoids writeback when the l-value is not physical).
+    We may also need some way of representing <q>this will be
+    consumed by the nth curry</q>.
+  </p>
   
   <!-- ********************************************************************* -->
   <h2 id="type">Types</h2>
@@ -815,6 +858,8 @@
     
     type-simple ::= <a href="#type-identifier">type-identifier</a>
     type-simple ::= <a href="#type-tuple">type-tuple</a>
+
+    type-annotation ::= <a href="#attribute-list">attribute-list</a> type
   </pre>
 
   <p>Swift has a small collection of core datatypes that are built into the
@@ -830,6 +875,12 @@
     explicit type is not fully-typed.  In other words, a type is
     fully-typed unless it syntactically contains a tuple element with
     no explicit type annotation.</p>
+
+  <p id="materializable">A type may be <i>materializable</i>.  A type
+    is materializable unless it is 1) annotated with
+    a <a href="#attribute-byref"><tt>byref</tt></a> attribute or 2) a
+    tuple with a non-materializable element type.  In general, variables
+    must have materializable type.</p>
   
   <p>
   FIXME: Why is array a type instead of type-simple?
@@ -862,7 +913,7 @@
     type-tuple ::= lparen-any type-tuple-body? ')'
     type-tuple-body ::= type-tuple-element (',' type-tuple-element)*
     type-tuple-element ::= identifier <a href="#value-specifier">value-specifier</a>
-    type-tuple-element ::= type
+    type-tuple-element ::= <a href="#type">type-annotation</a>
   </pre>
 
   <p>Syntactically, tuple types are simply a (possibly empty) list of
@@ -927,6 +978,9 @@
      "takes b and returns c" or you can pass two arguments to "get a c".  For
      example:
   </p>
+
+  <p>The result type of a function type must
+    be <a href="#materializable">materializable</a>.</p>
   
   <pre class="example">
     <i>// A simple function that takes a tuple and returns int:</i>
@@ -984,6 +1038,9 @@
   indices would be valid).  For now, the array size must be a literal integer.
   TODO: Define a notion like C's integer-constant-expression for how constant
   folding works.</p>
+
+  <p>The element type of an array type must
+    be <a href="#materializable">materializable</a>.</p>
   
   <p>FIXME: int[][] not valid because the element type isn't sized.  We need
   some constraint to reject this, or do we?</p>
@@ -1055,6 +1112,9 @@
   
   <p>A default initialized value of oneof type is initialized to the first
   element type in the list, with the default value for its element type.</p>
+
+  <p>All of the element types of a oneof type must
+    be <a href="#materializable">materializable</a>.</p>
   
   <p>TODO: Should attributes be allowed on oneof elements?
   TODO: Eventually, with generics we'll have equality and inequality operators.
@@ -1114,7 +1174,7 @@
   <!-- ********************************************************************* -->
 
   <pre class="grammar">
-    pattern-typed ::= pattern-atom ':' <a href="#type">type</a>
+    pattern-typed ::= pattern-atom ':' <a href="#type">type-annotation</a>
   </pre>
 
   <p>A type annotation constrains a pattern to have a specific type.
@@ -1136,8 +1196,14 @@
     context.</p>
 
   <p>As a special case, if the identifier is <tt>_</tt> then no variable
-    comes into scope, and the value matched is lost.  An identifier pattern
-    which does not fall into this case is called a "named pattern".</p>
+    comes into scope, and the value matched is lost.  Such an identifier
+    pattern is called an "ignore pattern".  An identifier pattern
+    which is not an ignore pattern is called a "named pattern".</p>
+
+  <p>The type of a named pattern must be
+    <a href="#materializable">materializable</a> unless it appears in a
+    <a href="#function-signature">function-signature</a> and is directly
+    a <a href="attribute-byref"><tt>byref</tt></a>-annotated type.</p>
 
   <!-- ********************************************************************* -->
   <h3 id="pattern-tuple">Tuple Patterns</h3>

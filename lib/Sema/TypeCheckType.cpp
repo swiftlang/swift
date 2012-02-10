@@ -61,6 +61,11 @@ bool TypeChecker::validateType(Type InTy) {
       
       IsInvalid = validateType(Elt);
       if (IsInvalid) break;
+
+      if (!Elt->getArgumentType()->isMaterializable()) {
+        diagnose(Elt->getIdentifierLoc(),
+                 diag::oneof_element_not_materializable);
+      }
     }
     break;
       
@@ -116,17 +121,20 @@ bool TypeChecker::validateType(Type InTy) {
   }
 
   case TypeKind::LValue:
+    // FIXME: diagnose non-materializability of object type!
     IsInvalid = validateType(cast<LValueType>(T)->getObjectType());
     break;
       
   case TypeKind::Function: {
     FunctionType *FT = cast<FunctionType>(T);
     IsInvalid = validateType(FT->getInput()) || validateType(FT->getResult());
+    // FIXME: diagnose non-materializability of result type!
     break;
   }
   case TypeKind::Array: {
     ArrayType *AT = cast<ArrayType>(T);
     IsInvalid = validateType(AT->getBaseType());
+    // FIXME: diagnose non-materializability of element type!
     // FIXME: We need to check AT->Size! (It also has to be convertible to int).
     break;
   }
@@ -154,4 +162,3 @@ bool TypeChecker::validateType(Type InTy) {
   // let the value mismatch be detected at typechecking time? 
   return false;
 }
-

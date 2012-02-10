@@ -15,9 +15,41 @@
 //===----------------------------------------------------------------------===//
 
 #include "Parser.h"
+#include "swift/AST/Attr.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
+
+bool Parser::parseTypeAnnotation(Type &result) {
+  return parseTypeAnnotation(result, diag::expected_type);
+}
+
+/// parseTypeAnnotation
+///   type-annotation:
+///     attribute-list type
+bool Parser::parseTypeAnnotation(Type &result, Diag<> message) {
+  // Parse attributes.
+  DeclAttributes attrs;
+  parseAttributeList(attrs);
+
+  // Parse the type.
+  if (parseType(result, message))
+    return true;
+
+  // Apply those attributes that do apply.
+  if (attrs.empty()) return false;
+
+  if (attrs.isByref()) {
+    result = LValueType::get(result, Context);
+    attrs.Byref = false; // so that the empty() check below works
+  }
+
+  // FIXME: this is lame.
+  if (!attrs.empty())
+    diagnose(attrs.LSquareLoc, diag::attribute_does_not_apply_to_type);
+
+  return false;
+}
 
 bool Parser::parseType(Type &Result) {
   return parseType(Result, diag::expected_type);
@@ -128,7 +160,7 @@ bool Parser::parseTypeIdentifier(Type &Result) {
 ///     type-tuple-element (',' type-tuple-element)*
 ///   type-tuple-element:
 ///     identifier value-specifier
-///     type
+///     type-annotation
 bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
   SmallVector<TupleTypeElt, 8> Elements;
 
@@ -156,13 +188,13 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
       }
 
       // Otherwise, this has to be a type.
-      if ((HadError = parseType(type)))
+      if ((HadError = parseTypeAnnotation(type)))
         break;
 
       Expr *init = nullptr;
 
       // Parse the optional default value expression.
-      if (Tok.is(tok::colon)) {
+      if (consumeIf(tok::equal)) {
         ParseResult<Expr> initResult =
           parseExpr(diag::expected_initializer_expr);
 

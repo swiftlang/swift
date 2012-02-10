@@ -45,7 +45,7 @@ public:
   void typeCheckDecl(Decl *D);
   bool typeCheckPattern(Pattern *P);
   bool convertToType(Pattern *P, Type Ty);
-  
+
   bool bindAndValidateClosureArgs(Expr *Body, Type FuncInput);
 
   /// convertToType - Do semantic analysis of an expression in a context that
@@ -58,6 +58,7 @@ public:
 
   Expr *buildDeclRefRValue(ValueDecl *D, SourceLoc loc);
   Expr *convertToRValue(Expr *E);
+  Expr *convertToMaterializable(Expr *E);
 
   Expr *foldSequence(SequenceExpr *E);
   
