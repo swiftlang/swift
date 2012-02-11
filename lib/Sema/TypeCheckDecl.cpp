@@ -44,6 +44,18 @@ public:
   }
   
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
+    // Check for a protocol or oneof declaration.  This avoids redundant
+    // work because only an actual protocol or oneof declaration can cause
+    // the type to be *directly* the underlying type of a typealias.
+    Type type = TAD->getUnderlyingType();
+    if (OneOfType *oneof = dyn_cast<OneOfType>(type)) {
+      for (auto elt : oneof->Elements)
+        visitOneOfElementDecl(elt);
+    } else if (ProtocolType *protocol = dyn_cast<ProtocolType>(type)) {
+      for (ValueDecl *member : protocol->Elements)
+        visit(member);
+    }
+
     TC.validateType(TAD->getAliasType());
   }
 
@@ -85,8 +97,55 @@ public:
     if (VD->getNestedName() && validateVarName(VD->getType(), VD->getNestedName()))
       VD->setNestedName(nullptr);
   }
+
+  /// Given the type associated with the container of this method,
+  /// derive its 'this' type.
+  Type getThisType(FuncDecl *FD, Type ContainerType) {
+    if (ContainerType->hasReferenceSemantics())
+      return ContainerType;
+    return LValueType::get(ContainerType, TC.Context);
+  }
+
+  /// Find the type of 'this' for this function, if it has a 'this'.
+  Type getThisType(FuncDecl *FD) {
+    if (FD->isPlus()) return Type();
+
+    DeclContext *DC = FD->getDeclContext();
+    switch (DC->getContextKind()) {
+    case DeclContextKind::TranslationUnit:
+    case DeclContextKind::BuiltinModule:
+    case DeclContextKind::FuncExpr:
+    case DeclContextKind::OneOfType:
+      return Type();
+
+    // For extensions, it depends on whether the type has value or
+    // pointer semantics.
+    case DeclContextKind::ExtensionDecl:
+      return getThisType(FD, cast<ExtensionDecl>(DC)->getExtendedType());
+
+    // It's not really clear how protocol types should get passed.
+    case DeclContextKind::ProtocolType:
+      return getThisType(FD, cast<ProtocolType>(DC));
+    }
+    llvm_unreachable("bad context kind");
+  }
   
   void visitFuncDecl(FuncDecl *FD) {
+    // Before anything else, set up the 'this' argument correctly.
+    if (Type thisType = getThisType(FD)) {
+      FunctionType *fnType = cast<FunctionType>(FD->getType());
+      FD->overwriteType(FunctionType::get(thisType, fnType->getResult(),
+                                          TC.Context));
+
+      if (FuncExpr *body = FD->getBody()) {
+        body->setType(FD->getType());
+        TypedPattern *thisPattern =
+          cast<TypedPattern>(body->getParamPatterns()[0]);
+        assert(thisPattern->getType()->is<DependentType>());
+        thisPattern->overwriteType(thisType);
+      }
+    }
+
     visitValueDecl(FD);
     
     // Validate that the initializers type matches the expected type.
@@ -106,8 +165,18 @@ public:
       }
     }
   }
-  void visitOneOfElementDecl(OneOfElementDecl *OOED) {
-    // No type checking required?
+  void visitOneOfElementDecl(OneOfElementDecl *ED) {
+    // Ignore element decls that carry no type.
+    if (ED->getArgumentType().isNull()) return;
+      
+    // Validate the function type.
+    if (TC.validateType(ED)) return;
+
+    // Require the carried type to be materializable.
+    if (!ED->getArgumentType()->isMaterializable()) {
+      TC.diagnose(ED->getIdentifierLoc(),
+                  diag::oneof_element_not_materializable);
+    }
   }
   void visitExtensionDecl(ExtensionDecl *ED) {
     TC.validateType(ED->getExtendedType());

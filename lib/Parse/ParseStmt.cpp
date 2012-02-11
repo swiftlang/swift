@@ -109,8 +109,7 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       else if (!Res.isSemaError())
         Entries.push_back(Res.get());
     } else if (isStartOfDecl(Tok, peekToken())) {
-      if (parseDecl(TmpDecls, Type(),
-                    IsTopLevel ? PD_AllowTopLevel : PD_Default))
+      if (parseDecl(TmpDecls, IsTopLevel ? PD_AllowTopLevel : PD_Default))
         NeedParseErrorRecovery = true;
       else {
         for (Decl *D : TmpDecls)

@@ -276,9 +276,9 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
       FuncDecl *func = cast<FuncDecl>(member);
       if (func->isPlus()) {
         // Eventually this won't always be the right thing.
-        emitGlobalFunction(func);
+        emitPlusMethod(func);
       } else {
-        unimplemented(member->getLocStart(), "non-plus FuncDecl in extension");
+        emitInstanceMethod(func);
       }
       continue;
       }

@@ -54,19 +54,8 @@ bool TypeChecker::validateType(Type InTy) {
     // These types are already canonical anyway.
     return false;
   case TypeKind::OneOf:
-    for (OneOfElementDecl *Elt : cast<OneOfType>(T)->Elements) {
-      // Ignore element decls that have no associated type.
-      if (Elt->getArgumentType().isNull())
-        continue;
-      
-      IsInvalid = validateType(Elt);
-      if (IsInvalid) break;
-
-      if (!Elt->getArgumentType()->isMaterializable()) {
-        diagnose(Elt->getIdentifierLoc(),
-                 diag::oneof_element_not_materializable);
-      }
-    }
+    for (OneOfElementDecl *Elt : cast<OneOfType>(T)->Elements)
+      typeCheckDecl(Elt);
     break;
       
   case TypeKind::MetaType:
@@ -139,9 +128,13 @@ bool TypeChecker::validateType(Type InTy) {
     break;
   }
       
-  case TypeKind::Protocol:
-    // TODO: Validate Protocol types.
+  case TypeKind::Protocol: {
+    ProtocolType *PT = cast<ProtocolType>(T);
+    for (auto *member : PT->Elements)
+      typeCheckDecl(member);
     break;
+  }
+
   }
 
   // If we determined that this type is invalid, erase it in the caller.

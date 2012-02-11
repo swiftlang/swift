@@ -166,13 +166,13 @@ public:
   static bool isStartOfDecl(const Token &Tok, const Token &Tok2);
 
   TranslationUnit *parseTranslationUnit();
-  bool parseDecl(SmallVectorImpl<Decl*> &Entries, Type ThisType,
-                 unsigned Flags);
+  bool parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags);
   enum {
     PD_Default           = 0,
     PD_AllowTopLevel     = 1 << 1,
     PD_DisallowVar       = 1 << 2,
-    PD_DisallowOperators = 1 << 3
+    PD_DisallowOperators = 1 << 3,
+    PD_HasContainerType  = 1 << 4
   };
   
   TypeAliasDecl *parseDeclTypeAlias();
@@ -193,7 +193,7 @@ public:
   bool parseDeclStruct(SmallVectorImpl<Decl*> &Decls);
   bool parseDeclVar(SmallVectorImpl<Decl*> &Decls);
   VarDecl *parseDeclVarSimple();
-  FuncDecl *parseDeclFunc(Type ThisType = Type());
+  FuncDecl *parseDeclFunc(bool hasThis = false);
   Decl *parseDeclProtocol();
   bool parseProtocolBody(SourceLoc ProtocolLoc, const DeclAttributes &Attrs,
                          TypeAliasDecl *TypeName = 0);

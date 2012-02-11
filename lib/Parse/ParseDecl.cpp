@@ -245,8 +245,7 @@ void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
 ///     decl-struct
 ///     decl-import  [[Only if AllowImportDecl = true]]
 ///
-bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, Type ThisType,
-                       unsigned Flags) {
+bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   unsigned EntryStart = Entries.size();
   bool HadParseError = false;
   switch (Tok.getKind()) {
@@ -281,7 +280,7 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, Type ThisType,
       goto ParseError;
     // FALL THROUGH.
   case tok::kw_func:
-    Entries.push_back(parseDeclFunc(ThisType));
+    Entries.push_back(parseDeclFunc(Flags & PD_HasContainerType));
     break;
   }
   
@@ -358,7 +357,8 @@ Decl *Parser::parseDeclExtension() {
   // Parse the body as a series of decls.
   SmallVector<Decl*, 8> MemberDecls;
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-    if (parseDecl(MemberDecls, Ty, PD_DisallowVar|PD_DisallowOperators))
+    if (parseDecl(MemberDecls,
+                  PD_HasContainerType|PD_DisallowVar|PD_DisallowOperators))
       skipUntilDeclRBrace();
   }
 
@@ -557,7 +557,6 @@ VarDecl *Parser::parseDeclVarSimple() {
   return 0;
 }
 
-
 /// parseDeclFunc - Parse a 'func' declaration, returning null on error.  The
 /// caller handles this case and does recovery as appropriate.  If AllowScoped
 /// is true, we parse both productions.
@@ -568,13 +567,13 @@ VarDecl *Parser::parseDeclVarSimple() {
 /// NOTE: The caller of this method must ensure that the token sequence is
 /// either 'func' or 'plus' 'func'.
 ///
-FuncDecl *Parser::parseDeclFunc(Type ReceiverTy) {
+FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   SourceLoc PlusLoc;
   if (Tok.is(tok::kw_plus)) {
     PlusLoc = consumeToken(tok::kw_plus);
 
     // Reject 'plus' functions at global scope.
-    if (ReceiverTy.isNull()) {
+    if (!hasContainerType) {
       diagnose(Tok, diag::plus_func_decl_global_scope);
       PlusLoc = SourceLoc();
     }
@@ -599,16 +598,17 @@ FuncDecl *Parser::parseDeclFunc(Type ReceiverTy) {
 
   SmallVector<Pattern*, 8> Params;
 
-  // If a receiver type was specified and this isn't a plus method,
-  // add an implicit first pattern to match the receiver type as an
-  // element named 'this'.  This turns "int->int" on FooTy into
-  // "(this : FooTy)->(int->int)".
-  if (!ReceiverTy.isNull() && !PlusLoc.isValid()) {
+  // If we're within a container and this isn't a plus method, add an
+  // implicit first pattern to match the container type as an element
+  // named 'this'.  This turns "int->int" on FooTy into "(this :
+  // FooTy)->(int->int)".  Note that we can't actually compute the
+  // type here until Sema.
+  if (hasContainerType && !PlusLoc.isValid()) {
     VarDecl *D =
       new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
-                            ReceiverTy, nullptr, CurDeclContext);
+                            Type(), nullptr, CurDeclContext);
     Pattern *P = new (Context) NamedPattern(D);
-    P = new (Context) TypedPattern(P, ReceiverTy);
+    P = new (Context) TypedPattern(P, Context.TheDependentType);
     Params.push_back(P);
   }
   
@@ -716,7 +716,8 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
   // Parse the body as a series of decls.
   SmallVector<Decl*, 8> MemberDecls;
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-    if (parseDecl(MemberDecls, Result, PD_DisallowVar|PD_DisallowOperators))
+    if (parseDecl(MemberDecls,
+                  PD_HasContainerType|PD_DisallowVar|PD_DisallowOperators))
       skipUntilDeclRBrace();
   }
   
@@ -836,7 +837,8 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   // Parse the body as a series of decls.
   SmallVector<Decl*, 8> MemberDecls;
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-    if (parseDecl(MemberDecls, StructTy, PD_DisallowVar|PD_DisallowOperators))
+    if (parseDecl(MemberDecls,
+                  PD_HasContainerType|PD_DisallowVar|PD_DisallowOperators))
       skipUntilDeclRBrace();
   }
   
@@ -902,8 +904,6 @@ bool Parser::parseProtocolBody(SourceLoc ProtocolLoc,
   if (parseToken(tok::l_brace, diag::expected_lbrace_protocol_type))
     return true;
   
-  Type ThisType = TypeName->getAliasType();
-  
   // Parse the list of protocol elements.
   SmallVector<ValueDecl*, 8> Elements;
   do {
@@ -914,10 +914,10 @@ bool Parser::parseProtocolBody(SourceLoc ProtocolLoc,
     case tok::r_brace:  // End of protocol body.
       break;
       
-      // FIXME: use standard parseDecl loop.
+    // FIXME: use standard parseDecl loop.
     case tok::kw_plus:
     case tok::kw_func:
-      Elements.push_back(parseDeclFunc(ThisType));
+      Elements.push_back(parseDeclFunc(Tok.is(tok::kw_func)));
       if (Elements.back() == 0) return true;
       break;
     case tok::kw_var:

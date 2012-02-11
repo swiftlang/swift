@@ -121,6 +121,13 @@ public:
   /// the rules of the language?  Basically, does it not contain any
   /// l-value types?
   bool isMaterializable();
+
+  /// hasReferenceSemantics() - Do objects of this type have reference
+  /// semantics?
+  bool hasReferenceSemantics() {
+    // For now, the answer is always 'no'.
+    return false;
+  }
     
   void dump() const;
   void print(raw_ostream &OS) const;
@@ -617,6 +624,9 @@ public:
   static bool classof(const ArrayType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Protocol;
+  }
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::ProtocolType;
   }
 
 private:

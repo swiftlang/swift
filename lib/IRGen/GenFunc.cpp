@@ -683,7 +683,7 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &resultType) {
     assert(callee.UncurryLevel < callSites.size());
 
     // Find the formal type we're calling.
-    unsigned calleeIndex = callSites.size() - callee.UncurryLevel - 1;
+    unsigned calleeIndex = callSites.size() - 1;
     Type calleeFormalType = callSites[calleeIndex].FnType;
     llvm::Value *fnPtr =
       callee.getFunctionPointer(*this, calleeFormalType);
@@ -1006,8 +1006,10 @@ namespace {
   public:
     CurriedData(IRGenModule &IGM, FuncExpr *funcExpr,
                 ExplosionKind explosionLevel,
+                unsigned minUncurryLevel,
                 unsigned maxUncurryLevel)
-      : IGM(IGM), Func(funcExpr), ExplosionLevel(explosionLevel), CurClause(0) {
+      : IGM(IGM), Func(funcExpr), ExplosionLevel(explosionLevel),
+        CurClause(minUncurryLevel) {
       accumulateClauses(funcExpr->getType(), maxUncurryLevel);
     }
 
@@ -1219,8 +1221,9 @@ namespace {
   };
 }
 
-/// Emit the definition for the given global function.
-void IRGenModule::emitGlobalFunction(FuncDecl *func) {
+/// Emit a function declaration, starting at the given uncurry level.
+static void emitFunction(IRGenModule &IGM, FuncDecl *func,
+                         unsigned startingUncurryLevel) {
   // Nothing to do if the function has no body.
   if (!func->getBody()) return;
   FuncExpr *funcExpr = func->getBody();
@@ -1228,20 +1231,23 @@ void IRGenModule::emitGlobalFunction(FuncDecl *func) {
   // FIXME: variant currying levels!
   // FIXME: also emit entrypoints with maximal explosion when all types are known!
   unsigned naturalUncurryLevel = getNaturalUncurryLevel(func);
+  assert(startingUncurryLevel <= naturalUncurryLevel);
+
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
 
   // Get the address of the first entrypoint we're going to emit.
   llvm::Function *entrypoint =
-    getAddrOfGlobalFunction(func, explosionLevel, /*uncurryLevel*/ 0);
+    IGM.getAddrOfGlobalFunction(func, explosionLevel, startingUncurryLevel);
 
-  CurriedData curriedData(*this, funcExpr, explosionLevel, naturalUncurryLevel);
+  CurriedData curriedData(IGM, funcExpr, explosionLevel,
+                          startingUncurryLevel, naturalUncurryLevel);
 
   // Emit the curried entrypoints.  At the end of each iteration,
   // fnAddr will point to the next entrypoint in the currying sequence.
-  for (unsigned uncurryLevel = 0; uncurryLevel != naturalUncurryLevel;
-         ++uncurryLevel) {
+  for (unsigned uncurryLevel = startingUncurryLevel;
+         uncurryLevel != naturalUncurryLevel; ++uncurryLevel) {
     llvm::Function *nextEntrypoint =
-      getAddrOfGlobalFunction(func, explosionLevel, uncurryLevel + 1);
+      IGM.getAddrOfGlobalFunction(func, explosionLevel, uncurryLevel + 1);
 
     curriedData.emitCurriedEntrypoint(entrypoint, nextEntrypoint);
 
@@ -1250,9 +1256,26 @@ void IRGenModule::emitGlobalFunction(FuncDecl *func) {
 
   // Finally, emit the uncurried entrypoint.
   PrettyStackTraceDecl stackTrace("emitting IR for", func);
-  IRGenFunction(*this, funcExpr, explosionLevel,
+  IRGenFunction(IGM, funcExpr, explosionLevel,
                 naturalUncurryLevel, entrypoint)
     .emitFunctionTopLevel(funcExpr->getBody());
+}
+
+/// Emit the definition for the given instance method.
+void IRGenModule::emitInstanceMethod(FuncDecl *func) {
+  assert(!func->isPlus());
+  emitFunction(*this, func, 1);
+}
+
+/// Emit the definition for the given plus method.
+void IRGenModule::emitPlusMethod(FuncDecl *func) {
+  assert(func->isPlus());
+  emitFunction(*this, func, 0);
+}
+
+/// Emit the definition for the given global function.
+void IRGenModule::emitGlobalFunction(FuncDecl *func) {
+  emitFunction(*this, func, 0);
 }
 
 /// Emit the code for the top-level of a function.

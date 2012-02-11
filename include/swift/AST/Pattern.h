@@ -75,6 +75,9 @@ public:
   /// type-checked.
   void setType(Type ty) { assert(!hasType()); Ty = ty; }
 
+  /// Overwrite the type of this pattern.
+  void overwriteType(Type ty) { assert(hasType()); Ty = ty; }
+
   /// Returns the name directly bound by this pattern, or the null
   /// identifier if the pattern does not bind a name directly.
   Identifier getBoundName() const;
