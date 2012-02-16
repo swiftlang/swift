@@ -455,7 +455,7 @@ namespace {
 void IRGenFunction::emitExplodedTupleElement(TupleElementExpr *E,
                                              Explosion &explosion) {
   // If we're doing an l-value projection, this is straightforward.
-  if (E->isLValueProjection())
+  if (E->getType()->is<LValueType>())
     return emitLValueAsScalar(emitTupleElementLValue(E), explosion);
 
   Expr *tuple = E->getBase();
@@ -504,7 +504,7 @@ IRGenFunction::tryEmitTupleElementAsAddress(TupleElementExpr *E) {
 }
 
 LValue IRGenFunction::emitTupleElementLValue(TupleElementExpr *E) {
-  assert(E->isLValueProjection());
+  assert(E->getType()->is<LValueType>());
 
   // Emit the base l-value.
   Expr *tuple = E->getBase();

@@ -611,7 +611,7 @@ public:
 
     Type resultType = oneof->getTransparentType();
     if (isLValue) resultType = LValueType::get(resultType, TC.Context);
-    return new (TC.Context) LookThroughOneofExpr(E, resultType, isLValue);
+    return new (TC.Context) LookThroughOneofExpr(E, resultType);
   }
 
   Expr *buildTupleElementExpr(Expr *base, UnresolvedDotExpr *syntax,
@@ -627,7 +627,7 @@ public:
       
     return new (TC.Context) TupleElementExpr(base, syntax->getDotLoc(),
                                              fieldIndex, syntax->getNameLoc(),
-                                             fieldType, baseIsLValue);
+                                             fieldType);
   }
   
   SemaExpressionTree(TypeChecker &tc) : TC(tc) {}

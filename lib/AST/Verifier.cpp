@@ -152,7 +152,7 @@ namespace {
     void verifyChecked(TupleElementExpr *E) {
       Type resultType = E->getType();
       Type baseType = E->getBase()->getType();
-      checkSameLValueness(baseType, resultType, E->isLValueProjection(),
+      checkSameLValueness(baseType, resultType,
                           "base and result of TupleElementExpr");
 
       TupleType *tupleType = baseType->getAs<TupleType>();
@@ -180,7 +180,7 @@ namespace {
     void verifyChecked(LookThroughOneofExpr *E) {
       Type operandType = E->getSubExpr()->getType();
       Type resultType = E->getType();
-      checkSameLValueness(operandType, resultType, E->isLValueProjection(),
+      checkSameLValueness(operandType, resultType,
                           "operand and result of LookThroughOneofExpr");
 
       OneOfType *oneof = operandType->getAs<OneOfType>();

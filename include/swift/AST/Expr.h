@@ -454,19 +454,17 @@ public:
 /// LookThroughOneofExpr - Implicitly look through a 'oneof' type with
 /// one enumerator.
 class LookThroughOneofExpr : public Expr {
-  llvm::PointerIntPair<Expr*, 1, bool> SubExprAndIsLValue;
+  Expr *SubExpr;
 
 public:
-  LookThroughOneofExpr(Expr *subexpr, Type ty, bool isLValue)
-    : Expr(ExprKind::LookThroughOneof, ty),
-      SubExprAndIsLValue(subexpr, isLValue) {}
+  LookThroughOneofExpr(Expr *subexpr, Type ty)
+    : Expr(ExprKind::LookThroughOneof, ty), SubExpr(subexpr) {}
 
   SourceRange getSourceRange() const { return getSubExpr()->getSourceRange(); }
   SourceLoc getLoc() const { return getSubExpr()->getLoc(); }
-  const Expr *getSubExpr() const { return SubExprAndIsLValue.getPointer(); }
-  Expr *getSubExpr() { return SubExprAndIsLValue.getPointer(); }
-  void setSubExpr(Expr *E) { SubExprAndIsLValue.setPointer(E); }
-  bool isLValueProjection() const { return SubExprAndIsLValue.getInt(); }
+  const Expr *getSubExpr() const { return SubExpr; }
+  Expr *getSubExpr() { return SubExpr; }
+  void setSubExpr(Expr *E) { SubExpr = E; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const LookThroughOneofExpr *) { return true; }
@@ -500,14 +498,13 @@ class TupleElementExpr : public Expr {
   Expr *SubExpr;
   SourceLoc DotLoc;
   SourceLoc NameLoc;
-  unsigned FieldNo : 31;
-  unsigned IsLValue : 1;
+  unsigned FieldNo;
   
 public:
   TupleElementExpr(Expr *subexpr, SourceLoc dotloc, unsigned fieldno,
-                   SourceLoc nameloc, Type ty, bool isLValue)
+                   SourceLoc nameloc, Type ty)
   : Expr(ExprKind::TupleElement, ty), SubExpr(subexpr), DotLoc(dotloc),
-    NameLoc(nameloc), FieldNo(fieldno), IsLValue(isLValue) {}
+    NameLoc(nameloc), FieldNo(fieldno) {}
 
   SourceRange getSourceRange() const { 
     return SourceRange(SubExpr->getStartLoc(), NameLoc);
@@ -517,8 +514,6 @@ public:
   SourceLoc getLoc() const { return NameLoc; }
   Expr *getBase() const { return SubExpr; }
   void setBase(Expr *e) { SubExpr = e; }
-
-  bool isLValueProjection() const { return IsLValue; }
 
   unsigned getFieldNumber() const { return FieldNo; }
   SourceLoc getNameLoc() const { return NameLoc; }  
