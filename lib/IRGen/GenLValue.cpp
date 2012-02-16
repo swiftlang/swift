@@ -47,7 +47,7 @@ namespace {
 /// Create an l-value which resolves exactly to the given address.
 LValue IRGenFunction::emitAddressLValue(Address address) {
   LValue lvalue;
-  lvalue.push<FixedAddress>(address);
+  lvalue.add<FixedAddress>(address);
   return lvalue;
 }
 
@@ -55,20 +55,10 @@ LValue IRGenFunction::emitAddressLValue(Address address) {
 void IRGenFunction::emitExplodedLoad(const LValue &lvalue,
                                      const TypeInfo &type,
                                      Explosion &explosion) {
-  // Find the addresses of the components of the stack so that we can
-  // efficiently walk backwards.  This is basically just flattening
-  // the recursion.  Maybe our stack should be optimized to make this
-  // more reasonable.
-  SmallVector<LValue::const_iterator, 16> components;
-  for (auto i = lvalue.begin(), e = lvalue.end(); i != e; ++i) {
-    components.push_back(i);
-  }
-
   Address address;
 
-  // Walk backwards through the stack.
-  for (auto i = components.rbegin(), e = components.rend(); i != e; ++i) {
-    const PathComponent &component = **i;
+  for (auto i = lvalue.begin(), e = lvalue.end(); i != e; ) {
+    const PathComponent &component = *i++;
 
     // If this is a physical component, just compute it relative to the
     // previous component.  The address is initialized on the first pass,
@@ -79,7 +69,7 @@ void IRGenFunction::emitExplodedLoad(const LValue &lvalue,
     }
 
     // If this is the last component, load it and return that as the result.
-    if (i + 1 == e)
+    if (i == e)
       return component.asLogical().loadExplosion(*this, address, explosion);
 
     // Otherwise, load and materialize the result into memory.
@@ -89,20 +79,18 @@ void IRGenFunction::emitExplodedLoad(const LValue &lvalue,
   return type.loadExplosion(*this, address, explosion);
 }
 
-typedef std::reverse_iterator<LValue::const_iterator*> path_iterator;
-
 /// Perform a store into the given path, given the base of the first
 /// component.
 static void emitStoreRecursive(IRGenFunction &IGF, Address base,
                                const TypeInfo &finalType,
                                Explosion &finalValue,
-                               path_iterator pathStart,
-                               path_iterator pathEnd) {
+                               LValue::const_iterator pathStart,
+                               LValue::const_iterator pathEnd) {
   // Drill into any physical components.
   while (true) {
     assert(pathStart != pathEnd);
 
-    const PathComponent &component = **pathStart;
+    const PathComponent &component = *pathStart;
     if (component.isLogical()) break;
     base = component.asPhysical().offset(IGF, base);
 
@@ -114,10 +102,11 @@ static void emitStoreRecursive(IRGenFunction &IGF, Address base,
 
   // Okay, we have a logical component.
   assert(pathStart != pathEnd);
-  const LogicalPathComponent &component = (*pathStart)->asLogical();
+  const LogicalPathComponent &component = pathStart->asLogical();
+  ++pathStart;
   
   // If this is the final component, just do a logical store.
-  if (pathStart + 1 == pathEnd) {
+  if (pathStart == pathEnd) {
     return component.storeExplosion(IGF, finalValue, base);
   }
 
@@ -125,7 +114,7 @@ static void emitStoreRecursive(IRGenFunction &IGF, Address base,
   Address temp = component.loadAndMaterialize(IGF, base);
 
   // Recursively perform the store.
-  emitStoreRecursive(IGF, temp, finalType, finalValue, pathStart + 1, pathEnd);
+  emitStoreRecursive(IGF, temp, finalType, finalValue, pathStart, pathEnd);
 
   // Store the temporary back.
   component.storeMaterialized(IGF, temp, base);
@@ -134,47 +123,27 @@ static void emitStoreRecursive(IRGenFunction &IGF, Address base,
 
 void IRGenFunction::emitStore(Explosion &rvalue, const LValue &lvalue,
                               const TypeInfo &type) {
-
-  // Find the addresses of the components of the stack so that we can
-  // efficiently walk backwards.  This is basically just flattening
-  // the recursion.  Maybe our stack should be optimized to make this
-  // more reasonable.
-  SmallVector<LValue::const_iterator, 16> components;
-  for (auto i = lvalue.begin(), e = lvalue.end(); i != e; ++i) {
-    components.push_back(i);
-  }
-
   emitStoreRecursive(*this, Address(), type, rvalue,
-                     components.rbegin(), components.rend());
+                     lvalue.begin(), lvalue.end());
 }
 
 /// Given an l-value which is known to be physical, load from it.
 Address IRGenFunction::emitAddressForPhysicalLValue(const LValue &lvalue) {
-  SmallVector<LValue::const_iterator, 16> components;
-  for (auto i = lvalue.begin(), e = lvalue.end(); i != e; ++i) {
-    components.push_back(i);
-  }
-
   Address address;
-  for (auto i = components.rbegin(), e = components.rend(); i != e; ++i) {
-    address = (*i)->asPhysical().offset(*this, address);
+  for (auto &component : lvalue) {
+    address = component.asPhysical().offset(*this, address);
   }
   return address;
 }
 
 void IRGenFunction::emitLValueAsScalar(const LValue &lvalue,
                                        Explosion &explosion) {
-  SmallVector<LValue::const_iterator, 16> components;
-  for (auto i = lvalue.begin(), e = lvalue.end(); i != e; ++i) {
-    components.push_back(i);
-  }
-
   Address address;
-  for (auto i = components.rbegin(), e = components.rend(); i != e; ++i) {
-    if ((*i)->isLogical())
-      address = (*i)->asLogical().loadAndMaterialize(*this, address);
+  for (auto &component : lvalue) {
+    if (component.isLogical())
+      address = component.asLogical().loadAndMaterialize(*this, address);
     else
-      address = (*i)->asPhysical().offset(*this, address);
+      address = component.asPhysical().offset(*this, address);
   }
 
   // FIXME: writebacks

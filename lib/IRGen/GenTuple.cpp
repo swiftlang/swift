@@ -521,7 +521,7 @@ LValue IRGenFunction::emitTupleElementLValue(TupleElementExpr *E) {
   }
 
   // Project.
-  tupleLV.push<TupleElement>(field);
+  tupleLV.add<TupleElement>(field);
   return tupleLV;
 }
 

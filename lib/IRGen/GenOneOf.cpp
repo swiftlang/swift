@@ -366,7 +366,7 @@ namespace {
 
 LValue IRGenFunction::emitLookThroughOneofLValue(LookThroughOneofExpr *E) {
   LValue oneofLV = emitLValue(E->getSubExpr());
-  oneofLV.push<LookThroughOneof>();
+  oneofLV.add<LookThroughOneof>();
   return oneofLV;
 }
 

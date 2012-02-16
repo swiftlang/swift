@@ -19,7 +19,7 @@
 
 #include "Address.h"
 #include "IRGen.h"
-#include "DiverseStack.h"
+#include "DiverseList.h"
 
 namespace llvm {
   template <class T> class SmallVectorImpl;
@@ -143,7 +143,7 @@ inline const LogicalPathComponent &PathComponent::asLogical() const {
 /// of a type, as opposed to an r-value, which is an actual value
 /// of the type.
 class LValue {
-  DiverseStack<PathComponent, 128> Path;
+  DiverseList<PathComponent, 128> Path;
 
 public:
   LValue() = default;
@@ -164,17 +164,12 @@ public:
   }
 
   /// Add a new component at the end of the access path of this l-value.
-  template <class T, class... A> T &push(A &&...args) {
-    return Path.push<T>(std::forward<A>(args)...);
+  template <class T, class... A> T &add(A &&...args) {
+    return Path.add<T>(std::forward<A>(args)...);
   }
 
-  /// Pop a component off the end of the access path of this l-value.
-  void pop() {
-    Path.pop();
-  }
-
-  typedef DiverseStackImpl<PathComponent>::iterator iterator;
-  typedef DiverseStackImpl<PathComponent>::const_iterator const_iterator;
+  typedef DiverseListImpl<PathComponent>::iterator iterator;
+  typedef DiverseListImpl<PathComponent>::const_iterator const_iterator;
 
   iterator begin() { return Path.begin(); }
   iterator end() { return Path.end(); }
