@@ -57,6 +57,7 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E) {
     llvm_unreachable("decl is not a value decl");
 
   case DeclKind::Func:
+  case DeclKind::OneOfElement:
     llvm_unreachable("decl cannot be emitted as an l-value");
 
   case DeclKind::Var:
@@ -65,7 +66,6 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E) {
     return IGF.getGlobal(cast<VarDecl>(D));
 
   case DeclKind::ElementRef:
-  case DeclKind::OneOfElement:
     IGF.unimplemented(E->getLoc(), "emitting this decl as an l-value");
     return IGF.emitFakeLValue(IGF.getFragileTypeInfo(D->getType()));
   }
@@ -89,9 +89,7 @@ void IRGenFunction::emitExplodedDeclRef(DeclRefExpr *E, Explosion &explosion) {
     return;
 
   case DeclKind::OneOfElement:
-    explosion.add(IGM.getAddrOfInjectionFunction(cast<OneOfElementDecl>(D)));
-    explosion.add(llvm::UndefValue::get(IGM.Int8PtrTy));
-    return;
+    return emitOneOfElementRef(cast<OneOfElementDecl>(D), explosion);
 
   case DeclKind::ElementRef:
     unimplemented(E->getLoc(), "emitting this decl as an r-value");

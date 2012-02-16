@@ -239,7 +239,7 @@ IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
   // The formal type of the function is generally the type of the decl,
   // but if that's not a function type, it's () -> that.
   Type formalType = D->getType();
-  if (!formalType->is<FunctionType>()) {
+  if (!isa<FunctionType>(formalType)) {
     formalType = FunctionType::get(TupleType::getEmpty(Context),
                                    formalType, Context);
   }

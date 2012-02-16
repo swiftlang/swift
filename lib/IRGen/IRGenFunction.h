@@ -38,6 +38,7 @@ namespace swift {
   class FuncExpr;
   class IfStmt;
   class LookThroughOneofExpr;
+  class OneOfElementDecl;
   template<typename T> class Optional;
   class ReturnStmt;
   class SourceLoc;
@@ -174,10 +175,13 @@ private:
   void emitExplodedRValueForFunction(FuncDecl *Fn, Explosion &explosion);
 
   void emitExplodedApplyExpr(ApplyExpr *apply, Explosion &explosion);
+  void emitExplodedNullaryCall(llvm::Value *fn, Type resultType,
+                               Explosion &result);
   Optional<Address> tryEmitApplyAsAddress(ApplyExpr *apply, const TypeInfo &);
   RValue emitApplyExpr(ApplyExpr *apply, const TypeInfo &type);
 
   void emitExplodedDeclRef(DeclRefExpr *DeclRef, Explosion &explosion);
+  void emitOneOfElementRef(OneOfElementDecl *elt, Explosion &explosion);
 
   void emitExplodedLookThroughOneof(LookThroughOneofExpr *E, Explosion &expl);
   Optional<Address> tryEmitLookThroughOneofAsAddress(LookThroughOneofExpr *E);

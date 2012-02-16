@@ -30,6 +30,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/DerivedTypes.h"
+#include "llvm/Function.h"
 
 #include "GenType.h"
 #include "IRGenFunction.h"
@@ -377,6 +378,27 @@ IRGenFunction::tryEmitLookThroughOneofAsAddress(LookThroughOneofExpr *E) {
   if (!oneofAddr) return Nothing;
 
   return SingletonOneofTypeInfo::getSingletonAddress(*this, oneofAddr.getValue());
+}
+
+/// Emit a reference to a oneof element decl.
+void IRGenFunction::emitOneOfElementRef(OneOfElementDecl *elt,
+                                        Explosion &result) {
+  // Find the injection function.
+  llvm::Function *injection = IGM.getAddrOfInjectionFunction(elt);
+
+  // If the element is of function type, just emit this as a function
+  // reference.  It will always literally be of function type when
+  // written this way.
+  if (isa<FunctionType>(elt->getType())) {
+    result.add(llvm::ConstantExpr::getBitCast(injection, IGM.Int8PtrTy));
+    result.add(llvm::UndefValue::get(IGM.Int8PtrTy));
+    return;
+  }
+
+  // Otherwise, we need to call the injection function (with no
+  // arguments, except maybe a temporary result) and expand the result
+  // into the explosion.
+  emitExplodedNullaryCall(injection, elt->getType(), result);
 }
 
 /// Emit the injection function for the given element.

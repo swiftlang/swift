@@ -60,6 +60,7 @@
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
 #include "llvm/Module.h"
+#include "llvm/Support/CallSite.h"
 #include "llvm/Target/TargetData.h"
 
 #include "GenType.h"
@@ -644,6 +645,16 @@ static FuncDecl *emitAsKnownFunctionReference(IRGenFunction &IGF, Expr *E) {
   return nullptr;
 }
 
+/// Set attributes on the given call site consistent with it returning
+/// an aggregate result.
+static void setAggResultAttributes(llvm::CallSite call) {
+  llvm::SmallVector<llvm::AttributeWithIndex, 1> attrs;
+  attrs.push_back(llvm::AttributeWithIndex::get(1,
+                                llvm::Attribute::StructRet |
+                                llvm::Attribute::NoAlias));
+  call.setAttributes(llvm::AttrListPtr::get(attrs.data(), attrs.size()));
+}
+
 /// Emit a function call.
 RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &resultType) {
   // 1.  Try to uncurry the source expression.  Note that the argument
@@ -738,12 +749,7 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &resultType) {
     // attributes on the agg return slot, then return, since agg
     // results can only be final.
     if (isAggregateResult) {
-      llvm::SmallVector<llvm::AttributeWithIndex, 1> attrs;
-      attrs.push_back(llvm::AttributeWithIndex::get(1,
-                                llvm::Attribute::StructRet |
-                                llvm::Attribute::NoAlias));
-      call->setAttributes(llvm::AttrListPtr::get(attrs.data(), attrs.size()));
-
+      setAggResultAttributes(call);
       return RValue::forAggregate(resultAddress.getAddress());
     }
 
@@ -769,6 +775,42 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &resultType) {
     callee.ExplosionLevel = ExplosionKind::Minimal;
     callee.UncurryLevel = 0;
     callee.set(scalars[0], scalars[1]);
+  }
+}
+
+/// Emit a nullary call to the given function, using the standard
+/// calling-convention and so on, and explode the result.
+void IRGenFunction::emitExplodedNullaryCall(llvm::Value *fnPtr,
+                                            Type resultType,
+                                            Explosion &resultExplosion) {
+  const TypeInfo &resultTI = getFragileTypeInfo(resultType);
+  RValueSchema resultSchema = resultTI.getSchema();
+
+  llvm::SmallVector<llvm::Value*, 1> args;
+  Address resultAddress;
+  if (resultSchema.isAggregate()) {
+    resultAddress = createFullExprAlloca(resultTI.StorageType,
+                                         resultTI.StorageAlignment,
+                                         "call.aggresult");
+    args.push_back(resultAddress.getAddress());
+  }
+
+  // FIXME: exceptions
+  llvm::CallInst *call = Builder.CreateCall(fnPtr, args);
+
+  if (resultSchema.isAggregate()) {
+    setAggResultAttributes(call);
+    resultTI.loadExplosion(*this, resultAddress, resultExplosion);
+    return;
+  }
+
+  unsigned numScalars = resultSchema.getScalarTypes().size();
+  if (numScalars == 0) return;
+  if (numScalars == 1) return resultExplosion.add(call);
+
+  for (unsigned i = 0; i != numScalars; ++i) {
+    llvm::Value *scalar = Builder.CreateExtractValue(call, i);
+    resultExplosion.add(scalar);
   }
 }
 
