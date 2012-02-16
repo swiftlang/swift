@@ -106,7 +106,9 @@ public:
 
 //--- Function prologue and epilogue -------------------------------------------
 public:
+  Explosion collectParameters();
   void emitFunctionTopLevel(BraceStmt *S);
+  void emitScalarReturn(Explosion &scalars);
 private:
   void emitPrologue();
   void emitEpilogue();

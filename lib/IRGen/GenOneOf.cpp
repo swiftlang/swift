@@ -56,6 +56,22 @@ namespace {
       llvm::StructType *Struct = getStorageType();
       return cast<llvm::IntegerType>(Struct->getElementType(0));
     }
+
+    /// Map the given element to the appropriate value in the
+    /// discriminator type.
+    llvm::ConstantInt *getDiscriminatorIndex(OneOfElementDecl *target) const {
+      // FIXME: using a linear search here is fairly ridiculous.
+      unsigned index = 0;
+      for (auto elt : cast<OneOfType>(target->getDeclContext())->getElements()) {
+        if (elt == target) break;
+        index++;
+      }
+      return llvm::ConstantInt::get(getDiscriminatorType(), index);
+    }
+
+    virtual void emitInjectionFunctionBody(IRGenFunction &IGF,
+                                           OneOfElementDecl *elt,
+                                           Explosion &params) const = 0;
   };
 
   /// A TypeInfo implementation which uses an aggregate.
@@ -92,6 +108,13 @@ namespace {
 
     void storeExplosion(IRGenFunction &IGF, Explosion &e, Address addr) const {
       // FIXME
+    }
+
+    void emitInjectionFunctionBody(IRGenFunction &IGF,
+                                   OneOfElementDecl *elt,
+                                   Explosion &params) const {
+      // FIXME
+      IGF.Builder.CreateRetVoid();
     }
   };
 
@@ -147,6 +170,26 @@ namespace {
       if (!Singleton) return;
       Singleton->storeExplosion(IGF, e, getSingletonAddress(IGF, addr));
     }
+
+    void emitInjectionFunctionBody(IRGenFunction &IGF,
+                                   OneOfElementDecl *elt,
+                                   Explosion &params) const {
+      // If this oneof carries no data, the function must take no
+      // arguments and return void.
+      if (!Singleton) {
+        IGF.Builder.CreateRetVoid();
+        return;
+      }
+
+      // Otherwise, package up the result.
+      if (Singleton->getSchema().isAggregate()) {
+        Address returnSlot(params.claimNext(), Singleton->StorageAlignment);
+        Singleton->storeExplosion(IGF, params, returnSlot);
+        IGF.Builder.CreateRetVoid();
+      } else {
+        IGF.emitScalarReturn(params);
+      }
+    }
   };
 
   /// A TypeInfo implementation for oneofs with no payload.
@@ -198,6 +241,12 @@ namespace {
       IGF.Builder.CreateStore(e.claimNext(),
                               IGF.Builder.CreateStructGEP(addr.getAddress(), 0),
                               addr.getAlignment());
+    }
+
+    void emitInjectionFunctionBody(IRGenFunction &IGF,
+                                   OneOfElementDecl *elt,
+                                   Explosion &params) const {
+      IGF.Builder.CreateRet(getDiscriminatorIndex(elt));
     }
   };
 }
@@ -330,10 +379,25 @@ IRGenFunction::tryEmitLookThroughOneofAsAddress(LookThroughOneofExpr *E) {
   return SingletonOneofTypeInfo::getSingletonAddress(*this, oneofAddr.getValue());
 }
 
+/// Emit the injection function for the given element.
+static void emitInjectionFunction(IRGenModule &IGM,
+                                  const OneofTypeInfo &oneofTI,
+                                  OneOfElementDecl *elt) {
+  // Get or create the injection function.
+  llvm::Function *fn = IGM.getAddrOfInjectionFunction(elt);
+
+  ExplosionKind explosionKind = ExplosionKind::Minimal;
+  IRGenFunction IGF(IGM, nullptr, explosionKind,
+                    /*uncurry level*/ 0, fn, Prologue::Bare);
+
+  Explosion explosion = IGF.collectParameters();
+  oneofTI.emitInjectionFunctionBody(IGF, elt, explosion);
+}
+
 /// emitOneOfType - Emit all the declarations associated with this oneof type.
 void IRGenModule::emitOneOfType(OneOfType *oneof) {
   const OneofTypeInfo &typeInfo = getFragileTypeInfo(oneof).as<OneofTypeInfo>();
   for (auto elt : oneof->Elements) {
-    //typeInfo.emitInjectionFunction(*this, elt);
+    emitInjectionFunction(*this, typeInfo, elt);
   }
 }

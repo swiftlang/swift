@@ -236,9 +236,17 @@ IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return cast<llvm::Function>(entry);
 
+  // The formal type of the function is generally the type of the decl,
+  // but if that's not a function type, it's () -> that.
+  Type formalType = D->getType();
+  if (!formalType->is<FunctionType>()) {
+    formalType = FunctionType::get(TupleType::getEmpty(Context),
+                                   formalType, Context);
+  }
+
   // FIXME: pick the explosion kind better!
   llvm::FunctionType *fnType =
-    getFunctionType(D->getType(), ExplosionKind::Minimal, /*uncurry*/ 0,
+    getFunctionType(formalType, ExplosionKind::Minimal, /*uncurry*/ 0,
                     /*data*/ false);
 
   LinkInfo link = LinkInfo::get(*this, entity);

@@ -772,10 +772,11 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &resultType) {
   }
 }
 
-/// Initialize an Explosion with the parameters of the current function.
-static Explosion collectParameters(IRGenFunction &IGF) {
-  Explosion params(IGF.CurExplosionLevel);
-  for (auto i = IGF.CurFn->arg_begin(), e = IGF.CurFn->arg_end(); i != e; ++i)
+/// Initialize an Explosion with the parameters of the current
+/// function.  This is really only useful when writing prologue code.
+Explosion IRGenFunction::collectParameters() {
+  Explosion params(CurExplosionLevel);
+  for (auto i = CurFn->arg_begin(), e = CurFn->arg_end(); i != e; ++i)
     params.add(i);
   return params;
 }
@@ -889,7 +890,7 @@ void IRGenFunction::emitPrologue() {
   CurFn->getBasicBlockList().push_back(ReturnBB);
 
   // List out the parameter values in an Explosion.
-  Explosion values = collectParameters(*this);
+  Explosion values = collectParameters();
 
   // Set up the return slot, stealing the first argument if necessary.
   {
@@ -970,14 +971,22 @@ void IRGenFunction::emitEpilogue() {
   } else {
     Explosion result(CurExplosionLevel);
     resultType.loadExplosion(*this, ReturnSlot, result);
-    if (result.size() == 1) {
-      Builder.CreateRet(result.claimNext());
-    } else {
-      llvm::Value *resultAgg = llvm::UndefValue::get(CurFn->getReturnType());
-      for (unsigned i = 0, e = result.size(); i != e; ++i)
-        resultAgg = Builder.CreateInsertValue(resultAgg, result.claimNext(), i);
-      Builder.CreateRet(resultAgg);
-    }
+    emitScalarReturn(result);
+  }
+}
+
+void IRGenFunction::emitScalarReturn(Explosion &result) {
+  if (result.size() == 0) {
+    Builder.CreateRetVoid();
+  } else if (result.size() == 1) {
+    Builder.CreateRet(result.claimNext());
+  } else {
+    assert(cast<llvm::StructType>(CurFn->getReturnType())->getNumElements()
+             == result.size());
+    llvm::Value *resultAgg = llvm::UndefValue::get(CurFn->getReturnType());
+    for (unsigned i = 0, e = result.size(); i != e; ++i)
+      resultAgg = Builder.CreateInsertValue(resultAgg, result.claimNext(), i);
+    Builder.CreateRet(resultAgg);
   }
 }
 
@@ -1121,7 +1130,7 @@ namespace {
       IRGenFunction IGF(IGM, Func, ExplosionLevel, CurClause, entrypoint,
                         Prologue::Bare);
 
-      Explosion params = collectParameters(IGF);
+      Explosion params = IGF.collectParameters();
 
       // We're returning a function, so no need to worry about an
       // aggregate return slot.
@@ -1187,7 +1196,7 @@ namespace {
                         Prologue::Bare);
 
       // Accumulate the function's immediate parameters.
-      Explosion params = collectParameters(IGF);
+      Explosion params = IGF.collectParameters();
 
       // If there's a data pointer required, grab it (it's always the
       // last parameter) and load out the extra, previously-curried
