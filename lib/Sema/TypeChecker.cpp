@@ -73,10 +73,11 @@ struct RewriteAnonArgExpr : Walker {
     // context they are being used in.
     if (TupleType *TT = dyn_cast<TupleType>(FuncInputTy.getPointer())) {
       A->setType(LValueType::get(TT->getElementType(A->getArgNumber()),
-                                 TC.Context));
+                                 LValueType::Qual::Default, TC.Context));
     } else {
       assert(NumInputArgs == 1 && "Must have unary case");
-      A->setType(LValueType::get(FuncInputTy, TC.Context));
+      A->setType(LValueType::get(FuncInputTy, LValueType::Qual::Default,
+                                 TC.Context));
     }
     return A;
   }

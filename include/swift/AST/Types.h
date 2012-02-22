@@ -656,15 +656,114 @@ private:
 /// carries an l-value, the carried l-value types are converted
 /// to their object type.
 class LValueType : public TypeBase {
-  Type ObjectTy;
+public:
+  class Qual {
+  public:
+    typedef unsigned opaque_type;
 
-  LValueType(Type objectTy, ASTContext *canonicalContext)
-    : TypeBase(TypeKind::LValue, canonicalContext), ObjectTy(objectTy) {}
+    enum QualBits : opaque_type {
+      // The bits are chosen to make the subtype queries as efficient
+      // as possible.  Basically, we want the subtypes to involve
+      // fewer bits.
+
+      /// An explicit l-value is one which has been formed with the
+      /// builtin '&' operator.  It implicitly converts to an implicit
+      /// l-value, but the reverse is not true.  Ordinary [byref]
+      /// arguments require an explicit l-value, but a
+      /// [byref(implicit)] argument can be bound implicitly.
+      Implicit = 1,
+
+      Default = Implicit
+    };
+
+  private:
+    opaque_type Bits;
+
+  public:
+    Qual() : Bits(0) {}
+    explicit Qual(unsigned bits) : Bits(bits) {}
+    Qual(QualBits qual) : Bits(qual) {}
+
+    /// Return an opaque representation of this qualifier set.
+    /// The result is hashable by DenseMap.
+    opaque_type getOpaqueData() const { return Bits; }
+
+    /// Given that these qualifiers have the 'implicit' bit set,
+    /// return a set of qualifiers without it.
+    Qual withoutImplicit() const {
+      assert(*this & Implicit);
+      return *this & ~Implicit;
+    }
+
+    /// Union two qualifier sets, given that they are compatible.
+    friend Qual operator|(Qual l, Qual r) { return Qual(l.Bits | r.Bits); }
+
+    /// Union a qualifier set into this qualifier set, given that
+    /// they are compatible.
+    Qual &operator|=(Qual r) { Bits |= r.Bits; return *this; }
+
+    /// Intersect two qualifier sets, given that they are compatible.
+    friend QualBits operator&(Qual l, Qual r) {
+      // Use QualBits to allow a wider range of conversions to bool.
+      return QualBits(l.Bits & r.Bits);
+    }
+
+    /// Intersect a qualifier set into this qualifier set.
+    Qual &operator&=(Qual r) { Bits &= r.Bits; return *this; }
+
+    /// Invert a qualifier set.  The state of the resulting
+    /// non-boolean qualifiers is non-determined, except that they are
+    /// is compatible with anything.
+    friend Qual operator~(Qual qs) { return Qual(~qs.Bits); }
+    friend Qual operator~(QualBits qs) { return Qual(~opaque_type(qs)); }
+
+    /// Are these qualifier sets equivalent?
+    friend bool operator==(Qual l, Qual r) { return l.Bits == r.Bits; }
+    friend bool operator!=(Qual l, Qual r) { return l.Bits != r.Bits; }
+
+    /// Is one qualifier set 'QL' "smaller than" another set 'QR'?
+    /// This corresponds to the subtype relation on lvalue types
+    /// for a fixed type T;  that is,
+    ///   'QL <= QR' iff 'T [byref(QL)]' <= 'T [byref(QR)]'.
+    /// Recall that this means that the first is implicitly convertible
+    /// to the latter without "coercion", for some sense of that.
+    ///
+    /// This is not a total order.
+    ///
+    /// Right now, the subtyping rules are as follows:
+    ///   An l-value type is a subtype of another l-value of the
+    ///   same object type except:
+    ///   - an implicit l-value is not a subtype of an explicit one.
+    friend bool operator<=(Qual l, Qual r) {
+      // Right now, all our qualifiers are boolean and independent,
+      // and we've set it up so that 1 bits correspond to supertypes.
+      // Therefore this is just the set-algebraic 'is subset of'
+      // operation and can be performed by intersecting the sets and
+      // testing for identity with the left.
+      return (l & r) == l;
+    }
+    friend bool operator<(Qual l, Qual r) { return l != r && l <= r; }
+    friend bool operator>(Qual l, Qual r) { return r < l; }
+    friend bool operator>=(Qual l, Qual r) { return r <= l; }
+  };
+
+private:
+  Type ObjectTy;
+  Qual Quals; // TODO: put these bits in TypeBase
+
+  LValueType(Type objectTy, Qual quals, ASTContext *canonicalContext)
+    : TypeBase(TypeKind::LValue, canonicalContext),
+      ObjectTy(objectTy), Quals(quals) {}
 
 public:
-  static LValueType *get(Type type, ASTContext &C);
+  static LValueType *get(Type type, Qual quals, ASTContext &C);
 
   Type getObjectType() const { return ObjectTy; }
+  Qual getQualifiers() const { return Quals; }
+
+  bool isExplicit() const {
+    return !(getQualifiers() & Qual::Implicit);
+  }
 
   void print(raw_ostream &OS) const;
 

@@ -202,7 +202,9 @@ Expr *TypeChecker::buildDeclRefRValue(ValueDecl *val, SourceLoc loc) {
     return new (Context) DeclRefExpr(val, loc, val->getType());
   }
 
-  Type lvalueType = LValueType::get(val->getType(), Context);
+  Type lvalueType = LValueType::get(val->getType(),
+                                    LValueType::Qual::Default,
+                                    Context);
   Expr *E = new (Context) DeclRefExpr(val, loc, lvalueType);
   return new (Context) LoadExpr(E, val->getType());
 }
@@ -210,8 +212,11 @@ Expr *TypeChecker::buildDeclRefRValue(ValueDecl *val, SourceLoc loc) {
 Expr *TypeChecker::convertToRValue(Expr *E) {
   assert(E && "no expression to load!");
 
-  if (LValueType *lv = E->getType()->getAs<LValueType>())
+  if (LValueType *lv = E->getType()->getAs<LValueType>()) {
+    // FIXME: reject explicit l-values
+    assert(!lv->isExplicit());
     return new (Context) LoadExpr(E, lv->getObjectType());
+  }
 
   return E;
 }
@@ -249,8 +254,11 @@ static void convertToMaterializableHelper(TypeChecker &TC, Expr *E) {
 /// At the moment, this cannot fail.
 Expr *TypeChecker::convertToMaterializable(Expr *E) {
   // Load l-values.
-  if (LValueType *lv = E->getType()->getAs<LValueType>())
+  if (LValueType *lv = E->getType()->getAs<LValueType>()) {
+    // FIXME: reject explicit l-values
+    assert(!lv->isExplicit());
     return new (Context) LoadExpr(E, lv->getObjectType());
+  }
 
   // Recursively walk into tuples and parens, performing loads.
   convertToMaterializableHelper(*this, E);
@@ -302,8 +310,8 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   }
 
   // Perform lvalue-to-rvalue conversion on the function.
-  if (LValueType *LT = E1->getType()->getAs<LValueType>())
-    E1 = new (Context) LoadExpr(E1, LT->getObjectType());
+  E1 = convertToRValue(E1);
+  if (!E1) return nullptr;
   
   // If we have a concrete function type, then we win.
   if (FunctionType *FT = E1->getType()->getAs<FunctionType>()) {
@@ -551,6 +559,35 @@ public:
     // LoadExpr is fully checked.
     return E;
   }
+
+  Expr *visitMaterializeExpr(MaterializeExpr *E) {
+    // MaterializeExpr is fully checked.
+    return E;
+  }
+  
+  Expr *visitAddressOfExpr(AddressOfExpr *E) {
+    // Turn l-values into explicit l-values.
+    if (LValueType *type = E->getSubExpr()->getType()->getAs<LValueType>()) {
+      if (!type->isExplicit())
+        type = LValueType::get(type->getObjectType(),
+                               type->getQualifiers().withoutImplicit(),
+                               TC.Context);
+      E->setType(type);
+      return E;
+    }
+
+    // Propagate out dependence.
+    if (E->getSubExpr()->getType()->is<DependentType>()) {
+      E->setType(E->getSubExpr()->getType());
+      return E;
+    }
+
+    // Complain.
+    TC.diagnose(E->getLoc(), diag::address_of_rvalue,
+                E->getSubExpr()->getType())
+      << E->getSourceRange();
+    return nullptr;
+  }
   
   Expr *visitSequenceExpr(SequenceExpr *E);
   
@@ -567,8 +604,7 @@ public:
   }
 
   Expr *visitClosureExpr(ClosureExpr *E) {
-    assert(0 && "Should not walk into ClosureExprs!");
-    return 0;
+    llvm_unreachable("Should not walk into ClosureExprs!");
   }
   
   Expr *visitAnonClosureArgExpr(AnonClosureArgExpr *E) {
@@ -600,6 +636,15 @@ public:
     return visitApplyExpr(E);
   }
 
+  Type makeSimilarLValue(Type objectType, Type lvalueType) {
+    LValueType::Qual qs = cast<LValueType>(lvalueType)->getQualifiers();
+
+    // Don't propagate explicitness.
+    qs |= LValueType::Qual::Implicit;
+
+    return LValueType::get(objectType, qs, TC.Context);
+  }
+
   Expr *lookThroughOneofs(Expr *E, bool isLValue) {
     assert(isLValue == E->getType()->is<LValueType>());
 
@@ -610,7 +655,8 @@ public:
     assert(oneof->isTransparentType());
 
     Type resultType = oneof->getTransparentType();
-    if (isLValue) resultType = LValueType::get(resultType, TC.Context);
+    if (isLValue)
+      resultType = makeSimilarLValue(resultType, E->getType());
     return new (TC.Context) LookThroughOneofExpr(E, resultType);
   }
 
@@ -623,7 +669,8 @@ public:
       base = lookThroughOneofs(base, baseIsLValue);
 
     Type fieldType = baseType->getElementType(fieldIndex);
-    if (baseIsLValue) fieldType = LValueType::get(fieldType, TC.Context);
+    if (baseIsLValue)
+      fieldType = makeSimilarLValue(fieldType, base->getType());
       
     return new (TC.Context) TupleElementExpr(base, syntax->getDotLoc(),
                                              fieldIndex, syntax->getNameLoc(),

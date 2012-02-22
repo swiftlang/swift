@@ -96,9 +96,11 @@ TypeBase *TypeBase::getCanonicalType() {
   }
     
   case TypeKind::LValue: {
-    Type objectType = cast<LValueType>(this)->getObjectType();
+    LValueType *lvalue = cast<LValueType>(this);
+    Type objectType = lvalue->getObjectType();
     objectType = objectType->getCanonicalType();
-    Result = LValueType::get(objectType, objectType->getASTContext());
+    Result = LValueType::get(objectType, lvalue->getQualifiers(),
+                             objectType->getASTContext());
     break;
   }
   case TypeKind::Function: {
@@ -400,6 +402,14 @@ void ProtocolType::print(raw_ostream &OS) const {
 }
 
 void LValueType::print(raw_ostream &OS) const {
-  OS << "[byref] ";
+  OS << "[byref";
+
+  Qual qs = getQualifiers();
+  if (qs & (Qual::Implicit)) {
+    OS << '(';
+    if (qs & Qual::Implicit) OS << "implicit";
+    OS << ')';
+  }
+  OS << "] ";
   getObjectType()->print(OS);
 }

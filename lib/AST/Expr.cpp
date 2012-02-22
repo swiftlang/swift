@@ -217,8 +217,10 @@ ValueDecl *ApplyExpr::getCalledValue() const {
 /// tuple elements for E in the IdentList+NumIdents array.  DestTy specifies the
 /// type to convert to, which is known to be a TupleType.
 static Expr::ConversionRank 
-getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
+getTupleToTupleTypeConversionRank(const Expr *E, TupleType *ETy,
                                   TupleType *DestTy) {
+  unsigned NumExprElements = ETy->getFields().size();
+
   // If the tuple expression or destination type have named elements, we
   // have to match them up to handle the swizzle case for when:
   //   (.y = 4, .x = 3)
@@ -233,32 +235,31 @@ getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
   SmallVector<bool, 16> UsedElements(NumExprElements);
   SmallVector<int, 16>  DestElementSources(DestTy->getFields().size(), -1);
 
-  if (TupleType *ETy = E->getType()->getAs<TupleType>()) {
-    assert(ETy->getFields().size() == NumExprElements && "Expr #elements mismatch!");
-    { unsigned i = 0;
+  assert(ETy->getFields().size() == NumExprElements && "Expr #elements mismatch!");
+  {
+    unsigned i = 0;
     for (const TupleTypeElt &Elt : ETy->getFields())
       IdentList[i++] = Elt.getName();
-    }
+  }
   
-    // First off, see if we can resolve any named values from matching named
-    // inputs.
-    for (unsigned i = 0, e = DestTy->getFields().size(); i != e; ++i) {
-      const TupleTypeElt &DestElt = DestTy->getFields()[i];
-      // If this destination field is named, first check for a matching named
-      // element in the input, from any position.
-      if (!DestElt.hasName()) continue;
+  // First off, see if we can resolve any named values from matching named
+  // inputs.
+  for (unsigned i = 0, e = DestTy->getFields().size(); i != e; ++i) {
+    const TupleTypeElt &DestElt = DestTy->getFields()[i];
+    // If this destination field is named, first check for a matching named
+    // element in the input, from any position.
+    if (!DestElt.hasName()) continue;
       
-      int InputElement = -1;
-      for (unsigned j = 0; j != NumExprElements; ++j)
-        if (IdentList[j] == DestElt.getName()) {
-          InputElement = j;
-          break;
-        }
-      if (InputElement == -1) continue;
+    int InputElement = -1;
+    for (unsigned j = 0; j != NumExprElements; ++j)
+      if (IdentList[j] == DestElt.getName()) {
+        InputElement = j;
+        break;
+      }
+    if (InputElement == -1) continue;
       
-      DestElementSources[i] = InputElement;
-      UsedElements[InputElement] = true;
-    }
+    DestElementSources[i] = InputElement;
+    UsedElements[InputElement] = true;
   }
   
   // Next step, resolve (in order) unmatched named results and unnamed results
@@ -335,7 +336,6 @@ getTupleToTupleTypeConversionRank(const Expr *E, unsigned NumExprElements,
   
   // A tuple-to-tuple conversion of a non-parenthesized tuple is allowed to
   // permute the elements, but cannot perform conversions of each value.
-  TupleType *ETy = E->getType()->castTo<TupleType>();
   for (unsigned i = 0, e = DestTy->getFields().size(); i != e; ++i) {
     // Extract the input element corresponding to this destination element.
     unsigned SrcField = DestElementSources[i];
@@ -366,27 +366,37 @@ static Expr::ConversionRank getConversionRank(const Expr *E, Type DestTy) {
          "Result of conversion can't be dependent");
 
   // Exact matches are identity conversions.
-  if (E->getType()->getCanonicalType() == DestTy->getCanonicalType())
+  if (E->getType()->isEqual(DestTy))
     return Expr::CR_Identity;
   
   // Look through parentheses.
   if (const ParenExpr *PE = dyn_cast<ParenExpr>(E))
     return getConversionRank(PE->getSubExpr(), DestTy);
 
-  // Permit lvalue-to-rvalue conversion.
-  if (LValueType *LT = E->getType()->getAs<LValueType>()) {
-    // Rule out lvalue-to-lvalue conversion.
-    if (DestTy->is<LValueType>())
-      return Expr::CR_Invalid;
+  // If we're converting to an l-value type, check for permitted
+  // qualification conversions or materializations.
+  if (LValueType *DestLT = DestTy->getAs<LValueType>()) {
+    LValueType *SrcLT = E->getType()->getAs<LValueType>();
 
-    LoadExpr load(const_cast<Expr*>(E), LT->getObjectType());
-    return getConversionRank(&load, DestTy);
+    // Permit l-value conversions if they respect subtyping.
+    // FIXME: this should probably distiniguish overloads.
+    if (SrcLT &&
+        DestLT->getObjectType()->isEqual(SrcLT->getObjectType()) &&
+        SrcLT->getQualifiers() <= DestLT->getQualifiers())
+      return Expr::CR_Identity;
+
+    // Permit materializations.
+    if (!DestLT->isExplicit())
+      return getConversionRank(E, DestLT->getObjectType());
+
+    // Otherwise, nothing converts to an l-value.
+    return Expr::CR_Invalid;
   }
-  
+
   if (TupleType *TT = DestTy->getAs<TupleType>()) {
-    if (const TupleExpr *TE = dyn_cast<TupleExpr>(E))
-      return getTupleToTupleTypeConversionRank(TE, TE->getNumElements(),
-                                               TT);
+    if (isa<TupleExpr>(E))
+      return getTupleToTupleTypeConversionRank(E,
+                                      E->getType()->castTo<TupleType>(), TT);
     
     // If the is a scalar to tuple conversion, form the tuple and return it.
     int ScalarFieldNo = TT->getFieldForScalarInit();
@@ -400,7 +410,10 @@ static Expr::ConversionRank getConversionRank(const Expr *E, Type DestTy) {
     // If the input is a tuple and the output is a tuple, see if we can convert
     // each element.
     if (TupleType *ETy = E->getType()->getAs<TupleType>())
-      return getTupleToTupleTypeConversionRank(E, ETy->getFields().size(), TT);
+      return getTupleToTupleTypeConversionRank(E, ETy, TT);
+
+    // Otherwise, fall through and see if an l2r conversion on the
+    // source would help.
   }
 
   // Otherwise, check to see if this is an auto-closure case.  This case happens
@@ -411,6 +424,12 @@ static Expr::ConversionRank getConversionRank(const Expr *E, Type DestTy) {
       return Expr::CR_Invalid;
     
     return Expr::CR_AutoClosure;
+  }
+
+  // If all else fails, do an lvalue-to-rvalue conversion on the source.
+  if (LValueType *SrcLT = E->getType()->getAs<LValueType>()) {
+    LoadExpr load(const_cast<Expr*>(E), SrcLT->getObjectType());
+    return getConversionRank(&load, DestTy);
   }
 
   // If the expression has a dependent type or we have some other case, we fail.
@@ -516,12 +535,6 @@ public:
     }
     OS << ')';
   }
-  void visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
-    OS.indent(Indent) << "(look_through_oneof_expr type='" << E->getType();
-    OS << "\'\n";
-    printRec(E->getSubExpr());
-    OS << ')';
-  }
   void visitModuleExpr(ModuleExpr *E) {
     OS.indent(Indent) << "(module_expr type='" << E->getType() << "')";
   }
@@ -531,6 +544,7 @@ public:
     printRec(E->getBase());
     OS << ')';
   }
+
   void visitTupleShuffleExpr(TupleShuffleExpr *E) {
     OS.indent(Indent) << "(tuple_shuffle type='" << E->getType();
     OS << "' Elements=[";
@@ -542,11 +556,28 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
-
+  void visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
+    OS.indent(Indent) << "(look_through_oneof_expr type='" << E->getType();
+    OS << "\'\n";
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
   void visitLoadExpr(LoadExpr *E) {
-    visit(E->getSubExpr());
+    OS.indent(Indent) << "(load_expr type='" << E->getType() << "\'\n";
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
+  void visitMaterializeExpr(MaterializeExpr *E) {
+    OS.indent(Indent) << "(materialize_expr type='" << E->getType() << "\'\n";
+    printRec(E->getSubExpr());
+    OS << ')';
   }
 
+  void visitAddressOfExpr(AddressOfExpr *E) {
+    OS.indent(Indent) << "(address_of_expr type='" << E->getType() << "\'\n";
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
   void visitSequenceExpr(SequenceExpr *E) {
     OS.indent(Indent) << "(sequence_expr type='" << E->getType() << '\'';
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {

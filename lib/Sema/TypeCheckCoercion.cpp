@@ -211,7 +211,31 @@ public:
   Expr *visitLoadExpr(LoadExpr *E) {
     return E;
   }
-  
+
+  Expr *visitMaterializeExpr(MaterializeExpr *E) {
+    return E;
+  }
+
+  Expr *visitAddressOfExpr(AddressOfExpr *E) {
+    LValueType *DestLT = DestTy->getAs<LValueType>();
+    if (!DestLT) {
+      TC.diagnose(E->getLoc(), diag::load_of_explicit_lvalue,
+                  E->getType()->castTo<LValueType>()->getObjectType())
+        << E->getSourceRange();
+      return nullptr;
+    }
+
+    // Really minor optimization.
+    if (!DestLT->isExplicit())
+      return visit(E->getSubExpr());
+
+    LValueType::Qual qs = DestLT->getQualifiers();
+    qs |= LValueType::Qual::Implicit;
+
+    Type NewDestTy = LValueType::get(DestLT->getObjectType(), qs, TC.Context);
+    return convertToType(E, NewDestTy, true, TC);
+  }
+
   SemaCoerce(TypeChecker &TC, Type DestTy) : TC(TC), DestTy(DestTy) {
     assert(!DestTy->is<DependentType>());
   }
@@ -474,6 +498,13 @@ Expr *SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
                                     DestTy);
 }
 
+/// Would the source lvalue type be coercible to the dest lvalue type
+/// if it were explicit?
+static bool isSubtypeExceptImplicit(LValueType *SrcTy, LValueType *DestTy) {
+  return DestTy->getObjectType()->isEqual(SrcTy->getObjectType())
+      && SrcTy->getQualifiers().withoutImplicit() <= DestTy->getQualifiers();
+}
+
 /// convertToType - This is the recursive implementation of
 /// ConvertToType.  It does produces diagnostics and returns null on failure.
 ///
@@ -488,17 +519,6 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
   if (E->getType()->isEqual(DestTy))
     return E;
   
-  // If we have an exact match except for an l-value to r-value
-  // conversion, we're done.
-  Type SrcTy = E->getType();
-  bool WasLValue = false;
-  if (LValueType *LV = SrcTy->getAs<LValueType>()) {
-    SrcTy = LV->getObjectType();
-    if (SrcTy->isEqual(DestTy))
-      return new (TC.Context) LoadExpr(E, DestTy);
-    WasLValue = true;
-  }
-
   // If the expression is a grouping parenthesis and it has a dependent type,
   // just force the type through it, regardless of what DestTy is.
   if (ParenExpr *PE = dyn_cast<ParenExpr>(E)) {
@@ -507,6 +527,51 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
     if (PE->getSubExpr() == 0) return 0;
     PE->setType(PE->getSubExpr()->getType());
     return PE;
+  }
+
+  if (LValueType *DestLT = DestTy->getAs<LValueType>()) {
+    LValueType *SrcLT = E->getType()->getAs<LValueType>();
+
+    // Qualification conversion.
+    if (SrcLT && DestLT->getObjectType()->isEqual(SrcLT->getObjectType()) &&
+        SrcLT->getQualifiers() <= DestLT->getQualifiers()) {
+      // TODO: should we have an AST node for qualification conversions?
+      return E;
+    }
+
+    // Materialization.
+    if (!DestLT->isExplicit()) {
+      E = convertToType(E, DestLT->getObjectType(), IgnoreAnonDecls, TC);
+      if (!E) return nullptr;
+
+      return new (TC.Context) MaterializeExpr(E, DestTy);
+    }
+
+    // Just ignore dependent types for now.
+    if (E->getType()->is<DependentType>()) return E;
+
+    // Failure.
+
+    // Use a special diagnostic if the coercion would have worked
+    // except we needed an explicit marker.
+    if (SrcLT && isSubtypeExceptImplicit(SrcLT, DestLT)) {
+      TC.diagnose(E->getLoc(), diag::implicit_use_of_lvalue,
+                  SrcLT->getObjectType())
+        << E->getSourceRange();
+      return nullptr;
+    }
+
+    // Use a special diagnostic for mismatched l-values.
+    if (SrcLT) {
+      TC.diagnose(E->getLoc(), diag::invalid_conversion_of_lvalue,
+                  SrcLT->getObjectType(), DestLT->getObjectType())
+        << E->getSourceRange();
+      return nullptr;
+    }
+
+    TC.diagnose(E->getLoc(), diag::invalid_conversion_to_lvalue,
+                E->getType(), DestLT->getObjectType());
+    return nullptr;
   }
 
   if (TupleType *TT = DestTy->getAs<TupleType>()) {
@@ -528,10 +593,17 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
     
     // If the input is a tuple and the output is a tuple, see if we can convert
     // each element.
-    if (TupleType *ETy = SrcTy->getAs<TupleType>()) {
-      if (WasLValue) E = new (TC.Context) LoadExpr(E, SrcTy);
+    if (TupleType *ETy = E->getType()->getAs<TupleType>())
       return convertTupleToTupleType(E, ETy->getFields().size(), TT, TC);
-    }
+  }
+
+  // If the source is an l-value, load from it.  We intentionally do
+  // this before checking for certain destination types below.
+  if (LValueType *SrcLT = E->getType()->getAs<LValueType>()) {
+    // FIXME: reject explicit l-values
+    assert(!SrcLT->isExplicit());
+    E = new (TC.Context) LoadExpr(E, SrcLT->getObjectType());
+    return convertToType(E, DestTy, IgnoreAnonDecls, TC);
   }
 
   // Otherwise, check to see if this is an auto-closure case.  This case happens
@@ -558,7 +630,7 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
     
     return new (TC.Context) ClosureExpr(ERes, DestTy);
   }
-  
+
   // If the input expression has a dependent type, then there are two cases:
   // first this could be an AnonDecl whose type will be specified by a larger
   // context, second, this could be a context sensitive expression value like
@@ -569,23 +641,8 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
 
   // Could not do the conversion.
 
-  // Use a special diagnostic for conversions to l-value type.
-  if (LValueType *LT = DestTy->getAs<LValueType>()) {
-    // Use an even more special one for mismatched l-values.
-    if (WasLValue) {
-      TC.diagnose(E->getLoc(), diag::invalid_conversion_of_lvalue,
-                  SrcTy, LT->getObjectType())
-        << E->getSourceRange();
-      return nullptr;
-    }
-
-    TC.diagnose(E->getLoc(), diag::invalid_conversion_to_lvalue,
-                SrcTy, LT->getObjectType());
-    return nullptr;
-  }
-
   // When diagnosing a failed conversion, ignore l-values on the source type.
-  TC.diagnose(E->getLoc(), diag::invalid_conversion, SrcTy, DestTy);
+  TC.diagnose(E->getLoc(), diag::invalid_conversion, E->getType(), DestTy);
   return nullptr;
 }
 

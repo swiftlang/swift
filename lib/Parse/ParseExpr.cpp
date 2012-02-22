@@ -90,6 +90,17 @@ ParseResult<Expr> Parser::parseExprUnary(Diag<> Message) {
   // If the next token is not an operator, just parse this as expr-postfix
   if (Tok.isNot(tok::oper))
     return parseExprPostfix(Message);
+
+  // '&' is a very special case.
+  if (Tok.getText() == "&") {
+    SourceLoc loc = Tok.getLoc();
+    consumeToken(tok::oper);
+
+    ParseResult<Expr> SubExpr = parseExprUnary(Message);
+    if (!SubExpr.isSuccess()) return SubExpr;
+
+    return new (Context) AddressOfExpr(loc, SubExpr.get(), Type());
+  }
   
   // Parse the operator.
   Expr *Operator = parseExprOperator();

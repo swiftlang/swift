@@ -110,6 +110,17 @@ llvm::Value *IRGenFunction::emitAsPrimitiveScalar(Expr *E) {
   return result;
 }
 
+/// Emit a rvalue-to-lvalue conversion.
+static Address emitMaterializeExpr(IRGenFunction &IGF, MaterializeExpr *E) {
+  Expr *subExpr = E->getSubExpr();
+  const TypeInfo &valueTI = IGF.getFragileTypeInfo(subExpr->getType());
+  Address temporary = IGF.createFullExprAlloca(valueTI.getStorageType(),
+                                               valueTI.StorageAlignment,
+                                               "materialized-temporary");
+  IGF.emitRValueToMemory(subExpr, temporary, valueTI);
+  return temporary;
+}
+
 void IRGenFunction::emitExplodedRValue(Expr *E, Explosion &explosion) {
   switch (E->getKind()) {
 #define EXPR(Id, Parent)
@@ -124,8 +135,18 @@ void IRGenFunction::emitExplodedRValue(Expr *E, Explosion &explosion) {
                             type, explosion);
   }
 
+  case ExprKind::Materialize: {
+    Address addr = emitMaterializeExpr(*this, cast<MaterializeExpr>(E));
+    explosion.add(addr.getAddress());
+    return;
+  }
+
   case ExprKind::Paren:
     return emitExplodedRValue(cast<ParenExpr>(E)->getSubExpr(), explosion);
+
+  case ExprKind::AddressOf:
+    return emitExplodedRValue(cast<AddressOfExpr>(E)->getSubExpr(),
+                              explosion);    
 
   case ExprKind::Tuple:
     return emitExplodedTupleLiteral(cast<TupleExpr>(E), explosion);
@@ -206,11 +227,19 @@ LValue IRGenFunction::emitLValue(Expr *E) {
   case ExprKind::Paren:
     return emitLValue(cast<ParenExpr>(E)->getSubExpr());
 
+  case ExprKind::AddressOf:
+    return emitLValue(cast<AddressOfExpr>(E)->getSubExpr());
+
   case ExprKind::TupleElement:
     return emitTupleElementLValue(cast<TupleElementExpr>(E));
 
   case ExprKind::LookThroughOneof:
     return emitLookThroughOneofLValue(cast<LookThroughOneofExpr>(E));
+
+  case ExprKind::Materialize: {
+    Address addr = emitMaterializeExpr(*this, cast<MaterializeExpr>(E));
+    return emitAddressLValue(addr);
+  }
 
   case ExprKind::DeclRef:
     return emitDeclRefLValue(*this, cast<DeclRefExpr>(E));
@@ -283,12 +312,22 @@ IRGenFunction::tryEmitAsAddress(Expr *E, const TypeInfo &type) {
   case ExprKind::TupleElement:
     return tryEmitTupleElementAsAddress(cast<TupleElementExpr>(E));
 
+  // &x is in memory if x is.
+  case ExprKind::AddressOf:
+    // The difference in type between explicit and implicit is
+    // currently not relevant.
+    return tryEmitAsAddress(cast<AddressOfExpr>(E)->getSubExpr(), type);
+
+  // Materializations are always in memory.
+  case ExprKind::Materialize:
+    return emitMaterializeExpr(*this, cast<MaterializeExpr>(E));
+
   // These expressions may be in memory in some cases, but we haven't
   // gotten around to applying this optimization to them yet.
   case ExprKind::AnonClosureArg:
     return Nothing;
 
-  // These expressions aren't naturally placed in memory.
+  // These expressions aren't naturally already in memory.
   case ExprKind::Tuple:
   case ExprKind::IntegerLiteral:
   case ExprKind::FloatLiteral:

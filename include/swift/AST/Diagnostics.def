@@ -342,6 +342,14 @@ ERROR(oneof_attributes,attribute_parsing,none,
 ERROR(protocol_attributes,attribute_parsing,none,
       "protocol types are not allowed to have attributes", ())
 
+ERROR(byref_attribute_expected_identifier,attribute_parsing,none,
+      "expected identifier for byref attribute", ())
+ERROR(byref_attribute_unknown_qualifier,attribute_parsing,none,
+      "unknown qualifier for byref attribute", ())
+ERROR(byref_attribute_expected_rparen,attribute_parsing,none,
+      "expected ')' at end of byref qualifiers", ())
+
+
 //==============================================================================
 // Semantic Analysis Diagnostics
 //==============================================================================
@@ -422,6 +430,10 @@ ERROR(invalid_conversion_of_lvalue,sema_tcc,none,
 ERROR(invalid_conversion_to_lvalue,sema_tcc,none,
       "passing %0 value by reference as %1 variable",
       (Type, Type))
+ERROR(implicit_use_of_lvalue,sema_tcc,none,
+      "passing %0 variable by reference without an '&' operator", (Type))
+ERROR(load_of_explicit_lvalue,sema_tcc,none,
+      "%0 variable is not being passed by reference", (Type))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations
@@ -512,6 +524,8 @@ ERROR(non_assoc_adjacent,sema_tce,none,
 ERROR(incompatible_assoc,sema_tce,none,
       "operator is adjacent to operator of same precedence"
       " but incompatible associativity", ())
+ERROR(address_of_rvalue,sema_tce,none,
+      "cannot apply '&' to non-lvalue of type %0", (Type))
 
 //------------------------------------------------------------------------------
 // Type Check Statements

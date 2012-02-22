@@ -136,6 +136,7 @@ public:
   InfixData Infix;
   ResilienceData Resilience;
   bool Byref;
+  bool ByrefImplicit;
 
   DeclAttributes() : Byref(false) { }
 
@@ -145,6 +146,7 @@ public:
   InfixData getInfixData() const { return Infix; }
   ResilienceData getResilienceData() const { return Resilience; }
   bool isByref() const { return Byref; }
+  bool isByrefImplicit() const { assert(isByref()); return ByrefImplicit; }
     
   bool empty() const {
     return !isInfix()

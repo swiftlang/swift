@@ -149,6 +149,33 @@ namespace {
       checkSameType(lhsTy, S->getSrc()->getType(), "assignment operands");
     }
 
+    void verifyChecked(AddressOfExpr *E) {
+      Type resultType = E->getType();
+      checkLValue(resultType, "result of AddressOfExpr");
+      LValueType *resultLV = resultType->castTo<LValueType>();
+
+      Type srcType = E->getSubExpr()->getType();
+      checkLValue(srcType, "source of AddressOfExpr");
+      LValueType *srcLV = srcType->castTo<LValueType>();
+
+      checkSameType(resultLV->getObjectType(), srcLV->getObjectType(),
+                    "object types for AddressOfExpr");
+
+      if ((resultLV->getQualifiers() | LValueType::Qual::Implicit)
+            != srcLV->getQualifiers()) {
+        Out << "mismatched qualifiers";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+    }
+
+    void verifyChecked(MaterializeExpr *E) {
+      Type obj = checkLValue(E->getType(), "result of MaterializeExpr");
+      checkSameType(obj, E->getSubExpr()->getType(),
+                    "result and operand of MaterializeExpr");
+    }
+
     void verifyChecked(TupleElementExpr *E) {
       Type resultType = E->getType();
       Type baseType = E->getBase()->getType();

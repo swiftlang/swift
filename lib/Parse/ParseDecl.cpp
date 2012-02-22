@@ -189,6 +189,27 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     consumeToken(tok::identifier);
 
     Attributes.Byref = true;
+    Attributes.ByrefImplicit = false;
+
+    // Permit "qualifiers" on the byref.
+    SourceLoc beginLoc = Tok.getLoc();
+    if (consumeIf(tok::l_paren) || consumeIf(tok::l_paren_space)) {
+      if (!Tok.is(tok::identifier)) {
+        diagnose(Tok, diag::byref_attribute_expected_identifier);
+        skipUntil(tok::r_paren);
+      } else if (Tok.getText() == "implicit") {
+        Attributes.ByrefImplicit = true;
+        consumeToken(tok::identifier);
+      } else {
+        diagnose(Tok, diag::byref_attribute_unknown_qualifier);
+        consumeToken(tok::identifier);
+      }
+      SourceLoc endLoc;
+      parseMatchingToken(tok::r_paren, endLoc,
+                         diag::byref_attribute_expected_rparen,
+                         beginLoc,
+                         diag::opening_paren);
+    }
     return false;
   }
   llvm_unreachable("bad attribute kind");

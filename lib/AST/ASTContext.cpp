@@ -36,7 +36,8 @@ struct ASTContext::Implementation {
   llvm::DenseMap<std::pair<Type, uint64_t>, ArrayType*> ArrayTypes;
   llvm::DenseMap<unsigned, BuiltinIntegerType*> IntegerTypes;
   llvm::DenseMap<Type, ParenType*> ParenTypes;
-  llvm::DenseMap<Type, LValueType*> LValueTypes;
+  llvm::DenseMap<std::pair<Type, LValueType::Qual::opaque_type>, LValueType*>
+    LValueTypes;
 };
 ASTContext::Implementation::Implementation()
  : IdentifierTable(Allocator) {}
@@ -244,11 +245,13 @@ ProtocolType::ProtocolType(SourceLoc ProtocolLoc, ArrayRef<ValueDecl*> Elts,
     ProtocolLoc(ProtocolLoc), Elements(Elts), TheDecl(TheDecl) {
 }
 
-LValueType *LValueType::get(Type objectTy, ASTContext &C) {
-  LValueType *&entry = C.Impl.LValueTypes[objectTy];
-  if (!entry) {
-    ASTContext *canonicalContext = (objectTy->isCanonical() ? &C : nullptr);
-    entry = new (C) LValueType(objectTy, canonicalContext);
-  }
-  return entry;
+LValueType *LValueType::get(Type objectTy, Qual quals, ASTContext &C) {
+  auto key = std::make_pair(objectTy, quals.getOpaqueData());
+  auto it = C.Impl.LValueTypes.find(key);
+  if (it != C.Impl.LValueTypes.end()) return it->second;
+
+  ASTContext *canonicalContext = (objectTy->isCanonical() ? &C : nullptr);
+  LValueType *type = new (C) LValueType(objectTy, quals, canonicalContext);
+  C.Impl.LValueTypes.insert(std::make_pair(key, type));
+  return type;
 }

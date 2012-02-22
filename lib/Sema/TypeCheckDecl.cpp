@@ -103,7 +103,10 @@ public:
   Type getThisType(FuncDecl *FD, Type ContainerType) {
     if (ContainerType->hasReferenceSemantics())
       return ContainerType;
-    return LValueType::get(ContainerType, TC.Context);
+
+    // 'this' is accepts implicit l-values.
+    return LValueType::get(ContainerType, LValueType::Qual::Implicit,
+                           TC.Context);
   }
 
   /// Find the type of 'this' for this function, if it has a 'this'.

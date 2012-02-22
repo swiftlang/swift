@@ -111,7 +111,7 @@ public:
     /// identical types return this, types that are just aliases of each other
     /// do as well, conversion of a scalar to a single-element tuple, etc.
     CR_Identity,
-    
+
     /// CR_AutoClosure - Conversion of the source type to the destination type
     /// requires the introduction of a closure.  This occurs with a conversion
     /// from "()" to "()->()" type, for example.
@@ -451,28 +451,6 @@ public:
   }
 };
 
-/// LookThroughOneofExpr - Implicitly look through a 'oneof' type with
-/// one enumerator.
-class LookThroughOneofExpr : public Expr {
-  Expr *SubExpr;
-
-public:
-  LookThroughOneofExpr(Expr *subexpr, Type ty)
-    : Expr(ExprKind::LookThroughOneof, ty), SubExpr(subexpr) {}
-
-  SourceRange getSourceRange() const { return getSubExpr()->getSourceRange(); }
-  SourceLoc getLoc() const { return getSubExpr()->getLoc(); }
-  const Expr *getSubExpr() const { return SubExpr; }
-  Expr *getSubExpr() { return SubExpr; }
-  void setSubExpr(Expr *E) { SubExpr = E; }
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const LookThroughOneofExpr *) { return true; }
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::LookThroughOneof;
-  }
-};
-  
 /// ModuleExpr - Reference a module by name.  The module being referenced is
 /// captured in the type of the expression, which is always a ModuleType.
 class ModuleExpr : public Expr {
@@ -525,12 +503,33 @@ public:
   }
 };
 
+/// ImplicitConversionExpr - An abstract class for expressions which
+/// implicitly convert the value of an expression in some way.
+class ImplicitConversionExpr : public Expr {
+  Expr *SubExpr;
+
+protected:
+  ImplicitConversionExpr(ExprKind kind, Expr *subExpr, Type ty)
+    : Expr(kind, ty), SubExpr(subExpr) {}
+
+public:
+  SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
+  SourceLoc getLoc() const { return SubExpr->getLoc(); }
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *e) { SubExpr = e; }
+
+  static bool classof(const ImplicitConversionExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() >= ExprKind::First_ImplicitConversionExpr &&
+           E->getKind() <= ExprKind::Last_ImplicitConversionExpr;
+  }
+};
+
 /// TupleShuffleExpr - This represents a permutation of a tuple value to a new
 /// tuple type.  The expression's type is known to be a tuple type and the
 /// subexpression is known to have a tuple type as well.
-class TupleShuffleExpr : public Expr {
-  Expr *SubExpr;
-  
+class TupleShuffleExpr : public ImplicitConversionExpr {
   /// This contains an entry for each element in the Expr type.  Each element
   /// specifies which index from the SubExpr that the destination element gets.
   /// If the element value is -1, then the destination value gets the default
@@ -538,14 +537,10 @@ class TupleShuffleExpr : public Expr {
   ArrayRef<int> ElementMapping;
   
 public:
-  TupleShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping, Type Ty)
-    : Expr(ExprKind::TupleShuffle, Ty),
-      SubExpr(subExpr), ElementMapping(elementMapping) {}
+  TupleShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping, Type ty)
+    : ImplicitConversionExpr(ExprKind::TupleShuffle, subExpr, ty),
+      ElementMapping(elementMapping) {}
 
-  SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
-  
-  Expr *getSubExpr() const { return SubExpr; }
-  void setSubExpr(Expr *e) { SubExpr = e; }
   ArrayRef<int> getElementMapping() const { return ElementMapping; }
   
   // Implement isa/cast/dyncast/etc.
@@ -555,26 +550,78 @@ public:
   }
 };
 
-/// LoadExpr - An implicitly-emitted lvalue-to-rvalue conversion.
-class LoadExpr : public Expr {
-  Expr *SubExpr;
-
+/// LoadExpr - Turn an l-value into an r-value by performing a "load"
+/// operation.  This operation may actually be a logical operation,
+/// i.e. one implemented using a call to a potentially user-defined
+/// function instead of a simple memory transaction.
+class LoadExpr : public ImplicitConversionExpr {
 public:
-  LoadExpr(Expr *SubExpr, Type type)
-    : Expr(ExprKind::Load, type), SubExpr(SubExpr) {}
-
-  SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
-
-  Expr *getSubExpr() const { return SubExpr; }
-  void setSubExpr(Expr *E) { SubExpr = E; }
+  LoadExpr(Expr *subExpr, Type type)
+    : ImplicitConversionExpr(ExprKind::Load, subExpr, type) {}
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const LoadExpr *) { return true; }
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Load; }
 };
+
+/// MaterializeExpr - Turn an r-value into an l-value by placing it in
+/// temporary memory.
+class MaterializeExpr : public ImplicitConversionExpr {
+public:
+  MaterializeExpr(Expr *subExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::Materialize, subExpr, ty) {}
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const MaterializeExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Materialize;
+  }
+};
   
-/// SequenceExpr - a series of expressions which should be evaluated
-/// sequentially, e.g. foo()  bar().
+/// LookThroughOneofExpr - Implicitly look through a 'oneof' type with
+/// one enumerator.  This operation may be performed on either an
+/// r-value or an l-value.
+class LookThroughOneofExpr : public ImplicitConversionExpr {
+public:
+  LookThroughOneofExpr(Expr *subExpr, Type type)
+    : ImplicitConversionExpr(ExprKind::LookThroughOneof, subExpr, type) {}
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const LookThroughOneofExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::LookThroughOneof;
+  }
+};
+
+/// AddressOfExpr - Using the builtin unary '&' operator, convert the
+/// given l-value into an explicit l-value.
+class AddressOfExpr : public Expr {
+  Expr *SubExpr;
+  SourceLoc OperLoc;
+
+public:
+  AddressOfExpr(SourceLoc operLoc, Expr *subExpr, Type type)
+    : Expr(ExprKind::AddressOf, type), SubExpr(subExpr), OperLoc(operLoc) {}
+
+  SourceRange getSourceRange() const {
+    return SourceRange(OperLoc, SubExpr->getEndLoc());
+  }
+  SourceLoc getLoc() const { return OperLoc; }
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *e) { SubExpr = e; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const AddressOfExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::AddressOf;
+  }
+};
+
+/// SequenceExpr - A list of binary operations which has not yet been
+/// folded into a tree.  The operands all have even indices, while the
+/// subexpressions with odd indices are all (potentially overloaded)
+/// references to binary operators.
 class SequenceExpr : public Expr {
   unsigned NumElements;
 
@@ -671,6 +718,8 @@ public:
 /// expression in a function context where the expression's type matches the
 /// result of the function.  The Decl list indicates which decls the formal
 /// arguments are bound to.
+///
+/// Maybe this should be an ImplicitConversionExpr?
 class ClosureExpr : public Expr {
   Expr *Input;
   
