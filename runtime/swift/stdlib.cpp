@@ -5,17 +5,6 @@ extern "C" bool _TSsop2leFT3lhsNSs5int643rhsS__NSs4bool(int64_t l, int64_t r) {
   return l <= r;
 }
 
-extern "C" int64_t _TSsop1sFT3lhsNSs5int643rhsS__S_(int64_t l, int64_t r) {
-  return l - r;
-}
-
-extern "C" int64_t _TSsop1pFT3lhsNSs5int643rhsS__S_(int64_t l, int64_t r) {
-  return l + r;
-}
-
-extern "C" double _TSsop1pFT3lhsNSs6double3rhsS__S_(double l, double r) {
-  return l + r;
-}
 
 extern "C" double _TSsop1sFT1aNSs6double_S_(double x) {
     return -x;
