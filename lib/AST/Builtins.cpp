@@ -20,9 +20,9 @@
 using namespace swift;
 
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
-  if (Name == "FP_IEEE32")
+  if (Name == "FPIEEE32")
     return Context.TheIEEE32Type;
-  if (Name == "FP_IEEE64")
+  if (Name == "FPIEEE64")
     return Context.TheIEEE64Type;
 
   // Handle 'int8' and friends.
@@ -34,13 +34,13 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
   }
   
   // Target specific FP types.
-  if (Name == "FP_IEEE16")
+  if (Name == "FPIEEE16")
     return Context.TheIEEE16Type;
-  if (Name == "FP_IEEE80")
+  if (Name == "FPIEEE80")
     return Context.TheIEEE80Type;
-  if (Name == "FP_IEEE128")
+  if (Name == "FPIEEE128")
     return Context.TheIEEE128Type;
-  if (Name == "FP_PPC128")
+  if (Name == "FPPPC128")
     return Context.ThePPC128Type;
   
   return Type();
@@ -52,13 +52,6 @@ BuiltinValueKind swift::isBuiltinValue(ASTContext &C, StringRef Name, Type &Ty){
   StringRef::size_type Underscore = Name.find_last_of('_');
   if (Underscore == StringRef::npos) return BuiltinValueKind::None;
   
-  // If the _ is part of FP_XXX, then skip to the next previous one.
-  if (Name.substr(0, Underscore).endswith("FP")) {
-    Underscore = Name.substr(0, Underscore).find_last_of('_');
-    if (Underscore == StringRef::npos) return BuiltinValueKind::None;
-  }
-  
-
   // Check that the type parameter is well-formed and set it up for returning.
   Ty = getBuiltinType(C, Name.substr(Underscore + 1));
   if (Ty.isNull())
