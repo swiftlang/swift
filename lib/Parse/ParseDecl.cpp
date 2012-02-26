@@ -456,8 +456,7 @@ TypeAliasDecl *Parser::parseDeclTypeAlias() {
   
   Identifier Id;
   Type Ty;
-  // FIXME: Shouldn't allow operators.
-  if (parseAnyIdentifier(Id, diag::expected_identifier_in_decl, "typealias") ||
+  if (parseIdentifier(Id, diag::expected_identifier_in_decl, "typealias") ||
       parseToken(tok::colon, diag::expected_colon_in_typealias) ||
       parseType(Ty, diag::expected_type_in_typealias))
     return 0;
@@ -585,7 +584,7 @@ VarDecl *Parser::parseDeclVarSimple() {
 /// is true, we parse both productions.
 ///
 ///   decl-func:
-///     'plus'? 'func' attribute-list? identifier type stmt-brace?
+///     'plus'? 'func' attribute-list? any-identifier type stmt-brace?
 ///
 /// NOTE: The caller of this method must ensure that the token sequence is
 /// either 'func' or 'plus' 'func'.
@@ -697,8 +696,7 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
   
   SourceLoc NameLoc = Tok.getLoc();
   Identifier OneOfName;
-  // FIXME: Shouldn't allow operators.
-  if (parseAnyIdentifier(OneOfName, diag::expected_identifier_in_decl, "oneof"))
+  if (parseIdentifier(OneOfName, diag::expected_identifier_in_decl, "oneof"))
     return true;
   
   TypeAliasDecl *TAD =
@@ -833,8 +831,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   
   Identifier StructName;
   SourceLoc LBLoc, RBLoc;
-  if (parseAnyIdentifier(StructName, diag::expected_identifier_in_decl,
-                         "struct") ||
+  if (parseIdentifier(StructName, diag::expected_identifier_in_decl, "struct")||
       parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct))
     return true;
 
@@ -904,8 +901,8 @@ Decl *Parser::parseDeclProtocol() {
   
   SourceLoc NameLoc = Tok.getLoc();
   Identifier ProtocolName;
-  if (parseAnyIdentifier(ProtocolName,
-                         diag::expected_identifier_in_decl, "protocol"))
+  if (parseIdentifier(ProtocolName,
+                      diag::expected_identifier_in_decl, "protocol"))
     return 0;
   
   TypeAliasDecl *TAD =

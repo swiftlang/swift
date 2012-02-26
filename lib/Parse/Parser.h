@@ -130,6 +130,15 @@ public:
   //===--------------------------------------------------------------------===//
   // Primitive Parsing
 
+  /// parseIdentifier - Consume an identifier (but not an operator) if
+  /// present and return its name in Result.  Otherwise, emit an error and
+  /// return true.
+  bool parseIdentifier(Identifier &Result, const Diagnostic &D);
+  
+  template<typename ...ArgTypes>
+  bool parseIdentifier(Identifier &Result,  ArgTypes... Args) {
+    return parseIdentifier(Result, Diagnostic(Args...));
+  }
   
   /// parseAnyIdentifier - Consume an identifier or operator if present and
   /// return its name in Result.  Otherwise, emit an error and return true.
