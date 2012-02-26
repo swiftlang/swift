@@ -411,10 +411,15 @@ Decl *Parser::actOnDeclExtension(SourceLoc ExtensionLoc, Type Ty,
 ///   var-name:
 ///     identifier
 ///     '(' ')'
-///     '(' name (',' name)* ')'
+///     '(' var-name (',' var-name)* ')'
 bool Parser::parseVarName(DeclVarName &Name) {
+  if (Tok.is(tok::oper)) {
+    diagnose(Tok, diag::operator_not_func);
+    return true;
+  }
+  
   // Single name case.
-  if (Tok.is(tok::identifier) || Tok.is(tok::oper)) {
+  if (Tok.is(tok::identifier)) {
     SourceLoc IdLoc = Tok.getLoc();
     Identifier Id = Context.getIdentifier(Tok.getText());
     consumeToken();
