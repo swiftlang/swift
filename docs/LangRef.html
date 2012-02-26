@@ -36,8 +36,8 @@
   
   
   <p>This is the language reference manual for the Swift language, which is
-  highly volatile and constantly under development.  It is my (Chris') intention
-  to keep this up to date as the prototype evolves.</p>
+  highly volatile and constantly under development.  As the prototype evolves,
+  this document should be kept up to date with what is actually implemented.</p>
   
   <p>The grammar and structure of the language is defined in BNF form in yellow
   boxes.  Examples are shown in gray boxes, and assume that the standard library
@@ -52,6 +52,8 @@
     research project.  We really want to focus on delivering a real product,
     and having the design and spec co-evolve.
   </div>
+  
+  <p>In no particular order, and not explained well:</p>
 
   <ol>
   <li>Support building great frameworks and applications, with a specific focus
@@ -63,12 +65,32 @@
   <li>Support low-level system programming.  We should want to write compilers,
     operating system kernels, and media codecs in Swift.  This means that being
     able to obtain high performance is really quite important.</li>
-  <li>Provide really great tools.</li>
+  <li>Provide really great tools, like an IDE, debugger, profiling, etc.</li>
   <li>Where possible, steal great ideas instead of innovating new things that
       will work out in unpredictable ways.  It turns out that there are a lot
       of good ideas already out there.</li>
+  <li>Memory safe by default: array overrun errors, uninitialized values,
+      and other problems endemic to C should not occur in Swift, even if it
+      means some amount of runtime overhead.  Eventually these checks will be
+      disablable for people who want ultimate performance in production
+      builds.</li>
+  <li>Efficiently implementable with a static compiler: runtime compilation is
+      great technology and Swift may eventually get a runtime optimizer, but it
+      is a strong goal to be able to implement swift with just a static
+      compiler.</li>
+  <li>Interoperate as transparently as possible with C, Objective-C, and
+      C++ without having to write an equivalent of "extern C" for every
+      referenced definition.</li>
+  <li>Great support for efficient by-value types.</li>
+  <li>Elegant and natural syntax, aiming to be familiar and easy to transition
+      to for "C" people.  Differences from the C family should only be done when
+      it provides a significant win (e.g. eliminate declarator syntax).</li>
   <li>Lots of other stuff too.</li>
   </ol>
+  
+  <p>A smaller wishlist goal is to support embedded sub-languages in swift, so
+     that we don't get the OpenCL-is-like-C-but-very-different-in-many-details
+     problem.</p>
   
   <!-- ===================================================================== -->
   <h3>Basic Approach</h3>
@@ -87,9 +109,8 @@
      start at the very bottom of the stack (simple expressions and the trivial
      bits of the type system) and incrementally build things up one brick at a
      time.  There is a big focus on making things as simple as possible and
-     having a clean internal core.  Where it makes sense some sugar (e.g. "func"
-     and "struct") is added on top to make the core more expressive for common
-     situations.</p>
+     having a clean internal core.  Where it makes sense, sugar is added on top
+     to make the core more expressive for common situations.</p>
   
   <p>One major aspect that dovetails with expressivity, learnability, and focus
      on API development is that much of the language is implemented in a <a
@@ -160,8 +181,8 @@
   <!-- ===================================================================== -->
   
   <div class="commentary">
-    Nested block comments are useful, because we don't have the nestable "#if 0"
-    hack from C to rely on.
+    Nested block comments are important because we don't have the nestable
+    "#if 0" hack from C to rely on.
   </div>
   <pre class="grammar">
     whitespace ::= ' '
@@ -225,25 +246,25 @@
 
   <div class="commentary">
     The number of keywords is reduced by pushing most functionality
-    into the library.  This allows us to add new stuff to the library in
-    the future without worrying about conflicting with the user's namespace.
+    into the library (e.g. "builtin" datatypes like 'int' and 'bool').  This
+    allows us to add new stuff to the library in the future without worrying
+    about conflicting with the user's namespace.
   </div>
 
   <pre class="grammar">
-    keyword ::= 'import'
-    keyword ::= 'extension'
-    keyword ::= 'oneof'
-    keyword ::= 'struct'
-    keyword ::= 'var'
-    keyword ::= 'func'
-    keyword ::= 'typealias'
-    keyword ::= 'protocol'
-    keyword ::= 'plus'
-
-    keyword ::= 'if'
     keyword ::= 'else'
-    keyword ::= 'while'
+    keyword ::= 'extension'
+    keyword ::= 'if'
+    keyword ::= 'import'
+    keyword ::= 'func'
+    keyword ::= 'oneof'
+    keyword ::= 'plus'
+    keyword ::= 'protocol'
     keyword ::= 'return'
+    keyword ::= 'struct'
+    keyword ::= 'typealias'
+    keyword ::= 'var'
+    keyword ::= 'while'
   </pre>
 
   <p>These are the builtin keywords.</p>
@@ -293,35 +314,29 @@
   <!-- ********************************************************************* -->
   
   <pre class="grammar">
-    decl ::= <a href="#decl-var">decl-var</a>
+    decl ::= <a href="#decl-extension">decl-extension</a>
     decl ::= <a href="#decl-func">decl-func</a>
-    decl ::= <a href="#decl-typealias">decl-typealias</a>
+    decl ::= <a href="#decl-import">decl-import</a>
     decl ::= <a href="#decl-oneof">decl-oneof</a>
-    decl ::= <a href="#decl-struct">decl-struct</a>
     decl ::= <a href="#decl-protocol">decl-protocol</a>
-    
-    decl-top-level ::= <a href="#decl-import">decl-import</a>
-    decl-top-level ::= <a href="#decl-extension">decl-extension</a>
+    decl ::= <a href="#decl-struct">decl-struct</a>
+    decl ::= <a href="#decl-typealias">decl-typealias</a>
+    decl ::= <a href="#decl-var">decl-var</a>    
   </pre>
 
-  The "decl-top-level" productions are only valid at the top level of a
-  translation unit.
 
   <!-- ===================================================================== -->
   <h3 id="decl-translation-unit">Translation Unit</h3>
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-expr-stmt ::= <a href="#decl">decl</a>
-    decl-expr-stmt ::= <a href="#expr">expr</a>
-    decl-expr-stmt ::= <a href="#stmt">stmt</a>
-    
-    translation-unit ::= (<a href="#stmt-brace">decl-expr-stmt</a> | <a href="#decl">decl-top-level</a>)*
+    translation-unit ::= <a href="#stmt-brace">stmt-brace-item</a>*
   </pre>
   
   <p>The top level of a swift source file is grammatically identical to the
-  contents of a <a href="#stmt-brace">brace statement</a>, except that it also
-  allows extra <a href="#decl">decl-top-level</a> productions.
+  contents of a <a href="#stmt-brace">brace statement</a>.  Some declarations
+  have semantic restrictions that only allow them within a translation unit
+  though.
   </p>
   
   <!-- ===================================================================== -->
@@ -329,7 +344,7 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-import ::= 'import' attribute-list any-identifier ('.' any-identifier)*
+    decl-import ::= 'import' <a href="#attribute-list">attribute-list</a> any-identifier ('.' any-identifier)*
   </pre>  
   
   <p>'import' declarations allow named values and types to be accessed with
@@ -346,7 +361,8 @@
   entire module is imported in its entirety into the current scope.  If a
   scope (such as a namespace) is named, then all entities in the namespace are
   imported.  If a specific type or variable is named (e.g. "import swift.int")
-  then only the one type and/or value is imported.</p>
+  then only the one type and/or value is imported.  If the named value is
+  overloaded, then the entire overload set is imported.</p>
   
   <pre class="example">
     <i>// Import all of the top level symbols and types in a package.</i>
@@ -357,6 +373,9 @@
 
     <i>// Import a single variable, function, type, etc.</i>
     import swift.io.bufferedstream
+
+    <i>// Import all multiplication overloads.</i>
+    import swift.*
   </pre>
 
   <!-- ===================================================================== -->
@@ -372,13 +391,13 @@
   </pre>
 
   <p>'extension' declarations allow adding member declarations to existing
-     types, even in other translation units and ownership domains.  'extension's
-     may be declared on the following kinds of declarations:
+     types, even in other translation units and modules.  There are different
+     semantic rules for each type that is extended.
   </p>
   
   <!-- _____________________________________________________________________ -->
   <h4 id="decl-extension-oneof-struct"><a href="#decl-oneof">oneof</a> and <a
-    href="#decl-struct">struct</a> declarations</h4>
+    href="#decl-struct">struct</a> declaration extensions</h4>
 
   <p>'<a href="#decl-var">var</a>' decls are not allowed in a oneof or struct,
   data members should be used instead.</p>
@@ -394,21 +413,17 @@
   </div>
   
   <pre id="value-specifier" class="grammar">
-    decl-var-simple ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#identifier">any-identifier</a> <a href="#value-specifier">value-specifier</a>
     decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> var-name <a href="#value-specifier">value-specifier</a>
+    decl-var-simple ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#value-specifier">value-specifier</a>
     
-    value-specifier ::= ':' <a href="#type">type</a>
-    value-specifier ::= ':' <a href="#type">type</a> '=' <a href="#expr">expr</a>
+    value-specifier ::= ':' <a href="#type">type-annotation</a>
+    value-specifier ::= ':' <a href="#type">type-annotation</a> '=' <a href="#expr">expr</a>
     value-specifier ::= '=' <a href="#expr">expr</a>
   </pre>
   
 
-  <p>'var' declarations form the backbone of value declarations in Swift and
-     are the core semantic model for these values.  The <a
-     href="#decl-func">func declaration</a> is just syntactic sugar for a var
-     declaration with an <a href="#expr-func">expr-func</a> body.</p>
-  
-  <p>Syntactically, var declarations come in three forms from the
+  <p>'var' declarations form the backbone of value declarations in Swift.
+     Syntactically, var declarations come in three forms from the
      value-specifier production.  In the first form,
      a type is specified and the value is default initialized.  In the second
      form the type is elided but a value is specified, the declaration gets the
@@ -416,11 +431,11 @@
      form, the value's type is as specified and the initializer is <a
      href="#typecheck_conversions">converted to</a> that type if required.</p>
   
-  <p>Var declarations can optionally have a list of <a
+  <p>Like all other declarations, var's can optionally have a list of <a
     href="#attribute-list">attributes</a> applied to them.</p>
   
   <pre class="grammar">
-    var-name ::= <a href="#identifier">any-identifier</a>
+    var-name ::= <a href="#identifier">identifier</a>
     var-name ::= lparen-any ')'
     var-name ::= lparen-any var-name (',' var-name)* ')'
   </pre>
@@ -444,16 +459,12 @@
     var b : int
     var c : int = 42
     
-    <i>// Declaring a function like value with 'var', using an attribute.</i>
-    <i>// The name here is "==", the type is a function that takes a tuple</i>
-    <i>// and returns an int.</i>
-    var [infix_left=120] == : (lhs : int, rhs : int) -&gt; int
-    
     <i>// This decodes the tuple return value into independently named parts</i>
     <i>// and both 'val' and 'err' are in scope after this line.</i>
     var (val, err) = foo()
     
     <i>// This binds elements of a struct into local variables.</i>
+    // <b>FIXME</b> This seems like a really bad idea, making binding 'fragile'.
     struct point { x : int, y : int }
     var (a, b) = foo()  <i>// when foo returns a 'point'.</i>
   </pre>
@@ -505,8 +516,9 @@
     <i>// Really simple function</i>
     func c(arg : int) -&gt; int { return arg+4 }
 
-    <i>// Simple operator.</i>
-    func [infix_left=120] + (lhs: int, rhs: int) -&gt; int
+    <i>// Simple operators.</i>
+    func [infix_left=190] + (lhs: int, rhs: int) -&gt; int
+    func [infix_left=160] == (lhs : int, rhs : int) -&gt; bool
 
     <i>// Function with multiple return values:</i>
     func d(a : int) -&gt; (b : int) -&gt; (res1 : int, res2 : int)
@@ -1738,7 +1750,11 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    stmt-brace      ::= '{' <a href="#decl-translation-unit">decl-expr-stmt</a>* '}'
+    stmt-brace      ::= '{' stmt-brace-item* '}'
+    
+    stmt-brace-item ::= <a href="#decl">decl</a>
+    stmt-brace-item ::= <a href="#expr">expr</a>
+    stmt-brace-item ::= <a href="#stmt">stmt</a>
   </pre>
   
   <p>The brace statement provides a sequencing operation which evaluates the
