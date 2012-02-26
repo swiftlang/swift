@@ -51,6 +51,13 @@ BuiltinValueKind swift::isBuiltinValue(ASTContext &C, StringRef Name, Type &Ty){
   // This will almost certainly get more sophisticated.
   StringRef::size_type Underscore = Name.find_last_of('_');
   if (Underscore == StringRef::npos) return BuiltinValueKind::None;
+  
+  // If the _ is part of FP_XXX, then skip to the next previous one.
+  if (Name.substr(0, Underscore).endswith("FP")) {
+    Underscore = Name.substr(0, Underscore).find_last_of('_');
+    if (Underscore == StringRef::npos) return BuiltinValueKind::None;
+  }
+  
 
   // Check that the type parameter is well-formed and set it up for returning.
   Ty = getBuiltinType(C, Name.substr(Underscore + 1));

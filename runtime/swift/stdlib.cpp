@@ -43,10 +43,3 @@ _TNSs6double26convert_from_float_literalFT3valf64_S_(double x)
 {
     return x;
 }
-
-extern "C"
-double
-_TSsop1mFT3lhsNSs6double3rhsS__S_(double x, double y)
-{
-    return x * y;
-}
