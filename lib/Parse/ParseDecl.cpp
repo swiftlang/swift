@@ -335,7 +335,7 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
 /// no token skipping) on error.
 ///
 ///   decl-import:
-///      'import' attribute-list? any-identifier ('.' any-identifier)*
+///      'import' attribute-list any-identifier ('.' any-identifier)*
 ///
 Decl *Parser::parseDeclImport() {
   SourceLoc ImportLoc = consumeToken(tok::kw_import);
@@ -410,8 +410,8 @@ Decl *Parser::actOnDeclExtension(SourceLoc ExtensionLoc, Type Ty,
 /// parseVarName
 ///   var-name:
 ///     identifier
-///     '(' ')'
-///     '(' var-name (',' var-name)* ')'
+///     lparen-any ')'
+///     lparen-any var-name (',' var-name)* ')'
 bool Parser::parseVarName(DeclVarName &Name) {
   if (Tok.is(tok::oper)) {
     diagnose(Tok, diag::operator_not_func);
@@ -517,7 +517,7 @@ void Parser::actOnVarDeclName(const DeclVarName *Name,
 /// token skipping) on error.
 ///
 ///   decl-var:
-///      'var' attribute-list? var-name value-specifier
+///      'var' attribute-list var-name value-specifier
 bool Parser::parseDeclVar(SmallVectorImpl<Decl*> &Decls) {
   SourceLoc VarLoc = consumeToken(tok::kw_var);
   
@@ -566,9 +566,11 @@ bool Parser::parseDeclVar(SmallVectorImpl<Decl*> &Decls) {
 }
 
 /// parseDeclVarSimple - This just parses a reduced case of decl-var.
+/// FIXME: This is only used by protocol elements.  It seems that there should
+/// be a better way to handle these.
 ///
 ///   decl-var-simple:
-///      'var' attribute-list? any-identifier value-specifier
+///      'var' attribute-list identifier value-specifier
 ///
 VarDecl *Parser::parseDeclVarSimple() {
   SourceLoc CurLoc = Tok.getLoc();
@@ -589,7 +591,7 @@ VarDecl *Parser::parseDeclVarSimple() {
 /// is true, we parse both productions.
 ///
 ///   decl-func:
-///     'plus'? 'func' attribute-list? any-identifier type stmt-brace?
+///     'plus'? 'func' attribute-list any-identifier type stmt-brace?
 ///
 /// NOTE: The caller of this method must ensure that the token sequence is
 /// either 'func' or 'plus' 'func'.
