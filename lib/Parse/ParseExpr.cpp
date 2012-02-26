@@ -156,7 +156,7 @@ ParseResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
     SourceLoc ColonLoc = consumeToken(tok::colon);
     Identifier Name;
     SourceLoc NameLoc = Tok.getLoc();
-    if (parseIdentifier(Name, diag::expected_identifier_after_colon_expr))
+    if (parseAnyIdentifier(Name, diag::expected_identifier_after_colon_expr))
       return true;
     
     // Handle :foo by just making an AST node.
@@ -345,8 +345,8 @@ ParseResult<Expr> Parser::parseExprParen() {
       // "x =".
       if (consumeIf(tok::period) ||
           (Tok.is(tok::identifier) && peekToken().is(tok::equal))) {
-        if (parseIdentifier(FieldName,
-                            diag::expected_field_spec_name_tuple_expr) ||
+        if (parseAnyIdentifier(FieldName,
+                               diag::expected_field_spec_name_tuple_expr) ||
             parseToken(tok::equal, diag::expected_equal_in_tuple_expr))
           return true;
       }

@@ -264,7 +264,7 @@ void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
 ///     decl-func
 ///     decl-oneof
 ///     decl-struct
-///     decl-import  [[Only if AllowImportDecl = true]]
+///     decl-import
 ///
 bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   unsigned EntryStart = Entries.size();
@@ -335,7 +335,7 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
 /// no token skipping) on error.
 ///
 ///   decl-import:
-///      'import' attribute-list? identifier ('.' identifier)*
+///      'import' attribute-list? any-identifier ('.' any-identifier)*
 ///
 Decl *Parser::parseDeclImport() {
   SourceLoc ImportLoc = consumeToken(tok::kw_import);
@@ -345,12 +345,13 @@ Decl *Parser::parseDeclImport() {
   
   SmallVector<std::pair<Identifier, SourceLoc>, 8> ImportPath(1);
   ImportPath.back().second = Tok.getLoc();
-  if (parseIdentifier(ImportPath.back().first,diag::decl_expected_module_name))
+  if (parseAnyIdentifier(ImportPath.back().first,
+                         diag::decl_expected_module_name))
     return 0;
   
   while (consumeIf(tok::period)) {
     ImportPath.push_back(std::make_pair(Identifier(), Tok.getLoc()));
-    if (parseIdentifier(ImportPath.back().first,
+    if (parseAnyIdentifier(ImportPath.back().first,
                         diag::expected_identifier_in_decl, "import"))
       return 0;
   }
@@ -455,7 +456,8 @@ TypeAliasDecl *Parser::parseDeclTypeAlias() {
   
   Identifier Id;
   Type Ty;
-  if (parseIdentifier(Id, diag::expected_identifier_in_decl, "typealias") ||
+  // FIXME: Shouldn't allow operators.
+  if (parseAnyIdentifier(Id, diag::expected_identifier_in_decl, "typealias") ||
       parseToken(tok::colon, diag::expected_colon_in_typealias) ||
       parseType(Ty, diag::expected_type_in_typealias))
     return 0;
@@ -608,7 +610,7 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
 
   Identifier Name;
   SourceLoc TypeNameLoc = Tok.getLoc();
-  if (parseIdentifier(Name, diag::expected_identifier_in_decl, "func"))
+  if (parseAnyIdentifier(Name, diag::expected_identifier_in_decl, "func"))
     return 0;
 
   // We force first type of a func declaration to be a tuple for consistency.
@@ -695,7 +697,8 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
   
   SourceLoc NameLoc = Tok.getLoc();
   Identifier OneOfName;
-  if (parseIdentifier(OneOfName, diag::expected_identifier_in_decl, "oneof"))
+  // FIXME: Shouldn't allow operators.
+  if (parseAnyIdentifier(OneOfName, diag::expected_identifier_in_decl, "oneof"))
     return true;
   
   TypeAliasDecl *TAD =
@@ -830,7 +833,8 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   
   Identifier StructName;
   SourceLoc LBLoc, RBLoc;
-  if (parseIdentifier(StructName, diag::expected_identifier_in_decl, "struct")||
+  if (parseAnyIdentifier(StructName, diag::expected_identifier_in_decl,
+                         "struct") ||
       parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct))
     return true;
 
@@ -900,8 +904,8 @@ Decl *Parser::parseDeclProtocol() {
   
   SourceLoc NameLoc = Tok.getLoc();
   Identifier ProtocolName;
-  if (parseIdentifier(ProtocolName,
-                      diag::expected_identifier_in_decl, "protocol"))
+  if (parseAnyIdentifier(ProtocolName,
+                         diag::expected_identifier_in_decl, "protocol"))
     return 0;
   
   TypeAliasDecl *TAD =

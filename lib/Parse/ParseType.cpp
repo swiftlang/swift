@@ -137,7 +137,7 @@ bool Parser::parseTypeIdentifier(Type &Result) {
   while (consumeIf(tok::period)) {
     SourceLoc Loc = Tok.getLoc();
     Identifier Name;
-    if (parseIdentifier(Name, diag::expected_identifier_in_dotted_type))
+    if (parseAnyIdentifier(Name, diag::expected_identifier_in_dotted_type))
       return true;
     Components.push_back(IdentifierType::Component(Loc, Name));
   }

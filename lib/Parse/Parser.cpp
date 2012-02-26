@@ -134,9 +134,9 @@ void Parser::skipUntilDeclStmtRBrace() {
 // Primitive Parsing
 //===----------------------------------------------------------------------===//
 
-/// parseIdentifier - Consume an identifier if present and return its name in
-/// Result.  Otherwise, emit an error and return true.
-bool Parser::parseIdentifier(Identifier &Result, const Diagnostic &D) {
+/// parseAnyIdentifier - Consume an identifier or operator if present and return
+/// its name in Result.  Otherwise, emit an error and return true.
+bool Parser::parseAnyIdentifier(Identifier &Result, const Diagnostic &D) {
   if (Tok.is(tok::identifier) || Tok.is(tok::oper)) {
     Result = Context.getIdentifier(Tok.getText());
     consumeToken();

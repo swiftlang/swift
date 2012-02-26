@@ -129,11 +129,15 @@ public:
                    
   //===--------------------------------------------------------------------===//
   // Primitive Parsing
-  bool parseIdentifier(Identifier &Result, const Diagnostic &D);
+
+  
+  /// parseAnyIdentifier - Consume an identifier or operator if present and
+  /// return its name in Result.  Otherwise, emit an error and return true.
+  bool parseAnyIdentifier(Identifier &Result, const Diagnostic &D);
 
   template<typename ...ArgTypes>
-  bool parseIdentifier(Identifier &Result,  ArgTypes... Args) {
-    return parseIdentifier(Result, Diagnostic(Args...));
+  bool parseAnyIdentifier(Identifier &Result,  ArgTypes... Args) {
+    return parseAnyIdentifier(Result, Diagnostic(Args...));
   }
 
   /// parseToken - The parser expects that 'K' is next in the input.  If so, it
