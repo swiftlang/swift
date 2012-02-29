@@ -478,19 +478,23 @@
     decl-func        ::= 'plus'? 'func' <a href="#attribute-list">attribute-list</a> <a href="#identifier">any-identifier</a> <a href="#type">type</a> <a href="#stmt-brace">stmt-brace</a>?
   </pre>
   
-  <p>A 'func' declaration is syntactic sugar for a 'var' to be used in the
-  (extremely) common case of a declaring a function.  The argument list and
+  <p>'func' is a declaration for a function.  The argument list and
   optional return value are specified by the type production of the function,
-  and the body is either not specified or is a brace expression.  Like other
+  and the body is either a brace expression or elided.  Like all other
   declarations, functions are can have attributes.</p>
   
   <p>If the type is not syntactically a function type (i.e., has no -&gt; in it
-  at top-level), then the return value is implicitly inferred to be "()".  All
-  of the argument and return value names are injected into the
-  <a href="#namebind_scope">scope</a> of the function body.</p>
+  at top-level), then the return value is implicitly inferred to be
+  "<tt>()</tt>".  All of the argument and return value names are injected into
+  the <a href="#namebind_scope">scope</a> of the function body.</p>
+  
+  <p>A function in an <a  href="#decl-extension">extension</a> of some type (or
+  in other places that are semantically equivalent to an extension) implicitly
+  get a 'this' argument with these rules ... [todo]</p>
   
   <p>'plus' functions are only allowed in an <a 
-     href="#decl-extension">extension</a> of another type.  They indicate that
+     href="#decl-extension">extension</a> of some type (or in other places
+     that are semantically equivalent to an extension).  They indicate that
      the function is actually defined on the metatype for the type, not on the 
      type itself.  Thus it does not implicitly get a first 'this' argument.</p>
   
@@ -509,6 +513,8 @@
 
     <i>// Same as 'a'</i>
     func a1() -&gt; void {}
+    
+    <i>// Function pointers to a function expression.</i>
     var a2 = func ()-&gt;() {}
     var a3 = func () {}
     var a4 = func {}
@@ -517,10 +523,10 @@
     func c(arg : int) -&gt; int { return arg+4 }
 
     <i>// Simple operators.</i>
-    func [infix_left=190] + (lhs: int, rhs: int) -&gt; int
+    func [infix_left=190] +  (lhs : int, rhs : int) -&gt; int
     func [infix_left=160] == (lhs : int, rhs : int) -&gt; bool
 
-    <i>// Function with multiple return values:</i>
+    <i>// Curried function with multiple return values:</i>
     func d(a : int) -&gt; (b : int) -&gt; (res1 : int, res2 : int)
     
     <i>// A more realistic example on a trivial type.</i>
@@ -540,13 +546,18 @@
   <h3 id="decl-typealias">typealias Declarations</h3>
   <!-- ===================================================================== -->
   
+  <div class="commentary">
+    We use the keyword "typealias" instead of "typedef" because it really is an
+    alias for an existing type, not a "definition" of a new type.
+  </div>
+
+  
   <pre class="grammar">
     decl-typealias ::= 'typealias' <a href="#identifier">identifier</a> ':' <a href="#type">type</a>
   </pre>
 
   <p>'typealias' makes a named alias of a type, like a typedef in C.  From that
-  point on, the alias may be used in all situations the specified name is.  It
-  is named "typealias" because it really is an alias, not a "new" type.</p>
+  point on, the alias may be used in all situations the specified name is.</p>
   
   <p>Here are some examples of type aliases:</p>
   
