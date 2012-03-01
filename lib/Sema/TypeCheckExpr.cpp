@@ -1105,9 +1105,9 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
 
       Type getIntLiteralType(SourceLoc loc) {
         if (IntLiteralType.isNull()) {
-          IntLiteralType = lookupGlobalType("integerLiteralType");
+          IntLiteralType = lookupGlobalType("IntegerLiteralType");
           if (IntLiteralType.isNull()) {
-            TC.diagnose(loc, diag::no_integerLiteralType_found);
+            TC.diagnose(loc, diag::no_IntegerLiteralType_found);
             IntLiteralType = BuiltinIntegerType::get(32, TC.Context);
           }
         }
@@ -1116,9 +1116,9 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
 
       Type getFloatLiteralType(SourceLoc loc) {
         if (FloatLiteralType.isNull()) {
-          FloatLiteralType = lookupGlobalType("floatLiteralType");
+          FloatLiteralType = lookupGlobalType("FloatLiteralType");
           if (FloatLiteralType.isNull()) {
-            TC.diagnose(loc, diag::no_floatLiteralType_found);
+            TC.diagnose(loc, diag::no_FloatLiteralType_found);
             FloatLiteralType = TC.Context.TheIEEE64Type;
           }
         }
