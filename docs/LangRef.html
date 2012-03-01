@@ -622,7 +622,7 @@
     typealias location : (x : int, y : int)
       
     <i>// pair_fn is a function that takes two ints and returns a tuple.</i>
-    typealias pair_fn : int -&gt; int -&gt; (first : int, second : int)
+    typealias pair_fn : (int) -&gt; (int) -&gt; (first : int, second : int)
   </pre>
 
   <p>'typealias' is the core semantic model for all named types.  For example, a
@@ -702,8 +702,8 @@
       <i>Constructor for None has type "SomeInts".</i>
       var a : SomeInts = SomeInts::None
     
-      <i>Constructor for One has type "int -&gt; SomeInts".</i>
-      var b : int -&gt; SomeInts = SomeInts::One
+      <i>Constructor for One has type "(int) -&gt; SomeInts".</i>
+      var b : (int) -&gt; SomeInts = SomeInts::One
     
       <i>Constructor for Two has type "(:int,:int) -&gt; SomeInts".</i>
       var c : (:int,:int) -&gt; SomeInts = SomeInts::Two
@@ -1102,7 +1102,8 @@
   FIXME: The argument will eventually have to be a tuple.</p>
 
   <p>Because of the grammar structure, a nested function type like 
-     "a -&gt; b -&gt; c" is parsed as "a -&gt; (b -&gt; c)".  This means that if 
+     "(a) -&gt; (b) -&gt; c" is parsed as "(a) -&gt; ((b) -&gt; c)".  This means
+     that if 
      you declare this that you can pass it one argument to get a function that
      "takes b and returns c" or you can pass two arguments to "get a c".  This
      is known as <a href="http://en.wikipedia.org/wiki/Currying">currying</a>.
@@ -1117,9 +1118,9 @@
     var a : (a : int, b : int) -&gt; (val: int, err: int)
 
     <i>// Declare a function that returns a function:</i>
-    var x : int -&gt; int -&gt; int
+    var x : (int) -&gt; (int) -&gt; int
     
-    <i>// y has type int -&gt; int</i>
+    <i>// y has type (int) -&gt; int</i>
     var y = x(1)
 
     <i>// z1 and z2 both has type int, and both have the same value (assuming
@@ -1234,11 +1235,11 @@
     var d : int[4][]
 
     <i>// Declare an array of function pointers:</i>
-    var array_fn_ptrs : (: int -&gt; int)[42]
+    var array_fn_ptrs : (: (int) -&gt; int)[42]
     var g = array_fn_ptrs[12](4)
 
     <i>// Without parens, this is a function that returns a fixed size array:</i>
-    var fn_returning_array : int -&gt; int[42]
+    var fn_returning_array : (int) -&gt; int[42]
     var h : int[42] = fn_returning_array(4)
     
     <i>// You can even have arrays of tuples and other things, these work right
@@ -1720,7 +1721,7 @@
     g(4)
     
     <i>// Application of 4 to the function returned by h().</i>
-    var h : int -&gt; int -&gt; int
+    var h : (int) -&gt; (int) -&gt; int
     ...
     h()(4)
 
