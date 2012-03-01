@@ -31,6 +31,7 @@ using namespace irgen;
 
 void IRGenFunction::emitStmt(Stmt *S) {
   switch (S->getKind()) {
+  case StmtKind::Error: assert(0 && "Invalid programs shouldn't get here");
   case StmtKind::Semi:
     // Nothing to do.
     return;

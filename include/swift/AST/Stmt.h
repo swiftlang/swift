@@ -78,6 +78,22 @@ public:
   void *operator new(size_t Bytes, void *Mem) throw() = delete;
 
 };
+  
+/// ErrorStmt - Represents a semantically erroneous statement in the AST.
+class ErrorStmt : public Stmt {
+  SourceRange Range;
+public:
+  ErrorStmt(SourceRange Range) : Stmt(StmtKind::Error), Range(Range) {}
+  
+  SourceRange getSourceRange() const { return Range; }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ErrorStmt *) { return true; }
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::Error;
+  }
+};
+
 
 /// SemiStmt - A semicolon, the noop statement: ";"
 class SemiStmt : public Stmt {

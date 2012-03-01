@@ -63,6 +63,10 @@ public:
   // Visit Methods.
   //===--------------------------------------------------------------------===//
 
+  Stmt *visitErrorStmt(ErrorStmt *S) {
+    return S;
+  }
+
   Stmt *visitSemiStmt(SemiStmt *S) {
     return S;
   }

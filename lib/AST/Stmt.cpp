@@ -118,7 +118,11 @@ public:
   
   void printRec(Decl *D) { D->print(OS, Indent+2); }
   void printRec(Expr *E) { E->print(OS, Indent+2); }
-  
+
+  void visitErrorStmt(ErrorStmt *S) {
+    OS.indent(Indent) << "(error_stmt)";
+  }
+
   void visitSemiStmt(SemiStmt *S) {
     OS.indent(Indent) << "(semi_stmt)";
   }
