@@ -20,7 +20,8 @@
 using namespace swift;
 
 bool Parser::isStartOfExpr(const Token &Tok, const Token &Next) {
-  if (Tok.is(tok::numeric_constant) || Tok.is(tok::colon) ||
+  if (Tok.is(tok::integer_literal) || Tok.is(tok::floating_literal) ||
+      Tok.is(tok::colon) ||
       Tok.is(tok::l_paren_space) || Tok.is(tok::dollarident) ||
       Tok.is(tok::identifier) || Tok.is(tok::oper))
     return true;
@@ -127,7 +128,8 @@ Expr *Parser::parseExprOperator() {
 /// parseExprPostfix
 ///
 ///   expr-literal:
-///     numeric_constant
+///     integer_literal
+///     floating_literal
 ///
 ///   expr-primary:
 ///     expr-literal
@@ -159,9 +161,28 @@ Expr *Parser::parseExprOperator() {
 ParseResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
   ParseResult<Expr> Result;
   switch (Tok.getKind()) {
-  case tok::numeric_constant:
-    Result = parseExprNumericConstant();
+  case tok::integer_literal: {
+    StringRef Text = Tok.getText();
+    SourceLoc Loc = consumeToken(tok::integer_literal);
+    Result = new (Context) IntegerLiteralExpr(Text, Loc);
     break;
+  }
+  case tok::floating_literal: {
+    StringRef Text = Tok.getText();
+    SourceLoc Loc = consumeToken(tok::floating_literal);
+    
+    // Check to see if we have an integer constant.
+    // Okay, we have a floating point constant.  Verify we have a single dot.
+    size_t DotPos = Text.find('.');
+    DotPos = Text.find('.', DotPos+1);
+    if (DotPos != StringRef::npos) {
+      diagnose(Loc.getAdvancedLoc(DotPos), diag::float_literal_multi_decimal);
+      Result = ParseResult<Expr>::getSemaError();
+    } else {
+      Result = new (Context) FloatLiteralExpr(Text, Loc);
+    }
+    break;
+  }
   case tok::identifier:  // foo
     Result = parseExprIdentifier();
     break;
@@ -259,25 +280,6 @@ ParseResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
   }
   
   return Result;
-}
-
-ParseResult<Expr> Parser::parseExprNumericConstant() {
-  StringRef Text = Tok.getText();
-  SourceLoc Loc = consumeToken(tok::numeric_constant);
-
-  // Check to see if we have an integer constant.
-  size_t DotPos = Text.find('.');
-  if (DotPos == StringRef::npos)
-    return new (Context) IntegerLiteralExpr(Text, Loc);
-  
-  // Okay, we have a floating point constant.  Verify we have a single dot.
-  DotPos = Text.find('.', DotPos+1);
-  if (DotPos != StringRef::npos) {
-    diagnose(Loc.getAdvancedLoc(DotPos), diag::float_literal_multi_decimal);
-    return ParseResult<Expr>::getSemaError();
-  }
-  
-  return new (Context) FloatLiteralExpr(Text, Loc);
 }
 
 ///   expr-identifier:

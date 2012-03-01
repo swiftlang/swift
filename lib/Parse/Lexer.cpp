@@ -212,7 +212,10 @@ void Lexer::lexNumber() {
       break;
   }
   
-  return formToken(tok::numeric_constant, TokStart);
+  if (StringRef(TokStart,CurPtr-TokStart).find('.') != StringRef::npos)
+    return formToken(tok::floating_literal, TokStart);
+  
+  return formToken(tok::integer_literal, TokStart);
 }
 
 

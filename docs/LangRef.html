@@ -270,20 +270,31 @@
   <p>These are the builtin keywords.</p>
 
   <!-- ===================================================================== -->
-  <h3 id="numeric_constant">Numeric Constant</h3>
+  <h3 id="integer_literal">Integer Literals</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    integer_literal ::= [0-9]+
+  </pre>
+
+  <p>integer_literal tokens represent simple integer values of unspecified
+     precision.</p>
+
+  <!-- ===================================================================== -->
+  <h3 id="floating_literal">Floating Point Literals</h3>
   <!-- ===================================================================== -->
   
   <div class="commentary">
     We require a digit after a dot to allow lexing "4.km" as "4 . km" instead of
     "4. km".  This regex can be generalized to support exponents someday.
   </div>
-
+  
   <pre class="grammar">
-    numeric_constant ::= ([0-9]|[.][0-9])*
+    floating_literal ::= [0-9]*.[0-9]+
   </pre>
-
-  <p>Numeric constant tokens represent simple integer and floating point
-     values.</p>
+  
+  <p>floating_literal tokens represent floating point values of unspecified
+  precision.</p>
 
   <!-- ===================================================================== -->
   <h3 id="identifier">Identifier Tokens</h3>
@@ -863,9 +874,9 @@
   <h4 id="attribute-infix">Infix Attributes</h4>
     
   <pre class="grammar">
-    attribute-infix ::= 'infix_left'  '=' <a href="#numeric_constant">numeric_constant</a>
-    attribute-infix ::= 'infix_right' '=' <a href="#numeric_constant">numeric_constant</a>
-    attribute-infix ::= 'infix        '=' <a href="#numeric_constant">numeric_constant</a>
+    attribute-infix ::= 'infix_left'  '=' <a href="#integer_literal">integer_literal</a>
+    attribute-infix ::= 'infix_right' '=' <a href="#integer_literal">integer_literal</a>
+    attribute-infix ::= 'infix        '=' <a href="#integer_literal">integer_literal</a>
   </pre>
 
   <p>The infix attributes may only be applied to the declaration of a
@@ -1455,11 +1466,12 @@
   </div>
 
   <pre class="grammar">
-    expr-literal ::= <a href="#numeric_constant">numeric_constant</a>
+    expr-literal ::= <a href="#integer_literal">integer_literal</a>
+    expr-literal ::= <a href="#floating_literal">floating_literal</a>
   </pre>
-  
-  <p>Numeric literals are either integer or floating point depending on whether
-     there is a '.' in the literal value.  The type of the literal is inferred
+
+  <p>Numeric literals are either integer or floating point depending on their
+     lexical form.  The type of the literal is inferred
      based on its context.  If there is no contextual type information for an
      expression, all unresolved types are inferred to 'integer_literal_type'
      type and floating point values to 'float_literal_type'.  If a literal is

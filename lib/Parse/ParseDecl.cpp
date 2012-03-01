@@ -150,7 +150,7 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     if (consumeIf(tok::equal)) {
       SourceLoc PrecLoc = Tok.getLoc();
       StringRef Text = Tok.getText();
-      if (!parseToken(tok::numeric_constant, diag::expected_precedence_value)){
+      if (!parseToken(tok::integer_literal, diag::expected_precedence_value)){
         long long Value;
         if (Text.getAsInteger(10, Value) || Value > 255 || Value < 0)
           diagnose(PrecLoc, diag::invalid_precedence, Text);
