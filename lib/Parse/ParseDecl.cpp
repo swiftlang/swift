@@ -217,9 +217,7 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
 
 /// parsePresentAttributeList
 ///   attribute-list:
-///     attribute-list-present?
-///
-///   attribute-list-present:
+///     /*empty*/
 ///     '[' ']'
 ///     '[' attribute (',' attribute)* ']'
 void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
@@ -591,7 +589,7 @@ VarDecl *Parser::parseDeclVarSimple() {
 /// is true, we parse both productions.
 ///
 ///   decl-func:
-///     'plus'? 'func' attribute-list any-identifier type stmt-brace?
+///     'plus'? 'func' attribute-list any-identifier func-signature stmt-brace?
 ///
 /// NOTE: The caller of this method must ensure that the token sequence is
 /// either 'func' or 'plus' 'func'.
@@ -693,7 +691,7 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
 ///      '{' oneof-element (',' oneof-element)* decl* '}'
 ///   oneof-element:
 ///      identifier
-///      identifier ':' type
+///      identifier ':' type-annotation
 ///      
 bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
   SourceLoc OneOfLoc = consumeToken(tok::kw_oneof);
@@ -828,7 +826,9 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
 /// with a single element.
 ///
 ///   decl-struct:
-///      'struct' attribute-list identifier { type-tuple-body? decl* }
+///      'struct' attribute-list identifier '{' decl-struct-body '}
+///   decl-struct-body:
+///      type-tuple-body? decl*
 ///
 bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   SourceLoc StructLoc = consumeToken(tok::kw_struct);
@@ -920,8 +920,8 @@ Decl *Parser::parseDeclProtocol() {
 }
 
 ///   protocol-body:
-///      '{' protocol-element* '}'
-///   protocol-element:
+///      '{' protocol-member* '}'
+///   protocol-member:
 ///      decl-func
 ///      decl-var-simple
 ///      // 'typealias' identifier

@@ -114,7 +114,11 @@ static bool checkFullyTyped(Parser &P, Pattern *pattern) {
   llvm_unreachable("bad pattern kind");
 }
 
-/// Parse a function definition signature.
+/// parseFunctionSignature - Parse a function definition signature.
+///   func-signature:
+///     pattern-tuple+ func-signature-result?
+///   func-signature-result:
+///     '->' type
 bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &params,
                                     Type &type) {
   // Parse curried function argument clauses as long as we can.

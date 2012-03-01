@@ -253,10 +253,10 @@ public:
   ParseResult<Expr> parseExpr(Diag<> ID);
   ParseResult<Expr> parseExprPostfix(Diag<> ID);
   ParseResult<Expr> parseExprUnary(Diag<> ID);
-  ParseResult<Expr> parseExprIdentifier();
-  Expr *parseExprOperator();
   ParseResult<Expr> parseExprNumericConstant();
-  ParseResult<Expr> parseExprDollarIdentifier();
+  ParseResult<Expr> parseExprIdentifier();
+  ParseResult<Expr> parseExprAnonClosureArg();
+  Expr *parseExprOperator();
   ParseResult<Expr> parseExprParen();
   ParseResult<Expr> parseExprFunc();
   

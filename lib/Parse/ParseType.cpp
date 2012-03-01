@@ -80,10 +80,8 @@ bool Parser::parseType(Type &Result, Diag<> MessageID) {
   case tok::l_paren:
   case tok::l_paren_space: {
     SourceLoc LPLoc = consumeToken(), RPLoc;
-    if (parseTypeTupleBody(LPLoc, Result))
-      return true;
-    // FIXME: matching.
-    if (parseMatchingToken(tok::r_paren, RPLoc,
+    if (parseTypeTupleBody(LPLoc, Result) ||
+        parseMatchingToken(tok::r_paren, RPLoc,
                            diag::expected_rparen_tuple_type_list,
                            LPLoc, diag::opening_paren))
       return true;
@@ -142,9 +140,8 @@ bool Parser::parseTypeIdentifier(Type &Result) {
     Components.push_back(IdentifierType::Component(Loc, Name));
   }
 
-  // Otherwise, this is a qualified lookup.  Lookup element #0 through our
-  // current scope chains in case it is some thing local (this returns null if
-  // nothing is found).
+  // Lookup element #0 through our current scope chains in case it is some thing
+  // local (this returns null if nothing is found).
   Components[0].Value = ScopeInfo.lookupValueName(Components[0].Id);
 
   auto Ty = IdentifierType::getNew(Context, Components);
@@ -157,7 +154,7 @@ bool Parser::parseTypeIdentifier(Type &Result) {
 
 /// parseTypeTupleBody
 ///   type-tuple:
-///     '(' type-tuple-body? ')'
+///     lparen-any type-tuple-body? ')'
 ///   type-tuple-body:
 ///     type-tuple-element (',' type-tuple-element)*
 ///   type-tuple-element:

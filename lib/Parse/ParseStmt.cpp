@@ -87,10 +87,12 @@ bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
 ///     stmt
 ///   stmt:
 ///     ';'
-///     expr '=' expr
+///     stmt-assign
 ///     stmt-brace
 ///     stmt-return
 ///     stmt-if
+///   stmt-assign:
+///     expr '=' expr
 bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
                                 bool IsTopLevel) {
   // This forms a lexical scope.

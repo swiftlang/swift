@@ -35,8 +35,9 @@ bool Parser::isStartOfExpr(const Token &Tok, const Token &Next) {
 
 /// parseExpr
 ///   expr:
-///     expr-unary
-///     expr-unary operator expr
+///     expr-unary expr-binary*
+///   expr-binary:
+///     operator expr-unary
 ///
 /// The sequencing here is not structural, i.e. binary operators are
 /// not inherently right-associative.
@@ -110,6 +111,19 @@ ParseResult<Expr> Parser::parseExprUnary(Diag<> Message) {
   return new (Context) UnaryExpr(Operator, SubExpr.get());
 }
 
+/// parseExprOperator - Parse an operator reference expression.  These
+/// are not "proper" expressions; they can only appear in binary/unary
+/// operators.
+Expr *Parser::parseExprOperator() {
+  assert(Tok.is(tok::oper));
+  SourceLoc Loc = Tok.getLoc();
+  Identifier Name = Context.getIdentifier(Tok.getText());
+  consumeToken(tok::oper);
+  
+  return actOnIdentifierExpr(Name, Loc);
+}
+
+
 /// parseExprPostfix
 ///
 ///   expr-literal:
@@ -118,9 +132,13 @@ ParseResult<Expr> Parser::parseExprUnary(Diag<> Message) {
 ///   expr-primary:
 ///     expr-literal
 ///     expr-identifier
-///     ':' identifier
+///     expr-anon-closure-argument
+///     expr-delayed-identifier
 ///     expr-paren
 ///     expr-func
+///
+///   expr-delayed-identifier:
+///     ':' identifier
 ///
 ///   expr-dot:
 ///     expr-postfix '.' identifier
@@ -144,12 +162,11 @@ ParseResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
   case tok::numeric_constant:
     Result = parseExprNumericConstant();
     break;
-
-  case tok::dollarident: // $1
-    Result = parseExprDollarIdentifier();
-    break;
   case tok::identifier:  // foo
     Result = parseExprIdentifier();
+    break;
+  case tok::dollarident: // $1
+    Result = parseExprAnonClosureArg();
     break;
 
   case tok::colon: {     // :foo
@@ -264,8 +281,18 @@ ParseResult<Expr> Parser::parseExprNumericConstant() {
 }
 
 ///   expr-identifier:
+///     identifier
+ParseResult<Expr> Parser::parseExprIdentifier() {
+  assert(Tok.is(tok::identifier));
+  SourceLoc Loc = Tok.getLoc();
+  Identifier Name = Context.getIdentifier(Tok.getText());
+  consumeToken(tok::identifier);
+  return actOnIdentifierExpr(Name, Loc);
+}
+
+///   expr-anon-closure-argument:
 ///     dollarident
-ParseResult<Expr> Parser::parseExprDollarIdentifier() {
+ParseResult<Expr> Parser::parseExprAnonClosureArg() {
   StringRef Name = Tok.getText();
   SourceLoc Loc = consumeToken(tok::dollarident);
   assert(Name[0] == '$' && "Not a dollarident");
@@ -287,31 +314,6 @@ ParseResult<Expr> Parser::parseExprDollarIdentifier() {
   return new (Context) AnonClosureArgExpr(ArgNo, Loc);
 }
 
-
-/// parseExprOperator - Parse an operator reference expression.  These
-/// are not "proper" expressions; they can only appear interlaced in
-/// SequenceExprs.
-Expr *Parser::parseExprOperator() {
-  assert(Tok.is(tok::oper));
-  SourceLoc Loc = Tok.getLoc();
-  Identifier Name = Context.getIdentifier(Tok.getText());
-  consumeToken(tok::oper);
-
-  return actOnIdentifierExpr(Name, Loc);
-}
-
-/// parseExprIdentifier - Parse an identifier expression:
-///
-///   expr-identifier:
-///     identifier
-ParseResult<Expr> Parser::parseExprIdentifier() {
-  assert(Tok.is(tok::identifier));
-  SourceLoc Loc = Tok.getLoc();
-  Identifier Name = Context.getIdentifier(Tok.getText());
-  consumeToken(tok::identifier);
-  return actOnIdentifierExpr(Name, Loc);
-}
-
 Expr *Parser::actOnIdentifierExpr(Identifier Text, SourceLoc Loc) {
   ValueDecl *D = ScopeInfo.lookupValueName(Text);
   
@@ -325,8 +327,8 @@ Expr *Parser::actOnIdentifierExpr(Identifier Text, SourceLoc Loc) {
 /// parseExprParen - Parse a tuple expression.
 ///
 ///   expr-paren: 
-///     '(' ')'
-///     '(' expr-paren-element (',' expr-paren-element)* ')'
+///     lparen-any ')'
+///     lparen-any expr-paren-element (',' expr-paren-element)* ')'
 ///
 ///   expr-paren-element:
 ///     ('.'? identifier '=')? expr
@@ -400,7 +402,7 @@ ParseResult<Expr> Parser::parseExprParen() {
 /// parseExprFunc - Parse a func expression.
 ///
 ///   expr-func: 
-///     'func' type? stmt-brace
+///     'func' func-signature? stmt-brace
 ///
 /// The type must start with '(' if present.
 ///

@@ -261,7 +261,7 @@ public:
 };
 
 /// ValueDecl - All named decls that are values in the language.  These can
-/// have an initializer, type, etc.
+/// have a type, etc.
 class ValueDecl : public NamedDecl {
   Type Ty;
 
