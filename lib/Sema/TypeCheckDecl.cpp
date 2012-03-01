@@ -94,7 +94,8 @@ public:
     
     // If the VarDecl had a name specifier, verify that it lines up with the
     // actual type of the VarDecl.
-    if (VD->getNestedName() && validateVarName(VD->getType(), VD->getNestedName()))
+    if (VD->getNestedName() &&
+        validateVarName(VD->getType(), VD->getNestedName()))
       VD->setNestedName(nullptr);
   }
 
@@ -291,12 +292,6 @@ bool DeclChecker::validateVarName(Type Ty, DeclVarName *Name) {
   
   // If we're peering into an unresolved type, we can't analyze it yet.
   if (Ty->is<DependentType>()) return false;
-  
-  // If we have a single-element oneof (like a struct) then we allow matching
-  // the struct elements with the tuple syntax.
-  if (OneOfType *OOT = Ty->getAs<OneOfType>())
-    if (OOT->isTransparentType())
-      Ty = OOT->getTransparentType();
   
   // If we have a complex case, Ty must be a tuple and the name specifier must
   // have the correct number of elements.
