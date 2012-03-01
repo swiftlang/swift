@@ -64,7 +64,7 @@ bool Parser::parseType(Type &Result) {
 ///     type-array
 ///
 ///   type-function:
-///     type-simple '->' type 
+///     type-tuple '->' type 
 ///
 ///   type-simple:
 ///     type-identifier
@@ -72,6 +72,8 @@ bool Parser::parseType(Type &Result) {
 ///
 bool Parser::parseType(Type &Result, Diag<> MessageID) {
   // Parse type-simple first.
+  SourceLoc TypeLoc = Tok.getLoc();
+  bool isTupleType = false;
   switch (Tok.getKind()) {
   case tok::identifier:
     if (parseTypeIdentifier(Result))
@@ -79,6 +81,7 @@ bool Parser::parseType(Type &Result, Diag<> MessageID) {
     break;
   case tok::l_paren:
   case tok::l_paren_space: {
+    isTupleType = true;
     SourceLoc LPLoc = consumeToken(), RPLoc;
     if (parseTypeTupleBody(LPLoc, Result) ||
         parseMatchingToken(tok::r_paren, RPLoc,
@@ -91,19 +94,24 @@ bool Parser::parseType(Type &Result, Diag<> MessageID) {
     diagnose(Tok.getLoc(), MessageID);
     return true;
   }
-  
-  while (1) {
-    // If there is an arrow, parse the rest of the type.
-    SourceLoc TokLoc = Tok.getLoc();
-    if (consumeIf(tok::arrow)) {
-      Type SecondHalf;
-      if (parseType(SecondHalf, diag::expected_type_function_result))
-        return true;
-      Result = FunctionType::get(Result, SecondHalf, Context);
-      continue;
+
+  // Handle type-function if we have an arrow.
+  if (consumeIf(tok::arrow)) {
+    // If the argument was not syntactically a tuple type, report an error.
+    if (!isTupleType) {
+      diagnose(TypeLoc, diag::expected_function_argument_must_be_paren);
     }
     
+    Type SecondHalf;
+    if (parseType(SecondHalf, diag::expected_type_function_result))
+      return true;
+    Result = FunctionType::get(Result, SecondHalf, Context);
+    return false;
+  }
+  
+  while (1) {
     // If there is a square bracket, we have an array.
+    SourceLoc TokLoc = Tok.getLoc();
     if (consumeIf(tok::l_square)) {
       if (parseTypeArray(TokLoc, Result)) return true;
       continue;
@@ -111,7 +119,6 @@ bool Parser::parseType(Type &Result, Diag<> MessageID) {
     
     break;
   }
-        
   
   return false;
 }

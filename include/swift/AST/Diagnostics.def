@@ -171,6 +171,9 @@ ERROR(named_definition_isnt_type,expr_parsing,none,
 ERROR(expected_type_function_result,type_parsing,none,
       "expected type for function result", ())
 
+ERROR(expected_function_argument_must_be_paren,type_parsing,none,
+      "function argument type must be parenthesized", ())
+
 // OneOf Types
 ERROR(expected_lbrace_oneof_type,type_parsing,none,
       "expected '{' in oneof", ())

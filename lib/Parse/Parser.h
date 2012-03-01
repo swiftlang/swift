@@ -268,7 +268,8 @@ public:
 
   //===--------------------------------------------------------------------===//
   // Statement Parsing
-  
+  // Each of these returns null (in a NullablePtr) on a parse error, or an
+  // ErrorStmt on a semantic error.
   static bool isStartOfStmtOtherThanAssignment(const Token &Tok);
   NullablePtr<Stmt> parseStmtOtherThanAssignment();
   NullablePtr<BraceStmt> parseStmtBrace(Diag<> ID);
