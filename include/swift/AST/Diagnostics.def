@@ -75,6 +75,10 @@ NOTE(lex_comment_start,lexing,none,
 
 ERROR(lex_invalid_character,lexing,none,
        "invalid character in source file", ())
+ERROR(lex_expected_sign_in_fp,lexing,none,
+       "expected '+' or '-' in floating point literal exponent", ())
+ERROR(lex_expected_digit_in_fp_exponent,lexing,none,
+       "expected a digit after decimal point in floating point exponent", ())
 
 //------------------------------------------------------------------------------
 // Declaration parsing diagnostics
@@ -309,8 +313,6 @@ ERROR(int_literal_too_large,literal_parsing,none,
       "integer constant too large (%0 bits) for %1",
       (unsigned, Type))
       
-ERROR(float_literal_multi_decimal,literal_parsing,none,
-      "floating point constant contains multiple decimal points", ())
 WARNING(float_literal_overflow,literal_parsing,none,
         "floating point constant overflowed to %0", (StringRef))
 WARNING(float_literal_underflow,literal_parsing,none,

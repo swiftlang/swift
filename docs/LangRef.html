@@ -286,11 +286,15 @@
   
   <div class="commentary">
     We require a digit after a dot to allow lexing "4.km" as "4 . km" instead of
-    "4. km".  This regex can be generalized to support exponents someday.
+    "4. km".  This regex is same as the Java floating point literal regex,
+    except that we do not allow "4." and do not allow a trailing suffix that
+    specifies a precision.
   </div>
   
   <pre class="grammar">
-    floating_literal ::= [0-9]*.[0-9]+
+    floating_literal ::= [0-9]+(\.[0-9]+)?
+    floating_literal ::= [0-9]+(\.[0-9]*)?[eE][+-][0-9]+
+    floating_literal ::= \.[0-9]+([eE][+-][0-9]+)?
   </pre>
   
   <p>floating_literal tokens represent floating point values of unspecified

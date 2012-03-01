@@ -170,17 +170,7 @@ ParseResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
   case tok::floating_literal: {
     StringRef Text = Tok.getText();
     SourceLoc Loc = consumeToken(tok::floating_literal);
-    
-    // Check to see if we have an integer constant.
-    // Okay, we have a floating point constant.  Verify we have a single dot.
-    size_t DotPos = Text.find('.');
-    DotPos = Text.find('.', DotPos+1);
-    if (DotPos != StringRef::npos) {
-      diagnose(Loc.getAdvancedLoc(DotPos), diag::float_literal_multi_decimal);
-      Result = ParseResult<Expr>::getSemaError();
-    } else {
-      Result = new (Context) FloatLiteralExpr(Text, Loc);
-    }
+    Result = new (Context) FloatLiteralExpr(Text, Loc);
     break;
   }
   case tok::identifier:  // foo

@@ -198,24 +198,73 @@ void Lexer::lexDollarIdent() {
 }
 
 
-/// lexNumber - Match ([0-9]|[.][0-9])*
+// Return true if the string starts with "[eE][+-][0-9]"
+static bool isValidExponent(const char *P) {
+  if (*P != 'e' && *P != 'E')
+    return false;
+  ++P;
+  if (*P != '+' && *P != '-')
+    return false;
+  ++P;
+  return isdigit(*P);
+}
+
+/// lexNumber:
+///   integer_literal  ::= [0-9]+
+///   floating_literal ::= [0-9]+(\.[0-9]+)?
+///   floating_literal ::= [0-9]+(\.[0-9]*)?[eE][+-][0-9]+
+///   floating_literal ::= \.[0-9]+([eE][+-][0-9]+)?
 void Lexer::lexNumber() {
   const char *TokStart = CurPtr-1;
   assert((isdigit(*TokStart) || *TokStart == '.') && "Unexpected start");
 
-  while (1) {
-    if (isdigit(*CurPtr))
+  // Handle the leading character here as well.
+  --CurPtr;
+
+  // Handle a leading [0-9]+, lexing an integer or falling through if we have a
+  // floating point value.
+  if (isdigit(*CurPtr)) {
+    while (isdigit(*CurPtr))
       ++CurPtr;
-    else if (*CurPtr == '.' && isdigit(CurPtr[1]))
-      CurPtr += 2;
-    else
-      break;
+    
+    // Floating literals must have '.', 'e', or 'E' after digits.  If it is
+    // something else, then this is the end of the token.
+    if (*CurPtr != '.' && *CurPtr != 'e' && *CurPtr != 'E')
+      return formToken(tok::integer_literal, TokStart);
+    
+    // Lex things like 4.x as '4' followed by a tok::period.
+    if (*CurPtr == '.' && !isdigit(CurPtr[1]) && !isValidExponent(CurPtr+1))
+      return formToken(tok::integer_literal, TokStart);
   }
   
-  if (StringRef(TokStart,CurPtr-TokStart).find('.') != StringRef::npos)
-    return formToken(tok::floating_literal, TokStart);
+  // Lex decimal point.
+  if (*CurPtr == '.') {
+    ++CurPtr;
+   
+    // Lex any digits after the decimal point.
+    while (isdigit(*CurPtr))
+      ++CurPtr;
+  }
   
-  return formToken(tok::integer_literal, TokStart);
+  // Lex exponent.
+  if (*CurPtr == 'e' || *CurPtr == 'E') {
+    ++CurPtr;  // Eat the 'e'
+    if (*CurPtr != '+' && *CurPtr != '-') {
+      diagnose(CurPtr, diag::lex_expected_sign_in_fp);
+      return formToken(tok::unknown, TokStart);
+    }
+    ++CurPtr;  // Eat the sign.
+    
+    if (!isdigit(*CurPtr)) {
+      diagnose(CurPtr, diag::lex_expected_digit_in_fp_exponent);
+      return formToken(tok::unknown, TokStart);
+    }
+    
+    while (isdigit(*CurPtr))
+      ++CurPtr;
+  }
+  
+  return formToken(tok::floating_literal, TokStart);
 }
 
 
