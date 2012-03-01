@@ -1536,7 +1536,7 @@
   <pre class="grammar">
     expr-paren      ::= lparen-any ')'
     expr-paren      ::= lparen-any expr-paren-element (',' expr-paren-element)* ')'
-    expr-paren-element ::= ('.'? <a href="#identifier">identifier</a> '=')? <a href="#expr">expr</a>
+    expr-paren-element ::= (<a href="#identifier">identifier</a> '=')? <a href="#expr">expr</a>
   </pre>
 
   <p>Parentheses expressions contain an (optionally empty) list of optionally

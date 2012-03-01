@@ -331,7 +331,7 @@ Expr *Parser::actOnIdentifierExpr(Identifier Text, SourceLoc Loc) {
 ///     lparen-any expr-paren-element (',' expr-paren-element)* ')'
 ///
 ///   expr-paren-element:
-///     ('.'? identifier '=')? expr
+///     (identifier '=')? expr
 ///
 ParseResult<Expr> Parser::parseExprParen() {
   SourceLoc LPLoc = consumeToken();
@@ -343,10 +343,8 @@ ParseResult<Expr> Parser::parseExprParen() {
   if (Tok.isNot(tok::r_paren)) {
     do {
       Identifier FieldName;
-      // Check to see if there is a field specifier.  This is either ".x =" or
-      // "x =".
-      if (consumeIf(tok::period) ||
-          (Tok.is(tok::identifier) && peekToken().is(tok::equal))) {
+      // Check to see if there is a field specifier, like "x =".
+      if (Tok.is(tok::identifier) && peekToken().is(tok::equal)) {
         if (parseIdentifier(FieldName,
                             diag::expected_field_spec_name_tuple_expr) ||
             parseToken(tok::equal, diag::expected_equal_in_tuple_expr))
