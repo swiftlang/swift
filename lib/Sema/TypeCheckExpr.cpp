@@ -32,12 +32,12 @@ using namespace swift;
 static std::pair<FuncDecl*, Type> 
 isLiteralCompatibleType(Type Ty, SourceLoc Loc, bool isInt, TypeChecker *TC) {
   
-  // Look up the convert_from_*_literal method on the type.  If it is missing,
+  // Look up the convertFrom*Literal method on the type.  If it is missing,
   // then the type isn't compatible with literals.  If it is present, it must
   // have a single argument.
   SmallVector<ValueDecl*, 8> Methods;
   const char *MethodName =
-    isInt ? "convert_from_integer_literal" : "convert_from_float_literal";
+    isInt ? "convertFromIntegerLiteral" : "convertFromFloatLiteral";
   TC->TU.lookupGlobalExtensionMethods(Ty, TC->Context.getIdentifier(MethodName),
                                       Methods);
   
@@ -61,7 +61,7 @@ isLiteralCompatibleType(Type Ty, SourceLoc Loc, bool isInt, TypeChecker *TC) {
     return std::pair<FuncDecl*, Type>();
   }
   
-  // Check that the type of the 'convert_from_*_literal' method makes
+  // Check that the type of the 'convertFrom*Literal' method makes
   // sense.  We want a type of "S -> DestTy" where S is the expected type.
   FunctionType *FT = Method->getType()->castTo<FunctionType>();
   
