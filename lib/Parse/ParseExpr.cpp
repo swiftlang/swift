@@ -395,12 +395,9 @@ NullablePtr<Expr> Parser::parseExprFunc() {
   ContextChange CC(*this, FE);
   
   // Then parse the expression.
-  ParseResult<BraceStmt> Body;
-  if ((Body = parseStmtBrace(diag::expected_lbrace_func_expr)))
+  NullablePtr<BraceStmt> Body = parseStmtBrace(diag::expected_lbrace_func_expr);
+  if (Body.isNull())
     return 0;
-  // FIXME: Eliminate sema error from statements.
-  if (Body.isSemaError())
-    return new (Context) ErrorExpr(FuncLoc);
   
   FE->setBody(Body.get());
   return FE;

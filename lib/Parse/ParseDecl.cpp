@@ -661,11 +661,11 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
     
     // Check to see if we have a "{" to start a brace statement.
     if (Tok.is(tok::l_brace)) {
-      ParseResult<BraceStmt> Body = parseStmtBrace(diag::invalid_diagnostic);
-      if (Body.isSuccess())
+      NullablePtr<BraceStmt> Body = parseStmtBrace(diag::invalid_diagnostic);
+      if (Body.isNull())
+        FE = 0; // FIXME: Should do some sort of error recovery here.
+      else
         FE->setBody(Body.get());
-      else  // FIXME: Should do some sort of error recovery here.
-        FE = 0;
       
     } else {
       // Note, we just discard FE here.  It is bump pointer allocated, so this

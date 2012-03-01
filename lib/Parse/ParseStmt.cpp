@@ -105,10 +105,10 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     
     // Parse the decl, stmt, or expression.    
     if (isStartOfStmtOtherThanAssignment(Tok)) {
-      ParseResult<Stmt> Res = parseStmtOtherThanAssignment();
-      if (Res.isParseError())
+      NullablePtr<Stmt> Res = parseStmtOtherThanAssignment();
+      if (Res.isNull())
         NeedParseErrorRecovery = true;
-      else if (!Res.isSemaError())
+      else
         Entries.push_back(Res.get());
     } else if (isStartOfDecl(Tok, peekToken())) {
       if (parseDecl(TmpDecls, IsTopLevel ? PD_AllowTopLevel : PD_Default))
@@ -153,13 +153,14 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
 /// parseStmtOtherThanAssignment - Note that this doesn't handle the
 /// "expr '=' expr" production.
 ///
-ParseResult<Stmt> Parser::parseStmtOtherThanAssignment() {
+NullablePtr<Stmt> Parser::parseStmtOtherThanAssignment() {
   switch (Tok.getKind()) {
   default:
     diagnose(Tok, diag::expected_stmt);
-    return true;
+    return 0;
   case tok::semi:      return new (Context) SemiStmt(consumeToken(tok::semi));
-  case tok::l_brace:   return parseStmtBrace(diag::invalid_diagnostic);
+  case tok::l_brace:
+    return parseStmtBrace(diag::invalid_diagnostic).getPtrOrNull();
   case tok::kw_return: return parseStmtReturn();
   case tok::kw_if:     return parseStmtIf();
   case tok::kw_while:  return parseStmtWhile();
@@ -172,10 +173,10 @@ ParseResult<Stmt> Parser::parseStmtOtherThanAssignment() {
 ///   stmt-brace:
 ///     '{' stmt-brace-item* '}'
 ///
-ParseResult<BraceStmt> Parser::parseStmtBrace(Diag<> ID) {
+NullablePtr<BraceStmt> Parser::parseStmtBrace(Diag<> ID) {
   if (Tok.isNot(tok::l_brace)) {
     diagnose(Tok.getLoc(), ID);
-    return true;
+    return 0;
   }
   SourceLoc LBLoc = consumeToken(tok::l_brace);
   
@@ -186,7 +187,7 @@ ParseResult<BraceStmt> Parser::parseStmtBrace(Diag<> ID) {
       parseMatchingToken(tok::r_brace, RBLoc,
                          diag::expected_rbrace_in_brace_stmt,
                          LBLoc, diag::opening_brace))
-    return true;
+    return 0;
   
   return BraceStmt::create(Context, LBLoc, Entries, RBLoc);
 }
@@ -196,7 +197,7 @@ ParseResult<BraceStmt> Parser::parseStmtBrace(Diag<> ID) {
 ///   stmt-return:
 ///     return expr?
 ///   
-ParseResult<Stmt> Parser::parseStmtReturn() {
+NullablePtr<Stmt> Parser::parseStmtReturn() {
   SourceLoc ReturnLoc = consumeToken(tok::kw_return);
 
   // Handle the ambiguity between consuming the expression and allowing the
@@ -205,7 +206,7 @@ ParseResult<Stmt> Parser::parseStmtReturn() {
   if (isStartOfExpr(Tok, peekToken())) {
     Result = parseExpr(diag::expected_expr_return);
     if (Result.isNull())
-      return true;
+      return 0;
   } else {
     // Result value defaults to ().
     Result = new (Context) TupleExpr(SourceLoc(), MutableArrayRef<Expr*>(), 0,
@@ -222,59 +223,51 @@ ParseResult<Stmt> Parser::parseStmtReturn() {
 ///   stmt-if-else:
 ///    'else' stmt-brace
 ///    'else' stmt-if
-ParseResult<Stmt> Parser::parseStmtIf() {
+NullablePtr<Stmt> Parser::parseStmtIf() {
   SourceLoc IfLoc = consumeToken(tok::kw_if);
 
   NullablePtr<Expr> Condition = parseExpr(diag::expected_expr_if);
-  if (Condition.isNull()) return true;
-  ParseResult<BraceStmt> NormalBody;
-  if ((NormalBody = parseStmtBrace(diag::expected_lbrace_after_if)))
-    return true;
+  if (Condition.isNull()) return 0;
+  NullablePtr<BraceStmt> NormalBody =
+    parseStmtBrace(diag::expected_lbrace_after_if);
+  if (NormalBody.isNull())
+    return 0;
     
-  ParseResult<Stmt> ElseBody;
+  NullablePtr<Stmt> ElseBody;
   SourceLoc ElseLoc = Tok.getLoc();
   if (consumeIf(tok::kw_else)) {
     if (Tok.is(tok::kw_if))
       ElseBody = parseStmtIf();
     else
-      ElseBody = parseStmtBrace(diag::expected_lbrace_after_else);
-    if (ElseBody.isParseError()) return true;
+      ElseBody =parseStmtBrace(diag::expected_lbrace_after_else).getPtrOrNull();
+    if (ElseBody.isNull())
+      return 0;
   } else {
     ElseLoc = SourceLoc();
   }
 
   // If our condition and normal expression parsed correctly, build an AST.
-  if (NormalBody.isSemaError() || ElseBody.isSemaError())
-    return ParseResult<Stmt>::getSemaError();
-  
   Expr *Cond = actOnCondition(Condition.get());
   
-  Stmt *ElseBodyStmt = 0;
-  if (!ElseBody.isAbsent())
-    ElseBodyStmt = ElseBody.get();
-  
   return new (Context) IfStmt(IfLoc, Cond, NormalBody.get(),
-                              ElseLoc, ElseBodyStmt);
+                              ElseLoc, ElseBody.getPtrOrNull());
 }
 
 /// 
 ///   stmt-while:
 ///     'while' expr stmt-brace
-ParseResult<Stmt> Parser::parseStmtWhile() {
+NullablePtr<Stmt> Parser::parseStmtWhile() {
   SourceLoc WhileLoc = consumeToken(tok::kw_while);
   
   NullablePtr<Expr> Condition = parseExpr(diag::expected_expr_while);
-  if (Condition.isNull()) return true;
-  ParseResult<BraceStmt> Body;
-  if ((Body = parseStmtBrace(diag::expected_lbrace_after_while)))
-    return true;
+  if (Condition.isNull()) return 0;
+  NullablePtr<BraceStmt> Body =
+    parseStmtBrace(diag::expected_lbrace_after_while);
+  if (Body.isNull())
+    return 0;
   
   // If our normal expression parsed correctly, build an AST.
-  if (Body.isSemaError())
-    return ParseResult<Stmt>::getSemaError();
-  
   Expr *Cond = actOnCondition(Condition.get());
-
   return new (Context) WhileStmt(WhileLoc, Cond, Body.get());
 }
 

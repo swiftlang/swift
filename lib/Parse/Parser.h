@@ -270,11 +270,11 @@ public:
   // Statement Parsing
   
   static bool isStartOfStmtOtherThanAssignment(const Token &Tok);
-  ParseResult<Stmt> parseStmtOtherThanAssignment();
-  ParseResult<BraceStmt> parseStmtBrace(Diag<> ID);
-  ParseResult<Stmt> parseStmtReturn();
-  ParseResult<Stmt> parseStmtIf();
-  ParseResult<Stmt> parseStmtWhile();
+  NullablePtr<Stmt> parseStmtOtherThanAssignment();
+  NullablePtr<BraceStmt> parseStmtBrace(Diag<> ID);
+  NullablePtr<Stmt> parseStmtReturn();
+  NullablePtr<Stmt> parseStmtIf();
+  NullablePtr<Stmt> parseStmtWhile();
 
   /// actOnCondition - Handle a condition to an if/while statement, inserting
   /// the call that will convert to a 1-bit type.
