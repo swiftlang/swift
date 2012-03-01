@@ -26,7 +26,7 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
     return Context.TheIEEE64Type;
 
   // Handle 'int8' and friends.
-  if (Name.substr(0, 3) == "int") {
+  if (Name.substr(0, 3) == "Int") {
     unsigned BitWidth;
     if (!Name.substr(3).getAsInteger(10, BitWidth) &&
         BitWidth <= 1024 && BitWidth != 0)  // Cap to prevent insane things.
