@@ -478,10 +478,10 @@ NOTE(first_declaration,sema_tce,none,
 NOTE(second_declaration,sema_tce,none,
      "second declaration", ())
 
-ERROR(no_integer_literal_type_found,sema_tce,none,
-      "standard library error: integer_literal_type not defined", ())
-ERROR(no_float_literal_type_found,sema_tce,none,
-      "standard library error: float_literal_type not defined", ())
+ERROR(no_integerLiteralType_found,sema_tce,none,
+      "standard library error: integerLiteralType not defined", ())
+ERROR(no_floatLiteralType_found,sema_tce,none,
+      "standard library error: floatLiteralType not defined", ())
 
 ERROR(ambiguous_expression_unresolved,sema_tce,none,
       "ambiguous expression was not resolved to a concrete type", ())
