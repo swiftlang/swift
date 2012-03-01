@@ -120,21 +120,22 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
 
       TmpDecls.clear();
     } else {
-      ParseResult<Expr> ResultExpr;
-      if ((ResultExpr = parseExpr(diag::expected_expr))) {
+      NullablePtr<Expr> ResultExpr = parseExpr(diag::expected_expr);
+      if (ResultExpr.isNull()) {
         NeedParseErrorRecovery = true;
-      } else if (Tok.is(tok::equal)) {
+      } else if (Tok.isNot(tok::equal)) {
+        Entries.push_back(ResultExpr.get());
+      } else {
         // Check for assignment.  If we don't have it, then we just have a
         // simple expression.
         SourceLoc EqualLoc = consumeToken();
-        ParseResult<Expr> RHSExpr;
-        if ((RHSExpr = parseExpr(diag::expected_expr_assignment))) {
+        NullablePtr<Expr> RHSExpr = parseExpr(diag::expected_expr_assignment);
+        if (RHSExpr.isNull()) {
           NeedParseErrorRecovery = true;  // Error.
-        } else if (!ResultExpr.isSemaError() && !RHSExpr.isSemaError())
+        } else {
           Entries.push_back(new (Context) AssignStmt(ResultExpr.get(),
                                                      EqualLoc, RHSExpr.get()));
-      } else if (!ResultExpr.isSemaError()) {
-        Entries.push_back(ResultExpr.get());
+        }
       }
     }
    
@@ -200,9 +201,10 @@ ParseResult<Stmt> Parser::parseStmtReturn() {
 
   // Handle the ambiguity between consuming the expression and allowing the
   // enclosing stmt-brace to get it by eagerly eating it.
-  ParseResult<Expr> Result;
+  NullablePtr<Expr> Result;
   if (isStartOfExpr(Tok, peekToken())) {
-    if ((Result = parseExpr(diag::expected_expr_return)))
+    Result = parseExpr(diag::expected_expr_return);
+    if (Result.isNull())
       return true;
   } else {
     // Result value defaults to ().
@@ -210,9 +212,7 @@ ParseResult<Stmt> Parser::parseStmtReturn() {
                                      SourceLoc());
   }
 
-  if (!Result.isSemaError())
-    return new (Context) ReturnStmt(ReturnLoc, Result.get());
-  return ParseResult<Stmt>::getSemaError();
+  return new (Context) ReturnStmt(ReturnLoc, Result.get());
 }
 
 
@@ -225,10 +225,10 @@ ParseResult<Stmt> Parser::parseStmtReturn() {
 ParseResult<Stmt> Parser::parseStmtIf() {
   SourceLoc IfLoc = consumeToken(tok::kw_if);
 
-  ParseResult<Expr> Condition;
+  NullablePtr<Expr> Condition = parseExpr(diag::expected_expr_if);
+  if (Condition.isNull()) return true;
   ParseResult<BraceStmt> NormalBody;
-  if ((Condition = parseExpr(diag::expected_expr_if)) ||
-      (NormalBody = parseStmtBrace(diag::expected_lbrace_after_if)))
+  if ((NormalBody = parseStmtBrace(diag::expected_lbrace_after_if)))
     return true;
     
   ParseResult<Stmt> ElseBody;
@@ -244,8 +244,7 @@ ParseResult<Stmt> Parser::parseStmtIf() {
   }
 
   // If our condition and normal expression parsed correctly, build an AST.
-  if (Condition.isSemaError() || NormalBody.isSemaError() ||
-      ElseBody.isSemaError())
+  if (NormalBody.isSemaError() || ElseBody.isSemaError())
     return ParseResult<Stmt>::getSemaError();
   
   Expr *Cond = actOnCondition(Condition.get());
@@ -264,14 +263,14 @@ ParseResult<Stmt> Parser::parseStmtIf() {
 ParseResult<Stmt> Parser::parseStmtWhile() {
   SourceLoc WhileLoc = consumeToken(tok::kw_while);
   
-  ParseResult<Expr> Condition;
+  NullablePtr<Expr> Condition = parseExpr(diag::expected_expr_while);
+  if (Condition.isNull()) return true;
   ParseResult<BraceStmt> Body;
-  if ((Condition = parseExpr(diag::expected_expr_while)) ||
-      (Body = parseStmtBrace(diag::expected_lbrace_after_while)))
+  if ((Body = parseStmtBrace(diag::expected_lbrace_after_while)))
     return true;
   
-  // If our condition and normal expression parsed correctly, build an AST.
-  if (Condition.isSemaError() || Body.isSemaError())
+  // If our normal expression parsed correctly, build an AST.
+  if (Body.isSemaError())
     return ParseResult<Stmt>::getSemaError();
   
   Expr *Cond = actOnCondition(Condition.get());

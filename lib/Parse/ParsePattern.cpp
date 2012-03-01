@@ -245,15 +245,13 @@ ParseResult<Pattern> Parser::parsePatternTuple() {
         skipUntil(tok::r_paren);
         return true;
       } else if (consumeIf(tok::equal)) {
-        ParseResult<Expr> initR = parseExpr(diag::expected_initializer_expr);
-        if (initR.isParseError()) {
+        NullablePtr<Expr> initR = parseExpr(diag::expected_initializer_expr);
+        if (initR.isNull()) {
           skipUntil(tok::r_paren);
           return true;
-        } else if (initR.isSemaError()) {
-          hasSemaError = true;
-        } else {
-          init = initR.get();
         }
+        
+        init = initR.get();
       }
 
       if (pattern.isSemaError()) {

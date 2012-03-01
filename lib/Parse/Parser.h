@@ -250,15 +250,18 @@ public:
   // Expression Parsing
   
   static bool isStartOfExpr(const Token &Tok, const Token &Next);
-  ParseResult<Expr> parseExpr(Diag<> ID);
-  ParseResult<Expr> parseExprPostfix(Diag<> ID);
-  ParseResult<Expr> parseExprUnary(Diag<> ID);
-  ParseResult<Expr> parseExprIdentifier();
-  ParseResult<Expr> parseExprAnonClosureArg();
-  Expr *parseExprOperator();
-  ParseResult<Expr> parseExprParen();
-  ParseResult<Expr> parseExprFunc();
+  // Each of these parsing methods returns null (in a NullablePtr) on a parse
+  // error, or an ErrorExpr on a semantic error.  If the method cannot fail, it
+  // returns a raw Expr*.
+  NullablePtr<Expr> parseExpr(Diag<> ID);
+  NullablePtr<Expr> parseExprPostfix(Diag<> ID);
+  NullablePtr<Expr> parseExprUnary(Diag<> ID);
+  Expr *parseExprIdentifier();
+  Expr *parseExprAnonClosureArg();
+  NullablePtr<Expr> parseExprParen();
+  NullablePtr<Expr> parseExprFunc();
   
+  Expr *parseExprOperator();
   Expr *actOnIdentifierExpr(Identifier Text, SourceLoc Loc);
   FuncExpr *actOnFuncExprStart(SourceLoc FuncLoc, Type FuncTy,
                                ArrayRef<Pattern*> Patterns);

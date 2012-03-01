@@ -219,20 +219,11 @@ bool Parser::parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init) {
   
   // Parse the initializer, if present.
   if (consumeIf(tok::equal)) {
-    ParseResult<Expr> Tmp = parseExpr(diag::expected_initializer_expr);
-    if (Tmp)
+    NullablePtr<Expr> Tmp = parseExpr(diag::expected_initializer_expr);
+    if (Tmp.isNull())
       return true;
     
-    if (!Tmp.isSemaError())
-      Init = Tmp.get();
-    // FIXME: Create an ErrorExpr here.
-    
-    // If there was an expression, but it had a parse error, give the var decl
-    // an error type to avoid chained errors.
-    // FIXME: We really need to distinguish erroneous expr from missing expr in
-    // ActOnVarDecl.
-    if (Tmp.isSemaError() && Ty.isNull())
-      Ty = Context.TheErrorType;
+    Init = Tmp.get();
   }
   
   return false;

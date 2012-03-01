@@ -194,18 +194,16 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
 
       // Parse the optional default value expression.
       if (consumeIf(tok::equal)) {
-        ParseResult<Expr> initResult =
+        NullablePtr<Expr> initResult =
           parseExpr(diag::expected_initializer_expr);
 
         // Die if there was a parse error.
-        if (initResult) {
+        if (initResult.isNull()) {
           HadError = true;
           break;
         }
 
-        if (!initResult.isSemaError()) {
-          init = initResult.get();
-        }
+        init = initResult.get();
       }
 
       Elements.push_back(TupleTypeElt(type, name, init));
@@ -243,17 +241,17 @@ bool Parser::parseTypeArray(SourceLoc LSquareLoc, Type &Result) {
     return ArrayType::get(Result, 0, Context);
   }
   
-  ParseResult<Expr> SizeEx;
+  NullablePtr<Expr> SizeEx = parseExpr(diag::expected_expr_array_type);
+  if (SizeEx.isNull()) return true;
   SourceLoc RArrayTok;
-  if ((SizeEx = parseExpr(diag::expected_expr_array_type)) ||
-      parseMatchingToken(tok::r_square, RArrayTok,
+  if (parseMatchingToken(tok::r_square, RArrayTok,
                          diag::expected_rbracket_array_type,
                          LSquareLoc, diag::opening_bracket))
     return true;
   
   // If we had a semantic error on the size or if the base type is invalid,
   // propagate up an error type.
-  if (SizeEx.isSemaError() || isa<ErrorType>(Result.getPointer())) {
+  if (isa<ErrorType>(Result.getPointer())) {
     Result = ErrorType::get(Context);
     return false;
   }

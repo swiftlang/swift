@@ -42,22 +42,15 @@ bool Parser::isStartOfExpr(const Token &Tok, const Token &Next) {
 ///
 /// The sequencing here is not structural, i.e. binary operators are
 /// not inherently right-associative.
-ParseResult<Expr> Parser::parseExpr(Diag<> Message) {
+NullablePtr<Expr> Parser::parseExpr(Diag<> Message) {
   SmallVector<Expr*, 8> SequencedExprs;
 
-  bool HasSemaError = false;
-
   while (true) {
-    // Parse a primary expression.
-    ParseResult<Expr> Primary = parseExprUnary(Message);
-    if (Primary.isParseError())
-      return true;
-
-    if (Primary.isSemaError()) {
-      HasSemaError = true;
-    } else {
-      SequencedExprs.push_back(Primary.get());
-    }
+    // Parse a unary expression.
+    auto Primary = parseExprUnary(Message);
+    if (Primary.isNull())
+      return 0;
+    SequencedExprs.push_back(Primary.get());
 
     // If the next token is not an operator, we're done.
     if (Tok.isNot(tok::oper))
@@ -72,8 +65,6 @@ ParseResult<Expr> Parser::parseExpr(Diag<> Message) {
   }
 
   // If we had semantic errors, just fail here.
-  if (HasSemaError)
-    return ParseResult<Expr>::getSemaError();
   assert(!SequencedExprs.empty());
 
   // If we saw no operators, don't build a sequence.
@@ -88,7 +79,7 @@ ParseResult<Expr> Parser::parseExpr(Diag<> Message) {
 ///   expr-unary:
 ///     expr-postfix
 ///     operator expr-unary
-ParseResult<Expr> Parser::parseExprUnary(Diag<> Message) {
+NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
   // If the next token is not an operator, just parse this as expr-postfix
   if (Tok.isNot(tok::oper))
     return parseExprPostfix(Message);
@@ -98,18 +89,17 @@ ParseResult<Expr> Parser::parseExprUnary(Diag<> Message) {
     SourceLoc loc = Tok.getLoc();
     consumeToken(tok::oper);
 
-    ParseResult<Expr> SubExpr = parseExprUnary(Message);
-    if (!SubExpr.isSuccess()) return SubExpr;
-
-    return new (Context) AddressOfExpr(loc, SubExpr.get(), Type());
+    if (Expr *SubExpr = parseExprUnary(Message).getPtrOrNull())
+      return new (Context) AddressOfExpr(loc, SubExpr, Type());
+    return 0;
   }
   
   // Parse the operator.
   Expr *Operator = parseExprOperator();
 
-  ParseResult<Expr> SubExpr = parseExprUnary(Message);
-  if (!SubExpr.isSuccess()) return SubExpr;
-  return new (Context) UnaryExpr(Operator, SubExpr.get());
+  if (Expr *SubExpr = parseExprUnary(Message).getPtrOrNull())
+    return new (Context) UnaryExpr(Operator, SubExpr);
+  return 0;
 }
 
 /// parseExprOperator - Parse an operator reference expression.  These
@@ -158,8 +148,8 @@ Expr *Parser::parseExprOperator() {
 ///     expr-subscript
 ///     expr-call
 ///
-ParseResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
-  ParseResult<Expr> Result;
+NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
+  NullablePtr<Expr> Result;
   switch (Tok.getKind()) {
   case tok::integer_literal: {
     StringRef Text = Tok.getText();
@@ -185,7 +175,7 @@ ParseResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
     Identifier Name;
     SourceLoc NameLoc = Tok.getLoc();
     if (parseIdentifier(Name, diag::expected_identifier_after_colon_expr))
-      return true;
+      return 0;
     
     // Handle :foo by just making an AST node.
     Result = new (Context) UnresolvedMemberExpr(ColonLoc, NameLoc, Name);
@@ -205,13 +195,12 @@ ParseResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
       
   default:
     diagnose(Tok.getLoc(), ID);
-    return true;
+    return 0;
   }
   
-  // If we had a parse error, don't attempt to parse suffixes.  Do keep going if
-  // we had semantic errors though.
-  if (Result.isParseError())
-    return true;
+  // If we had a parse error, don't attempt to parse suffixes.
+  if (Result.isNull())
+    return 0;
     
   // Handle suffix expressions.
   while (1) {
@@ -221,14 +210,12 @@ ParseResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
     if (consumeIf(tok::period)) {
       if (Tok.isNot(tok::identifier) && Tok.isNot(tok::dollarident)) {
         diagnose(Tok, diag::expected_field_name);
-        return true;
+        return 0;
       }
         
-      if (!Result.isSemaError()) {
-        Identifier Name = Context.getIdentifier(Tok.getText());
-        Result = new (Context) UnresolvedDotExpr(Result.get(), TokLoc, Name,
-                                                 Tok.getLoc());
-      }
+      Identifier Name = Context.getIdentifier(Tok.getText());
+      Result = new (Context) UnresolvedDotExpr(Result.get(), TokLoc, Name,
+                                               Tok.getLoc());
       if (Tok.is(tok::identifier))
         consumeToken(tok::identifier);
       else
@@ -239,31 +226,26 @@ ParseResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
     // Check for a () suffix, which indicates a call.
     // Note that this cannot be a l_paren_space.
     if (Tok.is(tok::l_paren)) {
-      ParseResult<Expr> Arg = parseExprParen();
-      if (Arg.isParseError())
-        return true;
-      if (Arg.isSemaError())
-        Result = ParseResult<Expr>::getSemaError();
-      else if (!Result.isSemaError())
-        Result = new (Context) CallExpr(Result.get(), Arg.get());
+      NullablePtr<Expr> Arg = parseExprParen();
+      if (Arg.isNull())
+        return 0;
+      Result = new (Context) CallExpr(Result.get(), Arg.get());
       continue;
     }
     
     // Check for a [expr] suffix.
     if (consumeIf(tok::l_square)) {
-      ParseResult<Expr> Idx;
+      NullablePtr<Expr> Idx = parseExpr(diag::expected_expr_subscript_value);
       SourceLoc RLoc;
-      if ((Idx = parseExpr(diag::expected_expr_subscript_value)) ||
+      if (Idx.isNull() ||
           parseMatchingToken(tok::r_square, RLoc,
                              diag::expected_bracket_array_subscript,
                              TokLoc, diag::opening_bracket))
-        return true;
+        return 0;
       
-      if (!Result.isSemaError() && !Idx.isSemaError()) {
-        // FIXME: Implement.  This should modify Result like the cases
-        // above.
-        Result = Result;
-      }
+      // FIXME: Implement.  This should modify Result like the cases
+      // above.
+      Result = Result;
     }
         
     break;
@@ -274,7 +256,7 @@ ParseResult<Expr> Parser::parseExprPostfix(Diag<> ID) {
 
 ///   expr-identifier:
 ///     identifier
-ParseResult<Expr> Parser::parseExprIdentifier() {
+Expr *Parser::parseExprIdentifier() {
   assert(Tok.is(tok::identifier));
   SourceLoc Loc = Tok.getLoc();
   Identifier Name = Context.getIdentifier(Tok.getText());
@@ -284,7 +266,7 @@ ParseResult<Expr> Parser::parseExprIdentifier() {
 
 ///   expr-anon-closure-argument:
 ///     dollarident
-ParseResult<Expr> Parser::parseExprAnonClosureArg() {
+Expr *Parser::parseExprAnonClosureArg() {
   StringRef Name = Tok.getText();
   SourceLoc Loc = consumeToken(tok::dollarident);
   assert(Name[0] == '$' && "Not a dollarident");
@@ -294,13 +276,13 @@ ParseResult<Expr> Parser::parseExprAnonClosureArg() {
   
   if (Name.size() == 1 || !AllNumeric) {
     diagnose(Loc.getAdvancedLoc(1), diag::expected_dollar_numeric);
-    return ParseResult<Expr>::getSemaError();
+    return new (Context) ErrorExpr(Loc);
   }
   
   unsigned ArgNo = 0;
   if (Name.substr(1).getAsInteger(10, ArgNo)) {
     diagnose(Loc.getAdvancedLoc(1), diag::dollar_numeric_too_large);
-    return ParseResult<Expr>::getSemaError();
+    return new (Context) ErrorExpr(Loc);
   }
   
   return new (Context) AnonClosureArgExpr(ArgNo, Loc);
@@ -325,12 +307,11 @@ Expr *Parser::actOnIdentifierExpr(Identifier Text, SourceLoc Loc) {
 ///   expr-paren-element:
 ///     (identifier '=')? expr
 ///
-ParseResult<Expr> Parser::parseExprParen() {
+NullablePtr<Expr> Parser::parseExprParen() {
   SourceLoc LPLoc = consumeToken();
   
   SmallVector<Expr*, 8> SubExprs;
   SmallVector<Identifier, 8> SubExprNames; 
-  bool AnySubExprSemaErrors = false;
   
   if (Tok.isNot(tok::r_paren)) {
     do {
@@ -340,7 +321,7 @@ ParseResult<Expr> Parser::parseExprParen() {
         if (parseIdentifier(FieldName,
                             diag::expected_field_spec_name_tuple_expr) ||
             parseToken(tok::equal, diag::expected_equal_in_tuple_expr))
-          return true;
+          return 0;
       }
       
       if (!SubExprNames.empty())
@@ -350,15 +331,10 @@ ParseResult<Expr> Parser::parseExprParen() {
         SubExprNames.push_back(FieldName);
       }
       
-      ParseResult<Expr> SubExpr;
-      if ((SubExpr = parseExpr(diag::expected_expr_parentheses)))
-        return true;
-      
-      if (SubExpr.isSemaError())
-        AnySubExprSemaErrors = true;
-      else
-        SubExprs.push_back(SubExpr.get());
-    
+      NullablePtr<Expr> SubExpr = parseExpr(diag::expected_expr_parentheses);
+      if (SubExpr.isNull())
+        return 0;
+      SubExprs.push_back(SubExpr.get());
     } while (consumeIf(tok::comma));
   }
   
@@ -366,10 +342,7 @@ ParseResult<Expr> Parser::parseExprParen() {
   if (parseMatchingToken(tok::r_paren, RPLoc,
                          diag::expected_rparen_parenthesis_expr,
                          LPLoc, diag::opening_paren))
-    return true;
-
-  if (AnySubExprSemaErrors)
-    return ParseResult<Expr>::getSemaError();
+    return 0;
 
   MutableArrayRef<Expr *> NewSubExprs = Context.AllocateCopy(SubExprs);
   
@@ -396,7 +369,7 @@ ParseResult<Expr> Parser::parseExprParen() {
 ///
 /// The type must start with '(' if present.
 ///
-ParseResult<Expr> Parser::parseExprFunc() {
+NullablePtr<Expr> Parser::parseExprFunc() {
   SourceLoc FuncLoc = consumeToken(tok::kw_func);
 
   SmallVector<Pattern*, 4> Params;
@@ -409,9 +382,9 @@ ParseResult<Expr> Parser::parseExprFunc() {
     Ty = FunctionType::get(Ty, Ty, Context);
   } else if (!Tok.is(tok::l_paren) && !Tok.is(tok::l_paren_space)) {
     diagnose(Tok, diag::func_decl_without_paren);
-    return true;
+    return 0;
   } else if (parseFunctionSignature(Params, Ty)) {
-    return true;
+    return 0;
   }
   
   // The arguments to the func are defined in their own scope.
@@ -424,9 +397,10 @@ ParseResult<Expr> Parser::parseExprFunc() {
   // Then parse the expression.
   ParseResult<BraceStmt> Body;
   if ((Body = parseStmtBrace(diag::expected_lbrace_func_expr)))
-    return true;
+    return 0;
+  // FIXME: Eliminate sema error from statements.
   if (Body.isSemaError())
-    return ParseResult<Expr>::getSemaError();
+    return new (Context) ErrorExpr(FuncLoc);
   
   FE->setBody(Body.get());
   return FE;
