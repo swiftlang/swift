@@ -34,6 +34,10 @@ Expr *Parser::actOnCondition(Expr *Cond) {
 
 /// isStartOfStmtOtherThanAssignment - Return true if the specified token starts
 /// a statement (other than assignment, which starts looking like an expr).
+///
+/// Note this also returns true for '{' which can be the start of a stmt-brace
+/// or the start of an expr-closure.  This ambiguity is resolved towards
+/// statements when not in a subexpression context.
 bool Parser::isStartOfStmtOtherThanAssignment(const Token &Tok) {
   switch (Tok.getKind()) {
   default: return false;
@@ -120,6 +124,10 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
 
       TmpDecls.clear();
     } else {
+      // Verify that the ambiguity between expr-anon-closure and stmt-brace
+      // isn't causing us heartburn.
+      assert(Tok.isNot(tok::l_brace) &&
+             "expr-anon-closure should be parsed as stmt-brace here");
       NullablePtr<Expr> ResultExpr = parseExpr(diag::expected_expr);
       if (ResultExpr.isNull()) {
         NeedParseErrorRecovery = true;

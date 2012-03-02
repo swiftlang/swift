@@ -1383,6 +1383,7 @@
     
     expr-primary ::= <a href="#expr-literal">expr-literal</a>
     expr-primary ::= <a href="#expr-identifier">expr-identifier</a>
+    expr-primary ::= <a href="#expr-anon-closure">expr-anon-closure</a>
     expr-primary ::= <a href="#expr-anon-closure-arg">expr-anon-closure-arg</a>
     expr-primary ::= <a href="#expr-paren">expr-paren</a>
     expr-primary ::= <a href="#expr-delayed-identifier">expr-delayed-identifier</a>
@@ -1504,7 +1505,49 @@
      resolution.  Value declarations are installed with <a 
      href="#decl-var">var</a> and the syntactic sugar forms like <a 
      href="decl-func">func</a> declarations.</p>
+
+  <!-- ===================================================================== -->
+  <h3 id="expr-anon-closure">Anonymous Closure Expression</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    expr-anon-closure ::= '{' expr '}'
+  </pre>
+  
+  <p>A closure expression is a super-concise version of <a 
+     href="#expr-func">expr-func</a> for cases where very simple predicates and
+     other small closures are needed (e.g. sorting and searching predicates).
+     It uses Swift's aggressive type system to infer both the argument and
+     return values types for the closure from the context it is used in, and
+     allows access to the formal arguments of the closure through <a 
+      href="#expr-anon-closure-arg">anonymous closure argument expressions</a>.
+  </p>
+  
+  <p>It is illegal to use these expressions when there is insufficient context
+     to infer the argument and return types of the closure.</p>
+  
+  <p>Note that expr-anon-closure is ambiguous with <a 
+     href="#stmt-brace">stmt-brace</a> when used in a another stmt-brace or in
+     <a href="#decl-translation-unit">translation-unit</a> scope.  This
+     ambiguity is resolved towards stmt-brace, because these context never have
+     enough contextual information to infer the type of the closure, thus they
+     would always be a semantic error if parsed that way.</p>
+
+  <pre class="example">
+    // Takes a closure that it calls to determine an ordering relation.
+    func magic(val : int, predicate : (a : int, b : int) -> bool)
     
+    func f() {
+      // Compare one way.
+      magic(42, { $0 &lt; $1 })
+      // Compare the other way way.
+      magic(42, { $1 &lt; $0 })
+    
+      // Error, not enough context to infer the type of $0.
+      var x = { $0 } 
+    }
+  </pre>
+
   <!-- ===================================================================== -->
   <h3 id="expr-anon-closure-arg">Anonymous Closure Arguments</h3>
   <!-- ===================================================================== -->
@@ -1517,6 +1560,13 @@
   expression is a reference to an anonymous closure argument that is formed when
   the containing expression is <a href="#typecheck_anon">coerced into a closure
   context</a>.  All other dollar identifiers are invalid.</p>
+  
+  <p>This is typically used in the body of an <a
+     href="#expr-anon-closure">expr-anon-closure</a> but can also be used when
+     autoclosing an expression to a closure type.
+  FIXME: Nail this down and add support for it.
+  </p>
+  
 
   <!-- ===================================================================== -->
   <h3 id="expr-delayed-identifier">Delayed Identifier Resolution</h3>
