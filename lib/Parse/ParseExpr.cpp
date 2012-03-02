@@ -19,21 +19,6 @@
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
-bool Parser::isStartOfExpr(const Token &Tok, const Token &Next) {
-  if (Tok.is(tok::integer_literal) || Tok.is(tok::floating_literal) ||
-      Tok.is(tok::colon) ||
-      Tok.is(tok::l_paren_space) || Tok.is(tok::dollarident) ||
-      Tok.is(tok::identifier) || Tok.is(tok::oper))
-    return true;
-  
-  // "func(" and "func{" are func expressions.  "func x" is a func declaration.
-  if (Tok.is(tok::kw_func) &&
-      (Next.is(tok::l_paren) || Next.is(tok::l_paren_space) ||
-       Next.is(tok::l_brace)))
-    return true;
-  return false;
-}
-
 /// parseExpr
 ///   expr:
 ///     expr-unary expr-binary*
@@ -367,14 +352,13 @@ NullablePtr<Expr> Parser::parseExprParen() {
 ///   expr-func: 
 ///     'func' func-signature? stmt-brace
 ///
-/// The type must start with '(' if present.
-///
 NullablePtr<Expr> Parser::parseExprFunc() {
   SourceLoc FuncLoc = consumeToken(tok::kw_func);
 
   SmallVector<Pattern*, 4> Params;
   Type Ty;
   if (Tok.is(tok::l_brace)) {
+    // If the func-signature isn't present, then this is a ()->() function.
     Params.push_back(TuplePattern::create(Context, SourceLoc(),
                                           llvm::ArrayRef<TuplePatternElt>(),
                                           SourceLoc()));

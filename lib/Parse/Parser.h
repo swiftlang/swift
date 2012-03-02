@@ -249,7 +249,6 @@ public:
   //===--------------------------------------------------------------------===//
   // Expression Parsing
   
-  static bool isStartOfExpr(const Token &Tok, const Token &Next);
   // Each of these parsing methods returns null (in a NullablePtr) on a parse
   // error, or an ErrorExpr on a semantic error.  If the method cannot fail, it
   // returns a raw Expr*.
