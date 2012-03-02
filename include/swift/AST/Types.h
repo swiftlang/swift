@@ -312,31 +312,6 @@ public:
   }
 };
 
-/// ParenType - A paren type is a type that's been written in parentheses.
-class ParenType : public TypeBase {
-  Type UnderlyingType;
-
-  friend class ASTContext;
-  ParenType(Type UnderlyingType)
-    : TypeBase(TypeKind::Paren), UnderlyingType(UnderlyingType) {}
-public:
-  Type getUnderlyingType() const { return UnderlyingType; }
-
-  static ParenType *get(ASTContext &C, Type underlying);
-   
-  /// getDesugaredType - If this type is a sugared type, remove all levels of
-  /// sugar until we get down to a non-sugar type.
-  TypeBase *getDesugaredType();
-
-  void print(raw_ostream &OS) const;
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const ParenType *) { return true; }
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::Paren;
-  }
-};
-
 /// TupleTypeElt - This represents a single element of a tuple.
 class TupleTypeElt {
   /// Name - An optional name for the field.

@@ -144,8 +144,6 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::LValue:
     // None of these types have sugar at the outer level.
     return this;
-  case TypeKind::Paren:
-    return cast<ParenType>(this)->getDesugaredType();
   case TypeKind::Identifier:
     return cast<IdentifierType>(this)->getDesugaredType();
   case TypeKind::NameAlias:
@@ -153,10 +151,6 @@ TypeBase *TypeBase::getDesugaredType() {
   }
 
   llvm_unreachable("Unknown type kind");
-}
-
-TypeBase *ParenType::getDesugaredType() {
-  return getUnderlyingType()->getDesugaredType();
 }
 
 TypeBase *NameAliasType::getDesugaredType() {
@@ -314,17 +308,17 @@ void TypeBase::print(raw_ostream &OS) const {
 }
 
 void BuiltinIntegerType::print(raw_ostream &OS) const {
-  OS << "Builtin::int" << cast<BuiltinIntegerType>(this)->getBitWidth();
+  OS << "Builtin::Int" << cast<BuiltinIntegerType>(this)->getBitWidth();
 }
 
 void BuiltinFloatType::print(raw_ostream &OS) const {
   switch (getFPKind()) {
-  case IEEE16:  OS << "Builtin::FP_IEEE16"; return;
-  case IEEE32:  OS << "Builtin::FP_IEEE32"; return;
-  case IEEE64:  OS << "Builtin::FP_IEEE64"; return;
-  case IEEE80:  OS << "Builtin::FP_IEEE80"; return;
-  case IEEE128: OS << "Builtin::FP_IEEE128"; return;
-  case PPC128:  OS << "Builtin::FP_PPC128"; return;
+  case IEEE16:  OS << "Builtin::FPIEEE16"; return;
+  case IEEE32:  OS << "Builtin::FPIEEE32"; return;
+  case IEEE64:  OS << "Builtin::FPIEEE64"; return;
+  case IEEE80:  OS << "Builtin::FPIEEE80"; return;
+  case IEEE128: OS << "Builtin::FPIEEE128"; return;
+  case PPC128:  OS << "Builtin::FPPPC128"; return;
   }
 }
 
@@ -334,12 +328,6 @@ void ErrorType::print(raw_ostream &OS) const {
 
 void DependentType::print(raw_ostream &OS) const {
   OS << "<<dependent type>>";
-}
-
-void ParenType::print(raw_ostream &OS) const {
-  OS << '(';
-  UnderlyingType->print(OS);
-  OS << ')';
 }
 
 void NameAliasType::print(raw_ostream &OS) const {

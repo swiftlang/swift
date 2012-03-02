@@ -36,9 +36,6 @@ static bool checkFullyTyped(Parser &P, Type type) {
   case TypeKind::Dependent:
     return false;
 
-  case TypeKind::Paren:
-    return checkFullyTyped(P, cast<ParenType>(type)->getUnderlyingType());
-
   case TypeKind::LValue:
     return checkFullyTyped(P, cast<LValueType>(type)->getObjectType());
 

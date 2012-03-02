@@ -35,7 +35,6 @@ struct ASTContext::Implementation {
   llvm::DenseMap<std::pair<Type,Type>, FunctionType*> FunctionTypes;
   llvm::DenseMap<std::pair<Type, uint64_t>, ArrayType*> ArrayTypes;
   llvm::DenseMap<unsigned, BuiltinIntegerType*> IntegerTypes;
-  llvm::DenseMap<Type, ParenType*> ParenTypes;
   llvm::DenseMap<std::pair<Type, LValueType::Qual::opaque_type>, LValueType*>
     LValueTypes;
 };
@@ -95,13 +94,6 @@ BuiltinIntegerType *BuiltinIntegerType::get(unsigned BitWidth, ASTContext &C) {
   BuiltinIntegerType *&Result = C.Impl.IntegerTypes[BitWidth];
   if (Result == 0)
     Result = new (C) BuiltinIntegerType(BitWidth, C);
-  return Result;
-}
-
-ParenType *ParenType::get(ASTContext &C, Type underlying) {
-  ParenType *&Result = C.Impl.ParenTypes[underlying];
-  if (Result == 0)
-    Result = new (C) ParenType(underlying);
   return Result;
 }
 
