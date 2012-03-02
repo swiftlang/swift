@@ -181,6 +181,12 @@ Type IdentifierType::getMappedType() {
   return Components.back().Value.get<TypeBase*>();
 }
 
+TupleType *TupleType::getGroupingParen(Type T, ASTContext &Ctx) {
+  TupleTypeElt Elt(T, Identifier());
+  return get(Elt, Ctx);
+}
+
+
 /// hasAnyDefaultValues - Return true if any of our elements has a default
 /// value.
 bool TupleType::hasAnyDefaultValues() const {

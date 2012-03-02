@@ -73,7 +73,6 @@ bool Parser::parseType(Type &Result) {
 bool Parser::parseType(Type &Result, Diag<> MessageID) {
   // Parse type-simple first.
   SourceLoc TypeLoc = Tok.getLoc();
-  bool isTupleType = false;
   switch (Tok.getKind()) {
   case tok::identifier:
     if (parseTypeIdentifier(Result))
@@ -81,7 +80,6 @@ bool Parser::parseType(Type &Result, Diag<> MessageID) {
     break;
   case tok::l_paren:
   case tok::l_paren_space: {
-    isTupleType = true;
     SourceLoc LPLoc = consumeToken(), RPLoc;
     if (parseTypeTupleBody(LPLoc, Result) ||
         parseMatchingToken(tok::r_paren, RPLoc,
@@ -98,8 +96,9 @@ bool Parser::parseType(Type &Result, Diag<> MessageID) {
   // Handle type-function if we have an arrow.
   if (consumeIf(tok::arrow)) {
     // If the argument was not syntactically a tuple type, report an error.
-    if (!isTupleType) {
+    if (!isa<TupleType>(Result.getPointer())) {
       diagnose(TypeLoc, diag::expected_function_argument_must_be_paren);
+      Result = TupleType::getGroupingParen(Result, Context);
     }
     
     Type SecondHalf;

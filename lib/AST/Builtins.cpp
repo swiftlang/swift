@@ -76,7 +76,8 @@ static FuncDecl *getBuiltinFunction(ASTContext &Context, Identifier Id, Type T){
 /// Build a unary operation declaration.
 static ValueDecl *getUnaryOperation(ASTContext &Context, Identifier Id,
                                     Type ArgType) {
-  Type FnTy = FunctionType::get(ArgType, ArgType, Context);
+  Type FnTy = FunctionType::get(TupleType::getGroupingParen(ArgType, Context),
+                                ArgType, Context);
   return getBuiltinFunction(Context, Id, FnTy);
 }
 
@@ -87,7 +88,7 @@ static ValueDecl *getBinaryOperation(ASTContext &Context, Identifier Id,
     TupleTypeElt(ArgType, Identifier()),
     TupleTypeElt(ArgType, Identifier())
   };
-  Type Arg = TupleType::get(ArgElts, Context);
+  TupleType *Arg = TupleType::get(ArgElts, Context);
   Type FnTy = FunctionType::get(Arg, ArgType, Context);
   return getBuiltinFunction(Context, Id, FnTy);
 }
@@ -99,7 +100,7 @@ static ValueDecl *getBinaryPredicate(ASTContext &Context, Identifier Id,
     TupleTypeElt(ArgType, Identifier()),
     TupleTypeElt(ArgType, Identifier())
   };
-  Type Arg = TupleType::get(ArgElts, Context);
+  TupleType *Arg = TupleType::get(ArgElts, Context);
   Type FnTy = FunctionType::get(Arg, BuiltinIntegerType::get(1, Context),
                                 Context);
   return getBuiltinFunction(Context, Id, FnTy);
