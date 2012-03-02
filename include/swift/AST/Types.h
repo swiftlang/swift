@@ -524,7 +524,7 @@ private:
 };
   
 /// FunctionType - A function type has a single input and result, e.g.
-/// "int -> int" or (var a : int, var b : int) -> (int, int).
+/// "(int) -> int" or (var a : int, var b : int) -> (int, int).
 class FunctionType : public TypeBase {
   const Type Input;
   const Type Result;
