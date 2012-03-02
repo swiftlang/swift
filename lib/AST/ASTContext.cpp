@@ -126,7 +126,7 @@ TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
   // FIXME: This is pointless for types with named fields.  The ValueDecl fields
   // themselves are not unique'd so they all get their own addresses, which
   // means that we'll never get a hit here.  This should unique all-type tuples
-  // though.  Likewise with default values.
+  // though.  Same problem with un-uniqued default value expressions.
   void *InsertPos = 0;
   if (TupleType *TT = C.Impl.TupleTypes.FindNodeOrInsertPos(ID, InsertPos))
     return TT;
@@ -143,6 +143,11 @@ TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
       break;
     }
   }
+  
+  // A single-element tuple with no name is a grouping paren, which is never
+  // canonical.  The canonical type for it is the element type.
+  if (Fields.size() == 1 && !Fields.back().hasName())
+    IsCanonical = false;
 
   Fields = ArrayRef<TupleTypeElt>(FieldsCopy, Fields.size());
   

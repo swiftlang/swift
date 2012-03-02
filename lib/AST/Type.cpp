@@ -82,6 +82,13 @@ TypeBase *TypeBase::getCanonicalType() {
     TupleType *TT = cast<TupleType>(this);
     assert(!TT->getFields().empty() && "Empty tuples are always canonical");
 
+    // The canonical form for a grouping paren is the underlying element type.
+    if (TT->getFields().size() == 1 &&
+        !TT->getFields().back().hasName()) {
+      Result = TT->getFields().back().getType()->getCanonicalType();
+      break;
+    }
+    
     SmallVector<TupleTypeElt, 8> CanElts;
     CanElts.reserve(TT->getFields().size());
     for (const TupleTypeElt &field : TT->getFields()) {
