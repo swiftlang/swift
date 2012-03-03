@@ -170,7 +170,7 @@ public:
     return E;      
   }
 
-  Expr *visitClosureExpr(ClosureExpr *E) {
+  Expr *visitImplicitClosureExpr(ImplicitClosureExpr *E) {
     return E;      
   }
   
@@ -628,7 +628,7 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
     if (TC.typeCheckExpression(ERes))
       return 0;
     
-    return new (TC.Context) ClosureExpr(ERes, DestTy);
+    return new (TC.Context) ImplicitClosureExpr(ERes, DestTy);
   }
 
   // If the input expression has a dependent type, then there are two cases:

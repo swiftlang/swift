@@ -55,8 +55,7 @@ class Expr {
   Type Ty;
 
 public:
-  Expr(ExprKind kind, Type ty = Type())
-    : Kind(kind), Ty(ty) {}
+  Expr(ExprKind Kind, Type Ty = Type()) : Kind(Kind), Ty(Ty) {}
 
   /// getKind - Return the kind of this expression.
   ExprKind getKind() const { return Kind; }
@@ -716,31 +715,54 @@ public:
   
 /// ClosureExpr - An expression which is implicitly created by using an
 /// expression in a function context where the expression's type matches the
-/// result of the function.  The Decl list indicates which decls the formal
-/// arguments are bound to.
+/// result of the function.  This may either be explicit in source or implicitly
+/// formed.  Once type checking has completed, ClosureExpr's are known to have
+/// FunctionType.
 ///
-/// Maybe this should be an ImplicitConversionExpr?
 class ClosureExpr : public Expr {
-  Expr *Input;
+  Expr *Body;
   
 public:
-  ClosureExpr(Expr *input, Type ResultTy)
-    : Expr(ExprKind::Closure, ResultTy),
-      Input(input) {}
+  ClosureExpr(ExprKind Kind, Expr *Body, Type ResultTy)
+    : Expr(Kind, ResultTy), Body(Body) {}
 
-  Expr *getInput() const { return Input; }
-  void setInput(Expr *e) { Input = e; }
+  Expr *getBody() const { return Body; }
+  void setBody(Expr *e) { Body = e; }
 
-  SourceRange getSourceRange() const { return Input->getSourceRange(); }
-  
-  /// getNumArgs - Return the number of arguments that this closure expr takes.
+  /// getNumArgs - Return the number of arguments that this closure expr takes,
+  /// deriving it from the Type of the expression.
   unsigned getNumArgs() const;
-  
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ClosureExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->getKind() == ExprKind::Closure; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ImplicitClosure;
+  }
 };
   
+/// ImplicitClosureExpr - This is a closure of the contained subexpression that
+/// is formed when an scalar expression is converted to closure type.  For
+/// example, if an integer expression is used in a context expecting "()->int",
+/// an autoclosure is formed.
+///
+class ImplicitClosureExpr : public ClosureExpr {
+public:
+  ImplicitClosureExpr(Expr *Body, Type ResultTy)
+    : ClosureExpr(ExprKind::ImplicitClosure, Body, ResultTy) {}
+  
+  
+  SourceRange getSourceRange() const { return getBody()->getSourceRange(); }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ImplicitClosureExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ImplicitClosure;
+  }
+};
+  
+  
+/// AnonClosureArgExpr - This is a use of an anonymous closure argument inside
+/// and ExplicitClosure expression.  In code, this is something like "$1".
 class AnonClosureArgExpr : public Expr {
   unsigned ArgNo;
   SourceLoc Loc;

@@ -164,9 +164,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return nullptr;
   }
   
-  Expr *visitClosureExpr(ClosureExpr *E) {
-    if (Expr *E2 = doIt(E->getInput())) {
-      E->setInput(E2);
+  Expr *visitImplicitClosureExpr(ClosureExpr *E) {
+    if (Expr *E2 = doIt(E->getBody())) {
+      E->setBody(E2);
       return E;
     }
     return nullptr;

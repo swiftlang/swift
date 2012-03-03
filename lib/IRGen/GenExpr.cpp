@@ -183,7 +183,7 @@ void IRGenFunction::emitExplodedRValue(Expr *E, Explosion &explosion) {
     return emitExplodedDeclRef(cast<DeclRefExpr>(E), explosion);
 
   case ExprKind::Func:
-  case ExprKind::Closure:
+  case ExprKind::ImplicitClosure:
   case ExprKind::AnonClosureArg:
   case ExprKind::Module:
     IGM.unimplemented(E->getLoc(),
@@ -214,7 +214,7 @@ LValue IRGenFunction::emitLValue(Expr *E) {
   case ExprKind::FloatLiteral:
   case ExprKind::TupleShuffle:
   case ExprKind::Func:
-  case ExprKind::Closure:
+  case ExprKind::ImplicitClosure:
   case ExprKind::AnonClosureArg:
   case ExprKind::Load:
   case ExprKind::Tuple:
@@ -333,7 +333,7 @@ IRGenFunction::tryEmitAsAddress(Expr *E, const TypeInfo &type) {
   case ExprKind::FloatLiteral:
   case ExprKind::TupleShuffle:
   case ExprKind::Func:
-  case ExprKind::Closure:
+  case ExprKind::ImplicitClosure:
   case ExprKind::DotSyntaxPlusFuncUse:
   case ExprKind::Module:
     return Nothing;

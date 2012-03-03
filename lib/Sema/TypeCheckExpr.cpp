@@ -603,7 +603,7 @@ public:
     return E;
   }
 
-  Expr *visitClosureExpr(ClosureExpr *E) {
+  Expr *visitImplicitClosureExpr(ImplicitClosureExpr *E) {
     llvm_unreachable("Should not walk into ClosureExprs!");
   }
   

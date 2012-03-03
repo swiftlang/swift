@@ -591,9 +591,10 @@ public:
     printRec(E->getBody());
     OS << ')';
   }
-  void visitClosureExpr(ClosureExpr *E) {
-    OS.indent(Indent) << "(closure_expr type='" << E->getType() << "'\n";
-    printRec(E->getInput());
+  void visitImplicitClosureExpr(ImplicitClosureExpr *E) {
+    OS.indent(Indent) << "(implicit_closure_expr type='" << E->getType()
+      << "'\n";
+    printRec(E->getBody());
     OS << ')';
   }
   
