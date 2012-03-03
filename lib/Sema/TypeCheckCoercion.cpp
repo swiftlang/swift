@@ -170,6 +170,11 @@ public:
     return E;      
   }
 
+  Expr *visitExplicitClosureExpr(ExplicitClosureExpr *E) {
+    // FIXME: This should apply the type to the closure!
+    return E;      
+  }
+
   Expr *visitImplicitClosureExpr(ImplicitClosureExpr *E) {
     return E;      
   }

@@ -723,7 +723,7 @@ class ClosureExpr : public Expr {
   Expr *Body;
   
 public:
-  ClosureExpr(ExprKind Kind, Expr *Body, Type ResultTy)
+  ClosureExpr(ExprKind Kind, Expr *Body, Type ResultTy = Type())
     : Expr(Kind, ResultTy), Body(Body) {}
 
   Expr *getBody() const { return Body; }
@@ -736,7 +736,30 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ClosureExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ImplicitClosure;
+    return E->getKind() == ExprKind::ImplicitClosure ||
+           E->getKind() == ExprKind::ExplicitClosure;
+  }
+};
+
+/// ExplicitClosureExpr - An explicitly formed closure expression in braces,
+/// e.g. "{ foo() }".  This may contain AnonClosureArgExprs within it that
+/// reference the formal arguments of the closure.
+class ExplicitClosureExpr : public ClosureExpr {
+  SourceLoc LBraceLoc, RBraceLoc;
+public:
+  ExplicitClosureExpr(Expr *Body, SourceLoc LBraceLoc, SourceLoc RBraceLoc) 
+    : ClosureExpr(ExprKind::ExplicitClosure, Body),
+      LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc) {}
+  
+  
+  SourceRange getSourceRange() const {
+    return SourceRange(LBraceLoc, RBraceLoc);
+  }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ExplicitClosureExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ExplicitClosure;
   }
 };
   
@@ -766,7 +789,7 @@ public:
 class AnonClosureArgExpr : public Expr {
   unsigned ArgNo;
   SourceLoc Loc;
-  
+ // TODO: Up pointer to the containing ExplicitClosureExpr.
 public:
   AnonClosureArgExpr(unsigned argNo, SourceLoc loc)
     : Expr(ExprKind::AnonClosureArg), ArgNo(argNo), Loc(loc) {}

@@ -590,6 +590,11 @@ public:
     printRec(E->getBody());
     OS << ')';
   }
+  void visitExplicitClosureExpr(ExplicitClosureExpr *E) {
+    printCommon(E, "explicit_closure_expr") << '\n';
+    printRec(E->getBody());
+    OS << ')';
+  }
   void visitImplicitClosureExpr(ImplicitClosureExpr *E) {
     printCommon(E, "implicit_closure_expr") << '\n';
     printRec(E->getBody());
