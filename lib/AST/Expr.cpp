@@ -472,13 +472,16 @@ public:
   void printRec(Decl *D) { D->print(OS, Indent+2); }
   void printRec(Stmt *S) { S->print(OS, Indent+2); }
 
+  raw_ostream &printCommon(Expr *E, const char *C) {
+    return OS.indent(Indent) << '(' << C << " type='" << E->getType() << '\'';
+  }
+  
   void visitErrorExpr(ErrorExpr *E) {
-    OS.indent(Indent) << "(error_expr type='" << E->getType() << "')";
+    printCommon(E, "error_expr") << ')';
   }
 
   void visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
-    OS.indent(Indent) << "(integer_literal_expr type='" << E->getType();
-    OS << "' value=";
+    printCommon(E, "integer_literal_expr") << " value=";
     if (E->getType().isNull() || E->getType()->is<DependentType>())
       OS << E->getText();
     else
@@ -486,16 +489,14 @@ public:
     OS << ')';
   }
   void visitFloatLiteralExpr(FloatLiteralExpr *E) {
-    OS.indent(Indent) << "(float_literal_expr type='" << E->getType();
-    OS << "' value=" << E->getText() << ')';
+    printCommon(E, "float_literal_expr") << " value=" << E->getText() << ')';
   }
   void visitDeclRefExpr(DeclRefExpr *E) {
-    OS.indent(Indent) << "(declref_expr type='" << E->getType();
-    OS << "' decl=" << E->getDecl()->getName() << ')';
+    printCommon(E, "declref_expr")
+      << " decl=" << E->getDecl()->getName() << ')';
   }
   void visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
-    OS.indent(Indent) << "(overloadsetref_expr type='" << E->getType();
-    OS << "' #decls=" << E->getDecls().size();
+    printCommon(E, "overloadsetref_expr") << " #decls=" <<E->getDecls().size();
     for (Decl *D : E->getDecls()) {
       OS << '\n';
       printRec(D);
@@ -503,20 +504,20 @@ public:
     OS << ')';
   }
   void visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
-    OS.indent(Indent) << "(unresolved_decl_ref_expr type='" << E->getType();
-    OS << "' name=" << E->getName() << ')';
+    printCommon(E, "unresolved_decl_ref_expr")
+      << " name=" << E->getName() << ')';
   }
   void visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
-    OS.indent(Indent) << "(unresolved_member_expr type='" << E->getType();
-    OS << "\' name='" << E->getName() << "')";
+    printCommon(E, "unresolved_member_expr")
+      << " name='" << E->getName() << "')";
   }
   void visitParenExpr(ParenExpr *E) {
-    OS.indent(Indent) << "(paren_expr type='" << E->getType() << "'\n";
+    printCommon(E, "paren_expr") << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }
   void visitTupleExpr(TupleExpr *E) {
-    OS.indent(Indent) << "(tuple_expr type='" << E->getType() << '\'';
+    printCommon(E, "tuple_expr");
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
       OS << '\n';
       if (E->getElement(i))
@@ -527,8 +528,8 @@ public:
     OS << ')';
   }
   void visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
-    OS.indent(Indent) << "(unresolved_dot_expr type='" << E->getType();
-    OS << "\' field '" << E->getName().str() << "'";
+    printCommon(E, "unresolved_dot_expr")
+      << " field '" << E->getName().str() << "'";
     if (E->getBase()) {
       OS << '\n';
       printRec(E->getBase());
@@ -536,18 +537,17 @@ public:
     OS << ')';
   }
   void visitModuleExpr(ModuleExpr *E) {
-    OS.indent(Indent) << "(module_expr type='" << E->getType() << "')";
+    printCommon(E, "module_expr") << '\n';
   }
   void visitTupleElementExpr(TupleElementExpr *E) {
-    OS.indent(Indent) << "(tuple_element_expr type='" << E->getType();
-    OS << "\' field #" << E->getFieldNumber() << "\n";
+    printCommon(E, "tuple_element_expr")
+      << " field #" << E->getFieldNumber() << '\n';
     printRec(E->getBase());
     OS << ')';
   }
 
   void visitTupleShuffleExpr(TupleShuffleExpr *E) {
-    OS.indent(Indent) << "(tuple_shuffle type='" << E->getType();
-    OS << "' Elements=[";
+    printCommon(E, "tuple_shuffle_expr") << " elements=[";
     for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
       if (i) OS << ", ";
       OS << E->getElementMapping()[i];
@@ -557,29 +557,28 @@ public:
     OS << ')';
   }
   void visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
-    OS.indent(Indent) << "(look_through_oneof_expr type='" << E->getType();
-    OS << "\'\n";
+    printCommon(E, "look_through_oneof_expr") << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }
   void visitLoadExpr(LoadExpr *E) {
-    OS.indent(Indent) << "(load_expr type='" << E->getType() << "\'\n";
+    printCommon(E, "load_expr") << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }
   void visitMaterializeExpr(MaterializeExpr *E) {
-    OS.indent(Indent) << "(materialize_expr type='" << E->getType() << "\'\n";
+    printCommon(E, "materialize_expr") << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }
 
   void visitAddressOfExpr(AddressOfExpr *E) {
-    OS.indent(Indent) << "(address_of_expr type='" << E->getType() << "\'\n";
+    printCommon(E, "address_of_expr") << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }
   void visitSequenceExpr(SequenceExpr *E) {
-    OS.indent(Indent) << "(sequence_expr type='" << E->getType() << '\'';
+    printCommon(E, "sequence_expr") << '\n';
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
       OS << '\n';
       printRec(E->getElement(i));
@@ -587,24 +586,23 @@ public:
     OS << ')';
   }
   void visitFuncExpr(FuncExpr *E) {
-    OS.indent(Indent) << "(func_expr type='" << E->getType() << "'\n";
+    printCommon(E, "func_expr") << '\n';
     printRec(E->getBody());
     OS << ')';
   }
   void visitImplicitClosureExpr(ImplicitClosureExpr *E) {
-    OS.indent(Indent) << "(implicit_closure_expr type='" << E->getType()
-      << "'\n";
+    printCommon(E, "implicit_closure_expr") << '\n';
     printRec(E->getBody());
     OS << ')';
   }
   
   void visitAnonClosureArgExpr(AnonClosureArgExpr *E) {
-    OS.indent(Indent) << "(anon_closure_arg_expr type='" << E->getType();
-    OS << "' ArgNo=" << E->getArgNumber() << ')';
+    printCommon(E, "anon_closure_arg_expr")
+      << " ArgNo=" << E->getArgNumber() << ')';
   }
   
-  void visitApplyExpr(ApplyExpr *E, const char *NodeName) {
-    OS.indent(Indent) << '(' << NodeName << " type='" << E->getType() << "\'\n";
+  void printApplyExpr(ApplyExpr *E, const char *NodeName) {
+    printCommon(E, NodeName) << '\n';
     printRec(E->getFn());
     OS << '\n';
     printRec(E->getArg());
@@ -612,23 +610,22 @@ public:
   }
   
   void visitCallExpr(CallExpr *E) {
-    visitApplyExpr(E, "call_expr");
+    printApplyExpr(E, "call_expr");
   }
   void visitUnaryExpr(UnaryExpr *E) {
-    visitApplyExpr(E, "unary_expr");
+    printApplyExpr(E, "unary_expr");
   }
   void visitBinaryExpr(BinaryExpr *E) {
-    visitApplyExpr(E, "binary_expr");
+    printApplyExpr(E, "binary_expr");
   }
   void visitConstructorCallExpr(ConstructorCallExpr *E) {
-    visitApplyExpr(E, "constructor_call_expr");
+    printApplyExpr(E, "constructor_call_expr");
   }
   void visitDotSyntaxCallExpr(DotSyntaxCallExpr *E) {
-    visitApplyExpr(E, "dot_syntax_call_expr");
+    printApplyExpr(E, "dot_syntax_call_expr");
   }
   void visitDotSyntaxPlusFuncUseExpr(DotSyntaxPlusFuncUseExpr *E) {
-    OS.indent(Indent) << "(dot_syntax_plus_func_use type='"
-       << E->getType() << "'\n";
+    printCommon(E, "dot_syntax_plus_func_use") << '\n';
     printRec(E->getBaseExpr());
     OS << '\n';
     printRec(E->getPlusFuncExpr());
