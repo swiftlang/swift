@@ -170,40 +170,7 @@ public:
     return E;      
   }
 
-  Expr *visitExplicitClosureExpr(ExplicitClosureExpr *E) {
-    // Make sure that we're converting the closure to a function type.  If not,
-    // diagnose the error.
-    FunctionType *FT = DestTy->getAs<FunctionType>();
-    if (FT == 0) {
-      TC.diagnose(E->getStartLoc(), diag::closure_not_function_type, DestTy)
-        << E->getSourceRange();
-      return 0;
-    }
-    
-    // Bind any anonymous closure arguments, validating them and resolving
-    // their types.
-    if (TC.bindAndValidateClosureArgs(E->getBody(), FT->getInput()))
-      return 0;
-
-    E->setType(FT);
-
-    // Now that the AnonClosureArgExpr's potentially have a type, redo semantic
-    // analysis from the leaves of the expression tree up.
-    Expr *Result = E->getBody();
-    if (TC.typeCheckExpression(Result))
-      return 0;
-    // Make sure that the body agrees with the result type of the closure.
-    Result = TC.convertToType(Result, FT->getResult());
-    if (Result == 0) {
-      TC.diagnose(E->getStartLoc(), 
-                  diag::while_converting_closure_body_to_inferred_return_type,
-                  FT->getResult())
-        << E->getBody()->getSourceRange();
-      return 0;
-    }
-    E->setBody(Result);
-    return E;
-  }
+  Expr *visitExplicitClosureExpr(ExplicitClosureExpr *E);
 
   Expr *visitImplicitClosureExpr(ImplicitClosureExpr *E) {
     return E;      
@@ -268,7 +235,7 @@ public:
     qs |= LValueType::Qual::Implicit;
 
     Type NewDestTy = LValueType::get(DestLT->getObjectType(), qs, TC.Context);
-    return convertToType(E, NewDestTy, true, TC);
+    return convertToType(E, NewDestTy, TC);
   }
 
   SemaCoerce(TypeChecker &TC, Type DestTy) : TC(TC), DestTy(DestTy) {
@@ -279,8 +246,7 @@ public:
   }
   
   /// convertToType - This is the main entrypoint to SemaCoerce.
-  static Expr *convertToType(Expr *E, Type DestTy, bool IgnoreAnonDecls,
-                             TypeChecker &TC);
+  static Expr *convertToType(Expr *E, Type DestTy, TypeChecker &TC);
 
   static Expr *convertScalarToTupleType(Expr *E, TupleType *DestTy,
                                         unsigned FieldNo, TypeChecker &TC);
@@ -291,7 +257,7 @@ public:
 } // end anonymous namespace.
 
 Expr *SemaCoerce::visitParenExpr(ParenExpr *E) {
-  Expr *Sub = convertToType(E->getSubExpr(), DestTy, true, TC);
+  Expr *Sub = convertToType(E->getSubExpr(), DestTy, TC);
   if (Sub == 0) return 0;
 
   E->setSubExpr(Sub);    
@@ -300,8 +266,44 @@ Expr *SemaCoerce::visitParenExpr(ParenExpr *E) {
 }
 
 Expr *SemaCoerce::visitTupleExpr(TupleExpr *E) {
-  return convertToType(E, DestTy, true, TC);
+  return convertToType(E, DestTy, TC);
 }
+
+Expr *SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
+  // Make sure that we're converting the closure to a function type.  If not,
+  // diagnose the error.
+  FunctionType *FT = DestTy->getAs<FunctionType>();
+  if (FT == 0) {
+    TC.diagnose(E->getStartLoc(), diag::closure_not_function_type, DestTy)
+    << E->getSourceRange();
+    return 0;
+  }
+  
+  // Bind any anonymous closure arguments, validating them and resolving
+  // their types.
+  if (TC.bindAndValidateClosureArgs(E->getBody(), FT->getInput()))
+    return 0;
+  
+  E->setType(FT);
+  
+  // Now that the AnonClosureArgExpr's potentially have a type, redo semantic
+  // analysis from the leaves of the expression tree up.
+  Expr *Result = E->getBody();
+  if (TC.typeCheckExpression(Result))
+    return 0;
+  // Make sure that the body agrees with the result type of the closure.
+  Result = TC.convertToType(Result, FT->getResult());
+  if (Result == 0) {
+    TC.diagnose(E->getStartLoc(), 
+                diag::while_converting_closure_body_to_inferred_return_type,
+                FT->getResult())
+    << E->getBody()->getSourceRange();
+    return 0;
+  }
+  E->setBody(Result);
+  return E;
+}
+
 
 /// convertTupleToTupleType - Given an expression that has tuple type, convert
 /// it to have some other tuple type.
@@ -448,7 +450,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       // element type.
       Expr *Elt = OrigElts[SrcField];
       
-      Elt = convertToType(Elt, DestTy->getElementType(i), true, TC);
+      Elt = convertToType(Elt, DestTy->getElementType(i), TC);
       // TODO: QOI: Include a note about this failure!
       if (Elt == 0) return 0;
       TE->setElement(i, Elt);
@@ -503,7 +505,7 @@ Expr *SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   // default value, see if the expression's type is convertable to the
   // element type.  This handles assigning 4 to "(a = 4, b : int)".
   Type ScalarType = DestTy->getElementType(ScalarField);
-  Expr *ERes = convertToType(E, ScalarType, false, TC);
+  Expr *ERes = convertToType(E, ScalarType, TC);
   if (ERes == 0) return 0;
   
   unsigned NumFields = DestTy->getFields().size();
@@ -545,8 +547,7 @@ static bool isSubtypeExceptImplicit(LValueType *SrcTy, LValueType *DestTy) {
 ///
 /// NOTE: This needs to be kept in synch with getConversionRank in Expr.cpp.
 ///
-Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
-                                bool IgnoreAnonDecls, TypeChecker &TC) {
+Expr *SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC) {
   assert(!DestTy->is<DependentType>() &&
          "Result of conversion can't be dependent");
 
@@ -557,8 +558,7 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
   // If the expression is a grouping parenthesis and it has a dependent type,
   // just force the type through it, regardless of what DestTy is.
   if (ParenExpr *PE = dyn_cast<ParenExpr>(E)) {
-    PE->setSubExpr(convertToType(PE->getSubExpr(), DestTy,
-                                 IgnoreAnonDecls, TC));
+    PE->setSubExpr(convertToType(PE->getSubExpr(), DestTy, TC));
     if (PE->getSubExpr() == 0) return 0;
     PE->setType(PE->getSubExpr()->getType());
     return PE;
@@ -576,7 +576,7 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
 
     // Materialization.
     if (!DestLT->isExplicit()) {
-      E = convertToType(E, DestLT->getObjectType(), IgnoreAnonDecls, TC);
+      E = convertToType(E, DestLT->getObjectType(), TC);
       if (!E) return nullptr;
 
       return new (TC.Context) MaterializeExpr(E, DestTy);
@@ -638,7 +638,7 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
     // FIXME: reject explicit l-values
     assert(!SrcLT->isExplicit());
     E = new (TC.Context) LoadExpr(E, SrcLT->getObjectType());
-    return convertToType(E, DestTy, IgnoreAnonDecls, TC);
+    return convertToType(E, DestTy, TC);
   }
 
   // Otherwise, check to see if this is an auto-closure case.  This case happens
@@ -646,7 +646,7 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
   // type.
   if (!isa<ExplicitClosureExpr>(E)) {
     if (FunctionType *FT = DestTy->getAs<FunctionType>()) {
-      // FIXME: Reevaluate IgnoreAnonDecls and this implementation.
+      // FIXME: Reevaluate this implementation.
       
       
       // If there are any live anonymous closure arguments, this level will use
@@ -654,7 +654,7 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
       // (int,int)->(int,int)->() the arguments bind to the first level, not the
       // inner level.  To handle this, we ignore anonymous decls in the
       // recursive case here.
-      Expr *ERes = convertToType(E, FT->getResult(), true, TC);
+      Expr *ERes = convertToType(E, FT->getResult(), TC);
       if (ERes == 0) return 0;
     
       // Now that the AnonClosureArgExpr's potentially have a type, redo
@@ -685,5 +685,5 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
 
 
 Expr *TypeChecker::convertToType(Expr *E, Type DestTy) {
-  return SemaCoerce::convertToType(E, DestTy, false, *this);
+  return SemaCoerce::convertToType(E, DestTy, *this);
 }
