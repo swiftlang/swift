@@ -334,7 +334,8 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     E2 = convertToType(E2, FT->getInput());
     if (E2 == 0) {
       diagnose(E1->getLoc(), diag::while_converting_function_argument,
-               FT->getInput());
+               FT->getInput())
+        << E->getArg()->getSourceRange();
       return 0;
     }
     
