@@ -17,6 +17,7 @@
 #include "Parser.h"
 #include "swift/AST/Diagnostics.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
 /// parseExpr
@@ -259,8 +260,16 @@ Expr *Parser::parseExprIdentifier() {
 NullablePtr<Expr> Parser::parseExprExplicitClosure() {
   SourceLoc LBLoc = consumeToken(tok::l_brace);
   
+  ExplicitClosureExpr *ThisClosure = new (Context) ExplicitClosureExpr(LBLoc);
+  
+  // Install ThisClosure as the current ExplicitClosureExpr so that arguments
+  // can be linked into it.
+  llvm::SaveAndRestore<ExplicitClosureExpr*> X(CurExplicitClosure, ThisClosure);
+  
   NullablePtr<Expr> Body = parseExpr(diag::expected_expr_closure);
   if (Body.isNull()) return 0;
+  
+  ThisClosure->setBody(Body.get());
   
   SourceLoc RBLoc;
   if (parseMatchingToken(tok::r_brace, RBLoc,
@@ -268,7 +277,8 @@ NullablePtr<Expr> Parser::parseExprExplicitClosure() {
                          LBLoc, diag::opening_brace))
     RBLoc = Body.get()->getEndLoc();
   
-  return new (Context) ExplicitClosureExpr(LBLoc, Body.get(), RBLoc);
+  ThisClosure->setRBraceLoc(RBLoc);
+  return ThisClosure;
 }
 
 ///   expr-anon-closure-argument:
@@ -291,6 +301,14 @@ Expr *Parser::parseExprAnonClosureArg() {
     diagnose(Loc.getAdvancedLoc(1), diag::dollar_numeric_too_large);
     return new (Context) ErrorExpr(Loc);
   }
+  
+  // Make sure that this is located in an explicit closure expression.
+  if (CurExplicitClosure == 0) {
+    diagnose(Loc, diag::anon_closure_arg_not_in_closure);
+    return new (Context) ErrorExpr(Loc);
+  }
+  
+  // FIXME: Link it up.
   
   return new (Context) AnonClosureArgExpr(ArgNo, Loc);
 }

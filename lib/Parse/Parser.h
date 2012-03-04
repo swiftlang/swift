@@ -46,6 +46,7 @@ public:
   const llvm::MemoryBuffer *Buffer;
   Lexer &L;
   DeclContext *CurDeclContext;
+  ExplicitClosureExpr *CurExplicitClosure;
   swift::Component *Component;
   ASTContext &Context;
   ScopeInfo ScopeInfo;

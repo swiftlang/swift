@@ -747,10 +747,14 @@ public:
 class ExplicitClosureExpr : public ClosureExpr {
   SourceLoc LBraceLoc, RBraceLoc;
 public:
-  ExplicitClosureExpr(SourceLoc LBraceLoc, Expr *Body, SourceLoc RBraceLoc) 
+  ExplicitClosureExpr(SourceLoc LBraceLoc, Expr *Body = 0, 
+                      SourceLoc RBraceLoc = SourceLoc())
     : ClosureExpr(ExprKind::ExplicitClosure, Body),
       LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc) {}
   
+  void setRBraceLoc(SourceLoc L) {
+    RBraceLoc = L;
+  }
   
   SourceRange getSourceRange() const {
     return SourceRange(LBraceLoc, RBraceLoc);

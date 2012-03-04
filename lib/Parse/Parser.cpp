@@ -62,6 +62,7 @@ Parser::Parser(unsigned BufferID, swift::Component *Comp, ASTContext &Context)
     Component(Comp),
     Context(Context),
     ScopeInfo(*this) {
+  CurExplicitClosure = 0;
 }
 
 Parser::~Parser() {
