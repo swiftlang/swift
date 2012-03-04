@@ -180,8 +180,20 @@ public:
       return 0;
     }
     
-    // FIXME: This should apply the type to the closure!
-    return E;      
+    // Bind any anonymous closure arguments, validating them and resolving
+    // their types.
+    if (TC.bindAndValidateClosureArgs(E->getBody(), FT->getInput()))
+      return 0;
+
+    E->setType(FT);
+
+    // Now that the AnonClosureArgExpr's potentially have a type, redo semantic
+    // analysis from the leaves of the expression tree up.
+    Expr *Result = E->getBody();
+    if (TC.typeCheckExpression(Result))
+      return 0;
+    E->setBody(Result);
+    return E;
   }
 
   Expr *visitImplicitClosureExpr(ImplicitClosureExpr *E) {
@@ -623,26 +635,28 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
   // Otherwise, check to see if this is an auto-closure case.  This case happens
   // when we convert an expression E to a function type whose result is E's
   // type.
-  if (FunctionType *FT = DestTy->getAs<FunctionType>()) {
-    // If we bound any anonymous closure arguments, validate them and resolve
-    // their types.
-    if (!IgnoreAnonDecls && TC.bindAndValidateClosureArgs(E, FT->getInput()))
-      return 0;
+  if (!isa<ExplicitClosureExpr>(E)) {
+    if (FunctionType *FT = DestTy->getAs<FunctionType>()) {
+      // If we bound any anonymous closure arguments, validate them and resolve
+      // their types.
+      if (!IgnoreAnonDecls && TC.bindAndValidateClosureArgs(E, FT->getInput()))
+        return 0;
 
-    // If there are any live anonymous closure arguments, this level will use
-    // them and remove them.  When binding something like $0+$1 to
-    // (int,int)->(int,int)->() the arguments bind to the first level, not the
-    // inner level.  To handle this, we ignore anonymous decls in the recursive
-    // case here.
-    Expr *ERes = convertToType(E, FT->getResult(), true, TC);
-    if (ERes == 0) return 0;
-  
-    // Now that the AnonClosureArgExpr's potentially have a type, redo semantic
-    // analysis from the leaves of the expression tree up.
-    if (TC.typeCheckExpression(ERes))
-      return 0;
+      // If there are any live anonymous closure arguments, this level will use
+      // them and remove them.  When binding something like $0+$1 to
+      // (int,int)->(int,int)->() the arguments bind to the first level, not the
+      // inner level.  To handle this, we ignore anonymous decls in the
+      // recursive case here.
+      Expr *ERes = convertToType(E, FT->getResult(), true, TC);
+      if (ERes == 0) return 0;
     
-    return new (TC.Context) ImplicitClosureExpr(ERes, DestTy);
+      // Now that the AnonClosureArgExpr's potentially have a type, redo
+      // semantic analysis from the leaves of the expression tree up.
+      if (TC.typeCheckExpression(ERes))
+        return 0;
+      
+      return new (TC.Context) ImplicitClosureExpr(ERes, DestTy);
+    }
   }
 
   // If the input expression has a dependent type, then there are two cases:

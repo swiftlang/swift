@@ -40,6 +40,7 @@ struct RewriteAnonArgExpr : Walker {
   bool walkToExprPre(Expr *E) {
     // If this is a ClosureExpr, don't walk into it.  This would find *its*
     // anonymous closure arguments, not ours.
+    // FIXME: This should only stop at *explicit* closures.
     if (isa<ClosureExpr>(E)) return false; // Don't recurse into it.
       
     // Otherwise, do recurse into it.  We handle anon args in the postorder
