@@ -308,9 +308,12 @@ Expr *Parser::parseExprAnonClosureArg() {
     return new (Context) ErrorExpr(Loc);
   }
   
-  // FIXME: Link it up.
+  AnonClosureArgExpr *NewArg = new (Context) AnonClosureArgExpr(ArgNo, Loc);
   
-  return new (Context) AnonClosureArgExpr(ArgNo, Loc);
+  // Add the argument to the closure's list of argument uses.
+  CurExplicitClosure->addClosureArgumentUse(NewArg);
+
+  return NewArg;
 }
 
 Expr *Parser::actOnIdentifierExpr(Identifier Text, SourceLoc Loc) {

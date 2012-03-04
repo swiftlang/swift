@@ -741,16 +741,53 @@ public:
   }
 };
 
+/// AnonClosureArgExpr - This is a use of an anonymous closure argument inside
+/// and ExplicitClosure expression.  In code, this is something like "$1".
+class AnonClosureArgExpr : public Expr {
+  unsigned ArgNo;
+  SourceLoc Loc;
+ 
+  /// NextArg - A singly linked list of argument uses for a specific closure.
+  AnonClosureArgExpr *NextArg;
+public:
+  AnonClosureArgExpr(unsigned argNo, SourceLoc loc)
+    : Expr(ExprKind::AnonClosureArg), ArgNo(argNo), Loc(loc), NextArg(0) {}
+
+  SourceRange getSourceRange() const { return Loc; }
+
+  unsigned getArgNumber() const { return ArgNo; }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const AnonClosureArgExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::AnonClosureArg;
+  }
+  
+private:
+  friend class ExplicitClosureExpr;
+  void addToList(AnonClosureArgExpr *&List) {
+    assert(NextArg == 0 && "Already in an argument list");
+    NextArg = List;
+    List = this;
+  }
+};
+  
+
 /// ExplicitClosureExpr - An explicitly formed closure expression in braces,
 /// e.g. "{ foo() }".  This may contain AnonClosureArgExprs within it that
 /// reference the formal arguments of the closure.
 class ExplicitClosureExpr : public ClosureExpr {
   SourceLoc LBraceLoc, RBraceLoc;
+  
+  /// This is a singly linked list of all the closure arguments references in
+  /// this closure.  Each argument number may occur 0, 1 or many times in the
+  /// list, because they occur each time an argument is used.
+  AnonClosureArgExpr *ClosureArgList;
 public:
   ExplicitClosureExpr(SourceLoc LBraceLoc, Expr *Body = 0, 
                       SourceLoc RBraceLoc = SourceLoc())
     : ClosureExpr(ExprKind::ExplicitClosure, Body),
-      LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc) {}
+      LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc), ClosureArgList(0) {}
   
   void setRBraceLoc(SourceLoc L) {
     RBraceLoc = L;
@@ -758,6 +795,10 @@ public:
   
   SourceRange getSourceRange() const {
     return SourceRange(LBraceLoc, RBraceLoc);
+  }
+  
+  void addClosureArgumentUse(AnonClosureArgExpr *E) {
+    E->addToList(ClosureArgList);
   }
   
   // Implement isa/cast/dyncast/etc.
@@ -787,27 +828,6 @@ public:
   }
 };
   
-  
-/// AnonClosureArgExpr - This is a use of an anonymous closure argument inside
-/// and ExplicitClosure expression.  In code, this is something like "$1".
-class AnonClosureArgExpr : public Expr {
-  unsigned ArgNo;
-  SourceLoc Loc;
- // TODO: Up pointer to the containing ExplicitClosureExpr.
-public:
-  AnonClosureArgExpr(unsigned argNo, SourceLoc loc)
-    : Expr(ExprKind::AnonClosureArg), ArgNo(argNo), Loc(loc) {}
-
-  SourceRange getSourceRange() const { return Loc; }
-
-  unsigned getArgNumber() const { return ArgNo; }
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const AnonClosureArgExpr *) { return true; }
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::AnonClosureArg;
-  }
-};
   
 /// ApplyExpr - Superclass of various function calls, which apply an argument to
 /// a function to get a result.

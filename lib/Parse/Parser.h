@@ -46,6 +46,8 @@ public:
   const llvm::MemoryBuffer *Buffer;
   Lexer &L;
   DeclContext *CurDeclContext;
+  /// CurExplicitClosure - When parsing the body of an explicit closure
+  /// expression, this pointer points to the closure.
   ExplicitClosureExpr *CurExplicitClosure;
   swift::Component *Component;
   ASTContext &Context;
