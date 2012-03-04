@@ -192,6 +192,15 @@ public:
     Expr *Result = E->getBody();
     if (TC.typeCheckExpression(Result))
       return 0;
+    // Make sure that the body agrees with the result type of the closure.
+    Result = TC.convertToType(Result, FT->getResult());
+    if (Result == 0) {
+      TC.diagnose(E->getStartLoc(), 
+                  diag::while_converting_closure_body_to_inferred_return_type,
+                  FT->getResult())
+        << E->getBody()->getSourceRange();
+      return 0;
+    }
     E->setBody(Result);
     return E;
   }
@@ -670,7 +679,8 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy,
   // Could not do the conversion.
 
   // When diagnosing a failed conversion, ignore l-values on the source type.
-  TC.diagnose(E->getLoc(), diag::invalid_conversion, E->getType(), DestTy);
+  TC.diagnose(E->getLoc(), diag::invalid_conversion, E->getType(), DestTy)
+    << E->getSourceRange();
   return nullptr;
 }
 
