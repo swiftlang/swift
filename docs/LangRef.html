@@ -1383,7 +1383,7 @@
     
     expr-primary ::= <a href="#expr-literal">expr-literal</a>
     expr-primary ::= <a href="#expr-identifier">expr-identifier</a>
-    expr-primary ::= <a href="#expr-anon-closure">expr-anon-closure</a>
+    expr-primary ::= <a href="#expr-explicit-closure">expr-explicit-closure</a>
     expr-primary ::= <a href="#expr-anon-closure-arg">expr-anon-closure-arg</a>
     expr-primary ::= <a href="#expr-paren">expr-paren</a>
     expr-primary ::= <a href="#expr-delayed-identifier">expr-delayed-identifier</a>
@@ -1507,11 +1507,21 @@
      href="decl-func">func</a> declarations.</p>
 
   <!-- ===================================================================== -->
-  <h3 id="expr-anon-closure">Anonymous Closure Expression</h3>
+  <h3 id="expr-explicit-closure">Explicit Closure Expression</h3>
   <!-- ===================================================================== -->
   
+  <div class="commentary">
+    It would be possible to allow { expr } and { stmt-brace-item* } here - 
+    allowing the same syntax as stmt-brace.  The
+    intepretation of this would be that a single expression is evaluated and
+    returned implicitly, but that a multi-statement sequence would require an
+    explicit return.  This would mean that {4} and {return 4} both do the same
+    thing. OTOH, it is possibly confusing that {4} and {4;} would have very
+    different meanings.
+  </div>
+
   <pre class="grammar">
-    expr-anon-closure ::= '{' expr '}'
+    expr-explicit-closure ::= '{' expr '}'
   </pre>
   
   <p>A closure expression is a super-concise version of <a 
@@ -1526,7 +1536,7 @@
   <p>It is illegal to use these expressions when there is insufficient context
      to infer the argument and return types of the closure.</p>
   
-  <p>Note that expr-anon-closure is ambiguous with <a 
+  <p>Note that expr-explicit-closure is ambiguous with <a 
      href="#stmt-brace">stmt-brace</a> when used in a another stmt-brace or in
      <a href="#decl-translation-unit">translation-unit</a> scope.  This
      ambiguity is resolved towards stmt-brace, because these context never have
@@ -1534,16 +1544,19 @@
      would always be a semantic error if parsed that way.</p>
 
   <pre class="example">
-    // Takes a closure that it calls to determine an ordering relation.
+    <i>// Takes a closure that it calls to determine an ordering relation.</i>
     func magic(val : int, predicate : (a : int, b : int) -> bool)
     
     func f() {
-      // Compare one way.
+      <i>// Compare one way.  Closure is inferred to return bool and take two ints</i>
+      <i>// from the argument context.  This same information infers that $0 and $1</i>
+      <i>// both have type 'int'.</i>
       magic(42, { $0 &lt; $1 })
-      // Compare the other way way.
+    
+      <i>// Compare the other way way.</i>
       magic(42, { $1 &lt; $0 })
     
-      // Error, not enough context to infer the type of $0.
+      <i>// Error, not enough context to infer the type of $0.</i>
       var x = { $0 } 
     }
   </pre>
@@ -1561,10 +1574,8 @@
   the containing expression is <a href="#typecheck_anon">coerced into a closure
   context</a>.  All other dollar identifiers are invalid.</p>
   
-  <p>This is typically used in the body of an <a
-     href="#expr-anon-closure">expr-anon-closure</a> but can also be used when
-     autoclosing an expression to a closure type.
-  FIXME: Nail this down and add support for it.
+  <p>This can only be used in the body of an <a
+     href="#expr-explicit-closure">expr-explicit-closure</a>.
   </p>
   
 
