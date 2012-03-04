@@ -604,7 +604,10 @@ public:
   }
 
   Expr *visitExplicitClosureExpr(ExplicitClosureExpr *E) {
-    llvm_unreachable("Should not walk into ClosureExprs!");
+    assert(E->getType().isNull() &&
+           "Shouldn't walk into typed ExplicitClosures");
+    E->setDependentType(DependentType::get(TC.Context));
+    return E;
   }
   Expr *visitImplicitClosureExpr(ImplicitClosureExpr *E) {
     llvm_unreachable("Should not walk into ClosureExprs!");
@@ -688,10 +691,18 @@ public:
   }
 
   bool walkToExprPre(Expr *E) {
-    // Do not walk into ClosureExpr.  Anonexprs within a nested closures
-    // will have already been resolved, so we don't need to recurse into it.
-    // This also prevents N^2 re-sema activity with lots of nested closures.
-    return !(isa<ClosureExpr>(E) || isa<FuncExpr>(E));
+    // Do not walk into explicit closures.  They are analyzed modularly, so we
+    // don't need to recurse into them and reanalyze their body. This also
+    // prevents N^2 re-sema activity with lots of nested closures.
+    if (isa<FuncExpr>(E)) return false;
+
+    // Only walk into Explicit Closures if they haven't been seen at all yet.
+    // This ensures that everything gets a type, even if it is a DependentType.
+    if (isa<ExplicitClosureExpr>(E) && E->getType().isNull())
+      return true;
+    
+    // FIXME: Implicit closures should be entered.
+    return !isa<ClosureExpr>(E);
   }
 
   Expr *walkToExprPost(Expr *E) {

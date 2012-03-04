@@ -747,7 +747,7 @@ public:
 class ExplicitClosureExpr : public ClosureExpr {
   SourceLoc LBraceLoc, RBraceLoc;
 public:
-  ExplicitClosureExpr(Expr *Body, SourceLoc LBraceLoc, SourceLoc RBraceLoc) 
+  ExplicitClosureExpr(SourceLoc LBraceLoc, Expr *Body, SourceLoc RBraceLoc) 
     : ClosureExpr(ExprKind::ExplicitClosure, Body),
       LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc) {}
   

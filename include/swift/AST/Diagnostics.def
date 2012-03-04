@@ -270,6 +270,11 @@ ERROR(expected_identifier_after_colon_expr,expr_parsing,none,
 ERROR(expected_field_spec_name_tuple_expr,expr_parsing,none,
       "expected field specifier name in tuple expression", ())    
 
+ERROR(expected_expr_closure,expr_parsing,none,
+      "expected expression in closure", ())
+ERROR(expected_rbrace_in_closure,expr_parsing,none,
+      "expected '}' at end of closure", ())
+
 // Subscript expressions
 ERROR(expected_expr_subscript_value,expr_parsing,none,
       "expected expression for subscript value", ())
@@ -513,7 +518,10 @@ ERROR(field_number_too_large,sema_tce,none,
       "field number is too large for tuple", ())
 ERROR(no_valid_dot_expression,sema_tce,none,
       "base type %0 has no valid '.' expression for this field", (Type))
-      
+    
+ERROR(closure_not_function_type,sema_tce,none,
+      "closure inferred to have non-function type %0", (Type))
+    
 // Operators
 ERROR(binop_not_infix,sema_tce,none,
       "binary operator has no infix attribute", ())

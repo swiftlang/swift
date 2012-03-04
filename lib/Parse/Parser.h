@@ -256,6 +256,7 @@ public:
   NullablePtr<Expr> parseExprPostfix(Diag<> ID);
   NullablePtr<Expr> parseExprUnary(Diag<> ID);
   Expr *parseExprIdentifier();
+  NullablePtr<Expr> parseExprExplicitClosure();
   Expr *parseExprAnonClosureArg();
   NullablePtr<Expr> parseExprParen();
   NullablePtr<Expr> parseExprFunc();

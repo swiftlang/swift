@@ -109,6 +109,7 @@ Expr *Parser::parseExprOperator() {
 ///   expr-primary:
 ///     expr-literal
 ///     expr-identifier
+///     expr-explicit-closure
 ///     expr-anon-closure-argument
 ///     expr-delayed-identifier
 ///     expr-paren
@@ -153,6 +154,10 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     break;
   case tok::dollarident: // $1
     Result = parseExprAnonClosureArg();
+    break;
+
+  case tok::l_brace:     // { expr }
+    Result = parseExprExplicitClosure();
     break;
 
   case tok::colon: {     // :foo
@@ -247,6 +252,23 @@ Expr *Parser::parseExprIdentifier() {
   Identifier Name = Context.getIdentifier(Tok.getText());
   consumeToken(tok::identifier);
   return actOnIdentifierExpr(Name, Loc);
+}
+
+///   expr-explicit-closure:
+///     '{' expr '}'
+NullablePtr<Expr> Parser::parseExprExplicitClosure() {
+  SourceLoc LBLoc = consumeToken(tok::l_brace);
+  
+  NullablePtr<Expr> Body = parseExpr(diag::expected_expr_closure);
+  if (Body.isNull()) return 0;
+  
+  SourceLoc RBLoc;
+  if (parseMatchingToken(tok::r_brace, RBLoc,
+                         diag::expected_rbrace_in_closure,
+                         LBLoc, diag::opening_brace))
+    RBLoc = Body.get()->getEndLoc();
+  
+  return new (Context) ExplicitClosureExpr(LBLoc, Body.get(), RBLoc);
 }
 
 ///   expr-anon-closure-argument:

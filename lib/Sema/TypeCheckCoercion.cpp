@@ -171,6 +171,15 @@ public:
   }
 
   Expr *visitExplicitClosureExpr(ExplicitClosureExpr *E) {
+    // Make sure that we're converting the closure to a function type.  If not,
+    // diagnose the error.
+    FunctionType *FT = DestTy->getAs<FunctionType>();
+    if (FT == 0) {
+      TC.diagnose(E->getStartLoc(), diag::closure_not_function_type, DestTy)
+        << E->getSourceRange();
+      return 0;
+    }
+    
     // FIXME: This should apply the type to the closure!
     return E;      
   }
