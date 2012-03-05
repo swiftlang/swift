@@ -107,8 +107,13 @@ public:
                                         DED->getType());
   }  
   
-  Expr *visitParenExpr(ParenExpr *E);
-  Expr *visitTupleExpr(TupleExpr *E);
+  Expr *visitParenExpr(ParenExpr *E) {
+    assert(0 && "Already special cased in SemaCoerce::convertToType");
+  }
+    
+  Expr *visitTupleExpr(TupleExpr *E) {
+    return E;
+  }
   
   Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
     return E;
@@ -256,19 +261,6 @@ public:
 };
 } // end anonymous namespace.
 
-Expr *SemaCoerce::visitParenExpr(ParenExpr *E) {
-  Expr *Sub = convertToType(E->getSubExpr(), DestTy, TC);
-  if (Sub == 0) return 0;
-
-  E->setSubExpr(Sub);    
-  E->setType(Sub->getType());
-  return E;
-}
-
-Expr *SemaCoerce::visitTupleExpr(TupleExpr *E) {
-  return convertToType(E, DestTy, TC);
-}
-
 
 Expr *SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
   // Make sure that we're converting the closure to a function type.  If not,
@@ -325,8 +317,7 @@ Expr *SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
   // Now that the AnonClosureArgExpr's have a type, redo semantic analysis of
   // the closure from the leaves of the expression tree up.
   Expr *Result = E->getBody();
-  if (TC.typeCheckExpression(Result))
-    return 0;
+  
   // Make sure that the body agrees with the result type of the closure.
   Result = TC.convertToType(Result, FT->getResult());
   if (Result == 0) {
@@ -336,6 +327,11 @@ Expr *SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
     << E->getBody()->getSourceRange();
     return 0;
   }
+
+  // Type check the full expression, verifying that it is fully typed.
+  if (TC.typeCheckExpression(Result, FT->getResult()))
+    return 0;
+  
   E->setBody(Result);
   return E;
 }
@@ -680,10 +676,11 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC) {
   // Otherwise, check to see if this is an auto-closure case.  This case happens
   // when we convert an expression E to a function type whose result is E's
   // type.
-  if (!isa<ExplicitClosureExpr>(E)) {
-    if (FunctionType *FT = DestTy->getAs<FunctionType>()) {
-      // FIXME: Reevaluate this implementation.
-      
+  if (FunctionType *FT = DestTy->getAs<FunctionType>()) {
+    // FIXME: This should only happen when an explicit argument attribute
+    // is used to enable it.
+    TupleType *InTy = FT->getInput()->getAs<TupleType>();
+    if (!isa<ExplicitClosureExpr>(E)  && InTy && InTy->getFields().empty()) {
       
       // If there are any live anonymous closure arguments, this level will use
       // them and remove them.  When binding something like $0+$1 to

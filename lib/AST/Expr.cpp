@@ -372,7 +372,7 @@ static Expr::ConversionRank getConversionRank(const Expr *E, Type DestTy) {
   // Look through parentheses.
   if (const ParenExpr *PE = dyn_cast<ParenExpr>(E))
     return getConversionRank(PE->getSubExpr(), DestTy);
-
+  
   // If we're converting to an l-value type, check for permitted
   // qualification conversions or materializations.
   if (LValueType *DestLT = DestTy->getAs<LValueType>()) {
@@ -420,10 +420,15 @@ static Expr::ConversionRank getConversionRank(const Expr *E, Type DestTy) {
   // when we convert an expression E to a function type whose result is E's
   // type.
   if (FunctionType *FT = DestTy->getAs<FunctionType>()) {
-    if (getConversionRank(E, FT->getResult()) == Expr::CR_Invalid)
-      return Expr::CR_Invalid;
+    // FIXME: This should only happen when an explicit argument attribute
+    // is used to enable it.
+    TupleType *InTy = FT->getInput()->getAs<TupleType>();
+    if (!isa<ExplicitClosureExpr>(E) && InTy && InTy->getFields().empty()) {
+      if (getConversionRank(E, FT->getResult()) == Expr::CR_Invalid)
+        return Expr::CR_Invalid;
     
-    return Expr::CR_AutoClosure;
+      return Expr::CR_AutoClosure;
+    }
   }
 
   // If all else fails, do an lvalue-to-rvalue conversion on the source.
