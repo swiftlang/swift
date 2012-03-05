@@ -338,7 +338,8 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
         << E->getArg()->getSourceRange();
       return 0;
     }
-    
+
+    E->setFn(E1);
     E->setArg(E2);
     E->setType(FT->getResult());
     return E;
