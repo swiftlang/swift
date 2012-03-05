@@ -692,18 +692,14 @@ public:
   }
 
   bool walkToExprPre(Expr *E) {
-    // Do not walk into explicit closures.  They are analyzed modularly, so we
-    // don't need to recurse into them and reanalyze their body. This also
-    // prevents N^2 re-sema activity with lots of nested closures.
+    // Do not walk into FuncExpr or explicit closures.  They are analyzed
+    // modularly, so we don't need to recurse into them and reanalyze their
+    // body.  This prevents N^2 re-sema activity with lots of nested closures.
     if (isa<FuncExpr>(E)) return false;
 
     // Only walk into Explicit Closures if they haven't been seen at all yet.
     // This ensures that everything gets a type, even if it is a DependentType.
-    if (isa<ExplicitClosureExpr>(E) && E->getType().isNull())
-      return true;
-    
-    // FIXME: Implicit closures should be entered.
-    return !isa<ClosureExpr>(E);
+    return !isa<ExplicitClosureExpr>(E) || E->getType().isNull();
   }
 
   Expr *walkToExprPost(Expr *E) {
