@@ -56,7 +56,7 @@ public:
   }
 
   Expr *coerceOverloadToLValue(OverloadSetRefExpr *E, LValueType *lv) {
-    for (ValueDecl *val : E->Decls) {
+    for (ValueDecl *val : E->getDecls()) {
       if (isMatchForLValue(val, lv))
         return new (TC.Context) DeclRefExpr(val, E->getLoc(), lv);
     }
@@ -74,7 +74,7 @@ public:
     // FIXME: and other conversions as well; really this should consider
     //   conversion rank
     // FIXME: diagnose ambiguity
-    for (ValueDecl *val : E->Decls) {
+    for (ValueDecl *val : E->getDecls()) {
       Type srcTy = val->getType();
       if (!srcTy->isEqual(DestTy)) continue;
       return TC.buildDeclRefRValue(val, E->getLoc());

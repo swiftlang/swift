@@ -613,7 +613,6 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   parseAttributeList(Attributes);
 
   Identifier Name;
-  SourceLoc TypeNameLoc = Tok.getLoc();
   if (parseAnyIdentifier(Name, diag::expected_identifier_in_decl, "func"))
     return 0;
 
@@ -846,8 +845,6 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   TypeAliasDecl *TAD =
     new (Context) TypeAliasDecl(StructLoc, StructName, Type(), CurDeclContext);
 
-  Type StructTy = TAD->getAliasType();
-  
   // Parse elements of the body as a tuple body.
   Type BodyTy;
   if (parseTypeTupleBody(LBLoc, BodyTy))
@@ -855,7 +852,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   assert(isa<TupleType>(BodyTy.getPointer()));
   
   // Reject any unnamed members.
-  for (auto Elt : BodyTy->castTo<TupleType>()->Fields)
+  for (auto Elt : BodyTy->castTo<TupleType>()->getFields())
     if (!Elt.hasName()) {
       // FIXME: Mark erroneous, terrible location info.  Probably should just
       // have custom parsing logic instead of reusing type-tuple-body.

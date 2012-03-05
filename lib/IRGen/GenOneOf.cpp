@@ -419,7 +419,7 @@ static void emitInjectionFunction(IRGenModule &IGM,
 /// emitOneOfType - Emit all the declarations associated with this oneof type.
 void IRGenModule::emitOneOfType(OneOfType *oneof) {
   const OneofTypeInfo &typeInfo = getFragileTypeInfo(oneof).as<OneofTypeInfo>();
-  for (auto elt : oneof->Elements) {
+  for (auto elt : oneof->getElements()) {
     emitInjectionFunction(*this, typeInfo, elt);
   }
 }

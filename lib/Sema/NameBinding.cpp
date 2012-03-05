@@ -196,7 +196,7 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT) {
       Components[0].Value = Decls[0];
     } else {
       // If that fails, this may be the name of a module, try looking that up.
-      for (const ImportedModule &ImpEntry : TU->ImportedModules)
+      for (const ImportedModule &ImpEntry : TU->getImportedModules())
         if (ImpEntry.second->Name == Name) {
           Components[0].Value = ImpEntry.second;
           break;
@@ -269,7 +269,7 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, NameBinder &Binder) {
 
   // If that fails, this may be the name of a module, try looking that up.
   if (Decls.empty()) {
-    for (const ImportedModule &ImpEntry : Binder.TU->ImportedModules)
+    for (const ImportedModule &ImpEntry : Binder.TU->getImportedModules())
       if (ImpEntry.second->Name == Name) {
         ModuleType *MT = ModuleType::get(ImpEntry.second);
         return new (Binder.Context) ModuleExpr(Loc, MT);

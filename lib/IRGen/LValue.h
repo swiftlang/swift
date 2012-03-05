@@ -65,6 +65,8 @@ protected:
   PathComponent(size_t size, bool isPhysical)
     : AllocatedSize(size), IsPhysical(isPhysical) {}
 
+  ~PathComponent() {}
+
 public:
   /// Returns sizeof(the final type), plus any extra storage required.
   size_t allocated_size() const { return AllocatedSize; }
@@ -82,8 +84,6 @@ public:
 
   LogicalPathComponent &asLogical();
   const LogicalPathComponent &asLogical() const;
-
-  ~PathComponent() = delete;
 };
 
 /// An abstract class for "physical" path components, i.e. path

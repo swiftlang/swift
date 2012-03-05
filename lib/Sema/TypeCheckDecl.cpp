@@ -49,7 +49,7 @@ public:
     // the type to be *directly* the underlying type of a typealias.
     Type type = TAD->getUnderlyingType();
     if (OneOfType *oneof = dyn_cast<OneOfType>(type)) {
-      for (auto elt : oneof->Elements)
+      for (auto elt : oneof->getElements())
         visitOneOfElementDecl(elt);
     } else if (ProtocolType *protocol = dyn_cast<ProtocolType>(type)) {
       for (ValueDecl *member : protocol->Elements)

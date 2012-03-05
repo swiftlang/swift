@@ -1130,7 +1130,7 @@ namespace {
     void accumulateParameterDataTypes(Type ty) {
       // As an optimization, expand tuples instead of grabbing their TypeInfo.
       if (TupleType *tuple = ty->getAs<TupleType>()) {
-        for (const TupleTypeElt &field : tuple->Fields)
+        for (const TupleTypeElt &field : tuple->getFields())
           accumulateParameterDataTypes(field.getType());
         return;
       }

@@ -54,7 +54,7 @@ bool TypeChecker::validateType(Type InTy) {
     // These types are already canonical anyway.
     return false;
   case TypeKind::OneOf:
-    for (OneOfElementDecl *Elt : cast<OneOfType>(T)->Elements)
+    for (OneOfElementDecl *Elt : cast<OneOfType>(T)->getElements())
       typeCheckDecl(Elt);
     break;
       

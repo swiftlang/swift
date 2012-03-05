@@ -399,7 +399,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   ValueDecl *BestCandidateFound = 0;
   Expr::ConversionRank BestRank = Expr::CR_Invalid;
   
-  for (ValueDecl *Fn : OS->Decls) {
+  for (ValueDecl *Fn : OS->getDecls()) {
     // Verify we found a declaration of function type.
     FunctionType *fnTy = Fn->getType()->getAs<FunctionType>();
     if (!fnTy) continue;
@@ -446,7 +446,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     diagnose(E1->getLoc(), diag::no_candidates, 2);
   
   // Print out the candidate set.
-  for (auto TheDecl : OS->Decls) {
+  for (auto TheDecl : OS->getDecls()) {
     Type ArgTy = TheDecl->getType()->castTo<FunctionType>()->getInput();
     if (E2->getRankOfConversionTo(ArgTy) != BestRank)
       continue;
@@ -872,7 +872,7 @@ static InfixData getInfixData(TypeChecker &TC, Expr *E) {
 
     ValueDecl *FirstDecl = nullptr;
     InfixData Infix;
-    for (auto D : OO->Decls) {
+    for (auto D : OO->getDecls()) {
       // It is possible some unary operators got mixed into the overload set.
       if (!D->getAttrs().isInfix())
         continue;
