@@ -46,8 +46,6 @@ public:
   bool typeCheckPattern(Pattern *P);
   bool convertToType(Pattern *P, Type Ty);
 
-  bool bindAndValidateClosureArgs(Expr *Body, Type FuncInput);
-
   /// convertToType - Do semantic analysis of an expression in a context that
   /// expects a particular type.  This performs a conversion to that type if
   /// the types don't match and diagnoses cases where the conversion cannot be

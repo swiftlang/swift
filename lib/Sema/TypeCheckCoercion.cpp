@@ -269,6 +269,7 @@ Expr *SemaCoerce::visitTupleExpr(TupleExpr *E) {
   return convertToType(E, DestTy, TC);
 }
 
+
 Expr *SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
   // Make sure that we're converting the closure to a function type.  If not,
   // diagnose the error.
@@ -278,16 +279,51 @@ Expr *SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
     << E->getSourceRange();
     return 0;
   }
-  
-  // Bind any anonymous closure arguments, validating them and resolving
-  // their types.
-  if (TC.bindAndValidateClosureArgs(E->getBody(), FT->getInput()))
-    return 0;
-  
+
+  // Now that we have a FunctionType for the closure, we can know how many
+  // arguments are allowed.
   E->setType(FT);
   
-  // Now that the AnonClosureArgExpr's potentially have a type, redo semantic
-  // analysis from the leaves of the expression tree up.
+  // If the input to the function is a non-tuple, only $0 is valid, if it is a
+  // tuple, then $0..$N are valid depending on the number of inputs to the
+  // tuple.
+  unsigned NumInputArgs = 1;
+  TupleType *FuncInputTT = dyn_cast<TupleType>(FT->getInput().getPointer());
+  if (FuncInputTT)
+    NumInputArgs = FuncInputTT->getFields().size();
+    
+  // Bind any anonymous closure arguments, validating them and resolving
+  // their types.
+  for (AnonClosureArgExpr *Arg = E->getClosureArgList(); Arg;
+       Arg = Arg->getNextInClosure()) {
+    assert((Arg->getType().isNull() || Arg->getType()->is<DependentType>()) &&
+           "Anon arg already has a type?");
+    
+    // Verify that the argument number isn't too large, e.g. using $4 when the
+    // bound function only has 2 inputs.
+    if (Arg->getArgNumber() >= NumInputArgs) {
+      TC.diagnose(Arg->getLoc(), diag::invalid_anonymous_argument,
+                  Arg->getArgNumber(), NumInputArgs);
+      Arg->setType(ErrorType::get(TC.Context));
+      // TODO: We could turn this into error expr or something else to preserve
+      // the AST.
+      return 0;
+    }
+    
+    Type NewArgType;
+    if (FuncInputTT) {
+      NewArgType = FuncInputTT->getElementType(Arg->getArgNumber());
+    } else {
+      assert(NumInputArgs == 1 && "Must have unary case");
+      NewArgType = FT->getInput();
+    }
+
+    Arg->setType(LValueType::get(NewArgType, LValueType::Qual::Default,
+                                 TC.Context));
+  }
+  
+  // Now that the AnonClosureArgExpr's have a type, redo semantic analysis of
+  // the closure from the leaves of the expression tree up.
   Expr *Result = E->getBody();
   if (TC.typeCheckExpression(Result))
     return 0;

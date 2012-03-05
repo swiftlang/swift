@@ -763,6 +763,10 @@ public:
     return E->getKind() == ExprKind::AnonClosureArg;
   }
   
+  
+  const AnonClosureArgExpr *getNextInClosure() const { return NextArg; }
+  AnonClosureArgExpr *getNextInClosure() { return NextArg; }
+  
 private:
   friend class ExplicitClosureExpr;
   void addToList(AnonClosureArgExpr *&List) {
@@ -800,6 +804,9 @@ public:
   void addClosureArgumentUse(AnonClosureArgExpr *E) {
     E->addToList(ClosureArgList);
   }
+  
+  AnonClosureArgExpr *getClosureArgList() { return ClosureArgList; }
+  const AnonClosureArgExpr *getClosureArgList() const { return ClosureArgList; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ExplicitClosureExpr *) { return true; }
