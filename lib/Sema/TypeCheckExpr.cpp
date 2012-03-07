@@ -112,7 +112,21 @@ Expr *TypeChecker::applyTypeToLiteral(Expr *E, Type DestTy) {
     // If this is a direct use of the builtin integer type, use the integer size
     // to diagnose excess precision issues.
     llvm::APInt Value(1, 0);
-    bool Failure = cast<IntegerLiteralExpr>(E)->getText().getAsInteger(0,Value);
+    StringRef IntText = cast<IntegerLiteralExpr>(E)->getText();
+    unsigned Radix;
+    if (IntText.startswith("0x")) {
+      IntText = IntText.substr(2);
+      Radix = 16;
+    } else if (IntText.startswith("0o")) {
+      IntText = IntText.substr(2);
+      Radix = 8;
+    } else if (IntText.startswith("0b")) {
+      IntText = IntText.substr(2);
+      Radix = 2;
+    } else {
+      Radix = 10;
+    }
+    bool Failure = IntText.getAsInteger(Radix, Value);
     assert(!Failure && "Lexer should have verified a reasonable type!");
     (void)Failure;
     
