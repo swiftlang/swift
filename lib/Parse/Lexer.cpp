@@ -211,12 +211,37 @@ static bool isValidExponent(const char *P) {
 
 /// lexNumber:
 ///   integer_literal  ::= [0-9]+
+///   integer_literal  ::= 0x[0-9a-fA-F]+
+///   integer_literal  ::= 0o[0-7]+
+///   integer_literal  ::= 0b[01]+
 ///   floating_literal ::= [0-9]+(\.[0-9]+)?
 ///   floating_literal ::= [0-9]+(\.[0-9]*)?[eE][+-][0-9]+
 ///   floating_literal ::= \.[0-9]+([eE][+-][0-9]+)?
 void Lexer::lexNumber() {
   const char *TokStart = CurPtr-1;
   assert((isdigit(*TokStart) || *TokStart == '.') && "Unexpected start");
+
+  if (*TokStart == '0' && *CurPtr == 'x') {
+    // 0x[0-9a-fA-F]+
+    ++CurPtr;
+    while (isdigit(*CurPtr) ||
+           (*CurPtr >= 'a' && *CurPtr <= 'f') ||
+           (*CurPtr >= 'A' && *CurPtr <= 'F'))
+      ++CurPtr;
+    return formToken(tok::integer_literal, TokStart);
+  } else if (*TokStart == '0' && *CurPtr == 'o') {
+    // 0o[0-7]+
+    ++CurPtr;
+    while (*CurPtr >= '0' && *CurPtr <= '7')
+      ++CurPtr;
+    return formToken(tok::integer_literal, TokStart);
+  } else if (*TokStart == '0' && *CurPtr == 'b') {
+    // 0b[01]+
+    ++CurPtr;
+    while (*CurPtr == '0' || *CurPtr == '1')
+      ++CurPtr;
+    return formToken(tok::integer_literal, TokStart);
+  }
 
   // Handle the leading character here as well.
   --CurPtr;
