@@ -189,11 +189,10 @@ public:
   }
 
   /// ImportedModules - This is the list of modules that are imported by this
-  /// module.  This is filled in by the Name Binding phase.
+  /// module.  This is filled in as the first thing that the Name Binding phase
+  /// does.
   ArrayRef<ImportedModule> getImportedModules() const {
-    // FIXME: Figure out what this assertion is supposed to be checking and
-    // why it triggers on everything.
-    //assert(ASTStage >= NameBound);
+    assert(ASTStage >= Parsed);
     return ImportedModules;
   }
   void setImportedModules(ArrayRef<ImportedModule> IM) {
