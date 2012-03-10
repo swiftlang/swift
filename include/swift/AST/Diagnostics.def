@@ -79,6 +79,8 @@ ERROR(lex_expected_sign_in_fp,lexing,none,
        "expected '+' or '-' in floating point literal exponent", ())
 ERROR(lex_expected_digit_in_fp_exponent,lexing,none,
        "expected a digit after decimal point in floating point exponent", ())
+ERROR(lex_expected_digit_in_int_literal,lexing,none,
+       "expected a digit after integer literal prefix", ())
 
 //------------------------------------------------------------------------------
 // Declaration parsing diagnostics

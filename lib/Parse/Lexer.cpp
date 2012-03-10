@@ -228,18 +228,30 @@ void Lexer::lexNumber() {
            (*CurPtr >= 'a' && *CurPtr <= 'f') ||
            (*CurPtr >= 'A' && *CurPtr <= 'F'))
       ++CurPtr;
+    if (CurPtr - TokStart == 2) {
+      diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
+      return formToken(tok::unknown, TokStart);
+    }
     return formToken(tok::integer_literal, TokStart);
   } else if (*TokStart == '0' && *CurPtr == 'o') {
     // 0o[0-7]+
     ++CurPtr;
     while (*CurPtr >= '0' && *CurPtr <= '7')
       ++CurPtr;
+    if (CurPtr - TokStart == 2) {
+      diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
+      return formToken(tok::unknown, TokStart);
+    }
     return formToken(tok::integer_literal, TokStart);
   } else if (*TokStart == '0' && *CurPtr == 'b') {
     // 0b[01]+
     ++CurPtr;
     while (*CurPtr == '0' || *CurPtr == '1')
       ++CurPtr;
+    if (CurPtr - TokStart == 2) {
+      diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
+      return formToken(tok::unknown, TokStart);
+    }
     return formToken(tok::integer_literal, TokStart);
   }
 
