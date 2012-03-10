@@ -279,11 +279,6 @@ public:
   NullablePtr<Stmt> parseStmtReturn();
   NullablePtr<Stmt> parseStmtIf();
   NullablePtr<Stmt> parseStmtWhile();
-
-  /// actOnCondition - Handle a condition to an if/while statement, inserting
-  /// the call that will convert to a 1-bit type.
-  Expr *actOnCondition(Expr *Cond);
-
 };
 
 } // end namespace swift

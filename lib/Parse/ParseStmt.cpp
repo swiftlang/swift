@@ -19,19 +19,6 @@
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
-/// ActOnCondition - Handle a condition to an if/while statement, inserting
-/// the call that will convert to a 1-bit type.
-Expr *Parser::actOnCondition(Expr *Cond) {
-  assert(Cond);
-  
-  // The condition needs to be convertible to a logic value.  Build a call to
-  // "convertToLogicValue" passing in the condition as an argument.
-  Identifier C2LVFuncId = Context.getIdentifier("convertToLogicValue");
-  Expr *C2LVFunc = actOnIdentifierExpr(C2LVFuncId, Cond->getStartLoc());
-  
-  return new (Context) CallExpr(C2LVFunc, Cond, Type());
-}
-
 /// isStartOfStmtOtherThanAssignment - Return true if the specified token starts
 /// a statement (other than assignment, which starts looking like an expr).
 ///
@@ -256,9 +243,7 @@ NullablePtr<Stmt> Parser::parseStmtIf() {
   }
 
   // If our condition and normal expression parsed correctly, build an AST.
-  Expr *Cond = actOnCondition(Condition.get());
-  
-  return new (Context) IfStmt(IfLoc, Cond, NormalBody.get(),
+  return new (Context) IfStmt(IfLoc, Condition.get(), NormalBody.get(),
                               ElseLoc, ElseBody.getPtrOrNull());
 }
 
@@ -276,8 +261,7 @@ NullablePtr<Stmt> Parser::parseStmtWhile() {
     return 0;
   
   // If our normal expression parsed correctly, build an AST.
-  Expr *Cond = actOnCondition(Condition.get());
-  return new (Context) WhileStmt(WhileLoc, Cond, Body.get());
+  return new (Context) WhileStmt(WhileLoc, Condition.get(), Body.get());
 }
 
 

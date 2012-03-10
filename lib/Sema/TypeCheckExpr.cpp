@@ -546,7 +546,9 @@ public:
       return 0;
     return E;
   }
-  Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *E);
+  Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
+    return TC.semaUnresolvedDotExpr(E);
+  }
   
   Expr *visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
     // LookThroughOneofExpr is fully resolved.
@@ -657,47 +659,6 @@ public:
   Expr *visitDotSyntaxCallExpr(DotSyntaxCallExpr *E) {
     return visitApplyExpr(E);
   }
-
-  Type makeSimilarLValue(Type objectType, Type lvalueType) {
-    LValueType::Qual qs = cast<LValueType>(lvalueType)->getQualifiers();
-
-    // Don't propagate explicitness.
-    qs |= LValueType::Qual::Implicit;
-
-    return LValueType::get(objectType, qs, TC.Context);
-  }
-
-  Expr *lookThroughOneofs(Expr *E, bool isLValue) {
-    assert(isLValue == E->getType()->is<LValueType>());
-
-    Type baseType = E->getType();
-    if (isLValue) baseType = cast<LValueType>(baseType)->getObjectType();
-
-    OneOfType *oneof = baseType->castTo<OneOfType>();
-    assert(oneof->isTransparentType());
-
-    Type resultType = oneof->getTransparentType();
-    if (isLValue)
-      resultType = makeSimilarLValue(resultType, E->getType());
-    return new (TC.Context) LookThroughOneofExpr(E, resultType);
-  }
-
-  Expr *buildTupleElementExpr(Expr *base, UnresolvedDotExpr *syntax,
-                              TupleType *baseType, unsigned fieldIndex,
-                              bool baseIsLValue, bool baseIsOneof) {
-    assert(baseIsLValue == base->getType()->is<LValueType>());
-
-    if (baseIsOneof)
-      base = lookThroughOneofs(base, baseIsLValue);
-
-    Type fieldType = baseType->getElementType(fieldIndex);
-    if (baseIsLValue)
-      fieldType = makeSimilarLValue(fieldType, base->getType());
-      
-    return new (TC.Context) TupleElementExpr(base, syntax->getDotLoc(),
-                                             fieldIndex, syntax->getNameLoc(),
-                                             fieldType);
-  }
   
   SemaExpressionTree(TypeChecker &tc) : TC(tc) {}
   
@@ -730,10 +691,54 @@ public:
 };
 } // end anonymous namespace.
 
-Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
+static Type makeSimilarLValue(Type objectType, Type lvalueType,
+                              TypeChecker &TC) {
+  LValueType::Qual qs = cast<LValueType>(lvalueType)->getQualifiers();
+
+  // Don't propagate explicitness.
+  qs |= LValueType::Qual::Implicit;
+
+  return LValueType::get(objectType, qs, TC.Context);
+}
+
+static Expr *lookThroughOneofs(Expr *E, bool isLValue, TypeChecker &TC) {
+  assert(isLValue == E->getType()->is<LValueType>());
+
+  Type baseType = E->getType();
+  if (isLValue) baseType = cast<LValueType>(baseType)->getObjectType();
+
+  OneOfType *oneof = baseType->castTo<OneOfType>();
+  assert(oneof->isTransparentType());
+
+  Type resultType = oneof->getTransparentType();
+  if (isLValue)
+    resultType = makeSimilarLValue(resultType, E->getType(), TC);
+  return new (TC.Context) LookThroughOneofExpr(E, resultType);
+}
+
+static Expr *buildTupleElementExpr(Expr *base, UnresolvedDotExpr *syntax,
+                                   TupleType *baseType, unsigned fieldIndex,
+                                   bool baseIsLValue, bool baseIsOneof,
+                                   TypeChecker &TC) {
+  assert(baseIsLValue == base->getType()->is<LValueType>());
+
+  if (baseIsOneof)
+    base = lookThroughOneofs(base, baseIsLValue, TC);
+
+  Type fieldType = baseType->getElementType(fieldIndex);
+  if (baseIsLValue)
+    fieldType = makeSimilarLValue(fieldType, base->getType(), TC);
+    
+  return new (TC.Context) TupleElementExpr(base, syntax->getDotLoc(),
+                                           fieldIndex, syntax->getNameLoc(),
+                                           fieldType);
+}
+
+Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
   Expr *Base = E->getBase();
   Type SubExprTy = Base->getType();
   Identifier MemberName = E->getName();
+  TypeChecker &TC = *this;
 
   bool wasLValue = false;
   if (LValueType *LV = SubExprTy->getAs<LValueType>()) {
@@ -843,7 +848,7 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     int fieldIndex = TT->getNamedElementId(MemberName);
     if (fieldIndex != -1)
       return buildTupleElementExpr(Base, E, TT, (unsigned) fieldIndex,
-                                   wasLValue, wasOneof);
+                                   wasLValue, wasOneof, TC);
 
     StringRef name = MemberName.str();
     if (name.startswith("$")) {
@@ -854,7 +859,8 @@ Expr *SemaExpressionTree::visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
           return 0;
         }
 
-        return buildTupleElementExpr(Base, E, TT, Value, wasLValue, wasOneof);
+        return buildTupleElementExpr(Base, E, TT, Value,
+                                     wasLValue, wasOneof, TC);
       }
     }
   }
@@ -1196,4 +1202,30 @@ bool TypeChecker::semaFunctionSignature(FuncExpr *FE) {
     }
   }
   return hadError;
+}
+
+
+bool TypeChecker::typeCheckCondition(Expr *&E) {
+  if (typeCheckExpression(E))
+    return true;
+  E = convertToRValue(E);
+  TypeBase *BuiltinI1 = BuiltinIntegerType::get(1, Context);
+  while (E->getType()->getCanonicalType() != BuiltinI1) {
+    Identifier LogicValId = Context.getIdentifier("getLogicValue");
+    UnresolvedDotExpr *UDE = 
+        new (Context) UnresolvedDotExpr(E, E->getStartLoc(), LogicValId,
+                                        E->getEndLoc());
+    E = semaUnresolvedDotExpr(UDE);
+    if (!E)
+      return true;
+    TupleExpr *CallArgs =
+        new (Context) TupleExpr(E->getStartLoc(), MutableArrayRef<Expr *>(), 0,
+                                E->getEndLoc(), TupleType::getEmpty(Context));
+    CallExpr *CE =
+        new (Context) CallExpr(E, CallArgs, Type());
+    E = semaApplyExpr(CE);
+    if (!E)
+      return true;
+  }
+  return false;
 }

@@ -39,12 +39,14 @@ public:
   bool semaFunctionSignature(FuncExpr *FE);
   bool semaTupleExpr(TupleExpr *TE);
   Expr *semaApplyExpr(ApplyExpr *E);
+  Expr *semaUnresolvedDotExpr(UnresolvedDotExpr *E);
   void typeCheckIgnoredExpr(Expr *E);
   
   bool typeCheckExpression(Expr *&E, Type ConvertType = Type());
   void typeCheckDecl(Decl *D);
   bool typeCheckPattern(Pattern *P);
   bool convertToType(Pattern *P, Type Ty);
+  bool typeCheckCondition(Expr *&E);
 
   /// convertToType - Do semantic analysis of an expression in a context that
   /// expects a particular type.  This performs a conversion to that type if

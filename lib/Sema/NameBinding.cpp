@@ -143,6 +143,7 @@ Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
   // This should eventually be eliminated by having actual fully resolved binary
   // dumps of the code instead of reparsing though.
   performNameBinding(TU);
+  performTypeChecking(TU);
   
   return TU;
 }
