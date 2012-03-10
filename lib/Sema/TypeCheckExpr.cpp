@@ -21,6 +21,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
@@ -1210,7 +1211,15 @@ bool TypeChecker::typeCheckCondition(Expr *&E) {
     return true;
   E = convertToRValue(E);
   TypeBase *BuiltinI1 = BuiltinIntegerType::get(1, Context);
+  llvm::SmallPtrSet<TypeBase*, 8> CheckedTypes;
   while (E->getType()->getCanonicalType() != BuiltinI1) {
+    // Make sure we don't run into a closed infinite loop.
+    // FIXME: Is any other kind of infinite loop possible here?
+    if (!CheckedTypes.insert(E->getType()->getCanonicalType())) {
+      diagnose(E->getStartLoc(), diag::condition_convert_infinite_loop,
+               E->getType()->getCanonicalType());
+      return true;
+    }
     Identifier LogicValId = Context.getIdentifier("getLogicValue");
     UnresolvedDotExpr *UDE = 
         new (Context) UnresolvedDotExpr(E, E->getStartLoc(), LogicValId,

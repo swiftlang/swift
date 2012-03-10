@@ -549,6 +549,9 @@ ERROR(incompatible_assoc,sema_tce,none,
 ERROR(address_of_rvalue,sema_tce,none,
       "cannot apply '&' to non-lvalue of type %0", (Type))
 
+ERROR(condition_convert_infinite_loop,sema_tce,none,
+      "conversion for conditional involves infinite loop with type %0", (Type))
+
 //------------------------------------------------------------------------------
 // Type Check Statements
 //------------------------------------------------------------------------------
