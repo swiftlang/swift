@@ -575,7 +575,7 @@ static bool isSubtypeExceptImplicit(LValueType *SrcTy, LValueType *DestTy) {
 }
 
 /// convertToType - This is the recursive implementation of
-/// ConvertToType.  It does produces diagnostics and returns null on failure.
+/// ConvertToType.  It produces diagnostics and returns null on failure.
 ///
 /// NOTE: This needs to be kept in synch with getConversionRank in Expr.cpp.
 ///
@@ -666,10 +666,10 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC) {
 
   // If the source is an l-value, load from it.  We intentionally do
   // this before checking for certain destination types below.
-  if (LValueType *SrcLT = E->getType()->getAs<LValueType>()) {
-    // FIXME: reject explicit l-values
-    assert(!SrcLT->isExplicit());
-    E = new (TC.Context) LoadExpr(E, SrcLT->getObjectType());
+  if (LValueType *srcLV = E->getType()->getAs<LValueType>()) {
+    E = TC.convertLValueToRValue(srcLV, E);
+    if (!E) return nullptr;
+
     return convertToType(E, DestTy, TC);
   }
 

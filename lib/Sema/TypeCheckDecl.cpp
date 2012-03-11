@@ -78,7 +78,11 @@ public:
       if (!TC.typeCheckExpression(Init, DestTy)) {
         // Always infer a materializable type, and do the loads
         // necessary to make that happen.
-        if (!DestTy) Init = TC.convertToMaterializable(Init);
+        if (!DestTy) {
+          Expr *newInit = TC.convertToMaterializable(Init);
+          if (newInit) Init = newInit;
+        }
+
         VD->setInit(Init);
         VD->overwriteType(Init->getType());
       } else if (!DestTy.isNull()) {

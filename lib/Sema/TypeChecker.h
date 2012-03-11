@@ -58,6 +58,7 @@ public:
 
   Expr *buildDeclRefRValue(ValueDecl *D, SourceLoc loc);
   Expr *convertToRValue(Expr *E);
+  Expr *convertLValueToRValue(LValueType *SrcLT, Expr *E);
   Expr *convertToMaterializable(Expr *E);
 
   Expr *foldSequence(SequenceExpr *E);

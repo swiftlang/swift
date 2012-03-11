@@ -224,14 +224,24 @@ Expr *TypeChecker::buildDeclRefRValue(ValueDecl *val, SourceLoc loc) {
   return new (Context) LoadExpr(E, val->getType());
 }
 
+Expr *TypeChecker::convertLValueToRValue(LValueType *srcLV, Expr *E) {
+  assert(E && "no expression to load!");
+  assert(E->getType()->isEqual(srcLV));
+
+  if (!srcLV->isExplicit())
+    return new (Context) LoadExpr(E, srcLV->getObjectType());
+
+  diagnose(E->getLoc(), diag::load_of_explicit_lvalue,
+           srcLV->getObjectType())
+    << E->getSourceRange();
+  return nullptr;
+}
+
 Expr *TypeChecker::convertToRValue(Expr *E) {
   assert(E && "no expression to load!");
 
-  if (LValueType *lv = E->getType()->getAs<LValueType>()) {
-    // FIXME: reject explicit l-values
-    assert(!lv->isExplicit());
-    return new (Context) LoadExpr(E, lv->getObjectType());
-  }
+  if (LValueType *lv = E->getType()->getAs<LValueType>())
+    return convertLValueToRValue(lv, E);
 
   return E;
 }
@@ -247,6 +257,7 @@ static void convertToMaterializableHelper(TypeChecker &TC, Expr *E) {
     for (Expr *&eltRef : TE->getElements()) {
       Type oldType = eltRef->getType();
       Expr *newElt = TC.convertToMaterializable(eltRef);
+      if (!newElt) return;
 
       // Remember if the type changed at all.  A superficial test is fine.
       if (newElt->getType().getPointer() != oldType.getPointer()) {
@@ -265,15 +276,10 @@ static void convertToMaterializableHelper(TypeChecker &TC, Expr *E) {
 
 /// Make the given expression have a materializable type if it doesn't
 /// already.
-///
-/// At the moment, this cannot fail.
 Expr *TypeChecker::convertToMaterializable(Expr *E) {
   // Load l-values.
-  if (LValueType *lv = E->getType()->getAs<LValueType>()) {
-    // FIXME: reject explicit l-values
-    assert(!lv->isExplicit());
-    return new (Context) LoadExpr(E, lv->getObjectType());
-  }
+  if (LValueType *lv = E->getType()->getAs<LValueType>())
+    return convertLValueToRValue(lv, E);
 
   // Recursively walk into tuples and parens, performing loads.
   convertToMaterializableHelper(*this, E);
@@ -1209,7 +1215,9 @@ bool TypeChecker::semaFunctionSignature(FuncExpr *FE) {
 bool TypeChecker::typeCheckCondition(Expr *&E) {
   if (typeCheckExpression(E))
     return true;
-  E = convertToRValue(E);
+  if (!(E = convertToRValue(E)))
+    return true;
+
   TypeBase *BuiltinI1 = BuiltinIntegerType::get(1, Context);
   llvm::SmallPtrSet<TypeBase*, 8> CheckedTypes;
   while (E->getType()->getCanonicalType() != BuiltinI1) {
