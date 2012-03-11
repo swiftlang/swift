@@ -549,6 +549,13 @@ public:
     printRec(E->getBase());
     OS << ')';
   }
+  void visitImplicitThisTupleElementExpr(TupleElementExpr *E) {
+    printCommon(E, "implicit_this_tuple_element_expr")
+    << " field #" << E->getFieldNumber() << '\n';
+    printRec(E->getBase());
+    OS << ')';
+  }
+  
 
   void visitTupleShuffleExpr(TupleShuffleExpr *E) {
     printCommon(E, "tuple_shuffle_expr") << " elements=[";

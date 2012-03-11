@@ -155,6 +155,7 @@ void IRGenFunction::emitExplodedRValue(Expr *E, Explosion &explosion) {
     return emitExplodedTupleShuffle(cast<TupleShuffleExpr>(E), explosion);
 
   case ExprKind::SyntacticTupleElement:
+  case ExprKind::ImplicitThisTupleElement:
     return emitExplodedTupleElement(cast<TupleElementExpr>(E), explosion);
 
   case ExprKind::DotSyntaxPlusFuncUse: {
@@ -233,6 +234,7 @@ LValue IRGenFunction::emitLValue(Expr *E) {
     return emitLValue(cast<AddressOfExpr>(E)->getSubExpr());
 
   case ExprKind::SyntacticTupleElement:
+  case ExprKind::ImplicitThisTupleElement:
     return emitTupleElementLValue(cast<TupleElementExpr>(E));
 
   case ExprKind::LookThroughOneof:
@@ -312,6 +314,7 @@ IRGenFunction::tryEmitAsAddress(Expr *E, const TypeInfo &type) {
 
   // We can locate a tuple element if we can locate the tuple.
   case ExprKind::SyntacticTupleElement:
+  case ExprKind::ImplicitThisTupleElement:
     return tryEmitTupleElementAsAddress(cast<TupleElementExpr>(E));
 
   // &x is in memory if x is.

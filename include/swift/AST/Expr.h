@@ -488,7 +488,8 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TupleElementExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::SyntacticTupleElement;
+    return E->getKind() == ExprKind::SyntacticTupleElement ||
+           E->getKind() == ExprKind::ImplicitThisTupleElement;
   }
 };
   
@@ -516,7 +517,31 @@ public:
     return E->getKind() == ExprKind::SyntacticTupleElement;
   }
 };
+
+/// ImplicitThisTupleElementExpr - Reference to a tuple element inside of a
+/// context that has an implicit this member.  We represent the AST with an
+/// explicit reference to 'this', but use this node so that clients have
+/// accurate source ranges and other location information.
+class ImplicitThisTupleElementExpr : public TupleElementExpr {
+public:
   
+  // The name is the only thing that was written in the code.
+  SourceRange getSourceRange() const { 
+    return SourceRange(getNameLoc(), getNameLoc());
+  }
+  
+  ImplicitThisTupleElementExpr(Expr *SubExpr,
+                               unsigned FieldNo, SourceLoc NameLoc, Type Ty)
+    : TupleElementExpr(ExprKind::ImplicitThisTupleElement, SubExpr, FieldNo,
+                     NameLoc, Ty) {}
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ImplicitThisTupleElementExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ImplicitThisTupleElement;
+  }
+};
+
 
 /// ImplicitConversionExpr - An abstract class for expressions which
 /// implicitly convert the value of an expression in some way.
