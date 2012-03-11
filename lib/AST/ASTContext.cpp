@@ -206,15 +206,15 @@ FunctionType *FunctionType::get(Type Input, Type Result, bool isAutoClosure,
                                                        (char)isAutoClosure))];
   if (Entry) return Entry;
   
-  return Entry = new (C) FunctionType(Input, Result);
+  return Entry = new (C) FunctionType(Input, Result, isAutoClosure);
 }
 
 // If the input and result types are canonical, then so is the result.
-FunctionType::FunctionType(Type input, Type result)
+FunctionType::FunctionType(Type input, Type result, bool isAutoClosure)
   : TypeBase(TypeKind::Function,
              (input->isCanonical() && result->isCanonical()) ?
                &input->getASTContext() : 0),
-    Input(input), Result(result) {
+    Input(input), Result(result), AutoClosure(isAutoClosure) {
 }
 
 

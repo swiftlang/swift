@@ -107,7 +107,8 @@ TypeBase *TypeBase::getCanonicalType() {
     FunctionType *FT = cast<FunctionType>(this);
     Type In = FT->getInput()->getCanonicalType();
     Type Out = FT->getResult()->getCanonicalType();
-    Result = FunctionType::get(In, Out, In->getASTContext());
+    Result = FunctionType::get(In, Out, FT->isAutoClosure(),
+                               In->getASTContext());
     break;
   }
   case TypeKind::Array:

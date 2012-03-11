@@ -545,14 +545,19 @@ private:
   }
 };
   
-/// FunctionType - A function type has a single input and result, e.g.
-/// "(int) -> int" or (var a : int, var b : int) -> (int, int).
+/// FunctionType - A function type has a single input and result, but these
+/// types may be a tuple, for example:
+///   "(int) -> int" or "(a : int, b : int) -> (int, int)".
+/// Note that the parser requires that the input to a function type be a Tuple
+/// or ParenType, but ParenType desugars to its element, so the input to a
+/// function may be an arbitrary type.
 ///
 /// If the AutoClosure bit is set to true, then the input type is known to be ()
 /// and a value of this function type is only assignable (in source code) from
 /// the destination type of the function.  Sema inserts an ImplicitClosure to
 /// close over the value.  For example:
 ///   var x : [auto_closure] () -> int = 4
+///
 class FunctionType : public TypeBase {
   const Type Input;
   const Type Result;
@@ -579,7 +584,7 @@ public:
   }
   
 private:
-  FunctionType(Type Input, Type Result);
+  FunctionType(Type Input, Type Result, bool isAutoClosure);
 };
   
   
