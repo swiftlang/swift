@@ -18,7 +18,6 @@
 #define SWIFT_TYPE_H
 
 #include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/ADT/PointerIntPair.h"
 #include "swift/AST/LLVM.h"
 #include <string>
 
