@@ -1,5 +1,6 @@
 add_swift_library(swiftAST
   ASTContext.cpp
+  ASTWalker.cpp
   Attr.cpp
   Builtins.cpp
   Decl.cpp
@@ -13,6 +14,5 @@ add_swift_library(swiftAST
   Stmt.cpp
   Type.cpp
   Verifier.cpp
-  Walk.cpp
   DEPENDS swiftBasic)
 
