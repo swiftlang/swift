@@ -73,27 +73,19 @@ TranslationUnit *Parser::parseTranslationUnit() {
   return TU;
 }
 
-#define FORALL_ATTRS(MACRO) \
-  MACRO(infix_left) \
-  MACRO(infix_right) \
-  MACRO(infix) \
-  MACRO(resilient) \
-  MACRO(fragile) \
-  MACRO(born_fragile) \
-  MACRO(byref)
-
 namespace {
 #define MAKE_ENUMERATOR(id) id,
   enum class AttrName {
     none,
-    FORALL_ATTRS(MAKE_ENUMERATOR)
+#define ATTR(X) X,
+#include "swift/AST/Attr.def"
   };
 }
 
 static AttrName getAttrName(StringRef text) {
   return llvm::StringSwitch<AttrName>(text)
-#define MAKE_SWITCH_CASE(id) .Case(#id, AttrName::id)
-    FORALL_ATTRS(MAKE_SWITCH_CASE)
+#define ATTR(X) .Case(#X, AttrName::X)
+#include "swift/AST/Attr.def"
     .Default(AttrName::none);
 }
 
