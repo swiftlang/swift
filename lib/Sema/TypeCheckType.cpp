@@ -72,6 +72,8 @@ bool TypeChecker::validateType(Type InTy) {
   }
   case TypeKind::Identifier:
     return validateType(cast<IdentifierType>(T)->getMappedType());
+  case TypeKind::Paren:
+    return validateType(cast<ParenType>(T)->getUnderlyingType());
   case TypeKind::Tuple: {
     TupleType *TT = cast<TupleType>(T);
     

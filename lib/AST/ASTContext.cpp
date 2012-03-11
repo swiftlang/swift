@@ -35,6 +35,7 @@ struct ASTContext::Implementation {
   llvm::DenseMap<std::pair<Type,Type>, FunctionType*> FunctionTypes;
   llvm::DenseMap<std::pair<Type, uint64_t>, ArrayType*> ArrayTypes;
   llvm::DenseMap<unsigned, BuiltinIntegerType*> IntegerTypes;
+  llvm::DenseMap<Type, ParenType*> ParenTypes;
   llvm::DenseMap<std::pair<Type, LValueType::Qual::opaque_type>, LValueType*>
     LValueTypes;
 };
@@ -97,6 +98,13 @@ BuiltinIntegerType *BuiltinIntegerType::get(unsigned BitWidth, ASTContext &C) {
   return Result;
 }
 
+ParenType *ParenType::get(ASTContext &C, Type underlying) {
+  ParenType *&Result = C.Impl.ParenTypes[underlying];
+  if (Result == 0)
+    Result = new (C) ParenType(underlying);
+  return Result;
+}
+
 Type TupleType::getEmpty(ASTContext &C) { return C.TheEmptyTupleType; }
 
 void TupleType::Profile(llvm::FoldingSetNodeID &ID,
@@ -118,7 +126,7 @@ TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
   // FIXME: This is pointless for types with named fields.  The ValueDecl fields
   // themselves are not unique'd so they all get their own addresses, which
   // means that we'll never get a hit here.  This should unique all-type tuples
-  // though.  Same problem with un-uniqued default value expressions.
+  // though.  Likewise with default values.
   void *InsertPos = 0;
   if (TupleType *TT = C.Impl.TupleTypes.FindNodeOrInsertPos(ID, InsertPos))
     return TT;
@@ -135,11 +143,6 @@ TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
       break;
     }
   }
-  
-  // A single-element tuple with no name is a grouping paren, which is never
-  // canonical.  The canonical type for it is the element type.
-  if (Fields.size() == 1 && !Fields.back().hasName())
-    IsCanonical = false;
 
   Fields = ArrayRef<TupleTypeElt>(FieldsCopy, Fields.size());
   

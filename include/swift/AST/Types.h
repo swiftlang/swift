@@ -312,6 +312,31 @@ public:
   }
 };
 
+/// ParenType - A paren type is a type that's been written in parentheses.
+class ParenType : public TypeBase {
+  Type UnderlyingType;
+
+  friend class ASTContext;
+  ParenType(Type UnderlyingType)
+    : TypeBase(TypeKind::Paren), UnderlyingType(UnderlyingType) {}
+public:
+  Type getUnderlyingType() const { return UnderlyingType; }
+
+  static ParenType *get(ASTContext &C, Type underlying);
+   
+  /// getDesugaredType - If this type is a sugared type, remove all levels of
+  /// sugar until we get down to a non-sugar type.
+  TypeBase *getDesugaredType();
+
+  void print(raw_ostream &OS) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ParenType *) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Paren;
+  }
+};
+
 /// TupleTypeElt - This represents a single element of a tuple.
 class TupleTypeElt {
   /// Name - An optional name for the field.
@@ -338,7 +363,7 @@ public:
   Expr *getInit() const { return Init; }
   void setInit(Expr *E) { Init = E; }
 };
-
+  
 /// TupleType - A tuple is a parenthesized list of types where each name has an
 /// optional name.
 ///
@@ -351,9 +376,6 @@ public:
 
   /// getEmpty - Return the empty tuple type '()'.
   static Type getEmpty(ASTContext &C);
-
-  /// getGroupingParen - Return "(t)" for some 't'.
-  static TupleType *getGroupingParen(Type T, ASTContext &Ctx);
 
   /// getFields - Return the fields of this tuple.
   ArrayRef<TupleTypeElt> getFields() const { return Fields; }
