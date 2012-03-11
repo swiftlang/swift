@@ -468,6 +468,8 @@ ERROR(varname_element_count_mismatch,sema_tcd,none,
       (Type, unsigned, unsigned))
 ERROR(operator_not_func,sema_tcd,none,
       "operators must be declared with 'func'", ())
+ERROR(custom_operator_addressof,sema_tcd,none,
+      "cannot declare a custom unary '&' operator", ())
 ERROR(var_type_not_materializable,sema_tcd,none,
       "type %0 of variable is not materializable", (Type))
 ERROR(oneof_element_not_materializable,sema_tcd,none,

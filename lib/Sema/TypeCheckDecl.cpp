@@ -253,6 +253,15 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     // FIXME: Set the 'isError' bit on the decl.
     return;
   }
+
+  // The unary operator '&' cannot be overloaded.  In an expression,
+  // the parser never interprets this as a normal unary operator
+  // anyway.
+  if (VD->isOperator() && NumArguments == 1 &&
+      VD->getName().str() == "&") {
+    TC.diagnose(VD->getLocStart(), diag::custom_operator_addressof);
+    return;
+  }
   
   // If the decl has an infix precedence specified, then it must be a function
   // whose input is a two element tuple.
