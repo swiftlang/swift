@@ -204,7 +204,7 @@ VarDecl *FuncExpr::getImplicitThisDecl() {
   
   // The decl should be named 'this' and have no location information.
   NamedPattern *NP = dyn_cast<NamedPattern>(TP->getSubPattern());
-  if (NP && NP->getBoundName().str() == "this" && NP->getLoc().isValid())
+  if (NP && NP->getBoundName().str() == "this" && !NP->getLoc().isValid())
     return NP->getDecl();
   return 0;
 }
