@@ -51,14 +51,6 @@ public:
     return false;
   }
  
-  bool typeCheckConversion(Expr *&E, Type T) {
-    Expr *E2 = TC.convertToType(E, T);
-    if (E2 == 0) return true;
-    E = E2;
-    return false;
-  }
-  
-  
   //===--------------------------------------------------------------------===//
   // Visit Methods.
   //===--------------------------------------------------------------------===//

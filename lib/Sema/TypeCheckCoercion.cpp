@@ -583,6 +583,21 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC) {
   assert(!DestTy->is<DependentType>() &&
          "Result of conversion can't be dependent");
 
+  // If the destination is a AutoClosing FunctionType, we have special rules.
+  if (FunctionType *FT = DestTy->getAs<FunctionType>())
+    if (FT->isAutoClosure()) {
+      // We require the expression to be an ImplicitClosureExpr that produces
+      // DestTy.
+      if (E->getType()->isEqual(DestTy) && isa<ImplicitClosureExpr>(E))
+        return E;
+      
+      // If we don't have it yet, force the input to the result of the closure
+      // and build the implicit closure.
+      E = convertToType(E, FT->getResult(), TC);
+      if (E == 0) return 0;
+      return new (TC.Context) ImplicitClosureExpr(E, DestTy);
+    }
+  
   // If we have an exact match, we're done.
   if (E->getType()->isEqual(DestTy))
     return E;
