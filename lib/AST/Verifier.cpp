@@ -16,7 +16,6 @@
 
 #include "swift/Subsystems.h"
 #include "swift/AST/AST.h"
-#include "swift/AST/ASTVisitor.h"
 #include "swift/Parse/Lexer.h" // bad dependency!
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/MemoryBuffer.h"

@@ -195,14 +195,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return E;
   }
 
-  Expr *visitCallExpr(CallExpr *E) {
-    return visitApplyExpr(E);
-  }
-
-  Expr *visitUnaryExpr(UnaryExpr *E) {
-    return visitApplyExpr(E);
-  }
-
   Expr *visitBinaryExpr(BinaryExpr *E) {
     // Visit the arguments to the tuple, but visit the operator in
     // infix order.
@@ -222,14 +214,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return E;
   }
 
-  Expr *visitConstructorCallExpr(ConstructorCallExpr *E) {
-    return visitApplyExpr(E);
-  }
-
-  Expr *visitDotSyntaxCallExpr(DotSyntaxCallExpr *E) {
-    return visitApplyExpr(E);
-  }
-  
   Expr *visitDotSyntaxPlusFuncUseExpr(DotSyntaxPlusFuncUseExpr *E) {
     Expr *E2 = doIt(E->getBaseExpr());
     if (E2 == nullptr) return nullptr;

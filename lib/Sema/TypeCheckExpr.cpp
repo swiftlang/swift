@@ -494,7 +494,8 @@ namespace {
 /// intermediate nodes, introduce type coercion etc.  This visitor does this
 /// job.  Each visit method reanalyzes the children of a node, then reanalyzes
 /// the node, and returns true on error.
-class SemaExpressionTree : public Walker, public ExprVisitor<SemaExpressionTree, Expr*> {
+class SemaExpressionTree : 
+  public Walker, public ExprVisitor<SemaExpressionTree, Expr*> {
 public:
   TypeChecker &TC;
   
@@ -651,19 +652,11 @@ public:
   Expr *visitApplyExpr(ApplyExpr *E) {
     return TC.semaApplyExpr(E);
   }
-  Expr *visitCallExpr(CallExpr *E) { return visitApplyExpr(E); }
-  Expr *visitUnaryExpr(UnaryExpr *E) { return visitApplyExpr(E); }
   Expr *visitBinaryExpr(BinaryExpr *E) {
     // This is necessary because ExprWalker doesn't visit the
     // TupleExpr right now.
     if (TC.semaTupleExpr(E->getArgTuple()))
       return 0;
-    return visitApplyExpr(E);
-  }
-  Expr *visitConstructorCallExpr(ConstructorCallExpr *E) {
-    return visitApplyExpr(E);
-  }
-  Expr *visitDotSyntaxCallExpr(DotSyntaxCallExpr *E) {
     return visitApplyExpr(E);
   }
   
