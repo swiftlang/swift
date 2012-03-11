@@ -26,7 +26,9 @@ namespace swift {
   class TypeBase;
 
 /// Type - This is a simple value object that contains a pointer to a type
-/// class.  This is potentially sugared.
+/// class.  This is potentially sugared.  We use this throughout the codebase
+/// instead of a raw "TypeBase*" to disable equality comparison, which is unsafe
+/// for sugared types.
 class Type {
   TypeBase *Ptr;
 public:

@@ -364,12 +364,19 @@ ERROR(oneof_attributes,attribute_parsing,none,
 ERROR(protocol_attributes,attribute_parsing,none,
       "protocol types are not allowed to have attributes", ())
 
+// byref
 ERROR(byref_attribute_expected_identifier,attribute_parsing,none,
       "expected identifier for byref attribute", ())
 ERROR(byref_attribute_unknown_qualifier,attribute_parsing,none,
       "unknown qualifier for byref attribute", ())
 ERROR(byref_attribute_expected_rparen,attribute_parsing,none,
       "expected ')' at end of byref qualifiers", ())
+
+// auto_closure
+ERROR(autoclosure_requires_function_type,attribute_parsing,none,
+      "auto_closure attribute only applies to syntactic function types", ())
+ERROR(autoclosure_function_input_nonunit,attribute_parsing,none,
+      "auto_closure argument type %0 must be '()'", (Type))
 
 
 //==============================================================================

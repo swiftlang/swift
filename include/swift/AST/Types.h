@@ -547,16 +547,28 @@ private:
   
 /// FunctionType - A function type has a single input and result, e.g.
 /// "(int) -> int" or (var a : int, var b : int) -> (int, int).
+///
+/// If the AutoClosure bit is set to true, then the input type is known to be ()
+/// and a value of this function type is only assignable (in source code) from
+/// the destination type of the function.  Sema inserts an ImplicitClosure to
+/// close over the value.  For example:
+///   var x : [auto_closure] () -> int = 4
 class FunctionType : public TypeBase {
   const Type Input;
   const Type Result;
-  
+
+  bool AutoClosure;
 public:
   /// 'Constructor' Factory Function
-  static FunctionType *get(Type Input, Type Result, ASTContext &C);
+  static FunctionType *get(Type Input, Type Result, ASTContext &C) {
+    return get(Input, Result, false, C);
+  }
+  static FunctionType *get(Type Input, Type Result, bool isAutoClosure,
+                           ASTContext &C);
 
   Type getInput() const { return Input; }
   Type getResult() const { return Result; }
+  bool isAutoClosure() const { return AutoClosure; }
   
   void print(raw_ostream &OS) const;
   

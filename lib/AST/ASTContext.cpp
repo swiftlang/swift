@@ -32,7 +32,8 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<TupleType> TupleTypes;
   llvm::DenseMap<TypeAliasDecl*, MetaTypeType*> MetaTypeTypes;
   llvm::DenseMap<Module*, ModuleType*> ModuleTypes;
-  llvm::DenseMap<std::pair<Type,Type>, FunctionType*> FunctionTypes;
+  llvm::DenseMap<std::pair<Type,std::pair<Type,char>>,
+                 FunctionType*> FunctionTypes;
   llvm::DenseMap<std::pair<Type, uint64_t>, ArrayType*> ArrayTypes;
   llvm::DenseMap<unsigned, BuiltinIntegerType*> IntegerTypes;
   llvm::DenseMap<Type, ParenType*> ParenTypes;
@@ -197,8 +198,12 @@ ModuleType *ModuleType::get(Module *M) {
 
 /// FunctionType::get - Return a uniqued function type with the specified
 /// input and result.
-FunctionType *FunctionType::get(Type Input, Type Result, ASTContext &C) {
-  FunctionType *&Entry = C.Impl.FunctionTypes[std::make_pair(Input, Result)];
+FunctionType *FunctionType::get(Type Input, Type Result, bool isAutoClosure,
+                                ASTContext &C) {
+  FunctionType *&Entry =
+    C.Impl.FunctionTypes[std::make_pair(Input,
+                                        std::make_pair(Result, 
+                                                       (char)isAutoClosure))];
   if (Entry) return Entry;
   
   return Entry = new (C) FunctionType(Input, Result);

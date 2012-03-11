@@ -384,6 +384,8 @@ void TupleType::print(raw_ostream &OS) const {
 }
 
 void FunctionType::print(raw_ostream &OS) const {
+  if (isAutoClosure())
+    OS << "[auto_closure]";
   OS << Input << " -> " << Result;
 }
 
