@@ -18,7 +18,7 @@
 #define SWIFT_AST_STMT_H
 
 #include "swift/AST/LLVM.h"
-#include "swift/AST/Walk.h"
+#include "swift/AST/Walker.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"

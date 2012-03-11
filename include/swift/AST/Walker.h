@@ -1,4 +1,4 @@
-//===--- Walk.h - Support structures for walking the AST --------*- C++ -*-===//
+//===--- Walker.h - Class for walking the AST -------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_AST_WALK_H
-#define SWIFT_AST_WALK_H
+#ifndef SWIFT_AST_WALKER_H
+#define SWIFT_AST_WALKER_H
 
 #include "llvm/ADT/PointerUnion.h"
 
@@ -21,7 +21,8 @@ class Expr;
 class Stmt;
   
 /// \brief An abstract class used to traverse an AST.
-struct Walker {
+class Walker {
+public:
   /// \brief The parent of the node we are visiting.
   llvm::PointerUnion<Expr *, Stmt *> Parent;
 

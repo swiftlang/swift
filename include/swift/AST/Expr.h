@@ -20,7 +20,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
-#include "swift/AST/Walk.h"
+#include "swift/AST/Walker.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/ArrayRef.h"
