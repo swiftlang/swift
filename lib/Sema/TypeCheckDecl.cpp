@@ -290,8 +290,13 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
   }
 
   if (Attrs.isByref()) {
-    TC.diagnose(VD->getLocStart(), diag::byref_decl);
+    TC.diagnose(VD->getLocStart(), diag::invalid_decl_attribute, "byref");
     VD->getMutableAttrs().Byref = false;
+  }
+
+  if (Attrs.isAutoClosure()) {
+    TC.diagnose(VD->getLocStart(), diag::invalid_decl_attribute, "auto_closure");
+    VD->getMutableAttrs().AutoClosure = false;
   }
 }
 

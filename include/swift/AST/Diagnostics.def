@@ -496,7 +496,9 @@ ERROR(infix_left_invalid_on_decls,sema_tcd,none,
       "declaration cannot be declared 'infix_left'", ())
 ERROR(binops_infix_left,sema_tcd,none,
       "binary operators must be declared 'infix_left'", ())
-ERROR(byref_decl,sema_tcd,none, "declaration cannot be declared 'byref'", ())
+
+ERROR(invalid_decl_attribute,sema_tcd,none,
+      "attribute '%0' cannot be applied to declaration", (StringRef))
 
 //------------------------------------------------------------------------------
 // Type Check Expressions
