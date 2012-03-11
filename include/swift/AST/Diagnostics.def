@@ -346,6 +346,8 @@ ERROR(unknown_attribute,attribute_parsing,none,
       "unknown attribute '%0'", (StringRef))
 ERROR(duplicate_attribute,attribute_parsing,none,
       "duplicate '%0' attribute", (StringRef))
+ERROR(cannot_combine_attribute,attribute_parsing,none,
+      "attribute '%0' cannot be combined with this attribute", (StringRef))
 ERROR(expected_in_attribute_list,attribute_parsing,none,
       "expected ']' or ',' in attribute list", ())
 

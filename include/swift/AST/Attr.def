@@ -26,5 +26,6 @@ ATTR(resilient)
 ATTR(fragile)
 ATTR(born_fragile)
 ATTR(byref)
+ATTR(auto_closure)
 
 #undef ATTR

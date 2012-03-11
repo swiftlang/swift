@@ -191,7 +191,8 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
 
   // 'byref' attribute.
   // FIXME: only permit this in specific contexts.
-  case AttrName::byref:
+  case AttrName::byref: {
+    SourceLoc TokLoc = Tok.getLoc();
     if (Attributes.Byref)
       diagnose(Tok, diag::duplicate_attribute, Tok.getText());
     consumeToken(tok::identifier);
@@ -218,7 +219,34 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
                          beginLoc,
                          diag::opening_paren);
     }
+    
+    // Verify that we're not combining this attribute incorrectly.  Cannot be
+    // both byref and auto_closure.
+    if (Attributes.isAutoClosure()) {
+      diagnose(TokLoc, diag::cannot_combine_attribute, "auto_closure");
+      Attributes.AutoClosure = false;
+    }
+    
     return false;
+  }
+      
+  // FIXME: Only valid on var and tuple elements, not on func's, typealias, etc.
+  case AttrName::auto_closure: {
+    SourceLoc TokLoc = Tok.getLoc();
+    if (Attributes.isAutoClosure())
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+    consumeToken(tok::identifier);
+    
+    // Verify that we're not combining this attribute incorrectly.  Cannot be
+    // both byref and auto_closure.
+    if (Attributes.isByref()) {
+      diagnose(TokLoc, diag::cannot_combine_attribute, "byref");
+      return false;
+    }
+    
+    Attributes.AutoClosure = true;
+    return false;
+  }
   }
   llvm_unreachable("bad attribute kind");
 }

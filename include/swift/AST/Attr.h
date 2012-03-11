@@ -137,8 +137,9 @@ public:
   ResilienceData Resilience;
   bool Byref;
   bool ByrefImplicit;
+  bool AutoClosure;
 
-  DeclAttributes() : Byref(false) { }
+  DeclAttributes() : Byref(false), AutoClosure(false) { }
 
   bool isValid() const { return LSquareLoc.isValid(); }
 
@@ -147,11 +148,11 @@ public:
   ResilienceData getResilienceData() const { return Resilience; }
   bool isByref() const { return Byref; }
   bool isByrefImplicit() const { assert(isByref()); return ByrefImplicit; }
+  bool isAutoClosure() const { return AutoClosure; }
     
   bool empty() const {
-    return !isInfix()
-        && !getResilienceData().isValid()
-        && !isByref();
+    return !isInfix() && !getResilienceData().isValid() && !isByref() &&
+           !isAutoClosure();
   }
 };
   
