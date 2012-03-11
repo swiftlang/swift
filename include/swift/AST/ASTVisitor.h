@@ -64,7 +64,7 @@ public:
   // require full coverage of the AST nodes by the visitor.
 #define ABSTRACT_EXPR(CLASS, PARENT)                                \
   ExprRetTy visit##CLASS##Expr(CLASS##Expr *E) {                    \
-     return static_cast<ImplClass*>(this)->visit##PARENT##Expr(E);  \
+     return static_cast<ImplClass*>(this)->visit##PARENT(E);  \
   }
 #define EXPR(CLASS, PARENT) ABSTRACT_EXPR(CLASS, PARENT)
 #include "swift/AST/ExprNodes.def"
