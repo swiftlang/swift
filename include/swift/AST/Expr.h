@@ -35,6 +35,7 @@ namespace swift {
   class BraceStmt;
   class TypeAliasDecl;
   class ASTWalker;
+  class VarDecl;
 
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -736,6 +737,7 @@ public:
   ArrayRef<Pattern*> getParamPatterns() const {
     return ArrayRef<Pattern*>(getParamsBuffer(), NumPatterns);
   }
+  
 
   /// Returns the location of the 'func' keyword.
   SourceLoc getFuncLoc() const { return FuncLoc; }
@@ -744,6 +746,14 @@ public:
   void setBody(BraceStmt *S) { Body = S; }
 
   Type getBodyResultType() const;
+
+  /// getImplicitThisDecl - If this FuncExpr is a non-plus method in an
+  /// extension context, it will have a 'this' argument.  This method returns it
+  /// if present, or returns null if not.
+  VarDecl *getImplicitThisDecl();
+  const VarDecl *getImplicitThisDecl() const {
+    return const_cast<FuncExpr*>(this)->getImplicitThisDecl();
+  }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const FuncExpr *) { return true; }

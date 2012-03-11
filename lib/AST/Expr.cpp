@@ -15,9 +15,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Expr.h"
+#include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/Types.h"
-#include "swift/AST/ASTContext.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -191,6 +190,23 @@ Type FuncExpr::getBodyResultType() const {
     ty = cast<FunctionType>(ty)->getResult();
   } while (--n);
   return ty;
+}
+
+/// getImplicitThisDecl - If this FuncExpr is a non-plus method in an
+/// extension context, it will have a 'this' argument.  This method returns it
+/// if present, or returns null if not.
+VarDecl *FuncExpr::getImplicitThisDecl() {
+  if (getParamPatterns().empty()) return 0;
+
+  // "this" is represented as (typed_pattern (named_pattern (var_decl 'this')).
+  TypedPattern *TP = dyn_cast<TypedPattern>(getParamPatterns()[0]);
+  if (TP == 0) return 0;
+  
+  // The decl should be named 'this' and have no location information.
+  NamedPattern *NP = dyn_cast<NamedPattern>(TP->getSubPattern());
+  if (NP && NP->getBoundName().str() == "this" && NP->getLoc().isValid())
+    return NP->getDecl();
+  return 0;
 }
 
 static ValueDecl *getCalledValue(Expr *E) {
