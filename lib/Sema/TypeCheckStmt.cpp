@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/ASTWalker.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
@@ -180,7 +181,7 @@ void swift::performTypeChecking(TranslationUnit *TU) {
   
   // Find all the FuncExprs in the translation unit and collapse all
   // the sequences.
-  struct PrePassWalker : Walker {
+  struct PrePassWalker : ASTWalker {
     TypeChecker &TC;
     SmallVector<FuncExpr*, 32> FuncExprs;
 

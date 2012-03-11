@@ -16,6 +16,7 @@
 
 #include "swift/Subsystems.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/Parse/Lexer.h" // bad dependency!
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -25,7 +26,7 @@ using namespace swift;
 namespace {
   enum ShouldHalt { Continue, Halt };
 
-  class Verifier : public Walker {
+  class Verifier : public ASTWalker {
     TranslationUnit *TU;
     ASTContext &Ctx;
     llvm::raw_ostream &Out;

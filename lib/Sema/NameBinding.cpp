@@ -18,6 +18,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/Component.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/AST/ASTWalker.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/Twine.h"
@@ -348,7 +349,7 @@ void swift::performNameBinding(TranslationUnit *TU) {
     }
   }
 
-  struct NameBindingWalker : Walker {
+  struct NameBindingWalker : ASTWalker {
     NameBinder &Binder;
     NameBindingWalker(NameBinder &binder) : Binder(binder) {}
     

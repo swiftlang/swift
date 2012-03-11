@@ -14,14 +14,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/PrettyStackTrace.h"
 using namespace swift;
 
-bool Walker::walkToExprPre(Expr *E) { return true; }
-Expr *Walker::walkToExprPost(Expr *E) { return E; }
-bool Walker::walkToStmtPre(Stmt *S) { return true; }
-Stmt *Walker::walkToStmtPost(Stmt *S) { return S; }
+bool ASTWalker::walkToExprPre(Expr *E) { return true; }
+Expr *ASTWalker::walkToExprPost(Expr *E) { return E; }
+bool ASTWalker::walkToStmtPre(Stmt *S) { return true; }
+Stmt *ASTWalker::walkToStmtPost(Stmt *S) { return S; }
 
 namespace {
 
@@ -31,19 +32,19 @@ namespace {
 class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   friend class ASTVisitor<Traversal, Expr*, Stmt*>;
 
-  swift::Walker &Walker;
+  ASTWalker &Walker;
 
   typedef ASTVisitor<Traversal, Expr*, Stmt*> inherited;
   
   /// \brief RAII object that sets the parent of the walk context 
   /// appropriately.
   class SetParentRAII {
-    swift::Walker &Walker;
-    decltype(swift::Walker::Parent) PriorParent;
+    ASTWalker &Walker;
+    decltype(ASTWalker::Parent) PriorParent;
     
   public:
     template<typename T>
-    SetParentRAII(swift::Walker &walker, T *newParent)
+    SetParentRAII(ASTWalker &walker, T *newParent)
       : Walker(walker), PriorParent(walker.Parent) {
       walker.Parent = newParent;
     }
@@ -345,7 +346,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   }
      
 public:
-  Traversal(swift::Walker &walker) : Walker(walker) {}
+  Traversal(ASTWalker &walker) : Walker(walker) {}
 
   Expr *doIt(Expr *E) {
     // Do the pre-order visitation.  If it returns false, we just
@@ -380,10 +381,10 @@ public:
 
 } // end anonymous namespace.
 
-Expr *Expr::walk(Walker &walker) {
+Expr *Expr::walk(ASTWalker &walker) {
   return Traversal(walker).doIt(this);
 }
 
-Stmt *Stmt::walk(Walker &walker) {
+Stmt *Stmt::walk(ASTWalker &walker) {
   return Traversal(walker).doIt(this);
 }

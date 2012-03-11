@@ -20,7 +20,6 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
-#include "swift/AST/Walker.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -35,6 +34,7 @@ namespace swift {
   class Stmt;
   class BraceStmt;
   class TypeAliasDecl;
+  class ASTWalker;
 
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -99,8 +99,8 @@ public:
   Expr *getValueProvidingExpr();
 
   /// walk - This recursively walks the AST rooted at this expression.
-  Expr *walk(Walker &walker);
-  Expr *walk(Walker &&walker) { return walk(walker); }
+  Expr *walk(ASTWalker &walker);
+  Expr *walk(ASTWalker &&walker) { return walk(walker); }
   
   /// ConversionRank - This enum specifies the rank of an implicit conversion
   /// of a value from one type to another.  These are ordered from cheapest to

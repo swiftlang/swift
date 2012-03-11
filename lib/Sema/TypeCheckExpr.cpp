@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/ASTWalker.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -495,7 +496,7 @@ namespace {
 /// job.  Each visit method reanalyzes the children of a node, then reanalyzes
 /// the node, and returns true on error.
 class SemaExpressionTree : 
-  public Walker, public ExprVisitor<SemaExpressionTree, Expr*> {
+  public ASTWalker, public ExprVisitor<SemaExpressionTree, Expr*> {
 public:
   TypeChecker &TC;
   
@@ -653,7 +654,7 @@ public:
     return TC.semaApplyExpr(E);
   }
   Expr *visitBinaryExpr(BinaryExpr *E) {
-    // This is necessary because ExprWalker doesn't visit the
+    // This is necessary because ASTWalker doesn't visit the
     // TupleExpr right now.
     if (TC.semaTupleExpr(E->getArgTuple()))
       return 0;
@@ -1061,7 +1062,7 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
   // all of the types contained within it.  If we've resolved everything, then
   // we're done processing the expression.  While we're doing the walk, keep
   // track of whether we have any literals without a resolved type.
-  struct DependenceWalker : Walker {
+  struct DependenceWalker : ASTWalker {
     DependenceWalker() { reset(); }
 
     void reset() {
@@ -1102,7 +1103,7 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
   // Otherwise, if we found any dependent literals, then force them to
   // the library specified default type for the appropriate literal kind.
   if (dependence.HasDependentLiterals) {
-    struct UpdateWalker : Walker {
+    struct UpdateWalker : ASTWalker {
       UpdateWalker(TypeChecker &TC) : TC(TC) {}
 
       Expr *walkToExprPost(Expr *E) {

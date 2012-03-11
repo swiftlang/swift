@@ -18,7 +18,6 @@
 #define SWIFT_AST_STMT_H
 
 #include "swift/AST/LLVM.h"
-#include "swift/AST/Walker.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -27,6 +26,7 @@ namespace swift {
   class ASTContext;
   class Decl;
   class Expr;
+  class ASTWalker;
 
 enum class StmtKind {
 #define STMT(ID, PARENT) ID,
@@ -55,8 +55,8 @@ public:
   SourceRange getSourceRange() const;
   
   /// walk - This recursively walks the AST rooted at this statement.
-  Stmt *walk(Walker &walker);
-  Stmt *walk(Walker &&walker) { return walk(walker); }
+  Stmt *walk(ASTWalker &walker);
+  Stmt *walk(ASTWalker &&walker) { return walk(walker); }
   
   
   void dump() const;
