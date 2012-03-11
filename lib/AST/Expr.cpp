@@ -543,8 +543,8 @@ public:
   void visitModuleExpr(ModuleExpr *E) {
     printCommon(E, "module_expr") << '\n';
   }
-  void visitTupleElementExpr(TupleElementExpr *E) {
-    printCommon(E, "tuple_element_expr")
+  void visitSyntacticTupleElementExpr(TupleElementExpr *E) {
+    printCommon(E, "syntactic_tuple_element_expr")
       << " field #" << E->getFieldNumber() << '\n';
     printRec(E->getBase());
     OS << ')';
