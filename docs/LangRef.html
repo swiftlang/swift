@@ -871,10 +871,12 @@
     attribute      ::= attribute-infix
     attribute      ::= attribute-resilience
     attribute      ::= attribute-byref
+    attribute      ::= attribute-auto_closure
   </pre>
   
   <p>An attribute is a (possibly empty) comma separated list of attributes.</p>
   
+  <!-- _____________________________________________________________________ -->
   <h4 id="attribute-infix">Infix Attributes</h4>
     
   <pre class="grammar">
@@ -891,6 +893,7 @@
   
   <p>FIXME: Implement these restrictions.</p>
 
+  <!-- _____________________________________________________________________ -->
   <h4 id="attribute-resilence">Resilience Attribute</h4>
 
   <pre class="grammar">
@@ -901,6 +904,7 @@
 
   <p>See the resilience design.</p>
   
+  <!-- _____________________________________________________________________ -->
   <h4 id="attribute-byref">By-Reference Attribute</h4>
 
   <pre class="grammar">
@@ -924,6 +928,45 @@
     We may also need some way of representing <q>this will be
     consumed by the nth curry</q>.
   </p>
+  
+  <!-- _____________________________________________________________________ -->
+  <h4 id="attribute-auto_closure">auto_closure Attribute</h4>
+  
+  <pre class="grammar">
+    attribute-auto_closure ::= 'auto_closure'
+  </pre>
+  
+  <p>The <tt>auto_closure</tt> attribute modifies a <a 
+  href="#type-function">function type</a>, changing the behavior of any
+  assignment into (or initialization of) a value with the function type. 
+  Instead of requiring that the rvalue and lvalue have the same function type,
+  an "auto closing" function type requires its initializer expression to have 
+  the same type as the function's result type, and it implicitly binds a 
+  closure over this expression.  This is typically useful for function arguments
+  that want to capture computation that can be run lazily.</p>
+  
+  <p><tt>auto_closure</tt> is only valid in a <tt>type-annotation</tt> of a
+  syntactic function type that is defined to take a syntactic empty tuple.
+  </p>
+
+  <pre class="example">
+  <i>// An auto closure value.  This captures an implicit closure over the</i>
+  <i>// specified expression, instead of the expression itself.</i>
+  var a : [auto_closure] () -&gt; int = 4
+  
+  <i>// Definition of an 'assert' function.  Assertions and logging routines</i>
+  <i>// often want to conditionally evaluate their argument.</i>
+  func assert(condition : [auto_closure] () -> bool)
+    
+  <i>// Definition of the || operator - it captures its right hand side as</i>
+  <i>// an autoclosure so it can short-circuit evaluate it.</i>
+  func [infix_left=110] || (lhs: bool, rhs: [auto_closure] ()->bool) -&gt; bool
+    
+  <i>// Example uses of these functions:</i>
+  assert(i &lt; j)
+  if (a == 0 || b == 42) { ... }
+  </pre>
+
   
   <!-- ********************************************************************* -->
   <h2 id="type">Types</h2>
@@ -1098,8 +1141,10 @@
      context captured when the function value was formed.</p>
 
   <p>The result type of a function type must
-     be <a href="#materializable">materializable</a>.
-  FIXME: The argument will eventually have to be a tuple.</p>
+     be <a href="#materializable">materializable</a>.  The argument type of a
+     function is always required to be parenthesized (a tuple).  The  behavior
+     of function types may be modified with the <a 
+      href="#attribute-auto_closure"><tt>auto_closure</tt> attribute</a>.</p>
 
   <p>Because of the grammar structure, a nested function type like 
      "(a) -&gt; (b) -&gt; c" is parsed as "(a) -&gt; ((b) -&gt; c)".  This means
@@ -1127,6 +1172,10 @@
     // the function had no side effects).</i>
     var z1 = x(1)(2)
     var z2 = y(2)
+    
+    <i>// An auto closure value.  This captures an implicit closure over the</i>
+    <i>// specified expression, instead of the expression itself.</i>
+    var a : [auto_closure] () -> int = 4
   </pre>
   
   <!-- ===================================================================== -->
