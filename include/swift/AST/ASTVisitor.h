@@ -57,6 +57,18 @@ public:
     llvm_unreachable("Not reachable, all cases handled");
   }
   
+  // Provide default implementations of abstract "visit" implementations that
+  // just chain to their base class.  This allows visitors to just implement
+  // the base behavior and handle all subclasses if they desire.  Since this is
+  // a template, it will only instantiate cases that are used and thus we still
+  // require full coverage of the AST nodes by the visitor.
+#define ABSTRACT_EXPR(CLASS, PARENT)                                \
+  ExprRetTy visit##CLASS##Expr(CLASS##Expr *E) {                    \
+     return static_cast<ImplClass*>(this)->visit##PARENT##Expr(E);  \
+  }
+#define EXPR(CLASS, PARENT) ABSTRACT_EXPR(CLASS, PARENT)
+#include "swift/AST/ExprNodes.def"
+
   StmtRetTy visit(Stmt *S) {
     switch (S->getKind()) {
 
