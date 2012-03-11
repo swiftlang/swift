@@ -17,6 +17,7 @@
 
 namespace swift {
 
+class Decl;
 class Expr;
 class Stmt;
   
@@ -31,7 +32,7 @@ public:
   /// subtree is ignored.
   ///
   /// The default implementation always returns true.
-  virtual bool walkToExprPre(Expr *E);
+  virtual bool walkToExprPre(Expr *E) { return true; }
 
   /// This method is called after visiting an expression's children.
   /// If it returns null, the walk is terminated; otherwise, the
@@ -39,14 +40,14 @@ public:
   /// previously appeared.
   ///
   /// The default implementation always returns its argument.
-  virtual Expr *walkToExprPost(Expr *E);
+  virtual Expr *walkToExprPost(Expr *E) { return E; }
 
   /// This method is called when first visiting a statement, before
   /// walking into its children.  If it returns false, the subtree is
   /// ignored.
   ///
   /// The default implementation always returns true.
-  virtual bool walkToStmtPre(Stmt *S);
+  virtual bool walkToStmtPre(Stmt *S) { return true; }
 
   /// This method is called after visiting a statement's children.  If
   /// it returns null, the walk is terminated; otherwise, the returned
@@ -54,12 +55,24 @@ public:
   /// appeared.
   ///
   /// The default implementation always returns its argument.
-  virtual Stmt *walkToStmtPost(Stmt *S);
+  virtual Stmt *walkToStmtPost(Stmt *S) { return S; }
+
+  
+  /// walkToDeclPre - This method is called when first visiting a decl, before
+  /// walking into its children.  If it returns false, the subtree is skipped.
+  virtual bool walkToDeclPre(Decl *D) { return true; }
+
+  /// walkToDeclPost - This method is called after visiting the children of a
+  /// decl.  If it returns false, the remaining traversal is terminated and
+  /// returns failure.
+  virtual bool walkToDeclPost(Decl *D) { return true; }
 
 protected:
   ASTWalker() = default;
   ASTWalker(const ASTWalker &) = default;
   ~ASTWalker() = default;
+  
+  virtual void anchor();
 };
 
 } // end namespace swift

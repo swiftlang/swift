@@ -19,10 +19,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 using namespace swift;
 
-bool ASTWalker::walkToExprPre(Expr *E) { return true; }
-Expr *ASTWalker::walkToExprPost(Expr *E) { return E; }
-bool ASTWalker::walkToStmtPre(Stmt *S) { return true; }
-Stmt *ASTWalker::walkToStmtPost(Stmt *S) { return S; }
+void ASTWalker::anchor() {}
 
 namespace {
 
@@ -265,7 +262,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
         continue;
       }
 
-      if (visitDecl(BS->getElement(i).get<Decl*>()))
+      if (doIt(BS->getElement(i).get<Decl*>()))
         return nullptr;
     }
     
@@ -313,37 +310,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return WS;
   }
 
-  /// Returns true on failure.
-  bool visitDecl(Decl *D) {
-    if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
-      if (Expr *Init = VD->getInit()) {
-#ifndef NDEBUG
-        PrettyStackTraceDecl debugStack("walking into initializer for", VD);
-#endif
-        if (Expr *E2 = doIt(Init))
-          VD->setInit(E2);
-        else
-          return true;
-      }
-    } else if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
-      if (FuncExpr *Body = FD->getBody()) {
-#ifndef NDEBUG
-        PrettyStackTraceDecl debugStack("walking into body of", FD);
-#endif
-        if (FuncExpr *E2 = cast_or_null<FuncExpr>(doIt(Body)))
-          FD->setBody(E2);
-        else
-          return true;
-      }
-
-    } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
-      for (Decl *M : ED->getMembers()) {
-        if (visitDecl(M))
-          return true;
-      }
-    }
-    return false;
-  }
      
 public:
   Traversal(ASTWalker &walker) : Walker(walker) {}
@@ -376,6 +342,44 @@ public:
     if (S) S = Walker.walkToStmtPost(S);
 
     return S;
+  }
+  
+  /// Returns true on failure.
+  bool doIt(Decl *D) {
+    // Do the pre-order visitation.  If it returns false, we just
+    // skip entering subnodes of this tree.
+    if (!Walker.walkToDeclPre(D))
+      return false;
+
+    if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
+      if (Expr *Init = VD->getInit()) {
+#ifndef NDEBUG
+        PrettyStackTraceDecl debugStack("walking into initializer for", VD);
+#endif
+        if (Expr *E2 = doIt(Init))
+          VD->setInit(E2);
+        else
+          return true;
+      }
+    } else if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
+      if (FuncExpr *Body = FD->getBody()) {
+#ifndef NDEBUG
+        PrettyStackTraceDecl debugStack("walking into body of", FD);
+#endif
+        if (FuncExpr *E2 = cast_or_null<FuncExpr>(doIt(Body)))
+          FD->setBody(E2);
+        else
+          return true;
+      }
+      
+    } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
+      for (Decl *M : ED->getMembers()) {
+        if (doIt(M))
+          return true;
+      }
+    }
+    
+    return !Walker.walkToDeclPost(D);
   }
 };
 
