@@ -111,11 +111,6 @@ public:
     /// do as well, conversion of a scalar to a single-element tuple, etc.
     CR_Identity,
 
-    /// CR_AutoClosure - Conversion of the source type to the destination type
-    /// requires the introduction of a closure.  This occurs with a conversion
-    /// from "()" to "()->()" type, for example.
-    CR_AutoClosure,
-    
     /// CR_Invalid - It isn't valid to convert these types.  For example, it
     /// isn't valid to convert a value of type "()" to "(int)".
     CR_Invalid

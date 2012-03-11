@@ -688,32 +688,6 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC) {
     return convertToType(E, DestTy, TC);
   }
 
-  // Otherwise, check to see if this is an auto-closure case.  This case happens
-  // when we convert an expression E to a function type whose result is E's
-  // type.
-  if (FunctionType *FT = DestTy->getAs<FunctionType>()) {
-    // FIXME: This should only happen when an explicit argument attribute
-    // is used to enable it.
-    TupleType *InTy = FT->getInput()->getAs<TupleType>();
-    if (!isa<ExplicitClosureExpr>(E)  && InTy && InTy->getFields().empty()) {
-      
-      // If there are any live anonymous closure arguments, this level will use
-      // them and remove them.  When binding something like $0+$1 to
-      // (int,int)->(int,int)->() the arguments bind to the first level, not the
-      // inner level.  To handle this, we ignore anonymous decls in the
-      // recursive case here.
-      Expr *ERes = convertToType(E, FT->getResult(), TC);
-      if (ERes == 0) return 0;
-    
-      // Now that the AnonClosureArgExpr's potentially have a type, redo
-      // semantic analysis from the leaves of the expression tree up.
-      if (TC.typeCheckExpression(ERes))
-        return 0;
-      
-      return new (TC.Context) ImplicitClosureExpr(ERes, DestTy);
-    }
-  }
-
   // If the input expression has a dependent type, then there are two cases:
   // first this could be an AnonDecl whose type will be specified by a larger
   // context, second, this could be a context sensitive expression value like

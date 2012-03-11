@@ -365,6 +365,20 @@ static Expr::ConversionRank getConversionRank(const Expr *E, Type DestTy) {
   assert(!DestTy->is<DependentType>() &&
          "Result of conversion can't be dependent");
 
+  // If the destination is a AutoClosing FunctionType, we have special rules.
+  if (FunctionType *FT = DestTy->getAs<FunctionType>())
+    if (FT->isAutoClosure()) {
+      // We require the expression to be an ImplicitClosureExpr that produces
+      // DestTy.  If we have it, we have an identity match.
+      if (E->getType()->isEqual(DestTy) && isa<ImplicitClosureExpr>(E))
+        return Expr::CR_Identity;
+      
+      // Otherwise, the autoconversion is considered to be free.  Just see
+      // whether the subexpression converts to the result type.
+      return getConversionRank(E, FT->getResult());
+    }
+
+  
   // Exact matches are identity conversions.
   if (E->getType()->isEqual(DestTy))
     return Expr::CR_Identity;
@@ -414,21 +428,6 @@ static Expr::ConversionRank getConversionRank(const Expr *E, Type DestTy) {
 
     // Otherwise, fall through and see if an l2r conversion on the
     // source would help.
-  }
-
-  // Otherwise, check to see if this is an auto-closure case.  This case happens
-  // when we convert an expression E to a function type whose result is E's
-  // type.
-  if (FunctionType *FT = DestTy->getAs<FunctionType>()) {
-    // FIXME: This should only happen when an explicit argument attribute
-    // is used to enable it.
-    TupleType *InTy = FT->getInput()->getAs<TupleType>();
-    if (!isa<ExplicitClosureExpr>(E) && InTy && InTy->getFields().empty()) {
-      if (getConversionRank(E, FT->getResult()) == Expr::CR_Invalid)
-        return Expr::CR_Invalid;
-    
-      return Expr::CR_AutoClosure;
-    }
   }
 
   // If all else fails, do an lvalue-to-rvalue conversion on the source.
