@@ -207,7 +207,9 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
   llvm_unreachable("bad attribute kind");
 }
 
-/// parsePresentAttributeList
+/// parsePresentAttributeList - This is the internal implementation of
+/// parseAttributeList, which we expect to be inlined to handle the common case
+/// of an absent attribute list.
 ///   attribute-list:
 ///     /*empty*/
 ///     '[' ']'
