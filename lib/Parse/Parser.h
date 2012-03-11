@@ -181,6 +181,7 @@ public:
   // Decl Parsing
   static bool isStartOfDecl(const Token &Tok, const Token &Tok2);
 
+  Identifier getModuleIdentifier();
   TranslationUnit *parseTranslationUnit();
   bool parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags);
   enum {

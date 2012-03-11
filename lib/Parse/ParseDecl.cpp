@@ -27,6 +27,24 @@
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
+Identifier Parser::getModuleIdentifier() {
+  StringRef moduleName = Buffer->getBufferIdentifier();
+
+  // As a special case, recognize <stdin>.
+  if (moduleName == "<stdin>")
+    return Context.getIdentifier("stdin");
+
+  // Find the stem of the filename.
+  moduleName = llvm::sys::path::stem(moduleName);
+
+  // Complain about non-identifier characters in the module name.
+  if (!Lexer::isIdentifier(moduleName)) {
+    diagnose(L.getLocForStartOfBuffer(), diag::bad_module_name);
+    moduleName = "bad";
+  }
+
+  return Context.getIdentifier(moduleName);
+}
 
 /// parseTranslationUnit - Main entrypoint for the parser.
 ///   translation-unit:
@@ -36,10 +54,8 @@ TranslationUnit *Parser::parseTranslationUnit() {
   consumeToken();
   SourceLoc FileStartLoc = Tok.getLoc();
 
-  StringRef ModuleName = llvm::sys::path::stem(Buffer->getBufferIdentifier());
   TranslationUnit *TU =
-    new (Context) TranslationUnit(Context.getIdentifier(ModuleName),
-                                  Component, Context);
+    new (Context) TranslationUnit(getModuleIdentifier(), Component, Context);
   CurDeclContext = TU;
   
   // Parse the body of the file.

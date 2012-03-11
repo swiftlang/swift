@@ -86,6 +86,9 @@ ERROR(lex_expected_digit_in_int_literal,lexing,none,
 // Declaration parsing diagnostics
 //------------------------------------------------------------------------------
 
+ERROR(bad_module_name,decl_parsing,none,
+      "file name is not a valid identifier", ())
+
 ERROR(expected_decl,decl_parsing,none,
       "expected declaration", ())
 ERROR(top_level_decl_without_type,decl_parsing,none,

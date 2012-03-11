@@ -130,14 +130,30 @@ void Lexer::skipSlashStarComment() {
   }
 }
 
+static bool isValidStartOfIdentifier(char c) {
+  return isalpha(c) || c == '_';
+}
+static bool isValidContinuationOfIdentifier(char c) {
+  return isalnum(c) || c == '_' || c == '$';
+}
+
+/// isIdentifier - Checks whether a string matches the identifier regex.
+bool Lexer::isIdentifier(llvm::StringRef string) {
+  if (string.empty()) return false;
+  if (!isValidStartOfIdentifier(string[0])) return false;
+  for (unsigned i = 1, e = string.size(); i != e; ++i)
+    if (!isValidContinuationOfIdentifier(string[i]))
+      return false;
+  return true;
+}
 
 /// lexIdentifier - Match [a-zA-Z_][a-zA-Z_$0-9]*
 void Lexer::lexIdentifier() {
   const char *TokStart = CurPtr-1;
-  assert((isalpha(*TokStart) || *TokStart == '_') && "Unexpected start");
+  assert(isValidStartOfIdentifier(*TokStart) && "Unexpected start");
   
   // Lex [a-zA-Z_$0-9]*
-  while (isalnum(*CurPtr) || *CurPtr == '_' || *CurPtr == '$')
+  while (isValidContinuationOfIdentifier(*CurPtr))
     ++CurPtr;
   
   tok Kind =

@@ -69,6 +69,14 @@ public:
   ///
   /// \param Loc The source location of the beginning of a token.
   static SourceLoc getLocForEndOfToken(llvm::SourceMgr &SM, SourceLoc Loc);
+
+  /// \brief Determines if the given string is a valid non-operator
+  /// identifier.
+  static bool isIdentifier(llvm::StringRef identifier);
+
+  SourceLoc getLocForStartOfBuffer() const {
+    return SourceLoc(llvm::SMLoc::getFromPointer(BufferStart));
+  }
   
 private:
   static SourceLoc getSourceLoc(const char *Loc) {

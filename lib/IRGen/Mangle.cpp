@@ -135,6 +135,8 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     if (DeclContext *parent = module->getParent())
       mangleDeclContext(parent);
 
+    // This should work, because the language should be restricting
+    // the name of a module to be a valid language identifier.
     mangleIdentifier(module->Name);
     addSubstitution(module);
     return;
