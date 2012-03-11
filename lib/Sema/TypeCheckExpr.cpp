@@ -736,9 +736,10 @@ static Expr *buildTupleElementExpr(Expr *base, UnresolvedDotExpr *syntax,
   if (baseIsLValue)
     fieldType = makeSimilarLValue(fieldType, base->getType(), TC);
     
-  return new (TC.Context) TupleElementExpr(base, syntax->getDotLoc(),
-                                           fieldIndex, syntax->getNameLoc(),
-                                           fieldType);
+  return new (TC.Context) SyntacticTupleElementExpr(base, syntax->getDotLoc(),
+                                                    fieldIndex,
+                                                    syntax->getNameLoc(),
+                                                    fieldType);
 }
 
 Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {

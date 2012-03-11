@@ -465,24 +465,19 @@ public:
 };
 
 
-/// TupleElementExpr - Refer to an element of a tuple, e.g. "(1,2).field0".
+/// TupleElementExpr - Common base class of syntactic forms that access tuple
+/// elements.
 class TupleElementExpr : public Expr {
   Expr *SubExpr;
-  SourceLoc DotLoc;
   SourceLoc NameLoc;
   unsigned FieldNo;
   
+protected:
+  TupleElementExpr(ExprKind Kind, Expr *SubExpr, unsigned FieldNo,
+                   SourceLoc NameLoc, Type Ty)
+    : Expr(Kind, Ty), SubExpr(SubExpr), NameLoc(NameLoc), FieldNo(FieldNo) {}
 public:
-  TupleElementExpr(Expr *subexpr, SourceLoc dotloc, unsigned fieldno,
-                   SourceLoc nameloc, Type ty)
-  : Expr(ExprKind::TupleElement, ty), SubExpr(subexpr), DotLoc(dotloc),
-    NameLoc(nameloc), FieldNo(fieldno) {}
 
-  SourceRange getSourceRange() const { 
-    return SourceRange(SubExpr->getStartLoc(), NameLoc);
-  }
-  
-  SourceLoc getDotLoc() const { return DotLoc; }
   SourceLoc getLoc() const { return NameLoc; }
   Expr *getBase() const { return SubExpr; }
   void setBase(Expr *e) { SubExpr = e; }
@@ -493,9 +488,35 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TupleElementExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::TupleElement;
+    return E->getKind() == ExprKind::SyntacticTupleElement;
   }
 };
+  
+  
+/// SyntacticTupleElementExpr - Dot syntact used to refer to an element of a tuple,
+/// e.g. "(1,field=2).field".
+class SyntacticTupleElementExpr : public TupleElementExpr {
+  SourceLoc DotLoc;
+public:
+  SourceLoc getDotLoc() const { return DotLoc; }
+
+  SourceRange getSourceRange() const { 
+    return SourceRange(getBase()->getStartLoc(), getNameLoc());
+  }
+
+  SyntacticTupleElementExpr(Expr *SubExpr, SourceLoc DotLoc,
+                            unsigned FieldNo, SourceLoc NameLoc, Type Ty)
+    : TupleElementExpr(ExprKind::SyntacticTupleElement, SubExpr, FieldNo,
+                       NameLoc, Ty),
+      DotLoc(DotLoc) {}
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const SyntacticTupleElementExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::SyntacticTupleElement;
+  }
+};
+  
 
 /// ImplicitConversionExpr - An abstract class for expressions which
 /// implicitly convert the value of an expression in some way.
@@ -811,15 +832,14 @@ public:
 };
   
 /// ImplicitClosureExpr - This is a closure of the contained subexpression that
-/// is formed when an scalar expression is converted to closure type.  For
-/// example, if an integer expression is used in a context expecting "()->int",
-/// an autoclosure is formed.
+/// is formed when an scalar expression is converted to [auto_closure] function
+/// type.  For example:  
+///   var x : [auto_closure] () -> int = 4
 ///
 class ImplicitClosureExpr : public ClosureExpr {
 public:
   ImplicitClosureExpr(Expr *Body, Type ResultTy)
     : ClosureExpr(ExprKind::ImplicitClosure, Body, ResultTy) {}
-  
   
   SourceRange getSourceRange() const { return getBody()->getSourceRange(); }
   

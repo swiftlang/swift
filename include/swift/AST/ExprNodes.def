@@ -18,6 +18,9 @@
 ///   If the expression node is not abstract, its enumerator value is
 ///   ExprKind::Id.  The node's class name is Id##Expr, and the name of
 ///   its base class (in the Expr hierarchy) is Parent.
+#ifndef EXPR
+#define EXPR(Id, Parent)
+#endif
 
 /// An abstract expression node is an abstract base class in the hierarchy;
 /// it is never a most-derived type, and it does not have an enumerator in
@@ -63,7 +66,8 @@ UNCHECKED_EXPR(UnresolvedDot, Expr)
 UNCHECKED_EXPR(Sequence, Expr)
 EXPR(Paren, Expr)
 EXPR(Tuple, Expr)
-EXPR(TupleElement, Expr)
+ABSTRACT_EXPR(TupleElement, Expr)
+  EXPR(SyntacticTupleElement, TupleElement)
 EXPR(Func, Expr)
 ABSTRACT_EXPR(Closure, Expr)
   EXPR(ExplicitClosure, ClosureExpr)
