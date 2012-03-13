@@ -1214,13 +1214,15 @@ bool TypeChecker::typeCheckCondition(Expr *&E) {
     return true;
 
   TypeBase *BuiltinI1 = BuiltinIntegerType::get(1, Context);
-  llvm::SmallPtrSet<TypeBase*, 8> CheckedTypes;
+  unsigned ConvertLimit = 0;
+  Type OrigType = E->getType();
   while (E->getType()->getCanonicalType() != BuiltinI1) {
-    // Make sure we don't run into a closed infinite loop.
-    // FIXME: Is any other kind of infinite loop possible here?
-    if (!CheckedTypes.insert(E->getType()->getCanonicalType())) {
-      diagnose(E->getStartLoc(), diag::condition_convert_infinite_loop,
-               E->getType()->getCanonicalType());
+    // We allow up to two iterations here: one to convert to bool, and one to
+    // convert from bool to i1.  (The diagnostic here assumes normal cade
+    // which uses the swift standard library.)
+    if (ConvertLimit == 2) {
+      diagnose(E->getStartLoc(), diag::condition_convert_limit_reached,
+               OrigType);
       return true;
     }
     Identifier LogicValId = Context.getIdentifier("getLogicValue");
@@ -1238,6 +1240,7 @@ bool TypeChecker::typeCheckCondition(Expr *&E) {
     E = semaApplyExpr(CE);
     if (!E)
       return true;
+    ++ConvertLimit;
   }
   return false;
 }
