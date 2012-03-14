@@ -41,15 +41,36 @@ void IRGenFunction::emitExplodedClosure(ClosureExpr *E,
   llvm::Function *Func =
       llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
                              "closure", &IGM.Module);
-  IRGenFunction(IGM, 0, ExplosionKind::Minimal, 0, Func, Prologue::Bare).
-      emitClosureBody(E->getBody());
+  IRGenFunction(IGM, 0, ExplosionKind::Minimal, 0, Func, Prologue::Bare)
+      .emitClosureBody(E);
   explosion.add(Builder.CreateBitCast(Func, IGM.Int8PtrTy));
   explosion.add(llvm::UndefValue::get(IGM.Int8PtrTy));
 }
 
-void IRGenFunction::emitClosureBody(Expr *E) {
+void IRGenFunction::emitClosureBody(ClosureExpr *E) {
+  // Emit $0..$n
+  Explosion values = collectParameters();
+  FunctionType *FT = E->getType()->getAs<FunctionType>();
+  TupleType *FuncInputTT = dyn_cast<TupleType>(FT->getInput().getPointer());
+  if (FuncInputTT) {
+    unsigned NumInputArgs = FuncInputTT->getFields().size();
+    for (unsigned i = 0; i < NumInputArgs; i++) {
+      Type ArgType = FuncInputTT->getElementType(i);
+      std::string Name("$");
+      Name += '0' + i;
+      ClosureParams.push_back(getAddrForParameter(ArgType, Name,
+                                                  /*isByref*/false, values));
+    }
+  } else {
+    ClosureParams.push_back(getAddrForParameter(FT->getInput(), "$0",
+                                                /*isByref*/false, values));
+  }
+
+  // FIXME: Need to set up captures.
+
+  // Emit the body of the closure
   FullExpr fullExpr(*this);
   Explosion result(CurExplosionLevel);
-  emitExplodedRValue(E, result);
+  emitExplodedRValue(E->getBody(), result);
   emitScalarReturn(result);
 }

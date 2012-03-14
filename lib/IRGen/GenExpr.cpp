@@ -129,6 +129,9 @@ void IRGenFunction::emitExplodedRValue(Expr *E, Explosion &explosion) {
   case ExprKind::Error:
     llvm_unreachable("these expression kinds should not survive to IR-gen");
 
+  case ExprKind::AnonClosureArg:
+    llvm_unreachable("these expression kinds should never be rvalues");
+
   case ExprKind::Load: {
     const TypeInfo &type = getFragileTypeInfo(E->getType());
     return emitExplodedLoad(emitLValue(cast<LoadExpr>(E)->getSubExpr()),
@@ -188,7 +191,6 @@ void IRGenFunction::emitExplodedRValue(Expr *E, Explosion &explosion) {
     return emitExplodedClosure(cast<ClosureExpr>(E), explosion);
 
   case ExprKind::Func:
-  case ExprKind::AnonClosureArg:
   case ExprKind::Module:
     IGM.unimplemented(E->getLoc(),
                       "cannot explode r-values for this expression yet");
@@ -250,9 +252,8 @@ LValue IRGenFunction::emitLValue(Expr *E) {
     return emitDeclRefLValue(*this, cast<DeclRefExpr>(E));
 
   case ExprKind::AnonClosureArg: {
-    IGM.unimplemented(E->getLoc(), "anonymous closure argument");
-    Type MemTy = cast<LValueType>(E->getType())->getObjectType();
-    return emitFakeLValue(IGM.getFragileTypeInfo(MemTy));
+    Address addr = ClosureParams[cast<AnonClosureArgExpr>(E)->getArgNumber()];
+    return emitAddressLValue(addr);
   }
   }
   llvm_unreachable("bad expression kind!");
@@ -334,10 +335,9 @@ IRGenFunction::tryEmitAsAddress(Expr *E, const TypeInfo &type) {
   case ExprKind::Materialize:
     return emitMaterializeExpr(*this, cast<MaterializeExpr>(E));
 
-  // These expressions may be in memory in some cases, but we haven't
-  // gotten around to applying this optimization to them yet.
+  // Closure arguments are always in memory.
   case ExprKind::AnonClosureArg:
-    return Nothing;
+    return ClosureParams[cast<AnonClosureArgExpr>(E)->getArgNumber()];
 
   // These expressions aren't naturally already in memory.
   case ExprKind::Tuple:

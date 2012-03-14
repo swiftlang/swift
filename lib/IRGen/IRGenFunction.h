@@ -172,6 +172,9 @@ public:
   void emitInit(Address addr, Expr *E, const TypeInfo &type);
   void emitZeroInit(Address addr, const TypeInfo &type);
 
+  Address getAddrForParameter(Type ty, StringRef Name, bool isByref,
+                              Explosion &paramValues);
+
 private:
   void emitExplodedRValueForFunction(FuncDecl *Fn, Explosion &explosion);
 
@@ -197,7 +200,8 @@ private:
   Condition emitCondition(Expr *E, bool hasFalseCode);
 
   void emitExplodedClosure(ClosureExpr *E, Explosion &explosion);
-  void emitClosureBody(Expr *E);
+  void emitClosureBody(ClosureExpr *E);
+  std::vector<Address> ClosureParams;
 
 //--- Declaration emission -----------------------------------------------------
 public:

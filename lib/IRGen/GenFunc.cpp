@@ -823,10 +823,10 @@ Explosion IRGenFunction::collectParameters() {
   return params;
 }
 
-/// Emit a specific parameter.
-static void emitParameter(IRGenFunction &IGF, VarDecl *param,
-                          Explosion &paramValues) {
-  const TypeInfo &paramType = IGF.IGM.getFragileTypeInfo(param->getType());
+Address IRGenFunction::getAddrForParameter(Type ty, StringRef Name,
+                                           bool isByref,
+                                           Explosion &paramValues) {
+  const TypeInfo &paramType = IGM.getFragileTypeInfo(ty);
 
   ExplosionSchema paramSchema(paramValues.getKind());
   paramType.getExplosionSchema(paramSchema);
@@ -835,7 +835,7 @@ static void emitParameter(IRGenFunction &IGF, VarDecl *param,
 
   // If the parameter is byref, the next parameter is the value we
   // should use.
-  if (param->getAttrs().isByref()) {
+  if (isByref) {
     llvm::Value *addr = paramValues.claimNext();
     paramAddr = Address(addr, paramType.StorageAlignment);
     
@@ -843,20 +843,20 @@ static void emitParameter(IRGenFunction &IGF, VarDecl *param,
   // just treat the next parameter as that type.
   } else if (paramSchema.size() == 1 && paramSchema.begin()->isAggregate()) {
     llvm::Value *addr = paramValues.claimNext();
-    addr = IGF.Builder.CreateBitCast(addr,
+    addr = Builder.CreateBitCast(addr,
                     paramSchema.begin()->getAggregateType()->getPointerTo());
     paramAddr = Address(addr, paramType.StorageAlignment);
 
   // Otherwise, make an alloca and load into it.
   } else {
-    paramAddr = IGF.createScopeAlloca(paramType.getStorageType(),
-                                      paramType.StorageAlignment,
-                                      param->getName().str());
+    paramAddr = createScopeAlloca(paramType.getStorageType(),
+                                  paramType.StorageAlignment,
+                                  Name);
 
-    paramType.storeExplosion(IGF, paramValues, paramAddr);
+    paramType.storeExplosion(*this, paramValues, paramAddr);
   }
 
-  IGF.setLocal(param, paramAddr);
+  return paramAddr;
 }
 
 /// Emit a specific parameter clause by walking into any literal tuple
@@ -879,9 +879,15 @@ static void emitParameterClause(IRGenFunction &IGF, Pattern *param,
                                paramValues);
 
   // Bind names.
-  case PatternKind::Named:
-    emitParameter(IGF, cast<NamedPattern>(param)->getDecl(), paramValues);
+  case PatternKind::Named: {
+    VarDecl *decl = cast<NamedPattern>(param)->getDecl();
+    Address addr = IGF.getAddrForParameter(decl->getType(),
+                                           decl->getName().str(),
+                                           decl->getAttrs().isByref(),
+                                           paramValues);
+    IGF.setLocal(decl, addr);
     return;
+  }
 
   // Ignore ignored parameters by consuming the right number of values.
   case PatternKind::Any: {
