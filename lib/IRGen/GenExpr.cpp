@@ -183,9 +183,11 @@ void IRGenFunction::emitExplodedRValue(Expr *E, Explosion &explosion) {
   case ExprKind::DeclRef:
     return emitExplodedDeclRef(cast<DeclRefExpr>(E), explosion);
 
-  case ExprKind::Func:
-  case ExprKind::ExplicitClosure:
   case ExprKind::ImplicitClosure:
+  case ExprKind::ExplicitClosure:
+    return emitExplodedClosure(cast<ClosureExpr>(E), explosion);
+
+  case ExprKind::Func:
   case ExprKind::AnonClosureArg:
   case ExprKind::Module:
     IGM.unimplemented(E->getLoc(),
@@ -218,7 +220,6 @@ LValue IRGenFunction::emitLValue(Expr *E) {
   case ExprKind::Func:
   case ExprKind::ExplicitClosure:
   case ExprKind::ImplicitClosure:
-  case ExprKind::AnonClosureArg:
   case ExprKind::Load:
   case ExprKind::Tuple:
   case ExprKind::DotSyntaxPlusFuncUse:
@@ -247,6 +248,12 @@ LValue IRGenFunction::emitLValue(Expr *E) {
 
   case ExprKind::DeclRef:
     return emitDeclRefLValue(*this, cast<DeclRefExpr>(E));
+
+  case ExprKind::AnonClosureArg: {
+    IGM.unimplemented(E->getLoc(), "anonymous closure argument");
+    Type MemTy = cast<LValueType>(E->getType())->getObjectType();
+    return emitFakeLValue(IGM.getFragileTypeInfo(MemTy));
+  }
   }
   llvm_unreachable("bad expression kind!");
 }

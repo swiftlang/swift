@@ -31,6 +31,7 @@ namespace swift {
   class ApplyExpr;
   class AssignStmt;
   class BraceStmt;
+  class ClosureExpr;
   class Decl;
   class DeclRefExpr;
   class Expr;
@@ -194,6 +195,9 @@ private:
   void emitExplodedTupleLiteral(TupleExpr *E, Explosion &explosion);
   void emitExplodedTupleShuffle(TupleShuffleExpr *E, Explosion &explosion);
   Condition emitCondition(Expr *E, bool hasFalseCode);
+
+  void emitExplodedClosure(ClosureExpr *E, Explosion &explosion);
+  void emitClosureBody(Expr *E);
 
 //--- Declaration emission -----------------------------------------------------
 public:
