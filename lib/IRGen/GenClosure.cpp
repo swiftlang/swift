@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -34,8 +35,37 @@
 using namespace swift;
 using namespace irgen;
 
+namespace {
+  class FindCapturedVars : public ASTWalker {
+    IRGenFunction &IGF;
+    bool FoundVar;
+
+  public:
+    bool walkToExprPre(Expr *E) {
+      if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
+        if (DRE->getDecl()->getKind() == DeclKind::Var &&
+            DRE->getDecl()->getDeclContext()->isLocalContext()) {
+          IGF.IGM.unimplemented(E->getLoc(), "cannot capture local var yet");
+          FoundVar = true;
+        }
+      }
+      return true;
+    }
+
+    FindCapturedVars(IRGenFunction &igf) : IGF(igf), FoundVar(false) {}
+
+    bool doWalk(Expr *E) {
+      E->walk(*this);
+      return FoundVar;
+    }
+  };
+}
+
 void IRGenFunction::emitExplodedClosure(ClosureExpr *E,
                                         Explosion &explosion) {
+  if (FindCapturedVars(*this).doWalk(E->getBody()))
+    return emitFakeExplosion(getFragileTypeInfo(E->getType()), explosion);
+
   llvm::FunctionType *fnType =
       IGM.getFunctionType(E->getType(), ExplosionKind::Minimal, 0, true);
   llvm::Function *Func =
