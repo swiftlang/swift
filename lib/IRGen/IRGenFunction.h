@@ -172,7 +172,7 @@ public:
   void emitInit(Address addr, Expr *E, const TypeInfo &type);
   void emitZeroInit(Address addr, const TypeInfo &type);
 
-  Address getAddrForParameter(Type ty, StringRef Name, bool isByref,
+  Address getAddrForParameter(Type ty, const Twine& Name, bool isByref,
                               Explosion &paramValues);
 
 private:

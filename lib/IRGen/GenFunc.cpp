@@ -823,7 +823,7 @@ Explosion IRGenFunction::collectParameters() {
   return params;
 }
 
-Address IRGenFunction::getAddrForParameter(Type ty, StringRef Name,
+Address IRGenFunction::getAddrForParameter(Type ty, const Twine& Name,
                                            bool isByref,
                                            Explosion &paramValues) {
   const TypeInfo &paramType = IGM.getFragileTypeInfo(ty);
@@ -837,12 +837,14 @@ Address IRGenFunction::getAddrForParameter(Type ty, StringRef Name,
   // should use.
   if (isByref) {
     llvm::Value *addr = paramValues.claimNext();
+    addr->setName(Name);
     paramAddr = Address(addr, paramType.StorageAlignment);
     
   // If the schema contains a single aggregate, assume we can
   // just treat the next parameter as that type.
   } else if (paramSchema.size() == 1 && paramSchema.begin()->isAggregate()) {
     llvm::Value *addr = paramValues.claimNext();
+    addr->setName(Name);
     addr = Builder.CreateBitCast(addr,
                     paramSchema.begin()->getAggregateType()->getPointerTo());
     paramAddr = Address(addr, paramType.StorageAlignment);
@@ -851,9 +853,20 @@ Address IRGenFunction::getAddrForParameter(Type ty, StringRef Name,
   } else {
     paramAddr = createScopeAlloca(paramType.getStorageType(),
                                   paramType.StorageAlignment,
-                                  Name);
+                                  Name + ".addr");
+
+    // FIXME: This way of getting a list of arguments claimed by storeExplosion
+    // is really ugly.
+    auto storedStart = paramValues.begin();
 
     paramType.storeExplosion(*this, paramValues, paramAddr);
+
+    // Set names for argument(s)
+    for (auto i = storedStart, e = paramValues.begin(); i != e; ++i)
+      if (e - storedStart == 1)
+        (*i)->setName(Name);
+      else
+        (*i)->setName(Name + "." + Twine(i - storedStart));
   }
 
   return paramAddr;

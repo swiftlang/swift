@@ -56,9 +56,7 @@ void IRGenFunction::emitClosureBody(ClosureExpr *E) {
     unsigned NumInputArgs = FuncInputTT->getFields().size();
     for (unsigned i = 0; i < NumInputArgs; i++) {
       Type ArgType = FuncInputTT->getElementType(i);
-      std::string Name("$");
-      Name += '0' + i;
-      ClosureParams.push_back(getAddrForParameter(ArgType, Name,
+      ClosureParams.push_back(getAddrForParameter(ArgType, "$" + Twine(i),
                                                   /*isByref*/false, values));
     }
   } else {

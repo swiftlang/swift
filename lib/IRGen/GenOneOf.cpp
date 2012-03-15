@@ -185,7 +185,7 @@ namespace {
       // Otherwise, package up the result.
       if (Singleton->getSchema().isAggregate()) {
         Address returnSlot(params.claimNext(), Singleton->StorageAlignment);
-        Singleton->storeExplosion(IGF, params, returnSlot);
+        storeExplosion(IGF, params, returnSlot);
         IGF.Builder.CreateRetVoid();
       } else {
         IGF.emitScalarReturn(params);
