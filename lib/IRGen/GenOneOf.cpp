@@ -93,7 +93,11 @@ namespace {
       // FIXME
     }
 
-    void store(IRGenFunction &IGF, Explosion &e, Address addr) const {
+    void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
+      // FIXME
+    }
+
+    void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
       // FIXME
     }
 
@@ -140,9 +144,14 @@ namespace {
       Singleton->load(IGF, getSingletonAddress(IGF, addr), e);
     }
 
-    void store(IRGenFunction &IGF, Explosion &e, Address addr) const {
+    void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
       if (!Singleton) return;
-      Singleton->store(IGF, e, getSingletonAddress(IGF, addr));
+      Singleton->assign(IGF, e, getSingletonAddress(IGF, addr));
+    }
+
+    void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
+      if (!Singleton) return;
+      Singleton->initialize(IGF, e, getSingletonAddress(IGF, addr));
     }
 
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
@@ -164,7 +173,7 @@ namespace {
       Singleton->getSchema(schema);
       if (schema.requiresIndirectResult()) {
         Address returnSlot(params.claimNext(), Singleton->StorageAlignment);
-        store(IGF, params, returnSlot);
+        initialize(IGF, params, returnSlot);
         IGF.Builder.CreateRetVoid();
       } else {
         IGF.emitScalarReturn(params);
@@ -190,16 +199,18 @@ namespace {
 
     void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
       assert(isComplete());
-      e.add(IGF.Builder.CreateLoad(IGF.Builder.CreateStructGEP(addr.getAddress(), 0),
-                                   addr.getAlignment(),
-                                   addr.getAddress()->getName() + ".load"));
+      e.add(IGF.Builder.CreateLoad(IGF.Builder.CreateStructGEP(addr, 0, Size(0)),
+                                   addr->getName() + ".load"));
     }
 
-    void store(IRGenFunction &IGF, Explosion &e, Address addr) const {
+    void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
       assert(isComplete());
       IGF.Builder.CreateStore(e.claimNext(),
-                              IGF.Builder.CreateStructGEP(addr.getAddress(), 0),
-                              addr.getAlignment());
+                              IGF.Builder.CreateStructGEP(addr, 0, Size(0)));
+    }
+
+    void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
+      EnumTypeInfo::assign(IGF, e, addr);
     }
 
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {

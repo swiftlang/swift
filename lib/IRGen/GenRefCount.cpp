@@ -43,8 +43,12 @@ namespace {
       e.add(IGF.emitLoadRetained(addr));
     }
 
-    void store(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      IGF.emitStoreRetained(e.claimNext(), addr);
+    void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
+      IGF.emitAssignRetained(e.claimNext(), addr);
+    }
+
+    void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
+      IGF.emitInitializeRetained(e.claimNext(), addr);
     }
 
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
@@ -78,7 +82,7 @@ llvm::Value *IRGenFunction::emitLoadRetained(Address address) {
 }
 
 /// Emit a store of a live value to the given retaining variable.
-void IRGenFunction::emitStoreRetained(llvm::Value *newValue, Address address) {
+void IRGenFunction::emitAssignRetained(llvm::Value *newValue, Address address) {
   // Pull the old value out of the address.
   llvm::Value *oldValue = Builder.CreateLoad(address);
 
@@ -87,6 +91,13 @@ void IRGenFunction::emitStoreRetained(llvm::Value *newValue, Address address) {
 
   // Release the old value.
   emitRelease(oldValue);
+}
+
+/// Emit an initialize of a live value to the given retaining variable.
+void IRGenFunction::emitInitializeRetained(llvm::Value *newValue,
+                                           Address address) {
+  // We assume the new value is already retained.
+  Builder.CreateStore(newValue, address);
 }
 
 /// Emit a release of a live value.

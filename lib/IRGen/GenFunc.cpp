@@ -245,46 +245,44 @@ namespace {
       schema.add(ExplosionSchema::Element::forScalar(Ty->getElementType(1)));
     }
 
-    void load(IRGenFunction &IGF, Address address, Explosion &e) const {
-      llvm::Value *addr = address.getAddress();
-
-      // Load the function.
-      llvm::Value *fnAddr =
-        IGF.Builder.CreateStructGEP(addr, 0, addr->getName() + ".fn");
-      llvm::LoadInst *fn =
-        IGF.Builder.CreateLoad(fnAddr, address.getAlignment(),
-                               fnAddr->getName() + ".load");
-      e.add(fn);
-
-      // Load the data.  This load is offset by sizeof(void*) from the
-      // base and so may have a lesser alignment.
-      // FIXME: retains?
-      llvm::Value *dataAddr =
-        IGF.Builder.CreateStructGEP(addr, 1, addr->getName() + ".data");
-      llvm::Value *data =
-        IGF.Builder.CreateLoad(dataAddr,
-                               address.getAlignment().alignmentAtOffset(
-                                          Size(StorageAlignment.getValue())),
-                               dataAddr->getName() + ".load");
-      e.add(data);
+    static Address projectFunction(IRGenFunction &IGF, Address address) {
+      return IGF.Builder.CreateStructGEP(address, 0, Size(0),
+                                         address->getName() + ".fn");
     }
 
-    void store(IRGenFunction &IGF, Explosion &e, Address address) const {
-      llvm::Value *addr = address.getAddress();
+    static Address projectData(IRGenFunction &IGF, Address address) {
+      return IGF.Builder.CreateStructGEP(address, 1, IGF.IGM.getPointerSize(),
+                                         address->getName() + ".data");
+    }
 
+    void load(IRGenFunction &IGF, Address address, Explosion &e) const {
+      // Load the function.
+      Address fnAddr = projectFunction(IGF, address);
+      e.add(IGF.Builder.CreateLoad(fnAddr, fnAddr->getName() + ".load"));
+
+      // Load the data.
+      Address dataAddr = projectData(IGF, address);
+      e.add(IGF.emitLoadRetained(dataAddr));
+    }
+
+    void assign(IRGenFunction &IGF, Explosion &e, Address address) const {
       // Store the function pointer.
-      llvm::Value *fnAddr =
-        IGF.Builder.CreateStructGEP(addr, 0, addr->getName() + ".fn");
-      IGF.Builder.CreateStore(e.claimNext(), fnAddr,
-                              address.getAlignment());
+      Address fnAddr = projectFunction(IGF, address);
+      IGF.Builder.CreateStore(e.claimNext(), fnAddr);
 
-      // Store the data.
-      // FIXME: retains?
-      llvm::Value *dataAddr =
-        IGF.Builder.CreateStructGEP(addr, 1, addr->getName() + ".data");
-      IGF.Builder.CreateStore(e.claimNext(), dataAddr,
-                              address.getAlignment().alignmentAtOffset(
-                                         Size(StorageAlignment.getValue())));
+      // Store the data pointer.
+      Address dataAddr = projectData(IGF, address);
+      IGF.emitAssignRetained(e.claimNext(), dataAddr);
+    }
+
+    void initialize(IRGenFunction &IGF, Explosion &e, Address address) const {
+      // Store the function pointer.
+      Address fnAddr = projectFunction(IGF, address);
+      IGF.Builder.CreateStore(e.claimNext(), fnAddr);
+
+      // Store the data pointer, transferring the +1.
+      Address dataAddr = projectData(IGF, address);
+      IGF.emitInitializeRetained(e.claimNext(), dataAddr);
     }
 
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
@@ -1307,7 +1305,7 @@ namespace {
             IGF.Builder.CreateStructGEP(addr, fieldLayout.StructIndex);
           Alignment fieldAlign =
             layout.getAlignment().alignmentAtOffset(fieldLayout.ByteOffset);
-          dataTypes[i]->store(IGF, params, Address(fieldAddr, fieldAlign));
+          dataTypes[i]->initialize(IGF, params, Address(fieldAddr, fieldAlign));
         }
 
         // Reset the cursor in the explosion.

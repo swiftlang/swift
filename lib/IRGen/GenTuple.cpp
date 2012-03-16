@@ -172,13 +172,23 @@ namespace {
       }
     }
 
-    void store(IRGenFunction &IGF, Explosion &e, Address addr) const {
+    void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
       for (auto &field : getFieldInfos()) {
         // Ignore fields that don't have storage.
         if (!field.hasStorage()) continue;
 
         Address fieldAddr = projectAddress(IGF, addr, field);
-        field.Type.store(IGF, e, fieldAddr);
+        field.Type.assign(IGF, e, fieldAddr);
+      }
+    }
+
+    void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
+      for (auto &field : getFieldInfos()) {
+        // Ignore fields that don't have storage.
+        if (!field.hasStorage()) continue;
+
+        Address fieldAddr = projectAddress(IGF, addr, field);
+        field.Type.initialize(IGF, e, fieldAddr);
       }
     }
 

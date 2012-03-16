@@ -52,7 +52,11 @@ namespace {
       e.add(IGF.Builder.CreateLoad(addr));
     }
 
-    void store(IRGenFunction &IGF, Explosion &e, Address addr) const {
+    void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
+      IGF.Builder.CreateStore(e.claimNext(), addr);
+    }
+
+    void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
       IGF.Builder.CreateStore(e.claimNext(), addr);
     }
 
@@ -64,13 +68,6 @@ namespace {
 
 bool TypeInfo::isSingleRetainablePointer(ResilienceScope scope) const {
   return false;
-}
-
-void TypeInfo::initialize(IRGenFunction &IGF, Explosion &explosion,
-                          Address addr) const {
-  // FIXME: this should probably require opting-in or should assert
-  // that the type is POD or something.
-  store(IGF, explosion, addr);
 }
 
 static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }

@@ -137,7 +137,8 @@ private:
 //--- Reference-counting methods -----------------------------------------------
 public:
   llvm::Value *emitLoadRetained(Address addr);
-  void emitStoreRetained(llvm::Value *value, Address addr);
+  void emitAssignRetained(llvm::Value *value, Address addr);
+  void emitInitializeRetained(llvm::Value *value, Address addr);
   void emitRelease(llvm::Value *value);
   void enterReleaseCleanup(llvm::Value *value);
 
@@ -172,9 +173,9 @@ public:
 
   void emitExplodedLoad(const LValue &lvalue, const TypeInfo &type,
                         Explosion &explosion);
-  void emitStore(Explosion &rvalue, const LValue &lvalue,
-                 const TypeInfo &type);
-  void emitAssignment(Expr *E, const LValue &lvalue, const TypeInfo &type);
+  void emitAssign(Explosion &rvalue, const LValue &lvalue,
+                  const TypeInfo &type);
+  void emitAssign(Expr *E, const LValue &lvalue, const TypeInfo &type);
 
   void emitInit(Address addr, Expr *E, const TypeInfo &type);
   void emitZeroInit(Address addr, const TypeInfo &type);

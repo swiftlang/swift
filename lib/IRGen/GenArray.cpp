@@ -44,7 +44,11 @@ namespace {
       // FIXME
     }
 
-    void store(IRGenFunction &IGF, Explosion &explosion, Address addr) const {
+    void assign(IRGenFunction &IGF, Explosion &explosion, Address addr) const {
+      // FIXME
+    }
+
+    void initialize(IRGenFunction &IGF, Explosion &explosion, Address addr) const {
       // FIXME
     }
 

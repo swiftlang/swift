@@ -80,11 +80,11 @@ void IRGenFunction::emitExplodedLoad(const LValue &lvalue,
 
 /// Perform a store into the given path, given the base of the first
 /// component.
-static void emitStoreRecursive(IRGenFunction &IGF, Address base,
-                               const TypeInfo &finalType,
-                               Explosion &finalValue,
-                               LValue::const_iterator pathStart,
-                               LValue::const_iterator pathEnd) {
+static void emitAssignRecursive(IRGenFunction &IGF, Address base,
+                                const TypeInfo &finalType,
+                                Explosion &finalValue,
+                                LValue::const_iterator pathStart,
+                                LValue::const_iterator pathEnd) {
   // Drill into any physical components.
   while (true) {
     assert(pathStart != pathEnd);
@@ -93,9 +93,9 @@ static void emitStoreRecursive(IRGenFunction &IGF, Address base,
     if (component.isLogical()) break;
     base = component.asPhysical().offset(IGF, base);
 
-    // If we reach the end, do a simple store and we're done.
+    // If we reach the end, do an assignment and we're done.
     if (++pathStart == pathEnd) {
-      return finalType.store(IGF, finalValue, base);
+      return finalType.assign(IGF, finalValue, base);
     }
   }
 
@@ -113,17 +113,17 @@ static void emitStoreRecursive(IRGenFunction &IGF, Address base,
   Address temp = component.loadAndMaterialize(IGF, base);
 
   // Recursively perform the store.
-  emitStoreRecursive(IGF, temp, finalType, finalValue, pathStart, pathEnd);
+  emitAssignRecursive(IGF, temp, finalType, finalValue, pathStart, pathEnd);
 
   // Store the temporary back.
   component.storeMaterialized(IGF, temp, base);
 }
                            
 
-void IRGenFunction::emitStore(Explosion &rvalue, const LValue &lvalue,
+void IRGenFunction::emitAssign(Explosion &rvalue, const LValue &lvalue,
                               const TypeInfo &type) {
-  emitStoreRecursive(*this, Address(), type, rvalue,
-                     lvalue.begin(), lvalue.end());
+  emitAssignRecursive(*this, Address(), type, rvalue,
+                      lvalue.begin(), lvalue.end());
 }
 
 /// Given an l-value which is known to be physical, load from it.
@@ -150,11 +150,11 @@ void IRGenFunction::emitLValueAsScalar(const LValue &lvalue,
   explosion.add(address.getAddress());
 }
 
-void IRGenFunction::emitAssignment(Expr *rhs, const LValue &lhs,
+void IRGenFunction::emitAssign(Expr *rhs, const LValue &lhs,
                                    const TypeInfo &type) {
   // We don't expect that l-value emission is generally going to admit
   // maximally-exploded calls.
   Explosion explosion(ExplosionKind::Minimal);
   emitExplodedRValue(rhs, explosion);
-  emitStore(explosion, lhs, type);
+  emitAssign(explosion, lhs, type);
 }

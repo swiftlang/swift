@@ -33,11 +33,14 @@ public:
     assert(addr != nullptr && "building an invalid address");
   }
 
+  llvm::Value *operator->() const {
+    assert(isValid());
+    return getAddress();
+  }
+
   bool isValid() const { return Addr != nullptr; }
 
-  llvm::Value *getAddress() const {
-    return Addr;
-  }
+  llvm::Value *getAddress() const { return Addr; }
 
   Alignment getAlignment() const {
     return Align;

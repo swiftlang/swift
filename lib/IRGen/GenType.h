@@ -100,14 +100,14 @@ public:
   virtual void load(IRGenFunction &IGF, Address addr,
                     Explosion &explosion) const = 0;
 
-  /// Store a set of exploded values to an address.  The values are
+  /// Assign a set of exploded values into an address.  The values are
   /// consumed out of the explosion.
-  virtual void store(IRGenFunction &IGF, Explosion &explosion,
-                     Address addr) const = 0;
+  virtual void assign(IRGenFunction &IGF, Explosion &explosion,
+                      Address addr) const = 0;
 
-  /// Initialize a memory object by consuming values out of an explosion.
+  /// Initialize an address by consuming values out of an explosion.
   virtual void initialize(IRGenFunction &IGF, Explosion &explosion,
-                          Address addr) const;
+                          Address addr) const = 0;
 
   /// Consume a bunch of values which have exploded at one explosion
   /// level and produce them at another.
