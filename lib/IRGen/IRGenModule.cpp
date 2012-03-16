@@ -50,6 +50,8 @@ IRGenModule::IRGenModule(ASTContext &Context,
   SizeTy = TargetData.getIntPtrType(getLLVMContext());
   MemCpyFn = nullptr;
   AllocFn = nullptr;
+  RetainFn = nullptr;
+  ReleaseFn = nullptr;
 
   RefCountedTy = llvm::StructType::create(getLLVMContext(), Int8PtrTy,
                                           "swift.refcounted");
