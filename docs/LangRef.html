@@ -275,6 +275,9 @@
   
   <pre class="grammar">
     integer_literal ::= [0-9]+
+    integer_literal ::= 0x[0-9a-fA-F]+
+    integer_literal ::= 0o[0-7]+
+    integer_literal ::= 0b[01]+
   </pre>
 
   <p>integer_literal tokens represent simple integer values of unspecified
@@ -578,7 +581,9 @@
     func [infix_left=160] == (lhs : int, rhs : int) -&gt; bool
 
     <i>// Curried function with multiple return values:</i>
-    func d(a : int) -&gt; (b : int) -&gt; (res1 : int, res2 : int)
+    func d(a : int) (b : int) -&gt; (res1 : int, res2 : int) {
+      return (a,b)
+    }
     
     <i>// A more realistic example on a trivial type.</i>
     struct bankaccount { 
@@ -668,7 +673,7 @@
     oneof SomeInts {
       None,
       One : int,
-      Two : (:int, :int)
+      Two : (int, int)
     }
     
     <i>// Declares three "enums".</i>
@@ -678,35 +683,35 @@
     
     func f1(searchpolicy : DataSearchFlags)  <i>// DataSearchFlags is a valid type name</i>
     func test1() {
-      f1(DataSearchFlags::None)  <i>// Use of constructor with qualified identifier</i>
+      f1(DataSearchFlags.None)  <i>// Use of constructor with qualified identifier</i>
       f1(:None)                  <i>// Use of constructor with context sensitive type inference</i> 
     
       <i>// "None" has no type argument, so the constructor's type is "DataSearchFlags".</i> 
       var a : DataSearchFlags = :None
     }
     
-    oneof SomeInts {
+    oneof SomeMoreInts {
       None,               <i>// Doesn't conflict with previous "None".</i>
-      One : int,          <i>// Argument type is simple int.</i>
-      Two : (:int, :int)  <i>// Argument type is simple tuple.</i>
+      One : int,
+      Two : (int, int)
     }
     
-    func f2(a : SomeInts)
+    func f2(a : SomeMoreInts)
     
     func test2() {
-      <i>Constructors for oneof element can be used in the obvious way.</i>
+      <i>// Constructors for oneof element can be used in the obvious way.</i>
       f2(:None)
-      f2(:One 4)
+      f2(:One(4))
       f2(:Two(1, 2))
     
-      <i>Constructor for None has type "SomeInts".</i>
-      var a : SomeInts = SomeInts::None
+      <i>// Constructor for None has type "SomeMoreInts".</i>
+      var a : SomeMoreInts = SomeMoreInts.None
     
-      <i>Constructor for One has type "(int) -&gt; SomeInts".</i>
-      var b : (int) -&gt; SomeInts = SomeInts::One
+      <i>// Constructor for One has type "(int) -&gt; SomeMoreInts".</i>
+      var b : (int) -&gt; SomeMoreInts = SomeMoreInts.One
     
-      <i>Constructor for Two has type "(:int,:int) -&gt; SomeInts".</i>
-      var c : (:int,:int) -&gt; SomeInts = SomeInts::Two
+      <i>// Constructor for Two has type "(int,int) -&gt; SomeMoreInts".</i>
+      var c : (int,int) -&gt; SomeMoreInts = SomeMoreInts.Two
     }
   </pre>
   
@@ -1063,7 +1068,7 @@
   
   <pre class="example">
     <i>// Direct reference to a member of another module.</i>
-    var x : Swift.Int
+    var x : swift.int
   </pre>
 
   
@@ -1735,8 +1740,8 @@
     var a = func(val : int) { print(val+1) }
     
     <i>// A recursive func expression.</i>
-    var fib = func(n : int) {
-      if (n &lt; 2) return n;
+    var fib = func(n : int) -> int {
+      if (n &lt; 2) { return n; }
       return fib(n-1)+fib(n-2)
     }
   </pre>
@@ -1963,18 +1968,12 @@
     stmt-if-else ::= 'else' stmt-if
   </pre>
   
-  <p>'if' statements provide a simple control transfer operations that evalutes
-  the condition, then invokes the 'convertToLogicValue' function on the result,
-  and determines the direction of the branch based on the result of
-  convertToLogicValue.  This structure allows any type that can be converted to
-  a logic value to be used in an 'if' condition.  FIXME: revise this to work
-  more like literal handling.
-  </p>
-  
-  <p>If there is no convertToLogicValue function that accepts a 'T', or if 
-  the resultant function does not produce a value of '<a
-  href="#type-builtin">__builtin_int1_type</a>' type, then the code is
-  malformed.
+  <p>'if' statements provide a simple control transfer operations that evaluates
+  the condition, invokes the 'getLogicValue' member of the result if the result
+  not a 'bool', then determines the direction of the branch based on the result.
+  (Internally, the standard library type 'bool' has a getLogicValue member that
+  returns a 'Builtin.Int1'.)  It is an error if the type of the expression is
+  context-dependent or some non-bool type.
   </p>
   
   <p>Some examples include:</p>
@@ -2003,16 +2002,11 @@
   </pre>
   
   <p>'while' statements provide simple loop construct which (on each iteration
-  of the loop) evalutes the condition, then invokes the 'convertToLogicValue'
-  function on the result and uses it to determine whether to keep looping.
-  This structure allows any type that can be converted to a logic value to be
-  used in an 'if' condition.
-  </p>
-  
-  <p>If there is no convertToLogicValue function that accepts a 'T', or if 
-  the resultant function does not produce a value of '<a
-  href="#type-builtin">__builtin_int1_type</a>' type, then the code is
-  malformed.
+  of the loop) evalutes the condition, invokes the 'getLogicValue' member of
+  the result if the result not a 'bool', then determines whether to keep
+  looping. (Internally, the standard library type 'bool' has a getLogicValue
+  member that returns a 'Builtin.Int1'.)  It is an error if the type of
+  the expression is context-dependent or some non-bool type.
   </p>
   
   <p>Some examples include:</p>
@@ -2172,10 +2166,10 @@
   
   <pre class="stdlib">
     <i>// Fixed size types are simple structs of the right size.</i>
-    struct int8  { value : Builtin.int8 }
-    struct int16 { value : Builtin.int16 }
-    struct int32 { value : Builtin.int32 }
-    struct int64 { value : Builtin.int64 }
+    struct int8  { value : Builtin.Int8 }
+    struct int16 { value : Builtin.Int16 }
+    struct int32 { value : Builtin.Int32 }
+    struct int64 { value : Builtin.Int64 }
 
     <i>// int is just an alias for the 64-bit integer type.</i>
     typealias int : int64
@@ -2183,8 +2177,8 @@
 
   <h4 id="stdlib-int">int, int8, int16, int32, int64</h4>
   <pre class="stdlib">
-    struct float  { value : Builtin.float32 }
-    struct double { value : Builtin.float64 }
+    struct float  { value : Builtin.Float32 }
+    struct double { value : Builtin.Float64 }
   </pre>
 
   <h4 id="stdlib-bool">bool, true, false</h4>
@@ -2199,9 +2193,7 @@
     var true = bool.true
     var false = bool.false
   </pre>
-  
-  <h4 id="stdlib-void">void</h4>
-  
+
   <!-- ===================================================================== -->
   <h3 id="stdlib-arithmetic">Arithmetic and Logical Operations</h3>
   <!-- ===================================================================== -->
