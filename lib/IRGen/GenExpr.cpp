@@ -28,7 +28,6 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LValue.h"
-#include "RValue.h"
 #include "Explosion.h"
 
 using namespace swift;
@@ -369,20 +368,22 @@ void IRGenFunction::emitRValueToMemory(Expr *E, Address addr,
 
 /// Zero-initializer the given l-value.
 void IRGenFunction::emitZeroInit(Address addr, const TypeInfo &type) {
-  RValueSchema schema = type.getSchema();
+  ExplosionSchema schema(ExplosionKind::Maximal);
+  type.getExplosionSchema(schema);
 
-  // If the schema is scalar, just store a bunch of values into it.
-  // This makes for better IR than a memset.
-  if (schema.isScalar()) {
-    SmallVector<llvm::Value*, RValue::MaxScalars> scalars;
-    for (llvm::Type *ty : schema.getScalarTypes()) {
-      scalars.push_back(llvm::Constant::getNullValue(ty));
+  // Try to fill the value in with stores if that doesn't make for a
+  // ridiculous amount of IR.  This is impossible if the schema
+  // contains an aggregate;  otherwise, 4 is just a number.
+  if (!schema.containsAggregate() && schema.size() <= 4) {
+    Explosion explosion(schema.getKind());
+    for (auto elt : schema) {
+      explosion.add(llvm::Constant::getNullValue(elt.getScalarType()));
     }
-    type.store(*this, RValue::forScalars(scalars), addr);
+    type.initWithExplosion(*this, explosion, addr);
     return;
   }
 
-  // Otherwise, since the schema is aggregate, do a memset.
+  // Otherwise, just do a memset.
   Builder.CreateMemSet(Builder.CreateBitCast(addr.getAddress(), IGM.Int8PtrTy),
                        Builder.getInt8(0),
                        Builder.getInt64(type.StorageSize.getValue()),
@@ -403,23 +404,6 @@ LValue IRGenFunction::emitFakeLValue(const TypeInfo &type) {
   llvm::Value *fakeAddr =
     llvm::UndefValue::get(type.getStorageType()->getPointerTo());
   return emitAddressLValue(Address(fakeAddr, type.StorageAlignment));
-}
-
-/// Emit a fake r-value which obeys the given specification.  This
-/// should only ever be used for error recovery.
-RValue IRGenFunction::emitFakeRValue(const TypeInfo &TInfo) {
-  RValueSchema Schema = TInfo.getSchema();
-  if (Schema.isScalar()) {
-    llvm::SmallVector<llvm::Value*, RValue::MaxScalars> Scalars;
-    for (llvm::Type *T : Schema.getScalarTypes()) {
-      Scalars.push_back(llvm::UndefValue::get(T));
-    }
-    return RValue::forScalars(Scalars);
-  } else {
-    llvm::Value *Addr =
-      llvm::UndefValue::get(Schema.getAggregateType()->getPointerTo());
-    return RValue::forAggregate(Addr);
-  }
 }
 
 void IRGenFunction::emitFakeExplosion(const TypeInfo &type, Explosion &explosion) {

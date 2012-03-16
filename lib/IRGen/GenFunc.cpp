@@ -67,7 +67,6 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LValue.h"
-#include "RValue.h"
 #include "Explosion.h"
 #include "StructLayout.h"
 
@@ -119,6 +118,40 @@ const TypeInfo &IRGenFunction::getResultTypeInfo() const {
 }
 
 namespace {
+  /// The natural form of the result of performing a call.  A call
+  /// result may be indirect, in which case it is returned in memory
+  /// whose address is passed as an implicit first argument, or it may
+  /// be direct.
+  struct CallResult {
+  private:
+    llvm::Value *DirectValues[ExplosionSchema::MaxScalarsForDirectResult];
+    unsigned char NumDirectValues;
+  public:
+    ExplosionKind DirectExplosionLevel;
+
+    /// The address into which to emit an indirect call.  If this is
+    /// set, the call will be evaluated (as an initialization) into
+    /// this address; otherwise, memory will be allocated on the stack.
+    Address IndirectAddress;
+
+    CallResult() : NumDirectValues(0) {}
+
+    void addDirectValue(llvm::Value *value) {
+      assert(NumDirectValues < ExplosionSchema::MaxScalarsForDirectResult);
+      DirectValues[NumDirectValues++] = value;
+    }
+    llvm::Value *getDirectValue(unsigned i) const {
+      assert(i < NumDirectValues);
+      return DirectValues[i];
+    }
+    void clearDirectValues() {
+      NumDirectValues = 0;
+    }
+    ArrayRef<llvm::Value*> getDirectValues() const {
+      return ArrayRef<llvm::Value*>(DirectValues, DirectValues+NumDirectValues);
+    }
+  };
+
   /// A signature represents something which can actually be called.
   class Signature {
     llvm::PointerIntPair<llvm::FunctionType*, 1, bool> TypeAndHasIndirectReturn;
@@ -201,56 +234,6 @@ namespace {
     Signature getSignature(IRGenModule &IGM, ExplosionKind explosionKind,
                            unsigned currying, bool needsData) const;
 
-    RValueSchema getSchema() const {
-      llvm::StructType *Ty = getStorageType();
-      assert(Ty->getNumElements() == 2);
-      return RValueSchema::forScalars(Ty->getElementType(0),
-                                      Ty->getElementType(1));
-    }
-
-    RValue load(IRGenFunction &IGF, Address address) const {
-      llvm::Value *addr = address.getAddress();
-
-      // Load the function.
-      llvm::Value *fnAddr =
-        IGF.Builder.CreateStructGEP(addr, 0, addr->getName() + ".fn");
-      llvm::LoadInst *fn =
-        IGF.Builder.CreateLoad(fnAddr, address.getAlignment(),
-                               fnAddr->getName() + ".load");
-
-      // Load the data.  This load is offset by sizeof(void*) from the
-      // base and so may have a lesser alignment.
-      // FIXME: retains?
-      llvm::Value *dataAddr =
-        IGF.Builder.CreateStructGEP(addr, 1, addr->getName() + ".data");
-      llvm::Value *data =
-        IGF.Builder.CreateLoad(dataAddr,
-                               address.getAlignment().alignmentAtOffset(
-                                          Size(StorageAlignment.getValue())),
-                               dataAddr->getName() + ".load");
-
-      return RValue::forScalars(fn, data);
-    }
-
-    void store(IRGenFunction &IGF, const RValue &RV, Address address) const {
-      assert(RV.isScalar() && RV.getScalars().size() == 2);
-      llvm::Value *addr = address.getAddress();
-
-      // Store the function pointer.
-      llvm::Value *fnAddr =
-        IGF.Builder.CreateStructGEP(addr, 0, addr->getName() + ".fn");
-      IGF.Builder.CreateStore(RV.getScalars()[0], fnAddr,
-                              address.getAlignment());
-
-      // Store the data.
-      // FIXME: retains?
-      llvm::Value *dataAddr =
-        IGF.Builder.CreateStructGEP(addr, 1, addr->getName() + ".data");
-      IGF.Builder.CreateStore(RV.getScalars()[1], dataAddr,
-                              address.getAlignment().alignmentAtOffset(
-                                         Size(StorageAlignment.getValue())));
-    }
-
     unsigned getExplosionSize(ExplosionKind kind) const {
       return 2;
     }
@@ -262,15 +245,51 @@ namespace {
       schema.add(ExplosionSchema::Element::forScalar(Ty->getElementType(1)));
     }
 
-    void loadExplosion(IRGenFunction &IGF, Address addr, Explosion &e) const {
-      RValue rv = load(IGF, addr);
-      e.add(rv.getScalars());
+    void loadExplosion(IRGenFunction &IGF, Address address, Explosion &e) const {
+      llvm::Value *addr = address.getAddress();
+
+      // Load the function.
+      llvm::Value *fnAddr =
+        IGF.Builder.CreateStructGEP(addr, 0, addr->getName() + ".fn");
+      llvm::LoadInst *fn =
+        IGF.Builder.CreateLoad(fnAddr, address.getAlignment(),
+                               fnAddr->getName() + ".load");
+      e.add(fn);
+
+      // Load the data.  This load is offset by sizeof(void*) from the
+      // base and so may have a lesser alignment.
+      // FIXME: retains?
+      llvm::Value *dataAddr =
+        IGF.Builder.CreateStructGEP(addr, 1, addr->getName() + ".data");
+      llvm::Value *data =
+        IGF.Builder.CreateLoad(dataAddr,
+                               address.getAlignment().alignmentAtOffset(
+                                          Size(StorageAlignment.getValue())),
+                               dataAddr->getName() + ".load");
+      e.add(data);
     }
 
-    void storeExplosion(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      llvm::Value *func = e.claimNext();
-      llvm::Value *data = e.claimNext();
-      store(IGF, RValue::forScalars(func, data), addr);
+    void storeExplosion(IRGenFunction &IGF, Explosion &e, Address address) const {
+      llvm::Value *addr = address.getAddress();
+
+      // Store the function pointer.
+      llvm::Value *fnAddr =
+        IGF.Builder.CreateStructGEP(addr, 0, addr->getName() + ".fn");
+      IGF.Builder.CreateStore(e.claimNext(), fnAddr,
+                              address.getAlignment());
+
+      // Store the data.
+      // FIXME: retains?
+      llvm::Value *dataAddr =
+        IGF.Builder.CreateStructGEP(addr, 1, addr->getName() + ".data");
+      IGF.Builder.CreateStore(e.claimNext(), dataAddr,
+                              address.getAlignment().alignmentAtOffset(
+                                         Size(StorageAlignment.getValue())));
+    }
+
+    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      dest.add(src.claimNext());
+      dest.add(src.claimNext());
     }
   };
 }
@@ -280,16 +299,6 @@ TypeConverter::convertFunctionType(IRGenModule &IGM, FunctionType *T) {
   return FuncTypeInfo::create(T, IGM.FunctionPairTy,
                               IGM.getPointerSize() * 2,
                               IGM.getPointerAlignment());
-}
-
-/// Given the explosion schema for the result type of a function, does
-/// it require an aggregate result?
-static bool requiresAggregateResult(const ExplosionSchema &schema) {
-  if (schema.size() > RValue::MaxScalars) return true;
-  for (auto &elt : schema)
-    if (elt.isAggregate())
-      return true;
-  return false;
 }
 
 /// Decompose a function type into its exploded parameter types
@@ -365,7 +374,7 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
     ExplosionSchema schema(explosionKind);
     IGM.getExplosionSchema(formalResultType, schema);
 
-    hasAggregateResult = requiresAggregateResult(schema);
+    hasAggregateResult = schema.requiresIndirectResult();
     if (hasAggregateResult) {
       const TypeInfo &info = IGM.getFragileTypeInfo(formalResultType);
       argTypes[0] = info.StorageType->getPointerTo();
@@ -375,7 +384,7 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
     } else if (schema.size() == 1) {
       resultType = schema.begin()->getScalarType();
     } else {
-      llvm::SmallVector<llvm::Type*, RValue::MaxScalars> elts;
+      llvm::SmallVector<llvm::Type*, ExplosionSchema::MaxScalarsForDirectResult> elts;
       for (auto &elt : schema) elts.push_back(elt.getScalarType());
       resultType = llvm::StructType::get(IGM.getLLVMContext(), elts);
     }
@@ -439,6 +448,12 @@ namespace {
       DataPtr = dataPtr;
     }
 
+    void setForIndirectCall(llvm::Value *fn, llvm::Value *data) {
+      ExplosionLevel = ExplosionKind::Minimal;
+      UncurryLevel = 0;
+      set(fn, isa<llvm::ConstantPointerNull>(data) ? nullptr : data);
+    }
+
     llvm::Value *getOpaqueFunctionPointer(IRGenFunction &IGF) const {
       return IGF.Builder.CreateBitCast(FnPtr, IGF.IGM.Int8PtrTy);
     }
@@ -468,7 +483,7 @@ namespace {
 
 /// Emit a reference to a function, using the best parameters possible
 /// up to given limits.
-static Callee emitCallee(IRGenFunction &IGF, FuncDecl *fn,
+static Callee emitCallee(IRGenModule &IGM, FuncDecl *fn,
                          ExplosionKind bestExplosion, unsigned bestUncurry) {
   // Use the apparent natural uncurrying level of a function as a
   // maximum on the uncurrying to do.
@@ -483,11 +498,11 @@ static Callee emitCallee(IRGenFunction &IGF, FuncDecl *fn,
   callee.ExplosionLevel = bestExplosion;
 
   if (!fn->getDeclContext()->isLocalContext()) {
-    callee.set(IGF.IGM.getAddrOfGlobalFunction(fn, bestExplosion, bestUncurry),
+    callee.set(IGM.getAddrOfGlobalFunction(fn, bestExplosion, bestUncurry),
                nullptr);
   } else {
-    IGF.unimplemented(fn->getLocStart(), "local function emission");
-    llvm::Value *undef = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
+    IGM.unimplemented(fn->getLocStart(), "local function emission");
+    llvm::Value *undef = llvm::UndefValue::get(IGM.Int8PtrTy);
     callee.set(undef, nullptr);
   }
 
@@ -498,7 +513,7 @@ static Callee emitCallee(IRGenFunction &IGF, FuncDecl *fn,
 void IRGenFunction::emitExplodedRValueForFunction(FuncDecl *fn,
                                                   Explosion &explosion) {
   // Function pointers are always fully curried and use ExplosionKind::Minimal.
-  Callee callee = emitCallee(*this, fn, ExplosionKind::Minimal, 0);
+  Callee callee = emitCallee(IGM, fn, ExplosionKind::Minimal, 0);
   assert(callee.ExplosionLevel == ExplosionKind::Minimal);
   assert(callee.UncurryLevel == 0);
   explosion.add(callee.getOpaqueFunctionPointer(*this));
@@ -515,10 +530,8 @@ namespace {
 }
 
 /// emitBuiltinCall - Emit a call to a builtin function.
-static RValue emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn, Expr *Arg,
-                              const TypeInfo &resultType) {
-  assert(resultType.getSchema().isScalar() && "builtin type with agg return");
-
+static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
+                            Expr *Arg, CallResult &result) {
   // Emit the arguments.  Maybe we'll get builtins that are more
   // complex than this.
   ArgList args(ExplosionKind::Minimal);
@@ -533,7 +546,7 @@ static RValue emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn, Expr *Arg,
 #define UNARY_OPERATION(Op) {                                               \
     llvm::Value *op = args.Values.claimNext();                              \
     assert(args.Values.empty() && "wrong operands to unary operation");     \
-    return RValue::forScalars(IGF.Builder.Create##Op(op));                  \
+    return result.addDirectValue(IGF.Builder.Create##Op(op));               \
   }
 
 /// A macro which expands to the emission of a simple binary operation
@@ -542,7 +555,7 @@ static RValue emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn, Expr *Arg,
     llvm::Value *lhs = args.Values.claimNext();                             \
     llvm::Value *rhs = args.Values.claimNext();                             \
     assert(args.Values.empty() && "wrong operands to binary operation");    \
-    return RValue::forScalars(IGF.Builder.Create##Op(lhs, rhs));            \
+    return result.addDirectValue(IGF.Builder.Create##Op(lhs, rhs));         \
   }
 
 /// A macro which expands to the emission of a simple binary operation
@@ -552,9 +565,9 @@ static RValue emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn, Expr *Arg,
     llvm::Value *rhs = args.Values.claimNext();                             \
     assert(args.Values.empty() && "wrong operands to binary operation");    \
     if (lhs->getType()->isFloatingPointTy()) {                              \
-      return RValue::forScalars(IGF.Builder.Create##FPOp(lhs, rhs));        \
+      return result.addDirectValue(IGF.Builder.Create##FPOp(lhs, rhs));     \
     } else {                                                                \
-      return RValue::forScalars(IGF.Builder.Create##IntOp(lhs, rhs));       \
+      return result.addDirectValue(IGF.Builder.Create##IntOp(lhs, rhs));    \
     }                                                                       \
   }
 
@@ -601,29 +614,36 @@ static RValue emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn, Expr *Arg,
   llvm_unreachable("bad builtin kind!");
 }
 
-void IRGenFunction::emitExplodedApplyExpr(ApplyExpr *E, Explosion &explosion) {
-  const TypeInfo &type = getFragileTypeInfo(E->getType());
-  RValue rvalue = emitApplyExpr(E, type);
-  return type.explode(*this, rvalue, explosion);
-}
-
-Optional<Address>
-IRGenFunction::tryEmitApplyAsAddress(ApplyExpr *E, const TypeInfo &resultType) {
-  RValueSchema resultSchema = resultType.getSchema();
-  if (!resultSchema.isAggregate())
-    return Nothing;
-
-  RValue result = emitApplyExpr(E, resultType);
-  assert(result.isAggregate());
-  return Address(result.getAggregateAddress(), resultType.StorageAlignment);
-}
-
 namespace {
+  /// A single call site, with argument expression and the type of
+  /// function being applied.
   struct CallSite {
     CallSite(Expr *arg, Type fnType) : Arg(arg), FnType(fnType) {}
 
     Expr *Arg;
     Type FnType;
+  };
+
+  /// A holistic plan for performing a call.
+  struct CallPlan {
+    /// All the call sites we're going to evaluate.  Note that the
+    /// call sites are in reversed order of application, i.e. the
+    /// first site is the last call which will logically be performed.
+    llvm::SmallVector<CallSite, 8> CallSites;
+    Expr *UncurriedFn;
+    FuncDecl *KnownFn;
+
+    /// getFinalResultExplosionLevel - Returns the explosion level at
+    /// which we will naturally emit the last call.
+    ExplosionKind getFinalResultExplosionLevel(IRGenModule &IGM) const {
+      // If we don't have a known function, we have to use
+      // indirect-call rules.
+      if (!KnownFn) return ExplosionKind::Minimal;
+
+      Callee callee = emitCallee(IGM, KnownFn, ExplosionKind::Maximal,
+                                 CallSites.size() - 1);
+      return callee.ExplosionLevel;
+    }
   };
 }
 
@@ -640,11 +660,19 @@ static Expr *uncurry(ApplyExpr *E, SmallVectorImpl<CallSite> &callSites) {
 
 /// Emit the given expression, trying to tie it down to a known
 /// function.
-static FuncDecl *emitAsKnownFunctionReference(IRGenFunction &IGF, Expr *E) {
+static FuncDecl *getAsKnownFunctionReference(Expr *E) {
   E = E->getSemanticsProvidingExpr();
   if (DeclRefExpr *declRef = dyn_cast<DeclRefExpr>(E))
     return dyn_cast<FuncDecl>(declRef->getDecl());
   return nullptr;
+}
+
+/// Compute the plan for performing a sequence of call expressions.
+static CallPlan getCallPlan(IRGenModule &IGM, ApplyExpr *E) {
+  CallPlan plan;
+  plan.UncurriedFn = uncurry(E, plan.CallSites);
+  plan.KnownFn = getAsKnownFunctionReference(plan.UncurriedFn);
+  return plan;
 }
 
 /// Set attributes on the given call site consistent with it returning
@@ -658,49 +686,51 @@ static void setAggResultAttributes(llvm::CallSite call) {
 }
 
 /// Emit a function call.
-RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &resultType) {
-  // 1.  Try to uncurry the source expression.  Note that the argument
-  // expressions will appear in reverse order.
-  llvm::SmallVector<CallSite, 8> callSites;
-  Expr *fnExpr = uncurry(E, callSites);
-
-  // 2.  Emit the function expression.
+static void emitApplyExpr(IRGenFunction &IGF, CallPlan &plan,
+                          CallResult &result, const TypeInfo &resultType) {
+  // 1.  Emit the function expression.
   Callee callee;
 
   // We can do a lot if we know we're calling a known function.
-  if (FuncDecl *fn = emitAsKnownFunctionReference(*this, fnExpr)) {
-    // Handle calls to builtin functions.
-    if (isa<BuiltinModule>(fn->getDeclContext())) {
-      assert(callSites.size() == 1);
-      return emitBuiltinCall(*this, cast<FuncDecl>(fn), callSites[0].Arg,
-                             resultType);
-    }
+  if (plan.KnownFn) {
+    // Handle calls to builtin functions.  These are never curried, but they
+    // might return a function pointer.
+    if (isa<BuiltinModule>(plan.KnownFn->getDeclContext())) {
+      emitBuiltinCall(IGF, plan.KnownFn, plan.CallSites.back().Arg, result);
+
+      // If there are no trailing calls, we're done.
+      if (plan.CallSites.size() == 1) return;
+
+      // Otherwise, pop that call site off and set up the callee conservatively.
+      callee.setForIndirectCall(result.getDirectValue(0),
+                                result.getDirectValue(1));
+      result.clearDirectValues();
 
     // Otherwise, compute information about the function we're calling.
-    callee = emitCallee(*this, fn, ExplosionKind::Maximal, callSites.size()-1);
+    } else {
+      callee = emitCallee(IGF.IGM, plan.KnownFn, ExplosionKind::Maximal,
+                          plan.CallSites.size() - 1);
+    }
 
   // Otherwise, emit as a function pointer and use the pessimistic
   // rules for calling such.
   } else {
     Explosion fnValues(ExplosionKind::Maximal);
-    emitExplodedRValue(fnExpr, fnValues);
-    callee.ExplosionLevel = ExplosionKind::Minimal;
-    callee.UncurryLevel = 0;
+    IGF.emitExplodedRValue(plan.UncurriedFn, fnValues);
     llvm::Value *fnPtr = fnValues.claimNext();
     llvm::Value *dataPtr = fnValues.claimNext();
-    callee.set(fnPtr, isa<llvm::ConstantPointerNull>(dataPtr)
-                        ? nullptr : dataPtr);
+    callee.setForIndirectCall(fnPtr, dataPtr);
   }
 
   // 3. Emit arguments and call.
   while (true) {
-    assert(callee.UncurryLevel < callSites.size());
+    assert(callee.UncurryLevel < plan.CallSites.size());
 
     // Find the formal type we're calling.
-    unsigned calleeIndex = callSites.size() - 1;
-    Type calleeFormalType = callSites[calleeIndex].FnType;
+    unsigned calleeIndex = plan.CallSites.size() - 1;
+    Type calleeFormalType = plan.CallSites[calleeIndex].FnType;
     llvm::Value *fnPtr =
-      callee.getFunctionPointer(*this, calleeFormalType);
+      callee.getFunctionPointer(IGF, calleeFormalType);
     llvm::FunctionType *calleeType = 
       cast<llvm::FunctionType>(cast<llvm::PointerType>(fnPtr->getType())
                                  ->getElementType());
@@ -710,16 +740,16 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &resultType) {
 
     // Add the data pointer in.
     if (callee.hasDataPointer())
-      args[--lastArgWritten] = callee.getDataPointer(IGM);
+      args[--lastArgWritten] = callee.getDataPointer(IGF.IGM);
 
     // Emit all of the arguments we need to pass here.
     for (unsigned i = callee.UncurryLevel + 1; i != 0; --i) {
-      Expr *arg = callSites.back().Arg;
-      callSites.pop_back();
+      Expr *arg = plan.CallSites.back().Arg;
+      plan.CallSites.pop_back();
 
       // Emit the argument, exploded at the appropriate level.
       Explosion argExplosion(callee.ExplosionLevel);
-      emitExplodedRValue(arg, argExplosion);
+      IGF.emitExplodedRValue(arg, argExplosion);
 
       assert(lastArgWritten >= argExplosion.size());
       lastArgWritten -= argExplosion.size();
@@ -730,55 +760,104 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &resultType) {
     }
 
     // Emit and insert the result type if required.
-    Address resultAddress;
     assert(lastArgWritten == 0 || lastArgWritten == 1);
     bool isAggregateResult = (lastArgWritten != 0);
     if (isAggregateResult) {
-      assert(callSites.empty() && "aggregate result on non-final call?");
+      assert(plan.CallSites.empty() && "aggregate result on non-final call?");
       Type formalResultType =
         calleeFormalType->castTo<FunctionType>()->getResult();
-      const TypeInfo &type = IGM.getFragileTypeInfo(formalResultType);
+      const TypeInfo &type = IGF.IGM.getFragileTypeInfo(formalResultType);
 
-      resultAddress = createFullExprAlloca(type.StorageType,
-                                           type.StorageAlignment,
-                                           "call.aggresult");
-      args[0] = resultAddress.getAddress();
+      // Force there to be an indirect address.
+      if (!result.IndirectAddress.isValid()) {
+        result.IndirectAddress =
+          IGF.createFullExprAlloca(type.StorageType,
+                                   type.StorageAlignment,
+                                   "call.aggresult");
+      }
+      args[0] = result.IndirectAddress.getAddress();
     }
 
     // TODO: exceptions, calling conventions
-    llvm::CallInst *call = Builder.CreateCall(fnPtr, args);
+    llvm::CallInst *call = IGF.Builder.CreateCall(fnPtr, args);
     
     // If we have an aggregate result, set the sret and noalias
     // attributes on the agg return slot, then return, since agg
     // results can only be final.
     if (isAggregateResult) {
       setAggResultAttributes(call);
-      return RValue::forAggregate(resultAddress.getAddress());
+      assert(result.getDirectValues().empty());
+      assert(result.IndirectAddress.isValid());
+      return;
     }
 
     // Extract out the scalar results.
-    llvm::SmallVector<llvm::Value*, RValue::MaxScalars> scalars;
+    llvm::SmallVector<llvm::Value*, ExplosionSchema::MaxScalarsForDirectResult> scalars;
     if (llvm::StructType *structType
-        = dyn_cast<llvm::StructType>(call->getType())) {
+          = dyn_cast<llvm::StructType>(call->getType())) {
       for (unsigned i = 0, e = structType->getNumElements(); i != e; ++i) {
-        llvm::Value *scalar = Builder.CreateExtractValue(call, i);
-        scalars.push_back(scalar);
+        llvm::Value *scalar = IGF.Builder.CreateExtractValue(call, i);
+        result.addDirectValue(scalar);
       }
     } else if (!call->getType()->isVoidTy()) {
-      scalars.push_back(call);
+      result.addDirectValue(call);
     }
 
     // If this is the end of the call sites, we're done.
-    if (callSites.empty())
-      return RValue::forScalars(scalars);
+    if (plan.CallSites.empty()) {
+      assert(!result.IndirectAddress.isValid() &&
+             "returning direct values when indirect result was requested!");
+      result.DirectExplosionLevel = callee.ExplosionLevel;
+      return;
+    }
 
     // Otherwise, we must have gotten a function back.  Set ourselves
     // up to call it, then continue emitting calls.
-    assert(scalars.size() == 2);
-    callee.ExplosionLevel = ExplosionKind::Minimal;
-    callee.UncurryLevel = 0;
-    callee.set(scalars[0], scalars[1]);
+    assert(result.getDirectValues().size() == 2);
+    callee.setForIndirectCall(result.getDirectValue(0),
+                              result.getDirectValue(1));
+    result.clearDirectValues();
   }
+}
+
+/// Emit a call for its exploded results.
+void IRGenFunction::emitExplodedApplyExpr(ApplyExpr *E, Explosion &explosion) {
+  CallPlan plan = getCallPlan(IGM, E);
+
+  const TypeInfo &resultTI = getFragileTypeInfo(E->getType());
+
+  CallResult result;
+  emitApplyExpr(*this, plan, result, resultTI);
+
+  // If this was an indirect return, explode it.
+  if (result.IndirectAddress.isValid()) {
+    return resultTI.loadExplosion(*this, result.IndirectAddress, explosion);
+  }
+
+  if (result.DirectExplosionLevel == explosion.getKind())
+    return explosion.add(result.getDirectValues());
+
+  Explosion resultExplosion(result.DirectExplosionLevel);
+  resultExplosion.add(result.getDirectValues());
+  resultTI.reexplode(*this, resultExplosion, explosion);
+}
+
+/// See whether we can emit the result of the given call as an object
+/// naturally located in memory.
+Optional<Address>
+IRGenFunction::tryEmitApplyAsAddress(ApplyExpr *E, const TypeInfo &resultTI) {
+  CallPlan plan = getCallPlan(IGM, E);
+
+  // Give up if the call won't be returned indirectly.
+  ExplosionSchema schema(plan.getFinalResultExplosionLevel(IGM));
+  resultTI.getExplosionSchema(schema);
+  if (!schema.requiresIndirectResult())
+    return Nothing;
+
+  CallResult result;
+  emitApplyExpr(*this, plan, result, resultTI);
+  assert(result.IndirectAddress.isValid());
+  return result.IndirectAddress;
 }
 
 /// Emit a nullary call to the given function, using the standard
@@ -786,12 +865,13 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &resultType) {
 void IRGenFunction::emitExplodedNullaryCall(llvm::Value *fnPtr,
                                             Type resultType,
                                             Explosion &resultExplosion) {
+  ExplosionSchema resultSchema(resultExplosion.getKind());
   const TypeInfo &resultTI = getFragileTypeInfo(resultType);
-  RValueSchema resultSchema = resultTI.getSchema();
+  resultTI.getExplosionSchema(resultSchema);
 
   llvm::SmallVector<llvm::Value*, 1> args;
   Address resultAddress;
-  if (resultSchema.isAggregate()) {
+  if (resultSchema.requiresIndirectResult()) {
     resultAddress = createFullExprAlloca(resultTI.StorageType,
                                          resultTI.StorageAlignment,
                                          "call.aggresult");
@@ -801,13 +881,13 @@ void IRGenFunction::emitExplodedNullaryCall(llvm::Value *fnPtr,
   // FIXME: exceptions
   llvm::CallInst *call = Builder.CreateCall(fnPtr, args);
 
-  if (resultSchema.isAggregate()) {
+  if (resultSchema.requiresIndirectResult()) {
     setAggResultAttributes(call);
     resultTI.loadExplosion(*this, resultAddress, resultExplosion);
     return;
   }
 
-  unsigned numScalars = resultSchema.getScalarTypes().size();
+  unsigned numScalars = resultSchema.size();
   if (numScalars == 0) return;
   if (numScalars == 1) return resultExplosion.add(call);
 
@@ -964,7 +1044,7 @@ void IRGenFunction::emitPrologue() {
     ExplosionSchema resultSchema(CurExplosionLevel);
     resultType.getExplosionSchema(resultSchema);
 
-    if (requiresAggregateResult(resultSchema)) {
+    if (resultSchema.requiresIndirectResult()) {
       ReturnSlot = Address(values.claimNext(), resultType.StorageAlignment);
     } else if (resultSchema.empty()) {
       assert(!ReturnSlot.isValid());
@@ -1026,7 +1106,7 @@ void IRGenFunction::emitEpilogue() {
   ExplosionSchema resultSchema(CurExplosionLevel);
   resultType.getExplosionSchema(resultSchema);
 
-  if (requiresAggregateResult(resultSchema)) {
+  if (resultSchema.requiresIndirectResult()) {
     assert(isa<llvm::Argument>(ReturnSlot.getAddress()));
     Builder.CreateRetVoid();
   } else if (resultSchema.empty()) {
@@ -1157,8 +1237,12 @@ namespace {
         return;
       }
 
+      // Add data for an individual type unless it's known to be empty.
+      // This is for layout local to this tunit, so we can use our
+      // full knowledge.
       const TypeInfo &type = IGM.getFragileTypeInfo(ty);
-      if (!type.isEmpty()) AllDataTypes.push_back(&type);
+      if (!type.isEmpty(ResilienceScope::Local))
+        AllDataTypes.push_back(&type);
     }
 
     /// Create a forwarding stub.

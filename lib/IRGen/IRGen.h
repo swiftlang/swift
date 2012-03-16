@@ -44,10 +44,13 @@ class Size;
 /// structure is resilient, is there any reason not to answer as if
 /// the subject structure were universally fragile?
 enum class ResilienceScope {
+  /// Local scope means the decision doesn't have to be consistent
+  /// with anything.
+  Local,
+
   /// Component scope means the decision has to be consistent within
-  /// the current component.  We currently don't describe any tighter
-  /// scopes than this because the build model is for the entire
-  /// component to be compiled in one pass.
+  /// the current component.  In the current theory, this is equivalent
+  /// to Local because the entire component is recompiled as one.
   Component,
 
   /// Program scope means the decision has to be consistent across all

@@ -31,7 +31,6 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LValue.h"
-#include "RValue.h"
 #include "Explosion.h"
 
 using namespace swift;
@@ -74,27 +73,42 @@ namespace {
     unsigned MinimalEnd : 16;
   };
 
-  /// An abstract base class for tuple types.
+  /// Layout information for tuple types.
   class TupleTypeInfo : public TypeInfo {
     /// The number of TupleFieldInfos for this type.  Equal to the
     /// number of fields in the tuple.  The actual data is stored
     /// after the TypeInfo.
-    unsigned NumFields : 31;
-    unsigned IsAggregate : 1;
+    unsigned NumFields;
+    unsigned MaximalExplosionSize;
+    unsigned MinimalExplosionSize;
 
-    TupleFieldInfo *getFieldInfoStorage();
+    TupleFieldInfo *getFieldInfoStorage() {
+      return reinterpret_cast<TupleFieldInfo*>(this+1);
+    }
     const TupleFieldInfo *getFieldInfoStorage() const {
       return const_cast<TupleTypeInfo*>(this)->getFieldInfoStorage();
     }
 
-  public:
     TupleTypeInfo(llvm::Type *T, Size S, Alignment A,
-                  bool IsAggregate, ArrayRef<TupleFieldInfo> Fields)
-      : TypeInfo(T, S, A), NumFields(Fields.size()), IsAggregate(IsAggregate) {
+                  unsigned maximalSize, unsigned minimalSize,
+                  ArrayRef<TupleFieldInfo> fields)
+      : TypeInfo(T, S, A), NumFields(fields.size()),
+        MaximalExplosionSize(maximalSize), MinimalExplosionSize(minimalSize) {
 
-      TupleFieldInfo *FieldStorage = getFieldInfoStorage();
-      for (unsigned I = 0, E = Fields.size(); I != E; ++I)
-        new(&FieldStorage[I]) TupleFieldInfo(Fields[I]);
+      TupleFieldInfo *storage = getFieldInfoStorage();
+      for (unsigned i = 0, e = fields.size(); i != e; ++i)
+        new(&storage[i]) TupleFieldInfo(fields[i]);
+    }
+
+  public:
+    static TupleTypeInfo *create(llvm::Type *storageType,
+                                 Size size, Alignment align,
+                                 unsigned maximalSize, unsigned minimalSize,
+                                 ArrayRef<TupleFieldInfo> fields) {
+      void *buffer = new char[sizeof(TupleTypeInfo)
+                                + fields.size() * sizeof(TupleFieldInfo)];
+      return new(buffer) TupleTypeInfo(storageType, size, align,
+                                       maximalSize, minimalSize, fields);
     }
 
     ArrayRef<TupleFieldInfo> getFieldInfos() const {
@@ -134,6 +148,14 @@ namespace {
       llvm_unreachable("bad explosion kind");
     }
 
+    unsigned getExplosionSize(ExplosionKind level) const {
+      switch (level) {
+      case ExplosionKind::Minimal: return MinimalExplosionSize;
+      case ExplosionKind::Maximal: return MaximalExplosionSize;
+      }
+      llvm_unreachable("bad explosion level");
+    }
+
     void getExplosionSchema(ExplosionSchema &schema) const {
       for (auto &fieldInfo : getFieldInfos()) {
         fieldInfo.Type.getExplosionSchema(schema);
@@ -159,140 +181,10 @@ namespace {
         field.Type.storeExplosion(IGF, e, fieldAddr);
       }
     }
-  };
 
-  /// A TypeInfo implementation for tuples that are broken down into scalars.
-  class ScalarTupleTypeInfo : public TupleTypeInfo {
-    RValueSchema Schema;
-    
-    ScalarTupleTypeInfo(llvm::Type *T, Size S, Alignment A,
-                        ArrayRef<TupleFieldInfo> Fields,
-                        const RValueSchema &Schema)
-      : TupleTypeInfo(T, S, A, /*agg*/ false, Fields), Schema(Schema) {}
-
-  public:
-    static ScalarTupleTypeInfo *create(llvm::Type *T, Size S, Alignment A,
-                                       ArrayRef<llvm::Type*> ScalarTypes,
-                                       ArrayRef<TupleFieldInfo> FieldInfos) {
-      void *Storage = operator new(sizeof(ScalarTupleTypeInfo) +
-                                   sizeof(TupleFieldInfo) * FieldInfos.size());
-      return new(Storage) ScalarTupleTypeInfo(T, S, A, FieldInfos,
-                               RValueSchema::forScalars(ScalarTypes));
-    }
-
-    unsigned getNumScalars() const {
-      return Schema.getScalarTypes().size();
-    }
-
-    unsigned getExplosionSize(ExplosionKind kind) const {
-      return getNumScalars();
-    }
-
-    RValueSchema getSchema() const {
-      return Schema;
-    }
-
-    RValue load(IRGenFunction &IGF, Address addr) const {
-      SmallVector<llvm::Value*, RValue::MaxScalars> scalars;
-
-      // Load by loading the elements.
-      for (const TupleFieldInfo &field : getFieldInfos()) {
-        assert(scalars.size() == field.ScalarBegin);
-
-        // Skip fields that contribute no scalars.
-        if (field.ScalarBegin == field.ScalarEnd) continue;
-
-        // Load the field and extract the scalars.
-        Address fieldAddr = projectAddress(IGF, addr, field);
-        RValue fieldRV = field.Type.load(IGF, fieldAddr);
-        scalars.append(fieldRV.getScalars().begin(),
-                       fieldRV.getScalars().end());
-
-        assert(scalars.size() == field.ScalarEnd);
-      }
-
-      return RValue::forScalars(scalars);
-    }
-
-    void store(IRGenFunction &IGF, const RValue &RV, Address addr) const {
-      assert(RV.isScalar());
-
-      for (const TupleFieldInfo &field : getFieldInfos()) {
-        // Skip fields that contribute no scalars.
-        if (field.ScalarBegin == field.ScalarEnd) continue;
-
-        // Project out the appropriate r-value.
-        ArrayRef<llvm::Value*> scalars = 
-          RV.getScalars().slice(field.ScalarBegin,
-                                field.ScalarEnd - field.ScalarBegin);
-        RValue fieldRV = RValue::forScalars(scalars);
-
-        // Write the extracted r-value into a projected l-value.
-        Address fieldAddr = projectAddress(IGF, addr, field);
-        field.Type.store(IGF, fieldRV, fieldAddr);
-      }
-    }
-  };
-
-  /// A TypeInfo implementation for tuples that are passed around as
-  /// aggregates.
-  class AggregateTupleTypeInfo : public TupleTypeInfo {
-    unsigned MaximalExplosionSize;
-    unsigned MinimalExplosionSize;
-
-    AggregateTupleTypeInfo(llvm::Type *T, Size S, Alignment A,
-                           ArrayRef<TupleFieldInfo> Fields,
-                           unsigned maximalExplosionSize,
-                           unsigned minimalExplosionSize)
-      : TupleTypeInfo(T, S, A, /*agg*/ true, Fields),
-        MaximalExplosionSize(maximalExplosionSize),
-        MinimalExplosionSize(minimalExplosionSize) {
-    }
-
-  public:
-    static AggregateTupleTypeInfo *create(llvm::StructType *T,
-                                          Size S, Alignment A,
-                                          ArrayRef<TupleFieldInfo> FieldInfos,
-                                          unsigned maximalExplosionSize,
-                                          unsigned minimalExplosionSize) {
-      void *Storage = operator new(sizeof(AggregateTupleTypeInfo) +
-                                   sizeof(TupleFieldInfo) * FieldInfos.size());
-      return new(Storage) AggregateTupleTypeInfo(T, S, A, FieldInfos,
-                                                 maximalExplosionSize,
-                                                 minimalExplosionSize);
-    }
-
-    unsigned getExplosionSize(ExplosionKind kind) const {
-      switch (kind) {
-      case ExplosionKind::Maximal: return MaximalExplosionSize;
-      case ExplosionKind::Minimal: return MinimalExplosionSize;
-      }
-      llvm_unreachable("bad explosion kind");
-    }
-
-    llvm::StructType *getStorageType() const {
-      return cast<llvm::StructType>(TypeInfo::getStorageType());
-    }
-
-    RValueSchema getSchema() const {
-      return RValueSchema::forAggregate(getStorageType(), StorageAlignment);
-    }
-
-    RValue load(IRGenFunction &IGF, Address addr) const {
-      Address temp = IGF.createFullExprAlloca(StorageType, StorageAlignment,
-                                             "lvalue-load");
-      // FIXME: a memcpy isn't right if any of the fields require
-      // special logic for loads or stores.
-      IGF.emitMemCpy(temp.getAddress(), addr.getAddress(), StorageSize,
-                     std::min(StorageAlignment, addr.getAlignment()));
-      return RValue::forAggregate(temp.getAddress());
-    }
-
-    void store(IRGenFunction &IGF, const RValue &RV, Address addr) const {
-      // FIXME: a memcpy isn't right if any of the fields require
-      // special logic for loads or stores.
-      IGF.emitMemCpy(addr.getAddress(), RV.getAggregateAddress(), StorageSize,
-                     std::min(StorageAlignment, addr.getAlignment()));
+    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      for (auto &field : getFieldInfos())
+        field.Type.reexplode(IGF, src, dest);
     }
   };
 }
@@ -311,123 +203,81 @@ static const TupleTypeInfo &getAsTupleTypeInfo(IRGenFunction &IGF, Type type) {
   return getAsTupleTypeInfo(IGF.getFragileTypeInfo(type));
 }
 
-TupleFieldInfo *TupleTypeInfo::getFieldInfoStorage() {
-  void *Ptr;
-  if (IsAggregate)
-    Ptr = static_cast<AggregateTupleTypeInfo*>(this)+1;
-  else
-    Ptr = static_cast<ScalarTupleTypeInfo*>(this)+1;
-  return reinterpret_cast<TupleFieldInfo*>(Ptr);
-}
-
 const TypeInfo *
 TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
-  SmallVector<TupleFieldInfo, 8> FieldInfos;
-  SmallVector<llvm::Type*, 8> ScalarTypes;
-  SmallVector<llvm::Type*, 8> StorageTypes;
-  FieldInfos.reserve(T->getFields().size());
-  StorageTypes.reserve(T->getFields().size());
+  SmallVector<TupleFieldInfo, 8> fieldInfos;
+  SmallVector<llvm::Type*, 8> storageTypes;
+  fieldInfos.reserve(T->getFields().size());
+  storageTypes.reserve(T->getFields().size());
 
   unsigned maximalExplosionSize = 0, minimalExplosionSize = 0;
 
-  bool HasAggregateField = false;
-
-  Size StorageSize;
-  Alignment StorageAlignment;
+  Size storageSize;
+  Alignment storageAlignment(1);
 
   // TODO: rearrange the tuple for optimal packing.
-  for (const TupleTypeElt &Field : T->getFields()) {
-    const TypeInfo &TInfo = getFragileTypeInfo(IGM, Field.getType());
-    assert(TInfo.isComplete());
+  for (const TupleTypeElt &field : T->getFields()) {
+    const TypeInfo &fieldTI = getFragileTypeInfo(IGM, field.getType());
+    assert(fieldTI.isComplete());
 
-    FieldInfos.push_back(TupleFieldInfo(Field, TInfo));
-    TupleFieldInfo &FieldInfo = FieldInfos.back();
+    fieldInfos.push_back(TupleFieldInfo(field, fieldTI));
+    TupleFieldInfo &fieldInfo = fieldInfos.back();
 
-    FieldInfo.MaximalBegin = maximalExplosionSize;
-    maximalExplosionSize += TInfo.getExplosionSize(ExplosionKind::Maximal);
-    FieldInfo.MaximalEnd = maximalExplosionSize;
+    fieldInfo.MaximalBegin = maximalExplosionSize;
+    maximalExplosionSize += fieldTI.getExplosionSize(ExplosionKind::Maximal);
+    fieldInfo.MaximalEnd = maximalExplosionSize;
 
-    FieldInfo.MinimalBegin = minimalExplosionSize;
-    minimalExplosionSize += TInfo.getExplosionSize(ExplosionKind::Minimal);
-    FieldInfo.MinimalEnd = minimalExplosionSize;
+    fieldInfo.MinimalBegin = minimalExplosionSize;
+    minimalExplosionSize += fieldTI.getExplosionSize(ExplosionKind::Minimal);
+    fieldInfo.MinimalEnd = minimalExplosionSize;
 
     // Ignore zero-sized fields.
-    if (TInfo.StorageSize.isZero()) {
-      FieldInfo.StorageIndex = TupleFieldInfo::NoStorage;
-      FieldInfo.ScalarBegin = FieldInfo.ScalarEnd = ScalarTypes.size();
+    if (fieldTI.StorageSize.isZero()) {
+      fieldInfo.StorageIndex = TupleFieldInfo::NoStorage;
       continue;
     }
 
-    if (!HasAggregateField) {
-      RValueSchema Schema = TInfo.getSchema();
-      if (Schema.isAggregate()) {
-        HasAggregateField = true;
-      } else {
-        FieldInfo.ScalarBegin = ScalarTypes.size();
-        ScalarTypes.append(Schema.getScalarTypes().begin(),
-                           Schema.getScalarTypes().end());
-        FieldInfo.ScalarEnd = ScalarTypes.size();
-      }
-    }
-
-    StorageAlignment = std::max(StorageAlignment, TInfo.StorageAlignment);
+    storageAlignment = std::max(storageAlignment, fieldTI.StorageAlignment);
 
     // If the current tuple size isn't a multiple of the tuple
     // alignment, we need padding.
-    if (Size OffsetFromAlignment = StorageSize % StorageAlignment) {
-      unsigned PaddingRequired
-        = StorageAlignment.getValue() - OffsetFromAlignment.getValue();
+    if (Size offsetFromAlignment = storageSize % storageAlignment) {
+      unsigned paddingRequired
+        = storageAlignment.getValue() - offsetFromAlignment.getValue();
 
       // We don't actually need to uglify the IR unless the natural
       // alignment of the IR type for the field isn't good enough.
-      Alignment FieldIRAlignment(
-          IGM.TargetData.getABITypeAlignment(TInfo.StorageType));
-      assert(FieldIRAlignment <= TInfo.StorageAlignment);
-      if (FieldIRAlignment != TInfo.StorageAlignment) {
-        StorageTypes.push_back(llvm::ArrayType::get(IGM.Int8Ty,
-                                                    PaddingRequired));
+      Alignment fieldIRAlignment(
+          IGM.TargetData.getABITypeAlignment(fieldTI.StorageType));
+      assert(fieldIRAlignment <= fieldTI.StorageAlignment);
+      if (fieldIRAlignment != fieldTI.StorageAlignment) {
+        storageTypes.push_back(llvm::ArrayType::get(IGM.Int8Ty,
+                                                    paddingRequired));
       }
 
       // Regardless, the storage size goes up.
-      StorageSize += Size(PaddingRequired);
+      storageSize += Size(paddingRequired);
     }
 
-    FieldInfo.StorageIndex = StorageTypes.size();
-    FieldInfo.StorageOffset = StorageSize;
-    StorageTypes.push_back(TInfo.getStorageType());
-    StorageSize += TInfo.StorageSize;
+    fieldInfo.StorageIndex = storageTypes.size();
+    fieldInfo.StorageOffset = storageSize;
+    storageTypes.push_back(fieldTI.getStorageType());
+    storageSize += fieldTI.StorageSize;
   }
 
   // If the tuple requires no storage at all, just use i8.  Most
   // clients will just ignore zero-size types, but those that care can
   // have a sensible one-byte type.
-  if (StorageSize.isZero()) {
-    assert(ScalarTypes.empty());
-    assert(StorageTypes.empty());
-    return ScalarTupleTypeInfo::create(IGM.Int8Ty, Size(0), Alignment(1),
-                                       ScalarTypes, FieldInfos);
+  llvm::Type *convertedTy;
+  if (storageSize.isZero()) {
+    convertedTy = IGM.Int8Ty;
+  } else {
+    convertedTy = llvm::StructType::get(IGM.getLLVMContext(), storageTypes);
   }
 
-  // Otherwise, build a new, structural type.
-  llvm::StructType *Converted
-    = llvm::StructType::get(IGM.getLLVMContext(), StorageTypes);
-
-  // If the tuple has no aggregate fields, and the number of scalars
-  // doesn't exceed the maximum, pass it as scalars.
-  if (!HasAggregateField && ScalarTypes.size() <= RValueSchema::MaxScalars) {
-    assert(ScalarTypes.size() == maximalExplosionSize);
-    assert(ScalarTypes.size() == minimalExplosionSize);
-    return ScalarTupleTypeInfo::create(Converted, StorageSize, StorageAlignment,
-                                       ScalarTypes, FieldInfos);
-  }
-
-  // Otherwise, pass the entire thing as an aggregate.  This is a bit
-  // wasteful; we could really pass some of the fields as aggregates
-  // and some as scalars.
-  return AggregateTupleTypeInfo::create(Converted, StorageSize,
-                                        StorageAlignment, FieldInfos,
-                                        maximalExplosionSize,
-                                        minimalExplosionSize);
+  return TupleTypeInfo::create(convertedTy, storageSize, storageAlignment,
+                               maximalExplosionSize, minimalExplosionSize,
+                               fieldInfos);
 }
 
 void IRGenFunction::emitExplodedTupleLiteral(TupleExpr *E,

@@ -19,7 +19,6 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "JumpDest.h"
-#include "RValue.h"
 
 using namespace swift;
 using namespace irgen;

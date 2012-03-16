@@ -83,13 +83,11 @@ public:
   /// Whether this type info has been completely converted.
   bool isComplete() const { return !StorageAlignment.isZero(); }
 
-  /// Whether this type info is for an empty type.
-  bool isEmpty() const { return StorageSize.isZero(); }
+  /// Whether this type is known to be empty within the given
+  /// resilience scope.
+  bool isEmpty(ResilienceScope Scope) const { return StorageSize.isZero(); }
 
   llvm::Type *getStorageType() const { return StorageType; }
-
-  /// Compute a schema for passing around r-values of this type.
-  virtual RValueSchema getSchema() const = 0;
 
   /// Add the information for exploding values of this type to the
   /// given schema.
@@ -98,24 +96,23 @@ public:
   /// Return the number of elements in an explosion of this type.
   virtual unsigned getExplosionSize(ExplosionKind kind) const = 0;
 
-  /// Load an r-value from the given address.
-  virtual RValue load(IRGenFunction &IGF, Address addr) const = 0;
-
   /// Load a list of exploded values from an address.
   virtual void loadExplosion(IRGenFunction &IGF, Address addr,
                              Explosion &explosion) const = 0;
-
-  /// Store an r-value to the given address.
-  virtual void store(IRGenFunction &IGF, const RValue &RV,
-                     Address addr) const = 0;
 
   /// Store a set of exploded values to an address.  The values are
   /// consumed out of the explosion.
   virtual void storeExplosion(IRGenFunction &IGF, Explosion &explosion,
                               Address addr) const = 0;
 
-  /// Given an r-value of this type, explode it.
-  void explode(IRGenFunction &IGF, const RValue &RV, Explosion &expl) const;
+  /// Initialize a memory object by consuming values out of an explosion.
+  virtual void initWithExplosion(IRGenFunction &IGF, Explosion &explosion,
+                                 Address addr) const;
+
+  /// Consume a bunch of values which have exploded at one explosion
+  /// level and produce them at another.
+  virtual void reexplode(IRGenFunction &IGF, Explosion &sourceExplosion,
+                         Explosion &targetExplosion) const = 0;
 
   /// Should optimizations be enabled which rely on the representation
   /// for this type being a single retainable object pointer?

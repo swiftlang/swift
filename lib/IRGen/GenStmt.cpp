@@ -24,7 +24,6 @@
 #include "IRGenFunction.h"
 #include "JumpDest.h"
 #include "LValue.h"
-#include "RValue.h"
 
 using namespace swift;
 using namespace irgen;

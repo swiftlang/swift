@@ -29,7 +29,6 @@
 #include "IRGenModule.h"
 #include "JumpDest.h"
 #include "LValue.h"
-#include "RValue.h"
 #include "Explosion.h"
 
 using namespace swift;

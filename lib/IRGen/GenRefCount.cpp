@@ -21,7 +21,6 @@
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "RValue.h"
 
 using namespace swift;
 using namespace irgen;
@@ -32,10 +31,6 @@ namespace {
     RefCountedTypeInfo(llvm::PointerType *storage, Size size, Alignment align)
       : TypeInfo(storage, size, align) {}
 
-    RValueSchema getSchema() const {
-      return RValueSchema::forScalars(getStorageType());
-    }
-
     unsigned getExplosionSize(ExplosionKind kind) const {
       return 1;
     }
@@ -44,21 +39,16 @@ namespace {
       schema.add(ExplosionSchema::Element::forScalar(getStorageType()));
     }
 
-    RValue load(IRGenFunction &IGF, Address addr) const {
-      return RValue::forScalars(IGF.emitLoadRetained(addr));
-    }
-
     void loadExplosion(IRGenFunction &IGF, Address addr, Explosion &e) const {
       e.add(IGF.emitLoadRetained(addr));
     }
 
-    void store(IRGenFunction &IGF, const RValue &RV, Address addr) const {
-      assert(RV.isScalar() && RV.getScalars().size() == 1);
-      IGF.emitStoreRetained(RV.getScalars()[0], addr);
-    }
-
     void storeExplosion(IRGenFunction &IGF, Explosion &e, Address addr) const {
       IGF.emitStoreRetained(e.claimNext(), addr);
+    }
+
+    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      dest.add(src.claimNext());
     }
   };
 }

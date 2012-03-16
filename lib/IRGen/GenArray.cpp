@@ -23,7 +23,6 @@
 #include "Address.h"
 #include "GenType.h"
 #include "IRGenModule.h"
-#include "RValue.h"
 
 using namespace swift;
 using namespace irgen;
@@ -33,11 +32,6 @@ namespace {
   public:
     ArrayTypeInfo() : TypeInfo(nullptr, Size(0), Alignment(0)) {}
 
-    RValueSchema getSchema() const {
-      // FIXME
-      return RValueSchema();
-    }
-
     unsigned getExplosionSize(ExplosionKind kind) const {
       return 1;
     }
@@ -46,20 +40,15 @@ namespace {
       // FIXME
     }
 
-    RValue load(IRGenFunction &IGF, Address addr) const {
-      // FIXME
-      return RValue();
-    }
-
-    void store(IRGenFunction &CGF, const RValue &rvalue, Address addr) const {
-      // FIXME
-    }
-
     void loadExplosion(IRGenFunction &IGF, Address addr, Explosion &explosion) const {
       // FIXME
     }
 
     void storeExplosion(IRGenFunction &IGF, Explosion &explosion, Address addr) const {
+      // FIXME
+    }
+
+    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       // FIXME
     }
   };

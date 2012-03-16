@@ -36,7 +36,6 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LValue.h"
-#include "RValue.h"
 #include "Explosion.h"
 
 using namespace swift;
@@ -81,10 +80,6 @@ namespace {
     AggregateOneofTypeInfo(llvm::StructType *T, Size S, Alignment A)
       : OneofTypeInfo(T, S, A) {}
 
-    RValueSchema getSchema() const {
-      return RValueSchema::forAggregate(getStorageType(), StorageAlignment);
-    }
-
     void getExplosionSchema(ExplosionSchema &schema) const {
       schema.add(ExplosionSchema::Element::forAggregate(getStorageType(),
                                                         StorageAlignment));
@@ -94,20 +89,15 @@ namespace {
       return 1;
     }
 
-    RValue load(IRGenFunction &IGF, Address addr) const {
-      // FIXME
-      return RValue();
-    }
-
-    void store(IRGenFunction &CGF, const RValue &RV, Address addr) const {
-      // FIXME
-    }
-
     void loadExplosion(IRGenFunction &IGF, Address addr, Explosion &e) const {
       // FIXME
     }
 
     void storeExplosion(IRGenFunction &IGF, Explosion &e, Address addr) const {
+      // FIXME
+    }
+
+    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       // FIXME
     }
 
@@ -134,12 +124,6 @@ namespace {
     SingletonOneofTypeInfo(llvm::StructType *T, Size S, Alignment A)
       : OneofTypeInfo(T, S, A), Singleton(nullptr) {}
 
-    RValueSchema getSchema() const {
-      assert(isComplete());
-      if (!Singleton) return RValueSchema::forScalars();
-      return Singleton->getSchema();
-    }
-
     void getExplosionSchema(ExplosionSchema &schema) const {
       assert(isComplete());
       if (Singleton) Singleton->getExplosionSchema(schema);
@@ -151,17 +135,6 @@ namespace {
       return Singleton->getExplosionSize(kind);
     }
 
-    RValue load(IRGenFunction &IGF, Address addr) const {
-      assert(isComplete());
-      if (!Singleton) return RValue::forScalars();
-      return Singleton->load(IGF, getSingletonAddress(IGF, addr));
-    }
-
-    void store(IRGenFunction &IGF, const RValue &RV, Address addr) const {
-      if (!Singleton) return;
-      Singleton->store(IGF, RV, getSingletonAddress(IGF, addr));
-    }
-
     void loadExplosion(IRGenFunction &IGF, Address addr, Explosion &e) const {
       if (!Singleton) return;
       Singleton->loadExplosion(IGF, getSingletonAddress(IGF, addr), e);
@@ -170,6 +143,10 @@ namespace {
     void storeExplosion(IRGenFunction &IGF, Explosion &e, Address addr) const {
       if (!Singleton) return;
       Singleton->storeExplosion(IGF, e, getSingletonAddress(IGF, addr));
+    }
+
+    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      if (Singleton) Singleton->reexplode(IGF, src, dest);
     }
 
     void emitInjectionFunctionBody(IRGenFunction &IGF,
@@ -183,7 +160,9 @@ namespace {
       }
 
       // Otherwise, package up the result.
-      if (Singleton->getSchema().isAggregate()) {
+      ExplosionSchema schema(params.getKind());
+      Singleton->getExplosionSchema(schema);
+      if (schema.requiresIndirectResult()) {
         Address returnSlot(params.claimNext(), Singleton->StorageAlignment);
         storeExplosion(IGF, params, returnSlot);
         IGF.Builder.CreateRetVoid();
@@ -199,11 +178,6 @@ namespace {
     EnumTypeInfo(llvm::StructType *T, Size S, Alignment A)
       : OneofTypeInfo(T, S, A) {}
 
-    RValueSchema getSchema() const {
-      assert(isComplete());
-      return RValueSchema::forScalars(getDiscriminatorType());
-    }
-
     unsigned getExplosionSize(ExplosionKind kind) const {
       assert(isComplete());
       return 1;
@@ -212,22 +186,6 @@ namespace {
     void getExplosionSchema(ExplosionSchema &schema) const {
       assert(isComplete());
       schema.add(ExplosionSchema::Element::forScalar(getDiscriminatorType()));
-    }
-
-    RValue load(IRGenFunction &IGF, Address addr) const {
-      llvm::Value *oneofAddr = addr.getAddress();
-      llvm::Value *enumAddr = IGF.Builder.CreateStructGEP(oneofAddr, 0);
-      llvm::Value *v = IGF.Builder.CreateLoad(enumAddr,
-                                              addr.getAlignment(),
-                                              oneofAddr->getName() + ".load");
-      return RValue::forScalars(v);
-    }
-
-    void store(IRGenFunction &IGF, const RValue &RV, Address addr) const {
-      assert(RV.isScalar(1));
-      llvm::Value *oneofAddr = addr.getAddress();
-      llvm::Value *enumAddr = IGF.Builder.CreateStructGEP(oneofAddr, 0);
-      IGF.Builder.CreateStore(RV.getScalars()[0], enumAddr, addr.getAlignment());
     }
 
     void loadExplosion(IRGenFunction &IGF, Address addr, Explosion &e) const {
@@ -242,6 +200,10 @@ namespace {
       IGF.Builder.CreateStore(e.claimNext(),
                               IGF.Builder.CreateStructGEP(addr.getAddress(), 0),
                               addr.getAlignment());
+    }
+
+    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      dest.add(src.claimNext());
     }
 
     void emitInjectionFunctionBody(IRGenFunction &IGF,
@@ -318,7 +280,7 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
     // zero-size data.
     const TypeInfo &eltTInfo = getFragileTypeInfo(IGM, eltType);
     assert(eltTInfo.isComplete());
-    if (eltTInfo.isEmpty()) continue;
+    if (eltTInfo.isEmpty(ResilienceScope::Local)) continue;
 
     // The required payload size is the amount of padding needed to
     // get up to the element's alignment, plus the actual size.

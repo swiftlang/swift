@@ -26,7 +26,6 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Address.h"
-#include "RValue.h"
 #include "Explosion.h"
 #include "Linking.h"
 
@@ -41,10 +40,6 @@ namespace {
     PrimitiveTypeInfo(llvm::Type *Type, Size S, Alignment A)
       : TypeInfo(Type, S, A) {}
 
-    RValueSchema getSchema() const {
-      return RValueSchema::forScalars(getStorageType());
-    }
-
     unsigned getExplosionSize(ExplosionKind kind) const {
       return 1;
     }
@@ -53,21 +48,16 @@ namespace {
       schema.add(ExplosionSchema::Element::forScalar(getStorageType()));
     }
 
-    RValue load(IRGenFunction &IGF, Address addr) const {
-      return RValue::forScalars(IGF.Builder.CreateLoad(addr));
-    }
-
     void loadExplosion(IRGenFunction &IGF, Address addr, Explosion &e) const {
       e.add(IGF.Builder.CreateLoad(addr));
     }
 
-    void store(IRGenFunction &IGF, const RValue &RV, Address addr) const {
-      assert(RV.isScalar() && RV.getScalars().size() == 1);
-      IGF.Builder.CreateStore(RV.getScalars()[0], addr);
-    }
-
     void storeExplosion(IRGenFunction &IGF, Explosion &e, Address addr) const {
       IGF.Builder.CreateStore(e.claimNext(), addr);
+    }
+
+    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      dest.add(src.claimNext());
     }
   };
 }
@@ -76,13 +66,11 @@ bool TypeInfo::isSingleRetainablePointer(ResilienceScope scope) const {
   return false;
 }
 
-void TypeInfo::explode(IRGenFunction &IGF, const RValue &rvalue,
-                       Explosion &explosion) const {
-  if (rvalue.isScalar())
-    return explosion.add(rvalue.getScalars());
-
-  Address addr(rvalue.getAggregateAddress(), StorageAlignment);
-  loadExplosion(IGF, addr, explosion);
+void TypeInfo::initWithExplosion(IRGenFunction &IGF, Explosion &explosion,
+                                 Address addr) const {
+  // FIXME: this should probably require opting-in or should assert
+  // that the type is POD or something.
+  storeExplosion(IGF, explosion, addr);
 }
 
 static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }

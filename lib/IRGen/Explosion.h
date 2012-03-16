@@ -133,6 +133,11 @@ public:
 /// An explosion schema is essentially the type of an Explosion.
 class ExplosionSchema {
 public:
+  /// The maximum number of scalars that we allow to be returned
+  /// directly.
+  enum { MaxScalarsForDirectResult = 3 };
+
+  /// The schema for one atom of the explosion.
   class Element {
     llvm::Type *Type;
     Alignment::int_type Align;
@@ -170,15 +175,24 @@ public:
 private:
   llvm::SmallVector<Element, 8> Elements;
   ExplosionKind Kind;
+  bool ContainsAggregate;
 
 public:
-  ExplosionSchema(ExplosionKind kind) : Kind(kind) {}
+  ExplosionSchema(ExplosionKind kind)
+    : Kind(kind), ContainsAggregate(false) {}
 
   ExplosionKind getKind() const { return Kind; }
 
   /// Return the number of elements in this schema.
   unsigned size() const { return Elements.size(); }
   bool empty() const { return Elements.empty(); }
+
+  /// Does this explosion contain an aggregate?
+  bool containsAggregate() const { return ContainsAggregate; }
+
+  bool requiresIndirectResult() const {
+    return containsAggregate() || size() > MaxScalarsForDirectResult;
+  }
 
   typedef llvm::SmallVectorImpl<Element>::iterator iterator;
   typedef llvm::SmallVectorImpl<Element>::const_iterator const_iterator;
@@ -188,7 +202,10 @@ public:
   const_iterator begin() const { return Elements.begin(); }
   const_iterator end() const { return Elements.end(); }
 
-  void add(Element e) { Elements.push_back(e); }
+  void add(Element e) {
+    Elements.push_back(e);
+    ContainsAggregate |= e.isAggregate();
+  }
 };
 
 } // end namespace irgen

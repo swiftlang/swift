@@ -19,7 +19,6 @@
 #include "IRGenFunction.h"
 #include "Explosion.h"
 #include "LValue.h"
-#include "RValue.h"
 
 using namespace swift;
 using namespace irgen;

@@ -155,7 +155,6 @@ private:
 //--- Expression emission ------------------------------------------------------
 public:
   void emitFakeExplosion(const TypeInfo &type, Explosion &explosion);
-  RValue emitFakeRValue(const TypeInfo &type);
   LValue emitFakeLValue(const TypeInfo &type);
 
   void emitIgnored(Expr *E);
@@ -190,7 +189,8 @@ private:
   void emitExplodedNullaryCall(llvm::Value *fn, Type resultType,
                                Explosion &result);
   Optional<Address> tryEmitApplyAsAddress(ApplyExpr *apply, const TypeInfo &);
-  RValue emitApplyExpr(ApplyExpr *apply, const TypeInfo &type);
+  void emitApplyExprToMemory(ApplyExpr *apply, Address addr,
+                             const TypeInfo &type);
 
   void emitExplodedDeclRef(DeclRefExpr *DeclRef, Explosion &explosion);
   void emitOneOfElementRef(OneOfElementDecl *elt, Explosion &explosion);
