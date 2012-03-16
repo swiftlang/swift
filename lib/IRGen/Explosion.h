@@ -21,7 +21,9 @@
 #ifndef SWIFT_IRGEN_EXPLOSION_H
 #define SWIFT_IRGEN_EXPLOSION_H
 
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
+#include "IRGen.h"
 
 namespace llvm {
   class Value;

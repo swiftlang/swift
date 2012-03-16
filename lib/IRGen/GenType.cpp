@@ -146,6 +146,8 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
   case TypeKind::MetaType:
   case TypeKind::Module:
     llvm_unreachable("cannot codegen this type - no runtime representation");
+  case TypeKind::BuiltinObjectPointer:
+    return convertBuiltinObjectPointer(IGM);
   case TypeKind::BuiltinFloat:
     switch (cast<BuiltinFloatType>(T)->getFPKind()) {
     case BuiltinFloatType::IEEE16:

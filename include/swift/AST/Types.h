@@ -124,10 +124,7 @@ public:
 
   /// hasReferenceSemantics() - Do objects of this type have reference
   /// semantics?
-  bool hasReferenceSemantics() {
-    // For now, the answer is always 'no'.
-    return false;
-  }
+  bool hasReferenceSemantics();
     
   void dump() const;
   void print(raw_ostream &OS) const;
@@ -164,6 +161,22 @@ public:
   static bool classof(const ErrorType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Error;
+  }
+};
+
+/// BuiltinObjectPointerType - The builtin opaque object-pointer type.
+/// Useful for keeping an object alive when it is otherwise being
+/// manipulated via an unsafe pointer type.
+class BuiltinObjectPointerType : public TypeBase {
+  friend class ASTContext;
+  BuiltinObjectPointerType(ASTContext &C)
+    : TypeBase(TypeKind::BuiltinObjectPointer, &C) {}
+public:
+  void print(raw_ostream &OS) const;
+
+  static bool classof(const BuiltinObjectPointerType *) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinObjectPointer;
   }
 };
 

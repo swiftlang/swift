@@ -50,6 +50,7 @@ bool TypeChecker::validateType(Type InTy) {
     return true;
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinInteger:
+  case TypeKind::BuiltinObjectPointer:
   case TypeKind::Dependent:
     // These types are already canonical anyway.
     return false;

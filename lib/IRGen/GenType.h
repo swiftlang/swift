@@ -124,7 +124,7 @@ public:
   virtual bool isSingleRetainablePointer(ResilienceScope scope) const;
 };
 
-/// The hepler class for generating types.
+/// The helper class for generating types.
 class TypeConverter {
   llvm::DenseMap<TypeBase*, const TypeInfo*> Converted;
   const TypeInfo *FirstConverted;
@@ -135,6 +135,7 @@ class TypeConverter {
   static const TypeInfo *convertFunctionType(IRGenModule &IGM, FunctionType *T);
   static const TypeInfo *convertArrayType(IRGenModule &IGM, ArrayType *T);
   static const TypeInfo *convertLValueType(IRGenModule &IGM, LValueType *T);
+  static const TypeInfo *convertBuiltinObjectPointer(IRGenModule &IGM);
 
  public:
   TypeConverter();

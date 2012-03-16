@@ -41,7 +41,7 @@ static llvm::Function *createGlobalInitFunction(IRGenModule &IGM,
   nameStream << tunit->Name.str() << '.' << "init";
 
   llvm::FunctionType *fnType =
-    llvm::FunctionType::get(llvm::Type::getVoidTy(IGM.LLVMContext), false);
+    llvm::FunctionType::get(IGM.VoidTy, false);
   return llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
                                 nameStream.str(), &IGM.Module);
 }

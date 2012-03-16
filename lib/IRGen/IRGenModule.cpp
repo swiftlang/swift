@@ -40,6 +40,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
   : Context(Context), Opts(Opts),
     Module(Module), LLVMContext(Module.getContext()),
     TargetData(TargetData), Types(*new TypeConverter()) {
+  VoidTy = llvm::Type::getVoidTy(getLLVMContext());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
   Int8Ty = llvm::Type::getInt8Ty(getLLVMContext());
   Int16Ty = llvm::Type::getInt16Ty(getLLVMContext());
@@ -50,8 +51,14 @@ IRGenModule::IRGenModule(ASTContext &Context,
   MemCpyFn = nullptr;
   AllocFn = nullptr;
 
+  RefCountedTy = llvm::StructType::create(getLLVMContext(), Int8PtrTy,
+                                          "swift.refcounted");
+  RefCountedPtrTy = RefCountedTy->getPointerTo(/*addrspace*/ 0);
+
+  PtrSize = Size(TargetData.getPointerSize());
+
   llvm::Type *elts[] = { Int8PtrTy, Int8PtrTy };
-  Int8PtrPairTy = llvm::StructType::get(LLVMContext, elts, /*packed*/ false);
+  FunctionPairTy = llvm::StructType::get(LLVMContext, elts, /*packed*/ false);
 }
 
 IRGenModule::~IRGenModule() {
@@ -74,6 +81,24 @@ llvm::Constant *IRGenModule::getAllocationFunction() {
   llvm::FunctionType *fnType = llvm::FunctionType::get(Int8PtrTy, types, false);
   AllocFn = Module.getOrInsertFunction("malloc", fnType);
   return AllocFn;
+}
+
+llvm::Constant *IRGenModule::getRetainFn() {
+  if (RetainFn) return RetainFn;
+
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(RefCountedPtrTy, RefCountedPtrTy, false);
+  RetainFn = Module.getOrInsertFunction("swift_retain", fnType);
+  return RetainFn;
+}
+
+llvm::Constant *IRGenModule::getReleaseFn() {
+  if (ReleaseFn) return ReleaseFn;
+
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(VoidTy, RefCountedPtrTy, false);
+  ReleaseFn = Module.getOrInsertFunction("swift_release", fnType);
+  return ReleaseFn;
 }
 
 void IRGenModule::unimplemented(SourceLoc Loc, StringRef Message) {

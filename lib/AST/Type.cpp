@@ -49,6 +49,12 @@ bool TypeBase::isMaterializable() {
   return !is<LValueType>();
 }
 
+/// hasReferenceSemantics - Does this type have reference semantics?
+bool TypeBase::hasReferenceSemantics() {
+  // For now, only Builtin.ObjectPointer.
+  return is<BuiltinObjectPointerType>();
+}
+
 /// getCanonicalType - Return the canonical version of this type, which has
 /// sugar from all levels stripped off.
 TypeBase *TypeBase::getCanonicalType() {
@@ -305,6 +311,10 @@ void TypeBase::print(raw_ostream &OS) const {
 #include "swift/AST/TypeNodes.def"
   }
   llvm_unreachable("bad type kind!");
+}
+
+void BuiltinObjectPointerType::print(raw_ostream &OS) const {
+  OS << "Builtin.ObjectPointer"; return;
 }
 
 void BuiltinIntegerType::print(raw_ostream &OS) const {

@@ -277,9 +277,9 @@ namespace {
 
 const TypeInfo *
 TypeConverter::convertFunctionType(IRGenModule &IGM, FunctionType *T) {
-  Size StructSize = Size(IGM.TargetData.getPointerSize()) * 2;
-  Alignment StructAlign = Alignment(IGM.TargetData.getPointerABIAlignment());
-  return FuncTypeInfo::create(T, IGM.Int8PtrPairTy, StructSize, StructAlign);
+  return FuncTypeInfo::create(T, IGM.FunctionPairTy,
+                              IGM.getPointerSize() * 2,
+                              IGM.getPointerAlignment());
 }
 
 /// Given the explosion schema for the result type of a function, does
@@ -369,9 +369,9 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
     if (hasAggregateResult) {
       const TypeInfo &info = IGM.getFragileTypeInfo(formalResultType);
       argTypes[0] = info.StorageType->getPointerTo();
-      resultType = llvm::Type::getVoidTy(IGM.getLLVMContext());
+      resultType = IGM.VoidTy;
     } else if (schema.size() == 0) {
-      resultType = llvm::Type::getVoidTy(IGM.getLLVMContext());
+      resultType = IGM.VoidTy;
     } else if (schema.size() == 1) {
       resultType = schema.begin()->getScalarType();
     } else {
@@ -1227,7 +1227,7 @@ namespace {
       }
 
       // Build the function result.
-      llvm::Value *result = llvm::UndefValue::get(IGM.Int8PtrPairTy);
+      llvm::Value *result = llvm::UndefValue::get(IGM.FunctionPairTy);
       result = IGF.Builder.CreateInsertValue(result,
                       llvm::ConstantExpr::getBitCast(forwarder, IGM.Int8PtrTy),
                                              0);

@@ -10,6 +10,7 @@ add_swift_library(swiftIRGen
   GenLocal.cpp
   GenLValue.cpp
   GenOneOf.cpp
+  GenRefCount.cpp
   GenStmt.cpp
   GenTuple.cpp
   GenType.cpp

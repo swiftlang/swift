@@ -20,6 +20,9 @@
 using namespace swift;
 
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
+  if (Name == "ObjectPointer")
+    return Context.TheObjectPointerType;
+  
   if (Name == "FPIEEE32")
     return Context.TheIEEE32Type;
   if (Name == "FPIEEE64")
@@ -42,7 +45,7 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
     return Context.TheIEEE128Type;
   if (Name == "FPPPC128")
     return Context.ThePPC128Type;
-  
+
   return Type();
 }
 

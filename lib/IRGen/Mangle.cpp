@@ -192,7 +192,7 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     llvm_unreachable("Cannot mangle metatype yet");
   case TypeKind::Module:
     llvm_unreachable("Cannot mangle module type yet");
-      
+
   // We don't care about these types being a bit verbose because we
   // don't expect them to come up that often in API names.
   case TypeKind::BuiltinFloat:
@@ -207,6 +207,9 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     llvm_unreachable("bad floating-point kind");
   case TypeKind::BuiltinInteger:
     Buffer << "i" << cast<BuiltinIntegerType>(type)->getBitWidth();
+    return;
+  case TypeKind::BuiltinObjectPointer:
+    Buffer << "o";
     return;
 
 #define SUGARED_TYPE(id, parent) \

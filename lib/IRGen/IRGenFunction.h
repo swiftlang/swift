@@ -133,6 +133,12 @@ public:
 private:
   llvm::Instruction *AllocaIP;
 
+//--- Reference-counting methods -----------------------------------------------
+public:
+  llvm::Value *emitLoadRetained(Address addr);
+  void emitStoreRetained(llvm::Value *value, Address addr);
+  void emitRelease(llvm::Value *value);
+
 //--- Statement emission -------------------------------------------------------
 public:
   void emitStmt(Stmt *S);

@@ -20,6 +20,7 @@
 
 #include "swift/AST/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
+#include "IRGen.h"
 
 namespace llvm {
   class Constant;
@@ -69,6 +70,7 @@ public:
   llvm::LLVMContext &LLVMContext;
   const llvm::TargetData &TargetData;
 
+  llvm::Type *VoidTy;
   llvm::IntegerType *Int1Ty;
   llvm::IntegerType *Int8Ty;
   llvm::IntegerType *Int16Ty;
@@ -76,9 +78,20 @@ public:
   llvm::IntegerType *Int64Ty;
   llvm::IntegerType *SizeTy;
   llvm::PointerType *Int8PtrTy;
-  llvm::StructType *Int8PtrPairTy;
+  llvm::StructType *RefCountedTy;
+  llvm::PointerType *RefCountedPtrTy;
+  llvm::StructType *FunctionPairTy;
+
+  Size getPointerSize() const { return PtrSize; }
+  Alignment getPointerAlignment() const {
+    // We always use the pointer's width as its swift ABI alignment.
+    return Alignment(PtrSize.getValue());
+  }
 
   void unimplemented(SourceLoc, StringRef Message);
+
+private:
+  Size PtrSize;
 
 //--- Types -----------------------------------------------------------------
 public:
@@ -103,10 +116,14 @@ private:
 public:
   llvm::Constant *getMemCpyFn();
   llvm::Constant *getAllocationFunction();
+  llvm::Constant *getRetainFn();
+  llvm::Constant *getReleaseFn();
 
 private:
   llvm::Function *MemCpyFn;
   llvm::Constant *AllocFn;
+  llvm::Constant *RetainFn;
+  llvm::Constant *ReleaseFn;
 
 //--- Generic ---------------------------------------------------------------
 public:
