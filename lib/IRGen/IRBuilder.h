@@ -78,8 +78,8 @@ public:
     load->setAlignment(align.getValue());
     return load;
   }
-  llvm::LoadInst *CreateLoad(Address addr) {
-    return CreateLoad(addr.getAddress(), addr.getAlignment());
+  llvm::LoadInst *CreateLoad(Address addr, const llvm::Twine &name = "") {
+    return CreateLoad(addr.getAddress(), addr.getAlignment(), name);
   }
 
   using IRBuilderBase::CreateStore;
@@ -91,6 +91,13 @@ public:
   }
   llvm::StoreInst *CreateStore(llvm::Value *value, Address addr) {
     return CreateStore(value, addr.getAddress(), addr.getAlignment());
+  }
+
+  using IRBuilderBase::CreateStructGEP;
+  Address CreateStructGEP(Address address, unsigned index, Size size,
+                          const llvm::Twine &name = "") {
+    llvm::Value *addr = CreateStructGEP(address.getAddress(), index, name);
+    return Address(addr, address.getAlignment().alignmentAtOffset(size));
   }
 
   /// Insert the given basic block after the IP block and move the
