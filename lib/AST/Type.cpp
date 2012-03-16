@@ -308,17 +308,17 @@ void TypeBase::print(raw_ostream &OS) const {
 }
 
 void BuiltinIntegerType::print(raw_ostream &OS) const {
-  OS << "Builtin::int" << cast<BuiltinIntegerType>(this)->getBitWidth();
+  OS << "Builtin.int" << cast<BuiltinIntegerType>(this)->getBitWidth();
 }
 
 void BuiltinFloatType::print(raw_ostream &OS) const {
   switch (getFPKind()) {
-  case IEEE16:  OS << "Builtin::FP_IEEE16"; return;
-  case IEEE32:  OS << "Builtin::FP_IEEE32"; return;
-  case IEEE64:  OS << "Builtin::FP_IEEE64"; return;
-  case IEEE80:  OS << "Builtin::FP_IEEE80"; return;
-  case IEEE128: OS << "Builtin::FP_IEEE128"; return;
-  case PPC128:  OS << "Builtin::FP_PPC128"; return;
+  case IEEE16:  OS << "Builtin.FP_IEEE16"; return;
+  case IEEE32:  OS << "Builtin.FP_IEEE32"; return;
+  case IEEE64:  OS << "Builtin.FP_IEEE64"; return;
+  case IEEE80:  OS << "Builtin.FP_IEEE80"; return;
+  case IEEE128: OS << "Builtin.FP_IEEE128"; return;
+  case PPC128:  OS << "Builtin.FP_PPC128"; return;
   }
 }
 
