@@ -130,6 +130,7 @@ public:
   const TypeInfo &getFragileTypeInfo(Type T);
   void emitMemCpy(llvm::Value *dest, llvm::Value *src,
                   Size size, Alignment align);
+  void popCleanup();
 private:
   llvm::Instruction *AllocaIP;
 
@@ -138,6 +139,7 @@ public:
   llvm::Value *emitLoadRetained(Address addr);
   void emitStoreRetained(llvm::Value *value, Address addr);
   void emitRelease(llvm::Value *value);
+  void enterReleaseCleanup(llvm::Value *value);
 
 //--- Statement emission -------------------------------------------------------
 public:

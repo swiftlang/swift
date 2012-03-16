@@ -391,7 +391,7 @@ void IRGenFunction::emitOneOfElementRef(OneOfElementDecl *elt,
   // written this way.
   if (isa<FunctionType>(elt->getType())) {
     result.add(llvm::ConstantExpr::getBitCast(injection, IGM.Int8PtrTy));
-    result.add(llvm::UndefValue::get(IGM.Int8PtrTy));
+    result.add(llvm::ConstantPointerNull::get(IGM.RefCountedPtrTy));
     return;
   }
 

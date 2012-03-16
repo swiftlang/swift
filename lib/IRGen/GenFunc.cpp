@@ -384,7 +384,7 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
   // Data arguments are last.
   // See the comment in this file's header comment.
   if (needsData)
-    argTypes.push_back(IGM.Int8PtrTy);
+    argTypes.push_back(IGM.RefCountedPtrTy);
 
   // Ignore the first element of the array unless we have an aggregate result.
   llvm::ArrayRef<llvm::Type*> realArgTypes = argTypes;
@@ -430,8 +430,10 @@ namespace {
       assert(fnPtr->getType()->getContainedType(0)->isFunctionTy() ||
              fnPtr->getType()->getContainedType(0)->isIntegerTy(8));
       assert(dataPtr == nullptr ||
-             dataPtr->getType()->getContainedType(0)->isIntegerTy(8));
-      assert(dataPtr == nullptr || !isa<llvm::UndefValue>(dataPtr));
+             (dataPtr->getType()->getContainedType(0)->isStructTy() &&
+              cast<llvm::StructType>(dataPtr->getType()->getContainedType(0))
+                ->getName() == "swift.refcounted"));
+      assert(dataPtr == nullptr || !isa<llvm::ConstantPointerNull>(dataPtr));
 
       FnPtr = fnPtr;
       DataPtr = dataPtr;
@@ -459,7 +461,7 @@ namespace {
 
     llvm::Value *getDataPointer(IRGenModule &IGM) const {
       if (DataPtr) return DataPtr;
-      return llvm::UndefValue::get(IGM.Int8PtrTy);
+      return llvm::ConstantPointerNull::get(IGM.RefCountedPtrTy);
     }
   };
 }
@@ -686,7 +688,8 @@ RValue IRGenFunction::emitApplyExpr(ApplyExpr *E, const TypeInfo &resultType) {
     callee.UncurryLevel = 0;
     llvm::Value *fnPtr = fnValues.claimNext();
     llvm::Value *dataPtr = fnValues.claimNext();
-    callee.set(fnPtr, isa<llvm::UndefValue>(dataPtr) ? nullptr : dataPtr);
+    callee.set(fnPtr, isa<llvm::ConstantPointerNull>(dataPtr)
+                        ? nullptr : dataPtr);
   }
 
   // 3. Emit arguments and call.
@@ -1197,13 +1200,15 @@ namespace {
       // aggregate return slot.
 
       // Compute a data object.
-      llvm::Value *data = nullptr;
-      if (!layout.empty()) {
+      llvm::Value *data;
+      if (layout.empty()) {
+        data = llvm::ConstantPointerNull::get(IGM.RefCountedPtrTy);
+      } else {
         // Allocate a new object.  FIXME: refcounting, exceptions.
         llvm::Value *size = llvm::ConstantInt::get(IGM.SizeTy,
                                                    layout.getSize().getValue());
         llvm::CallInst *call =
-          IGF.Builder.CreateCall(IGM.getAllocationFunction(), size);
+          IGF.Builder.CreateCall(IGM.getAllocFn(), size);
         call->setDoesNotThrow();
         data = call;
 
@@ -1231,8 +1236,7 @@ namespace {
       result = IGF.Builder.CreateInsertValue(result,
                       llvm::ConstantExpr::getBitCast(forwarder, IGM.Int8PtrTy),
                                              0);
-      if (!layout.empty())
-        result = IGF.Builder.CreateInsertValue(result, data, 1);
+      result = IGF.Builder.CreateInsertValue(result, data, 1);
 
       // Return that.
       IGF.Builder.CreateRet(result);
@@ -1264,6 +1268,7 @@ namespace {
       // parameters.
       if (!layout.empty()) {
         llvm::Value *data = params.takeLast();
+        IGF.enterReleaseCleanup(data);
         data = IGF.Builder.CreateBitCast(data, layout.getType()->getPointerTo());
 
         // Perform the loads.
@@ -1281,6 +1286,9 @@ namespace {
       llvm::CallInst *call =
         IGF.Builder.CreateCall(nextEntrypoint, params.claimAll());
       call->setTailCall();
+
+      if (!layout.empty())
+        IGF.popCleanup();
 
       if (call->getType()->isVoidTy()) {
         IGF.Builder.CreateRetVoid();

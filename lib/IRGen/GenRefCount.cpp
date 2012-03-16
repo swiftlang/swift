@@ -111,3 +111,12 @@ void IRGenFunction::emitRelease(llvm::Value *value) {
   llvm::CallInst *call = Builder.CreateCall(fn, value);
   call->setDoesNotThrow();
 }
+
+/// Enter a cleanup to release an object.
+void IRGenFunction::enterReleaseCleanup(llvm::Value *value) {
+  // FIXME: implement
+}
+
+void IRGenFunction::popCleanup() {
+  // FIXME: implement
+}

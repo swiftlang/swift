@@ -57,7 +57,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
 
   PtrSize = Size(TargetData.getPointerSize());
 
-  llvm::Type *elts[] = { Int8PtrTy, Int8PtrTy };
+  llvm::Type *elts[] = { Int8PtrTy, RefCountedPtrTy };
   FunctionPairTy = llvm::StructType::get(LLVMContext, elts, /*packed*/ false);
 }
 
@@ -74,12 +74,14 @@ llvm::Constant *IRGenModule::getMemCpyFn() {
   return MemCpyFn;
 }
 
-llvm::Constant *IRGenModule::getAllocationFunction() {
+llvm::Constant *IRGenModule::getAllocFn() {
   if (AllocFn) return AllocFn;
 
+  // FIXME: maybe this should also take a class pointer?
   llvm::Type *types[] = { SizeTy };
-  llvm::FunctionType *fnType = llvm::FunctionType::get(Int8PtrTy, types, false);
-  AllocFn = Module.getOrInsertFunction("malloc", fnType);
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(RefCountedPtrTy, types, false);
+  AllocFn = Module.getOrInsertFunction("swift_alloc", fnType);
   return AllocFn;
 }
 
