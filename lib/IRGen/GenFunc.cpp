@@ -238,14 +238,14 @@ namespace {
       return 2;
     }
 
-    void getExplosionSchema(ExplosionSchema &schema) const {
+    void getSchema(ExplosionSchema &schema) const {
       llvm::StructType *Ty = getStorageType();
       assert(Ty->getNumElements() == 2);
       schema.add(ExplosionSchema::Element::forScalar(Ty->getElementType(0)));
       schema.add(ExplosionSchema::Element::forScalar(Ty->getElementType(1)));
     }
 
-    void loadExplosion(IRGenFunction &IGF, Address address, Explosion &e) const {
+    void load(IRGenFunction &IGF, Address address, Explosion &e) const {
       llvm::Value *addr = address.getAddress();
 
       // Load the function.
@@ -269,7 +269,7 @@ namespace {
       e.add(data);
     }
 
-    void storeExplosion(IRGenFunction &IGF, Explosion &e, Address address) const {
+    void store(IRGenFunction &IGF, Explosion &e, Address address) const {
       llvm::Value *addr = address.getAddress();
 
       // Store the function pointer.
@@ -333,7 +333,7 @@ static Type decomposeFunctionType(IRGenModule &IGM, FunctionType *fn,
   // Explode the argument clusters in that reversed order.
   for (Type type : formalArgTypes) {
     ExplosionSchema schema(explosionKind);
-    IGM.getExplosionSchema(type, schema);
+    IGM.getSchema(type, schema);
 
     for (ExplosionSchema::Element &elt : schema) {
       if (elt.isAggregate())
@@ -372,7 +372,7 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
   bool hasAggregateResult;
   {
     ExplosionSchema schema(explosionKind);
-    IGM.getExplosionSchema(formalResultType, schema);
+    IGM.getSchema(formalResultType, schema);
 
     hasAggregateResult = schema.requiresIndirectResult();
     if (hasAggregateResult) {
@@ -831,7 +831,7 @@ void IRGenFunction::emitExplodedApplyExpr(ApplyExpr *E, Explosion &explosion) {
 
   // If this was an indirect return, explode it.
   if (result.IndirectAddress.isValid()) {
-    return resultTI.loadExplosion(*this, result.IndirectAddress, explosion);
+    return resultTI.load(*this, result.IndirectAddress, explosion);
   }
 
   if (result.DirectExplosionLevel == explosion.getKind())
@@ -850,7 +850,7 @@ IRGenFunction::tryEmitApplyAsAddress(ApplyExpr *E, const TypeInfo &resultTI) {
 
   // Give up if the call won't be returned indirectly.
   ExplosionSchema schema(plan.getFinalResultExplosionLevel(IGM));
-  resultTI.getExplosionSchema(schema);
+  resultTI.getSchema(schema);
   if (!schema.requiresIndirectResult())
     return Nothing;
 
@@ -867,7 +867,7 @@ void IRGenFunction::emitExplodedNullaryCall(llvm::Value *fnPtr,
                                             Explosion &resultExplosion) {
   ExplosionSchema resultSchema(resultExplosion.getKind());
   const TypeInfo &resultTI = getFragileTypeInfo(resultType);
-  resultTI.getExplosionSchema(resultSchema);
+  resultTI.getSchema(resultSchema);
 
   llvm::SmallVector<llvm::Value*, 1> args;
   Address resultAddress;
@@ -883,7 +883,7 @@ void IRGenFunction::emitExplodedNullaryCall(llvm::Value *fnPtr,
 
   if (resultSchema.requiresIndirectResult()) {
     setAggResultAttributes(call);
-    resultTI.loadExplosion(*this, resultAddress, resultExplosion);
+    resultTI.load(*this, resultAddress, resultExplosion);
     return;
   }
 
@@ -912,7 +912,7 @@ Address IRGenFunction::getAddrForParameter(Type ty, const Twine& Name,
   const TypeInfo &paramType = IGM.getFragileTypeInfo(ty);
 
   ExplosionSchema paramSchema(paramValues.getKind());
-  paramType.getExplosionSchema(paramSchema);
+  paramType.getSchema(paramSchema);
 
   Address paramAddr;
 
@@ -942,7 +942,7 @@ Address IRGenFunction::getAddrForParameter(Type ty, const Twine& Name,
     // is really ugly.
     auto storedStart = paramValues.begin();
 
-    paramType.storeExplosion(*this, paramValues, paramAddr);
+    paramType.initialize(*this, paramValues, paramAddr);
 
     // Set names for argument(s)
     for (auto i = storedStart, e = paramValues.begin(); i != e; ++i)
@@ -988,7 +988,7 @@ static void emitParameterClause(IRGenFunction &IGF, Pattern *param,
   // Ignore ignored parameters by consuming the right number of values.
   case PatternKind::Any: {
     ExplosionSchema paramSchema(paramValues.getKind());
-    IGF.IGM.getExplosionSchema(param->getType(), paramSchema);
+    IGF.IGM.getSchema(param->getType(), paramSchema);
     paramValues.claim(paramSchema.size());
     return;
   }
@@ -1042,7 +1042,7 @@ void IRGenFunction::emitPrologue() {
     const TypeInfo &resultType = getResultTypeInfo();
 
     ExplosionSchema resultSchema(CurExplosionLevel);
-    resultType.getExplosionSchema(resultSchema);
+    resultType.getSchema(resultSchema);
 
     if (resultSchema.requiresIndirectResult()) {
       ReturnSlot = Address(values.claimNext(), resultType.StorageAlignment);
@@ -1104,7 +1104,7 @@ void IRGenFunction::emitEpilogue() {
 
   const TypeInfo &resultType = getResultTypeInfo();
   ExplosionSchema resultSchema(CurExplosionLevel);
-  resultType.getExplosionSchema(resultSchema);
+  resultType.getSchema(resultSchema);
 
   if (resultSchema.requiresIndirectResult()) {
     assert(isa<llvm::Argument>(ReturnSlot.getAddress()));
@@ -1114,7 +1114,7 @@ void IRGenFunction::emitEpilogue() {
     Builder.CreateRetVoid();
   } else {
     Explosion result(CurExplosionLevel);
-    resultType.loadExplosion(*this, ReturnSlot, result);
+    resultType.load(*this, ReturnSlot, result);
     emitScalarReturn(result);
   }
 }
@@ -1307,8 +1307,7 @@ namespace {
             IGF.Builder.CreateStructGEP(addr, fieldLayout.StructIndex);
           Alignment fieldAlign =
             layout.getAlignment().alignmentAtOffset(fieldLayout.ByteOffset);
-          dataTypes[i]->storeExplosion(IGF, params,
-                                       Address(fieldAddr, fieldAlign));
+          dataTypes[i]->store(IGF, params, Address(fieldAddr, fieldAlign));
         }
 
         // Reset the cursor in the explosion.
@@ -1362,8 +1361,7 @@ namespace {
             IGF.Builder.CreateStructGEP(data, fieldLayout.StructIndex);
           Alignment fieldAlign =
             layout.getAlignment().alignmentAtOffset(fieldLayout.ByteOffset);
-          dataTypes[i]->loadExplosion(IGF, Address(fieldAddr, fieldAlign),
-                                      params);
+          dataTypes[i]->load(IGF, Address(fieldAddr, fieldAlign), params);
         }
       }
 

@@ -75,7 +75,7 @@ void IRGenFunction::emitExplodedLoad(const LValue &lvalue,
     address = component.asLogical().loadAndMaterialize(*this, address);
   }
 
-  return type.loadExplosion(*this, address, explosion);
+  return type.load(*this, address, explosion);
 }
 
 /// Perform a store into the given path, given the base of the first
@@ -95,7 +95,7 @@ static void emitStoreRecursive(IRGenFunction &IGF, Address base,
 
     // If we reach the end, do a simple store and we're done.
     if (++pathStart == pathEnd) {
-      return finalType.storeExplosion(IGF, finalValue, base);
+      return finalType.store(IGF, finalValue, base);
     }
   }
 

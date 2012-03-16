@@ -363,13 +363,13 @@ void IRGenFunction::emitRValueToMemory(Expr *E, Address addr,
                                        const TypeInfo &type) {
   Explosion explosion(ExplosionKind::Maximal);
   emitExplodedRValue(E, explosion);
-  type.storeExplosion(*this, explosion, addr);
+  type.initialize(*this, explosion, addr);
 }
 
-/// Zero-initializer the given l-value.
+/// Zero-initialize the given memory location.
 void IRGenFunction::emitZeroInit(Address addr, const TypeInfo &type) {
   ExplosionSchema schema(ExplosionKind::Maximal);
-  type.getExplosionSchema(schema);
+  type.getSchema(schema);
 
   // Try to fill the value in with stores if that doesn't make for a
   // ridiculous amount of IR.  This is impossible if the schema
@@ -379,7 +379,7 @@ void IRGenFunction::emitZeroInit(Address addr, const TypeInfo &type) {
     for (auto elt : schema) {
       explosion.add(llvm::Constant::getNullValue(elt.getScalarType()));
     }
-    type.initWithExplosion(*this, explosion, addr);
+    type.initialize(*this, explosion, addr);
     return;
   }
 
@@ -408,7 +408,7 @@ LValue IRGenFunction::emitFakeLValue(const TypeInfo &type) {
 
 void IRGenFunction::emitFakeExplosion(const TypeInfo &type, Explosion &explosion) {
   ExplosionSchema schema(explosion.getKind());
-  type.getExplosionSchema(schema);
+  type.getSchema(schema);
   for (auto &element : schema) {
     llvm::Type *elementType;
     if (element.isAggregate()) {

@@ -44,15 +44,15 @@ namespace {
       return 1;
     }
 
-    void getExplosionSchema(ExplosionSchema &schema) const {
+    void getSchema(ExplosionSchema &schema) const {
       schema.add(ExplosionSchema::Element::forScalar(getStorageType()));
     }
 
-    void loadExplosion(IRGenFunction &IGF, Address addr, Explosion &e) const {
+    void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
       e.add(IGF.Builder.CreateLoad(addr));
     }
 
-    void storeExplosion(IRGenFunction &IGF, Explosion &e, Address addr) const {
+    void store(IRGenFunction &IGF, Explosion &e, Address addr) const {
       IGF.Builder.CreateStore(e.claimNext(), addr);
     }
 
@@ -66,11 +66,11 @@ bool TypeInfo::isSingleRetainablePointer(ResilienceScope scope) const {
   return false;
 }
 
-void TypeInfo::initWithExplosion(IRGenFunction &IGF, Explosion &explosion,
-                                 Address addr) const {
+void TypeInfo::initialize(IRGenFunction &IGF, Explosion &explosion,
+                          Address addr) const {
   // FIXME: this should probably require opting-in or should assert
   // that the type is POD or something.
-  storeExplosion(IGF, explosion, addr);
+  store(IGF, explosion, addr);
 }
 
 static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
@@ -210,16 +210,16 @@ llvm::StructType *IRGenModule::createNominalType(TypeAliasDecl *alias) {
 }
 
 /// Compute the explosion schema for the given type.
-void IRGenModule::getExplosionSchema(Type type, ExplosionSchema &schema) {
+void IRGenModule::getSchema(Type type, ExplosionSchema &schema) {
   // As an optimization, avoid actually building a TypeInfo for any
   // obvious TupleTypes.  This assumes that a TupleType's explosion
   // schema is always the concatenation of its components schemata.
   if (TupleType *tuple = dyn_cast<TupleType>(type)) {
     for (const TupleTypeElt &field : tuple->getFields())
-      getExplosionSchema(field.getType(), schema);
+      getSchema(field.getType(), schema);
     return;
   }
 
   // Okay, that didn't work;  just do the general thing.
-  getFragileTypeInfo(type).getExplosionSchema(schema);
+  getFragileTypeInfo(type).getSchema(schema);
 }

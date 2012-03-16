@@ -91,23 +91,23 @@ public:
 
   /// Add the information for exploding values of this type to the
   /// given schema.
-  virtual void getExplosionSchema(ExplosionSchema &schema) const = 0;
+  virtual void getSchema(ExplosionSchema &schema) const = 0;
 
   /// Return the number of elements in an explosion of this type.
   virtual unsigned getExplosionSize(ExplosionKind kind) const = 0;
 
   /// Load a list of exploded values from an address.
-  virtual void loadExplosion(IRGenFunction &IGF, Address addr,
-                             Explosion &explosion) const = 0;
+  virtual void load(IRGenFunction &IGF, Address addr,
+                    Explosion &explosion) const = 0;
 
   /// Store a set of exploded values to an address.  The values are
   /// consumed out of the explosion.
-  virtual void storeExplosion(IRGenFunction &IGF, Explosion &explosion,
-                              Address addr) const = 0;
+  virtual void store(IRGenFunction &IGF, Explosion &explosion,
+                     Address addr) const = 0;
 
   /// Initialize a memory object by consuming values out of an explosion.
-  virtual void initWithExplosion(IRGenFunction &IGF, Explosion &explosion,
-                                 Address addr) const;
+  virtual void initialize(IRGenFunction &IGF, Explosion &explosion,
+                          Address addr) const;
 
   /// Consume a bunch of values which have exploded at one explosion
   /// level and produce them at another.

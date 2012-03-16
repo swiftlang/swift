@@ -156,29 +156,29 @@ namespace {
       llvm_unreachable("bad explosion level");
     }
 
-    void getExplosionSchema(ExplosionSchema &schema) const {
+    void getSchema(ExplosionSchema &schema) const {
       for (auto &fieldInfo : getFieldInfos()) {
-        fieldInfo.Type.getExplosionSchema(schema);
+        fieldInfo.Type.getSchema(schema);
       }
     }
 
-    void loadExplosion(IRGenFunction &IGF, Address addr, Explosion &e) const {
+    void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
       for (auto &field : getFieldInfos()) {
         // Ignore fields that don't have storage.
         if (!field.hasStorage()) continue;
 
         Address fieldAddr = projectAddress(IGF, addr, field);
-        field.Type.loadExplosion(IGF, fieldAddr, e);
+        field.Type.load(IGF, fieldAddr, e);
       }
     }
 
-    void storeExplosion(IRGenFunction &IGF, Explosion &e, Address addr) const {
+    void store(IRGenFunction &IGF, Explosion &e, Address addr) const {
       for (auto &field : getFieldInfos()) {
         // Ignore fields that don't have storage.
         if (!field.hasStorage()) continue;
 
         Address fieldAddr = projectAddress(IGF, addr, field);
-        field.Type.storeExplosion(IGF, e, fieldAddr);
+        field.Type.store(IGF, e, fieldAddr);
       }
     }
 
@@ -325,7 +325,7 @@ void IRGenFunction::emitExplodedTupleElement(TupleElementExpr *E,
   // of unnecessary work.
   if (Optional<Address> tupleAddr = tryEmitAsAddress(tuple, tupleType)) {
     Address addr = tupleType.projectAddress(*this, tupleAddr.getValue(), field);
-    return field.Type.loadExplosion(*this, addr, explosion);
+    return field.Type.load(*this, addr, explosion);
   }
 
   // Otherwise, emit the base as an r-value and project.
@@ -418,7 +418,7 @@ void IRGenFunction::emitExplodedTupleShuffle(TupleShuffleExpr *E,
     if (innerTupleAddr.isValid()) {
       Address elementAddr = innerTupleType.projectAddress(*this, innerTupleAddr,
                                                           innerField);
-      innerField.Type.loadExplosion(*this, elementAddr, outerTupleExplosion);
+      innerField.Type.load(*this, elementAddr, outerTupleExplosion);
 
     // Otherwise, project the r-value down.
     } else {

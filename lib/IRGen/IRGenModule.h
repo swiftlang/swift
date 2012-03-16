@@ -99,7 +99,7 @@ public:
   llvm::Type *getFragileType(Type T);
   llvm::StructType *createNominalType(TypeAliasDecl *D);
   void emitTypeAlias(Type T);
-  void getExplosionSchema(Type T, ExplosionSchema &schema);
+  void getSchema(Type T, ExplosionSchema &schema);
 
 private:
   TypeConverter &Types;

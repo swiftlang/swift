@@ -80,7 +80,7 @@ namespace {
     AggregateOneofTypeInfo(llvm::StructType *T, Size S, Alignment A)
       : OneofTypeInfo(T, S, A) {}
 
-    void getExplosionSchema(ExplosionSchema &schema) const {
+    void getSchema(ExplosionSchema &schema) const {
       schema.add(ExplosionSchema::Element::forAggregate(getStorageType(),
                                                         StorageAlignment));
     }
@@ -89,11 +89,11 @@ namespace {
       return 1;
     }
 
-    void loadExplosion(IRGenFunction &IGF, Address addr, Explosion &e) const {
+    void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
       // FIXME
     }
 
-    void storeExplosion(IRGenFunction &IGF, Explosion &e, Address addr) const {
+    void store(IRGenFunction &IGF, Explosion &e, Address addr) const {
       // FIXME
     }
 
@@ -124,9 +124,9 @@ namespace {
     SingletonOneofTypeInfo(llvm::StructType *T, Size S, Alignment A)
       : OneofTypeInfo(T, S, A), Singleton(nullptr) {}
 
-    void getExplosionSchema(ExplosionSchema &schema) const {
+    void getSchema(ExplosionSchema &schema) const {
       assert(isComplete());
-      if (Singleton) Singleton->getExplosionSchema(schema);
+      if (Singleton) Singleton->getSchema(schema);
     }
 
     unsigned getExplosionSize(ExplosionKind kind) const {
@@ -135,14 +135,14 @@ namespace {
       return Singleton->getExplosionSize(kind);
     }
 
-    void loadExplosion(IRGenFunction &IGF, Address addr, Explosion &e) const {
+    void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
       if (!Singleton) return;
-      Singleton->loadExplosion(IGF, getSingletonAddress(IGF, addr), e);
+      Singleton->load(IGF, getSingletonAddress(IGF, addr), e);
     }
 
-    void storeExplosion(IRGenFunction &IGF, Explosion &e, Address addr) const {
+    void store(IRGenFunction &IGF, Explosion &e, Address addr) const {
       if (!Singleton) return;
-      Singleton->storeExplosion(IGF, e, getSingletonAddress(IGF, addr));
+      Singleton->store(IGF, e, getSingletonAddress(IGF, addr));
     }
 
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
@@ -161,10 +161,10 @@ namespace {
 
       // Otherwise, package up the result.
       ExplosionSchema schema(params.getKind());
-      Singleton->getExplosionSchema(schema);
+      Singleton->getSchema(schema);
       if (schema.requiresIndirectResult()) {
         Address returnSlot(params.claimNext(), Singleton->StorageAlignment);
-        storeExplosion(IGF, params, returnSlot);
+        store(IGF, params, returnSlot);
         IGF.Builder.CreateRetVoid();
       } else {
         IGF.emitScalarReturn(params);
@@ -183,19 +183,19 @@ namespace {
       return 1;
     }
 
-    void getExplosionSchema(ExplosionSchema &schema) const {
+    void getSchema(ExplosionSchema &schema) const {
       assert(isComplete());
       schema.add(ExplosionSchema::Element::forScalar(getDiscriminatorType()));
     }
 
-    void loadExplosion(IRGenFunction &IGF, Address addr, Explosion &e) const {
+    void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
       assert(isComplete());
       e.add(IGF.Builder.CreateLoad(IGF.Builder.CreateStructGEP(addr.getAddress(), 0),
                                    addr.getAlignment(),
                                    addr.getAddress()->getName() + ".load"));
     }
 
-    void storeExplosion(IRGenFunction &IGF, Explosion &e, Address addr) const {
+    void store(IRGenFunction &IGF, Explosion &e, Address addr) const {
       assert(isComplete());
       IGF.Builder.CreateStore(e.claimNext(),
                               IGF.Builder.CreateStructGEP(addr.getAddress(), 0),

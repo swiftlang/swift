@@ -36,15 +36,15 @@ namespace {
       return 1;
     }
 
-    void getExplosionSchema(ExplosionSchema &schema) const {
+    void getSchema(ExplosionSchema &schema) const {
       // FIXME
     }
 
-    void loadExplosion(IRGenFunction &IGF, Address addr, Explosion &explosion) const {
+    void load(IRGenFunction &IGF, Address addr, Explosion &explosion) const {
       // FIXME
     }
 
-    void storeExplosion(IRGenFunction &IGF, Explosion &explosion, Address addr) const {
+    void store(IRGenFunction &IGF, Explosion &explosion, Address addr) const {
       // FIXME
     }
 

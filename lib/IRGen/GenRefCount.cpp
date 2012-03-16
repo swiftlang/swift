@@ -35,15 +35,15 @@ namespace {
       return 1;
     }
 
-    void getExplosionSchema(ExplosionSchema &schema) const {
+    void getSchema(ExplosionSchema &schema) const {
       schema.add(ExplosionSchema::Element::forScalar(getStorageType()));
     }
 
-    void loadExplosion(IRGenFunction &IGF, Address addr, Explosion &e) const {
+    void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
       e.add(IGF.emitLoadRetained(addr));
     }
 
-    void storeExplosion(IRGenFunction &IGF, Explosion &e, Address addr) const {
+    void store(IRGenFunction &IGF, Explosion &e, Address addr) const {
       IGF.emitStoreRetained(e.claimNext(), addr);
     }
 
