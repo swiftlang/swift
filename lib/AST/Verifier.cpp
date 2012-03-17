@@ -229,6 +229,38 @@ namespace {
                     "result of LookThroughOneofExpr and single element of oneof");
     }
 
+    void verifyChecked(ApplyExpr *E) {
+      FunctionType *FT = E->getFn()->getType()->getAs<FunctionType>();
+      if (!FT) {
+        Out << "callee of apply expression does not have function type:";
+        E->getFn()->getType()->print(Out);
+        Out << "\n";
+        abort();
+      }
+      TypeBase *InputExprTy = E->getArg()->getType()->getCanonicalType();
+      TypeBase *ResultExprTy = E->getType()->getCanonicalType();
+      if (ResultExprTy != FT->getResult()->getCanonicalType()) {
+        Out << "Type of callee does not match type of ApplyExpr:";
+        E->getType()->print(Out);
+        Out << " vs. ";
+        FT->getResult()->print(Out);
+        Out << "\n";
+        abort();
+      }
+      if (InputExprTy != FT->getInput()->getCanonicalType()) {
+        TupleType *TT = FT->getInput()->getAs<TupleType>();
+        if (!TT || TT->getFields().size() != 1 ||
+            TT->getFields()[0].getType()->getCanonicalType() != InputExprTy) {
+          Out << "Type of callee does not match type of arg for ApplyExpr:";
+          E->getArg()->getType()->print(Out);
+          Out << " vs. ";
+          FT->getInput()->print(Out);
+          Out << "\n";
+          abort();
+        }
+      }
+    }
+
     /// Look through a possible l-value type, returning true if it was
     /// an l-value.
     bool lookThroughLValue(Type &type) {
