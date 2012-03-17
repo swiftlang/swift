@@ -72,7 +72,7 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E) {
 }
 
 /// Emit a declaration reference as an exploded r-value.
-void IRGenFunction::emitExplodedDeclRef(DeclRefExpr *E, Explosion &explosion) {
+void IRGenFunction::emitDeclRef(DeclRefExpr *E, Explosion &explosion) {
   ValueDecl *D = E->getDecl();
   switch (D->getKind()) {
   case DeclKind::Extension:
@@ -84,7 +84,7 @@ void IRGenFunction::emitExplodedDeclRef(DeclRefExpr *E, Explosion &explosion) {
     return emitLValueAsScalar(emitDeclRefLValue(*this, E), explosion);
 
   case DeclKind::Func:
-    emitExplodedRValueForFunction(cast<FuncDecl>(D), explosion);
+    emitRValueForFunction(cast<FuncDecl>(D), explosion);
     return;
 
   case DeclKind::OneOfElement:
@@ -102,7 +102,7 @@ void IRGenFunction::emitExplodedDeclRef(DeclRefExpr *E, Explosion &explosion) {
 /// for not needing to construct and destroy an Explosion.
 llvm::Value *IRGenFunction::emitAsPrimitiveScalar(Expr *E) {
   Explosion explosion(ExplosionKind::Minimal);
-  emitExplodedRValue(E, explosion);
+  emitRValue(E, explosion);
 
   llvm::Value *result = explosion.claimNext();
   assert(explosion.empty());
@@ -120,7 +120,7 @@ static Address emitMaterializeExpr(IRGenFunction &IGF, MaterializeExpr *E) {
   return temporary;
 }
 
-void IRGenFunction::emitExplodedRValue(Expr *E, Explosion &explosion) {
+void IRGenFunction::emitRValue(Expr *E, Explosion &explosion) {
   switch (E->getKind()) {
 #define EXPR(Id, Parent)
 #define UNCHECKED_EXPR(Id, Parent) case ExprKind::Id:
@@ -133,7 +133,7 @@ void IRGenFunction::emitExplodedRValue(Expr *E, Explosion &explosion) {
 
   case ExprKind::Load: {
     const TypeInfo &type = getFragileTypeInfo(E->getType());
-    return emitExplodedLoad(emitLValue(cast<LoadExpr>(E)->getSubExpr()),
+    return emitLoad(emitLValue(cast<LoadExpr>(E)->getSubExpr()),
                             type, explosion);
   }
 
@@ -144,26 +144,26 @@ void IRGenFunction::emitExplodedRValue(Expr *E, Explosion &explosion) {
   }
 
   case ExprKind::Paren:
-    return emitExplodedRValue(cast<ParenExpr>(E)->getSubExpr(), explosion);
+    return emitRValue(cast<ParenExpr>(E)->getSubExpr(), explosion);
 
   case ExprKind::AddressOf:
-    return emitExplodedRValue(cast<AddressOfExpr>(E)->getSubExpr(),
+    return emitRValue(cast<AddressOfExpr>(E)->getSubExpr(),
                               explosion);    
 
   case ExprKind::Tuple:
-    return emitExplodedTupleLiteral(cast<TupleExpr>(E), explosion);
+    return emitTupleLiteral(cast<TupleExpr>(E), explosion);
 
   case ExprKind::TupleShuffle:
-    return emitExplodedTupleShuffle(cast<TupleShuffleExpr>(E), explosion);
+    return emitTupleShuffle(cast<TupleShuffleExpr>(E), explosion);
 
   case ExprKind::SyntacticTupleElement:
   case ExprKind::ImplicitThisTupleElement:
-    return emitExplodedTupleElement(cast<TupleElementExpr>(E), explosion);
+    return emitTupleElement(cast<TupleElementExpr>(E), explosion);
 
   case ExprKind::DotSyntaxPlusFuncUse: {
     DotSyntaxPlusFuncUseExpr *DE = cast<DotSyntaxPlusFuncUseExpr>(E);
     emitIgnored(DE->getBaseExpr());
-    return emitExplodedRValue(DE->getPlusFuncExpr(), explosion);
+    return emitRValue(DE->getPlusFuncExpr(), explosion);
   }
 
   case ExprKind::Call:
@@ -171,7 +171,7 @@ void IRGenFunction::emitExplodedRValue(Expr *E, Explosion &explosion) {
   case ExprKind::Binary:
   case ExprKind::ConstructorCall:
   case ExprKind::DotSyntaxCall:
-    return emitExplodedApplyExpr(cast<ApplyExpr>(E), explosion);
+    return emitApplyExpr(cast<ApplyExpr>(E), explosion);
 
   case ExprKind::IntegerLiteral:
     return explosion.add(emitIntegerLiteralExpr(*this, cast<IntegerLiteralExpr>(E)));
@@ -179,15 +179,15 @@ void IRGenFunction::emitExplodedRValue(Expr *E, Explosion &explosion) {
     return explosion.add(emitFloatLiteralExpr(*this, cast<FloatLiteralExpr>(E)));
 
   case ExprKind::LookThroughOneof:
-    return emitExplodedRValue(cast<LookThroughOneofExpr>(E)->getSubExpr(),
+    return emitRValue(cast<LookThroughOneofExpr>(E)->getSubExpr(),
                               explosion);
 
   case ExprKind::DeclRef:
-    return emitExplodedDeclRef(cast<DeclRefExpr>(E), explosion);
+    return emitDeclRef(cast<DeclRefExpr>(E), explosion);
 
   case ExprKind::ImplicitClosure:
   case ExprKind::ExplicitClosure:
-    return emitExplodedClosure(cast<ClosureExpr>(E), explosion);
+    return emitClosure(cast<ClosureExpr>(E), explosion);
 
   case ExprKind::Func:
   case ExprKind::Module:
@@ -362,7 +362,7 @@ void IRGenFunction::emitInit(Address addr, Expr *E, const TypeInfo &type) {
 void IRGenFunction::emitRValueToMemory(Expr *E, Address addr,
                                        const TypeInfo &type) {
   Explosion explosion(ExplosionKind::Maximal);
-  emitExplodedRValue(E, explosion);
+  emitRValue(E, explosion);
   type.initialize(*this, explosion, addr);
 }
 
@@ -395,7 +395,7 @@ void IRGenFunction::emitZeroInit(Address addr, const TypeInfo &type) {
 void IRGenFunction::emitIgnored(Expr *E) {
   // For now, just emit it as an r-value.
   Explosion explosion(ExplosionKind::Maximal);
-  emitExplodedRValue(E, explosion);
+  emitRValue(E, explosion);
 }
 
 /// Emit a fake l-value which obeys the given specification.  This

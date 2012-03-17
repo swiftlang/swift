@@ -167,12 +167,12 @@ public:
   void emitLValueAsScalar(const LValue &lvalue, Explosion &explosion);
 
   void emitRValueToMemory(Expr *E, Address addr, const TypeInfo &type);
-  void emitExplodedRValue(Expr *E, Explosion &explosion);
+  void emitRValue(Expr *E, Explosion &explosion);
 
   llvm::Value *emitAsPrimitiveScalar(Expr *E);
 
-  void emitExplodedLoad(const LValue &lvalue, const TypeInfo &type,
-                        Explosion &explosion);
+  void emitLoad(const LValue &lvalue, const TypeInfo &type,
+                Explosion &explosion);
   void emitAssign(Explosion &rvalue, const LValue &lvalue,
                   const TypeInfo &type);
   void emitAssign(Expr *E, const LValue &lvalue, const TypeInfo &type);
@@ -184,31 +184,31 @@ public:
                               Explosion &paramValues);
 
 private:
-  void emitExplodedRValueForFunction(FuncDecl *Fn, Explosion &explosion);
+  void emitRValueForFunction(FuncDecl *Fn, Explosion &explosion);
 
-  void emitExplodedApplyExpr(ApplyExpr *apply, Explosion &explosion);
-  void emitExplodedNullaryCall(llvm::Value *fn, Type resultType,
+  void emitApplyExpr(ApplyExpr *apply, Explosion &explosion);
+  void emitNullaryCall(llvm::Value *fn, Type resultType,
                                Explosion &result);
   Optional<Address> tryEmitApplyAsAddress(ApplyExpr *apply, const TypeInfo &);
   void emitApplyExprToMemory(ApplyExpr *apply, Address addr,
                              const TypeInfo &type);
 
-  void emitExplodedDeclRef(DeclRefExpr *DeclRef, Explosion &explosion);
+  void emitDeclRef(DeclRefExpr *DeclRef, Explosion &explosion);
   void emitOneOfElementRef(OneOfElementDecl *elt, Explosion &explosion);
 
-  void emitExplodedLookThroughOneof(LookThroughOneofExpr *E, Explosion &expl);
+  void emitLookThroughOneof(LookThroughOneofExpr *E, Explosion &expl);
   Optional<Address> tryEmitLookThroughOneofAsAddress(LookThroughOneofExpr *E);
   LValue emitLookThroughOneofLValue(LookThroughOneofExpr *E);
 
-  void emitExplodedTupleElement(TupleElementExpr *E, Explosion &explosion);
+  void emitTupleElement(TupleElementExpr *E, Explosion &explosion);
   Optional<Address> tryEmitTupleElementAsAddress(TupleElementExpr *E);
   LValue emitTupleElementLValue(TupleElementExpr *E);
 
-  void emitExplodedTupleLiteral(TupleExpr *E, Explosion &explosion);
-  void emitExplodedTupleShuffle(TupleShuffleExpr *E, Explosion &explosion);
+  void emitTupleLiteral(TupleExpr *E, Explosion &explosion);
+  void emitTupleShuffle(TupleShuffleExpr *E, Explosion &explosion);
   Condition emitCondition(Expr *E, bool hasFalseCode);
 
-  void emitExplodedClosure(ClosureExpr *E, Explosion &explosion);
+  void emitClosure(ClosureExpr *E, Explosion &explosion);
   void emitClosureBody(ClosureExpr *E);
   std::vector<Address> ClosureParams;
 

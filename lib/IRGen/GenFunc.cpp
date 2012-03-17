@@ -508,8 +508,7 @@ static Callee emitCallee(IRGenModule &IGM, FuncDecl *fn,
 }
 
 /// Emit a reference to the given function as a generic function pointer.
-void IRGenFunction::emitExplodedRValueForFunction(FuncDecl *fn,
-                                                  Explosion &explosion) {
+void IRGenFunction::emitRValueForFunction(FuncDecl *fn, Explosion &explosion) {
   // Function pointers are always fully curried and use ExplosionKind::Minimal.
   Callee callee = emitCallee(IGM, fn, ExplosionKind::Minimal, 0);
   assert(callee.ExplosionLevel == ExplosionKind::Minimal);
@@ -533,7 +532,7 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
   // Emit the arguments.  Maybe we'll get builtins that are more
   // complex than this.
   ArgList args(ExplosionKind::Minimal);
-  IGF.emitExplodedRValue(Arg, args.Values);
+  IGF.emitRValue(Arg, args.Values);
 
   Type BuiltinType;
   switch (isBuiltinValue(IGF.IGM.Context, Fn->getName().str(), BuiltinType)) {
@@ -642,6 +641,9 @@ namespace {
                                  CallSites.size() - 1);
       return callee.ExplosionLevel;
     }
+
+    void emit(IRGenFunction &IGF, CallResult &result,
+              const TypeInfo &resultType);
   };
 }
 
@@ -684,20 +686,20 @@ static void setAggResultAttributes(llvm::CallSite call) {
 }
 
 /// Emit a function call.
-static void emitApplyExpr(IRGenFunction &IGF, CallPlan &plan,
-                          CallResult &result, const TypeInfo &resultType) {
+void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
+                    const TypeInfo &resultType) {
   // 1.  Emit the function expression.
   Callee callee;
 
   // We can do a lot if we know we're calling a known function.
-  if (plan.KnownFn) {
+  if (KnownFn) {
     // Handle calls to builtin functions.  These are never curried, but they
     // might return a function pointer.
-    if (isa<BuiltinModule>(plan.KnownFn->getDeclContext())) {
-      emitBuiltinCall(IGF, plan.KnownFn, plan.CallSites.back().Arg, result);
+    if (isa<BuiltinModule>(KnownFn->getDeclContext())) {
+      emitBuiltinCall(IGF, KnownFn, CallSites.back().Arg, result);
 
       // If there are no trailing calls, we're done.
-      if (plan.CallSites.size() == 1) return;
+      if (CallSites.size() == 1) return;
 
       // Otherwise, pop that call site off and set up the callee conservatively.
       callee.setForIndirectCall(result.getDirectValue(0),
@@ -706,15 +708,15 @@ static void emitApplyExpr(IRGenFunction &IGF, CallPlan &plan,
 
     // Otherwise, compute information about the function we're calling.
     } else {
-      callee = emitCallee(IGF.IGM, plan.KnownFn, ExplosionKind::Maximal,
-                          plan.CallSites.size() - 1);
+      callee = emitCallee(IGF.IGM, KnownFn, ExplosionKind::Maximal,
+                          CallSites.size() - 1);
     }
 
   // Otherwise, emit as a function pointer and use the pessimistic
   // rules for calling such.
   } else {
     Explosion fnValues(ExplosionKind::Maximal);
-    IGF.emitExplodedRValue(plan.UncurriedFn, fnValues);
+    IGF.emitRValue(UncurriedFn, fnValues);
     llvm::Value *fnPtr = fnValues.claimNext();
     llvm::Value *dataPtr = fnValues.claimNext();
     callee.setForIndirectCall(fnPtr, dataPtr);
@@ -722,11 +724,11 @@ static void emitApplyExpr(IRGenFunction &IGF, CallPlan &plan,
 
   // 3. Emit arguments and call.
   while (true) {
-    assert(callee.UncurryLevel < plan.CallSites.size());
+    assert(callee.UncurryLevel < CallSites.size());
 
     // Find the formal type we're calling.
-    unsigned calleeIndex = plan.CallSites.size() - 1;
-    Type calleeFormalType = plan.CallSites[calleeIndex].FnType;
+    unsigned calleeIndex = CallSites.size() - 1;
+    Type calleeFormalType = CallSites[calleeIndex].FnType;
     llvm::Value *fnPtr =
       callee.getFunctionPointer(IGF, calleeFormalType);
     llvm::FunctionType *calleeType = 
@@ -742,12 +744,12 @@ static void emitApplyExpr(IRGenFunction &IGF, CallPlan &plan,
 
     // Emit all of the arguments we need to pass here.
     for (unsigned i = callee.UncurryLevel + 1; i != 0; --i) {
-      Expr *arg = plan.CallSites.back().Arg;
-      plan.CallSites.pop_back();
+      Expr *arg = CallSites.back().Arg;
+      CallSites.pop_back();
 
       // Emit the argument, exploded at the appropriate level.
       Explosion argExplosion(callee.ExplosionLevel);
-      IGF.emitExplodedRValue(arg, argExplosion);
+      IGF.emitRValue(arg, argExplosion);
 
       assert(lastArgWritten >= argExplosion.size());
       lastArgWritten -= argExplosion.size();
@@ -761,7 +763,7 @@ static void emitApplyExpr(IRGenFunction &IGF, CallPlan &plan,
     assert(lastArgWritten == 0 || lastArgWritten == 1);
     bool isAggregateResult = (lastArgWritten != 0);
     if (isAggregateResult) {
-      assert(plan.CallSites.empty() && "aggregate result on non-final call?");
+      assert(CallSites.empty() && "aggregate result on non-final call?");
       Type formalResultType =
         calleeFormalType->castTo<FunctionType>()->getResult();
       const TypeInfo &type = IGF.IGM.getFragileTypeInfo(formalResultType);
@@ -802,7 +804,7 @@ static void emitApplyExpr(IRGenFunction &IGF, CallPlan &plan,
     }
 
     // If this is the end of the call sites, we're done.
-    if (plan.CallSites.empty()) {
+    if (CallSites.empty()) {
       assert(!result.IndirectAddress.isValid() &&
              "returning direct values when indirect result was requested!");
       result.DirectExplosionLevel = callee.ExplosionLevel;
@@ -819,13 +821,13 @@ static void emitApplyExpr(IRGenFunction &IGF, CallPlan &plan,
 }
 
 /// Emit a call for its exploded results.
-void IRGenFunction::emitExplodedApplyExpr(ApplyExpr *E, Explosion &explosion) {
+void IRGenFunction::emitApplyExpr(ApplyExpr *E, Explosion &explosion) {
   CallPlan plan = getCallPlan(IGM, E);
 
   const TypeInfo &resultTI = getFragileTypeInfo(E->getType());
 
   CallResult result;
-  emitApplyExpr(*this, plan, result, resultTI);
+  plan.emit(*this, result, resultTI);
 
   // If this was an indirect return, explode it.
   if (result.IndirectAddress.isValid()) {
@@ -853,16 +855,16 @@ IRGenFunction::tryEmitApplyAsAddress(ApplyExpr *E, const TypeInfo &resultTI) {
     return Nothing;
 
   CallResult result;
-  emitApplyExpr(*this, plan, result, resultTI);
+  plan.emit(*this, result, resultTI);
   assert(result.IndirectAddress.isValid());
   return result.IndirectAddress;
 }
 
 /// Emit a nullary call to the given function, using the standard
 /// calling-convention and so on, and explode the result.
-void IRGenFunction::emitExplodedNullaryCall(llvm::Value *fnPtr,
-                                            Type resultType,
-                                            Explosion &resultExplosion) {
+void IRGenFunction::emitNullaryCall(llvm::Value *fnPtr,
+                                    Type resultType,
+                                    Explosion &resultExplosion) {
   ExplosionSchema resultSchema(resultExplosion.getKind());
   const TypeInfo &resultTI = getFragileTypeInfo(resultType);
   resultTI.getSchema(resultSchema);

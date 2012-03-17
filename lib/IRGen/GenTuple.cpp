@@ -290,11 +290,10 @@ TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
                                fieldInfos);
 }
 
-void IRGenFunction::emitExplodedTupleLiteral(TupleExpr *E,
-                                             Explosion &explosion) {
+void IRGenFunction::emitTupleLiteral(TupleExpr *E, Explosion &explosion) {
   // Emit all the sub-expressions.
   for (Expr *elt : E->getElements()) {
-    emitExplodedRValue(elt, explosion);
+    emitRValue(elt, explosion);
   }
 }
 
@@ -312,8 +311,8 @@ namespace {
   };
 }
 
-void IRGenFunction::emitExplodedTupleElement(TupleElementExpr *E,
-                                             Explosion &explosion) {
+void IRGenFunction::emitTupleElement(TupleElementExpr *E,
+                                     Explosion &explosion) {
   // If we're doing an l-value projection, this is straightforward.
   if (E->getType()->is<LValueType>())
     return emitLValueAsScalar(emitTupleElementLValue(E), explosion);
@@ -340,7 +339,7 @@ void IRGenFunction::emitExplodedTupleElement(TupleElementExpr *E,
 
   // Otherwise, emit the base as an r-value and project.
   Explosion tupleExplosion(explosion.getKind());
-  emitExplodedRValue(tuple, tupleExplosion);
+  emitRValue(tuple, tupleExplosion);
   return tupleType.projectExplosion(tupleExplosion, field, explosion);
 }
 
@@ -385,11 +384,10 @@ LValue IRGenFunction::emitTupleElementLValue(TupleElementExpr *E) {
   return tupleLV;
 }
 
-/// Emit a tuple shuffle in exploded form.
-/// emitExplodedTupleShuffleExpr - Emit a tuple-shuffle expression
+/// emitTupleShuffle - Emit a tuple-shuffle expression
 /// as an exploded r-value.
-void IRGenFunction::emitExplodedTupleShuffle(TupleShuffleExpr *E,
-                                             Explosion &outerTupleExplosion) {
+void IRGenFunction::emitTupleShuffle(TupleShuffleExpr *E,
+                                     Explosion &outerTupleExplosion) {
   Expr *innerTuple = E->getSubExpr();
   const TupleTypeInfo &innerTupleType =
     getAsTupleTypeInfo(*this, innerTuple->getType());
@@ -400,7 +398,7 @@ void IRGenFunction::emitExplodedTupleShuffle(TupleShuffleExpr *E,
   if (Optional<Address> addr = tryEmitAsAddress(innerTuple, innerTupleType)) {
     innerTupleAddr = addr.getValue();
   } else {
-    emitExplodedRValue(innerTuple, innerTupleExplosion);
+    emitRValue(innerTuple, innerTupleExplosion);
   }
 
   llvm::ArrayRef<TupleTypeElt> outerFields =
@@ -413,7 +411,7 @@ void IRGenFunction::emitExplodedTupleShuffle(TupleShuffleExpr *E,
     // If the shuffle index is -1, we're supposed to use the default value.
     if (shuffleIndex == -1) {
       assert(outerField.hasInit() && "no default initializer for field!");
-      emitExplodedRValue(outerField.getInit(), outerTupleExplosion);
+      emitRValue(outerField.getInit(), outerTupleExplosion);
       continue;
     }
 

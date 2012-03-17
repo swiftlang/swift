@@ -60,7 +60,7 @@ namespace {
   };
 }
 
-void IRGenFunction::emitExplodedClosure(ClosureExpr *E,
+void IRGenFunction::emitClosure(ClosureExpr *E,
                                         Explosion &explosion) {
   if (FindCapturedVars(*this).doWalk(E->getBody()))
     return emitFakeExplosion(getFragileTypeInfo(E->getType()), explosion);
@@ -98,6 +98,6 @@ void IRGenFunction::emitClosureBody(ClosureExpr *E) {
   // Emit the body of the closure
   FullExpr fullExpr(*this);
   Explosion result(CurExplosionLevel);
-  emitExplodedRValue(E->getBody(), result);
+  emitRValue(E->getBody(), result);
   emitScalarReturn(result);
 }

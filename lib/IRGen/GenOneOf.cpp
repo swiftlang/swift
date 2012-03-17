@@ -371,7 +371,7 @@ void IRGenFunction::emitOneOfElementRef(OneOfElementDecl *elt,
   // Otherwise, we need to call the injection function (with no
   // arguments, except maybe a temporary result) and expand the result
   // into the explosion.
-  emitExplodedNullaryCall(injection, elt->getType(), result);
+  emitNullaryCall(injection, elt->getType(), result);
 }
 
 /// Emit the injection function for the given element.

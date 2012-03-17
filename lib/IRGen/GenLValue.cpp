@@ -51,9 +51,8 @@ LValue IRGenFunction::emitAddressLValue(Address address) {
 }
 
 /// Load this l-value to create an exploded r-value.
-void IRGenFunction::emitExplodedLoad(const LValue &lvalue,
-                                     const TypeInfo &type,
-                                     Explosion &explosion) {
+void IRGenFunction::emitLoad(const LValue &lvalue, const TypeInfo &type,
+                             Explosion &explosion) {
   Address address;
 
   for (auto i = lvalue.begin(), e = lvalue.end(); i != e; ) {
@@ -155,6 +154,6 @@ void IRGenFunction::emitAssign(Expr *rhs, const LValue &lhs,
   // We don't expect that l-value emission is generally going to admit
   // maximally-exploded calls.
   Explosion explosion(ExplosionKind::Minimal);
-  emitExplodedRValue(rhs, explosion);
+  emitRValue(rhs, explosion);
   emitAssign(explosion, lhs, type);
 }
