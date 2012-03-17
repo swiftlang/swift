@@ -431,6 +431,17 @@ public:
   void setBody(FuncExpr *NewBody) { Body = NewBody; }
 
   
+  /// getExtensionType - If this is a method in a type extension for some type,
+  /// return that type, otherwise return Type().
+  Type getExtensionType() const;
+  
+  /// computeThisType - If this is a method in a type extension for some type,
+  /// compute and return the type to be used for the 'this' argument of the
+  /// type (which varies based on whether the extended type is a reference type
+  /// or not), or an empty Type() if no 'this' argument should exist.  This can
+  /// only be used after name binding has resolved types.
+  Type computeThisType() const;
+  
   SourceLoc getPlusLoc() const { return PlusLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }
     

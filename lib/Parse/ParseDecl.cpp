@@ -665,7 +665,7 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   // If we're within a container and this isn't a plus method, add an
   // implicit first pattern to match the container type as an element
   // named 'this'.  This turns "(int)->int" on FooTy into "(this :
-  // FooTy)->((int)->int)".  Note that we can't actually compute the
+  // [byref] FooTy)->((int)->int)".  Note that we can't actually compute the
   // type here until Sema.
   if (hasContainerType && !PlusLoc.isValid()) {
     VarDecl *D =

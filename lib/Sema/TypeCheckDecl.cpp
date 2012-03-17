@@ -103,44 +103,9 @@ public:
       VD->setNestedName(nullptr);
   }
 
-  /// Given the type associated with the container of this method,
-  /// derive its 'this' type.
-  Type getThisType(FuncDecl *FD, Type ContainerType) {
-    if (ContainerType->hasReferenceSemantics())
-      return ContainerType;
-
-    // 'this' is accepts implicit l-values.
-    return LValueType::get(ContainerType, LValueType::Qual::Implicit,
-                           TC.Context);
-  }
-
-  /// Find the type of 'this' for this function, if it has a 'this'.
-  Type getThisType(FuncDecl *FD) {
-    if (FD->isPlus()) return Type();
-
-    DeclContext *DC = FD->getDeclContext();
-    switch (DC->getContextKind()) {
-    case DeclContextKind::TranslationUnit:
-    case DeclContextKind::BuiltinModule:
-    case DeclContextKind::FuncExpr:
-    case DeclContextKind::OneOfType:
-      return Type();
-
-    // For extensions, it depends on whether the type has value or
-    // pointer semantics.
-    case DeclContextKind::ExtensionDecl:
-      return getThisType(FD, cast<ExtensionDecl>(DC)->getExtendedType());
-
-    // It's not really clear how protocol types should get passed.
-    case DeclContextKind::ProtocolType:
-      return getThisType(FD, cast<ProtocolType>(DC));
-    }
-    llvm_unreachable("bad context kind");
-  }
-  
   void visitFuncDecl(FuncDecl *FD) {
     // Before anything else, set up the 'this' argument correctly.
-    if (Type thisType = getThisType(FD)) {
+    if (Type thisType = FD->computeThisType()) {
       FunctionType *fnType = cast<FunctionType>(FD->getType());
       FD->overwriteType(FunctionType::get(thisType, fnType->getResult(),
                                           TC.Context));

@@ -161,6 +161,51 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
 }
 
 
+/// getExtensionType - If this is a method in a type extension for some type,
+/// return that type, otherwise return Type().
+Type FuncDecl::getExtensionType() const {
+  DeclContext *DC = getDeclContext();
+  switch (DC->getContextKind()) {
+  case DeclContextKind::TranslationUnit:
+  case DeclContextKind::BuiltinModule:
+  case DeclContextKind::FuncExpr:
+  case DeclContextKind::OneOfType:
+    return Type();
+    
+    // For extensions, it depends on whether the type has value or
+    // pointer semantics.
+  case DeclContextKind::ExtensionDecl:
+    return cast<ExtensionDecl>(DC)->getExtendedType();
+    
+  case DeclContextKind::ProtocolType:
+    // FIXME: It's not really clear how protocol types should get passed.
+    return cast<ProtocolType>(DC);
+  }
+  llvm_unreachable("bad context kind");
+}
+
+
+/// computeThisType - If this is a method in a type extension for some type,
+/// compute and return the type to be used for the 'this' argument of the
+/// type (which varies based on whether the extended type is a reference type
+/// or not), or an empty Type() if no 'this' argument should exist.  This can
+/// only be used after name binding has resolved types.
+Type FuncDecl::computeThisType() const {
+  // 'plus' functions have no 'this' argument.
+  if (isPlus()) return Type();
+  
+  Type ContainerType = getExtensionType();
+  if (ContainerType.isNull()) return ContainerType;
+  
+  if (ContainerType->hasReferenceSemantics())
+    return ContainerType;
+  
+  // 'this' is accepts implicit l-values.
+  return LValueType::get(ContainerType, LValueType::Qual::Implicit,
+                         getASTContext());
+}
+
+
 
 //===----------------------------------------------------------------------===//
 //  Decl printing.
