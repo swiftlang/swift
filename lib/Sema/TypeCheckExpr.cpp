@@ -737,16 +737,25 @@ static Expr *buildTupleElementExpr(Expr *base, UnresolvedDotExpr *syntax,
 }
 
 Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
+  // FIXME: Kill diag::invalid_member
   Expr *Base = E->getBase();
   Type SubExprTy = Base->getType();
   Identifier MemberName = E->getName();
-  TypeChecker &TC = *this;
 
   bool wasLValue = false;
   if (LValueType *LV = SubExprTy->getAs<LValueType>()) {
     wasLValue = true;
     SubExprTy = LV->getObjectType();
   }
+  
+  if (SubExprTy->is<DependentType>()) {
+    E->setDependentType(SubExprTy);
+    return E;
+  }
+  
+  if (SubExprTy->is<ErrorType>())
+    return 0;  // Squelch an erroneous subexpression.
+  
 
   // Check in the context of a protocol.
   if (ProtocolType *PT = SubExprTy->getAs<ProtocolType>()) {
@@ -754,16 +763,16 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
       if (VD->getName() != MemberName) continue;
       
       // The protocol value is applied via a DeclRefExpr.
-      Expr *fn = TC.buildDeclRefRValue(VD, E->getNameLoc());
+      Expr *fn = buildDeclRefRValue(VD, E->getNameLoc());
       
       if (FuncDecl *FD = dyn_cast<FuncDecl>(VD))
         if (FD->isPlus())
-          return new (TC.Context) DotSyntaxPlusFuncUseExpr(Base, E->getDotLoc(),
+          return new (Context) DotSyntaxPlusFuncUseExpr(Base, E->getDotLoc(),
                                                            fn);
       
-      ApplyExpr *Call = new (TC.Context) 
+      ApplyExpr *Call = new (Context) 
         DotSyntaxCallExpr(fn, E->getDotLoc(), Base);
-      return TC.semaApplyExpr(Call);
+      return semaApplyExpr(Call);
     }
   }
   
@@ -779,17 +788,17 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
     if (OneOfType *OOTy = Ty->getAs<OneOfType>()) {
       OneOfElementDecl *Elt = OOTy->getElement(MemberName);
       if (Elt)  // FIXME: This throws away syntactic information from the AST.
-        return new (TC.Context) DeclRefExpr(Elt, E->getNameLoc(),
-                                            Elt->getTypeOfReference());
+        return new (Context) DeclRefExpr(Elt, E->getNameLoc(),
+                                         Elt->getTypeOfReference());
     }
     
     // Look up references in extension methods.
     // Look in any extensions that add methods to the base type.
     SmallVector<ValueDecl*, 8> ExtensionMethods;
-    TC.TU.lookupGlobalExtensionMethods(Ty, MemberName, ExtensionMethods);
+    TU.lookupGlobalExtensionMethods(Ty, MemberName, ExtensionMethods);
 
     if (ExtensionMethods.empty()) {
-      TC.diagnose(E->getDotLoc(), diag::invalid_member, MemberName, Ty)
+      diagnose(E->getDotLoc(), diag::invalid_member, MemberName, Ty)
         << Base->getSourceRange()
         << SourceRange(E->getNameLoc(), E->getNameLoc());
       return 0;
@@ -805,7 +814,7 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
                                  NLKind::QualifiedLookup, Decls);
 
     if (Decls.empty()) {
-      TC.diagnose(E->getDotLoc(), diag::invalid_module_member, MemberName,
+      diagnose(E->getDotLoc(), diag::invalid_module_member, MemberName,
                   MT->getModule()->Name)
         << Base->getSourceRange()
         << SourceRange(E->getNameLoc(), E->getNameLoc());
@@ -816,7 +825,7 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
 
   // Look in any extensions that add methods to the base type.
   SmallVector<ValueDecl*, 8> ExtensionMethods;
-  TC.TU.lookupGlobalExtensionMethods(SubExprTy, MemberName, ExtensionMethods);
+  TU.lookupGlobalExtensionMethods(SubExprTy, MemberName, ExtensionMethods);
   
   if (!ExtensionMethods.empty()) {
     Expr *FnRef = OverloadSetRefExpr::createWithCopy(ExtensionMethods,
@@ -825,12 +834,12 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
     if (ExtensionMethods.size() == 1)
       if (FuncDecl *FD = dyn_cast<FuncDecl>(ExtensionMethods[0]))
         if (FD->isPlus())
-          return new (TC.Context) DotSyntaxPlusFuncUseExpr(Base, E->getDotLoc(),
+          return new (Context) DotSyntaxPlusFuncUseExpr(Base, E->getDotLoc(),
                                                      cast<DeclRefExpr>(FnRef));
 
-    ApplyExpr *Call = new (TC.Context) DotSyntaxCallExpr(FnRef, E->getDotLoc(),
-                                                         Base);
-    return TC.semaApplyExpr(Call);
+    ApplyExpr *Call = new (Context) DotSyntaxCallExpr(FnRef, E->getDotLoc(),
+                                                      Base);
+    return semaApplyExpr(Call);
   }
 
   // If this is a member access to a oneof with a single element constructor
@@ -850,31 +859,25 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
     int fieldIndex = TT->getNamedElementId(MemberName);
     if (fieldIndex != -1)
       return buildTupleElementExpr(Base, E, TT, (unsigned) fieldIndex,
-                                   wasLValue, wasOneof, TC);
+                                   wasLValue, wasOneof, *this);
 
     StringRef name = MemberName.str();
     if (name.startswith("$")) {
       unsigned Value = 0;
       if (!name.substr(1).getAsInteger(10, Value)) {
         if (Value >= TT->getFields().size()) {
-          TC.diagnose(E->getNameLoc(), diag::field_number_too_large);
+          diagnose(E->getNameLoc(), diag::field_number_too_large);
           return 0;
         }
 
         return buildTupleElementExpr(Base, E, TT, Value,
-                                     wasLValue, wasOneof, TC);
+                                     wasLValue, wasOneof, *this);
       }
     }
   }
   
-  if (SubExprTy->is<DependentType>()) {
-    E->setDependentType(SubExprTy);
-    return E;
-  }
-
-  // FIXME: This diagnostic is a bit painful. Plus, fix the source range when
-  // expressions actually have source ranges.
-  TC.diagnose(E->getDotLoc(), diag::no_valid_dot_expression, SubExprTy)
+  // FIXME: This diagnostic is a bit painful.
+  diagnose(E->getDotLoc(), diag::no_valid_dot_expression, SubExprTy)
     << Base->getSourceRange() << SourceRange(E->getNameLoc(), E->getNameLoc());
   return 0;
 }
