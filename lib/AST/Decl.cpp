@@ -15,10 +15,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
-#include "swift/AST/Module.h"
-#include "swift/AST/ASTContext.h"
+#include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/Types.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
@@ -203,6 +201,25 @@ Type FuncDecl::computeThisType() const {
   // 'this' is accepts implicit l-values.
   return LValueType::get(ContainerType, LValueType::Qual::Implicit,
                          getASTContext());
+}
+
+/// getImplicitThisDecl - If this FuncDecl is a non-plus method in an
+/// extension context, it will have a 'this' argument.  This method returns it
+/// if present, or returns null if not.
+VarDecl *FuncDecl::getImplicitThisDecl() {
+  if (isPlus()) return 0;
+  
+  if (Body->getParamPatterns().empty()) return 0;
+  
+  // "this" is represented as (typed_pattern (named_pattern (var_decl 'this')).
+  TypedPattern *TP = dyn_cast<TypedPattern>(Body->getParamPatterns()[0]);
+  if (TP == 0) return 0;
+  
+  // The decl should be named 'this' and have no location information.
+  NamedPattern *NP = dyn_cast<NamedPattern>(TP->getSubPattern());
+  if (NP && NP->getBoundName().str() == "this" && !NP->getLoc().isValid())
+    return NP->getDecl();
+  return 0;
 }
 
 

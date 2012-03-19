@@ -746,15 +746,7 @@ public:
   void setBody(BraceStmt *S) { Body = S; }
 
   Type getBodyResultType() const;
-
-  /// getImplicitThisDecl - If this FuncExpr is a non-plus method in an
-  /// extension context, it will have a 'this' argument.  This method returns it
-  /// if present, or returns null if not.
-  VarDecl *getImplicitThisDecl();
-  const VarDecl *getImplicitThisDecl() const {
-    return const_cast<FuncExpr*>(this)->getImplicitThisDecl();
-  }
-  
+ 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const FuncExpr *) { return true; }
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Func; }

@@ -442,6 +442,14 @@ public:
   /// only be used after name binding has resolved types.
   Type computeThisType() const;
   
+  /// getImplicitThisDecl - If this FuncDecl is a non-plus method in an
+  /// extension context, it will have a 'this' argument.  This method returns it
+  /// if present, or returns null if not.
+  VarDecl *getImplicitThisDecl();
+  const VarDecl *getImplicitThisDecl() const {
+    return const_cast<FuncDecl*>(this)->getImplicitThisDecl();
+  }
+  
   SourceLoc getPlusLoc() const { return PlusLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }
     
