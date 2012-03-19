@@ -20,6 +20,9 @@
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {
+  class ASTContext;
+  class Expr;
+  class SourceLoc;
   class ValueDecl;
   class Type;
   class Module;
@@ -87,6 +90,14 @@ public:
   /// Results - The constructor fills this vector in with all of the results.
   /// If name lookup failed, this is empty.
   llvm::SmallVector<MemberLookupResult, 4> Results;
+  
+  /// isSuccess - Return true if anything was found by the name lookup.
+  bool isSuccess() const { return !Results.empty(); }
+  
+  /// createResultAST - Build an AST to represent this lookup, with the
+  /// specified base expression.
+  Expr *createResultAST(Expr *Base, SourceLoc DotLoc, SourceLoc NameLoc,
+                        ASTContext &Context);
   
 private:
   void doIt(Type BaseTy, Identifier Name, Module &M);

@@ -141,4 +141,91 @@ void MemberLookup::doTuple(TupleType *TT, Identifier Name, bool IsStruct) {
   }
 }
 
+static Type makeSimilarLValue(Type objectType, Type lvalueType,
+                              ASTContext &Context) {
+  LValueType::Qual qs = cast<LValueType>(lvalueType)->getQualifiers();
+  
+  // Don't propagate explicitness.
+  qs |= LValueType::Qual::Implicit;
+  
+  return LValueType::get(objectType, qs, Context);
+}
 
+static Expr *lookThroughOneofs(Expr *E, ASTContext &Context) {
+  
+  Type BaseType = E->getType();
+  bool IsLValue = E->getType()->is<LValueType>();
+  if (IsLValue)
+    BaseType = cast<LValueType>(BaseType)->getObjectType();
+  
+  OneOfType *Oneof = BaseType->castTo<OneOfType>();
+  assert(Oneof->isTransparentType());
+  
+  Type ResultType = Oneof->getTransparentType();
+  if (IsLValue)
+    ResultType = makeSimilarLValue(ResultType, E->getType(), Context);
+  return new (Context) LookThroughOneofExpr(E, ResultType);
+}
+
+static Expr *buildTupleElementExpr(Expr *Base, SourceLoc DotLoc,
+                                   SourceLoc NameLoc, unsigned FieldIndex,
+                                   ASTContext &Context) {
+  Type BaseTy = Base->getType();
+  bool IsLValue = false;
+  if (LValueType *LV = BaseTy->getAs<LValueType>()) {
+    IsLValue = true;
+    BaseTy = LV->getObjectType();
+  }
+  
+  Type FieldType = BaseTy->castTo<TupleType>()->getElementType(FieldIndex);
+  if (IsLValue)
+    FieldType = makeSimilarLValue(FieldType, Base->getType(), Context);
+  
+  return new (Context) SyntacticTupleElementExpr(Base, DotLoc, FieldIndex,
+                                                 NameLoc, FieldType);
+}
+
+
+/// createResultAST - Build an AST to represent this lookup, with the
+/// specified base expression.
+Expr *MemberLookup::createResultAST(Expr *Base, SourceLoc DotLoc, 
+                                    SourceLoc NameLoc, ASTContext &Context) {
+  assert(isSuccess() && "Can't create a result if we didn't find anything");
+         
+  // Handle the case when we found exactly one result..
+  if (Results.size() == 1) {
+    MemberLookupResult R = Results[0];
+    
+    switch (R.Kind) {
+    case MemberLookupResult::StructElement:
+      Base = lookThroughOneofs(Base, Context);
+      // FALL THROUGH.
+    case MemberLookupResult::TupleElement:
+      return buildTupleElementExpr(Base, DotLoc, NameLoc, R.TupleFieldNo,
+                                   Context);
+    case MemberLookupResult::PassBase: {
+      Expr *Fn = new (Context) DeclRefExpr(R.D, NameLoc,
+                                           R.D->getTypeOfReference());
+      return new (Context) DotSyntaxCallExpr(Fn, DotLoc, Base);
+    }
+    case MemberLookupResult::IgnoreBase:
+      Expr *RHS = new (Context) DeclRefExpr(R.D, NameLoc,
+                                            R.D->getTypeOfReference());
+      return new (Context) DotSyntaxBaseIgnoredExpr(Base, DotLoc, RHS);
+    }
+  }
+  
+  // If we have an ambiguous result, build an overload set.
+  SmallVector<ValueDecl*, 8> ResultSet;
+    
+  // FIXME: This is collecting a mix of plus and normal functions.  This also
+  // discards the base expression and is completely wrong in the case when
+  // we're referencing something that needs it!
+  for (MemberLookupResult X : Results) {
+    assert(X.Kind != MemberLookupResult::TupleElement &&
+           X.Kind != MemberLookupResult::StructElement);
+    ResultSet.push_back(X.D);
+  }
+  
+  return OverloadSetRefExpr::createWithCopy(ResultSet, NameLoc);
+}

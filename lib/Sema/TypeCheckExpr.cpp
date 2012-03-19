@@ -693,51 +693,6 @@ public:
 };
 } // end anonymous namespace.
 
-static Type makeSimilarLValue(Type objectType, Type lvalueType,
-                              ASTContext &Context) {
-  LValueType::Qual qs = cast<LValueType>(lvalueType)->getQualifiers();
-
-  // Don't propagate explicitness.
-  qs |= LValueType::Qual::Implicit;
-
-  return LValueType::get(objectType, qs, Context);
-}
-
-static Expr *lookThroughOneofs(Expr *E, ASTContext &Context) {
-
-  Type BaseType = E->getType();
-  bool IsLValue = E->getType()->is<LValueType>();
-  if (IsLValue)
-    BaseType = cast<LValueType>(BaseType)->getObjectType();
-
-  OneOfType *Oneof = BaseType->castTo<OneOfType>();
-  assert(Oneof->isTransparentType());
-
-  Type ResultType = Oneof->getTransparentType();
-  if (IsLValue)
-    ResultType = makeSimilarLValue(ResultType, E->getType(), Context);
-  return new (Context) LookThroughOneofExpr(E, ResultType);
-}
-
-static Expr *buildTupleElementExpr(Expr *Base, UnresolvedDotExpr *Syntax,
-                                   unsigned FieldIndex,
-                                   ASTContext &Context) {
-  Type BaseTy = Base->getType();
-  bool IsLValue = false;
-  if (LValueType *LV = BaseTy->getAs<LValueType>()) {
-    IsLValue = true;
-    BaseTy = LV->getObjectType();
-  }
-
-  Type FieldType = BaseTy->castTo<TupleType>()->getElementType(FieldIndex);
-  if (IsLValue)
-    FieldType = makeSimilarLValue(FieldType, Base->getType(), Context);
-    
-  return new (Context) SyntacticTupleElementExpr(Base, Syntax->getDotLoc(),
-                                                 FieldIndex,
-                                                 Syntax->getNameLoc(),
-                                                 FieldType);
-}
 
 Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
   Expr *Base = E->getBase();
@@ -755,47 +710,20 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
   // Perform name lookup.
   MemberLookup Lookup(BaseTy, MemberName, TU);
   
-  // If we performed a lookup and found exactly one result, return success.
-  if (Lookup.Results.size() == 1) {
-    MemberLookupResult R = Lookup.Results[0];
-
-    switch (R.Kind) {
-    case MemberLookupResult::StructElement:
-      Base = lookThroughOneofs(Base, Context);
-      // FALL THROUGH.
-    case MemberLookupResult::TupleElement:
-      return buildTupleElementExpr(Base, E, R.TupleFieldNo, Context);
-    case MemberLookupResult::PassBase: {
-      Expr *Fn = new (Context) DeclRefExpr(R.D, E->getNameLoc(),
-                                           R.D->getTypeOfReference());
-      return semaApplyExpr(new (Context) DotSyntaxCallExpr(Fn, E->getDotLoc(),
-                                                           Base));
-    }
-    case MemberLookupResult::IgnoreBase:
-      Expr *RHS = new (Context) DeclRefExpr(R.D, E->getNameLoc(),
-                                            R.D->getTypeOfReference());
-      return new (Context) DotSyntaxBaseIgnoredExpr(Base, E->getDotLoc(), RHS);
-    }
+  if (!Lookup.isSuccess()) {
+    // FIXME: This diagnostic is a bit painful.
+    diagnose(E->getDotLoc(), diag::no_valid_dot_expression, BaseTy)
+      << Base->getSourceRange() << SourceRange(E->getNameLoc(),E->getNameLoc());
+    return 0;
   }
   
-  // If we have an ambiguous result, build an overload set.
-  if (Lookup.Results.size() > 1) {
-    SmallVector<ValueDecl*, 8> ResultSet;
-
-    // FIXME: This is collecting a mix of plus and normal functions.
-    for (MemberLookupResult X : Lookup.Results) {
-      assert(X.Kind != MemberLookupResult::TupleElement &&
-             X.Kind != MemberLookupResult::StructElement);
-      ResultSet.push_back(X.D);
-    }
-    
-    return OverloadSetRefExpr::createWithCopy(ResultSet, E->getNameLoc());
-  }
-    
-  // FIXME: This diagnostic is a bit painful.
-  diagnose(E->getDotLoc(), diag::no_valid_dot_expression, BaseTy)
-    << Base->getSourceRange() << SourceRange(E->getNameLoc(), E->getNameLoc());
-  return 0;
+  Expr *R = Lookup.createResultAST(Base, E->getDotLoc(), E->getNameLoc(), 
+                                   Context);
+  
+  // FIXME: This is really ad-hoc!
+  if (ApplyExpr *AE = dyn_cast_or_null<ApplyExpr>(R))
+    return semaApplyExpr(AE);
+  return R;
 }
 
 
