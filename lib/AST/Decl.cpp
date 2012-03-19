@@ -49,7 +49,7 @@ void *Module::operator new(size_t Bytes, ASTContext &C,
 
 
 SourceLoc Decl::getLocStart() const {
-  switch (Kind) {
+  switch (getKind()) {
 #define DECL(NAME, X) \
   case DeclKind::NAME: return cast<NAME##Decl>(this)->getLocStart();
 #include "swift/AST/DeclNodes.def"
@@ -294,6 +294,9 @@ namespace {
       else
         OS << "<null type>";
       OS << '\'';
+
+      if (VD->hasUseAsHeapLValue()) OS << " usedAsHeapLValue=true";
+      else if (VD->hasUseAsLValue()) OS << " usedAsLValue=true";
     }
 
 

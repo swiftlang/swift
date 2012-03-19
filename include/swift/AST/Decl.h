@@ -109,20 +109,57 @@ public:
 
 /// Decl - Base class for all declarations in Swift.
 class Decl {
-  const DeclKind Kind;
+  class DeclBitfields {
+    friend class Decl;
+    unsigned Kind : 8;
+  };
+  enum { NumDeclBits = 8 };
+  static_assert(NumDeclBits <= 32, "fits in an unsigned");
+
+  enum { NumNamedDeclBits = NumDeclBits };
+  static_assert(NumNamedDeclBits <= 32, "fits in an unsigned");
+
+  class ValueDeclBitfields {
+    friend class ValueDecl;
+    unsigned : NumNamedDeclBits;
+
+    // The following flags are not necessarily meaningful for all
+    // kinds of value-declarations.
+
+    /// Has this declaration been used as an l-value, other than by
+    /// immediately loading it?
+    unsigned UsedAsLValue : 1;
+
+    /// Has this declaration been used as a heap l-value, other than
+    /// by immediating loading it or converting it to a non-heap
+    /// l-value?
+    unsigned UsedAsHeapLValue : 1;
+  };
+  enum { NumValueDeclBits = NumNamedDeclBits + 2 };
+  static_assert(NumValueDeclBits <= 32, "fits in an unsigned");
+
+protected:
+  union {
+    DeclBitfields DeclBits;
+    ValueDeclBitfields ValueDeclBits;
+  };
+
+private:
   DeclContext *Context;
 
   Decl(const Decl&) = delete;
   void operator=(const Decl&) = delete;
 
 protected:
-  Decl(DeclKind kind, DeclContext *DC) : Kind(kind), Context(DC) {}
+  Decl(DeclKind kind, DeclContext *DC) : Context(DC) {
+    DeclBits.Kind = unsigned(kind);
+  }
 
 public:
   /// Alignment - The required alignment of Decl objects.
   enum { Alignment = 8 };
 
-  DeclKind getKind() const { return Kind; }
+  DeclKind getKind() const { return DeclKind(DeclBits.Kind); }
 
   DeclContext *getDeclContext() const { return Context; }
   void setDeclContext(DeclContext *DC) { Context = DC; }
@@ -268,6 +305,8 @@ class ValueDecl : public NamedDecl {
 protected:
   ValueDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty)
     : NamedDecl(K, DC, name), Ty(ty) {
+    ValueDeclBits.UsedAsLValue = false;
+    ValueDeclBits.UsedAsHeapLValue = false;
   }
 
 public:
@@ -304,6 +343,37 @@ public:
   /// declaration are l-values.
   bool isReferencedAsLValue() const {
     return getKind() == DeclKind::Var || getKind() == DeclKind::ElementRef;
+  }
+
+  /// flagUseAsLValue - Record that the given declaration is known to
+  /// be used as an l-value, but not necessarily a heap l-value.
+  void flagUseAsLValue() {
+    ValueDeclBits.UsedAsLValue = true;
+  }
+
+  /// flagUseAsHeapLValue - Record that the given declaration is known
+  /// to be used as a heap l-value.
+  void flagUseAsHeapLValue() {
+    ValueDeclBits.UsedAsLValue = true;
+    ValueDeclBits.UsedAsHeapLValue = true;
+  }
+
+  /// Is this declaration known to be used somewhere as an l-value?  A
+  /// 'false' answer is not definitive unless it's known that all
+  /// possible references to the declaration have been seen, as might
+  /// be true of (say) a local variable after typechecking is
+  /// complete.
+  bool hasUseAsLValue() const {
+    return ValueDeclBits.UsedAsLValue;
+  }
+
+  /// Is this declaration known to be used somewhere as a heap
+  /// l-value?  A 'false' answer is not definitive unless it's known
+  /// that all possible references to the declaration have been seen,
+  /// as might be true of (say) a local variable after typechecking is
+  /// complete.
+  bool hasUseAsHeapLValue() const {
+    return ValueDeclBits.UsedAsHeapLValue;
   }
 
   // Implement isa/cast/dyncast/etc.

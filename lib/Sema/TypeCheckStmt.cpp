@@ -70,7 +70,8 @@ public:
     S->setDest(E);
 
     Type lhsTy = E->getType();
-    if (LValueType *lvalueTy = dyn_cast<LValueType>(lhsTy)) {
+    if (LValueType *lvalueTy = lhsTy->getAs<LValueType>()) {
+      TC.markUseAsLValue(E, /*as heap*/ false);
       lhsTy = lvalueTy->getObjectType();
     } else {
       TC.diagnose(E->getLoc(), diag::assignment_lhs_not_lvalue);
@@ -79,7 +80,7 @@ public:
     E = S->getSrc();
     if (typeCheckExpr(E, lhsTy)) return 0;
     S->setSrc(E);
-    
+
     return S;
   }
   

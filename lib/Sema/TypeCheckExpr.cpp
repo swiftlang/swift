@@ -1075,3 +1075,117 @@ bool TypeChecker::typeCheckCondition(Expr *&E) {
   }
   return false;
 }
+
+/// Given a type-checked expression which yields a value that may or
+/// may not be materializable, find any l-value expressions which
+/// create part of the expression's result and call markUseAsLValue
+/// for them as appropriate.
+///
+/// The basic behavior here is simply checking whether the
+/// expression's type is an l-value type, except we can have r-value
+/// expressions that embed l-values in some cases.  This can only
+/// happen with tuple literals, but nonetheless it can happen.
+void TypeChecker::markUsesOfLValues(Expr *E) {
+  // Look through parens.
+  if (ParenExpr *PE = dyn_cast<ParenExpr>(E))
+    return markUsesOfLValues(PE->getSubExpr());
+  if (TupleExpr *TE = dyn_cast<TupleExpr>(E)) {
+    for (Expr *elt : TE->getElements())
+      markUsesOfLValues(elt);
+    return;
+  }
+  if (LValueType *LT = E->getType()->getAs<LValueType>())
+    markUseAsLValue(E, LT->isHeap());
+}
+
+namespace {
+  class LValueVisitor : public ASTVisitor<LValueVisitor> {
+    bool AsHeap;
+  public:
+    LValueVisitor(bool asHeap) : AsHeap(asHeap) {}
+
+#define EXPR(Id, Parent)
+#define UNCHECKED_EXPR(Id, Parent) \
+    void visit##Id##Expr(Id##Expr *E) { \
+      llvm_unreachable("trying to mark an unchecked expression"); \
+    }
+#include "swift/AST/ExprNodes.def"
+
+#define NON_LVALUE_EXPR(Id) \
+    void visit##Id##Expr(Id##Expr *E) { \
+      llvm_unreachable("never an l-value"); \
+    }
+    NON_LVALUE_EXPR(IntegerLiteral)
+    NON_LVALUE_EXPR(FloatLiteral)
+    NON_LVALUE_EXPR(Apply)
+    NON_LVALUE_EXPR(Closure)
+    NON_LVALUE_EXPR(Func)
+    NON_LVALUE_EXPR(Load)
+    NON_LVALUE_EXPR(Module)
+#undef NON_VALUE_EXPR
+
+    void visitErrorExpr(ErrorExpr *E) {}
+
+    void visitDeclRefExpr(DeclRefExpr *E) {
+      if (AsHeap) {
+        E->getDecl()->flagUseAsHeapLValue();
+      } else {
+        E->getDecl()->flagUseAsLValue();
+      }
+    }
+
+    void visitParenExpr(ParenExpr *E) {
+      visit(E->getSubExpr());
+    }
+
+    void visitAddressOfExpr(AddressOfExpr *E) {
+      visit(E->getSubExpr());
+    }
+
+    void visitTupleElementExpr(TupleElementExpr *E) {
+      visit(E->getBase());
+    }
+
+    void visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
+      visit(E->getSubExpr());
+    }
+
+    void visitRequalifyExpr(RequalifyExpr *E) {
+      visit(E->getSubExpr());
+    }
+
+    void visitMaterializeExpr(MaterializeExpr *E) {
+      // Nothing to mark.
+    }
+
+    void visitAnonClosureArgExpr(AnonClosureArgExpr *E) {
+      // FIXME: these should disappear and get turned into DREs.
+    }
+
+    void visitTupleShuffleExpr(TupleShuffleExpr *E) {
+      // Tuple shuffles can add l-values as defaults.
+      TupleType *TT = E->getType()->castTo<TupleType>();
+      for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i) {
+        if (E->getElementMapping()[i] == -1)
+          visit(TT->getFields()[i].getInit());
+      }
+      visit(E->getSubExpr());
+    }
+
+    void visitTupleExpr(TupleExpr *E) {
+      for (auto elt : E->getElements())
+        visit(elt);
+    }
+
+    void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
+      visit(E->getRHS());
+    }
+  };
+}
+
+/// Given an expression of l-value type, try to mark the ValueDecl
+/// which serves as a base for the l-value as having been used as an
+/// l-value.
+void TypeChecker::markUseAsLValue(Expr *E, bool asHeap) {
+  LValueVisitor(asHeap).visit(E);
+}

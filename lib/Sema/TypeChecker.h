@@ -62,6 +62,9 @@ public:
   Expr *convertToMaterializable(Expr *E);
 
   Expr *foldSequence(SequenceExpr *E);
+
+  void markUseAsLValue(Expr *E, bool asHeap);
+  void markUsesOfLValues(Expr *E);
   
   /// applyTypeToLiteral - Apply the specified type to the integer or float
   /// literal expression (which is known to have dependent type), performing

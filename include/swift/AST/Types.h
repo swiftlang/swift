@@ -808,6 +808,14 @@ public:
   Type getObjectType() const { return ObjectTy; }
   Qual getQualifiers() const { return Quals; }
 
+  /// Is this a 'heap' l-value type?  Certain l-values are usable as
+  /// heap l-values, i.e. they can be arbitrarily persisted.
+  bool isHeap() const {
+    return !(getQualifiers() & Qual::NonHeap);
+  }
+
+  /// Is this an 'explicit' l-value type?  L-value expressions become
+  /// explicit by being explicitly prefixed with &.
   bool isExplicit() const {
     return !(getQualifiers() & Qual::Implicit);
   }
