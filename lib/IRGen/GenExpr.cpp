@@ -445,7 +445,6 @@ namespace {
     USING_SUBEXPR(LookThroughOneof)
     USING_SUBEXPR(Requalify)
     USING_SUBEXPR(Materialize)
-    USING_SUBEXPR(Load) // This might not be safe.
 
     void visitTupleShuffleExpr(TupleShuffleExpr *E) {
       // First, evaluate the base expression.
