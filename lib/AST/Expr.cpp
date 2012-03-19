@@ -557,7 +557,7 @@ public:
     OS << ')';
   }
   void visitModuleExpr(ModuleExpr *E) {
-    printCommon(E, "module_expr") << '\n';
+    printCommon(E, "module_expr") << ')';
   }
   void visitSyntacticTupleElementExpr(TupleElementExpr *E) {
     printCommon(E, "syntactic_tuple_element_expr")
