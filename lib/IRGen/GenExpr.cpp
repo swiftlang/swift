@@ -174,13 +174,15 @@ void IRGenFunction::emitRValue(Expr *E, Explosion &explosion) {
     return emitApplyExpr(cast<ApplyExpr>(E), explosion);
 
   case ExprKind::IntegerLiteral:
-    return explosion.add(emitIntegerLiteralExpr(*this, cast<IntegerLiteralExpr>(E)));
+    return explosion.add(emitIntegerLiteralExpr(*this,
+                                                cast<IntegerLiteralExpr>(E)));
   case ExprKind::FloatLiteral:
-    return explosion.add(emitFloatLiteralExpr(*this, cast<FloatLiteralExpr>(E)));
+    return explosion.add(emitFloatLiteralExpr(*this,
+                                              cast<FloatLiteralExpr>(E)));
 
   case ExprKind::LookThroughOneof:
     return emitRValue(cast<LookThroughOneofExpr>(E)->getSubExpr(),
-                              explosion);
+                      explosion);
 
   case ExprKind::DeclRef:
     return emitDeclRef(cast<DeclRefExpr>(E), explosion);
@@ -393,6 +395,12 @@ void IRGenFunction::emitZeroInit(Address addr, const TypeInfo &type) {
 
 /// Emit an expression whose value is being ignored.
 void IRGenFunction::emitIgnored(Expr *E) {
+  // If this has module or metatype type, there is no value to emit.
+  // FIXME: This can be revisited if they get a runtime representation.
+  if (E->getType()->is<ModuleType>() ||
+      E->getType()->is<MetaTypeType>())
+    return;  
+  
   // For now, just emit it as an r-value.
   Explosion explosion(ExplosionKind::Maximal);
   emitRValue(E, explosion);

@@ -70,8 +70,11 @@ SourceLoc Expr::getLoc() const {
 }
 
 Expr *Expr::getSemanticsProvidingExpr() {
-  if (ParenExpr *parens = dyn_cast<ParenExpr>(this))
-    return parens->getSubExpr()->getSemanticsProvidingExpr();
+  if (ParenExpr *PE = dyn_cast<ParenExpr>(this))
+    return PE->getSubExpr()->getSemanticsProvidingExpr();
+  if (auto *DSBIE = dyn_cast<DotSyntaxBaseIgnoredExpr>(this))
+    return DSBIE->getRHS()->getSemanticsProvidingExpr();
+      
   return this;
 }
 

@@ -772,14 +772,9 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
                                                            Base));
     }
     case MemberLookupResult::IgnoreBase:
-      Expr *Result = new (Context) DeclRefExpr(R.D, E->getNameLoc(),
-                                                R.D->getTypeOfReference());
-      if (FuncDecl *FD = dyn_cast<FuncDecl>(R.D))
-        if (FD->isPlus())
-          return new (Context) DotSyntaxBaseIgnoredExpr(Base, E->getDotLoc(),
-                                                        Result);
-
-      return Result;
+      Expr *RHS = new (Context) DeclRefExpr(R.D, E->getNameLoc(),
+                                            R.D->getTypeOfReference());
+      return new (Context) DotSyntaxBaseIgnoredExpr(Base, E->getDotLoc(), RHS);
     }
   }
   
