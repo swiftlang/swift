@@ -578,8 +578,8 @@ public:
     return E;
   }
   
-  Expr *visitDotSyntaxPlusFuncUseExpr(DotSyntaxPlusFuncUseExpr *E) {
-    // DotSyntaxPlusFuncUseExpr is fully type checked.
+  Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
+    // DotSyntaxBaseIgnoredExpr is fully type checked.
     return E;
   }
 
@@ -776,7 +776,7 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
                                                 R.D->getTypeOfReference());
       if (FuncDecl *FD = dyn_cast<FuncDecl>(R.D))
         if (FD->isPlus())
-          return new (Context) DotSyntaxPlusFuncUseExpr(Base, E->getDotLoc(),
+          return new (Context) DotSyntaxBaseIgnoredExpr(Base, E->getDotLoc(),
                                                         Result);
 
       return Result;

@@ -211,7 +211,8 @@ public:
     return E;
   }
   
-  Expr *visitDotSyntaxPlusFuncUseExpr(DotSyntaxPlusFuncUseExpr *E) {
+  Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
+    // FIXME: Coerces the RHS.
     return E;
   }
 

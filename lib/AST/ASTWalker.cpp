@@ -212,14 +212,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return E;
   }
 
-  Expr *visitDotSyntaxPlusFuncUseExpr(DotSyntaxPlusFuncUseExpr *E) {
-    Expr *E2 = doIt(E->getBaseExpr());
+  Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
+    Expr *E2 = doIt(E->getLHS());
     if (E2 == nullptr) return nullptr;
-    E->setBaseExpr(E2);
+    E->setLHS(E2);
     
-    E2 = doIt(E->getPlusFuncExpr());
+    E2 = doIt(E->getRHS());
     if (E2 == nullptr) return nullptr;
-    E->setPlusFuncExpr(cast<DeclRefExpr>(E2));
+    E->setRHS(E2);
     return E;      
   }    
 

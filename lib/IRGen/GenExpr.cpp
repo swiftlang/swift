@@ -160,10 +160,10 @@ void IRGenFunction::emitRValue(Expr *E, Explosion &explosion) {
   case ExprKind::ImplicitThisTupleElement:
     return emitTupleElement(cast<TupleElementExpr>(E), explosion);
 
-  case ExprKind::DotSyntaxPlusFuncUse: {
-    DotSyntaxPlusFuncUseExpr *DE = cast<DotSyntaxPlusFuncUseExpr>(E);
-    emitIgnored(DE->getBaseExpr());
-    return emitRValue(DE->getPlusFuncExpr(), explosion);
+  case ExprKind::DotSyntaxBaseIgnored: {
+    DotSyntaxBaseIgnoredExpr *DE = cast<DotSyntaxBaseIgnoredExpr>(E);
+    emitIgnored(DE->getLHS());
+    return emitRValue(DE->getRHS(), explosion);
   }
 
   case ExprKind::Call:
@@ -223,7 +223,7 @@ LValue IRGenFunction::emitLValue(Expr *E) {
   case ExprKind::ImplicitClosure:
   case ExprKind::Load:
   case ExprKind::Tuple:
-  case ExprKind::DotSyntaxPlusFuncUse:
+  case ExprKind::DotSyntaxBaseIgnored:
   case ExprKind::Module:
   case ExprKind::ConstructorCall:
   case ExprKind::DotSyntaxCall:
@@ -346,7 +346,7 @@ IRGenFunction::tryEmitAsAddress(Expr *E, const TypeInfo &type) {
   case ExprKind::Func:
   case ExprKind::ExplicitClosure:
   case ExprKind::ImplicitClosure:
-  case ExprKind::DotSyntaxPlusFuncUse:
+  case ExprKind::DotSyntaxBaseIgnored:
   case ExprKind::Module:
     return Nothing;
   }

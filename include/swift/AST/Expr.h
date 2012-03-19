@@ -1029,34 +1029,35 @@ public:
 };
 
   
-/// DotSyntaxPlusFuncUseExpr - When a.b resolves to a 'plus' function on A's
-/// type, then 'a' is evaluated and discarded.  'b' is evaluated and returned as
-/// the result of the expression.
-class DotSyntaxPlusFuncUseExpr : public Expr {
-  Expr *BaseExpr;
+/// DotSyntaxBaseIgnoredExpr - When a.b resolves to something that does not need
+/// the actual value of the base (e.g. when applied to a metatype, module, or
+/// the base of a 'plus' function) this expression node is created.  The
+/// semantics are that its base is evaluated and discarded, then 'b' is
+/// evaluated and returned as the result of the expression.
+class DotSyntaxBaseIgnoredExpr : public Expr {
+  Expr *LHS;
   SourceLoc DotLoc;
-  Expr *PlusFuncExpr;
+  Expr *RHS;
 public:
-  DotSyntaxPlusFuncUseExpr(Expr *BaseExpr, SourceLoc DotLoc, 
-                           Expr *PlusFuncExpr)
-    : Expr(ExprKind::DotSyntaxPlusFuncUse, PlusFuncExpr->getType()),
-      BaseExpr(BaseExpr), DotLoc(DotLoc), PlusFuncExpr(PlusFuncExpr) {
+  DotSyntaxBaseIgnoredExpr(Expr *LHS, SourceLoc DotLoc, Expr *RHS)
+    : Expr(ExprKind::DotSyntaxBaseIgnored, RHS->getType()),
+      LHS(LHS), DotLoc(DotLoc), RHS(RHS) {
   }
   
-  Expr *getBaseExpr() { return BaseExpr; }
-  void setBaseExpr(Expr *E) { BaseExpr = E; }
+  Expr *getLHS() { return LHS; }
+  void setLHS(Expr *E) { LHS = E; }
   SourceLoc getDotLoc() const { return DotLoc; }
-  Expr *getPlusFuncExpr() { return PlusFuncExpr; }
-  void setPlusFuncExpr(Expr *DRE) { PlusFuncExpr = DRE; }
+  Expr *getRHS() { return RHS; }
+  void setRHS(Expr *E) { RHS = E; }
 
   SourceRange getSourceRange() const {
-    return SourceRange(BaseExpr->getStartLoc(), PlusFuncExpr->getEndLoc());
+    return SourceRange(LHS->getStartLoc(), RHS->getEndLoc());
   }
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const DotSyntaxPlusFuncUseExpr *) { return true; }
+  static bool classof(const DotSyntaxBaseIgnoredExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::DotSyntaxPlusFuncUse;
+    return E->getKind() == ExprKind::DotSyntaxBaseIgnored;
   }
 
 };

@@ -656,11 +656,11 @@ public:
   void visitDotSyntaxCallExpr(DotSyntaxCallExpr *E) {
     printApplyExpr(E, "dot_syntax_call_expr");
   }
-  void visitDotSyntaxPlusFuncUseExpr(DotSyntaxPlusFuncUseExpr *E) {
-    printCommon(E, "dot_syntax_plus_func_use") << '\n';
-    printRec(E->getBaseExpr());
+  void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
+    printCommon(E, "dot_syntax_base_ignored") << '\n';
+    printRec(E->getLHS());
     OS << '\n';
-    printRec(E->getPlusFuncExpr());
+    printRec(E->getRHS());
     OS << ')';
   }    
 };
