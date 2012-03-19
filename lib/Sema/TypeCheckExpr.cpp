@@ -220,7 +220,7 @@ Expr *TypeChecker::buildDeclRefRValue(ValueDecl *val, SourceLoc loc) {
   }
 
   Type lvalueType = LValueType::get(val->getType(),
-                                    LValueType::Qual::Default,
+                                    LValueType::Qual::DefaultForVar,
                                     Context);
   Expr *E = new (Context) DeclRefExpr(val, loc, lvalueType);
   return new (Context) LoadExpr(E, val->getType());
@@ -560,20 +560,8 @@ public:
     return TC.semaUnresolvedDotExpr(E);
   }
   
-  Expr *visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
-    // LookThroughOneofExpr is fully resolved.
-    assert(!E->getType()->is<DependentType>());
-    return E;
-  }
-
   Expr *visitTupleElementExpr(TupleElementExpr *E) {
     // TupleElementExpr is fully resolved.
-    assert(!E->getType()->is<DependentType>());
-    return E;
-  }
-  
-  Expr *visitTupleShuffleExpr(TupleShuffleExpr *E) {
-    // TupleShuffleExpr is fully resolved.
     assert(!E->getType()->is<DependentType>());
     return E;
   }
@@ -583,13 +571,9 @@ public:
     return E;
   }
 
-  Expr *visitLoadExpr(LoadExpr *E) {
-    // LoadExpr is fully checked.
-    return E;
-  }
-
-  Expr *visitMaterializeExpr(MaterializeExpr *E) {
-    // MaterializeExpr is fully checked.
+  Expr *visitImplicitConversionExpr(ImplicitConversionExpr *E) {
+    assert(!E->getType()->is<DependentType>());
+    // Implicit conversions have been fully checked.
     return E;
   }
   

@@ -618,6 +618,21 @@ public:
     return E->getKind() == ExprKind::Materialize;
   }
 };
+
+/// RequalifyExpr - Change the qualification on an l-value.  The new
+/// type always has the same object type as the old type with strictly
+/// "more" (i.e. a supertyped set of) qualifiers.
+class RequalifyExpr : public ImplicitConversionExpr {
+public:
+  RequalifyExpr(Expr *subExpr, Type type)
+    : ImplicitConversionExpr(ExprKind::Requalify, subExpr, type) {}
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const RequalifyExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Requalify;
+  }
+};
   
 /// LookThroughOneofExpr - Implicitly look through a 'oneof' type with
 /// one enumerator.  This operation may be performed on either an

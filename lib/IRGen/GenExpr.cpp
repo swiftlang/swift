@@ -143,6 +143,9 @@ void IRGenFunction::emitRValue(Expr *E, Explosion &explosion) {
     return;
   }
 
+  case ExprKind::Requalify:
+    return emitRequalify(cast<RequalifyExpr>(E), explosion);
+
   case ExprKind::Paren:
     return emitRValue(cast<ParenExpr>(E)->getSubExpr(), explosion);
 
@@ -244,6 +247,10 @@ LValue IRGenFunction::emitLValue(Expr *E) {
   case ExprKind::LookThroughOneof:
     return emitLookThroughOneofLValue(cast<LookThroughOneofExpr>(E));
 
+  // Qualification never affects emission as an l-value.
+  case ExprKind::Requalify:
+    return emitLValue(cast<RequalifyExpr>(E)->getSubExpr());
+
   case ExprKind::Materialize: {
     Address addr = emitMaterializeExpr(*this, cast<MaterializeExpr>(E));
     return emitAddressLValue(addr);
@@ -316,6 +323,10 @@ IRGenFunction::tryEmitAsAddress(Expr *E, const TypeInfo &type) {
   // Look through parens.
   case ExprKind::Paren:
     return tryEmitAsAddress(cast<ParenExpr>(E)->getSubExpr(), type);
+
+  // We can locate a requalified l-value if we can locate the original.
+  case ExprKind::Requalify:
+    return tryEmitAsAddress(cast<RequalifyExpr>(E)->getSubExpr(), type);
 
   // We can locate a oneof payload if we can locate the oneof.
   case ExprKind::LookThroughOneof:

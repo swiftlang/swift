@@ -39,6 +39,7 @@ bool TypeBase::isEqual(Type Other) {
 /// rules of the language?  Basically, does it not contain any l-value
 /// types?
 bool TypeBase::isMaterializable() {
+  // Tuples are materializable if all their elements are.
   if (TupleType *tuple = getAs<TupleType>()) {
     for (auto &field : tuple->getFields())
       if (!field.getType()->isMaterializable())
@@ -46,7 +47,12 @@ bool TypeBase::isMaterializable() {
     return true;
   }
 
-  return !is<LValueType>();
+  // Some l-values may be materializable someday.
+  if (LValueType *lvalue = getAs<LValueType>())
+    return lvalue->isMaterializable();
+
+  // Everything else is materializable.
+  return true;
 }
 
 /// hasReferenceSemantics - Does this type have reference semantics?
@@ -418,10 +424,23 @@ void LValueType::print(raw_ostream &OS) const {
   OS << "[byref";
 
   Qual qs = getQualifiers();
-  if (qs & (Qual::Implicit)) {
+  if (qs != Qual::DefaultForType) {
+    bool hasQual = false;
+#define APPEND_QUAL(cond, text) do { \
+      if (cond) {                    \
+        if (hasQual) OS << ", ";     \
+        hasQual = true;              \
+        OS << text;                  \
+      }                              \
+    } while(false)
+
     OS << '(';
-    if (qs & Qual::Implicit) OS << "implicit";
+    APPEND_QUAL(!(qs & Qual::NonHeap), "heap");
+    APPEND_QUAL(qs & Qual::Implicit, "implicit");
+    assert(hasQual && "wrote no qualifiers!");
     OS << ')';
+
+#undef APPEND_QUAL
   }
   OS << "] ";
   getObjectType()->print(OS);

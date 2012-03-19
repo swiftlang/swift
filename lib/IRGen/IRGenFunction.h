@@ -41,6 +41,7 @@ namespace swift {
   class LookThroughOneofExpr;
   class OneOfElementDecl;
   template<typename T> class Optional;
+  class RequalifyExpr;
   class ReturnStmt;
   class SourceLoc;
   class Stmt;
@@ -199,6 +200,8 @@ private:
   void emitLookThroughOneof(LookThroughOneofExpr *E, Explosion &expl);
   Optional<Address> tryEmitLookThroughOneofAsAddress(LookThroughOneofExpr *E);
   LValue emitLookThroughOneofLValue(LookThroughOneofExpr *E);
+
+  void emitRequalify(RequalifyExpr *E, Explosion &expl);
 
   void emitTupleElement(TupleElementExpr *E, Explosion &explosion);
   Optional<Address> tryEmitTupleElementAsAddress(TupleElementExpr *E);

@@ -122,7 +122,7 @@ ImportDecl::ImportDecl(DeclContext *DC, SourceLoc ImportLoc,
 /// reference to this value.
 Type ValueDecl::getTypeOfReference() const {
   if (isReferencedAsLValue()) {
-    return LValueType::get(Ty, LValueType::Qual::Default, getASTContext());
+    return LValueType::get(Ty, LValueType::Qual::DefaultForVar, getASTContext());
   } else {
     return Ty;
   }
@@ -198,8 +198,9 @@ Type FuncDecl::computeThisType() const {
   if (ContainerType->hasReferenceSemantics())
     return ContainerType;
   
-  // 'this' is accepts implicit l-values.
-  return LValueType::get(ContainerType, LValueType::Qual::Implicit,
+  // 'this' is accepts implicit l-values and doesn't force them to the heap.
+  return LValueType::get(ContainerType,
+                         LValueType::Qual::Implicit | LValueType::Qual::NonHeap,
                          getASTContext());
 }
 

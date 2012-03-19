@@ -150,20 +150,35 @@ namespace {
     }
 
     void verifyChecked(AddressOfExpr *E) {
-      Type resultType = E->getType();
-      checkLValue(resultType, "result of AddressOfExpr");
-      LValueType *resultLV = resultType->castTo<LValueType>();
+      LValueType::Qual resultQuals;
+      Type resultObj = checkLValue(E->getType(), resultQuals,
+                                   "result of AddressOfExpr");
 
-      Type srcType = E->getSubExpr()->getType();
-      checkLValue(srcType, "source of AddressOfExpr");
-      LValueType *srcLV = srcType->castTo<LValueType>();
+      LValueType::Qual srcQuals;
+      Type srcObj = checkLValue(E->getSubExpr()->getType(), srcQuals,
+                                "source of AddressOfExpr");
 
-      checkSameType(resultLV->getObjectType(), srcLV->getObjectType(),
-                    "object types for AddressOfExpr");
+      checkSameType(resultObj, srcObj, "object types for AddressOfExpr");
 
-      if ((resultLV->getQualifiers() | LValueType::Qual::Implicit)
-            != srcLV->getQualifiers()) {
+      if ((resultQuals | LValueType::Qual::Implicit) != srcQuals) {
         Out << "mismatched qualifiers";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+    }
+
+    void verifyChecked(RequalifyExpr *E) {
+      LValueType::Qual dstQuals, srcQuals;
+      Type dstObj = checkLValue(E->getType(), dstQuals,
+                                "result of RequalifyExpr");
+      Type srcObj = checkLValue(E->getSubExpr()->getType(), srcQuals,
+                                "input to RequalifyExpr");
+      checkSameType(dstObj, srcObj,
+                    "objects of result and operand of RequalifyExpr");
+
+      if (!(srcQuals < dstQuals)) {
+        Out << "bad qualifier sets for RequalifyExpr";
         E->print(Out);
         Out << "\n";
         abort();
@@ -263,7 +278,7 @@ namespace {
 
     /// Look through a possible l-value type, returning true if it was
     /// an l-value.
-    bool lookThroughLValue(Type &type) {
+    bool lookThroughLValue(Type &type, LValueType::Qual &qs) {
       if (LValueType *lv = type->getAs<LValueType>()) {
         Type objectType = lv->getObjectType();
         if (objectType->is<LValueType>()) {
@@ -276,20 +291,36 @@ namespace {
       }
       return false;
     }
+    bool lookThroughLValue(Type &type) {
+      LValueType::Qual qs;
+      return lookThroughLValue(type, qs);
+    }
 
     /// The two types are required to either both be l-values or
     /// both not be l-values.  They are adjusted to not be l-values.
     /// Returns true if they are both l-values.
-    bool checkSameLValueness(Type &T0, Type &T1, const char *what) {
-      bool isLValue0 = lookThroughLValue(T0);
-      bool isLValue1 = lookThroughLValue(T1);
+    bool checkSameLValueness(Type &T0, Type &T1,
+                             const char *what) {
+      LValueType::Qual Q0, Q1;
+      bool isLValue0 = lookThroughLValue(T0, Q0);
+      bool isLValue1 = lookThroughLValue(T1, Q1);
       
-      if (isLValue0 == isLValue1)
-        return isLValue0;
+      if (isLValue0 != isLValue1) {
+        Out << "lvalue-ness of " << what << " do not match: "
+            << isLValue0 << ", " << isLValue1 << "\n";
+        abort();
+      }
 
-      Out << "lvalue-ness of " << what << " do not match: "
-          << isLValue0 << ", " << isLValue1 << ")\n";
-      abort();
+      if (isLValue0 && Q0 != Q1) {
+        Out << "qualification of " << what << " do not match: ";
+        printQualifiers(Q0);
+        Out << ", ";
+        printQualifiers(Q1);
+        Out << "\n";
+        abort();
+      }
+
+      return isLValue0;
     }
 
     /// The two types are required to either both be l-values or
@@ -305,14 +336,21 @@ namespace {
       abort();
     }
 
-    Type checkLValue(Type T, const char *what) {
+    Type checkLValue(Type T, LValueType::Qual &Q, const char *what) {
       LValueType *LV = T->getAs<LValueType>();
-      if (LV) return LV->getObjectType();
+      if (LV) {
+        Q = LV->getQualifiers();
+        return LV->getObjectType();
+      }
 
       Out << "type is not an l-value in " << what << ": ";
       T.print(Out);
       Out << "\n";
       abort();
+    }
+    Type checkLValue(Type T, const char *what) {
+      LValueType::Qual qs;
+      return checkLValue(T, qs, what);
     }
 
     // Verification utilities.
@@ -407,7 +445,11 @@ namespace {
                            End.Value.getPointer() - Begin.Value.getPointer());
       Out << '"' << Text << '"';
     }
-    
+
+    void printQualifiers(LValueType::Qual qs) {
+      if (qs & LValueType::Qual::Implicit) Out << "implicit";
+      if (qs & LValueType::Qual::NonHeap) Out << "|nonheap";
+    }
   };
 }
 

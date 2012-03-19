@@ -87,6 +87,7 @@ ABSTRACT_EXPR(ImplicitConversion, Expr)
   EXPR(Load, ImplicitConversionExpr)
   EXPR(LookThroughOneof, ImplicitConversionExpr)
   EXPR(Materialize, ImplicitConversionExpr)
+  EXPR(Requalify, ImplicitConversionExpr)
   EXPR(TupleShuffle, ImplicitConversionExpr)
   EXPR_RANGE(ImplicitConversion, Load, TupleShuffle)
 

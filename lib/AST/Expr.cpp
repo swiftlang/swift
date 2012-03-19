@@ -584,6 +584,11 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitRequalifyExpr(RequalifyExpr *E) {
+    printCommon(E, "requalify_expr") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
 
   void visitAddressOfExpr(AddressOfExpr *E) {
     printCommon(E, "address_of_expr") << '\n';

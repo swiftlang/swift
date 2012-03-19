@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Expr.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "Explosion.h"
@@ -156,4 +157,9 @@ void IRGenFunction::emitAssign(Expr *rhs, const LValue &lhs,
   Explosion explosion(ExplosionKind::Minimal);
   emitRValue(rhs, explosion);
   emitAssign(explosion, lhs, type);
+}
+
+void IRGenFunction::emitRequalify(RequalifyExpr *E, Explosion &explosion) {
+  // For now, all l-values have the same representation.
+  return emitRValue(E->getSubExpr(), explosion);
 }

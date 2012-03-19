@@ -199,6 +199,7 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
 
     Attributes.Byref = true;
     Attributes.ByrefImplicit = false;
+    Attributes.ByrefHeap = false;
 
     // Permit "qualifiers" on the byref.
     SourceLoc beginLoc = Tok.getLoc();
@@ -208,6 +209,9 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
         skipUntil(tok::r_paren);
       } else if (Tok.getText() == "implicit") {
         Attributes.ByrefImplicit = true;
+        consumeToken(tok::identifier);
+      } else if (Tok.getText() == "heap") {
+        Attributes.ByrefHeap = true;
         consumeToken(tok::identifier);
       } else {
         diagnose(Tok, diag::byref_attribute_unknown_qualifier);

@@ -42,6 +42,7 @@ bool Parser::parseTypeAnnotation(Type &result, Diag<> message) {
   if (attrs.isByref()) {
     LValueType::Qual quals;
     if (attrs.isByrefImplicit()) quals |= LValueType::Qual::Implicit;
+    if (!attrs.isByrefHeap()) quals |= LValueType::Qual::NonHeap;
     result = LValueType::get(result, quals, Context);
     attrs.Byref = false; // so that the empty() check below works
   }

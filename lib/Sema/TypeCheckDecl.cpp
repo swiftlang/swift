@@ -92,8 +92,11 @@ public:
 
     // Verify that the type is materializable.
     if (!VD->getType()->isMaterializable()) {
-      TC.diagnose(VD->getLocStart(), diag::var_type_not_materializable,
-                  VD->getType());
+      if (VD->getType()->is<LValueType>())
+        TC.diagnose(VD->getLocStart(), diag::var_type_is_lvalue);
+      else
+        TC.diagnose(VD->getLocStart(), diag::var_type_not_materializable,
+                    VD->getType());
     }
     
     // If the VarDecl had a name specifier, verify that it lines up with the

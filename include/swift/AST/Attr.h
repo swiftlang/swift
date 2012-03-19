@@ -137,6 +137,7 @@ public:
   ResilienceData Resilience;
   bool Byref;
   bool ByrefImplicit;
+  bool ByrefHeap;
   bool AutoClosure;
 
   DeclAttributes() : Byref(false), AutoClosure(false) { }
@@ -147,6 +148,7 @@ public:
   InfixData getInfixData() const { return Infix; }
   ResilienceData getResilienceData() const { return Resilience; }
   bool isByref() const { return Byref; }
+  bool isByrefHeap() const { assert(isByref()); return ByrefHeap; }
   bool isByrefImplicit() const { assert(isByref()); return ByrefImplicit; }
   bool isAutoClosure() const { return AutoClosure; }
     

@@ -122,20 +122,11 @@ public:
     return E;
   }
 
-  Expr *visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
-    llvm_unreachable("coercing an expression already looked through");
-  }
-  
   Expr *visitTupleElementExpr(TupleElementExpr *E) {
     // TupleElementExpr is fully resolved.
     llvm_unreachable("This node doesn't exist for dependent types");
   }
   
-  Expr *visitTupleShuffleExpr(TupleShuffleExpr *E) {
-    // TupleElementExpr is fully resolved.
-    llvm_unreachable("This node doesn't exist for dependent types");
-  }
-
   
   Expr *visitCallExpr(CallExpr *E) {
     // If we have ":f(x)" and the result type of the call is a OneOfType, then
@@ -216,11 +207,7 @@ public:
     return E;
   }
 
-  Expr *visitLoadExpr(LoadExpr *E) {
-    return E;
-  }
-
-  Expr *visitMaterializeExpr(MaterializeExpr *E) {
+  Expr *visitImplicitConversionExpr(ImplicitConversionExpr *E) {
     return E;
   }
 
@@ -311,7 +298,7 @@ Expr *SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
       NewArgType = FT->getInput();
     }
 
-    Arg->setType(LValueType::get(NewArgType, LValueType::Qual::Default,
+    Arg->setType(LValueType::get(NewArgType, LValueType::Qual::DefaultForVar,
                                  TC.Context));
   }
   
@@ -618,8 +605,9 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC) {
     // Qualification conversion.
     if (SrcLT && DestLT->getObjectType()->isEqual(SrcLT->getObjectType()) &&
         SrcLT->getQualifiers() <= DestLT->getQualifiers()) {
-      // TODO: should we have an AST node for qualification conversions?
-      return E;
+      assert(SrcLT->getQualifiers() < DestLT->getQualifiers() &&
+             "qualifiers match exactly but types are different?");
+      return new (TC.Context) RequalifyExpr(E, DestTy);
     }
 
     // Materialization.

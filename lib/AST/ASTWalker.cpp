@@ -97,14 +97,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return nullptr;
   }
   
-  Expr *visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
-    if (Expr *E2 = doIt(E->getSubExpr())) {
-      E->setSubExpr(E2);
-      return E;
-    }
-    return nullptr;
-  }
-  
   Expr *visitTupleElementExpr(TupleElementExpr *E) {
     if (Expr *E2 = doIt(E->getBase())) {
       E->setBase(E2);
@@ -113,29 +105,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return nullptr;
   }
   
-  Expr *visitTupleShuffleExpr(TupleShuffleExpr *E) {
+  Expr *visitImplicitConversionExpr(ImplicitConversionExpr *E) {
     if (Expr *E2 = doIt(E->getSubExpr())) {
       E->setSubExpr(E2);
       return E;
     }
     return nullptr;
-  }
-  
-  Expr *visitLoadExpr(LoadExpr *E) {
-    if (Expr *E2 = doIt(E->getSubExpr())) {
-      E->setSubExpr(E2);
-      return E;
-    }
-    return nullptr;
-  }
-
-  Expr *visitMaterializeExpr(MaterializeExpr *E) {
-    if (Expr *E2 = doIt(E->getSubExpr())) {
-      E->setSubExpr(E2);
-      return E;
-    }
-    return nullptr;
-  }
+}
 
   Expr *visitAddressOfExpr(AddressOfExpr *E) {
     if (Expr *E2 = doIt(E->getSubExpr())) {
