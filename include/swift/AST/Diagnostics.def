@@ -519,8 +519,6 @@ ERROR(no_FloatLiteralType_found,sema_tce,none,
 ERROR(ambiguous_expression_unresolved,sema_tce,none,
       "ambiguous expression was not resolved to a concrete type", ())
 
-ERROR(invalid_member,sema_tce,none,
-      "%0 is not a member of %1", (Identifier, Type))
 ERROR(invalid_module_member,sema_tce,none,
       "%0 is not a member of %1 module", (Identifier, Identifier))
 

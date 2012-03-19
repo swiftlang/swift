@@ -20,7 +20,7 @@
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {
-  class Decl;
+  class ValueDecl;
   class Type;
   class Module;
   class Identifier;
@@ -30,7 +30,7 @@ namespace swift {
 struct MemberLookupResult {
   /// D - The decl found or tuple element referenced.
   union {
-    Decl *D;
+    ValueDecl *D;
     unsigned TupleFieldNo;
   };
 
@@ -52,13 +52,13 @@ struct MemberLookupResult {
     StructElement
   } Kind;
   
-  static MemberLookupResult getPassBase(Decl *D) {
+  static MemberLookupResult getPassBase(ValueDecl *D) {
     MemberLookupResult R;
     R.D = D;
     R.Kind = PassBase;
     return R;
   }
-  static MemberLookupResult getIgnoreBase(Decl *D) {
+  static MemberLookupResult getIgnoreBase(ValueDecl *D) {
     MemberLookupResult R;
     R.D = D;
     R.Kind = IgnoreBase;

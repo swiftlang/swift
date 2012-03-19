@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "NameLookup.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/ASTWalker.h"
@@ -693,191 +694,111 @@ public:
 } // end anonymous namespace.
 
 static Type makeSimilarLValue(Type objectType, Type lvalueType,
-                              TypeChecker &TC) {
+                              ASTContext &Context) {
   LValueType::Qual qs = cast<LValueType>(lvalueType)->getQualifiers();
 
   // Don't propagate explicitness.
   qs |= LValueType::Qual::Implicit;
 
-  return LValueType::get(objectType, qs, TC.Context);
+  return LValueType::get(objectType, qs, Context);
 }
 
-static Expr *lookThroughOneofs(Expr *E, bool isLValue, TypeChecker &TC) {
-  assert(isLValue == E->getType()->is<LValueType>());
+static Expr *lookThroughOneofs(Expr *E, ASTContext &Context) {
 
-  Type baseType = E->getType();
-  if (isLValue) baseType = cast<LValueType>(baseType)->getObjectType();
+  Type BaseType = E->getType();
+  bool IsLValue = E->getType()->is<LValueType>();
+  if (IsLValue)
+    BaseType = cast<LValueType>(BaseType)->getObjectType();
 
-  OneOfType *oneof = baseType->castTo<OneOfType>();
-  assert(oneof->isTransparentType());
+  OneOfType *Oneof = BaseType->castTo<OneOfType>();
+  assert(Oneof->isTransparentType());
 
-  Type resultType = oneof->getTransparentType();
-  if (isLValue)
-    resultType = makeSimilarLValue(resultType, E->getType(), TC);
-  return new (TC.Context) LookThroughOneofExpr(E, resultType);
+  Type ResultType = Oneof->getTransparentType();
+  if (IsLValue)
+    ResultType = makeSimilarLValue(ResultType, E->getType(), Context);
+  return new (Context) LookThroughOneofExpr(E, ResultType);
 }
 
-static Expr *buildTupleElementExpr(Expr *base, UnresolvedDotExpr *syntax,
-                                   TupleType *baseType, unsigned fieldIndex,
-                                   bool baseIsLValue, bool baseIsOneof,
-                                   TypeChecker &TC) {
-  assert(baseIsLValue == base->getType()->is<LValueType>());
+static Expr *buildTupleElementExpr(Expr *Base, UnresolvedDotExpr *Syntax,
+                                   unsigned FieldIndex,
+                                   ASTContext &Context) {
+  Type BaseTy = Base->getType();
+  bool IsLValue = false;
+  if (LValueType *LV = BaseTy->getAs<LValueType>()) {
+    IsLValue = true;
+    BaseTy = LV->getObjectType();
+  }
 
-  if (baseIsOneof)
-    base = lookThroughOneofs(base, baseIsLValue, TC);
-
-  Type fieldType = baseType->getElementType(fieldIndex);
-  if (baseIsLValue)
-    fieldType = makeSimilarLValue(fieldType, base->getType(), TC);
+  Type FieldType = BaseTy->castTo<TupleType>()->getElementType(FieldIndex);
+  if (IsLValue)
+    FieldType = makeSimilarLValue(FieldType, Base->getType(), Context);
     
-  return new (TC.Context) SyntacticTupleElementExpr(base, syntax->getDotLoc(),
-                                                    fieldIndex,
-                                                    syntax->getNameLoc(),
-                                                    fieldType);
+  return new (Context) SyntacticTupleElementExpr(Base, Syntax->getDotLoc(),
+                                                 FieldIndex,
+                                                 Syntax->getNameLoc(),
+                                                 FieldType);
 }
 
 Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
-  // FIXME: Kill diag::invalid_member
   Expr *Base = E->getBase();
-  Type SubExprTy = Base->getType();
+  Type BaseTy = Base->getType();
   Identifier MemberName = E->getName();
-
-  bool wasLValue = false;
-  if (LValueType *LV = SubExprTy->getAs<LValueType>()) {
-    wasLValue = true;
-    SubExprTy = LV->getObjectType();
-  }
   
-  if (SubExprTy->is<DependentType>()) {
-    E->setDependentType(SubExprTy);
+  if (BaseTy->is<DependentType>()) {
+    E->setDependentType(BaseTy);
     return E;
   }
   
-  if (SubExprTy->is<ErrorType>())
+  if (BaseTy->is<ErrorType>())
     return 0;  // Squelch an erroneous subexpression.
-  
 
-  // Check in the context of a protocol.
-  if (ProtocolType *PT = SubExprTy->getAs<ProtocolType>()) {
-    for (ValueDecl *VD : PT->Elements) {
-      if (VD->getName() != MemberName) continue;
-      
-      // The protocol value is applied via a DeclRefExpr.
-      Expr *fn = buildDeclRefRValue(VD, E->getNameLoc());
-      
-      if (FuncDecl *FD = dyn_cast<FuncDecl>(VD))
+  // Perform name lookup.
+  MemberLookup Lookup(BaseTy, MemberName, TU);
+  
+  // If we performed a lookup and found exactly one result, return success.
+  if (Lookup.Results.size() == 1) {
+    MemberLookupResult R = Lookup.Results[0];
+
+    switch (R.Kind) {
+    case MemberLookupResult::StructElement:
+      Base = lookThroughOneofs(Base, Context);
+      // FALL THROUGH.
+    case MemberLookupResult::TupleElement:
+      return buildTupleElementExpr(Base, E, R.TupleFieldNo, Context);
+    case MemberLookupResult::PassBase: {
+      Expr *Fn = new (Context) DeclRefExpr(R.D, E->getNameLoc(),
+                                           R.D->getTypeOfReference());
+      return semaApplyExpr(new (Context) DotSyntaxCallExpr(Fn, E->getDotLoc(),
+                                                           Base));
+    }
+    case MemberLookupResult::IgnoreBase:
+      Expr *Result = new (Context) DeclRefExpr(R.D, E->getNameLoc(),
+                                                R.D->getTypeOfReference());
+      if (FuncDecl *FD = dyn_cast<FuncDecl>(R.D))
         if (FD->isPlus())
           return new (Context) DotSyntaxPlusFuncUseExpr(Base, E->getDotLoc(),
-                                                           fn);
-      
-      ApplyExpr *Call = new (Context) 
-        DotSyntaxCallExpr(fn, E->getDotLoc(), Base);
-      return semaApplyExpr(Call);
+                                                        Result);
+
+      return Result;
     }
   }
   
-  // Type check metatype references, as in "some_type.some_member".
-  if (MetaTypeType *MTT = SubExprTy->getAs<MetaTypeType>()) {
-    // The metatype represents an arbitrary named type: dig through the
-    // TypeAlias to see what we're dealing with.  If the typealias was erroneous
-    // then silently squish this erroneous subexpression.
-    Type Ty = MTT->getTypeDecl()->getUnderlyingType();
-    if (Ty->is<ErrorType>())
-      return 0;  // Squelch an erroneous subexpression.
-        
-    if (OneOfType *OOTy = Ty->getAs<OneOfType>()) {
-      OneOfElementDecl *Elt = OOTy->getElement(MemberName);
-      if (Elt)  // FIXME: This throws away syntactic information from the AST.
-        return new (Context) DeclRefExpr(Elt, E->getNameLoc(),
-                                         Elt->getTypeOfReference());
+  // If we have an ambiguous result, build an overload set.
+  if (Lookup.Results.size() > 1) {
+    SmallVector<ValueDecl*, 8> ResultSet;
+
+    // FIXME: This is collecting a mix of plus and normal functions.
+    for (MemberLookupResult X : Lookup.Results) {
+      assert(X.Kind != MemberLookupResult::TupleElement &&
+             X.Kind != MemberLookupResult::StructElement);
+      ResultSet.push_back(X.D);
     }
     
-    // Look up references in extension methods.
-    // Look in any extensions that add methods to the base type.
-    SmallVector<ValueDecl*, 8> ExtensionMethods;
-    TU.lookupGlobalExtensionMethods(Ty, MemberName, ExtensionMethods);
-
-    if (ExtensionMethods.empty()) {
-      diagnose(E->getDotLoc(), diag::invalid_member, MemberName, Ty)
-        << Base->getSourceRange()
-        << SourceRange(E->getNameLoc(), E->getNameLoc());
-      return 0;
-    }
+    return OverloadSetRefExpr::createWithCopy(ResultSet, E->getNameLoc());
+  }
     
-    return OverloadSetRefExpr::createWithCopy(ExtensionMethods,E->getNameLoc());
-  }
-
-  // Type check module type references, as on some_module.some_member".
-  if (ModuleType *MT = SubExprTy->getAs<ModuleType>()) {
-    SmallVector<ValueDecl*, 8> Decls;
-    MT->getModule()->lookupValue(Module::AccessPathTy(), MemberName,
-                                 NLKind::QualifiedLookup, Decls);
-
-    if (Decls.empty()) {
-      diagnose(E->getDotLoc(), diag::invalid_module_member, MemberName,
-                  MT->getModule()->Name)
-        << Base->getSourceRange()
-        << SourceRange(E->getNameLoc(), E->getNameLoc());
-      return 0;
-    }
-    return OverloadSetRefExpr::createWithCopy(Decls, E->getNameLoc());
-  }
-
-  // Look in any extensions that add methods to the base type.
-  SmallVector<ValueDecl*, 8> ExtensionMethods;
-  TU.lookupGlobalExtensionMethods(SubExprTy, MemberName, ExtensionMethods);
-  
-  if (!ExtensionMethods.empty()) {
-    Expr *FnRef = OverloadSetRefExpr::createWithCopy(ExtensionMethods,
-                                                     E->getNameLoc());
-    // Handle "plus" methods.
-    if (ExtensionMethods.size() == 1)
-      if (FuncDecl *FD = dyn_cast<FuncDecl>(ExtensionMethods[0]))
-        if (FD->isPlus())
-          return new (Context) DotSyntaxPlusFuncUseExpr(Base, E->getDotLoc(),
-                                                     cast<DeclRefExpr>(FnRef));
-
-    ApplyExpr *Call = new (Context) DotSyntaxCallExpr(FnRef, E->getDotLoc(),
-                                                      Base);
-    return semaApplyExpr(Call);
-  }
-
-  // If this is a member access to a oneof with a single element constructor
-  // (e.g. a struct), allow direct access to the type underlying the single
-  // element.
-  bool wasOneof = false;
-  if (OneOfType *OneOf = SubExprTy->getAs<OneOfType>())
-    if (OneOf->isTransparentType()) {
-      SubExprTy = OneOf->getTransparentType();
-      wasOneof = true;
-    }
-  
-  // Check to see if this is a reference to a tuple field.
-  if (TupleType *TT = SubExprTy->getAs<TupleType>()) {
-    // If the field name exists, we win.  Otherwise, if the field
-    // name is a dollarident like $4, process it as a field index.
-    int fieldIndex = TT->getNamedElementId(MemberName);
-    if (fieldIndex != -1)
-      return buildTupleElementExpr(Base, E, TT, (unsigned) fieldIndex,
-                                   wasLValue, wasOneof, *this);
-
-    StringRef name = MemberName.str();
-    if (name.startswith("$")) {
-      unsigned Value = 0;
-      if (!name.substr(1).getAsInteger(10, Value)) {
-        if (Value >= TT->getFields().size()) {
-          diagnose(E->getNameLoc(), diag::field_number_too_large);
-          return 0;
-        }
-
-        return buildTupleElementExpr(Base, E, TT, Value,
-                                     wasLValue, wasOneof, *this);
-      }
-    }
-  }
-  
   // FIXME: This diagnostic is a bit painful.
-  diagnose(E->getDotLoc(), diag::no_valid_dot_expression, SubExprTy)
+  diagnose(E->getDotLoc(), diag::no_valid_dot_expression, BaseTy)
     << Base->getSourceRange() << SourceRange(E->getNameLoc(), E->getNameLoc());
   return 0;
 }
