@@ -262,44 +262,44 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT) {
 //===----------------------------------------------------------------------===//
 
 /// BindNameToIVar - We have an unresolved reference to an identifier in some
-/// DeclContext.  Check to see if this is a reference to an instance variable,
+/// FuncDecl.  Check to see if this is a reference to an instance variable,
 /// and return an AST for the reference if so.  If not, return null with no
 /// error emitted.
-static Expr *BindNameToIVar(UnresolvedDeclRefExpr *UDRE, DeclContext *DC, 
+static Expr *BindNameToIVar(UnresolvedDeclRefExpr *UDRE, FuncDecl *CurFD, 
                             NameBinder &Binder) {
-  // Scan up the DeclContext chain until we find a FuncExpr.
-  for (; DC; DC = DC->getParent()) {
-    FuncExpr *FE = dyn_cast<FuncExpr>(DC);
-    if (FE == 0) continue;
-    
-    // If this is a non-plus function, it's parameter pattern will have a 'this'
-    // argument without location information.
-    VarDecl *ThisDecl = FE->getImplicitThisDecl();
-    if (ThisDecl == 0) continue;
+  Type ExtendedType = CurFD->getExtensionType();
+  if (ExtendedType.isNull()) return 0;
 
-    //ThisDecl->dump();
-    
-    
-    // This is happening after name binding types.  
+  // This should find methods even in plus functions.
+  
+  
+  // FIXME: This is going to have to find properties as well some day, which
+  // requires doing full extension lookup.
+  
+  
+  
+  //ExtendedType.dump();
+  // This is happening after name binding types.  
       
-    //(tuple_element_expr type='[byref(implicit)] CGSize' field #1
-    //  (look_through_oneof_expr type='[byref(implicit)] (origin : CGPoint, size : CGSize)'
-    //    (declref_expr type='[byref(implicit)] oneof { CGRect : (origin : CGPoint, size : CGSize)}' decl=t
-  }
+  //(tuple_element_expr type='[byref(implicit)] CGSize' field #1
+  //  (look_through_oneof_expr type='[byref(implicit)] (origin : CGPoint, size : CGSize)'
+  //    (declref_expr type='[byref(implicit)] oneof { CGRect : (origin : CGPoint, size : CGSize)}' decl=t
+  
   
   return 0;
 }
 
 /// BindName - Bind an UnresolvedDeclRefExpr by performing name lookup and
-/// returning the resultant expression.  If this reference is inside of a decl
-/// (e.g. in a function body) then DC is the DeclContext, otherwise it is null.
-static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *DC, 
+/// returning the resultant expression.  If this reference is inside of a
+/// FuncDecl (i.e. in a function body, not at global scope) then CurFD is the
+/// innermost function, otherwise null.
+static Expr *BindName(UnresolvedDeclRefExpr *UDRE, FuncDecl *CurFD, 
                       NameBinder &Binder) {
   
-  // If we are inside of a declaration context, check to see if there are any
-  // ivars in scope, and if so, whether this is a reference to one of them.
-  if (DC)
-    if (Expr *E = BindNameToIVar(UDRE, DC, Binder))
+  // If we are inside of a method, check to see if there are any ivars in scope,
+  // and if so, whether this is a reference to one of them.
+  if (CurFD)
+    if (Expr *E = BindNameToIVar(UDRE, CurFD, Binder))
       return E;
 
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
@@ -393,25 +393,28 @@ void swift::performNameBinding(TranslationUnit *TU) {
     NameBinder &Binder;
     NameBindingWalker(NameBinder &binder) : Binder(binder) {}
     
-    /// CurFuncs - This is the stack of FuncExprs that we're nested in.
-    SmallVector<FuncExpr*, 4> CurFuncs;
+    /// CurFuncDecls - This is the stack of FuncDecls that we're nested in.
+    SmallVector<FuncDecl*, 4> CurFuncDecls;
     
-    virtual bool walkToExprPre(Expr *E) {
-      if (FuncExpr *FE = dyn_cast<FuncExpr>(E))
-        CurFuncs.push_back(FE);
-        
+    virtual bool walkToDeclPre(Decl *D) {
+      if (FuncDecl *FD = dyn_cast<FuncDecl>(D))
+        CurFuncDecls.push_back(FD);
+      return true;
+    }
+    
+    virtual bool walkToDeclPost(Decl *D) {
+      if (isa<FuncDecl>(D)) {
+        assert(CurFuncDecls.back() == D && "Decl misbalance");
+        CurFuncDecls.pop_back();
+      }
       return true;
     }
     
     Expr *walkToExprPost(Expr *E) {
-      if (FuncExpr *FE = dyn_cast<FuncExpr>(E)) {
-        assert(CurFuncs.back() == FE && "Decl misbalance!");
-        CurFuncs.pop_back();
-        return E;
+      if (UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
+        return BindName(UDRE, CurFuncDecls.empty() ? 0 : CurFuncDecls.back(),
+                        Binder);
       }
-      
-      if (UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E))
-        return BindName(UDRE, CurFuncs.empty() ? 0 : CurFuncs.back(), Binder);
       return E;
     }
   };
