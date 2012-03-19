@@ -17,8 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Types.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
@@ -404,17 +403,75 @@ void IRGenFunction::emitZeroInit(Address addr, const TypeInfo &type) {
                        /*volatile*/ false);
 }
 
+namespace {
+  struct IgnoredExprEmitter : ASTVisitor<IgnoredExprEmitter> {
+    IRGenFunction &IGF;
+    IgnoredExprEmitter(IRGenFunction &IGF) : IGF(IGF) {}
+
+#define EXPR(Id, Parent)
+#define UNCHECKED_EXPR(Id, Parent) \
+    void visit##Id##Expr(Id##Expr *E) { \
+      llvm_unreachable("expression should not have survived to IR-gen"); \
+    }
+#include "swift/AST/ExprNodes.def"
+    void visitErrorExpr(ErrorExpr *E) {
+      llvm_unreachable("expression should not have survived to IR-gen");
+    }
+    void visitIntegerLiteralExpr(IntegerLiteralExpr *E) {}
+    void visitFloatLiteralExpr(FloatLiteralExpr *E) {}
+    void visitDeclRefExpr(DeclRefExpr *E) {}
+    void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
+      visit(E->getLHS());
+      visit(E->getRHS());
+    }
+    void visitTupleExpr(TupleExpr *E) {
+      for (auto elt : E->getElements())
+        visit(elt);
+    }
+    void visitTupleElementExpr(TupleElementExpr *E) {
+      visit(E->getBase());
+    }
+    void visitFuncExpr(FuncExpr *E) {}
+    void visitClosureExpr(ClosureExpr *E) {}
+    void visitAnonClosureArgExpr(AnonClosureArgExpr *E) {}
+    void visitModuleExpr(ModuleExpr *E) {}
+
+#define USING_SUBEXPR(Id) \
+    void visit##Id##Expr(Id##Expr *E) { \
+      return visit(E->getSubExpr()); \
+    }
+    USING_SUBEXPR(Paren)
+    USING_SUBEXPR(AddressOf)
+    USING_SUBEXPR(LookThroughOneof)
+    USING_SUBEXPR(Requalify)
+    USING_SUBEXPR(Materialize)
+    USING_SUBEXPR(Load) // This might not be safe.
+
+    void visitTupleShuffleExpr(TupleShuffleExpr *E) {
+      // First, evaluate the base expression.
+      visit(E->getSubExpr());
+
+      // Then evaluate any defaulted elements.
+      TupleType *TT = E->getType()->castTo<TupleType>();
+      for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i) {
+        if (E->getElementMapping()[i] == -1)
+          visit(TT->getFields()[i].getInit());
+      }
+    }
+
+    void visitExpr(Expr *E) {
+      // If all else fails, emit it as an r-value.
+      Explosion explosion(ExplosionKind::Maximal);
+      IGF.emitRValue(E, explosion);
+    }
+
+
+  };
+}
+
 /// Emit an expression whose value is being ignored.
 void IRGenFunction::emitIgnored(Expr *E) {
-  // If this has module or metatype type, there is no value to emit.
-  // FIXME: This can be revisited if they get a runtime representation.
-  if (E->getType()->is<ModuleType>() ||
-      E->getType()->is<MetaTypeType>())
-    return;  
-  
-  // For now, just emit it as an r-value.
-  Explosion explosion(ExplosionKind::Maximal);
-  emitRValue(E, explosion);
+  IgnoredExprEmitter(*this).visit(E);
 }
 
 /// Emit a fake l-value which obeys the given specification.  This

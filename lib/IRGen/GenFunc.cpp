@@ -627,7 +627,7 @@ namespace {
     /// call sites are in reversed order of application, i.e. the
     /// first site is the last call which will logically be performed.
     llvm::SmallVector<CallSite, 8> CallSites;
-    Expr *UncurriedFn;
+    Expr *NontrivialFn;
     FuncDecl *KnownFn;
 
     /// getFinalResultExplosionLevel - Returns the explosion level at
@@ -658,20 +658,33 @@ static Expr *uncurry(ApplyExpr *E, SmallVectorImpl<CallSite> &callSites) {
   return fnExpr;
 }
 
-/// Emit the given expression, trying to tie it down to a known
-/// function.
-static FuncDecl *getAsKnownFunctionReference(Expr *E) {
+static void decomposeFunctionReference(CallPlan &plan, DeclRefExpr *E) {
+  plan.KnownFn = dyn_cast<FuncDecl>(E->getDecl());
+  plan.NontrivialFn = (plan.KnownFn ? nullptr : E);
+}
+
+/// Try to decompose a function reference into a known function
+/// declaration.
+static void decomposeFunctionReference(CallPlan &plan, Expr *E) {
   E = E->getSemanticsProvidingExpr();
   if (DeclRefExpr *declRef = dyn_cast<DeclRefExpr>(E))
-    return dyn_cast<FuncDecl>(declRef->getDecl());
-  return nullptr;
+    return decomposeFunctionReference(plan, declRef);
+  if (DotSyntaxBaseIgnoredExpr *baseIgnored
+        = dyn_cast<DotSyntaxBaseIgnoredExpr>(E)) {
+    decomposeFunctionReference(plan, baseIgnored->getRHS());
+    plan.NontrivialFn = E; // overwrite
+    return;
+  }
+
+  plan.KnownFn = nullptr;
+  plan.NontrivialFn = E;
 }
 
 /// Compute the plan for performing a sequence of call expressions.
 static CallPlan getCallPlan(IRGenModule &IGM, ApplyExpr *E) {
   CallPlan plan;
-  plan.UncurriedFn = uncurry(E, plan.CallSites);
-  plan.KnownFn = getAsKnownFunctionReference(plan.UncurriedFn);
+
+  decomposeFunctionReference(plan, uncurry(E, plan.CallSites));
   return plan;
 }
 
@@ -693,6 +706,9 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
 
   // We can do a lot if we know we're calling a known function.
   if (KnownFn) {
+    // Go ahead and emit the nontrivial function expression if we found one.
+    if (NontrivialFn) IGF.emitIgnored(NontrivialFn);
+
     // Handle calls to builtin functions.  These are never curried, but they
     // might return a function pointer.
     if (isa<BuiltinModule>(KnownFn->getDeclContext())) {
@@ -716,7 +732,7 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
   // rules for calling such.
   } else {
     Explosion fnValues(ExplosionKind::Maximal);
-    IGF.emitRValue(UncurriedFn, fnValues);
+    IGF.emitRValue(NontrivialFn, fnValues);
     llvm::Value *fnPtr = fnValues.claimNext();
     llvm::Value *dataPtr = fnValues.claimNext();
     callee.setForIndirectCall(fnPtr, dataPtr);
