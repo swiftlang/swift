@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Subsystems.h"
+#include "NameLookup.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Component.h"
 #include "swift/AST/Diagnostics.h"
@@ -270,23 +271,22 @@ static Expr *BindNameToIVar(UnresolvedDeclRefExpr *UDRE, FuncDecl *CurFD,
   Type ExtendedType = CurFD->getExtensionType();
   if (ExtendedType.isNull()) return 0;
 
-  // This should find methods even in plus functions.
+  // Do a full "dot syntax" name lookup with the implicit 'this' base.
+  MemberLookup Lookup(ExtendedType, UDRE->getName(), *Binder.TU);
+  
+  // On failure, this isn't an ivar or method reference.
+  if (!Lookup.isSuccess()) return 0;
   
   
-  // FIXME: This is going to have to find properties as well some day, which
-  // requires doing full extension lookup.
-  
-  
-  
-  //ExtendedType.dump();
-  // This is happening after name binding types.  
-      
-  //(tuple_element_expr type='[byref(implicit)] CGSize' field #1
-  //  (look_through_oneof_expr type='[byref(implicit)] (origin : CGPoint, size : CGSize)'
-  //    (declref_expr type='[byref(implicit)] oneof { CGRect : (origin : CGPoint, size : CGSize)}' decl=t
-  
-  
-  return 0;
+  // On success, this is a member reference.  Build a VarDecl around the
+  // implicit 'this' VarDecl.
+  VarDecl *ThisDecl = CurFD->getImplicitThisDecl();
+  assert(ThisDecl && "Couldn't find decl for 'this'");
+  Expr *ThisExpr = new (Binder.Context) DeclRefExpr(ThisDecl, SourceLoc(),
+                                                    CurFD->computeThisType());
+
+  return Lookup.createResultAST(ThisExpr, SourceLoc(), UDRE->getLoc(),
+                                Binder.Context);
 }
 
 /// BindName - Bind an UnresolvedDeclRefExpr by performing name lookup and
