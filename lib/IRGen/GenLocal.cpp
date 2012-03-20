@@ -54,10 +54,12 @@ void IRGenFunction::emitLocal(Decl *D) {
 /// emitLocalVar - Emit a local variable.
 void IRGenFunction::emitLocalVar(VarDecl *var) {
   const TypeInfo &typeInfo = getFragileTypeInfo(var->getType());
+
   Address addr = createScopeAlloca(typeInfo.getStorageType(),
                                    typeInfo.StorageAlignment,
                                    var->getName().str());
-  Locals.insert(std::make_pair(var, addr));
+
+  setLocal(var, IGM.RefCountedNull, addr);
 
   if (Expr *init = var->getInit()) {
     emitInit(addr, init, typeInfo);
@@ -69,10 +71,16 @@ void IRGenFunction::emitLocalVar(VarDecl *var) {
 Address IRGenFunction::getLocal(ValueDecl *D) {
   auto I = Locals.find(D);
   assert(I != Locals.end() && "no entry in local map!");
-  return I->second;
+  return I->second.Var.Addr;
 }
 
-void IRGenFunction::setLocal(ValueDecl *D, Address addr) {
+void IRGenFunction::setLocal(ValueDecl *D, llvm::Value *owner, Address addr) {
   assert(!Locals.count(D));
-  Locals.insert(std::make_pair(D, addr));
+
+  std::pair<ValueDecl*, LocalRecord> entry;
+  entry.first = D;
+  entry.second.Var.Owner = owner;
+  entry.second.Var.Addr = addr;
+
+  Locals.insert(entry);
 }

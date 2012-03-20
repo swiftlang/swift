@@ -997,7 +997,9 @@ static void emitParameterClause(IRGenFunction &IGF, Pattern *param,
                                            decl->getName().str(),
                                            decl->getAttrs().isByref(),
                                            paramValues);
-    IGF.setLocal(decl, addr);
+
+    // FIXME: heap byrefs.
+    IGF.setLocal(decl, IGF.IGM.RefCountedNull, addr);
     return;
   }
 

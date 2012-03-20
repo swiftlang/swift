@@ -220,11 +220,21 @@ public:
   void emitLocal(Decl *D);
   Address getLocal(ValueDecl *D);
   LValue getGlobal(VarDecl *D);
-  void setLocal(ValueDecl *D, Address addr);
+  void setLocal(ValueDecl *D, llvm::Value *owner, Address addr);
 
 private:
   void emitLocalVar(VarDecl *D);
-  llvm::DenseMap<ValueDecl*, Address> Locals;
+
+  struct LocalVarRecord {
+    Address Addr;
+    llvm::Value *Owner;
+  };
+  union LocalRecord {
+    LocalVarRecord Var;
+
+    LocalRecord() {}
+  };
+  llvm::DenseMap<ValueDecl*, LocalRecord> Locals;
 
 //--- Global context emission --------------------------------------------------
 public:
