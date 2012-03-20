@@ -2170,6 +2170,7 @@
     struct int16 { value : Builtin.Int16 }
     struct int32 { value : Builtin.Int32 }
     struct int64 { value : Builtin.Int64 }
+    struct int128 { value : Builtin.Int128 }
 
     <i>// int is just an alias for the 64-bit integer type.</i>
     typealias int : int64
@@ -2177,8 +2178,8 @@
 
   <h4 id="stdlib-int">int, int8, int16, int32, int64</h4>
   <pre class="stdlib">
-    struct float  { value : Builtin.Float32 }
-    struct double { value : Builtin.Float64 }
+    struct float  { value : Builtin.FPIEEE32 }
+    struct double { value : Builtin.FPIEEE64 }
   </pre>
 
   <h4 id="stdlib-bool">bool, true, false</h4>

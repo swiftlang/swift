@@ -824,7 +824,7 @@ public:
 };
 
 /// AnonClosureArgExpr - This is a use of an anonymous closure argument inside
-/// and ExplicitClosure expression.  In code, this is something like "$1".
+/// an ExplicitClosure expression.  In code, this is something like "$1".
 class AnonClosureArgExpr : public Expr {
   unsigned ArgNo;
   SourceLoc Loc;
