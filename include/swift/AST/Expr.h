@@ -831,9 +831,12 @@ class AnonClosureArgExpr : public Expr {
  
   /// NextArg - A singly linked list of argument uses for a specific closure.
   AnonClosureArgExpr *NextArg;
+
+  VarDecl *Var;
 public:
   AnonClosureArgExpr(unsigned argNo, SourceLoc loc)
-    : Expr(ExprKind::AnonClosureArg), ArgNo(argNo), Loc(loc), NextArg(0) {}
+    : Expr(ExprKind::AnonClosureArg), ArgNo(argNo), Loc(loc), NextArg(0),
+      Var(0) {}
 
   SourceRange getSourceRange() const { return Loc; }
 
@@ -848,7 +851,11 @@ public:
   
   const AnonClosureArgExpr *getNextInClosure() const { return NextArg; }
   AnonClosureArgExpr *getNextInClosure() { return NextArg; }
-  
+
+  const VarDecl *getDecl() const { return Var; }
+  VarDecl *getDecl() { return Var; }
+  void setDecl(VarDecl *v) { Var = v; }
+
 private:
   friend class ExplicitClosureExpr;
   void addToList(AnonClosureArgExpr *&List) {
@@ -869,6 +876,9 @@ class ExplicitClosureExpr : public ClosureExpr {
   /// this closure.  Each argument number may occur 0, 1 or many times in the
   /// list, because they occur each time an argument is used.
   AnonClosureArgExpr *ClosureArgList;
+
+  Pattern *Pat;
+
 public:
   ExplicitClosureExpr(SourceLoc LBraceLoc, DeclContext *Parent,
                       Expr *Body = 0, SourceLoc RBraceLoc = SourceLoc())
@@ -890,7 +900,11 @@ public:
   
   AnonClosureArgExpr *getClosureArgList() { return ClosureArgList; }
   const AnonClosureArgExpr *getClosureArgList() const { return ClosureArgList; }
-  
+
+  Pattern *getPattern() { return Pat; }
+  const Pattern *getPattern() const { return Pat; }
+  void setPattern(Pattern *pat) { Pat = pat; }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ExplicitClosureExpr *) { return true; }
   static bool classof(const Expr *E) {

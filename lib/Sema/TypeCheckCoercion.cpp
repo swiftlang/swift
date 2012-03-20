@@ -296,6 +296,7 @@ Expr *SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
     ArgVars.push_back(var);
     ArgPat = new (TC.Context) NamedPattern(var);
   }
+  E->setPattern(ArgPat);
 
   // Bind any anonymous closure arguments, validating them and resolving
   // their types.
@@ -325,6 +326,7 @@ Expr *SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
 
     Arg->setType(LValueType::get(NewArgType, LValueType::Qual::DefaultForVar,
                                  TC.Context));
+    Arg->setDecl(ArgVars[Arg->getArgNumber()]);
   }
   
   // Now that the AnonClosureArgExpr's have a type, redo semantic analysis of
