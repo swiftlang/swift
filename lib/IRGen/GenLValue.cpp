@@ -159,6 +159,9 @@ void IRGenFunction::emitAssign(Expr *rhs, const LValue &lhs,
   emitAssign(explosion, lhs, type);
 }
 
+/// Emit a change in the qualification of an l-value.  The only change
+/// that we need to handle here explicitly is the shift of a heap
+/// l-value to a non-heap l-value.
 void IRGenFunction::emitRequalify(RequalifyExpr *E, Explosion &explosion) {
   // For now, all l-values have the same representation.
   return emitRValue(E->getSubExpr(), explosion);
