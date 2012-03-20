@@ -80,6 +80,7 @@ public:
   llvm::PointerType *Int8PtrTy;        /// i8*
   llvm::StructType *RefCountedTy;      /// %swift.refcounted = type { i8* }
   llvm::PointerType *RefCountedPtrTy;  /// %swift.refcounted*
+  llvm::Constant *RefCountedNull;      /// %swift.refcounted* null
   llvm::StructType *FunctionPairTy;    /// { i8*, %swift.refcounted* }
 
   Size getPointerSize() const { return PtrSize; }

@@ -474,7 +474,7 @@ namespace {
 
     llvm::Value *getDataPointer(IRGenModule &IGM) const {
       if (DataPtr) return DataPtr;
-      return llvm::ConstantPointerNull::get(IGM.RefCountedPtrTy);
+      return IGM.RefCountedNull;
     }
   };
 }
@@ -1302,7 +1302,7 @@ namespace {
       // Compute a data object.
       llvm::Value *data;
       if (layout.empty()) {
-        data = llvm::ConstantPointerNull::get(IGM.RefCountedPtrTy);
+        data = IGM.RefCountedNull;
       } else {
         // Allocate a new object.  FIXME: refcounting, exceptions.
         llvm::Value *size = llvm::ConstantInt::get(IGM.SizeTy,

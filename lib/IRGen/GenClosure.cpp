@@ -73,7 +73,7 @@ void IRGenFunction::emitClosure(ClosureExpr *E,
   IRGenFunction(IGM, 0, ExplosionKind::Minimal, 0, Func, Prologue::Bare)
       .emitClosureBody(E);
   explosion.add(Builder.CreateBitCast(Func, IGM.Int8PtrTy));
-  explosion.add(llvm::ConstantPointerNull::get(IGM.RefCountedPtrTy));
+  explosion.add(IGM.RefCountedNull);
 }
 
 void IRGenFunction::emitClosureBody(ClosureExpr *E) {
