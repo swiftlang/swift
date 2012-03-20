@@ -125,6 +125,9 @@ public:
 class TypeConverter {
   llvm::DenseMap<TypeBase*, const TypeInfo*> Converted;
   const TypeInfo *FirstConverted;
+
+  static const TypeInfo *createPrimitive(llvm::Type *T,
+                                         Size size, Alignment align);
     
   static const TypeInfo *convertType(IRGenModule &IGM, Type T);
   static const TypeInfo *convertTupleType(IRGenModule &IGM, TupleType *T);

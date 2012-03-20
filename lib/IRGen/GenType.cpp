@@ -32,6 +32,12 @@
 using namespace swift;
 using namespace irgen;
 
+bool TypeInfo::isSingleRetainablePointer(ResilienceScope scope) const {
+  return false;
+}
+
+static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
+
 namespace {
   /// Basic IR generation for primitive types, which are always
   /// represented as a single scalar.
@@ -66,11 +72,12 @@ namespace {
   };
 }
 
-bool TypeInfo::isSingleRetainablePointer(ResilienceScope scope) const {
-  return false;
+/// Constructs a type info which performs simple loads and stores of
+/// the given IR type.
+const TypeInfo *TypeConverter::createPrimitive(llvm::Type *type,
+                                               Size size, Alignment align) {
+  return new PrimitiveTypeInfo(type, size, align);
 }
-
-static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
 
 TypeConverter::TypeConverter() : FirstConverted(invalidTypeInfo()) {}
 
@@ -136,23 +143,23 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
   case TypeKind::BuiltinFloat:
     switch (cast<BuiltinFloatType>(T)->getFPKind()) {
     case BuiltinFloatType::IEEE16:
-      return new PrimitiveTypeInfo(llvm::Type::getHalfTy(Ctx),
-                                   Size(2), Alignment(2));
+      return createPrimitive(llvm::Type::getHalfTy(Ctx),
+                             Size(2), Alignment(2));
     case BuiltinFloatType::IEEE32:
-      return new PrimitiveTypeInfo(llvm::Type::getFloatTy(Ctx),
-                                   Size(4), Alignment(4));
+      return createPrimitive(llvm::Type::getFloatTy(Ctx),
+                             Size(4), Alignment(4));
     case BuiltinFloatType::IEEE64:
-      return new PrimitiveTypeInfo(llvm::Type::getDoubleTy(Ctx),
-                                   Size(8), Alignment(8));
+      return createPrimitive(llvm::Type::getDoubleTy(Ctx),
+                             Size(8), Alignment(8));
     case BuiltinFloatType::IEEE80:
-      return new PrimitiveTypeInfo(llvm::Type::getX86_FP80Ty(Ctx),
-                                   Size(10), Alignment(16));
+      return createPrimitive(llvm::Type::getX86_FP80Ty(Ctx),
+                             Size(10), Alignment(16));
     case BuiltinFloatType::IEEE128:
-      return new PrimitiveTypeInfo(llvm::Type::getFP128Ty(Ctx),
-                                   Size(16), Alignment(16));
+      return createPrimitive(llvm::Type::getFP128Ty(Ctx),
+                             Size(16), Alignment(16));
     case BuiltinFloatType::PPC128:
-      return new PrimitiveTypeInfo(llvm::Type::getPPC_FP128Ty(Ctx),
-                                   Size(16), Alignment(16));
+      return createPrimitive(llvm::Type::getPPC_FP128Ty(Ctx),
+                             Size(16), Alignment(16));
     }
     llvm_unreachable("bad builtin floating-point type kind");
   case TypeKind::BuiltinInteger: {
@@ -162,8 +169,8 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
     if (!llvm::isPowerOf2_32(ByteSize))
       ByteSize = llvm::NextPowerOf2(ByteSize);
     
-    return new PrimitiveTypeInfo(llvm::IntegerType::get(Ctx, BitWidth),
-                                 Size(ByteSize), Alignment(ByteSize));
+    return createPrimitive(llvm::IntegerType::get(Ctx, BitWidth),
+                           Size(ByteSize), Alignment(ByteSize));
   }
   case TypeKind::LValue:
     return convertLValueType(IGM, cast<LValueType>(TB));
@@ -184,9 +191,9 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
 const TypeInfo *TypeConverter::convertLValueType(IRGenModule &IGM,
                                                  LValueType *T) {
   const TypeInfo &objectTI = IGM.getFragileTypeInfo(T->getObjectType());
-  return new PrimitiveTypeInfo(objectTI.StorageType->getPointerTo(),
-                               Size(IGM.TargetData.getPointerSize()),
-                          Alignment(IGM.TargetData.getPointerABIAlignment()));
+  return createPrimitive(objectTI.StorageType->getPointerTo(),
+                         Size(IGM.TargetData.getPointerSize()),
+                         Alignment(IGM.TargetData.getPointerABIAlignment()));
 }
 
 /// emitTypeAlias - Emit a type alias.  You wouldn't think that these
