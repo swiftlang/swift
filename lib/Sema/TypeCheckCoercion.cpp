@@ -583,7 +583,11 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC) {
       // and build the implicit closure.
       E = convertToType(E, FT->getResult(), TC);
       if (E == 0) return 0;
-      return new (TC.Context) ImplicitClosureExpr(E, DestTy);
+
+      // FIXME: Need to figure out correct parent DeclContext; fortunately,
+      // it doesn't matter much for the moment because nothing actually needs
+      // to use the ImplicitClosureExpr as its context.
+      return new (TC.Context) ImplicitClosureExpr(E, &TC.TU, DestTy);
     }
   
   // If we have an exact match, we're done.

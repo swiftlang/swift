@@ -167,6 +167,8 @@ Type FuncDecl::getExtensionType() const {
   case DeclContextKind::TranslationUnit:
   case DeclContextKind::BuiltinModule:
   case DeclContextKind::FuncExpr:
+  case DeclContextKind::ExplicitClosureExpr:
+  case DeclContextKind::ImplicitClosureExpr:
   case DeclContextKind::OneOfType:
     return Type();
     

@@ -720,10 +720,30 @@ public:
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Sequence; }
 };
 
+/// CapturingExpr - a FuncExpr or a ClosureExpr; always returns something
+/// of function type, and can capture variables from an enclosing scope.
+class CapturingExpr : public Expr, public DeclContext {
+public:
+  CapturingExpr(ExprKind Kind, Type FnType, DeclContextKind DCKind,
+                DeclContext *Parent)
+    : Expr(Kind, FnType), DeclContext(DCKind, Parent) {}
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const CapturingExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() >= ExprKind::First_CapturingExpr &&
+           E->getKind() <= ExprKind::Last_CapturingExpr;
+  }
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() >= DeclContextKind::First_Capturing &&
+           DC->getContextKind() <= DeclContextKind::Last_Capturing;
+  }
+};
+
 /// FuncExpr - An explicit unnamed func definition, which can optionally
 /// have named arguments.
 ///    e.g.  func(a : int) -> int { return a+1 }
-class FuncExpr : public Expr, public DeclContext {
+class FuncExpr : public CapturingExpr {
   SourceLoc FuncLoc;
   unsigned NumPatterns;
   
@@ -738,8 +758,7 @@ class FuncExpr : public Expr, public DeclContext {
   
   FuncExpr(SourceLoc FuncLoc, unsigned NumPatterns, Type FnType,
            BraceStmt *Body, DeclContext *Parent)
-    : Expr(ExprKind::Func, FnType),
-      DeclContext(DeclContextKind::FuncExpr, Parent),
+    : CapturingExpr(ExprKind::Func, FnType, DeclContextKind::FuncExpr, Parent),
       FuncLoc(FuncLoc), NumPatterns(NumPatterns), Body(Body) {}
 public:
   static FuncExpr *create(ASTContext &Context, SourceLoc FuncLoc,
@@ -777,12 +796,13 @@ public:
 /// formed.  Once type checking has completed, ClosureExpr's are known to have
 /// FunctionType.
 ///
-class ClosureExpr : public Expr {
+class ClosureExpr : public CapturingExpr {
   Expr *Body;
   
 public:
-  ClosureExpr(ExprKind Kind, Expr *Body, Type ResultTy = Type())
-    : Expr(Kind, ResultTy), Body(Body) {}
+  ClosureExpr(ExprKind Kind, Expr *Body, DeclContextKind DCKind,
+              DeclContext *Parent, Type ResultTy = Type())
+    : CapturingExpr(Kind, ResultTy, DCKind, Parent), Body(Body) {}
 
   Expr *getBody() const { return Body; }
   void setBody(Expr *e) { Body = e; }
@@ -796,6 +816,10 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ImplicitClosure ||
            E->getKind() == ExprKind::ExplicitClosure;
+  }
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() >= DeclContextKind::First_Closure &&
+           DC->getContextKind() <= DeclContextKind::Last_Closure;
   }
 };
 
@@ -846,9 +870,10 @@ class ExplicitClosureExpr : public ClosureExpr {
   /// list, because they occur each time an argument is used.
   AnonClosureArgExpr *ClosureArgList;
 public:
-  ExplicitClosureExpr(SourceLoc LBraceLoc, Expr *Body = 0, 
-                      SourceLoc RBraceLoc = SourceLoc())
-    : ClosureExpr(ExprKind::ExplicitClosure, Body),
+  ExplicitClosureExpr(SourceLoc LBraceLoc, DeclContext *Parent,
+                      Expr *Body = 0, SourceLoc RBraceLoc = SourceLoc())
+    : ClosureExpr(ExprKind::ExplicitClosure, Body,
+                  DeclContextKind::ExplicitClosureExpr, Parent),
       LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc), ClosureArgList(0) {}
   
   void setRBraceLoc(SourceLoc L) {
@@ -871,6 +896,9 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ExplicitClosure;
   }
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::ExplicitClosureExpr;
+  }
 };
   
 /// ImplicitClosureExpr - This is a closure of the contained subexpression that
@@ -880,8 +908,9 @@ public:
 ///
 class ImplicitClosureExpr : public ClosureExpr {
 public:
-  ImplicitClosureExpr(Expr *Body, Type ResultTy)
-    : ClosureExpr(ExprKind::ImplicitClosure, Body, ResultTy) {}
+  ImplicitClosureExpr(Expr *Body, DeclContext *Parent, Type ResultTy)
+    : ClosureExpr(ExprKind::ImplicitClosure, Body,
+                  DeclContextKind::ImplicitClosureExpr, Parent, ResultTy) {}
   
   SourceRange getSourceRange() const { return getBody()->getSourceRange(); }
   
@@ -889,6 +918,9 @@ public:
   static bool classof(const ImplicitClosureExpr *) { return true; }
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ImplicitClosure;
+  }
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::ImplicitClosureExpr;
   }
 };
   

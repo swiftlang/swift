@@ -50,12 +50,18 @@ enum class DeclContextKind {
   //Module,
     TranslationUnit,
     BuiltinModule,
-  FuncExpr,
+  //CapturingExpr,
+    FuncExpr,
+    //ClosureExpr,
+      ExplicitClosureExpr,
+      ImplicitClosureExpr,
   OneOfType,
   ExtensionDecl,
   ProtocolType,
   
-  First_Module = TranslationUnit, Last_Module = BuiltinModule
+  First_Module = TranslationUnit, Last_Module = BuiltinModule,
+  First_Capturing = FuncExpr, Last_Capturing = ImplicitClosureExpr,
+  First_Closure = ExplicitClosureExpr, Last_Closure = ImplicitClosureExpr
 };
   
 /// A DeclContext is an AST object which acts as a semantic container

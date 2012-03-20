@@ -159,6 +159,8 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     return;
 
   case DeclContextKind::FuncExpr:
+  case DeclContextKind::ExplicitClosureExpr:
+  case DeclContextKind::ImplicitClosureExpr:
     // FIXME: we don't need to agree about these across components, but
     // that's no excuse for not mangling *something* in here.
     break;

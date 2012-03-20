@@ -260,7 +260,8 @@ Expr *Parser::parseExprIdentifier() {
 NullablePtr<Expr> Parser::parseExprExplicitClosure() {
   SourceLoc LBLoc = consumeToken(tok::l_brace);
   
-  ExplicitClosureExpr *ThisClosure = new (Context) ExplicitClosureExpr(LBLoc);
+  ExplicitClosureExpr *ThisClosure =
+      new (Context) ExplicitClosureExpr(LBLoc, CurDeclContext);
   
   // Install ThisClosure as the current ExplicitClosureExpr so that arguments
   // can be linked into it.
