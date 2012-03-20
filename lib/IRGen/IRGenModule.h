@@ -70,17 +70,17 @@ public:
   llvm::LLVMContext &LLVMContext;
   const llvm::TargetData &TargetData;
 
-  llvm::Type *VoidTy;
-  llvm::IntegerType *Int1Ty;
-  llvm::IntegerType *Int8Ty;
-  llvm::IntegerType *Int16Ty;
-  llvm::IntegerType *Int32Ty;
-  llvm::IntegerType *Int64Ty;
-  llvm::IntegerType *SizeTy;
-  llvm::PointerType *Int8PtrTy;
-  llvm::StructType *RefCountedTy;
-  llvm::PointerType *RefCountedPtrTy;
-  llvm::StructType *FunctionPairTy;
+  llvm::Type *VoidTy;                  /// void (usually {})
+  llvm::IntegerType *Int1Ty;           /// i1
+  llvm::IntegerType *Int8Ty;           /// i8
+  llvm::IntegerType *Int16Ty;          /// i16
+  llvm::IntegerType *Int32Ty;          /// i32
+  llvm::IntegerType *Int64Ty;          /// i64
+  llvm::IntegerType *SizeTy;           /// usually i32 or i64
+  llvm::PointerType *Int8PtrTy;        /// i8*
+  llvm::StructType *RefCountedTy;      /// %swift.refcounted = type { i8* }
+  llvm::PointerType *RefCountedPtrTy;  /// %swift.refcounted*
+  llvm::StructType *FunctionPairTy;    /// { i8*, %swift.refcounted* }
 
   Size getPointerSize() const { return PtrSize; }
   Alignment getPointerAlignment() const {
