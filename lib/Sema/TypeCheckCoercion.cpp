@@ -271,7 +271,32 @@ Expr *SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
   TupleType *FuncInputTT = dyn_cast<TupleType>(FT->getInput().getPointer());
   if (FuncInputTT)
     NumInputArgs = FuncInputTT->getFields().size();
-    
+
+  // Build pattern for parameters.
+  // FIXME: This pattern is currently unused!
+  SmallVector<VarDecl*, 4> ArgVars;
+  Pattern *ArgPat;
+  SourceLoc loc = E->getLoc();
+  if (FuncInputTT) {
+    unsigned NumInputArgs = FuncInputTT->getFields().size();
+    SmallVector<TuplePatternElt, 4> ArgElts;
+    for (unsigned i = 0; i < NumInputArgs; ++i) {
+      Type ty = FuncInputTT->getElementType(i);
+      Identifier ident = TC.Context.getIdentifier(("$" + Twine(i)).str());
+      VarDecl *var = new (TC.Context) VarDecl(E->getLoc(), ident, ty, nullptr,
+                                              E);
+      ArgVars.push_back(var);
+      ArgElts.push_back(TuplePatternElt(new (TC.Context) NamedPattern(var)));
+    }
+    ArgPat = TuplePattern::create(TC.Context, loc, ArgElts, loc);
+  } else {
+    Identifier ident = TC.Context.getIdentifier("$0");
+    VarDecl *var = new (TC.Context) VarDecl(loc, ident, Type(), nullptr,
+                                            E);
+    ArgVars.push_back(var);
+    ArgPat = new (TC.Context) NamedPattern(var);
+  }
+
   // Bind any anonymous closure arguments, validating them and resolving
   // their types.
   for (AnonClosureArgExpr *Arg = E->getClosureArgList(); Arg;
