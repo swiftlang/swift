@@ -60,6 +60,7 @@ public:
       if (isMatchForLValue(val, lv))
         return new (TC.Context) DeclRefExpr(val, E->getLoc(), lv);
     }
+    // FIXME: We should be able to materialize values here.
     return E;
   }
   
@@ -79,6 +80,8 @@ public:
       if (!srcTy->isEqual(DestTy)) continue;
       return TC.buildDeclRefRValue(val, E->getLoc());
     }
+    // FIXME: Diagnose so we don't get the generic "ambiguous expression"
+    // diagnostic.
     return E;
   }
   
@@ -101,7 +104,13 @@ public:
       TC.diagnose(DT->getOneOfLoc(), diag::type_declared_here);
       return 0;
     }
-    
+
+    if (DED->getType()->is<FunctionType>()) {
+      TC.diagnose(UME->getLoc(), diag::call_element_function_type,
+                  DestTy, UME->getName());
+      return 0;
+    }
+
     // If it does, then everything is good, resolve the reference.
     return new (TC.Context) DeclRefExpr(DED, UME->getColonLoc(),
                                         DED->getType());
@@ -137,9 +146,16 @@ public:
       if (OneOfType *DT = DestTy->getAs<OneOfType>()) {
         // The oneof type must have an element of the specified name.
         OneOfElementDecl *DED = DT->getElement(UME->getName());
-        if (DED == 0 || !DED->getType()->is<FunctionType>()) {
-          TC.diagnose(UME->getLoc(), diag::invalid_type_to_initialize_member,
-                      DestTy);
+        if (DED == 0) {
+          TC.diagnose(UME->getLoc(), diag::invalid_member_in_type,
+                      DestTy, UME->getName());
+          TC.diagnose(DT->getOneOfLoc(), diag::type_declared_here);
+          return 0;
+        }
+        
+        if (!DED->getType()->is<FunctionType>()) {
+          TC.diagnose(UME->getLoc(), diag::call_element_not_function_type,
+                      DestTy, UME->getName());
           return 0;
         }
 
@@ -213,17 +229,11 @@ public:
 
   Expr *visitAddressOfExpr(AddressOfExpr *E) {
     LValueType *DestLT = DestTy->getAs<LValueType>();
-    if (!DestLT) {
-      TC.diagnose(E->getLoc(), diag::load_of_explicit_lvalue,
-                  E->getType()->castTo<LValueType>()->getObjectType())
-        << E->getSourceRange();
-      return nullptr;
-    }
+    if (!DestLT)
+      return E;
 
-    // Really minor optimization.
-    if (!DestLT->isExplicit())
-      return visit(E->getSubExpr());
-
+    // FIXME: This is rather broken: we do not want to materialize the operand
+    // of an '&'.
     LValueType::Qual qs = DestLT->getQualifiers();
     qs |= LValueType::Qual::Implicit;
 
@@ -645,6 +655,11 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC) {
       return new (TC.Context) RequalifyExpr(E, DestTy);
     }
 
+    // If the input expression has a dependent type, try to coerce it to an
+    // appropriate type.
+    if (E->getType()->is<DependentType>())
+      return SemaCoerce(TC, DestTy).doIt(E);
+
     // Materialization.
     if (!DestLT->isExplicit()) {
       E = convertToType(E, DestLT->getObjectType(), TC);
@@ -652,9 +667,6 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC) {
 
       return new (TC.Context) MaterializeExpr(E, DestTy);
     }
-
-    // Just ignore dependent types for now.
-    if (E->getType()->is<DependentType>()) return E;
 
     // Failure.
 
@@ -703,6 +715,11 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC) {
       return convertTupleToTupleType(E, ETy->getFields().size(), TT, TC);
   }
 
+  // If the input expression has a dependent type, try to coerce it to an
+  // appropriate type.
+  if (E->getType()->is<DependentType>())
+    return SemaCoerce(TC, DestTy).doIt(E);
+
   // If the source is an l-value, load from it.  We intentionally do
   // this before checking for certain destination types below.
   if (LValueType *srcLV = E->getType()->getAs<LValueType>()) {
@@ -711,14 +728,6 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC) {
 
     return convertToType(E, DestTy, TC);
   }
-
-  // If the input expression has a dependent type, then there are two cases:
-  // first this could be an AnonDecl whose type will be specified by a larger
-  // context, second, this could be a context sensitive expression value like
-  // :foo.  If this is a context sensitive expression, propagate the type down
-  // into the subexpression.
-  if (E->getType()->is<DependentType>())
-    return SemaCoerce(TC, DestTy).doIt(E);
 
   // Could not do the conversion.
 
