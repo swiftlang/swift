@@ -137,43 +137,8 @@ public:
   }
   
   
-  Expr *visitCallExpr(CallExpr *E) {
-    // If we have ":f(x)" and the result type of the call is a OneOfType, then
-    // :f must be an element constructor for the oneof value.  Note that
-    // handling this syntactically causes us to reject "(:f)(x)" as ambiguous.
-    if (UnresolvedMemberExpr *UME =
-          dyn_cast<UnresolvedMemberExpr>(E->getFn())) {
-      if (OneOfType *DT = DestTy->getAs<OneOfType>()) {
-        // The oneof type must have an element of the specified name.
-        OneOfElementDecl *DED = DT->getElement(UME->getName());
-        if (DED == 0) {
-          TC.diagnose(UME->getLoc(), diag::invalid_member_in_type,
-                      DestTy, UME->getName());
-          TC.diagnose(DT->getOneOfLoc(), diag::type_declared_here);
-          return 0;
-        }
-        
-        if (!DED->getType()->is<FunctionType>()) {
-          TC.diagnose(UME->getLoc(), diag::call_element_not_function_type,
-                      DestTy, UME->getName());
-          return 0;
-        }
-
-        // FIXME: Preserve source locations.
-        E->setFn(new (TC.Context) DeclRefExpr(DED, UME->getColonLoc(),
-                                              DED->getType()));
-        return TC.semaApplyExpr(E);
-      }
-    }
-    
-    // FIXME: Given a CallExpr a(b) where "a" is an overloaded value, we
-    // may be able to prune the overload set based on the known result type.
-    // Doing this may allow the ambiguity to resolve by removing candidates
-    // that caused the ambiguity.  For example if we know that the destination
-    // type is 'int', and we had "int -> int" and "SomeTy -> float", we can
-    // prune the second one, and then recursively apply 'int' to b.
-    return E;
-  }
+  Expr *visitApplyExpr(ApplyExpr *E);
+  
   Expr *visitSequenceExpr(SequenceExpr *E) {
     llvm_unreachable("SequenceExprs should all be resolved by this pass");
   }
@@ -196,28 +161,6 @@ public:
     return E;
   }
 
-  Expr *visitUnaryExpr(UnaryExpr *E) {
-    // TODO: If the function is an overload set and the result type that we're
-    // coercing onto the binop is completely incompatible with some elements
-    // of the overload set, trim them out.      
-    return E;
-  }
-
-  Expr *visitBinaryExpr(BinaryExpr *E) {
-    // TODO: If the function is an overload set and the result type that we're
-    // coercing onto the binop is completely incompatible with some elements
-    // of the overload set, trim them out.      
-    return E;
-  }
-
-  Expr *visitConstructorCallExpr(ConstructorCallExpr *E) {
-    return E;
-  }
-
-  Expr *visitDotSyntaxCallExpr(DotSyntaxCallExpr *E) {
-    return E;
-  }
-  
   Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
     // FIXME: Coerces the RHS.
     return E;
@@ -258,6 +201,45 @@ public:
                           TupleType *DestTy, TypeChecker &TC);
 };
 } // end anonymous namespace.
+
+
+Expr *SemaCoerce::visitApplyExpr(ApplyExpr *E) {
+  // If we have ":f(x)" and the result type of the call is a OneOfType, then
+  // :f must be an element constructor for the oneof value.  Note that
+  // handling this syntactically causes us to reject "(:f)(x)" as ambiguous.
+  if (UnresolvedMemberExpr *UME =
+      dyn_cast<UnresolvedMemberExpr>(E->getFn())) {
+    if (OneOfType *DT = DestTy->getAs<OneOfType>()) {
+      // The oneof type must have an element of the specified name.
+      OneOfElementDecl *DED = DT->getElement(UME->getName());
+      if (DED == 0) {
+        TC.diagnose(UME->getLoc(), diag::invalid_member_in_type,
+                    DestTy, UME->getName());
+        TC.diagnose(DT->getOneOfLoc(), diag::type_declared_here);
+        return 0;
+      }
+      
+      if (!DED->getType()->is<FunctionType>()) {
+        TC.diagnose(UME->getLoc(), diag::call_element_not_function_type,
+                    DestTy, UME->getName());
+        return 0;
+      }
+      
+      // FIXME: Preserve source locations.
+      E->setFn(new (TC.Context) DeclRefExpr(DED, UME->getColonLoc(),
+                                            DED->getType()));
+      return TC.semaApplyExpr(E);
+    }
+  }
+  
+  // FIXME: Given a CallExpr a(b) where "a" is an overloaded value, we
+  // may be able to prune the overload set based on the known result type.
+  // Doing this may allow the ambiguity to resolve by removing candidates
+  // that caused the ambiguity.  For example if we know that the destination
+  // type is 'int', and we had "int -> int" and "SomeTy -> float", we can
+  // prune the second one, and then recursively apply 'int' to b.
+  return E;
+}
 
 
 Expr *SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
