@@ -723,10 +723,15 @@ public:
 /// CapturingExpr - a FuncExpr or a ClosureExpr; always returns something
 /// of function type, and can capture variables from an enclosing scope.
 class CapturingExpr : public Expr, public DeclContext {
+  ArrayRef<ValueDecl*> Captures;
+
 public:
   CapturingExpr(ExprKind Kind, Type FnType, DeclContextKind DCKind,
                 DeclContext *Parent)
     : Expr(Kind, FnType), DeclContext(DCKind, Parent) {}
+
+  ArrayRef<ValueDecl*> getCaptures() { return Captures; }
+  void setCaptures(ArrayRef<ValueDecl*> C) { Captures = C; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const CapturingExpr *) { return true; }

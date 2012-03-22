@@ -262,10 +262,8 @@ NullablePtr<Expr> Parser::parseExprExplicitClosure() {
   
   ExplicitClosureExpr *ThisClosure =
       new (Context) ExplicitClosureExpr(LBLoc, CurDeclContext);
-  
-  // Install ThisClosure as the current ExplicitClosureExpr so that arguments
-  // can be linked into it.
-  llvm::SaveAndRestore<ExplicitClosureExpr*> X(CurExplicitClosure, ThisClosure);
+
+  ContextChange CC(*this, ThisClosure);
   
   NullablePtr<Expr> Body = parseExpr(diag::expected_expr_closure);
   if (Body.isNull()) return 0;
@@ -277,8 +275,14 @@ NullablePtr<Expr> Parser::parseExprExplicitClosure() {
                          diag::expected_rbrace_in_closure,
                          LBLoc, diag::opening_brace))
     RBLoc = Body.get()->getEndLoc();
-  
+
+  auto& Captures = ValCaptures.back();
+  ValueDecl** CaptureCopy = Context.AllocateCopy<ValueDecl*>(Captures.begin(),
+                                                             Captures.end());
+  ThisClosure->setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
+
   ThisClosure->setRBraceLoc(RBLoc);
+
   return ThisClosure;
 }
 
@@ -304,7 +308,7 @@ Expr *Parser::parseExprAnonClosureArg() {
   }
   
   // Make sure that this is located in an explicit closure expression.
-  if (CurExplicitClosure == 0) {
+  if (!isa<ExplicitClosureExpr>(CurDeclContext)) {
     diagnose(Loc, diag::anon_closure_arg_not_in_closure);
     return new (Context) ErrorExpr(Loc);
   }
@@ -312,7 +316,7 @@ Expr *Parser::parseExprAnonClosureArg() {
   AnonClosureArgExpr *NewArg = new (Context) AnonClosureArgExpr(ArgNo, Loc);
   
   // Add the argument to the closure's list of argument uses.
-  CurExplicitClosure->addClosureArgumentUse(NewArg);
+  cast<ExplicitClosureExpr>(CurDeclContext)->addClosureArgumentUse(NewArg);
 
   return NewArg;
 }
@@ -322,7 +326,17 @@ Expr *Parser::actOnIdentifierExpr(Identifier Text, SourceLoc Loc) {
   
   if (D == 0)
     return new (Context) UnresolvedDeclRefExpr(Text, Loc);
-  
+
+  // Compute captures for local value declaration.
+  DeclContext *ValDC = D->getDeclContext();
+  if (ValDC->isLocalContext()) {
+    DeclContext *DC = CurDeclContext;
+    unsigned i = ValCaptures.size();
+    while (DC != ValDC) {
+      ValCaptures[--i].insert(D);
+      DC = DC->getParent();
+    }
+  }
   return new (Context) DeclRefExpr(D, Loc);
 }
 

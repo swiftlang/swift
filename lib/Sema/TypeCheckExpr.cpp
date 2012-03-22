@@ -606,7 +606,7 @@ public:
   void PreProcessBraceStmt(BraceStmt *BS);
   
   Expr *visitFuncExpr(FuncExpr *E) {
-    return E;
+    llvm_unreachable("Should not walk into FuncExprs!");
   }
   
   Expr *visitModuleExpr(ModuleExpr *E) {

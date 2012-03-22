@@ -60,10 +60,16 @@ namespace {
   };
 }
 
-void IRGenFunction::emitClosure(ClosureExpr *E,
-                                        Explosion &explosion) {
-  if (FindCapturedVars(*this).doWalk(E->getBody()))
+void IRGenFunction::emitClosure(ClosureExpr *E, Explosion &explosion) {
+  if (!E->getCaptures().empty()) {
+    IGM.unimplemented(E->getLoc(), "cannot capture local vars yet");
     return emitFakeExplosion(getFragileTypeInfo(E->getType()), explosion);
+  }
+  if (FindCapturedVars(*this).doWalk(E->getBody())) {
+    // FIXME: The previous check should work for implicit closures as well.
+    assert(isa<ImplicitClosureExpr>(E) && "Explicit closure missed capture");
+    return emitFakeExplosion(getFragileTypeInfo(E->getType()), explosion);
+  }
 
   llvm::FunctionType *fnType =
       IGM.getFunctionType(E->getType(), ExplosionKind::Minimal, 0, false);

@@ -207,7 +207,9 @@ void swift::performTypeChecking(TranslationUnit *TU) {
   // expressions and variable decls.
   StmtChecker(TC, 0).typeCheckStmt(TU->Body);
 
-  // Type check the body of each of the FuncExpr in turn.
+  // Type check the body of each of the FuncExpr in turn.  Note that outside
+  // FuncExprs must be visited before nested FuncExprs for type-checking to
+  // work correctly.
   for (FuncExpr *FE : prePass.FuncExprs) {
     TC.semaFunctionSignature(FE);
 

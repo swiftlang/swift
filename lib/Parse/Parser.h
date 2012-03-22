@@ -22,6 +22,7 @@
 #include "swift/Parse/Token.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Diagnostics.h"
+#include "llvm/ADT/SetVector.h"
 
 namespace llvm {
   class Component;
@@ -46,14 +47,12 @@ public:
   const llvm::MemoryBuffer *Buffer;
   Lexer &L;
   DeclContext *CurDeclContext;
-  /// CurExplicitClosure - When parsing the body of an explicit closure
-  /// expression, this pointer points to the closure.
-  ExplicitClosureExpr *CurExplicitClosure;
   swift::Component *Component;
   ASTContext &Context;
   ScopeInfo ScopeInfo;
   std::vector<TypeAliasDecl*> UnresolvedTypeNames;
   std::vector<IdentifierType*> UnresolvedIdentifierTypes;
+  std::vector<llvm::SetVector<ValueDecl*>> ValCaptures;
   
   /// Tok - This is the current token being considered by the parser.
   Token Tok;
@@ -69,6 +68,7 @@ public:
       : P(P), OldContext(P.CurDeclContext) {
       assert(DC && "pushing null context?");
       P.CurDeclContext = DC;
+      P.ValCaptures.emplace_back();
     }
 
     /// Prematurely pop the DeclContext installed by the constructor.
@@ -77,6 +77,7 @@ public:
       assert(OldContext && "already popped context!");
       P.CurDeclContext = OldContext;
       OldContext = nullptr;
+      P.ValCaptures.pop_back();
     }
 
     ~ContextChange() {
