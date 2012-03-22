@@ -259,7 +259,7 @@ LValue IRGenFunction::emitLValue(Expr *E) {
     return emitDeclRefLValue(*this, cast<DeclRefExpr>(E));
 
   case ExprKind::AnonClosureArg: {
-    Address addr = ClosureParams[cast<AnonClosureArgExpr>(E)->getArgNumber()];
+    Address addr = getLocal(cast<AnonClosureArgExpr>(E)->getDecl());
     return emitAddressLValue(addr);
   }
   }
@@ -348,7 +348,7 @@ IRGenFunction::tryEmitAsAddress(Expr *E, const TypeInfo &type) {
 
   // Closure arguments are always in memory.
   case ExprKind::AnonClosureArg:
-    return ClosureParams[cast<AnonClosureArgExpr>(E)->getArgNumber()];
+    return getLocal(cast<AnonClosureArgExpr>(E)->getDecl());
 
   // These expressions aren't naturally already in memory.
   case ExprKind::Tuple:

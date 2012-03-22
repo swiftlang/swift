@@ -33,19 +33,6 @@
 using namespace swift;
 using namespace irgen;
 
-/// Create the global initializer function for a translation unit.
-static llvm::Function *createGlobalInitFunction(IRGenModule &IGM,
-                                                TranslationUnit *tunit) {
-  llvm::SmallString<32> name;
-  llvm::raw_svector_ostream nameStream(name);
-  nameStream << tunit->Name.str() << '.' << "init";
-
-  llvm::FunctionType *fnType =
-    llvm::FunctionType::get(IGM.VoidTy, false);
-  return llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
-                                nameStream.str(), &IGM.Module);
-}
-
 static bool isTrivialGlobalInit(llvm::Function *fn) {
   // Must be exactly one basic block.
   if (next(fn->begin()) != fn->end()) return false;
@@ -67,11 +54,15 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit) {
     TuplePattern::create(Context, SourceLoc(),
                          llvm::ArrayRef<TuplePatternElt>(), SourceLoc())
   };
-  FuncExpr *func = FuncExpr::create(Context, SourceLoc(), params,
-                                    unitToUnit, nullptr, tunit);
 
-  llvm::Function *fn = createGlobalInitFunction(*this, tunit);
-  IRGenFunction(*this, func, ExplosionKind::Minimal, /*uncurry*/ 0, fn)
+  llvm::FunctionType *fnType =
+      getFunctionType(unitToUnit, ExplosionKind::Minimal, 0, false);
+  llvm::Function *fn =
+      llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
+                             tunit->Name.str() + ".init", &Module);
+
+  IRGenFunction(*this, unitToUnit, params, ExplosionKind::Minimal,
+                /*uncurry*/ 0, fn)
     .emitGlobalTopLevel(tunit->Body);
 
   // Not all translation units need a global initialization function.

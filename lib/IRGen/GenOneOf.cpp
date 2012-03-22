@@ -382,7 +382,7 @@ static void emitInjectionFunction(IRGenModule &IGM,
   llvm::Function *fn = IGM.getAddrOfInjectionFunction(elt);
 
   ExplosionKind explosionKind = ExplosionKind::Minimal;
-  IRGenFunction IGF(IGM, nullptr, explosionKind,
+  IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(), explosionKind,
                     /*uncurry level*/ 0, fn, Prologue::Bare);
 
   Explosion explosion = IGF.collectParameters();

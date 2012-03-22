@@ -87,16 +87,6 @@ Expr *Expr::getValueProvidingExpr() {
 // Support methods for Exprs.
 //===----------------------------------------------------------------------===//
 
-/// getNumArgs - Return the number of arguments that this closure expr takes.
-/// This is the length of the ArgList.
-unsigned ClosureExpr::getNumArgs() const {
-  Type Input = getType()->getAs<FunctionType>()->getInput();
-  
-  if (TupleType *TT = Input->getAs<TupleType>())
-    return TT->getFields().size();
-  return 1;  
-}
-
 APInt IntegerLiteralExpr::getValue() const {
   assert(!getType().isNull() && "Semantic analysis has not completed");
   unsigned BitWidth = getType()->castTo<BuiltinIntegerType>()->getBitWidth();

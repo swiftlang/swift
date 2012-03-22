@@ -787,7 +787,7 @@ public:
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::FuncExpr;
   }
-
+  static bool classof(const CapturingExpr *E) { return classof(cast<Expr>(E)); }
 };
   
 /// ClosureExpr - An expression which is implicitly created by using an
@@ -798,18 +798,22 @@ public:
 ///
 class ClosureExpr : public CapturingExpr {
   Expr *Body;
-  
+  Pattern *Pat;
+
 public:
   ClosureExpr(ExprKind Kind, Expr *Body, DeclContextKind DCKind,
               DeclContext *Parent, Type ResultTy = Type())
-    : CapturingExpr(Kind, ResultTy, DCKind, Parent), Body(Body) {}
+    : CapturingExpr(Kind, ResultTy, DCKind, Parent), Body(Body), Pat(0) {}
 
   Expr *getBody() const { return Body; }
   void setBody(Expr *e) { Body = e; }
 
-  /// getNumArgs - Return the number of arguments that this closure expr takes,
-  /// deriving it from the Type of the expression.
-  unsigned getNumArgs() const;
+  Pattern *getPattern() { return Pat; }
+  const Pattern *getPattern() const { return Pat; }
+  void setPattern(Pattern *pat) { Pat = pat; }
+  ArrayRef<Pattern*> getParamPatterns() const {
+    return Pat;
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ClosureExpr *) { return true; }
@@ -821,6 +825,7 @@ public:
     return DC->getContextKind() >= DeclContextKind::First_Closure &&
            DC->getContextKind() <= DeclContextKind::Last_Closure;
   }
+  static bool classof(const CapturingExpr *E) { return classof(cast<Expr>(E)); }
 };
 
 /// AnonClosureArgExpr - This is a use of an anonymous closure argument inside
@@ -877,8 +882,6 @@ class ExplicitClosureExpr : public ClosureExpr {
   /// list, because they occur each time an argument is used.
   AnonClosureArgExpr *ClosureArgList;
 
-  Pattern *Pat;
-
 public:
   ExplicitClosureExpr(SourceLoc LBraceLoc, DeclContext *Parent,
                       Expr *Body = 0, SourceLoc RBraceLoc = SourceLoc())
@@ -901,10 +904,6 @@ public:
   AnonClosureArgExpr *getClosureArgList() { return ClosureArgList; }
   const AnonClosureArgExpr *getClosureArgList() const { return ClosureArgList; }
 
-  Pattern *getPattern() { return Pat; }
-  const Pattern *getPattern() const { return Pat; }
-  void setPattern(Pattern *pat) { Pat = pat; }
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ExplicitClosureExpr *) { return true; }
   static bool classof(const Expr *E) {
@@ -913,6 +912,7 @@ public:
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::ExplicitClosureExpr;
   }
+  static bool classof(const CapturingExpr *E) { return classof(cast<Expr>(E)); }
 };
   
 /// ImplicitClosureExpr - This is a closure of the contained subexpression that
@@ -927,7 +927,11 @@ public:
                   DeclContextKind::ImplicitClosureExpr, Parent, ResultTy) {}
   
   SourceRange getSourceRange() const { return getBody()->getSourceRange(); }
-  
+
+  ArrayRef<Pattern*> getParamPatterns() const {
+    return ArrayRef<Pattern*>();
+  }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ImplicitClosureExpr *) { return true; }
   static bool classof(const Expr *E) {
@@ -936,6 +940,7 @@ public:
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::ImplicitClosureExpr;
   }
+  static bool classof(const CapturingExpr *E) { return classof(cast<Expr>(E)); }
 };
   
   

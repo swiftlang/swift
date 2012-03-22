@@ -113,7 +113,7 @@ static Type getResultType(Type type, unsigned uncurryLevel) {
 }
 
 const TypeInfo &IRGenFunction::getResultTypeInfo() const {
-  Type resultType = getResultType(CurFuncExpr->getType(), CurUncurryLevel);
+  Type resultType = getResultType(CurFuncType, CurUncurryLevel);
   return IGM.getFragileTypeInfo(resultType);
 }
 
@@ -1043,7 +1043,7 @@ void IRGenFunction::emitPrologue() {
                                   "alloca point");
 
   // That's it for the 'bare' prologue.
-  if (CurPrologue != Prologue::Standard)
+  if (CurPrologue == Prologue::Bare)
     return;
 
   // Set up the return block and insert it.  This creates a second
@@ -1074,10 +1074,8 @@ void IRGenFunction::emitPrologue() {
   }
 
   // Set up the parameters.
-  auto params = CurFuncExpr->getParamPatterns().slice(0, CurUncurryLevel + 1);
+  auto params = CurFuncParamPatterns.slice(0, CurUncurryLevel + 1);
   emitParameterClauses(*this, params, values);
-
-  // TODO: set up the data pointer.
 
   assert(values.empty() && "didn't exhaust all parameters?");
 }
@@ -1088,7 +1086,7 @@ void IRGenFunction::emitEpilogue() {
   AllocaIP->eraseFromParent();
 
   // That's it for the 'bare' epilogue.
-  if (CurPrologue != Prologue::Standard)
+  if (CurPrologue == Prologue::Bare)
     return;
 
   // If there are no edges to the return block, we never want to emit it.
@@ -1293,8 +1291,8 @@ namespace {
                                       "emitting IR for curried entrypoint to",
                                       Func);
 
-      IRGenFunction IGF(IGM, Func, ExplosionLevel, CurClause, entrypoint,
-                        Prologue::Bare);
+      IRGenFunction IGF(IGM, Func->getType(), Func->getParamPatterns(),
+                        ExplosionLevel, CurClause, entrypoint, Prologue::Bare);
 
       Explosion params = IGF.collectParameters();
 
@@ -1358,8 +1356,8 @@ namespace {
                                       "emitting IR for currying forwarder of",
                                       Func);
 
-      IRGenFunction IGF(IGM, Func, ExplosionLevel, CurClause, forwarder,
-                        Prologue::Bare);
+      IRGenFunction IGF(IGM, Func->getType(), Func->getParamPatterns(),
+                        ExplosionLevel, CurClause, forwarder, Prologue::Bare);
 
       // Accumulate the function's immediate parameters.
       Explosion params = IGF.collectParameters();
@@ -1434,8 +1432,8 @@ static void emitFunction(IRGenModule &IGM, FuncDecl *func,
 
   // Finally, emit the uncurried entrypoint.
   PrettyStackTraceDecl stackTrace("emitting IR for", func);
-  IRGenFunction(IGM, funcExpr, explosionLevel,
-                naturalUncurryLevel, entrypoint)
+  IRGenFunction(IGM, funcExpr->getType(), funcExpr->getParamPatterns(),
+                explosionLevel, naturalUncurryLevel, entrypoint)
     .emitFunctionTopLevel(funcExpr->getBody());
 }
 

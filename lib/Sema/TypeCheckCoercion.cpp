@@ -624,7 +624,13 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC) {
       // FIXME: Need to figure out correct parent DeclContext; fortunately,
       // it doesn't matter much for the moment because nothing actually needs
       // to use the ImplicitClosureExpr as its context.
-      return new (TC.Context) ImplicitClosureExpr(E, &TC.TU, DestTy);
+      ImplicitClosureExpr *ICE =
+          new (TC.Context) ImplicitClosureExpr(E, &TC.TU, DestTy);
+      Pattern *Pat = TuplePattern::create(TC.Context, E->getLoc(),
+                                          ArrayRef<TuplePatternElt>(),
+                                          E->getLoc());
+      ICE->setPattern(Pat);
+      return ICE;
     }
   
   // If we have an exact match, we're done.

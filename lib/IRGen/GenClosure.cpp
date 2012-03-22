@@ -66,38 +66,28 @@ void IRGenFunction::emitClosure(ClosureExpr *E,
     return emitFakeExplosion(getFragileTypeInfo(E->getType()), explosion);
 
   llvm::FunctionType *fnType =
-      IGM.getFunctionType(E->getType(), ExplosionKind::Minimal, 0, true);
+      IGM.getFunctionType(E->getType(), ExplosionKind::Minimal, 0, false);
   llvm::Function *Func =
       llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
                              "closure", &IGM.Module);
-  IRGenFunction(IGM, 0, ExplosionKind::Minimal, 0, Func, Prologue::Bare)
+  auto Patterns = E->getParamPatterns();
+  IRGenFunction(IGM, E->getType(), Patterns, ExplosionKind::Minimal, 0, Func)
       .emitClosureBody(E);
   explosion.add(Builder.CreateBitCast(Func, IGM.Int8PtrTy));
   explosion.add(IGM.RefCountedNull);
 }
 
 void IRGenFunction::emitClosureBody(ClosureExpr *E) {
-  // Emit $0..$n
-  Explosion values = collectParameters();
-  FunctionType *FT = E->getType()->getAs<FunctionType>();
-  TupleType *FuncInputTT = dyn_cast<TupleType>(FT->getInput().getPointer());
-  if (FuncInputTT) {
-    unsigned NumInputArgs = FuncInputTT->getFields().size();
-    for (unsigned i = 0; i < NumInputArgs; i++) {
-      Type ArgType = FuncInputTT->getElementType(i);
-      ClosureParams.push_back(getAddrForParameter(ArgType, "$" + Twine(i),
-                                                  /*isByref*/false, values));
-    }
-  } else {
-    ClosureParams.push_back(getAddrForParameter(FT->getInput(), "$0",
-                                                /*isByref*/false, values));
-  }
-
   // FIXME: Need to set up captures.
 
-  // Emit the body of the closure
+  // Emit the body of the closure.
   FullExpr fullExpr(*this);
-  Explosion result(CurExplosionLevel);
-  emitRValue(E->getBody(), result);
-  emitScalarReturn(result);
+  const TypeInfo &resultType = getFragileTypeInfo(E->getBody()->getType());
+  emitRValueToMemory(E->getBody(), ReturnSlot, resultType);
+  fullExpr.pop();
+
+  // Return from the closure.
+  JumpDest returnDest(ReturnBB);
+  emitBranch(returnDest);
+  Builder.ClearInsertionPoint();
 }

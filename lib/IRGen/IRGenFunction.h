@@ -19,6 +19,7 @@
 #define SWIFT_IRGEN_IRGENFUNCTION_H
 
 #include "swift/AST/LLVM.h"
+#include "swift/AST/Type.h"
 #include "llvm/ADT/DenseMap.h"
 #include "IRBuilder.h"
 
@@ -41,6 +42,7 @@ namespace swift {
   class LookThroughOneofExpr;
   class OneOfElementDecl;
   template<typename T> class Optional;
+  class Pattern;
   class RequalifyExpr;
   class ReturnStmt;
   class SourceLoc;
@@ -48,7 +50,6 @@ namespace swift {
   class TupleExpr;
   class TupleElementExpr;
   class TupleShuffleExpr;
-  class Type;
   class ValueDecl;
   class VarDecl;
   class WhileStmt;
@@ -90,13 +91,15 @@ public:
   IRGenModule &IGM;
   IRBuilder Builder;
 
-  FuncExpr *CurFuncExpr;
+  Type CurFuncType;
+  ArrayRef<Pattern*> CurFuncParamPatterns;
   llvm::Function *CurFn;
   ExplosionKind CurExplosionLevel;
   unsigned CurUncurryLevel;
   Prologue CurPrologue;
 
-  IRGenFunction(IRGenModule &IGM, FuncExpr *FE, ExplosionKind explosion,
+  IRGenFunction(IRGenModule &IGM, Type t, ArrayRef<Pattern*> p,
+                ExplosionKind explosion,
                 unsigned uncurryLevel, llvm::Function *fn,
                 Prologue prologue = Prologue::Standard);
   ~IRGenFunction();
@@ -213,7 +216,6 @@ private:
 
   void emitClosure(ClosureExpr *E, Explosion &explosion);
   void emitClosureBody(ClosureExpr *E);
-  std::vector<Address> ClosureParams;
 
 //--- Declaration emission -----------------------------------------------------
 public:
