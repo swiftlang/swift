@@ -440,8 +440,14 @@ NullablePtr<Expr> Parser::parseExprFunc() {
   NullablePtr<BraceStmt> Body = parseStmtBrace(diag::expected_lbrace_func_expr);
   if (Body.isNull())
     return 0;
-  
+
   FE->setBody(Body.get());
+
+  auto& Captures = ValCaptures.back();
+  ValueDecl** CaptureCopy = Context.AllocateCopy<ValueDecl*>(Captures.begin(),
+                                                             Captures.end());
+  FE->setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
+
   return FE;
 }
 

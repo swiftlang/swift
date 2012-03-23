@@ -18,6 +18,8 @@
 
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ASTWalker.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
@@ -581,6 +583,27 @@ static bool isSubtypeExceptImplicit(LValueType *SrcTy, LValueType *DestTy) {
       && SrcTy->getQualifiers().withoutImplicit() <= DestTy->getQualifiers();
 }
 
+namespace {
+  class FindCapturedVars : public ASTWalker {
+    llvm::SetVector<ValueDecl*> &Captures;
+
+  public:
+    bool walkToExprPre(Expr *E) {
+      if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
+        if (DRE->getDecl()->getDeclContext()->isLocalContext())
+          Captures.insert(DRE->getDecl());
+      return true;
+    }
+
+    FindCapturedVars(llvm::SetVector<ValueDecl*> &captures)
+      : Captures(captures) {}
+
+    void doWalk(Expr *E) {
+      E->walk(*this);
+    }
+  };
+}
+
 /// convertToType - This is the recursive implementation of
 /// ConvertToType.  It produces diagnostics and returns null on failure.
 ///
@@ -612,6 +635,16 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC) {
                                           ArrayRef<TuplePatternElt>(),
                                           E->getLoc());
       ICE->setPattern(Pat);
+
+      // Perform a recursive walk to compute the capture list; this is quite
+      // different from the way this is done for explicit closures because
+      // the closure doesn't exist until type-checking.
+      llvm::SetVector<ValueDecl*> Captures;
+      FindCapturedVars(Captures).doWalk(E);
+      ValueDecl** CaptureCopy =
+          TC.Context.AllocateCopy<ValueDecl*>(Captures.begin(), Captures.end());
+      ICE->setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
+
       return ICE;
     }
   

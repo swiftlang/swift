@@ -34,40 +34,9 @@
 using namespace swift;
 using namespace irgen;
 
-namespace {
-  class FindCapturedVars : public ASTWalker {
-    IRGenFunction &IGF;
-    bool FoundVar;
-
-  public:
-    bool walkToExprPre(Expr *E) {
-      if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
-        if (DRE->getDecl()->getKind() == DeclKind::Var &&
-            DRE->getDecl()->getDeclContext()->isLocalContext()) {
-          IGF.IGM.unimplemented(E->getLoc(), "cannot capture local var yet");
-          FoundVar = true;
-        }
-      }
-      return true;
-    }
-
-    FindCapturedVars(IRGenFunction &igf) : IGF(igf), FoundVar(false) {}
-
-    bool doWalk(Expr *E) {
-      E->walk(*this);
-      return FoundVar;
-    }
-  };
-}
-
 void IRGenFunction::emitClosure(ClosureExpr *E, Explosion &explosion) {
   if (!E->getCaptures().empty()) {
     IGM.unimplemented(E->getLoc(), "cannot capture local vars yet");
-    return emitFakeExplosion(getFragileTypeInfo(E->getType()), explosion);
-  }
-  if (FindCapturedVars(*this).doWalk(E->getBody())) {
-    // FIXME: The previous check should work for implicit closures as well.
-    assert(isa<ImplicitClosureExpr>(E) && "Explicit closure missed capture");
     return emitFakeExplosion(getFragileTypeInfo(E->getType()), explosion);
   }
 
