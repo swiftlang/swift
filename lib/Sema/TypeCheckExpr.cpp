@@ -401,22 +401,53 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     return 0;
   }
   
-  // Okay, if the argument is also dependent, we can't do anything here.  Just
-  // wait until something gets resolved.
-  if (E2->getType()->is<DependentType>()) {
-    E->setDependentType(E2->getType());
-    return E;
-  }
-  
-  // Okay, we have a typed argument and untyped function.  See if we can infer
-  // a type for that function.
-  
   // Otherwise, we must have an application to an overload set.  See if we can
   // resolve which overload member is based on the argument type.
   OverloadSetRefExpr *OS = dyn_cast<OverloadSetRefExpr>(E1);
   if (!OS) {
     // If not, just use the dependent type.
     E->setType(E1->getType());
+    return E;
+  }
+
+  // See if we can prune down the overload set based on the syntactic form of
+  // the call.  For example, we can reject binary "-" operators when analyzing a
+  // unary operator.
+  // FIXME: Can this become a property of the type propagated by
+  // TypeCheckCoercion?
+  if (isa<UnaryExpr>(E) || isa<BinaryExpr>(E)) {
+    unsigned NumArguments = 1+isa<BinaryExpr>(E);
+    
+    SmallVector<ValueDecl*, 8> NewCandidates;
+    for (ValueDecl *VD : OS->getDecls()) {
+      // Reject candidates with the wrong number of arguments.
+      FunctionType *FT = VD->getType()->castTo<FunctionType>();
+      if (TupleType *TT = dyn_cast<TupleType>(FT->getInput()))
+        if (TT->getFields().size() != NumArguments)
+          continue;
+      
+      NewCandidates.push_back(VD);
+    }
+    
+    if (NewCandidates.empty()) {
+      if (isa<BinaryExpr>(E))
+        diagnose(E1->getLoc(), diag::no_candidates, 0) << E->getSourceRange();
+      else if (isa<UnaryExpr>(E))
+        diagnose(E1->getLoc(), diag::no_candidates, 1) << E->getSourceRange();
+      return 0;
+    } else if (NewCandidates.size() != OS->getDecls().size()) {
+      // If we successfully trimmed the overload set (hopefully down to 1),
+      // rebuild the function and re-sema it.
+      E->setFn(OverloadSetRefExpr::createWithCopy(NewCandidates,
+                                                  OS->getLoc()));
+      return semaApplyExpr(E);
+    }
+  }
+  
+  // Okay, if the argument is also dependent, we can't do anything here.  Just
+  // wait until something gets resolved.
+  if (E2->getType()->is<DependentType>()) {
+    E->setDependentType(E2->getType());
     return E;
   }
   
@@ -461,13 +492,13 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // Otherwise we have either an ambiguity between multiple possible candidates
   // or not candidate at all.
   if (BestRank != Expr::CR_Invalid)
-    diagnose(E1->getLoc(), diag::overloading_ambiguity);
+    diagnose(E1->getLoc(), diag::overloading_ambiguity) << E->getSourceRange();
   else if (isa<BinaryExpr>(E))
-    diagnose(E1->getLoc(), diag::no_candidates, 0);
+    diagnose(E1->getLoc(), diag::no_candidates, 0) << E->getSourceRange();
   else if (isa<UnaryExpr>(E))
-    diagnose(E1->getLoc(), diag::no_candidates, 1);
+    diagnose(E1->getLoc(), diag::no_candidates, 1) << E->getSourceRange();
   else
-    diagnose(E1->getLoc(), diag::no_candidates, 2);
+    diagnose(E1->getLoc(), diag::no_candidates, 2) << E->getSourceRange();
   
   // Print out the candidate set.
   for (auto TheDecl : OS->getDecls()) {

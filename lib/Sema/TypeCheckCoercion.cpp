@@ -232,7 +232,7 @@ Expr *SemaCoerce::visitApplyExpr(ApplyExpr *E) {
     }
     
     if (NewCandidates.empty()) {
-      abort();
+      ; // FIXME.
     } else if (NewCandidates.size() != OSE->getDecls().size()) {
       // If we successfully trimmed the overload set (hopefully down to 1),
       // rebuild the function and re-sema it.
