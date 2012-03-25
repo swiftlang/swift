@@ -66,6 +66,11 @@ public:
   void markUseAsLValue(Expr *E, bool asHeap);
   void markUsesOfLValues(Expr *E);
   
+  /// diagnoseEmptyOverloadSet - Diagnose a case where we disproved all of the
+  /// possible candidates in an overload set of a call.
+  void diagnoseEmptyOverloadSet(ApplyExpr *Call, OverloadSetRefExpr *OSE);
+  void printOverloadSetCandidates(OverloadSetRefExpr *OSE);
+  
   /// applyTypeToLiteral - Apply the specified type to the integer or float
   /// literal expression (which is known to have dependent type), performing
   /// semantic analysis and returning null on a semantic error or the new AST to

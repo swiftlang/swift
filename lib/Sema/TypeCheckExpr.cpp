@@ -491,24 +491,33 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   
   // Otherwise we have either an ambiguity between multiple possible candidates
   // or not candidate at all.
-  if (BestRank != Expr::CR_Invalid)
+  if (BestRank != Expr::CR_Invalid) {
     diagnose(E1->getLoc(), diag::overloading_ambiguity) << E->getSourceRange();
-  else if (isa<BinaryExpr>(E))
-    diagnose(E1->getLoc(), diag::no_candidates, 0) << E->getSourceRange();
-  else if (isa<UnaryExpr>(E))
-    diagnose(E1->getLoc(), diag::no_candidates, 1) << E->getSourceRange();
-  else
-    diagnose(E1->getLoc(), diag::no_candidates, 2) << E->getSourceRange();
-  
-  // Print out the candidate set.
-  for (auto TheDecl : OS->getDecls()) {
-    Type ArgTy = TheDecl->getType()->castTo<FunctionType>()->getInput();
-    if (E2->getRankOfConversionTo(ArgTy) != BestRank)
-      continue;
-    diagnose(TheDecl->getLocStart(), diag::found_candidate);
-  }
+    printOverloadSetCandidates(OS);
+  } else
+    diagnoseEmptyOverloadSet(E, OS);
   return 0;
 }
+                                
+void TypeChecker::diagnoseEmptyOverloadSet(ApplyExpr *E,
+                                           OverloadSetRefExpr *OSE) {
+  if (isa<BinaryExpr>(E))
+    diagnose(E->getFn()->getLoc(), diag::no_candidates, 0)
+      << E->getSourceRange();
+  else if (isa<UnaryExpr>(E))
+    diagnose(E->getFn()->getLoc(), diag::no_candidates, 1)
+      << E->getSourceRange();
+  else
+    diagnose(E->getFn()->getLoc(), diag::no_candidates, 2)
+      << E->getSourceRange();
+  printOverloadSetCandidates(OSE);
+}
+void TypeChecker::printOverloadSetCandidates(OverloadSetRefExpr *OSE) {
+  // Print out the candidate set.
+  for (auto TheDecl : OSE->getDecls())
+    diagnose(TheDecl->getLocStart(), diag::found_candidate);
+}
+
 
 //===----------------------------------------------------------------------===//
 // Expression Reanalysis - SemaExpressionTree
