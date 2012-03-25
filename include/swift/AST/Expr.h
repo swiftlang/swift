@@ -238,6 +238,7 @@ public:
 
   ArrayRef<ValueDecl*> getDecls() const { return Decls; }
 
+  SourceLoc getLoc() const { return Loc; }
   SourceRange getSourceRange() const { return Loc; }
   
   /// createWithCopy - Create and return a new OverloadSetRefExpr or a new

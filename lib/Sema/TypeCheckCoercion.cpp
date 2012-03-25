@@ -206,9 +206,47 @@ public:
 
 
 Expr *SemaCoerce::visitApplyExpr(ApplyExpr *E) {
+  // TODO: We would really like to propagate something like
+  // "DependentTy->DestTy" up into the Fn argument, eliminating these special
+  // cases.  See the 'syntactic' FIXME's below.
+  
+  // Given a CallExpr a(b) where "a" is an overloaded value, we may be able to
+  // prune the overload set based on the known result type.  Doing this may
+  // allow the ambiguity to resolve by removing candidates
+  // that caused the ambiguity.  For example if we know that the destination
+  // type is 'int', and we had "(int) -> int" and "(SomeTy) -> float", we can
+  // prune the second one, and then recursively apply 'int' to b.
+  //
+  // FIXME: Handling this syntactically causes us to reject "(:f)(x)" as
+  // ambiguous.
+  if (OverloadSetRefExpr *OSE = dyn_cast<OverloadSetRefExpr>(E->getFn())) {
+    SmallVector<ValueDecl*, 8> NewCandidates;
+    for (ValueDecl *VD : OSE->getDecls()) {
+      FunctionType *FT = VD->getType()->castTo<FunctionType>();
+      // FIXME: Requiring an exact match prevents implicit conversions for
+      // lvalue/rvalue and tuple element shuffles from happening.
+      if (!FT->getResult()->isEqual(DestTy))
+        continue;
+      
+      NewCandidates.push_back(VD);
+    }
+    
+    if (NewCandidates.empty()) {
+      abort();
+    } else if (NewCandidates.size() != OSE->getDecls().size()) {
+      // If we successfully trimmed the overload set (hopefully down to 1),
+      // rebuild the function and re-sema it.
+      E->setFn(OverloadSetRefExpr::createWithCopy(NewCandidates,
+                                                  OSE->getLoc()));
+      return TC.semaApplyExpr(E);
+    }
+  }
+  
   // If we have ":f(x)" and the result type of the call is a OneOfType, then
-  // :f must be an element constructor for the oneof value.  Note that
-  // handling this syntactically causes us to reject "(:f)(x)" as ambiguous.
+  // :f must be an element constructor for the oneof value.
+  //
+  // FIXME: Handling this syntactically causes us to reject "(:f)(x)" as
+  // ambiguous.
   if (UnresolvedMemberExpr *UME =
       dyn_cast<UnresolvedMemberExpr>(E->getFn())) {
     if (OneOfType *DT = DestTy->getAs<OneOfType>()) {
@@ -234,12 +272,6 @@ Expr *SemaCoerce::visitApplyExpr(ApplyExpr *E) {
     }
   }
   
-  // FIXME: Given a CallExpr a(b) where "a" is an overloaded value, we
-  // may be able to prune the overload set based on the known result type.
-  // Doing this may allow the ambiguity to resolve by removing candidates
-  // that caused the ambiguity.  For example if we know that the destination
-  // type is 'int', and we had "int -> int" and "SomeTy -> float", we can
-  // prune the second one, and then recursively apply 'int' to b.
   return E;
 }
 

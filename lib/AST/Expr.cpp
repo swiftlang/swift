@@ -225,7 +225,8 @@ getTupleToTupleTypeConversionRank(const Expr *E, TupleType *ETy,
   SmallVector<bool, 16> UsedElements(NumExprElements);
   SmallVector<int, 16>  DestElementSources(DestTy->getFields().size(), -1);
 
-  assert(ETy->getFields().size() == NumExprElements && "Expr #elements mismatch!");
+  assert(ETy->getFields().size() == NumExprElements &&
+         "Expr #elements mismatch!");
   {
     unsigned i = 0;
     for (const TupleTypeElt &Elt : ETy->getFields())
