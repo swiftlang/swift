@@ -14,55 +14,50 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ASTWalker.h"
-#include "swift/AST/Types.h"
-#include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
-#include "swift/Basic/Optional.h"
+#include "swift/AST/Stmt.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
-#include "llvm/Target/TargetData.h"
 
-#include "Cleanup.h"
-#include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "JumpDest.h"
-#include "LValue.h"
 #include "Explosion.h"
+
+#include "GenClosure.h"
 
 using namespace swift;
 using namespace irgen;
 
-void IRGenFunction::emitClosure(ClosureExpr *E, Explosion &explosion) {
-  if (!E->getCaptures().empty()) {
-    IGM.unimplemented(E->getLoc(), "cannot capture local vars yet");
-    return emitFakeExplosion(getFragileTypeInfo(E->getType()), explosion);
-  }
-
-  llvm::FunctionType *fnType =
-      IGM.getFunctionType(E->getType(), ExplosionKind::Minimal, 0, false);
-  llvm::Function *Func =
-      llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
-                             "closure", &IGM.Module);
-  auto Patterns = E->getParamPatterns();
-  IRGenFunction(IGM, E->getType(), Patterns, ExplosionKind::Minimal, 0, Func)
-      .emitClosureBody(E);
-  explosion.add(Builder.CreateBitCast(Func, IGM.Int8PtrTy));
-  explosion.add(IGM.RefCountedNull);
-}
-
-void IRGenFunction::emitClosureBody(ClosureExpr *E) {
+static void emitClosureBody(IRGenFunction &IGF, ClosureExpr *E) {
   // FIXME: Need to set up captures.
 
-  // Emit the body of the closure.
-  FullExpr fullExpr(*this);
-  const TypeInfo &resultType = getFragileTypeInfo(E->getBody()->getType());
-  emitRValueToMemory(E->getBody(), ReturnSlot, resultType);
-  fullExpr.pop();
+  // Emit the body of the closure as if it were a single return
+  // statement.
+  ReturnStmt ret(SourceLoc(), E->getBody());
+  IGF.emitStmt(&ret);
+}
 
-  // Return from the closure.
-  JumpDest returnDest(ReturnBB);
-  emitBranch(returnDest);
-  Builder.ClearInsertionPoint();
+void swift::irgen::emitClosure(IRGenFunction &IGF, ClosureExpr *E,
+                               Explosion &explosion) {
+  if (!E->getCaptures().empty()) {
+    IGF.unimplemented(E->getLoc(), "cannot capture local vars yet");
+    return IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()),
+                                 explosion);
+  }
+
+  // Create the IR function.
+  llvm::FunctionType *fnType =
+      IGF.IGM.getFunctionType(E->getType(), ExplosionKind::Minimal, 0, false);
+  llvm::Function *fn =
+      llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
+                             "closure", &IGF.IGM.Module);
+
+  // Go ahead and build the explosion result now.
+  explosion.add(IGF.Builder.CreateBitCast(fn, IGF.IGM.Int8PtrTy));
+  explosion.add(IGF.IGM.RefCountedNull);
+
+  IRGenFunction innerIGF(IGF.IGM, E->getType(), E->getParamPatterns(),
+                         ExplosionKind::Minimal, /*uncurry level*/ 0, fn);
+
+  emitClosureBody(innerIGF, E);
 }

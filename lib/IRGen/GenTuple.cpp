@@ -33,6 +33,8 @@
 #include "LValue.h"
 #include "Explosion.h"
 
+#include "GenTuple.h"
+
 using namespace swift;
 using namespace irgen;
 
@@ -290,10 +292,11 @@ TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
                                fieldInfos);
 }
 
-void IRGenFunction::emitTupleLiteral(TupleExpr *E, Explosion &explosion) {
+void swift::irgen::emitTupleLiteral(IRGenFunction &IGF, TupleExpr *E,
+                                    Explosion &explosion) {
   // Emit all the sub-expressions.
   for (Expr *elt : E->getElements()) {
-    emitRValue(elt, explosion);
+    IGF.emitRValue(elt, explosion);
   }
 }
 
@@ -312,16 +315,16 @@ namespace {
   };
 }
 
-void IRGenFunction::emitTupleElement(TupleElementExpr *E,
-                                     Explosion &explosion) {
+void swift::irgen::emitTupleElement(IRGenFunction &IGF, TupleElementExpr *E,
+                                    Explosion &explosion) {
   // If we're doing an l-value projection, this is straightforward.
   if (LValueType *lv = E->getType()->getAs<LValueType>())
-    return emitLValueAsScalar(emitTupleElementLValue(E),
-                              lv->isHeap() ? OnHeap : NotOnHeap,
-                              explosion);
+    return IGF.emitLValueAsScalar(emitTupleElementLValue(IGF, E),
+                                  lv->isHeap() ? OnHeap : NotOnHeap,
+                                  explosion);
 
   Expr *tuple = E->getBase();
-  const TupleTypeInfo &tupleType = getAsTupleTypeInfo(*this, tuple->getType());
+  const TupleTypeInfo &tupleType = getAsTupleTypeInfo(IGF, tuple->getType());
 
   const TupleFieldInfo &field =
     tupleType.getFieldInfos()[E->getFieldNumber()];
@@ -329,32 +332,33 @@ void IRGenFunction::emitTupleElement(TupleElementExpr *E,
   // If the field requires no storage, there's nothing to do.
   if (!field.hasStorage()) {
     // Emit the base in case it has side-effects.
-    emitIgnored(tuple);
-    return emitFakeExplosion(field.Type, explosion);
+    IGF.emitIgnored(tuple);
+    return IGF.emitFakeExplosion(field.Type, explosion);
   }
 
   // If we can emit the base as an l-value, we can avoid a lot
   // of unnecessary work.
-  if (Optional<Address> tupleAddr = tryEmitAsAddress(tuple, tupleType)) {
-    Address addr = tupleType.projectAddress(*this, tupleAddr.getValue(), field);
-    return field.Type.load(*this, addr, explosion);
+  if (Optional<Address> tupleAddr = IGF.tryEmitAsAddress(tuple, tupleType)) {
+    Address addr = tupleType.projectAddress(IGF, tupleAddr.getValue(), field);
+    return field.Type.load(IGF, addr, explosion);
   }
 
   // Otherwise, emit the base as an r-value and project.
   Explosion tupleExplosion(explosion.getKind());
-  emitRValue(tuple, tupleExplosion);
+  IGF.emitRValue(tuple, tupleExplosion);
   return tupleType.projectExplosion(tupleExplosion, field, explosion);
 }
 
 /// Try to emit a tuple-element reference expression as an address.
 Optional<Address>
-IRGenFunction::tryEmitTupleElementAsAddress(TupleElementExpr *E) {
+swift::irgen::tryEmitTupleElementAsAddress(IRGenFunction &IGF,
+                                           TupleElementExpr *E) {
   Expr *tuple = E->getBase();
-  const TupleTypeInfo &tupleType = getAsTupleTypeInfo(*this, tuple->getType());
+  const TupleTypeInfo &tupleType = getAsTupleTypeInfo(IGF, tuple->getType());
 
   // This is contigent exclusively on whether we can emit an address
   // for the tuple.
-  Optional<Address> tupleAddr = tryEmitAsAddress(tuple, tupleType);
+  Optional<Address> tupleAddr = IGF.tryEmitAsAddress(tuple, tupleType);
   if (!tupleAddr) return Nothing;
 
   // We succeeded;  now just GEP down.
@@ -362,18 +366,19 @@ IRGenFunction::tryEmitTupleElementAsAddress(TupleElementExpr *E) {
     tupleType.getFieldInfos()[E->getFieldNumber()];
   if (!field.hasStorage()) return Address();
 
-  return tupleType.projectAddress(*this, tupleAddr.getValue(), field);
+  return tupleType.projectAddress(IGF, tupleAddr.getValue(), field);
 }
 
-LValue IRGenFunction::emitTupleElementLValue(TupleElementExpr *E) {
+LValue swift::irgen::emitTupleElementLValue(IRGenFunction &IGF,
+                                            TupleElementExpr *E) {
   assert(E->getType()->is<LValueType>());
 
   // Emit the base l-value.
   Expr *tuple = E->getBase();
-  LValue tupleLV = emitLValue(tuple);
+  LValue tupleLV = IGF.emitLValue(tuple);
 
   Type tupleType = tuple->getType()->castTo<LValueType>()->getObjectType();
-  const TupleTypeInfo &tupleTI = getAsTupleTypeInfo(*this, tupleType);
+  const TupleTypeInfo &tupleTI = getAsTupleTypeInfo(IGF, tupleType);
   const TupleFieldInfo &field =
     tupleTI.getFieldInfos()[E->getFieldNumber()];
 
@@ -389,19 +394,20 @@ LValue IRGenFunction::emitTupleElementLValue(TupleElementExpr *E) {
 
 /// emitTupleShuffle - Emit a tuple-shuffle expression
 /// as an exploded r-value.
-void IRGenFunction::emitTupleShuffle(TupleShuffleExpr *E,
-                                     Explosion &outerTupleExplosion) {
+void swift::irgen::emitTupleShuffle(IRGenFunction &IGF, TupleShuffleExpr *E,
+                                    Explosion &outerTupleExplosion) {
   Expr *innerTuple = E->getSubExpr();
   const TupleTypeInfo &innerTupleType =
-    getAsTupleTypeInfo(*this, innerTuple->getType());
+    getAsTupleTypeInfo(IGF, innerTuple->getType());
 
   // Emit the inner tuple.  We prefer to emit it as an address.
   Explosion innerTupleExplosion(outerTupleExplosion.getKind());
   Address innerTupleAddr;
-  if (Optional<Address> addr = tryEmitAsAddress(innerTuple, innerTupleType)) {
+  if (Optional<Address> addr
+        = IGF.tryEmitAsAddress(innerTuple, innerTupleType)) {
     innerTupleAddr = addr.getValue();
   } else {
-    emitRValue(innerTuple, innerTupleExplosion);
+    IGF.emitRValue(innerTuple, innerTupleExplosion);
   }
 
   llvm::ArrayRef<TupleTypeElt> outerFields =
@@ -414,7 +420,7 @@ void IRGenFunction::emitTupleShuffle(TupleShuffleExpr *E,
     // If the shuffle index is -1, we're supposed to use the default value.
     if (shuffleIndex == -1) {
       assert(outerField.hasInit() && "no default initializer for field!");
-      emitRValue(outerField.getInit(), outerTupleExplosion);
+      IGF.emitRValue(outerField.getInit(), outerTupleExplosion);
       continue;
     }
 
@@ -427,9 +433,9 @@ void IRGenFunction::emitTupleShuffle(TupleShuffleExpr *E,
 
     // If we're loading from an l-value, project from that.
     if (innerTupleAddr.isValid()) {
-      Address elementAddr = innerTupleType.projectAddress(*this, innerTupleAddr,
+      Address elementAddr = innerTupleType.projectAddress(IGF, innerTupleAddr,
                                                           innerField);
-      innerField.Type.load(*this, elementAddr, outerTupleExplosion);
+      innerField.Type.load(IGF, elementAddr, outerTupleExplosion);
 
     // Otherwise, project the r-value down.
     } else {

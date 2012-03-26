@@ -17,12 +17,17 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Types.h"
-#include "swift/AST/ASTVisitor.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
 #include "llvm/Target/TargetData.h"
 
+#include "ASTVisitor.h"
+#include "GenClosure.h"
+#include "GenFunc.h"
+#include "GenLValue.h"
+#include "GenOneOf.h"
+#include "GenTuple.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -71,7 +76,8 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E) {
 }
 
 /// Emit a declaration reference as an exploded r-value.
-void IRGenFunction::emitDeclRef(DeclRefExpr *E, Explosion &explosion) {
+static void emitDeclRef(IRGenFunction &IGF, DeclRefExpr *E,
+                        Explosion &explosion) {
   ValueDecl *D = E->getDecl();
   switch (D->getKind()) {
   case DeclKind::Extension:
@@ -80,19 +86,19 @@ void IRGenFunction::emitDeclRef(DeclRefExpr *E, Explosion &explosion) {
     llvm_unreachable("decl is not a value decl");
 
   case DeclKind::Var:
-    return emitLValueAsScalar(emitDeclRefLValue(*this, E),
-                              OnHeap, explosion);
+    return IGF.emitLValueAsScalar(emitDeclRefLValue(IGF, E),
+                                  OnHeap, explosion);
 
   case DeclKind::Func:
-    emitRValueForFunction(cast<FuncDecl>(D), explosion);
-    return;
+    return emitRValueForFunction(IGF, cast<FuncDecl>(D), explosion);
 
   case DeclKind::OneOfElement:
-    return emitOneOfElementRef(cast<OneOfElementDecl>(D), explosion);
+    return emitOneOfElementRef(IGF, cast<OneOfElementDecl>(D), explosion);
 
   case DeclKind::ElementRef:
-    unimplemented(E->getLoc(), "emitting this decl as an r-value");
-    return emitFakeExplosion(getFragileTypeInfo(E->getType()), explosion);
+    IGF.unimplemented(E->getLoc(), "emitting this decl as an r-value");
+    return IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()),
+                                 explosion);
   }
   llvm_unreachable("bad decl kind");
 }
@@ -124,87 +130,145 @@ static OwnedAddress emitMaterializeExpr(IRGenFunction &IGF,
   return addr;
 }
 
+namespace {
+  /// A visitor for emitting a value into an explosion.  We call this
+  /// r-value emission, but do note that it's valid to emit an
+  /// expression of l-value type in this way; the effect is that of
+  /// emitLValueAsScalar.
+  class RValueEmitter : public irgen::ExprVisitor<RValueEmitter> {
+    IRGenFunction &IGF;
+    Explosion &Out;
+
+  public:
+    RValueEmitter(IRGenFunction &IGF, Explosion &out) : IGF(IGF), Out(out) {}
+
+    void visitAnonClosureArgExpr(AnonClosureArgExpr *E) {
+      OwnedAddress addr = IGF.getLocal(E->getDecl());
+      return IGF.emitLValueAsScalar(IGF.emitAddressLValue(addr), OnHeap, Out);
+    }
+
+    void visitLoadExpr(LoadExpr *E) {
+      const TypeInfo &type = IGF.getFragileTypeInfo(E->getType());
+      return IGF.emitLoad(IGF.emitLValue(E->getSubExpr()),
+                          type, Out);
+    }
+
+    void visitMaterializeExpr(MaterializeExpr *E) {
+      OwnedAddress addr = emitMaterializeExpr(IGF, E);
+      Out.add(addr.getAddressPointer());
+    }
+
+    void visitRequalifyExpr(RequalifyExpr *E) {
+      emitRequalify(IGF, E, Out);
+    }
+
+    void visitTupleExpr(TupleExpr *E) {
+      emitTupleLiteral(IGF, E, Out);
+    }
+
+    void visitTupleShuffleExpr(TupleShuffleExpr *E) {
+      emitTupleShuffle(IGF, E, Out);
+    }
+
+    void visitTupleElementExpr(TupleElementExpr *E) {
+      emitTupleElement(IGF, E, Out);
+    }
+
+    void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
+      IGF.emitIgnored(E->getLHS());
+      IGF.emitRValue(E->getRHS(), Out);
+    }
+
+    void visitApplyExpr(ApplyExpr *E) {
+      emitApplyExpr(IGF, E, Out);
+    }
+
+    void visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
+      Out.add(emitIntegerLiteralExpr(IGF, E));
+    }
+
+    void visitFloatLiteralExpr(FloatLiteralExpr *E) {
+      Out.add(emitFloatLiteralExpr(IGF, E));
+    }
+
+    void visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
+      emitLookThroughOneof(IGF, E, Out);
+    }
+
+    void visitDeclRefExpr(DeclRefExpr *E) {
+      emitDeclRef(IGF, E, Out);
+    }
+
+    void visitClosureExpr(ClosureExpr *E) {
+      emitClosure(IGF, E, Out);
+    }
+
+    void visitFuncExpr(FuncExpr *E) {
+      IGF.IGM.unimplemented(E->getLoc(),
+                            "cannot explode r-values for this expression yet");
+      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
+    }
+
+    void visitModuleExpr(ModuleExpr *E) {
+      // Nothing to do: modules have no runtime representation.
+    }
+  };
+}
+
 void IRGenFunction::emitRValue(Expr *E, Explosion &explosion) {
-  switch (E->getKind()) {
-#define EXPR(Id, Parent)
-#define UNCHECKED_EXPR(Id, Parent) case ExprKind::Id:
-#include "swift/AST/ExprNodes.def"
-  case ExprKind::Error:
-    llvm_unreachable("these expression kinds should not survive to IR-gen");
+  RValueEmitter(*this, explosion).visit(E);
+}
 
-  case ExprKind::AnonClosureArg:
-    llvm_unreachable("these expression kinds should never be rvalues");
+namespace {
+  class LValueEmitter : public irgen::ExprVisitor<LValueEmitter, LValue> {
+    IRGenFunction &IGF;
 
-  case ExprKind::Load: {
-    const TypeInfo &type = getFragileTypeInfo(E->getType());
-    return emitLoad(emitLValue(cast<LoadExpr>(E)->getSubExpr()),
-                            type, explosion);
-  }
+  public:
+    LValueEmitter(IRGenFunction &IGF) : IGF(IGF) {}
 
-  case ExprKind::Materialize: {
-    OwnedAddress addr = emitMaterializeExpr(*this, cast<MaterializeExpr>(E));
-    explosion.add(addr.getAddressPointer());
-    return;
-  }
+#define NOT_LVALUE_EXPR(Id) \
+    LValue visit##Id##Expr(Id##Expr *E) { \
+      llvm_unreachable("these expression kinds should never be l-values"); \
+    }
+    NOT_LVALUE_EXPR(Apply)
+    NOT_LVALUE_EXPR(IntegerLiteral)
+    NOT_LVALUE_EXPR(FloatLiteral)
+    NOT_LVALUE_EXPR(TupleShuffle)
+    NOT_LVALUE_EXPR(Func)
+    NOT_LVALUE_EXPR(Closure)
+    NOT_LVALUE_EXPR(Load)
+    NOT_LVALUE_EXPR(Tuple)
+    NOT_LVALUE_EXPR(DotSyntaxBaseIgnored)
+    NOT_LVALUE_EXPR(Module)
+#undef NOT_LVALUE_EXPR
 
-  case ExprKind::Requalify:
-    return emitRequalify(cast<RequalifyExpr>(E), explosion);
+    LValue visitTupleElementExpr(TupleElementExpr *E) {
+      return emitTupleElementLValue(IGF, E);
+    }
 
-  case ExprKind::Paren:
-    return emitRValue(cast<ParenExpr>(E)->getSubExpr(), explosion);
+    LValue visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
+      return emitLookThroughOneofLValue(IGF, E);
+    }
 
-  case ExprKind::AddressOf:
-    return emitRValue(cast<AddressOfExpr>(E)->getSubExpr(),
-                              explosion);    
+    // Qualification never affects emission as an l-value.
+    LValue visitRequalifyExpr(RequalifyExpr *E) {
+      return visit(E);
+    }
 
-  case ExprKind::Tuple:
-    return emitTupleLiteral(cast<TupleExpr>(E), explosion);
+    LValue visitMaterializeExpr(MaterializeExpr *E) {
+      OwnedAddress addr = emitMaterializeExpr(IGF, E);
+      return IGF.emitAddressLValue(addr);
+    }
 
-  case ExprKind::TupleShuffle:
-    return emitTupleShuffle(cast<TupleShuffleExpr>(E), explosion);
+    LValue visitDeclRefExpr(DeclRefExpr *E) {
+      return emitDeclRefLValue(IGF, E);
+    }
 
-  case ExprKind::SyntacticTupleElement:
-  case ExprKind::ImplicitThisTupleElement:
-    return emitTupleElement(cast<TupleElementExpr>(E), explosion);
-
-  case ExprKind::DotSyntaxBaseIgnored: {
-    DotSyntaxBaseIgnoredExpr *DE = cast<DotSyntaxBaseIgnoredExpr>(E);
-    emitIgnored(DE->getLHS());
-    return emitRValue(DE->getRHS(), explosion);
-  }
-
-  case ExprKind::Call:
-  case ExprKind::Unary:
-  case ExprKind::Binary:
-  case ExprKind::ConstructorCall:
-  case ExprKind::DotSyntaxCall:
-    return emitApplyExpr(cast<ApplyExpr>(E), explosion);
-
-  case ExprKind::IntegerLiteral:
-    return explosion.add(emitIntegerLiteralExpr(*this,
-                                                cast<IntegerLiteralExpr>(E)));
-  case ExprKind::FloatLiteral:
-    return explosion.add(emitFloatLiteralExpr(*this,
-                                              cast<FloatLiteralExpr>(E)));
-
-  case ExprKind::LookThroughOneof:
-    return emitRValue(cast<LookThroughOneofExpr>(E)->getSubExpr(),
-                      explosion);
-
-  case ExprKind::DeclRef:
-    return emitDeclRef(cast<DeclRefExpr>(E), explosion);
-
-  case ExprKind::ImplicitClosure:
-  case ExprKind::ExplicitClosure:
-    return emitClosure(cast<ClosureExpr>(E), explosion);
-
-  case ExprKind::Func:
-  case ExprKind::Module:
-    IGM.unimplemented(E->getLoc(),
-                      "cannot explode r-values for this expression yet");
-    return emitFakeExplosion(getFragileTypeInfo(E->getType()), explosion);
-  }
-  llvm_unreachable("bad expression kind!");
+    LValue visitAnonClosureArgExpr(AnonClosureArgExpr *E) {
+      OwnedAddress addr = IGF.getLocal(E->getDecl());
+      return IGF.emitAddressLValue(addr);
+    }
+  };
 }
 
 /// Emit the given expression as an l-value.  The expression must
@@ -213,161 +277,112 @@ void IRGenFunction::emitRValue(Expr *E, Explosion &explosion) {
 /// tryEmitAsAddress.
 LValue IRGenFunction::emitLValue(Expr *E) {
   assert(E->getType()->is<LValueType>());
+  return LValueEmitter(*this).visit(E);
+}
 
-  switch (E->getKind()) {
-#define EXPR(Id, Parent)
-#define UNCHECKED_EXPR(Id, Parent) case ExprKind::Id:
-#include "swift/AST/ExprNodes.def"
-  case ExprKind::Error:
-    llvm_unreachable("these expression kinds should not survive to IR-gen");
+namespace {
+  class AddressEmitter : public irgen::ASTVisitor<AddressEmitter,
+                                                  Optional<Address>,
+                                                  void,
+                                                  Optional<Address> > {
+    IRGenFunction &IGF;
+    const TypeInfo &ObjectType;
 
-  case ExprKind::Call:
-  case ExprKind::Unary:
-  case ExprKind::Binary:
-  case ExprKind::IntegerLiteral:
-  case ExprKind::FloatLiteral:
-  case ExprKind::TupleShuffle:
-  case ExprKind::Func:
-  case ExprKind::ExplicitClosure:
-  case ExprKind::ImplicitClosure:
-  case ExprKind::Load:
-  case ExprKind::Tuple:
-  case ExprKind::DotSyntaxBaseIgnored:
-  case ExprKind::Module:
-  case ExprKind::ConstructorCall:
-  case ExprKind::DotSyntaxCall:
-    llvm_unreachable("these expression kinds should never be l-values");
+  public:
+    AddressEmitter(IRGenFunction &IGF, const TypeInfo &objectType)
+      : IGF(IGF), ObjectType(objectType) {}
 
-  case ExprKind::Paren:
-    return emitLValue(cast<ParenExpr>(E)->getSubExpr());
+#define NON_LOCATEABLE(T) \
+    Optional<Address> visit##T(T *D) { return Nothing; }
 
-  case ExprKind::AddressOf:
-    return emitLValue(cast<AddressOfExpr>(E)->getSubExpr());
+    // Look through loads without further ado.
+    Optional<Address> visitLoadExpr(LoadExpr *E) {
+      return visit(E->getSubExpr());
+    }
 
-  case ExprKind::SyntacticTupleElement:
-  case ExprKind::ImplicitThisTupleElement:
-    return emitTupleElementLValue(cast<TupleElementExpr>(E));
+    // We can find addresses for some locals.
+    Optional<Address> visitDeclRefExpr(DeclRefExpr *E) {
+      return visit(E->getDecl());
+    }
 
-  case ExprKind::LookThroughOneof:
-    return emitLookThroughOneofLValue(cast<LookThroughOneofExpr>(E));
+    // Visiting a decl is equivalent to visiting a reference to it.
 
-  // Qualification never affects emission as an l-value.
-  case ExprKind::Requalify:
-    return emitLValue(cast<RequalifyExpr>(E)->getSubExpr());
+    // Ignore non-value decls.
+#define DECL(Id, Parent) \
+    Optional<Address> visit##Id##Decl(Id##Decl *D) { \
+      llvm_unreachable("not a value decl!"); \
+    }
+#define VALUE_DECL(Id, Parent)
+#include "swift/AST/DeclNodes.def"
 
-  case ExprKind::Materialize: {
-    OwnedAddress addr = emitMaterializeExpr(*this, cast<MaterializeExpr>(E));
-    return emitAddressLValue(addr);
-  }
+    // These are r-values.
+    NON_LOCATEABLE(FuncDecl)
+    NON_LOCATEABLE(OneOfElementDecl)
 
-  case ExprKind::DeclRef:
-    return emitDeclRefLValue(*this, cast<DeclRefExpr>(E));
+    // These are potentially supportable.
+    NON_LOCATEABLE(TypeAliasDecl)
+    NON_LOCATEABLE(ElementRefDecl)
 
-  case ExprKind::AnonClosureArg: {
-    OwnedAddress addr = getLocal(cast<AnonClosureArgExpr>(E)->getDecl());
-    return emitAddressLValue(addr);
-  }
-  }
-  llvm_unreachable("bad expression kind!");
+    // These we support.
+    Optional<Address> visitVarDecl(VarDecl *D) {
+      // For now, only bother with locals.
+      if (!D->getDeclContext()->isLocalContext())
+        return Nothing;
+
+      return IGF.getLocal(D);
+    }
+
+    // Some call results will naturally come back in memory.
+    Optional<Address> visitApplyExpr(ApplyExpr *E) {
+      return tryEmitApplyAsAddress(IGF, E, ObjectType);
+    }
+
+    // Changes in qualification are unimportant for this.
+    Optional<Address> visitRequalifyExpr(RequalifyExpr *E) {
+      return visit(E->getSubExpr());
+    }
+    Optional<Address> visitAddressOfExpr(AddressOfExpr *E) {
+      return visit(E->getSubExpr());
+    }
+
+    // We can locate a oneof payload if we can locate the oneof.
+    Optional<Address> visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
+      return tryEmitLookThroughOneofAsAddress(IGF, E);
+    }
+
+    // We can locate a tuple element if we can locate the tuple.
+    Optional<Address> visitTupleElementExpr(TupleElementExpr *E) {
+      return tryEmitTupleElementAsAddress(IGF, E);
+    }
+
+    // Materializations are always in memory.
+    Optional<Address> visitMaterializeExpr(MaterializeExpr *E) {
+      return emitMaterializeExpr(IGF, cast<MaterializeExpr>(E));
+    }
+
+    // Closure arguments are always in memory.
+    Optional<Address> visitAnonClosureArgExpr(AnonClosureArgExpr *E) {
+      return visitVarDecl(E->getDecl());
+    }
+
+    // These expressions aren't naturally already in memory.
+    NON_LOCATEABLE(TupleExpr)
+    NON_LOCATEABLE(IntegerLiteralExpr)
+    NON_LOCATEABLE(FloatLiteralExpr)
+    NON_LOCATEABLE(TupleShuffleExpr)
+    NON_LOCATEABLE(CapturingExpr)
+    NON_LOCATEABLE(ModuleExpr)
+    NON_LOCATEABLE(DotSyntaxBaseIgnoredExpr)
+
+#undef NON_LOCATEABLE
+  };
 }
 
 /// Try to emit the given expression as an entity with an address.
 /// This is useful for local optimizations.
 Optional<Address>
 IRGenFunction::tryEmitAsAddress(Expr *E, const TypeInfo &type) {
-  switch (E->getKind()) {
-#define EXPR(Id, Parent)
-#define UNCHECKED_EXPR(Id, Parent) case ExprKind::Id:
-#include "swift/AST/ExprNodes.def"
-  case ExprKind::Error:
-    llvm_unreachable("these expression kinds should not survive to IR-gen");
-
-  // Look through loads without further ado.
-  case ExprKind::Load:
-    return tryEmitAsAddress(cast<LoadExpr>(E)->getSubExpr(), type);
-
-  // We can find addresses for some locals.
-  case ExprKind::DeclRef: {
-    ValueDecl *D = cast<DeclRefExpr>(E)->getDecl();
-    switch (D->getKind()) {
-#define DECL(Id, Parent) case DeclKind::Id:
-#define VALUE_DECL(Id, Parent)
-#include "swift/AST/DeclNodes.def"
-      llvm_unreachable("not a value decl!");
-
-    // These are r-values.
-    case DeclKind::Func:
-    case DeclKind::OneOfElement:
-      return Nothing;
-
-    // These are potentially supportable.
-    case DeclKind::TypeAlias:
-    case DeclKind::ElementRef:
-      return Nothing;
-
-    // These we support.
-    case DeclKind::Var:
-      // For now, only bother with locals.
-      if (!D->getDeclContext()->isLocalContext())
-        return Nothing;
-
-      return getLocal(D);
-    }
-    llvm_unreachable("bad declaration kind!");
-  }
-
-  // Some call results will naturally come back in memory.
-  case ExprKind::Call:
-  case ExprKind::Unary:
-  case ExprKind::Binary:
-  case ExprKind::DotSyntaxCall:
-  case ExprKind::ConstructorCall:
-    return tryEmitApplyAsAddress(cast<ApplyExpr>(E), type);
-
-  // Look through parens.
-  case ExprKind::Paren:
-    return tryEmitAsAddress(cast<ParenExpr>(E)->getSubExpr(), type);
-
-  // We can locate a requalified l-value if we can locate the original.
-  case ExprKind::Requalify:
-    return tryEmitAsAddress(cast<RequalifyExpr>(E)->getSubExpr(), type);
-
-  // We can locate a oneof payload if we can locate the oneof.
-  case ExprKind::LookThroughOneof:
-    return tryEmitLookThroughOneofAsAddress(cast<LookThroughOneofExpr>(E));
-
-  // We can locate a tuple element if we can locate the tuple.
-  case ExprKind::SyntacticTupleElement:
-  case ExprKind::ImplicitThisTupleElement:
-    return tryEmitTupleElementAsAddress(cast<TupleElementExpr>(E));
-
-  // &x is in memory if x is.
-  case ExprKind::AddressOf:
-    // The difference in type between explicit and implicit is
-    // currently not relevant.
-    return tryEmitAsAddress(cast<AddressOfExpr>(E)->getSubExpr(), type);
-
-  // Materializations are always in memory.
-  case ExprKind::Materialize:
-    return emitMaterializeExpr(*this, cast<MaterializeExpr>(E));
-
-  // Closure arguments are always in memory.
-  case ExprKind::AnonClosureArg:
-    return getLocal(cast<AnonClosureArgExpr>(E)->getDecl());
-
-  // These expressions aren't naturally already in memory.
-  case ExprKind::Tuple:
-  case ExprKind::IntegerLiteral:
-  case ExprKind::FloatLiteral:
-  case ExprKind::TupleShuffle:
-  case ExprKind::Func:
-  case ExprKind::ExplicitClosure:
-  case ExprKind::ImplicitClosure:
-  case ExprKind::DotSyntaxBaseIgnored:
-  case ExprKind::Module:
-    return Nothing;
-  }
-  llvm_unreachable("bad expression kind!");
+  return AddressEmitter(*this, type).visit(E);
 }
 
 /// Emit an expression as an initializer for the given l-value.
@@ -409,7 +424,7 @@ void IRGenFunction::emitZeroInit(Address addr, const TypeInfo &type) {
 }
 
 namespace {
-  struct IgnoredExprEmitter : ASTVisitor<IgnoredExprEmitter> {
+  struct IgnoredExprEmitter : irgen::ASTVisitor<IgnoredExprEmitter> {
     IRGenFunction &IGF;
     IgnoredExprEmitter(IRGenFunction &IGF) : IGF(IGF) {}
 

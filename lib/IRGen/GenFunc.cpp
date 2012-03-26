@@ -70,6 +70,8 @@
 #include "Explosion.h"
 #include "StructLayout.h"
 
+#include "GenFunc.h"
+
 using namespace swift;
 using namespace irgen;
 
@@ -508,13 +510,14 @@ static Callee emitCallee(IRGenModule &IGM, FuncDecl *fn,
 }
 
 /// Emit a reference to the given function as a generic function pointer.
-void IRGenFunction::emitRValueForFunction(FuncDecl *fn, Explosion &explosion) {
+void swift::irgen::emitRValueForFunction(IRGenFunction &IGF, FuncDecl *fn,
+                                         Explosion &explosion) {
   // Function pointers are always fully curried and use ExplosionKind::Minimal.
-  Callee callee = emitCallee(IGM, fn, ExplosionKind::Minimal, 0);
+  Callee callee = emitCallee(IGF.IGM, fn, ExplosionKind::Minimal, 0);
   assert(callee.ExplosionLevel == ExplosionKind::Minimal);
   assert(callee.UncurryLevel == 0);
-  explosion.add(callee.getOpaqueFunctionPointer(*this));
-  explosion.add(callee.getDataPointer(IGM));
+  explosion.add(callee.getOpaqueFunctionPointer(IGF));
+  explosion.add(callee.getDataPointer(IGF.IGM));
 }
 
 namespace {
@@ -835,17 +838,18 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
 }
 
 /// Emit a call for its exploded results.
-void IRGenFunction::emitApplyExpr(ApplyExpr *E, Explosion &explosion) {
-  CallPlan plan = getCallPlan(IGM, E);
+void swift::irgen::emitApplyExpr(IRGenFunction &IGF, ApplyExpr *E,
+                                 Explosion &explosion) {
+  CallPlan plan = getCallPlan(IGF.IGM, E);
 
-  const TypeInfo &resultTI = getFragileTypeInfo(E->getType());
+  const TypeInfo &resultTI = IGF.getFragileTypeInfo(E->getType());
 
   CallResult result;
-  plan.emit(*this, result, resultTI);
+  plan.emit(IGF, result, resultTI);
 
   // If this was an indirect return, explode it.
   if (result.IndirectAddress.isValid()) {
-    return resultTI.load(*this, result.IndirectAddress, explosion);
+    return resultTI.load(IGF, result.IndirectAddress, explosion);
   }
 
   if (result.DirectExplosionLevel == explosion.getKind())
@@ -853,23 +857,24 @@ void IRGenFunction::emitApplyExpr(ApplyExpr *E, Explosion &explosion) {
 
   Explosion resultExplosion(result.DirectExplosionLevel);
   resultExplosion.add(result.getDirectValues());
-  resultTI.reexplode(*this, resultExplosion, explosion);
+  resultTI.reexplode(IGF, resultExplosion, explosion);
 }
 
 /// See whether we can emit the result of the given call as an object
 /// naturally located in memory.
 Optional<Address>
-IRGenFunction::tryEmitApplyAsAddress(ApplyExpr *E, const TypeInfo &resultTI) {
-  CallPlan plan = getCallPlan(IGM, E);
+swift::irgen::tryEmitApplyAsAddress(IRGenFunction &IGF, ApplyExpr *E,
+                                    const TypeInfo &resultTI) {
+  CallPlan plan = getCallPlan(IGF.IGM, E);
 
   // Give up if the call won't be returned indirectly.
-  ExplosionSchema schema(plan.getFinalResultExplosionLevel(IGM));
+  ExplosionSchema schema(plan.getFinalResultExplosionLevel(IGF.IGM));
   resultTI.getSchema(schema);
   if (!schema.requiresIndirectResult())
     return Nothing;
 
   CallResult result;
-  plan.emit(*this, result, resultTI);
+  plan.emit(IGF, result, resultTI);
   assert(result.IndirectAddress.isValid());
   return result.IndirectAddress;
 }

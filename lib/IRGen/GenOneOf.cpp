@@ -38,6 +38,8 @@
 #include "LValue.h"
 #include "Explosion.h"
 
+#include "GenOneOf.h"
+
 using namespace swift;
 using namespace irgen;
 
@@ -326,6 +328,13 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
   return convertedTInfo;
 }
 
+void swift::irgen::emitLookThroughOneof(IRGenFunction &IGF,
+                                        LookThroughOneofExpr *E,
+                                        Explosion &explosion) {
+  // For now, the oneof never changes anything.
+  IGF.emitRValue(E->getSubExpr(), explosion);
+}
+
 namespace {
   class LookThroughOneof : public PhysicalPathComponent {
   public:
@@ -338,41 +347,44 @@ namespace {
   };
 }
 
-LValue IRGenFunction::emitLookThroughOneofLValue(LookThroughOneofExpr *E) {
-  LValue oneofLV = emitLValue(E->getSubExpr());
+LValue swift::irgen::emitLookThroughOneofLValue(IRGenFunction &IGF,
+                                                LookThroughOneofExpr *E) {
+  LValue oneofLV = IGF.emitLValue(E->getSubExpr());
   oneofLV.add<LookThroughOneof>();
   return oneofLV;
 }
 
 Optional<Address>
-IRGenFunction::tryEmitLookThroughOneofAsAddress(LookThroughOneofExpr *E) {
+swift::irgen::tryEmitLookThroughOneofAsAddress(IRGenFunction &IGF,
+                                               LookThroughOneofExpr *E) {
   Expr *oneof = E->getSubExpr();
   Optional<Address> oneofAddr =
-    tryEmitAsAddress(oneof, getFragileTypeInfo(oneof->getType()));
+    IGF.tryEmitAsAddress(oneof, IGF.getFragileTypeInfo(oneof->getType()));
   if (!oneofAddr) return Nothing;
 
-  return SingletonOneofTypeInfo::getSingletonAddress(*this, oneofAddr.getValue());
+  return SingletonOneofTypeInfo::getSingletonAddress(IGF, oneofAddr.getValue());
 }
 
 /// Emit a reference to a oneof element decl.
-void IRGenFunction::emitOneOfElementRef(OneOfElementDecl *elt,
-                                        Explosion &result) {
+void swift::irgen::emitOneOfElementRef(IRGenFunction &IGF,
+                                       OneOfElementDecl *elt,
+                                       Explosion &result) {
   // Find the injection function.
-  llvm::Function *injection = IGM.getAddrOfInjectionFunction(elt);
+  llvm::Function *injection = IGF.IGM.getAddrOfInjectionFunction(elt);
 
   // If the element is of function type, just emit this as a function
   // reference.  It will always literally be of function type when
   // written this way.
   if (isa<FunctionType>(elt->getType())) {
-    result.add(llvm::ConstantExpr::getBitCast(injection, IGM.Int8PtrTy));
-    result.add(llvm::ConstantPointerNull::get(IGM.RefCountedPtrTy));
+    result.add(llvm::ConstantExpr::getBitCast(injection, IGF.IGM.Int8PtrTy));
+    result.add(llvm::ConstantPointerNull::get(IGF.IGM.RefCountedPtrTy));
     return;
   }
 
   // Otherwise, we need to call the injection function (with no
   // arguments, except maybe a temporary result) and expand the result
   // into the explosion.
-  emitNullaryCall(injection, elt->getType(), result);
+  IGF.emitNullaryCall(injection, elt->getType(), result);
 }
 
 /// Emit the injection function for the given element.

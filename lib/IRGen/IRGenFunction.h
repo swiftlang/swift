@@ -47,9 +47,6 @@ namespace swift {
   class ReturnStmt;
   class SourceLoc;
   class Stmt;
-  class TupleExpr;
-  class TupleElementExpr;
-  class TupleShuffleExpr;
   class ValueDecl;
   class VarDecl;
   class WhileStmt;
@@ -187,38 +184,13 @@ public:
   void emitInit(Address addr, Expr *E, const TypeInfo &type);
   void emitZeroInit(Address addr, const TypeInfo &type);
 
-  enum ByrefKind { BK_byval, BK_byref, BK_byrefHeap };
   OwnedAddress getAddrForParameter(VarDecl *param, Explosion &paramValues);
 
-private:
-  void emitRValueForFunction(FuncDecl *Fn, Explosion &explosion);
-
-  void emitApplyExpr(ApplyExpr *apply, Explosion &explosion);
   void emitNullaryCall(llvm::Value *fn, Type resultType,
                                Explosion &result);
-  Optional<Address> tryEmitApplyAsAddress(ApplyExpr *apply, const TypeInfo &);
-  void emitApplyExprToMemory(ApplyExpr *apply, Address addr,
-                             const TypeInfo &type);
 
-  void emitDeclRef(DeclRefExpr *DeclRef, Explosion &explosion);
-  void emitOneOfElementRef(OneOfElementDecl *elt, Explosion &explosion);
-
-  void emitLookThroughOneof(LookThroughOneofExpr *E, Explosion &expl);
-  Optional<Address> tryEmitLookThroughOneofAsAddress(LookThroughOneofExpr *E);
-  LValue emitLookThroughOneofLValue(LookThroughOneofExpr *E);
-
-  void emitRequalify(RequalifyExpr *E, Explosion &expl);
-
-  void emitTupleElement(TupleElementExpr *E, Explosion &explosion);
-  Optional<Address> tryEmitTupleElementAsAddress(TupleElementExpr *E);
-  LValue emitTupleElementLValue(TupleElementExpr *E);
-
-  void emitTupleLiteral(TupleExpr *E, Explosion &explosion);
-  void emitTupleShuffle(TupleShuffleExpr *E, Explosion &explosion);
+private:
   Condition emitCondition(Expr *E, bool hasFalseCode);
-
-  void emitClosure(ClosureExpr *E, Explosion &explosion);
-  void emitClosureBody(ClosureExpr *E);
 
 //--- Declaration emission -----------------------------------------------------
 public:

@@ -24,6 +24,8 @@
 #include "Explosion.h"
 #include "LValue.h"
 
+#include "GenLValue.h"
+
 using namespace swift;
 using namespace irgen;
 
@@ -274,22 +276,23 @@ const TypeInfo *TypeConverter::convertLValueType(IRGenModule &IGM,
 /// Emit a change in the qualification of an l-value.  The only change
 /// that we need to handle here explicitly is the shift of a heap
 /// l-value to a non-heap l-value.
-void IRGenFunction::emitRequalify(RequalifyExpr *E, Explosion &explosion) {
+void swift::irgen::emitRequalify(IRGenFunction &IGF, RequalifyExpr *E,
+                                 Explosion &explosion) {
   LValueType *srcType = E->getSubExpr()->getType()->castTo<LValueType>();
   LValueType::Qual srcQs = srcType->getQualifiers();
   LValueType::Qual destQs = E->getType()->castTo<LValueType>()->getQualifiers();
 
   // If we're losing heap-qualification, this involves a representation change.
   if (srcQs.isHeap() && !destQs.isHeap()) {
-    const TypeInfo &heapTI = getFragileTypeInfo(srcType->getObjectType());
+    const TypeInfo &heapTI = IGF.getFragileTypeInfo(srcType->getObjectType());
 
     // Try to just figure out an address and use that.
-    if (Optional<Address> addr = tryEmitAsAddress(E->getSubExpr(), heapTI))
+    if (Optional<Address> addr = IGF.tryEmitAsAddress(E->getSubExpr(), heapTI))
       return explosion.add(addr.getValue().getAddress());
 
     // Otherwise, emit as a heap l-value and project out the reference.
     Explosion subExplosion(explosion.getKind());
-    emitRValue(E->getSubExpr(), subExplosion);
+    IGF.emitRValue(E->getSubExpr(), subExplosion);
     explosion.add(subExplosion.claimNext());
 
     // FIXME: decide how we want to handle the owner value.
@@ -298,5 +301,5 @@ void IRGenFunction::emitRequalify(RequalifyExpr *E, Explosion &explosion) {
 
   // Otherwise, it doesn't, and we can just emit the underlying
   // expression directly.
-  return emitRValue(E->getSubExpr(), explosion);
+  return IGF.emitRValue(E->getSubExpr(), explosion);
 }
