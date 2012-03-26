@@ -29,21 +29,13 @@ namespace llvm {
 }
 
 namespace swift {
-  class ApplyExpr;
   class AssignStmt;
   class BraceStmt;
-  class ClosureExpr;
   class Decl;
-  class DeclRefExpr;
   class Expr;
-  class FuncDecl;
-  class FuncExpr;
   class IfStmt;
-  class LookThroughOneofExpr;
-  class OneOfElementDecl;
   template<typename T> class Optional;
   class Pattern;
-  class RequalifyExpr;
   class ReturnStmt;
   class SourceLoc;
   class Stmt;
@@ -58,7 +50,6 @@ namespace irgen {
   class IRGenModule;
   class JumpDest;
   class LValue;
-  class RValue;
   class TypeInfo;
 
 /// Prologue - A value indicating controlling the kind of prologue/epilogue
