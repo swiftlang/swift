@@ -738,6 +738,9 @@ public:
       return *this & ~Implicit;
     }
 
+    bool isHeap() const { return !(*this & NonHeap); }
+    bool isExplicit() const { return !(*this & Implicit); }
+
     friend Qual operator|(QualBits l, QualBits r) {
       return Qual(opaque_type(l) | opaque_type(r));
     }
@@ -811,13 +814,13 @@ public:
   /// Is this a 'heap' l-value type?  Certain l-values are usable as
   /// heap l-values, i.e. they can be arbitrarily persisted.
   bool isHeap() const {
-    return !(getQualifiers() & Qual::NonHeap);
+    return getQualifiers().isHeap();
   }
 
   /// Is this an 'explicit' l-value type?  L-value expressions become
   /// explicit by being explicitly prefixed with &.
   bool isExplicit() const {
-    return !(getQualifiers() & Qual::Implicit);
+    return getQualifiers().isExplicit();
   }
 
   /// For now, no l-values are ever materializable.  Maybe in the
