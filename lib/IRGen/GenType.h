@@ -93,6 +93,9 @@ public:
   /// given schema.
   virtual void getSchema(ExplosionSchema &schema) const = 0;
 
+  /// A convenience for getting the schema of a single type.
+  ExplosionSchema getSchema(ExplosionKind kind) const;
+
   /// Return the number of elements in an explosion of this type.
   virtual unsigned getExplosionSize(ExplosionKind kind) const = 0;
 
@@ -108,6 +111,12 @@ public:
   /// Initialize an address by consuming values out of an explosion.
   virtual void initialize(IRGenFunction &IGF, Explosion &explosion,
                           Address addr) const = 0;
+
+  /// Perform a "take-initialization" from the given object.  A
+  /// take-initialization is like a C++ move-initialization, except that
+  /// the old object is actually no longer permitted to be destroyed.
+  void initializeWithTake(IRGenFunction &IGF, Address destAddr,
+                          Address srcAddr) const;
 
   /// Consume a bunch of values which have exploded at one explosion
   /// level and produce them at another.

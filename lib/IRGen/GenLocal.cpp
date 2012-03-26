@@ -18,6 +18,7 @@
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "StructLayout.h"
 
 using namespace swift;
 using namespace irgen;
@@ -55,11 +56,12 @@ void IRGenFunction::emitLocal(Decl *D) {
 void IRGenFunction::emitLocalVar(VarDecl *var) {
   const TypeInfo &typeInfo = getFragileTypeInfo(var->getType());
 
-  Address addr = createScopeAlloca(typeInfo.getStorageType(),
-                                   typeInfo.StorageAlignment,
-                                   var->getName().str());
+  OwnedAddress addr = createScopeAlloca(typeInfo,
+                                        var->hasUseAsHeapLValue()
+                                          ? OnHeap : NotOnHeap,
+                                        var->getName().str());
 
-  setLocal(var, IGM.RefCountedNull, addr);
+  setLocal(var, addr);
 
   if (Expr *init = var->getInit()) {
     emitInit(addr, init, typeInfo);
@@ -68,19 +70,106 @@ void IRGenFunction::emitLocalVar(VarDecl *var) {
   }
 };
 
-Address IRGenFunction::getLocal(ValueDecl *D) {
+OwnedAddress IRGenFunction::getLocal(ValueDecl *D) {
   auto I = Locals.find(D);
   assert(I != Locals.end() && "no entry in local map!");
   return I->second.Var.Addr;
 }
 
-void IRGenFunction::setLocal(ValueDecl *D, llvm::Value *owner, Address addr) {
+void IRGenFunction::setLocal(ValueDecl *D, OwnedAddress addr) {
   assert(!Locals.count(D));
 
   std::pair<ValueDecl*, LocalRecord> entry;
   entry.first = D;
-  entry.second.Var.Owner = owner;
   entry.second.Var.Addr = addr;
 
   Locals.insert(entry);
+}
+
+/// Create an allocation for an empty object.
+static OwnedAddress createEmptyAlloca(IRGenModule &IGM, const TypeInfo &type) {
+  llvm::Value *badPointer =
+    llvm::UndefValue::get(type.getStorageType()->getPointerTo());
+  return OwnedAddress(Address(badPointer, type.StorageAlignment),
+                      IGM.RefCountedNull);
+}
+
+/// Create an allocation on the stack.
+static OwnedAddress createStackAlloca(IRGenFunction &IGF,
+                                      const TypeInfo &type,
+                                      const llvm::Twine &name,
+                                      llvm::Instruction *allocaIP) {
+  llvm::AllocaInst *alloca =
+    new llvm::AllocaInst(type.getStorageType(), name, allocaIP);
+  alloca->setAlignment(type.StorageAlignment.getValue());
+
+  // TODO: lifetime intrinsics.
+  return OwnedAddress(Address(alloca, type.StorageAlignment),
+                      IGF.IGM.RefCountedNull);
+}
+
+/// Create an allocation on the heap.
+static OwnedAddress createHeapAlloca(IRGenFunction &IGF,
+                                     const TypeInfo &type,
+                                     const llvm::Twine &name) {
+  // Create the type as appropriate.
+  StructLayout layout(IGF.IGM, LayoutKind::HeapObject,
+                      LayoutStrategy::Optimal, &type);
+  assert(!layout.empty() && "non-empty type had empty layout?");
+  auto &elt = layout.getElements()[0];
+
+  // Allocate a new object.  FIXME: exceptions.
+  llvm::Value *size =
+    llvm::ConstantInt::get(IGF.IGM.SizeTy, layout.getSize().getValue());
+  llvm::CallInst *allocation =
+    IGF.Builder.CreateCall(IGF.IGM.getAllocFn(), size);
+  allocation->setDoesNotThrow();
+  allocation->setName(name + ".alloc");
+
+  // Enter a cleanup to release that.
+  IGF.enterReleaseCleanup(allocation);
+
+  // Cast and GEP down to the element.
+  llvm::Value *structPointer =
+    IGF.Builder.CreateBitCast(allocation, layout.getType()->getPointerTo(0));
+  llvm::Value *address =
+    IGF.Builder.CreateStructGEP(structPointer, elt.StructIndex);
+  address->setName(name);
+
+  Alignment eltAlign = layout.getAlignment().alignmentAtOffset(elt.ByteOffset);
+
+  // TODO: lifetime intrinsics.
+  return OwnedAddress(Address(address, eltAlign), allocation);
+}
+
+/// Common code for creating an allocation on the stack or heap.
+static OwnedAddress createAlloca(IRGenFunction &IGF, 
+                                 const TypeInfo &type,
+                                 OnHeap_t onHeap,
+                                 const llvm::Twine &name,
+                                 llvm::Instruction *allocaIP) {
+  assert(allocaIP && "alloca insertion point has not been initialized!");
+
+  // If the type is known to be empty, don't actually allocate anything.
+  if (type.isEmpty(ResilienceScope::Local))
+    return createEmptyAlloca(IGF.IGM, type);
+
+  if (onHeap) return createHeapAlloca(IGF, type, name);
+  return createStackAlloca(IGF, type, name, allocaIP);
+}
+
+/// Create an alloca whose lifetime is the duration of the current
+/// full-expression.
+OwnedAddress IRGenFunction::createFullExprAlloca(const TypeInfo &type,
+                                                 OnHeap_t onHeap,
+                                                 const llvm::Twine &name) {
+  return createAlloca(*this, type, onHeap, name, AllocaIP);
+}
+
+/// Create an alloca whose lifetime is the duration of the current
+/// scope.
+OwnedAddress IRGenFunction::createScopeAlloca(const TypeInfo &type,
+                                              OnHeap_t onHeap,
+                                              const llvm::Twine &name) {
+  return createAlloca(*this, type, onHeap, name, AllocaIP);
 }

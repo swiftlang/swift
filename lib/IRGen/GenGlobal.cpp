@@ -251,7 +251,8 @@ IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
 }
 
 LValue IRGenFunction::getGlobal(VarDecl *var) {
-  return emitAddressLValue(IGM.getAddrOfGlobalVariable(var));
+  OwnedAddress addr(IGM.getAddrOfGlobalVariable(var), IGM.RefCountedNull);
+  return emitAddressLValue(addr);
 }
 
 /// Emit a type extension.

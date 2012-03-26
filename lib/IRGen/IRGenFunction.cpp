@@ -40,19 +40,6 @@ IRGenFunction::~IRGenFunction() {
   emitEpilogue();
 }
 
-/// Create an alloca whose lifetime is the duration of the current
-/// full-expression.
-Address IRGenFunction::createFullExprAlloca(llvm::Type *ty, Alignment align,
-                                            const llvm::Twine &name) {
-  assert(AllocaIP && "alloca insertion point has not been initialized!");
-  llvm::AllocaInst *alloca = new llvm::AllocaInst(ty, name, AllocaIP);
-  alloca->setAlignment(align.getValue());
-
-  // TODO: lifetime intrinsics.
-
-  return Address(alloca, align);
-}
-
 /// Call the llvm.memcpy intrinsic.  The arguments need not already
 /// be of i8* type.
 void IRGenFunction::emitMemCpy(llvm::Value *dest, llvm::Value *src,
@@ -69,19 +56,6 @@ void IRGenFunction::emitMemCpy(llvm::Value *dest, llvm::Value *src,
   };
 
   Builder.CreateCall(IGM.getMemCpyFn(), args);
-}                               
-
-/// Create an alloca whose lifetime is the duration of the current
-/// scope.
-Address IRGenFunction::createScopeAlloca(llvm::Type *ty, Alignment align,
-                                         const llvm::Twine &name) {
-  assert(AllocaIP && "alloca insertion point has not been initialized!");
-  llvm::AllocaInst *alloca = new llvm::AllocaInst(ty, name, AllocaIP);
-  alloca->setAlignment(align.getValue());
-
-  // TODO: lifetime intrinsics.
-
-  return Address(alloca, align);
 }
 
 void IRGenFunction::unimplemented(SourceLoc Loc, StringRef Message) {

@@ -26,7 +26,8 @@ using namespace swift;
 using namespace irgen;
 
 /// Perform structure layout on the given types.
-StructLayout::StructLayout(IRGenModule &IGM, LayoutStrategy strategy,
+StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
+                           LayoutStrategy strategy,
                            llvm::ArrayRef<const TypeInfo *> types) {
   // For now, we actually only have one algorithm, and it's not
   // exactly optimal.
@@ -34,6 +35,8 @@ StructLayout::StructLayout(IRGenModule &IGM, LayoutStrategy strategy,
   Size storageSize(0);
   Alignment storageAlign(1);
   llvm::SmallVector<llvm::Type*, 8> storageTypes;
+
+  // FIXME: heap header.
 
   for (const TypeInfo *type : types) {
     // The struct alignment is the max of the alignment of the fields.

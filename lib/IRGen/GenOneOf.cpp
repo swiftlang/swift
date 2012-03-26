@@ -331,8 +331,9 @@ namespace {
   public:
     LookThroughOneof() : PhysicalPathComponent(sizeof(LookThroughOneof)) {}
 
-    Address offset(IRGenFunction &IGF, Address addr) const {
-      return SingletonOneofTypeInfo::getSingletonAddress(IGF, addr);
+    OwnedAddress offset(IRGenFunction &IGF, OwnedAddress addr) const {
+      Address project = SingletonOneofTypeInfo::getSingletonAddress(IGF, addr);
+      return OwnedAddress(project, addr.getOwner());
     }
   };
 }

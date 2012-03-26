@@ -262,7 +262,7 @@ namespace {
 
       // Load the data.
       Address dataAddr = projectData(IGF, address);
-      e.add(IGF.emitLoadRetained(dataAddr));
+      IGF.emitLoadAndRetain(dataAddr, e);
     }
 
     void assign(IRGenFunction &IGF, Explosion &e, Address address) const {
@@ -787,9 +787,7 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
       // Force there to be an indirect address.
       if (!result.IndirectAddress.isValid()) {
         result.IndirectAddress =
-          IGF.createFullExprAlloca(type.StorageType,
-                                   type.StorageAlignment,
-                                   "call.aggresult");
+          IGF.createFullExprAlloca(type, NotOnHeap, "call.aggresult");
       }
       args[0] = result.IndirectAddress.getAddress();
     }
@@ -888,9 +886,7 @@ void IRGenFunction::emitNullaryCall(llvm::Value *fnPtr,
   llvm::SmallVector<llvm::Value*, 1> args;
   Address resultAddress;
   if (resultSchema.requiresIndirectResult()) {
-    resultAddress = createFullExprAlloca(resultTI.StorageType,
-                                         resultTI.StorageAlignment,
-                                         "call.aggresult");
+    resultAddress = createFullExprAlloca(resultTI, NotOnHeap, "call.aggresult");
     args.push_back(resultAddress.getAddress());
   }
 
@@ -922,50 +918,70 @@ Explosion IRGenFunction::collectParameters() {
   return params;
 }
 
-Address IRGenFunction::getAddrForParameter(Type ty, const Twine& Name,
-                                           bool isByref,
-                                           Explosion &paramValues) {
-  const TypeInfo &paramType = IGM.getFragileTypeInfo(ty);
+OwnedAddress IRGenFunction::getAddrForParameter(VarDecl *param,
+                                                Explosion &paramValues) {
+  const TypeInfo &paramType = IGM.getFragileTypeInfo(param->getType());
 
   ExplosionSchema paramSchema(paramValues.getKind());
   paramType.getSchema(paramSchema);
 
-  Address paramAddr;
+  Twine name = param->getName().str();
 
   // If the parameter is byref, the next parameter is the value we
   // should use.
-  if (isByref) {
+  if (param->getAttrs().isByref()) {
     llvm::Value *addr = paramValues.claimNext();
-    addr->setName(Name);
-    paramAddr = Address(addr, paramType.StorageAlignment);
-    
+    addr->setName(name);
+
+    llvm::Value *owner = IGM.RefCountedNull;
+    if (param->getAttrs().isByrefHeap()) {
+      owner = paramValues.claimNext();
+      owner->setName(name + ".owner");
+    }
+
+    return OwnedAddress(Address(addr, paramType.StorageAlignment), owner);
+  }
+
   // If the schema contains a single aggregate, assume we can
   // just treat the next parameter as that type.
-  } else if (paramSchema.size() == 1 && paramSchema.begin()->isAggregate()) {
+  if (paramSchema.size() == 1 && paramSchema.begin()->isAggregate()) {
     llvm::Value *addr = paramValues.claimNext();
-    addr->setName(Name);
+    addr->setName(name);
     addr = Builder.CreateBitCast(addr,
                     paramSchema.begin()->getAggregateType()->getPointerTo());
-    paramAddr = Address(addr, paramType.StorageAlignment);
+    Address paramAddr(addr, paramType.StorageAlignment);
+
+    // If it's not referenced on the heap, we can use that directly.
+    if (!param->hasUseAsHeapLValue())
+      return OwnedAddress(paramAddr, IGM.RefCountedNull);
+
+    // Otherwise, we might have to move it to the heap.
+    OwnedAddress paramHeapAddr = createScopeAlloca(paramType, OnHeap,
+                                                   name + ".heap");
+
+    // Do a 'take' initialization to directly transfer responsibility.
+    paramType.initializeWithTake(*this, paramHeapAddr, paramAddr);
+    return paramHeapAddr;
+  }
 
   // Otherwise, make an alloca and load into it.
-  } else {
-    paramAddr = createScopeAlloca(paramType.getStorageType(),
-                                  paramType.StorageAlignment,
-                                  Name + ".addr");
+  OwnedAddress paramAddr = createScopeAlloca(paramType,
+                                             param->hasUseAsHeapLValue()
+                                               ? OnHeap : NotOnHeap,
+                                             name + ".addr");
 
-    // FIXME: This way of getting a list of arguments claimed by storeExplosion
-    // is really ugly.
-    auto storedStart = paramValues.begin();
+  // FIXME: This way of getting a list of arguments claimed by storeExplosion
+  // is really ugly.
+  auto storedStart = paramValues.begin();
 
-    paramType.initialize(*this, paramValues, paramAddr);
+  paramType.initialize(*this, paramValues, paramAddr);
 
-    // Set names for argument(s)
-    for (auto i = storedStart, e = paramValues.begin(); i != e; ++i)
-      if (e - storedStart == 1)
-        (*i)->setName(Name);
-      else
-        (*i)->setName(Name + "." + Twine(i - storedStart));
+  // Set names for argument(s)
+  for (auto i = storedStart, e = paramValues.begin(); i != e; ++i) {
+    if (e - storedStart == 1)
+      (*i)->setName(name);
+    else
+      (*i)->setName(name + "." + Twine(i - storedStart));
   }
 
   return paramAddr;
@@ -993,13 +1009,10 @@ static void emitParameterClause(IRGenFunction &IGF, Pattern *param,
   // Bind names.
   case PatternKind::Named: {
     VarDecl *decl = cast<NamedPattern>(param)->getDecl();
-    Address addr = IGF.getAddrForParameter(decl->getType(),
-                                           decl->getName().str(),
-                                           decl->getAttrs().isByref(),
-                                           paramValues);
+    OwnedAddress addr = IGF.getAddrForParameter(decl, paramValues);
 
     // FIXME: heap byrefs.
-    IGF.setLocal(decl, IGF.IGM.RefCountedNull, addr);
+    IGF.setLocal(decl, addr);
     return;
   }
 
@@ -1067,9 +1080,7 @@ void IRGenFunction::emitPrologue() {
     } else if (resultSchema.empty()) {
       assert(!ReturnSlot.isValid());
     } else {
-      ReturnSlot = createScopeAlloca(resultType.getStorageType(),
-                                     resultType.StorageAlignment,
-                                     "return_value");
+      ReturnSlot = createScopeAlloca(resultType, NotOnHeap, "return_value");
     }
   }
 
@@ -1200,7 +1211,8 @@ namespace {
       // Compute the layout of the data we have now.
       llvm::ArrayRef<const TypeInfo *> dataTypes = AllDataTypes;
       dataTypes = dataTypes.slice(Clauses[CurClause].DataTypesBeginIndex);
-      StructLayout layout(IGM, LayoutStrategy::Optimal, dataTypes);
+      StructLayout layout(IGM, LayoutKind::HeapObject,
+                          LayoutStrategy::Optimal, dataTypes);
 
       // Create an internal function to serve as the forwarding
       // function (B -> C).

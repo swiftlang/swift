@@ -36,6 +36,33 @@ bool TypeInfo::isSingleRetainablePointer(ResilienceScope scope) const {
   return false;
 }
 
+ExplosionSchema TypeInfo::getSchema(ExplosionKind kind) const {
+  ExplosionSchema schema(kind);
+  getSchema(schema);
+  return schema;
+}
+
+/// Copy a value from one object to a new object, directly taking
+/// responsibility for anything it might have.  This is like C++
+/// move-initialization, except the old object will not be destroyed.
+void TypeInfo::initializeWithTake(IRGenFunction &IGF,
+                                  Address destAddr, Address srcAddr) const {
+  // Prefer loads and stores if we won't make a million of them.
+  // Maybe this should also require the scalars to have a fixed offset.
+  ExplosionSchema schema = getSchema(ExplosionKind::Maximal);
+  if (!schema.containsAggregate() && schema.size() <= 2) {
+    Explosion copy(ExplosionKind::Maximal);
+    load(IGF, srcAddr, copy);
+    initialize(IGF, copy, destAddr);
+    return;
+  }
+
+  // Otherwise, use a memcpy.
+  IGF.emitMemCpy(destAddr.getAddress(), srcAddr.getAddress(),
+                 StorageSize, std::min(destAddr.getAlignment(),
+                                       srcAddr.getAlignment()));
+}
+
 static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
 
 namespace {
@@ -186,14 +213,6 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
     llvm_unreachable("protocol not handled in IRGen yet");
   }
   llvm_unreachable("bad type kind");
-}
-
-const TypeInfo *TypeConverter::convertLValueType(IRGenModule &IGM,
-                                                 LValueType *T) {
-  const TypeInfo &objectTI = IGM.getFragileTypeInfo(T->getObjectType());
-  return createPrimitive(objectTI.StorageType->getPointerTo(),
-                         Size(IGM.TargetData.getPointerSize()),
-                         Alignment(IGM.TargetData.getPointerABIAlignment()));
 }
 
 /// emitTypeAlias - Emit a type alias.  You wouldn't think that these

@@ -96,7 +96,8 @@ protected:
   PhysicalPathComponent(size_t size) : PathComponent(size, true) {}
 
 public:
-  virtual Address offset(IRGenFunction &IGF, Address base) const = 0;
+  virtual OwnedAddress offset(IRGenFunction &IGF,
+                              OwnedAddress base) const = 0;
 };
 
 inline PhysicalPathComponent &PathComponent::asPhysical() {
@@ -126,8 +127,9 @@ public:
                              Explosion &exp) const = 0;
   virtual void loadMaterialized(IRGenFunction &IGF, Address base,
                                 Address temp) const = 0;
-  virtual Address loadAndMaterialize(IRGenFunction &IGF,
-                                     Address base) const = 0;
+  virtual OwnedAddress loadAndMaterialize(IRGenFunction &IGF,
+                                          OnHeap_t onHeap,
+                                          Address base) const = 0;
 };
 
 inline LogicalPathComponent &PathComponent::asLogical() {

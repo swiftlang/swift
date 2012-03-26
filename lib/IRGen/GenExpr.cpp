@@ -80,7 +80,8 @@ void IRGenFunction::emitDeclRef(DeclRefExpr *E, Explosion &explosion) {
     llvm_unreachable("decl is not a value decl");
 
   case DeclKind::Var:
-    return emitLValueAsScalar(emitDeclRefLValue(*this, E), explosion);
+    return emitLValueAsScalar(emitDeclRefLValue(*this, E),
+                              OnHeap, explosion);
 
   case DeclKind::Func:
     emitRValueForFunction(cast<FuncDecl>(D), explosion);
@@ -109,14 +110,18 @@ llvm::Value *IRGenFunction::emitAsPrimitiveScalar(Expr *E) {
 }
 
 /// Emit a rvalue-to-lvalue conversion.
-static Address emitMaterializeExpr(IRGenFunction &IGF, MaterializeExpr *E) {
+static OwnedAddress emitMaterializeExpr(IRGenFunction &IGF,
+                                        MaterializeExpr *E) {
   Expr *subExpr = E->getSubExpr();
   const TypeInfo &valueTI = IGF.getFragileTypeInfo(subExpr->getType());
-  Address temporary = IGF.createFullExprAlloca(valueTI.getStorageType(),
-                                               valueTI.StorageAlignment,
+
+  bool onHeap = E->getType()->castTo<LValueType>()->isHeap();
+  OwnedAddress addr = IGF.createFullExprAlloca(valueTI,
+                                               onHeap ? OnHeap : NotOnHeap,
                                                "materialized-temporary");
-  IGF.emitRValueToMemory(subExpr, temporary, valueTI);
-  return temporary;
+
+  IGF.emitRValueToMemory(subExpr, addr.getAddress(), valueTI);
+  return addr;
 }
 
 void IRGenFunction::emitRValue(Expr *E, Explosion &explosion) {
@@ -137,8 +142,8 @@ void IRGenFunction::emitRValue(Expr *E, Explosion &explosion) {
   }
 
   case ExprKind::Materialize: {
-    Address addr = emitMaterializeExpr(*this, cast<MaterializeExpr>(E));
-    explosion.add(addr.getAddress());
+    OwnedAddress addr = emitMaterializeExpr(*this, cast<MaterializeExpr>(E));
+    explosion.add(addr.getAddressPointer());
     return;
   }
 
@@ -251,7 +256,7 @@ LValue IRGenFunction::emitLValue(Expr *E) {
     return emitLValue(cast<RequalifyExpr>(E)->getSubExpr());
 
   case ExprKind::Materialize: {
-    Address addr = emitMaterializeExpr(*this, cast<MaterializeExpr>(E));
+    OwnedAddress addr = emitMaterializeExpr(*this, cast<MaterializeExpr>(E));
     return emitAddressLValue(addr);
   }
 
@@ -259,7 +264,7 @@ LValue IRGenFunction::emitLValue(Expr *E) {
     return emitDeclRefLValue(*this, cast<DeclRefExpr>(E));
 
   case ExprKind::AnonClosureArg: {
-    Address addr = getLocal(cast<AnonClosureArgExpr>(E)->getDecl());
+    OwnedAddress addr = getLocal(cast<AnonClosureArgExpr>(E)->getDecl());
     return emitAddressLValue(addr);
   }
   }
@@ -478,7 +483,8 @@ void IRGenFunction::emitIgnored(Expr *E) {
 LValue IRGenFunction::emitFakeLValue(const TypeInfo &type) {
   llvm::Value *fakeAddr =
     llvm::UndefValue::get(type.getStorageType()->getPointerTo());
-  return emitAddressLValue(Address(fakeAddr, type.StorageAlignment));
+  return emitAddressLValue(OwnedAddress(Address(fakeAddr, type.StorageAlignment),
+                                        IGM.RefCountedNull));
 }
 
 void IRGenFunction::emitFakeExplosion(const TypeInfo &type, Explosion &explosion) {

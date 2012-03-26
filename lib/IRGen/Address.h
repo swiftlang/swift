@@ -47,6 +47,26 @@ public:
   }
 };
 
+/// An address in memory together with the (possibly null) object
+/// which owns it.
+class OwnedAddress {
+  Address Addr;
+  llvm::Value *Owner;
+
+public:
+  OwnedAddress() : Owner(nullptr) {}
+  OwnedAddress(Address address, llvm::Value *owner)
+    : Addr(address), Owner(owner) {}
+
+  llvm::Value *getAddressPointer() const { return Addr.getAddress(); }
+  Address getAddress() const { return Addr; }
+  llvm::Value *getOwner() const { return Owner; }
+
+  operator Address() const { return getAddress(); }
+
+  bool isValid() const { return Addr.isValid(); }
+};
+
 } // end namespace irgen
 } // end namespace swift
 

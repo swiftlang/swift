@@ -305,8 +305,9 @@ namespace {
     TupleElement(const TupleFieldInfo &field)
       : PhysicalPathComponent(sizeof(TupleElement)), Field(field) {}
 
-    Address offset(IRGenFunction &IGF, Address addr) const {
-      return TupleTypeInfo::projectAddress(IGF, addr, Field);
+    OwnedAddress offset(IRGenFunction &IGF, OwnedAddress addr) const {
+      Address project = TupleTypeInfo::projectAddress(IGF, addr, Field);
+      return OwnedAddress(project, addr.getOwner());
     }
   };
 }
@@ -314,8 +315,10 @@ namespace {
 void IRGenFunction::emitTupleElement(TupleElementExpr *E,
                                      Explosion &explosion) {
   // If we're doing an l-value projection, this is straightforward.
-  if (E->getType()->is<LValueType>())
-    return emitLValueAsScalar(emitTupleElementLValue(E), explosion);
+  if (LValueType *lv = E->getType()->getAs<LValueType>())
+    return emitLValueAsScalar(emitTupleElementLValue(E),
+                              lv->isHeap() ? OnHeap : NotOnHeap,
+                              explosion);
 
   Expr *tuple = E->getBase();
   const TupleTypeInfo &tupleType = getAsTupleTypeInfo(*this, tuple->getType());

@@ -37,6 +37,16 @@ enum class LayoutStrategy {
   Optimal
 };
 
+/// The kind of object being laid out.
+enum class LayoutKind {
+  /// A non-heap object does not require a heap header.
+  NonHeapObject,
+
+  /// A heap object is destined to be allocated on the heap and must
+  /// be emitted with the standard heap header.
+  HeapObject,
+};
+
 /// An element layout is the layout for a single element of a type.
 struct ElementLayout {
   /// The offset in bytes from the start of the struct.
@@ -54,7 +64,13 @@ class StructLayout {
   llvm::SmallVector<ElementLayout, 8> Elements;
 
 public:
-  StructLayout(IRGenModule &IGM, LayoutStrategy strategy,
+  /// Create a structure layout.
+  ///
+  /// \param strategy - how much leeway the algorithm has to rearrange
+  ///   and combine the storage of fields
+  /// \param kind - the kind of layout to perform, including whether the
+  ///   layout must include the reference-counting header
+  StructLayout(IRGenModule &IGM, LayoutKind kind, LayoutStrategy strategy,
                llvm::ArrayRef<const TypeInfo *> fields);
 
   /// Return the element layouts.  This is parallel to the fields

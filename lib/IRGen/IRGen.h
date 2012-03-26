@@ -30,6 +30,12 @@ namespace irgen {
 
 class Size;
 
+/// Whether or not an object should be emitted on the heap.
+enum OnHeap_t : unsigned char {
+  NotOnHeap,
+  OnHeap
+};
+
 /// ResilienceScope - The compiler is often able to pursue
 /// optimizations based on its knowledge of the implementation of some
 /// language structure.  However, optimizations which affect

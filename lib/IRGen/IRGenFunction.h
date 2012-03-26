@@ -126,10 +126,11 @@ private:
 
 //--- Helper methods -----------------------------------------------------------
 public:
-  Address createFullExprAlloca(llvm::Type *Ty, Alignment Align,
-                               const llvm::Twine &Name);
-  Address createScopeAlloca(llvm::Type *Ty, Alignment Align,
-                            const llvm::Twine &Name);
+  OwnedAddress createFullExprAlloca(const TypeInfo &type, OnHeap_t onHeap,
+                                    const llvm::Twine &name);
+  OwnedAddress createScopeAlloca(const TypeInfo &type, OnHeap_t onHeap,
+                                 const llvm::Twine &name);
+
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
   const TypeInfo &getFragileTypeInfo(Type T);
   void emitMemCpy(llvm::Value *dest, llvm::Value *src,
@@ -140,9 +141,10 @@ private:
 
 //--- Reference-counting methods -----------------------------------------------
 public:
-  llvm::Value *emitLoadRetained(Address addr);
+  void emitLoadAndRetain(Address addr, Explosion &explosion);
   void emitAssignRetained(llvm::Value *value, Address addr);
   void emitInitializeRetained(llvm::Value *value, Address addr);
+  void emitRetain(llvm::Value *value, Explosion &explosion);
   void emitRelease(llvm::Value *value);
   void enterReleaseCleanup(llvm::Value *value);
 
@@ -166,9 +168,10 @@ public:
 
   LValue emitLValue(Expr *E);
   Optional<Address> tryEmitAsAddress(Expr *E, const TypeInfo &type);
-  LValue emitAddressLValue(Address addr);
-  Address emitAddressForPhysicalLValue(const LValue &lvalue);
-  void emitLValueAsScalar(const LValue &lvalue, Explosion &explosion);
+  LValue emitAddressLValue(OwnedAddress addr);
+  OwnedAddress emitAddressForPhysicalLValue(const LValue &lvalue);
+  void emitLValueAsScalar(const LValue &lvalue, OnHeap_t onHeap,
+                          Explosion &explosion);
 
   void emitRValueToMemory(Expr *E, Address addr, const TypeInfo &type);
   void emitRValue(Expr *E, Explosion &explosion);
@@ -184,8 +187,8 @@ public:
   void emitInit(Address addr, Expr *E, const TypeInfo &type);
   void emitZeroInit(Address addr, const TypeInfo &type);
 
-  Address getAddrForParameter(Type ty, const Twine& Name, bool isByref,
-                              Explosion &paramValues);
+  enum ByrefKind { BK_byval, BK_byref, BK_byrefHeap };
+  OwnedAddress getAddrForParameter(VarDecl *param, Explosion &paramValues);
 
 private:
   void emitRValueForFunction(FuncDecl *Fn, Explosion &explosion);
@@ -220,16 +223,15 @@ private:
 //--- Declaration emission -----------------------------------------------------
 public:
   void emitLocal(Decl *D);
-  Address getLocal(ValueDecl *D);
+  OwnedAddress getLocal(ValueDecl *D);
   LValue getGlobal(VarDecl *D);
-  void setLocal(ValueDecl *D, llvm::Value *owner, Address addr);
+  void setLocal(ValueDecl *D, OwnedAddress addr);
 
 private:
   void emitLocalVar(VarDecl *D);
 
   struct LocalVarRecord {
-    Address Addr;
-    llvm::Value *Owner;
+    OwnedAddress Addr;
   };
   union LocalRecord {
     LocalVarRecord Var;

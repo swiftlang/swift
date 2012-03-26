@@ -40,7 +40,7 @@ namespace {
     }
 
     void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
-      e.add(IGF.emitLoadRetained(addr));
+      IGF.emitLoadAndRetain(addr, e);
     }
 
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
@@ -63,22 +63,46 @@ const TypeInfo *TypeConverter::convertBuiltinObjectPointer(IRGenModule &IGM) {
                                 IGM.getPointerAlignment());
 }
 
-/// Emit a load of a live value from the given retaining variable.
-llvm::Value *IRGenFunction::emitLoadRetained(Address address) {
-  llvm::Value *value = Builder.CreateLoad(address);
+/// Does the given value superficially not require reference-counting?
+static bool doesNotRequireRefCounting(llvm::Value *value) {
+  // Constants never require reference-counting.
+  return isa<llvm::Constant>(value);
+}
 
-  llvm::Constant *fn = IGM.getRetainFn();
-  if (value->getType() != IGM.RefCountedPtrTy) {
+/// Emit a call to swift_retain.
+static void emitRetainCall(IRGenFunction &IGF, llvm::Value *value,
+                           Explosion &out) {
+  // Instead of casting the input, retaining, and casting back, we
+  // cast the function to the right type.  This tends to produce less
+  // IR, but it might be evil.
+  llvm::Constant *fn = IGF.IGM.getRetainFn();
+  if (value->getType() != IGF.IGM.RefCountedPtrTy) {
     llvm::FunctionType *fnType =
       llvm::FunctionType::get(value->getType(), value->getType(), false);
     fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
   }
 
-  llvm::CallInst *call = Builder.CreateCall(fn, value);
+  // Emit the call.
+  llvm::CallInst *call = IGF.Builder.CreateCall(fn, value);
   call->setDoesNotThrow();
 
-  // FIXME: enter an EH cleanup to balance this out!
-  return call;
+  // FIXME: enter a cleanup to balance this out and register that on
+  // the explosion.
+  out.add(call);
+}
+
+/// Emit a retain of a value.  This is usually not required because
+/// values in explosions are typically "live", i.e. have a +1 owned by
+/// the explosion.
+void IRGenFunction::emitRetain(llvm::Value *value, Explosion &out) {
+  if (doesNotRequireRefCounting(value)) return;
+  return emitRetainCall(*this, value, out);
+}
+
+/// Emit a load of a live value from the given retaining variable.
+void IRGenFunction::emitLoadAndRetain(Address address, Explosion &out) {
+  llvm::Value *value = Builder.CreateLoad(address);
+  emitRetainCall(*this, value, out);
 }
 
 /// Emit a store of a live value to the given retaining variable.
@@ -100,21 +124,32 @@ void IRGenFunction::emitInitializeRetained(llvm::Value *newValue,
   Builder.CreateStore(newValue, address);
 }
 
-/// Emit a release of a live value.
-void IRGenFunction::emitRelease(llvm::Value *value) {
-  llvm::Constant *fn = IGM.getReleaseFn();
-  if (value->getType() != IGM.RefCountedPtrTy) {
+/// Emit a call to swift_release for the given value.
+static void emitReleaseCall(IRGenFunction &IGF, llvm::Value *value) {
+  // Instead of casting the input to %swift.refcounted*, we cast the
+  // function type.  This tends to produce less IR, but might be evil.
+  llvm::Constant *fn = IGF.IGM.getReleaseFn();
+  if (value->getType() != IGF.IGM.RefCountedPtrTy) {
     llvm::FunctionType *fnType =
-      llvm::FunctionType::get(IGM.VoidTy, value->getType(), false);
+      llvm::FunctionType::get(IGF.IGM.VoidTy, value->getType(), false);
     fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
   }
 
-  llvm::CallInst *call = Builder.CreateCall(fn, value);
-  call->setDoesNotThrow();
+  // The call itself can never throw.
+  llvm::CallInst *call = IGF.Builder.CreateCall(fn, value);
+  call->setDoesNotThrow();  
+}
+
+/// Emit a release of a live value.
+void IRGenFunction::emitRelease(llvm::Value *value) {
+  if (doesNotRequireRefCounting(value)) return;
+  return emitReleaseCall(*this, value);
 }
 
 /// Enter a cleanup to release an object.
 void IRGenFunction::enterReleaseCleanup(llvm::Value *value) {
+  if (doesNotRequireRefCounting(value)) return;
+
   // FIXME: implement
 }
 
