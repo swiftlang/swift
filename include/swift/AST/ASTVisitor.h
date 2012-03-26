@@ -91,7 +91,7 @@ template<typename ImplClass, typename StmtRetTy = void>
 using StmtVisitor = ASTVisitor<ImplClass, void, StmtRetTy>;
 
 template<typename ImplClass, typename DeclRetTy = void>
-using DeclVisitor = ASTVisitor<ImplClass, void, DeclRetTy>;
+using DeclVisitor = ASTVisitor<ImplClass, void, void, DeclRetTy>;
 
 } // end namespace swift
   
