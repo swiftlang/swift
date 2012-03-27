@@ -795,6 +795,7 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
       args[0] = result.IndirectAddress.getAddress();
     }
 
+    // Make the call.
     // TODO: exceptions, calling conventions
     llvm::CallInst *call = IGF.Builder.CreateCall(fnPtr, args);
     
@@ -1383,9 +1384,9 @@ namespace {
       // last parameter) and load out the extra, previously-curried
       // parameters.
       if (!layout.empty()) {
-        llvm::Value *data = params.takeLast();
-        IGF.enterReleaseCleanup(data);
-        data = IGF.Builder.CreateBitCast(data, layout.getType()->getPointerTo());
+        llvm::Value *rawData = params.takeLast();
+        llvm::Value *data =
+          IGF.Builder.CreateBitCast(rawData, layout.getType()->getPointerTo());
 
         // Perform the loads.
         for (unsigned i = 0, e = dataTypes.size(); i != e; ++i) {
@@ -1396,6 +1397,11 @@ namespace {
             layout.getAlignment().alignmentAtOffset(fieldLayout.ByteOffset);
           dataTypes[i]->load(IGF, Address(fieldAddr, fieldAlign), params);
         }
+
+        // Kill the allocated data pointer immediately.  The safety of
+        // this assumes that neither this release nor any of the loads
+        // can throw.
+        IGF.emitRelease(rawData);
       }
 
       llvm::CallInst *call =
