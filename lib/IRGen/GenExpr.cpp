@@ -26,6 +26,7 @@
 #include "GenClosure.h"
 #include "GenFunc.h"
 #include "GenLValue.h"
+#include "GenMeta.h"
 #include "GenOneOf.h"
 #include "GenTuple.h"
 #include "GenType.h"
@@ -54,11 +55,12 @@ static llvm::Value *emitFloatLiteralExpr(IRGenFunction &IGF,
 static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E) {
   ValueDecl *D = E->getDecl();
   switch (D->getKind()) {
-  case DeclKind::Extension:
-  case DeclKind::Import:
-  case DeclKind::TypeAlias:
+#define VALUE_DECL(id, parent)
+#define DECL(id, parent) case DeclKind::id:
+#include "swift/AST/DeclNodes.def"
     llvm_unreachable("decl is not a value decl");
 
+  case DeclKind::TypeAlias:
   case DeclKind::Func:
   case DeclKind::OneOfElement:
     llvm_unreachable("decl cannot be emitted as an l-value");
@@ -80,10 +82,14 @@ static void emitDeclRef(IRGenFunction &IGF, DeclRefExpr *E,
                         Explosion &explosion) {
   ValueDecl *D = E->getDecl();
   switch (D->getKind()) {
-  case DeclKind::Extension:
-  case DeclKind::Import:
-  case DeclKind::TypeAlias:
+#define VALUE_DECL(id, parent)
+#define DECL(id, parent) case DeclKind::id:
+#include "swift/AST/DeclNodes.def"
     llvm_unreachable("decl is not a value decl");
+
+  case DeclKind::TypeAlias:
+    emitMetaTypeRef(IGF, cast<TypeAliasDecl>(D)->getAliasType(), explosion);
+    return;
 
   case DeclKind::Var:
     return IGF.emitLValueAsScalar(emitDeclRefLValue(IGF, E),

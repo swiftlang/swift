@@ -31,6 +31,8 @@ namespace swift {
   class ArrayType;
   class FunctionType;
   class LValueType;
+  class MetaTypeType;
+  class ModuleType;
   class OneOfType;
   class TupleType;
   class Type;
@@ -60,7 +62,7 @@ public:
     : NextConverted(0), StorageType(Type), StorageSize(S),
       StorageAlignment(A) {}
 
-  virtual ~TypeInfo() {}
+  virtual ~TypeInfo() = default;
 
   /// Unsafely cast this to the given subtype.
   template <class T> const T &as() const {
@@ -144,6 +146,8 @@ class TypeConverter {
   static const TypeInfo *convertFunctionType(IRGenModule &IGM, FunctionType *T);
   static const TypeInfo *convertArrayType(IRGenModule &IGM, ArrayType *T);
   static const TypeInfo *convertLValueType(IRGenModule &IGM, LValueType *T);
+  static const TypeInfo *convertMetaTypeType(IRGenModule &IGM, MetaTypeType *T);
+  static const TypeInfo *convertModuleType(IRGenModule &IGM, ModuleType *T);
   static const TypeInfo *convertBuiltinObjectPointer(IRGenModule &IGM);
 
  public:

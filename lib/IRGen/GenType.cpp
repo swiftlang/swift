@@ -163,8 +163,9 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
   case TypeKind::MetaType:
+    return convertMetaTypeType(IGM, cast<MetaTypeType>(T));
   case TypeKind::Module:
-    llvm_unreachable("cannot codegen this type - no runtime representation");
+    return convertModuleType(IGM, cast<ModuleType>(T));
   case TypeKind::BuiltinObjectPointer:
     return convertBuiltinObjectPointer(IGM);
   case TypeKind::BuiltinFloat:

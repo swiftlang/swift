@@ -9,6 +9,7 @@ add_swift_library(swiftIRGen
   GenGlobal.cpp
   GenLocal.cpp
   GenLValue.cpp
+  GenMeta.cpp
   GenOneOf.cpp
   GenRefCount.cpp
   GenStmt.cpp
