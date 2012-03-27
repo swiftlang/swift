@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Target/TargetData.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/DerivedTypes.h"
@@ -24,6 +25,24 @@
 
 using namespace swift;
 using namespace irgen;
+
+/// Given a layout strategy, find the resilience scope at which we
+/// must operate.
+static ResilienceScope getResilienceScopeForStrategy(LayoutStrategy strategy) {
+  switch (strategy) {
+  case LayoutStrategy::Optimal: return ResilienceScope::Local;
+  }
+  llvm_unreachable("bad layout strategy!");
+}
+
+/// Does this layout kind require a heap header?
+static bool requiresHeapHeader(LayoutKind kind) {
+  switch (kind) {
+  case LayoutKind::NonHeapObject: return false;
+  case LayoutKind::HeapObject: return true;
+  }
+  llvm_unreachable("bad layout kind!");
+}
 
 /// Perform structure layout on the given types.
 StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
@@ -36,9 +55,27 @@ StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
   Alignment storageAlign(1);
   llvm::SmallVector<llvm::Type*, 8> storageTypes;
 
-  // FIXME: heap header.
+  // Add the heap header if necessary.
+  if (requiresHeapHeader(layoutKind)) {
+    storageSize += IGM.getPointerSize() * 2;
+    storageAlign = IGM.getPointerAlignment();
+    storageTypes.push_back(IGM.RefCountedStructTy);
+  }
+  
+  ResilienceScope resilience = getResilienceScopeForStrategy(strategy);
 
+  bool isEmpty = true;
   for (const TypeInfo *type : types) {
+    // Skip types known to be empty.
+    if (type->isEmpty(resilience)) {
+      ElementLayout element = { Size(0), (unsigned) -1 };
+      Elements.push_back(element);
+      continue;
+    }
+
+    // The struct is no longer empty.
+    isEmpty = false;
+
     // The struct alignment is the max of the alignment of the fields.
     storageAlign = std::max(storageAlign, type->StorageAlignment);
 
@@ -69,12 +106,15 @@ StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
     storageSize += type->StorageSize;
   }
 
+  // If we concluded that the overall type is empty, bail out.
+  if (isEmpty) {
+    Align = Alignment(1);
+    TotalSize = Size(0);
+    Ty = IGM.Int8Ty;
+    return;
+  }
+
   Align = storageAlign;
   TotalSize = storageSize;
-
-  if (storageTypes.empty()) {
-    Ty = IGM.Int8Ty;
-  } else {
-    Ty = llvm::StructType::get(IGM.getLLVMContext(), storageTypes);
-  }
+  Ty = llvm::StructType::get(IGM.getLLVMContext(), storageTypes);
 }

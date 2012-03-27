@@ -78,7 +78,7 @@ public:
   llvm::IntegerType *Int64Ty;          /// i64
   llvm::IntegerType *SizeTy;           /// usually i32 or i64
   llvm::PointerType *Int8PtrTy;        /// i8*
-  llvm::StructType *RefCountedTy;      /// %swift.refcounted = type { i8* }
+  llvm::StructType *RefCountedStructTy;/// %swift.refcounted = type { i8* }
   llvm::PointerType *RefCountedPtrTy;  /// %swift.refcounted*
   llvm::Constant *RefCountedNull;      /// %swift.refcounted* null
   llvm::StructType *FunctionPairTy;    /// { i8*, %swift.refcounted* }

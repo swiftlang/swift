@@ -55,9 +55,10 @@ IRGenModule::IRGenModule(ASTContext &Context,
   ReleaseFn = nullptr;
 
   llvm::Type *refCountedElts[] = { Int8PtrTy, SizeTy };
-  RefCountedTy = llvm::StructType::create(getLLVMContext(), refCountedElts,
-                                          "swift.refcounted");
-  RefCountedPtrTy = RefCountedTy->getPointerTo(/*addrspace*/ 0);
+  RefCountedStructTy =
+    llvm::StructType::create(getLLVMContext(), refCountedElts,
+                             "swift.refcounted");
+  RefCountedPtrTy = RefCountedStructTy->getPointerTo(/*addrspace*/ 0);
   RefCountedNull = llvm::ConstantPointerNull::get(RefCountedPtrTy);
 
   PtrSize = Size(TargetData.getPointerSize());
