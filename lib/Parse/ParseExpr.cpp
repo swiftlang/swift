@@ -264,7 +264,8 @@ NullablePtr<Expr> Parser::parseExprExplicitClosure() {
       new (Context) ExplicitClosureExpr(LBLoc, CurDeclContext);
 
   ContextChange CC(*this, ThisClosure);
-  
+  AnonClosureVars.emplace_back();
+
   NullablePtr<Expr> Body = parseExpr(diag::expected_expr_closure);
   if (Body.isNull()) return 0;
   
@@ -282,6 +283,11 @@ NullablePtr<Expr> Parser::parseExprExplicitClosure() {
   ThisClosure->setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
 
   ThisClosure->setRBraceLoc(RBLoc);
+
+  auto& Vars = AnonClosureVars.back();
+  VarDecl** VarsCopy = Context.AllocateCopy<VarDecl*>(Vars.begin(), Vars.end());
+  ThisClosure->setParserVarDecls(llvm::makeArrayRef(VarsCopy, Vars.size()));
+  AnonClosureVars.pop_back();
 
   return ThisClosure;
 }
@@ -306,19 +312,17 @@ Expr *Parser::parseExprAnonClosureArg() {
     diagnose(Loc.getAdvancedLoc(1), diag::dollar_numeric_too_large);
     return new (Context) ErrorExpr(Loc);
   }
-  
+
   // Make sure that this is located in an explicit closure expression.
-  if (!isa<ExplicitClosureExpr>(CurDeclContext)) {
+  ExplicitClosureExpr *ECE = dyn_cast<ExplicitClosureExpr>(CurDeclContext);
+  if (!ECE) {
     diagnose(Loc, diag::anon_closure_arg_not_in_closure);
     return new (Context) ErrorExpr(Loc);
   }
-  
-  AnonClosureArgExpr *NewArg = new (Context) AnonClosureArgExpr(ArgNo, Loc);
-  
-  // Add the argument to the closure's list of argument uses.
-  cast<ExplicitClosureExpr>(CurDeclContext)->addClosureArgumentUse(NewArg);
 
-  return NewArg;
+  ECE->GenerateVarDecls(ArgNo, AnonClosureVars.back(), Context);
+
+  return new (Context) DeclRefExpr(AnonClosureVars.back()[ArgNo], Loc);
 }
 
 Expr *Parser::actOnIdentifierExpr(Identifier Text, SourceLoc Loc) {

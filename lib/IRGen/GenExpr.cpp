@@ -142,11 +142,6 @@ namespace {
   public:
     RValueEmitter(IRGenFunction &IGF, Explosion &out) : IGF(IGF), Out(out) {}
 
-    void visitAnonClosureArgExpr(AnonClosureArgExpr *E) {
-      OwnedAddress addr = IGF.getLocal(E->getDecl());
-      return IGF.emitLValueAsScalar(IGF.emitAddressLValue(addr), OnHeap, Out);
-    }
-
     void visitLoadExpr(LoadExpr *E) {
       const TypeInfo &type = IGF.getFragileTypeInfo(E->getType());
       return IGF.emitLoad(IGF.emitLValue(E->getSubExpr()),
@@ -263,11 +258,6 @@ namespace {
     LValue visitDeclRefExpr(DeclRefExpr *E) {
       return emitDeclRefLValue(IGF, E);
     }
-
-    LValue visitAnonClosureArgExpr(AnonClosureArgExpr *E) {
-      OwnedAddress addr = IGF.getLocal(E->getDecl());
-      return IGF.emitAddressLValue(addr);
-    }
   };
 }
 
@@ -360,11 +350,6 @@ namespace {
       return emitMaterializeExpr(IGF, cast<MaterializeExpr>(E));
     }
 
-    // Closure arguments are always in memory.
-    Optional<Address> visitAnonClosureArgExpr(AnonClosureArgExpr *E) {
-      return visitVarDecl(E->getDecl());
-    }
-
     // These expressions aren't naturally already in memory.
     NON_LOCATEABLE(TupleExpr)
     NON_LOCATEABLE(IntegerLiteralExpr)
@@ -453,7 +438,6 @@ namespace {
     }
     void visitFuncExpr(FuncExpr *E) {}
     void visitClosureExpr(ClosureExpr *E) {}
-    void visitAnonClosureArgExpr(AnonClosureArgExpr *E) {}
     void visitModuleExpr(ModuleExpr *E) {}
 
 #define USING_SUBEXPR(Id) \

@@ -88,7 +88,8 @@ public:
   /// code block.  A context that appears in such a scope, like a
   /// local type declaration, does not itself become a local context.
   bool isLocalContext() const {
-    return getContextKind() == DeclContextKind::FuncExpr;
+    return getContextKind() >= DeclContextKind::First_Capturing &&
+           getContextKind() <= DeclContextKind::Last_Capturing;
   }
   
   /// isModuleContext - Return true if this is a subclass of Module.

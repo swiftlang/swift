@@ -154,8 +154,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return nullptr;
   }
   
-  Expr *visitAnonClosureArgExpr(AnonClosureArgExpr *E) { return E; }
-  
   Expr *visitModuleExpr(ModuleExpr *E) { return E; }
 
   Expr *visitApplyExpr(ApplyExpr *E) {

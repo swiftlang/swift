@@ -834,66 +834,20 @@ public:
   static bool classof(const CapturingExpr *E) { return classof(cast<Expr>(E)); }
 };
 
-/// AnonClosureArgExpr - This is a use of an anonymous closure argument inside
-/// an ExplicitClosure expression.  In code, this is something like "$1".
-class AnonClosureArgExpr : public Expr {
-  unsigned ArgNo;
-  SourceLoc Loc;
- 
-  /// NextArg - A singly linked list of argument uses for a specific closure.
-  AnonClosureArgExpr *NextArg;
-
-  VarDecl *Var;
-public:
-  AnonClosureArgExpr(unsigned argNo, SourceLoc loc)
-    : Expr(ExprKind::AnonClosureArg), ArgNo(argNo), Loc(loc), NextArg(0),
-      Var(0) {}
-
-  SourceRange getSourceRange() const { return Loc; }
-
-  unsigned getArgNumber() const { return ArgNo; }
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const AnonClosureArgExpr *) { return true; }
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::AnonClosureArg;
-  }
-  
-  
-  const AnonClosureArgExpr *getNextInClosure() const { return NextArg; }
-  AnonClosureArgExpr *getNextInClosure() { return NextArg; }
-
-  const VarDecl *getDecl() const { return Var; }
-  VarDecl *getDecl() { return Var; }
-  void setDecl(VarDecl *v) { Var = v; }
-
-private:
-  friend class ExplicitClosureExpr;
-  void addToList(AnonClosureArgExpr *&List) {
-    assert(NextArg == 0 && "Already in an argument list");
-    NextArg = List;
-    List = this;
-  }
-};
-  
-
 /// ExplicitClosureExpr - An explicitly formed closure expression in braces,
 /// e.g. "{ foo() }".  This may contain AnonClosureArgExprs within it that
 /// reference the formal arguments of the closure.
 class ExplicitClosureExpr : public ClosureExpr {
   SourceLoc LBraceLoc, RBraceLoc;
-  
-  /// This is a singly linked list of all the closure arguments references in
-  /// this closure.  Each argument number may occur 0, 1 or many times in the
-  /// list, because they occur each time an argument is used.
-  AnonClosureArgExpr *ClosureArgList;
+
+  ArrayRef<VarDecl*> ParserVarDecls;
 
 public:
   ExplicitClosureExpr(SourceLoc LBraceLoc, DeclContext *Parent,
                       Expr *Body = 0, SourceLoc RBraceLoc = SourceLoc())
     : ClosureExpr(ExprKind::ExplicitClosure, Body,
                   DeclContextKind::ExplicitClosureExpr, Parent),
-      LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc), ClosureArgList(0) {}
+      LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc) {}
   
   void setRBraceLoc(SourceLoc L) {
     RBraceLoc = L;
@@ -902,13 +856,14 @@ public:
   SourceRange getSourceRange() const {
     return SourceRange(LBraceLoc, RBraceLoc);
   }
-  
-  void addClosureArgumentUse(AnonClosureArgExpr *E) {
-    E->addToList(ClosureArgList);
+
+  ArrayRef<VarDecl*> getParserVarDecls() { return ParserVarDecls; }
+  void setParserVarDecls(ArrayRef<VarDecl*> decls) {
+    ParserVarDecls = decls;
   }
-  
-  AnonClosureArgExpr *getClosureArgList() { return ClosureArgList; }
-  const AnonClosureArgExpr *getClosureArgList() const { return ClosureArgList; }
+  void GenerateVarDecls(unsigned NumDecls,
+                        std::vector<VarDecl*> &Decls,
+                        ASTContext &Context);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ExplicitClosureExpr *) { return true; }

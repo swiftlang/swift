@@ -562,7 +562,14 @@ public:
       TC.diagnose(E->getLoc(), diag::use_undeclared_identifier);
       return 0;
     }
-    
+
+    // If the type of a decl is not computed yet, make the declref dependent;
+    // this can happen for references to "$0" etc.
+    if (!E->getDecl()->hasType()) {
+      E->setType(DependentType::get(TC.Context));
+      return E;
+    }
+
     // If the decl had an invalid type, then an error has already been emitted,
     // just propagate it up.
     if (E->getDecl()->getType()->is<ErrorType>())
@@ -664,17 +671,7 @@ public:
   Expr *visitImplicitClosureExpr(ImplicitClosureExpr *E) {
     llvm_unreachable("Should not walk into ClosureExprs!");
   }
-  
-  Expr *visitAnonClosureArgExpr(AnonClosureArgExpr *E) {
-    // Nothing we can do here.  These remain as resolved or unresolved as they
-    // always were.  If no type is assigned, we give them a dependent type so
-    // that we get resolution later.
-    if (E->getType().isNull())
-      E->setDependentType(DependentType::get(TC.Context));
-    return E;
-  }
-  
-  
+
   Expr *visitApplyExpr(ApplyExpr *E) {
     return TC.semaApplyExpr(E);
   }
@@ -1196,10 +1193,6 @@ namespace {
 
     void visitMaterializeExpr(MaterializeExpr *E) {
       // Nothing to mark.
-    }
-
-    void visitAnonClosureArgExpr(AnonClosureArgExpr *E) {
-      // FIXME: these should disappear and get turned into DREs.
     }
 
     void visitTupleShuffleExpr(TupleShuffleExpr *E) {

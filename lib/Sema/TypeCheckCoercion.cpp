@@ -158,10 +158,6 @@ public:
   Expr *visitModuleExpr(ModuleExpr *E) {
     return E;
   }
-  
-  Expr *visitAnonClosureArgExpr(AnonClosureArgExpr *E) {
-    return E;
-  }
 
   Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
     // FIXME: Coerces the RHS.
@@ -299,76 +295,37 @@ Expr *SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
   if (FuncInputTT)
     NumInputArgs = FuncInputTT->getFields().size();
 
-  // Build pattern for parameters.
-  // FIXME: This pattern is currently unused!
-  SmallVector<VarDecl*, 4> ArgVars;
-  Pattern *ArgPat;
-  SourceLoc loc = E->getLoc();
-  if (FuncInputTT) {
-    unsigned NumInputArgs = FuncInputTT->getFields().size();
-    SmallVector<TuplePatternElt, 4> ArgElts;
-    for (unsigned i = 0; i < NumInputArgs; ++i) {
-      Type ty = FuncInputTT->getElementType(i);
-      Identifier ident = TC.Context.getIdentifier(("$" + Twine(i)).str());
-      VarDecl *var = new (TC.Context) VarDecl(E->getLoc(), ident, ty, nullptr,
-                                              E);
-      ArgVars.push_back(var);
-      ArgElts.push_back(TuplePatternElt(new (TC.Context) NamedPattern(var)));
-    }
-    ArgPat = TuplePattern::create(TC.Context, loc, ArgElts, loc);
-  } else {
-    Identifier ident = TC.Context.getIdentifier("$0");
-    VarDecl *var = new (TC.Context) VarDecl(loc, ident, Type(), nullptr,
-                                            E);
-    ArgVars.push_back(var);
-    ArgPat = new (TC.Context) NamedPattern(var);
-  }
-  E->setPattern(ArgPat);
-
-  // Bind any anonymous closure arguments, validating them and resolving
-  // their types.
-  for (AnonClosureArgExpr *Arg = E->getClosureArgList(); Arg;
-       Arg = Arg->getNextInClosure()) {
-    assert((Arg->getType().isNull() || Arg->getType()->is<DependentType>()) &&
-           "Anon arg already has a type?");
-    
-    // Verify that the argument number isn't too large, e.g. using $4 when the
-    // bound function only has 2 inputs.
-    if (Arg->getArgNumber() >= NumInputArgs) {
-      TC.diagnose(Arg->getLoc(), diag::invalid_anonymous_argument,
-                  Arg->getArgNumber(), NumInputArgs);
-      Arg->setType(ErrorType::get(TC.Context));
+  if (NumInputArgs < E->getParserVarDecls().size()) {
+    TC.diagnose(E->getLoc(), diag::invalid_anonymous_argument,
+                E->getParserVarDecls().size() - 1, NumInputArgs);
       // TODO: We could turn this into error expr or something else to preserve
       // the AST.
       return 0;
-    }
-    
-    Type NewArgType;
-    if (FuncInputTT) {
-      NewArgType = FuncInputTT->getElementType(Arg->getArgNumber());
-    } else {
-      assert(NumInputArgs == 1 && "Must have unary case");
-      NewArgType = FT->getInput();
-    }
+  }
 
-    Arg->setType(LValueType::get(NewArgType, LValueType::Qual::DefaultForVar,
-                                 TC.Context));
-    Arg->setDecl(ArgVars[Arg->getArgNumber()]);
+  // Build pattern for parameters.
+  // FIXME: This pattern is currently unused!
+  std::vector<VarDecl*> ArgVars(E->getParserVarDecls().begin(),
+                                E->getParserVarDecls().end());
+  Pattern *ArgPat;
+  SourceLoc loc = E->getLoc();
+
+  E->GenerateVarDecls(NumInputArgs, ArgVars, TC.Context);
+
+  if (FuncInputTT) {
+    std::vector<TuplePatternElt> ArgElts;
+    for (unsigned i = 0; i < NumInputArgs; ++i) {
+      ArgVars[i]->setType(FuncInputTT->getElementType(i));
+      ArgElts.emplace_back(new (TC.Context) NamedPattern(ArgVars[i]));
+    }
+    ArgPat = TuplePattern::create(TC.Context, loc, ArgElts, loc);
+  } else {
+    ArgVars[0]->setType(FT->getInput());
+    ArgPat = new (TC.Context) NamedPattern(ArgVars[0]);
   }
-  
-  // Now that the AnonClosureArgExpr's have a type, redo semantic analysis of
-  // the closure from the leaves of the expression tree up.
+  E->setPattern(ArgPat);
+
   Expr *Result = E->getBody();
-  
-  // Make sure that the body agrees with the result type of the closure.
-  Result = TC.convertToType(Result, FT->getResult());
-  if (Result == 0) {
-    TC.diagnose(E->getStartLoc(), 
-                diag::while_converting_closure_body_to_inferred_return_type,
-                FT->getResult())
-    << E->getBody()->getSourceRange();
-    return 0;
-  }
 
   // Type check the full expression, verifying that it is fully typed.
   if (TC.typeCheckExpression(Result, FT->getResult()))

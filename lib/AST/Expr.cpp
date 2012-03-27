@@ -20,6 +20,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
@@ -194,6 +195,20 @@ static ValueDecl *getCalledValue(Expr *E) {
 
 ValueDecl *ApplyExpr::getCalledValue() const {
   return ::getCalledValue(Fn);
+}
+
+void ExplicitClosureExpr::GenerateVarDecls(unsigned NumDecls,
+                                           std::vector<VarDecl*> &Decls,
+                                           ASTContext &Context) {
+  while (NumDecls >= Decls.size()) {
+    unsigned NextIdx = Decls.size();
+    llvm::SmallVector<char, 4> StrBuf;
+    StringRef VarName = ("$" + Twine(NextIdx)).toStringRef(StrBuf);
+    Identifier ident = Context.getIdentifier(VarName);
+    SourceLoc VarLoc; // FIXME: Location?
+    VarDecl *var = new (Context) VarDecl(VarLoc, ident, nullptr, nullptr, this);
+    Decls.push_back(var);
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -606,11 +621,6 @@ public:
     printCommon(E, "implicit_closure_expr") << '\n';
     printRec(E->getBody());
     OS << ')';
-  }
-  
-  void visitAnonClosureArgExpr(AnonClosureArgExpr *E) {
-    printCommon(E, "anon_closure_arg_expr")
-      << " ArgNo=" << E->getArgNumber() << ')';
   }
   
   void printApplyExpr(ApplyExpr *E, const char *NodeName) {
