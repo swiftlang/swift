@@ -615,6 +615,7 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC) {
       // and build the implicit closure.
       E = convertToType(E, FT->getResult(), TC);
       if (E == 0) return 0;
+      if (E->getType()->is<DependentType>()) return E;
 
       // FIXME: Need to figure out correct parent DeclContext; fortunately,
       // it doesn't matter much for the moment because nothing actually needs
