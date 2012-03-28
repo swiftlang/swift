@@ -70,7 +70,7 @@ SourceLoc Pattern::getLoc() const {
 }
 
 /// Standard allocator for Patterns.
-void *Pattern::operator new(size_t numBytes, ASTContext &C) throw() {
+void *Pattern::operator new(size_t numBytes, ASTContext &C) {
   return C.Allocate(numBytes, Pattern::Alignment);
 }
 

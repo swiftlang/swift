@@ -93,7 +93,7 @@ public:
 
   enum { Alignment = 8U };
 
-  void *operator new(size_t bytes, ASTContext &C) throw();
+  void *operator new(size_t bytes, ASTContext &C);
 
   // Make placement new and vanilla new/delete illegal for Patterns.
   void *operator new(size_t bytes) = delete;
