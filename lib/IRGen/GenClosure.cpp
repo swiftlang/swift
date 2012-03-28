@@ -28,15 +28,6 @@
 using namespace swift;
 using namespace irgen;
 
-static void emitClosureBody(IRGenFunction &IGF, ClosureExpr *E) {
-  // FIXME: Need to set up captures.
-
-  // Emit the body of the closure as if it were a single return
-  // statement.
-  ReturnStmt ret(SourceLoc(), E->getBody());
-  IGF.emitStmt(&ret);
-}
-
 void swift::irgen::emitClosure(IRGenFunction &IGF, ClosureExpr *E,
                                Explosion &explosion) {
   if (!E->getCaptures().empty()) {
@@ -52,12 +43,63 @@ void swift::irgen::emitClosure(IRGenFunction &IGF, ClosureExpr *E,
       llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
                              "closure", &IGF.IGM.Module);
 
-  // Go ahead and build the explosion result now.
-  explosion.add(IGF.Builder.CreateBitCast(fn, IGF.IGM.Int8PtrTy));
-  explosion.add(IGF.IGM.RefCountedNull);
-
   IRGenFunction innerIGF(IGF.IGM, E->getType(), E->getParamPatterns(),
                          ExplosionKind::Minimal, /*uncurry level*/ 0, fn);
 
-  emitClosureBody(innerIGF, E);
+  llvm::Value *ContextPtr = IGF.IGM.RefCountedNull;
+
+  // There are three places we need to generate code for captures: in the
+  // current function, to store the captures to a capture block; in the inner
+  // function, to load the captures from the capture block; and the destructor
+  // for the capture block.
+  // FIXME: Not generating the destructor for the capture block yet; figure out
+  // how to do that once we actually have destructors.
+  if (!E->getCaptures().empty()) {
+    // First, compute the size of the capture block
+    // FIXME: This is completely hacky
+    unsigned NumPointers = E->getCaptures().size();
+    llvm::Value *size =
+      llvm::ConstantInt::get(IGF.IGM.SizeTy, NumPointers * 16);
+
+    // Allocate the capture block
+    llvm::CallInst *allocation =
+      IGF.Builder.CreateCall(IGF.IGM.getAllocFn(), size);
+    allocation->setDoesNotThrow();
+    allocation->setName(".capturealloc");
+    ContextPtr = allocation;
+    llvm::Type *CapturesType = IGF.IGM.RefCountedPtrTy->getPointerTo();
+    llvm::Value *CaptureArray =
+        IGF.Builder.CreateBitCast(allocation, CapturesType);
+
+    // Emit stores and loads for capture block
+    for (unsigned i = 0, e = E->getCaptures().size(); i != e; ++i) {
+      ValueDecl *D = E->getCaptures()[i];
+      OwnedAddress Var = IGF.getLocal(D);
+      llvm::Value *CaptureOwnerAddr =
+          IGF.Builder.CreateConstInBoundsGEP1_32(CaptureArray, 2 * i);
+      llvm::Value *CaptureValueAddr =
+          IGF.Builder.CreateConstInBoundsGEP1_32(CaptureArray, 2 * i + 1);
+      llvm::Type *ValueAddrTy = Var.getAddress()->getType()->getPointerTo();
+      CaptureValueAddr = IGF.Builder.CreateBitCast(CaptureValueAddr, ValueAddrTy);
+      IGF.Builder.CreateStore(Var.getOwner(), CaptureOwnerAddr);
+      IGF.Builder.CreateStore(Var.getAddressPointer(), CaptureValueAddr);
+
+      // FIXME: Stub out inner var for the moment.
+      llvm::Value *InnerOwnerAddr = 0;
+      llvm::Value *InnerValueAddr =
+          llvm::Constant::getNullValue(Var.getAddress()->getType());
+      Address InnerValue(InnerValueAddr, Var.getAddress().getAlignment());
+      OwnedAddress InnerLocal = OwnedAddress(InnerValue, InnerOwnerAddr);
+      innerIGF.setLocal(D, InnerLocal);
+    }
+  }
+
+  // Emit the body of the closure as if it were a single return
+  // statement.
+  ReturnStmt ret(SourceLoc(), E->getBody());
+  innerIGF.emitStmt(&ret);
+
+  // Build the explosion result.
+  explosion.add(IGF.Builder.CreateBitCast(fn, IGF.IGM.Int8PtrTy));
+  explosion.add(ContextPtr);
 }
