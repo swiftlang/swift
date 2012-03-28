@@ -140,7 +140,8 @@ public:
   bool ByrefHeap;
   bool AutoClosure;
 
-  DeclAttributes() : Byref(false), AutoClosure(false) { }
+  DeclAttributes() : Byref(false), ByrefImplicit(false),
+                     ByrefHeap(false), AutoClosure(false) { }
 
   bool isValid() const { return LSquareLoc.isValid(); }
 
