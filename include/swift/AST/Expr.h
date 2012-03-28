@@ -363,19 +363,19 @@ public:
 /// corresponding SubExpr element will be null.
 class TupleExpr : public Expr {
   SourceLoc LParenLoc;
+  SourceLoc RParenLoc;
   /// SubExprs - Elements of these can be set to null to get the default init
   /// value for the tuple element.
   MutableArrayRef<Expr *> SubExprs;
   /// SubExprNames - Can be null if no names.  Otherwise length = SubExpr.size()
   Identifier *SubExprNames;
-  SourceLoc RParenLoc;
   
 public:
   TupleExpr(SourceLoc LParenLoc, MutableArrayRef<Expr *> SubExprs,
             Identifier *SubExprNames, SourceLoc RParenLoc,
             Type Ty = Type())
-    : Expr(ExprKind::Tuple, Ty), LParenLoc(LParenLoc), SubExprs(SubExprs),
-      SubExprNames(SubExprNames), RParenLoc(RParenLoc) {
+    : Expr(ExprKind::Tuple, Ty), LParenLoc(LParenLoc), RParenLoc(RParenLoc),
+      SubExprs(SubExprs), SubExprNames(SubExprNames) {
     assert(LParenLoc.isValid() == RParenLoc.isValid() &&
            "Mismatched parenthesis location information validity");
   }
@@ -420,13 +420,13 @@ public:
 class UnresolvedDotExpr : public Expr {
   Expr *SubExpr;
   SourceLoc DotLoc;
-  Identifier Name;
   SourceLoc NameLoc;
+  Identifier Name;
 public:
   UnresolvedDotExpr(Expr *subexpr, SourceLoc dotloc, Identifier name,
                     SourceLoc nameloc)
   : Expr(ExprKind::UnresolvedDot), SubExpr(subexpr), DotLoc(dotloc),
-    Name(name), NameLoc(nameloc) {}
+    NameLoc(nameloc), Name(name) {}
   
   SourceLoc getLoc() const { return NameLoc; }
   
