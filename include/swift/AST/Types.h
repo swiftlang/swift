@@ -141,7 +141,7 @@ public:
   // Only allow allocation of Types using the allocator in ASTContext
   // or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = 8) throw();  
+                     unsigned Alignment = 8);  
 };
 
 /// ErrorType - This represents a type that was erroneously constructed.  This

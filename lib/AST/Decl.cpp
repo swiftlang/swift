@@ -31,19 +31,19 @@ ASTContext &DeclContext::getASTContext() {
 
 // Only allow allocation of Decls using the allocator in ASTContext.
 void *DeclVarName::operator new(size_t Bytes, ASTContext &C,
-                                unsigned Alignment) throw() {
+                                unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
 
 // Only allow allocation of Decls using the allocator in ASTContext.
 void *Decl::operator new(size_t Bytes, ASTContext &C,
-                         unsigned Alignment) throw() {
+                         unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
 
 // Only allow allocation of Modules using the allocator in ASTContext.
 void *Module::operator new(size_t Bytes, ASTContext &C,
-                           unsigned Alignment) throw() {
+                           unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
 

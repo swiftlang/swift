@@ -103,7 +103,7 @@ public:
   // Only allow allocation of DeclVarNames using the allocator in ASTContext
   // or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = 8) throw();  
+                     unsigned Alignment = 8);  
 };
 
 
@@ -185,8 +185,8 @@ public:
   // Only allow allocation of Decls using the allocator in ASTContext
   // or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = Decl::Alignment) throw();
-  void *operator new(size_t Bytes, void *Mem) throw() { 
+                     unsigned Alignment = Decl::Alignment);
+  void *operator new(size_t Bytes, void *Mem) { 
     assert(Mem); 
     return Mem; 
   }

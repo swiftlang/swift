@@ -30,7 +30,7 @@ using namespace swift;
 
 // Only allow allocation of Stmts using the allocator in ASTContext.
 void *Expr::operator new(size_t Bytes, ASTContext &C,
-                         unsigned Alignment) throw() {
+                         unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
 

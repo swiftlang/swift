@@ -70,7 +70,7 @@ public:
   // Only allow allocation of Exprs using the allocator in ASTContext
   // or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = Stmt::Alignment) throw();
+                     unsigned Alignment = Stmt::Alignment);
   
   // Make placement new and vanilla new/delete illegal for Exprs.
   void *operator new(size_t Bytes) throw() = delete;
