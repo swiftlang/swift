@@ -1094,6 +1094,11 @@ void IRGenFunction::emitPrologue() {
   auto params = CurFuncParamPatterns.slice(0, CurUncurryLevel + 1);
   emitParameterClauses(*this, params, values);
 
+  if (CurPrologue == Prologue::StandardWithContext) {
+    ContextPtr = values.claimNext();
+    ContextPtr->setName(".context");
+  }
+
   assert(values.empty() && "didn't exhaust all parameters?");
 }
 

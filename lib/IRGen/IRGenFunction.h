@@ -63,6 +63,9 @@ enum class Prologue : unsigned char {
   ///   - initializing ReturnSlot and extracting the return value from it.
   Standard,
 
+  // Standard prologue/epilogue, but the function uses the context pointer.
+  StandardWithContext,
+
   /// The bare prologue is useful for emitting small functions that
   /// don't need proper statement/expression emission.  It implies:
   ///   - creating the entry block
@@ -85,6 +88,7 @@ public:
   ExplosionKind CurExplosionLevel;
   unsigned CurUncurryLevel;
   Prologue CurPrologue;
+  llvm::Value *ContextPtr;
 
   IRGenFunction(IRGenModule &IGM, Type t, ArrayRef<Pattern*> p,
                 ExplosionKind explosion,
