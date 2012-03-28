@@ -1,6 +1,7 @@
 add_swift_library(swiftSema
   NameBinding.cpp
   NameLookup.cpp
+  NameLookup.h
   TypeChecker.cpp
   TypeChecker.h
   TypeCheckCoercion.cpp

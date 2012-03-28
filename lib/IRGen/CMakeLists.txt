@@ -1,21 +1,35 @@
 add_swift_library(swiftIRGen
+  ASTVisitor.h
+  Address.h
+  CMakeLists.txt
   Cleanup.h
   Condition.h
+  DiverseList.h
   DiverseStack.cpp
+  DiverseStack.h
+  Explosion.h
   GenArray.cpp
+  GenClosure.cpp
+  GenClosure.h
   GenControl.cpp
   GenExpr.cpp
   GenFunc.cpp
+  GenFunc.h
   GenGlobal.cpp
-  GenLocal.cpp
   GenLValue.cpp
+  GenLValue.h
+  GenLocal.cpp
   GenMeta.cpp
+  GenMeta.h
   GenOneOf.cpp
+  GenOneOf.h
   GenRefCount.cpp
   GenStmt.cpp
   GenTuple.cpp
+  GenTuple.h
   GenType.cpp
   GenType.h
+  IRBuilder.h
   IRGen.cpp
   IRGen.h
   IRGenFunction.cpp
@@ -24,6 +38,8 @@ add_swift_library(swiftIRGen
   IRGenModule.h
   JumpDest.h
   LValue.h
+  Linking.h
   Mangle.cpp
-  RValue.h
+  StructLayout.cpp
+  StructLayout.h
   DEPENDS swiftAST)
