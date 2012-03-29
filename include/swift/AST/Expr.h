@@ -288,9 +288,9 @@ public:
   }
 };
 
-/// UnresolvedMemberExpr - This represents ':foo', an unresolved reference to a
+/// UnresolvedMemberExpr - This represents '.foo', an unresolved reference to a
 /// member, which is to be resolved with context sensitive type information into
-/// bar::foo.  These always have dependent type.
+/// bar.foo.  These always have dependent type.
 class UnresolvedMemberExpr : public Expr {
   SourceLoc ColonLoc;
   SourceLoc NameLoc;

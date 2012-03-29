@@ -684,7 +684,7 @@
     func f1(searchpolicy : DataSearchFlags)  <i>// DataSearchFlags is a valid type name</i>
     func test1() {
       f1(DataSearchFlags.None)  <i>// Use of constructor with qualified identifier</i>
-      f1(:None)                  <i>// Use of constructor with context sensitive type inference</i> 
+      f1(.None)                  <i>// Use of constructor with context sensitive type inference</i> 
     
       <i>// "None" has no type argument, so the constructor's type is "DataSearchFlags".</i> 
       var a : DataSearchFlags = :None
@@ -700,9 +700,9 @@
     
     func test2() {
       <i>// Constructors for oneof element can be used in the obvious way.</i>
-      f2(:None)
-      f2(:One(4))
-      f2(:Two(1, 2))
+      f2(.None)
+      f2(.One(4))
+      f2(.Two(1, 2))
     
       <i>// Constructor for None has type "SomeMoreInts".</i>
       var a : SomeMoreInts = SomeMoreInts.None
@@ -1116,7 +1116,7 @@
   <i>// Tuple type inferred from an initializers:</i>
   var m = ()                     <i>// Type = ()</i>
   var n = (x = 1, y = 2)         <i>// Type = (x : int, y : int)</i>
-  var o = (1, 2, 3)              <i>// Type = (:int, :int, :int)</i>
+  var o = (1, 2, 3)              <i>// Type = (int, int, int)</i>
 
   <i>// Function argument and result is a tuple type.</i>
   func foo(x : int, y : int) -&gt; (val : int, err : int)
@@ -1638,12 +1638,12 @@
   <!-- ===================================================================== -->
 
   <div class="commentary">
-    The ":bar" syntax was picked because it is related to the syntax of a fully
+    The ".bar" syntax was picked because it is related to the syntax of a fully
     qualified "foo.bar" reference.
   </div>
   
   <pre class="grammar">
-    expr-delayed-identifier ::= ':' <a href="#identifier">identifier</a>
+    expr-delayed-identifier ::= '.' <a href="#identifier">identifier</a>
   </pre>
   
   <p>A delayed identifier expression refers to a constructor of a <a 
@@ -1656,8 +1656,8 @@
     func search(val : int, direction : Direction)
     
     func f() {
-      search(42, :Up)
-      search(17, :Down)
+      search(42, .Up)
+      search(17, .Down)
     }
   </pre>
 

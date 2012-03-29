@@ -161,15 +161,15 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     Result = parseExprExplicitClosure();
     break;
 
-  case tok::colon: {     // :foo
-    SourceLoc ColonLoc = consumeToken(tok::colon);
+  case tok::period: {     // .foo
+    SourceLoc DotLoc = consumeToken(tok::period);
     Identifier Name;
     SourceLoc NameLoc = Tok.getLoc();
-    if (parseIdentifier(Name, diag::expected_identifier_after_colon_expr))
+    if (parseIdentifier(Name, diag::expected_identifier_after_dot_expr))
       return 0;
     
-    // Handle :foo by just making an AST node.
-    Result = new (Context) UnresolvedMemberExpr(ColonLoc, NameLoc, Name);
+    // Handle .foo by just making an AST node.
+    Result = new (Context) UnresolvedMemberExpr(DotLoc, NameLoc, Name);
     break;
   }
 
