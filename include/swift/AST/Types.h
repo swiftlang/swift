@@ -239,21 +239,25 @@ public:
   }
 };
   
-/// DependentType - This is a expression type whose actual kind is specified by
-/// context which hasn't been provided yet.
-class DependentType : public TypeBase {
+/// UnstructuredDependentType - This is a expression type whose actual kind
+/// is specified by context which hasn't been provided yet, and which
+/// has no known structure. For example, a tuple element ".foo" will have
+/// an unstructured dependent type. however, a tuple "(x, .foo)" would have
+/// a dependent type that is not an UnstructuredDependentType, because it is
+/// known to be a tuple type and have a first element of the type of x.
+class UnstructuredDependentType : public TypeBase {
   friend class ASTContext;
   // The Dependent type is always canonical.
-  DependentType(ASTContext &C) : TypeBase(TypeKind::Dependent, &C) {}
+  UnstructuredDependentType(ASTContext &C) : TypeBase(TypeKind::UnstructuredDependent, &C) {}
 public:
   static Type get(ASTContext &C);
 
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const DependentType *) { return true; }
+  static bool classof(const UnstructuredDependentType *) { return true; }
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::Dependent;
+    return T->getKind() == TypeKind::UnstructuredDependent;
   }
 };
 
@@ -844,7 +848,7 @@ public:
 };
 
 inline bool TypeBase::isDependentType() {
-  return is<DependentType>();
+  return is<UnstructuredDependentType>();
 }
 
 } // end namespace swift

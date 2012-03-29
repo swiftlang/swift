@@ -52,7 +52,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
     TheErrorType(new (*this) ErrorType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheObjectPointerType(new (*this) BuiltinObjectPointerType(*this)),
-    TheDependentType(new (*this) DependentType(*this)),
+    TheUnstructuredDependentType(new (*this) UnstructuredDependentType(*this)),
     TheIEEE32Type(new (*this) BuiltinFloatType(BuiltinFloatType::IEEE32,*this)),
     TheIEEE64Type(new (*this) BuiltinFloatType(BuiltinFloatType::IEEE64,*this)),
     TheIEEE16Type(new (*this) BuiltinFloatType(BuiltinFloatType::IEEE16,*this)),
@@ -90,7 +90,9 @@ bool ASTContext::hadError() const {
 
 // Simple accessors.
 Type ErrorType::get(ASTContext &C) { return C.TheErrorType; }
-Type DependentType::get(ASTContext &C) { return C.TheDependentType; }
+Type UnstructuredDependentType::get(ASTContext &C) { 
+  return C.TheUnstructuredDependentType; 
+}
 
 
 BuiltinIntegerType *BuiltinIntegerType::get(unsigned BitWidth, ASTContext &C) {

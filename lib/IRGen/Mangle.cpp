@@ -187,7 +187,7 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
   switch (base->getKind()) {
   case TypeKind::Error:
     llvm_unreachable("mangling error type");
-  case TypeKind::Dependent:
+  case TypeKind::UnstructuredDependent:
     llvm_unreachable("mangling dependent type");
 
   case TypeKind::MetaType:

@@ -34,7 +34,7 @@ static bool checkFullyTyped(Parser &P, Type type) {
   case TypeKind::OneOf:
   case TypeKind::MetaType:
   case TypeKind::Module:
-  case TypeKind::Dependent:
+  case TypeKind::UnstructuredDependent:
     return false;
 
   case TypeKind::Paren:

@@ -549,12 +549,12 @@ public:
 
   Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
     if (E->getType().isNull())
-      E->setDependentType(DependentType::get(TC.Context));
+      E->setDependentType(UnstructuredDependentType::get(TC.Context));
     return E;
   }
   Expr *visitFloatLiteralExpr(FloatLiteralExpr *E) {
     if (E->getType().isNull())
-      E->setDependentType(DependentType::get(TC.Context));
+      E->setDependentType(UnstructuredDependentType::get(TC.Context));
     return E;
   }
   Expr *visitDeclRefExpr(DeclRefExpr *E) {
@@ -566,7 +566,7 @@ public:
     // If the type of a decl is not computed yet, make the declref dependent;
     // this can happen for references to "$0" etc.
     if (!E->getDecl()->hasType()) {
-      E->setType(DependentType::get(TC.Context));
+      E->setType(UnstructuredDependentType::get(TC.Context));
       return E;
     }
 
@@ -581,7 +581,7 @@ public:
     return E;
   }
   Expr *visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
-    E->setDependentType(DependentType::get(TC.Context));
+    E->setDependentType(UnstructuredDependentType::get(TC.Context));
     return E;
   }
   Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
@@ -589,7 +589,7 @@ public:
     return 0;
   }
   Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
-    E->setDependentType(DependentType::get(TC.Context));
+    E->setDependentType(UnstructuredDependentType::get(TC.Context));
     return E;
   }
 
@@ -665,7 +665,7 @@ public:
   Expr *visitExplicitClosureExpr(ExplicitClosureExpr *E) {
     assert(E->getType().isNull() &&
            "Shouldn't walk into typed ExplicitClosures");
-    E->setDependentType(DependentType::get(TC.Context));
+    E->setDependentType(UnstructuredDependentType::get(TC.Context));
     return E;
   }
   Expr *visitImplicitClosureExpr(ImplicitClosureExpr *E) {
@@ -697,7 +697,7 @@ public:
     if (isa<FuncExpr>(E)) return false;
 
     // Only walk into Explicit Closures if they haven't been seen at all yet.
-    // This ensures that everything gets a type, even if it is a DependentType.
+    // This ensures that everything gets a type, even if it is a UnstructuredDependentType.
     return !isa<ExplicitClosureExpr>(E) || E->getType().isNull();
   }
 

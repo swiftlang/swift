@@ -127,7 +127,7 @@ Expr *OverloadSetRefExpr::createWithCopy(ArrayRef<ValueDecl*> Decls,
   // Otherwise, copy the overload set into ASTContext memory and return the
   // overload set.
   return new (C) OverloadSetRefExpr(C.AllocateCopy(Decls), Loc,
-                                    DependentType::get(C));
+                                    UnstructuredDependentType::get(C));
 }
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {

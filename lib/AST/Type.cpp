@@ -342,7 +342,7 @@ void ErrorType::print(raw_ostream &OS) const {
   OS << "<<error type>>";
 }
 
-void DependentType::print(raw_ostream &OS) const {
+void UnstructuredDependentType::print(raw_ostream &OS) const {
   OS << "<<dependent type>>";
 }
 

@@ -571,7 +571,7 @@ public:
   /// getTypeForPath - Given a type and an access path into it, return the
   /// referenced element type.  If the access path is invalid for the specified
   /// type, this returns null.  If the query goes into an unresolved (dependent)
-  /// part of the type, this returns DependentType.
+  /// part of the type, this returns UnstructuredDependentType.
   static Type getTypeForPath(Type Ty, ArrayRef<unsigned> Path);
   
   SourceLoc getNameLoc() const { return NameLoc; }

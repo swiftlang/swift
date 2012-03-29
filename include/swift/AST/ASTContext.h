@@ -126,10 +126,11 @@ public:
   const Type TheEmptyTupleType;  /// TheEmptyTupleType - This is "()"
   const Type TheObjectPointerType; /// Builtin.ObjectPointer
   
-  /// TheDependentType - Dependent on context.  This is given to an anonymous
-  /// closure argument (e.g. $4) and to UnresolvedMemberExprs (e.g. :foo) during
-  /// type checking until they are resolved to something with concrete type.
-  const Type TheDependentType;
+  /// TheUnstructuredDependentType - Dependent on context.  This is given to an 
+  /// anonymous closure argument (e.g. $4) and to UnresolvedMemberExprs 
+  /// (e.g. .foo) during type checking until they are resolved to something with 
+  /// concrete type.
+  const Type TheUnstructuredDependentType;
   const Type TheIEEE32Type;     /// TheIEEE32Type  - 32-bit IEEE floating point
   const Type TheIEEE64Type;     /// TheIEEE64Type  - 64-bit IEEE floating point
   

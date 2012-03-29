@@ -525,7 +525,7 @@ void Parser::actOnVarDeclName(const DeclVarName *Name,
     Type Ty = ElementRefDecl::getTypeForPath(VD->getType(), AccessPath);
     
     // If the type of the path is obviously invalid, diagnose it now and refuse
-    // to create the decl.  The most common result here is DependentType, which
+    // to create the decl.  The most common result here is UnstructuredDependentType, which
     // allows type checking to resolve this later.
     if (Ty.isNull()) {
       diagnose(Name->getLocation(), diag::invalid_index_in_var_name_path,
@@ -573,7 +573,7 @@ bool Parser::parseDeclVar(SmallVectorImpl<Decl*> &Decls) {
     return true;
 
   if (Ty.isNull())
-    Ty = DependentType::get(Context);
+    Ty = UnstructuredDependentType::get(Context);
 
   // Note that we enter the declaration into the current scope.  Since var's are
   // not allowed to be recursive, they are entered after its initializer is
@@ -676,7 +676,8 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
       new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
                             Type(), nullptr, CurDeclContext);
     Pattern *P = new (Context) NamedPattern(D);
-    P = new (Context) TypedPattern(P, Context.TheDependentType);
+    P = new (Context) TypedPattern(P, 
+                                   UnstructuredDependentType::get(Context));
     Params.push_back(P);
   }
   
