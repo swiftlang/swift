@@ -674,9 +674,10 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC) {
   // If the expression is a grouping parenthesis and it has a dependent type,
   // just force the type through it, regardless of what DestTy is.
   if (ParenExpr *PE = dyn_cast<ParenExpr>(E)) {
-    PE->setSubExpr(convertToType(PE->getSubExpr(), DestTy, TC));
-    if (PE->getSubExpr() == 0) return 0;
-    PE->setType(PE->getSubExpr()->getType());
+    Expr *Sub = convertToType(PE->getSubExpr(), DestTy, TC);
+    if (!Sub) return nullptr;
+    PE->setSubExpr(Sub);
+    PE->setType(Sub->getType());
     return PE;
   }
 
