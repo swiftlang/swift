@@ -440,7 +440,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // Okay, if the argument is also dependent, we can't do anything here.  Just
   // wait until something gets resolved.
   if (E2->getType()->isDependentType()) {
-    E->setDependentType(E2->getType());
+    E->setType(UnstructuredDependentType::get(Context));
     return E;
   }
 
@@ -542,12 +542,12 @@ public:
 
   Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
     if (E->getType().isNull())
-      E->setDependentType(UnstructuredDependentType::get(TC.Context));
+      E->setType(UnstructuredDependentType::get(TC.Context));
     return E;
   }
   Expr *visitFloatLiteralExpr(FloatLiteralExpr *E) {
     if (E->getType().isNull())
-      E->setDependentType(UnstructuredDependentType::get(TC.Context));
+      E->setType(UnstructuredDependentType::get(TC.Context));
     return E;
   }
   Expr *visitDeclRefExpr(DeclRefExpr *E) {
@@ -574,7 +574,7 @@ public:
     return E;
   }
   Expr *visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
-    E->setDependentType(UnstructuredDependentType::get(TC.Context));
+    E->setType(UnstructuredDependentType::get(TC.Context));
     return E;
   }
   Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
@@ -582,7 +582,7 @@ public:
     return 0;
   }
   Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
-    E->setDependentType(UnstructuredDependentType::get(TC.Context));
+    E->setType(UnstructuredDependentType::get(TC.Context));
     return E;
   }
 
@@ -659,7 +659,7 @@ public:
   Expr *visitExplicitClosureExpr(ExplicitClosureExpr *E) {
     assert(E->getType().isNull() &&
            "Shouldn't walk into typed ExplicitClosures");
-    E->setDependentType(UnstructuredDependentType::get(TC.Context));
+    E->setType(UnstructuredDependentType::get(TC.Context));
     return E;
   }
   Expr *visitImplicitClosureExpr(ImplicitClosureExpr *E) {
@@ -715,7 +715,7 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
   Identifier MemberName = E->getName();
   
   if (BaseTy->isDependentType()) {
-    E->setDependentType(UnstructuredDependentType::get(Context));
+    E->setType(UnstructuredDependentType::get(Context));
     return E;
   }
   

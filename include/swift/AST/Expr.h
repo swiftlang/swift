@@ -68,11 +68,6 @@ public:
   /// setType - Sets the type of this expression.
   void setType(Type T) { Ty = T; }
 
-  /// setDependentType - Sets this expression to have the given
-  /// dependent type.  This is just like setType except more
-  /// self-documenting.
-  void setDependentType(Type T) { setType(T); }
-
   /// \brief Return the source range of the expression.
   SourceRange getSourceRange() const;
   
