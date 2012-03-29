@@ -41,6 +41,12 @@ void swift::irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E,
   else
     Patterns = cast<ClosureExpr>(E)->getParamPatterns();
 
+  if (Patterns.size() != 1) {
+    IGF.unimplemented(E->getLoc(), "curried local functions");
+    return IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()),
+                                 explosion);
+  }
+
   // Create the IR function.
   llvm::FunctionType *fnType =
       IGF.IGM.getFunctionType(E->getType(), ExplosionKind::Minimal, 0, true);
