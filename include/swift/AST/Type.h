@@ -53,6 +53,24 @@ private:
   void operator!=(Type T) const = delete;
 };
 
+/// CanType - This is a Type that is statically known to be canonical.  To get
+/// one of these, use Type->getCanonicalType().  Since all CanType's can be used
+/// as 'Type' (they just don't have sugar) we derive from Type.
+class CanType : public Type {
+  bool isActuallyCanonicalOrNull() const;
+public:
+  explicit CanType(TypeBase *P = 0) : Type(P) {
+    assert(isActuallyCanonicalOrNull() &&
+           "Forming a CanType out of a non-canonical type!");
+  }
+  
+  // Direct comparison is allowed for CanTypes - they are known canonical.
+  bool operator==(CanType T) const { return getPointer() == T.getPointer(); }
+  bool operator!=(CanType T) const { return !operator==(T); }
+
+};
+  
+  
 } // end namespace swift
 
 namespace llvm {
@@ -71,6 +89,10 @@ namespace llvm {
   };
   template<> struct simplify_type< ::swift::Type>
     : public simplify_type<const ::swift::Type> {};
+  template<> struct simplify_type<const ::swift::CanType>
+    : public simplify_type<const ::swift::Type> {};
+  template<> struct simplify_type< ::swift::CanType>
+    : public simplify_type<const ::swift::CanType> {};
     
   // Type hashes just like pointers.
   template<> struct DenseMapInfo<swift::Type> {
@@ -87,6 +109,17 @@ namespace llvm {
       return LHS.getPointer() == RHS.getPointer();
     }
   };
+  template<> struct DenseMapInfo<swift::CanType>
+    : public DenseMapInfo<swift::Type> {
+    static swift::CanType getEmptyKey() {
+      return swift::CanType(0);
+    }
+    static swift::CanType getTombstoneKey() {
+      return swift::CanType(llvm::DenseMapInfo<swift::
+                              TypeBase*>::getTombstoneKey());
+    }
+  };
+
   
   // An Type is "pointer like".
   template<typename T> class PointerLikeTypeTraits;
@@ -100,7 +133,16 @@ namespace llvm {
       return (swift::TypeBase*)P;
     }
     enum { NumLowBitsAvailable = 3 };
-  };    
+  };
+  
+  template<>
+  class PointerLikeTypeTraits<swift::CanType> :
+    public PointerLikeTypeTraits<swift::Type> {
+    static inline swift::CanType getFromVoidPointer(void *P) {
+      return swift::CanType((swift::TypeBase*)P);
+    }
+  };
+
 } // end namespace llvm
 
 #endif

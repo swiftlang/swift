@@ -92,7 +92,7 @@ public:
   
   /// getCanonicalType - Return the canonical version of this type, which has
   /// sugar from all levels stripped off.
-  TypeBase *getCanonicalType();
+  CanType getCanonicalType();
   
   /// getASTContext - Return the ASTContext that this type belongs to.
   ASTContext &getASTContext() {

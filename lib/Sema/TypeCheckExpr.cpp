@@ -1075,7 +1075,7 @@ bool TypeChecker::typeCheckCondition(Expr *&E) {
   if (!(E = convertToRValue(E)))
     return true;
 
-  TypeBase *BuiltinI1 = BuiltinIntegerType::get(1, Context);
+  CanType BuiltinI1(BuiltinIntegerType::get(1, Context));
   unsigned ConvertLimit = 0;
   Type OrigType = E->getType();
   while (E->getType()->getCanonicalType() != BuiltinI1) {

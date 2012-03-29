@@ -252,8 +252,8 @@ namespace {
         Out << "\n";
         abort();
       }
-      TypeBase *InputExprTy = E->getArg()->getType()->getCanonicalType();
-      TypeBase *ResultExprTy = E->getType()->getCanonicalType();
+      CanType InputExprTy = E->getArg()->getType()->getCanonicalType();
+      CanType ResultExprTy = E->getType()->getCanonicalType();
       if (ResultExprTy != FT->getResult()->getCanonicalType()) {
         Out << "Type of callee does not match type of ApplyExpr:";
         E->getType()->print(Out);

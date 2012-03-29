@@ -167,13 +167,12 @@ void TUModuleCache::lookupValue(AccessPathTy AccessPath, Identifier Name,
 
 namespace {
   class TUExtensionCache {
-    llvm::DenseMap<TypeBase*, TinyPtrVector<ExtensionDecl*>> Extensions;
+    llvm::DenseMap<CanType, TinyPtrVector<ExtensionDecl*>> Extensions;
   public:
 
     TUExtensionCache(TranslationUnit &TU);
     
-    ArrayRef<ExtensionDecl*> getExtensions(TypeBase *T) const{
-      assert(T->isCanonical());
+    ArrayRef<ExtensionDecl*> getExtensions(CanType T) const{
       auto I = Extensions.find(T);
       if (I == Extensions.end())
         return ArrayRef<ExtensionDecl*>();

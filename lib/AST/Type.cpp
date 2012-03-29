@@ -26,6 +26,14 @@ void *TypeBase::operator new(size_t Bytes, ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
+bool CanType::isActuallyCanonicalOrNull() const {
+  return getPointer() == 0 || 
+         getPointer() == llvm::DenseMapInfo<TypeBase*>::getTombstoneKey() ||
+         getPointer()->isCanonical();
+}
+
+
+
 //===----------------------------------------------------------------------===//
 // Various Type Methods.
 //===----------------------------------------------------------------------===//
@@ -63,16 +71,16 @@ bool TypeBase::hasReferenceSemantics() {
 
 /// getCanonicalType - Return the canonical version of this type, which has
 /// sugar from all levels stripped off.
-TypeBase *TypeBase::getCanonicalType() {
+CanType TypeBase::getCanonicalType() {
   assert(this != 0 &&
          "Cannot call getCanonicalType before name binding is complete");
 
   // If the type is itself canonical, return it.
   if (CanonicalType.is<ASTContext*>())
-    return this;
+    return CanType(this);
   // If the canonical type was already computed, just return what we have.
   if (TypeBase *CT = CanonicalType.get<TypeBase*>())
-    return CT;
+    return CanType(CT);
   
   // Otherwise, compute and cache it.
   TypeBase *Result = 0;
@@ -85,7 +93,8 @@ TypeBase *TypeBase::getCanonicalType() {
 
 #define SUGARED_TYPE(id, parent) \
   case TypeKind::id: \
-    Result = cast<id##Type>(this)->getDesugaredType()->getCanonicalType(); \
+    Result = cast<id##Type>(this)-> \
+             getDesugaredType()->getCanonicalType().getPointer(); \
     break;
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
@@ -134,7 +143,7 @@ TypeBase *TypeBase::getCanonicalType() {
   // Cache the canonical type for future queries.
   assert(Result && "Case not implemented!");
   CanonicalType = Result;
-  return Result;
+  return CanType(Result);
 }
 
 
