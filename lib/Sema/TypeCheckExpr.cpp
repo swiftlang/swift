@@ -443,7 +443,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     E->setDependentType(E2->getType());
     return E;
   }
-  
+
   ValueDecl *BestCandidateFound = 0;
   Expr::ConversionRank BestRank = Expr::CR_Invalid;
   
@@ -602,6 +602,7 @@ public:
   
   Expr *visitTupleElementExpr(TupleElementExpr *E) {
     // TupleElementExpr is fully resolved.
+    // FIXME: This will not always be the case?
     assert(!E->getType()->isDependentType());
     return E;
   }
@@ -630,7 +631,7 @@ public:
 
     // Propagate out dependence.
     if (E->getSubExpr()->getType()->isDependentType()) {
-      E->setType(E->getSubExpr()->getType());
+      E->setType(UnstructuredDependentType::get(TC.Context));
       return E;
     }
 
@@ -714,7 +715,7 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
   Identifier MemberName = E->getName();
   
   if (BaseTy->isDependentType()) {
-    E->setDependentType(BaseTy);
+    E->setDependentType(UnstructuredDependentType::get(Context));
     return E;
   }
   
