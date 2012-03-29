@@ -294,10 +294,17 @@ TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
 
 void swift::irgen::emitTupleLiteral(IRGenFunction &IGF, TupleExpr *E,
                                     Explosion &explosion) {
+ for (Expr *elt : E->getElements())
+   if (!elt) {
+     IGF.unimplemented(E->getLoc(), "tuple default element");
+     IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()),
+                           explosion);
+     return;
+   }
+
   // Emit all the sub-expressions.
-  for (Expr *elt : E->getElements()) {
+  for (Expr *elt : E->getElements())
     IGF.emitRValue(elt, explosion);
-  }
 }
 
 namespace {

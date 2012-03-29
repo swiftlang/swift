@@ -139,12 +139,24 @@ SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
 
 SourceRange TupleExpr::getSourceRange() const {
   SourceLoc Start = LParenLoc;
-  if (!Start.isValid())
-    Start = getElement(0)->getStartLoc();
+  if (!Start.isValid()) {
+    unsigned i = 0;
+    while (!getElement(i)) {
+      ++i;
+      assert(i != getNumElements() && "Implicit tuple must have subexpression");
+    }
+    Start = getElement(i)->getStartLoc();
+  }
 
   SourceLoc End = RParenLoc;
-  if (!End.isValid())
-    End = getElement(getNumElements() - 1)->getEndLoc();
+  if (!End.isValid()) {
+    unsigned i = getNumElements() - 1;
+    while (!getElement(i)) {
+      --i;
+      assert(i != 0 && "Implicit tuple must have subexpression");
+    }
+    End = getElement(i)->getEndLoc();
+  }
   
   return SourceRange(Start, End);
 }
