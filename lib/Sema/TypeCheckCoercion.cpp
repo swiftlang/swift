@@ -481,6 +481,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       // element type.
       Expr *Elt = OrigElts[SrcField];
       
+      // FIXME: Check for dependent destination type.
       Elt = convertToType(Elt, DestTy->getElementType(i), TC);
       // TODO: QOI: Include a note about this failure!
       if (Elt == 0) return 0;
@@ -498,6 +499,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   TupleType *ETy = E->getType()->getAs<TupleType>();
   SmallVector<int, 16> NewElements(DestTy->getFields().size());
   
+  bool RebuildSourceType = false;
   for (unsigned i = 0, e = DestTy->getFields().size(); i != e; ++i) {
     // Extract the input element corresponding to this destination element.
     unsigned SrcField = DestElementSources[i];
@@ -511,19 +513,45 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     
     Type DestEltTy = DestTy->getElementType(i);
     
-    if (ETy && !ETy->getElementType(SrcField)->isEqual(DestEltTy)) {
-      TC.diagnose(E->getLoc(), diag::tuple_element_type_mismatch, i,
-                  ETy->getElementType(SrcField),
-                  DestTy->getElementType(i));
-      return 0;
+    if (ETy) {
+      Type ElementTy = ETy->getElementType(SrcField);
+      // FIXME: What if the destination type is dependent?
+      if (TE && ElementTy->isDependentType()) {
+        // FIXME: We shouldn't need a TupleExpr to handle this coercion.
+        Expr *Elt = TE->getElement(SrcField);
+        Elt = convertToType(Elt, DestEltTy, TC);
+        // FIXME: QOI: Include a note about this failure!
+        if (!Elt) return 0;
+        TE->setElement(SrcField, Elt);
+        
+        // Because we have coerced something in the source tuple, we need to
+        // rebuild the type of that tuple.
+        RebuildSourceType = true;
+      } else if (ETy && !ElementTy->isEqual(DestEltTy)) {
+        TC.diagnose(E->getLoc(), diag::tuple_element_type_mismatch, i,
+                    ETy->getElementType(SrcField),
+                    DestTy->getElementType(i));
+        return 0;
+      }
     }
     
     NewElements[i] = SrcField;
   }
   
+  // If we need to rebuild the type of the source due to coercion, do so now.
+  if (RebuildSourceType) {
+    SmallVector<TupleTypeElt, 4> NewTypeElts;
+    NewTypeElts.reserve(ETy->getFields().size());
+
+    unsigned I = 0;
+    for (const auto &Elt : ETy->getFields())
+      NewTypeElts.push_back(Elt.getWithType(TE->getElement(I++)->getType()));
+    
+    E->setType(TupleType::get(NewTypeElts, TC.Context));
+  }
+  
   // If we got here, the type conversion is successful, create a new TupleExpr.  
   ArrayRef<int> Mapping = TC.Context.AllocateCopy(NewElements);
-  
   return new (TC.Context) TupleShuffleExpr(E, Mapping, DestTy);
 }
 

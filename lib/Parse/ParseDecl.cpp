@@ -522,7 +522,8 @@ void Parser::actOnVarDeclName(const DeclVarName *Name,
   if (Name->isSimple()) {
     // If this is a leaf name, create a ElementRefDecl with the specified
     // access path.
-    Type Ty = ElementRefDecl::getTypeForPath(VD->getType(), AccessPath);
+    Type Ty = ElementRefDecl::getTypeForPath(Context, VD->getType(), 
+                                             AccessPath);
     
     // If the type of the path is obviously invalid, diagnose it now and refuse
     // to create the decl.  The most common result here is UnstructuredDependentType, which

@@ -169,7 +169,8 @@ OneOfType *OneOfType::getNew(SourceLoc OneOfLoc,
 // oneof types are always canonical.
 OneOfType::OneOfType(SourceLoc OneOfLoc, ArrayRef<OneOfElementDecl*> Elts,
                      TypeAliasDecl *TheDecl)
-  : TypeBase(TypeKind::OneOf, &TheDecl->getASTContext()),
+: TypeBase(TypeKind::OneOf, &TheDecl->getASTContext(),
+           /*Dependent=*/false),
     DeclContext(DeclContextKind::OneOfType, TheDecl->getDeclContext()),
     OneOfLoc(OneOfLoc), Elements(Elts), TheDecl(TheDecl) {
 }
@@ -216,9 +217,9 @@ FunctionType *FunctionType::get(Type Input, Type Result, bool isAutoClosure,
 FunctionType::FunctionType(Type input, Type result, bool isAutoClosure)
   : TypeBase(TypeKind::Function,
              (input->isCanonical() && result->isCanonical()) ?
-               &input->getASTContext() : 0),
-    Input(input), Result(result), AutoClosure(isAutoClosure) {
-}
+               &input->getASTContext() : 0,
+             (input->isDependentType() || result->isDependentType())),
+    Input(input), Result(result), AutoClosure(isAutoClosure) { }
 
 
 /// getArrayType - Return a uniqued array type with the specified base type
@@ -231,7 +232,9 @@ ArrayType *ArrayType::get(Type BaseType, uint64_t Size, ASTContext &C) {
 }
 
 ArrayType::ArrayType(Type base, uint64_t size)
-  : TypeBase(TypeKind::Array, base->isCanonical() ? &base->getASTContext() : 0),
+  : TypeBase(TypeKind::Array, 
+             base->isCanonical() ? &base->getASTContext() : 0,
+             base->isDependentType()),
     Base(base), Size(size) {}
 
 
@@ -248,7 +251,8 @@ ProtocolType *ProtocolType::getNew(SourceLoc ProtocolLoc,
 
 ProtocolType::ProtocolType(SourceLoc ProtocolLoc, ArrayRef<ValueDecl*> Elts,
                            TypeAliasDecl *TheDecl)
-  : TypeBase(TypeKind::Protocol, &TheDecl->getASTContext()),
+  : TypeBase(TypeKind::Protocol, &TheDecl->getASTContext(),
+             /*Dependent=*/false),
     DeclContext(DeclContextKind::ProtocolType, TheDecl->getDeclContext()),
     ProtocolLoc(ProtocolLoc), Elements(Elts), TheDecl(TheDecl) {
 }

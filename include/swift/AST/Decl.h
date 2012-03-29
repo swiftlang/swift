@@ -572,7 +572,7 @@ public:
   /// referenced element type.  If the access path is invalid for the specified
   /// type, this returns null.  If the query goes into an unresolved (dependent)
   /// part of the type, this returns UnstructuredDependentType.
-  static Type getTypeForPath(Type Ty, ArrayRef<unsigned> Path);
+  static Type getTypeForPath(ASTContext &C, Type Ty, ArrayRef<unsigned> Path);
   
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLocStart() const { return NameLoc; }

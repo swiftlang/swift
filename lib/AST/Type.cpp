@@ -193,6 +193,18 @@ Type IdentifierType::getMappedType() {
   return Components.back().Value.get<TypeBase*>();
 }
 
+TupleType::TupleType(ArrayRef<TupleTypeElt> fields, ASTContext *CanCtx)
+  : TypeBase(TypeKind::Tuple, CanCtx, /*Dependent=*/false), Fields(fields) 
+{
+  // Determine whether this tuple type is dependent.
+  for (const auto &F : Fields) {
+    if (!F.getType().isNull() && F.getType()->isDependentType()) {
+      setDependent();
+      break;
+    }
+  }
+}
+
 /// hasAnyDefaultValues - Return true if any of our elements has a default
 /// value.
 bool TupleType::hasAnyDefaultValues() const {
@@ -307,6 +319,8 @@ std::string TypeBase::getString() const {
 
 void TypeBase::dump() const {
   print(llvm::errs());
+  if (isDependentType())
+    llvm::errs() << " [dependent]";
   llvm::errs() << '\n';
 }
 

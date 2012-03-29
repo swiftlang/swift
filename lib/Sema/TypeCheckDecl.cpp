@@ -171,7 +171,8 @@ public:
     // simple.
     if (!ERD->getType()->isDependentType()) return;
     
-    if (Type T = ElementRefDecl::getTypeForPath(ERD->getVarDecl()->getType(),
+    if (Type T = ElementRefDecl::getTypeForPath(TC.Context, 
+                                                ERD->getVarDecl()->getType(),
                                                 ERD->getAccessPath())) {
       ERD->overwriteType(T);
     } else {
@@ -275,14 +276,15 @@ bool DeclChecker::validateVarName(Type Ty, DeclVarName *Name) {
   // If this is a simple varname, then it matches any type, and we're done.
   if (Name->isSimple())
     return false;
-  
-  // If we're peering into an unresolved type, we can't analyze it yet.
-  if (Ty->isDependentType()) return false;
-  
+    
   // If we have a complex case, Ty must be a tuple and the name specifier must
   // have the correct number of elements.
   TupleType *AccessedTuple = Ty->getAs<TupleType>();
   if (AccessedTuple == 0) {
+    // If we're peering into an unresolved type that isn't a tuple type, we
+    // can't analyze it yet.
+    if (Ty->isDependentType()) return false;
+    
     TC.diagnose(Name->getLocation(), diag::name_matches_nontuple, Ty);
     return true;
   }

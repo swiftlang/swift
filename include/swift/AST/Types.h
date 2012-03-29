@@ -56,14 +56,29 @@ class TypeBase {
   /// Kind - The discriminator that indicates what subclass of type this is.
   const TypeKind Kind;
 
+  struct TypeBaseBits {
+    /// Dependent - Whether this type is dependent.
+    unsigned Dependent : 1;
+  };
+  static const unsigned NumTypeBaseBits = 1;
+  
+  union {
+    TypeBaseBits TypeBase;
+  } TypeBits;
+  
 protected:
-  TypeBase(TypeKind kind, ASTContext *CanTypeCtx = 0)
+  TypeBase(TypeKind kind, ASTContext *CanTypeCtx, bool Dependent)
     : CanonicalType((TypeBase*)nullptr), Kind(kind) {
     // If this type is canonical, switch the CanonicalType union to ASTContext.
     if (CanTypeCtx)
       CanonicalType = CanTypeCtx;
+    
+    setDependent(Dependent);
   }
 
+  /// \brief Mark this bit as dependent
+  void setDependent(bool D = true) { TypeBits.TypeBase.Dependent = D; }
+  
 public:
   /// getKind - Return what kind of type this is.
   TypeKind getKind() const { return Kind; }
@@ -129,7 +144,7 @@ public:
   /// isDependentType() - Determines whether this type is a dependent
   /// type, meaning that part of the type depends on the context in which
   /// the type occurs.
-  bool isDependentType();
+  bool isDependentType() const;
   
   void dump() const;
   void print(raw_ostream &OS) const;
@@ -156,7 +171,8 @@ public:
 class ErrorType : public TypeBase {
   friend class ASTContext;
   // The Error type is always canonical.
-  ErrorType(ASTContext &C) : TypeBase(TypeKind::Error, &C) {}
+  ErrorType(ASTContext &C) 
+    : TypeBase(TypeKind::Error, &C, /*Dependent=*/false) { }
 public:
   static Type get(ASTContext &C);
   
@@ -175,7 +191,7 @@ public:
 class BuiltinObjectPointerType : public TypeBase {
   friend class ASTContext;
   BuiltinObjectPointerType(ASTContext &C)
-    : TypeBase(TypeKind::BuiltinObjectPointer, &C) {}
+    : TypeBase(TypeKind::BuiltinObjectPointer, &C, /*Dependent=*/false) {}
 public:
   void print(raw_ostream &OS) const;
 
@@ -192,7 +208,8 @@ class BuiltinIntegerType : public TypeBase {
   friend class ASTContext;
   unsigned BitWidth;
   BuiltinIntegerType(unsigned BitWidth, ASTContext &C)
-    : TypeBase(TypeKind::BuiltinInteger, &C), BitWidth(BitWidth) {}
+    : TypeBase(TypeKind::BuiltinInteger, &C, /*Dependent=*/false), 
+      BitWidth(BitWidth) {}
 public:
   
   static BuiltinIntegerType *get(unsigned BitWidth, ASTContext &C);
@@ -221,7 +238,8 @@ private:
   FPKind Kind;
   
   BuiltinFloatType(FPKind Kind, ASTContext &C)
-    : TypeBase(TypeKind::BuiltinFloat, &C), Kind(Kind) {}
+    : TypeBase(TypeKind::BuiltinFloat, &C, /*Dependent=*/false), 
+      Kind(Kind) {}
 public:
   
   /// getFPKind - Get the 
@@ -248,7 +266,8 @@ public:
 class UnstructuredDependentType : public TypeBase {
   friend class ASTContext;
   // The Dependent type is always canonical.
-  UnstructuredDependentType(ASTContext &C) : TypeBase(TypeKind::UnstructuredDependent, &C) {}
+  UnstructuredDependentType(ASTContext &C) 
+    : TypeBase(TypeKind::UnstructuredDependent, &C, /*Dependent=*/true) {}
 public:
   static Type get(ASTContext &C);
 
@@ -266,7 +285,9 @@ public:
 class NameAliasType : public TypeBase {
   friend class TypeAliasDecl;
   // NameAliasType are never canonical.
-  NameAliasType(TypeAliasDecl *d) : TypeBase(TypeKind::NameAlias), TheDecl(d) {}
+  NameAliasType(TypeAliasDecl *d) 
+    : TypeBase(TypeKind::NameAlias, nullptr, /*Dependent=*/false), 
+      TheDecl(d) {}
   TypeAliasDecl *const TheDecl;
 
 public:
@@ -305,7 +326,8 @@ public:
 private:
   // IdentifierType are never canonical.
   IdentifierType(MutableArrayRef<Component> Components)
-    : TypeBase(TypeKind::Identifier), Components(Components) {}
+    : TypeBase(TypeKind::Identifier, nullptr, /*Dependent=*/false), 
+      Components(Components) {}
 public:
   
   /// The components that make this up.
@@ -340,7 +362,8 @@ class ParenType : public TypeBase {
 
   friend class ASTContext;
   ParenType(Type UnderlyingType)
-    : TypeBase(TypeKind::Paren), UnderlyingType(UnderlyingType) {}
+    : TypeBase(TypeKind::Paren, nullptr, UnderlyingType->isDependentType()), 
+      UnderlyingType(UnderlyingType) {}
 public:
   Type getUnderlyingType() const { return UnderlyingType; }
 
@@ -381,6 +404,13 @@ public:
 
   Type getType() const { return Ty; }
 
+  /// \brief Retrieve a copy of this tuple type element with the type replaced.
+  TupleTypeElt getWithType(Type T) const {
+    TupleTypeElt Result;
+    Result.Ty = T;
+    return Result;
+  }
+  
   bool hasInit() const { return Init != nullptr; }
   Expr *getInit() const { return Init; }
   void setInit(Expr *E) { Init = E; }
@@ -441,8 +471,7 @@ public:
                       ArrayRef<TupleTypeElt> Fields);
   
 private:
-  TupleType(ArrayRef<TupleTypeElt> fields, ASTContext *CanCtx)
-    : TypeBase(TypeKind::Tuple, CanCtx), Fields(fields) {}
+  TupleType(ArrayRef<TupleTypeElt> fields, ASTContext *CanCtx);
 };
   
 /// OneOfType - a 'oneof' type.  This represents the oneof type itself, not its
@@ -535,7 +564,8 @@ public:
   
 private:
   MetaTypeType(TypeAliasDecl *Type, ASTContext &Ctx)
-    : TypeBase(TypeKind::MetaType, &Ctx), // Always canonical
+    : TypeBase(TypeKind::MetaType, &Ctx, // Always canonical
+               /*Dependent=*/false),
       TheType(Type) {
   }
 };
@@ -562,7 +592,8 @@ public:
   
 private:
   ModuleType(Module *M, ASTContext &Ctx)
-    : TypeBase(TypeKind::Module, &Ctx), // Always canonical
+    : TypeBase(TypeKind::Module, &Ctx, // Always canonical
+               /*Dependent=*/false),
       TheModule(M) {
   }
 };
@@ -811,7 +842,8 @@ private:
   Qual Quals; // TODO: put these bits in TypeBase
 
   LValueType(Type objectTy, Qual quals, ASTContext *canonicalContext)
-    : TypeBase(TypeKind::LValue, canonicalContext),
+    : TypeBase(TypeKind::LValue, canonicalContext, 
+               objectTy->isDependentType()),
       ObjectTy(objectTy), Quals(quals) {}
 
 public:
@@ -847,8 +879,8 @@ public:
   }
 };
 
-inline bool TypeBase::isDependentType() {
-  return is<UnstructuredDependentType>();
+inline bool TypeBase::isDependentType() const {
+  return TypeBits.TypeBase.Dependent;
 }
 
 } // end namespace swift

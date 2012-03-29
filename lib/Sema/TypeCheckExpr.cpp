@@ -306,13 +306,6 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
       EltTy = Elt->getType();
     }
 
-    // If any of the tuple element types is dependent, the whole tuple should
-    // have dependent type.
-    if (EltTy->isDependentType()) {
-      TE->setDependentType(Elt->getType());
-      return false;
-    }
-
     // If a name was specified for this element, use it.
     Identifier Name = TE->getElementName(i);
     ResultTyElts[i] = TupleTypeElt(EltTy, Name);
@@ -406,7 +399,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   OverloadSetRefExpr *OS = dyn_cast<OverloadSetRefExpr>(E1);
   if (!OS) {
     // If not, just use the dependent type.
-    E->setType(E1->getType());
+    E->setType(UnstructuredDependentType::get(Context));
     return E;
   }
 

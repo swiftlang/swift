@@ -71,17 +71,14 @@ NameAliasType *TypeAliasDecl::getAliasType() const {
 /// getTypeForPath - Given a type and an access path into it, return the
 /// referenced element type.  If the access path is invalid for the specified
 /// type, this returns null.
-Type ElementRefDecl::getTypeForPath(Type InTy, ArrayRef<unsigned> Path) {
+Type ElementRefDecl::getTypeForPath(ASTContext &C, Type InTy, 
+                                    ArrayRef<unsigned> Path) {
   assert(!InTy.isNull() && "getTypeForPath() doesn't allow a null type!");
   
   if (Path.empty())
     return InTy;
   
   TypeBase *Ty = InTy->getDesugaredType();
-  
-  // If we reach a dependent type, just return it.
-  if (Ty->isDependentType())
-    return Ty;
   
   // If we have a single-element oneof (like a struct) then we allow matching
   // the struct elements with the tuple syntax.
@@ -96,8 +93,13 @@ Type ElementRefDecl::getTypeForPath(Type InTy, ArrayRef<unsigned> Path) {
     if (Path[0] >= TT->getFields().size())
       return 0;
   
-    return getTypeForPath(TT->getElementType(Path[0]), Path.slice(1));
+    return getTypeForPath(C, TT->getElementType(Path[0]), Path.slice(1));
   }
+  
+  // If we reach a dependent type, return the unstructured dependent type,
+  // since we can't get any more information out of it.
+  if (Ty->isDependentType())
+    return UnstructuredDependentType::get(C);
   
   return 0;
 }
