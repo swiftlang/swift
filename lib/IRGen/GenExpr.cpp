@@ -200,14 +200,8 @@ namespace {
       emitDeclRef(IGF, E, Out);
     }
 
-    void visitClosureExpr(ClosureExpr *E) {
+    void visitCapturingExpr(CapturingExpr *E) {
       emitClosure(IGF, E, Out);
-    }
-
-    void visitFuncExpr(FuncExpr *E) {
-      IGF.IGM.unimplemented(E->getLoc(),
-                            "cannot explode r-values for this expression yet");
-      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
     }
 
     void visitModuleExpr(ModuleExpr *E) {

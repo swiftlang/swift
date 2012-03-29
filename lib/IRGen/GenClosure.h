@@ -25,7 +25,7 @@ namespace irgen {
   class IRGenFunction;
 
   /// Emit a closure expression as an r-value.
-  void emitClosure(IRGenFunction &IGF, ClosureExpr *E, Explosion &explosion);
+  void emitClosure(IRGenFunction &IGF, CapturingExpr *E, Explosion &explosion);
 
 } // end namespace irgen
 } // end namespace swift

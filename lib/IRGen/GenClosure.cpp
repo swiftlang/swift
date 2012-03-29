@@ -31,8 +31,16 @@
 using namespace swift;
 using namespace irgen;
 
-void swift::irgen::emitClosure(IRGenFunction &IGF, ClosureExpr *E,
+void swift::irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E,
                                Explosion &explosion) {
+  assert(isa<FuncExpr>(E) || isa<ClosureExpr>(E));
+
+  ArrayRef<Pattern*> Patterns;
+  if (FuncExpr *FE = dyn_cast<FuncExpr>(E))
+    Patterns = FE->getParamPatterns();
+  else
+    Patterns = cast<ClosureExpr>(E)->getParamPatterns();
+
   // Create the IR function.
   llvm::FunctionType *fnType =
       IGF.IGM.getFunctionType(E->getType(), ExplosionKind::Minimal, 0, true);
@@ -40,7 +48,7 @@ void swift::irgen::emitClosure(IRGenFunction &IGF, ClosureExpr *E,
       llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
                              "closure", &IGF.IGM.Module);
 
-  IRGenFunction innerIGF(IGF.IGM, E->getType(), E->getParamPatterns(),
+  IRGenFunction innerIGF(IGF.IGM, E->getType(), Patterns,
                          ExplosionKind::Minimal, /*uncurry level*/ 0, fn,
                          Prologue::StandardWithContext);
 
@@ -106,10 +114,14 @@ void swift::irgen::emitClosure(IRGenFunction &IGF, ClosureExpr *E,
     }
   }
 
-  // Emit the body of the closure as if it were a single return
-  // statement.
-  ReturnStmt ret(SourceLoc(), E->getBody());
-  innerIGF.emitStmt(&ret);
+  if (FuncExpr *FE = dyn_cast<FuncExpr>(E)) {
+    innerIGF.emitFunctionTopLevel(FE->getBody());
+  } else {
+    // Emit the body of the closure as if it were a single return
+    // statement.
+    ReturnStmt ret(SourceLoc(), cast<ClosureExpr>(E)->getBody());
+    innerIGF.emitStmt(&ret);
+  }
 
   // Build the explosion result.
   explosion.add(IGF.Builder.CreateBitCast(fn, IGF.IGM.Int8PtrTy));
