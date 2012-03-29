@@ -33,12 +33,6 @@ using namespace irgen;
 
 void swift::irgen::emitClosure(IRGenFunction &IGF, ClosureExpr *E,
                                Explosion &explosion) {
-  if (!E->getCaptures().empty()) {
-    IGF.unimplemented(E->getLoc(), "cannot capture local vars yet");
-    return IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()),
-                                 explosion);
-  }
-
   // Create the IR function.
   llvm::FunctionType *fnType =
       IGF.IGM.getFunctionType(E->getType(), ExplosionKind::Minimal, 0, true);
