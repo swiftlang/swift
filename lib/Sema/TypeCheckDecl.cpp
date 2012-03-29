@@ -68,11 +68,11 @@ public:
     if (VD->getInit() == 0) {
       // If we have no initializer and the type is dependent, then the
       // initializer was invalid and removed.
-      if (VD->getType()->is<DependentType>())
+      if (VD->getType()->isDependentType())
         return;
     } else {
       Type DestTy = VD->getType();
-      if (DestTy->is<DependentType>())
+      if (DestTy->isDependentType())
         DestTy = Type();
       Expr *Init = VD->getInit();
       if (!TC.typeCheckExpression(Init, DestTy)) {
@@ -117,7 +117,7 @@ public:
         body->setType(FD->getType());
         TypedPattern *thisPattern =
           cast<TypedPattern>(body->getParamPatterns()[0]);
-        assert(thisPattern->getType()->is<DependentType>());
+        assert(thisPattern->getType()->isDependentType());
         thisPattern->overwriteType(thisType);
       }
     }
@@ -128,11 +128,11 @@ public:
     if (FD->getBody() == 0) {
       // If we have no initializer and the type is dependent, then the
       // initializer was invalid and removed.
-      if (FD->getType()->is<DependentType>())
+      if (FD->getType()->isDependentType())
         return;
     } else {
       Type DestTy = FD->getType();
-      if (DestTy->is<DependentType>())
+      if (DestTy->isDependentType())
         DestTy = Type();
       Expr *Body = FD->getBody();
       if (!TC.typeCheckExpression(Body, DestTy)) {
@@ -169,7 +169,7 @@ public:
   void visitElementRefDecl(ElementRefDecl *ERD) {
     // If the type is already resolved we're done.  ElementRefDecls are
     // simple.
-    if (!ERD->getType()->is<DependentType>()) return;
+    if (!ERD->getType()->isDependentType()) return;
     
     if (Type T = ElementRefDecl::getTypeForPath(ERD->getVarDecl()->getType(),
                                                 ERD->getAccessPath())) {
@@ -277,7 +277,7 @@ bool DeclChecker::validateVarName(Type Ty, DeclVarName *Name) {
     return false;
   
   // If we're peering into an unresolved type, we can't analyze it yet.
-  if (Ty->is<DependentType>()) return false;
+  if (Ty->isDependentType()) return false;
   
   // If we have a complex case, Ty must be a tuple and the name specifier must
   // have the correct number of elements.

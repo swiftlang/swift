@@ -80,7 +80,7 @@ Type ElementRefDecl::getTypeForPath(Type InTy, ArrayRef<unsigned> Path) {
   TypeBase *Ty = InTy->getDesugaredType();
   
   // If we reach a dependent type, just return it.
-  if (isa<DependentType>(Ty))
+  if (Ty->isDependentType())
     return Ty;
   
   // If we have a single-element oneof (like a struct) then we allow matching

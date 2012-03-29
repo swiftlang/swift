@@ -183,7 +183,7 @@ public:
   }
 
   SemaCoerce(TypeChecker &TC, Type DestTy) : TC(TC), DestTy(DestTy) {
-    assert(!DestTy->is<DependentType>());
+    assert(!DestTy->isDependentType());
   }
   Expr *doIt(Expr *E) {
     return visit(E);
@@ -600,7 +600,7 @@ namespace {
 /// NOTE: This needs to be kept in synch with getConversionRank in Expr.cpp.
 ///
 Expr *SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC) {
-  assert(!DestTy->is<DependentType>() &&
+  assert(!DestTy->isDependentType() &&
          "Result of conversion can't be dependent");
 
   // If the destination is a AutoClosing FunctionType, we have special rules.
@@ -615,7 +615,7 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC) {
       // and build the implicit closure.
       E = convertToType(E, FT->getResult(), TC);
       if (E == 0) return 0;
-      if (E->getType()->is<DependentType>()) return E;
+      if (E->getType()->isDependentType()) return E;
 
       // FIXME: Need to figure out correct parent DeclContext; fortunately,
       // it doesn't matter much for the moment because nothing actually needs
@@ -666,7 +666,7 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC) {
 
     // If the input expression has a dependent type, try to coerce it to an
     // appropriate type.
-    if (E->getType()->is<DependentType>())
+    if (E->getType()->isDependentType())
       return SemaCoerce(TC, DestTy).doIt(E);
 
     // Materialization.
@@ -726,7 +726,7 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC) {
 
   // If the input expression has a dependent type, try to coerce it to an
   // appropriate type.
-  if (E->getType()->is<DependentType>())
+  if (E->getType()->isDependentType())
     return SemaCoerce(TC, DestTy).doIt(E);
 
   // If the source is an l-value, load from it.  We intentionally do

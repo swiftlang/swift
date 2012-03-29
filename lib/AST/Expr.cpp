@@ -380,7 +380,7 @@ getTupleToTupleTypeConversionRank(const Expr *E, TupleType *ETy,
 /// Note that this code needs to be kept carefully in synch with
 /// SemaCoerceBottomUp::convertToType.
 static Expr::ConversionRank getConversionRank(const Expr *E, Type DestTy) {
-  assert(!DestTy->is<DependentType>() &&
+  assert(!DestTy->isDependentType() &&
          "Result of conversion can't be dependent");
 
   // If the destination is a AutoClosing FunctionType, we have special rules.
@@ -504,7 +504,7 @@ public:
 
   void visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
     printCommon(E, "integer_literal_expr") << " value=";
-    if (E->getType().isNull() || E->getType()->is<DependentType>())
+    if (E->getType().isNull() || E->getType()->isDependentType())
       OS << E->getText();
     else
       OS << E->getValue();

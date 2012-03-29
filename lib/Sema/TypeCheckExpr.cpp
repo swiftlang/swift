@@ -91,7 +91,7 @@ isLiteralCompatibleType(Type Ty, SourceLoc Loc, bool isInt, TypeChecker *TC) {
 /// (which is known to have dependent type), performing semantic analysis and
 /// returning null on a semantic error or the new AST to use on success.
 Expr *TypeChecker::applyTypeToLiteral(Expr *E, Type DestTy) {
-  assert(E->getType()->is<DependentType>() &&
+  assert(E->getType()->isDependentType() &&
          "should only be called on dependent integers");
   bool isInt = isa<IntegerLiteralExpr>(E);
   assert((isInt || isa<FloatLiteralExpr>(E)) && "Unknown literal kind");
@@ -308,7 +308,7 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
 
     // If any of the tuple element types is dependent, the whole tuple should
     // have dependent type.
-    if (EltTy->is<DependentType>()) {
+    if (EltTy->isDependentType()) {
       TE->setDependentType(Elt->getType());
       return false;
     }
@@ -396,7 +396,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   
   // Otherwise, the function's type must be dependent.  If it is something else,
   // we have a type error.
-  if (!E1->getType()->is<DependentType>()) {
+  if (!E1->getType()->isDependentType()) {
     diagnose(E1->getLoc(), diag::called_expr_isnt_function);
     return 0;
   }
@@ -446,7 +446,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   
   // Okay, if the argument is also dependent, we can't do anything here.  Just
   // wait until something gets resolved.
-  if (E2->getType()->is<DependentType>()) {
+  if (E2->getType()->isDependentType()) {
     E->setDependentType(E2->getType());
     return E;
   }
@@ -609,7 +609,7 @@ public:
   
   Expr *visitTupleElementExpr(TupleElementExpr *E) {
     // TupleElementExpr is fully resolved.
-    assert(!E->getType()->is<DependentType>());
+    assert(!E->getType()->isDependentType());
     return E;
   }
   
@@ -619,7 +619,7 @@ public:
   }
 
   Expr *visitImplicitConversionExpr(ImplicitConversionExpr *E) {
-    assert(!E->getType()->is<DependentType>());
+    assert(!E->getType()->isDependentType());
     // Implicit conversions have been fully checked.
     return E;
   }
@@ -636,7 +636,7 @@ public:
     }
 
     // Propagate out dependence.
-    if (E->getSubExpr()->getType()->is<DependentType>()) {
+    if (E->getSubExpr()->getType()->isDependentType()) {
       E->setType(E->getSubExpr()->getType());
       return E;
     }
@@ -658,7 +658,7 @@ public:
   
   Expr *visitModuleExpr(ModuleExpr *E) {
     // ModuleExpr is fully resolved.
-    assert(!E->getType()->is<DependentType>());
+    assert(!E->getType()->isDependentType());
     return E;
   }
 
@@ -720,7 +720,7 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
   Type BaseTy = Base->getType();
   Identifier MemberName = E->getName();
   
-  if (BaseTy->is<DependentType>()) {
+  if (BaseTy->isDependentType()) {
     E->setDependentType(BaseTy);
     return E;
   }
@@ -941,7 +941,7 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
     Expr *walkToExprPost(Expr *E) {    
       assert(!isa<SequenceExpr>(E) && "Should have resolved this");
     
-      if (E->getType()->is<DependentType>()) {
+      if (E->getType()->isDependentType()) {
         // Remember the first dependent expression we come across.
         if (OneDependentExpr == 0)
           OneDependentExpr = E;
@@ -976,7 +976,7 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
 
       Expr *walkToExprPost(Expr *E) {
         // Process dependent literals.
-        if (E->getType()->is<DependentType>()) {
+        if (E->getType()->isDependentType()) {
           if (IntegerLiteralExpr *lit = dyn_cast<IntegerLiteralExpr>(E)) {
             Type type = getIntLiteralType(lit->getLoc());
             if (type.isNull()) return nullptr;

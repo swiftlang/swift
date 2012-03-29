@@ -125,7 +125,12 @@ public:
   /// hasReferenceSemantics() - Do objects of this type have reference
   /// semantics?
   bool hasReferenceSemantics();
-    
+  
+  /// isDependentType() - Determines whether this type is a dependent
+  /// type, meaning that part of the type depends on the context in which
+  /// the type occurs.
+  bool isDependentType();
+  
   void dump() const;
   void print(raw_ostream &OS) const;
   
@@ -837,6 +842,10 @@ public:
     return type->getKind() == TypeKind::LValue;
   }
 };
+
+inline bool TypeBase::isDependentType() {
+  return is<DependentType>();
+}
 
 } // end namespace swift
 
