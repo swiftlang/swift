@@ -62,9 +62,6 @@ public:
   Expr *convertToMaterializable(Expr *E);
 
   Expr *foldSequence(SequenceExpr *E);
-
-  void markUseAsLValue(Expr *E, bool asHeap);
-  void markUsesOfLValues(Expr *E);
   
   /// diagnoseEmptyOverloadSet - Diagnose a case where we disproved all of the
   /// possible candidates in an overload set of a call.

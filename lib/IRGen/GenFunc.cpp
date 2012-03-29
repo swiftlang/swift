@@ -957,8 +957,8 @@ OwnedAddress IRGenFunction::getAddrForParameter(VarDecl *param,
                     paramSchema.begin()->getAggregateType()->getPointerTo());
     Address paramAddr(addr, paramType.StorageAlignment);
 
-    // If it's not referenced on the heap, we can use that directly.
-    if (!param->hasUseAsHeapLValue())
+    // If the lifetime can't be extended, just use the address directly.
+    if (param->hasFixedLifetime())
       return OwnedAddress(paramAddr, IGM.RefCountedNull);
 
     // Otherwise, we might have to move it to the heap.
@@ -972,8 +972,8 @@ OwnedAddress IRGenFunction::getAddrForParameter(VarDecl *param,
 
   // Otherwise, make an alloca and load into it.
   OwnedAddress paramAddr = createScopeAlloca(paramType,
-                                             param->hasUseAsHeapLValue()
-                                               ? OnHeap : NotOnHeap,
+                                             param->hasFixedLifetime()
+                                               ? NotOnHeap : OnHeap,
                                              name + ".addr");
 
   // FIXME: This way of getting a list of arguments claimed by storeExplosion

@@ -44,18 +44,7 @@ IRGenFunction::~IRGenFunction() {
 /// be of i8* type.
 void IRGenFunction::emitMemCpy(llvm::Value *dest, llvm::Value *src,
                                Size size, Alignment align) {
-  dest = Builder.CreateBitCast(dest, IGM.Int8PtrTy);
-  src = Builder.CreateBitCast(src, IGM.Int8PtrTy);
-
-  llvm::Value *args[] = {
-    dest,
-    src,
-    llvm::ConstantInt::get(IGM.SizeTy, size.getValue()),
-    llvm::ConstantInt::get(IGM.SizeTy, align.getValue()),
-    Builder.getFalse() // volatile
-  };
-
-  Builder.CreateCall(IGM.getMemCpyFn(), args);
+  Builder.CreateMemCpy(dest, src, size.getValue(), align.getValue(), false);
 }
 
 void IRGenFunction::unimplemented(SourceLoc Loc, StringRef Message) {

@@ -72,15 +72,6 @@ IRGenModule::~IRGenModule() {
   delete &Types;
 }
 
-llvm::Constant *IRGenModule::getMemCpyFn() {
-  if (MemCpyFn) return MemCpyFn;
-
-  llvm::Type *types[] = { SizeTy };
-  MemCpyFn = llvm::Intrinsic::getDeclaration(&Module, llvm::Intrinsic::memcpy,
-                                             types);
-  return MemCpyFn;
-}
-
 llvm::Constant *IRGenModule::getAllocFn() {
   if (AllocFn) return AllocFn;
 

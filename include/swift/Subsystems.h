@@ -45,6 +45,11 @@ namespace swift {
   ///
   void performTypeChecking(TranslationUnit *TU);
 
+  /// performCaptureAnalysis - Analyse the AST and mark local declarations
+  /// and expressions which can capture them so they can be emitted more
+  /// efficiently.
+  void performCaptureAnalysis(TranslationUnit *TU);
+
   /// performIRGeneration - Turn the given translation unit into
   /// either LLVM IR or native code.
   void performIRGeneration(TranslationUnit *TU, irgen::Options &Opts);

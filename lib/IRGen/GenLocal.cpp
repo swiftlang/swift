@@ -57,8 +57,8 @@ void IRGenFunction::emitLocalVar(VarDecl *var) {
   const TypeInfo &typeInfo = getFragileTypeInfo(var->getType());
 
   OwnedAddress addr = createScopeAlloca(typeInfo,
-                                        var->hasUseAsHeapLValue()
-                                          ? OnHeap : NotOnHeap,
+                                        var->hasFixedLifetime()
+                                          ? NotOnHeap : OnHeap,
                                         var->getName().str());
 
   setLocal(var, addr);

@@ -115,7 +115,6 @@ private:
 
 //--- Runtime ---------------------------------------------------------------
 public:
-  llvm::Constant *getMemCpyFn();
   llvm::Constant *getAllocFn();
   llvm::Constant *getRetainFn();
   llvm::Constant *getReleaseFn();

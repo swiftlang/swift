@@ -640,10 +640,8 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC) {
     }
   
   // If we have an exact match, we're done.
-  if (E->getType()->isEqual(DestTy)) {
-    TC.markUsesOfLValues(E);
+  if (E->getType()->isEqual(DestTy))
     return E;
-  }
   
   // If the expression is a grouping parenthesis and it has a dependent type,
   // just force the type through it, regardless of what DestTy is.
@@ -663,7 +661,6 @@ Expr *SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC) {
       assert(SrcLT->getQualifiers() < DestLT->getQualifiers() &&
              "qualifiers match exactly but types are different?");
 
-      TC.markUseAsLValue(E, DestLT->isHeap());
       return new (TC.Context) RequalifyExpr(E, DestTy);
     }
 

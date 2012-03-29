@@ -297,8 +297,8 @@ namespace {
         OS << "<null type>";
       OS << '\'';
 
-      if (VD->hasUseAsHeapLValue()) OS << " usedAsHeapLValue=true";
-      else if (VD->hasUseAsLValue()) OS << " usedAsLValue=true";
+      if (VD->hasFixedLifetime()) OS << " hasFixedLifetime=true";
+      if (VD->isNeverUsedAsLValue()) OS << " neverUsedAsLValue=true";
     }
 
 

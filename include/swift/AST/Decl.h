@@ -126,14 +126,14 @@ class Decl {
     // The following flags are not necessarily meaningful for all
     // kinds of value-declarations.
 
-    /// Has this declaration been used as an l-value, other than by
-    /// immediately loading it?
-    unsigned UsedAsLValue : 1;
+    // NeverUsedAsLValue - Whether this decl is ever used as an lvalue 
+    // (i.e. used in a context where it could be modified).
+    unsigned NeverUsedAsLValue : 1;
 
-    /// Has this declaration been used as a heap l-value, other than
-    /// by immediating loading it or converting it to a non-heap
-    /// l-value?
-    unsigned UsedAsHeapLValue : 1;
+    // HasFixedLifetime - Whether the lifetime of this decl matches its
+    // scope (i.e. the decl isn't captured, so it can be allocated as part of
+    // the stack frame.)
+    unsigned HasFixedLifetime : 1;
   };
   enum { NumValueDeclBits = NumNamedDeclBits + 2 };
   static_assert(NumValueDeclBits <= 32, "fits in an unsigned");
@@ -305,8 +305,8 @@ class ValueDecl : public NamedDecl {
 protected:
   ValueDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty)
     : NamedDecl(K, DC, name), Ty(ty) {
-    ValueDeclBits.UsedAsLValue = false;
-    ValueDeclBits.UsedAsHeapLValue = false;
+    ValueDeclBits.NeverUsedAsLValue = false;
+    ValueDeclBits.HasFixedLifetime = false;
   }
 
 public:
@@ -345,35 +345,18 @@ public:
     return getKind() == DeclKind::Var || getKind() == DeclKind::ElementRef;
   }
 
-  /// flagUseAsLValue - Record that the given declaration is known to
-  /// be used as an l-value, but not necessarily a heap l-value.
-  void flagUseAsLValue() {
-    ValueDeclBits.UsedAsLValue = true;
+  void setHasFixedLifetime(bool flag) {
+    ValueDeclBits.HasFixedLifetime = flag;
+  }
+  void setNeverUsedAsLValue(bool flag) {
+    ValueDeclBits.NeverUsedAsLValue = flag;
   }
 
-  /// flagUseAsHeapLValue - Record that the given declaration is known
-  /// to be used as a heap l-value.
-  void flagUseAsHeapLValue() {
-    ValueDeclBits.UsedAsLValue = true;
-    ValueDeclBits.UsedAsHeapLValue = true;
+  bool hasFixedLifetime() const {
+    return ValueDeclBits.HasFixedLifetime;
   }
-
-  /// Is this declaration known to be used somewhere as an l-value?  A
-  /// 'false' answer is not definitive unless it's known that all
-  /// possible references to the declaration have been seen, as might
-  /// be true of (say) a local variable after typechecking is
-  /// complete.
-  bool hasUseAsLValue() const {
-    return ValueDeclBits.UsedAsLValue;
-  }
-
-  /// Is this declaration known to be used somewhere as a heap
-  /// l-value?  A 'false' answer is not definitive unless it's known
-  /// that all possible references to the declaration have been seen,
-  /// as might be true of (say) a local variable after typechecking is
-  /// complete.
-  bool hasUseAsHeapLValue() const {
-    return ValueDeclBits.UsedAsHeapLValue;
+  bool isNeverUsedAsLValue() const {
+    return ValueDeclBits.NeverUsedAsLValue;
   }
 
   // Implement isa/cast/dyncast/etc.
