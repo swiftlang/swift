@@ -1,4 +1,5 @@
 add_swift_library(swiftSema
+  CaptureAnalysis.cpp
   NameBinding.cpp
   NameLookup.cpp
   NameLookup.h
