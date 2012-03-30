@@ -170,19 +170,25 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   Expr *visitBinaryExpr(BinaryExpr *E) {
     // Visit the arguments to the tuple, but visit the operator in
     // infix order.
-    TupleExpr *Arg = E->getArgTuple();
-    assert(Arg->getNumElements() == 2);
-    Expr *E2 = doIt(Arg->getElement(0));
+    MutableArrayRef<Expr *> Elements;
+    if (TupleExpr *Tuple = dyn_cast<TupleExpr>(E->getArg())) {
+      Elements = Tuple->getElements();
+      assert(Elements.size() == 2 && "Binary expression with wrong arguments");
+    } else {
+      llvm_unreachable("Binary expression without a tuple?");
+    }
+    
+    Expr *E2 = doIt(Elements[0]);
     if (E2 == nullptr) return nullptr;
-    Arg->setElement(0, E2);
+    Elements[0] = E2;
 
     E2 = doIt(E->getFn());
     if (E2 == 0) return 0;
     E->setFn(E2);
     
-    E2 = doIt(Arg->getElement(1));
+    E2 = doIt(Elements[1]);
     if (E2 == 0) return 0;
-    Arg->setElement(1, E2);
+    Elements[1] = E2;
     return E;
   }
 

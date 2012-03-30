@@ -672,8 +672,10 @@ public:
   Expr *visitBinaryExpr(BinaryExpr *E) {
     // This is necessary because ASTWalker doesn't visit the
     // TupleExpr right now.
-    if (TC.semaTupleExpr(E->getArgTuple()))
-      return 0;
+    if (TupleExpr *Tuple = dyn_cast<TupleExpr>(E->getArg())) {
+      if (TC.semaTupleExpr(Tuple))
+        return 0;
+    }
     return visitApplyExpr(E);
   }
   

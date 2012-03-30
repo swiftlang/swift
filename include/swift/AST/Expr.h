@@ -699,6 +699,10 @@ public:
   
   unsigned getNumElements() const { return NumElements; }
 
+  MutableArrayRef<Expr*> getElements() {
+    return MutableArrayRef<Expr*>(getSubExprs(), NumElements);
+  }
+
   ArrayRef<Expr*> getElements() const {
     return ArrayRef<Expr*>(getSubExprs(), NumElements);
   }
@@ -976,16 +980,10 @@ public:
   BinaryExpr(Expr *Fn, TupleExpr *Arg, Type Ty = Type())
     : ApplyExpr(ExprKind::Binary, Fn, Arg, Ty) {}
 
-  /// getArgTuple - The argument is always a tuple literal.  This accessor
-  /// reinterprets it properly.
-  TupleExpr *getArgTuple() const {
-    return cast<TupleExpr>(getArg());
-  }
-
   SourceLoc getLoc() const { return getFn()->getLoc(); }
                  
   SourceRange getSourceRange() const {
-    return getArgTuple()->getSourceRange();
+    return getArg()->getSourceRange();
   }  
 
   // Implement isa/cast/dyncast/etc.
