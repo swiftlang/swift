@@ -181,8 +181,12 @@ static Expr *buildTupleElementExpr(Expr *Base, SourceLoc DotLoc,
   if (IsLValue)
     FieldType = makeSimilarLValue(FieldType, Base->getType(), Context);
   
-  return new (Context) SyntacticTupleElementExpr(Base, DotLoc, FieldIndex,
-                                                 NameLoc, FieldType);
+  if (DotLoc.isValid())
+    return new (Context) SyntacticTupleElementExpr(Base, DotLoc, FieldIndex,
+                                                   NameLoc, FieldType);
+  
+  return new (Context) ImplicitThisTupleElementExpr(Base, FieldIndex, NameLoc,
+                                                    FieldType);
 }
 
 
