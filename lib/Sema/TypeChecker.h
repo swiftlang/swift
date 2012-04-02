@@ -45,16 +45,16 @@ public:
   bool typeCheckExpression(Expr *&E, Type ConvertType = Type());
   void typeCheckDecl(Decl *D);
   bool typeCheckPattern(Pattern *P);
-  bool convertToType(Pattern *P, Type Ty);
+  bool coerceToType(Pattern *P, Type Ty);
   bool typeCheckCondition(Expr *&E);
 
-  /// convertToType - Do semantic analysis of an expression in a context that
+  /// coerceToType - Do semantic analysis of an expression in a context that
   /// expects a particular type.  This performs a conversion to that type if
   /// the types don't match and diagnoses cases where the conversion cannot be
   /// performed.
   ///
   /// This emits a diagnostic and returns null on error.
-  Expr *convertToType(Expr *E, Type Ty);
+  Expr *coerceToType(Expr *E, Type Ty);
   
   /// isCoercibleToType - Determine whether the given expression can be 
   /// coerced to the given type.

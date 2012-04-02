@@ -162,7 +162,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     
     // We have a function application.  Check that the argument type matches the
     // expected type of the function.
-    E2 = convertToType(E2, FT->getInput());
+    E2 = coerceToType(E2, FT->getInput());
     if (E2 == 0) {
       diagnose(E1->getLoc(), diag::while_converting_function_argument,
                FT->getInput())
@@ -662,7 +662,7 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
 
   // If our context specifies a type, apply it to the expression.
   if (ConvertType) {
-    E = convertToType(E, ConvertType);
+    E = coerceToType(E, ConvertType);
     if (E == 0) return true;
   }
   
@@ -720,13 +720,13 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
           if (IntegerLiteralExpr *lit = dyn_cast<IntegerLiteralExpr>(E)) {
             Type type = getIntLiteralType(lit->getLoc());
             if (type.isNull()) return nullptr;
-            return TC.convertToType(lit, type);
+            return TC.coerceToType(lit, type);
           }
 
           if (FloatLiteralExpr *lit = dyn_cast<FloatLiteralExpr>(E)) {
             Type type = getFloatLiteralType(lit->getLoc());
             if (type.isNull()) return nullptr;
-            return TC.convertToType(lit, type);
+            return TC.coerceToType(lit, type);
           }
         }
         return E;
@@ -783,7 +783,7 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
 
     // If our context specifies a type, apply it to the expression.
     if (ConvertType) {
-      E = convertToType(E, ConvertType);
+      E = coerceToType(E, ConvertType);
       if (E == 0) return true;
     }
 

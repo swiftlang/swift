@@ -54,7 +54,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P) {
   case PatternKind::Typed:
     if (validateType(P->getType()))
       return true;
-    if (convertToType(cast<TypedPattern>(P)->getSubPattern(), P->getType()))
+    if (coerceToType(cast<TypedPattern>(P)->getSubPattern(), P->getType()))
       return true;
     return false;
 
@@ -95,7 +95,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P) {
         // If there's an initializer, use the pattern's type
         // to type-check the initializer.
         if (init) {
-          init = convertToType(init, type);
+          init = coerceToType(init, type);
           if (!init) {
             hadError = true;
           } else {
@@ -116,12 +116,12 @@ bool TypeChecker::typeCheckPattern(Pattern *P) {
 }
 
 /// Perform top-down type coercion on the given pattern.
-bool TypeChecker::convertToType(Pattern *P, Type type) {
+bool TypeChecker::coerceToType(Pattern *P, Type type) {
   switch (P->getKind()) {
   // For parens, just set the type annotation and propagate inwards.
   case PatternKind::Paren:
     P->setType(type);
-    return convertToType(cast<ParenPattern>(P)->getSubPattern(), type);
+    return coerceToType(cast<ParenPattern>(P)->getSubPattern(), type);
 
   // If we see an explicit type annotation, coerce the sub-pattern to
   // that type.
@@ -137,7 +137,7 @@ bool TypeChecker::convertToType(Pattern *P, Type type) {
       return true;
     }
 
-    return convertToType(TP->getSubPattern(), TP->getType());
+    return coerceToType(TP->getSubPattern(), TP->getType());
   }
 
   // For wildcard and name patterns, just set the type.
@@ -192,7 +192,7 @@ bool TypeChecker::convertToType(Pattern *P, Type type) {
         elt.setInit(nullptr);
       }
 
-      if (convertToType(pattern, tupleTy->getFields()[i].getType()))
+      if (coerceToType(pattern, tupleTy->getFields()[i].getType()))
         return true;
     }
 

@@ -231,7 +231,7 @@ public:
   }  
   
   CoercedResult visitParenExpr(ParenExpr *E) {
-    assert(0 && "Already special cased in SemaCoerce::convertToType");
+    assert(0 && "Already special cased in SemaCoerce::coerceToType");
   }
     
   CoercedResult visitTupleExpr(TupleExpr *E) {
@@ -298,7 +298,7 @@ public:
     qs |= LValueType::Qual::Implicit;
 
     Type NewDestTy = LValueType::get(DestLT->getObjectType(), qs, TC.Context);
-    return convertToType(E, NewDestTy, TC, Apply);
+    return coerceToType(E, NewDestTy, TC, Apply);
   }
 
   SemaCoerce(TypeChecker &TC, Type DestTy, bool Apply) 
@@ -311,8 +311,8 @@ public:
     return visit(E);
   }
   
-  /// convertToType - This is the main entrypoint to SemaCoerce.
-  static CoercedResult convertToType(Expr *E, Type DestTy, TypeChecker &TC,
+  /// coerceToType - This is the main entrypoint to SemaCoerce.
+  static CoercedResult coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
                                      bool Apply);
 
   static CoercedResult convertScalarToTupleType(Expr *E, TupleType *DestTy,
@@ -488,7 +488,7 @@ CoercedResult SemaCoerce::coerceLiteral(Expr *E) {
     // If this a 'chaining' case, recursively convert the literal to the
     // intermediate type, then use our conversion function to finish the
     // translation.
-    if (CoercedResult IntermediateRes = convertToType(E, ArgType, TC, Apply)) {
+    if (CoercedResult IntermediateRes = coerceToType(E, ArgType, TC, Apply)) {
       if (!Apply)
         return DestTy;
       
@@ -567,8 +567,8 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
     return nullptr;
   }
   
-  // If we have ":f(x)" and the result type of the call is a OneOfType, then
-  // :f must be an element constructor for the oneof value.
+  // If we have ".f(x)" and the result type of the call is a OneOfType, then
+  // .f must be an element constructor for the oneof value.
   //
   // FIXME: Handling this syntactically causes us to reject "(:f)(x)" as
   // ambiguous.
@@ -826,7 +826,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       
       // Check to see if the src value can be converted to the destination
       // element type.
-      if (CoercedResult Elt = convertToType(OrigElts[SrcField], 
+      if (CoercedResult Elt = coerceToType(OrigElts[SrcField], 
                                             DestTy->getElementType(i),
                                             TC, Apply)) {
         if (Apply)
@@ -872,7 +872,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
         // FIXME: We shouldn't need a TupleExpr to handle this coercion.
         // Check to see if the src value can be converted to the destination
         // element type.
-        if (CoercedResult Elt = convertToType(TE->getElement(SrcField), 
+        if (CoercedResult Elt = coerceToType(TE->getElement(SrcField), 
                                               DestEltTy, TC, Apply)) {
           if (Apply)
             TE->setElement(SrcField, Elt.getExpr());
@@ -927,7 +927,7 @@ CoercedResult SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   // default value, see if the expression's type is convertable to the
   // element type.  This handles assigning 4 to "(a = 4, b : int)".
   Type ScalarType = DestTy->getElementType(ScalarField);
-  CoercedResult ERes = convertToType(E, ScalarType, TC, Apply);
+  CoercedResult ERes = coerceToType(E, ScalarType, TC, Apply);
   if (!ERes)
     return nullptr;
 
@@ -989,9 +989,9 @@ namespace {
   };
 }
 
-/// convertToType - This is the recursive implementation of
-/// ConvertToType.  It produces diagnostics and returns null on failure.
-CoercedResult SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC,
+/// coerceToType - This is the recursive implementation of
+/// coerceToType.  It produces diagnostics and returns null on failure.
+CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
                                         bool Apply) {
   assert(!DestTy->isDependentType() &&
          "Result of conversion can't be dependent");
@@ -1006,7 +1006,7 @@ CoercedResult SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC,
       
       // If we don't have it yet, force the input to the result of the closure
       // and build the implicit closure.
-      if (CoercedResult CoercedE = convertToType(E, FT->getResult(), TC, Apply)) {
+      if (CoercedResult CoercedE = coerceToType(E, FT->getResult(), TC, Apply)) {
         if (!Apply)
           return DestTy;
         
@@ -1049,7 +1049,7 @@ CoercedResult SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC,
   // If the expression is a grouping parenthesis and it has a dependent type,
   // just force the type through it, regardless of what DestTy is.
   if (ParenExpr *PE = dyn_cast<ParenExpr>(E)) {
-    CoercedResult Sub = convertToType(PE->getSubExpr(), DestTy, TC, Apply);
+    CoercedResult Sub = coerceToType(PE->getSubExpr(), DestTy, TC, Apply);
     if (!Sub)
       return nullptr;
     
@@ -1083,7 +1083,7 @@ CoercedResult SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC,
 
     // Materialization.
     if (!DestLT->isExplicit()) {
-      CoercedResult CoercedE = convertToType(E, DestLT->getObjectType(), TC,
+      CoercedResult CoercedE = coerceToType(E, DestLT->getObjectType(), TC,
                                              Apply);
       if (!CoercedE)
         return nullptr;
@@ -1156,7 +1156,7 @@ CoercedResult SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC,
     E = TC.convertLValueToRValue(srcLV, E);
     if (!E) return nullptr;
 
-    return convertToType(E, DestTy, TC, Apply);
+    return coerceToType(E, DestTy, TC, Apply);
   }
 
   // Could not do the conversion.
@@ -1168,8 +1168,8 @@ CoercedResult SemaCoerce::convertToType(Expr *E, Type DestTy, TypeChecker &TC,
   return nullptr;
 }
 
-Expr *TypeChecker::convertToType(Expr *E, Type DestTy) {
-  if (CoercedResult Res = SemaCoerce::convertToType(E, DestTy, *this, 
+Expr *TypeChecker::coerceToType(Expr *E, Type DestTy) {
+  if (CoercedResult Res = SemaCoerce::coerceToType(E, DestTy, *this, 
                                                     /*Apply=*/true))
     return Res.getExpr();
   
@@ -1177,5 +1177,5 @@ Expr *TypeChecker::convertToType(Expr *E, Type DestTy) {
 }
 
 bool TypeChecker::isCoercibleToType(Expr *E, Type Ty) {
-  return (bool)SemaCoerce::convertToType(E, Ty, *this, /*Apply=*/false);
+  return (bool)SemaCoerce::coerceToType(E, Ty, *this, /*Apply=*/false);
 }
