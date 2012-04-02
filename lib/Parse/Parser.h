@@ -201,7 +201,6 @@ public:
   }
   void parseAttributeListPresent(DeclAttributes &Attributes);
   bool parseAttribute(DeclAttributes &Attributes);
-  bool parseVarName(DeclVarName &Name);
   
   Decl *parseDeclImport();
   Decl *parseDeclExtension();
@@ -216,11 +215,6 @@ public:
   Decl *parseDeclProtocol();
   bool parseProtocolBody(SourceLoc ProtocolLoc, const DeclAttributes &Attrs,
                          TypeAliasDecl *TypeName = 0);
-
-  void actOnVarDeclName(const DeclVarName *Name,
-                        SmallVectorImpl<unsigned> &AccessPath,
-                        VarDecl *VD,
-                        SmallVectorImpl<Decl*> &Decls);
   
   struct OneOfElementInfo {
     SourceLoc NameLoc;

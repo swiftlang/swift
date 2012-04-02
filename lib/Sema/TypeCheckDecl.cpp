@@ -32,7 +32,6 @@ public:
   //===--------------------------------------------------------------------===//
 
   bool visitValueDecl(ValueDecl *VD);
-  bool validateVarName(Type Ty, DeclVarName *Name);
   void validateAttributes(ValueDecl *VD);
 
   //===--------------------------------------------------------------------===//
@@ -42,7 +41,67 @@ public:
   void visitImportDecl(ImportDecl *ID) {
     // Nothing to do.
   }
-  
+
+  void visitBoundVars(Pattern *P) {
+    switch (P->getKind()) {
+    // Recurse into patterns.
+    case PatternKind::Tuple:
+      for (auto &field : cast<TuplePattern>(P)->getFields())
+        visitBoundVars(field.getPattern());
+      return;
+    case PatternKind::Paren:
+      return visitBoundVars(cast<ParenPattern>(P)->getSubPattern());
+    case PatternKind::Typed:
+      return visitBoundVars(cast<TypedPattern>(P)->getSubPattern());
+
+    // Handle vars.
+    case PatternKind::Named:
+      visitValueDecl(cast<NamedPattern>(P)->getDecl());
+      return;
+
+    // Handle non-vars.
+    case PatternKind::Any:
+      return;
+    }
+    llvm_unreachable("bad pattern kind!");
+  }
+
+  void visitPatternBindingDecl(PatternBindingDecl *PBD) {
+    if (PBD->getInit()) {
+      Type DestTy;
+      if (PBD->getPattern()->hasType()) {
+        DestTy = PBD->getPattern()->getType();
+        if (TC.validateType(DestTy))
+          return;
+        if (DestTy->isDependentType())
+          DestTy = Type();
+      }
+      Expr *Init = PBD->getInit();
+      if (TC.typeCheckExpression(Init, DestTy)) {
+        if (DestTy)
+          TC.diagnose(PBD->getLocStart(), diag::while_converting_var_init,
+                      DestTy);
+        return;
+      }
+      if (!DestTy) {
+        Expr *newInit = TC.convertToMaterializable(Init);
+        if (newInit) Init = newInit;
+      }
+      PBD->setInit(Init);
+      if (!DestTy) {
+        if (TC.coerceToType(PBD->getPattern(), Init->getType()))
+          return;
+      } else {
+        if (TC.typeCheckPattern(PBD->getPattern()))
+          return;
+      }
+    } else {
+      if (TC.typeCheckPattern(PBD->getPattern()))
+        return;
+    }
+    visitBoundVars(PBD->getPattern());
+  }
+
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     // Check for a protocol or oneof declaration.  This avoids redundant
     // work because only an actual protocol or oneof declaration can cause
@@ -60,50 +119,8 @@ public:
   }
 
   void visitVarDecl(VarDecl *VD) {
-    // Type check the ValueDecl part of a VarDecl.
-    if (visitValueDecl(VD))
-      return;
-    
-    // Validate that the initializers type matches the expected type.
-    if (VD->getInit() == 0) {
-      // If we have no initializer and the type is dependent, then the
-      // initializer was invalid and removed.
-      if (VD->getType()->isDependentType())
-        return;
-    } else {
-      Type DestTy = VD->getType();
-      if (DestTy->isDependentType())
-        DestTy = Type();
-      Expr *Init = VD->getInit();
-      if (!TC.typeCheckExpression(Init, DestTy)) {
-        // Always infer a materializable type, and do the loads
-        // necessary to make that happen.
-        if (!DestTy) {
-          Expr *newInit = TC.convertToMaterializable(Init);
-          if (newInit) Init = newInit;
-        }
-
-        VD->setInit(Init);
-        VD->overwriteType(Init->getType());
-      } else if (!DestTy.isNull()) {
-        TC.diagnose(VD->getLocStart(), diag::while_converting_var_init, DestTy);
-      }
-    }
-
-    // Verify that the type is materializable.
-    if (!VD->getType()->isMaterializable()) {
-      if (VD->getType()->is<LValueType>())
-        TC.diagnose(VD->getLocStart(), diag::var_type_is_lvalue);
-      else
-        TC.diagnose(VD->getLocStart(), diag::var_type_not_materializable,
-                    VD->getType());
-    }
-    
-    // If the VarDecl had a name specifier, verify that it lines up with the
-    // actual type of the VarDecl.
-    if (VD->getNestedName() &&
-        validateVarName(VD->getType(), VD->getNestedName()))
-      VD->setNestedName(nullptr);
+    // Delay type-checking on VarDecls until we see the corresponding
+    // PatternBindingDecl.
   }
 
   void visitFuncDecl(FuncDecl *FD) {
@@ -163,22 +180,6 @@ public:
       
       // Then check to see if it is valid in an extension.
       
-    }
-  }
-
-  void visitElementRefDecl(ElementRefDecl *ERD) {
-    // If the type is already resolved we're done.  ElementRefDecls are
-    // simple.
-    if (!ERD->getType()->isDependentType()) return;
-    
-    if (Type T = ElementRefDecl::getTypeForPath(TC.Context, 
-                                                ERD->getVarDecl()->getType(),
-                                                ERD->getAccessPath())) {
-      ERD->overwriteType(T);
-    } else {
-      TC.diagnose(ERD->getLocStart(), diag::invalid_index_in_element_ref,
-                  ERD->getName(), ERD->getVarDecl()->getType());
-      ERD->overwriteType(ErrorType::get(TC.Context));
     }
   }
 };
@@ -268,41 +269,3 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     VD->getMutableAttrs().AutoClosure = false;
   }
 }
-
-bool DeclChecker::validateVarName(Type Ty, DeclVarName *Name) {
-  // Check for a type specifier mismatch on this level.
-  assert(Ty && "This lookup should never fail");
-  
-  // If this is a simple varname, then it matches any type, and we're done.
-  if (Name->isSimple())
-    return false;
-    
-  // If we have a complex case, Ty must be a tuple and the name specifier must
-  // have the correct number of elements.
-  TupleType *AccessedTuple = Ty->getAs<TupleType>();
-  if (AccessedTuple == 0) {
-    // If we're peering into an unresolved type that isn't a tuple type, we
-    // can't analyze it yet.
-    if (Ty->isDependentType()) return false;
-    
-    TC.diagnose(Name->getLocation(), diag::name_matches_nontuple, Ty);
-    return true;
-  }
-  
-  // Verify the # elements line up.
-  ArrayRef<DeclVarName *> Elements = Name->getElements();
-  if (Elements.size() != AccessedTuple->getFields().size()) {
-    TC.diagnose(Name->getLocation(), diag::varname_element_count_mismatch,
-                Ty, AccessedTuple->getFields().size(), Elements.size());
-    return true;
-  }
-  
-  // Okay, everything looks good at this level, recurse.
-  for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
-    if (validateVarName(AccessedTuple->getFields()[i].getType(), Elements[i]))
-      return true;
-  }
-  
-  return false;
-}
-

@@ -36,6 +36,7 @@ namespace swift {
   class IfStmt;
   template<typename T> class Optional;
   class Pattern;
+  class PatternBindingDecl;
   class ReturnStmt;
   class SourceLoc;
   class Stmt;
@@ -178,6 +179,8 @@ public:
 
   void emitInit(Address addr, Expr *E, const TypeInfo &type);
   void emitZeroInit(Address addr, const TypeInfo &type);
+
+  void emitPatternBindingInit(PatternBindingDecl *D, bool isGlobal);
 
   OwnedAddress getAddrForParameter(VarDecl *param, Explosion &paramValues);
 

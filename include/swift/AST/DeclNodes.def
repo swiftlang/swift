@@ -53,15 +53,15 @@
 
 DECL(Import, Decl)
 DECL(Extension, Decl)
+DECL(PatternBinding, Decl)
 ABSTRACT_DECL(Named, Decl)
   ABSTRACT_DECL(Value, Named)
     VALUE_DECL(TypeAlias, Decl)
     VALUE_DECL(Var, Value)
     VALUE_DECL(Func, Value)
     VALUE_DECL(OneOfElement, Value)
-    VALUE_DECL(ElementRef, Value)
-    DECL_RANGE(Value, TypeAlias, ElementRef)
-  DECL_RANGE(Named, TypeAlias, ElementRef)
+    DECL_RANGE(Value, TypeAlias, OneOfElement)
+  DECL_RANGE(Named, TypeAlias, OneOfElement)
 
 #undef VALUE_DECL
 #undef NAMED_DECL

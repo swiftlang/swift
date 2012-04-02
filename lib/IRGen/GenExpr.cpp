@@ -16,6 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/DerivedTypes.h"
@@ -69,10 +70,6 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E) {
     if (D->getDeclContext()->isLocalContext())
       return IGF.emitAddressLValue(IGF.getLocal(D));
     return IGF.getGlobal(cast<VarDecl>(D));
-
-  case DeclKind::ElementRef:
-    IGF.unimplemented(E->getLoc(), "emitting this decl as an l-value");
-    return IGF.emitFakeLValue(IGF.getFragileTypeInfo(D->getType()));
   }
   llvm_unreachable("bad decl kind");
 }
@@ -100,11 +97,6 @@ static void emitDeclRef(IRGenFunction &IGF, DeclRefExpr *E,
 
   case DeclKind::OneOfElement:
     return emitOneOfElementRef(IGF, cast<OneOfElementDecl>(D), explosion);
-
-  case DeclKind::ElementRef:
-    IGF.unimplemented(E->getLoc(), "emitting this decl as an r-value");
-    return IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()),
-                                 explosion);
   }
   llvm_unreachable("bad decl kind");
 }
@@ -311,7 +303,6 @@ namespace {
 
     // These are potentially supportable.
     NON_LOCATEABLE(TypeAliasDecl)
-    NON_LOCATEABLE(ElementRefDecl)
 
     // These we support.
     Optional<Address> visitVarDecl(VarDecl *D) {
@@ -406,6 +397,32 @@ void IRGenFunction::emitZeroInit(Address addr, const TypeInfo &type) {
                        Builder.getInt64(type.StorageSize.getValue()),
                        addr.getAlignment().getValue(),
                        /*volatile*/ false);
+}
+
+void IRGenFunction::emitPatternBindingInit(PatternBindingDecl *D, bool isGlobal) {
+  // FIXME: For now, we only handle the case where the pattern maps onto a
+  // single variable.
+  PatternBindingDecl *PBD = cast<PatternBindingDecl>(D);
+  Pattern *P = PBD->getPattern();
+  do {
+    if (ParenPattern *PP = dyn_cast<ParenPattern>(P))
+      P = PP->getSubPattern();
+    else if (TypedPattern *TP = dyn_cast<TypedPattern>(P))
+      P = TP->getSubPattern();
+    else
+      break;
+  } while (1);
+  if (NamedPattern *NP = dyn_cast<NamedPattern>(P)) {
+    VarDecl *var = NP->getDecl();
+    const TypeInfo &type = IGM.getFragileTypeInfo(var->getType());
+    Address addr = isGlobal ? IGM.getAddrOfGlobalVariable(var) : getLocal(var);
+    if (PBD->getInit())
+      emitInit(addr, PBD->getInit(), type);
+    else if (!isGlobal)
+      emitZeroInit(addr, type);
+  } else if (!isGlobal || PBD->getInit()) {
+    unimplemented(D->getLocStart(), "pattern binding init");
+  }
 }
 
 namespace {

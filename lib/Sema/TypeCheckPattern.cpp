@@ -196,7 +196,6 @@ bool TypeChecker::coerceToType(Pattern *P, Type type) {
         return true;
     }
 
-    P->setType(type);
     return false;
   }
   }

@@ -35,6 +35,7 @@ namespace swift {
   class DeclAttributes;
   class OneOfElementDecl;
   class NameAliasType;
+  class Pattern;
   enum class Resilience : unsigned char;
   class TypeAliasDecl;
   
@@ -44,68 +45,6 @@ enum class DeclKind {
   First_##Id##Decl = FirstId, Last_##Id##Decl = LastId,
 #include "swift/AST/DeclNodes.def"
 };
-  
-  
-/// DeclVarName - This is a recursive structure that represents the varname
-/// datatype which can be used to name various pieces of a var definition.  For
-/// example:  var ((a, b), c) = foo();
-///
-class DeclVarName {
-  /// LPLoc/RPLoc - This is the location of the '(' and ')' if this is a complex
-  /// name, or both contain the same location if this is simple.
-  SourceLoc LPLoc, RPLoc;
-  
-  union {
-    void *Name; //< Storage for a simple variable name
-    struct {
-      DeclVarName * const *Start;
-      unsigned Length;
-    } Elements; //< Storage for a parenthesized list of variable names
-  };
-  
-public:
-  DeclVarName() {}
-  
-  DeclVarName(Identifier Name, SourceLoc NameLoc)
-    : LPLoc(NameLoc), RPLoc(NameLoc), Name(Name.getAsOpaquePointer()) { }
-  
-  DeclVarName(SourceLoc LPLoc, ArrayRef<DeclVarName *> Elements,
-              SourceLoc RPLoc) : LPLoc(LPLoc), RPLoc(RPLoc) {
-    this->Elements.Start = Elements.data();
-    this->Elements.Length = Elements.size();
-  }
-  
-  SourceLoc getLocation() const { return LPLoc; }
-  
-  Identifier getIdentifier() const {
-    assert(isSimple() && 
-           "Cannot retrieve an identifier for a non-simple name");
-    return Identifier::getFromOpaquePointer(Name);
-  }
-  
-  ArrayRef<DeclVarName *> getElements() const {
-    assert(!isSimple() && "Cannot retrieve elements for a simple name");
-    return ArrayRef<DeclVarName *>(Elements.Start, Elements.Length);
-  }
-   
-  bool isSimple() const { return LPLoc == RPLoc; }
-
-  SourceRange getSourceRange() {
-    return SourceRange(LPLoc, RPLoc);
-  }
-  
-private:
-  // Make placement new and vanilla new/delete illegal for DeclVarNames.
-  void *operator new(size_t Bytes) throw() = delete;
-  void operator delete(void *Data) throw() = delete;
-  void *operator new(size_t Bytes, void *Mem) throw() = delete;
-public:
-  // Only allow allocation of DeclVarNames using the allocator in ASTContext
-  // or by doing a placement new.
-  void *operator new(size_t Bytes, ASTContext &C,
-                     unsigned Alignment = 8);  
-};
-
 
 /// Decl - Base class for all declarations in Swift.
 class Decl {
@@ -266,8 +205,37 @@ public:
   }
   static bool classof(const ExtensionDecl *D) { return true; }
 };
-  
-  
+
+// PatternBindingDecl - This decl contains a pattern and optional initializer
+// for a set of one or more VarDecls declared together.  (For example, in
+// "var (a,b) = foo()", this contains the pattern "(a,b)" and the intializer
+// "foo()".  The same applies to simpler declarations like "var a = foo()".)
+class PatternBindingDecl : public Decl {
+  SourceLoc VarLoc; // Location of the 'var' keyword
+  Pattern *Pat; // The pattern which this decl binds
+  Expr *Init; // Initializer for the variables
+
+public:
+  PatternBindingDecl(SourceLoc VarLoc, Pattern *Pat, Expr *E,
+                     DeclContext *Parent)
+    : Decl(DeclKind::PatternBinding, Parent), VarLoc(VarLoc), Pat(Pat),
+      Init(E) {
+  }
+
+  SourceLoc getVarLoc() const { return VarLoc; }
+  SourceLoc getLocStart() const { return VarLoc; }
+
+  Pattern *getPattern() const { return Pat; }
+
+  Expr *getInit() const { return Init; }
+  void setInit(Expr *E) { Init = E; }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::PatternBinding;
+  }
+  static bool classof(const PatternBindingDecl *D) { return true; }
+
+};
   
 /// NamedDecl - An abstract base class for declarations with names.
 class NamedDecl : public Decl {
@@ -342,7 +310,7 @@ public:
   /// isReferencedAsLValue - Returns 'true' if references to this
   /// declaration are l-values.
   bool isReferencedAsLValue() const {
-    return getKind() == DeclKind::Var || getKind() == DeclKind::ElementRef;
+    return getKind() == DeclKind::Var;
   }
 
   void setHasFixedLifetime(bool flag) {
@@ -430,33 +398,13 @@ public:
 class VarDecl : public ValueDecl {
 private:
   SourceLoc VarLoc;    // Location of the 'var' token.
-  Expr *Init;
-
-  /// NestedName - If this is a simple var definition, the name is stored in the
-  /// name identifier.  If the varname is complex, Name is empty and this
-  /// contains the nested name specifier.
-  DeclVarName *NestedName;
   
 public:
-  VarDecl(SourceLoc VarLoc, Identifier Name, Type Ty, Expr *Init,
-          DeclContext *DC)
-    : ValueDecl(DeclKind::Var, DC, Name, Ty), VarLoc(VarLoc), Init(Init),
-      NestedName(0) {}
-  VarDecl(SourceLoc VarLoc, DeclVarName *Name, Type Ty, Expr *Init,
-          DeclContext *DC)
-    : ValueDecl(DeclKind::Var, DC, Identifier(), Ty),
-      VarLoc(VarLoc), Init(Init), NestedName(Name) {}
-
-  Expr *getInit() const { return Init; }
-  void setInit(Expr *init) { Init = init; }
+  VarDecl(SourceLoc VarLoc, Identifier Name, Type Ty, DeclContext *DC)
+    : ValueDecl(DeclKind::Var, DC, Name, Ty), VarLoc(VarLoc) {}
 
   /// getVarLoc - The location of the 'var' token.
   SourceLoc getVarLoc() const { return VarLoc; }
-
-  /// getNestedName - Returns the nested-name-specifier of this
-  /// variable, if it has one.
-  DeclVarName *getNestedName() const { return NestedName; }
-  void setNestedName(DeclVarName *name) { NestedName = name; }
   
   SourceLoc getLocStart() const { return VarLoc; }
   
@@ -547,43 +495,6 @@ public:
  
 };
 
-  
-/// ElementRefDecl - A reference to the element of another decl which is formed
-/// through name binding.  For example, in "var (a,b) = f();" there is a VarDecl
-/// with no name and two ElementRefDecls (named A and B) referring to elements
-/// of the nameless vardecl.
-class ElementRefDecl : public ValueDecl {
-  VarDecl *VD;
-  SourceLoc NameLoc;
-  ArrayRef<unsigned> AccessPath;
-  
-public:
-  ElementRefDecl(VarDecl *VD, SourceLoc NameLoc, Identifier Name,
-                 ArrayRef<unsigned> Path, Type Ty, DeclContext *DC)
-    : ValueDecl(DeclKind::ElementRef, DC, Name, Ty), VD(VD),
-      NameLoc(NameLoc), AccessPath(Path) {
-  }
-
-  VarDecl *getVarDecl() const { return VD; }
-
-  ArrayRef<unsigned> getAccessPath() const { return AccessPath; }
-
-  /// getTypeForPath - Given a type and an access path into it, return the
-  /// referenced element type.  If the access path is invalid for the specified
-  /// type, this returns null.  If the query goes into an unresolved (dependent)
-  /// part of the type, this returns UnstructuredDependentType.
-  static Type getTypeForPath(ASTContext &C, Type Ty, ArrayRef<unsigned> Path);
-  
-  SourceLoc getNameLoc() const { return NameLoc; }
-  SourceLoc getLocStart() const { return NameLoc; }
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::ElementRef;
-  }
-  static bool classof(const ElementRefDecl *D) { return true; }
-};
-  
 } // end namespace swift
 
 #endif

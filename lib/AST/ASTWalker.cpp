@@ -331,13 +331,13 @@ public:
     if (!Walker.walkToDeclPre(D))
       return false;
 
-    if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
-      if (Expr *Init = VD->getInit()) {
+    if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D)) {
+      if (Expr *Init = PBD->getInit()) {
 #ifndef NDEBUG
-        PrettyStackTraceDecl debugStack("walking into initializer for", VD);
+        PrettyStackTraceDecl debugStack("walking into initializer for", PBD);
 #endif
         if (Expr *E2 = doIt(Init))
-          VD->setInit(E2);
+          PBD->setInit(E2);
         else
           return true;
       }

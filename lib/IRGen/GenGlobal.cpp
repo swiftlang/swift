@@ -121,11 +121,12 @@ LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity) {
 /// Emit a global declaration.
 void IRGenFunction::emitGlobalDecl(Decl *D) {
   switch (D->getKind()) {
-  case DeclKind::ElementRef:
-    llvm_unreachable("cannot encounter this decl here");
-
   case DeclKind::Extension:
     IGM.emitExtension(cast<ExtensionDecl>(D));
+    return;
+
+  case DeclKind::PatternBinding:
+    emitPatternBindingInit(cast<PatternBindingDecl>(D), /*isGlobal*/true);
     return;
 
   // oneof elements can be found at the top level because of struct
@@ -188,11 +189,6 @@ void IRGenFunction::emitGlobalVariable(VarDecl *var) {
   // Always zero-initialize globals.
   llvm::GlobalVariable *gvar = cast<llvm::GlobalVariable>(addr.getAddress());
   gvar->setInitializer(llvm::Constant::getNullValue(type.StorageType));
-
-  // Also emit the initializer as a global constructor if necessary.
-  if (Expr *init = var->getInit()) {
-    emitInit(addr, init, type);
-  }
 }
 
 /// Fetch the declaration of the given global function.
@@ -261,7 +257,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     switch (member->getKind()) {
     case DeclKind::Import:
     case DeclKind::OneOfElement:
-    case DeclKind::ElementRef:
+    case DeclKind::PatternBinding:
       llvm_unreachable("decl not allowed in extension!");
     case DeclKind::Extension:
       emitExtension(cast<ExtensionDecl>(member));

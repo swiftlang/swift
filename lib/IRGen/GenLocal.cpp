@@ -26,7 +26,6 @@ using namespace irgen;
 void IRGenFunction::emitLocal(Decl *D) {
   switch (D->getKind()) {
   case DeclKind::Import:
-  case DeclKind::ElementRef:
     llvm_unreachable("declaration cannot appear in local scope");
 
   // Type aliases require IR-gen support if they're really
@@ -48,6 +47,11 @@ void IRGenFunction::emitLocal(Decl *D) {
   case DeclKind::Func:
     unimplemented(D->getLocStart(), "local function emission");
     return;
+
+  case DeclKind::PatternBinding:
+    emitPatternBindingInit(cast<PatternBindingDecl>(D), /*isGlobal*/false);
+    return;
+
   }
   llvm_unreachable("bad declaration kind!");
 }
@@ -62,12 +66,6 @@ void IRGenFunction::emitLocalVar(VarDecl *var) {
                                         var->getName().str());
 
   setLocal(var, addr);
-
-  if (Expr *init = var->getInit()) {
-    emitInit(addr, init, typeInfo);
-  } else {
-    emitZeroInit(addr, typeInfo);
-  }
 };
 
 OwnedAddress IRGenFunction::getLocal(ValueDecl *D) {

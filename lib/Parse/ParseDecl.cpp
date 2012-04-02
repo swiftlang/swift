@@ -446,53 +446,6 @@ Decl *Parser::actOnDeclExtension(SourceLoc ExtensionLoc, Type Ty,
   return ED;
 }
 
-
-/// parseVarName
-///   var-name:
-///     identifier
-///     lparen-any ')'
-///     lparen-any var-name (',' var-name)* ')'
-bool Parser::parseVarName(DeclVarName &Name) {
-  if (Tok.is(tok::oper)) {
-    diagnose(Tok, diag::operator_not_func);
-    return true;
-  }
-  
-  // Single name case.
-  if (Tok.is(tok::identifier)) {
-    SourceLoc IdLoc = Tok.getLoc();
-    Identifier Id = Context.getIdentifier(Tok.getText());
-    consumeToken();
-    Name = DeclVarName(Id, IdLoc);
-    return false;
-  }
-  
-  if (Tok.isNot(tok::l_paren) && Tok.isNot(tok::l_paren_space)) {
-    diagnose(Tok, diag::expected_lparen_var_name);
-    return true;
-  }
-  
-  SourceLoc LPLoc = consumeToken();
-  
-  SmallVector<DeclVarName*, 8> ChildNames;
-  
-  if (Tok.isNot(tok::r_paren)) {
-    do {
-      DeclVarName *Elt = new (Context) DeclVarName();
-      if (parseVarName(*Elt)) return true;
-      ChildNames.push_back(Elt);
-    } while (consumeIf(tok::comma));
-  }
-
-  SourceLoc RPLoc;
-  parseMatchingToken(tok::r_paren, RPLoc, diag::expected_rparen_var_name,
-                     LPLoc, diag::opening_paren);
-
-  Name = DeclVarName(LPLoc, Context.AllocateCopy(ChildNames), RPLoc);
-  return false;
-}
-
-
 /// parseDeclTypeAlias
 ///   decl-typealias:
 ///     'typealias' identifier ':' type
@@ -512,46 +465,40 @@ TypeAliasDecl *Parser::parseDeclTypeAlias() {
   return TAD;
 }
 
+static void addVarsToScope(Parser &P, Pattern *Pat,
+                           SmallVectorImpl<Decl*> &Decls,
+                           DeclAttributes &Attributes) {
+  switch (Pat->getKind()) {
+  // Recurse into patterns.
+  case PatternKind::Tuple:
+    for (auto &field : cast<TuplePattern>(Pat)->getFields())
+      addVarsToScope(P, field.getPattern(), Decls, Attributes);
+    return;
+  case PatternKind::Paren:
+    return addVarsToScope(P, cast<ParenPattern>(Pat)->getSubPattern(), Decls,
+                          Attributes);
+  case PatternKind::Typed:
+    return addVarsToScope(P, cast<TypedPattern>(Pat)->getSubPattern(), Decls,
+                          Attributes);
 
-/// AddElementNamesForVarDecl - This recursive function walks a name specifier
-/// adding ElementRefDecls for the named subcomponents and checking that types
-/// match up correctly.
-void Parser::actOnVarDeclName(const DeclVarName *Name,
-                              SmallVectorImpl<unsigned> &AccessPath,
-                              VarDecl *VD, SmallVectorImpl<Decl*> &Decls) {
-  if (Name->isSimple()) {
-    // If this is a leaf name, create a ElementRefDecl with the specified
-    // access path.
-    Type Ty = ElementRefDecl::getTypeForPath(Context, VD->getType(), 
-                                             AccessPath);
-    
-    // If the type of the path is obviously invalid, diagnose it now and refuse
-    // to create the decl.  The most common result here is UnstructuredDependentType, which
-    // allows type checking to resolve this later.
-    if (Ty.isNull()) {
-      diagnose(Name->getLocation(), diag::invalid_index_in_var_name_path,
-               Name->getIdentifier(), VD->getType());
-      return;
-    }
-    
-    // Create the decl for this name and add it to the current scope.
-    ElementRefDecl *ERD =
-      new (Context) ElementRefDecl(VD, Name->getLocation(),
-                                   Name->getIdentifier(),
-                                   Context.AllocateCopy(AccessPath), Ty,
-                                   CurDeclContext);
-    Decls.push_back(ERD);
-    ScopeInfo.addToScope(ERD);
+  // Handle vars.
+  case PatternKind::Named: {
+    VarDecl *VD = cast<NamedPattern>(Pat)->getDecl();
+    if (!VD->hasType())
+      VD->setType(UnstructuredDependentType::get(P.Context));
+    if (Attributes.isValid())
+      VD->getMutableAttrs() = Attributes;
+
+    Decls.push_back(VD);
+    P.ScopeInfo.addToScope(VD);
     return;
   }
-  
-  AccessPath.push_back(0);
-  unsigned Index = 0;
-  for (auto Element : Name->getElements()) {
-    AccessPath.back() = Index++;
-    actOnVarDeclName(Element, AccessPath, VD, Decls);
+
+  // Handle non-vars.
+  case PatternKind::Any:
+    return;
   }
-  AccessPath.pop_back();
+  llvm_unreachable("bad pattern kind!");
 }
 
 /// parseDeclVar - Parse a 'var' declaration, returning null (and doing no
@@ -565,44 +512,23 @@ bool Parser::parseDeclVar(SmallVectorImpl<Decl*> &Decls) {
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
 
-  DeclVarName VarName;
-  if (parseVarName(VarName)) return true;
-  
+  ParseResult<Pattern> pattern = parsePattern();
+  if (pattern.isParseError()) return true;
+
   Type Ty;
   NullablePtr<Expr> Init;
-  if (parseValueSpecifier(Ty, Init))
-    return true;
-
-  if (Ty.isNull())
-    Ty = UnstructuredDependentType::get(Context);
-
-  // Note that we enter the declaration into the current scope.  Since var's are
-  // not allowed to be recursive, they are entered after its initializer is
-  // parsed.  This does mean that stuff like this is different than C:
-  //    var x = 1; { var x = x+1; assert(x == 2); }
-  if (VarName.isSimple()) {
-    VarDecl *VD = new (Context) VarDecl(VarLoc,  VarName.getIdentifier(), Ty,
-                                        Init.getPtrOrNull(), CurDeclContext);
-    if (Attributes.isValid())
-      VD->getMutableAttrs() = Attributes;
-    ScopeInfo.addToScope(VD);
-    Decls.push_back(VD);
-    return false;
+  if (consumeIf(tok::equal)) {
+    Init = parseExpr(diag::expected_initializer_expr);
+    if (Init.isNull())
+      return true;
   }
-  
-  // Copy the name into the ASTContext heap.
-  DeclVarName *TmpName = new (Context) DeclVarName(VarName);
-  VarDecl *VD = new (Context) VarDecl(VarLoc, TmpName, Ty, Init.getPtrOrNull(),
-                                      CurDeclContext);
-  if (Attributes.isValid())
-    VD->getMutableAttrs() = Attributes;
-  Decls.push_back(VD);
-  
-  // If there is a more interesting name presented here, then we need to walk
-  // through it and synthesize the decls that reference the var elements as
-  // appropriate.
-  SmallVector<unsigned, 8> AccessPath;
-  actOnVarDeclName(VD->getNestedName(), AccessPath, VD, Decls);
+
+  addVarsToScope(*this, pattern.get(), Decls, Attributes);
+
+  PatternBindingDecl *PBD =
+      new (Context) PatternBindingDecl(VarLoc, pattern.get(),
+                                       Init.getPtrOrNull(), CurDeclContext);
+  Decls.push_back(PBD);
   return false;
 }
 
@@ -611,20 +537,27 @@ bool Parser::parseDeclVar(SmallVectorImpl<Decl*> &Decls) {
 /// be a better way to handle these.
 ///
 ///   decl-var-simple:
-///      'var' attribute-list identifier value-specifier
+///      'var' attribute-list identifier ':' type-annotation
 ///
 VarDecl *Parser::parseDeclVarSimple() {
-  SourceLoc CurLoc = Tok.getLoc();
-  SmallVector<Decl*, 2> Decls;
-  if (parseDeclVar(Decls)) return 0;
-  
-  if (Decls.size() == 1)
-    if (VarDecl *VD = dyn_cast_or_null<VarDecl>(Decls[0]))
-      return VD;
-  
-  // FIXME: "here" requires a lot more context.
-  diagnose(CurLoc, diag::non_simple_var);
-  return 0;
+  SourceLoc VarLoc = consumeToken(tok::kw_var);
+
+  if (Tok.isNot(tok::identifier))
+    diagnose(Tok, diag::expected_lparen_var_name);
+
+  Identifier ident = Context.getIdentifier(Tok.getText());
+  consumeToken();
+
+  if (!consumeIf(tok::colon)) {
+    diagnose(Tok, diag::expected_type_or_init);
+    return 0;
+  }
+
+  Type Ty;
+  if (parseTypeAnnotation(Ty, diag::expected_type))
+    return 0;
+
+  return new (Context) VarDecl(VarLoc, ident, Ty, CurDeclContext);
 }
 
 /// parseDeclFunc - Parse a 'func' declaration, returning null on error.  The
@@ -675,7 +608,7 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   if (hasContainerType && !PlusLoc.isValid()) {
     VarDecl *D =
       new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
-                            Type(), nullptr, CurDeclContext);
+                            Type(), CurDeclContext);
     Pattern *P = new (Context) NamedPattern(D);
     P = new (Context) TypedPattern(P, 
                                    UnstructuredDependentType::get(Context));

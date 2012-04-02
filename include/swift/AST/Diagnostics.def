@@ -472,19 +472,12 @@ ERROR(load_of_explicit_lvalue,sema_tcc,none,
 
 ERROR(invalid_index_in_element_ref,sema_tcd,none,
       "%0 is an invalid index for %1", (Identifier, Type))
-ERROR(name_matches_nontuple,sema_tcd,none,
-      "name specifier matches %0 which is not a tuple", (Type))
-ERROR(varname_element_count_mismatch,sema_tcd,none,
-      "name specifier matches %0 which requires %1 names, but has %2",
-      (Type, unsigned, unsigned))
 ERROR(operator_not_func,sema_tcd,none,
       "operators must be declared with 'func'", ())
 ERROR(custom_operator_addressof,sema_tcd,none,
       "cannot declare a custom unary '&' operator", ())
 ERROR(var_type_not_materializable,sema_tcd,none,
       "type %0 of variable is not materializable", (Type))
-ERROR(var_type_is_lvalue,sema_tcd,none,
-      "variable cannot have a 'byref' type", ())
 ERROR(oneof_element_not_materializable,sema_tcd,none,
       "type of oneof element is not materializable", ())
 

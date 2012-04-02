@@ -30,12 +30,6 @@ ASTContext &DeclContext::getASTContext() {
 }
 
 // Only allow allocation of Decls using the allocator in ASTContext.
-void *DeclVarName::operator new(size_t Bytes, ASTContext &C,
-                                unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
-
-// Only allow allocation of Decls using the allocator in ASTContext.
 void *Decl::operator new(size_t Bytes, ASTContext &C,
                          unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
@@ -66,42 +60,6 @@ NameAliasType *TypeAliasDecl::getAliasType() const {
                                             const_cast<TypeAliasDecl*>(this));
    
   return AliasTy;
-}
-
-/// getTypeForPath - Given a type and an access path into it, return the
-/// referenced element type.  If the access path is invalid for the specified
-/// type, this returns null.
-Type ElementRefDecl::getTypeForPath(ASTContext &C, Type InTy, 
-                                    ArrayRef<unsigned> Path) {
-  assert(!InTy.isNull() && "getTypeForPath() doesn't allow a null type!");
-  
-  if (Path.empty())
-    return InTy;
-  
-  TypeBase *Ty = InTy->getDesugaredType();
-  
-  // If we have a single-element oneof (like a struct) then we allow matching
-  // the struct elements with the tuple syntax.
-  if (OneOfType *OOT = Ty->getAs<OneOfType>())
-    if (OOT->isTransparentType())
-      Ty = OOT->getTransparentType().getPointer();
-  
-  // Right now, you can only dive into syntactic tuples.  Eventually this should 
-  // handle oneof's etc.
-  if (TupleType *TT = dyn_cast<TupleType>(Ty)) {
-    // Reject invalid indices.
-    if (Path[0] >= TT->getFields().size())
-      return 0;
-  
-    return getTypeForPath(C, TT->getElementType(Path[0]), Path.slice(1));
-  }
-  
-  // If we reach a dependent type, return the unstructured dependent type,
-  // since we can't get any more information out of it.
-  if (Ty->isDependentType())
-    return UnstructuredDependentType::get(C);
-  
-  return 0;
 }
 
 ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
@@ -137,14 +95,13 @@ bool ValueDecl::isDefinition() const {
   switch (getKind()) {
   case DeclKind::Import:
   case DeclKind::Extension:
+  case DeclKind::PatternBinding:
     llvm_unreachable("non-value decls shouldn't get here");
       
-  case DeclKind::Var:
-    return cast<VarDecl>(this)->getInit() != 0;
   case DeclKind::Func:
     return cast<FuncDecl>(this)->getBody() != 0;
 
-  case DeclKind::ElementRef:
+  case DeclKind::Var:
   case DeclKind::OneOfElement:
   case DeclKind::TypeAlias:
     return true;
@@ -316,11 +273,6 @@ namespace {
     
     void visitVarDecl(VarDecl *VD) {
       printCommon(VD, "var_decl");
-      if (VD->getInit()) {
-        OS << '\n';
-        printRec(VD->getInit());
-      }
-
       OS << ')';
     }
     
@@ -337,18 +289,15 @@ namespace {
       printCommon(OOED, "oneof_element_decl");
       OS << ')';
     }
-    
-    void visitElementRefDecl(ElementRefDecl *ERD) {
-      printCommon(ERD, "element_ref_decl");
-      OS << '\n';
-      OS.indent(Indent+2);
-      OS << "(accesspath ";
-      printDeclName(ERD->getVarDecl());
-      for (unsigned i = 0, e = ERD->getAccessPath().size(); i != e; ++i)
-        OS << ", " << ERD->getAccessPath()[i];
-      
-      OS << "))";
+
+    void visitPatternBindingDecl(PatternBindingDecl *PBD) {
+      printCommon(PBD, "pattern_binding_decl");
+      if (PBD->getInit()) {
+        OS << '\n';
+        printRec(PBD->getInit());
+      }
     }
+
   };
 } // end anonymous namespace.
 
