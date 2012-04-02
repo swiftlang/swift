@@ -976,13 +976,13 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
           if (IntegerLiteralExpr *lit = dyn_cast<IntegerLiteralExpr>(E)) {
             Type type = getIntLiteralType(lit->getLoc());
             if (type.isNull()) return nullptr;
-            return TC.applyTypeToLiteral(lit, type);
+            return TC.convertToType(lit, type);
           }
 
           if (FloatLiteralExpr *lit = dyn_cast<FloatLiteralExpr>(E)) {
             Type type = getFloatLiteralType(lit->getLoc());
             if (type.isNull()) return nullptr;
-            return TC.applyTypeToLiteral(lit, type);
+            return TC.convertToType(lit, type);
           }
         }
         return E;
