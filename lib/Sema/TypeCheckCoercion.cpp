@@ -79,7 +79,6 @@ class SemaCoerce : public ExprVisitor<SemaCoerce, CoercedResult> {
   /// The literal is assumed to have dependent type.
   CoercedResult coerceLiteral(Expr *E);
   
-public:
   TypeChecker &TC;
   Type DestTy;
   
@@ -128,6 +127,7 @@ public:
     return CoercedResult(E);
   }
 
+public:
   CoercedResult visitErrorExpr(ErrorExpr *E) {
     return unchanged(E);
   }
