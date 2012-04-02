@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_RUNTIME_H
-#define SWIFT_RUNTIME_H
+#ifndef SWIFT_ABI_ALLOC_H
+#define SWIFT_ABI_ALLOC_H
 
 #include <stddef.h>
 
@@ -113,4 +113,4 @@ void swift_dealloc(struct SwiftHeapObject *object, size_t allocatedSize);
 } /* extern "C" */
 #endif
 
-#endif /* SWIFT_RUNTIME_H */
+#endif /* SWIFT_ABI_ALLOC_H */
