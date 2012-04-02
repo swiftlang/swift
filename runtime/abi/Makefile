@@ -1,4 +1,4 @@
-##===- tools/Makefile --------------------------------------*- Makefile -*-===##
+##===- tools/swift/Makefile -------------------------------*- Makefile -*-===##
 #
 # This source file is part of the Swift.org open source project
 #
@@ -10,9 +10,9 @@
 #
 ##===----------------------------------------------------------------------===##
 
-SWIFT_LEVEL := ..
-DIRS := abi
-
+SWIFT_LEVEL := ../..
 include $(SWIFT_LEVEL)/../../Makefile.config
+
+LIBRARYNAME := swift_abi
 
 include $(SWIFT_LEVEL)/Makefile
