@@ -24,6 +24,7 @@
 using namespace swift;
 
 namespace {
+
 /// SemaCoerce - This class implements top-down semantic analysis (aka "root to
 /// leaf", using the type of "+" to infer the type of "a" in "a+1") of an
 /// already-existing expression tree.  This is performed when an expression with
@@ -38,6 +39,11 @@ public:
   TypeChecker &TC;
   Type DestTy;
   
+  template<typename ...ArgTypes>
+  InFlightDiagnostic diagnose(ArgTypes... Args) {
+    return TC.diagnose(Args...);
+  }
+
   Expr *visitErrorExpr(ErrorExpr *E) {
     return E;
   }
@@ -93,23 +99,23 @@ public:
     // The only valid type for an UME is a OneOfType.
     OneOfType *DT = DestTy->getAs<OneOfType>();
     if (DT == 0) {
-      TC.diagnose(UME->getLoc(), diag::cannot_convert_dependent_reference,
-                  UME->getName(), DestTy);
+      diagnose(UME->getLoc(), diag::cannot_convert_dependent_reference,
+               UME->getName(), DestTy);
       return 0;
     }
     
     // The oneof type must have an element of the specified name.
     OneOfElementDecl *DED = DT->getElement(UME->getName());
     if (DED == 0) {
-      TC.diagnose(UME->getLoc(), diag::invalid_member_in_type,
-                  DestTy, UME->getName());
-      TC.diagnose(DT->getOneOfLoc(), diag::type_declared_here);
+      diagnose(UME->getLoc(), diag::invalid_member_in_type,
+               DestTy, UME->getName());
+      diagnose(DT->getOneOfLoc(), diag::type_declared_here);
       return 0;
     }
 
     if (DED->getType()->is<FunctionType>()) {
-      TC.diagnose(UME->getLoc(), diag::call_element_function_type,
-                  DestTy, UME->getName());
+      diagnose(UME->getLoc(), diag::call_element_function_type,
+               DestTy, UME->getName());
       return 0;
     }
 
@@ -250,15 +256,15 @@ Expr *SemaCoerce::visitApplyExpr(ApplyExpr *E) {
       // The oneof type must have an element of the specified name.
       OneOfElementDecl *DED = DT->getElement(UME->getName());
       if (DED == 0) {
-        TC.diagnose(UME->getLoc(), diag::invalid_member_in_type,
+        diagnose(UME->getLoc(), diag::invalid_member_in_type,
                     DestTy, UME->getName());
-        TC.diagnose(DT->getOneOfLoc(), diag::type_declared_here);
+        diagnose(DT->getOneOfLoc(), diag::type_declared_here);
         return 0;
       }
       
       if (!DED->getType()->is<FunctionType>()) {
-        TC.diagnose(UME->getLoc(), diag::call_element_not_function_type,
-                    DestTy, UME->getName());
+        diagnose(UME->getLoc(), diag::call_element_not_function_type,
+                 DestTy, UME->getName());
         return 0;
       }
       
@@ -278,8 +284,8 @@ Expr *SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
   // diagnose the error.
   FunctionType *FT = DestTy->getAs<FunctionType>();
   if (FT == 0) {
-    TC.diagnose(E->getStartLoc(), diag::closure_not_function_type, DestTy)
-    << E->getSourceRange();
+    diagnose(E->getStartLoc(), diag::closure_not_function_type, DestTy)
+      << E->getSourceRange();
     return 0;
   }
 
@@ -296,8 +302,8 @@ Expr *SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
     NumInputArgs = FuncInputTT->getFields().size();
 
   if (NumInputArgs < E->getParserVarDecls().size()) {
-    TC.diagnose(E->getLoc(), diag::invalid_anonymous_argument,
-                E->getParserVarDecls().size() - 1, NumInputArgs);
+    diagnose(E->getLoc(), diag::invalid_anonymous_argument,
+             E->getParserVarDecls().size() - 1, NumInputArgs);
       // TODO: We could turn this into error expr or something else to preserve
       // the AST.
       return 0;
@@ -416,7 +422,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
         // DestElementSources field set to -2.
         DestElementSources[i] = -2;
         continue;
-      }        
+      }
      
       // If this is a TupleExpr (common case) get a more precise location for
       // the element we care about.
