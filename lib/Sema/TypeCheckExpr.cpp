@@ -20,194 +20,9 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/ASTWalker.h"
-#include "llvm/ADT/APFloat.h"
-#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/Twine.h"
 using namespace swift;
-
-/// isLiteralCompatibleType - Check to see if the specified type has a properly
-/// defined literal conversion function, emiting an error and returning null if
-/// not.  If everything looks kosher, return the conversion function and the
-/// argument type that it expects.
-static std::pair<FuncDecl*, Type> 
-isLiteralCompatibleType(Type Ty, SourceLoc Loc, bool isInt, TypeChecker *TC) {
-  
-  // Look up the convertFrom*Literal method on the type.  If it is missing,
-  // then the type isn't compatible with literals.  If it is present, it must
-  // have a single argument.
-  SmallVector<ValueDecl*, 8> Methods;
-  const char *MethodName =
-    isInt ? "convertFromIntegerLiteral" : "convertFromFloatLiteral";
-  TC->TU.lookupGlobalExtensionMethods(Ty, TC->Context.getIdentifier(MethodName),
-                                      Methods);
-  
-  if (Methods.empty()) {
-    TC->diagnose(Loc, diag::type_not_compatible_literal, Ty);
-    return std::pair<FuncDecl*, Type>();
-  }
-  
-  if (Methods.size() != 1) {
-    TC->diagnose(Loc, diag::type_ambiguous_literal_conversion, Ty, MethodName);
-    for (ValueDecl *D : Methods)
-      TC->diagnose(D->getLocStart(), diag::found_candidate);
-    return std::pair<FuncDecl*, Type>();
-  }
-
-  // Verify that the implementation is a metatype 'plus' func.
-  FuncDecl *Method = dyn_cast<FuncDecl>(Methods[0]);
-  if (Method == 0 || !Method->isPlus()) {
-    TC->diagnose(Method->getLocStart(), diag::type_literal_conversion_not_plus,
-                 Ty, MethodName);
-    return std::pair<FuncDecl*, Type>();
-  }
-  
-  // Check that the type of the 'convertFrom*Literal' method makes
-  // sense.  We want a type of "S -> DestTy" where S is the expected type.
-  FunctionType *FT = Method->getType()->castTo<FunctionType>();
-  
-  // The result of the convert function must be the destination type.
-  if (!FT->getResult()->isEqual(Ty)) {
-    TC->diagnose(Method->getLocStart(), 
-                 diag::literal_conversion_wrong_return_type, Ty, MethodName);
-    TC->diagnose(Loc, diag::while_converting_literal, Ty);
-    return std::pair<FuncDecl*, Type>();
-  }
-  
-  // Get the argument type, ignoring single element tuples.
-  Type ArgType = FT->getInput();
-    
-  // Look through single element tuples.
-  if (TupleType *TT = ArgType->getAs<TupleType>())
-    if (TT->getFields().size() == 1)
-      ArgType = TT->getFields()[0].getType();
-  
-  return std::pair<FuncDecl*, Type>(Method, ArgType);
-}
-
-/// applyTypeToLiteral - Apply the specified type to the literal expression
-/// (which is known to have dependent type), performing semantic analysis and
-/// returning null on a semantic error or the new AST to use on success.
-Expr *TypeChecker::applyTypeToLiteral(Expr *E, Type DestTy) {
-  assert(E->getType()->isDependentType() &&
-         "should only be called on dependent integers");
-  bool isInt = isa<IntegerLiteralExpr>(E);
-  assert((isInt || isa<FloatLiteralExpr>(E)) && "Unknown literal kind");
-  
-  // Check the destination type to see if it is compatible with literals,
-  // diagnosing the failure if not.
-  std::pair<FuncDecl*, Type> LiteralInfo =
-    isLiteralCompatibleType(DestTy, E->getLoc(), isInt, this);
-  FuncDecl *Method = LiteralInfo.first;
-  Type ArgType = LiteralInfo.second;
-  if (Method == 0) return 0;
-  
-  // The argument type must either be a Builtin:: integer/fp type (in which case
-  // this is a type in the standard library) or some other type that itself has
-  // a conversion function from a builtin type (in which case we have
-  // "chaining", and an implicit conversion through that type).
-  Expr *Intermediate;
-  BuiltinIntegerType *BIT;
-  BuiltinFloatType *BFT;
-  if (isInt && (BIT = ArgType->getAs<BuiltinIntegerType>())) {
-    // If this is a direct use of the builtin integer type, use the integer size
-    // to diagnose excess precision issues.
-    llvm::APInt Value(1, 0);
-    StringRef IntText = cast<IntegerLiteralExpr>(E)->getText();
-    unsigned Radix;
-    if (IntText.startswith("0x")) {
-      IntText = IntText.substr(2);
-      Radix = 16;
-    } else if (IntText.startswith("0o")) {
-      IntText = IntText.substr(2);
-      Radix = 8;
-    } else if (IntText.startswith("0b")) {
-      IntText = IntText.substr(2);
-      Radix = 2;
-    } else {
-      Radix = 10;
-    }
-    bool Failure = IntText.getAsInteger(Radix, Value);
-    assert(!Failure && "Lexer should have verified a reasonable type!");
-    (void)Failure;
-    
-    if (Value.getActiveBits() > BIT->getBitWidth()) {
-      diagnose(E->getLoc(), diag::int_literal_too_large, Value.getBitWidth(),
-               DestTy);
-      return 0;
-    }
-    
-    // Give the integer literal the builtin integer type.
-    E->setType(ArgType);
-    Intermediate = E;
-  } else if (!isInt && (BFT = ArgType->getAs<BuiltinFloatType>())) {
-    // If this is a direct use of a builtin floating point type, use the
-    // floating point type to do the syntax verification.
-    llvm::APFloat Val(BFT->getAPFloatSemantics());
-    switch (Val.convertFromString(cast<FloatLiteralExpr>(E)->getText(),
-                                  llvm::APFloat::rmNearestTiesToEven)) {
-    default: break;
-    case llvm::APFloat::opOverflow: {
-      llvm::SmallString<20> Buffer;
-      llvm::APFloat::getLargest(Val.getSemantics()).toString(Buffer);
-      diagnose(E->getLoc(), diag::float_literal_overflow, Buffer);
-      break;
-    }
-    case llvm::APFloat::opUnderflow: {
-      // Denormals are ok, but reported as underflow by APFloat.
-      if (!Val.isZero()) break;
-      llvm::SmallString<20> Buffer;
-      llvm::APFloat::getSmallest(Val.getSemantics()).toString(Buffer);
-      diagnose(E->getLoc(), diag::float_literal_underflow, Buffer);
-      break;
-    }
-    }
-    
-    E->setType(ArgType);
-    Intermediate = E;
-  } else {
-    // Check to see if this is the chaining case, where ArgType itself has a
-    // conversion from a Builtin type.
-    LiteralInfo = isLiteralCompatibleType(ArgType, E->getLoc(), isInt, this);
-    if (LiteralInfo.first == 0) {
-      diagnose(Method->getLocStart(),
-               diag::while_processing_literal_conversion_function, DestTy);
-      return 0;
-    }
-    
-    if (isInt && LiteralInfo.second->is<BuiltinIntegerType>()) {
-      // ok.
-    } else if (!isInt && LiteralInfo.second->is<BuiltinFloatType>()) {
-      // ok.
-    } else {
-      diagnose(Method->getLocStart(),
-               diag::type_literal_conversion_defined_wrong, DestTy);
-      diagnose(E->getLoc(), diag::while_converting_literal, DestTy);
-      return 0;
-    }
-    
-    // If this a 'chaining' case, recursively convert the literal to the
-    // intermediate type, then use our conversion function to finish the
-    // translation.
-    Intermediate = applyTypeToLiteral(E, ArgType);
-    if (Intermediate == 0) return 0;
-    
-    // Okay, now Intermediate is known to have type 'ArgType' so we can use a
-    // call to our conversion function to finish things off.
-  }
-      
-  DeclRefExpr *DRE =
-    new (Context) DeclRefExpr(Method,
-                              // FIXME: This location is a hack!
-                              Intermediate->getStartLoc(),
-                              Method->getType());
-  
-  // Return a new call of the conversion function, passing in the integer
-  // literal.
-  return new (Context) CallExpr(DRE, Intermediate, DestTy);
-}
 
 //===----------------------------------------------------------------------===//
 // Expression Semantic Analysis Routines
@@ -444,8 +259,8 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     return E;
   }
 
-  ValueDecl *BestCandidateFound = 0;
-  Expr::ConversionRank BestRank = Expr::CR_Invalid;
+  ValueDecl *CandidateFound = 0;
+  bool Ambiguous = false;
   
   for (ValueDecl *Fn : OS->getDecls()) {
     // Verify we found a declaration of function type.
@@ -454,37 +269,31 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     
     Type ArgTy = fnTy->getInput();
     // If we found an exact match, disambiguate the overload set.
-    Expr::ConversionRank Rank = E2->getRankOfConversionTo(ArgTy);
-    
-    // If this conversion is worst than our best candidate, ignore it.
-    if (Rank > BestRank)
+    if (!isCoercibleToType(E2, ArgTy))
       continue;
-    
-    // If this is better than our previous candidate, use it!
-    if (Rank < BestRank) {
-      BestRank = Rank;
-      BestCandidateFound = Fn;
-      continue;
+
+    if (CandidateFound) {
+      // We have found more than one candidate, which means that the
+      // overloads are ambiguous.
+      Ambiguous = true;
+      CandidateFound = nullptr;
+      break;
     }
     
-    // Otherwise, this is a repeat of an existing candidate with the same
-    // rank.  This means that the candidates at this rank are ambiguous with
-    // respect to each other, so none can be used.  If something comes along
-    // with a lower rank we can use it though.
-    BestCandidateFound = 0;
+    CandidateFound = Fn;
   }
   
   // If we found a successful match, resolve the overload set to it and continue
   // type checking.
-  if (BestCandidateFound) {
-    E1 = buildDeclRefRValue(BestCandidateFound, OS->getLoc());
+  if (CandidateFound) {
+    E1 = buildDeclRefRValue(   CandidateFound, OS->getLoc());
     E->setFn(E1);
     return semaApplyExpr(E);
   }
   
   // Otherwise we have either an ambiguity between multiple possible candidates
   // or not candidate at all.
-  if (BestRank != Expr::CR_Invalid) {
+  if (Ambiguous) {
     diagnose(E1->getLoc(), diag::overloading_ambiguity) << E->getSourceRange();
     printOverloadSetCandidates(OS);
   } else

@@ -55,7 +55,11 @@ public:
   ///
   /// This emits a diagnostic and returns null on error.
   Expr *convertToType(Expr *E, Type Ty);
-
+  
+  /// isCoercibleToType - Determine whether the given expression can be 
+  /// coerced to 
+  bool isCoercibleToType(Expr *E, Type Ty);
+  
   Expr *buildDeclRefRValue(ValueDecl *D, SourceLoc loc);
   Expr *convertToRValue(Expr *E);
   Expr *convertLValueToRValue(LValueType *SrcLT, Expr *E);
@@ -67,12 +71,6 @@ public:
   /// possible candidates in an overload set of a call.
   void diagnoseEmptyOverloadSet(ApplyExpr *Call, OverloadSetRefExpr *OSE);
   void printOverloadSetCandidates(OverloadSetRefExpr *OSE);
-  
-  /// applyTypeToLiteral - Apply the specified type to the integer or float
-  /// literal expression (which is known to have dependent type), performing
-  /// semantic analysis and returning null on a semantic error or the new AST to
-  /// use on success.
-  Expr *applyTypeToLiteral(Expr *E, Type Ty);
 };
 
   
