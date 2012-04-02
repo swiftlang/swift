@@ -13,3 +13,63 @@
 // Allocation ABI Shims While the Language is Bootstrapped
 //
 //===----------------------------------------------------------------------===//
+//===--- Alloc.h - Swift Language Allocation ABI --------------------------===//
+//
+//                     The LLVM Compiler Infrastructure
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
+//
+//===----------------------------------------------------------------------===//
+//
+// Swift Allocation ABI
+//
+//===----------------------------------------------------------------------===//
+
+#include "Alloc.h"
+#include <stdlib.h>
+#include <unistd.h>
+
+struct SwiftHeapObject *
+swift_alloc(struct SwiftHeapMetadata *metadata,
+            size_t requiredSize,
+            size_t requiredAlignment)
+{
+  size_t mask = requiredAlignment - 1;
+  struct SwiftHeapMetadata **object;
+  for (;;) {
+    object = reinterpret_cast<struct SwiftHeapMetadata **>(
+      calloc(1, (requiredSize + mask) & ~mask));
+    if (object) {
+      break;
+    }
+    sleep(1); // XXX FIXME -- Enqueue this thread and resume after free()
+  }
+  *object = metadata;
+  return reinterpret_cast<struct SwiftHeapObject *>(object);
+}
+
+struct SwiftHeapObject *
+swift_retain(struct SwiftHeapObject *object)
+{
+  ++object->runtimePrivateData;
+  return object;
+}
+
+void
+swift_release(struct SwiftHeapObject *object)
+{
+  if (--object->runtimePrivateData > 0) {
+    return;
+  }
+  size_t allocSize = object->metadata->destroy(object);
+  if (allocSize) {
+    swift_dealloc(object, allocSize);
+  }
+}
+
+void
+swift_dealloc(struct SwiftHeapObject *object, size_t allocatedSize)
+{
+  free(object);
+}
