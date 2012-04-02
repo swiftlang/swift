@@ -221,10 +221,7 @@ namespace swift {
     }
     
     /// \brief Suppress the given diagnostic.
-    void suppress() { 
-      assert(IsActive && "Cannot suppress inactive diagnostic");
-      IsActive = false; 
-    }
+    void suppress();
     
     /// \brief Flush the active diagnostic to the diagnostic output engine.
     void flush();
@@ -322,11 +319,14 @@ namespace swift {
       ActiveDiagnostic = Diagnostic(ID, std::move(Args)...);
       return InFlightDiagnostic(*this);
     }  
-    
+       
   private:
     /// \brief Flush the active diagnostic.
     void flushActiveDiagnostic();
     
+    /// \brief Suppress the active diagnostic.
+    void suppressActiveDiagnostic();
+
     /// \brief Retrieve the active diagnostic.
     Diagnostic &getActiveDiagnostic() { return *ActiveDiagnostic; }
   };
@@ -337,6 +337,12 @@ namespace swift {
     return *this;
   }
 
+  inline void InFlightDiagnostic::suppress() {
+    assert(IsActive && "Cannot suppress inactive diagnostic");
+    IsActive = false;
+    if (Engine)
+      Engine->suppressActiveDiagnostic();
+  }
 } // end namespace swift
 
 #endif

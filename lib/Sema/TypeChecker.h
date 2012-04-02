@@ -57,7 +57,7 @@ public:
   Expr *convertToType(Expr *E, Type Ty);
   
   /// isCoercibleToType - Determine whether the given expression can be 
-  /// coerced to 
+  /// coerced to the given type.
   bool isCoercibleToType(Expr *E, Type Ty);
   
   Expr *buildDeclRefRValue(ValueDecl *D, SourceLoc loc);
@@ -66,11 +66,49 @@ public:
   Expr *convertToMaterializable(Expr *E);
 
   Expr *foldSequence(SequenceExpr *E);
+
+  /// \name Overload resolution
+  ///
+  /// Routines that perform overload resolution or provide diagnostics related
+  /// to overload resolution.
+  /// @{
   
   /// diagnoseEmptyOverloadSet - Diagnose a case where we disproved all of the
   /// possible candidates in an overload set of a call.
   void diagnoseEmptyOverloadSet(ApplyExpr *Call, OverloadSetRefExpr *OSE);
   void printOverloadSetCandidates(OverloadSetRefExpr *OSE);
+  
+  /// filterOverloadSet - Filter a set of overload candidates based on the 
+  /// the given argument type (for a call) or result type (if the context 
+  /// provides such a type). 
+  /// 
+  /// This routine is used in both type-checking directions (root-to-leaf and
+  /// leaf-to-root). The call argument allows leaf-to-root type checking
+  /// to filter out candidates that can't be called as functions or have
+  /// incompatible arguments. Conversely, when a destination type is provided,
+  /// root-to-leaf type checking filters out candidates that cannot produce a
+  /// result of an acceptable type. Both argument and destination type may be
+  /// provided, which provides overload resolution based on both the call
+  /// arguments and the expected result of the call.
+  ///
+  /// \param Candidates The set of overloaded candidates that should be 
+  /// considered
+  ///
+  /// \param Arg The argument type, for a call to the overloaded functions.
+  /// This argument is required.
+  ///
+  /// \param DestTy The type to which the result should be coerced, or null if
+  /// not known.
+  ///
+  /// \param Viable Output vector to which all of the viable candidates will be
+  /// added.
+  ///
+  /// \returns The best candidate, if there is one.
+  ValueDecl *filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
+                               Expr *Arg,
+                               Type DestTy,
+                               SmallVectorImpl<ValueDecl *> &Viable);
+  /// @}
 };
 
   

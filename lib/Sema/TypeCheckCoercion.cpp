@@ -530,34 +530,41 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
   // FIXME: Handling this syntactically causes us to reject "(:f)(x)" as
   // ambiguous.
   if (OverloadSetRefExpr *OSE = dyn_cast<OverloadSetRefExpr>(E->getFn())) {
-    SmallVector<ValueDecl*, 8> NewCandidates;
-    for (ValueDecl *VD : OSE->getDecls()) {
-      FunctionType *FT = VD->getType()->castTo<FunctionType>();
-      // FIXME: Requiring an exact match prevents implicit conversions for
-      // lvalue/rvalue and tuple element shuffles from happening.
-      if (!FT->getResult()->isEqual(DestTy))
-        continue;
+    SmallVector<ValueDecl*, 4> Viable;
+    if (ValueDecl *Best = TC.filterOverloadSet(OSE->getDecls(), E->getArg(),
+                                               DestTy, Viable)) {
+      if (!Apply) {
+        // Determine the type of the resulting call expression.
+        Type Ty = Best->getType();
+        if (LValueType *LValue = Ty->getAs<LValueType>())
+          Ty = LValue->getObjectType();
+        
+        if (FunctionType *FnTy = Ty->getAs<FunctionType>())
+          return FnTy->getResult();
+        
+        return Ty;
+      }
       
-      NewCandidates.push_back(VD);
-    }
-    
-    if (NewCandidates.empty()) {
-      if (Apply)        
-        TC.diagnoseEmptyOverloadSet(E, OSE);
+      Expr *Fn = TC.buildDeclRefRValue(Best, OSE->getLoc());
+      E->setFn(Fn);
+      
+      if (Expr *Result = TC.semaApplyExpr(E))
+        return coerced(Result);
       
       return nullptr;
-    } else if (NewCandidates.size() != OSE->getDecls().size()) {
-      // If we successfully trimmed the overload set (hopefully down to 1),
-      // rebuild the function and re-sema it.
-      E->setFn(OverloadSetRefExpr::createWithCopy(NewCandidates,
-                                                  OSE->getLoc()));
-      // FIXME: We need to be able to perform overload resolution here
-      // without calling into the type checker (which can emit diagnostics).
-      Expr *Result = TC.semaApplyExpr(E);
-      if (!Result)
-        return nullptr;
-      return unchanged(Result);
     }
+    
+    if (Apply) {
+      if (Viable.empty())
+        TC.diagnoseEmptyOverloadSet(E, OSE);
+      else {
+        diagnose(E->getFn()->getLoc(), diag::overloading_ambiguity)
+          << E->getSourceRange();
+        TC.printOverloadSetCandidates(OSE);
+      }
+    }
+    
+    return nullptr;
   }
   
   // If we have ":f(x)" and the result type of the call is a OneOfType, then
@@ -586,8 +593,8 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
       // FIXME: Preserve source locations.
       E->setFn(new (TC.Context) DeclRefExpr(DED, UME->getColonLoc(),
                                             DED->getType()));
-      // FIXME: We need to be able to perform overload resolution here
-      // without calling into the type checker (which can emit diagnostics).
+      // FIXME: We need to be able to perform type-checking here without
+      // emitting diagnostics in the failure case.
       Expr *Result = TC.semaApplyExpr(E);
       if (!Result)
         return nullptr;

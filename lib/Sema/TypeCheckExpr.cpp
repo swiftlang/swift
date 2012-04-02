@@ -218,108 +218,43 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     return E;
   }
 
-  // See if we can prune down the overload set based on the syntactic form of
-  // the call.  For example, we can reject binary "-" operators when analyzing a
-  // unary operator.
-  // FIXME: Can this become a property of the type propagated by
-  // TypeCheckCoercion?
-  if (isa<UnaryExpr>(E) || isa<BinaryExpr>(E)) {
-    unsigned NumArguments = 1+isa<BinaryExpr>(E);
-    
-    SmallVector<ValueDecl*, 8> NewCandidates;
-    for (ValueDecl *VD : OS->getDecls()) {
-      // Reject candidates with the wrong number of arguments.
-      FunctionType *FT = VD->getType()->castTo<FunctionType>();
-      if (TupleType *TT = dyn_cast<TupleType>(FT->getInput()))
-        if (TT->getFields().size() != NumArguments)
-          continue;
-      
-      NewCandidates.push_back(VD);
-    }
-    
-    if (NewCandidates.empty()) {
-      if (isa<BinaryExpr>(E))
-        diagnose(E1->getLoc(), diag::no_candidates, 0) << E->getSourceRange();
-      else if (isa<UnaryExpr>(E))
-        diagnose(E1->getLoc(), diag::no_candidates, 1) << E->getSourceRange();
-      return 0;
-    } else if (NewCandidates.size() != OS->getDecls().size()) {
-      // If we successfully trimmed the overload set (hopefully down to 1),
-      // rebuild the function and re-sema it.
-      E->setFn(OverloadSetRefExpr::createWithCopy(NewCandidates,
-                                                  OS->getLoc()));
-      return semaApplyExpr(E);
-    }
-  }
-  
-  // Okay, if the argument is also dependent, we can't do anything here.  Just
-  // wait until something gets resolved.
-  if (E2->getType()->isDependentType()) {
+  // If the argument type is a completely unstructured dependent type,
+  // there's nothing we can do now.
+  if (E2->getType()->is<UnstructuredDependentType>()) {
     E->setType(UnstructuredDependentType::get(Context));
     return E;
   }
-
-  ValueDecl *CandidateFound = 0;
-  bool Ambiguous = false;
   
-  for (ValueDecl *Fn : OS->getDecls()) {
-    // Verify we found a declaration of function type.
-    FunctionType *fnTy = Fn->getType()->getAs<FunctionType>();
-    if (!fnTy) continue;
-    
-    Type ArgTy = fnTy->getInput();
-    // If we found an exact match, disambiguate the overload set.
-    if (!isCoercibleToType(E2, ArgTy))
-      continue;
-
-    if (CandidateFound) {
-      // We have found more than one candidate, which means that the
-      // overloads are ambiguous.
-      Ambiguous = true;
-      CandidateFound = nullptr;
-      break;
-    }
-    
-    CandidateFound = Fn;
-  }
+  // Perform overload resolution.
+  llvm::SmallVector<ValueDecl *, 4> Viable;
+  ValueDecl *Best = filterOverloadSet(OS->getDecls(), E2, Type(), Viable);
   
-  // If we found a successful match, resolve the overload set to it and continue
-  // type checking.
-  if (CandidateFound) {
-    E1 = buildDeclRefRValue(   CandidateFound, OS->getLoc());
+  // If we have a best candidate, build a call to it now.
+  if (Best) {
+    E1 = buildDeclRefRValue(Best, OS->getLoc());
     E->setFn(E1);
     return semaApplyExpr(E);
   }
   
-  // Otherwise we have either an ambiguity between multiple possible candidates
-  // or not candidate at all.
-  if (Ambiguous) {
-    diagnose(E1->getLoc(), diag::overloading_ambiguity) << E->getSourceRange();
-    printOverloadSetCandidates(OS);
-  } else
+  // If there are no more viable candidates, complain now.
+  if (Viable.empty()) {
     diagnoseEmptyOverloadSet(E, OS);
-  return 0;
+    return nullptr;
+  }
+  
+  // We have more than one viable candidate. This might be resolved when/if
+  // we get a destination type to coerce to.  
+  E->setType(UnstructuredDependentType::get(Context));
+  if (Viable.size() == OS->getDecls().size())
+    return E;
+  
+  // We have trimmed the overload set; rebuild the overload set so that we
+  // no longer have to consider those non-matching candidates.
+  // FIXME: We may simple want to mark them as non-viable in the overload set
+  // itself, so we can provide them in diagnostics.
+  E->setFn(OverloadSetRefExpr::createWithCopy(Viable, OS->getLoc()));
+  return E;
 }
-                                
-void TypeChecker::diagnoseEmptyOverloadSet(ApplyExpr *E,
-                                           OverloadSetRefExpr *OSE) {
-  if (isa<BinaryExpr>(E))
-    diagnose(E->getFn()->getLoc(), diag::no_candidates, 0)
-      << E->getSourceRange();
-  else if (isa<UnaryExpr>(E))
-    diagnose(E->getFn()->getLoc(), diag::no_candidates, 1)
-      << E->getSourceRange();
-  else
-    diagnose(E->getFn()->getLoc(), diag::no_candidates, 2)
-      << E->getSourceRange();
-  printOverloadSetCandidates(OSE);
-}
-void TypeChecker::printOverloadSetCandidates(OverloadSetRefExpr *OSE) {
-  // Print out the candidate set.
-  for (auto TheDecl : OSE->getDecls())
-    diagnose(TheDecl->getLocStart(), diag::found_candidate);
-}
-
 
 //===----------------------------------------------------------------------===//
 // Expression Reanalysis - SemaExpressionTree
