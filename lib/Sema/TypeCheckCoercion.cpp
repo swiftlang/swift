@@ -886,7 +886,6 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     
     if (ETy) {
       Type ElementTy = ETy->getElementType(SrcField);
-      // FIXME: What if the destination type is dependent?
       if (TE && ElementTy->isDependentType()) {
         // FIXME: We shouldn't need a TupleExpr to handle this coercion.
         // Check to see if the src value can be converted to the destination
@@ -1035,10 +1034,6 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
         return nullptr;
       }
       
-      // FIXME: Can this happen in a non-failure case?
-      if (E->getType()->isDependentType()) 
-        return coerced(E, Apply);
-
       // FIXME: Need to figure out correct parent DeclContext; fortunately,
       // it doesn't matter much for the moment because nothing actually needs
       // to use the ImplicitClosureExpr as its context.
