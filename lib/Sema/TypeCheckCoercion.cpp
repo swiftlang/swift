@@ -176,29 +176,43 @@ public:
   CoercedResult visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
     // If we're looking for an lvalue type, we need an exact match
     // to the target object type.
+    // FIXME: What about qualifiers?
     if (LValueType *lv = DestTy->getAs<LValueType>())
       return coerceOverloadToLValue(E, lv);
 
-    // Otherwise, we can at the very least do lvalue-to-rvalue conversions
-    // on the value.
-    // FIXME: and other conversions as well; really this should consider
-    //   conversion rank
-    // FIXME: diagnose ambiguity
-    for (ValueDecl *val : E->getDecls()) {
-      Type srcTy = val->getType();
-      if (!srcTy->isEqual(DestTy)) continue;
+    // Determine which declarations are viable.
+    SmallVector<ValueDecl *, 4> Viable;
+    for (ValueDecl *Val : E->getDecls()) {
+      Type srcTy = Val->getType();
       
+      DeclRefExpr DRE(Val, E->getLoc(), srcTy);
+      if (!TC.isCoercibleToType(&DRE, DestTy))
+        continue;
+      
+      Viable.push_back(Val);
+    }
+    
+    if (Viable.size() == 1) {
       if (!Apply)
         return DestTy;
       
-      return coerced(TC.buildDeclRefRValue(val, E->getLoc()));
+      return coerced(TC.buildDeclRefRValue(Viable[0], E->getLoc()));      
     }
-    // FIXME: Diagnose so we don't get the generic "ambiguous expression"
-    // diagnostic.
-    if (!Apply)
-      return nullptr;
+      
+    if (Apply) {
+      if (Viable.empty()) {
+        diagnose(E->getLoc(), diag::no_candidates_ref, 
+                 E->getDecls()[0]->getName())
+          << E->getSourceRange();
+        TC.printOverloadSetCandidates(E->getDecls());
+      } else {
+        diagnose(E->getLoc(), diag::overloading_ambiguity)
+          << E->getSourceRange();
+        TC.printOverloadSetCandidates(Viable);
+      }
+    }
     
-    return unchanged(E);
+    return nullptr;
   }
   
   // If this is an UnresolvedMemberExpr, then this provides the type we've
@@ -561,11 +575,11 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
     
     if (Apply) {
       if (Viable.empty())
-        TC.diagnoseEmptyOverloadSet(E, OSE);
+        TC.diagnoseEmptyOverloadSet(E, OSE->getDecls());
       else {
         diagnose(E->getFn()->getLoc(), diag::overloading_ambiguity)
           << E->getSourceRange();
-        TC.printOverloadSetCandidates(OSE);
+        TC.printOverloadSetCandidates(Viable);
       }
     }
     

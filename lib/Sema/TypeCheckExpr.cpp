@@ -231,7 +231,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   
   // If there are no more viable candidates, complain now.
   if (Viable.empty()) {
-    diagnoseEmptyOverloadSet(E, OS);
+    diagnoseEmptyOverloadSet(E, OS->getDecls());
     return nullptr;
   }
   

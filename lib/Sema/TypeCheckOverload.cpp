@@ -16,23 +16,22 @@
 #include "TypeChecker.h"
 using namespace swift;
 
-void TypeChecker::diagnoseEmptyOverloadSet(ApplyExpr *E,
-                                           OverloadSetRefExpr *OSE) {
+void TypeChecker::diagnoseEmptyOverloadSet(Expr *E,
+                                           ArrayRef<ValueDecl *> Candidates) {
   if (isa<BinaryExpr>(E))
-    diagnose(E->getFn()->getLoc(), diag::no_candidates, 0)
+    diagnose(E->getLoc(), diag::no_candidates, 0)
     << E->getSourceRange();
   else if (isa<UnaryExpr>(E))
-    diagnose(E->getFn()->getLoc(), diag::no_candidates, 1)
+    diagnose(E->getLoc(), diag::no_candidates, 1)
     << E->getSourceRange();
   else
-    diagnose(E->getFn()->getLoc(), diag::no_candidates, 2)
+    diagnose(E->getLoc(), diag::no_candidates, 2)
     << E->getSourceRange();
-  printOverloadSetCandidates(OSE);
+  printOverloadSetCandidates(Candidates);
 }
 
-void TypeChecker::printOverloadSetCandidates(OverloadSetRefExpr *OSE) {
-  // Print out the candidate set.
-  for (auto TheDecl : OSE->getDecls())
+void TypeChecker::printOverloadSetCandidates(ArrayRef<ValueDecl *> Candidates) {
+  for (auto TheDecl : Candidates)
     diagnose(TheDecl->getLocStart(), diag::found_candidate);
 }
 

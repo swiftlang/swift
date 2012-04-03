@@ -75,8 +75,8 @@ public:
   
   /// diagnoseEmptyOverloadSet - Diagnose a case where we disproved all of the
   /// possible candidates in an overload set of a call.
-  void diagnoseEmptyOverloadSet(ApplyExpr *Call, OverloadSetRefExpr *OSE);
-  void printOverloadSetCandidates(OverloadSetRefExpr *OSE);
+  void diagnoseEmptyOverloadSet(Expr *E, ArrayRef<ValueDecl *> Candidates);
+  void printOverloadSetCandidates(ArrayRef<ValueDecl *> Candidates);
   
   /// filterOverloadSet - Filter a set of overload candidates based on the 
   /// the given argument type (for a call) or result type (if the context 

@@ -530,6 +530,8 @@ ERROR(overloading_ambiguity,sema_tce,none,
 ERROR(no_candidates,sema_tce,none,
       "no candidates found for %select{binary operator|unary operator|call}0",
       (unsigned))
+ERROR(no_candidates_ref,sema_tce,none,
+      "no candidates found for reference to overloaded %0", (Identifier))
 ERROR(use_undeclared_identifier,sema_tce,none,
       "use of undeclared identifier", ())
 ERROR(field_number_too_large,sema_tce,none,
