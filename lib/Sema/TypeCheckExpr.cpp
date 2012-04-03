@@ -218,13 +218,6 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     return E;
   }
 
-  // If the argument type is a completely unstructured dependent type,
-  // there's nothing we can do now.
-  if (E2->getType()->is<UnstructuredDependentType>()) {
-    E->setType(UnstructuredDependentType::get(Context));
-    return E;
-  }
-  
   // Perform overload resolution.
   llvm::SmallVector<ValueDecl *, 4> Viable;
   ValueDecl *Best = filterOverloadSet(OS->getDecls(), E2, Type(), Viable);

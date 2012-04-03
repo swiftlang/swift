@@ -72,6 +72,11 @@ public:
 /// type (possibly recursively) and (optionally) returns the new/updated 
 /// expression.
 class SemaCoerce : public ExprVisitor<SemaCoerce, CoercedResult> {
+  /// \brief Determine whether the given type is compatible with an integer
+  /// or floating-point literal and what function would perform the conversion.
+  ///
+  /// \returns The function that will perform the conversion, along with the
+  /// type of the argument of this function.
   std::pair<FuncDecl*, Type> isLiteralCompatibleType(Type Ty, SourceLoc Loc, 
                                                      bool isInt);
 
