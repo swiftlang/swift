@@ -347,6 +347,11 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitParameterRenameExpr(ParameterRenameExpr *E) {
+    printCommon(E, "parameter_rename_expr") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
   void visitLoadExpr(LoadExpr *E) {
     printCommon(E, "load_expr") << '\n';
     printRec(E->getSubExpr());

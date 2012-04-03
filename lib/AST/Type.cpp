@@ -69,6 +69,106 @@ bool TypeBase::hasReferenceSemantics() {
   return is<BuiltinObjectPointerType>();
 }
 
+Type TypeBase::getUnlabeledType(ASTContext &Context) {
+  switch (getKind()) {
+  case TypeKind::Error: 
+  case TypeKind::BuiltinObjectPointer:
+  case TypeKind::BuiltinInteger:
+  case TypeKind::BuiltinFloat:
+  case TypeKind::UnstructuredDependent:
+  case TypeKind::OneOf:
+  case TypeKind::MetaType:
+  case TypeKind::Module:
+  case TypeKind::Protocol:
+    return this;
+
+  case TypeKind::NameAlias:
+    if (TypeAliasDecl *D = cast<NameAliasType>(this)->getDecl())
+      if (D->hasUnderlyingType())
+        return D->getUnderlyingType()->getUnlabeledType(Context);
+    
+    return this;
+      
+  case TypeKind::Identifier: {
+    IdentifierType *IdentTy = cast<IdentifierType>(this);
+    if (IdentTy->isMapped())
+      return IdentTy->getMappedType()->getUnlabeledType(Context);
+    return this;
+  }
+  
+  case TypeKind::Paren: {
+    ParenType *ParenTy = cast<ParenType>(this);
+    Type UnderlyingTy = ParenTy->getUnderlyingType()->getUnlabeledType(Context);
+    if (UnderlyingTy.getPointer() != ParenTy->getUnderlyingType().getPointer())
+      return ParenType::get(Context, UnderlyingTy);
+    return this;
+  }
+      
+  case TypeKind::Tuple: {
+    TupleType *TupleTy = cast<TupleType>(this);
+    llvm::SmallVector<TupleTypeElt, 4> Elements;
+    bool Rebuild = false;
+    unsigned Idx = 0;
+    for (const TupleTypeElt &Elt : TupleTy->getFields()) {
+      Type EltTy = Elt.getType()->getUnlabeledType(Context);
+      if (EltTy.getPointer() != Elt.getType().getPointer() ||
+          Elt.getInit() || !Elt.getName().empty() || Rebuild) {
+        if (!Rebuild) {
+          Elements.reserve(TupleTy->getFields().size());
+          for (unsigned I = 0; I != Idx; ++I) {
+            Elements.push_back(TupleTypeElt(TupleTy->getElementType(I),
+                                            Identifier()));
+          }
+          Rebuild = true;
+        }
+        
+        Elements.push_back(TupleTypeElt(EltTy, Identifier()));
+      }
+      ++Idx;
+    }
+    
+    if (!Rebuild)
+      return this;
+    
+    // An unlabeled 1-element tuple type is represented as a parenthesized
+    // type.
+    if (Elements.size() == 1)
+      return ParenType::get(Context, Elements[0].getType());
+    
+    return TupleType::get(Elements, Context);
+  }
+      
+  case TypeKind::Function: {
+    FunctionType *FunctionTy = cast<FunctionType>(this);
+    Type InputTy = FunctionTy->getInput()->getUnlabeledType(Context);
+    Type ResultTy = FunctionTy->getResult()->getUnlabeledType(Context);
+    if (InputTy.getPointer() != FunctionTy->getInput().getPointer() ||
+        ResultTy.getPointer() != FunctionTy->getResult().getPointer())
+      return FunctionType::get(InputTy, ResultTy, FunctionTy->isAutoClosure(),
+                               Context);
+    
+    return this;
+  }
+      
+  case TypeKind::Array: {
+    ArrayType *ArrayTy = cast<ArrayType>(this);
+    Type BaseTy = ArrayTy->getBaseType()->getUnlabeledType(Context);
+    if (BaseTy.getPointer() != ArrayTy->getBaseType().getPointer())
+      return ArrayType::get(BaseTy, ArrayTy->getSize(), Context);
+    
+    return this;
+  }
+      
+  case TypeKind::LValue: {
+    LValueType *LValueTy = cast<LValueType>(this);
+    Type ObjectTy = LValueTy->getObjectType()->getUnlabeledType(Context);
+    if (ObjectTy.getPointer() != LValueTy->getObjectType().getPointer())
+      return LValueType::get(ObjectTy, LValueTy->getQualifiers(), Context);
+    return this;
+  }
+  }
+}
+
 /// getCanonicalType - Return the canonical version of this type, which has
 /// sugar from all levels stripped off.
 CanType TypeBase::getCanonicalType() {
@@ -194,6 +294,10 @@ const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {
   }
   assert(0 && "Unknown FP semantics");
   return APFloat::IEEEhalf;
+}
+
+bool IdentifierType::isMapped() const {
+  return !Components.back().Value.isNull();
 }
 
 Type IdentifierType::getMappedType() {

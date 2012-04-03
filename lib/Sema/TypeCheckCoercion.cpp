@@ -1163,6 +1163,23 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
   if (E->getType()->isDependentType())
     return SemaCoerce(TC, DestTy, Apply).doIt(E);
 
+  // A function type can converted to a function type with the same input/result
+  // types, ignoring labels.
+  // FIXME: We will probably want to allow a contravariant return type and
+  // covariant parameter types, but for now we don't have anything that compels
+  // us to do so.
+  if (FunctionType *DestFuncTy = DestTy->getAs<FunctionType>()) {
+    if (FunctionType *SrcFuncTy = E->getType()->getAs<FunctionType>()) {
+      if (DestFuncTy->getUnlabeledType(TC.Context)->isEqual(
+            SrcFuncTy->getUnlabeledType(TC.Context))) {
+        if (!Apply)
+          return DestTy;
+            
+        return coerced(new (TC.Context) ParameterRenameExpr(E, DestTy), Apply);
+      }
+    }
+  }
+
   // If the source is an l-value, load from it.  We intentionally do
   // this before checking for certain destination types below.
   if (LValueType *srcLV = E->getType()->getAs<LValueType>()) {

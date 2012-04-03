@@ -90,7 +90,8 @@ ABSTRACT_EXPR(ImplicitConversion, Expr)
   EXPR(Materialize, ImplicitConversionExpr)
   EXPR(Requalify, ImplicitConversionExpr)
   EXPR(TupleShuffle, ImplicitConversionExpr)
-  EXPR_RANGE(ImplicitConversion, Load, TupleShuffle)
+  EXPR(ParameterRename, ImplicitConversionExpr)
+  EXPR_RANGE(ImplicitConversion, Load, ParameterRename)
 
 #undef EXPR_RANGE
 #undef UNBOUND_EXPR

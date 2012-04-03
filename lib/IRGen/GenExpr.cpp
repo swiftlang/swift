@@ -163,6 +163,10 @@ namespace {
       emitTupleShuffle(IGF, E, Out);
     }
 
+    void visitParameterRenameExpr(ParameterRenameExpr *E) {
+      IGF.emitRValue(E->getSubExpr(), Out);
+    }
+    
     void visitTupleElementExpr(TupleElementExpr *E) {
       emitTupleElement(IGF, E, Out);
     }
@@ -239,7 +243,7 @@ namespace {
 
     // Qualification never affects emission as an l-value.
     LValue visitRequalifyExpr(RequalifyExpr *E) {
-      return visit(E);
+      return visit(E->getSubExpr());
     }
 
     LValue visitMaterializeExpr(MaterializeExpr *E) {
@@ -247,6 +251,10 @@ namespace {
       return IGF.emitAddressLValue(addr);
     }
 
+    LValue visitParameterRenameExpr(ParameterRenameExpr *E) {
+      return visit(E->getSubExpr());
+    }
+    
     LValue visitDeclRefExpr(DeclRefExpr *E) {
       return emitDeclRefLValue(IGF, E);
     }
@@ -320,6 +328,9 @@ namespace {
 
     // Changes in qualification are unimportant for this.
     Optional<Address> visitRequalifyExpr(RequalifyExpr *E) {
+      return visit(E->getSubExpr());
+    }
+    Optional<Address> visitParameterRenameExpr(ParameterRenameExpr *E) {
       return visit(E->getSubExpr());
     }
     Optional<Address> visitAddressOfExpr(AddressOfExpr *E) {

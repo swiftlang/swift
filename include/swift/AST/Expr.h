@@ -628,6 +628,20 @@ public:
   }
 };
 
+/// ParameterRenameExpr - Rename the parameters or return values of a 
+/// function type.
+class ParameterRenameExpr : public ImplicitConversionExpr {
+public:
+  ParameterRenameExpr(Expr *subExpr, Type type)
+    : ImplicitConversionExpr(ExprKind::ParameterRename, subExpr, type) {}
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ParameterRenameExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ParameterRename;
+  }
+};
+
 /// AddressOfExpr - Using the builtin unary '&' operator, convert the
 /// given l-value into an explicit l-value.
 class AddressOfExpr : public Expr {

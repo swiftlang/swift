@@ -146,6 +146,14 @@ public:
   /// the type occurs.
   bool isDependentType() const;
   
+  /// getUnlabeledType - Retrieve a version of this type with all labels
+  /// removed at every level. For example, given a tuple type 
+  /// \code
+  /// (p : (x : int, y : int))
+  /// \endcode
+  /// the result would be the (parenthesized) type ((int, int)).
+  Type getUnlabeledType(ASTContext &Context);
+  
   void dump() const;
   void print(raw_ostream &OS) const;
   
@@ -339,6 +347,10 @@ public:
   static IdentifierType *getNew(ASTContext &C,
                                 MutableArrayRef<Component> Components);
 
+  /// isMapped - Determine whether name binding has resolved the identifiers
+  /// to an actual type.
+  bool isMapped() const;
+  
   /// getMappedType - After name binding is complete, this indicates what type
   /// this refers to (without removing any other sugar).
   Type getMappedType();
