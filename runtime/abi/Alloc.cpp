@@ -52,6 +52,9 @@ swift_alloc(struct SwiftHeapMetadata *metadata,
 struct SwiftHeapObject *
 swift_retain(struct SwiftHeapObject *object)
 {
+  if (!object) {
+    return NULL;
+  }
   ++object->runtimePrivateData;
   return object;
 }
@@ -59,6 +62,9 @@ swift_retain(struct SwiftHeapObject *object)
 void
 swift_release(struct SwiftHeapObject *object)
 {
+  if (!object) {
+    return;
+  }
   if (--object->runtimePrivateData > 0) {
     return;
   }
