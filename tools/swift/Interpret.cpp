@@ -44,6 +44,7 @@ void swift::Interpret(TranslationUnit *TU) {
   Options.OptLevel = 0;
   Options.OutputKind = irgen::OutputKind::Module;
 
+  // IRGen the main module.
   llvm::LLVMContext LLVMContext;
   llvm::Module Module(Options.OutputFilename, LLVMContext);
   performCaptureAnalysis(TU);
@@ -52,6 +53,7 @@ void swift::Interpret(TranslationUnit *TU) {
   if (Context.hadError())
     return;
 
+  // IRGen the modules this module depends on.
   for (auto ModPair : TU->getImportedModules()) {
     if (isa<BuiltinModule>(ModPair.second))
       continue;
@@ -74,9 +76,8 @@ void swift::Interpret(TranslationUnit *TU) {
     }
   }
 
-  // FIXME: This isn't the right entry point!  (But what is?)
-  llvm::Function *EntryFn = Module.getFunction("main");
-
+  // Load the swift runtime.
+  // FIXME: Need error-checking.
   llvm::sys::Path LibPath = llvm::sys::Path::GetMainExecutable(0, (void*)&Interpret);
   LibPath.eraseComponent();
   LibPath.eraseComponent();
@@ -84,14 +85,17 @@ void swift::Interpret(TranslationUnit *TU) {
   LibPath.appendComponent("libswift_abi.dylib");
   dlopen(LibPath.c_str(), 0);
 
+  // Run the generated program.
+
+  // FIXME: This isn't the right entry point!  (But what is?)
+  llvm::Function *EntryFn = Module.getFunction("main");
+
   llvm::EngineBuilder builder(&Module);
   std::string ErrorMsg;
   builder.setErrorStr(&ErrorMsg);
   builder.setEngineKind(llvm::EngineKind::JIT);
   builder.setUseMCJIT(true);
 
-  // FIXME: We should be loading the load swift runtime shared library
-  // via dlopen (when it exists).
   llvm::ExecutionEngine *EE = builder.create();
   EE->runFunctionAsMain(EntryFn, std::vector<std::string>(), 0);
 }
