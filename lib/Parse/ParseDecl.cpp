@@ -512,8 +512,8 @@ bool Parser::parseDeclVar(SmallVectorImpl<Decl*> &Decls) {
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
 
-  ParseResult<Pattern> pattern = parsePattern();
-  if (pattern.isParseError()) return true;
+  NullablePtr<Pattern> pattern = parsePattern();
+  if (pattern.isNull()) return true;
 
   Type Ty;
   NullablePtr<Expr> Init;

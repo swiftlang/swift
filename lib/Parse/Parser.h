@@ -17,7 +17,6 @@
 #ifndef SWIFT_PARSER_H
 #define SWIFT_PARSER_H
 
-#include "ParseResult.h"
 #include "Scope.h"
 #include "swift/Parse/Token.h"
 #include "swift/AST/AST.h"
@@ -242,9 +241,9 @@ public:
   // Pattern Parsing
 
   bool parseFunctionSignature(SmallVectorImpl<Pattern*> &params, Type &type);
-  ParseResult<Pattern> parsePattern();
-  ParseResult<Pattern> parsePatternTuple();
-  ParseResult<Pattern> parsePatternAtom();
+  NullablePtr<Pattern> parsePattern();
+  NullablePtr<Pattern> parsePatternTuple();
+  NullablePtr<Pattern> parsePatternAtom();
   
   //===--------------------------------------------------------------------===//
   // Expression Parsing

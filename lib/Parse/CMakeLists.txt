@@ -5,7 +5,6 @@ add_swift_library(swiftParse
   ParseDecl.cpp
   ParseExpr.cpp
   ParsePattern.cpp
-  ParseResult.h
   ParseStmt.cpp
   ParseType.cpp
   Scope.cpp

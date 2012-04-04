@@ -123,16 +123,12 @@ static bool checkFullyTyped(Parser &P, Pattern *pattern) {
 bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &params,
                                     Type &type) {
   // Parse curried function argument clauses as long as we can.
-  bool hasSemaError = false;
   do {
-    ParseResult<Pattern> pattern = parsePatternTuple();
-    if (pattern.isParseError()) {
+    NullablePtr<Pattern> pattern = parsePatternTuple();
+    if (pattern.isNull())
       return true;
-    } else if (pattern.isSemaError()) {
-      hasSemaError = true;
-    } else {
+    else
       params.push_back(pattern.get());
-    }
   } while (Tok.is(tok::l_paren) || Tok.is(tok::l_paren_space));
 
   // If there's a trailing arrow, parse the rest as the result type.
@@ -169,19 +165,18 @@ bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &params,
 /// Parse a pattern.
 ///   pattern ::= pattern-atom
 ///   pattern ::= pattern-atom ':' type-annotation
-ParseResult<Pattern> Parser::parsePattern() {
+NullablePtr<Pattern> Parser::parsePattern() {
   // First, parse the pattern atom.
-  ParseResult<Pattern> pattern = parsePatternAtom();
-  if (pattern.isParseError()) return true;
+  NullablePtr<Pattern> pattern = parsePatternAtom();
+  if (pattern.isNull()) return nullptr;
 
   // Now parse an optional type annotation.
   if (consumeIf(tok::colon)) {
     Type type;
     if (parseTypeAnnotation(type))
-      return true;
+      return nullptr;
 
-    if (!pattern.isSemaError())
-      pattern = new (Context) TypedPattern(pattern.get(), type);
+    pattern = new (Context) TypedPattern(pattern.get(), type);
   }
 
   return pattern;
@@ -192,7 +187,7 @@ ParseResult<Pattern> Parser::parsePattern() {
 ///
 ///   pattern-atom ::= identifier
 ///   pattern-atom ::= pattern-tuple
-ParseResult<Pattern> Parser::parsePatternAtom() {
+NullablePtr<Pattern> Parser::parsePatternAtom() {
   switch (Tok.getKind()) {
   case tok::l_paren:
   case tok::l_paren_space:
@@ -215,7 +210,7 @@ ParseResult<Pattern> Parser::parsePatternAtom() {
 
   default:
     diagnose(Tok, diag::expected_pattern);
-    return true;
+    return nullptr;
   }
 }
 
@@ -227,7 +222,7 @@ ParseResult<Pattern> Parser::parsePatternAtom() {
 ///     pattern-tuple-element (',' pattern-tuple-body)*
 ///   pattern-tuple-element:
 ///     pattern ('=' expr)?
-ParseResult<Pattern> Parser::parsePatternTuple() {
+NullablePtr<Pattern> Parser::parsePatternTuple() {
   assert(Tok.is(tok::l_paren) || Tok.is(tok::l_paren_space));
 
   // We're looking at the left parenthesis; consume it.
@@ -235,44 +230,36 @@ ParseResult<Pattern> Parser::parsePatternTuple() {
 
   // Parse all the elements.
   SmallVector<TuplePatternElt, 8> elts;
-  bool hasSemaError = false;
   if (Tok.isNot(tok::r_paren)) {
     do {
-      ParseResult<Pattern> pattern = parsePattern();
+      NullablePtr<Pattern> pattern = parsePattern();
       Expr *init = nullptr;
 
-      if (pattern.isParseError()) {
+      if (pattern.isNull()) {
         skipUntil(tok::r_paren);
-        return true;
+        return nullptr;
       } else if (consumeIf(tok::equal)) {
         NullablePtr<Expr> initR = parseExpr(diag::expected_initializer_expr);
         if (initR.isNull()) {
           skipUntil(tok::r_paren);
-          return true;
+          return nullptr;
         }
         
         init = initR.get();
       }
 
-      if (pattern.isSemaError()) {
-        hasSemaError = true;
-      } else {
-        elts.push_back(TuplePatternElt(pattern.get(), init));
-      }
+      elts.push_back(TuplePatternElt(pattern.get(), init));
     } while (consumeIf(tok::comma));
 
     if (Tok.isNot(tok::r_paren)) {
       diagnose(Tok, diag::expected_rparen_tuple_pattern_list);
       skipUntil(tok::r_paren);
-      return true;
+      return nullptr;
     }
   }
 
   // Consume the right parenthesis.
   SourceLoc rp = consumeToken(tok::r_paren);
-
-  if (hasSemaError)
-    return ParseResult<Pattern>::getSemaError();
 
   // A pattern which wraps a single anonymous pattern is not a tuple.
   if (elts.size() == 1 &&
