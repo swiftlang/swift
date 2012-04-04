@@ -23,6 +23,7 @@
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/DiagnosticConsumer.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Host.h"
@@ -53,13 +54,17 @@ void swift::RunImmediately(TranslationUnit *TU) {
   if (Context.hadError())
     return;
 
+  llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
   // IRGen the modules this module depends on.
   for (auto ModPair : TU->getImportedModules()) {
     if (isa<BuiltinModule>(ModPair.second))
       continue;
 
-    // FIXME: Need to check whether this is actually safe in general.
     TranslationUnit *SubTU = cast<TranslationUnit>(ModPair.second);
+    if (!ImportedModules.insert(SubTU))
+      continue;
+
+    // FIXME: Need to check whether this is actually safe in general.
     llvm::Module SubModule(SubTU->Name.str(), LLVMContext);
     performCaptureAnalysis(SubTU);
     performIRGenerationIntoModule(SubTU, Options, SubModule);
@@ -72,6 +77,7 @@ void swift::RunImmediately(TranslationUnit *TU) {
                                   llvm::Linker::DestroySource,
                                   &ErrorMessage)) {
       llvm::errs() << "Error linking swift modules\n";
+      llvm::errs() << ErrorMessage << "\n";
       return;
     }
   }

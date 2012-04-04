@@ -22,6 +22,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
@@ -45,8 +46,11 @@ namespace {
   public:
     TranslationUnit *TU;
     ASTContext &Context;
-    
-    NameBinder(TranslationUnit *TU) : TU(TU), Context(TU->Ctx) {
+    llvm::StringMap<TranslationUnit*> LoadedModules;
+    bool ImportedBuiltinModule;
+
+    NameBinder(TranslationUnit *TU)
+    : TU(TU), Context(TU->Ctx), ImportedBuiltinModule(false) {
     }
     ~NameBinder() {
     }
@@ -57,6 +61,7 @@ namespace {
     }
     
     void addImport(ImportDecl *ID, SmallVectorImpl<ImportedModule> &Result);
+    void addStandardLibraryImport(SmallVectorImpl<ImportedModule> &Result);
 
     /// resolveIdentifierType - Perform name binding for a IdentifierType,
     /// resolving it or diagnosing the error as appropriate and return true on
@@ -118,7 +123,16 @@ Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
   // TODO: We currently just recursively parse referenced modules.  This works
   // fine for now since they are each a single file.  Ultimately we'll want a
   // compiled form of AST's like clang's that support lazy deserialization.
-  
+
+  // FIXME: We shouldn't really allow arbitrary modules to import Builtin.
+  if (ModuleID.first.str() == "Builtin") {
+    ImportedBuiltinModule = true;
+    return TU->Ctx.TheBuiltinModule;
+  }
+
+  TranslationUnit *ImportedTU = LoadedModules.lookup(ModuleID.first.str());
+  if (ImportedTU) return ImportedTU;
+
   // Open the input file.
   llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
   if (llvm::error_code Err = findModule(ModuleID.first.str(), ModuleID.second,
@@ -137,17 +151,19 @@ Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
 
   // Parse the translation unit, but don't do name binding or type checking.
   // This can produce new errors etc if the input is erroneous.
-  TranslationUnit *TU = parseTranslationUnit(BufferID, Comp, Context);
-  if (TU == 0)
+  ImportedTU = parseTranslationUnit(BufferID, Comp, Context);
+  if (ImportedTU == 0)
     return 0;
-  
+  LoadedModules[ModuleID.first.str()] = ImportedTU;
+
   // We have to do name binding on it to ensure that types are fully resolved.
   // This should eventually be eliminated by having actual fully resolved binary
   // dumps of the code instead of reparsing though.
-  performNameBinding(TU);
-  performTypeChecking(TU);
+  // FIXME: We also need to deal with circular imports!
+  performNameBinding(ImportedTU);
+  performTypeChecking(ImportedTU);
   
-  return TU;
+  return ImportedTU;
 }
 
 
@@ -165,6 +181,23 @@ void NameBinder::addImport(ImportDecl *ID,
   }
   
   Result.push_back(std::make_pair(Path.slice(1), M));
+}
+
+void NameBinder::
+addStandardLibraryImport(SmallVectorImpl<ImportedModule> &Result) {
+  // FIXME: The current model is that if a module doesn't explicitly import
+  // Builtin or swift, we implicitly import swift.  This isn't really ideal.
+  if (ImportedBuiltinModule)
+    return;
+  if (LoadedModules.lookup("swift"))
+    return;
+  if (TU->Name.str() == "swift")
+    return;
+
+  Identifier SwiftID = Context.getIdentifier("swift");
+  Module *M = getModule(std::make_pair(SwiftID, TU->Body->getStartLoc()));
+  if (M == 0) return;
+  Result.push_back(std::make_pair(Module::AccessPathTy(), M));
 }
 
 /// resolveIdentifierType - Perform name binding for a IdentifierType,
@@ -337,16 +370,6 @@ void swift::performNameBinding(TranslationUnit *TU) {
   NameBinder Binder(TU);
 
   SmallVector<ImportedModule, 8> ImportedModules;
-  
-  // Import the builtin library as an implicit import.
-  // FIXME: This should only happen for translation units in the standard
-  // library.
-  ImportedModules.push_back(std::make_pair(Module::AccessPathTy(),
-                                           TU->Ctx.TheBuiltinModule));
-  
-  // FIXME: For translation units not in the standard library, we should import
-  // swift.swift implicitly.  We need a way for swift.swift itself to not
-  // recursively import itself though.
 
   // Do a prepass over the declarations to find and load the imported modules.
   for (auto Elt : TU->Body->getElements())
@@ -354,7 +377,9 @@ void swift::performNameBinding(TranslationUnit *TU) {
       if (ImportDecl *ID = dyn_cast<ImportDecl>(D))
         Binder.addImport(ID, ImportedModules);
     }
-  
+
+  Binder.addStandardLibraryImport(ImportedModules);
+
   TU->setImportedModules(TU->Ctx.AllocateCopy(ImportedModules));
   
   // Type binding.  Loop over all of the unresolved types in the translation
