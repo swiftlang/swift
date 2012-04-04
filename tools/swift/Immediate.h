@@ -1,4 +1,4 @@
-//===-- Interpret.h - Entry point for swift interpreter ------------------===//
+//===-- Immediate.h - Entry point for swift immediate mode ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This is the entry point to the swift interpreter, which takes a
-// TranslationUnit and JITs it.
+// This is the entry point to the swift immediate mode, which takes a
+// TranslationUnit, and runs it immediately using the JIT.
 //
 //===----------------------------------------------------------------------===//
 
@@ -20,5 +20,5 @@
 namespace swift {
   class TranslationUnit;
 
-  void Interpret(TranslationUnit *TU);
+  void RunImmediately(TranslationUnit *TU);
 }

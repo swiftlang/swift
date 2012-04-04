@@ -1,4 +1,4 @@
-//===-- Interpret.cpp - the swift interpreter -----------------------------===//
+//===-- Immediate.cpp - the swift immediate mode --------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Interpret.h"
+#include "Immediate.h"
 #include "swift/Subsystems.h"
 #include "swift/IRGen/Options.h"
 #include "swift/AST/ASTContext.h"
@@ -36,7 +36,7 @@
 
 #include <dlfcn.h>
 
-void swift::Interpret(TranslationUnit *TU) {
+void swift::RunImmediately(TranslationUnit *TU) {
   ASTContext &Context = TU->Ctx;
   irgen::Options Options;
   Options.OutputFilename = TU->Name.str();
@@ -78,7 +78,8 @@ void swift::Interpret(TranslationUnit *TU) {
 
   // Load the swift runtime.
   // FIXME: Need error-checking.
-  llvm::sys::Path LibPath = llvm::sys::Path::GetMainExecutable(0, (void*)&Interpret);
+  llvm::sys::Path LibPath =
+      llvm::sys::Path::GetMainExecutable(0, (void*)&RunImmediately);
   LibPath.eraseComponent();
   LibPath.eraseComponent();
   LibPath.appendComponent("lib");
