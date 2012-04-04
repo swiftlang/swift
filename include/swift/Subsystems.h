@@ -17,6 +17,10 @@
 #ifndef SWIFT_SUBSYSTEMS_H
 #define SWIFT_SUBSYSTEMS_H
 
+namespace llvm {
+  class Module;
+}
+
 namespace swift {
   class TranslationUnit;
   class ASTContext;
@@ -53,7 +57,12 @@ namespace swift {
   /// performIRGeneration - Turn the given translation unit into
   /// either LLVM IR or native code.
   void performIRGeneration(TranslationUnit *TU, irgen::Options &Opts);
-  
+
+  /// performIRGenerationIntoModule - Alternate entry point for IR generation
+  /// for users which need the resulting module in memory.
+  void performIRGenerationIntoModule(TranslationUnit *TU, irgen::Options &Opts,
+                                     llvm::Module &Module);
+
 } // end namespace swift
 
 #endif

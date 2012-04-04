@@ -24,6 +24,9 @@ namespace swift {
 namespace irgen {
 
 enum class OutputKind : unsigned {
+  /// Just generate an LLVM module and return it.
+  Module,
+
   /// Generate an LLVM module and write it out as LLVM assembly.
   LLVMAssembly,
 
@@ -44,7 +47,7 @@ public:
   std::string Triple;
 
   /// The kind of compilation we should do.
-  OutputKind OutputKind : 2;
+  OutputKind OutputKind : 3;
 
   /// Should we spend time verifying that the IR we produce is
   /// well-formed?

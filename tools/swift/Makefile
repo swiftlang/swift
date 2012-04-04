@@ -19,8 +19,10 @@ TOOLNAME = swift
 # LINK_COMPONENTS before including Makefile.rules
 include $(SWIFT_LEVEL)/../../Makefile.config
 
-#LINK_COMPONENTS := $(TARGETS_TO_BUILD) bitwriter codegen ipo selectiondag
-LINK_COMPONENTS := $(TARGETS_TO_BUILD) bitwriter ipo
+# $(TARGETS_TO_BUILD) and ipo are necessary for code generation. bitwriter is
+# necessary to write out a .bc file. mcjit, jit, and linker are used for
+# JIT execution.
+LINK_COMPONENTS := $(TARGETS_TO_BUILD) bitwriter ipo mcjit jit linker
 USEDLIBS = swiftIRGen.a swiftParse.a swiftSema.a swiftAST.a swiftBasic.a
 
 include $(SWIFT_LEVEL)/Makefile

@@ -14,5 +14,7 @@ SWIFT_LEVEL := ../..
 include $(SWIFT_LEVEL)/../../Makefile.config
 
 LIBRARYNAME := swift_abi
+LINK_LIBS_IN_SHARED := 1
+SHARED_LIBRARY := 1
 
 include $(SWIFT_LEVEL)/Makefile

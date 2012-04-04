@@ -441,7 +441,7 @@ namespace {
       assert(dataPtr == nullptr ||
              (dataPtr->getType()->getContainedType(0)->isStructTy() &&
               cast<llvm::StructType>(dataPtr->getType()->getContainedType(0))
-                ->getName() == "swift.refcounted"));
+                ->getName().startswith("swift.refcounted")));
       assert(dataPtr == nullptr || !isa<llvm::ConstantPointerNull>(dataPtr));
 
       FnPtr = fnPtr;

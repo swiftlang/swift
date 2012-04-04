@@ -39,6 +39,7 @@ using namespace llvm;
 
 static bool isBinaryOutput(OutputKind kind) {
   switch (kind) {
+  case OutputKind::Module:
   case OutputKind::LLVMAssembly:
   case OutputKind::NativeAssembly:
     return false;
@@ -50,11 +51,17 @@ static bool isBinaryOutput(OutputKind kind) {
 }
 
 void swift::performIRGeneration(TranslationUnit *TU, Options &Opts) {
-  assert(!TU->Ctx.hadError());
-
   // Create the module.
   LLVMContext LLVMContext;
   llvm::Module Module(Opts.OutputFilename, LLVMContext);
+
+  performIRGenerationIntoModule(TU, Opts, Module);
+}
+
+void swift::performIRGenerationIntoModule(TranslationUnit *TU, Options &Opts,
+                                          llvm::Module &Module) {
+  assert(!TU->Ctx.hadError());
+
   Module.setTargetTriple(Opts.Triple);
 
   std::string Error;
@@ -143,6 +150,8 @@ void swift::performIRGeneration(TranslationUnit *TU, Options &Opts) {
 
   // Set up the final emission passes.
   switch (Opts.OutputKind) {
+  case OutputKind::Module:
+    break;
   case OutputKind::LLVMAssembly:
     ModulePasses.add(createPrintModulePass(&FormattedOS));
     break;
