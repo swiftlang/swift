@@ -106,7 +106,14 @@ public:
     }
     friend bool operator!=(stable_iterator a, stable_iterator b) {
       return a.Depth != b.Depth;
-    }    
+    }
+
+    static stable_iterator invalid() {
+      return stable_iterator((std::size_t) -1);
+    }
+    bool isValid() const {
+      return Depth != (std::size_t) -1;
+    }
   };
   stable_iterator stable_begin() const {
     return stable_iterator(End - Begin);
@@ -170,6 +177,10 @@ public:
     return *reinterpret_cast<const T*>(Begin);
   }
 
+  using DiverseStackBase::stable_iterator;
+  using DiverseStackBase::stable_begin;
+  using DiverseStackBase::stable_end;
+
   class const_iterator;
   class iterator {
     char *Ptr;
@@ -205,8 +216,9 @@ public:
   iterator begin() { checkValid(); return iterator(Begin); }
   iterator end() { checkValid(); return iterator(End); }
   iterator find(stable_iterator it) {
+    assert(it.isValid() && "trying to find an invalid iterator");
     checkValid();
-    assert(it.Depth <= End - Begin);
+    assert(it.Depth <= size_t(End - Begin));
     return iterator(End - it.Depth);
   }
   stable_iterator stabilize(iterator it) const {
