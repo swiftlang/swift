@@ -506,7 +506,7 @@ static void addVarsToScope(Parser &P, Pattern *Pat,
 /// token skipping) on error.
 ///
 ///   decl-var:
-///      'var' attribute-list var-name value-specifier
+///      'var' attribute-list var-name initializer?
 bool Parser::parseDeclVar(SmallVectorImpl<Decl*> &Decls) {
   SourceLoc VarLoc = consumeToken(tok::kw_var);
   
@@ -538,7 +538,7 @@ bool Parser::parseDeclVar(SmallVectorImpl<Decl*> &Decls) {
 /// be a better way to handle these.
 ///
 ///   decl-var-simple:
-///      'var' attribute-list identifier ':' type-annotation
+///      'var' identifier ':' type-annotation
 ///
 VarDecl *Parser::parseDeclVarSimple() {
   SourceLoc VarLoc = consumeToken(tok::kw_var);
