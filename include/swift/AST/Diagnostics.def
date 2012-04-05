@@ -329,9 +329,9 @@ ERROR(type_literal_conversion_defined_wrong,literal_parsing,none,
       "conversion method in %0 not defined in terms of standard library type",
        (Type))
 
-ERROR(int_literal_too_large,literal_parsing,none,
-      "integer constant too large (%0 bits) for %1",
-      (unsigned, Type))
+WARNING(int_literal_too_large,literal_parsing,none,
+        "integer constant too large (%0 bits) for %1",
+        (unsigned, Type))
       
 WARNING(float_literal_overflow,literal_parsing,none,
         "floating point constant overflowed to %0", (StringRef))

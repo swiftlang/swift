@@ -445,11 +445,9 @@ CoercedResult SemaCoerce::coerceLiteral(Expr *E) {
     assert(!Failure && "Lexer should have verified a reasonable type!");
     (void)Failure;
     
-    if (Value.getActiveBits() > BIT->getBitWidth()) {
+    if (Value.getActiveBits() > BIT->getBitWidth())
       diagnose(E->getLoc(), diag::int_literal_too_large, Value.getBitWidth(),
                DestTy);
-      return nullptr;
-    }
     
     // Give the integer literal the builtin integer type.
     if (Apply)
