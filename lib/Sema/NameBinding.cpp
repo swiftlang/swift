@@ -151,7 +151,8 @@ Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
 
   // Parse the translation unit, but don't do name binding or type checking.
   // This can produce new errors etc if the input is erroneous.
-  ImportedTU = parseTranslationUnit(BufferID, Comp, Context);
+  ImportedTU = parseTranslationUnit(BufferID, Comp, Context,
+                                    /*IsMainModule*/false);
   if (ImportedTU == 0)
     return 0;
   LoadedModules[ModuleID.first.str()] = ImportedTU;

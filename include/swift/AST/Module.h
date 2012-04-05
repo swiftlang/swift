@@ -51,6 +51,7 @@ class Module : public DeclContext {
 public:
   ASTContext &Ctx;
   Identifier Name;
+  bool IsMainModule;
   
   //===--------------------------------------------------------------------===//
   // AST Phase of Translation
@@ -71,9 +72,11 @@ public:
   } ASTStage;
 
 protected:
-  Module(DeclContextKind Kind, Identifier Name, Component *C, ASTContext &Ctx)
+  Module(DeclContextKind Kind, Identifier Name, Component *C, ASTContext &Ctx,
+         bool IsMainModule)
   : DeclContext(Kind, nullptr), LookupCachePimpl(0), ExtensionCachePimpl(0),
-    Comp(C), Ctx(Ctx), Name(Name), ASTStage(Parsing) {
+    Comp(C), Ctx(Ctx), Name(Name), IsMainModule(IsMainModule),
+    ASTStage(Parsing) {
     assert(Comp != nullptr || Kind == DeclContextKind::BuiltinModule);
   }
 
@@ -163,8 +166,9 @@ public:
   /// expressions and declarations for a translation unit.
   BraceStmt *Body;
   
-  TranslationUnit(Identifier Name, Component *Comp, ASTContext &C)
-    : Module(DeclContextKind::TranslationUnit, Name, Comp, C) {
+  TranslationUnit(Identifier Name, Component *Comp, ASTContext &C,
+                  bool IsMainModule)
+    : Module(DeclContextKind::TranslationUnit, Name, Comp, C, IsMainModule) {
   }
 
   ArrayRef<TypeAliasDecl*> getUnresolvedTypes() const {
@@ -216,7 +220,7 @@ public:
 class BuiltinModule : public Module {
 public:
   BuiltinModule(Identifier Name, ASTContext &Ctx)
-    : Module(DeclContextKind::BuiltinModule, Name, nullptr, Ctx) {
+    : Module(DeclContextKind::BuiltinModule, Name, nullptr, Ctx, false) {
     // The Builtin module is always well formed.
     ASTStage = TypeChecked;
   }

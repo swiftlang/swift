@@ -55,7 +55,8 @@ TranslationUnit *Parser::parseTranslationUnit() {
   SourceLoc FileStartLoc = Tok.getLoc();
 
   TranslationUnit *TU =
-    new (Context) TranslationUnit(getModuleIdentifier(), Component, Context);
+    new (Context) TranslationUnit(getModuleIdentifier(), Component, Context,
+                                  IsMainModule);
   CurDeclContext = TU;
   
   // Parse the body of the file.

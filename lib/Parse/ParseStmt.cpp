@@ -93,7 +93,7 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
   
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
     bool NeedParseErrorRecovery = false;
-    
+
     // Parse the decl, stmt, or expression.    
     if (isStartOfStmtOtherThanAssignment(Tok)) {
       NullablePtr<Stmt> Res = parseStmtOtherThanAssignment();
@@ -140,6 +140,13 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     // "hard".
     if (NeedParseErrorRecovery)
       skipUntilDeclStmtRBrace();
+
+    if (IsTopLevel && !IsMainModule && !NeedParseErrorRecovery &&
+        Entries.back().is<Stmt*>()) {
+      // Statements are not allowed at the top level outside the main module
+      SourceLoc Loc = Entries.back().get<Stmt*>()->getStartLoc();
+      diagnose(Loc, diag::illegal_top_level_stmt);
+    }
   }
 
   return false;

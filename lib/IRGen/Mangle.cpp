@@ -289,10 +289,6 @@ static bool shouldMangle(NamedDecl *D) {
   // Everything not declared in global context needs to be mangled.
   if (!isa<TranslationUnit>(D->getDeclContext())) return true;
 
-  // Don't mangle a function named main.
-  if (isa<FuncDecl>(D) && D->getName().str() == "main")
-    return false;
-
   return true;
 }
 

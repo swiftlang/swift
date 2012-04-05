@@ -227,6 +227,8 @@ ERROR(expected_rparen_tuple_pattern_list,pattern_parsing,non,
 //------------------------------------------------------------------------------
 ERROR(expected_stmt,stmt_parsing,none,
       "expected statement", ())
+ERROR(illegal_top_level_stmt,stmt_parsing,none,
+      "statments are not allowed at the top level", ())
 
 // Assignment statement
 ERROR(expected_expr_assignment,stmt_parsing,none,

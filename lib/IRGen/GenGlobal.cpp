@@ -57,13 +57,25 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit) {
 
   llvm::FunctionType *fnType =
       getFunctionType(unitToUnit, ExplosionKind::Minimal, 0, false);
-  llvm::Function *fn =
-      llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
-                             tunit->Name.str() + ".init", &Module);
+  llvm::Function *fn;
+  if (tunit->IsMainModule) {
+    // For the main module, just emit main().
+    fn = llvm::Function::Create(fnType, llvm::GlobalValue::ExternalLinkage,
+                                "main", &Module);
+  } else {
+    // Otherwise, create a global initializer.
+    // FIXME: This is completely, utterly, wrong.
+    fn = llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
+                                tunit->Name.str() + ".init", &Module);
+  }
 
   IRGenFunction(*this, unitToUnit, params, ExplosionKind::Minimal,
                 /*uncurry*/ 0, fn)
     .emitGlobalTopLevel(tunit->Body);
+
+  // We don't need global init to call main().
+  if (tunit->IsMainModule)
+    return;
 
   // Not all translation units need a global initialization function.
   if (isTrivialGlobalInit(fn)) {
@@ -100,8 +112,7 @@ void IRGenFunction::emitGlobalTopLevel(BraceStmt *body) {
     } else if (Expr *E = elt.dyn_cast<Expr*>()) {
       emitIgnored(E);
     } else {
-      Stmt *S = elt.get<Stmt*>();
-      unimplemented(S->getStartLoc(), "statement emission at global scope");
+      emitStmt(elt.get<Stmt*>());
     }
   }
 }

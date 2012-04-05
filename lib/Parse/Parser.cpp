@@ -44,8 +44,9 @@ namespace {
 /// parseTranslationUnit - Entrypoint for the parser.
 TranslationUnit *swift::parseTranslationUnit(unsigned BufferID,
                                              Component *Comp,
-                                             ASTContext &Ctx) {
-  Parser P(BufferID, Comp, Ctx);
+                                             ASTContext &Ctx,
+                                             bool IsMainModule) {
+  Parser P(BufferID, Comp, Ctx, IsMainModule);
   PrettyStackTraceParser stackTrace(P);
   return P.parseTranslationUnit();
 }
@@ -54,14 +55,16 @@ TranslationUnit *swift::parseTranslationUnit(unsigned BufferID,
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
-Parser::Parser(unsigned BufferID, swift::Component *Comp, ASTContext &Context)
+Parser::Parser(unsigned BufferID, swift::Component *Comp, ASTContext &Context,
+               bool IsMainModule)
   : SourceMgr(Context.SourceMgr),
     Diags(Context.Diags),
     Buffer(SourceMgr.getMemoryBuffer(BufferID)),
     L(*new Lexer(Buffer->getBuffer(), SourceMgr, &Diags)),
     Component(Comp),
     Context(Context),
-    ScopeInfo(*this) {
+    ScopeInfo(*this),
+    IsMainModule(IsMainModule) {
 }
 
 Parser::~Parser() {

@@ -53,6 +53,7 @@ public:
   std::vector<IdentifierType*> UnresolvedIdentifierTypes;
   std::vector<llvm::SetVector<ValueDecl*>> ValCaptures;
   std::vector<std::vector<VarDecl*>> AnonClosureVars;
+  bool IsMainModule;
 
   /// Tok - This is the current token being considered by the parser.
   Token Tok;
@@ -86,7 +87,8 @@ public:
   };
 
 
-  Parser(unsigned BufferID, swift::Component *Component, ASTContext &Ctx);
+  Parser(unsigned BufferID, swift::Component *Component, ASTContext &Ctx,
+         bool IsMainModule);
   ~Parser();
   
   //===--------------------------------------------------------------------===//

@@ -38,7 +38,7 @@ namespace swift {
   /// parseTranslationUnit - Parse a single buffer as a translation unit
   /// in the given component and return the decl.
   TranslationUnit *parseTranslationUnit(unsigned BufferID, Component *Comp,
-                                        ASTContext &Ctx);
+                                        ASTContext &Ctx, bool IsMainModule);
 
   /// performNameBinding - Once parsing is complete, this walks the AST to
   /// resolve names and do other top-level validation.
