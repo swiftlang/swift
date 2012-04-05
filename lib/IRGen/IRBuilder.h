@@ -84,7 +84,12 @@ public:
   public:
     StableIP() = default;
     explicit StableIP(const IRBuilder &Builder) {
-      assert(Builder.hasValidIP() && "constructing stable IP for invalid IP");
+      if (!Builder.hasValidIP()) {
+        After = UnionTy();
+        assert(!isValid());
+        return;
+      }
+
       llvm::BasicBlock *curBlock = Builder.GetInsertBlock();
       assert(Builder.GetInsertPoint() == curBlock->end());
       if (curBlock->empty())
@@ -93,10 +98,16 @@ public:
         After = &curBlock->back();
     }
 
+    /// Does this stable IP point to a valid location?
+    bool isValid() const {
+      return !After.isNull();
+    }
+
     /// Insert an unparented instruction at this insertion point.
     /// Note that inserting multiple instructions at an IP will cause
     /// them to end up in reverse order.
     void insert(llvm::Instruction *I) {
+      assert(isValid() && "inserting at invalid location!");
       assert(I->getParent() == nullptr);
       if (llvm::BasicBlock *block = After.dyn_cast<llvm::BasicBlock*>()) {
         block->getInstList().push_front(I);
