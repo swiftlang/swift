@@ -1155,6 +1155,15 @@ void IRGenFunction::emitEpilogue() {
     resultType.load(*this, ReturnSlot, result);
     emitScalarReturn(result);
   }
+
+  // Destroy the unreachable block if it's unused.
+  if (UnreachableBB && UnreachableBB->use_empty())
+    UnreachableBB->eraseFromParent();
+
+  // Destroy the jump-destination slot if it's unused.
+  // TODO: also destroy it if it's only used for stores.
+  if (JumpDestSlot && JumpDestSlot->use_empty())
+    JumpDestSlot->eraseFromParent();
 }
 
 void IRGenFunction::emitScalarReturn(Explosion &result) {

@@ -21,9 +21,11 @@
 #include "swift/AST/LLVM.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/DenseMap.h"
+#include "DiverseStack.h"
 #include "IRBuilder.h"
 
 namespace llvm {
+  class AllocaInst;
   class Constant;
   class Function;
 }
@@ -45,6 +47,7 @@ namespace swift {
   class WhileStmt;
 
 namespace irgen {
+  class Cleanup;
   class Condition;
   class Explosion;
   enum class ExplosionKind : unsigned;
@@ -76,6 +79,18 @@ enum class Prologue : unsigned char {
   Bare
 };
 
+/// The valid states that a cleanup can be in.
+enum class CleanupState {
+  /// The cleanup is inactive but may be activated later.
+  Dormant,
+
+  /// The cleanup is currently active.
+  Active,
+
+  /// The cleanup is inactive and will not be activated later.
+  Dead
+};
+
 /// IRGenFunction - Primary class for emitting LLVM instructions for a
 /// specific function.
 class IRGenFunction {
@@ -103,6 +118,46 @@ public:
 public:
   void emitBranch(JumpDest D);
 
+  /// Push a new cleanup in the current scope.
+  template <class T, class... A>
+  T &pushCleanup(A &&... args) {
+    return pushCleanupInState<T, A...>(::std::forward<A>(args)...);
+  }
+
+  /// Push a new cleanup in the current scope.
+  template <class T, class... A>
+  T &pushCleanupInState(CleanupState state, A &&... args) {
+    assert(state != CleanupState::Dead);
+
+    T &cleanup = Cleanups.push<T, A...>(::std::forward<A>(args)...);
+    return static_cast<T&>(initCleanup(cleanup, sizeof(T), state));
+  }
+
+  typedef DiverseStackImpl<Cleanup>::stable_iterator CleanupsDepth;
+
+  /// Retun a stable reference to the current cleanup.
+  CleanupsDepth getCleanupsDepth() const {
+    return Cleanups.stable_begin();
+  }
+
+  /// Set the state of the cleanup at the given depth.
+  /// The transition must be non-trivial and legal.
+  void setCleanupState(CleanupsDepth depth, CleanupState state);
+
+  void popCleanups(CleanupsDepth depth);
+
+  llvm::Value *getJumpDestSlot();
+  static Alignment getJumpDestAlignment() { return Alignment(4); }
+  llvm::BasicBlock *getUnreachableBlock();
+
+private:
+  DiverseStack<Cleanup, 128> Cleanups;
+  llvm::BasicBlock *UnreachableBB;
+  llvm::Instruction *JumpDestSlot;
+
+  Cleanup &initCleanup(Cleanup &cleanup, size_t allocSize, CleanupState state);
+  void setCleanupState(Cleanup &cleanup, CleanupState state);
+
 //--- Function prologue and epilogue -------------------------------------------
 public:
   Explosion collectParameters();
@@ -114,7 +169,6 @@ private:
 
   Address ReturnSlot;
   llvm::BasicBlock *ReturnBB;
-  JumpDest getReturnDest();
   const TypeInfo &getResultTypeInfo() const;
 
 //--- Helper methods -----------------------------------------------------------
@@ -123,6 +177,8 @@ public:
                                     const llvm::Twine &name);
   OwnedAddress createScopeAlloca(const TypeInfo &type, OnHeap_t onHeap,
                                  const llvm::Twine &name);
+  llvm::AllocaInst *createSupportAlloca(llvm::Type *type, Alignment align,
+                                        const llvm::Twine &name);
 
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
   const TypeInfo &getFragileTypeInfo(Type T);

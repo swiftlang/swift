@@ -116,8 +116,7 @@ void IRGenFunction::emitReturnStmt(ReturnStmt *S) {
   fullExpr.pop();
 
   // In either case, branch to the return block.
-  JumpDest returnDest(ReturnBB);
-  emitBranch(returnDest);
+  emitBranch(JumpDest(ReturnBB, Cleanups.stable_end()));
   Builder.ClearInsertionPoint();
 }
 

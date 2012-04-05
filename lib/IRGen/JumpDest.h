@@ -17,6 +17,8 @@
 #ifndef SWIFT_IRGEN_JUMPDEST_H
 #define SWIFT_IRGEN_JUMPDEST_H
 
+#include "IRGenFunction.h"
+
 namespace llvm {
   class BasicBlock;
 }
@@ -29,11 +31,13 @@ namespace irgen {
 /// needs to worry about branches into scopes, not out of them.
 class JumpDest {
   llvm::BasicBlock *Block;
-  // FIXME: also a scope depth
+  IRGenFunction::CleanupsDepth Depth;
 public:
-  explicit JumpDest(llvm::BasicBlock *Block) : Block(Block) {}
+  JumpDest(llvm::BasicBlock *block, IRGenFunction::CleanupsDepth depth)
+    : Block(block), Depth(depth) {}
 
   llvm::BasicBlock *getBlock() const { return Block; }
+  IRGenFunction::CleanupsDepth getDepth() const { return Depth; }
 };
 
 } // end namespace irgen
