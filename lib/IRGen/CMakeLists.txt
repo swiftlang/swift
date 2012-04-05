@@ -40,6 +40,7 @@ add_swift_library(swiftIRGen
   LValue.h
   Linking.h
   Mangle.cpp
+  Scope.h
   StructLayout.cpp
   StructLayout.h
   DEPENDS swiftAST)

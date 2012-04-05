@@ -17,6 +17,7 @@
 
 #include "swift/AST/LLVM.h"
 #include "llvm/DerivedTypes.h"
+#include "Cleanup.h"
 #include "Explosion.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
@@ -146,13 +147,20 @@ void IRGenFunction::emitRelease(llvm::Value *value) {
   return emitReleaseCall(*this, value);
 }
 
+namespace {
+  struct CallRelease : Cleanup {
+    llvm::Value *Value;
+    CallRelease(llvm::Value *value) : Value(value) {}
+
+    void emit(IRGenFunction &IGF) const {
+      emitReleaseCall(IGF, Value);
+    }
+  };
+}
+
 /// Enter a cleanup to release an object.
 void IRGenFunction::enterReleaseCleanup(llvm::Value *value) {
   if (doesNotRequireRefCounting(value)) return;
 
-  // FIXME: implement
-}
-
-void IRGenFunction::popCleanup() {
-  // FIXME: implement
+  pushFullExprCleanup<CallRelease>(value);
 }

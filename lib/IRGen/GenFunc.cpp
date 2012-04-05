@@ -1102,8 +1102,34 @@ void IRGenFunction::emitPrologue() {
   assert(values.empty() && "didn't exhaust all parameters?");
 }
 
+/// Given an alloca, destroy it if its uses are all stores.
+static void eraseAllocaIfOnlyStoredTo(llvm::AllocaInst *alloca) {
+  for (auto i = alloca->use_begin(), e = alloca->use_end(); i != e; ++i) {
+    // Check if this use is a store.
+    llvm::StoreInst *store = dyn_cast<llvm::StoreInst>(*i);
+    if (!store) return;
+    assert(i.getOperandNo() == 1 && "address of alloca was taken");
+  }
+
+  // If we got here, all the uses are stores;  kill them.
+  for (auto i = alloca->use_begin(), e = alloca->use_end(); i != e; ) {
+    llvm::StoreInst *store = cast<llvm::StoreInst>(*i);
+    ++i; // advance now to avoid being invalidated
+
+    // TODO: maybe clean up the stored value?
+    store->eraseFromParent();
+  }
+
+  alloca->eraseFromParent();
+}
+
 /// Emit the epilogue for the function.
 void IRGenFunction::emitEpilogue() {
+  // Leave the cleanups created for the parameters if we've got a full
+  // prologue.
+  if (CurPrologue != Prologue::Bare)
+    endScope(Cleanups.stable_end());
+
   // Destroy the alloca insertion point.
   AllocaIP->eraseFromParent();
 
@@ -1162,8 +1188,8 @@ void IRGenFunction::emitEpilogue() {
 
   // Destroy the jump-destination slot if it's unused.
   // TODO: also destroy it if it's only used for stores.
-  if (JumpDestSlot && JumpDestSlot->use_empty())
-    JumpDestSlot->eraseFromParent();
+  if (JumpDestSlot)
+    eraseAllocaIfOnlyStoredTo(cast<llvm::AllocaInst>(JumpDestSlot));
 }
 
 void IRGenFunction::emitScalarReturn(Explosion &result) {
@@ -1421,9 +1447,6 @@ namespace {
       llvm::CallInst *call =
         IGF.Builder.CreateCall(nextEntrypoint, params.claimAll());
       call->setTailCall();
-
-      if (!layout.empty())
-        IGF.popCleanup();
 
       if (call->getType()->isVoidTy()) {
         IGF.Builder.CreateRetVoid();

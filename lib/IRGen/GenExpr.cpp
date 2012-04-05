@@ -424,6 +424,7 @@ void IRGenFunction::emitPatternBindingInit(PatternBindingDecl *D, bool isGlobal)
       break;
   } while (1);
   if (NamedPattern *NP = dyn_cast<NamedPattern>(P)) {
+    // FIXME: should be a full-expression scope.
     VarDecl *var = NP->getDecl();
     const TypeInfo &type = IGM.getFragileTypeInfo(var->getType());
     Address addr = isGlobal ? IGM.getAddrOfGlobalVariable(var) : getLocal(var);

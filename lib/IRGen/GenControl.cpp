@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/ADT/OwningPtr.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Function.h"
 #include "Cleanup.h"
 #include "Condition.h"
@@ -33,6 +34,26 @@ IRGenFunction::createSupportAlloca(llvm::Type *ty, Alignment align,
   llvm::AllocaInst *alloca = new llvm::AllocaInst(ty, name, AllocaIP);
   alloca->setAlignment(align.getValue());
   return alloca;
+}
+
+/// Like emitBlock, but merge the target block into its unique
+/// predecessor if possible.
+void IRBuilder::emitMergeableBlock(llvm::BasicBlock *BB) {
+  assert(ClearedIP == nullptr);
+
+  // Check our special case.
+  if (BB->hasOneUse()) {
+    llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(*BB->use_begin());
+    if (br && br->isUnconditional()) {
+      IRBuilderBase::SetInsertPoint(br->getParent());
+      br->eraseFromParent();
+      delete BB;
+      return;
+    }
+  }
+
+  // Do the normal thing.
+  emitBlock(BB);
 }
 
 /// Insert the given basic block after the IP block and move the
@@ -367,12 +388,18 @@ void Cleanup::setControl(const CleanupControl &control) {
 
 /// Alter a control flag at the current insertion point (which must be valid).
 static void setFlagNow(IRGenFunction &IGF, llvm::AllocaInst *flag, bool value) {
+  assert(IGF.Builder.hasValidIP());
   IGF.Builder.CreateStore(IGF.Builder.getInt1(value), flag, Alignment(1));
 }
 
 /// Alter a control flag at the given stable insertion point.
 static void setFlagThen(IRGenFunction &IGF, IRBuilder::StableIP ip,
                         llvm::AllocaInst *flag, bool value) {
+  if (!ip.isValid()) {
+    assert(value == false && "activation point is unreachable!");
+    return;
+  }
+
   llvm::StoreInst *store =
     new llvm::StoreInst(IGF.Builder.getInt1(value), flag);
   store->setAlignment(1);
@@ -619,8 +646,31 @@ static void popAndEmitTopDeadCleanups(IRGenFunction &IGF,
   } while (!stack.empty() && stack.begin()->isDead());
 }
 
-/// Pop all the cleanups down to a given depth.
-void IRGenFunction::popCleanups(CleanupsDepth depth) {
+/// Are there any active cleanups in the given range?
+static bool hasAnyActiveCleanups(DiverseStackImpl<Cleanup>::iterator begin,
+                                 DiverseStackImpl<Cleanup>::iterator end) {
+  for (; begin != end; ++begin)
+    if (begin->isActive())
+      return true;
+  return false;
+}
+
+/// Leave a scope, with all its cleanups.
+void IRGenFunction::endScope(CleanupsDepth depth) {
+  // Fast path: no cleanups to leave in this scope.
+  if (Cleanups.stable_begin() == depth) return;
+
+  // Thread a branch through the cleanups if there are any active
+  // cleanups and we have a valid insertion point.
+  llvm::BasicBlock *contBB = nullptr;
+  if (Builder.hasValidIP() &&
+      hasAnyActiveCleanups(Cleanups.begin(), Cleanups.find(depth))) {
+    contBB = createBasicBlock("cleanups.fallthrough");
+    emitBranch(JumpDest(contBB, depth));
+  }
+
+  // Iteratively mark cleanups dead and pop them.
+  // Maybe we'd get better results if we marked them all dead in one shot?
   while (Cleanups.stable_begin() != depth) {
     // Mark the cleanup dead.
     if (!Cleanups.begin()->isDead())
@@ -629,6 +679,17 @@ void IRGenFunction::popCleanups(CleanupsDepth depth) {
     // Pop it.
     popAndEmitTopCleanup(*this, Cleanups);
   }
+
+  // Emit the continuation block if we made one.
+  if (contBB) {
+    Builder.emitMergeableBlock(contBB);
+  }
+}
+
+/// End the scope induced by a single cleanup.
+void IRGenFunction::endSingleCleanupScope() {
+  assert(!Cleanups.empty());
+  endScope(Cleanups.stabilize(llvm::next(Cleanups.begin())));
 }
 
 /// Initialize a just-pushed cleanup.
@@ -657,6 +718,12 @@ void IRGenFunction::setCleanupState(CleanupsDepth depth,
   auto iter = Cleanups.find(depth);
   assert(iter != Cleanups.end() && "changing state of end of stack");
   setCleanupState(*iter, newState);
+
+  // If we just killed the cleanup at the top of the stack, just kill
+  // it.  TODO: don't kill past the innermost scope.
+  if (newState == CleanupState::Dead && depth == Cleanups.stable_begin()) {
+    popAndEmitTopDeadCleanups(*this, Cleanups);
+  }
 }
 
 void IRGenFunction::setCleanupState(Cleanup &cleanup, CleanupState newState) {
@@ -681,7 +748,7 @@ void IRGenFunction::setCleanupState(Cleanup &cleanup, CleanupState newState) {
     // This isn't a state transition we need to do anything about,
     // though.
     case CleanupState::Dead:
-      goto killDeadCleanups;
+      return;
 
     // We're activating a dormant cleanup.
     case CleanupState::Active: {
@@ -724,18 +791,25 @@ void IRGenFunction::setCleanupState(Cleanup &cleanup, CleanupState newState) {
 
     // If we have a control flag already, just store to it.
     if (control.hasFlag()) {
-      setFlagNow(*this, control.getFlag(), false);
+      // Deactivation doesn't have to happen at a valid IP.
+      if (Builder.hasValidIP())
+        setFlagNow(*this, control.getFlag(), false);
+
+      return;
+    }
 
     // Otherwise, the control is an IP range over which the cleanup
     // was in a dormant state.
 
     // If the cleanup has been referenced in both states, force it now.
-    } else if (cleanup.isUsedWhileActive() && cleanup.isUsedWhileInactive()) {
+    if (cleanup.isUsedWhileActive() && cleanup.isUsedWhileInactive()) {
       transitionControlToFlag(*this, cleanup);
+      return;
+    }
 
     // If the cleanup was not referenced in this most recent active
     // interval, don't update the locations.
-    } else if (!cleanup.isUsedWhileActive()) {
+    if (cleanup.isUsedWhileActive()) {
       // do nothing
 
     // Otherwise, we have uses while active but none while inactive.
@@ -745,24 +819,10 @@ void IRGenFunction::setCleanupState(Cleanup &cleanup, CleanupState newState) {
       cleanup.setControl(CleanupControl::forIPRange(control.getIPEnd(),
                                                     Builder.getStableIP()));
     }
-
-    // Destroy permanently inactive cleanups if we've changed anything there.
-    if (newState == CleanupState::Dead)
-      goto killDeadCleanups;
     return;
   }
   }
   llvm_unreachable("bad cleanup state");
-
-  // Pare down the stack if possible.  All transitions to CleanupState::Dead
-  // should lead here in the end.
- killDeadCleanups:
-  assert(newState == CleanupState::Dead);
-
-  // If we're not working with the top of the stack, we're done.
-  if (&cleanup != &*Cleanups.begin()) return;
-
-  popAndEmitTopDeadCleanups(*this, Cleanups);
 }
 
 /// Emit a branch to the given jump destination, threading out through

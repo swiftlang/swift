@@ -10,8 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines some types that are generically useful for
-// dealing with cleanups in IR Generation.
+// This file defines the Cleanup type.
 //
 //===----------------------------------------------------------------------===//
 
@@ -22,7 +21,9 @@
 
 namespace swift {
 namespace irgen {
+  class IRGenFunction;
 
+// These classes are private to GenCleanup.cpp.
 class CleanupControl;
 class CleanupOutflows;
 
@@ -53,7 +54,10 @@ public:
   size_t allocated_size() const { return AllocatedSize; }
 
   CleanupState getState() const { return CleanupState(State); }
-  void setState(CleanupState state) { State = unsigned(state); }
+  void setState(CleanupState state) {
+    State = unsigned(state);
+    assert(getState() == state);
+  }
 
   CleanupControl getControl() const;
   void setControl(const CleanupControl &control);
@@ -94,39 +98,6 @@ public:
 
 private:
   virtual void _anchor();
-};
-
-/// A Scope is a RAII object recording that a scope (e.g. a brace
-/// statement) has been entered.
-class Scope {
-  IRGenFunction &IGF;
-  IRGenFunction::CleanupsDepth Depth;
-public:
-  explicit Scope(IRGenFunction &IGF)
-    : IGF(IGF), Depth(IGF.getCleanupsDepth()) {}
-
-  void pop() {
-    assert(Depth.isValid() && "popping a scope twice!");
-    if (Depth != IGF.getCleanupsDepth()) {
-      IGF.popCleanups(Depth);
-    }
-    Depth = IRGenFunction::CleanupsDepth::invalid();
-  }
-
-  ~Scope() {
-    if (Depth.isValid()) IGF.popCleanups(Depth);
-  }
-};
-
-/// A FullExpr is a RAII object recording that a full-expression has
-/// been entered.  A full-expression is essentially a very small scope
-/// for the temporaries in an expression, with the added complexity
-/// that (eventually, very likely) we have to deal with expressions
-/// that are only conditionally evaluated.
-class FullExpr : private Scope {
-public:
-  explicit FullExpr(IRGenFunction &IGF) : Scope(IGF) {}
-  using Scope::pop;
 };
 
 } // end namespace irgen

@@ -204,6 +204,14 @@ public:
   /// insertion point to it.  Only valid if the IP is valid.
   void emitBlock(llvm::BasicBlock *BB);
 
+  /// Insert the given basic block after the block containing the IP
+  /// and move the IP to it.  Only valid if the IP is valid.
+  ///
+  /// If the block has a single use as the destination of an
+  /// unconditional branch, it is permitted to instead kill that
+  /// branch and this block, and place the 
+  void emitMergeableBlock(llvm::BasicBlock *BB);
+
   /// Insert the given basic block "anywhere".  The IP may be invalid,
   /// in which case the block will be inserted after the block which
   /// contained the IP before the IP was invalidated.

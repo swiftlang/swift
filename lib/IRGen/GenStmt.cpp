@@ -18,8 +18,8 @@
 #include "swift/AST/Stmt.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "Cleanup.h"
 #include "Condition.h"
+#include "Scope.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "JumpDest.h"
@@ -61,6 +61,7 @@ void IRGenFunction::emitBraceStmt(BraceStmt *BS) {
     assert(Builder.hasValidIP());
 
     if (Expr *E = Elt.dyn_cast<Expr*>()) {
+      FullExpr scope(*this);
       emitIgnored(E);
     } else if (Stmt *S = Elt.dyn_cast<Stmt*>()) {
       emitStmt(S);

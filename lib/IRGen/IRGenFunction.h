@@ -121,7 +121,8 @@ public:
   /// Push a new cleanup in the current scope.
   template <class T, class... A>
   T &pushCleanup(A &&... args) {
-    return pushCleanupInState<T, A...>(::std::forward<A>(args)...);
+    return pushCleanupInState<T, A...>(CleanupState::Active,
+                                       ::std::forward<A>(args)...);
   }
 
   /// Push a new cleanup in the current scope.
@@ -131,6 +132,18 @@ public:
 
     T &cleanup = Cleanups.push<T, A...>(::std::forward<A>(args)...);
     return static_cast<T&>(initCleanup(cleanup, sizeof(T), state));
+  }
+
+  /// Push a new cleanup which is expected to be destroyed at the end
+  /// of the current full-expression.
+  ///
+  /// The relevant property here is that full-expression cleanups may
+  /// not be dominated by the locations in which they're active in a
+  /// full-expression expression.
+  template <class T, class... A>
+  T &pushFullExprCleanup(A &&... args) {
+    assert(!isConditionallyEvaluated());
+    return pushCleanup<T, A...>(::std::forward<A>(args)...);
   }
 
   typedef DiverseStackImpl<Cleanup>::stable_iterator CleanupsDepth;
@@ -144,7 +157,13 @@ public:
   /// The transition must be non-trivial and legal.
   void setCleanupState(CleanupsDepth depth, CleanupState state);
 
-  void popCleanups(CleanupsDepth depth);
+  void endScope(CleanupsDepth depth);
+  void endSingleCleanupScope();
+
+  /// Is the current emission point conditionally evaluated?  Right
+  /// now we don't have any expressions which introduce conditional
+  /// evaluation, but it's not at all unlikely that this will change.
+  bool isConditionallyEvaluated() const { return false; }
 
   llvm::Value *getJumpDestSlot();
   static Alignment getJumpDestAlignment() { return Alignment(4); }
@@ -184,7 +203,6 @@ public:
   const TypeInfo &getFragileTypeInfo(Type T);
   void emitMemCpy(llvm::Value *dest, llvm::Value *src,
                   Size size, Alignment align);
-  void popCleanup();
 private:
   llvm::Instruction *AllocaIP;
 
