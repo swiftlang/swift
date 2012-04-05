@@ -425,46 +425,31 @@
   <h3 id="decl-var">var Declarations</h3>
   <!-- ===================================================================== -->
   
-  <div class="commentary">
-    Eventually add support for "var x,y : int", to allow declarating multiple
-    values of the same type?
-  </div>
-  
   <pre id="value-specifier" class="grammar">
-    decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> var-name <a href="#value-specifier">value-specifier</a>
-    decl-var-simple ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#value-specifier">value-specifier</a>
+    decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#pattern">pattern</a> initializer?
+    decl-var-simple ::= 'var' identifier ':' type-annotation
     
-    value-specifier ::= ':' <a href="#type">type-annotation</a>
-    value-specifier ::= ':' <a href="#type">type-annotation</a> '=' <a href="#expr">expr</a>
-    value-specifier ::= '=' <a href="#expr">expr</a>
+    initializer ::= '=' <a href="#expr">expr</a>
   </pre>
   
 
   <p>'var' declarations form the backbone of value declarations in Swift.
-     Syntactically, var declarations come in three forms from the
-     value-specifier production.  In the first form,
-     a type is specified and the value is default initialized.  In the second
-     form the type is elided but a value is specified, the declaration gets the
-     specified value and has the same type as its initializer.  In the third
-     form, the value's type is as specified and the initializer is <a
-     href="#typecheck_conversions">converted to</a> that type if required.</p>
-  
+     A var declaration takes a pattern and an optional initializer, and
+     declares all the pattern-identifiers in the pattern as variables.
+     If there is an initializer and the pattern is fully-typed, the
+     initializer is converted to the type of the pattern.  If there is an
+     initializer and the pattern is not fully-typed, the type of initializer
+     is computed independently of the pattern, and the type of the pattern is
+     derived from the initializer. If no initializer is specified,
+     the pattern must be fully-typed, and the values are
+     default-initialized.</p>
+
+  <p>FIXME: Should the type of a pattern which isn't fully typed affect the
+     type-checking of the expression (i.e. should we compute a structured
+     dependent type)?</p>
+
   <p>Like all other declarations, var's can optionally have a list of <a
     href="#attribute-list">attributes</a> applied to them.</p>
-  
-  <pre class="grammar">
-    var-name ::= <a href="#identifier">identifier</a>
-    var-name ::= lparen-any ')'
-    var-name ::= lparen-any var-name (',' var-name)* ')'
-  </pre>
-  
-  <p>The name given to the var can have structure that allows fields of the
-     returned value to be directly named and accessed in later code.  The
-     structure of the name is required to match up with the type being matched.
-     An single identifier is always valid to capture the entire value
-     (potentially as an aggregate).  Parenthesized values match up against tuple
-     types.  FIXME: This should be integrated with pattern matching.
-  </p>
 
   <p>The type of a variable must be
     <a href="#materializable"><i>materializable</i></a>.</p>
@@ -480,11 +465,6 @@
     <i>// This decodes the tuple return value into independently named parts</i>
     <i>// and both 'val' and 'err' are in scope after this line.</i>
     var (val, err) = foo()
-    
-    <i>// This binds elements of a struct into local variables.</i>
-    // <b>FIXME</b> This seems like a really bad idea, making binding 'fragile'.
-    struct point { x : int, y : int }
-    var (a, b) = foo()  <i>// when foo returns a 'point'.</i>
   </pre>
 
     
