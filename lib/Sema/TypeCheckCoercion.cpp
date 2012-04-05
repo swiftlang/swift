@@ -164,13 +164,16 @@ public:
         return coerced(new (TC.Context) DeclRefExpr(val, E->getLoc(), Matched));
       }
     }
-    
-    // FIXME: Diagnose issues here?
-    if (!Apply)
-      return nullptr;
-    
-    // FIXME: We should be able to materialize values here.
-    return unchanged(E);
+
+    // FIXME: We should be able to materialize values here, unless
+    // implicit(byref) goes away.
+    if (Apply) {
+      diagnose(E->getLoc(), diag::no_candidates_ref,
+               E->getDecls()[0]->getName());
+      TC.printOverloadSetCandidates(E->getDecls());
+    }
+
+    return nullptr;
   }
   
   CoercedResult visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
