@@ -17,6 +17,7 @@
 #ifndef SWIFT_IRGEN_IRBUILDER_H
 #define SWIFT_IRGEN_IRBUILDER_H
 
+#include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/IRBuilder.h"
 #include "Address.h"
 #include "IRGen.h"
@@ -71,6 +72,94 @@ public:
     IRBuilderBase::SetInsertPoint(BB);
   }
 
+  /// A stable insertion point in the function.  "Stable" means that
+  /// it will point to the same location in the function, even if
+  /// instructions are subsequently added to the the current basic
+  /// block.
+  class StableIP {
+    /// Either an instruction that we're inserting after or the basic
+    /// block that we're inserting at the beginning of.
+    typedef llvm::PointerUnion<llvm::Instruction*, llvm::BasicBlock*> UnionTy;
+    UnionTy After;
+  public:
+    StableIP() = default;
+    explicit StableIP(const IRBuilder &Builder) {
+      assert(Builder.hasValidIP() && "constructing stable IP for invalid IP");
+      llvm::BasicBlock *curBlock = Builder.GetInsertBlock();
+      assert(Builder.GetInsertPoint() == curBlock->end());
+      if (curBlock->empty())
+        After = curBlock;
+      else
+        After = &curBlock->back();
+    }
+
+    /// Insert an unparented instruction at this insertion point.
+    /// Note that inserting multiple instructions at an IP will cause
+    /// them to end up in reverse order.
+    void insert(llvm::Instruction *I) {
+      assert(I->getParent() == nullptr);
+      if (llvm::BasicBlock *block = After.dyn_cast<llvm::BasicBlock*>()) {
+        block->getInstList().push_front(I);
+      } else {
+        llvm::Instruction *afterInsn = After.get<llvm::Instruction*>();
+        afterInsn->getParent()->getInstList().insertAfter(afterInsn, I);
+      }
+    }
+
+    // Support for being placed in pointer unions.
+    void *getOpaqueValue() const { return After.getOpaqueValue(); }
+    static StableIP getFromOpaqueValue(void *p) {
+      StableIP result;
+      result.After = UnionTy::getFromOpaqueValue(p);
+      return result;
+    }
+    enum { NumLowBitsAvailable
+             = llvm::PointerLikeTypeTraits<UnionTy>::NumLowBitsAvailable };
+  };
+
+  /// Capture a stable reference to the current IP.
+  StableIP getStableIP() const {
+    return StableIP(*this);
+  }
+
+  /// A RAII object for temporarily saving and restoring the IP.
+  class ShiftIP {
+    IRBuilder &Builder;
+    llvm::BasicBlock *ClearedIP;
+    InsertPoint SavedIP;
+    bool Restored;
+
+    ShiftIP(const ShiftIP &) = delete;
+    ShiftIP &operator=(const ShiftIP &) = delete;
+
+    void restoreImpl() {
+      Builder.restoreIP(SavedIP);
+      Builder.ClearedIP = ClearedIP;
+    }
+
+  public:
+    ShiftIP(IRBuilder &builder, llvm::BasicBlock *newBlock)
+      : Builder(builder), ClearedIP(builder.ClearedIP),
+        SavedIP(builder.saveIP()), Restored(false) {
+      assert(newBlock != nullptr);
+      assert(newBlock->getParent() != nullptr &&
+             "new block has not been inserted!");
+
+      builder.ClearedIP = nullptr;
+      builder.SetInsertPoint(newBlock);
+    }
+
+    void restore() {
+      assert(!Restored);
+      restoreImpl();
+      Restored = true;
+    }
+
+    ~ShiftIP() {
+      if (!Restored) restoreImpl();
+    }
+  };
+
   using IRBuilderBase::CreateLoad;
   llvm::LoadInst *CreateLoad(llvm::Value *addr, Alignment align,
                              const llvm::Twine &name = "") {
@@ -112,5 +201,23 @@ public:
 
 } // end namespace irgen
 } // end namespace swift
+
+namespace llvm {
+  template <> class PointerLikeTypeTraits<swift::irgen::IRBuilder::StableIP> {
+    typedef swift::irgen::IRBuilder::StableIP type;
+  public:
+    static void *getAsVoidPointer(type IP) {
+      return IP.getOpaqueValue();
+    }
+    static type getFromVoidPointer(void *p) {
+      return type::getFromOpaqueValue(p);
+    }
+
+    // The number of bits available are the min of the two pointer types.
+    enum {
+      NumLowBitsAvailable = type::NumLowBitsAvailable
+    };
+  };
+}
 
 #endif
