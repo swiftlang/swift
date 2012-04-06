@@ -1544,13 +1544,13 @@ static void emitFunction(IRGenModule &IGM, FuncDecl *func,
 
 /// Emit the definition for the given instance method.
 void IRGenModule::emitInstanceMethod(FuncDecl *func) {
-  assert(!func->isPlus());
+  assert(!func->isStatic());
   emitFunction(*this, func, 1);
 }
 
-/// Emit the definition for the given plus method.
-void IRGenModule::emitPlusMethod(FuncDecl *func) {
-  assert(func->isPlus());
+/// Emit the definition for the given static method.
+void IRGenModule::emitStaticMethod(FuncDecl *func) {
+  assert(func->isStatic());
   emitFunction(*this, func, 0);
 }
 

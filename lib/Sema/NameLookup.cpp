@@ -53,8 +53,8 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M) {
     
     // Otherwise, just perform normal dot lookup on the type with the specified
     // member name to see if we find extensions or anything else.  For example,
-    // If type SomeTy.SomeMember can look up plus functions, and can even look
-    // up non-plus functions as well (thus getting the address of the member).
+    // If type SomeTy.SomeMember can look up static functions, and can even look
+    // up non-static functions as well (thus getting the address of the member).
     doIt(Ty, Name, M);
 
     // If we find anything that requires 'this', reset it back because we don't
@@ -84,9 +84,9 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M) {
     for (ValueDecl *VD : PT->Elements) {
       if (VD->getName() != Name) continue;
       
-      // If this is a 'plus' function, then just ignore the base expression.
+      // If this is a 'static' function, then just ignore the base expression.
       if (FuncDecl *FD = dyn_cast<FuncDecl>(VD))
-        if (FD->isPlus()) {
+        if (FD->isStatic()) {
           Results.push_back(Result::getIgnoreBase(FD));
           return;
         }
@@ -115,7 +115,7 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M) {
 
   for (ValueDecl *VD : ExtensionMethods) {
     if (FuncDecl *FD = dyn_cast<FuncDecl>(VD))
-      if (FD->isPlus()) {
+      if (FD->isStatic()) {
         Results.push_back(Result::getIgnoreBase(FD));
         continue;
       }
@@ -222,7 +222,7 @@ Expr *MemberLookup::createResultAST(Expr *Base, SourceLoc DotLoc,
   // If we have an ambiguous result, build an overload set.
   SmallVector<ValueDecl*, 8> ResultSet;
     
-  // FIXME: This is collecting a mix of plus and normal functions.  This also
+  // FIXME: This is collecting a mix of static and normal functions.  This also
   // discards the base expression and is completely wrong in the case when
   // we're referencing something that needs it!
   for (MemberLookupResult X : Results) {

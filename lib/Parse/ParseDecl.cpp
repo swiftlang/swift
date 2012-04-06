@@ -337,7 +337,7 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   case tok::kw_protocol:
     Entries.push_back(parseDeclProtocol());
     break;
-  case tok::kw_plus:
+  case tok::kw_static:
     if (peekToken().isNot(tok::kw_func))
       goto ParseError;
     // FALL THROUGH.
@@ -566,20 +566,21 @@ VarDecl *Parser::parseDeclVarSimple() {
 /// is true, we parse both productions.
 ///
 ///   decl-func:
-///     'plus'? 'func' attribute-list any-identifier func-signature stmt-brace?
+///     'static'? 'func' attribute-list any-identifier func-signature 
+///               stmt-brace?
 ///
 /// NOTE: The caller of this method must ensure that the token sequence is
-/// either 'func' or 'plus' 'func'.
+/// either 'func' or 'static' 'func'.
 ///
 FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
-  SourceLoc PlusLoc;
-  if (Tok.is(tok::kw_plus)) {
-    PlusLoc = consumeToken(tok::kw_plus);
+  SourceLoc StaticLoc;
+  if (Tok.is(tok::kw_static)) {
+    StaticLoc = consumeToken(tok::kw_static);
 
-    // Reject 'plus' functions at global scope.
+    // Reject 'static' functions at global scope.
     if (!hasContainerType) {
-      diagnose(Tok, diag::plus_func_decl_global_scope);
-      PlusLoc = SourceLoc();
+      diagnose(Tok, diag::static_func_decl_global_scope);
+      StaticLoc = SourceLoc();
     }
   }
   
@@ -601,12 +602,12 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
 
   SmallVector<Pattern*, 8> Params;
 
-  // If we're within a container and this isn't a plus method, add an
+  // If we're within a container and this isn't a static method, add an
   // implicit first pattern to match the container type as an element
   // named 'this'.  This turns "(int)->int" on FooTy into "(this :
   // [byref] FooTy)->((int)->int)".  Note that we can't actually compute the
   // type here until Sema.
-  if (hasContainerType && !PlusLoc.isValid()) {
+  if (hasContainerType && !StaticLoc.isValid()) {
     VarDecl *D =
       new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
                             Type(), CurDeclContext);
@@ -652,7 +653,7 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   }
   
   // Create the decl for the func and add it to the parent scope.
-  FuncDecl *FD = new (Context) FuncDecl(PlusLoc, FuncLoc, Name,
+  FuncDecl *FD = new (Context) FuncDecl(StaticLoc, FuncLoc, Name,
                                         FuncTy, FE, CurDeclContext);
   if (Attributes.isValid()) FD->getMutableAttrs() = Attributes;
   ScopeInfo.addToScope(FD);
@@ -919,7 +920,7 @@ bool Parser::parseProtocolBody(SourceLoc ProtocolLoc,
       break;
       
     // FIXME: use standard parseDecl loop.
-    case tok::kw_plus:
+    case tok::kw_static:
     case tok::kw_func:
       Elements.push_back(parseDeclFunc(Tok.is(tok::kw_func)));
       if (Elements.back() == 0) return true;

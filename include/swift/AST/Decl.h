@@ -416,17 +416,17 @@ public:
 
 /// FuncDecl - 'func' declaration.
 class FuncDecl : public ValueDecl {
-  SourceLoc PlusLoc;    // Location of the 'plus' token or invalid if not 'plus'
+  SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
   FuncExpr *Body;
 public:
-  FuncDecl(SourceLoc PlusLoc, SourceLoc FuncLoc, Identifier Name,
+  FuncDecl(SourceLoc StaticLoc, SourceLoc FuncLoc, Identifier Name,
            Type Ty, FuncExpr *Body, DeclContext *DC)
-    : ValueDecl(DeclKind::Func, DC, Name, Ty), PlusLoc(PlusLoc),
+    : ValueDecl(DeclKind::Func, DC, Name, Ty), StaticLoc(StaticLoc),
       FuncLoc(FuncLoc), Body(Body) {
   }
   
-  bool isPlus() const { return PlusLoc.isValid(); }
+  bool isStatic() const { return StaticLoc.isValid(); }
 
   FuncExpr *getBody() const { return Body; }
   void setBody(FuncExpr *NewBody) { Body = NewBody; }
@@ -443,7 +443,7 @@ public:
   /// only be used after name binding has resolved types.
   Type computeThisType() const;
   
-  /// getImplicitThisDecl - If this FuncDecl is a non-plus method in an
+  /// getImplicitThisDecl - If this FuncDecl is a non-static method in an
   /// extension context, it will have a 'this' argument.  This method returns it
   /// if present, or returns null if not.
   VarDecl *getImplicitThisDecl();
@@ -451,11 +451,11 @@ public:
     return const_cast<FuncDecl*>(this)->getImplicitThisDecl();
   }
   
-  SourceLoc getPlusLoc() const { return PlusLoc; }
+  SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }
     
   SourceLoc getLocStart() const {
-    return PlusLoc.isValid() ? PlusLoc : FuncLoc;
+    return StaticLoc.isValid() ? StaticLoc : FuncLoc;
   }
   
   // Implement isa/cast/dyncast/etc.

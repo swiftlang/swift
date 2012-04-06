@@ -42,7 +42,7 @@ enum class tok {
   KEYWORD(struct)
   KEYWORD(typealias)
   KEYWORD(var)
-  KEYWORD(plus)
+  KEYWORD(static)
   
   // Statements
   KEYWORD(if)

@@ -138,7 +138,7 @@ public:
   void emitOneOfType(OneOfType *type);
   void emitExtension(ExtensionDecl *D);
   void emitGlobalFunction(FuncDecl *D);  
-  void emitPlusMethod(FuncDecl *D);
+  void emitStaticMethod(FuncDecl *D);
   void emitInstanceMethod(FuncDecl *D);
 
   llvm::FunctionType *getFunctionType(Type fnType, ExplosionKind kind,

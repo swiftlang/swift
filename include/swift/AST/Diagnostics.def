@@ -136,8 +136,8 @@ ERROR(expected_type_in_typealias,decl_parsing,none,
 // Func
 ERROR(func_decl_without_paren,decl_parsing,none,
       "expected '(' in argument list of func declaration", ())
-ERROR(plus_func_decl_global_scope,decl_parsing,none,
-      "'plus' functions may only be declared on a type", ())
+ERROR(static_func_decl_global_scope,decl_parsing,none,
+      "'static' functions may only be declared on a type", ())
 
 // OneOf
 
@@ -320,8 +320,8 @@ ERROR(type_not_compatible_literal,literal_parsing,none,
       "inferred type %0 is not compatible with literal", (Type))
 ERROR(type_ambiguous_literal_conversion,literal_parsing,none,
       "%0 has multiple '%1' methods", (Type, StringRef))
-ERROR(type_literal_conversion_not_plus,literal_parsing,none,
-      "'%1' method in %0 must be a plus method",
+ERROR(type_literal_conversion_not_static,literal_parsing,none,
+      "'%1' method in %0 must be a static method",
       (Type, StringRef))
 ERROR(literal_conversion_wrong_return_type,literal_parsing,none,
       "'%1' should return %0", (Type, StringRef))

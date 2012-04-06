@@ -989,7 +989,7 @@ public:
 
 /// ConstructorCallExpr - This is the application of an argument to a metatype,
 /// which resolves to construction of the type.  For example, "SomeType(1,2,3)".
-/// The function in the application is known to be one of the plus methods to
+/// The function in the application is known to be one of the static methods to
 /// construct the type.  This is formed by Sema, and is just a sugared form of
 /// ApplyExpr.
 class ConstructorCallExpr : public ApplyExpr {
@@ -1040,7 +1040,7 @@ public:
   
 /// DotSyntaxBaseIgnoredExpr - When a.b resolves to something that does not need
 /// the actual value of the base (e.g. when applied to a metatype, module, or
-/// the base of a 'plus' function) this expression node is created.  The
+/// the base of a 'static' function) this expression node is created.  The
 /// semantics are that its base is evaluated and discarded, then 'b' is
 /// evaluated and returned as the result of the expression.
 class DotSyntaxBaseIgnoredExpr : public Expr {

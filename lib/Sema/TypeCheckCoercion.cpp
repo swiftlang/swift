@@ -374,10 +374,10 @@ SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, bool isInt) {
     return std::pair<FuncDecl*, Type>();
   }
   
-  // Verify that the implementation is a metatype 'plus' func.
+  // Verify that the implementation is a metatype 'static' func.
   FuncDecl *Method = dyn_cast<FuncDecl>(Methods[0]);
-  if (Method == 0 || !Method->isPlus()) {
-    diagnose(Method->getLocStart(), diag::type_literal_conversion_not_plus,
+  if (Method == 0 || !Method->isStatic()) {
+    diagnose(Method->getLocStart(), diag::type_literal_conversion_not_static,
              Ty, MethodName);
     return std::pair<FuncDecl*, Type>();
   }

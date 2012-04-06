@@ -55,7 +55,7 @@ bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
     // "func identifier" and "func [attribute]" is a func declaration,
     // otherwise we have a func expression.
     return !isFuncExpr(Tok, Tok2);
-  case tok::kw_plus:
+  case tok::kw_static:
     return Tok2.is(tok::kw_func);
   case tok::kw_extension:
   case tok::kw_var:

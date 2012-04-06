@@ -258,7 +258,7 @@
     keyword ::= 'import'
     keyword ::= 'func'
     keyword ::= 'oneof'
-    keyword ::= 'plus'
+    keyword ::= 'static'
     keyword ::= 'protocol'
     keyword ::= 'return'
     keyword ::= 'struct'
@@ -473,7 +473,7 @@
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-func        ::= 'plus'? 'func' <a href="#attribute-list">attribute-list</a> <a href="#identifier">any-identifier</a> <a href="#func-signature">func-signature</a> <a href="#stmt-brace">stmt-brace</a>?
+    decl-func        ::= 'static'? 'func' <a href="#attribute-list">attribute-list</a> <a href="#identifier">any-identifier</a> <a href="#func-signature">func-signature</a> <a href="#stmt-brace">stmt-brace</a>?
   </pre>
   
   <p>'func' is a declaration for a function.  The argument list and
@@ -490,7 +490,7 @@
   in other places that are semantically equivalent to an extension) implicitly
   get a 'this' argument with these rules ... [todo]</p>
   
-  <p>'plus' functions are only allowed in an <a 
+  <p>'static' functions are only allowed in an <a 
      href="#decl-extension">extension</a> of some type (or in other places
      that are semantically equivalent to an extension).  They indicate that
      the function is actually defined on the <a href="#metatype">metatype</a>
@@ -569,14 +569,14 @@
     struct bankaccount { 
       amount : int
     
-      plus func bankaccount() -> bankaccount {
+      static func bankaccount() -> bankaccount {
         // Custom 'constructor' logic goes here.
       }
       func deposit(arg : int) {
         amount = amount + arg
       }
     
-      plus func someMetaTypeMethod() {}
+      static func someMetaTypeMethod() {}
     }
     
     // Dot syntax on metatype.
@@ -983,19 +983,19 @@
   <p id="metatype">Each type has a corresponding <i>metatype</i>, with the same
     name as the type, that is injected into the standard name lookup scope when
     a type is <a href="#decl">declared</a>.  This allows access to '<a 
-    href="#decl-func">plus functions</a>' through dot syntax.  For example:</p>
+    href="#decl-func">static functions</a>' through dot syntax.  For example:</p>
   
   <pre class="example">
     // Declares a type 'foo' as well as its metatype.
     struct foo {
-      plus func bar() {}
+      static func bar() {}
     }
     
     // Declares x to be of type foo.  A reference to a name in type context
     // refers to the type itself.
     var x : foo
     
-    // Accesses a plus function on the foo metatype.  In a value context, the
+    // Accesses a static function on the foo metatype.  In a value context, the
     // name of its type refers to its metatype.
     foo.bar()
   </pre>
@@ -1519,7 +1519,7 @@
   
   <p>A literal is compatible with its inferred type if that type implements an
      informal protocol required by literals.  This informal protocol requires
-     that the type have an unambiguous metatype ("plus") function defined whose
+     that the type have an unambiguous "static" function defined whose
      result type is the same as the inferred type, and that takes a single
      argument that is either itself literal compatible, or is a <a 
      href="#builtin">builtin</a> integer type.

@@ -281,9 +281,9 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
       continue;
     case DeclKind::Func: {
       FuncDecl *func = cast<FuncDecl>(member);
-      if (func->isPlus()) {
+      if (func->isStatic()) {
         // Eventually this won't always be the right thing.
-        emitPlusMethod(func);
+        emitStaticMethod(func);
       } else {
         emitInstanceMethod(func);
       }

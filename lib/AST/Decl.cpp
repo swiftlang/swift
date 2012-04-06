@@ -150,8 +150,8 @@ Type FuncDecl::getExtensionType() const {
 /// or not), or an empty Type() if no 'this' argument should exist.  This can
 /// only be used after name binding has resolved types.
 Type FuncDecl::computeThisType() const {
-  // 'plus' functions have no 'this' argument.
-  if (isPlus()) return Type();
+  // 'static' functions have no 'this' argument.
+  if (isStatic()) return Type();
   
   Type ContainerType = getExtensionType();
   if (ContainerType.isNull()) return ContainerType;
@@ -165,11 +165,11 @@ Type FuncDecl::computeThisType() const {
                          getASTContext());
 }
 
-/// getImplicitThisDecl - If this FuncDecl is a non-plus method in an
+/// getImplicitThisDecl - If this FuncDecl is a non-static method in an
 /// extension context, it will have a 'this' argument.  This method returns it
 /// if present, or returns null if not.
 VarDecl *FuncDecl::getImplicitThisDecl() {
-  if (isPlus()) return 0;
+  if (isStatic()) return 0;
   
   if (Body->getParamPatterns().empty()) return 0;
   
