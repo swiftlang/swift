@@ -270,7 +270,7 @@ namespace {
     void assign(IRGenFunction &IGF, Explosion &e, Address address) const {
       // Store the function pointer.
       Address fnAddr = projectFunction(IGF, address);
-      IGF.Builder.CreateStore(e.claimNext(), fnAddr);
+      IGF.Builder.CreateStore(e.claimSinglePrimitive(), fnAddr);
 
       // Store the data pointer.
       Address dataAddr = projectData(IGF, address);
@@ -280,7 +280,7 @@ namespace {
     void initialize(IRGenFunction &IGF, Explosion &e, Address address) const {
       // Store the function pointer.
       Address fnAddr = projectFunction(IGF, address);
-      IGF.Builder.CreateStore(e.claimNext(), fnAddr);
+      IGF.Builder.CreateStore(e.claimSinglePrimitive(), fnAddr);
 
       // Store the data pointer, transferring the +1.
       Address dataAddr = projectData(IGF, address);
@@ -288,8 +288,7 @@ namespace {
     }
 
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      dest.add(src.claimNext());
-      dest.add(src.claimNext());
+      src.transferInto(dest, 2);
     }
   };
 }
@@ -544,7 +543,7 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
 /// A macro which expands to the emission of a simple unary operation
 /// or predicate.
 #define UNARY_OPERATION(Op) {                                               \
-    llvm::Value *op = args.Values.claimNext();                              \
+    llvm::Value *op = args.Values.claimSinglePrimitive();                   \
     assert(args.Values.empty() && "wrong operands to unary operation");     \
     return result.addDirectValue(IGF.Builder.Create##Op(op));               \
   }
@@ -552,8 +551,8 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
 /// A macro which expands to the emission of a simple binary operation
 /// or predicate.
 #define BINARY_OPERATION(Op) {                                              \
-    llvm::Value *lhs = args.Values.claimNext();                             \
-    llvm::Value *rhs = args.Values.claimNext();                             \
+    llvm::Value *lhs = args.Values.claimSinglePrimitive();                  \
+    llvm::Value *rhs = args.Values.claimSinglePrimitive();                  \
     assert(args.Values.empty() && "wrong operands to binary operation");    \
     return result.addDirectValue(IGF.Builder.Create##Op(lhs, rhs));         \
   }
@@ -561,8 +560,8 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
 /// A macro which expands to the emission of a simple binary operation
 /// or predicate defined over both floating-point and integer types.
 #define BINARY_ARITHMETIC_OPERATION(IntOp, FPOp) {                          \
-    llvm::Value *lhs = args.Values.claimNext();                             \
-    llvm::Value *rhs = args.Values.claimNext();                             \
+    llvm::Value *lhs = args.Values.claimSinglePrimitive();                  \
+    llvm::Value *rhs = args.Values.claimSinglePrimitive();                  \
     assert(args.Values.empty() && "wrong operands to binary operation");    \
     if (lhs->getType()->isFloatingPointTy()) {                              \
       return result.addDirectValue(IGF.Builder.Create##FPOp(lhs, rhs));     \
@@ -736,7 +735,7 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
   } else {
     Explosion fnValues(ExplosionKind::Maximal);
     IGF.emitRValue(NontrivialFn, fnValues);
-    llvm::Value *fnPtr = fnValues.claimNext();
+    llvm::Value *fnPtr = fnValues.claimSinglePrimitive();
     llvm::Value *dataPtr = fnValues.claimNext();
     callee.setForIndirectCall(fnPtr, dataPtr);
   }
@@ -774,7 +773,8 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
       lastArgWritten -= argExplosion.size();
 
       // Now copy that into place in the argument list.
-      std::copy(argExplosion.begin(), argExplosion.end(),
+      auto argValues = argExplosion.claim(argExplosion.size());
+      std::copy(argValues.begin(), argValues.end(),
                 args.begin() + lastArgWritten);
     }
 
@@ -936,12 +936,12 @@ OwnedAddress IRGenFunction::getAddrForParameter(VarDecl *param,
   // If the parameter is byref, the next parameter is the value we
   // should use.
   if (param->getAttrs().isByref()) {
-    llvm::Value *addr = paramValues.claimNext();
+    llvm::Value *addr = paramValues.claimSinglePrimitive();
     addr->setName(name);
 
     llvm::Value *owner = IGM.RefCountedNull;
     if (param->getAttrs().isByrefHeap()) {
-      owner = paramValues.claimNext();
+      owner = paramValues.claimSinglePrimitive();
       owner->setName(name + ".owner");
     }
 
@@ -951,7 +951,7 @@ OwnedAddress IRGenFunction::getAddrForParameter(VarDecl *param,
   // If the schema contains a single aggregate, assume we can
   // just treat the next parameter as that type.
   if (paramSchema.size() == 1 && paramSchema.begin()->isAggregate()) {
-    llvm::Value *addr = paramValues.claimNext();
+    llvm::Value *addr = paramValues.claimSinglePrimitive();
     addr->setName(name);
     addr = Builder.CreateBitCast(addr,
                     paramSchema.begin()->getAggregateType()->getPointerTo());
@@ -1082,7 +1082,8 @@ void IRGenFunction::emitPrologue() {
     resultType.getSchema(resultSchema);
 
     if (resultSchema.requiresIndirectResult()) {
-      ReturnSlot = Address(values.claimNext(), resultType.StorageAlignment);
+      ReturnSlot = Address(values.claimSinglePrimitive(),
+                           resultType.StorageAlignment);
     } else if (resultSchema.empty()) {
       assert(!ReturnSlot.isValid());
     } else {
@@ -1095,7 +1096,7 @@ void IRGenFunction::emitPrologue() {
   emitParameterClauses(*this, params, values);
 
   if (CurPrologue == Prologue::StandardWithContext) {
-    ContextPtr = values.claimNext();
+    ContextPtr = values.claimSinglePrimitive();
     ContextPtr->setName(".context");
   }
 
@@ -1371,21 +1372,18 @@ namespace {
         data = call;
 
         // Cast to the appropriate struct type.
-        llvm::Value *addr =
-          IGF.Builder.CreateBitCast(data, layout.getType()->getPointerTo());
+        Address structAddr(
+          IGF.Builder.CreateBitCast(data, layout.getType()->getPointerTo()),
+          layout.getAlignment());
 
         // Perform the store.
         for (unsigned i = 0, e = dataTypes.size(); i != e; ++i) {
           auto &fieldLayout = layout.getElements()[i];
-          llvm::Value *fieldAddr =
-            IGF.Builder.CreateStructGEP(addr, fieldLayout.StructIndex);
-          Alignment fieldAlign =
-            layout.getAlignment().alignmentAtOffset(fieldLayout.ByteOffset);
-          dataTypes[i]->initialize(IGF, params, Address(fieldAddr, fieldAlign));
+          Address fieldAddr =
+            IGF.Builder.CreateStructGEP(structAddr, fieldLayout.StructIndex,
+                                        fieldLayout.ByteOffset);
+          dataTypes[i]->initialize(IGF, params, fieldAddr);
         }
-
-        // Reset the cursor in the explosion.
-        params.resetClaim();
       }
 
       // Build the function result.

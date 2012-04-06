@@ -53,7 +53,7 @@ namespace {
     }
 
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      dest.add(src.claimNext());
+      src.transferInto(dest, 1);
     }
   };
 }

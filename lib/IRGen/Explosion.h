@@ -44,6 +44,10 @@ class Explosion {
 public:
   Explosion(ExplosionKind kind) : NextValue(0), Kind(kind) {}
 
+  ~Explosion() {
+    assert(empty() && "explosion had values remaining when destroyed!");
+  }
+
   /// Return the type of explosion this represents.
   ExplosionKind getKind() const { return Kind; }
 
@@ -86,6 +90,27 @@ public:
   /// are not claimed.
   llvm::ArrayRef<llvm::Value*> getAll() {
     return llvm::makeArrayRef(begin(), Values.size() - NextValue);
+  }
+
+  /// Transfer ownership of the next N values to the given explosion.
+  void transferInto(Explosion &other, unsigned n) {
+    other.add(claim(n));
+  }
+
+  /// The next N values are being ignored; ensure they are destroyed.
+  void ignoreAndDestroy(IRGenFunction &IGF, unsigned n) {
+    claim(n);
+  }
+
+  /// The next N values have been claimed in some indirect way (e.g.
+  /// using getRange() and the like); just give up on them.
+  void markClaimed(unsigned n) {
+    claim(n);
+  }
+
+  /// Claim a value which has no cleanups attached.
+  llvm::Value *claimSinglePrimitive() {
+    return claimNext();
   }
 
   /// Claim and return the next value in this explosion.

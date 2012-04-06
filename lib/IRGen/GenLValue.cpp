@@ -223,7 +223,8 @@ namespace {
 
     void assign(IRGenFunction &IGF, Explosion &e, Address address) const {
       // Store the reference.
-      IGF.Builder.CreateStore(e.claimNext(), projectReference(IGF, address));
+      IGF.Builder.CreateStore(e.claimSinglePrimitive(),
+                              projectReference(IGF, address));
 
       // Store the owner.
       IGF.emitAssignRetained(e.claimNext(), projectOwner(IGF, address));
@@ -231,15 +232,15 @@ namespace {
 
     void initialize(IRGenFunction &IGF, Explosion &e, Address address) const {
       // Store the reference.
-      IGF.Builder.CreateStore(e.claimNext(), projectReference(IGF, address));
+      IGF.Builder.CreateStore(e.claimSinglePrimitive(),
+                              projectReference(IGF, address));
 
       // Store the owner, transferring the +1.
       IGF.emitInitializeRetained(e.claimNext(), projectOwner(IGF, address));
     }
 
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      dest.add(src.claimNext());
-      dest.add(src.claimNext());
+      src.transferInto(dest, 2);
     }
   };
 }
@@ -293,9 +294,8 @@ void swift::irgen::emitRequalify(IRGenFunction &IGF, RequalifyExpr *E,
     // Otherwise, emit as a heap l-value and project out the reference.
     Explosion subExplosion(explosion.getKind());
     IGF.emitRValue(E->getSubExpr(), subExplosion);
-    explosion.add(subExplosion.claimNext());
-
-    // FIXME: decide how we want to handle the owner value.
+    subExplosion.transferInto(explosion, 1);
+    subExplosion.ignoreAndDestroy(IGF, 1);
     return;
   }
 

@@ -134,20 +134,17 @@ namespace {
       return Address(addr, align);
     }
 
-    /// Perform an exploded r-value projection.
-    static void projectExplosion(Explosion &inner, const TupleFieldInfo &field,
-                                 Explosion &outer) {
-      assert(inner.getKind() == outer.getKind());
-      switch (inner.getKind()) {
+    /// Get the range of explosion indices associated with a given field.
+    static std::pair<unsigned, unsigned>
+    getFieldProjectionRange(const TupleFieldInfo &field, ExplosionKind kind) {
+      switch (kind) {
       case ExplosionKind::Maximal:
-        outer.add(inner.getRange(field.MaximalBegin, field.MaximalEnd));
-        return;
+        return std::make_pair(field.MaximalBegin, field.MaximalEnd);
 
       case ExplosionKind::Minimal:
-        outer.add(inner.getRange(field.MinimalBegin, field.MinimalEnd));
-        return;
+        return std::make_pair(field.MinimalBegin, field.MinimalEnd);
       }
-      llvm_unreachable("bad explosion kind");
+      llvm_unreachable("bad explosion kind!");
     }
 
     unsigned getExplosionSize(ExplosionKind level) const {
@@ -353,7 +350,18 @@ void swift::irgen::emitTupleElement(IRGenFunction &IGF, TupleElementExpr *E,
   // Otherwise, emit the base as an r-value and project.
   Explosion tupleExplosion(explosion.getKind());
   IGF.emitRValue(tuple, tupleExplosion);
-  return tupleType.projectExplosion(tupleExplosion, field, explosion);
+
+  auto fieldRange =
+    tupleType.getFieldProjectionRange(field, explosion.getKind());
+
+  // Ignore up to the start of the range.
+  tupleExplosion.ignoreAndDestroy(IGF, fieldRange.first);
+
+  // Transfer the correct range.
+  tupleExplosion.transferInto(explosion, fieldRange.second - fieldRange.first);
+
+  // Ignore everything else.
+  tupleExplosion.ignoreAndDestroy(IGF, tupleExplosion.size());
 }
 
 /// Try to emit a tuple-element reference expression as an address.
@@ -446,8 +454,15 @@ void swift::irgen::emitTupleShuffle(IRGenFunction &IGF, TupleShuffleExpr *E,
 
     // Otherwise, project the r-value down.
     } else {
-      innerTupleType.projectExplosion(innerTupleExplosion, innerField,
-                                      outerTupleExplosion);
+      // Get the range of elements and project those down.
+      auto fieldRange =
+        innerTupleType.getFieldProjectionRange(innerField,
+                                               innerTupleExplosion.getKind());
+      outerTupleExplosion.add(innerTupleExplosion.getRange(fieldRange.first,
+                                                           fieldRange.second));
     }
   }
+
+  // Tuple shuffles always use everything from the inner tuple.
+  innerTupleExplosion.markClaimed(innerTupleExplosion.size());
 }

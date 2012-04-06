@@ -86,15 +86,15 @@ namespace {
     }
 
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      IGF.Builder.CreateStore(e.claimNext(), addr);
+      IGF.Builder.CreateStore(e.claimSinglePrimitive(), addr);
     }
 
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      IGF.Builder.CreateStore(e.claimNext(), addr);
+      IGF.Builder.CreateStore(e.claimSinglePrimitive(), addr);
     }
 
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      dest.add(src.claimNext());
+      src.transferInto(dest, 1);
     }
   };
 }

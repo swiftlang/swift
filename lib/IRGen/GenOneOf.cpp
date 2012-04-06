@@ -111,6 +111,7 @@ namespace {
                                    OneOfElementDecl *elt,
                                    Explosion &params) const {
       // FIXME
+      params.ignoreAndDestroy(IGF, params.size());
       IGF.Builder.CreateRetVoid();
     }
   };
@@ -174,7 +175,8 @@ namespace {
       ExplosionSchema schema(params.getKind());
       Singleton->getSchema(schema);
       if (schema.requiresIndirectResult()) {
-        Address returnSlot(params.claimNext(), Singleton->StorageAlignment);
+        Address returnSlot(params.claimSinglePrimitive(),
+                           Singleton->StorageAlignment);
         initialize(IGF, params, returnSlot);
         IGF.Builder.CreateRetVoid();
       } else {
@@ -207,7 +209,7 @@ namespace {
 
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
       assert(isComplete());
-      IGF.Builder.CreateStore(e.claimNext(),
+      IGF.Builder.CreateStore(e.claimSinglePrimitive(),
                               IGF.Builder.CreateStructGEP(addr, 0, Size(0)));
     }
 
@@ -216,7 +218,7 @@ namespace {
     }
 
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      dest.add(src.claimNext());
+      src.transferInto(dest, 1);
     }
 
     void emitInjectionFunctionBody(IRGenFunction &IGF,

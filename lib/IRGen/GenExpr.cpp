@@ -108,7 +108,7 @@ llvm::Value *IRGenFunction::emitAsPrimitiveScalar(Expr *E) {
   Explosion explosion(ExplosionKind::Minimal);
   emitRValue(E, explosion);
 
-  llvm::Value *result = explosion.claimNext();
+  llvm::Value *result = explosion.claimSinglePrimitive();
   assert(explosion.empty());
   return result;
 }
@@ -495,9 +495,10 @@ namespace {
       // If all else fails, emit it as an r-value.
       Explosion explosion(ExplosionKind::Maximal);
       IGF.emitRValue(E, explosion);
+
+      // Ignore all the values.
+      explosion.ignoreAndDestroy(IGF, explosion.size());
     }
-
-
   };
 }
 
