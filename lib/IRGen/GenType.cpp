@@ -82,18 +82,22 @@ namespace {
     }
 
     void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
-      e.add(IGF.Builder.CreateLoad(addr));
+      e.addUnmanaged(IGF.Builder.CreateLoad(addr));
     }
 
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      IGF.Builder.CreateStore(e.claimSinglePrimitive(), addr);
+      IGF.Builder.CreateStore(e.claimUnmanagedNext(), addr);
     }
 
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      IGF.Builder.CreateStore(e.claimSinglePrimitive(), addr);
+      IGF.Builder.CreateStore(e.claimUnmanagedNext(), addr);
     }
 
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      src.transferInto(dest, 1);
+    }
+
+    void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       src.transferInto(dest, 1);
     }
   };

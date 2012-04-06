@@ -125,6 +125,11 @@ public:
   virtual void reexplode(IRGenFunction &IGF, Explosion &sourceExplosion,
                          Explosion &targetExplosion) const = 0;
 
+  /// Enter management of an unmanaged exploded value by adding
+  /// cleanups where appropriate.
+  virtual void manage(IRGenFunction &IGF, Explosion &sourceExplosion,
+                      Explosion &destExplosion) const = 0;
+
   /// Should optimizations be enabled which rely on the representation
   /// for this type being a single retainable object pointer?
   ///

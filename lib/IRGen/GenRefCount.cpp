@@ -45,15 +45,19 @@ namespace {
     }
 
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      IGF.emitAssignRetained(e.claimNext(), addr);
+      IGF.emitAssignRetained(e.forwardNext(IGF), addr);
     }
 
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      IGF.emitInitializeRetained(e.claimNext(), addr);
+      IGF.emitInitializeRetained(e.forwardNext(IGF), addr);
     }
 
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       src.transferInto(dest, 1);
+    }
+
+    void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      dest.add(IGF.enterReleaseCleanup(src.claimUnmanagedNext()));
     }
   };
 }
@@ -87,9 +91,7 @@ static void emitRetainCall(IRGenFunction &IGF, llvm::Value *value,
   llvm::CallInst *call = IGF.Builder.CreateCall(fn, value);
   call->setDoesNotThrow();
 
-  // FIXME: enter a cleanup to balance this out and register that on
-  // the explosion.
-  out.add(call);
+  out.add(IGF.enterReleaseCleanup(call));
 }
 
 /// Emit a retain of a value.  This is usually not required because
@@ -97,7 +99,8 @@ static void emitRetainCall(IRGenFunction &IGF, llvm::Value *value,
 /// the explosion.
 void IRGenFunction::emitRetain(llvm::Value *value, Explosion &out) {
   if (doesNotRequireRefCounting(value)) return;
-  return emitRetainCall(*this, value, out);
+
+  emitRetainCall(*this, value, out);
 }
 
 /// Emit a load of a live value from the given retaining variable.
@@ -159,8 +162,10 @@ namespace {
 }
 
 /// Enter a cleanup to release an object.
-void IRGenFunction::enterReleaseCleanup(llvm::Value *value) {
-  if (doesNotRequireRefCounting(value)) return;
+ManagedValue IRGenFunction::enterReleaseCleanup(llvm::Value *value) {
+  if (doesNotRequireRefCounting(value))
+    return ManagedValue(value);
 
   pushFullExprCleanup<CallRelease>(value);
+  return ManagedValue(value, getCleanupsDepth());
 }

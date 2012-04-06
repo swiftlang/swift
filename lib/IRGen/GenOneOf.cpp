@@ -107,6 +107,10 @@ namespace {
       // FIXME
     }
 
+    void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      // FIXME
+    }
+
     void emitInjectionFunctionBody(IRGenFunction &IGF,
                                    OneOfElementDecl *elt,
                                    Explosion &params) const {
@@ -161,6 +165,10 @@ namespace {
       if (Singleton) Singleton->reexplode(IGF, src, dest);
     }
 
+    void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      if (Singleton) Singleton->manage(IGF, src, dest);
+    }
+
     void emitInjectionFunctionBody(IRGenFunction &IGF,
                                    OneOfElementDecl *elt,
                                    Explosion &params) const {
@@ -175,7 +183,7 @@ namespace {
       ExplosionSchema schema(params.getKind());
       Singleton->getSchema(schema);
       if (schema.requiresIndirectResult()) {
-        Address returnSlot(params.claimSinglePrimitive(),
+        Address returnSlot(params.claimUnmanagedNext(),
                            Singleton->StorageAlignment);
         initialize(IGF, params, returnSlot);
         IGF.Builder.CreateRetVoid();
@@ -201,16 +209,19 @@ namespace {
       schema.add(ExplosionSchema::Element::forScalar(getDiscriminatorType()));
     }
 
+    static Address projectValue(IRGenFunction &IGF, Address addr) {
+      return IGF.Builder.CreateStructGEP(addr, 0, Size(0));
+    }
+
     void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
       assert(isComplete());
-      e.add(IGF.Builder.CreateLoad(IGF.Builder.CreateStructGEP(addr, 0, Size(0)),
-                                   addr->getName() + ".load"));
+      e.addUnmanaged(IGF.Builder.CreateLoad(projectValue(IGF, addr),
+                                            addr->getName() + ".load"));
     }
 
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
       assert(isComplete());
-      IGF.Builder.CreateStore(e.claimSinglePrimitive(),
-                              IGF.Builder.CreateStructGEP(addr, 0, Size(0)));
+      IGF.Builder.CreateStore(e.claimUnmanagedNext(), projectValue(IGF, addr));
     }
 
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
@@ -218,6 +229,10 @@ namespace {
     }
 
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      src.transferInto(dest, 1);
+    }
+
+    void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       src.transferInto(dest, 1);
     }
 
@@ -378,8 +393,9 @@ void swift::irgen::emitOneOfElementRef(IRGenFunction &IGF,
   // reference.  It will always literally be of function type when
   // written this way.
   if (isa<FunctionType>(elt->getType())) {
-    result.add(llvm::ConstantExpr::getBitCast(injection, IGF.IGM.Int8PtrTy));
-    result.add(llvm::ConstantPointerNull::get(IGF.IGM.RefCountedPtrTy));
+    result.addUnmanaged(
+               llvm::ConstantExpr::getBitCast(injection, IGF.IGM.Int8PtrTy));
+    result.addUnmanaged(IGF.IGM.RefCountedNull);
     return;
   }
 

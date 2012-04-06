@@ -195,6 +195,11 @@ namespace {
       for (auto &field : getFieldInfos())
         field.Type.reexplode(IGF, src, dest);
     }
+
+    void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      for (auto &field : getFieldInfos())
+        field.Type.manage(IGF, src, dest);
+    }
   };
 }
 

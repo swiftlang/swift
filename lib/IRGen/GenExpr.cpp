@@ -108,7 +108,7 @@ llvm::Value *IRGenFunction::emitAsPrimitiveScalar(Expr *E) {
   Explosion explosion(ExplosionKind::Minimal);
   emitRValue(E, explosion);
 
-  llvm::Value *result = explosion.claimSinglePrimitive();
+  llvm::Value *result = explosion.claimUnmanagedNext();
   assert(explosion.empty());
   return result;
 }
@@ -148,7 +148,7 @@ namespace {
 
     void visitMaterializeExpr(MaterializeExpr *E) {
       OwnedAddress addr = emitMaterializeExpr(IGF, E);
-      Out.add(addr.getAddressPointer());
+      Out.addUnmanaged(addr.getAddressPointer());
     }
 
     void visitRequalifyExpr(RequalifyExpr *E) {
@@ -181,11 +181,11 @@ namespace {
     }
 
     void visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
-      Out.add(emitIntegerLiteralExpr(IGF, E));
+      Out.addUnmanaged(emitIntegerLiteralExpr(IGF, E));
     }
 
     void visitFloatLiteralExpr(FloatLiteralExpr *E) {
-      Out.add(emitFloatLiteralExpr(IGF, E));
+      Out.addUnmanaged(emitFloatLiteralExpr(IGF, E));
     }
 
     void visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
@@ -396,7 +396,7 @@ void IRGenFunction::emitZeroInit(Address addr, const TypeInfo &type) {
   if (!schema.containsAggregate() && schema.size() <= 4) {
     Explosion explosion(schema.getKind());
     for (auto elt : schema) {
-      explosion.add(llvm::Constant::getNullValue(elt.getScalarType()));
+      explosion.addUnmanaged(llvm::Constant::getNullValue(elt.getScalarType()));
     }
     type.initialize(*this, explosion, addr);
     return;
@@ -527,6 +527,6 @@ void IRGenFunction::emitFakeExplosion(const TypeInfo &type, Explosion &explosion
       elementType = element.getScalarType();
     }
 
-    explosion.add(llvm::UndefValue::get(elementType));
+    explosion.addUnmanaged(llvm::UndefValue::get(elementType));
   }
 }

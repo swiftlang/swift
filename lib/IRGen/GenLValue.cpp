@@ -161,7 +161,7 @@ void IRGenFunction::emitLValueAsScalar(const LValue &lvalue, OnHeap_t onHeap,
   // FIXME: rematerialize if inadequate alignment
 
   // Add the address.
-  explosion.add(address.getAddressPointer());
+  explosion.addUnmanaged(address.getAddressPointer());
 
   // If we're emitting a heap l-value, also emit the owner pointer.
   if (onHeap == OnHeap) {
@@ -215,7 +215,8 @@ namespace {
     void load(IRGenFunction &IGF, Address address, Explosion &e) const {
       // Load the reference.
       Address refAddr = projectReference(IGF, address);
-      e.add(IGF.Builder.CreateLoad(refAddr, refAddr->getName() + ".load"));
+      e.addUnmanaged(
+            IGF.Builder.CreateLoad(refAddr, refAddr->getName() + ".load"));
 
       // Load the owner.
       IGF.emitLoadAndRetain(projectOwner(IGF, address), e);
@@ -223,24 +224,31 @@ namespace {
 
     void assign(IRGenFunction &IGF, Explosion &e, Address address) const {
       // Store the reference.
-      IGF.Builder.CreateStore(e.claimSinglePrimitive(),
+      IGF.Builder.CreateStore(e.claimUnmanagedNext(),
                               projectReference(IGF, address));
 
       // Store the owner.
-      IGF.emitAssignRetained(e.claimNext(), projectOwner(IGF, address));
+      IGF.emitAssignRetained(e.forwardNext(IGF),
+                             projectOwner(IGF, address));
     }
 
     void initialize(IRGenFunction &IGF, Explosion &e, Address address) const {
       // Store the reference.
-      IGF.Builder.CreateStore(e.claimSinglePrimitive(),
+      IGF.Builder.CreateStore(e.claimUnmanagedNext(),
                               projectReference(IGF, address));
 
       // Store the owner, transferring the +1.
-      IGF.emitInitializeRetained(e.claimNext(), projectOwner(IGF, address));
+      IGF.emitInitializeRetained(e.forwardNext(IGF),
+                                 projectOwner(IGF, address));
     }
 
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       src.transferInto(dest, 2);
+    }
+
+    void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      src.transferInto(dest, 1);
+      dest.add(IGF.enterReleaseCleanup(src.claimUnmanagedNext()));
     }
   };
 }
@@ -289,7 +297,7 @@ void swift::irgen::emitRequalify(IRGenFunction &IGF, RequalifyExpr *E,
 
     // Try to just figure out an address and use that.
     if (Optional<Address> addr = IGF.tryEmitAsAddress(E->getSubExpr(), heapTI))
-      return explosion.add(addr.getValue().getAddress());
+      return explosion.addUnmanaged(addr.getValue().getAddress());
 
     // Otherwise, emit as a heap l-value and project out the reference.
     Explosion subExplosion(explosion.getKind());

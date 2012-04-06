@@ -54,6 +54,7 @@ namespace irgen {
   class IRGenModule;
   class JumpDest;
   class LValue;
+  class ManagedValue;
   class TypeInfo;
 
 /// Prologue - A value indicating controlling the kind of prologue/epilogue
@@ -213,7 +214,7 @@ public:
   void emitInitializeRetained(llvm::Value *value, Address addr);
   void emitRetain(llvm::Value *value, Explosion &explosion);
   void emitRelease(llvm::Value *value);
-  void enterReleaseCleanup(llvm::Value *value);
+  ManagedValue enterReleaseCleanup(llvm::Value *value);
 
 //--- Statement emission -------------------------------------------------------
 public:

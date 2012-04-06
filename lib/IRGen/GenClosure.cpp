@@ -58,7 +58,7 @@ void swift::irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E,
                          ExplosionKind::Minimal, /*uncurry level*/ 0, fn,
                          Prologue::StandardWithContext);
 
-  llvm::Value *ContextPtr = IGF.IGM.RefCountedNull;
+  ManagedValue contextPtr(IGF.IGM.RefCountedNull);
 
   // There are three places we need to generate code for captures: in the
   // current function, to store the captures to a capture block; in the inner
@@ -85,7 +85,8 @@ void swift::irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E,
         IGF.Builder.CreateCall(IGF.IGM.getAllocFn(), size);
     allocation->setDoesNotThrow();
     allocation->setName(".capturealloc");
-    ContextPtr = allocation;
+
+    contextPtr = IGF.enterReleaseCleanup(allocation);
     llvm::Type *CapturesType = layout.getType()->getPointerTo();
     llvm::Value *CaptureStruct =
         IGF.Builder.CreateBitCast(allocation, CapturesType);
@@ -130,6 +131,6 @@ void swift::irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E,
   }
 
   // Build the explosion result.
-  explosion.add(IGF.Builder.CreateBitCast(fn, IGF.IGM.Int8PtrTy));
-  explosion.add(ContextPtr);
+  explosion.addUnmanaged(IGF.Builder.CreateBitCast(fn, IGF.IGM.Int8PtrTy));
+  explosion.add(contextPtr);
 }

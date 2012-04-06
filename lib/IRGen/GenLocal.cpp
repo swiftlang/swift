@@ -19,6 +19,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "StructLayout.h"
+#include "Explosion.h"
 
 using namespace swift;
 using namespace irgen;

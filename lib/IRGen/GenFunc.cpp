@@ -126,7 +126,7 @@ namespace {
   /// be direct.
   struct CallResult {
   private:
-    llvm::Value *DirectValues[ExplosionSchema::MaxScalarsForDirectResult];
+    ManagedValue DirectValues[ExplosionSchema::MaxScalarsForDirectResult];
     unsigned char NumDirectValues;
   public:
     ExplosionKind DirectExplosionLevel;
@@ -138,19 +138,22 @@ namespace {
 
     CallResult() : NumDirectValues(0) {}
 
-    void addDirectValue(llvm::Value *value) {
+    void addDirectUnmanagedValue(llvm::Value *value) {
+      addDirectValue(ManagedValue(value));
+    }
+    void addDirectValue(ManagedValue value) {
       assert(NumDirectValues < ExplosionSchema::MaxScalarsForDirectResult);
       DirectValues[NumDirectValues++] = value;
     }
-    llvm::Value *getDirectValue(unsigned i) const {
+    ManagedValue getDirectValue(unsigned i) const {
       assert(i < NumDirectValues);
       return DirectValues[i];
     }
     void clearDirectValues() {
       NumDirectValues = 0;
     }
-    ArrayRef<llvm::Value*> getDirectValues() const {
-      return ArrayRef<llvm::Value*>(DirectValues, DirectValues+NumDirectValues);
+    llvm::ArrayRef<ManagedValue> getDirectValues() const {
+      return ArrayRef<ManagedValue>(DirectValues, DirectValues+NumDirectValues);
     }
   };
 
@@ -260,7 +263,7 @@ namespace {
     void load(IRGenFunction &IGF, Address address, Explosion &e) const {
       // Load the function.
       Address fnAddr = projectFunction(IGF, address);
-      e.add(IGF.Builder.CreateLoad(fnAddr, fnAddr->getName() + ".load"));
+      e.addUnmanaged(IGF.Builder.CreateLoad(fnAddr, fnAddr->getName()+".load"));
 
       // Load the data.
       Address dataAddr = projectData(IGF, address);
@@ -270,25 +273,30 @@ namespace {
     void assign(IRGenFunction &IGF, Explosion &e, Address address) const {
       // Store the function pointer.
       Address fnAddr = projectFunction(IGF, address);
-      IGF.Builder.CreateStore(e.claimSinglePrimitive(), fnAddr);
+      IGF.Builder.CreateStore(e.claimUnmanagedNext(), fnAddr);
 
       // Store the data pointer.
       Address dataAddr = projectData(IGF, address);
-      IGF.emitAssignRetained(e.claimNext(), dataAddr);
+      IGF.emitAssignRetained(e.forwardNext(IGF), dataAddr);
     }
 
     void initialize(IRGenFunction &IGF, Explosion &e, Address address) const {
       // Store the function pointer.
       Address fnAddr = projectFunction(IGF, address);
-      IGF.Builder.CreateStore(e.claimSinglePrimitive(), fnAddr);
+      IGF.Builder.CreateStore(e.claimUnmanagedNext(), fnAddr);
 
       // Store the data pointer, transferring the +1.
       Address dataAddr = projectData(IGF, address);
-      IGF.emitInitializeRetained(e.claimNext(), dataAddr);
+      IGF.emitInitializeRetained(e.forwardNext(IGF), dataAddr);
     }
 
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       src.transferInto(dest, 2);
+    }
+
+    void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      src.transferInto(dest, 1);
+      dest.add(IGF.enterReleaseCleanup(src.claimUnmanagedNext()));
     }
   };
 }
@@ -418,6 +426,14 @@ IRGenModule::getFunctionType(Type type, ExplosionKind explosionKind,
   return sig.getType();
 }
 
+static bool isRefCountPtrTy(llvm::Type *ty) {
+  return isa<llvm::PointerType>(ty)
+      && cast<llvm::PointerType>(ty)->getAddressSpace() == 0
+      && ty->getContainedType(0)->isStructTy()
+      && cast<llvm::StructType>(ty->getContainedType(0))
+           ->getName().startswith("swift.refcounted");
+}
+
 namespace {
   struct Callee {
     /// The explosion level of the function to call.
@@ -430,27 +446,28 @@ namespace {
     /// The function to call.
     llvm::Value *FnPtr;
 
-    /// The data pointer to pass, if required.  Null otherwise.
-    llvm::Value *DataPtr;
+    /// The data pointer to pass, if required; otherwise the value is
+    /// null.
+    ManagedValue DataPtr;
 
   public:
-    void set(llvm::Value *fnPtr, llvm::Value *dataPtr) {
+    void set(llvm::Value *fnPtr, ManagedValue dataPtr) {
       assert(fnPtr->getType()->getContainedType(0)->isFunctionTy() ||
              fnPtr->getType()->getContainedType(0)->isIntegerTy(8));
-      assert(dataPtr == nullptr ||
-             (dataPtr->getType()->getContainedType(0)->isStructTy() &&
-              cast<llvm::StructType>(dataPtr->getType()->getContainedType(0))
-                ->getName().startswith("swift.refcounted")));
-      assert(dataPtr == nullptr || !isa<llvm::ConstantPointerNull>(dataPtr));
+      assert(dataPtr.getValue() == nullptr ||
+             isRefCountPtrTy(dataPtr.getValue()->getType()));
+      assert(dataPtr.getValue() == nullptr ||
+             !isa<llvm::ConstantPointerNull>(dataPtr.getValue()));
 
       FnPtr = fnPtr;
       DataPtr = dataPtr;
     }
 
-    void setForIndirectCall(llvm::Value *fn, llvm::Value *data) {
+    void setForIndirectCall(llvm::Value *fn, ManagedValue data) {
       ExplosionLevel = ExplosionKind::Minimal;
       UncurryLevel = 0;
-      set(fn, isa<llvm::ConstantPointerNull>(data) ? nullptr : data);
+      set(fn, isa<llvm::ConstantPointerNull>(data.getValue())
+                ? ManagedValue(nullptr) : data);
     }
 
     llvm::Value *getOpaqueFunctionPointer(IRGenFunction &IGF) const {
@@ -471,11 +488,11 @@ namespace {
                                        getFunctionPointerType(IGF.IGM, type));
     }
 
-    bool hasDataPointer() const { return DataPtr != nullptr; }
+    bool hasDataPointer() const { return DataPtr.getValue() != nullptr; }
 
-    llvm::Value *getDataPointer(IRGenModule &IGM) const {
-      if (DataPtr) return DataPtr;
-      return IGM.RefCountedNull;
+    ManagedValue getDataPointer(IRGenModule &IGM) const {
+      if (hasDataPointer()) return DataPtr;
+      return ManagedValue(IGM.RefCountedNull);
     }
   };
 }
@@ -498,11 +515,11 @@ static Callee emitCallee(IRGenModule &IGM, FuncDecl *fn,
 
   if (!fn->getDeclContext()->isLocalContext()) {
     callee.set(IGM.getAddrOfGlobalFunction(fn, bestExplosion, bestUncurry),
-               nullptr);
+               ManagedValue(nullptr));
   } else {
     IGM.unimplemented(fn->getLocStart(), "local function emission");
     llvm::Value *undef = llvm::UndefValue::get(IGM.Int8PtrTy);
-    callee.set(undef, nullptr);
+    callee.set(undef, ManagedValue(nullptr));
   }
 
   return callee;
@@ -515,7 +532,7 @@ void swift::irgen::emitRValueForFunction(IRGenFunction &IGF, FuncDecl *fn,
   Callee callee = emitCallee(IGF.IGM, fn, ExplosionKind::Minimal, 0);
   assert(callee.ExplosionLevel == ExplosionKind::Minimal);
   assert(callee.UncurryLevel == 0);
-  explosion.add(callee.getOpaqueFunctionPointer(IGF));
+  explosion.addUnmanaged(callee.getOpaqueFunctionPointer(IGF));
   explosion.add(callee.getDataPointer(IGF.IGM));
 }
 
@@ -543,30 +560,32 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
 /// A macro which expands to the emission of a simple unary operation
 /// or predicate.
 #define UNARY_OPERATION(Op) {                                               \
-    llvm::Value *op = args.Values.claimSinglePrimitive();                   \
+    llvm::Value *op = args.Values.claimUnmanagedNext();                     \
     assert(args.Values.empty() && "wrong operands to unary operation");     \
-    return result.addDirectValue(IGF.Builder.Create##Op(op));               \
+    return result.addDirectUnmanagedValue(IGF.Builder.Create##Op(op));      \
   }
 
 /// A macro which expands to the emission of a simple binary operation
 /// or predicate.
 #define BINARY_OPERATION(Op) {                                              \
-    llvm::Value *lhs = args.Values.claimSinglePrimitive();                  \
-    llvm::Value *rhs = args.Values.claimSinglePrimitive();                  \
+    llvm::Value *lhs = args.Values.claimUnmanagedNext();                    \
+    llvm::Value *rhs = args.Values.claimUnmanagedNext();                    \
     assert(args.Values.empty() && "wrong operands to binary operation");    \
-    return result.addDirectValue(IGF.Builder.Create##Op(lhs, rhs));         \
+    return result.addDirectUnmanagedValue(IGF.Builder.Create##Op(lhs, rhs));\
   }
 
 /// A macro which expands to the emission of a simple binary operation
 /// or predicate defined over both floating-point and integer types.
 #define BINARY_ARITHMETIC_OPERATION(IntOp, FPOp) {                          \
-    llvm::Value *lhs = args.Values.claimSinglePrimitive();                  \
-    llvm::Value *rhs = args.Values.claimSinglePrimitive();                  \
+    llvm::Value *lhs = args.Values.claimUnmanagedNext();                    \
+    llvm::Value *rhs = args.Values.claimUnmanagedNext();                    \
     assert(args.Values.empty() && "wrong operands to binary operation");    \
     if (lhs->getType()->isFloatingPointTy()) {                              \
-      return result.addDirectValue(IGF.Builder.Create##FPOp(lhs, rhs));     \
+      return result.addDirectUnmanagedValue(                                \
+                          IGF.Builder.Create##FPOp(lhs, rhs));              \
     } else {                                                                \
-      return result.addDirectValue(IGF.Builder.Create##IntOp(lhs, rhs));    \
+      return result.addDirectUnmanagedValue(                                \
+                          IGF.Builder.Create##IntOp(lhs, rhs));             \
     }                                                                       \
   }
 
@@ -700,6 +719,29 @@ static void setAggResultAttributes(llvm::CallSite call) {
   call.setAttributes(llvm::AttrListPtr::get(attrs.data(), attrs.size()));
 }
 
+/// Extract the direct scalar results of a call instruction into an
+/// explosion, registering cleanups as appropriate for the type.
+static void extractScalarResults(IRGenFunction &IGF, llvm::Value *call,
+                                 const TypeInfo &resultTI, Explosion &out) {
+  // We need to make a temporary explosion to hold the values as we
+  // tag them with cleanups.
+  Explosion tempExplosion(out.getKind());
+
+  // Extract the values.
+  if (llvm::StructType *structType
+        = dyn_cast<llvm::StructType>(call->getType())) {
+    for (unsigned i = 0, e = structType->getNumElements(); i != e; ++i) {
+      llvm::Value *scalar = IGF.Builder.CreateExtractValue(call, i);
+      tempExplosion.addUnmanaged(scalar);
+    }
+  } else {
+    assert(!call->getType()->isVoidTy());
+    tempExplosion.addUnmanaged(call);
+  }
+
+  resultTI.manage(IGF, tempExplosion, out);
+}                               
+
 /// Emit a function call.
 void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
                     const TypeInfo &resultType) {
@@ -720,7 +762,7 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
       if (CallSites.size() == 1) return;
 
       // Otherwise, pop that call site off and set up the callee conservatively.
-      callee.setForIndirectCall(result.getDirectValue(0),
+      callee.setForIndirectCall(result.getDirectValue(0).getUnmanagedValue(),
                                 result.getDirectValue(1));
       result.clearDirectValues();
 
@@ -735,8 +777,8 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
   } else {
     Explosion fnValues(ExplosionKind::Maximal);
     IGF.emitRValue(NontrivialFn, fnValues);
-    llvm::Value *fnPtr = fnValues.claimSinglePrimitive();
-    llvm::Value *dataPtr = fnValues.claimNext();
+    llvm::Value *fnPtr = fnValues.claimUnmanagedNext();
+    ManagedValue dataPtr = fnValues.claimNext();
     callee.setForIndirectCall(fnPtr, dataPtr);
   }
 
@@ -744,21 +786,30 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
   while (true) {
     assert(callee.UncurryLevel < CallSites.size());
 
-    // Find the formal type we're calling.
-    unsigned calleeIndex = CallSites.size() - 1;
-    Type calleeFormalType = CallSites[calleeIndex].FnType;
+    // Find the formal type of the function we're calling.  This is the
+    // least-uncurried function type.
+    Type calleeFormalType = CallSites.back().FnType;
     llvm::Value *fnPtr =
       callee.getFunctionPointer(IGF, calleeFormalType);
     llvm::FunctionType *calleeType = 
       cast<llvm::FunctionType>(cast<llvm::PointerType>(fnPtr->getType())
                                  ->getElementType());
 
+    // Additionally compute the information for the formal result
+    // type.  This is the result of the uncurried function type.
+    Type formalResultType =
+      CallSites[CallSites.size() - callee.UncurryLevel - 1]
+        .FnType->castTo<FunctionType>()->getResult();
+    const TypeInfo &resultTI = IGF.IGM.getFragileTypeInfo(formalResultType);
+
+    // Build the arguments:
     SmallVector<llvm::Value*, 16> args(calleeType->getNumParams());
     unsigned lastArgWritten = calleeType->getNumParams();
 
     // Add the data pointer in.
-    if (callee.hasDataPointer())
-      args[--lastArgWritten] = callee.getDataPointer(IGF.IGM);
+    if (callee.hasDataPointer()) {
+      args[--lastArgWritten] = callee.getDataPointer(IGF.IGM).forward(IGF);
+    }
 
     // Emit all of the arguments we need to pass here.
     for (unsigned i = callee.UncurryLevel + 1; i != 0; --i) {
@@ -772,25 +823,25 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
       assert(lastArgWritten >= argExplosion.size());
       lastArgWritten -= argExplosion.size();
 
-      // Now copy that into place in the argument list.
-      auto argValues = argExplosion.claim(argExplosion.size());
-      std::copy(argValues.begin(), argValues.end(),
-                args.begin() + lastArgWritten);
+      // Now forward those values into the argument list.
+      auto argIterator = args.begin() + lastArgWritten;
+      for (auto value : argExplosion.claimAll()) {
+        *argIterator++ = value.forward(IGF);
+      }
     }
 
-    // Emit and insert the result type if required.
+    // Emit and insert the result slot if required.
     assert(lastArgWritten == 0 || lastArgWritten == 1);
     bool isAggregateResult = (lastArgWritten != 0);
+    assert(isAggregateResult ==
+           resultTI.getSchema(callee.ExplosionLevel).requiresIndirectResult());
     if (isAggregateResult) {
       assert(CallSites.empty() && "aggregate result on non-final call?");
-      Type formalResultType =
-        calleeFormalType->castTo<FunctionType>()->getResult();
-      const TypeInfo &type = IGF.IGM.getFragileTypeInfo(formalResultType);
 
       // Force there to be an indirect address.
       if (!result.IndirectAddress.isValid()) {
         result.IndirectAddress =
-          IGF.createFullExprAlloca(type, NotOnHeap, "call.aggresult");
+          IGF.createFullExprAlloca(resultTI, NotOnHeap, "call.aggresult");
       }
       args[0] = result.IndirectAddress.getAddress();
     }
@@ -810,17 +861,13 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
     }
 
     // Extract out the scalar results.
-    llvm::SmallVector<llvm::Value*, ExplosionSchema::MaxScalarsForDirectResult> scalars;
-    if (llvm::StructType *structType
-          = dyn_cast<llvm::StructType>(call->getType())) {
-      for (unsigned i = 0, e = structType->getNumElements(); i != e; ++i) {
-        llvm::Value *scalar = IGF.Builder.CreateExtractValue(call, i);
-        result.addDirectValue(scalar);
-      }
-    } else if (!call->getType()->isVoidTy()) {
-      result.addDirectValue(call);
+    if (!call->getType()->isVoidTy()) {
+      Explosion resultExplosion(callee.ExplosionLevel);
+      extractScalarResults(IGF, call, resultTI, resultExplosion);
+      for (auto value : resultExplosion.claimAll())
+        result.addDirectValue(value);
     }
-
+      
     // If this is the end of the call sites, we're done.
     if (CallSites.empty()) {
       assert(!result.IndirectAddress.isValid() &&
@@ -832,7 +879,7 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
     // Otherwise, we must have gotten a function back.  Set ourselves
     // up to call it, then continue emitting calls.
     assert(result.getDirectValues().size() == 2);
-    callee.setForIndirectCall(result.getDirectValue(0),
+    callee.setForIndirectCall(result.getDirectValue(0).getUnmanagedValue(),
                               result.getDirectValue(1));
     result.clearDirectValues();
   }
@@ -905,22 +952,16 @@ void IRGenFunction::emitNullaryCall(llvm::Value *fnPtr,
     return;
   }
 
-  unsigned numScalars = resultSchema.size();
-  if (numScalars == 0) return;
-  if (numScalars == 1) return resultExplosion.add(call);
-
-  for (unsigned i = 0; i != numScalars; ++i) {
-    llvm::Value *scalar = Builder.CreateExtractValue(call, i);
-    resultExplosion.add(scalar);
-  }
+  extractScalarResults(*this, call, resultTI, resultExplosion);
 }
 
 /// Initialize an Explosion with the parameters of the current
-/// function.  This is really only useful when writing prologue code.
+/// function.  All of the objects will be added unmanaged.  This is
+/// really only useful when writing prologue code.
 Explosion IRGenFunction::collectParameters() {
   Explosion params(CurExplosionLevel);
   for (auto i = CurFn->arg_begin(), e = CurFn->arg_end(); i != e; ++i)
-    params.add(i);
+    params.addUnmanaged(i);
   return params;
 }
 
@@ -936,13 +977,14 @@ OwnedAddress IRGenFunction::getAddrForParameter(VarDecl *param,
   // If the parameter is byref, the next parameter is the value we
   // should use.
   if (param->getAttrs().isByref()) {
-    llvm::Value *addr = paramValues.claimSinglePrimitive();
+    llvm::Value *addr = paramValues.claimUnmanagedNext();
     addr->setName(name);
 
     llvm::Value *owner = IGM.RefCountedNull;
     if (param->getAttrs().isByrefHeap()) {
-      owner = paramValues.claimSinglePrimitive();
+      owner = paramValues.claimUnmanagedNext();
       owner->setName(name + ".owner");
+      enterReleaseCleanup(owner);
     }
 
     return OwnedAddress(Address(addr, paramType.StorageAlignment), owner);
@@ -951,7 +993,7 @@ OwnedAddress IRGenFunction::getAddrForParameter(VarDecl *param,
   // If the schema contains a single aggregate, assume we can
   // just treat the next parameter as that type.
   if (paramSchema.size() == 1 && paramSchema.begin()->isAggregate()) {
-    llvm::Value *addr = paramValues.claimSinglePrimitive();
+    llvm::Value *addr = paramValues.claimUnmanagedNext();
     addr->setName(name);
     addr = Builder.CreateBitCast(addr,
                     paramSchema.begin()->getAggregateType()->getPointerTo());
@@ -985,9 +1027,9 @@ OwnedAddress IRGenFunction::getAddrForParameter(VarDecl *param,
   // Set names for argument(s)
   for (auto i = storedStart, e = paramValues.begin(); i != e; ++i) {
     if (e - storedStart == 1)
-      (*i)->setName(name);
+      i->getValue()->setName(name);
     else
-      (*i)->setName(name + "." + Twine(i - storedStart));
+      i->getValue()->setName(name + "." + Twine(i - storedStart));
   }
 
   return paramAddr;
@@ -1082,7 +1124,7 @@ void IRGenFunction::emitPrologue() {
     resultType.getSchema(resultSchema);
 
     if (resultSchema.requiresIndirectResult()) {
-      ReturnSlot = Address(values.claimSinglePrimitive(),
+      ReturnSlot = Address(values.claimUnmanagedNext(),
                            resultType.StorageAlignment);
     } else if (resultSchema.empty()) {
       assert(!ReturnSlot.isValid());
@@ -1096,8 +1138,9 @@ void IRGenFunction::emitPrologue() {
   emitParameterClauses(*this, params, values);
 
   if (CurPrologue == Prologue::StandardWithContext) {
-    ContextPtr = values.claimSinglePrimitive();
+    ContextPtr = values.claimUnmanagedNext();
     ContextPtr->setName(".context");
+    enterReleaseCleanup(ContextPtr);
   }
 
   assert(values.empty() && "didn't exhaust all parameters?");
@@ -1197,13 +1240,15 @@ void IRGenFunction::emitScalarReturn(Explosion &result) {
   if (result.size() == 0) {
     Builder.CreateRetVoid();
   } else if (result.size() == 1) {
-    Builder.CreateRet(result.claimNext());
+    Builder.CreateRet(result.forwardNext(*this));
   } else {
     assert(cast<llvm::StructType>(CurFn->getReturnType())->getNumElements()
              == result.size());
     llvm::Value *resultAgg = llvm::UndefValue::get(CurFn->getReturnType());
-    for (unsigned i = 0, e = result.size(); i != e; ++i)
-      resultAgg = Builder.CreateInsertValue(resultAgg, result.claimNext(), i);
+    for (unsigned i = 0, e = result.size(); i != e; ++i) {
+      llvm::Value *elt = result.forwardNext(*this);
+      resultAgg = Builder.CreateInsertValue(resultAgg, elt, i);
+    }
     Builder.CreateRet(resultAgg);
   }
 }
@@ -1422,7 +1467,7 @@ namespace {
       // last parameter) and load out the extra, previously-curried
       // parameters.
       if (!layout.empty()) {
-        llvm::Value *rawData = params.takeLast();
+        llvm::Value *rawData = params.takeLast().getUnmanagedValue();
         llvm::Value *data =
           IGF.Builder.CreateBitCast(rawData, layout.getType()->getPointerTo());
 
@@ -1442,8 +1487,10 @@ namespace {
         IGF.emitRelease(rawData);
       }
 
-      llvm::CallInst *call =
-        IGF.Builder.CreateCall(nextEntrypoint, params.claimAll());
+      llvm::SmallVector<llvm::Value*, 8> args;
+      params.claimUnmanaged(params.size(), args);
+
+      llvm::CallInst *call = IGF.Builder.CreateCall(nextEntrypoint, args);
       call->setTailCall();
 
       if (call->getType()->isVoidTy()) {
