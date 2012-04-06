@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Alloc.h"
-#include <stdlib.h>
+#include <cstdlib>
 #include <unistd.h>
 
 struct SwiftHeapObject *
