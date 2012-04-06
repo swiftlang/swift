@@ -13,18 +13,6 @@
 // Allocation ABI Shims While the Language is Bootstrapped
 //
 //===----------------------------------------------------------------------===//
-//===--- Alloc.h - Swift Language Allocation ABI --------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-//
-// Swift Allocation ABI
-//
-//===----------------------------------------------------------------------===//
 
 #include "Alloc.h"
 #include <stdlib.h>
