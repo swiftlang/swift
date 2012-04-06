@@ -146,6 +146,8 @@ bool TypeChecker::coerceToType(Pattern *P, Type type) {
     if (LValueType *lv = type->getAs<LValueType>()) {
       NP->getDecl()->overwriteType(lv->getObjectType());
       NP->getDecl()->getMutableAttrs().Byref = true;
+      if (lv->isHeap())
+        NP->getDecl()->getMutableAttrs().ByrefHeap = true;
     } else {
       NP->getDecl()->overwriteType(type);
 
