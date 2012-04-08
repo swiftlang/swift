@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Alloc.h"
+#include <llvm/Support/MathExtras.h>
 #include <cstdlib>
 #include <unistd.h>
 
@@ -23,11 +24,10 @@ swift_alloc(struct SwiftHeapMetadata *metadata,
             size_t requiredSize,
             size_t requiredAlignment)
 {
-  size_t mask = requiredAlignment - 1;
   struct SwiftHeapMetadata **object;
   for (;;) {
     object = reinterpret_cast<struct SwiftHeapMetadata **>(
-      calloc(1, (requiredSize + mask) & ~mask));
+      calloc(1, llvm::RoundUpToAlignment(requiredSize, requiredAlignment)));
     if (object) {
       break;
     }
