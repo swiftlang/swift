@@ -41,19 +41,6 @@ Expr *TypeChecker::buildDeclRefRValue(ValueDecl *val, SourceLoc loc) {
   return new (Context) LoadExpr(E, val->getType());
 }
 
-Expr *TypeChecker::convertLValueToRValue(LValueType *srcLV, Expr *E) {
-  assert(E && "no expression to load!");
-  assert(E->getType()->isEqual(srcLV));
-
-  if (!srcLV->isExplicit())
-    return new (Context) LoadExpr(E, srcLV->getObjectType());
-
-  diagnose(E->getLoc(), diag::load_of_explicit_lvalue,
-           srcLV->getObjectType())
-    << E->getSourceRange();
-  return nullptr;
-}
-
 Expr *TypeChecker::convertToRValue(Expr *E) {
   assert(E && "no expression to load!");
 

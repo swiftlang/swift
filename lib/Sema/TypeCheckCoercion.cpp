@@ -130,8 +130,8 @@ class SemaCoerce : public ExprVisitor<SemaCoerce, CoercedResult> {
   static CoercedResult coerced(Expr *E, bool Apply) {
     assert(Apply && "Cannot return a coerced expression when not applying");
     return CoercedResult(E);
-  }
-
+  }  
+  
 public:
   CoercedResult visitErrorExpr(ErrorExpr *E) {
     return unchanged(E);
@@ -310,17 +310,33 @@ public:
       if (!Apply)
         return nullptr;
       
-      // FIXME: Diagnose
+      // The '&' is incorrect. Customize our diagnostic based on whether
+      // removing the '&' would make the code type-check or not.
+      if (coerceToType(E->getSubExpr(), DestTy, TC, false)) {
+        // The code would have type-checked without '&'; tell the user that the
+        // '&' is extraneous and type-check as if it weren't there.
+        diagnose(E->getLoc(), diag::explicit_lvalue)
+          << E->getSubExpr()->getSourceRange();
+        return coerceToType(E->getSubExpr(), DestTy, TC, true);
+      }
+
+      // The '&' wouldn't fix it, either; produce diagnostics based on coercing
+      // the subexpression directly, and the user can deal with the '&'
+      // afterward.
+      return coerceToType(E->getSubExpr(), DestTy, TC, true);
+    }
+    
+    
+    if (CoercedResult Sub = coerceToType(E->getSubExpr(), DestTy, TC, Apply)) {
+      if (!Apply)
+        return DestTy;
+      
+      E->setSubExpr(Sub.getExpr());
+      E->setType(DestTy);
       return unchanged(E);
     }
     
-    // FIXME: This is rather broken: we do not want to materialize the operand
-    // of an '&'.
-    LValueType::Qual qs = DestLT->getQualifiers();
-    qs |= LValueType::Qual::Implicit;
-
-    Type NewDestTy = LValueType::get(DestLT->getObjectType(), qs, TC.Context);
-    return coerceToType(E, NewDestTy, TC, Apply);
+    return nullptr;
   }
 
   SemaCoerce(TypeChecker &TC, Type DestTy, bool Apply) 
@@ -335,7 +351,7 @@ public:
   
   /// coerceToType - This is the main entrypoint to SemaCoerce.
   static CoercedResult coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
-                                     bool Apply);
+                                    bool Apply);
 
   static CoercedResult convertScalarToTupleType(Expr *E, TupleType *DestTy,
                                                 unsigned FieldNo, 
@@ -343,7 +359,33 @@ public:
   static CoercedResult
   convertTupleToTupleType(Expr *E, unsigned NumExprElements,
                           TupleType *DestTy, TypeChecker &TC, bool Apply);
+  
+  /// loadLValue - Load the given lvalue expression.
+  static CoercedResult loadLValue(Expr *E, LValueType *LValue, TypeChecker &TC,
+                                  bool Apply) {
+    assert(E->getType()->isEqual(LValue));
+    
+    // Can't load from an explicit lvalue.
+    if (LValue->isExplicit()) {
+      if (Apply)
+        TC.diagnose(E->getLoc(), diag::load_of_explicit_lvalue,
+                    LValue->getObjectType())
+          << E->getSourceRange();
+      
+      return nullptr;
+    }
+    
+    if (!Apply) {
+      // If we're not going to apply the result anyway, just return the
+      // appropriate type.
+      return LValue->getObjectType();
+    }
+    
+    return coerced(new (TC.Context) LoadExpr(E, LValue->getObjectType()),
+                   Apply);
+  }
 };
+  
 } // end anonymous namespace.
 
 /// isLiteralCompatibleType - Check to see if the specified type has a properly
@@ -1181,14 +1223,19 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
     }
   }
 
-  // If the source is an l-value, load from it.  We intentionally do
-  // this before checking for certain destination types below.
-  if (LValueType *srcLV = E->getType()->getAs<LValueType>()) {
-    // FIXME: Doesn't work with !Apply
-    E = TC.convertLValueToRValue(srcLV, E);
-    if (!E) return nullptr;
-
-    return coerceToType(E, DestTy, TC, Apply);
+  // If the source is an l-value, load from it.
+  if (LValueType *LValue = E->getType()->getAs<LValueType>()) {
+    if (CoercedResult Loaded = loadLValue(E, LValue, TC, Apply)) {
+      if (!Apply) {
+        // Since we aren't applying the expression anyway, 
+        LoadExpr Load(E, Loaded.getType());
+        return coerceToType(&Load, DestTy, TC, Apply);
+      }
+      
+      return coerceToType(Loaded.getExpr(), DestTy, TC, Apply);
+    }
+    
+    return nullptr;
   }
 
   // Could not do the conversion.
@@ -1211,3 +1258,14 @@ Expr *TypeChecker::coerceToType(Expr *E, Type DestTy) {
 bool TypeChecker::isCoercibleToType(Expr *E, Type Ty) {
   return (bool)SemaCoerce::coerceToType(E, Ty, *this, /*Apply=*/false);
 }
+
+Expr *TypeChecker::convertLValueToRValue(LValueType *srcLV, Expr *E) {
+  assert(E && "no expression to load!");
+  assert(E->getType()->isEqual(srcLV));
+  
+  if (CoercedResult Result = SemaCoerce::loadLValue(E, srcLV, *this, true))
+    return Result.getExpr();
+
+  return nullptr;
+}
+
