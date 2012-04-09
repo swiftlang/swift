@@ -205,21 +205,46 @@ public:
 
 /// OverloadSetRefExpr - A reference to an overloaded set of values with a
 /// single name.
+///
+/// This is an abstract class that covers the various different kinds of
+/// overload sets.
 class OverloadSetRefExpr : public Expr {
   ArrayRef<ValueDecl*> Decls;
+
+protected:
+  OverloadSetRefExpr(ExprKind Kind, ArrayRef<ValueDecl*> decls, Type Ty)
+    : Expr(Kind, Ty), Decls(decls) {}
+
+public:
+  ArrayRef<ValueDecl*> getDecls() const { return Decls; }
+  
+  /// createFilteredWithCopy - Given a subset of the declarations in the given
+  /// overloaded reference expression, return a new expression of the same
+  /// form but with the restricted set of declarations. This is equivalent
+  /// to calling createWithCopy() on the appropriate subclass of
+  /// OverloadSetRefExpr with arguments derived from the current expression.
+  Expr *createFilteredWithCopy(ArrayRef<ValueDecl *> Decls);
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const OverloadSetRefExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() >= ExprKind::First_OverloadSetRefExpr &&
+           E->getKind() <= ExprKind::Last_OverloadSetRefExpr;
+  }
+};
+
+/// OverloadedDeclRef - A reference to an overloaded name, which may b
+class OverloadedDeclRefExpr : public OverloadSetRefExpr {
   SourceLoc Loc;
 
 public:
-  OverloadSetRefExpr(ArrayRef<ValueDecl*> decls, SourceLoc Loc,
-                     Type Ty = Type())
-  : Expr(ExprKind::OverloadSetRef, Ty), Decls(decls), Loc(Loc) {}
-
-  ArrayRef<ValueDecl*> getDecls() const { return Decls; }
-
+  OverloadedDeclRefExpr(ArrayRef<ValueDecl*> Decls, SourceLoc Loc, Type Ty)
+    : OverloadSetRefExpr(ExprKind::OverloadedDeclRef, Decls, Ty), Loc(Loc) { }
+  
   SourceLoc getLoc() const { return Loc; }
   SourceRange getSourceRange() const { return Loc; }
-  
-  /// createWithCopy - Create and return a new OverloadSetRefExpr or a new
+
+  /// createWithCopy - Create and return a new OverloadedDeclRefExpr or a new
   /// DeclRefExpr (if the list of decls has a single entry) from the specified
   /// (non-empty) list of decls.  If we end up creating an overload set, this
   /// method handles copying the list of decls into ASTContext memory.
@@ -230,15 +255,14 @@ public:
     llvm::SmallVector<ValueDecl*, 4> ValueDecls(Decls.begin(), Decls.end());
     return createWithCopy(ValueDecls, Loc);
   }
-  
-  
-  
+
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const OverloadSetRefExpr *) { return true; }
+  static bool classof(const OverloadedDeclRefExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::OverloadSetRef;
+    return E->getKind() == ExprKind::OverloadedDeclRef;
   }
 };
+  
   
 /// UnresolvedDeclRefExpr - This represents use of an undeclared identifier,
 /// which may ultimately be a use of something that hasn't been defined yet, it

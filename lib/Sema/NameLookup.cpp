@@ -231,5 +231,5 @@ Expr *MemberLookup::createResultAST(Expr *Base, SourceLoc DotLoc,
     ResultSet.push_back(X.D);
   }
   
-  return OverloadSetRefExpr::createWithCopy(ResultSet, NameLoc);
+  return OverloadedDeclRefExpr::createWithCopy(ResultSet, NameLoc);
 }

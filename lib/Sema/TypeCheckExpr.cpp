@@ -182,8 +182,8 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // silly and pointless to do so.
     if (OneOfType *OOT = Ty->getAs<OneOfType>()) {
       if (!OOT->getElements().empty()) {
-        Expr *FnRef = OverloadSetRefExpr::createWithCopy(OOT->getElements(),
-                                                         E1->getStartLoc());
+        Expr *FnRef = OverloadedDeclRefExpr::createWithCopy(OOT->getElements(),
+                                                            E1->getStartLoc());
         return semaApplyExpr(new (Context) ConstructorCallExpr(FnRef, E2));
       }
     }
@@ -232,7 +232,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // no longer have to consider those non-matching candidates.
   // FIXME: We may simple want to mark them as non-viable in the overload set
   // itself, so we can provide them in diagnostics.
-  E->setFn(OverloadSetRefExpr::createWithCopy(Viable, OS->getLoc()));
+  E->setFn(OS->createFilteredWithCopy(Viable));
   return E;
 }
 
@@ -479,8 +479,7 @@ static InfixData getInfixData(TypeChecker &TC, Expr *E) {
 
   // If this is an overload set, the entire overload set is required
   // to have the same infix data.
-  } else if (OverloadSetRefExpr *OO = dyn_cast<OverloadSetRefExpr>(E)) {
-
+  } else if (OverloadedDeclRefExpr *OO = dyn_cast<OverloadedDeclRefExpr>(E)) {
     ValueDecl *FirstDecl = nullptr;
     InfixData Infix;
     for (auto D : OO->getDecls()) {

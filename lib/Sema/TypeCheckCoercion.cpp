@@ -160,8 +160,11 @@ public:
       if (Type Matched = matchLValueType(val, lv)) {
         if (!Apply)
           return Matched;
-          
-        return coerced(new (TC.Context) DeclRefExpr(val, E->getLoc(), Matched));
+        
+        // FIXME: We should be handling this like overload resolution, because
+        // ambiguities are possible.
+        return coerced(
+                 E->createFilteredWithCopy(ArrayRef<ValueDecl *>(&val, 1)));
       }
     }
 
@@ -199,7 +202,7 @@ public:
       if (!Apply)
         return DestTy;
       
-      return coerced(TC.buildDeclRefRValue(Viable[0], E->getLoc()));      
+      return coerced(TC.convertToRValue(E->createFilteredWithCopy(Viable)));
     }
       
     if (Apply) {

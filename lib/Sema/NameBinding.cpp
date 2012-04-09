@@ -357,7 +357,7 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, FuncDecl *CurFD,
     return new (Binder.Context) ErrorExpr(Loc);
   }
 
-  return OverloadSetRefExpr::createWithCopy(Decls, Loc);
+  return OverloadedDeclRefExpr::createWithCopy(Decls, Loc);
 }
 
 

@@ -112,12 +112,20 @@ llvm::APFloat FloatLiteralExpr::getValue() const {
   return Val;
 }
 
-/// createWithCopy - Create and return a new OverloadSetRefExpr or a new
+Expr *OverloadSetRefExpr::createFilteredWithCopy(ArrayRef<ValueDecl *> Decls) {
+  if (OverloadedDeclRefExpr *DRE = dyn_cast<OverloadedDeclRefExpr>(this)) {
+    return OverloadedDeclRefExpr::createWithCopy(Decls, DRE->getLoc());
+  }
+  
+  llvm_unreachable("Unhandled overloaded set reference expression");
+}
+
+/// createWithCopy - Create and return a new OverloadedDeclRefExpr or a new
 /// DeclRefExpr (if the list of decls has a single entry) from the specified
 /// (non-empty) list of decls.  If we end up creating an overload set, this
 /// method handles copying the list of decls into ASTContext memory.
-Expr *OverloadSetRefExpr::createWithCopy(ArrayRef<ValueDecl*> Decls,
-                                         SourceLoc Loc) {
+Expr *OverloadedDeclRefExpr::createWithCopy(ArrayRef<ValueDecl*> Decls,
+                                            SourceLoc Loc) {
   assert(!Decls.empty() &&
          "Cannot create a decl ref with an empty list of decls");
   ASTContext &C = Decls[0]->getASTContext();
@@ -126,8 +134,8 @@ Expr *OverloadSetRefExpr::createWithCopy(ArrayRef<ValueDecl*> Decls,
   
   // Otherwise, copy the overload set into ASTContext memory and return the
   // overload set.
-  return new (C) OverloadSetRefExpr(C.AllocateCopy(Decls), Loc,
-                                    UnstructuredDependentType::get(C));
+  return new (C) OverloadedDeclRefExpr(C.AllocateCopy(Decls), Loc,
+                                       UnstructuredDependentType::get(C));
 }
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
@@ -274,8 +282,9 @@ public:
     printCommon(E, "declref_expr")
       << " decl=" << E->getDecl()->getName() << ')';
   }
-  void visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
-    printCommon(E, "overloadsetref_expr") << " #decls=" <<E->getDecls().size();
+  void visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E) {
+    printCommon(E, "overloadeddeclref_expr")
+      << " #decls=" << E->getDecls().size();
     for (Decl *D : E->getDecls()) {
       OS << '\n';
       printRec(D);

@@ -65,7 +65,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *E) { return E; }
   Expr *visitFloatLiteralExpr(FloatLiteralExpr *E) { return E; }
   Expr *visitDeclRefExpr(DeclRefExpr *E) { return E; }
-  Expr *visitOverloadSetRefExpr(OverloadSetRefExpr *E) { return E; }
+  Expr *visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E) { return E; }
   Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) { return E; }
   Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) { return E; }
 
