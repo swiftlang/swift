@@ -70,6 +70,8 @@ class Scope {
   Scope(const Scope&) = delete;
   void operator=(const Scope&) = delete;
   ScopeInfo &SI;
+  llvm::ScopedHashTableScope<Identifier, 
+                             ScopeInfo::ValueScopeEntry> ValueHTScope;
 
   Scope *PrevScope;
   unsigned Depth;

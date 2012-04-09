@@ -24,7 +24,8 @@ using namespace swift;
 // Scope Implementation
 //===----------------------------------------------------------------------===//
 
-Scope::Scope(Parser *P) : SI(P->ScopeInfo), PrevScope(SI.CurScope) {
+Scope::Scope(Parser *P) : SI(P->ScopeInfo), ValueHTScope(SI.ValueScopeHT),
+                          PrevScope(SI.CurScope) {
   if (SI.CurScope)
     Depth = SI.CurScope->Depth+1;
   else
