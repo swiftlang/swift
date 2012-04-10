@@ -52,6 +52,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
     TheErrorType(new (*this) ErrorType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheObjectPointerType(new (*this) BuiltinObjectPointerType(*this)),
+    TheRawPointerType(new (*this) BuiltinRawPointerType(*this)),
     TheUnstructuredDependentType(new (*this) UnstructuredDependentType(*this)),
     TheIEEE32Type(new (*this) BuiltinFloatType(BuiltinFloatType::IEEE32,*this)),
     TheIEEE64Type(new (*this) BuiltinFloatType(BuiltinFloatType::IEEE64,*this)),

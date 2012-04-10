@@ -72,6 +72,7 @@ bool TypeBase::hasReferenceSemantics() {
 Type TypeBase::getUnlabeledType(ASTContext &Context) {
   switch (getKind()) {
   case TypeKind::Error: 
+  case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinFloat:
@@ -446,8 +447,12 @@ void TypeBase::print(raw_ostream &OS) const {
   llvm_unreachable("bad type kind!");
 }
 
+void BuiltinRawPointerType::print(raw_ostream &OS) const {
+  OS << "Builtin.RawPointer";
+}
+
 void BuiltinObjectPointerType::print(raw_ostream &OS) const {
-  OS << "Builtin.ObjectPointer"; return;
+  OS << "Builtin.ObjectPointer";
 }
 
 void BuiltinIntegerType::print(raw_ostream &OS) const {

@@ -170,6 +170,9 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
     return convertMetaTypeType(IGM, cast<MetaTypeType>(T));
   case TypeKind::Module:
     return convertModuleType(IGM, cast<ModuleType>(T));
+  case TypeKind::BuiltinRawPointer:
+    return createPrimitive(llvm::Type::getInt8PtrTy(Ctx), IGM.getPointerSize(),
+                           IGM.getPointerAlignment());
   case TypeKind::BuiltinObjectPointer:
     return convertBuiltinObjectPointer(IGM);
   case TypeKind::BuiltinFloat:

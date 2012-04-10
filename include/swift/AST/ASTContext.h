@@ -125,6 +125,7 @@ public:
   const Type TheErrorType;       /// TheErrorType - This is the error singleton.
   const Type TheEmptyTupleType;  /// TheEmptyTupleType - This is "()"
   const Type TheObjectPointerType; /// Builtin.ObjectPointer
+  const Type TheRawPointerType;  /// Builtin.RawPointer
   
   /// TheUnstructuredDependentType - Dependent on context.  This is given to an 
   /// anonymous closure argument (e.g. $4) and to UnresolvedMemberExprs 

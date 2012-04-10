@@ -210,6 +210,9 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
   case TypeKind::BuiltinInteger:
     Buffer << "i" << cast<BuiltinIntegerType>(type)->getBitWidth();
     return;
+  case TypeKind::BuiltinRawPointer:
+    Buffer << "p";
+    return;
   case TypeKind::BuiltinObjectPointer:
     Buffer << "o";
     return;

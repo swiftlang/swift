@@ -27,6 +27,7 @@ static bool checkFullyTyped(Parser &P, Type type) {
   case TypeKind::Error:
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinFloat:
+  case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::NameAlias: // FIXME: underlying type could be non-fully-typed!
   case TypeKind::Identifier:

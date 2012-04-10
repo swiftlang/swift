@@ -193,6 +193,22 @@ public:
   }
 };
 
+/// BuiltinRawPointerType - The builtin raw (and dangling) pointer type.  This
+/// pointer is completely unmanaged and is equivalent to i8* in LLVM IR.
+class BuiltinRawPointerType : public TypeBase {
+  friend class ASTContext;
+  BuiltinRawPointerType(ASTContext &C)
+    : TypeBase(TypeKind::BuiltinRawPointer, &C, /*Dependent=*/false) {}
+public:
+  void print(raw_ostream &OS) const;
+  
+  static bool classof(const BuiltinRawPointerType *) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinRawPointer;
+  }
+};
+
+
 /// BuiltinObjectPointerType - The builtin opaque object-pointer type.
 /// Useful for keeping an object alive when it is otherwise being
 /// manipulated via an unsafe pointer type.
@@ -208,7 +224,7 @@ public:
     return T->getKind() == TypeKind::BuiltinObjectPointer;
   }
 };
-
+  
 /// BuiltinIntegerType - The builtin integer types.  These directly correspond
 /// to LLVM IR integer types.  They lack signedness and have an arbitrary
 /// bitwidth.
