@@ -70,7 +70,7 @@ public:
 protected:
   ASTWalker() = default;
   ASTWalker(const ASTWalker &) = default;
-  ~ASTWalker() = default;
+  virtual ~ASTWalker() {}
   
   virtual void anchor();
 };
