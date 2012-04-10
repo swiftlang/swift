@@ -321,31 +321,32 @@ void Lexer::lexNumber() {
 }
 
 /// lexStringLiteral:
-///   string_literal  ::= ["][^"]*["]
+///   string_literal  ::= ["][^"\\\n\r]*["]
 void Lexer::lexStringLiteral() {
   const char *TokStart = CurPtr-1;
   assert(*TokStart == '"' && "Unexpected start");
   
 EatString:
-  while (*CurPtr != '\0' && *CurPtr != '"')
+  // String literals cannot have \n or \r in them, and \ is an escape.
+  while (*CurPtr != '\0' && *CurPtr != '"' && *CurPtr != '\\' &&
+         *CurPtr != '\n' && *CurPtr != '\r')
     ++CurPtr;
-  
-  if (*CurPtr == 0) {
-    // If we got a nul, we're either at the end of file, or have an embedded
-    // nul.
-    if (CurPtr-1 != BufferEnd) {
-      diagnose(CurPtr-1, diag::lex_nul_character);
-      goto EatString;
-    }
-    
-    diagnose(TokStart, diag::lex_unterminated_string);
-    --CurPtr;
-    return;
+
+  // If we found the closing " character, we're done.
+  if (*CurPtr == '"') {
+    ++CurPtr;
+    return formToken(tok::string_literal, TokStart);
   }
-  
-  assert(*CurPtr == '"');
-  ++CurPtr;
-  return formToken(tok::string_literal, TokStart);
+
+  // If we got a nul, we're either at the end of file, or have an embedded
+  // nul.
+  if (*CurPtr == 0 && CurPtr-1 != BufferEnd) {
+    diagnose(CurPtr-1, diag::lex_nul_character);
+    goto EatString;
+  }
+    
+  diagnose(TokStart, diag::lex_unterminated_string);
+  --CurPtr;
 }
 
 

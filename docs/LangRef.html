@@ -308,10 +308,11 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    string_literal ::= ["][^"]*["]
+    string_literal ::= ["][^"\\\n\r]*["]
   </pre>
   
-  <p>string_literal tokens represent a string.</p>
+  <p>string_literal tokens represent a string, and are surrounded by double
+     quotes.  String literals cannot span multiple lines.</p>
 
 
   <!-- ===================================================================== -->
