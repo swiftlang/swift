@@ -429,31 +429,88 @@ void IRGenFunction::emitZeroInit(Address addr, const TypeInfo &type) {
                        /*volatile*/ false);
 }
 
-void IRGenFunction::emitPatternBindingInit(PatternBindingDecl *D, bool isGlobal) {
-  // FIXME: For now, we only handle the case where the pattern maps onto a
-  // single variable.
-  PatternBindingDecl *PBD = cast<PatternBindingDecl>(D);
-  Pattern *P = PBD->getPattern();
-  do {
-    if (ParenPattern *PP = dyn_cast<ParenPattern>(P))
-      P = PP->getSubPattern();
-    else if (TypedPattern *TP = dyn_cast<TypedPattern>(P))
-      P = TP->getSubPattern();
-    else
-      break;
-  } while (1);
-  if (NamedPattern *NP = dyn_cast<NamedPattern>(P)) {
-    // FIXME: should be a full-expression scope.
-    VarDecl *var = NP->getDecl();
-    const TypeInfo &type = IGM.getFragileTypeInfo(var->getType());
-    Address addr = isGlobal ? IGM.getAddrOfGlobalVariable(var) : getLocal(var);
-    if (PBD->getInit())
-      emitInit(addr, PBD->getInit(), type);
-    else if (!isGlobal)
-      emitZeroInit(addr, type);
-  } else if (!isGlobal || PBD->getInit()) {
-    unimplemented(D->getLocStart(), "pattern binding init");
-  }
+namespace {
+  /// A struct for initializing a pattern with an (optional) initializer.
+  struct PatternBinder : public irgen::PatternVisitor<PatternBinder> {
+    IRGenFunction &IGF;
+    Expr *Init;
+    bool IsGlobal;
+    PatternBinder(IRGenFunction &IGF, Expr *init, bool isGlobal)
+      : IGF(IGF), Init(init), IsGlobal(isGlobal) {}
+
+    // Bind to an 'any' pattern by emitting the initializer and
+    // ignoring it.
+    void visitAnyPattern(AnyPattern *P) {
+      if (Init) IGF.emitIgnored(Init);
+    }
+
+    // Bind to a tuple pattern by emitting the initializer into place.
+    void visitNamedPattern(NamedPattern *P) {
+      VarDecl *var = P->getDecl();
+      Address addr =
+        IsGlobal ? IGF.IGM.getAddrOfGlobalVariable(var) : IGF.getLocal(var);
+      const TypeInfo &type = IGF.getFragileTypeInfo(var->getType());
+
+      if (Init) {
+        IGF.emitInit(addr, Init, type);
+      } else if (!IsGlobal) {
+        IGF.emitZeroInit(addr, type);
+      }
+    }
+
+    void visitTuplePattern(TuplePattern *P) {
+      // If we have no initializer, just emit the subpatterns using
+      // that missing initializer.
+      if (!Init) {
+        for (auto &elt : P->getFields())
+          visit(elt.getPattern());
+        return;
+      }
+
+      // Otherwise, ask the tuple-specific code to handle it.
+      emitTuplePatternInit(IGF, P, Init, IsGlobal);
+    }
+  };
+}
+
+void IRGenFunction::emitPatternBindingInit(Pattern *P, Expr *E, bool isGlobal) {
+  PatternBinder(*this, E, isGlobal).visit(P);
+}
+
+namespace {
+  /// A struct for initializing a pattern from an explosion.
+  struct ExplosionPatternBinder
+      : public irgen::PatternVisitor<ExplosionPatternBinder> {
+    IRGenFunction &IGF;
+    Explosion &Values;
+    bool IsGlobal;
+    ExplosionPatternBinder(IRGenFunction &IGF, Explosion &values, bool isGlobal)
+      : IGF(IGF), Values(values), IsGlobal(isGlobal) {}
+
+    void visitAnyPattern(AnyPattern *P) {
+      const TypeInfo &type = IGF.getFragileTypeInfo(P->getType());
+      Values.ignoreAndDestroy(IGF, type.getExplosionSize(Values.getKind()));
+    }
+
+    void visitNamedPattern(NamedPattern *P) {
+      VarDecl *var = P->getDecl();
+      Address addr =
+        IsGlobal ? IGF.IGM.getAddrOfGlobalVariable(var) : IGF.getLocal(var);
+
+      const TypeInfo &type = IGF.getFragileTypeInfo(var->getType());
+      type.initialize(IGF, Values, addr);
+    }
+
+    void visitTuplePattern(TuplePattern *TP) {
+      for (auto &field : TP->getFields())
+        visit(field.getPattern());
+    }
+  };
+}
+
+void IRGenFunction::emitPatternBindingInit(Pattern *P, Explosion &explosion,
+                                           bool isGlobal) {
+  ExplosionPatternBinder(*this, explosion, isGlobal).visit(P);
 }
 
 namespace {

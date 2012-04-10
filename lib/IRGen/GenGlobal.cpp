@@ -29,6 +29,7 @@
 #include "IRGenModule.h"
 #include "Linking.h"
 #include "LValue.h"
+#include "Scope.h"
 
 using namespace swift;
 using namespace irgen;
@@ -136,9 +137,12 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
     IGM.emitExtension(cast<ExtensionDecl>(D));
     return;
 
-  case DeclKind::PatternBinding:
-    emitPatternBindingInit(cast<PatternBindingDecl>(D), /*isGlobal*/true);
+  case DeclKind::PatternBinding: {
+    FullExpr scope(*this);
+    PatternBindingDecl *PBD = cast<PatternBindingDecl>(D); 
+    emitPatternBindingInit(PBD->getPattern(), PBD->getInit(), /*global*/true);
     return;
+  }
 
   // oneof elements can be found at the top level because of struct
   // "constructor" injection.  Just ignore them here; we'll get them

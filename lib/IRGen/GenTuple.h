@@ -20,6 +20,7 @@
 namespace swift {
   class TupleElementExpr;
   class TupleExpr;
+  class TuplePattern;
   class TupleShuffleExpr;
   template <class T> class Optional;
 
@@ -47,6 +48,14 @@ namespace irgen {
   /// Emit a tuple shuffle expression as an r-value.
   void emitTupleShuffle(IRGenFunction &IGF, TupleShuffleExpr *E,
                         Explosion &explosion);
+
+  /// Emit an initializer for a tuple pattern.
+  void emitTuplePatternInit(IRGenFunction &IGF, TuplePattern *P, Expr *E,
+                            bool isGlobal);
+
+  /// Emit an initializer for a tuple pattern.
+  void emitTuplePatternInit(IRGenFunction &IGF, TuplePattern *P,
+                            Explosion &E, bool isGlobal);
 
 } // end namespace irgen
 } // end namespace swift

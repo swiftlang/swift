@@ -20,6 +20,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "llvm/Support/ErrorHandling.h"
 
@@ -29,7 +30,8 @@ namespace swift {
 template<typename ImplClass,
          typename ExprRetTy = void,
          typename StmtRetTy = void,
-         typename DeclRetTy = void> 
+         typename DeclRetTy = void,
+         typename PatternRetTy = void> 
 class ASTVisitor {
 public:
 
@@ -81,6 +83,17 @@ public:
     }
     llvm_unreachable("Not reachable, all cases handled");
   }
+
+  PatternRetTy visit(Pattern *P) {
+    switch (P->getKind()) {
+#define PATTERN(CLASS, PARENT) \
+    case PatternKind::CLASS: \
+      return static_cast<ImplClass*>(this) \
+        ->visit##CLASS##Pattern(static_cast<CLASS##Pattern*>(P));
+#include "swift/AST/PatternNodes.def"
+    }
+    llvm_unreachable("Not reachable, all cases handled");
+  }
 };
   
   
@@ -92,6 +105,9 @@ using StmtVisitor = ASTVisitor<ImplClass, void, StmtRetTy>;
 
 template<typename ImplClass, typename DeclRetTy = void>
 using DeclVisitor = ASTVisitor<ImplClass, void, void, DeclRetTy>;
+
+template<typename ImplClass, typename PatternRetTy = void>
+using PatternVisitor = ASTVisitor<ImplClass, void, void, void, PatternRetTy>;
 
 } // end namespace swift
   

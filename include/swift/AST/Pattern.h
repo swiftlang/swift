@@ -64,6 +64,11 @@ private:
 public:
   PatternKind getKind() const { return PatternKind(PatternBits.Kind); }
 
+  Pattern *getSemanticsProvidingPattern();
+  const Pattern *getSemanticsProvidingPattern() const {
+    return const_cast<Pattern*>(this)->getSemanticsProvidingPattern();
+  }
+
   /// Returns whether this pattern has been type-checked yet.
   bool hasType() const { return !Ty.isNull(); }
 
@@ -242,6 +247,14 @@ public:
   }
   static bool classof(const TypedPattern *P) { return true; }
 };
+
+inline Pattern *Pattern::getSemanticsProvidingPattern() {
+  if (ParenPattern *pp = dyn_cast<ParenPattern>(this))
+    return pp->getSubPattern()->getSemanticsProvidingPattern();
+  if (TypedPattern *tp = dyn_cast<TypedPattern>(this))
+    return tp->getSubPattern()->getSemanticsProvidingPattern();
+  return this;
+}
 
 } // end namespace swift
 

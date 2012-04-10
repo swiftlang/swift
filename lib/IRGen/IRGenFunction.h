@@ -259,7 +259,8 @@ public:
   void emitInit(Address addr, Expr *E, const TypeInfo &type);
   void emitZeroInit(Address addr, const TypeInfo &type);
 
-  void emitPatternBindingInit(PatternBindingDecl *D, bool isGlobal);
+  void emitPatternBindingInit(Pattern *P, Expr *E, bool isGlobal);
+  void emitPatternBindingInit(Pattern *P, Explosion &E, bool isGlobal);
 
   OwnedAddress getAddrForParameter(VarDecl *param, Explosion &paramValues);
 

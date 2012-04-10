@@ -20,6 +20,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Explosion.h"
+#include "Scope.h"
 
 using namespace swift;
 using namespace irgen;
@@ -49,9 +50,12 @@ void IRGenFunction::emitLocal(Decl *D) {
     unimplemented(D->getLocStart(), "local function emission");
     return;
 
-  case DeclKind::PatternBinding:
-    emitPatternBindingInit(cast<PatternBindingDecl>(D), /*isGlobal*/false);
+  case DeclKind::PatternBinding: {
+    FullExpr scope(*this);
+    PatternBindingDecl *PBD = cast<PatternBindingDecl>(D); 
+    emitPatternBindingInit(PBD->getPattern(), PBD->getInit(), /*global*/false);
     return;
+  }
 
   }
   llvm_unreachable("bad declaration kind!");

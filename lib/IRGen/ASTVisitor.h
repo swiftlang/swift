@@ -27,9 +27,11 @@ namespace irgen {
 template<typename ImplClass,
          typename ExprRetTy = void,
          typename StmtRetTy = void,
-         typename DeclRetTy = void> 
+         typename DeclRetTy = void,
+         typename PatternRetTy = void> 
 class ASTVisitor :
-  public swift::ASTVisitor<ImplClass, ExprRetTy, StmtRetTy, DeclRetTy> {
+  public swift::ASTVisitor<ImplClass, ExprRetTy, StmtRetTy, DeclRetTy,
+                           PatternRetTy> {
 public:
 
 #define EXPR(Id, Parent)
@@ -50,6 +52,14 @@ public:
   ExprRetTy visitAddressOfExpr(AddressOfExpr *E) {
     return static_cast<ImplClass*>(this)->visit(E->getSubExpr());
   }
+
+  PatternRetTy visitParenPattern(ParenPattern *P) {
+    return static_cast<ImplClass*>(this)->visit(P->getSubPattern());
+  }
+
+  PatternRetTy visitTypedPattern(TypedPattern *P) {
+    return static_cast<ImplClass*>(this)->visit(P->getSubPattern());
+  }
 };  
   
 template<typename ImplClass, typename ExprRetTy = void>
@@ -60,6 +70,9 @@ using StmtVisitor = ASTVisitor<ImplClass, void, StmtRetTy>;
 
 template<typename ImplClass, typename DeclRetTy = void>
 using DeclVisitor = ASTVisitor<ImplClass, void, void, DeclRetTy>;
+
+template<typename ImplClass, typename PatternRetTy = void>
+using PatternVisitor = ASTVisitor<ImplClass, void, void, void, PatternRetTy>;
 
 } // end namespace irgen
 } // end namespace swift
