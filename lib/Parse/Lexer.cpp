@@ -340,6 +340,10 @@ static bool EncodeToUTF8(unsigned CharValue,
     // Encoding is 0x1110aaaa 10bbbbbb 10cccccc
     Result.push_back(char(0xE0 | (CharValue >> (6+6))));
     NumTrailingBytes = 2;
+    
+    // UTF-16 surrogate pair values are not valid code points.
+    if (CharValue >= 0xD800 && CharValue <= 0xDFFF)
+      return true;
   } else if (NumBits <= 3+6+6+6) {
     // Encoding is 0x11110aaa 10bbbbbb 10cccccc 10dddddd
     Result.push_back(char(0xF0 | (CharValue >> (6+6+6))));
@@ -420,6 +424,12 @@ void Lexer::lexStringLiteral() {
         }
           
         StringRef(CurPtr+1, 2).getAsInteger(16, CharValue);
+          
+        // Reject \x80 and above, since it is going to encode into a multibyte
+        // unicode encoding, which is something that C folks may not expect.
+        if (CharValue >= 0x80)
+          diagnose(CurPtr, diag::lex_invalid_hex_escape);
+          
         CurPtr += 3;
         break;
 

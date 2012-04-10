@@ -85,6 +85,8 @@ ERROR(lex_invalid_string_U_escape,lexing,none,
        "\\U escape sequence expects 8 hex digits to follow it", ())
 ERROR(lex_invalid_unicode_code_point,lexing,none,
        "invalid unicode code point", ())
+ERROR(lex_invalid_hex_escape,lexing,none,
+       "invalid hex escape, use \\u00XX for values over \\x7F", ())
 
 
 ERROR(lex_invalid_character,lexing,none,
