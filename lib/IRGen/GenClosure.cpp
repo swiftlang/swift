@@ -60,10 +60,9 @@ void swift::irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E,
 
   ManagedValue contextPtr(IGF.IGM.RefCountedNull);
 
-  // There are three places we need to generate code for captures: in the
-  // current function, to store the captures to a capture block; in the inner
-  // function, to load the captures from the capture block; and the destructor
-  // for the capture block.
+  // There are two places we need to generate code for captures: in the
+  // current function, to store the captures to a capture block, and in the
+  // inner function, to load the captures from the capture block.
   if (!E->getCaptures().empty()) {
     SmallVector<const TypeInfo *, 4> Fields;
     for (ValueDecl *D : E->getCaptures()) {
