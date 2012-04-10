@@ -35,7 +35,7 @@ namespace swift {
   class ModuleType;
   class OneOfType;
   class TupleType;
-  class Type;
+  class CanType;
   class TypeBase;
 
 namespace irgen {
@@ -169,7 +169,7 @@ class TypeConverter {
   static const TypeInfo *createPrimitive(llvm::Type *T,
                                          Size size, Alignment align);
     
-  static const TypeInfo *convertType(IRGenModule &IGM, Type T);
+  static const TypeInfo *convertType(IRGenModule &IGM, CanType T);
   static const TypeInfo *convertTupleType(IRGenModule &IGM, TupleType *T);
   static const TypeInfo *convertOneOfType(IRGenModule &IGM, OneOfType *T);
   static const TypeInfo *convertFunctionType(IRGenModule &IGM, FunctionType *T);

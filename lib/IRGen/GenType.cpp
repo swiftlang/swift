@@ -138,47 +138,50 @@ const TypeInfo &IRGenModule::getFragileTypeInfo(Type T) {
   return TypeConverter::getFragileTypeInfo(*this, T);
 }
 
-const TypeInfo &TypeConverter::getFragileTypeInfo(IRGenModule &IGM, Type T) {
-  assert(!T.isNull());
-  auto Entry = IGM.Types.Converted.find(T.getPointer());
-  if (Entry != IGM.Types.Converted.end())
-    return *Entry->second;
+const TypeInfo &TypeConverter::getFragileTypeInfo(IRGenModule &IGM,
+                                                  Type sugaredTy) {
+  assert(!sugaredTy.isNull());
+  CanType canonicalTy = sugaredTy->getCanonicalType();
 
-  const TypeInfo *Result = convertType(IGM, T);
-  IGM.Types.Converted[T.getPointer()] = Result;
+  auto entry = IGM.Types.Converted.find(canonicalTy.getPointer());
+  if (entry != IGM.Types.Converted.end())
+    return *entry->second;
+
+  const TypeInfo *result = convertType(IGM, canonicalTy);
+  IGM.Types.Converted[canonicalTy.getPointer()] = result;
 
   // If the type info hasn't been added to the list of types, do so.
-  if (!Result->NextConverted) {
-    Result->NextConverted = IGM.Types.FirstConverted;
-    IGM.Types.FirstConverted = Result;
+  if (!result->NextConverted) {
+    result->NextConverted = IGM.Types.FirstConverted;
+    IGM.Types.FirstConverted = result;
   }
 
-  return *Result;
+  return *result;
 }
 
-const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
+const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, CanType canTy) {
   llvm::LLVMContext &Ctx = IGM.getLLVMContext();
-  TypeBase *TB = T.getPointer();
-  switch (TB->getKind()) {
+  TypeBase *ty = canTy.getPointer();
+  switch (ty->getKind()) {
 #define UNCHECKED_TYPE(id, parent) \
   case TypeKind::id: \
-    llvm_unreachable("generating an " #id "Type");
+    llvm_unreachable("found a " #id "Type in IR-gen");
 #define SUGARED_TYPE(id, parent) \
   case TypeKind::id: \
-    return &getFragileTypeInfo(IGM, cast<id##Type>(TB)->getDesugaredType());
+    llvm_unreachable("converting a " #id "Type after canonicalization");
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
   case TypeKind::MetaType:
-    return convertMetaTypeType(IGM, cast<MetaTypeType>(T));
+    return convertMetaTypeType(IGM, cast<MetaTypeType>(ty));
   case TypeKind::Module:
-    return convertModuleType(IGM, cast<ModuleType>(T));
+    return convertModuleType(IGM, cast<ModuleType>(ty));
   case TypeKind::BuiltinRawPointer:
     return createPrimitive(IGM.Int8PtrTy, IGM.getPointerSize(),
                            IGM.getPointerAlignment());
   case TypeKind::BuiltinObjectPointer:
     return convertBuiltinObjectPointer(IGM);
   case TypeKind::BuiltinFloat:
-    switch (cast<BuiltinFloatType>(T)->getFPKind()) {
+    switch (cast<BuiltinFloatType>(ty)->getFPKind()) {
     case BuiltinFloatType::IEEE16:
       return createPrimitive(llvm::Type::getHalfTy(Ctx),
                              Size(2), Alignment(2));
@@ -200,7 +203,7 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
     }
     llvm_unreachable("bad builtin floating-point type kind");
   case TypeKind::BuiltinInteger: {
-    unsigned BitWidth = cast<BuiltinIntegerType>(T)->getBitWidth();
+    unsigned BitWidth = cast<BuiltinIntegerType>(ty)->getBitWidth();
     unsigned ByteSize = (BitWidth+7U)/8U;
     // Round up the memory size and alignment to a power of 2. 
     if (!llvm::isPowerOf2_32(ByteSize))
@@ -210,15 +213,15 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, Type T) {
                            Size(ByteSize), Alignment(ByteSize));
   }
   case TypeKind::LValue:
-    return convertLValueType(IGM, cast<LValueType>(TB));
+    return convertLValueType(IGM, cast<LValueType>(ty));
   case TypeKind::Tuple:
-    return convertTupleType(IGM, cast<TupleType>(TB));
+    return convertTupleType(IGM, cast<TupleType>(ty));
   case TypeKind::OneOf:
-    return convertOneOfType(IGM, cast<OneOfType>(TB));
+    return convertOneOfType(IGM, cast<OneOfType>(ty));
   case TypeKind::Function:
-    return convertFunctionType(IGM, cast<FunctionType>(TB));
+    return convertFunctionType(IGM, cast<FunctionType>(ty));
   case TypeKind::Array:
-    return convertArrayType(IGM, cast<ArrayType>(TB));
+    return convertArrayType(IGM, cast<ArrayType>(ty));
   case TypeKind::Protocol:
     llvm_unreachable("protocol not handled in IRGen yet");
   }
