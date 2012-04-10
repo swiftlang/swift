@@ -410,8 +410,7 @@ void swift::performNameBinding(TranslationUnit *TU) {
 
       // This IdentifierType resolved to the error type.
       for (auto &C : DNT->Components)
-        // FIXME: Want MutableArrayRef
-        const_cast<IdentifierType::Component&>(C).Value = Error;
+        C.Value = Error;
     }
   }
 
