@@ -188,6 +188,10 @@ namespace {
       Out.addUnmanaged(emitFloatLiteralExpr(IGF, E));
     }
 
+    void visitStringLiteralExpr(StringLiteralExpr *E) {
+      // FIXME: Implement.
+    }
+
     void visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
       emitLookThroughOneof(IGF, E, Out);
     }
@@ -224,6 +228,7 @@ namespace {
     NOT_LVALUE_EXPR(Apply)
     NOT_LVALUE_EXPR(IntegerLiteral)
     NOT_LVALUE_EXPR(FloatLiteral)
+    NOT_LVALUE_EXPR(StringLiteral)
     NOT_LVALUE_EXPR(TupleShuffle)
     NOT_LVALUE_EXPR(Func)
     NOT_LVALUE_EXPR(Closure)
@@ -356,6 +361,7 @@ namespace {
     NON_LOCATEABLE(TupleExpr)
     NON_LOCATEABLE(IntegerLiteralExpr)
     NON_LOCATEABLE(FloatLiteralExpr)
+    NON_LOCATEABLE(StringLiteralExpr)
     NON_LOCATEABLE(TupleShuffleExpr)
     NON_LOCATEABLE(CapturingExpr)
     NON_LOCATEABLE(ModuleExpr)

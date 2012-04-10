@@ -278,6 +278,9 @@ public:
   void visitFloatLiteralExpr(FloatLiteralExpr *E) {
     printCommon(E, "float_literal_expr") << " value=" << E->getText() << ')';
   }
+  void visitStringLiteralExpr(StringLiteralExpr *E) {
+    printCommon(E, "string_literal_expr") << " value=" << E->getValue() << ')';
+  }
   void visitDeclRefExpr(DeclRefExpr *E) {
     printCommon(E, "declref_expr")
       << " decl=" << E->getDecl()->getName() << ')';

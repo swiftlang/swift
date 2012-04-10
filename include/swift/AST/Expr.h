@@ -182,6 +182,28 @@ public:
     return E->getKind() == ExprKind::FloatLiteral;
   }
 };
+  
+/// StringLiteralExpr - String literal, like '"foo"'.  After semantic
+/// analysis assigns types, this is guaranteed to only have a
+/// BuiltinRawPointerType.
+class StringLiteralExpr : public Expr {
+  StringRef Val;
+  SourceLoc Loc;
+  
+public:
+  StringLiteralExpr(StringRef Val, SourceLoc Loc)
+    : Expr(ExprKind::StringLiteral), Val(Val), Loc(Loc) {}
+  
+  StringRef getValue() const { return Val; }
+  SourceRange getSourceRange() const { return Loc; }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const StringLiteralExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::StringLiteral;
+  }
+};
+
 
 /// DeclRefExpr - A reference to a value, "x".
 class DeclRefExpr : public Expr {

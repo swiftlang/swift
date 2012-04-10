@@ -57,6 +57,7 @@
 EXPR(Error, Expr)
 EXPR(IntegerLiteral, Expr)
 EXPR(FloatLiteral, Expr)
+EXPR(StringLiteral, Expr)
 EXPR(DeclRef, Expr)
 EXPR(DotSyntaxBaseIgnored, Expr)
 ABSTRACT_EXPR(OverloadSetRef, Expr)

@@ -106,6 +106,7 @@ Expr *Parser::parseExprOperator() {
 ///   expr-literal:
 ///     integer_literal
 ///     floating_literal
+///     string_literal
 ///
 ///   expr-primary:
 ///     expr-literal
@@ -148,6 +149,12 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     StringRef Text = Tok.getText();
     SourceLoc Loc = consumeToken(tok::floating_literal);
     Result = new (Context) FloatLiteralExpr(Text, Loc);
+    break;
+  }
+  case tok::string_literal: {
+    StringRef Text = Tok.getText();
+    SourceLoc Loc = consumeToken(tok::string_literal);
+    Result = new (Context) StringLiteralExpr(Text, Loc);
     break;
   }
   case tok::identifier:  // foo

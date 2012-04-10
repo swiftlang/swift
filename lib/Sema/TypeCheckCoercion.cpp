@@ -72,13 +72,17 @@ public:
 /// type (possibly recursively) and (optionally) returns the new/updated 
 /// expression.
 class SemaCoerce : public ExprVisitor<SemaCoerce, CoercedResult> {
+  enum class LiteralType {
+    Int, Float, String
+  };
+  
   /// \brief Determine whether the given type is compatible with an integer
   /// or floating-point literal and what function would perform the conversion.
   ///
   /// \returns The function that will perform the conversion, along with the
   /// type of the argument of this function.
   std::pair<FuncDecl*, Type> isLiteralCompatibleType(Type Ty, SourceLoc Loc, 
-                                                     bool isInt);
+                                                     LiteralType LitTy);
 
   /// coerceLiteralToType - Coerce the given literal to the destination type.
   /// The literal is assumed to have dependent type.
@@ -141,6 +145,9 @@ public:
     return coerceLiteral(E);
   }
   CoercedResult visitFloatLiteralExpr(FloatLiteralExpr *E) {
+    return coerceLiteral(E);
+  }
+  CoercedResult visitStringLiteralExpr(StringLiteralExpr *E) {
     return coerceLiteral(E);
   }
   CoercedResult visitDeclRefExpr(DeclRefExpr *E) {
@@ -396,13 +403,18 @@ public:
 /// not.  If everything looks kosher, return the conversion function and the
 /// argument type that it expects.
 std::pair<FuncDecl*, Type> 
-SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, bool isInt) {
+SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralType LitTy) {
   // Look up the convertFrom*Literal method on the type.  If it is missing,
   // then the type isn't compatible with literals.  If it is present, it must
   // have a single argument.
   SmallVector<ValueDecl*, 8> Methods;
-  const char *MethodName 
-    = isInt ? "convertFromIntegerLiteral" : "convertFromFloatLiteral";
+  const char *MethodName = 0;
+  switch (LitTy) {
+  case LiteralType::Int:    MethodName = "convertFromIntegerLiteral"; break;
+  case LiteralType::Float:  MethodName = "convertFromFloatLiteral"; break;
+  case LiteralType::String: MethodName = "convertFromStringLiteral"; break;
+  }
+  assert(MethodName && "Didn't know LitTy");
   TC.TU.lookupGlobalExtensionMethods(Ty, TC.Context.getIdentifier(MethodName),
                                      Methods);
   
@@ -452,13 +464,20 @@ SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, bool isInt) {
 
 CoercedResult SemaCoerce::coerceLiteral(Expr *E) {
   assert(E->getType()->isDependentType() && "only accepts dependent types");
-  bool isInt = isa<IntegerLiteralExpr>(E);
-  assert((isInt || isa<FloatLiteralExpr>(E)) && "Unknown literal kind");
+  LiteralType LitTy;
+  if (isa<IntegerLiteralExpr>(E))
+    LitTy = LiteralType::Int;
+  else if (isa<FloatLiteralExpr>(E))
+    LitTy = LiteralType::Float;
+  else {
+    assert(isa<StringLiteralExpr>(E));
+    LitTy = LiteralType::String;
+  }
   
   // Check the destination type to see if it is compatible with literals,
   // diagnosing the failure if not.
   std::pair<FuncDecl*, Type> LiteralInfo 
-    = isLiteralCompatibleType(DestTy, E->getLoc(), isInt);
+    = isLiteralCompatibleType(DestTy, E->getLoc(), LitTy);
   FuncDecl *Method = LiteralInfo.first;
   Type ArgType = LiteralInfo.second;
   if (!Method)
@@ -471,7 +490,8 @@ CoercedResult SemaCoerce::coerceLiteral(Expr *E) {
   Expr *Intermediate;
   BuiltinIntegerType *BIT;
   BuiltinFloatType *BFT;
-  if (isInt && (BIT = ArgType->getAs<BuiltinIntegerType>())) {
+  if (LitTy == LiteralType::Int &&
+      (BIT = ArgType->getAs<BuiltinIntegerType>())) {
     // If this is a direct use of the builtin integer type, use the integer size
     // to diagnose excess precision issues.
     llvm::APInt Value(1, 0);
@@ -501,7 +521,8 @@ CoercedResult SemaCoerce::coerceLiteral(Expr *E) {
     if (Apply)
       E->setType(ArgType);
     Intermediate = E;
-  } else if (!isInt && (BFT = ArgType->getAs<BuiltinFloatType>())) {
+  } else if (LitTy == LiteralType::Float &&
+             (BFT = ArgType->getAs<BuiltinFloatType>())) {
     // If this is a direct use of a builtin floating point type, use the
     // floating point type to do the syntax verification.
     llvm::APFloat Val(BFT->getAPFloatSemantics());
@@ -529,19 +550,29 @@ CoercedResult SemaCoerce::coerceLiteral(Expr *E) {
     if (Apply)
       E->setType(ArgType);
     Intermediate = E;
+  } else if (LitTy == LiteralType::String &&
+             ArgType->is<BuiltinRawPointerType>()) {
+    // Nothing to do.
+    E->setType(ArgType);
+    Intermediate = E;
   } else {
     // Check to see if this is the chaining case, where ArgType itself has a
     // conversion from a Builtin type.
-    LiteralInfo = isLiteralCompatibleType(ArgType, E->getLoc(), isInt);
+    LiteralInfo = isLiteralCompatibleType(ArgType, E->getLoc(), LitTy);
     if (LiteralInfo.first == 0) {
       diagnose(Method->getLocStart(),
                diag::while_processing_literal_conversion_function, DestTy);
       return nullptr;
     }
     
-    if (isInt && LiteralInfo.second->is<BuiltinIntegerType>()) {
+    if (LitTy == LiteralType::Int &&
+        LiteralInfo.second->is<BuiltinIntegerType>()) {
       // ok.
-    } else if (!isInt && LiteralInfo.second->is<BuiltinFloatType>()) {
+    } else if (LitTy == LiteralType::Float &&
+               LiteralInfo.second->is<BuiltinFloatType>()) {
+      // ok.
+    } else if (LitTy == LiteralType::String &&
+               LiteralInfo.second->is<BuiltinRawPointerType>()) {
       // ok.
     } else {
       diagnose(Method->getLocStart(),

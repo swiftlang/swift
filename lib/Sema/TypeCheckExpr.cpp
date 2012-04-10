@@ -274,6 +274,11 @@ public:
       E->setType(UnstructuredDependentType::get(TC.Context));
     return E;
   }
+  Expr *visitStringLiteralExpr(StringLiteralExpr *E) {
+    if (E->getType().isNull())
+      E->setType(UnstructuredDependentType::get(TC.Context));
+    return E;
+  }
   Expr *visitDeclRefExpr(DeclRefExpr *E) {
     if (E->getDecl() == 0) {
       TC.diagnose(E->getLoc(), diag::use_undeclared_identifier);
@@ -666,7 +671,8 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
           OneDependentExpr = E;
 
         // Also remember if we see any literals with dependent types.
-        if ((isa<IntegerLiteralExpr>(E) || isa<FloatLiteralExpr>(E)))
+        if (isa<IntegerLiteralExpr>(E) || isa<FloatLiteralExpr>(E) ||
+            isa<StringLiteralExpr>(E))
           HasDependentLiterals = true;
       }
       return E;
@@ -696,17 +702,14 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
       Expr *walkToExprPost(Expr *E) {
         // Process dependent literals.
         if (E->getType()->isDependentType()) {
-          if (IntegerLiteralExpr *lit = dyn_cast<IntegerLiteralExpr>(E)) {
-            Type type = getIntLiteralType(lit->getLoc());
-            if (type.isNull()) return nullptr;
-            return TC.coerceToType(lit, type);
-          }
+          if (IntegerLiteralExpr *lit = dyn_cast<IntegerLiteralExpr>(E))
+            return TC.coerceToType(lit, getIntLiteralType(lit->getLoc()));
 
-          if (FloatLiteralExpr *lit = dyn_cast<FloatLiteralExpr>(E)) {
-            Type type = getFloatLiteralType(lit->getLoc());
-            if (type.isNull()) return nullptr;
-            return TC.coerceToType(lit, type);
-          }
+          if (FloatLiteralExpr *lit = dyn_cast<FloatLiteralExpr>(E))
+            return TC.coerceToType(lit, getFloatLiteralType(lit->getLoc()));
+          
+          if (StringLiteralExpr *lit = dyn_cast<StringLiteralExpr>(E))
+            return TC.coerceToType(lit, getStringLiteralType(lit->getLoc()));
         }
         return E;
       }
@@ -745,10 +748,19 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
         }
         return FloatLiteralType;
       }
+      Type getStringLiteralType(SourceLoc loc) {
+        if (StringLiteralType.isNull()) {
+          StringLiteralType = lookupGlobalType("StringLiteralType");
+          if (StringLiteralType.isNull()) {
+            TC.diagnose(loc, diag::no_StringLiteralType_found);
+            StringLiteralType = TC.Context.TheRawPointerType;
+          }
+        }
+        return StringLiteralType;
+      }
 
       TypeChecker &TC;
-      Type IntLiteralType;
-      Type FloatLiteralType;
+      Type IntLiteralType, FloatLiteralType, StringLiteralType;
     };
 
     // Walk the tree again to update all the entries.  If this fails, give up.
