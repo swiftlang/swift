@@ -73,6 +73,9 @@ ERROR(lex_unterminated_block_comment,lexing,none,
 NOTE(lex_comment_start,lexing,none,
      "comment started here", ())
 
+ERROR(lex_unterminated_string,lexing,none,
+      "unterminated string literal", ())
+
 ERROR(lex_invalid_character,lexing,none,
        "invalid character in source file", ())
 ERROR(lex_expected_sign_in_fp,lexing,none,

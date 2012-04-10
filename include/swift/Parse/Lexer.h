@@ -92,6 +92,7 @@ private:
   void lexDollarIdent();
   void lexOperatorIdentifier();
   void lexNumber();
+  void lexStringLiteral();
 };
   
   

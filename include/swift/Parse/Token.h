@@ -31,6 +31,7 @@ enum class tok {
   dollarident,
   integer_literal,
   floating_literal,
+  string_literal,
   
 #define KEYWORD(X) kw_ ## X,
   // Decl and type keywords.
