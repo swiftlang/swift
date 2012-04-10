@@ -553,7 +553,8 @@ CoercedResult SemaCoerce::coerceLiteral(Expr *E) {
   } else if (LitTy == LiteralType::String &&
              ArgType->is<BuiltinRawPointerType>()) {
     // Nothing to do.
-    E->setType(ArgType);
+    if (Apply)
+      E->setType(ArgType);
     Intermediate = E;
   } else {
     // Check to see if this is the chaining case, where ArgType itself has a
