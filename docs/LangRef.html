@@ -307,8 +307,19 @@
   <h3 id="string_literal">String Literals</h3>
   <!-- ===================================================================== -->
   
+  <div class="commentary">
+    In the future, we can consider adding string interpolation with
+    "\(expression)".
+  </div>
+  
   <pre class="grammar">
-    string_literal ::= ["][^"\\\n\r]*["]
+    string_literal ::= ["]([^"\\\n\r]|string_escape)*["]
+    
+    string_escape  ::= [\][\] | [\]t | [\]n | [\]r | [\]" | [\]'
+    string_escape  ::= [\]x hex hex  
+    string_escape  ::= [\]u hex hex hex hex  
+    string_escape  ::= [\]U hex hex hex hex hex hex hex hex
+    hex            ::= [0-9a-fA-F]
   </pre>
   
   <p>string_literal tokens represent a string, and are surrounded by double

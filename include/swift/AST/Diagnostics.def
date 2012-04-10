@@ -75,6 +75,15 @@ NOTE(lex_comment_start,lexing,none,
 
 ERROR(lex_unterminated_string,lexing,none,
       "unterminated string literal", ())
+ERROR(lex_invalid_string_escape,lexing,none,
+       "invalid escape sequence in string literal", ())
+ERROR(lex_invalid_string_x_escape,lexing,none,
+       "\\x escape sequence expects 2 hex digits to follow it", ())
+ERROR(lex_invalid_string_u_escape,lexing,none,
+       "\\u escape sequence expects 4 hex digits to follow it", ())
+ERROR(lex_invalid_string_U_escape,lexing,none,
+       "\\U escape sequence expects 8 hex digits to follow it", ())
+
 
 ERROR(lex_invalid_character,lexing,none,
        "invalid character in source file", ())

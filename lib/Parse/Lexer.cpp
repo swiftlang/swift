@@ -325,28 +325,69 @@ void Lexer::lexNumber() {
 void Lexer::lexStringLiteral() {
   const char *TokStart = CurPtr-1;
   assert(*TokStart == '"' && "Unexpected start");
-  
-EatString:
-  // String literals cannot have \n or \r in them, and \ is an escape.
-  while (*CurPtr != '\0' && *CurPtr != '"' && *CurPtr != '\\' &&
-         *CurPtr != '\n' && *CurPtr != '\r')
-    ++CurPtr;
 
-  // If we found the closing " character, we're done.
-  if (*CurPtr == '"') {
-    ++CurPtr;
-    return formToken(tok::string_literal, TokStart);
-  }
+  while (1) {
+    switch (*CurPtr++) {
+    // If we found the closing " character, we're done.
+    case '"':
+      return formToken(tok::string_literal, TokStart);
+    case 0:
+      if (CurPtr-2 != BufferEnd) {
+        diagnose(CurPtr-2, diag::lex_nul_character);
+        continue;
+      }
+      --CurPtr;
+      // FALL THROUGH.
+    case '\n':  // String literals cannot have \n or \r in them.
+    case '\r':
+      diagnose(TokStart, diag::lex_unterminated_string);
+      return;
+    case '\\':  // Escapes.
+      switch (*CurPtr) {
+      default:  // Invalid escape.
+        diagnose(CurPtr, diag::lex_invalid_string_escape);
+        continue;
+          
+        // Simple single-character escapes.
+      case 't':
+      case 'n':
+      case 'r':
+      case '"':
+      case '\'':
+      case '\\':
+        ++CurPtr;
+        continue;
+        // Unicode escapes of various lengths.
+      case 'x':  //  \x HEX HEX
+        if (isxdigit(CurPtr[1]) && isxdigit(CurPtr[2])) {
+          CurPtr += 3;
+          continue;
+        }
 
-  // If we got a nul, we're either at the end of file, or have an embedded
-  // nul.
-  if (*CurPtr == 0 && CurPtr-1 != BufferEnd) {
-    diagnose(CurPtr-1, diag::lex_nul_character);
-    goto EatString;
+        diagnose(CurPtr, diag::lex_invalid_string_x_escape);
+        continue;
+      case 'u':  //  \u HEX HEX HEX HEX 
+        if (isxdigit(CurPtr[1]) && isxdigit(CurPtr[2]) && 
+            isxdigit(CurPtr[3]) && isxdigit(CurPtr[4])) {
+          CurPtr += 5;
+          continue;
+        }
+        
+        diagnose(CurPtr, diag::lex_invalid_string_u_escape);
+        continue;
+      case 'U':  //  \U HEX HEX HEX HEX HEX HEX HEX HEX 
+        if (isxdigit(CurPtr[1]) && isxdigit(CurPtr[2]) && 
+            isxdigit(CurPtr[3]) && isxdigit(CurPtr[4]) &&
+            isxdigit(CurPtr[5]) && isxdigit(CurPtr[6]) && 
+            isxdigit(CurPtr[7]) && isxdigit(CurPtr[8])) {
+          CurPtr += 9;
+          continue;
+        }
+        diagnose(CurPtr, diag::lex_invalid_string_U_escape);
+        continue;
+      }
+    }
   }
-    
-  diagnose(TokStart, diag::lex_unterminated_string);
-  --CurPtr;
 }
 
 
