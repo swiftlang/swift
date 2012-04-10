@@ -348,16 +348,11 @@ static bool EncodeToUTF8(unsigned CharValue,
     // Encoding is 0x11110aaa 10bbbbbb 10cccccc 10dddddd
     Result.push_back(char(0xF0 | (CharValue >> (6+6+6))));
     NumTrailingBytes = 3;
-  } else if (NumBits <= 2+6+6+6+6) {
-    // Encoding is 0x111110aa 10bbbbbb 10cccccc 10dddddd 10eeeeee
-    Result.push_back(char(0xF8 | (CharValue >> (6+6+6+6))));
-    NumTrailingBytes = 4;
-  } else if (NumBits <= 1+6+6+6+6+6) {
-    // Encoding is 0x1111110a 10bbbbbb 10cccccc 10dddddd 10eeeeee 10ffffff
-    Result.push_back(char(0xFC | (CharValue >> (6+6+6+6+6))));
-    NumTrailingBytes = 5;
+    // Reject over-large code points.
+    if (CharValue > 0x10FFFF)
+      return true;
   } else {
-    return true;  // UTF8 can't encode a full 32-bit value.
+    return true;  // UTF8 can encode these, but they aren't valid code points.
   }
   
   // Emit all of the trailing bytes.
