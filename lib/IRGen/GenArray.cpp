@@ -30,7 +30,7 @@ using namespace irgen;
 namespace {
   class ArrayTypeInfo : public TypeInfo {
   public:
-    ArrayTypeInfo() : TypeInfo(nullptr, Size(0), Alignment(0)) {}
+    ArrayTypeInfo() : TypeInfo(nullptr, Size(0), Alignment(0), IsPOD) {}
 
     unsigned getExplosionSize(ExplosionKind kind) const {
       return 1;
@@ -57,6 +57,10 @@ namespace {
     }
 
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      // FIXME
+    }
+
+    void destroy(IRGenFunction &IGF, Address addr) const {
       // FIXME
     }
   };

@@ -17,8 +17,8 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Target/TargetData.h"
 #include "llvm/DerivedTypes.h"
-#include "llvm/DerivedTypes.h"
 
+#include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "GenType.h"
 #include "StructLayout.h"
@@ -68,7 +68,7 @@ StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
   for (const TypeInfo *type : types) {
     // Skip types known to be empty.
     if (type->isEmpty(resilience)) {
-      ElementLayout element = { Size(0), (unsigned) -1 };
+      ElementLayout element = { Size(0), (unsigned) -1, type };
       Elements.push_back(element);
       continue;
     }
@@ -99,7 +99,8 @@ StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
       storageSize += Size(paddingRequired);
     }
 
-    ElementLayout element = { storageSize, (unsigned) storageTypes.size() };
+    ElementLayout element =
+      { storageSize, (unsigned) storageTypes.size(), type };
     Elements.push_back(element);
 
     storageTypes.push_back(type->getStorageType());
@@ -117,4 +118,20 @@ StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
   Align = storageAlign;
   TotalSize = storageSize;
   Ty = llvm::StructType::get(IGM.getLLVMContext(), storageTypes);
+}
+
+llvm::Value *StructLayout::emitSize(IRGenFunction &IGF) const {
+  assert(hasStaticLayout());
+  return llvm::ConstantInt::get(IGF.IGM.SizeTy, getSize().getValue());
+}
+
+llvm::Value *StructLayout::emitAlign(IRGenFunction &IGF) const {
+  assert(hasStaticLayout());
+  return llvm::ConstantInt::get(IGF.IGM.SizeTy, getAlignment().getValue());
+}
+
+Address ElementLayout::project(IRGenFunction &IGF, Address baseAddr,
+                               const llvm::Twine &suffix) const {
+  return IGF.Builder.CreateStructGEP(baseAddr, StructIndex, ByteOffset,
+                                     baseAddr.getAddress()->getName() + suffix);
 }

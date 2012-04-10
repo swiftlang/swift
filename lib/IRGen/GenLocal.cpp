@@ -15,10 +15,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
+#include "GenHeap.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "StructLayout.h"
 #include "Explosion.h"
 
 using namespace swift;
@@ -112,33 +112,19 @@ static OwnedAddress createHeapAlloca(IRGenFunction &IGF,
                                      const TypeInfo &type,
                                      const llvm::Twine &name) {
   // Create the type as appropriate.
-  StructLayout layout(IGF.IGM, LayoutKind::HeapObject,
-                      LayoutStrategy::Optimal, &type);
+  HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, &type);
   assert(!layout.empty() && "non-empty type had empty layout?");
   auto &elt = layout.getElements()[0];
 
   // Allocate a new object.  FIXME: exceptions.
-  llvm::Value *size =
-    llvm::ConstantInt::get(IGF.IGM.SizeTy, layout.getSize().getValue());
-  llvm::CallInst *allocation =
-    IGF.Builder.CreateCall(IGF.IGM.getAllocFn(), size);
-  allocation->setDoesNotThrow();
-  allocation->setName(name + ".alloc");
-
-  // Enter a cleanup to release that.
-  IGF.enterReleaseCleanup(allocation);
+  ManagedValue allocation = IGF.emitAlloc(layout, name + ".alloc");
 
   // Cast and GEP down to the element.
-  llvm::Value *structPointer =
-    IGF.Builder.CreateBitCast(allocation, layout.getType()->getPointerTo(0));
-  llvm::Value *address =
-    IGF.Builder.CreateStructGEP(structPointer, elt.StructIndex);
-  address->setName(name);
-
-  Alignment eltAlign = layout.getAlignment().alignmentAtOffset(elt.ByteOffset);
+  Address address = layout.emitCastOfAlloc(IGF, allocation.getValue());
+  address = elt.project(IGF, address, name);
 
   // TODO: lifetime intrinsics.
-  return OwnedAddress(Address(address, eltAlign), allocation);
+  return OwnedAddress(address, allocation.getValue());
 }
 
 /// Common code for creating an allocation on the stack or heap.

@@ -47,8 +47,8 @@ namespace {
   /// An abstract base class for TypeInfo implementations of oneof types.
   class OneofTypeInfo : public TypeInfo {
   public:
-    OneofTypeInfo(llvm::StructType *T, Size S, Alignment A)
-      : TypeInfo(T, S, A) {}
+    OneofTypeInfo(llvm::StructType *T, Size S, Alignment A, IsPOD_t isPOD)
+      : TypeInfo(T, S, A, isPOD) {}
 
     llvm::StructType *getStorageType() const {
       return cast<llvm::StructType>(TypeInfo::getStorageType());
@@ -79,8 +79,9 @@ namespace {
   /// A TypeInfo implementation which uses an aggregate.
   class AggregateOneofTypeInfo : public OneofTypeInfo {
   public:
-    AggregateOneofTypeInfo(llvm::StructType *T, Size S, Alignment A)
-      : OneofTypeInfo(T, S, A) {}
+    AggregateOneofTypeInfo(llvm::StructType *T, Size S, Alignment A,
+                           IsPOD_t isPOD)
+      : OneofTypeInfo(T, S, A, isPOD) {}
 
     void getSchema(ExplosionSchema &schema) const {
       schema.add(ExplosionSchema::Element::forAggregate(getStorageType(),
@@ -111,6 +112,10 @@ namespace {
       // FIXME
     }
 
+    void destroy(IRGenFunction &IGF, Address addr) const {
+      // FIXME
+    }
+
     void emitInjectionFunctionBody(IRGenFunction &IGF,
                                    OneOfElementDecl *elt,
                                    Explosion &params) const {
@@ -132,8 +137,9 @@ namespace {
     /// The type info of the singleton member, or null if it carries no data.
     const TypeInfo *Singleton;
 
-    SingletonOneofTypeInfo(llvm::StructType *T, Size S, Alignment A)
-      : OneofTypeInfo(T, S, A), Singleton(nullptr) {}
+    SingletonOneofTypeInfo(llvm::StructType *T, Size S, Alignment A,
+                           IsPOD_t isPOD)
+      : OneofTypeInfo(T, S, A, isPOD), Singleton(nullptr) {}
 
     void getSchema(ExplosionSchema &schema) const {
       assert(isComplete());
@@ -169,6 +175,11 @@ namespace {
       if (Singleton) Singleton->manage(IGF, src, dest);
     }
 
+    void destroy(IRGenFunction &IGF, Address addr) const {
+      if (Singleton && !isPOD(ResilienceScope::Local))
+        Singleton->destroy(IGF, getSingletonAddress(IGF, addr));
+    }
+
     void emitInjectionFunctionBody(IRGenFunction &IGF,
                                    OneOfElementDecl *elt,
                                    Explosion &params) const {
@@ -197,7 +208,7 @@ namespace {
   class EnumTypeInfo : public OneofTypeInfo {
   public:
     EnumTypeInfo(llvm::StructType *T, Size S, Alignment A)
-      : OneofTypeInfo(T, S, A) {}
+      : OneofTypeInfo(T, S, A, IsPOD) {}
 
     unsigned getExplosionSize(ExplosionKind kind) const {
       assert(isComplete());
@@ -236,6 +247,8 @@ namespace {
       src.transferInto(dest, 1);
     }
 
+    void destroy(IRGenFunction &IGF, Address addr) const {}
+
     void emitInjectionFunctionBody(IRGenFunction &IGF,
                                    OneOfElementDecl *elt,
                                    Explosion &params) const {
@@ -251,7 +264,7 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
   // We don't need a discriminator if this is a singleton ADT.
   if (T->getElements().size() == 1) {
     SingletonOneofTypeInfo *convertedTInfo =
-      new SingletonOneofTypeInfo(convertedStruct, Size(0), Alignment(0));
+      new SingletonOneofTypeInfo(convertedStruct, Size(0), Alignment(0), IsPOD);
     assert(!IGM.Types.Converted.count(T));
     IGM.Types.Converted.insert(std::make_pair(T, convertedTInfo));
 
@@ -269,6 +282,7 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
       convertedTInfo->StorageSize = eltTInfo.StorageSize;
       convertedTInfo->StorageAlignment = eltTInfo.StorageAlignment;
       convertedTInfo->Singleton = &eltTInfo;
+      convertedTInfo->setPOD(eltTInfo.isPOD(ResilienceScope::Local));
     }
 
     llvm::Type *body[] = { storageType };
@@ -299,6 +313,7 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
 
   Size payloadSize = Size(0);
   Alignment storageAlignment = Alignment(1);
+  IsPOD_t isPOD = IsPOD;
 
   // Figure out how much storage we need for the union.
   for (auto &elt : T->getElements()) {
@@ -321,6 +336,7 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
 
     payloadSize = std::max(payloadSize, eltPayloadSize);
     storageAlignment = std::max(storageAlignment, eltTInfo.StorageAlignment);
+    isPOD &= eltTInfo.isPOD(ResilienceScope::Local);
   }
 
   Size storageSize = discriminatorSize + payloadSize;
@@ -329,6 +345,7 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
 
   // If there's no payload at all, use the enum TypeInfo.
   if (!payloadSize) {
+    assert(isPOD);
     convertedTInfo = new EnumTypeInfo(convertedStruct, storageSize,
                                       storageAlignment);
 
@@ -338,7 +355,7 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
 
     // TODO: don't always use an aggregate representation.
     convertedTInfo = new AggregateOneofTypeInfo(convertedStruct, storageSize,
-                                                storageAlignment);
+                                                storageAlignment, isPOD);
   }
 
   convertedStruct->setBody(body);

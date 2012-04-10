@@ -24,7 +24,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Explosion.h"
-#include "StructLayout.h"
+#include "GenHeap.h"
 
 #include "GenClosure.h"
 
@@ -64,8 +64,6 @@ void swift::irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E,
   // current function, to store the captures to a capture block; in the inner
   // function, to load the captures from the capture block; and the destructor
   // for the capture block.
-  // FIXME: Not generating the destructor for the capture block yet; figure out
-  // how to do that once we actually have destructors.
   if (!E->getCaptures().empty()) {
     SmallVector<const TypeInfo *, 4> Fields;
     for (ValueDecl *D : E->getCaptures()) {
@@ -75,44 +73,37 @@ void swift::irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E,
       const TypeInfo &typeInfo = IGF.getFragileTypeInfo(RefTy);
       Fields.push_back(&typeInfo);
     }
-    StructLayout layout(IGF.IGM, LayoutKind::HeapObject,
-                        LayoutStrategy::Optimal, Fields);
+    HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, Fields);
 
-    // Allocate the capture block
-    llvm::Value *size =
-        llvm::ConstantInt::get(IGF.IGM.SizeTy, layout.getSize().getValue());
-    llvm::CallInst *allocation =
-        IGF.Builder.CreateCall(IGF.IGM.getAllocFn(), size);
-    allocation->setDoesNotThrow();
-    allocation->setName(".capturealloc");
-
-    contextPtr = IGF.enterReleaseCleanup(allocation);
-    llvm::Type *CapturesType = layout.getType()->getPointerTo();
-    llvm::Value *CaptureStruct =
-        IGF.Builder.CreateBitCast(allocation, CapturesType);
-    llvm::Value *InnerStruct =
-        innerIGF.Builder.CreateBitCast(innerIGF.ContextPtr, CapturesType);
+    // Allocate the capture block.
+    contextPtr = IGF.emitAlloc(layout, "closure-data.alloc");
+    
+    Address CaptureStruct =
+      layout.emitCastOfAlloc(IGF, contextPtr.getValue(), "closure-data");
+    Address InnerStruct =
+      layout.emitCastOfAlloc(innerIGF, innerIGF.ContextPtr, "closure-data");
 
     // Emit stores and loads for capture block
     for (unsigned i = 0, e = E->getCaptures().size(); i != e; ++i) {
+      // FIXME: avoid capturing owner when this is obviously derivable.
+
       ValueDecl *D = E->getCaptures()[i];
       OwnedAddress Var = IGF.getLocal(D);
-      unsigned StructIdx = layout.getElements()[i].StructIndex;
-      llvm::Value *CaptureAddr =
-        IGF.Builder.CreateStructGEP(CaptureStruct, StructIdx);
-      llvm::Value *CaptureValueAddr =
-        IGF.Builder.CreateStructGEP(CaptureAddr, 0);
-      llvm::Value *CaptureOwnerAddr =
-          IGF.Builder.CreateStructGEP(CaptureAddr, 1);
+      auto &elt = layout.getElements()[i];
+      Address CaptureAddr = elt.project(IGF, CaptureStruct);
+
+      Address CaptureValueAddr =
+        IGF.Builder.CreateStructGEP(CaptureAddr, 0, Size(0));
+      Address CaptureOwnerAddr =
+        IGF.Builder.CreateStructGEP(CaptureAddr, 1, IGF.IGM.getPointerSize());
       IGF.Builder.CreateStore(Var.getOwner(), CaptureOwnerAddr);
       IGF.Builder.CreateStore(Var.getAddressPointer(), CaptureValueAddr);
 
-      llvm::Value *InnerAddr =
-        innerIGF.Builder.CreateStructGEP(InnerStruct, StructIdx);
-      llvm::Value *InnerValueAddr =
-        innerIGF.Builder.CreateStructGEP(InnerAddr, 0);
-      llvm::Value *InnerOwnerAddr =
-          innerIGF.Builder.CreateStructGEP(InnerAddr, 1);
+      Address InnerAddr = elt.project(innerIGF, InnerStruct);
+      Address InnerValueAddr =
+        innerIGF.Builder.CreateStructGEP(InnerAddr, 0, Size(0));
+      Address InnerOwnerAddr =
+        innerIGF.Builder.CreateStructGEP(InnerAddr, 1, IGF.IGM.getPointerSize());
       Address InnerValue(innerIGF.Builder.CreateLoad(InnerValueAddr),
                          Var.getAddress().getAlignment());
       OwnedAddress InnerLocal(InnerValue,

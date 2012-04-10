@@ -51,6 +51,7 @@ namespace irgen {
   class Condition;
   class Explosion;
   enum class ExplosionKind : unsigned;
+  class HeapLayout;
   class IRGenModule;
   class JumpDest;
   class LValue;
@@ -209,6 +210,9 @@ private:
 
 //--- Reference-counting methods -----------------------------------------------
 public:
+  ManagedValue emitAlloc(const HeapLayout &layout, const llvm::Twine &name);
+  llvm::Value *emitUnmanagedAlloc(const HeapLayout &layout,
+                                  const llvm::Twine &name);
   void emitLoadAndRetain(Address addr, Explosion &explosion);
   void emitAssignRetained(llvm::Value *value, Address addr);
   void emitInitializeRetained(llvm::Value *value, Address addr);

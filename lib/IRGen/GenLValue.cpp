@@ -185,7 +185,7 @@ namespace {
   class HeapLValueTypeInfo : public TypeInfo {
   public:
     HeapLValueTypeInfo(llvm::StructType *type, Size s, Alignment a)
-      : TypeInfo(type, s, a) {}
+      : TypeInfo(type, s, a, IsNotPOD) {}
 
     llvm::StructType *getStorageType() const {
       return cast<llvm::StructType>(TypeInfo::getStorageType());
@@ -249,6 +249,10 @@ namespace {
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       src.transferInto(dest, 1);
       dest.add(IGF.enterReleaseCleanup(src.claimUnmanagedNext()));
+    }
+
+    void destroy(IRGenFunction &IGF, Address addr) const {
+      IGF.emitRelease(IGF.Builder.CreateLoad(projectOwner(IGF, addr)));
     }
   };
 }

@@ -78,10 +78,13 @@ public:
   llvm::IntegerType *Int64Ty;          /// i64
   llvm::IntegerType *SizeTy;           /// usually i32 or i64
   llvm::PointerType *Int8PtrTy;        /// i8*
-  llvm::StructType *RefCountedStructTy;/// %swift.refcounted = type { i8* }
+  llvm::StructType *RefCountedStructTy;/// %swift.refcounted = type { ... }
   llvm::PointerType *RefCountedPtrTy;  /// %swift.refcounted*
   llvm::Constant *RefCountedNull;      /// %swift.refcounted* null
   llvm::StructType *FunctionPairTy;    /// { i8*, %swift.refcounted* }
+  llvm::FunctionType *DtorTy;          /// size_t (%swift.refcounted*)
+  llvm::StructType *HeapMetadataStructTy; /// %swift.heapmetadata = type { ... }
+  llvm::PointerType *HeapMetadataPtrTy;/// %swift.heapmetadata*
 
   Size getPointerSize() const { return PtrSize; }
   Alignment getPointerAlignment() const {

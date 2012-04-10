@@ -63,12 +63,12 @@
 #include "llvm/Support/CallSite.h"
 #include "llvm/Target/TargetData.h"
 
+#include "Explosion.h"
+#include "GenHeap.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LValue.h"
-#include "Explosion.h"
-#include "StructLayout.h"
 
 #include "GenFunc.h"
 
@@ -208,7 +208,7 @@ namespace {
 
     FuncTypeInfo(FunctionType *formalType, llvm::StructType *storageType,
                  Size size, Alignment align, unsigned numCurries)
-      : TypeInfo(storageType, size, align), FormalType(formalType) {
+      : TypeInfo(storageType, size, align, IsNotPOD), FormalType(formalType) {
       
       // Initialize the curryings.
       for (unsigned i = 0; i != numCurries; ++i) {
@@ -297,6 +297,10 @@ namespace {
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       src.transferInto(dest, 1);
       dest.add(IGF.enterReleaseCleanup(src.claimUnmanagedNext()));
+    }
+
+    void destroy(IRGenFunction &IGF, Address addr) const {
+      IGF.emitRelease(IGF.Builder.CreateLoad(projectData(IGF, addr)));
     }
   };
 }
@@ -1303,8 +1307,7 @@ namespace {
       // Compute the layout of the data we have now.
       llvm::ArrayRef<const TypeInfo *> dataTypes = AllDataTypes;
       dataTypes = dataTypes.slice(Clauses[CurClause].DataTypesBeginIndex);
-      StructLayout layout(IGM, LayoutKind::HeapObject,
-                          LayoutStrategy::Optimal, dataTypes);
+      HeapLayout layout(IGM, LayoutStrategy::Optimal, dataTypes);
 
       // Create an internal function to serve as the forwarding
       // function (B -> C).
@@ -1312,10 +1315,10 @@ namespace {
         getAddrOfForwardingStub(nextEntrypoint, /*hasData*/ !layout.empty());
 
       // Emit the curried entrypoint.
-      emitCurriedEntrypointBody(entrypoint, forwarder, dataTypes, layout);
+      emitCurriedEntrypointBody(entrypoint, forwarder, layout);
 
       // Emit the forwarding stub.
-      emitCurriedForwarderBody(forwarder, nextEntrypoint, dataTypes, layout);
+      emitCurriedForwarderBody(forwarder, nextEntrypoint, layout);
 
       CurClause++;
     }
@@ -1389,8 +1392,7 @@ namespace {
     /// stub and the allocated data.
     void emitCurriedEntrypointBody(llvm::Function *entrypoint,
                                    llvm::Function *forwarder,
-                                   llvm::ArrayRef<const TypeInfo *> dataTypes,
-                                   const StructLayout &layout) {
+                                   const HeapLayout &layout) {
       PrettyStackTraceExpr stackTrace(IGM.Context,
                                       "emitting IR for curried entrypoint to",
                                       Func);
@@ -1408,26 +1410,16 @@ namespace {
       if (layout.empty()) {
         data = IGM.RefCountedNull;
       } else {
-        // Allocate a new object.  FIXME: refcounting, exceptions.
-        llvm::Value *size = llvm::ConstantInt::get(IGM.SizeTy,
-                                                   layout.getSize().getValue());
-        llvm::CallInst *call =
-          IGF.Builder.CreateCall(IGM.getAllocFn(), size);
-        call->setDoesNotThrow();
-        data = call;
+        // Allocate a new object.  FIXME: if this can throw, we need to
+        // do a lot of setup beforehand.
+        data = IGF.emitUnmanagedAlloc(layout, "data");
 
-        // Cast to the appropriate struct type.
-        Address structAddr(
-          IGF.Builder.CreateBitCast(data, layout.getType()->getPointerTo()),
-          layout.getAlignment());
+        Address dataAddr = layout.emitCastOfAlloc(IGF, data);
 
         // Perform the store.
-        for (unsigned i = 0, e = dataTypes.size(); i != e; ++i) {
-          auto &fieldLayout = layout.getElements()[i];
-          Address fieldAddr =
-            IGF.Builder.CreateStructGEP(structAddr, fieldLayout.StructIndex,
-                                        fieldLayout.ByteOffset);
-          dataTypes[i]->initialize(IGF, params, fieldAddr);
+        for (auto &fieldLayout : layout.getElements()) {
+          Address fieldAddr = fieldLayout.project(IGF, dataAddr);
+          fieldLayout.Type->initialize(IGF, params, fieldAddr);
         }
       }
 
@@ -1451,8 +1443,7 @@ namespace {
     /// the sequence.
     void emitCurriedForwarderBody(llvm::Function *forwarder,
                                   llvm::Function *nextEntrypoint,
-                                  llvm::ArrayRef<const TypeInfo *> dataTypes,
-                                  const StructLayout &layout) {
+                                  const HeapLayout &layout) {
       PrettyStackTraceExpr stackTrace(IGM.Context,
                                       "emitting IR for currying forwarder of",
                                       Func);
@@ -1468,17 +1459,12 @@ namespace {
       // parameters.
       if (!layout.empty()) {
         llvm::Value *rawData = params.takeLast().getUnmanagedValue();
-        llvm::Value *data =
-          IGF.Builder.CreateBitCast(rawData, layout.getType()->getPointerTo());
+        Address data = layout.emitCastOfAlloc(IGF, rawData);
 
         // Perform the loads.
-        for (unsigned i = 0, e = dataTypes.size(); i != e; ++i) {
-          auto &fieldLayout = layout.getElements()[i];
-          llvm::Value *fieldAddr =
-            IGF.Builder.CreateStructGEP(data, fieldLayout.StructIndex);
-          Alignment fieldAlign =
-            layout.getAlignment().alignmentAtOffset(fieldLayout.ByteOffset);
-          dataTypes[i]->load(IGF, Address(fieldAddr, fieldAlign), params);
+        for (auto &fieldLayout : layout.getElements()) {
+          Address fieldAddr = fieldLayout.project(IGF, data);
+          fieldLayout.Type->load(IGF, fieldAddr, params);
         }
 
         // Kill the allocated data pointer immediately.  The safety of

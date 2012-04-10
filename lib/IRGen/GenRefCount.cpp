@@ -30,7 +30,7 @@ namespace {
   class RefCountedTypeInfo : public TypeInfo {
   public:
     RefCountedTypeInfo(llvm::PointerType *storage, Size size, Alignment align)
-      : TypeInfo(storage, size, align) {}
+      : TypeInfo(storage, size, align, IsNotPOD) {}
 
     unsigned getExplosionSize(ExplosionKind kind) const {
       return 1;
@@ -58,6 +58,11 @@ namespace {
 
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       dest.add(IGF.enterReleaseCleanup(src.claimUnmanagedNext()));
+    }
+
+    void destroy(IRGenFunction &IGF, Address addr) const {
+      llvm::Value *value = IGF.Builder.CreateLoad(addr);
+      IGF.emitRelease(value);
     }
   };
 }

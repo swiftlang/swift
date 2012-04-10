@@ -71,7 +71,7 @@ namespace {
   class PrimitiveTypeInfo : public TypeInfo {
   public:
     PrimitiveTypeInfo(llvm::Type *Type, Size S, Alignment A)
-      : TypeInfo(Type, S, A) {}
+      : TypeInfo(Type, S, A, IsPOD) {}
 
     unsigned getExplosionSize(ExplosionKind kind) const {
       return 1;
@@ -100,6 +100,8 @@ namespace {
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       src.transferInto(dest, 1);
     }
+
+    void destroy(IRGenFunction &IGF, Address addr) const {}
   };
 }
 

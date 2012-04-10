@@ -20,14 +20,18 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/Twine.h"
 #include "IRGen.h"
 
 namespace llvm {
   class Type;
+  class Value;
 }
 
 namespace swift {
 namespace irgen {
+  class Address;
+  class IRGenFunction;
   class IRGenModule;
   class TypeInfo;
 
@@ -54,6 +58,12 @@ struct ElementLayout {
 
   /// The index of this element in the LLVM struct.
   unsigned StructIndex;
+
+  /// The swift type information for this element.
+  const TypeInfo *Type;
+
+  Address project(IRGenFunction &IGF, Address addr,
+                  const llvm::Twine &suffix = "") const;
 };
 
 /// A struct layout is the result of laying out a complete structure.
@@ -80,6 +90,10 @@ public:
   Size getSize() const { return TotalSize; }
   Alignment getAlignment() const { return Align; }
   bool empty() const { return TotalSize.isZero(); }
+
+  bool hasStaticLayout() const { return true; }
+  llvm::Value *emitSize(IRGenFunction &IGF) const;
+  llvm::Value *emitAlign(IRGenFunction &IGF) const;
 };
 
 } // end namespace irgen

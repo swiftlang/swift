@@ -48,6 +48,14 @@ namespace irgen {
   class RValue;
   class RValueSchema;
 
+enum IsPOD_t : bool { IsNotPOD, IsPOD };
+inline IsPOD_t operator&(IsPOD_t l, IsPOD_t r) {
+  return IsPOD_t(unsigned(l) & unsigned(r));
+}
+inline IsPOD_t &operator&=(IsPOD_t &l, IsPOD_t r) {
+  return (l = (l & r));
+}
+
 /// Information about the IR representation and generation of the
 /// given type.
 class TypeInfo {
@@ -58,9 +66,9 @@ class TypeInfo {
   mutable const TypeInfo *NextConverted;
 
 public:
-  TypeInfo(llvm::Type *Type, Size S, Alignment A)
+  TypeInfo(llvm::Type *Type, Size S, Alignment A, IsPOD_t pod)
     : NextConverted(0), StorageType(Type), StorageSize(S),
-      StorageAlignment(A) {}
+      StorageAlignment(A), POD(pod) {}
 
   virtual ~TypeInfo() = default;
 
@@ -82,12 +90,25 @@ public:
   /// for a completely-converted type.
   Alignment StorageAlignment;
 
+private:
+  /// Whether this type is POD.
+  unsigned POD : 1;
+
+public:
+  /// Sets whether this type is POD.  Should only be called during
+  /// completion of a forward-declaration.
+  void setPOD(IsPOD_t isPOD) { POD = unsigned(isPOD); }
+
   /// Whether this type info has been completely converted.
   bool isComplete() const { return !StorageAlignment.isZero(); }
 
   /// Whether this type is known to be empty within the given
   /// resilience scope.
   bool isEmpty(ResilienceScope Scope) const { return StorageSize.isZero(); }
+
+  /// Whether this type is known to be POD, i.e. to not require any
+  /// particular action on copy or destroy.
+  IsPOD_t isPOD(ResilienceScope scope) const { return IsPOD_t(POD); }
 
   llvm::Type *getStorageType() const { return StorageType; }
 
@@ -129,6 +150,9 @@ public:
   /// cleanups where appropriate.
   virtual void manage(IRGenFunction &IGF, Explosion &sourceExplosion,
                       Explosion &destExplosion) const = 0;
+
+  /// Destroy an object of this type in memory.
+  virtual void destroy(IRGenFunction &IGF, Address address) const = 0;
 
   /// Should optimizations be enabled which rely on the representation
   /// for this type being a single retainable object pointer?

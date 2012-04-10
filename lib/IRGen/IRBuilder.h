@@ -171,10 +171,9 @@ public:
     }
   };
 
-  using IRBuilderBase::CreateLoad;
   llvm::LoadInst *CreateLoad(llvm::Value *addr, Alignment align,
                              const llvm::Twine &name = "") {
-    llvm::LoadInst *load = CreateLoad(addr, name);
+    llvm::LoadInst *load = IRBuilderBase::CreateLoad(addr, name);
     load->setAlignment(align.getValue());
     return load;
   }
@@ -182,10 +181,9 @@ public:
     return CreateLoad(addr.getAddress(), addr.getAlignment(), name);
   }
 
-  using IRBuilderBase::CreateStore;
   llvm::StoreInst *CreateStore(llvm::Value *value, llvm::Value *addr,
                                Alignment align) {
-    llvm::StoreInst *store = CreateStore(value, addr);
+    llvm::StoreInst *store = IRBuilderBase::CreateStore(value, addr);
     store->setAlignment(align.getValue());
     return store;
   }

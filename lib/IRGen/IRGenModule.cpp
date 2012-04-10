@@ -54,12 +54,21 @@ IRGenModule::IRGenModule(ASTContext &Context,
   RetainFn = nullptr;
   ReleaseFn = nullptr;
 
-  llvm::Type *refCountedElts[] = { Int8PtrTy, SizeTy };
   RefCountedStructTy =
-    llvm::StructType::create(getLLVMContext(), refCountedElts,
-                             "swift.refcounted");
+    llvm::StructType::create(getLLVMContext(), "swift.refcounted");
   RefCountedPtrTy = RefCountedStructTy->getPointerTo(/*addrspace*/ 0);
   RefCountedNull = llvm::ConstantPointerNull::get(RefCountedPtrTy);
+
+  DtorTy = llvm::FunctionType::get(SizeTy, RefCountedPtrTy, false);
+  llvm::Type *dtorPtrTy = DtorTy->getPointerTo();
+  llvm::Type *heapMetadataElts[] = { dtorPtrTy, dtorPtrTy };
+  HeapMetadataStructTy =
+    llvm::StructType::create(getLLVMContext(), heapMetadataElts,
+                             "swift.heapmetadata");
+  HeapMetadataPtrTy = HeapMetadataStructTy->getPointerTo(/*addrspace*/ 0);
+
+  llvm::Type *refCountedElts[] = { HeapMetadataPtrTy, SizeTy };
+  RefCountedStructTy->setBody(refCountedElts);
 
   PtrSize = Size(TargetData.getPointerSize());
 
@@ -75,8 +84,7 @@ IRGenModule::~IRGenModule() {
 llvm::Constant *IRGenModule::getAllocFn() {
   if (AllocFn) return AllocFn;
 
-  // FIXME: maybe this should also take a class pointer?
-  llvm::Type *types[] = { SizeTy };
+  llvm::Type *types[] = { HeapMetadataPtrTy, SizeTy, SizeTy };
   llvm::FunctionType *fnType =
     llvm::FunctionType::get(RefCountedPtrTy, types, false);
   AllocFn = Module.getOrInsertFunction("swift_alloc", fnType);

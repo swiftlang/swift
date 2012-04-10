@@ -59,10 +59,12 @@ namespace {
     /// The offset of this field into the storage type.
     Size StorageOffset;
 
+    unsigned IsPOD : 1;
+
     /// The index of this field into the storage type, or NoStorage
     /// if the field requires no storage.
-    unsigned StorageIndex : 24;
-    enum : unsigned { NoStorage = 0xFFFFFFU };
+    unsigned StorageIndex : 23;
+    enum : unsigned { NoStorage = 0x7FFFFFU };
 
     bool hasStorage() const { return StorageIndex != NoStorage; }
 
@@ -91,10 +93,10 @@ namespace {
       return const_cast<TupleTypeInfo*>(this)->getFieldInfoStorage();
     }
 
-    TupleTypeInfo(llvm::Type *T, Size S, Alignment A,
+    TupleTypeInfo(llvm::Type *T, Size size, Alignment align, IsPOD_t isPOD,
                   unsigned maximalSize, unsigned minimalSize,
                   ArrayRef<TupleFieldInfo> fields)
-      : TypeInfo(T, S, A), NumFields(fields.size()),
+      : TypeInfo(T, size, align, isPOD), NumFields(fields.size()),
         MaximalExplosionSize(maximalSize), MinimalExplosionSize(minimalSize) {
 
       TupleFieldInfo *storage = getFieldInfoStorage();
@@ -104,12 +106,12 @@ namespace {
 
   public:
     static TupleTypeInfo *create(llvm::Type *storageType,
-                                 Size size, Alignment align,
+                                 Size size, Alignment align, IsPOD_t isPOD,
                                  unsigned maximalSize, unsigned minimalSize,
                                  ArrayRef<TupleFieldInfo> fields) {
       void *buffer = new char[sizeof(TupleTypeInfo)
                                 + fields.size() * sizeof(TupleFieldInfo)];
-      return new(buffer) TupleTypeInfo(storageType, size, align,
+      return new(buffer) TupleTypeInfo(storageType, size, align, isPOD,
                                        maximalSize, minimalSize, fields);
     }
 
@@ -200,6 +202,12 @@ namespace {
       for (auto &field : getFieldInfos())
         field.Type.manage(IGF, src, dest);
     }
+
+    void destroy(IRGenFunction &IGF, Address addr) const {
+      for (auto &field : getFieldInfos())
+        if (!field.Type.isPOD(ResilienceScope::Local))
+          field.Type.destroy(IGF, projectAddress(IGF, addr, field));
+    }
   };
 }
 
@@ -226,6 +234,7 @@ TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
 
   unsigned maximalExplosionSize = 0, minimalExplosionSize = 0;
 
+  IsPOD_t pod = IsPOD;
   Size storageSize;
   Alignment storageAlignment(1);
 
@@ -233,6 +242,8 @@ TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
   for (const TupleTypeElt &field : T->getFields()) {
     const TypeInfo &fieldTI = getFragileTypeInfo(IGM, field.getType());
     assert(fieldTI.isComplete());
+
+    pod &= fieldTI.isPOD(ResilienceScope::Local);
 
     fieldInfos.push_back(TupleFieldInfo(field, fieldTI));
     TupleFieldInfo &fieldInfo = fieldInfos.back();
@@ -289,7 +300,7 @@ TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
     convertedTy = llvm::StructType::get(IGM.getLLVMContext(), storageTypes);
   }
 
-  return TupleTypeInfo::create(convertedTy, storageSize, storageAlignment,
+  return TupleTypeInfo::create(convertedTy, storageSize, storageAlignment, pod,
                                maximalExplosionSize, minimalExplosionSize,
                                fieldInfos);
 }
