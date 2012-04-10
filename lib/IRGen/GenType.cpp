@@ -249,7 +249,7 @@ llvm::StructType *IRGenModule::createNominalType(TypeAliasDecl *alias) {
 void IRGenModule::getSchema(Type type, ExplosionSchema &schema) {
   // As an optimization, avoid actually building a TypeInfo for any
   // obvious TupleTypes.  This assumes that a TupleType's explosion
-  // schema is always the concatenation of its components schemata.
+  // schema is always the concatenation of its component's schemata.
   if (TupleType *tuple = dyn_cast<TupleType>(type)) {
     for (const TupleTypeElt &field : tuple->getFields())
       getSchema(field.getType(), schema);
