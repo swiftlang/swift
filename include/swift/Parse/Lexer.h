@@ -27,6 +27,7 @@ namespace swift {
   class DiagnosticEngine;
   class Identifier;
   class InFlightDiagnostic;
+  class ASTContext;
   
   template<typename ...T> struct Diag;
 
@@ -77,6 +78,11 @@ public:
   SourceLoc getLocForStartOfBuffer() const {
     return SourceLoc(llvm::SMLoc::getFromPointer(BufferStart));
   }
+  
+  /// getEncodedStringLiteral - Given a string literal token, return the bytes
+  /// that the actual string literal should codegen to.  If a copy needs to be
+  /// made, it will be allocated out of the ASTContext allocator.
+  static StringRef getEncodedStringLiteral(const Token &Str, ASTContext &Ctx); 
   
 private:
   static SourceLoc getSourceLoc(const char *Loc) {

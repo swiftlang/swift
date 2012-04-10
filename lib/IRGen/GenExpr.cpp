@@ -22,7 +22,6 @@
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
 #include "llvm/Target/TargetData.h"
-#include "llvm/ADT/SmallString.h"
 
 #include "ASTVisitor.h"
 #include "GenClosure.h"
@@ -58,12 +57,8 @@ static llvm::Value *emitFloatLiteralExpr(IRGenFunction &IGF,
 static llvm::Value *emitStringLiteralExpr(IRGenFunction &IGF,
                                           StringLiteralExpr *E) {
   assert(E->getType()->is<BuiltinRawPointerType>());
-
-  // Walk the elements, eventually this will do escape processing.
-  llvm::SmallString<64> Elements(E->getValue().begin()+1,
-                                 E->getValue().end()-1);
   // CreateGlobalStringPtr adds our nul terminator.
-  return IGF.Builder.CreateGlobalStringPtr(Elements);
+  return IGF.Builder.CreateGlobalStringPtr(E->getValue());
 }
 
 static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E) {

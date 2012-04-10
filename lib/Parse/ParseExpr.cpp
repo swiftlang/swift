@@ -16,6 +16,7 @@
 
 #include "Parser.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
@@ -152,7 +153,7 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     break;
   }
   case tok::string_literal: {
-    StringRef Text = Tok.getText();
+    StringRef Text = L.getEncodedStringLiteral(Tok, Context);
     SourceLoc Loc = consumeToken(tok::string_literal);
     Result = new (Context) StringLiteralExpr(Text, Loc);
     break;

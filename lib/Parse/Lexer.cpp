@@ -20,6 +20,7 @@
 #include "swift/AST/Identifier.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
@@ -390,6 +391,86 @@ void Lexer::lexStringLiteral() {
   }
 }
 
+/// getEncodedStringLiteral - Given a string literal token, return the bytes
+/// that the actual string literal should codegen to.  If a copy needs to be
+/// made, it will be allocated out of the ASTContext allocator.
+StringRef Lexer::getEncodedStringLiteral(const Token &Str, ASTContext &Ctx) {
+  // Get the bytes behind the string literal, dropping the double quotes.
+  StringRef Bytes = Str.getText().drop_front().drop_back();
+  llvm::SmallString<64> TempString;
+
+  // Note that it is always safe to read one over the end of "Bytes" because
+  // we know that there is a terminating " character.  Use BytesPtr to avoid a
+  // range check subscripting on the StringRef.
+  const char *BytesPtr = Bytes.begin();
+  while (BytesPtr != Bytes.end()) {
+    char CurChar = *BytesPtr++;
+    if (CurChar != '\\') {
+      TempString += CurChar;
+      continue;
+    }
+    
+    // Invalid escapes are accepted by the lexer but diagnosed as an error.  We
+    // just ignore them here.
+    unsigned CharValue; // Unicode character value for \x, \u, \U.
+    switch (*BytesPtr++) {
+    default:
+      continue;   // Invalid escape, ignore it.
+          
+      // Simple single-character escapes.
+    case 't': TempString += '\t'; continue;
+    case 'n': TempString += '\n'; continue;
+    case 'r': TempString += '\r'; continue;
+    case '"': TempString += '"'; continue;
+    case '\'': TempString += '\''; continue;
+    case '\\': TempString += '\\'; continue;
+        
+      // Unicode escapes of various lengths.
+    case 'x':  //  \x HEX HEX
+      if (!isxdigit(BytesPtr[0]) || !isxdigit(BytesPtr[1]))
+        continue;  // Ignore invalid escapes.
+      
+      StringRef(BytesPtr, 2).getAsInteger(16, CharValue);
+      BytesPtr += 2;
+      break;
+    case 'u':  //  \u HEX HEX HEX HEX 
+      if (!isxdigit(BytesPtr[0]) || !isxdigit(BytesPtr[1]) ||
+          !isxdigit(BytesPtr[2]) || !isxdigit(BytesPtr[3]))
+        continue;  // Ignore invalid escapes.
+      
+      StringRef(BytesPtr, 4).getAsInteger(16, CharValue);
+      BytesPtr += 4;
+      break;
+    case 'U':  //  \U HEX HEX HEX HEX HEX HEX HEX HEX 
+      if (!isxdigit(BytesPtr[0]) || !isxdigit(BytesPtr[1]) ||
+          !isxdigit(BytesPtr[2]) || !isxdigit(BytesPtr[3]) ||
+          !isxdigit(BytesPtr[4]) || !isxdigit(BytesPtr[5]) ||
+          !isxdigit(BytesPtr[6]) || !isxdigit(BytesPtr[7]))
+        continue;  // Ignore invalid escapes.
+      
+      StringRef(BytesPtr, 8).getAsInteger(16, CharValue);
+      BytesPtr += 8;
+      break;
+    }
+    
+    if (CharValue < 0x80) 
+      TempString += (char)CharValue;
+    else {
+      assert(0 && "Unimplemented - unicode escapes");
+      abort();
+    }
+  }
+  
+  // If we didn't escape or reprocess anything, then we don't need to reallocate
+  // a copy of the string, just point to the lexer's version.  We know that this
+  // is safe because unescaped strings are always shorter than their escaped
+  // forms (in a valid string).
+  if (TempString.size() == Bytes.size())
+    return Bytes;
+  
+  auto Res = Ctx.AllocateCopy(TempString);
+  return StringRef(Res.data(), Res.size());  // ArrayRef to StringRef.
+}
 
 //===----------------------------------------------------------------------===//
 // Main Lexer Loop
