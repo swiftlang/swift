@@ -17,6 +17,7 @@
 
 #include "NameLookup.h"
 #include "swift/AST/AST.h"
+#include <algorithm>
 using namespace swift;
 
 MemberLookup::MemberLookup(Type BaseTy, Identifier Name, Module &M) {
@@ -59,11 +60,33 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M) {
 
     // If we find anything that requires 'this', reset it back because we don't
     // have a this.
-    for (Result &R : Results)
-      // No 'this' to pass.
-      if (R.Kind == Result::PassBase)
+    bool AnyInvalid = false;
+    for (Result &R : Results) {
+      switch (R.Kind) {
+      case Result::PassBase:
+        // No 'this' to pass.
         R.Kind = Result::IgnoreBase;
-    
+        break;
+          
+      case Result::IgnoreBase:
+        break;
+          
+      case Result::StructElement:
+      case Result::TupleElement:
+        AnyInvalid = true;
+        break;
+      }
+    }
+
+    if (AnyInvalid) {
+      // If we found any results that can't have their base ignored, drop
+      // them.
+      // FIXME: This is a terrible way to implement this, but we crash
+      // in createResultAST if we don't do something here.
+      Results.erase(std::remove_if(Results.begin(), Results.end(),
+                      ^(Result &R) { return R.Kind != Result::IgnoreBase; }),
+                    Results.end());
+    }
     return;
   }
   
@@ -199,7 +222,7 @@ Expr *MemberLookup::createResultAST(Expr *Base, SourceLoc DotLoc,
   // Handle the case when we found exactly one result.
   if (Results.size() == 1) {
     MemberLookupResult R = Results[0];
-    
+
     switch (R.Kind) {
     case MemberLookupResult::StructElement:
       Base = lookThroughOneofs(Base, Context);
