@@ -33,6 +33,7 @@ namespace {
 
   public:
     Verifier(TranslationUnit *TU) : TU(TU), Ctx(TU->Ctx), Out(llvm::errs()) {}
+    virtual ~Verifier() {}
 
     bool walkToExprPre(Expr *E) {
       switch (E->getKind()) {

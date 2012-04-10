@@ -96,6 +96,7 @@ protected:
   PhysicalPathComponent(size_t size) : PathComponent(size, true) {}
 
 public:
+  virtual ~PhysicalPathComponent() {};
   virtual OwnedAddress offset(IRGenFunction &IGF,
                               OwnedAddress base) const = 0;
 };
@@ -117,6 +118,7 @@ class LogicalPathComponent : public PathComponent {
 
 protected:
   LogicalPathComponent(size_t size) : PathComponent(size, false) {}
+  virtual ~LogicalPathComponent() {};
 
 public:
   virtual void storeExplosion(IRGenFunction &IGF, Explosion &rvalue,

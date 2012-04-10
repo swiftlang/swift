@@ -185,6 +185,7 @@ void swift::performTypeChecking(TranslationUnit *TU) {
     SmallVector<FuncExpr*, 32> FuncExprs;
 
     PrePassWalker(TypeChecker &TC) : TC(TC) {}
+    virtual ~PrePassWalker() {}
 
     bool walkToExprPre(Expr *E) {
       if (FuncExpr *FE = dyn_cast<FuncExpr>(E))

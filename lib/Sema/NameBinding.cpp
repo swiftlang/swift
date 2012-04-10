@@ -417,6 +417,7 @@ void swift::performNameBinding(TranslationUnit *TU) {
   struct NameBindingWalker : public ASTWalker {
     NameBinder &Binder;
     NameBindingWalker(NameBinder &binder) : Binder(binder) {}
+    virtual ~NameBindingWalker() {}
     
     /// CurFuncDecls - This is the stack of FuncDecls that we're nested in.
     SmallVector<FuncDecl*, 4> CurFuncDecls;

@@ -258,6 +258,7 @@ class SemaExpressionTree :
   public ASTWalker, public ExprVisitor<SemaExpressionTree, Expr*> {
 public:
   TypeChecker &TC;
+  virtual ~SemaExpressionTree() {}
   
   Expr *visitErrorExpr(ErrorExpr *E) {
     if (E->getType().isNull())
@@ -657,6 +658,7 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
   // track of whether we have any literals without a resolved type.
   struct DependenceWalker : ASTWalker {
     DependenceWalker() { reset(); }
+    virtual ~DependenceWalker() {}
 
     void reset() {
       OneDependentExpr = nullptr;
@@ -699,6 +701,7 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
   if (dependence.HasDependentLiterals) {
     struct UpdateWalker : ASTWalker {
       UpdateWalker(TypeChecker &TC) : TC(TC) {}
+      virtual ~UpdateWalker() {}
 
       Expr *walkToExprPost(Expr *E) {
         // Process dependent literals.

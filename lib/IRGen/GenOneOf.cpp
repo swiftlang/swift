@@ -373,6 +373,7 @@ namespace {
   class LookThroughOneof : public PhysicalPathComponent {
   public:
     LookThroughOneof() : PhysicalPathComponent(sizeof(LookThroughOneof)) {}
+    virtual ~LookThroughOneof() {}
 
     OwnedAddress offset(IRGenFunction &IGF, OwnedAddress addr) const {
       Address project = SingletonOneofTypeInfo::getSingletonAddress(IGF, addr);

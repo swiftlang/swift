@@ -1086,6 +1086,8 @@ namespace {
 
     FindCapturedVars(llvm::SetVector<ValueDecl*> &captures)
       : Captures(captures) {}
+    
+    virtual ~FindCapturedVars() {}
 
     void doWalk(Expr *E) {
       E->walk(*this);
