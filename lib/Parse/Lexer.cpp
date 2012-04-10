@@ -348,7 +348,8 @@ static bool EncodeToUTF8(unsigned CharValue,
     // Encoding is 0x11110aaa 10bbbbbb 10cccccc 10dddddd
     Result.push_back(char(0xF0 | (CharValue >> (6+6+6))));
     NumTrailingBytes = 3;
-    // Reject over-large code points.
+    // Reject over-large code points.  These cannot be encoded as UTF-16
+    // surrogate pairs, so UTF-32 doesn't allow them.
     if (CharValue > 0x10FFFF)
       return true;
   } else {
