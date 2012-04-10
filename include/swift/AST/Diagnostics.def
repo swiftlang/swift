@@ -83,6 +83,8 @@ ERROR(lex_invalid_string_u_escape,lexing,none,
        "\\u escape sequence expects 4 hex digits to follow it", ())
 ERROR(lex_invalid_string_U_escape,lexing,none,
        "\\U escape sequence expects 8 hex digits to follow it", ())
+ERROR(lex_invalid_unicode_code_point,lexing,none,
+       "invalid unicode code point", ())
 
 
 ERROR(lex_invalid_character,lexing,none,

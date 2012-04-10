@@ -322,76 +322,6 @@ void Lexer::lexNumber() {
   return formToken(tok::floating_literal, TokStart);
 }
 
-/// lexStringLiteral:
-///   string_literal  ::= ["][^"\\\n\r]*["]
-void Lexer::lexStringLiteral() {
-  const char *TokStart = CurPtr-1;
-  assert(*TokStart == '"' && "Unexpected start");
-
-  while (1) {
-    switch (*CurPtr++) {
-    // If we found the closing " character, we're done.
-    case '"':
-      return formToken(tok::string_literal, TokStart);
-    case 0:
-      if (CurPtr-2 != BufferEnd) {
-        diagnose(CurPtr-2, diag::lex_nul_character);
-        continue;
-      }
-      --CurPtr;
-      // FALL THROUGH.
-    case '\n':  // String literals cannot have \n or \r in them.
-    case '\r':
-      diagnose(TokStart, diag::lex_unterminated_string);
-      return;
-    case '\\':  // Escapes.
-      switch (*CurPtr) {
-      default:  // Invalid escape.
-        diagnose(CurPtr, diag::lex_invalid_string_escape);
-        continue;
-          
-        // Simple single-character escapes.
-      case 't':
-      case 'n':
-      case 'r':
-      case '"':
-      case '\'':
-      case '\\':
-        ++CurPtr;
-        continue;
-        // Unicode escapes of various lengths.
-      case 'x':  //  \x HEX HEX
-        if (isxdigit(CurPtr[1]) && isxdigit(CurPtr[2])) {
-          CurPtr += 3;
-          continue;
-        }
-
-        diagnose(CurPtr, diag::lex_invalid_string_x_escape);
-        continue;
-      case 'u':  //  \u HEX HEX HEX HEX 
-        if (isxdigit(CurPtr[1]) && isxdigit(CurPtr[2]) && 
-            isxdigit(CurPtr[3]) && isxdigit(CurPtr[4])) {
-          CurPtr += 5;
-          continue;
-        }
-        
-        diagnose(CurPtr, diag::lex_invalid_string_u_escape);
-        continue;
-      case 'U':  //  \U HEX HEX HEX HEX HEX HEX HEX HEX 
-        if (isxdigit(CurPtr[1]) && isxdigit(CurPtr[2]) && 
-            isxdigit(CurPtr[3]) && isxdigit(CurPtr[4]) &&
-            isxdigit(CurPtr[5]) && isxdigit(CurPtr[6]) && 
-            isxdigit(CurPtr[7]) && isxdigit(CurPtr[8])) {
-          CurPtr += 9;
-          continue;
-        }
-        diagnose(CurPtr, diag::lex_invalid_string_U_escape);
-        continue;
-      }
-    }
-  }
-}
-
 /// EncodeToUTF8 - Encode the specified code point into a UTF8 stream.  Return
 /// true if it is an erroneous code point.
 static bool EncodeToUTF8(unsigned CharValue,
@@ -425,11 +355,102 @@ static bool EncodeToUTF8(unsigned CharValue,
   } else {
     return true;  // UTF8 can't encode a full 32-bit value.
   }
-
+  
   // Emit all of the trailing bytes.
   while (NumTrailingBytes--)
     Result.push_back(char(0x80 | (0x7F & (CharValue >> (NumTrailingBytes*6)))));
   return false;
+}
+
+
+/// lexStringLiteral:
+///   string_literal ::= ["]([^"\\\n\r]|string_escape)*["]
+/// 
+///   string_escape  ::= [\][\] | [\]t | [\]n | [\]r | [\]" | [\]'
+///   string_escape  ::= [\]x hex hex  
+///   string_escape  ::= [\]u hex hex hex hex  
+///   string_escape  ::= [\]U hex hex hex hex hex hex hex hex
+///   hex            ::= [0-9a-fA-F]
+void Lexer::lexStringLiteral() {
+  const char *TokStart = CurPtr-1;
+  assert(*TokStart == '"' && "Unexpected start");
+
+  llvm::SmallString<64> TempString;
+
+  while (1) {
+    unsigned CharValue = 0;
+    const char *CharStart = CurPtr;
+    switch (*CurPtr++) {
+    default: // Normal characters are part of the string.
+      continue;
+    // If we found the closing " character, we're done.
+    case '"':
+      return formToken(tok::string_literal, TokStart);
+    case 0:
+      if (CurPtr-2 != BufferEnd) {
+        diagnose(CurPtr-2, diag::lex_nul_character);
+        continue;
+      }
+      --CurPtr;
+      // FALL THROUGH.
+    case '\n':  // String literals cannot have \n or \r in them.
+    case '\r':
+      diagnose(TokStart, diag::lex_unterminated_string);
+      return;
+    case '\\':  // Escapes.
+      switch (*CurPtr) {
+      default:  // Invalid escape.
+        diagnose(CurPtr, diag::lex_invalid_string_escape);
+        continue;
+          
+        // Simple single-character escapes.
+      case 't':
+      case 'n':
+      case 'r':
+      case '"':
+      case '\'':
+      case '\\':
+        ++CurPtr;
+        continue;
+        // Unicode escapes of various lengths.
+      case 'x':  //  \x HEX HEX
+        if (!isxdigit(CurPtr[1]) || !isxdigit(CurPtr[2])) {
+          diagnose(CurPtr, diag::lex_invalid_string_x_escape);
+          continue;
+        }
+          
+        StringRef(CurPtr+1, 2).getAsInteger(16, CharValue);
+        CurPtr += 3;
+        break;
+
+      case 'u':  //  \u HEX HEX HEX HEX 
+        if (!isxdigit(CurPtr[1]) || !isxdigit(CurPtr[2]) ||
+            !isxdigit(CurPtr[3]) || !isxdigit(CurPtr[4])) {
+          diagnose(CurPtr, diag::lex_invalid_string_u_escape);
+          continue;
+        }
+        
+        StringRef(CurPtr+1, 4).getAsInteger(16, CharValue);
+        CurPtr += 5;
+        break;
+      case 'U':  //  \U HEX HEX HEX HEX HEX HEX HEX HEX 
+        if (!isxdigit(CurPtr[1]) || !isxdigit(CurPtr[2]) || 
+            !isxdigit(CurPtr[3]) || !isxdigit(CurPtr[4]) ||
+            !isxdigit(CurPtr[5]) || !isxdigit(CurPtr[6]) || 
+            !isxdigit(CurPtr[7]) || !isxdigit(CurPtr[8])) {
+          diagnose(CurPtr, diag::lex_invalid_string_U_escape);
+          continue;
+        }
+        StringRef(CurPtr+1, 8).getAsInteger(16, CharValue);
+        CurPtr += 9;
+        break;
+      }
+    }
+    
+    // Check to see if the encoding is valid.
+    if (CharValue >= 0x80 && EncodeToUTF8(CharValue, TempString))
+      diagnose(CharStart, diag::lex_invalid_unicode_code_point);
+  }
 }
 
 /// getEncodedStringLiteral - Given a string literal token, return the bytes
