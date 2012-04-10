@@ -207,12 +207,13 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
 
   // Perform overload resolution.
   llvm::SmallVector<ValueDecl *, 4> Viable;
-  ValueDecl *Best = filterOverloadSet(OS->getDecls(), E2, Type(), Viable);
+  ValueDecl *Best = filterOverloadSet(OS->getDecls(), OS->getBaseType(), E2,
+                                      Type(), Viable);
   
   // If we have a best candidate, build a call to it now.
   if (Best) {
-    E1 = buildDeclRefRValue(Best, OS->getLoc());
-    E->setFn(E1);
+    E1 = buildFilteredOverloadSet(OS, Best);
+    E->setFn(convertToRValue(E1));
     return semaApplyExpr(E);
   }
   
@@ -232,7 +233,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // no longer have to consider those non-matching candidates.
   // FIXME: We may simple want to mark them as non-viable in the overload set
   // itself, so we can provide them in diagnostics.
-  E->setFn(OS->createFilteredWithCopy(Viable));
+  E->setFn(buildFilteredOverloadSet(OS, Viable));
   return E;
 }
 

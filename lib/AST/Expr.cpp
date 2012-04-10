@@ -112,10 +112,32 @@ llvm::APFloat FloatLiteralExpr::getValue() const {
   return Val;
 }
 
-Expr *OverloadSetRefExpr::createFilteredWithCopy(ArrayRef<ValueDecl *> Decls) {
-  if (OverloadedDeclRefExpr *DRE = dyn_cast<OverloadedDeclRefExpr>(this)) {
-    return OverloadedDeclRefExpr::createWithCopy(Decls, DRE->getLoc());
+Type OverloadSetRefExpr::getBaseType() const {
+  if (isa<OverloadedDeclRefExpr>(this))
+    return Type();
+  if (const OverloadedMemberRefExpr *DRE
+      = dyn_cast<OverloadedMemberRefExpr>(this)) {
+    Type BaseTy = DRE->getBase()->getType();
+    
+    // Metatype types aren't considered to be base types.
+    // FIXME:: If metatypes stop being singletons, we'll have to change this
+    // and update all callers.
+    if (BaseTy->is<MetaTypeType>())
+      return Type();
+    
+    return BaseTy;
   }
+  
+  llvm_unreachable("Unhandled overloaded set reference expression");
+}
+
+Expr *OverloadSetRefExpr::createFilteredWithCopy(ArrayRef<ValueDecl *> Decls) {
+  if (OverloadedDeclRefExpr *DRE = dyn_cast<OverloadedDeclRefExpr>(this))
+    return OverloadedDeclRefExpr::createWithCopy(Decls, DRE->getLoc());
+  if (OverloadedMemberRefExpr *DRE = dyn_cast<OverloadedMemberRefExpr>(this))
+    return OverloadedMemberRefExpr::createWithCopy(DRE->getBase(),
+                                                   DRE->getDotLoc(), Decls,
+                                                   DRE->getMemberLoc());
   
   llvm_unreachable("Unhandled overloaded set reference expression");
 }
@@ -136,6 +158,32 @@ Expr *OverloadedDeclRefExpr::createWithCopy(ArrayRef<ValueDecl*> Decls,
   // overload set.
   return new (C) OverloadedDeclRefExpr(C.AllocateCopy(Decls), Loc,
                                        UnstructuredDependentType::get(C));
+}
+
+Expr *OverloadedMemberRefExpr::createWithCopy(Expr *Base, SourceLoc DotLoc,
+                                              ArrayRef<ValueDecl*> Decls,
+                                              SourceLoc MemberLoc) {
+  assert(!Decls.empty() &&
+         "Cannot create an overloaded member ref with no decls");
+  ASTContext &C = Decls[0]->getASTContext();
+
+  if (Decls.size() == 1) {
+    Expr *Fn = new (C) DeclRefExpr(Decls[0], MemberLoc,
+                                   Decls[0]->getTypeOfReference());
+    // FIXME: If metatype types ever get a runtime representation, we'll need
+    // to evaluate the object.
+    if (Decls[0]->isInstanceMember() &&
+        !Base->getType()->is<MetaTypeType>()) {
+      return new (C) DotSyntaxCallExpr(Fn, DotLoc, Base);
+    }
+    
+    return new (C) DotSyntaxBaseIgnoredExpr(Base, DotLoc, Fn);
+  }
+  
+  // Otherwise, copy the overload set into the ASTContext's memory.
+  return new (C) OverloadedMemberRefExpr(Base, DotLoc, C.AllocateCopy(Decls),
+                                         MemberLoc,
+                                         UnstructuredDependentType::get(C));
 }
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
@@ -288,6 +336,17 @@ public:
   void visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E) {
     printCommon(E, "overloadeddeclref_expr")
       << " #decls=" << E->getDecls().size();
+    for (Decl *D : E->getDecls()) {
+      OS << '\n';
+      printRec(D);
+    }
+    OS << ')';
+  }
+  void visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *E) {
+    printCommon(E, "overloadedmemberref_expr")
+      << "#decls=" << E->getDecls().size() << "\n"
+      << "base = ";
+    printRec(E->getBase());
     for (Decl *D : E->getDecls()) {
       OS << '\n';
       printRec(D);

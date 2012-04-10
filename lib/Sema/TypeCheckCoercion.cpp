@@ -170,8 +170,7 @@ public:
         
         // FIXME: We should be handling this like overload resolution, because
         // ambiguities are possible.
-        return coerced(
-                 E->createFilteredWithCopy(ArrayRef<ValueDecl *>(&val, 1)));
+        return coerced(TC.buildFilteredOverloadSet(E, val));
       }
     }
 
@@ -198,6 +197,12 @@ public:
     for (ValueDecl *Val : E->getDecls()) {
       Type srcTy = Val->getType();
       
+      // If we have a non-static method along with an object argument,
+      // look past the 'this'.
+      if (FuncDecl *Func = dyn_cast<FuncDecl>(Val))
+        if (!Func->isStatic() && E->getBaseType())
+          srcTy = srcTy->getAs<FunctionType>()->getResult();
+      
       DeclRefExpr DRE(Val, E->getLoc(), srcTy);
       if (!TC.isCoercibleToType(&DRE, DestTy))
         continue;
@@ -209,7 +214,7 @@ public:
       if (!Apply)
         return DestTy;
       
-      return coerced(TC.convertToRValue(E->createFilteredWithCopy(Viable)));
+      return coerced(TC.convertToRValue(TC.buildFilteredOverloadSet(E,Viable)));
     }
       
     if (Apply) {
@@ -628,7 +633,9 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
   // ambiguous.
   if (OverloadSetRefExpr *OSE = dyn_cast<OverloadSetRefExpr>(E->getFn())) {
     SmallVector<ValueDecl*, 4> Viable;
-    if (ValueDecl *Best = TC.filterOverloadSet(OSE->getDecls(), E->getArg(),
+    if (ValueDecl *Best = TC.filterOverloadSet(OSE->getDecls(),
+                                               OSE->getBaseType(),
+                                               E->getArg(),
                                                DestTy, Viable)) {
       if (!Apply) {
         // Determine the type of the resulting call expression.
@@ -642,7 +649,8 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
         return Ty;
       }
       
-      Expr *Fn = TC.buildDeclRefRValue(Best, OSE->getLoc());
+      Expr *Fn = TC.buildFilteredOverloadSet(OSE, Best);
+      Fn = TC.convertToRValue(Fn);
       E->setFn(Fn);
       
       if (Expr *Result = TC.semaApplyExpr(E))

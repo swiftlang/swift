@@ -67,6 +67,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   Expr *visitStringLiteralExpr(StringLiteralExpr *E) { return E; }
   Expr *visitDeclRefExpr(DeclRefExpr *E) { return E; }
   Expr *visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E) { return E; }
+  Expr *visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *E) { return E; }
   Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) { return E; }
   Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) { return E; }
 

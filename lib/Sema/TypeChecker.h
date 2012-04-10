@@ -94,8 +94,11 @@ public:
   /// \param Candidates The set of overloaded candidates that should be 
   /// considered
   ///
-  /// \param Arg The argument type, for a call to the overloaded functions.
-  /// This argument is required.
+  /// \param BaseTy The type of the object that will become the 'this' pointer
+  /// for a call to a method. If not provided, then there is no 'this' object.
+  ///
+  /// \param Arg The calll argument, to be passed to the function that is
+  /// eventually selected by overload resolution.
   ///
   /// \param DestTy The type to which the result should be coerced, or null if
   /// not known.
@@ -105,10 +108,22 @@ public:
   ///
   /// \returns The best candidate, if there is one.
   ValueDecl *filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
+                               Type BaseTy,
                                Expr *Arg,
                                Type DestTy,
                                SmallVectorImpl<ValueDecl *> &Viable);
-  /// @}
+  
+  /// buildFilteredOverloadSet - Given an overload set that has already been
+  /// filtered, produce a new overload set with just the given set of
+  /// declarations in it.
+  Expr *buildFilteredOverloadSet(OverloadSetRefExpr *OSE,
+                                 ArrayRef<ValueDecl *> Remaining);
+
+  /// buildFilteredOverloadSet - Given an overload set for which we have
+  /// chosen a best candidate,return an expression that refers to that
+  /// candidate.
+  Expr *buildFilteredOverloadSet(OverloadSetRefExpr *OSE, ValueDecl *Best);
+/// @}
 };
 
   

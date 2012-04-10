@@ -196,7 +196,7 @@ Expr *MemberLookup::createResultAST(Expr *Base, SourceLoc DotLoc,
                                     SourceLoc NameLoc, ASTContext &Context) {
   assert(isSuccess() && "Can't create a result if we didn't find anything");
          
-  // Handle the case when we found exactly one result..
+  // Handle the case when we found exactly one result.
   if (Results.size() == 1) {
     MemberLookupResult R = Results[0];
     
@@ -222,14 +222,14 @@ Expr *MemberLookup::createResultAST(Expr *Base, SourceLoc DotLoc,
   // If we have an ambiguous result, build an overload set.
   SmallVector<ValueDecl*, 8> ResultSet;
     
-  // FIXME: This is collecting a mix of static and normal functions.  This also
-  // discards the base expression and is completely wrong in the case when
-  // we're referencing something that needs it!
+  // This is collecting a mix of static and normal functions. We won't know
+  // until after overload resolution whether we actually need 'this'.
   for (MemberLookupResult X : Results) {
     assert(X.Kind != MemberLookupResult::TupleElement &&
            X.Kind != MemberLookupResult::StructElement);
     ResultSet.push_back(X.D);
   }
   
-  return OverloadedDeclRefExpr::createWithCopy(ResultSet, NameLoc);
+  return OverloadedMemberRefExpr::createWithCopy(Base, DotLoc, ResultSet,
+                                                 NameLoc);
 }

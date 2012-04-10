@@ -108,6 +108,23 @@ bool ValueDecl::isDefinition() const {
   }
 }
 
+bool ValueDecl::isInstanceMember() const {
+  DeclContext *DC = getDeclContext();
+  if (!isa<OneOfType>(DC) && !isa<ExtensionDecl>(DC) && !isa<ProtocolType>(DC))
+    return false;
+  
+  // Variables in oneofs/extensions/protocols are instance members.
+  // FIXME: If we ever end up with static variables, we'll have to check for
+  // them here.
+  if (isa<VarDecl>(this))
+    return true;
+  
+  // Non-static methods are instance members.
+  if (const FuncDecl *Func = dyn_cast<FuncDecl>(this))
+    return !Func->isStatic();
+  
+  return false;
+}
 
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                              Type Underlyingty, DeclContext *DC)

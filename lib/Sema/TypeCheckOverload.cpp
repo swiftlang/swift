@@ -37,6 +37,7 @@ void TypeChecker::printOverloadSetCandidates(ArrayRef<ValueDecl *> Candidates) {
 
 ValueDecl *
 TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
+                               Type BaseTy,
                                Expr *Arg,
                                Type DestTy,
                                SmallVectorImpl<ValueDecl *> &Viable) {
@@ -50,6 +51,15 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     FunctionType *FunctionTy = VDType->getAs<FunctionType>();
     if (!FunctionTy)
       continue;
+
+    // If we have a 'this' argument and the declaration is a non-static method,
+    // the method's 'this' parameter has already been bound. Look instead at the
+    // actual argument types.
+    if (BaseTy && isa<FuncDecl>(VD) && !cast<FuncDecl>(VD)->isStatic()) {
+      // FIXME: Derived-to-base conversions will eventually be needed.
+      FunctionTy = FunctionTy->getResult()->getAs<FunctionType>();
+      assert(FunctionTy && "Method has incorrect type");
+    }
     
     // Check whether arguments are suitable for this function.
     if (!isCoercibleToType(Arg, FunctionTy->getInput()))
@@ -63,4 +73,20 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
   }
   
   return Viable.size() == 1? Viable[0] : 0;
+}
+
+Expr *TypeChecker::buildFilteredOverloadSet(OverloadSetRefExpr *OSE,
+                                            ArrayRef<ValueDecl *> Remaining) {
+  assert(!Remaining.empty() && "Cannot handle empty overload set");
+  Expr *Result = OSE->createFilteredWithCopy(Remaining);
+  if (ApplyExpr *Apply = dyn_cast<ApplyExpr>(Result))
+    return semaApplyExpr(Apply);
+  
+  return Result;
+}
+
+Expr *TypeChecker::buildFilteredOverloadSet(OverloadSetRefExpr *OSE,
+                                            ValueDecl *Best) {
+  llvm::SmallVector<ValueDecl *, 1> Remaining(1, Best);
+  return buildFilteredOverloadSet(OSE, ArrayRef<ValueDecl *>(&Best, 1));
 }

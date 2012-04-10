@@ -240,6 +240,11 @@ protected:
 public:
   ArrayRef<ValueDecl*> getDecls() const { return Decls; }
   
+  /// getBaseType - Determine the type of the base object provided for the
+  /// given overload set, which is only non-null when dealing with an overloaded
+  /// member reference.
+  Type getBaseType() const;
+  
   /// createFilteredWithCopy - Given a subset of the declarations in the given
   /// overloaded reference expression, return a new expression of the same
   /// form but with the restricted set of declarations. This is equivalent
@@ -255,7 +260,8 @@ public:
   }
 };
 
-/// OverloadedDeclRef - A reference to an overloaded name, which may b
+/// OverloadedDeclRefExpr - A reference to an overloaded name that should
+/// eventually be resolved (by overload resolution) to a value reference.
 class OverloadedDeclRefExpr : public OverloadSetRefExpr {
   SourceLoc Loc;
 
@@ -284,7 +290,49 @@ public:
     return E->getKind() == ExprKind::OverloadedDeclRef;
   }
 };
+
+/// OverloadedMemberRefExpr - A reference to an overloaded name that is a
+/// member, relative to some base expression, that will eventually be
+/// resolved to some kind of member-reference expression.
+class OverloadedMemberRefExpr : public OverloadSetRefExpr {
+  Expr *SubExpr;
+  SourceLoc DotLoc;
+  SourceLoc MemberLoc;
   
+public:
+  OverloadedMemberRefExpr(Expr *SubExpr, SourceLoc DotLoc,
+                          ArrayRef<ValueDecl *> Decls, SourceLoc MemberLoc,
+                          Type Ty)
+    : OverloadSetRefExpr(ExprKind::OverloadedMemberRef, Decls, Ty),
+      SubExpr(SubExpr), DotLoc(DotLoc), MemberLoc(MemberLoc) { }
+
+  SourceLoc getDotLoc() const { return DotLoc; }
+  SourceLoc getMemberLoc() const { return MemberLoc; }
+  Expr *getBase() const { return SubExpr; }
+  void setBase(Expr *E) { SubExpr = E; }
+  
+  SourceLoc getLoc() const { return MemberLoc; }
+  SourceLoc getStartLoc() const { return SubExpr->getStartLoc(); }
+  SourceLoc getEndLoc() const { return MemberLoc; }
+  SourceRange getSourceRange() const {
+    return SourceRange(SubExpr->getStartLoc(), MemberLoc);
+  }
+
+  /// createWithCopy - Create and return a new OverloadedMemberRefExpr or a new
+  /// DotSyntaxCallExpr (if the list of decls has a single entry) from the
+  /// specified (non-empty) list of decls and with the given base.  If we end up
+  /// creating an overload set, this method handles copying the list of decls
+  /// into ASTContext memory.
+  static Expr *createWithCopy(Expr *Base, SourceLoc DotLoc,
+                              ArrayRef<ValueDecl*> Decls,
+                              SourceLoc MemberLoc);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const OverloadedMemberRefExpr *) { return true; }
+  static bool classof(const Expr *E) {
+  return E->getKind() == ExprKind::OverloadedMemberRef;
+  }
+};
   
 /// UnresolvedDeclRefExpr - This represents use of an undeclared identifier,
 /// which may ultimately be a use of something that hasn't been defined yet, it

@@ -327,6 +327,10 @@ public:
     return ValueDeclBits.NeverUsedAsLValue;
   }
 
+  /// isInstanceMember - Determine whether this value is an instance member
+  /// of a oneof or protocol.
+  bool isInstanceMember() const;
+  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_ValueDecl &&
