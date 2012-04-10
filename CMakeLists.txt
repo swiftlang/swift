@@ -20,8 +20,8 @@ if( CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR )
   endif()
 
   # FIXME: The check for a 'Debug' tblgen is madness
-  if( NOT EXISTS "${SWIFT_PATH_TO_LLVM_BUILD}/bin/tblgen${CMAKE_EXECUTABLE_SUFFIX}" )
-    if ( NOT EXISTS "${SWIFT_PATH_TO_LLVM_BUILD}/bin/Debug/tblgen${CMAKE_EXECUTABLE_SUFFIX}" )
+  if( NOT EXISTS "${SWIFT_PATH_TO_LLVM_BUILD}/bin/llvm-tblgen${CMAKE_EXECUTABLE_SUFFIX}" )
+    if ( NOT EXISTS "${SWIFT_PATH_TO_LLVM_BUILD}/bin/Debug/llvm-tblgen${CMAKE_EXECUTABLE_SUFFIX}" )
       message(FATAL_ERROR "Please set SWIFT_PATH_TO_LLVM_BUILD to a directory containing an LLVM build.")
     endif()
   endif()
