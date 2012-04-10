@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/Identifier.h"
+#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/SmallString.h"
@@ -391,6 +392,46 @@ void Lexer::lexStringLiteral() {
   }
 }
 
+/// EncodeToUTF8 - Encode the specified code point into a UTF8 stream.  Return
+/// true if it is an erroneous code point.
+static bool EncodeToUTF8(unsigned CharValue,
+                         llvm::SmallVectorImpl<char> &Result) {
+  assert(CharValue >= 0x80 && "Single-byte encoding should be already handled");
+  // Number of bits in the value, ignoring leading zeros.
+  unsigned NumBits = 32-llvm::CountLeadingZeros_32(CharValue);
+  
+  // Handle the leading byte, based on the number of bits in the value.
+  unsigned NumTrailingBytes;
+  if (NumBits <= 5+6) {
+    // Encoding is 0x110aaaaa 10bbbbbb
+    Result.push_back(char(0xC0 | (CharValue >> 6)));
+    NumTrailingBytes = 1;
+  } else if (NumBits <= 4+6+6) {
+    // Encoding is 0x1110aaaa 10bbbbbb 10cccccc
+    Result.push_back(char(0xE0 | (CharValue >> (6+6))));
+    NumTrailingBytes = 2;
+  } else if (NumBits <= 3+6+6+6) {
+    // Encoding is 0x11110aaa 10bbbbbb 10cccccc 10dddddd
+    Result.push_back(char(0xF0 | (CharValue >> (6+6+6))));
+    NumTrailingBytes = 3;
+  } else if (NumBits <= 2+6+6+6+6) {
+    // Encoding is 0x111110aa 10bbbbbb 10cccccc 10dddddd 10eeeeee
+    Result.push_back(char(0xF8 | (CharValue >> (6+6+6+6))));
+    NumTrailingBytes = 4;
+  } else if (NumBits <= 1+6+6+6+6+6) {
+    // Encoding is 0x1111110a 10bbbbbb 10cccccc 10dddddd 10eeeeee 10ffffff
+    Result.push_back(char(0xFC | (CharValue >> (6+6+6+6+6))));
+    NumTrailingBytes = 5;
+  } else {
+    return true;  // UTF8 can't encode a full 32-bit value.
+  }
+
+  // Emit all of the trailing bytes.
+  while (NumTrailingBytes--)
+    Result.push_back(char(0x80 | (0x7F & (CharValue >> (NumTrailingBytes*6)))));
+  return false;
+}
+
 /// getEncodedStringLiteral - Given a string literal token, return the bytes
 /// that the actual string literal should codegen to.  If a copy needs to be
 /// made, it will be allocated out of the ASTContext allocator.
@@ -455,10 +496,8 @@ StringRef Lexer::getEncodedStringLiteral(const Token &Str, ASTContext &Ctx) {
     
     if (CharValue < 0x80) 
       TempString += (char)CharValue;
-    else {
-      assert(0 && "Unimplemented - unicode escapes");
-      abort();
-    }
+    else
+      EncodeToUTF8(CharValue, TempString);
   }
   
   // If we didn't escape or reprocess anything, then we don't need to reallocate
