@@ -485,6 +485,7 @@ static void addVarsToScope(Parser &P, Pattern *Pat,
   // Handle vars.
   case PatternKind::Named: {
     VarDecl *VD = cast<NamedPattern>(Pat)->getDecl();
+    VD->setDeclContext(P.CurDeclContext);
     if (!VD->hasType())
       VD->setType(UnstructuredDependentType::get(P.Context));
     if (Attributes.isValid())

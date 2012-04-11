@@ -204,7 +204,7 @@ NullablePtr<Pattern> Parser::parsePatternAtom() {
       return new (Context) AnyPattern(loc);
     } else {
       Identifier ident = Context.getIdentifier(text);
-      VarDecl *var = new (Context) VarDecl(loc, ident, Type(), CurDeclContext);
+      VarDecl *var = new (Context) VarDecl(loc, ident, Type(), nullptr);
       return new (Context) NamedPattern(var);
     }
   }
