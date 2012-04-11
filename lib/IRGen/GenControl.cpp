@@ -650,7 +650,8 @@ static void popAndEmitTopCleanup(IRGenFunction &IGF,
 static void popAndEmitTopDeadCleanups(IRGenFunction &IGF,
                                       DiverseStackImpl<Cleanup> &stack,
                                       IRGenFunction::CleanupsDepth end) {
-  while (stack.stable_begin() != end && stack.begin()->isDead()) {
+  while (stack.stable_begin() != end && !stack.empty() &&
+         stack.begin()->isDead()) {
     // We might get better results popping them all at once.
     popAndEmitTopCleanup(IGF, stack);
   }
