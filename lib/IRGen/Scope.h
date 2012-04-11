@@ -28,24 +28,34 @@ class Scope {
   IRGenFunction &IGF;
   IRGenFunction::CleanupsDepth Depth;
   IRGenFunction::CleanupsDepth SavedInnermostScope;
+
+  void popImpl() {
+    IGF.Cleanups.checkIterator(Depth);
+    IGF.Cleanups.checkIterator(IGF.InnermostScope);
+    assert(IGF.InnermostScope == Depth && "popping scopes out of order");
+
+    IGF.InnermostScope = SavedInnermostScope;
+    IGF.endScope(Depth);
+    IGF.Cleanups.checkIterator(IGF.InnermostScope);
+  }
+
 public:
   explicit Scope(IRGenFunction &IGF)
     : IGF(IGF), Depth(IGF.getCleanupsDepth()),
       SavedInnermostScope(IGF.InnermostScope) {
+    assert(Depth.isValid());
+    IGF.Cleanups.checkIterator(IGF.InnermostScope);
     IGF.InnermostScope = Depth;
   }
 
   void pop() {
     assert(Depth.isValid() && "popping a scope twice!");
-    assert(IGF.InnermostScope == Depth && "popping scopes out of order");
-    IGF.InnermostScope = SavedInnermostScope;
-
-    IGF.endScope(Depth);
+    popImpl();
     Depth = IRGenFunction::CleanupsDepth::invalid();
   }
 
   ~Scope() {
-    if (Depth.isValid()) IGF.endScope(Depth);
+    if (Depth.isValid()) popImpl();
   }
 };
 

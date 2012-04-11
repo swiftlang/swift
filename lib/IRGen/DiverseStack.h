@@ -121,6 +121,12 @@ public:
   static stable_iterator stable_end() {
     return stable_iterator(0);
   }
+
+  void checkIterator(stable_iterator it) const {
+    assert(it.isValid() && "checking an invalid iterator");
+    checkValid();
+    assert(it.Depth <= size_t(End - Begin));
+  }
 };
 
 template <class T> class DiverseStackImpl : private DiverseStackBase {
@@ -213,17 +219,21 @@ public:
     friend bool operator==(iterator a, iterator b) { return a.Ptr == b.Ptr; }
     friend bool operator!=(iterator a, iterator b) { return a.Ptr != b.Ptr; }
   };
+
+  using DiverseStackBase::checkIterator;
+  void checkIterator(iterator it) const {
+    checkValid();
+    assert(Begin <= it.Ptr && it.Ptr <= End);
+  }
+
   iterator begin() { checkValid(); return iterator(Begin); }
   iterator end() { checkValid(); return iterator(End); }
   iterator find(stable_iterator it) {
-    assert(it.isValid() && "trying to find an invalid iterator");
-    checkValid();
-    assert(it.Depth <= size_t(End - Begin));
+    checkIterator(it);
     return iterator(End - it.Depth);
   }
   stable_iterator stabilize(iterator it) const {
-    checkValid();
-    assert(Begin <= it.Ptr && it.Ptr <= End);
+    checkIterator(it);
     return stable_iterator(End - it.Ptr);
   } 
 
@@ -263,14 +273,16 @@ public:
   };
   const_iterator begin() const { checkValid(); return const_iterator(Begin); }
   const_iterator end() const { checkValid(); return const_iterator(End); }
-  const_iterator find(stable_iterator it) const {
+  void checkIterator(const_iterator it) const {
     checkValid();
-    assert(it.Depth <= End - Begin);
+    assert(Begin <= it.Ptr && it.Ptr <= End);
+  }
+  const_iterator find(stable_iterator it) const {
+    checkIterator(it);
     return const_iterator(End - it.Depth);
   }
   stable_iterator stabilize(const_iterator it) const {
-    checkValid();
-    assert(Begin <= it.Ptr && it.Ptr <= End);
+    checkIterator(it);
     return stable_iterator(End - it.Ptr);
   }
 

@@ -650,10 +650,14 @@ static void popAndEmitTopCleanup(IRGenFunction &IGF,
 static void popAndEmitTopDeadCleanups(IRGenFunction &IGF,
                                       DiverseStackImpl<Cleanup> &stack,
                                       IRGenFunction::CleanupsDepth end) {
-  while (stack.stable_begin() != end && !stack.empty() &&
-         stack.begin()->isDead()) {
+  stack.checkIterator(end);
+
+  while (stack.stable_begin() != end && stack.begin()->isDead()) {
+    assert(!stack.empty());
+
     // We might get better results popping them all at once.
     popAndEmitTopCleanup(IGF, stack);
+    stack.checkIterator(end);
   }
 }
 
@@ -668,6 +672,8 @@ static bool hasAnyActiveCleanups(DiverseStackImpl<Cleanup>::iterator begin,
 
 /// Leave a scope, with all its cleanups.
 void IRGenFunction::endScope(CleanupsDepth depth) {
+  Cleanups.checkIterator(depth);
+
   // Fast path: no cleanups to leave in this scope.
   if (Cleanups.stable_begin() == depth) {
     popAndEmitTopDeadCleanups(*this, Cleanups, InnermostScope);
@@ -702,7 +708,10 @@ void IRGenFunction::endScope(CleanupsDepth depth) {
 
 /// End the scope induced by a single cleanup.
 void IRGenFunction::endSingleCleanupScope() {
-  assert(!Cleanups.empty());
+  assert(!Cleanups.empty() && "popping empty stack!");
+  Cleanups.checkIterator(InnermostScope);
+  assert(Cleanups.stable_begin() != InnermostScope &&
+         "popping past innermost scope!");
   endScope(Cleanups.stabilize(llvm::next(Cleanups.begin())));
 }
 
