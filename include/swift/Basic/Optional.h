@@ -23,6 +23,7 @@
 
 #include <type_traits>
 #include <utility>
+#include <cassert>
 
 #ifndef SWIFT_BASIC_OPTIONAL_H
 #define SWIFT_BASIC_OPTIONAL_H
