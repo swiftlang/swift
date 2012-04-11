@@ -65,7 +65,7 @@ protected:
   PathComponent(size_t size, bool isPhysical)
     : AllocatedSize(size), IsPhysical(isPhysical) {}
 
-  ~PathComponent() {}
+  virtual ~PathComponent() {}
 
 public:
   /// Returns sizeof(the final type), plus any extra storage required.
