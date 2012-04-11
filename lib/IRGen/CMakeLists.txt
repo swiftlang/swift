@@ -18,6 +18,7 @@ add_swift_library(swiftIRGen
   GenGlobal.cpp
   GenHeap.cpp
   GenHeap.h
+  GenInit.cpp
   GenLValue.cpp
   GenLValue.h
   GenLocal.cpp
