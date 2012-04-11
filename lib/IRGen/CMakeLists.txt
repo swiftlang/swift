@@ -26,7 +26,6 @@ add_swift_library(swiftIRGen
   GenMeta.h
   GenOneOf.cpp
   GenOneOf.h
-  GenRefCount.cpp
   GenStmt.cpp
   GenTuple.cpp
   GenTuple.h
