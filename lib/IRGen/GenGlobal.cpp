@@ -29,7 +29,6 @@
 #include "IRGenModule.h"
 #include "Linking.h"
 #include "LValue.h"
-#include "Scope.h"
 
 using namespace swift;
 using namespace irgen;
@@ -137,12 +136,9 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
     IGM.emitExtension(cast<ExtensionDecl>(D));
     return;
 
-  case DeclKind::PatternBinding: {
-    FullExpr scope(*this);
-    PatternBindingDecl *PBD = cast<PatternBindingDecl>(D); 
-    emitPatternBindingInit(PBD->getPattern(), PBD->getInit(), /*global*/true);
+  case DeclKind::PatternBinding:
+    emitPatternBindingDecl(cast<PatternBindingDecl>(D));
     return;
-  }
 
   // oneof elements can be found at the top level because of struct
   // "constructor" injection.  Just ignore them here; we'll get them
@@ -159,8 +155,9 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
   case DeclKind::Import:
     return;
 
+  // We emit these as part of the PatternBindingDecl.
   case DeclKind::Var:
-    return emitGlobalVariable(cast<VarDecl>(D));
+    return;
 
   case DeclKind::Func:
     return IGM.emitGlobalFunction(cast<FuncDecl>(D));
@@ -193,17 +190,6 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var) {
 
   entry = addr;
   return Address(addr, align);
-}
-
-/// Emit a global variable declaration.  The IGF is for the
-/// global-initializer function.
-void IRGenFunction::emitGlobalVariable(VarDecl *var) {
-  Address addr = IGM.getAddrOfGlobalVariable(var);
-  const TypeInfo &type = IGM.getFragileTypeInfo(var->getType());
-
-  // Always zero-initialize globals.
-  llvm::GlobalVariable *gvar = cast<llvm::GlobalVariable>(addr.getAddress());
-  gvar->setInitializer(llvm::Constant::getNullValue(type.StorageType));
 }
 
 /// Fetch the declaration of the given global function.

@@ -69,7 +69,7 @@ void IRBuilder::emitBlock(llvm::BasicBlock *BB) {
 /// Insert the given basic block "anywhere".  The IP may be invalid,
 /// in which case the block will be inserted after the block which
 /// contained the IP before the IP was invalidated.
-void IRBuilder::emitBlockAnywhere(llvm::BasicBlock *BB) {
+void IRBuilder::insertBlockAnywhere(llvm::BasicBlock *BB) {
   llvm::BasicBlock *IP = GetInsertBlock();
   if (!IP) {
     assert(ClearedIP && "no insertion point and none saved, either");
@@ -77,6 +77,14 @@ void IRBuilder::emitBlockAnywhere(llvm::BasicBlock *BB) {
     ClearedIP = nullptr;
   }
   IP->getParent()->getBasicBlockList().insertAfter(IP, BB);
+}
+
+/// Insert the given basic block "anywhere" and move the insertion
+/// point to it.  The IP may be invalid, in which case the block will
+/// be inserted after the block which contained the IP before the IP
+/// was invalidated.
+void IRBuilder::emitBlockAnywhere(llvm::BasicBlock *BB) {
+  insertBlockAnywhere(BB);
   IRBuilderBase::SetInsertPoint(BB);
 }
 
@@ -580,9 +588,10 @@ static void popAndEmitTopCleanup(IRGenFunction &IGF,
     }
 
   // If the block has multiple uses, insert it at the next reasonable point.
+  // Don't enter it yet, though.
   } else {
     trueEntry = entry;
-    IGF.Builder.emitBlockAnywhere(trueEntry);
+    IGF.Builder.insertBlockAnywhere(trueEntry);
   }
 
   // Temporarily enter the entry block.
@@ -639,11 +648,12 @@ static void popAndEmitTopCleanup(IRGenFunction &IGF,
 
 /// Remove all the dead cleanups on the top of the cleanup stack.
 static void popAndEmitTopDeadCleanups(IRGenFunction &IGF,
-                                      DiverseStackImpl<Cleanup> &stack) {
-  do {
-    assert(stack.begin()->isDead());
+                                      DiverseStackImpl<Cleanup> &stack,
+                                      IRGenFunction::CleanupsDepth end) {
+  while (stack.stable_begin() != end && stack.begin()->isDead()) {
+    // We might get better results popping them all at once.
     popAndEmitTopCleanup(IGF, stack);
-  } while (!stack.empty() && stack.begin()->isDead());
+  }
 }
 
 /// Are there any active cleanups in the given range?
@@ -658,7 +668,10 @@ static bool hasAnyActiveCleanups(DiverseStackImpl<Cleanup>::iterator begin,
 /// Leave a scope, with all its cleanups.
 void IRGenFunction::endScope(CleanupsDepth depth) {
   // Fast path: no cleanups to leave in this scope.
-  if (Cleanups.stable_begin() == depth) return;
+  if (Cleanups.stable_begin() == depth) {
+    popAndEmitTopDeadCleanups(*this, Cleanups, InnermostScope);
+    return;
+  }
 
   // Thread a branch through the cleanups if there are any active
   // cleanups and we have a valid insertion point.
@@ -719,11 +732,8 @@ void IRGenFunction::setCleanupState(CleanupsDepth depth,
   assert(iter != Cleanups.end() && "changing state of end of stack");
   setCleanupState(*iter, newState);
 
-  // If we just killed the cleanup at the top of the stack, just kill
-  // it.  TODO: don't kill past the innermost scope.
-  if (newState == CleanupState::Dead && depth == Cleanups.stable_begin()) {
-    popAndEmitTopDeadCleanups(*this, Cleanups);
-  }
+  if (newState == CleanupState::Dead && iter == Cleanups.begin())
+    popAndEmitTopDeadCleanups(*this, Cleanups, InnermostScope);
 }
 
 void IRGenFunction::setCleanupState(Cleanup &cleanup, CleanupState newState) {

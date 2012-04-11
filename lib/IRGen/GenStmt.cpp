@@ -110,7 +110,7 @@ void IRGenFunction::emitReturnStmt(ReturnStmt *S) {
     emitIgnored(S->getResult());
   } else {
     const TypeInfo &resultType = getFragileTypeInfo(S->getResult()->getType());
-    emitRValueToMemory(S->getResult(), ReturnSlot, resultType);
+    emitInit(S->getResult(), ReturnSlot, resultType);
   }
 
   // Leave the full-expression.

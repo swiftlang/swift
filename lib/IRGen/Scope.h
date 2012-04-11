@@ -27,15 +27,20 @@ namespace irgen {
 class Scope {
   IRGenFunction &IGF;
   IRGenFunction::CleanupsDepth Depth;
+  IRGenFunction::CleanupsDepth SavedInnermostScope;
 public:
   explicit Scope(IRGenFunction &IGF)
-    : IGF(IGF), Depth(IGF.getCleanupsDepth()) {}
+    : IGF(IGF), Depth(IGF.getCleanupsDepth()),
+      SavedInnermostScope(IGF.InnermostScope) {
+    IGF.InnermostScope = Depth;
+  }
 
   void pop() {
     assert(Depth.isValid() && "popping a scope twice!");
-    if (Depth != IGF.getCleanupsDepth()) {
-      IGF.endScope(Depth);
-    }
+    assert(IGF.InnermostScope == Depth && "popping scopes out of order");
+    IGF.InnermostScope = SavedInnermostScope;
+
+    IGF.endScope(Depth);
     Depth = IRGenFunction::CleanupsDepth::invalid();
   }
 

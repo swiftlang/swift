@@ -210,10 +210,14 @@ public:
   /// branch and this block, and place the 
   void emitMergeableBlock(llvm::BasicBlock *BB);
 
-  /// Insert the given basic block "anywhere".  The IP may be invalid,
-  /// in which case the block will be inserted after the block which
-  /// contained the IP before the IP was invalidated.
+  /// Insert the given basic block "anywhere" and move the insertion
+  /// point to it. The IP may be invalid, in which case the block will
+  /// be inserted after the block which contained the IP before the IP
+  /// was invalidated.
   void emitBlockAnywhere(llvm::BasicBlock *BB);
+
+  /// Insert the given basic block "anywhere".
+  void insertBlockAnywhere(llvm::BasicBlock *BB);
 };
 
 } // end namespace irgen

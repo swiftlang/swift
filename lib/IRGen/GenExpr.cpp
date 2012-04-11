@@ -26,6 +26,7 @@
 #include "ASTVisitor.h"
 #include "GenClosure.h"
 #include "GenFunc.h"
+#include "GenInit.h"
 #include "GenLValue.h"
 #include "GenMeta.h"
 #include "GenOneOf.h"
@@ -124,15 +125,28 @@ llvm::Value *IRGenFunction::emitAsPrimitiveScalar(Expr *E) {
 /// Emit a rvalue-to-lvalue conversion.
 static OwnedAddress emitMaterializeExpr(IRGenFunction &IGF,
                                         MaterializeExpr *E) {
+  // Do we need a heap object?
+  OnHeap_t onHeap = E->getType()->castTo<LValueType>()->isHeap()
+                         ? OnHeap : NotOnHeap;
+
+  // Compute the object type.
   Expr *subExpr = E->getSubExpr();
-  const TypeInfo &valueTI = IGF.getFragileTypeInfo(subExpr->getType());
+  const TypeInfo &objectTI = IGF.getFragileTypeInfo(subExpr->getType());
 
-  bool onHeap = E->getType()->castTo<LValueType>()->isHeap();
-  OwnedAddress addr = IGF.createFullExprAlloca(valueTI,
-                                               onHeap ? OnHeap : NotOnHeap,
-                                               "materialized-temporary");
+  // Begin the initialization.
+  Initialization I;
+  Initialization::Object object = I.getObjectForTemporary();
+  I.registerObject(IGF, object, onHeap, objectTI);
 
-  IGF.emitRValueToMemory(subExpr, addr.getAddress(), valueTI);
+  // Allocate.
+  OwnedAddress addr =
+    I.emitLocalAllocation(IGF, object, onHeap, objectTI,
+                          "materialized-temporary");
+
+  // Emit the initializer.
+  I.emitInit(IGF, object, addr, subExpr, objectTI);
+
+  // We're done.
   return addr;
 }
 

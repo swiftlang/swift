@@ -29,6 +29,7 @@
 #include "llvm/Target/TargetData.h"
 
 #include "ASTVisitor.h"
+#include "GenInit.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -485,37 +486,16 @@ void swift::irgen::emitTupleShuffle(IRGenFunction &IGF, TupleShuffleExpr *E,
   innerTupleExplosion.markClaimed(innerTupleExplosion.size());
 }
 
-static bool tryEmitTuplePatternElementwise(IRGenFunction &IGF, TuplePattern *P,
-                                           Expr *E, bool isGlobalPattern) {
-  // Skip sugar.
-  E = E->getSemanticsProvidingExpr();
-
-  // If we can break the initializer down into a literal, that's great.
-  if (TupleExpr *literal = dyn_cast<TupleExpr>(E)) {
-    assert(literal->getNumElements() == P->getNumFields());
-
-    for (unsigned i = 0, e = literal->getNumElements(); i != e; ++i) {
-      IGF.emitPatternBindingInit(P->getFields()[i].getPattern(),
-                                 literal->getElement(i),
-                                 isGlobalPattern);
-    }
-    return true;
-  }
-
-  // TODO: we can also be cleverer about shuffles.
-  return false;
-}
-
 namespace {
-  /// An emitter which initializes a pattern from an 
+  /// A visitor for initializing a pattern from an address.
   struct InitPatternFromAddress
       : irgen::PatternVisitor<InitPatternFromAddress> {
     IRGenFunction &IGF;
-    Address Addr;
-    bool IsGlobal;
+    Initialization &I;
+    Address SrcAddr;
 
-    InitPatternFromAddress(IRGenFunction &IGF, Address addr, bool isGlobal)
-      : IGF(IGF), Addr(addr), IsGlobal(isGlobal) {}
+    InitPatternFromAddress(IRGenFunction &IGF, Initialization &I, Address addr)
+      : IGF(IGF), I(I), SrcAddr(addr) {}
 
     void visitAnyPattern(AnyPattern *P) {
       // No need to copy anything out.
@@ -523,10 +503,15 @@ namespace {
 
     void visitNamedPattern(NamedPattern *P) {
       VarDecl *var = P->getDecl();
-      Address destAddr =
-        IsGlobal ? IGF.IGM.getAddrOfGlobalVariable(var) : IGF.getLocal(var);
+
       const TypeInfo &fieldTI = IGF.getFragileTypeInfo(var->getType());
-      fieldTI.initializeWithCopy(IGF, destAddr, Addr);
+      Address destAddr = I.emitVariable(IGF, var, fieldTI);
+      fieldTI.initializeWithCopy(IGF, destAddr, SrcAddr);
+
+      // The validity of marking this after the initialization comes from
+      // the assumption that initializeWithCopy is atomic w.r.t.
+      // exceptions and control flow.
+      I.markInitialized(IGF, I.getObjectForDecl(var));
     }
 
     void visitTuplePattern(TuplePattern *P) {
@@ -534,6 +519,7 @@ namespace {
     }
 
     void visitTuplePattern(TuplePattern *P, const TupleTypeInfo &tupleTI) {
+      Address srcTupleAddr = SrcAddr;
       for (unsigned i = 0, e = P->getNumFields(); i != e; ++i) {
         auto &field = tupleTI.getFieldInfos()[i];
         if (!field.hasStorage()) continue;
@@ -543,34 +529,23 @@ namespace {
           P->getFields()[i].getPattern()->getSemanticsProvidingPattern();
         if (isa<AnyPattern>(fieldP)) continue;
 
-        // Otherwise recurse.
-        Address fieldAddr = tupleTI.projectAddress(IGF, Addr, field);
-        InitPatternFromAddress(IGF, fieldAddr, IsGlobal).visit(fieldP);
+        // Otherwise, change the source address and recurse on each field.
+        SrcAddr = tupleTI.projectAddress(IGF, srcTupleAddr, field);
+        visit(fieldP);
       }
     }
   };
 }
 
 /// Emit an initializer for a tuple pattern.
-void swift::irgen::emitTuplePatternInit(IRGenFunction &IGF, TuplePattern *P,
-                                        Expr *init, bool isGlobalPattern) {
-  // Otherwise, try to break the initializer into independent element
-  // initializers.
-  if (tryEmitTuplePatternElementwise(IGF, P, init, isGlobalPattern))
-    return;
-
-  const TupleTypeInfo &tupleTI = getAsTupleTypeInfo(IGF, init->getType());
+void swift::irgen::emitTuplePatternInitFromAddress(IRGenFunction &IGF,
+                                                   Initialization &I,
+                                                   Address addr,
+                                                   TuplePattern *P,
+                                                   const TypeInfo &TI) {
+  const TupleTypeInfo &tupleTI = getAsTupleTypeInfo(TI);
 
   // If we can emit the initializer as an address, we can project
   // and copy directly.
-  if (Optional<Address> addr = IGF.tryEmitAsAddress(init, tupleTI)) {
-    InitPatternFromAddress initter(IGF, addr.getValue(), isGlobalPattern);
-    initter.visitTuplePattern(P, tupleTI);
-    return;
-  }
-
-  // Otherwise, explode and sub-initialize.
-  Explosion explosion(ExplosionKind::Maximal);
-  IGF.emitRValue(init, explosion);
-  IGF.emitPatternBindingInit(P, explosion, isGlobalPattern);
+  InitPatternFromAddress(IGF, I, addr).visitTuplePattern(P, tupleTI);
 }

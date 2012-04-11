@@ -121,12 +121,14 @@ public:
   llvm::Constant *getAllocFn();
   llvm::Constant *getRetainFn();
   llvm::Constant *getReleaseFn();
+  llvm::Constant *getDeallocFn();
 
 private:
   llvm::Function *MemCpyFn;
   llvm::Constant *AllocFn;
   llvm::Constant *RetainFn;
   llvm::Constant *ReleaseFn;
+  llvm::Constant *DeallocFn;
 
 //--- Generic ---------------------------------------------------------------
 public:

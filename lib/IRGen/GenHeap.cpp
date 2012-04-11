@@ -122,7 +122,6 @@ ManagedValue IRGenFunction::emitAlloc(const HeapLayout &layout,
   return enterReleaseCleanup(alloc);
 }
 
-
 /// Given that an object has been allocated, cast the result to the
 /// appropriate type.
 Address HeapLayout::emitCastOfAlloc(IRGenFunction &IGF,

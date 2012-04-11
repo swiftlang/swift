@@ -33,7 +33,8 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM, Type t, ArrayRef<Pattern*> p,
     CurFuncParamPatterns(p), CurFn(Fn),
     CurExplosionLevel(explosionLevel), CurUncurryLevel(uncurryLevel),
     CurPrologue(prologue), ContextPtr(nullptr),
-    UnreachableBB(nullptr), JumpDestSlot(nullptr) {
+    UnreachableBB(nullptr), JumpDestSlot(nullptr),
+    InnermostScope(Cleanups.stable_end()) {
   emitPrologue();
 }
 

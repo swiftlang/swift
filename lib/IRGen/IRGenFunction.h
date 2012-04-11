@@ -56,6 +56,7 @@ namespace irgen {
   class JumpDest;
   class LValue;
   class ManagedValue;
+  class Scope;
   class TypeInfo;
 
 /// Prologue - A value indicating controlling the kind of prologue/epilogue
@@ -132,8 +133,18 @@ public:
   T &pushCleanupInState(CleanupState state, A &&... args) {
     assert(state != CleanupState::Dead);
 
+#ifndef NDEBUG
+    CleanupsDepth oldTop = Cleanups.stable_begin();
+#endif
+
     T &cleanup = Cleanups.push<T, A...>(::std::forward<A>(args)...);
-    return static_cast<T&>(initCleanup(cleanup, sizeof(T), state));
+    T &result = static_cast<T&>(initCleanup(cleanup, sizeof(T), state));
+
+#ifndef NDEBUG
+    auto newTop = Cleanups.begin(); ++newTop;
+    assert(newTop == Cleanups.find(oldTop));
+#endif
+    return result;
   }
 
   /// Push a new cleanup which is expected to be destroyed at the end
@@ -148,6 +159,12 @@ public:
     return pushCleanup<T, A...>(::std::forward<A>(args)...);
   }
 
+  template <class T, class... A>
+  T &pushFullExprCleanupInState(CleanupState state, A &&... args) {
+    assert(!isConditionallyEvaluated());
+    return pushCleanupInState<T, A...>(state, ::std::forward<A>(args)...);
+  }
+
   typedef DiverseStackImpl<Cleanup>::stable_iterator CleanupsDepth;
 
   /// Retun a stable reference to the current cleanup.
@@ -158,6 +175,11 @@ public:
   /// Set the state of the cleanup at the given depth.
   /// The transition must be non-trivial and legal.
   void setCleanupState(CleanupsDepth depth, CleanupState state);
+
+  Cleanup &findCleanup(CleanupsDepth depth) {
+    assert(depth != Cleanups.stable_end());
+    return *Cleanups.find(depth);
+  }
 
   void endScope(CleanupsDepth depth);
   void endSingleCleanupScope();
@@ -175,7 +197,9 @@ private:
   DiverseStack<Cleanup, 128> Cleanups;
   llvm::BasicBlock *UnreachableBB;
   llvm::Instruction *JumpDestSlot;
+  CleanupsDepth InnermostScope;
 
+  friend class Scope;
   Cleanup &initCleanup(Cleanup &cleanup, size_t allocSize, CleanupState state);
   void setCleanupState(Cleanup &cleanup, CleanupState state);
 
@@ -194,10 +218,8 @@ private:
 
 //--- Helper methods -----------------------------------------------------------
 public:
-  OwnedAddress createFullExprAlloca(const TypeInfo &type, OnHeap_t onHeap,
-                                    const llvm::Twine &name);
-  OwnedAddress createScopeAlloca(const TypeInfo &type, OnHeap_t onHeap,
-                                 const llvm::Twine &name);
+  Address createAlloca(llvm::Type *ty, Alignment align,
+                       const llvm::Twine &name);
   llvm::AllocaInst *createSupportAlloca(llvm::Type *type, Alignment align,
                                         const llvm::Twine &name);
 
@@ -213,6 +235,7 @@ public:
   ManagedValue emitAlloc(const HeapLayout &layout, const llvm::Twine &name);
   llvm::Value *emitUnmanagedAlloc(const HeapLayout &layout,
                                   const llvm::Twine &name);
+  CleanupsDepth pushDeallocCleanup(llvm::Value *allocation);
   void emitLoadAndRetain(Address addr, Explosion &explosion);
   void emitAssignRetained(llvm::Value *value, Address addr);
   void emitInitializeRetained(llvm::Value *value, Address addr);
@@ -238,6 +261,8 @@ public:
 
   void emitIgnored(Expr *E);
 
+  void emitInit(Expr *E, Address address, const TypeInfo &type);
+
   LValue emitLValue(Expr *E);
   Optional<Address> tryEmitAsAddress(Expr *E, const TypeInfo &type);
   LValue emitAddressLValue(OwnedAddress addr);
@@ -256,9 +281,6 @@ public:
                   const TypeInfo &type);
   void emitAssign(Expr *E, const LValue &lvalue, const TypeInfo &type);
 
-  void emitInit(Address addr, Expr *E, const TypeInfo &type);
-  void emitZeroInit(Address addr, const TypeInfo &type);
-
   void emitPatternBindingInit(Pattern *P, Expr *E, bool isGlobal);
   void emitPatternBindingInit(Pattern *P, Explosion &E, bool isGlobal);
 
@@ -276,6 +298,7 @@ public:
   OwnedAddress getLocal(ValueDecl *D);
   LValue getGlobal(VarDecl *D);
   void setLocal(ValueDecl *D, OwnedAddress addr);
+  void emitPatternBindingDecl(PatternBindingDecl *D);
 
 private:
   void emitLocalVar(VarDecl *D);
@@ -295,7 +318,6 @@ public:
   void emitGlobalTopLevel(BraceStmt *S);
 private:
   void emitGlobalDecl(Decl *D);
-  void emitGlobalVariable(VarDecl *D);
 };
 
 } // end namespace irgen

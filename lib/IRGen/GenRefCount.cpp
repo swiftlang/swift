@@ -174,3 +174,36 @@ ManagedValue IRGenFunction::enterReleaseCleanup(llvm::Value *value) {
   pushFullExprCleanup<CallRelease>(value);
   return ManagedValue(value, getCleanupsDepth());
 }
+
+/// Emit a call to swift_dealloc.
+static void emitDeallocCall(IRGenFunction &IGF, llvm::Value *allocation) {
+  llvm::Constant *fn = IGF.IGM.getDeallocFn();
+  if (allocation->getType() != IGF.IGM.RefCountedPtrTy) {
+    llvm::FunctionType *fnType =
+      llvm::FunctionType::get(IGF.IGM.VoidTy, allocation->getType(), false);
+    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
+  }
+
+  llvm::CallInst *call = IGF.Builder.CreateCall(fn, allocation);
+  call->setDoesNotThrow();
+}
+
+namespace {
+  class CallDealloc : public Cleanup {
+    llvm::Value *Allocation;
+  public:
+    CallDealloc(llvm::Value *allocation) : Allocation(allocation) {}
+    void emit(IRGenFunction &IGF) const {
+      emitDeallocCall(IGF, Allocation);
+    }
+  };
+}
+
+/// Enter a cleanup to call swift_dealloc on the given pointer.
+/// This cleanup will usually be deactivated as soon as the
+/// initializer completes.
+IRGenFunction::CleanupsDepth
+IRGenFunction::pushDeallocCleanup(llvm::Value *allocation) {
+  pushFullExprCleanup<CallDealloc>(allocation);
+  return getCleanupsDepth();
+}

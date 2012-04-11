@@ -53,6 +53,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
   AllocFn = nullptr;
   RetainFn = nullptr;
   ReleaseFn = nullptr;
+  DeallocFn = nullptr;
 
   RefCountedStructTy =
     llvm::StructType::create(getLLVMContext(), "swift.refcounted");
@@ -107,6 +108,15 @@ llvm::Constant *IRGenModule::getReleaseFn() {
     llvm::FunctionType::get(VoidTy, RefCountedPtrTy, false);
   ReleaseFn = Module.getOrInsertFunction("swift_release", fnType);
   return ReleaseFn;
+}
+
+llvm::Constant *IRGenModule::getDeallocFn() {
+  if (DeallocFn) return DeallocFn;
+
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(VoidTy, RefCountedPtrTy, false);
+  DeallocFn = Module.getOrInsertFunction("swift_dealloc", fnType);
+  return DeallocFn;
 }
 
 void IRGenModule::unimplemented(SourceLoc Loc, StringRef Message) {

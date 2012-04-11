@@ -28,6 +28,7 @@ namespace irgen {
   class Address;
   class Explosion;
   class IRGenFunction;
+  class Initialization;
   class LValue;
 
   /// Emit an element projection as an r-value.
@@ -49,13 +50,10 @@ namespace irgen {
   void emitTupleShuffle(IRGenFunction &IGF, TupleShuffleExpr *E,
                         Explosion &explosion);
 
-  /// Emit an initializer for a tuple pattern.
-  void emitTuplePatternInit(IRGenFunction &IGF, TuplePattern *P, Expr *E,
-                            bool isGlobal);
-
-  /// Emit an initializer for a tuple pattern.
-  void emitTuplePatternInit(IRGenFunction &IGF, TuplePattern *P,
-                            Explosion &E, bool isGlobal);
+  /// Initialize a tuple pattern by copying from an address.
+  void emitTuplePatternInitFromAddress(IRGenFunction &IGF, Initialization &I,
+                                       Address address, TuplePattern *P,
+                                       const TypeInfo &type);
 
 } // end namespace irgen
 } // end namespace swift

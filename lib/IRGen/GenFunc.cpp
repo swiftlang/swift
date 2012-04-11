@@ -65,6 +65,7 @@
 
 #include "Explosion.h"
 #include "GenHeap.h"
+#include "GenInit.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -834,6 +835,10 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
       }
     }
 
+    Initialization indirectInit;
+    Initialization::Object indirectResultObject
+      = Initialization::Object::invalid();
+
     // Emit and insert the result slot if required.
     assert(lastArgWritten == 0 || lastArgWritten == 1);
     bool isAggregateResult = (lastArgWritten != 0);
@@ -844,8 +849,13 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
 
       // Force there to be an indirect address.
       if (!result.IndirectAddress.isValid()) {
+        indirectResultObject = indirectInit.getObjectForTemporary();
+        indirectInit.registerObject(IGF, indirectResultObject,
+                                    NotOnHeap, resultTI);
         result.IndirectAddress =
-          IGF.createFullExprAlloca(resultTI, NotOnHeap, "call.aggresult");
+          indirectInit.emitLocalAllocation(IGF, indirectResultObject,
+                                           NotOnHeap, resultTI,
+                                           "call.aggresult");
       }
       args[0] = result.IndirectAddress.getAddress();
     }
@@ -858,6 +868,10 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
     // attributes on the agg return slot, then return, since agg
     // results can only be final.
     if (isAggregateResult) {
+      // Mark that we've successfully initialized the indirect result.
+      if (indirectResultObject.isValid())
+        indirectInit.markInitialized(IGF, indirectResultObject);
+
       setAggResultAttributes(call);
       assert(result.getDirectValues().empty());
       assert(result.IndirectAddress.isValid());
@@ -941,17 +955,28 @@ void IRGenFunction::emitNullaryCall(llvm::Value *fnPtr,
   resultTI.getSchema(resultSchema);
 
   llvm::SmallVector<llvm::Value*, 1> args;
+
+  // Build the aggregate result.
+  Initialization resultInit;
+  Initialization::Object resultObject = Initialization::Object::invalid();
   Address resultAddress;
   if (resultSchema.requiresIndirectResult()) {
-    resultAddress = createFullExprAlloca(resultTI, NotOnHeap, "call.aggresult");
+    resultObject = resultInit.getObjectForTemporary();
+    resultInit.registerObject(*this, resultObject, NotOnHeap, resultTI);
+    resultAddress =
+      resultInit.emitLocalAllocation(*this, resultObject, NotOnHeap,
+                                     resultTI, "call.aggresult");
     args.push_back(resultAddress.getAddress());
   }
 
-  // FIXME: exceptions
+  // FIXME: exceptions, etc.
   llvm::CallInst *call = Builder.CreateCall(fnPtr, args);
 
+  // Transfer control into an indirect result and then load out.
   if (resultSchema.requiresIndirectResult()) {
     setAggResultAttributes(call);
+
+    resultInit.markInitialized(*this, resultObject);
     resultTI.load(*this, resultAddress, resultExplosion);
     return;
   }
@@ -994,6 +1019,8 @@ OwnedAddress IRGenFunction::getAddrForParameter(VarDecl *param,
     return OwnedAddress(Address(addr, paramType.StorageAlignment), owner);
   }
 
+  OnHeap_t onHeap = param->hasFixedLifetime() ? NotOnHeap : OnHeap;
+
   // If the schema contains a single aggregate, assume we can
   // just treat the next parameter as that type.
   if (paramSchema.size() == 1 && paramSchema.begin()->isAggregate()) {
@@ -1003,30 +1030,42 @@ OwnedAddress IRGenFunction::getAddrForParameter(VarDecl *param,
                     paramSchema.begin()->getAggregateType()->getPointerTo());
     Address paramAddr(addr, paramType.StorageAlignment);
 
-    // If the lifetime can't be extended, just use the address directly.
-    if (param->hasFixedLifetime())
+    // If we don't locally need the variable on the heap, just use the
+    // original address.
+    if (!onHeap)
       return OwnedAddress(paramAddr, IGM.RefCountedNull);
 
-    // Otherwise, we might have to move it to the heap.
-    OwnedAddress paramHeapAddr = createScopeAlloca(paramType, OnHeap,
-                                                   name + ".heap");
+    // Otherwise, we have to move it to the heap.
+    Initialization paramInit;
+    Initialization::Object paramObj = paramInit.getObjectForDecl(param);
+    paramInit.registerObject(*this, paramObj, OnHeap, paramType);
+
+    OwnedAddress paramHeapAddr =
+      paramInit.emitLocalAllocation(*this, paramObj, OnHeap, paramType,
+                                    name + ".heap");
 
     // Do a 'take' initialization to directly transfer responsibility.
     paramType.initializeWithTake(*this, paramHeapAddr, paramAddr);
+    paramInit.markInitialized(*this, paramObj);
+
     return paramHeapAddr;
   }
 
   // Otherwise, make an alloca and load into it.
-  OwnedAddress paramAddr = createScopeAlloca(paramType,
-                                             param->hasFixedLifetime()
-                                               ? NotOnHeap : OnHeap,
-                                             name + ".addr");
+  Initialization paramInit;
+  Initialization::Object paramObj = paramInit.getObjectForDecl(param);
+  paramInit.registerObject(*this, paramObj, onHeap, paramType);
+
+  OwnedAddress paramAddr =
+    paramInit.emitLocalAllocation(*this, paramObj, onHeap, paramType,
+                                  name + ".addr");
 
   // FIXME: This way of getting a list of arguments claimed by storeExplosion
   // is really ugly.
   auto storedStart = paramValues.begin();
 
   paramType.initialize(*this, paramValues, paramAddr);
+  paramInit.markInitialized(*this, paramObj);
 
   // Set names for argument(s)
   for (auto i = storedStart, e = paramValues.begin(); i != e; ++i) {
@@ -1133,7 +1172,18 @@ void IRGenFunction::emitPrologue() {
     } else if (resultSchema.empty()) {
       assert(!ReturnSlot.isValid());
     } else {
-      ReturnSlot = createScopeAlloca(resultType, NotOnHeap, "return_value");
+      // Prepare the return slot.  We intentionally do not create
+      // a destroy cleanup, because the return slot doesn't really
+      // work in the normal way.
+      Initialization returnInit;
+      auto returnObject = returnInit.getObjectForTemporary();
+      returnInit.registerObjectWithoutDestroy(returnObject);
+
+      // Allocate the slot and leave its allocation cleanup hanging
+      // around.
+      ReturnSlot = returnInit.emitLocalAllocation(*this, returnObject,
+                                                  NotOnHeap, resultType,
+                                                  "return_value");
     }
   }
 
