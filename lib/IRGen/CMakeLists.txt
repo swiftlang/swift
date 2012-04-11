@@ -12,17 +12,16 @@ add_swift_library(swiftIRGen
   GenClosure.cpp
   GenClosure.h
   GenControl.cpp
+  GenDecl.cpp
   GenExpr.cpp
   GenFunc.cpp
   GenFunc.h
-  GenGlobal.cpp
   GenHeap.cpp
   GenHeap.h
   GenInit.cpp
   GenInit.h
   GenLValue.cpp
   GenLValue.h
-  GenLocal.cpp
   GenMeta.cpp
   GenMeta.h
   GenOneOf.cpp
