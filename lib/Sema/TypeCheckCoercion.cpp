@@ -103,6 +103,7 @@ class SemaCoerce : public ExprVisitor<SemaCoerce, CoercedResult> {
     
   public:
     CoerceDiagnostic() : Diag() { }
+    CoerceDiagnostic(CoerceDiagnostic &&Other) : Diag(std::move(Other.Diag)) { }
     CoerceDiagnostic(InFlightDiagnostic &&Diag) : Diag(std::move(Diag)) { }
     
     /// \brief Add a source range to the diagnostic.
