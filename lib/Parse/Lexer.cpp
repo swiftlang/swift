@@ -232,7 +232,7 @@ static bool isValidExponent(const char *P) {
 ///   integer_literal  ::= 0x[0-9a-fA-F]+
 ///   integer_literal  ::= 0o[0-7]+
 ///   integer_literal  ::= 0b[01]+
-///   floating_literal ::= [0-9]+(\.[0-9]+)?
+///   floating_literal ::= [0-9]+\.[0-9]+
 ///   floating_literal ::= [0-9]+(\.[0-9]*)?[eE][+-][0-9]+
 ///   floating_literal ::= \.[0-9]+([eE][+-][0-9]+)?
 void Lexer::lexNumber() {
