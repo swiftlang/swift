@@ -242,7 +242,3 @@ void DiagnosticEngine::flushActiveDiagnostic() {
   // Reset the active diagnostic.
   ActiveDiagnostic.reset();
 }
-
-void DiagnosticEngine::suppressActiveDiagnostic() {
-  ActiveDiagnostic.reset();
-}

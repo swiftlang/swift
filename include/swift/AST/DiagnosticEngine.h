@@ -220,9 +220,6 @@ namespace swift {
         flush();
     }
     
-    /// \brief Suppress the given diagnostic.
-    void suppress();
-    
     /// \brief Flush the active diagnostic to the diagnostic output engine.
     void flush();
     
@@ -324,24 +321,15 @@ namespace swift {
     /// \brief Flush the active diagnostic.
     void flushActiveDiagnostic();
     
-    /// \brief Suppress the active diagnostic.
-    void suppressActiveDiagnostic();
-
     /// \brief Retrieve the active diagnostic.
     Diagnostic &getActiveDiagnostic() { return *ActiveDiagnostic; }
   };
   
   inline InFlightDiagnostic &InFlightDiagnostic::operator<<(SourceRange R) {
+    assert(IsActive && "Cannot modify an inactive diagnostic");
     if (Engine)
       Engine->getActiveDiagnostic() << R;
     return *this;
-  }
-
-  inline void InFlightDiagnostic::suppress() {
-    assert(IsActive && "Cannot suppress inactive diagnostic");
-    IsActive = false;
-    if (Engine)
-      Engine->suppressActiveDiagnostic();
   }
 } // end namespace swift
 
