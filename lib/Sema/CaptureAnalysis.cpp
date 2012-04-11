@@ -27,7 +27,7 @@
 using namespace swift;
 
 static void VisitValueDecl(ValueDecl *VD) {
-  if (VD->getDeclContext()->isLocalContext()) {
+  if (!VD->isModuleScope()) {
     // We assume that these flags are correct unless
     // we show otherwise in walkToExprPre.
     VD->setNeverUsedAsLValue(true);
@@ -104,14 +104,14 @@ class CaptureAnalysisVisitor : public ASTWalker {
       if ((DstLT->getQualifiers() & LValueType::Qual::NonHeap) &&
           !(SrcLT->getQualifiers() & LValueType::Qual::NonHeap))
       if (ValueDecl *D = FindValueDecl(RE->getSubExpr())) {
-        if (D->getDeclContext()->isLocalContext())
+        if (!D->isModuleScope())
           D->setNeverUsedAsLValue(false);
         return false;
       }
     } else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
       // We can't reason about the decl referred to by a general DeclRefExpr.
       ValueDecl *D = DRE->getDecl();
-      if (D->getDeclContext()->isLocalContext()) {
+      if (!D->isModuleScope()) {
         D->setNeverUsedAsLValue(false);
         D->setHasFixedLifetime(false);
       }
@@ -142,7 +142,7 @@ class CaptureAnalysisVisitor : public ASTWalker {
     if (AssignStmt *AS = dyn_cast<AssignStmt>(S)) {
       // An assignment to a variable can't extend its lifetime.
       if (ValueDecl *D = FindValueDecl(AS->getDest())) {
-        if (D->getDeclContext()->isLocalContext())
+        if (!D->isModuleScope())
           D->setNeverUsedAsLValue(false);
 
         AS->getSrc()->walk(*this);

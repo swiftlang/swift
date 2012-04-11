@@ -95,3 +95,8 @@ void ScopeInfo::addToScope(ValueDecl *D) {
   
   ValueScopeHT.insert(D->getName(), std::make_pair(CurScope->getDepth(), D));
 }
+
+
+bool ScopeInfo::isModuleScope() {
+  return CurScope->getDepth() == 0;
+}

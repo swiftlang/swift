@@ -274,7 +274,8 @@ void ExplicitClosureExpr::GenerateVarDecls(unsigned NumDecls,
     StringRef VarName = ("$" + Twine(NextIdx)).toStringRef(StrBuf);
     Identifier ident = Context.getIdentifier(VarName);
     SourceLoc VarLoc; // FIXME: Location?
-    VarDecl *var = new (Context) VarDecl(VarLoc, ident, Type(), this);
+    VarDecl *var = new (Context) VarDecl(VarLoc, ident, Type(), this,
+                                         /*IsModuleScope*/false);
     Decls.push_back(var);
   }
 }

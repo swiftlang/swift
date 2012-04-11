@@ -289,10 +289,7 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
 }
 
 static bool shouldMangle(NamedDecl *D) {
-  // Everything not declared in global context needs to be mangled.
-  if (!isa<TranslationUnit>(D->getDeclContext())) return true;
-
-  return true;
+  return isa<ValueDecl>(D) && cast<ValueDecl>(D)->isModuleScope();
 }
 
 void LinkEntity::mangle(raw_ostream &buffer) const {

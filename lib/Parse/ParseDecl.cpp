@@ -461,7 +461,8 @@ TypeAliasDecl *Parser::parseDeclTypeAlias() {
     return 0;
 
   TypeAliasDecl *TAD =
-    new (Context) TypeAliasDecl(TypeAliasLoc, Id, Ty, CurDeclContext);
+    new (Context) TypeAliasDecl(TypeAliasLoc, Id, Ty, CurDeclContext,
+                                ScopeInfo.isModuleScope());
   ScopeInfo.addToScope(TAD);
   return TAD;
 }
@@ -486,6 +487,7 @@ static void addVarsToScope(Parser &P, Pattern *Pat,
   case PatternKind::Named: {
     VarDecl *VD = cast<NamedPattern>(Pat)->getDecl();
     VD->setDeclContext(P.CurDeclContext);
+    VD->setModuleScope(P.ScopeInfo.isModuleScope());
     if (!VD->hasType())
       VD->setType(UnstructuredDependentType::get(P.Context));
     if (Attributes.isValid())
@@ -559,7 +561,8 @@ VarDecl *Parser::parseDeclVarSimple() {
   if (parseTypeAnnotation(Ty, diag::expected_type))
     return 0;
 
-  return new (Context) VarDecl(VarLoc, ident, Ty, CurDeclContext);
+  return new (Context) VarDecl(VarLoc, ident, Ty, CurDeclContext,
+                               ScopeInfo.isModuleScope());
 }
 
 /// parseDeclFunc - Parse a 'func' declaration, returning null on error.  The
@@ -611,7 +614,7 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   if (hasContainerType && !StaticLoc.isValid()) {
     VarDecl *D =
       new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
-                            Type(), CurDeclContext);
+                            Type(), CurDeclContext, /*isModuleScope*/false);
     Pattern *P = new (Context) NamedPattern(D);
     P = new (Context) TypedPattern(P, 
                                    UnstructuredDependentType::get(Context));
@@ -655,7 +658,8 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   
   // Create the decl for the func and add it to the parent scope.
   FuncDecl *FD = new (Context) FuncDecl(StaticLoc, FuncLoc, Name,
-                                        FuncTy, FE, CurDeclContext);
+                                        FuncTy, FE, CurDeclContext,
+                                        ScopeInfo.isModuleScope());
   if (Attributes.isValid()) FD->getMutableAttrs() = Attributes;
   ScopeInfo.addToScope(FD);
   return FD;
@@ -684,7 +688,8 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
     return true;
   
   TypeAliasDecl *TAD =
-    new (Context) TypeAliasDecl(NameLoc, OneOfName, Type(), CurDeclContext);
+    new (Context) TypeAliasDecl(NameLoc, OneOfName, Type(), CurDeclContext,
+                                ScopeInfo.isModuleScope());
   Decls.push_back(TAD);
 
   SourceLoc LBLoc, RBLoc;
@@ -781,8 +786,9 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
     
     // Create a decl for each element, giving each a temporary type.
     EltDecls.push_back(new (Context) OneOfElementDecl(Elt.NameLoc, NameI,
-                                                      EltTy, Elt.EltType,
-                                                      CurDeclContext));
+                                                  EltTy, Elt.EltType,
+                                                  CurDeclContext,
+                                                  ScopeInfo.isModuleScope()));
   }
   
   OneOfType *Result = OneOfType::getNew(OneOfLoc, EltDecls, PrettyTypeName);
@@ -823,7 +829,8 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
 
   // Get the TypeAlias for the name that we'll eventually have.
   TypeAliasDecl *TAD =
-    new (Context) TypeAliasDecl(StructLoc, StructName, Type(), CurDeclContext);
+    new (Context) TypeAliasDecl(StructLoc, StructName, Type(), CurDeclContext,
+                                ScopeInfo.isModuleScope());
 
   // Parse elements of the body as a tuple body.
   Type BodyTy;
@@ -890,7 +897,8 @@ Decl *Parser::parseDeclProtocol() {
     return 0;
   
   TypeAliasDecl *TAD =
-    new (Context) TypeAliasDecl(NameLoc, ProtocolName, Type(), CurDeclContext);
+    new (Context) TypeAliasDecl(NameLoc, ProtocolName, Type(), CurDeclContext,
+                                ScopeInfo.isModuleScope());
   if (parseProtocolBody(ProtocolLoc, Attributes, TAD))
     return 0;
   return TAD;
