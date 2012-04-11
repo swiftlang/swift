@@ -312,10 +312,12 @@ public:
   void setBase(Expr *E) { SubExpr = E; }
   
   SourceLoc getLoc() const { return MemberLoc; }
-  SourceLoc getStartLoc() const { return SubExpr->getStartLoc(); }
+  SourceLoc getStartLoc() const {
+    return DotLoc.isValid()? SubExpr->getStartLoc() : MemberLoc;
+  }
   SourceLoc getEndLoc() const { return MemberLoc; }
   SourceRange getSourceRange() const {
-    return SourceRange(SubExpr->getStartLoc(), MemberLoc);
+    return SourceRange(getStartLoc(), MemberLoc);
   }
 
   /// createWithCopy - Create and return a new OverloadedMemberRefExpr or a new
@@ -1119,9 +1121,12 @@ public:
 
   SourceLoc getDotLoc() const { return DotLoc; }
   SourceLoc getLoc() const { return getArg()->getStartLoc(); }
+  SourceLoc getEndLoc() const {
+    return DotLoc.isValid()? getFn()->getEndLoc() : getArg()->getEndLoc();
+  }
   
   SourceRange getSourceRange() const {
-    return SourceRange(getArg()->getStartLoc(), getFn()->getEndLoc());
+    return SourceRange(getArg()->getStartLoc(), getEndLoc());
   }
   
   // Implement isa/cast/dyncast/etc.
