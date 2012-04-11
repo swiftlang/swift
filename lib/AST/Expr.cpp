@@ -84,6 +84,17 @@ Expr *Expr::getValueProvidingExpr() {
   return getSemanticsProvidingExpr();
 }
 
+bool Expr::isImplicit() const {
+  if (const DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(this))
+    return !DRE->getLoc().isValid();
+  
+  if (const ImplicitConversionExpr *ICE
+        = dyn_cast<ImplicitConversionExpr>(this))
+    return ICE->getSubExpr()->isImplicit();
+  
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 // Support methods for Exprs.
 //===----------------------------------------------------------------------===//

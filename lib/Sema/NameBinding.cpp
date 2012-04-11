@@ -305,21 +305,38 @@ static Expr *BindNameToIVar(UnresolvedDeclRefExpr *UDRE, FuncDecl *CurFD,
   Type ExtendedType = CurFD->getExtensionType();
   if (ExtendedType.isNull()) return 0;
 
+  // For a static method, we perform name lookup in the corresponding metatype.
+  TypeAliasDecl *StaticAlias = 0;
+  if (CurFD->isStatic()) {
+    if (ProtocolType *Proto = ExtendedType->getAs<ProtocolType>())
+      StaticAlias = Proto->TheDecl;
+    else
+      StaticAlias = ExtendedType->castTo<OneOfType>()->getDecl();
+    
+    ExtendedType = MetaTypeType::get(StaticAlias);
+  }
+  
   // Do a full "dot syntax" name lookup with the implicit 'this' base.
   MemberLookup Lookup(ExtendedType, UDRE->getName(), *Binder.TU);
   
-  // On failure, this isn't an ivar or method reference.
+  // On failure, this isn't an member reference.
   if (!Lookup.isSuccess()) return 0;
   
+  // On success, this is a member reference. Build either a reference to the
+  // implicit 'this' VarDecl (for instance methods) or to the metaclass
+  // instance (for static methods).
+  Expr *BaseExpr;
+  if (StaticAlias) {
+    BaseExpr = new (Binder.Context) DeclRefExpr(StaticAlias, SourceLoc(),
+                                      StaticAlias->getTypeOfReference());
+  } else {
+    VarDecl *ThisDecl = CurFD->getImplicitThisDecl();
+    assert(ThisDecl && "Couldn't find decl for 'this'");
+    BaseExpr = new (Binder.Context) DeclRefExpr(ThisDecl, SourceLoc(),
+                                                ThisDecl->getTypeOfReference());
+  }
   
-  // On success, this is a member reference.  Build a VarDecl around the
-  // implicit 'this' VarDecl.
-  VarDecl *ThisDecl = CurFD->getImplicitThisDecl();
-  assert(ThisDecl && "Couldn't find decl for 'this'");
-  Expr *ThisExpr = new (Binder.Context) DeclRefExpr(ThisDecl, SourceLoc(),
-                                                    CurFD->computeThisType());
-
-  return Lookup.createResultAST(ThisExpr, SourceLoc(), UDRE->getLoc(),
+  return Lookup.createResultAST(BaseExpr, SourceLoc(), UDRE->getLoc(),
                                 Binder.Context);
 }
 
@@ -422,8 +439,21 @@ void swift::performNameBinding(TranslationUnit *TU) {
     SmallVector<FuncDecl*, 4> CurFuncDecls;
     
     virtual bool walkToDeclPre(Decl *D) {
-      if (FuncDecl *FD = dyn_cast<FuncDecl>(D))
+      if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
         CurFuncDecls.push_back(FD);
+        
+        // If this is an instance method with a body, set the type of it's
+        // implicit 'this' variable.
+        if (FD->getBody())
+          if (Type ThisTy = FD->computeThisType()) {
+            // References to the 'this' declaration will add back the lvalue
+            // type as appropriate.
+            if (LValueType *LValue = ThisTy->getAs<LValueType>())
+              ThisTy = LValue->getObjectType();
+            
+            FD->getImplicitThisDecl()->setType(ThisTy);
+          }
+      }
       return true;
     }
     

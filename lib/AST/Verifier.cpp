@@ -368,6 +368,11 @@ namespace {
     
     void checkSourceRanges(Expr *E) {
       if (!E->getSourceRange().isValid()) {
+        // We don't care about source ranges on implicitly-generated
+        // expressions.
+        if (E->isImplicit())
+          return;
+        
         Out << "invalid source range for expression: ";
         E->print(Out);
         Out << "\n";

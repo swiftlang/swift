@@ -99,6 +99,10 @@ public:
   Expr *walk(ASTWalker &walker);
   Expr *walk(ASTWalker &&walker) { return walk(walker); }
   
+  /// isImplicit - Determines whether this expression was implicitly-generated,
+  /// rather than explicitly written in the AST.
+  bool isImplicit() const;
+  
   void dump() const;
   void print(raw_ostream &OS, unsigned Indent = 0) const;
 
@@ -1158,8 +1162,12 @@ public:
   Expr *getRHS() { return RHS; }
   void setRHS(Expr *E) { RHS = E; }
 
+  SourceLoc getStartLoc() const {
+    return DotLoc.isValid()? LHS->getStartLoc() : RHS->getStartLoc();
+  }
+  
   SourceRange getSourceRange() const {
-    return SourceRange(LHS->getStartLoc(), RHS->getEndLoc());
+    return SourceRange(getStartLoc(), RHS->getEndLoc());
   }
 
   // Implement isa/cast/dyncast/etc.
