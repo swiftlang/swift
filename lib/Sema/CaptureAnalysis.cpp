@@ -158,8 +158,6 @@ class CaptureAnalysisVisitor : public ASTWalker {
 
     return true;
   }
-public:
-  virtual ~CaptureAnalysisVisitor() {}
 };
 
 } // end anonymous namespace

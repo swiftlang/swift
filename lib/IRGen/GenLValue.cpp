@@ -42,8 +42,6 @@ namespace {
     FixedAddress(OwnedAddress addr)
       : PhysicalPathComponent(sizeof(FixedAddress)), Addr(addr) {}
 
-    virtual ~FixedAddress() {}
-
     OwnedAddress offset(IRGenFunction &IGF, OwnedAddress base) const {
       assert(!base.isValid());
       return Addr;

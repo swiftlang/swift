@@ -159,7 +159,6 @@ namespace {
   struct CallRelease : Cleanup {
     llvm::Value *Value;
     CallRelease(llvm::Value *value) : Value(value) {}
-    virtual ~CallRelease() {}
 
     void emit(IRGenFunction &IGF) const {
       emitReleaseCall(IGF, Value);

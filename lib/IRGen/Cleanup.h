@@ -46,7 +46,6 @@ class Cleanup {
   friend Cleanup &IRGenFunction::initCleanup(Cleanup &, size_t, CleanupState);
 protected:
   Cleanup() {}
-  virtual ~Cleanup() {};
   // The fields are initialized by IRGenFunction::initCleanup.
 
 public:
