@@ -31,13 +31,13 @@ class CleanupOutflows;
 /// cause something to occur when a scope or full-expression is
 /// concluded.
 class Cleanup {
-  size_t AllocatedSize;
+  unsigned AllocatedSize;
   unsigned State : 2;
   unsigned UsedWhileActive : 1;
   unsigned UsedWhileInactive : 1;
   unsigned HasFallthroughOutflow : 1;
   unsigned HasControlFlag : 1;
-  unsigned NextDestLabel;
+  unsigned NextDestLabel : 26;
   llvm::BasicBlock *NormalEntryBB;
   CleanupOutflows *Outflows;
   void *ControlBegin;
