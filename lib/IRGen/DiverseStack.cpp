@@ -40,6 +40,8 @@ void DiverseStackBase::pushNewStorageSlow(std::size_t needed) {
   Begin = End - oldSize;
   std::memcpy(Begin, oldBegin, oldSize);
 
+  Begin -= needed;
+
   if (!wasInline) delete[] oldAllocation;
 }  
 
