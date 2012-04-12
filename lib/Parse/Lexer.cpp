@@ -124,6 +124,10 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr) {
     ++Ptr;
   }
   
+  // UTF-16 surrogate pair values are not valid code points.
+  if (CharValue >= 0xD800 && CharValue <= 0xDFFF)
+    return ~0U;
+  
   // If we got here, we read the appropriate number of accumulated bytes.
   // Verify that the encoding was actually minimal.
   // Number of bits in the value, ignoring leading zeros.
@@ -180,6 +184,13 @@ void Lexer::skipSlashSlashComment() {
     case '\r':
       return;  // If we found the end of the line, return.
     default:
+      // If this is a "high" UTF-8 character, validate it.
+      if ((signed char)(CurPtr[-1]) < 0) {
+        --CurPtr;
+        const char *CharStart = CurPtr;
+        if (validateUTF8CharacterAndAdvance(CurPtr) == ~0U)
+          diagnose(CharStart, diag::lex_invalid_utf8_character);
+      }
       break;   // Otherwise, eat other characters.
     case 0:
       // If this is a random nul character in the middle of a buffer, skip it as
@@ -226,6 +237,14 @@ void Lexer::skipSlashStarComment() {
       }
       break;
     default:
+      // If this is a "high" UTF-8 character, validate it.
+      if ((signed char)(CurPtr[-1]) < 0) {
+        --CurPtr;
+        const char *CharStart = CurPtr;
+        if (validateUTF8CharacterAndAdvance(CurPtr) == ~0U)
+          diagnose(CharStart, diag::lex_invalid_utf8_character);
+      }
+
       break;   // Otherwise, eat other characters.
     case 0:
       // If this is a random nul character in the middle of a buffer, skip it as
