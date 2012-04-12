@@ -55,12 +55,25 @@ TranslationUnit *swift::parseTranslationUnit(unsigned BufferID,
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
+/// SkipShebang - If this is a main module and it starts with a #! line, don't
+/// lex it.
+static StringRef SkipShebang(StringRef File, bool IsMainModule) {
+  if (IsMainModule && File.startswith("#!")) {
+    StringRef::size_type Pos = File.find_first_of("\n\r");
+    if (Pos != StringRef::npos)
+      return File.substr(Pos);
+  }
+  return File;
+}
+
+
 Parser::Parser(unsigned BufferID, swift::Component *Comp, ASTContext &Context,
                bool IsMainModule)
   : SourceMgr(Context.SourceMgr),
     Diags(Context.Diags),
     Buffer(SourceMgr.getMemoryBuffer(BufferID)),
-    L(*new Lexer(Buffer->getBuffer(), SourceMgr, &Diags)),
+    L(*new Lexer(SkipShebang(Buffer->getBuffer(), IsMainModule),
+                 SourceMgr, &Diags)),
     Component(Comp),
     Context(Context),
     ScopeInfo(*this),
