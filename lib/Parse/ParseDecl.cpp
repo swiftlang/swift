@@ -357,8 +357,7 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     Decl *D = Entries[i];
 
     // FIXME: Mark decls erroneous.
-    if ((isa<ImportDecl>(D) || isa<ExtensionDecl>(D)) &&
-        !(Flags & PD_AllowTopLevel))
+    if (isa<ImportDecl>(D) && !(Flags & PD_AllowTopLevel))
       diagnose(D->getLocStart(), diag::decl_inner_scope);
     if (isa<VarDecl>(D) && (Flags & PD_DisallowVar)) {
       diagnose(D->getLocStart(), diag::disallowed_var_decl);
@@ -873,7 +872,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   
   // If there were members, create an 'extension' to hold them.
   if (!MemberDecls.empty())
-    Decls.push_back(actOnDeclExtension(SourceLoc(), OneOfTy, MemberDecls));
+    Decls.push_back(actOnDeclExtension(StructLoc, OneOfTy, MemberDecls));
   return false;
 }
 
