@@ -332,7 +332,7 @@
   
   <pre class="grammar">
     identifier ::= [a-zA-Z_][a-zA-Z_$0-9]*
-    operator ::= [/=-+*%&lt;&gt;!&amp;|^]+
+    <a name="operator">operator</a> ::= [/=-+*%&lt;&gt;!&amp;|^]+
     any-identifier ::= identifier | operator
   </pre>
   
@@ -895,7 +895,7 @@
 
   <p>The infix attributes may only be applied to the declaration of a
   function of binary operator type whose name is an
-  <a href="#identifier"><tt>operator</tt></a>.  The name indicates the
+  <a href="#operator"><tt>operator</tt></a>.  The name indicates the
   associativity of the operator, either left associative, right associative, or
   non-associative.</p>
   
@@ -1479,7 +1479,7 @@
   </div>
   
   <pre class="grammar">
-    expr-binary ::= operator <a href="#expr-unary">expr-unary</a>
+    expr-binary ::= <a href="#operator">operator</a> <a href="#expr-unary">expr-unary</a>
   </pre>
 
   <p>Infix binary expressions are not formed during parsing.  Instead,
@@ -1504,7 +1504,7 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    expr-unary   ::= operator* <a href="#expr">expr-postfix</a>
+    expr-unary   ::= <a href="#operator">operator</a>* <a href="#expr">expr-postfix</a>
   </pre>
     
   <p>If an operator is used as a unary operator, but name resolution
