@@ -137,9 +137,7 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr) {
     return EncodedBytes == 2 ? CharValue : ~0U;
   if (NumBits <= 4+6+6)
     return EncodedBytes == 3 ? CharValue : ~0U;
-  if (NumBits <= 3+6+6+6)
-    return EncodedBytes == 4 ? CharValue : ~0U;
-  return EncodedBytes == 5 ? CharValue : ~0U;
+  return EncodedBytes == 4 ? CharValue : ~0U;
 }
 
 
