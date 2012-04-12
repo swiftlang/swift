@@ -138,6 +138,36 @@ ERROR(expected_rparen_var_name,decl_parsing,none,
 ERROR(invalid_index_in_var_name_path,decl_parsing,none,
       "%0 is an invalid index for %1", (Identifier, Type))
       
+// Variable getters/setters
+ERROR(getset_missing_type,decl_parsing,none,
+      "variable with getter/setter must have an explicit type", ())
+ERROR(getset_nontrivial_pattern,decl_parsing,none,
+      "getter/setter can only be defined for a single variable", ())
+ERROR(expected_rbrace_in_getset,decl_parsing,none,
+      "expected '}' at end of variable get/set clause", ())
+ERROR(duplicate_getset,decl_parsing,none,
+      "duplicate definition of %select{getter|setter}0 for %1", 
+      (bool, Identifier))
+NOTE(previous_getset,decl_parsing,none,
+     "previous definition of %select{getter|setter}0 is here", (bool))
+ERROR(expected_lbrace_get,decl_parsing,none,
+      "expected '{' to start getter definition", ())
+ERROR(expected_getset,decl_parsing,none,
+      "expected 'get' or 'set' to define variable access",())
+ERROR(expected_setname,decl_parsing,none,
+      "expected the name of the setter value",())
+ERROR(empty_parens_getsetname,decl_parsing,none,
+      "empty parameter list is unnecessary for %select{getter|setter}0",
+      (bool))
+ERROR(expected_rparen_setname,decl_parsing,none,
+      "expected ')' after setter value name",())
+ERROR(expected_lbrace_set,decl_parsing,none,
+      "expected '{' to start setter definition", ())
+ERROR(var_set_without_get,decl_parsing,none,
+      "variable with a setter must also have a getter", ())
+ERROR(getset_init,decl_parsing,none,
+      "variable with getter/setter cannot have an initializer", ())
+
 // Import
 ERROR(decl_expected_module_name,decl_parsing,none,
       "expected module name in import declaration", ())

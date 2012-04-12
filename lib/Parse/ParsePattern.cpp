@@ -147,9 +147,17 @@ bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &params,
   // Now build up the function type.  We require all function
   // signatures to be fully-typed: that is, all top-down paths to a
   // leaf pattern must pass through a TypedPattern.
+  return buildFunctionSignature(params, type);
+}
+
+bool Parser::buildFunctionSignature(SmallVectorImpl<Pattern*> &params,
+                                    Type &type) {
+  // Now build up the function type.  We require all function
+  // signatures to be fully-typed: that is, all top-down paths to a
+  // leaf pattern must pass through a TypedPattern.
   for (unsigned i = params.size(); i != 0; --i) {
     Pattern *param = params[i - 1];
-
+    
     Type paramType;
     if (checkFullyTyped(*this, param)) {
       // Recover by ignoring everything.
@@ -159,9 +167,10 @@ bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &params,
     }
     type = FunctionType::get(paramType, type, Context);
   }
-
-  return false;
+  
+  return false;  
 }
+
 
 /// Parse a pattern.
 ///   pattern ::= pattern-atom

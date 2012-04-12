@@ -40,6 +40,10 @@ namespace swift {
 class Parser {
   Parser(const Parser&) = delete;
   void operator=(const Parser&) = delete;
+  
+  Identifier GetIdent;
+  Identifier SetIdent;
+  
 public:
   llvm::SourceMgr &SourceMgr;
   DiagnosticEngine &Diags;
@@ -210,9 +214,12 @@ public:
   bool parseDeclOneOf(SmallVectorImpl<Decl*> &Decls);
 
   bool parseDeclStruct(SmallVectorImpl<Decl*> &Decls);
-  bool parseDeclVar(SmallVectorImpl<Decl*> &Decls);
+  bool parseDeclVar(bool hasContainerType, SmallVectorImpl<Decl*> &Decls);
+  void parseDeclVarGetSet(Pattern &pattern, bool hasContainerType);
+  
   VarDecl *parseDeclVarSimple();
-  FuncDecl *parseDeclFunc(bool hasThis = false);
+  Pattern *buildImplicitThisParameter();
+  FuncDecl *parseDeclFunc(bool hasContainerType = false);
   Decl *parseDeclProtocol();
   bool parseProtocolBody(SourceLoc ProtocolLoc, const DeclAttributes &Attrs,
                          TypeAliasDecl *TypeName = 0);
@@ -243,6 +250,7 @@ public:
   // Pattern Parsing
 
   bool parseFunctionSignature(SmallVectorImpl<Pattern*> &params, Type &type);
+  bool buildFunctionSignature(SmallVectorImpl<Pattern*> &params, Type &type);
   NullablePtr<Pattern> parsePattern();
   NullablePtr<Pattern> parsePatternTuple();
   NullablePtr<Pattern> parsePatternAtom();

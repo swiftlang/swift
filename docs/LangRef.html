@@ -367,7 +367,7 @@
     decl ::= <a href="#decl-struct">decl-struct</a>
     decl ::= <a href="#decl-typealias">decl-typealias</a>
     decl ::= <a href="#decl-var">decl-var</a>    
-  </pre>
+ </pre>
 
 
   <!-- ===================================================================== -->
@@ -454,10 +454,21 @@
   
   <pre id="value-specifier" class="grammar">
     decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#pattern">pattern</a> initializer?
-    decl-var-simple ::= 'var' identifier ':' type-annotation
-    
-    initializer ::= '=' <a href="#expr">expr</a>
-  </pre>
+    decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a> '{' var-get-set '}'
+  
+    decl-var-simple ::= 'var' <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a>
+
+    initializer     ::= '=' <a href="#expr">expr</a>
+
+    var-get-set     ::= var-get var-set?
+    var-get-set     ::= var-set var-get
+
+    var-get         ::= 'get' <a href="#stmt-brace">stmt-brace</a>
+
+    var-set         ::= 'set' var-set-name? <a href="#stmt-brace">stmt-brace</a>
+
+    var-set-name    ::= '(' <a href="#identifier">identifier</a> ')'
+</pre>
   
 
   <p>'var' declarations form the backbone of value declarations in Swift.
@@ -471,6 +482,18 @@
      the pattern must be fully-typed, and the values are
      default-initialized.</p>
 
+  <p>A var declaration may contain a getter and (optionally) a setter,
+which will be used when reading or writing the variable, respectively.
+Such a variable does not have any associated storage. A var
+declaration with a getter or setter must have a type (call it
+<code>T</code>). The getter function, whose body is provided as part
+of the <code>var-get</code> clause, has type <code>() -> T</code>.
+Similarly, the setter function, whose body is part of the
+<code>var-set</code> clause (if provided), has type <code>(T)
+-> ()</code>. If the <code>var-set</code> clause contains a <code>var-set-name</code>
+clause, the identifier of that clause is used as the name of the
+parameter to the setter. Otherwise, the parameter name is "value".</p>
+
   <p>FIXME: Should the type of a pattern which isn't fully typed affect the
      type-checking of the expression (i.e. should we compute a structured
      dependent type)?</p>
@@ -479,7 +502,9 @@
     href="#attribute-list">attributes</a> applied to them.</p>
 
   <p>The type of a variable must be
-    <a href="#materializable"><i>materializable</i></a>.</p>
+    <a href="#materializable"><i>materializable</i></a>. A variable is
+an lvalue unless it has a <code>var-get</code> clause but not
+<code>var-set</code> clause. </p>
   
   <p>Here are some examples of var declarations:</p>
   
@@ -492,8 +517,26 @@
     <i>// This decodes the tuple return value into independently named parts</i>
     <i>// and both 'val' and 'err' are in scope after this line.</i>
     var (val, err) = foo()
+
+    <i>// Variable getter/setter</i>
+    var _x : int = 0
+    var x_modify_count : int = 0
+    var x {
+      get { return _x }
+      set {
+        x_modify_count = x_modify_count + 1
+        _x = value
+      }
+    }
   </pre>
 
+  <p>Note that both 'get' and 'set' are context-sensitive keywords,
+which means that at both global and local scope, there is a syntactic
+ambiguity between a variable with a <code>var-get-set</code> clause
+and a variable followed by a <code><a
+ href="#stmt-brace">stmt-brace</a></code>. This ambiguity is resolved
+in favor of a variable with a <code>var-get-set</code> clause if the
+token following the opening '{' is either 'set' or 'get'.</p>
     
   <!-- ===================================================================== -->
   <h3 id="decl-func">func Declarations</h3>
@@ -609,7 +652,7 @@
     // Dot syntax on metatype.
     bankaccount.someMetaTypeMethod()
   </pre>
-  
+
   <!-- ===================================================================== -->
   <h3 id="decl-typealias">typealias Declarations</h3>
   <!-- ===================================================================== -->
