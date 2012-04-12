@@ -358,10 +358,77 @@ static bool EncodeToUTF8(unsigned CharValue,
   
   // Emit all of the trailing bytes.
   while (NumTrailingBytes--)
-    Result.push_back(char(0x80 | (0x7F & (CharValue >> (NumTrailingBytes*6)))));
+    Result.push_back(char(0x80 | (0x3F & (CharValue >> (NumTrailingBytes*6)))));
   return false;
 }
 
+
+/// CLO8 - Return the number of leading ones in the specified 8-bit value.
+static unsigned CLO8(unsigned char C) {
+  return llvm::CountLeadingOnes_32(uint32_t(C) << 24);
+}
+
+/// isStartOfUTF8Character - Return true if this isn't a UTF8 continuation
+/// character, which will be of the form 0b10XXXXXX
+static bool isStartOfUTF8Character(unsigned char C) {
+  return (signed char)C >= 0 || C >= 0xC0;  // C0 = 0b11000000
+}
+
+/// validateUTF8CharacterAndAdvance - Given a pointer to the starting byte of a
+/// UTF8 character, validate it and advance the lexer past it.  This returns the
+/// encoded character or ~0U if the encoding is invalid.
+static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr) {
+  assert((signed char)(*Ptr) < 0 && "Not the start of an encoded letter");
+  
+  unsigned char CurByte = *Ptr++;
+  
+  // Read the number of high bits set, which indicates the number of bytes in
+  // the character.
+  unsigned EncodedBytes = CLO8(CurByte);
+  
+  // If this is 0b10XXXXXX, then it is a continuation character.
+  if (EncodedBytes == 1 ||
+      // If the number of encoded bytes is > 4, then this is an invalid
+      // character in the range of 0xF5 and above.  These would start an
+      // encoding for something that couldn't be represented with UTF16
+      // digraphs, so Unicode rejects them.
+      EncodedBytes > 4) {
+    // Skip until we get the start of another character.  This is guaranteed to
+    // at least stop at the nul at the end of the buffer.
+    while (!isStartOfUTF8Character(*Ptr))
+      ++Ptr;
+    return ~0U;
+  }
+  
+  // Drop the high bits indicating the # bytes of the result.
+  unsigned CharValue = (unsigned char)(CurByte << EncodedBytes) >> EncodedBytes;
+  
+  // Read and validate the continuation bytes.
+  for (unsigned i = 1; i != EncodedBytes; ++i) {
+    CurByte = *Ptr;
+    // If the high bit isn't set or the second bit isn't clear, then this is not
+    // a continuation byte!
+    if (CurByte < 0x80 || CurByte >= 0xC0) return ~0U;
+    
+    // Accumulate our result.
+    CharValue <<= 6;
+    CharValue |= CurByte & 0x3F;
+    ++Ptr;
+  }
+  
+  // If we got here, we read the appropriate number of accumulated bytes.
+  // Verify that the encoding was actually minimal.
+  // Number of bits in the value, ignoring leading zeros.
+  unsigned NumBits = 32-llvm::CountLeadingZeros_32(CharValue);
+  
+  if (NumBits <= 5+6)
+    return EncodedBytes == 2 ? CharValue : ~0U;
+  if (NumBits <= 4+6+6)
+    return EncodedBytes == 3 ? CharValue : ~0U;
+  if (NumBits <= 3+6+6+6)
+    return EncodedBytes == 4 ? CharValue : ~0U;
+  return EncodedBytes == 5 ? CharValue : ~0U;
+}
 
 /// lexStringLiteral:
 ///   string_literal ::= ["]([^"\\\n\r]|string_escape)*["]
@@ -382,6 +449,12 @@ void Lexer::lexStringLiteral() {
     const char *CharStart = CurPtr;
     switch (*CurPtr++) {
     default: // Normal characters are part of the string.
+      // If this is a "high" UTF-8 character, validate it.
+      if ((signed char)(CurPtr[-1]) < 0) {
+        --CurPtr;
+        if (validateUTF8CharacterAndAdvance(CurPtr) == ~0U)
+          diagnose(CharStart, diag::lex_invalid_utf8_character);
+      }
       continue;
     // If we found the closing " character, we're done.
     case '"':
