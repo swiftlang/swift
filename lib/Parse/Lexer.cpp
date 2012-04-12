@@ -282,6 +282,8 @@ bool Lexer::isIdentifier(llvm::StringRef string) {
 }
 
 /// lexIdentifier - Match [a-zA-Z_][a-zA-Z_$0-9]*
+///
+/// FIXME: We should also allow unicode characters in identifiers.
 void Lexer::lexIdentifier() {
   const char *TokStart = CurPtr-1;
   assert(isValidStartOfIdentifier(*TokStart) && "Unexpected start");
