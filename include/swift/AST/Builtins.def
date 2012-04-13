@@ -19,14 +19,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Unary operations have type T -> T.
-#ifndef BUILTIN_UNARY_OPERATION
-#define BUILTIN_UNARY_OPERATION(Id, Name, Overload) BUILTIN(Id, Name)
-#endif
-BUILTIN_UNARY_OPERATION(Neg,      "neg",      OverloadedBuiltinKind::Arithmetic)
-BUILTIN_UNARY_OPERATION(Not,      "not",      OverloadedBuiltinKind::Integer)
-#undef BUILTIN_UNARY_OPERATION
-
 /// Binary operations have type (T,T) -> T.
 #ifndef BUILTIN_BINARY_OPERATION
 #define BUILTIN_BINARY_OPERATION(Id, Name, Overload) BUILTIN(Id, Name)

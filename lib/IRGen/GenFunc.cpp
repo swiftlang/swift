@@ -562,14 +562,6 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
   switch (isBuiltinValue(IGF.IGM.Context, Fn->getName().str(), BuiltinType)) {
   case BuiltinValueKind::None: llvm_unreachable("not a builtin after all!");
 
-/// A macro which expands to the emission of a simple unary operation
-/// or predicate.
-#define UNARY_OPERATION(Op) {                                               \
-    llvm::Value *op = args.Values.claimUnmanagedNext();                     \
-    assert(args.Values.empty() && "wrong operands to unary operation");     \
-    return result.addDirectUnmanagedValue(IGF.Builder.Create##Op(op));      \
-  }
-
 /// A macro which expands to the emission of a simple binary operation
 /// or predicate.
 #define BINARY_OPERATION(Op) {                                              \
@@ -594,8 +586,6 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
     }                                                                       \
   }
 
-  case BuiltinValueKind::Neg:       UNARY_OPERATION(Neg)
-  case BuiltinValueKind::Not:       UNARY_OPERATION(Not)
   case BuiltinValueKind::Add:       BINARY_ARITHMETIC_OPERATION(Add, FAdd)
   case BuiltinValueKind::And:       BINARY_OPERATION(And)
   case BuiltinValueKind::FDiv:      BINARY_OPERATION(FDiv)
