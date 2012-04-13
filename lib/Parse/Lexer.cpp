@@ -731,6 +731,7 @@ Restart:
   case '&':
   case '|':
   case '^':
+  case '~':
     return lexOperatorIdentifier();
 
   case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G':
