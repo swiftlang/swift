@@ -1119,6 +1119,10 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
   assert(!DestTy->isDependentType() &&
          "Result of conversion can't be dependent");
 
+  // Don't bother trying to perform a conversion to error type.
+  if (DestTy->is<ErrorType>())
+    return nullptr;
+  
   // If the destination is a AutoClosing FunctionType, we have special rules.
   if (FunctionType *FT = DestTy->getAs<FunctionType>())
     if (FT->isAutoClosure()) {

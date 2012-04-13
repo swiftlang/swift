@@ -292,7 +292,42 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return WS;
   }
 
-     
+  bool visitPatternVarGetSet(Pattern *P) {
+    switch (P->getKind()) {
+    case PatternKind::Paren:
+      return visitPatternVarGetSet(cast<ParenPattern>(P)->getSubPattern());
+
+    case PatternKind::Tuple:
+      for (auto &Elt : cast<TuplePattern>(P)->getFields())
+        if (visitPatternVarGetSet(Elt.getPattern()))
+          return true;
+      return false;
+        
+    case PatternKind::Named:
+      if (VarDecl *Var = cast<NamedPattern>(P)->getDecl()) {
+        if (!Var->isProperty())
+          return false;
+        
+        if (FuncDecl *Get = Var->getGetter()) {
+          if (doIt(Get))
+            return true;
+        }
+        
+        if (FuncDecl *Set = Var->getSetter()) {
+          if (doIt(Set))
+            return true;
+        }
+      }
+      return false;
+
+    case PatternKind::Any:
+      return false;
+        
+    case PatternKind::Typed:
+      return visitPatternVarGetSet(cast<TypedPattern>(P)->getSubPattern());
+    }
+  }
+  
 public:
   Traversal(ASTWalker &walker) : Walker(walker) {}
 
@@ -334,6 +369,9 @@ public:
       return false;
 
     if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D)) {
+      if (visitPatternVarGetSet(PBD->getPattern()))
+        return true;
+      
       if (Expr *Init = PBD->getInit()) {
 #ifndef NDEBUG
         PrettyStackTraceDecl debugStack("walking into initializer for", PBD);

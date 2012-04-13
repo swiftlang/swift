@@ -582,14 +582,30 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool hasContainerType) {
       
       // Set up a function declaration for the getter and parse its body.
       
-      // Getter has type: () -> T
-      Type FuncTy = FunctionType::get(TupleType::getEmpty(Context), Ty,
-                                      Context);
+      // Create the parameter list(s) for the getter.
+      llvm::SmallVector<Pattern *, 2> Params;
+      
+      // Add the implicit 'this' to Params, if needed.
+      if (hasContainerType)
+        Params.push_back(buildImplicitThisParameter());
+      
+      // Add a no-parameters clause.
+      Params.push_back(TuplePattern::create(Context, SourceLoc(),
+                                            ArrayRef<TuplePatternElt>(),
+                                            SourceLoc()));
+      
+      // Getter has type: () -> T.
+      Type FuncTy = Ty;
+      if (buildFunctionSignature(Params, FuncTy)) {
+        skipUntilDeclRBrace();
+        Invalid = true;
+        break;
+      }
+
       Scope FnBodyScope(this);
 
       // Start the function.
-      FuncExpr *GetFn = actOnFuncExprStart(GetLoc, FuncTy,
-                                           ArrayRef<Pattern *>());
+      FuncExpr *GetFn = actOnFuncExprStart(GetLoc, FuncTy, Params);
       
       // Establish the new context.
       ContextChange CC(*this, GetFn);
