@@ -485,16 +485,15 @@
 </pre>
   
 
-  <p>'var' declarations form the backbone of value declarations in Swift.
-     A var declaration takes a pattern and an optional initializer, and
-     declares all the pattern-identifiers in the pattern as variables.
-     If there is an initializer and the pattern is fully-typed, the
-     initializer is converted to the type of the pattern.  If there is an
-     initializer and the pattern is not fully-typed, the type of initializer
-     is computed independently of the pattern, and the type of the pattern is
-     derived from the initializer. If no initializer is specified,
-     the pattern must be fully-typed, and the values are
-     default-initialized.</p>
+  <p>'var' declarations form the backbone of value declarations in Swift. A var
+  declaration takes a pattern and an optional initializer, and declares all the
+  pattern-identifiers in the pattern as variables. If there is an initializer
+  and the pattern is <a href="#fully_typed_types">fully-typed</a>, the
+  initializer is converted to the type of the pattern. If there is an
+  initializer and the pattern is not fully-typed, the type of initializer is
+  computed independently of the pattern, and the type of the pattern is derived
+  from the initializer. If no initializer is specified, the pattern must be
+  fully-typed, and the values are default-initialized.</p>
 
   <p>A var declaration may contain a getter and (optionally) a setter,
 which will be used when reading or writing the variable, respectively.
@@ -606,9 +605,9 @@ token following the opening '{' is either 'set' or 'get'.</p>
     all the variables bound by all of the parameter patterns are in
     scope, and the function must return a value of the result type.</p>
 
-  <p>An outermost pattern in a function signature must be fully-typed
-    and irrefutable.  If a result type is given, it must also be
-    fully-typed.</p>
+  <p>An outermost pattern in a function signature must be <a
+  href="#fully_typed_types">fully-typed</a> and irrefutable. If a result type is
+  given, it must also be fully-typed.</p>
 
   <p>The type of a function with signature <tt>(P<sub>0</sub>)(P<sub>1</sub>)..(P<sub><i>n</i></sub>) -&gt; R</tt>
     is <tt>T<sub>0</sub> -&gt; T<sub>1</sub> -&gt; .. -&gt; T<sub><i>n</i></sub> -&gt; R</tt>,
@@ -1085,16 +1084,21 @@ token following the opening '{' is either 'set' or 'get'.</p>
   </pre>
 
   <!-- _____________________________________________________________________ -->
-  <h4>Full-Typed Types</h4>
+  <h4 id="fully_typed_types">Fully-Typed Types</h4>
 
-  <p>A type may be <i>fully-typed</i>.  A type is fully-typed unless
-    it is 1) a function type whose result or input type is not
-    fully-typed or 2) a tuple type with an element that is not
-    fully-typed.  A tuple element is fully-typed unless it has no
-    explicit type (which is permitted for defaultable elements) or its
-    explicit type is not fully-typed.  In other words, a type is
-    fully-typed unless it syntactically contains a tuple element with
-    no explicit type annotation.</p>
+  <p>A type may be <i>fully-typed</i>.  A type is fully-typed <i>unless</i> one
+    of the following conditions hold:</p>
+    
+  <ol>
+    <li>It is a function type whose result or input type is not
+        fully-typed.</li>
+    <li>It is a tuple type with an element that is not
+        fully-typed.  A tuple element is fully-typed unless it has no
+        explicit type (which is permitted for defaultable elements) or its
+        explicit type is not fully-typed.  In other words, a type is
+        fully-typed unless it syntactically contains a tuple element with
+        no explicit type annotation.</li>
+  </ol>
   
   <p>A type being 'fully-typed' informally means that the type is specified
      directly from its type annotation without needing contextual or other
