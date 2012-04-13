@@ -754,9 +754,9 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool hasContainerType) {
     Invalid = true;
   }
 
-  if (!Invalid && PrimaryVar && (Set || Get)) {
-    // FIXME: Attach the getter/setter to the AST.
-  }
+  // If things went well, turn this variable into a property.
+  if (!Invalid && PrimaryVar && (Set || Get))
+    PrimaryVar->setProperty(Context, LBLoc, Get, Set, RBLoc);
 }
 
 /// parseDeclVar - Parse a 'var' declaration, returning null (and doing no

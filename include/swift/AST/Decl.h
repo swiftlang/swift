@@ -29,6 +29,7 @@ namespace swift {
   class ASTContext;
   class Type;
   class Expr;
+  class FuncDecl;
   class FuncExpr;
   class BraceStmt;
   class Component;
@@ -416,17 +417,40 @@ class VarDecl : public ValueDecl {
 private:
   SourceLoc VarLoc;    // Location of the 'var' token.
   
+  struct GetSetRecord {
+    SourceRange Braces;
+    FuncDecl *Get;       // User-defined getter
+    FuncDecl *Set;       // User-defined setter
+  };
+  
+  GetSetRecord *GetSet;
+  
 public:
   VarDecl(SourceLoc VarLoc, Identifier Name, Type Ty, DeclContext *DC,
           bool IsModuleScope)
     : ValueDecl(DeclKind::Var, DC, IsModuleScope, Name, Ty),
-       VarLoc(VarLoc) {}
+      VarLoc(VarLoc), GetSet() {}
 
   /// getVarLoc - The location of the 'var' token.
   SourceLoc getVarLoc() const { return VarLoc; }
   
   SourceLoc getLocStart() const { return VarLoc; }
+
+  /// \brief Determine whether this variable is actually a property, which
+  /// has no storage but does have a user-defined getter or setter.
+  bool isProperty() const { return GetSet != nullptr; }
   
+  /// \brief Make this variable into a property, providing a getter and
+  /// setter.
+  void setProperty(ASTContext &Context, SourceLoc LBraceLoc, FuncDecl *Get,
+                   FuncDecl *Set, SourceLoc RBraceLoc);
+
+  /// \brief Retrieve the getter used to access the value of this variable.
+  FuncDecl *getGetter() const { return GetSet? GetSet->Get : nullptr; }
+
+  /// \brief Retrieve the setter used to mutate the value of this variable.
+  FuncDecl *getSetter() const { return GetSet? GetSet->Set : nullptr; }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Var; }
   static bool classof(const VarDecl *D) { return true; }

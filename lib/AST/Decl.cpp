@@ -16,6 +16,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
@@ -135,6 +136,15 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
   setType(MetaTypeType::get(this));
 }
 
+void VarDecl::setProperty(ASTContext &Context, SourceLoc LBraceLoc,
+                          FuncDecl *Get, FuncDecl *Set, SourceLoc RBraceLoc) {
+  assert(!GetSet && "Variable is already a property?");
+  void *Mem = Context.Allocate(sizeof(GetSetRecord), alignof(GetSetRecord));
+  GetSet = new (Mem) GetSetRecord;
+  GetSet->Braces = SourceRange(LBraceLoc, RBraceLoc);
+  GetSet->Get = Get;
+  GetSet->Set = Set;
+}
 
 /// getExtensionType - If this is a method in a type extension for some type,
 /// return that type, otherwise return Type().
@@ -291,6 +301,20 @@ namespace {
     
     void visitVarDecl(VarDecl *VD) {
       printCommon(VD, "var_decl");
+      if (VD->isProperty()) {
+        if (FuncDecl *Get = VD->getGetter()) {
+          OS << "\n";
+          OS.indent(Indent + 2);
+          OS << "get = ";
+          printRec(Get);
+        }
+        if (FuncDecl *Set = VD->getSetter()) {
+          OS << "\n";
+          OS.indent(Indent + 2);
+          OS << "set = ";
+          printRec(Set);
+        }
+      }
       OS << ')';
     }
     
