@@ -1966,6 +1966,18 @@ token following the opening '{' is either 'set' or 'get'.</p>
   <h3 id="stmt-assign">Assignment Statement</h3>
   <!-- ===================================================================== -->
   
+  <div class="commentary">
+    The requirement that '=' can only be used as a statement means that the
+    following is inherently illegal:
+    
+    <pre>  if (x = 1)</pre>
+    
+    It also implies that nested assignments are also illegal:
+    
+    <pre>  x = y = z</pre>
+    
+  </div>
+  
   <pre class="grammar">
     stmt-assign ::= <a href="#expr">expr</a> '=' <a href="#expr">expr</a>
   </pre>
