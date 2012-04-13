@@ -69,19 +69,9 @@ TranslationUnit *Parser::parseTranslationUnit() {
   // First thing, we transform the body into a brace expression.
   TU->Body = BraceStmt::create(Context, FileStartLoc, Items, FileEnd);
   
-  // Turn our little catalog of unresolved types and identifier types into a
-  // list on the TranslationUnit, so NameBinding can bind them.
-  SmallVector<TypeAliasDecl*, 8> UnresolvedTypeList;
-  for (TypeAliasDecl *Decl : UnresolvedTypeNames) {
-    if (!Decl->hasUnderlyingType())
-      UnresolvedTypeList.push_back(Decl);
-  }
-  
-  TU->setUnresolvedTypes(Context.AllocateCopy(UnresolvedTypeList));
   TU->setUnresolvedIdentifierTypes(
           Context.AllocateCopy(llvm::makeArrayRef(UnresolvedIdentifierTypes)));
 
-  UnresolvedTypeNames.clear();
   UnresolvedIdentifierTypes.clear();
 
   // Note that the translation unit is fully parsed and verify it.

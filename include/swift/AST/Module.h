@@ -147,10 +147,6 @@ class TranslationUnit : public Module {
 public:
   typedef std::pair<Module::AccessPathTy, Module*> ImportedModule;
 private:
-  /// UnresolvedTypes - This is a list of types that were unresolved at the end
-  /// of the translation unit's parse phase.
-  ArrayRef<TypeAliasDecl*> UnresolvedTypes;
-  
   /// UnresolvedIdentifierTypes - This is a list of scope-qualified dotted types
   /// that were unresolved at the end of the translation unit's parse
   /// phase.
@@ -169,15 +165,6 @@ public:
   TranslationUnit(Identifier Name, Component *Comp, ASTContext &C,
                   bool IsMainModule)
     : Module(DeclContextKind::TranslationUnit, Name, Comp, C, IsMainModule) {
-  }
-
-  ArrayRef<TypeAliasDecl*> getUnresolvedTypes() const {
-    assert(ASTStage == Parsed);
-    return UnresolvedTypes;
-  }
-  void setUnresolvedTypes(ArrayRef<TypeAliasDecl*> UT) {
-    assert(ASTStage == Parsing);
-    UnresolvedTypes = UT;
   }
   
   /// getUnresolvedIdentifierTypes - This is a list of scope-qualified types

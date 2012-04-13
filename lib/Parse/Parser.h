@@ -53,7 +53,6 @@ public:
   swift::Component *Component;
   ASTContext &Context;
   ScopeInfo ScopeInfo;
-  std::vector<TypeAliasDecl*> UnresolvedTypeNames;
   std::vector<IdentifierType*> UnresolvedIdentifierTypes;
   std::vector<llvm::SetVector<ValueDecl*>> ValCaptures;
   std::vector<std::vector<VarDecl*>> AnonClosureVars;

@@ -401,25 +401,6 @@ void swift::performNameBinding(TranslationUnit *TU) {
   Binder.addStandardLibraryImport(ImportedModules);
 
   TU->setImportedModules(TU->Ctx.AllocateCopy(ImportedModules));
-  
-  // Type binding.  Loop over all of the unresolved types in the translation
-  // unit, resolving them with imports.
-  for (TypeAliasDecl *TA : TU->getUnresolvedTypes()) {
-    if (TypeAliasDecl *Result =
-          Binder.TU->lookupGlobalType(TA->getName(),
-                                      NLKind::UnqualifiedLookup)) {
-      assert(!TA->hasUnderlyingType() && "Not an unresolved type");
-      // Update the decl we already have to be the correct type.
-      TA->setTypeAliasLoc(Result->getTypeAliasLoc());
-      TA->setUnderlyingType(Result->getUnderlyingType());
-      continue;
-    }
-    
-    Binder.diagnose(TA->getLocStart(), diag::use_undeclared_type,
-                    TA->getName());
-    
-    TA->setUnderlyingType(TU->Ctx.TheErrorType);
-  }
 
   // Loop over all the unresolved dotted types in the translation unit,
   // resolving them if possible.
