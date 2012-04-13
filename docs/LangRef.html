@@ -521,7 +521,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
     <i>// Variable getter/setter</i>
     var _x : int = 0
     var x_modify_count : int = 0
-    var x {
+    var x : int {
       get { return _x }
       set {
         x_modify_count = x_modify_count + 1
