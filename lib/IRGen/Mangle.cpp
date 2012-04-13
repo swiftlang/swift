@@ -46,6 +46,7 @@ static char mangleOperatorChar(char op) {
   case '%': return 'r'; // 'remainder'
   case '-': return 's'; // 'subtract'
   case '^': return 'x'; // 'xor'
+  case '~': return 't'; // 'tilde'
   default: llvm_unreachable("bad identifier character");
   }
 }
