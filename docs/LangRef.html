@@ -332,11 +332,16 @@
 
   <div class="commentary">
     FIXME: We need to support unicode identifiers.
+    
+    <br><br><b>[1]</b> The '=' token is explicitly handled in the grammar elsewhere,
+    and in general users cannot provide custom definitions for the '=' operator.
   </div>
 
   <pre class="grammar">
     identifier ::= [a-zA-Z_][a-zA-Z_$0-9]*
-    <a name="operator">operator</a> ::= [/=-+*%&lt;&gt;!&amp;|^~]+
+    
+    <a name="operator">operator</a> ::= [/=-+*%&lt;&gt;!&amp;|^~]+  (excluding '=', see <b>[1]</b>)
+
     any-identifier ::= identifier | operator
   </pre>
   
