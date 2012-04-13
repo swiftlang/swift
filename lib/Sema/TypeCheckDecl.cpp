@@ -121,6 +121,12 @@ public:
   void visitVarDecl(VarDecl *VD) {
     // Delay type-checking on VarDecls until we see the corresponding
     // PatternBindingDecl.
+    if (VD->isProperty()) {
+      if (FuncDecl *Get = VD->getGetter())
+        visitFuncDecl(Get);
+      if (FuncDecl *Set = VD->getSetter())
+        visitFuncDecl(Set);
+    }
   }
 
   void visitFuncDecl(FuncDecl *FD) {
