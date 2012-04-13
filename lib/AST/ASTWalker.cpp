@@ -369,8 +369,10 @@ public:
       return false;
 
     if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D)) {
+#if 0
       if (visitPatternVarGetSet(PBD->getPattern()))
         return true;
+#endif
       
       if (Expr *Init = PBD->getInit()) {
 #ifndef NDEBUG

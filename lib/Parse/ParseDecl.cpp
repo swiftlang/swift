@@ -483,6 +483,13 @@ static void addVarsToScope(Parser &P, Pattern *Pat,
     if (Attributes.isValid())
       VD->getMutableAttrs() = Attributes;
 
+    if (VD->isProperty()) {
+      if (FuncDecl *Get = VD->getGetter())
+        Decls.push_back(Get);
+      if (FuncDecl *Set = VD->getSetter())
+        Decls.push_back(Set);
+    }
+    
     Decls.push_back(VD);
     P.ScopeInfo.addToScope(VD);
     return;

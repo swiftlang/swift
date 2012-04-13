@@ -146,16 +146,6 @@ void VarDecl::setProperty(ASTContext &Context, SourceLoc LBraceLoc,
   GetSet->Set = Set;
 }
 
-void VarDecl::updateDeclContextForGetSet() {
-  if (!GetSet)
-    return;
-  
-  if (GetSet->Get)
-    GetSet->Get->setDeclContext(getDeclContext());
-  if (GetSet->Set)
-    GetSet->Set->setDeclContext(getDeclContext());
-}
-
 /// getExtensionType - If this is a method in a type extension for some type,
 /// return that type, otherwise return Type().
 Type FuncDecl::getExtensionType() const {
@@ -221,37 +211,6 @@ VarDecl *FuncDecl::getImplicitThisDecl() {
     return NP->getDecl();
   return 0;
 }
-
-static void updateDeclContextForVarsInPattern(Pattern *P, DeclContext *DC) {
-  switch (P->getKind()) {
-    case PatternKind::Any:
-      break;
-      
-    case PatternKind::Named:
-      cast<NamedPattern>(P)->getDecl()->setDeclContext(DC);
-      break;
-      
-    case PatternKind::Paren:
-      updateDeclContextForVarsInPattern(cast<ParenPattern>(P)->getSubPattern(),
-                                        DC);
-      break;
-
-    case PatternKind::Tuple:
-      for (auto &Elt : cast<TuplePattern>(P)->getFields())
-        updateDeclContextForVarsInPattern(Elt.getPattern(), DC);
-      break;
-      
-    case PatternKind::Typed:
-      updateDeclContextForVarsInPattern(cast<TypedPattern>(P)->getSubPattern(),
-                                        DC);
-      break;
-  }
-}
-  
-void PatternBindingDecl::updateDeclContextForVars() {
-  updateDeclContextForVarsInPattern(Pat, getDeclContext());
-}
-
 
 //===----------------------------------------------------------------------===//
 //  Decl printing.

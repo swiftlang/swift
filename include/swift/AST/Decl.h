@@ -104,7 +104,7 @@ public:
   DeclKind getKind() const { return DeclKind(DeclBits.Kind); }
 
   DeclContext *getDeclContext() const { return Context; }
-  void setDeclContext(DeclContext *DC);
+  void setDeclContext(DeclContext *DC) { Context = DC; }
 
   /// getASTContext - Return the ASTContext that this decl lives in.
   ASTContext &getASTContext() const {
@@ -219,10 +219,6 @@ class PatternBindingDecl : public Decl {
   Expr *Init; // Initializer for the variables
 
   friend class Decl;
-  
-  /// \brief Update the DeclContext for any variables in the pattern to
-  /// refer to the same DeclContext as this declaration.
-  void updateDeclContextForVars();
   
 public:
   PatternBindingDecl(SourceLoc VarLoc, Pattern *Pat, Expr *E,
@@ -431,9 +427,6 @@ private:
   
   GetSetRecord *GetSet;
   
-  friend class Decl;
-  void updateDeclContextForGetSet();
-  
 public:
   VarDecl(SourceLoc VarLoc, Identifier Name, Type Ty, DeclContext *DC,
           bool IsModuleScope)
@@ -549,14 +542,6 @@ public:
  
 };
 
-inline void Decl::setDeclContext(DeclContext *DC) {
-  Context = DC;
-  if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(this))
-    PBD->updateDeclContextForVars();
-  else if (VarDecl *Var = dyn_cast<VarDecl>(this))
-    Var->updateDeclContextForGetSet();
-}
-  
 } // end namespace swift
 
 #endif
