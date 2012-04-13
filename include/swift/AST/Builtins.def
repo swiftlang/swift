@@ -19,6 +19,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+
 /// Binary operations have type (T,T) -> T.
 #ifndef BUILTIN_BINARY_OPERATION
 #define BUILTIN_BINARY_OPERATION(Id, Name, Overload) BUILTIN(Id, Name)
@@ -67,5 +68,15 @@ BUILTIN_BINARY_PREDICATE(FCmpULE, "fcmp_ule", OverloadedBuiltinKind::Float)
 BUILTIN_BINARY_PREDICATE(FCmpUNE, "fcmp_une", OverloadedBuiltinKind::Float)
 BUILTIN_BINARY_PREDICATE(FCmpUNO, "fcmp_uno", OverloadedBuiltinKind::Float)
 #undef BUILTIN_BINARY_PREDICATE
+
+
+/// GetElementPtr has type (Builtin.RawPointer, T) -> Builtin.RawPointer
+#ifndef BUILTIN_GEP_OPERATION
+#define BUILTIN_GEP_OPERATION(Id, Name, Overload) BUILTIN(Id, Name)
+#endif
+
+BUILTIN_GEP_OPERATION(Gep, "gep", OverloadedBuiltinKind::Integer)
+#undef BUILTIN_GEP_OPERATION
+
 
 #undef BUILTIN

@@ -561,6 +561,13 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
   Type BuiltinType;
   switch (isBuiltinValue(IGF.IGM.Context, Fn->getName().str(), BuiltinType)) {
   case BuiltinValueKind::None: llvm_unreachable("not a builtin after all!");
+  case BuiltinValueKind::Gep: {
+    llvm::Value *lhs = args.Values.claimUnmanagedNext();
+    llvm::Value *rhs = args.Values.claimUnmanagedNext();
+    assert(args.Values.empty() && "wrong operands to gep operation");
+    return result.addDirectUnmanagedValue(IGF.Builder.CreateGEP(lhs, rhs));
+  }
+      
 
 /// A macro which expands to the emission of a simple binary operation
 /// or predicate.
@@ -585,7 +592,6 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
                           IGF.Builder.Create##IntOp(lhs, rhs));             \
     }                                                                       \
   }
-
   case BuiltinValueKind::Add:       BINARY_ARITHMETIC_OPERATION(Add, FAdd)
   case BuiltinValueKind::And:       BINARY_OPERATION(And)
   case BuiltinValueKind::FDiv:      BINARY_OPERATION(FDiv)

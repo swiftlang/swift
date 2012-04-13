@@ -79,10 +79,16 @@ static FuncDecl *getBuiltinFunction(ASTContext &Context, Identifier Id, Type T){
                                 /*IsModuleScope*/true);
 }
 
-/// Build a unary operation declaration.
-static ValueDecl *getUnaryOperation(ASTContext &Context, Identifier Id,
-                                    Type ArgType) {
-  Type FnTy = FunctionType::get(ArgType, ArgType, Context);
+/// Build a getelementptr operation declaration.
+static ValueDecl *getGepOperation(ASTContext &Context, Identifier Id,
+                                  Type ArgType) {
+  // This is always "(i8*, IntTy) -> i8*"
+  TupleTypeElt ArgElts[] = {
+    TupleTypeElt(Context.TheRawPointerType, Identifier()),
+    TupleTypeElt(ArgType, Identifier())
+  };
+  Type Arg = TupleType::get(ArgElts, Context);
+  Type FnTy = FunctionType::get(Arg, Context.TheRawPointerType, Context);
   return getBuiltinFunction(Context, Id, FnTy);
 }
 
@@ -117,7 +123,7 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
 
 // There's deliberately no BUILTIN clause here so that we'll blow up
 // if new builtin categories are added there and not here.
-#define BUILTIN_UNARY_OPERATION(id, name, overload) overload,
+#define BUILTIN_GEP_OPERATION(id, name, overload) overload,
 #define BUILTIN_BINARY_OPERATION(id, name, overload) overload,
 #define BUILTIN_BINARY_PREDICATE(id, name, overload) overload,
 #include "swift/AST/Builtins.def"
@@ -154,9 +160,9 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::None: return nullptr;
 
 #define BUILTIN(id, name)
-#define BUILTIN_UNARY_OPERATION(id, name, overload)  case BuiltinValueKind::id:
+#define BUILTIN_GEP_OPERATION(id, name, overload)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-    return getUnaryOperation(Context, Id, ArgType);
+    return getGepOperation(Context, Id, ArgType);
 
 #define BUILTIN(id, name)
 #define BUILTIN_BINARY_OPERATION(id, name, overload)  case BuiltinValueKind::id:
