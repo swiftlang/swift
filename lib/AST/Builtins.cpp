@@ -156,13 +156,30 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
     break;
   case BuiltinValueKind::FPToUI:
   case BuiltinValueKind::FPToSI:
+    if (Output.isNull() || !Input->is<BuiltinFloatType>() ||
+        !Output->is<BuiltinIntegerType>())
+      return nullptr;
+    break;
+      
   case BuiltinValueKind::UIToFP:
   case BuiltinValueKind::SIToFP:
+    if (Output.isNull() || !Input->is<BuiltinIntegerType>() ||
+        !Output->is<BuiltinFloatType>())
+      return nullptr;
+    break;
+
   case BuiltinValueKind::FPTrunc:
+    if (Output.isNull() ||
+        Input->castTo<BuiltinFloatType>()->getFPKind() <=
+        Output->castTo<BuiltinFloatType>()->getFPKind())
+      return nullptr;
+    break;
   case BuiltinValueKind::FPExt:
-      // FIXME: moar typechecking.
-    if (Output.isNull()) return nullptr;
-    return nullptr;
+    if (Output.isNull() ||
+        Input->castTo<BuiltinFloatType>()->getFPKind() >=
+        Output->castTo<BuiltinFloatType>()->getFPKind())
+      return nullptr;
+    break;
 
   case BuiltinValueKind::PtrToInt:
     if (!Output.isNull()) return nullptr;
@@ -175,7 +192,8 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
     break;
   case BuiltinValueKind::Bitcast:
     if (Output.isNull()) return nullptr;
-    // FIXME: moar typechecking.
+    // FIXME: Implement bitcast typechecking.
+    assert(0 && "Bitcast not supported yet!");
     return nullptr;
   }
   
