@@ -464,6 +464,8 @@ class FuncDecl : public ValueDecl {
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
   FuncExpr *Body;
+  llvm::PointerIntPair<VarDecl *, 1, bool> GetOrSetVar;
+  
 public:
   FuncDecl(SourceLoc StaticLoc, SourceLoc FuncLoc, Identifier Name,
            Type Ty, FuncExpr *Body, DeclContext *DC,
@@ -504,6 +506,30 @@ public:
     return StaticLoc.isValid() ? StaticLoc : FuncLoc;
   }
   
+  /// makeGetter - Note that this function is the getter for the given variable.
+  void makeGetter(VarDecl *Var) {
+    GetOrSetVar.setPointer(Var);
+    GetOrSetVar.setInt(false);
+  }
+  
+  /// makeSetter - Note that this function is the setter for the given variable.
+  void makeSetter(VarDecl *Var) {
+    GetOrSetVar.setPointer(Var);
+    GetOrSetVar.setInt(true);
+  }
+  
+  /// getGetterVar - If this function is a getter, retrieve the variable for
+  /// which it is a getter. Otherwise, returns null.
+  VarDecl *getGetterVar() const {
+    return GetOrSetVar.getInt()? nullptr : GetOrSetVar.getPointer();
+  }
+
+  /// getSetterVar - If this function is a setter, retrieve the variable for
+  /// which it is a setter. Otherwise, returns null.
+  VarDecl *getSetterVar() const {
+    return GetOrSetVar.getInt()? GetOrSetVar.getPointer() : nullptr;
+  }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
   static bool classof(const FuncDecl *D) { return true; }

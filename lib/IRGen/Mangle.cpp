@@ -177,6 +177,23 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
 void Mangler::mangleDeclName(NamedDecl *decl) {
   // decl ::= context identifier
   mangleDeclContext(decl->getDeclContext());
+  
+  // Special case: mangle getters and setters.
+  // FIXME: Come up with a more sane mangling.
+  if (FuncDecl *Func = dyn_cast<FuncDecl>(decl)) {
+    if (VarDecl *Var = Func->getGetterVar()) {
+      Buffer << "__get";
+      mangleIdentifier(Var->getName());
+      return;
+    }
+
+    if (VarDecl *Var = Func->getSetterVar()) {
+      Buffer << "__set";
+      mangleIdentifier(Var->getName());
+      return;
+    }
+  }
+  
   mangleIdentifier(decl->getName());
 }
 

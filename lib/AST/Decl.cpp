@@ -144,6 +144,11 @@ void VarDecl::setProperty(ASTContext &Context, SourceLoc LBraceLoc,
   GetSet->Braces = SourceRange(LBraceLoc, RBraceLoc);
   GetSet->Get = Get;
   GetSet->Set = Set;
+  
+  if (Get)
+    Get->makeGetter(this);
+  if (Set)
+    Set->makeSetter(this);
 }
 
 /// getExtensionType - If this is a method in a type extension for some type,

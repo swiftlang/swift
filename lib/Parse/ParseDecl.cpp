@@ -484,10 +484,16 @@ static void addVarsToScope(Parser &P, Pattern *Pat,
       VD->getMutableAttrs() = Attributes;
 
     if (VD->isProperty()) {
-      if (FuncDecl *Get = VD->getGetter())
+      if (FuncDecl *Get = VD->getGetter()) {
+        Get->setDeclContext(P.CurDeclContext);
+        Get->setModuleScope(P.ScopeInfo.isModuleScope());
         Decls.push_back(Get);
-      if (FuncDecl *Set = VD->getSetter())
+      }
+      if (FuncDecl *Set = VD->getSetter()) {
+        Set->setDeclContext(P.CurDeclContext);
+        Set->setModuleScope(P.ScopeInfo.isModuleScope());
         Decls.push_back(Set);
+      }
     }
     
     Decls.push_back(VD);
@@ -704,7 +710,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool hasContainerType) {
     {
       VarDecl *Value = new (Context) VarDecl(SetNameLoc, SetName, Ty,
                                              CurDeclContext,
-                                             ScopeInfo.isModuleScope());
+                                             /*IsModuleScope=*/false);
       
       Pattern *ValuePattern
         = new (Context) TypedPattern(new (Context) NamedPattern(Value), Ty);
