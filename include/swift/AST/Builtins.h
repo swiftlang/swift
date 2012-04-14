@@ -58,7 +58,8 @@ enum class BuiltinValueKind {
 /// isBuiltinValue - Finds the builtin value with this name.
 ///
 /// \param Type - Set to the overloaded type parameter of the builtin.
-BuiltinValueKind isBuiltinValue(ASTContext &C, StringRef Name, Type &Ty);
+BuiltinValueKind isBuiltinValue(ASTContext &C, StringRef Name,
+                                Type &Ty1, Type &Ty2);
 
 /// getBuiltinValue - Finds the builtin value with the given name.
 ///

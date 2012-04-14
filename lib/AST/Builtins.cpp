@@ -51,17 +51,30 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
   return Type();
 }
 
-BuiltinValueKind swift::isBuiltinValue(ASTContext &C, StringRef Name, Type &Ty){
-  // builtin-id ::= operation-id '_' type-id
+BuiltinValueKind swift::isBuiltinValue(ASTContext &C, StringRef Name,
+                                       Type &Ty1, Type &Ty2) {
+  // builtin-id ::= operation-id '_' type-id ('_' type-id)?
   // This will almost certainly get more sophisticated.
   StringRef::size_type Underscore = Name.find_last_of('_');
   if (Underscore == StringRef::npos) return BuiltinValueKind::None;
   
   // Check that the type parameter is well-formed and set it up for returning.
-  Ty = getBuiltinType(C, Name.substr(Underscore + 1));
-  if (Ty.isNull())
+  Ty1 = getBuiltinType(C, Name.substr(Underscore + 1));
+  if (Ty1.isNull())
     return BuiltinValueKind::None;
 
+  // Check whether there is a second underscore.
+  StringRef::size_type Underscore2 = Name.find_last_of('_', Underscore-1);
+  if (Underscore2 != StringRef::npos) {
+    Ty2 = Ty1;
+    Ty1 = getBuiltinType(C, Name.substr(Underscore2 + 1,
+                                        Underscore-Underscore2-1));
+    if (Ty1.isNull())
+      std::swap(Ty1, Ty2);
+    else
+      Underscore = Underscore2;
+  }
+  
   // Check that the operation name is well-formed.
   StringRef OperationName = Name.substr(0, Underscore);
 
@@ -117,12 +130,66 @@ static ValueDecl *getBinaryPredicate(ASTContext &Context, Identifier Id,
   return getBuiltinFunction(Context, Id, FnTy);
 }
 
+/// Build a cast.  There is some custom type checking here.
+static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
+                                   BuiltinValueKind VK,
+                                   Type Input, Type Output) {
+  assert(!Input.isNull() && "We know that we have at least one type here");
+  
+  // Custom type checking.  We know the one or two types have been subjected to
+  // the "isBuiltinTypeOverloaded" predicate successfully.
+  switch (VK) {
+  default: assert(0 && "Not a cast operation");
+  case BuiltinValueKind::Trunc:
+    if (Output.isNull() ||
+        Input->castTo<BuiltinIntegerType>()->getBitWidth() <=
+        Output->castTo<BuiltinIntegerType>()->getBitWidth())
+      return nullptr;
+    break;
+      
+  case BuiltinValueKind::ZExt:
+  case BuiltinValueKind::SExt:
+    if (Output.isNull() ||
+        Input->castTo<BuiltinIntegerType>()->getBitWidth() >=
+        Output->castTo<BuiltinIntegerType>()->getBitWidth())
+      return nullptr;
+    break;
+  case BuiltinValueKind::FPToUI:
+  case BuiltinValueKind::FPToSI:
+  case BuiltinValueKind::UIToFP:
+  case BuiltinValueKind::SIToFP:
+  case BuiltinValueKind::FPTrunc:
+  case BuiltinValueKind::FPExt:
+      // FIXME: moar typechecking.
+    if (Output.isNull()) return nullptr;
+    return nullptr;
+
+  case BuiltinValueKind::PtrToInt:
+    if (!Output.isNull()) return nullptr;
+    Output = Input;
+    Input = Context.TheRawPointerType;
+    break;
+  case BuiltinValueKind::IntToPtr:
+    if (!Output.isNull()) return nullptr;
+    Output = Context.TheRawPointerType;
+    break;
+  case BuiltinValueKind::Bitcast:
+    if (Output.isNull()) return nullptr;
+    // FIXME: moar typechecking.
+    return nullptr;
+  }
+  
+  Type FnTy = FunctionType::get(Input, Output, Context);
+  return getBuiltinFunction(Context, Id, FnTy);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
 
 // There's deliberately no BUILTIN clause here so that we'll blow up
 // if new builtin categories are added there and not here.
+#define BUILTIN_CAST_OPERATION(id, name, overload) overload,
 #define BUILTIN_GEP_OPERATION(id, name, overload) overload,
 #define BUILTIN_BINARY_OPERATION(id, name, overload) overload,
 #define BUILTIN_BINARY_PREDICATE(id, name, overload) overload,
@@ -147,13 +214,15 @@ inline bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
 
 
 ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
-  Type ArgType;
-  BuiltinValueKind BV = isBuiltinValue(Context, Id.str(), ArgType);
+  Type ArgType1, ArgType2;
+  BuiltinValueKind BV = isBuiltinValue(Context, Id.str(), ArgType1, ArgType2);
 
   // Filter out inappropriate overloads.
   OverloadedBuiltinKind OBK = OverloadedBuiltinKinds[unsigned(BV)];
-  if (OBK != OverloadedBuiltinKind::None &&
-      !isBuiltinTypeOverloaded(ArgType, OBK))
+  if (OBK == OverloadedBuiltinKind::None) return nullptr;
+  
+  if (!isBuiltinTypeOverloaded(ArgType1, OBK) ||
+      (!ArgType2.isNull() && !isBuiltinTypeOverloaded(ArgType2, OBK)))
     return nullptr;
 
   switch (BV) {
@@ -162,17 +231,25 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
 #define BUILTIN(id, name)
 #define BUILTIN_GEP_OPERATION(id, name, overload)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-    return getGepOperation(Context, Id, ArgType);
+    if (!ArgType2.isNull()) return nullptr;
+    return getGepOperation(Context, Id, ArgType1);
 
 #define BUILTIN(id, name)
 #define BUILTIN_BINARY_OPERATION(id, name, overload)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-    return getBinaryOperation(Context, Id, ArgType);
+    if (!ArgType2.isNull()) return nullptr;
+    return getBinaryOperation(Context, Id, ArgType1);
 
 #define BUILTIN(id, name)
 #define BUILTIN_BINARY_PREDICATE(id, name, overload)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-    return getBinaryPredicate(Context, Id, ArgType);
+    if (!ArgType2.isNull()) return nullptr;
+    return getBinaryPredicate(Context, Id, ArgType1);
+      
+#define BUILTIN(id, name)
+#define BUILTIN_CAST_OPERATION(id, name, overload)  case BuiltinValueKind::id:
+#include "swift/AST/Builtins.def"
+    return getCastOperation(Context, Id, BV, ArgType1, ArgType2);
   }
   llvm_unreachable("bad builtin value!");
 }
