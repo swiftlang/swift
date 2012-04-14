@@ -550,6 +550,18 @@ namespace {
   };
 }
 
+static void emitCastBuiltin(llvm::Instruction::CastOps Opcode,
+                            IRGenFunction &IGF, ArgList &args,
+                            Type DestType, CallResult &result) {
+  llvm::Value *Input = args.Values.claimUnmanagedNext();
+  llvm::Type *DestTy = IGF.IGM.getFragileTypeInfo(DestType).getStorageType();
+  assert(args.Values.empty() && "wrong operands to cast operation");
+  return result.addDirectUnmanagedValue(IGF.Builder.CreateCast(Opcode, Input,
+                                                               DestTy));
+
+}
+
+
 /// emitBuiltinCall - Emit a call to a builtin function.
 static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
                             Expr *Arg, CallResult &result) {
@@ -568,16 +580,6 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
     assert(args.Values.empty() && "wrong operands to gep operation");
     return result.addDirectUnmanagedValue(IGF.Builder.CreateGEP(lhs, rhs));
   }
-
-
-/// A macro which expands to the emission of a cast operation.
-#define CAST_OPERATION(Op) {                                              \
-    llvm::Value *Input = args.Values.claimUnmanagedNext();                \
-    llvm::Type *DestTy = IGF.IGM.getFragileTypeInfo(BuiltinType2).getStorageType(); \
-    assert(args.Values.empty() && "wrong operands to cast operation");    \
-    return result.addDirectUnmanagedValue(IGF.Builder.Create##Op(Input, DestTy)); \
-  }
-     
 
 /// A macro which expands to the emission of a simple binary operation
 /// or predicate.
@@ -603,18 +605,53 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
     }                                                                       \
   }
       
-  case BuiltinValueKind::Trunc:     CAST_OPERATION(Trunc)
-  case BuiltinValueKind::ZExt:      CAST_OPERATION(ZExt)
-  case BuiltinValueKind::SExt:      CAST_OPERATION(SExt)
-  case BuiltinValueKind::FPToUI:    CAST_OPERATION(FPToUI)
-  case BuiltinValueKind::FPToSI:    CAST_OPERATION(FPToSI)
-  case BuiltinValueKind::UIToFP:    CAST_OPERATION(UIToFP)
-  case BuiltinValueKind::SIToFP:    CAST_OPERATION(SIToFP)
-  case BuiltinValueKind::FPTrunc:   CAST_OPERATION(FPTrunc)
-  case BuiltinValueKind::FPExt:     CAST_OPERATION(FPExt)
-  case BuiltinValueKind::PtrToInt:  CAST_OPERATION(PtrToInt)
-  case BuiltinValueKind::IntToPtr:  CAST_OPERATION(IntToPtr)
-  case BuiltinValueKind::Bitcast:   CAST_OPERATION(BitCast)
+  case BuiltinValueKind::Trunc:
+    return emitCastBuiltin(llvm::Instruction::Trunc,
+                           IGF, args, BuiltinType2, result);
+  case BuiltinValueKind::ZExt:
+    return emitCastBuiltin(llvm::Instruction::ZExt,
+                           IGF, args, BuiltinType2, result);
+
+  case BuiltinValueKind::SExt:
+    return emitCastBuiltin(llvm::Instruction::SExt,
+                           IGF, args, BuiltinType2, result);
+
+  case BuiltinValueKind::FPToUI:
+    return emitCastBuiltin(llvm::Instruction::FPToUI,
+                           IGF, args, BuiltinType2, result);
+
+  case BuiltinValueKind::FPToSI:
+    return emitCastBuiltin(llvm::Instruction::FPToSI,
+                           IGF, args, BuiltinType2, result);
+
+  case BuiltinValueKind::UIToFP:
+    return emitCastBuiltin(llvm::Instruction::UIToFP,
+                           IGF, args, BuiltinType2, result);
+
+  case BuiltinValueKind::SIToFP:
+    return emitCastBuiltin(llvm::Instruction::SIToFP,
+                           IGF, args, BuiltinType2, result);
+      
+  case BuiltinValueKind::FPTrunc:
+    return emitCastBuiltin(llvm::Instruction::FPTrunc,
+                           IGF, args, BuiltinType2, result);
+
+  case BuiltinValueKind::FPExt:
+    return emitCastBuiltin(llvm::Instruction::FPExt,
+                           IGF, args, BuiltinType2, result);
+
+  case BuiltinValueKind::PtrToInt:
+    return emitCastBuiltin(llvm::Instruction::PtrToInt,
+                           IGF, args, BuiltinType, result);
+
+  case BuiltinValueKind::IntToPtr:
+    return emitCastBuiltin(llvm::Instruction::IntToPtr,
+                           IGF, args, IGF.IGM.Context.TheRawPointerType, result);
+
+  case BuiltinValueKind::Bitcast:
+    return emitCastBuiltin(llvm::Instruction::BitCast,
+                           IGF, args, BuiltinType2, result);
+
   case BuiltinValueKind::Add:       BINARY_ARITHMETIC_OPERATION(Add, FAdd)
   case BuiltinValueKind::And:       BINARY_OPERATION(And)
   case BuiltinValueKind::FDiv:      BINARY_OPERATION(FDiv)
