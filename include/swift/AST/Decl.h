@@ -316,9 +316,7 @@ public:
 
   /// isReferencedAsLValue - Returns 'true' if references to this
   /// declaration are l-values.
-  bool isReferencedAsLValue() const {
-    return getKind() == DeclKind::Var;
-  }
+  bool isReferencedAsLValue() const;
 
   void setHasFixedLifetime(bool flag) {
     ValueDeclBits.HasFixedLifetime = flag;
@@ -567,6 +565,15 @@ public:
   static bool classof(const OneOfElementDecl *D) { return true; }
  
 };
+  
+inline bool ValueDecl::isReferencedAsLValue() const {
+  if (getKind() != DeclKind::Var)
+    return false;
+  
+  const VarDecl *Var = cast<VarDecl>(this);
+  
+  return !Var->isProperty() || Var->getSetter();
+}
 
 } // end namespace swift
 
