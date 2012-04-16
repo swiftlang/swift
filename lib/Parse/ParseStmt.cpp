@@ -84,7 +84,7 @@ bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
 ///     stmt-if
 ///   stmt-assign:
 ///     expr '=' expr
-bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
+void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
                                 bool IsTopLevel) {
   // This forms a lexical scope.
   Scope BraceScope(this);
@@ -147,9 +147,12 @@ bool Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       SourceLoc Loc = Entries.back().get<Stmt*>()->getStartLoc();
       diagnose(Loc, diag::illegal_top_level_stmt);
     }
-  }
 
-  return false;
+    if (IsTopLevel && IsMainModule)
+      if (!Entries.back().is<Decl*>() ||
+          isa<PatternBindingDecl>(Entries.back().get<Decl*>()))
+        break;
+  }
 }
 
 /// parseStmtOtherThanAssignment - Note that this doesn't handle the
@@ -184,9 +187,9 @@ NullablePtr<BraceStmt> Parser::parseStmtBrace(Diag<> ID) {
   
   SmallVector<ExprStmtOrDecl, 16> Entries;
   SourceLoc RBLoc;
-  
-  if (parseBraceItemList(Entries, false /*NotTopLevel*/) ||
-      parseMatchingToken(tok::r_brace, RBLoc,
+
+  parseBraceItemList(Entries, false /*NotTopLevel*/);
+  if (parseMatchingToken(tok::r_brace, RBLoc,
                          diag::expected_rbrace_in_brace_stmt,
                          LBLoc, diag::opening_brace))
     return 0;

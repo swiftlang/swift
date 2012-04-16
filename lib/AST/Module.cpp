@@ -113,6 +113,11 @@ static TUModuleCache &getTUCachePimpl(void *&Ptr, TranslationUnit &TU) {
   return *(TUModuleCache*)Ptr;
 }
 
+static void freeTUCachePimpl(void *&Ptr) {
+  delete (TUModuleCache*)Ptr;
+  Ptr = 0;
+}
+
 
 /// Populate our cache on the first name lookup.
 TUModuleCache::TUModuleCache(TranslationUnit &TU) {
@@ -189,6 +194,11 @@ static TUExtensionCache &getTUExtensionCachePimpl(void *&Ptr,
   if (Ptr == 0)
     Ptr = new TUExtensionCache(TU);
   return *(TUExtensionCache*)Ptr;
+}
+
+static void freeTUExtensionCachePimpl(void *&Ptr) {
+  delete (TUExtensionCache*)Ptr;
+  Ptr = 0;
 }
 
 TUExtensionCache::TUExtensionCache(TranslationUnit &TU) {
@@ -347,3 +357,11 @@ void Module::lookupGlobalExtensionMethods(Type BaseType, Identifier Name,
   }
 }
 
+//===----------------------------------------------------------------------===//
+// TranslationUnit Implementation
+//===----------------------------------------------------------------------===//
+
+void TranslationUnit::clearLookupCache() {
+  freeTUCachePimpl(LookupCachePimpl);
+  freeTUExtensionCachePimpl(ExtensionCachePimpl);
+}

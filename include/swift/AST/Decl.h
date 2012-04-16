@@ -27,6 +27,7 @@
 
 namespace swift {
   class ASTContext;
+  class ASTWalker;
   class Type;
   class Expr;
   class FuncDecl;
@@ -116,7 +117,9 @@ public:
  
   void dump() const;
   void print(raw_ostream &OS, unsigned Indent = 0) const;
-  
+
+  bool walk(ASTWalker &walker);
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *) { return true; }
   

@@ -175,7 +175,7 @@ void TypeChecker::typeCheckIgnoredExpr(Expr *E) {
 /// walks the AST to resolve types and diagnose problems therein.
 ///
 /// FIXME: This should be moved out to somewhere else.
-void swift::performTypeChecking(TranslationUnit *TU) {
+void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   TypeChecker TC(*TU);
   
   // Find all the FuncExprs in the translation unit and collapse all
@@ -199,11 +199,31 @@ void swift::performTypeChecking(TranslationUnit *TU) {
     }
   };
   PrePassWalker prePass(TC);
-  TU->Body->walk(prePass);
+  for (unsigned i = StartElem, e = TU->Body->getNumElements(); i != e; ++i) {
+    auto Elem = TU->Body->getElement(i);
+    if (Expr *E = Elem.dyn_cast<Expr*>())
+      TU->Body->setElement(i, E->walk(prePass));
+    else if (Stmt *S = Elem.dyn_cast<Stmt*>())
+      TU->Body->setElement(i, S->walk(prePass));
+    else
+      Elem.get<Decl*>()->walk(prePass);
+  }
 
-  // Type check the top-level BraceExpr.  This sorts out any top-level
-  // expressions and variable decls.
-  StmtChecker(TC, 0).typeCheckStmt(TU->Body);
+  // Type check the top-level elements of the translation unit.
+  StmtChecker checker(TC, 0);
+  for (unsigned i = StartElem, e = TU->Body->getNumElements(); i != e; ++i) {
+    auto Elem = TU->Body->getElement(i);
+    if (Expr *E = Elem.dyn_cast<Expr*>()) {
+      if (checker.typeCheckExpr(E)) continue;
+      TC.typeCheckIgnoredExpr(E);
+      TU->Body->setElement(i, E);
+    } else if (Stmt *S = Elem.dyn_cast<Stmt*>()) {
+      if (checker.typeCheckStmt(S)) continue;
+      TU->Body->setElement(i, S);
+    } else {
+      TC.typeCheckDecl(Elem.get<Decl*>());
+    }
+  }
 
   // Type check the body of each of the FuncExpr in turn.  Note that outside
   // FuncExprs must be visited before nested FuncExprs for type-checking to

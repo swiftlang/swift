@@ -414,3 +414,7 @@ Expr *Expr::walk(ASTWalker &walker) {
 Stmt *Stmt::walk(ASTWalker &walker) {
   return Traversal(walker).doIt(this);
 }
+
+bool Decl::walk(ASTWalker &walker) {
+  return Traversal(walker).doIt(this);
+}

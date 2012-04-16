@@ -49,7 +49,7 @@ void swift::RunImmediately(TranslationUnit *TU) {
   llvm::LLVMContext LLVMContext;
   llvm::Module Module(Options.OutputFilename, LLVMContext);
   performCaptureAnalysis(TU);
-  performIRGenerationIntoModule(TU, Options, Module);
+  performIRGeneration(Options, &Module, TU);
 
   if (Context.hadError())
     return;
@@ -67,7 +67,7 @@ void swift::RunImmediately(TranslationUnit *TU) {
     // FIXME: Need to check whether this is actually safe in general.
     llvm::Module SubModule(SubTU->Name.str(), LLVMContext);
     performCaptureAnalysis(SubTU);
-    performIRGenerationIntoModule(SubTU, Options, SubModule);
+    performIRGeneration(Options, &SubModule, SubTU);
 
     if (Context.hadError())
       return;

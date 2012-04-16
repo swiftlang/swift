@@ -50,19 +50,19 @@ static bool isBinaryOutput(OutputKind kind) {
   llvm_unreachable("bad output kind!");
 }
 
-void swift::performIRGeneration(TranslationUnit *TU, Options &Opts) {
-  // Create the module.
-  LLVMContext LLVMContext;
-  llvm::Module Module(Opts.OutputFilename, LLVMContext);
-
-  performIRGenerationIntoModule(TU, Opts, Module);
-}
-
-void swift::performIRGenerationIntoModule(TranslationUnit *TU, Options &Opts,
-                                          llvm::Module &Module) {
+void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
+                                TranslationUnit *TU, unsigned StartElem) {
   assert(!TU->Ctx.hadError());
 
-  Module.setTargetTriple(Opts.Triple);
+  std::unique_ptr<LLVMContext> Context;
+  std::unique_ptr<llvm::Module> ModuleOwner;
+  if (!Module) {
+    Context.reset(new LLVMContext);
+    ModuleOwner.reset(new llvm::Module(Opts.OutputFilename, *Context));
+    Module = ModuleOwner.get();
+  }
+
+  Module->setTargetTriple(Opts.Triple);
 
   std::string Error;
   const Target *Target =
@@ -98,10 +98,10 @@ void swift::performIRGenerationIntoModule(TranslationUnit *TU, Options &Opts,
   // Set the module's string representation.
   const TargetData *TargetData = TargetMachine->getTargetData();
   assert(TargetData && "target machine didn't set TargetData?");
-  Module.setDataLayout(TargetData->getStringRepresentation());
+  Module->setDataLayout(TargetData->getStringRepresentation());
 
   // Emit the translation unit.
-  IRGenModule IRM(TU->Ctx, Opts, Module, *TargetData);
+  IRGenModule IRM(TU->Ctx, Opts, *Module, *TargetData);
   IRM.emitTranslationUnit(TU);
 
   // Bail out if there are any errors.
@@ -130,7 +130,7 @@ void swift::performIRGenerationIntoModule(TranslationUnit *TU, Options &Opts,
   PMBuilder.OptLevel = Opts.OptLevel;
 
   // Configure the function passes.
-  FunctionPassManager FunctionPasses(&Module);
+  FunctionPassManager FunctionPasses(Module);
   FunctionPasses.add(new llvm::TargetData(*TargetData));
   if (Opts.Verify)
     FunctionPasses.add(createVerifierPass());
@@ -138,7 +138,7 @@ void swift::performIRGenerationIntoModule(TranslationUnit *TU, Options &Opts,
 
   // Run the function passes.
   FunctionPasses.doInitialization();
-  for (auto I = Module.begin(), E = Module.end(); I != E; ++I)
+  for (auto I = Module->begin(), E = Module->end(); I != E; ++I)
     if (!I->isDeclaration())
       FunctionPasses.run(*I);
   FunctionPasses.doFinalization();
@@ -175,5 +175,5 @@ void swift::performIRGenerationIntoModule(TranslationUnit *TU, Options &Opts,
   }
 
   // Do it.
-  ModulePasses.run(Module);
+  ModulePasses.run(*Module);
 }

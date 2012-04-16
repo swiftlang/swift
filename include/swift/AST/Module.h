@@ -45,6 +45,7 @@ namespace swift {
 /// Module - A unit of modularity.  The current translation unit is a
 /// module, as is an imported module.
 class Module : public DeclContext {
+protected:
   void *LookupCachePimpl;
   void *ExtensionCachePimpl;
   Component *Comp;
@@ -164,8 +165,8 @@ public:
   
   TranslationUnit(Identifier Name, Component *Comp, ASTContext &C,
                   bool IsMainModule)
-    : Module(DeclContextKind::TranslationUnit, Name, Comp, C, IsMainModule) {
-  }
+    : Module(DeclContextKind::TranslationUnit, Name, Comp, C, IsMainModule),
+      Body(nullptr) { }
   
   /// getUnresolvedIdentifierTypes - This is a list of scope-qualified types
   /// that were unresolved at the end of the translation unit's parse
@@ -191,7 +192,8 @@ public:
     ImportedModules = IM;
   }
 
-  
+  void clearLookupCache();
+
   void dump() const;
   
   // Implement isa/cast/dyncast/etc.

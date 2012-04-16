@@ -148,13 +148,10 @@ Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
 
   // For now, treat all separate modules as unique components.
   Component *Comp = new (Context.Allocate<Component>(1)) Component();
+  ImportedTU = new (Context) TranslationUnit(ModuleID.first, Comp, Context,
+                                             /*IsMainModule*/false);
 
-  // Parse the translation unit, but don't do name binding or type checking.
-  // This can produce new errors etc if the input is erroneous.
-  ImportedTU = parseTranslationUnit(BufferID, Comp, Context,
-                                    /*IsMainModule*/false);
-  if (ImportedTU == 0)
-    return 0;
+  parseIntoTranslationUnit(ImportedTU, BufferID);
   LoadedModules[ModuleID.first.str()] = ImportedTU;
 
   // We have to do name binding on it to ensure that types are fully resolved.
@@ -386,21 +383,38 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, FuncDecl *CurFD,
 /// At this parsing has been performed, but we still have UnresolvedDeclRefExpr
 /// nodes for unresolved value names, and we may have unresolved type names as
 /// well.  This handles import directives and forward references.
-void swift::performNameBinding(TranslationUnit *TU) {
+void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
+  // Make sure we skip adding the standard library imports if the
+  // translation unit is empty.
+  if (TU->Body->getNumElements() == 0)
+    return;
+
+  // Reset the name lookup cache so we find new decls.
+  // FIXME: This is inefficient.
+  TU->clearLookupCache();
+
   NameBinder Binder(TU);
 
   SmallVector<ImportedModule, 8> ImportedModules;
+  ImportedModules.append(TU->getImportedModules().begin(),
+                         TU->getImportedModules().end());
 
   // Do a prepass over the declarations to find and load the imported modules.
-  for (auto Elt : TU->Body->getElements())
-    if (Decl *D = Elt.dyn_cast<Decl*>()) {
+  for (unsigned i = StartElem, e = TU->Body->getNumElements(); i != e; ++i)
+    if (Decl *D = TU->Body->getElement(i).dyn_cast<Decl*>())
       if (ImportDecl *ID = dyn_cast<ImportDecl>(D))
         Binder.addImport(ID, ImportedModules);
-    }
 
-  Binder.addStandardLibraryImport(ImportedModules);
+  // Add the standard library import.
+  // FIXME: The semantics here are sort of strange if an import statement is
+  // after the first "chunk" in the main module.
+  if (StartElem == 0)
+    Binder.addStandardLibraryImport(ImportedModules);
 
-  TU->setImportedModules(TU->Ctx.AllocateCopy(ImportedModules));
+  // FIXME: This algorithm has quadratic memory usage.  (In practice,
+  // import statements after the first "chunk" should be rare, though.)
+  if (ImportedModules.size() > TU->getImportedModules().size())
+    TU->setImportedModules(TU->Ctx.AllocateCopy(ImportedModules));
 
   // Loop over all the unresolved dotted types in the translation unit,
   // resolving them if possible.
@@ -456,11 +470,20 @@ void swift::performNameBinding(TranslationUnit *TU) {
       return E;
     }
   };
+
   NameBindingWalker walker(Binder);
-  
+
   // Now that we know the top-level value names, go through and resolve any
   // UnresolvedDeclRefExprs that exist.
-  TU->Body = cast<BraceStmt>(TU->Body->walk(walker));
+  for (unsigned i = StartElem, e = TU->Body->getNumElements(); i != e; ++i) {
+    auto Elem = TU->Body->getElement(i);
+    if (Expr *E = Elem.dyn_cast<Expr*>())
+      TU->Body->setElement(i, E->walk(walker));
+    else if (Stmt *S = Elem.dyn_cast<Stmt*>())
+      TU->Body->setElement(i, S->walk(walker));
+    else
+      Elem.get<Decl*>()->walk(walker);
+  }
 
   TU->ASTStage = TranslationUnit::NameBound;
   verify(TU);

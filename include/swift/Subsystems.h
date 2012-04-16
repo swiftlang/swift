@@ -35,33 +35,35 @@ namespace swift {
   /// sense), aborting and spewing errors if not.
   void verify(TranslationUnit *TUnit);
 
-  /// parseTranslationUnit - Parse a single buffer as a translation unit
-  /// in the given component and return the decl.
-  TranslationUnit *parseTranslationUnit(unsigned BufferID, Component *Comp,
-                                        ASTContext &Ctx, bool IsMainModule);
+  /// parseIntoTranslationUnit - Parse a single buffer into the given
+  /// taranslation unit.  If the translation unit is the main module, stop
+  /// parsing after the next stmt-brace-item with side-effects.  Returns
+  /// the number of bytes parsed from the given buffer.
+  bool parseIntoTranslationUnit(TranslationUnit *TU, unsigned BufferID,
+                                unsigned *BufferOffset = 0);
 
   /// performNameBinding - Once parsing is complete, this walks the AST to
-  /// resolve names and do other top-level validation.
-  void performNameBinding(TranslationUnit *TU);
+  /// resolve names and do other top-level validation.  StartElem indicates
+  /// where to start for incremental name binding in the main module.
+  void performNameBinding(TranslationUnit *TU, unsigned StartElem = 0);
   
   /// performTypeChecking - Once parsing and namebinding are complete, this
-  /// walks the AST to resolve types and diagnose problems therein.
-  ///
-  void performTypeChecking(TranslationUnit *TU);
+  /// walks the AST to resolve types and diagnose problems therein. StartElem
+  /// indicates where to start for incremental type checking in the
+  /// main module.
+  void performTypeChecking(TranslationUnit *TU, unsigned StartElem = 0);
 
   /// performCaptureAnalysis - Analyse the AST and mark local declarations
   /// and expressions which can capture them so they can be emitted more
-  /// efficiently.
-  void performCaptureAnalysis(TranslationUnit *TU);
+  /// efficiently.  StartElem indicates where to start for incremental capture
+  /// analysis in the main module.
+  void performCaptureAnalysis(TranslationUnit *TU, unsigned StartElem = 0);
 
   /// performIRGeneration - Turn the given translation unit into
-  /// either LLVM IR or native code.
-  void performIRGeneration(TranslationUnit *TU, irgen::Options &Opts);
-
-  /// performIRGenerationIntoModule - Alternate entry point for IR generation
-  /// for users which need the resulting module in memory.
-  void performIRGenerationIntoModule(TranslationUnit *TU, irgen::Options &Opts,
-                                     llvm::Module &Module);
+  /// either LLVM IR or native code.  StartElem indicates where to start for
+  /// incremental IRGen in the main module.
+  void performIRGeneration(irgen::Options &Opts, llvm::Module *Module,
+                           TranslationUnit *TU, unsigned StartElem = 0);
 
 } // end namespace swift
 

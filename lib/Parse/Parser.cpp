@@ -42,37 +42,46 @@ namespace {
 }
   
 /// parseTranslationUnit - Entrypoint for the parser.
-TranslationUnit *swift::parseTranslationUnit(unsigned BufferID,
-                                             Component *Comp,
-                                             ASTContext &Ctx,
-                                             bool IsMainModule) {
-  Parser P(BufferID, Comp, Ctx, IsMainModule);
+bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
+                                     unsigned BufferID,
+                                     unsigned *BufferOffset) {
+  Parser P(BufferID, TU->getComponent(), TU->Ctx,
+           BufferOffset ? *BufferOffset : 0, TU->IsMainModule);
   PrettyStackTraceParser stackTrace(P);
-  return P.parseTranslationUnit();
+  P.parseTranslationUnit(TU);
+  if (BufferOffset)
+    *BufferOffset = P.Tok.getLoc().Value.getPointer() -
+                    P.Buffer->getBuffer().begin();
+  return P.Tok.is(tok::eof);
 }
   
 //===----------------------------------------------------------------------===//
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
-/// SkipShebang - If this is a main module and it starts with a #! line, don't
-/// lex it.
-static StringRef SkipShebang(StringRef File, bool IsMainModule) {
+/// ComputeLexStart - Compute the start of lexing; if there's an offset, take
+/// that into account.  If there's a #! line in a main module, ignore it.
+static StringRef ComputeLexStart(StringRef File, unsigned Offset,
+                                 bool IsMainModule) {
+  if (Offset)
+    return File.substr(Offset);
+
   if (IsMainModule && File.startswith("#!")) {
     StringRef::size_type Pos = File.find_first_of("\n\r");
     if (Pos != StringRef::npos)
       return File.substr(Pos);
   }
+
   return File;
 }
 
 
 Parser::Parser(unsigned BufferID, swift::Component *Comp, ASTContext &Context,
-               bool IsMainModule)
+               unsigned Offset, bool IsMainModule)
   : SourceMgr(Context.SourceMgr),
     Diags(Context.Diags),
     Buffer(SourceMgr.getMemoryBuffer(BufferID)),
-    L(*new Lexer(SkipShebang(Buffer->getBuffer(), IsMainModule),
+    L(*new Lexer(ComputeLexStart(Buffer->getBuffer(), Offset, IsMainModule),
                  SourceMgr, &Diags)),
     Component(Comp),
     Context(Context),

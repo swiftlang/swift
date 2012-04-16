@@ -91,7 +91,7 @@ public:
 
 
   Parser(unsigned BufferID, swift::Component *Component, ASTContext &Ctx,
-         bool IsMainModule);
+         unsigned Offset, bool IsMainModule);
   ~Parser();
   
   //===--------------------------------------------------------------------===//
@@ -180,15 +180,14 @@ public:
   
   bool parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init);
 
-  bool parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Decls,
+  void parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Decls,
                           bool IsTopLevel);
 
   //===--------------------------------------------------------------------===//
   // Decl Parsing
   static bool isStartOfDecl(const Token &Tok, const Token &Tok2);
 
-  Identifier getModuleIdentifier();
-  TranslationUnit *parseTranslationUnit();
+  void parseTranslationUnit(TranslationUnit *TU);
   bool parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags);
   enum {
     PD_Default           = 0,

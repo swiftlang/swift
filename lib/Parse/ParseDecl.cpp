@@ -27,45 +27,36 @@
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
-Identifier Parser::getModuleIdentifier() {
-  StringRef moduleName = Buffer->getBufferIdentifier();
-
-  // As a special case, recognize <stdin>.
-  if (moduleName == "<stdin>")
-    return Context.getIdentifier("stdin");
-
-  // Find the stem of the filename.
-  moduleName = llvm::sys::path::stem(moduleName);
-
-  // Complain about non-identifier characters in the module name.
-  if (!Lexer::isIdentifier(moduleName)) {
-    diagnose(L.getLocForStartOfBuffer(), diag::bad_module_name);
-    moduleName = "bad";
-  }
-
-  return Context.getIdentifier(moduleName);
-}
-
 /// parseTranslationUnit - Main entrypoint for the parser.
 ///   translation-unit:
 ///     stmt-brace-item*
-TranslationUnit *Parser::parseTranslationUnit() {
+void Parser::parseTranslationUnit(TranslationUnit *TU) {
+  TU->ASTStage = TranslationUnit::Parsing;
+
   // Prime the lexer.
   consumeToken();
-  SourceLoc FileStartLoc = Tok.getLoc();
+  SourceLoc FileStartLoc;
+  if (TU->Body)
+    FileStartLoc = TU->Body->getStartLoc();
+  else
+    FileStartLoc = Tok.getLoc();
 
-  TranslationUnit *TU =
-    new (Context) TranslationUnit(getModuleIdentifier(), Component, Context,
-                                  IsMainModule);
   CurDeclContext = TU;
   
   // Parse the body of the file.
   SmallVector<ExprStmtOrDecl, 128> Items;
+
+  // FIXME: Recreating the BraceStmt from scratch for each chunk wastes
+  // a bunch of memory.
+  if (TU->Body)
+    Items.append(TU->Body->getElements().begin(),
+                 TU->Body->getElements().end());
+
   parseBraceItemList(Items, true);
 
   // Process the end of the translation unit.
   SourceLoc FileEnd = Tok.getLoc();
-  
+
   // First thing, we transform the body into a brace expression.
   TU->Body = BraceStmt::create(Context, FileStartLoc, Items, FileEnd);
   
@@ -77,7 +68,6 @@ TranslationUnit *Parser::parseTranslationUnit() {
   // Note that the translation unit is fully parsed and verify it.
   TU->ASTStage = TranslationUnit::Parsed;
   verify(TU);
-  return TU;
 }
 
 namespace {

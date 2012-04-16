@@ -162,6 +162,15 @@ class CaptureAnalysisVisitor : public ASTWalker {
 
 } // end anonymous namespace
 
-void swift::performCaptureAnalysis(TranslationUnit *TU) {
-  TU->Body->walk(CaptureAnalysisVisitor());
+void swift::performCaptureAnalysis(TranslationUnit *TU, unsigned StartElem) {
+  CaptureAnalysisVisitor walker;
+  for (unsigned i = StartElem, e = TU->Body->getNumElements(); i != e; ++i) {
+    auto Elem = TU->Body->getElement(i);
+    if (Expr *E = Elem.dyn_cast<Expr*>())
+      E->walk(walker);
+    else if (Stmt *S = Elem.dyn_cast<Stmt*>())
+      S->walk(walker);
+    else
+      Elem.get<Decl*>()->walk(walker);
+  }
 }
