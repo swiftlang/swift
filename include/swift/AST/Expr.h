@@ -365,6 +365,44 @@ public:
   }
 };
 
+/// MemberRefExpr - This represents 'a.b' where we are referring to a member
+/// of a type.
+///
+/// FIXME: This is only used for property accesses right now, because structs
+/// are tuples and, therefore, their elements are referenced via a
+/// TupleElementExpr. This will change when structs become "real" types.
+class MemberRefExpr : public Expr {
+  Expr *Base;
+  ValueDecl *Value;
+  SourceLoc DotLoc;
+  SourceLoc NameLoc;
+  
+public:  
+  MemberRefExpr(Expr *Base, SourceLoc DotLoc, ValueDecl *Value,
+                SourceLoc NameLoc);
+  Expr *getBase() const { return Base; }
+  ValueDecl *getDecl() const { return Value; }
+  SourceLoc getNameLoc() const { return NameLoc; }
+  SourceLoc getDotLoc() const { return DotLoc; }
+  
+  void setBase(Expr *E) { Base = E; }
+  
+  SourceLoc getLoc() const { return NameLoc; }
+  SourceRange getSourceRange() const {
+    if (Base->isImplicit())
+      return SourceRange(NameLoc);
+  
+    return SourceRange(Base->getStartLoc(), NameLoc);
+  }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const MemberRefExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::MemberRef;
+  }
+};
+  
+
 /// UnresolvedMemberExpr - This represents '.foo', an unresolved reference to a
 /// member, which is to be resolved with context sensitive type information into
 /// bar.foo.  These always have dependent type.

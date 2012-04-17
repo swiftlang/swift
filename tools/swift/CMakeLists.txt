@@ -1,4 +1,6 @@
 add_swift_executable(swift
+  Frontend.cpp
+  Frontend.h
   Immediate.cpp
   Immediate.h
   PrintingDiagnosticConsumer.cpp

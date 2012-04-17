@@ -222,6 +222,10 @@ namespace {
       emitDeclRef(IGF, E, Out);
     }
 
+    void visitMemberRefExpr(MemberRefExpr *E) {
+      IGF.unimplemented(E->getLoc(), "emit rvalue MembeRefExpr");
+    }
+    
     void visitCapturingExpr(CapturingExpr *E) {
       emitClosure(IGF, E, Out);
     }
@@ -284,6 +288,11 @@ namespace {
     
     LValue visitDeclRefExpr(DeclRefExpr *E) {
       return emitDeclRefLValue(IGF, E);
+    }
+    
+    LValue visitMemberRefExpr(MemberRefExpr *E) {
+      IGF.unimplemented(E->getLoc(), "emit lvalue MembeRefExpr");
+      return LValue();
     }
   };
 }
@@ -377,6 +386,11 @@ namespace {
     // Materializations are always in memory.
     Optional<Address> visitMaterializeExpr(MaterializeExpr *E) {
       return emitMaterializeExpr(IGF, cast<MaterializeExpr>(E));
+    }
+
+    Optional<Address> visitMemberRefExpr(MemberRefExpr *E) {
+      IGF.unimplemented(E->getLoc(), "emit address of MembeRefExpr");
+      return Optional<Address>();
     }
 
     // These expressions aren't naturally already in memory.

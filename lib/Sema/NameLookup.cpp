@@ -231,9 +231,13 @@ Expr *MemberLookup::createResultAST(Expr *Base, SourceLoc DotLoc,
       return buildTupleElementExpr(Base, DotLoc, NameLoc, R.TupleFieldNo,
                                    Context);
     case MemberLookupResult::PassBase: {
-      Expr *Fn = new (Context) DeclRefExpr(R.D, NameLoc,
-                                           R.D->getTypeOfReference());
-      return new (Context) DotSyntaxCallExpr(Fn, DotLoc, Base);
+      if (isa<FuncDecl>(R.D)) {
+        Expr *Fn = new (Context) DeclRefExpr(R.D, NameLoc,
+                                             R.D->getTypeOfReference());
+        return new (Context) DotSyntaxCallExpr(Fn, DotLoc, Base);
+      }
+      
+      return new (Context) MemberRefExpr(Base, DotLoc, R.D, NameLoc);
     }
     case MemberLookupResult::IgnoreBase:
       Expr *RHS = new (Context) DeclRefExpr(R.D, NameLoc,

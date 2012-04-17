@@ -42,6 +42,12 @@ public:
   Expr *semaUnresolvedDotExpr(UnresolvedDotExpr *E);
   void typeCheckIgnoredExpr(Expr *E);
   
+  /// \brief Perform a shallow recheck of the given newly-built AST node.
+  ///
+  /// Rechecking typically occurs when one has resolved name lookup and built a
+  /// new AST node that then needs to be type-checked.
+  Expr *recheckTypes(Expr *E);
+  
   bool typeCheckExpression(Expr *&E, Type ConvertType = Type());
   void typeCheckDecl(Decl *D);
   bool typeCheckPattern(Pattern *P);

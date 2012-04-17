@@ -123,6 +123,12 @@ llvm::APFloat FloatLiteralExpr::getValue() const {
   return Val;
 }
 
+MemberRefExpr::MemberRefExpr(Expr *Base, SourceLoc DotLoc, ValueDecl *Value,
+                             SourceLoc NameLoc)
+  : Expr(ExprKind::MemberRef, Value->getTypeOfReference()), Base(Base),
+    Value(Value), DotLoc(DotLoc), NameLoc(NameLoc) { }
+
+
 Type OverloadSetRefExpr::getBaseType() const {
   if (isa<OverloadedDeclRefExpr>(this))
     return Type();
@@ -185,7 +191,10 @@ Expr *OverloadedMemberRefExpr::createWithCopy(Expr *Base, SourceLoc DotLoc,
     // to evaluate the object.
     if (Decls[0]->isInstanceMember() &&
         !Base->getType()->is<MetaTypeType>()) {
-      return new (C) DotSyntaxCallExpr(Fn, DotLoc, Base);
+      if (isa<FuncDecl>(Decls[0]))
+        return new (C) DotSyntaxCallExpr(Fn, DotLoc, Base);
+      
+      return new (C) MemberRefExpr(Base, DotLoc, Decls[0], MemberLoc);
     }
     
     return new (C) DotSyntaxBaseIgnoredExpr(Base, DotLoc, Fn);
@@ -369,6 +378,13 @@ public:
     printCommon(E, "unresolved_decl_ref_expr")
       << " name=" << E->getName() << ')';
   }
+  void visitMemberRefExpr(MemberRefExpr *E) {
+    printCommon(E, "member_ref_expr")
+      << " decl=" << E->getDecl()->getName() << '\n';
+    printRec(E->getBase());
+    OS << ')';
+  }
+  
   void visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     printCommon(E, "unresolved_member_expr")
       << " name='" << E->getName() << "')";

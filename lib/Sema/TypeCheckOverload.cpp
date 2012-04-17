@@ -78,11 +78,7 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
 Expr *TypeChecker::buildFilteredOverloadSet(OverloadSetRefExpr *OSE,
                                             ArrayRef<ValueDecl *> Remaining) {
   assert(!Remaining.empty() && "Cannot handle empty overload set");
-  Expr *Result = OSE->createFilteredWithCopy(Remaining);
-  if (ApplyExpr *Apply = dyn_cast<ApplyExpr>(Result))
-    return semaApplyExpr(Apply);
-  
-  return Result;
+  return recheckTypes(OSE->createFilteredWithCopy(Remaining));
 }
 
 Expr *TypeChecker::buildFilteredOverloadSet(OverloadSetRefExpr *OSE,

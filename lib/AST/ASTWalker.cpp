@@ -71,6 +71,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) { return E; }
   Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) { return E; }
 
+  Expr *visitMemberRefExpr(MemberRefExpr *E) {
+    if (Expr *Base = doIt(E->getBase())) {
+      E->setBase(Base);
+      return E;
+    }
+    return nullptr;
+  }
+  
   Expr *visitParenExpr(ParenExpr *E) {
     if (Expr *subExpr = doIt(E->getSubExpr())) {
       E->setSubExpr(subExpr);

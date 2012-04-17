@@ -311,6 +311,20 @@ public:
     llvm_unreachable("name binding should resolve all UnresolvedDeclRefExprs!");
     return 0;
   }
+  Expr *visitMemberRefExpr(MemberRefExpr *E) {
+    if (E->getDecl()->getType()->is<ErrorType>())
+      return 0;
+    
+    // If the base is an lvalue, so is the member reference.
+    Type ResultTy = E->getDecl()->getTypeOfReference();
+    if (!E->getBase()->getType()->is<LValueType>()) {
+      if (LValueType *ResultRefTy = ResultTy->getAs<LValueType>())
+        ResultTy = ResultRefTy->getObjectType();
+    }
+    
+    E->setType(ResultTy);
+    return E;
+  }
   Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     E->setType(UnstructuredDependentType::get(TC.Context));
     return E;
@@ -464,13 +478,8 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
     return 0;
   }
   
-  Expr *R = Lookup.createResultAST(Base, E->getDotLoc(), E->getNameLoc(), 
-                                   Context);
-  
-  // FIXME: This is really ad-hoc!
-  if (ApplyExpr *AE = dyn_cast_or_null<ApplyExpr>(R))
-    return semaApplyExpr(AE);
-  return R;
+  return recheckTypes(Lookup.createResultAST(Base, E->getDotLoc(),
+                                             E->getNameLoc(), Context));
 }
 
 
@@ -637,6 +646,13 @@ Expr *TypeChecker::foldSequence(SequenceExpr *E) {
 
 Expr *SemaExpressionTree::visitSequenceExpr(SequenceExpr *E) {
   llvm_unreachable("visiting sequence expression during normal type-checking!");
+}
+
+Expr *TypeChecker::recheckTypes(Expr *E) {
+  if (!E)
+    return nullptr;
+  
+  return SemaExpressionTree(*this).visit(E);
 }
 
 bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
