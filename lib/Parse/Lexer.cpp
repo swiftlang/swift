@@ -324,6 +324,7 @@ void Lexer::lexOperatorIdentifier() {
   if (CurPtr-TokStart == 1) {
     switch (TokStart[0]) {
     case '=': return formToken(tok::equal, TokStart);
+    case '.': return formToken(tok::period, TokStart);
     }
   } else if (CurPtr-TokStart == 2) {
     switch ((TokStart[0] << 8) | TokStart[1]) {
@@ -700,7 +701,7 @@ Restart:
     if (isdigit(CurPtr[0]))   // .42
       return lexNumber();
       
-    return formToken(tok::period, TokStart);
+    return lexOperatorIdentifier();
   case ',': return formToken(tok::comma,    TokStart);
   case ';': return formToken(tok::semi,     TokStart);
   case ':': return formToken(tok::colon,    TokStart);

@@ -59,7 +59,7 @@ public:
   /// isOperatorChar - Return true if the specified character is a
   /// valid part of an operator.
   static bool isOperatorChar(char C) {
-    return strchr("/=-+*%<>!&|^~", C) != 0;
+    return strchr("/=-+*%<>!&|^~.", C) != 0;
   }
   
   void *getAsOpaquePointer() const { return (void *)Pointer; }

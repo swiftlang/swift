@@ -31,7 +31,7 @@ using namespace irgen;
 
 /// Translate the given operator character into its mangled form.
 ///
-/// Current operator characters:    /=-+*%<>!&|^
+/// Current operator characters:    /=-+*%<>!&|^~.
 static char mangleOperatorChar(char op) {
   switch (op) {
   case '&': return 'a'; // 'and'
@@ -47,6 +47,7 @@ static char mangleOperatorChar(char op) {
   case '-': return 's'; // 'subtract'
   case '^': return 'x'; // 'xor'
   case '~': return 't'; // 'tilde'
+  case '.': return 'z'; // 'period'
   default: llvm_unreachable("bad identifier character");
   }
 }
