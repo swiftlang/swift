@@ -317,14 +317,13 @@ void Lexer::lexIdentifier() {
 void Lexer::lexOperatorIdentifier() {
   const char *TokStart = CurPtr-1;
 
-  while (Identifier::isOperatorChar(*CurPtr))
+  while (Identifier::isOperatorChar(*CurPtr) && *CurPtr != '.')
     ++CurPtr;
   
   // Match various reserved words.
   if (CurPtr-TokStart == 1) {
     switch (TokStart[0]) {
     case '=': return formToken(tok::equal, TokStart);
-    case '.': return formToken(tok::period, TokStart);
     }
   } else if (CurPtr-TokStart == 2) {
     switch ((TokStart[0] << 8) | TokStart[1]) {
@@ -700,8 +699,14 @@ Restart:
   case '.':
     if (isdigit(CurPtr[0]))   // .42
       return lexNumber();
-      
-    return lexOperatorIdentifier();
+
+    if (CurPtr[0] == '.') {
+      ++CurPtr;
+      return formToken(tok::oper, TokStart);
+    }
+
+    return formToken(tok::period, TokStart);
+
   case ',': return formToken(tok::comma,    TokStart);
   case ';': return formToken(tok::semi,     TokStart);
   case ':': return formToken(tok::colon,    TokStart);

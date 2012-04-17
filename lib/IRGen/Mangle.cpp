@@ -31,7 +31,7 @@ using namespace irgen;
 
 /// Translate the given operator character into its mangled form.
 ///
-/// Current operator characters:    /=-+*%<>!&|^~.
+/// Current operator characters:    /=-+*%<>!&|^~ and the special operator '..'
 static char mangleOperatorChar(char op) {
   switch (op) {
   case '&': return 'a'; // 'and'
