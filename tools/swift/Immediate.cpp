@@ -110,15 +110,15 @@ void swift::RunImmediately(TranslationUnit *TU) {
 // FIXME: We shouldn't be writing implemenetations for functions in the swift
 // module in C, and this isn't really an ideal place to put those
 // implementations.
-extern "C" void _TSs5printFT3valNSs5int64_T_(int64_t l) {
+extern "C" void _TSs5printFT3valNSs5Int64_T_(int64_t l) {
   printf("%lld", l);
 }
 
-extern "C" void _TSs5printFT3valNSs6double_T_(double l) {
+extern "C" void _TSs5printFT3valNSs6Double_T_(double l) {
   printf("%f", l);
 }
 
-extern "C" void __TSs9printCharFT9characterNSs5int64_T_(int64_t l) {
+extern "C" void __TSs9printCharFT9characterNSs5Int64_T_(int64_t l) {
   printf("%c", (char)l);
 }
 
@@ -126,7 +126,7 @@ extern "C" void _TSs5printFT3valNSs6String_T_(char* l) {
   printf("%s", l);
 }
 
-extern "C" bool _TNSs4bool13getLogicValuefRS_FT_i1(bool* b) {
+extern "C" bool _TNSs4Bool13getLogicValuefRS_FT_i1(bool* b) {
   return *b;
 }
 
