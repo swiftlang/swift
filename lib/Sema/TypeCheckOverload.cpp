@@ -17,14 +17,12 @@
 using namespace swift;
 
 static Identifier getFirstOverloadedIdentifier(const Expr *Fn) {
-  if (const DeclRefExpr *DR = dyn_cast<DeclRefExpr>(Fn)) {
-    const NamedDecl *ND = cast<NamedDecl>(DR->getDecl());
-    return ND->getName();
-  }
+  if (const DeclRefExpr *DR = dyn_cast<DeclRefExpr>(Fn))
+    return DR->getDecl()->getName();
   const OverloadedDeclRefExpr *ODR = cast<OverloadedDeclRefExpr>(Fn);
   auto Decls = ODR->getDecls();
   assert(!Decls.empty());
-  return cast<NamedDecl>(*Decls.begin())->getName();
+  return (*Decls.begin())->getName();
 }
 
 static bool displayOperandType(Type T) {
