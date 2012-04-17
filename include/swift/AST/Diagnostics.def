@@ -582,9 +582,15 @@ ERROR(called_expr_isnt_function,sema_tce,none,
       "called expression isn't a function", ())
 ERROR(overloading_ambiguity,sema_tce,none,
       "overloading ambiguity found", ())
-ERROR(no_candidates,sema_tce,none,
-      "no candidates found for %select{binary operator|unary operator|call}0",
-      (unsigned))
+ERROR(no_candidates_op, sema_tce, none,
+      "no candidates found for %select{binary|unary}0 operator %1",
+      (unsigned, Identifier))
+NOTE(no_candidates_binop_operands, sema_tce, none,
+      "operands have types %0 and %1",
+      (Type, Type))
+NOTE(no_candidates_unary_operand, sema_tce, none,
+     "operand has type %0", (Type))
+ERROR(no_candidates,sema_tce,none, "no candidates found for call", ())
 ERROR(no_candidates_ref,sema_tce,none,
       "no candidates found for reference to overloaded %0", (Identifier))
 ERROR(use_undeclared_identifier,sema_tce,none,
