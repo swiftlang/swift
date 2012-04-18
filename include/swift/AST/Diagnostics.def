@@ -61,6 +61,9 @@ NOTE(previous_declaration,parsing,none,
 NOTE(previous_definition,parsing,none,
      "previous definition of %0 is here", (Identifier))
 
+ERROR(extra_rbrace,parsing,none,
+      "extraneous '}' at top level", ())
+      
 //------------------------------------------------------------------------------
 // Lexer diagnostics
 //------------------------------------------------------------------------------
@@ -201,6 +204,19 @@ ERROR(struct_unnamed_member,decl_parsing,none,
       "unnamed members invalid in structs", ())
 
 // Protocol
+
+// Subscripting
+ERROR(expected_lparen_subscript,decl_parsing,none,
+      "expected '(' for subscript parameters", ())
+ERROR(expected_arrow_subscript,decl_parsing,none,
+      "expected '->' for subscript element type", ())
+ERROR(expected_type_subscript,type_parsing,none,
+      "expected subscripting element type", ())
+ERROR(expected_lbrace_subscript,decl_parsing,none,
+      "expected '{' for subscripting", ())
+ERROR(set_without_get_subscript,decl_parsing,none,
+      "subscripting with a setter must also have a getter", ())
+
 
 //------------------------------------------------------------------------------
 // Type parsing diagnostics

@@ -52,6 +52,11 @@ void Parser::parseTranslationUnit(TranslationUnit *TU) {
     Items.append(TU->Body->getElements().begin(),
                  TU->Body->getElements().end());
 
+  if (Tok.is(tok::r_brace)) {
+    diagnose(Tok.getLoc(), diag::extra_rbrace);
+    consumeToken();
+  }
+  
   parseBraceItemList(Items, true);
 
   // Process the end of the translation unit.
@@ -325,6 +330,9 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   case tok::kw_func:
     Entries.push_back(parseDeclFunc(Flags & PD_HasContainerType));
     break;
+  case tok::kw_subscript:
+    HadParseError = parseDeclSubscript(Flags & PD_HasContainerType, Entries);
+    break;
   }
   
   // If we got back a null pointer, then a parse error happened.
@@ -347,6 +355,7 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
       if (ND->isOperator() && (Flags & PD_DisallowOperators))
         diagnose(ND->getLocStart(), diag::operator_in_decl);
     }
+    // FIXME: Diagnose top-level subscript
   }
   
   return HadParseError;
@@ -475,6 +484,7 @@ static void addVarsToScope(Parser &P, Pattern *Pat,
       VD->getMutableAttrs() = Attributes;
 
     if (VD->isProperty()) {
+      // FIXME: Order of get/set not preserved.
       if (FuncDecl *Get = VD->getGetter()) {
         Get->setDeclContext(P.CurDeclContext);
         Get->setModuleScope(P.ScopeInfo.isModuleScope());
@@ -517,6 +527,11 @@ static void addVarsToScope(Parser &P, Pattern *Pat,
 bool Parser::parseGetSet(bool HasContainerType, Type ElementTy,
                          FuncDecl *&Get, FuncDecl *&Set,
                          SourceLoc &LastValidLoc) {
+  if (GetIdent.empty()) {
+    GetIdent = Context.getIdentifier("get");
+    SetIdent = Context.getIdentifier("set");
+  }
+
   bool Invalid = false;
   Get = 0;
   Set = 0;
@@ -1264,6 +1279,96 @@ bool Parser::parseProtocolBody(SourceLoc ProtocolLoc,
   TypeName->setUnderlyingType(NewProto);
   
   return false;
+}
+
+/// parseDeclSubscript - Parse a 'subscript' declaration, returning true
+/// on error.
+///
+///   decl-subscript:
+///     'subscript' attribute-list pattern-tuple '->' type '{' get-set '}'
+///
+bool Parser::parseDeclSubscript(bool HasContainerType,
+                                SmallVectorImpl<Decl *> &Decls) {
+  SourceLoc SubscriptLoc = consumeToken(tok::kw_subscript);
+  
+  // attribute-list
+  DeclAttributes Attributes;
+  parseAttributeList(Attributes);
+  
+  // pattern-tuple
+  if (!Tok.is(tok::l_paren) && !Tok.is(tok::l_paren_space)) {
+    diagnose(Tok.getLoc(), diag::expected_lparen_subscript);
+    return true;
+  }
+  
+  NullablePtr<Pattern> Params = parsePatternTuple();
+  if (Params.isNull())
+    return true;
+  
+  // '->'
+  if (!Tok.is(tok::arrow)) {
+    diagnose(Tok.getLoc(), diag::expected_arrow_subscript);
+    return true;
+  }
+  SourceLoc ArrowLoc = consumeToken();
+  
+  // type
+  Type ElementTy;
+  if (parseTypeAnnotation(ElementTy, diag::expected_type_subscript))
+    return true;
+  
+  // '{'
+  if (!Tok.is(tok::l_brace)) {
+    diagnose(Tok.getLoc(), diag::expected_lbrace_subscript);
+    return true;
+  }
+  SourceLoc LBLoc = consumeToken();
+  
+  // Parse getter and setter.
+  FuncDecl *Get = 0;
+  FuncDecl *Set = 0;
+  SourceLoc LastValidLoc = LBLoc;
+  bool Invalid = false;
+  if (parseGetSet(HasContainerType, ElementTy, Get, Set, LastValidLoc))
+    Invalid = true;
+
+  // Parse the final '}'.
+  SourceLoc RBLoc;
+  if (Invalid) {
+    skipUntilDeclRBrace();
+    RBLoc = LastValidLoc;
+  } else if (parseMatchingToken(tok::r_brace, RBLoc,
+                                diag::expected_rbrace_in_getset,
+                                LBLoc, diag::opening_brace)) {
+    RBLoc = LastValidLoc;
+  }
+
+  if (Set && !Get) {
+    if (!Invalid)
+      diagnose(Set->getLocStart(), diag::set_without_get_subscript);
+    
+    Set = nullptr;
+    Invalid = true;
+  }
+  
+  if (!Invalid && (Set || Get)) {
+    // FIXME: Order of get/set not preserved.
+    if (Set) {
+      Set->setDeclContext(CurDeclContext);
+      Set->setModuleScope(ScopeInfo.isModuleScope());
+      Decls.push_back(Set);
+    }
+
+    if (Get) {
+      Get->setDeclContext(CurDeclContext);
+      Get->setModuleScope(ScopeInfo.isModuleScope());
+      Decls.push_back(Get);
+    }
+    
+    // FIXME: Build an AST for the subscript declaration.
+    
+  }
+  return Invalid;
 }
 
 

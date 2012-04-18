@@ -225,6 +225,9 @@ public:
   bool parseProtocolBody(SourceLoc ProtocolLoc, const DeclAttributes &Attrs,
                          TypeAliasDecl *TypeName = 0);
   
+  bool parseDeclSubscript(bool HasContainerType,
+                          SmallVectorImpl<Decl *> &Decls);
+  
   struct OneOfElementInfo {
     SourceLoc NameLoc;
     StringRef Name;

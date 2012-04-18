@@ -64,6 +64,7 @@ bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
   case tok::kw_struct:
   case tok::kw_protocol:
   case tok::kw_import:
+  case tok::kw_subscript:
     return true;
   default:
     return false;

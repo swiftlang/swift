@@ -389,7 +389,8 @@
     decl ::= <a href="#decl-struct">decl-struct</a>
     decl ::= <a href="#decl-typealias">decl-typealias</a>
     decl ::= <a href="#decl-var">decl-var</a>    
-</pre>
+    decl ::= <a href="#decl-subscript">decl-subscript</a>
+ </pre>
 
 
   <!-- ===================================================================== -->
@@ -932,7 +933,15 @@ token following the opening '{' is either 'set' or 'get'.</p>
   protocol type.</p>
   
   <p>TODO: typealias members</p>
-   
+  
+  <!-- ===================================================================== -->
+  <h3 id="decl-subscript">subscript Declarations</h3>
+  <!-- ===================================================================== -->
+  
+  <pre id="value-specifier" class="grammar">
+    decl-subscript        ::= 'subscript' <a href="#attribute-list">attribute-list</a> <a href="#pattern-tuple">pattern-tuple</a> '->' <a href="#type">type</a> '{' <a href="#get-set">get-set<a/> '}'
+  </pre>
+  
   <!-- ===================================================================== -->
   <h3 id="attribute-list">Attribute Lists</h3>
   <!-- ===================================================================== -->

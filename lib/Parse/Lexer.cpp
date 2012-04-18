@@ -313,6 +313,7 @@ void Lexer::lexIdentifier() {
     .Case("typealias", tok::kw_typealias)
     .Case("var", tok::kw_var)
     .Case("static", tok::kw_static)
+    .Case("subscript", tok::kw_subscript)
   
     // Statements
     .Case("if", tok::kw_if)
