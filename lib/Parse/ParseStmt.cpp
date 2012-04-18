@@ -148,10 +148,13 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       diagnose(Loc, diag::illegal_top_level_stmt);
     }
 
-    if (IsTopLevel && IsMainModule)
+    if (IsTopLevel && IsMainModule) {
       if (!Entries.back().is<Decl*>() ||
-          isa<PatternBindingDecl>(Entries.back().get<Decl*>()))
+          isa<PatternBindingDecl>(Entries.back().get<Decl*>())) {
+        FoundSideEffects = true;
         break;
+      }
+    }
   }
 }
 

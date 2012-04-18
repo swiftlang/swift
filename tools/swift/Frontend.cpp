@@ -61,29 +61,33 @@ swift::buildSingleTranslationUnit(ASTContext &Context, unsigned BufferID,
 
   unsigned BufferOffset = 0;
   unsigned CurTUElem = 0;
-  bool CompleteParse;
   do {
-    CompleteParse = parseIntoTranslationUnit(TU, BufferID, &BufferOffset);
+    parseIntoTranslationUnit(TU, BufferID, &BufferOffset);
     if (!ParseOnly) {
       performNameBinding(TU, CurTUElem);
       performTypeChecking(TU, CurTUElem);
       CurTUElem = TU->Body->getNumElements();
     }
-  } while (!CompleteParse);
+  } while (BufferOffset != Buffer->getBufferSize());
 
   return TU;
 }
 
-void swift::appendToMainTranslationUnit(TranslationUnit *TU, unsigned BufferID,
+bool swift::appendToMainTranslationUnit(TranslationUnit *TU, unsigned BufferID,
+                                        unsigned CurTUElem,
                                         unsigned &BufferOffset,
                                         unsigned BufferEndOffset) {
-  unsigned CurTUElem = TU->Body ? TU->Body->getNumElements() : 0;
-  bool CompleteParse;
+  bool FoundAnySideEffects = false;
   do {
-    CompleteParse = parseIntoTranslationUnit(TU, BufferID, &BufferOffset,
-                                             BufferEndOffset);
-    performNameBinding(TU, CurTUElem);
-    performTypeChecking(TU, CurTUElem);
+    bool FoundSideEffects = parseIntoTranslationUnit(TU, BufferID,
+                                                     &BufferOffset,
+                                                     BufferEndOffset);
+    if (FoundSideEffects) {
+      FoundAnySideEffects = true;
+      performNameBinding(TU, CurTUElem);
+      performTypeChecking(TU, CurTUElem);
+    }
     CurTUElem = TU->Body->getNumElements();
-  } while (!CompleteParse);
+  } while (BufferOffset != BufferEndOffset);
+  return FoundAnySideEffects;
 }

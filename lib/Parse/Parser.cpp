@@ -54,7 +54,8 @@ bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
   if (BufferOffset)
     *BufferOffset = P.Tok.getLoc().Value.getPointer() -
                     P.Buffer->getBuffer().begin();
-  return P.Tok.is(tok::eof);
+
+  return P.FoundSideEffects;
 }
   
 //===----------------------------------------------------------------------===//
@@ -89,7 +90,8 @@ Parser::Parser(unsigned BufferID, swift::Component *Comp, ASTContext &Context,
     Component(Comp),
     Context(Context),
     ScopeInfo(*this),
-    IsMainModule(IsMainModule) {
+    IsMainModule(IsMainModule),
+    FoundSideEffects(false) {
 }
 
 Parser::~Parser() {

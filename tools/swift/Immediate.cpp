@@ -21,6 +21,7 @@
 #include "swift/IRGen/Options.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Component.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
@@ -160,9 +161,9 @@ void swift::REPL(ASTContext &Context) {
 
   InitEditLine e;
 
-  while (1) {
-    unsigned CurTUElem = TU->Body ? TU->Body->getNumElements() : 0;
+  unsigned CurTUElem = 0;
 
+  while (1) {
     int LineCount;
     const char* Line = el_gets(e, &LineCount);
     if (!Line)
@@ -176,16 +177,23 @@ void swift::REPL(ASTContext &Context) {
     *CurBuffer++ = '\n';
     CurBufferEndOffset += strlen(Line) + 1;
 
-    swift::appendToMainTranslationUnit(TU, BufferID, CurBufferOffset,
-                                       CurBufferEndOffset);
+    bool ShouldRun =
+        swift::appendToMainTranslationUnit(TU, BufferID, CurTUElem,
+                                           CurBufferOffset,
+                                           CurBufferEndOffset);
 
     // FIXME: Better error recovery would be really nice here.
     if (Context.hadError())
       return;
 
+    if (!ShouldRun)
+      continue;
+
     // IRGen the main module.
     performCaptureAnalysis(TU, CurTUElem);
     performIRGeneration(Options, &Module, TU, CurTUElem);
+
+    CurTUElem = TU->Body->getNumElements();
 
     if (Context.hadError())
       return;

@@ -57,6 +57,7 @@ public:
   std::vector<llvm::SetVector<ValueDecl*>> ValCaptures;
   std::vector<std::vector<VarDecl*>> AnonClosureVars;
   bool IsMainModule;
+  bool FoundSideEffects;
 
   /// Tok - This is the current token being considered by the parser.
   Token Tok;
