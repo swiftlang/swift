@@ -128,17 +128,10 @@ bool Parser::parseType(Type &Result, Diag<> MessageID) {
     Result = FunctionType::get(Result, SecondHalf, Context);
     return false;
   }
-  
-  while (1) {
-    // If there is a square bracket without a space, we have an array.
-    SourceLoc TokLoc = Tok.getLoc();
-    if (consumeIf(tok::l_square)) {
-      if (parseTypeArray(TokLoc, Result)) return true;
-      continue;
-    }
-    
-    break;
-  }
+
+  // If there is a square bracket without a space, we have an array.
+  if (Tok.is(tok::l_square))
+    return parseTypeArray(Result);
   
   return false;
 }
@@ -255,54 +248,76 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
 }
 
 
-/// parseTypeArray - The l_square has already been consumed.
-///   type-array:
-///     type '[' ']'
-///     type '[' expr ']'
+/// parseTypeArray - Parse the type-array production, given that we
+/// are looking at the initial l_square.  Note that this index
+/// clause is actually the outermost (first-indexed) clause.
 ///
-bool Parser::parseTypeArray(SourceLoc LSquareLoc, Type &Result) {
-  // Handle the [] production, and unsized array.
+///   type-array:
+///     type-simple
+///     type-array '[' ']'
+///     type-array '[' expr ']'
+///
+bool Parser::parseTypeArray(Type &result) {
+  SourceLoc lsquareLoc = Tok.getLoc();
+  consumeToken(tok::l_square);
+
+  // Handle the [] production, meaning an array slice.
   if (consumeIf(tok::r_square)) {
-    if (isa<ErrorType>(Result.getPointer()))
-      return Result;
-    return ArrayType::get(Result, 0, Context);
+    // If we're starting another square-bracket clause, recurse.
+    if (Tok.is(tok::l_square) && parseTypeArray(result)) {
+      return true;
+
+    // Propagate an error type out.
+    } else if (isa<ErrorType>(result)) {
+      return true;
+    }
+
+    return ArrayType::get(result, 0, Context);
   }
   
-  NullablePtr<Expr> SizeEx = parseExpr(diag::expected_expr_array_type);
-  if (SizeEx.isNull()) return true;
-  SourceLoc RArrayTok;
-  if (parseMatchingToken(tok::r_square, RArrayTok,
+  NullablePtr<Expr> sizeEx = parseExpr(diag::expected_expr_array_type);
+  if (sizeEx.isNull()) return true;
+
+  SourceLoc rsquareLoc;
+  if (parseMatchingToken(tok::r_square, rsquareLoc,
                          diag::expected_rbracket_array_type,
-                         LSquareLoc, diag::opening_bracket))
+                         lsquareLoc, diag::opening_bracket))
+    return true;
+
+  // If we're starting another square-bracket clause, recurse.
+  if (Tok.is(tok::l_square) && parseTypeArray(result)) {
     return true;
   
   // If we had a semantic error on the size or if the base type is invalid,
   // propagate up an error type.
-  if (isa<ErrorType>(Result.getPointer())) {
-    Result = ErrorType::get(Context);
-    return false;
+  } else if (isa<ErrorType>(result)) {
+    return true;
   }
   
   // Semantic analysis.
   
-  Expr *Size = SizeEx.get();
+  Expr *size = sizeEx.get();
   
   // FIXME: Add real support for evaluating constant expressions for array
   // sizes.
-  uint64_t SizeVal;
-  if (IntegerLiteralExpr *IL = dyn_cast<IntegerLiteralExpr>(Size)) {
-    SizeVal = IL->getValue().getZExtValue() /*hack*/;
+  uint64_t sizeVal;
+  if (IntegerLiteralExpr *lit = dyn_cast<IntegerLiteralExpr>(size)) {
+    sizeVal = lit->getValue().getZExtValue() /*hack*/;
   } else {
-    diagnose(Size->getLoc(), diag::non_constant_array);
-    return ErrorType::get(Context);
+    diagnose(size->getLoc(), diag::non_constant_array)
+      << size->getSourceRange();
+    result = ErrorType::get(Context);
+    return true;
   }
   
-  if (SizeVal == 0) {
-    diagnose(Size->getLoc(), diag::zero_length_array);
-    return ErrorType::get(Context);
+  if (sizeVal == 0) {
+    diagnose(size->getLoc(), diag::zero_length_array)
+      << size->getSourceRange();
+    result = ErrorType::get(Context);
+    return true;
   }
   
-  Result = ArrayType::get(Result, SizeVal, Context);
+  result = ArrayType::get(result, sizeVal, Context);
   return false;
 }
 

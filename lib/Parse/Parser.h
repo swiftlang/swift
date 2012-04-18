@@ -243,7 +243,7 @@ public:
   bool parseTypeIdentifier(Type &Result);
   bool parseTypeTupleBody(SourceLoc LPLoc, Type &Result);
   
-  bool parseTypeArray(SourceLoc LSquareLoc, Type &Result);
+  bool parseTypeArray(Type &result);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
