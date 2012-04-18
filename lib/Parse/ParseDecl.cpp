@@ -517,6 +517,70 @@ static void addVarsToScope(Parser &P, Pattern *Pat,
   llvm_unreachable("bad pattern kind!");
 }
 
+/// clonePattern - Clone the given pattern.
+static Pattern *clonePattern(ASTContext &Context, Pattern *Pat);
+
+/// cloneTuplePatternElts - Clone the given tuple pattern elements into the
+/// 'to' list.
+static void cloneTuplePatternElts(ASTContext &Context, Pattern &From,
+                                  SmallVectorImpl<TuplePatternElt> &To) {
+  if (TuplePattern *FromTuple = dyn_cast<TuplePattern>(&From)) {
+    for (auto &Elt : FromTuple->getFields())
+      // FIXME: Do we have to clone the initializer?
+      To.push_back(TuplePatternElt(clonePattern(Context, Elt.getPattern()),
+                                   Elt.getInit()));
+    return;
+  }
+  
+  ParenPattern *FromParen = cast<ParenPattern>(&From);
+  To.push_back(TuplePatternElt(clonePattern(Context,
+                                            FromParen->getSubPattern())));
+}
+
+/// clonePattern - Clone the given pattern.
+static Pattern *clonePattern(ASTContext &Context, Pattern *Pat) {
+  switch (Pat->getKind()) {
+  case PatternKind::Any:
+    return new (Context) AnyPattern(cast<AnyPattern>(Pat)->getLoc());
+      
+  case PatternKind::Named: {
+    NamedPattern *Named = cast<NamedPattern>(Pat);
+    VarDecl *Var = new (Context) VarDecl(Named->getLoc(),
+                                         Named->getBoundName(),
+                                         Named->hasType()? Named->getType()
+                                                         : Type(),
+                                         Named->getDecl()->getDeclContext(),
+                                         Named->getDecl()->isModuleScope());
+    return new (Context) NamedPattern(Var);
+  }
+    
+  case PatternKind::Paren: {
+    ParenPattern *Paren = cast<ParenPattern>(Pat);
+    return new (Context) ParenPattern(Paren->getLParenLoc(),
+                                      clonePattern(Context,
+                                                   Paren->getSubPattern()),
+                                      Paren->getRParenLoc());
+  }
+    
+  case PatternKind::Tuple: {
+    TuplePattern *Tuple = cast<TuplePattern>(Pat);
+    SmallVector<TuplePatternElt, 2> Elts;
+    Elts.reserve(Tuple->getNumFields());
+    cloneTuplePatternElts(Context, *Tuple, Elts);
+    return TuplePattern::create(Context, Tuple->getLParenLoc(), Elts,
+                                Tuple->getRParenLoc());
+  }
+    
+  case PatternKind::Typed: {
+    TypedPattern *Typed = cast<TypedPattern>(Pat);
+    return new (Context) TypedPattern(clonePattern(Context,
+                                                   Typed->getSubPattern()),
+                                      Typed->getType());
+  }
+  }
+}
+
+
 /// parseSetGet - Parse a get-set clause, containing a getter and (optionally)
 /// a setter.
 ///
@@ -532,8 +596,8 @@ static void addVarsToScope(Parser &P, Pattern *Pat,
 ///
 ///   set-name:
 ///     '(' identifier ')'
-bool Parser::parseGetSet(bool HasContainerType, Type ElementTy,
-                         FuncDecl *&Get, FuncDecl *&Set,
+bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
+                         Type ElementTy, FuncDecl *&Get, FuncDecl *&Set,
                          SourceLoc &LastValidLoc) {
   if (GetIdent.empty()) {
     GetIdent = Context.getIdentifier("get");
@@ -584,8 +648,10 @@ bool Parser::parseGetSet(bool HasContainerType, Type ElementTy,
         Params.push_back(buildImplicitThisParameter());
       
       // Add a no-parameters clause.
-      Params.push_back(TuplePattern::create(Context, SourceLoc(),
-                                            ArrayRef<TuplePatternElt>(),
+      SmallVector<TuplePatternElt, 2> TupleElts;
+      if (Indices)
+        cloneTuplePatternElts(Context, *Indices, TupleElts);
+      Params.push_back(TuplePattern::create(Context, SourceLoc(), TupleElts,
                                             SourceLoc()));
       
       // Getter has type: () -> T.
@@ -685,6 +751,10 @@ bool Parser::parseGetSet(bool HasContainerType, Type ElementTy,
       SetName = Context.getIdentifier("value");
     
     {
+      SmallVector<TuplePatternElt, 2> TupleElts;
+      if (Indices)
+        cloneTuplePatternElts(Context, *Indices, TupleElts);
+      
       VarDecl *Value = new (Context) VarDecl(SetNameLoc, SetName, ElementTy,
                                              CurDeclContext,
                                              /*IsModuleScope=*/false);
@@ -693,10 +763,9 @@ bool Parser::parseGetSet(bool HasContainerType, Type ElementTy,
         = new (Context) TypedPattern(new (Context) NamedPattern(Value),
                                      ElementTy);
       
-      TuplePatternElt ValuePatternElt(ValuePattern, /*Init=*/nullptr);
+      TupleElts.push_back(TuplePatternElt(ValuePattern, /*Init=*/nullptr));
       Pattern *ValueParamsPattern
-      = TuplePattern::create(Context, SetNameParens.Start,
-                             ArrayRef<TuplePatternElt>(&ValuePatternElt, 1),
+      = TuplePattern::create(Context, SetNameParens.Start, TupleElts,
                              SetNameParens.End);
       Params.push_back(ValueParamsPattern);
     }
@@ -777,7 +846,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool hasContainerType) {
   FuncDecl *Get = 0;
   FuncDecl *Set = 0;
   SourceLoc LastValidLoc = LBLoc;
-  if (parseGetSet(hasContainerType, Ty, Get, Set, LastValidLoc))
+  if (parseGetSet(hasContainerType, /*Indices=*/0, Ty, Get, Set, LastValidLoc))
     Invalid = true;
   
   // Parse the final '}'.
@@ -1297,6 +1366,7 @@ bool Parser::parseProtocolBody(SourceLoc ProtocolLoc,
 ///
 bool Parser::parseDeclSubscript(bool HasContainerType,
                                 SmallVectorImpl<Decl *> &Decls) {
+  bool Invalid = false;
   SourceLoc SubscriptLoc = consumeToken(tok::kw_subscript);
   
   // attribute-list
@@ -1312,6 +1382,8 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   NullablePtr<Pattern> Params = parsePatternTuple();
   if (Params.isNull())
     return true;
+  if (checkFullyTyped(Params.get()))
+    Invalid = true;
   
   // '->'
   if (!Tok.is(tok::arrow)) {
@@ -1324,6 +1396,8 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   Type ElementTy;
   if (parseTypeAnnotation(ElementTy, diag::expected_type_subscript))
     return true;
+  if (checkFullyTyped(ElementTy))
+    Invalid = true;
   
   // '{'
   if (!Tok.is(tok::l_brace)) {
@@ -1336,8 +1410,8 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   FuncDecl *Get = 0;
   FuncDecl *Set = 0;
   SourceLoc LastValidLoc = LBLoc;
-  bool Invalid = false;
-  if (parseGetSet(HasContainerType, ElementTy, Get, Set, LastValidLoc))
+  if (parseGetSet(HasContainerType, Params.get(), ElementTy, Get, Set,
+                  LastValidLoc))
     Invalid = true;
 
   // Parse the final '}'.

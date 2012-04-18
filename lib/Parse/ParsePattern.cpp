@@ -19,7 +19,7 @@ using namespace swift;
 
 /// Check that the given type is fully-typed.
 /// FIXME: this is *terrible* for source locations.
-static bool checkFullyTyped(Parser &P, Type type) {
+bool Parser::checkFullyTyped(Type type) {
   switch (type->getKind()) {
   // Any sort of non-structural type can be ignored here.
   // Many of these are not actually possible to encounter in the
@@ -39,21 +39,21 @@ static bool checkFullyTyped(Parser &P, Type type) {
     return false;
 
   case TypeKind::Paren:
-    return checkFullyTyped(P, cast<ParenType>(type)->getUnderlyingType());
+    return checkFullyTyped(cast<ParenType>(type)->getUnderlyingType());
 
   case TypeKind::LValue:
-    return checkFullyTyped(P, cast<LValueType>(type)->getObjectType());
+    return checkFullyTyped(cast<LValueType>(type)->getObjectType());
 
   case TypeKind::Array:
-    return checkFullyTyped(P, cast<ArrayType>(type)->getBaseType());
+    return checkFullyTyped(cast<ArrayType>(type)->getBaseType());
 
   case TypeKind::ArraySlice:
-    return checkFullyTyped(P, cast<ArraySliceType>(type)->getBaseType());
+    return checkFullyTyped(cast<ArraySliceType>(type)->getBaseType());
 
   case TypeKind::Function: {
     FunctionType *fn = cast<FunctionType>(type);
-    return checkFullyTyped(P, fn->getInput())
-         | checkFullyTyped(P, fn->getResult());
+    return checkFullyTyped(fn->getInput())
+         | checkFullyTyped(fn->getResult());
   }
 
   case TypeKind::Tuple: {
@@ -62,12 +62,12 @@ static bool checkFullyTyped(Parser &P, Type type) {
     for (auto &elt : tuple->getFields()) {
       if (elt.getType().isNull()) {
         assert(elt.hasInit());
-        P.diagnose(elt.getInit()->getLoc(),
-                   diag::untyped_tuple_elt_in_function_signature)
+        diagnose(elt.getInit()->getLoc(),
+                 diag::untyped_tuple_elt_in_function_signature)
           << elt.getInit()->getSourceRange();
         isInvalid = true;
       } else {
-        isInvalid |= checkFullyTyped(P, elt.getType());
+        isInvalid |= checkFullyTyped(elt.getType());
       }
     }
     return isInvalid;
@@ -77,17 +77,17 @@ static bool checkFullyTyped(Parser &P, Type type) {
 }
 
 /// Check that the given pattern is fully-typed.
-static bool checkFullyTyped(Parser &P, Pattern *pattern) {
+bool Parser::checkFullyTyped(Pattern *pattern) {
   switch (pattern->getKind()) {
   // Any type with an explicit annotation is okay, as long as the
   // annotation is fully-typed.
   case PatternKind::Typed:
-    return checkFullyTyped(P, pattern->getType());
+    return checkFullyTyped(pattern->getType());
 
   // Paren types depend on their parenthesized pattern.
   case PatternKind::Paren: {
     Pattern *sub = cast<ParenPattern>(pattern)->getSubPattern();
-    if (checkFullyTyped(P, sub)) return true;
+    if (checkFullyTyped(sub)) return true;
     pattern->setType(sub->getType());
     return false;
   }
@@ -99,20 +99,20 @@ static bool checkFullyTyped(Parser &P, Pattern *pattern) {
     typeElts.reserve(tuple->getNumFields());
     for (const TuplePatternElt &elt : tuple->getFields()) {
       Pattern *subpattern = elt.getPattern();
-      if (checkFullyTyped(P, subpattern))
+      if (checkFullyTyped(subpattern))
         return true;
       typeElts.push_back(TupleTypeElt(subpattern->getType(),
                                       subpattern->getBoundName(),
                                       elt.getInit()));
     }
-    tuple->setType(TupleType::get(typeElts, P.Context));
+    tuple->setType(TupleType::get(typeElts, Context));
     return false;
   }
 
   // Everything else is uninferrable.
   case PatternKind::Named:
   case PatternKind::Any:
-    P.diagnose(pattern->getLoc(), diag::untyped_pattern_in_function_signature)
+    diagnose(pattern->getLoc(), diag::untyped_pattern_in_function_signature)
       << pattern->getSourceRange();
     return true;
   }
@@ -140,7 +140,7 @@ bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &params,
     if (parseType(type))
       return true;
 
-    checkFullyTyped(*this, type);
+    checkFullyTyped(type);
 
   // Otherwise, we implicitly return ().
   } else {
@@ -162,7 +162,7 @@ bool Parser::buildFunctionSignature(SmallVectorImpl<Pattern*> &params,
     Pattern *param = params[i - 1];
     
     Type paramType;
-    if (checkFullyTyped(*this, param)) {
+    if (checkFullyTyped(param)) {
       // Recover by ignoring everything.
       paramType = TupleType::getEmpty(Context);
     } else {

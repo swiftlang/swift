@@ -214,7 +214,7 @@ public:
 
   bool parseDeclStruct(SmallVectorImpl<Decl*> &Decls);
   bool parseDeclVar(bool hasContainerType, SmallVectorImpl<Decl*> &Decls);
-  bool parseGetSet(bool HasContainerType, Type ElementTy,
+  bool parseGetSet(bool HasContainerType, Pattern *Indices, Type ElementTy, 
                    FuncDecl *&Get, FuncDecl *&Set, SourceLoc &LastValidLoc);
   void parseDeclVarGetSet(Pattern &pattern, bool hasContainerType);
   
@@ -258,6 +258,8 @@ public:
   NullablePtr<Pattern> parsePattern();
   NullablePtr<Pattern> parsePatternTuple();
   NullablePtr<Pattern> parsePatternAtom();
+  bool checkFullyTyped(Type Ty);
+  bool checkFullyTyped(Pattern *Param);
   
   //===--------------------------------------------------------------------===//
   // Expression Parsing
