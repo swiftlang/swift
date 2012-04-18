@@ -45,7 +45,7 @@ static bool isFuncExpr(const Token &Tok1, const Token &Tok2) {
   // "func identifier" and "func [attribute]" is a func declaration,
   // otherwise we have a func expression.
   return Tok2.isNot(tok::identifier) && Tok2.isNot(tok::oper) &&
-         Tok2.isNot(tok::l_square);
+         Tok2.isNot(tok::l_square) && Tok2.isNot(tok::l_square_space);
 }
 
 /// isStartOfDecl - Return true if this is the start of a decl or decl-import.

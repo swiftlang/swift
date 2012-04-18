@@ -169,6 +169,17 @@ void Lexer::formToken(tok Kind, const char *TokStart) {
   NextToken.setToken(Kind, StringRef(TokStart, CurPtr-TokStart));
 }
 
+bool Lexer::isPrecededBySpace() {
+  // For these purposes, the start of the file is considered to be
+  // preceeded by infinite whitespace.
+  if (CurPtr - 1 == BufferStart)
+    return true;
+
+  // Otherwise, our list of whitespace characters is pretty short.
+  char LastChar = *(CurPtr - 2);
+  return (isspace(LastChar) || LastChar == '\0');
+}
+
 //===----------------------------------------------------------------------===//
 // Lexer Subroutines
 //===----------------------------------------------------------------------===//
@@ -669,31 +680,15 @@ Restart:
     // Otherwise, this is the end of the buffer.  Return EOF.
     return formToken(tok::eof, TokStart);
 
-  case '(': {
-    // This is either l_paren or l_paren_space depending on whether there is
-    // whitespace before it.
-    bool PrecededBySpace;
-
-    // For these purposes, the start of the file is considered to be
-    // preceeded by infinite whitespace.
-    if (CurPtr - 1 == BufferStart) {
-      PrecededBySpace = true;
-
-    // Otherwise, our list of whitespace characters is pretty short.
-    } else {
-      char LastChar = *(CurPtr - 2);
-      PrecededBySpace = (isspace(LastChar) || LastChar == '\0');
-    }
-
-    if (PrecededBySpace)
-      return formToken(tok::l_paren_space, TokStart);
-
-    return formToken(tok::l_paren, TokStart);
-  }
+  case '(':
+    return formToken(isPrecededBySpace() ? tok::l_paren_space : tok::l_paren,
+                     TokStart);
   case ')': return formToken(tok::r_paren,  TokStart);
   case '{': return formToken(tok::l_brace,  TokStart);
   case '}': return formToken(tok::r_brace,  TokStart);
-  case '[': return formToken(tok::l_square, TokStart);
+  case '[':
+    return formToken(isPrecededBySpace() ? tok::l_square_space : tok::l_square,
+                     TokStart);
   case ']': return formToken(tok::r_square, TokStart);
 
   case '.':

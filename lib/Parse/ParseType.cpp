@@ -130,7 +130,7 @@ bool Parser::parseType(Type &Result, Diag<> MessageID) {
   }
   
   while (1) {
-    // If there is a square bracket, we have an array.
+    // If there is a square bracket without a space, we have an array.
     SourceLoc TokLoc = Tok.getLoc();
     if (consumeIf(tok::l_square)) {
       if (parseTypeArray(TokLoc, Result)) return true;

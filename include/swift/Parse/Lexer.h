@@ -99,6 +99,7 @@ private:
   void lexOperatorIdentifier();
   void lexNumber();
   void lexStringLiteral();
+  bool isPrecededBySpace();
 };
   
   

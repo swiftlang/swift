@@ -200,7 +200,7 @@ public:
   
   TypeAliasDecl *parseDeclTypeAlias();
   void parseAttributeList(DeclAttributes &Attributes) {
-    if (Tok.is(tok::l_square))
+    if (Tok.is(tok::l_square) || Tok.is(tok::l_square_space))
       parseAttributeListPresent(Attributes);
   }
   void parseAttributeListPresent(DeclAttributes &Attributes);

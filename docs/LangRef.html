@@ -195,10 +195,10 @@
   </pre>
 
   <p>Space, newline, tab, and the nul byte are all considered whitespace and are
-     discarded, with one exception:  a '(' which does not follow a
+     discarded, with one exception:  a '(' or '[' which does not follow a
      non-whitespace character is different kind of token (called
      <em>spaced</em>) from one which does not (called <em>unspaced</em>).
-     A '(' at the beginning of a file is spaced.</p>
+     A '(' or '[' at the beginning of a file is spaced.</p>
   
   <p>Comments may follow the BCPL style, starting with a "//" and running to the
      end of the line, or may be recursively nested /**/ style comments. Comments
@@ -216,17 +216,23 @@
   </div>
 
   <pre class="grammar">
-    lparen-spaced   ::= '('      // preceded by space
-    lparen-unspaced ::= '('      // not preceded by space
-    lparen-any      ::= lparen-spaced
-    lparen-any      ::= lparen-unspaced
+    lparen-spaced    ::= '('      // preceded by space
+    lparen-unspaced  ::= '('      // not preceded by space
+    lparen-any       ::= lparen-spaced
+    lparen-any       ::= lparen-unspaced
+
+    lsquare-spaced   ::= '['      // preceded by space
+    lsquare-unspaced ::= '['      // not preceded by space
+    lsquare-any      ::= lsquare-spaced
+    lsquare-any      ::= lsquare-unspaced
 
     punctuation ::= lparen-spaced
     punctuation ::= lparen-unspaced
     punctuation ::= ')'
     punctuation ::= '{'
     punctuation ::= '}'
-    punctuation ::= '['
+    punctuation ::= lsquare-spaced
+    punctuation ::= lsquare-unspaced
     punctuation ::= ']'
     punctuation ::= '.'
     punctuation ::= ','
@@ -935,8 +941,8 @@ token following the opening '{' is either 'set' or 'get'.</p>
 
   <pre class="grammar">
     attribute-list ::= /*empty*/
-    attribute-list ::= '[' ']'
-    attribute-list ::= '[' attribute (',' attribute)* ']'
+    attribute-list ::= lsquare-any ']'
+    attribute-list ::= lsquare-any attribute (',' attribute)* ']'
     
     attribute      ::= attribute-infix
     attribute      ::= attribute-resilience
@@ -1311,8 +1317,8 @@ token following the opening '{' is either 'set' or 'get'.</p>
   </div>
   
   <pre class="grammar">
-    type-array ::= <a href="#type">type</a> '[' ']'
-    type-array ::= <a href="#type">type</a> '[' <a href="#expr">expr</a> ']'
+    type-array ::= <a href="#type">type</a> lsquare-unspaced ']'
+    type-array ::= <a href="#type">type</a> lsquare-unspaced <a href="#expr">expr</a> ']'
   </pre>
   
   <p>Array types include a base type and an optional size.  Array types indicate
@@ -1853,12 +1859,17 @@ token following the opening '{' is either 'set' or 'get'.</p>
   <!-- ===================================================================== -->
   
   <div class="commentary">
-    As with arrays, this is just hacked in for now.  Revisit this after we have
-    generics.
+    As with arrays, this is just hacked in for now.  Revisit this
+    after we have generics.
+
+    <br/><br/>We require an unspaced '[' because we want to avoid
+    ambiguities with expressions starting with '['.  We don't have any
+    of those right now, but it's inevitable that we'll want something
+    like an array literal or a list comprehension.
   </div>
 
   <pre class="grammar">
-    expr-subscript ::= <a href="#expr">expr-postfix</a> '[' <a href="#expr">expr</a> ']'
+    expr-subscript ::= <a href="#expr">expr-postfix</a> lsquare-unspaced <a href="#expr">expr</a> ']'
   </pre>
   
   <p>FIXME: Array subscript should just be an overloaded operator like any

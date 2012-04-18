@@ -233,6 +233,7 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     }
     
     // Check for a [expr] suffix.
+    // Note that this cannot be a l_square_space.
     if (consumeIf(tok::l_square)) {
       NullablePtr<Expr> Idx = parseExpr(diag::expected_expr_subscript_value);
       SourceLoc RLoc;

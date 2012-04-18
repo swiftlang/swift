@@ -244,7 +244,8 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
 ///     '[' ']'
 ///     '[' attribute (',' attribute)* ']'
 void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
-  Attributes.LSquareLoc = consumeToken(tok::l_square);
+  assert(Tok.is(tok::l_square) || Tok.is(tok::l_square_space));
+  Attributes.LSquareLoc = consumeToken();
   
   // If this is an empty attribute list, consume it and return.
   if (Tok.is(tok::r_square)) {

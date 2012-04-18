@@ -58,6 +58,7 @@ enum class tok {
   PUNCTUATOR(r_paren,     ")")
   PUNCTUATOR(l_brace,     "{")
   PUNCTUATOR(r_brace,     "}")
+  PUNCTUATOR(l_square_space, "[")
   PUNCTUATOR(l_square,    "[")
   PUNCTUATOR(r_square,    "]")
 
