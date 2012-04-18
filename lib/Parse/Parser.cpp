@@ -66,8 +66,10 @@ bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
 /// that into account.  If there's a #! line in a main module, ignore it.
 static StringRef ComputeLexStart(StringRef File, unsigned Offset,
                                  unsigned EndOffset, bool IsMainModule) {
-  if (Offset || EndOffset)
+  if (EndOffset)
     return File.slice(Offset, EndOffset);
+  else if (Offset)
+    return File.substr(Offset);
 
   if (IsMainModule && File.startswith("#!")) {
     StringRef::size_type Pos = File.find_first_of("\n\r");
