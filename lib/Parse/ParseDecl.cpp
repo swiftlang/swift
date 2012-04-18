@@ -31,6 +31,14 @@ using namespace swift;
 ///   translation-unit:
 ///     stmt-brace-item*
 void Parser::parseTranslationUnit(TranslationUnit *TU) {
+  if (TU->ASTStage == TranslationUnit::Parsed) {
+    // FIXME: This is a bit messy; need to figure out a better way to deal
+    // with memory allocation for TranslationUnit.
+    UnresolvedIdentifierTypes.insert(UnresolvedIdentifierTypes.end(),
+                                     TU->getUnresolvedIdentifierTypes().begin(),
+                                     TU->getUnresolvedIdentifierTypes().end());
+  }
+
   TU->ASTStage = TranslationUnit::Parsing;
 
   // Prime the lexer.

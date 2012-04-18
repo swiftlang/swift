@@ -148,14 +148,23 @@ void swift::REPL(ASTContext &Context) {
   llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
   llvm::LLVMContext LLVMContext;
   llvm::Module Module("REPL", LLVMContext);
+  std::string ErrorMessage;
 
   LoadSwiftRuntime();
+
+  llvm::EngineBuilder builder(&Module);
+  std::string ErrorMsg;
+  builder.setErrorStr(&ErrorMsg);
+  builder.setEngineKind(llvm::EngineKind::JIT);
+
+  llvm::ExecutionEngine *EE = builder.create();
 
   irgen::Options Options;
   Options.OutputFilename = "";
   Options.Triple = llvm::sys::getDefaultTargetTriple();
   Options.OptLevel = 0;
   Options.OutputKind = irgen::OutputKind::Module;
+  Options.IsREPL = true;
 
   char* CurBuffer = const_cast<char*>(Buffer->getBufferStart());
   unsigned CurBufferOffset = 0;
@@ -191,14 +200,23 @@ void swift::REPL(ASTContext &Context) {
     if (!ShouldRun)
       continue;
 
-    // IRGen the main module.
+    // IRGen the current line(s) module.
+    llvm::Module LineModule("REPLLine", LLVMContext);
     performCaptureAnalysis(TU, CurTUElem);
-    performIRGeneration(Options, &Module, TU, CurTUElem);
-
-    CurTUElem = TU->Body->getNumElements();
+    performIRGeneration(Options, &LineModule, TU, CurTUElem);
 
     if (Context.hadError())
       return;
+
+    CurTUElem = TU->Body->getNumElements();
+
+    if (llvm::Linker::LinkModules(&Module, &LineModule,
+                                  llvm::Linker::DestroySource,
+                                  &ErrorMessage)) {
+      llvm::errs() << "Error linking swift modules\n";
+      llvm::errs() << ErrorMessage << "\n";
+      return;
+    }
 
     // IRGen the modules this module depends on.
     for (auto ModPair : TU->getImportedModules()) {
@@ -217,7 +235,6 @@ void swift::REPL(ASTContext &Context) {
       if (Context.hadError())
         return;
 
-      std::string ErrorMessage;
       if (llvm::Linker::LinkModules(&Module, &SubModule,
                                     llvm::Linker::DestroySource,
                                     &ErrorMessage)) {
@@ -229,18 +246,8 @@ void swift::REPL(ASTContext &Context) {
 
     // The way we do this is really ugly... we should be able to improve this.
     llvm::Function *EntryFn = Module.getFunction("main");
-
-    {
-      llvm::EngineBuilder builder(&Module);
-      std::string ErrorMsg;
-      builder.setErrorStr(&ErrorMsg);
-      builder.setEngineKind(llvm::EngineKind::JIT);
-
-      llvm::ExecutionEngine *EE = builder.create();
-
-      EE->runFunctionAsMain(EntryFn, std::vector<std::string>(), 0);
-    }
-
+    EE->runFunctionAsMain(EntryFn, std::vector<std::string>(), 0);
+    EE->freeMachineCodeForFunction(EntryFn);
     EntryFn->eraseFromParent();
   }
 }

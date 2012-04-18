@@ -56,7 +56,10 @@ public:
   /// The optimization level, as in -O2.
   unsigned OptLevel : 2;
 
-  Options() : OutputKind(OutputKind::LLVMAssembly), Verify(true), OptLevel(0) {}
+  bool IsREPL : 1;
+
+  Options() : OutputKind(OutputKind::LLVMAssembly), Verify(true), OptLevel(0),
+              IsREPL(false) {}
 };
 
 } // end namespace irgen
