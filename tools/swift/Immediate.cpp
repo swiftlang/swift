@@ -265,6 +265,22 @@ extern "C" void _TSs5printFT3valNSs6String_T_(char* l) {
   printf("%s", l);
 }
 
+// func Strlen(value : Builtin.RawPointer) -> Int
+extern "C" int64_t _TSs6StrlenFT5valuep_NSs5Int64(char* s) {
+  return strlen(s);
+}
+
+// func [infix_left=190] + (lhs : String,
+//                          rhs : String) -> String
+extern "C" char* _TSsop1pFT3lhsNSs6String3rhsS__S_(char* lhs, char* rhs) {
+   size_t ls = strlen(lhs);
+   size_t rs = strlen(rhs);
+   char* s = (char*)malloc(ls+rs+1);
+   memcpy(s, lhs, ls);
+   strcpy(s+ls, rhs);
+   return s;
+}
+
 extern "C" bool _TNSs4Bool13getLogicValuefRS_FT_i1(bool* b) {
   return *b;
 }
