@@ -35,6 +35,7 @@ struct ASTContext::Implementation {
   llvm::DenseMap<std::pair<Type,std::pair<Type,char>>,
                  FunctionType*> FunctionTypes;
   llvm::DenseMap<std::pair<Type, uint64_t>, ArrayType*> ArrayTypes;
+  llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
   llvm::DenseMap<unsigned, BuiltinIntegerType*> IntegerTypes;
   llvm::DenseMap<Type, ParenType*> ParenTypes;
   llvm::DenseMap<std::pair<Type, LValueType::Qual::opaque_type>, LValueType*>
@@ -223,9 +224,11 @@ FunctionType::FunctionType(Type input, Type result, bool isAutoClosure)
     Input(input), Result(result), AutoClosure(isAutoClosure) { }
 
 
-/// getArrayType - Return a uniqued array type with the specified base type
-/// and the specified size.  Size=0 indicates an unspecified size array.
+/// Return a uniqued array type with the specified base type and the
+/// specified size.
 ArrayType *ArrayType::get(Type BaseType, uint64_t Size, ASTContext &C) {
+  assert(Size != 0);
+
   ArrayType *&Entry = C.Impl.ArrayTypes[std::make_pair(BaseType, Size)];
   if (Entry) return Entry;
 
@@ -239,6 +242,13 @@ ArrayType::ArrayType(Type base, uint64_t size)
     Base(base), Size(size) {}
 
 
+/// Return a uniqued array slice type with the specified base type.
+ArraySliceType *ArraySliceType::get(Type base, SourceLoc loc, ASTContext &C) {
+  ArraySliceType *&entry = C.Impl.ArraySliceTypes[base];
+  if (entry) return entry;
+
+  return entry = new (C) ArraySliceType(loc, base);
+}
 
 /// getNew - Return a new instance of a protocol type.  These are never
 /// uniqued since each syntactic instance of them is semantically considered

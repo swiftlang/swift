@@ -60,6 +60,7 @@ ALWAYS_CANONICAL_TYPE(MetaType, Type)
 ALWAYS_CANONICAL_TYPE(Module, Type)
 TYPE(Function, Type)
 TYPE(Array, Type)
+SUGARED_TYPE(ArraySlice, Type)
 ALWAYS_CANONICAL_TYPE(Protocol, Type)
 TYPE(LValue, Type)
 

@@ -17,6 +17,7 @@
 #include "Parser.h"
 #include "swift/AST/Attr.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
@@ -272,7 +273,9 @@ bool Parser::parseTypeArray(Type &result) {
       return true;
     }
 
-    return ArrayType::get(result, 0, Context);
+    // Just build a normal array slice type.
+    result = ArraySliceType::get(result, lsquareLoc, Context);
+    return false;
   }
   
   NullablePtr<Expr> sizeEx = parseExpr(diag::expected_expr_array_type);

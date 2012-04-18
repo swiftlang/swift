@@ -659,6 +659,15 @@ ERROR(coerced_tuple_pattern_has_init,sema_tcp,none,
 ERROR(named_pattern_not_materializable,sema_tcp,none,
       "type %0 of named pattern is not materializable", (Type))
 
+//------------------------------------------------------------------------------
+// Type Check Types
+//------------------------------------------------------------------------------
+
+ERROR(base_of_array_slice_not_nominal,sema_tct,none,
+      "base type of array slice must be a nominal type", (Type))
+ERROR(slice_type_not_found,sema_tct,none,
+      "cannot find slice implementation type '%0'", (StringRef))
+
 //==============================================================================
 // IR Generation Diagnostics
 //==============================================================================

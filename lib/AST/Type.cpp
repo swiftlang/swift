@@ -159,6 +159,15 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
     
     return this;
   }
+
+  case TypeKind::ArraySlice: {
+    ArraySliceType *sliceTy = cast<ArraySliceType>(this);
+    Type baseTy = sliceTy->getBaseType()->getUnlabeledType(Context);
+    if (baseTy.getPointer() != sliceTy->getBaseType().getPointer())
+      return ArraySliceType::get(baseTy, sliceTy->getFirstRefLoc(), Context);
+    
+    return this;
+  }
       
   case TypeKind::LValue: {
     LValueType *LValueTy = cast<LValueType>(this);
@@ -266,6 +275,8 @@ TypeBase *TypeBase::getDesugaredType() {
     return cast<IdentifierType>(this)->getDesugaredType();
   case TypeKind::NameAlias:
     return cast<NameAliasType>(this)->getDesugaredType();
+  case TypeKind::ArraySlice:
+    return cast<ArraySliceType>(this)->getDesugaredType();
   }
 
   llvm_unreachable("Unknown type kind");
@@ -283,6 +294,9 @@ TypeBase *IdentifierType::getDesugaredType() {
   return getMappedType()->getDesugaredType();
 }
 
+TypeBase *ArraySliceType::getDesugaredType() {
+  return getImplementationType()->getDesugaredType();
+}
 
 const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {
   switch (getFPKind()) {
@@ -538,11 +552,12 @@ void FunctionType::print(raw_ostream &OS) const {
   OS << Input << " -> " << Result;
 }
 
+void ArraySliceType::print(raw_ostream &OS) const {
+  OS << Base << "[]";
+}
+
 void ArrayType::print(raw_ostream &OS) const {
-  OS << Base << '[';
-  if (Size)
-    OS << Size;
-  OS << ']';
+  OS << Base << '[' << Size << ']';
 }
 
 void ProtocolType::print(raw_ostream &OS) const {

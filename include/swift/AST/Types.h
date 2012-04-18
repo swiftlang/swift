@@ -680,7 +680,6 @@ class ArrayType : public TypeBase {
   
 public:
   /// 'Constructor' Factory Function.
-  /// Size=0 indicates an unspecified size array.
   static ArrayType *get(Type BaseType, uint64_t Size, ASTContext &C);
 
   Type getBaseType() const { return Base; }
@@ -698,6 +697,53 @@ private:
   ArrayType(Type Base, uint64_t Size);
 };
   
+/// ArraySliceType - An array slice type is the type T[], which is
+/// always sugar for a library type.
+class ArraySliceType : public TypeBase {
+  // ArraySliceTypes are never canonical.
+  ArraySliceType(SourceLoc loc, Type base)
+    : TypeBase(TypeKind::ArraySlice, nullptr, /*Dependent=*/false),
+      FirstRef(loc), Base(base) {}
+
+  SourceLoc FirstRef;
+  Type Base;
+  Type Impl;
+
+public:
+  static ArraySliceType *get(Type baseTy, SourceLoc loc, ASTContext &C);
+
+  // HACK
+  SourceLoc getFirstRefLoc() const {
+    return FirstRef;
+  }
+
+  bool hasImplementationType() const { return !Impl.isNull(); }
+  void setImplementationType(Type ty) {
+    assert(!hasImplementationType());
+    Impl = ty;
+  }
+  Type getImplementationType() const {
+    assert(hasImplementationType());
+    return Impl;
+  }
+
+  Type getBaseType() const {
+    return Base;
+  }
+   
+  /// getDesugaredType - If this type is a sugared type, remove all levels of
+  /// sugar until we get down to a non-sugar type.
+  TypeBase *getDesugaredType();
+
+  void print(raw_ostream &OS) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ArraySliceType *) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::ArraySlice;
+  }
+};
+
 /// ProtocolType - A protocol type describes an abstract interface implemented
 /// by another type.
 class ProtocolType : public TypeBase, public DeclContext {

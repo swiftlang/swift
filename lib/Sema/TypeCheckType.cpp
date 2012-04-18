@@ -16,8 +16,43 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
+
+/// Given an array slice type with a valid base type and no
+/// implementation type, find its canonicalization.
+static bool buildArraySliceType(TypeChecker &TC, ArraySliceType *sliceTy) {
+  Type baseTy = sliceTy->getBaseType();
+
+  SourceLoc loc = sliceTy->getFirstRefLoc();
+
+  // As our current hack for array slices, require the base type to be
+  // a nominal type X, then look for a type SliceX.
+  Identifier name;
+  if (OneOfType *oneof = baseTy->getAs<OneOfType>()) {
+    name = oneof->getDecl()->getName();
+  } else {
+    TC.diagnose(loc, diag::base_of_array_slice_not_nominal, baseTy);
+    return true;
+  }
+
+  llvm::SmallString<32> nameBuffer("Slice");
+  nameBuffer.append(name.str());
+
+  TypeAliasDecl *TAD =
+    TC.TU.lookupGlobalType(TC.Context.getIdentifier(nameBuffer),
+                           NLKind::UnqualifiedLookup);
+  if (!TAD) {
+    TC.diagnose(loc, diag::slice_type_not_found, nameBuffer);
+    return true;
+  }
+
+  // FIXME: there's no reason to think that the alias type will have
+  // been validated in general.
+  sliceTy->setImplementationType(TAD->getAliasType());
+  return false;
+}
 
 /// validateType - Recursively check to see if the type of a decl is valid.  If
 /// not, diagnose the problem and collapse it to an ErrorType.
@@ -127,6 +162,14 @@ bool TypeChecker::validateType(Type InTy) {
     IsInvalid = validateType(AT->getBaseType());
     // FIXME: diagnose non-materializability of element type!
     // FIXME: We need to check AT->Size! (It also has to be convertible to int).
+    break;
+  }
+  case TypeKind::ArraySlice: {
+    ArraySliceType *AT = cast<ArraySliceType>(T);
+    IsInvalid = validateType(AT->getBaseType());
+    // FIXME: diagnose non-materializability of element type?
+    if (!IsInvalid)
+      IsInvalid = buildArraySliceType(*this, AT);
     break;
   }
       
