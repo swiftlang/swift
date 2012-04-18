@@ -117,11 +117,13 @@ void swift::RunImmediately(TranslationUnit *TU) {
 
 struct InitEditLine {
   EditLine *e;
+  static char *PromptFn(EditLine *) {
+    return (char*)"swift> ";
+  };
+
   InitEditLine() {
     e = el_init("swift", stdin, stdout, stderr);
     el_set(e, EL_EDITOR, "emacs");
-    char *(*PromptFn)(EditLine *) =
-        [](EditLine *e) { return (char*)"swift> "; };
     el_set(e, EL_PROMPT, PromptFn);
   }
   ~InitEditLine() {
