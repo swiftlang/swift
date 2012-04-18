@@ -141,11 +141,16 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     if (NeedParseErrorRecovery)
       skipUntilDeclStmtRBrace();
 
-    if (IsTopLevel && !IsMainModule && !NeedParseErrorRecovery &&
-        Entries.back().is<Stmt*>()) {
-      // Statements are not allowed at the top level outside the main module
-      SourceLoc Loc = Entries.back().get<Stmt*>()->getStartLoc();
-      diagnose(Loc, diag::illegal_top_level_stmt);
+    if (IsTopLevel && !IsMainModule && !NeedParseErrorRecovery) {
+      if (Entries.back().is<Stmt*>()) {
+        // Statements are not allowed at the top level outside the main module.
+        SourceLoc Loc = Entries.back().get<Stmt*>()->getStartLoc();
+        diagnose(Loc, diag::illegal_top_level_stmt);
+      } else if (Entries.back().is<Expr*>()) {
+        // Expressions are not allowed at the top level outside the main module.
+        SourceLoc Loc = Entries.back().get<Expr*>()->getStartLoc();
+        diagnose(Loc, diag::illegal_top_level_expr);
+      }
     }
 
     if (IsTopLevel && IsMainModule) {
