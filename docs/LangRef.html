@@ -1929,12 +1929,6 @@ token following the opening '{' is either 'set' or 'get'.</p>
   <h3 id="expr-call">Function Application</h3>
   <!-- ===================================================================== -->
   
-  <div class="commentary">
-    Type conversions/casts are just normal function calls: Int(4.0) just runs
-    the (overloaded) 'Int' function on its argument.  Separation of the value
-    and type namespace makes this simple.
-  </div>
-
   <pre class="grammar">
     expr-call ::= <a href="#expr">expr-postfix</a> <a href="#expr-paren">expr-paren</a>
   </pre>
@@ -1943,8 +1937,25 @@ token following the opening '{' is either 'set' or 'get'.</p>
   a <tt>lparen-unspaced</tt>.  This greatly reduces the likelihood of
   confusion from semicolon elision, without requiring feedback from
   the typechecker or more aggressive whitespace sensitivity.</p>
-  
-  <p>Simple examples:</p>
+
+  <p>If the <tt>expr-prefix</tt> refers to a (possibly
+  parenthesized) name of a type, the <tt>expr-paren</tt> is first
+  coerced to the type named by <tt>expr-prefix</tt>. If that coercion
+  fails, then the <tt>expr-prefix</tt> refers to the set of
+  constructors for that type, which consists of:
+  <ul>
+    <li>All of the elements of a oneof type (if any), and</li>
+    <li>All of the methods with the name as the oneof type, found in
+  either the original declaration of the oneof type or its extensions.</li>
+  </ul></p>
+
+  <div class="commentary">
+    Actual type conversions/casts are just normal function calls to
+    constructors: Int(4.0) just runs the (overloaded) 'Int' function
+    on its argument.
+  </div>
+
+ <p>Simple examples:</p>
   
   <pre class="example">
     <i>// Application of an empty tuple to the function f.</i>

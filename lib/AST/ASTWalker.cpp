@@ -222,6 +222,18 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return E;      
   }    
 
+  Expr *visitCoerceExpr(CoerceExpr *E) {
+    Expr *LHS = doIt(E->getLHS());
+    if (!LHS) return nullptr;
+    E->setLHS(LHS);
+    
+    Expr *RHS = doIt(E->getRHS());
+    if (!RHS) return nullptr;
+    E->setRHS(RHS);
+    
+    return E;
+  }
+  
   Stmt *visitErrorStmt(ErrorStmt *S) {
     return S;
   }

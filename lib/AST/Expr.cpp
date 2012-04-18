@@ -544,7 +544,14 @@ public:
     OS << '\n';
     printRec(E->getRHS());
     OS << ')';
-  }    
+  }
+  void visitCoerceExpr(CoerceExpr *E) {
+    printCommon(E, "coerce_expr") << '\n';
+    printRec(E->getLHS());
+    OS << '\n';
+    printRec(E->getRHS());
+    OS << ')';
+  }
 };
 
 } // end anonymous namespace.

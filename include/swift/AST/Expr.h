@@ -1272,7 +1272,38 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DotSyntaxBaseIgnored;
   }
+};
 
+/// CoerceExpr - Represents a function application a(b) that is actually a
+/// type coercion of the expression 'b' to the type 'a'. This expression
+/// is not used for actual casts, because those are constructor calls.
+class CoerceExpr : public Expr {
+  Expr *LHS;
+  Expr *RHS;
+  
+public:
+  CoerceExpr(Expr *LHS, Expr *RHS)
+    : Expr(ExprKind::Coerce, RHS->getType()), LHS(LHS), RHS(RHS) { }
+           
+  Expr *getLHS() const { return LHS; }
+  Expr *getRHS() const { return RHS; }
+  
+  void setLHS(Expr *E) { LHS = E; }
+  void setRHS(Expr *E) { RHS = E; }
+  
+  
+  SourceLoc getStartLoc() const { return LHS->getStartLoc(); }
+  SourceLoc getEndLoc() const { return RHS->getEndLoc(); }
+  
+  SourceRange getSourceRange() const {
+    return SourceRange(LHS->getStartLoc(), RHS->getEndLoc());
+  }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const CoerceExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Coerce;
+  }
 };
   
 } // end namespace swift

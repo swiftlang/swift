@@ -178,6 +178,7 @@ public:
   CoercedResult visitNewArrayExpr(NewArrayExpr *E) {
     return unchanged(E);
   }
+  
   static Type matchLValueType(ValueDecl *val, LValueType *lv) {
     if (val->isReferencedAsLValue() && 
         val->getType()->isEqual(lv->getObjectType()))
@@ -296,15 +297,24 @@ public:
   }
     
   CoercedResult visitTupleExpr(TupleExpr *E) {
+    if (!Apply && !DestTy->isEqual(E->getType()))
+      return nullptr;
+    
     return unchanged(E);
   }
   
   CoercedResult visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
     // FIXME: Is this an error-recovery case?
+    if (!Apply && !DestTy->isEqual(E->getType()))
+      return nullptr;
+    
     return unchanged(E);
   }
   CoercedResult visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     // FIXME: Is this an error-recovery case?
+    if (!Apply && !DestTy->isEqual(E->getType()))
+      return nullptr;
+    
     return unchanged(E);
   }
 
@@ -339,6 +349,10 @@ public:
     return unchanged(E);
   }
 
+  CoercedResult visitCoerceExpr(CoerceExpr *E) {
+    return unchanged(E);
+  }
+  
   CoercedResult visitImplicitConversionExpr(ImplicitConversionExpr *E) {
     return unchanged(E);
   }
@@ -1124,8 +1138,8 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
   assert(!DestTy->isDependentType() &&
          "Result of conversion can't be dependent");
 
-  // Don't bother trying to perform a conversion to error type.
-  if (DestTy->is<ErrorType>())
+  // Don't bother trying to perform a conversion to or from error type.
+  if (DestTy->is<ErrorType>() || E->getType()->is<ErrorType>())
     return nullptr;
   
   // If the destination is a AutoClosing FunctionType, we have special rules.

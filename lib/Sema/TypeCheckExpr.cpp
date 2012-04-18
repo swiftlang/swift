@@ -117,6 +117,15 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
   return false;
 }
 
+/// \brief Determine whether this expression refers to a type directly (ignoring
+/// parentheses), rather than some variable of metatype type.
+static bool isDirectTypeReference(Expr *E) {
+  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->getSemanticsProvidingExpr()))
+    return isa<TypeAliasDecl>(DRE->getDecl());
+  
+  return false;
+}
+
 Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   Expr *E1 = E->getFn();
   Expr *E2 = E->getArg();
@@ -174,6 +183,13 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     if (Ty->is<ErrorType>())
       return 0;  // Squelch an erroneous subexpression.
 
+    // If the 'function' is actually a direct reference to a type alias,
+    // and the argument is coercible to that type, this is a type cast.
+    if (isDirectTypeReference(E1) && isCoercibleToType(E2, Ty)) {
+      assert(!Ty->is<LValueType>() && "Cannot coerce to lvalue type!");
+      return new (Context) CoerceExpr(E1, coerceToType(E2, Ty));
+    }
+
     // The only well formed version of this is a oneof (or sugar for one) that
     // is constructed.
     // TODO: It might make sense to be able to "default construct" protocols if
@@ -181,23 +197,21 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // TODO: We could allow constructing a tuple this way, though it is somewhat
     // silly and pointless to do so.
     if (OneOfType *OOT = Ty->getAs<OneOfType>()) {
-      if (!OOT->getElements().empty()) {
-        SmallVector<ValueDecl *, 4> Methods;
-        
-        // Look for extension methods with the same name as the class.
-        // FIXME: This should look specifically for constructors.
-        TU.lookupGlobalExtensionMethods(Ty, OOT->getDecl()->getName(),
-                                        Methods);
-        
-        // Add each of the one-of elements.
-        Methods.insert(Methods.begin(),
-                       OOT->getElements().begin(), OOT->getElements().end());
-        Expr *FnRef = OverloadedDeclRefExpr::createWithCopy(Methods,
-                                                            E1->getStartLoc());
-        
-        // FIXME: This loses source information!
-        return semaApplyExpr(new (Context) ConstructorCallExpr(FnRef, E2));
-      }
+      SmallVector<ValueDecl *, 4> Methods;
+      
+      // Look for extension methods with the same name as the class.
+      // FIXME: This should look specifically for constructors.
+      TU.lookupGlobalExtensionMethods(Ty, OOT->getDecl()->getName(),
+                                      Methods);
+      
+      // Add each of the one-of elements.
+      Methods.insert(Methods.begin(),
+                     OOT->getElements().begin(), OOT->getElements().end());
+      Expr *FnRef = OverloadedDeclRefExpr::createWithCopy(Methods,
+                                                          E1->getStartLoc());
+      
+      // FIXME: This loses source information!
+      return semaApplyExpr(new (Context) ConstructorCallExpr(FnRef, E2));
     }
   }
   
@@ -377,6 +391,11 @@ public:
     return E;
   }
 
+  Expr *visitCoerceExpr(CoerceExpr *E) {
+    assert(!E->getType()->isDependentType());
+    return E;
+  }
+    
   Expr *visitImplicitConversionExpr(ImplicitConversionExpr *E) {
     assert(!E->getType()->isDependentType());
     // Implicit conversions have been fully checked.
