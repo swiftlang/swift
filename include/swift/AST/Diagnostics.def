@@ -146,8 +146,8 @@ ERROR(getset_nontrivial_pattern,decl_parsing,none,
 ERROR(expected_rbrace_in_getset,decl_parsing,none,
       "expected '}' at end of variable get/set clause", ())
 ERROR(duplicate_getset,decl_parsing,none,
-      "duplicate definition of %select{getter|setter}0 for %1", 
-      (bool, Identifier))
+      "duplicate definition of %select{getter|setter}0",
+      (bool))
 NOTE(previous_getset,decl_parsing,none,
      "previous definition of %select{getter|setter}0 is here", (bool))
 ERROR(expected_lbrace_get,decl_parsing,none,

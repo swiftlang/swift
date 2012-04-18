@@ -214,6 +214,8 @@ public:
 
   bool parseDeclStruct(SmallVectorImpl<Decl*> &Decls);
   bool parseDeclVar(bool hasContainerType, SmallVectorImpl<Decl*> &Decls);
+  bool parseGetSet(bool HasContainerType, Type ElementTy,
+                   FuncDecl *&Get, FuncDecl *&Set, SourceLoc &LastValidLoc);
   void parseDeclVarGetSet(Pattern &pattern, bool hasContainerType);
   
   VarDecl *parseDeclVarSimple();
@@ -232,7 +234,7 @@ public:
   OneOfType *actOnOneOfType(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
                             ArrayRef<OneOfElementInfo> Elts,
                             TypeAliasDecl *PrettyTypeName);
-
+  
   //===--------------------------------------------------------------------===//
   // Type Parsing
   

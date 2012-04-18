@@ -389,7 +389,7 @@
     decl ::= <a href="#decl-struct">decl-struct</a>
     decl ::= <a href="#decl-typealias">decl-typealias</a>
     decl ::= <a href="#decl-var">decl-var</a>    
- </pre>
+</pre>
 
 
   <!-- ===================================================================== -->
@@ -476,20 +476,20 @@
   
   <pre id="value-specifier" class="grammar">
     decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#pattern">pattern</a> initializer?
-    decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a> '{' var-get-set '}'
+    decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a> '{' get-set '}'
   
     decl-var-simple ::= 'var' <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a>
 
     initializer     ::= '=' <a href="#expr">expr</a>
 
-    var-get-set     ::= var-get var-set?
-    var-get-set     ::= var-set var-get
+    <a name="get-set"></a>get-set         ::= get set?
+    get-set         ::= set get
 
-    var-get         ::= 'get' <a href="#stmt-brace">stmt-brace</a>
+    get             ::= 'get' <a href="#stmt-brace">stmt-brace</a>
 
-    var-set         ::= 'set' var-set-name? <a href="#stmt-brace">stmt-brace</a>
+    set             ::= 'set' set-name? <a href="#stmt-brace">stmt-brace</a>
 
-    var-set-name    ::= '(' <a href="#identifier">identifier</a> ')'
+    set-name        ::= '(' <a href="#identifier">identifier</a> ')'
 </pre>
   
 
@@ -932,9 +932,7 @@ token following the opening '{' is either 'set' or 'get'.</p>
   protocol type.</p>
   
   <p>TODO: typealias members</p>
-  
-
-  
+   
   <!-- ===================================================================== -->
   <h3 id="attribute-list">Attribute Lists</h3>
   <!-- ===================================================================== -->

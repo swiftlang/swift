@@ -44,6 +44,7 @@ enum class tok {
   KEYWORD(typealias)
   KEYWORD(var)
   KEYWORD(static)
+  KEYWORD(subscript)
   
   // Statements
   KEYWORD(if)

@@ -499,22 +499,224 @@ static void addVarsToScope(Parser &P, Pattern *Pat,
   llvm_unreachable("bad pattern kind!");
 }
 
+/// parseSetGet - Parse a get-set clause, containing a getter and (optionally)
+/// a setter.
+///
+///   get-set:
+///      get var-set?
+///      set var-get
+///
+///   get:
+///     'get' stmt-brace
+///
+///   set:
+///     'set' set-name? stmt-brace
+///
+///   set-name:
+///     '(' identifier ')'
+bool Parser::parseGetSet(bool HasContainerType, Type ElementTy,
+                         FuncDecl *&Get, FuncDecl *&Set,
+                         SourceLoc &LastValidLoc) {
+  bool Invalid = false;
+  Get = 0;
+  Set = 0;
+  
+  while (true) {
+    if (!Tok.is(tok::identifier))
+      break;
+    
+    Identifier Id = Context.getIdentifier(Tok.getText());
+    
+    if (Id == GetIdent) {
+      //   get         ::= 'get' stmt-brace
+      
+      // Have we already parsed a get clause?
+      if (Get) {
+        diagnose(Tok.getLoc(), diag::duplicate_getset, false);
+        diagnose(Get->getLocStart(), diag::previous_getset, false);
+        
+        // Forget the previous version.
+        Get = 0;
+      }
+      
+      SourceLoc GetLoc = consumeToken();
+      
+      // It's easy to imagine someone writing redundant parentheses here;
+      // diagnose this directly.
+      if ((Tok.is(tok::l_paren) || Tok.is(tok::l_paren_space)) &&
+          peekToken().is(tok::r_paren)) {
+        SourceLoc StartLoc = consumeToken();
+        SourceLoc EndLoc = consumeToken();
+        diagnose(StartLoc, diag::empty_parens_getsetname, false)
+          << SourceRange(StartLoc, EndLoc);
+      }
+      
+      // Set up a function declaration for the getter and parse its body.
+      
+      // Create the parameter list(s) for the getter.
+      llvm::SmallVector<Pattern *, 2> Params;
+      
+      // Add the implicit 'this' to Params, if needed.
+      if (HasContainerType)
+        Params.push_back(buildImplicitThisParameter());
+      
+      // Add a no-parameters clause.
+      Params.push_back(TuplePattern::create(Context, SourceLoc(),
+                                            ArrayRef<TuplePatternElt>(),
+                                            SourceLoc()));
+      
+      // Getter has type: () -> T.
+      Type FuncTy = ElementTy;
+      if (buildFunctionSignature(Params, FuncTy)) {
+        skipUntilDeclRBrace();
+        Invalid = true;
+        break;
+      }
+      
+      Scope FnBodyScope(this);
+      
+      // Start the function.
+      FuncExpr *GetFn = actOnFuncExprStart(GetLoc, FuncTy, Params);
+      
+      // Establish the new context.
+      ContextChange CC(*this, GetFn);
+      
+      NullablePtr<BraceStmt> Body = parseStmtBrace(diag::expected_lbrace_get);
+      if (Body.isNull()) {
+        GetLoc = SourceLoc();
+        skipUntilDeclRBrace();
+        Invalid = true;
+        break;
+      }
+      
+      GetFn->setBody(Body.get());
+      LastValidLoc = Body.get()->getRBraceLoc();
+      
+      Get = new (Context) FuncDecl(/*StaticLoc=*/SourceLoc(), GetLoc,
+                                   Identifier(), FuncTy, GetFn, CurDeclContext,
+                                   ScopeInfo.isModuleScope());
+      continue;
+    }
+    
+    if (Id != SetIdent) {
+      diagnose(Tok.getLoc(), diag::expected_getset);
+      skipUntilDeclRBrace();
+      Invalid = true;
+      break;
+    }
+    
+    //   var-set         ::= 'set' var-set-name? stmt-brace
+    
+    // Have we already parsed a var-set clause?
+    if (Set) {
+      diagnose(Tok.getLoc(), diag::duplicate_getset, true);
+      diagnose(Set->getLocStart(), diag::previous_getset, true);
+      
+      // Forget the previous setter.
+      Set = 0;
+    }
+    
+    SourceLoc SetLoc = consumeToken();
+    
+    //   var-set-name    ::= '(' identifier ')'
+    Identifier SetName;
+    SourceLoc SetNameLoc;
+    SourceRange SetNameParens;
+    if (Tok.is(tok::l_paren) || Tok.is(tok::l_paren_space)) {
+      SourceLoc StartLoc = consumeToken();
+      if (Tok.is(tok::identifier)) {
+        // We have a name.
+        SetName = Context.getIdentifier(Tok.getText());
+        SetNameLoc = consumeToken();
+        
+        // Look for the closing ')'.
+        SourceLoc EndLoc;
+        if (parseMatchingToken(tok::r_paren, EndLoc,
+                               diag::expected_rparen_setname,
+                               StartLoc, diag::opening_paren))
+          EndLoc = SetNameLoc;
+        SetNameParens = SourceRange(StartLoc, EndLoc);
+      } else if (Tok.is(tok::r_paren)) {
+        diagnose(StartLoc, diag::empty_parens_getsetname, true)
+        << SourceRange(StartLoc, consumeToken());
+      } else {
+        diagnose(Tok.getLoc(), diag::expected_setname);
+        skipUntil(tok::r_paren, tok::l_brace);
+        if (Tok.is(tok::r_paren))
+          consumeToken();
+      }
+    }
+    
+    // Set up a function declaration for the setter and parse its body.
+    
+    // Create the parameter list(s) for the setter.
+    llvm::SmallVector<Pattern *, 2> Params;
+    
+    // Add the implicit 'this' to Params, if needed.
+    if (HasContainerType)
+      Params.push_back(buildImplicitThisParameter());
+    
+    // Add the parameter. If no name was specified, the name defaults to
+    // 'value'.
+    if (SetName.empty())
+      SetName = Context.getIdentifier("value");
+    
+    {
+      VarDecl *Value = new (Context) VarDecl(SetNameLoc, SetName, ElementTy,
+                                             CurDeclContext,
+                                             /*IsModuleScope=*/false);
+      
+      Pattern *ValuePattern
+        = new (Context) TypedPattern(new (Context) NamedPattern(Value),
+                                     ElementTy);
+      
+      TuplePatternElt ValuePatternElt(ValuePattern, /*Init=*/nullptr);
+      Pattern *ValueParamsPattern
+      = TuplePattern::create(Context, SetNameParens.Start,
+                             ArrayRef<TuplePatternElt>(&ValuePatternElt, 1),
+                             SetNameParens.End);
+      Params.push_back(ValueParamsPattern);
+    }
+    
+    // Getter has type: (value : T) -> ()
+    Type FuncTy = TupleType::getEmpty(Context);
+    if (buildFunctionSignature(Params, FuncTy)) {
+      skipUntilDeclRBrace();
+      Invalid = true;
+      break;
+    }
+    
+    Scope FnBodyScope(this);
+    
+    // Start the function.
+    FuncExpr *SetFn = actOnFuncExprStart(SetLoc, FuncTy, Params);
+    
+    // Establish the new context.
+    ContextChange CC(*this, SetFn);
+    
+    // Parse the body.
+    NullablePtr<BraceStmt> Body = parseStmtBrace(diag::expected_lbrace_set);
+    if (Body.isNull()) {
+      skipUntilDeclRBrace();
+      Invalid = true;
+      break;
+    }
+    
+    SetFn->setBody(Body.get());
+    LastValidLoc = Body.get()->getRBraceLoc();
+    
+    Set = new (Context) FuncDecl(/*StaticLoc=*/SourceLoc(), SetLoc,
+                                 Identifier(), FuncTy, SetFn, CurDeclContext,
+                                 ScopeInfo.isModuleScope());
+  }
+  
+  return Invalid;
+}
+
 /// parseDeclVarGetSet - Parse the brace-enclosed getter and setter for a variable.
 ///
 ///   decl-var:
-///      'var' attribute-list identifier : type-annotation { var-get-set }
-///   var-get-set:
-///      var-get var-set?
-///      var-set var-get
-///
-///   var-get:
-///     'get' stmt-brace
-///
-///   var-set:
-///     'set' var-set-name? stmt-brace
-///
-///   var-set-name:
-///     '(' identifier ')'
+///      'var' attribute-list identifier : type-annotation { get-set }
 void Parser::parseDeclVarGetSet(Pattern &pattern, bool hasContainerType) {
   assert(!GetIdent.empty() && "No 'get' identifier?");
   assert(!SetIdent.empty() && "No 'set' identifier?");
@@ -552,199 +754,8 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool hasContainerType) {
   FuncDecl *Get = 0;
   FuncDecl *Set = 0;
   SourceLoc LastValidLoc = LBLoc;
-  while (true) {
-    if (!Tok.is(tok::identifier))
-      break;
-    
-    Identifier Id = Context.getIdentifier(Tok.getText());
-    
-    if (Id == GetIdent) {
-      //   var-get         ::= 'get' stmt-brace
-  
-      // Have we already parsed a var-get clause?
-      if (Get) {
-        if (PrimaryVar) {
-          diagnose(Tok.getLoc(), diag::duplicate_getset,
-                   false, PrimaryVar->getName());
-          diagnose(Get->getLocStart(), diag::previous_getset, false);
-        }
-        
-        // Forget the previous version.
-        Get = 0;
-      }
-      
-      SourceLoc GetLoc = consumeToken();
-
-      // It's easy to imagine someone writing redundant parentheses here;
-      // diagnose this directly.
-      if ((Tok.is(tok::l_paren) || Tok.is(tok::l_paren_space)) &&
-          peekToken().is(tok::r_paren)) {
-        SourceLoc StartLoc = consumeToken();
-        SourceLoc EndLoc = consumeToken();
-        diagnose(StartLoc, diag::empty_parens_getsetname, false)
-          << SourceRange(StartLoc, EndLoc);
-      }
-      
-      // Set up a function declaration for the getter and parse its body.
-      
-      // Create the parameter list(s) for the getter.
-      llvm::SmallVector<Pattern *, 2> Params;
-      
-      // Add the implicit 'this' to Params, if needed.
-      if (hasContainerType)
-        Params.push_back(buildImplicitThisParameter());
-      
-      // Add a no-parameters clause.
-      Params.push_back(TuplePattern::create(Context, SourceLoc(),
-                                            ArrayRef<TuplePatternElt>(),
-                                            SourceLoc()));
-      
-      // Getter has type: () -> T.
-      Type FuncTy = Ty;
-      if (buildFunctionSignature(Params, FuncTy)) {
-        skipUntilDeclRBrace();
-        Invalid = true;
-        break;
-      }
-
-      Scope FnBodyScope(this);
-
-      // Start the function.
-      FuncExpr *GetFn = actOnFuncExprStart(GetLoc, FuncTy, Params);
-      
-      // Establish the new context.
-      ContextChange CC(*this, GetFn);
-
-      NullablePtr<BraceStmt> Body = parseStmtBrace(diag::expected_lbrace_get);
-      if (Body.isNull()) {
-        GetLoc = SourceLoc();
-        skipUntilDeclRBrace();
-        Invalid = true;
-        break;
-      }
-
-      GetFn->setBody(Body.get());
-      LastValidLoc = Body.get()->getRBraceLoc();
-      
-      Get = new (Context) FuncDecl(/*StaticLoc=*/SourceLoc(), GetLoc,
-                                   Identifier(), FuncTy, GetFn, CurDeclContext,
-                                   ScopeInfo.isModuleScope());
-      continue;
-    }
-    
-    if (Id != SetIdent) {
-      diagnose(Tok.getLoc(), diag::expected_getset);
-      skipUntilDeclRBrace();
-      Invalid = true;
-      break;
-    }
-    
-    //   var-set         ::= 'set' var-set-name? stmt-brace
-    
-    // Have we already parsed a var-set clause?
-    if (Set) {
-      if (PrimaryVar) {
-        diagnose(Tok.getLoc(), diag::duplicate_getset,
-                 true, PrimaryVar->getName());
-        diagnose(Set->getLocStart(), diag::previous_getset, true);
-      }
-      
-      // Forget the previous setter.
-      Set = 0;
-    }
-    
-    SourceLoc SetLoc = consumeToken();
-    
-    //   var-set-name    ::= '(' identifier ')'
-    Identifier SetName;
-    SourceLoc SetNameLoc;
-    SourceRange SetNameParens;
-    if (Tok.is(tok::l_paren) || Tok.is(tok::l_paren_space)) {
-      SourceLoc StartLoc = consumeToken();
-      if (Tok.is(tok::identifier)) {
-        // We have a name.
-        SetName = Context.getIdentifier(Tok.getText());
-        SetNameLoc = consumeToken();
-        
-        // Look for the closing ')'.
-        SourceLoc EndLoc;
-        if (parseMatchingToken(tok::r_paren, EndLoc,
-                               diag::expected_rparen_setname,
-                               StartLoc, diag::opening_paren))
-          EndLoc = SetNameLoc;
-        SetNameParens = SourceRange(StartLoc, EndLoc);
-      } else if (Tok.is(tok::r_paren)) {
-        diagnose(StartLoc, diag::empty_parens_getsetname, true)
-          << SourceRange(StartLoc, consumeToken());
-      } else {
-        diagnose(Tok.getLoc(), diag::expected_setname);
-        skipUntil(tok::r_paren, tok::l_brace);
-        if (Tok.is(tok::r_paren))
-          consumeToken();
-      }
-    }
-    
-    // Set up a function declaration for the setter and parse its body.
-
-    // Create the parameter list(s) for the setter.
-    llvm::SmallVector<Pattern *, 2> Params;
-    
-    // Add the implicit 'this' to Params, if needed.
-    if (hasContainerType)
-      Params.push_back(buildImplicitThisParameter());
-    
-    // Add the parameter. If no name was specified, the name defaults to
-    // 'value'.
-    if (SetName.empty())
-      SetName = Context.getIdentifier("value");
-
-    {
-      VarDecl *Value = new (Context) VarDecl(SetNameLoc, SetName, Ty,
-                                             CurDeclContext,
-                                             /*IsModuleScope=*/false);
-      
-      Pattern *ValuePattern
-        = new (Context) TypedPattern(new (Context) NamedPattern(Value), Ty);
-      
-      TuplePatternElt ValuePatternElt(ValuePattern, /*Init=*/nullptr);
-      Pattern *ValueParamsPattern
-        = TuplePattern::create(Context, SetNameParens.Start,
-                               ArrayRef<TuplePatternElt>(&ValuePatternElt, 1),
-                               SetNameParens.End);
-      Params.push_back(ValueParamsPattern);
-    }
-    
-    // Getter has type: (value : T) -> ()
-    Type FuncTy = TupleType::getEmpty(Context);
-    if (buildFunctionSignature(Params, FuncTy)) {
-      skipUntilDeclRBrace();
-      Invalid = true;
-      break;
-    }
-    
-    Scope FnBodyScope(this);
-    
-    // Start the function.
-    FuncExpr *SetFn = actOnFuncExprStart(SetLoc, FuncTy, Params);
-    
-    // Establish the new context.
-    ContextChange CC(*this, SetFn);
-
-    // Parse the body.
-    NullablePtr<BraceStmt> Body = parseStmtBrace(diag::expected_lbrace_set);
-    if (Body.isNull()) {
-      skipUntilDeclRBrace();
-      Invalid = true;
-      break;
-    }
-    
-    SetFn->setBody(Body.get());
-    LastValidLoc = Body.get()->getRBraceLoc();
-    
-    Set = new (Context) FuncDecl(/*StaticLoc=*/SourceLoc(), SetLoc,
-                                 Identifier(), FuncTy, SetFn, CurDeclContext,
-                                 ScopeInfo.isModuleScope());
-  }
+  if (parseGetSet(hasContainerType, Ty, Get, Set, LastValidLoc))
+    Invalid = true;
   
   // Parse the final '}'.
   SourceLoc RBLoc;
@@ -770,12 +781,12 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool hasContainerType) {
     PrimaryVar->setProperty(Context, LBLoc, Get, Set, RBLoc);
 }
 
-/// parseDeclVar - Parse a 'var' declaration, returning null (and doing no
+/// parseDeclVar - Parse a 'var' declaration, returning true (and doing no
 /// token skipping) on error.
 ///
 ///   decl-var:
 ///      'var' attribute-list pattern initializer?
-///      'var' attribute-list identifier : type-annotation { var-get-set }
+///      'var' attribute-list identifier : type-annotation { get-set }
 bool Parser::parseDeclVar(bool hasContainerType, SmallVectorImpl<Decl*> &Decls){
   SourceLoc VarLoc = consumeToken(tok::kw_var);
   
@@ -1254,4 +1265,6 @@ bool Parser::parseProtocolBody(SourceLoc ProtocolLoc,
   
   return false;
 }
+
+
 
