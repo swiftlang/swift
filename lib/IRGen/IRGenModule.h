@@ -138,7 +138,7 @@ public:
 
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }
 
-  void emitTranslationUnit(TranslationUnit *TU);
+  void emitTranslationUnit(TranslationUnit *TU, unsigned StartElem);
 
   void emitOneOfType(OneOfType *type);
   void emitExtension(ExtensionDecl *D);

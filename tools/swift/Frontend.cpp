@@ -74,12 +74,14 @@ swift::buildSingleTranslationUnit(ASTContext &Context, unsigned BufferID,
   return TU;
 }
 
-void swift::appendToMainTranslationUnit(TranslationUnit *TU, unsigned BufferID) {
-  unsigned BufferOffset = 0;
-  unsigned CurTUElem = TU->Body->getNumElements();
+void swift::appendToMainTranslationUnit(TranslationUnit *TU, unsigned BufferID,
+                                        unsigned &BufferOffset,
+                                        unsigned BufferEndOffset) {
+  unsigned CurTUElem = TU->Body ? TU->Body->getNumElements() : 0;
   bool CompleteParse;
   do {
-    CompleteParse = parseIntoTranslationUnit(TU, BufferID, &BufferOffset);
+    CompleteParse = parseIntoTranslationUnit(TU, BufferID, &BufferOffset,
+                                             BufferEndOffset);
     performNameBinding(TU, CurTUElem);
     performTypeChecking(TU, CurTUElem);
     CurTUElem = TU->Body->getNumElements();

@@ -44,9 +44,11 @@ namespace {
 /// parseTranslationUnit - Entrypoint for the parser.
 bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
                                      unsigned BufferID,
-                                     unsigned *BufferOffset) {
+                                     unsigned *BufferOffset,
+                                     unsigned BufferEndOffset) {
   Parser P(BufferID, TU->getComponent(), TU->Ctx,
-           BufferOffset ? *BufferOffset : 0, TU->IsMainModule);
+           BufferOffset ? *BufferOffset : 0, BufferEndOffset,
+           TU->IsMainModule);
   PrettyStackTraceParser stackTrace(P);
   P.parseTranslationUnit(TU);
   if (BufferOffset)
@@ -62,9 +64,9 @@ bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
 /// ComputeLexStart - Compute the start of lexing; if there's an offset, take
 /// that into account.  If there's a #! line in a main module, ignore it.
 static StringRef ComputeLexStart(StringRef File, unsigned Offset,
-                                 bool IsMainModule) {
-  if (Offset)
-    return File.substr(Offset);
+                                 unsigned EndOffset, bool IsMainModule) {
+  if (Offset || EndOffset)
+    return File.slice(Offset, EndOffset);
 
   if (IsMainModule && File.startswith("#!")) {
     StringRef::size_type Pos = File.find_first_of("\n\r");
@@ -77,11 +79,12 @@ static StringRef ComputeLexStart(StringRef File, unsigned Offset,
 
 
 Parser::Parser(unsigned BufferID, swift::Component *Comp, ASTContext &Context,
-               unsigned Offset, bool IsMainModule)
+               unsigned Offset, unsigned EndOffset, bool IsMainModule)
   : SourceMgr(Context.SourceMgr),
     Diags(Context.Diags),
     Buffer(SourceMgr.getMemoryBuffer(BufferID)),
-    L(*new Lexer(ComputeLexStart(Buffer->getBuffer(), Offset, IsMainModule),
+    L(*new Lexer(ComputeLexStart(Buffer->getBuffer(), Offset, EndOffset,
+                                 IsMainModule),
                  SourceMgr, &Diags)),
     Component(Comp),
     Context(Context),

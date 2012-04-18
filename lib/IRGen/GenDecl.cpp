@@ -48,7 +48,8 @@ static bool isTrivialGlobalInit(llvm::Function *fn) {
 }
 
 /// Emit all the top-level code in the translation unit.
-void IRGenModule::emitTranslationUnit(TranslationUnit *tunit) {
+void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
+                                      unsigned StartElem) {
   Type emptyTuple = TupleType::getEmpty(Context);
   FunctionType *unitToUnit = FunctionType::get(emptyTuple, emptyTuple, Context);
   Pattern *params[] = {
@@ -72,7 +73,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit) {
 
   IRGenFunction(*this, unitToUnit, params, ExplosionKind::Minimal,
                 /*uncurry*/ 0, fn)
-    .emitGlobalTopLevel(tunit->Body);
+    .emitGlobalTopLevel(tunit->Body, StartElem);
 
   // We don't need global init to call main().
   if (tunit->IsMainModule)
@@ -105,9 +106,10 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit) {
                                   "llvm.global_ctors");
 }
 
-void IRGenFunction::emitGlobalTopLevel(BraceStmt *body) {
-  for (auto elt : body->getElements()) {
+void IRGenFunction::emitGlobalTopLevel(BraceStmt *body, unsigned StartElem) {
+  for (unsigned i = StartElem, e = body->getNumElements(); i != e; ++i) {
     assert(Builder.hasValidIP());
+    auto elt = body->getElement(i);
     if (Decl *D = elt.dyn_cast<Decl*>()) {
       emitGlobalDecl(D);
     } else if (Expr *E = elt.dyn_cast<Expr*>()) {

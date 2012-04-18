@@ -91,7 +91,7 @@ public:
 
 
   Parser(unsigned BufferID, swift::Component *Component, ASTContext &Ctx,
-         unsigned Offset, bool IsMainModule);
+         unsigned Offset, unsigned EndOffset, bool IsMainModule);
   ~Parser();
   
   //===--------------------------------------------------------------------===//

@@ -18,7 +18,9 @@
 #include <string>
 
 namespace swift {
+  class ASTContext;
   class TranslationUnit;
 
   void RunImmediately(TranslationUnit *TU);
+  void REPL(ASTContext &Context);
 }

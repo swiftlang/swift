@@ -102,30 +102,34 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
 
   // Emit the translation unit.
   IRGenModule IRM(TU->Ctx, Opts, *Module, *TargetData);
-  IRM.emitTranslationUnit(TU);
+  IRM.emitTranslationUnit(TU, StartElem);
 
   // Bail out if there are any errors.
   if (TU->Ctx.hadError()) return;
 
-  // Try to open the output file.  Clobbering an existing file is fine.
-  // Open in binary mode if we're doing binary output.
-  unsigned OSFlags = 0;
-  if (isBinaryOutput(Opts.OutputKind))
-    OSFlags |= raw_fd_ostream::F_Binary;
-  raw_fd_ostream RawOS(Opts.OutputFilename.c_str(), Error, OSFlags);
-  if (RawOS.has_error()) {
-    TU->Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                           Opts.OutputFilename, Error);
-    return;
+  llvm::OwningPtr<raw_fd_ostream> RawOS;
+  formatted_raw_ostream FormattedOS;
+  if (!Opts.OutputFilename.empty()) {
+    // Try to open the output file.  Clobbering an existing file is fine.
+    // Open in binary mode if we're doing binary output.
+    unsigned OSFlags = 0;
+    if (isBinaryOutput(Opts.OutputKind))
+      OSFlags |= raw_fd_ostream::F_Binary;
+    RawOS.reset(new raw_fd_ostream(Opts.OutputFilename.c_str(),
+                                   Error, OSFlags));
+    if (RawOS->has_error()) {
+      TU->Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                             Opts.OutputFilename, Error);
+      return;
+    }
+
+    // Most output kinds want a formatted output stream.  It's not clear
+    // why writing an object file does.
+    if (Opts.OutputKind != OutputKind::LLVMBitcode)
+      FormattedOS.setStream(*RawOS, formatted_raw_ostream::PRESERVE_STREAM);
   }
 
-  // Most output kinds want a formatted output stream.  It's not clear
-  // why writing an object file does.
-  formatted_raw_ostream FormattedOS;
-  if (Opts.OutputKind != OutputKind::LLVMBitcode)
-    FormattedOS.setStream(RawOS, formatted_raw_ostream::PRESERVE_STREAM);
-
-  // Okay, set up a pipeline.
+  // Set up a pipeline.
   PassManagerBuilder PMBuilder;
   PMBuilder.OptLevel = Opts.OptLevel;
 
@@ -156,7 +160,7 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
     ModulePasses.add(createPrintModulePass(&FormattedOS));
     break;
   case OutputKind::LLVMBitcode:
-    ModulePasses.add(createBitcodeWriterPass(RawOS));
+    ModulePasses.add(createBitcodeWriterPass(*RawOS));
     break;
   case OutputKind::NativeAssembly:
   case OutputKind::ObjectFile: {

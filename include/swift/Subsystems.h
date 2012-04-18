@@ -40,7 +40,8 @@ namespace swift {
   /// parsing after the next stmt-brace-item with side-effects.  Returns
   /// the number of bytes parsed from the given buffer.
   bool parseIntoTranslationUnit(TranslationUnit *TU, unsigned BufferID,
-                                unsigned *BufferOffset = 0);
+                                unsigned *BufferOffset = 0,
+                                unsigned BufferEndOffset = 0);
 
   /// performNameBinding - Once parsing is complete, this walks the AST to
   /// resolve names and do other top-level validation.  StartElem indicates

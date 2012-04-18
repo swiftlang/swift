@@ -20,10 +20,11 @@ TOOLNAME = swift
 include $(SWIFT_LEVEL)/../../Makefile.config
 
 # $(TARGETS_TO_BUILD) and ipo are necessary for code generation. bitwriter is
-# necessary to write out a .bc file. mcjit, jit, and linker are used for
+# necessary to write out a .bc file. jit and linker are used for
 # JIT execution.
-LINK_COMPONENTS := $(TARGETS_TO_BUILD) bitwriter ipo mcjit jit linker
+LINK_COMPONENTS := $(TARGETS_TO_BUILD) bitwriter ipo jit linker
 USEDLIBS = swiftIRGen.a swiftParse.a swiftSema.a swiftAST.a swiftBasic.a
+LLVMLibsOptions := $(LLVMLibsOptions) -ledit
 
 include $(SWIFT_LEVEL)/Makefile
 

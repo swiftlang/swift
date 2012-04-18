@@ -315,7 +315,7 @@ private:
 
 //--- Global context emission --------------------------------------------------
 public:
-  void emitGlobalTopLevel(BraceStmt *S);
+  void emitGlobalTopLevel(BraceStmt *S, unsigned StartElem);
 private:
   void emitGlobalDecl(Decl *D);
 };
