@@ -182,8 +182,20 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // silly and pointless to do so.
     if (OneOfType *OOT = Ty->getAs<OneOfType>()) {
       if (!OOT->getElements().empty()) {
-        Expr *FnRef = OverloadedDeclRefExpr::createWithCopy(OOT->getElements(),
+        SmallVector<ValueDecl *, 4> Methods;
+        
+        // Look for extension methods with the same name as the class.
+        // FIXME: This should look specifically for constructors.
+        TU.lookupGlobalExtensionMethods(Ty, OOT->getDecl()->getName(),
+                                        Methods);
+        
+        // Add each of the one-of elements.
+        Methods.insert(Methods.begin(),
+                       OOT->getElements().begin(), OOT->getElements().end());
+        Expr *FnRef = OverloadedDeclRefExpr::createWithCopy(Methods,
                                                             E1->getStartLoc());
+        
+        // FIXME: This loses source information!
         return semaApplyExpr(new (Context) ConstructorCallExpr(FnRef, E2));
       }
     }
