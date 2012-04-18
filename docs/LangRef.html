@@ -1314,11 +1314,21 @@ token following the opening '{' is either 'set' or 'get'.</p>
     compiler.  Arrays don't make sense to fully define until we have generics,
     because array syntax should just be sugar for a standard library type.
     "Int[4]" should just be sugar for array&lt;Int, 4&gt; or whatever.
+
+    <br/><br/>Note that array types are parsed inside-out, with the first
+    bounds clause being the outermost one.  This little oddity is required
+    for the bounds of nested arrays to correspond in sequence to subscript
+    indexes.  That is, given an array "x : Int[5][7][11][13]" and a
+    chained subscript expression of the form "x[i][j][k][l]", we really
+    want "i" to be bounded by 5, "j" by 7, and so on.  This is probably
+    the only case where C's rule of "declaration follows use" really makes
+    sense.  There's precedent for this in many languages, including Java and C#.
   </div>
   
   <pre class="grammar">
-    type-array ::= <a href="#type">type</a> lsquare-unspaced ']'
-    type-array ::= <a href="#type">type</a> lsquare-unspaced <a href="#expr">expr</a> ']'
+    type-array ::= <a href="#type">type-simple</a>
+    type-array ::= <a href="#type">type-array</a> lsquare-unspaced ']'
+    type-array ::= <a href="#type">type-array</a> lsquare-unspaced <a href="#expr">expr</a> ']'
   </pre>
   
   <p>Array types include a base type and an optional size.  Array types indicate
