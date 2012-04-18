@@ -175,6 +175,9 @@ public:
   CoercedResult visitMemberRefExpr(MemberRefExpr *E) {
     return unchanged(E);
   }
+  CoercedResult visitNewArrayExpr(NewArrayExpr *E) {
+    return unchanged(E);
+  }
   static Type matchLValueType(ValueDecl *val, LValueType *lv) {
     if (val->isReferencedAsLValue() && 
         val->getType()->isEqual(lv->getObjectType()))

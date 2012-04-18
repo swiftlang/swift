@@ -139,6 +139,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
         return nullptr;
     return E;
   }
+
+  Expr *visitNewArrayExpr(NewArrayExpr *E) {
+    for (auto &bound : E->getBounds()) {
+      Expr *newValue = doIt(bound.Value);
+      if (!newValue) return nullptr;
+      bound.Value = newValue;
+    }
+    return E;
+  }
   
   Expr *visitFuncExpr(FuncExpr *E) {
     if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(E->getBody()))) {
@@ -147,7 +156,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     }
     return nullptr;
   }
-  
+
   Expr *visitExplicitClosureExpr(ExplicitClosureExpr *E) {
     if (Expr *E2 = doIt(E->getBody())) {
       E->setBody(E2);

@@ -350,6 +350,15 @@ public:
     assert(!E->getType()->isDependentType());
     return E;
   }
+
+  Expr *visitNewArrayExpr(NewArrayExpr *E) {
+    if (TC.validateType(E->getElementType()))
+      return nullptr;
+
+    // FIXME
+    E->setType(E->getElementType());
+    return E;
+  }
   
   Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
     // DotSyntaxBaseIgnoredExpr is fully type checked.

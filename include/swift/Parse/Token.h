@@ -50,6 +50,9 @@ enum class tok {
   KEYWORD(else)
   KEYWORD(while)
   KEYWORD(return)
+
+  // Expressions
+  KEYWORD(new)
 #undef KEYWORD
   
 #define PUNCTUATOR(X, Y) X,

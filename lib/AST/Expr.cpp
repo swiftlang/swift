@@ -213,6 +213,17 @@ SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
   return ::new(Buffer) SequenceExpr(elements);
 }
 
+NewArrayExpr *NewArrayExpr::create(ASTContext &ctx, SourceLoc newLoc,
+                                   Type elementTy, ArrayRef<Bound> bounds) {
+  void *buffer = ctx.Allocate(sizeof(NewArrayExpr) +
+                              bounds.size() * sizeof(Bound),
+                              Expr::Alignment);
+  NewArrayExpr *E =
+    ::new(buffer) NewArrayExpr(newLoc, elementTy, bounds.size(), Type());
+  memcpy(E->getBoundsBuffer(), bounds.data(), bounds.size() * sizeof(Bound));
+  return E;
+}
+
 SourceRange TupleExpr::getSourceRange() const {
   SourceLoc Start = LParenLoc;
   if (!Start.isValid()) {
@@ -493,6 +504,14 @@ public:
   void visitImplicitClosureExpr(ImplicitClosureExpr *E) {
     printCommon(E, "implicit_closure_expr") << '\n';
     printRec(E->getBody());
+    OS << ')';
+  }
+
+  void visitNewArrayExpr(NewArrayExpr *E) {
+    printCommon(E, "new_array_expr")
+      << " elementType='" << E->getElementType() << "'\n";
+    for (auto &bound : E->getBounds())
+      printRec(bound.Value);
     OS << ')';
   }
   

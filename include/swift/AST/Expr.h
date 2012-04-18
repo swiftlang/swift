@@ -1037,6 +1037,66 @@ public:
   }
   static bool classof(const CapturingExpr *E) { return classof(cast<Expr>(E)); }
 };
+
+
+/// NewArrayExpr - The allocation of an array.  Allocates and constructs
+/// the array, then injects that into the corresponding slice type.
+class NewArrayExpr : public Expr {
+public:
+  struct Bound {
+    Expr *Value;
+    SourceRange Brackets;
+
+    Bound() = default;
+    Bound(Expr *value, SourceRange brackets)
+      : Value(value), Brackets(brackets) {}
+  };
+
+private:
+  Type ElementTy;
+  unsigned NumBounds;
+  SourceLoc NewLoc;
+
+  NewArrayExpr(SourceLoc newLoc, Type elementTy, unsigned numBounds, Type ty)
+    : Expr(ExprKind::NewArray, ty), ElementTy(elementTy),
+      NumBounds(numBounds), NewLoc(newLoc) {}
+
+  Bound *getBoundsBuffer() {
+    return reinterpret_cast<Bound*>(this + 1);
+  }
+  const Bound *getBoundsBuffer() const {
+    return reinterpret_cast<const Bound*>(this + 1);
+  }
+
+public:
+  static NewArrayExpr *create(ASTContext &Context, SourceLoc newLoc,
+                              Type elementTy, ArrayRef<Bound> bounds);
+
+  unsigned getNumBounds() const { return NumBounds; }
+
+  MutableArrayRef<Bound> getBounds() {
+    return MutableArrayRef<Bound>(getBoundsBuffer(), getNumBounds());
+  }
+  ArrayRef<Bound> getBounds() const {
+    return ArrayRef<Bound>(getBoundsBuffer(), getNumBounds());
+  }
+
+  /// Return the location of the 'new' keyword.
+  SourceLoc getNewLoc() const { return NewLoc; }
+
+  SourceRange getSourceRange() const {
+    return SourceRange(NewLoc, getBounds().back().Brackets.End);
+  }
+  SourceLoc getLoc() const { return NewLoc; }
+
+  Type getElementType() const { return ElementTy; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const NewArrayExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::NewArray;
+  }
+};
   
   
 /// ApplyExpr - Superclass of various function calls, which apply an argument to
@@ -1146,8 +1206,7 @@ public:
     return E->getKind() == ExprKind::ConstructorCall;
   }
 };
-  
-  
+
 /// DotSyntaxCallExpr - Refer to an element or method of a type, e.g. P.x.  'x'
 /// is modeled as a DeclRefExpr or OverloadSetRefExpr on the field's decl.
 ///

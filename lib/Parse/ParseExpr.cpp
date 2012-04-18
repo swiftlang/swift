@@ -65,9 +65,14 @@ NullablePtr<Expr> Parser::parseExpr(Diag<> Message) {
 ///
 ///   expr-unary:
 ///     expr-postfix
+///     expr-new
 ///     operator expr-unary
 NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
-  // If the next token is not an operator, just parse this as expr-postfix
+  // If the next token is the keyword 'new', this must be expr-new.
+  if (Tok.is(tok::kw_new))
+    return parseExprNew();
+
+  // If the next token is not an operator, just parse this as expr-postfix.
   if (Tok.isNot(tok::oper))
     return parseExprPostfix(Message);
 
@@ -101,6 +106,60 @@ Expr *Parser::parseExprOperator() {
   return actOnIdentifierExpr(Name, Loc);
 }
 
+/// parseExprNew
+///
+///   expr-new:
+///     'new' type-identifier expr-new-bounds?
+///   expr-new-bounds:
+///     expr-new-bound
+///     expr-new-bounds expr-new-bound
+///   expr-new-bound:
+///     lsquare-unspaced expr ']'
+NullablePtr<Expr> Parser::parseExprNew() {
+  SourceLoc newLoc = Tok.getLoc();
+  consumeToken(tok::kw_new);
+
+  // FIXME: this should probably be type-simple.
+  Type elementTy;
+  if (parseTypeIdentifier(elementTy))
+    return nullptr;
+
+  // If we're not followed by an unspaced '[', that's all we've got.
+  // TODO: we should probably allow a tuple-expr here as an initializer.
+  if (Tok.isNot(tok::l_square)) {
+    diagnose(newLoc, diag::non_array_new_unsupported);
+    return nullptr;
+  }
+
+  bool hadInvalid = false;
+  SmallVector<NewArrayExpr::Bound, 4> bounds;
+  do {
+    SourceRange brackets;
+    brackets.Start = Tok.getLoc();
+    consumeToken(tok::l_square);
+
+    auto boundValue = parseExpr(diag::expected_expr_new_array_bound);
+    if (boundValue.isNull() || !Tok.is(tok::r_square)) {
+      if (!boundValue.isNull())
+        diagnose(Tok.getLoc(), diag::expected_bracket_array_new);
+
+      skipUntil(tok::r_square);
+      if (!Tok.is(tok::r_square)) return nullptr;
+      hadInvalid = true;
+    }
+
+    brackets.End = Tok.getLoc();
+    consumeToken(tok::r_square);
+
+    bounds.push_back(NewArrayExpr::Bound(boundValue.get(), brackets));
+  } while (Tok.is(tok::l_square));
+
+  // TODO: we should probably allow a tuple-expr here as an initializer.
+
+  if (hadInvalid) return nullptr;
+
+  return NewArrayExpr::create(Context, newLoc, elementTy, bounds);
+}
 
 /// parseExprPostfix
 ///

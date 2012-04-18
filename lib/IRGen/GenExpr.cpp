@@ -198,6 +198,10 @@ namespace {
       IGF.emitRValue(E->getRHS(), Out);
     }
 
+    void visitNewArrayExpr(NewArrayExpr *E) {
+      IGF.unimplemented(E->getLoc(), "emit rvalue NewArrayExpr");
+    }
+
     void visitApplyExpr(ApplyExpr *E) {
       emitApplyExpr(IGF, E, Out);
     }
@@ -260,6 +264,7 @@ namespace {
     NOT_LVALUE_EXPR(Closure)
     NOT_LVALUE_EXPR(Load)
     NOT_LVALUE_EXPR(Tuple)
+    NOT_LVALUE_EXPR(NewArray)
     NOT_LVALUE_EXPR(DotSyntaxBaseIgnored)
     NOT_LVALUE_EXPR(Module)
 #undef NOT_LVALUE_EXPR
@@ -402,6 +407,7 @@ namespace {
     NON_LOCATEABLE(CapturingExpr)
     NON_LOCATEABLE(ModuleExpr)
     NON_LOCATEABLE(DotSyntaxBaseIgnoredExpr)
+    NON_LOCATEABLE(NewArrayExpr)
 
 #undef NON_LOCATEABLE
   };

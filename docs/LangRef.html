@@ -1530,6 +1530,7 @@ token following the opening '{' is either 'set' or 'get'.</p>
     expr-primary ::= <a href="#expr-func">expr-func</a>
 
     expr-postfix ::= expr-primary
+    expr-postfix ::= <a href="#expr-new">expr-new</a>
     expr-postfix ::= <a href="#expr-dot">expr-dot</a>
     expr-postfix ::= <a href="#expr-subscript">expr-subscript</a>
     expr-postfix ::= <a href="#expr-call">expr-call</a>
@@ -1900,7 +1901,30 @@ token following the opening '{' is either 'set' or 'get'.</p>
   compile time or run time.</p>
   
   <p>TODO: Eventually support map operations etc.</p> -->
+
+  <!-- ===================================================================== -->
+  <h3 id="expr-new">New Expressions</h3>
+  <!-- ===================================================================== -->
   
+  <div class="commentary">
+    It's not really clear what the behavior of multiple bounds should be.
+
+    <br/><br/>We should probably allow an initializer, which would
+    have to start with an lparen-unspaced; the semantics would be to
+    evaluate that constructor for each element constructed.
+  </div>
+
+  <pre class="grammar">
+    expr-new        ::= 'new' <a href="#type">type-identifier</a> expr-new-bounds?
+
+    expr-new-bounds ::= expr-new-bound
+    expr-new-bounds ::= expr-new-bounds expr-new-bound
+    expr-new-bound  ::= lsquare-unspaced <a href="#expr">expr</a> ']'
+  </pre>
+    
+  <p>Allocates and initializes a new array of objects with value
+    semantics or an individual object with reference semantics.</p>
+
   <!-- ===================================================================== -->
   <h3 id="expr-call">Function Application</h3>
   <!-- ===================================================================== -->
