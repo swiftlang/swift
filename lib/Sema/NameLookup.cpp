@@ -48,7 +48,8 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M) {
       OneOfElementDecl *Elt = OOTy->getElement(Name);
       if (Elt) {
         Results.push_back(Result::getIgnoreBase(Elt));
-        return;
+
+        // Fall through to find any members with the same name.
       }
     }
     
