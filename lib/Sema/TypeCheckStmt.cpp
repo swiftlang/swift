@@ -319,9 +319,10 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
   }
   FuncTy = FunctionType::get(FuncTy, TupleType::getEmpty(Context), Context);
   VarDecl *Arg = new (Context) VarDecl(Loc, Context.getIdentifier("arg"), T,
-                                       TLCD);
+                                       nullptr);
   Pattern* ParamPat = new (Context) NamedPattern(Arg);
   FuncExpr *FE = FuncExpr::create(Context, Loc, ParamPat, FuncTy, 0, TLCD);
+  Arg->setDeclContext(FE);
 
   // Build the body of the function which prints the expression.
   SmallVector<unsigned, 4> MemberIndexes;
