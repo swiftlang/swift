@@ -168,12 +168,9 @@ public:
   void claimUnmanaged(unsigned n, llvm::SmallVectorImpl<llvm::Value *> &out) {
     assert(NextValue + n <= Values.size());
 
-    auto firstOutIndex = out.size();
-    out.set_size(firstOutIndex + n);
-    auto outIterator = &out[firstOutIndex];
-
+    out.reserve(out.size() + n);
     for (auto i = begin(), e = i + n; i != e; ++i)
-      *outIterator++ = i->getUnmanagedValue();
+      out.push_back(i->getUnmanagedValue());
     NextValue += n;
   }
 
@@ -211,13 +208,9 @@ public:
                llvm::SmallVectorImpl<llvm::Value *> &out) {
     assert(NextValue + n <= Values.size());
 
-    auto firstOutIndex = out.size();
-    out.set_size(firstOutIndex + n);
-    auto outIterator = &out[firstOutIndex];
-
-    for (auto i = begin(), e = i + n; i != e; ++i) {
-      *outIterator++ = i->forward(IGF);
-    }
+    out.reserve(out.size() + n);
+    for (auto i = begin(), e = i + n; i != e; ++i)
+      out.push_back(i->forward(IGF));
 
     NextValue += n;
   }

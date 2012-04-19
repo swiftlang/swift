@@ -1580,7 +1580,7 @@ namespace {
       }
 
       llvm::SmallVector<llvm::Value*, 8> args;
-      params.claimUnmanaged(params.size(), args);
+      params.forward(IGF, params.size(), args);
 
       llvm::CallInst *call = IGF.Builder.CreateCall(nextEntrypoint, args);
       call->setTailCall();
