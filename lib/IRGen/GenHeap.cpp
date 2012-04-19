@@ -210,7 +210,10 @@ static void emitRetainCall(IRGenFunction &IGF, llvm::Value *value,
 /// values in explosions are typically "live", i.e. have a +1 owned by
 /// the explosion.
 void IRGenFunction::emitRetain(llvm::Value *value, Explosion &out) {
-  if (doesNotRequireRefCounting(value)) return;
+  if (doesNotRequireRefCounting(value)) {
+    out.addUnmanaged(value);
+    return;
+  }
 
   emitRetainCall(*this, value, out);
 }
