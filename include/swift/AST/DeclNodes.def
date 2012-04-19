@@ -54,7 +54,6 @@
 DECL(Import, Decl)
 DECL(Extension, Decl)
 DECL(PatternBinding, Decl)
-DECL(Subscript, Decl)
 DECL(TopLevelCode, Decl)
 ABSTRACT_DECL(Named, Decl)
   ABSTRACT_DECL(Value, Named)
@@ -62,7 +61,8 @@ ABSTRACT_DECL(Named, Decl)
     VALUE_DECL(Var, Value)
     VALUE_DECL(Func, Value)
     VALUE_DECL(OneOfElement, Value)
-    DECL_RANGE(Value, TypeAlias, OneOfElement)
+    VALUE_DECL(Subscript, ValueDecl)
+    DECL_RANGE(Value, TypeAlias, Subscript)
   DECL_RANGE(Named, TypeAlias, OneOfElement)
 
 #undef VALUE_DECL

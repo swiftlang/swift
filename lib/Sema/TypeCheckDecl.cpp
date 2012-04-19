@@ -106,6 +106,12 @@ public:
     // The getter and setter functions will be type-checked separately.
     if (!SD->getDeclContext()->isTypeContext())
       TC.diagnose(SD->getLocStart(), diag::subscript_not_member);
+    
+    if (SD->getIndices()->hasType())
+      SD->setType(FunctionType::get(SD->getIndices()->getType(),
+                                    SD->getElementType(), TC.Context));
+    else
+      SD->setType(ErrorType::get(TC.Context));
   }
   
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {

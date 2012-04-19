@@ -128,13 +128,57 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
   
   // Determine the type of the base of this subscript expression.
   Type BaseTy = SE->getBase()->getType();
-  bool IsLValue = false;
-  if (LValueType *BaseLV = BaseTy->getAs<LValueType>()) {
-    IsLValue = true;
+  if (LValueType *BaseLV = BaseTy->getAs<LValueType>())
     BaseTy = BaseLV->getObjectType();
+  
+  // Look for subscript operators in the base type.
+  // FIXME: hard-coding of the name __subscript is ueber-lame.
+  MemberLookup Lookup(BaseTy, Context.getIdentifier("__subscript"), TU);
+  
+  if (!Lookup.isSuccess()) {
+    diagnose(SE->getLBracketLoc(), diag::no_subscript_declaration, BaseTy)
+      << SE->getBase()->getSourceRange();
+    SE->setType(ErrorType::get(Context));
+    return SE;
   }
   
-  diagnose(SE->getLoc(), diag::subscript_unimplemented);
+  llvm::SmallVector<ValueDecl *, 4> LookupResults;
+  for (const auto &R : Lookup.Results)
+    LookupResults.push_back(R.D);
+  llvm::SmallVector<ValueDecl *, 4> Viable;
+  ValueDecl *Best = filterOverloadSet(LookupResults, BaseTy, SE->getIndex(),
+                                      Type(), Viable);
+
+  if (Best) {
+    SubscriptDecl *BestSub = cast<SubscriptDecl>(Best);
+    SE->setDecl(BestSub);
+
+    // Convert the indices appropriately.
+    Type IndexType = BestSub->getIndices()->getType();
+    Expr *Index = coerceToType(SE->getIndex(), IndexType);
+    if (!Index) {
+      diagnose(SE->getBase()->getLoc(), diag::while_converting_subscript_index,
+               IndexType)
+        << SE->getIndex()->getSourceRange();
+      return 0;
+    }
+    
+    // FIXME: Convert the base by turning it into an lvalue?
+    
+    // Compute the final lvalue type and we're done.
+    SE->setType(LValueType::get(BestSub->getElementType(),
+                                (LValueType::Qual::NonHeap|
+                                 LValueType::Qual::Implicit),
+                                Context));
+    return SE;
+  }
+  
+  // FIXME: We should be able to build some kind of OverloadedSubscriptExpr
+  // here and hope that type coercion will resolve it.
+  diagnose(SE->getLBracketLoc(), diag::subscript_overload_fail,
+           !Viable.empty(), BaseTy, SE->getIndex()->getType())
+    << SE->getBase()->getSourceRange() << SE->getIndex()->getSourceRange();
+  printOverloadSetCandidates(Viable.empty()? LookupResults : Viable);
   SE->setType(ErrorType::get(Context));
   return SE;
 }

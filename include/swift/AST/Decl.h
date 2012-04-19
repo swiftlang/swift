@@ -277,74 +277,6 @@ public:
   static bool classof(const TopLevelCodeDecl *D) { return true; }
 };
 
-/// SubscriptDecl - Declares a subscripting operator for a type.
-///
-/// A subscript declaration is defined as a get/set pair that produces a
-/// specific type. For example:
-///
-/// \code
-/// subscript (i : Int) -> String {
-///   get { /* return ith String */ }
-///   set { /* set ith string to value */ }
-/// }
-/// \endcode
-///
-/// A type with a subscript declaration can be used as the base of a subscript
-/// expression a[i], where a is of the subscriptable type and i is the type
-/// of the index. A subscript can have multiple indices:
-///
-/// struct Matrix {
-///   subscript (i : Int, j : Int) -> Double {
-///     get { /* return element at position (i, j) */ }
-///     set { /* set element at position (i, j) */ }
-///   }
-/// }
-///
-/// A given type can have multiple subscript declarations, so long as the
-/// signatures (indices and element type) are distinct.
-class SubscriptDecl : public Decl {
-  SourceLoc SubscriptLoc;
-  SourceLoc ArrowLoc;
-  Pattern *Indices;
-  Type ElementTy;
-  SourceRange Braces;
-  FuncDecl *Get;
-  FuncDecl *Set;
-  
-public:
-  SubscriptDecl(SourceLoc SubscriptLoc, Pattern *Indices, SourceLoc ArrowLoc,
-                Type ElementTy, SourceRange Braces, FuncDecl *Get,
-                FuncDecl *Set, DeclContext *Parent)
-    : Decl(DeclKind::Subscript, Parent), SubscriptLoc(SubscriptLoc),
-      ArrowLoc(ArrowLoc), Indices(Indices), ElementTy(ElementTy),
-      Braces(Braces), Get(Get), Set(Set) { }
-  
-  SourceLoc getLocStart() const { return SubscriptLoc; }
-  
-  /// \brief Retrieve the indices for this subscript operation.
-  Pattern *getIndices() const { return Indices; }
-  
-  /// \brief Retrieve the type of the element referenced by a subscript
-  /// operation.
-  Type getElementType() const { return ElementTy; }
-  
-  /// \brief Retrieve the subscript getter, a function that takes the indices
-  /// and produces a value of the element type.
-  FuncDecl *getGetter() const { return Get; }
-  
-  /// \brief Retrieve the subscript setter, a function that takes the indices
-  /// and a new value of the lement type and updates the corresponding value.
-  ///
-  /// The subscript setter is optional.
-  FuncDecl *getSetter() const { return Set; }
-  
-  static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::Subscript;
-  }
-  
-  static bool classof(const SubscriptDecl *D) { return true; }
-};
-
 /// NamedDecl - An abstract base class for declarations with names.
 class NamedDecl : public Decl {
   Identifier Name;
@@ -657,6 +589,78 @@ public:
   }
   static bool classof(const OneOfElementDecl *D) { return true; }
  
+};
+
+/// SubscriptDecl - Declares a subscripting operator for a type.
+///
+/// A subscript declaration is defined as a get/set pair that produces a
+/// specific type. For example:
+///
+/// \code
+/// subscript (i : Int) -> String {
+///   get { /* return ith String */ }
+///   set { /* set ith string to value */ }
+/// }
+/// \endcode
+///
+/// A type with a subscript declaration can be used as the base of a subscript
+/// expression a[i], where a is of the subscriptable type and i is the type
+/// of the index. A subscript can have multiple indices:
+///
+/// struct Matrix {
+///   subscript (i : Int, j : Int) -> Double {
+///     get { /* return element at position (i, j) */ }
+///     set { /* set element at position (i, j) */ }
+///   }
+/// }
+///
+/// A given type can have multiple subscript declarations, so long as the
+/// signatures (indices and element type) are distinct.
+///
+/// FIXME: SubscriptDecl isn't naturally a ValueDecl, but it's currently useful
+/// to get name lookup to find it with a bogus name.
+class SubscriptDecl : public ValueDecl {
+  SourceLoc SubscriptLoc;
+  SourceLoc ArrowLoc;
+  Pattern *Indices;
+  Type ElementTy;
+  SourceRange Braces;
+  FuncDecl *Get;
+  FuncDecl *Set;
+  
+public:
+  SubscriptDecl(Identifier NameHack, SourceLoc SubscriptLoc, Pattern *Indices,
+                SourceLoc ArrowLoc, Type ElementTy, SourceRange Braces,
+                FuncDecl *Get, FuncDecl *Set, DeclContext *Parent)
+    : ValueDecl(DeclKind::Subscript, Parent, NameHack, Type()),
+      SubscriptLoc(SubscriptLoc),
+      ArrowLoc(ArrowLoc), Indices(Indices), ElementTy(ElementTy),
+      Braces(Braces), Get(Get), Set(Set) { }
+  
+  SourceLoc getLocStart() const { return SubscriptLoc; }
+  
+  /// \brief Retrieve the indices for this subscript operation.
+  Pattern *getIndices() const { return Indices; }
+  
+  /// \brief Retrieve the type of the element referenced by a subscript
+  /// operation.
+  Type getElementType() const { return ElementTy; }
+  
+  /// \brief Retrieve the subscript getter, a function that takes the indices
+  /// and produces a value of the element type.
+  FuncDecl *getGetter() const { return Get; }
+  
+  /// \brief Retrieve the subscript setter, a function that takes the indices
+  /// and a new value of the lement type and updates the corresponding value.
+  ///
+  /// The subscript setter is optional.
+  FuncDecl *getSetter() const { return Set; }
+  
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::Subscript;
+  }
+  
+  static bool classof(const SubscriptDecl *D) { return true; }
 };
 
 } // end namespace swift

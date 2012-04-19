@@ -570,6 +570,9 @@ public:
   }
   void setDecl(SubscriptDecl *D) { this->D = D; }
   
+  SourceLoc getLBracketLoc() const { return Brackets.Start; }
+  SourceLoc getRBracketLoc() const { return Brackets.End; }
+  
   SourceRange getSourceRange() const {
     return SourceRange(Base->getStartLoc(), Brackets.End);
   }

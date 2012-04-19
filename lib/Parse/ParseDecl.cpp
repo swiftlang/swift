@@ -1426,7 +1426,8 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
 
     // Build an AST for the subscript declaration.
     SubscriptDecl *Subscript
-      = new (Context) SubscriptDecl(SubscriptLoc, Indices.get(), ArrowLoc,
+      = new (Context) SubscriptDecl(Context.getIdentifier("__subscript"),
+                                    SubscriptLoc, Indices.get(), ArrowLoc,
                                     ElementTy, SourceRange(LBLoc, RBLoc),
                                     Get, Set, CurDeclContext);
     Decls.push_back(Subscript);

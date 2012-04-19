@@ -483,6 +483,8 @@ NOTE(while_converting_default_tuple_value,sema,none,
      "while converting default tuple value to element type %0", (Type))
 NOTE(while_converting_function_argument,sema,none,
      "while converting function argument to expected type %0", (Type))
+NOTE(while_converting_subscript_index,sema,none,
+     "while converting subscript index to expected type %0", (Type))
 
 ERROR(invalid_anonymous_argument,sema,none,
       "use of invalid anonymous argument, %0 is larger than"
@@ -665,8 +667,11 @@ ERROR(incompatible_assoc,sema_tce,none,
       " but incompatible associativity", ())
 ERROR(address_of_rvalue,sema_tce,none,
       "cannot apply '&' to non-lvalue of type %0", (Type))
-ERROR(subscript_unimplemented,sema_tce,none,
-      "subscripting is not yet implemented", ())
+ERROR(no_subscript_declaration,sema_tce,none,
+      "type %0 cannot be subscripted", (Type))
+ERROR(subscript_overload_fail,sema_tce,none,
+      "%select{no matching function|ambiguous overloads}0 subscripting base %1 "
+      "with index of type %2", (bool, Type, Type))
 ERROR(condition_convert_limit_reached,sema_tce,none,
       "getLogicValue() for type %0 used in a conditional does not return "
       "a bool", (Type))

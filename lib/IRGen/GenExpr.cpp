@@ -79,6 +79,9 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E) {
     if (D->getDeclContext()->isLocalContext())
       return IGF.emitAddressLValue(IGF.getLocal(D));
     return IGF.getGlobal(cast<VarDecl>(D));
+      
+  case DeclKind::Subscript:
+    llvm_unreachable("subscript decl cannot be referenced");
   }
   llvm_unreachable("bad decl kind");
 }
@@ -106,6 +109,9 @@ static void emitDeclRef(IRGenFunction &IGF, DeclRefExpr *E,
 
   case DeclKind::OneOfElement:
     return emitOneOfElementRef(IGF, cast<OneOfElementDecl>(D), explosion);
+
+  case DeclKind::Subscript:
+    llvm_unreachable("subscript decl cannot be referenced");
   }
   llvm_unreachable("bad decl kind");
 }
@@ -367,6 +373,9 @@ namespace {
     // These are potentially supportable.
     NON_LOCATEABLE(TypeAliasDecl)
 
+    // FIXME: Not really a ValueDecl.
+    NON_LOCATEABLE(SubscriptDecl);
+                                                    
     // These we support.
     Optional<Address> visitVarDecl(VarDecl *D) {
       // For now, only bother with locals.
