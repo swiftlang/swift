@@ -309,16 +309,14 @@ void Module::lookupGlobalValue(Identifier Name, NLKind LookupKind,
 
   // If we get any hits, we're done.  Also, the builtin module never has
   // imports, so it is always done at this point.
-  if (!Result.empty() || isa<BuiltinModule>(this)) return;
+  if (isa<BuiltinModule>(this)) return;
   
   TranslationUnit &TU = *cast<TranslationUnit>(this);
 
   // If we still haven't found it, scrape through all of the imports, taking the
   // first match of the name.
-  for (auto &ImpEntry : TU.getImportedModules()) {
+  for (auto &ImpEntry : TU.getImportedModules())
     ImpEntry.second->lookupValue(ImpEntry.first, Name, LookupKind, Result);
-    if (!Result.empty()) return;  // If we found a match, return the decls.
-  }
 }
 
 /// lookupGlobalExtensionMethods - Lookup the extensions members for the
