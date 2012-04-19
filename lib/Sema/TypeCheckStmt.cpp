@@ -175,6 +175,12 @@ void TypeChecker::typeCheckIgnoredExpr(Expr *E) {
 
 /// Check an expression at the top level in a REPL.
 void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E) {
+  // If the input is an lvalue, force an lvalue-to-rvalue conversion.
+  Expr *ConvertedE = convertToRValue(E);
+  if (!ConvertedE)
+    return;
+  E = ConvertedE;
+
   CanType T = E->getType()->getCanonicalType();
   SourceLoc Loc = E->getStartLoc();
   SourceLoc EndLoc = E->getEndLoc();
@@ -192,20 +198,22 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E) {
   FuncExpr *FE = FuncExpr::create(Context, Loc, ParamPat, FuncTy, 0, &TU);
 
   // Print the expression.
-  // FIXME: Need to handle lvalues.
   // FIXME: Need structural printing for tuples.
   // FIXME: Need structural printing for oneofs.
   SmallVector<BraceStmt::ExprStmtOrDecl, 4> BodyContent;
   Identifier MemberName = Context.getIdentifier("replPrint");
   MemberLookup Lookup(T, MemberName, TU);
   if (Lookup.isSuccess()) {
-    Expr *ArgRef = new (Context) DeclRefExpr(Arg, Loc);
+    Expr *ArgRef = new (Context) DeclRefExpr(Arg, Loc,
+                                             Arg->getTypeOfReference());
+    ArgRef = convertToRValue(ArgRef);
     Expr *Res = recheckTypes(Lookup.createResultAST(ArgRef, Loc, EndLoc,
                                                     Context));
     if (!Res)
       return;
     TupleExpr *CallArgs =
-        new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc);
+        new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc,
+                                TupleType::getEmpty(Context));
     CallExpr *CE = new (Context) CallExpr(Res, CallArgs, Type());
     Res = semaApplyExpr(CE);
     if (!Res)
