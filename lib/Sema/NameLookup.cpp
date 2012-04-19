@@ -43,7 +43,7 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M) {
     // then silently squish this erroneous subexpression.
     Type Ty = MTT->getTypeDecl()->getUnderlyingType();
     
-    // Handle references the to constructors of a oneof.
+    // Handle references to the constructors of a oneof.
     if (OneOfType *OOTy = Ty->getAs<OneOfType>()) {
       OneOfElementDecl *Elt = OOTy->getElement(Name);
       if (Elt) {
@@ -52,7 +52,7 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M) {
         // Fall through to find any members with the same name.
       }
     }
-    
+        
     // Otherwise, just perform normal dot lookup on the type with the specified
     // member name to see if we find extensions or anything else.  For example,
     // If type SomeTy.SomeMember can look up static functions, and can even look

@@ -40,6 +40,7 @@ public:
 
   bool semaFunctionSignature(FuncExpr *FE);
   bool semaTupleExpr(TupleExpr *TE);
+  Expr *semaSubscriptExpr(SubscriptExpr *SE);
   Expr *semaApplyExpr(ApplyExpr *E);
   Expr *semaUnresolvedDotExpr(UnresolvedDotExpr *E);
   void typeCheckIgnoredExpr(Expr *E);

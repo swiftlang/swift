@@ -31,6 +31,7 @@ namespace swift {
   class ValueDecl;
   class Decl;
   class Pattern;
+  class SubscriptDecl;
   class Stmt;
   class BraceStmt;
   class TypeAliasDecl;
@@ -530,6 +531,56 @@ public:
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Tuple; }
 };
 
+/// SubscriptExpr - Subscripting expressions like a[i] that refer to an element
+/// within a container.
+///
+/// There is no built-in subscripting in the language. Rather, a fully
+/// type-checked and well-formed subscript expression refers to a subscript
+/// declaration, which provides a getter and (optionally) a setter that will
+/// be used to perform reads/writes.
+class SubscriptExpr : public Expr {
+  SubscriptDecl *D;
+  SourceRange Brackets;
+  Expr *Base;
+  Expr *Index;
+  
+public:
+  SubscriptExpr(Expr *Base, SourceLoc LBracketLoc, Expr *Index,
+                SourceLoc RBracketLoc, SubscriptDecl *D = 0);
+  
+  /// getBase - Retrieve the base of the subscript expression, i.e., the
+  /// value being indexed.
+  Expr *getBase() const { return Base; }
+  void setBase(Expr *E) { Base = E; }
+  
+  /// getBase - Retrieve the index of the subscript expression, i.e., the
+  /// "offset" into the base value.
+  Expr *getIndex() const { return Index; }
+  void setIndex(Expr *E) { Index = E; }
+  
+  /// hasDecl - Determine whether subscript operation has a known underlying
+  /// subscript declaration or not.
+  bool hasDecl() const { return D != 0; }
+  
+  /// getDecl - Retrieve the subscript declaration that this subscripting
+  /// operation refers to. Only valid when \c hasDecl() is true.
+  SubscriptDecl *getDecl() const {
+    assert(hasDecl() && "No subscript declaration known!");
+    return D;
+  }
+  void setDecl(SubscriptDecl *D) { this->D = D; }
+  
+  SourceRange getSourceRange() const {
+    return SourceRange(Base->getStartLoc(), Brackets.End);
+  }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const SubscriptExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Subscript;
+  }
+};
+  
 /// UnresolvedDotExpr - A field access (foo.bar) on an expression with dependent
 /// type.
 class UnresolvedDotExpr : public Expr {

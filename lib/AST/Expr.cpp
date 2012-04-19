@@ -17,6 +17,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -248,6 +249,11 @@ SourceRange TupleExpr::getSourceRange() const {
   return SourceRange(Start, End);
 }
 
+SubscriptExpr::SubscriptExpr(Expr *Base, SourceLoc LBracketLoc, Expr *Index,
+                             SourceLoc RBracketLoc, SubscriptDecl *D)
+  : Expr(ExprKind::Subscript, D? D->getElementType() : Type()),
+    D(D), Brackets(LBracketLoc, RBracketLoc), Base(Base), Index(Index) { }
+
 FuncExpr *FuncExpr::create(ASTContext &C, SourceLoc funcLoc,
                            ArrayRef<Pattern*> params, Type fnType,
                            BraceStmt *body, DeclContext *parent) {
@@ -413,6 +419,14 @@ public:
       else
         OS.indent(Indent+2) << "<<tuple element default value>>";
     }
+    OS << ')';
+  }
+  void visitSubscriptExpr(SubscriptExpr *E) {
+    printCommon(E, "subscript_expr");
+    OS << '\n';
+    printRec(E->getBase());
+    OS << '\n';
+    printRec(E->getIndex());
     OS << ')';
   }
   void visitUnresolvedDotExpr(UnresolvedDotExpr *E) {

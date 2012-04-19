@@ -85,7 +85,7 @@ public:
     Type lhsTy = E->getType();
     if (LValueType *lvalueTy = lhsTy->getAs<LValueType>())
       lhsTy = lvalueTy->getObjectType();
-    else
+    else if (!lhsTy->is<ErrorType>())
       TC.diagnose(E->getLoc(), diag::assignment_lhs_not_lvalue);
 
     E = S->getSrc();

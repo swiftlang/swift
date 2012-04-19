@@ -181,6 +181,9 @@ namespace {
       emitTupleLiteral(IGF, E, Out);
     }
 
+    void visitSubscriptExpr(SubscriptExpr *E) {
+      IGF.unimplemented(E->getLoc(), "emit rvalue SubscriptExpr");
+    }
     void visitTupleShuffleExpr(TupleShuffleExpr *E) {
       emitTupleShuffle(IGF, E, Out);
     }
@@ -305,6 +308,11 @@ namespace {
       IGF.unimplemented(E->getLoc(), "emit lvalue MembeRefExpr");
       return LValue();
     }
+    
+    LValue visitSubscriptExpr(SubscriptExpr *E) {
+      IGF.unimplemented(E->getLoc(), "emit lvalue SubscriptExpr");
+      return LValue();
+    }
   };
 }
 
@@ -415,6 +423,9 @@ namespace {
     NON_LOCATEABLE(DotSyntaxBaseIgnoredExpr)
     NON_LOCATEABLE(NewArrayExpr)
     NON_LOCATEABLE(CoerceExpr)
+                                                    
+    // FIXME: We may want to specialize IR generation for array subscripts.
+    NON_LOCATEABLE(SubscriptExpr);
 #undef NON_LOCATEABLE
   };
 }

@@ -118,6 +118,27 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
   return false;
 }
 
+Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
+  // Propagate errors up.
+  if (SE->getBase()->getType()->is<ErrorType>() ||
+      SE->getIndex()->getType()->is<ErrorType>()) {
+    SE->setType(ErrorType::get(Context));
+    return SE;
+  }
+  
+  // Determine the type of the base of this subscript expression.
+  Type BaseTy = SE->getBase()->getType();
+  bool IsLValue = false;
+  if (LValueType *BaseLV = BaseTy->getAs<LValueType>()) {
+    IsLValue = true;
+    BaseTy = BaseLV->getObjectType();
+  }
+  
+  diagnose(SE->getLoc(), diag::subscript_unimplemented);
+  SE->setType(ErrorType::get(Context));
+  return SE;
+}
+
 /// \brief Determine whether this expression refers to a type directly (ignoring
 /// parentheses), rather than some variable of metatype type.
 static bool isDirectTypeReference(Expr *E) {
@@ -367,6 +388,11 @@ public:
       return 0;
     return E;
   }
+
+  Expr *visitSubscriptExpr(SubscriptExpr *E) {
+    return TC.semaSubscriptExpr(E);
+  }
+    
   Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     return TC.semaUnresolvedDotExpr(E);
   }

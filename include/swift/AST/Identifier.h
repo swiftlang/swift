@@ -80,7 +80,7 @@ public:
                       llvm::DenseMapInfo<const void*>::getTombstoneKey());
   }
 };
-  
+
 } // end namespace swift
 
 namespace llvm {

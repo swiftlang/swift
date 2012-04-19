@@ -306,7 +306,8 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     
     // Check for a [expr] suffix.
     // Note that this cannot be a l_square_space.
-    if (consumeIf(tok::l_square)) {
+    if (Tok.is(tok::l_square)) {
+      SourceLoc LLoc = consumeToken();
       NullablePtr<Expr> Idx = parseExpr(diag::expected_expr_subscript_value);
       SourceLoc RLoc;
       if (Idx.isNull() ||
@@ -315,9 +316,7 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
                              TokLoc, diag::opening_bracket))
         return 0;
       
-      // FIXME: Implement.  This should modify Result like the cases
-      // above.
-      Result = Result;
+      Result = new (Context) SubscriptExpr(Result.get(), LLoc, Idx.get(), RLoc);
     }
         
     break;

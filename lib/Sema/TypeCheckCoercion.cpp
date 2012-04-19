@@ -178,6 +178,9 @@ public:
   CoercedResult visitNewArrayExpr(NewArrayExpr *E) {
     return unchanged(E);
   }
+  CoercedResult visitSubscriptExpr(SubscriptExpr *E) {
+    return unchanged(E);
+  }
   
   static Type matchLValueType(ValueDecl *val, LValueType *lv) {
     if (val->isReferencedAsLValue() && 
