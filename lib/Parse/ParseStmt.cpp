@@ -34,6 +34,7 @@ bool Parser::isStartOfStmtOtherThanAssignment(const Token &Tok) {
   case tok::kw_return:
   case tok::kw_if:
   case tok::kw_while:
+  case tok::kw_for:
     return true;
   }
 }
@@ -320,7 +321,7 @@ NullablePtr<Stmt> Parser::parseStmtWhile() {
 ///     'for' '(' expr-or-stmt-assign? ';' expr? ';' expr-or-stmt-assign? ')'
 ///           stmt-brace
 NullablePtr<Stmt> Parser::parseStmtFor() {
-  consumeToken(tok::kw_for);
+  SourceLoc ForLoc = consumeToken(tok::kw_for);
   SourceLoc LPLoc, Semi1Loc, Semi2Loc, RPLoc;
   
   ExprStmtOrDecl First;
@@ -328,18 +329,39 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
   ExprStmtOrDecl Third;
   NullablePtr<BraceStmt> Body;
   
-  if (parseToken(tok::l_paren, LPLoc, diag::expected_lparen_for_stmt) ||
-      (Tok.isNot(tok::semi) && parseExprOrStmtAssign(First)) ||
+  if (Tok.is(tok::l_paren_space))
+    LPLoc = consumeToken(tok::l_paren_space);
+  else if (parseToken(tok::l_paren, LPLoc, diag::expected_lparen_for_stmt))
+    return 0;
+  
+  if ((Tok.isNot(tok::semi) && parseExprOrStmtAssign(First)) ||
       parseToken(tok::semi, Semi1Loc, diag::expected_semi_for_stmt) ||
-      (Tok.isNot(tok::semi) && (Second = parseExpr(diag::expected_cond_for_stmt)).isNull()) ||
+      (Tok.isNot(tok::semi) &&
+        (Second = parseExpr(diag::expected_cond_for_stmt)).isNull()) ||
       parseToken(tok::semi, Semi2Loc, diag::expected_semi_for_stmt) ||
       (Tok.isNot(tok::r_paren) && parseExprOrStmtAssign(Third)) ||
-      parseToken(tok::r_paren, RPLoc, diag::expected_rparen_for_stmt) ||
+      parseMatchingToken(tok::r_paren, RPLoc, diag::expected_rparen_for_stmt,
+                         LPLoc, diag::opening_paren) ||
       (Body = parseStmtBrace(diag::expected_lbrace_after_for)).isNull())
     return 0;
+  
+  PointerUnion<Expr*, AssignStmt*> Initializer, Increment;
+  if (First.isNull())
+    ;
+  else if (First.is<Expr*>())
+    Initializer = First.get<Expr*>();
+  else
+    Initializer = cast<AssignStmt>(First.get<Stmt*>());
 
-  // FIXME: ASTify
-  return 0;
+  if (Third.isNull())
+    ;
+  else if (Third.is<Expr*>())
+    Increment = Third.get<Expr*>();
+  else
+    Increment = cast<AssignStmt>(Third.get<Stmt*>());
+
+  return new (Context) ForStmt(ForLoc, LPLoc, Initializer, Semi1Loc, Second,
+                               Semi2Loc, Increment, RPLoc, Body.get());
 }
 
 

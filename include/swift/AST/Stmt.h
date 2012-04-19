@@ -20,6 +20,7 @@
 #include "swift/AST/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
@@ -208,7 +209,7 @@ public:
 
 /// IfStmt - if/then/else statement.  If no 'else' is specified, then the
 /// ElseLoc location is not specified and the Else statement is null.  The
-/// condition of the 'if' is required to have a __builtin_int1 type.
+/// condition of the 'if' is required to have a Builtin.Int1 type.
 class IfStmt : public Stmt {
   SourceLoc IfLoc;
   SourceLoc ElseLoc;
@@ -242,7 +243,7 @@ public:
 };
 
 /// WhileStmt - while statement.  The condition is required to have a
-/// __builtin_int1 type.
+/// Builtin.Int1 type.
 class WhileStmt : public Stmt {
   SourceLoc WhileLoc;
   Expr *Cond;
@@ -264,6 +265,46 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const WhileStmt *) { return true; }
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::While; }
+};
+
+/// ForStmt - for statement.  The condition is required to have a
+/// Builtin.Int1 type.  Note that the condition is optional.  If not present,
+/// it always evaluates to one.  The Initializer and Increment are also
+/// optional.
+class ForStmt : public Stmt {
+  SourceLoc ForLoc, LPLoc, Semi1Loc, Semi2Loc, RPLoc;
+  PointerUnion<Expr*, AssignStmt*> Initializer;
+  NullablePtr<Expr> Cond;
+  PointerUnion<Expr*, AssignStmt*> Increment;
+  Stmt *Body;
+  
+public:
+  ForStmt(SourceLoc ForLoc, SourceLoc LPLoc, 
+          PointerUnion<Expr*, AssignStmt*> Initializer,
+          SourceLoc Semi1Loc, NullablePtr<Expr> Cond, SourceLoc Semi2Loc,
+          PointerUnion<Expr*, AssignStmt*> Increment, SourceLoc RPLoc,
+          Stmt *Body)
+  : Stmt(StmtKind::For), ForLoc(ForLoc), LPLoc(LPLoc), Semi1Loc(Semi1Loc),
+    Semi2Loc(Semi2Loc), RPLoc(RPLoc), Initializer(Initializer), 
+    Cond(Cond), Increment(Increment), Body(Body) {
+  }
+  
+  SourceRange getSourceRange() const {
+    return SourceRange(ForLoc, Body->getEndLoc());
+  }
+  
+  PointerUnion<Expr*, AssignStmt*> getInitializer() const { return Initializer;}
+  void setInitializer(PointerUnion<Expr*, AssignStmt*> V) { Initializer = V; }
+  NullablePtr<Expr> getCond() const { return Cond; }
+  void setCond(NullablePtr<Expr> C) { Cond = C; }
+  PointerUnion<Expr*, AssignStmt*> getIncrement() const { return Increment; }
+  void setIncrement(PointerUnion<Expr*, AssignStmt*> V) { Increment = V; }
+  Stmt *getBody() const { return Body; }
+  void setBody(Stmt *s) { Body = s; }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ForStmt *) { return true; }
+  static bool classof(const Stmt *S) { return S->getKind() == StmtKind::For; }
 };
 
 } // end namespace swift

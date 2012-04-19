@@ -173,6 +173,32 @@ public:
     printRec(S->getBody());
     OS << ')';
   }
+  void visitForStmt(ForStmt *S) {
+    OS.indent(Indent) << "(for_stmt\n";
+    if (S->getInitializer().isNull())
+      OS.indent(Indent+2) << "<null initializer>";
+    else if (Expr *E = S->getInitializer().dyn_cast<Expr*>())
+      printRec(E);
+    else
+      printRec(S->getInitializer().get<AssignStmt*>());
+    OS << '\n';
+
+    if (S->getCond().isNull())
+      OS.indent(Indent+2) << "<null condition>";
+    else
+      printRec(S->getCond().get());
+    OS << '\n';
+
+    if (S->getIncrement().isNull())
+      OS.indent(Indent+2) << "<null increment>";
+    else if (Expr *E = S->getIncrement().dyn_cast<Expr*>())
+      printRec(E);
+    else
+      printRec(S->getIncrement().get<AssignStmt*>());
+    OS << '\n';
+    printRec(S->getBody());
+    OS << ')';
+  }
 };
 
 } // end anonymous namespace.

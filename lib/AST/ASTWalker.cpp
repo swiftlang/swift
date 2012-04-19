@@ -324,6 +324,46 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return WS;
   }
 
+  Stmt *visitForStmt(ForStmt *FS) {
+    if (Expr *E = FS->getInitializer().dyn_cast<Expr*>()) {
+      if ((E = doIt(E)))
+        FS->setInitializer(E);
+      else
+        return nullptr;
+    } else if (AssignStmt *S = FS->getInitializer().dyn_cast<AssignStmt*>()) {
+      if ((S = cast_or_null<AssignStmt>(doIt(S))))
+        FS->setInitializer(S);
+      else
+        return nullptr;
+    }
+    
+    if (FS->getCond().isNonNull()) {
+      if (Expr *E2 = doIt(FS->getCond().get()))
+        FS->setCond(E2);
+      else
+        return nullptr;
+
+    }
+    
+    if (Expr *E = FS->getIncrement().dyn_cast<Expr*>()) {
+      if ((E = doIt(E)))
+        FS->setIncrement(E);
+      else
+        return nullptr;
+    } else if (AssignStmt *S = FS->getIncrement().dyn_cast<AssignStmt*>()) {
+      if ((S = cast_or_null<AssignStmt>(doIt(S))))
+        FS->setIncrement(S);
+      else
+        return nullptr;
+    }
+    
+    if (Stmt *S = doIt(FS->getBody()))
+      FS->setBody(S);
+    else
+      return nullptr;
+    return FS;
+  }
+
   bool visitPatternVarGetSet(Pattern *P) {
     switch (P->getKind()) {
     case PatternKind::Paren:

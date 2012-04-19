@@ -35,6 +35,7 @@ namespace swift {
   class BraceStmt;
   class Decl;
   class Expr;
+  class ForStmt;
   class IfStmt;
   template<typename T> class Optional;
   class Pattern;
@@ -253,6 +254,7 @@ private:
   void emitIfStmt(IfStmt *S);
   void emitReturnStmt(ReturnStmt *S);
   void emitWhileStmt(WhileStmt *S);
+  void emitForStmt(ForStmt *S);
 
 //--- Expression emission ------------------------------------------------------
 public:

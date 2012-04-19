@@ -53,6 +53,17 @@ public:
     S = S2;
     return false;
   }
+  
+  bool typeCheck(PointerUnion<Expr*, AssignStmt*> &Val) {
+    if (Expr *E = Val.dyn_cast<Expr*>()) {
+      if (typeCheckExpr(E)) return true;
+      Val = E;
+    } else if (AssignStmt *S = Val.dyn_cast<AssignStmt*>()) {
+      if (typeCheckStmt(S)) return true;
+      Val = S;
+    }
+    return false;
+  }
  
   //===--------------------------------------------------------------------===//
   // Visit Methods.
@@ -127,6 +138,28 @@ public:
     WS->setBody(S);
     
     return WS;
+  }
+  Stmt *visitForStmt(ForStmt *FS) {
+    // Type check the condition if present.
+    if (FS->getCond().isNonNull()) {
+      Expr *E = FS->getCond().get();
+      if (TC.typeCheckCondition(E)) return 0;
+      FS->setCond(E);
+    }
+    
+    PointerUnion<Expr*, AssignStmt*> Tmp = FS->getInitializer();
+    if (typeCheck(Tmp)) return 0;
+    FS->setInitializer(Tmp);
+    
+    Tmp = FS->getIncrement();
+    if (typeCheck(Tmp)) return 0;
+    FS->setIncrement(Tmp);
+    
+    Stmt *S = FS->getBody();
+    if (typeCheckStmt(S)) return 0;
+    FS->setBody(S);
+    
+    return FS;
   }
 };
   

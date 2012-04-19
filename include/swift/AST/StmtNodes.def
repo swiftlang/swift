@@ -36,6 +36,7 @@ STMT(Brace, Stmt)
 STMT(Return, Stmt)
 STMT(If, Stmt)
 STMT(While, Stmt)
+STMT(For, Stmt)
 
 #undef ABSTRACT_STMT
 #undef STMT

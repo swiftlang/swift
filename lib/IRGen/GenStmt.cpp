@@ -49,6 +49,9 @@ void IRGenFunction::emitStmt(Stmt *S) {
 
   case StmtKind::While:
     return emitWhileStmt(cast<WhileStmt>(S));
+      
+  case StmtKind::For:
+    return emitForStmt(cast<ForStmt>(S));
   }
   llvm_unreachable("bad statement kind!");
 }
@@ -145,3 +148,54 @@ void IRGenFunction::emitWhileStmt(WhileStmt *S) {
   // Complete the conditional execution.
   cond.complete(*this);
 }
+
+void IRGenFunction::emitForStmt(ForStmt *S) {
+  if (Expr *E = S->getInitializer().dyn_cast<Expr*>()) {
+    FullExpr scope(*this);
+    emitIgnored(E);
+  } else if (Stmt *AS = S->getInitializer().dyn_cast<AssignStmt*>()) {
+    emitStmt(AS);
+  }
+  
+  // If we ever reach an unreachable point, stop emitting statements.
+  // This will need revision if we ever add goto.
+  if (!Builder.hasValidIP()) return;
+
+  // Create a new basic block and jump into it.
+  llvm::BasicBlock *loopBB = createBasicBlock("for.condition");
+  Builder.CreateBr(loopBB);
+  Builder.emitBlock(loopBB);
+  
+  // Evaluate the condition with the false edge leading directly
+  // to the continuation block.
+  Condition cond = S->getCond().isNonNull() ?
+    emitCondition(S->getCond().get(), /*hasFalseCode*/ false) :
+    Condition(loopBB, 0, 0);  // Infinite loop.
+  
+  // If there's a true edge, emit the body in it.
+  if (cond.hasTrue()) {
+    cond.enterTrue(*this);
+    emitStmt(S->getBody());
+    
+    if (Builder.hasValidIP() && !S->getIncrement().isNull()) {
+      if (Expr *E = S->getIncrement().dyn_cast<Expr*>()) {
+        FullExpr scope(*this);
+        emitIgnored(E);
+      } else if (Stmt *AS = S->getIncrement().dyn_cast<AssignStmt*>()) {
+        emitStmt(AS);
+      }
+    }
+      
+    if (Builder.hasValidIP()) {
+      Builder.CreateBr(loopBB);
+      Builder.ClearInsertionPoint();
+    }
+    cond.exitTrue(*this);
+  }
+  
+  // Complete the conditional execution.
+  cond.complete(*this);
+
+}
+
+
