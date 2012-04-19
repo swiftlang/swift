@@ -461,8 +461,7 @@ TypeAliasDecl *Parser::parseDeclTypeAlias() {
     return 0;
 
   TypeAliasDecl *TAD =
-    new (Context) TypeAliasDecl(TypeAliasLoc, Id, Ty, CurDeclContext,
-                                ScopeInfo.isModuleScope());
+    new (Context) TypeAliasDecl(TypeAliasLoc, Id, Ty, CurDeclContext);
   ScopeInfo.addToScope(TAD);
   return TAD;
 }
@@ -487,7 +486,6 @@ static void addVarsToScope(Parser &P, Pattern *Pat,
   case PatternKind::Named: {
     VarDecl *VD = cast<NamedPattern>(Pat)->getDecl();
     VD->setDeclContext(P.CurDeclContext);
-    VD->setModuleScope(P.ScopeInfo.isModuleScope());
     if (!VD->hasType())
       VD->setType(UnstructuredDependentType::get(P.Context));
     if (Attributes.isValid())
@@ -497,12 +495,10 @@ static void addVarsToScope(Parser &P, Pattern *Pat,
       // FIXME: Order of get/set not preserved.
       if (FuncDecl *Get = VD->getGetter()) {
         Get->setDeclContext(P.CurDeclContext);
-        Get->setModuleScope(P.ScopeInfo.isModuleScope());
         Decls.push_back(Get);
       }
       if (FuncDecl *Set = VD->getSetter()) {
         Set->setDeclContext(P.CurDeclContext);
-        Set->setModuleScope(P.ScopeInfo.isModuleScope());
         Decls.push_back(Set);
       }
     }
@@ -551,8 +547,7 @@ static Pattern *clonePattern(ASTContext &Context, Pattern *Pat) {
                                          Named->getBoundName(),
                                          Named->hasType()? Named->getType()
                                                          : Type(),
-                                         Named->getDecl()->getDeclContext(),
-                                         Named->getDecl()->isModuleScope());
+                                         Named->getDecl()->getDeclContext());
     return new (Context) NamedPattern(Var);
   }
     
@@ -684,8 +679,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       LastValidLoc = Body.get()->getRBraceLoc();
       
       Get = new (Context) FuncDecl(/*StaticLoc=*/SourceLoc(), GetLoc,
-                                   Identifier(), FuncTy, GetFn, CurDeclContext,
-                                   ScopeInfo.isModuleScope());
+                                   Identifier(), FuncTy, GetFn, CurDeclContext);
       continue;
     }
     
@@ -758,8 +752,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
         cloneTuplePatternElts(Context, *Indices, TupleElts);
       
       VarDecl *Value = new (Context) VarDecl(SetNameLoc, SetName, ElementTy,
-                                             CurDeclContext,
-                                             /*IsModuleScope=*/false);
+                                             CurDeclContext);
       
       Pattern *ValuePattern
         = new (Context) TypedPattern(new (Context) NamedPattern(Value),
@@ -800,8 +793,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     LastValidLoc = Body.get()->getRBraceLoc();
     
     Set = new (Context) FuncDecl(/*StaticLoc=*/SourceLoc(), SetLoc,
-                                 Identifier(), FuncTy, SetFn, CurDeclContext,
-                                 ScopeInfo.isModuleScope());
+                                 Identifier(), FuncTy, SetFn, CurDeclContext);
   }
   
   return Invalid;
@@ -959,8 +951,7 @@ VarDecl *Parser::parseDeclVarSimple() {
   if (parseTypeAnnotation(Ty, diag::expected_type))
     return 0;
 
-  return new (Context) VarDecl(VarLoc, ident, Ty, CurDeclContext,
-                               ScopeInfo.isModuleScope());
+  return new (Context) VarDecl(VarLoc, ident, Ty, CurDeclContext);
 }
 
 /// addImplicitThisParameter - Add an implicit 'this' parameter to the given
@@ -968,7 +959,7 @@ VarDecl *Parser::parseDeclVarSimple() {
 Pattern *Parser::buildImplicitThisParameter() {
   VarDecl *D
     = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
-                            Type(), CurDeclContext, /*isModuleScope*/false);
+                            Type(), CurDeclContext);
   Pattern *P = new (Context) NamedPattern(D);
   return new (Context) TypedPattern(P, UnstructuredDependentType::get(Context));
 }
@@ -1058,8 +1049,7 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   
   // Create the decl for the func and add it to the parent scope.
   FuncDecl *FD = new (Context) FuncDecl(StaticLoc, FuncLoc, Name,
-                                        FuncTy, FE, CurDeclContext,
-                                        ScopeInfo.isModuleScope());
+                                        FuncTy, FE, CurDeclContext);
   if (Attributes.isValid()) FD->getMutableAttrs() = Attributes;
   ScopeInfo.addToScope(FD);
   return FD;
@@ -1088,8 +1078,7 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
     return true;
   
   TypeAliasDecl *TAD =
-    new (Context) TypeAliasDecl(NameLoc, OneOfName, Type(), CurDeclContext,
-                                ScopeInfo.isModuleScope());
+    new (Context) TypeAliasDecl(NameLoc, OneOfName, Type(), CurDeclContext);
   Decls.push_back(TAD);
 
   SourceLoc LBLoc, RBLoc;
@@ -1186,9 +1175,8 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
     
     // Create a decl for each element, giving each a temporary type.
     EltDecls.push_back(new (Context) OneOfElementDecl(Elt.NameLoc, NameI,
-                                                  EltTy, Elt.EltType,
-                                                  CurDeclContext,
-                                                  ScopeInfo.isModuleScope()));
+                                                      EltTy, Elt.EltType,
+                                                      CurDeclContext));
   }
   
   OneOfType *Result = OneOfType::getNew(OneOfLoc, EltDecls, PrettyTypeName);
@@ -1229,8 +1217,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
 
   // Get the TypeAlias for the name that we'll eventually have.
   TypeAliasDecl *TAD =
-    new (Context) TypeAliasDecl(StructLoc, StructName, Type(), CurDeclContext,
-                                ScopeInfo.isModuleScope());
+    new (Context) TypeAliasDecl(StructLoc, StructName, Type(), CurDeclContext);
 
   // Parse elements of the body as a tuple body.
   Type BodyTy;
@@ -1297,8 +1284,7 @@ Decl *Parser::parseDeclProtocol() {
     return 0;
   
   TypeAliasDecl *TAD =
-    new (Context) TypeAliasDecl(NameLoc, ProtocolName, Type(), CurDeclContext,
-                                ScopeInfo.isModuleScope());
+    new (Context) TypeAliasDecl(NameLoc, ProtocolName, Type(), CurDeclContext);
   if (parseProtocolBody(ProtocolLoc, Attributes, TAD))
     return 0;
   return TAD;
@@ -1448,14 +1434,12 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
     // FIXME: Order of get/set not preserved.
     if (Set) {
       Set->setDeclContext(CurDeclContext);
-      Set->setModuleScope(ScopeInfo.isModuleScope());
       Set->makeSetter(Subscript);
       Decls.push_back(Set);
     }
 
     if (Get) {
       Get->setDeclContext(CurDeclContext);
-      Get->setModuleScope(ScopeInfo.isModuleScope());
       Get->makeGetter(Subscript);
       Decls.push_back(Get);
     }    

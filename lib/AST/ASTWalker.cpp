@@ -431,6 +431,17 @@ public:
         if (doIt(M))
           return true;
       }
+    } else if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+      auto Body = TLCD->getBody();
+      if (Body.is<Expr*>()) {
+        Expr *E = Body.get<Expr*>();
+        E = doIt(E);
+        TLCD->setBody(E);
+      } else {
+        Stmt *S = Body.get<Stmt*>();
+        S = doIt(S);
+        TLCD->setBody(S);
+      }
     }
     
     return !Walker.walkToDeclPost(D);

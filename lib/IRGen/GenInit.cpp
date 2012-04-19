@@ -119,7 +119,7 @@ void Initialization::markAllocated(IRGenFunction &IGF, Object object,
 /// emitLocalVariable or emitGlobalVariable, depending.
 OwnedAddress Initialization::emitVariable(IRGenFunction &IGF, VarDecl *var,
                                           const TypeInfo &type) {
-  if (var->isModuleScope())
+  if (!var->getDeclContext()->isLocalContext())
     return emitGlobalVariable(IGF, var, type);
 
   OwnedAddress addr =
@@ -418,7 +418,7 @@ namespace {
       VarDecl *var = P->getDecl();
 
       // There's never a destroy cleanup for global declarations.
-      if (var->isModuleScope())
+      if (!var->getDeclContext()->isLocalContext())
         return I.registerObjectWithoutDestroy(I.getObjectForDecl(var));
 
       const TypeInfo &varTI = IGF.getFragileTypeInfo(var->getType());

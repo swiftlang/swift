@@ -76,7 +76,7 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E) {
     llvm_unreachable("decl cannot be emitted as an l-value");
 
   case DeclKind::Var:
-    if (!D->isModuleScope())
+    if (D->getDeclContext()->isLocalContext())
       return IGF.emitAddressLValue(IGF.getLocal(D));
     return IGF.getGlobal(cast<VarDecl>(D));
   }

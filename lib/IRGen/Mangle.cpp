@@ -160,9 +160,8 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
                ExplosionKind::Minimal, 0);
     return;
 
-  case DeclContextKind::FuncExpr:
-  case DeclContextKind::ExplicitClosureExpr:
-  case DeclContextKind::ImplicitClosureExpr:
+  case DeclContextKind::CapturingExpr:
+  case DeclContextKind::TopLevelCodeDecl:
     // FIXME: we don't need to agree about these across components, but
     // that's no excuse for not mangling *something* in here.
     break;
@@ -319,20 +318,10 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
   llvm_unreachable("bad type kind");
 }
 
-static bool shouldMangle(NamedDecl *D) {
-  return isa<ValueDecl>(D) && cast<ValueDecl>(D)->isModuleScope();
-}
-
 void LinkEntity::mangle(raw_ostream &buffer) const {
-  // Check for declarations which should not be mangled.
-  if (!shouldMangle(TheDecl)) {
-    buffer << TheDecl->getName().str();
-    return;
-  }
-
   // mangled-name ::= '_T' identifier+ type?
 
-  // Otherwise, add the prefix.
+  // Add the prefix.
   buffer << "_T"; // T is for Tigger
 
   Mangler mangler(buffer);

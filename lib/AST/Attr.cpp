@@ -56,9 +56,8 @@ Resilience NamedDecl::getResilienceFrom(Component *C) const {
                   ? Resilience::Resilient : Resilience::Fragile;
 
     // Local declarations are always inherently fragile.
-    case DeclContextKind::FuncExpr:
-    case DeclContextKind::ExplicitClosureExpr:
-    case DeclContextKind::ImplicitClosureExpr:
+    case DeclContextKind::CapturingExpr:
+    case DeclContextKind::TopLevelCodeDecl:
       return Resilience::InherentlyFragile;
 
     // For oneofs, we walk out through the oneof decl.

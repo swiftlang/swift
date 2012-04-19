@@ -875,8 +875,7 @@ public:
            E->getKind() <= ExprKind::Last_CapturingExpr;
   }
   static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() >= DeclContextKind::First_Capturing &&
-           DC->getContextKind() <= DeclContextKind::Last_Capturing;
+    return DC->getContextKind() == DeclContextKind::CapturingExpr;
   }
 };
 
@@ -898,7 +897,8 @@ class FuncExpr : public CapturingExpr {
   
   FuncExpr(SourceLoc FuncLoc, unsigned NumPatterns, Type FnType,
            BraceStmt *Body, DeclContext *Parent)
-    : CapturingExpr(ExprKind::Func, FnType, DeclContextKind::FuncExpr, Parent),
+    : CapturingExpr(ExprKind::Func, FnType,
+                    DeclContextKind::CapturingExpr, Parent),
       FuncLoc(FuncLoc), NumPatterns(NumPatterns), Body(Body) {}
 public:
   static FuncExpr *create(ASTContext &Context, SourceLoc FuncLoc,
@@ -925,7 +925,7 @@ public:
   static bool classof(const FuncExpr *) { return true; }
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Func; }
   static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::FuncExpr;
+    return isa<CapturingExpr>(DC) && classof(cast<CapturingExpr>(DC));
   }
   static bool classof(const CapturingExpr *E) { return classof(cast<Expr>(E)); }
 };
@@ -962,8 +962,7 @@ public:
            E->getKind() == ExprKind::ExplicitClosure;
   }
   static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() >= DeclContextKind::First_Closure &&
-           DC->getContextKind() <= DeclContextKind::Last_Closure;
+    return isa<CapturingExpr>(DC) && classof(cast<CapturingExpr>(DC));
   }
   static bool classof(const CapturingExpr *E) { return classof(cast<Expr>(E)); }
 };
@@ -980,7 +979,7 @@ public:
   ExplicitClosureExpr(SourceLoc LBraceLoc, DeclContext *Parent,
                       Expr *Body = 0, SourceLoc RBraceLoc = SourceLoc())
     : ClosureExpr(ExprKind::ExplicitClosure, Body,
-                  DeclContextKind::ExplicitClosureExpr, Parent),
+                  DeclContextKind::CapturingExpr, Parent),
       LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc) {}
   
   void setRBraceLoc(SourceLoc L) {
@@ -1005,7 +1004,7 @@ public:
     return E->getKind() == ExprKind::ExplicitClosure;
   }
   static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::ExplicitClosureExpr;
+    return isa<CapturingExpr>(DC) && classof(cast<CapturingExpr>(DC));
   }
   static bool classof(const CapturingExpr *E) { return classof(cast<Expr>(E)); }
 };
@@ -1019,7 +1018,7 @@ class ImplicitClosureExpr : public ClosureExpr {
 public:
   ImplicitClosureExpr(Expr *Body, DeclContext *Parent, Type ResultTy)
     : ClosureExpr(ExprKind::ImplicitClosure, Body,
-                  DeclContextKind::ImplicitClosureExpr, Parent, ResultTy) {}
+                  DeclContextKind::CapturingExpr, Parent, ResultTy) {}
   
   SourceRange getSourceRange() const { return getBody()->getSourceRange(); }
 
@@ -1033,7 +1032,7 @@ public:
     return E->getKind() == ExprKind::ImplicitClosure;
   }
   static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::ImplicitClosureExpr;
+    return isa<CapturingExpr>(DC) && classof(cast<CapturingExpr>(DC));
   }
   static bool classof(const CapturingExpr *E) { return classof(cast<Expr>(E)); }
 };

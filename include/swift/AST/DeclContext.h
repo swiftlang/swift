@@ -50,18 +50,13 @@ enum class DeclContextKind {
   //Module,
     TranslationUnit,
     BuiltinModule,
-  //CapturingExpr,
-    FuncExpr,
-    //ClosureExpr,
-      ExplicitClosureExpr,
-      ImplicitClosureExpr,
+  CapturingExpr,
   OneOfType,
   ExtensionDecl,
   ProtocolType,
+  TopLevelCodeDecl,
   
   First_Module = TranslationUnit, Last_Module = BuiltinModule,
-  First_Capturing = FuncExpr, Last_Capturing = ImplicitClosureExpr,
-  First_Closure = ExplicitClosureExpr, Last_Closure = ImplicitClosureExpr
 };
   
 /// A DeclContext is an AST object which acts as a semantic container
@@ -88,8 +83,8 @@ public:
   /// code block.  A context that appears in such a scope, like a
   /// local type declaration, does not itself become a local context.
   bool isLocalContext() const {
-    return getContextKind() >= DeclContextKind::First_Capturing &&
-           getContextKind() <= DeclContextKind::Last_Capturing;
+    return getContextKind() == DeclContextKind::CapturingExpr ||
+           getContextKind() == DeclContextKind::TopLevelCodeDecl;
   }
   
   /// isModuleContext - Return true if this is a subclass of Module.

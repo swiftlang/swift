@@ -188,6 +188,11 @@ public:
       
     }
   }
+
+  void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
+    // See swift::performTypeChecking for TopLevelCodeDecl handling.
+    llvm_unreachable("TopLevelCodeDecls are handled elsewhere");
+  }
 };
 }; // end anonymous namespace.
 

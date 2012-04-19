@@ -23,6 +23,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/PointerUnion.h"
 #include <cstddef>
 
 namespace swift {
@@ -40,6 +41,7 @@ namespace swift {
   class Pattern;
   enum class Resilience : unsigned char;
   class TypeAliasDecl;
+  class Stmt;
   
 enum class DeclKind {
 #define DECL(Id, Parent) Id,
@@ -64,8 +66,6 @@ class Decl {
     friend class ValueDecl;
     unsigned : NumNamedDeclBits;
 
-    unsigned IsModuleScope : 1;
-
     // The following flags are not necessarily meaningful for all
     // kinds of value-declarations.
 
@@ -78,7 +78,7 @@ class Decl {
     // the stack frame.)
     unsigned HasFixedLifetime : 1;
   };
-  enum { NumValueDeclBits = NumNamedDeclBits + 3 };
+  enum { NumValueDeclBits = NumNamedDeclBits + 2 };
   static_assert(NumValueDeclBits <= 32, "fits in an unsigned");
 
 protected:
@@ -244,7 +244,32 @@ public:
   static bool classof(const PatternBindingDecl *D) { return true; }
 
 };
-  
+
+class TopLevelCodeDecl : public Decl, public DeclContext {
+public:
+  typedef llvm::PointerUnion<Expr*, Stmt*> ExprOrStmt;
+
+private:
+  ExprOrStmt Body;
+
+public:
+  TopLevelCodeDecl(DeclContext *Parent)
+    : Decl(DeclKind::TopLevelCode, Parent),
+      DeclContext(DeclContextKind::TopLevelCodeDecl, Parent) {}
+
+  ExprOrStmt getBody() { return Body; }
+  void setBody(Expr *E) { Body = E; }
+  void setBody(Stmt *S) { Body = S; }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::TopLevelCode;
+  }
+  static bool classof(const DeclContext *C) {
+    return C->getContextKind() == DeclContextKind::TopLevelCodeDecl;
+  }
+  static bool classof(const TopLevelCodeDecl *D) { return true; }
+};
+
 /// SubscriptDecl - Declares a subscripting operator for a type.
 ///
 /// A subscript declaration is defined as a get/set pair that produces a
@@ -347,10 +372,8 @@ class ValueDecl : public NamedDecl {
   Type Ty;
 
 protected:
-  ValueDecl(DeclKind K, DeclContext *DC, bool IsModuleScope,
-            Identifier name, Type ty)
+  ValueDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty)
     : NamedDecl(K, DC, name), Ty(ty) {
-    ValueDeclBits.IsModuleScope = IsModuleScope;
     ValueDeclBits.NeverUsedAsLValue = false;
     ValueDeclBits.HasFixedLifetime = false;
   }
@@ -405,14 +428,6 @@ public:
     return ValueDeclBits.NeverUsedAsLValue;
   }
 
-  bool isModuleScope() const { 
-    return ValueDeclBits.IsModuleScope;
-  }
-  void setModuleScope(bool flag) {
-    ValueDeclBits.IsModuleScope = flag;
-  }
-
-
   /// isInstanceMember - Determine whether this value is an instance member
   /// of a oneof or protocol.
   bool isInstanceMember() const;
@@ -440,8 +455,7 @@ class TypeAliasDecl : public ValueDecl {
   
 public:
   TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
-                Type Underlyingty, DeclContext *DC,
-                bool IsModuleScope);
+                Type Underlyingty, DeclContext *DC);
   
   SourceLoc getTypeAliasLoc() const { return TypeAliasLoc; }
   void setTypeAliasLoc(SourceLoc loc) { TypeAliasLoc = loc; }
@@ -499,9 +513,8 @@ private:
   GetSetRecord *GetSet;
   
 public:
-  VarDecl(SourceLoc VarLoc, Identifier Name, Type Ty, DeclContext *DC,
-          bool IsModuleScope)
-    : ValueDecl(DeclKind::Var, DC, IsModuleScope, Name, Ty),
+  VarDecl(SourceLoc VarLoc, Identifier Name, Type Ty, DeclContext *DC)
+    : ValueDecl(DeclKind::Var, DC, Name, Ty),
       VarLoc(VarLoc), GetSet() {}
 
   /// getVarLoc - The location of the 'var' token.
@@ -539,10 +552,9 @@ class FuncDecl : public ValueDecl {
   
 public:
   FuncDecl(SourceLoc StaticLoc, SourceLoc FuncLoc, Identifier Name,
-           Type Ty, FuncExpr *Body, DeclContext *DC,
-           bool IsModuleScope)
-    : ValueDecl(DeclKind::Func, DC, IsModuleScope, Name, Ty),
-      StaticLoc(StaticLoc), FuncLoc(FuncLoc), Body(Body) {
+           Type Ty, FuncExpr *Body, DeclContext *DC)
+    : ValueDecl(DeclKind::Func, DC, Name, Ty), StaticLoc(StaticLoc),
+      FuncLoc(FuncLoc), Body(Body) {
   }
   
   bool isStatic() const { return StaticLoc.isValid(); }
@@ -623,9 +635,8 @@ class OneOfElementDecl : public ValueDecl {
     
 public:
   OneOfElementDecl(SourceLoc IdentifierLoc, Identifier Name, Type Ty,
-                   Type ArgumentType, DeclContext *DC,
-                   bool IsModuleScope)
-  : ValueDecl(DeclKind::OneOfElement, DC, IsModuleScope, Name, Ty),
+                   Type ArgumentType, DeclContext *DC)
+  : ValueDecl(DeclKind::OneOfElement, DC, Name, Ty),
     IdentifierLoc(IdentifierLoc), ArgumentType(ArgumentType) {}
 
   Type getArgumentType() const { return ArgumentType; }

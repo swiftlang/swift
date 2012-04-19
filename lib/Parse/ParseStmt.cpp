@@ -16,6 +16,7 @@
 
 #include "Parser.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
@@ -96,6 +97,19 @@ bool Parser::parseExprOrStmtAssign(ExprStmtOrDecl &Result) {
   return false;
 }
 
+bool Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
+  if (isStartOfStmtOtherThanAssignment(Tok)) {
+    NullablePtr<Stmt> Res = parseStmtOtherThanAssignment();
+    if (Res.isNull())
+      return true;
+    Result = Res.get();
+    return false;
+  }
+
+  assert(Tok.isNot(tok::l_brace) &&
+         "expr-anon-closure should be parsed as stmt-brace here");
+  return parseExprOrStmtAssign(Result);
+}
 
 ///   stmt-brace-item:
 ///     decl
@@ -118,15 +132,11 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
   
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
     bool NeedParseErrorRecovery = false;
+    TopLevelCodeDecl *TLCD = 0;
+    llvm::OwningPtr<ContextChange> CC;
 
-    // Parse the decl, stmt, or expression.    
-    if (isStartOfStmtOtherThanAssignment(Tok)) {
-      NullablePtr<Stmt> Res = parseStmtOtherThanAssignment();
-      if (Res.isNull())
-        NeedParseErrorRecovery = true;
-      else
-        Entries.push_back(Res.get());
-    } else if (isStartOfDecl(Tok, peekToken())) {
+    // Parse the decl, stmt, or expression.
+    if (isStartOfDecl(Tok, peekToken())) {
       if (parseDecl(TmpDecls, IsTopLevel ? PD_AllowTopLevel : PD_Default))
         NeedParseErrorRecovery = true;
       else {
@@ -135,20 +145,28 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       }
 
       TmpDecls.clear();
-    } else {
-      // Verify that the ambiguity between expr-anon-closure and stmt-brace
-      // isn't causing us heartburn.
-      assert(Tok.isNot(tok::l_brace) &&
-             "expr-anon-closure should be parsed as stmt-brace here");
+    } else if (IsTopLevel) {
+      TLCD = new (Context) TopLevelCodeDecl(CurDeclContext);
+      ContextChange CC(*this, TLCD);
 
-      // Parse 'expr' or 'stmt-assign'.
-      ExprStmtOrDecl Res;
-      if (parseExprOrStmtAssign(Res))
+      ExprStmtOrDecl Result;
+      if (parseExprOrStmt(Result)) {
+        NeedParseErrorRecovery = true;
+      } else {
+        if (Result.is<Expr*>())
+           TLCD->setBody(Result.get<Expr*>());
+        else
+          TLCD->setBody(Result.get<Stmt*>());
+        Entries.push_back(TLCD);
+      }
+    } else {
+      ExprStmtOrDecl Result;
+      if (parseExprOrStmt(Result))
         NeedParseErrorRecovery = true;
       else
-        Entries.push_back(Res);
+        Entries.push_back(Result);
     }
-   
+
     // If we had a parse error, skip to the start of the next stmt or decl.  It
     // would be ideal to stop at the start of the next expression (e.g. "X = 4")
     // but distinguishing the start of an expression from the middle of one is
@@ -156,21 +174,20 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     if (NeedParseErrorRecovery)
       skipUntilDeclStmtRBrace();
 
-    if (IsTopLevel && !IsMainModule && !NeedParseErrorRecovery) {
-      if (Entries.back().is<Stmt*>()) {
+    if (TLCD && !IsMainModule && !NeedParseErrorRecovery) {
+      if (TLCD->getBody().is<Stmt*>()) {
         // Statements are not allowed at the top level outside the main module.
-        SourceLoc Loc = Entries.back().get<Stmt*>()->getStartLoc();
+        SourceLoc Loc = TLCD->getBody().get<Stmt*>()->getStartLoc();
         diagnose(Loc, diag::illegal_top_level_stmt);
-      } else if (Entries.back().is<Expr*>()) {
+      } else {
         // Expressions are not allowed at the top level outside the main module.
-        SourceLoc Loc = Entries.back().get<Expr*>()->getStartLoc();
+        SourceLoc Loc = TLCD->getBody().get<Expr*>()->getStartLoc();
         diagnose(Loc, diag::illegal_top_level_expr);
       }
     }
 
-    if (IsTopLevel && IsMainModule) {
-      if (!Entries.back().is<Decl*>() ||
-          isa<PatternBindingDecl>(Entries.back().get<Decl*>())) {
+    if (IsTopLevel && IsMainModule && !NeedParseErrorRecovery) {
+      if (TLCD || isa<PatternBindingDecl>(Entries.back().get<Decl*>())) {
         FoundSideEffects = true;
         break;
       }
@@ -303,7 +320,7 @@ NullablePtr<Stmt> Parser::parseStmtWhile() {
 ///     'for' '(' expr-or-stmt-assign? ';' expr? ';' expr-or-stmt-assign? ')'
 ///           stmt-brace
 NullablePtr<Stmt> Parser::parseStmtFor() {
-  SourceLoc ForLoc = consumeToken(tok::kw_for);
+  consumeToken(tok::kw_for);
   SourceLoc LPLoc, Semi1Loc, Semi2Loc, RPLoc;
   
   ExprStmtOrDecl First;
@@ -320,8 +337,9 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
       parseToken(tok::r_paren, RPLoc, diag::expected_rparen_for_stmt) ||
       (Body = parseStmtBrace(diag::expected_lbrace_after_for)).isNull())
     return 0;
-    
- // FIXME: ASTify
+
+  // FIXME: ASTify
+  return 0;
 }
 
 

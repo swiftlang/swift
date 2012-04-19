@@ -109,14 +109,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
 void IRGenFunction::emitGlobalTopLevel(BraceStmt *body, unsigned StartElem) {
   for (unsigned i = StartElem, e = body->getNumElements(); i != e; ++i) {
     assert(Builder.hasValidIP());
-    auto elt = body->getElement(i);
-    if (Decl *D = elt.dyn_cast<Decl*>()) {
-      emitGlobalDecl(D);
-    } else if (Expr *E = elt.dyn_cast<Expr*>()) {
-      emitIgnored(E);
-    } else {
-      emitStmt(elt.get<Stmt*>());
-    }
+    emitGlobalDecl(body->getElement(i).get<Decl*>());
   }
 }
 
@@ -167,7 +160,15 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
 
   case DeclKind::Func:
     return IGM.emitGlobalFunction(cast<FuncDecl>(D));
+
+  case DeclKind::TopLevelCode: {
+    auto Body = cast<TopLevelCodeDecl>(D)->getBody();
+    if (Body.is<Expr*>())
+      return emitIgnored(Body.get<Expr*>());
+    return emitStmt(Body.get<Stmt*>());
   }
+  }
+
   llvm_unreachable("bad decl kind!");
 }
 
@@ -265,6 +266,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     case DeclKind::Import:
     case DeclKind::OneOfElement:
     case DeclKind::PatternBinding:
+    case DeclKind::TopLevelCode:
       llvm_unreachable("decl not allowed in extension!");
     case DeclKind::Subscript:
       // Getter/setter will be handled separately.
@@ -297,6 +299,7 @@ void IRGenFunction::emitLocal(Decl *D) {
   switch (D->getKind()) {
   case DeclKind::Import:
   case DeclKind::Subscript:
+  case DeclKind::TopLevelCode:
     llvm_unreachable("declaration cannot appear in local scope");
 
   // Type aliases require IR-gen support if they're really

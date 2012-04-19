@@ -47,8 +47,6 @@ public:
   ScopeInfo(Parser &TheParser) : TheParser(TheParser), CurScope(0) {}
   ~ScopeInfo() {}
 
-  bool isModuleScope();
-
   ValueDecl *lookupValueName(Identifier Name) {
     // If we found nothing, or we found a decl at the top-level, return nothing.
     // We ignore results at the top-level because we may have overloading that

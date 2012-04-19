@@ -289,6 +289,7 @@ public:
   static bool isStartOfStmtOtherThanAssignment(const Token &Tok);
   NullablePtr<Stmt> parseStmtOtherThanAssignment();
   bool parseExprOrStmtAssign(ExprStmtOrDecl &Results);
+  bool parseExprOrStmt(ExprStmtOrDecl &Results);
   NullablePtr<BraceStmt> parseStmtBrace(Diag<> ID);
   NullablePtr<Stmt> parseStmtReturn();
   NullablePtr<Stmt> parseStmtIf();

@@ -98,6 +98,7 @@ bool ValueDecl::isDefinition() const {
   case DeclKind::Extension:
   case DeclKind::PatternBinding:
   case DeclKind::Subscript:
+  case DeclKind::TopLevelCode:
     llvm_unreachable("non-value decls shouldn't get here");
       
   case DeclKind::Func:
@@ -129,10 +130,9 @@ bool ValueDecl::isInstanceMember() const {
 }
 
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
-                             Type Underlyingty, DeclContext *DC,
-                             bool IsModuleScope)
-  : ValueDecl(DeclKind::TypeAlias, DC, IsModuleScope, Name, Type()),
-    AliasTy(0), TypeAliasLoc(TypeAliasLoc), UnderlyingTy(Underlyingty) {
+                             Type Underlyingty, DeclContext *DC)
+  : ValueDecl(DeclKind::TypeAlias, DC, Name, Type()), AliasTy(0),
+    TypeAliasLoc(TypeAliasLoc), UnderlyingTy(Underlyingty) {
   // Set the type of the TypeAlias to the right MetaTypeType.
   setType(MetaTypeType::get(this));
 }
@@ -159,10 +159,9 @@ Type FuncDecl::getExtensionType() const {
   switch (DC->getContextKind()) {
   case DeclContextKind::TranslationUnit:
   case DeclContextKind::BuiltinModule:
-  case DeclContextKind::FuncExpr:
-  case DeclContextKind::ExplicitClosureExpr:
-  case DeclContextKind::ImplicitClosureExpr:
+  case DeclContextKind::CapturingExpr:
   case DeclContextKind::OneOfType:
+  case DeclContextKind::TopLevelCodeDecl:
     return Type();
     
     // For extensions, it depends on whether the type has value or
@@ -360,6 +359,18 @@ namespace {
       }
       OS << ')';
     }
+
+    void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
+      printCommon(TLCD, "top_level_code_decl");
+      auto Body = TLCD->getBody();
+      if (!Body.isNull()) {
+        if (Body.is<Expr*>())
+          printRec(Body.get<Expr*>());
+        else
+          printRec(Body.get<Stmt*>());
+      }
+    }
+
   };
 } // end anonymous namespace.
 

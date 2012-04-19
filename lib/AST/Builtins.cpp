@@ -88,8 +88,7 @@ BuiltinValueKind swift::isBuiltinValue(ASTContext &C, StringRef Name,
 /// Build a builtin function declarations.
 static FuncDecl *getBuiltinFunction(ASTContext &Context, Identifier Id, Type T){
   return new (Context) FuncDecl(SourceLoc(), SourceLoc(), Id, T,
-                                /*init*/ nullptr, Context.TheBuiltinModule,
-                                /*IsModuleScope*/true);
+                                /*init*/ nullptr, Context.TheBuiltinModule);
 }
 
 /// Build a getelementptr operation declaration.
