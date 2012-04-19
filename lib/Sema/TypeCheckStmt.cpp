@@ -267,7 +267,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
 }
 
 /// Check an expression at the top level in a REPL.
-void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E) {
+void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
   // If the input is an lvalue, force an lvalue-to-rvalue conversion.
   Expr *ConvertedE = convertToRValue(E);
   if (!ConvertedE)
@@ -286,9 +286,9 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E) {
   }
   FuncTy = FunctionType::get(FuncTy, TupleType::getEmpty(Context), Context);
   VarDecl *Arg = new (Context) VarDecl(Loc, Context.getIdentifier("arg"), T,
-                                       &TU);
+                                       TLCD);
   Pattern* ParamPat = new (Context) NamedPattern(Arg);
-  FuncExpr *FE = FuncExpr::create(Context, Loc, ParamPat, FuncTy, 0, &TU);
+  FuncExpr *FE = FuncExpr::create(Context, Loc, ParamPat, FuncTy, 0, TLCD);
 
   // Build the body of the function which prints the expression.
   SmallVector<unsigned, 4> MemberIndexes;
@@ -361,7 +361,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       if (Expr *E = Elem.dyn_cast<Expr*>()) {
         if (checker.typeCheckExpr(E)) continue;
         if (TU->IsReplModule)
-          TC.typeCheckTopLevelReplExpr(E);
+          TC.typeCheckTopLevelReplExpr(E, TLCD);
         else
           TC.typeCheckIgnoredExpr(E);
         TLCD->setBody(E);
