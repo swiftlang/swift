@@ -67,7 +67,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
   } else {
     // Otherwise, create a global initializer.
     // FIXME: This is completely, utterly, wrong.
-    fn = llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
+    fn = llvm::Function::Create(fnType, llvm::GlobalValue::ExternalLinkage,
                                 tunit->Name.str() + ".init", &Module);
   }
 

@@ -72,6 +72,7 @@ void swift::RunImmediately(TranslationUnit *TU) {
     return;
 
   llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
+  llvm::SmallVector<llvm::Function*, 4> InitFuncs;
   // IRGen the modules this module depends on.
   for (auto ModPair : TU->getImportedModules()) {
     if (isa<BuiltinModule>(ModPair.second))
@@ -97,14 +98,19 @@ void swift::RunImmediately(TranslationUnit *TU) {
       llvm::errs() << ErrorMessage << "\n";
       return;
     }
+
+    // FIXME: This is an ugly hack; need to figure out how this should
+    // actually work.
+    SmallVector<char, 20> NameBuf;
+    StringRef InitFnName = (SubTU->Name.str() + ".init").toStringRef(NameBuf);
+    llvm::Function *InitFn = Module.getFunction(InitFnName);
+    if (InitFn)
+      InitFuncs.push_back(InitFn);
   }
 
   LoadSwiftRuntime();
 
   // Run the generated program.
-
-  // FIXME: This isn't the right entry point!  (But what is?)
-  llvm::Function *EntryFn = Module.getFunction("main");
 
   llvm::EngineBuilder builder(&Module);
   std::string ErrorMsg;
@@ -112,6 +118,10 @@ void swift::RunImmediately(TranslationUnit *TU) {
   builder.setEngineKind(llvm::EngineKind::JIT);
 
   llvm::ExecutionEngine *EE = builder.create();
+  for (auto InitFn : InitFuncs)
+    EE->runFunctionAsMain(InitFn, std::vector<std::string>(), 0);
+
+  llvm::Function *EntryFn = Module.getFunction("main");
   EE->runFunctionAsMain(EntryFn, std::vector<std::string>(), 0);
 }
 
@@ -220,6 +230,7 @@ void swift::REPL(ASTContext &Context) {
     }
 
     // IRGen the modules this module depends on.
+    llvm::SmallVector<llvm::Function*, 4> InitFuncs;
     for (auto ModPair : TU->getImportedModules()) {
       if (isa<BuiltinModule>(ModPair.second))
         continue;
@@ -243,9 +254,21 @@ void swift::REPL(ASTContext &Context) {
         llvm::errs() << ErrorMessage << "\n";
         return;
       }
+
+      // FIXME: This is an ugly hack; need to figure out how this should
+      // actually work.
+      SmallVector<char, 20> NameBuf;
+      StringRef InitFnName = (SubTU->Name.str() + ".init").toStringRef(NameBuf);
+      llvm::Function *InitFn = Module.getFunction(InitFnName);
+      if (InitFn)
+        InitFuncs.push_back(InitFn);
     }
 
-    // The way we do this is really ugly... we should be able to improve this.
+    for (auto InitFn : InitFuncs)
+      EE->runFunctionAsMain(InitFn, std::vector<std::string>(), 0);
+
+    // FIXME: The way we do this is really ugly... we should be able to
+    // improve this.
     llvm::Function *EntryFn = Module.getFunction("main");
     EE->runFunctionAsMain(EntryFn, std::vector<std::string>(), 0);
     EE->freeMachineCodeForFunction(EntryFn);
