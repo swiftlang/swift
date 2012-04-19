@@ -1381,10 +1381,10 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
     return true;
   }
   
-  NullablePtr<Pattern> Params = parsePatternTuple();
-  if (Params.isNull())
+  NullablePtr<Pattern> Indices = parsePatternTuple();
+  if (Indices.isNull())
     return true;
-  if (checkFullyTyped(Params.get()))
+  if (checkFullyTyped(Indices.get()))
     Invalid = true;
   
   // '->'
@@ -1412,7 +1412,7 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   FuncDecl *Get = 0;
   FuncDecl *Set = 0;
   SourceLoc LastValidLoc = LBLoc;
-  if (parseGetSet(HasContainerType, Params.get(), ElementTy, Get, Set,
+  if (parseGetSet(HasContainerType, Indices.get(), ElementTy, Get, Set,
                   LastValidLoc))
     Invalid = true;
 
@@ -1436,6 +1436,14 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   }
   
   if (!Invalid && (Set || Get)) {
+    // FIXME: We should build the declarations even if they are invalid.
+
+    // Build an AST for the subscript declaration.
+    SubscriptDecl *Subscript
+      = new (Context) SubscriptDecl(SubscriptLoc, Indices.get(), ArrowLoc,
+                                    ElementTy, SourceRange(LBLoc, RBLoc),
+                                    Get, Set, CurDeclContext);
+    
     // FIXME: Order of get/set not preserved.
     if (Set) {
       Set->setDeclContext(CurDeclContext);
@@ -1449,8 +1457,7 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
       Decls.push_back(Get);
     }
     
-    // FIXME: Build an AST for the subscript declaration.
-    
+    Decls.push_back(Subscript);
   }
   return Invalid;
 }

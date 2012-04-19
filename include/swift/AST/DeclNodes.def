@@ -54,6 +54,7 @@
 DECL(Import, Decl)
 DECL(Extension, Decl)
 DECL(PatternBinding, Decl)
+DECL(Subscript, Decl)
 ABSTRACT_DECL(Named, Decl)
   ABSTRACT_DECL(Value, Named)
     VALUE_DECL(TypeAlias, Decl)

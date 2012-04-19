@@ -97,6 +97,7 @@ bool ValueDecl::isDefinition() const {
   case DeclKind::Import:
   case DeclKind::Extension:
   case DeclKind::PatternBinding:
+  case DeclKind::Subscript:
     llvm_unreachable("non-value decls shouldn't get here");
       
   case DeclKind::Func:
@@ -343,6 +344,22 @@ namespace {
       }
     }
 
+    void visitSubscriptDecl(SubscriptDecl *SD) {
+      printCommon(SD, "subscript_decl");
+      if (FuncDecl *Get = SD->getGetter()) {
+        OS << "\n";
+        OS.indent(Indent + 2);
+        OS << "get = ";
+        printRec(Get);
+      }
+      if (FuncDecl *Set = SD->getSetter()) {
+        OS << "\n";
+        OS.indent(Indent + 2);
+        OS << "set = ";
+        printRec(Set);
+      }
+      OS << ')';
+    }
   };
 } // end anonymous namespace.
 

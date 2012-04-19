@@ -102,6 +102,11 @@ public:
     visitBoundVars(PBD->getPattern());
   }
 
+  void visitSubscriptDecl(SubscriptDecl *) {
+    // The only checking needed for subscript declarations is in the getter
+    // and setter functions, which will be handled separately.
+  }
+  
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     // Check for a protocol or oneof declaration.  This avoids redundant
     // work because only an actual protocol or oneof declaration can cause

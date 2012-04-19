@@ -143,6 +143,11 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
     emitPatternBindingDecl(cast<PatternBindingDecl>(D));
     return;
 
+  case DeclKind::Subscript:
+    // Nothing to emit for a subscript declaration; the getter and
+    // setter will be handled separately.
+    return;
+      
   // oneof elements can be found at the top level because of struct
   // "constructor" injection.  Just ignore them here; we'll get them
   // as part of the struct.
@@ -263,6 +268,9 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     case DeclKind::OneOfElement:
     case DeclKind::PatternBinding:
       llvm_unreachable("decl not allowed in extension!");
+    case DeclKind::Subscript:
+      // Getter/setter will be handled separately.
+      continue;
     case DeclKind::Extension:
       emitExtension(cast<ExtensionDecl>(member));
       continue;
@@ -290,6 +298,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
 void IRGenFunction::emitLocal(Decl *D) {
   switch (D->getKind()) {
   case DeclKind::Import:
+  case DeclKind::Subscript:
     llvm_unreachable("declaration cannot appear in local scope");
 
   // Type aliases require IR-gen support if they're really
@@ -315,7 +324,7 @@ void IRGenFunction::emitLocal(Decl *D) {
 
   case DeclKind::PatternBinding:
     emitPatternBindingDecl(cast<PatternBindingDecl>(D));
-    return;
+    return;      
   }
   llvm_unreachable("bad declaration kind!");
 }
