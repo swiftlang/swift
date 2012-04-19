@@ -57,7 +57,8 @@ swift::buildSingleTranslationUnit(ASTContext &Context, unsigned BufferID,
   const llvm::MemoryBuffer *Buffer = Context.SourceMgr.getMemoryBuffer(BufferID);
   Identifier ID = getModuleIdentifier(Buffer, Context);
   TranslationUnit *TU = new (Context) TranslationUnit(ID, Comp, Context,
-                                                      IsMainModule);
+                                                      IsMainModule,
+                                                      /*IsReplModule=*/false);
 
   unsigned BufferOffset = 0;
   unsigned CurTUElem = 0;

@@ -47,23 +47,27 @@ void swift::irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E,
                                  explosion);
   }
 
+  bool HasCaptures = !E->getCaptures().empty();
+
   // Create the IR function.
   llvm::FunctionType *fnType =
-      IGF.IGM.getFunctionType(E->getType(), ExplosionKind::Minimal, 0, true);
+      IGF.IGM.getFunctionType(E->getType(), ExplosionKind::Minimal, 0,
+                              HasCaptures);
   llvm::Function *fn =
       llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
                              "closure", &IGF.IGM.Module);
 
   IRGenFunction innerIGF(IGF.IGM, E->getType(), Patterns,
                          ExplosionKind::Minimal, /*uncurry level*/ 0, fn,
-                         Prologue::StandardWithContext);
+                         HasCaptures ? Prologue::StandardWithContext :
+                                       Prologue::Standard);
 
   ManagedValue contextPtr(IGF.IGM.RefCountedNull);
 
   // There are two places we need to generate code for captures: in the
   // current function, to store the captures to a capture block, and in the
   // inner function, to load the captures from the capture block.
-  if (!E->getCaptures().empty()) {
+  if (HasCaptures) {
     SmallVector<const TypeInfo *, 4> Fields;
     for (ValueDecl *D : E->getCaptures()) {
       Type RefTy = LValueType::get(D->getType(),

@@ -41,7 +41,8 @@ public:
   Expr *semaApplyExpr(ApplyExpr *E);
   Expr *semaUnresolvedDotExpr(UnresolvedDotExpr *E);
   void typeCheckIgnoredExpr(Expr *E);
-  
+  void typeCheckTopLevelReplExpr(Expr *&E);
+
   /// \brief Perform a shallow recheck of the given newly-built AST node.
   ///
   /// Rechecking typically occurs when one has resolved name lookup and built a

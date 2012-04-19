@@ -21,6 +21,8 @@
 #include "swift/AST/ASTWalker.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
+#include "NameLookup.h"
+
 using namespace swift;
 
 namespace {
@@ -171,6 +173,74 @@ void TypeChecker::typeCheckIgnoredExpr(Expr *E) {
   }
 }
 
+/// Check an expression at the top level in a REPL.
+void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E) {
+  CanType T = E->getType()->getCanonicalType();
+  SourceLoc Loc = E->getStartLoc();
+  SourceLoc EndLoc = E->getEndLoc();
+
+  // Build the function to call to print the expression.
+  Type FuncTy = T;
+  if (!isa<TupleType>(FuncTy)) {
+    TupleTypeElt Elt(T, Context.getIdentifier("arg"));
+    FuncTy = TupleType::get(Elt, Context);
+  }
+  FuncTy = FunctionType::get(FuncTy, TupleType::getEmpty(Context), Context);
+  VarDecl *Arg = new (Context) VarDecl(Loc, Context.getIdentifier("arg"), T,
+                                       &TU, /*IsModuleScope*/false);
+  Pattern* ParamPat = new (Context) NamedPattern(Arg);
+  FuncExpr *FE = FuncExpr::create(Context, Loc, ParamPat, FuncTy, 0, &TU);
+
+  // Print the expression.
+  // FIXME: Need to handle lvalues.
+  // FIXME: Need structural printing for tuples.
+  // FIXME: Need structural printing for oneofs.
+  SmallVector<BraceStmt::ExprStmtOrDecl, 4> BodyContent;
+  Identifier MemberName = Context.getIdentifier("replPrint");
+  MemberLookup Lookup(T, MemberName, TU);
+  if (Lookup.isSuccess()) {
+    Expr *ArgRef = new (Context) DeclRefExpr(Arg, Loc);
+    Expr *Res = recheckTypes(Lookup.createResultAST(ArgRef, Loc, EndLoc,
+                                                    Context));
+    if (!Res)
+      return;
+    TupleExpr *CallArgs =
+        new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc);
+    CallExpr *CE = new (Context) CallExpr(Res, CallArgs, Type());
+    Res = semaApplyExpr(CE);
+    if (!Res)
+      return;
+    BodyContent.push_back(Res);
+  } else {
+    Expr *PrintUnknown = new (Context) StringLiteralExpr("<unprintable value>",
+                                                         Loc);
+    SmallVector<ValueDecl*, 4> Decls;
+    TU.lookupGlobalValue(Context.getIdentifier("print"),
+                         NLKind::UnqualifiedLookup, Decls);
+    Expr *PrintStrFn = OverloadedDeclRefExpr::createWithCopy(Decls, Loc);
+    PrintUnknown = new (Context) CallExpr(PrintStrFn, PrintUnknown, Type());
+    BodyContent.push_back(PrintUnknown);
+  }
+
+  // Print a newline at the end.
+  Expr *PrintNewLine = new (Context) StringLiteralExpr("\n", E->getStartLoc());
+  SmallVector<ValueDecl*, 4> Decls;
+  TU.lookupGlobalValue(Context.getIdentifier("print"),
+                       NLKind::UnqualifiedLookup, Decls);
+  Expr *PrintStrFn = OverloadedDeclRefExpr::createWithCopy(Decls, Loc);
+  PrintNewLine = new (Context) CallExpr(PrintStrFn, PrintNewLine, Type());
+  BodyContent.push_back(PrintNewLine);
+
+  // Typecheck the function.
+  BraceStmt *Body = BraceStmt::create(Context, Loc, BodyContent, EndLoc);
+  StmtChecker(*this, FE).typeCheckStmt(Body);
+  FE->setBody(Body);
+
+  // Typecheck the call.
+  CallExpr *CE = new (Context) CallExpr(FE, E);
+  E = semaApplyExpr(CE);
+}
+
 /// performTypeChecking - Once parsing and namebinding are complete, these
 /// walks the AST to resolve types and diagnose problems therein.
 ///
@@ -215,7 +285,10 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     auto Elem = TU->Body->getElement(i);
     if (Expr *E = Elem.dyn_cast<Expr*>()) {
       if (checker.typeCheckExpr(E)) continue;
-      TC.typeCheckIgnoredExpr(E);
+      if (TU->IsReplModule)
+        TC.typeCheckTopLevelReplExpr(E);
+      else
+        TC.typeCheckIgnoredExpr(E);
       TU->Body->setElement(i, E);
     } else if (Stmt *S = Elem.dyn_cast<Stmt*>()) {
       if (checker.typeCheckStmt(S)) continue;

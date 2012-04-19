@@ -143,7 +143,8 @@ void swift::REPL(ASTContext &Context) {
     Context.SourceMgr.AddNewSourceBuffer(Buffer, llvm::SMLoc());
   Identifier ID = Context.getIdentifier("REPL");
   TranslationUnit *TU = new (Context) TranslationUnit(ID, Comp, Context,
-                                                      /*IsMainModule=*/true);
+                                                      /*IsMainModule=*/true,
+                                                      /*IsReplModule=*/true);
 
   llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
   llvm::LLVMContext LLVMContext;

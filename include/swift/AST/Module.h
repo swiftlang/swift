@@ -53,6 +53,7 @@ public:
   ASTContext &Ctx;
   Identifier Name;
   bool IsMainModule;
+  bool IsReplModule;
   
   //===--------------------------------------------------------------------===//
   // AST Phase of Translation
@@ -74,10 +75,10 @@ public:
 
 protected:
   Module(DeclContextKind Kind, Identifier Name, Component *C, ASTContext &Ctx,
-         bool IsMainModule)
+         bool IsMainModule, bool IsReplModule)
   : DeclContext(Kind, nullptr), LookupCachePimpl(0), ExtensionCachePimpl(0),
     Comp(C), Ctx(Ctx), Name(Name), IsMainModule(IsMainModule),
-    ASTStage(Parsing) {
+    IsReplModule(IsReplModule), ASTStage(Parsing) {
     assert(Comp != nullptr || Kind == DeclContextKind::BuiltinModule);
   }
 
@@ -164,8 +165,9 @@ public:
   BraceStmt *Body;
   
   TranslationUnit(Identifier Name, Component *Comp, ASTContext &C,
-                  bool IsMainModule)
-    : Module(DeclContextKind::TranslationUnit, Name, Comp, C, IsMainModule),
+                  bool IsMainModule, bool IsReplModule)
+    : Module(DeclContextKind::TranslationUnit, Name, Comp, C, IsMainModule,
+             IsReplModule),
       Body(nullptr) { }
   
   /// getUnresolvedIdentifierTypes - This is a list of scope-qualified types
@@ -209,7 +211,7 @@ public:
 class BuiltinModule : public Module {
 public:
   BuiltinModule(Identifier Name, ASTContext &Ctx)
-    : Module(DeclContextKind::BuiltinModule, Name, nullptr, Ctx, false) {
+    : Module(DeclContextKind::BuiltinModule, Name, nullptr, Ctx, false, false) {
     // The Builtin module is always well formed.
     ASTStage = TypeChecked;
   }

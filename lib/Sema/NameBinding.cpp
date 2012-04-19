@@ -149,7 +149,8 @@ Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
   // For now, treat all separate modules as unique components.
   Component *Comp = new (Context.Allocate<Component>(1)) Component();
   ImportedTU = new (Context) TranslationUnit(ModuleID.first, Comp, Context,
-                                             /*IsMainModule*/false);
+                                             /*IsMainModule*/false,
+                                             /*IsReplModule*/false);
 
   parseIntoTranslationUnit(ImportedTU, BufferID);
   LoadedModules[ModuleID.first.str()] = ImportedTU;
