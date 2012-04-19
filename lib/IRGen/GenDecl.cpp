@@ -144,9 +144,7 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
     return;
 
   case DeclKind::Subscript:
-    // Nothing to emit for a subscript declaration; the getter and
-    // setter will be handled separately.
-    return;
+    llvm_unreachable("there are no global subscript operations");
       
   // oneof elements can be found at the top level because of struct
   // "constructor" injection.  Just ignore them here; we'll get them
