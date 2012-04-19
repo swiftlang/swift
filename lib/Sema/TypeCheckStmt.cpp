@@ -173,6 +173,99 @@ void TypeChecker::typeCheckIgnoredExpr(Expr *E) {
   }
 }
 
+void
+PrintLiteralString(StringRef Str, ASTContext &Context, SourceLoc Loc,
+                   SmallVectorImpl<ValueDecl*> &PrintDecls,
+                   SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent) {
+  Expr *PrintStr = new (Context) StringLiteralExpr(Str, Loc);
+  Expr *PrintStrFn = OverloadedDeclRefExpr::createWithCopy(PrintDecls, Loc);
+  BodyContent.push_back(new (Context) CallExpr(PrintStrFn, PrintStr));
+}
+
+static void
+PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
+              SourceLoc EndLoc,
+              SmallVectorImpl<unsigned> &MemberIndexes,
+              SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent) {
+  ASTContext &Context = TC.Context;
+  TranslationUnit &TU = TC.TU;
+
+  // Lookup the "print" function used for strings.
+  SmallVector<ValueDecl*, 4> PrintDecls;
+  TU.lookupGlobalValue(Context.getIdentifier("print"),
+                       NLKind::UnqualifiedLookup, PrintDecls);
+
+  if (TupleType *TT = dyn_cast<TupleType>(T)) {
+    // We print a tuple by printing each element.
+    PrintLiteralString("(", Context, Loc, PrintDecls, BodyContent);
+
+    for (unsigned i = 0, e = TT->getFields().size(); i < e; ++i) {
+      MemberIndexes.push_back(i);
+      CanType SubType = TT->getElementType(i)->getCanonicalType();
+      PrintReplExpr(TC, Arg, SubType, Loc, EndLoc, MemberIndexes,
+                    BodyContent);
+      MemberIndexes.pop_back();
+
+      if (i + 1 != e)
+        PrintLiteralString(", ", Context, Loc, PrintDecls, BodyContent);
+    }
+
+    PrintLiteralString(")", Context, Loc, PrintDecls, BodyContent);
+    return;
+  }
+
+  Identifier MemberName = Context.getIdentifier("replPrint");
+  MemberLookup Lookup(T, MemberName, TU);
+  if (Lookup.isSuccess()) {
+    Expr *ArgRef = new (Context) DeclRefExpr(Arg, Loc,
+                                             Arg->getTypeOfReference());
+    ArgRef = TC.convertToRValue(ArgRef);
+    for (unsigned i : MemberIndexes) {
+      // For each index, we look through a TupleType or transparent OneOfType.
+      CanType CurT = ArgRef->getType()->getCanonicalType();
+      if (OneOfType *OOT = dyn_cast<OneOfType>(CurT)) {
+        CurT = OOT->getTransparentType()->getCanonicalType();
+        ArgRef = new (Context) LookThroughOneofExpr(ArgRef, CurT);
+      }
+      TupleType *TT = cast<TupleType>(CurT);
+      ArgRef = new (Context) SyntacticTupleElementExpr(ArgRef, Loc, i, Loc,
+                                                       TT->getElementType(i));
+    }
+    Expr *Res = TC.recheckTypes(Lookup.createResultAST(ArgRef, Loc, EndLoc,
+                                                       Context));
+    if (!Res)
+      return;
+    TupleExpr *CallArgs =
+        new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc,
+                                TupleType::getEmpty(Context));
+    CallExpr *CE = new (Context) CallExpr(Res, CallArgs, Type());
+    Res = TC.semaApplyExpr(CE);
+    if (!Res)
+      return;
+    BodyContent.push_back(Res);
+    return;
+  }
+
+  if (OneOfType *OOT = dyn_cast<OneOfType>(T)) {
+    if (OOT->isTransparentType()) {
+      // Print "struct" types as if we are constructing one: the name
+      // followed by the underlying tuple.
+      PrintLiteralString(OOT->getDecl()->getName().str(), Context, Loc,
+                         PrintDecls, BodyContent);
+      CanType SubType = OOT->getTransparentType()->getCanonicalType();
+      PrintReplExpr(TC, Arg, SubType, Loc, EndLoc,
+                    MemberIndexes, BodyContent);
+      return;
+    }
+
+    // FIXME: We should handle non-transparent OneOfTypes at some point, but
+    // it's tricky to represent in the AST without a "match" statement.
+  }
+
+  PrintLiteralString("<unprintable value>", Context, Loc, PrintDecls,
+                     BodyContent);
+}
+
 /// Check an expression at the top level in a REPL.
 void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E) {
   // If the input is an lvalue, force an lvalue-to-rvalue conversion.
@@ -185,7 +278,7 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E) {
   SourceLoc Loc = E->getStartLoc();
   SourceLoc EndLoc = E->getEndLoc();
 
-  // Build the function to call to print the expression.
+  // Build a function to call to print the expression.
   Type FuncTy = T;
   if (!isa<TupleType>(FuncTy)) {
     TupleTypeElt Elt(T, Context.getIdentifier("arg"));
@@ -197,38 +290,10 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E) {
   Pattern* ParamPat = new (Context) NamedPattern(Arg);
   FuncExpr *FE = FuncExpr::create(Context, Loc, ParamPat, FuncTy, 0, &TU);
 
-  // Print the expression.
-  // FIXME: Need structural printing for tuples.
-  // FIXME: Need structural printing for oneofs.
+  // Build the body of the function which prints the expression.
+  SmallVector<unsigned, 4> MemberIndexes;
   SmallVector<BraceStmt::ExprStmtOrDecl, 4> BodyContent;
-  Identifier MemberName = Context.getIdentifier("replPrint");
-  MemberLookup Lookup(T, MemberName, TU);
-  if (Lookup.isSuccess()) {
-    Expr *ArgRef = new (Context) DeclRefExpr(Arg, Loc,
-                                             Arg->getTypeOfReference());
-    ArgRef = convertToRValue(ArgRef);
-    Expr *Res = recheckTypes(Lookup.createResultAST(ArgRef, Loc, EndLoc,
-                                                    Context));
-    if (!Res)
-      return;
-    TupleExpr *CallArgs =
-        new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc,
-                                TupleType::getEmpty(Context));
-    CallExpr *CE = new (Context) CallExpr(Res, CallArgs, Type());
-    Res = semaApplyExpr(CE);
-    if (!Res)
-      return;
-    BodyContent.push_back(Res);
-  } else {
-    Expr *PrintUnknown = new (Context) StringLiteralExpr("<unprintable value>",
-                                                         Loc);
-    SmallVector<ValueDecl*, 4> Decls;
-    TU.lookupGlobalValue(Context.getIdentifier("print"),
-                         NLKind::UnqualifiedLookup, Decls);
-    Expr *PrintStrFn = OverloadedDeclRefExpr::createWithCopy(Decls, Loc);
-    PrintUnknown = new (Context) CallExpr(PrintStrFn, PrintUnknown, Type());
-    BodyContent.push_back(PrintUnknown);
-  }
+  PrintReplExpr(*this, Arg, T, Loc, EndLoc, MemberIndexes, BodyContent);
 
   // Print a newline at the end.
   Expr *PrintNewLine = new (Context) StringLiteralExpr("\n", E->getStartLoc());
