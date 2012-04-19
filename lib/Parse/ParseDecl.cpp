@@ -1443,7 +1443,8 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
       = new (Context) SubscriptDecl(SubscriptLoc, Indices.get(), ArrowLoc,
                                     ElementTy, SourceRange(LBLoc, RBLoc),
                                     Get, Set, CurDeclContext);
-    
+    Decls.push_back(Subscript);
+
     // FIXME: Order of get/set not preserved.
     if (Set) {
       Set->setDeclContext(CurDeclContext);
@@ -1455,9 +1456,7 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
       Get->setDeclContext(CurDeclContext);
       Get->setModuleScope(ScopeInfo.isModuleScope());
       Decls.push_back(Get);
-    }
-    
-    Decls.push_back(Subscript);
+    }    
   }
   return Invalid;
 }

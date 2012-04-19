@@ -102,9 +102,10 @@ public:
     visitBoundVars(PBD->getPattern());
   }
 
-  void visitSubscriptDecl(SubscriptDecl *) {
-    // The only checking needed for subscript declarations is in the getter
-    // and setter functions, which will be handled separately.
+  void visitSubscriptDecl(SubscriptDecl *SD) {
+    // The getter and setter functions will be type-checked separately.
+    if (!SD->getDeclContext()->isTypeContext())
+      TC.diagnose(SD->getLocStart(), diag::subscript_not_member);
   }
   
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {

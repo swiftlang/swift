@@ -287,6 +287,8 @@ public:
       ArrowLoc(ArrowLoc), Indices(Indices), ElementTy(ElementTy),
       Braces(Braces), Get(Get), Set(Set) { }
   
+  SourceLoc getLocStart() const { return SubscriptLoc; }
+  
   /// \brief Retrieve the indices for this subscript operation.
   Pattern *getIndices() const { return Indices; }
   

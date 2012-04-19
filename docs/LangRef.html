@@ -941,7 +941,9 @@ token following the opening '{' is either 'set' or 'get'.</p>
   <pre id="value-specifier" class="grammar">
     decl-subscript        ::= 'subscript' <a href="#attribute-list">attribute-list</a> <a href="#pattern-tuple">pattern-tuple</a> '->' <a href="#type">type</a> '{' <a href="#get-set">get-set<a/> '}'
   </pre>
-  
+
+  <p>A subscript declaration provides support for subscripting an object of a particular type via a getter and (optional) setter. Therefore, subscript declarations can only appear within a type definition or extension.</p>
+ 
   <!-- ===================================================================== -->
   <h3 id="attribute-list">Attribute Lists</h3>
   <!-- ===================================================================== -->

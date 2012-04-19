@@ -98,6 +98,13 @@ public:
            getContextKind() <= DeclContextKind::Last_Module;
   }
 
+  /// isTypeContext - Return true if this is a type context, e.g., a oneof,
+  /// an extension, or a protocol.
+  bool isTypeContext() const {
+    return getContextKind() >= DeclContextKind::OneOfType &&
+           getContextKind() <= DeclContextKind::ProtocolType;
+  }
+  
   /// Returns the semantic parent of this context.  A context has a
   /// parent if and only if it is not a module context.
   DeclContext *getParent() const {

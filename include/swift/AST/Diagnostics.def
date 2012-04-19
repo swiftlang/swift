@@ -571,6 +571,8 @@ ERROR(var_type_not_materializable,sema_tcd,none,
       "type %0 of variable is not materializable", (Type))
 ERROR(oneof_element_not_materializable,sema_tcd,none,
       "type of oneof element is not materializable", ())
+ERROR(subscript_not_member,sema_tcd,none,
+      "subscript declaration must be a member of a type", ())
 
 // Attributes
 ERROR(invalid_arg_count_for_operator,sema_tcd,none,
