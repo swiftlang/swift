@@ -288,11 +288,12 @@ public:
   // ErrorStmt on a semantic error.
   static bool isStartOfStmtOtherThanAssignment(const Token &Tok);
   NullablePtr<Stmt> parseStmtOtherThanAssignment();
-  ExprStmtOrDecl parseExprOrStmtAssign();
+  bool parseExprOrStmtAssign(ExprStmtOrDecl &Results);
   NullablePtr<BraceStmt> parseStmtBrace(Diag<> ID);
   NullablePtr<Stmt> parseStmtReturn();
   NullablePtr<Stmt> parseStmtIf();
   NullablePtr<Stmt> parseStmtWhile();
+  NullablePtr<Stmt> parseStmtFor();
 };
 
 } // end namespace swift

@@ -323,6 +323,18 @@ ERROR(expected_expr_while,stmt_parsing,none,
 ERROR(expected_lbrace_after_while,stmt_parsing,none,
       "expected '{' after 'while' condition", ())
 
+// For Stmt
+ERROR(expected_lparen_for_stmt,decl_parsing,none,
+      "expected '(' in 'for' statement", ())
+ERROR(expected_semi_for_stmt,decl_parsing,none,
+      "expected ';' in 'for' statement", ())
+ERROR(expected_cond_for_stmt,decl_parsing,none,
+      "expected condition in 'for' statement", ())
+ERROR(expected_rparen_for_stmt,decl_parsing,none,
+      "expected ')' in 'for' statement", ())
+ERROR(expected_lbrace_after_for,stmt_parsing,none,
+      "expected '{' in 'for' statement", ())
+
 //------------------------------------------------------------------------------
 // Expression parsing diagnostics
 //------------------------------------------------------------------------------

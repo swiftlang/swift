@@ -75,22 +75,25 @@ bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
 ///   expr-or-stmt-assign:
 ///     expr
 ///     stmt-assign
-Parser::ExprStmtOrDecl Parser::parseExprOrStmtAssign() {
+bool Parser::parseExprOrStmtAssign(ExprStmtOrDecl &Result) {
   NullablePtr<Expr> ResultExpr = parseExpr(diag::expected_expr);
   if (ResultExpr.isNull())
-    return ExprStmtOrDecl();
+    return true;
 
+  Result = ResultExpr.get();
+  
   // Check for assignment.  If we don't have it, then we just have a
   // simple expression.
   if (Tok.isNot(tok::equal))
-    return ResultExpr.get();
+    return false;
 
   SourceLoc EqualLoc = consumeToken();
   NullablePtr<Expr> RHSExpr = parseExpr(diag::expected_expr_assignment);
   if (RHSExpr.isNull())
-    return ExprStmtOrDecl();
-  return new (Context) AssignStmt(ResultExpr.get(),
-                                  EqualLoc, RHSExpr.get());
+    return true;
+  Result = new (Context) AssignStmt(ResultExpr.get(),
+                                    EqualLoc, RHSExpr.get());
+  return false;
 }
 
 
@@ -139,8 +142,8 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
              "expr-anon-closure should be parsed as stmt-brace here");
 
       // Parse 'expr' or 'stmt-assign'.
-      ExprStmtOrDecl Res = parseExprOrStmtAssign();
-      if (Res.isNull())
+      ExprStmtOrDecl Res;
+      if (parseExprOrStmtAssign(Res))
         NeedParseErrorRecovery = true;
       else
         Entries.push_back(Res);
@@ -189,6 +192,7 @@ NullablePtr<Stmt> Parser::parseStmtOtherThanAssignment() {
   case tok::kw_return: return parseStmtReturn();
   case tok::kw_if:     return parseStmtIf();
   case tok::kw_while:  return parseStmtWhile();
+  case tok::kw_for:    return parseStmtFor();
   }
 }
 
@@ -293,5 +297,32 @@ NullablePtr<Stmt> Parser::parseStmtWhile() {
   // If our normal expression parsed correctly, build an AST.
   return new (Context) WhileStmt(WhileLoc, Condition.get(), Body.get());
 }
+
+/// 
+///   stmt-for:
+///     'for' '(' expr-or-stmt-assign? ';' expr? ';' expr-or-stmt-assign? ')'
+///           stmt-brace
+NullablePtr<Stmt> Parser::parseStmtFor() {
+  SourceLoc ForLoc = consumeToken(tok::kw_for);
+  SourceLoc LPLoc, Semi1Loc, Semi2Loc, RPLoc;
+  
+  ExprStmtOrDecl First;
+  NullablePtr<Expr> Second;
+  ExprStmtOrDecl Third;
+  NullablePtr<BraceStmt> Body;
+  
+  if (parseToken(tok::l_paren, LPLoc, diag::expected_lparen_for_stmt) ||
+      (Tok.isNot(tok::semi) && parseExprOrStmtAssign(First)) ||
+      parseToken(tok::semi, Semi1Loc, diag::expected_semi_for_stmt) ||
+      (Tok.isNot(tok::semi) && (Second = parseExpr(diag::expected_cond_for_stmt)).isNull()) ||
+      parseToken(tok::semi, Semi2Loc, diag::expected_semi_for_stmt) ||
+      (Tok.isNot(tok::r_paren) && parseExprOrStmtAssign(Third)) ||
+      parseToken(tok::r_paren, RPLoc, diag::expected_rparen_for_stmt) ||
+      (Body = parseStmtBrace(diag::expected_lbrace_after_for)).isNull())
+    return 0;
+    
+ // FIXME: ASTify
+}
+
 
 
