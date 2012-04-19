@@ -245,6 +245,13 @@ public:
 
 };
 
+/// TopLevelCodeDecl - This decl is used as a container for top-level
+/// expressions and statements in the main module.  It is always a direct
+/// child of the body of a TranslationUnit.  The primary reason for
+/// building these is to give top-level statements a DeclContext which is
+/// distinct from the TranslationUnit itself.  This, among other things,
+/// makes it easier to distinguish between local top-level variables (which
+/// are not live past the end of the statement) and global variables.
 class TopLevelCodeDecl : public Decl, public DeclContext {
 public:
   typedef llvm::PointerUnion<Expr*, Stmt*> ExprOrStmt;
