@@ -1449,12 +1449,14 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
     if (Set) {
       Set->setDeclContext(CurDeclContext);
       Set->setModuleScope(ScopeInfo.isModuleScope());
+      Set->makeSetter(Subscript);
       Decls.push_back(Set);
     }
 
     if (Get) {
       Get->setDeclContext(CurDeclContext);
       Get->setModuleScope(ScopeInfo.isModuleScope());
+      Get->makeGetter(Subscript);
       Decls.push_back(Get);
     }    
   }

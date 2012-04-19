@@ -182,15 +182,27 @@ void Mangler::mangleDeclName(NamedDecl *decl) {
   // Special case: mangle getters and setters.
   // FIXME: Come up with a more sane mangling.
   if (FuncDecl *Func = dyn_cast<FuncDecl>(decl)) {
-    if (VarDecl *Var = Func->getGetterVar()) {
-      Buffer << "__get";
-      mangleIdentifier(Var->getName());
+    if (Decl *D = Func->getGetterDecl()) {
+      if (VarDecl *Var = dyn_cast<VarDecl>(D)) {
+        Buffer << "__get";
+        mangleIdentifier(Var->getName());
+        return;
+      }
+      
+      assert(isa<SubscriptDecl>(D) && "Unknown getter kind?");
+      Buffer << "__subset";
       return;
     }
 
-    if (VarDecl *Var = Func->getSetterVar()) {
-      Buffer << "__set";
-      mangleIdentifier(Var->getName());
+    if (Decl *D = Func->getSetterDecl()) {
+      if (VarDecl *Var = dyn_cast<VarDecl>(D)) {
+        Buffer << "__set";
+        mangleIdentifier(Var->getName());
+        return;
+      }
+      
+      assert(isa<SubscriptDecl>(D) && "Unknown setter kind?");
+      Buffer << "__subget";
       return;
     }
   }

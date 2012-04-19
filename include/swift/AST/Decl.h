@@ -535,7 +535,7 @@ class FuncDecl : public ValueDecl {
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
   FuncExpr *Body;
-  llvm::PointerIntPair<VarDecl *, 1, bool> GetOrSetVar;
+  llvm::PointerIntPair<Decl *, 1, bool> GetOrSetDecl;
   
 public:
   FuncDecl(SourceLoc StaticLoc, SourceLoc FuncLoc, Identifier Name,
@@ -577,28 +577,30 @@ public:
     return StaticLoc.isValid() ? StaticLoc : FuncLoc;
   }
   
-  /// makeGetter - Note that this function is the getter for the given variable.
-  void makeGetter(VarDecl *Var) {
-    GetOrSetVar.setPointer(Var);
-    GetOrSetVar.setInt(false);
+  /// makeGetter - Note that this function is the getter for the given
+  /// declaration, which may be either a variable or a subscript declaration.
+  void makeGetter(Decl *D) {
+    GetOrSetDecl.setPointer(D);
+    GetOrSetDecl.setInt(false);
   }
   
-  /// makeSetter - Note that this function is the setter for the given variable.
-  void makeSetter(VarDecl *Var) {
-    GetOrSetVar.setPointer(Var);
-    GetOrSetVar.setInt(true);
+  /// makeSetter - Note that this function is the setter for the given
+  /// declaration, which may be either a variable or a subscript declaration.
+  void makeSetter(Decl *D) {
+    GetOrSetDecl.setPointer(D);
+    GetOrSetDecl.setInt(true);
   }
   
-  /// getGetterVar - If this function is a getter, retrieve the variable for
+  /// getGetterVar - If this function is a getter, retrieve the declaration for
   /// which it is a getter. Otherwise, returns null.
-  VarDecl *getGetterVar() const {
-    return GetOrSetVar.getInt()? nullptr : GetOrSetVar.getPointer();
+  Decl *getGetterDecl() const {
+    return GetOrSetDecl.getInt()? nullptr : GetOrSetDecl.getPointer();
   }
 
-  /// getSetterVar - If this function is a setter, retrieve the variable for
+  /// getSetterVar - If this function is a setter, retrieve the declaration for
   /// which it is a setter. Otherwise, returns null.
-  VarDecl *getSetterVar() const {
-    return GetOrSetVar.getInt()? GetOrSetVar.getPointer() : nullptr;
+  Decl *getSetterDecl() const {
+    return GetOrSetDecl.getInt()? GetOrSetDecl.getPointer() : nullptr;
   }
 
   // Implement isa/cast/dyncast/etc.
