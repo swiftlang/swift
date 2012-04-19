@@ -144,6 +144,16 @@ namespace {
 
     // Specialized verifiers.
 
+    void verifyChecked(IfStmt *S) {
+      checkSameType(S->getCond()->getType(), BuiltinIntegerType::get(1, Ctx),
+                    "if condition type");
+    }
+
+    void verifyChecked(WhileStmt *S) {
+      checkSameType(S->getCond()->getType(), BuiltinIntegerType::get(1, Ctx),
+                    "while condition type");
+    }
+
     void verifyChecked(AssignStmt *S) {
       Type lhsTy = checkLValue(S->getDest()->getType(), "LHS of assignment");
       checkSameType(lhsTy, S->getSrc()->getType(), "assignment operands");
@@ -273,6 +283,17 @@ namespace {
           Out << "\n";
           abort();
         }
+      }
+    }
+
+    void verifyParsed(NewArrayExpr *E) {
+      if (E->getBounds().empty()) {
+        Out << "NewArrayExpr has an empty bounds list\n";
+        abort();
+      }
+      if (E->getBounds()[0].Value == nullptr) {
+        Out << "First bound of NewArrayExpr is missing\n";
+        abort();
       }
     }
 

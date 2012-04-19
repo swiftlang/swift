@@ -375,6 +375,8 @@ ERROR(expected_bracket_array_subscript,expr_parsing,none,
 // New expressions
 ERROR(non_array_new_unsupported,expr_parsing,none,
       "no support for non-array new", ())
+ERROR(array_new_missing_first_bound,expr_parsing,none,
+      "must specify length of array to allocate", ())
 ERROR(expected_expr_new_array_bound,expr_parsing,none,
       "expected expression for new array bound", ())
 ERROR(expected_bracket_array_new,expr_parsing,none,
@@ -667,6 +669,12 @@ ERROR(address_of_rvalue,sema_tce,none,
 ERROR(condition_convert_limit_reached,sema_tce,none,
       "getLogicValue() for type %0 used in a conditional does not return "
       "a bool", (Type))
+
+ERROR(new_array_bound_zero,sema_tce,none,
+      "array type cannot have zero length", ())
+ERROR(array_bound_convert_limit_reached,sema_tce,none,
+      "getArrayBoundValue() for type %0 used as an array size does not return "
+      "an integer type", (Type))
 
 //------------------------------------------------------------------------------
 // Type Check Statements

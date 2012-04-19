@@ -138,6 +138,19 @@ NullablePtr<Expr> Parser::parseExprNew() {
     brackets.Start = Tok.getLoc();
     consumeToken(tok::l_square);
 
+    // If the bound is missing, that's okay unless this is the first bound.
+    if (Tok.is(tok::r_square)) {
+      if (bounds.empty()) {
+        diagnose(Tok.getLoc(), diag::array_new_missing_first_bound);
+        hadInvalid = true;
+      }
+
+      brackets.End = Tok.getLoc();
+      consumeToken(tok::r_square);
+      bounds.push_back(NewArrayExpr::Bound(nullptr, brackets));
+      continue;
+    }
+
     auto boundValue = parseExpr(diag::expected_expr_new_array_bound);
     if (boundValue.isNull() || !Tok.is(tok::r_square)) {
       if (!boundValue.isNull())

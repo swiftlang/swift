@@ -20,6 +20,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/ASTWalker.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
 using namespace swift;
@@ -381,8 +382,49 @@ public:
     if (TC.validateType(E->getElementType()))
       return nullptr;
 
-    // FIXME
-    E->setType(E->getElementType());
+    Type resultType = E->getElementType();
+
+    // Walk backward over the non-initial bounds.  These must all be
+    // either slices (i.e. []) or constant (i.e. [6]).
+    for (unsigned i = E->getBounds().size(); i != 1; --i) {
+      auto &bound = E->getBounds()[i-1];
+
+      // If it's a slice, build the appropriate slice type.
+      if (!bound.Value) {
+        resultType = TC.getArraySliceType(bound.Brackets.Start, resultType);
+        if (resultType.isNull()) return nullptr;
+        continue;
+      }
+
+      // Otherwise, build the approproiate constant array type.
+
+      // Force the array type to be constant.
+      if (TC.typeCheckArrayBound(bound.Value, /*requireConstant*/ true))
+        return nullptr;
+
+      // Compute the bound, and require a non-zero value.
+      IntegerLiteralExpr *lit = cast<IntegerLiteralExpr>(bound.Value);
+      uint64_t size = lit->getValue().getZExtValue();
+      if (size == 0) {
+        TC.diagnose(lit->getLoc(), diag::new_array_bound_zero)
+          << lit->getSourceRange();
+        return nullptr;
+      }
+
+      resultType = ArrayType::get(resultType, size, TC.Context);
+    }
+
+    auto &outerBound = E->getBounds()[0];
+    // Try to build the appropriate slice type.
+    resultType = TC.getArraySliceType(outerBound.Brackets.Start, resultType);
+    if (resultType.isNull()) return nullptr;
+
+    // Convert the outer bound to some integral type.
+    assert(outerBound.Value);
+    if (TC.typeCheckArrayBound(outerBound.Value, /*requireConstant*/ false))
+      return nullptr;
+
+    E->setType(resultType);
     return E;
   }
   
@@ -862,41 +904,93 @@ bool TypeChecker::semaFunctionSignature(FuncExpr *FE) {
   return hadError;
 }
 
+static bool convertWithMethod(TypeChecker &TC, Expr *&E, Identifier method,
+                              bool (*isTypeOkay)(Type),
+                              Diag<Type> diagnostic) {
+  // If it's just an l2r conversion away from the right type, we're done.
+  if (LValueType *lvalue = E->getType()->getAs<LValueType>()) {
+    if (isTypeOkay(lvalue->getObjectType())) {
+      Expr *newExpr = TC.convertToRValue(E);
+      if (!newExpr) return true;
+      E = newExpr;
+      return false;
+    }
+
+  // Otherwise, if it *is* the right type, we're done.
+  } else if (isTypeOkay(E->getType())) {
+    return false;
+  }
+
+  // We allow up to two iterations here: one to convert to some
+  // intermediate type, and one to convert from that to an acceptable
+  // type.  (The diagnostic here assumes normal cade which uses the
+  // swift standard library.)
+  unsigned numConversionsRemaining = 2;
+  Type origType = E->getType();
+  do {
+    UnresolvedDotExpr *UDE =
+      new (TC.Context) UnresolvedDotExpr(E, E->getStartLoc(), method,
+                                         E->getEndLoc());
+    E = TC.semaUnresolvedDotExpr(UDE);
+    if (!E) return true;
+
+    TupleExpr *callArgs =
+      new (TC.Context) TupleExpr(E->getStartLoc(), MutableArrayRef<Expr *>(), 0,
+                                 E->getEndLoc(),
+                                 TupleType::getEmpty(TC.Context));
+    CallExpr *CE = new (TC.Context) CallExpr(E, callArgs, Type());
+    E = TC.semaApplyExpr(CE);
+    if (!E) return true;
+
+    // We're done as soon as we reach an acceptable type.
+    if (isTypeOkay(E->getType())) return false;
+
+    --numConversionsRemaining;
+  } while (numConversionsRemaining != 0);
+
+  TC.diagnose(E->getLoc(), diagnostic, origType)
+    << E->getSourceRange();
+  return true;
+}
+
+static bool isBuiltinIntegerType(Type T) {
+  return T->is<BuiltinIntegerType>();
+}
+
+/// Type check an array bound.
+bool TypeChecker::typeCheckArrayBound(Expr *&E, bool constantRequired) {
+  // If it's an integer literal expression, just convert the type directly.
+  if (isa<IntegerLiteralExpr>(E)) {
+    // FIXME: the choice of 64-bit is rather arbitrary.
+    E->setType(BuiltinIntegerType::get(64, Context));
+    return false;
+  }
+
+  // Otherwise, if a constant expression is required, fail.
+  if (constantRequired) {
+    diagnose(E->getLoc(), diag::non_constant_array)
+      << E->getSourceRange();
+    return true;
+  }
+
+  // Otherwise, apply .getArrayBoundValue() until we get an acceptable
+  // integer type.
+  Identifier methodName = Context.getIdentifier("getArrayBoundValue");
+  return convertWithMethod(*this, E, methodName, &isBuiltinIntegerType,
+                           diag::array_bound_convert_limit_reached);
+}
+
+static bool isBuiltinI1(Type T) {
+  if (BuiltinIntegerType *BT = T->getAs<BuiltinIntegerType>())
+    return BT->getBitWidth() == 1;
+  return false;
+}
 
 bool TypeChecker::typeCheckCondition(Expr *&E) {
   if (typeCheckExpression(E))
     return true;
-  if (!(E = convertToRValue(E)))
-    return true;
 
-  CanType BuiltinI1(BuiltinIntegerType::get(1, Context));
-  unsigned ConvertLimit = 0;
-  Type OrigType = E->getType();
-  while (E->getType()->getCanonicalType() != BuiltinI1) {
-    // We allow up to two iterations here: one to convert to bool, and one to
-    // convert from bool to i1.  (The diagnostic here assumes normal cade
-    // which uses the swift standard library.)
-    if (ConvertLimit == 2) {
-      diagnose(E->getStartLoc(), diag::condition_convert_limit_reached,
-               OrigType);
-      return true;
-    }
-    Identifier LogicValId = Context.getIdentifier("getLogicValue");
-    UnresolvedDotExpr *UDE = 
-        new (Context) UnresolvedDotExpr(E, E->getStartLoc(), LogicValId,
-                                        E->getEndLoc());
-    E = semaUnresolvedDotExpr(UDE);
-    if (!E)
-      return true;
-    TupleExpr *CallArgs =
-        new (Context) TupleExpr(E->getStartLoc(), MutableArrayRef<Expr *>(), 0,
-                                E->getEndLoc(), TupleType::getEmpty(Context));
-    CallExpr *CE =
-        new (Context) CallExpr(E, CallArgs, Type());
-    E = semaApplyExpr(CE);
-    if (!E)
-      return true;
-    ++ConvertLimit;
-  }
-  return false;
+  Identifier methodName = Context.getIdentifier("getLogicValue");
+  return convertWithMethod(*this, E, methodName, &isBuiltinI1,
+                           diag::condition_convert_limit_reached);
 }

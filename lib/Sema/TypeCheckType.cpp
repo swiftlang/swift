@@ -54,6 +54,14 @@ static bool buildArraySliceType(TypeChecker &TC, ArraySliceType *sliceTy) {
   return false;
 }
 
+Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
+  ArraySliceType *sliceTy = ArraySliceType::get(elementType, loc, Context);
+  if (sliceTy->hasCanonicalTypeComputed()) return sliceTy;
+  if (buildArraySliceType(*this, sliceTy)) return Type();
+  sliceTy->getCanonicalType();
+  return sliceTy;
+}
+
 /// validateType - Recursively check to see if the type of a decl is valid.  If
 /// not, diagnose the problem and collapse it to an ErrorType.
 bool TypeChecker::validateType(ValueDecl *VD) {

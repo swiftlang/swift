@@ -142,6 +142,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
 
   Expr *visitNewArrayExpr(NewArrayExpr *E) {
     for (auto &bound : E->getBounds()) {
+      // Ignore empty bounds.
+      if (!bound.Value) continue;
+
       Expr *newValue = doIt(bound.Value);
       if (!newValue) return nullptr;
       bound.Value = newValue;

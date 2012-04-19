@@ -32,6 +32,8 @@ public:
   InFlightDiagnostic diagnose(ArgTypes... Args) {
     return Context.Diags.diagnose(Args...);
   }
+
+  Type getArraySliceType(SourceLoc loc, Type elementType);
   
   bool validateType(ValueDecl *VD);
   bool validateType(Type T);
@@ -54,6 +56,7 @@ public:
   bool typeCheckPattern(Pattern *P);
   bool coerceToType(Pattern *P, Type Ty);
   bool typeCheckCondition(Expr *&E);
+  bool typeCheckArrayBound(Expr *&E, bool requireConstant);
 
   /// coerceToType - Do semantic analysis of an expression in a context that
   /// expects a particular type.  This performs a conversion to that type if

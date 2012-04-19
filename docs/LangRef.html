@@ -1928,11 +1928,14 @@ token following the opening '{' is either 'set' or 'get'.</p>
 
     expr-new-bounds ::= expr-new-bound
     expr-new-bounds ::= expr-new-bounds expr-new-bound
-    expr-new-bound  ::= lsquare-unspaced <a href="#expr">expr</a> ']'
+    expr-new-bound  ::= lsquare-unspaced <a href="#expr">expr?</a> ']'
   </pre>
     
   <p>Allocates and initializes a new array of objects with value
-    semantics or an individual object with reference semantics.</p>
+    semantics or an individual object with reference semantics.  If
+    any bounds clauses are present, the first clause must have an
+    expression; subsequent bounds, if present, must be constant under the
+    <a href="#type-array">usual rules for array types</a>.</p>
 
   <!-- ===================================================================== -->
   <h3 id="expr-call">Function Application</h3>
