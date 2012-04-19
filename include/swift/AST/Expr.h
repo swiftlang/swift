@@ -583,7 +583,57 @@ public:
     return E->getKind() == ExprKind::Subscript;
   }
 };
+
+/// OverloadedSubscriptExpr - Subscripting expressions like a[i] that refer to
+/// an element within a container, for which overload resolution has found
+/// multiple potential subscript declarations that may apply.
+///
+/// Instances of OverloadedSubscriptExpr are mapped down to SubscriptExpr
+/// instances by type-checking.
+class OverloadedSubscriptExpr : public Expr {
+  SourceRange Brackets;
+  ArrayRef<ValueDecl *> Decls;
+  Expr *Base;
+  Expr *Index;
   
+  OverloadedSubscriptExpr(Expr *Base, ArrayRef<ValueDecl *> Decls,
+                          SourceLoc LBracketLoc, Expr *Index,
+                          SourceLoc RBracketLoc, Type Ty)
+    : Expr(ExprKind::OverloadedSubscript, Ty),
+      Brackets(LBracketLoc, RBracketLoc), Decls(Decls), Base(Base),
+      Index(Index) { }
+  
+public:
+  Expr *getBase() const { return Base; }
+  Expr *getIndex() const { return Index; }
+  
+  ArrayRef<ValueDecl *> getDecls() const { return Decls; }
+  
+  SourceLoc getLBracketLoc() const { return Brackets.Start; }
+  SourceLoc getRBracketLoc() const { return Brackets.End; }
+  
+  SourceLoc getLoc() const { return getLBracketLoc(); }
+  SourceLoc getStartLoc() const { return getBase()->getStartLoc(); }
+  SourceLoc getEndLoc() const { return getRBracketLoc(); }
+  
+  SourceRange getSourceRange() const {
+    return SourceRange(getBase()->getStartLoc(), getRBracketLoc());
+  }
+  
+  /// createWithCopy - Create and return a new OverloadedSubscriptExpr or a
+  /// new SubscriptExpr (if the list of decls has a single entry) from the
+  /// specified (non-empty) list of decls and with the given base/index.
+  static Expr *createWithCopy(Expr *Base, ArrayRef<ValueDecl*> Decls,
+                              SourceLoc LBracketLoc, Expr *Index,
+                              SourceLoc RBracketLoc);
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const OverloadedSubscriptExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::OverloadedSubscript;
+  }
+};
+
 /// UnresolvedDotExpr - A field access (foo.bar) on an expression with dependent
 /// type.
 class UnresolvedDotExpr : public Expr {

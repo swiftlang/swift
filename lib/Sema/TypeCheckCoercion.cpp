@@ -181,6 +181,44 @@ public:
   CoercedResult visitSubscriptExpr(SubscriptExpr *E) {
     return unchanged(E);
   }
+  CoercedResult visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *E) {
+    Type BaseTy = E->getBase()->getType();
+    if (LValueType *BaseLV = BaseTy->getAs<LValueType>())
+      BaseTy = BaseLV->getObjectType();
+    
+    llvm::SmallVector<ValueDecl *, 2> Viable;
+    ValueDecl *Best = TC.filterOverloadSet(E->getDecls(), BaseTy, E->getIndex(),
+                                           DestTy, Viable);
+    
+    if (Best) {
+      SubscriptDecl *BestSub = cast<SubscriptDecl>(Best);      
+      Type ResultTy = LValueType::get(BestSub->getElementType(),
+                                      (LValueType::Qual::NonHeap|
+                                       LValueType::Qual::Implicit),
+                                      TC.Context);
+      if (!Apply)
+        return ResultTy;
+      
+      SubscriptExpr *Result
+        = new (TC.Context) SubscriptExpr(E->getBase(), E->getLBracketLoc(),
+                                         E->getIndex(), E->getRBracketLoc(),
+                                         BestSub);
+      return coerced(TC.semaSubscriptExpr(Result));
+    }
+    
+    if (!Apply)
+      return nullptr;
+    
+    // FIXME: We should be able to build some kind of OverloadedSubscriptExpr
+    // here and hope that type coercion will resolve it.
+    diagnose(E->getLBracketLoc(), diag::subscript_overload_fail,
+             !Viable.empty(), BaseTy, E->getIndex()->getType())
+      << E->getBase()->getSourceRange() << E->getIndex()->getSourceRange();
+    TC.printOverloadSetCandidates(Viable);
+    E->setType(ErrorType::get(TC.Context));
+    return nullptr;
+
+  }
   
   static Type matchLValueType(ValueDecl *val, LValueType *lv) {
     if (val->isReferencedAsLValue() && 

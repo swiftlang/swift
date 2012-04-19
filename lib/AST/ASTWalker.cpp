@@ -70,7 +70,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   Expr *visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *E) { return E; }
   Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) { return E; }
   Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) { return E; }
-
+  
   Expr *visitMemberRefExpr(MemberRefExpr *E) {
     if (Expr *Base = doIt(E->getBase())) {
       E->setBase(Base);
@@ -109,6 +109,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     
     return E;
   }
+  Expr *visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *E) { return E; }
   Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     if (!E->getBase())
       return E;

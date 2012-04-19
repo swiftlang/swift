@@ -126,6 +126,29 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
     return SE;
   }
   
+  // If we already know what subscript declaration to use, do it now.
+  if (SE->hasDecl()) {
+    // Convert the indices appropriately.
+    SubscriptDecl *SubDecl = SE->getDecl();
+    Type IndexType = SubDecl->getIndices()->getType();
+    Expr *Index = coerceToType(SE->getIndex(), IndexType);
+    if (!Index) {
+      diagnose(SE->getBase()->getLoc(), diag::while_converting_subscript_index,
+               IndexType)
+      << SE->getIndex()->getSourceRange();
+      return 0;
+    }
+    
+    // FIXME: Convert the base by turning it into an lvalue?
+    
+    // Compute the final lvalue type and we're done.
+    SE->setType(LValueType::get(SubDecl->getElementType(),
+                                (LValueType::Qual::NonHeap|
+                                 LValueType::Qual::Implicit),
+                                Context));
+    return SE;
+  }
+  
   // Determine the type of the base of this subscript expression.
   Type BaseTy = SE->getBase()->getType();
   if (LValueType *BaseLV = BaseTy->getAs<LValueType>())
@@ -150,37 +173,27 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
                                       Type(), Viable);
 
   if (Best) {
-    SubscriptDecl *BestSub = cast<SubscriptDecl>(Best);
-    SE->setDecl(BestSub);
-
-    // Convert the indices appropriately.
-    Type IndexType = BestSub->getIndices()->getType();
-    Expr *Index = coerceToType(SE->getIndex(), IndexType);
-    if (!Index) {
-      diagnose(SE->getBase()->getLoc(), diag::while_converting_subscript_index,
-               IndexType)
-        << SE->getIndex()->getSourceRange();
-      return 0;
-    }
-    
-    // FIXME: Convert the base by turning it into an lvalue?
-    
-    // Compute the final lvalue type and we're done.
-    SE->setType(LValueType::get(BestSub->getElementType(),
-                                (LValueType::Qual::NonHeap|
-                                 LValueType::Qual::Implicit),
-                                Context));
+    // We have a candidate: use it.
+    SE->setDecl(cast<SubscriptDecl>(Best));
+    return semaSubscriptExpr(SE);
+  }
+  
+  // If there were no viable candidates, complain.
+  if (Viable.empty()) {
+    diagnose(SE->getLBracketLoc(), diag::subscript_overload_fail,
+             false, BaseTy, SE->getIndex()->getType())
+      << SE->getBase()->getSourceRange() << SE->getIndex()->getSourceRange();
+    printOverloadSetCandidates(Viable.empty()? LookupResults : Viable);
+    SE->setType(ErrorType::get(Context));
     return SE;
   }
   
-  // FIXME: We should be able to build some kind of OverloadedSubscriptExpr
-  // here and hope that type coercion will resolve it.
-  diagnose(SE->getLBracketLoc(), diag::subscript_overload_fail,
-           !Viable.empty(), BaseTy, SE->getIndex()->getType())
-    << SE->getBase()->getSourceRange() << SE->getIndex()->getSourceRange();
-  printOverloadSetCandidates(Viable.empty()? LookupResults : Viable);
-  SE->setType(ErrorType::get(Context));
-  return SE;
+  // Create an overloaded subscript expression; type coercion may be able to
+  // resolve it.
+  return OverloadedSubscriptExpr::createWithCopy(SE->getBase(), Viable,
+                                                 SE->getLBracketLoc(),
+                                                 SE->getIndex(),
+                                                 SE->getRBracketLoc());
 }
 
 /// \brief Determine whether this expression refers to a type directly (ignoring
@@ -435,6 +448,10 @@ public:
 
   Expr *visitSubscriptExpr(SubscriptExpr *E) {
     return TC.semaSubscriptExpr(E);
+  }
+  Expr *visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *E) {
+    E->setType(UnstructuredDependentType::get(TC.Context));
+    return E;
   }
     
   Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *E) {

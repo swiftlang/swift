@@ -254,6 +254,24 @@ SubscriptExpr::SubscriptExpr(Expr *Base, SourceLoc LBracketLoc, Expr *Index,
   : Expr(ExprKind::Subscript, D? D->getElementType() : Type()),
     D(D), Brackets(LBracketLoc, RBracketLoc), Base(Base), Index(Index) { }
 
+Expr *OverloadedSubscriptExpr::createWithCopy(Expr *Base,
+                                              ArrayRef<ValueDecl*> Decls,
+                                              SourceLoc LBracketLoc,
+                                              Expr *Index,
+                                              SourceLoc RBracketLoc) {
+  assert(!Decls.empty() &&
+         "Cannot create an overloaded member ref with no decls");
+  ASTContext &C = Decls[0]->getASTContext();
+  
+  if (Decls.size() == 1)
+    return new (C) SubscriptExpr(Base, LBracketLoc, Index, RBracketLoc);
+  
+  // Otherwise, copy the overload set into the ASTContext's memory.
+  return new (C) OverloadedSubscriptExpr(Base, C.AllocateCopy(Decls),
+                                         LBracketLoc, Index, RBracketLoc,
+                                         UnstructuredDependentType::get(C));
+}
+
 FuncExpr *FuncExpr::create(ASTContext &C, SourceLoc funcLoc,
                            ArrayRef<Pattern*> params, Type fnType,
                            BraceStmt *body, DeclContext *parent) {
@@ -423,6 +441,14 @@ public:
   }
   void visitSubscriptExpr(SubscriptExpr *E) {
     printCommon(E, "subscript_expr");
+    OS << '\n';
+    printRec(E->getBase());
+    OS << '\n';
+    printRec(E->getIndex());
+    OS << ')';
+  }
+  void visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *E) {
+    printCommon(E, "overloaded_subscript_expr");
     OS << '\n';
     printRec(E->getBase());
     OS << '\n';
