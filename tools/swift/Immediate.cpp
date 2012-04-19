@@ -19,6 +19,7 @@
 #include "Frontend.h"
 #include "swift/Subsystems.h"
 #include "swift/IRGen/Options.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Component.h"
 #include "swift/AST/Decl.h"
@@ -125,18 +126,25 @@ void swift::RunImmediately(TranslationUnit *TU) {
   EE->runFunctionAsMain(EntryFn, std::vector<std::string>(), 0);
 }
 
-struct InitEditLine {
+struct EditLineWrapper {
   EditLine *e;
-  static char *PromptFn(EditLine *) {
-    return (char*)"swift> ";
+  bool PromptContinuation;
+
+  static char *PromptFn(EditLine *e) {
+    void* clientdata;
+    el_get(e, EL_CLIENTDATA, &clientdata);
+    EditLineWrapper *wrap = (EditLineWrapper*)clientdata;
+    return wrap->PromptContinuation ? (char*)"swift| " : (char*)"swift> ";
   };
 
-  InitEditLine() {
+  EditLineWrapper() {
     e = el_init("swift", stdin, stdout, stderr);
+    PromptContinuation = false;
     el_set(e, EL_EDITOR, "emacs");
     el_set(e, EL_PROMPT, PromptFn);
+    el_set(e, EL_CLIENTDATA, (void*)this);
   }
-  ~InitEditLine() {
+  ~EditLineWrapper() {
     el_end(e);
   }
   operator EditLine*() { return e; }
@@ -167,7 +175,6 @@ void swift::REPL(ASTContext &Context) {
   std::string ErrorMsg;
   builder.setErrorStr(&ErrorMsg);
   builder.setEngineKind(llvm::EngineKind::JIT);
-
   llvm::ExecutionEngine *EE = builder.create();
 
   irgen::Options Options;
@@ -177,28 +184,43 @@ void swift::REPL(ASTContext &Context) {
   Options.OutputKind = irgen::OutputKind::Module;
   Options.IsREPL = true;
 
+  EditLineWrapper e;
+
   char* CurBuffer = const_cast<char*>(Buffer->getBufferStart());
   unsigned CurBufferOffset = 0;
   unsigned CurBufferEndOffset = 0;
-
-  InitEditLine e;
-
+  
   unsigned CurTUElem = 0;
+  unsigned BraceCount = 0;
 
   while (1) {
+    // Read one line.
+    e.PromptContinuation = BraceCount != 0;
     int LineCount;
     const char* Line = el_gets(e, &LineCount);
     if (!Line)
       return;
-
-    // FIXME: Should continue reading lines when there is an unbalanced
-    // brace/paren/bracket.
 
     strcpy(CurBuffer, Line);
     CurBuffer += strlen(Line);
     *CurBuffer++ = '\n';
     CurBufferEndOffset += strlen(Line) + 1;
 
+    // If we detect unbalanced braces, keep reading before we start parsing.
+    Lexer L(Line, Context.SourceMgr, nullptr);
+    Token Tok;
+    do {
+      L.lex(Tok);
+      if (Tok.is(tok::l_brace))
+        ++BraceCount;
+      else if (Tok.is(tok::r_brace) && BraceCount > 0)
+        --BraceCount;
+    } while (!Tok.is(tok::eof));
+
+    if (BraceCount)
+      continue;
+
+    // Parse the current line(s).
     bool ShouldRun =
         swift::appendToMainTranslationUnit(TU, BufferID, CurTUElem,
                                            CurBufferOffset,
@@ -208,10 +230,12 @@ void swift::REPL(ASTContext &Context) {
     if (Context.hadError())
       return;
 
+    // If we didn't see an expression, statement, or decl which might have
+    // side-effects, keep reading.
     if (!ShouldRun)
       continue;
 
-    // IRGen the current line(s) module.
+    // IRGen the current line(s).
     llvm::Module LineModule("REPLLine", LLVMContext);
     performCaptureAnalysis(TU, CurTUElem);
     performIRGeneration(Options, &LineModule, TU, CurTUElem);
