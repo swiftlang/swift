@@ -611,11 +611,12 @@ ERROR(overloading_ambiguity,sema_tce,none,
 ERROR(no_candidates_op, sema_tce, none,
       "no candidates found for %select{binary|unary}0 operator %1",
       (unsigned, Identifier))
-NOTE(no_candidates_binop_operands, sema_tce, none,
-      "operands have types %0 and %1",
-      (Type, Type))
-NOTE(no_candidates_unary_operand, sema_tce, none,
-     "operand has type %0", (Type))
+ERROR(no_candidates_binop, sema_tce, none,
+      "no matching binary operator %0 for types %1 and %2",
+      (Identifier, Type, Type))
+ERROR(no_candidates_unary, sema_tce, none,
+      "no matching unary operator %0 for type %1",
+      (Identifier, Type))
 ERROR(no_candidates,sema_tce,none, "no candidates found for call", ())
 ERROR(no_candidates_ref,sema_tce,none,
       "no candidates found for reference to overloaded %0", (Identifier))

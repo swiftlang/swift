@@ -40,15 +40,19 @@ void TypeChecker::diagnoseEmptyOverloadSet(Expr *E,
     const TupleExpr *Arg = cast<TupleExpr>(BE->getArg());
     auto Elements = Arg->getElements();
     SourceLoc L = Fn->getLoc();
-    diagnose(L, diag::no_candidates_op, 0, getFirstOverloadedIdentifier(Fn))
-      << Elements[0]->getSourceRange() << Elements[1]->getSourceRange();
-    // Issue a note indicating the types of the operands, but only do
+    Identifier I = getFirstOverloadedIdentifier(Fn);
+    // Issue an error indicating the types of the operands, but only do
     // so if they are both dependent types and not "error types".
     Type TypeA = Elements[0]->getType();
     Type TypeB = Elements[1]->getType();
-    if (displayOperandType(TypeA) && displayOperandType(TypeB))
-      diagnose(L, diag::no_candidates_binop_operands, TypeA, TypeB)
+    if (displayOperandType(TypeA) && displayOperandType(TypeB)) {
+      diagnose(L, diag::no_candidates_binop, I, TypeA, TypeB)
         << Elements[0]->getSourceRange() << Elements[1]->getSourceRange();
+    }
+    else {
+      diagnose(L, diag::no_candidates_op, 0, I)
+        << Elements[0]->getSourceRange() << Elements[1]->getSourceRange();
+    }
   }
   else if (const UnaryExpr *UE = dyn_cast<UnaryExpr>(E)) {
     // FIXME: this feels a bit ad hoc with how we dig through the AST, and
@@ -57,15 +61,18 @@ void TypeChecker::diagnoseEmptyOverloadSet(Expr *E,
     // itself.
     const Expr *Fn = UE->getFn();
     const Expr *Arg = UE->getArg();
-    diagnose(Fn->getLoc(), diag::no_candidates_op, 1,
-             getFirstOverloadedIdentifier(Fn))
-      << Arg->getSourceRange();
+    Identifier I = getFirstOverloadedIdentifier(Fn);
     // Issue a note indicating the types of the operand, but only do
     // so if it is a dependent type.  Otherwise, the diagnostic is confusing.
     Type TypeArg = Arg->getType();
-    if (displayOperandType(TypeArg))
-      diagnose(Arg->getLoc(), diag::no_candidates_unary_operand, TypeArg)
+    if (displayOperandType(TypeArg)) {      
+      diagnose(Arg->getLoc(), diag::no_candidates_unary, I, TypeArg)
         << Arg->getSourceRange();
+    }
+    else {
+      diagnose(Arg->getLoc(), diag::no_candidates_op, 1, I)
+        << Arg->getSourceRange();
+    }
   }
   else {
     diagnose(E->getLoc(), diag::no_candidates)
