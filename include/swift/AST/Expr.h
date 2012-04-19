@@ -1056,10 +1056,11 @@ private:
   Type ElementTy;
   unsigned NumBounds;
   SourceLoc NewLoc;
+  Expr *InjectionFn;
 
   NewArrayExpr(SourceLoc newLoc, Type elementTy, unsigned numBounds, Type ty)
     : Expr(ExprKind::NewArray, ty), ElementTy(elementTy),
-      NumBounds(numBounds), NewLoc(newLoc) {}
+      NumBounds(numBounds), NewLoc(newLoc), InjectionFn(nullptr) {}
 
   Bound *getBoundsBuffer() {
     return reinterpret_cast<Bound*>(this + 1);
@@ -1088,6 +1089,13 @@ public:
     return SourceRange(NewLoc, getBounds().back().Brackets.End);
   }
   SourceLoc getLoc() const { return NewLoc; }
+
+  /// Set the injection function expression to use.
+  void setInjectionFunction(Expr *fn) { InjectionFn = fn; }
+  Expr *getInjectionFunction() const {
+    assert(InjectionFn != nullptr);
+    return InjectionFn;
+  }
 
   Type getElementType() const { return ElementTy; }
 
