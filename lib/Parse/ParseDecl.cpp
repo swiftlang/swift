@@ -344,7 +344,9 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   }
   
   // If we got back a null pointer, then a parse error happened.
-  if (Entries.back() == 0) {
+  if (Entries.empty())
+    HadParseError = true;
+  else if (Entries.back() == 0) {
     Entries.pop_back();
     HadParseError = true;
   }
