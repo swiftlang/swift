@@ -71,6 +71,27 @@ bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
   }
 }
 
+/// parseExprOrStmtAssign
+///   expr-or-stmt-assign:
+///     expr
+///     stmt-assign
+Parser::ExprStmtOrDecl Parser::parseExprOrStmtAssign() {
+  NullablePtr<Expr> ResultExpr = parseExpr(diag::expected_expr);
+  if (ResultExpr.isNull())
+    return ExprStmtOrDecl();
+
+  // Check for assignment.  If we don't have it, then we just have a
+  // simple expression.
+  if (Tok.isNot(tok::equal))
+    return ResultExpr.get();
+
+  SourceLoc EqualLoc = consumeToken();
+  NullablePtr<Expr> RHSExpr = parseExpr(diag::expected_expr_assignment);
+  if (RHSExpr.isNull())
+    return ExprStmtOrDecl();
+  return new (Context) AssignStmt(ResultExpr.get(),
+                                  EqualLoc, RHSExpr.get());
+}
 
 
 ///   stmt-brace-item:
@@ -116,23 +137,13 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       // isn't causing us heartburn.
       assert(Tok.isNot(tok::l_brace) &&
              "expr-anon-closure should be parsed as stmt-brace here");
-      NullablePtr<Expr> ResultExpr = parseExpr(diag::expected_expr);
-      if (ResultExpr.isNull()) {
+
+      // Parse 'expr' or 'stmt-assign'.
+      ExprStmtOrDecl Res = parseExprOrStmtAssign();
+      if (Res.isNull())
         NeedParseErrorRecovery = true;
-      } else if (Tok.isNot(tok::equal)) {
-        Entries.push_back(ResultExpr.get());
-      } else {
-        // Check for assignment.  If we don't have it, then we just have a
-        // simple expression.
-        SourceLoc EqualLoc = consumeToken();
-        NullablePtr<Expr> RHSExpr = parseExpr(diag::expected_expr_assignment);
-        if (RHSExpr.isNull()) {
-          NeedParseErrorRecovery = true;  // Error.
-        } else {
-          Entries.push_back(new (Context) AssignStmt(ResultExpr.get(),
-                                                     EqualLoc, RHSExpr.get()));
-        }
-      }
+      else
+        Entries.push_back(Res);
     }
    
     // If we had a parse error, skip to the start of the next stmt or decl.  It

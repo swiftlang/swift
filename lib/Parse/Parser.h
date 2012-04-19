@@ -288,6 +288,7 @@ public:
   // ErrorStmt on a semantic error.
   static bool isStartOfStmtOtherThanAssignment(const Token &Tok);
   NullablePtr<Stmt> parseStmtOtherThanAssignment();
+  ExprStmtOrDecl parseExprOrStmtAssign();
   NullablePtr<BraceStmt> parseStmtBrace(Diag<> ID);
   NullablePtr<Stmt> parseStmtReturn();
   NullablePtr<Stmt> parseStmtIf();
