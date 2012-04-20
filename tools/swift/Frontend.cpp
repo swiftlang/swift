@@ -67,7 +67,7 @@ swift::buildSingleTranslationUnit(ASTContext &Context, unsigned BufferID,
     if (!ParseOnly) {
       performNameBinding(TU, CurTUElem);
       performTypeChecking(TU, CurTUElem);
-      CurTUElem = TU->Body->getNumElements();
+      CurTUElem = TU->Decls.size();
     }
   } while (BufferOffset != Buffer->getBufferSize());
 
@@ -88,7 +88,7 @@ bool swift::appendToMainTranslationUnit(TranslationUnit *TU, unsigned BufferID,
       performNameBinding(TU, CurTUElem);
       performTypeChecking(TU, CurTUElem);
     }
-    CurTUElem = TU->Body->getNumElements();
+    CurTUElem = TU->Decls.size();
   } while (BufferOffset != BufferEndOffset);
   return FoundAnySideEffects;
 }

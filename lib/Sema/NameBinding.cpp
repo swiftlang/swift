@@ -194,7 +194,7 @@ addStandardLibraryImport(SmallVectorImpl<ImportedModule> &Result) {
     return;
 
   Identifier SwiftID = Context.getIdentifier("swift");
-  Module *M = getModule(std::make_pair(SwiftID, TU->Body->getStartLoc()));
+  Module *M = getModule(std::make_pair(SwiftID, TU->Decls[0]->getLocStart()));
   if (M == 0) return;
   Result.push_back(std::make_pair(Module::AccessPathTy(), M));
 }
@@ -387,7 +387,7 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, FuncDecl *CurFD,
 void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
   // Make sure we skip adding the standard library imports if the
   // translation unit is empty.
-  if (TU->Body->getNumElements() == 0)
+  if (TU->Decls.empty())
     return;
 
   // Reset the name lookup cache so we find new decls.
@@ -401,10 +401,9 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
                          TU->getImportedModules().end());
 
   // Do a prepass over the declarations to find and load the imported modules.
-  for (unsigned i = StartElem, e = TU->Body->getNumElements(); i != e; ++i)
-    if (Decl *D = TU->Body->getElement(i).dyn_cast<Decl*>())
-      if (ImportDecl *ID = dyn_cast<ImportDecl>(D))
-        Binder.addImport(ID, ImportedModules);
+  for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i)
+    if (ImportDecl *ID = dyn_cast<ImportDecl>(TU->Decls[i]))
+      Binder.addImport(ID, ImportedModules);
 
   // Add the standard library import.
   // FIXME: The semantics here are sort of strange if an import statement is
@@ -476,15 +475,8 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
 
   // Now that we know the top-level value names, go through and resolve any
   // UnresolvedDeclRefExprs that exist.
-  for (unsigned i = StartElem, e = TU->Body->getNumElements(); i != e; ++i) {
-    auto Elem = TU->Body->getElement(i);
-    if (Expr *E = Elem.dyn_cast<Expr*>())
-      TU->Body->setElement(i, E->walk(walker));
-    else if (Stmt *S = Elem.dyn_cast<Stmt*>())
-      TU->Body->setElement(i, S->walk(walker));
-    else
-      Elem.get<Decl*>()->walk(walker);
-  }
+  for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i)
+    TU->Decls[i]->walk(walker);
 
   TU->ASTStage = TranslationUnit::NameBound;
   verify(TU);

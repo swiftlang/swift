@@ -43,22 +43,11 @@ void Parser::parseTranslationUnit(TranslationUnit *TU) {
 
   // Prime the lexer.
   consumeToken();
-  SourceLoc FileStartLoc;
-  if (TU->Body)
-    FileStartLoc = TU->Body->getStartLoc();
-  else
-    FileStartLoc = Tok.getLoc();
 
   CurDeclContext = TU;
   
   // Parse the body of the file.
   SmallVector<ExprStmtOrDecl, 128> Items;
-
-  // FIXME: Recreating the BraceStmt from scratch for each chunk wastes
-  // a bunch of memory.
-  if (TU->Body)
-    Items.append(TU->Body->getElements().begin(),
-                 TU->Body->getElements().end());
 
   if (Tok.is(tok::r_brace)) {
     diagnose(Tok.getLoc(), diag::extra_rbrace);
@@ -67,11 +56,8 @@ void Parser::parseTranslationUnit(TranslationUnit *TU) {
   
   parseBraceItemList(Items, true);
 
-  // Process the end of the translation unit.
-  SourceLoc FileEnd = Tok.getLoc();
-
-  // First thing, we transform the body into a brace expression.
-  TU->Body = BraceStmt::create(Context, FileStartLoc, Items, FileEnd);
+  for (auto Item : Items)
+    TU->Decls.push_back(Item.get<Decl*>());
   
   TU->setUnresolvedIdentifierTypes(
           Context.AllocateCopy(llvm::makeArrayRef(UnresolvedIdentifierTypes)));

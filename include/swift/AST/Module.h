@@ -26,6 +26,7 @@ namespace swift {
   class ASTContext;
   class BraceStmt;
   class Component;
+  class Decl;
   class ExtensionDecl;
   class OneOfElementDecl;
   class NameAliasType;
@@ -160,15 +161,13 @@ private:
 
 public:
 
-  /// Body - This is a synthesized BraceStmt that holds the top level
-  /// expressions and declarations for a translation unit.
-  BraceStmt *Body;
+  /// Decls; the list of top-level declarations for a translation unit.
+  std::vector<Decl*> Decls;
   
   TranslationUnit(Identifier Name, Component *Comp, ASTContext &C,
                   bool IsMainModule, bool IsReplModule)
     : Module(DeclContextKind::TranslationUnit, Name, Comp, C, IsMainModule,
-             IsReplModule),
-      Body(nullptr) { }
+             IsReplModule) { }
   
   /// getUnresolvedIdentifierTypes - This is a list of scope-qualified types
   /// that were unresolved at the end of the translation unit's parse

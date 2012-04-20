@@ -73,7 +73,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
 
   IRGenFunction(*this, unitToUnit, params, ExplosionKind::Minimal,
                 /*uncurry*/ 0, fn)
-    .emitGlobalTopLevel(tunit->Body, StartElem);
+    .emitGlobalTopLevel(tunit, StartElem);
 
   // We don't need global init to call main().
   if (tunit->IsMainModule)
@@ -106,10 +106,10 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
                                   "llvm.global_ctors");
 }
 
-void IRGenFunction::emitGlobalTopLevel(BraceStmt *body, unsigned StartElem) {
-  for (unsigned i = StartElem, e = body->getNumElements(); i != e; ++i) {
+void IRGenFunction::emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem) {
+  for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
     assert(Builder.hasValidIP());
-    emitGlobalDecl(body->getElement(i).get<Decl*>());
+    emitGlobalDecl(TU->Decls[i]);
   }
 }
 

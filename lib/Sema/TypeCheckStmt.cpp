@@ -376,20 +376,13 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     }
   };
   PrePassWalker prePass(TC);
-  for (unsigned i = StartElem, e = TU->Body->getNumElements(); i != e; ++i) {
-    auto Elem = TU->Body->getElement(i);
-    if (Expr *E = Elem.dyn_cast<Expr*>())
-      TU->Body->setElement(i, E->walk(prePass));
-    else if (Stmt *S = Elem.dyn_cast<Stmt*>())
-      TU->Body->setElement(i, S->walk(prePass));
-    else
-      Elem.get<Decl*>()->walk(prePass);
-  }
+  for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i)
+    TU->Decls[i]->walk(prePass);
 
   // Type check the top-level elements of the translation unit.
   StmtChecker checker(TC, 0);
-  for (unsigned i = StartElem, e = TU->Body->getNumElements(); i != e; ++i) {
-    Decl *D = TU->Body->getElement(i).get<Decl*>();
+  for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
+    Decl *D = TU->Decls[i];
     if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       auto Elem = TLCD->getBody();
       if (Expr *E = Elem.dyn_cast<Expr*>()) {

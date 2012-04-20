@@ -484,5 +484,6 @@ void swift::verify(TranslationUnit *TUnit) {
   if (TUnit->Ctx.hadError()) return;
 
   Verifier verifier(TUnit);
-  TUnit->Body->walk(verifier);
+  for (Decl *D : TUnit->Decls)
+    D->walk(verifier);
 }

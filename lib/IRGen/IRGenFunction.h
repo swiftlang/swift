@@ -43,6 +43,7 @@ namespace swift {
   class ReturnStmt;
   class SourceLoc;
   class Stmt;
+  class TranslationUnit;
   class ValueDecl;
   class VarDecl;
   class WhileStmt;
@@ -317,7 +318,7 @@ private:
 
 //--- Global context emission --------------------------------------------------
 public:
-  void emitGlobalTopLevel(BraceStmt *S, unsigned StartElem);
+  void emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem);
 private:
   void emitGlobalDecl(Decl *D);
 };

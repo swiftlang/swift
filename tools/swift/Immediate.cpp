@@ -243,7 +243,7 @@ void swift::REPL(ASTContext &Context) {
     if (Context.hadError())
       return;
 
-    CurTUElem = TU->Body->getNumElements();
+    CurTUElem = TU->Decls.size();
 
     if (llvm::Linker::LinkModules(&Module, &LineModule,
                                   llvm::Linker::DestroySource,

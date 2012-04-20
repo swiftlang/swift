@@ -297,17 +297,15 @@ namespace {
       if (VD->isNeverUsedAsLValue()) OS << " neverUsedAsLValue=true";
     }
 
-
     void visitTranslationUnit(const TranslationUnit *TU) {
       OS.indent(Indent) << "(translation_unit\n";
-      if (TU->Body)
-        printRec(TU->Body);
-      else
-        OS.indent(Indent+2) << "(null body!)";
+      for (Decl *D : TU->Decls) {
+        OS << '\n';
+        printRec(D);
+      }
       OS << ')';
     }
-    
-    
+
     void visitVarDecl(VarDecl *VD) {
       printCommon(VD, "var_decl");
       if (VD->isProperty()) {

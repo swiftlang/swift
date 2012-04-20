@@ -120,15 +120,14 @@ static void freeTUCachePimpl(void *&Ptr) {
 
 /// Populate our cache on the first name lookup.
 TUModuleCache::TUModuleCache(TranslationUnit &TU) {
-  for (auto Elt : TU.Body->getElements())
-    if (Decl *D = Elt.dyn_cast<Decl*>()) {
-      if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D))
-        if (!TAD->getName().empty())
-          TopLevelTypes[TAD->getName()] = TAD;
-      if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-        if (!VD->getName().empty())
-          TopLevelValues[VD->getName()].push_back(VD);
-    }
+  for (Decl *D : TU.Decls) {
+    if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D))
+      if (!TAD->getName().empty())
+        TopLevelTypes[TAD->getName()] = TAD;
+    if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+      if (!VD->getName().empty())
+        TopLevelValues[VD->getName()].push_back(VD);
+  }
 }
 
 
@@ -201,14 +200,12 @@ static void freeTUExtensionCachePimpl(void *&Ptr) {
 }
 
 TUExtensionCache::TUExtensionCache(TranslationUnit &TU) {
-  for (auto Elt : TU.Body->getElements()) {
-    if (Decl *D = Elt.dyn_cast<Decl*>()) {
-      if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
-        // Ignore failed name lookups.
-        if (ED->getExtendedType()->is<ErrorType>()) continue;
-        
-        Extensions[ED->getExtendedType()->getCanonicalType()].push_back(ED);
-      }
+  for (Decl *D : TU.Decls) {
+    if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
+      // Ignore failed name lookups.
+      if (ED->getExtendedType()->is<ErrorType>()) continue;
+      
+      Extensions[ED->getExtendedType()->getCanonicalType()].push_back(ED);
     }
   }
 }
