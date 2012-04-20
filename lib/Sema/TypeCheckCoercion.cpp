@@ -186,9 +186,13 @@ public:
     if (LValueType *BaseLV = BaseTy->getAs<LValueType>())
       BaseTy = BaseLV->getObjectType();
     
+    Type DestElementTy = DestTy;
+    if (LValueType *DestElementLV = DestElementTy->getAs<LValueType>())
+      DestElementTy = DestElementLV->getObjectType();
+    
     llvm::SmallVector<ValueDecl *, 2> Viable;
     ValueDecl *Best = TC.filterOverloadSet(E->getDecls(), BaseTy, E->getIndex(),
-                                           DestTy, Viable);
+                                           DestElementTy, Viable);
     
     if (Best) {
       SubscriptDecl *BestSub = cast<SubscriptDecl>(Best);      

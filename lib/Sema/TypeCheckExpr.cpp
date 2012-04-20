@@ -885,6 +885,125 @@ Expr *TypeChecker::recheckTypes(Expr *E) {
   return SemaExpressionTree(*this).visit(E);
 }
 
+namespace {
+  // Check the initializer/body to make sure that we succeeded in resolving
+  // all of the types contained within it.  If we've resolved everything, then
+  // we're done processing the expression.  While we're doing the walk, keep
+  // track of whether we have any literals without a resolved type.
+  struct DependenceWalker : ASTWalker {
+    DependenceWalker() { reset(); }
+    
+    void reset() {
+      OneDependentExpr = nullptr;
+      HasDependentLiterals = false;
+    }
+    
+    Expr *walkToExprPost(Expr *E) {    
+      assert(!isa<SequenceExpr>(E) && "Should have resolved this");
+      
+      if (E->getType()->isDependentType()) {
+        // Remember the first dependent expression we come across.
+        if (OneDependentExpr == 0)
+          OneDependentExpr = E;
+        
+        // Also remember if we see any literals with dependent types.
+        if (isa<IntegerLiteralExpr>(E) || isa<FloatLiteralExpr>(E) ||
+            isa<StringLiteralExpr>(E))
+          HasDependentLiterals = true;
+      }
+      return E;
+    }
+    
+    bool walkToStmtPre(Stmt *S) {
+      // Never recurse into statements.
+      return false;
+    }
+    
+    Expr *OneDependentExpr;
+    bool HasDependentLiterals;
+  }; 
+}
+
+bool TypeChecker::resolveDependentLiterals(Expr *&E) {
+  struct UpdateWalker : ASTWalker {
+    UpdateWalker(TypeChecker &TC) : TC(TC) {}
+    
+    Expr *walkToExprPost(Expr *E) {
+      // Process dependent literals.
+      if (E->getType()->isDependentType()) {
+        if (IntegerLiteralExpr *lit = dyn_cast<IntegerLiteralExpr>(E))
+          return TC.coerceToType(lit, getIntLiteralType(lit->getLoc()));
+        
+        if (FloatLiteralExpr *lit = dyn_cast<FloatLiteralExpr>(E))
+          return TC.coerceToType(lit, getFloatLiteralType(lit->getLoc()));
+        
+        if (StringLiteralExpr *lit = dyn_cast<StringLiteralExpr>(E))
+          return TC.coerceToType(lit, getStringLiteralType(lit->getLoc()));
+      }
+      return E;
+    }
+    
+    bool walkToStmtPre(Stmt *S) {
+      // Never recurse into statements.
+      return false;
+    }
+    
+  private:
+    Type lookupGlobalType(StringRef name) {
+      TypeAliasDecl *TAD =
+      TC.TU.lookupGlobalType(TC.Context.getIdentifier(name),
+                             NLKind::UnqualifiedLookup);
+      return (TAD ? TAD->getAliasType() : nullptr);
+    }
+    
+    Type getIntLiteralType(SourceLoc loc) {
+      if (IntLiteralType.isNull()) {
+        IntLiteralType = lookupGlobalType("IntegerLiteralType");
+        if (IntLiteralType.isNull()) {
+          TC.diagnose(loc, diag::no_IntegerLiteralType_found);
+          IntLiteralType = BuiltinIntegerType::get(32, TC.Context);
+        }
+      }
+      return IntLiteralType;
+    }
+    
+    Type getFloatLiteralType(SourceLoc loc) {
+      if (FloatLiteralType.isNull()) {
+        FloatLiteralType = lookupGlobalType("FloatLiteralType");
+        if (FloatLiteralType.isNull()) {
+          TC.diagnose(loc, diag::no_FloatLiteralType_found);
+          FloatLiteralType = TC.Context.TheIEEE64Type;
+        }
+      }
+      return FloatLiteralType;
+    }
+    Type getStringLiteralType(SourceLoc loc) {
+      if (StringLiteralType.isNull()) {
+        StringLiteralType = lookupGlobalType("StringLiteralType");
+        if (StringLiteralType.isNull()) {
+          TC.diagnose(loc, diag::no_StringLiteralType_found);
+          StringLiteralType = TC.Context.TheRawPointerType;
+        }
+      }
+      return StringLiteralType;
+    }
+    
+    TypeChecker &TC;
+    Type IntLiteralType, FloatLiteralType, StringLiteralType;
+  };
+  
+  // Walk the tree again to update all the entries.  If this fails, give up.
+  E = E->walk(UpdateWalker(*this));
+  if (!E)
+    return true;
+  
+  // Now that we've added some types to the mix, re-type-check the expression
+  // tree and recheck for dependent types.
+  SemaExpressionTree SET(*this);
+  E = SET.doIt(E);
+  return E == nullptr;
+}
+
 bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
   SemaExpressionTree SET(*this);
   E = SET.doIt(E);
@@ -897,42 +1016,6 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
     if (E == 0) return true;
   }
   
-  // Check the initializer/body to make sure that we succeeded in resolving
-  // all of the types contained within it.  If we've resolved everything, then
-  // we're done processing the expression.  While we're doing the walk, keep
-  // track of whether we have any literals without a resolved type.
-  struct DependenceWalker : ASTWalker {
-    DependenceWalker() { reset(); }
-
-    void reset() {
-      OneDependentExpr = nullptr;
-      HasDependentLiterals = false;
-    }
-
-    Expr *walkToExprPost(Expr *E) {    
-      assert(!isa<SequenceExpr>(E) && "Should have resolved this");
-    
-      if (E->getType()->isDependentType()) {
-        // Remember the first dependent expression we come across.
-        if (OneDependentExpr == 0)
-          OneDependentExpr = E;
-
-        // Also remember if we see any literals with dependent types.
-        if (isa<IntegerLiteralExpr>(E) || isa<FloatLiteralExpr>(E) ||
-            isa<StringLiteralExpr>(E))
-          HasDependentLiterals = true;
-      }
-      return E;
-    }
-
-    bool walkToStmtPre(Stmt *S) {
-      // Never recurse into statements.
-      return false;
-    }
-
-    Expr *OneDependentExpr;
-    bool HasDependentLiterals;
-  };
   DependenceWalker dependence;
   E->walk(dependence);
 
@@ -943,82 +1026,9 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
   // Otherwise, if we found any dependent literals, then force them to
   // the library specified default type for the appropriate literal kind.
   if (dependence.HasDependentLiterals) {
-    struct UpdateWalker : ASTWalker {
-      UpdateWalker(TypeChecker &TC) : TC(TC) {}
-
-      Expr *walkToExprPost(Expr *E) {
-        // Process dependent literals.
-        if (E->getType()->isDependentType()) {
-          if (IntegerLiteralExpr *lit = dyn_cast<IntegerLiteralExpr>(E))
-            return TC.coerceToType(lit, getIntLiteralType(lit->getLoc()));
-
-          if (FloatLiteralExpr *lit = dyn_cast<FloatLiteralExpr>(E))
-            return TC.coerceToType(lit, getFloatLiteralType(lit->getLoc()));
-          
-          if (StringLiteralExpr *lit = dyn_cast<StringLiteralExpr>(E))
-            return TC.coerceToType(lit, getStringLiteralType(lit->getLoc()));
-        }
-        return E;
-      }
-
-      bool walkToStmtPre(Stmt *S) {
-        // Never recurse into statements.
-        return false;
-      }
-
-    private:
-      Type lookupGlobalType(StringRef name) {
-        TypeAliasDecl *TAD =
-          TC.TU.lookupGlobalType(TC.Context.getIdentifier(name),
-                                 NLKind::UnqualifiedLookup);
-        return (TAD ? TAD->getAliasType() : nullptr);
-      }
-
-      Type getIntLiteralType(SourceLoc loc) {
-        if (IntLiteralType.isNull()) {
-          IntLiteralType = lookupGlobalType("IntegerLiteralType");
-          if (IntLiteralType.isNull()) {
-            TC.diagnose(loc, diag::no_IntegerLiteralType_found);
-            IntLiteralType = BuiltinIntegerType::get(32, TC.Context);
-          }
-        }
-        return IntLiteralType;
-      }
-
-      Type getFloatLiteralType(SourceLoc loc) {
-        if (FloatLiteralType.isNull()) {
-          FloatLiteralType = lookupGlobalType("FloatLiteralType");
-          if (FloatLiteralType.isNull()) {
-            TC.diagnose(loc, diag::no_FloatLiteralType_found);
-            FloatLiteralType = TC.Context.TheIEEE64Type;
-          }
-        }
-        return FloatLiteralType;
-      }
-      Type getStringLiteralType(SourceLoc loc) {
-        if (StringLiteralType.isNull()) {
-          StringLiteralType = lookupGlobalType("StringLiteralType");
-          if (StringLiteralType.isNull()) {
-            TC.diagnose(loc, diag::no_StringLiteralType_found);
-            StringLiteralType = TC.Context.TheRawPointerType;
-          }
-        }
-        return StringLiteralType;
-      }
-
-      TypeChecker &TC;
-      Type IntLiteralType, FloatLiteralType, StringLiteralType;
-    };
-
-    // Walk the tree again to update all the entries.  If this fails, give up.
-    E = E->walk(UpdateWalker(*this));
-    if (E == 0) return true;
+    if (resolveDependentLiterals(E))
+      return true;
     
-    // Now that we've added some types to the mix, re-type-check the expression
-    // tree and recheck for dependent types.
-    E = SET.doIt(E);
-    if (E == 0) return true;
-
     // If our context specifies a type, apply it to the expression.
     if (ConvertType) {
       E = coerceToType(E, ConvertType);
@@ -1141,4 +1151,89 @@ bool TypeChecker::typeCheckCondition(Expr *&E) {
   Identifier methodName = Context.getIdentifier("getLogicValue");
   return convertWithMethod(*this, E, methodName, &isBuiltinI1,
                            diag::condition_convert_limit_reached);
+}
+
+bool TypeChecker::typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc,
+                                      Expr *&Src) {
+  SemaExpressionTree SET(*this);
+  
+  // Type check the destination.
+  Dest = SET.doIt(Dest);
+  if (!Dest) return true;
+  
+  // Type check the source.
+  Src = SET.doIt(Src);
+  if (!Src) return true;
+  
+  // Determine whether the destination and source have dependent expressions.
+  DependenceWalker DestDependence;
+  Dest->walk(DestDependence);
+
+  DependenceWalker SrcDependence;
+  Src->walk(SrcDependence);
+
+  bool IsDestDependent = DestDependence.OneDependentExpr != nullptr;
+  bool IsSrcDependent = SrcDependence.OneDependentExpr != nullptr;
+
+  // If both destination and source are dependent, try resolving dependent
+  // literals.
+  if (IsDestDependent && IsSrcDependent) {
+    // Resolve dependent literals in the destination, first.
+    if (resolveDependentLiterals(Dest))
+      return true;
+
+    // Is the destination still dependent?
+    DestDependence.reset();
+    Dest->walk(DestDependence);
+    IsDestDependent = DestDependence.OneDependentExpr != nullptr;
+    
+    // If the destination is still dependent, resolve dependent literals in
+    // the source as well.
+    if (IsDestDependent) {
+      if (resolveDependentLiterals(Src))
+        return true;
+      
+      // Is the destination still dependent?
+      SrcDependence.reset();
+      Src->walk(SrcDependence);
+      IsSrcDependent = SrcDependence.OneDependentExpr != nullptr;
+    }
+  }
+  
+  // If the destination is not dependent, coerce the source to the object type
+  // of the destination.
+  if (!IsDestDependent) {
+    Type DestTy = Dest->getType();
+    if (LValueType *DestLV = DestTy->getAs<LValueType>())
+      DestTy = DestLV->getObjectType();
+    else {
+      if (!DestTy->is<ErrorType>())
+        diagnose(EqualLoc, diag::assignment_lhs_not_lvalue)
+        << Dest->getSourceRange();
+      
+      return true;
+    }
+    
+    Src = coerceToType(Src, DestTy);
+    return Src == nullptr;    
+  }
+
+  // If the source is not dependent (but the destination is), coerce the
+  // destination to an lvalue of the source type.
+  if (!IsSrcDependent) {
+    Src = convertToRValue(Src);
+    if (!Src) return true;
+    
+    Type SrcTy = Src->getType();
+    Dest = coerceToType(Dest, LValueType::get(SrcTy,
+                                              LValueType::Qual::NonHeap,
+                                              Context));
+    return Dest == nullptr;
+  }
+  
+  // Both source and destination are still dependent.
+  diagnose(DestDependence.OneDependentExpr->getLoc(),
+           diag::ambiguous_expression_unresolved)
+    << DestDependence.OneDependentExpr->getSourceRange();
+  return true;
 }

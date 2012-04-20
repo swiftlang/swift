@@ -78,20 +78,13 @@ public:
   }
 
   Stmt *visitAssignStmt(AssignStmt *S) {
-    Expr *E = S->getDest();
-    if (typeCheckExpr(E)) return 0;
-    S->setDest(E);
-
-    Type lhsTy = E->getType();
-    if (LValueType *lvalueTy = lhsTy->getAs<LValueType>())
-      lhsTy = lvalueTy->getObjectType();
-    else if (!lhsTy->is<ErrorType>())
-      TC.diagnose(E->getLoc(), diag::assignment_lhs_not_lvalue);
-
-    E = S->getSrc();
-    if (typeCheckExpr(E, lhsTy)) return 0;
-    S->setSrc(E);
-
+    Expr *Dest = S->getDest();
+    Expr *Src = S->getSrc();
+    if (TC.typeCheckAssignment(Dest, S->getEqualLoc(), Src))
+      return 0;
+    
+    S->setDest(Dest);
+    S->setSrc(Src);
     return S;
   }
   
