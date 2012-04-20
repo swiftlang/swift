@@ -697,8 +697,8 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
 
   case BuiltinValueKind::Add:       BINARY_ARITHMETIC_OPERATION(Add, FAdd)
   case BuiltinValueKind::And:       BINARY_OPERATION(And)
+  case BuiltinValueKind::AShr:      BINARY_OPERATION(AShr)
   case BuiltinValueKind::FDiv:      BINARY_OPERATION(FDiv)
-  case BuiltinValueKind::LShr:      BINARY_OPERATION(LShr)
   case BuiltinValueKind::Mul:       BINARY_ARITHMETIC_OPERATION(Mul, FMul)
   case BuiltinValueKind::Or:        BINARY_OPERATION(Or)
   case BuiltinValueKind::SDiv:      BINARY_OPERATION(SDiv)
