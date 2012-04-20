@@ -286,6 +286,26 @@ namespace {
       }
     }
 
+    void verifyChecked(SubscriptExpr *E) {
+      if (!E->getBase()->getType()->is<LValueType>()) {
+        Out << "Subscript base type is not an lvalue";
+        abort();
+      }
+      
+      if (!E->getType()->is<LValueType>()) {
+        Out << "Subscript type is not an lvalue";
+        abort();
+      }
+      
+      if (!E->getDecl()) {
+        Out << "Subscript expression is missing subscript declaration";
+        abort();
+      }
+      
+      checkSameType(E->getDecl()->getIndices()->getType(),
+                    E->getIndex()->getType(), "subscript indices");
+    }
+      
     void verifyParsed(NewArrayExpr *E) {
       if (E->getBounds().empty()) {
         Out << "NewArrayExpr has an empty bounds list\n";

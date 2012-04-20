@@ -118,6 +118,17 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
   return false;
 }
 
+/// makeBaseExprLValue - Make the given base expression for a member or
+/// subscript operation an lvalue, materializing it if necessary.
+static Expr *makeBaseExprLValue(ASTContext &Context, Expr *E) {
+  Type BaseTy = E->getType();
+  if (BaseTy->is<LValueType>())
+    return E;
+
+  Type Ty = LValueType::get(BaseTy, LValueType::Qual::DefaultForGetSet, Context);
+  return new (Context) MaterializeExpr(E, Ty);
+}
+
 Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
   // Propagate errors up.
   if (SE->getBase()->getType()->is<ErrorType>() ||
@@ -138,13 +149,15 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
       << SE->getIndex()->getSourceRange();
       return 0;
     }
+    SE->setIndex(Index);
     
-    // FIXME: Convert the base by turning it into an lvalue?
-    
+    // Ensure that the base is an lvalue, materializing it if is not an
+    // lvalue yet.
+    SE->setBase(makeBaseExprLValue(Context, SE->getBase()));
+       
     // Compute the final lvalue type and we're done.
     SE->setType(LValueType::get(SubDecl->getElementType(),
-                                (LValueType::Qual::NonHeap|
-                                 LValueType::Qual::Implicit),
+                                LValueType::Qual::DefaultForGetSet,
                                 Context));
     return SE;
   }

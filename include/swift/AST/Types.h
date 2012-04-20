@@ -830,7 +830,10 @@ public:
       DefaultForType = NonHeap,
 
       /// The default for a variable reference.
-      DefaultForVar = Implicit
+      DefaultForVar = Implicit,
+  
+      /// The default for get/set lvalues such as properties.
+      DefaultForGetSet = Implicit|NonHeap
     };
 
   private:
