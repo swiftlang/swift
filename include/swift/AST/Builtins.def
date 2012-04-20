@@ -94,9 +94,24 @@ BUILTIN_BINARY_PREDICATE(FCmpUNO, "fcmp_uno", OverloadedBuiltinKind::Float)
 #ifndef BUILTIN_GEP_OPERATION
 #define BUILTIN_GEP_OPERATION(Id, Name, Overload) BUILTIN(Id, Name)
 #endif
-
+                       
 BUILTIN_GEP_OPERATION(Gep, "gep", OverloadedBuiltinKind::Integer)
 #undef BUILTIN_GEP_OPERATION
 
+/// Load has type (Builtin.RawPointer) -> T
+/// FIXME: Is Arithmetic a proper stand in for 'any type?'
+#ifndef BUILTIN_LOAD
+#define BUILTIN_LOAD(Id, Name, Overload) BUILTIN(Id, Name)
+#endif
+BUILTIN_LOAD(Load, "load", OverloadedBuiltinKind::Arithmetic)
+#undef BUILTIN_LOAD
+
+/// Store has type (T, Builtin.RawPointer) -> ()
+/// FIXME: Is Arithmetic a proper stand in for 'any type?'
+#ifndef BUILTIN_STORE
+#define BUILTIN_STORE(Id, Name, Overload) BUILTIN(Id, Name)
+#endif
+BUILTIN_STORE(Store, "store", OverloadedBuiltinKind::Arithmetic)
+#undef BUILTIN_STORE
 
 #undef BUILTIN

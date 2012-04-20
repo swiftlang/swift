@@ -200,6 +200,27 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
   return getBuiltinFunction(Context, Id, FnTy);
 }
 
+static ValueDecl *getLoadOperation(ASTContext &Context, Identifier Id,
+                                   Type ResultTy) {
+  TupleTypeElt ArgElts[] = {
+    TupleTypeElt(Context.TheRawPointerType, Identifier())
+  };
+  Type Arg = TupleType::get(ArgElts, Context);
+  Type FnTy = FunctionType::get(Arg, ResultTy, Context);
+  return getBuiltinFunction(Context, Id, FnTy);
+}
+
+static ValueDecl *getStoreOperation(ASTContext &Context, Identifier Id,
+                                    Type ValueTy) {
+  TupleTypeElt ArgElts[] = {
+    TupleTypeElt(ValueTy, Identifier()),
+    TupleTypeElt(Context.TheRawPointerType, Identifier())
+  };
+  Type Arg = TupleType::get(ArgElts, Context);
+  Type FnTy = FunctionType::get(Arg, TupleType::getEmpty(Context), Context);
+  return getBuiltinFunction(Context, Id, FnTy);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -210,6 +231,8 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
 #define BUILTIN_GEP_OPERATION(id, name, overload) overload,
 #define BUILTIN_BINARY_OPERATION(id, name, overload) overload,
 #define BUILTIN_BINARY_PREDICATE(id, name, overload) overload,
+#define BUILTIN_LOAD(id, name, overload) overload,
+#define BUILTIN_STORE(id, name, overload) overload,
 #include "swift/AST/Builtins.def"
 };
 
@@ -267,6 +290,16 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
 #define BUILTIN_CAST_OPERATION(id, name, overload)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
     return getCastOperation(Context, Id, BV, ArgType1, ArgType2);
+      
+#define BUILTIN(id, name)
+#define BUILTIN_LOAD(id, name, overload)  case BuiltinValueKind::id:
+#include "swift/AST/Builtins.def"
+    return getLoadOperation(Context, Id, ArgType1);
+
+#define BUILTIN(id, name)
+#define BUILTIN_STORE(id, name, overload)  case BuiltinValueKind::id:
+#include "swift/AST/Builtins.def"
+      return getStoreOperation(Context, Id, ArgType1);
   }
   llvm_unreachable("bad builtin value!");
 }

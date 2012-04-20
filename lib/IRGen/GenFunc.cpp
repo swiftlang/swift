@@ -581,6 +581,41 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
     return result.addDirectUnmanagedValue(IGF.Builder.CreateGEP(lhs, rhs));
   }
 
+      
+  case BuiltinValueKind::Load: {
+    llvm::Value *addr = args.Values.claimUnmanagedNext();
+    assert(args.Values.empty() && "wrong operands to load operation");
+
+    Type ResultTy = Fn->getType()->castTo<FunctionType>()->getResult();
+    
+    // Cast the raw pointer to an appropriately-typed pointer.
+    const TypeInfo &ResultTypeInfo = IGF.IGM.getFragileTypeInfo(ResultTy);
+    llvm::Type *ptr = ResultTypeInfo.StorageType->getPointerTo();
+    addr = IGF.Builder.CreateBitCast(addr, ptr);
+    
+    // Create the load.
+    return result.addDirectUnmanagedValue(
+             IGF.Builder.CreateLoad(addr, ResultTypeInfo.StorageAlignment));
+  }
+     
+  case BuiltinValueKind::Store: {
+    llvm::Value *value = args.Values.claimUnmanagedNext();
+    llvm::Value *addr = args.Values.claimUnmanagedNext();
+    assert(args.Values.empty() && "wrong operands to store operation");
+
+    // Extract the type of the value we're storing.
+    Type ValueTy = Fn->getType()->castTo<FunctionType>()->getInput()
+                     ->castTo<TupleType>()->getElementType(0);
+    const TypeInfo &ValueTypeInfo = IGF.IGM.getFragileTypeInfo(ValueTy);
+    
+    // Cast the raw pointer to an appropriately-typed pointer.
+    addr = IGF.Builder.CreateBitCast(addr, value->getType()->getPointerTo());
+    
+    // Create the store.
+    IGF.Builder.CreateStore(value, addr, ValueTypeInfo.StorageAlignment);
+    return;
+  }
+      
 /// A macro which expands to the emission of a simple binary operation
 /// or predicate.
 #define BINARY_OPERATION(Op) {                                              \
