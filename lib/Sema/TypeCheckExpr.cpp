@@ -720,7 +720,12 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
       << Base->getSourceRange() << SourceRange(E->getNameLoc(),E->getNameLoc());
     return 0;
   }
-  
+
+  // If the base is a tuple, we need to force it to be either a proper lvalue
+  // or a proper rvalue; otherwise, the semantics are strange.
+  if (!Base->getType()->is<LValueType>())
+    Base = convertToMaterializable(Base);
+
   return recheckTypes(Lookup.createResultAST(Base, E->getDotLoc(),
                                              E->getNameLoc(), Context));
 }

@@ -295,7 +295,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
 /// Check an expression at the top level in a REPL.
 void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
   // If the input is an lvalue, force an lvalue-to-rvalue conversion.
-  Expr *ConvertedE = convertToRValue(E);
+  Expr *ConvertedE = convertToMaterializable(E);
   if (!ConvertedE)
     return;
   E = ConvertedE;
