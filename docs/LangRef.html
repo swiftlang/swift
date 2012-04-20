@@ -942,8 +942,63 @@ token following the opening '{' is either 'set' or 'get'.</p>
     decl-subscript        ::= 'subscript' <a href="#attribute-list">attribute-list</a> <a href="#pattern-tuple">pattern-tuple</a> '->' <a href="#type">type</a> '{' <a href="#get-set">get-set<a/> '}'
   </pre>
 
-  <p>A subscript declaration provides support for subscripting an object of a particular type via a getter and (optional) setter. Therefore, subscript declarations can only appear within a type definition or extension.</p>
- 
+  <p>A subscript declaration provides support for <a
+ href="#expr-subscript"> subscripting</a> an object of a particular
+type via a getter and (optional) setter. Therefore, subscript
+declarations can only appear within a type definition or
+extension.</p>
+
+  <p> The <tt>pattern-tuple</tt> of a subscript declaration provides
+the indices that will be used in the subscript expression, e.g., the
+<tt>i</tt> in <tt>a[i]</tt>. This pattern must be fully-typed. The
+<tt>type</tt> following the arrow provides the type of element being
+accessed, which must be materializable. Subscript declarations can be
+overloaded, so long as either the <tt>pattern-tuple</tt> or
+<tt>type</tt> differs from other declarations.</p>
+
+  <p>The <tt>get-set</tt> clause specifies the getter and setter used
+for subscripting. The getter is a function whose input is the type of
+the <tt>pattern-tuple</tt> and whose result is the element type.
+Similarly, the setter is a function whose result type is <tt>()</tt>
+and whose input is the type of the <tt>pattern-tuple</tt> with a
+parameter of the element type added to the end of the tuple; the name
+of the parameter is the <tt>set-name</tt>, if provided, or
+<tt>value</tt> otherwise.
+
+  <pre class="example">
+<i>// Simple bit vector with storage for 64 boolean values</i>
+struct BitVector64 {
+  bits : Int64
+
+  <i>// Allow subscripting with integer subscripts and a boolean result.</i>
+  subscript (bit : Int) -&gt; Bool {
+    <i>// Getter tests the given bit</i>
+    get {
+      if (bits & (1 &lt;&lt; bit)) != 0 {
+        return true
+      }
+      return false;
+    }
+
+    <i>// Setter sets the given bit to the provided value</i>
+    set {
+      var mask = 1 &lt;&lt; bit
+      if value {
+        bits = bits | mask
+      } else {
+        bits = bits & ~mask
+      }  
+    }
+  }
+}
+
+var vec : BitVector64
+vec[2] = true
+if vec[3] {
+  print("third bit is set\n");
+}
+  </pre>
+
   <!-- ===================================================================== -->
   <h3 id="attribute-list">Attribute Lists</h3>
   <!-- ===================================================================== -->
@@ -1879,37 +1934,29 @@ token following the opening '{' is either 'set' or 'get'.</p>
   <!-- ===================================================================== -->
   
   <div class="commentary">
-    As with arrays, this is just hacked in for now.  Revisit this
-    after we have generics.
+    There is no "built-in" semantics for subscripting. Rather, all
+    subscripting semantics is implemented via subscript declarations
+    in the library.
 
-    <br/><br/>We require an unspaced '[' because we want to avoid
-    ambiguities with expressions starting with '['.  We don't have any
-    of those right now, but it's inevitable that we'll want something
-    like an array literal or a list comprehension.
+    <br/<br/>We require an unspaced '[' because we want to avoid
+    ambiguities with expressions or statements starting with '['. We
+    don't have any of those right now, but it's inevitable that we'll
+    want something like an array literal, list comprehension, or
+    statement attribute.
   </div>
 
   <pre class="grammar">
     expr-subscript ::= <a href="#expr">expr-postfix</a> lsquare-unspaced <a href="#expr">expr</a> ']'
   </pre>
-  
-  <p>FIXME: Array subscript should just be an overloaded operator like any
-  other.  a[x] should just call a function subscript(a, x).  This will allow
-  natural support for arrays and dictionaries, whose implementation of subscript
-  comes from the stdlib.</p>
-  
-  <p>FIXME2: Two problems with this: 1) we need support for lvalue function
-  calls e.g. f(a, x) = 4, otherwise we can't use an array subscript as an
-  lvalue. 2) we want overloading in the long term to get non-array types.</p>
-  
-  
-  <!--
-  <p>On an array, the subscript expression accesses the specified element number
-  of the array, where the first element is numbered zero.  The index expression
-  is required to convert to an integer type.  All array accesses
-  are bounds checked and out-of-bounds array accesses are detected at either
-  compile time or run time.</p>
-  
-  <p>TODO: Eventually support map operations etc.</p> -->
+
+ <p>A subscript expression invokes a <a
+  href="#decl-subscript">subscript getter or setter</a> on the type
+  of the <tt>expr-postfix</tt>. The <tt>expr</tt> is used as the
+  subscript argument, which will be provided to either the getter or
+  setter depending on whether the subscript expression is used as an
+  rvalue (reading) or lvalue (writing), respectively. A subscript
+  expression that resolves to a subscript declaration with no setter
+  cannot be modified.</p>
 
   <!-- ===================================================================== -->
   <h3 id="expr-new">New Expressions</h3>
