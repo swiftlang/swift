@@ -580,7 +580,6 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
     assert(args.Values.empty() && "wrong operands to gep operation");
     return result.addDirectUnmanagedValue(IGF.Builder.CreateGEP(lhs, rhs));
   }
-
       
   case BuiltinValueKind::Load: {
     llvm::Value *addr = args.Values.claimUnmanagedNext();
@@ -594,12 +593,17 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
     addr = IGF.Builder.CreateBitCast(addr, ptr);
     
     // Create the load.
-    return result.addDirectUnmanagedValue(
-             IGF.Builder.CreateLoad(addr, ResultTypeInfo.StorageAlignment));
+    llvm::Value *load
+      = IGF.Builder.CreateLoad(addr, ResultTypeInfo.StorageAlignment);
+    
+    if (ResultTy->is<BuiltinObjectPointerType>())
+      return result.addDirectValue(IGF.enterReleaseCleanup(load));
+    
+    return result.addDirectUnmanagedValue(load);
   }
      
   case BuiltinValueKind::Store: {
-    llvm::Value *value = args.Values.claimUnmanagedNext();
+    llvm::Value *value = args.Values.forwardNext(IGF);
     llvm::Value *addr = args.Values.claimUnmanagedNext();
     assert(args.Values.empty() && "wrong operands to store operation");
 
@@ -612,7 +616,11 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
     addr = IGF.Builder.CreateBitCast(addr, value->getType()->getPointerTo());
     
     // Create the store.
-    IGF.Builder.CreateStore(value, addr, ValueTypeInfo.StorageAlignment);
+    if (ValueTy->is<BuiltinObjectPointerType>())
+      IGF.emitAssignRetained(value,
+                             Address(addr, ValueTypeInfo.StorageAlignment));
+    else
+      IGF.Builder.CreateStore(value, addr, ValueTypeInfo.StorageAlignment);
     return;
   }
       
