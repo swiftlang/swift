@@ -192,6 +192,7 @@ void swift::REPL(ASTContext &Context) {
   
   unsigned CurTUElem = 0;
   unsigned BraceCount = 0;
+  unsigned CurChunkLines = 0;
 
   while (1) {
     // Read one line.
@@ -203,8 +204,8 @@ void swift::REPL(ASTContext &Context) {
 
     strcpy(CurBuffer, Line);
     CurBuffer += strlen(Line);
-    *CurBuffer++ = '\n';
-    CurBufferEndOffset += strlen(Line) + 1;
+    CurBufferEndOffset += strlen(Line);
+    ++CurChunkLines;
 
     // If we detect unbalanced braces, keep reading before we start parsing.
     Lexer L(Line, Context.SourceMgr, nullptr);
@@ -226,9 +227,20 @@ void swift::REPL(ASTContext &Context) {
                                            CurBufferOffset,
                                            CurBufferEndOffset);
 
-    // FIXME: Better error recovery would be really nice here.
-    if (Context.hadError())
-      return;
+    if (Context.hadError()) {
+      Context.Diags.resetHadAnyError();
+      while (TU->Decls.size() > CurTUElem)
+        TU->Decls.pop_back();
+      TU->clearUnresolvedIdentifierTypes();
+
+      // FIXME: Handling of "import" declarations?  Is there any other
+      // state which needs to be reset?
+
+      if (CurChunkLines > 1)
+        llvm::errs() << "(discarded " << CurChunkLines << " lines)\n";
+      CurChunkLines = 0;
+      continue;
+    }
 
     // If we didn't see an expression, statement, or decl which might have
     // side-effects, keep reading.
@@ -244,6 +256,7 @@ void swift::REPL(ASTContext &Context) {
       return;
 
     CurTUElem = TU->Decls.size();
+    CurChunkLines = 0;
 
     if (llvm::Linker::LinkModules(&Module, &LineModule,
                                   llvm::Linker::DestroySource,

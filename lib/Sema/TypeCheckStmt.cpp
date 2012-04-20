@@ -311,6 +311,9 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
   SourceLoc Loc = E->getStartLoc();
   SourceLoc EndLoc = E->getEndLoc();
 
+  if (isa<ErrorType>(T))
+    return;
+
   // Build a function to call to print the expression.
   Type FuncTy = T;
   if (!isa<TupleType>(FuncTy)) {

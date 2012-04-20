@@ -260,7 +260,11 @@ namespace swift {
     bool hadAnyError() const {
       return HadAnyError;
     }
-    
+
+    void resetHadAnyError() {
+      HadAnyError = false;
+    }
+
     /// \brief Emit a diagnostic using a preformatted array of diagnostic
     /// arguments.
     ///

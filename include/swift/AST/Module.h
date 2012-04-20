@@ -180,6 +180,9 @@ public:
     assert(ASTStage == Parsing);
     UnresolvedIdentifierTypes = T;
   }
+  void clearUnresolvedIdentifierTypes() {
+    UnresolvedIdentifierTypes = ArrayRef<IdentifierType*>();
+  }
 
   /// ImportedModules - This is the list of modules that are imported by this
   /// module.  This is filled in as the first thing that the Name Binding phase

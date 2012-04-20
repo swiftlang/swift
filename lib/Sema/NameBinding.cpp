@@ -390,6 +390,8 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
   if (TU->Decls.empty())
     return;
 
+  bool IsInitialNameBinding = TU->getImportedModules().empty();
+
   // Reset the name lookup cache so we find new decls.
   // FIXME: This is inefficient.
   TU->clearLookupCache();
@@ -408,7 +410,7 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
   // Add the standard library import.
   // FIXME: The semantics here are sort of strange if an import statement is
   // after the first "chunk" in the main module.
-  if (StartElem == 0)
+  if (IsInitialNameBinding)
     Binder.addStandardLibraryImport(ImportedModules);
 
   // FIXME: This algorithm has quadratic memory usage.  (In practice,
