@@ -298,7 +298,7 @@ namespace {
     }
 
     void visitTranslationUnit(const TranslationUnit *TU) {
-      OS.indent(Indent) << "(translation_unit\n";
+      OS.indent(Indent) << "(translation_unit";
       for (Decl *D : TU->Decls) {
         OS << '\n';
         printRec(D);
@@ -368,6 +368,7 @@ namespace {
       printCommon(TLCD, "top_level_code_decl");
       auto Body = TLCD->getBody();
       if (!Body.isNull()) {
+        OS << "\n";
         if (Body.is<Expr*>())
           printRec(Body.get<Expr*>());
         else
