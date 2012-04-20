@@ -213,8 +213,6 @@ public:
     if (!Apply)
       return nullptr;
     
-    // FIXME: We should be able to build some kind of OverloadedSubscriptExpr
-    // here and hope that type coercion will resolve it.
     diagnose(E->getLBracketLoc(), diag::subscript_overload_fail,
              !Viable.empty(), BaseTy, E->getIndex()->getType())
       << E->getBase()->getSourceRange() << E->getIndex()->getSourceRange();
