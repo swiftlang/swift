@@ -304,6 +304,15 @@ namespace {
       
       checkSameType(E->getDecl()->getIndices()->getType(),
                     E->getIndex()->getType(), "subscript indices");
+      
+      LValueType *ResultLV = E->getType()->getAs<LValueType>();
+      if (!ResultLV) {
+        Out << "Subscript expression has non-lvalue type";
+        abort();
+      }
+      
+      checkSameType(E->getDecl()->getElementType(), ResultLV->getObjectType(),
+                    "subscript result type");
     }
       
     void verifyParsed(NewArrayExpr *E) {
