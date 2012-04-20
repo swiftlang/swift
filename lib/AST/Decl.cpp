@@ -79,6 +79,12 @@ ImportDecl::ImportDecl(DeclContext *DC, SourceLoc ImportLoc,
   memcpy(getPathBuffer(), Path.data(), Path.size() * sizeof(AccessPathElement));
 }
 
+SourceLoc TopLevelCodeDecl::getLocStart() const {
+  if (Body.is<Expr*>())
+    return Body.get<Expr*>()->getStartLoc();
+  return Body.get<Stmt*>()->getStartLoc();
+}
+
 /// getTypeOfReference - Return the full type judgement for a non-member
 /// reference to this value.
 Type ValueDecl::getTypeOfReference() const {

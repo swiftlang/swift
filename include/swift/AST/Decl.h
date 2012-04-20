@@ -268,6 +268,8 @@ public:
   void setBody(Expr *E) { Body = E; }
   void setBody(Stmt *S) { Body = S; }
 
+  SourceLoc getLocStart() const;
+
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::TopLevelCode;
   }
