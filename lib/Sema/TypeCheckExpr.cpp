@@ -433,14 +433,14 @@ public:
     if (E->getDecl()->getType()->is<ErrorType>())
       return 0;
     
-    // If the base is an lvalue, so is the member reference.
-    Type ResultTy = E->getDecl()->getTypeOfReference();
-    if (!E->getBase()->getType()->is<LValueType>()) {
-      if (LValueType *ResultRefTy = ResultTy->getAs<LValueType>())
-        ResultTy = ResultRefTy->getObjectType();
-    }
-    
-    E->setType(ResultTy);
+    // Ensure that the base is an lvalue, materializing it if is not an
+    // lvalue yet.
+    E->setBase(makeBaseExprLValue(TC.Context, E->getBase()));
+
+    // Compute the final lvalue type and we're done.
+    E->setType(LValueType::get(E->getDecl()->getType(),
+                               LValueType::Qual::DefaultForGetSet,
+                               TC.Context));
     return E;
   }
   Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {

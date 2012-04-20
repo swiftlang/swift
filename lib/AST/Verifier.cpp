@@ -286,6 +286,32 @@ namespace {
       }
     }
 
+    void verifyChecked(MemberRefExpr *E) {
+      if (!E->getBase()->getType()->is<LValueType>()) {
+        Out << "Member reference base type is not an lvalue";
+        abort();
+      }
+      
+      if (!E->getType()->is<LValueType>()) {
+        Out << "Member reference type is not an lvalue";
+        abort();
+      }
+      
+      if (!E->getDecl()) {
+        Out << "Member reference is missing declaration";
+        abort();
+      }
+      
+      LValueType *ResultLV = E->getType()->getAs<LValueType>();
+      if (!ResultLV) {
+        Out << "Member reference has non-lvalue type";
+        abort();
+      }
+      
+      checkSameType(E->getDecl()->getType(), ResultLV->getObjectType(),
+                    "member reference result type and referenced member");
+    }
+    
     void verifyChecked(SubscriptExpr *E) {
       if (!E->getBase()->getType()->is<LValueType>()) {
         Out << "Subscript base type is not an lvalue";
@@ -312,7 +338,7 @@ namespace {
       }
       
       checkSameType(E->getDecl()->getElementType(), ResultLV->getObjectType(),
-                    "subscript result type");
+                    "subscript result type and subscript declaration");
     }
       
     void verifyParsed(NewArrayExpr *E) {
