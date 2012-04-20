@@ -317,6 +317,7 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
         return 0;
       
       Result = new (Context) SubscriptExpr(Result.get(), LLoc, Idx.get(), RLoc);
+      continue;
     }
         
     break;
