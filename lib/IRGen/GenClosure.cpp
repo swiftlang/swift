@@ -14,6 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "GenClosure.h"
+
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
@@ -25,8 +27,8 @@
 #include "IRGenModule.h"
 #include "Explosion.h"
 #include "GenHeap.h"
-
-#include "GenClosure.h"
+#include "GenType.h"
+#include "LValue.h"
 
 using namespace swift;
 using namespace irgen;
@@ -91,16 +93,14 @@ void swift::irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E,
       // FIXME: avoid capturing owner when this is obviously derivable.
 
       ValueDecl *D = E->getCaptures()[i];
-      OwnedAddress Var = IGF.getLocal(D);
       auto &elt = layout.getElements()[i];
-      Address CaptureAddr = elt.project(IGF, CaptureStruct);
 
-      Address CaptureValueAddr =
-        IGF.Builder.CreateStructGEP(CaptureAddr, 0, Size(0));
-      Address CaptureOwnerAddr =
-        IGF.Builder.CreateStructGEP(CaptureAddr, 1, IGF.IGM.getPointerSize());
-      IGF.Builder.CreateStore(Var.getOwner(), CaptureOwnerAddr);
-      IGF.Builder.CreateStore(Var.getAddressPointer(), CaptureValueAddr);
+      Explosion OuterExplosion(ExplosionKind::Maximal);
+      OwnedAddress Var = IGF.getLocal(D);
+      IGF.emitLValueAsScalar(IGF.emitAddressLValue(Var),
+                             OnHeap, OuterExplosion);
+      Address CaptureAddr = elt.project(IGF, CaptureStruct);
+      elt.Type->assign(IGF, OuterExplosion, CaptureAddr);
 
       Address InnerAddr = elt.project(innerIGF, InnerStruct);
       Address InnerValueAddr =

@@ -18,7 +18,7 @@
 #define SWIFT_IRGEN_GENCLOSURE_H
 
 namespace swift {
-  class ClosureExpr;
+  class CapturingExpr;
 
 namespace irgen {
   class Explosion;

@@ -24,16 +24,17 @@ swift_alloc(struct SwiftHeapMetadata *metadata,
             size_t requiredSize,
             size_t requiredAlignment)
 {
-  struct SwiftHeapMetadata **object;
+  struct SwiftHeapObject *object;
   for (;;) {
-    object = reinterpret_cast<struct SwiftHeapMetadata **>(
+    object = reinterpret_cast<struct SwiftHeapObject *>(
       calloc(1, llvm::RoundUpToAlignment(requiredSize, requiredAlignment)));
     if (object) {
       break;
     }
     sleep(1); // XXX FIXME -- Enqueue this thread and resume after free()
   }
-  *object = metadata;
+  object->metadata = metadata;
+  object->runtimePrivateData = 1;
   return reinterpret_cast<struct SwiftHeapObject *>(object);
 }
 

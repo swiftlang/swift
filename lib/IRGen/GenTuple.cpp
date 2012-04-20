@@ -388,7 +388,15 @@ Optional<Address>
 swift::irgen::tryEmitTupleElementAsAddress(IRGenFunction &IGF,
                                            TupleElementExpr *E) {
   Expr *tuple = E->getBase();
-  const TupleTypeInfo &tupleType = getAsTupleTypeInfo(IGF, tuple->getType());
+
+  // There are two kinds of TupleElementExprs; ones where the input is an
+  // lvalue, and ones where the input is an rvalue.  Either way, we just
+  // want to tryEmitAsAddress on the operand and GEP into it.
+  CanType TT = tuple->getType()->getCanonicalType();
+  if (!isa<TupleType>(TT))
+    TT = cast<LValueType>(TT)->getObjectType()->getCanonicalType();
+
+  const TupleTypeInfo &tupleType = getAsTupleTypeInfo(IGF, TT);
 
   // This is contigent exclusively on whether we can emit an address
   // for the tuple.
