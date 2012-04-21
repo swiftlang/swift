@@ -341,7 +341,7 @@ extern "C" void _TSs5printFT3valNSs6Double_T_(double l) {
   printf("%f", l);
 }
 
-extern "C" void _TSs9printCharFT9characterNSs5Int64_T_(int64_t l) {
+extern "C" void _TSs9printCharFT9characterNSs5Int32_T_(int32_t l) {
   printf("%c", (char)l);
 }
 
@@ -366,4 +366,8 @@ extern "C" bool _TNSs4Bool13getLogicValuefRS_FT_i1(bool* b) {
 
 extern "C" void _TSs4exitFT8exitCodeNSs5Int64_T_(int64_t l) {
   exit(l);
+}
+
+extern "C" void _TSs5abortFT_T_() {
+  abort();
 }
