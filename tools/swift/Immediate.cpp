@@ -345,10 +345,6 @@ extern "C" void _TSs9printCharFT9characterNSs5Int32_T_(int32_t l) {
   printf("%c", (char)l);
 }
 
-extern "C" void _TSs5printFT3valNSs6String_T_(char* l) {
-  printf("%s", l);
-}
-
 // func [infix_left=190] + (lhs : String,
 //                          rhs : String) -> String
 extern "C" char* _TSsop1pFT3lhsNSs6String3rhsS__S_(char* lhs, char* rhs) {
