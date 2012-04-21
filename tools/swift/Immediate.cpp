@@ -33,6 +33,7 @@
 #include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/Process.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/system_error.h"
@@ -128,22 +129,34 @@ void swift::RunImmediately(TranslationUnit *TU) {
 
 struct EditLineWrapper {
   EditLine *e;
-  bool PromptContinuation;
-
-  static char *PromptFn(EditLine *e) {
-    void* clientdata;
-    el_get(e, EL_CLIENTDATA, &clientdata);
-    EditLineWrapper *wrap = (EditLineWrapper*)clientdata;
-    return wrap->PromptContinuation ? (char*)"swift| " : (char*)"swift> ";
-  };
+  size_t PromptContinuationLevel;
+  
+  llvm::SmallString<80> PromptString;
 
   EditLineWrapper() {
     e = el_init("swift", stdin, stdout, stderr);
-    PromptContinuation = false;
+    PromptContinuationLevel = 0;
     el_set(e, EL_EDITOR, "emacs");
     el_set(e, EL_PROMPT, PromptFn);
     el_set(e, EL_CLIENTDATA, (void*)this);
   }
+  
+  static char *PromptFn(EditLine *e) {
+    void* clientdata;
+    el_get(e, EL_CLIENTDATA, &clientdata);
+    return (char*)((EditLineWrapper*)clientdata)->getPrompt();
+  }
+  
+  const char *getPrompt() {
+    if (PromptContinuationLevel == 0)
+      return "swift> ";
+    
+    PromptString = "swift| ";
+    PromptString.append(2*PromptContinuationLevel, ' ');
+    return PromptString.c_str();
+  };
+        
+
   ~EditLineWrapper() {
     el_end(e);
   }
@@ -151,6 +164,9 @@ struct EditLineWrapper {
 };
 
 void swift::REPL(ASTContext &Context) {
+  if (llvm::sys::Process::FileDescriptorIsDisplayed(2))
+    llvm::errs() << "Welcome to swift.  Type 'help' for assistance.\n";
+  
   // FIXME: We should do something a bit more elaborate than
   // "allocate a 1MB buffer and hope it's enough".
   llvm::MemoryBuffer *Buffer =
@@ -196,7 +212,7 @@ void swift::REPL(ASTContext &Context) {
 
   while (1) {
     // Read one line.
-    e.PromptContinuation = BraceCount != 0;
+    e.PromptContinuationLevel = BraceCount;
     int LineCount;
     const char* Line = el_gets(e, &LineCount);
     if (!Line)
