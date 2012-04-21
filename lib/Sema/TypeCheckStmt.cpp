@@ -344,6 +344,104 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
   E = semaApplyExpr(CE);
 }
 
+struct PatternBindingPrintLHS : public ASTVisitor<PatternBindingPrintLHS> {
+  SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent;
+  SmallVectorImpl<ValueDecl*> &PrintDecls;
+  SourceLoc Loc;
+  ASTContext &Context;
+
+  PatternBindingPrintLHS(SmallVectorImpl<BraceStmt::ExprStmtOrDecl>&BodyContent,
+                         SmallVectorImpl<ValueDecl*> &PrintDecls,
+                         SourceLoc Loc,
+                         ASTContext &Context)
+    : BodyContent(BodyContent), PrintDecls(PrintDecls), Loc(Loc),
+      Context(Context) {}
+
+  void print(StringRef Str) {
+    PrintLiteralString(Str, Context, Loc, PrintDecls, BodyContent);
+  }
+
+  void visitTuplePattern(TuplePattern *P) {
+    // We print tuples as "(x, y)".
+    print("(");
+    for (unsigned i = 0, e = P->getNumFields(); i != e; ++i) {
+      visit(P->getFields()[i].getPattern());
+      if (i + 1 != e)
+        print(", ");
+    }
+    print(")");
+  }
+  void visitNamedPattern(NamedPattern *P) {
+    print(P->getBoundName().str());
+  }
+  void visitAnyPattern(AnyPattern *P) {
+    print("_");
+  }
+
+  void visitTypedPattern(TypedPattern *P) {
+    // We prefer to print the type separately.
+    visit(P->getSubPattern());
+  }
+  void visitParenPattern(ParenPattern *P) {
+    // Don't print parentheses: they break the correspondence with the
+    // way we print the expression.
+    visit(P->getSubPattern());
+  }
+};
+
+static void REPLCheckPatternBinding(PatternBindingDecl *D, TypeChecker &TC) {
+  ASTContext &Context = TC.Context;
+  Expr *E = D->getInit();
+
+  // FIXME: I'm assuming we don't need to bother printing the pattern binding
+  // if it's a null initialization.
+  if (!E)
+    return;
+
+  CanType T = E->getType()->getCanonicalType();
+  SourceLoc Loc = E->getStartLoc();
+  SourceLoc EndLoc = E->getEndLoc();
+
+  SmallVector<ValueDecl*, 4> PrintDecls;
+  TC.TU.lookupGlobalValue(Context.getIdentifier("print"),
+                          NLKind::UnqualifiedLookup, PrintDecls);
+
+  // Build function of type T->T which prints the operand.
+  Type FuncTy = T;
+  if (!isa<TupleType>(FuncTy)) {
+    TupleTypeElt Elt(T, Context.getIdentifier("arg"));
+    FuncTy = TupleType::get(Elt, Context);
+  }
+  FuncTy = FunctionType::get(FuncTy, FuncTy, Context);
+  VarDecl *Arg = new (Context) VarDecl(Loc, Context.getIdentifier("arg"), T,
+                                       nullptr);
+  Pattern* ParamPat = new (Context) NamedPattern(Arg);
+  FuncExpr *FE = FuncExpr::create(Context, Loc, ParamPat, FuncTy, 0, &TC.TU);
+  Arg->setDeclContext(FE);
+  
+  // Fill in body of function.
+  SmallVector<BraceStmt::ExprStmtOrDecl, 4> BodyContent;
+  PatternBindingPrintLHS PatPrinter(BodyContent, PrintDecls, Loc, Context);
+  PatPrinter.visit(D->getPattern());
+  PrintLiteralString(" : ", Context, Loc, PrintDecls, BodyContent);
+  auto TypeStr = Context.getIdentifier(E->getType()->getString()).str();
+  PrintLiteralString(TypeStr, Context, Loc, PrintDecls, BodyContent);
+  PrintLiteralString(" = ", Context, Loc, PrintDecls, BodyContent);
+  SmallVector<unsigned, 4> MemberIndexes;
+  PrintReplExpr(TC, Arg, T, Loc, EndLoc, MemberIndexes, BodyContent);
+  PrintLiteralString("\n", Context, Loc, PrintDecls, BodyContent);
+  Expr *ArgRef = new (Context) DeclRefExpr(Arg, Loc, Arg->getTypeOfReference());
+  BodyContent.push_back(new (Context) ReturnStmt(Loc, ArgRef));
+
+  // Typecheck the function.
+  BraceStmt *Body = BraceStmt::create(Context, Loc, BodyContent, EndLoc);
+  StmtChecker(TC, FE).typeCheckStmt(Body);
+  FE->setBody(Body);
+
+  CallExpr *CE = new (Context) CallExpr(FE, E);
+  D->setInit(TC.semaApplyExpr(CE));
+}
+
 /// performTypeChecking - Once parsing and namebinding are complete, these
 /// walks the AST to resolve types and diagnose problems therein.
 ///
@@ -395,6 +493,9 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       }
     } else {
       TC.typeCheckDecl(D);
+      if (TU->IsReplModule)
+        if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D))
+          REPLCheckPatternBinding(PBD, TC);
     }
   }
 
