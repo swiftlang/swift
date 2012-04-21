@@ -1338,7 +1338,11 @@ public:
   }
   
   SourceRange getSourceRange() const {
-    return SourceRange(getArg()->getStartLoc(), getEndLoc());
+    // Implicit 'this' receivers don't have location info for DotLoc or the
+    // 'arg' expression.
+    if (DotLoc.isValid())
+      return SourceRange(getArg()->getStartLoc(), getEndLoc());
+    return getFn()->getSourceRange();
   }
   
   // Implement isa/cast/dyncast/etc.
