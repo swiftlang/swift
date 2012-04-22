@@ -42,6 +42,7 @@
 #include "llvm/LLVMContext.h"
 #include "llvm/Module.h"
 
+#include <cmath>
 #include <histedit.h>
 #include <dlfcn.h>
 
@@ -366,4 +367,9 @@ extern "C" void _TSs4exitFT8exitCodeNSs5Int64_T_(int64_t l) {
 
 extern "C" void _TSs5abortFT_T_() {
   abort();
+}
+
+extern "C" double _TSs4sqrtFT1aNSs6Double_S_(double X) { return sqrt(X); }
+extern "C" float _TSs4sqrtFT1aNSs5Float_S_(float X) {
+  return sqrtf(X);
 }
