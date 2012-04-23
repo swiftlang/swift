@@ -346,6 +346,8 @@ extern "C" void _TSs9printCharFT9characterNSs5Int32_T_(int32_t l) {
   printf("%c", (char)l);
 }
 
+// String implementation.
+
 // func [infix_left=190] + (lhs : String,
 //                          rhs : String) -> String
 extern "C" char* _TSsop1pFT3lhsNSs6String3rhsS__S_(char* lhs, char* rhs) {
@@ -356,6 +358,40 @@ extern "C" char* _TSsop1pFT3lhsNSs6String3rhsS__S_(char* lhs, char* rhs) {
    strcpy(s+ls, rhs);
    return s;
 }
+
+// static func String(v : Int128) -> String
+extern "C" char *_TNSs6String6StringFT1vNSs6Int128_S_(__int128_t X) {
+  char TmpBuffer[128];
+  char *P = TmpBuffer+128;
+  
+  *--P = 0; // Null terminate buffer.
+  
+  bool WasNeg = X < 0;
+  __uint128_t Y = WasNeg ? -X : X;
+
+  if (Y == 0) *--P = 0;  // Special case.
+
+  while (Y) {
+    *--P = '0' + char(Y % 10);
+    Y /= 10;
+  }
+  
+  if (WasNeg) *--P = '-';
+  return strdup(P);
+}
+
+// static func String(v : Double) -> String
+extern "C" char *_TNSs6String6StringFT1vNSs6Double_S_(double X) {
+  // TODO: optimize with snprintf etc if anyone cares.
+  llvm::SmallString<128> Result;
+  {
+    llvm::raw_svector_ostream Str(Result);
+    Str << X;
+  }
+  return strdup(Result.c_str());
+}
+
+
 
 extern "C" bool _TNSs4Bool13getLogicValuefRS_FT_i1(bool* b) {
   return *b;
