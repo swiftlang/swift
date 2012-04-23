@@ -413,3 +413,14 @@ extern "C" double _TSs4sqrtFT1aNSs6Double_S_(double X) { return sqrt(X); }
 extern "C" float _TSs4sqrtFT1aNSs5Float_S_(float X) {
   return sqrtf(X);
 }
+
+extern "C" double _TSs3sinFT1aNSs6Double_S_(double X) { return sin(X); }
+extern "C" float _TSs3sinFT1aNSs5Float_S_(float X) {
+  return sinf(X);
+}
+
+extern "C" double _TSs3cosFT1aNSs6Double_S_(double X) { return cos(X); }
+extern "C" float _TSs3cosFT1aNSs5Float_S_(float X) {
+  return cosf(X);
+}
+
