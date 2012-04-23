@@ -107,7 +107,6 @@ APInt IntegerLiteralExpr::getValue() const {
   llvm::APInt Value(BitWidth, 0);
   bool Error = getText().getAsInteger(0, Value);
   assert(!Error && "Invalid IntegerLiteral formed"); (void)Error;
-  assert(Value.getActiveBits() <= BitWidth && "Value too large for size");
   if (Value.getBitWidth() != BitWidth)
     Value = Value.zextOrTrunc(BitWidth);
   return Value;
