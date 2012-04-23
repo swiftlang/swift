@@ -127,7 +127,14 @@ namespace {
   /// be direct.
   class CallResult {
     union Value {
-      char [[align(alignof(Explosion))]] Direct[sizeof(Explosion)];
+      /// The buffer for the set of direct values produced by the call.
+      /// This can be greater than the normal cap on scalar values if
+      /// the actual call is inlined or builtin.
+      ///
+      /// FIXME: when we commit to a proper C++11 compiler, this can just
+      /// be "Explosion Direct;".
+      char Direct[sizeof(Explosion)];
+
       Explosion &getDirect() { return *reinterpret_cast<Explosion*>(Direct); }
 
       /// The address into which to emit an indirect call.  If this is
