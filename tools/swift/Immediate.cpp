@@ -424,3 +424,10 @@ extern "C" float _TSs3cosFT1aNSs5Float_S_(float X) {
   return cosf(X);
 }
 
+extern "C" double _TSs5atan2FT1yNSs6Double1xS__S_(double Y, double X) {
+  return atan2(Y, X);
+}
+extern "C" float _TSs5atan2FT1yNSs5Float1xS__S_(float Y, float X) {
+  return atan2f(Y, X);
+}
+
