@@ -273,7 +273,49 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
   }
 
   if (VD->isOperator() && !VD->getAttrs().isInfix() && NumArguments != 1) {
-    TC.diagnose(VD->getLocStart(), diag::binops_infix_left);
+    // If this declaration is defined in the translation unit, check whether
+    // there are any other operators in this scope with the same name that are
+    // infix. If so, inherit that infix.
+    // FIXME: This is a hack in so many ways. We may eventually want to separate
+    // the declaration of an operator name + precedence from a new operator
+    // function, or at the very least check the consistency of operator
+    // associativity and precedence within a given scope.
+    if (TranslationUnit *TU = dyn_cast<TranslationUnit>(VD->getDeclContext())) {
+      // Look in the translation unit.
+      for (Decl *D : TU->Decls) {
+        if (ValueDecl *Existing = dyn_cast<ValueDecl>(D)) {
+          if (Existing->getName() == VD->getName() &&
+              Existing->getAttrs().isInfix()) {
+            VD->getMutableAttrs().Infix = Existing->getAttrs().Infix;
+            break;
+          }
+        }
+      }
+      
+      // Look in imported modules.
+      if (!VD->getAttrs().isInfix()) {
+        for (auto &ModPath : TU->getImportedModules()) {
+          if (Module *Mod = ModPath.second) {
+            SmallVector<ValueDecl *, 4> Found;
+            Mod->lookupValue(Module::AccessPathTy(), VD->getName(),
+                             NLKind::QualifiedLookup, Found);
+            for (ValueDecl *Existing : Found) {
+              if (Existing->getName() == VD->getName() &&
+                  Existing->getAttrs().isInfix()) {
+                VD->getMutableAttrs().Infix = Existing->getAttrs().Infix;
+                break;              
+              }
+
+            if (VD->getAttrs().isInfix())
+              break;
+            }
+          }
+        }
+      }
+    }
+    
+    if (!VD->getAttrs().isInfix())
+      TC.diagnose(VD->getLocStart(), diag::binops_infix_left);
   }
 
   if (Attrs.isByref()) {
