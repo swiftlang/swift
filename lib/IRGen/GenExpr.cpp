@@ -241,7 +241,7 @@ namespace {
     }
 
     void visitMemberRefExpr(MemberRefExpr *E) {
-      IGF.unimplemented(E->getLoc(), "emit rvalue MembeRefExpr");
+      IGF.unimplemented(E->getLoc(), "emit rvalue MemberRefExpr");
     }
     
     void visitCapturingExpr(CapturingExpr *E) {
@@ -311,7 +311,7 @@ namespace {
     }
     
     LValue visitMemberRefExpr(MemberRefExpr *E) {
-      IGF.unimplemented(E->getLoc(), "emit lvalue MembeRefExpr");
+      IGF.unimplemented(E->getLoc(), "emit lvalue MemberRefExpr");
       return LValue();
     }
     
@@ -417,7 +417,7 @@ namespace {
     }
 
     Optional<Address> visitMemberRefExpr(MemberRefExpr *E) {
-      IGF.unimplemented(E->getLoc(), "emit address of MembeRefExpr");
+      IGF.unimplemented(E->getLoc(), "emit address of MemberRefExpr");
       return Optional<Address>();
     }
 
