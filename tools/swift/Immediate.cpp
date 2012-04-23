@@ -208,6 +208,7 @@ void swift::REPL(ASTContext &Context) {
   unsigned CurBufferEndOffset = 0;
   
   unsigned CurTUElem = 0;
+  unsigned CurIRGenElem = 0;
   unsigned BraceCount = 0;
   unsigned CurChunkLines = 0;
 
@@ -276,6 +277,9 @@ void swift::REPL(ASTContext &Context) {
       continue;
     }
 
+    CurTUElem = TU->Decls.size();
+    CurChunkLines = 0;
+
     // If we didn't see an expression, statement, or decl which might have
     // side-effects, keep reading.
     if (!ShouldRun)
@@ -283,14 +287,12 @@ void swift::REPL(ASTContext &Context) {
 
     // IRGen the current line(s).
     llvm::Module LineModule("REPLLine", LLVMContext);
-    performCaptureAnalysis(TU, CurTUElem);
-    performIRGeneration(Options, &LineModule, TU, CurTUElem);
+    performCaptureAnalysis(TU, CurIRGenElem);
+    performIRGeneration(Options, &LineModule, TU, CurIRGenElem);
+    CurIRGenElem = CurTUElem;
 
     if (Context.hadError())
       return;
-
-    CurTUElem = TU->Decls.size();
-    CurChunkLines = 0;
 
     if (llvm::Linker::LinkModules(&Module, &LineModule,
                                   llvm::Linker::DestroySource,
