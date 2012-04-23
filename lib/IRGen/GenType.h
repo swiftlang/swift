@@ -122,9 +122,15 @@ public:
   /// Return the number of elements in an explosion of this type.
   virtual unsigned getExplosionSize(ExplosionKind kind) const = 0;
 
-  /// Load a list of exploded values from an address.
+  /// Load an explosion of values from an address.
   virtual void load(IRGenFunction &IGF, Address addr,
                     Explosion &explosion) const = 0;
+
+  /// Perform a 'take' load of the given address.  This is like a C++
+  /// move-initialization, except that the object at the old address
+  /// will not be destroyed.
+  virtual void loadAsTake(IRGenFunction &IGF, Address addr,
+                          Explosion &explosion) const = 0;
 
   /// Assign a set of exploded values into an address.  The values are
   /// consumed out of the explosion.

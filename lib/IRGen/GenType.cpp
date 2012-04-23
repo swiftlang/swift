@@ -52,7 +52,7 @@ void TypeInfo::initializeWithTake(IRGenFunction &IGF,
   ExplosionSchema schema = getSchema(ExplosionKind::Maximal);
   if (!schema.containsAggregate() && schema.size() <= 2) {
     Explosion copy(ExplosionKind::Maximal);
-    load(IGF, srcAddr, copy);
+    loadAsTake(IGF, srcAddr, copy);
     initialize(IGF, copy, destAddr);
     return;
   }
@@ -100,6 +100,10 @@ namespace {
 
     void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
       e.addUnmanaged(IGF.Builder.CreateLoad(addr));
+    }
+
+    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
+      return PrimitiveTypeInfo::load(IGF, addr, e);
     }
 
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {

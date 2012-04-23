@@ -44,6 +44,10 @@ namespace {
       // FIXME
     }
 
+    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
+      // FIXME
+    }
+
     void assign(IRGenFunction &IGF, Explosion &explosion, Address addr) const {
       // FIXME
     }

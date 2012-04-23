@@ -151,6 +151,10 @@ namespace {
       IGF.emitLoadAndRetain(addr, e);
     }
 
+    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
+      e.addUnmanaged(IGF.Builder.CreateLoad(addr));
+    }
+
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
       IGF.emitAssignRetained(e.forwardNext(IGF), addr);
     }

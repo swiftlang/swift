@@ -176,6 +176,16 @@ namespace {
       }
     }
 
+    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
+      for (auto &field : getFieldInfos()) {
+        // Ignore fields that don't have storage.
+        if (!field.hasStorage()) continue;
+
+        Address fieldAddr = projectAddress(IGF, addr, field);
+        field.Type.loadAsTake(IGF, fieldAddr, e);
+      }
+    }
+
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
       for (auto &field : getFieldInfos()) {
         // Ignore fields that don't have storage.

@@ -310,6 +310,16 @@ namespace {
       IGF.emitLoadAndRetain(dataAddr, e);
     }
 
+    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
+      // Load the function.
+      Address fnAddr = projectFunction(IGF, addr);
+      e.addUnmanaged(IGF.Builder.CreateLoad(fnAddr));
+
+      // Load the data.
+      Address dataAddr = projectData(IGF, addr);
+      e.addUnmanaged(IGF.Builder.CreateLoad(dataAddr));
+    }
+
     void assign(IRGenFunction &IGF, Explosion &e, Address address) const {
       // Store the function pointer.
       Address fnAddr = projectFunction(IGF, address);
@@ -1439,7 +1449,7 @@ void IRGenFunction::emitEpilogue() {
     Builder.CreateRetVoid();
   } else {
     Explosion result(CurExplosionLevel);
-    resultType.load(*this, ReturnSlot, result);
+    resultType.loadAsTake(*this, ReturnSlot, result);
     emitScalarReturn(result);
   }
 

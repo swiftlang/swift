@@ -222,6 +222,16 @@ namespace {
       IGF.emitLoadAndRetain(projectOwner(IGF, address), e);
     }
 
+    void loadAsTake(IRGenFunction &IGF, Address address, Explosion &e) const {
+      // Load the reference.
+      Address refAddr = projectReference(IGF, address);
+      e.addUnmanaged(IGF.Builder.CreateLoad(refAddr));
+
+      // Load the owner.
+      Address ownerAddr = projectOwner(IGF, address);
+      e.addUnmanaged(IGF.Builder.CreateLoad(ownerAddr));
+    }
+
     void assign(IRGenFunction &IGF, Explosion &e, Address address) const {
       // Store the reference.
       IGF.Builder.CreateStore(e.claimUnmanagedNext(),

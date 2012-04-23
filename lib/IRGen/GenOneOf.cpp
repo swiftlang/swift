@@ -96,6 +96,10 @@ namespace {
       // FIXME
     }
 
+    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
+      // FIXME
+    }
+
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
       // FIXME
     }
@@ -155,6 +159,11 @@ namespace {
     void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
       if (!Singleton) return;
       Singleton->load(IGF, getSingletonAddress(IGF, addr), e);
+    }
+
+    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
+      if (!Singleton) return;
+      Singleton->loadAsTake(IGF, getSingletonAddress(IGF, addr), e);
     }
 
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
@@ -228,6 +237,10 @@ namespace {
       assert(isComplete());
       e.addUnmanaged(IGF.Builder.CreateLoad(projectValue(IGF, addr),
                                             addr->getName() + ".load"));
+    }
+
+    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
+      return EnumTypeInfo::load(IGF, addr, e);
     }
 
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
