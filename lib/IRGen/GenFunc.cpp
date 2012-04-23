@@ -127,7 +127,8 @@ namespace {
   /// be direct.
   class CallResult {
     union Value {
-      Explosion Direct;
+      char [[align(alignof(Explosion))]] Direct[sizeof(Explosion)];
+      Explosion &getDirect() { return *reinterpret_cast<Explosion*>(Direct); }
 
       /// The address into which to emit an indirect call.  If this is
       /// set, the call will be evaluated (as an initialization) into
@@ -154,8 +155,7 @@ namespace {
     Explosion &initForDirectValues(ExplosionKind level) {
       assert(CurState == State::Invalid);
       CurState = State::Direct;
-      Explosion *buffer = &CurValue.Direct;
-      return *new (buffer) Explosion(level);
+      return *new (&CurValue.getDirect()) Explosion(level);
     }
 
     /// As a potential efficiency, set that this is a direct result
@@ -182,7 +182,7 @@ namespace {
 
     Explosion &getDirectValues() {
       assert(isDirect());
-      return CurValue.Direct;
+      return CurValue.getDirect();
     }
 
     Address getIndirectAddress() const {
@@ -192,7 +192,7 @@ namespace {
 
     void reset() {
       if (CurState == State::Direct)
-        CurValue.Direct.~Explosion();
+        CurValue.getDirect().~Explosion();
       CurState = State::Invalid;
     }
   };
