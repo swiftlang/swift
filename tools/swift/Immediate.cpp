@@ -339,7 +339,11 @@ extern "C" void _TSs5printFT3valNSs5Int64_T_(int64_t l) {
 }
 
 extern "C" void _TSs5printFT3valNSs6Double_T_(double l) {
-  printf("%f", l);
+  char Buffer[256];
+  sprintf(Buffer, "%g", l);
+  if (llvm::StringRef((char*)Buffer).find_first_of(".e") == llvm::StringRef::npos)
+    strcat(Buffer, ".0");
+  printf("%s", Buffer);
 }
 
 extern "C" void _TSs9printCharFT9characterNSs5Int32_T_(int32_t l) {
