@@ -166,7 +166,7 @@ struct EditLineWrapper {
 
 void swift::REPL(ASTContext &Context) {
   if (llvm::sys::Process::StandardInIsUserInput())
-    printf("%s", "Welcome to swift.  Type 'help' for assistance.\n");
+    printf("%s", "Welcome to swift.  Type ':help' for assistance.\n");
   
   // FIXME: We should do something a bit more elaborate than
   // "allocate a 1MB buffer and hope it's enough".
@@ -227,13 +227,30 @@ void swift::REPL(ASTContext &Context) {
     // If we detect unbalanced braces, keep reading before we start parsing.
     Lexer L(Line, Context.SourceMgr, nullptr);
     Token Tok;
+    L.lex(Tok);
+    if (CurChunkLines == 1 && !BraceCount && Tok.is(tok::colon)) {
+      if (L.peekNextToken().getText() == "help") {
+        printf("%s", "I'm not helpful yet, but use :quit to exit\n");
+      } else if (L.peekNextToken().getText() == "quit" ||
+                 L.peekNextToken().getText() == "exit") {
+        return;
+      } else {
+        printf("%s", "Unknown interpreter escape; try :help\n");
+      }
+      CurBufferOffset = CurBufferEndOffset;
+      CurChunkLines = 0;
+      continue;
+    }
     do {
-      L.lex(Tok);
       if (Tok.is(tok::l_brace))
         ++BraceCount;
       else if (Tok.is(tok::r_brace) && BraceCount > 0)
         --BraceCount;
-    } while (!Tok.is(tok::eof));
+      else if (Tok.is(tok::eof))
+        break;
+
+      L.lex(Tok);
+    } while (1);
 
     if (BraceCount)
       continue;
