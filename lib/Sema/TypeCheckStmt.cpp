@@ -304,7 +304,12 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
   SourceLoc Loc = E->getStartLoc();
   SourceLoc EndLoc = E->getEndLoc();
 
+  // Don't try to print invalid expressions.
   if (isa<ErrorType>(T))
+    return;
+
+  // Skip printing for expressions of void type.
+  if (isa<TupleType>(T) && cast<TupleType>(T)->getFields().empty())
     return;
 
   // Build a function to call to print the expression.
@@ -323,16 +328,15 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
   // Build the body of the function which prints the expression.
   SmallVector<unsigned, 4> MemberIndexes;
   SmallVector<BraceStmt::ExprStmtOrDecl, 4> BodyContent;
-  PrintReplExpr(*this, Arg, T, Loc, EndLoc, MemberIndexes, BodyContent);
-
-  // Print a newline at the end.
-  Expr *PrintNewLine = new (Context) StringLiteralExpr("\n", E->getStartLoc());
-  SmallVector<ValueDecl*, 4> Decls;
+  SmallVector<ValueDecl*, 4> PrintDecls;
   TU.lookupGlobalValue(Context.getIdentifier("print"),
-                       NLKind::UnqualifiedLookup, Decls);
-  Expr *PrintStrFn = OverloadedDeclRefExpr::createWithCopy(Decls, Loc);
-  PrintNewLine = new (Context) CallExpr(PrintStrFn, PrintNewLine, Type());
-  BodyContent.push_back(PrintNewLine);
+                       NLKind::UnqualifiedLookup, PrintDecls);
+
+  // Printing format is "expression result = 0\n".
+  PrintLiteralString("expression result = ", Context, Loc, PrintDecls,
+                     BodyContent);
+  PrintReplExpr(*this, Arg, T, Loc, EndLoc, MemberIndexes, BodyContent);
+  PrintLiteralString("\n", Context, Loc, PrintDecls, BodyContent);
 
   // Typecheck the function.
   BraceStmt *Body = BraceStmt::create(Context, Loc, BodyContent, EndLoc);
