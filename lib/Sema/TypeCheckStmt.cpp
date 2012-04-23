@@ -332,9 +332,10 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
   TU.lookupGlobalValue(Context.getIdentifier("print"),
                        NLKind::UnqualifiedLookup, PrintDecls);
 
-  // Printing format is "expression result = 0\n".
-  PrintLiteralString("expression result = ", Context, Loc, PrintDecls,
-                     BodyContent);
+  // Printing format is "Int = 0\n".
+  auto TypeStr = Context.getIdentifier(E->getType()->getString()).str();
+  PrintLiteralString(TypeStr, Context, Loc, PrintDecls, BodyContent);
+  PrintLiteralString(" = ", Context, Loc, PrintDecls, BodyContent);
   PrintReplExpr(*this, Arg, T, Loc, EndLoc, MemberIndexes, BodyContent);
   PrintLiteralString("\n", Context, Loc, PrintDecls, BodyContent);
 
