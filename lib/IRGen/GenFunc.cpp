@@ -125,36 +125,75 @@ namespace {
   /// result may be indirect, in which case it is returned in memory
   /// whose address is passed as an implicit first argument, or it may
   /// be direct.
-  struct CallResult {
-  private:
-    ManagedValue DirectValues[ExplosionSchema::MaxScalarsForDirectResult];
-    unsigned char NumDirectValues;
+  class CallResult {
+    union Value {
+      Explosion Direct;
+
+      /// The address into which to emit an indirect call.  If this is
+      /// set, the call will be evaluated (as an initialization) into
+      /// this address; otherwise, memory will be allocated on the stack.
+      Address Indirect;
+
+      Value() {}
+      ~Value() {}
+    };
+
+    enum class State {
+      Invalid, Indirect, Direct
+    };
+
+    Value CurValue;
+    State CurState;
+
   public:
-    ExplosionKind DirectExplosionLevel;
+    CallResult() : CurState(State::Invalid) {}
+    ~CallResult() { reset(); }
 
-    /// The address into which to emit an indirect call.  If this is
-    /// set, the call will be evaluated (as an initialization) into
-    /// this address; otherwise, memory will be allocated on the stack.
-    Address IndirectAddress;
+    /// Configure this result to carry a number of direct values at
+    /// the given explosion level.
+    Explosion &initForDirectValues(ExplosionKind level) {
+      assert(CurState == State::Invalid);
+      CurState = State::Direct;
+      Explosion *buffer = &CurValue.Direct;
+      return *new (buffer) Explosion(level);
+    }
 
-    CallResult() : NumDirectValues(0) {}
+    /// As a potential efficiency, set that this is a direct result
+    /// with no values.
+    void setAsEmptyDirect() {
+      initForDirectValues(ExplosionKind::Maximal);
+    }
 
-    void addDirectUnmanagedValue(llvm::Value *value) {
-      addDirectValue(ManagedValue(value));
+    /// Set this result so that it carries a single directly-returned
+    /// maximally-fragile value without management.
+    void setAsSingleDirectUnmanagedFragileValue(llvm::Value *value) {
+      initForDirectValues(ExplosionKind::Maximal).addUnmanaged(value);
     }
-    void addDirectValue(ManagedValue value) {
-      assert(NumDirectValues < ExplosionSchema::MaxScalarsForDirectResult);
-      DirectValues[NumDirectValues++] = value;
+
+    void setAsIndirectAddress(Address address) {
+      assert(CurState == State::Invalid);
+      CurState = State::Indirect;
+      CurValue.Indirect = address;
     }
-    ManagedValue getDirectValue(unsigned i) const {
-      assert(i < NumDirectValues);
-      return DirectValues[i];
+
+    bool isInvalid() const { return CurState == State::Invalid; } 
+    bool isDirect() const { return CurState == State::Direct; }
+    bool isIndirect() const { return CurState == State::Indirect; }
+
+    Explosion &getDirectValues() {
+      assert(isDirect());
+      return CurValue.Direct;
     }
-    void clearDirectValues() {
-      NumDirectValues = 0;
+
+    Address getIndirectAddress() const {
+      assert(isIndirect());
+      return CurValue.Indirect;
     }
-    llvm::ArrayRef<ManagedValue> getDirectValues() const {
-      return ArrayRef<ManagedValue>(DirectValues, DirectValues+NumDirectValues);
+
+    void reset() {
+      if (CurState == State::Direct)
+        CurValue.Direct.~Explosion();
+      CurState = State::Invalid;
     }
   };
 
@@ -475,6 +514,15 @@ namespace {
                 ? ManagedValue(nullptr) : data);
     }
 
+    void setForIndirectCallFromResult(CallResult &result) {
+      assert(result.isDirect());
+      Explosion &values = result.getDirectValues();
+      assert(values.size() == 2);
+      llvm::Value *fn = values.claimUnmanagedNext();
+      ManagedValue data = values.claimNext();
+      setForIndirectCall(fn, data);
+    }
+
     llvm::Value *getOpaqueFunctionPointer(IRGenFunction &IGF) const {
       return IGF.Builder.CreateBitCast(FnPtr, IGF.IGM.Int8PtrTy);
     }
@@ -550,15 +598,24 @@ namespace {
   };
 }
 
-static void emitCastBuiltin(llvm::Instruction::CastOps Opcode,
+static void emitCastBuiltin(llvm::Instruction::CastOps opcode,
                             IRGenFunction &IGF, ArgList &args,
                             Type DestType, CallResult &result) {
-  llvm::Value *Input = args.Values.claimUnmanagedNext();
-  llvm::Type *DestTy = IGF.IGM.getFragileTypeInfo(DestType).getStorageType();
+  llvm::Value *input = args.Values.claimUnmanagedNext();
+  llvm::Type *destTy = IGF.IGM.getFragileTypeInfo(DestType).getStorageType();
   assert(args.Values.empty() && "wrong operands to cast operation");
-  return result.addDirectUnmanagedValue(IGF.Builder.CreateCast(Opcode, Input,
-                                                               DestTy));
+  llvm::Value *output = IGF.Builder.CreateCast(opcode, input, destTy);
+  result.setAsSingleDirectUnmanagedFragileValue(output);
+}
 
+/// Given an address representing an unsafe pointer to the given type,
+/// turn it into a valid Address.
+static Address getAddressForUnsafePointer(IRGenFunction &IGF,
+                                          const TypeInfo &type,
+                                          llvm::Value *addr) {
+  llvm::Value *castAddr =
+    IGF.Builder.CreateBitCast(addr, type.getStorageType()->getPointerTo());
+  return Address(castAddr, type.StorageAlignment);
 }
 
 
@@ -578,50 +635,43 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
     llvm::Value *lhs = args.Values.claimUnmanagedNext();
     llvm::Value *rhs = args.Values.claimUnmanagedNext();
     assert(args.Values.empty() && "wrong operands to gep operation");
-    return result.addDirectUnmanagedValue(IGF.Builder.CreateGEP(lhs, rhs));
+
+    // We don't expose a non-inbounds GEP operation.
+    llvm::Value *gep = IGF.Builder.CreateInBoundsGEP(lhs, rhs);
+    return result.setAsSingleDirectUnmanagedFragileValue(gep);
   }
       
   case BuiltinValueKind::Load: {
-    llvm::Value *addr = args.Values.claimUnmanagedNext();
+    // The type of the operation is the result type of the load function.
+    Type valueTy = Fn->getType()->castTo<FunctionType>()->getResult();
+    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
+
+    // Treat the raw pointer as a physical l-value of that type.
+    llvm::Value *addrValue = args.Values.claimUnmanagedNext();
+    Address addr = getAddressForUnsafePointer(IGF, valueTI, addrValue);
     assert(args.Values.empty() && "wrong operands to load operation");
 
-    Type ResultTy = Fn->getType()->castTo<FunctionType>()->getResult();
-    
-    // Cast the raw pointer to an appropriately-typed pointer.
-    const TypeInfo &ResultTypeInfo = IGF.IGM.getFragileTypeInfo(ResultTy);
-    llvm::Type *ptr = ResultTypeInfo.StorageType->getPointerTo();
-    addr = IGF.Builder.CreateBitCast(addr, ptr);
-    
-    // Create the load.
-    llvm::Value *load
-      = IGF.Builder.CreateLoad(addr, ResultTypeInfo.StorageAlignment);
-    
-    if (ResultTy->is<BuiltinObjectPointerType>())
-      return result.addDirectValue(IGF.enterReleaseCleanup(load));
-    
-    return result.addDirectUnmanagedValue(load);
+    // Perform the load.
+    Explosion &out = result.initForDirectValues(ExplosionKind::Maximal);
+    return valueTI.load(IGF, addr, out);
   }
      
   case BuiltinValueKind::Store: {
-    llvm::Value *value = args.Values.forwardNext(IGF);
-    llvm::Value *addr = args.Values.claimUnmanagedNext();
-    assert(args.Values.empty() && "wrong operands to store operation");
-
-    // Extract the type of the value we're storing.
-    Type ValueTy = Fn->getType()->castTo<FunctionType>()->getInput()
+    // The type of the operation is the type of the first argument of
+    // the store function.
+    Type valueTy = Fn->getType()->castTo<FunctionType>()->getInput()
                      ->castTo<TupleType>()->getElementType(0);
-    const TypeInfo &ValueTypeInfo = IGF.IGM.getFragileTypeInfo(ValueTy);
-    
-    // Cast the raw pointer to an appropriately-typed pointer.
-    addr = IGF.Builder.CreateBitCast(addr, value->getType()->getPointerTo());
-    
-    // Create the store.
-    if (ValueTy->is<BuiltinObjectPointerType>())
-      IGF.emitAssignRetained(value,
-                             Address(addr, ValueTypeInfo.StorageAlignment));
-    else
-      IGF.Builder.CreateStore(value, addr, ValueTypeInfo.StorageAlignment);
-    return;
+    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
+
+    // Treat the raw pointer as a physical l-value of that type.
+    llvm::Value *addrValue = args.Values.takeLast().getUnmanagedValue();
+    Address addr = getAddressForUnsafePointer(IGF, valueTI, addrValue);
+
+    // Mark that we're not returning anything.
+    result.setAsEmptyDirect();
+
+    // Perform the assignment operation.
+    return valueTI.assign(IGF, args.Values, addr);
   }
       
 /// A macro which expands to the emission of a simple binary operation
@@ -630,7 +680,8 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
     llvm::Value *lhs = args.Values.claimUnmanagedNext();                    \
     llvm::Value *rhs = args.Values.claimUnmanagedNext();                    \
     assert(args.Values.empty() && "wrong operands to binary operation");    \
-    return result.addDirectUnmanagedValue(IGF.Builder.Create##Op(lhs, rhs));\
+    return result.setAsSingleDirectUnmanagedFragileValue(                   \
+                                         IGF.Builder.Create##Op(lhs, rhs)); \
   }
 
 /// A macro which expands to the emission of a simple binary operation
@@ -640,10 +691,10 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
     llvm::Value *rhs = args.Values.claimUnmanagedNext();                    \
     assert(args.Values.empty() && "wrong operands to binary operation");    \
     if (lhs->getType()->isFloatingPointTy()) {                              \
-      return result.addDirectUnmanagedValue(                                \
+      return result.setAsSingleDirectUnmanagedFragileValue(                 \
                           IGF.Builder.Create##FPOp(lhs, rhs));              \
     } else {                                                                \
-      return result.addDirectUnmanagedValue(                                \
+      return result.setAsSingleDirectUnmanagedFragileValue(                 \
                           IGF.Builder.Create##IntOp(lhs, rhs));             \
     }                                                                       \
   }
@@ -852,6 +903,14 @@ static void extractScalarResults(IRGenFunction &IGF, llvm::Value *call,
 /// Emit a function call.
 void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
                     const TypeInfo &resultType) {
+  // Save the final result address if one was given, then reset
+  // to establish the invariant that the result is always invalid.
+  Address finalAddress;
+  if (result.isIndirect()) {
+    finalAddress = result.getIndirectAddress();
+    result.reset();
+  }
+
   // 1.  Emit the function expression.
   Callee callee;
 
@@ -869,9 +928,8 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
       if (CallSites.size() == 1) return;
 
       // Otherwise, pop that call site off and set up the callee conservatively.
-      callee.setForIndirectCall(result.getDirectValue(0).getUnmanagedValue(),
-                                result.getDirectValue(1));
-      result.clearDirectValues();
+      callee.setForIndirectCallFromResult(result);
+      result.reset();
 
     // Otherwise, compute information about the function we're calling.
     } else {
@@ -950,16 +1008,20 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
       assert(CallSites.empty() && "aggregate result on non-final call?");
 
       // Force there to be an indirect address.
-      if (!result.IndirectAddress.isValid()) {
+      Address resultAddress;
+      if (finalAddress.isValid()) {
+        resultAddress = finalAddress;
+      } else {
         indirectResultObject = indirectInit.getObjectForTemporary();
         indirectInit.registerObject(IGF, indirectResultObject,
                                     NotOnHeap, resultTI);
-        result.IndirectAddress =
+        resultAddress =
           indirectInit.emitLocalAllocation(IGF, indirectResultObject,
                                            NotOnHeap, resultTI,
                                            "call.aggresult");
       }
-      args[0] = result.IndirectAddress.getAddress();
+      args[0] = resultAddress.getAddress();
+      result.setAsIndirectAddress(resultAddress);
     }
 
     // Make the call.
@@ -975,33 +1037,29 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
         indirectInit.markInitialized(IGF, indirectResultObject);
 
       setAggResultAttributes(call);
-      assert(result.getDirectValues().empty());
-      assert(result.IndirectAddress.isValid());
+      assert(result.isIndirect());
       return;
     }
 
     // Extract out the scalar results.
-    if (!call->getType()->isVoidTy()) {
-      Explosion resultExplosion(callee.ExplosionLevel);
-      extractScalarResults(IGF, call, resultTI, resultExplosion);
-      for (auto value : resultExplosion.claimAll())
-        result.addDirectValue(value);
+    if (call->getType()->isVoidTy()) {
+      result.setAsEmptyDirect();
+    } else {
+      Explosion &out = result.initForDirectValues(callee.ExplosionLevel);
+      extractScalarResults(IGF, call, resultTI, out);
     }
       
     // If this is the end of the call sites, we're done.
     if (CallSites.empty()) {
-      assert(!result.IndirectAddress.isValid() &&
+      assert(!result.isIndirect() &&
              "returning direct values when indirect result was requested!");
-      result.DirectExplosionLevel = callee.ExplosionLevel;
       return;
     }
 
     // Otherwise, we must have gotten a function back.  Set ourselves
     // up to call it, then continue emitting calls.
-    assert(result.getDirectValues().size() == 2);
-    callee.setForIndirectCall(result.getDirectValue(0).getUnmanagedValue(),
-                              result.getDirectValue(1));
-    result.clearDirectValues();
+    callee.setForIndirectCallFromResult(result);
+    result.reset();
   }
 }
 
@@ -1016,16 +1074,19 @@ void swift::irgen::emitApplyExpr(IRGenFunction &IGF, ApplyExpr *E,
   plan.emit(IGF, result, resultTI);
 
   // If this was an indirect return, explode it.
-  if (result.IndirectAddress.isValid()) {
-    return resultTI.load(IGF, result.IndirectAddress, explosion);
+  if (result.isIndirect()) {
+    return resultTI.load(IGF, result.getIndirectAddress(), explosion);
   }
 
-  if (result.DirectExplosionLevel == explosion.getKind())
-    return explosion.add(result.getDirectValues());
+  Explosion &directValues = result.getDirectValues();
 
-  Explosion resultExplosion(result.DirectExplosionLevel);
-  resultExplosion.add(result.getDirectValues());
-  resultTI.reexplode(IGF, resultExplosion, explosion);
+  // If the explosion kind of the direct values matches that of the
+  // result, we're okay.
+  if (directValues.getKind() == explosion.getKind())
+    return explosion.add(directValues.claimAll());
+
+  // Otherwise we need to re-explode.
+  resultTI.reexplode(IGF, directValues, explosion);
 }
 
 /// See whether we can emit the result of the given call as an object
@@ -1043,8 +1104,8 @@ swift::irgen::tryEmitApplyAsAddress(IRGenFunction &IGF, ApplyExpr *E,
 
   CallResult result;
   plan.emit(IGF, result, resultTI);
-  assert(result.IndirectAddress.isValid());
-  return result.IndirectAddress;
+  assert(result.isIndirect());
+  return result.getIndirectAddress();
 }
 
 /// Emit a nullary call to the given function, using the standard

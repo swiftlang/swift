@@ -229,6 +229,11 @@ public:
     NextValue = 0;
     Values.clear();
   }
+
+  void reset(ExplosionKind level) {
+    Kind = level;
+    reset();
+  }
 };
 
 /// An explosion schema is essentially the type of an Explosion.
