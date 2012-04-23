@@ -165,8 +165,8 @@ struct EditLineWrapper {
 };
 
 void swift::REPL(ASTContext &Context) {
-  if (llvm::sys::Process::FileDescriptorIsDisplayed(2))
-    llvm::errs() << "Welcome to swift.  Type 'help' for assistance.\n";
+  if (llvm::sys::Process::StandardInIsUserInput())
+    printf("%s", "Welcome to swift.  Type 'help' for assistance.\n");
   
   // FIXME: We should do something a bit more elaborate than
   // "allocate a 1MB buffer and hope it's enough".
