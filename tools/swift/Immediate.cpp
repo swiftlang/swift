@@ -147,10 +147,14 @@ struct EditLineWrapper {
   History *h;
   size_t PromptContinuationLevel;
   bool NeedPromptContinuation;
+  bool ShowColors;
   
   llvm::SmallString<80> PromptString;
 
   EditLineWrapper() {
+    // Only show colors if both stderr and stdin are displayed.
+    ShowColors = llvm::errs().is_displayed() && llvm::outs().is_displayed();
+
     e = el_init("swift", stdin, stdout, stderr);
     h = history_init();
     PromptContinuationLevel = 0;
@@ -169,11 +173,28 @@ struct EditLineWrapper {
   }
   
   const char *getPrompt() {
-    if (!NeedPromptContinuation)
-      return "swift> ";
+    PromptString.clear();
+
+    if (ShowColors) {
+      const char *colorCode =
+        llvm::sys::Process::OutputColor(llvm::raw_ostream::YELLOW, false, false);
+      if (colorCode)
+        PromptString = colorCode;
+    }
     
-    PromptString = "swift| ";
-    PromptString.append(2*PromptContinuationLevel, ' ');
+    if (!NeedPromptContinuation)
+      PromptString += "swift> ";
+    else {
+      PromptString += "swift| ";
+      PromptString.append(2*PromptContinuationLevel, ' ');
+    }
+    
+    if (ShowColors) {
+      const char *colorCode = llvm::sys::Process::ResetColor();
+      if (colorCode)
+        PromptString += colorCode;
+    }
+
     return PromptString.c_str();
   };
         
