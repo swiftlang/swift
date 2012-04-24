@@ -485,7 +485,10 @@ extern "C" char *_TNSs6String6StringFT1vNSs6Double_S_(double X) {
   return strdup(Buffer);
 }
 
-
+// func print(val : String)
+extern "C" void _TSs5printFT3valNSs6String_T_(const char* s) {
+  printf("%s", s);
+}
 
 extern "C" bool _TNSs4Bool13getLogicValuefRS_FT_i1(bool* b) {
   return *b;
