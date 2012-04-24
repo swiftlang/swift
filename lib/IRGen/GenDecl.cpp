@@ -262,48 +262,69 @@ static Type addOwnerArgument(ASTContext &ctx, Type owner, Type resultType) {
   return FunctionType::get(argType, resultType, ctx);
 }
 
-static Type addOwnerArgument(ASTContext &ctx, ValueDecl *value,
-                             Type resultType) {
+static void addOwnerArgument(ASTContext &ctx, ValueDecl *value,
+                             Type &resultType, unsigned &uncurryLevel) {
   DeclContext *DC = value->getDeclContext();
   switch (DC->getContextKind()) {
   case DeclContextKind::TranslationUnit:
   case DeclContextKind::BuiltinModule:
   case DeclContextKind::CapturingExpr:
   case DeclContextKind::TopLevelCodeDecl:
-    return resultType;
+    return;
 
   case DeclContextKind::ExtensionDecl:
-    return addOwnerArgument(ctx, cast<ExtensionDecl>(DC)->getExtendedType(),
-                            resultType);
+    resultType =
+      addOwnerArgument(ctx, cast<ExtensionDecl>(DC)->getExtendedType(),
+                       resultType);
+    uncurryLevel++;
+    return;
 
   case DeclContextKind::OneOfType:
-    return addOwnerArgument(ctx, cast<OneOfType>(DC), resultType);
+    resultType = addOwnerArgument(ctx, cast<OneOfType>(DC), resultType);
+    uncurryLevel++;
+    return;
 
   case DeclContextKind::ProtocolType:
-    return addOwnerArgument(ctx, cast<ProtocolType>(DC), resultType);
+    resultType = addOwnerArgument(ctx, cast<ProtocolType>(DC), resultType);
+    uncurryLevel++;
+    return;
   }
   llvm_unreachable("bad decl context");
 }
 
+static Type getObjectType(ValueDecl *decl) {
+  if (SubscriptDecl *sub = dyn_cast<SubscriptDecl>(decl))
+    return sub->getElementType();
+  return decl->getType();
+}
+
 /// getAddrOfGetter - Get the address of the function which performs a
-/// get or set.
-llvm::Function *IRGenModule::getAddrOfGetter(VarDecl *var,
+/// get of a variable or subscripted object.
+llvm::Function *IRGenModule::getAddrOfGetter(ValueDecl *value,
                                              ExplosionKind explosionLevel) {
-  LinkEntity entity = LinkEntity::forGetter(var, explosionLevel);
+  LinkEntity entity = LinkEntity::forGetter(value, explosionLevel);
 
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return cast<llvm::Function>(entry);
 
   // The formal type of a getter function is one of:
-  //   () -> T (for a nontype member)
-  //   ([byref] A) -> () -> T (for a type member)
-  Type formalType = var->getType();
+  //   S -> () -> T (for a nontype member)
+  //   A -> S -> () -> T (for a type member)
+  // where T is the value type of the object and S is the index type
+  // (this clause is skipped for a non-subscript getter).
+  unsigned uncurryLevel = 0;
+  Type formalType = getObjectType(value);
   formalType = FunctionType::get(TupleType::getEmpty(Context),
                                  formalType, Context);
-  formalType = addOwnerArgument(Context, var, formalType);
+  if (SubscriptDecl *sub = dyn_cast<SubscriptDecl>(value)) {
+    formalType = FunctionType::get(sub->getIndices()->getType(),
+                                   formalType, Context);
+    uncurryLevel++;
+  }
+  addOwnerArgument(Context, value, formalType, uncurryLevel);
 
   llvm::FunctionType *fnType =
-    getFunctionType(formalType, explosionLevel, /*uncurry*/ 1,
+    getFunctionType(formalType, explosionLevel, uncurryLevel,
                     /*data*/ false);
 
   LinkInfo link = LinkInfo::get(*this, entity);
@@ -316,25 +337,34 @@ llvm::Function *IRGenModule::getAddrOfGetter(VarDecl *var,
   return addr;
 }
 
-/// getAddrOfGetter - Get the address of the function which performs a
-/// get or set.
-llvm::Function *IRGenModule::getAddrOfSetter(VarDecl *var,
+/// getAddrOfSetter - Get the address of the function which performs a
+/// set of a variable or subscripted object.
+llvm::Function *IRGenModule::getAddrOfSetter(ValueDecl *value,
                                              ExplosionKind explosionLevel) {
-  LinkEntity entity = LinkEntity::forSetter(var, explosionLevel);
+  LinkEntity entity = LinkEntity::forSetter(value, explosionLevel);
 
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return cast<llvm::Function>(entry);
 
   // The formal type of a setter function is one of:
-  //   T -> () (for a nontype member)
-  //   ([byref] A) -> T -> () (for a type member)
-  Type formalType = var->getType();
-  formalType = FunctionType::get(formalType, TupleType::getEmpty(Context),
-                                 Context);
-  formalType = addOwnerArgument(Context, var, formalType);
+  //   (S, T) -> () (for a nontype member)
+  //   A -> (S, T) -> () (for a type member)
+  // where T is the value type of the object and S is the index type
+  // (using just T for a non-subscript setter).
+  unsigned uncurryLevel = 0;
+  Type argType = getObjectType(value);
+  if (SubscriptDecl *sub = dyn_cast<SubscriptDecl>(value)) {
+    TupleTypeElt elts[2];
+    elts[0] = TupleTypeElt(sub->getIndices()->getType(), Identifier());
+    elts[1] = TupleTypeElt(argType, Identifier());
+    argType = TupleType::get(elts, Context);
+  }
+  Type formalType = FunctionType::get(argType, TupleType::getEmpty(Context),
+                                      Context);
+  addOwnerArgument(Context, value, formalType, uncurryLevel);
 
   llvm::FunctionType *fnType =
-    getFunctionType(formalType, explosionLevel, /*uncurry*/ 1,
+    getFunctionType(formalType, explosionLevel, uncurryLevel,
                     /*data*/ false);
 
   LinkInfo link = LinkInfo::get(*this, entity);
@@ -371,6 +401,9 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
       emitTypeAlias(cast<TypeAliasDecl>(member)->getUnderlyingType());
       continue;
     case DeclKind::Var:
+      if (cast<VarDecl>(member)->isProperty())
+        // Getter/setter will be handled separately.
+        continue;
       unimplemented(member->getLocStart(), "var decl in extension");
       continue;
     case DeclKind::Func: {

@@ -107,7 +107,7 @@ public:
     assert(hasGetterSetter(decl));
     LinkEntity entity;
     entity.TheDecl = decl;
-    entity.TheKind = unsigned(Kind::Getter);
+    entity.TheKind = unsigned(Kind::Setter);
     entity.Explosion = unsigned(explosionKind);
     entity.UncurryLevel = 0;
     return entity;

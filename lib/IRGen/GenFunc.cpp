@@ -1865,8 +1865,15 @@ static void emitFunction(IRGenModule &IGM, FuncDecl *func,
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
 
   // Get the address of the first entrypoint we're going to emit.
-  llvm::Function *entrypoint =
-    IGM.getAddrOfGlobalFunction(func, explosionLevel, startingUncurryLevel);
+  llvm::Function *entrypoint;
+  if (Decl *var = func->getGetterDecl()) {
+    entrypoint = IGM.getAddrOfGetter(cast<ValueDecl>(var), explosionLevel);
+  } else if (Decl *var = func->getSetterDecl()) {
+    entrypoint = IGM.getAddrOfSetter(cast<ValueDecl>(var), explosionLevel);
+  } else {
+    entrypoint = IGM.getAddrOfGlobalFunction(func, explosionLevel,
+                                             startingUncurryLevel);
+  }
 
   CurriedData curriedData(IGM, funcExpr, explosionLevel,
                           startingUncurryLevel, naturalUncurryLevel);
