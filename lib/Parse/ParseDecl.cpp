@@ -452,45 +452,45 @@ TypeAliasDecl *Parser::parseDeclTypeAlias() {
   return TAD;
 }
 
-static void addVarsToScope(Parser &P, Pattern *Pat,
-                           SmallVectorImpl<Decl*> &Decls,
-                           DeclAttributes &Attributes) {
+void Parser::addVarsToScope(Pattern *Pat,
+                            SmallVectorImpl<Decl*> &Decls,
+                            DeclAttributes &Attributes) {
   switch (Pat->getKind()) {
   // Recurse into patterns.
   case PatternKind::Tuple:
     for (auto &field : cast<TuplePattern>(Pat)->getFields())
-      addVarsToScope(P, field.getPattern(), Decls, Attributes);
+      addVarsToScope(field.getPattern(), Decls, Attributes);
     return;
   case PatternKind::Paren:
-    return addVarsToScope(P, cast<ParenPattern>(Pat)->getSubPattern(), Decls,
+    return addVarsToScope(cast<ParenPattern>(Pat)->getSubPattern(), Decls,
                           Attributes);
   case PatternKind::Typed:
-    return addVarsToScope(P, cast<TypedPattern>(Pat)->getSubPattern(), Decls,
+    return addVarsToScope(cast<TypedPattern>(Pat)->getSubPattern(), Decls,
                           Attributes);
 
   // Handle vars.
   case PatternKind::Named: {
     VarDecl *VD = cast<NamedPattern>(Pat)->getDecl();
-    VD->setDeclContext(P.CurDeclContext);
+    VD->setDeclContext(CurDeclContext);
     if (!VD->hasType())
-      VD->setType(UnstructuredDependentType::get(P.Context));
+      VD->setType(UnstructuredDependentType::get(Context));
     if (Attributes.isValid())
       VD->getMutableAttrs() = Attributes;
 
     if (VD->isProperty()) {
       // FIXME: Order of get/set not preserved.
       if (FuncDecl *Get = VD->getGetter()) {
-        Get->setDeclContext(P.CurDeclContext);
+        Get->setDeclContext(CurDeclContext);
         Decls.push_back(Get);
       }
       if (FuncDecl *Set = VD->getSetter()) {
-        Set->setDeclContext(P.CurDeclContext);
+        Set->setDeclContext(CurDeclContext);
         Decls.push_back(Set);
       }
     }
     
     Decls.push_back(VD);
-    P.ScopeInfo.addToScope(VD);
+    ScopeInfo.addToScope(VD);
     return;
   }
 
@@ -903,7 +903,7 @@ bool Parser::parseDeclVar(bool hasContainerType, SmallVectorImpl<Decl*> &Decls){
     }
   }
   
-  addVarsToScope(*this, pattern.get(), Decls, Attributes);
+  addVarsToScope(pattern.get(), Decls, Attributes);
 
   PatternBindingDecl *PBD =
       new (Context) PatternBindingDecl(VarLoc, pattern.get(),

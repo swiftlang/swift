@@ -199,6 +199,13 @@ public:
     printRec(S->getBody());
     OS << ')';
   }
+  void visitForEachStmt(ForEachStmt *S) {
+    OS.indent(Indent) << "(for_each_stmt\n";
+    printRec(S->getContainer());
+    OS << '\n';
+    printRec(S->getBody());
+    OS << ')';
+  }
 };
 
 } // end anonymous namespace.

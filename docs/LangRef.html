@@ -262,6 +262,9 @@
     keyword ::= 'extension'
     keyword ::= 'if'
     keyword ::= 'import'
+    keyword ::= 'in'
+    keyword ::= 'for'
+    keyword ::= 'foreach'
     keyword ::= 'func'
     keyword ::= 'oneof'
     keyword ::= 'static'
@@ -2052,6 +2055,7 @@ if vec[3] {
     stmt ::= <a href="#stmt-if">stmt-if</a>
     stmt ::= <a href="#stmt-while">stmt-while</a>
     stmt ::= <a href="#stmt-for">stmt-for</a>
+    stmt ::= <a href="#stmt-foreach">stmt-foreach</a>
   </pre>
 
   <p>Statements provide the control flow constructs of function bodies and
@@ -2243,7 +2247,26 @@ if vec[3] {
       /*...*/
     }
   </pre>
+
+  <!-- ===================================================================== -->
+  <h3 id="stmt-foreach">'foreach' Statement</h3>
+  <!-- ===================================================================== -->
   
+  <pre class="grammar">
+    stmt-foreach        ::= 'foreach' <a href="#pattern">pattern</a> 'in' <a href="#expr">expr</a> <a href="#stmt-brace">stmt-brace</a>
+  </pre>
+  
+  <p>'foreach' statements provide iteration over the values in a
+  range.</p>
+  
+  <p>Some examples include:</p>
+  
+  <pre class="example">
+    foreach i in 0..100 {
+      println(String(i));
+    }
+ </pre>
+
 
   <!-- ********************************************************************* -->
   <h2>Protocols</h2>

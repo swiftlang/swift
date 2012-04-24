@@ -25,6 +25,9 @@
 #include "JumpDest.h"
 #include "LValue.h"
 
+// FIXME: Temporary
+#include "IRGenModule.h"
+
 using namespace swift;
 using namespace irgen;
 
@@ -52,6 +55,10 @@ void IRGenFunction::emitStmt(Stmt *S) {
       
   case StmtKind::For:
     return emitForStmt(cast<ForStmt>(S));
+      
+  case StmtKind::ForEach:
+    IGM.unimplemented(S->getStartLoc(), "foreach loop");
+    return;
   }
   llvm_unreachable("bad statement kind!");
 }

@@ -28,7 +28,8 @@ namespace swift {
   class Decl;
   class Expr;
   class ASTWalker;
-
+  class Pattern;
+  
 enum class StmtKind {
 #define STMT(ID, PARENT) ID,
 #include "swift/AST/StmtNodes.def"
@@ -307,6 +308,52 @@ public:
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::For; }
 };
 
+/// ForEachStmt - foreach statement that iterates over the elements in a
+/// container.
+///
+/// Example:
+/// \code
+/// foreach i in 0..10 {
+///   println(String(i))
+/// }
+/// \endcode
+class ForEachStmt : public Stmt {
+  SourceLoc ForEachLoc;
+  SourceLoc InLoc;
+  Pattern *Pat;
+  Expr *Container;
+  BraceStmt *Body;
+  
+public:
+  ForEachStmt(SourceLoc ForEachLoc, Pattern *Pat, SourceLoc InLoc,
+              Expr *Container, BraceStmt *Body)
+    : Stmt(StmtKind::ForEach), ForEachLoc(ForEachLoc), Pat(Pat),
+      Container(Container), Body(Body) { }
+  
+  /// getPattern - Retrieve the pattern describing the iteration variables.
+  /// These variables will only be visible within the body of the loop.
+  Pattern *getPattern() const { return Pat; }
+  
+  /// getContainer - Retrieve the container whose elements will be visited
+  /// by this foreach loop.
+  Expr *getContainer() const { return Container; }
+  void setContainer(Expr *C) { Container = C; }
+  
+  /// getBody - Retrieve the body of the loop.
+  BraceStmt *getBody() const { return Body; }
+  void setBody(BraceStmt *B) { Body = B; }
+  
+  SourceRange getSourceRange() const {
+    return SourceRange(ForEachLoc, Body->getEndLoc());
+  }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ForEachStmt *) { return true; }
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::ForEach;
+  }
+};
+  
 } // end namespace swift
 
 #endif

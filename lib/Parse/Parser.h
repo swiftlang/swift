@@ -199,6 +199,11 @@ public:
   };
   
   TypeAliasDecl *parseDeclTypeAlias();
+  /// addVarsToScope - Add the variables in the given pattern to the current
+  /// scope, collecting the variables in the vector \c Decls and applying
+  /// \c Attributes to each one.
+  void addVarsToScope(Pattern *Pat, SmallVectorImpl<Decl*> &Decls,
+                      DeclAttributes &Attributes);
   void parseAttributeList(DeclAttributes &Attributes) {
     if (Tok.is(tok::l_square) || Tok.is(tok::l_square_space))
       parseAttributeListPresent(Attributes);
@@ -295,6 +300,7 @@ public:
   NullablePtr<Stmt> parseStmtIf();
   NullablePtr<Stmt> parseStmtWhile();
   NullablePtr<Stmt> parseStmtFor();
+  NullablePtr<Stmt> parseStmtForEach();
 };
 
 } // end namespace swift

@@ -154,6 +154,11 @@ public:
     
     return FS;
   }
+  
+  Stmt *visitForEachStmt(ForEachStmt *S) {
+    // FIXME: Type checking!
+    return S;
+  }
 };
   
 } // end anonymous namespace

@@ -324,17 +324,25 @@ ERROR(expected_lbrace_after_while,stmt_parsing,none,
       "expected '{' after 'while' condition", ())
 
 // For Stmt
-ERROR(expected_lparen_for_stmt,decl_parsing,none,
+ERROR(expected_lparen_for_stmt,stmt_parsing,none,
       "expected '(' in 'for' statement", ())
-ERROR(expected_semi_for_stmt,decl_parsing,none,
+ERROR(expected_semi_for_stmt,stmt_parsing,none,
       "expected ';' in 'for' statement", ())
-ERROR(expected_cond_for_stmt,decl_parsing,none,
+ERROR(expected_cond_for_stmt,stmt_parsing,none,
       "expected condition in 'for' statement", ())
-ERROR(expected_rparen_for_stmt,decl_parsing,none,
+ERROR(expected_rparen_for_stmt,stmt_parsing,none,
       "expected ')' in 'for' statement", ())
 ERROR(expected_lbrace_after_for,stmt_parsing,none,
       "expected '{' in 'for' statement", ())
 
+// Foreach Stmt
+ERROR(expected_foreach_in,stmt_parsing,none,
+      "expected 'in' after foreach pattern", ())
+ERROR(expected_foreach_container,stmt_parsing,none,
+      "expected container expression for foreach loop", ())
+ERROR(expected_foreach_lbrace,stmt_parsing,none,
+      "expected '{' to start the body of foreach loop", ())
+      
 //------------------------------------------------------------------------------
 // Expression parsing diagnostics
 //------------------------------------------------------------------------------

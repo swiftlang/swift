@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Parser.h"
+#include "swift/AST/Attr.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/Twine.h"
@@ -35,6 +36,7 @@ bool Parser::isStartOfStmtOtherThanAssignment(const Token &Tok) {
   case tok::kw_if:
   case tok::kw_while:
   case tok::kw_for:
+  case tok::kw_foreach:
     return true;
   }
 }
@@ -211,6 +213,7 @@ NullablePtr<Stmt> Parser::parseStmtOtherThanAssignment() {
   case tok::kw_if:     return parseStmtIf();
   case tok::kw_while:  return parseStmtWhile();
   case tok::kw_for:    return parseStmtFor();
+  case tok::kw_foreach: return parseStmtForEach();
   }
 }
 
@@ -364,5 +367,45 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
                                Semi2Loc, Increment, RPLoc, Body.get());
 }
 
+/// 
+///   stmt-for:
+///     'foreach' pattern 'in' expr stmt-brace
+NullablePtr<Stmt> Parser::parseStmtForEach() {
+  // 'foreach'
+  SourceLoc ForEachLoc = consumeToken(tok::kw_foreach);
+  
+  // pattern
+  NullablePtr<Pattern> Pattern = parsePattern();
+  
+  // 'in'
+  if (!Tok.is(tok::kw_in)) {
+    if (Pattern.isNonNull())
+      diagnose(Tok.getLoc(), diag::expected_foreach_in);
+    return nullptr;
+  }
+  SourceLoc InLoc = consumeToken();
+  
+  // expr
+  NullablePtr<Expr> Container = parseExpr(diag::expected_foreach_container);
+
+  // Introduce a new scope and place the variables in the pattern into that
+  // scope.
+  // FIXME: We may want to merge this scope with the scope introduced by
+  // the stmt-brace, as in C++.
+  Scope ForEachScope(this);
+  if (Pattern.isNonNull()) {
+    SmallVector<Decl *, 2> Decls;
+    DeclAttributes Attributes;
+    addVarsToScope(Pattern.get(), Decls, Attributes);
+  }
+  // stmt-brace
+  NullablePtr<BraceStmt> Body = parseStmtBrace(diag::expected_foreach_lbrace);
+  
+  if (Pattern.isNull() || Container.isNull() || Body.isNull())
+    return nullptr;
+
+  return new (Context) ForEachStmt(ForEachLoc, Pattern.get(), InLoc,
+                                   Container.get(), Body.get());
+}
 
 

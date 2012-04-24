@@ -378,6 +378,24 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return FS;
   }
 
+  Stmt *visitForEachStmt(ForEachStmt *S) {
+    if (Expr *Container = S->getContainer()) {
+      if ((Container = doIt(Container)))
+        S->setContainer(Container);
+      else
+        return nullptr;
+    }
+    
+    if (Stmt *Body = S->getBody()) {
+      if ((Body = doIt(Body)))
+        S->setBody(cast<BraceStmt>(Body));
+      else
+        return nullptr;
+    }
+    
+    return S;
+  }
+  
   bool visitPatternVarGetSet(Pattern *P) {
     switch (P->getKind()) {
     case PatternKind::Paren:

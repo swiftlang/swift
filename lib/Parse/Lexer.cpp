@@ -317,8 +317,10 @@ void Lexer::lexIdentifier() {
   
     // Statements
     .Case("if", tok::kw_if)
+    .Case("in", tok::kw_in)
     .Case("else", tok::kw_else)
     .Case("for", tok::kw_for)
+    .Case("foreach", tok::kw_foreach)
     .Case("while", tok::kw_while)
     .Case("return", tok::kw_return)
 
