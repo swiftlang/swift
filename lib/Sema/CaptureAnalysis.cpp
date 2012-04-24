@@ -69,6 +69,9 @@ static ValueDecl* FindValueDecl(Expr *E) {
       E = LTOE->getSubExpr();
     else if (AddressOfExpr *AOE = dyn_cast<AddressOfExpr>(E))
       E = AOE->getSubExpr();
+    else if (MemberRefExpr *MRE = dyn_cast<MemberRefExpr>(E))
+      // FIXME: maybe this shouldn't apply to bases with reference semantics?
+      E = MRE->getBase();
     else
       break;
   }
