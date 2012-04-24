@@ -29,6 +29,7 @@ namespace swift {
   class Expr;
   class ASTWalker;
   class Pattern;
+  class VarDecl;
   
 enum class StmtKind {
 #define STMT(ID, PARENT) ID,
@@ -324,21 +325,72 @@ class ForEachStmt : public Stmt {
   Expr *Container;
   BraceStmt *Body;
   
+  /// Range - The implicit variable used to store the range, which is local to
+  /// the foreach loop and is used solely for iteration.
+  VarDecl *Range;
+  
+  /// RangeInit - The expression that initializes the range.
+  Expr *RangeInit;
+  
+  /// RangeEmpty - The expression that determines whether the range is empty.
+  Expr *RangeEmpty;
+  
+  /// RangeGetFirst - The expression that retrieves the first element in the
+  /// range.
+  Expr *RangeGetFirst;
+
+  /// RangeDropFirst - The expression that drops the first element in the
+  /// range.
+  Expr *RangeDropFirst;
+
 public:
   ForEachStmt(SourceLoc ForEachLoc, Pattern *Pat, SourceLoc InLoc,
               Expr *Container, BraceStmt *Body)
-    : Stmt(StmtKind::ForEach), ForEachLoc(ForEachLoc), Pat(Pat),
-      Container(Container), Body(Body) { }
+    : Stmt(StmtKind::ForEach), ForEachLoc(ForEachLoc), InLoc(InLoc), Pat(Pat),
+      Container(Container), Body(Body), Range(), RangeInit(), RangeEmpty(),
+      RangeGetFirst(), RangeDropFirst(){ }
+  
+  /// getForEachLoc - Retrieve the location of the 'foreach' keyword.
+  SourceLoc getForEachLoc() const { return ForEachLoc; }
+
+  /// getInLoc - Retrieve the location of the 'in' keyword.
+  SourceLoc getInLoc() const { return InLoc; }
   
   /// getPattern - Retrieve the pattern describing the iteration variables.
   /// These variables will only be visible within the body of the loop.
   Pattern *getPattern() const { return Pat; }
   
   /// getContainer - Retrieve the container whose elements will be visited
-  /// by this foreach loop.
+  /// by this foreach loop, as it was written in the source code and
+  /// subsequently type-checked. To determine the semantic behavior of this
+  /// expression to extract a range, use \c getRangeInit().
   Expr *getContainer() const { return Container; }
   void setContainer(Expr *C) { Container = C; }
   
+  /// getRange - Retrieve the variable that
+  VarDecl *getRange() const { return Range; }
+  void setRange(VarDecl *R) { Range = R; }
+  
+  /// getRangeInit - Retrieve the initializer for the range, which will
+  /// include the evaluation of the container expression.
+  Expr *getRangeInit() const {return RangeInit; }
+  void setRangeInit(Expr *R) { RangeInit = R; }
+  
+  /// getRangeEmpty - Retrieve the expression that determines whether the
+  /// given range is empty.
+  Expr *getRangeEmpty() const { return RangeEmpty; }
+  void setRangeEmpty(Expr *E) { RangeEmpty = E; }
+  
+  /// getRangeGetFirst - Retrieve the expression that gets the first element
+  /// in the range.
+  Expr *getRangeGetFirst() const { return RangeGetFirst; }
+  void setRangeGetFirst(Expr *E) { RangeGetFirst = E; }
+
+  /// getRangeGetFirst - Retrieve the expression that gets the first element
+  /// in the range.
+  Expr *getRangeDropFirst() const { return RangeDropFirst; }
+  void setRangeDropFirst(Expr *E) { RangeDropFirst = E; }
+
   /// getBody - Retrieve the body of the loop.
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *B) { Body = B; }

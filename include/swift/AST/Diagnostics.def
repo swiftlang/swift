@@ -484,6 +484,8 @@ ERROR(autoclosure_function_input_nonunit,attribute_parsing,none,
 
 NOTE(type_declared_here,sema,none,
      "type declared here", ())
+NOTE(decl_declared_here,sema,none,
+     "%0 declared here", (Identifier))
 
 NOTE(while_converting_var_init,sema,none,
      "while converting 'var' initializer to declared type %0", (Type))
@@ -702,6 +704,34 @@ ERROR(expression_unused_lvalue,sema_tcs,none,
       "expression resolves to an unused l-value", ())
 ERROR(assignment_lhs_not_lvalue,sema_tcs,none,
       "cannot assign to the result of this expression", ())
+
+// ForEach Stmt
+ERROR(foreach_getelements,sema_tcs,none,
+      "no 'getElements' member in foreach container of type %0", (Type))
+ERROR(foreach_nonfunc_getelements,sema_tcs,none,
+      "'getElements' member of foreach container of type %0 is not a function",
+      (Type))
+ERROR(foreach_nonmaterializable_range,sema_tcs,none,
+      "non-materializable range type %0 returned by getElements() method of "
+      "type %1", (Type, Type))
+ERROR(foreach_range_empty,sema_tcs,none,
+      "no 'empty' member in foreach range of type %0", (Type))
+ERROR(foreach_nonfunc_range_empty,sema_tcs,none,
+      "'empty' member of foreach range of type %0 is not a function",
+      (Type))
+ERROR(foreach_range_getfirst,sema_tcs,none,
+      "no 'getfirst' member in foreach range of type %0", (Type))
+ERROR(foreach_nonfunc_range_getfirst,sema_tcs,none,
+      "'getfirst' member of foreach range of type %0 is not a function",
+      (Type))
+ERROR(foreach_nonmaterializable_element,sema_tcs,none,
+      "non-materializable element type %0 returned by getFirst() method of "
+      "range type %1", (Type, Type))
+ERROR(foreach_range_dropfirst,sema_tcs,none,
+      "no 'drp[first' member in foreach range of type %0", (Type))
+ERROR(foreach_nonfunc_range_dropfirst,sema_tcs,none,
+      "'dropfirst' member of foreach range of type %0 is not a function",
+      (Type))
 
 //------------------------------------------------------------------------------
 // Type Check Patterns

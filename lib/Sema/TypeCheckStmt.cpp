@@ -16,6 +16,7 @@
 
 #include "swift/Subsystems.h"
 #include "TypeChecker.h"
+#include "NameLookup.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ASTWalker.h"
@@ -155,8 +156,148 @@ public:
     return FS;
   }
   
+  /// callNullaryMemberOf - Form a call (with no arguments) to a method of the
+  /// given base.
+  Expr *callNullaryMethodOf(Expr *Base, Identifier Name, SourceLoc Loc,
+                            Diag<Type> MissingMember,
+                            Diag<Type> NonFuncMember) {
+    Type BaseType = Base->getType();
+    if (LValueType *BaseLV = BaseType->getAs<LValueType>())
+      BaseType = BaseLV->getObjectType();
+    
+    // Look for getElements.
+    MemberLookup Lookup(BaseType, Name, TC.TU);
+    if (!Lookup.isSuccess()) {
+      TC.diagnose(Loc, MissingMember, BaseType)
+        << Base->getSourceRange();
+      return nullptr;
+    }
+    
+    // Make sure we found a function (which may be overloaded, of course).
+    if (Lookup.Results.front().Kind == MemberLookupResult::TupleElement ||
+        Lookup.Results.front().Kind == MemberLookupResult::StructElement ||
+        !isa<FuncDecl>(Lookup.Results.front().D)) {
+      TC.diagnose(Loc, NonFuncMember, BaseType)
+        << Base->getSourceRange();
+      if (!Lookup.Results.front().Kind == MemberLookupResult::TupleElement &&
+          !Lookup.Results.front().Kind == MemberLookupResult::StructElement)
+        TC.diagnose(Lookup.Results.front().D->getLocStart(),
+                    diag::decl_declared_here,
+                    Lookup.Results.front().D->getName());
+      return nullptr;
+    }
+    
+    // Form container.getElements
+    Expr *Mem = Lookup.createResultAST(Base, Loc, Loc, TC.Context);
+    Mem = TC.recheckTypes(Mem);
+    if (!Mem) return nullptr;
+    
+    // Call container.getElements().
+    Expr *EmptyArgs
+    = new (TC.Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, Loc,
+                                 TupleType::getEmpty(TC.Context));
+    ApplyExpr *Call = new (TC.Context) CallExpr(Mem, EmptyArgs);
+    Expr *Result = TC.semaApplyExpr(Call);
+    if (!Result) return nullptr;
+    return TC.convertToRValue(Result);
+  }
+  
   Stmt *visitForEachStmt(ForEachStmt *S) {
-    // FIXME: Type checking!
+    // Type-check the container and convert it to an rvalue.
+    Expr *Container = S->getContainer();
+    if (TC.typeCheckExpression(Container)) return nullptr;
+    S->setContainer(Container);
+
+    // FIXME: When protocols come along, we'll have a protocol to check here,
+    // which will make this logic less hackish.
+
+    // Invoke getElements() on the container to retrieve the range of elements.
+    Type RangeTy;
+    VarDecl *Range;
+    {
+      Type ContainerType = Container->getType();
+      if (LValueType *ContainerLV = ContainerType->getAs<LValueType>())
+        ContainerType = ContainerLV->getObjectType();
+      
+      Expr *GetElements
+        = callNullaryMethodOf(Container,
+                              TC.Context.getIdentifier("getElements"),
+                              S->getInLoc(), diag::foreach_getelements,
+                              diag::foreach_nonfunc_getelements);
+      if (!GetElements) return nullptr;
+      
+      // Make sure our range type is materializable.
+      if (!GetElements->getType()->isMaterializable()) {
+        TC.diagnose(S->getInLoc(), diag::foreach_nonmaterializable_range,
+                    GetElements->getType(), ContainerType)
+          << Container->getSourceRange();
+        return nullptr;
+      }
+      
+      // Create a local variable to capture the range.
+      // FIXME: Mark declaration as implicit?
+      RangeTy = GetElements->getType();
+      DeclContext *DC = &TC.TU;
+      if (TheFunc)
+        DC = TheFunc;
+      Range = new (TC.Context) VarDecl(S->getInLoc(),
+                                       TC.Context.getIdentifier("__range"),
+                                       RangeTy, DC);
+      
+      // Add the range and its initializer to the AST.
+      S->setRange(Range);
+      S->setRangeInit(GetElements);
+    }
+    
+    // Compute the expression that determines whether the range is empty.
+    Expr *Empty
+      = callNullaryMethodOf(new (TC.Context) DeclRefExpr(Range, S->getInLoc(),
+                                                         RangeTy),
+                            TC.Context.getIdentifier("empty"),
+                            S->getInLoc(), diag::foreach_range_empty,
+                            diag::foreach_nonfunc_range_empty);
+    if (!Empty) return nullptr;
+    if (TC.typeCheckCondition(Empty)) return nullptr;
+    S->setRangeEmpty(Empty);
+    
+    // Compute the expression that extracts a value from the range.
+    Expr *GetFirst
+      = callNullaryMethodOf(new (TC.Context) DeclRefExpr(Range, S->getInLoc(),
+                                                         RangeTy),
+                            TC.Context.getIdentifier("getFirst"),
+                            S->getInLoc(), diag::foreach_range_getfirst,
+                            diag::foreach_nonfunc_range_getfirst);
+    if (!GetFirst) return nullptr;
+    
+    // Make sure our element type is materializable.
+    if (!GetFirst->getType()->isMaterializable()) {
+      TC.diagnose(S->getInLoc(), diag::foreach_nonmaterializable_element,
+                  GetFirst->getType(), RangeTy)
+        << Container->getSourceRange();
+      return nullptr;
+    }
+    S->setRangeGetFirst(GetFirst);
+
+    // Coerce the pattern to the element type, now that we know the element
+    // type.
+    Type ElementTy = GetFirst->getType();
+    if (TC.coerceToType(S->getPattern(), ElementTy)) return nullptr;
+    
+    // Compute the expression that drops the first value from the range.
+    Expr *DropFirst
+      = callNullaryMethodOf(new (TC.Context) DeclRefExpr(Range, S->getInLoc(),
+                                                         RangeTy),
+                            TC.Context.getIdentifier("dropFirst"),
+                            S->getInLoc(), diag::foreach_range_dropfirst,
+                            diag::foreach_nonfunc_range_dropfirst);
+    if (!DropFirst) return nullptr;
+    S->setRangeDropFirst(DropFirst);
+    
+    // Type-check the body of the loop.
+    BraceStmt *Body = S->getBody();
+    if (typeCheckStmt(Body)) return nullptr;
+    S->setBody(Body);
+    
     return S;
   }
 };

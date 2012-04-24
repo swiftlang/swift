@@ -2257,7 +2257,30 @@ if vec[3] {
   </pre>
   
   <p>'foreach' statements provide iteration over the values in a
-  range.</p>
+ container. The <tt>expr</tt> is the container, and shall have a
+ method <tt>getElements()</tt> that, when called, returns the range
+ over which the loop will iterate.</p>
+
+  <p>The range must, at a minimum, have three methods:
+  <div class="commentary">
+    The methods used here constitute an informal protocol. In the
+  future, we intend to express this via a formal protocol.
+ </div>
+<dl>
+  <dt><tt>empty() -> Bool</tt></dt>
+  <dd>Determines whether the range is empty, meaning that the loop
+    should terminate.</dd>
+  </dl>
+
+  <dt><tt>getFirst() -> T</tt></dt>
+  <dd>Retrieves the first element in the range. The type <tt>T</tt>
+  can be any materializable type, and will be used to initialize the
+  variables in the <tt>pattern</tt>.</dd>
+
+  <dt><tt>dropFirst()</tt></dt>
+  <dd>Drops the first element in the range, reducing the length of the
+  range by one.</dd>
+  </dl></p>
   
   <p>Some examples include:</p>
   
