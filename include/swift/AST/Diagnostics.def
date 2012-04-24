@@ -714,10 +714,10 @@ ERROR(foreach_nonfunc_getelements,sema_tcs,none,
 ERROR(foreach_nonmaterializable_range,sema_tcs,none,
       "non-materializable range type %0 returned by getElements() method of "
       "type %1", (Type, Type))
-ERROR(foreach_range_empty,sema_tcs,none,
-      "no 'empty' member in foreach range of type %0", (Type))
-ERROR(foreach_nonfunc_range_empty,sema_tcs,none,
-      "'empty' member of foreach range of type %0 is not a function",
+ERROR(foreach_range_isempty,sema_tcs,none,
+      "no 'isEmpty' member in foreach range of type %0", (Type))
+ERROR(foreach_nonfunc_range_isempty,sema_tcs,none,
+      "'isEmpty' member of foreach range of type %0 is not a function",
       (Type))
 ERROR(foreach_range_getfirst,sema_tcs,none,
       "no 'getfirst' member in foreach range of type %0", (Type))

@@ -259,9 +259,9 @@ public:
       = callNullaryMethodOf(
           new (TC.Context) DeclRefExpr(Range, S->getInLoc(),
                                        Range->getTypeOfReference()),
-          TC.Context.getIdentifier("empty"),
-          S->getInLoc(), diag::foreach_range_empty,
-          diag::foreach_nonfunc_range_empty);
+          TC.Context.getIdentifier("isEmpty"),
+          S->getInLoc(), diag::foreach_range_isempty,
+          diag::foreach_nonfunc_range_isempty);
     if (!Empty) return nullptr;
     if (TC.typeCheckCondition(Empty)) return nullptr;
     S->setRangeEmpty(Empty);
