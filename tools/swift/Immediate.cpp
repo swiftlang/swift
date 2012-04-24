@@ -291,12 +291,13 @@ void swift::REPL(ASTContext &Context) {
     memcpy(CurBuffer, Line, LineLen);
 
     // Special-case backslash for line continuations in the REPL.
-    bool HaveLineContinuation = false;
     if (LineLen > 1 && Line[LineLen-1] == '\n' && Line[LineLen-2] == '\\') {
-      HaveLineContinuation = true;
+      HadLineContinuation = true;
       CurBuffer[LineLen-2] = '\n';
       CurBuffer[LineLen-1] = '\0';
       LineLen -= 1;
+    } else {
+      HadLineContinuation = false;
     }
 
     // Enter the line into the line history.
@@ -341,7 +342,7 @@ void swift::REPL(ASTContext &Context) {
       L.lex(Tok);
     } while (1);
 
-    if (BraceCount || HaveLineContinuation)
+    if (BraceCount || HadLineContinuation)
       continue;
 
     // Parse the current line(s).
