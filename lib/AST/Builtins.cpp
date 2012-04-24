@@ -232,7 +232,8 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
 #define BUILTIN_BINARY_OPERATION(id, name, overload) overload,
 #define BUILTIN_BINARY_PREDICATE(id, name, overload) overload,
 #define BUILTIN_LOAD(id, name, overload) overload,
-#define BUILTIN_STORE(id, name, overload) overload,
+#define BUILTIN_ASSIGN(id, name, overload) overload,
+#define BUILTIN_INIT(id, name, overload) overload,
 #include "swift/AST/Builtins.def"
 };
 
@@ -297,7 +298,8 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
     return getLoadOperation(Context, Id, ArgType1);
 
 #define BUILTIN(id, name)
-#define BUILTIN_STORE(id, name, overload)  case BuiltinValueKind::id:
+#define BUILTIN_ASSIGN(id, name, overload)  case BuiltinValueKind::id:
+#define BUILTIN_INIT(id, name, overload)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
       return getStoreOperation(Context, Id, ArgType1);
   }

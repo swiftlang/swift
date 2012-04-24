@@ -630,7 +630,7 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
     return valueTI.load(IGF, addr, out);
   }
      
-  case BuiltinValueKind::Store: {
+  case BuiltinValueKind::Assign: {
     // The type of the operation is the type of the first argument of
     // the store function.
     Type valueTy = Fn->getType()->castTo<FunctionType>()->getInput()
@@ -646,6 +646,24 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
 
     // Perform the assignment operation.
     return valueTI.assign(IGF, args.Values, addr);
+  }
+
+  case BuiltinValueKind::Init: {
+    // The type of the operation is the type of the first argument of
+    // the store function.
+    Type valueTy = Fn->getType()->castTo<FunctionType>()->getInput()
+                     ->castTo<TupleType>()->getElementType(0);
+    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
+
+    // Treat the raw pointer as a physical l-value of that type.
+    llvm::Value *addrValue = args.Values.takeLast().getUnmanagedValue();
+    Address addr = getAddressForUnsafePointer(IGF, valueTI, addrValue);
+
+    // Mark that we're not returning anything.
+    result.setAsEmptyDirect();
+
+    // Perform the init operation.
+    return valueTI.initialize(IGF, args.Values, addr);
   }
       
 /// A macro which expands to the emission of a simple binary operation
