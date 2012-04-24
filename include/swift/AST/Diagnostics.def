@@ -516,6 +516,9 @@ ERROR(unknown_dotted_type_base,sema_nb,none,
 ERROR(dotted_reference_not_type,sema_nb,none,
       "dotted reference to %0 does not resolve to a type", (Identifier))
 
+ERROR(invalid_redecl,sema_nb,none,"invalid redeclaration",())
+NOTE(invalid_redecl_prev,sema_nb,none,
+     "%0 previously declared here", (Identifier))
 
 ERROR(no_module_or_type,sema_nb,none,
       "no such module or type", ())

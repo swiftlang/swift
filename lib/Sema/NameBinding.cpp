@@ -22,6 +22,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
@@ -418,6 +419,30 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
   // import statements after the first "chunk" should be rare, though.)
   if (ImportedModules.size() > TU->getImportedModules().size())
     TU->setImportedModules(TU->Ctx.AllocateCopy(ImportedModules));
+
+  // FIXME: This is quadratic time for TUs with multiple chunks.
+  // FIXME: Can we make this more efficient?
+  // Check for declarations with the same name which aren't overloaded
+  // vars/funcs.
+  llvm::DenseMap<Identifier, ValueDecl*> CheckTypes;
+  for (unsigned i = 0, e = TU->Decls.size(); i != e; ++i) {
+    if (ValueDecl *VD = dyn_cast<ValueDecl>(TU->Decls[i])) {
+      // FIXME: I'm not sure this check is really correct.
+      if (VD->getName().empty())
+        continue;
+      ValueDecl *&LookupD = CheckTypes[VD->getName()];
+      ValueDecl *PrevD = LookupD;
+      LookupD = VD;
+      if (i >= StartElem) {
+        if (PrevD && !((isa<VarDecl>(VD)    || isa<FuncDecl>(VD)) &&
+                       (isa<VarDecl>(PrevD) || isa<FuncDecl>(PrevD)))) {
+          Binder.diagnose(VD->getLocStart(), diag::invalid_redecl);
+          Binder.diagnose(PrevD->getLocStart(), diag::invalid_redecl_prev,
+                          VD->getName());
+        }
+      }
+    }
+  }
 
   // Loop over all the unresolved dotted types in the translation unit,
   // resolving them if possible.

@@ -17,10 +17,13 @@
 #include "swift/Subsystems.h"
 #include "TypeChecker.h"
 #include "NameLookup.h"
-#include "swift/AST/ASTVisitor.h"
-#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ASTVisitor.h"
+#include "swift/AST/Identifier.h"
+#include "swift/AST/PrettyStackTrace.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
 #include "NameLookup.h"
 
@@ -660,6 +663,31 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       if (TU->IsReplModule)
         if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D))
           REPLCheckPatternBinding(PBD, TC);
+    }
+  }
+
+  // Check overloaded vars/funcs.
+  // FIXME: This is quadratic time for TUs with multiple chunks.
+  // FIXME: Can we make this more efficient?
+  // FIXME: This check should be earlier to avoid ambiguous overload
+  // errors etc.
+  llvm::DenseMap<Identifier, TinyPtrVector<ValueDecl*>> CheckOverloads;
+  for (unsigned i = 0, e = TU->Decls.size(); i != e; ++i) {
+    if (ValueDecl *VD = dyn_cast<ValueDecl>(TU->Decls[i])) {
+      // FIXME: I'm not sure this check is really correct.
+      if (VD->getName().empty())
+        continue;
+      auto &PrevOv = CheckOverloads[VD->getName()];
+      if (i >= StartElem) {
+        for (ValueDecl *PrevD : PrevOv) {
+          if (PrevD->getType()->isEqual(VD->getType())) {
+            TC.diagnose(VD->getLocStart(), diag::invalid_redecl);
+            TC.diagnose(PrevD->getLocStart(), diag::invalid_redecl_prev,
+                        VD->getName());
+          }
+        }
+      }
+      PrevOv.push_back(VD);
     }
   }
 
