@@ -46,6 +46,8 @@
 #include <histedit.h>
 #include <dlfcn.h>
 
+using namespace swift;
+
 static void LoadSwiftRuntime() {
   // FIXME: Need error-checking.
   llvm::sys::Path LibPath =
@@ -55,6 +57,54 @@ static void LoadSwiftRuntime() {
   LibPath.appendComponent("lib");
   LibPath.appendComponent("libswift_abi.dylib");
   dlopen(LibPath.c_str(), 0);
+}
+
+static bool IRGenImportedModules(TranslationUnit *TU,
+                                 llvm::ExecutionEngine *EE,
+                                 llvm::Module &Module,
+                                 llvm::SmallPtrSet<TranslationUnit*, 8>
+                                     &ImportedModules,
+                                 irgen::Options &Options) {
+  // IRGen the modules this module depends on.
+  llvm::SmallVector<llvm::Function*, 4> InitFuncs;
+  for (auto ModPair : TU->getImportedModules()) {
+    if (isa<BuiltinModule>(ModPair.second))
+      continue;
+
+    TranslationUnit *SubTU = cast<TranslationUnit>(ModPair.second);
+    if (!ImportedModules.insert(SubTU))
+      continue;
+
+    // FIXME: Need to check whether this is actually safe in general.
+    llvm::Module SubModule(SubTU->Name.str(), Module.getContext());
+    performCaptureAnalysis(SubTU);
+    performIRGeneration(Options, &SubModule, SubTU);
+
+    if (TU->Ctx.hadError())
+      return true;
+
+    std::string ErrorMessage;
+    if (llvm::Linker::LinkModules(&Module, &SubModule,
+                                  llvm::Linker::DestroySource,
+                                  &ErrorMessage)) {
+      llvm::errs() << "Error linking swift modules\n";
+      llvm::errs() << ErrorMessage << "\n";
+      return true;
+    }
+
+    // FIXME: This is an ugly hack; need to figure out how this should
+    // actually work.
+    SmallVector<char, 20> NameBuf;
+    StringRef InitFnName = (SubTU->Name.str() + ".init").toStringRef(NameBuf);
+    llvm::Function *InitFn = Module.getFunction(InitFnName);
+    if (InitFn)
+      InitFuncs.push_back(InitFn);
+  }
+
+  for (auto InitFn : InitFuncs)
+    EE->runFunctionAsMain(InitFn, std::vector<std::string>(), 0);
+
+  return false;
 }
 
 void swift::RunImmediately(TranslationUnit *TU) {
@@ -74,56 +124,20 @@ void swift::RunImmediately(TranslationUnit *TU) {
   if (Context.hadError())
     return;
 
-  llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
-  llvm::SmallVector<llvm::Function*, 4> InitFuncs;
-  // IRGen the modules this module depends on.
-  for (auto ModPair : TU->getImportedModules()) {
-    if (isa<BuiltinModule>(ModPair.second))
-      continue;
-
-    TranslationUnit *SubTU = cast<TranslationUnit>(ModPair.second);
-    if (!ImportedModules.insert(SubTU))
-      continue;
-
-    // FIXME: Need to check whether this is actually safe in general.
-    llvm::Module SubModule(SubTU->Name.str(), LLVMContext);
-    performCaptureAnalysis(SubTU);
-    performIRGeneration(Options, &SubModule, SubTU);
-
-    if (Context.hadError())
-      return;
-
-    std::string ErrorMessage;
-    if (llvm::Linker::LinkModules(&Module, &SubModule,
-                                  llvm::Linker::DestroySource,
-                                  &ErrorMessage)) {
-      llvm::errs() << "Error linking swift modules\n";
-      llvm::errs() << ErrorMessage << "\n";
-      return;
-    }
-
-    // FIXME: This is an ugly hack; need to figure out how this should
-    // actually work.
-    SmallVector<char, 20> NameBuf;
-    StringRef InitFnName = (SubTU->Name.str() + ".init").toStringRef(NameBuf);
-    llvm::Function *InitFn = Module.getFunction(InitFnName);
-    if (InitFn)
-      InitFuncs.push_back(InitFn);
-  }
-
-  LoadSwiftRuntime();
-
-  // Run the generated program.
-
+  // Build the ExecutionEngine.
   llvm::EngineBuilder builder(&Module);
   std::string ErrorMsg;
   builder.setErrorStr(&ErrorMsg);
   builder.setEngineKind(llvm::EngineKind::JIT);
-
   llvm::ExecutionEngine *EE = builder.create();
-  for (auto InitFn : InitFuncs)
-    EE->runFunctionAsMain(InitFn, std::vector<std::string>(), 0);
 
+  LoadSwiftRuntime();
+
+  llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
+  if (IRGenImportedModules(TU, EE, Module, ImportedModules, Options))
+    return;
+
+  // Run the generated program.
   llvm::Function *EntryFn = Module.getFunction("main");
   EE->runFunctionAsMain(EntryFn, std::vector<std::string>(), 0);
 }
@@ -165,9 +179,6 @@ struct EditLineWrapper {
 };
 
 void swift::REPL(ASTContext &Context) {
-  if (llvm::sys::Process::StandardInIsUserInput())
-    printf("%s", "Welcome to swift.  Type ':help' for assistance.\n");
-  
   // FIXME: We should do something a bit more elaborate than
   // "allocate a 1MB buffer and hope it's enough".
   llvm::MemoryBuffer *Buffer =
@@ -184,7 +195,6 @@ void swift::REPL(ASTContext &Context) {
   llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
   llvm::LLVMContext LLVMContext;
   llvm::Module Module("REPL", LLVMContext);
-  std::string ErrorMessage;
 
   LoadSwiftRuntime();
 
@@ -211,6 +221,33 @@ void swift::REPL(ASTContext &Context) {
   unsigned CurIRGenElem = 0;
   unsigned BraceCount = 0;
   unsigned CurChunkLines = 0;
+
+  // Force swift.swift to be parsed/type-checked immediately.  This forces
+  // any errors to appear upfront, and helps eliminate some nasty lag after
+  // the first statement is typed into the REPL.
+  const char importstmt[] = "import swift\n";
+  strcpy(CurBuffer, importstmt);
+  CurBuffer += strlen(importstmt);
+  CurBufferEndOffset += strlen(importstmt);
+
+  swift::appendToMainTranslationUnit(TU, BufferID, CurTUElem,
+                                     CurBufferOffset,
+                                     CurBufferEndOffset);
+  if (Context.hadError())
+    return;
+
+  CurTUElem = CurIRGenElem = TU->Decls.size();
+
+  if (llvm::sys::Process::StandardInIsUserInput())
+    printf("%s", "Welcome to swift.  Type ':help' for assistance.\n");
+
+  if (IRGenImportedModules(TU, EE, Module, ImportedModules, Options))
+    return;
+
+  // Force upfront IRGen for swift.swift, to make the prompt more responsive.
+  // FIXME: We really shouldn't be JIT'ing swift.swift in the first place.
+  for (llvm::Function& F : Module)
+    EE->getPointerToFunction(&F);
 
   while (1) {
     // Read one line.
@@ -294,6 +331,7 @@ void swift::REPL(ASTContext &Context) {
     if (Context.hadError())
       return;
 
+    std::string ErrorMessage;
     if (llvm::Linker::LinkModules(&Module, &LineModule,
                                   llvm::Linker::DestroySource,
                                   &ErrorMessage)) {
@@ -302,43 +340,8 @@ void swift::REPL(ASTContext &Context) {
       return;
     }
 
-    // IRGen the modules this module depends on.
-    llvm::SmallVector<llvm::Function*, 4> InitFuncs;
-    for (auto ModPair : TU->getImportedModules()) {
-      if (isa<BuiltinModule>(ModPair.second))
-        continue;
-
-      TranslationUnit *SubTU = cast<TranslationUnit>(ModPair.second);
-      if (!ImportedModules.insert(SubTU))
-        continue;
-
-      // FIXME: Need to check whether this is actually safe in general.
-      llvm::Module SubModule(SubTU->Name.str(), LLVMContext);
-      performCaptureAnalysis(SubTU);
-      performIRGeneration(Options, &SubModule, SubTU);
-
-      if (Context.hadError())
-        return;
-
-      if (llvm::Linker::LinkModules(&Module, &SubModule,
-                                    llvm::Linker::DestroySource,
-                                    &ErrorMessage)) {
-        llvm::errs() << "Error linking swift modules\n";
-        llvm::errs() << ErrorMessage << "\n";
-        return;
-      }
-
-      // FIXME: This is an ugly hack; need to figure out how this should
-      // actually work.
-      SmallVector<char, 20> NameBuf;
-      StringRef InitFnName = (SubTU->Name.str() + ".init").toStringRef(NameBuf);
-      llvm::Function *InitFn = Module.getFunction(InitFnName);
-      if (InitFn)
-        InitFuncs.push_back(InitFn);
-    }
-
-    for (auto InitFn : InitFuncs)
-      EE->runFunctionAsMain(InitFn, std::vector<std::string>(), 0);
+    if (IRGenImportedModules(TU, EE, Module, ImportedModules, Options))
+      return;
 
     // FIXME: The way we do this is really ugly... we should be able to
     // improve this.

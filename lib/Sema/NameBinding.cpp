@@ -46,11 +46,13 @@ namespace {
   public:
     TranslationUnit *TU;
     ASTContext &Context;
-    llvm::StringMap<TranslationUnit*> LoadedModules;
+    llvm::StringMap<Module*> LoadedModules;
     bool ImportedBuiltinModule;
 
     NameBinder(TranslationUnit *TU)
     : TU(TU), Context(TU->Ctx), ImportedBuiltinModule(false) {
+      for (auto M : TU->getImportedModules())
+        LoadedModules[M.second->Name.str()] = M.second;
     }
     ~NameBinder() {
     }
@@ -130,8 +132,8 @@ Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
     return TU->Ctx.TheBuiltinModule;
   }
 
-  TranslationUnit *ImportedTU = LoadedModules.lookup(ModuleID.first.str());
-  if (ImportedTU) return ImportedTU;
+  Module *M = LoadedModules.lookup(ModuleID.first.str());
+  if (M) return M;
 
   // Open the input file.
   llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
@@ -148,6 +150,7 @@ Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
 
   // For now, treat all separate modules as unique components.
   Component *Comp = new (Context.Allocate<Component>(1)) Component();
+  TranslationUnit *ImportedTU;
   ImportedTU = new (Context) TranslationUnit(ModuleID.first, Comp, Context,
                                              /*IsMainModule*/false,
                                              /*IsReplModule*/false);
