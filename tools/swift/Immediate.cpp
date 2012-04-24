@@ -145,6 +145,7 @@ void swift::RunImmediately(TranslationUnit *TU) {
 struct EditLineWrapper {
   EditLine *e;
   size_t PromptContinuationLevel;
+  bool NeedPromptContinuation;
   
   llvm::SmallString<80> PromptString;
 
@@ -163,7 +164,7 @@ struct EditLineWrapper {
   }
   
   const char *getPrompt() {
-    if (PromptContinuationLevel == 0)
+    if (!NeedPromptContinuation)
       return "swift> ";
     
     PromptString = "swift| ";
@@ -220,6 +221,7 @@ void swift::REPL(ASTContext &Context) {
   unsigned CurTUElem = 0;
   unsigned CurIRGenElem = 0;
   unsigned BraceCount = 0;
+  bool HadLineContinuation = false;
   unsigned CurChunkLines = 0;
 
   // Force swift.swift to be parsed/type-checked immediately.  This forces
@@ -252,17 +254,31 @@ void swift::REPL(ASTContext &Context) {
   while (1) {
     // Read one line.
     e.PromptContinuationLevel = BraceCount;
+    e.NeedPromptContinuation = HadLineContinuation;
     int LineCount;
     const char* Line = el_gets(e, &LineCount);
     if (!Line)
       return;
+    size_t LineLen = strlen(Line);
 
-    strcpy(CurBuffer, Line);
-    CurBuffer += strlen(Line);
-    CurBufferEndOffset += strlen(Line);
+    memcpy(CurBuffer, Line, LineLen);
+
+    // Special-case backslash for line continuations in the REPL.
+    bool HaveLineContinuation = false;
+    if (LineLen > 1 && Line[LineLen-1] == '\n' && Line[LineLen-2] == '\\') {
+      HaveLineContinuation = true;
+      CurBuffer[LineLen-2] = '\n';
+      CurBuffer[LineLen-1] = '\0';
+      LineLen -= 1;
+    }
+
+    CurBuffer += LineLen;
+    CurBufferEndOffset += LineLen;
     ++CurChunkLines;
 
-    // If we detect unbalanced braces, keep reading before we start parsing.
+    // If we detect a line starting with a colon, treat it as a special
+    // REPL escape. If we detect unbalanced braces, keep reading before
+    // we start parsing.
     Lexer L(Line, Context.SourceMgr, nullptr);
     Token Tok;
     L.lex(Tok);
@@ -290,7 +306,7 @@ void swift::REPL(ASTContext &Context) {
       L.lex(Tok);
     } while (1);
 
-    if (BraceCount)
+    if (BraceCount || HaveLineContinuation)
       continue;
 
     // Parse the current line(s).
