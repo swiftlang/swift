@@ -153,7 +153,11 @@ struct EditLineWrapper {
 
   EditLineWrapper() {
     // Only show colors if both stderr and stdin are displayed.
+#if 0
+    // FIXME: Colors disabled until we can figure out why they interact badly
+    // with history.
     ShowColors = llvm::errs().is_displayed() && llvm::outs().is_displayed();
+#endif
 
     e = el_init("swift", stdin, stdout, stderr);
     h = history_init();
