@@ -447,13 +447,12 @@ extern "C" char *_TNSs6String6StringFT1vNSs6Int128_S_(__int128_t X) {
 
 // static func String(v : Double) -> String
 extern "C" char *_TNSs6String6StringFT1vNSs6Double_S_(double X) {
-  // TODO: optimize with snprintf etc if anyone cares.
-  llvm::SmallString<128> Result;
-  {
-    llvm::raw_svector_ostream Str(Result);
-    Str << X;
-  }
-  return strdup(Result.c_str());
+  char Buffer[256];
+  sprintf(Buffer, "%g", X);
+  if (llvm::StringRef((char*)Buffer).find_first_of(".e") ==
+        llvm::StringRef::npos)
+    strcat(Buffer, ".0");
+  return strdup(Buffer);
 }
 
 
