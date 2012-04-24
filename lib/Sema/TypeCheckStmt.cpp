@@ -212,14 +212,10 @@ static void
 PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
               SourceLoc EndLoc,
               SmallVectorImpl<unsigned> &MemberIndexes,
-              SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent) {
+              SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent,
+              SmallVectorImpl<ValueDecl*> &PrintDecls) {
   ASTContext &Context = TC.Context;
   TranslationUnit &TU = TC.TU;
-
-  // Lookup the "print" function used for strings.
-  SmallVector<ValueDecl*, 4> PrintDecls;
-  TU.lookupGlobalValue(Context.getIdentifier("print"),
-                       NLKind::UnqualifiedLookup, PrintDecls);
 
   if (TupleType *TT = dyn_cast<TupleType>(T)) {
     // We print a tuple by printing each element.
@@ -229,7 +225,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
       MemberIndexes.push_back(i);
       CanType SubType = TT->getElementType(i)->getCanonicalType();
       PrintReplExpr(TC, Arg, SubType, Loc, EndLoc, MemberIndexes,
-                    BodyContent);
+                    BodyContent, PrintDecls);
       MemberIndexes.pop_back();
 
       if (i + 1 != e)
@@ -280,7 +276,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
                          PrintDecls, BodyContent);
       CanType SubType = OOT->getTransparentType()->getCanonicalType();
       PrintReplExpr(TC, Arg, SubType, Loc, EndLoc,
-                    MemberIndexes, BodyContent);
+                    MemberIndexes, BodyContent, PrintDecls);
       return;
     }
 
@@ -331,12 +327,15 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
   SmallVector<ValueDecl*, 4> PrintDecls;
   TU.lookupGlobalValue(Context.getIdentifier("print"),
                        NLKind::UnqualifiedLookup, PrintDecls);
+  if (PrintDecls.empty())
+    return;
 
   // Printing format is "Int = 0\n".
   auto TypeStr = Context.getIdentifier(E->getType()->getString()).str();
   PrintLiteralString(TypeStr, Context, Loc, PrintDecls, BodyContent);
   PrintLiteralString(" = ", Context, Loc, PrintDecls, BodyContent);
-  PrintReplExpr(*this, Arg, T, Loc, EndLoc, MemberIndexes, BodyContent);
+  PrintReplExpr(*this, Arg, T, Loc, EndLoc, MemberIndexes, BodyContent,
+                PrintDecls);
   PrintLiteralString("\n", Context, Loc, PrintDecls, BodyContent);
 
   // Typecheck the function.
@@ -410,6 +409,8 @@ static void REPLCheckPatternBinding(PatternBindingDecl *D, TypeChecker &TC) {
   SmallVector<ValueDecl*, 4> PrintDecls;
   TC.TU.lookupGlobalValue(Context.getIdentifier("print"),
                           NLKind::UnqualifiedLookup, PrintDecls);
+  if (PrintDecls.empty())
+    return;
 
   // Build function of type T->T which prints the operand.
   Type FuncTy = T;
@@ -433,7 +434,8 @@ static void REPLCheckPatternBinding(PatternBindingDecl *D, TypeChecker &TC) {
   PrintLiteralString(TypeStr, Context, Loc, PrintDecls, BodyContent);
   PrintLiteralString(" = ", Context, Loc, PrintDecls, BodyContent);
   SmallVector<unsigned, 4> MemberIndexes;
-  PrintReplExpr(TC, Arg, T, Loc, EndLoc, MemberIndexes, BodyContent);
+  PrintReplExpr(TC, Arg, T, Loc, EndLoc, MemberIndexes, BodyContent,
+                PrintDecls);
   PrintLiteralString("\n", Context, Loc, PrintDecls, BodyContent);
   Expr *ArgRef = new (Context) DeclRefExpr(Arg, Loc, Arg->getTypeOfReference());
   BodyContent.push_back(new (Context) ReturnStmt(Loc, ArgRef));
