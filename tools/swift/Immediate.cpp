@@ -259,7 +259,7 @@ void swift::REPL(ASTContext &Context) {
   while (1) {
     // Read one line.
     e.PromptContinuationLevel = BraceCount;
-    e.NeedPromptContinuation = HadLineContinuation;
+    e.NeedPromptContinuation = BraceCount != 0 || HadLineContinuation;
     int LineCount;
     const char* Line = el_gets(e, &LineCount);
     if (!Line)
