@@ -187,6 +187,15 @@ namespace {
     bool isDirect() const { return CurState == State::Direct; }
     bool isIndirect() const { return CurState == State::Indirect; }
 
+    Callee getDirectValuesAsIndirectCallee() {
+      assert(isDirect());
+      Explosion &values = getDirectValues();
+      assert(values.size() == 2);
+      llvm::Value *fn = values.claimUnmanagedNext();
+      ManagedValue data = values.claimNext();
+      return Callee::forIndirectCall(fn, data);
+    }
+
     Explosion &getDirectValues() {
       assert(isDirect());
       return CurValue.getDirect();
@@ -487,84 +496,37 @@ IRGenModule::getFunctionType(Type type, ExplosionKind explosionKind,
   return sig.getType();
 }
 
-static bool isRefCountPtrTy(llvm::Type *ty) {
-  return isa<llvm::PointerType>(ty)
-      && cast<llvm::PointerType>(ty)->getAddressSpace() == 0
-      && ty->getContainedType(0)->isStructTy()
-      && cast<llvm::StructType>(ty->getContainedType(0))
-           ->getName().startswith("swift.refcounted");
+/// Return the appropriate function pointer type at which to call the
+/// given function.
+llvm::PointerType *Callee::getFunctionPointerType(IRGenModule &IGM,
+                                                  Type fnType) const {
+  return IGM.getFunctionType(fnType, ExplosionLevel, UncurryLevel,
+                             hasDataPointer())->getPointerTo();
 }
 
-namespace {
-  struct Callee {
-    /// The explosion level of the function to call.
-    ExplosionKind ExplosionLevel;
+/// Return this function pointer, bitcasted to an i8*.
+llvm::Value *Callee::getOpaqueFunctionPointer(IRGenFunction &IGF) const {
+  if (FnPtr->getType() == IGF.IGM.Int8PtrTy)
+    return FnPtr;
+  return IGF.Builder.CreateBitCast(FnPtr, IGF.IGM.Int8PtrTy);
+}
 
-    /// The uncurry level of the function to call.
-    unsigned UncurryLevel;
+/// Return this function pointer, bitcasted to the appropriate formal type.
+llvm::Value *Callee::getFunctionPointer(IRGenFunction &IGF, Type fnType) const {
+  llvm::Type *ty = getFunctionPointerType(IGF.IGM, fnType);
+  return IGF.Builder.CreateBitCast(FnPtr, ty);
+}
 
-  private:
-    /// The function to call.
-    llvm::Value *FnPtr;
+/// Return this data pointer.
+ManagedValue Callee::getDataPointer(IRGenFunction &IGF) const {
+  if (hasDataPointer()) return DataPtr;
+  return ManagedValue(IGF.IGM.RefCountedNull);
+}
 
-    /// The data pointer to pass, if required; otherwise the value is
-    /// null.
-    ManagedValue DataPtr;
-
-  public:
-    void set(llvm::Value *fnPtr, ManagedValue dataPtr) {
-      assert(fnPtr->getType()->getContainedType(0)->isFunctionTy() ||
-             fnPtr->getType()->getContainedType(0)->isIntegerTy(8));
-      assert(dataPtr.getValue() == nullptr ||
-             isRefCountPtrTy(dataPtr.getValue()->getType()));
-      assert(dataPtr.getValue() == nullptr ||
-             !isa<llvm::ConstantPointerNull>(dataPtr.getValue()));
-
-      FnPtr = fnPtr;
-      DataPtr = dataPtr;
-    }
-
-    void setForIndirectCall(llvm::Value *fn, ManagedValue data) {
-      ExplosionLevel = ExplosionKind::Minimal;
-      UncurryLevel = 0;
-      set(fn, isa<llvm::ConstantPointerNull>(data.getValue())
-                ? ManagedValue(nullptr) : data);
-    }
-
-    void setForIndirectCallFromResult(CallResult &result) {
-      assert(result.isDirect());
-      Explosion &values = result.getDirectValues();
-      assert(values.size() == 2);
-      llvm::Value *fn = values.claimUnmanagedNext();
-      ManagedValue data = values.claimNext();
-      setForIndirectCall(fn, data);
-    }
-
-    llvm::Value *getOpaqueFunctionPointer(IRGenFunction &IGF) const {
-      return IGF.Builder.CreateBitCast(FnPtr, IGF.IGM.Int8PtrTy);
-    }
-
-    llvm::Type *getFunctionPointerType(IRGenModule &IGM, Type type) const {
-      return IGM.getFunctionType(type, ExplosionLevel, UncurryLevel,
-                                 hasDataPointer())->getPointerTo();
-    }
-
-    llvm::Value *getFunctionPointer(IRGenFunction &IGF, Type type) const {
-      if (FnPtr->getType() != IGF.IGM.Int8PtrTy) {
-        assert(FnPtr->getType() == getFunctionPointerType(IGF.IGM, type));
-        return FnPtr;
-      }
-      return IGF.Builder.CreateBitCast(FnPtr,
-                                       getFunctionPointerType(IGF.IGM, type));
-    }
-
-    bool hasDataPointer() const { return DataPtr.getValue() != nullptr; }
-
-    ManagedValue getDataPointer(IRGenModule &IGM) const {
-      if (hasDataPointer()) return DataPtr;
-      return ManagedValue(IGM.RefCountedNull);
-    }
-  };
+Callee Callee::forIndirectCall(llvm::Value *fn, ManagedValue data) {
+  if (isa<llvm::ConstantPointerNull>(data.getValue()))
+    data = ManagedValue(nullptr);
+  return forKnownFunction(fn, data, ExplosionKind::Minimal, 0);
 }
 
 /// Emit a reference to a function, using the best parameters possible
@@ -579,20 +541,15 @@ static Callee emitCallee(IRGenModule &IGM, FuncDecl *fn,
   // TODO: be less conservative
   bestExplosion = ExplosionKind::Minimal;
 
-  Callee callee;
-  callee.UncurryLevel = bestUncurry;
-  callee.ExplosionLevel = bestExplosion;
-
   if (!fn->getDeclContext()->isLocalContext()) {
-    callee.set(IGM.getAddrOfGlobalFunction(fn, bestExplosion, bestUncurry),
-               ManagedValue(nullptr));
-  } else {
-    IGM.unimplemented(fn->getLocStart(), "local function emission");
-    llvm::Value *undef = llvm::UndefValue::get(IGM.Int8PtrTy);
-    callee.set(undef, ManagedValue(nullptr));
+    llvm::Constant *fnPtr =
+      IGM.getAddrOfGlobalFunction(fn, bestExplosion, bestUncurry);
+    return Callee::forGlobalFunction(fnPtr, bestExplosion, bestUncurry);
   }
 
-  return callee;
+  IGM.unimplemented(fn->getLocStart(), "local function emission");
+  llvm::Constant *undef = llvm::UndefValue::get(IGM.Int8PtrTy);
+  return Callee::forGlobalFunction(undef, bestExplosion, bestUncurry);
 }
 
 /// Emit a reference to the given function as a generic function pointer.
@@ -600,10 +557,10 @@ void swift::irgen::emitRValueForFunction(IRGenFunction &IGF, FuncDecl *fn,
                                          Explosion &explosion) {
   // Function pointers are always fully curried and use ExplosionKind::Minimal.
   Callee callee = emitCallee(IGF.IGM, fn, ExplosionKind::Minimal, 0);
-  assert(callee.ExplosionLevel == ExplosionKind::Minimal);
-  assert(callee.UncurryLevel == 0);
+  assert(callee.getExplosionLevel() == ExplosionKind::Minimal);
+  assert(callee.getUncurryLevel() == 0);
   explosion.addUnmanaged(callee.getOpaqueFunctionPointer(IGF));
-  explosion.add(callee.getDataPointer(IGF.IGM));
+  explosion.add(callee.getDataPointer(IGF));
 }
 
 namespace {
@@ -835,7 +792,7 @@ namespace {
 
       Callee callee = emitCallee(IGM, KnownFn, ExplosionKind::Maximal,
                                  CallSites.size() - 1);
-      return callee.ExplosionLevel;
+      return callee.getExplosionLevel();
     }
 
     void emit(IRGenFunction &IGF, CallResult &result,
@@ -945,7 +902,7 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
       if (CallSites.size() == 1) return;
 
       // Otherwise, pop that call site off and set up the callee conservatively.
-      callee.setForIndirectCallFromResult(result);
+      callee = result.getDirectValuesAsIndirectCallee();
       result.reset();
 
     // Otherwise, compute information about the function we're calling.
@@ -961,12 +918,12 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
     IGF.emitRValue(NontrivialFn, fnValues);
     llvm::Value *fnPtr = fnValues.claimUnmanagedNext();
     ManagedValue dataPtr = fnValues.claimNext();
-    callee.setForIndirectCall(fnPtr, dataPtr);
+    callee = Callee::forIndirectCall(fnPtr, dataPtr);
   }
 
   // 3. Emit arguments and call.
   while (true) {
-    assert(callee.UncurryLevel < CallSites.size());
+    assert(callee.getUncurryLevel() < CallSites.size());
 
     // Find the formal type of the function we're calling.  This is the
     // least-uncurried function type.
@@ -980,7 +937,7 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
     // Additionally compute the information for the formal result
     // type.  This is the result of the uncurried function type.
     Type formalResultType =
-      CallSites[CallSites.size() - callee.UncurryLevel - 1]
+      CallSites[CallSites.size() - callee.getUncurryLevel() - 1]
         .FnType->castTo<FunctionType>()->getResult();
     const TypeInfo &resultTI = IGF.IGM.getFragileTypeInfo(formalResultType);
 
@@ -990,16 +947,16 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
 
     // Add the data pointer in.
     if (callee.hasDataPointer()) {
-      args[--lastArgWritten] = callee.getDataPointer(IGF.IGM).forward(IGF);
+      args[--lastArgWritten] = callee.getDataPointer(IGF).forward(IGF);
     }
 
     // Emit all of the arguments we need to pass here.
-    for (unsigned i = callee.UncurryLevel + 1; i != 0; --i) {
+    for (unsigned i = callee.getUncurryLevel() + 1; i != 0; --i) {
       Expr *arg = CallSites.back().Arg;
       CallSites.pop_back();
 
       // Emit the argument, exploded at the appropriate level.
-      Explosion argExplosion(callee.ExplosionLevel);
+      Explosion argExplosion(callee.getExplosionLevel());
       IGF.emitRValue(arg, argExplosion);
 
       assert(lastArgWritten >= argExplosion.size());
@@ -1020,7 +977,8 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
     assert(lastArgWritten == 0 || lastArgWritten == 1);
     bool isAggregateResult = (lastArgWritten != 0);
     assert(isAggregateResult ==
-           resultTI.getSchema(callee.ExplosionLevel).requiresIndirectResult());
+           resultTI.getSchema(callee.getExplosionLevel())
+             .requiresIndirectResult());
     if (isAggregateResult) {
       assert(CallSites.empty() && "aggregate result on non-final call?");
 
@@ -1062,7 +1020,7 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
     if (call->getType()->isVoidTy()) {
       result.setAsEmptyDirect();
     } else {
-      Explosion &out = result.initForDirectValues(callee.ExplosionLevel);
+      Explosion &out = result.initForDirectValues(callee.getExplosionLevel());
       extractScalarResults(IGF, call, resultTI, out);
     }
       
@@ -1075,7 +1033,7 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
 
     // Otherwise, we must have gotten a function back.  Set ourselves
     // up to call it, then continue emitting calls.
-    callee.setForIndirectCallFromResult(result);
+    callee = result.getDirectValuesAsIndirectCallee();
     result.reset();
   }
 }
