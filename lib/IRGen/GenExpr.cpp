@@ -193,6 +193,7 @@ namespace {
 
     void visitSubscriptExpr(SubscriptExpr *E) {
       IGF.unimplemented(E->getLoc(), "emit rvalue SubscriptExpr");
+      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
     }
     void visitTupleShuffleExpr(TupleShuffleExpr *E) {
       emitTupleShuffle(IGF, E, Out);
@@ -218,6 +219,7 @@ namespace {
 
     void visitNewArrayExpr(NewArrayExpr *E) {
       IGF.unimplemented(E->getLoc(), "emit rvalue NewArrayExpr");
+      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
     }
 
     void visitApplyExpr(ApplyExpr *E) {
@@ -321,7 +323,7 @@ namespace {
     
     LValue visitSubscriptExpr(SubscriptExpr *E) {
       IGF.unimplemented(E->getLoc(), "emit lvalue SubscriptExpr");
-      return LValue();
+      return IGF.emitFakeLValue(IGF.getFragileTypeInfo(E->getType()));
     }
   };
 }
