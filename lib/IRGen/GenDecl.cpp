@@ -254,6 +254,99 @@ IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
   return addr;
 }
 
+static Type addOwnerArgument(ASTContext &ctx, Type owner, Type resultType) {
+  Type argType = owner;
+  if (!argType->hasReferenceSemantics()) {
+    argType = LValueType::get(argType, LValueType::Qual::DefaultForGetSet, ctx);
+  }
+  return FunctionType::get(argType, resultType, ctx);
+}
+
+static Type addOwnerArgument(ASTContext &ctx, ValueDecl *value,
+                             Type resultType) {
+  DeclContext *DC = value->getDeclContext();
+  switch (DC->getContextKind()) {
+  case DeclContextKind::TranslationUnit:
+  case DeclContextKind::BuiltinModule:
+  case DeclContextKind::CapturingExpr:
+  case DeclContextKind::TopLevelCodeDecl:
+    return resultType;
+
+  case DeclContextKind::ExtensionDecl:
+    return addOwnerArgument(ctx, cast<ExtensionDecl>(DC)->getExtendedType(),
+                            resultType);
+
+  case DeclContextKind::OneOfType:
+    return addOwnerArgument(ctx, cast<OneOfType>(DC), resultType);
+
+  case DeclContextKind::ProtocolType:
+    return addOwnerArgument(ctx, cast<ProtocolType>(DC), resultType);
+  }
+  llvm_unreachable("bad decl context");
+}
+
+/// getAddrOfGetter - Get the address of the function which performs a
+/// get or set.
+llvm::Function *IRGenModule::getAddrOfGetter(VarDecl *var,
+                                             ExplosionKind explosionLevel) {
+  LinkEntity entity = LinkEntity::forGetter(var, explosionLevel);
+
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) return cast<llvm::Function>(entry);
+
+  // The formal type of a getter function is one of:
+  //   () -> T (for a nontype member)
+  //   ([byref] A) -> () -> T (for a type member)
+  Type formalType = var->getType();
+  formalType = FunctionType::get(TupleType::getEmpty(Context),
+                                 formalType, Context);
+  formalType = addOwnerArgument(Context, var, formalType);
+
+  llvm::FunctionType *fnType =
+    getFunctionType(formalType, explosionLevel, /*uncurry*/ 1,
+                    /*data*/ false);
+
+  LinkInfo link = LinkInfo::get(*this, entity);
+  llvm::Function *addr
+    = cast<llvm::Function>(Module.getOrInsertFunction(link.getName(), fnType));
+  addr->setLinkage(link.getLinkage());
+  addr->setVisibility(link.getVisibility());
+
+  entry = addr;
+  return addr;
+}
+
+/// getAddrOfGetter - Get the address of the function which performs a
+/// get or set.
+llvm::Function *IRGenModule::getAddrOfSetter(VarDecl *var,
+                                             ExplosionKind explosionLevel) {
+  LinkEntity entity = LinkEntity::forSetter(var, explosionLevel);
+
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) return cast<llvm::Function>(entry);
+
+  // The formal type of a setter function is one of:
+  //   T -> () (for a nontype member)
+  //   ([byref] A) -> T -> () (for a type member)
+  Type formalType = var->getType();
+  formalType = FunctionType::get(formalType, TupleType::getEmpty(Context),
+                                 Context);
+  formalType = addOwnerArgument(Context, var, formalType);
+
+  llvm::FunctionType *fnType =
+    getFunctionType(formalType, explosionLevel, /*uncurry*/ 1,
+                    /*data*/ false);
+
+  LinkInfo link = LinkInfo::get(*this, entity);
+  llvm::Function *addr
+    = cast<llvm::Function>(Module.getOrInsertFunction(link.getName(), fnType));
+  addr->setLinkage(link.getLinkage());
+  addr->setVisibility(link.getVisibility());
+
+  entry = addr;
+  return addr;
+}
+
 LValue IRGenFunction::getGlobal(VarDecl *var) {
   OwnedAddress addr(IGM.getAddrOfGlobalVariable(var), IGM.RefCountedNull);
   return emitAddressLValue(addr);

@@ -15,9 +15,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/Function.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Optional.h"
+#include "GenFunc.h"
+#include "GenInit.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -324,4 +328,130 @@ void swift::irgen::emitRequalify(IRGenFunction &IGF, RequalifyExpr *E,
   // Otherwise, it doesn't, and we can just emit the underlying
   // expression directly.
   return IGF.emitRValue(E->getSubExpr(), explosion);
+}
+
+/// Must accesses to the given member variable be performed as a
+/// logical access?
+static bool isMemberAccessLogical(IRGenFunction &IGF, VarDecl *var) {
+  // For now, the answer is yes only if the variable is a property.
+  return var->isProperty();
+}
+
+/// Find the address of a setter at the best available resilience level.
+static Callee findSetter(IRGenFunction &IGF, VarDecl *member,
+                         ExplosionKind level) {
+  // For now, always be pessimistic.
+  level = ExplosionKind::Minimal;
+  return Callee::forGlobalFunction(IGF.IGM.getAddrOfSetter(member, level),
+                                   level, 1);
+}
+
+/// Find the address of a getter at the best available resilience level.
+static Callee findGetter(IRGenFunction &IGF, VarDecl *member,
+                         ExplosionKind level) {
+  // For now, always be pessimistic.
+  level = ExplosionKind::Minimal;
+  return Callee::forGlobalFunction(IGF.IGM.getAddrOfGetter(member, level),
+                                   level, 1);
+}
+
+namespace {
+  class LogicalMemberRef : public LogicalPathComponent {
+    VarDecl *Member;
+  public:
+    LogicalMemberRef(VarDecl *member)
+      : LogicalPathComponent(sizeof(LogicalMemberRef)), Member(member) {}
+
+    static void store(IRGenFunction &IGF, const Callee &setter, Address base,
+                      Explosion &value, const TypeInfo &valueTI) {
+      // Add the 'self' byref argument.
+      Explosion selfArg(setter.getExplosionLevel());
+      selfArg.addUnmanaged(base.getAddress());
+
+      Arg args[] = { Arg(selfArg), Arg(value, valueTI) };
+      emitVoidCall(IGF, setter, args);
+    }
+
+    void storeExplosion(IRGenFunction &IGF, Explosion &raw,
+                        Address base) const {
+      const TypeInfo &valueTI = IGF.getFragileTypeInfo(Member->getType());
+
+      Callee setter = findSetter(IGF, Member, raw.getKind());
+      store(IGF, setter, base, raw, valueTI);
+    }
+
+    void storeMaterialized(IRGenFunction &IGF, Address temp,
+                           Address base) const {
+      Callee setter = findSetter(IGF, Member, ExplosionKind::Maximal);
+
+      // Explode the value at the natural level of the setter we found.
+      Explosion value(setter.getExplosionLevel());
+      const TypeInfo &valueTI = IGF.getFragileTypeInfo(Member->getType());
+      valueTI.load(IGF, temp, value);
+
+      store(IGF, setter, base, value, valueTI);
+    }
+
+    void loadExplosion(IRGenFunction &IGF, Address base, Explosion &out) const {
+      Callee getter = findGetter(IGF, Member, out.getKind());
+
+      // Add the 'self' byref argument.
+      Explosion selfArg(getter.getExplosionLevel());
+      selfArg.addUnmanaged(base.getAddress());
+
+      const TypeInfo &valueTI = IGF.getFragileTypeInfo(Member->getType());
+
+      Arg args[] = { Arg(selfArg), Arg() };
+      emitCall(IGF, getter, args, valueTI, out);
+    }
+
+    void loadMaterialized(IRGenFunction &IGF, Address base, Address temp) const {
+      Callee getter = findGetter(IGF, Member, ExplosionKind::Maximal);
+
+      // Add the 'self' byref argument.
+      Explosion selfArg(getter.getExplosionLevel());
+      selfArg.addUnmanaged(base.getAddress());
+
+      const TypeInfo &valueTI = IGF.getFragileTypeInfo(Member->getType());
+
+      Arg args[] = { Arg(selfArg), Arg() };
+      emitCallToMemory(IGF, getter, args, valueTI, temp);
+    }
+
+    OwnedAddress loadAndMaterialize(IRGenFunction &IGF, OnHeap_t onHeap,
+                                    Address base) const {
+      Initialization init;
+      Initialization::Object object = init.getObjectForTemporary();
+
+      // Emit a local allocation for the object.
+      const TypeInfo &valueTI = IGF.getFragileTypeInfo(Member->getType());
+      OwnedAddress addr = init.emitLocalAllocation(IGF, object, onHeap,
+                                                   valueTI, "temporary");
+
+      // Load into the new memory.
+      loadMaterialized(IGF, base, addr);
+
+      // The load is complete;  mark the memory as initialized.
+      init.markInitialized(IGF, object);
+
+      return addr;
+    }
+  };
+}
+
+/// Emit an l-value for the given member reference.
+LValue swift::irgen::emitMemberRefLValue(IRGenFunction &IGF, MemberRefExpr *E) {
+  // TODO: we need to take a slightly different path if the base is a
+  // reference type.
+  assert(!E->getBase()->getType()->hasReferenceSemantics());
+  
+  // Emit the base l-value.
+  LValue lvalue = IGF.emitLValue(E->getBase());
+
+  // If we must access the member logically, push a logical member reference.
+  VarDecl *var = E->getDecl();
+  assert(isMemberAccessLogical(IGF, var));
+  lvalue.add<LogicalMemberRef>(var);
+
+  return lvalue;
 }

@@ -333,7 +333,17 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   // moment they can *all* be overloaded.
   if (ValueDecl *valueDecl = dyn_cast<ValueDecl>(TheDecl))
     if (!isa<TypeAliasDecl>(TheDecl))
-      mangler.mangleType(valueDecl->getType(), Explosion, UncurryLevel);
+      mangler.mangleType(valueDecl->getType(),
+                         getExplosionKind(),
+                         getUncurryLevel());
+
+  // Add a getter/setter suffix if applicable.
+  switch (getKind()) {
+  case Kind::Function: break;
+  case Kind::Other: break;
+  case Kind::Getter: buffer << "g"; break;
+  case Kind::Setter: buffer << "s"; break;
+  }
 
   // TODO: mangle generics information here.
 }

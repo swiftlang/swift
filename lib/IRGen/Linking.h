@@ -30,9 +30,6 @@ namespace llvm {
 }
 
 namespace swift {
-class NamedDecl;
-class ValueDecl;
-
 namespace irgen {
 enum class ExplosionKind : unsigned;
 class IRGenModule;
@@ -47,14 +44,27 @@ class IRGenModule;
 class LinkEntity {
   NamedDecl *TheDecl;
 
-  // These are only meaningful for function entities.
-  ExplosionKind Explosion;
-  unsigned UncurryLevel;
+  enum class Kind {
+    Function, Getter, Setter, Other
+  };
+  unsigned char TheKind;
+
+  // These are only meaningful for non-Other entities.
+  unsigned char Explosion;
+  unsigned char UncurryLevel;
 
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
   static bool isFunction(NamedDecl *decl) {
     return (isa<FuncDecl>(decl) || isa<OneOfElementDecl>(decl));
+  }
+
+  static bool hasGetterSetter(ValueDecl *decl) {
+    return (isa<VarDecl>(decl) || isa<SubscriptDecl>(decl));
+  }
+
+  Kind getKind() const {
+    return Kind(TheKind);
   }
 
   LinkEntity() = default;
@@ -66,22 +76,47 @@ public:
 
     LinkEntity entity;
     entity.TheDecl = fn;
-    entity.Explosion = explosionKind;
+    entity.TheKind = unsigned(Kind::Function);
+    entity.Explosion = unsigned(explosionKind);
     entity.UncurryLevel = uncurryLevel;
     return entity;
   }
+
   static LinkEntity forNonFunction(NamedDecl *decl) {
     assert(!isFunction(decl));
 
     LinkEntity entity;
     entity.TheDecl = decl;
+    entity.TheKind = unsigned(Kind::Other);
+    entity.Explosion = 0;
+    entity.UncurryLevel = 0;
+    return entity;
+  }
+
+  static LinkEntity forGetter(ValueDecl *decl, ExplosionKind explosionKind) {
+    assert(hasGetterSetter(decl));
+    LinkEntity entity;
+    entity.TheDecl = decl;
+    entity.TheKind = unsigned(Kind::Getter);
+    entity.Explosion = unsigned(explosionKind);
+    entity.UncurryLevel = 0;
+    return entity;
+  }
+
+  static LinkEntity forSetter(ValueDecl *decl, ExplosionKind explosionKind) {
+    assert(hasGetterSetter(decl));
+    LinkEntity entity;
+    entity.TheDecl = decl;
+    entity.TheKind = unsigned(Kind::Getter);
+    entity.Explosion = unsigned(explosionKind);
+    entity.UncurryLevel = 0;
     return entity;
   }
 
   void mangle(llvm::raw_ostream &out) const;
 
   NamedDecl *getDecl() const { return TheDecl; }
-  ExplosionKind getExplosionKind() const { return Explosion; }
+  ExplosionKind getExplosionKind() const { return ExplosionKind(Explosion); }
   unsigned getUncurryLevel() const { return UncurryLevel; }
 };
 
@@ -117,23 +152,28 @@ template <> struct llvm::DenseMapInfo<swift::irgen::LinkEntity> {
   static LinkEntity getEmptyKey() {
     LinkEntity entity;
     entity.TheDecl = nullptr;
-    entity.Explosion = swift::irgen::ExplosionKind::Minimal;
+    entity.TheKind = 0;
+    entity.Explosion = 0;
     entity.UncurryLevel = 0;
     return entity;
   }
   static LinkEntity getTombstoneKey() {
     LinkEntity entity;
     entity.TheDecl = nullptr;
-    entity.Explosion = swift::irgen::ExplosionKind::Minimal;
+    entity.TheKind = 0;
+    entity.Explosion = 0;
     entity.UncurryLevel = 1;
     return entity;
   }
   static unsigned getHashValue(const LinkEntity &entity) {
     return DenseMapInfo<swift::NamedDecl*>::getHashValue(entity.TheDecl)
-         + unsigned(entity.Explosion) + entity.UncurryLevel;
+         ^ ((entity.TheKind << 0) |
+            (entity.Explosion << 8) |
+            (entity.UncurryLevel << 16));
   }
   static bool isEqual(const LinkEntity &LHS, const LinkEntity &RHS) {
     return LHS.TheDecl == RHS.TheDecl
+        && LHS.TheKind == RHS.TheKind
         && LHS.Explosion == RHS.Explosion
         && LHS.UncurryLevel == RHS.UncurryLevel;
   }

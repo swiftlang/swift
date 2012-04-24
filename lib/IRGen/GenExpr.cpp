@@ -40,6 +40,11 @@
 using namespace swift;
 using namespace irgen;
 
+/// Is the given l-value type heap or non-heap?
+static OnHeap_t isOnHeap(Type type) {
+  return (type->castTo<LValueType>()->isHeap() ? OnHeap : NotOnHeap);
+}
+
 /// Emit an integer literal expression.
 static llvm::Value *emitIntegerLiteralExpr(IRGenFunction &IGF,
                                            IntegerLiteralExpr *E) {
@@ -132,8 +137,7 @@ llvm::Value *IRGenFunction::emitAsPrimitiveScalar(Expr *E) {
 static OwnedAddress emitMaterializeExpr(IRGenFunction &IGF,
                                         MaterializeExpr *E) {
   // Do we need a heap object?
-  OnHeap_t onHeap = E->getType()->castTo<LValueType>()->isHeap()
-                         ? OnHeap : NotOnHeap;
+  OnHeap_t onHeap = isOnHeap(E->getType());
 
   // Compute the object type.
   Expr *subExpr = E->getSubExpr();
@@ -241,7 +245,8 @@ namespace {
     }
 
     void visitMemberRefExpr(MemberRefExpr *E) {
-      IGF.unimplemented(E->getLoc(), "emit rvalue MemberRefExpr");
+      IGF.emitLValueAsScalar(emitMemberRefLValue(IGF, E),
+                             isOnHeap(E->getType()), Out);
     }
     
     void visitCapturingExpr(CapturingExpr *E) {
@@ -311,8 +316,7 @@ namespace {
     }
     
     LValue visitMemberRefExpr(MemberRefExpr *E) {
-      IGF.unimplemented(E->getLoc(), "emit lvalue MemberRefExpr");
-      return LValue();
+      return emitMemberRefLValue(IGF, E);
     }
     
     LValue visitSubscriptExpr(SubscriptExpr *E) {

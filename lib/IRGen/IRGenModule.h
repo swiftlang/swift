@@ -153,6 +153,8 @@ public:
   llvm::Function *getAddrOfGlobalFunction(FuncDecl *D, ExplosionKind kind,
                                           unsigned curryingLevel);
   llvm::Function *getAddrOfInjectionFunction(OneOfElementDecl *D);
+  llvm::Function *getAddrOfGetter(VarDecl *D, ExplosionKind kind);
+  llvm::Function *getAddrOfSetter(VarDecl *D, ExplosionKind kind);
 };
 
 } // end namespace irgen

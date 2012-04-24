@@ -88,11 +88,46 @@ namespace irgen {
     /// Return the function pointer as an appropriately-casted 
     llvm::Value *getFunctionPointer(IRGenFunction &IGF, Type formalType) const;
 
+    llvm::Value *getRawFunctionPointer() const {
+      return FnPtr;
+    }
+
     /// Is it possible that this function requires a non-null data pointer?
     bool hasDataPointer() const { return DataPtr.getValue() != nullptr; }
 
     /// Return the data pointer as a %swift.refcounted*.
     ManagedValue getDataPointer(IRGenFunction &IGF) const;
+  };
+
+  /// An argument to a call.
+  class Arg {
+    Explosion *Value;
+    const TypeInfo *Ty;
+
+  public:
+    /// Creates an empty argument with no values.
+    Arg() : Value(nullptr), Ty(nullptr) {}
+
+    /// Creates an untyped argument; the explosion's kind must
+    /// match the explosion kind of the callee.
+    explicit Arg(Explosion &value) : Value(&value), Ty(nullptr) {}
+
+    /// Creates a typed arugment.
+    Arg(Explosion &value, const TypeInfo &type) : Value(&value), Ty(&type) {}
+
+    bool empty() const {
+      return Value == nullptr;
+    }
+
+    Explosion &getValue() const {
+      assert(Value != nullptr && "asking for value of empty argument!");
+      return *Value;
+    }
+
+    const TypeInfo &getType() const {
+      assert(Ty != nullptr && "asking for type of untyped argument!");
+      return *Ty;
+    }
   };
 
   /// Emit an r-value reference to a function.
@@ -112,6 +147,21 @@ namespace irgen {
   /// call.
   void emitApplyExprToMemory(IRGenFunction &IGF, ApplyExpr *apply,
                              Address addr, const TypeInfo &type);
+
+  /// Emit a call.
+  void emitCall(IRGenFunction &IGF, const Callee &callee,
+                ArrayRef<Arg> args, const TypeInfo &resultTI,
+                Explosion &result);
+
+  /// Emit a call and place the result in memory.
+  void emitCallToMemory(IRGenFunction &IGF, const Callee &callee,
+                        ArrayRef<Arg> args, const TypeInfo &resultTI,
+                        Address resultAddress);
+
+  /// Emit a call with a void return value.
+  void emitVoidCall(IRGenFunction &IGF, const Callee &callee,
+                    ArrayRef<Arg> args);
+
 
 } // end namespace irgen
 } // end namespace swift

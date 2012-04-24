@@ -18,14 +18,19 @@
 #define SWIFT_IRGEN_GENLVALUE_H
 
 namespace swift {
+  class MemberRefExpr;
   class RequalifyExpr;
 
 namespace irgen {
   class Explosion;
   class IRGenFunction;
+  class LValue;
 
   /// Emit a requalification expression as an r-value.
   void emitRequalify(IRGenFunction &IGF, RequalifyExpr *E, Explosion &expl);
+
+  /// Emit an l-value for a member reference.
+  LValue emitMemberRefLValue(IRGenFunction &IGF, MemberRefExpr *E);
 
 } // end namespace irgen
 } // end namespace swift

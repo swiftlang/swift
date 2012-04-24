@@ -58,6 +58,13 @@ public:
       IGF.setCleanupState(getCleanup(), CleanupState::Dead);
     return getValue();
   }
+
+  /// Split this value into its underlying value and, if present, its cleanup.
+  llvm::Value *split(llvm::SmallVectorImpl<IRGenFunction::CleanupsDepth>
+                       &cleanups) {
+    if (hasCleanup()) cleanups.push_back(getCleanup());
+    return getValue();
+  }
 };
 
 /// The representation for an explosion is just a list of raw LLVM

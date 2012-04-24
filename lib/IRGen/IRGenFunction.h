@@ -289,8 +289,7 @@ public:
 
   OwnedAddress getAddrForParameter(VarDecl *param, Explosion &paramValues);
 
-  void emitNullaryCall(llvm::Value *fn, Type resultType,
-                               Explosion &result);
+  void emitNullaryCall(llvm::Value *fn, Type resultType, Explosion &result);
 
 private:
   Condition emitCondition(Expr *E, bool hasFalseCode);

@@ -872,7 +872,215 @@ static void extractScalarResults(IRGenFunction &IGF, llvm::Value *call,
   }
 
   resultTI.manage(IGF, tempExplosion, out);
-}                               
+}
+
+namespace {
+  /// An abstract helper class for emitting a single call.
+  class CallEmitter {
+  protected:
+    IRGenFunction &IGF;
+    const Callee &TheCallee;
+
+  private:
+    const TypeInfo &ResultTI;
+    CallResult &Result;
+    Address FinalAddress;
+
+    unsigned LastArgWritten;
+    SmallVector<llvm::Value*, 16> Args;
+    SmallVector<IRGenFunction::CleanupsDepth, 16> ArgCleanups;
+    
+  protected:
+    CallEmitter(IRGenFunction &IGF, const Callee &callee,
+                const TypeInfo &resultTI, CallResult &result,
+                Address finalAddress)
+      : IGF(IGF), TheCallee(callee), ResultTI(resultTI), Result(result),
+        FinalAddress(finalAddress) {
+    }
+
+    virtual void emitArgs() = 0;
+
+    /// Emit an individual argument explosion.  Generally, emitArgs
+    /// should call this once for each uncurry level.
+    void emitArg(Explosion &arg) {
+      assert(LastArgWritten >= arg.size());
+      LastArgWritten -= arg.size();
+    
+      auto argIterator = Args.begin() + LastArgWritten;
+      for (auto value : arg.claimAll()) {
+        *argIterator++ = value.split(ArgCleanups);
+      }
+    }
+
+  public:
+    void emit(llvm::Value *fnPtr);
+  };
+
+  /// ArgCallEmitter - A helper class for emitting a single call based
+  /// on an array of Arg objects.
+  class ArgCallEmitter : public CallEmitter {
+    ArrayRef<Arg> Args;
+
+  public:
+    ArgCallEmitter(IRGenFunction &IGF, const Callee &callee,
+                   ArrayRef<Arg> args,
+                   const TypeInfo &resultTI, CallResult &result,
+                   Address finalAddress)
+      : CallEmitter(IGF, callee, resultTI, result, finalAddress), Args(args) {
+      assert(TheCallee.getUncurryLevel() == Args.size());
+    }
+
+    void emitArgs() {
+      for (auto &arg : Args) {
+        // Ignore obviously empty arguments.
+        if (arg.empty()) continue;
+
+        Explosion &rawArgValue = arg.getValue();
+
+        // If the argument was emitted at the appropriate level, we're okay.
+        if (rawArgValue.getKind() == TheCallee.getExplosionLevel()) {
+          emitArg(rawArgValue);
+          continue;
+        }
+
+        // Otherwise, we need to re-explode it.
+        Explosion reexploded(TheCallee.getExplosionLevel());
+        arg.getType().reexplode(IGF, rawArgValue, reexploded);
+        emitArg(reexploded);
+      }
+    }
+  };
+
+  /// CallSiteCallEmitter - A helper class for emitting a single call
+  /// based on a stack of CallSites.
+  class CallSiteCallEmitter : public CallEmitter {
+    llvm::SmallVectorImpl<CallSite> &CallSites;
+
+  public:
+    CallSiteCallEmitter(IRGenFunction &IGF, const Callee &callee,
+                        llvm::SmallVectorImpl<CallSite> &callSites,
+                        const TypeInfo &resultTI, CallResult &result,
+                        Address finalAddress)
+      : CallEmitter(IGF, callee, resultTI, result, finalAddress),
+        CallSites(callSites) {
+      assert(TheCallee.getUncurryLevel() < CallSites.size());
+    }
+
+    void emitArgs() {
+      // Emit all of the arguments we need to pass here.
+      for (unsigned i = TheCallee.getUncurryLevel() + 1; i != 0; --i) {
+        Expr *arg = CallSites.back().Arg;
+        CallSites.pop_back();
+
+        // Emit the argument, exploded at the appropriate level.
+        Explosion argExplosion(TheCallee.getExplosionLevel());
+        IGF.emitRValue(arg, argExplosion);
+
+        emitArg(argExplosion);
+      }
+    }
+  };
+}
+
+/// Emit a call to the given function pointer, which should have been
+/// casted to exactly the right type.
+void CallEmitter::emit(llvm::Value *fnPtr) {
+  llvm::FunctionType *calleeType = 
+    cast<llvm::FunctionType>(cast<llvm::PointerType>(fnPtr->getType())
+                             ->getElementType());
+
+  // Build the arguments:
+  unsigned numArgs = calleeType->getNumParams();
+  Args.reserve(numArgs);
+  Args.set_size(numArgs);
+  LastArgWritten = numArgs;
+
+  //   Add the data pointer in.
+  if (TheCallee.hasDataPointer()) {
+    Args[--LastArgWritten] = TheCallee.getDataPointer(IGF).split(ArgCleanups);
+  }
+
+  //   Emit all of the formal arguments we have.
+  emitArgs();
+
+  Initialization indirectInit;
+  Initialization::Object indirectResultObject
+    = Initialization::Object::invalid();
+
+  // Emit and insert the result slot if required.
+  assert(LastArgWritten == 0 || LastArgWritten == 1);
+  bool isAggregateResult = (LastArgWritten != 0);
+  assert(isAggregateResult ==
+         ResultTI.getSchema(TheCallee.getExplosionLevel())
+           .requiresIndirectResult());
+  if (isAggregateResult) {
+    // Force there to be an indirect address.
+    Address resultAddress;
+    if (FinalAddress.isValid()) {
+      resultAddress = FinalAddress;
+    } else {
+      indirectResultObject = indirectInit.getObjectForTemporary();
+      indirectInit.registerObject(IGF, indirectResultObject,
+                                  NotOnHeap, ResultTI);
+      resultAddress =
+        indirectInit.emitLocalAllocation(IGF, indirectResultObject,
+                                         NotOnHeap, ResultTI,
+                                         "call.aggresult");
+    }
+    Args[0] = resultAddress.getAddress();
+    Result.setAsIndirectAddress(resultAddress);
+  }
+
+  // Deactivate all the cleanups.
+  for (auto cleanup : ArgCleanups)
+    IGF.setCleanupState(cleanup, CleanupState::Dead);
+
+  // Make the call.
+  // TODO: exceptions, calling conventions
+  llvm::CallInst *call = IGF.Builder.CreateCall(fnPtr, Args);
+    
+  // If we have an aggregate result, set the sret and noalias
+  // attributes on the agg return slot, then return, since agg
+  // results can only be final.
+  if (isAggregateResult) {
+    // Mark that we've successfully initialized the indirect result.
+    if (indirectResultObject.isValid())
+      indirectInit.markInitialized(IGF, indirectResultObject);
+
+    setAggResultAttributes(call);
+    assert(Result.isIndirect());
+    return;
+  }
+
+  // If we have a void result, there's nothing to do.
+  if (call->getType()->isVoidTy()) {
+    Result.setAsEmptyDirect();
+    return;
+  }
+
+  // Extract out the scalar results.
+  Explosion &out = Result.initForDirectValues(TheCallee.getExplosionLevel());
+  extractScalarResults(IGF, call, ResultTI, out);
+}
+
+/// Emit a call with a set of arguments which have already been emitted.
+static void emitCall(IRGenFunction &IGF, const Callee &callee,
+                     ArrayRef<Arg> args, const TypeInfo &resultTI,
+                     CallResult &result) {
+  // Remember the requested final address, if applicable.
+  Address finalAddress;
+  if (!result.isInvalid()) {
+    finalAddress = result.getIndirectAddress();
+    result.reset();
+  }
+
+  // Find the function pointer.  In this world, the function pointer
+  // needs to already have been appropriately casted.
+  llvm::Value *fn = callee.getRawFunctionPointer();
+
+  // Emit the call.
+  ArgCallEmitter(IGF, callee, args, resultTI, result, finalAddress).emit(fn);
+}
 
 /// Emit a function call.
 void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
@@ -930,9 +1138,6 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
     Type calleeFormalType = CallSites.back().FnType;
     llvm::Value *fnPtr =
       callee.getFunctionPointer(IGF, calleeFormalType);
-    llvm::FunctionType *calleeType = 
-      cast<llvm::FunctionType>(cast<llvm::PointerType>(fnPtr->getType())
-                                 ->getElementType());
 
     // Additionally compute the information for the formal result
     // type.  This is the result of the uncurried function type.
@@ -941,93 +1146,11 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
         .FnType->castTo<FunctionType>()->getResult();
     const TypeInfo &resultTI = IGF.IGM.getFragileTypeInfo(formalResultType);
 
-    // Build the arguments:
-    SmallVector<llvm::Value*, 16> args(calleeType->getNumParams());
-    unsigned lastArgWritten = calleeType->getNumParams();
+    CallSiteCallEmitter(IGF, callee, CallSites, resultTI, result, finalAddress)
+      .emit(fnPtr);
 
-    // Add the data pointer in.
-    if (callee.hasDataPointer()) {
-      args[--lastArgWritten] = callee.getDataPointer(IGF).forward(IGF);
-    }
-
-    // Emit all of the arguments we need to pass here.
-    for (unsigned i = callee.getUncurryLevel() + 1; i != 0; --i) {
-      Expr *arg = CallSites.back().Arg;
-      CallSites.pop_back();
-
-      // Emit the argument, exploded at the appropriate level.
-      Explosion argExplosion(callee.getExplosionLevel());
-      IGF.emitRValue(arg, argExplosion);
-
-      assert(lastArgWritten >= argExplosion.size());
-      lastArgWritten -= argExplosion.size();
-
-      // Now forward those values into the argument list.
-      auto argIterator = args.begin() + lastArgWritten;
-      for (auto value : argExplosion.claimAll()) {
-        *argIterator++ = value.forward(IGF);
-      }
-    }
-
-    Initialization indirectInit;
-    Initialization::Object indirectResultObject
-      = Initialization::Object::invalid();
-
-    // Emit and insert the result slot if required.
-    assert(lastArgWritten == 0 || lastArgWritten == 1);
-    bool isAggregateResult = (lastArgWritten != 0);
-    assert(isAggregateResult ==
-           resultTI.getSchema(callee.getExplosionLevel())
-             .requiresIndirectResult());
-    if (isAggregateResult) {
-      assert(CallSites.empty() && "aggregate result on non-final call?");
-
-      // Force there to be an indirect address.
-      Address resultAddress;
-      if (finalAddress.isValid()) {
-        resultAddress = finalAddress;
-      } else {
-        indirectResultObject = indirectInit.getObjectForTemporary();
-        indirectInit.registerObject(IGF, indirectResultObject,
-                                    NotOnHeap, resultTI);
-        resultAddress =
-          indirectInit.emitLocalAllocation(IGF, indirectResultObject,
-                                           NotOnHeap, resultTI,
-                                           "call.aggresult");
-      }
-      args[0] = resultAddress.getAddress();
-      result.setAsIndirectAddress(resultAddress);
-    }
-
-    // Make the call.
-    // TODO: exceptions, calling conventions
-    llvm::CallInst *call = IGF.Builder.CreateCall(fnPtr, args);
-    
-    // If we have an aggregate result, set the sret and noalias
-    // attributes on the agg return slot, then return, since agg
-    // results can only be final.
-    if (isAggregateResult) {
-      // Mark that we've successfully initialized the indirect result.
-      if (indirectResultObject.isValid())
-        indirectInit.markInitialized(IGF, indirectResultObject);
-
-      setAggResultAttributes(call);
-      assert(result.isIndirect());
-      return;
-    }
-
-    // Extract out the scalar results.
-    if (call->getType()->isVoidTy()) {
-      result.setAsEmptyDirect();
-    } else {
-      Explosion &out = result.initForDirectValues(callee.getExplosionLevel());
-      extractScalarResults(IGF, call, resultTI, out);
-    }
-      
     // If this is the end of the call sites, we're done.
     if (CallSites.empty()) {
-      assert(!result.isIndirect() &&
-             "returning direct values when indirect result was requested!");
       return;
     }
 
@@ -1081,6 +1204,57 @@ swift::irgen::tryEmitApplyAsAddress(IRGenFunction &IGF, ApplyExpr *E,
   plan.emit(IGF, result, resultTI);
   assert(result.isIndirect());
   return result.getIndirectAddress();
+}
+
+/// Emit a call against a set of arguments which have already been
+/// emitted, placing the result in memory.
+void swift::irgen::emitCallToMemory(IRGenFunction &IGF, const Callee &callee,
+                                    ArrayRef<Arg> args, const TypeInfo &resultTI,
+                                    Address resultAddress) {
+  CallResult result;
+  result.setAsIndirectAddress(resultAddress);
+  ::emitCall(IGF, callee, args, resultTI, result);
+
+  if (result.isIndirect()) {
+    assert(result.getIndirectAddress().getAddress()
+             == resultAddress.getAddress());
+    return;
+  }
+
+  Explosion &directValues = result.getDirectValues();
+  resultTI.initialize(IGF, directValues, resultAddress);
+}
+
+/// Emit a call against a set of arguments which have already been
+/// emitted, placing the result in an explosion.
+void swift::irgen::emitCall(IRGenFunction &IGF, const Callee &callee,
+                            ArrayRef<Arg> args, const TypeInfo &resultTI,
+                            Explosion &resultExplosion) {
+  CallResult result;
+  ::emitCall(IGF, callee, args, resultTI, result);
+
+  if (result.isIndirect()) {
+    resultTI.load(IGF, result.getIndirectAddress(), resultExplosion);
+    return;
+  }
+
+  Explosion &directValues = result.getDirectValues();
+  if (directValues.getKind() == resultExplosion.getKind())
+    return resultExplosion.add(directValues.claimAll());
+
+  resultTI.reexplode(IGF, directValues, resultExplosion);
+}
+
+/// Emit a void-returning call against a set of arguments which have
+/// already been emitted.
+void swift::irgen::emitVoidCall(IRGenFunction &IGF, const Callee &callee,
+                                ArrayRef<Arg> args) {
+  const TypeInfo &resultTI =
+    IGF.getFragileTypeInfo(TupleType::getEmpty(IGF.IGM.Context));
+
+  CallResult result;
+  ::emitCall(IGF, callee, args, resultTI, result);
+  assert(result.isDirect() && result.getDirectValues().empty());
 }
 
 /// Emit a nullary call to the given function, using the standard
