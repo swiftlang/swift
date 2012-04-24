@@ -144,6 +144,7 @@ void swift::RunImmediately(TranslationUnit *TU) {
 
 struct EditLineWrapper {
   EditLine *e;
+  History *h;
   size_t PromptContinuationLevel;
   bool NeedPromptContinuation;
   
@@ -151,12 +152,16 @@ struct EditLineWrapper {
 
   EditLineWrapper() {
     e = el_init("swift", stdin, stdout, stderr);
+    h = history_init();
     PromptContinuationLevel = 0;
     el_set(e, EL_EDITOR, "emacs");
     el_set(e, EL_PROMPT, PromptFn);
     el_set(e, EL_CLIENTDATA, (void*)this);
+    el_set(e, EL_HIST, history, h);
+    HistEvent ev;
+    history(h, &ev, H_SETSIZE, 800);
   }
-  
+
   static char *PromptFn(EditLine *e) {
     void* clientdata;
     el_get(e, EL_CLIENTDATA, &clientdata);
@@ -271,6 +276,12 @@ void swift::REPL(ASTContext &Context) {
       CurBuffer[LineLen-1] = '\0';
       LineLen -= 1;
     }
+
+    // Enter the line into the line history.
+    // FIXME: We should probably be a bit more clever here about which lines we
+    // put into the history and when we put them in.
+    HistEvent ev;
+    history(e.h, &ev, H_ENTER, CurBuffer);
 
     CurBuffer += LineLen;
     CurBufferEndOffset += LineLen;
