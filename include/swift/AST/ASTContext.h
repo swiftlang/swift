@@ -19,6 +19,7 @@
 
 #include "llvm/Support/DataTypes.h"
 #include "swift/AST/Type.h"
+#include "llvm/ADT/StringMap.h"
 #include <vector>
 
 namespace llvm {
@@ -57,6 +58,9 @@ public:
 
   /// \Diags - The diagnostics engine.
   DiagnosticEngine &Diags;
+  
+  /// LoadedModules - The set of modules we have loaded.
+  llvm::StringMap<Module*> LoadedModules;
   
   /// TheBuiltinModule - The builtin module.
   Module * const TheBuiltinModule;

@@ -22,7 +22,6 @@
 #include "swift/AST/ASTWalker.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"
-#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
@@ -46,13 +45,12 @@ namespace {
   public:
     TranslationUnit *TU;
     ASTContext &Context;
-    llvm::StringMap<Module*> LoadedModules;
     bool ImportedBuiltinModule;
 
     NameBinder(TranslationUnit *TU)
     : TU(TU), Context(TU->Ctx), ImportedBuiltinModule(false) {
       for (auto M : TU->getImportedModules())
-        LoadedModules[M.second->Name.str()] = M.second;
+        Context.LoadedModules[M.second->Name.str()] = M.second;
     }
     ~NameBinder() {
     }
@@ -132,7 +130,7 @@ Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
     return TU->Ctx.TheBuiltinModule;
   }
 
-  Module *M = LoadedModules.lookup(ModuleID.first.str());
+  Module *M = Context.LoadedModules.lookup(ModuleID.first.str());
   if (M) return M;
 
   // Open the input file.
@@ -156,7 +154,7 @@ Module *NameBinder::getModule(std::pair<Identifier, SourceLoc> ModuleID) {
                                              /*IsReplModule*/false);
 
   parseIntoTranslationUnit(ImportedTU, BufferID);
-  LoadedModules[ModuleID.first.str()] = ImportedTU;
+  Context.LoadedModules[ModuleID.first.str()] = ImportedTU;
 
   // We have to do name binding on it to ensure that types are fully resolved.
   // This should eventually be eliminated by having actual fully resolved binary
@@ -191,7 +189,7 @@ addStandardLibraryImport(SmallVectorImpl<ImportedModule> &Result) {
   // Builtin or swift, we implicitly import swift.  This isn't really ideal.
   if (ImportedBuiltinModule)
     return;
-  if (LoadedModules.lookup("swift"))
+  if (Context.LoadedModules.lookup("swift"))
     return;
   if (TU->Name.str() == "swift")
     return;

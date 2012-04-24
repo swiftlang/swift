@@ -18,6 +18,8 @@
 #include "swift/AST/AST.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/ADT/SmallPtrSet.h"
+
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -58,6 +60,7 @@ TypeAliasDecl *BuiltinModuleCache::lookupType(Identifier Name,
   if (LookupKind != NLKind::QualifiedLookup) return nullptr;
   
   NamedDecl *&Entry = Cache[Name];
+  
   if (Entry == 0)
     if (Type Ty = getBuiltinType(M.Ctx, Name.str()))
       Entry = new (M.Ctx) TypeAliasDecl(SourceLoc(), Name, Ty,
@@ -285,7 +288,11 @@ TypeAliasDecl *Module::lookupGlobalType(Identifier Name, NLKind LookupKind) {
   
   // If we still haven't found it, scrape through all of the imports, taking the
   // first match of the name.
+  llvm::SmallPtrSet<Module *, 16> Visited;
   for (auto &ImpEntry : TU.getImportedModules()) {
+    if (!Visited.insert(ImpEntry.second))
+      continue;
+    
     TAD = ImpEntry.second->lookupType(ImpEntry.first, Name, LookupKind);
     if (TAD) return TAD;  // If we found a match, return the decl.
   }
@@ -311,8 +318,13 @@ void Module::lookupGlobalValue(Identifier Name, NLKind LookupKind,
 
   // If we still haven't found it, scrape through all of the imports, taking the
   // first match of the name.
-  for (auto &ImpEntry : TU.getImportedModules())
+  llvm::SmallPtrSet<Module *, 16> Visited;
+  for (auto &ImpEntry : TU.getImportedModules()) {
+    if (!Visited.insert(ImpEntry.second))
+      continue;
+    
     ImpEntry.second->lookupValue(ImpEntry.first, Name, LookupKind, Result);
+  }
 }
 
 /// lookupGlobalExtensionMethods - Lookup the extensions members for the
@@ -337,7 +349,11 @@ void Module::lookupGlobalExtensionMethods(Type BaseType, Identifier Name,
   TranslationUnit &TU = *cast<TranslationUnit>(this);
 
   // Otherwise, check our imported extensions as well.
+  llvm::SmallPtrSet<Module *, 16> Visited;
   for (auto &ImpEntry : TU.getImportedModules()) {
+    if (!Visited.insert(ImpEntry.second))
+      continue;
+    
     for (ExtensionDecl *ED : ImpEntry.second->lookupExtensions(BaseType)) {
       for (Decl *Member : ED->getMembers()) {
         if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
