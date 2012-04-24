@@ -201,6 +201,7 @@ void swift::REPL(ASTContext &Context) {
   llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
   llvm::LLVMContext LLVMContext;
   llvm::Module Module("REPL", LLVMContext);
+  llvm::Module DumpModule("REPL", LLVMContext);
 
   LoadSwiftRuntime();
 
@@ -299,6 +300,8 @@ void swift::REPL(ASTContext &Context) {
       } else if (L.peekNextToken().getText() == "quit" ||
                  L.peekNextToken().getText() == "exit") {
         return;
+      } else if (L.peekNextToken().getText() == "dump_ir") {
+        DumpModule.dump();
       } else {
         printf("%s", "Unknown interpreter escape; try :help\n");
       }
@@ -360,12 +363,21 @@ void swift::REPL(ASTContext &Context) {
 
     std::string ErrorMessage;
     if (llvm::Linker::LinkModules(&Module, &LineModule,
+                                  llvm::Linker::PreserveSource,
+                                  &ErrorMessage)) {
+      llvm::errs() << "Error linking swift modules\n";
+      llvm::errs() << ErrorMessage << "\n";
+      return;
+    }
+    if (llvm::Linker::LinkModules(&DumpModule, &LineModule,
                                   llvm::Linker::DestroySource,
                                   &ErrorMessage)) {
       llvm::errs() << "Error linking swift modules\n";
       llvm::errs() << ErrorMessage << "\n";
       return;
     }
+    llvm::Function *DumpModuleMain = DumpModule.getFunction("main");
+    DumpModuleMain->setName("repl.line");
 
     if (IRGenImportedModules(TU, EE, Module, ImportedModules, Options))
       return;
