@@ -93,6 +93,12 @@ SourceRange WhileStmt::getSourceRange() const {
   return SourceRange(WhileLoc, Body->getEndLoc());
 }
 
+Pattern *ForEachStmt::getPattern() const {
+  if (Pattern *P = Pat.dyn_cast<Pattern *>())
+    return P;
+  return Pat.get<PatternBindingDecl *>()->getPattern();
+}
+
 //===----------------------------------------------------------------------===//
 // Printing for Stmt and all subclasses.
 //===----------------------------------------------------------------------===//

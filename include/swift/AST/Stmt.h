@@ -29,7 +29,7 @@ namespace swift {
   class Expr;
   class ASTWalker;
   class Pattern;
-  class VarDecl;
+  class PatternBindingDecl;
   
 enum class StmtKind {
 #define STMT(ID, PARENT) ID,
@@ -321,24 +321,16 @@ public:
 class ForEachStmt : public Stmt {
   SourceLoc ForEachLoc;
   SourceLoc InLoc;
-  Pattern *Pat;
+  llvm::PointerUnion<Pattern *, PatternBindingDecl *> Pat;
   Expr *Container;
   BraceStmt *Body;
   
-  /// Range - The implicit variable used to store the range, which is local to
-  /// the foreach loop and is used solely for iteration.
-  VarDecl *Range;
-  
-  /// RangeInit - The expression that initializes the range.
-  Expr *RangeInit;
-  
+  /// Range - The range variable along with its initializer.
+  PatternBindingDecl *Range;
+    
   /// RangeEmpty - The expression that determines whether the range is empty.
   Expr *RangeEmpty;
   
-  /// RangeGetFirst - The expression that retrieves the first element in the
-  /// range.
-  Expr *RangeGetFirst;
-
   /// RangeDropFirst - The expression that drops the first element in the
   /// range.
   Expr *RangeDropFirst;
@@ -347,8 +339,8 @@ public:
   ForEachStmt(SourceLoc ForEachLoc, Pattern *Pat, SourceLoc InLoc,
               Expr *Container, BraceStmt *Body)
     : Stmt(StmtKind::ForEach), ForEachLoc(ForEachLoc), InLoc(InLoc), Pat(Pat),
-      Container(Container), Body(Body), Range(), RangeInit(), RangeEmpty(),
-      RangeGetFirst(), RangeDropFirst(){ }
+      Container(Container), Body(Body), Range(), RangeEmpty(),
+      RangeDropFirst() { }
   
   /// getForEachLoc - Retrieve the location of the 'foreach' keyword.
   SourceLoc getForEachLoc() const { return ForEachLoc; }
@@ -358,7 +350,7 @@ public:
   
   /// getPattern - Retrieve the pattern describing the iteration variables.
   /// These variables will only be visible within the body of the loop.
-  Pattern *getPattern() const { return Pat; }
+  Pattern *getPattern() const;
   
   /// getContainer - Retrieve the container whose elements will be visited
   /// by this foreach loop, as it was written in the source code and
@@ -367,27 +359,26 @@ public:
   Expr *getContainer() const { return Container; }
   void setContainer(Expr *C) { Container = C; }
   
-  /// getRange - Retrieve the variable that
-  VarDecl *getRange() const { return Range; }
-  void setRange(VarDecl *R) { Range = R; }
-  
-  /// getRangeInit - Retrieve the initializer for the range, which will
-  /// include the evaluation of the container expression.
-  Expr *getRangeInit() const {return RangeInit; }
-  void setRangeInit(Expr *R) { RangeInit = R; }
+  /// getRange - Retrieve the pattern binding that contains the (implicit)
+  /// range variable and its initialization from the container.
+  PatternBindingDecl *getRange() const { return Range; }
+  void setRange(PatternBindingDecl *R) { Range = R; }
   
   /// getRangeEmpty - Retrieve the expression that determines whether the
   /// given range is empty.
   Expr *getRangeEmpty() const { return RangeEmpty; }
   void setRangeEmpty(Expr *E) { RangeEmpty = E; }
   
-  /// getRangeGetFirst - Retrieve the expression that gets the first element
-  /// in the range.
-  Expr *getRangeGetFirst() const { return RangeGetFirst; }
-  void setRangeGetFirst(Expr *E) { RangeGetFirst = E; }
+  /// getElementInit - Retrieve the pattern binding that binds the pattern
+  /// (with the iteration variables) to the initialization of that pattern
+  /// from the result of getFirst().
+  PatternBindingDecl *getElementInit() const {
+    return Pat.dyn_cast<PatternBindingDecl *>();
+  }
+  void setElementInit(PatternBindingDecl *EI) { Pat = EI; }
 
-  /// getRangeGetFirst - Retrieve the expression that gets the first element
-  /// in the range.
+  /// getRangeDropFirst - Retrieve the expression that drops the first element
+  /// from the range, modifying the range in-place.
   Expr *getRangeDropFirst() const { return RangeDropFirst; }
   void setRangeDropFirst(Expr *E) { RangeDropFirst = E; }
 

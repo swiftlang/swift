@@ -35,6 +35,7 @@ namespace swift {
   class BraceStmt;
   class Decl;
   class Expr;
+  class ForEachStmt;
   class ForStmt;
   class IfStmt;
   template<typename T> class Optional;
@@ -256,6 +257,7 @@ private:
   void emitReturnStmt(ReturnStmt *S);
   void emitWhileStmt(WhileStmt *S);
   void emitForStmt(ForStmt *S);
+  void emitForEachStmt(ForEachStmt *S);
 
 //--- Expression emission ------------------------------------------------------
 public:
@@ -303,8 +305,6 @@ public:
   void emitPatternBindingDecl(PatternBindingDecl *D);
 
 private:
-  void emitLocalVar(VarDecl *D);
-
   struct LocalVarRecord {
     OwnedAddress Addr;
   };

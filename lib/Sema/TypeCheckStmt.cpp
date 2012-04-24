@@ -211,6 +211,11 @@ public:
     // FIXME: When protocols come along, we'll have a protocol to check here,
     // which will make this logic less hackish.
 
+    // Figure out the declaration context we're in.
+    DeclContext *DC = &TC.TU;
+    if (TheFunc)
+      DC = TheFunc;
+
     // Invoke getElements() on the container to retrieve the range of elements.
     Type RangeTy;
     VarDecl *Range;
@@ -237,16 +242,16 @@ public:
       // Create a local variable to capture the range.
       // FIXME: Mark declaration as implicit?
       RangeTy = GetElements->getType();
-      DeclContext *DC = &TC.TU;
-      if (TheFunc)
-        DC = TheFunc;
       Range = new (TC.Context) VarDecl(S->getInLoc(),
                                        TC.Context.getIdentifier("__range"),
                                        RangeTy, DC);
       
-      // Add the range and its initializer to the AST.
-      S->setRange(Range);
-      S->setRangeInit(GetElements);
+      // Create a pattern binding to initialize the range and wire it into the
+      // AST.
+      Pattern *RangePat = new (TC.Context) NamedPattern(Range);
+      S->setRange(new (TC.Context) PatternBindingDecl(S->getForEachLoc(),
+                                                      RangePat, GetElements,
+                                                      DC));
     }
     
     // Compute the expression that determines whether the range is empty.
@@ -276,7 +281,10 @@ public:
         << Container->getSourceRange();
       return nullptr;
     }
-    S->setRangeGetFirst(GetFirst);
+    S->setElementInit(new (TC.Context) PatternBindingDecl(S->getForEachLoc(),
+                                                          S->getPattern(),
+                                                          GetFirst,
+                                                          DC));
 
     // Coerce the pattern to the element type, now that we know the element
     // type.
