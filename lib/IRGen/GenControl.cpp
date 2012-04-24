@@ -22,6 +22,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "JumpDest.h"
+#include "Scope.h"
 
 using namespace swift;
 using namespace irgen;
@@ -99,11 +100,15 @@ IRGenFunction::createBasicBlock(const llvm::Twine &Name) {
 ///
 /// \param hasFalseCode - true if the false branch doesn't just lead
 /// to the fallthrough.
-Condition IRGenFunction::emitCondition(Expr *E, bool hasFalseCode) {
+/// \param invertValue - true if this routine should invert the value before
+/// testing true/false.
+Condition IRGenFunction::emitCondition(Expr *E, bool hasFalseCode,
+                                       bool invertValue) {
   assert(Builder.hasValidIP() && "emitting condition at unreachable point");
 
   // Sema forces conditions to have Builtin.i1 type, which guarantees this.
   // TODO: special-case interesting condition expressions.
+  FullExpr Scope(*this);
   llvm::Value *V = emitAsPrimitiveScalar(E);
   assert(V->getType()->isIntegerTy(1));
 
@@ -113,7 +118,7 @@ Condition IRGenFunction::emitCondition(Expr *E, bool hasFalseCode) {
   if (llvm::ConstantInt *C = dyn_cast<llvm::ConstantInt>(V)) {
     // If the condition is constant false, ignore the true branch.  We
     // will fall into the false branch unless there is none.
-    if (C->isZero()) {
+    if (C->isZero() == !invertValue) {
       trueBB = nullptr;
       falseBB = (hasFalseCode ? Builder.GetInsertBlock() : nullptr);
 
@@ -129,6 +134,12 @@ Condition IRGenFunction::emitCondition(Expr *E, bool hasFalseCode) {
 
   // Otherwise, the condition requires a conditional branch.
   } else {
+    // If requested, invert the value.
+    if (invertValue)
+      V = Builder.CreateXor(V,
+                            llvm::Constant::getIntegerValue(IGM.Int1Ty,
+                                                            llvm::APInt(1, 1)));
+    
     contBB = createBasicBlock("condition.cont");
     trueBB = createBasicBlock("if.true");
 

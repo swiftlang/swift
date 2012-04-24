@@ -286,15 +286,12 @@ public:
                   const TypeInfo &type);
   void emitAssign(Expr *E, const LValue &lvalue, const TypeInfo &type);
 
-  void emitPatternBindingInit(Pattern *P, Expr *E, bool isGlobal);
-  void emitPatternBindingInit(Pattern *P, Explosion &E, bool isGlobal);
-
   OwnedAddress getAddrForParameter(VarDecl *param, Explosion &paramValues);
 
   void emitNullaryCall(llvm::Value *fn, Type resultType, Explosion &result);
 
 private:
-  Condition emitCondition(Expr *E, bool hasFalseCode);
+  Condition emitCondition(Expr *E, bool hasFalseCode, bool invertValue = false);
 
 //--- Declaration emission -----------------------------------------------------
 public:

@@ -25,9 +25,6 @@
 #include "JumpDest.h"
 #include "LValue.h"
 
-// FIXME: Temporary
-#include "IRGenModule.h"
-
 using namespace swift;
 using namespace irgen;
 
@@ -57,8 +54,7 @@ void IRGenFunction::emitStmt(Stmt *S) {
     return emitForStmt(cast<ForStmt>(S));
       
   case StmtKind::ForEach:
-    IGM.unimplemented(S->getStartLoc(), "foreach loop");
-    return;
+    return emitForEachStmt(cast<ForEachStmt>(S));
   }
   llvm_unreachable("bad statement kind!");
 }
@@ -205,4 +201,46 @@ void IRGenFunction::emitForStmt(ForStmt *S) {
 
 }
 
+void IRGenFunction::emitForEachStmt(ForEachStmt *S) {
+  FullExpr Scope(*this);
+  
+  // Emit the 'range' variable that we'll be using for iteration.
+  emitPatternBindingDecl(S->getRange());
+  
+  // If we ever reach an unreachable point, stop emitting statements.
+  // This will need revision if we ever add goto.
+  if (!Builder.hasValidIP()) return;
+
+  // Create a new basic block and jump into it.
+  llvm::BasicBlock *LoopBB = createBasicBlock("foreach.cond");
+  Builder.CreateBr(LoopBB);
+  Builder.emitBlock(LoopBB);
+
+  Condition Cond = emitCondition(S->getRangeEmpty(), /*hasFalseCode=*/false,
+                                 /*invertValue=*/true);
+  if (Cond.hasTrue()) {
+    Cond.enterTrue(*this);
+
+    // Emit the loop body.
+    FullExpr Scope(*this);
+    emitPatternBindingDecl(S->getElementInit());
+    emitStmt(S->getBody());
+
+    // Drop the first element in the range
+    if (Builder.hasValidIP()) {
+      FullExpr Scope(*this);
+      emitIgnored(S->getRangeDropFirst());
+    }
+    
+    // Loop back to the header.
+    if (Builder.hasValidIP()) {
+      Builder.CreateBr(LoopBB);
+      Builder.ClearInsertionPoint();
+    }
+    Cond.exitTrue(*this);
+  }
+  
+  // Complete the conditional execution.
+  Cond.complete(*this);  
+}
 

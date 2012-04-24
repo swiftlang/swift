@@ -256,22 +256,24 @@ public:
     
     // Compute the expression that determines whether the range is empty.
     Expr *Empty
-      = callNullaryMethodOf(new (TC.Context) DeclRefExpr(Range, S->getInLoc(),
-                                                         RangeTy),
-                            TC.Context.getIdentifier("empty"),
-                            S->getInLoc(), diag::foreach_range_empty,
-                            diag::foreach_nonfunc_range_empty);
+      = callNullaryMethodOf(
+          new (TC.Context) DeclRefExpr(Range, S->getInLoc(),
+                                       Range->getTypeOfReference()),
+          TC.Context.getIdentifier("empty"),
+          S->getInLoc(), diag::foreach_range_empty,
+          diag::foreach_nonfunc_range_empty);
     if (!Empty) return nullptr;
     if (TC.typeCheckCondition(Empty)) return nullptr;
     S->setRangeEmpty(Empty);
     
     // Compute the expression that extracts a value from the range.
     Expr *GetFirst
-      = callNullaryMethodOf(new (TC.Context) DeclRefExpr(Range, S->getInLoc(),
-                                                         RangeTy),
-                            TC.Context.getIdentifier("getFirst"),
-                            S->getInLoc(), diag::foreach_range_getfirst,
-                            diag::foreach_nonfunc_range_getfirst);
+      = callNullaryMethodOf(
+          new (TC.Context) DeclRefExpr(Range, S->getInLoc(),
+                                       Range->getTypeOfReference()),
+          TC.Context.getIdentifier("getFirst"),
+          S->getInLoc(), diag::foreach_range_getfirst,
+          diag::foreach_nonfunc_range_getfirst);
     if (!GetFirst) return nullptr;
     
     // Make sure our element type is materializable.
@@ -293,11 +295,12 @@ public:
     
     // Compute the expression that drops the first value from the range.
     Expr *DropFirst
-      = callNullaryMethodOf(new (TC.Context) DeclRefExpr(Range, S->getInLoc(),
-                                                         RangeTy),
-                            TC.Context.getIdentifier("dropFirst"),
-                            S->getInLoc(), diag::foreach_range_dropfirst,
-                            diag::foreach_nonfunc_range_dropfirst);
+      = callNullaryMethodOf(
+          new (TC.Context) DeclRefExpr(Range, S->getInLoc(),
+                                       Range->getTypeOfReference()),
+          TC.Context.getIdentifier("dropFirst"),
+          S->getInLoc(), diag::foreach_range_dropfirst,
+          diag::foreach_nonfunc_range_dropfirst);
     if (!DropFirst) return nullptr;
     S->setRangeDropFirst(DropFirst);
     
