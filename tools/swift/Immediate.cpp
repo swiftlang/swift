@@ -464,7 +464,7 @@ extern "C" char *_TNSs6String6StringFT1vNSs6Int128_S_(__int128_t X) {
   bool WasNeg = X < 0;
   __uint128_t Y = WasNeg ? -X : X;
 
-  if (Y == 0) *--P = 0;  // Special case.
+  if (Y == 0) *--P = '0';  // Special case.
 
   while (Y) {
     *--P = '0' + char(Y % 10);
