@@ -927,7 +927,7 @@ namespace {
                    const TypeInfo &resultTI, CallResult &result,
                    Address finalAddress)
       : CallEmitter(IGF, callee, resultTI, result, finalAddress), Args(args) {
-      assert(TheCallee.getUncurryLevel() == Args.size());
+      assert(TheCallee.getUncurryLevel() + 1== Args.size());
     }
 
     void emitArgs() {

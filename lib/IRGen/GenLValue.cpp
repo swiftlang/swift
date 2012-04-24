@@ -122,7 +122,7 @@ static void emitAssignRecursive(IRGenFunction &IGF,
   }
 
   // Otherwise, load and materialize into a temporary.
-  Address temp = component.loadAndMaterialize(IGF, OnHeap, base);
+  Address temp = component.loadAndMaterialize(IGF, NotOnHeap, base);
 
   // Recursively perform the store.
   emitAssignRecursive(IGF, temp, finalType, finalValue, pathStart, pathEnd);

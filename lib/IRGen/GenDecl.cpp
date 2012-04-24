@@ -388,9 +388,15 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     switch (member->getKind()) {
     case DeclKind::Import:
     case DeclKind::OneOfElement:
-    case DeclKind::PatternBinding:
     case DeclKind::TopLevelCode:
       llvm_unreachable("decl not allowed in extension!");
+
+    // PatternBindingDecls don't really make sense here, but we
+    // produce one as a side-effect of parsing a var property.
+    // Just ignore it.
+    case DeclKind::PatternBinding:
+      continue;
+
     case DeclKind::Subscript:
       // Getter/setter will be handled separately.
       continue;
