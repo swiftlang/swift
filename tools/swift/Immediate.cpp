@@ -328,6 +328,8 @@ void swift::REPL(ASTContext &Context) {
         return;
       } else if (L.peekNextToken().getText() == "dump_ir") {
         DumpModule.dump();
+      } else if (L.peekNextToken().getText() == "dump_ast") {
+        TU->dump();
       } else {
         printf("%s", "Unknown interpreter escape; try :help\n");
       }
