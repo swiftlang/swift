@@ -237,8 +237,9 @@ Expr *MemberLookup::createResultAST(Expr *Base, SourceLoc DotLoc,
                                              R.D->getTypeOfReference());
         return new (Context) DotSyntaxCallExpr(Fn, DotLoc, Base);
       }
-      
-      return new (Context) MemberRefExpr(Base, DotLoc, R.D, NameLoc);
+
+      VarDecl *Var = cast<VarDecl>(R.D);
+      return new (Context) MemberRefExpr(Base, DotLoc, Var, NameLoc);
     }
     case MemberLookupResult::IgnoreBase:
       Expr *RHS = new (Context) DeclRefExpr(R.D, NameLoc,

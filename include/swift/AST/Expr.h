@@ -374,15 +374,15 @@ public:
 /// TupleElementExpr. This will change when structs become "real" types.
 class MemberRefExpr : public Expr {
   Expr *Base;
-  ValueDecl *Value;
+  VarDecl *Value;
   SourceLoc DotLoc;
   SourceLoc NameLoc;
   
 public:  
-  MemberRefExpr(Expr *Base, SourceLoc DotLoc, ValueDecl *Value,
+  MemberRefExpr(Expr *Base, SourceLoc DotLoc, VarDecl *Value,
                 SourceLoc NameLoc);
   Expr *getBase() const { return Base; }
-  ValueDecl *getDecl() const { return Value; }
+  VarDecl *getDecl() const { return Value; }
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getDotLoc() const { return DotLoc; }
   

@@ -123,7 +123,7 @@ llvm::APFloat FloatLiteralExpr::getValue() const {
   return Val;
 }
 
-MemberRefExpr::MemberRefExpr(Expr *Base, SourceLoc DotLoc, ValueDecl *Value,
+MemberRefExpr::MemberRefExpr(Expr *Base, SourceLoc DotLoc, VarDecl *Value,
                              SourceLoc NameLoc)
   : Expr(ExprKind::MemberRef, Value->getTypeOfReference()), Base(Base),
     Value(Value), DotLoc(DotLoc), NameLoc(NameLoc) { }
@@ -194,7 +194,8 @@ Expr *OverloadedMemberRefExpr::createWithCopy(Expr *Base, SourceLoc DotLoc,
       if (isa<FuncDecl>(Decls[0]))
         return new (C) DotSyntaxCallExpr(Fn, DotLoc, Base);
       
-      return new (C) MemberRefExpr(Base, DotLoc, Decls[0], MemberLoc);
+      VarDecl *Var = cast<VarDecl>(Decls[0]);
+      return new (C) MemberRefExpr(Base, DotLoc, Var, MemberLoc);
     }
     
     return new (C) DotSyntaxBaseIgnoredExpr(Base, DotLoc, Fn);
