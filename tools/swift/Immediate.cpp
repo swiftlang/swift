@@ -66,7 +66,6 @@ static bool IRGenImportedModules(TranslationUnit *TU,
                                      &ImportedModules,
                                  irgen::Options &Options) {
   // IRGen the modules this module depends on.
-  llvm::SmallVector<llvm::Function*, 4> InitFuncs;
   for (auto ModPair : TU->getImportedModules()) {
     if (isa<BuiltinModule>(ModPair.second))
       continue;
@@ -74,6 +73,9 @@ static bool IRGenImportedModules(TranslationUnit *TU,
     TranslationUnit *SubTU = cast<TranslationUnit>(ModPair.second);
     if (!ImportedModules.insert(SubTU))
       continue;
+
+    // Recursively IRGen imported modules.
+    IRGenImportedModules(SubTU, EE, Module, ImportedModules, Options);
 
     // FIXME: Need to check whether this is actually safe in general.
     llvm::Module SubModule(SubTU->Name.str(), Module.getContext());
@@ -98,11 +100,8 @@ static bool IRGenImportedModules(TranslationUnit *TU,
     StringRef InitFnName = (SubTU->Name.str() + ".init").toStringRef(NameBuf);
     llvm::Function *InitFn = Module.getFunction(InitFnName);
     if (InitFn)
-      InitFuncs.push_back(InitFn);
+      EE->runFunctionAsMain(InitFn, std::vector<std::string>(), 0);
   }
-
-  for (auto InitFn : InitFuncs)
-    EE->runFunctionAsMain(InitFn, std::vector<std::string>(), 0);
 
   return false;
 }

@@ -190,8 +190,9 @@ addStandardLibraryImport(SmallVectorImpl<ImportedModule> &Result) {
   // Builtin or swift, we implicitly import swift.  This isn't really ideal.
   if (ImportedBuiltinModule)
     return;
-  if (Context.LoadedModules.lookup("swift"))
-    return;
+  for (ImportedModule M : Result)
+    if (M.second->Name.str() == "swift")
+      return;
   if (TU->Name.str() == "swift")
     return;
 
