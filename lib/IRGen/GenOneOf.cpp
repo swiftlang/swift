@@ -112,6 +112,10 @@ namespace {
       // FIXME
     }
 
+    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      // FIXME
+    }
+
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       // FIXME
     }
@@ -178,6 +182,10 @@ namespace {
 
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       if (Singleton) Singleton->reexplode(IGF, src, dest);
+    }
+
+    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      if (Singleton) Singleton->copy(IGF, src, dest);
     }
 
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
@@ -253,6 +261,10 @@ namespace {
     }
 
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      src.transferInto(dest, 1);
+    }
+
+    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       src.transferInto(dest, 1);
     }
 

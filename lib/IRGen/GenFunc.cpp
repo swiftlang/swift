@@ -360,6 +360,11 @@ namespace {
       src.transferInto(dest, 2);
     }
 
+    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      src.transferInto(dest, 1);
+      IGF.emitRetain(src.claimNext().getValue(), dest);
+    }
+
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       src.transferInto(dest, 1);
       dest.add(IGF.enterReleaseCleanup(src.claimUnmanagedNext()));

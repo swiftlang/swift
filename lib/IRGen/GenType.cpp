@@ -118,6 +118,10 @@ namespace {
       src.transferInto(dest, 1);
     }
 
+    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      src.transferInto(dest, 1);
+    }
+
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       src.transferInto(dest, 1);
     }

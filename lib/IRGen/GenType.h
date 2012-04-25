@@ -156,6 +156,15 @@ public:
   virtual void reexplode(IRGenFunction &IGF, Explosion &sourceExplosion,
                          Explosion &targetExplosion) const = 0;
 
+  /// Copy a value into a new explosion without touching any of the
+  /// existing cleanups.  This operation may also shift explosion levels.
+  ///
+  /// This operation is useful when an explosion is being used
+  /// multiple times, for example in when doing load-modify-store
+  /// l-value operations.
+  virtual void copy(IRGenFunction &IGF, Explosion &sourceExplosion,
+                    Explosion &targetExplosion) const = 0;
+
   /// Enter management of an unmanaged exploded value by adding
   /// cleanups where appropriate.
   virtual void manage(IRGenFunction &IGF, Explosion &sourceExplosion,

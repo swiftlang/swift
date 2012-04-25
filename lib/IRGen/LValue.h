@@ -120,17 +120,45 @@ protected:
   LogicalPathComponent() : PathComponent(false) {}
 
 public:
+  /// Perform a store operation with a value held in the given
+  /// explosion.
+  ///
+  /// \param preserve - if true, more operations on this lvalue
+  ///    are forthcoming
   virtual void storeExplosion(IRGenFunction &IGF, Explosion &rvalue,
-                              Address base) const = 0;
+                              Address base, bool preserve) const = 0;
+
+  /// Perform a store operation with a value held in memory.
+  ///
+  /// \param preserve - if true, more operations on this lvalue
+  ///    are forthcoming
   virtual void storeMaterialized(IRGenFunction &IGF, Address temp,
-                                 Address base) const = 0;
+                                 Address base, bool preserve) const = 0;
+
+  /// Perform a load operation from this path into the given
+  /// explosion.
+  ///
+  /// \param preserve - if true, more operations on this lvalue
+  ///    are forthcoming
   virtual void loadExplosion(IRGenFunction &IGF, Address base,
-                             Explosion &exp) const = 0;
+                             Explosion &exp, bool preserve) const = 0;
+
+  /// Perform a load operation from this path into memory
+  /// at a given address.
+  ///
+  /// \param preserve - if true, more operations on this lvalue
+  ///    are forthcoming
   virtual void loadMaterialized(IRGenFunction &IGF, Address base,
-                                Address temp) const = 0;
+                                Address temp, bool preserve) const = 0;
+
+  /// Perform a load operation from this path into temporary
+  /// memory.
+  ///
+  /// \param preserve - if true, more operations on this lvalue
+  ///    are forthcoming
   virtual OwnedAddress loadAndMaterialize(IRGenFunction &IGF,
-                                          OnHeap_t onHeap,
-                                          Address base) const = 0;
+                                          OnHeap_t onHeap, Address base,
+                                          bool preserve) const = 0;
 };
 
 inline LogicalPathComponent &PathComponent::asLogical() {

@@ -167,6 +167,10 @@ namespace {
       src.transferInto(dest, 1);
     }
 
+    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
+      IGF.emitRetain(src.claimNext().getValue(), dest);
+    }
+
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       dest.add(IGF.enterReleaseCleanup(src.claimUnmanagedNext()));
     }

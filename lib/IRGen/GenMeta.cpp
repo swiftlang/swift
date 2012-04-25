@@ -40,6 +40,7 @@ namespace {
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {}
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {}
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {}
+    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {}
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {}
     void destroy(IRGenFunction &IGF, Address addr) const {}
   };
