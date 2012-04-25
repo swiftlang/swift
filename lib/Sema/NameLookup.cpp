@@ -138,6 +138,10 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M) {
   M.lookupGlobalExtensionMethods(BaseTy, Name, ExtensionMethods);
 
   for (ValueDecl *VD : ExtensionMethods) {
+    if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(VD)) {
+      Results.push_back(Result::getIgnoreBase(TAD));
+      continue;
+    }
     if (FuncDecl *FD = dyn_cast<FuncDecl>(VD))
       if (FD->isStatic()) {
         Results.push_back(Result::getIgnoreBase(FD));
