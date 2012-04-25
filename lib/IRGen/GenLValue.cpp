@@ -355,64 +355,176 @@ static Callee findGetter(IRGenFunction &IGF, VarDecl *member,
 }
 
 namespace {
-  class LogicalMemberRef : public LogicalPathComponent {
-    VarDecl *Member;
+  class GetterSetterTarget {
   public:
-    LogicalMemberRef(VarDecl *member) : Member(member) {}
+    enum Kind {
+      IndependentVar, ByrefMemberVar, ByrefMemberSubscript
+    };
+    static bool isSubscriptKind(Kind kind) {
+      return kind == Kind::ByrefMemberSubscript;
+    }
+    static bool isByrefMemberKind(Kind kind) {
+      return kind != Kind::IndependentVar;
+    }
 
-    static void store(IRGenFunction &IGF, const Callee &setter, Address base,
-                      Explosion &value, const TypeInfo &valueTI) {
-      // Add the 'self' byref argument.
+  private:
+    GetterSetterTarget(Kind kind, ValueDecl *decl)
+      : TargetAndKind(decl, kind) {
+      assert(!isSubscript() || isa<SubscriptDecl>(decl));
+      assert(!isVar() || isa<VarDecl>(decl));
+    }
+
+  public:
+    static GetterSetterTarget forByrefMemberVar(VarDecl *var) {
+      return GetterSetterTarget(Kind::ByrefMemberVar, var);
+    }
+    static GetterSetterTarget forIndependentVar(VarDecl *var) {
+      return GetterSetterTarget(Kind::IndependentVar, var);
+    }
+    // FIXME: forByrefMemberSubscript
+
+    Kind getKind() const { return TargetAndKind.getInt(); }
+    bool isSubscript() const { return isSubscriptKind(getKind()); }
+    bool isVar() const { return !isSubscript(); }
+    bool isByrefMember() const { return isByrefMemberKind(getKind()); }
+
+    ValueDecl *getDecl() const { return TargetAndKind.getPointer(); }
+    VarDecl *getVarDecl() const {
+      assert(!isSubscript());
+      return cast<VarDecl>(getDecl());
+    }
+    SubscriptDecl *getSubscriptDecl() const {
+      assert(isSubscript());
+      return cast<SubscriptDecl>(getDecl());
+    }
+
+    /// Find the formal type of this object.
+    Type getType() const {
+      if (isSubscript())
+        return getSubscriptDecl()->getElementType();
+      return getVarDecl()->getType();
+    }
+
+    /// Find the address of the getter function.
+    Callee getGetter(IRGenFunction &IGF, ExplosionKind bestKind) const {
+      assert(isVar());
+      return findGetter(IGF, getVarDecl(), bestKind);
+    }
+
+    /// Find the address of the getter function.
+    Callee getSetter(IRGenFunction &IGF, ExplosionKind bestKind) const {
+      assert(isVar());
+      return findSetter(IGF, getVarDecl(), bestKind);
+    }
+
+  private:
+    llvm::PointerIntPair<ValueDecl*,2,Kind> TargetAndKind;
+  };
+
+  class GetterSetterComponent : public LogicalPathComponent {
+    GetterSetterTarget Target;
+  public:
+    GetterSetterComponent(GetterSetterTarget &&target) : Target(target) {}
+
+    /// A helper routine for performing code common to all store paths.
+    void store(IRGenFunction &IGF, const Callee &setter, Address base,
+               Explosion &value, const TypeInfo &valueTI) const {
+      // An explosion for the 'self' argument, if required.
       Explosion selfArg(setter.getExplosionLevel());
-      selfArg.addUnmanaged(base.getAddress());
 
-      Arg args[] = { Arg(selfArg), Arg(value, valueTI) };
+      SmallVector<Arg, 2> args;
+
+      // A byref member requires 'self' as its first argument.
+      if (Target.isByrefMember()) {
+        selfArg.addUnmanaged(base.getAddress());
+        args.push_back(Arg(selfArg));
+      }
+
+      // Add the value argument.
+      // FIXME: for a subscript, this needs to get messed with.
+      args.push_back(Arg(value, valueTI));
+
+      // Make the call.
       emitVoidCall(IGF, setter, args);
     }
 
     void storeExplosion(IRGenFunction &IGF, Explosion &raw,
                         Address base) const {
-      const TypeInfo &valueTI = IGF.getFragileTypeInfo(Member->getType());
+      Callee setter = Target.getSetter(IGF, raw.getKind());
 
-      Callee setter = findSetter(IGF, Member, raw.getKind());
+      const TypeInfo &valueTI = IGF.getFragileTypeInfo(Target.getType());
       store(IGF, setter, base, raw, valueTI);
     }
 
     void storeMaterialized(IRGenFunction &IGF, Address temp,
                            Address base) const {
-      Callee setter = findSetter(IGF, Member, ExplosionKind::Maximal);
+      Callee setter = Target.getSetter(IGF, ExplosionKind::Maximal);
 
       // Explode the value at the natural level of the setter we found.
       Explosion value(setter.getExplosionLevel());
-      const TypeInfo &valueTI = IGF.getFragileTypeInfo(Member->getType());
+      const TypeInfo &valueTI = IGF.getFragileTypeInfo(Target.getType());
       valueTI.load(IGF, temp, value);
 
       store(IGF, setter, base, value, valueTI);
     }
 
     void loadExplosion(IRGenFunction &IGF, Address base, Explosion &out) const {
-      Callee getter = findGetter(IGF, Member, out.getKind());
+      Callee getter = Target.getGetter(IGF, out.getKind());
 
-      // Add the 'self' byref argument.
+      // Build the arguments.
+      SmallVector<Arg, 2> args;
+
+      // Byref members need a 'self' argument.
       Explosion selfArg(getter.getExplosionLevel());
-      selfArg.addUnmanaged(base.getAddress());
+      if (Target.isByrefMember()) {
+        selfArg.addUnmanaged(base.getAddress());
 
-      const TypeInfo &valueTI = IGF.getFragileTypeInfo(Member->getType());
+        // We can use an untyped Arg because we perfectly match the
+        // getter's explosion level.
+        args.push_back(Arg(selfArg));
+      }
 
-      Arg args[] = { Arg(selfArg), Arg() };
+      // The next argument is the "index".
+      // For subscripts, this is stored in the target.
+      if (Target.isSubscript()) {
+        // FIXME: implement
+
+      // For everything else, pass an empty tuple.
+      } else {
+        args.push_back(Arg());
+      }
+
+      const TypeInfo &valueTI = IGF.getFragileTypeInfo(Target.getType());
       emitCall(IGF, getter, args, valueTI, out);
     }
 
     void loadMaterialized(IRGenFunction &IGF, Address base, Address temp) const {
-      Callee getter = findGetter(IGF, Member, ExplosionKind::Maximal);
+      Callee getter = Target.getGetter(IGF, ExplosionKind::Maximal);
 
-      // Add the 'self' byref argument.
+      // Build the arguments.
+      SmallVector<Arg, 2> args;
+
+      // Byref members need a 'self' argument.
       Explosion selfArg(getter.getExplosionLevel());
-      selfArg.addUnmanaged(base.getAddress());
+      if (Target.isByrefMember()) {
+        selfArg.addUnmanaged(base.getAddress());
 
-      const TypeInfo &valueTI = IGF.getFragileTypeInfo(Member->getType());
+        // We can use an untyped Arg because we perfectly match the
+        // getter's explosion level.
+        args.push_back(Arg(selfArg));
+      }
 
-      Arg args[] = { Arg(selfArg), Arg() };
+      // The next argument is the "index".
+      // For subscripts, this is stored in the target.
+      if (Target.isSubscript()) {
+        // FIXME: implement
+
+      // For everything else, pass an empty tuple.
+      } else {
+        args.push_back(Arg());
+      }
+
+      const TypeInfo &valueTI = IGF.getFragileTypeInfo(Target.getType());
       emitCallToMemory(IGF, getter, args, valueTI, temp);
     }
 
@@ -422,12 +534,12 @@ namespace {
       Initialization::Object object = init.getObjectForTemporary();
 
       // Emit a local allocation for the object.
-      const TypeInfo &valueTI = IGF.getFragileTypeInfo(Member->getType());
+      const TypeInfo &valueTI = IGF.getFragileTypeInfo(Target.getType());
       OwnedAddress addr = init.emitLocalAllocation(IGF, object, onHeap,
                                                    valueTI, "temporary");
 
       // Load into the new memory.
-      loadMaterialized(IGF, base, addr);
+      GetterSetterComponent::loadMaterialized(IGF, base, addr);
 
       // The load is complete;  mark the memory as initialized.
       init.markInitialized(IGF, object);
@@ -449,7 +561,7 @@ LValue swift::irgen::emitMemberRefLValue(IRGenFunction &IGF, MemberRefExpr *E) {
   // If we must access the member logically, push a logical member reference.
   VarDecl *var = E->getDecl();
   assert(isMemberAccessLogical(IGF, var));
-  lvalue.add<LogicalMemberRef>(var);
+  lvalue.add<GetterSetterComponent>(GetterSetterTarget::forByrefMemberVar(var));
 
   return lvalue;
 }
