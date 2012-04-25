@@ -39,9 +39,15 @@ public:
   // top level code.
   FuncExpr *TheFunc;
   
-  StmtChecker(TypeChecker &TC, FuncExpr *TheFunc) : TC(TC), TheFunc(TheFunc) {
-  }
+  /// TopLevelCode - This is the current top-level code declaration being
+  /// checked, or null if we are in a function.
+  TopLevelCodeDecl *TopLevelCode;
+  
+  StmtChecker(TypeChecker &TC, FuncExpr *TheFunc)
+    : TC(TC), TheFunc(TheFunc), TopLevelCode() { }
 
+  void setTopLevelCode(TopLevelCodeDecl *TLC) { TopLevelCode = TLC; }
+  
   //===--------------------------------------------------------------------===//
   // Helper Functions.
   //===--------------------------------------------------------------------===//
@@ -218,7 +224,9 @@ public:
     DeclContext *DC = &TC.TU;
     if (TheFunc)
       DC = TheFunc;
-
+    else if (TopLevelCode)
+      DC = TopLevelCode;
+    
     // Invoke getElements() on the container to retrieve the range of elements.
     Type RangeTy;
     VarDecl *Range;
@@ -645,6 +653,23 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
     Decl *D = TU->Decls[i];
     if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+      // Tell the statement checker that we have top-level code.
+      struct TopLevelCodeRAII {
+        StmtChecker &Checker;
+        TopLevelCodeDecl *Old;
+        
+      public:
+        TopLevelCodeRAII(StmtChecker &Checker, TopLevelCodeDecl *TLC)
+        : Checker(Checker), Old(Checker.TopLevelCode)
+        {
+          Checker.setTopLevelCode(TLC);
+        }
+        
+        ~TopLevelCodeRAII() {
+          Checker.setTopLevelCode(Old);
+        }
+      } IntroduceTopLevelCode(checker, TLCD);
+
       auto Elem = TLCD->getBody();
       if (Expr *E = Elem.dyn_cast<Expr*>()) {
         if (checker.typeCheckExpr(E)) continue;
