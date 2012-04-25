@@ -338,8 +338,7 @@ namespace {
     const TupleFieldInfo &Field;
 
   public:
-    TupleElement(const TupleFieldInfo &field)
-      : PhysicalPathComponent(sizeof(TupleElement)), Field(field) {}
+    TupleElement(const TupleFieldInfo &field) : Field(field) {}
 
     OwnedAddress offset(IRGenFunction &IGF, OwnedAddress addr) const {
       Address project = TupleTypeInfo::projectAddress(IGF, addr, Field);

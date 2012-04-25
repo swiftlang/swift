@@ -43,8 +43,7 @@ namespace {
     OwnedAddress Addr;
 
   public:
-    FixedAddress(OwnedAddress addr)
-      : PhysicalPathComponent(sizeof(FixedAddress)), Addr(addr) {}
+    FixedAddress(OwnedAddress addr) : Addr(addr) {}
 
     OwnedAddress offset(IRGenFunction &IGF, OwnedAddress base) const {
       assert(!base.isValid());
@@ -359,8 +358,7 @@ namespace {
   class LogicalMemberRef : public LogicalPathComponent {
     VarDecl *Member;
   public:
-    LogicalMemberRef(VarDecl *member)
-      : LogicalPathComponent(sizeof(LogicalMemberRef)), Member(member) {}
+    LogicalMemberRef(VarDecl *member) : Member(member) {}
 
     static void store(IRGenFunction &IGF, const Callee &setter, Address base,
                       Explosion &value, const TypeInfo &valueTI) {

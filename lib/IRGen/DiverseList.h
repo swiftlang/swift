@@ -272,7 +272,6 @@ public:
   template <class U, class... A> U &add(A && ...args) {
     char *storage = addNewStorage(sizeof(U));
     U &newObject = *::new (storage) U(::std::forward<A>(args)...);
-    assert(newObject.allocated_size() == sizeof(U));
     return newObject;
   }
 };

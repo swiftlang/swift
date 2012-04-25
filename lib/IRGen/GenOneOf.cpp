@@ -385,7 +385,7 @@ void swift::irgen::emitLookThroughOneof(IRGenFunction &IGF,
 namespace {
   class LookThroughOneof : public PhysicalPathComponent {
   public:
-    LookThroughOneof() : PhysicalPathComponent(sizeof(LookThroughOneof)) {}
+    LookThroughOneof() {}
 
     OwnedAddress offset(IRGenFunction &IGF, OwnedAddress addr) const {
       Address project = SingletonOneofTypeInfo::getSingletonAddress(IGF, addr);

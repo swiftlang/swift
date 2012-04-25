@@ -52,7 +52,8 @@ class LogicalPathComponent;
 ///     still qualify for physical access if we are in a privileged
 ///     component.
 class PathComponent {
-  const unsigned AllocatedSize : 31;
+  friend class LValue;
+  unsigned AllocatedSize : 31;
   const unsigned IsPhysical : 1;
 
   // This anchor method serves three purposes: it aligns the class to
@@ -62,8 +63,8 @@ class PathComponent {
   virtual void _anchor();
 
 protected:
-  PathComponent(size_t size, bool isPhysical)
-    : AllocatedSize(size), IsPhysical(isPhysical) {}
+  PathComponent(bool isPhysical)
+    : IsPhysical(isPhysical) {}
 
   virtual ~PathComponent() {}
 
@@ -93,7 +94,7 @@ class PhysicalPathComponent : public PathComponent {
   virtual void _anchor();
 
 protected:
-  PhysicalPathComponent(size_t size) : PathComponent(size, true) {}
+  PhysicalPathComponent() : PathComponent(true) {}
 
 public:
   virtual OwnedAddress offset(IRGenFunction &IGF,
@@ -116,7 +117,7 @@ class LogicalPathComponent : public PathComponent {
   virtual void _anchor();
 
 protected:
-  LogicalPathComponent(size_t size) : PathComponent(size, false) {}
+  LogicalPathComponent() : PathComponent(false) {}
 
 public:
   virtual void storeExplosion(IRGenFunction &IGF, Explosion &rvalue,
@@ -167,7 +168,10 @@ public:
 
   /// Add a new component at the end of the access path of this l-value.
   template <class T, class... A> T &add(A &&...args) {
-    return Path.add<T>(std::forward<A>(args)...);
+    T &component = Path.add<T>(std::forward<A>(args)...);
+    component.AllocatedSize = sizeof(T);
+    assert(component.allocated_size() == sizeof(T));
+    return component;
   }
 
   typedef DiverseListImpl<PathComponent>::iterator iterator;
