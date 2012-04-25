@@ -329,29 +329,12 @@ void swift::irgen::emitRequalify(IRGenFunction &IGF, RequalifyExpr *E,
   return IGF.emitRValue(E->getSubExpr(), explosion);
 }
 
-/// Must accesses to the given member variable be performed as a
+/// Must accesses to the given variable be performed as a
 /// logical access?
-static bool isMemberAccessLogical(IRGenFunction &IGF, VarDecl *var) {
+static bool isVarAccessLogical(IRGenFunction &IGF, VarDecl *var) {
   // For now, the answer is yes only if the variable is a property.
+  // FIXME: resilience
   return var->isProperty();
-}
-
-/// Find the address of a setter at the best available resilience level.
-static Callee findSetter(IRGenFunction &IGF, VarDecl *member,
-                         ExplosionKind level) {
-  // For now, always be pessimistic.
-  level = ExplosionKind::Minimal;
-  return Callee::forGlobalFunction(IGF.IGM.getAddrOfSetter(member, level),
-                                   level, 1);
-}
-
-/// Find the address of a getter at the best available resilience level.
-static Callee findGetter(IRGenFunction &IGF, VarDecl *member,
-                         ExplosionKind level) {
-  // For now, always be pessimistic.
-  level = ExplosionKind::Minimal;
-  return Callee::forGlobalFunction(IGF.IGM.getAddrOfGetter(member, level),
-                                   level, 1);
 }
 
 namespace {
@@ -406,15 +389,31 @@ namespace {
     }
 
     /// Find the address of the getter function.
-    Callee getGetter(IRGenFunction &IGF, ExplosionKind bestKind) const {
-      assert(isVar());
-      return findGetter(IGF, getVarDecl(), bestKind);
+    Callee getGetter(IRGenFunction &IGF, ExplosionKind explosionLevel) const {
+      // For now, always be pessimistic.
+      explosionLevel = ExplosionKind::Minimal;
+
+      // The uncurry level is 0 unless we have a byref argument.
+      unsigned uncurryLevel = 0;
+      if (isByrefMember()) uncurryLevel++;
+
+      llvm::Constant *fn = IGF.IGM.getAddrOfGetter(getDecl(), explosionLevel);
+
+      return Callee::forGlobalFunction(fn, explosionLevel, uncurryLevel);
     }
 
     /// Find the address of the getter function.
-    Callee getSetter(IRGenFunction &IGF, ExplosionKind bestKind) const {
-      assert(isVar());
-      return findSetter(IGF, getVarDecl(), bestKind);
+    Callee getSetter(IRGenFunction &IGF, ExplosionKind explosionLevel) const {
+      // For now, always be pessimistic.
+      explosionLevel = ExplosionKind::Minimal;
+
+      // The uncurry level is 0 unless we have a byref argument.
+      unsigned uncurryLevel = 0;
+      if (isByrefMember()) uncurryLevel++;
+
+      llvm::Constant *fn = IGF.IGM.getAddrOfSetter(getDecl(), explosionLevel);
+
+      return Callee::forGlobalFunction(fn, explosionLevel, uncurryLevel);
     }
 
   private:
@@ -560,13 +559,24 @@ LValue swift::irgen::emitMemberRefLValue(IRGenFunction &IGF, MemberRefExpr *E) {
 
   // If we must access the member logically, push a logical member reference.
   VarDecl *var = E->getDecl();
-  assert(isMemberAccessLogical(IGF, var));
+  assert(isVarAccessLogical(IGF, var));
   lvalue.add<GetterSetterComponent>(GetterSetterTarget::forByrefMemberVar(var));
 
   return lvalue;
 }
 
+/// Emit a reference to a global variable.
 LValue IRGenFunction::getGlobal(VarDecl *var) {
+  // If we need to access this variable logically, use a
+  // GetterSetterComponent.
+  if (isVarAccessLogical(*this, var)) {
+    LValue lvalue;
+    lvalue.add<GetterSetterComponent>(
+                                 GetterSetterTarget::forIndependentVar(var));
+    return lvalue;
+  }
+
+  // Otherwise we can use a physical-address component.
   OwnedAddress addr(IGM.getAddrOfGlobalVariable(var), IGM.RefCountedNull);
   return emitAddressLValue(addr);
 }
