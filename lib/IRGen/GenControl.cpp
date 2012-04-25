@@ -289,6 +289,7 @@ llvm::BasicBlock *IRGenFunction::getUnreachableBlock() {
 
   // Create it at the very end of the function.
   UnreachableBB = createBasicBlock("unreachable");
+  new llvm::UnreachableInst(UnreachableBB->getContext(), UnreachableBB);
   CurFn->getBasicBlockList().push_back(UnreachableBB);
   
   return UnreachableBB;
