@@ -477,6 +477,11 @@ ERROR(autoclosure_requires_function_type,attribute_parsing,none,
 ERROR(autoclosure_function_input_nonunit,attribute_parsing,none,
       "auto_closure argument type %0 must be '()'", (Type))
 
+// asmname
+ERROR(asmname_expected_equals,attribute_parsing,none,
+      "expected '=' in asmname attribute", ())
+ERROR(asmname_expected_string_literal,attribute_parsing,none,
+      "expected string literal in asmname attribute", ())
 
 //==============================================================================
 // Semantic Analysis Diagnostics

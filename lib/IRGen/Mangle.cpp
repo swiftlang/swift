@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Attr.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
@@ -320,6 +321,11 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
 
 void LinkEntity::mangle(raw_ostream &buffer) const {
   // mangled-name ::= '_T' identifier+ type?
+
+  if (!TheDecl->getAttrs().AsmName.empty()) {
+    buffer << TheDecl->getAttrs().AsmName;
+    return;
+  }
 
   // Add the prefix.
   buffer << "_T"; // T is for Tigger

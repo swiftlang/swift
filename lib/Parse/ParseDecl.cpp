@@ -105,6 +105,8 @@ static Resilience getResilience(AttrName attr) {
 
 /// parseAttribute
 ///   attribute:
+///     'asmname' '=' identifier  (FIXME: This is a temporary hack until we
+///                                       can import C modules.)
 ///     'infix' '=' numeric_constant
 ///     'infix_left' '=' numeric_constant
 ///     'infix_right' '=' numeric_constant
@@ -229,6 +231,28 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     }
     
     Attributes.AutoClosure = true;
+    return false;
+  }
+
+  /// FIXME: This is a temporary hack until we can import C modules.
+  case AttrName::asmname: {
+    SourceLoc TokLoc = Tok.getLoc();
+    if (!Attributes.AsmName.empty())
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+    consumeToken(tok::identifier);
+
+    if (!consumeIf(tok::equal)) {
+      diagnose(TokLoc, diag::asmname_expected_equals);
+      return false;
+    }
+
+    if (!Tok.is(tok::string_literal)) {
+      diagnose(TokLoc, diag::asmname_expected_string_literal);
+      return false;
+    }
+
+    Attributes.AsmName = L.getEncodedStringLiteral(Tok, Context);
+    consumeToken(tok::string_literal);
     return false;
   }
   }

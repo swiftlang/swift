@@ -18,6 +18,7 @@
 #define SWIFT_ATTR_H
 
 #include "swift/Basic/SourceLoc.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace swift {
 
@@ -135,6 +136,7 @@ public:
 
   InfixData Infix;
   ResilienceData Resilience;
+  StringRef AsmName;
   bool Byref;
   bool ByrefImplicit;
   bool ByrefHeap;

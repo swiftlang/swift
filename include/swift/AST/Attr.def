@@ -27,5 +27,6 @@ ATTR(fragile)
 ATTR(born_fragile)
 ATTR(byref)
 ATTR(auto_closure)
+ATTR(asmname)
 
 #undef ATTR
