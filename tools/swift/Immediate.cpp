@@ -494,33 +494,3 @@ extern "C" bool _TNSs4Bool13getLogicValuefRS_FT_i1(bool* b) {
   return *b;
 }
 
-extern "C" void _TSs4exitFT8exitCodeNSs5Int64_T_(int64_t l) {
-  exit(l);
-}
-
-extern "C" void _TSs5abortFT_T_() {
-  abort();
-}
-
-extern "C" double _TSs4sqrtFT1aNSs6Double_S_(double X) { return sqrt(X); }
-extern "C" float _TSs4sqrtFT1aNSs5Float_S_(float X) {
-  return sqrtf(X);
-}
-
-extern "C" double _TSs3sinFT1aNSs6Double_S_(double X) { return sin(X); }
-extern "C" float _TSs3sinFT1aNSs5Float_S_(float X) {
-  return sinf(X);
-}
-
-extern "C" double _TSs3cosFT1aNSs6Double_S_(double X) { return cos(X); }
-extern "C" float _TSs3cosFT1aNSs5Float_S_(float X) {
-  return cosf(X);
-}
-
-extern "C" double _TSs5atan2FT1yNSs6Double1xS__S_(double Y, double X) {
-  return atan2(Y, X);
-}
-extern "C" float _TSs5atan2FT1yNSs5Float1xS__S_(float Y, float X) {
-  return atan2f(Y, X);
-}
-
