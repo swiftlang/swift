@@ -100,7 +100,7 @@ void swift::irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E,
       IGF.emitLValueAsScalar(IGF.emitAddressLValue(Var),
                              OnHeap, OuterExplosion);
       Address CaptureAddr = elt.project(IGF, CaptureStruct);
-      elt.Type->assign(IGF, OuterExplosion, CaptureAddr);
+      elt.Type->initialize(IGF, OuterExplosion, CaptureAddr);
 
       Address InnerAddr = elt.project(innerIGF, InnerStruct);
       Address InnerValueAddr =
