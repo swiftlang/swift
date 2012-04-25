@@ -437,8 +437,37 @@ extern "C" void _TSs5printFT3valNSs6Double_T_(double l) {
   printf("%s", Buffer);
 }
 
+// func printChar(character : Int32)
+// TODO:  Move this into swift.swift
 extern "C" void _TSs9printCharFT9characterNSs5Int32_T_(int32_t l) {
-  printf("%c", (char)l);
+  uint32_t wc = static_cast<uint32_t>(l);
+  char s[] = "invalid Unicode code point";
+  char* p = s;
+  if (wc < 0x000080) {
+    *p++ = static_cast<char>(wc);
+    *p = 0;
+  }
+  else if (wc < 0x000800) {
+    *p++ = static_cast<char>(0xC0 | (wc >> 6));
+    *p++ = static_cast<char>(0x80 | (wc & 0x03F));
+    *p = 0;
+  }
+  else if (wc < 0x010000) {
+    if (!(0x00D800 <= wc && wc < 0x00E000)) {
+      *p++ = static_cast<char>(0xE0 |  (wc >> 12));
+      *p++ = static_cast<char>(0x80 | ((wc & 0x0FC0) >> 6));
+      *p++ = static_cast<char>(0x80 |  (wc & 0x003F));
+      *p = 0;
+    }
+  }
+  else if (wc < 0x110000) {
+    *p++ = static_cast<char>(0xF0 |  (wc >> 18));
+    *p++ = static_cast<char>(0x80 | ((wc & 0x03F000) >> 12));
+    *p++ = static_cast<char>(0x80 | ((wc & 0x000FC0) >> 6));
+    *p++ = static_cast<char>(0x80 |  (wc & 0x00003F));
+    *p = 0;
+  }
+  printf("%s", s);
 }
 
 // String implementation.
