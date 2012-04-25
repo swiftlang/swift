@@ -174,6 +174,14 @@ public:
     return component;
   }
 
+  template <class T, class... A> T &addWithExtra(A &&...args) {
+    size_t extraSize = T::extra_storage_size(std::forward<A>(args)...);
+    T &component = Path.addWithExtra<T>(extraSize, std::forward<A>(args)...);
+    component.AllocatedSize = sizeof(T) + extraSize;
+    assert(component.allocated_size() == sizeof(T) + extraSize);
+    return component;
+  }
+
   typedef DiverseListImpl<PathComponent>::iterator iterator;
   typedef DiverseListImpl<PathComponent>::const_iterator const_iterator;
 

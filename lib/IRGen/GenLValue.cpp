@@ -18,6 +18,7 @@
 #include "llvm/Function.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Optional.h"
 #include "GenFunc.h"
@@ -351,10 +352,11 @@ namespace {
     }
 
   private:
-    GetterSetterTarget(Kind kind, ValueDecl *decl)
-      : TargetAndKind(decl, kind) {
+    GetterSetterTarget(Kind kind, ValueDecl *decl, unsigned indexSize = 0)
+      : TargetAndKind(decl, kind), IndexExplosionSize(indexSize) {
       assert(!isSubscript() || isa<SubscriptDecl>(decl));
       assert(!isVar() || isa<VarDecl>(decl));
+      assert(isSubscript() || indexSize == 0);
     }
 
   public:
@@ -364,7 +366,12 @@ namespace {
     static GetterSetterTarget forIndependentVar(VarDecl *var) {
       return GetterSetterTarget(Kind::IndependentVar, var);
     }
-    // FIXME: forByrefMemberSubscript
+    static GetterSetterTarget
+    forByrefMemberSubscript(SubscriptDecl *subscript,
+                            unsigned indexExplosionSize) {
+      return GetterSetterTarget(Kind::ByrefMemberSubscript,
+                                subscript, indexExplosionSize);
+    }
 
     Kind getKind() const { return TargetAndKind.getInt(); }
     bool isSubscript() const { return isSubscriptKind(getKind()); }
@@ -381,11 +388,21 @@ namespace {
       return cast<SubscriptDecl>(getDecl());
     }
 
+    /// Returns the size of the index value as a maximal explosion.
+    unsigned getIndexExplosionSize() const {
+      assert(isSubscript());
+      return IndexExplosionSize;
+    }
+
     /// Find the formal type of this object.
     Type getType() const {
       if (isSubscript())
         return getSubscriptDecl()->getElementType();
       return getVarDecl()->getType();
+    }
+
+    Type getIndexType() const {
+      return getSubscriptDecl()->getIndices()->getType();
     }
 
     /// Find the address of the getter function.
@@ -418,16 +435,58 @@ namespace {
 
   private:
     llvm::PointerIntPair<ValueDecl*,2,Kind> TargetAndKind;
+    unsigned IndexExplosionSize;
   };
 
   class GetterSetterComponent : public LogicalPathComponent {
     GetterSetterTarget Target;
+
+    const ManagedValue *getIndexValuesBuffer() const {
+      return reinterpret_cast<const ManagedValue*>(this + 1);
+    }
+    ManagedValue *getIndexValuesBuffer() {
+      return reinterpret_cast<ManagedValue*>(this + 1);
+    }
+
   public:
     GetterSetterComponent(GetterSetterTarget &&target) : Target(target) {}
 
+    /// Required by LValue::addWithExtra.
+    static size_t extra_storage_size(const GetterSetterTarget &target) {
+      assert(target.isSubscript());
+      return sizeof(ManagedValue) * target.getIndexExplosionSize();
+    }
+
+    void initIndexValues(Explosion &values) {
+      assert(values.getKind() == ExplosionKind::Maximal &&
+             "cannot store non-maximal index explosion in "
+             "GetterSetterComponent!");
+      assert(values.size() == Target.getIndexExplosionSize());
+      std::memcpy(getIndexValuesBuffer(), values.claimAll().data(),
+                  extra_storage_size(Target));
+    }
+
+    /// Add the index values to the given explosion.
+    void addIndexValues(IRGenFunction &IGF, Explosion &out) const {
+      // The stored index values come from a maximal explosion.
+      ArrayRef<ManagedValue> storedValues(getIndexValuesBuffer(),
+                                          Target.getIndexExplosionSize());
+
+      // Just copy them in straight if the target is maximal.
+      if (out.getKind() == ExplosionKind::Maximal)
+        return out.add(storedValues);
+
+      // Otherwise, reexplode.
+      Explosion storedExplosion(ExplosionKind::Maximal);
+      storedExplosion.add(storedValues);
+
+      Type indexType = Target.getIndexType();
+      IGF.getFragileTypeInfo(indexType).reexplode(IGF, storedExplosion, out);
+    }
+
     /// A helper routine for performing code common to all store paths.
     void store(IRGenFunction &IGF, const Callee &setter, Address base,
-               Explosion &value, const TypeInfo &valueTI) const {
+               Explosion &rawValue, const TypeInfo &valueTI) const {
       // An explosion for the 'self' argument, if required.
       Explosion selfArg(setter.getExplosionLevel());
 
@@ -440,8 +499,17 @@ namespace {
       }
 
       // Add the value argument.
-      // FIXME: for a subscript, this needs to get messed with.
-      args.push_back(Arg(value, valueTI));
+      // In a subscript, this is a tuple of the subscript and the value.
+      Explosion value(setter.getExplosionLevel());
+      if (Target.isSubscript()) {
+        addIndexValues(IGF, value);
+        valueTI.reexplode(IGF, rawValue, value);
+        args.push_back(Arg(value));
+
+      // Otherwise, it's just the original value.
+      } else {
+        args.push_back(Arg(rawValue, valueTI));
+      }
 
       // Make the call.
       emitVoidCall(IGF, setter, args);
@@ -484,11 +552,13 @@ namespace {
       }
 
       // The next argument is the "index".
-      // For subscripts, this is stored in the target.
+      // In a subscript, this is a tuple of the subscript and the value.
+      Explosion index(getter.getExplosionLevel());
       if (Target.isSubscript()) {
-        // FIXME: implement
+        addIndexValues(IGF, index);
+        args.push_back(Arg(index));
 
-      // For everything else, pass an empty tuple.
+      // Otherwise, it's an empty tuple.
       } else {
         args.push_back(Arg());
       }
@@ -514,11 +584,13 @@ namespace {
       }
 
       // The next argument is the "index".
-      // For subscripts, this is stored in the target.
+      // In a subscript, this is a tuple of the subscript and the value.
+      Explosion index(getter.getExplosionLevel());
       if (Target.isSubscript()) {
-        // FIXME: implement
+        addIndexValues(IGF, index);
+        args.push_back(Arg(index));
 
-      // For everything else, pass an empty tuple.
+      // Otherwise, it's an empty tuple.
       } else {
         args.push_back(Arg());
       }
@@ -579,4 +651,30 @@ LValue IRGenFunction::getGlobal(VarDecl *var) {
   // Otherwise we can use a physical-address component.
   OwnedAddress addr(IGM.getAddrOfGlobalVariable(var), IGM.RefCountedNull);
   return emitAddressLValue(addr);
+}
+
+/// Emit an l-value for the given subscripted reference.
+LValue swift::irgen::emitSubscriptLValue(IRGenFunction &IGF, SubscriptExpr *E) {
+  // TODO: we need to take a slightly different path if the base is a
+  // reference type.
+  assert(!E->getBase()->getType()->hasReferenceSemantics());
+  
+  // Emit the base l-value.
+  LValue lvalue = IGF.emitLValue(E->getBase());
+
+  // Emit the index.  GetterSetterComponent requires this to be
+  // maximal; in theory it might be better to try to match the
+  // getter/setter, but that would require some significant
+  // complexity.
+  Explosion index(ExplosionKind::Maximal);
+  IGF.emitRValue(E->getIndex(), index);
+
+  // Subscript accesses are always logical (for now).
+  GetterSetterComponent &component =
+    lvalue.addWithExtra<GetterSetterComponent>(
+                GetterSetterTarget::forByrefMemberSubscript(E->getDecl(),
+                                                            index.size()));
+  component.initIndexValues(index);
+
+  return lvalue;
 }

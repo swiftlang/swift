@@ -20,6 +20,7 @@
 namespace swift {
   class MemberRefExpr;
   class RequalifyExpr;
+  class SubscriptExpr;
 
 namespace irgen {
   class Explosion;
@@ -31,6 +32,9 @@ namespace irgen {
 
   /// Emit an l-value for a member reference.
   LValue emitMemberRefLValue(IRGenFunction &IGF, MemberRefExpr *E);
+
+  /// Emit an l-value for a subscripting.
+  LValue emitSubscriptLValue(IRGenFunction &IGF, SubscriptExpr *E);
 
 } // end namespace irgen
 } // end namespace swift

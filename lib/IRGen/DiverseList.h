@@ -274,6 +274,13 @@ public:
     U &newObject = *::new (storage) U(::std::forward<A>(args)...);
     return newObject;
   }
+
+  /// Add a new object onto the end of the list with some extra storage.
+  template <class U, class... A> U &addWithExtra(size_t extra, A && ...args) {
+    char *storage = addNewStorage(sizeof(U) + extra);
+    U &newObject = *::new (storage) U(::std::forward<A>(args)...);
+    return newObject;
+  }
 };
 
 } // end namespace irgen

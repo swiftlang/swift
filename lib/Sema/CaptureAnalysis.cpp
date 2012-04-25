@@ -72,6 +72,9 @@ static ValueDecl* FindValueDecl(Expr *E) {
     else if (MemberRefExpr *MRE = dyn_cast<MemberRefExpr>(E))
       // FIXME: maybe this shouldn't apply to bases with reference semantics?
       E = MRE->getBase();
+    else if (SubscriptExpr *SE = dyn_cast<SubscriptExpr>(E))
+      // FIXME: maybe this shouldn't apply to bases with reference semantics?
+      E = SE->getBase();
     else
       break;
   }

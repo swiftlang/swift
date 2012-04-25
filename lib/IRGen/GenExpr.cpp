@@ -192,8 +192,8 @@ namespace {
     }
 
     void visitSubscriptExpr(SubscriptExpr *E) {
-      IGF.unimplemented(E->getLoc(), "emit rvalue SubscriptExpr");
-      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
+      IGF.emitLValueAsScalar(emitSubscriptLValue(IGF, E),
+                             isOnHeap(E->getType()), Out);
     }
     void visitTupleShuffleExpr(TupleShuffleExpr *E) {
       emitTupleShuffle(IGF, E, Out);
@@ -322,8 +322,7 @@ namespace {
     }
     
     LValue visitSubscriptExpr(SubscriptExpr *E) {
-      IGF.unimplemented(E->getLoc(), "emit lvalue SubscriptExpr");
-      return IGF.emitFakeLValue(IGF.getFragileTypeInfo(E->getType()));
+      return emitSubscriptLValue(IGF, E);
     }
   };
 }
