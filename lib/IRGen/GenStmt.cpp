@@ -113,7 +113,8 @@ void IRGenFunction::emitReturnStmt(ReturnStmt *S) {
   // If this function takes no return value, ignore the result of the
   // expression.
   if (!ReturnSlot.isValid()) {
-    emitIgnored(S->getResult());
+    if (S->hasResult())
+      emitIgnored(S->getResult());
   } else {
     const TypeInfo &resultType = getFragileTypeInfo(S->getResult()->getType());
     emitInit(S->getResult(), ReturnSlot, resultType);

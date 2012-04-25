@@ -298,6 +298,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   }
 
   Stmt *visitReturnStmt(ReturnStmt *RS) {
+    if (!RS->hasResult())
+      return RS;
     if (Expr *E = doIt(RS->getResult()))
       RS->setResult(E);
     else

@@ -106,8 +106,15 @@ public:
       return 0;
     }
 
+    Type ResultTy = TheFunc->getBodyResultType();
+    if (!RS->hasResult()) {
+      if (!ResultTy->isEqual(TupleType::getEmpty(TC.Context)))
+        TC.diagnose(RS->getReturnLoc(), diag::return_expr_missing);
+      return RS;
+    }
+
     Expr *E = RS->getResult();
-    if (typeCheckExpr(E, TheFunc->getBodyResultType()))
+    if (typeCheckExpr(E, ResultTy))
       return 0;
     RS->setResult(E);
 

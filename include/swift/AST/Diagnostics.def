@@ -706,6 +706,8 @@ ERROR(array_bound_convert_limit_reached,sema_tce,none,
 
 ERROR(return_invalid_outside_func,sema_tcs,none,
       "return invalid outside of a func", ())
+ERROR(return_expr_missing,sema_tcs,none,
+      "non-void function should return a value", ())
 ERROR(expression_unused_function,sema_tcs,none,
       "expression resolves to an unused function", ())
 ERROR(expression_unused_lvalue,sema_tcs,none,

@@ -201,7 +201,11 @@ public:
   SourceRange getSourceRange() const;
   SourceLoc getReturnLoc() const { return ReturnLoc; }
 
-  Expr *getResult() const { return Result; }
+  bool hasResult() { return Result != 0; }
+  Expr *getResult() const {
+    assert(Result && "ReturnStmt doesn't have a result");
+    return Result;
+  }
   void setResult(Expr *e) { Result = e; }
   
   // Implement isa/cast/dyncast/etc.

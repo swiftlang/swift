@@ -253,18 +253,15 @@ NullablePtr<Stmt> Parser::parseStmtReturn() {
   // Handle the ambiguity between consuming the expression and allowing the
   // enclosing stmt-brace to get it by eagerly eating it unless the return is
   // followed by a }.
-  NullablePtr<Expr> Result;
+  Expr *RetExpr = nullptr;
   if (Tok.isNot(tok::r_brace)) {
-    Result = parseExpr(diag::expected_expr_return);
+    NullablePtr<Expr> Result = parseExpr(diag::expected_expr_return);
     if (Result.isNull())
       return 0;
-  } else {
-    // Result value defaults to ().
-    Result = new (Context) TupleExpr(SourceLoc(), MutableArrayRef<Expr*>(), 0,
-                                     SourceLoc());
+    RetExpr = Result.get();
   }
 
-  return new (Context) ReturnStmt(ReturnLoc, Result.get());
+  return new (Context) ReturnStmt(ReturnLoc, RetExpr);
 }
 
 
