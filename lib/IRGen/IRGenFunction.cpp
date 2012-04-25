@@ -21,6 +21,7 @@
 
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "Linking.h"
 
 using namespace swift;
 using namespace irgen;

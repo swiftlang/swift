@@ -82,7 +82,7 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E) {
 
   case DeclKind::Var:
     if (D->getDeclContext()->isLocalContext())
-      return IGF.emitAddressLValue(IGF.getLocal(D));
+      return IGF.emitAddressLValue(IGF.getLocalVar(cast<VarDecl>(D)));
     return IGF.getGlobal(cast<VarDecl>(D));
       
   case DeclKind::Subscript:
@@ -387,7 +387,7 @@ namespace {
       if (!D->getDeclContext()->isLocalContext())
         return Nothing;
 
-      return IGF.getLocal(D);
+      return IGF.getLocalVar(D);
     }
 
     // Some call results will naturally come back in memory.

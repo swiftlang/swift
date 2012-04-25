@@ -57,6 +57,7 @@ namespace irgen {
   class HeapLayout;
   class IRGenModule;
   class JumpDest;
+  class LinkEntity;
   class LValue;
   class ManagedValue;
   class Scope;
@@ -296,21 +297,14 @@ private:
 //--- Declaration emission -----------------------------------------------------
 public:
   void emitLocal(Decl *D);
-  OwnedAddress getLocal(ValueDecl *D);
+  OwnedAddress getLocalVar(VarDecl *D);
   LValue getGlobal(VarDecl *D);
-  void setLocal(ValueDecl *D, OwnedAddress addr);
+  void setLocalVar(VarDecl *D, OwnedAddress addr);
   void emitPatternBindingDecl(PatternBindingDecl *D);
 
 private:
-  struct LocalVarRecord {
-    OwnedAddress Addr;
-  };
-  union LocalRecord {
-    LocalVarRecord Var;
-
-    LocalRecord() {}
-  };
-  llvm::DenseMap<ValueDecl*, LocalRecord> Locals;
+  llvm::DenseMap<LinkEntity, llvm::Function*> LocalFuncs;
+  llvm::DenseMap<VarDecl*, OwnedAddress> LocalVars;
 
 //--- Global context emission --------------------------------------------------
 public:

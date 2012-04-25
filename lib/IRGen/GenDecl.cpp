@@ -457,20 +457,16 @@ void IRGenFunction::emitLocal(Decl *D) {
   llvm_unreachable("bad declaration kind!");
 }
 
-OwnedAddress IRGenFunction::getLocal(ValueDecl *D) {
-  auto I = Locals.find(D);
-  assert(I != Locals.end() && "no entry in local map!");
-  return I->second.Var.Addr;
+OwnedAddress IRGenFunction::getLocalVar(VarDecl *D) {
+  auto I = LocalVars.find(D);
+  assert(I != LocalVars.end() && "no entry in local map!");
+  return I->second;
 }
 
-void IRGenFunction::setLocal(ValueDecl *D, OwnedAddress addr) {
-  assert(!Locals.count(D));
+void IRGenFunction::setLocalVar(VarDecl *D, OwnedAddress addr) {
+  assert(!LocalVars.count(D));
 
-  std::pair<ValueDecl*, LocalRecord> entry;
-  entry.first = D;
-  entry.second.Var.Addr = addr;
-
-  Locals.insert(entry);
+  LocalVars.insert(std::make_pair(D, addr));
 }
 
 /// Create an allocation on the stack.

@@ -49,6 +49,14 @@ void swift::irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E,
                                  explosion);
   }
 
+  for (ValueDecl *D : E->getCaptures()) {
+    if (!isa<VarDecl>(D)) {
+      IGF.unimplemented(E->getLoc(), "capturing non-variables");
+      return IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()),
+                                  explosion);
+    }
+  }
+
   bool HasCaptures = !E->getCaptures().empty();
 
   // Create the IR function.
@@ -96,7 +104,7 @@ void swift::irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E,
       auto &elt = layout.getElements()[i];
 
       Explosion OuterExplosion(ExplosionKind::Maximal);
-      OwnedAddress Var = IGF.getLocal(D);
+      OwnedAddress Var = IGF.getLocalVar(cast<VarDecl>(D));
       IGF.emitLValueAsScalar(IGF.emitAddressLValue(Var),
                              OnHeap, OuterExplosion);
       Address CaptureAddr = elt.project(IGF, CaptureStruct);
@@ -111,7 +119,7 @@ void swift::irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E,
                          Var.getAddress().getAlignment());
       OwnedAddress InnerLocal(InnerValue,
                               innerIGF.Builder.CreateLoad(InnerOwnerAddr));
-      innerIGF.setLocal(D, InnerLocal);
+      innerIGF.setLocalVar(cast<VarDecl>(D), InnerLocal);
     }
   }
 

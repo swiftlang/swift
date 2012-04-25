@@ -1438,7 +1438,7 @@ static void emitParameterClause(IRGenFunction &IGF, Pattern *param,
     OwnedAddress addr = IGF.getAddrForParameter(decl, paramValues);
 
     // FIXME: heap byrefs.
-    IGF.setLocal(decl, addr);
+    IGF.setLocalVar(decl, addr);
     return;
   }
 

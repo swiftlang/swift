@@ -125,7 +125,7 @@ OwnedAddress Initialization::emitVariable(IRGenFunction &IGF, VarDecl *var,
   OwnedAddress addr =
     emitLocalAllocation(IGF, getObjectForDecl(var), isOnHeap(var), type,
                         var->getName().str());
-  IGF.setLocal(var, addr);
+  IGF.setLocalVar(var, addr);
   return addr;
 }
 
