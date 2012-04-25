@@ -377,11 +377,6 @@ llvm::Function *IRGenModule::getAddrOfSetter(ValueDecl *value,
   return addr;
 }
 
-LValue IRGenFunction::getGlobal(VarDecl *var) {
-  OwnedAddress addr(IGM.getAddrOfGlobalVariable(var), IGM.RefCountedNull);
-  return emitAddressLValue(addr);
-}
-
 /// Emit a type extension.
 void IRGenModule::emitExtension(ExtensionDecl *ext) {
   for (Decl *member : ext->getMembers()) {

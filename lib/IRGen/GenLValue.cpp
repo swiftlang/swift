@@ -565,3 +565,8 @@ LValue swift::irgen::emitMemberRefLValue(IRGenFunction &IGF, MemberRefExpr *E) {
 
   return lvalue;
 }
+
+LValue IRGenFunction::getGlobal(VarDecl *var) {
+  OwnedAddress addr(IGM.getAddrOfGlobalVariable(var), IGM.RefCountedNull);
+  return emitAddressLValue(addr);
+}
