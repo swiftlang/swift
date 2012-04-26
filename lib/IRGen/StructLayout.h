@@ -96,6 +96,9 @@ public:
   llvm::Value *emitAlign(IRGenFunction &IGF) const;
 };
 
+void addHeapHeaderToLayout(IRGenModule &IGM, Size &size, Alignment &align,
+                           SmallVectorImpl<llvm::Type*> &fieldTypes);
+
 } // end namespace irgen
 } // end namespace swift
 

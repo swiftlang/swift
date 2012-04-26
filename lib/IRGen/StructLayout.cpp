@@ -44,6 +44,15 @@ static bool requiresHeapHeader(LayoutKind kind) {
   llvm_unreachable("bad layout kind!");
 }
 
+void swift::irgen::addHeapHeaderToLayout(IRGenModule &IGM,
+                                         Size &size, Alignment &align,
+                                         SmallVectorImpl<llvm::Type*> &fields) {
+  assert(size.isZero() && align.isOne() && fields.empty());
+  size += IGM.getPointerSize() * 2;
+  align = IGM.getPointerAlignment();
+  fields.push_back(IGM.RefCountedStructTy);
+}
+
 /// Perform structure layout on the given types.
 StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
                            LayoutStrategy strategy,
