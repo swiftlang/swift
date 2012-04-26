@@ -1201,6 +1201,7 @@ public:
   }
 
   Type getElementType() const { return ElementTy; }
+  void setElementType(Type ty) { ElementTy = ty; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const NewArrayExpr *) { return true; }

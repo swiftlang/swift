@@ -550,6 +550,9 @@ public:
       resultType = ArrayType::get(resultType, size, TC.Context);
     }
 
+    // Okay, we've built up the actual element type now.
+    E->setElementType(resultType);
+
     // Convert the outer bound to some integral type.
     auto &outerBound = E->getBounds()[0];
     assert(outerBound.Value);
