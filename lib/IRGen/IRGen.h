@@ -95,7 +95,7 @@ public:
 
   int_type getValue() const { return Value; }
 
-  bool isOne() const { return Value == 0; }
+  bool isOne() const { return Value == 1; }
   bool isZero() const { return Value == 0; }
 
   Alignment alignmentAtOffset(Size S) const;
@@ -146,6 +146,11 @@ public:
   }
 
   explicit operator bool() const { return Value != 0; }
+
+  Size roundUpToAlignment(Alignment align) const {
+    int_type value = getValue() + align.getValue() - 1;
+    return Size(value & ~int_type(align.getValue() - 1));
+  }
 
   friend bool operator< (Size L, Size R) { return L.Value <  R.Value; }
   friend bool operator<=(Size L, Size R) { return L.Value <= R.Value; }
