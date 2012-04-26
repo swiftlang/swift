@@ -536,7 +536,7 @@ Callee Callee::forIndirectCall(llvm::Value *fn, ManagedValue data) {
 
 /// Emit a reference to a function, using the best parameters possible
 /// up to given limits.
-static Callee emitCallee(IRGenModule &IGM, FuncDecl *fn,
+static Callee emitCallee(IRGenFunction &IGF, FuncDecl *fn,
                          ExplosionKind bestExplosion, unsigned bestUncurry) {
   // Use the apparent natural uncurrying level of a function as a
   // maximum on the uncurrying to do.
@@ -548,20 +548,28 @@ static Callee emitCallee(IRGenModule &IGM, FuncDecl *fn,
 
   if (!fn->getDeclContext()->isLocalContext()) {
     llvm::Constant *fnPtr =
-      IGM.getAddrOfGlobalFunction(fn, bestExplosion, bestUncurry);
+      IGF.IGM.getAddrOfGlobalFunction(fn, bestExplosion, bestUncurry);
     return Callee::forGlobalFunction(fnPtr, bestExplosion, bestUncurry);
   }
 
-  IGM.unimplemented(fn->getLocStart(), "local function emission");
-  llvm::Constant *undef = llvm::UndefValue::get(IGM.Int8PtrTy);
-  return Callee::forGlobalFunction(undef, bestExplosion, bestUncurry);
+  if (bestUncurry != 0) {
+    IGF.unimplemented(fn->getLocStart(), "curried local function emission");
+    llvm::Constant *undef = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
+    return Callee::forGlobalFunction(undef, bestExplosion, bestUncurry);
+  }
+
+  Explosion e(ExplosionKind::Maximal);
+  IGF.getFragileTypeInfo(fn->getType()).load(IGF, IGF.getLocalFunc(fn), e);
+  llvm::Value *fnPtr = e.claimUnmanagedNext();
+  ManagedValue data = e.claimNext();
+  return Callee::forKnownFunction(fnPtr, data, bestExplosion, bestUncurry);
 }
 
 /// Emit a reference to the given function as a generic function pointer.
 void swift::irgen::emitRValueForFunction(IRGenFunction &IGF, FuncDecl *fn,
                                          Explosion &explosion) {
   // Function pointers are always fully curried and use ExplosionKind::Minimal.
-  Callee callee = emitCallee(IGF.IGM, fn, ExplosionKind::Minimal, 0);
+  Callee callee = emitCallee(IGF, fn, ExplosionKind::Minimal, 0);
   assert(callee.getExplosionLevel() == ExplosionKind::Minimal);
   assert(callee.getUncurryLevel() == 0);
   explosion.addUnmanaged(callee.getOpaqueFunctionPointer(IGF));
@@ -808,12 +816,12 @@ namespace {
 
     /// getFinalResultExplosionLevel - Returns the explosion level at
     /// which we will naturally emit the last call.
-    ExplosionKind getFinalResultExplosionLevel(IRGenModule &IGM) const {
+    ExplosionKind getFinalResultExplosionLevel(IRGenFunction &IGF) const {
       // If we don't have a known function, we have to use
       // indirect-call rules.
       if (!KnownFn) return ExplosionKind::Minimal;
 
-      Callee callee = emitCallee(IGM, KnownFn, ExplosionKind::Maximal,
+      Callee callee = emitCallee(IGF, KnownFn, ExplosionKind::Maximal,
                                  CallSites.size() - 1);
       return callee.getExplosionLevel();
     }
@@ -1138,7 +1146,7 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
 
     // Otherwise, compute information about the function we're calling.
     } else {
-      callee = emitCallee(IGF.IGM, KnownFn, ExplosionKind::Maximal,
+      callee = emitCallee(IGF, KnownFn, ExplosionKind::Maximal,
                           CallSites.size() - 1);
     }
 
@@ -1218,7 +1226,7 @@ swift::irgen::tryEmitApplyAsAddress(IRGenFunction &IGF, ApplyExpr *E,
   CallPlan plan = getCallPlan(IGF.IGM, E);
 
   // Give up if the call won't be returned indirectly.
-  ExplosionSchema schema(plan.getFinalResultExplosionLevel(IGF.IGM));
+  ExplosionSchema schema(plan.getFinalResultExplosionLevel(IGF));
   resultTI.getSchema(schema);
   if (!schema.requiresIndirectResult())
     return Nothing;

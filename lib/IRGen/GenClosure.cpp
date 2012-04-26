@@ -27,6 +27,7 @@
 #include "IRGenModule.h"
 #include "Explosion.h"
 #include "GenHeap.h"
+#include "GenInit.h"
 #include "GenType.h"
 #include "LValue.h"
 
@@ -136,3 +137,25 @@ void swift::irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E,
   explosion.addUnmanaged(IGF.Builder.CreateBitCast(fn, IGF.IGM.Int8PtrTy));
   explosion.add(contextPtr);
 }
+
+/// Emit a function declaration, starting at the given uncurry level.
+void IRGenFunction::emitLocalFunction(FuncDecl *func) {
+  // Nothing to do if the function has no body.
+  if (!func->getBody()) return;
+  FuncExpr *funcExpr = func->getBody();
+
+  Initialization I;
+  auto object = I.getObjectForDecl(func);
+  const TypeInfo &type = getFragileTypeInfo(func->getType());
+  I.registerObject(*this, object, NotOnHeap, type);
+  OwnedAddress addr =
+    I.emitLocalAllocation(*this, object, NotOnHeap, type,
+                          func->getName().str());
+
+  Explosion e(ExplosionKind::Maximal);
+  emitClosure(*this, funcExpr, e);
+  type.initialize(*this, e, addr);
+
+  setLocalFunc(func, addr);
+}
+

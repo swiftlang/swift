@@ -37,6 +37,7 @@ namespace swift {
   class Expr;
   class ForEachStmt;
   class ForStmt;
+  class FuncDecl;
   class IfStmt;
   template<typename T> class Optional;
   class Pattern;
@@ -297,13 +298,17 @@ private:
 //--- Declaration emission -----------------------------------------------------
 public:
   void emitLocal(Decl *D);
-  OwnedAddress getLocalVar(VarDecl *D);
   LValue getGlobal(VarDecl *D);
+  OwnedAddress getLocalVar(VarDecl *D);
   void setLocalVar(VarDecl *D, OwnedAddress addr);
   void emitPatternBindingDecl(PatternBindingDecl *D);
 
+  Address getLocalFunc(FuncDecl*);
+  void setLocalFunc(FuncDecl*, Address);
+  void emitLocalFunction(FuncDecl *func);
+
 private:
-  llvm::DenseMap<LinkEntity, llvm::Function*> LocalFuncs;
+  llvm::DenseMap<FuncDecl*, Address> LocalFuncs;
   llvm::DenseMap<VarDecl*, OwnedAddress> LocalVars;
 
 //--- Global context emission --------------------------------------------------

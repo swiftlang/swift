@@ -686,6 +686,12 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       }
       
       GetFn->setBody(Body.get());
+
+      auto& Captures = ValCaptures.back();
+      ValueDecl** CaptureCopy =
+          Context.AllocateCopy<ValueDecl*>(Captures.begin(), Captures.end());
+      GetFn->setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
+
       LastValidLoc = Body.get()->getRBraceLoc();
       
       Get = new (Context) FuncDecl(/*StaticLoc=*/SourceLoc(), GetLoc,
@@ -800,6 +806,12 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     }
     
     SetFn->setBody(Body.get());
+
+    auto& Captures = ValCaptures.back();
+    ValueDecl** CaptureCopy =
+        Context.AllocateCopy<ValueDecl*>(Captures.begin(), Captures.end());
+    SetFn->setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
+
     LastValidLoc = Body.get()->getRBraceLoc();
     
     Set = new (Context) FuncDecl(/*StaticLoc=*/SourceLoc(), SetLoc,
@@ -1045,10 +1057,16 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
     // Check to see if we have a "{" to start a brace statement.
     if (Tok.is(tok::l_brace)) {
       NullablePtr<BraceStmt> Body = parseStmtBrace(diag::invalid_diagnostic);
-      if (Body.isNull())
+      if (Body.isNull()) {
         FE = 0; // FIXME: Should do some sort of error recovery here.
-      else
+      } else {
         FE->setBody(Body.get());
+
+        auto& Captures = ValCaptures.back();
+        ValueDecl** CaptureCopy =
+            Context.AllocateCopy<ValueDecl*>(Captures.begin(), Captures.end());
+        FE->setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
+      }
       
     } else {
       // Note, we just discard FE here.  It is bump pointer allocated, so this

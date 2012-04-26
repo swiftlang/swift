@@ -447,7 +447,7 @@ void IRGenFunction::emitLocal(Decl *D) {
     return;
 
   case DeclKind::Func:
-    unimplemented(D->getLocStart(), "local function emission");
+    emitLocalFunction(cast<FuncDecl>(D));
     return;
 
   case DeclKind::PatternBinding:
@@ -467,6 +467,18 @@ void IRGenFunction::setLocalVar(VarDecl *D, OwnedAddress addr) {
   assert(!LocalVars.count(D));
 
   LocalVars.insert(std::make_pair(D, addr));
+}
+
+Address IRGenFunction::getLocalFunc(FuncDecl *D) {
+  auto I = LocalFuncs.find(D);
+  assert(I != LocalFuncs.end() && "no entry in local map!");
+  return I->second;
+}
+
+void IRGenFunction::setLocalFunc(FuncDecl *D, Address addr) {
+  assert(!LocalFuncs.count(D));
+
+  LocalFuncs.insert(std::make_pair(D, addr));
 }
 
 /// Create an allocation on the stack.
