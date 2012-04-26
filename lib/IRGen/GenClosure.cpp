@@ -51,7 +51,7 @@ void swift::irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E,
   }
 
   for (ValueDecl *D : E->getCaptures()) {
-    if (!isa<VarDecl>(D)) {
+    if (!isa<VarDecl>(D) && !isa<FuncDecl>(D)) {
       IGF.unimplemented(E->getLoc(), "capturing non-variables");
       return IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()),
                                   explosion);
@@ -81,9 +81,15 @@ void swift::irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E,
   if (HasCaptures) {
     SmallVector<const TypeInfo *, 4> Fields;
     for (ValueDecl *D : E->getCaptures()) {
-      Type RefTy = LValueType::get(D->getType(),
-                                   LValueType::Qual::DefaultForVar,
-                                   IGF.IGM.Context);
+      Type RefTy;
+      if (isa<VarDecl>(D)) {
+        RefTy = LValueType::get(D->getType(),
+                                LValueType::Qual::DefaultForVar,
+                                IGF.IGM.Context);
+      } else {
+        assert(isa<FuncDecl>(D) && "Unexpected decl");
+        RefTy = D->getType();
+      }
       const TypeInfo &typeInfo = IGF.getFragileTypeInfo(RefTy);
       Fields.push_back(&typeInfo);
     }
@@ -103,6 +109,18 @@ void swift::irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E,
 
       ValueDecl *D = E->getCaptures()[i];
       auto &elt = layout.getElements()[i];
+
+      if (isa<FuncDecl>(D)) {
+        Explosion OuterExplosion(ExplosionKind::Maximal);
+        Address Func = IGF.getLocalFunc(cast<FuncDecl>(D));
+        elt.Type->load(IGF, Func, OuterExplosion);
+        Address CaptureAddr = elt.project(IGF, CaptureStruct);
+        elt.Type->initialize(IGF, OuterExplosion, CaptureAddr);
+
+        Address InnerAddr = elt.project(innerIGF, InnerStruct);
+        innerIGF.setLocalFunc(cast<FuncDecl>(D), InnerAddr);
+        continue;
+      }
 
       Explosion OuterExplosion(ExplosionKind::Maximal);
       OwnedAddress Var = IGF.getLocalVar(cast<VarDecl>(D));
