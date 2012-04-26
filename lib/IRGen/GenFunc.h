@@ -18,6 +18,7 @@
 #ifndef SWIFT_IRGEN_GENFUNC_H
 #define SWIFT_IRGEN_GENFUNC_H
 
+#include <vector>
 #include "Explosion.h"
 
 namespace llvm {
@@ -101,34 +102,89 @@ namespace irgen {
 
   /// An argument to a call.
   class Arg {
-    Explosion *Value;
+    typedef llvm::PointerIntPair<Explosion*,1,bool> ValueAndIsOwned_t;
+    ValueAndIsOwned_t ValueAndIsOwned;
     const TypeInfo *Ty;
+
+    Arg(ValueAndIsOwned_t value, const TypeInfo *type)
+      : ValueAndIsOwned(value), Ty(type) {}
 
   public:
     /// Creates an empty argument with no values.
-    Arg() : Value(nullptr), Ty(nullptr) {}
+    Arg() : Ty(nullptr) {}
 
     /// Creates an untyped argument; the explosion's kind must
     /// match the explosion kind of the callee.
-    explicit Arg(Explosion &value) : Value(&value), Ty(nullptr) {}
+    static Arg forUnowned(Explosion &value) {
+      return Arg(ValueAndIsOwned_t(&value, false), nullptr);
+    }
 
     /// Creates a typed arugment.
-    Arg(Explosion &value, const TypeInfo &type) : Value(&value), Ty(&type) {}
+    static Arg forUnowned(Explosion &value, const TypeInfo &type) {
+      return Arg(ValueAndIsOwned_t(&value, false), &type);
+    }
 
+    /// Creates an untyped argument; the explosion's kind must
+    /// match the explosion kind of the callee.
+    static Arg forOwned(Explosion *value) {
+      assert(value);
+      return Arg(ValueAndIsOwned_t(value, true), nullptr);
+    }
+
+    /// Creates a typed arugment.
+    static Arg forOwned(Explosion *value, const TypeInfo &type) {
+      assert(value);
+      return Arg(ValueAndIsOwned_t(value, true), &type);
+    }
+
+    // Arg is move-only.
+    Arg(const Arg &) = delete;
+    Arg &operator=(const Arg &) = delete;
+
+    // Move ctor and assignment.
+    Arg(Arg &&other)
+      : ValueAndIsOwned(other.ValueAndIsOwned), Ty(other.Ty) {
+      other.ValueAndIsOwned = ValueAndIsOwned_t();
+    }
+    Arg &operator=(Arg &&other) {
+      ValueAndIsOwned = other.ValueAndIsOwned;
+      other.ValueAndIsOwned = ValueAndIsOwned_t();
+      Ty = other.Ty;
+      return *this;
+    }
+
+    // Dtor.
+    ~Arg() {
+      if (ValueAndIsOwned.getInt())
+        delete ValueAndIsOwned.getPointer();
+    }
+
+    /// Is this argument obviously empty?
     bool empty() const {
-      return Value == nullptr;
+      return ValueAndIsOwned.getPointer() == nullptr;
     }
 
+    /// Return the explosion for this argument, assuming it's non-empty.
     Explosion &getValue() const {
-      assert(Value != nullptr && "asking for value of empty argument!");
-      return *Value;
+      assert(!empty() && "asking for value of empty argument!");
+      return *ValueAndIsOwned.getPointer();
     }
 
+    /// Return the type for this argument, assuming it's typed.
     const TypeInfo &getType() const {
       assert(Ty != nullptr && "asking for type of untyped argument!");
       return *Ty;
     }
   };
+
+  /// Emit an expression as a callee.
+  ///
+  /// \param args - arguments to which any extras should be added.
+  ///   This has to be a <vector> because llvm::SmallVector doesn't
+  ///   support move-only types.
+  Callee emitCallee(IRGenFunction &IGF, Expr *fn, ExplosionKind bestLevel,
+                    unsigned additionalUncurrying,
+                    std::vector<Arg> &args);
 
   /// Emit an r-value reference to a function.
   void emitRValueForFunction(IRGenFunction &IGF, FuncDecl *Fn,
@@ -161,7 +217,6 @@ namespace irgen {
   /// Emit a call with a void return value.
   void emitVoidCall(IRGenFunction &IGF, const Callee &callee,
                     ArrayRef<Arg> args);
-
 
 } // end namespace irgen
 } // end namespace swift

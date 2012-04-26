@@ -569,7 +569,7 @@ static Callee emitCallee(IRGenFunction &IGF, FuncDecl *fn,
 void swift::irgen::emitRValueForFunction(IRGenFunction &IGF, FuncDecl *fn,
                                          Explosion &explosion) {
   // Function pointers are always fully curried and use ExplosionKind::Minimal.
-  Callee callee = emitCallee(IGF, fn, ExplosionKind::Minimal, 0);
+  Callee callee = ::emitCallee(IGF, fn, ExplosionKind::Minimal, 0);
   assert(callee.getExplosionLevel() == ExplosionKind::Minimal);
   assert(callee.getUncurryLevel() == 0);
   explosion.addUnmanaged(callee.getOpaqueFunctionPointer(IGF));
@@ -867,9 +867,33 @@ static void decomposeFunctionReference(CallPlan &plan, Expr *E) {
 /// Compute the plan for performing a sequence of call expressions.
 static CallPlan getCallPlan(IRGenModule &IGM, ApplyExpr *E) {
   CallPlan plan;
-
   decomposeFunctionReference(plan, uncurry(E, plan.CallSites));
   return plan;
+}
+
+/// Emit an expression as a callee suitable for being passed to
+/// swift::irgen::emitCall or one its variants.
+Callee swift::irgen::emitCallee(IRGenFunction &IGF, Expr *fn,
+                                ExplosionKind bestExplosion,
+                                unsigned addedUncurrying,
+                                std::vector<Arg> &args) {
+  assert(addedUncurrying == 0);
+
+  // FIXME: be less lazy about this.
+  Explosion fnValues(ExplosionKind::Maximal);
+  IGF.emitRValue(fn, fnValues);
+
+  auto fnPtr = fnValues.claimUnmanagedNext();
+  auto dataPtr = fnValues.claimNext();
+
+  bool hasDataPtr = !isa<llvm::ConstantPointerNull>(dataPtr.getValue());
+  if (!hasDataPtr) dataPtr = ManagedValue(nullptr);
+
+  llvm::FunctionType *fnType =
+    IGF.IGM.getFunctionType(fn->getType(), ExplosionKind::Minimal,
+                            /*uncurrying*/ 0, hasDataPtr);
+  fnPtr = IGF.Builder.CreateBitCast(fnPtr, fnType->getPointerTo());
+  return Callee::forKnownFunction(fnPtr, dataPtr, ExplosionKind::Minimal, 0);
 }
 
 /// Set attributes on the given call site consistent with it returning
@@ -958,7 +982,7 @@ namespace {
                    const TypeInfo &resultTI, CallResult &result,
                    Address finalAddress)
       : CallEmitter(IGF, callee, resultTI, result, finalAddress), Args(args) {
-      assert(TheCallee.getUncurryLevel() + 1== Args.size());
+      assert(TheCallee.getUncurryLevel() + 1 == Args.size());
     }
 
     void emitArgs() {
@@ -1146,8 +1170,8 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
 
     // Otherwise, compute information about the function we're calling.
     } else {
-      callee = emitCallee(IGF, KnownFn, ExplosionKind::Maximal,
-                          CallSites.size() - 1);
+      callee = ::emitCallee(IGF, KnownFn, ExplosionKind::Maximal,
+                            CallSites.size() - 1);
     }
 
   // Otherwise, emit as a function pointer and use the pessimistic

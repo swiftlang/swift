@@ -18,12 +18,20 @@
 #ifndef SWIFT_IRGEN_GENARRAY_H
 #define SWIFT_IRGEN_GENARRAY_H
 
+namespace llvm {
+  class Twine;
+  class Value;
+}
+
 namespace swift {
+  class Expr;
   class NewArrayExpr;
 
 namespace irgen {
   class Explosion;
   class IRGenFunction;
+  class ManagedValue;
+  class TypeInfo;
 
   /// Emit an r-value reference to a function.
   void emitNewArrayExpr(IRGenFunction &IGF, NewArrayExpr *E,

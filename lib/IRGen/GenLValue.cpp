@@ -506,12 +506,12 @@ namespace {
       // An explosion for the 'self' argument, if required.
       Explosion selfArg(setter.getExplosionLevel());
 
-      SmallVector<Arg, 2> args;
+      std::vector<Arg> args;
 
       // A byref member requires 'self' as its first argument.
       if (Target.isByrefMember()) {
         selfArg.addUnmanaged(base.getAddress());
-        args.push_back(Arg(selfArg));
+        args.push_back(Arg::forUnowned(selfArg));
       }
 
       // Add the value argument.
@@ -520,11 +520,11 @@ namespace {
       if (Target.isSubscript()) {
         addIndexValues(IGF, value, preserve);
         valueTI.reexplode(IGF, rawValue, value);
-        args.push_back(Arg(value));
+        args.push_back(Arg::forUnowned(value));
 
       // Otherwise, it's just the original value.
       } else {
-        args.push_back(Arg(rawValue, valueTI));
+        args.push_back(Arg::forUnowned(rawValue, valueTI));
       }
 
       // Make the call.
@@ -556,7 +556,7 @@ namespace {
       Callee getter = Target.getGetter(IGF, out.getKind());
 
       // Build the arguments.
-      SmallVector<Arg, 2> args;
+      std::vector<Arg> args;
 
       // Byref members need a 'self' argument.
       Explosion selfArg(getter.getExplosionLevel());
@@ -565,7 +565,7 @@ namespace {
 
         // We can use an untyped Arg because we perfectly match the
         // getter's explosion level.
-        args.push_back(Arg(selfArg));
+        args.push_back(Arg::forUnowned(selfArg));
       }
 
       // The next argument is the "index".
@@ -573,7 +573,7 @@ namespace {
       Explosion index(getter.getExplosionLevel());
       if (Target.isSubscript()) {
         addIndexValues(IGF, index, preserve);
-        args.push_back(Arg(index));
+        args.push_back(Arg::forUnowned(index));
 
       // Otherwise, it's an empty tuple.
       } else {
@@ -589,7 +589,7 @@ namespace {
       Callee getter = Target.getGetter(IGF, ExplosionKind::Maximal);
 
       // Build the arguments.
-      SmallVector<Arg, 2> args;
+      std::vector<Arg> args;
 
       // Byref members need a 'self' argument.
       Explosion selfArg(getter.getExplosionLevel());
@@ -598,7 +598,7 @@ namespace {
 
         // We can use an untyped Arg because we perfectly match the
         // getter's explosion level.
-        args.push_back(Arg(selfArg));
+        args.push_back(Arg::forUnowned(selfArg));
       }
 
       // The next argument is the "index".
@@ -606,7 +606,7 @@ namespace {
       Explosion index(getter.getExplosionLevel());
       if (Target.isSubscript()) {
         addIndexValues(IGF, index, preserve);
-        args.push_back(Arg(index));
+        args.push_back(Arg::forUnowned(index));
 
       // Otherwise, it's an empty tuple.
       } else {

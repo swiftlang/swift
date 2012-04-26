@@ -24,6 +24,7 @@
 #include "llvm/Target/TargetData.h"
 
 #include "ASTVisitor.h"
+#include "GenArray.h"
 #include "GenClosure.h"
 #include "GenFunc.h"
 #include "GenInit.h"
@@ -218,8 +219,7 @@ namespace {
     }
 
     void visitNewArrayExpr(NewArrayExpr *E) {
-      IGF.unimplemented(E->getLoc(), "emit rvalue NewArrayExpr");
-      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
+      emitNewArrayExpr(IGF, E, Out);
     }
 
     void visitApplyExpr(ApplyExpr *E) {
