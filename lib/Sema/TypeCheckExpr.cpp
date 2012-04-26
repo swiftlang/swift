@@ -383,17 +383,7 @@ public:
     return E;
   }
 
-  Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
-    if (E->getType().isNull())
-      E->setType(UnstructuredDependentType::get(TC.Context));
-    return E;
-  }
-  Expr *visitFloatLiteralExpr(FloatLiteralExpr *E) {
-    if (E->getType().isNull())
-      E->setType(UnstructuredDependentType::get(TC.Context));
-    return E;
-  }
-  Expr *visitStringLiteralExpr(StringLiteralExpr *E) {
+  Expr *visitLiteralExpr(LiteralExpr *E) {
     if (E->getType().isNull())
       E->setType(UnstructuredDependentType::get(TC.Context));
     return E;
@@ -928,8 +918,7 @@ namespace {
           OneDependentExpr = E;
         
         // Also remember if we see any literals with dependent types.
-        if (isa<IntegerLiteralExpr>(E) || isa<FloatLiteralExpr>(E) ||
-            isa<StringLiteralExpr>(E))
+        if (isa<LiteralExpr>(E))
           HasDependentLiterals = true;
       }
       return E;

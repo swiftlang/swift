@@ -140,17 +140,31 @@ public:
     return E->getKind() == ExprKind::Error;
   }
 };
+
+/// LiteralExpr - Common base class between the literals.
+class LiteralExpr : public Expr {
+public:
+  LiteralExpr(ExprKind Kind) : Expr(Kind) {}
   
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const LiteralExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::IntegerLiteral ||
+           E->getKind() == ExprKind::FloatLiteral ||
+           E->getKind() == ExprKind::StringLiteral;
+  }
+};
 
 /// IntegerLiteralExpr - Integer literal, like '4'.  After semantic analysis
 /// assigns types, this is guaranteed to only have a BuiltinIntegerType.
-class IntegerLiteralExpr : public Expr {
+class IntegerLiteralExpr : public LiteralExpr {
   StringRef Val;  // Use StringRef instead of APInt, APInt leaks.
   SourceLoc Loc;
 
 public:
   IntegerLiteralExpr(StringRef Val, SourceLoc Loc)
-    : Expr(ExprKind::IntegerLiteral), Val(Val), Loc(Loc) {}
+    : LiteralExpr(ExprKind::IntegerLiteral), Val(Val), Loc(Loc) {}
   
   APInt getValue() const;
 
@@ -168,13 +182,13 @@ public:
 /// FloatLiteralExpr - Floating point literal, like '4.0'.  After semantic
 /// analysis assigns types, this is guaranteed to only have a
 /// BuiltinFloatingPointType.
-class FloatLiteralExpr : public Expr {
+class FloatLiteralExpr : public LiteralExpr {
   StringRef Val; // Use StringRef instead of APFloat, APFloat leaks.
   SourceLoc Loc;
 
 public:
   FloatLiteralExpr(StringRef Val, SourceLoc Loc)
-    : Expr(ExprKind::FloatLiteral), Val(Val), Loc(Loc) {}
+    : LiteralExpr(ExprKind::FloatLiteral), Val(Val), Loc(Loc) {}
 
   APFloat getValue() const;
 
@@ -191,13 +205,13 @@ public:
 /// StringLiteralExpr - String literal, like '"foo"'.  After semantic
 /// analysis assigns types, this is guaranteed to only have a
 /// BuiltinRawPointerType.
-class StringLiteralExpr : public Expr {
+class StringLiteralExpr : public LiteralExpr {
   StringRef Val;
   SourceLoc Loc;
   
 public:
   StringLiteralExpr(StringRef Val, SourceLoc Loc)
-    : Expr(ExprKind::StringLiteral), Val(Val), Loc(Loc) {}
+    : LiteralExpr(ExprKind::StringLiteral), Val(Val), Loc(Loc) {}
   
   StringRef getValue() const { return Val; }
   SourceRange getSourceRange() const { return Loc; }

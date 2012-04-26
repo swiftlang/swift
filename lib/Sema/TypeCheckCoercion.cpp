@@ -86,7 +86,7 @@ class SemaCoerce : public ExprVisitor<SemaCoerce, CoercedResult> {
 
   /// coerceLiteralToType - Coerce the given literal to the destination type.
   /// The literal is assumed to have dependent type.
-  CoercedResult coerceLiteral(Expr *E);
+  CoercedResult coerceLiteral(LiteralExpr *E);
   
   TypeChecker &TC;
   Type DestTy;
@@ -160,15 +160,7 @@ public:
     return unchanged(E);
   }
   
-  CoercedResult visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
-    return coerceLiteral(E);
-  }
-  CoercedResult visitFloatLiteralExpr(FloatLiteralExpr *E) {
-    return coerceLiteral(E);
-  }
-  CoercedResult visitStringLiteralExpr(StringLiteralExpr *E) {
-    return coerceLiteral(E);
-  }
+  CoercedResult visitLiteralExpr(LiteralExpr *E);
   CoercedResult visitDeclRefExpr(DeclRefExpr *E) {
     return unchanged(E);
   }
@@ -548,7 +540,7 @@ SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralType LitTy) {
   return std::pair<FuncDecl*, Type>(Method, ArgType);
 }
 
-CoercedResult SemaCoerce::coerceLiteral(Expr *E) {
+CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
   assert(E->getType()->isDependentType() && "only accepts dependent types");
   LiteralType LitTy;
   if (isa<IntegerLiteralExpr>(E))

@@ -55,9 +55,10 @@
 #endif
 
 EXPR(Error, Expr)
-EXPR(IntegerLiteral, Expr)
-EXPR(FloatLiteral, Expr)
-EXPR(StringLiteral, Expr)
+ABSTRACT_EXPR(Literal, Expr)
+  EXPR(IntegerLiteral, LiteralExpr)
+  EXPR(FloatLiteral, LiteralExpr)
+  EXPR(StringLiteral, LiteralExpr)
 EXPR(DeclRef, Expr)
 EXPR(DotSyntaxBaseIgnored, Expr)
 ABSTRACT_EXPR(OverloadSetRef, Expr)
