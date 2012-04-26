@@ -167,8 +167,7 @@ ArrayHeapLayout::ArrayHeapLayout(IRGenModule &IGM, const TypeInfo &elementTI)
 static void emitArrayDestroy(IRGenFunction &IGF,
                              llvm::Value *begin, llvm::Value *end,
                              const TypeInfo &elementTI) {
-  // Skip this if the type is known to be POD.
-  if (elementTI.isPOD(ResilienceScope::Local)) return;
+  assert(!elementTI.isPOD(ResilienceScope::Local));
 
   llvm::BasicBlock *endBB = IGF.createBasicBlock("end");
   llvm::BasicBlock *bodyBB = IGF.createBasicBlock("loop-body");
@@ -219,10 +218,11 @@ static llvm::Function *createArrayDtorFn(IRGenModule &IGM,
   Address lengthPtr = layout.getLengthPointer(IGF, header);
   llvm::Value *length = IGF.Builder.CreateLoad(lengthPtr, "length");
 
-  llvm::Value *begin = layout.getBeginPointer(IGF, header);
-  llvm::Value *end = IGF.Builder.CreateInBoundsGEP(begin, length, "end");
-
-  emitArrayDestroy(IGF, begin, end, layout.getElementTypeInfo());
+  if (!layout.getElementTypeInfo().isPOD(ResilienceScope::Local)) {
+    llvm::Value *begin = layout.getBeginPointer(IGF, header);
+    llvm::Value *end = IGF.Builder.CreateInBoundsGEP(begin, length, "end");
+    emitArrayDestroy(IGF, begin, end, layout.getElementTypeInfo());
+  }
 
   llvm::Value *size = layout.getAllocationSize(IGF, length, false, false);
   IGF.Builder.CreateRet(size);
