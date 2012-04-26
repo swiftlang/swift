@@ -279,7 +279,8 @@ void swift::REPL(ASTContext &Context) {
   // Force upfront IRGen for swift.swift, to make the prompt more responsive.
   // FIXME: We really shouldn't be JIT'ing swift.swift in the first place.
   for (llvm::Function& F : Module)
-    EE->getPointerToFunction(&F);
+    if (!F.empty())
+      EE->getPointerToFunction(&F);
 
   while (1) {
     // Read one line.
