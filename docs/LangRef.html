@@ -489,7 +489,7 @@
   <!-- ===================================================================== -->
   
   <pre id="value-specifier" class="grammar">
-    decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#pattern">pattern</a> initializer?
+    decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#pattern">pattern</a> initializer?  (',' pattern initializer?)*
     decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a> '{' get-set '}'
   
     decl-var-simple ::= 'var' <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a>
@@ -516,6 +516,10 @@
   computed independently of the pattern, and the type of the pattern is derived
   from the initializer. If no initializer is specified, the pattern must be
   fully-typed, and the values are default-initialized.</p>
+
+  <p>If there is more than one pattern in a 'var' declaration, they are each
+  considered independently, as if there were multiple declarations.  The
+  initial attribute-list is shared between all the declared variables. 
 
   <p>A var declaration may contain a getter and (optionally) a setter,
 which will be used when reading or writing the variable, respectively.

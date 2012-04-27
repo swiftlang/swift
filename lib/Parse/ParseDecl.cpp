@@ -893,7 +893,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool hasContainerType) {
 /// token skipping) on error.
 ///
 ///   decl-var:
-///      'var' attribute-list pattern initializer?
+///      'var' attribute-list pattern initializer? (',' pattern initializer? )*
 ///      'var' attribute-list identifier : type-annotation { get-set }
 bool Parser::parseDeclVar(bool hasContainerType, SmallVectorImpl<Decl*> &Decls){
   SourceLoc VarLoc = consumeToken(tok::kw_var);
@@ -924,27 +924,36 @@ bool Parser::parseDeclVar(bool hasContainerType, SmallVectorImpl<Decl*> &Decls){
       }
     }
   }
-  
-  Type Ty;
-  NullablePtr<Expr> Init;
-  if (consumeIf(tok::equal)) {
-    Init = parseExpr(diag::expected_initializer_expr);
-    if (Init.isNull())
-      return true;
-    
-    if (HasGetSet) {
-      diagnose(pattern.get()->getLoc(), diag::getset_init)
-        << Init.get()->getSourceRange();
-      Init = nullptr;
-    }
-  }
-  
-  addVarsToScope(pattern.get(), Decls, Attributes);
 
-  PatternBindingDecl *PBD =
-      new (Context) PatternBindingDecl(VarLoc, pattern.get(),
-                                       Init.getPtrOrNull(), CurDeclContext);
-  Decls.push_back(PBD);
+  do {
+    Type Ty;
+    NullablePtr<Expr> Init;
+    if (consumeIf(tok::equal)) {
+      Init = parseExpr(diag::expected_initializer_expr);
+      if (Init.isNull())
+        return true;
+    
+      if (HasGetSet) {
+        diagnose(pattern.get()->getLoc(), diag::getset_init)
+          << Init.get()->getSourceRange();
+        Init = nullptr;
+      }
+    }
+
+    addVarsToScope(pattern.get(), Decls, Attributes);
+
+    PatternBindingDecl *PBD =
+        new (Context) PatternBindingDecl(VarLoc, pattern.get(),
+                                         Init.getPtrOrNull(), CurDeclContext);
+    Decls.push_back(PBD);
+
+    if (!consumeIf(tok::comma))
+      break;
+
+    pattern = parsePattern();
+    if (pattern.isNull()) return true;
+  } while (1);
+
   return false;
 }
 
