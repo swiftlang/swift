@@ -608,12 +608,12 @@ void Lexer::lexCharacterLiteral() {
   // If this wasn't a normal character, then this is a malformed character.
   if (CharValue == ~0U) {
     diagnose(TokStart, diag::lex_invalid_character_literal);
-    return;
+    return formToken(tok::unknown, TokStart);
   }
     
   if (*CurPtr != '\'') {
     diagnose(TokStart, diag::lex_invalid_character_literal);
-    return;
+    return formToken(tok::unknown, TokStart);;
   }
   ++CurPtr;
   return formToken(tok::character_literal, TokStart);
@@ -650,7 +650,7 @@ void Lexer::lexStringLiteral() {
     case '\n':  // String literals cannot have \n or \r in them.
     case '\r':
       diagnose(TokStart, diag::lex_unterminated_string);
-      return;        
+      return formToken(tok::unknown, TokStart);
     }
   }
 }
