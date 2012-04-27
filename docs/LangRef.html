@@ -1262,6 +1262,12 @@ if vec[3] {
   var declaration.  The name affects swizzling of elements in the tuple when <a
   href="#typecheck_conversions">tuple conversions</a> are performed.</p>
 
+  <p>For tuples with elements with default values, the default value is
+  evaluated when converting an expression to that tuple type if it is used, or
+  when a value of that tuple type is default-initialized.  The default value
+  is not allowed to refer to local declarations. FIXME: Maybe we should relax
+  this?</p>
+
   <pre class="example">
   <i>// Variable definitions.</i>
   var a : ()

@@ -773,6 +773,8 @@ ERROR(base_of_array_slice_not_nominal,sema_tct,none,
       "base type of array slice must be a nominal type", (Type))
 ERROR(slice_type_not_found,sema_tct,none,
       "cannot find slice implementation type '%0'", (StringRef))
+ERROR(tuple_default_local_ref,sema_tct,none,
+      "cannot refer to local value from default expression in tuple", ())
 
 //==============================================================================
 // IR Generation Diagnostics

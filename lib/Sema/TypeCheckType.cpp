@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "swift/AST/ASTWalker.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
@@ -143,7 +144,27 @@ bool TypeChecker::validateType(Type InTy) {
         IsInvalid = true;
         break;
       }
-        
+
+      if (!EltTy)
+        EltInit = convertToMaterializable(EltInit);
+
+      struct CheckForLocalRef : public ASTWalker {
+        TypeChecker &TC;
+
+        CheckForLocalRef(TypeChecker &TC) : TC(TC) {}
+
+        bool walkToExprPre(Expr *E) {
+          if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
+            if (DRE->getDecl()->getDeclContext()->isLocalContext()) {
+              TC.diagnose(E->getLoc(), diag::tuple_default_local_ref);
+            }
+          }
+          return true;
+        }
+      };
+
+      EltInit->walk(CheckForLocalRef(*this));
+
       // If both a type and an initializer are specified, make sure the
       // initializer's type agrees with the (redundant) type.
       assert(EltTy.isNull() || EltTy->isEqual(EltInit->getType()));
