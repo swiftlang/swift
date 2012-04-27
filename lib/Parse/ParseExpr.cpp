@@ -180,6 +180,7 @@ NullablePtr<Expr> Parser::parseExprNew() {
 ///     integer_literal
 ///     floating_literal
 ///     string_literal
+///     character_literal
 ///
 ///   expr-primary:
 ///     expr-literal

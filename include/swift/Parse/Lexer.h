@@ -98,6 +98,9 @@ private:
   void lexDollarIdent();
   void lexOperatorIdentifier();
   void lexNumber();
+  
+  unsigned lexCharacter(bool StopAtDoubleQuote);
+  void lexCharacterLiteral();
   void lexStringLiteral();
   bool isPrecededBySpace();
 };

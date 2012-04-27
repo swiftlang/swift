@@ -313,6 +313,22 @@
   precision.</p>
   
   <!-- ===================================================================== -->
+  <h3 id="character_literal">Character Literals</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    character_literal ::= '[^"\\\n\r]|character_escape'
+    character_escape  ::= [\][\] | [\]t | [\]n | [\]r | [\]" | [\]'
+    character_escape  ::= [\]x hex hex  
+    character_escape  ::= [\]u hex hex hex hex  
+    character_escape  ::= [\]U hex hex hex hex hex hex hex hex
+    hex               ::= [0-9a-fA-F]
+  </pre>
+  
+  <p>character_literal tokens represent a single character, and are surrounded
+  by single quotes.</p>
+
+  <!-- ===================================================================== -->
   <h3 id="string_literal">String Literals</h3>
   <!-- ===================================================================== -->
   
@@ -322,13 +338,7 @@
   </div>
   
   <pre class="grammar">
-    string_literal ::= ["]([^"\\\n\r]|string_escape)*["]
-    
-    string_escape  ::= [\][\] | [\]t | [\]n | [\]r | [\]" | [\]'
-    string_escape  ::= [\]x hex hex  
-    string_escape  ::= [\]u hex hex hex hex  
-    string_escape  ::= [\]U hex hex hex hex hex hex hex hex
-    hex            ::= [0-9a-fA-F]
+    string_literal ::= ["]([^"\\\n\r]|character_escape)*["]
   </pre>
   
   <p>string_literal tokens represent a string, and are surrounded by double
@@ -1682,14 +1692,16 @@ if vec[3] {
   <pre class="grammar">
     expr-literal ::= <a href="#integer_literal">integer_literal</a>
     expr-literal ::= <a href="#floating_literal">floating_literal</a>
+    expr-literal ::= <a href="#character_literal">character_literal</a>
     expr-literal ::= <a href="#string_literal">string_literal</a>
   </pre>
 
-  <p>Numeric literals are either integer, floating point, or string depending on
-     its lexical form.  The type of the literal is inferred
+  <p>Numeric literals are either integer, floating point, character, or string
+     depending on its lexical form.  The type of the literal is inferred
      based on its context.  If there is no contextual type information for an
      expression, all unresolved types are inferred to 'IntegerLiteralType'
-     type, to 'FloatLiteralType', and to 'StringLiteralType', respectively.
+     type, to 'FloatLiteralType', to 'CharacterLiteralType', and to
+     'StringLiteralType', respectively.
      If a literal is used and these types are not defined, then the code is
      malformed.</p>
   

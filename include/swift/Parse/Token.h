@@ -32,6 +32,7 @@ enum class tok {
   integer_literal,
   floating_literal,
   string_literal,
+  character_literal,
   
 #define KEYWORD(X) kw_ ## X,
   // Decl and type keywords.

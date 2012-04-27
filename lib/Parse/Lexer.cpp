@@ -473,106 +473,171 @@ void Lexer::lexNumber() {
   return formToken(tok::floating_literal, TokStart);
 }
 
+/// lexCharacter - Read a character and return its UTF32 code.  If this is the
+/// end of enclosing string/character sequence, this returns ~0U.
+/// 
+///   character_escape  ::= [\][\] | [\]t | [\]n | [\]r | [\]" | [\]'
+///   character_escape  ::= [\]x hex hex  
+///   character_escape  ::= [\]u hex hex hex hex  
+///   character_escape  ::= [\]U hex hex hex hex hex hex hex hex
+///   hex               ::= [0-9a-fA-F]
+unsigned Lexer::lexCharacter(bool StopAtDoubleQuote) {
+  const char *CharStart = CurPtr;
+
+  switch (*CurPtr++) {
+  default: {// Normal characters are part of the string.
+    // If this is a "high" UTF-8 character, validate it.
+    if ((signed char)(CurPtr[-1]) >= 0)
+      return CurPtr[-1];
+    --CurPtr;
+    unsigned CharValue = validateUTF8CharacterAndAdvance(CurPtr);
+    if (CharValue != ~0U) return CharValue;
+    diagnose(CharStart, diag::lex_invalid_utf8_character);
+    return 0;
+  }
+  case '"':
+    // If we found the closing " character, we're done.
+    if (StopAtDoubleQuote) {
+      --CurPtr;
+      return ~0U;
+    }
+    // In a single quoted string, this is just a character.
+    return CurPtr[-1];
+  case '\'':
+    if (!StopAtDoubleQuote) {
+      --CurPtr;  
+      return ~0U;
+    }
+    // In a double quoted string, this is just a character.
+    return CurPtr[-1];
+      
+  case 0:
+    if (CurPtr-2 != BufferEnd) {
+      diagnose(CurPtr-2, diag::lex_nul_character);
+      return 0;
+    }
+    // FALL THROUGH.
+  case '\n':  // String literals cannot have \n or \r in them.
+  case '\r':
+    --CurPtr;
+    return ~0U;
+  case '\\':  // Escapes.
+    break;
+  }
+  
+  unsigned CharValue = 0;
+  // Escape processing.  We already ate the "\".
+  switch (*CurPtr) {
+  default:  // Invalid escape.
+    diagnose(CurPtr, diag::lex_invalid_string_escape);
+    return 0;
+      
+  // Simple single-character escapes.
+  case 't': ++CurPtr; return '\t';
+  case 'n': ++CurPtr; return '\n';
+  case 'r': ++CurPtr; return '\r';
+  case '"': ++CurPtr; return '"';
+  case '\'': ++CurPtr; return '\'';
+  case '\\': ++CurPtr; return '\\';
+  // Unicode escapes of various lengths.
+  case 'x':  //  \x HEX HEX
+    if (!isxdigit(CurPtr[1]) || !isxdigit(CurPtr[2])) {
+      diagnose(CurPtr, diag::lex_invalid_string_x_escape);
+      return 0;
+    }
+    
+    StringRef(CurPtr+1, 2).getAsInteger(16, CharValue);
+    
+    // Reject \x80 and above, since it is going to encode into a multibyte
+    // unicode encoding, which is something that C folks may not expect.
+    if (CharValue >= 0x80)
+      diagnose(CurPtr, diag::lex_invalid_hex_escape);
+    
+    CurPtr += 3;
+    break;
+    
+  case 'u':  //  \u HEX HEX HEX HEX 
+    if (!isxdigit(CurPtr[1]) || !isxdigit(CurPtr[2]) ||
+        !isxdigit(CurPtr[3]) || !isxdigit(CurPtr[4])) {
+      diagnose(CurPtr, diag::lex_invalid_string_u_escape);
+      return 0;
+    }
+    
+    StringRef(CurPtr+1, 4).getAsInteger(16, CharValue);
+    CurPtr += 5;
+    break;
+  case 'U':  //  \U HEX HEX HEX HEX HEX HEX HEX HEX 
+    if (!isxdigit(CurPtr[1]) || !isxdigit(CurPtr[2]) || 
+        !isxdigit(CurPtr[3]) || !isxdigit(CurPtr[4]) ||
+        !isxdigit(CurPtr[5]) || !isxdigit(CurPtr[6]) || 
+        !isxdigit(CurPtr[7]) || !isxdigit(CurPtr[8])) {
+      diagnose(CurPtr, diag::lex_invalid_string_U_escape);
+      return 0;
+    }
+    StringRef(CurPtr+1, 8).getAsInteger(16, CharValue);
+    CurPtr += 9;
+    break;
+  }
+  
+  // Check to see if the encoding is valid.
+  llvm::SmallString<64> TempString;
+  if (CharValue >= 0x80 && EncodeToUTF8(CharValue, TempString)) {
+    diagnose(CharStart, diag::lex_invalid_unicode_code_point);
+    return 0;
+  }
+  
+  return CharValue;
+}
+
+
+/// lexCharacterLiteral:
+///   character_literal ::= '([^"\\\n\r]|character_escape)'
+void Lexer::lexCharacterLiteral() {
+  const char *TokStart = CurPtr-1;
+  assert(*TokStart == '\'' && "Unexpected start");
+  
+  unsigned CharValue = lexCharacter(false);
+    
+  // If this wasn't a normal character, then this is a malformed character.
+  if (CharValue == ~0U) {
+    diagnose(TokStart, diag::lex_invalid_character_literal);
+    return;
+  }
+    
+  if (*CurPtr != '\'') {
+    diagnose(TokStart, diag::lex_invalid_character_literal);
+    return;
+  }
+  ++CurPtr;
+  return formToken(tok::character_literal, TokStart);
+}
+
 
 /// lexStringLiteral:
-///   string_literal ::= ["]([^"\\\n\r]|string_escape)*["]
-/// 
-///   string_escape  ::= [\][\] | [\]t | [\]n | [\]r | [\]" | [\]'
-///   string_escape  ::= [\]x hex hex  
-///   string_escape  ::= [\]u hex hex hex hex  
-///   string_escape  ::= [\]U hex hex hex hex hex hex hex hex
-///   hex            ::= [0-9a-fA-F]
+///   string_literal ::= ["]([^"\\\n\r]|character_escape)*["]
 void Lexer::lexStringLiteral() {
   const char *TokStart = CurPtr-1;
   assert(*TokStart == '"' && "Unexpected start");
 
-  llvm::SmallString<64> TempString;
-
   while (1) {
-    unsigned CharValue = 0;
-    const char *CharStart = CurPtr;
-    switch (*CurPtr++) {
-    default: // Normal characters are part of the string.
-      // If this is a "high" UTF-8 character, validate it.
-      if ((signed char)(CurPtr[-1]) < 0) {
-        --CurPtr;
-        if (validateUTF8CharacterAndAdvance(CurPtr) == ~0U)
-          diagnose(CharStart, diag::lex_invalid_utf8_character);
-      }
+    unsigned CharValue = lexCharacter(true);
+    
+    // If this is a normal character, just munch it.
+    if (CharValue != ~0U)
       continue;
+    
+    switch (*CurPtr) {
+    default: assert(0 && "Unknown reason to stop lexing character");
     // If we found the closing " character, we're done.
     case '"':
+        ++CurPtr;
       return formToken(tok::string_literal, TokStart);
     case 0:
-      if (CurPtr-2 != BufferEnd) {
-        diagnose(CurPtr-2, diag::lex_nul_character);
-        continue;
-      }
-      --CurPtr;
-      // FALL THROUGH.
     case '\n':  // String literals cannot have \n or \r in them.
     case '\r':
       diagnose(TokStart, diag::lex_unterminated_string);
-      return;
-    case '\\':  // Escapes.
-      switch (*CurPtr) {
-      default:  // Invalid escape.
-        diagnose(CurPtr, diag::lex_invalid_string_escape);
-        continue;
-          
-        // Simple single-character escapes.
-      case 't':
-      case 'n':
-      case 'r':
-      case '"':
-      case '\'':
-      case '\\':
-        ++CurPtr;
-        continue;
-        // Unicode escapes of various lengths.
-      case 'x':  //  \x HEX HEX
-        if (!isxdigit(CurPtr[1]) || !isxdigit(CurPtr[2])) {
-          diagnose(CurPtr, diag::lex_invalid_string_x_escape);
-          continue;
-        }
-          
-        StringRef(CurPtr+1, 2).getAsInteger(16, CharValue);
-          
-        // Reject \x80 and above, since it is going to encode into a multibyte
-        // unicode encoding, which is something that C folks may not expect.
-        if (CharValue >= 0x80)
-          diagnose(CurPtr, diag::lex_invalid_hex_escape);
-          
-        CurPtr += 3;
-        break;
-
-      case 'u':  //  \u HEX HEX HEX HEX 
-        if (!isxdigit(CurPtr[1]) || !isxdigit(CurPtr[2]) ||
-            !isxdigit(CurPtr[3]) || !isxdigit(CurPtr[4])) {
-          diagnose(CurPtr, diag::lex_invalid_string_u_escape);
-          continue;
-        }
-        
-        StringRef(CurPtr+1, 4).getAsInteger(16, CharValue);
-        CurPtr += 5;
-        break;
-      case 'U':  //  \U HEX HEX HEX HEX HEX HEX HEX HEX 
-        if (!isxdigit(CurPtr[1]) || !isxdigit(CurPtr[2]) || 
-            !isxdigit(CurPtr[3]) || !isxdigit(CurPtr[4]) ||
-            !isxdigit(CurPtr[5]) || !isxdigit(CurPtr[6]) || 
-            !isxdigit(CurPtr[7]) || !isxdigit(CurPtr[8])) {
-          diagnose(CurPtr, diag::lex_invalid_string_U_escape);
-          continue;
-        }
-        StringRef(CurPtr+1, 8).getAsInteger(16, CharValue);
-        CurPtr += 9;
-        break;
-      }
+      return;        
     }
-    
-    // Check to see if the encoding is valid.
-    if (CharValue >= 0x80 && EncodeToUTF8(CharValue, TempString))
-      diagnose(CharStart, diag::lex_invalid_unicode_code_point);
   }
 }
 
@@ -760,6 +825,8 @@ Restart:
   case '0': case '1': case '2': case '3': case '4':
   case '5': case '6': case '7': case '8': case '9':
     return lexNumber();
+  case '\'':
+    return lexCharacterLiteral();
   case '"':
     return lexStringLiteral();
   }
