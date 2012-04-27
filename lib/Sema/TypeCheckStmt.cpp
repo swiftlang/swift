@@ -692,7 +692,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       }
     } else {
       TC.typeCheckDecl(D);
-      if (TU->IsReplModule)
+      if (TU->IsReplModule && !TC.Context.hadError())
         if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D))
           REPLCheckPatternBinding(PBD, TC);
     }

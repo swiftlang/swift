@@ -146,7 +146,8 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
     if (!Index) {
       diagnose(SE->getBase()->getLoc(), diag::while_converting_subscript_index,
                IndexType)
-      << SE->getIndex()->getSourceRange();
+        << SE->getIndex()->getSourceRange();
+      SE->setType(ErrorType::get(Context));
       return 0;
     }
     SE->setIndex(Index);
