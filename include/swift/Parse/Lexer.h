@@ -83,7 +83,11 @@ public:
   /// that the actual string literal should codegen to.  If a copy needs to be
   /// made, it will be allocated out of the ASTContext allocator.
   static StringRef getEncodedStringLiteral(const Token &Str, ASTContext &Ctx); 
-  
+
+  /// getEncodedCharacterLiteral - Return the UTF32 codepoint for the specified
+  /// character literal.
+  uint32_t getEncodedCharacterLiteral(const Token &Str); 
+
 private:
   static SourceLoc getSourceLoc(const char *Loc) {
     return SourceLoc(llvm::SMLoc::getFromPointer(Loc));
@@ -99,7 +103,8 @@ private:
   void lexOperatorIdentifier();
   void lexNumber();
   
-  unsigned lexCharacter(bool StopAtDoubleQuote);
+  unsigned lexCharacter(const char *&CurPtr,
+                        bool StopAtDoubleQuote, bool EmitDiagnostics);
   void lexCharacterLiteral();
   void lexStringLiteral();
   bool isPrecededBySpace();

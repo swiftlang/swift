@@ -152,6 +152,7 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::IntegerLiteral ||
            E->getKind() == ExprKind::FloatLiteral ||
+           E->getKind() == ExprKind::CharacterLiteral ||
            E->getKind() == ExprKind::StringLiteral;
   }
 };
@@ -199,6 +200,26 @@ public:
   static bool classof(const FloatLiteralExpr *) { return true; }
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::FloatLiteral;
+  }
+};
+
+  
+/// CharacterLiteral - Character literal, like 'x'.  After semantic analysis
+/// assigns types, this is guaranteed to only have a 32-bit BuiltinIntegerType.
+class CharacterLiteralExpr : public LiteralExpr {
+  uint32_t Val;
+  SourceLoc Loc;
+public:
+  CharacterLiteralExpr(uint32_t Val, SourceLoc Loc)
+    : LiteralExpr(ExprKind::CharacterLiteral), Val(Val), Loc(Loc) {}
+  
+  uint32_t getValue() const { return Val; }
+  SourceRange getSourceRange() const { return Loc; }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const CharacterLiteralExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::CharacterLiteral;
   }
 };
   

@@ -948,6 +948,9 @@ bool TypeChecker::resolveDependentLiterals(Expr *&E) {
         if (FloatLiteralExpr *lit = dyn_cast<FloatLiteralExpr>(E))
           return TC.coerceToType(lit, getFloatLiteralType(lit->getLoc()));
         
+        if (CharacterLiteralExpr *lit = dyn_cast<CharacterLiteralExpr>(E))
+          return TC.coerceToType(lit, getCharacterLiteralType(lit->getLoc()));
+        
         if (StringLiteralExpr *lit = dyn_cast<StringLiteralExpr>(E))
           return TC.coerceToType(lit, getStringLiteralType(lit->getLoc()));
       }
@@ -988,6 +991,17 @@ bool TypeChecker::resolveDependentLiterals(Expr *&E) {
       }
       return FloatLiteralType;
     }
+    Type getCharacterLiteralType(SourceLoc loc) {
+      if (CharacterLiteralType.isNull()) {
+        CharacterLiteralType = lookupGlobalType("CharacterLiteralType");
+        if (CharacterLiteralType.isNull()) {
+          TC.diagnose(loc, diag::no_CharacterLiteralType_found);
+          CharacterLiteralType = BuiltinIntegerType::get(32, TC.Context);
+        }
+      }
+      return CharacterLiteralType;
+    }
+
     Type getStringLiteralType(SourceLoc loc) {
       if (StringLiteralType.isNull()) {
         StringLiteralType = lookupGlobalType("StringLiteralType");
@@ -1000,7 +1014,8 @@ bool TypeChecker::resolveDependentLiterals(Expr *&E) {
     }
     
     TypeChecker &TC;
-    Type IntLiteralType, FloatLiteralType, StringLiteralType;
+    Type IntLiteralType, FloatLiteralType, CharacterLiteralType;
+    Type StringLiteralType;
   };
   
   // Walk the tree again to update all the entries.  If this fails, give up.

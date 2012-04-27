@@ -73,7 +73,7 @@ public:
 /// expression.
 class SemaCoerce : public ExprVisitor<SemaCoerce, CoercedResult> {
   enum class LiteralType {
-    Int, Float, String
+    Int, Float, Char, String
   };
   
   /// \brief Determine whether the given type is compatible with an integer
@@ -490,6 +490,7 @@ SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralType LitTy) {
   switch (LitTy) {
   case LiteralType::Int:    MethodName = "convertFromIntegerLiteral"; break;
   case LiteralType::Float:  MethodName = "convertFromFloatLiteral"; break;
+  case LiteralType::Char:   MethodName = "convertFromCharacterLiteral"; break;
   case LiteralType::String: MethodName = "convertFromStringLiteral"; break;
   }
   assert(MethodName && "Didn't know LitTy");
@@ -547,6 +548,8 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
     LitTy = LiteralType::Int;
   else if (isa<FloatLiteralExpr>(E))
     LitTy = LiteralType::Float;
+  else if (isa<CharacterLiteralExpr>(E))
+    LitTy = LiteralType::Char;
   else {
     assert(isa<StringLiteralExpr>(E));
     LitTy = LiteralType::String;
@@ -634,6 +637,13 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
     if (Apply)
       E->setType(ArgType);
     Intermediate = E;
+  } else if (LitTy == LiteralType::Char &&
+             ArgType->is<BuiltinIntegerType>() &&
+             ArgType->getAs<BuiltinIntegerType>()->getBitWidth() == 32) {
+    // Nothing to do.
+    if (Apply)
+      E->setType(ArgType);
+    Intermediate = E;
   } else {
     // Check to see if this is the chaining case, where ArgType itself has a
     // conversion from a Builtin type.
@@ -650,6 +660,11 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
     } else if (LitTy == LiteralType::Float &&
                LiteralInfo.second->is<BuiltinFloatType>()) {
       // ok.
+    } else if (LitTy == LiteralType::Char &&
+               LiteralInfo.second->is<BuiltinIntegerType>() &&
+         LiteralInfo.second->getAs<BuiltinIntegerType>()->getBitWidth() == 32) {
+      // ok.
+
     } else if (LitTy == LiteralType::String &&
                LiteralInfo.second->is<BuiltinRawPointerType>()) {
       // ok.

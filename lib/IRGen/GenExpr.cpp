@@ -61,6 +61,13 @@ static llvm::Value *emitFloatLiteralExpr(IRGenFunction &IGF,
 }
 
 /// Emit an string literal expression.
+static llvm::Value *emitCharacterLiteralExpr(IRGenFunction &IGF,
+                                             CharacterLiteralExpr *E) {
+  assert(E->getType()->is<BuiltinIntegerType>());
+  return llvm::ConstantInt::get(IGF.IGM.Int32Ty, E->getValue());
+}
+
+/// Emit an string literal expression.
 static llvm::Value *emitStringLiteralExpr(IRGenFunction &IGF,
                                           StringLiteralExpr *E) {
   assert(E->getType()->is<BuiltinRawPointerType>());
@@ -234,6 +241,9 @@ namespace {
       Out.addUnmanaged(emitFloatLiteralExpr(IGF, E));
     }
 
+    void visitCharacterLiteralExpr(CharacterLiteralExpr *E) {
+      Out.addUnmanaged(emitCharacterLiteralExpr(IGF, E));
+    }
     void visitStringLiteralExpr(StringLiteralExpr *E) {
       Out.addUnmanaged(emitStringLiteralExpr(IGF, E));
     }
@@ -279,6 +289,7 @@ namespace {
     NOT_LVALUE_EXPR(Apply)
     NOT_LVALUE_EXPR(IntegerLiteral)
     NOT_LVALUE_EXPR(FloatLiteral)
+    NOT_LVALUE_EXPR(CharacterLiteral)
     NOT_LVALUE_EXPR(StringLiteral)
     NOT_LVALUE_EXPR(TupleShuffle)
     NOT_LVALUE_EXPR(Func)
@@ -430,6 +441,7 @@ namespace {
     NON_LOCATEABLE(TupleExpr)
     NON_LOCATEABLE(IntegerLiteralExpr)
     NON_LOCATEABLE(FloatLiteralExpr)
+    NON_LOCATEABLE(CharacterLiteralExpr)
     NON_LOCATEABLE(StringLiteralExpr)
     NON_LOCATEABLE(TupleShuffleExpr)
     NON_LOCATEABLE(CapturingExpr)

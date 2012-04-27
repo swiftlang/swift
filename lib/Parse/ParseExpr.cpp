@@ -225,6 +225,12 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     Result = new (Context) FloatLiteralExpr(Text, Loc);
     break;
   }
+  case tok::character_literal: {
+    uint32_t Codepoint = L.getEncodedCharacterLiteral(Tok);
+    SourceLoc Loc = consumeToken(tok::character_literal);
+    Result = new (Context) CharacterLiteralExpr(Codepoint, Loc);
+    break;
+  }
   case tok::string_literal: {
     StringRef Text = L.getEncodedStringLiteral(Tok, Context);
     SourceLoc Loc = consumeToken(tok::string_literal);

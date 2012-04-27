@@ -381,6 +381,9 @@ public:
   void visitFloatLiteralExpr(FloatLiteralExpr *E) {
     printCommon(E, "float_literal_expr") << " value=" << E->getText() << ')';
   }
+  void visitCharacterLiteralExpr(CharacterLiteralExpr *E) {
+    printCommon(E, "character_literal_expr") << " value=" << E->getValue()<<')';
+  }
   void visitStringLiteralExpr(StringLiteralExpr *E) {
     printCommon(E, "string_literal_expr") << " value=" << E->getValue() << ')';
   }

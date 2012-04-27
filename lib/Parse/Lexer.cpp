@@ -481,7 +481,8 @@ void Lexer::lexNumber() {
 ///   character_escape  ::= [\]u hex hex hex hex  
 ///   character_escape  ::= [\]U hex hex hex hex hex hex hex hex
 ///   hex               ::= [0-9a-fA-F]
-unsigned Lexer::lexCharacter(bool StopAtDoubleQuote) {
+unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
+                             bool EmitDiagnostics) {
   const char *CharStart = CurPtr;
 
   switch (*CurPtr++) {
@@ -492,7 +493,8 @@ unsigned Lexer::lexCharacter(bool StopAtDoubleQuote) {
     --CurPtr;
     unsigned CharValue = validateUTF8CharacterAndAdvance(CurPtr);
     if (CharValue != ~0U) return CharValue;
-    diagnose(CharStart, diag::lex_invalid_utf8_character);
+    if (EmitDiagnostics)
+      diagnose(CharStart, diag::lex_invalid_utf8_character);
     return 0;
   }
   case '"':
@@ -513,7 +515,8 @@ unsigned Lexer::lexCharacter(bool StopAtDoubleQuote) {
       
   case 0:
     if (CurPtr-2 != BufferEnd) {
-      diagnose(CurPtr-2, diag::lex_nul_character);
+      if (EmitDiagnostics)
+        diagnose(CurPtr-2, diag::lex_nul_character);
       return 0;
     }
     // FALL THROUGH.
@@ -542,7 +545,8 @@ unsigned Lexer::lexCharacter(bool StopAtDoubleQuote) {
   // Unicode escapes of various lengths.
   case 'x':  //  \x HEX HEX
     if (!isxdigit(CurPtr[1]) || !isxdigit(CurPtr[2])) {
-      diagnose(CurPtr, diag::lex_invalid_string_x_escape);
+      if (EmitDiagnostics)
+        diagnose(CurPtr, diag::lex_invalid_string_x_escape);
       return 0;
     }
     
@@ -559,7 +563,8 @@ unsigned Lexer::lexCharacter(bool StopAtDoubleQuote) {
   case 'u':  //  \u HEX HEX HEX HEX 
     if (!isxdigit(CurPtr[1]) || !isxdigit(CurPtr[2]) ||
         !isxdigit(CurPtr[3]) || !isxdigit(CurPtr[4])) {
-      diagnose(CurPtr, diag::lex_invalid_string_u_escape);
+      if (EmitDiagnostics)
+        diagnose(CurPtr, diag::lex_invalid_string_u_escape);
       return 0;
     }
     
@@ -571,7 +576,8 @@ unsigned Lexer::lexCharacter(bool StopAtDoubleQuote) {
         !isxdigit(CurPtr[3]) || !isxdigit(CurPtr[4]) ||
         !isxdigit(CurPtr[5]) || !isxdigit(CurPtr[6]) || 
         !isxdigit(CurPtr[7]) || !isxdigit(CurPtr[8])) {
-      diagnose(CurPtr, diag::lex_invalid_string_U_escape);
+      if (EmitDiagnostics)
+        diagnose(CurPtr, diag::lex_invalid_string_U_escape);
       return 0;
     }
     StringRef(CurPtr+1, 8).getAsInteger(16, CharValue);
@@ -582,7 +588,8 @@ unsigned Lexer::lexCharacter(bool StopAtDoubleQuote) {
   // Check to see if the encoding is valid.
   llvm::SmallString<64> TempString;
   if (CharValue >= 0x80 && EncodeToUTF8(CharValue, TempString)) {
-    diagnose(CharStart, diag::lex_invalid_unicode_code_point);
+    if (EmitDiagnostics)
+      diagnose(CharStart, diag::lex_invalid_unicode_code_point);
     return 0;
   }
   
@@ -596,7 +603,7 @@ void Lexer::lexCharacterLiteral() {
   const char *TokStart = CurPtr-1;
   assert(*TokStart == '\'' && "Unexpected start");
   
-  unsigned CharValue = lexCharacter(false);
+  unsigned CharValue = lexCharacter(CurPtr, false, true);
     
   // If this wasn't a normal character, then this is a malformed character.
   if (CharValue == ~0U) {
@@ -612,6 +619,13 @@ void Lexer::lexCharacterLiteral() {
   return formToken(tok::character_literal, TokStart);
 }
 
+/// getEncodedCharacterLiteral - Return the UTF32 codepoint for the specified
+/// character literal.
+uint32_t Lexer::getEncodedCharacterLiteral(const Token &Str) {
+  const char *CharStart = Str.getText().data()+1;
+  return lexCharacter(CharStart, false, false);
+}
+
 
 /// lexStringLiteral:
 ///   string_literal ::= ["]([^"\\\n\r]|character_escape)*["]
@@ -620,7 +634,7 @@ void Lexer::lexStringLiteral() {
   assert(*TokStart == '"' && "Unexpected start");
 
   while (1) {
-    unsigned CharValue = lexCharacter(true);
+    unsigned CharValue = lexCharacter(CurPtr, true, true);
     
     // If this is a normal character, just munch it.
     if (CharValue != ~0U)

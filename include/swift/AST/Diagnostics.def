@@ -630,6 +630,8 @@ ERROR(no_IntegerLiteralType_found,sema_tce,none,
       "standard library error: IntegerLiteralType not defined", ())
 ERROR(no_FloatLiteralType_found,sema_tce,none,
       "standard library error: FloatLiteralType not defined", ())
+ERROR(no_CharacterLiteralType_found,sema_tce,none,
+      "standard library error: CharacterLiteralType not defined", ())
 ERROR(no_StringLiteralType_found,sema_tce,none,
       "standard library error: StringLiteralType not defined", ())
 
