@@ -39,6 +39,9 @@ enum class OverloadedBuiltinKind : unsigned char {
   /// The builtin is overloaded over all integer types.
   Integer,
 
+  /// The builtin is overloaded over all integer types and the raw pointer type.
+  IntegerOrRawPointer,
+
   /// The builtin is overloaded over all floating-point types.
   Float,
 

@@ -245,6 +245,8 @@ inline bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
     break; // invalid 
   case OverloadedBuiltinKind::Integer:
     return T->is<BuiltinIntegerType>();
+  case OverloadedBuiltinKind::IntegerOrRawPointer:
+    return T->is<BuiltinIntegerType>() || T->is<BuiltinRawPointerType>();
   case OverloadedBuiltinKind::Float:
     return T->is<BuiltinFloatType>();
   case OverloadedBuiltinKind::Arithmetic:
