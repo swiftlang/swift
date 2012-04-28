@@ -29,19 +29,6 @@ using namespace swift;
 // Expression Semantic Analysis Routines
 //===----------------------------------------------------------------------===//
 
-/// Build a reference to the given declaration as an r-value.
-Expr *TypeChecker::buildDeclRefRValue(ValueDecl *val, SourceLoc loc) {
-  if (!val->isReferencedAsLValue()) {
-    return new (Context) DeclRefExpr(val, loc, val->getType());
-  }
-
-  Type lvalueType = LValueType::get(val->getType(),
-                                    LValueType::Qual::DefaultForVar,
-                                    Context);
-  Expr *E = new (Context) DeclRefExpr(val, loc, lvalueType);
-  return new (Context) LoadExpr(E, val->getType());
-}
-
 Expr *TypeChecker::convertToRValue(Expr *E) {
   assert(E && "no expression to load!");
 

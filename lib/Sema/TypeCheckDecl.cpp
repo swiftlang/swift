@@ -210,7 +210,13 @@ void TypeChecker::typeCheckDecl(Decl *D) {
 bool DeclChecker::visitValueDecl(ValueDecl *VD) {
   if (TC.validateType(VD))
     return true;
-  
+
+  if (!VD->getType()->isMaterializable()) {
+    TC.diagnose(VD->getLocStart(), diag::var_type_not_materializable,
+                VD->getType());
+    VD->overwriteType(ErrorType::get(TC.Context));
+  }
+
   validateAttributes(VD);
   return false;
 }

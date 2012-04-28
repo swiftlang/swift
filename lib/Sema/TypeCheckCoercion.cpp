@@ -455,10 +455,12 @@ public:
     
     // Can't load from an explicit lvalue.
     if (LValue->isExplicit()) {
-      if (Apply)
+      if (Apply) {
         TC.diagnose(E->getLoc(), diag::load_of_explicit_lvalue,
                     LValue->getObjectType())
           << E->getSourceRange();
+        E->setType(ErrorType::get(TC.Context));
+      }
       
       return nullptr;
     }

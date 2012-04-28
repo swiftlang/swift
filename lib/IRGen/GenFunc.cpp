@@ -1372,12 +1372,12 @@ OwnedAddress IRGenFunction::getAddrForParameter(VarDecl *param,
 
   // If the parameter is byref, the next parameter is the value we
   // should use.
-  if (param->getAttrs().isByref()) {
+  if (param->getType()->is<LValueType>()) {
     llvm::Value *addr = paramValues.claimUnmanagedNext();
     addr->setName(name);
 
     llvm::Value *owner = IGM.RefCountedNull;
-    if (param->getAttrs().isByrefHeap()) {
+    if (param->getType()->castTo<LValueType>()->isHeap()) {
       owner = paramValues.claimUnmanagedNext();
       owner->setName(name + ".owner");
       enterReleaseCleanup(owner);

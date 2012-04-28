@@ -77,7 +77,6 @@ public:
   /// coerced to the given type.
   bool isCoercibleToType(Expr *E, Type Ty);
   
-  Expr *buildDeclRefRValue(ValueDecl *D, SourceLoc loc);
   Expr *convertToRValue(Expr *E);
   Expr *convertLValueToRValue(LValueType *SrcLT, Expr *E);
   Expr *convertToMaterializable(Expr *E);

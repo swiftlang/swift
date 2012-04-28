@@ -762,8 +762,6 @@ ERROR(tuple_pattern_length_mismatch,sema_tcp,none,
       "tuple pattern has the wrong length for tuple type %0", (Type))
 ERROR(coerced_tuple_pattern_has_init,sema_tcp,none,
       "tuple element in pattern cannot have a default initializer", ())
-ERROR(named_pattern_not_materializable,sema_tcp,none,
-      "type %0 of named pattern is not materializable", (Type))
 
 //------------------------------------------------------------------------------
 // Type Check Types

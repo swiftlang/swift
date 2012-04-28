@@ -81,15 +81,7 @@ void swift::irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E,
   if (HasCaptures) {
     SmallVector<const TypeInfo *, 4> Fields;
     for (ValueDecl *D : E->getCaptures()) {
-      Type RefTy;
-      if (isa<VarDecl>(D)) {
-        RefTy = LValueType::get(D->getType(),
-                                LValueType::Qual::DefaultForVar,
-                                IGF.IGM.Context);
-      } else {
-        assert(isa<FuncDecl>(D) && "Unexpected decl");
-        RefTy = D->getType();
-      }
+      Type RefTy = D->getTypeOfReference();
       const TypeInfo &typeInfo = IGF.getFragileTypeInfo(RefTy);
       Fields.push_back(&typeInfo);
     }

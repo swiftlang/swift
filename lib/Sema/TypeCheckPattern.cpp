@@ -143,18 +143,10 @@ bool TypeChecker::coerceToType(Pattern *P, Type type) {
   // For wildcard and name patterns, just set the type.
   case PatternKind::Named: {
     NamedPattern *NP = cast<NamedPattern>(P);
-    if (LValueType *lv = type->getAs<LValueType>()) {
-      NP->getDecl()->overwriteType(lv->getObjectType());
-      NP->getDecl()->getMutableAttrs().Byref = true;
-      if (lv->isHeap())
-        NP->getDecl()->getMutableAttrs().ByrefHeap = true;
-    } else {
-      NP->getDecl()->overwriteType(type);
+    NP->getDecl()->overwriteType(type);
 
-      if (!type->isMaterializable())
-        diagnose(NP->getLoc(), diag::named_pattern_not_materializable, type);
-    }
-    // fallthrough
+    P->setType(type);
+    return false;
   }
   case PatternKind::Any:
     P->setType(type);
