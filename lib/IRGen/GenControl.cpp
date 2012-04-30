@@ -108,8 +108,11 @@ Condition IRGenFunction::emitCondition(Expr *E, bool hasFalseCode,
 
   // Sema forces conditions to have Builtin.i1 type, which guarantees this.
   // TODO: special-case interesting condition expressions.
-  FullExpr Scope(*this);
-  llvm::Value *V = emitAsPrimitiveScalar(E);
+  llvm::Value *V;
+  {
+    FullExpr Scope(*this);
+    V = emitAsPrimitiveScalar(E);
+  }
   assert(V->getType()->isIntegerTy(1));
 
   llvm::BasicBlock *trueBB, *falseBB, *contBB;
