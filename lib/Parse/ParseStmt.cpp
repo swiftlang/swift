@@ -254,7 +254,7 @@ NullablePtr<Stmt> Parser::parseStmtReturn() {
   // enclosing stmt-brace to get it by eagerly eating it unless the return is
   // followed by a }.
   Expr *RetExpr = nullptr;
-  if (Tok.isNot(tok::r_brace)) {
+  if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::semi)) {
     NullablePtr<Expr> Result = parseExpr(diag::expected_expr_return);
     if (Result.isNull())
       return 0;
