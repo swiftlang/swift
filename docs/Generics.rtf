@@ -1,4 +1,4 @@
-{\rtf1\ansi\ansicpg1252\cocoartf1138
+{\rtf1\ansi\ansicpg1252\cocoartf1138\cocoasubrtf320
 {\fonttbl\f0\fswiss\fcharset0 Helvetica;}
 {\colortbl;\red255\green255\blue255;}
 {\*\listtable{\list\listtemplateid1\listhybrid{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{disc\}}{\leveltext\leveltemplateid1\'01\uc0\u8226 ;}{\levelnumbers;}\fi-360\li720\lin720 }{\listname ;}\listid1}
@@ -124,7 +124,7 @@ Multiple refinement is permitted, allowing us to form a directed acyclic graph o
 Any type that conforms to PersistentDocument also conforms to VersionedDocument, Document, and Serializable, which gives us substitutability.\
 \
 
-\b Self Types
+\b This Types
 \b0 \
 \
 Protocols thus far do not give us an easy way to express simple binary operations. For example, let's try to write a Comparable protocol that could be used to search for a generic find() operation:\
@@ -151,21 +151,21 @@ Java and C# programmers work around this issue by parameterizing the interface, 
 \
 and then a class X that wants to be Comparable will inherit from Comparable<X>. This is ugly and has a number of pitfalls; see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6479372 .\
 \
-Scala and Strongtalk have the notion of the 'Self' type, which effectively allows one to refer to the eventual type of 'self'. Self allows us to express the Comparable protocol in a natural way:\
+Scala and Strongtalk have the notion of the 'Self' type, which effectively allows one to refer to the eventual type of 'self' (which we call 'this'). 'Self' (which we call 'This' in Swift) allows us to express the Comparable protocol in a natural way:\
 \
 	protocol Comparable \{\
-	  func ==(other : Self);\
+	  func ==(other : This);\
 	\}\
 \
 By expressing Comparable in this way, we know that if we have two objects of type T where T conforms to Comparable, comparison between those two objects with == is well-typed. However, if we have objects of different types T and U, we cannot compare those objects with == even if both T and U are Comparable.\
 \
-Self types are not without their costs, particularly in the case where Self is used as a parameter type of a class method that will be subclassed. Here, the parameter type ends up being (implicitly) covariant, which tightens up type-checking but may also force us into more dynamic type checks. We can explore this separately; within protocols, type-checking for Self is more direct.\
+This types are not without their costs, particularly in the case where This is used as a parameter type of a class method that will be subclassed. Here, the parameter type ends up being (implicitly) covariant, which tightens up type-checking but may also force us into more dynamic type checks. We can explore this separately; within protocols, type-checking for This is more direct.\
 \
 
 \b Associated Types
 \b0 \
 \
-In addition to Self, a protocol's operations often need to refer to types that are related to the type of 'Self', such as a type of data stored in a collection, or the node and edge types of a graph. For example, this would allow us to cleanly describe a protocol for collections:\
+In addition to This, a protocol's operations often need to refer to types that are related to the type of 'This', such as a type of data stored in a collection, or the node and edge types of a graph. For example, this would allow us to cleanly describe a protocol for collections:\
 \
 	protocol Collection \{\
 	  typealias Value\
@@ -201,7 +201,7 @@ This gives rise to a natural "top" type, such that every type in the language is
 	value = "hello" // or a string\
 	value = (42, "hello", Red) // or anything else\
 \
-Naturally, such polymorphism is dynamic, and will require boxing of value types to implement. We can now see how Self types interact with subtype polymorphism. For example, say we have two values of type Comparable, and we try to compare them:\
+Naturally, such polymorphism is dynamic, and will require boxing of value types to implement. We can now see how This types interact with subtype polymorphism. For example, say we have two values of type Comparable, and we try to compare them:\
 \
 	var x : Comparable = \'85\
 	var y : Comparable = \'85\
@@ -306,7 +306,7 @@ There are two other important kinds of constraints that need to be expressible. 
 	  typealias Value\
   	  func empty() -> bool\
 	  func getFirst() -> Value\
-              func getRest() -> Self\
+              func getRest() -> This\
 	\}\
 \
 Now, we want to express the notion of an enumerable collection, which provides a range, which we do using a requires clause inside the protocol\
@@ -317,16 +317,16 @@ Now, we want to express the notion of an enumerable collection, which provides a
 	  func getRange() -> RangeType\
 	\}\
 \
-Here, we are specifying constraints on an associated type (RangeType must conform to the Range protocol), and also ensuring that the type of values produced by querying the range is the same as the type of values stored in the container. This is important, for example, for use with the Comparable protocol (and any protocol using Self types), because it maintains type identity within the generic function or type.\
+Here, we are specifying constraints on an associated type (RangeType must conform to the Range protocol), and also ensuring that the type of values produced by querying the range is the same as the type of values stored in the container. This is important, for example, for use with the Comparable protocol (and any protocol using This types), because it maintains type identity within the generic function or type.\
 \
-We now note that the protocol refinement is actually just syntactic sugar for a requires clause on the Self type, e.g.,\
+We now note that the protocol refinement is actually just syntactic sugar for a requires clause on the This type, e.g.,\
 \
 	protocol SerializableDocument : Document, Serializable \{ \}\
 \
 is equivalent to\
 \
 	protocol SerializableDocument \{\
-	  requires Self : Document, Self : Serializable\
+	  requires This : Document, This : Serializable\
 	\}\
 \
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
@@ -386,8 +386,8 @@ one could implement a function that draws a sequence of shapes, e.g.,\
 This would make the following code well-formed (assuming that List<T> is an EnumerableCollection):\
 \
 	struct Circle \{\
-	  var center : Point;\
-	  var radius : int;\
+	  center : Point,\
+	  radius : int\
 \
 	  func draw() \{\
 	    // draw it\
@@ -442,12 +442,12 @@ When using a set of libraries, it's fairly common that one library defines a pro
 \i Retroactive modeling
 \i0  is the process by which the type is retrofitted (without changing the type) to meet the requirements of the protocol. \
 \
-In Swift, one could provide support for retroactive modeling by allowing class extensions, e.g.,\
+In Swift, we provide support for retroactive modeling by allowing class extensions, e.g.,\
 \
 	extension string : Collection \{\
 	  typealias Value = char\
               func forEach(callback : (value : Value) -> void) \{ /* use existing string routines to enumerate characters */ \}\
-              func add(value : Value) \{ self += value /* append character */ \}\
+              func add(value : Value) \{ this += value /* append character */ \}\
 	\}\
 \
 Once an extension is defined, the extension now conforms to the Collection protocol, e.g.,\
@@ -469,10 +469,10 @@ One can also use string as if it had Collection's members:\
 \b0 \cf0 The functions declared within a protocol are requirements that any type must meet if it wants to conform to the protocol. There is a natural tension here, then, between larger protocols that make it easier to write generic algorithms, and smaller protocols that make it easier to write conforming types. For example, should a numeric protocol implement all operations, e.g.,\
 \
 	protocol Numeric \{\
-	  func +(other : Self) - > Self\
-	  func -(other : Self) - > Self\
-	  func +() - > Self\
-	  func -() - > Self\
+	  func +(other : This) - > This\
+	  func -(other : This) - > This\
+	  func +() - > This\
+	  func -() - > This\
 	\}
 \b \
 \
@@ -482,8 +482,8 @@ One can also use string as if it had Collection's members:\
 \
 
 \b0 	protocol Numeric \{\
-	  func +(other : Self) - > Self\
-	  func -() - > Self\
+	  func +(other : This) - > This\
+	  func -() - > This\
 	\}
 \b \
 \
@@ -491,10 +491,10 @@ One can also use string as if it had Collection's members:\
 \b0 to make it easier to adopt the protocol (but harder to write numeric algorithms)? Both of the protocols express the same thing (semantically), because one can use the core operations (binary +, unary -) to implement the other algorithms. However, it's far easier to allow the protocol itself to provide default implementations:\
 \
 	protocol Numeric \{\
-	  func +(other : Self) - > Self\
-	  func -(other : Self) - > Self \{ return self + -other; \}\
-	  func +() - > Self \{ return self; \}\
-	  func -() - > Self\
+	  func +(other : This) - > This\
+	  func -(other : This) - > This \{ return this + -other; \}\
+	  func +() - > This \{ return this; \}\
+	  func -() - > This\
 	\}
 \b \
 
