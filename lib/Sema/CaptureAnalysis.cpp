@@ -154,6 +154,17 @@ class CaptureAnalysisVisitor : public ASTWalker {
         AS->getSrc()->walk(*this);
         return false;
       }
+    } else if (ForEachStmt *FES = dyn_cast<ForEachStmt>(S)) {
+      // The normal ASTWalker walk doesn't examine everything we care about;
+      // use a custom walk which does the right thing.
+      WalkPattern(FES->getRange()->getPattern());
+      FES->getRange()->getInit()->walk(*this);
+      FES->getRangeEmpty()->walk(*this);
+      WalkPattern(FES->getElementInit()->getPattern());
+      FES->getElementInit()->getInit()->walk(*this);
+      FES->getRangeDropFirst()->walk(*this);
+      FES->getBody()->walk(*this);
+      return false;
     }
     return true;
   }
