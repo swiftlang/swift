@@ -998,14 +998,18 @@ public:
 /// of function type, and can capture variables from an enclosing scope.
 class CapturingExpr : public Expr, public DeclContext {
   ArrayRef<ValueDecl*> Captures;
+  bool IsNotCaptured;
 
 public:
   CapturingExpr(ExprKind Kind, Type FnType, DeclContextKind DCKind,
                 DeclContext *Parent)
-    : Expr(Kind, FnType), DeclContext(DCKind, Parent) {}
+    : Expr(Kind, FnType), DeclContext(DCKind, Parent), IsNotCaptured(false) {}
 
   ArrayRef<ValueDecl*> getCaptures() { return Captures; }
   void setCaptures(ArrayRef<ValueDecl*> C) { Captures = C; }
+
+  bool isNotCaptured() { return IsNotCaptured; }
+  void setIsNotCaptured(bool v) { IsNotCaptured = v; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const CapturingExpr *) { return true; }

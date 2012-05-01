@@ -88,15 +88,15 @@ void swift::irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E,
     HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, Fields);
 
     // Allocate the capture block.
-    if (0) {
-      // FIXME: Use this codepath for nocapture when we start computing it.
+    if (E->isNotCaptured()) {
       // FIXME: This doesn't compute the heap metadata pointer; do we need it?
       // FIXME: This should be refactored if anything else has a use for it.
       Address AllocatedPtr = IGF.createAlloca(layout.getType(),
                                               layout.getAlignment(),
                                               "closuretemp");
       Address HeapPtr = IGF.Builder.CreateStructGEP(AllocatedPtr, 0, Size(0));
-      Address RefCntPtr = IGF.Builder.CreateStructGEP(HeapPtr, 1, Size(8));
+      Address RefCntPtr = IGF.Builder.CreateStructGEP(HeapPtr, 1,
+                                                      IGF.IGM.getPointerSize());
       IGF.Builder.CreateStore(IGF.Builder.getInt64(2), RefCntPtr);
       contextPtr = 
           ManagedValue(IGF.Builder.CreateBitCast(AllocatedPtr.getAddress(),
