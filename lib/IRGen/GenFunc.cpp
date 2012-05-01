@@ -1137,6 +1137,45 @@ static void emitCall(IRGenFunction &IGF, const Callee &callee,
   ArgCallEmitter(IGF, callee, args, resultTI, result, finalAddress).emit(fn);
 }
 
+/// emitKnownCall - Emit a call to a known function.
+// FIXME: This is a rather ugly, but it's the best way I can think
+// of to avoid emitting calls to getLogicValue as external calls.
+static bool emitKnownCall(IRGenFunction &IGF, FuncDecl *Fn,
+                          llvm::SmallVectorImpl<CallSite> &CallSites,
+                          CallResult &result) {
+  if (Fn->getName().str() != "getLogicValue")
+    return false;
+
+  ExtensionDecl *ED = dyn_cast<ExtensionDecl>(Fn->getDeclContext());
+  if (!ED)
+    return false;
+
+  OneOfType *OOT = ED->getExtendedType()->getAs<OneOfType>();
+  if (!OOT)
+    return false;
+
+  if (OOT->getDecl()->getName().str() != "Bool")
+    return false;
+
+  Module *M = dyn_cast<Module>(ED->getDeclContext());
+  if (!M)
+    return false;
+
+  if (M->Name.str() != "swift")
+    return false;
+
+  if (CallSites.size() != 2)
+    return false;
+
+  Expr *Arg = CallSites.back().Arg;
+  Explosion &out = result.initForDirectValues(ExplosionKind::Maximal);
+  Explosion temp(ExplosionKind::Maximal);
+  Type ObjTy = Arg->getType()->castTo<LValueType>()->getObjectType();
+  const TypeInfo &ObjTInfo = IGF.IGM.getFragileTypeInfo(ObjTy);
+  IGF.emitLoad(IGF.emitLValue(Arg), ObjTInfo, out);
+  return true;
+}
+
 /// Emit a function call.
 void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
                     const TypeInfo &resultType) {
@@ -1167,6 +1206,9 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
       // Otherwise, pop that call site off and set up the callee conservatively.
       callee = result.getDirectValuesAsIndirectCallee();
       result.reset();
+
+    } else if (emitKnownCall(IGF, KnownFn, CallSites, result)) {
+      return;
 
     // Otherwise, compute information about the function we're calling.
     } else {
