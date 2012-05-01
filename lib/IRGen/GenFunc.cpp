@@ -70,6 +70,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LValue.h"
+#include "Condition.h"
 
 #include "GenFunc.h"
 
@@ -1143,37 +1144,72 @@ static void emitCall(IRGenFunction &IGF, const Callee &callee,
 static bool emitKnownCall(IRGenFunction &IGF, FuncDecl *Fn,
                           llvm::SmallVectorImpl<CallSite> &CallSites,
                           CallResult &result) {
-  if (Fn->getName().str() != "getLogicValue")
-    return false;
+  if (Fn->getName().str() == "getLogicValue") {
+    ExtensionDecl *ED = dyn_cast<ExtensionDecl>(Fn->getDeclContext());
+    if (!ED)
+      return false;
 
-  ExtensionDecl *ED = dyn_cast<ExtensionDecl>(Fn->getDeclContext());
-  if (!ED)
-    return false;
+    OneOfType *OOT = ED->getExtendedType()->getAs<OneOfType>();
+    if (!OOT)
+      return false;
 
-  OneOfType *OOT = ED->getExtendedType()->getAs<OneOfType>();
-  if (!OOT)
-    return false;
+    if (OOT->getDecl()->getName().str() != "Bool")
+      return false;
 
-  if (OOT->getDecl()->getName().str() != "Bool")
-    return false;
+    Module *M = dyn_cast<Module>(ED->getDeclContext());
+    if (!M)
+      return false;
 
-  Module *M = dyn_cast<Module>(ED->getDeclContext());
-  if (!M)
-    return false;
+    if (M->Name.str() != "swift")
+      return false;
 
-  if (M->Name.str() != "swift")
-    return false;
+    if (CallSites.size() != 2)
+      return false;
 
-  if (CallSites.size() != 2)
-    return false;
+    Expr *Arg = CallSites.back().Arg;
+    Explosion &out = result.initForDirectValues(ExplosionKind::Maximal);
+    Explosion temp(ExplosionKind::Maximal);
+    Type ObjTy = Arg->getType()->castTo<LValueType>()->getObjectType();
+    const TypeInfo &ObjTInfo = IGF.IGM.getFragileTypeInfo(ObjTy);
+    IGF.emitLoad(IGF.emitLValue(Arg), ObjTInfo, out);
+    return true;
+  }
 
-  Expr *Arg = CallSites.back().Arg;
-  Explosion &out = result.initForDirectValues(ExplosionKind::Maximal);
-  Explosion temp(ExplosionKind::Maximal);
-  Type ObjTy = Arg->getType()->castTo<LValueType>()->getObjectType();
-  const TypeInfo &ObjTInfo = IGF.IGM.getFragileTypeInfo(ObjTy);
-  IGF.emitLoad(IGF.emitLValue(Arg), ObjTInfo, out);
-  return true;
+  if (Fn->getName().str() == "&&" || Fn->getName().str() == "||") {
+    Module *M = dyn_cast<Module>(Fn->getDeclContext());
+    if (!M)
+      return false;
+
+    if (M->Name.str() != "swift")
+      return false;
+
+    TupleExpr *Arg = cast<TupleExpr>(CallSites.back().Arg);
+    
+    Condition cond = IGF.emitCondition(Arg->getElement(0), true,
+                                       Fn->getName().str() == "||");
+    Address CondBool = IGF.createAlloca(IGF.Builder.getInt1Ty(), Alignment(1),
+                                        "logical.cond");
+    if (cond.hasTrue()) {
+      cond.enterTrue(IGF);
+      Expr *Body = cast<ImplicitClosureExpr>(Arg->getElement(1))->getBody();
+      llvm::Value *Val = IGF.emitAsPrimitiveScalar(Body);
+      IGF.Builder.CreateStore(Val, CondBool);
+      cond.exitTrue(IGF);
+    }
+    if (cond.hasFalse()) {
+      cond.enterFalse(IGF);
+      Explosion explosion(ExplosionKind::Minimal);
+      llvm::Value *Val = IGF.Builder.getInt1(Fn->getName().str() == "||");
+      IGF.Builder.CreateStore(Val, CondBool);
+      cond.exitFalse(IGF);
+    }
+    cond.complete(IGF);
+    Explosion &out = result.initForDirectValues(ExplosionKind::Maximal);
+    out.addUnmanaged(IGF.Builder.CreateLoad(CondBool));
+    return true;
+  }
+
+  return false;
 }
 
 /// Emit a function call.

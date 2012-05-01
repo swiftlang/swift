@@ -292,7 +292,6 @@ public:
 
   void emitNullaryCall(llvm::Value *fn, Type resultType, Explosion &result);
 
-private:
   Condition emitCondition(Expr *E, bool hasFalseCode, bool invertValue = false);
 
 //--- Declaration emission -----------------------------------------------------
