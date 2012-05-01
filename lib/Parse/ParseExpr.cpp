@@ -21,6 +21,16 @@
 #include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
+
+/// isBinaryOperator - Return true if the specified token is a binary operator.
+/// For unfortuante gramatical reasons, we prevent ++ and -- from being parsed
+/// as binary operators (allowing them to be used as prefix unary operators.
+static bool isBinaryOperator(const Token &Tok) {
+  if (Tok.isNot(tok::oper)) return false;
+  
+  return Tok.getText() != "--" && Tok.getText() != "++";
+}
+
 /// parseExpr
 ///   expr:
 ///     expr-unary expr-binary*
@@ -39,8 +49,8 @@ NullablePtr<Expr> Parser::parseExpr(Diag<> Message) {
       return 0;
     SequencedExprs.push_back(Primary.get());
 
-    // If the next token is not an operator, we're done.
-    if (Tok.isNot(tok::oper))
+    // If the next token is not a binary operator, we're done.
+    if (!isBinaryOperator(Tok))
       break;
 
     // Parse the operator.
