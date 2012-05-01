@@ -156,6 +156,8 @@ struct EditLineWrapper {
     // FIXME: Colors disabled until we can figure out why they interact badly
     // with history.
     ShowColors = llvm::errs().is_displayed() && llvm::outs().is_displayed();
+#else
+    ShowColors = false;
 #endif
 
     e = el_init("swift", stdin, stdout, stderr);
