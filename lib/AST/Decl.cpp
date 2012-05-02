@@ -376,9 +376,9 @@ namespace {
 
     void visitPatternBindingDecl(PatternBindingDecl *PBD) {
       printCommon(PBD, "pattern_binding_decl");
-      OS << " pattern = \"";
+      OS << " pattern='";
       PrintPattern(OS).visit(PBD->getPattern());
-      OS << '"';
+      OS << '\'';
       if (PBD->getInit()) {
         OS << '\n';
         printRec(PBD->getInit());
