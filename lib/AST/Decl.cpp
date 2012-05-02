@@ -231,6 +231,38 @@ VarDecl *FuncDecl::getImplicitThisDecl() {
 //===----------------------------------------------------------------------===//
 
 namespace {
+  class PrintPattern : public PatternVisitor<PrintPattern> {
+  public:
+    raw_ostream &OS;
+    PrintPattern(raw_ostream &os) : OS(os) {}
+
+    void visitParenPattern(ParenPattern *P) {
+      OS << '(';
+      visit(P->getSubPattern());
+      OS << ')';
+    }
+    void visitTuplePattern(TuplePattern *P) {
+      OS << '(';
+      for (unsigned i = 0, e = P->getNumFields(); i != e; ++i) {
+        visit(P->getFields()[i].getPattern());
+        if (i + 1 != e)
+          OS << ", ";
+      }
+      OS << ')';
+    }
+    void visitNamedPattern(NamedPattern *P) {
+      OS << P->getBoundName().str();
+    }
+    void visitAnyPattern(AnyPattern *P) {
+      OS << '_';
+    }
+    void visitTypedPattern(TypedPattern *P) {
+      visit(P->getSubPattern());
+      OS << " : ";
+      P->getType()->print(OS);
+    }
+  };
+
   /// PrintDecl - Visitor implementation of Decl::print.
   class PrintDecl : public DeclVisitor<PrintDecl> {
   public:
@@ -344,10 +376,14 @@ namespace {
 
     void visitPatternBindingDecl(PatternBindingDecl *PBD) {
       printCommon(PBD, "pattern_binding_decl");
+      OS << " pattern = \"";
+      PrintPattern(OS).visit(PBD->getPattern());
+      OS << '"';
       if (PBD->getInit()) {
         OS << '\n';
         printRec(PBD->getInit());
       }
+      OS << ')';
     }
 
     void visitSubscriptDecl(SubscriptDecl *SD) {
