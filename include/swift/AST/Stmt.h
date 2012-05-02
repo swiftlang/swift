@@ -318,12 +318,12 @@ public:
 ///
 /// Example:
 /// \code
-/// foreach i in 0..10 {
+/// for i in 0..10 {
 ///   println(String(i))
 /// }
 /// \endcode
 class ForEachStmt : public Stmt {
-  SourceLoc ForEachLoc;
+  SourceLoc ForLoc;
   SourceLoc InLoc;
   llvm::PointerUnion<Pattern *, PatternBindingDecl *> Pat;
   Expr *Container;
@@ -340,14 +340,14 @@ class ForEachStmt : public Stmt {
   Expr *RangeDropFirst;
 
 public:
-  ForEachStmt(SourceLoc ForEachLoc, Pattern *Pat, SourceLoc InLoc,
+  ForEachStmt(SourceLoc ForLoc, Pattern *Pat, SourceLoc InLoc,
               Expr *Container, BraceStmt *Body)
-    : Stmt(StmtKind::ForEach), ForEachLoc(ForEachLoc), InLoc(InLoc), Pat(Pat),
+    : Stmt(StmtKind::ForEach), ForLoc(ForLoc), InLoc(InLoc), Pat(Pat),
       Container(Container), Body(Body), Range(), RangeEmpty(),
       RangeDropFirst() { }
   
-  /// getForEachLoc - Retrieve the location of the 'foreach' keyword.
-  SourceLoc getForEachLoc() const { return ForEachLoc; }
+  /// getForLoc - Retrieve the location of the 'for' keyword.
+  SourceLoc getForLoc() const { return ForLoc; }
 
   /// getInLoc - Retrieve the location of the 'in' keyword.
   SourceLoc getInLoc() const { return InLoc; }
@@ -391,7 +391,7 @@ public:
   void setBody(BraceStmt *B) { Body = B; }
   
   SourceRange getSourceRange() const {
-    return SourceRange(ForEachLoc, Body->getEndLoc());
+    return SourceRange(ForLoc, Body->getEndLoc());
   }
   
   // Implement isa/cast/dyncast/etc.

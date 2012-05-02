@@ -264,7 +264,6 @@
     keyword ::= 'import'
     keyword ::= 'in'
     keyword ::= 'for'
-    keyword ::= 'foreach'
     keyword ::= 'func'
     keyword ::= 'oneof'
     keyword ::= 'static'
@@ -2087,8 +2086,8 @@ if vec[3] {
     stmt ::= <a href="#stmt-return">stmt-return</a>
     stmt ::= <a href="#stmt-if">stmt-if</a>
     stmt ::= <a href="#stmt-while">stmt-while</a>
-    stmt ::= <a href="#stmt-for">stmt-for</a>
-    stmt ::= <a href="#stmt-foreach">stmt-foreach</a>
+    stmt ::= <a href="#stmt-for-c-style">stmt-for-c-style</a>
+    stmt ::= <a href="#stmt-for-each">stmt-for-each</a>
   </pre>
 
   <p>Statements provide the control flow constructs of function bodies and
@@ -2259,18 +2258,18 @@ if vec[3] {
   </pre>
 
   <!-- ===================================================================== -->
-  <h3 id="stmt-for">'for' Statement</h3>
+  <h3 id="stmt-for-c-style">C-Style 'for' Statement</h3>
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    stmt-for            ::= 'for' expr-or-stmt-assign? ';' <a href="#expr">expr</a>? ';' expr-or-stmt-assign? <a href="#stmt-brace">stmt-brace</a>
+    stmt-for-c-style    ::= 'for' expr-or-stmt-assign? ';' <a href="#expr">expr</a>? ';' expr-or-stmt-assign? <a href="#stmt-brace">stmt-brace</a>
     expr-or-stmt-assign ::= <a href="#expr">expr</a> | <a href="#stmt-assign">stmt-assign</a>
   </pre>
   
-  <p>'for' statements provide simple loop construct which evaluates the first
-  part of the parenthesized list before entering the loop, then evalutes the
-  second condition as a logic value to determines whether to keep looping.  The
-  third condition is executed at the end of the loop.
+  <p>C-Style 'for' statements provide simple loop construct which evaluates the
+  first part of the parenthesized list before entering the loop, then evalutes
+  the second condition as a logic value to determines whether to keep looping.
+  The third condition is executed at the end of the loop.
   </p>
   
   <p>Some examples include:</p>
@@ -2282,14 +2281,14 @@ if vec[3] {
   </pre>
 
   <!-- ===================================================================== -->
-  <h3 id="stmt-foreach">'foreach' Statement</h3>
+  <h3 id="stmt-for-each">'for-each' Statement</h3>
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    stmt-foreach        ::= 'foreach' <a href="#pattern">pattern</a> 'in' <a href="#expr">expr</a> <a href="#stmt-brace">stmt-brace</a>
+    stmt-for-each ::= 'for' <a href="#pattern">pattern</a> 'in' <a href="#expr">expr</a> <a href="#stmt-brace">stmt-brace</a>
   </pre>
   
-  <p>'foreach' statements provide iteration over the values in a
+  <p>'for-each' statements provide iteration over the values in a
  container. The <tt>expr</tt> is the container, and shall have a
  method <tt>getElements()</tt> that, when called, returns the range
  over which the loop will iterate.</p>
@@ -2318,7 +2317,7 @@ if vec[3] {
   <p>Some examples include:</p>
   
   <pre class="example">
-    foreach i in 0..100 {
+    for i in 0..100 {
       println(String(i));
     }
  </pre>

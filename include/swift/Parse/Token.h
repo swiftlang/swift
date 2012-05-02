@@ -52,7 +52,6 @@ enum class tok {
   KEYWORD(in)
   KEYWORD(else)
   KEYWORD(for)
-  KEYWORD(foreach)
   KEYWORD(while)
   KEYWORD(return)
 

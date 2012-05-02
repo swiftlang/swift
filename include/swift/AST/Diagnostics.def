@@ -326,7 +326,7 @@ ERROR(expected_expr_while,stmt_parsing,none,
 ERROR(expected_lbrace_after_while,stmt_parsing,none,
       "expected '{' after 'while' condition", ())
 
-// For Stmt
+// C-Style For Stmt
 ERROR(expected_lparen_for_stmt,stmt_parsing,none,
       "expected '(' in 'for' statement", ())
 ERROR(expected_semi_for_stmt,stmt_parsing,none,
@@ -338,13 +338,13 @@ ERROR(expected_rparen_for_stmt,stmt_parsing,none,
 ERROR(expected_lbrace_after_for,stmt_parsing,none,
       "expected '{' in 'for' statement", ())
 
-// Foreach Stmt
+// For-each Stmt
 ERROR(expected_foreach_in,stmt_parsing,none,
-      "expected 'in' after foreach pattern", ())
+      "expected 'in' after for-each pattern", ())
 ERROR(expected_foreach_container,stmt_parsing,none,
-      "expected container expression for foreach loop", ())
+      "expected container expression for for-each loop", ())
 ERROR(expected_foreach_lbrace,stmt_parsing,none,
-      "expected '{' to start the body of foreach loop", ())
+      "expected '{' to start the body of for-each loop", ())
       
 //------------------------------------------------------------------------------
 // Expression parsing diagnostics
@@ -722,30 +722,30 @@ ERROR(assignment_lhs_not_lvalue,sema_tcs,none,
 
 // ForEach Stmt
 ERROR(foreach_getelements,sema_tcs,none,
-      "no 'getElements' member in foreach container of type %0", (Type))
+      "no 'getElements' member in for-each container of type %0", (Type))
 ERROR(foreach_nonfunc_getelements,sema_tcs,none,
-      "'getElements' member of foreach container of type %0 is not a function",
+      "'getElements' member of for-each container of type %0 is not a function",
       (Type))
 ERROR(foreach_nonmaterializable_range,sema_tcs,none,
       "non-materializable range type %0 returned by getElements() method of "
       "type %1", (Type, Type))
 ERROR(foreach_range_isempty,sema_tcs,none,
-      "no 'isEmpty' member in foreach range of type %0", (Type))
+      "no 'isEmpty' member in for-each range of type %0", (Type))
 ERROR(foreach_nonfunc_range_isempty,sema_tcs,none,
-      "'isEmpty' member of foreach range of type %0 is not a function",
+      "'isEmpty' member of for-each range of type %0 is not a function",
       (Type))
 ERROR(foreach_range_getfirst,sema_tcs,none,
-      "no 'getfirst' member in foreach range of type %0", (Type))
+      "no 'getfirst' member in for-each range of type %0", (Type))
 ERROR(foreach_nonfunc_range_getfirst,sema_tcs,none,
-      "'getfirst' member of foreach range of type %0 is not a function",
+      "'getfirst' member of for-each range of type %0 is not a function",
       (Type))
 ERROR(foreach_nonmaterializable_element,sema_tcs,none,
       "non-materializable element type %0 returned by getFirst() method of "
       "range type %1", (Type, Type))
 ERROR(foreach_range_dropfirst,sema_tcs,none,
-      "no 'drp[first' member in foreach range of type %0", (Type))
+      "no 'drp[first' member in for-each range of type %0", (Type))
 ERROR(foreach_nonfunc_range_dropfirst,sema_tcs,none,
-      "'dropfirst' member of foreach range of type %0 is not a function",
+      "'dropfirst' member of for-each range of type %0 is not a function",
       (Type))
 
 //------------------------------------------------------------------------------

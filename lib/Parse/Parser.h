@@ -300,7 +300,8 @@ public:
   NullablePtr<Stmt> parseStmtIf();
   NullablePtr<Stmt> parseStmtWhile();
   NullablePtr<Stmt> parseStmtFor();
-  NullablePtr<Stmt> parseStmtForEach();
+  NullablePtr<Stmt> parseStmtForCStyle(SourceLoc ForLoc);
+  NullablePtr<Stmt> parseStmtForEach(SourceLoc ForLoc);
 };
 
 } // end namespace swift

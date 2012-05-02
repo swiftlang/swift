@@ -36,7 +36,6 @@ bool Parser::isStartOfStmtOtherThanAssignment(const Token &Tok) {
   case tok::kw_if:
   case tok::kw_while:
   case tok::kw_for:
-  case tok::kw_foreach:
     return true;
   }
 }
@@ -124,6 +123,8 @@ bool Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
 ///     stmt-brace
 ///     stmt-return
 ///     stmt-if
+///     stmt-for-c-style
+///     stmt-for-c-each
 ///   stmt-assign:
 ///     expr '=' expr
 void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
@@ -213,7 +214,6 @@ NullablePtr<Stmt> Parser::parseStmtOtherThanAssignment() {
   case tok::kw_if:     return parseStmtIf();
   case tok::kw_while:  return parseStmtWhile();
   case tok::kw_for:    return parseStmtFor();
-  case tok::kw_foreach: return parseStmtForEach();
   }
 }
 
@@ -316,12 +316,33 @@ NullablePtr<Stmt> Parser::parseStmtWhile() {
   return new (Context) WhileStmt(WhileLoc, Condition.get(), Body.get());
 }
 
-/// 
-///   stmt-for:
-///     'for' expr-or-stmt-assign? ';' expr? ';' expr-or-stmt-assign?
-///           stmt-brace
 NullablePtr<Stmt> Parser::parseStmtFor() {
   SourceLoc ForLoc = consumeToken(tok::kw_for);
+  
+  // The c-style-for loop and foreach-style-for loop are conflated together into
+  // a single keyword, so we have to do some lookahead to resolve what is going
+  // on.  Eventually we will allow optional ()'s around the condition of the
+  // c-style-for loop, which will require us to do arbitrary lookahead.  For now
+  // though, we can distinguish between the two with two-token lookahead.
+
+  // If we have a leading (, this is a pattern in a foreach loop.
+  if (Tok.isAnyLParen())
+    return parseStmtForEach(ForLoc);
+  
+  // If we have a leading identifier followed by a ':' or 'in', then this is a
+  // pattern, so it is foreach. 
+  if (Tok.is(tok::identifier) && 
+      (peekToken().is(tok::colon) || peekToken().is(tok::kw_in)))
+    return parseStmtForEach(ForLoc);
+
+  // Otherwise, this is some sort of c-style for loop.
+  return parseStmtForCStyle(ForLoc);
+}
+      
+///   stmt-for-c-style:
+///     'for' expr-or-stmt-assign? ';' expr? ';' expr-or-stmt-assign?
+///           stmt-brace
+NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   SourceLoc Semi1Loc, Semi2Loc;
   
   ExprStmtOrDecl First;
@@ -358,12 +379,9 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
 }
 
 /// 
-///   stmt-for:
-///     'foreach' pattern 'in' expr stmt-brace
-NullablePtr<Stmt> Parser::parseStmtForEach() {
-  // 'foreach'
-  SourceLoc ForEachLoc = consumeToken(tok::kw_foreach);
-  
+///   stmt-for-each:
+///     'for' pattern 'in' expr stmt-brace
+NullablePtr<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
   // pattern
   NullablePtr<Pattern> Pattern = parsePattern();
   
@@ -394,7 +412,7 @@ NullablePtr<Stmt> Parser::parseStmtForEach() {
   if (Pattern.isNull() || Container.isNull() || Body.isNull())
     return nullptr;
 
-  return new (Context) ForEachStmt(ForEachLoc, Pattern.get(), InLoc,
+  return new (Context) ForEachStmt(ForLoc, Pattern.get(), InLoc,
                                    Container.get(), Body.get());
 }
 

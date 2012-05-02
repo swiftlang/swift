@@ -267,7 +267,7 @@ public:
       // Create a pattern binding to initialize the range and wire it into the
       // AST.
       Pattern *RangePat = new (TC.Context) NamedPattern(Range);
-      S->setRange(new (TC.Context) PatternBindingDecl(S->getForEachLoc(),
+      S->setRange(new (TC.Context) PatternBindingDecl(S->getForLoc(),
                                                       RangePat, GetElements,
                                                       DC));
     }
@@ -301,7 +301,7 @@ public:
         << Container->getSourceRange();
       return nullptr;
     }
-    S->setElementInit(new (TC.Context) PatternBindingDecl(S->getForEachLoc(),
+    S->setElementInit(new (TC.Context) PatternBindingDecl(S->getForLoc(),
                                                           S->getPattern(),
                                                           GetFirst,
                                                           DC));
