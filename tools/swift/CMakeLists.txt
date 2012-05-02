@@ -7,7 +7,7 @@ add_swift_executable(swift
   PrintingDiagnosticConsumer.h
   swift.cpp
   DEPENDS swiftIRGen swiftParse swiftSema swiftAST
-  COMPONENT_DEPENDS bitwriter codegen ipo jit linker
+  COMPONENT_DEPENDS bitwriter codegen ipo jit linker mcjit
                                         selectiondag ${LLVM_TARGETS_TO_BUILD})
 
 target_link_libraries(swift edit)
