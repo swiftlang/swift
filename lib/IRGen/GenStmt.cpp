@@ -154,6 +154,13 @@ void IRGenFunction::emitWhileStmt(WhileStmt *S) {
 }
 
 void IRGenFunction::emitForStmt(ForStmt *S) {
+  // Enter a new scope.
+  Scope ForScope(*this);
+
+  // Emit any local 'var' variables declared in the initializer.
+  for (auto D : S->getInitializerVarDecls())
+    emitLocal(D);
+  
   if (Expr *E = S->getInitializer().dyn_cast<Expr*>()) {
     FullExpr scope(*this);
     emitIgnored(E);
