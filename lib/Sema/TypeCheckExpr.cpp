@@ -497,6 +497,13 @@ public:
       return nullptr;
 
     Type resultType = E->getElementType();
+    if (resultType->isDependentType()) {
+      E->setType(UnstructuredDependentType::get(TC.Context));
+      return E;
+    } else if (resultType->is<ErrorType>()) {
+      E->setType(resultType);
+      return nullptr;
+    }
 
     // Walk backward over the non-initial bounds.  These must all be
     // either slices (i.e. []) or constant (i.e. [6]).
@@ -540,6 +547,11 @@ public:
     // Try to build the appropriate slice type.
     resultType = TC.getArraySliceType(outerBound.Brackets.Start, resultType);
     if (resultType.isNull()) return nullptr;
+    E->setType(resultType);
+
+    // Delay checking the injection function while the bounds type is dependent.
+    if (outerBound.Value->getType()->isDependentType())
+      return E;
 
     // Find the appropriate injection function.
     ArraySliceType *sliceType = cast<ArraySliceType>(resultType);
@@ -566,7 +578,6 @@ public:
 
     E->setInjectionFunction(injectionFn);
 
-    E->setType(resultType);
     return E;
   }
   
@@ -1143,6 +1154,10 @@ bool TypeChecker::typeCheckArrayBound(Expr *&E, bool constantRequired) {
       << E->getSourceRange();
     return true;
   }
+
+  // Just quietly accept if the type is dependent.
+  if (E->getType()->isDependentType())
+    return false;
 
   // Otherwise, apply .getArrayBoundValue() until we get an acceptable
   // integer type.
