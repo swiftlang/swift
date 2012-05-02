@@ -524,7 +524,7 @@ NullablePtr<Expr> Parser::parseExprFunc() {
                                           SourceLoc()));
     Ty = TupleType::getEmpty(Context);
     Ty = FunctionType::get(Ty, Ty, Context);
-  } else if (!Tok.is(tok::l_paren) && !Tok.is(tok::l_paren_space)) {
+  } else if (Tok.isNotAnyLParen()) {
     diagnose(Tok, diag::func_decl_without_paren);
     return 0;
   } else if (parseFunctionSignature(Params, Ty)) {

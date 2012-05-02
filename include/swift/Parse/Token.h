@@ -106,6 +106,17 @@ public:
   bool is(tok K) const { return Kind == K; }
   bool isNot(tok K) const { return Kind != K; }
   
+  
+  bool isAnyLParen() const {
+    return Kind == tok::l_paren || Kind == tok::l_paren_space;
+  }
+  bool isNotAnyLParen() const { return !isAnyLParen(); }
+
+  bool isAnyLSquare() const {
+    return Kind == tok::l_square || Kind == tok::l_square_space;
+  }
+  bool isNotAnyLSquare() const { return !isAnyLSquare(); }
+  
   /// getLoc - Return a source location identifier for the specified
   /// offset in the current file.
   SourceLoc getLoc() const {

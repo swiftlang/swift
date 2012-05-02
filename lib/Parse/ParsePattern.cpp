@@ -133,7 +133,7 @@ bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &params,
       return true;
     else
       params.push_back(pattern.get());
-  } while (Tok.is(tok::l_paren) || Tok.is(tok::l_paren_space));
+  } while (Tok.isAnyLParen());
 
   // If there's a trailing arrow, parse the rest as the result type.
   if (consumeIf(tok::arrow)) {
@@ -236,7 +236,7 @@ NullablePtr<Pattern> Parser::parsePatternAtom() {
 ///   pattern-tuple-element:
 ///     pattern ('=' expr)?
 NullablePtr<Pattern> Parser::parsePatternTuple() {
-  assert(Tok.is(tok::l_paren) || Tok.is(tok::l_paren_space));
+  assert(Tok.isAnyLParen());
 
   // We're looking at the left parenthesis; consume it.
   SourceLoc lp = consumeToken();

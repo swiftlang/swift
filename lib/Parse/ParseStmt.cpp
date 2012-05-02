@@ -49,7 +49,7 @@ static bool isFuncExpr(const Token &Tok1, const Token &Tok2) {
   // "func identifier" and "func [attribute]" is a func declaration,
   // otherwise we have a func expression.
   return Tok2.isNot(tok::identifier) && Tok2.isNot(tok::oper) &&
-         Tok2.isNot(tok::l_square) && Tok2.isNot(tok::l_square_space);
+         Tok2.isNotAnyLSquare();
 }
 
 /// isStartOfDecl - Return true if this is the start of a decl or decl-import.
@@ -329,10 +329,12 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
   ExprStmtOrDecl Third;
   NullablePtr<BraceStmt> Body;
   
-  if (Tok.is(tok::l_paren_space))
-    LPLoc = consumeToken(tok::l_paren_space);
-  else if (parseToken(tok::l_paren, LPLoc, diag::expected_lparen_for_stmt))
+  if (Tok.isNotAnyLParen()) {
+    diagnose(Tok, diag::expected_lparen_for_stmt);
     return 0;
+  }
+  
+  LPLoc = consumeToken();
   
   if ((Tok.isNot(tok::semi) && parseExprOrStmtAssign(First)) ||
       parseToken(tok::semi, Semi1Loc, diag::expected_semi_for_stmt) ||

@@ -185,7 +185,8 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
 
     // Permit "qualifiers" on the byref.
     SourceLoc beginLoc = Tok.getLoc();
-    if (consumeIf(tok::l_paren) || consumeIf(tok::l_paren_space)) {
+    if (Tok.isAnyLParen()) {
+      consumeToken();
       if (!Tok.is(tok::identifier)) {
         diagnose(Tok, diag::byref_attribute_expected_identifier);
         skipUntil(tok::r_paren);
@@ -267,7 +268,7 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
 ///     '[' ']'
 ///     '[' attribute (',' attribute)* ']'
 void Parser::parseAttributeListPresent(DeclAttributes &Attributes) {
-  assert(Tok.is(tok::l_square) || Tok.is(tok::l_square_space));
+  assert(Tok.isAnyLSquare());
   Attributes.LSquareLoc = consumeToken();
   
   // If this is an empty attribute list, consume it and return.
@@ -637,8 +638,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       
       // It's easy to imagine someone writing redundant parentheses here;
       // diagnose this directly.
-      if ((Tok.is(tok::l_paren) || Tok.is(tok::l_paren_space)) &&
-          peekToken().is(tok::r_paren)) {
+      if (Tok.isAnyLParen() && peekToken().is(tok::r_paren)) {
         SourceLoc StartLoc = consumeToken();
         SourceLoc EndLoc = consumeToken();
         diagnose(StartLoc, diag::empty_parens_getsetname, false)
@@ -723,7 +723,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     Identifier SetName;
     SourceLoc SetNameLoc;
     SourceRange SetNameParens;
-    if (Tok.is(tok::l_paren) || Tok.is(tok::l_paren_space)) {
+    if (Tok.isAnyLParen()) {
       SourceLoc StartLoc = consumeToken();
       if (Tok.is(tok::identifier)) {
         // We have a name.
@@ -1029,7 +1029,7 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
     return 0;
 
   // We force first type of a func declaration to be a tuple for consistency.
-  if (Tok.isNot(tok::l_paren) && Tok.isNot(tok::l_paren_space)) {
+  if (Tok.isNotAnyLParen()) {
     diagnose(Tok, diag::func_decl_without_paren);
     return 0;
   }
@@ -1399,7 +1399,7 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   parseAttributeList(Attributes);
   
   // pattern-tuple
-  if (!Tok.is(tok::l_paren) && !Tok.is(tok::l_paren_space)) {
+  if (Tok.isNotAnyLParen()) {
     diagnose(Tok.getLoc(), diag::expected_lparen_subscript);
     return true;
   }
