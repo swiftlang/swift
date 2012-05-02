@@ -146,6 +146,9 @@ void swift::RunImmediately(TranslationUnit *TU) {
   // Build the ExecutionEngine.
   llvm::EngineBuilder builder(&Module);
   std::string ErrorMsg;
+  llvm::TargetOptions TargetOpt;
+  TargetOpt.NoFramePointerElimNonLeaf = true;
+  builder.setTargetOptions(TargetOpt);
   builder.setErrorStr(&ErrorMsg);
   builder.setEngineKind(llvm::EngineKind::JIT);
   builder.setUseMCJIT(true);
@@ -259,6 +262,9 @@ void swift::REPL(ASTContext &Context) {
 
   llvm::EngineBuilder builder(&Module);
   std::string ErrorMsg;
+  llvm::TargetOptions TargetOpt;
+  TargetOpt.NoFramePointerElimNonLeaf = true;
+  builder.setTargetOptions(TargetOpt);
   builder.setErrorStr(&ErrorMsg);
   builder.setEngineKind(llvm::EngineKind::JIT);
   llvm::ExecutionEngine *EE = builder.create();
