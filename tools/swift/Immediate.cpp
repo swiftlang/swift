@@ -169,6 +169,7 @@ struct EditLineWrapper {
   size_t PromptContinuationLevel;
   bool NeedPromptContinuation;
   bool ShowColors;
+  bool PromptedForLine;
   
   llvm::SmallString<80> PromptString;
 
@@ -189,6 +190,7 @@ struct EditLineWrapper {
     el_set(e, EL_PROMPT, PromptFn);
     el_set(e, EL_CLIENTDATA, (void*)this);
     el_set(e, EL_HIST, history, h);
+    el_set(e, EL_SIGNAL, 1);
     HistEvent ev;
     history(h, &ev, H_SETSIZE, 800);
   }
@@ -222,6 +224,7 @@ struct EditLineWrapper {
         PromptString += colorCode;
     }
 
+    PromptedForLine = true;
     return PromptString.c_str();
   };
         
@@ -316,10 +319,15 @@ void swift::REPL(ASTContext &Context) {
     // Read one line.
     e.PromptContinuationLevel = BraceCount;
     e.NeedPromptContinuation = BraceCount != 0 || HadLineContinuation;
+    e.PromptedForLine = false;
     int LineCount;
     const char* Line = el_gets(e, &LineCount);
-    if (!Line)
+    if (!Line) {
+      if (e.PromptedForLine)
+        printf("\n");
       return;
+    }
+
     size_t LineLen = strlen(Line);
 
     memcpy(CurBuffer, Line, LineLen);
