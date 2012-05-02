@@ -28,6 +28,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/ExecutionEngine/JIT.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Host.h"
@@ -38,9 +39,13 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/system_error.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Target/TargetData.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Transforms/IPO.h"
 #include "llvm/Linker.h"
 #include "llvm/LLVMContext.h"
 #include "llvm/Module.h"
+#include "llvm/PassManager.h"
 
 #include <cmath>
 #include <histedit.h>
@@ -60,10 +65,10 @@ static void LoadSwiftRuntime() {
 }
 
 static bool IRGenImportedModules(TranslationUnit *TU,
-                                 llvm::ExecutionEngine *EE,
                                  llvm::Module &Module,
                                  llvm::SmallPtrSet<TranslationUnit*, 8>
                                      &ImportedModules,
+                                 SmallVectorImpl<llvm::Function*> &InitFns,
                                  irgen::Options &Options) {
   // IRGen the modules this module depends on.
   for (auto ModPair : TU->getImportedModules()) {
@@ -75,7 +80,7 @@ static bool IRGenImportedModules(TranslationUnit *TU,
       continue;
 
     // Recursively IRGen imported modules.
-    IRGenImportedModules(SubTU, EE, Module, ImportedModules, Options);
+    IRGenImportedModules(SubTU, Module, ImportedModules, InitFns, Options);
 
     // FIXME: Need to check whether this is actually safe in general.
     llvm::Module SubModule(SubTU->Name.str(), Module.getContext());
@@ -100,7 +105,7 @@ static bool IRGenImportedModules(TranslationUnit *TU,
     StringRef InitFnName = (SubTU->Name.str() + ".init").toStringRef(NameBuf);
     llvm::Function *InitFn = Module.getFunction(InitFnName);
     if (InitFn)
-      EE->runFunctionAsMain(InitFn, std::vector<std::string>(), 0);
+      InitFns.push_back(InitFn);
   }
 
   return false;
@@ -111,7 +116,7 @@ void swift::RunImmediately(TranslationUnit *TU) {
   irgen::Options Options;
   Options.OutputFilename = "";
   Options.Triple = llvm::sys::getDefaultTargetTriple();
-  Options.OptLevel = 0;
+  Options.OptLevel = 2;
   Options.OutputKind = irgen::OutputKind::Module;
 
   // IRGen the main module.
@@ -123,20 +128,37 @@ void swift::RunImmediately(TranslationUnit *TU) {
   if (Context.hadError())
     return;
 
+  SmallVector<llvm::Function*, 8> InitFns;
+  llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
+  if (IRGenImportedModules(TU, Module, ImportedModules, InitFns, Options))
+    return;
+
+  llvm::PassManagerBuilder PMBuilder;
+  PMBuilder.OptLevel = 2;
+  PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
+  llvm::PassManager ModulePasses;
+  ModulePasses.add(new llvm::TargetData(Module.getDataLayout()));
+  PMBuilder.populateModulePassManager(ModulePasses);
+  ModulePasses.run(Module);
+
+  LoadSwiftRuntime();
+
   // Build the ExecutionEngine.
   llvm::EngineBuilder builder(&Module);
   std::string ErrorMsg;
   builder.setErrorStr(&ErrorMsg);
   builder.setEngineKind(llvm::EngineKind::JIT);
+  builder.setUseMCJIT(true);
   llvm::ExecutionEngine *EE = builder.create();
-
-  LoadSwiftRuntime();
-
-  llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
-  if (IRGenImportedModules(TU, EE, Module, ImportedModules, Options))
+  if (!EE) {
+    llvm::errs() << "Error loading JIT: " << ErrorMsg;
     return;
+  }
 
   // Run the generated program.
+  for (auto InitFn : InitFns)
+    EE->runFunctionAsMain(InitFn, std::vector<std::string>(), 0);
+
   llvm::Function *EntryFn = Module.getFunction("main");
   EE->runFunctionAsMain(EntryFn, std::vector<std::string>(), 0);
 }
@@ -225,6 +247,7 @@ void swift::REPL(ASTContext &Context) {
                                                       /*IsReplModule=*/true);
 
   llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
+  SmallVector<llvm::Function*, 8> InitFns;
   llvm::LLVMContext LLVMContext;
   llvm::Module Module("REPL", LLVMContext);
   llvm::Module DumpModule("REPL", LLVMContext);
@@ -275,7 +298,7 @@ void swift::REPL(ASTContext &Context) {
   if (llvm::sys::Process::StandardInIsUserInput())
     printf("%s", "Welcome to swift.  Type ':help' for assistance.\n");
 
-  if (IRGenImportedModules(TU, EE, Module, ImportedModules, Options))
+  if (IRGenImportedModules(TU, Module, ImportedModules, InitFns, Options))
     return;
 
   // Force upfront IRGen for swift.swift, to make the prompt more responsive.
@@ -283,6 +306,11 @@ void swift::REPL(ASTContext &Context) {
   for (llvm::Function& F : Module)
     if (!F.empty())
       EE->getPointerToFunction(&F);
+
+  // Run any init function from swift.swift.
+  for (auto InitFn : InitFns)
+    EE->runFunctionAsMain(InitFn, std::vector<std::string>(), 0);
+  InitFns.clear();
 
   while (1) {
     // Read one line.
@@ -418,8 +446,12 @@ void swift::REPL(ASTContext &Context) {
     llvm::Function *DumpModuleMain = DumpModule.getFunction("main");
     DumpModuleMain->setName("repl.line");
 
-    if (IRGenImportedModules(TU, EE, Module, ImportedModules, Options))
+    if (IRGenImportedModules(TU, Module, ImportedModules, InitFns, Options))
       return;
+
+    for (auto InitFn : InitFns)
+      EE->runFunctionAsMain(InitFn, std::vector<std::string>(), 0);
+    InitFns.clear();
 
     // FIXME: The way we do this is really ugly... we should be able to
     // improve this.
