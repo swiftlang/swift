@@ -278,20 +278,20 @@ public:
 /// it always evaluates to one.  The Initializer and Increment are also
 /// optional.
 class ForStmt : public Stmt {
-  SourceLoc ForLoc, LPLoc, Semi1Loc, Semi2Loc, RPLoc;
+  SourceLoc ForLoc, Semi1Loc, Semi2Loc;
   PointerUnion<Expr*, AssignStmt*> Initializer;
   NullablePtr<Expr> Cond;
   PointerUnion<Expr*, AssignStmt*> Increment;
   Stmt *Body;
   
 public:
-  ForStmt(SourceLoc ForLoc, SourceLoc LPLoc, 
+  ForStmt(SourceLoc ForLoc,
           PointerUnion<Expr*, AssignStmt*> Initializer,
           SourceLoc Semi1Loc, NullablePtr<Expr> Cond, SourceLoc Semi2Loc,
-          PointerUnion<Expr*, AssignStmt*> Increment, SourceLoc RPLoc,
+          PointerUnion<Expr*, AssignStmt*> Increment,
           Stmt *Body)
-  : Stmt(StmtKind::For), ForLoc(ForLoc), LPLoc(LPLoc), Semi1Loc(Semi1Loc),
-    Semi2Loc(Semi2Loc), RPLoc(RPLoc), Initializer(Initializer), 
+  : Stmt(StmtKind::For), ForLoc(ForLoc), Semi1Loc(Semi1Loc),
+    Semi2Loc(Semi2Loc), Initializer(Initializer), 
     Cond(Cond), Increment(Increment), Body(Body) {
   }
   

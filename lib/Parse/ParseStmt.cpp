@@ -318,32 +318,23 @@ NullablePtr<Stmt> Parser::parseStmtWhile() {
 
 /// 
 ///   stmt-for:
-///     'for' '(' expr-or-stmt-assign? ';' expr? ';' expr-or-stmt-assign? ')'
+///     'for' expr-or-stmt-assign? ';' expr? ';' expr-or-stmt-assign?
 ///           stmt-brace
 NullablePtr<Stmt> Parser::parseStmtFor() {
   SourceLoc ForLoc = consumeToken(tok::kw_for);
-  SourceLoc LPLoc, Semi1Loc, Semi2Loc, RPLoc;
+  SourceLoc Semi1Loc, Semi2Loc;
   
   ExprStmtOrDecl First;
   NullablePtr<Expr> Second;
   ExprStmtOrDecl Third;
   NullablePtr<BraceStmt> Body;
   
-  if (Tok.isNotAnyLParen()) {
-    diagnose(Tok, diag::expected_lparen_for_stmt);
-    return 0;
-  }
-  
-  LPLoc = consumeToken();
-  
   if ((Tok.isNot(tok::semi) && parseExprOrStmtAssign(First)) ||
       parseToken(tok::semi, Semi1Loc, diag::expected_semi_for_stmt) ||
-      (Tok.isNot(tok::semi) &&
+      (Tok.isNot(tok::semi) && Tok.isNot(tok::l_brace) &&
         (Second = parseExpr(diag::expected_cond_for_stmt)).isNull()) ||
       parseToken(tok::semi, Semi2Loc, diag::expected_semi_for_stmt) ||
-      (Tok.isNot(tok::r_paren) && parseExprOrStmtAssign(Third)) ||
-      parseMatchingToken(tok::r_paren, RPLoc, diag::expected_rparen_for_stmt,
-                         LPLoc, diag::opening_paren) ||
+      (Tok.isNot(tok::l_brace) && parseExprOrStmtAssign(Third)) ||
       (Body = parseStmtBrace(diag::expected_lbrace_after_for)).isNull())
     return 0;
   
@@ -362,8 +353,8 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
   else
     Increment = cast<AssignStmt>(Third.get<Stmt*>());
 
-  return new (Context) ForStmt(ForLoc, LPLoc, Initializer, Semi1Loc, Second,
-                               Semi2Loc, Increment, RPLoc, Body.get());
+  return new (Context) ForStmt(ForLoc, Initializer, Semi1Loc, Second,
+                               Semi2Loc, Increment, Body.get());
 }
 
 /// 

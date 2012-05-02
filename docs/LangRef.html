@@ -2263,7 +2263,7 @@ if vec[3] {
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    stmt-for            ::= 'for' '(' expr-or-stmt-assign? ';' <a href="#expr">expr</a>? ';' expr-or-stmt-assign? ')' <a href="#stmt-brace">stmt-brace</a>
+    stmt-for            ::= 'for' expr-or-stmt-assign? ';' <a href="#expr">expr</a>? ';' expr-or-stmt-assign? <a href="#stmt-brace">stmt-brace</a>
     expr-or-stmt-assign ::= <a href="#expr">expr</a> | <a href="#stmt-assign">stmt-assign</a>
   </pre>
   
@@ -2276,7 +2276,7 @@ if vec[3] {
   <p>Some examples include:</p>
   
   <pre class="example">
-    for (i = 0; i != 10; i = i + 1) {
+    for i = 0; i != 10; ++i {
       /*...*/
     }
   </pre>
