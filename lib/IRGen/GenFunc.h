@@ -18,7 +18,6 @@
 #ifndef SWIFT_IRGEN_GENFUNC_H
 #define SWIFT_IRGEN_GENFUNC_H
 
-#include <vector>
 #include "Explosion.h"
 
 namespace llvm {
@@ -184,7 +183,7 @@ namespace irgen {
   ///   support move-only types.
   Callee emitCallee(IRGenFunction &IGF, Expr *fn, ExplosionKind bestLevel,
                     unsigned additionalUncurrying,
-                    std::vector<Arg> &args);
+                    llvm::SmallVectorImpl<Arg> &args);
 
   /// Emit an r-value reference to a function.
   void emitRValueForFunction(IRGenFunction &IGF, FuncDecl *Fn,

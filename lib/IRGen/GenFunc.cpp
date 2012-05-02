@@ -877,7 +877,7 @@ static CallPlan getCallPlan(IRGenModule &IGM, ApplyExpr *E) {
 Callee swift::irgen::emitCallee(IRGenFunction &IGF, Expr *fn,
                                 ExplosionKind bestExplosion,
                                 unsigned addedUncurrying,
-                                std::vector<Arg> &args) {
+                                llvm::SmallVectorImpl<Arg> &args) {
   assert(addedUncurrying == 0);
 
   // FIXME: be less lazy about this.

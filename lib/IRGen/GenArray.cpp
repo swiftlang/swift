@@ -114,7 +114,7 @@ void swift::irgen::emitNewArrayExpr(IRGenFunction &IGF, NewArrayExpr *E,
   dataAddr = IGF.Builder.CreateBitCast(dataAddr, IGF.IGM.Int8PtrTy);
 
   // Emit the callee.
-  std::vector<Arg> args;
+  llvm::SmallVector<Arg, 4> args;
   Callee callee = emitCallee(IGF, E->getInjectionFunction(),
                              out.getKind(), /*uncurry*/ 0, args);
 
