@@ -339,6 +339,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   }
 
   Stmt *visitForStmt(ForStmt *FS) {
+    // Visit any var decls in the initializer.
+    for (auto D : FS->getInitializerVarDecls())
+      if (doIt(D))
+        return nullptr;
+    
     if (Expr *E = FS->getInitializer().dyn_cast<Expr*>()) {
       if ((E = doIt(E)))
         FS->setInitializer(E);

@@ -340,18 +340,31 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
 }
       
 ///   stmt-for-c-style:
-///     'for' expr-or-stmt-assign? ';' expr? ';' expr-or-stmt-assign?
+///     'for' stmt-for-c-style-init? ';' expr? ';' expr-or-stmt-assign?
 ///           stmt-brace
+///   stmt-for-c-style-init:
+///     decl-var
+///     expr-or-stmt-assign
 NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   SourceLoc Semi1Loc, Semi2Loc;
   
   ExprStmtOrDecl First;
+  SmallVector<Decl*, 2> FirstDecls;
   NullablePtr<Expr> Second;
   ExprStmtOrDecl Third;
   NullablePtr<BraceStmt> Body;
   
-  if ((Tok.isNot(tok::semi) && parseExprOrStmtAssign(First)) ||
-      parseToken(tok::semi, Semi1Loc, diag::expected_semi_for_stmt) ||
+  // Introduce a new scope to contain any var decls in the init value.
+  Scope ForScope(this);
+  
+  // Parse the first part, either a var, expr, or stmt-assign.
+  if (Tok.is(tok::kw_var)) {
+    if (parseDeclVar(false, FirstDecls)) return 0;
+  } else if ((Tok.isNot(tok::semi) && parseExprOrStmtAssign(First)))
+    return 0;
+  
+  // Parse the rest of the statement.
+  if (parseToken(tok::semi, Semi1Loc, diag::expected_semi_for_stmt) ||
       (Tok.isNot(tok::semi) && Tok.isNot(tok::l_brace) &&
         (Second = parseExpr(diag::expected_cond_for_stmt)).isNull()) ||
       parseToken(tok::semi, Semi2Loc, diag::expected_semi_for_stmt) ||
@@ -374,7 +387,12 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   else
     Increment = cast<AssignStmt>(Third.get<Stmt*>());
 
-  return new (Context) ForStmt(ForLoc, Initializer, Semi1Loc, Second,
+  ArrayRef<Decl*> FirstDeclsContext;
+  if (!FirstDecls.empty())
+    FirstDeclsContext = Context.AllocateCopy(FirstDecls);
+  
+  return new (Context) ForStmt(ForLoc, Initializer, FirstDeclsContext,
+                               Semi1Loc, Second,
                                Semi2Loc, Increment, Body.get());
 }
 

@@ -280,6 +280,7 @@ public:
 class ForStmt : public Stmt {
   SourceLoc ForLoc, Semi1Loc, Semi2Loc;
   PointerUnion<Expr*, AssignStmt*> Initializer;
+  ArrayRef<Decl*> InitializerVarDecls;
   NullablePtr<Expr> Cond;
   PointerUnion<Expr*, AssignStmt*> Increment;
   Stmt *Body;
@@ -287,11 +288,13 @@ class ForStmt : public Stmt {
 public:
   ForStmt(SourceLoc ForLoc,
           PointerUnion<Expr*, AssignStmt*> Initializer,
+          ArrayRef<Decl*> InitializerVarDecls,
           SourceLoc Semi1Loc, NullablePtr<Expr> Cond, SourceLoc Semi2Loc,
           PointerUnion<Expr*, AssignStmt*> Increment,
           Stmt *Body)
   : Stmt(StmtKind::For), ForLoc(ForLoc), Semi1Loc(Semi1Loc),
     Semi2Loc(Semi2Loc), Initializer(Initializer), 
+    InitializerVarDecls(InitializerVarDecls),
     Cond(Cond), Increment(Increment), Body(Body) {
   }
   
@@ -301,6 +304,10 @@ public:
   
   PointerUnion<Expr*, AssignStmt*> getInitializer() const { return Initializer;}
   void setInitializer(PointerUnion<Expr*, AssignStmt*> V) { Initializer = V; }
+  
+  ArrayRef<Decl*> getInitializerVarDecls() const { return InitializerVarDecls; }
+  void setInitializerVarDecls(ArrayRef<Decl*> D) { InitializerVarDecls = D; }
+  
   NullablePtr<Expr> getCond() const { return Cond; }
   void setCond(NullablePtr<Expr> C) { Cond = C; }
   PointerUnion<Expr*, AssignStmt*> getIncrement() const { return Increment; }

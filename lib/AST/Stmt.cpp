@@ -181,13 +181,20 @@ public:
   }
   void visitForStmt(ForStmt *S) {
     OS.indent(Indent) << "(for_stmt\n";
-    if (S->getInitializer().isNull())
-      OS.indent(Indent+2) << "<null initializer>";
-    else if (Expr *E = S->getInitializer().dyn_cast<Expr*>())
+    if (!S->getInitializerVarDecls().empty()) {
+      for (auto D : S->getInitializerVarDecls()) {
+        printRec(D);
+        OS << '\n';
+      }
+    } else if (S->getInitializer().isNull())
+      OS.indent(Indent+2) << "<null initializer>\n";
+    else if (Expr *E = S->getInitializer().dyn_cast<Expr*>()) {
       printRec(E);
-    else
+      OS << '\n';
+    } else {
       printRec(S->getInitializer().get<AssignStmt*>());
-    OS << '\n';
+      OS << '\n';
+    }
 
     if (S->getCond().isNull())
       OS.indent(Indent+2) << "<null condition>";

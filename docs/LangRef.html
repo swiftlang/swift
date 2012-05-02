@@ -400,7 +400,7 @@
     decl ::= <a href="#decl-protocol">decl-protocol</a>
     decl ::= <a href="#decl-struct">decl-struct</a>
     decl ::= <a href="#decl-typealias">decl-typealias</a>
-    decl ::= <a href="#decl-var">decl-var</a>    
+    decl ::= <a href="#decl-var">decl-var</a>
     decl ::= <a href="#decl-subscript">decl-subscript</a>
  </pre>
 
@@ -2262,14 +2262,17 @@ if vec[3] {
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    stmt-for-c-style    ::= 'for' expr-or-stmt-assign? ';' <a href="#expr">expr</a>? ';' expr-or-stmt-assign? <a href="#stmt-brace">stmt-brace</a>
-    expr-or-stmt-assign ::= <a href="#expr">expr</a> | <a href="#stmt-assign">stmt-assign</a>
+    stmt-for-c-style    ::= 'for' stmt-for-c-style-init? ';' <a href="#expr">expr</a>? ';' expr-or-stmt-assign? <a href="#stmt-brace">stmt-brace</a>
+    expr-or-stmt-assign   ::= <a href="#expr">expr</a> | <a href="#stmt-assign">stmt-assign</a>
+    stmt-for-c-style-init ::= <a href="#decl-var">decl-var</a>
+    stmt-for-c-style-init ::= expr-or-stmt-assign
   </pre>
   
   <p>C-Style 'for' statements provide simple loop construct which evaluates the
-  first part of the parenthesized list before entering the loop, then evalutes
-  the second condition as a logic value to determines whether to keep looping.
-  The third condition is executed at the end of the loop.
+  first part (the initializer) before entering the loop, then evalutes the
+  second condition as a logic value to determines whether to keep looping.
+  The third condition is executed at the end of the loop.  All three are
+  evaluated in a new scope that surrounds the for statement.
   </p>
   
   <p>Some examples include:</p>
@@ -2278,7 +2281,11 @@ if vec[3] {
     for i = 0; i != 10; ++i {
       /*...*/
     }
-  </pre>
+
+    for var (i,j) = (0,1); i != 10; ++i {
+      /*...*/
+    }
+</pre>
 
   <!-- ===================================================================== -->
   <h3 id="stmt-for-each">'for-each' Statement</h3>

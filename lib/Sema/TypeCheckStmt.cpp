@@ -150,16 +150,20 @@ public:
     return WS;
   }
   Stmt *visitForStmt(ForStmt *FS) {
+    // Type check any var decls in the initializer.
+    for (auto D : FS->getInitializerVarDecls())
+      TC.typeCheckDecl(D);
+
+    PointerUnion<Expr*, AssignStmt*> Tmp = FS->getInitializer();
+    if (typeCheck(Tmp)) return 0;
+    FS->setInitializer(Tmp);
+    
     // Type check the condition if present.
     if (FS->getCond().isNonNull()) {
       Expr *E = FS->getCond().get();
       if (TC.typeCheckCondition(E)) return 0;
       FS->setCond(E);
     }
-    
-    PointerUnion<Expr*, AssignStmt*> Tmp = FS->getInitializer();
-    if (typeCheck(Tmp)) return 0;
-    FS->setInitializer(Tmp);
     
     Tmp = FS->getIncrement();
     if (typeCheck(Tmp)) return 0;
@@ -347,8 +351,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
       if (!typeCheckStmt(SubStmt))
         BS->setElement(i, SubStmt);
     } else {
-      Decl *D = BS->getElement(i).get<Decl*>();
-      TC.typeCheckDecl(D);
+      TC.typeCheckDecl(BS->getElement(i).get<Decl*>());
     }
   }
   
