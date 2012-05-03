@@ -56,7 +56,7 @@ public:
   /// SourceMgr - The source manager object.
   llvm::SourceMgr &SourceMgr;
 
-  /// \Diags - The diagnostics engine.
+  /// Diags - The diagnostics engine.
   DiagnosticEngine &Diags;
   
   /// LoadedModules - The set of modules we have loaded.
