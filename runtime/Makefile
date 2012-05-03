@@ -26,3 +26,10 @@ SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
 $(ObjDir)/%.o: %.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER)
 	$(Echo) "Compiling $*.swift for $(BuildMode) build"
 	$(Verb) $(SWIFT_COMPILER) -c $< -o $(ObjDir)/swift.o -parse-as-library
+
+HeaderDir := $(PROJ_OBJ_ROOT)/$(BuildMode)/lib/swift/
+$(HeaderDir)/swift.swift: $(PROJ_SRC_DIR)/swift.swift $(HeaderDir)/.dir
+	$(Verb) cp $< $@
+	$(Echo) Copying $(notdir $<) to build dir
+
+all-local:: $(HeaderDir)/swift.swift
