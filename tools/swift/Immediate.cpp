@@ -337,11 +337,6 @@ void swift::REPL(ASTContext &Context) {
   if (llvm::sys::Process::StandardInIsUserInput())
     printf("%s", "Welcome to swift.  Type ':help' for assistance.\n");
 
-  // Run any init function from swift.swift.
-  for (auto InitFn : InitFns)
-    EE->runFunctionAsMain(InitFn, std::vector<std::string>(), 0);
-  InitFns.clear();
-
   while (1) {
     // Read one line.
     e.PromptContinuationLevel = BraceCount;
