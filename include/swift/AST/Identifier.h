@@ -59,7 +59,8 @@ public:
   /// isOperatorChar - Return true if the specified character is a
   /// valid part of an operator.
   static bool isOperatorChar(char C) {
-    return strchr("/=-+*%<>!&|^~.", C) != 0;
+    static const char OpChars[] = "/=-+*%<>!&|^~.";
+    return memchr(OpChars, C, sizeof(OpChars) - 1) != 0;
   }
   
   void *getAsOpaquePointer() const { return (void *)Pointer; }
