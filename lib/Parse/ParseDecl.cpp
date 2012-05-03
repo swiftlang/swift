@@ -925,6 +925,7 @@ bool Parser::parseDeclVar(bool hasContainerType, SmallVectorImpl<Decl*> &Decls){
     }
   }
 
+  SmallVector<PatternBindingDecl*, 4> PBDs;
   do {
     Type Ty;
     NullablePtr<Expr> Init;
@@ -946,6 +947,23 @@ bool Parser::parseDeclVar(bool hasContainerType, SmallVectorImpl<Decl*> &Decls){
         new (Context) PatternBindingDecl(VarLoc, pattern.get(),
                                          Init.getPtrOrNull(), CurDeclContext);
     Decls.push_back(PBD);
+
+    // Propagate back types for simple patterns, like "var A, B : T".
+    if (TypedPattern *TP = dyn_cast<TypedPattern>(PBD->getPattern())) {
+      if (isa<NamedPattern>(TP->getSubPattern()) && !PBD->hasInit()) {
+        for (unsigned i = PBDs.size(); i != 0; --i) {
+          PatternBindingDecl *PrevPBD = PBDs[i-1];
+          Pattern *PrevPat = PrevPBD->getPattern();
+          if (!isa<NamedPattern>(PrevPat) || PrevPBD->hasInit())
+            break;
+
+          TypedPattern *NewTP = new (Context) TypedPattern(PrevPat,
+                                                           TP->getType());
+          PrevPBD->setPattern(NewTP);
+        }
+      }
+    }
+    PBDs.push_back(PBD);
 
     if (!consumeIf(tok::comma))
       break;

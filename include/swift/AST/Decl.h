@@ -234,7 +234,9 @@ public:
   SourceLoc getLocStart() const { return VarLoc; }
 
   Pattern *getPattern() const { return Pat; }
+  void setPattern(Pattern *P) { Pat = P; }
 
+  bool hasInit() const { return Init; }
   Expr *getInit() const { return Init; }
   void setInit(Expr *E) { Init = E; }
 
