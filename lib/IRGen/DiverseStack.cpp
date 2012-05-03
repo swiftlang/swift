@@ -62,7 +62,7 @@ char *DiverseListBase::addNewStorageSlow(std::size_t needed) {
 
   Begin = new char[capacity];
   EndOfAllocation = Begin + capacity;
-  End = Begin + oldSize;
+  End = Begin + oldSize + needed;
   std::memcpy(Begin, oldBegin, oldSize);
 
   if (!wasInline) delete[] oldBegin;
