@@ -36,9 +36,6 @@ class Lexer {
   llvm::SourceMgr &SourceMgr;
   DiagnosticEngine *Diags;
   
-  // Note: when introducing new state into the lexer, be sure to update
-  // LocalLexingRAII.
-  
   const char *BufferStart;
   const char *BufferEnd;
   const char *CurPtr;
@@ -84,39 +81,6 @@ public:
   SourceLoc getLocForStartOfBuffer() const {
     return SourceLoc(llvm::SMLoc::getFromPointer(BufferStart));
   }
-  
-  /// \brief Enter into a scope where we can re-lex a part of the source
-  /// buffer and then resume the previous lexing state.
-  ///
-  /// This RAII object is used by string interpolation to go back and lex/parse
-  /// the expression parts of the string literal.
-  class LocalLexingRAII {
-    Lexer &L;
-    const char *BufferStart;
-    const char *BufferEnd;
-    const char *CurPtr;
-    
-    Token NextToken;
-    
-  public:
-    LocalLexingRAII(Lexer &L, StringRef String)
-      : L(L), BufferStart(L.BufferStart), BufferEnd(L.BufferEnd),
-    CurPtr(L.CurPtr), NextToken(L.NextToken) {
-      L.BufferStart = String.begin();
-      L.BufferEnd = String.end();
-      L.CurPtr = L.BufferStart;
-      
-      // Prime the lexer.
-      L.lexImpl();
-    }
-    
-    ~LocalLexingRAII() {
-      L.BufferStart = BufferStart;
-      L.BufferEnd = BufferEnd;
-      L.CurPtr = CurPtr;
-      L.NextToken = NextToken;
-    }
-  };
   
   /// StringSegment - A segment of a (potentially interpolated) string.
   struct StringSegment {
