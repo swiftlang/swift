@@ -405,6 +405,7 @@ void swift::REPL(ASTContext &Context) {
       }
       CurBufferOffset = CurBufferEndOffset;
       CurChunkLines = 0;
+      LastValidLineEnd = CurBuffer;
       continue;
     }
     do {
