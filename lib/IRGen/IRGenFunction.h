@@ -39,6 +39,8 @@ namespace swift {
   class ForStmt;
   class FuncDecl;
   class IfStmt;
+  class OneOfElementDecl;
+  class OneOfType;
   template<typename T> class Optional;
   class Pattern;
   class PatternBindingDecl;
@@ -306,9 +308,17 @@ public:
   void setLocalFunc(FuncDecl*, Address);
   void emitLocalFunction(FuncDecl *func);
 
+  llvm::Function *getAddrOfLocalInjectionFunction(OneOfElementDecl*);
+
 private:
   llvm::DenseMap<FuncDecl*, Address> LocalFuncs;
   llvm::DenseMap<VarDecl*, OwnedAddress> LocalVars;
+  llvm::DenseMap<OneOfElementDecl*, llvm::Function*> LocalInjectionFuncs;
+
+//--- Types -----------------------------------------------------------------
+public:
+  void emitTypeAlias(Type T);
+  void emitOneOfType(OneOfType *type);
 
 //--- Global context emission --------------------------------------------------
 public:

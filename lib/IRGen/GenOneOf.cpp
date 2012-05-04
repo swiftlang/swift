@@ -429,7 +429,12 @@ void swift::irgen::emitOneOfElementRef(IRGenFunction &IGF,
                                        OneOfElementDecl *elt,
                                        Explosion &result) {
   // Find the injection function.
-  llvm::Function *injection = IGF.IGM.getAddrOfInjectionFunction(elt);
+  llvm::Function *injection;
+  OneOfType *ParentOneOf = cast<OneOfType>(elt->getDeclContext());
+  if (ParentOneOf->getDecl()->getDeclContext()->isLocalContext())
+    injection = IGF.getAddrOfLocalInjectionFunction(elt);
+  else
+    injection = IGF.IGM.getAddrOfGlobalInjectionFunction(elt);
 
   // If the element is of function type, just emit this as a function
   // reference.  It will always literally be of function type when
@@ -449,11 +454,9 @@ void swift::irgen::emitOneOfElementRef(IRGenFunction &IGF,
 
 /// Emit the injection function for the given element.
 static void emitInjectionFunction(IRGenModule &IGM,
+                                  llvm::Function *fn,
                                   const OneofTypeInfo &oneofTI,
                                   OneOfElementDecl *elt) {
-  // Get or create the injection function.
-  llvm::Function *fn = IGM.getAddrOfInjectionFunction(elt);
-
   ExplosionKind explosionKind = ExplosionKind::Minimal;
   IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(), explosionKind,
                     /*uncurry level*/ 0, fn, Prologue::Bare);
@@ -466,6 +469,15 @@ static void emitInjectionFunction(IRGenModule &IGM,
 void IRGenModule::emitOneOfType(OneOfType *oneof) {
   const OneofTypeInfo &typeInfo = getFragileTypeInfo(oneof).as<OneofTypeInfo>();
   for (auto elt : oneof->getElements()) {
-    emitInjectionFunction(*this, typeInfo, elt);
+    llvm::Function *fn = getAddrOfGlobalInjectionFunction(elt);
+    emitInjectionFunction(*this, fn, typeInfo, elt);
+  }
+}
+
+void IRGenFunction::emitOneOfType(OneOfType *oneof) {
+  const OneofTypeInfo &typeInfo = getFragileTypeInfo(oneof).as<OneofTypeInfo>();
+  for (auto elt : oneof->getElements()) {
+    llvm::Function *fn = getAddrOfLocalInjectionFunction(elt);
+    emitInjectionFunction(IGM, fn, typeInfo, elt);
   }
 }

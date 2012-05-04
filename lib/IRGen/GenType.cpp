@@ -261,6 +261,11 @@ void IRGenModule::emitTypeAlias(Type underlyingType) {
     return emitOneOfType(oneof);
 }
 
+void IRGenFunction::emitTypeAlias(Type underlyingType) {
+  if (OneOfType *oneof = dyn_cast<OneOfType>(underlyingType))
+    return emitOneOfType(oneof);
+}
+
 /// createNominalType - Create a new nominal type.
 llvm::StructType *IRGenModule::createNominalType(TypeAliasDecl *alias) {
   llvm::SmallString<32> typeName;

@@ -222,34 +222,57 @@ llvm::Function *IRGenModule::getAddrOfGlobalFunction(FuncDecl *func,
   return addr;
 }
 
-/// getAddrOfInjectionFunction - Get the address of the function to
+static llvm::FunctionType *getInjectionFunctionType(OneOfElementDecl *D,
+                                                    IRGenModule &IGM) {
+  // The formal type of the function is generally the type of the decl,
+  // but if that's not a function type, it's () -> that.
+  Type formalType = D->getType();
+  if (!isa<FunctionType>(formalType)) {
+    formalType = FunctionType::get(TupleType::getEmpty(IGM.Context),
+                                   formalType, IGM.Context);
+  }
+
+  // FIXME: pick the explosion kind better!
+  return IGM.getFunctionType(formalType, ExplosionKind::Minimal, /*uncurry*/ 0,
+                             /*data*/ false);
+}
+
+/// getAddrOfGlobalInjectionFunction - Get the address of the function to
 /// perform a particular injection into a oneof type.
 llvm::Function *
-IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
+IRGenModule::getAddrOfGlobalInjectionFunction(OneOfElementDecl *D) {
   LinkEntity entity = LinkEntity::forFunction(D, ExplosionKind::Minimal, 0);
 
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return cast<llvm::Function>(entry);
 
-  // The formal type of the function is generally the type of the decl,
-  // but if that's not a function type, it's () -> that.
-  Type formalType = D->getType();
-  if (!isa<FunctionType>(formalType)) {
-    formalType = FunctionType::get(TupleType::getEmpty(Context),
-                                   formalType, Context);
-  }
-
-  // FIXME: pick the explosion kind better!
-  llvm::FunctionType *fnType =
-    getFunctionType(formalType, ExplosionKind::Minimal, /*uncurry*/ 0,
-                    /*data*/ false);
-
+  llvm::FunctionType *fnType = getInjectionFunctionType(D, *this);
   LinkInfo link = LinkInfo::get(*this, entity);
   llvm::Function *addr
     = cast<llvm::Function>(Module.getOrInsertFunction(link.getName(), fnType));
   addr->setLinkage(link.getLinkage());
   addr->setVisibility(link.getVisibility());
 
+  entry = addr;
+  return addr;
+}
+
+/// getAddrOfLocalInjectionFunction - Get the address of the function to
+/// perform a particular injection into a oneof type.
+llvm::Function *
+IRGenFunction::getAddrOfLocalInjectionFunction(OneOfElementDecl *D) {
+  llvm::Function *&entry = LocalInjectionFuncs[D];
+  if (entry) return entry;
+
+  llvm::FunctionType *fnType = getInjectionFunctionType(D, IGM);
+  OneOfType *ParentOneOf = cast<OneOfType>(D->getDeclContext());
+  llvm::SmallString<64> InjectionName = ParentOneOf->getDecl()->getName().str();
+  InjectionName += '.';
+  InjectionName += D->getName().str();
+  InjectionName += ".injection";
+  llvm::Function *addr =
+      llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
+                             InjectionName.str(), &IGM.Module);
   entry = addr;
   return addr;
 }
@@ -432,7 +455,7 @@ void IRGenFunction::emitLocal(Decl *D) {
   // Type aliases require IR-gen support if they're really
   // struct/oneof declarations.
   case DeclKind::TypeAlias:
-    return IGM.emitTypeAlias(cast<TypeAliasDecl>(D)->getUnderlyingType());
+    return emitTypeAlias(cast<TypeAliasDecl>(D)->getUnderlyingType());
 
   case DeclKind::OneOfElement:
     // no IR generation support required.
