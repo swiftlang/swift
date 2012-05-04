@@ -332,18 +332,41 @@
   <!-- ===================================================================== -->
   
   <div class="commentary">
-    In the future, we can consider adding string interpolation with
-    "\(expression)".
+    FIXME: Forcing + to concatenate strings is somewhat gross, a proper protocol
+    would be better.
   </div>
   
   <pre class="grammar">
-    string_literal ::= ["]([^"\\\n\r]|character_escape)*["]
+    string_literal   ::= ["]([^"\\\n\r]|character_escape|escape_expr)*["]
+    escape_expr      ::= [\]escape_expr_body
+    escape_expr_body ::= [(]escape_expr_body[)]
+    escape_expr_body ::= [^\n\r"()]
   </pre>
   
   <p>string_literal tokens represent a string, and are surrounded by double
      quotes.  String literals cannot span multiple lines.</p>
-
-
+  
+  <p>String literals may contain embedded expressions in them (known as
+  "interpolated expressions") subject to some specific lexical constraints:
+  the expression may not contain a double quote ["], newline [\n], or carriage
+  return [\r].  All parentheses must be balanced.</p>
+  
+  <p>In addition to these lexical rules, an interpolated expression must satisfy
+  the <a href="#expr">expr</a> production of the general swift grammar.  This
+  expression is evaluated, and passed to the constructor for the inferred type
+  of the string literal.  It is concatenated onto any fixed portions of the
+  string literal with a global "+" operator that is found through normal name
+  lookup.</p>
+  
+  <pre class="example">
+    // Simple string literal.
+    "Hello world!"
+    
+    // Interpolated expressions.
+    "\(min)..\(max)" + "Result is \((4+i)*j)"
+  </pre>
+  
+  
   <!-- ===================================================================== -->
   <h3 id="identifier">Identifier Tokens</h3>
   <!-- ===================================================================== -->

@@ -267,10 +267,10 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
         // Create a temporary lexer that lexes from the body of the string.
         Lexer LocalLex(Segment.Data, SourceMgr, &Diags);
         
-        // Swap out the parser's current lexer with our new one.
+        // Temporarily swap out the parser's current lexer with our new one.
         llvm::SaveAndRestore<Lexer*> T(L, &LocalLex);
         
-        // Prime the lexer.
+        // Prime the new lexer.
         L->lex(Tok);
         
         NullablePtr<Expr> E = parseExpr(diag::string_interpolation_expr);
