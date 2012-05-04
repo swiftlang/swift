@@ -188,18 +188,16 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
       !isStartOfDecl(Tok, peekToken())) {
     bool HadError = false;
     do {
-      Type type;
-      Identifier name;
-
       // If the tuple element starts with "ident :" or "ident =", then
       // the identifier is an element tag, and it is followed by a
       // value-specifier.
       if (Tok.is(tok::identifier) &&
           (peekToken().is(tok::colon) || peekToken().is(tok::equal))) {
-        name = Context.getIdentifier(Tok.getText());
+        Identifier name = Context.getIdentifier(Tok.getText());
         consumeToken(tok::identifier);
 
         NullablePtr<Expr> init;
+        Type type;
         if ((HadError = parseValueSpecifier(type, init)))
           break;
 
@@ -208,26 +206,11 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
       }
 
       // Otherwise, this has to be a type.
+      Type type;
       if ((HadError = parseTypeAnnotation(type)))
         break;
 
-      Expr *init = nullptr;
-
-      // Parse the optional default value expression.
-      if (consumeIf(tok::equal)) {
-        NullablePtr<Expr> initResult =
-          parseExpr(diag::expected_initializer_expr);
-
-        // Die if there was a parse error.
-        if (initResult.isNull()) {
-          HadError = true;
-          break;
-        }
-
-        init = initResult.get();
-      }
-
-      Elements.push_back(TupleTypeElt(type, name, init));
+      Elements.push_back(TupleTypeElt(type, Identifier(), nullptr));
     } while (consumeIf(tok::comma));
     
     if (HadError) {
