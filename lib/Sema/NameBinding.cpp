@@ -506,6 +506,22 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
   for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i)
     TU->Decls[i]->walk(walker);
 
+  // Also resolve UnresolvedDeclRefExprs in TupleTypes.
+  // FIXME: This code doesn't handle TupleTypes declared in the
+  // lexical context of an extension correctly yet.
+  for (auto TypeAndContext : TU->getTypesWithDefaultValues()) {
+    TupleType *TT = TypeAndContext.first;
+    for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i) {
+      const TupleTypeElt& Elt = TT->getFields()[i];
+      if (Elt.hasInit()) {
+        Expr *Init = Elt.getInit();
+        Init = Init->walk(walker);
+        TT->updateInitializedElementType(i, Elt.getType(), Init);
+      }
+    }
+  }
+  TU->clearTypesWithDefaultValues();
+
   TU->ASTStage = TranslationUnit::NameBound;
   verify(TU);
 }

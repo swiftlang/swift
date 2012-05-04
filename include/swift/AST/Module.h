@@ -30,6 +30,7 @@ namespace swift {
   class ExtensionDecl;
   class OneOfElementDecl;
   class NameAliasType;
+  class TupleType;
   class Type;
   class TypeAliasDecl;
   class LookupCache;
@@ -137,12 +138,18 @@ public:
 class TranslationUnit : public Module {
 public:
   typedef std::pair<Module::AccessPathTy, Module*> ImportedModule;
+  typedef std::pair<TupleType*, DeclContext*> TupleTypeAndContext;
 private:
   /// UnresolvedIdentifierTypes - This is a list of scope-qualified dotted types
   /// that were unresolved at the end of the translation unit's parse
   /// phase.
   ArrayRef<IdentifierType*> UnresolvedIdentifierTypes;
-  
+
+  /// UnresolvedIdentifierTypes - This is a list of tuples containing a default
+  /// value expression, along with the context containing the type with the
+  /// expression.
+  ArrayRef<TupleTypeAndContext> TypesWithDefaultValues;
+
   /// ImportedModules - This is the list of modules that are imported by this
   /// module.  This is filled in by the Name Binding phase.
   ArrayRef<ImportedModule> ImportedModules;
@@ -170,6 +177,18 @@ public:
   }
   void clearUnresolvedIdentifierTypes() {
     UnresolvedIdentifierTypes = ArrayRef<IdentifierType*>();
+  }
+
+  ArrayRef<TupleTypeAndContext> getTypesWithDefaultValues() const {
+    assert(ASTStage == Parsed);
+    return TypesWithDefaultValues;
+  }
+  void setTypesWithDefaultValues(ArrayRef<TupleTypeAndContext> T) {
+    assert(ASTStage == Parsing);
+    TypesWithDefaultValues = T;
+  }
+  void clearTypesWithDefaultValues() {
+    TypesWithDefaultValues = ArrayRef<TupleTypeAndContext>();
   }
 
   /// ImportedModules - This is the list of modules that are imported by this

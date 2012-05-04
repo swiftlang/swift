@@ -61,8 +61,11 @@ void Parser::parseTranslationUnit(TranslationUnit *TU) {
   
   TU->setUnresolvedIdentifierTypes(
           Context.AllocateCopy(llvm::makeArrayRef(UnresolvedIdentifierTypes)));
+  TU->setTypesWithDefaultValues(
+          Context.AllocateCopy(llvm::makeArrayRef(TypesWithDefaultValues)));
 
   UnresolvedIdentifierTypes.clear();
+  TypesWithDefaultValues.clear();
 
   // Note that the translation unit is fully parsed and verify it.
   TU->ASTStage = TranslationUnit::Parsed;

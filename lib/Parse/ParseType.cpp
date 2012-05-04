@@ -183,6 +183,7 @@ bool Parser::parseTypeIdentifier(Type &Result) {
 ///     type-annotation
 bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
   SmallVector<TupleTypeElt, 8> Elements;
+  bool HadExpr = false;
 
   if (Tok.isNot(tok::r_paren) && Tok.isNot(tok::r_brace) &&
       !isStartOfDecl(Tok, peekToken())) {
@@ -201,6 +202,7 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
         if ((HadError = parseValueSpecifier(type, init)))
           break;
 
+        HadExpr |= init.isNonNull();
         Elements.push_back(TupleTypeElt(type, name, init.getPtrOrNull()));
         continue;
       }
@@ -223,11 +225,15 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
 
   // A "tuple" with one anonymous element is actually not a tuple.
   if (Elements.size() == 1 && !Elements.back().hasName()) {
+    assert(!HadExpr && "Only TupleTypes have default values");
     Result = ParenType::get(Context, Elements.back().getType());
     return false;
   }
-  
-  Result = TupleType::get(Elements, Context);
+
+  TupleType *TT = TupleType::get(Elements, Context);
+  if (HadExpr)
+    TypesWithDefaultValues.emplace_back(TT, CurDeclContext);
+  Result = TT;
   return false;
 }
 

@@ -31,9 +31,10 @@ namespace llvm {
 }
 
 namespace swift {
+  class DiagnosticEngine;
   class Lexer;
   class ScopeInfo;
-  class DiagnosticEngine;
+  class TupleType;
   
   struct OneOfElementInfo;
 
@@ -56,6 +57,7 @@ public:
   std::vector<IdentifierType*> UnresolvedIdentifierTypes;
   std::vector<llvm::SetVector<ValueDecl*>> ValCaptures;
   std::vector<std::vector<VarDecl*>> AnonClosureVars;
+  std::vector<std::pair<TupleType*, DeclContext*>> TypesWithDefaultValues;
   bool IsMainModule;
   bool FoundSideEffects;
 
