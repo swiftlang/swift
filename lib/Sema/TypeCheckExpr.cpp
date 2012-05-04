@@ -962,10 +962,12 @@ bool TypeChecker::resolveDependentLiterals(Expr *&E) {
     
   private:
     Type lookupGlobalType(StringRef name) {
-      TypeAliasDecl *TAD =
-      TC.TU.lookupGlobalType(TC.Context.getIdentifier(name),
-                             NLKind::UnqualifiedLookup);
-      return (TAD ? TAD->getAliasType() : nullptr);
+      SmallVector<ValueDecl*, 8> Decls;
+      TC.TU.lookupGlobalValue(TC.Context.getIdentifier(name),
+                              NLKind::UnqualifiedLookup, Decls);
+      if (Decls.size() != 1 || !isa<TypeAliasDecl>(Decls.back()))
+        return nullptr;
+      return cast<TypeAliasDecl>(Decls.back())->getAliasType();
     }
     
     Type getIntLiteralType(SourceLoc loc) {

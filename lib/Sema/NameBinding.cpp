@@ -257,12 +257,11 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT) {
   for (auto &C : Components.slice(1, Components.size()-1)) {
     // TODO: Only support digging into modules so far.
     if (auto M = LastOne.Value.dyn_cast<Module*>()) {
-#if 0
-      // FIXME: Why is this lookupType instead of lookupValue?  How are they
-      // different?
-#endif
-      C.Value = M->lookupType(Module::AccessPathTy(), C.Id, 
-                              NLKind::QualifiedLookup);
+      SmallVector<ValueDecl*, 8> Decls;
+      M->lookupValue(Module::AccessPathTy(), C.Id, 
+                     NLKind::QualifiedLookup, Decls);
+      if (Decls.size() == 1 && isa<TypeAliasDecl>(Decls.back()))
+        C.Value = cast<TypeAliasDecl>(Decls.back());
     } else {
       diagnose(C.Loc, diag::unknown_dotted_type_base, LastOne.Id)
         << SourceRange(Components[0].Loc, Components.back().Loc);

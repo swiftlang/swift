@@ -90,13 +90,6 @@ public:
     assert(Comp && "fetching component for the builtin module");
     return Comp;
   }
-
-  /// lookupType - Look up a type at top-level scope (but with the specified 
-  /// access path, which may come from an import decl) within the current
-  /// module. This does a simple local lookup, not recursively looking  through
-  /// imports.  
-  TypeAliasDecl *lookupType(AccessPathTy AccessPath, Identifier Name,
-                            NLKind LookupKind);
   
   /// lookupValue - Look up a (possibly overloaded) value set at top-level scope
   /// (but with the specified access path, which may come from an import decl)
@@ -108,11 +101,6 @@ public:
   /// lookupExtensions - Look up all of the extensions in the module that are
   /// extending the specified type and return a list of them.
   ArrayRef<ExtensionDecl*> lookupExtensions(Type T);
-  
-  /// lookupGlobalType - Perform a type lookup within the current Module.
-  /// Unlike lookupType, this does look through import declarations to resolve
-  /// the name.
-  TypeAliasDecl *lookupGlobalType(Identifier Name, NLKind LookupKind);
 
   /// lookupGlobalValue - Perform a value lookup within the current Module.
   /// Unlike lookupValue, this does look through import declarations to resolve

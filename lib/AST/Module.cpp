@@ -38,8 +38,6 @@ namespace {
     llvm::DenseMap<Identifier, NamedDecl*> Cache;
   public:
 
-    TypeAliasDecl *lookupType(Identifier Name, NLKind LookupKind,
-                              BuiltinModule &M);
     void lookupValue(Identifier Name, NLKind LookupKind, BuiltinModule &M, 
                      SmallVectorImpl<ValueDecl*> &Result);
   };
@@ -53,22 +51,6 @@ static BuiltinModuleCache &getBuiltinCachePimpl(void *&Ptr) {
   return *(BuiltinModuleCache*)Ptr;
 }
 
-TypeAliasDecl *BuiltinModuleCache::lookupType(Identifier Name, 
-                                              NLKind LookupKind,
-                                              BuiltinModule &M) {
-  // Only qualified lookup ever finds anything in the builtin module.
-  if (LookupKind != NLKind::QualifiedLookup) return nullptr;
-  
-  NamedDecl *&Entry = Cache[Name];
-  
-  if (Entry == 0)
-    if (Type Ty = getBuiltinType(M.Ctx, Name.str()))
-      Entry = new (M.Ctx) TypeAliasDecl(SourceLoc(), Name, Ty,
-                                        M.Ctx.TheBuiltinModule);
-    
-  return dyn_cast_or_null<TypeAliasDecl>(Entry);
-}
-
 void BuiltinModuleCache::lookupValue(Identifier Name, NLKind LookupKind,
                                      BuiltinModule &M,
                                      SmallVectorImpl<ValueDecl*> &Result) {
@@ -76,6 +58,12 @@ void BuiltinModuleCache::lookupValue(Identifier Name, NLKind LookupKind,
   if (LookupKind != NLKind::QualifiedLookup) return;
   
   NamedDecl *&Entry = Cache[Name];
+
+  if (Entry == 0)
+    if (Type Ty = getBuiltinType(M.Ctx, Name.str()))
+      Entry = new (M.Ctx) TypeAliasDecl(SourceLoc(), Name, Ty,
+                                        M.Ctx.TheBuiltinModule);
+
   if (Entry == 0)
     Entry = getBuiltinValue(M.Ctx, Name);
       
@@ -99,8 +87,6 @@ namespace {
     
     TUModuleCache(TranslationUnit &TU);
     
-    TypeAliasDecl *lookupType(AccessPathTy AccessPath, Identifier Name,
-                              NLKind LookupKind, TranslationUnit &TU);
     void lookupValue(AccessPathTy AccessPath, Identifier Name, 
                      NLKind LookupKind, TranslationUnit &TU, 
                      SmallVectorImpl<ValueDecl*> &Result);
@@ -133,20 +119,6 @@ TUModuleCache::TUModuleCache(TranslationUnit &TU) {
   }
 }
 
-
-TypeAliasDecl *TUModuleCache::lookupType(AccessPathTy AccessPath,
-                                         Identifier Name, NLKind LookupKind,
-                                         TranslationUnit &TU) {
-  assert(AccessPath.size() <= 1 && "Don't handle this yet");
-  
-  // If this import is specific to some named type or decl ("import swift.int")
-  // then filter out any lookups that don't match.
-  if (AccessPath.size() == 1 && AccessPath[0].first != Name)
-    return 0;
-  
-  auto I = TopLevelTypes.find(Name);
-  return I != TopLevelTypes.end() ? I->second : 0;
-}
 
 void TUModuleCache::lookupValue(AccessPathTy AccessPath, Identifier Name, 
                                 NLKind LookupKind, TranslationUnit &TU, 
@@ -233,25 +205,6 @@ ArrayRef<ExtensionDecl*> Module::lookupExtensions(Type T) {
 // Module Implementation
 //===----------------------------------------------------------------------===//
 
-/// lookupType - Look up a type at top-level scope (but with the specified 
-/// access path, which may come from an import decl) within the current
-/// module. This does a simple local lookup, not recursively looking  through
-/// imports.  
-TypeAliasDecl *Module::lookupType(AccessPathTy AccessPath, Identifier Name,
-                                  NLKind LookupKind) {
-  if (BuiltinModule *BM = dyn_cast<BuiltinModule>(this)) {
-    assert(AccessPath.empty() && "builtin module's access path always empty!");
-    return getBuiltinCachePimpl(LookupCachePimpl)
-      .lookupType(Name, LookupKind, *BM);
-  }
-  
-  // Otherwise must be TranslationUnit.  Someday we should generalize this to
-  // allow modules with multiple translation units.
-  TranslationUnit &TU = *cast<TranslationUnit>(this);
-  return getTUCachePimpl(LookupCachePimpl, TU)
-    .lookupType(AccessPath, Name, LookupKind, TU);
-}
-
 /// lookupValue - Look up a (possibly overloaded) value set at top-level scope
 /// (but with the specified access path, which may come from an import decl)
 /// within the current module. This does a simple local lookup, not
@@ -270,33 +223,6 @@ void Module::lookupValue(AccessPathTy AccessPath, Identifier Name,
   TranslationUnit &TU = *cast<TranslationUnit>(this);
   return getTUCachePimpl(LookupCachePimpl, TU)
     .lookupValue(AccessPath, Name, LookupKind, TU, Result);
-}
-
-
-/// lookupGlobalType - Perform a type lookup within the current Module.
-/// Unlike lookupType, this does look through import declarations to resolve
-/// the name.
-TypeAliasDecl *Module::lookupGlobalType(Identifier Name, NLKind LookupKind) {
-  // Do a local lookup within the current module.
-  TypeAliasDecl *TAD = lookupType(AccessPathTy(), Name, LookupKind);
-  
-  // If we get a hit, we're done.  Also, the builtin module never has
-  // imports, so it is always done at this point.
-  if (TAD || isa<BuiltinModule>(this)) return TAD;
-  
-  TranslationUnit &TU = *cast<TranslationUnit>(this);
-  
-  // If we still haven't found it, scrape through all of the imports, taking the
-  // first match of the name.
-  llvm::SmallPtrSet<Module *, 16> Visited;
-  for (auto &ImpEntry : TU.getImportedModules()) {
-    if (!Visited.insert(ImpEntry.second))
-      continue;
-    
-    TAD = ImpEntry.second->lookupType(ImpEntry.first, Name, LookupKind);
-    if (TAD) return TAD;  // If we found a match, return the decl.
-  }
-  return 0;
 }
 
 /// lookupGlobalValue - Perform a value lookup within the current Module.

@@ -41,16 +41,17 @@ static bool buildArraySliceType(TypeChecker &TC, ArraySliceType *sliceTy) {
   llvm::SmallString<32> nameBuffer("Slice");
   nameBuffer.append(name.str());
 
-  TypeAliasDecl *TAD =
-    TC.TU.lookupGlobalType(TC.Context.getIdentifier(nameBuffer),
-                           NLKind::UnqualifiedLookup);
-  if (!TAD) {
+  SmallVector<ValueDecl*, 8> Decls;
+  TC.TU.lookupGlobalValue(TC.Context.getIdentifier(nameBuffer),
+                          NLKind::UnqualifiedLookup, Decls);
+  if (Decls.size() != 1 || !isa<TypeAliasDecl>(Decls.back())) {
     TC.diagnose(loc, diag::slice_type_not_found, nameBuffer);
     return true;
   }
 
   // FIXME: there's no reason to think that the alias type will have
   // been validated in general.
+  TypeAliasDecl *TAD = cast<TypeAliasDecl>(Decls.back());
   sliceTy->setImplementationType(TAD->getAliasType());
   return false;
 }
