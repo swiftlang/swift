@@ -188,17 +188,18 @@ class ExtensionDecl : public Decl, public DeclContext {
 public:
 
   ExtensionDecl(SourceLoc ExtensionLoc, Type ExtendedType,
-                ArrayRef<Decl*> Members, DeclContext *Parent)
+                DeclContext *Parent)
     : Decl(DeclKind::Extension, Parent),
       DeclContext(DeclContextKind::ExtensionDecl, Parent),
       ExtensionLoc(ExtensionLoc),
-      ExtendedType(ExtendedType), Members(Members) {
+      ExtendedType(ExtendedType) {
   }
   
   SourceLoc getExtensionLoc() const { return ExtensionLoc; }
   SourceLoc getLocStart() const { return ExtensionLoc; }
   Type getExtendedType() const { return ExtendedType; }
   ArrayRef<Decl*> getMembers() const { return Members; }
+  void setMembers(ArrayRef<Decl*> M) { Members = M; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

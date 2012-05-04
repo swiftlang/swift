@@ -435,7 +435,21 @@ Decl *Parser::parseDeclExtension() {
       parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_oneof_type))
     return 0;
   
-  // Parse the body as a series of decls.
+  Decl *ED = parseExtensionBody(ExtensionLoc, Ty);
+
+  parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_extension,
+                     LBLoc, diag::opening_brace);
+
+  return ED;
+}
+
+/// parseExtensionBody - Parse the body of an 'extension', or the
+/// extended body of a 'oneof'.
+Decl *Parser::parseExtensionBody(SourceLoc ExtensionLoc, Type Ty) {
+  ExtensionDecl *ED = new (Context) ExtensionDecl(ExtensionLoc, Ty,
+                                                  CurDeclContext);
+  ContextChange CC(*this, ED);
+
   SmallVector<Decl*, 8> MemberDecls;
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
     if (parseDecl(MemberDecls,
@@ -443,25 +457,7 @@ Decl *Parser::parseDeclExtension() {
       skipUntilDeclRBrace();
   }
 
-  parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_extension,
-                     LBLoc, diag::opening_brace);
-
-  
-  return actOnDeclExtension(ExtensionLoc, Ty, MemberDecls);
-}
-
-/// actOnDeclExtension - Given a list of declarations in an 'extension',
-/// 'struct', 'oneof', etc, create an ExtensionDecl and register them as
-/// members.
-Decl *Parser::actOnDeclExtension(SourceLoc ExtensionLoc, Type Ty,
-                                 ArrayRef<Decl*> MemberDecls) {
-  ExtensionDecl *ED = new (Context) ExtensionDecl(ExtensionLoc, Ty,
-                                              Context.AllocateCopy(MemberDecls),
-                                                  CurDeclContext);
-  // Install all of the members into the Extension's DeclContext.
-  for (Decl *D : MemberDecls)
-    D->setDeclContext(ED);
-  
+  ED->setMembers(Context.AllocateCopy(MemberDecls));
   return ED;
 }
 
@@ -1175,20 +1171,12 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
 
   OneOfType *Result = actOnOneOfType(OneOfLoc, Attributes, ElementInfos, TAD);
 
-  // Parse the body as a series of decls.
-  SmallVector<Decl*, 8> MemberDecls;
-  while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-    if (parseDecl(MemberDecls,
-                  PD_HasContainerType|PD_DisallowVar|PD_DisallowOperators))
-      skipUntilDeclRBrace();
-  }
+  // Parse the extended body of the oneof.
+  if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof))
+    Decls.push_back(parseExtensionBody(OneOfLoc, Result));
   
   parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_oneof_type,
                      LBLoc, diag::opening_brace);
-  
-  // If there were members, create an 'extension' to hold them.
-  if (!MemberDecls.empty())
-    Decls.push_back(actOnDeclExtension(SourceLoc(), Result, MemberDecls));
   
   return false;
 }
@@ -1295,19 +1283,6 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
       diagnose(LBLoc, diag::struct_unnamed_member);
     }
 
-  
-  // Parse the body as a series of decls.
-  SmallVector<Decl*, 8> MemberDecls;
-  while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-    if (parseDecl(MemberDecls,
-                  PD_HasContainerType|PD_DisallowVar|PD_DisallowOperators))
-      skipUntilDeclRBrace();
-  }
-  
-  if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_struct,
-                         LBLoc, diag::opening_brace))
-    return true;
-          
   Decls.push_back(TAD);
   
   // The 'struct' is syntactically fine, invoke the semantic actions for the
@@ -1319,10 +1294,15 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   ElementInfo.EltType = BodyTy;
   OneOfType *OneOfTy = actOnOneOfType(StructLoc, Attributes, ElementInfo, TAD);
   assert(OneOfTy->isTransparentType() && "Somehow isn't a struct?");
+
+  // Parse the extended body of the struct.
+  if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof))
+    Decls.push_back(parseExtensionBody(StructLoc, OneOfTy));
   
-  // If there were members, create an 'extension' to hold them.
-  if (!MemberDecls.empty())
-    Decls.push_back(actOnDeclExtension(StructLoc, OneOfTy, MemberDecls));
+  if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_struct,
+                         LBLoc, diag::opening_brace))
+    return true;
+
   return false;
 }
 

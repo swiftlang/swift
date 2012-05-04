@@ -213,8 +213,7 @@ public:
   
   Decl *parseDeclImport();
   Decl *parseDeclExtension();
-  Decl *actOnDeclExtension(SourceLoc ExtensionLoc, Type Ty,
-                           ArrayRef<Decl*> MemberDecls);
+  Decl *parseExtensionBody(SourceLoc ExtensionLoc, Type Ty);
   bool parseDeclOneOf(SmallVectorImpl<Decl*> &Decls);
 
   bool parseDeclStruct(SmallVectorImpl<Decl*> &Decls);
