@@ -22,10 +22,16 @@ include $(SWIFT_LEVEL)/../../Makefile.config
 
 include $(SWIFT_LEVEL)/Makefile
 
+ifeq ($(ENABLE_OPTIMIZED),1)
+  SWIFT_OPTFLAG := -O2
+else
+  SWIFT_OPTFLAG := -O0
+endif
+
 SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
 $(ObjDir)/%.o: %.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER)
 	$(Echo) "Compiling $*.swift for $(BuildMode) build"
-	$(Verb) $(SWIFT_COMPILER) -c $< -o $(ObjDir)/swift.o -parse-as-library
+	$(Verb) $(SWIFT_COMPILER) -c $< -o $(ObjDir)/swift.o -parse-as-library $(SWIFT_OPTFLAG)
 
 HeaderDir := $(PROJ_OBJ_ROOT)/$(BuildMode)/lib/swift/
 $(HeaderDir)/swift.swift: $(PROJ_SRC_DIR)/swift.swift $(HeaderDir)/.dir
