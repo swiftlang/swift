@@ -320,6 +320,12 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     Result = parseExprFunc();
     break;
       
+  // Eat an invalid token in an expression context.  Error tokens are diagnosed
+  // by the lexer, so there is no reason to emit another diagnostic.
+  case tok::unknown:
+    consumeToken(tok::unknown);
+    return 0;
+
   default:
     diagnose(Tok.getLoc(), ID);
     return 0;
