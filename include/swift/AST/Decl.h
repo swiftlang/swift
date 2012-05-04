@@ -59,12 +59,12 @@ class Decl {
   enum { NumDeclBits = 8 };
   static_assert(NumDeclBits <= 32, "fits in an unsigned");
 
-  enum { NumNamedDeclBits = NumDeclBits };
-  static_assert(NumNamedDeclBits <= 32, "fits in an unsigned");
+  enum { NumValueDeclBits = NumDeclBits };
+  static_assert(NumValueDeclBits <= 32, "fits in an unsigned");
 
   class ValueDeclBitfields {
     friend class ValueDecl;
-    unsigned : NumNamedDeclBits;
+    unsigned : NumValueDeclBits;
 
     // The following flags are not necessarily meaningful for all
     // kinds of value-declarations.
@@ -78,8 +78,6 @@ class Decl {
     // the stack frame.)
     unsigned HasFixedLifetime : 1;
   };
-  enum { NumValueDeclBits = NumNamedDeclBits + 2 };
-  static_assert(NumValueDeclBits <= 32, "fits in an unsigned");
 
 protected:
   union {
@@ -281,42 +279,18 @@ public:
   static bool classof(const TopLevelCodeDecl *D) { return true; }
 };
 
-/// NamedDecl - An abstract base class for declarations with names.
-class NamedDecl : public Decl {
-  Identifier Name;
-  const DeclAttributes *Attrs;
-  static const DeclAttributes EmptyAttrs;
-
-protected:
-  NamedDecl(DeclKind K, DeclContext *DC, Identifier name)
-    : Decl(K, DC), Name(name), Attrs(&EmptyAttrs) {
-  }
-  
-public:
-  Identifier getName() const { return Name; }
-  bool isOperator() const { return Name.isOperator(); }
-
-  DeclAttributes &getMutableAttrs();
-  const DeclAttributes &getAttrs() const { return *Attrs; }
-
-  Resilience getResilienceFrom(Component *C) const;
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) {
-    return D->getKind() >= DeclKind::First_NamedDecl &&
-           D->getKind() <= DeclKind::Last_NamedDecl;
-  }
-  static bool classof(const NamedDecl *D) { return true; }
-};
 
 /// ValueDecl - All named decls that are values in the language.  These can
 /// have a type, etc.
-class ValueDecl : public NamedDecl {
+class ValueDecl : public Decl {
+  Identifier Name;
+  const DeclAttributes *Attrs;
+  static const DeclAttributes EmptyAttrs;
   Type Ty;
 
 protected:
   ValueDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty)
-    : NamedDecl(K, DC, name), Ty(ty) {
+    : Decl(K, DC), Name(name), Attrs(&EmptyAttrs), Ty(ty) {
     ValueDeclBits.NeverUsedAsLValue = false;
     ValueDeclBits.HasFixedLifetime = false;
   }
@@ -328,6 +302,14 @@ public:
   /// the swift code.
   bool isDefinition() const;
   
+  Identifier getName() const { return Name; }
+  bool isOperator() const { return Name.isOperator(); }
+  
+  DeclAttributes &getMutableAttrs();
+  const DeclAttributes &getAttrs() const { return *Attrs; }
+  
+  Resilience getResilienceFrom(Component *C) const;
+
   bool hasType() const { return !Ty.isNull(); }
   Type getType() const {
     assert(!Ty.isNull() && "declaration has no type set yet");

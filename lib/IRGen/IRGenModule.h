@@ -42,7 +42,6 @@ namespace swift {
   class Decl;
   class ExtensionDecl;
   class FuncDecl;
-  class NamedDecl;
   class OneOfElementDecl;
   class OneOfType;
   class SourceLoc;

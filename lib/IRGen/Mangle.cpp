@@ -61,7 +61,7 @@ namespace {
 
   public:
     Mangler(raw_ostream &buffer) : Buffer(buffer) {}
-    void mangleDeclName(NamedDecl *decl);
+    void mangleDeclName(ValueDecl *decl);
     void mangleType(Type type, ExplosionKind kind, unsigned uncurryingLevel);
 
   private:
@@ -175,7 +175,7 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
   llvm_unreachable("bad decl context");
 }
 
-void Mangler::mangleDeclName(NamedDecl *decl) {
+void Mangler::mangleDeclName(ValueDecl *decl) {
   // decl ::= context identifier
   mangleDeclContext(decl->getDeclContext());
   

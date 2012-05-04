@@ -42,7 +42,7 @@ class IRGenModule;
 /// levels, each of which potentially creates a different top-level
 /// function.
 class LinkEntity {
-  NamedDecl *TheDecl;
+  ValueDecl *TheDecl;
 
   enum class Kind {
     Function, Getter, Setter, Other
@@ -55,7 +55,7 @@ class LinkEntity {
 
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
-  static bool isFunction(NamedDecl *decl) {
+  static bool isFunction(ValueDecl *decl) {
     return (isa<FuncDecl>(decl) || isa<OneOfElementDecl>(decl));
   }
 
@@ -82,7 +82,7 @@ public:
     return entity;
   }
 
-  static LinkEntity forNonFunction(NamedDecl *decl) {
+  static LinkEntity forNonFunction(ValueDecl *decl) {
     assert(!isFunction(decl));
 
     LinkEntity entity;
@@ -115,7 +115,7 @@ public:
 
   void mangle(llvm::raw_ostream &out) const;
 
-  NamedDecl *getDecl() const { return TheDecl; }
+  ValueDecl *getDecl() const { return TheDecl; }
   ExplosionKind getExplosionKind() const { return ExplosionKind(Explosion); }
   unsigned getUncurryLevel() const { return UncurryLevel; }
 };
@@ -166,7 +166,7 @@ template <> struct llvm::DenseMapInfo<swift::irgen::LinkEntity> {
     return entity;
   }
   static unsigned getHashValue(const LinkEntity &entity) {
-    return DenseMapInfo<swift::NamedDecl*>::getHashValue(entity.TheDecl)
+    return DenseMapInfo<swift::ValueDecl*>::getHashValue(entity.TheDecl)
          ^ ((entity.TheKind << 0) |
             (entity.Explosion << 8) |
             (entity.UncurryLevel << 16));

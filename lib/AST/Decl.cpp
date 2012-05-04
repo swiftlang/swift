@@ -299,17 +299,11 @@ namespace {
       OS << ")";
     }
 
-    void printDeclName(NamedDecl *D) {
+    void printDeclName(ValueDecl *D) {
       if (D->getName().get())
         OS << '\'' << D->getName() << '\'';
       else
         OS << "'anonname=" << (const void*)D << '\'';
-    }
-    
-    void printCommon(NamedDecl *D, const char *Name) {
-      printCommon((Decl*)D, Name);
-      OS << ' ';
-      printDeclName(D);
     }
     
     void visitTypeAliasDecl(TypeAliasDecl *TAD) {
@@ -320,7 +314,9 @@ namespace {
     }
 
     void printCommon(ValueDecl *VD, const char *Name) {
-      printCommon((NamedDecl*)VD, Name);
+      printCommon((Decl*)VD, Name);
+      OS << ' ';
+      printDeclName(VD);
       OS << " type='";
       if (VD->hasType())
         VD->getType()->print(OS);

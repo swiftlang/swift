@@ -24,9 +24,9 @@
 using namespace swift;
 
 /// A statically-allocated empty set of attributes.
-const DeclAttributes NamedDecl::EmptyAttrs;
+const DeclAttributes ValueDecl::EmptyAttrs;
 
-DeclAttributes &NamedDecl::getMutableAttrs() {
+DeclAttributes &ValueDecl::getMutableAttrs() {
   // If we don't have mutable attribute storage yet, allocate some.
   if (Attrs == &EmptyAttrs)
     Attrs = getASTContext().Allocate<DeclAttributes>(1);
@@ -35,13 +35,13 @@ DeclAttributes &NamedDecl::getMutableAttrs() {
 
 /// getResilienceFrom - Find the resilience of this declaration from
 /// the given component.
-Resilience NamedDecl::getResilienceFrom(Component *C) const {
+Resilience ValueDecl::getResilienceFrom(Component *C) const {
   const Resilience invalidResilience = Resilience(-1);
   Resilience explicitResilience = invalidResilience;
 
   DeclContext *DC = getDeclContext();
   while (true) {
-    NamedDecl *D = nullptr;
+    ValueDecl *D = nullptr;
     switch (DC->getContextKind()) {
     // All the builtin declarations are inherently fragile.
     case DeclContextKind::BuiltinModule:

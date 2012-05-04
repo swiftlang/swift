@@ -31,18 +31,11 @@
 #define ABSTRACT_DECL(Id, Parent)
 #endif
 
-/// NAMED_DECL(Id, Parent)
-///   Used for subclasses of NamedDecl.  The default behavior is to do
-///   the same as for Decl.
-#ifndef NAMED_DECL
-#define NAMED_DECL(Id, Parent) DECL(Id, Parent)
-#endif
-
 /// VALUE_DECL(Id, Parent)
 ///   Used for subclasses of ValueDecl.  The default behavior is to do
-///   the same as for NamedDecl.
+///   the same as for Decl.
 #ifndef VALUE_DECL
-#define VALUE_DECL(Id, Parent) NAMED_DECL(Id, Parent)
+#define VALUE_DECL(Id, Parent) DECL(Id, Parent)
 #endif
 
 /// A convenience for determining the range of declarations.  These will always
@@ -55,18 +48,15 @@ DECL(Import, Decl)
 DECL(Extension, Decl)
 DECL(PatternBinding, Decl)
 DECL(TopLevelCode, Decl)
-ABSTRACT_DECL(Named, Decl)
-  ABSTRACT_DECL(Value, NamedDecl)
-    VALUE_DECL(TypeAlias, ValueDecl)
-    VALUE_DECL(Var, ValueDecl)
-    VALUE_DECL(Func, ValueDecl)
-    VALUE_DECL(OneOfElement, ValueDecl)
-    VALUE_DECL(Subscript, ValueDecl)
-    DECL_RANGE(Value, TypeAlias, Subscript)
-  DECL_RANGE(Named, TypeAlias, Subscript)
+ABSTRACT_DECL(Value, Decl)
+  VALUE_DECL(TypeAlias, ValueDecl)
+  VALUE_DECL(Var, ValueDecl)
+  VALUE_DECL(Func, ValueDecl)
+  VALUE_DECL(OneOfElement, ValueDecl)
+  VALUE_DECL(Subscript, ValueDecl)
+  DECL_RANGE(Value, TypeAlias, Subscript)
 
 #undef VALUE_DECL
-#undef NAMED_DECL
 #undef DECL_RANGE
 #undef ABSTRACT_DECL
 #undef DECL

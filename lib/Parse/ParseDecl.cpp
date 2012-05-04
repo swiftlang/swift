@@ -372,9 +372,9 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     if (isa<VarDecl>(D) && (Flags & PD_DisallowVar) &&
         !cast<VarDecl>(D)->isProperty()) {
       diagnose(D->getLocStart(), diag::disallowed_var_decl);
-    } else if (NamedDecl *ND = dyn_cast<NamedDecl>(D)) {
-      if (ND->isOperator() && (Flags & PD_DisallowOperators))
-        diagnose(ND->getLocStart(), diag::operator_in_decl);
+    } else if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
+      if (VD->isOperator() && (Flags & PD_DisallowOperators))
+        diagnose(VD->getLocStart(), diag::operator_in_decl);
     }
     // FIXME: Diagnose top-level subscript
   }

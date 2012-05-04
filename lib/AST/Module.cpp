@@ -35,7 +35,7 @@ namespace {
     /// single hashtable for both types and values as a minor
     /// optimization; this prevents us from having both a builtin type
     /// and a builtin value with the same name, but that's okay.
-    llvm::DenseMap<Identifier, NamedDecl*> Cache;
+    llvm::DenseMap<Identifier, ValueDecl*> Cache;
   public:
 
     void lookupValue(Identifier Name, NLKind LookupKind, BuiltinModule &M, 
@@ -57,7 +57,7 @@ void BuiltinModuleCache::lookupValue(Identifier Name, NLKind LookupKind,
   // Only qualified lookup ever finds anything in the builtin module.
   if (LookupKind != NLKind::QualifiedLookup) return;
   
-  NamedDecl *&Entry = Cache[Name];
+  ValueDecl *&Entry = Cache[Name];
 
   if (Entry == 0)
     if (Type Ty = getBuiltinType(M.Ctx, Name.str()))
