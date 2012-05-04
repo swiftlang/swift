@@ -264,10 +264,14 @@ void IRGenModule::emitTypeAlias(Type underlyingType) {
 /// createNominalType - Create a new nominal type.
 llvm::StructType *IRGenModule::createNominalType(TypeAliasDecl *alias) {
   llvm::SmallString<32> typeName;
-  llvm::raw_svector_ostream nameStream(typeName);
-  LinkEntity::forNonFunction(alias).mangle(nameStream);
-  
-  return llvm::StructType::create(getLLVMContext(), nameStream.str());
+  if (alias->getDeclContext()->isLocalContext()) {
+    typeName = alias->getName().str();
+    typeName.append(".local");
+  } else {
+    llvm::raw_svector_ostream nameStream(typeName);
+    LinkEntity::forNonFunction(alias).mangle(nameStream);
+  }
+  return llvm::StructType::create(getLLVMContext(), typeName.str());
 }
 
 /// Compute the explosion schema for the given type.
