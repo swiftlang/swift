@@ -86,7 +86,7 @@ Parser::Parser(unsigned BufferID, swift::Component *Comp, ASTContext &Context,
   : SourceMgr(Context.SourceMgr),
     Diags(Context.Diags),
     Buffer(SourceMgr.getMemoryBuffer(BufferID)),
-    L(*new Lexer(ComputeLexStart(Buffer->getBuffer(), Offset, EndOffset,
+    L(new Lexer(ComputeLexStart(Buffer->getBuffer(), Offset, EndOffset,
                                  IsMainModule),
                  SourceMgr, &Diags)),
     Component(Comp),
@@ -97,18 +97,18 @@ Parser::Parser(unsigned BufferID, swift::Component *Comp, ASTContext &Context,
 }
 
 Parser::~Parser() {
-  delete &L;
+  delete L;
 }
 
 /// peekToken - Return the next token that will be installed by consumeToken.
 const Token &Parser::peekToken() {
-  return L.peekNextToken();
+  return L->peekNextToken();
 }
 
 SourceLoc Parser::consumeToken() {
   SourceLoc Loc = Tok.getLoc();
   assert(Tok.isNot(tok::eof) && "Lexing past eof!");
-  L.lex(Tok);
+  L->lex(Tok);
   return Loc;
 }
 

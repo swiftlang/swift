@@ -236,14 +236,14 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     break;
   }
   case tok::character_literal: {
-    uint32_t Codepoint = L.getEncodedCharacterLiteral(Tok);
+    uint32_t Codepoint = L->getEncodedCharacterLiteral(Tok);
     SourceLoc Loc = consumeToken(tok::character_literal);
     Result = new (Context) CharacterLiteralExpr(Codepoint, Loc);
     break;
   }
   case tok::string_literal: {
     llvm::SmallVector<Lexer::StringSegment, 1> Segments;
-    L.getEncodedStringLiteral(Tok, Context, Segments);
+    L->getEncodedStringLiteral(Tok, Context, Segments);
     SourceLoc Loc = consumeToken();
     
     // The simple case: just a single literal segment.
@@ -264,8 +264,8 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
       }
         
       case Lexer::StringSegment::Expr: {
-        Lexer::LocalLexingRAII LocalLex(L, Segment.Data);
-        L.lex(Tok);
+        Lexer::LocalLexingRAII LocalLex(*L, Segment.Data);
+        L->lex(Tok);
         NullablePtr<Expr> E = parseExpr(diag::string_interpolation_expr);
         if (E.isNonNull()) {
           Exprs.push_back(E.get());

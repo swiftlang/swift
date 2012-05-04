@@ -253,7 +253,7 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     }
 
     llvm::SmallVector<Lexer::StringSegment, 1> Segments;
-    L.getEncodedStringLiteral(Tok, Context, Segments);
+    L->getEncodedStringLiteral(Tok, Context, Segments);
     if (Segments.size() != 1 ||
         Segments.front().Kind == Lexer::StringSegment::Expr) {
       diagnose(TokLoc, diag::asmname_interpolated_string);

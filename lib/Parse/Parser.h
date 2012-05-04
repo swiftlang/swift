@@ -48,7 +48,7 @@ public:
   llvm::SourceMgr &SourceMgr;
   DiagnosticEngine &Diags;
   const llvm::MemoryBuffer *Buffer;
-  Lexer &L;
+  Lexer *L;
   DeclContext *CurDeclContext;
   swift::Component *Component;
   ASTContext &Context;
