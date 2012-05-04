@@ -153,7 +153,8 @@ public:
     return E->getKind() == ExprKind::IntegerLiteral ||
            E->getKind() == ExprKind::FloatLiteral ||
            E->getKind() == ExprKind::CharacterLiteral ||
-           E->getKind() == ExprKind::StringLiteral;
+           E->getKind() == ExprKind::StringLiteral ||
+           E->getKind() == ExprKind::InterpolatedStringLiteral;
   }
 };
 
@@ -244,6 +245,40 @@ public:
   }
 };
 
+/// InterpolatedStringLiteral - An interpolated string literal.
+///
+/// An interpolated string literal mixes expressions (which are evaluated and
+/// converted into string form) within a string literal.
+///
+/// \code
+/// "[\(min)..\(max)]"
+/// \endcode
+class InterpolatedStringLiteralExpr : public LiteralExpr {
+  SourceLoc Loc;
+  MutableArrayRef<Expr *> Segments;
+  Expr *SemanticExpr;
+  
+public:
+  InterpolatedStringLiteralExpr(SourceLoc Loc, MutableArrayRef<Expr *> Segments)
+    : LiteralExpr(ExprKind::InterpolatedStringLiteral), Loc(Loc), 
+      Segments(Segments), SemanticExpr() { }
+  
+  MutableArrayRef<Expr *> getSegments() { return Segments; }
+  ArrayRef<Expr *> getSegments() const { return Segments; }
+  
+  /// \brief Retrieve the expression that actually evaluates the resulting
+  /// string, typically with a series of '+' operations.
+  Expr *getSemanticExpr() const { return SemanticExpr; }
+  void setSemanticExpr(Expr *SE) { SemanticExpr = SE; }
+  
+  SourceRange getSourceRange() const { return Loc; }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const InterpolatedStringLiteralExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::InterpolatedStringLiteral;
+  }
+};
 
 /// DeclRefExpr - A reference to a value, "x".
 class DeclRefExpr : public Expr {

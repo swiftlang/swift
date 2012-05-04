@@ -84,6 +84,8 @@ ERROR(lex_invalid_character_literal,lexing,none,
 
 ERROR(lex_unterminated_string,lexing,none,
       "unterminated string literal", ())
+ERROR(lex_unterminated_interpolation,lexing,none,
+      "unterminated string interpolation", ())
 ERROR(lex_invalid_string_escape,lexing,none,
        "invalid escape sequence in string literal", ())
 ERROR(lex_invalid_string_x_escape,lexing,none,
@@ -438,7 +440,11 @@ WARNING(float_literal_overflow,literal_parsing,none,
 WARNING(float_literal_underflow,literal_parsing,none,
         "floating point constant underflowed to %0", (StringRef))
 
-
+ERROR(string_interpolation_expr,literal_parsing,none,
+      "expected an expression to interpolate into string", ())
+ERROR(string_interpolation_extra,literal_parsing,none,
+      "extra tokens after interpolated string expression", ())
+      
 //------------------------------------------------------------------------------
 // Attribute-parsing diagnostics
 //------------------------------------------------------------------------------
@@ -485,7 +491,9 @@ ERROR(asmname_expected_equals,attribute_parsing,none,
       "expected '=' in asmname attribute", ())
 ERROR(asmname_expected_string_literal,attribute_parsing,none,
       "expected string literal in asmname attribute", ())
-
+ERROR(asmname_interpolated_string,attribute_parsing,none,
+      "asmname cannot be an interpolated string literal", ())
+      
 //==============================================================================
 // Semantic Analysis Diagnostics
 //==============================================================================
@@ -705,6 +713,13 @@ ERROR(array_bound_convert_limit_reached,sema_tce,none,
       "getArrayBoundValue() for type %0 used as an array size does not return "
       "an integer type", (Type))
 
+ERROR(string_interpolation_overload_fail,sema_tce,none,
+      "could not interpolate strings with %0 + %1", (Type, Type))
+ERROR(string_interpolation_convert_fail,sema_tce,none,
+      "could not coerce expression %0 to string type %1", (Type, Type))
+ERROR(nonstring_interpolation_type,sema_tce,none,
+      "string interpolation coerced to non-string type %0", (Type))
+      
 //------------------------------------------------------------------------------
 // Type Check Statements
 //------------------------------------------------------------------------------

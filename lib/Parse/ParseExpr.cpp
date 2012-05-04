@@ -242,9 +242,48 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     break;
   }
   case tok::string_literal: {
-    StringRef Text = L.getEncodedStringLiteral(Tok, Context);
-    SourceLoc Loc = consumeToken(tok::string_literal);
-    Result = new (Context) StringLiteralExpr(Text, Loc);
+    llvm::SmallVector<Lexer::StringSegment, 1> Segments;
+    L.getEncodedStringLiteral(Tok, Context, Segments);
+    SourceLoc Loc = consumeToken();
+    
+    // The simple case: just a single literal segment.
+    if (Segments.size() == 1 &&
+        Segments.front().Kind == Lexer::StringSegment::Literal) {
+      Result = new (Context) StringLiteralExpr(Segments.front().Data, Loc);
+      break;
+    }
+    
+    Token SavedTok = Tok;
+    llvm::SmallVector<Expr *, 4> Exprs;
+    for (auto Segment : Segments) {
+      switch (Segment.Kind) {
+      case Lexer::StringSegment::Literal: {
+        SourceLoc Loc(llvm::SMLoc::getFromPointer(Segment.Data.data()));
+        Exprs.push_back(new (Context) StringLiteralExpr(Segment.Data, Loc));
+        break;
+      }
+        
+      case Lexer::StringSegment::Expr: {
+        Lexer::LocalLexingRAII LocalLex(L, Segment.Data);
+        L.lex(Tok);
+        NullablePtr<Expr> E = parseExpr(diag::string_interpolation_expr);
+        if (E.isNonNull()) {
+          Exprs.push_back(E.get());
+          
+          if (!Tok.is(tok::eof))
+            diagnose(Tok, diag::string_interpolation_extra);
+        }
+        break;
+      }
+      }
+    }
+    Tok = SavedTok;
+    
+    if (Exprs.empty())
+      return new (Context) ErrorExpr(Loc);
+    
+    Result = new (Context) InterpolatedStringLiteralExpr(Loc,
+                             Context.AllocateCopy(Exprs));
     break;
   }
   case tok::identifier:  // foo

@@ -252,7 +252,14 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
       return false;
     }
 
-    Attributes.AsmName = L.getEncodedStringLiteral(Tok, Context);
+    llvm::SmallVector<Lexer::StringSegment, 1> Segments;
+    L.getEncodedStringLiteral(Tok, Context, Segments);
+    if (Segments.size() != 1 ||
+        Segments.front().Kind == Lexer::StringSegment::Expr) {
+      diagnose(TokLoc, diag::asmname_interpolated_string);
+    } else {
+      Attributes.AsmName = Segments.front().Data;
+    }
     consumeToken(tok::string_literal);
     return false;
   }

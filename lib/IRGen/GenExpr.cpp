@@ -247,7 +247,9 @@ namespace {
     void visitStringLiteralExpr(StringLiteralExpr *E) {
       Out.addUnmanaged(emitStringLiteralExpr(IGF, E));
     }
-
+    void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
+      visit(E->getSemanticExpr());
+    }
     void visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
       emitLookThroughOneof(IGF, E, Out);
     }
@@ -291,6 +293,7 @@ namespace {
     NOT_LVALUE_EXPR(FloatLiteral)
     NOT_LVALUE_EXPR(CharacterLiteral)
     NOT_LVALUE_EXPR(StringLiteral)
+    NOT_LVALUE_EXPR(InterpolatedStringLiteral)
     NOT_LVALUE_EXPR(TupleShuffle)
     NOT_LVALUE_EXPR(Func)
     NOT_LVALUE_EXPR(Closure)
@@ -443,6 +446,7 @@ namespace {
     NON_LOCATEABLE(FloatLiteralExpr)
     NON_LOCATEABLE(CharacterLiteralExpr)
     NON_LOCATEABLE(StringLiteralExpr)
+    NON_LOCATEABLE(InterpolatedStringLiteralExpr)
     NON_LOCATEABLE(TupleShuffleExpr)
     NON_LOCATEABLE(CapturingExpr)
     NON_LOCATEABLE(ModuleExpr)

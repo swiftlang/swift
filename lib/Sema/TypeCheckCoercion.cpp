@@ -84,10 +84,6 @@ class SemaCoerce : public ExprVisitor<SemaCoerce, CoercedResult> {
   std::pair<FuncDecl*, Type> isLiteralCompatibleType(Type Ty, SourceLoc Loc, 
                                                      LiteralType LitTy);
 
-  /// coerceLiteralToType - Coerce the given literal to the destination type.
-  /// The literal is assumed to have dependent type.
-  CoercedResult coerceLiteral(LiteralExpr *E);
-  
   TypeChecker &TC;
   Type DestTy;
   
@@ -161,6 +157,9 @@ public:
   }
   
   CoercedResult visitLiteralExpr(LiteralExpr *E);
+  CoercedResult 
+  visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E);
+
   CoercedResult visitDeclRefExpr(DeclRefExpr *E) {
     return unchanged(E);
   }
@@ -705,6 +704,123 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
   // Return a new call of the conversion function, passing in the integer
   // literal.
   return coerced(new (TC.Context) CallExpr(DRE, Intermediate, DestTy));
+}
+
+CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
+                            InterpolatedStringLiteralExpr *E) {
+  TypeAliasDecl *DestTyDecl = 0;
+  if (OneOfType *OneOfTy = DestTy->getAs<OneOfType>())
+    DestTyDecl = OneOfTy->getDecl();
+  else if (ProtocolType *ProtocolTy = DestTy->getAs<ProtocolType>())
+    DestTyDecl = ProtocolTy->TheDecl;
+  else {
+    if (Apply)
+      diagnose(E->getLoc(), diag::nonstring_interpolation_type, DestTy);
+    return nullptr;
+  }
+  
+  // Find all of the constructors of the string type we're coercing to.
+  SmallVector<ValueDecl *, 4> Methods;
+  // Look for extension methods with the same name as the class.
+  // FIXME: This should look specifically for constructors.
+  TC.TU.lookupGlobalExtensionMethods(DestTy, DestTyDecl->getName(), Methods);
+
+  for (auto &Segment : E->getSegments()) {
+    // First, try coercing to the string type.
+    if (coerceToType(Segment, DestTy, TC, /*Apply=*/false)) {
+      if (!Apply)
+        continue;
+      
+      // Perform the coercion.
+      if (CoercedResult R = coerceToType(Segment, DestTy, TC, Apply)) {
+        Segment = R.getExpr();
+        continue;
+      } else {
+        return nullptr;
+      }
+    }
+    
+    // Second, try to find a constructor to explicitly perform the conversion.
+    SmallVector<ValueDecl *, 4> Viable;
+    ValueDecl *Best = TC.filterOverloadSet(Methods, Type(), Segment, Type(), 
+                                           Viable);
+    if (Best) {
+      if (!Apply)
+        continue;
+      
+      Expr *CtorRef = new (TC.Context) DeclRefExpr(Best, Segment->getLoc(),
+                                                   Best->getTypeOfReference());
+      ApplyExpr *Call = new (TC.Context) ConstructorCallExpr(CtorRef, Segment);
+      Expr *Checked = TC.semaApplyExpr(Call);
+      if (!Checked)
+        return nullptr;
+      
+      Segment = Checked;
+      continue;
+    }
+
+    if (Apply) {
+      // FIXME: We want range information here.
+      diagnose(Segment->getLoc(), diag::string_interpolation_overload_fail,
+               Segment->getType(), DestTy);
+      TC.printOverloadSetCandidates(Viable.empty()? Methods : Viable);
+    }
+    return nullptr;
+  }
+
+  // FIXME: Broken! We should be using some special kind of 'build from string
+  // fragments' (informal) protocol here, which is guaranteed to work, rather
+  // than going through so many '+' operations.
+  if (!Apply)
+    return DestTy;
+    
+  SmallVector<ValueDecl *, 16> PlusDecls;
+  TC.TU.lookupGlobalValue(TC.Context.getIdentifier("+"),
+                          NLKind::UnqualifiedLookup, PlusDecls);
+
+  Expr *Result = nullptr;
+  for (auto Segment : E->getSegments()) {
+    if (!Result) {
+      Result = Segment;
+      continue;
+    }
+
+    // FIXME: Leaks in !Apply mode!
+    Expr *Args[] = {Result, Segment};
+    TupleExpr *Arg = new (TC.Context) TupleExpr(SourceLoc(),
+                      TC.Context.AllocateCopy(MutableArrayRef<Expr *>(Args, 2)),
+                                                nullptr, SourceLoc());
+    if (TC.semaTupleExpr(Arg))
+      return nullptr;
+    
+    // Perform overload resolution.
+    SmallVector<ValueDecl *, 16> Viable;
+    ValueDecl *Best = TC.filterOverloadSet(PlusDecls, Type(), Arg, Type(),
+                                           Viable);
+    if (!Best) {
+      if (Apply) {
+        // FIXME: We want range information here.
+        diagnose(E->getStartLoc(), diag::string_interpolation_overload_fail,
+                 Result->getType(), Segment->getType());
+        TC.printOverloadSetCandidates(Viable.empty()? PlusDecls : Viable);
+      }
+      
+      return nullptr;
+    }
+    
+    Expr *Fn = new (TC.Context) DeclRefExpr(Best, Segment->getStartLoc(),
+                                            Best->getTypeOfReference());
+    Result = TC.semaApplyExpr(new (TC.Context) BinaryExpr(Fn, Arg));
+    if (!Result)
+      return nullptr;
+  }
+  
+  if (!Apply)
+    return Result->getType();
+  
+  E->setSemanticExpr(Result);
+  E->setType(Result->getType());
+  return coerced(E);
 }
 
 CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {

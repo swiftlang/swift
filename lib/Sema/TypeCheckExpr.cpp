@@ -951,6 +951,10 @@ bool TypeChecker::resolveDependentLiterals(Expr *&E) {
         
         if (StringLiteralExpr *lit = dyn_cast<StringLiteralExpr>(E))
           return TC.coerceToType(lit, getStringLiteralType(lit->getLoc()));
+
+        if (InterpolatedStringLiteralExpr *lit 
+              = dyn_cast<InterpolatedStringLiteralExpr>(E))
+          return TC.coerceToType(lit, getStringLiteralType(lit->getLoc()));
       }
       return E;
     }

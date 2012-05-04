@@ -18,6 +18,7 @@
 #define SWIFT_LEXER_H
 
 #include "Token.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace llvm {
   class SourceMgr;
@@ -35,6 +36,9 @@ class Lexer {
   llvm::SourceMgr &SourceMgr;
   DiagnosticEngine *Diags;
   
+  // Note: when introducing new state into the lexer, be sure to update
+  // LocalLexingRAII.
+  
   const char *BufferStart;
   const char *BufferEnd;
   const char *CurPtr;
@@ -43,14 +47,16 @@ class Lexer {
   
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
+
+  Lexer(llvm::StringRef Buffer, llvm::SourceMgr &SourceMgr,
+        DiagnosticEngine *Diags, 
+        const char *CurrentPosition);
+
 public:
   Lexer(llvm::StringRef Buffer, llvm::SourceMgr &SourceMgr,
         DiagnosticEngine *Diags)
     : Lexer(Buffer, SourceMgr, Diags, Buffer.begin()) { }
 
-  Lexer(llvm::StringRef Buffer, llvm::SourceMgr &SourceMgr,
-        DiagnosticEngine *Diags, 
-        const char *CurrentPosition);
 
   void lex(Token &Result) {
     Result = NextToken;
@@ -79,11 +85,66 @@ public:
     return SourceLoc(llvm::SMLoc::getFromPointer(BufferStart));
   }
   
-  /// getEncodedStringLiteral - Given a string literal token, return the bytes
-  /// that the actual string literal should codegen to.  If a copy needs to be
-  /// made, it will be allocated out of the ASTContext allocator.
-  static StringRef getEncodedStringLiteral(const Token &Str, ASTContext &Ctx); 
-
+  /// \brief Enter into a scope where we can re-lex a part of the source
+  /// buffer and then resume the previous lexing state.
+  ///
+  /// This RAII object is used by string interpolation to go back and lex/parse
+  /// the expression parts of the string literal.
+  class LocalLexingRAII {
+    Lexer &L;
+    const char *BufferStart;
+    const char *BufferEnd;
+    const char *CurPtr;
+    
+    Token NextToken;
+    
+  public:
+    LocalLexingRAII(Lexer &L, StringRef String)
+      : L(L), BufferStart(L.BufferStart), BufferEnd(L.BufferEnd),
+    CurPtr(L.CurPtr), NextToken(L.NextToken) {
+      L.BufferStart = String.begin();
+      L.BufferEnd = String.end();
+      L.CurPtr = L.BufferStart;
+      
+      // Prime the lexer.
+      L.lexImpl();
+    }
+    
+    ~LocalLexingRAII() {
+      L.BufferStart = BufferStart;
+      L.BufferEnd = BufferEnd;
+      L.CurPtr = CurPtr;
+      L.NextToken = NextToken;
+    }
+  };
+  
+  /// StringSegment - A segment of a (potentially interpolated) string.
+  struct StringSegment {
+    enum : char { Literal, Expr } Kind;
+    StringRef Data;
+    
+    static StringSegment getLiteral(StringRef Str) {
+      StringSegment Result;
+      Result.Kind = Literal;
+      Result.Data = Str;
+      return Result;
+    }
+    
+    static StringSegment getExpr(StringRef Str) {
+      StringSegment Result;
+      Result.Kind = Expr;
+      Result.Data = Str;
+      return Result;
+    }
+  };
+  
+  /// getEncodedStringLiteral - Given a string literal token, compute the bytes
+  /// that the actual string literal should codegen to along with any
+  /// sequences that represent interpolated expressions.
+  /// If a copy needs to be made, it will be allocated out of the ASTContext
+  /// allocator.
+  void getEncodedStringLiteral(const Token &Str, ASTContext &Ctx,
+                               llvm::SmallVectorImpl<StringSegment> &Segments);
   /// getEncodedCharacterLiteral - Return the UTF32 codepoint for the specified
   /// character literal.
   uint32_t getEncodedCharacterLiteral(const Token &Str); 

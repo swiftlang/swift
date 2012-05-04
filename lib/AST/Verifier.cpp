@@ -477,8 +477,12 @@ namespace {
       SourceRange Enclosing;
       if (Stmt *S = Parent.dyn_cast<Stmt *>())
         Enclosing = S->getSourceRange();
-      else if (Expr *E = Parent.dyn_cast<Expr *>())
+      else if (Expr *E = Parent.dyn_cast<Expr *>()) {
+        if (isa<InterpolatedStringLiteralExpr>(E))
+          return;
+
         Enclosing = E->getSourceRange();
+      }
       else // no parent
         return;
       

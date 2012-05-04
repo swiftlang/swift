@@ -167,6 +167,12 @@ InFlightDiagnostic Lexer::diagnose(const char *Loc, Diag<> ID) {
 
 void Lexer::formToken(tok Kind, const char *TokStart) {
   NextToken.setToken(Kind, StringRef(TokStart, CurPtr-TokStart));
+  
+  // If we ran past the end of the buffer, set the next token to EOF.
+  if (CurPtr > BufferEnd) {
+    CurPtr = BufferEnd;
+    NextToken.setToken(tok::eof, StringRef(BufferEnd, 0));
+  }
 }
 
 bool Lexer::isPrecededBySpace() {
@@ -625,6 +631,52 @@ uint32_t Lexer::getEncodedCharacterLiteral(const Token &Str) {
   return lexCharacter(CharStart, false, false);
 }
 
+/// skipToEndOfInterpolatedExpression - Given the first character after a \(
+/// sequence in a string literal (the start of an interpolated expression), 
+/// scan forward to the end of the interpolated expression and return the end
+/// on success or null on failure.  This basically just does brace matching.
+static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
+                                                     const char *BufferEnd) {
+  unsigned ParenCount = 1;
+  while (true) {
+    // This is a very simple scanner.  The implications of this include not
+    // being able to use string literals in an interpolated string, and not
+    // being able to break an expression over multiple lines in an interpolated
+    // string.  Both of these limitations make this simple and allow us to
+    // recover from common errors though.
+    //
+    // On success scanning the expression body, the real lexer will be used to
+    // relex the body when parsing the expressions.  We let it diagnose any
+    // issues with malformed tokens or other problems.
+    switch (*CurPtr++) {
+    // String literals in general cannot be split across multiple lines,
+    // interpolated ones are no exception.
+    case '\n':
+    case '\r':
+    // String literals cannot be used in interpolated string literals.
+    case '"':
+      return 0;
+    case 0:
+      // If we hit EOF, we fail.
+      if (CurPtr-1 == BufferEnd)
+        return 0;
+      continue;
+        
+    // Paren nesting deeper to support "foo = \((a+b)-(c*d)) bar".
+    case '(':
+      ++ParenCount;
+      continue;
+    case ')':
+      // If this is the last level of nesting, then we're done!
+      if (--ParenCount == 0)
+        return CurPtr;
+      continue;
+    default:
+      // Normal token character.
+      continue;
+    }
+  }
+}
 
 /// lexStringLiteral:
 ///   string_literal ::= ["]([^"\\\n\r]|character_escape)*["]
@@ -632,7 +684,23 @@ void Lexer::lexStringLiteral() {
   const char *TokStart = CurPtr-1;
   assert(*TokStart == '"' && "Unexpected start");
 
+  bool wasErroneous = false;
+  
   while (1) {
+    if (*CurPtr == '\\' && *(CurPtr + 1) == '(') {
+      // Consume tokens until we hit the corresponding ')'.
+      CurPtr += 2;
+      if (const char *EndPtr = skipToEndOfInterpolatedExpression(CurPtr,
+                                                                 BufferEnd)) {
+        // Successfully scanned the body of the expression literal.
+        CurPtr = EndPtr;
+      } else {
+        diagnose(CurPtr - 2, diag::lex_unterminated_interpolation);
+        wasErroneous = true;
+      }
+      continue;
+    }
+    
     unsigned CharValue = lexCharacter(CurPtr, true, true);
     
     // If this is a normal character, just munch it.
@@ -643,7 +711,8 @@ void Lexer::lexStringLiteral() {
     default: assert(0 && "Unknown reason to stop lexing character");
     // If we found the closing " character, we're done.
     case '"':
-        ++CurPtr;
+      ++CurPtr;
+      if (wasErroneous) return formToken(tok::unknown, TokStart);
       return formToken(tok::string_literal, TokStart);
     case 0:
     case '\n':  // String literals cannot have \n or \r in them.
@@ -657,7 +726,8 @@ void Lexer::lexStringLiteral() {
 /// getEncodedStringLiteral - Given a string literal token, return the bytes
 /// that the actual string literal should codegen to.  If a copy needs to be
 /// made, it will be allocated out of the ASTContext allocator.
-StringRef Lexer::getEncodedStringLiteral(const Token &Str, ASTContext &Ctx) {
+void Lexer::getEncodedStringLiteral(const Token &Str, ASTContext &Ctx,
+              llvm::SmallVectorImpl<StringSegment> &Segments) {
   // Get the bytes behind the string literal, dropping the double quotes.
   StringRef Bytes = Str.getText().drop_front().drop_back();
   llvm::SmallString<64> TempString;
@@ -687,6 +757,36 @@ StringRef Lexer::getEncodedStringLiteral(const Token &Str, ASTContext &Ctx) {
     case '"': TempString += '"'; continue;
     case '\'': TempString += '\''; continue;
     case '\\': TempString += '\\'; continue;
+      
+        
+    // String interpolation.
+    case '(': {
+      // Flush the current string.
+      if (!TempString.empty()) {
+        auto Res = Ctx.AllocateCopy(TempString);
+        Segments.push_back(StringSegment::getLiteral(StringRef(Res.data(),
+                                                               Res.size())));
+        TempString.clear();
+      }
+      
+      // Find the closing ')'.
+      if (const char *End = skipToEndOfInterpolatedExpression(BytesPtr,
+                                                              BufferEnd)) {
+        // Add an expression segment.
+        Segments.push_back(
+                   StringSegment::getExpr(StringRef(BytesPtr, End-BytesPtr-1)));
+        
+        // Reset the input bytes to the string that remains to be consumed.
+        Bytes = StringRef(End, Bytes.end() - End);
+        BytesPtr = End;
+      } else {
+        // Error: reset the input bytes to the string that remains to be
+        // consumed.
+        Bytes = StringRef(BytesPtr, Bytes.end() - BytesPtr);
+      }
+      
+      continue;
+    }
         
       // Unicode escapes of various lengths.
     case 'x':  //  \x HEX HEX
@@ -726,11 +826,13 @@ StringRef Lexer::getEncodedStringLiteral(const Token &Str, ASTContext &Ctx) {
   // a copy of the string, just point to the lexer's version.  We know that this
   // is safe because unescaped strings are always shorter than their escaped
   // forms (in a valid string).
-  if (TempString.size() == Bytes.size())
-    return Bytes;
-  
-  auto Res = Ctx.AllocateCopy(TempString);
-  return StringRef(Res.data(), Res.size());  // ArrayRef to StringRef.
+  if (Segments.empty() && TempString.size() == Bytes.size())
+    Segments.push_back(StringSegment::getLiteral(Bytes));
+  else if (Segments.empty() || !TempString.empty()) {
+    auto Res = Ctx.AllocateCopy(TempString);
+    Segments.push_back(StringSegment::getLiteral(StringRef(Res.data(),
+                                                           Res.size())));
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -769,7 +871,13 @@ Restart:
   case '(':
     return formToken(isPrecededBySpace() ? tok::l_paren_space : tok::l_paren,
                      TokStart);
-  case ')': return formToken(tok::r_paren,  TokStart);
+  case ')': 
+    // When lexing an interpolated string literal, the buffer will terminate
+    // with a ')'.
+    if (CurPtr-1 == BufferEnd)
+      return formToken(tok::eof, TokStart);
+    
+    return formToken(tok::r_paren,  TokStart);
   case '{': return formToken(tok::l_brace,  TokStart);
   case '}': return formToken(tok::r_brace,  TokStart);
   case '[':

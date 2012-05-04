@@ -387,6 +387,14 @@ public:
   void visitStringLiteralExpr(StringLiteralExpr *E) {
     printCommon(E, "string_literal_expr") << " value=" << E->getValue() << ')';
   }
+  void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
+    printCommon(E, "interpolated_string_literal_expr") << '\n';
+    for (auto Segment : E->getSegments()) {
+      printRec(Segment);
+      OS << '\n';
+    }
+    OS << ')';
+  }
   void visitDeclRefExpr(DeclRefExpr *E) {
     printCommon(E, "declref_expr")
       << " decl=" << E->getDecl()->getName() << ')';
