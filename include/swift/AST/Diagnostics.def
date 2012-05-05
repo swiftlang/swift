@@ -84,8 +84,8 @@ ERROR(lex_invalid_character_literal,lexing,none,
 
 ERROR(lex_unterminated_string,lexing,none,
       "unterminated string literal", ())
-ERROR(lex_unterminated_interpolation,lexing,none,
-      "unterminated string interpolation", ())
+ERROR(lex_unexpected_quote_string_interpolation,lexing,none,
+      "unexpected '\"' character in string interpolation", ())
 ERROR(lex_invalid_string_escape,lexing,none,
        "invalid escape sequence in string literal", ())
 ERROR(lex_invalid_string_x_escape,lexing,none,

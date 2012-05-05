@@ -54,6 +54,7 @@ public:
         DiagnosticEngine *Diags)
     : Lexer(Buffer, SourceMgr, Diags, Buffer.begin()) { }
 
+  const char *getBufferEnd() const { return BufferEnd; }
 
   void lex(Token &Result) {
     Result = NextToken;
@@ -113,11 +114,12 @@ public:
   /// character literal.
   uint32_t getEncodedCharacterLiteral(const Token &Str); 
 
-private:
+  InFlightDiagnostic diagnose(const char *Loc, Diag<> ID);
+
   static SourceLoc getSourceLoc(const char *Loc) {
     return SourceLoc(llvm::SMLoc::getFromPointer(Loc));
   }
-  InFlightDiagnostic diagnose(const char *Loc, Diag<> ID);
+private:
   void lexImpl();
   void formToken(tok Kind, const char *TokStart);
   

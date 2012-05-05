@@ -160,7 +160,7 @@ Lexer::Lexer(StringRef Buffer, llvm::SourceMgr &SourceMgr,
 
 InFlightDiagnostic Lexer::diagnose(const char *Loc, Diag<> ID) {
   if (Diags)
-    Diags->diagnose(getSourceLoc(Loc), ID);
+    return Diags->diagnose(getSourceLoc(Loc), ID);
   
   return InFlightDiagnostic();
 }
@@ -631,7 +631,8 @@ uint32_t Lexer::getEncodedCharacterLiteral(const Token &Str) {
 /// On success, the returned pointer will point to a ')'.  On failure, it will
 /// point to something else.  This basically just does brace matching.
 static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
-                                                     const char *BufferEnd) {
+                                                     Lexer *L) {
+  SourceLoc InterpStart = Lexer::getSourceLoc(CurPtr-1);
   unsigned ParenCount = 1;
   while (true) {
     // This is a very simple scanner.  The implications of this include not
@@ -648,13 +649,20 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
     // interpolated ones are no exception.
     case '\n':
     case '\r':
+      // Will be diagnosed as an unterminated string literal.
+      return CurPtr-1;
+
     // String literals cannot be used in interpolated string literals.
     case '"':
+      L->diagnose(CurPtr - 1, diag::lex_unexpected_quote_string_interpolation)
+        << SourceRange(InterpStart, Lexer::getSourceLoc(CurPtr-1));
       return CurPtr-1;
     case 0:
       // If we hit EOF, we fail.
-      if (CurPtr-1 == BufferEnd)
+      if (CurPtr-1 == L->getBufferEnd()) {
+        L->diagnose(CurPtr-1, diag::lex_unterminated_string);
         return CurPtr-1;
+      }
       continue;
         
     // Paren nesting deeper to support "foo = \((a+b)-(c*d)) bar".
@@ -685,13 +693,12 @@ void Lexer::lexStringLiteral() {
     if (*CurPtr == '\\' && *(CurPtr + 1) == '(') {
       // Consume tokens until we hit the corresponding ')'.
       CurPtr += 2;
-      const char *EndPtr = skipToEndOfInterpolatedExpression(CurPtr, BufferEnd);
+      const char *EndPtr = skipToEndOfInterpolatedExpression(CurPtr, this);
       
       if (*EndPtr == ')') {
         // Successfully scanned the body of the expression literal.
         CurPtr = EndPtr+1;
       } else {
-        diagnose(CurPtr - 2, diag::lex_unterminated_interpolation);
         wasErroneous = true;
       }
       continue;
@@ -766,7 +773,7 @@ void Lexer::getEncodedStringLiteral(const Token &Str, ASTContext &Ctx,
       }
       
       // Find the closing ')'.
-      const char *End = skipToEndOfInterpolatedExpression(BytesPtr, BufferEnd);
+      const char *End = skipToEndOfInterpolatedExpression(BytesPtr, this);
       assert(*End == ')' && "invalid string literal interpolations should"
              " not be returned as string literals");
       ++End;
