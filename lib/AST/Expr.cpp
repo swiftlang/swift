@@ -526,7 +526,7 @@ public:
     OS << ')';
   }
   void visitSequenceExpr(SequenceExpr *E) {
-    printCommon(E, "sequence_expr") << '\n';
+    printCommon(E, "sequence_expr");
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
       OS << '\n';
       printRec(E->getElement(i));
