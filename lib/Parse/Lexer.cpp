@@ -167,12 +167,6 @@ InFlightDiagnostic Lexer::diagnose(const char *Loc, Diag<> ID) {
 
 void Lexer::formToken(tok Kind, const char *TokStart) {
   NextToken.setToken(Kind, StringRef(TokStart, CurPtr-TokStart));
-  
-  // If we ran past the end of the buffer, set the next token to EOF.
-  if (CurPtr > BufferEnd) {
-    CurPtr = BufferEnd;
-    NextToken.setToken(tok::eof, StringRef(BufferEnd, 0));
-  }
 }
 
 bool Lexer::isPrecededBySpace() {
