@@ -302,7 +302,6 @@ void swift::REPL(ASTContext &Context) {
   Options.Triple = llvm::sys::getDefaultTargetTriple();
   Options.OptLevel = 0;
   Options.OutputKind = irgen::OutputKind::Module;
-  Options.IsREPL = true;
 
   EditLineWrapper e;
 
