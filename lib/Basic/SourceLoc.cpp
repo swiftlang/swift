@@ -28,16 +28,16 @@ void SourceLoc::print(raw_ostream &OS, const llvm::SourceMgr &SM,
     return;
   }
   
-  const llvm::MemoryBuffer *Buffer = SM.getMemoryBuffer((unsigned)BufferIndex);
-  const char *BufferStart = Buffer->getBufferStart();
-  
-  
   if (BufferIndex != LastBuffer) {
-    OS << Buffer->getBufferIdentifier();
+    OS << SM.getMemoryBuffer((unsigned)BufferIndex)->getBufferIdentifier();
     LastBuffer = BufferIndex;
+  } else {
+    OS << "line";
   }
-  
-  OS << ':' << (Value.getPointer() - BufferStart);
+
+  auto LineAndCol = SM.getLineAndColumn(Value, BufferIndex);
+
+  OS << ':' << LineAndCol.first << ':' << LineAndCol.second;
 }
 
 void SourceLoc::dump(const llvm::SourceMgr &SM) const {
@@ -57,7 +57,7 @@ void SourceRange::print(raw_ostream &OS, const llvm::SourceMgr &SM,
   
   OS << " RangeText=\""
      << StringRef(Start.Value.getPointer(),
-                  End.Value.getPointer() - Start.Value.getPointer())
+                  End.Value.getPointer() - Start.Value.getPointer()+1)
      << '"';
 }
 
