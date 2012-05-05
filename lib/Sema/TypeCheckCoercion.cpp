@@ -748,7 +748,7 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
       if (!Apply)
         continue;
       
-      Expr *CtorRef = new (TC.Context) DeclRefExpr(Best, Segment->getLoc(),
+      Expr *CtorRef = new (TC.Context) DeclRefExpr(Best, Segment->getStartLoc(),
                                                    Best->getTypeOfReference());
       ApplyExpr *Call = new (TC.Context) ConstructorCallExpr(CtorRef, Segment);
       Expr *Checked = TC.semaApplyExpr(Call);
