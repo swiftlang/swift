@@ -27,6 +27,7 @@
 #include "llvm/Target/TargetData.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Transforms/IPO.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/TargetRegistry.h"
@@ -83,6 +84,7 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   //   - relocation model
   //   - code model
   TargetOptions Options;
+  Options.NoFramePointerElimNonLeaf = true;
   
   // Create a target machine.
   TargetMachine *TargetMachine
@@ -132,6 +134,8 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   // Set up a pipeline.
   PassManagerBuilder PMBuilder;
   PMBuilder.OptLevel = Opts.OptLevel;
+  if (Opts.OptLevel != 0)
+    PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
 
   // Configure the function passes.
   FunctionPassManager FunctionPasses(Module);
