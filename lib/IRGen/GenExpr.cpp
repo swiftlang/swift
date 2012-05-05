@@ -211,6 +211,10 @@ namespace {
       IGF.emitRValue(E->getSubExpr(), Out);
     }
     
+    void visitScalarToTupleExpr(ScalarToTupleExpr *E) {
+      emitScalarToTuple(IGF, E, Out);
+    }
+
     void visitTupleElementExpr(TupleElementExpr *E) {
       emitTupleElement(IGF, E, Out);
     }
@@ -299,6 +303,7 @@ namespace {
     NOT_LVALUE_EXPR(Closure)
     NOT_LVALUE_EXPR(Load)
     NOT_LVALUE_EXPR(Tuple)
+    NOT_LVALUE_EXPR(ScalarToTuple)
     NOT_LVALUE_EXPR(NewArray)
     NOT_LVALUE_EXPR(DotSyntaxBaseIgnored)
     NOT_LVALUE_EXPR(Coerce)
@@ -456,6 +461,10 @@ namespace {
                                                     
     // FIXME: We may want to specialize IR generation for array subscripts.
     NON_LOCATEABLE(SubscriptExpr);
+
+    // FIXME: We might want to specialize IR generation for the case where the
+    // tuple type has only one element.
+    NON_LOCATEABLE(ScalarToTupleExpr);
 #undef NON_LOCATEABLE
   };
 }

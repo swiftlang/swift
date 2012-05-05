@@ -508,6 +508,30 @@ void swift::irgen::emitTupleShuffle(IRGenFunction &IGF, TupleShuffleExpr *E,
   innerTupleExplosion.markClaimed(innerTupleExplosion.size());
 }
 
+/// emitScalarToTuple - Emit a scalar-to-tuple conversion expression
+/// as an exploded r-value.
+void swift::irgen::emitScalarToTuple(IRGenFunction &IGF, ScalarToTupleExpr *E,
+                                     Explosion &tupleExplosion) {
+  Expr *scalar = E->getSubExpr();
+
+  // Note that the rules in LangRef require emitting the subexpression first.
+  Explosion scalarExplosion(tupleExplosion.getKind());
+  IGF.emitRValue(scalar, scalarExplosion);
+
+  TupleType *TT = E->getType()->castTo<TupleType>();
+  int scalarField = TT->getFieldForScalarInit();
+  int curField = 0;
+  assert(scalarField >= 0 && "Unexpected outer tuple type");
+
+  for (const TupleTypeElt &field : TT->getFields() ) {
+    if (curField == scalarField)
+      tupleExplosion.add(scalarExplosion.claimAll());
+    else
+      IGF.emitRValue(field.getInit(), tupleExplosion);
+    ++curField;
+  }
+}
+
 namespace {
   /// A visitor for initializing a pattern from an address.
   struct InitPatternFromAddress

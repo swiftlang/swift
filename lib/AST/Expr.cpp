@@ -226,26 +226,13 @@ NewArrayExpr *NewArrayExpr::create(ASTContext &ctx, SourceLoc newLoc,
 }
 
 SourceRange TupleExpr::getSourceRange() const {
-  SourceLoc Start = LParenLoc;
-  if (!Start.isValid()) {
-    unsigned i = 0;
-    while (!getElement(i)) {
-      ++i;
-      assert(i != getNumElements() && "Implicit tuple must have subexpression");
-    }
-    Start = getElement(i)->getStartLoc();
+  if (LParenLoc.isValid()) {
+    assert(RParenLoc.isValid() && "Mismatched parens?");
+    return SourceRange(LParenLoc, RParenLoc);
   }
-
-  SourceLoc End = RParenLoc;
-  if (!End.isValid()) {
-    unsigned i = getNumElements() - 1;
-    while (!getElement(i)) {
-      --i;
-      assert(i != 0 && "Implicit tuple must have subexpression");
-    }
-    End = getElement(i)->getEndLoc();
-  }
-  
+  assert(getNumElements() == 2 && "Unexpected tuple expr");
+  SourceLoc Start = getElement(0)->getStartLoc();
+  SourceLoc End = getElement(1)->getEndLoc();
   return SourceRange(Start, End);
 }
 
@@ -509,6 +496,11 @@ public:
   }
   void visitParameterRenameExpr(ParameterRenameExpr *E) {
     printCommon(E, "parameter_rename_expr") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
+  void visitScalarToTupleExpr(ScalarToTupleExpr *E) {
+    printCommon(E, "scalar_to_tuple_expr") << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }

@@ -1178,7 +1178,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     
     if (ETy) {
       Type ElementTy = ETy->getElementType(SrcField);
-      if (TE && ElementTy->isDependentType()) {
+      if (TE) {
         // FIXME: We shouldn't need a TupleExpr to handle this coercion.
         // Check to see if the src value can be converted to the destination
         // element type.
@@ -1243,32 +1243,8 @@ CoercedResult SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
 
   if (!Apply)
     return Type(DestTy);
-  
-  unsigned NumFields = DestTy->getFields().size();
-  
-  // Must allocate space for the AST node.
-  MutableArrayRef<Expr*> NewSE(TC.Context.Allocate<Expr*>(NumFields),NumFields);
-  
-  bool NeedsNames = false;
-  for (unsigned i = 0, e = NumFields; i != e; ++i) {
-    if (i == (unsigned)ScalarField)
-      NewSE[i] = ERes.getExpr();
-    else
-      NewSE[i] = 0;
-    
-    NeedsNames |= DestTy->getFields()[i].hasName();
-  }
-  
-  // Handle the name if the element is named.
-  Identifier *NewName = 0;
-  if (NeedsNames) {
-    NewName = TC.Context.Allocate<Identifier>(NumFields);
-    for (unsigned i = 0, e = NumFields; i != e; ++i)
-      NewName[i] = DestTy->getFields()[i].getName();
-  }
-  
-  return CoercedResult(new (TC.Context) TupleExpr(SourceLoc(), NewSE, NewName, 
-                                                  SourceLoc(), DestTy));
+
+  return CoercedResult(new (TC.Context) ScalarToTupleExpr(ERes.getExpr(), DestTy));
 }
 
 /// Would the source lvalue type be coercible to the dest lvalue type

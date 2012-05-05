@@ -540,13 +540,9 @@ public:
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Paren; }
 };
   
-/// TupleExpr - Parenthesized expressions like '(a=x+x)' and '(x, y, 4)'.  Tuple
-/// types automatically decay if they have a single element, this means that
-/// single element tuple literals, such as "(4)", will exist in the AST, but
-/// have a result type that is the same as the input operand type.
-///
-/// When a tuple element is formed with a default value for the type, the
-/// corresponding SubExpr element will be null.
+/// TupleExpr - Parenthesized expressions like '(a=x+x)' and '(x, y, 4)'.  Also
+/// used to represent the operands to a binary operator.  Note that
+/// expressions like '(4)' are represented with a ParenExpr.
 class TupleExpr : public Expr {
   SourceLoc LParenLoc;
   SourceLoc RParenLoc;
@@ -562,7 +558,8 @@ public:
             Type Ty = Type())
     : Expr(ExprKind::Tuple, Ty), LParenLoc(LParenLoc), RParenLoc(RParenLoc),
       SubExprs(SubExprs), SubExprNames(SubExprNames) {
-    assert(LParenLoc.isValid() == RParenLoc.isValid() &&
+    assert((LParenLoc.isValid() ||
+            (!RParenLoc.isValid() && getNumElements() == 2)) &&
            "Mismatched parenthesis location information validity");
   }
 
@@ -570,8 +567,6 @@ public:
   SourceLoc getRParenLoc() const { return RParenLoc; }
 
   SourceRange getSourceRange() const;
-
-  //unsigned getNumElements() const { return NumSubExprs; }
 
   MutableArrayRef<Expr*> getElements() {
     return SubExprs;
@@ -951,6 +946,19 @@ public:
   static bool classof(const ParameterRenameExpr *) { return true; }
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ParameterRename;
+  }
+};
+
+/// ScalarToTupleExpr - Initialze a tuple with a a scalar.
+class ScalarToTupleExpr : public ImplicitConversionExpr {
+public:
+  ScalarToTupleExpr(Expr *subExpr, Type type)
+    : ImplicitConversionExpr(ExprKind::ScalarToTuple, subExpr, type) {}
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ScalarToTupleExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ScalarToTuple;
   }
 };
 
