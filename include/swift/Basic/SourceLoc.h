@@ -20,6 +20,9 @@
 #include "swift/AST/LLVM.h"
 #include "llvm/Support/SMLoc.h"
 
+namespace llvm {
+  class SourceMgr;
+}
 namespace swift {
 
 /// SourceLoc in swift is just an SMLoc.  We define it as a different type
@@ -33,6 +36,7 @@ public:
   explicit SourceLoc(llvm::SMLoc Value) : Value(Value) {}
   
   bool isValid() const { return Value.isValid(); }
+  bool isInvalid() const { return !Value.isValid(); }
   
   bool operator==(const SourceLoc &RHS) const { return RHS.Value == Value; }
   bool operator!=(const SourceLoc &RHS) const { return RHS.Value != Value; }
@@ -44,6 +48,9 @@ public:
     return SourceLoc(llvm::SMLoc::getFromPointer(Value.getPointer() +
                                                  NumCharacters));
   }
+  
+  void print(raw_ostream &OS, const llvm::SourceMgr &SM) const;
+  void dump(const llvm::SourceMgr &SM) const;
 };
 
 /// SourceRange in swift is a pair of locations.  However, note that the end
@@ -62,6 +69,10 @@ public:
   }
   
   bool isValid() const { return Start.isValid(); }
+  bool isInvalid() const { return Start.isInvalid(); }
+
+  void print(raw_ostream &OS, const llvm::SourceMgr &SM) const;
+  void dump(const llvm::SourceMgr &SM) const;
 };
 
 } // end namespace swift

@@ -493,42 +493,12 @@ namespace {
         Out << "child source range not contained within its parent: ";
         printEntity();
         Out << "\n  parent range: ";
-        printRange(Enclosing);
+        Enclosing.print(Out, Ctx.SourceMgr);
         Out << "\n  child range: ";
-        printRange(Current);
+        Current.print(Out, Ctx.SourceMgr);
         Out << "\n";
         abort();
       }
-    }
-
-    void printRange(SourceRange R) {
-      SourceLoc Begin = R.Start, End = R.End;
-
-      // If either of those locations is invalid, fall back on printing pointers.
-      if (!Begin.isValid() || !End.isValid()) {
-        Out << "[" << (void*) Begin.Value.getPointer()
-            << "," << (void*) End.Value.getPointer()
-            << "]";
-        return;
-      }
-
-      // Otherwise, advance the end token.
-      End = Lexer::getLocForEndOfToken(Ctx.SourceMgr, R.End);
-
-      int BufferIndex = Ctx.SourceMgr.FindBufferContainingLoc(Begin.Value);
-      if (BufferIndex != -1) {
-        const llvm::MemoryBuffer *Buffer =
-          Ctx.SourceMgr.getMemoryBuffer((unsigned) BufferIndex);
-        const char *BufferStart = Buffer->getBufferStart();
-        Out << Buffer->getBufferIdentifier() 
-            << ':' << (Begin.Value.getPointer() - BufferStart)
-            << '-' << (End.Value.getPointer() - BufferStart)
-            << ' ';
-      }
-
-      llvm::StringRef Text(Begin.Value.getPointer(),
-                           End.Value.getPointer() - Begin.Value.getPointer());
-      Out << '"' << Text << '"';
     }
 
     void printQualifiers(LValueType::Qual qs) {
