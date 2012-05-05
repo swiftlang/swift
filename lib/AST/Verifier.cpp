@@ -475,21 +475,27 @@ namespace {
                            llvm::PointerUnion<Expr *, Stmt *> Parent,
                            void (^printEntity)()) {
       SourceRange Enclosing;
-      if (Stmt *S = Parent.dyn_cast<Stmt *>())
-        Enclosing = S->getSourceRange();
-      else if (Expr *E = Parent.dyn_cast<Expr *>()) {
-        if (isa<InterpolatedStringLiteralExpr>(E))
+      if (Parent.isNull())
           return;
-
-        Enclosing = E->getSourceRange();
+          
+      if (Stmt *S = Parent.dyn_cast<Stmt*>())
+        Enclosing = S->getSourceRange();
+      else {
+        // FIXME: This hack is required because the inclusion check below
+        // doesn't compares the *start* of the ranges, not the end of the
+        // ranges.  In the case of an interpolated string literal expr, the
+        // subexpressions are contained within the string token.  This means
+        // that comparing the start of the string token to the end of an
+        // embedded expression will fail.
+        if (isa<InterpolatedStringLiteralExpr>(Parent.get<Expr*>()))
+          return;
+        
+        Enclosing = Parent.get<Expr*>()->getSourceRange();
       }
-      else // no parent
-        return;
       
       // FIXME: This is a very ugly way to check inclusion.
       if (Enclosing.Start.Value.getPointer() > Current.Start.Value.getPointer()
-          || Enclosing.End.Value.getPointer() < Current.End.Value.getPointer()) 
-      {
+          || Enclosing.End.Value.getPointer() < Current.End.Value.getPointer()){
         Out << "child source range not contained within its parent: ";
         printEntity();
         Out << "\n  parent range: ";
