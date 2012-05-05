@@ -16,7 +16,8 @@
 #include "llvm/Support/SourceMgr.h"
 using namespace swift;
 
-void SourceLoc::print(raw_ostream &OS, const llvm::SourceMgr &SM) const {
+void SourceLoc::print(raw_ostream &OS, const llvm::SourceMgr &SM,
+                      int &LastBuffer) const {
   if (isInvalid()) {
     OS << "<invalid loc>";
     return;
@@ -29,19 +30,26 @@ void SourceLoc::print(raw_ostream &OS, const llvm::SourceMgr &SM) const {
   
   const llvm::MemoryBuffer *Buffer = SM.getMemoryBuffer((unsigned)BufferIndex);
   const char *BufferStart = Buffer->getBufferStart();
-  OS << Buffer->getBufferIdentifier() << ':'
-     << (Value.getPointer() - BufferStart);
+  
+  
+  if (BufferIndex != LastBuffer) {
+    OS << Buffer->getBufferIdentifier();
+    LastBuffer = BufferIndex;
+  }
+  
+  OS << ':' << (Value.getPointer() - BufferStart);
 }
 
 void SourceLoc::dump(const llvm::SourceMgr &SM) const {
   print(llvm::errs(), SM);
 }
 
-void SourceRange::print(raw_ostream &OS, const llvm::SourceMgr &SM) const {
+void SourceRange::print(raw_ostream &OS, const llvm::SourceMgr &SM,
+                        int &LastBuffer) const {
   OS << '[';
-  Start.print(OS, SM);
+  Start.print(OS, SM, LastBuffer);
   OS << " - ";
-  End.print(OS, SM);
+  End.print(OS, SM, LastBuffer);
   OS << ']';
   
   if (Start.isInvalid() || End.isInvalid())

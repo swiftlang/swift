@@ -48,8 +48,18 @@ public:
     return SourceLoc(llvm::SMLoc::getFromPointer(Value.getPointer() +
                                                  NumCharacters));
   }
-  
-  void print(raw_ostream &OS, const llvm::SourceMgr &SM) const;
+
+  /// print - Print out the SourceLoc.  If this location is in the same buffer
+  /// as specified by LastBuffer, then we don't print the filename.  If not, we
+  /// do print the filename, and then update LastBuffer with the BufferID
+  /// printed.
+  void print(raw_ostream &OS, const llvm::SourceMgr &SM,
+             int &LastBuffer) const;
+
+  void print(raw_ostream &OS, const llvm::SourceMgr &SM) const {
+    int Tmp = -1;
+    print(OS, SM, Tmp);
+  }
   void dump(const llvm::SourceMgr &SM) const;
 };
 
@@ -71,7 +81,17 @@ public:
   bool isValid() const { return Start.isValid(); }
   bool isInvalid() const { return Start.isInvalid(); }
 
-  void print(raw_ostream &OS, const llvm::SourceMgr &SM) const;
+  /// print - Print out the SourceRange. If the locations are in the same buffer
+  /// as specified by LastBuffer, then we don't print the filename.  If not, we
+  /// do print the filename, and then update LastBuffer with the BufferID
+  /// printed.
+  void print(raw_ostream &OS, const llvm::SourceMgr &SM,
+             int &LastBuffer) const;
+
+  void print(raw_ostream &OS, const llvm::SourceMgr &SM) const {
+    int Tmp = -1;
+    print(OS, SM, Tmp);
+  }
   void dump(const llvm::SourceMgr &SM) const;
 };
 
