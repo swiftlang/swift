@@ -150,11 +150,8 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const LiteralExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::IntegerLiteral ||
-           E->getKind() == ExprKind::FloatLiteral ||
-           E->getKind() == ExprKind::CharacterLiteral ||
-           E->getKind() == ExprKind::StringLiteral ||
-           E->getKind() == ExprKind::InterpolatedStringLiteral;
+    return E->getKind() >= ExprKind::First_LiteralExpr &&
+           E->getKind() <= ExprKind::Last_LiteralExpr;
   }
 };
 
