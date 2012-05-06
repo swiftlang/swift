@@ -119,7 +119,7 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
       OSFlags |= raw_fd_ostream::F_Binary;
     RawOS.reset(new raw_fd_ostream(Opts.OutputFilename.c_str(),
                                    Error, OSFlags));
-    if (RawOS->has_error()) {
+    if (RawOS->has_error() || !Error.empty()) {
       TU->Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
                              Opts.OutputFilename, Error);
       return;
