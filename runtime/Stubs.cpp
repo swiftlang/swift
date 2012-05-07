@@ -1,4 +1,4 @@
-//===--- Alloc.cpp - Swift Language ABI Allocation Support ----------------===//
+//===--- stubs.cpp - Swift Language ABI Runtime Stubs ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
