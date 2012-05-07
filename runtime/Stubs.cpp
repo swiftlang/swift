@@ -1,4 +1,4 @@
-//===--- stubs.cpp - Swift Language ABI Runtime Stubs ---------------------===//
+//===--- Stubs.cpp - Swift Language ABI Runtime Stubs ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
