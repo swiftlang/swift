@@ -64,6 +64,8 @@ endif()
 set(SWIFT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(SWIFT_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
+option(SWIFT_OPTIMIZED "Enable optimization for Swift source files" YES)
+
 # Xcode: use libc++ and c++'0x using proper build settings.
 if ( XCODE )
   # Force usage of Clang.
@@ -85,6 +87,75 @@ if ( XCODE )
   set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_HIDDEN_VIRTUAL_FUNCTIONS "YES")
   set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_UNINITIALIZED_AUTOS "YES")
 endif ( XCODE )
+
+# Compile a swift file into an object file (as a library).
+#
+# Usage:
+#   compile_swift_file(file         # Name of the source file, e.g., swift.swift)
+#     target                        # The target of which this file is a part
+#     objectvar)                    # Variable to receive the object file name
+function(compile_swift_file file target objectvar)
+  # Determine where this file is.
+  get_filename_component(file_path ${file} PATH) 
+  if(IS_ABSOLUTE "${file_path}")
+    set(source_file "${file}")
+  else()
+    set(source_file "${CMAKE_CURRENT_SOURCE_DIR}/${file}")
+  endif()
+  
+  # Compute flags to be passed down to swift when compiling a swift
+  # file.
+  if(SWIFT_OPTIMIZED)
+    set(swift_flags "-O2")
+  else()
+    set(swift_flags "-O0")
+  endif()
+
+  get_filename_component(file_name ${file} NAME_WE)
+  set(objfile
+    "${CMAKE_CURRENT_BINARY_DIR}/${file_name}${CMAKE_C_OUTPUT_EXTENSION}")
+  add_custom_command(
+    OUTPUT ${objfile}
+    COMMAND swift "-c" "-parse-as-library" "${swift_flags}" "-o" "${objfile}" "${source_file}"
+    DEPENDS ${source_file}
+#    MAIN_DEPENDENCY ${target}
+    COMMENT "Compiling ${file_name}${CMAKE_C_OUTPUT_EXTENSION}")
+  
+  # Make sure the build system knows the file is a generated object file.
+  set_source_files_properties(${objfile}
+    PROPERTIES 
+    GENERATED true 
+    EXTERNAL_OBJECT true
+    OBJECT_DEPENDS "${source_file}")
+
+  # Make sure this object file gets cleaned up.
+  set_directory_properties(
+    PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${objfile}")
+
+  # Pass the object file name back to the caller.
+  set(${objectvar} "${objfile}" PARENT_SCOPE)
+endfunction()
+
+# Process the sources within the given variable, pulling out any Swift
+# sources to be compiled with 'swift' directly. This updates
+# ${sourcesvar} in place with the resulting list.
+#
+# Usage:
+#   handle_swift_sources(sourcesvar target)
+function(handle_swift_sources sourcesvar target)
+  set(result)
+  foreach(src ${${sourcesvar}})
+    get_filename_component(extension ${src} EXT)
+    if(extension STREQUAL ".swift")
+      # We have a swift file; compile it.
+      compile_swift_file(${src} ${target} "obj")
+      list(APPEND result ${obj})
+    else()
+      list(APPEND result ${src})
+    endif()
+  endforeach()
+  set(${sourcesvar} "${result}" PARENT_SCOPE)
+endfunction()
 
 # Add a new Swift library.
 #
@@ -115,6 +186,7 @@ macro(add_swift_library name)
     set(libkind)
   endif()
 
+  handle_swift_sources(SWIFTLIB_SOURCES ${name})
   add_library( ${name} ${libkind} ${SWIFTLIB_SOURCES} )
 
   if( LLVM_COMMON_DEPENDS )
@@ -157,6 +229,8 @@ macro(add_swift_executable name)
   parse_arguments(SWIFTEXE  "DEPENDS;COMPONENT_DEPENDS" "EXCLUDE_FROM_ALL" 
     ${ARGN})
   
+  handle_swift_sources(SWIFTEXE_DEFAULT_ARGS ${name})
+
   # Add the executable
   if (${SWIFTEXE_EXCLUDE_FROM_ALL})
     add_executable(${name} EXCLUDE_FROM_ALL ${SWIFTEXE_DEFAULT_ARGS})
