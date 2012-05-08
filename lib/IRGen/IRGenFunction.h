@@ -317,7 +317,6 @@ private:
 
 //--- Types -----------------------------------------------------------------
 public:
-  void emitTypeAlias(Type T);
   void emitOneOfType(OneOfType *type);
 
 //--- Global context emission --------------------------------------------------

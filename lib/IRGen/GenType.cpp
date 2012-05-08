@@ -253,19 +253,6 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, CanType canTy) {
   llvm_unreachable("bad type kind");
 }
 
-/// emitTypeAlias - Emit a type alias.  You wouldn't think that these
-/// would need IR support, but we apparently want to emit struct and
-/// oneof declarations as these instead of as their own declarations.
-void IRGenModule::emitTypeAlias(Type underlyingType) {
-  if (OneOfType *oneof = dyn_cast<OneOfType>(underlyingType))
-    return emitOneOfType(oneof);
-}
-
-void IRGenFunction::emitTypeAlias(Type underlyingType) {
-  if (OneOfType *oneof = dyn_cast<OneOfType>(underlyingType))
-    return emitOneOfType(oneof);
-}
-
 /// createNominalType - Create a new nominal type.
 llvm::StructType *IRGenModule::createNominalType(OneOfDecl *type) {
   llvm::SmallString<32> typeName;

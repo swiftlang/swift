@@ -102,7 +102,6 @@ public:
   const TypeInfo &getFragileTypeInfo(Type T);
   llvm::Type *getFragileType(Type T);
   llvm::StructType *createNominalType(OneOfDecl *D);
-  void emitTypeAlias(Type T);
   void getSchema(Type T, ExplosionSchema &schema);
 
 private:
