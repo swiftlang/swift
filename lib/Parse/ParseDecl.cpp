@@ -1351,18 +1351,34 @@ bool Parser::parseProtocolBody(SourceLoc ProtocolLoc,
     default:
       diagnose(Tok, diag::expected_protocol_member);
       return true;
+        
+    case tok::eof:
+      diagnose(Tok, diag::expected_rbrace_protocol);
+      return true;
+        
     case tok::r_brace:  // End of protocol body.
       break;
       
-    // FIXME: use standard parseDecl loop.
+    // FIXME: use standard parseDecl loop?
     case tok::kw_static:
+      diagnose(consumeToken(), diag::protocol_static_func);
+      if (Tok.isNot(tok::kw_func))
+        continue;
+      // Fall through
+        
     case tok::kw_func:
-      Elements.push_back(parseDeclFunc(Tok.is(tok::kw_func)));
-      if (Elements.back() == 0) return true;
+      if (FuncDecl *Func = parseDeclFunc(/*hasContainerType=*/true)) {
+        if (Func->getBody()) {
+          diagnose(Func->getBody()->getLoc(), diag::protocol_func_def);
+          Func->setBody(0);
+        }
+        
+        Elements.push_back(Func);
+      }
       break;
     case tok::kw_var:
-      Elements.push_back(parseDeclVarSimple());
-      if (Elements.back() == 0) return true;
+      if (VarDecl *Var = parseDeclVarSimple())
+        Elements.push_back(Var);
       break;
     }
   } while (Tok.isNot(tok::r_brace));

@@ -209,6 +209,12 @@ ERROR(struct_unnamed_member,decl_parsing,none,
       "unnamed members invalid in structs", ())
 
 // Protocol
+ERROR(expected_rbrace_protocol,decl_parsing,none,
+      "expected '}' in protocol", ())
+ERROR(protocol_static_func,decl_parsing,none,
+      "static methods are not permitted in a protocol", ())
+ERROR(protocol_func_def,decl_parsing,none,
+      "methods may not be defined in a protocol", ())
 
 // Subscripting
 ERROR(expected_lparen_subscript,decl_parsing,none,

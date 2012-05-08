@@ -930,10 +930,10 @@ token following the opening '{' is either 'set' or 'get'.</p>
   </pre>
   
   <p>A protocol declaration describes an abstract interface implemented by
-     another type.  It consists of a comma-separated list of elements, each of
-     which are members that instances of the protocol are guaranteed to have.
-  Internally, protocol declarations are modelled as a <a
-    href="#decl-typealias">typealias</a> that wraps a protocol type.</p>
+     another type.  It consists of a set of declarations, which may be instance
+     methods or properties. A type <i>conforms</i> to a protocol if it
+     provides declarations that correspond to each of the declarations in
+     a protocol.</p>
   
   <p>Here are some examples of protocols:</p>
   
@@ -951,6 +951,7 @@ token following the opening '{' is either 'set' or 'get'.</p>
   
   <pre class="grammar">
     protocol-member ::= <a href="#decl-func">decl-func</a>
+    protocol-member ::= <a href="#decl-var-simple">decl-var-simple</a>
   </pre>
   
   <p>'func' members of a protocol define a value of function type that may be

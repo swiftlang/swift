@@ -105,7 +105,7 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M) {
   // If the base is a protocol, see if this is a reference to a declared
   // protocol member.
   if (ProtocolType *PT = BaseTy->getAs<ProtocolType>()) {
-    for (ValueDecl *VD : PT->TheDecl->getElements()) {
+    for (ValueDecl *VD : PT->getDecl()->getElements()) {
       if (VD->getName() != Name) continue;
       
       // If this is a 'static' function, then just ignore the base expression.
