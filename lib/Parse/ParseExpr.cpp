@@ -358,7 +358,9 @@ Expr *Parser::parseExprStringLiteral() {
       Segments.front().Kind == Lexer::StringSegment::Literal)
     return new (Context) StringLiteralExpr(Segments.front().Data, Loc);
     
-  Token SavedTok = Tok;
+  // We are going to mess with Tok to do reparsing for interpolated literals,
+  // don't lose our 'next' token.
+  llvm::SaveAndRestore<Token> SavedTok(Tok);
   llvm::SmallVector<Expr*, 4> Exprs;
   for (auto Segment : Segments) {
     switch (Segment.Kind) {
@@ -375,10 +377,12 @@ Expr *Parser::parseExprStringLiteral() {
       // Temporarily swap out the parser's current lexer with our new one.
       llvm::SaveAndRestore<Lexer*> T(L, &LocalLex);
       
-      // Prime the new lexer.
-      L->lex(Tok);
+      // Prime the new lexer with a '(' as the first token.
+      assert(Segment.Data.data()[-1] == '(' &&
+             "Didn't get an lparen before interpolated expression");
+      Tok.setToken(tok::l_paren, StringRef(Segment.Data.data()-1, 1));
       
-      NullablePtr<Expr> E = parseExpr(diag::string_interpolation_expr);
+      NullablePtr<Expr> E = parseExprParen();
       if (E.isNonNull()) {
         Exprs.push_back(E.get());
         
@@ -389,7 +393,6 @@ Expr *Parser::parseExprStringLiteral() {
     }
     }
   }
-  Tok = SavedTok;
   
   if (Exprs.empty())
     return new (Context) ErrorExpr(Loc);
@@ -398,7 +401,7 @@ Expr *Parser::parseExprStringLiteral() {
                                         Context.AllocateCopy(Exprs));
 }
   
-  ///   expr-identifier:
+///   expr-identifier:
 ///     identifier
 Expr *Parser::parseExprIdentifier() {
   assert(Tok.is(tok::identifier));
@@ -538,11 +541,20 @@ NullablePtr<Expr> Parser::parseExprParen() {
     } while (consumeIf(tok::comma));
   }
   
+  
+  // Check to see if the lexer stopped with an EOF token whose spelling is ')'.
+  // If this happens, then this is actually the tuple that is a string literal
+  // interpolation context.  Just accept the ) and build the tuple as we usually
+  // do.
   SourceLoc RPLoc;
-  if (parseMatchingToken(tok::r_paren, RPLoc,
-                         diag::expected_rparen_parenthesis_expr,
-                         LPLoc, diag::opening_paren))
-    return 0;
+  if (Tok.is(tok::eof) && Tok.getText()[0] == ')')
+    RPLoc = Tok.getLoc();
+  else {
+    if (parseMatchingToken(tok::r_paren, RPLoc,
+                           diag::expected_rparen_parenthesis_expr,
+                           LPLoc, diag::opening_paren))
+      return 0;
+  }
 
   MutableArrayRef<Expr *> NewSubExprs = Context.AllocateCopy(SubExprs);
   

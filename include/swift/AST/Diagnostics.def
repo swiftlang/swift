@@ -440,8 +440,6 @@ WARNING(float_literal_overflow,literal_parsing,none,
 WARNING(float_literal_underflow,literal_parsing,none,
         "floating point constant underflowed to %0", (StringRef))
 
-ERROR(string_interpolation_expr,literal_parsing,none,
-      "expected an expression to interpolate into string", ())
 ERROR(string_interpolation_extra,literal_parsing,none,
       "extra tokens after interpolated string expression", ())
       
