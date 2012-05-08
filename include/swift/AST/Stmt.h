@@ -342,16 +342,11 @@ class ForEachStmt : public Stmt {
   /// RangeEmpty - The expression that determines whether the range is empty.
   Expr *RangeEmpty;
   
-  /// RangeDropFirst - The expression that drops the first element in the
-  /// range.
-  Expr *RangeDropFirst;
-
 public:
   ForEachStmt(SourceLoc ForLoc, Pattern *Pat, SourceLoc InLoc,
               Expr *Container, BraceStmt *Body)
     : Stmt(StmtKind::ForEach), ForLoc(ForLoc), InLoc(InLoc), Pat(Pat),
-      Container(Container), Body(Body), Range(), RangeEmpty(),
-      RangeDropFirst() { }
+      Container(Container), Body(Body), Range(), RangeEmpty() { }
   
   /// getForLoc - Retrieve the location of the 'for' keyword.
   SourceLoc getForLoc() const { return ForLoc; }
@@ -387,11 +382,6 @@ public:
     return Pat.dyn_cast<PatternBindingDecl *>();
   }
   void setElementInit(PatternBindingDecl *EI) { Pat = EI; }
-
-  /// getRangeDropFirst - Retrieve the expression that drops the first element
-  /// from the range, modifying the range in-place.
-  Expr *getRangeDropFirst() const { return RangeDropFirst; }
-  void setRangeDropFirst(Expr *E) { RangeDropFirst = E; }
 
   /// getBody - Retrieve the body of the loop.
   BraceStmt *getBody() const { return Body; }

@@ -289,42 +289,32 @@ public:
     S->setRangeEmpty(Empty);
     
     // Compute the expression that extracts a value from the range.
-    Expr *GetFirst
+    Expr *GetFirstAndAdvance
       = callNullaryMethodOf(
           new (TC.Context) DeclRefExpr(Range, S->getInLoc(),
                                        Range->getTypeOfReference()),
-          TC.Context.getIdentifier("getFirst"),
-          S->getInLoc(), diag::foreach_range_getfirst,
-          diag::foreach_nonfunc_range_getfirst);
-    if (!GetFirst) return nullptr;
+          TC.Context.getIdentifier("getFirstAndAdvance"),
+          S->getInLoc(), diag::foreach_range_getfirstandadvance,
+          diag::foreach_nonfunc_range_getfirstandadvance);
+    if (!GetFirstAndAdvance) return nullptr;
     
     // Make sure our element type is materializable.
-    if (!GetFirst->getType()->isMaterializable()) {
+    if (!GetFirstAndAdvance->getType()->isMaterializable()) {
       TC.diagnose(S->getInLoc(), diag::foreach_nonmaterializable_element,
-                  GetFirst->getType(), RangeTy)
+                  GetFirstAndAdvance->getType(), RangeTy)
         << Container->getSourceRange();
       return nullptr;
     }
     S->setElementInit(new (TC.Context) PatternBindingDecl(S->getForLoc(),
                                                           S->getPattern(),
-                                                          GetFirst,
+                                                          GetFirstAndAdvance,
                                                           DC));
 
     // Coerce the pattern to the element type, now that we know the element
     // type.
-    Type ElementTy = GetFirst->getType();
+    Type ElementTy = GetFirstAndAdvance->getType();
     if (TC.coerceToType(S->getPattern(), ElementTy)) return nullptr;
     
-    // Compute the expression that drops the first value from the range.
-    Expr *DropFirst
-      = callNullaryMethodOf(
-          new (TC.Context) DeclRefExpr(Range, S->getInLoc(),
-                                       Range->getTypeOfReference()),
-          TC.Context.getIdentifier("dropFirst"),
-          S->getInLoc(), diag::foreach_range_dropfirst,
-          diag::foreach_nonfunc_range_dropfirst);
-    if (!DropFirst) return nullptr;
-    S->setRangeDropFirst(DropFirst);
     
     // Type-check the body of the loop.
     BraceStmt *Body = S->getBody();

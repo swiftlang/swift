@@ -162,7 +162,6 @@ class CaptureAnalysisVisitor : public ASTWalker {
       FES->getRangeEmpty()->walk(*this);
       WalkPattern(FES->getElementInit()->getPattern());
       FES->getElementInit()->getInit()->walk(*this);
-      FES->getRangeDropFirst()->walk(*this);
       FES->getBody()->walk(*this);
       return false;
     }

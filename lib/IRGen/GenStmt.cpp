@@ -233,12 +233,6 @@ void IRGenFunction::emitForEachStmt(ForEachStmt *S) {
     FullExpr Scope(*this);
     emitPatternBindingDecl(S->getElementInit());
     emitStmt(S->getBody());
-
-    // Drop the first element in the range
-    if (Builder.hasValidIP()) {
-      FullExpr Scope(*this);
-      emitIgnored(S->getRangeDropFirst());
-    }
     
     // Loop back to the header.
     if (Builder.hasValidIP()) {

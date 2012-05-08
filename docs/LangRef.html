@@ -2334,15 +2334,12 @@ if vec[3] {
     should terminate.</dd>
   </dl>
 
-  <dt><tt>getFirst() -> T</tt></dt>
-  <dd>Retrieves the first element in the range. The type <tt>T</tt>
-  can be any materializable type, and will be used to initialize the
-  variables in the <tt>pattern</tt>.</dd>
-
-  <dt><tt>dropFirst()</tt></dt>
-  <dd>Drops the first element in the range, reducing the length of the
-  range by one.</dd>
-  </dl></p>
+  <dt><tt>getFirstAndAdvance() -> T</tt></dt>
+  <dd>Retrieves the first element in the range then advances to the
+    next element in the range, reducing the length of the range by
+    one. The type <tt>T</tt> can be any materializable type, and will
+    be used to initialize the variables in the <tt>pattern</tt>.</dd>
+ </dl></p>
   
   <p>Some examples include:</p>
   

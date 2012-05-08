@@ -749,19 +749,14 @@ ERROR(foreach_range_isempty,sema_tcs,none,
 ERROR(foreach_nonfunc_range_isempty,sema_tcs,none,
       "'isEmpty' member of for-each range of type %0 is not a function",
       (Type))
-ERROR(foreach_range_getfirst,sema_tcs,none,
-      "no 'getfirst' member in for-each range of type %0", (Type))
-ERROR(foreach_nonfunc_range_getfirst,sema_tcs,none,
-      "'getfirst' member of for-each range of type %0 is not a function",
-      (Type))
+ERROR(foreach_range_getfirstandadvance,sema_tcs,none,
+      "no 'getFirstAndAdvance' member in for-each range of type %0", (Type))
+ERROR(foreach_nonfunc_range_getfirstandadvance,sema_tcs,none,
+      "'getFirstAndAdvance' member of for-each range of type %0 is not a "
+      "function", (Type))
 ERROR(foreach_nonmaterializable_element,sema_tcs,none,
-      "non-materializable element type %0 returned by getFirst() method of "
-      "range type %1", (Type, Type))
-ERROR(foreach_range_dropfirst,sema_tcs,none,
-      "no 'drp[first' member in for-each range of type %0", (Type))
-ERROR(foreach_nonfunc_range_dropfirst,sema_tcs,none,
-      "'dropfirst' member of for-each range of type %0 is not a function",
-      (Type))
+      "non-materializable element type %0 returned by getFirstAndAdvance() "
+      "method of range type %1", (Type, Type))
 
 //------------------------------------------------------------------------------
 // Type Check Patterns
