@@ -229,7 +229,7 @@ public:
   FuncDecl *parseDeclFunc(bool hasContainerType = false);
   Decl *parseDeclProtocol();
   bool parseProtocolBody(SourceLoc ProtocolLoc, const DeclAttributes &Attrs,
-                         TypeAliasDecl *TypeName = 0);
+                         ProtocolDecl *Proto);
   
   bool parseDeclSubscript(bool HasContainerType,
                           SmallVectorImpl<Decl *> &Decls);

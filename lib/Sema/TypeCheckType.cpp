@@ -104,6 +104,7 @@ bool TypeChecker::validateType(Type InTy) {
       
   case TypeKind::MetaType:
   case TypeKind::Module:
+  case TypeKind::Protocol:
     // Nothing to validate.
     break;
 
@@ -199,14 +200,6 @@ bool TypeChecker::validateType(Type InTy) {
       IsInvalid = buildArraySliceType(*this, AT);
     break;
   }
-      
-  case TypeKind::Protocol: {
-    ProtocolType *PT = cast<ProtocolType>(T);
-    for (auto *member : PT->Elements)
-      typeCheckDecl(member);
-    break;
-  }
-
   }
 
   // If we determined that this type is invalid, erase it in the caller.

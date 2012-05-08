@@ -115,15 +115,6 @@ public:
   }
   
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    // Check for a protocol or oneof declaration.  This avoids redundant
-    // work because only an actual protocol or oneof declaration can cause
-    // the type to be *directly* the underlying type of a typealias.
-    Type type = TAD->getUnderlyingType();
-    if (ProtocolType *protocol = dyn_cast<ProtocolType>(type)) {
-      for (ValueDecl *member : protocol->Elements)
-        visit(member);
-    }
-
     TC.validateType(TAD->getAliasType());
   }
 
@@ -132,6 +123,11 @@ public:
       visitOneOfElementDecl(elt);
   }
 
+  void visitProtocolDecl(ProtocolDecl *PD) {
+    for (ValueDecl *member : PD->getElements())
+      visit(member);
+  }
+  
   void visitVarDecl(VarDecl *VD) {
     // Delay type-checking on VarDecls until we see the corresponding
     // PatternBindingDecl.

@@ -247,20 +247,15 @@ ArraySliceType *ArraySliceType::get(Type base, SourceLoc loc, ASTContext &C) {
 /// getNew - Return a new instance of a protocol type.  These are never
 /// uniqued since each syntactic instance of them is semantically considered
 /// to be a different type.
-ProtocolType *ProtocolType::getNew(SourceLoc ProtocolLoc,
-                                   ArrayRef<ValueDecl*> Elts,
-                                   TypeAliasDecl *TheDecl) {
+ProtocolType *ProtocolType::getNew(ProtocolDecl *TheDecl) {
   ASTContext &C = TheDecl->getASTContext();
-  return new (C) ProtocolType(ProtocolLoc, C.AllocateCopy(Elts), TheDecl);
+  return new (C) ProtocolType(TheDecl);
 }
 
-ProtocolType::ProtocolType(SourceLoc ProtocolLoc, ArrayRef<ValueDecl*> Elts,
-                           TypeAliasDecl *TheDecl)
+ProtocolType::ProtocolType(ProtocolDecl *TheDecl)
   : TypeBase(TypeKind::Protocol, &TheDecl->getASTContext(),
              /*Dependent=*/false),
-    DeclContext(DeclContextKind::ProtocolType, TheDecl->getDeclContext()),
-    ProtocolLoc(ProtocolLoc), Elements(Elts), TheDecl(TheDecl) {
-}
+    TheDecl(TheDecl) { }
 
 LValueType *LValueType::get(Type objectTy, Qual quals, ASTContext &C) {
   auto key = std::make_pair(objectTy, quals.getOpaqueData());

@@ -168,7 +168,7 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     // that's no excuse for not mangling *something* in here.
     break;
 
-  case DeclContextKind::ProtocolType:
+  case DeclContextKind::ProtocolDecl:
     // It's not clear what members would be here that need to be mangled.
     llvm_unreachable("reference to member of protocol?");
   }

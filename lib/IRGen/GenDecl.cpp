@@ -132,6 +132,10 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
     IGM.emitExtension(cast<ExtensionDecl>(D));
     return;
 
+  case DeclKind::Protocol:
+    // FIXME: Will want to emit metadata, eventually.
+    return;
+      
   case DeclKind::PatternBinding:
     emitPatternBindingDecl(cast<PatternBindingDecl>(D));
     return;
@@ -309,8 +313,10 @@ static void addOwnerArgument(ASTContext &ctx, ValueDecl *value,
     uncurryLevel++;
     return;
 
-  case DeclContextKind::ProtocolType:
-    resultType = addOwnerArgument(ctx, cast<ProtocolType>(DC), resultType);
+  case DeclContextKind::ProtocolDecl:
+    resultType = addOwnerArgument(ctx,
+                                  cast<ProtocolDecl>(DC)->getDeclaredType(),
+                                  resultType);
     uncurryLevel++;
     return;
   }
@@ -409,6 +415,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     case DeclKind::Import:
     case DeclKind::OneOfElement:
     case DeclKind::TopLevelCode:
+    case DeclKind::Protocol:
       llvm_unreachable("decl not allowed in extension!");
 
     // PatternBindingDecls don't really make sense here, but we
@@ -454,6 +461,7 @@ void IRGenFunction::emitLocal(Decl *D) {
   case DeclKind::Import:
   case DeclKind::Subscript:
   case DeclKind::TopLevelCode:
+  case DeclKind::Protocol:
     llvm_unreachable("declaration cannot appear in local scope");
 
   case DeclKind::OneOf:

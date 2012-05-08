@@ -69,7 +69,7 @@ Resilience ValueDecl::getResilienceFrom(Component *C) const {
       // FIXME: we can't use the ExtensionDecl, it has no attrs.
       return Resilience::Fragile;
 
-    case DeclContextKind::ProtocolType:
+    case DeclContextKind::ProtocolDecl:
       // FIXME: no attrs here, either.
       return Resilience::Fragile;
     }

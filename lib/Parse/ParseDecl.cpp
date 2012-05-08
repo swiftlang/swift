@@ -1319,11 +1319,14 @@ Decl *Parser::parseDeclProtocol() {
                       diag::expected_identifier_in_decl, "protocol"))
     return 0;
   
-  TypeAliasDecl *TAD =
-    new (Context) TypeAliasDecl(NameLoc, ProtocolName, Type(), CurDeclContext);
-  if (parseProtocolBody(ProtocolLoc, Attributes, TAD))
+  ProtocolDecl *Proto = new (Context) ProtocolDecl(CurDeclContext, ProtocolLoc,
+                                                   NameLoc, ProtocolName);
+  Proto->setDeclaredType(ProtocolType::getNew(Proto));
+  Proto->setType(MetaTypeType::get(Proto));
+  ContextChange CC(*this, Proto);
+  if (parseProtocolBody(ProtocolLoc, Attributes, Proto))
     return 0;
-  return TAD;
+  return Proto;
 }
 
 ///   protocol-body:
@@ -1335,8 +1338,9 @@ Decl *Parser::parseDeclProtocol() {
 ///
 bool Parser::parseProtocolBody(SourceLoc ProtocolLoc, 
                                const DeclAttributes &Attributes,
-                               TypeAliasDecl *TypeName) {
+                               ProtocolDecl *Proto) {
   // Parse the body.
+  SourceLoc LBraceLoc = Tok.getLoc();
   if (parseToken(tok::l_brace, diag::expected_lbrace_protocol_type))
     return true;
   
@@ -1363,21 +1367,16 @@ bool Parser::parseProtocolBody(SourceLoc ProtocolLoc,
     }
   } while (Tok.isNot(tok::r_brace));
   
-  consumeToken(tok::r_brace);
+  SourceLoc RBraceLoc = consumeToken(tok::r_brace);
   
   
   // Act on what we've parsed.
   if (!Attributes.empty())
     diagnose(Attributes.LSquareLoc, diag::protocol_attributes);
-  
-  ProtocolType *NewProto = ProtocolType::getNew(ProtocolLoc, Elements,TypeName);
-  
-  // Install all of the members of protocol into the protocol's DeclContext.
-  for (Decl *D : Elements)
-    D->setDeclContext(NewProto);
-  
-  // Complete the pretty name for this type.
-  TypeName->setUnderlyingType(NewProto);
+
+  // Install the protocol elements.
+  Proto->setElements(Context.AllocateCopy(Elements),
+                     SourceRange(LBraceLoc, RBraceLoc));
   
   return false;
 }

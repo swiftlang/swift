@@ -117,6 +117,7 @@ bool ValueDecl::isDefinition() const {
   case DeclKind::OneOf:
   case DeclKind::OneOfElement:
   case DeclKind::TypeAlias:
+  case DeclKind::Protocol:
     return true;
   }
 }
@@ -142,6 +143,8 @@ bool ValueDecl::isInstanceMember() const {
 Type TypeDecl::getDeclaredType() {
   if (auto TAD = dyn_cast<TypeAliasDecl>(this))
     return TAD->getAliasType();
+  if (auto PD = dyn_cast<ProtocolDecl>(this))
+    return PD->getDeclaredType();
   assert(isa<OneOfDecl>(this));
   return cast<OneOfDecl>(this)->getDeclaredType();
 }
@@ -214,9 +217,8 @@ Type FuncDecl::getExtensionType() const {
   case DeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(DC)->getExtendedType();
     
-  case DeclContextKind::ProtocolType:
-    // FIXME: It's not really clear how protocol types should get passed.
-    return cast<ProtocolType>(DC);
+  case DeclContextKind::ProtocolDecl:
+    return cast<ProtocolDecl>(DC)->getDeclaredType();
   }
   llvm_unreachable("bad context kind");
 }
@@ -349,6 +351,15 @@ namespace {
       OS << "')";
     }
 
+    void visitProtocolDecl(ProtocolDecl *PD) {
+      printCommon(PD, "protocol");
+      for (auto VD : PD->getElements()) {
+        OS << '\n';
+        printRec(VD);
+      }
+      OS << ")";
+    }
+    
     void printCommon(ValueDecl *VD, const char *Name) {
       printCommon((Decl*)VD, Name);
       OS << ' ';

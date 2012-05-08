@@ -308,10 +308,10 @@ static Expr *BindNameToIVar(UnresolvedDeclRefExpr *UDRE, FuncDecl *CurFD,
   // For a static method, we perform name lookup in the corresponding metatype.
   TypeDecl *StaticAlias = 0;
   if (CurFD->isStatic()) {
-    if (ProtocolType *Proto = ExtendedType->getAs<ProtocolType>())
-      StaticAlias = Proto->TheDecl;
-    else if (OneOfType *OneOf = ExtendedType->getAs<OneOfType>())
+    if (OneOfType *OneOf = ExtendedType->getAs<OneOfType>())
       StaticAlias = OneOf->getDecl();
+    else if (ProtocolType *Proto = ExtendedType->getAs<ProtocolType>())
+      StaticAlias = Proto->getDecl();
     else
       return 0;
     

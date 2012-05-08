@@ -712,8 +712,8 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
   TypeDecl *DestTyDecl = 0;
   if (OneOfType *OneOfTy = DestTy->getAs<OneOfType>())
     DestTyDecl = OneOfTy->getDecl();
-  else if (ProtocolType *ProtocolTy = DestTy->getAs<ProtocolType>())
-    DestTyDecl = ProtocolTy->TheDecl;
+  else if (ProtocolType *ProtoTy = DestTy->getAs<ProtocolType>())
+    DestTyDecl = ProtoTy->getDecl();
   else {
     if (Apply)
       diagnose(E->getLoc(), diag::nonstring_interpolation_type, DestTy);

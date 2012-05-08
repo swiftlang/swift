@@ -441,6 +441,7 @@ public:
   static bool classof(const TypeAliasDecl *D) { return true; }
 };
 
+
 class OneOfDecl : public TypeDecl, public DeclContext {
   SourceLoc OneOfLoc;
   ArrayRef<OneOfElementDecl*> Elements;
@@ -476,6 +477,53 @@ public:
   static bool classof(const OneOfDecl *D) { return true; }
   static bool classof(const DeclContext *C) {
     return C->getContextKind() == DeclContextKind::OneOfDecl;
+  }
+};
+
+/// ProtocolDecl - A declaration of a protocol, for example:
+///
+///   protocol Drawable {
+///     func draw()
+///   }
+class ProtocolDecl : public TypeDecl, public DeclContext {
+  SourceLoc ProtocolLoc;
+  SourceLoc NameLoc;
+  SourceRange Braces;
+  MutableArrayRef<ValueDecl *> Elements;
+  Type ProtocolTy;
+  
+public:
+  ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
+               Identifier Name)
+    : TypeDecl(DeclKind::Protocol, DC, Name, Type()),
+  DeclContext(DeclContextKind::ProtocolDecl, DC),
+  ProtocolLoc(ProtocolLoc), NameLoc(NameLoc) { }
+  
+  using Decl::getASTContext;
+  
+  MutableArrayRef<ValueDecl *> getElements() { return Elements; }
+  ArrayRef<ValueDecl *> getElements() const { return Elements; }
+  void setElements(MutableArrayRef<ValueDecl *> E,
+                   SourceRange B) {
+    Elements = E;
+    Braces = B;
+  }
+  
+  Type getDeclaredType() const { return ProtocolTy; }
+  void setDeclaredType(Type Ty) { ProtocolTy = Ty; }
+  
+  SourceLoc getLocStart() const { return ProtocolLoc; }
+  SourceLoc getLoc() const { return NameLoc; }
+  SourceRange getSourceRange() { return SourceRange(ProtocolLoc, Braces.End); }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::Protocol;
+  }
+  static bool classof(const ProtocolDecl *D) { return true; }
+  
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::ProtocolDecl;
   }
 };
 

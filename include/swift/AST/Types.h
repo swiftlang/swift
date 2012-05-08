@@ -36,6 +36,7 @@ namespace swift {
   class TypeDecl;
   class OneOfDecl;
   class OneOfElementDecl;
+  class ProtocolDecl;
   class ValueDecl;
   class Module;
   
@@ -702,36 +703,29 @@ public:
 
 /// ProtocolType - A protocol type describes an abstract interface implemented
 /// by another type.
-class ProtocolType : public TypeBase, public DeclContext {
+class ProtocolType : public TypeBase {
+  /// TheDecl - The protocol declaration, which stores most of the information
+  /// about the protocol type.
+  ProtocolDecl * const TheDecl;
+  
 public:
-  SourceLoc ProtocolLoc;
-
-  const ArrayRef<ValueDecl*> Elements;
-
-  /// TheDecl - This is the TypeAlias that the oneof was declared with.  It
-  /// specifies the name and other useful information about this type.
-  TypeAliasDecl * const TheDecl;
-
   /// getNew - Return a new instance of a protocol type.  These are never
   /// uniqued since each syntactic instance of them is semantically considered
   /// to be a different type.
-  static ProtocolType *getNew(SourceLoc ProtocolLoc, ArrayRef<ValueDecl*> Elts,
-                              TypeAliasDecl *TheDecl);
+  static ProtocolType *getNew(ProtocolDecl *TheDecl);
+  
+  ProtocolDecl *getDecl() const { return TheDecl; }
   
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const ArrayType *) { return true; }
+  static bool classof(const ProtocolType *) { return true; }
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Protocol;
   }
-  static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::ProtocolType;
-  }
 
 private:
-  ProtocolType(SourceLoc ProtocolLoc, ArrayRef<ValueDecl*> Elts,
-               TypeAliasDecl *TheDecl);
+  ProtocolType(ProtocolDecl *TheDecl);
 };
 
 /// LValueType - An l-value is a handle to a physical object.  The

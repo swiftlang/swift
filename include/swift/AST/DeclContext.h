@@ -53,7 +53,7 @@ enum class DeclContextKind {
   CapturingExpr,
   OneOfDecl,
   ExtensionDecl,
-  ProtocolType,
+  ProtocolDecl,
   TopLevelCodeDecl,
   
   First_Module = TranslationUnit, Last_Module = BuiltinModule,
@@ -97,7 +97,7 @@ public:
   /// an extension, or a protocol.
   bool isTypeContext() const {
     return getContextKind() >= DeclContextKind::OneOfDecl &&
-           getContextKind() <= DeclContextKind::ProtocolType;
+           getContextKind() <= DeclContextKind::ProtocolDecl;
   }
   
   /// Returns the semantic parent of this context.  A context has a

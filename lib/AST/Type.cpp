@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Types.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/AST.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/Support/raw_ostream.h"
@@ -539,10 +540,7 @@ void ArrayType::print(raw_ostream &OS) const {
 }
 
 void ProtocolType::print(raw_ostream &OS) const {
-  OS << "protocol {";
-  for (Decl *D : Elements)
-    D->print(OS);
-  OS << '}';
+  OS << TheDecl->getName().str();
 }
 
 void LValueType::print(raw_ostream &OS) const {
