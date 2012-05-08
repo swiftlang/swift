@@ -1133,50 +1133,51 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
   
-  SourceLoc NameLoc = Tok.getLoc();
   Identifier OneOfName;
   if (parseIdentifier(OneOfName, diag::expected_identifier_in_decl, "oneof"))
     return true;
-  
-  TypeAliasDecl *TAD =
-    new (Context) TypeAliasDecl(NameLoc, OneOfName, Type(), CurDeclContext);
-  Decls.push_back(TAD);
 
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_oneof_type))
     return true;
-  
+
+  OneOfDecl *OOD = new (Context) OneOfDecl(OneOfLoc, OneOfName, CurDeclContext);
+  Decls.push_back(OOD);
   SmallVector<OneOfElementInfo, 8> ElementInfos;
-  
-  // Parse the comma separated list of oneof elements.
-  while (Tok.is(tok::identifier)) {
-    OneOfElementInfo ElementInfo;
-    ElementInfo.Name = Tok.getText();
-    ElementInfo.NameLoc = Tok.getLoc();
-    ElementInfo.EltType = 0;
+
+  {
+    ContextChange CC(*this, OOD);
+
+    // Parse the comma separated list of oneof elements.
+    while (Tok.is(tok::identifier)) {
+      OneOfElementInfo ElementInfo;
+      ElementInfo.Name = Tok.getText();
+      ElementInfo.NameLoc = Tok.getLoc();
+      ElementInfo.EltType = 0;
     
-    consumeToken(tok::identifier);
+      consumeToken(tok::identifier);
     
-    // See if we have a type specifier for this oneof element.  If so, parse it.
-    if (consumeIf(tok::colon) &&
-        parseTypeAnnotation(ElementInfo.EltType,
-                            diag::expected_type_oneof_element)) {
-      skipUntil(tok::r_brace);
-      return true;
+      // See if we have a type specifier for this oneof element.  If so, parse it.
+      if (consumeIf(tok::colon) &&
+          parseTypeAnnotation(ElementInfo.EltType,
+                              diag::expected_type_oneof_element)) {
+        skipUntil(tok::r_brace);
+        return true;
+      }
+    
+      ElementInfos.push_back(ElementInfo);
+    
+      // Require comma separation.
+      if (!consumeIf(tok::comma))
+        break;
     }
-    
-    ElementInfos.push_back(ElementInfo);
-    
-    // Require comma separation.
-    if (!consumeIf(tok::comma))
-      break;
   }
 
-  OneOfType *Result = actOnOneOfType(OneOfLoc, Attributes, ElementInfos, TAD);
+  actOnOneOfDecl(OneOfLoc, Attributes, ElementInfos, OOD);
 
   // Parse the extended body of the oneof.
   if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof))
-    Decls.push_back(parseExtensionBody(OneOfLoc, Result));
+    Decls.push_back(parseExtensionBody(OneOfLoc, OOD->getDeclaredType()));
   
   parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_oneof_type,
                      LBLoc, diag::opening_brace);
@@ -1184,24 +1185,22 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
   return false;
 }
 
-/// actOnOneOfType - Generate a oneof type and wire it into the scope tree.
+/// actOnOneOfDecl - Generate a oneof type and wire it into the scope tree.
 /// This is functionality shared by the different sugared forms of oneof types.
 ///
-OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
-                                  const DeclAttributes &Attrs,
-                                  ArrayRef<OneOfElementInfo> Elts,
-                                  TypeAliasDecl *PrettyTypeName) {
+void Parser::actOnOneOfDecl(SourceLoc OneOfLoc,
+                            const DeclAttributes &Attrs,
+                            ArrayRef<OneOfElementInfo> Elts,
+                            OneOfDecl *OOD) {
   // No attributes are valid on oneof types at this time.
   if (!Attrs.empty())
     diagnose(Attrs.LSquareLoc, diag::oneof_attributes);
   
   llvm::SmallPtrSet<const char *, 16> SeenSoFar;
   SmallVector<OneOfElementDecl *, 16> EltDecls;
-  
-  // If we have a PrettyTypeName to use, use it.  Otherwise, just assign the
-  // constructors a temporary dummy type.
-  Type AliasTy = PrettyTypeName->getAliasType();
-  
+
+  Type AliasTy = OOD->getDeclaredType();
+
   for (const OneOfElementInfo &Elt : Elts) {
     Identifier NameI = Context.getIdentifier(Elt.Name);
     
@@ -1229,21 +1228,12 @@ OneOfType *Parser::actOnOneOfType(SourceLoc OneOfLoc,
     // Create a decl for each element, giving each a temporary type.
     EltDecls.push_back(new (Context) OneOfElementDecl(Elt.NameLoc, NameI,
                                                       EltTy, Elt.EltType,
-                                                      CurDeclContext));
+                                                      OOD));
   }
-  
-  OneOfType *Result = OneOfType::getNew(OneOfLoc, EltDecls, PrettyTypeName);
-  for (OneOfElementDecl *D : EltDecls)
-    D->setDeclContext(Result);
-  
-  // Complete the type alias to its actual type.
-  PrettyTypeName->setUnderlyingType(Result);
-  
-  // Inject the type name into the containing scope so that it can be found as a
-  // metatype.
-  ScopeInfo.addToScope(PrettyTypeName);
 
-  return Result;
+  OOD->setElements(Context.AllocateCopy(EltDecls));
+
+  ScopeInfo.addToScope(OOD);
 }
 
 
@@ -1261,22 +1251,25 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
-  
+
   Identifier StructName;
   SourceLoc LBLoc, RBLoc;
   if (parseIdentifier(StructName, diag::expected_identifier_in_decl, "struct")||
       parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct))
     return true;
 
-  // Get the TypeAlias for the name that we'll eventually have.
-  TypeAliasDecl *TAD =
-    new (Context) TypeAliasDecl(StructLoc, StructName, Type(), CurDeclContext);
+  OneOfDecl *OOD = new (Context) OneOfDecl(StructLoc, StructName,
+                                           CurDeclContext);
+  Decls.push_back(OOD);
 
   // Parse elements of the body as a tuple body.
   Type BodyTy;
-  if (parseTypeTupleBody(LBLoc, BodyTy))
-    return true;
-  assert(isa<TupleType>(BodyTy.getPointer()));
+  {
+    ContextChange CC(*this, OOD);
+    if (parseTypeTupleBody(LBLoc, BodyTy))
+      return true;
+    assert(isa<TupleType>(BodyTy.getPointer()));
+  }
   
   // Reject any unnamed members.
   for (auto Elt : BodyTy->castTo<TupleType>()->getFields())
@@ -1285,8 +1278,6 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
       // have custom parsing logic instead of reusing type-tuple-body.
       diagnose(LBLoc, diag::struct_unnamed_member);
     }
-
-  Decls.push_back(TAD);
   
   // The 'struct' is syntactically fine, invoke the semantic actions for the
   // syntactically expanded oneof type.  Struct declarations are just sugar for
@@ -1295,13 +1286,13 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   ElementInfo.Name = StructName.str();
   ElementInfo.NameLoc = StructLoc;
   ElementInfo.EltType = BodyTy;
-  OneOfType *OneOfTy = actOnOneOfType(StructLoc, Attributes, ElementInfo, TAD);
-  assert(OneOfTy->isTransparentType() && "Somehow isn't a struct?");
+  actOnOneOfDecl(StructLoc, Attributes, ElementInfo, OOD);
+  assert(OOD->isTransparentType() && "Somehow isn't a struct?");
 
   // Parse the extended body of the struct.
   if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof))
-    Decls.push_back(parseExtensionBody(StructLoc, OneOfTy));
-  
+    Decls.push_back(parseExtensionBody(StructLoc, OOD->getDeclaredType()));
+
   if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_struct,
                          LBLoc, diag::opening_brace))
     return true;

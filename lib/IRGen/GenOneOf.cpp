@@ -64,7 +64,7 @@ namespace {
     llvm::ConstantInt *getDiscriminatorIndex(OneOfElementDecl *target) const {
       // FIXME: using a linear search here is fairly ridiculous.
       unsigned index = 0;
-      for (auto elt : cast<OneOfType>(target->getDeclContext())->getElements()) {
+      for (auto elt : cast<OneOfDecl>(target->getDeclContext())->getElements()) {
         if (elt == target) break;
         index++;
       }
@@ -284,16 +284,17 @@ namespace {
 
 const TypeInfo *
 TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
-  llvm::StructType *convertedStruct = IGM.createNominalType(T->getDecl());
+  OneOfDecl *D = T->getDecl();
+  llvm::StructType *convertedStruct = IGM.createNominalType(D);
 
   // We don't need a discriminator if this is a singleton ADT.
-  if (T->getElements().size() == 1) {
+  if (D->getElements().size() == 1) {
     SingletonOneofTypeInfo *convertedTInfo =
       new SingletonOneofTypeInfo(convertedStruct, Size(0), Alignment(0), IsPOD);
     assert(!IGM.Types.Converted.count(T));
     IGM.Types.Converted.insert(std::make_pair(T, convertedTInfo));
 
-    Type eltType = T->getElement(0)->getArgumentType();
+    Type eltType = D->getElements()[0]->getArgumentType();
 
     llvm::Type *storageType;
     if (eltType.isNull()) {
@@ -319,13 +320,13 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
   // Otherwise, we need a discriminator.
   llvm::Type *discriminatorType;
   Size discriminatorSize;
-  if (T->getElements().size() == 2) {
+  if (D->getElements().size() == 2) {
     discriminatorType = IGM.Int1Ty;
     discriminatorSize = Size(1);
-  } else if (T->getElements().size() <= (1 << 8)) {
+  } else if (D->getElements().size() <= (1 << 8)) {
     discriminatorType = IGM.Int8Ty;
     discriminatorSize = Size(1);
-  } else if (T->getElements().size() <= (1 << 16)) {
+  } else if (D->getElements().size() <= (1 << 16)) {
     discriminatorType = IGM.Int16Ty;
     discriminatorSize = Size(2);
   } else {
@@ -341,7 +342,7 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
   IsPOD_t isPOD = IsPOD;
 
   // Figure out how much storage we need for the union.
-  for (auto &elt : T->getElements()) {
+  for (auto &elt : D->getElements()) {
     // Ignore variants that carry no data.
     Type eltType = elt->getArgumentType();
     if (eltType.isNull()) continue;
@@ -430,8 +431,8 @@ void swift::irgen::emitOneOfElementRef(IRGenFunction &IGF,
                                        Explosion &result) {
   // Find the injection function.
   llvm::Function *injection;
-  OneOfType *ParentOneOf = cast<OneOfType>(elt->getDeclContext());
-  if (ParentOneOf->getDecl()->getDeclContext()->isLocalContext())
+  OneOfDecl *ParentOneOf = cast<OneOfDecl>(elt->getDeclContext());
+  if (ParentOneOf->getDeclContext()->isLocalContext())
     injection = IGF.getAddrOfLocalInjectionFunction(elt);
   else
     injection = IGF.IGM.getAddrOfGlobalInjectionFunction(elt);
@@ -468,7 +469,7 @@ static void emitInjectionFunction(IRGenModule &IGM,
 /// emitOneOfType - Emit all the declarations associated with this oneof type.
 void IRGenModule::emitOneOfType(OneOfType *oneof) {
   const OneofTypeInfo &typeInfo = getFragileTypeInfo(oneof).as<OneofTypeInfo>();
-  for (auto elt : oneof->getElements()) {
+  for (auto elt : oneof->getDecl()->getElements()) {
     llvm::Function *fn = getAddrOfGlobalInjectionFunction(elt);
     emitInjectionFunction(*this, fn, typeInfo, elt);
   }
@@ -476,7 +477,7 @@ void IRGenModule::emitOneOfType(OneOfType *oneof) {
 
 void IRGenFunction::emitOneOfType(OneOfType *oneof) {
   const OneofTypeInfo &typeInfo = getFragileTypeInfo(oneof).as<OneofTypeInfo>();
-  for (auto elt : oneof->getElements()) {
+  for (auto elt : oneof->getDecl()->getElements()) {
     llvm::Function *fn = getAddrOfLocalInjectionFunction(elt);
     emitInjectionFunction(IGM, fn, typeInfo, elt);
   }

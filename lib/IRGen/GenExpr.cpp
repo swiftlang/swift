@@ -84,6 +84,7 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E) {
     llvm_unreachable("decl is not a value decl");
 
   case DeclKind::TypeAlias:
+  case DeclKind::OneOf:
   case DeclKind::Func:
   case DeclKind::OneOfElement:
     llvm_unreachable("decl cannot be emitted as an l-value");
@@ -110,7 +111,8 @@ static void emitDeclRef(IRGenFunction &IGF, DeclRefExpr *E,
     llvm_unreachable("decl is not a value decl");
 
   case DeclKind::TypeAlias:
-    emitMetaTypeRef(IGF, cast<TypeAliasDecl>(D)->getAliasType(), explosion);
+  case DeclKind::OneOf:
+    emitMetaTypeRef(IGF, D->getType(), explosion);
     return;
 
   case DeclKind::Var:
@@ -396,6 +398,7 @@ namespace {
 
     // These are potentially supportable.
     NON_LOCATEABLE(TypeAliasDecl)
+    NON_LOCATEABLE(OneOfDecl)
 
     // FIXME: Not really a ValueDecl.
     NON_LOCATEABLE(SubscriptDecl);

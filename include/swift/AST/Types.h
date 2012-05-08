@@ -33,6 +33,8 @@ namespace swift {
   class Expr;
   class Identifier;
   class TypeAliasDecl;
+  class TypeDecl;
+  class OneOfDecl;
   class OneOfElementDecl;
   class ValueDecl;
   class Module;
@@ -330,7 +332,6 @@ public:
   }
 };
 
-    
 /// IdentifierType - A use of a type through a (possibly dotted) name, like
 /// "foo" or "a.b.c".  These are never canonical and never uniqued, as they
 /// carry location info for each identifier.
@@ -501,53 +502,17 @@ public:
 private:
   TupleType(ArrayRef<TupleTypeElt> fields, ASTContext *CanCtx);
 };
-  
-/// OneOfType - a 'oneof' type.  This represents the oneof type itself, not its
-/// elements (which are OneOfElementDecl's).  This is a DeclContext because it
-/// owns its OneOfElementDecl's.
-class OneOfType : public TypeBase, public DeclContext {
-  const SourceLoc OneOfLoc;
-  const ArrayRef<OneOfElementDecl*> Elements;
-  
-  /// TheDecl - This is the TypeAlias that the oneof was declared with.  It
+
+/// OneOfType - This represents the type declared by a OneOfDecl
+class OneOfType : public TypeBase {  
+  /// TheDecl - This is the TypeDecl which declares the given type. It
   /// specifies the name and other useful information about this type.
-  TypeAliasDecl * const TheDecl;
+  OneOfDecl * const TheDecl;
   
 public:
-  /// getNew - Return a new instance of oneof type.  These are never uniqued
-  /// since each syntactic instance of them is semantically considered to be a
-  /// different type.
-  static OneOfType *getNew(SourceLoc OneOfLoc,
-                           ArrayRef<OneOfElementDecl*> Elements,
-                           TypeAliasDecl *TheDecl);
+  /// getDecl() - Returns the decl which declares this type.
+  OneOfDecl *getDecl() const { return TheDecl; }
 
-  /// getOneOfLoc() - Returns the location of the 'oneof' keyword.
-  SourceLoc getOneOfLoc() const { return OneOfLoc; }
-
-  /// getElements() - Returns the elements of the type.
-  ArrayRef<OneOfElementDecl*> getElements() const { return Elements; }
-
-  /// getDecl() - Returns the alias declaration for this 'oneof'.
-  TypeAliasDecl *getDecl() const { return TheDecl; }
- 
-  SourceLoc getLocStart() const { return OneOfLoc; }
-  OneOfElementDecl *getElement(unsigned i) const {
-    assert(i < Elements.size() && "Invalid index");
-    return Elements[i];
-  }
-  
-  OneOfElementDecl *getElement(Identifier Name) const;
-  
-  /// isTransparentType - Return true if this 'oneof' is transparent
-  /// and be treated exactly like some other type.  This is true if
-  /// this is a single element oneof whose one element has an explicit
-  /// argument type.  These are typically (but not necessarily) made
-  /// with 'struct'.  Since it is unambiguous which slice is being
-  /// referenced, various syntactic forms are allowed for these, like
-  /// direct "foo.x" syntax.
-  bool isTransparentType() const;
-  Type getTransparentType() const;
-  
   void print(raw_ostream &O) const;
   
   // Implement isa/cast/dyncast/etc.
@@ -555,13 +520,10 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OneOf;
   }
-  static bool classof(const DeclContext *C) {
-    return C->getContextKind() == DeclContextKind::OneOfType;
-  }
   
 private:
-  OneOfType(SourceLoc OneOfLoc, ArrayRef<OneOfElementDecl*> Elts,
-            TypeAliasDecl *TheDecl);
+  OneOfType(OneOfDecl *TheDecl, ASTContext &Ctx);
+  friend class OneOfDecl;
 };
 
 /// MetaTypeType - This is the type given to a metatype value.  When a type is
@@ -570,17 +532,14 @@ private:
 ///
 ///  struct x { ... }  // declares type 'x' and metatype 'x'.
 ///  x.a()             // use of the metatype value since its a value context.
-///
-/// MetaTypeType is typically given to TypeAliasDecl, and can also exist on
-/// DeclRefExpr, ParenExpr, etc.
 class MetaTypeType : public TypeBase {
-  TypeAliasDecl *const TheType;
+  TypeDecl *const TheType;
   
 public:
-  /// get - Return the MetaTypeType for the specified type.
-  static MetaTypeType *get(TypeAliasDecl *Type);
+  /// get - Return the MetaTypeType for the specified type declaration.
+  static MetaTypeType *get(TypeDecl *Type);
 
-  TypeAliasDecl *getTypeDecl() const { return TheType; }
+  TypeDecl *getTypeDecl() const { return TheType; }
 
   void print(raw_ostream &O) const;
   
@@ -591,11 +550,8 @@ public:
   }
   
 private:
-  MetaTypeType(TypeAliasDecl *Type, ASTContext &Ctx)
-    : TypeBase(TypeKind::MetaType, &Ctx, // Always canonical
-               /*Dependent=*/false),
-      TheType(Type) {
-  }
+  MetaTypeType(TypeDecl *Type, ASTContext *Ctx);
+  friend class TypeDecl;
 };
   
 /// ModuleType - This is the type given to a module value, e.g. the "Builtin" in

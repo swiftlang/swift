@@ -38,14 +38,14 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M) {
   // Type check metatype references, as in "some_type.some_member".  These are
   // special and can't have extensions.
   if (MetaTypeType *MTT = BaseTy->getAs<MetaTypeType>()) {
-    // The metatype represents an arbitrary named type: dig through the
-    // TypeAlias to see what we're dealing with.  If the typealias was erroneous
+    // The metatype represents an arbitrary named type: dig through to the
+    // declared type to see what we're dealing with.  If the type was erroneous
     // then silently squish this erroneous subexpression.
-    Type Ty = MTT->getTypeDecl()->getUnderlyingType();
-    
+    Type Ty = MTT->getTypeDecl()->getDeclaredType();
+
     // Handle references to the constructors of a oneof.
     if (OneOfType *OOTy = Ty->getAs<OneOfType>()) {
-      OneOfElementDecl *Elt = OOTy->getElement(Name);
+      OneOfElementDecl *Elt = OOTy->getDecl()->getElement(Name);
       if (Elt) {
         Results.push_back(Result::getIgnoreBase(Elt));
 
@@ -127,10 +127,13 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M) {
   // If this is a member access to a oneof with a single element constructor
   // (e.g. a struct), allow direct access to the type underlying the single
   // element.
-  if (OneOfType *OneOf = BaseTy->getAs<OneOfType>())
-    if (OneOf->isTransparentType())
-      if (TupleType *TT = OneOf->getTransparentType()->getAs<TupleType>())
+  if (OneOfType *OneOf = BaseTy->getAs<OneOfType>()) {
+    if (OneOf->getDecl()->isTransparentType()) {
+      Type SubType = OneOf->getDecl()->getTransparentType();
+      if (TupleType *TT = SubType->getAs<TupleType>())
         doTuple(TT, Name, true);
+    }
+  }
   
 
   // Look in any extensions that add methods to the base type.
@@ -138,7 +141,7 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M) {
   M.lookupGlobalExtensionMethods(BaseTy, Name, ExtensionMethods);
 
   for (ValueDecl *VD : ExtensionMethods) {
-    if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(VD)) {
+    if (TypeDecl *TAD = dyn_cast<TypeDecl>(VD)) {
       Results.push_back(Result::getIgnoreBase(TAD));
       continue;
     }
@@ -187,9 +190,9 @@ static Expr *lookThroughOneofs(Expr *E, ASTContext &Context) {
     BaseType = cast<LValueType>(BaseType)->getObjectType();
   
   OneOfType *Oneof = BaseType->castTo<OneOfType>();
-  assert(Oneof->isTransparentType());
+  assert(Oneof->getDecl()->isTransparentType());
   
-  Type ResultType = Oneof->getTransparentType();
+  Type ResultType = Oneof->getDecl()->getTransparentType();
   if (IsLValue)
     ResultType = makeSimilarLValue(ResultType, E->getType(), Context);
   return new (Context) LookThroughOneofExpr(E, ResultType);

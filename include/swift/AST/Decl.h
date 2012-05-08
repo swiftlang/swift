@@ -37,6 +37,7 @@ namespace swift {
   class Component;
   class DeclAttributes;
   class OneOfElementDecl;
+  class OneOfType;
   class NameAliasType;
   class Pattern;
   enum class Resilience : unsigned char;
@@ -366,13 +367,29 @@ public:
   static bool classof(const ValueDecl *D) { return true; }
 };  
 
+/// This is a common base class for declarations which declare a type.
+class TypeDecl : public ValueDecl {
+public:
+  TypeDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty) :
+    ValueDecl(K, DC, name, ty) {}
+
+  Type getDeclaredType();
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) {
+    return D->getKind() >= DeclKind::First_TypeDecl &&
+           D->getKind() <= DeclKind::Last_TypeDecl;
+  }
+  static bool classof(const TypeAliasDecl *D) { return true; }
+};
+
 /// TypeAliasDecl - This is a declaration of a typealias, for example:
 ///
 ///    typealias foo : int
 ///
 /// TypeAliasDecl's always have 'MetaTypeType' type.
 ///
-class TypeAliasDecl : public ValueDecl {
+class TypeAliasDecl : public TypeDecl {
   /// The type that represents this (sugared) name alias.
   mutable NameAliasType *AliasTy;
 
@@ -423,7 +440,44 @@ public:
   }
   static bool classof(const TypeAliasDecl *D) { return true; }
 };
-  
+
+class OneOfDecl : public TypeDecl, public DeclContext {
+  SourceLoc OneOfLoc;
+  ArrayRef<OneOfElementDecl*> Elements;
+  OneOfType *OneOfTy;
+
+public:
+  OneOfDecl(SourceLoc OneOfLoc, Identifier Name, DeclContext *DC);
+
+  ArrayRef<OneOfElementDecl*> getElements() { return Elements; }
+  void setElements(ArrayRef<OneOfElementDecl*> elems) { Elements = elems; }
+
+  SourceLoc getOneOfLoc() const { return OneOfLoc; }
+  SourceLoc getLocStart() const { return OneOfLoc; }
+
+  OneOfElementDecl *getElement(Identifier Name) const;
+
+  /// isTransparentType - Return true if this 'oneof' is transparent
+  /// and be treated exactly like some other type.  This is true if
+  /// this is a single element oneof whose one element has an explicit
+  /// argument type.  These are typically (but not necessarily) made
+  /// with 'struct'.  Since it is unambiguous which slice is being
+  /// referenced, various syntactic forms are allowed for these, like
+  /// direct "foo.x" syntax.
+  bool isTransparentType() const;
+  Type getTransparentType() const;
+
+  OneOfType *getDeclaredType() { return OneOfTy; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::OneOf;
+  }
+  static bool classof(const OneOfDecl *D) { return true; }
+  static bool classof(const DeclContext *C) {
+    return C->getContextKind() == DeclContextKind::OneOfDecl;
+  }
+};
 
 /// VarDecl - 'var' declaration.
 class VarDecl : public ValueDecl {

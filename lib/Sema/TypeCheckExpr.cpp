@@ -201,7 +201,7 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
 /// parentheses), rather than some variable of metatype type.
 static bool isDirectTypeReference(Expr *E) {
   if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->getSemanticsProvidingExpr()))
-    return isa<TypeAliasDecl>(DRE->getDecl());
+    return isa<TypeDecl>(DRE->getDecl());
   
   return false;
 }
@@ -259,7 +259,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // The metatype represents an arbitrary named type: dig through the
     // TypeAlias to see what we're dealing with.  If the typealias was erroneous
     // then silently squish this erroneous subexpression.
-    Type Ty = MT->getTypeDecl()->getUnderlyingType();
+    Type Ty = MT->getTypeDecl()->getDeclaredType();
     if (Ty->is<ErrorType>())
       return 0;  // Squelch an erroneous subexpression.
 
@@ -277,16 +277,16 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // TODO: We could allow constructing a tuple this way, though it is somewhat
     // silly and pointless to do so.
     if (OneOfType *OOT = Ty->getAs<OneOfType>()) {
+      OneOfDecl *OOD = OOT->getDecl();
       SmallVector<ValueDecl *, 4> Methods;
-      
+
       // Look for extension methods with the same name as the class.
       // FIXME: This should look specifically for constructors.
-      TU.lookupGlobalExtensionMethods(Ty, OOT->getDecl()->getName(),
-                                      Methods);
+      TU.lookupGlobalExtensionMethods(Ty, OOD->getName(), Methods);
       
       // Add each of the one-of elements.
       Methods.insert(Methods.begin(),
-                     OOT->getElements().begin(), OOT->getElements().end());
+                     OOD->getElements().begin(), OOD->getElements().end());
       Expr *FnRef = OverloadedDeclRefExpr::createWithCopy(Methods,
                                                           E1->getStartLoc());
       
@@ -558,7 +558,12 @@ public:
 
     // Build the expression "Slice<T>".
     Type implType = sliceType->getImplementationType();
-    ValueDecl *implTypeDecl = cast<NameAliasType>(implType)->getDecl();
+    ValueDecl *implTypeDecl;
+    // FIXME: There should be a better way to handle this.
+    if (isa<NameAliasType>(implType))
+      implTypeDecl = cast<NameAliasType>(implType)->getDecl();
+    else
+      implTypeDecl = cast<OneOfType>(implType)->getDecl();
     Expr *sliceTypeRef =
       visitDeclRefExpr(new (TC.Context) DeclRefExpr(implTypeDecl,
                                                     E->getNewLoc()));
@@ -969,9 +974,9 @@ bool TypeChecker::resolveDependentLiterals(Expr *&E) {
       SmallVector<ValueDecl*, 8> Decls;
       TC.TU.lookupGlobalValue(TC.Context.getIdentifier(name),
                               NLKind::UnqualifiedLookup, Decls);
-      if (Decls.size() != 1 || !isa<TypeAliasDecl>(Decls.back()))
+      if (Decls.size() != 1 || !isa<TypeDecl>(Decls.back()))
         return nullptr;
-      return cast<TypeAliasDecl>(Decls.back())->getAliasType();
+      return cast<TypeDecl>(Decls.back())->getDeclaredType();
     }
     
     Type getIntLiteralType(SourceLoc loc) {

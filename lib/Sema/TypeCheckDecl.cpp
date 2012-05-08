@@ -119,15 +119,17 @@ public:
     // work because only an actual protocol or oneof declaration can cause
     // the type to be *directly* the underlying type of a typealias.
     Type type = TAD->getUnderlyingType();
-    if (OneOfType *oneof = dyn_cast<OneOfType>(type)) {
-      for (auto elt : oneof->getElements())
-        visitOneOfElementDecl(elt);
-    } else if (ProtocolType *protocol = dyn_cast<ProtocolType>(type)) {
+    if (ProtocolType *protocol = dyn_cast<ProtocolType>(type)) {
       for (ValueDecl *member : protocol->Elements)
         visit(member);
     }
 
     TC.validateType(TAD->getAliasType());
+  }
+
+  void visitOneOfDecl(OneOfDecl *OOD) {
+    for (auto elt : OOD->getElements())
+      visitOneOfElementDecl(elt);
   }
 
   void visitVarDecl(VarDecl *VD) {

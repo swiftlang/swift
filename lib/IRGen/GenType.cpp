@@ -267,14 +267,14 @@ void IRGenFunction::emitTypeAlias(Type underlyingType) {
 }
 
 /// createNominalType - Create a new nominal type.
-llvm::StructType *IRGenModule::createNominalType(TypeAliasDecl *alias) {
+llvm::StructType *IRGenModule::createNominalType(OneOfDecl *type) {
   llvm::SmallString<32> typeName;
-  if (alias->getDeclContext()->isLocalContext()) {
-    typeName = alias->getName().str();
+  if (type->getDeclContext()->isLocalContext()) {
+    typeName = type->getName().str();
     typeName.append(".local");
   } else {
     llvm::raw_svector_ostream nameStream(typeName);
-    LinkEntity::forNonFunction(alias).mangle(nameStream);
+    LinkEntity::forNonFunction(type).mangle(nameStream);
   }
   return llvm::StructType::create(getLLVMContext(), typeName.str());
 }

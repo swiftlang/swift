@@ -414,7 +414,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
       // For each index, we look through a TupleType or transparent OneOfType.
       CanType CurT = ArgRef->getType()->getCanonicalType();
       if (OneOfType *OOT = dyn_cast<OneOfType>(CurT)) {
-        CurT = OOT->getTransparentType()->getCanonicalType();
+        CurT = OOT->getDecl()->getTransparentType()->getCanonicalType();
         ArgRef = new (Context) LookThroughOneofExpr(ArgRef, CurT);
       }
       TupleType *TT = cast<TupleType>(CurT);
@@ -437,12 +437,13 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
   }
 
   if (OneOfType *OOT = dyn_cast<OneOfType>(T)) {
-    if (OOT->isTransparentType()) {
+    OneOfDecl *OOD = OOT->getDecl();
+    if (OOD->isTransparentType()) {
       // Print "struct" types as if we are constructing one: the name
       // followed by the underlying tuple.
-      PrintLiteralString(OOT->getDecl()->getName().str(), Context, Loc,
+      PrintLiteralString(OOD->getName().str(), Context, Loc,
                          PrintDecls, BodyContent);
-      CanType SubType = OOT->getTransparentType()->getCanonicalType();
+      CanType SubType = OOD->getTransparentType()->getCanonicalType();
       PrintReplExpr(TC, Arg, SubType, Loc, EndLoc,
                     MemberIndexes, BodyContent, PrintDecls);
       return;

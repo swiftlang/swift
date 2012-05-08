@@ -518,6 +518,10 @@ public:
         if (doIt(M))
           return true;
       }
+    } else if (OneOfDecl *OOD = dyn_cast<OneOfDecl>(D)) {
+      for (OneOfElementDecl *Element : OOD->getElements())
+        if (doIt(Element))
+          return true;
     } else if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       auto Body = TLCD->getBody();
       if (Body.is<Expr*>()) {

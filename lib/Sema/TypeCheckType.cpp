@@ -44,15 +44,15 @@ static bool buildArraySliceType(TypeChecker &TC, ArraySliceType *sliceTy) {
   SmallVector<ValueDecl*, 8> Decls;
   TC.TU.lookupGlobalValue(TC.Context.getIdentifier(nameBuffer),
                           NLKind::UnqualifiedLookup, Decls);
-  if (Decls.size() != 1 || !isa<TypeAliasDecl>(Decls.back())) {
+  if (Decls.size() != 1 || !isa<TypeDecl>(Decls.back())) {
     TC.diagnose(loc, diag::slice_type_not_found, nameBuffer);
     return true;
   }
 
   // FIXME: there's no reason to think that the alias type will have
   // been validated in general.
-  TypeAliasDecl *TAD = cast<TypeAliasDecl>(Decls.back());
-  sliceTy->setImplementationType(TAD->getAliasType());
+  TypeDecl *TD = cast<TypeDecl>(Decls.back());
+  sliceTy->setImplementationType(TD->getDeclaredType());
   return false;
 }
 
@@ -98,12 +98,9 @@ bool TypeChecker::validateType(Type InTy) {
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::UnstructuredDependent:
+  case TypeKind::OneOf:
     // These types are already canonical anyway.
     return false;
-  case TypeKind::OneOf:
-    for (OneOfElementDecl *Elt : cast<OneOfType>(T)->getElements())
-      typeCheckDecl(Elt);
-    break;
       
   case TypeKind::MetaType:
   case TypeKind::Module:

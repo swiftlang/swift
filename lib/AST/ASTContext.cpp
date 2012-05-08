@@ -30,7 +30,7 @@ struct ASTContext::Implementation {
   llvm::BumpPtrAllocator Allocator; // used in later initializations
   llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTable;
   llvm::FoldingSet<TupleType> TupleTypes;
-  llvm::DenseMap<TypeAliasDecl*, MetaTypeType*> MetaTypeTypes;
+  llvm::DenseMap<TypeDecl*, MetaTypeType*> MetaTypeTypes;
   llvm::DenseMap<Module*, ModuleType*> ModuleTypes;
   llvm::DenseMap<std::pair<Type,std::pair<Type,char>>,
                  FunctionType*> FunctionTypes;
@@ -158,23 +158,9 @@ TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
   return New;
 }
 
-/// getNewOneOfType - Return a new instance of oneof type.  These are never
-/// uniqued because the loc is generally different.
-OneOfType *OneOfType::getNew(SourceLoc OneOfLoc,
-                             ArrayRef<OneOfElementDecl*> InElts,
-                             TypeAliasDecl *TheDecl) {
-  ASTContext &C = TheDecl->getASTContext();
-  
-  return new (C) OneOfType(OneOfLoc, C.AllocateCopy(InElts), TheDecl);
-}
-
-// oneof types are always canonical.
-OneOfType::OneOfType(SourceLoc OneOfLoc, ArrayRef<OneOfElementDecl*> Elts,
-                     TypeAliasDecl *TheDecl)
-: TypeBase(TypeKind::OneOf, &TheDecl->getASTContext(),
-           /*Dependent=*/false),
-    DeclContext(DeclContextKind::OneOfType, TheDecl->getDeclContext()),
-    OneOfLoc(OneOfLoc), Elements(Elts), TheDecl(TheDecl) {
+OneOfType::OneOfType(OneOfDecl *TheDecl, ASTContext &C)
+: TypeBase(TypeKind::OneOf, &C, /*Dependent=*/false),
+  TheDecl(TheDecl) {
 }
 
 IdentifierType *IdentifierType::getNew(ASTContext &C,
@@ -184,13 +170,21 @@ IdentifierType *IdentifierType::getNew(ASTContext &C,
 }
 
 
-MetaTypeType *MetaTypeType::get(TypeAliasDecl *Type) {
+MetaTypeType *MetaTypeType::get(TypeDecl *Type) {
   ASTContext &C = Type->getASTContext();
 
   MetaTypeType *&Entry = C.Impl.MetaTypeTypes[Type];
   if (Entry) return Entry;
-  
-  return Entry = new (C) MetaTypeType(Type, C);
+
+  // FIXME: Should we build a MetaTypeType for TypeAliasDecls.  If so,
+  // should it be canonical?
+  bool IsCanonical = true;
+  return Entry = new (C) MetaTypeType(Type, IsCanonical ? &C : 0);
+}
+
+MetaTypeType::MetaTypeType(TypeDecl *Type, ASTContext *C)
+  : TypeBase(TypeKind::MetaType, C, /*Dependent=*/false),
+    TheType(Type) {
 }
 
 ModuleType *ModuleType::get(Module *M) {

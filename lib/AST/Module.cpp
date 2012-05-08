@@ -81,7 +81,6 @@ namespace {
   /// Module::LookupCachePimpl.
   class TUModuleCache {
     llvm::DenseMap<Identifier, TinyPtrVector<ValueDecl*>> TopLevelValues;
-    llvm::DenseMap<Identifier, TypeAliasDecl *> TopLevelTypes;
   public:
     typedef Module::AccessPathTy AccessPathTy;
     
@@ -110,9 +109,6 @@ static void freeTUCachePimpl(void *&Ptr) {
 /// Populate our cache on the first name lookup.
 TUModuleCache::TUModuleCache(TranslationUnit &TU) {
   for (Decl *D : TU.Decls) {
-    if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D))
-      if (!TAD->getName().empty())
-        TopLevelTypes[TAD->getName()] = TAD;
     if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
       if (!VD->getName().empty())
         TopLevelValues[VD->getName()].push_back(VD);

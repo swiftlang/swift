@@ -61,8 +61,8 @@ Resilience ValueDecl::getResilienceFrom(Component *C) const {
       return Resilience::InherentlyFragile;
 
     // For oneofs, we walk out through the oneof decl.
-    case DeclContextKind::OneOfType:
-      D = cast<OneOfType>(DC)->getDecl();
+    case DeclContextKind::OneOfDecl:
+      D = cast<OneOfDecl>(DC);
       goto HandleDecl;
 
     case DeclContextKind::ExtensionDecl:

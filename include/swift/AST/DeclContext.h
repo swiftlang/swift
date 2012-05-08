@@ -51,7 +51,7 @@ enum class DeclContextKind {
     TranslationUnit,
     BuiltinModule,
   CapturingExpr,
-  OneOfType,
+  OneOfDecl,
   ExtensionDecl,
   ProtocolType,
   TopLevelCodeDecl,
@@ -96,7 +96,7 @@ public:
   /// isTypeContext - Return true if this is a type context, e.g., a oneof,
   /// an extension, or a protocol.
   bool isTypeContext() const {
-    return getContextKind() >= DeclContextKind::OneOfType &&
+    return getContextKind() >= DeclContextKind::OneOfDecl &&
            getContextKind() <= DeclContextKind::ProtocolType;
   }
   

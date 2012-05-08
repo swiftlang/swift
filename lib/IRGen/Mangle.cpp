@@ -145,13 +145,14 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     return;
   }
 
-  case DeclContextKind::OneOfType: {
-    OneOfType *oneof = cast<OneOfType>(ctx);
+  case DeclContextKind::OneOfDecl: {
+    OneOfDecl *oneof = cast<OneOfDecl>(ctx);
 
-    if (tryMangleSubstitution(oneof)) return;
+    // FIXME: The mangling rule here is kind of weird.
+    if (tryMangleSubstitution(oneof->getDeclaredType())) return;
     mangleDeclContext(ctx->getParent());
-    mangleIdentifier(oneof->getDecl()->getName());
-    addSubstitution(oneof);
+    mangleIdentifier(oneof->getName());
+    addSubstitution(oneof->getDeclaredType());
     return;
   }
 
@@ -338,7 +339,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   // on all kinds of declarations, even variables, because at the
   // moment they can *all* be overloaded.
   if (ValueDecl *valueDecl = dyn_cast<ValueDecl>(TheDecl))
-    if (!isa<TypeAliasDecl>(TheDecl))
+    if (!isa<TypeDecl>(TheDecl))
       mangler.mangleType(valueDecl->getType(),
                          getExplosionKind(),
                          getUncurryLevel());

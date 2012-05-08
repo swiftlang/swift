@@ -302,13 +302,14 @@ public:
                UME->getName(), DestTy);
       return nullptr;
     }
-    
+
+    OneOfDecl *D = DT->getDecl();
     // The oneof type must have an element of the specified name.
-    OneOfElementDecl *DED = DT->getElement(UME->getName());
+    OneOfElementDecl *DED = D->getElement(UME->getName());
     if (DED == 0) {
       diagnose(UME->getLoc(), diag::invalid_member_in_type,
                DestTy, UME->getName());
-      diagnose(DT->getOneOfLoc(), diag::type_declared_here);
+      diagnose(D->getOneOfLoc(), diag::type_declared_here);
       return nullptr;
     }
 
@@ -708,7 +709,7 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
 
 CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
                             InterpolatedStringLiteralExpr *E) {
-  TypeAliasDecl *DestTyDecl = 0;
+  TypeDecl *DestTyDecl = 0;
   if (OneOfType *OneOfTy = DestTy->getAs<OneOfType>())
     DestTyDecl = OneOfTy->getDecl();
   else if (ProtocolType *ProtocolTy = DestTy->getAs<ProtocolType>())
@@ -887,11 +888,12 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
       dyn_cast<UnresolvedMemberExpr>(E->getFn())) {
     if (OneOfType *DT = DestTy->getAs<OneOfType>()) {
       // The oneof type must have an element of the specified name.
-      OneOfElementDecl *DED = DT->getElement(UME->getName());
+      OneOfDecl *D = DT->getDecl();
+      OneOfElementDecl *DED = D->getElement(UME->getName());
       if (DED == 0) {
         diagnose(UME->getLoc(), diag::invalid_member_in_type,
                     DestTy, UME->getName());
-        diagnose(DT->getOneOfLoc(), diag::type_declared_here);
+        diagnose(D->getOneOfLoc(), diag::type_declared_here);
         return 0;
       }
       

@@ -397,24 +397,6 @@ void TupleType::updateInitializedElementType(unsigned EltNo, Type NewTy,
   Elt = TupleTypeElt(NewTy, Elt.getName(), NewInit);
 }
 
-OneOfElementDecl *OneOfType::getElement(Identifier Name) const {
-  // FIXME: Linear search is not great for large oneof decls.
-  for (OneOfElementDecl *Elt : Elements)
-    if (Elt->getName() == Name)
-      return Elt;
-  return 0;
-}
-
-bool OneOfType::isTransparentType() const {
-  return Elements.size() == 1 && !Elements[0]->getArgumentType().isNull();
-}
-
-Type OneOfType::getTransparentType() const {
-  assert(Elements.size() == 1);
-  assert(!Elements[0]->getArgumentType().isNull());
-  return Elements[0]->getArgumentType();
-}
-
 //===----------------------------------------------------------------------===//
 //  Type Printing
 //===----------------------------------------------------------------------===//
@@ -515,16 +497,7 @@ void IdentifierType::print(raw_ostream &OS) const {
 }
 
 void OneOfType::print(raw_ostream &OS) const {
-  OS << "oneof { ";
-    
-  for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
-    if (i) OS << ", ";
-    OS << Elements[i]->getName();
-    if (!Elements[i]->getArgumentType().isNull())
-      OS << " : " << Elements[i]->getArgumentType();
-  }
-  
-  OS << '}';
+  OS << TheDecl->getName().get();
 }
 
 void MetaTypeType::print(raw_ostream &OS) const {

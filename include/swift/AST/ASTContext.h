@@ -29,7 +29,6 @@ namespace llvm {
 namespace swift {
   class SourceLoc;
   class Type;
-  class OneOfType;
   class TupleType;
   class FunctionType;
   class ArrayType;

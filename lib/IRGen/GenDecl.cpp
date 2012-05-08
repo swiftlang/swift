@@ -145,10 +145,11 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
   case DeclKind::OneOfElement:
     return;
 
-  // Type aliases require IR-gen support if they're really a struct/oneof
-  // declaration.
   case DeclKind::TypeAlias:
-    return IGM.emitTypeAlias(cast<TypeAliasDecl>(D)->getUnderlyingType());
+    return;
+
+  case DeclKind::OneOf:
+    return IGM.emitOneOfType(cast<OneOfDecl>(D)->getDeclaredType());
 
   // These declarations don't require IR-gen support.
   case DeclKind::Import:
@@ -265,8 +266,8 @@ IRGenFunction::getAddrOfLocalInjectionFunction(OneOfElementDecl *D) {
   if (entry) return entry;
 
   llvm::FunctionType *fnType = getInjectionFunctionType(D, IGM);
-  OneOfType *ParentOneOf = cast<OneOfType>(D->getDeclContext());
-  llvm::SmallString<64> InjectionName = ParentOneOf->getDecl()->getName().str();
+  OneOfDecl *ParentOneOf = cast<OneOfDecl>(D->getDeclContext());
+  llvm::SmallString<64> InjectionName = ParentOneOf->getName().str();
   InjectionName += '.';
   InjectionName += D->getName().str();
   InjectionName += ".injection";
@@ -302,8 +303,9 @@ static void addOwnerArgument(ASTContext &ctx, ValueDecl *value,
     uncurryLevel++;
     return;
 
-  case DeclContextKind::OneOfType:
-    resultType = addOwnerArgument(ctx, cast<OneOfType>(DC), resultType);
+  case DeclContextKind::OneOfDecl:
+    resultType = addOwnerArgument(ctx, cast<OneOfDecl>(DC)->getDeclaredType(),
+                                  resultType);
     uncurryLevel++;
     return;
 
@@ -422,7 +424,9 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
       emitExtension(cast<ExtensionDecl>(member));
       continue;
     case DeclKind::TypeAlias:
-      emitTypeAlias(cast<TypeAliasDecl>(member)->getUnderlyingType());
+      continue;
+    case DeclKind::OneOf:
+      emitOneOfType(cast<OneOfDecl>(member)->getDeclaredType());
       continue;
     case DeclKind::Var:
       if (cast<VarDecl>(member)->isProperty())
@@ -452,11 +456,10 @@ void IRGenFunction::emitLocal(Decl *D) {
   case DeclKind::TopLevelCode:
     llvm_unreachable("declaration cannot appear in local scope");
 
-  // Type aliases require IR-gen support if they're really
-  // struct/oneof declarations.
-  case DeclKind::TypeAlias:
-    return emitTypeAlias(cast<TypeAliasDecl>(D)->getUnderlyingType());
+  case DeclKind::OneOf:
+    return emitOneOfType(cast<OneOfDecl>(D)->getDeclaredType());
 
+  case DeclKind::TypeAlias:
   case DeclKind::OneOfElement:
     // no IR generation support required.
     return;

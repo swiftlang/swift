@@ -260,8 +260,8 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT) {
       SmallVector<ValueDecl*, 8> Decls;
       M->lookupValue(Module::AccessPathTy(), C.Id, 
                      NLKind::QualifiedLookup, Decls);
-      if (Decls.size() == 1 && isa<TypeAliasDecl>(Decls.back()))
-        C.Value = cast<TypeAliasDecl>(Decls.back());
+      if (Decls.size() == 1 && isa<TypeDecl>(Decls.back()))
+        C.Value = cast<TypeDecl>(Decls.back());
     } else {
       diagnose(C.Loc, diag::unknown_dotted_type_base, LastOne.Id)
         << SourceRange(Components[0].Loc, Components.back().Loc);
@@ -279,8 +279,9 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT) {
   
   // Finally, sanity check that the last value is a type.
   if (ValueDecl *Last = Components.back().Value.dyn_cast<ValueDecl*>())
-    if (auto TAD = dyn_cast<TypeAliasDecl>(Last)) {
-      Components[Components.size()-1].Value = TAD->getAliasType();
+    if (auto TAD = dyn_cast<TypeDecl>(Last)) {
+      Components[Components.size()-1].Value =
+          TAD->getDeclaredType().getPointer();
       return false;
     }
 
@@ -306,7 +307,7 @@ static Expr *BindNameToIVar(UnresolvedDeclRefExpr *UDRE, FuncDecl *CurFD,
   if (ExtendedType.isNull()) return 0;
 
   // For a static method, we perform name lookup in the corresponding metatype.
-  TypeAliasDecl *StaticAlias = 0;
+  TypeDecl *StaticAlias = 0;
   if (CurFD->isStatic()) {
     if (ProtocolType *Proto = ExtendedType->getAs<ProtocolType>())
       StaticAlias = Proto->TheDecl;

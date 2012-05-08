@@ -240,9 +240,8 @@ public:
     Type EltType;
   };
   
-  OneOfType *actOnOneOfType(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
-                            ArrayRef<OneOfElementInfo> Elts,
-                            TypeAliasDecl *PrettyTypeName);
+  void actOnOneOfDecl(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
+                      ArrayRef<OneOfElementInfo> Elts, OneOfDecl *OOD);
   
   //===--------------------------------------------------------------------===//
   // Type Parsing

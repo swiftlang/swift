@@ -243,14 +243,14 @@ namespace {
         abort();
       }
 
-      if (!oneof->isTransparentType()) {
+      if (!oneof->getDecl()->isTransparentType()) {
         Out << "looking through a oneof with multiple elements: ";
         E->getSubExpr()->getType().print(Out);
         Out << "\n";
         abort();
       }
 
-      checkSameType(resultType, oneof->getTransparentType(),
+      checkSameType(resultType, oneof->getDecl()->getTransparentType(),
                     "result of LookThroughOneofExpr and single element of oneof");
     }
 

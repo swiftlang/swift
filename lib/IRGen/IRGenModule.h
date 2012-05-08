@@ -43,6 +43,7 @@ namespace swift {
   class ExtensionDecl;
   class FuncDecl;
   class OneOfElementDecl;
+  class OneOfDecl;
   class OneOfType;
   class SourceLoc;
   class TranslationUnit;
@@ -100,7 +101,7 @@ private:
 public:
   const TypeInfo &getFragileTypeInfo(Type T);
   llvm::Type *getFragileType(Type T);
-  llvm::StructType *createNominalType(TypeAliasDecl *D);
+  llvm::StructType *createNominalType(OneOfDecl *D);
   void emitTypeAlias(Type T);
   void getSchema(Type T, ExplosionSchema &schema);
 
