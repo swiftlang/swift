@@ -375,10 +375,10 @@ public:
     printCommon(E, "string_literal_expr") << " value=" << E->getValue() << ')';
   }
   void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
-    printCommon(E, "interpolated_string_literal_expr") << '\n';
+    printCommon(E, "interpolated_string_literal_expr");
     for (auto Segment : E->getSegments()) {
-      printRec(Segment);
       OS << '\n';
+      printRec(Segment);
     }
     OS << ')';
   }
