@@ -344,7 +344,7 @@ public:
     
     /// Value is the decl or module that this refers to.  After name binding,
     /// the last entry in the component list is known to be a TypeBase*.
-    llvm::PointerUnion3<ValueDecl*, TypeBase*, Module*> Value;
+    llvm::PointerUnion3<ValueDecl*, Type, Module*> Value;
     Component(SourceLoc Loc, Identifier Id) : Loc(Loc), Id(Id) {}
   };
   

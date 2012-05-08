@@ -323,7 +323,7 @@ bool IdentifierType::isMapped() const {
 Type IdentifierType::getMappedType() {
   assert(!Components.back().Value.isNull() &&
          "Name binding haven't resolved this to a type yet");
-  return Components.back().Value.get<TypeBase*>();
+  return Components.back().Value.get<Type>();
 }
 
 TupleType::TupleType(ArrayRef<TupleTypeElt> fields, ASTContext *CanCtx)

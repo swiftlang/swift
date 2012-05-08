@@ -280,8 +280,7 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT) {
   // Finally, sanity check that the last value is a type.
   if (ValueDecl *Last = Components.back().Value.dyn_cast<ValueDecl*>())
     if (auto TAD = dyn_cast<TypeDecl>(Last)) {
-      Components[Components.size()-1].Value =
-          TAD->getDeclaredType().getPointer();
+      Components[Components.size()-1].Value = TAD->getDeclaredType();
       return false;
     }
 
@@ -449,11 +448,9 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
   // resolving them if possible.
   for (IdentifierType *DNT : TU->getUnresolvedIdentifierTypes()) {
     if (Binder.resolveIdentifierType(DNT)) {
-      TypeBase *Error = TU->Ctx.TheErrorType.getPointer();
-
       // This IdentifierType resolved to the error type.
       for (auto &C : DNT->Components)
-        C.Value = Error;
+        C.Value = TU->Ctx.TheErrorType;
     }
   }
 
