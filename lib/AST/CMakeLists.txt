@@ -4,7 +4,7 @@ add_swift_library(swiftAST
   Attr.cpp
   Builtins.cpp
   Decl.cpp
-  Diagnostics.cpp
+  DiagnosticList.cpp
   DiagnosticEngine.cpp
   Expr.cpp
   Identifier.cpp

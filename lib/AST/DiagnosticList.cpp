@@ -1,4 +1,4 @@
-//===- Diagnostics.cpp - Diagnostic Definitions -----------------*- C++ -*-===//
+//===- DiagnosticList.cpp - Diagnostic Definitions --------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Diagnostics.h"
-
 using namespace swift;
 
 // Define all of the diagnostic objects and initialize them with their 
