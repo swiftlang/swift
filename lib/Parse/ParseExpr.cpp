@@ -241,58 +241,9 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     Result = new (Context) CharacterLiteralExpr(Codepoint, Loc);
     break;
   }
-  case tok::string_literal: {
-    llvm::SmallVector<Lexer::StringSegment, 1> Segments;
-    L->getEncodedStringLiteral(Tok, Context, Segments);
-    SourceLoc Loc = consumeToken();
-    
-    // The simple case: just a single literal segment.
-    if (Segments.size() == 1 &&
-        Segments.front().Kind == Lexer::StringSegment::Literal) {
-      Result = new (Context) StringLiteralExpr(Segments.front().Data, Loc);
-      break;
-    }
-    
-    Token SavedTok = Tok;
-    llvm::SmallVector<Expr *, 4> Exprs;
-    for (auto Segment : Segments) {
-      switch (Segment.Kind) {
-      case Lexer::StringSegment::Literal: {
-        SourceLoc Loc(llvm::SMLoc::getFromPointer(Segment.Data.data()));
-        Exprs.push_back(new (Context) StringLiteralExpr(Segment.Data, Loc));
-        break;
-      }
-        
-      case Lexer::StringSegment::Expr: {
-        // Create a temporary lexer that lexes from the body of the string.
-        Lexer LocalLex(Segment.Data, SourceMgr, &Diags);
-        
-        // Temporarily swap out the parser's current lexer with our new one.
-        llvm::SaveAndRestore<Lexer*> T(L, &LocalLex);
-        
-        // Prime the new lexer.
-        L->lex(Tok);
-        
-        NullablePtr<Expr> E = parseExpr(diag::string_interpolation_expr);
-        if (E.isNonNull()) {
-          Exprs.push_back(E.get());
-          
-          if (!Tok.is(tok::eof))
-            diagnose(Tok, diag::string_interpolation_extra);
-        }
-        break;
-      }
-      }
-    }
-    Tok = SavedTok;
-    
-    if (Exprs.empty())
-      return new (Context) ErrorExpr(Loc);
-    
-    Result = new (Context) InterpolatedStringLiteralExpr(Loc,
-                             Context.AllocateCopy(Exprs));
+  case tok::string_literal:  // "foo"
+    Result = parseExprStringLiteral();
     break;
-  }
   case tok::identifier:  // foo
     Result = parseExprIdentifier();
     break;
@@ -395,7 +346,59 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
   return Result;
 }
 
-///   expr-identifier:
+///   expr-literal:
+///     string_literal
+Expr *Parser::parseExprStringLiteral() {
+  llvm::SmallVector<Lexer::StringSegment, 1> Segments;
+  L->getEncodedStringLiteral(Tok, Context, Segments);
+  SourceLoc Loc = consumeToken();
+    
+  // The simple case: just a single literal segment.
+  if (Segments.size() == 1 &&
+      Segments.front().Kind == Lexer::StringSegment::Literal)
+    return new (Context) StringLiteralExpr(Segments.front().Data, Loc);
+    
+  Token SavedTok = Tok;
+  llvm::SmallVector<Expr*, 4> Exprs;
+  for (auto Segment : Segments) {
+    switch (Segment.Kind) {
+    case Lexer::StringSegment::Literal: {
+      SourceLoc Loc(llvm::SMLoc::getFromPointer(Segment.Data.data()));
+      Exprs.push_back(new (Context) StringLiteralExpr(Segment.Data, Loc));
+      break;
+    }
+        
+    case Lexer::StringSegment::Expr: {
+      // Create a temporary lexer that lexes from the body of the string.
+      Lexer LocalLex(Segment.Data, SourceMgr, &Diags);
+      
+      // Temporarily swap out the parser's current lexer with our new one.
+      llvm::SaveAndRestore<Lexer*> T(L, &LocalLex);
+      
+      // Prime the new lexer.
+      L->lex(Tok);
+      
+      NullablePtr<Expr> E = parseExpr(diag::string_interpolation_expr);
+      if (E.isNonNull()) {
+        Exprs.push_back(E.get());
+        
+        if (!Tok.is(tok::eof))
+          diagnose(Tok, diag::string_interpolation_extra);
+      }
+      break;
+    }
+    }
+  }
+  Tok = SavedTok;
+  
+  if (Exprs.empty())
+    return new (Context) ErrorExpr(Loc);
+  
+  return new (Context) InterpolatedStringLiteralExpr(Loc,
+                                        Context.AllocateCopy(Exprs));
+}
+  
+  ///   expr-identifier:
 ///     identifier
 Expr *Parser::parseExprIdentifier() {
   assert(Tok.is(tok::identifier));
