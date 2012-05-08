@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include "llvm/ADT/StringExtras.h"
 
 // FIXME: We shouldn't be writing implemenetations for functions in the swift
 // module in C, and this isn't really an ideal place to put those
@@ -48,8 +49,12 @@ extern "C" char* _TSsop1pFT3lhsNSs6String3rhsS__S_(char* lhs, char* rhs) {
    return s;
 }
 
-// static func String(v : Int128) -> String
-extern "C" char *_TNSs6String6StringFT1vNSs6Int128_S_(__int128_t X) {
+// static func String(v : Int128, radix : Int) -> String
+extern "C" char *
+_TNSs6String6StringFT1vNSs6Int1285radixNSs5Int64_S_(__int128_t X,
+                                                    uint64_t Radix) {
+  assert(Radix != 0 && Radix <= 36 && "Invalid radix for string conversion");
+         
   char TmpBuffer[128];
   char *P = TmpBuffer+128;
   
@@ -58,11 +63,19 @@ extern "C" char *_TNSs6String6StringFT1vNSs6Int128_S_(__int128_t X) {
   bool WasNeg = X < 0;
   __uint128_t Y = WasNeg ? -X : X;
 
-  if (Y == 0) *--P = '0';  // Special case.
-
-  while (Y) {
-    *--P = '0' + char(Y % 10);
-    Y /= 10;
+  if (Y == 0) {
+    *--P = '0';  // Special case. 
+  } else if (Radix == 10) {  // Special case for 10, since we care so much about performance right now.
+    while (Y) {
+      *--P = '0' + char(Y % 10);
+      Y /= 10;
+    }
+  } else {
+    unsigned Radix32 = Radix;
+    while (Y) {
+      *--P = llvm::hexdigit(Y % Radix32);
+      Y /= Radix32;
+    }
   }
   
   if (WasNeg) *--P = '-';
