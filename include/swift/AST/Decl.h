@@ -443,7 +443,12 @@ public:
   static bool classof(const TypeAliasDecl *D) { return true; }
 };
 
-
+/// OneOfDecl - This is the declaration of a oneof, for example:
+///
+///    oneof Bool { true, false }
+///
+/// The type of the decl itself is a MetaTypeType; use getDeclaredType()
+/// to get the declared type ("Bool" in the above example).
 class OneOfDecl : public TypeDecl, public DeclContext {
   SourceLoc OneOfLoc;
   ArrayRef<OneOfElementDecl*> Elements;
@@ -472,6 +477,12 @@ public:
   }
 };
 
+/// StructDecl - This is the declaration of a struct, for example:
+///
+///    struct Complex { R : Double, I : Double }
+///
+/// The type of the decl itself is a MetaTypeType; use getDeclaredType()
+/// to get the declared type ("Complex" in the above example).
 class StructDecl : public TypeDecl, public DeclContext {
   SourceLoc StructLoc;
   Type UnderlyingType;

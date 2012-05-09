@@ -505,7 +505,7 @@ private:
   TupleType(ArrayRef<TupleTypeElt> fields, ASTContext *CanCtx);
 };
 
-/// OneOfType - This represents the type declared by a OneOfDecl
+/// OneOfType - This represents the type declared by a OneOfDecl.
 class OneOfType : public TypeBase {  
   /// TheDecl - This is the TypeDecl which declares the given type. It
   /// specifies the name and other useful information about this type.
@@ -528,7 +528,7 @@ private:
   friend class OneOfDecl;
 };
 
-/// StructType - This represents the type declared by a StructDecl
+/// StructType - This represents the type declared by a StructDecl.
 class StructType : public TypeBase {  
   /// TheDecl - This is the TypeDecl which declares the given type. It
   /// specifies the name and other useful information about this type.
