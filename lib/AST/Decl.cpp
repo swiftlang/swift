@@ -364,7 +364,7 @@ namespace {
 
     void visitProtocolDecl(ProtocolDecl *PD) {
       printCommon(PD, "protocol");
-      for (auto VD : PD->getElements()) {
+      for (auto VD : PD->getMembers()) {
         OS << '\n';
         printRec(VD);
       }

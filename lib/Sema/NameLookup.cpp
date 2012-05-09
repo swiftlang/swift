@@ -112,19 +112,13 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M) {
   // If the base is a protocol, see if this is a reference to a declared
   // protocol member.
   if (ProtocolType *PT = BaseTy->getAs<ProtocolType>()) {
-    for (ValueDecl *VD : PT->getDecl()->getElements()) {
-      if (VD->getName() != Name) continue;
-      
-      // If this is a 'static' function, then just ignore the base expression.
-      if (FuncDecl *FD = dyn_cast<FuncDecl>(VD))
-        if (FD->isStatic()) {
-          Results.push_back(Result::getIgnoreBase(FD));
-          return;
-        }
-      
-      Results.push_back(Result::getPassBase(VD));
-      return;
+    for (auto Member : PT->getDecl()->getMembers()) {
+      if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
+        if (VD->getName() != Name) continue;
+        Results.push_back(Result::getPassBase(VD));
+      }
     }
+    return;
   }
   
   // Check to see if this is a reference to a tuple field.

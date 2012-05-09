@@ -514,9 +514,7 @@
     decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#pattern">pattern</a> initializer?  (',' pattern initializer?)*
     decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a> '{' get-set '}'
   
-    decl-var-simple ::= 'var' <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a>
-
-    initializer     ::= '=' <a href="#expr">expr</a>
+   initializer     ::= '=' <a href="#expr">expr</a>
 
     <a name="get-set"></a>get-set         ::= get set?
     get-set         ::= set get
@@ -939,11 +937,11 @@ token following the opening '{' is either 'set' or 'get'.</p>
   
   <pre class="example">
     protocol Document {
-      func title() -&gt; string
+      var title : String
     }
     protocol VersionedDocument <i>/*: Document*/</i> {
-      func version() -&gt; Int
-    }
+      func bumpVersion()
+   }
   </pre>
   
   <!-- _____________________________________________________________________ -->
@@ -951,12 +949,12 @@ token following the opening '{' is either 'set' or 'get'.</p>
   
   <pre class="grammar">
     protocol-member ::= <a href="#decl-func">decl-func</a>
-    protocol-member ::= <a href="#decl-var-simple">decl-var-simple</a>
-  </pre>
+</pre>
   
   <p>'func' members of a protocol define a value of function type that may be
   accessed with dot syntax on a value of the protocol's type.  The function
-  gets an implicit "this" argument of the protocol type.</p>
+  gets an implicit "this" argument of the protocol type and shall not
+  be static.</p>
   
   <p>TODO: var members and typealias members</p>
   
@@ -964,13 +962,14 @@ token following the opening '{' is either 'set' or 'get'.</p>
   <h4 id="protocol-member-var">'var' protocol elements</h4>
   
   <pre class="grammar">
-    protocol-member ::= <a href="#decl-var">decl-var-simple</a>
+    protocol-member ::= <a href="#decl-var">decl-var</a>
   </pre>
   
   <p>'var' members of a protocol define "property" values that may be accessed
-  with dot syntax on a value of the protocol's type.  The declaration itself has
-  function type, where the argument is an implicit "this" argument of the
-  protocol type.</p>
+  with dot syntax on a value of the protocol's type. The actual
+  variables have no storage, and will instead by accessed by a getter
+  and setter. Thus, the variables shall have neither an initializer
+  nor a getter/setter clause.</p>
   
   <p>TODO: typealias members</p>
   

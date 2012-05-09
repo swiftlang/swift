@@ -511,23 +511,23 @@ class ProtocolDecl : public TypeDecl, public DeclContext {
   SourceLoc ProtocolLoc;
   SourceLoc NameLoc;
   SourceRange Braces;
-  MutableArrayRef<ValueDecl *> Elements;
+  MutableArrayRef<Decl *> Members;
   Type ProtocolTy;
   
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
                Identifier Name)
     : TypeDecl(DeclKind::Protocol, DC, Name, Type()),
-  DeclContext(DeclContextKind::ProtocolDecl, DC),
-  ProtocolLoc(ProtocolLoc), NameLoc(NameLoc) { }
+      DeclContext(DeclContextKind::ProtocolDecl, DC),
+      ProtocolLoc(ProtocolLoc), NameLoc(NameLoc) { }
   
   using Decl::getASTContext;
   
-  MutableArrayRef<ValueDecl *> getElements() { return Elements; }
-  ArrayRef<ValueDecl *> getElements() const { return Elements; }
-  void setElements(MutableArrayRef<ValueDecl *> E,
-                   SourceRange B) {
-    Elements = E;
+  MutableArrayRef<Decl *> getMembers() { return Members; }
+  ArrayRef<Decl *> getMembers() const { return Members; }
+  
+  void setMembers(MutableArrayRef<Decl *> M, SourceRange B) {
+    Members = M;
     Braces = B;
   }
   
@@ -665,6 +665,10 @@ public:
     return GetOrSetDecl.getInt()? GetOrSetDecl.getPointer() : nullptr;
   }
 
+  /// isGetterOrSetter - Determine whether this is a getter or a setter vs.
+  /// a normal function.
+  bool isGetterOrSetter() const { return GetOrSetDecl.getPointer() != 0; }
+  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
   static bool classof(const FuncDecl *D) { return true; }

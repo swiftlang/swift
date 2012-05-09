@@ -197,7 +197,12 @@ public:
     PD_AllowTopLevel     = 1 << 1,
     PD_DisallowVar       = 1 << 2,
     PD_DisallowOperators = 1 << 3,
-    PD_HasContainerType  = 1 << 4
+    PD_HasContainerType  = 1 << 4,
+    PD_DisallowProperty  = 1 << 5,
+    PD_DisallowTypes     = 1 << 6,
+    PD_DisallowStatic    = 1 << 7,
+    PD_DisallowFuncDef   = 1 << 8,
+    PD_DisallowInit      = 1 << 9
   };
   
   TypeAliasDecl *parseDeclTypeAlias();
@@ -224,7 +229,6 @@ public:
                    FuncDecl *&Get, FuncDecl *&Set, SourceLoc &LastValidLoc);
   void parseDeclVarGetSet(Pattern &pattern, bool hasContainerType);
   
-  VarDecl *parseDeclVarSimple();
   Pattern *buildImplicitThisParameter();
   FuncDecl *parseDeclFunc(bool hasContainerType = false);
   Decl *parseDeclProtocol();

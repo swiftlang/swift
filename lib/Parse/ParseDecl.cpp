@@ -377,14 +377,36 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     Decl *D = Entries[i];
 
     // FIXME: Mark decls erroneous.
+    // FIXME: Specialize diagnostics based on our context.
     if (isa<ImportDecl>(D) && !(Flags & PD_AllowTopLevel))
       diagnose(D->getLocStart(), diag::decl_inner_scope);
-    if (isa<VarDecl>(D) && (Flags & PD_DisallowVar) &&
-        !cast<VarDecl>(D)->isProperty()) {
-      diagnose(D->getLocStart(), diag::disallowed_var_decl);
-    } else if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
+    if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
       if (VD->isOperator() && (Flags & PD_DisallowOperators))
         diagnose(VD->getLocStart(), diag::operator_in_decl);
+      
+      if (auto Var = dyn_cast<VarDecl>(VD)) {
+        if ((Flags & PD_DisallowVar) && !Var->isProperty())
+          diagnose(D->getLocStart(), diag::disallowed_var_decl);
+        else if ((Flags & PD_DisallowProperty) && Var->isProperty())
+          diagnose(D->getLocStart(), diag::disallowed_property_decl);
+      }
+      
+      if (auto Func = dyn_cast<FuncDecl>(VD)) {
+        if ((Flags & PD_DisallowStatic) && Func->isStatic())
+          diagnose(Func->getStaticLoc(), diag::disallowed_static_func);
+        if ((Flags & PD_DisallowFuncDef) && Func->getBody() &&
+            !Func->isGetterOrSetter())
+          diagnose(Func->getBody()->getLoc(), diag::disallowed_func_def);
+      }
+      
+      if (auto Type = dyn_cast<TypeDecl>(VD)) {
+        if (Flags & PD_DisallowTypes)
+          diagnose(Type->getLocStart(), diag::disallowed_type);
+      }
+    } else if (auto Pattern = dyn_cast<PatternBindingDecl>(D)) {
+      if ((Flags & PD_DisallowInit) && Pattern->getInit())
+        diagnose(Pattern->getLocStart(), diag::disallowed_init)
+          << Pattern->getInit()->getSourceRange();
     }
     // FIXME: Diagnose top-level subscript
   }
@@ -981,34 +1003,6 @@ bool Parser::parseDeclVar(bool hasContainerType, SmallVectorImpl<Decl*> &Decls){
   return false;
 }
 
-/// parseDeclVarSimple - This just parses a reduced case of decl-var.
-/// FIXME: This is only used by protocol elements.  It seems that there should
-/// be a better way to handle these.
-///
-///   decl-var-simple:
-///      'var' identifier ':' type-annotation
-///
-VarDecl *Parser::parseDeclVarSimple() {
-  SourceLoc VarLoc = consumeToken(tok::kw_var);
-
-  if (Tok.isNot(tok::identifier))
-    diagnose(Tok, diag::expected_lparen_var_name);
-
-  Identifier ident = Context.getIdentifier(Tok.getText());
-  consumeToken();
-
-  if (!consumeIf(tok::colon)) {
-    diagnose(Tok, diag::expected_type_or_init);
-    return 0;
-  }
-
-  Type Ty;
-  if (parseTypeAnnotation(Ty, diag::expected_type))
-    return 0;
-
-  return new (Context) VarDecl(VarLoc, ident, Ty, CurDeclContext);
-}
-
 /// addImplicitThisParameter - Add an implicit 'this' parameter to the given
 /// set of parameter clauses.
 Pattern *Parser::buildImplicitThisParameter() {
@@ -1329,7 +1323,6 @@ Decl *Parser::parseDeclProtocol() {
 ///   protocol-member:
 ///      decl-func
 ///      decl-var-simple
-///      // 'typealias' identifier
 ///
 bool Parser::parseProtocolBody(SourceLoc ProtocolLoc, 
                                const DeclAttributes &Attributes,
@@ -1340,54 +1333,35 @@ bool Parser::parseProtocolBody(SourceLoc ProtocolLoc,
     return true;
   
   // Parse the list of protocol elements.
-  SmallVector<ValueDecl*, 8> Elements;
-  do {
-    switch (Tok.getKind()) {
-    default:
-      diagnose(Tok, diag::expected_protocol_member);
-      return true;
-        
-    case tok::eof:
-      diagnose(Tok, diag::expected_rbrace_protocol);
-      return true;
-        
-    case tok::r_brace:  // End of protocol body.
-      break;
-      
-    // FIXME: use standard parseDecl loop?
-    case tok::kw_static:
-      diagnose(consumeToken(), diag::protocol_static_func);
-      if (Tok.isNot(tok::kw_func))
-        continue;
-      // Fall through
-        
-    case tok::kw_func:
-      if (FuncDecl *Func = parseDeclFunc(/*hasContainerType=*/true)) {
-        if (Func->getBody()) {
-          diagnose(Func->getBody()->getLoc(), diag::protocol_func_def);
-          Func->setBody(0);
-        }
-        
-        Elements.push_back(Func);
-      }
-      break;
-    case tok::kw_var:
-      if (VarDecl *Var = parseDeclVarSimple())
-        Elements.push_back(Var);
-      break;
+  SmallVector<Decl*, 8> Members;
+  bool HadError = false;
+  while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
+    if (parseDecl(Members,
+                  PD_HasContainerType|PD_DisallowProperty|PD_DisallowOperators|
+                  PD_DisallowStatic|PD_DisallowFuncDef|PD_DisallowTypes|
+                  PD_DisallowInit)) {
+      skipUntilDeclRBrace();
+      HadError = true;
     }
-  } while (Tok.isNot(tok::r_brace));
+  }
+
+  // Find the closing brace.
+  SourceLoc RBraceLoc = Tok.getLoc();
+  if (Tok.is(tok::r_brace))
+    consumeToken();
+  else if (!HadError) {
+    diagnose(Tok.getLoc(), diag::expected_rbrace_protocol);
+    diagnose(LBraceLoc, diag::opening_brace);      
+  }
   
-  SourceLoc RBraceLoc = consumeToken(tok::r_brace);
   
-  
-  // Act on what we've parsed.
+  // Handle attributes.
   if (!Attributes.empty())
     diagnose(Attributes.LSquareLoc, diag::protocol_attributes);
 
   // Install the protocol elements.
-  Proto->setElements(Context.AllocateCopy(Elements),
-                     SourceRange(LBraceLoc, RBraceLoc));
+  Proto->setMembers(Context.AllocateCopy(Members),
+                    SourceRange(LBraceLoc, RBraceLoc));
   
   return false;
 }

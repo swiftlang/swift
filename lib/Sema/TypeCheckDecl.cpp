@@ -135,8 +135,8 @@ public:
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
-    for (ValueDecl *member : PD->getElements())
-      visit(member);
+    for (auto Member : PD->getMembers())
+      visit(Member);
   }
   
   void visitVarDecl(VarDecl *VD) {
