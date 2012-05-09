@@ -1,4 +1,4 @@
-//===--- GenOneOf.cpp - Swift IR Generation For 'struct' Types -------------===//
+//===--- GenStruct.cpp - Swift IR Generation For 'struct' Types -----------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -118,7 +118,7 @@ namespace {
       }
     }
   };
-}
+}  // end anonymous namespace.
 
 static void emitInjectionFunction(IRGenModule &IGM,
                                   llvm::Function *fn,

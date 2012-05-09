@@ -156,9 +156,11 @@ public:
   }
   
   void visitReturnStmt(ReturnStmt *S) {
-    OS.indent(Indent) << "(return_stmt\n";
-    if (S->hasResult())
+    OS.indent(Indent) << "(return_stmt";
+    if (S->hasResult()) {
+      OS << '\n';
       printRec(S->getResult());
+    }
     OS << ')';
   }
   

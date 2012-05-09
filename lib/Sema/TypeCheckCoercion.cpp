@@ -1248,7 +1248,8 @@ CoercedResult SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   if (!Apply)
     return Type(DestTy);
 
-  return CoercedResult(new (TC.Context) ScalarToTupleExpr(ERes.getExpr(), DestTy));
+  return CoercedResult(new (TC.Context) ScalarToTupleExpr(ERes.getExpr(),
+                                                          DestTy));
 }
 
 /// Would the source lvalue type be coercible to the dest lvalue type
@@ -1300,7 +1301,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
       
       // If we don't have it yet, force the input to the result of the closure
       // and build the implicit closure.
-      if (CoercedResult CoercedE = coerceToType(E, FT->getResult(), TC, Apply)) {
+      if (CoercedResult CoercedE = coerceToType(E, FT->getResult(), TC, Apply)){
         if (!Apply)
           return DestTy;
         
