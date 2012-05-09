@@ -107,7 +107,10 @@ void PrettyStackTraceDecl::print(llvm::raw_ostream &out) const {
   }
 
   if (ValueDecl *named = dyn_cast<ValueDecl>(TheDecl)) {
-    out << named->getName().str();
+    if (named->getName().get())
+      out << '\'' << named->getName() << '\'';
+    else
+      out << "'anonname=" << (const void*)named << '\'';
   } else {
     out << "declaration";
   }
