@@ -36,6 +36,7 @@ namespace swift {
   class TypeDecl;
   class OneOfDecl;
   class OneOfElementDecl;
+  class StructDecl;
   class ProtocolDecl;
   class ValueDecl;
   class Module;
@@ -525,6 +526,29 @@ public:
 private:
   OneOfType(OneOfDecl *TheDecl, ASTContext &Ctx);
   friend class OneOfDecl;
+};
+
+/// StructType - This represents the type declared by a StructDecl
+class StructType : public TypeBase {  
+  /// TheDecl - This is the TypeDecl which declares the given type. It
+  /// specifies the name and other useful information about this type.
+  StructDecl * const TheDecl;
+  
+public:
+  /// getDecl() - Returns the decl which declares this type.
+  StructDecl *getDecl() const { return TheDecl; }
+
+  void print(raw_ostream &O) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const StructType *D) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Struct;
+  }
+  
+private:
+  StructType(StructDecl *TheDecl, ASTContext &Ctx);
+  friend class StructDecl;
 };
 
 /// MetaTypeType - This is the type given to a metatype value.  When a type is

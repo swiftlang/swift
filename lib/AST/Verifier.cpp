@@ -235,22 +235,15 @@ namespace {
       checkSameLValueness(operandType, resultType,
                           "operand and result of LookThroughOneofExpr");
 
-      OneOfType *oneof = operandType->getAs<OneOfType>();
-      if (!oneof) {
+      StructType *sdecl = operandType->getAs<StructType>();
+      if (!sdecl) {
         Out << "operand of LookThroughOneofExpr does not have oneof type: ";
         E->getSubExpr()->getType().print(Out);
         Out << "\n";
         abort();
       }
 
-      if (!oneof->getDecl()->isTransparentType()) {
-        Out << "looking through a oneof with multiple elements: ";
-        E->getSubExpr()->getType().print(Out);
-        Out << "\n";
-        abort();
-      }
-
-      checkSameType(resultType, oneof->getDecl()->getTransparentType(),
+      checkSameType(resultType, sdecl->getDecl()->getUnderlyingType(),
                     "result of LookThroughOneofExpr and single element of oneof");
     }
 

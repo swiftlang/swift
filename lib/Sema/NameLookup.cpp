@@ -52,6 +52,13 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M) {
         // Fall through to find any members with the same name.
       }
     }
+
+    if (StructType *STy = Ty->getAs<StructType>()) {
+      if (STy->getDecl()->getName() == Name) {
+        Results.push_back(Result::getIgnoreBase(STy->getDecl()->getElement()));
+        // Fall through to find any members with the same name.
+      }
+    }
         
     // Otherwise, just perform normal dot lookup on the type with the specified
     // member name to see if we find extensions or anything else.  For example,
@@ -127,12 +134,10 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M) {
   // If this is a member access to a oneof with a single element constructor
   // (e.g. a struct), allow direct access to the type underlying the single
   // element.
-  if (OneOfType *OneOf = BaseTy->getAs<OneOfType>()) {
-    if (OneOf->getDecl()->isTransparentType()) {
-      Type SubType = OneOf->getDecl()->getTransparentType();
-      if (TupleType *TT = SubType->getAs<TupleType>())
-        doTuple(TT, Name, true);
-    }
+  if (StructType *OneOf = BaseTy->getAs<StructType>()) {
+    Type SubType = OneOf->getDecl()->getUnderlyingType();
+    if (TupleType *TT = SubType->getAs<TupleType>())
+      doTuple(TT, Name, true);
   }
   
 
@@ -189,10 +194,9 @@ static Expr *lookThroughOneofs(Expr *E, ASTContext &Context) {
   if (IsLValue)
     BaseType = cast<LValueType>(BaseType)->getObjectType();
   
-  OneOfType *Oneof = BaseType->castTo<OneOfType>();
-  assert(Oneof->getDecl()->isTransparentType());
+  StructType *ST = BaseType->castTo<StructType>();
   
-  Type ResultType = Oneof->getDecl()->getTransparentType();
+  Type ResultType = ST->getDecl()->getUnderlyingType();
   if (IsLValue)
     ResultType = makeSimilarLValue(ResultType, E->getType(), Context);
   return new (Context) LookThroughOneofExpr(E, ResultType);

@@ -52,6 +52,7 @@ enum class DeclContextKind {
     BuiltinModule,
   CapturingExpr,
   OneOfDecl,
+  StructDecl,
   ExtensionDecl,
   ProtocolDecl,
   TopLevelCodeDecl,

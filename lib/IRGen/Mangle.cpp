@@ -156,6 +156,17 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     return;
   }
 
+  case DeclContextKind::StructDecl: {
+    StructDecl *sdecl = cast<StructDecl>(ctx);
+
+    // FIXME: The mangling rule here is kind of weird.
+    if (tryMangleSubstitution(sdecl->getDeclaredType())) return;
+    mangleDeclContext(ctx->getParent());
+    mangleIdentifier(sdecl->getName());
+    addSubstitution(sdecl->getDeclaredType());
+    return;
+  }
+
   case DeclContextKind::ExtensionDecl:
     // Mandle the extension as the original type.
     mangleType(cast<ExtensionDecl>(ctx)->getExtendedType(),
@@ -284,6 +295,22 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     // type ::= 'N' decl
     Buffer << 'N';
     mangleDeclName(cast<OneOfType>(base)->getDecl());
+
+    addSubstitution(base);
+    return;
+  }
+
+  case TypeKind::Struct: {
+    // Try to mangle the entire name as a substitution.
+    // type ::= substitution
+    if (tryMangleSubstitution(base))
+      return;
+
+    // FIXME: Leaving this the same as oneof for the moment, to avoid changing
+    // the mangling, but this should probably change eventually.
+    // type ::= 'N' decl
+    Buffer << 'N';
+    mangleDeclName(cast<StructType>(base)->getDecl());
 
     addSubstitution(base);
     return;

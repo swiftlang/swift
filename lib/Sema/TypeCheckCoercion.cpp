@@ -712,6 +712,8 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
   TypeDecl *DestTyDecl = 0;
   if (OneOfType *OneOfTy = DestTy->getAs<OneOfType>())
     DestTyDecl = OneOfTy->getDecl();
+  else if (StructType *StructTy = DestTy->getAs<StructType>())
+    DestTyDecl = StructTy->getDecl();
   else if (ProtocolType *ProtoTy = DestTy->getAs<ProtocolType>())
     DestTyDecl = ProtoTy->getDecl();
   else {

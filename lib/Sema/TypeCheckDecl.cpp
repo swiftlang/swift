@@ -123,6 +123,17 @@ public:
       visitOneOfElementDecl(elt);
   }
 
+  void visitStructDecl(StructDecl *SD) {
+    // Validate the function type.
+    if (TC.validateType(SD->getUnderlyingType())) return;
+
+    // Require the carried type to be materializable.
+    if (!SD->getUnderlyingType()->isMaterializable()) {
+      TC.diagnose(SD->getStructLoc(),
+                  diag::oneof_element_not_materializable);
+    }
+  }
+
   void visitProtocolDecl(ProtocolDecl *PD) {
     for (ValueDecl *member : PD->getElements())
       visit(member);

@@ -413,8 +413,8 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
     for (unsigned i : MemberIndexes) {
       // For each index, we look through a TupleType or transparent OneOfType.
       CanType CurT = ArgRef->getType()->getCanonicalType();
-      if (OneOfType *OOT = dyn_cast<OneOfType>(CurT)) {
-        CurT = OOT->getDecl()->getTransparentType()->getCanonicalType();
+      if (StructType *ST = dyn_cast<StructType>(CurT)) {
+        CurT = ST->getDecl()->getUnderlyingType()->getCanonicalType();
         ArgRef = new (Context) LookThroughOneofExpr(ArgRef, CurT);
       }
       TupleType *TT = cast<TupleType>(CurT);
@@ -436,22 +436,20 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
     return;
   }
 
-  if (OneOfType *OOT = dyn_cast<OneOfType>(T)) {
-    OneOfDecl *OOD = OOT->getDecl();
-    if (OOD->isTransparentType()) {
-      // Print "struct" types as if we are constructing one: the name
-      // followed by the underlying tuple.
-      PrintLiteralString(OOD->getName().str(), Context, Loc,
-                         PrintDecls, BodyContent);
-      CanType SubType = OOD->getTransparentType()->getCanonicalType();
-      PrintReplExpr(TC, Arg, SubType, Loc, EndLoc,
-                    MemberIndexes, BodyContent, PrintDecls);
-      return;
-    }
-
-    // FIXME: We should handle non-transparent OneOfTypes at some point, but
-    // it's tricky to represent in the AST without a "match" statement.
+  if (StructType *ST = dyn_cast<StructType>(T)) {
+    StructDecl *SD = ST->getDecl();
+    // Print "struct" types as if we are constructing one: the name
+    // followed by the underlying tuple.
+    PrintLiteralString(SD->getName().str(), Context, Loc,
+                       PrintDecls, BodyContent);
+    CanType SubType = SD->getUnderlyingType()->getCanonicalType();
+    PrintReplExpr(TC, Arg, SubType, Loc, EndLoc,
+                  MemberIndexes, BodyContent, PrintDecls);
+    return;
   }
+
+  // FIXME: We should handle OneOfTypes at some point, but
+  // it's tricky to represent in the AST without a "match" statement.
 
   PrintLiteralString("<unprintable value>", Context, Loc, PrintDecls,
                      BodyContent);

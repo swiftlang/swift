@@ -79,6 +79,7 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
   case TypeKind::BuiltinFloat:
   case TypeKind::UnstructuredDependent:
   case TypeKind::OneOf:
+  case TypeKind::Struct:
   case TypeKind::MetaType:
   case TypeKind::Module:
   case TypeKind::Protocol:
@@ -567,4 +568,8 @@ void LValueType::print(raw_ostream &OS) const {
   }
   OS << "] ";
   getObjectType()->print(OS);
+}
+
+void StructType::print(raw_ostream &OS) const {
+  OS << TheDecl->getName().get();
 }

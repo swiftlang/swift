@@ -43,6 +43,8 @@ namespace swift {
   enum class Resilience : unsigned char;
   class TypeAliasDecl;
   class Stmt;
+  class StructType;
+  class TupleType;
   
 enum class DeclKind {
 #define DECL(Id, Parent) Id,
@@ -458,16 +460,6 @@ public:
 
   OneOfElementDecl *getElement(Identifier Name) const;
 
-  /// isTransparentType - Return true if this 'oneof' is transparent
-  /// and be treated exactly like some other type.  This is true if
-  /// this is a single element oneof whose one element has an explicit
-  /// argument type.  These are typically (but not necessarily) made
-  /// with 'struct'.  Since it is unambiguous which slice is being
-  /// referenced, various syntactic forms are allowed for these, like
-  /// direct "foo.x" syntax.
-  bool isTransparentType() const;
-  Type getTransparentType() const;
-
   OneOfType *getDeclaredType() { return OneOfTy; }
 
   // Implement isa/cast/dyncast/etc.
@@ -477,6 +469,36 @@ public:
   static bool classof(const OneOfDecl *D) { return true; }
   static bool classof(const DeclContext *C) {
     return C->getContextKind() == DeclContextKind::OneOfDecl;
+  }
+};
+
+class StructDecl : public TypeDecl, public DeclContext {
+  SourceLoc StructLoc;
+  Type UnderlyingType;
+  StructType *StructTy;
+  OneOfElementDecl* Element;
+
+public:
+  StructDecl(SourceLoc StructLoc, Identifier Name, DeclContext *DC);
+
+  Type getUnderlyingType() { return UnderlyingType; }
+  void setUnderlyingType(Type under);
+
+  SourceLoc getStructLoc() const { return StructLoc; }
+  SourceLoc getLocStart() const { return StructLoc; }
+
+  // FIXME: This is an ugly, short-term hack!
+  OneOfElementDecl *getElement() { return Element; }
+
+  StructType *getDeclaredType() { return StructTy; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::Struct;
+  }
+  static bool classof(const StructDecl *D) { return true; }
+  static bool classof(const DeclContext *C) {
+    return C->getContextKind() == DeclContextKind::StructDecl;
   }
 };
 

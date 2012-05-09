@@ -431,7 +431,12 @@ void swift::irgen::emitOneOfElementRef(IRGenFunction &IGF,
                                        Explosion &result) {
   // Find the injection function.
   llvm::Function *injection;
-  OneOfDecl *ParentOneOf = cast<OneOfDecl>(elt->getDeclContext());
+  Decl *ParentOneOf;
+  // FIXME: OneOfElement in Struct is a hack!
+  if (isa<StructDecl>(elt->getDeclContext()))
+    ParentOneOf = cast<StructDecl>(elt->getDeclContext());
+  else
+    ParentOneOf = cast<OneOfDecl>(elt->getDeclContext());
   if (ParentOneOf->getDeclContext()->isLocalContext())
     injection = IGF.getAddrOfLocalInjectionFunction(elt);
   else

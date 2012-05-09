@@ -116,6 +116,7 @@ bool ValueDecl::isDefinition() const {
   case DeclKind::Var:
   case DeclKind::OneOf:
   case DeclKind::OneOfElement:
+  case DeclKind::Struct:
   case DeclKind::TypeAlias:
   case DeclKind::Protocol:
     return true;
@@ -143,6 +144,8 @@ bool ValueDecl::isInstanceMember() const {
 Type TypeDecl::getDeclaredType() {
   if (auto TAD = dyn_cast<TypeAliasDecl>(this))
     return TAD->getAliasType();
+  if (auto SD = dyn_cast<StructDecl>(this))
+    return SD->getDeclaredType();
   if (auto PD = dyn_cast<ProtocolDecl>(this))
     return PD->getDeclaredType();
   assert(isa<OneOfDecl>(this));
@@ -167,22 +170,29 @@ OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name, DeclContext *Parent)
   OneOfTy = new (Parent->getASTContext()) OneOfType(this, Parent->getASTContext());
 }
 
+StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, DeclContext *Parent)
+  : TypeDecl(DeclKind::Struct, Parent, Name, Type()), 
+    DeclContext(DeclContextKind::StructDecl, Parent), StructLoc(StructLoc) {
+  // Set the type of the OneOfDecl to the right MetaTypeType.
+  setType(MetaTypeType::get(this));
+  // Compute the associated type for this OneOfDecl.
+  StructTy = new (Parent->getASTContext()) StructType(this, Parent->getASTContext());
+}
+
+void StructDecl::setUnderlyingType(Type under) {
+  ASTContext &Context = getDeclContext()->getASTContext();
+  Type EltTy = FunctionType::get(under, getDeclaredType(), Context);
+  Element = new (Context) OneOfElementDecl(StructLoc, getName(),
+                                           EltTy, under, this);
+  UnderlyingType = under;
+}
+
 OneOfElementDecl *OneOfDecl::getElement(Identifier Name) const {
   // FIXME: Linear search is not great for large oneof decls.
   for (OneOfElementDecl *Elt : Elements)
     if (Elt->getName() == Name)
       return Elt;
   return 0;
-}
-
-bool OneOfDecl::isTransparentType() const {
-  return Elements.size() == 1 && !Elements[0]->getArgumentType().isNull();
-}
-
-Type OneOfDecl::getTransparentType() const {
-  assert(Elements.size() == 1);
-  assert(!Elements[0]->getArgumentType().isNull());
-  return Elements[0]->getArgumentType();
 }
 
 void VarDecl::setProperty(ASTContext &Context, SourceLoc LBraceLoc,
@@ -209,6 +219,7 @@ Type FuncDecl::getExtensionType() const {
   case DeclContextKind::BuiltinModule:
   case DeclContextKind::CapturingExpr:
   case DeclContextKind::OneOfDecl:
+  case DeclContextKind::StructDecl:
   case DeclContextKind::TopLevelCodeDecl:
     return Type();
     
@@ -424,6 +435,13 @@ namespace {
     void visitOneOfElementDecl(OneOfElementDecl *OOED) {
       printCommon(OOED, "oneof_element_decl");
       OS << ')';
+    }
+
+    void visitStructDecl(StructDecl *SD) {
+      printCommon(SD, "struct_decl");
+      OS << "type='";
+      SD->getUnderlyingType()->print(OS);
+      OS << "')";
     }
 
     void visitPatternBindingDecl(PatternBindingDecl *PBD) {

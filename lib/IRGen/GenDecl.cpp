@@ -155,6 +155,9 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
   case DeclKind::OneOf:
     return IGM.emitOneOfType(cast<OneOfDecl>(D)->getDeclaredType());
 
+  case DeclKind::Struct:
+    return IGM.emitStructType(cast<StructDecl>(D)->getDeclaredType());
+
   // These declarations don't require IR-gen support.
   case DeclKind::Import:
     return;
@@ -270,7 +273,12 @@ IRGenFunction::getAddrOfLocalInjectionFunction(OneOfElementDecl *D) {
   if (entry) return entry;
 
   llvm::FunctionType *fnType = getInjectionFunctionType(D, IGM);
-  OneOfDecl *ParentOneOf = cast<OneOfDecl>(D->getDeclContext());
+  ValueDecl *ParentOneOf;
+  // FIXME: OneOfElementDecl in struct is a hack.
+  if (isa<StructDecl>(D->getDeclContext()))
+    ParentOneOf = cast<StructDecl>(D->getDeclContext());
+  else
+    ParentOneOf = cast<OneOfDecl>(D->getDeclContext());
   llvm::SmallString<64> InjectionName = ParentOneOf->getName().str();
   InjectionName += '.';
   InjectionName += D->getName().str();
@@ -309,6 +317,12 @@ static void addOwnerArgument(ASTContext &ctx, ValueDecl *value,
 
   case DeclContextKind::OneOfDecl:
     resultType = addOwnerArgument(ctx, cast<OneOfDecl>(DC)->getDeclaredType(),
+                                  resultType);
+    uncurryLevel++;
+    return;
+
+  case DeclContextKind::StructDecl:
+    resultType = addOwnerArgument(ctx, cast<StructDecl>(DC)->getDeclaredType(),
                                   resultType);
     uncurryLevel++;
     return;
@@ -435,6 +449,9 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     case DeclKind::OneOf:
       emitOneOfType(cast<OneOfDecl>(member)->getDeclaredType());
       continue;
+    case DeclKind::Struct:
+      emitStructType(cast<StructDecl>(member)->getDeclaredType());
+      continue;
     case DeclKind::Var:
       if (cast<VarDecl>(member)->isProperty())
         // Getter/setter will be handled separately.
@@ -466,6 +483,9 @@ void IRGenFunction::emitLocal(Decl *D) {
 
   case DeclKind::OneOf:
     return emitOneOfType(cast<OneOfDecl>(D)->getDeclaredType());
+
+  case DeclKind::Struct:
+    return emitStructType(cast<StructDecl>(D)->getDeclaredType());
 
   case DeclKind::TypeAlias:
   case DeclKind::OneOfElement:

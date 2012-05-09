@@ -310,6 +310,8 @@ static Expr *BindNameToIVar(UnresolvedDeclRefExpr *UDRE, FuncDecl *CurFD,
   if (CurFD->isStatic()) {
     if (OneOfType *OneOf = ExtendedType->getAs<OneOfType>())
       StaticAlias = OneOf->getDecl();
+    else if (StructType *ST = ExtendedType->getAs<StructType>())
+      StaticAlias = ST->getDecl();
     else if (ProtocolType *Proto = ExtendedType->getAs<ProtocolType>())
       StaticAlias = Proto->getDecl();
     else

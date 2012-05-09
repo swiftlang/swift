@@ -65,6 +65,11 @@ Resilience ValueDecl::getResilienceFrom(Component *C) const {
       D = cast<OneOfDecl>(DC);
       goto HandleDecl;
 
+    // For structs, we walk through the struct decl.
+    case DeclContextKind::StructDecl:
+      D = cast<StructDecl>(DC);
+      goto HandleDecl;
+
     case DeclContextKind::ExtensionDecl:
       // FIXME: we can't use the ExtensionDecl, it has no attrs.
       return Resilience::Fragile;

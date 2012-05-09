@@ -293,6 +293,22 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
       // FIXME: This loses source information!
       return semaApplyExpr(new (Context) ConstructorCallExpr(FnRef, E2));
     }
+
+    // FIXME: This is redundant with the OneOf case.
+    if (StructType *ST = Ty->getAs<StructType>()) {
+      StructDecl *SD = ST->getDecl();
+      SmallVector<ValueDecl *, 4> Methods;
+
+      // Look for extension methods with the same name as the class.
+      // FIXME: This should look specifically for constructors.
+      TU.lookupGlobalExtensionMethods(Ty, SD->getName(), Methods);
+      Methods.push_back(SD->getElement());
+      Expr *FnRef = OverloadedDeclRefExpr::createWithCopy(Methods,
+                                                          E1->getStartLoc());
+
+      // FIXME: This loses source information!
+      return semaApplyExpr(new (Context) ConstructorCallExpr(FnRef, E2));
+    }
   }
   
   // Otherwise, the function's type must be dependent.  If it is something else,
@@ -562,6 +578,8 @@ public:
     // FIXME: There should be a better way to handle this.
     if (isa<NameAliasType>(implType))
       implTypeDecl = cast<NameAliasType>(implType)->getDecl();
+    else if (isa<StructType>(implType))
+      implTypeDecl = cast<StructType>(implType)->getDecl();
     else
       implTypeDecl = cast<OneOfType>(implType)->getDecl();
     Expr *sliceTypeRef =

@@ -85,6 +85,7 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E) {
 
   case DeclKind::TypeAlias:
   case DeclKind::OneOf:
+  case DeclKind::Struct:
   case DeclKind::Protocol:
   case DeclKind::Func:
   case DeclKind::OneOfElement:
@@ -113,6 +114,7 @@ static void emitDeclRef(IRGenFunction &IGF, DeclRefExpr *E,
 
   case DeclKind::TypeAlias:
   case DeclKind::OneOf:
+  case DeclKind::Struct:
   case DeclKind::Protocol:
     emitMetaTypeRef(IGF, D->getType(), explosion);
     return;
@@ -401,6 +403,7 @@ namespace {
     // These are potentially supportable.
     NON_LOCATEABLE(TypeAliasDecl)
     NON_LOCATEABLE(OneOfDecl)
+    NON_LOCATEABLE(StructDecl)
     NON_LOCATEABLE(ProtocolDecl)
                                                     
     // FIXME: Not really a ValueDecl.

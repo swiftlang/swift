@@ -1258,14 +1258,14 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
       parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct))
     return true;
 
-  OneOfDecl *OOD = new (Context) OneOfDecl(StructLoc, StructName,
-                                           CurDeclContext);
-  Decls.push_back(OOD);
+  StructDecl *SD = new (Context) StructDecl(StructLoc, StructName,
+                                            CurDeclContext);
+  Decls.push_back(SD);
 
   // Parse elements of the body as a tuple body.
   Type BodyTy;
   {
-    ContextChange CC(*this, OOD);
+    ContextChange CC(*this, SD);
     if (parseTypeTupleBody(LBLoc, BodyTy))
       return true;
     assert(isa<TupleType>(BodyTy.getPointer()));
@@ -1278,20 +1278,15 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
       // have custom parsing logic instead of reusing type-tuple-body.
       diagnose(LBLoc, diag::struct_unnamed_member);
     }
-  
-  // The 'struct' is syntactically fine, invoke the semantic actions for the
-  // syntactically expanded oneof type.  Struct declarations are just sugar for
-  // other existing constructs.
-  Parser::OneOfElementInfo ElementInfo;
-  ElementInfo.Name = StructName.str();
-  ElementInfo.NameLoc = StructLoc;
-  ElementInfo.EltType = BodyTy;
-  actOnOneOfDecl(StructLoc, Attributes, ElementInfo, OOD);
-  assert(OOD->isTransparentType() && "Somehow isn't a struct?");
+
+  if (!Attributes.empty())
+    diagnose(Attributes.LSquareLoc, diag::oneof_attributes);
+  SD->setUnderlyingType(BodyTy);
+  ScopeInfo.addToScope(SD);
 
   // Parse the extended body of the struct.
   if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof))
-    Decls.push_back(parseExtensionBody(StructLoc, OOD->getDeclaredType()));
+    Decls.push_back(parseExtensionBody(StructLoc, SD->getDeclaredType()));
 
   if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_struct,
                          LBLoc, diag::opening_brace))

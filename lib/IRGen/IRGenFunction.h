@@ -47,6 +47,7 @@ namespace swift {
   class ReturnStmt;
   class SourceLoc;
   class Stmt;
+  class StructType;
   class TranslationUnit;
   class ValueDecl;
   class VarDecl;
@@ -318,6 +319,7 @@ private:
 //--- Types -----------------------------------------------------------------
 public:
   void emitOneOfType(OneOfType *type);
+  void emitStructType(StructType *type);
 
 //--- Global context emission --------------------------------------------------
 public:

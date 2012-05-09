@@ -163,6 +163,11 @@ OneOfType::OneOfType(OneOfDecl *TheDecl, ASTContext &C)
   TheDecl(TheDecl) {
 }
 
+StructType::StructType(StructDecl *TheDecl, ASTContext &C)
+: TypeBase(TypeKind::Struct, &C, /*Dependent=*/false),
+  TheDecl(TheDecl) {
+}
+
 IdentifierType *IdentifierType::getNew(ASTContext &C,
                                        MutableArrayRef<Component> Components) {
   Components = C.AllocateCopy(Components);

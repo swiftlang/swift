@@ -49,6 +49,7 @@ namespace swift {
   class TranslationUnit;
   class Type;
   class TypeAliasDecl;
+  class TypeDecl;
   class VarDecl;
 
 namespace irgen {
@@ -101,7 +102,7 @@ private:
 public:
   const TypeInfo &getFragileTypeInfo(Type T);
   llvm::Type *getFragileType(Type T);
-  llvm::StructType *createNominalType(OneOfDecl *D);
+  llvm::StructType *createNominalType(TypeDecl *D);
   void getSchema(Type T, ExplosionSchema &schema);
 
 private:
@@ -140,6 +141,7 @@ public:
   void emitTranslationUnit(TranslationUnit *TU, unsigned StartElem);
 
   void emitOneOfType(OneOfType *type);
+  void emitStructType(StructType *type);
   void emitExtension(ExtensionDecl *D);
   void emitGlobalFunction(FuncDecl *D);  
   void emitStaticMethod(FuncDecl *D);

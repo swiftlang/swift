@@ -243,6 +243,8 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, CanType canTy) {
     return convertTupleType(IGM, cast<TupleType>(ty));
   case TypeKind::OneOf:
     return convertOneOfType(IGM, cast<OneOfType>(ty));
+  case TypeKind::Struct:
+    return convertStructType(IGM, cast<StructType>(ty));
   case TypeKind::Function:
     return convertFunctionType(IGM, cast<FunctionType>(ty));
   case TypeKind::Array:
@@ -254,7 +256,7 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, CanType canTy) {
 }
 
 /// createNominalType - Create a new nominal type.
-llvm::StructType *IRGenModule::createNominalType(OneOfDecl *type) {
+llvm::StructType *IRGenModule::createNominalType(TypeDecl *type) {
   llvm::SmallString<32> typeName;
   if (type->getDeclContext()->isLocalContext()) {
     typeName = type->getName().str();

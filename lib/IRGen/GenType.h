@@ -34,6 +34,7 @@ namespace swift {
   class MetaTypeType;
   class ModuleType;
   class OneOfType;
+  class StructType;
   class TupleType;
   class CanType;
   class TypeBase;
@@ -191,6 +192,7 @@ class TypeConverter {
   static const TypeInfo *convertType(IRGenModule &IGM, CanType T);
   static const TypeInfo *convertTupleType(IRGenModule &IGM, TupleType *T);
   static const TypeInfo *convertOneOfType(IRGenModule &IGM, OneOfType *T);
+  static const TypeInfo *convertStructType(IRGenModule &IGM, StructType *T);
   static const TypeInfo *convertFunctionType(IRGenModule &IGM, FunctionType *T);
   static const TypeInfo *convertArrayType(IRGenModule &IGM, ArrayType *T);
   static const TypeInfo *convertLValueType(IRGenModule &IGM, LValueType *T);

@@ -33,6 +33,8 @@ static bool buildArraySliceType(TypeChecker &TC, ArraySliceType *sliceTy) {
   Identifier name;
   if (OneOfType *oneof = baseTy->getAs<OneOfType>()) {
     name = oneof->getDecl()->getName();
+  } else if (StructType *st = baseTy->getAs<StructType>()) {
+    name = st->getDecl()->getName();
   } else {
     TC.diagnose(loc, diag::base_of_array_slice_not_nominal, baseTy);
     return true;
@@ -99,6 +101,7 @@ bool TypeChecker::validateType(Type InTy) {
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::UnstructuredDependent:
   case TypeKind::OneOf:
+  case TypeKind::Struct:
     // These types are already canonical anyway.
     return false;
       
