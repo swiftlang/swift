@@ -35,28 +35,33 @@ swift_alloc(struct SwiftHeapMetadata *metadata,
   }
   object->metadata = metadata;
   object->runtimePrivateData = 1;
-  return reinterpret_cast<struct SwiftHeapObject *>(object);
+  return object;
 }
 
 struct SwiftHeapObject *
 swift_retain(struct SwiftHeapObject *object)
 {
-  if (!object) {
-    return NULL;
+  if (object) {
+    ++object->runtimePrivateData;
   }
-  ++object->runtimePrivateData;
   return object;
 }
+
+static void
+_swift_release_slow(struct SwiftHeapObject *object)
+  __attribute__((noinline,used));
 
 void
 swift_release(struct SwiftHeapObject *object)
 {
-  if (!object) {
-    return;
+  if (object && (--object->runtimePrivateData == 0)) {
+    _swift_release_slow(object);
   }
-  if (--object->runtimePrivateData > 0) {
-    return;
-  }
+}
+
+void
+_swift_release_slow(struct SwiftHeapObject *object)
+{
   size_t allocSize = object->metadata->destroy(object);
   if (allocSize) {
     swift_dealloc(object, allocSize);
