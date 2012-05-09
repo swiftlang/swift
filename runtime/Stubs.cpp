@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <algorithm>
 #include "llvm/ADT/StringExtras.h"
 
 // FIXME: We shouldn't be writing implemenetations for functions in the swift
@@ -36,59 +37,48 @@ extern "C" void _TSs5printFT3valNSs6Double_T_(double l) {
   printf("%s", Buffer);
 }
 
-// String implementation.
-
-// func [infix_left=190] + (lhs : String,
-//                          rhs : String) -> String
-extern "C" char* _TSsop1pFT3lhsNSs6String3rhsS__S_(char* lhs, char* rhs) {
-   size_t ls = strlen(lhs);
-   size_t rs = strlen(rhs);
-   char* s = (char*)malloc(ls+rs+1);
-   memcpy(s, lhs, ls);
-   strcpy(s+ls, rhs);
-   return s;
-}
-
 // static func String(v : Int128, radix : Int) -> String
-extern "C" char *
-_TNSs6String6StringFT1vNSs6Int1285radixNSs5Int64_S_(__int128_t X,
-                                                    uint64_t Radix) {
+extern "C"
+long long
+print_int(char* TmpBuffer, __int64_t buf_len, __int128_t X, uint64_t Radix) {
   assert(Radix != 0 && Radix <= 36 && "Invalid radix for string conversion");
-         
-  char TmpBuffer[128];
-  char *P = TmpBuffer+128;
-  
-  *--P = 0; // Null terminate buffer.
+  char *P = TmpBuffer;
   
   bool WasNeg = X < 0;
   __uint128_t Y = WasNeg ? -X : X;
 
   if (Y == 0) {
-    *--P = '0';  // Special case. 
+    *P++ = '0';  // Special case. 
   } else if (Radix == 10) {  // Special case for 10, since we care so much about performance right now.
     while (Y) {
-      *--P = '0' + char(Y % 10);
+      *P++ = '0' + char(Y % 10);
       Y /= 10;
     }
   } else {
     unsigned Radix32 = Radix;
     while (Y) {
-      *--P = llvm::hexdigit(Y % Radix32);
+      *P++ = llvm::hexdigit(Y % Radix32);
       Y /= Radix32;
     }
   }
   
-  if (WasNeg) *--P = '-';
-  return strdup(P);
+  if (WasNeg) *P++ = '-';
+  std::reverse(TmpBuffer, P);
+  *P++ = 0;
+  return P - TmpBuffer;
 }
 
 // static func String(v : Double) -> String
-extern "C" char *_TNSs6String6StringFT1vNSs6Double_S_(double X) {
-  char Buffer[256];
-  sprintf(Buffer, "%g", X);
-  if (strchr(Buffer, 'e') == nullptr && strchr(Buffer, '.') == nullptr)
-    strcat(Buffer, ".0");
-  return strdup(Buffer);
+extern "C"
+long long
+print_double(char* Buffer, double X) {
+  long long i = sprintf(Buffer, "%g", X);
+  if (strchr(Buffer, 'e') == nullptr && strchr(Buffer, '.') == nullptr) {
+    Buffer[i++] = '.';
+    Buffer[i++] = '0';
+  }
+  Buffer[i++] = 0;
+  return i;
 }
 
 extern "C" bool _TNSs4Bool13getLogicValuefRS_FT_i1(bool* b) {
