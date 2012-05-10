@@ -31,6 +31,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/TargetRegistry.h"
+#include "llvm/Linker.h"
 
 #include "IRGenModule.h"
 
@@ -106,6 +107,46 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   IRGenModule IRM(TU->Ctx, Opts, *Module, *TargetData);
   IRM.emitTranslationUnit(TU, StartElem);
 
+  // Ugly standard library optimization hack, part 1: pull in the relevant
+  // IR from swift.swift.
+  // FIXME: We should pre-generate a swift.bc; it would be substantially
+  // faster we could skip both generating and optimizing the standard library.
+  // FIXME: Figure out how to get this working for the REPL.
+  bool UseStandardLibraryHack = Opts.OptLevel != 0;
+  if (UseStandardLibraryHack) {
+    for (auto ModPair : TU->getImportedModules()) {
+      if (isa<BuiltinModule>(ModPair.second))
+        continue;
+
+      TranslationUnit *SubTU = cast<TranslationUnit>(ModPair.second);
+
+      if (SubTU->Name.str() == "swift") {
+        llvm::Module SubModule(SubTU->Name.str(), Module->getContext());
+        performCaptureAnalysis(SubTU);
+        performIRGeneration(Opts, &SubModule, SubTU);
+
+        for (llvm::Function &F : SubModule)
+          if (!F.isDeclaration() && F.hasExternalLinkage())
+            F.setLinkage(llvm::GlobalValue::AvailableExternallyLinkage);
+        for (llvm::GlobalVariable &G : SubModule.getGlobalList())
+          if (!G.isDeclaration() && G.hasExternalLinkage())
+            G.setLinkage(llvm::GlobalValue::AvailableExternallyLinkage);
+        for (llvm::GlobalAlias &A : SubModule.getAliasList())
+          if (!A.isDeclaration() && A.hasExternalLinkage())
+            A.setLinkage(llvm::GlobalValue::AvailableExternallyLinkage);
+
+        std::string ErrorMessage;
+        if (llvm::Linker::LinkModules(Module, &SubModule,
+                                      llvm::Linker::DestroySource,
+                                      &ErrorMessage)) {
+          llvm::errs() << "Error linking swift modules\n";
+          llvm::errs() << ErrorMessage << "\n";
+          return;
+        }
+      }
+    }
+  }
+
   // Bail out if there are any errors.
   if (TU->Ctx.hadError()) return;
 
@@ -156,15 +197,65 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   ModulePasses.add(new llvm::TargetData(*TargetData));
   PMBuilder.populateModulePassManager(ModulePasses);
 
+  // Do it.
+  ModulePasses.run(*Module);
+
+  PassManager EmitPasses;
+
+  // Ugly standard library optimization hack, part 2: eliminate the crap
+  // we don't need anymore from the module.
+  // FIXME: It would be nice if LLVM provided a simpler way to do this...
+  if (UseStandardLibraryHack) {
+    for (llvm::Function &F : *Module)
+      if (F.hasAvailableExternallyLinkage()) {
+        F.deleteBody();
+        F.setLinkage(llvm::GlobalValue::ExternalLinkage);
+      }
+    for (llvm::GlobalVariable &G : Module->getGlobalList())
+      if (G.hasAvailableExternallyLinkage()) {
+        G.setInitializer(nullptr);
+        G.setLinkage(llvm::GlobalValue::ExternalLinkage);
+      }
+    for (llvm::GlobalAlias &A : Module->getAliasList())
+      if (A.hasAvailableExternallyLinkage()) {
+        A.setAliasee(nullptr);
+        A.setLinkage(llvm::GlobalValue::ExternalLinkage);
+      }
+    bool changed;
+    do {
+      std::vector<llvm::GlobalValue *> vals;
+      for (llvm::GlobalVariable &G : Module->getGlobalList()) {
+        G.removeDeadConstantUsers();
+        if ((G.hasLocalLinkage() || G.isDeclaration()) && G.use_empty()) {
+          vals.push_back(&G);
+        }
+      }
+      for (llvm::Function &F : *Module) {
+        F.removeDeadConstantUsers();
+        if ((F.hasLocalLinkage() || F.isDeclaration()) && F.use_empty()) {
+          vals.push_back(&F);
+        }
+      }
+      for (llvm::GlobalAlias &A : Module->getAliasList()) {
+        A.removeDeadConstantUsers();
+        if ((A.hasLocalLinkage() || A.isDeclaration()) && A.use_empty()) {
+          vals.push_back(&A);
+        }
+      }
+      for (auto val : vals) val->eraseFromParent();
+      changed = !vals.empty();
+    } while (changed);
+  }
+
   // Set up the final emission passes.
   switch (Opts.OutputKind) {
   case OutputKind::Module:
     break;
   case OutputKind::LLVMAssembly:
-    ModulePasses.add(createPrintModulePass(&FormattedOS));
+    EmitPasses.add(createPrintModulePass(&FormattedOS));
     break;
   case OutputKind::LLVMBitcode:
-    ModulePasses.add(createBitcodeWriterPass(*RawOS));
+    EmitPasses.add(createBitcodeWriterPass(*RawOS));
     break;
   case OutputKind::NativeAssembly:
   case OutputKind::ObjectFile: {
@@ -173,7 +264,7 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
                   ? TargetMachine::CGFT_AssemblyFile
                   : TargetMachine::CGFT_ObjectFile);
 
-    if (TargetMachine->addPassesToEmitFile(ModulePasses, FormattedOS,
+    if (TargetMachine->addPassesToEmitFile(EmitPasses, FormattedOS,
                                            FileType, !Opts.Verify)) {
       TU->Ctx.Diags.diagnose(SourceLoc(), diag::error_codegen_init_fail);
       return;
@@ -182,6 +273,5 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   }
   }
 
-  // Do it.
-  ModulePasses.run(*Module);
+  EmitPasses.run(*Module);
 }

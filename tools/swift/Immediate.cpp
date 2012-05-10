@@ -83,8 +83,7 @@ static bool IRGenImportedModules(TranslationUnit *TU,
     // For the moment, if we're in the REPL, don't bother to IRGen
     // swift.swift at all.
     // FIXME: Checking for "swift" explicitly is an ugly hack.
-    // FIXME: The way the REPL manages modules needs to be rewritten.
-    if (SubTU->Name.str() == "swift" && IsREPL)
+    if (SubTU->Name.str() == "swift")
       continue;
 
     // Recursively IRGen imported modules.
@@ -97,24 +96,6 @@ static bool IRGenImportedModules(TranslationUnit *TU,
 
     if (TU->Ctx.hadError())
       return true;
-
-    // FIXME: Checking for "swift" explicitly is an ugly hack.
-    // FIXME: We might be able to make this faster by loading a pre-generated
-    // swift.bc instead of performing IRGen at runtime.  Probably doesn't
-    // matter much as long as we're forced to generate an AST anyway.
-    // FIXME: This doesn't handle symbols in swift.swift which don't have
-    // either local or external linkage.
-    if (SubTU->Name.str() == "swift") {
-      for (llvm::Function &F : SubModule)
-        if (!F.isDeclaration() && F.hasExternalLinkage())
-          F.setLinkage(llvm::GlobalValue::AvailableExternallyLinkage);
-      for (llvm::GlobalVariable &G : SubModule.getGlobalList())
-        if (!G.isDeclaration() && G.hasExternalLinkage())
-          G.setLinkage(llvm::GlobalValue::AvailableExternallyLinkage);
-      for (llvm::GlobalAlias &A : SubModule.getAliasList())
-        if (!A.isDeclaration() && A.hasExternalLinkage())
-          A.setLinkage(llvm::GlobalValue::AvailableExternallyLinkage);
-    }
 
     std::string ErrorMessage;
     if (llvm::Linker::LinkModules(&Module, &SubModule,
