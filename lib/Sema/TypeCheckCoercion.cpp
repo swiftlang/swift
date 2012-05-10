@@ -1434,7 +1434,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
     if (TupleType *ETy = E->getType()->getAs<TupleType>())
       return convertTupleToTupleType(E, ETy->getFields().size(), TT, TC, Apply);
   }
-
+  
   // If the input expression has a dependent type, try to coerce it to an
   // appropriate type.
   if (E->getType()->isDependentType())
@@ -1468,6 +1468,25 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
       
       return coerceToType(Loaded.getExpr(), DestTy, TC, Apply);
     }
+    
+    return nullptr;
+  }
+
+  // A value of any given type can be converted to a value of protocol type if
+  // the value's type conforms to the protocol.
+  if (ProtocolType *Proto = DestTy->getAs<ProtocolType>()) {
+    if (ProtocolConformance *Conformance
+          = TC.conformsToProtocol(E->getType(), Proto->getDecl())) {
+      if (!Apply)
+        return DestTy;
+
+      return coerced(new (TC.Context) ErasureExpr(E, DestTy, Conformance),
+                     Apply);
+    }
+    
+    if (Apply) // FIXME: Say *why* it doesn't conform.
+      TC.diagnose(E->getLoc(), diag::invalid_implicit_protocol_conformance,
+                  E->getType(), DestTy);
     
     return nullptr;
   }

@@ -221,6 +221,9 @@ namespace {
       emitScalarToTuple(IGF, E, Out);
     }
 
+    void visitErasureExpr(ErasureExpr *E) {
+      IGF.IGM.unimplemented(E->getLoc(), "ErasureExpr");
+    }
     void visitTupleElementExpr(TupleElementExpr *E) {
       emitTupleElement(IGF, E, Out);
     }
@@ -310,6 +313,7 @@ namespace {
     NOT_LVALUE_EXPR(Load)
     NOT_LVALUE_EXPR(Tuple)
     NOT_LVALUE_EXPR(ScalarToTuple)
+    NOT_LVALUE_EXPR(Erasure)
     NOT_LVALUE_EXPR(NewArray)
     NOT_LVALUE_EXPR(DotSyntaxBaseIgnored)
     NOT_LVALUE_EXPR(Coerce)
@@ -462,6 +466,7 @@ namespace {
     NON_LOCATEABLE(StringLiteralExpr)
     NON_LOCATEABLE(InterpolatedStringLiteralExpr)
     NON_LOCATEABLE(TupleShuffleExpr)
+    NON_LOCATEABLE(ErasureExpr)
     NON_LOCATEABLE(CapturingExpr)
     NON_LOCATEABLE(ModuleExpr)
     NON_LOCATEABLE(DotSyntaxBaseIgnoredExpr)

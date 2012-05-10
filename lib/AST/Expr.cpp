@@ -504,6 +504,11 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitErasureExpr(ErasureExpr *E) {
+    printCommon(E, "erasure_expr") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
   void visitLoadExpr(LoadExpr *E) {
     printCommon(E, "load_expr") << '\n';
     printRec(E->getSubExpr());

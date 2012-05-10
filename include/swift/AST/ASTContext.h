@@ -20,7 +20,9 @@
 #include "llvm/Support/DataTypes.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/DenseMap.h"
 #include <vector>
+#include <utility>
 
 namespace llvm {
   class SourceMgr;
@@ -36,7 +38,17 @@ namespace swift {
   class Module;
   class TupleTypeElt;
   class OneOfElementDecl;
+  class ProtocolDecl;
+  class ValueDecl;
   class DiagnosticEngine;
+  
+/// \brief Describes how a particular type conforms to a given protocol,
+/// providing the mapping from the protocol members to the type (or extension)
+/// members that provide the functionality for the concrete type.
+class ProtocolConformance {
+public:
+  llvm::DenseMap<ValueDecl *, ValueDecl *> Mapping;
+};
   
 /// ASTContext - This object creates and owns the AST objects.
 class ASTContext {
@@ -67,6 +79,13 @@ public:
   /// ImportSearchPaths - The paths to search for imports in.
   std::vector<std::string> ImportSearchPaths;
 
+  typedef llvm::DenseMap<std::pair<CanType, ProtocolDecl *>, 
+                         std::shared_ptr<ProtocolConformance>> ConformsToMap;
+  
+  /// ConformsTo - Caches the results of checking whether a given (canonical)
+  /// type conforms to a given protocol.
+  ConformsToMap ConformsTo;
+  
   /// Allocate - Allocate memory from the ASTContext bump pointer.
   void *Allocate(unsigned long Bytes, unsigned Alignment);
 

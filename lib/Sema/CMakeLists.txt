@@ -10,6 +10,7 @@ add_swift_library(swiftSema
   TypeCheckDecl.cpp
   TypeCheckOverload.cpp
   TypeCheckPattern.cpp
+  TypeCheckProtocol.cpp
   TypeCheckStmt.cpp
   TypeCheckType.cpp
   DEPENDS swiftAST swiftParse)
