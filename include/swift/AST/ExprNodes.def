@@ -104,7 +104,8 @@ ABSTRACT_EXPR(ImplicitConversion, Expr)
   EXPR(TupleShuffle, ImplicitConversionExpr)
   EXPR(ParameterRename, ImplicitConversionExpr)
   EXPR(ScalarToTuple, ImplicitConversionExpr)
-  EXPR_RANGE(ImplicitConversion, Load, ScalarToTuple)
+  EXPR(Erasure, ImplicitConversionExpr)
+  EXPR_RANGE(ImplicitConversion, Load, Erasure)
 EXPR(Coerce, Expr)
 
 #undef EXPR_RANGE

@@ -603,6 +603,8 @@ ERROR(load_of_explicit_lvalue,sema_tcc,none,
       "%0 variable is not being passed by reference", (Type))
 ERROR(explicit_lvalue,sema_tcc,none,
       "'&' is only needed when passing values by reference", ())
+ERROR(invalid_implicit_protocol_conformance,sema_tcc,none,
+      "type %0 does not conform to protocol %1", (Type,Type))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations
