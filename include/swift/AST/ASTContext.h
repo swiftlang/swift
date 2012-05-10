@@ -79,6 +79,7 @@ public:
   /// ImportSearchPaths - The paths to search for imports in.
   std::vector<std::string> ImportSearchPaths;
 
+  // FIXME: Once DenseMap learns about move semantics, use std::unique_ptr.
   typedef llvm::DenseMap<std::pair<CanType, ProtocolDecl *>, 
                          std::shared_ptr<ProtocolConformance>> ConformsToMap;
   
