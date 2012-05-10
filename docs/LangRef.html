@@ -2318,12 +2318,12 @@ if vec[3] {
     stmt-for-each ::= 'for' <a href="#pattern">pattern</a> 'in' <a href="#expr">expr</a> <a href="#stmt-brace">stmt-brace</a>
   </pre>
   
-  <p>'for-each' statements provide iteration over the values in a
+  <p>Range-based 'for' statements provide iteration over the values in a
  container. The <tt>expr</tt> is the container, and shall have a
  method <tt>getElements()</tt> that, when called, returns the range
  over which the loop will iterate.</p>
 
-  <p>The range must, at a minimum, have three methods:
+  <p>The range must, at a minimum, have two methods:
   <div class="commentary">
     The methods used here constitute an informal protocol. In the
   future, we intend to express this via a formal protocol.
@@ -2340,7 +2340,13 @@ if vec[3] {
     one. The type <tt>T</tt> can be any materializable type, and will
     be used to initialize the variables in the <tt>pattern</tt>.</dd>
  </dl></p>
-  
+
+  <p>Note that each iteration of the loop declares a distinct variable for each
+     variable in the pattern.  For example, in a loop like "for i in 0..10",
+     if i is captured inside the loop, each iteration captures a different "i",
+     so there would be a total of ten versions generated each time the loop
+     runs.</p>
+
   <p>Some examples include:</p>
   
   <pre class="example">
