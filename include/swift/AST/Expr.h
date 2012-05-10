@@ -37,8 +37,7 @@ namespace swift {
   class TypeAliasDecl;
   class ASTWalker;
   class VarDecl;
-  class ProtocolConformance;
-  
+
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
 #define EXPR_RANGE(Id, FirstId, LastId) \
@@ -947,7 +946,7 @@ public:
   }
 };
 
-/// ScalarToTupleExpr - Initialize a tuple with a a scalar.
+/// ScalarToTupleExpr - Initialze a tuple with a a scalar.
 class ScalarToTupleExpr : public ImplicitConversionExpr {
 public:
   ScalarToTupleExpr(Expr *subExpr, Type type)
@@ -960,39 +959,6 @@ public:
   }
 };
 
-/// ErasureExpr - Perform type erasure by converting a value to protocol type.
-/// For example:
-///
-/// \code
-/// protocol Printable {
-///   func print()
-/// }
-///
-/// struct Book {
-///   func print() { ... }
-/// }
-///
-/// var printable : Printable = Book() // erases type
-/// \endcode
-class ErasureExpr : public ImplicitConversionExpr {
-  ProtocolConformance *Conformance;
-  
-public:
-  ErasureExpr(Expr *SubExpr, Type Ty, ProtocolConformance *Conformance)
-    : ImplicitConversionExpr(ExprKind::Erasure, SubExpr, Ty),
-      Conformance(Conformance) {}
-  
-  /// \brief Retrieve the mapping specifying how the type of the subexpression
-  /// maps to the resulting protocol type.
-  ProtocolConformance *getConformance() const { return Conformance; }
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const ErasureExpr *) { return true; }
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::Erasure;
-  }
-};
-  
 /// AddressOfExpr - Using the builtin unary '&' operator, convert the
 /// given l-value into an explicit l-value.
 class AddressOfExpr : public Expr {

@@ -83,10 +83,6 @@ public:
 
   Expr *foldSequence(SequenceExpr *E);
 
-  /// conformsToProtocol - Determine whether the given type conforms to the
-  /// given protocol.
-  ProtocolConformance *conformsToProtocol(Type T, ProtocolDecl *Proto);
-  
   /// \name Overload resolution
   ///
   /// Routines that perform overload resolution or provide diagnostics related
