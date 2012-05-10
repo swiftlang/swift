@@ -54,10 +54,10 @@ public:
   swift::Component *Component;
   ASTContext &Context;
   ScopeInfo ScopeInfo;
-  std::vector<IdentifierType*> UnresolvedIdentifierTypes;
+  std::vector<TranslationUnit::IdentTypeAndContext> UnresolvedIdentifierTypes;
   std::vector<llvm::SetVector<ValueDecl*>> ValCaptures;
   std::vector<std::vector<VarDecl*>> AnonClosureVars;
-  std::vector<std::pair<TupleType*, DeclContext*>> TypesWithDefaultValues;
+  std::vector<TranslationUnit::TupleTypeAndContext> TypesWithDefaultValues;
   bool IsMainModule;
   bool FoundSideEffects;
 

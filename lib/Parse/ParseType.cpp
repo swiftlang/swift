@@ -166,7 +166,7 @@ bool Parser::parseTypeIdentifier(Type &Result) {
   Components[0].Value = ScopeInfo.lookupValueName(Components[0].Id);
 
   auto Ty = IdentifierType::getNew(Context, Components);
-  UnresolvedIdentifierTypes.push_back(Ty);
+  UnresolvedIdentifierTypes.emplace_back(Ty, CurDeclContext);
   Result = Ty;
   return false;
 }

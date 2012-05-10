@@ -448,10 +448,10 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
 
   // Loop over all the unresolved dotted types in the translation unit,
   // resolving them if possible.
-  for (IdentifierType *DNT : TU->getUnresolvedIdentifierTypes()) {
-    if (Binder.resolveIdentifierType(DNT)) {
+  for (auto IdAndContext : TU->getUnresolvedIdentifierTypes()) {
+    if (Binder.resolveIdentifierType(IdAndContext.first)) {
       // This IdentifierType resolved to the error type.
-      for (auto &C : DNT->Components)
+      for (auto &C : IdAndContext.first->Components)
         C.Value = TU->Ctx.TheErrorType;
     }
   }
