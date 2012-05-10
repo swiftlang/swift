@@ -75,7 +75,6 @@ void IRBuilder::insertBlockAnywhere(llvm::BasicBlock *BB) {
   if (!IP) {
     assert(ClearedIP && "no insertion point and none saved, either");
     IP = ClearedIP;
-    ClearedIP = nullptr;
   }
   IP->getParent()->getBasicBlockList().insertAfter(IP, BB);
 }
@@ -86,7 +85,7 @@ void IRBuilder::insertBlockAnywhere(llvm::BasicBlock *BB) {
 /// was invalidated.
 void IRBuilder::emitBlockAnywhere(llvm::BasicBlock *BB) {
   insertBlockAnywhere(BB);
-  IRBuilderBase::SetInsertPoint(BB);
+  SetInsertPoint(BB);
 }
 
 /// Create a new basic block with the given name.  The block is not
