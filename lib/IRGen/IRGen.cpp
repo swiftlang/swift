@@ -84,14 +84,14 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   //   - features
   //   - relocation model
   //   - code model
-  TargetOptions Options;
-  Options.NoFramePointerElimNonLeaf = true;
+  TargetOptions TargetOpts;
+  TargetOpts.NoFramePointerElimNonLeaf = true;
   
   // Create a target machine.
   TargetMachine *TargetMachine
     = Target->createTargetMachine(Opts.Triple, /*cpu*/ "", /*features*/ "",
-                                  Options, Reloc::Default, CodeModel::Default,
-                                  OptLevel);
+                                  TargetOpts, Reloc::Default,
+                                  CodeModel::Default, OptLevel);
   if (!TargetMachine) {
     TU->Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target,
                            Opts.Triple, "no LLVM target machine");
@@ -121,9 +121,13 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
       TranslationUnit *SubTU = cast<TranslationUnit>(ModPair.second);
 
       if (SubTU->Name.str() == "swift") {
+        Options SubOpts;
+        SubOpts.Triple = Opts.Triple;
+        SubOpts.OutputKind = OutputKind::Module;
+        SubOpts.OptLevel = 2;
         llvm::Module SubModule(SubTU->Name.str(), Module->getContext());
         performCaptureAnalysis(SubTU);
-        performIRGeneration(Opts, &SubModule, SubTU);
+        performIRGeneration(SubOpts, &SubModule, SubTU);
 
         for (llvm::Function &F : SubModule)
           if (!F.isDeclaration() && F.hasExternalLinkage())
@@ -163,6 +167,7 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
     if (RawOS->has_error() || !Error.empty()) {
       TU->Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
                              Opts.OutputFilename, Error);
+      RawOS->clear_error();
       return;
     }
 
