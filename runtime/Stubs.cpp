@@ -64,7 +64,6 @@ print_int(char* TmpBuffer, __int64_t buf_len, __int128_t X, uint64_t Radix) {
   
   if (WasNeg) *P++ = '-';
   std::reverse(TmpBuffer, P);
-  *P++ = 0;
   return P - TmpBuffer;
 }
 
@@ -77,7 +76,6 @@ print_double(char* Buffer, double X) {
     Buffer[i++] = '.';
     Buffer[i++] = '0';
   }
-  Buffer[i++] = 0;
   return i;
 }
 
