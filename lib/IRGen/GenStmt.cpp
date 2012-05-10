@@ -210,9 +210,8 @@ void IRGenFunction::emitForStmt(ForStmt *S) {
 }
 
 void IRGenFunction::emitForEachStmt(ForEachStmt *S) {
-  FullExpr Scope(*this);
-  
   // Emit the 'range' variable that we'll be using for iteration.
+  Scope OuterForScope(*this);
   emitPatternBindingDecl(S->getRange());
   
   // If we ever reach an unreachable point, stop emitting statements.
@@ -230,9 +229,13 @@ void IRGenFunction::emitForEachStmt(ForEachStmt *S) {
     Cond.enterTrue(*this);
 
     // Emit the loop body.
-    FullExpr Scope(*this);
-    emitPatternBindingDecl(S->getElementInit());
-    emitStmt(S->getBody());
+    // The declared variable(s) for the current element are destroyed
+    // at the end of each loop iteration.
+    {
+      Scope InnerForScope(*this);
+      emitPatternBindingDecl(S->getElementInit());
+      emitStmt(S->getBody());
+    }
     
     // Loop back to the header.
     if (Builder.hasValidIP()) {
