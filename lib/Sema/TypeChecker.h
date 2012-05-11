@@ -77,6 +77,16 @@ public:
   /// coerced to the given type.
   bool isCoercibleToType(Expr *E, Type Ty);
   
+  /// coerceObjectArgument - Coerce the given expression to an object argument
+  /// of the given type.
+  ///
+  /// The resulting expression will always be an lvalue.
+  Expr *coerceObjectArgument(Expr *E, Type Ty);
+  
+  /// isCoercibleObjectArgument - Determine whether the given expression can
+  /// be coerced to an object argument for a member of the given type.
+  bool isCoercibleObjectArgument(Expr *E, Type Ty);
+  
   Expr *convertToRValue(Expr *E);
   Expr *convertLValueToRValue(LValueType *SrcLT, Expr *E);
   Expr *convertToMaterializable(Expr *E);

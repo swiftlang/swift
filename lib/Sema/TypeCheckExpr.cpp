@@ -105,35 +105,6 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
   return false;
 }
 
-/// makeBaseExprLValue - Make the given base expression for a member or
-/// subscript operation an lvalue, materializing it if necessary.
-static Expr *makeBaseExprLValue(TypeChecker &TC, Expr *E,
-                                Type ContainerTy) {
-  Type BaseTy = E->getType();
-  LValueType *BaseLT = BaseTy->getAs<LValueType>();
-  Type BaseObjectTy = BaseLT? BaseLT->getObjectType() : BaseTy;
-  
-  // If the types don't match up, then we found the member in something we
-  // inherited. Convert to the container type.
-  if (!BaseObjectTy->isEqual(ContainerTy)) {
-    if (BaseLT)
-      E = TC.coerceToType(E,
-                          LValueType::get(ContainerTy, BaseLT->getQualifiers(),
-                                          TC.Context));
-    else
-      E = TC.coerceToType(E, ContainerTy);
-  }
-  
-  assert(E && "Base/member conflict");
-
-  if (BaseTy->is<LValueType>())
-    return E;
-  
-  Type Ty = LValueType::get(ContainerTy, LValueType::Qual::DefaultForGetSet,
-                            TC.Context);
-  return new (TC.Context) MaterializeExpr(E, Ty);
-}
-
 Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
   // Propagate errors up.
   if (SE->getBase()->getType()->is<ErrorType>() ||
@@ -164,8 +135,11 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
     
     // Ensure that the base is an lvalue, materializing it if is not an
     // lvalue yet.
-    SE->setBase(makeBaseExprLValue(*this, SE->getBase(), ContainerTy));
-       
+    if (Expr *Base = coerceObjectArgument(SE->getBase(), ContainerTy))
+      SE->setBase(Base);
+    else
+      return nullptr;
+    
     // Compute the final lvalue type and we're done.
     SE->setType(LValueType::get(SubDecl->getElementType(),
                                 LValueType::Qual::DefaultForGetSet,
@@ -261,7 +235,12 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     
     // We have a function application.  Check that the argument type matches the
     // expected type of the function.
-    E2 = coerceToType(E2, FT->getInput());
+    // If this is, syntactically, an expression x.f where 'f' is a method in
+    // the type of 'x', we're coercing the object argument ('this').
+    if (isa<DotSyntaxCallExpr>(E))
+      E2 = coerceObjectArgument(E2, FT->getInput());
+    else
+      E2 = coerceToType(E2, FT->getInput());
     if (E2 == 0) {
       diagnose(E1->getLoc(), diag::while_converting_function_argument,
                FT->getInput())
@@ -450,13 +429,16 @@ public:
   }
   Expr *visitMemberRefExpr(MemberRefExpr *E) {
     if (E->getDecl()->getType()->is<ErrorType>())
-      return 0;
+      return nullptr;
     
     // Ensure that the base is an lvalue, materializing it if is not an
     // lvalue yet.
     Type ContainerTy
       = E->getDecl()->getDeclContext()->getDeclaredTypeOfContext();
-    E->setBase(makeBaseExprLValue(TC, E->getBase(), ContainerTy));
+    if (Expr *Base = TC.coerceObjectArgument(E->getBase(), ContainerTy))
+      E->setBase(Base);
+    else
+      return nullptr;
 
     // Compute the final lvalue type and we're done.
     E->setType(LValueType::get(E->getDecl()->getType(),
