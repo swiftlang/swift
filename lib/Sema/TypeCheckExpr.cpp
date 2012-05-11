@@ -112,28 +112,19 @@ static Expr *makeBaseExprLValue(TypeChecker &TC, Expr *E,
   Type BaseTy = E->getType();
   LValueType *BaseLT = BaseTy->getAs<LValueType>();
   Type BaseObjectTy = BaseLT? BaseLT->getObjectType() : BaseTy;
-
-  // FIXME: Derived-to-base casts will also happen here.
   
-  // If the base object types aren't equivalent, convert them.
+  // If the types don't match up, then we found the member in something we
+  // inherited. Convert to the container type.
   if (!BaseObjectTy->isEqual(ContainerTy)) {
-    ProtocolType *ContainerProto = ContainerTy->getAs<ProtocolType>();
-    assert(ContainerProto &&
-           "Name lookup found something in the wrong container");
-    if (auto Conformance = TC.conformsToProtocol(BaseObjectTy,
-                                                 ContainerProto->getDecl())) {
-      BaseTy = ContainerTy;
-      
-      if (BaseLT) {
-        BaseLT = LValueType::get(BaseTy,
-                                 BaseLT->getQualifiers().withImplicit(),
-                                 TC.Context);
-        BaseTy = BaseLT;
-      }
-      
-      E = new (TC.Context) ErasureExpr(E, BaseTy, Conformance);
-    }
+    if (BaseLT)
+      E = TC.coerceToType(E,
+                          LValueType::get(ContainerTy, BaseLT->getQualifiers(),
+                                          TC.Context));
+    else
+      E = TC.coerceToType(E, ContainerTy);
   }
+  
+  assert(E && "Base/member conflict");
 
   if (BaseTy->is<LValueType>())
     return E;

@@ -1371,13 +1371,20 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
           SrcTy = DestLT->getObjectType();
           if (SrcLT) {
             SrcLT = LValueType::get(SrcTy,
-                                    SrcLT->getQualifiers().withImplicit(),
+                                    SrcLT->getQualifiers(),
                                     TC.Context);
             SrcTy = SrcLT;
           }
           
           if (Apply)
             E = new (TC.Context) ErasureExpr(E, SrcTy, Conformance);
+          
+          if (SrcTy->isEqual(DestTy)) {
+            if (!Apply)
+              return DestTy;
+            
+            return coerced(E, Apply);
+          }
         }
       }
     }

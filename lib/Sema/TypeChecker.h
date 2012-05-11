@@ -80,7 +80,7 @@ public:
   Expr *convertToRValue(Expr *E);
   Expr *convertLValueToRValue(LValueType *SrcLT, Expr *E);
   Expr *convertToMaterializable(Expr *E);
-
+  
   Expr *foldSequence(SequenceExpr *E);
 
   /// conformsToProtocol - Determine whether the given type conforms to the
