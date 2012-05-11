@@ -136,9 +136,14 @@ public:
 
   void visitProtocolDecl(ProtocolDecl *PD) {
     // Check the list of inherited protocols.
-    for (auto Inherited : PD->getInherited())
-      TC.validateType(Inherited);
-
+    for (auto Inherited : PD->getInherited()) {
+      if (!TC.validateType(Inherited))
+        if (!Inherited->is<ProtocolType>()) {
+          // FIXME: Terrible location information.
+          TC.diagnose(PD->getLoc(), diag::nonprotocol_inherit, Inherited);
+        }
+    }
+    
     // Check the members.
     for (auto Member : PD->getMembers())
       visit(Member);

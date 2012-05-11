@@ -639,6 +639,10 @@ ERROR(binops_infix_left,sema_tcd,none,
 ERROR(invalid_decl_attribute,sema_tcd,none,
       "attribute '%0' cannot be applied to declaration", (StringRef))
 
+// Protocols
+ERROR(nonprotocol_inherit,sema_tcd,none,
+      "protocol cannot inherit non-protocol type %0", (Type))
+
 //------------------------------------------------------------------------------
 // Type Check Expressions
 //------------------------------------------------------------------------------
