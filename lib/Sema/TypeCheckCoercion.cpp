@@ -61,6 +61,17 @@ public:
   }
 };
   
+namespace {
+  /// \brief Flags that control how type coercion is performed.
+  enum CoercionFlags {
+    /// \brief Apply the coercion, producing a coerced expression of the
+    /// requested type (if successful) or emitting diagnostics (if a failure
+    /// occurs). There is no way to back out of a coercion that has been
+    /// applied, because it destructively updates the AST.
+    CF_Apply = 0x01
+  };
+}
+  
 /// SemaCoerce - This class implements top-down semantic analysis (aka "root to
 /// leaf", using the type of "+" to infer the type of "a" in "a+1") of an
 /// already-existing expression tree.  This is performed when an expression with
@@ -87,9 +98,9 @@ class SemaCoerce : public ExprVisitor<SemaCoerce, CoercedResult> {
   TypeChecker &TC;
   Type DestTy;
   
-  /// Apply - Whether to apply the results of this coercion to the AST, 
-  /// returning new or updating ASTs and emitting any diagnostics.
-  bool Apply;
+  /// \brief Flags that control how the coercion is performed, e.g.,
+  /// if we are returning new/updated ASTs and emitted diagnostics.
+  unsigned Flags;
   
   /// \brief A wrapper around an optional in-flight diagnostic, which
   /// acts like a diagnostic if it is initialized with a diagnostic but is
@@ -113,7 +124,7 @@ class SemaCoerce : public ExprVisitor<SemaCoerce, CoercedResult> {
   /// diagnose - Diagnose a problem encountered during type coercion.
   template<typename ...ArgTypes>
   CoerceDiagnostic diagnose(ArgTypes &&...Args) {
-    if (Apply)
+    if (Flags & CF_Apply)
       return TC.diagnose(std::forward<ArgTypes>(Args)...);
     
     return CoerceDiagnostic();
@@ -125,7 +136,7 @@ class SemaCoerce : public ExprVisitor<SemaCoerce, CoercedResult> {
   /// we are applying an operation (returning an expression) and when checking
   /// whether coercion will succeed (returning a type).
   CoercedResult unchanged(Expr *E) {
-    return unchanged(E, Apply);
+    return unchanged(E, Flags & CF_Apply);
   }
 
   /// unchanged - Return an unchanged expressions as a coerced result. 
@@ -133,8 +144,8 @@ class SemaCoerce : public ExprVisitor<SemaCoerce, CoercedResult> {
   /// This routine takes care to produce the correct kind of result both when
   /// we are applying an operation (returning an expression) and when checking
   /// whether coercion will succeed (returning a type).
-  static CoercedResult unchanged(Expr *E, bool Apply) {
-    if (!Apply)
+  static CoercedResult unchanged(Expr *E, unsigned Flags) {
+    if (!(Flags & CF_Apply))
       return CoercedResult(E->getType());
     
     return CoercedResult(E);
@@ -142,12 +153,13 @@ class SemaCoerce : public ExprVisitor<SemaCoerce, CoercedResult> {
 
   /// coerce - Return a newly-coerced expression.
   CoercedResult coerced(Expr *E) {
-    return coerced(E, Apply);
+    return coerced(E, Flags);
   }
 
   /// coerce - Return a newly-coerced expression.
-  static CoercedResult coerced(Expr *E, bool Apply) {
-    assert(Apply && "Cannot return a coerced expression when not applying");
+  static CoercedResult coerced(Expr *E, unsigned Flags) {
+    assert((Flags & CF_Apply) &&
+           "Cannot return a coerced expression when not applying");
     return CoercedResult(E);
   }  
   
@@ -191,7 +203,7 @@ public:
                                       (LValueType::Qual::NonHeap|
                                        LValueType::Qual::Implicit),
                                       TC.Context);
-      if (!Apply)
+      if (!(Flags & CF_Apply))
         return ResultTy;
       
       SubscriptExpr *Result
@@ -201,7 +213,7 @@ public:
       return coerced(TC.semaSubscriptExpr(Result));
     }
     
-    if (!Apply)
+    if (!(Flags & CF_Apply))
       return nullptr;
     
     diagnose(E->getLBracketLoc(), diag::subscript_overload_fail,
@@ -224,7 +236,7 @@ public:
   CoercedResult coerceOverloadToLValue(OverloadSetRefExpr *E, LValueType *lv) {
     for (ValueDecl *val : E->getDecls()) {
       if (Type Matched = matchLValueType(val, lv)) {
-        if (!Apply)
+        if (!(Flags & CF_Apply))
           return Matched;
         
         // FIXME: We should be handling this like overload resolution, because
@@ -235,7 +247,7 @@ public:
 
     // FIXME: We should be able to materialize values here, unless
     // implicit(byref) goes away.
-    if (Apply) {
+    if (Flags & CF_Apply) {
       diagnose(E->getLoc(), diag::no_candidates_ref,
                E->getDecls()[0]->getName());
       TC.printOverloadSetCandidates(E->getDecls());
@@ -270,13 +282,13 @@ public:
     }
     
     if (Viable.size() == 1) {
-      if (!Apply)
+      if (!(Flags & CF_Apply))
         return DestTy;
       
       return coerced(TC.convertToRValue(TC.buildFilteredOverloadSet(E,Viable)));
     }
       
-    if (Apply) {
+    if (Flags & CF_Apply) {
       if (Viable.empty()) {
         diagnose(E->getLoc(), diag::no_candidates_ref, 
                  E->getDecls()[0]->getName())
@@ -320,7 +332,7 @@ public:
     }
 
     // If it does, then everything is good, resolve the reference.
-    if (!Apply)
+    if (!(Flags & CF_Apply))
       return DED->getType();
     
     return coerced(new (TC.Context) DeclRefExpr(DED, UME->getColonLoc(),
@@ -332,7 +344,7 @@ public:
   }
     
   CoercedResult visitTupleExpr(TupleExpr *E) {
-    if (!Apply && !DestTy->isEqual(E->getType()))
+    if (!(Flags & CF_Apply) && !DestTy->isEqual(E->getType()))
       return nullptr;
     
     return unchanged(E);
@@ -340,14 +352,14 @@ public:
   
   CoercedResult visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
     // FIXME: Is this an error-recovery case?
-    if (!Apply && !DestTy->isEqual(E->getType()))
+    if (!(Flags & CF_Apply) && !DestTy->isEqual(E->getType()))
       return nullptr;
     
     return unchanged(E);
   }
   CoercedResult visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     // FIXME: Is this an error-recovery case?
-    if (!Apply && !DestTy->isEqual(E->getType()))
+    if (!(Flags & CF_Apply) && !DestTy->isEqual(E->getType()))
       return nullptr;
     
     return unchanged(E);
@@ -395,28 +407,28 @@ public:
   CoercedResult visitAddressOfExpr(AddressOfExpr *E) {
     LValueType *DestLT = DestTy->getAs<LValueType>();
     if (!DestLT) {
-      if (!Apply)
+      if (!(Flags & CF_Apply))
         return nullptr;
       
       // The '&' is incorrect. Customize our diagnostic based on whether
       // removing the '&' would make the code type-check or not.
-      if (coerceToType(E->getSubExpr(), DestTy, TC, false)) {
+      if (coerceToType(E->getSubExpr(), DestTy, TC, /*Flags=*/0)) {
         // The code would have type-checked without '&'; tell the user that the
         // '&' is extraneous and type-check as if it weren't there.
         diagnose(E->getLoc(), diag::explicit_lvalue)
           << E->getSubExpr()->getSourceRange();
-        return coerceToType(E->getSubExpr(), DestTy, TC, true);
+        return coerceToType(E->getSubExpr(), DestTy, TC, Flags);
       }
 
       // The '&' wouldn't fix it, either; produce diagnostics based on coercing
       // the subexpression directly, and the user can deal with the '&'
       // afterward.
-      return coerceToType(E->getSubExpr(), DestTy, TC, true);
+      return coerceToType(E->getSubExpr(), DestTy, TC, Flags);
     }
     
     
-    if (CoercedResult Sub = coerceToType(E->getSubExpr(), DestTy, TC, Apply)) {
-      if (!Apply)
+    if (CoercedResult Sub = coerceToType(E->getSubExpr(), DestTy, TC, Flags)) {
+      if (!(Flags & CF_Apply))
         return DestTy;
       
       E->setSubExpr(Sub.getExpr());
@@ -427,8 +439,8 @@ public:
     return nullptr;
   }
 
-  SemaCoerce(TypeChecker &TC, Type DestTy, bool Apply) 
-    : TC(TC), DestTy(DestTy), Apply(Apply) 
+  SemaCoerce(TypeChecker &TC, Type DestTy, unsigned Flags)
+    : TC(TC), DestTy(DestTy), Flags(Flags)
   {
     assert(!DestTy->isDependentType());
   }
@@ -439,23 +451,24 @@ public:
   
   /// coerceToType - This is the main entrypoint to SemaCoerce.
   static CoercedResult coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
-                                    bool Apply);
+                                    unsigned Flags);
 
   static CoercedResult convertScalarToTupleType(Expr *E, TupleType *DestTy,
                                                 unsigned FieldNo, 
-                                                TypeChecker &TC, bool Apply);
+                                                TypeChecker &TC,
+                                                unsigned Flags);
   static CoercedResult
   convertTupleToTupleType(Expr *E, unsigned NumExprElements,
-                          TupleType *DestTy, TypeChecker &TC, bool Apply);
+                          TupleType *DestTy, TypeChecker &TC, unsigned Flags);
   
   /// loadLValue - Load the given lvalue expression.
   static CoercedResult loadLValue(Expr *E, LValueType *LValue, TypeChecker &TC,
-                                  bool Apply) {
+                                  unsigned Flags) {
     assert(E->getType()->isEqual(LValue));
     
     // Can't load from an explicit lvalue.
     if (LValue->isExplicit()) {
-      if (Apply) {
+      if (Flags & CF_Apply) {
         TC.diagnose(E->getLoc(), diag::load_of_explicit_lvalue,
                     LValue->getObjectType())
           << E->getSourceRange();
@@ -465,14 +478,13 @@ public:
       return nullptr;
     }
     
-    if (!Apply) {
+    if (!(Flags & CF_Apply)) {
       // If we're not going to apply the result anyway, just return the
       // appropriate type.
       return LValue->getObjectType();
     }
     
-    return coerced(new (TC.Context) LoadExpr(E, LValue->getObjectType()),
-                   Apply);
+    return coerced(new (TC.Context) LoadExpr(E, LValue->getObjectType()),Flags);
   }
 };
   
@@ -506,7 +518,7 @@ SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralType LitTy) {
   
   if (Methods.size() != 1) {
     diagnose(Loc, diag::type_ambiguous_literal_conversion, Ty, MethodName);
-    if (Apply)
+    if (Flags & CF_Apply)
       for (ValueDecl *D : Methods)
         diagnose(D->getLocStart(), diag::found_candidate);
     return std::pair<FuncDecl*, Type>();
@@ -601,7 +613,7 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
                DestTy);
     
     // Give the integer literal the builtin integer type.
-    if (Apply)
+    if (Flags & CF_Apply)
       E->setType(ArgType);
     Intermediate = E;
   } else if (LitTy == LiteralType::Float &&
@@ -613,14 +625,14 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
                                   llvm::APFloat::rmNearestTiesToEven)) {
     default: break;
     case llvm::APFloat::opOverflow: 
-      if (Apply) {
+      if (Flags & CF_Apply) {
         llvm::SmallString<20> Buffer;
         llvm::APFloat::getLargest(Val.getSemantics()).toString(Buffer);
         diagnose(E->getLoc(), diag::float_literal_overflow, Buffer);
       }
       break;
     case llvm::APFloat::opUnderflow: 
-      if (Apply) {
+      if (Flags & CF_Apply) {
         // Denormals are ok, but reported as underflow by APFloat.
         if (!Val.isZero()) break;
         llvm::SmallString<20> Buffer;
@@ -630,20 +642,20 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
       break;
     }
     
-    if (Apply)
+    if (Flags & CF_Apply)
       E->setType(ArgType);
     Intermediate = E;
   } else if (LitTy == LiteralType::String &&
              ArgType->is<BuiltinRawPointerType>()) {
     // Nothing to do.
-    if (Apply)
+    if (Flags & CF_Apply)
       E->setType(ArgType);
     Intermediate = E;
   } else if (LitTy == LiteralType::Char &&
              ArgType->is<BuiltinIntegerType>() &&
              ArgType->getAs<BuiltinIntegerType>()->getBitWidth() == 32) {
     // Nothing to do.
-    if (Apply)
+    if (Flags & CF_Apply)
       E->setType(ArgType);
     Intermediate = E;
   } else {
@@ -680,8 +692,8 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
     // If this a 'chaining' case, recursively convert the literal to the
     // intermediate type, then use our conversion function to finish the
     // translation.
-    if (CoercedResult IntermediateRes = coerceToType(E, ArgType, TC, Apply)) {
-      if (!Apply)
+    if (CoercedResult IntermediateRes = coerceToType(E, ArgType, TC, Flags)) {
+      if (!(Flags & CF_Apply))
         return DestTy;
       
       Intermediate = IntermediateRes.getExpr();
@@ -693,7 +705,7 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
     // call to our conversion function to finish things off.
   }
   
-  if (!Apply)
+  if (!(Flags & CF_Apply))
     return DestTy;
   
   DeclRefExpr *DRE
@@ -717,7 +729,7 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
   else if (ProtocolType *ProtoTy = DestTy->getAs<ProtocolType>())
     DestTyDecl = ProtoTy->getDecl();
   else {
-    if (Apply)
+    if (Flags & CF_Apply)
       diagnose(E->getLoc(), diag::nonstring_interpolation_type, DestTy);
     return nullptr;
   }
@@ -730,12 +742,12 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
 
   for (auto &Segment : E->getSegments()) {
     // First, try coercing to the string type.
-    if (coerceToType(Segment, DestTy, TC, /*Apply=*/false)) {
-      if (!Apply)
+    if (coerceToType(Segment, DestTy, TC, /*Flags=*/0)) {
+      if (!(Flags & CF_Apply))
         continue;
       
       // Perform the coercion.
-      if (CoercedResult R = coerceToType(Segment, DestTy, TC, Apply)) {
+      if (CoercedResult R = coerceToType(Segment, DestTy, TC, Flags)) {
         Segment = R.getExpr();
         continue;
       } else {
@@ -748,7 +760,7 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
     ValueDecl *Best = TC.filterOverloadSet(Methods, Type(), Segment, Type(), 
                                            Viable);
     if (Best) {
-      if (!Apply)
+      if (!(Flags & CF_Apply))
         continue;
       
       Expr *CtorRef = new (TC.Context) DeclRefExpr(Best, Segment->getStartLoc(),
@@ -762,7 +774,7 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
       continue;
     }
 
-    if (Apply) {
+    if (Flags & CF_Apply) {
       // FIXME: We want range information here.
       diagnose(Segment->getLoc(), diag::string_interpolation_overload_fail,
                Segment->getType(), DestTy);
@@ -774,7 +786,7 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
   // FIXME: Broken! We should be using some special kind of 'build from string
   // fragments' (informal) protocol here, which is guaranteed to work, rather
   // than going through so many '+' operations.
-  if (!Apply)
+  if (!(Flags & CF_Apply))
     return DestTy;
     
   SmallVector<ValueDecl *, 16> PlusDecls;
@@ -801,7 +813,7 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
     ValueDecl *Best = TC.filterOverloadSet(PlusDecls, Type(), Arg, Type(),
                                            Viable);
     if (!Best) {
-      if (Apply) {
+      if (Flags & CF_Apply) {
         // FIXME: We want range information here.
         diagnose(E->getStartLoc(), diag::string_interpolation_overload_fail,
                  Result->getType(), Segment->getType());
@@ -818,7 +830,7 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
       return nullptr;
   }
   
-  if (!Apply)
+  if (!(Flags & CF_Apply))
     return Result->getType();
   
   E->setSemanticExpr(Result);
@@ -846,7 +858,7 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
                                                OSE->getBaseType(),
                                                E->getArg(),
                                                DestTy, Viable)) {
-      if (!Apply) {
+      if (!(Flags & CF_Apply)) {
         // Determine the type of the resulting call expression.
         Type Ty = Best->getType();
         if (LValueType *LValue = Ty->getAs<LValueType>())
@@ -868,7 +880,7 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
       return nullptr;
     }
     
-    if (Apply) {
+    if (Flags & CF_Apply) {
       if (Viable.empty())
         TC.diagnoseEmptyOverloadSet(E, OSE->getDecls());
       else {
@@ -933,7 +945,7 @@ CoercedResult SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
 
   // Now that we have a FunctionType for the closure, we can know how many
   // arguments are allowed.
-  if (Apply)
+  if (Flags & CF_Apply)
     E->setType(FT);
   
   // If the input to the function is a non-tuple, only $0 is valid, if it is a
@@ -954,7 +966,7 @@ CoercedResult SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
   // that the closure expression type-checks with the given function type.
   // For now, we just assume that it does type-check, since we don't have a
   // way to silence the errors (yet).
-  if (!Apply)
+  if (!(Flags & CF_Apply))
     return DestTy;
   
   // Build pattern for parameters.
@@ -999,7 +1011,7 @@ CoercedResult SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
 CoercedResult
 SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
                                     TupleType *DestTy, TypeChecker &TC,
-                                    bool Apply){
+                                    unsigned Flags){
   
   // If the tuple expression or destination type have named elements, we
   // have to match them up to handle the swizzle case for when:
@@ -1079,7 +1091,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
         ErrorLoc = TE->getRParenLoc();
       
-      if (Apply) {
+      if (Flags & CF_Apply) {
         if (!DestTy->getFields()[i].hasName())
           TC.diagnose(ErrorLoc, diag::not_initialized_tuple_element, i,
                       E->getType());
@@ -1105,7 +1117,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
         if (Expr *SubExp = TE->getElement(i))
           ErrorLoc = SubExp->getLoc();
       
-      if (Apply) {
+      if (Flags & CF_Apply) {
         if (IdentList[i].empty())
           TC.diagnose(ErrorLoc, diag::tuple_element_not_used, i, DestTy);
         else
@@ -1134,7 +1146,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       // If SrcField is -2, then the destination element should use its default
       // value.
       if (SrcField == -2U) {
-        if (Apply)
+        if (Flags & CF_Apply)
           TE->setElement(i, 0);
         continue;
       }
@@ -1143,8 +1155,8 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       // element type.
       if (CoercedResult Elt = coerceToType(OrigElts[SrcField], 
                                             DestTy->getElementType(i),
-                                            TC, Apply)) {
-        if (Apply)
+                                            TC, Flags)) {
+        if (Flags & CF_Apply)
           TE->setElement(i, Elt.getExpr());
       } else {
         // TODO: QOI: Include a note about this failure!
@@ -1152,12 +1164,12 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       }
     }
     
-    if (!Apply)
+    if (!(Flags & CF_Apply))
       return Type(DestTy);
     
     // Okay, we updated the tuple in place.
     E->setType(DestTy);
-    return unchanged(E, Apply);
+    return unchanged(E, Flags);
   }
   
   // Otherwise, if it isn't a tuple literal, we unpack the source elementwise so
@@ -1187,8 +1199,8 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
         // Check to see if the src value can be converted to the destination
         // element type.
         if (CoercedResult Elt = coerceToType(TE->getElement(SrcField), 
-                                              DestEltTy, TC, Apply)) {
-          if (Apply)
+                                              DestEltTy, TC, Flags)) {
+          if (Flags & CF_Apply)
             TE->setElement(SrcField, Elt.getExpr());
         } else {
           // FIXME: QOI: Include a note about this failure!
@@ -1200,7 +1212,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
         RebuildSourceType = true;
       } else if (ETy && !ElementTy->isEqual(DestEltTy)) {
         // FIXME: Allow conversions when we don't have a tuple expression?
-        if (Apply)
+        if (Flags & CF_Apply)
           TC.diagnose(E->getLoc(), diag::tuple_element_type_mismatch, i,
                       ETy->getElementType(SrcField),
                       DestTy->getElementType(i));
@@ -1211,7 +1223,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     NewElements[i] = SrcField;
   }
   
-  if (!Apply)
+  if (!(Flags & CF_Apply))
     return Type(DestTy);
 
   // If we need to rebuild the type of the source due to coercion, do so now.
@@ -1228,7 +1240,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     
   // If we got here, the type conversion is successful, create a new TupleExpr.  
   ArrayRef<int> Mapping = TC.Context.AllocateCopy(NewElements);
-  return coerced(new (TC.Context) TupleShuffleExpr(E, Mapping, DestTy), Apply);
+  return coerced(new (TC.Context) TupleShuffleExpr(E, Mapping, DestTy), Flags);
 }
 
 /// convertScalarToTupleType - Convert the specified expression to the specified
@@ -1236,16 +1248,16 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
 CoercedResult SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
                                                    unsigned ScalarField,
                                                    TypeChecker &TC,
-                                                   bool Apply) {
+                                                   unsigned Flags) {
   // If the destination is a tuple type with at most one element that has no
   // default value, see if the expression's type is convertable to the
   // element type.  This handles assigning 4 to "(a = 4, b : int)".
   Type ScalarType = DestTy->getElementType(ScalarField);
-  CoercedResult ERes = coerceToType(E, ScalarType, TC, Apply);
+  CoercedResult ERes = coerceToType(E, ScalarType, TC, Flags);
   if (!ERes)
     return nullptr;
 
-  if (!Apply)
+  if (!(Flags & CF_Apply))
     return Type(DestTy);
 
   return CoercedResult(new (TC.Context) ScalarToTupleExpr(ERes.getExpr(),
@@ -1283,7 +1295,7 @@ namespace {
 /// coerceToType - This is the recursive implementation of
 /// coerceToType.  It produces diagnostics and returns null on failure.
 CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
-                                        bool Apply) {
+                                        unsigned Flags) {
   assert(!DestTy->isDependentType() &&
          "Result of conversion can't be dependent");
 
@@ -1297,12 +1309,12 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
       // We require the expression to be an ImplicitClosureExpr that produces
       // DestTy.
       if (E->getType()->isEqual(DestTy) && isa<ImplicitClosureExpr>(E))
-        return unchanged(E, Apply);
+        return unchanged(E, Flags);
       
       // If we don't have it yet, force the input to the result of the closure
       // and build the implicit closure.
-      if (CoercedResult CoercedE = coerceToType(E, FT->getResult(), TC, Apply)){
-        if (!Apply)
+      if (CoercedResult CoercedE = coerceToType(E, FT->getResult(), TC, Flags)){
+        if (!(Flags & CF_Apply))
           return DestTy;
         
         E = CoercedE.getExpr();
@@ -1330,26 +1342,26 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
         = TC.Context.AllocateCopy<ValueDecl*>(Captures.begin(), Captures.end());
       ICE->setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
 
-      return coerced(ICE, Apply);
+      return coerced(ICE, Flags);
     }
   
   // If we have an exact match, we're done.
   if (E->getType()->isEqual(DestTy))
-    return unchanged(E, Apply);
+    return unchanged(E, Flags);
   
   // If the expression is a grouping parenthesis and it has a dependent type,
   // just force the type through it, regardless of what DestTy is.
   if (ParenExpr *PE = dyn_cast<ParenExpr>(E)) {
-    CoercedResult Sub = coerceToType(PE->getSubExpr(), DestTy, TC, Apply);
+    CoercedResult Sub = coerceToType(PE->getSubExpr(), DestTy, TC, Flags);
     if (!Sub)
       return nullptr;
     
-    if (!Apply)
+    if (!(Flags & CF_Apply))
        return DestTy;
       
     PE->setSubExpr(Sub.getExpr());
     PE->setType(Sub.getType());
-    return coerced(PE, Apply);
+    return coerced(PE, Flags);
   }
 
   if (LValueType *DestLT = DestTy->getAs<LValueType>()) {
@@ -1359,7 +1371,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
     // If the input expression has a dependent type, try to coerce it to an
     // appropriate type.
     if (SrcTy->isDependentType())
-      return SemaCoerce(TC, DestTy, Apply).doIt(E);
+      return SemaCoerce(TC, DestTy, Flags).doIt(E);
 
     // If we're converting to a reference to a protocol, check whether the
     // source conforms to that protocol.
@@ -1376,14 +1388,14 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
             SrcTy = SrcLT;
           }
           
-          if (Apply)
+          if (Flags & CF_Apply)
             E = new (TC.Context) ErasureExpr(E, SrcTy, Conformance);
           
           if (SrcTy->isEqual(DestTy)) {
-            if (!Apply)
+            if (!(Flags & CF_Apply))
               return DestTy;
             
-            return coerced(E, Apply);
+            return coerced(E, Flags);
           }
         }
       }
@@ -1395,24 +1407,24 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
       assert(SrcLT->getQualifiers() < DestLT->getQualifiers() &&
              "qualifiers match exactly but types are different?");
 
-      if (!Apply)
+      if (!(Flags & CF_Apply))
         return DestTy;
       
-      return coerced(new (TC.Context) RequalifyExpr(E, DestTy), Apply);
+      return coerced(new (TC.Context) RequalifyExpr(E, DestTy), Flags);
     }
 
     // Materialization.
     if (!DestLT->isExplicit()) {
       CoercedResult CoercedE = coerceToType(E, DestLT->getObjectType(), TC,
-                                            Apply);
+                                            Flags);
       if (!CoercedE)
         return nullptr;
       
-      if (!Apply)
+      if (!(Flags & CF_Apply))
         return DestTy;
       
       return coerced(new (TC.Context) MaterializeExpr(CoercedE.getExpr(),
-                                                      DestTy), Apply);
+                                                      DestTy), Flags);
     }
 
     // Failure.
@@ -1420,7 +1432,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
     // Use a special diagnostic if the coercion would have worked
     // except we needed an explicit marker.
     if (SrcLT && isSubtypeExceptImplicit(SrcLT, DestLT)) {
-      if (Apply)
+      if (Flags & CF_Apply)
         TC.diagnose(E->getLoc(), diag::implicit_use_of_lvalue,
                     SrcLT->getObjectType())
           << E->getSourceRange();
@@ -1429,14 +1441,14 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
 
     // Use a special diagnostic for mismatched l-values.
     if (SrcLT) {
-      if (Apply)
+      if (Flags & CF_Apply)
         TC.diagnose(E->getLoc(), diag::invalid_conversion_of_lvalue,
                     SrcLT->getObjectType(), DestLT->getObjectType())
           << E->getSourceRange();
       return nullptr;
     }
 
-    if (Apply)
+    if (Flags & CF_Apply)
       TC.diagnose(E->getLoc(), diag::invalid_conversion_to_lvalue,
                   E->getType(), DestLT->getObjectType());
     return nullptr;
@@ -1452,23 +1464,23 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
     // If the element of the tuple has dependent type and is a TupleExpr, try to
     // convert it.
     if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
-      return convertTupleToTupleType(TE, TE->getNumElements(), TT, TC, Apply);
+      return convertTupleToTupleType(TE, TE->getNumElements(), TT, TC, Flags);
 
     // If the is a scalar to tuple conversion, form the tuple and return it.
     int ScalarFieldNo = TT->getFieldForScalarInit();
     if (ScalarFieldNo != -1)
-      return convertScalarToTupleType(E, TT, ScalarFieldNo, TC, Apply);
+      return convertScalarToTupleType(E, TT, ScalarFieldNo, TC, Flags);
     
     // If the input is a tuple and the output is a tuple, see if we can convert
     // each element.
     if (TupleType *ETy = E->getType()->getAs<TupleType>())
-      return convertTupleToTupleType(E, ETy->getFields().size(), TT, TC, Apply);
+      return convertTupleToTupleType(E, ETy->getFields().size(), TT, TC, Flags);
   }
   
   // If the input expression has a dependent type, try to coerce it to an
   // appropriate type.
   if (E->getType()->isDependentType())
-    return SemaCoerce(TC, DestTy, Apply).doIt(E);
+    return SemaCoerce(TC, DestTy, Flags).doIt(E);
 
   // A function type can converted to a function type with the same input/result
   // types, ignoring labels.
@@ -1479,24 +1491,24 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
     if (FunctionType *SrcFuncTy = E->getType()->getAs<FunctionType>()) {
       if (DestFuncTy->getUnlabeledType(TC.Context)->isEqual(
             SrcFuncTy->getUnlabeledType(TC.Context))) {
-        if (!Apply)
+        if (!(Flags & CF_Apply))
           return DestTy;
             
-        return coerced(new (TC.Context) ParameterRenameExpr(E, DestTy), Apply);
+        return coerced(new (TC.Context) ParameterRenameExpr(E, DestTy), Flags);
       }
     }
   }
 
   // If the source is an l-value, load from it.
   if (LValueType *LValue = E->getType()->getAs<LValueType>()) {
-    if (CoercedResult Loaded = loadLValue(E, LValue, TC, Apply)) {
-      if (!Apply) {
+    if (CoercedResult Loaded = loadLValue(E, LValue, TC, Flags)) {
+      if (!(Flags & CF_Apply)) {
         // Since we aren't applying the expression anyway, 
         LoadExpr Load(E, Loaded.getType());
-        return coerceToType(&Load, DestTy, TC, Apply);
+        return coerceToType(&Load, DestTy, TC, Flags);
       }
       
-      return coerceToType(Loaded.getExpr(), DestTy, TC, Apply);
+      return coerceToType(Loaded.getExpr(), DestTy, TC, Flags);
     }
     
     return nullptr;
@@ -1507,14 +1519,14 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
   if (ProtocolType *Proto = DestTy->getAs<ProtocolType>()) {
     if (ProtocolConformance *Conformance
           = TC.conformsToProtocol(E->getType(), Proto->getDecl())) {
-      if (!Apply)
+      if (!(Flags & CF_Apply))
         return DestTy;
 
       return coerced(new (TC.Context) ErasureExpr(E, DestTy, Conformance),
-                     Apply);
+                     Flags);
     }
     
-    if (Apply) // FIXME: Say *why* it doesn't conform.
+    if (Flags & CF_Apply) // FIXME: Say *why* it doesn't conform.
       TC.diagnose(E->getLoc(), diag::invalid_implicit_protocol_conformance,
                   E->getType(), DestTy);
     
@@ -1524,29 +1536,28 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
   // Could not do the conversion.
 
   // When diagnosing a failed conversion, ignore l-values on the source type.
-  if (Apply)
+  if (Flags & CF_Apply)
     TC.diagnose(E->getLoc(), diag::invalid_conversion, E->getType(), DestTy)
       << E->getSourceRange();
   return nullptr;
 }
 
 Expr *TypeChecker::coerceToType(Expr *E, Type DestTy) {
-  if (CoercedResult Res = SemaCoerce::coerceToType(E, DestTy, *this, 
-                                                    /*Apply=*/true))
+  if (CoercedResult Res = SemaCoerce::coerceToType(E, DestTy, *this, CF_Apply))
     return Res.getExpr();
   
   return nullptr;
 }
 
 bool TypeChecker::isCoercibleToType(Expr *E, Type Ty) {
-  return (bool)SemaCoerce::coerceToType(E, Ty, *this, /*Apply=*/false);
+  return (bool)SemaCoerce::coerceToType(E, Ty, *this, /*Flags=*/0);
 }
 
 Expr *TypeChecker::convertLValueToRValue(LValueType *srcLV, Expr *E) {
   assert(E && "no expression to load!");
   assert(E->getType()->isEqual(srcLV));
   
-  if (CoercedResult Result = SemaCoerce::loadLValue(E, srcLV, *this, true))
+  if (CoercedResult Result = SemaCoerce::loadLValue(E, srcLV, *this, CF_Apply))
     return Result.getExpr();
 
   return nullptr;
