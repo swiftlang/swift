@@ -745,6 +745,16 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
     return 0;
   }
 
+  bool IsMetatypeBase = Base->getType()->is<MetaTypeType>();
+  if (IsMetatypeBase && Lookup.Results.size() == 1) {
+    MemberLookupResult R = Lookup.Results[0];
+    if (R.Kind == MemberLookupResult::TupleElement ||
+        R.Kind == MemberLookupResult::MemberProperty) {
+      diagnose(E->getNameLoc(), diag::no_valid_dot_expression, Base->getType());
+      return 0;
+    }
+  }
+
   // If the base is a tuple, we need to force it to be either a proper lvalue
   // or a proper rvalue; otherwise, the semantics are strange.
   if (!Base->getType()->is<LValueType>())

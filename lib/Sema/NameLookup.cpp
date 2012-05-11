@@ -17,20 +17,21 @@
 
 #include "NameLookup.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/Diagnostics.h"
 #include <algorithm>
 using namespace swift;
 
 MemberLookup::MemberLookup(Type BaseTy, Identifier Name, Module &M) {
+  MemberName = Name;
   VisitedSet Visited;
-  doIt(BaseTy, Name, M, Visited);
+  doIt(BaseTy, M, Visited);
 }
 
 /// doIt - Lookup a member 'Name' in 'BaseTy' within the context
 /// of a given module 'M'.  This operation corresponds to a standard "dot" 
 /// lookup operation like "a.b" where 'this' is the type of 'a'.  This
 /// operation is only valid after name binding.
-void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M,
-                        VisitedSet &Visited) {
+void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
   typedef MemberLookupResult Result;
   
   // Just look through l-valueness.  It doesn't affect name lookup.
@@ -47,17 +48,18 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M,
 
     // Handle references to the constructors of a oneof.
     if (OneOfType *OOTy = Ty->getAs<OneOfType>()) {
-      OneOfElementDecl *Elt = OOTy->getDecl()->getElement(Name);
+      OneOfElementDecl *Elt = OOTy->getDecl()->getElement(MemberName);
       if (Elt) {
-        Results.push_back(Result::getIgnoreBase(Elt));
+        Results.push_back(Result::getMetatypeMember(Elt));
 
         // Fall through to find any members with the same name.
       }
     }
 
     if (StructType *STy = Ty->getAs<StructType>()) {
-      if (STy->getDecl()->getName() == Name) {
-        Results.push_back(Result::getIgnoreBase(STy->getDecl()->getMembers().back()));
+      if (STy->getDecl()->getName() == MemberName) {
+        ValueDecl *ConstructMember = STy->getDecl()->getMembers().back();
+        Results.push_back(Result::getMetatypeMember(ConstructMember));
         // Fall through to find any members with the same name.
       }
     }
@@ -66,36 +68,7 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M,
     // member name to see if we find extensions or anything else.  For example,
     // If type SomeTy.SomeMember can look up static functions, and can even look
     // up non-static functions as well (thus getting the address of the member).
-    doIt(Ty, Name, M, Visited);
-
-    // If we find anything that requires 'this', reset it back because we don't
-    // have a this.
-    bool AnyInvalid = false;
-    for (Result &R : Results) {
-      switch (R.Kind) {
-      case Result::PassBase:
-        // No 'this' to pass.
-        R.Kind = Result::IgnoreBase;
-        break;
-          
-      case Result::IgnoreBase:
-        break;
-          
-      case Result::TupleElement:
-        AnyInvalid = true;
-        break;
-      }
-    }
-
-    if (AnyInvalid) {
-      // If we found any results that can't have their base ignored, drop
-      // them.
-      // FIXME: This is a terrible way to implement this, but we crash
-      // in createResultAST if we don't do something here.
-      Results.erase(std::remove_if(Results.begin(), Results.end(),
-                      ^(Result &R) { return R.Kind != Result::IgnoreBase; }),
-                    Results.end());
-    }
+    doIt(Ty, M, Visited);
     return;
   }
   
@@ -103,10 +76,10 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M,
   // special and can't have extensions.
   if (ModuleType *MT = BaseTy->getAs<ModuleType>()) {
     SmallVector<ValueDecl*, 8> Decls;
-    MT->getModule()->lookupValue(Module::AccessPathTy(), Name,
+    MT->getModule()->lookupValue(Module::AccessPathTy(), MemberName,
                                  NLKind::QualifiedLookup, Decls);
     for (ValueDecl *VD : Decls)
-      Results.push_back(Result::getIgnoreBase(VD));
+      Results.push_back(Result::getMetatypeMember(VD));
     return;
   }
 
@@ -117,12 +90,18 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M,
       return;
       
     for (auto Inherited : PT->getDecl()->getInherited())
-      doIt(Inherited, Name, M, Visited);
+      doIt(Inherited, M, Visited);
     
     for (auto Member : PT->getDecl()->getMembers()) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
-        if (VD->getName() != Name) continue;
-        Results.push_back(Result::getPassBase(VD));
+        if (VD->getName() != MemberName) continue;
+        if (isa<VarDecl>(VD) || isa<SubscriptDecl>(VD)) {
+          Results.push_back(Result::getMemberProperty(VD));
+        } else {
+          assert(isa<FuncDecl>(VD) &&
+                 "Other protocol members not yet implemented");
+          Results.push_back(Result::getMemberFunction(VD));
+        }
       }
     }
     return;
@@ -130,46 +109,50 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M,
   
   // Check to see if this is a reference to a tuple field.
   if (TupleType *TT = BaseTy->getAs<TupleType>())
-    doTuple(TT, Name);
+    doTuple(TT);
 
   // Add direct members ot the struct to the lookup, if applicable.
   // FIXME: Integrate this with lookupGlobalExtensionMethods.
   if (StructType *ST = BaseTy->getAs<StructType>()) {
     for (ValueDecl *Member : ST->getDecl()->getMembers()) {
-      if (isa<VarDecl>(Member) && Member->getName() == Name) {
-        Results.push_back(Result::getPassBase(Member));
+      if (isa<VarDecl>(Member) && Member->getName() == MemberName) {
+        Results.push_back(Result::getMemberProperty(Member));
       }
     }
   }
 
   // Look in any extensions that add methods to the base type.
   SmallVector<ValueDecl*, 8> ExtensionMethods;
-  M.lookupGlobalExtensionMethods(BaseTy, Name, ExtensionMethods);
+  M.lookupGlobalExtensionMethods(BaseTy, MemberName, ExtensionMethods);
 
   for (ValueDecl *VD : ExtensionMethods) {
     if (TypeDecl *TAD = dyn_cast<TypeDecl>(VD)) {
-      Results.push_back(Result::getIgnoreBase(TAD));
+      Results.push_back(Result::getMetatypeMember(TAD));
       continue;
     }
-    if (FuncDecl *FD = dyn_cast<FuncDecl>(VD))
-      if (FD->isStatic()) {
-        Results.push_back(Result::getIgnoreBase(FD));
-        continue;
-      }
-    Results.push_back(Result::getPassBase(VD));
+    if (FuncDecl *FD = dyn_cast<FuncDecl>(VD)) {
+      if (FD->isStatic())
+        Results.push_back(Result::getMetatypeMember(FD));
+      else
+        Results.push_back(Result::getMemberFunction(FD));
+      continue;
+    }
+    assert((isa<VarDecl>(VD) || isa<SubscriptDecl>(VD)) &&
+           "Unexpected extension member");
+    Results.push_back(Result::getMemberProperty(VD));
   }
 }
 
-void MemberLookup::doTuple(TupleType *TT, Identifier Name) {
+void MemberLookup::doTuple(TupleType *TT) {
   // If the field name exists, we win.  Otherwise, if the field name is a
   // dollarident like $4, process it as a field index.
-  int FieldNo = TT->getNamedElementId(Name);
+  int FieldNo = TT->getNamedElementId(MemberName);
   if (FieldNo != -1) {
     Results.push_back(MemberLookupResult::getTupleElement(FieldNo));
     return;
   }
   
-  StringRef NameStr = Name.str();
+  StringRef NameStr = MemberName.str();
   if (NameStr.startswith("$")) {
     unsigned Value = 0;
     if (!NameStr.substr(1).getAsInteger(10, Value) &&
@@ -220,26 +203,40 @@ Expr *MemberLookup::createResultAST(Expr *Base, SourceLoc DotLoc,
   // Handle the case when we found exactly one result.
   if (Results.size() == 1) {
     MemberLookupResult R = Results[0];
+    bool IsMetatypeBase = Base->getType()->is<MetaTypeType>();
 
     switch (R.Kind) {
     case MemberLookupResult::TupleElement:
+      if (IsMetatypeBase)
+        break;
       return buildTupleElementExpr(Base, DotLoc, NameLoc, R.TupleFieldNo,
                                    Context);
-    case MemberLookupResult::PassBase: {
-      if (isa<FuncDecl>(R.D)) {
-        Expr *Fn = new (Context) DeclRefExpr(R.D, NameLoc,
-                                             R.D->getTypeOfReference());
-        return new (Context) DotSyntaxCallExpr(Fn, DotLoc, Base);
+    case MemberLookupResult::MemberFunction: {
+      if (IsMetatypeBase) {
+        Expr *RHS = new (Context) DeclRefExpr(R.D, NameLoc,
+                                              R.D->getTypeOfReference());
+        return new (Context) DotSyntaxBaseIgnoredExpr(Base, DotLoc, RHS);
       }
-
+      Expr *Fn = new (Context) DeclRefExpr(R.D, NameLoc,
+                                           R.D->getTypeOfReference());
+      return new (Context) DotSyntaxCallExpr(Fn, DotLoc, Base);
+    }
+    case MemberLookupResult::MemberProperty: {
+      if (IsMetatypeBase) 
+        break;
       VarDecl *Var = cast<VarDecl>(R.D);
       return new (Context) MemberRefExpr(Base, DotLoc, Var, NameLoc);
     }
-    case MemberLookupResult::IgnoreBase:
+    case MemberLookupResult::MetatypeMember: {
       Expr *RHS = new (Context) DeclRefExpr(R.D, NameLoc,
                                             R.D->getTypeOfReference());
       return new (Context) DotSyntaxBaseIgnoredExpr(Base, DotLoc, RHS);
     }
+    }
+
+    Expr *BadExpr = new (Context) UnresolvedDotExpr(Base, DotLoc,
+                                                    MemberName, NameLoc);
+    return BadExpr;
   }
   
   // If we have an ambiguous result, build an overload set.

@@ -19,6 +19,7 @@
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "swift/AST/Identifier.h"
 
 namespace swift {
   class ASTContext;
@@ -28,7 +29,6 @@ namespace swift {
   class Type;
   class TypeDecl;
   class Module;
-  class Identifier;
   class TupleType;
 
 /// MemberLookupResult - One result of member name lookup.
@@ -41,28 +41,40 @@ struct MemberLookupResult {
 
   /// Kind - The kind of reference.
   enum KindTy {
-    /// PassBase - "a.x" is a call to x where the a expression is passed in as
-    /// a 'this' pointer.
-    PassBase,
-    
-    /// IgnoreBase - "a.x" is a direct reference to "x".  "a" is evaluated, but
-    /// the result is discarded.
-    IgnoreBase,
-    
+    /// MemberProperty - "a.x" refers to an "x" which is an instance property
+    /// of "a".
+    MemberProperty,
+
+    /// MemberFunction - "a.x" refers to an "x" which is an instance function
+    /// of "a".  "A.x" refers to a curried function such that "A.x(a)" is
+    /// equivalent to "x.a" if "A" is the metatype of the type of "a".
+    MemberFunction,
+
+    /// MetatypeMember - "A.x" refers to an "x" which is a member of the
+    /// metatype "A". "a.x" is equivalent to "A.x", where "A' si the the
+    /// metatype of the type of "a"; the base is evaluated and ignored.
+    MetatypeMember,
+
     /// TupleElement - "a.x" is a direct reference to a field of a tuple.
     TupleElement,
   } Kind;
   
-  static MemberLookupResult getPassBase(ValueDecl *D) {
+  static MemberLookupResult getMemberProperty(ValueDecl *D) {
     MemberLookupResult R;
     R.D = D;
-    R.Kind = PassBase;
+    R.Kind = MemberProperty;
     return R;
   }
-  static MemberLookupResult getIgnoreBase(ValueDecl *D) {
+  static MemberLookupResult getMemberFunction(ValueDecl *D) {
     MemberLookupResult R;
     R.D = D;
-    R.Kind = IgnoreBase;
+    R.Kind = MemberFunction;
+    return R;
+  }
+  static MemberLookupResult getMetatypeMember(ValueDecl *D) {
+    MemberLookupResult R;
+    R.D = D;
+    R.Kind = MetatypeMember;
     return R;
   }
   static MemberLookupResult getTupleElement(unsigned Elt) {
@@ -98,9 +110,10 @@ public:
                         ASTContext &Context);
   
 private:
+  Identifier MemberName;
   typedef llvm::SmallPtrSet<TypeDecl *, 8> VisitedSet;
-  void doIt(Type BaseTy, Identifier Name, Module &M, VisitedSet &Visited);
-  void doTuple(TupleType *TT, Identifier Name);
+  void doIt(Type BaseTy, Module &M, VisitedSet &Visited);
+  void doTuple(TupleType *TT);
 };
 
 } // end namespace swift

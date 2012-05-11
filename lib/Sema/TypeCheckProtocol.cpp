@@ -61,12 +61,13 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto) {
       
       for (auto Candidate : Lookup.Results) {
         switch (Candidate.Kind) {
-        case MemberLookupResult::IgnoreBase:
+        case MemberLookupResult::MetatypeMember:
           // Static members are ignored.
           // FIXME: Diagnose if static members happen to match?
           break;
             
-        case MemberLookupResult::PassBase:
+        case MemberLookupResult::MemberProperty:
+        case MemberLookupResult::MemberFunction:
           if (Candidate.D->getKind() == Requirement->getKind() &&
               RequiredTy->isEqual(getInstanceUsageType(Candidate.D)))
             Viable.push_back(Candidate.D);
