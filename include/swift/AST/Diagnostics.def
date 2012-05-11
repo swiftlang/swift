@@ -280,10 +280,10 @@ ERROR(expected_expr_array_type,expr_parsing,none,
       "expected expression for size of array type", ())
 ERROR(non_constant_array,type_parsing,none,
       "array has non-constant size", ())
-ERROR(zero_length_array,type_parsing,none,
-      "array has length zero", ())
 ERROR(expected_rbracket_array_type,type_parsing,none,
       "expected ']' in array type", ())
+ERROR(unsupported_fixed_length_array,type_parsing,none,
+      "fixed-length arrays are not yet supported", ())
       
 // Tuple Types
 ERROR(expected_rparen_tuple_type_list,type_parsing,none,

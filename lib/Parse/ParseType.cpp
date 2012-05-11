@@ -286,30 +286,10 @@ bool Parser::parseTypeArray(Type &result) {
     return true;
   }
   
-  // Semantic analysis.
+  // FIXME: We don't supported fixed-length arrays yet.
+  diagnose(lsquareLoc, diag::unsupported_fixed_length_array)
+    << sizeEx.get()->getSourceRange();
   
-  Expr *size = sizeEx.get();
-  
-  // FIXME: Add real support for evaluating constant expressions for array
-  // sizes.
-  uint64_t sizeVal;
-  if (IntegerLiteralExpr *lit = dyn_cast<IntegerLiteralExpr>(size)) {
-    sizeVal = lit->getValue().getZExtValue() /*hack*/;
-  } else {
-    diagnose(size->getLoc(), diag::non_constant_array)
-      << size->getSourceRange();
-    result = ErrorType::get(Context);
-    return true;
-  }
-  
-  if (sizeVal == 0) {
-    diagnose(size->getLoc(), diag::zero_length_array)
-      << size->getSourceRange();
-    result = ErrorType::get(Context);
-    return true;
-  }
-  
-  result = ArrayType::get(result, sizeVal, Context);
-  return false;
+  return true;
 }
 
