@@ -31,6 +31,7 @@ using namespace irgen;
 static ResilienceScope getResilienceScopeForStrategy(LayoutStrategy strategy) {
   switch (strategy) {
   case LayoutStrategy::Optimal: return ResilienceScope::Local;
+  case LayoutStrategy::Universal: return ResilienceScope::Program;
   }
   llvm_unreachable("bad layout strategy!");
 }

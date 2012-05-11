@@ -38,7 +38,11 @@ namespace irgen {
 /// An algorithm for laying out a structure.
 enum class LayoutStrategy {
   /// Compute an optimal layout;  there are no constraints at all.
-  Optimal
+  Optimal,
+
+  /// The 'universal' strategy: all translation units must agree on
+  /// the layout.
+  Universal
 };
 
 /// The kind of object being laid out.
