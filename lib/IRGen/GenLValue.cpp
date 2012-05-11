@@ -25,7 +25,7 @@
 #include "swift/Basic/Optional.h"
 #include "GenFunc.h"
 #include "GenInit.h"
-#include "GenStruct.h"
+#include "GenSequential.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
