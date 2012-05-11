@@ -25,6 +25,7 @@
 namespace swift {
   class ASTContext;
   class DeclContext;
+  class Type;
 }
 
 namespace llvm {
@@ -100,6 +101,10 @@ public:
     return getContextKind() >= DeclContextKind::OneOfDecl &&
            getContextKind() <= DeclContextKind::ProtocolDecl;
   }
+  
+  /// getDeclaredTypeOfContext - For a type context, retrieves the declared
+  /// type of the context. Returns a null type for non-type contexts.
+  Type getDeclaredTypeOfContext() const;
   
   /// Returns the semantic parent of this context.  A context has a
   /// parent if and only if it is not a module context.

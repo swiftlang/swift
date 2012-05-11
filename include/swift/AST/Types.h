@@ -829,6 +829,11 @@ public:
       return *this & ~Implicit;
     }
 
+    /// Return the current set of qualifiers with the 'implicit' bit also set.
+    Qual withImplicit() const {
+      return *this | Implicit;
+    }
+
     bool isHeap() const { return !(*this & NonHeap); }
     bool isExplicit() const { return !(*this & Implicit); }
 

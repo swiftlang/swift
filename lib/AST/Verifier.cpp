@@ -281,28 +281,47 @@ namespace {
 
     void verifyChecked(MemberRefExpr *E) {
       if (!E->getBase()->getType()->is<LValueType>()) {
-        Out << "Member reference base type is not an lvalue";
+        Out << "Member reference base type is not an lvalue:\n";
+        E->dump();
         abort();
       }
       
       if (!E->getType()->is<LValueType>()) {
-        Out << "Member reference type is not an lvalue";
+        Out << "Member reference type is not an lvalue\n";
+        E->dump();
         abort();
       }
       
       if (!E->getDecl()) {
-        Out << "Member reference is missing declaration";
+        Out << "Member reference is missing declaration\n";
+        E->dump();
         abort();
       }
       
       LValueType *ResultLV = E->getType()->getAs<LValueType>();
       if (!ResultLV) {
-        Out << "Member reference has non-lvalue type";
+        Out << "Member reference has non-lvalue type\n";
+        E->dump();
         abort();
       }
       
       checkSameType(E->getDecl()->getType(), ResultLV->getObjectType(),
                     "member reference result type and referenced member");
+      
+      Type ContainerTy
+        = E->getDecl()->getDeclContext()->getDeclaredTypeOfContext();
+      if (!ContainerTy) {
+        Out << "container of member reference is not a type\n";
+        E->dump();
+        abort();
+      }
+      
+      Type BaseTy = E->getBase()->getType();
+      if (LValueType *BaseLV = BaseTy->getAs<LValueType>())
+        BaseTy = BaseLV->getObjectType();
+      
+      checkSameType(ContainerTy, BaseTy,
+                    "member container and member reference base");
     }
     
     void verifyChecked(SubscriptExpr *E) {
@@ -332,6 +351,21 @@ namespace {
       
       checkSameType(E->getDecl()->getElementType(), ResultLV->getObjectType(),
                     "subscript result type and subscript declaration");
+      
+      Type ContainerTy
+        = E->getDecl()->getDeclContext()->getDeclaredTypeOfContext();
+      if (!ContainerTy) {
+        Out << "container of subscript is not a type\n";
+        E->dump();
+        abort();
+      }
+      
+      Type BaseTy = E->getBase()->getType();
+      if (LValueType *BaseLV = BaseTy->getAs<LValueType>())
+        BaseTy = BaseLV->getObjectType();
+      
+      checkSameType(ContainerTy, BaseTy,
+                    "subscript container and subscript base");
     }
       
     void verifyParsed(NewArrayExpr *E) {

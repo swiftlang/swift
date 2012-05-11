@@ -348,7 +348,7 @@ static Expr *BindNameToIVar(UnresolvedDeclRefExpr *UDRE, FuncDecl *CurFD,
 /// returning the resultant expression.  If this reference is inside of a
 /// FuncDecl (i.e. in a function body, not at global scope) then CurFD is the
 /// innermost function, otherwise null.
-static Expr *BindName(UnresolvedDeclRefExpr *UDRE, FuncDecl *CurFD, 
+static Expr *BindName(UnresolvedDeclRefExpr *UDRE, FuncDecl *CurFD,
                       NameBinder &Binder) {
   
   // If we are inside of a method, check to see if there are any ivars in scope,

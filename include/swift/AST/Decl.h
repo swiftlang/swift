@@ -465,7 +465,7 @@ public:
 
   OneOfElementDecl *getElement(Identifier Name) const;
 
-  OneOfType *getDeclaredType() { return OneOfTy; }
+  OneOfType *getDeclaredType() const { return OneOfTy; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -501,7 +501,7 @@ public:
   // FIXME: This is an ugly, short-term hack!
   OneOfElementDecl *getElement() { return Element; }
 
-  StructType *getDeclaredType() { return StructTy; }
+  StructType *getDeclaredType() const { return StructTy; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -521,26 +521,32 @@ public:
 class ProtocolDecl : public TypeDecl, public DeclContext {
   SourceLoc ProtocolLoc;
   SourceLoc NameLoc;
+  MutableArrayRef<Type> Inherited;
   SourceRange Braces;
   MutableArrayRef<Decl *> Members;
   Type ProtocolTy;
   
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
-               Identifier Name)
+               Identifier Name, MutableArrayRef<Type> Inherited)
     : TypeDecl(DeclKind::Protocol, DC, Name, Type()),
       DeclContext(DeclContextKind::ProtocolDecl, DC),
-      ProtocolLoc(ProtocolLoc), NameLoc(NameLoc) { }
+      ProtocolLoc(ProtocolLoc), NameLoc(NameLoc), Inherited(Inherited) { }
   
   using Decl::getASTContext;
   
   MutableArrayRef<Decl *> getMembers() { return Members; }
   ArrayRef<Decl *> getMembers() const { return Members; }
-  
+
   void setMembers(MutableArrayRef<Decl *> M, SourceRange B) {
     Members = M;
     Braces = B;
   }
+
+  MutableArrayRef<Type> getInherited() { return Inherited; }
+  ArrayRef<Type> getInherited() const { return Inherited; }
+
+  void setInherited(MutableArrayRef<Type> I) { Inherited = I; }
   
   Type getDeclaredType() const { return ProtocolTy; }
   void setDeclaredType(Type Ty) { ProtocolTy = Ty; }

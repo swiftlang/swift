@@ -1353,7 +1353,34 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
   }
 
   if (LValueType *DestLT = DestTy->getAs<LValueType>()) {
-    LValueType *SrcLT = E->getType()->getAs<LValueType>();
+    Type SrcTy = E->getType();
+    LValueType *SrcLT = SrcTy->getAs<LValueType>();
+
+    // If the input expression has a dependent type, try to coerce it to an
+    // appropriate type.
+    if (SrcTy->isDependentType())
+      return SemaCoerce(TC, DestTy, Apply).doIt(E);
+
+    // If we're converting to a reference to a protocol, check whether the
+    // source conforms to that protocol.
+    if (auto DestProto = DestLT->getObjectType()->getAs<ProtocolType>()) {
+      Type SrcObjectTy = SrcLT? SrcLT->getObjectType() : SrcTy;
+      if (!SrcObjectTy->isEqual(DestProto)) {
+        if (auto Conformance = TC.conformsToProtocol(SrcObjectTy,
+                                                     DestProto->getDecl())) {
+          SrcTy = DestLT->getObjectType();
+          if (SrcLT) {
+            SrcLT = LValueType::get(SrcTy,
+                                    SrcLT->getQualifiers().withImplicit(),
+                                    TC.Context);
+            SrcTy = SrcLT;
+          }
+          
+          if (Apply)
+            E = new (TC.Context) ErasureExpr(E, SrcTy, Conformance);
+        }
+      }
+    }
 
     // Qualification conversion.
     if (SrcLT && DestLT->getObjectType()->isEqual(SrcLT->getObjectType()) &&
@@ -1367,22 +1394,18 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
       return coerced(new (TC.Context) RequalifyExpr(E, DestTy), Apply);
     }
 
-    // If the input expression has a dependent type, try to coerce it to an
-    // appropriate type.
-    if (E->getType()->isDependentType())
-      return SemaCoerce(TC, DestTy, Apply).doIt(E);
-
     // Materialization.
     if (!DestLT->isExplicit()) {
       CoercedResult CoercedE = coerceToType(E, DestLT->getObjectType(), TC,
-                                             Apply);
+                                            Apply);
       if (!CoercedE)
         return nullptr;
       
       if (!Apply)
         return DestTy;
       
-      return coerced(new (TC.Context) MaterializeExpr(E, DestTy), Apply);
+      return coerced(new (TC.Context) MaterializeExpr(CoercedE.getExpr(),
+                                                      DestTy), Apply);
     }
 
     // Failure.

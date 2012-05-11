@@ -17,6 +17,7 @@
 #ifndef SEMA_NAME_LOOKUP_H
 #define SEMA_NAME_LOOKUP_H
 
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {
@@ -25,6 +26,7 @@ namespace swift {
   class SourceLoc;
   class ValueDecl;
   class Type;
+  class TypeDecl;
   class Module;
   class Identifier;
   class TupleType;
@@ -100,7 +102,8 @@ public:
                         ASTContext &Context);
   
 private:
-  void doIt(Type BaseTy, Identifier Name, Module &M);
+  typedef llvm::SmallPtrSet<TypeDecl *, 8> VisitedSet;
+  void doIt(Type BaseTy, Identifier Name, Module &M, VisitedSet &Visited);
   void doTuple(TupleType *TT, Identifier Name, bool WasStruct);
 };
 

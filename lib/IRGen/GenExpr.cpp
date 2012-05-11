@@ -313,7 +313,6 @@ namespace {
     NOT_LVALUE_EXPR(Load)
     NOT_LVALUE_EXPR(Tuple)
     NOT_LVALUE_EXPR(ScalarToTuple)
-    NOT_LVALUE_EXPR(Erasure)
     NOT_LVALUE_EXPR(NewArray)
     NOT_LVALUE_EXPR(DotSyntaxBaseIgnored)
     NOT_LVALUE_EXPR(Coerce)
@@ -352,6 +351,11 @@ namespace {
     
     LValue visitSubscriptExpr(SubscriptExpr *E) {
       return emitSubscriptLValue(IGF, E);
+    }
+    
+    LValue visitErasureExpr(ErasureExpr *E) {
+      IGF.unimplemented(E->getLoc(), "erasure expression as lvalue");
+      return LValue();
     }
   };
 }
@@ -458,6 +462,11 @@ namespace {
       return Optional<Address>();
     }
 
+    Optional<Address> visitErasureExpr(ErasureExpr *E) {
+      IGF.unimplemented(E->getLoc(), "emit address of erasure expr");
+      return Optional<Address>();
+    }
+                                                    
     // These expressions aren't naturally already in memory.
     NON_LOCATEABLE(TupleExpr)
     NON_LOCATEABLE(IntegerLiteralExpr)
@@ -466,7 +475,6 @@ namespace {
     NON_LOCATEABLE(StringLiteralExpr)
     NON_LOCATEABLE(InterpolatedStringLiteralExpr)
     NON_LOCATEABLE(TupleShuffleExpr)
-    NON_LOCATEABLE(ErasureExpr)
     NON_LOCATEABLE(CapturingExpr)
     NON_LOCATEABLE(ModuleExpr)
     NON_LOCATEABLE(DotSyntaxBaseIgnoredExpr)

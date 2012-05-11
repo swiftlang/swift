@@ -135,6 +135,11 @@ public:
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
+    // Check the list of inherited protocols.
+    for (auto Inherited : PD->getInherited())
+      TC.validateType(Inherited);
+
+    // Check the members.
     for (auto Member : PD->getMembers())
       visit(Member);
   }

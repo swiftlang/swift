@@ -1294,8 +1294,12 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
 /// doing no token skipping) on error.
 ///
 ///   decl-protocol:
-///      'protocol' attribute-list identifier protocol-body
-///      
+///      'protocol' attribute-list identifier protocol-inheritance?
+///          protocol-body
+///
+///   protocol-inheritance:
+///      ':' type-identifier (',' type-identifier)*
+///
 Decl *Parser::parseDeclProtocol() {
   SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
   
@@ -1308,8 +1312,33 @@ Decl *Parser::parseDeclProtocol() {
                       diag::expected_identifier_in_decl, "protocol"))
     return 0;
   
-  ProtocolDecl *Proto = new (Context) ProtocolDecl(CurDeclContext, ProtocolLoc,
-                                                   NameLoc, ProtocolName);
+  SmallVector<Type, 4> InheritedProtocols;
+  if (Tok.is(tok::colon)) {
+    consumeToken();
+    
+    do {
+      // Parse the inherited type (which must be a protocol).
+      Type Ty;
+      if (parseTypeIdentifier(Ty))
+        break;
+      
+      // Record the type.
+      InheritedProtocols.push_back(Ty);
+      
+      // Check for a ',', which indicates that there are more protocols coming.
+      if (Tok.is(tok::comma)) {
+        consumeToken();
+        continue;
+      }
+      
+      break;
+    } while (true);
+  }
+  
+  ProtocolDecl *Proto
+    = new (Context) ProtocolDecl(CurDeclContext, ProtocolLoc, NameLoc,
+                                 ProtocolName,
+                                 Context.AllocateCopy(InheritedProtocols));
   Proto->setDeclaredType(ProtocolType::getNew(Proto));
   Proto->setType(MetaTypeType::get(Proto));
   ContextChange CC(*this, Proto);

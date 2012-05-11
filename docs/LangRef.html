@@ -917,14 +917,9 @@ token following the opening '{' is either 'set' or 'get'.</p>
   <h3 id="decl-protocol">Protocol Declarations</h3>
   <!-- ===================================================================== -->
   
-  <div class="commentary">
-    <b>The Protocol implementation is just an initial hack and is likely to
-      change substantially.</b>
-  </div>
-  
-  <pre class="grammar">
+ <pre class="grammar">
     decl-protocol ::= 'protocol' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> protocol-body
-    protocol-body ::= '{' protocol-member* '}'
+    protocol-body ::= <a href="#protocol-inheritance">protocol-inheritance</a>? '{' protocol-member* '}'
   </pre>
   
   <p>A protocol declaration describes an abstract interface implemented by
@@ -939,10 +934,7 @@ token following the opening '{' is either 'set' or 'get'.</p>
     protocol Document {
       var title : String
     }
-    protocol VersionedDocument <i>/*: Document*/</i> {
-      func bumpVersion()
-   }
-  </pre>
+ </pre>
   
   <!-- _____________________________________________________________________ -->
   <h4 id="protocol-member-func">'func' protocol elements</h4>
@@ -972,7 +964,29 @@ token following the opening '{' is either 'set' or 'get'.</p>
   nor a getter/setter clause.</p>
   
   <p>TODO: typealias members</p>
-  
+
+  <!-- _____________________________________________________________________ -->
+  <h4 id="protocol-inheritance">Protocol inheritance</h4>
+  <pre class="grammar">
+    protocol-inheritance ::= ':' <a href="#type-identifier">type-identifier</a> (',' <a href="#type-identifier">type-identifier</a>)*
+  </pre>
+
+  <p>A protocol can inherit other protocols, which aggregates the set
+  of requirements from all of the protocols. A type that conforms to
+  the current protocol shall conform to each of the protocols that it
+  inherits.</p>
+
+  <pre class="example">
+    protocol VersionedDocument : Document { <i>// every VersionedDocument is a Document</i>
+      func bumpVersion()
+   }
+
+   func print(doc : Document) { <i>/* ... */</i> }
+
+   var myDocument : VersionedDocument;
+   print(myDocument) <i>// okay: a VersionedDocument is a Document</i>
+  </pre>
+
   <!-- ===================================================================== -->
   <h3 id="decl-subscript">subscript Declarations</h3>
   <!-- ===================================================================== -->

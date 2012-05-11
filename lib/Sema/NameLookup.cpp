@@ -21,14 +21,16 @@
 using namespace swift;
 
 MemberLookup::MemberLookup(Type BaseTy, Identifier Name, Module &M) {
-  doIt(BaseTy, Name, M);
+  VisitedSet Visited;
+  doIt(BaseTy, Name, M, Visited);
 }
 
 /// doIt - Lookup a member 'Name' in 'BaseTy' within the context
 /// of a given module 'M'.  This operation corresponds to a standard "dot" 
 /// lookup operation like "a.b" where 'this' is the type of 'a'.  This
 /// operation is only valid after name binding.
-void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M) {
+void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M,
+                        VisitedSet &Visited) {
   typedef MemberLookupResult Result;
   
   // Just look through l-valueness.  It doesn't affect name lookup.
@@ -64,7 +66,7 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M) {
     // member name to see if we find extensions or anything else.  For example,
     // If type SomeTy.SomeMember can look up static functions, and can even look
     // up non-static functions as well (thus getting the address of the member).
-    doIt(Ty, Name, M);
+    doIt(Ty, Name, M, Visited);
 
     // If we find anything that requires 'this', reset it back because we don't
     // have a this.
@@ -112,6 +114,12 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M) {
   // If the base is a protocol, see if this is a reference to a declared
   // protocol member.
   if (ProtocolType *PT = BaseTy->getAs<ProtocolType>()) {
+    if (!Visited.insert(PT->getDecl()))
+      return;
+      
+    for (auto Inherited : PT->getDecl()->getInherited())
+      doIt(Inherited, Name, M, Visited);
+    
     for (auto Member : PT->getDecl()->getMembers()) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
         if (VD->getName() != Name) continue;

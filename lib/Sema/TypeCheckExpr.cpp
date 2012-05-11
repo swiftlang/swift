@@ -107,13 +107,40 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
 
 /// makeBaseExprLValue - Make the given base expression for a member or
 /// subscript operation an lvalue, materializing it if necessary.
-static Expr *makeBaseExprLValue(ASTContext &Context, Expr *E) {
+static Expr *makeBaseExprLValue(TypeChecker &TC, Expr *E,
+                                Type ContainerTy) {
   Type BaseTy = E->getType();
+  LValueType *BaseLT = BaseTy->getAs<LValueType>();
+  Type BaseObjectTy = BaseLT? BaseLT->getObjectType() : BaseTy;
+
+  // FIXME: Derived-to-base casts will also happen here.
+  
+  // If the base object types aren't equivalent, convert them.
+  if (!BaseObjectTy->isEqual(ContainerTy)) {
+    ProtocolType *ContainerProto = ContainerTy->getAs<ProtocolType>();
+    assert(ContainerProto &&
+           "Name lookup found something in the wrong container");
+    if (auto Conformance = TC.conformsToProtocol(BaseObjectTy,
+                                                 ContainerProto->getDecl())) {
+      BaseTy = ContainerTy;
+      
+      if (BaseLT) {
+        BaseLT = LValueType::get(BaseTy,
+                                 BaseLT->getQualifiers().withImplicit(),
+                                 TC.Context);
+        BaseTy = BaseLT;
+      }
+      
+      E = new (TC.Context) ErasureExpr(E, BaseTy, Conformance);
+    }
+  }
+
   if (BaseTy->is<LValueType>())
     return E;
-
-  Type Ty = LValueType::get(BaseTy, LValueType::Qual::DefaultForGetSet, Context);
-  return new (Context) MaterializeExpr(E, Ty);
+  
+  Type Ty = LValueType::get(ContainerTy, LValueType::Qual::DefaultForGetSet,
+                            TC.Context);
+  return new (TC.Context) MaterializeExpr(E, Ty);
 }
 
 Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
@@ -139,9 +166,14 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
     }
     SE->setIndex(Index);
     
+    Type ContainerTy
+      = SE->getDecl()->getDeclContext()->getDeclaredTypeOfContext();
+    if (!ContainerTy)
+      return nullptr;
+    
     // Ensure that the base is an lvalue, materializing it if is not an
     // lvalue yet.
-    SE->setBase(makeBaseExprLValue(Context, SE->getBase()));
+    SE->setBase(makeBaseExprLValue(*this, SE->getBase(), ContainerTy));
        
     // Compute the final lvalue type and we're done.
     SE->setType(LValueType::get(SubDecl->getElementType(),
@@ -429,7 +461,9 @@ public:
     
     // Ensure that the base is an lvalue, materializing it if is not an
     // lvalue yet.
-    E->setBase(makeBaseExprLValue(TC.Context, E->getBase()));
+    Type ContainerTy
+      = E->getDecl()->getDeclContext()->getDeclaredTypeOfContext();
+    E->setBase(makeBaseExprLValue(TC, E->getBase(), ContainerTy));
 
     // Compute the final lvalue type and we're done.
     E->setType(LValueType::get(E->getDecl()->getType(),

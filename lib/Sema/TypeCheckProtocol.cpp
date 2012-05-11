@@ -30,16 +30,30 @@ static Type getInstanceUsageType(ValueDecl *Value) {
 }
 
 static std::unique_ptr<ProtocolConformance>
-checkConformsToProtocol(TranslationUnit &TU, Type T, ProtocolDecl *Proto) {
+checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto) {
   llvm::DenseMap<ValueDecl *, ValueDecl *> Mapping;
+  llvm::DenseMap<ProtocolDecl *, ProtocolConformance *> InheritedMapping;
+
+  // Check that T conforms to all inherited protocols.
+  // FIXME: Mind the infinite recursion!
+  for (auto Inherited : Proto->getInherited()) {
+    ProtocolType *InheritedProto = Inherited->getAs<ProtocolType>();
+    if (!InheritedProto)
+      return nullptr;
+    
+    if (auto Conformance = TC.conformsToProtocol(T, InheritedProto->getDecl()))
+      InheritedMapping[InheritedProto->getDecl()] = Conformance;
+    else
+      return nullptr;
+  }
   
+  // Check that T provides all of the required members.
   for (auto Member : Proto->getMembers()) {
     auto Requirement = dyn_cast<ValueDecl>(Member);
     if (!Requirement)
       continue;
-    
-    
-    MemberLookup Lookup(T, Requirement->getName(), TU);
+
+    MemberLookup Lookup(T, Requirement->getName(), TC.TU);
 
     if (Lookup.isSuccess()) {
       SmallVector<ValueDecl *, 2> Viable;
@@ -81,6 +95,7 @@ checkConformsToProtocol(TranslationUnit &TU, Type T, ProtocolDecl *Proto) {
   std::unique_ptr<ProtocolConformance> Result(new ProtocolConformance);
   // FIXME: Make DenseMap movable to make this efficient.
   Result->Mapping = std::move(Mapping);
+  Result->InheritedMapping = std::move(InheritedMapping);
   return Result;
 }
 
@@ -90,6 +105,7 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto) {
   ASTContext::ConformsToMap::iterator Known = Context.ConformsTo.find(Key);
   if (Known == Context.ConformsTo.end())
     Known = Context.ConformsTo.insert(
-              std::make_pair(Key, checkConformsToProtocol(TU, T, Proto))).first;
+              std::make_pair(Key,
+                             checkConformsToProtocol(*this, T, Proto))).first;
   return Known->second.get();
 }

@@ -30,6 +30,28 @@ ASTContext &DeclContext::getASTContext() {
   return getParent()->getASTContext();
 }
 
+Type DeclContext::getDeclaredTypeOfContext() const {
+  switch (getContextKind()) {
+  case DeclContextKind::BuiltinModule:
+  case DeclContextKind::CapturingExpr:
+  case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::TranslationUnit:
+    return Type();
+    
+  case DeclContextKind::ExtensionDecl:
+    return cast<ExtensionDecl>(this)->getExtendedType();
+    
+  case DeclContextKind::OneOfDecl:
+    return cast<OneOfDecl>(this)->getDeclaredType();
+    
+  case DeclContextKind::ProtocolDecl:
+    return cast<ProtocolDecl>(this)->getDeclaredType();
+    
+  case DeclContextKind::StructDecl:
+    return cast<StructDecl>(this)->getDeclaredType();
+  }
+}
+
 // Only allow allocation of Decls using the allocator in ASTContext.
 void *Decl::operator new(size_t Bytes, ASTContext &C,
                          unsigned Alignment) {
