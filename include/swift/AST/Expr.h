@@ -978,6 +978,34 @@ public:
   }
 };
   
+/// SuperConversion - Performs a conversion from an object of a given type
+/// to one of its supertypes, e.g., an inherited protocol.
+  
+/// For example:
+///
+/// \code
+/// protocol Printable {
+///   func print()
+/// }
+///
+/// protocol FormattedPrintable : {
+///   func print(_ : Format)
+/// }
+/// var printable : Printable
+/// printable.print() // 'this' argument is converted to 'Printable'
+/// \endcode
+class SuperConversionExpr : public ImplicitConversionExpr {
+public:
+  SuperConversionExpr(Expr *SubExpr, Type Ty)
+    : ImplicitConversionExpr(ExprKind::SuperConversion, SubExpr, Ty) { }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const SuperConversionExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::SuperConversion;
+  }
+};
+
 /// AddressOfExpr - Using the builtin unary '&' operator, convert the
 /// given l-value into an explicit l-value.
 class AddressOfExpr : public Expr {

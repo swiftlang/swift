@@ -544,6 +544,10 @@ public:
 
   void setInherited(MutableArrayRef<Type> I) { Inherited = I; }
   
+  /// \brief Determine whether this protocol inherits from the given ("super")
+  /// protocol.
+  bool inheritsFrom(const ProtocolDecl *Super) const;
+  
   Type getDeclaredType() const { return ProtocolTy; }
   void setDeclaredType(Type Ty) { ProtocolTy = Ty; }
   

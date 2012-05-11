@@ -104,7 +104,8 @@ ABSTRACT_EXPR(ImplicitConversion, Expr)
   EXPR(ParameterRename, ImplicitConversionExpr)
   EXPR(ScalarToTuple, ImplicitConversionExpr)
   EXPR(Erasure, ImplicitConversionExpr)
-  EXPR_RANGE(ImplicitConversion, Load, Erasure)
+  EXPR(SuperConversion, ImplicitConversionExpr)
+  EXPR_RANGE(ImplicitConversion, Load, SuperConversion)
 EXPR(Coerce, Expr)
 
 #undef EXPR_RANGE

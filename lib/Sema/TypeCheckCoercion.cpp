@@ -1384,14 +1384,11 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
 
     // For the implicit object argument, we allow conversion from a value of
     // protocol type to a reference to an inherited protocol.
-    // FIXME: Only allow conversions to inherited protocols, rather than this
-    // overly-general protocol conformance search.
     if (Flags & CF_ImplicitObjectArg) {
       if (auto DestProto = DestLT->getObjectType()->getAs<ProtocolType>()) {
         Type SrcObjectTy = SrcLT? SrcLT->getObjectType() : SrcTy;
-        if (!SrcObjectTy->isEqual(DestProto)) {
-          if (auto Conformance = TC.conformsToProtocol(SrcObjectTy,
-                                                       DestProto->getDecl())) {
+        if (auto SrcProto = SrcObjectTy->getAs<ProtocolType>()) {
+          if (SrcProto->getDecl()->inheritsFrom(DestProto->getDecl())) {
             SrcTy = DestLT->getObjectType();
             if (SrcLT) {
               SrcLT = LValueType::get(SrcTy,
@@ -1401,7 +1398,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
             }
             
             if (Flags & CF_Apply)
-              E = new (TC.Context) ErasureExpr(E, SrcTy, Conformance);
+              E = new (TC.Context) SuperConversionExpr(E, SrcTy);
             
             if (SrcTy->isEqual(DestTy)) {
               if (!(Flags & CF_Apply))
@@ -1529,9 +1526,21 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
 
   // A value of any given type can be converted to a value of protocol type if
   // the value's type conforms to the protocol.
-  if (ProtocolType *Proto = DestTy->getAs<ProtocolType>()) {
+  if (auto DestProto = DestTy->getAs<ProtocolType>()) {
+    // Simple case: the source protocol inherits from the destination protocol.
+    if (auto SrcProto = E->getType()->getAs<ProtocolType>()) {
+      if (SrcProto->getDecl()->inheritsFrom(DestProto->getDecl())) {
+        if (!(Flags & CF_Apply))
+          return DestTy;
+
+        return coerced(new (TC.Context) SuperConversionExpr(E, DestTy), Flags);
+      }
+    }
+    
+    // Non-trivial case: source type (which may be a protocol) satisfies the
+    // requirements of the destination protocol.
     if (ProtocolConformance *Conformance
-          = TC.conformsToProtocol(E->getType(), Proto->getDecl())) {
+          = TC.conformsToProtocol(E->getType(), DestProto->getDecl())) {
       if (!(Flags & CF_Apply))
         return DestTy;
 

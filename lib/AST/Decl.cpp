@@ -18,6 +18,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
@@ -207,6 +208,32 @@ OneOfElementDecl *OneOfDecl::getElement(Identifier Name) const {
     if (Elt->getName() == Name)
       return Elt;
   return 0;
+}
+
+bool ProtocolDecl::inheritsFrom(const ProtocolDecl *Super) const {
+  if (this == Super)
+    return false;
+  
+  llvm::SmallPtrSet<const ProtocolDecl *, 4> Visited;
+  SmallVector<const ProtocolDecl *, 4> Stack;
+  
+  Stack.push_back(this);
+  Visited.insert(this);
+  while (!Stack.empty()) {
+    const ProtocolDecl *Current = Stack.back();
+    Stack.pop_back();
+    
+    for (auto Inherited : Current->getInherited()) {
+      if (auto InheritedProto = Inherited->getAs<ProtocolType>()) {
+        if (InheritedProto->getDecl() == Super)
+          return true;
+        else if (Visited.insert(InheritedProto->getDecl()))
+          Stack.push_back(InheritedProto->getDecl());
+      }
+    }
+  }
+  
+  return false;
 }
 
 void VarDecl::setProperty(ASTContext &Context, SourceLoc LBraceLoc,

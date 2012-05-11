@@ -224,6 +224,9 @@ namespace {
     void visitErasureExpr(ErasureExpr *E) {
       IGF.IGM.unimplemented(E->getLoc(), "ErasureExpr");
     }
+    void visitSuperConversionExpr(SuperConversionExpr *E) {
+      IGF.IGM.unimplemented(E->getLoc(), "SuperConversionExpr");
+    }
     void visitTupleElementExpr(TupleElementExpr *E) {
       emitTupleElement(IGF, E, Out);
     }
@@ -305,6 +308,7 @@ namespace {
     NOT_LVALUE_EXPR(StringLiteral)
     NOT_LVALUE_EXPR(InterpolatedStringLiteral)
     NOT_LVALUE_EXPR(TupleShuffle)
+    NOT_LVALUE_EXPR(Erasure)
     NOT_LVALUE_EXPR(Func)
     NOT_LVALUE_EXPR(Closure)
     NOT_LVALUE_EXPR(Load)
@@ -346,8 +350,8 @@ namespace {
       return emitSubscriptLValue(IGF, E);
     }
     
-    LValue visitErasureExpr(ErasureExpr *E) {
-      IGF.unimplemented(E->getLoc(), "erasure expression as lvalue");
+    LValue visitSuperConversionExpr(SuperConversionExpr *E) {
+      IGF.unimplemented(E->getLoc(), "super conversion expression as lvalue");
       return LValue();
     }
   };
@@ -450,8 +454,8 @@ namespace {
       return Optional<Address>();
     }
 
-    Optional<Address> visitErasureExpr(ErasureExpr *E) {
-      IGF.unimplemented(E->getLoc(), "emit address of erasure expr");
+    Optional<Address> visitSuperConversionExpr(SuperConversionExpr *E) {
+      IGF.unimplemented(E->getLoc(), "emit address of super conversion expr");
       return Optional<Address>();
     }
                                                     
@@ -463,6 +467,7 @@ namespace {
     NON_LOCATEABLE(StringLiteralExpr)
     NON_LOCATEABLE(InterpolatedStringLiteralExpr)
     NON_LOCATEABLE(TupleShuffleExpr)
+    NON_LOCATEABLE(ErasureExpr)
     NON_LOCATEABLE(CapturingExpr)
     NON_LOCATEABLE(ModuleExpr)
     NON_LOCATEABLE(DotSyntaxBaseIgnoredExpr)
