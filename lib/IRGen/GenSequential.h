@@ -25,9 +25,6 @@
 #include "StructLayout.h"
 
 namespace swift {
-  
-class MemberRefExpr;
-  
 namespace irgen {
 
 template <class, class> class SequentialTypeBuilder;
@@ -306,8 +303,6 @@ public:
   }  
 };
 
-LValue emitPhysicalStructMemberLValue(IRGenFunction &IGF, MemberRefExpr *E);
-  
 } // end namespace irgen
 } // end namespace swift
 

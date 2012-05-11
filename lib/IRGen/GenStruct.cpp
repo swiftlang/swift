@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "GenSequential.h"
+#include "GenStruct.h"
 
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
