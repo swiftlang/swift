@@ -325,7 +325,9 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
       // Look for extension methods with the same name as the class.
       // FIXME: This should look specifically for constructors.
       TU.lookupGlobalExtensionMethods(Ty, SD->getName(), Methods);
-      Methods.push_back(SD->getElement());
+      // FIXME: This is an ugly hack to get the implicit constructor.
+      assert(SD->getMembers().back()->getName() == SD->getName());
+      Methods.push_back(SD->getMembers().back());
       Expr *FnRef = OverloadedDeclRefExpr::createWithCopy(Methods,
                                                           E1->getStartLoc());
 

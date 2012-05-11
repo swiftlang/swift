@@ -51,10 +51,6 @@ struct MemberLookupResult {
     
     /// TupleElement - "a.x" is a direct reference to a field of a tuple.
     TupleElement,
-    
-    /// StructElement - "a.x" looks through the struct oneof to reference the
-    /// field of the tuple within it.
-    StructElement
   } Kind;
   
   static MemberLookupResult getPassBase(ValueDecl *D) {
@@ -69,10 +65,10 @@ struct MemberLookupResult {
     R.Kind = IgnoreBase;
     return R;
   }
-  static MemberLookupResult getTupleElement(unsigned Elt, bool IsStruct) {
+  static MemberLookupResult getTupleElement(unsigned Elt) {
     MemberLookupResult R;
     R.TupleFieldNo = Elt;
-    R.Kind = IsStruct ? StructElement : TupleElement;
+    R.Kind = TupleElement;
     return R;
   }
 };
@@ -104,7 +100,7 @@ public:
 private:
   typedef llvm::SmallPtrSet<TypeDecl *, 8> VisitedSet;
   void doIt(Type BaseTy, Identifier Name, Module &M, VisitedSet &Visited);
-  void doTuple(TupleType *TT, Identifier Name, bool WasStruct);
+  void doTuple(TupleType *TT, Identifier Name);
 };
 
 } // end namespace swift

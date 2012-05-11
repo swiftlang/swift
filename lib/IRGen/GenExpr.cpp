@@ -263,9 +263,6 @@ namespace {
     void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
       visit(E->getSemanticExpr());
     }
-    void visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
-      emitLookThroughOneof(IGF, E, Out);
-    }
 
     void visitDeclRefExpr(DeclRefExpr *E) {
       emitDeclRef(IGF, E, Out);
@@ -321,10 +318,6 @@ namespace {
 
     LValue visitTupleElementExpr(TupleElementExpr *E) {
       return emitTupleElementLValue(IGF, E);
-    }
-
-    LValue visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
-      return emitLookThroughOneofLValue(IGF, E);
     }
 
     // Qualification never affects emission as an l-value.
@@ -442,11 +435,6 @@ namespace {
       return visit(E->getSubExpr());
     }
 
-    // We can locate a oneof payload if we can locate the oneof.
-    Optional<Address> visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
-      return tryEmitLookThroughOneofAsAddress(IGF, E);
-    }
-
     // We can locate a tuple element if we can locate the tuple.
     Optional<Address> visitTupleElementExpr(TupleElementExpr *E) {
       return tryEmitTupleElementAsAddress(IGF, E);
@@ -536,7 +524,6 @@ namespace {
     }
     USING_SUBEXPR(Paren)
     USING_SUBEXPR(AddressOf)
-    USING_SUBEXPR(LookThroughOneof)
     USING_SUBEXPR(Requalify)
     USING_SUBEXPR(Materialize)
 

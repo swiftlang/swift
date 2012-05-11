@@ -72,7 +72,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto) {
             Viable.push_back(Candidate.D);
           break;
 
-        case MemberLookupResult::StructElement:
         case MemberLookupResult::TupleElement:
           // Tuple elements cannot satisfy requirements.
           break;

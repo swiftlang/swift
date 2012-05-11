@@ -1257,25 +1257,50 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   Decls.push_back(SD);
 
   // Parse elements of the body as a tuple body.
-  Type BodyTy;
-  {
+  SmallVector<ValueDecl*, 8> Elements;
+  if (Tok.isNot(tok::r_paren) && Tok.isNot(tok::r_brace) &&
+      !isStartOfDecl(Tok, peekToken())) {
     ContextChange CC(*this, SD);
-    if (parseTypeTupleBody(LBLoc, BodyTy))
-      return true;
-    assert(isa<TupleType>(BodyTy.getPointer()));
+    bool HadError = false;
+    do {
+      if (!Tok.is(tok::identifier)) {
+        diagnose(Tok, diag::expected_identifier_in_decl, "struct");
+        HadError = true;
+        break;
+      }
+
+      Identifier VarName = Context.getIdentifier(Tok.getText());
+      SourceLoc VarLoc = Tok.getLoc();
+      consumeToken();
+
+      if (!consumeIf(tok::colon)) {
+        diagnose(Tok, diag::expected_type_or_init);
+        HadError = true;
+        break;
+      }
+
+      Type VarType;
+      if ((HadError = parseTypeAnnotation(VarType)))
+        break;
+
+      VarDecl *Var = new (Context) VarDecl(VarLoc, VarName, VarType, SD);
+      Elements.push_back(Var);
+    } while (consumeIf(tok::comma));
   }
-  
-  // Reject any unnamed members.
-  for (auto Elt : BodyTy->castTo<TupleType>()->getFields())
-    if (!Elt.hasName()) {
-      // FIXME: Mark erroneous, terrible location info.  Probably should just
-      // have custom parsing logic instead of reusing type-tuple-body.
-      diagnose(LBLoc, diag::struct_unnamed_member);
-    }
+
+  // FIXME: We should come up with a better way to represent this implied
+  // constructor.
+  SmallVector<TupleTypeElt, 8> TupleElts;
+  for (ValueDecl *Element : Elements)
+    TupleElts.push_back(TupleTypeElt(Element->getType(), Element->getName()));
+  TupleType *TT = TupleType::get(TupleElts, Context);
+  Type CreateTy = FunctionType::get(TT, SD->getDeclaredType(), Context);
+  Elements.push_back(new (Context) OneOfElementDecl(StructLoc, StructName,
+                                                    CreateTy, TT, SD));
 
   if (!Attributes.empty())
     diagnose(Attributes.LSquareLoc, diag::oneof_attributes);
-  SD->setUnderlyingType(BodyTy);
+  SD->setMembers(Context.AllocateCopy(Elements));
   ScopeInfo.addToScope(SD);
 
   // Parse the extended body of the struct.

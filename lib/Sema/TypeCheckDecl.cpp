@@ -124,13 +124,14 @@ public:
   }
 
   void visitStructDecl(StructDecl *SD) {
-    // Validate the function type.
-    if (TC.validateType(SD->getUnderlyingType())) return;
+    for (ValueDecl *Member : SD->getMembers()) {
+      if (TC.validateType(Member->getType())) return;
 
-    // Require the carried type to be materializable.
-    if (!SD->getUnderlyingType()->isMaterializable()) {
-      TC.diagnose(SD->getStructLoc(),
-                  diag::oneof_element_not_materializable);
+      // Require the carried type to be materializable.
+      if (!Member->getType()->isMaterializable()) {
+        TC.diagnose(Member->getLocStart(),
+                    diag::oneof_element_not_materializable);
+      }
     }
   }
 

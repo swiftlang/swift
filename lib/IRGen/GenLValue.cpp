@@ -15,6 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "GenLValue.h"
+
 #include "llvm/Function.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -23,13 +25,12 @@
 #include "swift/Basic/Optional.h"
 #include "GenFunc.h"
 #include "GenInit.h"
+#include "GenStruct.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Explosion.h"
 #include "LValue.h"
-
-#include "GenLValue.h"
 
 using namespace swift;
 using namespace irgen;
@@ -645,13 +646,19 @@ LValue swift::irgen::emitMemberRefLValue(IRGenFunction &IGF, MemberRefExpr *E) {
   // TODO: we need to take a slightly different path if the base is a
   // reference type.
   assert(!E->getBase()->getType()->hasReferenceSemantics());
-  
+
+  VarDecl *var = E->getDecl();
+  if (!isVarAccessLogical(IGF, var)) {
+    if (isa<StructDecl>(var->getDeclContext()))
+      return emitPhysicalStructMemberLValue(IGF, E);
+
+    llvm_unreachable("Unexpected physical lvalue MemberRefExpr");
+  }
+
   // Emit the base l-value.
   LValue lvalue = IGF.emitLValue(E->getBase());
 
-  // If we must access the member logically, push a logical member reference.
-  VarDecl *var = E->getDecl();
-  assert(isVarAccessLogical(IGF, var));
+  // Push a logical member reference.
   lvalue.add<GetterSetterComponent>(GetterSetterTarget::forByrefMemberVar(var));
 
   return lvalue;

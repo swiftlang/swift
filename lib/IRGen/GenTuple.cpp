@@ -87,7 +87,7 @@ namespace {
     void performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
       StructLayout layout(IGM, LayoutKind::NonHeapObject,
                           LayoutStrategy::Universal, fieldTypes);
-      recordLayout(layout);
+      recordLayout(layout, layout.getType());
     }
   };
 }

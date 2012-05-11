@@ -195,12 +195,10 @@ public:
     
     // Make sure we found a function (which may be overloaded, of course).
     if (Lookup.Results.front().Kind == MemberLookupResult::TupleElement ||
-        Lookup.Results.front().Kind == MemberLookupResult::StructElement ||
         !isa<FuncDecl>(Lookup.Results.front().D)) {
       TC.diagnose(Loc, NonFuncMember, BaseType)
         << Base->getSourceRange();
-      if (!Lookup.Results.front().Kind == MemberLookupResult::TupleElement &&
-          !Lookup.Results.front().Kind == MemberLookupResult::StructElement)
+      if (!Lookup.Results.front().Kind == MemberLookupResult::TupleElement)
         TC.diagnose(Lookup.Results.front().D->getLocStart(),
                     diag::decl_declared_here,
                     Lookup.Results.front().D->getName());
@@ -413,10 +411,6 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
     for (unsigned i : MemberIndexes) {
       // For each index, we look through a TupleType or transparent OneOfType.
       CanType CurT = ArgRef->getType()->getCanonicalType();
-      if (StructType *ST = dyn_cast<StructType>(CurT)) {
-        CurT = ST->getDecl()->getUnderlyingType()->getCanonicalType();
-        ArgRef = new (Context) LookThroughOneofExpr(ArgRef, CurT);
-      }
       TupleType *TT = cast<TupleType>(CurT);
       ArgRef = new (Context) SyntacticTupleElementExpr(ArgRef, Loc, i, Loc,
                                                        TT->getElementType(i));
@@ -436,17 +430,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
     return;
   }
 
-  if (StructType *ST = dyn_cast<StructType>(T)) {
-    StructDecl *SD = ST->getDecl();
-    // Print "struct" types as if we are constructing one: the name
-    // followed by the underlying tuple.
-    PrintLiteralString(SD->getName().str(), Context, Loc,
-                       PrintDecls, BodyContent);
-    CanType SubType = SD->getUnderlyingType()->getCanonicalType();
-    PrintReplExpr(TC, Arg, SubType, Loc, EndLoc,
-                  MemberIndexes, BodyContent, PrintDecls);
-    return;
-  }
+  // FIXME: We should handle StructTypes!
 
   // FIXME: We should handle OneOfTypes at some point, but
   // it's tricky to represent in the AST without a "match" statement.

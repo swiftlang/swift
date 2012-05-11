@@ -14,6 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "GenStruct.h"
+
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -21,6 +23,7 @@
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
 
+#include "GenSequential.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -31,86 +34,40 @@ using namespace swift;
 using namespace irgen;
 
 namespace {
-  /// The TypeInfo implementation for structs.
-  class StructTypeInfo : public TypeInfo {
+  class StructFieldInfo : public SequentialField<StructFieldInfo> {
   public:
-    static Address getSingletonAddress(IRGenFunction &IGF, Address addr) {
-      llvm::Value *singletonAddr =
-        IGF.Builder.CreateStructGEP(addr.getAddress(), 0);
-      return Address(singletonAddr, addr.getAlignment());
+    StructFieldInfo(VarDecl *field, const TypeInfo &type)
+      : SequentialField(type), Field(field) {}
+
+    /// The field.
+    VarDecl *Field;
+
+    StringRef getFieldName() const {
+      return Field->getName().str();
     }
 
-    /// The type info of the singleton member, or null if it carries no data.
-    const TypeInfo *Singleton;
-
-    StructTypeInfo(llvm::StructType *T, Size S, Alignment A,
-                           IsPOD_t isPOD)
-      : TypeInfo(T, S, A, isPOD), Singleton(nullptr) {}
-
-    void getSchema(ExplosionSchema &schema) const {
-      assert(isComplete());
-      if (Singleton) Singleton->getSchema(schema);
+    Address projectAddress(IRGenFunction &IGF, Address seq) const {
+      seq = IGF.Builder.CreateStructGEP(seq, 0, Size(0));
+      return SequentialField<StructFieldInfo>::projectAddress(IGF, seq);
     }
+  };
 
-    unsigned getExplosionSize(ExplosionKind kind) const {
-      assert(isComplete());
-      if (!Singleton) return 0;
-      return Singleton->getExplosionSize(kind);
-    }
-
-    void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
-      if (!Singleton) return;
-      Singleton->load(IGF, getSingletonAddress(IGF, addr), e);
-    }
-
-    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
-      if (!Singleton) return;
-      Singleton->loadAsTake(IGF, getSingletonAddress(IGF, addr), e);
-    }
-
-    void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      if (!Singleton) return;
-      Singleton->assign(IGF, e, getSingletonAddress(IGF, addr));
-    }
-
-    void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      if (!Singleton) return;
-      Singleton->initialize(IGF, e, getSingletonAddress(IGF, addr));
-    }
-
-    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      if (Singleton) Singleton->reexplode(IGF, src, dest);
-    }
-
-    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      if (Singleton) Singleton->copy(IGF, src, dest);
-    }
-
-    void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      if (Singleton) Singleton->manage(IGF, src, dest);
-    }
-
-    void destroy(IRGenFunction &IGF, Address addr) const {
-      if (Singleton && !isPOD(ResilienceScope::Local))
-        Singleton->destroy(IGF, getSingletonAddress(IGF, addr));
+  /// Layout information for struct types.
+  class StructTypeInfo :
+    public SequentialTypeInfo<StructTypeInfo, StructFieldInfo> {
+  public:
+    StructTypeInfo(llvm::Type *T, unsigned numFields)
+      : SequentialTypeInfo(T, numFields) {
     }
 
     void emitInjectionFunctionBody(IRGenFunction &IGF,
                                    OneOfElementDecl *elt,
                                    Explosion &params) const {
-      // If this oneof carries no data, the function must take no
-      // arguments and return void.
-      if (!Singleton) {
-        IGF.Builder.CreateRetVoid();
-        return;
-      }
-
-      // Otherwise, package up the result.
       ExplosionSchema schema(params.getKind());
-      Singleton->getSchema(schema);
+      getSchema(schema);
       if (schema.requiresIndirectResult()) {
         Address returnSlot(params.claimUnmanagedNext(),
-                           Singleton->StorageAlignment);
+                           StorageAlignment);
         initialize(IGF, params, returnSlot);
         IGF.Builder.CreateRetVoid();
       } else {
@@ -118,7 +75,49 @@ namespace {
       }
     }
   };
+
+  class StructTypeBuilder :
+    public SequentialTypeBuilder<StructTypeBuilder, StructTypeInfo> {
+  private:
+    StructDecl *D;
+  public:
+    StructTypeBuilder(IRGenModule &IGM, StructDecl *D) :
+        SequentialTypeBuilder(IGM), D(D) {}
+
+    StructTypeInfo *construct(void *buffer, ArrayRef<VarDecl*> fields) {
+      return ::new(buffer) StructTypeInfo(IGM.Int8Ty, fields.size());
+    }
+
+    StructFieldInfo getFieldInfo(VarDecl *field,
+                                const TypeInfo &fieldTI) {
+      return StructFieldInfo(field, fieldTI);
+    }
+
+    Type getType(VarDecl *field) { return field->getType(); }
+
+    void performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
+      StructLayout layout(IGM, LayoutKind::NonHeapObject,
+                          LayoutStrategy::Optimal, fieldTypes);
+      llvm::StructType *structTy = IGM.createNominalType(D);
+      structTy->setBody(ArrayRef<llvm::Type*>(layout.getType()));
+      recordLayout(layout, structTy);
+    }
+  };
 }  // end anonymous namespace.
+
+namespace {
+  class PhysicalStructMember : public PhysicalPathComponent {
+    const StructFieldInfo &Field;
+
+  public:
+    PhysicalStructMember(const StructFieldInfo &field) : Field(field) {}
+
+    OwnedAddress offset(IRGenFunction &IGF, OwnedAddress addr) const {
+      Address project = Field.projectAddress(IGF, addr);
+      return OwnedAddress(project, addr.getOwner());
+    }
+  };
+}
 
 static void emitInjectionFunction(IRGenModule &IGM,
                                   llvm::Function *fn,
@@ -132,44 +131,49 @@ static void emitInjectionFunction(IRGenModule &IGM,
   structTI.emitInjectionFunctionBody(IGF, elt, explosion);
 }
 
+LValue swift::irgen::emitPhysicalStructMemberLValue(IRGenFunction &IGF,
+                                                    MemberRefExpr *E) {
+  LValue lvalue = IGF.emitLValue(E->getBase());
+  StructType *T = cast<StructDecl>(E->getDecl()->getDeclContext())->getDeclaredType();
+  const StructTypeInfo &info = TypeConverter::getFragileTypeInfo(IGF.IGM, T).as<StructTypeInfo>();
+
+  // FIXME: This field index computation is an ugly hack.
+  unsigned FieldIndex = 0;
+  for (ValueDecl *D : T->getDecl()->getMembers()) {
+    if (D == E->getDecl())
+      break;
+    if (isa<VarDecl>(D))
+      ++FieldIndex;
+  }
+
+  const StructFieldInfo &field = info.getFields()[FieldIndex];
+  lvalue.add<PhysicalStructMember>(field);
+  return lvalue;
+}
+
+
 /// emitStructType - Emit all the declarations associated with this oneof type.
 void IRGenModule::emitStructType(StructType *oneof) {
   const StructTypeInfo &typeInfo = getFragileTypeInfo(oneof).as<StructTypeInfo>();
-  OneOfElementDecl *elt = oneof->getDecl()->getElement();
+  OneOfElementDecl *elt = cast<OneOfElementDecl>(oneof->getDecl()->getMembers().back());
   llvm::Function *fn = getAddrOfGlobalInjectionFunction(elt);
   emitInjectionFunction(*this, fn, typeInfo, elt);
 }
 
 void IRGenFunction::emitStructType(StructType *oneof) {
   const StructTypeInfo &typeInfo = getFragileTypeInfo(oneof).as<StructTypeInfo>();
-  OneOfElementDecl *elt = oneof->getDecl()->getElement();
+  OneOfElementDecl *elt = cast<OneOfElementDecl>(oneof->getDecl()->getMembers().back());
   llvm::Function *fn = getAddrOfLocalInjectionFunction(elt);
   emitInjectionFunction(IGM, fn, typeInfo, elt);
 }
 
 const TypeInfo *
 TypeConverter::convertStructType(IRGenModule &IGM, StructType *T) {
-  StructDecl *D = T->getDecl();
-  llvm::StructType *convertedStruct = IGM.createNominalType(D);
-
-  StructTypeInfo *convertedTInfo =
-    new StructTypeInfo(convertedStruct, Size(0), Alignment(0), IsPOD);
-  assert(!IGM.Types.Converted.count(T));
-  IGM.Types.Converted.insert(std::make_pair(T, convertedTInfo));
-
-  Type eltType = D->getUnderlyingType();
-
-  llvm::Type *storageType;
-  const TypeInfo &eltTInfo = getFragileTypeInfo(IGM, eltType);
-  assert(eltTInfo.isComplete());
-  storageType = eltTInfo.StorageType;
-  convertedTInfo->StorageSize = eltTInfo.StorageSize;
-  convertedTInfo->StorageAlignment = eltTInfo.StorageAlignment;
-  convertedTInfo->Singleton = &eltTInfo;
-  convertedTInfo->setPOD(eltTInfo.isPOD(ResilienceScope::Local));
-
-  llvm::Type *body[] = { storageType };
-  convertedStruct->setBody(body);
-
-  return convertedTInfo;
+  StructTypeBuilder builder(IGM, T->getDecl());
+  SmallVector<VarDecl*, 8> Fields;
+  for (ValueDecl *D : T->getDecl()->getMembers())
+    if (VarDecl *VD = dyn_cast<VarDecl>(D))
+      Fields.push_back(VD);
+  builder.create(ArrayRef<VarDecl*>(Fields));
+  return builder.complete(ArrayRef<VarDecl*>(Fields));
 }

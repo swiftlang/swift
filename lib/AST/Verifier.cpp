@@ -226,27 +226,6 @@ namespace {
                     "TupleElementExpr and the corresponding tuple element");
     }
 
-    /// LookThroughOneofExpr:
-    ///   lvalue-ness of operand equals lvalue-ness of result
-    ///   ignoring lvalue-ness, result is transparent type of operand
-    void verifyChecked(LookThroughOneofExpr *E) {
-      Type operandType = E->getSubExpr()->getType();
-      Type resultType = E->getType();
-      checkSameLValueness(operandType, resultType,
-                          "operand and result of LookThroughOneofExpr");
-
-      StructType *sdecl = operandType->getAs<StructType>();
-      if (!sdecl) {
-        Out << "operand of LookThroughOneofExpr does not have oneof type: ";
-        E->getSubExpr()->getType().print(Out);
-        Out << "\n";
-        abort();
-      }
-
-      checkSameType(resultType, sdecl->getDecl()->getUnderlyingType(),
-                    "result of LookThroughOneofExpr and single element of oneof");
-    }
-
     void verifyChecked(ApplyExpr *E) {
       FunctionType *FT = E->getFn()->getType()->getAs<FunctionType>();
       if (!FT) {

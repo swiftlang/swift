@@ -125,7 +125,7 @@ llvm::APFloat FloatLiteralExpr::getValue() const {
 
 MemberRefExpr::MemberRefExpr(Expr *Base, SourceLoc DotLoc, VarDecl *Value,
                              SourceLoc NameLoc)
-  : Expr(ExprKind::MemberRef, Value->getTypeOfReference()), Base(Base),
+  : Expr(ExprKind::MemberRef), Base(Base),
     Value(Value), DotLoc(DotLoc), NameLoc(NameLoc) { }
 
 
@@ -486,11 +486,6 @@ public:
       OS << E->getElementMapping()[i];
     }
     OS << "]\n";
-    printRec(E->getSubExpr());
-    OS << ')';
-  }
-  void visitLookThroughOneofExpr(LookThroughOneofExpr *E) {
-    printCommon(E, "look_through_oneof_expr") << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }

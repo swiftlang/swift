@@ -218,10 +218,10 @@ protected:
 
   BuilderImpl *asImpl() { return static_cast<BuilderImpl*>(this); }
 
-  void recordLayout(StructLayout &layout) {
+  void recordLayout(StructLayout &layout, llvm::Type *StorageType) {
     SeqTI->StorageSize = layout.getSize();
     SeqTI->StorageAlignment = layout.getAlignment();
-    SeqTI->StorageType = layout.getType();
+    SeqTI->StorageType = StorageType;
 
     FieldImpl *nextFieldInfo = SeqTI->getFieldsBuffer();    
     for (auto &fieldLayout : layout.getElements()) {

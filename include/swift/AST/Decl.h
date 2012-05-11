@@ -485,21 +485,17 @@ public:
 /// to get the declared type ("Complex" in the above example).
 class StructDecl : public TypeDecl, public DeclContext {
   SourceLoc StructLoc;
-  Type UnderlyingType;
+  ArrayRef<ValueDecl*> Members;
   StructType *StructTy;
-  OneOfElementDecl* Element;
 
 public:
   StructDecl(SourceLoc StructLoc, Identifier Name, DeclContext *DC);
 
-  Type getUnderlyingType() { return UnderlyingType; }
-  void setUnderlyingType(Type under);
-
   SourceLoc getStructLoc() const { return StructLoc; }
   SourceLoc getLocStart() const { return StructLoc; }
 
-  // FIXME: This is an ugly, short-term hack!
-  OneOfElementDecl *getElement() { return Element; }
+  ArrayRef<ValueDecl*> getMembers() { return Members; }
+  void setMembers(ArrayRef<ValueDecl*> mems) { Members = mems; }
 
   StructType *getDeclaredType() const { return StructTy; }
 

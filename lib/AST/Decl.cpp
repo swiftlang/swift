@@ -201,14 +201,6 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, DeclContext *Parent
   StructTy = new (Parent->getASTContext()) StructType(this, Parent->getASTContext());
 }
 
-void StructDecl::setUnderlyingType(Type under) {
-  ASTContext &Context = getDeclContext()->getASTContext();
-  Type EltTy = FunctionType::get(under, getDeclaredType(), Context);
-  Element = new (Context) OneOfElementDecl(StructLoc, getName(),
-                                           EltTy, under, this);
-  UnderlyingType = under;
-}
-
 OneOfElementDecl *OneOfDecl::getElement(Identifier Name) const {
   // FIXME: Linear search is not great for large oneof decls.
   for (OneOfElementDecl *Elt : Elements)
@@ -461,8 +453,10 @@ namespace {
 
     void visitStructDecl(StructDecl *SD) {
       printCommon(SD, "struct_decl");
-      OS << "type='";
-      SD->getUnderlyingType()->print(OS);
+      for (ValueDecl *VD : SD->getMembers()) {
+        OS << '\n';
+        printRec(VD);
+      }
       OS << "')";
     }
 

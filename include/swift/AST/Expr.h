@@ -918,21 +918,6 @@ public:
   }
 };
   
-/// LookThroughOneofExpr - Implicitly look through a 'oneof' type with
-/// one enumerator.  This operation may be performed on either an
-/// r-value or an l-value.
-class LookThroughOneofExpr : public ImplicitConversionExpr {
-public:
-  LookThroughOneofExpr(Expr *subExpr, Type type)
-    : ImplicitConversionExpr(ExprKind::LookThroughOneof, subExpr, type) {}
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const LookThroughOneofExpr *) { return true; }
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::LookThroughOneof;
-  }
-};
-
 /// ParameterRenameExpr - Rename the parameters or return values of a 
 /// function type.
 class ParameterRenameExpr : public ImplicitConversionExpr {

@@ -387,44 +387,6 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
   convertedStruct->setBody(body);
   return convertedTInfo;
 }
-
-void swift::irgen::emitLookThroughOneof(IRGenFunction &IGF,
-                                        LookThroughOneofExpr *E,
-                                        Explosion &explosion) {
-  // For now, the oneof never changes anything.
-  IGF.emitRValue(E->getSubExpr(), explosion);
-}
-
-namespace {
-  class LookThroughOneof : public PhysicalPathComponent {
-  public:
-    LookThroughOneof() {}
-
-    OwnedAddress offset(IRGenFunction &IGF, OwnedAddress addr) const {
-      Address project = SingletonOneofTypeInfo::getSingletonAddress(IGF, addr);
-      return OwnedAddress(project, addr.getOwner());
-    }
-  };
-}
-
-LValue swift::irgen::emitLookThroughOneofLValue(IRGenFunction &IGF,
-                                                LookThroughOneofExpr *E) {
-  LValue oneofLV = IGF.emitLValue(E->getSubExpr());
-  oneofLV.add<LookThroughOneof>();
-  return oneofLV;
-}
-
-Optional<Address>
-swift::irgen::tryEmitLookThroughOneofAsAddress(IRGenFunction &IGF,
-                                               LookThroughOneofExpr *E) {
-  Expr *oneof = E->getSubExpr();
-  Optional<Address> oneofAddr =
-    IGF.tryEmitAsAddress(oneof, IGF.getFragileTypeInfo(oneof->getType()));
-  if (!oneofAddr) return Nothing;
-
-  return SingletonOneofTypeInfo::getSingletonAddress(IGF, oneofAddr.getValue());
-}
-
 /// Emit a reference to a oneof element decl.
 void swift::irgen::emitOneOfElementRef(IRGenFunction &IGF,
                                        OneOfElementDecl *elt,

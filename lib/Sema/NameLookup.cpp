@@ -57,7 +57,7 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M,
 
     if (StructType *STy = Ty->getAs<StructType>()) {
       if (STy->getDecl()->getName() == Name) {
-        Results.push_back(Result::getIgnoreBase(STy->getDecl()->getElement()));
+        Results.push_back(Result::getIgnoreBase(STy->getDecl()->getMembers().back()));
         // Fall through to find any members with the same name.
       }
     }
@@ -81,7 +81,6 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M,
       case Result::IgnoreBase:
         break;
           
-      case Result::StructElement:
       case Result::TupleElement:
         AnyInvalid = true;
         break;
@@ -131,17 +130,17 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M,
   
   // Check to see if this is a reference to a tuple field.
   if (TupleType *TT = BaseTy->getAs<TupleType>())
-    doTuple(TT, Name, false);
+    doTuple(TT, Name);
 
-  // If this is a member access to a oneof with a single element constructor
-  // (e.g. a struct), allow direct access to the type underlying the single
-  // element.
-  if (StructType *OneOf = BaseTy->getAs<StructType>()) {
-    Type SubType = OneOf->getDecl()->getUnderlyingType();
-    if (TupleType *TT = SubType->getAs<TupleType>())
-      doTuple(TT, Name, true);
+  // Add direct members ot the struct to the lookup, if applicable.
+  // FIXME: Integrate this with lookupGlobalExtensionMethods.
+  if (StructType *ST = BaseTy->getAs<StructType>()) {
+    for (ValueDecl *Member : ST->getDecl()->getMembers()) {
+      if (isa<VarDecl>(Member) && Member->getName() == Name) {
+        Results.push_back(Result::getPassBase(Member));
+      }
+    }
   }
-  
 
   // Look in any extensions that add methods to the base type.
   SmallVector<ValueDecl*, 8> ExtensionMethods;
@@ -161,12 +160,12 @@ void MemberLookup::doIt(Type BaseTy, Identifier Name, Module &M,
   }
 }
 
-void MemberLookup::doTuple(TupleType *TT, Identifier Name, bool IsStruct) {
+void MemberLookup::doTuple(TupleType *TT, Identifier Name) {
   // If the field name exists, we win.  Otherwise, if the field name is a
   // dollarident like $4, process it as a field index.
   int FieldNo = TT->getNamedElementId(Name);
   if (FieldNo != -1) {
-    Results.push_back(MemberLookupResult::getTupleElement(FieldNo, IsStruct));
+    Results.push_back(MemberLookupResult::getTupleElement(FieldNo));
     return;
   }
   
@@ -175,7 +174,7 @@ void MemberLookup::doTuple(TupleType *TT, Identifier Name, bool IsStruct) {
     unsigned Value = 0;
     if (!NameStr.substr(1).getAsInteger(10, Value) &&
         Value < TT->getFields().size())
-      Results.push_back(MemberLookupResult::getTupleElement(Value, IsStruct));
+      Results.push_back(MemberLookupResult::getTupleElement(Value));
   }
 }
 
@@ -187,21 +186,6 @@ static Type makeSimilarLValue(Type objectType, Type lvalueType,
   qs |= LValueType::Qual::Implicit;
   
   return LValueType::get(objectType, qs, Context);
-}
-
-static Expr *lookThroughOneofs(Expr *E, ASTContext &Context) {
-  
-  Type BaseType = E->getType();
-  bool IsLValue = E->getType()->is<LValueType>();
-  if (IsLValue)
-    BaseType = cast<LValueType>(BaseType)->getObjectType();
-  
-  StructType *ST = BaseType->castTo<StructType>();
-  
-  Type ResultType = ST->getDecl()->getUnderlyingType();
-  if (IsLValue)
-    ResultType = makeSimilarLValue(ResultType, E->getType(), Context);
-  return new (Context) LookThroughOneofExpr(E, ResultType);
 }
 
 static Expr *buildTupleElementExpr(Expr *Base, SourceLoc DotLoc,
@@ -238,9 +222,6 @@ Expr *MemberLookup::createResultAST(Expr *Base, SourceLoc DotLoc,
     MemberLookupResult R = Results[0];
 
     switch (R.Kind) {
-    case MemberLookupResult::StructElement:
-      Base = lookThroughOneofs(Base, Context);
-      // FALL THROUGH.
     case MemberLookupResult::TupleElement:
       return buildTupleElementExpr(Base, DotLoc, NameLoc, R.TupleFieldNo,
                                    Context);
@@ -267,8 +248,7 @@ Expr *MemberLookup::createResultAST(Expr *Base, SourceLoc DotLoc,
   // This is collecting a mix of static and normal functions. We won't know
   // until after overload resolution whether we actually need 'this'.
   for (MemberLookupResult X : Results) {
-    assert(X.Kind != MemberLookupResult::TupleElement &&
-           X.Kind != MemberLookupResult::StructElement);
+    assert(X.Kind != MemberLookupResult::TupleElement);
     ResultSet.push_back(X.D);
   }
   

@@ -19,7 +19,6 @@
 
 namespace swift {
   class OneOfElementDecl;
-  class LookThroughOneofExpr;
   template <class T> class Optional;
 
 namespace irgen {
@@ -31,18 +30,6 @@ namespace irgen {
   /// Emit a reference to a oneof element injection function.
   void emitOneOfElementRef(IRGenFunction &IGF, OneOfElementDecl *elt,
                            Explosion &explosion);
-
-  /// Emit a oneof lookthrough as an r-value.
-  void emitLookThroughOneof(IRGenFunction &IGF, LookThroughOneofExpr *E,
-                            Explosion &explosion);
-
-  /// Try to emit a oneof lookthrough as a natural address.
-  Optional<Address> tryEmitLookThroughOneofAsAddress(IRGenFunction &IGF,
-                                                     LookThroughOneofExpr *E);
-
-  /// Emit a oneof lookthrough as an l-value.
-  LValue emitLookThroughOneofLValue(IRGenFunction &IGF,
-                                    LookThroughOneofExpr *E);
 
 } // end namespace irgen
 } // end namespace swift

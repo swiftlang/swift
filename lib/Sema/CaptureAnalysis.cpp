@@ -65,8 +65,6 @@ static ValueDecl* FindValueDecl(Expr *E) {
       E = PE->getSubExpr();
     else if (TupleElementExpr *TE = dyn_cast<TupleElementExpr>(E))
       E = TE->getBase();
-    else if (LookThroughOneofExpr *LTOE = dyn_cast<LookThroughOneofExpr>(E))
-      E = LTOE->getSubExpr();
     else if (AddressOfExpr *AOE = dyn_cast<AddressOfExpr>(E))
       E = AOE->getSubExpr();
     else if (MemberRefExpr *MRE = dyn_cast<MemberRefExpr>(E))

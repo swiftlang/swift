@@ -19,7 +19,7 @@ using namespace swift;
 static Identifier getFirstOverloadedIdentifier(const Expr *Fn) {
   if (const DeclRefExpr *DR = dyn_cast<DeclRefExpr>(Fn))
     return DR->getDecl()->getName();
-  const OverloadedDeclRefExpr *ODR = cast<OverloadedDeclRefExpr>(Fn);
+  const OverloadSetRefExpr *ODR = cast<OverloadSetRefExpr>(Fn);
   auto Decls = ODR->getDecls();
   assert(!Decls.empty());
   return (*Decls.begin())->getName();
