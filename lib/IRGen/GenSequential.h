@@ -27,13 +27,13 @@
 namespace swift {
 namespace irgen {
 
-template <class, class> class SequentialTypeBuilder;
+template <class, class, class> class SequentialTypeBuilder;
 
 /// A field of a sequential type.
 template <class FieldImpl> class SequentialField {
   const TypeInfo &FieldTI;
 
-  template <class, class> friend class SequentialTypeBuilder;
+  template <class, class, class> friend class SequentialTypeBuilder;
 
   Size StorageOffset;
 
@@ -111,7 +111,7 @@ private:
     return reinterpret_cast<FieldImpl*>(static_cast<Impl*>(this)+1);
   }
 
-  template <class, class> friend class SequentialTypeBuilder;
+  template <class, class, class> friend class SequentialTypeBuilder;
 
 protected:
   SequentialTypeInfo(llvm::Type *ty, unsigned numFields)
@@ -205,7 +205,9 @@ public:
 ///   Type getType(const ASTField &field);
 ///   void performLayout(ArrayRef<const TypeInfo *> fieldTypes);
 ///     - should call recordLayout with the layout
-template <class BuilderImpl, class TypeInfoImpl> class SequentialTypeBuilder {
+template <class BuilderImpl, class TypeInfoImpl, class ASTField>
+class SequentialTypeBuilder {
+
 public:
   typedef typename TypeInfoImpl::FieldImpl FieldImpl;
 
@@ -237,14 +239,12 @@ public:
     assert(seqTI->isComplete());
   }
 
-  template <class ASTField>
   TypeInfoImpl *create(llvm::ArrayRef<ASTField> astFields) {
     void *buffer = ::operator new(sizeof(TypeInfoImpl) +
                                   astFields.size() * sizeof(FieldImpl));
     return SeqTI = asImpl()->construct(buffer, astFields);
   }
 
-  template <class ASTField>
   TypeInfoImpl *complete(llvm::ArrayRef<ASTField> astFields) {
     assert(SeqTI && "no allocated type info!");
     assert(!SeqTI->isComplete() && "completing type twice!");

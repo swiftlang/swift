@@ -68,7 +68,7 @@ namespace {
   };
 
   class TupleTypeBuilder :
-    public SequentialTypeBuilder<TupleTypeBuilder, TupleTypeInfo> {
+    public SequentialTypeBuilder<TupleTypeBuilder, TupleTypeInfo, TupleTypeElt>{
 
   public:
     TupleTypeBuilder(IRGenModule &IGM) : SequentialTypeBuilder(IGM) {}

@@ -45,11 +45,6 @@ namespace {
     StringRef getFieldName() const {
       return Field->getName().str();
     }
-
-    Address projectAddress(IRGenFunction &IGF, Address seq) const {
-      seq = IGF.Builder.CreateStructGEP(seq, 0, Size(0));
-      return SequentialField<StructFieldInfo>::projectAddress(IGF, seq);
-    }
   };
 
   /// Layout information for struct types.
@@ -77,19 +72,19 @@ namespace {
   };
 
   class StructTypeBuilder :
-    public SequentialTypeBuilder<StructTypeBuilder, StructTypeInfo> {
-  private:
-    StructDecl *D;
-  public:
-    StructTypeBuilder(IRGenModule &IGM, StructDecl *D) :
-        SequentialTypeBuilder(IGM), D(D) {}
+    public SequentialTypeBuilder<StructTypeBuilder, StructTypeInfo, VarDecl*> {
 
-    StructTypeInfo *construct(void *buffer, ArrayRef<VarDecl*> fields) {
-      return ::new(buffer) StructTypeInfo(IGM.Int8Ty, fields.size());
+    llvm::StructType *StructTy;
+  public:
+    StructTypeBuilder(IRGenModule &IGM, llvm::StructType *structTy) :
+      SequentialTypeBuilder(IGM), StructTy(structTy) {
     }
 
-    StructFieldInfo getFieldInfo(VarDecl *field,
-                                const TypeInfo &fieldTI) {
+    StructTypeInfo *construct(void *buffer, ArrayRef<VarDecl*> fields) {
+      return ::new(buffer) StructTypeInfo(StructTy, fields.size());
+    }
+
+    StructFieldInfo getFieldInfo(VarDecl *field, const TypeInfo &fieldTI) {
       return StructFieldInfo(field, fieldTI);
     }
 
@@ -97,10 +92,8 @@ namespace {
 
     void performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
       StructLayout layout(IGM, LayoutKind::NonHeapObject,
-                          LayoutStrategy::Optimal, fieldTypes);
-      llvm::StructType *structTy = IGM.createNominalType(D);
-      structTy->setBody(ArrayRef<llvm::Type*>(layout.getType()));
-      recordLayout(layout, structTy);
+                          LayoutStrategy::Optimal, fieldTypes, StructTy);
+      recordLayout(layout, StructTy);
     }
   };
 }  // end anonymous namespace.
@@ -135,7 +128,8 @@ LValue swift::irgen::emitPhysicalStructMemberLValue(IRGenFunction &IGF,
                                                     MemberRefExpr *E) {
   LValue lvalue = IGF.emitLValue(E->getBase());
   StructType *T = cast<StructDecl>(E->getDecl()->getDeclContext())->getDeclaredType();
-  const StructTypeInfo &info = TypeConverter::getFragileTypeInfo(IGF.IGM, T).as<StructTypeInfo>();
+  const StructTypeInfo &info =
+    TypeConverter::getFragileTypeInfo(IGF.IGM, T).as<StructTypeInfo>();
 
   // FIXME: This field index computation is an ugly hack.
   unsigned FieldIndex = 0;
@@ -169,11 +163,18 @@ void IRGenFunction::emitStructType(StructType *oneof) {
 
 const TypeInfo *
 TypeConverter::convertStructType(IRGenModule &IGM, StructType *T) {
-  StructTypeBuilder builder(IGM, T->getDecl());
-  SmallVector<VarDecl*, 8> Fields;
+  StructTypeBuilder builder(IGM, IGM.createNominalType(T->getDecl()));
+
+  // Collect all the fields from the type.
+  SmallVector<VarDecl*, 8> fields;
   for (ValueDecl *D : T->getDecl()->getMembers())
     if (VarDecl *VD = dyn_cast<VarDecl>(D))
-      Fields.push_back(VD);
-  builder.create(ArrayRef<VarDecl*>(Fields));
-  return builder.complete(ArrayRef<VarDecl*>(Fields));
+      fields.push_back(VD);
+
+  // Allocate the TypeInfo and register it as a forward-declaration.
+  auto structTI = builder.create(fields);
+  IGM.Types.Converted.insert(std::make_pair(T, structTI));
+
+  // Complete the type and return it.
+  return builder.complete(fields);
 }
