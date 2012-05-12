@@ -713,6 +713,8 @@ public:
   SourceLoc getLoc() const { return NameLoc; }
   
   SourceRange getSourceRange() const {
+    if (DotLoc.isInvalid())
+      return SourceRange(NameLoc, NameLoc);
     return SourceRange(SubExpr->getStartLoc(), NameLoc);
   }
   
