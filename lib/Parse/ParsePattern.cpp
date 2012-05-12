@@ -98,15 +98,31 @@ bool Parser::checkFullyTyped(Pattern *pattern) {
     TuplePattern *tuple = cast<TuplePattern>(pattern);
     SmallVector<TupleTypeElt, 8> typeElts;
     typeElts.reserve(tuple->getNumFields());
-    for (const TuplePatternElt &elt : tuple->getFields()) {
+    bool HadInit = false;
+    for (TuplePatternElt &elt : tuple->getFields()) {
       Pattern *subpattern = elt.getPattern();
       if (checkFullyTyped(subpattern))
         return true;
       typeElts.push_back(TupleTypeElt(subpattern->getType(),
                                       subpattern->getBoundName(),
                                       elt.getInit()));
+      HadInit |= (elt.getInit() != 0);
+      // The grammar allows default values in general patterns, but
+      // they aren't ever allowed semantically.  However, function
+      // declarations use a syntactic shortcut of sorts: the argument list
+      // declares both the pattern for the argument declarations, and the type
+      // of the function itself.  Default values are part of the type, not the
+      // pattern, so we set the pattern's initializer to null when we build
+      // the type.
+      elt.setInit(nullptr);
     }
-    tuple->setType(TupleType::get(typeElts, Context));
+    TupleType *TT = TupleType::get(typeElts, Context);
+
+    // Make sure we track this TupleType if it has default values.
+    if (HadInit)
+      TypesWithDefaultValues.emplace_back(TT, CurDeclContext);
+
+    tuple->setType(TT);
     return false;
   }
 

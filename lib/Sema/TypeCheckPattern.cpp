@@ -19,12 +19,6 @@
 #include "swift/AST/Attr.h"
 using namespace swift;
 
-static bool hasExplicitType(Pattern *P) {
-  while (ParenPattern *PP = dyn_cast<ParenPattern>(P))
-    P = PP->getSubPattern();
-  return isa<TypedPattern>(P);
-}
-
 /// Set the type of the pattern if it does not already have a type.
 /// Only evaluate the type expression if needed.
 #define SET_TYPE(pattern, type) { \
@@ -74,34 +68,15 @@ bool TypeChecker::typeCheckPattern(Pattern *P) {
       Type type;
       Expr *init = elt.getInit();
       Pattern *pattern = elt.getPattern();
-
-      // If there's an initializer and the pattern doesn't have an
-      // explicit type, then we want to type-check the initializer and
-      // coerce the pattern to that type.
-      if (init && !hasExplicitType(pattern)) {
-        if (typeCheckExpression(init)) {
-          hadError = true;
-        } else {
-          type = init->getType();
-          elt.setInit(init);
-        }
-
-      // Otherwise, we want to type-check the pattern.
+      if (init) {
+        diagnose(pattern->getLoc(), diag::coerced_tuple_pattern_has_init)
+          << pattern->getSourceRange();
+        elt.setInit(nullptr);
+        hadError = true;
       } else if (typeCheckPattern(pattern)) {
         hadError = true;
       } else {
         type = pattern->getType();
-
-        // If there's an initializer, use the pattern's type
-        // to type-check the initializer.
-        if (init) {
-          init = coerceToType(init, type);
-          if (!init) {
-            hadError = true;
-          } else {
-            elt.setInit(init);
-          }
-        }
       }
 
       typeElts.push_back(TupleTypeElt(type, pattern->getBoundName(), init));
