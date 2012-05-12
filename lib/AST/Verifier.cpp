@@ -186,13 +186,6 @@ namespace {
                                 "input to RequalifyExpr");
       checkSameType(dstObj, srcObj,
                     "objects of result and operand of RequalifyExpr");
-
-      if (!(srcQuals < dstQuals)) {
-        Out << "bad qualifier sets for RequalifyExpr";
-        E->print(Out);
-        Out << "\n";
-        abort();
-      }
     }
 
     void verifyChecked(MaterializeExpr *E) {

@@ -292,8 +292,7 @@ Type FuncDecl::computeThisType() const {
     return ContainerType;
   
   // 'this' is accepts implicit l-values and doesn't force them to the heap.
-  return LValueType::get(ContainerType,
-                         LValueType::Qual::Implicit | LValueType::Qual::NonHeap,
+  return LValueType::get(ContainerType, LValueType::Qual::NonHeap,
                          getASTContext());
 }
 

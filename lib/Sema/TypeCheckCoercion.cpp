@@ -1412,19 +1412,20 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
     }
     
     // Qualification conversion.
-    if (SrcLT && DestLT->getObjectType()->isEqual(SrcLT->getObjectType()) &&
-        SrcLT->getQualifiers() <= DestLT->getQualifiers()) {
-      assert(SrcLT->getQualifiers() < DestLT->getQualifiers() &&
-             "qualifiers match exactly but types are different?");
-
-      if (!(Flags & CF_Apply))
-        return DestTy;
-      
-      return coerced(new (TC.Context) RequalifyExpr(E, DestTy), Flags);
+    if (SrcLT && DestLT->getObjectType()->isEqual(SrcLT->getObjectType())) {
+      LValueType::Qual DestQuals = DestLT->getQualifiers();
+      if (Flags & CF_ImplicitObjectArg)
+        DestQuals = DestQuals | LValueType::Qual::Implicit;
+      if (SrcLT->getQualifiers() <= DestQuals) {
+        if (!(Flags & CF_Apply))
+          return DestTy;
+        
+        return coerced(new (TC.Context) RequalifyExpr(E, DestTy), Flags);
+      }
     }
 
     // Materialization.
-    if (!DestLT->isExplicit()) {
+    if (!DestLT->isExplicit() || (Flags & CF_ImplicitObjectArg)) {
       CoercedResult CoercedE = coerceToType(E, DestLT->getObjectType(), TC,
                                             Flags);
       if (!CoercedE)
