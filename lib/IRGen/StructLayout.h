@@ -24,6 +24,7 @@
 #include "IRGen.h"
 
 namespace llvm {
+  class StructType;
   class Type;
   class Value;
 }
@@ -84,8 +85,11 @@ public:
   ///   and combine the storage of fields
   /// \param kind - the kind of layout to perform, including whether the
   ///   layout must include the reference-counting header
+  /// \param typeToFill - if present, must be an opaque type whose body
+  ///   will be filled with this layout
   StructLayout(IRGenModule &IGM, LayoutKind kind, LayoutStrategy strategy,
-               llvm::ArrayRef<const TypeInfo *> fields);
+               llvm::ArrayRef<const TypeInfo *> fields,
+               llvm::StructType *typeToFill = 0);
 
   /// Return the element layouts.  This is parallel to the fields
   /// passed in the constructor.

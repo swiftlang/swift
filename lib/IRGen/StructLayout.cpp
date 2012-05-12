@@ -57,7 +57,10 @@ void swift::irgen::addHeapHeaderToLayout(IRGenModule &IGM,
 /// Perform structure layout on the given types.
 StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
                            LayoutStrategy strategy,
-                           llvm::ArrayRef<const TypeInfo *> types) {
+                           llvm::ArrayRef<const TypeInfo *> types,
+                           llvm::StructType *typeToFill) {
+  assert(typeToFill == nullptr || typeToFill->isOpaque());
+
   // For now, we actually only have one algorithm, and it's not
   // exactly optimal.
 
@@ -117,17 +120,25 @@ StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
     storageSize += type->StorageSize;
   }
 
-  // If we concluded that the overall type is empty, bail out.
+  // Special-case: there's nothing to store.
+  // In this case, produce an opaque type;  this tends to cause lovely
+  // assertions.
   if (isEmpty) {
+    assert(!storageTypes.empty() == requiresHeapHeader(layoutKind));
     Align = Alignment(1);
     TotalSize = Size(0);
-    Ty = IGM.Int8Ty;
-    return;
+    Ty = (typeToFill ? typeToFill : IGM.getOpaqueStructTy());
+  } else {
+    Align = storageAlign;
+    TotalSize = storageSize;
+    if (typeToFill) {
+      typeToFill->setBody(storageTypes);
+      Ty = typeToFill;
+    } else {
+      Ty = llvm::StructType::get(IGM.getLLVMContext(), storageTypes);
+    }
   }
-
-  Align = storageAlign;
-  TotalSize = storageSize;
-  Ty = llvm::StructType::get(IGM.getLLVMContext(), storageTypes);
+  assert(typeToFill == nullptr || Ty == typeToFill);
 }
 
 llvm::Value *StructLayout::emitSize(IRGenFunction &IGF) const {

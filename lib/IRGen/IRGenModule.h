@@ -85,7 +85,7 @@ public:
   llvm::StructType *FunctionPairTy;    /// { i8*, %swift.refcounted* }
   llvm::FunctionType *DtorTy;          /// size_t (%swift.refcounted*)
   llvm::StructType *HeapMetadataStructTy; /// %swift.heapmetadata = type { ... }
-  llvm::PointerType *HeapMetadataPtrTy;/// %swift.heapmetadata*
+  llvm::PointerType *HeapMetadataPtrTy;/// %swift.heapmetadata*  
 
   Size getPointerSize() const { return PtrSize; }
   Alignment getPointerAlignment() const {
@@ -93,10 +93,13 @@ public:
     return Alignment(PtrSize.getValue());
   }
 
+  llvm::StructType *getOpaqueStructTy();
+
   void unimplemented(SourceLoc, StringRef Message);
 
 private:
   Size PtrSize;
+  llvm::StructType *OpaqueStructTy;    /// %swift.opaquestruct
 
 //--- Types -----------------------------------------------------------------
 public:

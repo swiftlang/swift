@@ -76,10 +76,18 @@ IRGenModule::IRGenModule(ASTContext &Context,
   llvm::Type *funcElts[] = { Int8PtrTy, RefCountedPtrTy };
   FunctionPairTy = llvm::StructType::get(LLVMContext, funcElts,
                                          /*packed*/ false);
+
+  OpaqueStructTy = nullptr;
 }
 
 IRGenModule::~IRGenModule() {
   delete &Types;
+}
+
+llvm::StructType *IRGenModule::getOpaqueStructTy() {
+  if (OpaqueStructTy) return OpaqueStructTy;
+  OpaqueStructTy = llvm::StructType::create(LLVMContext);
+  return OpaqueStructTy;
 }
 
 llvm::Constant *IRGenModule::getAllocFn() {
