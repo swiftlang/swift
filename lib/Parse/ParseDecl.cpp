@@ -1444,7 +1444,8 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   NullablePtr<Pattern> Indices = parsePatternTuple();
   if (Indices.isNull())
     return true;
-  if (checkFullyTyped(Indices.get()))
+  Type DummyTy; // FIXME: We actually need to use this type here!
+  if (checkFullyTyped(Indices.get(), DummyTy))
     Invalid = true;
   
   // '->'

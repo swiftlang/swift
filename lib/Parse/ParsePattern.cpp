@@ -78,17 +78,20 @@ bool Parser::checkFullyTyped(Type type) {
 }
 
 /// Check that the given pattern is fully-typed.
-bool Parser::checkFullyTyped(Pattern *pattern) {
+bool Parser::checkFullyTyped(Pattern *pattern, Type &funcTy) {
   switch (pattern->getKind()) {
   // Any type with an explicit annotation is okay, as long as the
   // annotation is fully-typed.
   case PatternKind::Typed:
-    return checkFullyTyped(pattern->getType());
+    if (checkFullyTyped(pattern->getType()))
+      return true;
+    funcTy = pattern->getType();
+    return false;
 
   // Paren types depend on their parenthesized pattern.
   case PatternKind::Paren: {
     Pattern *sub = cast<ParenPattern>(pattern)->getSubPattern();
-    if (checkFullyTyped(sub)) return true;
+    if (checkFullyTyped(sub, funcTy)) return true;
     pattern->setType(sub->getType());
     return false;
   }
@@ -97,15 +100,19 @@ bool Parser::checkFullyTyped(Pattern *pattern) {
   case PatternKind::Tuple: {
     TuplePattern *tuple = cast<TuplePattern>(pattern);
     SmallVector<TupleTypeElt, 8> typeElts;
+    SmallVector<TupleTypeElt, 8> typeEltsWithInits;
     typeElts.reserve(tuple->getNumFields());
     bool HadInit = false;
     for (TuplePatternElt &elt : tuple->getFields()) {
       Pattern *subpattern = elt.getPattern();
-      if (checkFullyTyped(subpattern))
+      Type eltTy;
+      if (checkFullyTyped(subpattern, eltTy))
         return true;
       typeElts.push_back(TupleTypeElt(subpattern->getType(),
-                                      subpattern->getBoundName(),
-                                      elt.getInit()));
+                                      subpattern->getBoundName()));
+      typeEltsWithInits.push_back(TupleTypeElt(eltTy,
+                                               subpattern->getBoundName(),
+                                               elt.getInit()));
       HadInit |= (elt.getInit() != 0);
       // The grammar allows default values in general patterns, but
       // they aren't ever allowed semantically.  However, function
@@ -116,13 +123,13 @@ bool Parser::checkFullyTyped(Pattern *pattern) {
       // the type.
       elt.setInit(nullptr);
     }
-    TupleType *TT = TupleType::get(typeElts, Context);
-
-    // Make sure we track this TupleType if it has default values.
+    TupleType *patternTT = TupleType::get(typeElts, Context);
+    TupleType *funcTT = TupleType::get(typeEltsWithInits, Context);
     if (HadInit)
-      TypesWithDefaultValues.emplace_back(TT, CurDeclContext);
+      TypesWithDefaultValues.emplace_back(funcTT, CurDeclContext);
 
-    tuple->setType(TT);
+    tuple->setType(patternTT);
+    funcTy = funcTT;
     return false;
   }
 
@@ -179,11 +186,9 @@ bool Parser::buildFunctionSignature(SmallVectorImpl<Pattern*> &params,
     Pattern *param = params[i - 1];
     
     Type paramType;
-    if (checkFullyTyped(param)) {
+    if (checkFullyTyped(param, paramType)) {
       // Recover by ignoring everything.
       paramType = TupleType::getEmpty(Context);
-    } else {
-      paramType = param->getType();
     }
     type = FunctionType::get(paramType, type, Context);
   }

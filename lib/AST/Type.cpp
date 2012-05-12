@@ -392,8 +392,6 @@ int TupleType::getFieldForScalarInit() const {
 /// specified element.  This should only be used by TypeChecker.
 void TupleType::updateInitializedElementType(unsigned EltNo, Type NewTy,
                                              Expr *NewInit) {
-  assert(!hasCanonicalTypeComputed() &&
-         "Cannot munge an already canonicalized type!");
   TupleTypeElt &Elt = const_cast<TupleTypeElt&>(Fields[EltNo]);
   assert(Elt.hasInit() && "Can only update elements with default values");
   Elt = TupleTypeElt(NewTy, Elt.getName(), NewInit);
