@@ -29,6 +29,10 @@ extern "C" void _TSs5printFT3valNSs5Int64_T_(int64_t l) {
   printf("%lld", l);
 }
 
+extern "C" void _TSs5printFT3valNSs6UInt64_T_(uint64_t l) {
+  printf("%llu", l);
+}
+
 extern "C" void _TSs5printFT3valNSs6Double_T_(double l) {
   char Buffer[256];
   sprintf(Buffer, "%g", l);
