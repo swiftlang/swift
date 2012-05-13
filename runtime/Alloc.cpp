@@ -34,7 +34,7 @@ swift_alloc(struct SwiftHeapMetadata *metadata,
     sleep(1); // XXX FIXME -- Enqueue this thread and resume after free()
   }
   object->metadata = metadata;
-  object->runtimePrivateData = 1;
+  object->refCount = 1;
   return object;
 }
 
@@ -42,7 +42,7 @@ struct SwiftHeapObject *
 swift_retain(struct SwiftHeapObject *object)
 {
   if (object) {
-    ++object->runtimePrivateData;
+    ++object->refCount;
   }
   return object;
 }
@@ -54,7 +54,7 @@ _swift_release_slow(struct SwiftHeapObject *object)
 void
 swift_release(struct SwiftHeapObject *object)
 {
-  if (object && (--object->runtimePrivateData == 0)) {
+  if (object && (--object->refCount == 0)) {
     _swift_release_slow(object);
   }
 }

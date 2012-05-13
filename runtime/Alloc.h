@@ -17,7 +17,8 @@
 #ifndef SWIFT_ABI_ALLOC_H
 #define SWIFT_ABI_ALLOC_H
 
-#include <stddef.h>
+#include <cstddef>
+#include <cstdint>
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,8 +29,11 @@ struct SwiftHeapObject {
   /// This is always a valid pointer to a metadata object.
   struct SwiftHeapMetadata *metadata;
 
-  /// This information is private to the runtime.
-  size_t runtimePrivateData;
+  uint32_t refCount;
+  /// The compiler assumes one "word" of runtime metadata
+#ifdef __LP64__
+  uint32_t runtimePrivateData;
+#endif
 };
 
 /// The basic layout of a metadata object for a Swift heap object.
