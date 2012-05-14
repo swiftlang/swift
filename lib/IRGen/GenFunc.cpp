@@ -587,6 +587,17 @@ namespace {
 }
 
 
+/// Given an address representing an unsafe pointer to the given type,
+/// turn it into a valid Address.
+static Address getAddressForUnsafePointer(IRGenFunction &IGF,
+                                          const TypeInfo &type,
+                                          llvm::Value *addr) {
+  llvm::Value *castAddr =
+  IGF.Builder.CreateBitCast(addr, type.getStorageType()->getPointerTo());
+  return Address(castAddr, type.StorageAlignment);
+}
+
+
 static void emitCastBuiltin(llvm::Instruction::CastOps opcode, FuncDecl *Fn,
                             IRGenFunction &IGF, ArgList &args,
                             CallResult &result) {
@@ -598,16 +609,23 @@ static void emitCastBuiltin(llvm::Instruction::CastOps opcode, FuncDecl *Fn,
   result.setAsSingleDirectUnmanagedFragileValue(output);
 }
 
-/// Given an address representing an unsafe pointer to the given type,
-/// turn it into a valid Address.
-static Address getAddressForUnsafePointer(IRGenFunction &IGF,
-                                          const TypeInfo &type,
-                                          llvm::Value *addr) {
-  llvm::Value *castAddr =
-    IGF.Builder.CreateBitCast(addr, type.getStorageType()->getPointerTo());
-  return Address(castAddr, type.StorageAlignment);
+static void emitCompareBuiltin(llvm::CmpInst::Predicate pred, FuncDecl *Fn,
+                               IRGenFunction &IGF, ArgList &args,
+                               CallResult &result) {
+  llvm::Value *lhs = args.Values.claimUnmanagedNext();
+  llvm::Value *rhs = args.Values.claimUnmanagedNext();
+  assert(args.Values.empty() && "wrong operands to binary operation");
+  
+  llvm::Value *v;
+  if (lhs->getType()->isFPOrFPVectorTy())
+    v = IGF.Builder.CreateFCmp(pred, lhs, rhs);
+  else
+    v = IGF.Builder.CreateICmp(pred, lhs, rhs);
+           
+  return result.setAsSingleDirectUnmanagedFragileValue(v);
 }
-
+           
+           
 
 /// emitBuiltinCall - Emit a call to a builtin function.
 static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
@@ -630,7 +648,9 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
   
 //#define BUILTIN_GEP_OPERATION(id, name, overload) overload,
 //#define BUILTIN_BINARY_OPERATION(id, name, overload) overload,
-//#define BUILTIN_BINARY_PREDICATE(id, name, overload) overload,
+#define BUILTIN_BINARY_PREDICATE(id, name, overload) \
+  if (BuiltinName == name) \
+    return emitCompareBuiltin(llvm::CmpInst::id, Fn, IGF, args, result);
 #define BUILTIN(ID, Name)  // Ignore the rest.
 #include "swift/AST/Builtins.def"
 
@@ -744,30 +764,6 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
   case BuiltinValueKind::UDivExact: BINARY_OPERATION(ExactUDiv)
   case BuiltinValueKind::URem:      BINARY_OPERATION(URem)
   case BuiltinValueKind::Xor:       BINARY_OPERATION(Xor)
-  case BuiltinValueKind::CmpEQ:     BINARY_OPERATION(ICmpEQ)
-  case BuiltinValueKind::CmpNE:     BINARY_OPERATION(ICmpNE)
-  case BuiltinValueKind::CmpSLE:    BINARY_OPERATION(ICmpSLE)
-  case BuiltinValueKind::CmpSLT:    BINARY_OPERATION(ICmpSLT)
-  case BuiltinValueKind::CmpSGE:    BINARY_OPERATION(ICmpSGE)
-  case BuiltinValueKind::CmpSGT:    BINARY_OPERATION(ICmpSGT)
-  case BuiltinValueKind::CmpULE:    BINARY_OPERATION(ICmpULE)
-  case BuiltinValueKind::CmpULT:    BINARY_OPERATION(ICmpULT)
-  case BuiltinValueKind::CmpUGE:    BINARY_OPERATION(ICmpUGE)
-  case BuiltinValueKind::CmpUGT:    BINARY_OPERATION(ICmpUGT)
-  case BuiltinValueKind::FCmpOEQ:   BINARY_OPERATION(FCmpOEQ)
-  case BuiltinValueKind::FCmpOGT:   BINARY_OPERATION(FCmpOGT)
-  case BuiltinValueKind::FCmpOGE:   BINARY_OPERATION(FCmpOGE)
-  case BuiltinValueKind::FCmpOLT:   BINARY_OPERATION(FCmpOLT)
-  case BuiltinValueKind::FCmpOLE:   BINARY_OPERATION(FCmpOLE)
-  case BuiltinValueKind::FCmpONE:   BINARY_OPERATION(FCmpONE)
-  case BuiltinValueKind::FCmpORD:   BINARY_OPERATION(FCmpORD)
-  case BuiltinValueKind::FCmpUEQ:   BINARY_OPERATION(FCmpUEQ)
-  case BuiltinValueKind::FCmpUGT:   BINARY_OPERATION(FCmpUGT)
-  case BuiltinValueKind::FCmpUGE:   BINARY_OPERATION(FCmpUGE)
-  case BuiltinValueKind::FCmpULT:   BINARY_OPERATION(FCmpULT)
-  case BuiltinValueKind::FCmpULE:   BINARY_OPERATION(FCmpULE)
-  case BuiltinValueKind::FCmpUNE:   BINARY_OPERATION(FCmpUNE)
-  case BuiltinValueKind::FCmpUNO:   BINARY_OPERATION(FCmpUNO)
   }
   llvm_unreachable("bad builtin kind!");
 }
