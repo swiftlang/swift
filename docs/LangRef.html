@@ -962,8 +962,27 @@ token following the opening '{' is either 'set' or 'get'.</p>
   variables have no storage, and will instead by accessed by a getter
   and setter. Thus, the variables shall have neither an initializer
   nor a getter/setter clause.</p>
+
+  <!-- _____________________________________________________________________ -->
+  <h4 id="protocol-member-subscript">'subscript' protocol elements</h4>
   
+  <pre class="grammar">
+    protocol-member ::= <a href="#subscript-head">subscript-head</a>
+  </pre>
+  
+  <p>'subscript' members of a protocol define subscripting operations
+  that may be accessed with the subscript operator ('[]') applied to a
+  value of the protocol's type. </p>
+
+  <div class="commentary">
+    TODO: There is currently no way to express a requirement for a
+    read-only or write-only subscript operation or variable. We may
+    end up doing this with some kind of 'const' or 'immutable'
+    attribute.
+ </div>
+    
   <p>TODO: typealias members</p>
+
 
   <!-- _____________________________________________________________________ -->
   <h4 id="protocol-inheritance">Protocol inheritance</h4>
@@ -992,7 +1011,8 @@ token following the opening '{' is either 'set' or 'get'.</p>
   <!-- ===================================================================== -->
   
   <pre id="value-specifier" class="grammar">
-    decl-subscript        ::= 'subscript' <a href="#attribute-list">attribute-list</a> <a href="#pattern-tuple">pattern-tuple</a> '->' <a href="#type">type</a> '{' <a href="#get-set">get-set<a/> '}'
+    decl-subscript        ::= subscript-head '{' <a href="#get-set">get-set<a/> '}'
+    <a id="subscript-head"></a>subscript-head        ::= 'subscript' <a href="#attribute-list">attribute-list</a> <a href="#pattern-tuple">pattern-tuple</a> '->' <a href="#type">type</a>
   </pre>
 
   <p>A subscript declaration provides support for <a

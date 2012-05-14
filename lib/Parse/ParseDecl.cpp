@@ -360,7 +360,9 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     Entries.push_back(parseDeclFunc(Flags & PD_HasContainerType));
     break;
   case tok::kw_subscript:
-    HadParseError = parseDeclSubscript(Flags & PD_HasContainerType, Entries);
+    HadParseError = parseDeclSubscript(Flags & PD_HasContainerType,
+                                       !(Flags & PD_DisallowFuncDef),
+                                       Entries);
     break;
   }
   
@@ -1424,9 +1426,12 @@ bool Parser::parseProtocolBody(SourceLoc ProtocolLoc,
 /// on error.
 ///
 ///   decl-subscript:
-///     'subscript' attribute-list pattern-tuple '->' type '{' get-set '}'
+///     subscript-head get-set
+///   subscript-header
+///     'subscript' attribute-list pattern-tuple '->' type
 ///
 bool Parser::parseDeclSubscript(bool HasContainerType,
+                                bool NeedDefinition,
                                 SmallVectorImpl<Decl *> &Decls) {
   bool Invalid = false;
   SourceLoc SubscriptLoc = consumeToken(tok::kw_subscript);
@@ -1461,6 +1466,16 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
     return true;
   if (checkFullyTyped(ElementTy))
     Invalid = true;
+  
+  if (!NeedDefinition) {
+    SubscriptDecl *Subscript
+      = new (Context) SubscriptDecl(Context.getIdentifier("__subscript"),
+                                    SubscriptLoc, Indices.get(), ArrowLoc,
+                                    ElementTy, SourceRange(), 0, 0,
+                                    CurDeclContext);
+    Decls.push_back(Subscript);
+    return false;
+  }
   
   // '{'
   if (!Tok.is(tok::l_brace)) {

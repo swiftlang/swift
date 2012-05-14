@@ -236,6 +236,7 @@ public:
                          ProtocolDecl *Proto);
   
   bool parseDeclSubscript(bool HasContainerType,
+                          bool NeedDefinition,
                           SmallVectorImpl<Decl *> &Decls);
   
   struct OneOfElementInfo {
