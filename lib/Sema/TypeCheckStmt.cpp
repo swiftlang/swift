@@ -674,6 +674,26 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     }
   }
 
+  // If we're in a library, we skip type-checking global initializers in the
+  // first pass.  Type-check them now.
+  if (!TU->IsMainModule && !TC.Context.hadError()) {
+    for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
+      Decl *D = TU->Decls[i];
+      if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D)) {
+        if (PBD->getInit()) {
+          Expr *Init = PBD->getInit();
+          Type DestTy = PBD->getPattern()->getType();
+          if (TC.typeCheckExpression(Init, DestTy)) {
+            TC.diagnose(PBD->getLocStart(), diag::while_converting_var_init,
+                        DestTy);
+            continue;
+          }
+          PBD->setInit(Init);
+        }
+      }
+    }
+  }
+
   // Check overloaded vars/funcs.
   // FIXME: This is quadratic time for TUs with multiple chunks.
   // FIXME: Can we make this more efficient?

@@ -67,7 +67,8 @@ public:
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
-    if (PBD->getInit()) {
+    if (PBD->getInit() && (TC.TU.IsMainModule ||
+                           PBD->getDeclContext()->isLocalContext())) {
       Type DestTy;
       if (PBD->getPattern()->hasType()) {
         DestTy = PBD->getPattern()->getType();
