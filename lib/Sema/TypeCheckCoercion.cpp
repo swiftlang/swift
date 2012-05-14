@@ -1462,20 +1462,6 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
       return coerced(new (TC.Context) RequalifyExpr(E, DestTy), Flags);
     }
 
-    // Materialization.
-    if (!DestLT->isExplicit()) {
-      CoercedResult CoercedE = coerceToType(E, DestLT->getObjectType(), TC,
-                                            Flags);
-      if (!CoercedE)
-        return nullptr;
-      
-      if (!(Flags & CF_Apply))
-        return DestTy;
-      
-      return coerced(new (TC.Context) MaterializeExpr(CoercedE.getExpr(),
-                                                      DestTy), Flags);
-    }
-
     // Failure.
 
     // Use a special diagnostic if the coercion would have worked
