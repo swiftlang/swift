@@ -435,11 +435,11 @@ public:
 };
 
 /// MemberRefExpr - This represents 'a.b' where we are referring to a member
-/// of a type.
+/// of a type, such as a property or variable.
 ///
-/// FIXME: This is only used for property accesses right now, because structs
-/// are tuples and, therefore, their elements are referenced via a
-/// TupleElementExpr. This will change when structs become "real" types.
+/// Note that methods found via 'dot' syntax are expressed as DotSyntaxCallExpr
+/// nodes, because 'a.f' is actually an application of 'a' (the implicit object
+/// argument) to the function 'f'.
 class MemberRefExpr : public Expr {
   Expr *Base;
   VarDecl *Value;
@@ -907,7 +907,7 @@ public:
 
 /// RequalifyExpr - Change the qualification on an l-value.  The new
 /// type always has the same object type as the old type with strictly
-/// "more" (i.e. a supertyped set of) qualifiers.
+/// "more" (i.e. a supertyped set of) qualifiers (ignoring the 'implicit' bit).
 class RequalifyExpr : public ImplicitConversionExpr {
 public:
   RequalifyExpr(Expr *subExpr, Type type)
@@ -982,7 +982,7 @@ public:
   
 /// SuperConversion - Performs a conversion from an object of a given type
 /// to one of its supertypes, e.g., an inherited protocol.
-  
+///
 /// For example:
 ///
 /// \code
@@ -994,7 +994,8 @@ public:
 ///   func print(_ : Format)
 /// }
 /// var printable : Printable
-/// printable.print() // 'this' argument is converted to 'Printable'
+/// var formattedPrintable : FormattedPrintable
+/// printable = formattedPrintable
 /// \endcode
 class SuperConversionExpr : public ImplicitConversionExpr {
 public:
@@ -1447,9 +1448,8 @@ public:
   }
 };
 
-/// DotSyntaxCallExpr - Refer to an element or method of a type, e.g. P.x.  'x'
-/// is modeled as a DeclRefExpr or OverloadSetRefExpr on the field's decl.
-///
+/// DotSyntaxCallExpr - Refer to a method of a type, e.g. P.x.  'x'
+/// is modeled as a DeclRefExpr or OverloadSetRefExpr on the method.
 class DotSyntaxCallExpr : public ApplyExpr {
   SourceLoc DotLoc;
   

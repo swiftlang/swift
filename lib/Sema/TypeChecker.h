@@ -78,14 +78,15 @@ public:
   bool isCoercibleToType(Expr *E, Type Ty);
   
   /// coerceObjectArgument - Coerce the given expression to an object argument
-  /// of the given type.
+  /// of the given container type.
   ///
-  /// The resulting expression will always be an lvalue.
-  Expr *coerceObjectArgument(Expr *E, Type Ty);
+  /// The resulting expression will always be an lvalue, but may be an lvalue
+  /// to a subtype of the requested container type.
+  Expr *coerceObjectArgument(Expr *E, Type ContainerTy);
   
   /// isCoercibleObjectArgument - Determine whether the given expression can
   /// be coerced to an object argument for a member of the given type.
-  bool isCoercibleObjectArgument(Expr *E, Type Ty);
+  bool isCoercibleObjectArgument(Expr *E, Type ContainerTy);
   
   Expr *convertToRValue(Expr *E);
   Expr *convertLValueToRValue(LValueType *SrcLT, Expr *E);

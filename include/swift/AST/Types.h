@@ -806,8 +806,8 @@ public:
       /// The default for a variable reference.
       DefaultForVar = Implicit,
   
-      /// The default for get/set lvalues such as properties.
-      DefaultForGetSet = Implicit|NonHeap
+      /// The default for the base of a member access.
+      DefaultForMemberAccess = Implicit|NonHeap
     };
 
   private:

@@ -695,7 +695,9 @@ ERROR(field_number_too_large,sema_tce,none,
       "field number is too large for tuple", ())
 ERROR(no_valid_dot_expression,sema_tce,none,
       "base type %0 has no valid '.' expression for this field", (Type))
-    
+ERROR(no_convert_object_arg,sema_tca,none,
+      "cannot convert object argument %0 to type %1", (Type, Type))
+      
 ERROR(closure_not_function_type,sema_tce,none,
       "closure inferred to have non-function type %0", (Type))
 NOTE(while_converting_closure_body_to_inferred_return_type,sema,none,
@@ -739,7 +741,7 @@ ERROR(string_interpolation_convert_fail,sema_tce,none,
       "could not coerce expression %0 to string type %1", (Type, Type))
 ERROR(nonstring_interpolation_type,sema_tce,none,
       "string interpolation coerced to non-string type %0", (Type))
-      
+
 //------------------------------------------------------------------------------
 // Type Check Statements
 //------------------------------------------------------------------------------

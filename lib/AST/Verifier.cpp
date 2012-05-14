@@ -170,7 +170,8 @@ namespace {
 
       checkSameType(resultObj, srcObj, "object types for AddressOfExpr");
 
-      if ((resultQuals | LValueType::Qual::Implicit) != srcQuals) {
+      if ((resultQuals | LValueType::Qual::Implicit) !=
+          (srcQuals | LValueType::Qual::Implicit)) {
         Out << "mismatched qualifiers";
         E->print(Out);
         Out << "\n";
@@ -186,6 +187,13 @@ namespace {
                                 "input to RequalifyExpr");
       checkSameType(dstObj, srcObj,
                     "objects of result and operand of RequalifyExpr");
+      
+      if (!(srcQuals < dstQuals)) {
+        Out << "bad qualifier sets for RequalifyExpr";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
     }
 
     void verifyChecked(MaterializeExpr *E) {
@@ -194,6 +202,18 @@ namespace {
                     "result and operand of MaterializeExpr");
     }
 
+    void verifyChecked(SuperConversionExpr *E) {
+      if (E->getType()->is<LValueType>()) {
+        Out << "supertype conversion cannot be an lvalue";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+
+      checkSameOrSubType(E->getSubExpr()->getType(), E->getType(),
+                         "supertype and subtype");
+    }
+    
     void verifyChecked(TupleElementExpr *E) {
       Type resultType = E->getType();
       Type baseType = E->getBase()->getType();
@@ -239,8 +259,20 @@ namespace {
       }
       if (InputExprTy != FT->getInput()->getCanonicalType()) {
         TupleType *TT = FT->getInput()->getAs<TupleType>();
-        if (!TT || TT->getFields().size() != 1 ||
-            TT->getFields()[0].getType()->getCanonicalType() != InputExprTy) {
+        if (isa<DotSyntaxCallExpr>(E)) {
+          LValueType::Qual InputExprQuals;
+          Type InputExprObjectTy = checkLValue(InputExprTy, InputExprQuals,
+                                               "object argument");
+          LValueType::Qual FunctionInputQuals;
+          Type FunctionInputObjectTy = checkLValue(FT->getInput(),
+                                                   FunctionInputQuals,
+                                                   "'this' parameter");
+          
+          checkSameOrSubType(InputExprObjectTy, FunctionInputObjectTy,
+                             "object argument and 'this' parameter");
+        } else if (!TT || TT->getFields().size() != 1 ||
+                   TT->getFields()[0].getType()->getCanonicalType()
+                     != InputExprTy) {
           Out << "Type of callee does not match type of arg for ApplyExpr:";
           E->getArg()->getType()->print(Out);
           Out << " vs. ";
@@ -292,8 +324,8 @@ namespace {
       if (LValueType *BaseLV = BaseTy->getAs<LValueType>())
         BaseTy = BaseLV->getObjectType();
       
-      checkSameType(ContainerTy, BaseTy,
-                    "member container and member reference base");
+      checkSameOrSubType(BaseTy, ContainerTy,
+                         "member reference base and member container");
     }
     
     void verifyChecked(SubscriptExpr *E) {
@@ -336,8 +368,8 @@ namespace {
       if (LValueType *BaseLV = BaseTy->getAs<LValueType>())
         BaseTy = BaseLV->getObjectType();
       
-      checkSameType(ContainerTy, BaseTy,
-                    "subscript container and subscript base");
+      checkSameOrSubType(BaseTy, ContainerTy,
+                         "subscript base and subscript container");
     }
       
     void verifyParsed(NewArrayExpr *E) {
@@ -440,7 +472,25 @@ namespace {
       Out << "\n";
       abort();
     }
-    
+
+    void checkSameOrSubType(Type T0, Type T1, const char *what) {
+      if (T0->getCanonicalType() == T1->getCanonicalType())
+        return;
+
+      // Protocol subtyping.
+      if (auto Proto0 = T0->getAs<ProtocolType>())
+        if (auto Proto1 = T1->getAs<ProtocolType>())
+          if (Proto0->getDecl()->inheritsFrom(Proto1->getDecl()))
+            return;
+      
+      Out << "incompatible types for " << what << ": ";
+      T0.print(Out);
+      Out << " vs. ";
+      T1.print(Out);
+      Out << "\n";
+      abort();
+    }
+
     void checkSourceRanges(Expr *E) {
       if (!E->getSourceRange().isValid()) {
         // We don't care about source ranges on implicitly-generated

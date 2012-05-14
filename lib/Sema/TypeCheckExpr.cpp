@@ -142,7 +142,7 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
     
     // Compute the final lvalue type and we're done.
     SE->setType(LValueType::get(SubDecl->getElementType(),
-                                LValueType::Qual::DefaultForGetSet,
+                                LValueType::Qual::DefaultForMemberAccess,
                                 Context));
     return SE;
   }
@@ -442,7 +442,7 @@ public:
 
     // Compute the final lvalue type and we're done.
     E->setType(LValueType::get(E->getDecl()->getType(),
-                               LValueType::Qual::DefaultForGetSet,
+                               LValueType::Qual::DefaultForMemberAccess,
                                TC.Context));
     return E;
   }

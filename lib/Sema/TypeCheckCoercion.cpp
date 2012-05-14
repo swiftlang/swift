@@ -68,10 +68,7 @@ namespace {
     /// requested type (if successful) or emitting diagnostics (if a failure
     /// occurs). There is no way to back out of a coercion that has been
     /// applied, because it destructively updates the AST.
-    CF_Apply = 0x01,
-    /// \brief Whether this coercion is for the implicit object argument in a
-    /// reference to a member (e.g., a method or instance variable).
-    CF_ImplicitObjectArg = 0x02
+    CF_Apply = 0x01
   };
 }
   
@@ -489,6 +486,11 @@ public:
     
     return coerced(new (TC.Context) LoadExpr(E, LValue->getObjectType()),Flags);
   }
+  
+  static CoercedResult
+  coerceObjectArgument(Expr *E, Type ContainerTy, TypeChecker &TC,
+                       unsigned Flags);
+
 };
   
 } // end anonymous namespace.
@@ -696,7 +698,7 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
     // intermediate type, then use our conversion function to finish the
     // translation.
     if (CoercedResult IntermediateRes
-          = coerceToType(E, ArgType, TC, Flags & ~CF_ImplicitObjectArg)) {
+          = coerceToType(E, ArgType, TC, Flags)) {
       if (!(Flags & CF_Apply))
         return DestTy;
       
@@ -751,8 +753,7 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
         continue;
       
       // Perform the coercion.
-      if (CoercedResult R = coerceToType(Segment, DestTy, TC,
-                                         Flags & ~CF_ImplicitObjectArg)) {
+      if (CoercedResult R = coerceToType(Segment, DestTy, TC, Flags)) {
         Segment = R.getExpr();
         continue;
       } else {
@@ -1161,7 +1162,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       if (CoercedResult Elt = coerceToType(OrigElts[SrcField], 
                                            DestTy->getElementType(i),
                                            TC,
-                                           Flags & ~CF_ImplicitObjectArg)) {
+                                           Flags)) {
         if (Flags & CF_Apply)
           TE->setElement(i, Elt.getExpr());
       } else {
@@ -1205,8 +1206,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
         // Check to see if the src value can be converted to the destination
         // element type.
         if (CoercedResult Elt = coerceToType(TE->getElement(SrcField), 
-                                             DestEltTy, TC,
-                                             Flags & ~CF_ImplicitObjectArg)) {
+                                             DestEltTy, TC, Flags)) {
           if (Flags & CF_Apply)
             TE->setElement(SrcField, Elt.getExpr());
         } else {
@@ -1260,8 +1260,7 @@ CoercedResult SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   // default value, see if the expression's type is convertable to the
   // element type.  This handles assigning 4 to "(a = 4, b : int)".
   Type ScalarType = DestTy->getElementType(ScalarField);
-  CoercedResult ERes = coerceToType(E, ScalarType, TC,
-                                    Flags & ~CF_ImplicitObjectArg);
+  CoercedResult ERes = coerceToType(E, ScalarType, TC, Flags);
   if (!ERes)
     return nullptr;
 
@@ -1270,6 +1269,76 @@ CoercedResult SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
 
   return CoercedResult(new (TC.Context) ScalarToTupleExpr(ERes.getExpr(),
                                                           DestTy));
+}
+
+/// \brief Coerce the object argument for a member reference (.) or function
+/// application.
+CoercedResult
+SemaCoerce::coerceObjectArgument(Expr *E, Type ContainerTy, TypeChecker &TC,
+                                 unsigned Flags) {
+  // Silently propagate errors.
+  if (ContainerTy->is<ErrorType>() || E->getType()->is<ErrorType>())
+    return nullptr;
+
+  // The type we're converting to is always an lvalue of the given container
+  // type.
+  if (auto DestLV = ContainerTy->getAs<LValueType>())
+    ContainerTy = DestLV->getObjectType();
+  
+  // Determine the type we're converting from, and whether we need to
+  // materialize the source.
+  Type SrcTy = E->getType();
+  Type SrcObjectTy;
+  bool Materialize;
+  if (LValueType *SrcLV = SrcTy->getAs<LValueType>()) {
+    SrcObjectTy = SrcLV->getObjectType();
+    Materialize = false;
+  } else {
+    SrcObjectTy = SrcTy;
+    Materialize = true;    
+  }
+  
+  // Check whether the source object is the same as or a subtype of the
+  // container type.
+  bool Convertible = false;
+  if (SrcObjectTy->isEqual(ContainerTy)) {
+    Convertible = true;
+  } else if (auto DestProto = ContainerTy->getAs<ProtocolType>()) {
+    if (auto SrcProto = SrcObjectTy->getAs<ProtocolType>()) {
+      if (SrcProto->getDecl()->inheritsFrom(DestProto->getDecl()))
+        Convertible = true;
+    }
+  }
+  
+  // Complain if no conversion is possible.
+  if (!Convertible) {
+    if (Flags & CF_Apply)
+      TC.diagnose(E->getLoc(), diag::no_convert_object_arg, SrcObjectTy,
+                  ContainerTy);
+    return nullptr;
+  }
+
+  // Compute the destination type, which is simply an lvalue of the source
+  // object type.
+  Type DestTy = LValueType::get(SrcObjectTy,
+                                LValueType::Qual::DefaultForMemberAccess,
+                                TC.Context);
+
+  // If we're not applying the results, we're done.
+  if (!(Flags & CF_Apply))
+    return DestTy;
+  
+  // If we have to materialize the object, do so now.
+  if (Materialize) {
+    E = new (TC.Context) MaterializeExpr(E, DestTy);
+    return coerced(E, Flags);
+  }
+  
+  // The source is an lvalue, but we may need to change the qualifiers.
+  if (SrcTy->isEqual(DestTy))
+    return unchanged(E, Flags);
+  
+  return coerced(new (TC.Context) RequalifyExpr(E, DestTy), Flags);
 }
 
 /// Would the source lvalue type be coercible to the dest lvalue type
@@ -1303,7 +1372,7 @@ namespace {
 /// coerceToType - This is the recursive implementation of
 /// coerceToType.  It produces diagnostics and returns null on failure.
 CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
-                                        unsigned Flags) {
+                                       unsigned Flags) {
   assert(!DestTy->isDependentType() &&
          "Result of conversion can't be dependent");
 
@@ -1322,7 +1391,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
       // If we don't have it yet, force the input to the result of the closure
       // and build the implicit closure.
       if (CoercedResult CoercedE = coerceToType(E, FT->getResult(), TC,
-                                                Flags & ~CF_ImplicitObjectArg)){
+                                                Flags)){
         if (!(Flags & CF_Apply))
           return DestTy;
         
@@ -1382,50 +1451,19 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
     if (SrcTy->isDependentType())
       return SemaCoerce(TC, DestTy, Flags).doIt(E);
 
-    // For the implicit object argument, we allow conversion from a value of
-    // protocol type to a reference to an inherited protocol.
-    if (Flags & CF_ImplicitObjectArg) {
-      if (auto DestProto = DestLT->getObjectType()->getAs<ProtocolType>()) {
-        Type SrcObjectTy = SrcLT? SrcLT->getObjectType() : SrcTy;
-        if (auto SrcProto = SrcObjectTy->getAs<ProtocolType>()) {
-          if (SrcProto->getDecl()->inheritsFrom(DestProto->getDecl())) {
-            SrcTy = DestLT->getObjectType();
-            if (SrcLT) {
-              SrcLT = LValueType::get(SrcTy,
-                                      SrcLT->getQualifiers(),
-                                      TC.Context);
-              SrcTy = SrcLT;
-            }
-            
-            if (Flags & CF_Apply)
-              E = new (TC.Context) SuperConversionExpr(E, SrcTy);
-            
-            if (SrcTy->isEqual(DestTy)) {
-              if (!(Flags & CF_Apply))
-                return DestTy;
-              
-              return coerced(E, Flags);
-            }
-          }
-        }
-      }
-    }
-    
     // Qualification conversion.
-    if (SrcLT && DestLT->getObjectType()->isEqual(SrcLT->getObjectType())) {
-      LValueType::Qual DestQuals = DestLT->getQualifiers();
-      if (Flags & CF_ImplicitObjectArg)
-        DestQuals = DestQuals | LValueType::Qual::Implicit;
-      if (SrcLT->getQualifiers() <= DestQuals) {
-        if (!(Flags & CF_Apply))
-          return DestTy;
-        
-        return coerced(new (TC.Context) RequalifyExpr(E, DestTy), Flags);
-      }
+    if (SrcLT && DestLT->getObjectType()->isEqual(SrcLT->getObjectType()) &&
+        SrcLT->getQualifiers() < DestLT->getQualifiers()) {
+      assert(SrcLT->getQualifiers() < DestLT->getQualifiers() &&
+             "qualifiers match exactly but types are different?");
+      if (!(Flags & CF_Apply))
+        return DestTy;
+      
+      return coerced(new (TC.Context) RequalifyExpr(E, DestTy), Flags);
     }
 
     // Materialization.
-    if (!DestLT->isExplicit() || (Flags & CF_ImplicitObjectArg)) {
+    if (!DestLT->isExplicit()) {
       CoercedResult CoercedE = coerceToType(E, DestLT->getObjectType(), TC,
                                             Flags);
       if (!CoercedE)
@@ -1576,22 +1614,17 @@ bool TypeChecker::isCoercibleToType(Expr *E, Type Ty) {
   return (bool)SemaCoerce::coerceToType(E, Ty, *this, /*Flags=*/0);
 }
 
-Expr *TypeChecker::coerceObjectArgument(Expr *E, Type Ty) {
-  unsigned Flags = CF_Apply | CF_ImplicitObjectArg;
-  if (!Ty->is<LValueType>())
-    Ty = LValueType::get(Ty, LValueType::Qual::DefaultForGetSet, Context);
-  if (CoercedResult Res = SemaCoerce::coerceToType(E, Ty, *this, Flags))
+Expr *TypeChecker::coerceObjectArgument(Expr *E, Type ContainerTy) {
+  if (CoercedResult Res = SemaCoerce::coerceObjectArgument(E, ContainerTy,
+                                                           *this, CF_Apply))
     return Res.getExpr();
   
   return nullptr;
 }
 
-bool TypeChecker::isCoercibleObjectArgument(Expr *E, Type Ty) {
-  if (!Ty->is<LValueType>())
-    Ty = LValueType::get(Ty, LValueType::Qual::DefaultForGetSet, Context);
-  
-  return (bool)SemaCoerce::coerceToType(E, Ty, *this,
-                                        CF_ImplicitObjectArg);
+bool TypeChecker::isCoercibleObjectArgument(Expr *E, Type ContainerTy) {
+  return (bool)SemaCoerce::coerceObjectArgument(E, ContainerTy, *this,
+                                                /*Flags=*/0);
 }
 
 Expr *TypeChecker::convertLValueToRValue(LValueType *srcLV, Expr *E) {

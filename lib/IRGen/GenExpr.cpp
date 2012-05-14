@@ -308,6 +308,7 @@ namespace {
     NOT_LVALUE_EXPR(StringLiteral)
     NOT_LVALUE_EXPR(InterpolatedStringLiteral)
     NOT_LVALUE_EXPR(TupleShuffle)
+    NOT_LVALUE_EXPR(SuperConversion)
     NOT_LVALUE_EXPR(Erasure)
     NOT_LVALUE_EXPR(Func)
     NOT_LVALUE_EXPR(Closure)
@@ -348,11 +349,6 @@ namespace {
     
     LValue visitSubscriptExpr(SubscriptExpr *E) {
       return emitSubscriptLValue(IGF, E);
-    }
-    
-    LValue visitSuperConversionExpr(SuperConversionExpr *E) {
-      IGF.unimplemented(E->getLoc(), "super conversion expression as lvalue");
-      return LValue();
     }
   };
 }
@@ -454,11 +450,6 @@ namespace {
       return Optional<Address>();
     }
 
-    Optional<Address> visitSuperConversionExpr(SuperConversionExpr *E) {
-      IGF.unimplemented(E->getLoc(), "emit address of super conversion expr");
-      return Optional<Address>();
-    }
-                                                    
     // These expressions aren't naturally already in memory.
     NON_LOCATEABLE(TupleExpr)
     NON_LOCATEABLE(IntegerLiteralExpr)
@@ -467,6 +458,7 @@ namespace {
     NON_LOCATEABLE(StringLiteralExpr)
     NON_LOCATEABLE(InterpolatedStringLiteralExpr)
     NON_LOCATEABLE(TupleShuffleExpr)
+    NON_LOCATEABLE(SuperConversionExpr)
     NON_LOCATEABLE(ErasureExpr)
     NON_LOCATEABLE(CapturingExpr)
     NON_LOCATEABLE(ModuleExpr)

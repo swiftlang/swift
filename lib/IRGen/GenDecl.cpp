@@ -293,7 +293,8 @@ IRGenFunction::getAddrOfLocalInjectionFunction(OneOfElementDecl *D) {
 static Type addOwnerArgument(ASTContext &ctx, Type owner, Type resultType) {
   Type argType = owner;
   if (!argType->hasReferenceSemantics()) {
-    argType = LValueType::get(argType, LValueType::Qual::DefaultForGetSet, ctx);
+    argType = LValueType::get(argType, LValueType::Qual::DefaultForMemberAccess,
+                              ctx);
   }
   return FunctionType::get(argType, resultType, ctx);
 }
