@@ -51,32 +51,41 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
   return Type();
 }
 
-BuiltinValueKind swift::isBuiltinValue(ASTContext &C, StringRef Name,
-                                       Type &Ty1, Type &Ty2) {
-  // builtin-id ::= operation-id '_' type-id ('_' type-id)?
-  // This will almost certainly get more sophisticated.
-  StringRef::size_type Underscore = Name.find_last_of('_');
-  if (Underscore == StringRef::npos) return BuiltinValueKind::None;
-  
-  // Check that the type parameter is well-formed and set it up for returning.
-  Ty1 = getBuiltinType(C, Name.substr(Underscore + 1));
-  if (Ty1.isNull())
-    return BuiltinValueKind::None;
-
-  // Check whether there is a second underscore.
-  StringRef::size_type Underscore2 = Name.find_last_of('_', Underscore-1);
-  if (Underscore2 != StringRef::npos) {
-    Ty2 = Ty1;
-    Ty1 = getBuiltinType(C, Name.substr(Underscore2 + 1,
-                                        Underscore-Underscore2-1));
-    if (Ty1.isNull())
-      std::swap(Ty1, Ty2);
-    else
-      Underscore = Underscore2;
+/// getBuiltinBaseName - Decode the type list of a builtin (e.g. mul_Int32) and
+/// return the base name (e.g. "mul").
+StringRef swift::getBuiltinBaseName(ASTContext &C, StringRef Name,
+                                    SmallVectorImpl<Type> &Types) {
+  // builtin-id ::= operation-id ('_' type-id)*
+  for (StringRef::size_type Underscore = Name.find_last_of('_');
+       Underscore != StringRef::npos; Underscore = Name.find_last_of('_')) {
+    
+    // Check that the type parameter is well-formed and set it up for returning.
+    // This allows operations with underscores in them, like "icmp_eq".
+    Type Ty = getBuiltinType(C, Name.substr(Underscore + 1));
+    if (Ty.isNull()) break;
+    
+    Types.push_back(Ty);
+    
+    Name = Name.substr(0, Underscore);
   }
   
-  // Check that the operation name is well-formed.
-  StringRef OperationName = Name.substr(0, Underscore);
+  std::reverse(Types.begin(), Types.end());
+  return Name;
+}
+
+
+BuiltinValueKind swift::isBuiltinValue(ASTContext &C, StringRef Name,
+                                       Type &Ty1, Type &Ty2) {
+  SmallVector<Type, 4> Types;
+  StringRef OperationName = getBuiltinBaseName(C, Name, Types);
+  if (Types.size() >= 1) {
+    Ty1 = Types[0];
+    if (Types.size() >= 2) {
+      Ty2 = Types[1];
+      if (Types.size() > 2)
+        return BuiltinValueKind::None;
+    }
+  }
 
   return llvm::StringSwitch<BuiltinValueKind>(OperationName)
 #define BUILTIN(id, name) \

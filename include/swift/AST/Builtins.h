@@ -64,6 +64,11 @@ enum class BuiltinValueKind {
 BuiltinValueKind isBuiltinValue(ASTContext &C, StringRef Name,
                                 Type &Ty1, Type &Ty2);
 
+/// getBuiltinBaseName - Decode the type list of a builtin (e.g. mul_Int32) and
+/// return the base name (e.g. "mul").
+StringRef getBuiltinBaseName(ASTContext &C, StringRef Name,
+                             SmallVectorImpl<Type> &Types);
+  
 /// getBuiltinValue - Finds the builtin value with the given name.
 ///
 /// Returns null if the name does not identifier a known builtin value.
