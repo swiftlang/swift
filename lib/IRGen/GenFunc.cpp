@@ -609,6 +609,30 @@ static void emitCastBuiltin(llvm::Instruction::CastOps opcode, FuncDecl *Fn,
   result.setAsSingleDirectUnmanagedFragileValue(output);
 }
 
+#if 0
+static void emitBinaryBuiltin(Instruction::Opcode Op, FuncDecl *Fn,
+                              IRGenFunction &IGF, ArgList &args,
+                              CallResult &result) {
+  llvm::Value *lhs = args.Values.claimUnmanagedNext();
+  llvm::Value *rhs = args.Values.claimUnmanagedNext();
+  assert(args.Values.empty() && "wrong operands to binary operation");
+
+  llvm::Value *result;
+  if (llvm::Instruction::isBinaryOp(Op))
+    result = IGF.Builder.CreateBinOp((Instruction::BinaryOps)Op, lhs, rhs);
+//  else if (llvm::Instruction::
+  
+  V = IGF.Builder.CreateICmp(lhs, rhs);
+  V = IGF.Builder.CreateFCmp(lhs, rhs);
+  
+  
+  
+                              
+  return result.setAsSingleDirectUnmanagedFragileValue(
+                                 IGF.Builder.Create##Op(lhs, rhs));
+}
+#endif
+
 static void emitCompareBuiltin(llvm::CmpInst::Predicate pred, FuncDecl *Fn,
                                IRGenFunction &IGF, ArgList &args,
                                CallResult &result) {
@@ -733,33 +757,21 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
                                          IGF.Builder.Create##Op(lhs, rhs)); \
   }
 
-/// A macro which expands to the emission of a simple binary operation
-/// or predicate defined over both floating-point and integer types.
-#define BINARY_ARITHMETIC_OPERATION(IntOp, FPOp) {                          \
-    llvm::Value *lhs = args.Values.claimUnmanagedNext();                    \
-    llvm::Value *rhs = args.Values.claimUnmanagedNext();                    \
-    assert(args.Values.empty() && "wrong operands to binary operation");    \
-    if (lhs->getType()->isFloatingPointTy()) {                              \
-      return result.setAsSingleDirectUnmanagedFragileValue(                 \
-                          IGF.Builder.Create##FPOp(lhs, rhs));              \
-    } else {                                                                \
-      return result.setAsSingleDirectUnmanagedFragileValue(                 \
-                          IGF.Builder.Create##IntOp(lhs, rhs));             \
-    }                                                                       \
-  }
-
-  case BuiltinValueKind::Add:       BINARY_ARITHMETIC_OPERATION(Add, FAdd)
+  case BuiltinValueKind::Add:       BINARY_OPERATION(Add)
+  case BuiltinValueKind::FAdd:      BINARY_OPERATION(FAdd)
   case BuiltinValueKind::And:       BINARY_OPERATION(And)
   case BuiltinValueKind::AShr:      BINARY_OPERATION(AShr)
   case BuiltinValueKind::LShr:      BINARY_OPERATION(LShr)
   case BuiltinValueKind::FDiv:      BINARY_OPERATION(FDiv)
-  case BuiltinValueKind::Mul:       BINARY_ARITHMETIC_OPERATION(Mul, FMul)
+  case BuiltinValueKind::Mul:       BINARY_OPERATION(Mul)
+  case BuiltinValueKind::FMul:      BINARY_OPERATION(FMul)
   case BuiltinValueKind::Or:        BINARY_OPERATION(Or)
   case BuiltinValueKind::SDiv:      BINARY_OPERATION(SDiv)
   case BuiltinValueKind::SDivExact: BINARY_OPERATION(ExactSDiv)
   case BuiltinValueKind::Shl:       BINARY_OPERATION(Shl)
   case BuiltinValueKind::SRem:      BINARY_OPERATION(SRem)
-  case BuiltinValueKind::Sub:       BINARY_ARITHMETIC_OPERATION(Sub, FSub)
+  case BuiltinValueKind::Sub:       BINARY_OPERATION(Sub)
+  case BuiltinValueKind::FSub:      BINARY_OPERATION(FSub)
   case BuiltinValueKind::UDiv:      BINARY_OPERATION(UDiv)
   case BuiltinValueKind::UDivExact: BINARY_OPERATION(ExactUDiv)
   case BuiltinValueKind::URem:      BINARY_OPERATION(URem)
