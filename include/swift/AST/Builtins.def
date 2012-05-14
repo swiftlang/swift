@@ -34,7 +34,7 @@ BUILTIN_CAST_OPERATION(FPTrunc , "fptrunc",  OverloadedBuiltinKind::Arithmetic)
 BUILTIN_CAST_OPERATION(FPExt   , "fpext",    OverloadedBuiltinKind::Arithmetic)
 BUILTIN_CAST_OPERATION(PtrToInt, "ptrtoint", OverloadedBuiltinKind::Integer)
 BUILTIN_CAST_OPERATION(IntToPtr, "inttoptr", OverloadedBuiltinKind::Integer)
-BUILTIN_CAST_OPERATION(Bitcast , "bitcast", OverloadedBuiltinKind::Arithmetic)
+BUILTIN_CAST_OPERATION(BitCast , "bitcast", OverloadedBuiltinKind::Arithmetic)
 
 #undef BUILTIN_CAST_OPERATION
 

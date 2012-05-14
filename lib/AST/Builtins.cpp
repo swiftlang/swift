@@ -198,7 +198,7 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
     if (!Output.isNull()) return nullptr;
     Output = Context.TheRawPointerType;
     break;
-  case BuiltinValueKind::Bitcast:
+  case BuiltinValueKind::BitCast:
     if (Output.isNull()) return nullptr;
     // FIXME: Implement bitcast typechecking.
     assert(0 && "Bitcast not supported yet!");

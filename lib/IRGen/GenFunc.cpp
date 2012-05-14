@@ -618,9 +618,31 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
   IGF.emitRValue(Arg, args.Values);
 
   
+  // Decompose the function's name into a builtin name and type list.
+  SmallVector<Type, 4> Types;
+  StringRef BuiltinName = getBuiltinBaseName(IGF.IGM.Context,
+                                             Fn->getName().str(), Types);
+
+  // TODO: A linear series of if's is suboptimal.
+#define BUILTIN_CAST_OPERATION(id, name, overload) \
+  if (BuiltinName == name) \
+    return emitCastBuiltin(llvm::Instruction::id, Fn, IGF, args, result);
+  
+//#define BUILTIN_GEP_OPERATION(id, name, overload) overload,
+//#define BUILTIN_BINARY_OPERATION(id, name, overload) overload,
+//#define BUILTIN_BINARY_PREDICATE(id, name, overload) overload,
+//#define BUILTIN_LOAD(id, name, overload) overload,
+//#define BUILTIN_ASSIGN(id, name, overload) overload,
+//#define BUILTIN_INIT(id, name, overload) overload,
+#define BUILTIN(ID, Name)  // Ignore the rest.
+#include "swift/AST/Builtins.def"
+
+  
+  
   Type BuiltinType, BuiltinType2;
   switch (isBuiltinValue(IGF.IGM.Context, Fn->getName().str(),
                          BuiltinType, BuiltinType2)) {
+  default: assert(0 && "Unhandled builtin in IRGen");
   case BuiltinValueKind::None: llvm_unreachable("not a builtin after all!");
   case BuiltinValueKind::Gep: {
     llvm::Value *lhs = args.Values.claimUnmanagedNext();
@@ -707,51 +729,6 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
                           IGF.Builder.Create##IntOp(lhs, rhs));             \
     }                                                                       \
   }
-      
-  case BuiltinValueKind::Trunc:
-    return emitCastBuiltin(llvm::Instruction::Trunc, Fn, IGF, args, result);
-  case BuiltinValueKind::ZExt:
-    return emitCastBuiltin(llvm::Instruction::ZExt, Fn, IGF, args, result);
-
-  case BuiltinValueKind::SExt:
-    return emitCastBuiltin(llvm::Instruction::SExt,
-                           Fn, IGF, args, result);
-
-  case BuiltinValueKind::FPToUI:
-    return emitCastBuiltin(llvm::Instruction::FPToUI,
-                           Fn, IGF, args, result);
-
-  case BuiltinValueKind::FPToSI:
-    return emitCastBuiltin(llvm::Instruction::FPToSI,
-                           Fn, IGF, args, result);
-
-  case BuiltinValueKind::UIToFP:
-    return emitCastBuiltin(llvm::Instruction::UIToFP,
-                           Fn, IGF, args, result);
-
-  case BuiltinValueKind::SIToFP:
-    return emitCastBuiltin(llvm::Instruction::SIToFP,
-                           Fn, IGF, args, result);
-      
-  case BuiltinValueKind::FPTrunc:
-    return emitCastBuiltin(llvm::Instruction::FPTrunc,
-                           Fn, IGF, args, result);
-
-  case BuiltinValueKind::FPExt:
-    return emitCastBuiltin(llvm::Instruction::FPExt,
-                           Fn, IGF, args, result);
-
-  case BuiltinValueKind::PtrToInt:
-    return emitCastBuiltin(llvm::Instruction::PtrToInt,
-                           Fn, IGF, args, result);
-
-  case BuiltinValueKind::IntToPtr:
-    return emitCastBuiltin(llvm::Instruction::IntToPtr,
-                           Fn, IGF, args, result);
-
-  case BuiltinValueKind::Bitcast:
-    return emitCastBuiltin(llvm::Instruction::BitCast,
-                           Fn, IGF, args, result);
 
   case BuiltinValueKind::Add:       BINARY_ARITHMETIC_OPERATION(Add, FAdd)
   case BuiltinValueKind::And:       BINARY_OPERATION(And)
