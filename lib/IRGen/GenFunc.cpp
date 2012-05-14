@@ -631,79 +631,77 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
 //#define BUILTIN_GEP_OPERATION(id, name, overload) overload,
 //#define BUILTIN_BINARY_OPERATION(id, name, overload) overload,
 //#define BUILTIN_BINARY_PREDICATE(id, name, overload) overload,
-//#define BUILTIN_LOAD(id, name, overload) overload,
-//#define BUILTIN_ASSIGN(id, name, overload) overload,
-//#define BUILTIN_INIT(id, name, overload) overload,
 #define BUILTIN(ID, Name)  // Ignore the rest.
 #include "swift/AST/Builtins.def"
 
   
+  if (BuiltinName == "gep") {
+    llvm::Value *lhs = args.Values.claimUnmanagedNext();
+    llvm::Value *rhs = args.Values.claimUnmanagedNext();
+    assert(args.Values.empty() && "wrong operands to gep operation");
+    
+    // We don't expose a non-inbounds GEP operation.
+    llvm::Value *gep = IGF.Builder.CreateInBoundsGEP(lhs, rhs);
+    return result.setAsSingleDirectUnmanagedFragileValue(gep);
+  }
+
+  if (BuiltinName == "load") {
+    // The type of the operation is the result type of the load function.
+    Type valueTy = Fn->getType()->castTo<FunctionType>()->getResult();
+    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
+    
+    // Treat the raw pointer as a physical l-value of that type.
+    llvm::Value *addrValue = args.Values.claimUnmanagedNext();
+    Address addr = getAddressForUnsafePointer(IGF, valueTI, addrValue);
+    assert(args.Values.empty() && "wrong operands to load operation");
+    
+    // Perform the load.
+    Explosion &out = result.initForDirectValues(ExplosionKind::Maximal);
+    return valueTI.load(IGF, addr, out);
+  }
+  
+  if (BuiltinName == "assign") {
+    // The type of the operation is the type of the first argument of
+    // the store function.
+    Type valueTy = Fn->getType()->castTo<FunctionType>()->getInput()
+      ->castTo<TupleType>()->getElementType(0);
+    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
+    
+    // Treat the raw pointer as a physical l-value of that type.
+    llvm::Value *addrValue = args.Values.takeLast().getUnmanagedValue();
+    Address addr = getAddressForUnsafePointer(IGF, valueTI, addrValue);
+    
+    // Mark that we're not returning anything.
+    result.setAsEmptyDirect();
+    
+    // Perform the assignment operation.
+    return valueTI.assign(IGF, args.Values, addr);
+  }
+  
+  if (BuiltinName == "init") {
+    // The type of the operation is the type of the first argument of
+    // the store function.
+    Type valueTy = Fn->getType()->castTo<FunctionType>()->getInput()
+      ->castTo<TupleType>()->getElementType(0);
+    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
+    
+    // Treat the raw pointer as a physical l-value of that type.
+    llvm::Value *addrValue = args.Values.takeLast().getUnmanagedValue();
+    Address addr = getAddressForUnsafePointer(IGF, valueTI, addrValue);
+    
+    // Mark that we're not returning anything.
+    result.setAsEmptyDirect();
+    
+    // Perform the init operation.
+    return valueTI.initialize(IGF, args.Values, addr);
+  }
+
   
   Type BuiltinType, BuiltinType2;
   switch (isBuiltinValue(IGF.IGM.Context, Fn->getName().str(),
                          BuiltinType, BuiltinType2)) {
   default: assert(0 && "Unhandled builtin in IRGen");
   case BuiltinValueKind::None: llvm_unreachable("not a builtin after all!");
-  case BuiltinValueKind::Gep: {
-    llvm::Value *lhs = args.Values.claimUnmanagedNext();
-    llvm::Value *rhs = args.Values.claimUnmanagedNext();
-    assert(args.Values.empty() && "wrong operands to gep operation");
-
-    // We don't expose a non-inbounds GEP operation.
-    llvm::Value *gep = IGF.Builder.CreateInBoundsGEP(lhs, rhs);
-    return result.setAsSingleDirectUnmanagedFragileValue(gep);
-  }
-      
-  case BuiltinValueKind::Load: {
-    // The type of the operation is the result type of the load function.
-    Type valueTy = Fn->getType()->castTo<FunctionType>()->getResult();
-    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
-
-    // Treat the raw pointer as a physical l-value of that type.
-    llvm::Value *addrValue = args.Values.claimUnmanagedNext();
-    Address addr = getAddressForUnsafePointer(IGF, valueTI, addrValue);
-    assert(args.Values.empty() && "wrong operands to load operation");
-
-    // Perform the load.
-    Explosion &out = result.initForDirectValues(ExplosionKind::Maximal);
-    return valueTI.load(IGF, addr, out);
-  }
-     
-  case BuiltinValueKind::Assign: {
-    // The type of the operation is the type of the first argument of
-    // the store function.
-    Type valueTy = Fn->getType()->castTo<FunctionType>()->getInput()
-                     ->castTo<TupleType>()->getElementType(0);
-    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
-
-    // Treat the raw pointer as a physical l-value of that type.
-    llvm::Value *addrValue = args.Values.takeLast().getUnmanagedValue();
-    Address addr = getAddressForUnsafePointer(IGF, valueTI, addrValue);
-
-    // Mark that we're not returning anything.
-    result.setAsEmptyDirect();
-
-    // Perform the assignment operation.
-    return valueTI.assign(IGF, args.Values, addr);
-  }
-
-  case BuiltinValueKind::Init: {
-    // The type of the operation is the type of the first argument of
-    // the store function.
-    Type valueTy = Fn->getType()->castTo<FunctionType>()->getInput()
-                     ->castTo<TupleType>()->getElementType(0);
-    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
-
-    // Treat the raw pointer as a physical l-value of that type.
-    llvm::Value *addrValue = args.Values.takeLast().getUnmanagedValue();
-    Address addr = getAddressForUnsafePointer(IGF, valueTI, addrValue);
-
-    // Mark that we're not returning anything.
-    result.setAsEmptyDirect();
-
-    // Perform the init operation.
-    return valueTI.initialize(IGF, args.Values, addr);
-  }
       
 /// A macro which expands to the emission of a simple binary operation
 /// or predicate.
