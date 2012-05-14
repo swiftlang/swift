@@ -172,23 +172,10 @@ public:
     }
 
     visitValueDecl(FD);
-    
-    // Validate that the initializers type matches the expected type.
-    if (FD->getBody() == 0) {
-      // If we have no initializer and the type is dependent, then the
-      // initializer was invalid and removed.
-      if (FD->getType()->isDependentType())
-        return;
-    } else {
-      Type DestTy = FD->getType();
-      if (DestTy->isDependentType())
-        DestTy = Type();
-      Expr *Body = FD->getBody();
-      if (!TC.typeCheckExpression(Body, DestTy)) {
-        FD->setBody(cast<FuncExpr>(Body));
-        FD->overwriteType(Body->getType());
-      }
-    }
+
+    assert((!FD->getBody() ||
+            FD->getType()->isEqual(FD->getBody()->getType())) &&
+           "Unexpected func body");
   }
   void visitOneOfElementDecl(OneOfElementDecl *ED) {
     // Ignore element decls that carry no type.
