@@ -1531,23 +1531,6 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
   if (E->getType()->isDependentType())
     return SemaCoerce(TC, DestTy, Flags).doIt(E);
 
-  // A function type can converted to a function type with the same input/result
-  // types, ignoring labels.
-  // FIXME: We will probably want to allow a contravariant return type and
-  // covariant parameter types, but for now we don't have anything that compels
-  // us to do so.
-  if (FunctionType *DestFuncTy = DestTy->getAs<FunctionType>()) {
-    if (FunctionType *SrcFuncTy = E->getType()->getAs<FunctionType>()) {
-      if (DestFuncTy->getUnlabeledType(TC.Context)->isEqual(
-            SrcFuncTy->getUnlabeledType(TC.Context))) {
-        if (!(Flags & CF_Apply))
-          return DestTy;
-            
-        return coerced(new (TC.Context) ParameterRenameExpr(E, DestTy), Flags);
-      }
-    }
-  }
-
   // If the source is an l-value, load from it.
   if (LValueType *LValue = E->getType()->getAs<LValueType>()) {
     if (CoercedResult Loaded = loadLValue(E, LValue, TC, Flags)) {
@@ -1594,7 +1577,25 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
     return nullptr;
   }
 
+  // A value of function type can be converted to a value of another function
+  // type, so long as the source is a subtype of the destination.
+  if (E->getType()->is<FunctionType>() && DestTy->is<FunctionType>()) {
+    bool Trivial;
+    if (TC.isSubtypeOf(E->getType(), DestTy, Trivial)) {
+      if (!(Flags & CF_Apply))
+        return DestTy;
+      
+      return coerced(new (TC.Context) FunctionConversionExpr(E, DestTy,
+                                                             Trivial),
+                     Flags);
+    }
+  }
+
   // Could not do the conversion.
+  bool Trivial;
+  assert(!TC.isSubtypeOf(E->getType(), DestTy, Trivial) &&
+         "subtype relationship not handled by type coercion");
+  (void)Trivial;
 
   // When diagnosing a failed conversion, ignore l-values on the source type.
   if (Flags & CF_Apply)

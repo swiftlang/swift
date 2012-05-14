@@ -213,7 +213,7 @@ namespace {
       emitTupleShuffle(IGF, E, Out);
     }
 
-    void visitParameterRenameExpr(ParameterRenameExpr *E) {
+    void visitFunctionConversionExpr(FunctionConversionExpr *E) {
       IGF.emitRValue(E->getSubExpr(), Out);
     }
     
@@ -335,7 +335,7 @@ namespace {
       return IGF.emitAddressLValue(addr);
     }
 
-    LValue visitParameterRenameExpr(ParameterRenameExpr *E) {
+    LValue visitFunctionConversionExpr(FunctionConversionExpr *E) {
       return visit(E->getSubExpr());
     }
     
@@ -428,7 +428,7 @@ namespace {
     Optional<Address> visitRequalifyExpr(RequalifyExpr *E) {
       return visit(E->getSubExpr());
     }
-    Optional<Address> visitParameterRenameExpr(ParameterRenameExpr *E) {
+    Optional<Address> visitFunctionConversionExpr(FunctionConversionExpr *E) {
       return visit(E->getSubExpr());
     }
     Optional<Address> visitAddressOfExpr(AddressOfExpr *E) {

@@ -489,7 +489,7 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
-  void visitParameterRenameExpr(ParameterRenameExpr *E) {
+  void visitFunctionConversionExpr(FunctionConversionExpr *E) {
     printCommon(E, "parameter_rename_expr") << '\n';
     printRec(E->getSubExpr());
     OS << ')';

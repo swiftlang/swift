@@ -38,6 +38,8 @@ public:
   bool validateType(ValueDecl *VD);
   bool validateType(Type T);
 
+  bool isSubtypeOf(Type T1, Type T2, bool &Trivial);
+  
   bool semaFunctionSignature(FuncExpr *FE);
   bool semaTupleExpr(TupleExpr *TE);
   Expr *semaSubscriptExpr(SubscriptExpr *SE);

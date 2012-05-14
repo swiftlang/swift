@@ -920,17 +920,32 @@ public:
   }
 };
   
-/// ParameterRenameExpr - Rename the parameters or return values of a 
-/// function type.
-class ParameterRenameExpr : public ImplicitConversionExpr {
+/// FunctionConversionExpr - Convert a function to another function type,
+/// which might involve renaming the parameters or handling substitutions
+/// of subtypes (in the return) or supertypes (in the input).
+///
+/// FIXME: This should be a CapturingExpr.
+class FunctionConversionExpr : public ImplicitConversionExpr {
+  // FIXME: Sink into Expr.
+  unsigned IsTrivial : 1;
 public:
-  ParameterRenameExpr(Expr *subExpr, Type type)
-    : ImplicitConversionExpr(ExprKind::ParameterRename, subExpr, type) {}
+  FunctionConversionExpr(Expr *subExpr, Type type, bool IsTrivial)
+    : ImplicitConversionExpr(ExprKind::FunctionConversion, subExpr, type),
+      IsTrivial(IsTrivial) {}
+  
+  /// \brief Whether this is a "trivial" conversion, that only includes
+  /// parameter renaming and other similarly trivial operations that do not
+  /// change the representation of the function.
+  ///
+  /// The 'trivial' computation is a "best effort" computation based on the
+  /// language model itself. It does not account for conversions that may be
+  /// made trivial if the layout of specific data types is known.
+  bool isTrivial() const { return IsTrivial; }
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const ParameterRenameExpr *) { return true; }
+  static bool classof(const FunctionConversionExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ParameterRename;
+    return E->getKind() == ExprKind::FunctionConversion;
   }
 };
 
