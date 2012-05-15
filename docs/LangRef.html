@@ -490,7 +490,7 @@
   </div>
 
   <pre class="grammar">
-    decl-extension ::= 'extension' <a href="#type-identifier">type-identifier</a> '{' <a href="#decl">decl</a>* '}'
+    decl-extension ::= 'extension' <a href="#type-identifier">type-identifier</a> <a href="#inheritance">inheritance</a>? '{' <a href="#decl">decl</a>* '}'
   </pre>
 
   <p>'extension' declarations allow adding member declarations to existing
@@ -756,7 +756,7 @@ token following the opening '{' is either 'set' or 'get'.</p>
   </div>
   
   <pre class="grammar">
-    decl-oneof ::= 'oneof' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> oneof-body
+    decl-oneof ::= 'oneof' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#inheritance">inheritance</a>? oneof-body
     oneof-body         ::= '{' (oneof-element (',' oneof-element)*)? decl* '}'
     
     oneof-element      ::= <a href="#identifier">identifier</a>
@@ -829,7 +829,7 @@ token following the opening '{' is either 'set' or 'get'.</p>
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-struct ::= 'struct' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> '{' decl-struct-body '}'
+    decl-struct ::= 'struct' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#inheritance">inheritance</a>? '{' decl-struct-body '}'
     decl-struct-body ::= <a href="#type-tuple">type-tuple-body</a>? <a href="#decl">decl</a>*
   </pre>
 
@@ -919,7 +919,7 @@ token following the opening '{' is either 'set' or 'get'.</p>
   
  <pre class="grammar">
     decl-protocol ::= 'protocol' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> protocol-body
-    protocol-body ::= <a href="#protocol-inheritance">protocol-inheritance</a>? '{' protocol-member* '}'
+    protocol-body ::= <a href="#inheritance">inheritance</a>? '{' protocol-member* '}'
   </pre>
   
   <p>A protocol declaration describes an abstract interface implemented by
@@ -983,28 +983,6 @@ token following the opening '{' is either 'set' or 'get'.</p>
     
   <p>TODO: typealias members</p>
 
-
-  <!-- _____________________________________________________________________ -->
-  <h4 id="protocol-inheritance">Protocol inheritance</h4>
-  <pre class="grammar">
-    protocol-inheritance ::= ':' <a href="#type-identifier">type-identifier</a> (',' <a href="#type-identifier">type-identifier</a>)*
-  </pre>
-
-  <p>A protocol can inherit other protocols, which aggregates the set
-  of requirements from all of the protocols. A type that conforms to
-  the current protocol shall conform to each of the protocols that it
-  inherits.</p>
-
-  <pre class="example">
-    protocol VersionedDocument : Document { <i>// every VersionedDocument is a Document</i>
-      func bumpVersion()
-   }
-
-   func print(doc : Document) { <i>/* ... */</i> }
-
-   var myDocument : VersionedDocument;
-   print(myDocument) <i>// okay: a VersionedDocument is a Document</i>
-  </pre>
 
   <!-- ===================================================================== -->
   <h3 id="decl-subscript">subscript Declarations</h3>
@@ -1532,6 +1510,40 @@ if vec[3] {
     
     array_of_tuples[12].a = array_of_tuples[13].b
     tuple_of_arrays.a[12] = array_of_tuples.b[13]
+  </pre>
+
+  <!-- _____________________________________________________________________ -->
+  <h3 id="inheritance">Type inheritance</h4>
+  <pre class="grammar">
+    inheritance ::= ':' <a href="#type-identifier">type-identifier</a> (',' <a href="#type-identifier">type-identifier</a>)*
+  </pre>
+
+  <p>A named type (e.g., a class, struct, oneof, or protocol) can
+ "inherit" some set of protocols, which implies that any object of
+that type conforms to each of those protocols. When a protocol
+inherits other protocols, the set of requirements from all of those
+protocols is effectivel aggregated into the protocol, and a type that
+conforms to the current protocol shall conform to each of the
+ protocols that it inherits.</p>
+
+  <p>When a non-protocol type inherits a protocol, it is specifying
+explicitly that it conforms to that protocol. The program is
+ill-formed if the type does not conform to the protocol.</p>
+ 
+  <pre class="example">
+    protocol VersionedDocument : Document { <i>// every VersionedDocument is a Document</i>
+      func bumpVersion()
+   }
+
+   func print(doc : Document) { <i>/* ... */</i> }
+
+   var myDocument : VersionedDocument;
+   print(myDocument) <i>// okay: a VersionedDocument is a Document</i>
+
+   class StoredHTML : VersionedDocument { <i>// okay: StoredHTML conforms to VersionedDocument</i>
+     var Title : String
+     func bumpVersion()
+  }
   </pre>
 
   <!-- ********************************************************************* -->

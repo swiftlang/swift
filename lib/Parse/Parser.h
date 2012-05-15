@@ -219,8 +219,10 @@ public:
   bool parseAttribute(DeclAttributes &Attributes);
   
   Decl *parseDeclImport();
+  bool parseInheritance(SmallVectorImpl<Type> &Inherited);
   Decl *parseDeclExtension();
-  Decl *parseExtensionBody(SourceLoc ExtensionLoc, Type Ty);
+  Decl *parseExtensionBody(SourceLoc ExtensionLoc, Type Ty,
+                           MutableArrayRef<Type> Inherited);
   bool parseDeclOneOf(SmallVectorImpl<Decl*> &Decls);
 
   bool parseDeclStruct(SmallVectorImpl<Decl*> &Decls);

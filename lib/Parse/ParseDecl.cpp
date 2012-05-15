@@ -456,21 +456,56 @@ Decl *Parser::parseDeclImport() {
   return ImportDecl::create(Context, CurDeclContext, ImportLoc, ImportPath);
 }
 
+/// parseInheritance - Parse an inheritance clause.
+///
+///   inheritance:
+///      ':' type-identifier (',' type-identifier)*
+bool Parser::parseInheritance(SmallVectorImpl<Type> &Inherited) {
+  consumeToken(tok::colon);
+  
+  do {
+    // Parse the inherited type (which must be a protocol).
+    Type Ty;
+    if (parseTypeIdentifier(Ty))
+      return true;
+    
+    // Record the type.
+    Inherited.push_back(Ty);
+    
+    // Check for a ',', which indicates that there are more protocols coming.
+    if (Tok.is(tok::comma)) {
+      consumeToken();
+      continue;
+    }
+    
+    break;
+  } while (true);
+  
+  return false;
+}
+
 
 /// parseDeclExtension - Parse an 'extension' declaration.
 ///   extension:
-///    'extension' type-identifier '{' decl* '}'
+///    'extension' type-identifier inheritance? '{' decl* '}'
 ///
 Decl *Parser::parseDeclExtension() {
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
 
   Type Ty;
   SourceLoc LBLoc, RBLoc;
-  if (parseTypeIdentifier(Ty) ||
-      parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_oneof_type))
-    return 0;
+  if (parseTypeIdentifier(Ty))
+    return nullptr;
   
-  Decl *ED = parseExtensionBody(ExtensionLoc, Ty);
+  // Parse optional inheritance clause.
+  SmallVector<Type, 2> Inherited;
+  if (Tok.is(tok::colon))
+    parseInheritance(Inherited);
+
+  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_oneof_type))
+    return nullptr;
+  
+  Decl *ED = parseExtensionBody(ExtensionLoc, Ty, Inherited);
 
   parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_extension,
                      LBLoc, diag::opening_brace);
@@ -480,8 +515,9 @@ Decl *Parser::parseDeclExtension() {
 
 /// parseExtensionBody - Parse the body of an 'extension', or the
 /// extended body of a 'oneof'.
-Decl *Parser::parseExtensionBody(SourceLoc ExtensionLoc, Type Ty) {
-  ExtensionDecl *ED = new (Context) ExtensionDecl(ExtensionLoc, Ty,
+Decl *Parser::parseExtensionBody(SourceLoc ExtensionLoc, Type Ty,
+                                 MutableArrayRef<Type> Inherited) {
+  ExtensionDecl *ED = new (Context) ExtensionDecl(ExtensionLoc, Ty, Inherited,
                                                   CurDeclContext);
   ContextChange CC(*this, ED);
 
@@ -1124,7 +1160,7 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
 /// token skipping) on error.
 ///
 ///   decl-oneof:
-///      'oneof' attribute-list identifier oneof-body
+///      'oneof' attribute-list identifier inheritance? oneof-body
 ///   oneof-body:
 ///      '{' oneof-element (',' oneof-element)* decl* '}'
 ///   oneof-element:
@@ -1141,11 +1177,18 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
   if (parseIdentifier(OneOfName, diag::expected_identifier_in_decl, "oneof"))
     return true;
 
+  // Parse optional inheritance clause.
+  SmallVector<Type, 2> Inherited;
+  if (Tok.is(tok::colon))
+    parseInheritance(Inherited);
+  
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_oneof_type))
     return true;
 
-  OneOfDecl *OOD = new (Context) OneOfDecl(OneOfLoc, OneOfName, CurDeclContext);
+  OneOfDecl *OOD = new (Context) OneOfDecl(OneOfLoc, OneOfName,
+                                           Context.AllocateCopy(Inherited),
+                                           CurDeclContext);
   Decls.push_back(OOD);
   SmallVector<OneOfElementInfo, 8> ElementInfos;
 
@@ -1181,7 +1224,8 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
 
   // Parse the extended body of the oneof.
   if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof))
-    Decls.push_back(parseExtensionBody(OneOfLoc, OOD->getDeclaredType()));
+    Decls.push_back(parseExtensionBody(OneOfLoc, OOD->getDeclaredType(),
+                                       MutableArrayRef<Type>()));
   
   parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_oneof_type,
                      LBLoc, diag::opening_brace);
@@ -1245,7 +1289,7 @@ void Parser::actOnOneOfDecl(SourceLoc OneOfLoc,
 /// token skipping) on error.
 ///
 ///   decl-struct:
-///      'struct' attribute-list identifier '{' decl-struct-body '}
+///      'struct' attribute-list identifier inheritance? '{' decl-struct-body '}
 ///   decl-struct-body:
 ///      decl*
 ///
@@ -1257,11 +1301,19 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
 
   Identifier StructName;
   SourceLoc LBLoc, RBLoc;
-  if (parseIdentifier(StructName, diag::expected_identifier_in_decl, "struct")||
-      parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct))
+  if (parseIdentifier(StructName, diag::expected_identifier_in_decl, "struct"))
+    return true;
+  
+  // Parse optional inheritance clause.
+  SmallVector<Type, 2> Inherited;
+  if (Tok.is(tok::colon))
+    parseInheritance(Inherited);
+  
+  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct))
     return true;
 
   StructDecl *SD = new (Context) StructDecl(StructLoc, StructName,
+                                            Context.AllocateCopy(Inherited),
                                             CurDeclContext);
   Decls.push_back(SD);
 
@@ -1296,7 +1348,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
 /// token skipping) on error.  
 ///
 ///   decl-class:
-///      'class' attribute-list identifier '{' decl-class-body '}
+///      'class' attribute-list identifier inheritance? '{' decl-class-body '}
 ///   decl-class-body:
 ///      decl*
 ///
@@ -1308,12 +1360,20 @@ bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
 
   Identifier ClassName;
   SourceLoc LBLoc, RBLoc;
-  if (parseIdentifier(ClassName, diag::expected_identifier_in_decl, "class")||
-      parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class))
+  if (parseIdentifier(ClassName, diag::expected_identifier_in_decl, "class"))
+    return true;
+  
+  // Parse optional inheritance clause.
+  SmallVector<Type, 2> Inherited;
+  if (Tok.is(tok::colon))
+    parseInheritance(Inherited);
+  
+  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class))
     return true;
 
   ClassDecl *CD = new (Context) ClassDecl(StructLoc, ClassName,
-                                            CurDeclContext);
+                                          Context.AllocateCopy(Inherited),
+                                          CurDeclContext);
   Decls.push_back(CD);
 
   // Parse the body.
@@ -1342,11 +1402,7 @@ bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
 /// doing no token skipping) on error.
 ///
 ///   decl-protocol:
-///      'protocol' attribute-list identifier protocol-inheritance?
-///          protocol-body
-///
-///   protocol-inheritance:
-///      ':' type-identifier (',' type-identifier)*
+///      'protocol' attribute-list identifier inheritance? protocol-body
 ///
 Decl *Parser::parseDeclProtocol() {
   SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
@@ -1361,27 +1417,8 @@ Decl *Parser::parseDeclProtocol() {
     return 0;
   
   SmallVector<Type, 4> InheritedProtocols;
-  if (Tok.is(tok::colon)) {
-    consumeToken();
-    
-    do {
-      // Parse the inherited type (which must be a protocol).
-      Type Ty;
-      if (parseTypeIdentifier(Ty))
-        break;
-      
-      // Record the type.
-      InheritedProtocols.push_back(Ty);
-      
-      // Check for a ',', which indicates that there are more protocols coming.
-      if (Tok.is(tok::comma)) {
-        consumeToken();
-        continue;
-      }
-      
-      break;
-    } while (true);
-  }
+  if (Tok.is(tok::colon))
+    parseInheritance(InheritedProtocols);
   
   ProtocolDecl *Proto
     = new (Context) ProtocolDecl(CurDeclContext, ProtocolLoc, NameLoc,

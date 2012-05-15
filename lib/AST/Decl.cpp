@@ -181,27 +181,30 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
   setType(MetaTypeType::get(this));
 }
 
-OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name, DeclContext *Parent)
+OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name,
+                     MutableArrayRef<Type> Inherited, DeclContext *Parent)
   : DistinctTypeDecl(DeclKind::OneOf, Parent, Name, Type()), 
-    OneOfLoc(OneOfLoc) {
+    OneOfLoc(OneOfLoc), Inherited(Inherited) {
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(this));
   // Compute the associated type for this OneOfDecl.
   OneOfTy = new (Parent->getASTContext()) OneOfType(this, Parent->getASTContext());
 }
 
-StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, DeclContext *Parent)
+StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name,
+                       MutableArrayRef<Type> Inherited, DeclContext *Parent)
   : DistinctTypeDecl(DeclKind::Struct, Parent, Name, Type()), 
-    StructLoc(StructLoc) {
+    StructLoc(StructLoc), Inherited(Inherited) {
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(this));
   // Compute the associated type for this StructDecl.
   StructTy = new (Parent->getASTContext()) StructType(this, Parent->getASTContext());
 }
 
-ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, DeclContext *Parent)
+ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name,
+                     MutableArrayRef<Type> Inherited, DeclContext *Parent)
   : DistinctTypeDecl(DeclKind::Class, Parent, Name, Type()), 
-    ClassLoc(ClassLoc) {
+    ClassLoc(ClassLoc), Inherited(Inherited) {
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(this));
   // Compute the associated type for this ClassDecl.
@@ -371,6 +374,21 @@ namespace {
       OS.indent(Indent) << "(" << Name;
     }
 
+    void printInherited(ArrayRef<Type> Inherited) {
+      if (Inherited.empty())
+        return;
+      OS << "inherits: ";
+      bool First = true;
+      for (auto Super : Inherited) {
+        if (First)
+          First = false;
+        else
+          OS << ", ";
+        
+        Super->print(OS);
+      }
+    }
+    
     void visitImportDecl(ImportDecl *ID) {
       printCommon(ID, "import_decl");
       OS << " '" << ID->getAccessPath()[0].first;
@@ -383,6 +401,7 @@ namespace {
       printCommon(ED, "extension_decl");
       OS << ' ';
       ED->getExtendedType()->print(OS);
+      printInherited(ED->getInherited());
       for (Decl *Member : ED->getMembers()) {
         OS << '\n';
         printRec(Member);
@@ -406,6 +425,7 @@ namespace {
 
     void visitProtocolDecl(ProtocolDecl *PD) {
       printCommon(PD, "protocol");
+      printInherited(PD->getInherited());
       for (auto VD : PD->getMembers()) {
         OS << '\n';
         printRec(VD);
@@ -467,6 +487,7 @@ namespace {
 
     void visitOneOfDecl(OneOfDecl *OOD) {
       printCommon(OOD, "oneof_decl");
+      printInherited(OOD->getInherited());
       for (OneOfElementDecl *OOED : OOD->getElements()) {
         OS << '\n';
         printRec(OOED);
@@ -481,6 +502,7 @@ namespace {
 
     void visitStructDecl(StructDecl *SD) {
       printCommon(SD, "struct_decl");
+      printInherited(SD->getInherited());
       for (Decl *D : SD->getMembers()) {
         OS << '\n';
         printRec(D);
@@ -490,6 +512,7 @@ namespace {
 
     void visitClassDecl(ClassDecl *CD) {
       printCommon(CD, "class_decl");
+      printInherited(CD->getInherited());
       for (Decl *D : CD->getMembers()) {
         OS << '\n';
         printRec(D);

@@ -188,20 +188,28 @@ class ExtensionDecl : public Decl, public DeclContext {
   
   /// ExtendedType - The type being extended.
   Type ExtendedType;
+  MutableArrayRef<Type> Inherited;
   ArrayRef<Decl*> Members;
 public:
 
   ExtensionDecl(SourceLoc ExtensionLoc, Type ExtendedType,
+                MutableArrayRef<Type> Inherited,
                 DeclContext *Parent)
     : Decl(DeclKind::Extension, Parent),
       DeclContext(DeclContextKind::ExtensionDecl, Parent),
       ExtensionLoc(ExtensionLoc),
-      ExtendedType(ExtendedType) {
+      ExtendedType(ExtendedType), Inherited(Inherited) {
   }
   
   SourceLoc getExtensionLoc() const { return ExtensionLoc; }
   SourceLoc getLocStart() const { return ExtensionLoc; }
   Type getExtendedType() const { return ExtendedType; }
+  
+  /// \brief Retrieve the set of protocols that this type inherits (i.e,
+  /// explicitly conforms to).
+  MutableArrayRef<Type> getInherited() { return Inherited; }
+  ArrayRef<Type> getInherited() const { return Inherited; }
+
   ArrayRef<Decl*> getMembers() const { return Members; }
   void setMembers(ArrayRef<Decl*> M) { Members = M; }
 
@@ -471,11 +479,13 @@ public:
 /// to get the declared type ("Bool" in the above example).
 class OneOfDecl : public DistinctTypeDecl {
   SourceLoc OneOfLoc;
+  MutableArrayRef<Type> Inherited;
   ArrayRef<OneOfElementDecl*> Elements;
   OneOfType *OneOfTy;
 
 public:
-  OneOfDecl(SourceLoc OneOfLoc, Identifier Name, DeclContext *DC);
+  OneOfDecl(SourceLoc OneOfLoc, Identifier Name,
+            MutableArrayRef<Type> Inherited, DeclContext *DC);
 
   ArrayRef<OneOfElementDecl*> getElements() { return Elements; }
   void setElements(ArrayRef<OneOfElementDecl*> elems) { Elements = elems; }
@@ -483,6 +493,11 @@ public:
   SourceLoc getOneOfLoc() const { return OneOfLoc; }
   SourceLoc getLocStart() const { return OneOfLoc; }
 
+  /// \brief Retrieve the set of protocols that this type inherits (i.e,
+  /// explicitly conforms to).
+  MutableArrayRef<Type> getInherited() { return Inherited; }
+  ArrayRef<Type> getInherited() const { return Inherited; }
+  
   OneOfElementDecl *getElement(Identifier Name) const;
 
   OneOfType *getDeclaredType() const { return OneOfTy; }
@@ -508,14 +523,21 @@ public:
 /// to get the declared type ("Complex" in the above example).
 class StructDecl : public DistinctTypeDecl {
   SourceLoc StructLoc;
+  MutableArrayRef<Type> Inherited;
   ArrayRef<Decl*> Members;
   StructType *StructTy;
 
 public:
-  StructDecl(SourceLoc StructLoc, Identifier Name, DeclContext *DC);
+  StructDecl(SourceLoc StructLoc, Identifier Name,
+             MutableArrayRef<Type> Inherited, DeclContext *DC);
 
   SourceLoc getStructLoc() const { return StructLoc; }
   SourceLoc getLocStart() const { return StructLoc; }
+
+  /// \brief Retrieve the set of protocols that this type inherits (i.e,
+  /// explicitly conforms to).
+  MutableArrayRef<Type> getInherited() { return Inherited; }
+  ArrayRef<Type> getInherited() const { return Inherited; }
 
   ArrayRef<Decl*> getMembers() { return Members; }
   void setMembers(ArrayRef<Decl*> mems) { Members = mems; }
@@ -543,14 +565,21 @@ public:
 /// to get the declared type ("Complex" in the above example).
 class ClassDecl : public DistinctTypeDecl {
   SourceLoc ClassLoc;
+  MutableArrayRef<Type> Inherited;
   ArrayRef<Decl*> Members;
   ClassType *ClassTy;
 
 public:
-  ClassDecl(SourceLoc ClassLoc, Identifier Name, DeclContext *DC);
+  ClassDecl(SourceLoc ClassLoc, Identifier Name,
+            MutableArrayRef<Type> Inherited, DeclContext *DC);
 
   SourceLoc getClassLoc() const { return ClassLoc; }
   SourceLoc getLocStart() const { return ClassLoc; }
+
+  /// \brief Retrieve the set of protocols that this type inherits (i.e,
+  /// explicitly conforms to).
+  MutableArrayRef<Type> getInherited() { return Inherited; }
+  ArrayRef<Type> getInherited() const { return Inherited; }
 
   ArrayRef<Decl*> getMembers() { return Members; }
   void setMembers(ArrayRef<Decl*> mems) { Members = mems; }
