@@ -282,6 +282,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     if (!Methods.empty()) {
       Expr *FnRef = OverloadedDeclRefExpr::createWithCopy(Methods,
                                                           E1->getStartLoc());
+      // FIXME: This loses source information!
       return semaApplyExpr(new (Context) ConstructorCallExpr(FnRef, E2));
     }
   }
