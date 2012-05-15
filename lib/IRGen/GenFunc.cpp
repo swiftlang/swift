@@ -642,7 +642,7 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
                                              Fn->getName().str(), Types);
 
   // TODO: A linear series of if's is suboptimal.
-#define BUILTIN_CAST_OPERATION(id, name, overload) \
+#define BUILTIN_CAST_OPERATION(id, name) \
   if (BuiltinName == name) \
     return emitCastBuiltin(llvm::Instruction::id, Fn, IGF, args, result);
   

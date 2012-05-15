@@ -21,20 +21,20 @@
 
 /// Cast operations have type T1 -> T2.
 #ifndef BUILTIN_CAST_OPERATION
-#define BUILTIN_CAST_OPERATION(Id, Name, Overload) BUILTIN(Id, Name)
+#define BUILTIN_CAST_OPERATION(Id, Name) BUILTIN(Id, Name)
 #endif
-BUILTIN_CAST_OPERATION(Trunc   , "trunc",    OverloadedBuiltinKind::Integer)
-BUILTIN_CAST_OPERATION(ZExt    , "zext",     OverloadedBuiltinKind::Integer)
-BUILTIN_CAST_OPERATION(SExt    , "sext",     OverloadedBuiltinKind::Integer)
-BUILTIN_CAST_OPERATION(FPToUI  , "fptoui",   OverloadedBuiltinKind::Arithmetic)
-BUILTIN_CAST_OPERATION(FPToSI  , "fptosi",   OverloadedBuiltinKind::Arithmetic)
-BUILTIN_CAST_OPERATION(UIToFP  , "uitofp",   OverloadedBuiltinKind::Arithmetic)
-BUILTIN_CAST_OPERATION(SIToFP  , "sitofp",   OverloadedBuiltinKind::Arithmetic)
-BUILTIN_CAST_OPERATION(FPTrunc , "fptrunc",  OverloadedBuiltinKind::Arithmetic)
-BUILTIN_CAST_OPERATION(FPExt   , "fpext",    OverloadedBuiltinKind::Arithmetic)
-BUILTIN_CAST_OPERATION(PtrToInt, "ptrtoint", OverloadedBuiltinKind::Integer)
-BUILTIN_CAST_OPERATION(IntToPtr, "inttoptr", OverloadedBuiltinKind::Integer)
-BUILTIN_CAST_OPERATION(BitCast , "bitcast", OverloadedBuiltinKind::Arithmetic)
+BUILTIN_CAST_OPERATION(Trunc   , "trunc")
+BUILTIN_CAST_OPERATION(ZExt    , "zext")
+BUILTIN_CAST_OPERATION(SExt    , "sext")
+BUILTIN_CAST_OPERATION(FPToUI  , "fptoui")
+BUILTIN_CAST_OPERATION(FPToSI  , "fptosi")
+BUILTIN_CAST_OPERATION(UIToFP  , "uitofp")
+BUILTIN_CAST_OPERATION(SIToFP  , "sitofp")
+BUILTIN_CAST_OPERATION(FPTrunc , "fptrunc")
+BUILTIN_CAST_OPERATION(FPExt   , "fpext")
+BUILTIN_CAST_OPERATION(PtrToInt, "ptrtoint")
+BUILTIN_CAST_OPERATION(IntToPtr, "inttoptr")
+BUILTIN_CAST_OPERATION(BitCast , "bitcast")
 
 #undef BUILTIN_CAST_OPERATION
 
@@ -105,25 +105,25 @@ BUILTIN_GEP_OPERATION(Gep, "gep", OverloadedBuiltinKind::Integer)
 /// Load has type (Builtin.RawPointer) -> T
 /// FIXME: Is Arithmetic a proper stand in for 'any type?'
 #ifndef BUILTIN_LOAD
-#define BUILTIN_LOAD(Id, Name, Overload) BUILTIN(Id, Name)
+#define BUILTIN_LOAD(Id, Name) BUILTIN(Id, Name)
 #endif
-BUILTIN_LOAD(Load, "load", OverloadedBuiltinKind::Arithmetic)
+BUILTIN_LOAD(Load, "load")
 #undef BUILTIN_LOAD
 
 /// Assign has type (T, Builtin.RawPointer) -> ()
 /// FIXME: Is Arithmetic a proper stand in for 'any type?'
 #ifndef BUILTIN_ASSIGN
-#define BUILTIN_ASSIGN(Id, Name, Overload) BUILTIN(Id, Name)
+#define BUILTIN_ASSIGN(Id, Name) BUILTIN(Id, Name)
 #endif
-BUILTIN_ASSIGN(Assign, "assign", OverloadedBuiltinKind::Arithmetic)
+BUILTIN_ASSIGN(Assign, "assign")
 #undef BUILTIN_ASSIGN
 
 /// Init has type (T, Builtin.RawPointer) -> ()
 /// FIXME: Is Arithmetic a proper stand in for 'any type?'
 #ifndef BUILTIN_INIT
-#define BUILTIN_INIT(Id, Name, Overload) BUILTIN(Id, Name)
+#define BUILTIN_INIT(Id, Name) BUILTIN(Id, Name)
 #endif
-BUILTIN_INIT(Init, "init", OverloadedBuiltinKind::Arithmetic)
+BUILTIN_INIT(Init, "init")
 #undef BUILTIN_INIT
 
 #undef BUILTIN

@@ -45,8 +45,8 @@ enum class OverloadedBuiltinKind : unsigned char {
   /// The builtin is overloaded over all floating-point types.
   Float,
 
-  /// The builtin is overloaded over all integer and floating-point types.
-  Arithmetic
+  /// The builtin is has custom processing.
+  Special
 };
 
 

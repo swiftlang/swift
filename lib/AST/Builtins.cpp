@@ -159,6 +159,7 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
   default: assert(0 && "Not a cast operation");
   case BuiltinValueKind::Trunc:
     if (Output.isNull() ||
+        !Input->is<BuiltinIntegerType>() || !Output->is<BuiltinIntegerType>() ||
         Input->castTo<BuiltinIntegerType>()->getBitWidth() <=
         Output->castTo<BuiltinIntegerType>()->getBitWidth())
       return nullptr;
@@ -167,6 +168,7 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
   case BuiltinValueKind::ZExt:
   case BuiltinValueKind::SExt:
     if (Output.isNull() ||
+        !Input->is<BuiltinIntegerType>() || !Output->is<BuiltinIntegerType>() ||
         Input->castTo<BuiltinIntegerType>()->getBitWidth() >=
         Output->castTo<BuiltinIntegerType>()->getBitWidth())
       return nullptr;
@@ -187,24 +189,26 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
 
   case BuiltinValueKind::FPTrunc:
     if (Output.isNull() ||
+        !Input->is<BuiltinFloatType>() || !Output->is<BuiltinFloatType>() ||
         Input->castTo<BuiltinFloatType>()->getFPKind() <=
         Output->castTo<BuiltinFloatType>()->getFPKind())
       return nullptr;
     break;
   case BuiltinValueKind::FPExt:
     if (Output.isNull() ||
+        !Input->is<BuiltinFloatType>() || !Output->is<BuiltinFloatType>() ||
         Input->castTo<BuiltinFloatType>()->getFPKind() >=
         Output->castTo<BuiltinFloatType>()->getFPKind())
       return nullptr;
     break;
 
   case BuiltinValueKind::PtrToInt:
-    if (!Output.isNull()) return nullptr;
+    if (!Output.isNull() || !Input->is<BuiltinIntegerType>()) return nullptr;
     Output = Input;
     Input = Context.TheRawPointerType;
     break;
   case BuiltinValueKind::IntToPtr:
-    if (!Output.isNull()) return nullptr;
+    if (!Output.isNull() || !Input->is<BuiltinIntegerType>()) return nullptr;
     Output = Context.TheRawPointerType;
     break;
   case BuiltinValueKind::BitCast:
@@ -245,18 +249,17 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
 
 // There's deliberately no BUILTIN clause here so that we'll blow up
 // if new builtin categories are added there and not here.
-#define BUILTIN_CAST_OPERATION(id, name, overload) overload,
+#define BUILTIN_CAST_OPERATION(id, name) OverloadedBuiltinKind::Special,
 #define BUILTIN_GEP_OPERATION(id, name, overload) overload,
 #define BUILTIN_BINARY_OPERATION(id, name, overload) overload,
 #define BUILTIN_BINARY_PREDICATE(id, name, overload) overload,
-#define BUILTIN_LOAD(id, name, overload) overload,
-#define BUILTIN_ASSIGN(id, name, overload) overload,
-#define BUILTIN_INIT(id, name, overload) overload,
+#define BUILTIN_LOAD(id, name) OverloadedBuiltinKind::Special,
+#define BUILTIN_ASSIGN(id, name) OverloadedBuiltinKind::Special,
+#define BUILTIN_INIT(id, name) OverloadedBuiltinKind::Special,
 #include "swift/AST/Builtins.def"
 };
 
 /// Determines if a builtin type falls within the given category.
-/// The category cannot be OverloadedBuiltinKind::None.
 inline bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
   switch (OK) {
   case OverloadedBuiltinKind::None:
@@ -267,7 +270,7 @@ inline bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
     return T->is<BuiltinIntegerType>() || T->is<BuiltinRawPointerType>();
   case OverloadedBuiltinKind::Float:
     return T->is<BuiltinFloatType>();
-  case OverloadedBuiltinKind::Arithmetic:
+  case OverloadedBuiltinKind::Special:
     return true;
   }
   llvm_unreachable("bad overloaded builtin kind");
@@ -308,18 +311,18 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
     return getBinaryPredicate(Context, Id, ArgType1);
       
 #define BUILTIN(id, name)
-#define BUILTIN_CAST_OPERATION(id, name, overload)  case BuiltinValueKind::id:
+#define BUILTIN_CAST_OPERATION(id, name)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
     return getCastOperation(Context, Id, BV, ArgType1, ArgType2);
       
 #define BUILTIN(id, name)
-#define BUILTIN_LOAD(id, name, overload)  case BuiltinValueKind::id:
+#define BUILTIN_LOAD(id, name)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
     return getLoadOperation(Context, Id, ArgType1);
 
 #define BUILTIN(id, name)
-#define BUILTIN_ASSIGN(id, name, overload)  case BuiltinValueKind::id:
-#define BUILTIN_INIT(id, name, overload)  case BuiltinValueKind::id:
+#define BUILTIN_ASSIGN(id, name)  case BuiltinValueKind::id:
+#define BUILTIN_INIT(id, name)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
       return getStoreOperation(Context, Id, ArgType1);
   }
