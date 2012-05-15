@@ -59,6 +59,7 @@
 #include "swift/Basic/Optional.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
+#include "llvm/Intrinsics.h"
 #include "llvm/Module.h"
 #include "llvm/Support/CallSite.h"
 #include "llvm/Target/TargetData.h"
@@ -641,6 +642,15 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
   StringRef BuiltinName = getBuiltinBaseName(IGF.IGM.Context,
                                              Fn->getName().str(), Types);
 
+  if (BuiltinName == "trap") {
+    auto F = llvm::Intrinsic::getDeclaration(&IGF.IGM.Module,
+                                             llvm::Intrinsic::trap);
+    IGF.Builder.CreateCall(F);
+    // Mark that we're not returning anything.
+    result.setAsEmptyDirect();
+    return;
+  }
+  
   // TODO: A linear series of if's is suboptimal.
 #define BUILTIN_CAST_OPERATION(id, name) \
   if (BuiltinName == name) \

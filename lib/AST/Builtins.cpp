@@ -264,6 +264,13 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
   SmallVector<Type, 4> Types;
   StringRef OperationName = getBuiltinBaseName(Context, Id.str(), Types);
   
+  if (OperationName == "trap" && Types.empty()) {
+    Type Empty = TupleType::getEmpty(Context);
+    Type FnTy = FunctionType::get(Empty, Empty, Context);
+    return getBuiltinFunction(Context, Id, FnTy);
+  }
+  
+  
   BuiltinValueKind BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
 #define BUILTIN(id, name) \
        .Case(name, BuiltinValueKind::id)
