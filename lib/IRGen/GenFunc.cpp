@@ -609,30 +609,6 @@ static void emitCastBuiltin(llvm::Instruction::CastOps opcode, FuncDecl *Fn,
   result.setAsSingleDirectUnmanagedFragileValue(output);
 }
 
-#if 0
-static void emitBinaryBuiltin(Instruction::Opcode Op, FuncDecl *Fn,
-                              IRGenFunction &IGF, ArgList &args,
-                              CallResult &result) {
-  llvm::Value *lhs = args.Values.claimUnmanagedNext();
-  llvm::Value *rhs = args.Values.claimUnmanagedNext();
-  assert(args.Values.empty() && "wrong operands to binary operation");
-
-  llvm::Value *result;
-  if (llvm::Instruction::isBinaryOp(Op))
-    result = IGF.Builder.CreateBinOp((Instruction::BinaryOps)Op, lhs, rhs);
-//  else if (llvm::Instruction::
-  
-  V = IGF.Builder.CreateICmp(lhs, rhs);
-  V = IGF.Builder.CreateFCmp(lhs, rhs);
-  
-  
-  
-                              
-  return result.setAsSingleDirectUnmanagedFragileValue(
-                                 IGF.Builder.Create##Op(lhs, rhs));
-}
-#endif
-
 static void emitCompareBuiltin(llvm::CmpInst::Predicate pred, FuncDecl *Fn,
                                IRGenFunction &IGF, ArgList &args,
                                CallResult &result) {
@@ -670,8 +646,14 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
   if (BuiltinName == name) \
     return emitCastBuiltin(llvm::Instruction::id, Fn, IGF, args, result);
   
-//#define BUILTIN_GEP_OPERATION(id, name, overload) overload,
-//#define BUILTIN_BINARY_OPERATION(id, name, overload) overload,
+#define BUILTIN_BINARY_OPERATION(id, name, overload) \
+  if (BuiltinName == name) { \
+    llvm::Value *lhs = args.Values.claimUnmanagedNext(); \
+    llvm::Value *rhs = args.Values.claimUnmanagedNext(); \
+    llvm::Value *v = IGF.Builder.Create ##id(lhs, rhs); \
+    return result.setAsSingleDirectUnmanagedFragileValue(v); \
+  }
+  
 #define BUILTIN_BINARY_PREDICATE(id, name, overload) \
   if (BuiltinName == name) \
     return emitCompareBuiltin(llvm::CmpInst::id, Fn, IGF, args, result);
@@ -739,45 +721,8 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
     // Perform the init operation.
     return valueTI.initialize(IGF, args.Values, addr);
   }
-
   
-  Type BuiltinType, BuiltinType2;
-  switch (isBuiltinValue(IGF.IGM.Context, Fn->getName().str(),
-                         BuiltinType, BuiltinType2)) {
-  default: assert(0 && "Unhandled builtin in IRGen");
-  case BuiltinValueKind::None: llvm_unreachable("not a builtin after all!");
-      
-/// A macro which expands to the emission of a simple binary operation
-/// or predicate.
-#define BINARY_OPERATION(Op) {                                              \
-    llvm::Value *lhs = args.Values.claimUnmanagedNext();                    \
-    llvm::Value *rhs = args.Values.claimUnmanagedNext();                    \
-    assert(args.Values.empty() && "wrong operands to binary operation");    \
-    return result.setAsSingleDirectUnmanagedFragileValue(                   \
-                                         IGF.Builder.Create##Op(lhs, rhs)); \
-  }
-
-  case BuiltinValueKind::Add:       BINARY_OPERATION(Add)
-  case BuiltinValueKind::FAdd:      BINARY_OPERATION(FAdd)
-  case BuiltinValueKind::And:       BINARY_OPERATION(And)
-  case BuiltinValueKind::AShr:      BINARY_OPERATION(AShr)
-  case BuiltinValueKind::LShr:      BINARY_OPERATION(LShr)
-  case BuiltinValueKind::FDiv:      BINARY_OPERATION(FDiv)
-  case BuiltinValueKind::Mul:       BINARY_OPERATION(Mul)
-  case BuiltinValueKind::FMul:      BINARY_OPERATION(FMul)
-  case BuiltinValueKind::Or:        BINARY_OPERATION(Or)
-  case BuiltinValueKind::SDiv:      BINARY_OPERATION(SDiv)
-  case BuiltinValueKind::SDivExact: BINARY_OPERATION(ExactSDiv)
-  case BuiltinValueKind::Shl:       BINARY_OPERATION(Shl)
-  case BuiltinValueKind::SRem:      BINARY_OPERATION(SRem)
-  case BuiltinValueKind::Sub:       BINARY_OPERATION(Sub)
-  case BuiltinValueKind::FSub:      BINARY_OPERATION(FSub)
-  case BuiltinValueKind::UDiv:      BINARY_OPERATION(UDiv)
-  case BuiltinValueKind::UDivExact: BINARY_OPERATION(ExactUDiv)
-  case BuiltinValueKind::URem:      BINARY_OPERATION(URem)
-  case BuiltinValueKind::Xor:       BINARY_OPERATION(Xor)
-  }
-  llvm_unreachable("bad builtin kind!");
+  llvm_unreachable("IRGen unimplemented for this builtin!");
 }
 
 namespace {
