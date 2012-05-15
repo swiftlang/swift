@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "NameLookup.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "llvm/ADT/APFloat.h"
@@ -513,7 +514,6 @@ SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralType LitTy) {
   // Look up the convertFrom*Literal method on the type.  If it is missing,
   // then the type isn't compatible with literals.  If it is present, it must
   // have a single argument.
-  SmallVector<ValueDecl*, 8> Methods;
   const char *MethodName = 0;
   switch (LitTy) {
   case LiteralType::Int:    MethodName = "convertFromIntegerLiteral"; break;
@@ -522,28 +522,34 @@ SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralType LitTy) {
   case LiteralType::String: MethodName = "convertFromStringLiteral"; break;
   }
   assert(MethodName && "Didn't know LitTy");
-  TC.TU.lookupMembers(Ty, TC.Context.getIdentifier(MethodName), Methods);
+  MemberLookup Lookup(Ty, TC.Context.getIdentifier(MethodName), TC.TU);
   
-  if (Methods.empty()) {
+  if (!Lookup.isSuccess() || Ty->is<TupleType>() || Ty->is<LValueType>()) {
     diagnose(Loc, diag::type_not_compatible_literal, Ty);
     return std::pair<FuncDecl*, Type>();
   }
-  
-  if (Methods.size() != 1) {
+
+  if (Lookup.Results.size() != 1) {
     diagnose(Loc, diag::type_ambiguous_literal_conversion, Ty, MethodName);
-    if (Flags & CF_Apply)
-      for (ValueDecl *D : Methods)
-        diagnose(D->getLocStart(), diag::found_candidate);
+    for (MemberLookupResult Res : Lookup.Results) {
+      assert(Res.Kind != MemberLookupResult::TupleElement &&
+             "Unexpected lookup result in non-tuple");
+      diagnose(Res.D->getLocStart(), diag::found_candidate);
+    }
     return std::pair<FuncDecl*, Type>();
   }
   
   // Verify that the implementation is a metatype 'static' func.
-  FuncDecl *Method = dyn_cast<FuncDecl>(Methods[0]);
-  if (Method == 0 || !Method->isStatic()) {
-    diagnose(Method->getLocStart(), diag::type_literal_conversion_not_static,
+  MemberLookupResult LookupResult = Lookup.Results[0];
+  assert(LookupResult.Kind != MemberLookupResult::TupleElement &&
+         "Unexpected lookup result in non-tuple");
+  if (LookupResult.Kind != MemberLookupResult::MetatypeMember ||
+      !isa<FuncDecl>(LookupResult.D)) {
+    diagnose(LookupResult.D->getLocStart(), diag::type_literal_conversion_not_static,
              Ty, MethodName);
     return std::pair<FuncDecl*, Type>();
   }
+  FuncDecl *Method = cast<FuncDecl>(LookupResult.D);
   
   // Check that the type of the 'convertFrom*Literal' method makes
   // sense.  We want a type of "S -> DestTy" where S is the expected type.
