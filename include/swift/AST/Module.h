@@ -105,10 +105,18 @@ public:
   void lookupGlobalValue(Identifier Name, NLKind LookupKind, 
                          SmallVectorImpl<ValueDecl*> &Result);
 
-  /// lookupGlobalExtensionMethods - Lookup the extensions members for the
-  /// specified BaseType with the specified type, and return them in Result.
-  void lookupGlobalExtensionMethods(Type BaseType, Identifier Name,
-                                    SmallVectorImpl<ValueDecl*> &Result);
+  /// lookupMembers - Lookup the members for the specified BaseType with
+  /// the specified name, and return them in Result.  This looks in both the
+  /// type declaration itself and in extensions.
+  void lookupMembers(Type BaseType, Identifier Name,
+                     SmallVectorImpl<ValueDecl*> &Result);
+
+  /// lookupValueConstructor - Lookup value constructors for the specified
+  /// BaseType, and return them in Result.This looks in both the
+  /// type declaration itself and in extensions.
+  void lookupValueConstructors(Type BaseType,
+                               SmallVectorImpl<ValueDecl*> &Result);
+
 
   static bool classof(const Module *M) {
     return true;

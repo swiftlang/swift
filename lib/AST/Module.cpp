@@ -249,15 +249,13 @@ void Module::lookupGlobalValue(Identifier Name, NLKind LookupKind,
   }
 }
 
-/// lookupGlobalExtensionMethods - Lookup the extensions members for the
-/// specified BaseType with the specified type, and return them in Result.
-void Module::lookupGlobalExtensionMethods(Type BaseType, Identifier Name,
-                                          SmallVectorImpl<ValueDecl*> &Result) {
-  assert(Result.empty() &&
-         "This expects that the input list is empty, could be generalized");
-  
+static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
+                                    ArrayRef<ValueDecl*> BaseMembers,
+                                    Module *CurModule,
+                                    Module *BaseModule,
+                                    SmallVectorImpl<ValueDecl*> &Result) {
   // Find all extensions in this module.
-  for (ExtensionDecl *ED : lookupExtensions(BaseType)) {
+  for (ExtensionDecl *ED : CurModule->lookupExtensions(BaseType)) {
     for (Decl *Member : ED->getMembers()) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
         if (VD->getName() == Name)
@@ -265,12 +263,21 @@ void Module::lookupGlobalExtensionMethods(Type BaseType, Identifier Name,
     }
   }
 
-  // If we found anything in local extensions, they shadow imports.
-  if (!Result.empty() || isa<BuiltinModule>(this)) return;
+  if (BaseModule == CurModule) {
+    for (ValueDecl *VD : BaseMembers) {
+      if (VD->getName() == Name)
+        Result.push_back(VD);
+    }
+  }
 
-  TranslationUnit &TU = *cast<TranslationUnit>(this);
+  // If we found anything in local extensions, they shadow imports.
+  if (!Result.empty() || isa<BuiltinModule>(CurModule)) return;
+
+  TranslationUnit &TU = *cast<TranslationUnit>(CurModule);
 
   // Otherwise, check our imported extensions as well.
+  // FIXME: Is this actually looking in the right order?  What happens when
+  // one module imports two other modules which extend the same type?  
   llvm::SmallPtrSet<Module *, 16> Visited;
   for (auto &ImpEntry : TU.getImportedModules()) {
     if (!Visited.insert(ImpEntry.second))
@@ -283,10 +290,94 @@ void Module::lookupGlobalExtensionMethods(Type BaseType, Identifier Name,
             Result.push_back(VD);
       }
     }
-    
+
+    if (BaseModule == ImpEntry.second) {
+      for (ValueDecl *VD : BaseMembers) {
+        if (VD->getName() == Name)
+          Result.push_back(VD);
+      }
+    }
+
     // If we found something in an imported module, it wins.
     if (!Result.empty()) return;
   }
+}
+
+/// lookupGlobalExtensionMethods - Lookup the extensions members for the
+/// specified BaseType with the specified type, and return them in Result.
+void Module::lookupMembers(Type BaseType, Identifier Name,
+                           SmallVectorImpl<ValueDecl*> &Result) {
+  assert(Result.empty() &&
+         "This expects that the input list is empty, could be generalized");
+
+  TypeDecl *D;
+  ArrayRef<ValueDecl*> BaseMembers;
+  SmallVector<ValueDecl*, 2> BaseMembersStorage;
+  if (StructType *ST = BaseType->getAs<StructType>()) {
+    // FIXME: Refuse to look up "constructors" until we have real constructors.
+    if (ST->getDecl()->getName() == Name)
+      return;
+
+    D = ST->getDecl();
+    BaseMembers = ST->getDecl()->getMembers();
+  } else if (OneOfType *OOT = BaseType->getAs<OneOfType>()) {
+    // FIXME: Refuse to look up "constructors" until we have real constructors.
+    if (OOT->getDecl()->getName() == Name)
+      return;
+
+    D = OOT->getDecl();
+    if (OneOfElementDecl *OOED = OOT->getDecl()->getElement(Name))
+      BaseMembersStorage.push_back(OOED);
+    BaseMembers = BaseMembersStorage;
+  } else {
+    return;
+  }
+
+  DeclContext *DC = D->getDeclContext();
+  while (!DC->isModuleContext())
+    DC = DC->getParent();
+
+  DoGlobalExtensionLookup(BaseType, Name, BaseMembers, this, cast<Module>(DC),
+                          Result);
+}
+
+/// lookupGlobalExtensionMethods - Lookup the extensions members for the
+/// specified BaseType with the specified type, and return them in Result.
+void Module::lookupValueConstructors(Type BaseType,
+                                     SmallVectorImpl<ValueDecl*> &Result) {
+  assert(Result.empty() &&
+         "This expects that the input list is empty, could be generalized");
+
+  TypeDecl *D;
+  Identifier Name;
+  ArrayRef<ValueDecl*> BaseMembers;
+  SmallVector<ValueDecl*, 2> BaseMembersStorage;
+  if (StructType *ST = BaseType->getAs<StructType>()) {
+    D = ST->getDecl();
+    Name = ST->getDecl()->getName();
+    BaseMembers = ST->getDecl()->getMembers();
+  } else if (OneOfType *OOT = BaseType->getAs<OneOfType>()) {
+    D = OOT->getDecl();
+    Name = OOT->getDecl()->getName();
+    // FIXME: Is this really supposed to happen?  If so, are we ever
+    // supposed to suppress it?
+    Result.append(OOT->getDecl()->getElements().begin(),
+                  OOT->getDecl()->getElements().end());
+  } else {
+    return;
+  }
+
+  DeclContext *DC = D->getDeclContext();
+  if (!DC->isModuleContext()) {
+    for (ValueDecl *VD : BaseMembers) {
+      if (VD->getName() == Name)
+        Result.push_back(VD);
+    }
+    return;
+  }
+
+  DoGlobalExtensionLookup(BaseType, Name, BaseMembers, this, cast<Module>(DC),
+                          Result);
 }
 
 //===----------------------------------------------------------------------===//

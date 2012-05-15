@@ -522,8 +522,7 @@ SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralType LitTy) {
   case LiteralType::String: MethodName = "convertFromStringLiteral"; break;
   }
   assert(MethodName && "Didn't know LitTy");
-  TC.TU.lookupGlobalExtensionMethods(Ty, TC.Context.getIdentifier(MethodName),
-                                     Methods);
+  TC.TU.lookupMembers(Ty, TC.Context.getIdentifier(MethodName), Methods);
   
   if (Methods.empty()) {
     diagnose(Loc, diag::type_not_compatible_literal, Ty);
@@ -751,9 +750,8 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
   
   // Find all of the constructors of the string type we're coercing to.
   SmallVector<ValueDecl *, 4> Methods;
-  // Look for extension methods with the same name as the class.
-  // FIXME: This should look specifically for constructors.
-  TC.TU.lookupGlobalExtensionMethods(DestTy, DestTyDecl->getName(), Methods);
+  // Look for constructors.
+  TC.TU.lookupValueConstructors(DestTy, Methods);
 
   for (auto &Segment : E->getSegments()) {
     // First, try coercing to the string type.

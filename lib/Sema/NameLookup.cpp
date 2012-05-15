@@ -42,31 +42,12 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
   // special and can't have extensions.
   if (MetaTypeType *MTT = BaseTy->getAs<MetaTypeType>()) {
     // The metatype represents an arbitrary named type: dig through to the
-    // declared type to see what we're dealing with.  If the type was erroneous
-    // then silently squish this erroneous subexpression.
+    // declared type to see what we're dealing with.
     Type Ty = MTT->getTypeDecl()->getDeclaredType();
 
-    // Handle references to the constructors of a oneof.
-    if (OneOfType *OOTy = Ty->getAs<OneOfType>()) {
-      OneOfElementDecl *Elt = OOTy->getDecl()->getElement(MemberName);
-      if (Elt) {
-        Results.push_back(Result::getMetatypeMember(Elt));
-
-        // Fall through to find any members with the same name.
-      }
-    }
-
-    if (StructType *STy = Ty->getAs<StructType>()) {
-      if (STy->getDecl()->getName() == MemberName) {
-        ValueDecl *ConstructMember = STy->getDecl()->getMembers().back();
-        Results.push_back(Result::getMetatypeMember(ConstructMember));
-        // Fall through to find any members with the same name.
-      }
-    }
-        
-    // Otherwise, just perform normal dot lookup on the type with the specified
+    // Just perform normal dot lookup on the type with the specified
     // member name to see if we find extensions or anything else.  For example,
-    // If type SomeTy.SomeMember can look up static functions, and can even look
+    // type SomeTy.SomeMember can look up static functions, and can even look
     // up non-static functions as well (thus getting the address of the member).
     doIt(Ty, M, Visited);
     return;
@@ -108,22 +89,26 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
   }
   
   // Check to see if this is a reference to a tuple field.
-  if (TupleType *TT = BaseTy->getAs<TupleType>())
-    doTuple(TT);
-
-  // Add direct members ot the struct to the lookup, if applicable.
-  // FIXME: Integrate this with lookupGlobalExtensionMethods.
-  if (StructType *ST = BaseTy->getAs<StructType>()) {
-    for (ValueDecl *Member : ST->getDecl()->getMembers()) {
-      if (isa<VarDecl>(Member) && Member->getName() == MemberName) {
-        Results.push_back(Result::getMemberProperty(Member));
+  if (TupleType *TT = BaseTy->getAs<TupleType>()) {
+    // If the field name exists, we win.  Otherwise, if the field name is a
+    // dollarident like $4, process it as a field index.
+    int FieldNo = TT->getNamedElementId(MemberName);
+    if (FieldNo != -1) {
+      Results.push_back(MemberLookupResult::getTupleElement(FieldNo));
+    } else {
+      StringRef NameStr = MemberName.str();
+      if (NameStr.startswith("$")) {
+        unsigned Value = 0;
+        if (!NameStr.substr(1).getAsInteger(10, Value) &&
+            Value < TT->getFields().size())
+          Results.push_back(MemberLookupResult::getTupleElement(Value));
       }
     }
   }
 
   // Look in any extensions that add methods to the base type.
   SmallVector<ValueDecl*, 8> ExtensionMethods;
-  M.lookupGlobalExtensionMethods(BaseTy, MemberName, ExtensionMethods);
+  M.lookupMembers(BaseTy, MemberName, ExtensionMethods);
 
   for (ValueDecl *VD : ExtensionMethods) {
     if (TypeDecl *TAD = dyn_cast<TypeDecl>(VD)) {
@@ -137,27 +122,13 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
         Results.push_back(Result::getMemberFunction(FD));
       continue;
     }
+    if (OneOfElementDecl *OOED = dyn_cast<OneOfElementDecl>(VD)) {
+      Results.push_back(Result::getMetatypeMember(OOED));
+      continue;
+    }
     assert((isa<VarDecl>(VD) || isa<SubscriptDecl>(VD)) &&
            "Unexpected extension member");
     Results.push_back(Result::getMemberProperty(VD));
-  }
-}
-
-void MemberLookup::doTuple(TupleType *TT) {
-  // If the field name exists, we win.  Otherwise, if the field name is a
-  // dollarident like $4, process it as a field index.
-  int FieldNo = TT->getNamedElementId(MemberName);
-  if (FieldNo != -1) {
-    Results.push_back(MemberLookupResult::getTupleElement(FieldNo));
-    return;
-  }
-  
-  StringRef NameStr = MemberName.str();
-  if (NameStr.startswith("$")) {
-    unsigned Value = 0;
-    if (!NameStr.substr(1).getAsInteger(10, Value) &&
-        Value < TT->getFields().size())
-      Results.push_back(MemberLookupResult::getTupleElement(Value));
   }
 }
 

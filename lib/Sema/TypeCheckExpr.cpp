@@ -276,45 +276,12 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
       return new (Context) CoerceExpr(E1, coerceToType(E2, Ty));
     }
 
-    // The only well formed version of this is a oneof (or sugar for one) that
-    // is constructed.
-    // TODO: It might make sense to be able to "default construct" protocols if
-    // they have a construction member.
-    // TODO: We could allow constructing a tuple this way, though it is somewhat
-    // silly and pointless to do so.
-    if (OneOfType *OOT = Ty->getAs<OneOfType>()) {
-      OneOfDecl *OOD = OOT->getDecl();
-      SmallVector<ValueDecl *, 4> Methods;
-
-      // Look for extension methods with the same name as the class.
-      // FIXME: This should look specifically for constructors.
-      TU.lookupGlobalExtensionMethods(Ty, OOD->getName(), Methods);
-      
-      // Add each of the one-of elements.
-      Methods.insert(Methods.begin(),
-                     OOD->getElements().begin(), OOD->getElements().end());
+    // Check for a type with a constructor.
+    SmallVector<ValueDecl *, 4> Methods;
+    TU.lookupValueConstructors(Ty, Methods);
+    if (!Methods.empty()) {
       Expr *FnRef = OverloadedDeclRefExpr::createWithCopy(Methods,
                                                           E1->getStartLoc());
-      
-      // FIXME: This loses source information!
-      return semaApplyExpr(new (Context) ConstructorCallExpr(FnRef, E2));
-    }
-
-    // FIXME: This is redundant with the OneOf case.
-    if (StructType *ST = Ty->getAs<StructType>()) {
-      StructDecl *SD = ST->getDecl();
-      SmallVector<ValueDecl *, 4> Methods;
-
-      // Look for extension methods with the same name as the class.
-      // FIXME: This should look specifically for constructors.
-      TU.lookupGlobalExtensionMethods(Ty, SD->getName(), Methods);
-      // FIXME: This is an ugly hack to get the implicit constructor.
-      assert(SD->getMembers().back()->getName() == SD->getName());
-      Methods.push_back(SD->getMembers().back());
-      Expr *FnRef = OverloadedDeclRefExpr::createWithCopy(Methods,
-                                                          E1->getStartLoc());
-
-      // FIXME: This loses source information!
       return semaApplyExpr(new (Context) ConstructorCallExpr(FnRef, E2));
     }
   }

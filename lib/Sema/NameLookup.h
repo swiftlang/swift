@@ -113,7 +113,6 @@ private:
   Identifier MemberName;
   typedef llvm::SmallPtrSet<TypeDecl *, 8> VisitedSet;
   void doIt(Type BaseTy, Module &M, VisitedSet &Visited);
-  void doTuple(TupleType *TT);
 };
 
 } // end namespace swift
