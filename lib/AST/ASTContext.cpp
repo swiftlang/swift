@@ -125,20 +125,25 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
 
 /// getTupleType - Return the uniqued tuple type with the specified elements.
 TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
-  // Check to see if we've already seen this tuple before.
-  llvm::FoldingSetNodeID ID;
-  TupleType::Profile(ID, Fields);
-  
-  // FIXME: This is pointless for types with named fields.  The ValueDecl fields
-  // themselves are not unique'd so they all get their own addresses, which
-  // means that we'll never get a hit here.  This should unique all-type tuples
-  // though.  Likewise with default values.
+  bool HasAnyDefaultValues = false;
+  for (const TupleTypeElt &Elt : Fields) {
+    if (Elt.hasInit()) {
+      HasAnyDefaultValues = true;
+      break;
+    }
+  }
+
   void *InsertPos = 0;
-  if (TupleType *TT = C.Impl.TupleTypes.FindNodeOrInsertPos(ID, InsertPos))
-    return TT;
-  
-  // Okay, we didn't find one.  Make a copy of the fields list into ASTContext
-  // owned memory.
+  if (!HasAnyDefaultValues) {
+    // Check to see if we've already seen this tuple before.
+    llvm::FoldingSetNodeID ID;
+    TupleType::Profile(ID, Fields);
+
+    if (TupleType *TT = C.Impl.TupleTypes.FindNodeOrInsertPos(ID, InsertPos))
+      return TT;
+  }
+
+  // Make a copy of the fields list into ASTContext owned memory.
   TupleTypeElt *FieldsCopy =
     C.AllocateCopy<TupleTypeElt>(Fields.begin(), Fields.end());
   
@@ -153,7 +158,8 @@ TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
   Fields = ArrayRef<TupleTypeElt>(FieldsCopy, Fields.size());
   
   TupleType *New = new (C) TupleType(Fields, IsCanonical ? &C : 0);
-  C.Impl.TupleTypes.InsertNode(New, InsertPos);
+  if (!HasAnyDefaultValues)
+    C.Impl.TupleTypes.InsertNode(New, InsertPos);
 
   return New;
 }
