@@ -245,6 +245,9 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, CanType canTy) {
     return convertOneOfType(IGM, cast<OneOfType>(ty));
   case TypeKind::Struct:
     return convertStructType(IGM, cast<StructType>(ty));
+  case TypeKind::Class:
+    // FIXME: Implement!
+    return nullptr;
   case TypeKind::Function:
     return convertFunctionType(IGM, cast<FunctionType>(ty));
   case TypeKind::Array:

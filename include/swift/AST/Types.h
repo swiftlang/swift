@@ -30,6 +30,7 @@ namespace llvm {
 }
 namespace swift {
   class ASTContext;
+  class ClassDecl;
   class Expr;
   class Identifier;
   class TypeAliasDecl;
@@ -549,6 +550,29 @@ public:
 private:
   StructType(StructDecl *TheDecl, ASTContext &Ctx);
   friend class StructDecl;
+};
+
+/// ClassType - This represents the type declared by a ClassDecl.
+class ClassType : public TypeBase {  
+  /// TheDecl - This is the TypeDecl which declares the given type. It
+  /// specifies the name and other useful information about this type.
+  ClassDecl * const TheDecl;
+  
+public:
+  /// getDecl() - Returns the decl which declares this type.
+  ClassDecl *getDecl() const { return TheDecl; }
+
+  void print(raw_ostream &O) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ClassType *D) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Class;
+  }
+  
+private:
+  ClassType(ClassDecl *TheDecl, ASTContext &Ctx);
+  friend class ClassDecl;
 };
 
 /// MetaTypeType - This is the type given to a metatype value.  When a type is

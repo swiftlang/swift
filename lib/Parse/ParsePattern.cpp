@@ -34,6 +34,7 @@ bool Parser::checkFullyTyped(Type type) {
   case TypeKind::Protocol:
   case TypeKind::OneOf:
   case TypeKind::Struct:
+  case TypeKind::Class:
   case TypeKind::MetaType:
   case TypeKind::Module:
   case TypeKind::UnstructuredDependent:

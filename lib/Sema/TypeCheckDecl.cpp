@@ -141,6 +141,12 @@ public:
     cast<OneOfElementDecl>(SD->getMembers().back())->setArgumentType(TT);
   }
 
+  void visitClassDecl(ClassDecl *CD) {
+    for (Decl *Member : CD->getMembers()) {
+      visit(Member);
+    }
+  }
+
   void visitProtocolDecl(ProtocolDecl *PD) {
     // Check the list of inherited protocols.
     for (auto Inherited : PD->getInherited()) {

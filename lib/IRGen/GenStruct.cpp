@@ -176,6 +176,9 @@ void IRGenModule::emitStructType(StructType *st) {
     case DeclKind::Struct:
       emitStructType(cast<StructDecl>(member)->getDeclaredType());
       continue;
+    case DeclKind::Class:
+      // FIXME: Implement!
+      continue;
     case DeclKind::Var:
       if (cast<VarDecl>(member)->isProperty())
         // Getter/setter will be handled separately.

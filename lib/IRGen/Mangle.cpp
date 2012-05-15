@@ -145,23 +145,15 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     return;
   }
 
-  case DeclContextKind::OneOfDecl: {
-    OneOfDecl *oneof = cast<OneOfDecl>(ctx);
-
-    // FIXME: The mangling rule here is kind of weird.
-    if (tryMangleSubstitution(oneof->getDeclaredType())) return;
-    mangleDeclContext(ctx->getParent());
-    mangleIdentifier(oneof->getName());
-    addSubstitution(oneof->getDeclaredType());
-    return;
-  }
-
-  case DeclContextKind::StructDecl: {
-    StructDecl *sdecl = cast<StructDecl>(ctx);
-
-    // FIXME: The mangling rule here is kind of weird.
-    mangleType(sdecl->getDeclaredType(), ExplosionKind::Minimal, 0);
-    return;
+  case DeclContextKind::DistinctTypeDecl: {
+    if (isa<OneOfDecl>(ctx) || isa<StructDecl>(ctx) || isa<ClassDecl>(ctx)) {
+      // FIXME: The mangling rule here is kind of weird.
+      mangleType(cast<DistinctTypeDecl>(ctx)->getDeclaredType(),
+                 ExplosionKind::Minimal, 0);
+      return;
+    }
+    // It's not clear what would be mangled for protocols.
+    llvm_unreachable("Unexpected context");
   }
 
   case DeclContextKind::ExtensionDecl:
@@ -175,10 +167,6 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     // FIXME: we don't need to agree about these across components, but
     // that's no excuse for not mangling *something* in here.
     break;
-
-  case DeclContextKind::ProtocolDecl:
-    // It's not clear what members would be here that need to be mangled.
-    llvm_unreachable("reference to member of protocol?");
   }
 
   llvm_unreachable("bad decl context");
@@ -308,6 +296,22 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     // type ::= 'N' decl
     Buffer << 'N';
     mangleDeclName(cast<StructType>(base)->getDecl());
+
+    addSubstitution(base);
+    return;
+  }
+
+  case TypeKind::Class: {
+    // Try to mangle the entire name as a substitution.
+    // type ::= substitution
+    if (tryMangleSubstitution(base))
+      return;
+
+    // FIXME: Leaving this the same as oneof for the moment, to avoid changing
+    // the mangling, but this should probably change eventually.
+    // type ::= 'N' decl
+    Buffer << 'N';
+    mangleDeclName(cast<ClassType>(base)->getDecl());
 
     addSubstitution(base);
     return;

@@ -61,21 +61,18 @@ Resilience ValueDecl::getResilienceFrom(Component *C) const {
       return Resilience::InherentlyFragile;
 
     // For oneofs, we walk out through the oneof decl.
-    case DeclContextKind::OneOfDecl:
-      D = cast<OneOfDecl>(DC);
-      goto HandleDecl;
-
-    // For structs, we walk through the struct decl.
-    case DeclContextKind::StructDecl:
-      D = cast<StructDecl>(DC);
+    case DeclContextKind::DistinctTypeDecl:
+      if (isa<ProtocolDecl>(DC)) {
+        // FIXME: no attrs here, either.
+        return Resilience::Fragile;
+      }
+      assert(isa<StructDecl>(DC) || isa<OneOfDecl>(DC) || isa<ClassDecl>(DC) &&
+             "Unexpected decl");
+      D = cast<DistinctTypeDecl>(DC);
       goto HandleDecl;
 
     case DeclContextKind::ExtensionDecl:
       // FIXME: we can't use the ExtensionDecl, it has no attrs.
-      return Resilience::Fragile;
-
-    case DeclContextKind::ProtocolDecl:
-      // FIXME: no attrs here, either.
       return Resilience::Fragile;
     }
     llvm_unreachable("bad decl context kind!");

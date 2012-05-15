@@ -160,6 +160,10 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
   case DeclKind::Struct:
     return IGM.emitStructType(cast<StructDecl>(D)->getDeclaredType());
 
+  case DeclKind::Class:
+    // FIXME: Implement!
+    return;
+
   // These declarations don't require IR-gen support.
   case DeclKind::Import:
     return;
@@ -318,24 +322,12 @@ static void addOwnerArgument(ASTContext &ctx, ValueDecl *value,
     uncurryLevel++;
     return;
 
-  case DeclContextKind::OneOfDecl:
-    resultType = addOwnerArgument(ctx, cast<OneOfDecl>(DC)->getDeclaredType(),
-                                  resultType);
+  case DeclContextKind::DistinctTypeDecl: {
+    Type declTy = cast<DistinctTypeDecl>(DC)->getDeclaredType();
+    resultType = addOwnerArgument(ctx, declTy, resultType);
     uncurryLevel++;
     return;
-
-  case DeclContextKind::StructDecl:
-    resultType = addOwnerArgument(ctx, cast<StructDecl>(DC)->getDeclaredType(),
-                                  resultType);
-    uncurryLevel++;
-    return;
-
-  case DeclContextKind::ProtocolDecl:
-    resultType = addOwnerArgument(ctx,
-                                  cast<ProtocolDecl>(DC)->getDeclaredType(),
-                                  resultType);
-    uncurryLevel++;
-    return;
+  }
   }
   llvm_unreachable("bad decl context");
 }
@@ -455,6 +447,9 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     case DeclKind::Struct:
       emitStructType(cast<StructDecl>(member)->getDeclaredType());
       continue;
+    case DeclKind::Class:
+      // FIXME: Implement!
+      continue;
     case DeclKind::Var:
       if (cast<VarDecl>(member)->isProperty())
         // Getter/setter will be handled separately.
@@ -489,6 +484,10 @@ void IRGenFunction::emitLocal(Decl *D) {
 
   case DeclKind::Struct:
     return emitStructType(cast<StructDecl>(D)->getDeclaredType());
+
+  case DeclKind::Class:
+    // FIXME: Implement
+    return;
 
   case DeclKind::TypeAlias:
   case DeclKind::OneOfElement:

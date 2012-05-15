@@ -42,14 +42,8 @@ Type DeclContext::getDeclaredTypeOfContext() const {
   case DeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(this)->getExtendedType();
     
-  case DeclContextKind::OneOfDecl:
-    return cast<OneOfDecl>(this)->getDeclaredType();
-    
-  case DeclContextKind::ProtocolDecl:
-    return cast<ProtocolDecl>(this)->getDeclaredType();
-    
-  case DeclContextKind::StructDecl:
-    return cast<StructDecl>(this)->getDeclaredType();
+  case DeclContextKind::DistinctTypeDecl:
+    return cast<DistinctTypeDecl>(this)->getDeclaredType();
   }
 }
 
@@ -140,6 +134,7 @@ bool ValueDecl::isDefinition() const {
   case DeclKind::OneOf:
   case DeclKind::OneOfElement:
   case DeclKind::Struct:
+  case DeclKind::Class:
   case DeclKind::TypeAlias:
   case DeclKind::Protocol:
     return true;
@@ -164,7 +159,7 @@ bool ValueDecl::isInstanceMember() const {
   return false;
 }
 
-Type TypeDecl::getDeclaredType() {
+Type TypeDecl::getDeclaredType() const {
   if (auto TAD = dyn_cast<TypeAliasDecl>(this))
     return TAD->getAliasType();
   if (auto SD = dyn_cast<StructDecl>(this))
@@ -185,8 +180,8 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
 }
 
 OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name, DeclContext *Parent)
-  : TypeDecl(DeclKind::OneOf, Parent, Name, Type()), 
-    DeclContext(DeclContextKind::OneOfDecl, Parent), OneOfLoc(OneOfLoc) {
+  : DistinctTypeDecl(DeclKind::OneOf, Parent, Name, Type()), 
+    OneOfLoc(OneOfLoc) {
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(this));
   // Compute the associated type for this OneOfDecl.
@@ -194,8 +189,8 @@ OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name, DeclContext *Parent)
 }
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, DeclContext *Parent)
-  : TypeDecl(DeclKind::Struct, Parent, Name, Type()), 
-    DeclContext(DeclContextKind::StructDecl, Parent), StructLoc(StructLoc) {
+  : DistinctTypeDecl(DeclKind::Struct, Parent, Name, Type()), 
+    StructLoc(StructLoc) {
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(this));
   // Compute the associated type for this OneOfDecl.
@@ -262,14 +257,10 @@ Type FuncDecl::getExtensionType() const {
   case DeclContextKind::TopLevelCodeDecl:
     return Type();
 
-  case DeclContextKind::OneOfDecl:
-    return cast<OneOfDecl>(DC)->getDeclaredType();
-  case DeclContextKind::StructDecl:
-    return cast<StructDecl>(DC)->getDeclaredType();
+  case DeclContextKind::DistinctTypeDecl:
+    return cast<DistinctTypeDecl>(DC)->getDeclaredType();
   case DeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(DC)->getExtendedType();
-  case DeclContextKind::ProtocolDecl:
-    return cast<ProtocolDecl>(DC)->getDeclaredType();
   }
   llvm_unreachable("bad context kind");
 }
@@ -479,6 +470,15 @@ namespace {
     void visitStructDecl(StructDecl *SD) {
       printCommon(SD, "struct_decl");
       for (Decl *D : SD->getMembers()) {
+        OS << '\n';
+        printRec(D);
+      }
+      OS << "')";
+    }
+
+    void visitClassDecl(ClassDecl *CD) {
+      printCommon(CD, "class_decl");
+      for (Decl *D : CD->getMembers()) {
         OS << '\n';
         printRec(D);
       }

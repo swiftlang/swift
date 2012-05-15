@@ -30,6 +30,7 @@ namespace swift {
   class ASTContext;
   class ASTWalker;
   class Type;
+  class ClassType;
   class Expr;
   class FuncDecl;
   class FuncExpr;
@@ -375,14 +376,14 @@ public:
   TypeDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty) :
     ValueDecl(K, DC, name, ty) {}
 
-  Type getDeclaredType();
+  Type getDeclaredType() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_TypeDecl &&
            D->getKind() <= DeclKind::Last_TypeDecl;
   }
-  static bool classof(const TypeAliasDecl *D) { return true; }
+  static bool classof(const TypeDecl *D) { return true; }
 };
 
 /// TypeAliasDecl - This is a declaration of a typealias, for example:
@@ -443,13 +444,30 @@ public:
   static bool classof(const TypeAliasDecl *D) { return true; }
 };
 
+class DistinctTypeDecl : public TypeDecl, public DeclContext {
+public:
+  DistinctTypeDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty) :
+    TypeDecl(K, DC, name, ty),
+    DeclContext(DeclContextKind::DistinctTypeDecl, DC) {}
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) {
+    return D->getKind() >= DeclKind::First_DistinctTypeDecl &&
+           D->getKind() <= DeclKind::Last_DistinctTypeDecl;
+  }
+  static bool classof(const DistinctTypeDecl *D) { return true; }
+  static bool classof(const DeclContext *C) {
+    return C->getContextKind() == DeclContextKind::DistinctTypeDecl;
+  }
+};
+
 /// OneOfDecl - This is the declaration of a oneof, for example:
 ///
 ///    oneof Bool { true, false }
 ///
 /// The type of the decl itself is a MetaTypeType; use getDeclaredType()
 /// to get the declared type ("Bool" in the above example).
-class OneOfDecl : public TypeDecl, public DeclContext {
+class OneOfDecl : public DistinctTypeDecl {
   SourceLoc OneOfLoc;
   ArrayRef<OneOfElementDecl*> Elements;
   OneOfType *OneOfTy;
@@ -472,18 +490,21 @@ public:
     return D->getKind() == DeclKind::OneOf;
   }
   static bool classof(const OneOfDecl *D) { return true; }
+  static bool classof(const DistinctTypeDecl *D) {
+    return D->getKind() == DeclKind::OneOf;
+  }
   static bool classof(const DeclContext *C) {
-    return C->getContextKind() == DeclContextKind::OneOfDecl;
+    return isa<DistinctTypeDecl>(C) && classof(cast<DistinctTypeDecl>(C));
   }
 };
 
 /// StructDecl - This is the declaration of a struct, for example:
 ///
-///    struct Complex { R : Double, I : Double }
+///    struct Complex { var R : Double, I : Double }
 ///
 /// The type of the decl itself is a MetaTypeType; use getDeclaredType()
 /// to get the declared type ("Complex" in the above example).
-class StructDecl : public TypeDecl, public DeclContext {
+class StructDecl : public DistinctTypeDecl {
   SourceLoc StructLoc;
   ArrayRef<Decl*> Members;
   StructType *StructTy;
@@ -504,17 +525,56 @@ public:
     return D->getKind() == DeclKind::Struct;
   }
   static bool classof(const StructDecl *D) { return true; }
+  static bool classof(const DistinctTypeDecl *D) {
+    return D->getKind() == DeclKind::Struct;
+  }
   static bool classof(const DeclContext *C) {
-    return C->getContextKind() == DeclContextKind::StructDecl;
+    return isa<DistinctTypeDecl>(C) && classof(cast<DistinctTypeDecl>(C));
   }
 };
+
+/// ClassDecl - This is the declaration of a class, for example:
+///
+///    class Complex { var R : Double, I : Double }
+///
+/// The type of the decl itself is a MetaTypeType; use getDeclaredType()
+/// to get the declared type ("Complex" in the above example).
+class ClassDecl : public DistinctTypeDecl {
+  SourceLoc ClassLoc;
+  ArrayRef<Decl*> Members;
+  ClassType *ClassTy;
+
+public:
+  ClassDecl(SourceLoc ClassLoc, Identifier Name, DeclContext *DC);
+
+  SourceLoc getClassLoc() const { return ClassLoc; }
+  SourceLoc getLocStart() const { return ClassLoc; }
+
+  ArrayRef<Decl*> getMembers() { return Members; }
+  void setMembers(ArrayRef<Decl*> mems) { Members = mems; }
+
+  ClassType *getDeclaredType() const { return ClassTy; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::Class;
+  }
+  static bool classof(const ClassDecl *D) { return true; }
+  static bool classof(const DistinctTypeDecl *D) {
+    return D->getKind() == DeclKind::Class;
+  }
+  static bool classof(const DeclContext *C) {
+    return isa<DistinctTypeDecl>(C) && classof(cast<DistinctTypeDecl>(C));
+  }
+};
+
 
 /// ProtocolDecl - A declaration of a protocol, for example:
 ///
 ///   protocol Drawable {
 ///     func draw()
 ///   }
-class ProtocolDecl : public TypeDecl, public DeclContext {
+class ProtocolDecl : public DistinctTypeDecl {
   SourceLoc ProtocolLoc;
   SourceLoc NameLoc;
   MutableArrayRef<Type> Inherited;
@@ -525,8 +585,7 @@ class ProtocolDecl : public TypeDecl, public DeclContext {
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
                Identifier Name, MutableArrayRef<Type> Inherited)
-    : TypeDecl(DeclKind::Protocol, DC, Name, Type()),
-      DeclContext(DeclContextKind::ProtocolDecl, DC),
+    : DistinctTypeDecl(DeclKind::Protocol, DC, Name, Type()),
       ProtocolLoc(ProtocolLoc), NameLoc(NameLoc), Inherited(Inherited) { }
   
   using Decl::getASTContext;
@@ -560,9 +619,11 @@ public:
     return D->getKind() == DeclKind::Protocol;
   }
   static bool classof(const ProtocolDecl *D) { return true; }
-  
-  static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::ProtocolDecl;
+  static bool classof(const DistinctTypeDecl *D) {
+    return D->getKind() == DeclKind::Protocol;
+  }
+  static bool classof(const DeclContext *C) {
+    return isa<DistinctTypeDecl>(C) && classof(cast<DistinctTypeDecl>(C));
   }
 };
 
