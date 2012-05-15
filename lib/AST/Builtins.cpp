@@ -83,25 +83,6 @@ namespace {
   };
 }
 
-static BuiltinValueKind isBuiltinValue(ASTContext &C, StringRef Name,
-                                       Type &Ty1, Type &Ty2) {
-  SmallVector<Type, 4> Types;
-  StringRef OperationName = getBuiltinBaseName(C, Name, Types);
-  if (Types.size() >= 1) {
-    Ty1 = Types[0];
-    if (Types.size() >= 2) {
-      Ty2 = Types[1];
-      if (Types.size() > 2)
-        return BuiltinValueKind::None;
-    }
-  }
-
-  return llvm::StringSwitch<BuiltinValueKind>(OperationName)
-#define BUILTIN(id, name) \
-    .Case(name, BuiltinValueKind::id)
-#include "swift/AST/Builtins.def"
-    .Default(BuiltinValueKind::None);
-}
 
 /// Build a builtin function declarations.
 static FuncDecl *getBuiltinFunction(ASTContext &Context, Identifier Id, Type T){
@@ -150,8 +131,10 @@ static ValueDecl *getBinaryPredicate(ASTContext &Context, Identifier Id,
 /// Build a cast.  There is some custom type checking here.
 static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
                                    BuiltinValueKind VK,
-                                   Type Input, Type Output) {
-  assert(!Input.isNull() && "We know that we have at least one type here");
+                                   ArrayRef<Type> Types) {
+  if (Types.size() == 0 || Types.size() > 2) return nullptr;
+  Type Input = Types[0];
+  Type Output = Types.size() == 2 ? Types[1] : Type();
   
   // Custom type checking.  We know the one or two types have been subjected to
   // the "isBuiltinTypeOverloaded" predicate successfully.
@@ -263,7 +246,7 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
 inline bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
   switch (OK) {
   case OverloadedBuiltinKind::None:
-    break; // invalid 
+    return false;  // always fail. 
   case OverloadedBuiltinKind::Integer:
     return T->is<BuiltinIntegerType>();
   case OverloadedBuiltinKind::IntegerOrRawPointer:
@@ -278,16 +261,22 @@ inline bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
 
 
 ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
-  Type ArgType1, ArgType2;
-  BuiltinValueKind BV = isBuiltinValue(Context, Id.str(), ArgType1, ArgType2);
+  SmallVector<Type, 4> Types;
+  StringRef OperationName = getBuiltinBaseName(Context, Id.str(), Types);
+  
+  BuiltinValueKind BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
+#define BUILTIN(id, name) \
+       .Case(name, BuiltinValueKind::id)
+#include "swift/AST/Builtins.def"
+       .Default(BuiltinValueKind::None);
 
   // Filter out inappropriate overloads.
   OverloadedBuiltinKind OBK = OverloadedBuiltinKinds[unsigned(BV)];
-  if (OBK == OverloadedBuiltinKind::None) return nullptr;
-  
-  if (!isBuiltinTypeOverloaded(ArgType1, OBK) ||
-      (!ArgType2.isNull() && !isBuiltinTypeOverloaded(ArgType2, OBK)))
-    return nullptr;
+
+  // Verify that all types match the overload filter.
+  for (Type T : Types)
+    if (!isBuiltinTypeOverloaded(T, OBK))
+      return nullptr;
 
   switch (BV) {
   case BuiltinValueKind::None: return nullptr;
@@ -295,36 +284,34 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
 #define BUILTIN(id, name)
 #define BUILTIN_GEP_OPERATION(id, name, overload)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-    if (!ArgType2.isNull()) return nullptr;
-    return getGepOperation(Context, Id, ArgType1);
+    if (Types.size() != 1) return nullptr;
+    return getGepOperation(Context, Id, Types[0]);
 
 #define BUILTIN(id, name)
 #define BUILTIN_BINARY_OPERATION(id, name, overload)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-    if (!ArgType2.isNull()) return nullptr;
-    return getBinaryOperation(Context, Id, ArgType1);
+    if (Types.size() != 1) return nullptr;
+    return getBinaryOperation(Context, Id, Types[0]);
 
 #define BUILTIN(id, name)
 #define BUILTIN_BINARY_PREDICATE(id, name, overload)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-    if (!ArgType2.isNull()) return nullptr;
-    return getBinaryPredicate(Context, Id, ArgType1);
+    if (Types.size() != 1) return nullptr;
+    return getBinaryPredicate(Context, Id, Types[0]);
       
 #define BUILTIN(id, name)
 #define BUILTIN_CAST_OPERATION(id, name)  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
-    return getCastOperation(Context, Id, BV, ArgType1, ArgType2);
+    return getCastOperation(Context, Id, BV, Types);
       
-#define BUILTIN(id, name)
-#define BUILTIN_LOAD(id, name)  case BuiltinValueKind::id:
-#include "swift/AST/Builtins.def"
-    return getLoadOperation(Context, Id, ArgType1);
+  case BuiltinValueKind::Load:
+    if (Types.size() != 1) return nullptr;
+    return getLoadOperation(Context, Id, Types[0]);
 
-#define BUILTIN(id, name)
-#define BUILTIN_ASSIGN(id, name)  case BuiltinValueKind::id:
-#define BUILTIN_INIT(id, name)  case BuiltinValueKind::id:
-#include "swift/AST/Builtins.def"
-      return getStoreOperation(Context, Id, ArgType1);
+  case BuiltinValueKind::Assign:
+  case BuiltinValueKind::Init:
+    if (Types.size() != 1) return nullptr;
+    return getStoreOperation(Context, Id, Types[0]);
   }
   llvm_unreachable("bad builtin value!");
 }
