@@ -133,10 +133,10 @@ LValue swift::irgen::emitPhysicalStructMemberLValue(IRGenFunction &IGF,
 
   // FIXME: This field index computation is an ugly hack.
   unsigned FieldIndex = 0;
-  for (ValueDecl *D : T->getDecl()->getMembers()) {
+  for (Decl *D : T->getDecl()->getMembers()) {
     if (D == E->getDecl())
       break;
-    if (isa<VarDecl>(D))
+    if (isa<VarDecl>(D) && !cast<VarDecl>(D)->isProperty())
       ++FieldIndex;
   }
 
@@ -147,11 +147,62 @@ LValue swift::irgen::emitPhysicalStructMemberLValue(IRGenFunction &IGF,
 
 
 /// emitStructType - Emit all the declarations associated with this oneof type.
-void IRGenModule::emitStructType(StructType *oneof) {
-  const StructTypeInfo &typeInfo = getFragileTypeInfo(oneof).as<StructTypeInfo>();
-  OneOfElementDecl *elt = cast<OneOfElementDecl>(oneof->getDecl()->getMembers().back());
-  llvm::Function *fn = getAddrOfGlobalInjectionFunction(elt);
-  emitInjectionFunction(*this, fn, typeInfo, elt);
+void IRGenModule::emitStructType(StructType *st) {
+  // FIXME: This is mostly copy-paste from emitExtension;
+  // figure out how to refactor! 
+  for (Decl *member : st->getDecl()->getMembers()) {
+    switch (member->getKind()) {
+    case DeclKind::Import:
+    case DeclKind::TopLevelCode:
+    case DeclKind::Protocol:
+      llvm_unreachable("decl not allowed in extension!");
+
+    // We can have meaningful initializers for variables, but
+    // we can't handle them yet.  For the moment, just ignore them.
+    case DeclKind::PatternBinding:
+      continue;
+
+    case DeclKind::Subscript:
+      // Getter/setter will be handled separately.
+      continue;
+    case DeclKind::Extension:
+      emitExtension(cast<ExtensionDecl>(member));
+      continue;
+    case DeclKind::TypeAlias:
+      continue;
+    case DeclKind::OneOf:
+      emitOneOfType(cast<OneOfDecl>(member)->getDeclaredType());
+      continue;
+    case DeclKind::Struct:
+      emitStructType(cast<StructDecl>(member)->getDeclaredType());
+      continue;
+    case DeclKind::Var:
+      if (cast<VarDecl>(member)->isProperty())
+        // Getter/setter will be handled separately.
+        continue;
+      // FIXME: Will need an implementation here for resilience
+      continue;
+    case DeclKind::Func: {
+      FuncDecl *func = cast<FuncDecl>(member);
+      if (func->isStatic()) {
+        // Eventually this won't always be the right thing.
+        emitStaticMethod(func);
+      } else {
+        emitInstanceMethod(func);
+      }
+      continue;
+      }
+    case DeclKind::OneOfElement: {
+      const StructTypeInfo &typeInfo =
+          getFragileTypeInfo(st).as<StructTypeInfo>();
+      OneOfElementDecl *elt = cast<OneOfElementDecl>(member);
+      llvm::Function *fn = getAddrOfGlobalInjectionFunction(elt);
+      emitInjectionFunction(*this, fn, typeInfo, elt);
+      continue;
+    }
+    }
+    llvm_unreachable("bad extension member kind");
+  }
 }
 
 void IRGenFunction::emitStructType(StructType *oneof) {
@@ -167,9 +218,10 @@ TypeConverter::convertStructType(IRGenModule &IGM, StructType *T) {
 
   // Collect all the fields from the type.
   SmallVector<VarDecl*, 8> fields;
-  for (ValueDecl *D : T->getDecl()->getMembers())
+  for (Decl *D : T->getDecl()->getMembers())
     if (VarDecl *VD = dyn_cast<VarDecl>(D))
-      fields.push_back(VD);
+      if (!VD->isProperty())
+        fields.push_back(VD);
 
   // Allocate the TypeInfo and register it as a forward-declaration.
   auto structTI = builder.create(fields);

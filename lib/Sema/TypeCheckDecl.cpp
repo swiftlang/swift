@@ -125,15 +125,20 @@ public:
   }
 
   void visitStructDecl(StructDecl *SD) {
-    for (ValueDecl *Member : SD->getMembers()) {
-      if (TC.validateType(Member->getType())) return;
-
-      // Require the carried type to be materializable.
-      if (!Member->getType()->isMaterializable()) {
-        TC.diagnose(Member->getLocStart(),
-                    diag::oneof_element_not_materializable);
-      }
+    for (Decl *Member : SD->getMembers()) {
+      visit(Member);
     }
+    // FIXME: We should come up with a better way to represent this implied
+    // constructor.
+    SmallVector<TupleTypeElt, 8> TupleElts;
+    for (Decl *Member : SD->getMembers())
+      if (VarDecl *VarD = dyn_cast<VarDecl>(Member))
+        if (!VarD->isProperty())
+          TupleElts.push_back(TupleTypeElt(VarD->getType(), VarD->getName()));
+    TupleType *TT = TupleType::get(TupleElts, TC.Context);
+    Type CreateTy = FunctionType::get(TT, SD->getDeclaredType(), TC.Context);
+    cast<OneOfElementDecl>(SD->getMembers().back())->setType(CreateTy);
+    cast<OneOfElementDecl>(SD->getMembers().back())->setArgumentType(TT);
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {

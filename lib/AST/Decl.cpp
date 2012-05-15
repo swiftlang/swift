@@ -259,16 +259,15 @@ Type FuncDecl::getExtensionType() const {
   case DeclContextKind::TranslationUnit:
   case DeclContextKind::BuiltinModule:
   case DeclContextKind::CapturingExpr:
-  case DeclContextKind::OneOfDecl:
-  case DeclContextKind::StructDecl:
   case DeclContextKind::TopLevelCodeDecl:
     return Type();
-    
-    // For extensions, it depends on whether the type has value or
-    // pointer semantics.
+
+  case DeclContextKind::OneOfDecl:
+    return cast<OneOfDecl>(DC)->getDeclaredType();
+  case DeclContextKind::StructDecl:
+    return cast<StructDecl>(DC)->getDeclaredType();
   case DeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(DC)->getExtendedType();
-    
   case DeclContextKind::ProtocolDecl:
     return cast<ProtocolDecl>(DC)->getDeclaredType();
   }
@@ -479,9 +478,9 @@ namespace {
 
     void visitStructDecl(StructDecl *SD) {
       printCommon(SD, "struct_decl");
-      for (ValueDecl *VD : SD->getMembers()) {
+      for (Decl *D : SD->getMembers()) {
         OS << '\n';
-        printRec(VD);
+        printRec(D);
       }
       OS << "')";
     }

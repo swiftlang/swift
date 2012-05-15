@@ -319,7 +319,11 @@ void Module::lookupMembers(Type BaseType, Identifier Name,
       return;
 
     D = ST->getDecl();
-    BaseMembers = ST->getDecl()->getMembers();
+    for (Decl* Member : ST->getDecl()->getMembers()) {
+      if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
+        BaseMembersStorage.push_back(VD);
+    }
+    BaseMembers = BaseMembersStorage;
   } else if (OneOfType *OOT = BaseType->getAs<OneOfType>()) {
     // FIXME: Refuse to look up "constructors" until we have real constructors.
     if (OOT->getDecl()->getName() == Name)
@@ -355,7 +359,11 @@ void Module::lookupValueConstructors(Type BaseType,
   if (StructType *ST = BaseType->getAs<StructType>()) {
     D = ST->getDecl();
     Name = ST->getDecl()->getName();
-    BaseMembers = ST->getDecl()->getMembers();
+    for (Decl* Member : ST->getDecl()->getMembers()) {
+      if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
+        BaseMembersStorage.push_back(VD);
+    }
+    BaseMembers = BaseMembersStorage;
   } else if (OneOfType *OOT = BaseType->getAs<OneOfType>()) {
     D = OOT->getDecl();
     Name = OOT->getDecl()->getName();

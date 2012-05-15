@@ -485,7 +485,7 @@ public:
 /// to get the declared type ("Complex" in the above example).
 class StructDecl : public TypeDecl, public DeclContext {
   SourceLoc StructLoc;
-  ArrayRef<ValueDecl*> Members;
+  ArrayRef<Decl*> Members;
   StructType *StructTy;
 
 public:
@@ -494,8 +494,8 @@ public:
   SourceLoc getStructLoc() const { return StructLoc; }
   SourceLoc getLocStart() const { return StructLoc; }
 
-  ArrayRef<ValueDecl*> getMembers() { return Members; }
-  void setMembers(ArrayRef<ValueDecl*> mems) { Members = mems; }
+  ArrayRef<Decl*> getMembers() { return Members; }
+  void setMembers(ArrayRef<Decl*> mems) { Members = mems; }
 
   StructType *getDeclaredType() const { return StructTy; }
 
@@ -711,6 +711,7 @@ public:
     IdentifierLoc(IdentifierLoc), ArgumentType(ArgumentType) {}
 
   Type getArgumentType() const { return ArgumentType; }
+  void setArgumentType(Type t) { ArgumentType = t; }
 
   SourceLoc getIdentifierLoc() const { return IdentifierLoc; }
   SourceLoc getLocStart() const { return IdentifierLoc; }

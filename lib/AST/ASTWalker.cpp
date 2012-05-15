@@ -522,6 +522,10 @@ public:
       for (OneOfElementDecl *Element : OOD->getElements())
         if (doIt(Element))
           return true;
+    } else if (StructDecl *SD = dyn_cast<StructDecl>(D)) {
+      for (Decl *Member : SD->getMembers())
+        if (doIt(Member))
+          return true;
     } else if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       auto Body = TLCD->getBody();
       if (Body.is<Expr*>()) {

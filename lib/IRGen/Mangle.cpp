@@ -160,10 +160,7 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     StructDecl *sdecl = cast<StructDecl>(ctx);
 
     // FIXME: The mangling rule here is kind of weird.
-    if (tryMangleSubstitution(sdecl->getDeclaredType())) return;
-    mangleDeclContext(ctx->getParent());
-    mangleIdentifier(sdecl->getName());
-    addSubstitution(sdecl->getDeclaredType());
+    mangleType(sdecl->getDeclaredType(), ExplosionKind::Minimal, 0);
     return;
   }
 
