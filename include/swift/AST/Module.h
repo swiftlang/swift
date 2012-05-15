@@ -54,8 +54,6 @@ protected:
 public:
   ASTContext &Ctx;
   Identifier Name;
-  bool IsMainModule;
-  bool IsReplModule;
   
   //===--------------------------------------------------------------------===//
   // AST Phase of Translation
@@ -76,11 +74,9 @@ public:
   } ASTStage;
 
 protected:
-  Module(DeclContextKind Kind, Identifier Name, Component *C, ASTContext &Ctx,
-         bool IsMainModule, bool IsReplModule)
+  Module(DeclContextKind Kind, Identifier Name, Component *C, ASTContext &Ctx)
   : DeclContext(Kind, nullptr), LookupCachePimpl(0), ExtensionCachePimpl(0),
-    Comp(C), Ctx(Ctx), Name(Name), IsMainModule(IsMainModule),
-    IsReplModule(IsReplModule), ASTStage(Parsing) {
+    Comp(C), Ctx(Ctx), Name(Name), ASTStage(Parsing) {
     assert(Comp != nullptr || Kind == DeclContextKind::BuiltinModule);
   }
 
@@ -156,14 +152,25 @@ private:
   ArrayRef<ImportedModule> ImportedModules;
 
 public:
+  enum {
+    Library,
+    Main,
+    Repl,
+  } Kind;
 
   /// Decls; the list of top-level declarations for a translation unit.
   std::vector<Decl*> Decls;
   
   TranslationUnit(Identifier Name, Component *Comp, ASTContext &C,
                   bool IsMainModule, bool IsReplModule)
-    : Module(DeclContextKind::TranslationUnit, Name, Comp, C, IsMainModule,
-             IsReplModule) { }
+    : Module(DeclContextKind::TranslationUnit, Name, Comp, C) {
+    if (IsReplModule)
+      Kind = Repl;
+    else if (IsMainModule)
+      Kind = Main;
+    else
+      Kind = Library;
+  }
   
   /// getUnresolvedIdentifierTypes - This is a list of scope-qualified types
   /// that were unresolved at the end of the translation unit's parse
@@ -221,7 +228,7 @@ public:
 class BuiltinModule : public Module {
 public:
   BuiltinModule(Identifier Name, ASTContext &Ctx)
-    : Module(DeclContextKind::BuiltinModule, Name, nullptr, Ctx, false, false) {
+    : Module(DeclContextKind::BuiltinModule, Name, nullptr, Ctx) {
     // The Builtin module is always well formed.
     ASTStage = TypeChecked;
   }

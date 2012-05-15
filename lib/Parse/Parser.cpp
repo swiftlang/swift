@@ -48,7 +48,8 @@ bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
                                      unsigned BufferEndOffset) {
   Parser P(BufferID, TU->getComponent(), TU->Ctx,
            BufferOffset ? *BufferOffset : 0, BufferEndOffset,
-           TU->IsMainModule);
+           TU->Kind == TranslationUnit::Main ||
+           TU->Kind == TranslationUnit::Repl);
   PrettyStackTraceParser stackTrace(P);
   P.parseTranslationUnit(TU);
   if (BufferOffset)

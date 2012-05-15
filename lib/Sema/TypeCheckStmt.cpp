@@ -656,7 +656,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       auto Elem = TLCD->getBody();
       if (Expr *E = Elem.dyn_cast<Expr*>()) {
         if (checker.typeCheckExpr(E)) continue;
-        if (TU->IsReplModule)
+        if (TU->Kind == TranslationUnit::Repl)
           TC.typeCheckTopLevelReplExpr(E, TLCD);
         else
           TC.typeCheckIgnoredExpr(E);
@@ -668,7 +668,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       }
     } else {
       TC.typeCheckDecl(D);
-      if (TU->IsReplModule && !TC.Context.hadError())
+      if (TU->Kind == TranslationUnit::Repl && !TC.Context.hadError())
         if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D))
           REPLCheckPatternBinding(PBD, TC);
     }
@@ -676,7 +676,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
 
   // If we're in a library, we skip type-checking global initializers in the
   // first pass.  Type-check them now.
-  if (!TU->IsMainModule && !TC.Context.hadError()) {
+  if (TU->Kind == TranslationUnit::Library && !TC.Context.hadError()) {
     for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
       Decl *D = TU->Decls[i];
       if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D)) {

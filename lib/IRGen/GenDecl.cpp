@@ -60,7 +60,8 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
   llvm::FunctionType *fnType =
       getFunctionType(unitToUnit, ExplosionKind::Minimal, 0, false);
   llvm::Function *fn;
-  if (tunit->IsMainModule) {
+  if (tunit->Kind == TranslationUnit::Main ||
+      tunit->Kind == TranslationUnit::Repl) {
     // For the main module, just emit main().
     fn = llvm::Function::Create(fnType, llvm::GlobalValue::ExternalLinkage,
                                 "main", &Module);
@@ -76,7 +77,8 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
     .emitGlobalTopLevel(tunit, StartElem);
 
   // We don't need global init to call main().
-  if (tunit->IsMainModule)
+  if (tunit->Kind == TranslationUnit::Main ||
+      tunit->Kind == TranslationUnit::Repl)
     return;
 
   // Not all translation units need a global initialization function.
