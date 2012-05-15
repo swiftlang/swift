@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
+#include "swift/AST/Attr.h"
 using namespace swift;
 
 static Identifier getFirstOverloadedIdentifier(const Expr *Fn) {
@@ -88,6 +89,7 @@ void TypeChecker::printOverloadSetCandidates(ArrayRef<ValueDecl *> Candidates) {
 
 ValueDecl *
 TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
+                               bool OperatorSyntax,
                                Type BaseTy,
                                Expr *Arg,
                                Type DestTy,
@@ -113,7 +115,8 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     }
     
     // Check whether arguments are suitable for this function.
-    if (!isCoercibleToType(Arg, FunctionTy->getInput()))
+    if (!isCoercibleToType(Arg, FunctionTy->getInput(),
+                           (OperatorSyntax && VD->getAttrs().isAssignment())))
       continue;
     
     // FIXME: We don't want to require exact matching here.

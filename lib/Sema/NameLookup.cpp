@@ -164,10 +164,6 @@ void MemberLookup::doTuple(TupleType *TT) {
 static Type makeSimilarLValue(Type objectType, Type lvalueType,
                               ASTContext &Context) {
   LValueType::Qual qs = cast<LValueType>(lvalueType)->getQualifiers();
-  
-  // Don't propagate explicitness.
-  qs |= LValueType::Qual::Implicit;
-  
   return LValueType::get(objectType, qs, Context);
 }
 

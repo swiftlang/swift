@@ -72,12 +72,15 @@ public:
   /// the types don't match and diagnoses cases where the conversion cannot be
   /// performed.
   ///
+  ///
+  /// \param Assignment When true, treat this as an assignment.
+  ///
   /// This emits a diagnostic and returns null on error.
-  Expr *coerceToType(Expr *E, Type Ty);
+  Expr *coerceToType(Expr *E, Type Ty, bool Assignment = false);
   
   /// isCoercibleToType - Determine whether the given expression can be 
   /// coerced to the given type.
-  bool isCoercibleToType(Expr *E, Type Ty);
+  bool isCoercibleToType(Expr *E, Type Ty, bool Assignment = false);
   
   /// coerceObjectArgument - Coerce the given expression to an object argument
   /// of the given container type.
@@ -127,6 +130,10 @@ public:
   /// \param Candidates The set of overloaded candidates that should be 
   /// considered
   ///
+  /// \param OperatorSyntax Whether this the overloaded function is being
+  /// applied with operator syntax (e.g., a + b) rather than call syntax
+  /// (e.g., +(a, b)).
+  ///
   /// \param BaseTy The type of the object that will become the 'this' pointer
   /// for a call to a method. If not provided, then there is no 'this' object.
   ///
@@ -141,6 +148,7 @@ public:
   ///
   /// \returns The best candidate, if there is one.
   ValueDecl *filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
+                               bool OperatorSyntax,
                                Type BaseTy,
                                Expr *Arg,
                                Type DestTy,

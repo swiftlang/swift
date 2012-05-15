@@ -170,8 +170,7 @@ namespace {
 
       checkSameType(resultObj, srcObj, "object types for AddressOfExpr");
 
-      if ((resultQuals | LValueType::Qual::Implicit) !=
-          (srcQuals | LValueType::Qual::Implicit)) {
+      if (LValueType::Qual() != srcQuals) {
         Out << "mismatched qualifiers";
         E->print(Out);
         Out << "\n";
@@ -557,7 +556,6 @@ namespace {
     }
 
     void printQualifiers(LValueType::Qual qs) {
-      if (qs & LValueType::Qual::Implicit) Out << "implicit";
       if (qs & LValueType::Qual::NonHeap) Out << "|nonheap";
     }
   };

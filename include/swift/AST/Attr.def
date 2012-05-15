@@ -19,6 +19,7 @@
 #endif
 
 // ATTR(name) - Invokes a macro for each attribute.
+ATTR(assignment)
 ATTR(infix_left)
 ATTR(infix_right)
 ATTR(infix)

@@ -167,7 +167,9 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
   for (const auto &R : Lookup.Results)
     LookupResults.push_back(R.D);
   llvm::SmallVector<ValueDecl *, 4> Viable;
-  ValueDecl *Best = filterOverloadSet(LookupResults, BaseTy, SE->getIndex(),
+  ValueDecl *Best = filterOverloadSet(LookupResults,
+                                      /*OperatorSyntax=*/true,
+                                      BaseTy, SE->getIndex(),
                                       Type(), Viable);
 
   if (Best) {
@@ -221,16 +223,18 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   if (FunctionType *FT = E1->getType()->getAs<FunctionType>()) {
     // If this is an operator, make sure that the declaration found was declared
     // as such.
-    if (isa<UnaryExpr>(E) &&
-        !cast<DeclRefExpr>(E1)->getDecl()->isOperator()) {
-      diagnose(E1->getLoc(), diag::unary_op_without_attribute);
-      return 0;
-    }
-    
-    if (isa<BinaryExpr>(E) &&
-        !cast<DeclRefExpr>(E1)->getDecl()->getAttrs().isInfix()) {
-      diagnose(E1->getLoc(), diag::binary_op_without_attribute);
-      return 0;
+    bool Assignment = false;
+    if (isa<UnaryExpr>(E) || isa<BinaryExpr>(E)) {
+      auto DRE = cast<DeclRefExpr>(E1);
+      
+      if (!DRE->getDecl()->isOperator()) {
+        diagnose(E1->getLoc(),
+                 isa<UnaryExpr>(E) ? diag::unary_op_without_attribute
+                                  : diag::binary_op_without_attribute);
+        return nullptr;
+      }
+      
+      Assignment = DRE->getDecl()->getAttrs().isAssignment();
     }
     
     // We have a function application.  Check that the argument type matches the
@@ -240,7 +244,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     if (isa<DotSyntaxCallExpr>(E))
       E2 = coerceObjectArgument(E2, FT->getInput());
     else
-      E2 = coerceToType(E2, FT->getInput());
+      E2 = coerceToType(E2, FT->getInput(), Assignment);
     if (E2 == 0) {
       diagnose(E1->getLoc(), diag::while_converting_function_argument,
                FT->getInput())
@@ -333,7 +337,9 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
 
   // Perform overload resolution.
   llvm::SmallVector<ValueDecl *, 4> Viable;
-  ValueDecl *Best = filterOverloadSet(OS->getDecls(), OS->getBaseType(), E2,
+  ValueDecl *Best = filterOverloadSet(OS->getDecls(),
+                                      (isa<UnaryExpr>(E) || isa<BinaryExpr>(E)),
+                                      OS->getBaseType(), E2,
                                       Type(), Viable);
   
   // If we have a best candidate, build a call to it now.
@@ -631,12 +637,13 @@ public:
   
   Expr *visitAddressOfExpr(AddressOfExpr *E) {
     // Turn l-values into explicit l-values.
-    if (LValueType *type = E->getSubExpr()->getType()->getAs<LValueType>()) {
-      if (!type->isExplicit())
-        type = LValueType::get(type->getObjectType(),
-                               type->getQualifiers().withoutImplicit(),
-                               TC.Context);
-      E->setType(type);
+    if (E->getSubExpr()->getType()->is<LValueType>()) {
+      if (auto *AddrOf = dyn_cast<AddressOfExpr>(
+                           E->getSubExpr()->getSemanticsProvidingExpr()))
+        TC.diagnose(E->getLoc(), diag::address_of_address)
+          << AddrOf->getSourceRange();
+      
+      E->setType(E->getSubExpr()->getType());
       return E;
     }
 
@@ -1285,7 +1292,7 @@ bool TypeChecker::typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc,
     else {
       if (!DestTy->is<ErrorType>())
         diagnose(EqualLoc, diag::assignment_lhs_not_lvalue)
-        << Dest->getSourceRange();
+          << Dest->getSourceRange();
       
       return true;
     }
@@ -1301,9 +1308,11 @@ bool TypeChecker::typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc,
     if (!Src) return true;
     
     Type SrcTy = Src->getType();
-    Dest = coerceToType(Dest, LValueType::get(SrcTy,
-                                              LValueType::Qual::NonHeap,
-                                              Context));
+    Dest = coerceToType(Dest,
+                        LValueType::get(SrcTy,
+                                        LValueType::Qual::NonHeap,
+                                        Context),
+                        /*Assignment=*/true);
     return Dest == nullptr;
   }
   

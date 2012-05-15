@@ -558,8 +558,6 @@ void LValueType::print(raw_ostream &OS) const {
 
     OS << '(';
     APPEND_QUAL(!(qs & Qual::NonHeap), "heap");
-    APPEND_QUAL(qs & Qual::Implicit, "implicit");
-    assert(hasQual && "wrote no qualifiers!");
     OS << ')';
 
 #undef APPEND_QUAL

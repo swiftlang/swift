@@ -138,12 +138,12 @@ public:
   ResilienceData Resilience;
   StringRef AsmName;
   bool Byref;
-  bool ByrefImplicit;
   bool ByrefHeap;
   bool AutoClosure;
-
-  DeclAttributes() : Byref(false), ByrefImplicit(false),
-                     ByrefHeap(false), AutoClosure(false) { }
+  bool Assignment;
+  
+  DeclAttributes() : Byref(false), ByrefHeap(false),
+                     AutoClosure(false), Assignment(false) { }
 
   bool isValid() const { return LSquareLoc.isValid(); }
 
@@ -152,9 +152,9 @@ public:
   ResilienceData getResilienceData() const { return Resilience; }
   bool isByref() const { return Byref; }
   bool isByrefHeap() const { assert(isByref()); return ByrefHeap; }
-  bool isByrefImplicit() const { assert(isByref()); return ByrefImplicit; }
   bool isAutoClosure() const { return AutoClosure; }
-    
+  bool isAssignment() const { return Assignment; }
+  
   bool empty() const {
     return !isInfix() && !getResilienceData().isValid() && !isByref() &&
            !isAutoClosure();

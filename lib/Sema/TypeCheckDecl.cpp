@@ -286,6 +286,31 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     VD->getMutableAttrs().Infix = InfixData();
   }
 
+  if (Attrs.isAssignment()) {
+    // Only function declarations can be assignments.
+    if (!isa<FuncDecl>(VD) || !VD->isOperator()) {
+      TC.diagnose(VD->getLocStart(), diag::invalid_decl_attribute,"assignment");
+      VD->getMutableAttrs().Assignment = false;
+    } else if (NumArguments < 1) {
+      TC.diagnose(VD->getLocStart(), diag::assignment_without_byref);
+      VD->getMutableAttrs().Assignment = false;
+    } else {
+      auto FT = VD->getType()->castTo<FunctionType>();
+      Type ParamType = FT->getInput();
+      TupleType *ParamTT = ParamType->getAs<TupleType>();
+      if (ParamTT)
+        ParamType = ParamTT->getElementType(0);
+      
+      if (!ParamType->is<LValueType>()) {
+        TC.diagnose(VD->getLocStart(), diag::assignment_without_byref);
+        VD->getMutableAttrs().Assignment = false;
+      } else if (!FT->getResult()->isEqual(TupleType::getEmpty(TC.Context))) {
+        TC.diagnose(VD->getLocStart(), diag::assignment_nonvoid,
+                    FT->getResult());
+      }
+    }
+  }
+
   if (VD->isOperator() && !VD->getAttrs().isInfix() && NumArguments != 1) {
     // If this declaration is defined in the translation unit, check whether
     // there are any other operators in this scope with the same name that are
@@ -340,5 +365,5 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
   if (Attrs.isAutoClosure()) {
     TC.diagnose(VD->getLocStart(), diag::invalid_decl_attribute, "auto_closure");
     VD->getMutableAttrs().AutoClosure = false;
-  }
+  }  
 }

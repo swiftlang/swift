@@ -183,7 +183,6 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     consumeToken(tok::identifier);
 
     Attributes.Byref = true;
-    Attributes.ByrefImplicit = false;
     Attributes.ByrefHeap = false;
 
     // Permit "qualifiers" on the byref.
@@ -193,9 +192,6 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
       if (!Tok.is(tok::identifier)) {
         diagnose(Tok, diag::byref_attribute_expected_identifier);
         skipUntil(tok::r_paren);
-      } else if (Tok.getText() == "implicit") {
-        Attributes.ByrefImplicit = true;
-        consumeToken(tok::identifier);
       } else if (Tok.getText() == "heap") {
         Attributes.ByrefHeap = true;
         consumeToken(tok::identifier);
@@ -238,6 +234,15 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     return false;
   }
 
+  case AttrName::assignment: {
+    if (Attributes.isAssignment())
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+    consumeToken(tok::identifier);
+    
+    Attributes.Assignment = true;
+    return false;    
+  }
+      
   /// FIXME: This is a temporary hack until we can import C modules.
   case AttrName::asmname: {
     SourceLoc TokLoc = Tok.getLoc();

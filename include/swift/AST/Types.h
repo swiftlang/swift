@@ -784,13 +784,6 @@ public:
       // as possible.  Basically, we want the subtypes to involve
       // fewer bits.
 
-      /// An explicit l-value is one which has been formed with the
-      /// builtin '&' operator.  It implicitly converts to an implicit
-      /// l-value, but the reverse is not true.  Ordinary [byref]
-      /// arguments require an explicit l-value, but a
-      /// [byref(implicit)] argument can be bound implicitly.
-      Implicit = 0x1,
-
       /// A heap l-value is one which is located on, or at least
       /// capable of being located on, the heap.  Heap l-values are
       /// more than just references to logical objects; they also
@@ -798,16 +791,16 @@ public:
       /// keeps all the necessary components of the l-value alive.  A
       /// heap l-value can be used as a non-heap one, but not
       /// vice-versa.
-      NonHeap = 0x2,
+      NonHeap = 0x1,
 
       /// The default for a [byref] type.
       DefaultForType = NonHeap,
 
       /// The default for a variable reference.
-      DefaultForVar = Implicit,
+      DefaultForVar = 0,
   
       /// The default for the base of a member access.
-      DefaultForMemberAccess = Implicit|NonHeap
+      DefaultForMemberAccess = NonHeap
     };
 
   private:
@@ -822,15 +815,7 @@ public:
     /// The result is hashable by DenseMap.
     opaque_type getOpaqueData() const { return Bits; }
 
-    /// Given that these qualifiers have the 'implicit' bit set,
-    /// return a set of qualifiers without it.
-    Qual withoutImplicit() const {
-      assert(*this & Implicit);
-      return *this & ~Implicit;
-    }
-
     bool isHeap() const { return !(*this & NonHeap); }
-    bool isExplicit() const { return !(*this & Implicit); }
 
     friend Qual operator|(QualBits l, QualBits r) {
       return Qual(opaque_type(l) | opaque_type(r));
@@ -907,12 +892,6 @@ public:
   /// heap l-values, i.e. they can be arbitrarily persisted.
   bool isHeap() const {
     return getQualifiers().isHeap();
-  }
-
-  /// Is this an 'explicit' l-value type?  L-value expressions become
-  /// explicit by being explicitly prefixed with &.
-  bool isExplicit() const {
-    return getQualifiers().isExplicit();
   }
 
   /// For now, no l-values are ever materializable.  Maybe in the
