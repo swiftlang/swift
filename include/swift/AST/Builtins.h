@@ -50,20 +50,6 @@ enum class OverloadedBuiltinKind : unsigned char {
 };
 
 
-/// BuiltinValueKind - The set of (possibly overloaded) builtin functions.
-enum class BuiltinValueKind {
-  None,
-
-#define BUILTIN(Id, Name) Id,
-#include "swift/AST/Builtins.def"
-};
-
-/// isBuiltinValue - Finds the builtin value with this name.
-///
-/// \param Type - Set to the overloaded type parameter of the builtin.
-BuiltinValueKind isBuiltinValue(ASTContext &C, StringRef Name,
-                                Type &Ty1, Type &Ty2);
-
 /// getBuiltinBaseName - Decode the type list of a builtin (e.g. mul_Int32) and
 /// return the base name (e.g. "mul").
 StringRef getBuiltinBaseName(ASTContext &C, StringRef Name,

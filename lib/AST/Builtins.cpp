@@ -73,8 +73,17 @@ StringRef swift::getBuiltinBaseName(ASTContext &C, StringRef Name,
   return Name;
 }
 
+namespace {
+  /// BuiltinValueKind - The set of (possibly overloaded) builtin functions.
+  enum class BuiltinValueKind {
+    None,
+    
+#define BUILTIN(Id, Name) Id,
+#include "swift/AST/Builtins.def"
+  };
+}
 
-BuiltinValueKind swift::isBuiltinValue(ASTContext &C, StringRef Name,
+static BuiltinValueKind isBuiltinValue(ASTContext &C, StringRef Name,
                                        Type &Ty1, Type &Ty2) {
   SmallVector<Type, 4> Types;
   StringRef OperationName = getBuiltinBaseName(C, Name, Types);
