@@ -354,6 +354,9 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   case tok::kw_struct:
     HadParseError = parseDeclStruct(Entries);
     break;
+  case tok::kw_class:
+    HadParseError = parseDeclClass(Entries);
+    break;
   case tok::kw_protocol:
     Entries.push_back(parseDeclProtocol());
     break;
@@ -1238,14 +1241,13 @@ void Parser::actOnOneOfDecl(SourceLoc OneOfLoc,
 }
 
 
-/// parseDeclStruct - Parse a 'struct' declaration, returning null (and doing no
-/// token skipping) on error.  A 'struct' is just syntactic sugar for a oneof
-/// with a single element.
+/// parseDeclStruct - Parse a 'struct' declaration, returning true (and doing no
+/// token skipping) on error.
 ///
 ///   decl-struct:
 ///      'struct' attribute-list identifier '{' decl-struct-body '}
 ///   decl-struct-body:
-///      type-tuple-body? decl*
+///      decl*
 ///
 bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   SourceLoc StructLoc = consumeToken(tok::kw_struct);
@@ -1290,6 +1292,51 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   return false;
 }
 
+/// parseDeclStruct - Parse a 'struct' declaration, returning true (and doing no
+/// token skipping) on error.  
+///
+///   decl-class:
+///      'class' attribute-list identifier '{' decl-class-body '}
+///   decl-class-body:
+///      decl*
+///
+bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
+  SourceLoc StructLoc = consumeToken(tok::kw_class);
+  
+  DeclAttributes Attributes;
+  parseAttributeList(Attributes);
+
+  Identifier ClassName;
+  SourceLoc LBLoc, RBLoc;
+  if (parseIdentifier(ClassName, diag::expected_identifier_in_decl, "class")||
+      parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class))
+    return true;
+
+  ClassDecl *CD = new (Context) ClassDecl(StructLoc, ClassName,
+                                            CurDeclContext);
+  Decls.push_back(CD);
+
+  // Parse the body.
+  SmallVector<Decl*, 8> MemberDecls;
+  {
+    ContextChange CC(*this, CD);
+    while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
+      if (parseDecl(MemberDecls, PD_HasContainerType|PD_DisallowOperators))
+        skipUntilDeclRBrace();
+    }
+  }
+
+  if (!Attributes.empty())
+    diagnose(Attributes.LSquareLoc, diag::oneof_attributes);
+  CD->setMembers(Context.AllocateCopy(MemberDecls));
+  ScopeInfo.addToScope(CD);
+
+  if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_class,
+                         LBLoc, diag::opening_brace))
+    return true;
+
+  return false;
+}
 
 /// parseDeclProtocol - Parse a 'protocol' declaration, returning null (and
 /// doing no token skipping) on error.

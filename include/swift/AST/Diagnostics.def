@@ -213,10 +213,12 @@ ERROR(expected_lbrace_struct,decl_parsing,none,
       "expected '{' in struct", ())
 ERROR(expected_rbrace_struct,decl_parsing,none,
       "expected '}' in struct", ())
-ERROR(expected_struct_member,decl_parsing,none,
-      "expected a function or variable declaration in protocol", ())
-ERROR(struct_unnamed_member,decl_parsing,none,
-      "unnamed members invalid in structs", ())
+
+// Class
+ERROR(expected_lbrace_class,decl_parsing,none,
+      "expected '{' in class", ())
+ERROR(expected_rbrace_class,decl_parsing,none,
+      "expected '}' in class", ())
 
 // Protocol
 ERROR(expected_rbrace_protocol,decl_parsing,none,

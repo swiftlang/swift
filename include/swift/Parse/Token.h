@@ -36,9 +36,10 @@ enum class tok {
   
 #define KEYWORD(X) kw_ ## X,
   // Decl and type keywords.
+  KEYWORD(class)
   KEYWORD(extension)
-  KEYWORD(import)
   KEYWORD(func)
+  KEYWORD(import)
   KEYWORD(oneof)
   KEYWORD(protocol)
   KEYWORD(struct)

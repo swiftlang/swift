@@ -166,6 +166,8 @@ Type TypeDecl::getDeclaredType() const {
     return SD->getDeclaredType();
   if (auto PD = dyn_cast<ProtocolDecl>(this))
     return PD->getDeclaredType();
+  if (auto CD = dyn_cast<ClassDecl>(this))
+    return CD->getDeclaredType();
   assert(isa<OneOfDecl>(this));
   return cast<OneOfDecl>(this)->getDeclaredType();
 }
@@ -193,9 +195,19 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, DeclContext *Parent
     StructLoc(StructLoc) {
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(this));
-  // Compute the associated type for this OneOfDecl.
+  // Compute the associated type for this StructDecl.
   StructTy = new (Parent->getASTContext()) StructType(this, Parent->getASTContext());
 }
+
+ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, DeclContext *Parent)
+  : DistinctTypeDecl(DeclKind::Class, Parent, Name, Type()), 
+    ClassLoc(ClassLoc) {
+  // Set the type of the OneOfDecl to the right MetaTypeType.
+  setType(MetaTypeType::get(this));
+  // Compute the associated type for this ClassDecl.
+  ClassTy = new (Parent->getASTContext()) ClassType(this, Parent->getASTContext());
+}
+
 
 OneOfElementDecl *OneOfDecl::getElement(Identifier Name) const {
   // FIXME: Linear search is not great for large oneof decls.

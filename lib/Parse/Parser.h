@@ -224,6 +224,7 @@ public:
   bool parseDeclOneOf(SmallVectorImpl<Decl*> &Decls);
 
   bool parseDeclStruct(SmallVectorImpl<Decl*> &Decls);
+  bool parseDeclClass(SmallVectorImpl<Decl*> &Decls);
   bool parseDeclVar(bool hasContainerType, SmallVectorImpl<Decl*> &Decls);
   bool parseGetSet(bool HasContainerType, Pattern *Indices, Type ElementTy, 
                    FuncDecl *&Get, FuncDecl *&Set, SourceLoc &LastValidLoc);
