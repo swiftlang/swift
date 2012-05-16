@@ -527,6 +527,10 @@ public:
       for (Decl *Member : SD->getMembers())
         if (doIt(Member))
           return true;
+    } else if (ClassDecl *CD = dyn_cast<ClassDecl>(D)) {
+      for (Decl *Member : CD->getMembers())
+        if (doIt(Member))
+          return true;
     } else if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       auto Body = TLCD->getBody();
       if (Body.is<Expr*>()) {

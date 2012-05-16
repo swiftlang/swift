@@ -161,8 +161,7 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
     return IGM.emitStructType(cast<StructDecl>(D)->getDeclaredType());
 
   case DeclKind::Class:
-    // FIXME: Implement!
-    return;
+    return IGM.emitClassType(cast<ClassDecl>(D)->getDeclaredType());
 
   // These declarations don't require IR-gen support.
   case DeclKind::Import:
@@ -448,7 +447,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
       emitStructType(cast<StructDecl>(member)->getDeclaredType());
       continue;
     case DeclKind::Class:
-      // FIXME: Implement!
+      emitClassType(cast<ClassDecl>(member)->getDeclaredType());
       continue;
     case DeclKind::Var:
       if (cast<VarDecl>(member)->isProperty())
@@ -465,7 +464,56 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
         emitInstanceMethod(func);
       }
       continue;
-      }
+    }
+    }
+    llvm_unreachable("bad extension member kind");
+  }
+}
+
+/// Emit a type extension.
+void IRGenFunction::emitExtension(ExtensionDecl *ext) {
+  for (Decl *member : ext->getMembers()) {
+    switch (member->getKind()) {
+    case DeclKind::Import:
+    case DeclKind::OneOfElement:
+    case DeclKind::TopLevelCode:
+    case DeclKind::Protocol:
+      llvm_unreachable("decl not allowed in extension!");
+
+    // PatternBindingDecls don't really make sense here, but we
+    // produce one as a side-effect of parsing a var property.
+    // Just ignore it.
+    case DeclKind::PatternBinding:
+      continue;
+
+    case DeclKind::Subscript:
+      // Getter/setter will be handled separately.
+      continue;
+    case DeclKind::Extension:
+      emitExtension(cast<ExtensionDecl>(member));
+      continue;
+    case DeclKind::TypeAlias:
+      continue;
+    case DeclKind::OneOf:
+      emitOneOfType(cast<OneOfDecl>(member)->getDeclaredType());
+      continue;
+    case DeclKind::Struct:
+      emitStructType(cast<StructDecl>(member)->getDeclaredType());
+      continue;
+    case DeclKind::Class:
+      emitClassType(cast<ClassDecl>(member)->getDeclaredType());
+      continue;
+    case DeclKind::Var:
+      if (cast<VarDecl>(member)->isProperty())
+        // Getter/setter will be handled separately.
+        continue;
+      unimplemented(member->getLocStart(), "var decl in extension");
+      continue;
+    case DeclKind::Func: {
+      FuncDecl *func = cast<FuncDecl>(member);
+      unimplemented(func->getLocStart(), "local member function");
+      continue;
+    }
     }
     llvm_unreachable("bad extension member kind");
   }
@@ -486,8 +534,7 @@ void IRGenFunction::emitLocal(Decl *D) {
     return emitStructType(cast<StructDecl>(D)->getDeclaredType());
 
   case DeclKind::Class:
-    // FIXME: Implement
-    return;
+    return emitClassType(cast<ClassDecl>(D)->getDeclaredType());
 
   case DeclKind::TypeAlias:
   case DeclKind::OneOfElement:

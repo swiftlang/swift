@@ -39,6 +39,7 @@ namespace llvm {
 namespace swift {
   class ASTContext;
   class BraceStmt;
+  class ClassType;
   class Decl;
   class ExtensionDecl;
   class FuncDecl;
@@ -145,6 +146,7 @@ public:
 
   void emitOneOfType(OneOfType *type);
   void emitStructType(StructType *type);
+  void emitClassType(ClassType *type);
   void emitExtension(ExtensionDecl *D);
   void emitGlobalFunction(FuncDecl *D);  
   void emitStaticMethod(FuncDecl *D);

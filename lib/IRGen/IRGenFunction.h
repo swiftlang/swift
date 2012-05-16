@@ -33,8 +33,10 @@ namespace llvm {
 namespace swift {
   class AssignStmt;
   class BraceStmt;
+  class ClassType;
   class Decl;
   class Expr;
+  class ExtensionDecl;
   class ForEachStmt;
   class ForStmt;
   class FuncDecl;
@@ -320,6 +322,8 @@ private:
 public:
   void emitOneOfType(OneOfType *type);
   void emitStructType(StructType *type);
+  void emitClassType(ClassType *type);
+  void emitExtension(ExtensionDecl *ext);
 
 //--- Global context emission --------------------------------------------------
 public:
