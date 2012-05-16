@@ -1156,64 +1156,10 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       return nullptr;
     }
   }
-  
-  // It looks like the elements line up, walk through them and see if the types
-  // either agree or can be converted.  If the expression is a TupleExpr, we do
-  // this conversion in place.
+
+  // We coerce the source elements to the correct types, then build a shuffle
+  // if necessary.
   TupleExpr *TE = dyn_cast<TupleExpr>(E);
-  if (TE && TE->getNumElements() != 1 &&
-      TE->getNumElements() == DestTy->getFields().size()) {
-    SmallVector<Expr*, 8> OrigElts(TE->getElements().begin(),
-                                   TE->getElements().end());
-    
-    for (unsigned i = 0, e = DestTy->getFields().size(); i != e; ++i) {
-      // Extract the input element corresponding to this destination element.
-      unsigned SrcField = DestElementSources[i];
-      assert(SrcField != ~0U && "dest field not found?");
-      
-      // If SrcField is -2, then the destination element should use its default
-      // value.
-      if (SrcField == -2U) {
-        if (Flags & CF_Apply)
-          TE->setElement(i, 0);
-        continue;
-      }
-
-      // If we are performing coercion for an assignment, and this is the
-      // first argument, make it an implicit lvalue.
-      unsigned SubFlags = Flags;
-      if (SubFlags & CF_Assignment) {
-        SubFlags &= ~CF_NotPropagated;
-        
-        if (i == 0)
-          SubFlags |= CF_ImplicitLValue;
-      }
-
-      // Check to see if the src value can be converted to the destination
-      // element type.
-      if (CoercedResult Elt = coerceToType(OrigElts[SrcField],
-                                           DestTy->getElementType(i),
-                                           TC,
-                                           SubFlags)) {
-        if (Flags & CF_Apply)
-          TE->setElement(i, Elt.getExpr());
-      } else {
-        // TODO: QOI: Include a note about this failure!
-        return nullptr;
-      }
-    }
-    
-    if (!(Flags & CF_Apply))
-      return Type(DestTy);
-    
-    // Okay, we updated the tuple in place.
-    E->setType(DestTy);
-    return unchanged(E, Flags);
-  }
-  
-  // Otherwise, if it isn't a tuple literal, we unpack the source elementwise so
-  // we can do elementwise conversions as needed, then rebuild a new TupleExpr
-  // of the right destination type.
   TupleType *ETy = E->getType()->getAs<TupleType>();
   SmallVector<int, 16> NewElements(DestTy->getFields().size());
   
@@ -1274,6 +1220,21 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   
   if (!(Flags & CF_Apply))
     return Type(DestTy);
+
+  // If we don't actually need to shuffle, skip building a shuffle.
+  bool NullShuffle = true;
+  for (int i = 0, e = NewElements.size(); i != e; i++) {
+    if (i != NewElements[i]) {
+      NullShuffle = false;
+      break;
+    }
+  }
+  if (NullShuffle) {
+    // Force the type of the expression to match the destination to make
+    // the AST consistent.
+    E->setType(DestTy);
+    return unchanged(E, Flags);
+  }
 
   // If we need to rebuild the type of the source due to coercion, do so now.
   if (RebuildSourceType) {
