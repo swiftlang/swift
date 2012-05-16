@@ -1353,8 +1353,33 @@ public:
     return E->getKind() == ExprKind::NewArray;
   }
 };
-  
-  
+
+/// NewReferenceExpr - The allocation of a reference type.  Allocates and
+/// constructs an object, then returns a reference to it.
+class NewReferenceExpr : public Expr {
+private:
+  SourceLoc NewLoc;
+
+public:
+  NewReferenceExpr(Type ty, SourceLoc newLoc)
+    : Expr(ExprKind::NewReference, ty), NewLoc(newLoc) {}
+
+  /// Return the location of the 'new' keyword.
+  SourceLoc getNewLoc() const { return NewLoc; }
+
+  SourceRange getSourceRange() const {
+    // FIXME: This source range is wrong
+    return SourceRange(NewLoc, NewLoc);
+  }
+  SourceLoc getLoc() const { return NewLoc; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const NewReferenceExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::NewReference;
+  }
+};
+
 /// ApplyExpr - Superclass of various function calls, which apply an argument to
 /// a function to get a result.
 class ApplyExpr : public Expr {

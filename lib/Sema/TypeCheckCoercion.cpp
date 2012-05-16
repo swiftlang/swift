@@ -190,6 +190,9 @@ public:
   CoercedResult visitNewArrayExpr(NewArrayExpr *E) {
     return unchanged(E);
   }
+  CoercedResult visitNewReferenceExpr(NewReferenceExpr *E) {
+    return unchanged(E);
+  }
   CoercedResult visitSubscriptExpr(SubscriptExpr *E) {
     return unchanged(E);
   }

@@ -554,6 +554,11 @@ public:
     OS << ')';
   }
 
+  void visitNewReferenceExpr(NewReferenceExpr *E) {
+    printCommon(E, "new_reference_expr")
+      << " elementType='" << E->getType() << ')';
+  }
+
   void visitNewArrayExpr(NewArrayExpr *E) {
     printCommon(E, "new_array_expr")
       << " elementType='" << E->getElementType() << "'\n";

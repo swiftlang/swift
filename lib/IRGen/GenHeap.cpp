@@ -60,8 +60,9 @@ static llvm::Value *emitUnmanagedAllocCall(IRGenFunction &IGF,
 
 /// Perform the layout required for a heap object.
 HeapLayout::HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,
-                       llvm::ArrayRef<const TypeInfo *> fields)
-  : StructLayout(IGM, LayoutKind::HeapObject, strategy, fields) {
+                       llvm::ArrayRef<const TypeInfo *> fields,
+                       llvm::StructType *typeToFill)
+  : StructLayout(IGM, LayoutKind::HeapObject, strategy, fields, typeToFill) {
 }
 
 /// Create the destructor function for a layout.

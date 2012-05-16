@@ -404,8 +404,8 @@ ERROR(expected_bracket_array_subscript,expr_parsing,none,
       "expected ']' in subscript expression", ())
 
 // New expressions
-ERROR(non_array_new_unsupported,expr_parsing,none,
-      "no support for non-array new", ())
+ERROR(array_new_init_unsupported,expr_parsing,none,
+      "no support init in new", ())
 ERROR(array_new_missing_first_bound,expr_parsing,none,
       "must specify length of array to allocate", ())
 ERROR(expected_expr_new_array_bound,expr_parsing,none,
@@ -742,6 +742,9 @@ ERROR(new_array_bound_zero,sema_tce,none,
 ERROR(array_bound_convert_limit_reached,sema_tce,none,
       "getArrayBoundValue() for type %0 used as an array size does not return "
       "an integer type", (Type))
+
+ERROR(new_reference_not_class,sema_tce,none,
+      "new expression used with non-class type", ())
 
 ERROR(string_interpolation_overload_fail,sema_tce,none,
       "could not interpolate strings with %0 + %1", (Type, Type))

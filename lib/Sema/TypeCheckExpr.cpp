@@ -586,7 +586,19 @@ public:
 
     return E;
   }
-  
+
+  Expr *visitNewReferenceExpr(NewReferenceExpr *E) {
+    if (TC.validateType(E->getType()))
+      return nullptr;
+
+    if (!E->getType()->is<ClassType>()) {
+      TC.diagnose(E->getLoc(), diag::new_reference_not_class);
+      return nullptr;
+    }
+
+    return E;
+  }
+
   Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
     // DotSyntaxBaseIgnoredExpr is fully type checked.
     return E;

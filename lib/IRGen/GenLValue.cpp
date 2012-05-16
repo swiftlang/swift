@@ -644,16 +644,21 @@ namespace {
 
 /// Emit an l-value for the given member reference.
 LValue swift::irgen::emitMemberRefLValue(IRGenFunction &IGF, MemberRefExpr *E) {
-  // TODO: we need to take a slightly different path if the base is a
-  // reference type.
-  assert(!E->getBase()->getType()->hasReferenceSemantics());
-
   VarDecl *var = E->getDecl();
+
+  if (E->getBase()->getType()->hasReferenceSemantics()) {
+    if (!isVarAccessLogical(IGF, var)) {
+      if (isa<ClassDecl>(var->getDeclContext()))
+        return emitPhysicalClassMemberLValue(IGF, E);
+      llvm_unreachable("Unexpected physical lvalue MemberRefExpr");
+    }
+
+    llvm_unreachable("Not yet implemented");
+  }
+
   if (!isVarAccessLogical(IGF, var)) {
     if (isa<StructDecl>(var->getDeclContext()))
       return emitPhysicalStructMemberLValue(IGF, E);
-    if (isa<ClassDecl>(var->getDeclContext()))
-      return emitPhysicalClassMemberLValue(IGF, E);
 
     llvm_unreachable("Unexpected physical lvalue MemberRefExpr");
   }

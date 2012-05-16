@@ -26,7 +26,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LValue.h"
-#include "StructLayout.h"
+#include "GenHeap.h"
 
 
 using namespace swift;
@@ -35,18 +35,22 @@ using namespace irgen;
 namespace {
   /// Layout information for class types.
   class ClassTypeInfo : public TypeInfo {
-    Alignment HeapAlign;
+    HeapLayout Layout;
     std::vector<ElementLayout> Elements;
 
   public:
     ClassTypeInfo(llvm::Type *irType, Size size, Alignment align,
-                  Alignment heapAlign, ArrayRef<ElementLayout> elements)
-      : TypeInfo(irType, size, align, IsNotPOD), HeapAlign(heapAlign),
-        Elements(elements) {
+                  const HeapLayout &layout)
+      : TypeInfo(irType, size, align, IsNotPOD), Layout(layout) {
     }
 
-    Alignment getHeapAlignment() const { return HeapAlign; }
-    const std::vector<ElementLayout> &getElements() const { return Elements; }
+    const HeapLayout &getLayout() const { return Layout; }
+    Alignment getHeapAlignment() const {
+      return Layout.getAlignment();
+    }
+    llvm::ArrayRef<ElementLayout> getElements() const {
+      return Layout.getElements();
+    }
 
     unsigned getExplosionSize(ExplosionKind kind) const {
       return 1;
@@ -98,6 +102,7 @@ LValue swift::irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
   const ClassTypeInfo &info =
     TypeConverter::getFragileTypeInfo(IGF.IGM, T).as<ClassTypeInfo>();
   Explosion explosion(ExplosionKind::Maximal);
+  // FIXME: Can we avoid the retain/release here in some cases?
   IGF.emitRValue(E->getBase(), explosion);
   ManagedValue baseVal = explosion.claimNext();
 
@@ -116,6 +121,21 @@ LValue swift::irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
   return IGF.emitAddressLValue(OwnedAddress(memberAddr, baseVal.getValue()));
 }
 
+void swift::irgen::emitNewReferenceExpr(IRGenFunction &IGF,
+                                        NewReferenceExpr *E,
+                                        Explosion &Out) {
+  const ClassTypeInfo &info =
+      IGF.getFragileTypeInfo(E->getType()).as<ClassTypeInfo>();
+
+  // Allocate the class using the given layout.
+  // FIXME: Long-term, we clearly need a specialized runtime entry point.
+  llvm::Value *val = IGF.emitUnmanagedAlloc(info.getLayout(), "reference.new");
+  llvm::Type *destType = info.getLayout().getType()->getPointerTo();
+  llvm::Value *castVal = IGF.Builder.CreateBitCast(val, destType);
+
+  Out.add(IGF.enterReleaseCleanup(castVal));
+}
+
 const TypeInfo *
 TypeConverter::convertClassType(IRGenModule &IGM, ClassType *T) {
   // Collect all the fields from the type.
@@ -125,13 +145,11 @@ TypeConverter::convertClassType(IRGenModule &IGM, ClassType *T) {
       if (!VD->isProperty())
         fieldTypes.push_back(&IGM.getFragileTypeInfo(VD->getType()));
 
-  StructLayout layout(IGM, LayoutKind::HeapObject,
-                      LayoutStrategy::Optimal, fieldTypes,
-                      IGM.createNominalType(T->getDecl()));
+  HeapLayout layout(IGM, LayoutStrategy::Optimal, fieldTypes,
+                    IGM.createNominalType(T->getDecl()));
 
   llvm::Type *irType = layout.getType()->getPointerTo();
 
   return new ClassTypeInfo(irType, IGM.getPointerSize(),
-                           IGM.getPointerAlignment(),
-                           layout.getAlignment(), layout.getElements());
+                           IGM.getPointerAlignment(), layout);
 }

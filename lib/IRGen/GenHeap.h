@@ -35,7 +35,8 @@ namespace irgen {
 class HeapLayout : public StructLayout {
 public:
   HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,
-             llvm::ArrayRef<const TypeInfo *> fields);
+             llvm::ArrayRef<const TypeInfo *> fields,
+             llvm::StructType *typeToFill = 0);
 
   /// Add the layout's required metadata fields to the given collection.
   /// The address point of the metadata should be at the first field added.

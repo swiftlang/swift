@@ -19,12 +19,17 @@
 
 namespace swift {
   class MemberRefExpr;
+  class NewReferenceExpr;
 
 namespace irgen {
-  class LValue;
+  class Explosion;
   class IRGenFunction;
+  class LValue;
+
 
   LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF, MemberRefExpr *E);
+  void emitNewReferenceExpr(IRGenFunction &IGF, NewReferenceExpr *E,
+                            Explosion &Out);
 
 } // end namespace irgen
 } // end namespace swift

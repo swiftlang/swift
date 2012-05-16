@@ -134,16 +134,15 @@ NullablePtr<Expr> Parser::parseExprNew() {
   if (parseTypeIdentifier(elementTy))
     return nullptr;
 
-  // If we're not followed by an unspaced '[', that's all we've got.
   // TODO: we should probably allow a tuple-expr here as an initializer.
-  if (Tok.isNot(tok::l_square)) {
-    diagnose(newLoc, diag::non_array_new_unsupported);
+  if (Tok.is(tok::l_paren)) {
+    diagnose(newLoc, diag::array_new_init_unsupported);
     return nullptr;
   }
 
   bool hadInvalid = false;
   SmallVector<NewArrayExpr::Bound, 4> bounds;
-  do {
+  while (Tok.is(tok::l_square)) {
     SourceRange brackets;
     brackets.Start = Tok.getLoc();
     consumeToken(tok::l_square);
@@ -175,11 +174,12 @@ NullablePtr<Expr> Parser::parseExprNew() {
     consumeToken(tok::r_square);
 
     bounds.push_back(NewArrayExpr::Bound(boundValue.get(), brackets));
-  } while (Tok.is(tok::l_square));
-
-  // TODO: we should probably allow a tuple-expr here as an initializer.
+  }
 
   if (hadInvalid) return nullptr;
+
+  if (bounds.empty())
+    return new (Context) NewReferenceExpr(elementTy, newLoc);
 
   return NewArrayExpr::create(Context, newLoc, elementTy, bounds);
 }

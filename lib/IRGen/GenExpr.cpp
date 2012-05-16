@@ -25,6 +25,7 @@
 
 #include "ASTVisitor.h"
 #include "GenArray.h"
+#include "GenClass.h"
 #include "GenClosure.h"
 #include "GenFunc.h"
 #include "GenInit.h"
@@ -247,6 +248,10 @@ namespace {
       emitNewArrayExpr(IGF, E, Out);
     }
 
+    void visitNewReferenceExpr(NewReferenceExpr *E) {
+      emitNewReferenceExpr(IGF, E, Out);
+    }
+
     void visitApplyExpr(ApplyExpr *E) {
       emitApplyExpr(IGF, E, Out);
     }
@@ -318,6 +323,7 @@ namespace {
     NOT_LVALUE_EXPR(Tuple)
     NOT_LVALUE_EXPR(ScalarToTuple)
     NOT_LVALUE_EXPR(NewArray)
+    NOT_LVALUE_EXPR(NewReference)
     NOT_LVALUE_EXPR(DotSyntaxBaseIgnored)
     NOT_LVALUE_EXPR(Coerce)
     NOT_LVALUE_EXPR(Module)
@@ -466,6 +472,7 @@ namespace {
     NON_LOCATEABLE(CapturingExpr)
     NON_LOCATEABLE(ModuleExpr)
     NON_LOCATEABLE(DotSyntaxBaseIgnoredExpr)
+    NON_LOCATEABLE(NewReferenceExpr)
     NON_LOCATEABLE(NewArrayExpr)
     NON_LOCATEABLE(CoerceExpr)
                                                     
