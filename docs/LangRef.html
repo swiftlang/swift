@@ -416,6 +416,7 @@
   <!-- ********************************************************************* -->
   
   <pre class="grammar">
+    decl ::= <a href="#decl-class">decl-class</a>
     decl ::= <a href="#decl-extension">decl-extension</a>
     decl ::= <a href="#decl-func">decl-func</a>
     decl ::= <a href="#decl-import">decl-import</a>
@@ -499,11 +500,13 @@
   </p>
   
   <!-- _____________________________________________________________________ -->
-  <h4 id="decl-extension-oneof-struct"><a href="#decl-oneof">oneof</a> and <a
-    href="#decl-struct">struct</a> declaration extensions</h4>
+  <h4 id="decl-extension-oneof-struct"><a href="#decl-oneof">oneof</a>, <a
+    href="#decl-struct">struct</a>, and <a href="#decl-class">class</a>
+    declaration extensions</h4>
 
-  <p>'<a href="#decl-var">var</a>' decls that do not have a getter or setter are not allowed in a oneof or struct,
-  data members should be used instead.</p>
+  <p>'<a href="#decl-var">var</a>' decls that do not have a getter or setter
+    are not allowed in a oneof, struct, or class. Data members should be used
+    instead.</p>
   
   
   <!-- ===================================================================== -->
@@ -738,10 +741,6 @@ token following the opening '{' is either 'set' or 'get'.</p>
     <i>// pair_fn is a function that takes two ints and returns a tuple.</i>
     typealias pair_fn : (Int) -&gt; (Int) -&gt; (first : Int, second : Int)
   </pre>
-
-  <p>'typealias' is the core semantic model for all named types.  For example, a
-  <a  href="#decl-oneof">oneof decl</a> uses an implicit 'typealias' to
-  represent the name for the type.</p>
   
   <!-- ===================================================================== -->
   <h3 id="decl-oneof">oneof Declarations</h3>
@@ -830,61 +829,31 @@ token following the opening '{' is either 'set' or 'get'.</p>
 
   <pre class="grammar">
     decl-struct ::= 'struct' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#inheritance">inheritance</a>? '{' decl-struct-body '}'
-    decl-struct-body ::= <a href="#type-tuple">type-tuple-body</a>? <a href="#decl">decl</a>*
+    decl-struct-body ::= <a href="#decl">decl</a>*
   </pre>
 
   <p>A struct declares a simple value type that can contain data members and
-     have methods.  A struct is syntactic sugar for more primitive forms: a
-     oneof declaration of a single element, a 'typealias', a constructor, and
-     potentially an extension with functions in it.  Unlike tuple elements, all
-     members of the struct must be named.</p>
+     have methods.</p>
 
-  <p>Since the element types of a oneof must
-    be <a href="#materializable">materializable</a>, it follows that
-    all the struct field types must be as well.</p>
+  <p>The body of a 'struct' is a list of decls. Non-property 'var' decls
+     declare members with storage in the struct. Other declarations act like
+     they would in an <a href="#decl-extension">extension</a> of the
+     struct type.</p>  
 
-  <p>A 'struct' may include a list of decls after its member types, which is
-     syntactic sugar for defining an <a href="#decl-extension">extension</a> of
-     the type.  The limitations of an <a 
-        href="#decl-extension-oneof-struct">struct extensions</a> apply here as
-     well.</p>  
-
-  <p>These two declarations are equivalent (other than their names):</p>
+  <p>Here are a few simple examples:</p>
 
   <pre class="example">
-    struct S1 { a : Int, b : Int }
+    struct S1 {
+      var a : Int, b : Int
+    }
     
-    oneof S2 {
-      S2 : (a : Int, b : Int)
+    struct S2 {
+      var a : Int
+      func f() -> Int { return b }
+      var b : Int
     }
   </pre>
   
-  Likewise, these are two equivalent ways of writing the same thing:
-  
-  <pre class="example">
-    struct S3a { x = 4, y : Int }
-    struct S3b {
-      x = 4
-      y : Int
-    }
-  </pre>
-  
-  Likewise, a <a href="#decl-func">func</a> declared in the struct are
-  equivalent to declaring an <a href="#decl-extension">extension</a> containing
-  the func.
-  
-  <pre class="example">
-    struct S4a {
-      x : Int
-      func doStuff() { ... }
-    }
-    struct S4b {
-      x : Int
-    }
-    extension S4b {
-      func doStuff() { ... }
-    }
-  </pre>
 
   <p>Here are some more realistic examples of structs:</p>
   
@@ -912,7 +881,36 @@ token following the opening '{' is either 'set' or 'get'.</p>
       var x1_area2 = x1.area()
     }
   </pre>    
-  
+
+  <!-- ===================================================================== -->
+  <h3 id="decl-class">class Declarations</h3>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    decl-class ::= 'class' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#inheritance">inheritance</a>? '{' decl-class-body '}'
+    decl-class-body ::= <a href="#decl">decl</a>*
+  </pre>
+
+  <p>A class declares a reference type referring to an object which can contain
+     data members and have methods.</p>
+
+  <p>The body of a 'class' is a list of decls. Non-property 'var' decls
+     declare members with storage in the class. Other declarations act like
+     they would in an <a href="#decl-extension">extension</a> of the
+     class type.</p>
+
+  <p>The only way to create a new instance of a class is with a
+     <a href="#expr-new">new expression</a>.
+
+  <p>Here is a simple example:</p>
+
+  <pre class="example">
+    class C1 {
+      var a : Int
+      var b : Int
+    }
+  </pre>
+
   <!-- ===================================================================== -->
   <h3 id="decl-protocol">Protocol Declarations</h3>
   <!-- ===================================================================== -->
@@ -1286,10 +1284,9 @@ if vec[3] {
 
   <p>Tuples are the low-level form of data aggregation in Swift, and are used as
   the building block of <a href="#type-function">function</a> argument lists,
-  multiple return values, <a href="#decl-struct">struct</a> and 
-  <a href="#decl-oneof">oneof</a> bodies, etc.  Because tuples are widely
-  accessible and available everywhere in the language, aggregate data access and
-  transformation is uniform and powerful.</p>
+  multiple return values, <a href="#decl-oneof">oneof</a> bodies, etc. Because
+  tuples are widely accessible and available everywhere in the language,
+  aggregate data access and transformation is uniform and powerful.</p>
 
   <p>Each element of a tuple contains an optional name followed by a type and/or
   a default value expression, whose type conversion rules work like those in a
@@ -1391,34 +1388,28 @@ if vec[3] {
     comes from CLU.
   </div>
   
-  <p>A oneof type  is a simple discriminated union: the runtime representation
+  <p>A oneof type is a simple discriminated union: the runtime representation
   of a value of oneof type only has one of the specified elements at a time.</p>
-  
-  <p>A oneof type declares two things: 1) the type itself as an anonymous type,
-  and 2) each of the oneof elements declares a constructor value which creates a
-  value of the oneof type with the specified element kind.  The constructor
-  values are defined in a nested scope within the oneof descriptor type, so they
-  must be accessed with either a <a href="#expr-identifier">qualified
-  identifier</a> (if the type itself is named) or through <a
-  href="#expr-delayed-identifier">delayed identifier resolution</a>
-  with <a href="#typecheck_context">context sensitive type inference</a>.
-  </p>
 
-  <p>If the oneof element has no type specified with it, then the type of the 
-  constructor is the oneof type.  If a oneof element has a
-  type "T" associated with it, then the type of the constructor is a function
-  that takes "T" and returns the oneof type.</p>
+  <p>All of the element types of a oneof type must
+  be <a href="#materializable">materializable</a>.</p>
   
+  <p>A oneof type is defined by a <a href="#decl-oneof">oneof decl</a>.
+
   <p>A default initialized value of oneof type is initialized to the first
   element type in the list, with the default value for its element type.</p>
 
-  <p>All of the element types of a oneof type must
-    be <a href="#materializable">materializable</a>.</p>
-  
-  <p>Oneof types are implicitly created when <a href="#decl-oneof">declaring a
-    oneof</a>, <a href="#decl-struct">struct</a>, which produces a typealias and
-  an underlying oneof type.  There is no way to create an anonymous oneof type
-  in the type production of the grammar.
+  <p>The oneof metatype has a member corresponding to each declared element.
+  For elements with a declared type, this member is a function which can
+  construct a oneof containing that element.  For elements without a
+  declared type, the member is simply a oneof value for that element.  A
+  oneof value has no accessible members except those explicitly defined
+  by the user.</p>
+
+  <p>A reference to a member of the oneof metatype can be shortened using <a
+  href="#expr-delayed-identifier">delayed identifier resolution</a>
+  with <a href="#typecheck_context">context sensitive type inference</a>.
+  </p>
 
   <p>TODO: Should attributes be allowed on oneof elements?
   TODO: Eventually, with generics we'll have equality and inequality operators.
