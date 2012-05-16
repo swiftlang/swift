@@ -1338,16 +1338,9 @@ SemaCoerce::coerceObjectArgument(Expr *E, Type ContainerTy, TypeChecker &TC,
   // Determine the type we're converting from, and whether we need to
   // materialize the source.
   Type SrcTy = E->getType();
-  Type SrcObjectTy;
-  bool Materialize;
-  if (LValueType *SrcLV = SrcTy->getAs<LValueType>()) {
-    SrcObjectTy = SrcLV->getObjectType();
-    Materialize = false;
-  } else {
-    SrcObjectTy = SrcTy;
-    Materialize = true;    
-  }
-  
+  LValueType *SrcLV = SrcTy->getAs<LValueType>();
+  Type SrcObjectTy = SrcLV ? SrcLV->getObjectType() : SrcTy;
+
   // Check whether the source object is the same as or a subtype of the
   // container type.
   bool Convertible = false;
@@ -1368,6 +1361,20 @@ SemaCoerce::coerceObjectArgument(Expr *E, Type ContainerTy, TypeChecker &TC,
     return nullptr;
   }
 
+  if (SrcObjectTy->hasReferenceSemantics()) {
+    // The destination type is just the source object type.
+    if (!(Flags & CF_Apply))
+      return SrcObjectTy;
+
+    // If the source is an lvalue, perform an lvalue-to-rvalue conversion.
+    if (SrcLV) {
+      E = TC.convertLValueToRValue(SrcLV, E);
+      return coerced(E, Flags);
+    }
+
+    return unchanged(E, Flags);
+  }
+
   // Compute the destination type, which is simply an lvalue of the source
   // object type.
   Type DestTy = LValueType::get(SrcObjectTy,
@@ -1379,7 +1386,7 @@ SemaCoerce::coerceObjectArgument(Expr *E, Type ContainerTy, TypeChecker &TC,
     return DestTy;
   
   // If we have to materialize the object, do so now.
-  if (Materialize) {
+  if (!SrcLV) {
     E = new (TC.Context) MaterializeExpr(E, DestTy);
     return coerced(E, Flags);
   }

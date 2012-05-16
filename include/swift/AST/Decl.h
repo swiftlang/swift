@@ -452,7 +452,7 @@ public:
   static bool classof(const TypeAliasDecl *D) { return true; }
 };
 
-/// DistinctTypeDecl - a declaration of a distinct type, like a struct.  This
+/// DistinctTypeDecl - a declaration of a nominal type, like a struct.  This
 /// decl is always a DeclContext.
 class DistinctTypeDecl : public TypeDecl, public DeclContext {
 public:

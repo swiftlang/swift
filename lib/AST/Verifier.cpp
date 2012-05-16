@@ -260,8 +260,12 @@ namespace {
         TupleType *TT = FT->getInput()->getAs<TupleType>();
         if (isa<DotSyntaxCallExpr>(E)) {
           LValueType::Qual InputExprQuals;
-          Type InputExprObjectTy = checkLValue(InputExprTy, InputExprQuals,
-                                               "object argument");
+          Type InputExprObjectTy;
+          if (InputExprTy->hasReferenceSemantics())
+            InputExprObjectTy = InputExprTy;
+          else
+            InputExprObjectTy = checkLValue(InputExprTy, InputExprQuals,
+                                            "object argument");
           LValueType::Qual FunctionInputQuals;
           Type FunctionInputObjectTy = checkLValue(FT->getInput(),
                                                    FunctionInputQuals,
@@ -283,7 +287,8 @@ namespace {
     }
 
     void verifyChecked(MemberRefExpr *E) {
-      if (!E->getBase()->getType()->is<LValueType>()) {
+      if (!E->getBase()->getType()->is<LValueType>() &&
+          !E->getBase()->getType()->hasReferenceSemantics()) {
         Out << "Member reference base type is not an lvalue:\n";
         E->dump();
         abort();

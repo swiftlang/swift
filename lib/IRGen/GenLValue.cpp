@@ -23,6 +23,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Optional.h"
+#include "GenClass.h"
 #include "GenFunc.h"
 #include "GenInit.h"
 #include "GenStruct.h"
@@ -651,6 +652,8 @@ LValue swift::irgen::emitMemberRefLValue(IRGenFunction &IGF, MemberRefExpr *E) {
   if (!isVarAccessLogical(IGF, var)) {
     if (isa<StructDecl>(var->getDeclContext()))
       return emitPhysicalStructMemberLValue(IGF, E);
+    if (isa<ClassDecl>(var->getDeclContext()))
+      return emitPhysicalClassMemberLValue(IGF, E);
 
     llvm_unreachable("Unexpected physical lvalue MemberRefExpr");
   }

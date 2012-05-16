@@ -324,6 +324,13 @@ void Module::lookupMembers(Type BaseType, Identifier Name,
         BaseMembersStorage.push_back(VD);
     }
     BaseMembers = BaseMembersStorage;
+  } else if (ClassType *CT = BaseType->getAs<ClassType>()) {
+    D = CT->getDecl();
+    for (Decl* Member : CT->getDecl()->getMembers()) {
+      if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
+        BaseMembersStorage.push_back(VD);
+    }
+    BaseMembers = BaseMembersStorage;
   } else if (OneOfType *OOT = BaseType->getAs<OneOfType>()) {
     // FIXME: Refuse to look up "constructors" until we have real constructors.
     if (OOT->getDecl()->getName() == Name)

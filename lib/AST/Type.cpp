@@ -66,8 +66,8 @@ bool TypeBase::isMaterializable() {
 
 /// hasReferenceSemantics - Does this type have reference semantics?
 bool TypeBase::hasReferenceSemantics() {
-  // For now, only Builtin.ObjectPointer.
-  return is<BuiltinObjectPointerType>();
+  // At the moment, Builtin.ObjectPointer, class types, and function types.
+  return is<BuiltinObjectPointerType>() || is<ClassType>() || is<FunctionType>();
 }
 
 Type TypeBase::getUnlabeledType(ASTContext &Context) {

@@ -29,6 +29,7 @@ namespace llvm {
 
 namespace swift {
   class ArrayType;
+  class ClassType;
   class FunctionType;
   class LValueType;
   class MetaTypeType;
@@ -38,6 +39,7 @@ namespace swift {
   class TupleType;
   class CanType;
   class TypeBase;
+  class Type;
 
 namespace irgen {
   class IRGenFunction;
@@ -193,6 +195,7 @@ class TypeConverter {
   static const TypeInfo *convertTupleType(IRGenModule &IGM, TupleType *T);
   static const TypeInfo *convertOneOfType(IRGenModule &IGM, OneOfType *T);
   static const TypeInfo *convertStructType(IRGenModule &IGM, StructType *T);
+  static const TypeInfo *convertClassType(IRGenModule &IGM, ClassType *T);
   static const TypeInfo *convertFunctionType(IRGenModule &IGM, FunctionType *T);
   static const TypeInfo *convertArrayType(IRGenModule &IGM, ArrayType *T);
   static const TypeInfo *convertLValueType(IRGenModule &IGM, LValueType *T);
