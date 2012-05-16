@@ -9,6 +9,8 @@ add_swift_library(swiftIRGen
   DiverseStack.h
   Explosion.h
   GenArray.cpp
+  GenClass.cpp
+  GenClass.h
   GenClosure.cpp
   GenClosure.h
   GenControl.cpp
