@@ -75,6 +75,7 @@ enum class tok {
   PUNCTUATOR(colon,       ":")
   PUNCTUATOR(semi,        ";")
   PUNCTUATOR(equal,       "=")
+  PUNCTUATOR(ellipsis,    "...")
   
   PUNCTUATOR(arrow,       "->")
 #undef PUNCTUATOR

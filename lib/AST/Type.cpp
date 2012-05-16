@@ -226,8 +226,13 @@ CanType TypeBase::getCanonicalType() {
     for (const TupleTypeElt &field : TT->getFields()) {
       assert(!field.getType().isNull() &&
              "Cannot get canonical type of un-typechecked TupleType!");
+      Type canVarargBaseTy;
+      if (field.isVararg())
+        canVarargBaseTy = field.getVarargBaseTy()->getCanonicalType();
       CanElts.push_back(TupleTypeElt(field.getType()->getCanonicalType(),
-                                     field.getName()));
+                                     field.getName(),
+                                     field.getInit(),
+                                     canVarargBaseTy));
     }
     
     Result = TupleType::get(CanElts, CanElts[0].getType()->getASTContext());
@@ -519,8 +524,11 @@ void TupleType::print(raw_ostream &OS) const {
     
     if (TD.hasName())
       OS << TD.getName() << " : ";
-    
-    OS << TD.getType();
+
+    if (TD.isVararg())
+      OS <<  TD.getVarargBaseTy() << "...";
+    else
+      OS << TD.getType();
   }
   OS << ')';
 }

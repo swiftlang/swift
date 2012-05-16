@@ -120,6 +120,7 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
     ID.AddPointer(Elt.getType().getPointer());
     ID.AddPointer(Elt.getName().get());
     ID.AddPointer(Elt.getInit());
+    ID.AddPointer(Elt.getVarargBaseTy().getPointer());
   }
 }
 

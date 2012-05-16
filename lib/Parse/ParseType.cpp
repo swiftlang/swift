@@ -176,7 +176,7 @@ bool Parser::parseTypeIdentifier(Type &Result) {
 ///   type-tuple:
 ///     lparen-any type-tuple-body? ')'
 ///   type-tuple-body:
-///     type-tuple-element (',' type-tuple-element)*
+///     type-tuple-element (',' type-tuple-element)* '...'?
 ///   type-tuple-element:
 ///     identifier value-specifier
 ///     type-annotation
@@ -185,7 +185,7 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
   bool HadExpr = false;
 
   if (Tok.isNot(tok::r_paren) && Tok.isNot(tok::r_brace) &&
-      !isStartOfDecl(Tok, peekToken())) {
+      Tok.isNot(tok::ellipsis) && !isStartOfDecl(Tok, peekToken())) {
     bool HadError = false;
     do {
       // If the tuple element starts with "ident :" or "ident =", then
@@ -222,11 +222,34 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
     }
   }
 
+  bool HadEllipsis = false;
+  SourceLoc EllipsisLoc;
+  if (Tok.is(tok::ellipsis)) {
+    EllipsisLoc = consumeToken();
+    HadEllipsis = true;
+  }
+
   // A "tuple" with one anonymous element is actually not a tuple.
-  if (Elements.size() == 1 && !Elements.back().hasName()) {
+  if (Elements.size() == 1 && !Elements.back().hasName() && !HadEllipsis) {
     assert(!HadExpr && "Only TupleTypes have default values");
     Result = ParenType::get(Context, Elements.back().getType());
     return false;
+  }
+
+  if (HadEllipsis) {
+    if (Elements.empty()) {
+      diagnose(EllipsisLoc, diag::empty_tuple_ellipsis);
+      return true;
+    }
+    if (Elements.back().getInit()) {
+      diagnose(EllipsisLoc, diag::tuple_ellipsis_init);
+      return true;
+    }
+    Type BaseTy = Elements.back().getType();
+    Type FullTy = ArraySliceType::get(BaseTy, EllipsisLoc, Context);
+    Identifier Name = Elements.back().getName();
+    Expr *Init = Elements.back().getInit();
+    Elements.back() = TupleTypeElt(FullTy, Name, Init, BaseTy);
   }
 
   TupleType *TT = TupleType::get(Elements, Context);

@@ -892,6 +892,10 @@ Restart:
 
     if (CurPtr[0] == '.') {
       ++CurPtr;
+      if (CurPtr[0] == '.') {
+        ++CurPtr;
+        return formToken(tok::ellipsis, TokStart);
+      }
       return formToken(tok::oper, TokStart);
     }
 

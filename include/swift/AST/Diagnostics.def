@@ -292,6 +292,10 @@ ERROR(expected_rparen_tuple_type_list,type_parsing,none,
       "expected ')' at end of tuple list", ())
 ERROR(untyped_tuple_elt_in_function_signature,type_parsing,none,
       "tuple elements in function signatures must have an explicit type", ())
+ERROR(empty_tuple_ellipsis,type_parsing,none,
+      "varargs used in tuple type with no fields", ())
+ERROR(tuple_ellipsis_init,type_parsing,none,
+      "varargs used with tuple field with initializer", ())
 
 // Protocol Types
 ERROR(expected_lbrace_protocol_type,type_parsing,none,

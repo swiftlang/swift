@@ -426,15 +426,22 @@ class TupleTypeElt {
   /// value is not specified.
   Expr *Init;
 
+  /// VarargBaseTy - This is the base type of the field, ignoring the "..."
+  /// specifier, if one is present.
+  Type VarargBaseTy;
+
 public:
   TupleTypeElt() = default;
-  TupleTypeElt(Type ty, Identifier name, Expr *init = nullptr)
-    : Name(name), Ty(ty), Init(init) { }
+  TupleTypeElt(Type ty, Identifier name, Expr *init = nullptr,
+               Type VarargBaseTy = Type())
+    : Name(name), Ty(ty), Init(init), VarargBaseTy(VarargBaseTy) { }
 
   bool hasName() const { return !Name.empty(); }
   Identifier getName() const { return Name; }
 
   Type getType() const { return Ty; }
+  bool isVararg() const { return !VarargBaseTy.isNull(); }
+  Type getVarargBaseTy() const { return VarargBaseTy; }
 
   /// \brief Retrieve a copy of this tuple type element with the type replaced.
   TupleTypeElt getWithType(Type T) const {
