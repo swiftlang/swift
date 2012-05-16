@@ -24,6 +24,14 @@ include $(SWIFT_LEVEL)/Makefile
 
 ifeq ($(ENABLE_OPTIMIZED),1)
   SWIFT_OPTFLAG := -O2
+  ifeq ($(ARCH),x86_64)
+    CFLAGS += -momit-leaf-frame-pointer
+    CXXFLAGS += -momit-leaf-frame-pointer
+  endif
+  ifeq ($(ARCH),x86)
+    CFLAGS += -momit-leaf-frame-pointer
+    CXXFLAGS += -momit-leaf-frame-pointer
+  endif
 else
   SWIFT_OPTFLAG := -O0
 endif
