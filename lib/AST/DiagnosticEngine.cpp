@@ -88,6 +88,10 @@ skipToDelimiter(StringRef &Text, char Delim1, char Delim2 = 0) {
   return Result;
 }
 
+static void formatDiagnosticText(StringRef InText, 
+                                 ArrayRef<DiagnosticArgument> Args,
+                                 llvm::raw_ostream &Out);
+
 /// \brief Format a selection argument and write it to the given stream.
 static void formatSelectionArgument(StringRef ModifierArguments,
                                     ArrayRef<DiagnosticArgument> Args,
@@ -96,7 +100,7 @@ static void formatSelectionArgument(StringRef ModifierArguments,
   do {
     StringRef Text = skipToDelimiter(ModifierArguments, '|');
     if (SelectedIndex == 0) {
-      Out << Text;
+      formatDiagnosticText(Text, Args, Out);
       break;
     }
     --SelectedIndex;
@@ -154,8 +158,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
 /// buffer.
 static void formatDiagnosticText(StringRef InText, 
                                  ArrayRef<DiagnosticArgument> Args,
-                                 llvm::SmallVectorImpl<char> &OutText) {
-  llvm::raw_svector_ostream Out(OutText);
+                                 llvm::raw_ostream &Out) {
   while (!InText.empty()) {
     size_t Percent = InText.find('%');
     if (Percent == StringRef::npos) {
@@ -231,7 +234,10 @@ void DiagnosticEngine::flushActiveDiagnostic() {
   
   // Actually substitute the diagnostic arguments into the diagnostic text.
   llvm::SmallString<256> Text;
-  formatDiagnosticText(StoredInfo.Text, ActiveDiagnostic->getArgs(), Text);
+  {
+    llvm::raw_svector_ostream Out(Text);
+    formatDiagnosticText(StoredInfo.Text, ActiveDiagnostic->getArgs(), Out);
+  }
   
   // Pass the diagnostic off to the consumer.
   DiagnosticInfo Info;
