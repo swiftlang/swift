@@ -34,7 +34,9 @@ public:
   }
 
   Type getArraySliceType(SourceLoc loc, Type elementType);
-  
+  Expr *buildArrayInjectionFnRef(ArraySliceType *sliceType,
+                                 Type lenTy, SourceLoc Loc);
+
   bool validateType(ValueDecl *VD);
   bool validateType(Type T);
 

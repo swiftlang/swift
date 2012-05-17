@@ -862,14 +862,25 @@ class TupleShuffleExpr : public ImplicitConversionExpr {
   /// If the element value is -1, then the destination value gets the default
   /// initializer for that tuple element value.
   ArrayRef<int> ElementMapping;
-  
+
+  /// If we're doing a varargs shuffle, this is the function to build the
+  /// destination slice type.
+  Expr *InjectionFn;
+
 public:
   TupleShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping, Type ty)
     : ImplicitConversionExpr(ExprKind::TupleShuffle, subExpr, ty),
-      ElementMapping(elementMapping) {}
+      ElementMapping(elementMapping), InjectionFn(nullptr) {}
 
   ArrayRef<int> getElementMapping() const { return ElementMapping; }
-  
+
+  /// Set the injection function expression to use.
+  void setVarargsInjectionFunction(Expr *fn) { InjectionFn = fn; }
+  Expr *getVarargsInjectionFunction() const {
+    assert(InjectionFn != nullptr);
+    return InjectionFn;
+  }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TupleShuffleExpr *) { return true; }
   static bool classof(const Expr *E) {

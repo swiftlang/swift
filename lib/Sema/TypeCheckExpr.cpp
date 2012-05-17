@@ -455,42 +455,6 @@ public:
     return E;
   }
 
-  /// Is the given expression a valid thing to use as the injection
-  /// function from the data for a newly-allocated array into the
-  /// given slice type?
-  bool checkValidNewArrayInjection(Expr *&fn, ArraySliceType *sliceTy,
-                                   Expr *len) {
-    // The input is a tuple type:
-    TupleTypeElt argTypes[3];
-
-    // The first element is Builtin.RawPointer.
-    // FIXME: this should probably be either UnsafePointer<T> or the
-    // first two arguments should be combined into a byref(heap).
-    argTypes[0] = TupleTypeElt(TC.Context.TheRawPointerType, Identifier());
-
-    // The second element is the owner pointer, Builtin.ObjectPointer.
-    argTypes[1] = TupleTypeElt(TC.Context.TheObjectPointerType, Identifier());
-
-    // The third element is the bound type.  Maybe this should be a
-    // target-specific size_t type?
-    argTypes[2] = TupleTypeElt(len->getType(), Identifier());
-
-    TupleType *input = TupleType::get(argTypes, TC.Context);
-
-    // The result is just the slice type.
-    Type result = sliceTy;
-
-    FunctionType *fnTy = FunctionType::get(input, result, TC.Context);
-
-    // FIXME: this produces terrible diagnostics.
-
-    Expr *coercedFn = TC.coerceToType(fn, fnTy);
-    if (!coercedFn) return true;
-
-    fn = coercedFn;
-    return false;
-  }
-
   Expr *visitNewArrayExpr(NewArrayExpr *E) {
     if (TC.validateType(E->getElementType()))
       return nullptr;
@@ -555,31 +519,12 @@ public:
     // Find the appropriate injection function.
     ArraySliceType *sliceType = cast<ArraySliceType>(resultType);
 
-    // Build the expression "Slice<T>".
-    Type implType = sliceType->getImplementationType();
-    ValueDecl *implTypeDecl;
-    // FIXME: There should be a better way to handle this.
-    if (isa<NameAliasType>(implType))
-      implTypeDecl = cast<NameAliasType>(implType)->getDecl();
-    else if (isa<StructType>(implType))
-      implTypeDecl = cast<StructType>(implType)->getDecl();
-    else
-      implTypeDecl = cast<OneOfType>(implType)->getDecl();
-    Expr *sliceTypeRef =
-      visitDeclRefExpr(new (TC.Context) DeclRefExpr(implTypeDecl,
-                                                    E->getNewLoc()));
-    if (!sliceTypeRef) return nullptr;
-
-    // Build the expression "Slice<T>.convertFromHeapArray".
-    Expr *injectionFn = TC.semaUnresolvedDotExpr(
-      new (TC.Context) UnresolvedDotExpr(sliceTypeRef, E->getNewLoc(),
-                 TC.Context.getIdentifier("convertFromHeapArray"),
-                                         E->getNewLoc()));
-    if (!injectionFn) return nullptr;
-
     // Check that the injection member reference has the appropriate
     // function type.
-    if (checkValidNewArrayInjection(injectionFn, sliceType, outerBound.Value))
+    Expr* injectionFn =
+        TC.buildArrayInjectionFnRef(sliceType, outerBound.Value->getType(),
+                                    E->getNewLoc());
+    if (!injectionFn)
       return nullptr;
 
     E->setInjectionFunction(injectionFn);
@@ -707,6 +652,58 @@ public:
   }
 };
 } // end anonymous namespace.
+
+/// Is the given expression a valid thing to use as the injection
+/// function from the data for a newly-allocated array into the
+/// given slice type?
+Expr *TypeChecker::buildArrayInjectionFnRef(ArraySliceType *sliceType,
+                                            Type lenTy, SourceLoc Loc) {
+  // Build the expression "Slice<T>".
+  Type implType = sliceType->getImplementationType();
+  ValueDecl *implTypeDecl;
+  // FIXME: There should be a better way to handle this.
+  if (isa<NameAliasType>(implType))
+    implTypeDecl = cast<NameAliasType>(implType)->getDecl();
+  else if (isa<StructType>(implType))
+    implTypeDecl = cast<StructType>(implType)->getDecl();
+  else
+    implTypeDecl = cast<OneOfType>(implType)->getDecl();
+  Expr *sliceTypeRef =
+    recheckTypes(new (Context) DeclRefExpr(implTypeDecl, Loc));
+  if (!sliceTypeRef) return nullptr;
+
+  // Build the expression "Slice<T>.convertFromHeapArray".
+  Expr *injectionFn = semaUnresolvedDotExpr(
+    new (Context) UnresolvedDotExpr(sliceTypeRef, Loc,
+               Context.getIdentifier("convertFromHeapArray"),
+                                     Loc));
+  if (!injectionFn) return nullptr;
+
+  // The input is a tuple type:
+  TupleTypeElt argTypes[3];
+
+  // The first element is Builtin.RawPointer.
+  // FIXME: this should probably be either UnsafePointer<T> or the
+  // first two arguments should be combined into a byref(heap).
+  argTypes[0] = TupleTypeElt(Context.TheRawPointerType, Identifier());
+
+  // The second element is the owner pointer, Builtin.ObjectPointer.
+  argTypes[1] = TupleTypeElt(Context.TheObjectPointerType, Identifier());
+
+  // The third element is the bound type.  Maybe this should be a
+  // target-specific size_t type?
+  argTypes[2] = TupleTypeElt(lenTy, Identifier());
+
+  TupleType *input = TupleType::get(argTypes, Context);
+
+  // The result is just the slice type.
+  Type result = sliceType;
+
+  FunctionType *fnTy = FunctionType::get(input, result, Context);
+
+  // FIXME: this produces terrible diagnostics.
+  return coerceToType(injectionFn, fnTy);
+}
 
 
 Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
