@@ -42,8 +42,8 @@ Type DeclContext::getDeclaredTypeOfContext() const {
   case DeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(this)->getExtendedType();
     
-  case DeclContextKind::DistinctTypeDecl:
-    return cast<DistinctTypeDecl>(this)->getDeclaredType();
+  case DeclContextKind::NominalTypeDecl:
+    return cast<NominalTypeDecl>(this)->getDeclaredType();
   }
 }
 
@@ -183,7 +183,7 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
 
 OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name,
                      MutableArrayRef<Type> Inherited, DeclContext *Parent)
-  : DistinctTypeDecl(DeclKind::OneOf, Parent, Name, Type()), 
+  : NominalTypeDecl(DeclKind::OneOf, Parent, Name, Type()), 
     OneOfLoc(OneOfLoc), Inherited(Inherited) {
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(this));
@@ -193,7 +193,7 @@ OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name,
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name,
                        MutableArrayRef<Type> Inherited, DeclContext *Parent)
-  : DistinctTypeDecl(DeclKind::Struct, Parent, Name, Type()), 
+  : NominalTypeDecl(DeclKind::Struct, Parent, Name, Type()), 
     StructLoc(StructLoc), Inherited(Inherited) {
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(this));
@@ -203,7 +203,7 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name,
 
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name,
                      MutableArrayRef<Type> Inherited, DeclContext *Parent)
-  : DistinctTypeDecl(DeclKind::Class, Parent, Name, Type()), 
+  : NominalTypeDecl(DeclKind::Class, Parent, Name, Type()), 
     ClassLoc(ClassLoc), Inherited(Inherited) {
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(this));
@@ -272,8 +272,8 @@ Type FuncDecl::getExtensionType() const {
   case DeclContextKind::TopLevelCodeDecl:
     return Type();
 
-  case DeclContextKind::DistinctTypeDecl:
-    return cast<DistinctTypeDecl>(DC)->getDeclaredType();
+  case DeclContextKind::NominalTypeDecl:
+    return cast<NominalTypeDecl>(DC)->getDeclaredType();
   case DeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(DC)->getExtendedType();
   }

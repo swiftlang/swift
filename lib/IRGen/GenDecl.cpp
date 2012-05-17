@@ -321,8 +321,8 @@ static void addOwnerArgument(ASTContext &ctx, ValueDecl *value,
     uncurryLevel++;
     return;
 
-  case DeclContextKind::DistinctTypeDecl: {
-    Type declTy = cast<DistinctTypeDecl>(DC)->getDeclaredType();
+  case DeclContextKind::NominalTypeDecl: {
+    Type declTy = cast<NominalTypeDecl>(DC)->getDeclaredType();
     resultType = addOwnerArgument(ctx, declTy, resultType);
     uncurryLevel++;
     return;

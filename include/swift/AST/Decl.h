@@ -452,22 +452,22 @@ public:
   static bool classof(const TypeAliasDecl *D) { return true; }
 };
 
-/// DistinctTypeDecl - a declaration of a nominal type, like a struct.  This
+/// NominalTypeDecl - a declaration of a nominal type, like a struct.  This
 /// decl is always a DeclContext.
-class DistinctTypeDecl : public TypeDecl, public DeclContext {
+class NominalTypeDecl : public TypeDecl, public DeclContext {
 public:
-  DistinctTypeDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty) :
+  NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty) :
     TypeDecl(K, DC, name, ty),
-    DeclContext(DeclContextKind::DistinctTypeDecl, DC) {}
+    DeclContext(DeclContextKind::NominalTypeDecl, DC) {}
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->getKind() >= DeclKind::First_DistinctTypeDecl &&
-           D->getKind() <= DeclKind::Last_DistinctTypeDecl;
+    return D->getKind() >= DeclKind::First_NominalTypeDecl &&
+           D->getKind() <= DeclKind::Last_NominalTypeDecl;
   }
-  static bool classof(const DistinctTypeDecl *D) { return true; }
+  static bool classof(const NominalTypeDecl *D) { return true; }
   static bool classof(const DeclContext *C) {
-    return C->getContextKind() == DeclContextKind::DistinctTypeDecl;
+    return C->getContextKind() == DeclContextKind::NominalTypeDecl;
   }
 };
 
@@ -477,7 +477,7 @@ public:
 ///
 /// The type of the decl itself is a MetaTypeType; use getDeclaredType()
 /// to get the declared type ("Bool" in the above example).
-class OneOfDecl : public DistinctTypeDecl {
+class OneOfDecl : public NominalTypeDecl {
   SourceLoc OneOfLoc;
   MutableArrayRef<Type> Inherited;
   ArrayRef<OneOfElementDecl*> Elements;
@@ -507,11 +507,11 @@ public:
     return D->getKind() == DeclKind::OneOf;
   }
   static bool classof(const OneOfDecl *D) { return true; }
-  static bool classof(const DistinctTypeDecl *D) {
+  static bool classof(const NominalTypeDecl *D) {
     return D->getKind() == DeclKind::OneOf;
   }
   static bool classof(const DeclContext *C) {
-    return isa<DistinctTypeDecl>(C) && classof(cast<DistinctTypeDecl>(C));
+    return isa<NominalTypeDecl>(C) && classof(cast<NominalTypeDecl>(C));
   }
 };
 
@@ -521,7 +521,7 @@ public:
 ///
 /// The type of the decl itself is a MetaTypeType; use getDeclaredType()
 /// to get the declared type ("Complex" in the above example).
-class StructDecl : public DistinctTypeDecl {
+class StructDecl : public NominalTypeDecl {
   SourceLoc StructLoc;
   MutableArrayRef<Type> Inherited;
   ArrayRef<Decl*> Members;
@@ -549,11 +549,11 @@ public:
     return D->getKind() == DeclKind::Struct;
   }
   static bool classof(const StructDecl *D) { return true; }
-  static bool classof(const DistinctTypeDecl *D) {
+  static bool classof(const NominalTypeDecl *D) {
     return D->getKind() == DeclKind::Struct;
   }
   static bool classof(const DeclContext *C) {
-    return isa<DistinctTypeDecl>(C) && classof(cast<DistinctTypeDecl>(C));
+    return isa<NominalTypeDecl>(C) && classof(cast<NominalTypeDecl>(C));
   }
 };
 
@@ -563,7 +563,7 @@ public:
 ///
 /// The type of the decl itself is a MetaTypeType; use getDeclaredType()
 /// to get the declared type ("Complex" in the above example).
-class ClassDecl : public DistinctTypeDecl {
+class ClassDecl : public NominalTypeDecl {
   SourceLoc ClassLoc;
   MutableArrayRef<Type> Inherited;
   ArrayRef<Decl*> Members;
@@ -591,11 +591,11 @@ public:
     return D->getKind() == DeclKind::Class;
   }
   static bool classof(const ClassDecl *D) { return true; }
-  static bool classof(const DistinctTypeDecl *D) {
+  static bool classof(const NominalTypeDecl *D) {
     return D->getKind() == DeclKind::Class;
   }
   static bool classof(const DeclContext *C) {
-    return isa<DistinctTypeDecl>(C) && classof(cast<DistinctTypeDecl>(C));
+    return isa<NominalTypeDecl>(C) && classof(cast<NominalTypeDecl>(C));
   }
 };
 
@@ -605,7 +605,7 @@ public:
 ///   protocol Drawable {
 ///     func draw()
 ///   }
-class ProtocolDecl : public DistinctTypeDecl {
+class ProtocolDecl : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
   SourceLoc NameLoc;
   MutableArrayRef<Type> Inherited;
@@ -616,7 +616,7 @@ class ProtocolDecl : public DistinctTypeDecl {
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
                Identifier Name, MutableArrayRef<Type> Inherited)
-    : DistinctTypeDecl(DeclKind::Protocol, DC, Name, Type()),
+    : NominalTypeDecl(DeclKind::Protocol, DC, Name, Type()),
       ProtocolLoc(ProtocolLoc), NameLoc(NameLoc), Inherited(Inherited) { }
   
   using Decl::getASTContext;
@@ -650,11 +650,11 @@ public:
     return D->getKind() == DeclKind::Protocol;
   }
   static bool classof(const ProtocolDecl *D) { return true; }
-  static bool classof(const DistinctTypeDecl *D) {
+  static bool classof(const NominalTypeDecl *D) {
     return D->getKind() == DeclKind::Protocol;
   }
   static bool classof(const DeclContext *C) {
-    return isa<DistinctTypeDecl>(C) && classof(cast<DistinctTypeDecl>(C));
+    return isa<NominalTypeDecl>(C) && classof(cast<NominalTypeDecl>(C));
   }
 };
 

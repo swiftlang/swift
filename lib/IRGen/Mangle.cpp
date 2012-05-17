@@ -145,7 +145,7 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     return;
   }
 
-  case DeclContextKind::DistinctTypeDecl: {
+  case DeclContextKind::NominalTypeDecl: {
     if (isa<OneOfDecl>(ctx)) {
       OneOfDecl *oneof = cast<OneOfDecl>(ctx);
 
@@ -158,7 +158,7 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     }
     if (isa<StructDecl>(ctx) || isa<ClassDecl>(ctx)) {
       // FIXME: The mangling rule here is kind of weird.
-      mangleType(cast<DistinctTypeDecl>(ctx)->getDeclaredType(),
+      mangleType(cast<NominalTypeDecl>(ctx)->getDeclaredType(),
                  ExplosionKind::Minimal, 0);
       return;
     }
