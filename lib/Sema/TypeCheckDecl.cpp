@@ -260,10 +260,19 @@ public:
   }
   void visitExtensionDecl(ExtensionDecl *ED) {
     bool CheckConformance;
-    if (!TC.validateType(ED->getExtendedType()))
-      checkInherited(ED, ED->getExtendedType(), ED->getInherited(),
-                     CheckConformance);
-
+    if (!TC.validateType(ED->getExtendedType())) {
+      Type ExtendedTy = ED->getExtendedType();
+      if (!ExtendedTy->is<OneOfType>() && !ExtendedTy->is<StructType>() &&
+          !ExtendedTy->is<ClassType>() && !ExtendedTy->is<ErrorType>()) {
+        TC.diagnose(ED->getLocStart(), diag::non_nominal_extension,
+                    ExtendedTy->is<ProtocolType>(), ExtendedTy);
+        // FIXME: It would be nice to point out where we found the named type
+        // declaration, if any.
+      }
+      
+      checkInherited(ED, ExtendedTy, ED->getInherited(), CheckConformance);
+    }
+    
     for (Decl *Member : ED->getMembers()) {
       // First recursively type check each thing in the extension.
       visit(Member);

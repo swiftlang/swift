@@ -649,6 +649,10 @@ ERROR(assignment_nonvoid,sema_tcd,none,
 ERROR(invalid_decl_attribute,sema_tcd,none,
       "attribute '%0' cannot be applied to declaration", (StringRef))
 
+// Extensions
+ERROR(non_nominal_extension,sema_tcd,none,
+      "%select{non-nominal type|protocol}0 %1 cannot be extended", (bool, Type))
+
 // Protocols
 ERROR(nonprotocol_inherit,sema_tcd,none,
       "cannot inherit non-protocol type %0", (Type))
