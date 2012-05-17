@@ -54,6 +54,11 @@ enum class OverloadedBuiltinKind : unsigned char {
 /// return the base name (e.g. "mul").
 StringRef getBuiltinBaseName(ASTContext &C, StringRef Name,
                              SmallVectorImpl<Type> &Types);
+
+/// getLLVMIntrinsicID - Given an LLVM IR intrinsic name with argument types
+/// remove (e.g. like "bswap") return the LLVM IR IntrinsicID for the intrinsic
+/// or 0 if the intrinsic name doesn't match anything.
+unsigned getLLVMIntrinsicID(StringRef Name, bool HasArgTypes);
   
 /// getBuiltinValue - Finds the builtin value with the given name.
 ///

@@ -468,7 +468,8 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
     } else if (schema.size() == 1) {
       resultType = schema.begin()->getScalarType();
     } else {
-      llvm::SmallVector<llvm::Type*, ExplosionSchema::MaxScalarsForDirectResult> elts;
+      llvm::SmallVector<llvm::Type*,
+                        ExplosionSchema::MaxScalarsForDirectResult> elts;
       for (auto &elt : schema) elts.push_back(elt.getScalarType());
       resultType = llvm::StructType::get(IGM.getLLVMContext(), elts);
     }
@@ -642,12 +643,26 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
   StringRef BuiltinName = getBuiltinBaseName(IGF.IGM.Context,
                                              Fn->getName().str(), Types);
 
-  if (BuiltinName == "trap") {
+  // If this is an LLVM IR intrinsic, lower it to an intrinsic call.
+  if (unsigned IID = getLLVMIntrinsicID(BuiltinName, !Types.empty())) {
+    SmallVector<llvm::Type*, 4> ArgTys;
+    for (auto T : Types)
+      ArgTys.push_back(IGF.IGM.getFragileTypeInfo(T).getStorageType());
+      
     auto F = llvm::Intrinsic::getDeclaration(&IGF.IGM.Module,
-                                             llvm::Intrinsic::trap);
-    IGF.Builder.CreateCall(F);
-    // Mark that we're not returning anything.
-    result.setAsEmptyDirect();
+                                             (llvm::Intrinsic::ID)IID, ArgTys);
+    llvm::FunctionType *FT = F->getFunctionType();
+    SmallVector<llvm::Value*, 8> IRArgs;
+    for (unsigned i = 0, e = FT->getNumParams(); i != e; ++i)
+      IRArgs.push_back(args.Values.claimUnmanagedNext());
+    llvm::Value *TheCall = IGF.Builder.CreateCall(F, IRArgs);
+    
+    if (TheCall->getType()->isVoidTy())
+      // Mark that we're not returning anything.
+      result.setAsEmptyDirect();
+    else
+      result.setAsSingleDirectUnmanagedFragileValue(TheCall);
+    // FIXME: Multiple return values.
     return;
   }
   

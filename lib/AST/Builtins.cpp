@@ -16,7 +16,9 @@
 
 #include "swift/AST/Builtins.h"
 #include "swift/AST/AST.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Intrinsics.h"
 using namespace swift;
 
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
@@ -259,17 +261,143 @@ inline bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
   llvm_unreachable("bad overloaded builtin kind");
 }
 
+/// getLLVMIntrinsicID - Given an LLVM IR intrinsic name with argument types
+/// remove (e.g. like "bswap") return the LLVM IR IntrinsicID for the intrinsic
+/// or 0 if the intrinsic name doesn't match anything.
+unsigned swift::getLLVMIntrinsicID(StringRef InName, bool hasArgTypes) {
+  using namespace llvm;
+  // Prepend "llvm." and change _ to . in name.
+  SmallString<128> NameS;
+  NameS.append("llvm.");
+  for (char C : InName)
+    NameS.push_back(C == '_' ? '.' : C);
+  if (hasArgTypes)
+    NameS.push_back('.');
+  
+  const char *Name = NameS.c_str();
+  unsigned Len = NameS.size();
+#define GET_FUNCTION_RECOGNIZER
+#include "llvm/Intrinsics.gen"
+#undef GET_FUNCTION_RECOGNIZER
+  return llvm::Intrinsic::not_intrinsic;
+}
+
+
+// Get information about the LLVM IR types for intrinsics.
+#define GET_INTRINSTIC_GENERATOR_GLOBAL
+#include "llvm/Intrinsics.gen"
+#undef GET_INTRINSTIC_GENERATOR_GLOBAL
+
+static Type DecodeFixedType(unsigned &NextElt, ArrayRef<unsigned char> Infos,
+                             ArrayRef<Type> Tys, ASTContext &Context) {
+  IIT_Info Info = IIT_Info(Infos[NextElt++]);
+  unsigned StructElts = 2;
+  
+  switch (Info) {
+  case IIT_MMX:
+  case IIT_METADATA:
+  case IIT_V2:
+  case IIT_V4:
+  case IIT_V8:
+  case IIT_V16:
+  case IIT_V32:
+  case IIT_EXTEND_VEC_ARG:
+  case IIT_TRUNC_VEC_ARG:
+    // These types cannot be expressed in swift yet.
+    return Type();
+  case IIT_EMPTYSTRUCT:
+  case IIT_Done:
+    // "{}" and "void" IR types both map to ().
+    return TupleType::getEmpty(Context);
+  case IIT_I1:  return BuiltinIntegerType::get(1, Context);
+  case IIT_I8:  return BuiltinIntegerType::get(8, Context);
+  case IIT_I16: return BuiltinIntegerType::get(16, Context);
+  case IIT_I32: return BuiltinIntegerType::get(32, Context);
+  case IIT_I64: return BuiltinIntegerType::get(64, Context);
+  case IIT_F32: return Context.TheIEEE32Type;
+  case IIT_F64: return Context.TheIEEE64Type;
+  case IIT_PTR:
+    // Decode but ignore the pointee.  Just decode all IR pointers to unsafe
+    // pointer type.
+    (void)DecodeFixedType(NextElt, Infos, Tys, Context);
+    return Context.TheRawPointerType;
+  case IIT_ARG: {
+    unsigned ArgNo = NextElt == Infos.size() ? 0 : Infos[NextElt++];
+    if (ArgNo >= Tys.size())
+      return Type();
+    return Tys[ArgNo];
+  }
+  case IIT_STRUCT5: ++StructElts; // FALL THROUGH.
+  case IIT_STRUCT4: ++StructElts; // FALL THROUGH.
+  case IIT_STRUCT3: ++StructElts; // FALL THROUGH.
+  case IIT_STRUCT2: {
+    TupleTypeElt Elts[5];
+    for (unsigned i = 0; i != StructElts; ++i) {
+      Type T = DecodeFixedType(NextElt, Infos, Tys, Context);
+      if (!T) return Type();
+      
+      Elts[i] = TupleTypeElt(T, Identifier());
+    }
+    return TupleType::get(ArrayRef<TupleTypeElt>(Elts, StructElts), Context);
+  }
+  }
+  llvm_unreachable("unhandled");
+}
+
+
+static Type getSwiftFunctionTypeForIntrinsic(unsigned iid,
+                                             ArrayRef<Type> TypeArgs,
+                                             ASTContext &Context) {
+  // Check to see if the intrinsic's type was expressible by the table.
+  unsigned TableVal = IIT_Table[iid-1];
+  
+  // Decode the TableVal into an array of IITValues.
+  SmallVector<unsigned char, 8> IITValues;
+  ArrayRef<unsigned char> IITEntries;
+  unsigned NextElt = 0;
+  if ((TableVal >> 31) != 0) {
+    // This is an offset into the IIT_LongEncodingTable.
+    IITEntries = IIT_LongEncodingTable;
+    
+    // Strip sentinel bit.
+    NextElt = (TableVal << 1) >> 1;
+  } else {
+    do {
+      IITValues.push_back(TableVal & 0xF);
+      TableVal >>= 4;
+    } while (TableVal);
+    
+    IITEntries = IITValues;
+    NextElt = 0;
+  }
+
+  // Decode the intrinsic's LLVM IR type, and map it to swift builtin types.
+  Type ResultTy = DecodeFixedType(NextElt, IITEntries, TypeArgs, Context);
+  if (!ResultTy) return Type();
+  
+  SmallVector<TupleTypeElt, 8> ArgTys;
+  while (NextElt != IITEntries.size() && IITEntries[NextElt] != 0) {
+    Type ArgTy = DecodeFixedType(NextElt, IITEntries, TypeArgs, Context);
+    if (!ArgTy) return Type();
+    ArgTys.push_back(TupleTypeElt(ArgTy, Identifier()));
+  }
+  
+  Type Arg = TupleType::get(ArgTys, Context);
+  return FunctionType::get(Arg, ResultTy, Context);
+}
+
 
 ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
   SmallVector<Type, 4> Types;
   StringRef OperationName = getBuiltinBaseName(Context, Id.str(), Types);
-  
-  if (OperationName == "trap" && Types.empty()) {
-    Type Empty = TupleType::getEmpty(Context);
-    Type FnTy = FunctionType::get(Empty, Empty, Context);
-    return getBuiltinFunction(Context, Id, FnTy);
+
+  // If this is the name of an LLVM intrinsic, cons up a swift function with a
+  // type that matches the IR types.
+  if (unsigned ID = getLLVMIntrinsicID(OperationName, !Types.empty())) {
+    if (Type FnTy = getSwiftFunctionTypeForIntrinsic(ID, Types, Context))
+      return getBuiltinFunction(Context, Id, FnTy);
   }
-  
+    
   
   BuiltinValueKind BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
 #define BUILTIN(id, name) \
