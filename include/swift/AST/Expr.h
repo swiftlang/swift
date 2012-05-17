@@ -959,19 +959,6 @@ public:
   }
 };
 
-/// ScalarToTupleExpr - Initialize a tuple with a a scalar.
-class ScalarToTupleExpr : public ImplicitConversionExpr {
-public:
-  ScalarToTupleExpr(Expr *subExpr, Type type)
-    : ImplicitConversionExpr(ExprKind::ScalarToTuple, subExpr, type) {}
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const ScalarToTupleExpr *) { return true; }
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ScalarToTuple;
-  }
-};
-
 /// ErasureExpr - Perform type erasure by converting a value to protocol type.
 /// For example:
 ///

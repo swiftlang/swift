@@ -494,11 +494,6 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
-  void visitScalarToTupleExpr(ScalarToTupleExpr *E) {
-    printCommon(E, "scalar_to_tuple_expr") << '\n';
-    printRec(E->getSubExpr());
-    OS << ')';
-  }
   void visitErasureExpr(ErasureExpr *E) {
     printCommon(E, "erasure_expr") << '\n';
     printRec(E->getSubExpr());
