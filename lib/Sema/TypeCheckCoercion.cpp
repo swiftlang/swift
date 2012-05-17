@@ -1040,7 +1040,8 @@ CoercedResult
 SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
                                     TupleType *DestTy, TypeChecker &TC,
                                     unsigned Flags){
-  
+  assert(E->getType()->is<TupleType>() && "Unexpected expression");
+
   // If the tuple expression or destination type have named elements, we
   // have to match them up to handle the swizzle case for when:
   //   (.y = 4, .x = 3)
@@ -1055,6 +1056,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   // TODO: Record where the destination elements came from in the AST.
   SmallVector<bool, 16> UsedElements(NumExprElements);
   SmallVector<int, 16>  DestElementSources(DestTy->getFields().size(), -1);
+  SmallVector<int, 16>  VarargElementSources;
 
   if (TupleType *ETy = E->getType()->getAs<TupleType>()) {
     assert(ETy->getFields().size() == NumExprElements && "#elements mismatch!");
@@ -1088,7 +1090,21 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   for (unsigned i = 0, e = DestTy->getFields().size(); i != e; ++i) {
     // If we already found an input to satisfy this output, we're done.
     if (DestElementSources[i] != -1) continue;
-    
+
+    if (DestTy->getFields()[i].isVararg()) {
+      // This is a varargs field; eat all the rest of the unnamed elements.
+      while (NextInputValue != NumExprElements) {
+        if (!UsedElements[NextInputValue] &&
+            IdentList[NextInputValue].empty()) {
+          VarargElementSources.push_back(NextInputValue);
+          UsedElements[NextInputValue] = true;
+        }
+        ++NextInputValue;
+      }
+      DestElementSources[i] = -3;
+      break;
+    }
+
     // Scan for an unmatched unnamed input value.
     while (1) {
       // If we didn't find any input values, we ran out of inputs to use.
@@ -1161,20 +1177,25 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   // if necessary.
   TupleExpr *TE = dyn_cast<TupleExpr>(E);
   TupleType *ETy = E->getType()->getAs<TupleType>();
-  SmallVector<int, 16> NewElements(DestTy->getFields().size());
+  SmallVector<int, 16> NewElements;
   
   bool RebuildSourceType = false;
   for (unsigned i = 0, e = DestTy->getFields().size(); i != e; ++i) {
     // Extract the input element corresponding to this destination element.
-    unsigned SrcField = DestElementSources[i];
-    assert(SrcField != ~0U && "dest field not found?");
+    int SrcField = DestElementSources[i];
+    assert(SrcField != -1 && "dest field not found?");
     
-    if (SrcField == -2U) {
+    if (SrcField == -2) {
       // Use the default element for the tuple.
-      NewElements[i] = -1;
+      NewElements.push_back(-1);
       continue;
     }
-    
+
+    if (SrcField == -3) {
+      NewElements.push_back(-2);
+      break;
+    }
+
     Type DestEltTy = DestTy->getElementType(i);
     
     // If we are performing coercion for an assignment, and this is the
@@ -1208,16 +1229,58 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
       } else if (ETy && !ElementTy->isEqual(DestEltTy)) {
         // FIXME: Allow conversions when we don't have a tuple expression?
         if (Flags & CF_Apply)
-          TC.diagnose(E->getLoc(), diag::tuple_element_type_mismatch, i,
-                      ETy->getElementType(SrcField),
-                      DestTy->getElementType(i));
+          TC.diagnose(E->getLoc(), diag::tuple_element_type_mismatch, SrcField,
+                      ElementTy, DestEltTy);
         return nullptr;
       }
     }
     
-    NewElements[i] = SrcField;
+    NewElements.push_back(SrcField);
   }
-  
+
+  Expr *injectionFn = 0;
+  if (!VarargElementSources.empty()) {
+    Type DestEltTy = DestTy->getFields().back().getVarargBaseTy();
+    unsigned SubFlags = Flags & ~CF_NotPropagated;
+    for (int SrcField : VarargElementSources) {
+      Type ElementTy = ETy->getElementType(SrcField);
+      if (TE) {
+        // FIXME: We shouldn't need a TupleExpr to handle this coercion.
+        // Check to see if the src value can be converted to the destination
+        // element type.
+        if (CoercedResult Elt = coerceToType(TE->getElement(SrcField), 
+                                             DestEltTy, TC, SubFlags)) {
+          if (Flags & CF_Apply)
+            TE->setElement(SrcField, Elt.getExpr());
+        } else {
+          // FIXME: QOI: Include a note about this failure!
+          return nullptr;
+        }
+
+        // Because we have coerced something in the source tuple, we need to
+        // rebuild the type of that tuple.
+        RebuildSourceType = true;
+      } else if (ETy && !ElementTy->isEqual(DestEltTy)) {
+        // FIXME: Allow conversions when we don't have a tuple expression?
+        if (Flags & CF_Apply)
+          TC.diagnose(E->getLoc(), diag::tuple_element_type_mismatch, SrcField,
+                      ElementTy, DestEltTy);
+        return nullptr;
+      }
+
+      NewElements.push_back(SrcField);
+    }
+
+    // Find the appropriate injection function.
+    ArraySliceType *sliceType =
+        cast<ArraySliceType>(DestTy->getFields().back().getType());
+    Type boundType = BuiltinIntegerType::get(64, TC.Context);
+    injectionFn = TC.buildArrayInjectionFnRef(sliceType, boundType,
+                                              E->getStartLoc());
+    if (!injectionFn)
+      return nullptr;
+  }
+
   if (!(Flags & CF_Apply))
     return Type(DestTy);
 
@@ -1250,7 +1313,9 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     
   // If we got here, the type conversion is successful, create a new TupleExpr.  
   ArrayRef<int> Mapping = TC.Context.AllocateCopy(NewElements);
-  return coerced(new (TC.Context) TupleShuffleExpr(E, Mapping, DestTy), Flags);
+  TupleShuffleExpr *TSE = new (TC.Context) TupleShuffleExpr(E, Mapping, DestTy);
+  TSE->setVarargsInjectionFunction(injectionFn);
+  return coerced(TSE, Flags);
 }
 
 /// convertScalarToTupleType - Convert the specified expression to the specified
