@@ -19,6 +19,7 @@
 #define SWIFT_IRGEN_GENARRAY_H
 
 namespace llvm {
+  class Expr;
   class Twine;
   class Value;
 }
@@ -26,8 +27,10 @@ namespace llvm {
 namespace swift {
   class Expr;
   class NewArrayExpr;
+  class Type;
 
 namespace irgen {
+  class Address;
   class Explosion;
   class IRGenFunction;
   class ManagedValue;
@@ -36,6 +39,10 @@ namespace irgen {
   /// Emit an r-value reference to a function.
   void emitNewArrayExpr(IRGenFunction &IGF, NewArrayExpr *E,
                         Explosion &explosion);
+  void emitArrayInjectionCall(IRGenFunction &IGF, ManagedValue alloc,
+                              Address begin, Type sliceTy, Expr *injectionFn,
+                              llvm::Value *length, Explosion &out);
+
 
 } // end namespace irgen
 } // end namespace swift

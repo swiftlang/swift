@@ -98,7 +98,6 @@ void swift::irgen::emitNewArrayExpr(IRGenFunction &IGF, NewArrayExpr *E,
     length = bounds.claimUnmanagedNext();
   }
 
-  // Emit the allocation.
   const TypeInfo &elementTI = IGF.getFragileTypeInfo(E->getElementType());
 
   Expr *init = nullptr;
@@ -108,6 +107,16 @@ void swift::irgen::emitNewArrayExpr(IRGenFunction &IGF, NewArrayExpr *E,
   ManagedValue alloc =
     layout.emitAlloc(IGF, length, begin, init, "new-array");
 
+  emitArrayInjectionCall(IGF, alloc, begin, E->getType(),
+                         E->getInjectionFunction(), length, out);
+}
+
+void swift::irgen::emitArrayInjectionCall(IRGenFunction &IGF, ManagedValue alloc,
+                                          Address begin, Type sliceTy,
+                                          Expr *injectionFn, llvm::Value *length,
+                                          Explosion &out) {
+  // Emit the allocation.
+
   // Eventually the data address will be well-typed, but for now it
   // always needs to be an i8*.
   llvm::Value *dataAddr = begin.getAddress();
@@ -115,7 +124,7 @@ void swift::irgen::emitNewArrayExpr(IRGenFunction &IGF, NewArrayExpr *E,
 
   // Emit the callee.
   llvm::SmallVector<Arg, 4> args;
-  Callee callee = emitCallee(IGF, E->getInjectionFunction(),
+  Callee callee = emitCallee(IGF, injectionFn,
                              out.getKind(), /*uncurry*/ 0, args);
 
   // The injection function takes this tuple:
@@ -126,6 +135,6 @@ void swift::irgen::emitNewArrayExpr(IRGenFunction &IGF, NewArrayExpr *E,
   injectionArg.addUnmanaged(length);
   args.push_back(Arg::forUnowned(injectionArg));
 
-  const TypeInfo &sliceTI = IGF.getFragileTypeInfo(E->getType());
+  const TypeInfo &sliceTI = IGF.getFragileTypeInfo(sliceTy);
   emitCall(IGF, callee, args, sliceTI, out);
 }

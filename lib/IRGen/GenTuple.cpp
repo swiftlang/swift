@@ -29,6 +29,8 @@
 #include "llvm/Target/TargetData.h"
 
 #include "ASTVisitor.h"
+#include "GenArray.h"
+#include "GenHeap.h"
 #include "GenInit.h"
 #include "GenSequential.h"
 #include "GenType.h"
@@ -267,6 +269,63 @@ void swift::irgen::emitTupleShuffle(IRGenFunction &IGF, TupleShuffleExpr *E,
       assert(outerField.hasInit() && "no default initializer for field!");
       IGF.emitRValue(outerField.getInit(), outerTupleExplosion);
       continue;
+    }
+
+    // If the shuffle index is -2, it is the beginning of the list of
+    // varargs inputs.
+    if (shuffleIndex == -2) {
+      auto shuffleIndexIteratorEnd = E->getElementMapping().end();
+      unsigned numElems = shuffleIndexIteratorEnd - shuffleIndexIterator;
+      llvm::Value *length = IGF.Builder.getInt64(numElems);
+
+      const TypeInfo &elementTI =
+          IGF.getFragileTypeInfo(outerField.getVarargBaseTy());
+
+      Expr *init = nullptr;
+      ArrayHeapLayout layout(IGF.IGM, elementTI);
+
+      // Allocate the array.
+      // FIXME: This includes an unnecessary memset.
+      // FIXME: It would be nice if we could eventually avoid heap-allocating
+      // this array.
+      Address begin;
+      ManagedValue alloc =
+        layout.emitAlloc(IGF, length, begin, init, "new-array");
+
+      // Perform the call which generates the slice value.
+      emitArrayInjectionCall(IGF, alloc, begin,
+                             outerField.getType(),
+                             E->getVarargsInjectionFunction(), length,
+                             outerTupleExplosion);
+
+      // Emit all the elements into the allocated array.
+      unsigned curElem = 0;
+      while (shuffleIndexIterator != shuffleIndexIteratorEnd) {
+        int shuffleIndex = *shuffleIndexIterator++;
+        const TupleFieldInfo &innerField
+          = innerTupleType.getFields()[(unsigned) shuffleIndex];
+        Explosion varargTupleExplosion(ExplosionKind::Maximal);
+        llvm::Value *curElemVal = IGF.Builder.getInt64(curElem++);
+        llvm::Value *destValue = IGF.Builder.CreateGEP(begin.getAddress(),
+                                                       curElemVal);
+        Address destAddr(destValue, begin.getAlignment());
+
+        // If we're loading from an l-value, project from that.
+        if (innerTupleAddr.isValid()) {
+          Address elementAddr = innerField.projectAddress(IGF, innerTupleAddr);
+          elementTI.initializeWithCopy(IGF, destAddr, elementAddr);
+
+        // Otherwise, project the r-value down.
+        } else {
+          // Get the range of elements and project those down.
+          auto fieldRange =
+            innerField.getProjectionRange(innerTupleExplosion.getKind());
+          varargTupleExplosion.add(
+            innerTupleExplosion.getRange(fieldRange.first, fieldRange.second));
+          elementTI.initialize(IGF, varargTupleExplosion, destAddr);
+        }
+      }
+      break;
     }
 
     // Otherwise, we need to map from a different tuple.
