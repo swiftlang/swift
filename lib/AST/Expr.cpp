@@ -230,9 +230,9 @@ SourceRange TupleExpr::getSourceRange() const {
     assert(RParenLoc.isValid() && "Mismatched parens?");
     return SourceRange(LParenLoc, RParenLoc);
   }
-  assert(getNumElements() == 2 && "Unexpected tuple expr");
+  assert(!getElements().empty() && "Empty tuple missing paren locations!");
   SourceLoc Start = getElement(0)->getStartLoc();
-  SourceLoc End = getElement(1)->getEndLoc();
+  SourceLoc End = getElement(getElements().size()-1)->getEndLoc();
   return SourceRange(Start, End);
 }
 

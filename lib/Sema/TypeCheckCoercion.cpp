@@ -1327,7 +1327,9 @@ CoercedResult SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   // If the destination is a tuple type with at most one element that has no
   // default value, see if the expression's type is convertable to the
   // element type.  This handles assigning 4 to "(a = 4, b : int)".
-  
+
+  TupleTypeElt Field = DestTy->getFields()[ScalarField];
+
   // If we are performing coercion for an assignment, and this is the
   // first argument, make it an implicit lvalue.
   unsigned SubFlags = Flags;
@@ -1338,7 +1340,9 @@ CoercedResult SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
       SubFlags |= CF_ImplicitLValue;
   }
 
-  Type ScalarType = DestTy->getElementType(ScalarField);
+  Type ScalarType = Field.getType();
+  if (Field.isVararg())
+    ScalarType = Field.getVarargBaseTy();
   CoercedResult ERes = coerceToType(E, ScalarType, TC, SubFlags);
   if (!ERes)
     return nullptr;
@@ -1346,8 +1350,17 @@ CoercedResult SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   if (!(Flags & CF_Apply))
     return Type(DestTy);
 
-  return CoercedResult(new (TC.Context) ScalarToTupleExpr(ERes.getExpr(),
-                                                          DestTy));
+  // At this point, we know the conversion is going to succeed;
+  // convertTupleToTupleType is just being reused for convenience.
+  Expr * Exprs[] = { ERes.getExpr() };
+  MutableArrayRef<Expr *> TupleSubExprs =
+      TC.Context.AllocateCopy(MutableArrayRef<Expr*>(Exprs));
+  TupleExpr *TE = new (TC.Context) TupleExpr(SourceLoc(), TupleSubExprs,
+                                             nullptr, SourceLoc());
+  TupleType *SrcTT = TupleType::get(TupleTypeElt(ScalarType, Identifier()),
+                                    TC.Context);
+  TE->setType(SrcTT);
+  return convertTupleToTupleType(TE, 1, DestTy, TC, Flags);
 }
 
 /// \brief Coerce the object argument for a member reference (.) or function

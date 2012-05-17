@@ -556,8 +556,7 @@ public:
             Type Ty = Type())
     : Expr(ExprKind::Tuple, Ty), LParenLoc(LParenLoc), RParenLoc(RParenLoc),
       SubExprs(SubExprs), SubExprNames(SubExprNames) {
-    assert((LParenLoc.isValid() ||
-            (!RParenLoc.isValid() && getNumElements() == 2)) &&
+    assert(LParenLoc.isValid() == RParenLoc.isValid() &&
            "Mismatched parenthesis location information validity");
   }
 

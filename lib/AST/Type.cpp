@@ -380,7 +380,7 @@ int TupleType::getFieldForScalarInit() const {
     
     // If we already saw a field missing a default value, then we cannot assign
     // a scalar to this tuple.
-    if (FieldWithoutDefault != -1)
+    if (FieldWithoutDefault != -1 && !Fields[i].isVararg())
       return -1;
     
     // Otherwise, remember this field number.
