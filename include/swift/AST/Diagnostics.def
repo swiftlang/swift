@@ -669,6 +669,10 @@ NOTE(ambiguous_witnesses,sema_tcd,none,
      "with type %2", (int, Identifier, Type))
 NOTE(protocol_witness,sema_tcd,none,
      "possibly intended match with type %0", (Type))
+ERROR(circular_protocol_def,sema_tcd,none,
+      "circular protocol inheritance %0", (StringRef))
+NOTE(protocol_here,sema_tcd,none,
+     "protocol %0 declared here", (Identifier))
 
 //------------------------------------------------------------------------------
 // Type Check Expressions

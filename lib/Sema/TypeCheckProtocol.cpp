@@ -50,7 +50,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   llvm::DenseMap<ProtocolDecl *, ProtocolConformance *> InheritedMapping;
 
   // Check that T conforms to all inherited protocols.
-  // FIXME: Mind the infinite recursion!
   for (auto Inherited : Proto->getInherited()) {
     ProtocolType *InheritedProto = Inherited->getAs<ProtocolType>();
     if (!InheritedProto)
@@ -165,10 +164,18 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
                                 SourceLoc ComplainLoc) {
   ASTContext::ConformsToMap::key_type Key(T->getCanonicalType(), Proto);
   ASTContext::ConformsToMap::iterator Known = Context.ConformsTo.find(Key);
-  if (Known == Context.ConformsTo.end())
-    Known = Context.ConformsTo.insert(
-              std::make_pair(Key,
-                             checkConformsToProtocol(*this, T, Proto,
-                                                     ComplainLoc))).first;
-  return Known->second.get();
+  if (Known != Context.ConformsTo.end())
+    return Known->second.get();
+  
+  // Assume that the type does not conform to this protocol while checking
+  // whether it does in fact conform. This eliminates both infinite recursion
+  // (if the protocol hierarchies are circular) as well as tautologies.
+  // FIXME: Lame use of shared_ptr here.
+  Context.ConformsTo[Key] = nullptr;
+  if (std::shared_ptr<ProtocolConformance> Conformance
+        = checkConformsToProtocol(*this, T, Proto, ComplainLoc)) {
+    Context.ConformsTo[Key] = Conformance;
+    return Conformance.get();
+  }
+  return nullptr;
 }

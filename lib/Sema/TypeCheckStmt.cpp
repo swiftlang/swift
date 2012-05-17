@@ -23,6 +23,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
 #include "NameLookup.h"
@@ -609,6 +610,39 @@ static void checkExplicitConformance(TypeChecker &TC, Decl *D, Type Ty,
   }
 }
 
+/// \brief Check for circular inheritance of protocols.
+///
+/// \param Path The circular path through the protocol inheritance hierarchy,
+/// which will be constructed (backwards) if there is in fact a circular path.
+///
+/// \returns True if there was circular inheritance, false otherwise.
+bool checkProtocolCircularity(TypeChecker &TC, ProtocolDecl *Proto,
+                              llvm::SmallPtrSet<ProtocolDecl *, 16> &Visited,
+                              llvm::SmallPtrSet<ProtocolDecl *, 16> &Local,
+                              llvm::SmallVectorImpl<ProtocolDecl *> &Path) {
+  for (auto InheritedTy : Proto->getInherited()) {
+    if (ProtocolType *InheritedProtoTy = InheritedTy->getAs<ProtocolType>()) {
+      ProtocolDecl *InheritedProto = InheritedProtoTy->getDecl();
+      if (Visited.count(InheritedProto)) {
+        // We've seen this protocol as part of another protocol search;
+        // it's not circular.
+        continue;
+      }
+
+      // Whether we've seen this protocol before in our search or visiting it
+      // detects a circularity, record it in the path and abort.
+      if (!Local.insert(InheritedProto) ||
+          checkProtocolCircularity(TC, InheritedProto, Visited, Local, Path)) {
+        Path.push_back(InheritedProto);
+        return true;
+      }
+    }
+  }
+  
+  return false;
+}
+
+
 /// performTypeChecking - Once parsing and namebinding are complete, these
 /// walks the AST to resolve types and diagnose problems therein.
 ///
@@ -683,23 +717,53 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     }
   }
 
-  // Check for explicit conformance to protocols.
-  for (auto D : TU->Decls) {
-    if (auto Struct = dyn_cast<StructDecl>(D))
-      checkExplicitConformance(TC, Struct, Struct->getDeclaredType(),
-                               Struct->getInherited());
-    else if (auto Class = dyn_cast<ClassDecl>(D))
-      checkExplicitConformance(TC, Class, Class->getDeclaredType(),
-                               Class->getInherited());
-    else if (auto OneOf = dyn_cast<OneOfDecl>(D))
-      checkExplicitConformance(TC, OneOf, OneOf->getDeclaredType(),
-                               OneOf->getInherited());
-    else if (auto Proto = dyn_cast<ProtocolDecl>(D))
-      checkExplicitConformance(TC, Proto, Proto->getDeclaredType(),
-                               Proto->getInherited());
-    else if (auto Extension = dyn_cast<ExtensionDecl>(D))
-      checkExplicitConformance(TC, Extension, Extension->getExtendedType(),
-                               Extension->getInherited());
+  // Check for explicit conformance to protocols and for circularity in
+  // protocol definitions.
+  {
+    llvm::SmallPtrSet<ProtocolDecl *, 16> VisitedProtocols;
+    for (auto D : TU->Decls) {
+      if (auto Struct = dyn_cast<StructDecl>(D))
+        checkExplicitConformance(TC, Struct, Struct->getDeclaredType(),
+                                 Struct->getInherited());
+      else if (auto Class = dyn_cast<ClassDecl>(D))
+        checkExplicitConformance(TC, Class, Class->getDeclaredType(),
+                                 Class->getInherited());
+      else if (auto OneOf = dyn_cast<OneOfDecl>(D))
+        checkExplicitConformance(TC, OneOf, OneOf->getDeclaredType(),
+                                 OneOf->getInherited());
+      else if (auto Extension = dyn_cast<ExtensionDecl>(D))
+        checkExplicitConformance(TC, Extension, Extension->getExtendedType(),
+                                 Extension->getInherited());
+      else if (auto Protocol = dyn_cast<ProtocolDecl>(D)) {
+        // Check for circular protocol definitions.
+        llvm::SmallPtrSet<ProtocolDecl *, 16> LocalVisited;
+        llvm::SmallVector<ProtocolDecl *, 4> Path;
+        if (VisitedProtocols.count(Protocol) == 0) {
+          LocalVisited.insert(Protocol);
+          if (checkProtocolCircularity(TC, Protocol, VisitedProtocols,
+                                       LocalVisited, Path)) {
+            llvm::SmallString<128> PathStr;
+            PathStr += "'";
+            PathStr += Protocol->getName().str();
+            PathStr += "'";
+            for (unsigned I = Path.size(); I != 0; --I) {
+              PathStr += " -> '";
+              PathStr += Path[I-1]->getName().str();
+              PathStr += "'";
+            }
+            
+            TC.diagnose(Protocol->getLoc(), diag::circular_protocol_def,
+                        PathStr);
+            for (unsigned I = Path.size(); I != 1; --I) {
+              TC.diagnose(Path[I-1]->getLoc(), diag::protocol_here,
+                          Path[I-1]->getName());
+            }
+          }
+          
+          VisitedProtocols.insert(LocalVisited.begin(), LocalVisited.end());
+        }
+      }
+    }
   }
   
   // If we're in a library, we skip type-checking global initializers in the
