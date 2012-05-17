@@ -517,8 +517,10 @@ Decl *Parser::parseDeclExtension() {
 /// extended body of a 'oneof'.
 Decl *Parser::parseExtensionBody(SourceLoc ExtensionLoc, Type Ty,
                                  MutableArrayRef<Type> Inherited) {
-  ExtensionDecl *ED = new (Context) ExtensionDecl(ExtensionLoc, Ty, Inherited,
-                                                  CurDeclContext);
+  ExtensionDecl *ED
+    = new (Context) ExtensionDecl(ExtensionLoc, Ty,
+                                  Context.AllocateCopy(Inherited),
+                                  CurDeclContext);
   ContextChange CC(*this, ED);
 
   SmallVector<Decl*, 8> MemberDecls;
