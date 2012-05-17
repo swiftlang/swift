@@ -22,6 +22,7 @@ using namespace swift;
 
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
+  
 public:
   TypeChecker &TC;
   
@@ -34,6 +35,41 @@ public:
   bool visitValueDecl(ValueDecl *VD);
   void validateAttributes(ValueDecl *VD);
 
+  /// \brief Check the list of inherited protocols on the declaration D (which
+  /// declares or extends nominal type Ty).
+  ///
+  /// \param CheckConformance Will be set true if the caller needs to call
+  /// checkExplicitConformance() for this declaration once its member have
+  /// been type-checked. Otherwise, the conformance check can be delayed.
+  void checkInherited(Decl *D, Type T, MutableArrayRef<Type> Inherited,
+                      bool &CheckConformance) {
+    // Check the list of inherited protocols.
+    bool ConformsToProtocols = false;
+    for (auto InheritedTy : Inherited) {
+      if (!TC.validateType(InheritedTy)) {
+        if (!InheritedTy->is<ProtocolType>()) {
+          // FIXME: Terrible location information.
+          TC.diagnose(D->getLocStart(), diag::nonprotocol_inherit, InheritedTy);
+        } else {
+          ConformsToProtocols = true;
+        }
+      }
+    }
+    
+    CheckConformance = ConformsToProtocols &&
+      !D->getDeclContext()->isModuleContext() &&
+      !isa<ProtocolDecl>(D);
+  }
+
+  void checkExplicitConformance(Decl *D, Type T,
+                                MutableArrayRef<Type> Inherited) {
+    for (auto InheritedTy : Inherited) {
+      // FIXME: Poor location info.
+      if (auto Proto = InheritedTy->getAs<ProtocolType>())
+        TC.conformsToProtocol(T, Proto->getDecl(), D->getLocStart());
+    }
+  }
+  
   //===--------------------------------------------------------------------===//
   // Visit Methods.
   //===--------------------------------------------------------------------===//
@@ -118,16 +154,29 @@ public:
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     TC.validateType(TAD->getAliasType());
   }
-
+  
   void visitOneOfDecl(OneOfDecl *OOD) {
+    bool CheckConformance;
+    checkInherited(OOD, OOD->getDeclaredType(), OOD->getInherited(),
+                   CheckConformance);
+    
     for (auto elt : OOD->getElements())
       visitOneOfElementDecl(elt);
+    
+    if (CheckConformance)
+      checkExplicitConformance(OOD, OOD->getDeclaredType(),
+                               OOD->getInherited());
   }
 
   void visitStructDecl(StructDecl *SD) {
+    bool CheckConformance;
+    checkInherited(SD, SD->getDeclaredType(), SD->getInherited(),
+                   CheckConformance);
+    
     for (Decl *Member : SD->getMembers()) {
       visit(Member);
     }
+    
     // FIXME: We should come up with a better way to represent this implied
     // constructor.
     SmallVector<TupleTypeElt, 8> TupleElts;
@@ -139,23 +188,30 @@ public:
     Type CreateTy = FunctionType::get(TT, SD->getDeclaredType(), TC.Context);
     cast<OneOfElementDecl>(SD->getMembers().back())->setType(CreateTy);
     cast<OneOfElementDecl>(SD->getMembers().back())->setArgumentType(TT);
+    
+    if (CheckConformance)
+      checkExplicitConformance(SD, SD->getDeclaredType(),
+                               SD->getInherited());
   }
 
   void visitClassDecl(ClassDecl *CD) {
+    bool CheckConformance;
+    checkInherited(CD, CD->getDeclaredType(), CD->getInherited(),
+                   CheckConformance);
+
     for (Decl *Member : CD->getMembers()) {
       visit(Member);
     }
+    
+    if (CheckConformance)
+      checkExplicitConformance(CD, CD->getDeclaredType(),
+                               CD->getInherited());
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
-    // Check the list of inherited protocols.
-    for (auto Inherited : PD->getInherited()) {
-      if (!TC.validateType(Inherited))
-        if (!Inherited->is<ProtocolType>()) {
-          // FIXME: Terrible location information.
-          TC.diagnose(PD->getLoc(), diag::nonprotocol_inherit, Inherited);
-        }
-    }
+    bool CheckConformance;
+    checkInherited(PD, PD->getDeclaredType(), PD->getInherited(),
+                   CheckConformance);
     
     // Check the members.
     for (auto Member : PD->getMembers())
@@ -203,14 +259,14 @@ public:
     }
   }
   void visitExtensionDecl(ExtensionDecl *ED) {
-    TC.validateType(ED->getExtendedType());
+    bool CheckConformance;
+    if (!TC.validateType(ED->getExtendedType()))
+      checkInherited(ED, ED->getExtendedType(), ED->getInherited(),
+                     CheckConformance);
 
     for (Decl *Member : ED->getMembers()) {
       // First recursively type check each thing in the extension.
       visit(Member);
-      
-      // Then check to see if it is valid in an extension.
-      
     }
   }
 

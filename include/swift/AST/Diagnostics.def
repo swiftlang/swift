@@ -651,7 +651,20 @@ ERROR(invalid_decl_attribute,sema_tcd,none,
 
 // Protocols
 ERROR(nonprotocol_inherit,sema_tcd,none,
-      "protocol cannot inherit non-protocol type %0", (Type))
+      "cannot inherit non-protocol type %0", (Type))
+ERROR(type_does_not_conform,sema_tcd,none,
+      "type %0 does not conform to protocol %1", (Type, Type))
+NOTE(inherited_protocol_does_not_conform,sema_tcd,none,
+     "type %0 does not conform to inherited protocol %1", (Type, Type))
+NOTE(no_witnesses,sema_tcd,none,
+     "protocol requires %select{function %1|property %1|subscript operator}0 "
+     "with type %2", (int, Identifier, Type))
+NOTE(ambiguous_witnesses,sema_tcd,none,
+     "multiple matching "
+     "%select{functions named %1|properties named %1|subscript operators}0 "
+     "with type %2", (int, Identifier, Type))
+NOTE(protocol_witness,sema_tcd,none,
+     "possibly intended match with type %0", (Type))
 
 //------------------------------------------------------------------------------
 // Type Check Expressions

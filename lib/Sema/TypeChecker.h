@@ -103,7 +103,13 @@ public:
 
   /// conformsToProtocol - Determine whether the given type conforms to the
   /// given protocol.
-  ProtocolConformance *conformsToProtocol(Type T, ProtocolDecl *Proto);
+  ///
+  /// \param ComplainLoc If valid, then this function will emit diagnostics if
+  /// T does not conform to the given protocol. The primary diagnostic will
+  /// be placed at this location, with notes for each of the protocol
+  /// requirements not satisfied.
+  ProtocolConformance *conformsToProtocol(Type T, ProtocolDecl *Proto,
+                                          SourceLoc ComplainLoc = SourceLoc());
   
   /// \name Overload resolution
   ///

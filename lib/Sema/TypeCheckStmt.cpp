@@ -600,6 +600,15 @@ static void REPLCheckPatternBinding(PatternBindingDecl *D, TypeChecker &TC) {
   D->setInit(TC.semaApplyExpr(CE));
 }
 
+/// \brief Check for explicit protocol conformance.
+static void checkExplicitConformance(TypeChecker &TC, Decl *D, Type Ty,
+                                     ArrayRef<Type> Inherited) {
+  for (auto InheritedTy : Inherited) {
+    if (ProtocolType *Proto = InheritedTy->getAs<ProtocolType>())
+      TC.conformsToProtocol(Ty, Proto->getDecl(), D->getLocStart());
+  }
+}
+
 /// performTypeChecking - Once parsing and namebinding are complete, these
 /// walks the AST to resolve types and diagnose problems therein.
 ///
@@ -674,6 +683,25 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     }
   }
 
+  // Check for explicit conformance to protocols.
+  for (auto D : TU->Decls) {
+    if (auto Struct = dyn_cast<StructDecl>(D))
+      checkExplicitConformance(TC, Struct, Struct->getDeclaredType(),
+                               Struct->getInherited());
+    else if (auto Class = dyn_cast<ClassDecl>(D))
+      checkExplicitConformance(TC, Class, Class->getDeclaredType(),
+                               Class->getInherited());
+    else if (auto OneOf = dyn_cast<OneOfDecl>(D))
+      checkExplicitConformance(TC, OneOf, OneOf->getDeclaredType(),
+                               OneOf->getInherited());
+    else if (auto Proto = dyn_cast<ProtocolDecl>(D))
+      checkExplicitConformance(TC, Proto, Proto->getDeclaredType(),
+                               Proto->getInherited());
+    else if (auto Extension = dyn_cast<ExtensionDecl>(D))
+      checkExplicitConformance(TC, Extension, Extension->getExtendedType(),
+                               Extension->getInherited());
+  }
+  
   // If we're in a library, we skip type-checking global initializers in the
   // first pass.  Type-check them now.
   if (TU->Kind == TranslationUnit::Library && !TC.Context.hadError()) {

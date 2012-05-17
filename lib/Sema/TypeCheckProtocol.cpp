@@ -29,8 +29,23 @@ static Type getInstanceUsageType(ValueDecl *Value) {
   return Ty;
 }
 
+/// \brief Retrieve the kind of requirement described by the given declaration,
+/// for use in some diagnostics.
+/// FIXME: Enumify this.
+int getRequirementKind(ValueDecl *VD) {
+  if (isa<FuncDecl>(VD))
+    return 0;
+  
+  if (isa<VarDecl>(VD))
+    return 1;
+  
+  assert(isa<SubscriptDecl>(VD) && "Unhandled requirement kind");
+  return 2;
+}
+
 static std::unique_ptr<ProtocolConformance>
-checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto) {
+checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
+                        SourceLoc ComplainLoc) {
   llvm::DenseMap<ValueDecl *, ValueDecl *> Mapping;
   llvm::DenseMap<ProtocolDecl *, ProtocolConformance *> InheritedMapping;
 
@@ -41,13 +56,22 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto) {
     if (!InheritedProto)
       return nullptr;
     
-    if (auto Conformance = TC.conformsToProtocol(T, InheritedProto->getDecl()))
+    if (auto Conformance = TC.conformsToProtocol(T, InheritedProto->getDecl(),
+                                                 ComplainLoc))
       InheritedMapping[InheritedProto->getDecl()] = Conformance;
-    else
+    else {
+      // Recursive call already diagnosed this problem, but tack on a note
+      // to establish the relationship.
+      if (ComplainLoc.isValid()) {
+        TC.diagnose(Proto->getLocStart(),
+                    diag::inherited_protocol_does_not_conform, T, Inherited);
+      }
       return nullptr;
+    }
   }
   
   // Check that T provides all of the required members.
+  bool Complained = false;
   for (auto Member : Proto->getMembers()) {
     auto Requirement = dyn_cast<ValueDecl>(Member);
     if (!Requirement)
@@ -84,13 +108,50 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto) {
         continue;
       }
       
-      // FIXME: Diagnose ambiguity or lack of matches.
+      if (ComplainLoc.isInvalid())
+        return nullptr;
+      
+      if (!Viable.empty()) {
+        if (!Complained) {
+          TC.diagnose(ComplainLoc, diag::type_does_not_conform,
+                      T, Proto->getDeclaredType());
+          Complained = true;
+        }
+        
+        TC.diagnose(Requirement->getLocStart(), diag::ambiguous_witnesses,
+                    getRequirementKind(Requirement),
+                    Requirement->getName(),
+                    RequiredTy);
+        
+        for (auto Candidate : Viable)
+          TC.diagnose(Candidate->getLocStart(), diag::protocol_witness,
+                      getInstanceUsageType(Candidate));
+      }
+    }
+
+    if (ComplainLoc.isValid()) {
+      if (!Complained) {
+        TC.diagnose(ComplainLoc, diag::type_does_not_conform,
+                    T, Proto->getDeclaredType());
+        Complained = true;
+      }
+
+      TC.diagnose(Requirement->getLocStart(), diag::no_witnesses,
+                  getRequirementKind(Requirement),
+                  Requirement->getName(),
+                  getInstanceUsageType(Requirement));
+      for (auto Candidate : Lookup.Results) {
+        if (Candidate.hasDecl())
+          TC.diagnose(Candidate.D->getLocStart(), diag::protocol_witness,
+                      getInstanceUsageType(Candidate.D));
+      }
+    } else {
       return nullptr;
     }
-    
-    // FIXME: Diagnose complete lack of matches.
-    return nullptr;
   }
+  
+  if (Complained)
+    return nullptr;
   
   std::unique_ptr<ProtocolConformance> Result(new ProtocolConformance);
   // FIXME: Make DenseMap movable to make this efficient.
@@ -100,12 +161,14 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto) {
 }
 
 ProtocolConformance *
-TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto) {
+TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
+                                SourceLoc ComplainLoc) {
   ASTContext::ConformsToMap::key_type Key(T->getCanonicalType(), Proto);
   ASTContext::ConformsToMap::iterator Known = Context.ConformsTo.find(Key);
   if (Known == Context.ConformsTo.end())
     Known = Context.ConformsTo.insert(
               std::make_pair(Key,
-                             checkConformsToProtocol(*this, T, Proto))).first;
+                             checkConformsToProtocol(*this, T, Proto,
+                                                     ComplainLoc))).first;
   return Known->second.get();
 }

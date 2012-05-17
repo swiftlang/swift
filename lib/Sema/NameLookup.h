@@ -83,6 +83,9 @@ struct MemberLookupResult {
     R.Kind = TupleElement;
     return R;
   }
+  
+  /// \brief Determine whether this result has a declaration.
+  bool hasDecl() const { return Kind != TupleElement; }
 };
   
 /// MemberLookup - This class implements and represents the result of performing
