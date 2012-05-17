@@ -28,7 +28,6 @@
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/ExecutionEngine/JIT.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Host.h"
@@ -159,7 +158,6 @@ void swift::RunImmediately(TranslationUnit *TU) {
   builder.setTargetOptions(TargetOpt);
   builder.setErrorStr(&ErrorMsg);
   builder.setEngineKind(llvm::EngineKind::JIT);
-  builder.setUseMCJIT(true);
   llvm::ExecutionEngine *EE = builder.create();
   if (!EE) {
     llvm::errs() << "Error loading JIT: " << ErrorMsg;
