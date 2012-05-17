@@ -660,9 +660,15 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
     if (TheCall->getType()->isVoidTy())
       // Mark that we're not returning anything.
       result.setAsEmptyDirect();
-    else
+    else if (!TheCall->getType()->isStructTy())
       result.setAsSingleDirectUnmanagedFragileValue(TheCall);
-    // FIXME: Multiple return values.
+    else {
+      Explosion &E = result.initForDirectValues(ExplosionKind::Maximal);
+
+      auto STy = cast<llvm::StructType>(TheCall->getType());
+      for (unsigned i = 0, e = STy->getNumElements(); i != e; ++i)
+        E.addUnmanaged(IGF.Builder.CreateExtractValue(TheCall, i));
+    }
     return;
   }
   
