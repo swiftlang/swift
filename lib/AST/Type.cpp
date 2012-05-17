@@ -120,13 +120,18 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
         if (!Rebuild) {
           Elements.reserve(TupleTy->getFields().size());
           for (unsigned I = 0; I != Idx; ++I) {
-            Elements.push_back(TupleTypeElt(TupleTy->getElementType(I),
-                                            Identifier()));
+            const TupleTypeElt &Elt = TupleTy->getFields()[I];
+            Elements.push_back(TupleTypeElt(Elt.getType(), Identifier(),
+                                            nullptr, Elt.getVarargBaseTy()));
           }
           Rebuild = true;
         }
-        
-        Elements.push_back(TupleTypeElt(EltTy, Identifier()));
+
+        Type VarargBaseType;
+        if (Elt.isVararg())
+          VarargBaseType = Elt.getVarargBaseTy()->getUnlabeledType(Context);
+        Elements.push_back(TupleTypeElt(EltTy, Identifier(),
+                                        nullptr, VarargBaseType));
       }
       ++Idx;
     }
@@ -136,7 +141,7 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
     
     // An unlabeled 1-element tuple type is represented as a parenthesized
     // type.
-    if (Elements.size() == 1)
+    if (Elements.size() == 1 && !Elements[0].isVararg())
       return ParenType::get(Context, Elements[0].getType());
     
     return TupleType::get(Elements, Context);
