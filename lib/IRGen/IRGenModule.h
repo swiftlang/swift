@@ -88,6 +88,7 @@ public:
   llvm::FunctionType *DtorTy;          /// size_t (%swift.refcounted*)
   llvm::StructType *HeapMetadataStructTy; /// %swift.heapmetadata = type { ... }
   llvm::PointerType *HeapMetadataPtrTy;/// %swift.heapmetadata*
+  llvm::PointerType *ObjCPtrTy;        /// %objc_object*
 
   Size getPointerSize() const { return PtrSize; }
   Alignment getPointerAlignment() const {
@@ -137,12 +138,17 @@ public:
   llvm::Constant *getAllocRawFn();
   llvm::Constant *getDeallocRawFn();
 
+  llvm::Constant *getObjCRetainFn();
+  llvm::Constant *getObjCReleaseFn();
+
 private:
   llvm::Function *MemCpyFn;
   llvm::Constant *AllocFn;
   llvm::Constant *AllocRawFn;
   llvm::Constant *RetainFn;
   llvm::Constant *ReleaseFn;
+  llvm::Constant *ObjCRetainFn;
+  llvm::Constant *ObjCReleaseFn;
   llvm::Constant *DeallocFn;
   llvm::Constant *DeallocRawFn;
 

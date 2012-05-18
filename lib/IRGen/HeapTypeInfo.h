@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IRGEN_REFCOUNTED_H
-#define SWIFT_IRGEN_REFCOUNTED_H
+#ifndef SWIFT_IRGEN_HEAPTYPEINFO_H
+#define SWIFT_IRGEN_HEAPTYPEINFO_H
 
 #include "llvm/DerivedTypes.h"
 #include "GenType.h"

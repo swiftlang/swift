@@ -29,6 +29,7 @@ bool Parser::checkFullyTyped(Type type) {
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinObjectPointer:
+  case TypeKind::BuiltinObjCPointer:
   case TypeKind::NameAlias: // FIXME: underlying type could be non-fully-typed!
   case TypeKind::Identifier:
   case TypeKind::Protocol:

@@ -156,6 +156,7 @@ public:
   const Type TheErrorType;       /// TheErrorType - This is the error singleton.
   const Type TheEmptyTupleType;  /// TheEmptyTupleType - This is "()"
   const Type TheObjectPointerType; /// Builtin.ObjectPointer
+  const Type TheObjCPointerType; /// Builtin.ObjCPointer
   const Type TheRawPointerType;  /// Builtin.RawPointer
   
   /// TheUnstructuredDependentType - Dependent on context.  This is given to an 

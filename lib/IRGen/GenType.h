@@ -210,6 +210,7 @@ class TypeConverter {
   static const TypeInfo *convertModuleType(IRGenModule &IGM, ModuleType *T);
   static const TypeInfo *convertProtocolType(IRGenModule &IGM, ProtocolType *T);
   static const TypeInfo *convertBuiltinObjectPointer(IRGenModule &IGM);
+  static const TypeInfo *convertBuiltinObjCPointer(IRGenModule &IGM);
 
  public:
   TypeConverter();

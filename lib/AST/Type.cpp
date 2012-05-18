@@ -75,6 +75,7 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
   case TypeKind::Error: 
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinObjectPointer:
+  case TypeKind::BuiltinObjCPointer:
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinFloat:
   case TypeKind::UnstructuredDependent:
@@ -465,6 +466,10 @@ void BuiltinRawPointerType::print(raw_ostream &OS) const {
 
 void BuiltinObjectPointerType::print(raw_ostream &OS) const {
   OS << "Builtin.ObjectPointer";
+}
+
+void BuiltinObjCPointerType::print(raw_ostream &OS) const {
+  OS << "Builtin.ObjCPointer";
 }
 
 void BuiltinIntegerType::print(raw_ostream &OS) const {

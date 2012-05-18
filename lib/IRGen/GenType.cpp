@@ -221,6 +221,8 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, CanType canTy) {
                            IGM.getPointerAlignment());
   case TypeKind::BuiltinObjectPointer:
     return convertBuiltinObjectPointer(IGM);
+  case TypeKind::BuiltinObjCPointer:
+    return convertBuiltinObjCPointer(IGM);
   case TypeKind::BuiltinFloat:
     switch (cast<BuiltinFloatType>(ty)->getFPKind()) {
     case BuiltinFloatType::IEEE16:

@@ -56,6 +56,8 @@ IRGenModule::IRGenModule(ASTContext &Context,
   ReleaseFn = nullptr;
   DeallocFn = nullptr;
   DeallocRawFn = nullptr;
+  ObjCRetainFn = nullptr;
+  ObjCReleaseFn = nullptr;
 
   RefCountedStructTy =
     llvm::StructType::create(getLLVMContext(), "swift.refcounted");
@@ -83,6 +85,9 @@ IRGenModule::IRGenModule(ASTContext &Context,
   FixedBufferTy = nullptr;
   for (unsigned i = 0; i != NumValueWitnesses; ++i)
     ValueWitnessTys[i] = nullptr;
+
+  ObjCPtrTy = llvm::StructType::create(getLLVMContext(), "objc_object")
+                ->getPointerTo(0);
 }
 
 IRGenModule::~IRGenModule() {

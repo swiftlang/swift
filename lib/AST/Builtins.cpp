@@ -26,6 +26,8 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
     return Context.TheRawPointerType;
   if (Name == "ObjectPointer")
     return Context.TheObjectPointerType;
+  if (Name == "ObjCPointer")
+    return Context.TheObjCPointerType;
   
   if (Name == "FPIEEE32")
     return Context.TheIEEE32Type;

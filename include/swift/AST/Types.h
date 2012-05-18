@@ -229,6 +229,21 @@ public:
     return T->getKind() == TypeKind::BuiltinObjectPointer;
   }
 };
+
+/// BuiltinObjCPointerType - The builtin opaque Objective-C pointer type.
+/// Useful for pushing an Objective-C type through swift.
+class BuiltinObjCPointerType : public TypeBase {
+  friend class ASTContext;
+  BuiltinObjCPointerType(ASTContext &C)
+    : TypeBase(TypeKind::BuiltinObjCPointer, &C, /*Dependent=*/false) {}
+public:
+  void print(raw_ostream &OS) const;
+
+  static bool classof(const BuiltinObjCPointerType *) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinObjCPointer;
+  }
+};
   
 /// BuiltinIntegerType - The builtin integer types.  These directly correspond
 /// to LLVM IR integer types.  They lack signedness and have an arbitrary

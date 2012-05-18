@@ -219,6 +219,23 @@ void Mangler::mangleDeclName(ValueDecl *decl) {
 }
 
 /// Mangle a type into the buffer.
+///
+/// Type manglings should never start with [0-9_].
+///
+/// <type> ::= A <natural> <type>    # fixed-sized arrays
+/// <type> ::= F <type> <type>       # function type
+/// <type> ::= f <type> <type>       # uncurried function type
+/// <type> ::= f <natural>           # Builtin.Float
+/// <type> ::= i <natural>           # Builtin.Integer
+/// <type> ::= N <decl>              # oneof, struct, or class (substitutable)
+/// <type> ::= O                     # Builtin.ObjCPointer
+/// <type> ::= o                     # Builtin.ObjectPointer
+/// <type> ::= P <decl>              # protocol (substitutable)
+/// <type> ::= p                     # Builtin.RawPointer
+/// <type> ::= R <type>              # lvalue
+/// <type> ::= T <tuple-element>* _  # tuple
+///
+/// <tuple-element> ::= <identifier>? <type>
 void Mangler::mangleType(Type type, ExplosionKind explosion,
                          unsigned uncurryLevel) {
   TypeBase *base = type.getPointer();
@@ -254,6 +271,9 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     return;
   case TypeKind::BuiltinObjectPointer:
     Buffer << "o";
+    return;
+  case TypeKind::BuiltinObjCPointer:
+    Buffer << "O";
     return;
 
 #define SUGARED_TYPE(id, parent) \

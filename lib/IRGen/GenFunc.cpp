@@ -335,7 +335,7 @@ namespace {
 
       // Load the data.
       Address dataAddr = projectData(IGF, addr);
-      e.addUnmanaged(IGF.Builder.CreateLoad(dataAddr));
+      e.add(IGF.enterReleaseCleanup(IGF.Builder.CreateLoad(dataAddr)));
     }
 
     void assign(IRGenFunction &IGF, Explosion &e, Address address) const {

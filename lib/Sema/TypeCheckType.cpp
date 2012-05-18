@@ -99,6 +99,7 @@ bool TypeChecker::validateType(Type InTy) {
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinObjectPointer:
+  case TypeKind::BuiltinObjCPointer:
   case TypeKind::UnstructuredDependent:
   case TypeKind::OneOf:
   case TypeKind::Struct:
