@@ -198,6 +198,13 @@ public:
     return Address(addr, address.getAlignment().alignmentAtOffset(size));
   }
 
+  using IRBuilderBase::CreateBitCast;
+  Address CreateBitCast(Address address, llvm::Type *type,
+                        const llvm::Twine &name = "") {
+    llvm::Value *addr = CreateBitCast(address.getAddress(), type, name);
+    return Address(addr, address.getAlignment());
+  }
+
   /// Insert the given basic block after the IP block and move the
   /// insertion point to it.  Only valid if the IP is valid.
   void emitBlock(llvm::BasicBlock *BB);
