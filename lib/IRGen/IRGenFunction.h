@@ -237,6 +237,7 @@ public:
   const TypeInfo &getFragileTypeInfo(Type T);
   void emitMemCpy(llvm::Value *dest, llvm::Value *src,
                   Size size, Alignment align);
+  void emitMemCpy(Address dest, Address src, Size size);
 private:
   llvm::Instruction *AllocaIP;
 

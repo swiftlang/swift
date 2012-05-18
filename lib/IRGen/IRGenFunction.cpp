@@ -50,6 +50,12 @@ void IRGenFunction::emitMemCpy(llvm::Value *dest, llvm::Value *src,
   Builder.CreateMemCpy(dest, src, size.getValue(), align.getValue(), false);
 }
 
+void IRGenFunction::emitMemCpy(Address dest, Address src, Size size) {
+  // Map over to the inferior design of the LLVM intrinsic.
+  emitMemCpy(dest.getAddress(), src.getAddress(), size,
+             std::min(dest.getAlignment(), src.getAlignment()));
+}
+
 void IRGenFunction::unimplemented(SourceLoc Loc, StringRef Message) {
   return IGM.unimplemented(Loc, Message);
 }

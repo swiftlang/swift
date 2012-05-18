@@ -175,6 +175,21 @@ public:
     }
   }
 
+  void initializeWithCopy(IRGenFunction &IGF, Address dest,
+                          Address src) const {
+    // If we're POD, use the generic routine.
+    if (isPOD(ResilienceScope::Local))
+      return TypeInfo::initializeWithCopy(IGF, dest, src);
+
+    for (auto &field : getFields()) {
+      if (field.isEmpty()) continue;
+
+      Address destField = field.projectAddress(IGF, dest);
+      Address srcField = field.projectAddress(IGF, src);
+      field.getTypeInfo().initializeWithCopy(IGF, destField, srcField);
+    }
+  }
+
   void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
     for (auto &field : getFields())
       field.getTypeInfo().reexplode(IGF, src, dest);

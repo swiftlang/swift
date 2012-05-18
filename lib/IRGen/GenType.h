@@ -151,8 +151,8 @@ public:
                           Address srcAddr) const;
 
   /// Perform a copy-initialization from the given object.
-  void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
-                          Address srcAddr) const;
+  virtual void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
+                                  Address srcAddr) const;
 
   /// Consume a bunch of values which have exploded at one explosion
   /// level and produce them at another.

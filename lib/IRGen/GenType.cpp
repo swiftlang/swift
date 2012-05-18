@@ -58,12 +58,11 @@ void TypeInfo::initializeWithTake(IRGenFunction &IGF,
   }
 
   // Otherwise, use a memcpy.
-  IGF.emitMemCpy(destAddr.getAddress(), srcAddr.getAddress(),
-                 StorageSize, std::min(destAddr.getAlignment(),
-                                       srcAddr.getAlignment()));
+  IGF.emitMemCpy(destAddr, srcAddr, StorageSize);
 }
 
-/// Copy a value from one object to a new object.
+/// Copy a value from one object to a new object.  This is just the
+/// default implementation.
 void TypeInfo::initializeWithCopy(IRGenFunction &IGF,
                                   Address destAddr, Address srcAddr) const {
   // Use memcpy if that's legal.
@@ -72,8 +71,6 @@ void TypeInfo::initializeWithCopy(IRGenFunction &IGF,
   }
 
   // Otherwise explode and re-implode.
-  // FIXME: this should really be a primitive operation in case the
-  // individual operations can do better.
   Explosion copy(ExplosionKind::Maximal);
   load(IGF, srcAddr, copy);
   initialize(IGF, copy, destAddr);
