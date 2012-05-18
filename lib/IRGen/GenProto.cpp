@@ -557,12 +557,17 @@ namespace {
     }
 
     void assign(IRGenFunction &IGF, Explosion &in, Address dest) const {
-      auto srcValue = in.claimNext();
+      // TODO: by this point, we've aleady lost some interesting
+      // dynamic optimization opportunities because of the implicit
+      // copy into a temporary to form the explosion.
 
-      // This is a large enough operation that is probably out to be
-      // delegated to the runtime.
-      IGF.unimplemented(SourceLoc(), "assignment of generics!");
-      (void) srcValue;
+      // Destroy the old value.  This is safe because the value in the
+      // explosion is already +1, so even if there's any aliasing
+      // going on, we're totally fine.
+      emitDestroyExistential(IGF, dest);
+
+      // Take the new value.
+      ProtocolTypeInfo::initialize(IGF, in, dest);
     }
 
     void initialize(IRGenFunction &IGF, Explosion &in, Address dest) const {
