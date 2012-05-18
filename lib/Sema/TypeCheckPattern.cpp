@@ -79,7 +79,8 @@ bool TypeChecker::typeCheckPattern(Pattern *P) {
         type = pattern->getType();
       }
 
-      typeElts.push_back(TupleTypeElt(type, pattern->getBoundName(), init));
+      typeElts.push_back(TupleTypeElt(type, pattern->getBoundName(), init,
+                                      elt.getVarargBaseType()));
     }
 
     if (hadError) return true;

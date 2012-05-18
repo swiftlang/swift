@@ -613,7 +613,7 @@ static void cloneTuplePatternElts(ASTContext &Context, Pattern &From,
     for (auto &Elt : FromTuple->getFields())
       // FIXME: Do we have to clone the initializer?
       To.push_back(TuplePatternElt(clonePattern(Context, Elt.getPattern()),
-                                   Elt.getInit()));
+                                   Elt.getInit(), Elt.getVarargBaseType()));
     return;
   }
   

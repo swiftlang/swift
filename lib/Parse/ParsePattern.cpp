@@ -110,10 +110,12 @@ bool Parser::checkFullyTyped(Pattern *pattern, Type &funcTy) {
       if (checkFullyTyped(subpattern, eltTy))
         return true;
       typeElts.push_back(TupleTypeElt(subpattern->getType(),
-                                      subpattern->getBoundName()));
+                                      subpattern->getBoundName(), nullptr,
+                                      elt.getVarargBaseType()));
       typeEltsWithInits.push_back(TupleTypeElt(eltTy,
                                                subpattern->getBoundName(),
-                                               elt.getInit()));
+                                               elt.getInit(),
+                                               elt.getVarargBaseType()));
       HadInit |= (elt.getInit() != 0);
       // The grammar allows default values in general patterns, but
       // they aren't ever allowed semantically.  However, function
@@ -266,6 +268,7 @@ NullablePtr<Pattern> Parser::parsePatternTuple() {
 
   // Parse all the elements.
   SmallVector<TuplePatternElt, 8> elts;
+  bool hadEllipsis = false;
   if (Tok.isNot(tok::r_paren)) {
     do {
       NullablePtr<Pattern> pattern = parsePattern();
@@ -287,6 +290,29 @@ NullablePtr<Pattern> Parser::parsePatternTuple() {
       elts.push_back(TuplePatternElt(pattern.get(), init));
     } while (consumeIf(tok::comma));
 
+    if (Tok.is(tok::ellipsis)) {
+      if (elts.back().getInit()) {
+        diagnose(Tok.getLoc(), diag::tuple_ellipsis_init);
+        skipUntil(tok::r_paren);
+        return nullptr;
+      }
+      hadEllipsis = true;
+      consumeToken(tok::ellipsis);
+
+      TypedPattern *subpattern =
+          dyn_cast<TypedPattern>(elts.back().getPattern());
+      if (!subpattern) {
+        diagnose(elts.back().getPattern()->getLoc(),
+                 diag::untyped_pattern_ellipsis);
+        skipUntil(tok::r_paren);
+        return nullptr;
+      }
+      Type subTy = subpattern->getType();
+      elts.back().setVarargBaseType(subTy);
+      subpattern->overwriteType(ArraySliceType::get(subTy, SourceLoc(),
+                                                    Context));
+    }
+
     if (Tok.isNot(tok::r_paren)) {
       diagnose(Tok, diag::expected_rparen_tuple_pattern_list);
       skipUntil(tok::r_paren);
@@ -300,7 +326,8 @@ NullablePtr<Pattern> Parser::parsePatternTuple() {
   // A pattern which wraps a single anonymous pattern is not a tuple.
   if (elts.size() == 1 &&
       elts[0].getInit() == nullptr &&
-      elts[0].getPattern()->getBoundName().empty())
+      elts[0].getPattern()->getBoundName().empty() &&
+      !hadEllipsis)
     return new (Context) ParenPattern(lp, elts[0].getPattern(), rp);
 
   return TuplePattern::create(Context, lp, elts, rp);

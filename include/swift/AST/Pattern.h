@@ -133,14 +133,19 @@ public:
 class TuplePatternElt {
   Pattern *ThePattern;
   Expr *Init;
+  Type VarargBaseType;
 
 public:
   TuplePatternElt() = default;
-  explicit TuplePatternElt(Pattern *P, Expr *init = nullptr)
-    : ThePattern(P), Init(init) {}
+  explicit TuplePatternElt(Pattern *P, Expr *init = nullptr,
+                           Type varargBaseType = Type())
+    : ThePattern(P), Init(init), VarargBaseType(varargBaseType) {}
 
   Pattern *getPattern() const { return ThePattern; }
   Expr *getInit() const { return Init; }
+  bool isVararg() { return !VarargBaseType.isNull(); }
+  Type getVarargBaseType() { return VarargBaseType; }
+  void setVarargBaseType(Type ty) { VarargBaseType = ty; }
   void setInit(Expr *E) { Init = E; }
 };
 

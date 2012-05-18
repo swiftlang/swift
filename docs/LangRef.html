@@ -240,6 +240,7 @@
     punctuation ::= ':'
     punctuation ::= '='
     punctuation ::= '-&gt;'
+    punctuation ::= '...'
   </pre>
 
   <p>These are all reserved punctuation that are lexed into tokens.  Most other
@@ -1270,7 +1271,7 @@ if vec[3] {
 
   <pre class="grammar">
     type-tuple ::= lparen-any type-tuple-body? ')'
-    type-tuple-body ::= type-tuple-element (',' type-tuple-element)*
+    type-tuple-body ::= type-tuple-element (',' type-tuple-element)* '...'?
     type-tuple-element ::= identifier <a href="#value-specifier">value-specifier</a>
     type-tuple-element ::= <a href="#type">type-annotation</a>
   </pre>
@@ -1296,6 +1297,10 @@ if vec[3] {
   when a value of that tuple type is default-initialized.  The default value
   is not allowed to refer to local declarations. FIXME: Maybe we should relax
   this?</p>
+
+  <p>If the tuple body ends with '...', the tuple is a varargs tuple. The type
+     of the last element is changed from T to T[], and there are special rules
+     for converting an expression to varargs tuple type.</p>
 
   <pre class="example">
   <i>// Variable definitions.</i>
@@ -1623,8 +1628,7 @@ ill-formed if the type does not conform to the protocol.</p>
 
   <pre class="grammar">
     pattern-tuple ::= '(' pattern-tuple-body? ')'
-    pattern-tuple-body ::= pattern-tuple-element
-    pattern-tuple-body ::= pattern-tuple-element ',' pattern-tuple-body
+    pattern-tuple-body ::= pattern-tuple-element (',' pattern-tuple-body)* '...'?
     pattern-tuple-element ::= pattern
     pattern-tuple-element ::= pattern '=' <a href="#expr">expr</a>
   </pre>
@@ -1643,9 +1647,15 @@ ill-formed if the type does not conform to the protocol.</p>
     A <tt>pattern-tuple-element</tt> has a label if it is a named
     pattern or a type annotation of a named pattern.</p>
 
-  <p>As a special case, a tuple pattern with one element that lacks
-    both a label and default value is treated as a grouping parenthesis: it has
-    the type of its constituent pattern, not a tuple type.</p>
+  <p>A tuple pattern whose body ends in <tt>'...'</tt> is a varargs tuple.
+     The last element of such a tuple must be a typed pattern, and the type
+     of that pattern is changed from <tt>T</tt> to <tt>T[]</tt>.  The
+     corresponding tuple type for a varargs tuple is a varargs tuple type.</p>
+
+  <p>As a special case, a tuple pattern with one element that has no
+    label, has no default value, and is not varargs is treated as a
+    grouping parenthesis: it has the type of its constituent pattern,
+    not a tuple type.</p>
   
   <!-- ********************************************************************* -->
   <h2 id="expr">Expressions</h2>
