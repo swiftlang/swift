@@ -165,17 +165,17 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   ASTContext::ConformsToMap::key_type Key(T->getCanonicalType(), Proto);
   ASTContext::ConformsToMap::iterator Known = Context.ConformsTo.find(Key);
   if (Known != Context.ConformsTo.end())
-    return Known->second.get();
+    return Known->second;
   
   // Assume that the type does not conform to this protocol while checking
   // whether it does in fact conform. This eliminates both infinite recursion
   // (if the protocol hierarchies are circular) as well as tautologies.
-  // FIXME: Lame use of shared_ptr here.
   Context.ConformsTo[Key] = nullptr;
-  if (std::shared_ptr<ProtocolConformance> Conformance
+  if (std::unique_ptr<ProtocolConformance> Conformance
         = checkConformsToProtocol(*this, T, Proto, ComplainLoc)) {
-    Context.ConformsTo[Key] = Conformance;
-    return Conformance.get();
+    auto result = Conformance.release();
+    Context.ConformsTo[Key] = result;
+    return result;
   }
   return nullptr;
 }

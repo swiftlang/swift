@@ -66,6 +66,9 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
 
 ASTContext::~ASTContext() {
   delete &Impl;
+
+  for (auto &entry : ConformsTo)
+    delete const_cast<ProtocolConformance*>(entry.second);
 }
 
 void *ASTContext::Allocate(unsigned long Bytes, unsigned Alignment) {
