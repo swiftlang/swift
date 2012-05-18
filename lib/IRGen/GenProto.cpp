@@ -72,6 +72,11 @@ static llvm::PointerType *getWitnessTableTy(IRGenModule &IGM) {
   return IGM.Int8PtrTy->getPointerTo(0);
 }
 
+static llvm::StructType *getSizeAndAlignmentResultType(IRGenModule &IGM) {
+  llvm::Type *resultElts[] = { IGM.SizeTy, IGM.SizeTy };
+  return llvm::StructType::get(IGM.getLLVMContext(), resultElts, false);
+}
+
 static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
                                                      ValueWitness index) {
   switch (index) {
@@ -132,9 +137,7 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
   // typedef struct { size_t Size; size_t Align } layout_t;
   // layout_t (*sizeAndAlignment)(W *self);
   case ValueWitness::SizeAndAlignment: {
-    llvm::Type *resultElts[] = { IGM.SizeTy, IGM.SizeTy };
-    llvm::StructType *resultTy =
-      llvm::StructType::get(IGM.getLLVMContext(), resultElts, false);
+    llvm::StructType *resultTy = getSizeAndAlignmentResultType(IGM);
     return llvm::FunctionType::get(resultTy, getWitnessTableTy(IGM), false);
   }
 
@@ -923,10 +926,7 @@ static void buildValueWitness(IRGenModule &IGM,
   case ValueWitness::SizeAndAlignment: {
     auto sizeAndAlign = type.getSizeAndAlignment(IGF);
 
-    llvm::Type *pairElts[] = { IGF.IGM.SizeTy, IGF.IGM.SizeTy };
-    llvm::Type *pairTy =
-      llvm::StructType::get(IGF.IGM.getLLVMContext(), pairElts, false);
-
+    llvm::Type *pairTy = getSizeAndAlignmentResultType(IGF.IGM);
     llvm::Value *result = llvm::UndefValue::get(pairTy);
     result = IGF.Builder.CreateInsertValue(result, sizeAndAlign.first, 0);
     result = IGF.Builder.CreateInsertValue(result, sizeAndAlign.second, 1);
@@ -988,14 +988,100 @@ static llvm::Constant *getReturnSelfFunction(IRGenModule &IGM) {
   return fn;
 }
 
+/// Return a function which takes three pointer arguments and does a
+/// retaining assignWithCopy on the first two: it loads a pointer from
+/// the second, retains it, loads a pointer from the first, stores the
+/// new pointer in the first, and releases the old pointer.
+static llvm::Constant *getAssignWithCopyStrongFunction(IRGenModule &IGM) {
+  llvm::Type *ptrPtrTy = IGM.RefCountedPtrTy->getPointerTo();
+  llvm::Type *argTys[] = { ptrPtrTy, ptrPtrTy, IGM.Int8PtrTy };
+  llvm::FunctionType *fnTy =
+    llvm::FunctionType::get(ptrPtrTy, argTys, false);
+  llvm::Constant *fn =
+    IGM.Module.getOrInsertFunction("__swift_assignWithCopy_strong", fnTy);
+
+  if (llvm::Function *def = shouldDefineHelper(fn)) {
+    IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
+                      ExplosionKind::Minimal, 0, def, Prologue::Bare);
+    auto it = def->arg_begin();
+    Address dest(it++, IGM.getPointerAlignment());
+    Address src(it++, IGM.getPointerAlignment());
+
+    llvm::Value *newValue = IGF.Builder.CreateLoad(src, "new");
+    newValue = IGF.emitRetainCall(newValue);
+    llvm::Value *oldValue = IGF.Builder.CreateLoad(dest, "old");
+    IGF.Builder.CreateStore(newValue, dest);
+    IGF.emitRelease(oldValue);
+
+    IGF.Builder.CreateRet(dest.getAddress());
+  }
+  return fn;
+}
+
+/// Return a function which takes three pointer arguments and does a
+/// retaining assignWithTake on the first two: it loads a pointer from
+/// the second, retains it, loads a pointer from the first, stores the
+/// new pointer in the first, and releases the old pointer.
+static llvm::Constant *getAssignWithTakeStrongFunction(IRGenModule &IGM) {
+  llvm::Type *ptrPtrTy = IGM.RefCountedPtrTy->getPointerTo();
+  llvm::Type *argTys[] = { ptrPtrTy, ptrPtrTy, IGM.Int8PtrTy };
+  llvm::FunctionType *fnTy =
+    llvm::FunctionType::get(ptrPtrTy, argTys, false);
+  llvm::Constant *fn =
+    IGM.Module.getOrInsertFunction("__swift_assignWithTake_strong", fnTy);
+
+  if (llvm::Function *def = shouldDefineHelper(fn)) {
+    IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
+                      ExplosionKind::Minimal, 0, def, Prologue::Bare);
+    auto it = def->arg_begin();
+    Address dest(it++, IGM.getPointerAlignment());
+    Address src(it++, IGM.getPointerAlignment());
+
+    llvm::Value *newValue = IGF.Builder.CreateLoad(src, "new");
+    llvm::Value *oldValue = IGF.Builder.CreateLoad(dest, "old");
+    IGF.Builder.CreateStore(newValue, dest);
+    IGF.emitRelease(oldValue);
+
+    IGF.Builder.CreateRet(dest.getAddress());
+  }
+  return fn;
+}
+
+/// Return a function which takes three pointer arguments and does a
+/// retaining initWithCopy on the first two: it loads a pointer from
+/// the second, retains it, and stores that in the first.
+static llvm::Constant *getInitWithCopyStrongFunction(IRGenModule &IGM) {
+  llvm::Type *ptrPtrTy = IGM.RefCountedPtrTy->getPointerTo();
+  llvm::Type *argTys[] = { ptrPtrTy, ptrPtrTy, IGM.Int8PtrTy };
+  llvm::FunctionType *fnTy =
+    llvm::FunctionType::get(ptrPtrTy, argTys, false);
+  llvm::Constant *fn =
+    IGM.Module.getOrInsertFunction("__swift_initWithCopy_strong", fnTy);
+
+  if (llvm::Function *def = shouldDefineHelper(fn)) {
+    IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
+                      ExplosionKind::Minimal, 0, def, Prologue::Bare);
+    auto it = def->arg_begin();
+    Address dest(it++, IGM.getPointerAlignment());
+    Address src(it++, IGM.getPointerAlignment());
+
+    llvm::Value *newValue = IGF.Builder.CreateLoad(src, "new");
+    newValue = IGF.emitRetainCall(newValue);
+    IGF.Builder.CreateStore(newValue, dest);
+
+    IGF.Builder.CreateRet(dest.getAddress());
+  }
+  return fn;
+}
+
 /// Return a function which takes two pointer arguments, loads a
 /// pointer from the first, and calls swift_release on it immediately.
-static llvm::Constant *getLoadAndReleaseFunction(IRGenModule &IGM) {
+static llvm::Constant *getDestroyStrongFunction(IRGenModule &IGM) {
   llvm::Type *argTys[] = { IGM.Int8PtrTy->getPointerTo(), IGM.Int8PtrTy };
   llvm::FunctionType *fnTy =
-    llvm::FunctionType::get(IGM.Int8PtrTy, argTys, false);
+    llvm::FunctionType::get(IGM.VoidTy, argTys, false);
   llvm::Constant *fn =
-    IGM.Module.getOrInsertFunction("__swift_load_and_release", fnTy);
+    IGM.Module.getOrInsertFunction("__swift_destroy_strong", fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(fn)) {
     IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
@@ -1040,6 +1126,43 @@ static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
   return fn;
 }
 
+/// Return a function which takes one pointer argument and returns a
+/// constant size and alignment.
+static llvm::Constant *getSizeAndAlignmentFunction(IRGenModule &IGM,
+                                                   const TypeInfo &type) {
+  llvm::Type *argTys[] = { IGM.Int8PtrTy };
+  llvm::Type *resultTy = getSizeAndAlignmentResultType(IGM);
+  llvm::FunctionType *fnTy = llvm::FunctionType::get(resultTy, argTys, false);
+
+  // We need to unique by both size and alignment.  Note that we're
+  // assuming that it's safe to call a function that returns a pointer
+  // at a site that assumes the function returns void.
+  llvm::SmallString<40> name;
+  {
+    llvm::raw_svector_ostream nameStream(name);
+    nameStream << "__swift_sizeAndAlignment_";
+    nameStream << type.StorageSize.getValue();
+    nameStream << '_';
+    nameStream << type.StorageAlignment.getValue();
+  }
+
+  llvm::Constant *fn = IGM.Module.getOrInsertFunction(name, fnTy);
+  if (llvm::Function *def = shouldDefineHelper(fn)) {
+    IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
+                      ExplosionKind::Minimal, 0, def, Prologue::Bare);
+    auto sizeAndAlign = type.getSizeAndAlignment(IGF);
+    assert(isa<llvm::ConstantInt>(sizeAndAlign.first));
+    assert(isa<llvm::ConstantInt>(sizeAndAlign.second));
+
+    llvm::Value *result = llvm::UndefValue::get(resultTy);
+    result = IGF.Builder.CreateInsertValue(result, sizeAndAlign.first, 0);
+    result = IGF.Builder.CreateInsertValue(result, sizeAndAlign.second, 1);
+    IGF.Builder.CreateRet(result);
+  }
+  return fn;
+}
+
+
 /// Find a witness to the fact that a type is a value type.
 /// Always returns an i8*.
 static llvm::Constant *getValueWitness(IRGenModule &IGM,
@@ -1059,7 +1182,8 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
       if (isNeverAllocated(packing))
         return asOpaquePtr(IGM, getNoOpVoidFunction(IGM));
     } else if (concreteTI.isSingleRetainablePointer(ResilienceScope::Local)) {
-      return asOpaquePtr(IGM, getLoadAndReleaseFunction(IGM));
+      assert(isNeverAllocated(packing));
+      return asOpaquePtr(IGM, getDestroyStrongFunction(IGM));
     }
     goto standard;
 
@@ -1067,24 +1191,51 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
     if (concreteTI.isPOD(ResilienceScope::Local)) {
       return asOpaquePtr(IGM, getNoOpVoidFunction(IGM));
     } else if (concreteTI.isSingleRetainablePointer(ResilienceScope::Local)) {
-      return asOpaquePtr(IGM, getLoadAndReleaseFunction(IGM));
+      return asOpaquePtr(IGM, getDestroyStrongFunction(IGM));
     }
     goto standard;
 
   case ValueWitness::InitializeBufferWithCopyOfBuffer:
   case ValueWitness::InitializeBufferWithCopy:
+    if (packing == FixedPacking::OffsetZero) {
+      if (concreteTI.isPOD(ResilienceScope::Local)) {
+        return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
+      } else if (concreteTI.isSingleRetainablePointer(ResilienceScope::Local)) {
+        return asOpaquePtr(IGM, getInitWithCopyStrongFunction(IGM));
+      }
+    }
+    goto standard;
+
   case ValueWitness::InitializeBufferWithTake:
-    if (packing == FixedPacking::OffsetZero &&
-        concreteTI.isPOD(ResilienceScope::Local))
+    if (packing == FixedPacking::OffsetZero)    
       return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
     goto standard;
 
-  case ValueWitness::AssignWithCopy:
-  case ValueWitness::AssignWithTake:
-  case ValueWitness::InitializeWithCopy:
   case ValueWitness::InitializeWithTake:
-    if (concreteTI.isPOD(ResilienceScope::Local))
+    return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
+
+  case ValueWitness::AssignWithCopy:
+    if (concreteTI.isPOD(ResilienceScope::Local)) {
       return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
+    } else if (concreteTI.isSingleRetainablePointer(ResilienceScope::Local)) {
+      return asOpaquePtr(IGM, getAssignWithCopyStrongFunction(IGM));
+    }
+    goto standard;
+
+  case ValueWitness::AssignWithTake:
+    if (concreteTI.isPOD(ResilienceScope::Local)) {
+      return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
+    } else if (concreteTI.isSingleRetainablePointer(ResilienceScope::Local)) {
+      return asOpaquePtr(IGM, getAssignWithTakeStrongFunction(IGM));
+    }
+    goto standard;
+
+  case ValueWitness::InitializeWithCopy:
+    if (concreteTI.isPOD(ResilienceScope::Local)) {
+      return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
+    } else if (concreteTI.isSingleRetainablePointer(ResilienceScope::Local)) {
+      return asOpaquePtr(IGM, getInitWithCopyStrongFunction(IGM));
+    }
     goto standard;
 
   case ValueWitness::AllocateBuffer:
@@ -1094,7 +1245,7 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
     goto standard;
 
   case ValueWitness::SizeAndAlignment:
-    goto standard;
+    return asOpaquePtr(IGM, getSizeAndAlignmentFunction(IGM, concreteTI));
   }
   llvm_unreachable("bad value witness kind");
 

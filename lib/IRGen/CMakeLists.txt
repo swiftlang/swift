@@ -36,6 +36,7 @@ add_swift_library(swiftIRGen
   GenTuple.h
   GenType.cpp
   GenType.h
+  HeapTypeInfo.h
   IRBuilder.h
   IRGen.cpp
   IRGen.h

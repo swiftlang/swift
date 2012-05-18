@@ -27,6 +27,7 @@
 #include "IRGenModule.h"
 #include "LValue.h"
 #include "GenHeap.h"
+#include "HeapTypeInfo.h"
 
 
 using namespace swift;
@@ -34,14 +35,14 @@ using namespace irgen;
 
 namespace {
   /// Layout information for class types.
-  class ClassTypeInfo : public TypeInfo {
+  class ClassTypeInfo : public HeapTypeInfo {
     HeapLayout Layout;
     std::vector<ElementLayout> Elements;
 
   public:
-    ClassTypeInfo(llvm::Type *irType, Size size, Alignment align,
-                  const HeapLayout &layout)
-      : TypeInfo(irType, size, align, IsNotPOD), Layout(layout) {
+    ClassTypeInfo(llvm::PointerType *irType, Size size, Alignment align,
+                  HeapLayout &&layout)
+      : HeapTypeInfo(irType, size, align), Layout(layout) {
     }
 
     const HeapLayout &getLayout() const { return Layout; }
@@ -50,47 +51,6 @@ namespace {
     }
     llvm::ArrayRef<ElementLayout> getElements() const {
       return Layout.getElements();
-    }
-
-    unsigned getExplosionSize(ExplosionKind kind) const {
-      return 1;
-    }
-
-    void getSchema(ExplosionSchema &schema) const {
-      schema.add(ExplosionSchema::Element::forScalar(getStorageType()));
-    }
-
-    void load(IRGenFunction &IGF, Address address, Explosion &e) const {
-      IGF.emitLoadAndRetain(address, e);
-    }
-
-    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
-      e.addUnmanaged(IGF.Builder.CreateLoad(addr));
-    }
-
-    void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      IGF.emitAssignRetained(e.forwardNext(IGF), addr);
-    }
-
-    void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      IGF.emitInitializeRetained(e.forwardNext(IGF), addr);
-    }
-
-    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      src.transferInto(dest, 1);
-    }
-
-    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      IGF.emitRetain(src.claimNext().getValue(), dest);
-    }
-
-    void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      dest.add(IGF.enterReleaseCleanup(src.claimUnmanagedNext()));
-    }
-
-    void destroy(IRGenFunction &IGF, Address addr) const {
-      llvm::Value *value = IGF.Builder.CreateLoad(addr);
-      IGF.emitRelease(value);
     }
   };
 }  // end anonymous namespace.
@@ -250,8 +210,8 @@ TypeConverter::convertClassType(IRGenModule &IGM, ClassType *T) {
   HeapLayout layout(IGM, LayoutStrategy::Optimal, fieldTypes,
                     IGM.createNominalType(T->getDecl()));
 
-  llvm::Type *irType = layout.getType()->getPointerTo();
-
+  llvm::PointerType *irType = layout.getType()->getPointerTo();
   return new ClassTypeInfo(irType, IGM.getPointerSize(),
-                           IGM.getPointerAlignment(), layout);
+                           IGM.getPointerAlignment(),
+                           std::move(layout));
 }

@@ -25,6 +25,7 @@
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "HeapTypeInfo.h"
 
 #include "GenHeap.h"
 
@@ -476,59 +477,60 @@ Address HeapLayout::emitCastOfAlloc(IRGenFunction &IGF,
   return Address(addr, getAlignment());
 }
 
-namespace {
-  class RefCountedTypeInfo : public TypeInfo {
-  public:
-    RefCountedTypeInfo(llvm::PointerType *storage, Size size, Alignment align)
-      : TypeInfo(storage, size, align, IsNotPOD) {}
+bool HeapTypeInfo::isSingleRetainablePointer(ResilienceScope scope) const {
+  return true;
+}
 
-    unsigned getExplosionSize(ExplosionKind kind) const {
-      return 1;
-    }
+unsigned HeapTypeInfo::getExplosionSize(ExplosionKind kind) const {
+  return 1;
+}
 
-    void getSchema(ExplosionSchema &schema) const {
-      schema.add(ExplosionSchema::Element::forScalar(getStorageType()));
-    }
+void HeapTypeInfo::getSchema(ExplosionSchema &schema) const {
+  schema.add(ExplosionSchema::Element::forScalar(getStorageType()));
+}
 
-    void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
-      IGF.emitLoadAndRetain(addr, e);
-    }
+void HeapTypeInfo::load(IRGenFunction &IGF, Address addr, Explosion &e) const {
+  IGF.emitLoadAndRetain(addr, e);
+}
 
-    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
-      e.addUnmanaged(IGF.Builder.CreateLoad(addr));
-    }
+void HeapTypeInfo::loadAsTake(IRGenFunction &IGF, Address addr,
+                              Explosion &e) const {
+  e.addUnmanaged(IGF.Builder.CreateLoad(addr));
+}
 
-    void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      IGF.emitAssignRetained(e.forwardNext(IGF), addr);
-    }
+void HeapTypeInfo::assign(IRGenFunction &IGF, Explosion &e,
+                          Address addr) const {
+  IGF.emitAssignRetained(e.forwardNext(IGF), addr);
+}
 
-    void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      IGF.emitInitializeRetained(e.forwardNext(IGF), addr);
-    }
+void HeapTypeInfo::initialize(IRGenFunction &IGF, Explosion &e,
+                              Address addr) const {
+  IGF.emitInitializeRetained(e.forwardNext(IGF), addr);
+}
 
-    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      src.transferInto(dest, 1);
-    }
+void HeapTypeInfo::reexplode(IRGenFunction &IGF, Explosion &src,
+                             Explosion &dest) const {
+  src.transferInto(dest, 1);
+}
 
-    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      IGF.emitRetain(src.claimNext().getValue(), dest);
-    }
+void HeapTypeInfo::copy(IRGenFunction &IGF, Explosion &src,
+                        Explosion &dest) const {
+  IGF.emitRetain(src.claimNext().getValue(), dest);
+}
 
-    void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      dest.add(IGF.enterReleaseCleanup(src.claimUnmanagedNext()));
-    }
+void HeapTypeInfo::manage(IRGenFunction &IGF, Explosion &src,
+                          Explosion &dest) const {
+  dest.add(IGF.enterReleaseCleanup(src.claimUnmanagedNext()));
+}
 
-    void destroy(IRGenFunction &IGF, Address addr) const {
-      llvm::Value *value = IGF.Builder.CreateLoad(addr);
-      IGF.emitRelease(value);
-    }
-  };
+void HeapTypeInfo::destroy(IRGenFunction &IGF, Address addr) const {
+  llvm::Value *value = IGF.Builder.CreateLoad(addr);
+  IGF.emitRelease(value);
 }
 
 const TypeInfo *TypeConverter::convertBuiltinObjectPointer(IRGenModule &IGM) {
-  return new RefCountedTypeInfo(IGM.RefCountedPtrTy,
-                                IGM.getPointerSize(),
-                                IGM.getPointerAlignment());
+  return new HeapTypeInfo(IGM.RefCountedPtrTy, IGM.getPointerSize(),
+                          IGM.getPointerAlignment());
 }
 
 /// Does the given value superficially not require reference-counting?
@@ -537,24 +539,31 @@ static bool doesNotRequireRefCounting(llvm::Value *value) {
   return isa<llvm::Constant>(value);
 }
 
-/// Emit a call to swift_retain.
-static void emitRetainCall(IRGenFunction &IGF, llvm::Value *value,
-                           Explosion &out) {
+/// Emit a call to swift_retain.  In general, you should not be using
+/// this routine; instead you should use emitRetain, which properly
+/// balances the retain.
+llvm::Value *IRGenFunction::emitRetainCall(llvm::Value *value) {
   // Instead of casting the input, retaining, and casting back, we
   // cast the function to the right type.  This tends to produce less
   // IR, but it might be evil.
-  llvm::Constant *fn = IGF.IGM.getRetainFn();
-  if (value->getType() != IGF.IGM.RefCountedPtrTy) {
+  llvm::Constant *fn = IGM.getRetainFn();
+  if (value->getType() != IGM.RefCountedPtrTy) {
     llvm::FunctionType *fnType =
       llvm::FunctionType::get(value->getType(), value->getType(), false);
     fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
   }
 
   // Emit the call.
-  llvm::CallInst *call = IGF.Builder.CreateCall(fn, value);
+  llvm::CallInst *call = Builder.CreateCall(fn, value);
   call->setDoesNotThrow();
 
-  out.add(IGF.enterReleaseCleanup(call));
+  return call;
+}
+
+static void emitRetainAndManage(IRGenFunction &IGF, llvm::Value *value,
+                                Explosion &out) {
+  value = IGF.emitRetainCall(value);
+  out.add(IGF.enterReleaseCleanup(value));
 }
 
 /// Emit a retain of a value.  This is usually not required because
@@ -566,13 +575,13 @@ void IRGenFunction::emitRetain(llvm::Value *value, Explosion &out) {
     return;
   }
 
-  emitRetainCall(*this, value, out);
+  emitRetainAndManage(*this, value, out);
 }
 
 /// Emit a load of a live value from the given retaining variable.
 void IRGenFunction::emitLoadAndRetain(Address address, Explosion &out) {
   llvm::Value *value = Builder.CreateLoad(address);
-  emitRetainCall(*this, value, out);
+  emitRetainAndManage(*this, value, out);
 }
 
 /// Emit a store of a live value to the given retaining variable.
