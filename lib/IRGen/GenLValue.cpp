@@ -92,6 +92,36 @@ void IRGenFunction::emitLoad(const LValue &lvalue, const TypeInfo &type,
   return type.load(*this, address, explosion);
 }
 
+/// Emit a load from the given l-value as an initializer.
+void swift::irgen::emitLoadAsInit(IRGenFunction &IGF, const LValue &lvalue,
+                                  Address dest, const TypeInfo &destTI) {
+  OwnedAddress baseAddress;
+
+  for (auto i = lvalue.begin(), e = lvalue.end(); i != e; ) {
+    const PathComponent &component = *i++;
+
+    // If this is a physical component, just compute it relative to the
+    // previous component.  The address is initialized on the first pass,
+    // but that's okay, because the first component should never care.
+    if (component.isPhysical()) {
+      baseAddress = component.asPhysical().offset(IGF, baseAddress);
+      continue;
+    }
+
+    // If this is the last component, load it and return that as the result.
+    if (i == e)
+      return component.asLogical().loadMaterialized(IGF, baseAddress, dest,
+                                                    /*preserve*/ false);
+
+    // Otherwise, load and materialize the result into memory.
+    baseAddress = component.asLogical().loadAndMaterialize(IGF, NotOnHeap,
+                                                           baseAddress,
+                                                           /*preserve*/ false);
+  }
+
+  return destTI.initializeWithCopy(IGF, dest, baseAddress);  
+}
+
 /// Perform a store into the given path, given the base of the first
 /// component.
 static void emitAssignRecursive(IRGenFunction &IGF,

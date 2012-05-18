@@ -23,9 +23,15 @@ namespace swift {
   class SubscriptExpr;
 
 namespace irgen {
+  class Address;
   class Explosion;
   class IRGenFunction;
   class LValue;
+  class TypeInfo;
+
+  /// Emit a load from the given l-value as an initializer.
+  void emitLoadAsInit(IRGenFunction &IGF, const LValue &lvalue,
+                      Address addr, const TypeInfo &addrTI);
 
   /// Emit a requalification expression as an r-value.
   void emitRequalify(IRGenFunction &IGF, RequalifyExpr *E, Explosion &expl);

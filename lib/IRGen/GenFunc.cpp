@@ -1280,6 +1280,26 @@ void swift::irgen::emitApplyExpr(IRGenFunction &IGF, ApplyExpr *E,
   resultTI.reexplode(IGF, directValues, explosion);
 }
 
+/// Emit a call as the initializer for an object in memory.
+void swift::irgen::emitApplyExprToMemory(IRGenFunction &IGF, ApplyExpr *E,
+                                         Address resultAddress,
+                                         const TypeInfo &resultTI) {
+  CallPlan plan = getCallPlan(IGF.IGM, E);
+
+  CallResult result;
+  result.setAsIndirectAddress(resultAddress);
+  plan.emit(IGF, result, resultTI);
+
+  if (result.isIndirect()) {
+    assert(result.getIndirectAddress().getAddress()
+             == resultAddress.getAddress());
+    return;
+  }
+
+  Explosion &directValues = result.getDirectValues();
+  resultTI.initialize(IGF, directValues, resultAddress);
+}
+
 /// See whether we can emit the result of the given call as an object
 /// naturally located in memory.
 Optional<Address>

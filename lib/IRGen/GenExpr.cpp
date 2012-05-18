@@ -294,6 +294,52 @@ void IRGenFunction::emitRValue(Expr *E, Explosion &explosion) {
 }
 
 namespace {
+  /// A visitor for emitting a value into memory.  Like r-value
+  /// emission, this can actually emit an l-value, with the result
+  /// that the address (and possibly the owner) of the l-value are
+  /// stored.
+  class RValueInitEmitter : public irgen::ExprVisitor<RValueInitEmitter> {
+    IRGenFunction &IGF;
+    const TypeInfo &AddrTI;
+    Address Addr;
+
+  public:
+    RValueInitEmitter(IRGenFunction &IGF, const TypeInfo &addrTI, Address addr)
+      : IGF(IGF), AddrTI(addrTI), Addr(addr) {}
+
+    void visitExpr(Expr *E) {
+      // The default behavior is to emit as an explosion and then
+      // initialize from that.
+      Explosion explosion(ExplosionKind::Maximal);
+      IGF.emitRValue(E, explosion);
+      AddrTI.initialize(IGF, explosion, Addr);
+    }
+
+    void visitApplyExpr(ApplyExpr *E) {
+      emitApplyExprToMemory(IGF, E, Addr, AddrTI);
+    }
+
+    void visitLoadExpr(LoadExpr *E) {
+      return emitLoadAsInit(IGF, IGF.emitLValue(E->getSubExpr()),
+                            Addr, AddrTI);
+    }
+
+    // TODO: Implement some other interesting cases that could
+    // benefit from this:
+    //   TupleExpr
+    //   TupleShuffleExpr
+  };
+}
+
+/// Emit the given expression as the initializer for an object at the
+/// given address.  A FullExpr has already been pushed, and a cleanup
+/// for the address will be activated immediately after completion.
+void IRGenFunction::emitRValueAsInit(Expr *E, Address addr,
+                                     const TypeInfo &addrTI) {
+  RValueInitEmitter(*this, addrTI, addr).visit(E);
+}
+
+namespace {
   class LValueEmitter : public irgen::ExprVisitor<LValueEmitter, LValue> {
     IRGenFunction &IGF;
 

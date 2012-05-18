@@ -221,12 +221,7 @@ void Initialization::markInitialized(IRGenFunction &IGF, Object object) {
 /// Emit an expression as an initializer for the given location.
 void Initialization::emitInit(IRGenFunction &IGF, Object object,
                               Address addr, Expr *E, const TypeInfo &type) {
-  // For now, just explode and initialize from that.  This is a
-  // bit lame; in particular, we should evaluate indirect call
-  // results directly into place.
-  Explosion explosion(ExplosionKind::Maximal);
-  IGF.emitRValue(E, explosion);
-  type.initialize(IGF, explosion, addr);
+  IGF.emitRValueAsInit(E, addr, type);
 
   // Mark as initialized.  This assumes that calls to
   // TypeInfo::initialize are atomic w.r.t. exceptions and
@@ -235,7 +230,7 @@ void Initialization::emitInit(IRGenFunction &IGF, Object object,
 }
 
 /// Emit an r-value directly into memory as an initialization.
-/// Enable the given cleanup as soon as it's complete.
+/// Enable a cleanup for it as soon as it's complete.
 void IRGenFunction::emitInit(Expr *E, Address addr, const TypeInfo &type) {
   Initialization I;
   auto object = I.getObjectForTemporary();

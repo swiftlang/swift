@@ -282,7 +282,7 @@ public:
   void emitLValueAsScalar(const LValue &lvalue, OnHeap_t onHeap,
                           Explosion &explosion);
 
-  void emitRValueToMemory(Expr *E, Address addr, const TypeInfo &type);
+  void emitRValueAsInit(Expr *E, Address addr, const TypeInfo &type);
   void emitRValue(Expr *E, Explosion &explosion);
 
   llvm::Value *emitAsPrimitiveScalar(Expr *E);
