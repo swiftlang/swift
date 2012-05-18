@@ -249,7 +249,7 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, CanType canTy) {
   case TypeKind::Array:
     return convertArrayType(IGM, cast<ArrayType>(ty));
   case TypeKind::Protocol:
-    llvm_unreachable("protocol not handled in IRGen yet");
+    return convertProtocolType(IGM, cast<ProtocolType>(ty));
   }
   llvm_unreachable("bad type kind");
 }

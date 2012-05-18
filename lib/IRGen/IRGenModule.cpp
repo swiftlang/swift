@@ -24,6 +24,7 @@
 #include "llvm/Module.h"
 #include "llvm/Type.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Target/TargetData.h"
@@ -78,6 +79,9 @@ IRGenModule::IRGenModule(ASTContext &Context,
                                          /*packed*/ false);
 
   OpaqueStructTy = nullptr;
+  FixedBufferTy = nullptr;
+  for (unsigned i = 0; i != llvm::array_lengthof(ValueWitnessTys); ++i)
+    ValueWitnessTys[i] = nullptr;
 }
 
 IRGenModule::~IRGenModule() {

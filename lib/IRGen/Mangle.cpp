@@ -348,9 +348,14 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
   };
 
   case TypeKind::Protocol: {
-    // FIXME: mangle protocol elements?
+    if (tryMangleSubstitution(base))
+      return;
+
     // type ::= 'P'
     Buffer << 'P';
+    mangleDeclName(cast<ProtocolType>(base)->getDecl());
+
+    addSubstitution(base);
     return;
   }
 

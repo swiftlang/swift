@@ -61,6 +61,7 @@ namespace irgen {
   class Options;
   class TypeConverter;
   class TypeInfo;
+  enum class ValueWitness : unsigned;
 
 /// IRGenModule - Primary class for emitting IR for global declarations.
 /// 
@@ -86,7 +87,7 @@ public:
   llvm::StructType *FunctionPairTy;    /// { i8*, %swift.refcounted* }
   llvm::FunctionType *DtorTy;          /// size_t (%swift.refcounted*)
   llvm::StructType *HeapMetadataStructTy; /// %swift.heapmetadata = type { ... }
-  llvm::PointerType *HeapMetadataPtrTy;/// %swift.heapmetadata*  
+  llvm::PointerType *HeapMetadataPtrTy;/// %swift.heapmetadata*
 
   Size getPointerSize() const { return PtrSize; }
   Alignment getPointerAlignment() const {
@@ -95,12 +96,16 @@ public:
   }
 
   llvm::StructType *getOpaqueStructTy();
+  llvm::Type *getFixedBufferTy();
+  llvm::PointerType *getValueWitnessTy(ValueWitness index);
 
   void unimplemented(SourceLoc, StringRef Message);
 
 private:
   Size PtrSize;
   llvm::StructType *OpaqueStructTy;    /// %swift.opaquestruct
+  llvm::Type *FixedBufferTy;           /// [16 x i8]
+  llvm::PointerType *ValueWitnessTys[13]; /// all pointer-to-function types
 
 //--- Types -----------------------------------------------------------------
 public:

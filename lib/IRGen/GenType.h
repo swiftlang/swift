@@ -35,6 +35,7 @@ namespace swift {
   class MetaTypeType;
   class ModuleType;
   class OneOfType;
+  class ProtocolType;
   class StructType;
   class TupleType;
   class CanType;
@@ -201,6 +202,7 @@ class TypeConverter {
   static const TypeInfo *convertLValueType(IRGenModule &IGM, LValueType *T);
   static const TypeInfo *convertMetaTypeType(IRGenModule &IGM, MetaTypeType *T);
   static const TypeInfo *convertModuleType(IRGenModule &IGM, ModuleType *T);
+  static const TypeInfo *convertProtocolType(IRGenModule &IGM, ProtocolType *T);
   static const TypeInfo *convertBuiltinObjectPointer(IRGenModule &IGM);
 
  public:
