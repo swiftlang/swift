@@ -116,6 +116,12 @@ public:
 
   llvm::Type *getStorageType() const { return StorageType; }
 
+  /// Return the size and alignment of this type.
+  std::pair<llvm::Value*,llvm::Value*>
+    getSizeAndAlignment(IRGenFunction &IGF) const;
+  llvm::Value *getSizeOnly(IRGenFunction &IGF) const;
+  llvm::Value *getAlignmentOnly(IRGenFunction &IGF) const;
+
   /// Add the information for exploding values of this type to the
   /// given schema.
   virtual void getSchema(ExplosionSchema &schema) const = 0;

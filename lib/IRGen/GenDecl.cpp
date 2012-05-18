@@ -127,6 +127,16 @@ LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity) {
   return result;
 }
 
+/// Get or create an LLVM function with these linkage rules.
+llvm::Function *LinkInfo::getOrCreateFunction(IRGenModule &IGM,
+                                              llvm::FunctionType *fnType) {
+  llvm::Function *addr
+    = cast<llvm::Function>(IGM.Module.getOrInsertFunction(getName(), fnType));
+  addr->setLinkage(getLinkage());
+  addr->setVisibility(getVisibility());
+  return addr;
+}
+
 /// Emit a global declaration.
 void IRGenFunction::emitGlobalDecl(Decl *D) {
   switch (D->getKind()) {
@@ -226,13 +236,8 @@ llvm::Function *IRGenModule::getAddrOfGlobalFunction(FuncDecl *func,
     getFunctionType(func->getType(), kind, uncurryLevel, /*data*/ false);
 
   LinkInfo link = LinkInfo::get(*this, entity);
-  llvm::Function *addr
-    = cast<llvm::Function>(Module.getOrInsertFunction(link.getName(), fnType));
-  addr->setLinkage(link.getLinkage());
-  addr->setVisibility(link.getVisibility());
-
-  entry = addr;
-  return addr;
+  entry = link.getOrCreateFunction(*this, fnType);
+  return entry;
 }
 
 static llvm::FunctionType *getInjectionFunctionType(OneOfElementDecl *D,
@@ -261,13 +266,8 @@ IRGenModule::getAddrOfGlobalInjectionFunction(OneOfElementDecl *D) {
 
   llvm::FunctionType *fnType = getInjectionFunctionType(D, *this);
   LinkInfo link = LinkInfo::get(*this, entity);
-  llvm::Function *addr
-    = cast<llvm::Function>(Module.getOrInsertFunction(link.getName(), fnType));
-  addr->setLinkage(link.getLinkage());
-  addr->setVisibility(link.getVisibility());
-
-  entry = addr;
-  return addr;
+  entry = link.getOrCreateFunction(*this, fnType);
+  return entry;
 }
 
 /// getAddrOfLocalInjectionFunction - Get the address of the function to
@@ -293,6 +293,25 @@ IRGenFunction::getAddrOfLocalInjectionFunction(OneOfElementDecl *D) {
                              InjectionName.str(), &IGM.Module);
   entry = addr;
   return addr;
+}
+
+/// Returns the address of a value-witness function.
+llvm::Function *IRGenModule::getAddrOfValueWitness(Type concreteType,
+                                                   ValueWitness index) {
+  concreteType = concreteType->getCanonicalType();
+  LinkEntity entity = LinkEntity::forValueWitness(concreteType, index);
+
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) return entry;
+
+  // Find the appropriate function type.
+  llvm::FunctionType *fnType =
+    cast<llvm::FunctionType>(
+      cast<llvm::PointerType>(getValueWitnessTy(index))
+        ->getElementType());
+  LinkInfo link = LinkInfo::get(*this, entity);
+  entry = link.getOrCreateFunction(*this, fnType);
+  return entry;
 }
 
 static Type addOwnerArgument(ASTContext &ctx, Type owner, Type resultType) {
@@ -367,13 +386,8 @@ llvm::Function *IRGenModule::getAddrOfGetter(ValueDecl *value,
                     /*data*/ false);
 
   LinkInfo link = LinkInfo::get(*this, entity);
-  llvm::Function *addr
-    = cast<llvm::Function>(Module.getOrInsertFunction(link.getName(), fnType));
-  addr->setLinkage(link.getLinkage());
-  addr->setVisibility(link.getVisibility());
-
-  entry = addr;
-  return addr;
+  entry = link.getOrCreateFunction(*this, fnType);
+  return entry;
 }
 
 /// getAddrOfSetter - Get the address of the function which performs a
@@ -407,13 +421,8 @@ llvm::Function *IRGenModule::getAddrOfSetter(ValueDecl *value,
                     /*data*/ false);
 
   LinkInfo link = LinkInfo::get(*this, entity);
-  llvm::Function *addr
-    = cast<llvm::Function>(Module.getOrInsertFunction(link.getName(), fnType));
-  addr->setLinkage(link.getLinkage());
-  addr->setVisibility(link.getVisibility());
-
-  entry = addr;
-  return addr;
+  entry = link.getOrCreateFunction(*this, fnType);
+  return entry;
 }
 
 /// Emit a type extension.

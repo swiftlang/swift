@@ -27,160 +27,47 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/DerivedTypes.h"
+#include "llvm/Function.h"
+#include "llvm/Module.h"
 
 #include "Cleanup.h"
+#include "Explosion.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "Explosion.h"
+
+#include "GenProto.h"
 
 using namespace swift;
 using namespace irgen;
 
-/// The members required to attest that a type is a value type.
-///
-/// Logically, there are three basic data operations we must support
-/// on arbitrary types:
-///   - initializing an object by copying another
-///   - changing an object to be a copy of another
-///   - destroying an object
-///
-/// As an optimization to permit efficient transfers of data, the
-/// "copy" operations each have an analogous "take" operation which
-/// implicitly destroys the source object.
-///
-/// Therefore there are five basic data operations:
-///   initWithCopy(T*, T*)
-///   initWithTake(T*, T*)
-///   assignWithCopy(T*, T*)
-///   assignWithTake(T*, T*)
-///   destroy(T*)
-///
-/// As a further optimization, for every T*, there is a related
-/// operation which replaces that T* with a B*, combinatorially.  This
-/// makes 18 operations, except that some of these operations are
-/// fairly unlikely and so do not merit optimized entries, due to
-/// the common code patterns of the two use cases:
-///   - Existential code usually doesn't work directly with T*s
-///     because pointers into existential objects are not generally
-///     reliable.
-///   - Generic code works with T*s a fair amount, but it usually
-///     doesn't have to deal with B*s after initialization
-///     because initialization returns a reliable pointer.
-/// This leads us to the following conclusions:
-//    - Operations to copy a B* to a T* are very unlikely
-///     to be used (-4 operations).
-///   - Assignments involving two B*s are only likely in
-///     existential code, where we won't have the right
-///     typing guarantees to use them (-2 operations).
-/// Furthermore, take-initializing a buffer from a buffer is just a
-/// memcpy of the buffer (-1), and take-assigning a buffer from a
-/// buffer is just a destroy and a memcpy (-1).
-///
-/// This leaves us with 12 data operations, to which we add the
-/// meta-operation 'sizeAndAlign' for a total of 13.
-enum class swift::irgen::ValueWitness : unsigned {
-  // destroyBuffer comes first because I expect it to be the most
-  // common operation (both by code size and occurrence), since it's
-  // the optimal way to destroy an individual local/temporary.
-  //
-  // Several other candidates that are likely to see use in
-  // existential code are then grouped together for cache-locality
-  // reasons.
+/// A fixed-size buffer is always 16 bytes and pointer-aligned.
+/// If we align them more, we'll need to introduce padding to
+/// make protocol types work.
+static Size getFixedBufferSize(IRGenModule &IGM) {
+  return Size(16);
+}
+static Alignment getFixedBufferAlignment(IRGenModule &IGM) {
+  return IGM.getPointerAlignment();
+}
 
-  ///   void (*destroyBuffer)(B *buffer, W *self);
-  ///
-  /// Given a valid buffer which owns a valid object of this type,
-  /// destroy it.  This can be decomposed as
-  ///   self->destroy(self->projectBuffer(buffer), self);
-  ///   self->deallocateBuffer(buffer), self);
-  DestroyBuffer,
+/// Lazily create the standard fixed-buffer type.
+llvm::Type *IRGenModule::getFixedBufferTy() {
+  if (FixedBufferTy) return FixedBufferTy;
 
-  ///   T *(*initializeBufferWithCopyOfBuffer)(B *dest, B *src, W *self);
-  /// Given an invalid buffer, initialize it as a copy of the
-  /// object in the source buffer.  This can be decomposed as:
-  ///   initalizeBufferWithCopy(dest, self->projectBuffer(src), self)
-  InitializeBufferWithCopyOfBuffer,
+  auto size = getFixedBufferSize(*this).getValue();
+  FixedBufferTy = llvm::ArrayType::get(Int8Ty, size);
+  return FixedBufferTy;
+}
 
-  ///   T *(*projectBuffer)(B *buffer, W *self);
-  ///
-  /// Given an initialized fixed-size buffer, find its allocated
-  /// storage.
-  ProjectBuffer,
-
-  ///   void (*deallocateBuffer)(B *buffer, W *self);
-  ///
-  /// Given a buffer owning storage for an uninitialized object of this
-  /// type, deallocate the storage, putting the buffer in an invalid
-  /// state.
-  DeallocateBuffer, // likely along exception edges of initializers
-
-  ///   void (*destroy)(T *object, witness_t *self);
-  ///
-  /// Given a valid object of this type, destroy it, leaving it as an
-  /// invalid object.  This is useful when generically destroying
-  /// an object which has been allocated in-line, such as an array,
-  /// struct, or tuple element.
-  Destroy,
-
-  ///   T *(*initializeBufferWithCopy)(B *dest, T *src, W *self);
-  /// Given an invalid buffer, initialize it as a copy of the
-  /// source object.  This can be decomposed as:
-  ///   initializeWithCopy(self->allocateBuffer(dest, self), src, self)
-  InitializeBufferWithCopy,
-
-  ///   T *(*initializeWithCopy)(T *dest, T *src, W *self);
-  ///
-  /// Given an invalid object of this type, initialize it as a copy of
-  /// the source object.  Returns the dest object.
-  InitializeWithCopy,
-
-  ///   T *(*assignWithCopy)(T *dest, T *src, W *self);
-  ///
-  /// Given a valid object of this type, change it to be a copy of the
-  /// source object.  Returns the dest object.
-  AssignWithCopy,
-
-  ///   T *(*initializeBufferWithTake)(B *dest, T *src, W *self);
-  ///
-  /// Given an invalid buffer, initialize it by taking the value
-  /// of the source object.  The source object becomes invalid.
-  /// Returns the dest object.  
-  InitializeBufferWithTake,
-
-  ///   T *(*initializeWithTake)(T *dest, T *src, W *self);
-  ///
-  /// Given an invalid object of this type, initialize it by taking
-  /// the value of the source object.  The source object becomes
-  /// invalid.  Returns the dest object.
-  InitializeWithTake,
-
-  ///   T *(*assignWithTake)(T *dest, T *src, W *self);
-  ///
-  /// Given a valid object of this type, change it to be a copy of the
-  /// source object.  The source object becomes invalid.  Returns the
-  /// dest object.
-  AssignWithTake,
-
-  ///   T *(*allocateBuffer)(B *buffer, W *self);
-  /// 
-  /// Given a buffer in an invalid state, make it the owner of storage
-  /// for an uninitialized object of this type.  Return the address of
-  /// that object.
-  AllocateBuffer,
-
-  ///   typedef struct { size_t Size; size_t Align } layout_t;
-  ///   layout_t (*sizeAndAlignment)(W *self);
-  ///
-  /// Returns the required storage size and alignment of an object of
-  /// this type.
-  SizeAndAlignment,
-};
-const unsigned NumValueWitnesses = unsigned(ValueWitness::SizeAndAlignment) + 1;
-
+/// A witness table is an i8**.
 static llvm::PointerType *getWitnessTableTy(IRGenModule &IGM) {
   return IGM.Int8PtrTy->getPointerTo(0);
 }
@@ -247,7 +134,7 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
   case ValueWitness::SizeAndAlignment: {
     llvm::Type *resultElts[] = { IGM.SizeTy, IGM.SizeTy };
     llvm::StructType *resultTy =
-      llvm::StructType::get(IGM.getLLVMContext(), resultElts);
+      llvm::StructType::get(IGM.getLLVMContext(), resultElts, false);
     return llvm::FunctionType::get(resultTy, getWitnessTableTy(IGM), false);
   }
 
@@ -258,8 +145,7 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
 /// Return the cached pointer-to-function type for the given value
 /// witness index.
 llvm::PointerType *IRGenModule::getValueWitnessTy(ValueWitness index) {
-  static_assert(sizeof(ValueWitnessTys)/sizeof(*ValueWitnessTys)
-                  == NumValueWitnesses,
+  static_assert(IRGenModule::NumValueWitnesses == ::NumValueWitnesses,
                 "array on IGM has the wrong size");
 
   auto &ty = ValueWitnessTys[unsigned(index)];
@@ -321,7 +207,7 @@ static Size getBufferOffset(IRGenModule &IGM) {
 
 /// Given the address of an existential object, drill down to the
 /// buffer.
-static Address projectBuffer(IRGenFunction &IGF, Address addr) {
+static Address projectExistentialBuffer(IRGenFunction &IGF, Address addr) {
   return IGF.Builder.CreateStructGEP(addr, 1, getBufferOffset(IGF.IGM));
 }
 
@@ -419,7 +305,7 @@ static void emitDestroyBuffer(IRGenFunction &IGF,
 /// Given the address of an existential object, destroy it.
 static void emitDestroyExistential(IRGenFunction &IGF, Address addr) {
   llvm::Value *table = loadWitnessTable(IGF, addr);
-  emitDestroyBuffer(IGF, table, projectBuffer(IGF, addr));
+  emitDestroyBuffer(IGF, table, projectExistentialBuffer(IGF, addr));
 }
 
 namespace {
@@ -431,6 +317,8 @@ namespace {
       emitDestroyExistential(IGF, Addr);
     }
   };
+
+  class ConformanceInfo;
 
   /// A witness to a specific element of a protocol.  Every
   /// ProtocolTypeInfo stores one of these for each declaration in the
@@ -468,8 +356,16 @@ namespace {
   };
 
   class ProtocolTypeInfo : public TypeInfo {
+    /// The number of witnesses in this protocol.
     unsigned NumWitnesses;
+
+    /// The number of WitnessTableEntry objects stored here.
     unsigned NumTableEntries;
+
+    /// A table of all the conformance infos we've registered with
+    /// this type.
+    mutable llvm::DenseMap<ProtocolConformance*, ConformanceInfo*>
+      Conformances;
 
     ProtocolTypeInfo(llvm::Type *ty, Size size, Alignment align,
                      unsigned numWitnesses, unsigned numEntries)
@@ -484,6 +380,8 @@ namespace {
     }
 
   public:
+    ~ProtocolTypeInfo();
+
     static const ProtocolTypeInfo *create(llvm::Type *ty, Size size,
                                           Alignment align,
                                           const WitnessTableLayout &layout) {
@@ -500,6 +398,11 @@ namespace {
 
       return result;
     }
+
+    const ConformanceInfo &getConformance(IRGenModule &IGM,
+                                          Type concreteType,
+                                          const TypeInfo &concreteTI,
+                                          ProtocolConformance *conf) const;
 
     /// Return the number of witnesses required by this protocol
     /// beyond the basic value-type witnesses.
@@ -584,8 +487,8 @@ namespace {
 
       // Project down to the buffers and ask the witnesses to do a
       // copy-initialize.
-      Address srcBuffer = projectBuffer(IGF, src);
-      Address destBuffer = projectBuffer(IGF, dest);
+      Address srcBuffer = projectExistentialBuffer(IGF, src);
+      Address destBuffer = projectExistentialBuffer(IGF, dest);
       emitInitializeBufferWithCopyOfBuffer(IGF, table, destBuffer, srcBuffer);
     }
 
@@ -610,6 +513,48 @@ namespace {
       emitDestroyExistential(IGF, addr);
     }
   };
+
+  /// Ways in which an object can fit into a fixed-size buffer.
+  enum class FixedPacking {
+    /// It fits at offset zero.
+    OffsetZero,
+
+    /// It'll fit if it gets realigned.
+    Realign,
+
+    /// It doesn't fit and needs to be side-allocated.
+    Allocate
+
+    // Resilience: it needs to be checked dynamically.
+  };
+
+  /// Detail about how an object conforms to a protocol.
+  class ConformanceInfo {
+    friend class ProtocolTypeInfo;
+
+    /// The pointer to the table.  In practice, it's not really
+    /// reasonable for this to be always be a constant!  It probably
+    /// needs to be managed by the runtime, and the information stored
+    /// here would just indicate how to find the actual thing.
+    llvm::Constant *Table;
+
+    FixedPacking Packing;
+
+  public:
+    llvm::Value *getTable(IRGenFunction &IGF) const {
+      return Table;
+    }
+
+    FixedPacking getPacking() const {
+      return Packing;
+    }
+  };
+}
+
+ProtocolTypeInfo::~ProtocolTypeInfo() {
+  for (auto &conf : Conformances) {
+    delete conf.second;
+  }
 }
 
 /// Add a member to the witness-table layout.
@@ -617,24 +562,603 @@ void WitnessTableLayout::addMember(Decl *member) {
   // FIXME
 }
 
-/// A fixed-size buffer is always 16 bytes and pointer-aligned.
-/// If we align them more, we'll need to introduce padding to
-/// make protocol types work.
-static Size getFixedBufferSize(IRGenModule &IGM) {
-  return Size(16);
-}
-static Alignment getFixedBufferAlignment(IRGenModule &IGM) {
-  return IGM.getPointerAlignment();
+static FixedPacking computePacking(IRGenModule &IGM,
+                                   const TypeInfo &concreteTI) {
+  Size bufferSize = getFixedBufferSize(IGM);
+  Size requiredSize = concreteTI.StorageSize;
+
+  // Flat out, if we need more space than the buffer provides,
+  // we always have to allocate.
+  // FIXME: there might be some interesting cases where this
+  // is suboptimal for oneofs.
+  if (requiredSize > bufferSize)
+    return FixedPacking::Allocate;
+
+  Alignment bufferAlign = getFixedBufferAlignment(IGM);
+  Alignment requiredAlign = concreteTI.StorageAlignment;
+
+  // If the buffer alignment is good enough for the type, great.
+  if (bufferAlign >= requiredAlign)
+    return FixedPacking::OffsetZero;
+
+  // We can always reliably realign as long as the max difference
+  // between the alignments doesn't exceed the spare room.
+  if (requiredSize + Size(requiredAlign.getValue() - bufferAlign.getValue())
+        <= bufferSize)
+    return FixedPacking::Realign;
+
+  // TODO: consider using a slower mode that dynamically checks
+  // whether the buffer size is small enough.
+
+  // Otherwise we're stuck and have to separately allocate.
+  return FixedPacking::Allocate;
 }
 
-/// Lazily create the standard fixed-buffer type.
-llvm::Type *IRGenModule::getFixedBufferTy() {
-  if (FixedBufferTy) return FixedBufferTy;
-
-  auto size = getFixedBufferSize(*this).getValue();
-  FixedBufferTy = llvm::ArrayType::get(Int8Ty, size);
-  return FixedBufferTy;
+static bool isNeverAllocated(FixedPacking packing) {
+  switch (packing) {
+  case FixedPacking::OffsetZero: return true;
+  case FixedPacking::Realign: return true;
+  case FixedPacking::Allocate: return false;
+  }
+  llvm_unreachable("bad FixedPacking value");
 }
+
+/// Emit a 'projectBuffer' operation.  Always returns a T*.
+static Address emitProjectBuffer(IRGenFunction &IGF,
+                                 Address buffer,
+                                 FixedPacking packing,
+                                 const TypeInfo &type) {
+  llvm::PointerType *resultTy = type.getStorageType()->getPointerTo();
+  switch (packing) {
+  case FixedPacking::Allocate: {
+    Address slot = IGF.Builder.CreateBitCast(buffer, resultTy->getPointerTo(),
+                                             "storage-slot");
+    llvm::Value *address = IGF.Builder.CreateLoad(slot);
+    return Address(address, type.StorageAlignment);
+  }
+
+  case FixedPacking::OffsetZero: {
+    return IGF.Builder.CreateBitCast(buffer, resultTy, "object");
+  }
+    
+  case FixedPacking::Realign: {
+    // Round the buffer pointer up to the required alignment:
+
+    // Convert the buffer to an integer.
+    llvm::Value *addr = buffer.getAddress();
+    addr = IGF.Builder.CreatePtrToInt(addr, IGF.IGM.SizeTy);
+
+    // Add one less than the alignment.
+    llvm::Value *align = type.getAlignmentOnly(IGF);
+    llvm::Value *alignMask =
+      IGF.Builder.CreateSub(align,
+                            llvm::ConstantInt::get(IGF.IGM.SizeTy, 1),
+                            "alignMask");
+    addr = IGF.Builder.CreateAdd(addr, alignMask);
+
+    // Mask off the low bits.
+    alignMask = IGF.Builder.CreateNot(alignMask);
+    addr = IGF.Builder.CreateAnd(addr, alignMask, "addr-rounded");
+
+    addr = IGF.Builder.CreateIntToPtr(addr, resultTy, "object");
+    return Address(addr, type.StorageAlignment);
+  }
+  }
+  llvm_unreachable("bad packing!");
+  
+}
+
+/// Emit an 'allocateBuffer' operation.  Always returns a T*.
+static Address emitAllocateBuffer(IRGenFunction &IGF,
+                                  Address buffer,
+                                  FixedPacking packing,
+                                  const TypeInfo &type) {
+  switch (packing) {
+  case FixedPacking::Allocate: {
+    auto sizeAndAlign = type.getSizeAndAlignment(IGF);
+    llvm::Value *addr =
+      IGF.emitAllocRawCall(sizeAndAlign.first, sizeAndAlign.second);
+    buffer = IGF.Builder.CreateBitCast(buffer,
+                                       IGF.IGM.Int8PtrTy->getPointerTo());
+    IGF.Builder.CreateStore(addr, buffer);
+    return IGF.Builder.CreateBitCast(Address(addr, type.StorageAlignment),
+                                     type.getStorageType()->getPointerTo());
+  }
+
+  case FixedPacking::OffsetZero:
+  case FixedPacking::Realign:
+    return emitProjectBuffer(IGF, buffer, packing, type);
+  }
+  llvm_unreachable("bad packing!");
+}
+
+/// Emit an 'assignWithCopy' operation.
+static void emitAssignWithCopy(IRGenFunction &IGF,
+                               Address src, Address dest,
+                               const TypeInfo &type) {
+  Explosion value(ExplosionKind::Maximal);
+  type.load(IGF, src, value);
+  type.assign(IGF, value, dest);
+}
+
+/// Emit an 'assignWithTake' operation.
+static void emitAssignWithTake(IRGenFunction &IGF,
+                               Address src, Address dest,
+                               const TypeInfo &type) {
+  Explosion value(ExplosionKind::Maximal);
+  type.loadAsTake(IGF, src, value);
+  type.assign(IGF, value, dest);
+}
+
+/// Emit a 'deallocateBuffer' operation.
+static void emitDeallocateBuffer(IRGenFunction &IGF,
+                                 Address buffer,
+                                 FixedPacking packing,
+                                 const TypeInfo &type) {
+  switch (packing) {
+  case FixedPacking::Allocate: {
+    Address slot =
+      IGF.Builder.CreateBitCast(buffer, IGF.IGM.Int8PtrTy->getPointerTo());
+    llvm::Value *addr = IGF.Builder.CreateLoad(slot, "storage");
+    IGF.emitDeallocRawCall(addr, type.getSizeOnly(IGF));
+    return;
+  }
+
+  case FixedPacking::OffsetZero:
+  case FixedPacking::Realign:
+    return;
+  }
+  llvm_unreachable("bad packing!");
+}
+
+/// Emit a 'destroyObject' operation.
+static void emitDestroyObject(IRGenFunction &IGF,
+                              Address object,
+                              const TypeInfo &type) {
+  if (!type.isPOD(ResilienceScope::Local))
+    type.destroy(IGF, object);
+}
+
+/// Emit a 'destroyBuffer' operation.
+static void emitDestroyBuffer(IRGenFunction &IGF,
+                              Address buffer,
+                              FixedPacking packing,
+                              const TypeInfo &type) {
+  Address object = emitProjectBuffer(IGF, buffer, packing, type);
+  emitDestroyObject(IGF, object, type);
+  emitDeallocateBuffer(IGF, buffer, packing, type);
+}
+
+/// Emit an 'initializeWithCopy' operation.
+static void emitInitializeWithCopy(IRGenFunction &IGF,
+                                   Address dest, Address src,
+                                   const TypeInfo &type) {
+  type.initializeWithCopy(IGF, dest, src);
+}
+
+/// Emit an 'initializeWithTake' operation.
+static void emitInitializeWithTake(IRGenFunction &IGF,
+                                   Address dest, Address src,
+                                   const TypeInfo &type) {
+  type.initializeWithTake(IGF, dest, src);
+}
+
+/// Emit an 'initializeBufferWithCopyOfBuffer' operation.
+/// Returns the address of the destination object.
+static Address emitInitializeBufferWithCopyOfBuffer(IRGenFunction &IGF,
+                                                    Address dest,
+                                                    Address src,
+                                                    FixedPacking packing,
+                                                    const TypeInfo &type) {
+  Address destObject = emitAllocateBuffer(IGF, dest, packing, type);
+  Address srcObject = emitProjectBuffer(IGF, src, packing, type);
+  emitInitializeWithCopy(IGF, destObject, srcObject, type);
+  return destObject;
+}
+
+/// Emit an 'initializeBufferWithCopy' operation.
+/// Returns the address of the destination object.
+static Address emitInitializeBufferWithCopy(IRGenFunction &IGF,
+                                            Address dest,
+                                            Address srcObject,
+                                            FixedPacking packing,
+                                            const TypeInfo &type) {
+  Address destObject = emitAllocateBuffer(IGF, dest, packing, type);
+  emitInitializeWithCopy(IGF, destObject, srcObject, type);
+  return destObject;
+}
+
+/// Emit an 'initializeBufferWithTake' operation.
+/// Returns the address of the destination object.
+static Address emitInitializeBufferWithTake(IRGenFunction &IGF,
+                                            Address dest,
+                                            Address srcObject,
+                                            FixedPacking packing,
+                                            const TypeInfo &type) {
+  Address destObject = emitAllocateBuffer(IGF, dest, packing, type);
+  emitInitializeWithTake(IGF, destObject, srcObject, type);
+  return destObject;
+}
+
+static llvm::Value *getArg(llvm::Function::arg_iterator &it,
+                           StringRef name) {
+  llvm::Value *arg = it++;
+  arg->setName(name);
+  return arg;
+}
+
+/// Get the next argument as a pointer to the given storage type.
+static Address getArgAs(IRGenFunction &IGF,
+                        llvm::Function::arg_iterator &it,
+                        const TypeInfo &type,
+                        StringRef name) {
+  llvm::Value *arg = getArg(it, name);
+  llvm::Value *result =
+    IGF.Builder.CreateBitCast(arg, type.getStorageType()->getPointerTo());
+  return Address(result, type.StorageAlignment);
+}
+
+/// Get the next argument as a pointer to the given storage type.
+static Address getArgAsBuffer(IRGenFunction &IGF,
+                              llvm::Function::arg_iterator &it,
+                              StringRef name) {
+  llvm::Value *arg = getArg(it, name);
+  return Address(arg, getFixedBufferAlignment(IGF.IGM));
+}
+
+/// Build a specific value-witness function.
+static void buildValueWitness(IRGenModule &IGM,
+                              llvm::Function *fn,
+                              ValueWitness index,
+                              FixedPacking packing,
+                              const TypeInfo &type) {
+  IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
+                    ExplosionKind::Minimal, 0, fn, Prologue::Bare);
+
+  auto argv = fn->arg_begin();
+  switch (index) {
+  case ValueWitness::AllocateBuffer: {
+    Address buffer = getArgAsBuffer(IGF, argv, "buffer");
+    Address result = emitAllocateBuffer(IGF, buffer, packing, type);
+    result = IGF.Builder.CreateBitCast(result, IGF.IGM.Int8PtrTy);
+    IGF.Builder.CreateRet(result.getAddress());
+    return;
+  }
+
+  case ValueWitness::AssignWithCopy: {
+    Address dest = getArgAs(IGF, argv, type, "dest");
+    Address src = getArgAs(IGF, argv, type, "src");
+    emitAssignWithCopy(IGF, src, dest, type);
+    dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.Int8PtrTy);
+    IGF.Builder.CreateRet(dest.getAddress());
+    return;
+  }
+
+  case ValueWitness::AssignWithTake: {
+    Address dest = getArgAs(IGF, argv, type, "dest");
+    Address src = getArgAs(IGF, argv, type, "src");
+    emitAssignWithTake(IGF, src, dest, type);
+    dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.Int8PtrTy);
+    IGF.Builder.CreateRet(dest.getAddress());
+    return;
+  }
+
+  case ValueWitness::DeallocateBuffer: {
+    Address buffer = getArgAsBuffer(IGF, argv, "buffer");
+    emitDeallocateBuffer(IGF, buffer, packing, type);
+    IGF.Builder.CreateRetVoid();
+    return;
+  }
+
+  case ValueWitness::Destroy: {
+    Address object = getArgAs(IGF, argv, type, "object");
+    emitDestroyObject(IGF, object, type);
+    IGF.Builder.CreateRetVoid();
+    return;
+  }
+
+  case ValueWitness::DestroyBuffer: {
+    Address buffer = getArgAsBuffer(IGF, argv, "buffer");
+    emitDestroyBuffer(IGF, buffer, packing, type);
+    IGF.Builder.CreateRetVoid();
+    return;
+  }
+
+  case ValueWitness::InitializeBufferWithCopyOfBuffer: {
+    Address dest = getArgAsBuffer(IGF, argv, "dest");
+    Address src = getArgAsBuffer(IGF, argv, "src");
+    Address result =
+      emitInitializeBufferWithCopyOfBuffer(IGF, dest, src, packing, type);
+    result = IGF.Builder.CreateBitCast(result, IGF.IGM.Int8PtrTy);
+    IGF.Builder.CreateRet(result.getAddress());
+    return;
+  }
+
+  case ValueWitness::InitializeBufferWithCopy: {
+    Address dest = getArgAsBuffer(IGF, argv, "dest");
+    Address src = getArgAs(IGF, argv, type, "src");
+    Address result =
+      emitInitializeBufferWithCopy(IGF, dest, src, packing, type);
+    result = IGF.Builder.CreateBitCast(result, IGF.IGM.Int8PtrTy);
+    IGF.Builder.CreateRet(result.getAddress());
+    return;
+  }
+
+  case ValueWitness::InitializeBufferWithTake: {
+    Address dest = getArgAsBuffer(IGF, argv, "dest");
+    Address src = getArgAs(IGF, argv, type, "src");
+    Address result =
+      emitInitializeBufferWithTake(IGF, dest, src, packing, type);
+    result = IGF.Builder.CreateBitCast(result, IGF.IGM.Int8PtrTy);
+    IGF.Builder.CreateRet(result.getAddress());
+    return;
+  }
+
+  case ValueWitness::InitializeWithCopy: {
+    Address dest = getArgAs(IGF, argv, type, "dest");
+    Address src = getArgAs(IGF, argv, type, "src");
+    emitInitializeWithCopy(IGF, dest, src, type);
+    dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.Int8PtrTy);
+    IGF.Builder.CreateRet(dest.getAddress());
+    return;
+  }
+
+  case ValueWitness::InitializeWithTake: {
+    Address dest = getArgAs(IGF, argv, type, "dest");
+    Address src = getArgAs(IGF, argv, type, "src");
+    emitInitializeWithTake(IGF, dest, src, type);
+    dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.Int8PtrTy);
+    IGF.Builder.CreateRet(dest.getAddress());
+    return;
+  }
+
+  case ValueWitness::ProjectBuffer: {
+    Address buffer = getArgAsBuffer(IGF, argv, "buffer");
+    Address result = emitProjectBuffer(IGF, buffer, packing, type);
+    result = IGF.Builder.CreateBitCast(result, IGF.IGM.Int8PtrTy);
+    IGF.Builder.CreateRet(result.getAddress());
+    return;
+  }
+
+  case ValueWitness::SizeAndAlignment: {
+    auto sizeAndAlign = type.getSizeAndAlignment(IGF);
+
+    llvm::Type *pairElts[] = { IGF.IGM.SizeTy, IGF.IGM.SizeTy };
+    llvm::Type *pairTy =
+      llvm::StructType::get(IGF.IGM.getLLVMContext(), pairElts, false);
+
+    llvm::Value *result = llvm::UndefValue::get(pairTy);
+    result = IGF.Builder.CreateInsertValue(result, sizeAndAlign.first, 0);
+    result = IGF.Builder.CreateInsertValue(result, sizeAndAlign.second, 1);
+    IGF.Builder.CreateRet(result);
+    return;
+  }
+
+  }
+  llvm_unreachable("bad value witness kind!");
+}
+
+static llvm::Constant *asOpaquePtr(IRGenModule &IGM, llvm::Constant *in) {
+  return llvm::ConstantExpr::getBitCast(in, IGM.Int8PtrTy);
+}
+
+/// Should we be defining the given helper function?
+static llvm::Function *shouldDefineHelper(llvm::Constant *fn) {
+  llvm::Function *def = dyn_cast<llvm::Function>(fn);
+  if (!def) return nullptr;
+  if (!def->empty()) return nullptr;
+
+  def->setLinkage(llvm::Function::LinkOnceODRLinkage);
+  def->setVisibility(llvm::Function::HiddenVisibility);
+  return def;
+}
+
+/// Return a function which takes two pointer arguments and returns
+/// void immediately.
+static llvm::Constant *getNoOpVoidFunction(IRGenModule &IGM) {
+  llvm::Type *argTys[] = { IGM.Int8PtrTy, IGM.Int8PtrTy };
+  llvm::FunctionType *fnTy =
+    llvm::FunctionType::get(IGM.VoidTy, argTys, false);
+  llvm::Constant *fn =
+    IGM.Module.getOrInsertFunction("__swift_noop_void_return", fnTy);
+
+  if (llvm::Function *def = shouldDefineHelper(fn)) {
+    llvm::BasicBlock *entry =
+      llvm::BasicBlock::Create(IGM.getLLVMContext(), "entry", def);
+    llvm::ReturnInst::Create(IGM.getLLVMContext(), entry);
+  }
+  return fn;
+}
+
+/// Return a function which takes two pointer arguments and returns
+/// the first one immediately.
+static llvm::Constant *getReturnSelfFunction(IRGenModule &IGM) {
+  llvm::Type *argTys[] = { IGM.Int8PtrTy, IGM.Int8PtrTy };
+  llvm::FunctionType *fnTy =
+    llvm::FunctionType::get(IGM.Int8PtrTy, argTys, false);
+  llvm::Constant *fn =
+    IGM.Module.getOrInsertFunction("__swift_noop_self_return", fnTy);
+
+  if (llvm::Function *def = shouldDefineHelper(fn)) {
+    llvm::BasicBlock *entry =
+      llvm::BasicBlock::Create(IGM.getLLVMContext(), "entry", def);
+    llvm::ReturnInst::Create(IGM.getLLVMContext(),
+                             def->arg_begin(), entry);
+  }
+  return fn;
+}
+
+/// Return a function which takes two pointer arguments, loads a
+/// pointer from the first, and calls swift_release on it immediately.
+static llvm::Constant *getLoadAndReleaseFunction(IRGenModule &IGM) {
+  llvm::Type *argTys[] = { IGM.Int8PtrTy->getPointerTo(), IGM.Int8PtrTy };
+  llvm::FunctionType *fnTy =
+    llvm::FunctionType::get(IGM.Int8PtrTy, argTys, false);
+  llvm::Constant *fn =
+    IGM.Module.getOrInsertFunction("__swift_load_and_release", fnTy);
+
+  if (llvm::Function *def = shouldDefineHelper(fn)) {
+    IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
+                      ExplosionKind::Minimal, 0, def, Prologue::Bare);
+    Address arg(def->arg_begin(), IGM.getPointerAlignment());
+    IGF.emitRelease(IGF.Builder.CreateLoad(arg));
+    IGF.Builder.CreateRetVoid();
+  }
+  return fn;
+}
+
+/// Return a function which takes three pointer arguments, memcpys
+/// from the second to the first, and returns the first argument.
+static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
+                                         const TypeInfo &type) {
+  llvm::Type *argTys[] = { IGM.Int8PtrTy, IGM.Int8PtrTy, IGM.Int8PtrTy };
+  llvm::FunctionType *fnTy =
+    llvm::FunctionType::get(IGM.Int8PtrTy, argTys, false);
+
+  // We need to unique by both size and alignment.  Note that we're
+  // assuming that it's safe to call a function that returns a pointer
+  // at a site that assumes the function returns void.
+  llvm::SmallString<40> name;
+  {
+    llvm::raw_svector_ostream nameStream(name);
+    nameStream << "__swift_memcpy";
+    nameStream << type.StorageSize.getValue();
+    nameStream << '_';
+    nameStream << type.StorageAlignment.getValue();
+  }
+
+  llvm::Constant *fn = IGM.Module.getOrInsertFunction(name, fnTy);
+  if (llvm::Function *def = shouldDefineHelper(fn)) {
+    IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
+                      ExplosionKind::Minimal, 0, def, Prologue::Bare);
+    auto it = def->arg_begin();
+    Address dest(it++, type.StorageAlignment);
+    Address src(it++, type.StorageAlignment);
+    IGF.emitMemCpy(dest, src, type.StorageSize);
+    IGF.Builder.CreateRet(dest.getAddress());
+  }
+  return fn;
+}
+
+/// Find a witness to the fact that a type is a value type.
+/// Always returns an i8*.
+static llvm::Constant *getValueWitness(IRGenModule &IGM,
+                                       ValueWitness index,
+                                       FixedPacking packing,
+                                       Type concreteType,
+                                       const TypeInfo &concreteTI) {
+  // Try to use a standard function.
+  switch (index) {
+  case ValueWitness::DeallocateBuffer:
+    if (isNeverAllocated(packing))
+      return asOpaquePtr(IGM, getNoOpVoidFunction(IGM));
+    goto standard;
+
+  case ValueWitness::DestroyBuffer:
+    if (concreteTI.isPOD(ResilienceScope::Local)) {
+      if (isNeverAllocated(packing))
+        return asOpaquePtr(IGM, getNoOpVoidFunction(IGM));
+    } else if (concreteTI.isSingleRetainablePointer(ResilienceScope::Local)) {
+      return asOpaquePtr(IGM, getLoadAndReleaseFunction(IGM));
+    }
+    goto standard;
+
+  case ValueWitness::Destroy:
+    if (concreteTI.isPOD(ResilienceScope::Local)) {
+      return asOpaquePtr(IGM, getNoOpVoidFunction(IGM));
+    } else if (concreteTI.isSingleRetainablePointer(ResilienceScope::Local)) {
+      return asOpaquePtr(IGM, getLoadAndReleaseFunction(IGM));
+    }
+    goto standard;
+
+  case ValueWitness::InitializeBufferWithCopyOfBuffer:
+  case ValueWitness::InitializeBufferWithCopy:
+  case ValueWitness::InitializeBufferWithTake:
+    if (packing == FixedPacking::OffsetZero &&
+        concreteTI.isPOD(ResilienceScope::Local))
+      return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
+    goto standard;
+
+  case ValueWitness::AssignWithCopy:
+  case ValueWitness::AssignWithTake:
+  case ValueWitness::InitializeWithCopy:
+  case ValueWitness::InitializeWithTake:
+    if (concreteTI.isPOD(ResilienceScope::Local))
+      return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
+    goto standard;
+
+  case ValueWitness::AllocateBuffer:
+  case ValueWitness::ProjectBuffer:
+    if (packing == FixedPacking::OffsetZero)
+      return asOpaquePtr(IGM, getReturnSelfFunction(IGM));
+    goto standard;
+
+  case ValueWitness::SizeAndAlignment:
+    goto standard;
+  }
+  llvm_unreachable("bad value witness kind");
+
+ standard:
+  llvm::Function *fn =
+    IGM.getAddrOfValueWitness(concreteType, index);
+  if (fn->empty())
+    buildValueWitness(IGM, fn, index, packing, concreteTI);
+  return asOpaquePtr(IGM, fn);
+}
+
+/// Find the conformance information for a protocol.
+const ConformanceInfo &
+ProtocolTypeInfo::getConformance(IRGenModule &IGM, Type concreteType,
+                                 const TypeInfo &concreteTI,
+                                 ProtocolConformance *conformance) const {
+  // Check whether we've already cached this.
+  auto it = Conformances.find(conformance);
+  if (it != Conformances.end()) return *it->second;
+
+  // We haven't.  First things first:  compute the packing.
+  FixedPacking packing = computePacking(IGM, concreteTI);
+
+  // Build the witnesses:
+  SmallVector<llvm::Constant*, 32> witnesses;
+
+  // First, build the value witnesses.
+  for (unsigned i = 0; i != NumValueWitnesses; ++i) {
+    witnesses.push_back(getValueWitness(IGM, ValueWitness(i),
+                                        packing, concreteType,
+                                        concreteTI));
+  }
+
+  // Next, build the protocol witnesses.
+  // FIXME
+
+  // We've got our global initializer.
+  llvm::ArrayType *tableTy =
+    llvm::ArrayType::get(IGM.Int8PtrTy, witnesses.size());
+  llvm::Constant *initializer =
+    llvm::ConstantArray::get(tableTy, witnesses);
+
+  // Construct a variable for that.
+  // FIXME: linkage, better name, agreement across t-units,
+  // interaction with runtime, etc.
+  llvm::GlobalVariable *var =
+    new llvm::GlobalVariable(IGM.Module, tableTy, /*constant*/ true,
+                             llvm::GlobalVariable::InternalLinkage,
+                             initializer, "witness_table");
+
+  // Abstract away the length.
+  llvm::ConstantInt *zero = llvm::ConstantInt::get(IGM.SizeTy, 0);
+  llvm::Constant *indices[] = { zero, zero };
+  llvm::Constant *table =
+    llvm::ConstantExpr::getInBoundsGetElementPtr(var, indices);
+
+  ConformanceInfo *info = new ConformanceInfo;
+  info->Table = table;
+  info->Packing = packing;
+
+  auto res = Conformances.insert(std::make_pair(conformance, info));
+  return *res.first->second;
+}
+                                 
 
 const TypeInfo *
 TypeConverter::convertProtocolType(IRGenModule &IGM, ProtocolType *T) {
@@ -657,3 +1181,85 @@ TypeConverter::convertProtocolType(IRGenModule &IGM, ProtocolType *T) {
   return ProtocolTypeInfo::create(type, size, align, layout);
 }
 
+namespace {
+  class DeallocateBuffer : public Cleanup {
+    Address Buffer;
+    FixedPacking Packing;
+    const TypeInfo &ConcreteTI;
+
+  public:
+    DeallocateBuffer(Address buffer, FixedPacking packing,
+                     const TypeInfo &concreteTI)
+      : Buffer(buffer), Packing(packing), ConcreteTI(concreteTI) {}
+
+    void emit(IRGenFunction &IGF) const {
+      emitDeallocateBuffer(IGF, Buffer, Packing, ConcreteTI);
+    }
+  };
+}
+
+/// Emit an erasure expression as an initializer for the given memory.
+void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
+                              Address dest, const TypeInfo &rawTI) {
+  const ProtocolTypeInfo &protoTI = rawTI.as<ProtocolTypeInfo>();
+
+  // Find the concrete type.
+  Type concreteType = E->getSubExpr()->getType();
+  const TypeInfo &concreteTI = IGF.getFragileTypeInfo(concreteType);
+
+  // Compute the conformance information.
+  const ConformanceInfo &conformance =
+    protoTI.getConformance(IGF.IGM, concreteType, concreteTI,
+                           E->getConformance());
+
+  // First things first: compute the table and store that into the
+  // destination.
+
+  llvm::Value *table = conformance.getTable(IGF);
+  Address tableSlot = projectWitnessTable(IGF, dest);
+  IGF.Builder.CreateStore(table, tableSlot);
+
+  FixedPacking packing = conformance.getPacking();
+
+  // If the type is provably empty, just emit the operand as ignored.
+  if (concreteTI.isEmpty(ResilienceScope::Local)) {
+    assert(packing == FixedPacking::OffsetZero);
+    return IGF.emitIgnored(E->getSubExpr());
+  }
+
+  // Otherwise, allocate if necessary.
+  Address buffer = projectExistentialBuffer(IGF, dest);
+  Address object = emitAllocateBuffer(IGF, buffer, packing, concreteTI);
+
+  // Push a cleanup to destroy that.
+  IRGenFunction::CleanupsDepth deallocCleanup;
+  bool needsDeallocCleanup = !isNeverAllocated(packing);
+  if (needsDeallocCleanup) {
+    IGF.pushFullExprCleanup<DeallocateBuffer>(buffer, packing, concreteTI);
+    deallocCleanup = IGF.getCleanupsDepth();
+  }
+
+  // Emit the object in-place.
+  IGF.emitRValueAsInit(E->getSubExpr(), object, concreteTI);
+
+  // Deactivate the dealloc cleanup.
+  if (needsDeallocCleanup) {
+    IGF.setCleanupState(deallocCleanup, CleanupState::Dead);
+  }
+}
+
+/// Emit an expression which erases the concrete type of its value and
+/// replaces it with a generic type.
+void irgen::emitErasure(IRGenFunction &IGF, ErasureExpr *E, Explosion &out) {
+  const ProtocolTypeInfo &protoTI =
+    IGF.getFragileTypeInfo(E->getType()).as<ProtocolTypeInfo>();
+
+  // Create a temporary of the appropriate type.
+  Address temp = protoTI.createTemporary(IGF);
+
+  // Initialize the temporary.
+  emitErasureAsInit(IGF, E, temp, protoTI);
+
+  // Add that as something to destroy.
+  out.add(protoTI.enterCleanupForTemporary(IGF, temp));
+}

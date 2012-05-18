@@ -24,6 +24,7 @@
 #include "llvm/Support/ErrorHandling.h"
 
 #include "IRGenModule.h"
+#include "GenProto.h"
 #include "Linking.h"
 #include "IRGen.h"
 
@@ -363,26 +364,61 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
   llvm_unreachable("bad type kind");
 }
 
-void LinkEntity::mangle(raw_ostream &buffer) const {
-  // mangled-name ::= '_T' identifier+ type?
+static StringRef mangleValueWitness(ValueWitness witness) {
+  // The ones with at least one capital are the composite ops, and the
+  // capitals correspond roughly to the positions of buffers (as
+  // opposed to objects) in the arguments.  That doesn't serve any
+  // direct purpose, but it's neat.
+  switch (witness) {
+  case ValueWitness::AllocateBuffer: return "al";
+  case ValueWitness::AssignWithCopy: return "ac";
+  case ValueWitness::AssignWithTake: return "at";
+  case ValueWitness::DeallocateBuffer: return "de";
+  case ValueWitness::Destroy: return "xx";
+  case ValueWitness::DestroyBuffer: return "XX";
+  case ValueWitness::InitializeBufferWithCopyOfBuffer: return "CP";
+  case ValueWitness::InitializeBufferWithCopy: return "Cp";
+  case ValueWitness::InitializeWithCopy: return "cp";
+  case ValueWitness::InitializeBufferWithTake: return "Tk";
+  case ValueWitness::InitializeWithTake: return "tk";
+  case ValueWitness::ProjectBuffer: return "pr";
+  case ValueWitness::SizeAndAlignment: return "sa";
+  }
+  llvm_unreachable("bad witness kind");
+}
 
-  if (!TheDecl->getAttrs().AsmName.empty()) {
-    buffer << TheDecl->getAttrs().AsmName;
+void LinkEntity::mangle(raw_ostream &buffer) const {
+  // mangled-name ::= '_Tw' witness-kind type
+  if (getKind() == Kind::ValueWitness) {
+    buffer << "_Tw";
+    buffer << mangleValueWitness(getValueWitness());
+
+    Mangler mangler(buffer);
+    mangler.mangleType(getType(), ExplosionKind::Minimal, 0);
     return;
   }
+
+  // Declarations with asm names just use that.
+  assert(isDeclKind(getKind()));
+  if (!getDecl()->getAttrs().AsmName.empty()) {
+    buffer << getDecl()->getAttrs().AsmName;
+    return;
+  }
+
+  // mangled-name ::= '_T' identifier+ type?
 
   // Add the prefix.
   buffer << "_T"; // T is for Tigger
 
   Mangler mangler(buffer);
 
-  mangler.mangleDeclName(TheDecl);
+  mangler.mangleDeclName(getDecl());
 
   // Mangle in a type as well.  Note that we have to mangle the type
   // on all kinds of declarations, even variables, because at the
   // moment they can *all* be overloaded.
-  if (ValueDecl *valueDecl = dyn_cast<ValueDecl>(TheDecl))
-    if (!isa<TypeDecl>(TheDecl))
+  if (ValueDecl *valueDecl = dyn_cast<ValueDecl>(getDecl()))
+    if (!isa<TypeDecl>(getDecl()))
       mangler.mangleType(valueDecl->getType(),
                          getExplosionKind(),
                          getUncurryLevel());
@@ -393,6 +429,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   case Kind::Other: break;
   case Kind::Getter: buffer << "g"; break;
   case Kind::Setter: buffer << "s"; break;
+  case Kind::ValueWitness: llvm_unreachable("filtered out!");
   }
 
   // TODO: mangle generics information here.

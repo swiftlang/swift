@@ -56,6 +56,34 @@ void IRGenFunction::emitMemCpy(Address dest, Address src, Size size) {
              std::min(dest.getAlignment(), src.getAlignment()));
 }
 
+llvm::Value *IRGenFunction::emitAllocRawCall(llvm::Value *size,
+                                             llvm::Value *align) {
+  // For now, always emit the most general call.  Eventually
+  // we should probably have specialized entry points for specific
+  // small allocations.
+  llvm::CallInst *call =
+    Builder.CreateCall2(IGM.getAllocRawFn(), size, align);
+
+  // Set as nounwind noalias.
+  llvm::SmallVector<llvm::AttributeWithIndex, 1> attrs;
+  attrs.push_back(llvm::AttributeWithIndex::get(~0,
+                                llvm::Attribute::NoUnwind |
+                                llvm::Attribute::NoAlias));
+  call->setAttributes(llvm::AttrListPtr::get(attrs.data(), attrs.size()));  
+
+  return call;  
+}
+
+void IRGenFunction::emitDeallocRawCall(llvm::Value *pointer,
+                                       llvm::Value *align) {
+  // For now, always emit the most general call.  Eventually
+  // we should probably have specialized entry points for specific
+  // small allocations.
+  llvm::CallInst *call =
+    Builder.CreateCall2(IGM.getDeallocRawFn(), pointer, align);
+  call->setDoesNotThrow();
+}
+
 void IRGenFunction::unimplemented(SourceLoc Loc, StringRef Message) {
   return IGM.unimplemented(Loc, Message);
 }

@@ -24,7 +24,6 @@
 #include "llvm/Module.h"
 #include "llvm/Type.h"
 #include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Target/TargetData.h"
@@ -52,9 +51,11 @@ IRGenModule::IRGenModule(ASTContext &Context,
   SizeTy = TargetData.getIntPtrType(getLLVMContext());
   MemCpyFn = nullptr;
   AllocFn = nullptr;
+  AllocRawFn = nullptr;
   RetainFn = nullptr;
   ReleaseFn = nullptr;
   DeallocFn = nullptr;
+  DeallocRawFn = nullptr;
 
   RefCountedStructTy =
     llvm::StructType::create(getLLVMContext(), "swift.refcounted");
@@ -80,7 +81,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
 
   OpaqueStructTy = nullptr;
   FixedBufferTy = nullptr;
-  for (unsigned i = 0; i != llvm::array_lengthof(ValueWitnessTys); ++i)
+  for (unsigned i = 0; i != NumValueWitnesses; ++i)
     ValueWitnessTys[i] = nullptr;
 }
 
@@ -102,6 +103,26 @@ llvm::Constant *IRGenModule::getAllocFn() {
     llvm::FunctionType::get(RefCountedPtrTy, types, false);
   AllocFn = Module.getOrInsertFunction("swift_alloc", fnType);
   return AllocFn;
+}
+
+llvm::Constant *IRGenModule::getAllocRawFn() {
+  if (AllocRawFn) return AllocRawFn;
+
+  llvm::Type *types[] = { SizeTy, SizeTy };
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(Int8PtrTy, types, false);
+  AllocRawFn = Module.getOrInsertFunction("swift_allocRaw", fnType);
+  return AllocRawFn;
+}
+
+llvm::Constant *IRGenModule::getDeallocRawFn() {
+  if (DeallocRawFn) return DeallocRawFn;
+
+  llvm::Type *types[] = { Int8PtrTy, SizeTy };
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(VoidTy, types, false);
+  DeallocRawFn = Module.getOrInsertFunction("swift_deallocRaw", fnType);
+  return DeallocRawFn;
 }
 
 llvm::Constant *IRGenModule::getRetainFn() {

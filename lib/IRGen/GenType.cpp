@@ -76,6 +76,25 @@ void TypeInfo::initializeWithCopy(IRGenFunction &IGF,
   initialize(IGF, copy, destAddr);
 }
 
+/// Return the size and alignment of this type.
+/// TODO: this needs to be potentially virtual.
+std::pair<llvm::Value*,llvm::Value*>
+TypeInfo::getSizeAndAlignment(IRGenFunction &IGF) const {
+  return std::make_pair(llvm::ConstantInt::get(IGF.IGM.SizeTy,
+                                               StorageSize.getValue()),
+                        llvm::ConstantInt::get(IGF.IGM.SizeTy,
+                                               StorageAlignment.getValue()));
+}
+
+// Eventually optimizable.
+llvm::Value *TypeInfo::getSizeOnly(IRGenFunction &IGF) const {
+  return getSizeAndAlignment(IGF).first;
+}
+
+// Eventually optimizable.
+llvm::Value *TypeInfo::getAlignmentOnly(IRGenFunction &IGF) const {
+  return getSizeAndAlignment(IGF).second;
+}
 
 static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
 

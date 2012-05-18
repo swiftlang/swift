@@ -19,6 +19,7 @@
 #ifndef SWIFT_IRGEN_LINKING_H
 #define SWIFT_IRGEN_LINKING_H
 
+#include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallString.h"
@@ -42,17 +43,28 @@ class IRGenModule;
 /// levels, each of which potentially creates a different top-level
 /// function.
 class LinkEntity {
-  ValueDecl *TheDecl;
+  /// Either a ValueDecl* or a TypeBase*, depending on Kind.
+  void *Pointer;
+
+  /// A hand-rolled bitfield with the following layout:
+  unsigned Data;
+
+  enum : unsigned {
+    KindShift = 0, KindMask = 0xFF,
+
+    // These fields appear in decl kinds.
+    ExplosionLevelShift = 8, ExplosionLevelMask = 0xFF00,
+    UncurryLevelShift = 16, UncurryLevelMask = 0xFF0000,
+
+    // This field appears in a type kind.
+    ValueWitnessShift = 8, ValueWitnessMask = 0xFF00
+  };
+#define LINKENTITY_SET_FIELD(field, value) (value << field##Shift)
+#define LINKENTITY_GET_FIELD(value, field) ((value & field##Mask) >> field##Shift)
 
   enum class Kind {
-    Function, Getter, Setter, Other
+    Function, Getter, Setter, ValueWitness, Other
   };
-  unsigned char TheKind;
-
-  // These are only meaningful for non-Other entities.
-  unsigned char Explosion;
-  unsigned char UncurryLevel;
-
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
   static bool isFunction(ValueDecl *decl) {
@@ -64,7 +76,24 @@ class LinkEntity {
   }
 
   Kind getKind() const {
-    return Kind(TheKind);
+    return Kind(LINKENTITY_GET_FIELD(Data, Kind));
+  }
+
+  static bool isDeclKind(Kind k) {
+    return !isTypeKind(k);
+  }
+  static bool isTypeKind(Kind k) {
+    return k == Kind::ValueWitness;
+  }
+
+  void setForDecl(Kind kind,
+                  ValueDecl *decl, ExplosionKind explosionKind,
+                  unsigned uncurryLevel) {
+    assert(isDeclKind(kind));
+    Pointer = decl;
+    Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind))
+         | LINKENTITY_SET_FIELD(ExplosionLevel, unsigned(explosionKind))
+         | LINKENTITY_SET_FIELD(UncurryLevel, uncurryLevel);
   }
 
   LinkEntity() = default;
@@ -75,10 +104,7 @@ public:
     assert(isFunction(fn));
 
     LinkEntity entity;
-    entity.TheDecl = fn;
-    entity.TheKind = unsigned(Kind::Function);
-    entity.Explosion = unsigned(explosionKind);
-    entity.UncurryLevel = uncurryLevel;
+    entity.setForDecl(Kind::Function, fn, explosionKind, uncurryLevel);
     return entity;
   }
 
@@ -86,38 +112,58 @@ public:
     assert(!isFunction(decl));
 
     LinkEntity entity;
-    entity.TheDecl = decl;
-    entity.TheKind = unsigned(Kind::Other);
-    entity.Explosion = 0;
-    entity.UncurryLevel = 0;
+    entity.setForDecl(Kind::Other, decl, ExplosionKind(0), 0);
     return entity;
   }
 
   static LinkEntity forGetter(ValueDecl *decl, ExplosionKind explosionKind) {
     assert(hasGetterSetter(decl));
     LinkEntity entity;
-    entity.TheDecl = decl;
-    entity.TheKind = unsigned(Kind::Getter);
-    entity.Explosion = unsigned(explosionKind);
-    entity.UncurryLevel = 0;
+    entity.setForDecl(Kind::Getter, decl, explosionKind, 0);
     return entity;
   }
 
   static LinkEntity forSetter(ValueDecl *decl, ExplosionKind explosionKind) {
     assert(hasGetterSetter(decl));
     LinkEntity entity;
-    entity.TheDecl = decl;
-    entity.TheKind = unsigned(Kind::Setter);
-    entity.Explosion = unsigned(explosionKind);
-    entity.UncurryLevel = 0;
+    entity.setForDecl(Kind::Setter, decl, explosionKind, 0);
+    return entity;
+  }
+
+  static LinkEntity forValueWitness(Type concreteType, ValueWitness witness) {
+    assert(concreteType->isCanonical());
+    LinkEntity entity;
+    entity.Pointer = concreteType.getPointer();
+    entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::ValueWitness))
+                | LINKENTITY_SET_FIELD(ValueWitness, unsigned(witness));
     return entity;
   }
 
   void mangle(llvm::raw_ostream &out) const;
 
-  ValueDecl *getDecl() const { return TheDecl; }
-  ExplosionKind getExplosionKind() const { return ExplosionKind(Explosion); }
-  unsigned getUncurryLevel() const { return UncurryLevel; }
+  ValueDecl *getDecl() const {
+    assert(isDeclKind(getKind()));
+    return reinterpret_cast<ValueDecl*>(Pointer);
+  }
+  ExplosionKind getExplosionKind() const {
+    assert(isDeclKind(getKind()));
+    return ExplosionKind(LINKENTITY_GET_FIELD(Data, ExplosionLevel));
+  }
+  unsigned getUncurryLevel() const {
+    return LINKENTITY_GET_FIELD(Data, UncurryLevel);
+  }
+
+  Type getType() const {
+    assert(isTypeKind(getKind()));
+    return reinterpret_cast<TypeBase*>(Pointer);
+  }
+  ValueWitness getValueWitness() const {
+    assert(isTypeKind(getKind()));
+    return ValueWitness(LINKENTITY_GET_FIELD(Data, ValueWitness));
+  }
+
+#undef LINKENTITY_GET_FIELD
+#undef LINKENTITY_SET_FIELD
 };
 
 /// Encapsulated information about the linkage of an entity.
@@ -141,6 +187,9 @@ public:
   llvm::GlobalValue::VisibilityTypes getVisibility() const {
     return Visibility;
   }
+
+  llvm::Function *getOrCreateFunction(IRGenModule &IGM,
+                                      llvm::FunctionType *fnType);
 };
 
 } // end namespace irgen
@@ -151,31 +200,22 @@ template <> struct llvm::DenseMapInfo<swift::irgen::LinkEntity> {
   typedef swift::irgen::LinkEntity LinkEntity;
   static LinkEntity getEmptyKey() {
     LinkEntity entity;
-    entity.TheDecl = nullptr;
-    entity.TheKind = 0;
-    entity.Explosion = 0;
-    entity.UncurryLevel = 0;
+    entity.Pointer = nullptr;
+    entity.Data = 0;
     return entity;
   }
   static LinkEntity getTombstoneKey() {
     LinkEntity entity;
-    entity.TheDecl = nullptr;
-    entity.TheKind = 0;
-    entity.Explosion = 0;
-    entity.UncurryLevel = 1;
+    entity.Pointer = nullptr;
+    entity.Data = 1;
     return entity;
   }
   static unsigned getHashValue(const LinkEntity &entity) {
-    return DenseMapInfo<swift::ValueDecl*>::getHashValue(entity.TheDecl)
-         ^ ((entity.TheKind << 0) |
-            (entity.Explosion << 8) |
-            (entity.UncurryLevel << 16));
+    return DenseMapInfo<void*>::getHashValue(entity.Pointer)
+         ^ entity.Data;
   }
   static bool isEqual(const LinkEntity &LHS, const LinkEntity &RHS) {
-    return LHS.TheDecl == RHS.TheDecl
-        && LHS.TheKind == RHS.TheKind
-        && LHS.Explosion == RHS.Explosion
-        && LHS.UncurryLevel == RHS.UncurryLevel;
+    return LHS.Pointer == RHS.Pointer && LHS.Data == RHS.Data;
   }
 };
 

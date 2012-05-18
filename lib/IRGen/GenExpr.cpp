@@ -32,6 +32,7 @@
 #include "GenLValue.h"
 #include "GenMeta.h"
 #include "GenOneOf.h"
+#include "GenProto.h"
 #include "GenTuple.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
@@ -219,9 +220,8 @@ namespace {
     void visitFunctionConversionExpr(FunctionConversionExpr *E) {
       IGF.emitRValue(E->getSubExpr(), Out);
     }
-
     void visitErasureExpr(ErasureExpr *E) {
-      IGF.IGM.unimplemented(E->getLoc(), "ErasureExpr");
+      emitErasure(IGF, E, Out);
     }
     void visitSuperConversionExpr(SuperConversionExpr *E) {
       IGF.IGM.unimplemented(E->getLoc(), "SuperConversionExpr");
@@ -322,6 +322,10 @@ namespace {
     void visitLoadExpr(LoadExpr *E) {
       return emitLoadAsInit(IGF, IGF.emitLValue(E->getSubExpr()),
                             Addr, AddrTI);
+    }
+
+    void visitErasureExpr(ErasureExpr *E) {
+      return emitErasureAsInit(IGF, E, Addr, AddrTI);
     }
 
     // TODO: Implement some other interesting cases that could

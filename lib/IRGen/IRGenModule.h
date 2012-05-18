@@ -105,7 +105,9 @@ private:
   Size PtrSize;
   llvm::StructType *OpaqueStructTy;    /// %swift.opaquestruct
   llvm::Type *FixedBufferTy;           /// [16 x i8]
-  llvm::PointerType *ValueWitnessTys[13]; /// all pointer-to-function types
+
+  enum { NumValueWitnesses = 13 };
+  llvm::PointerType *ValueWitnessTys[NumValueWitnesses]; /// pointer-to-functions
 
 //--- Types -----------------------------------------------------------------
 public:
@@ -132,12 +134,17 @@ public:
   llvm::Constant *getReleaseFn();
   llvm::Constant *getDeallocFn();
 
+  llvm::Constant *getAllocRawFn();
+  llvm::Constant *getDeallocRawFn();
+
 private:
   llvm::Function *MemCpyFn;
   llvm::Constant *AllocFn;
+  llvm::Constant *AllocRawFn;
   llvm::Constant *RetainFn;
   llvm::Constant *ReleaseFn;
   llvm::Constant *DeallocFn;
+  llvm::Constant *DeallocRawFn;
 
 //--- Generic ---------------------------------------------------------------
 public:
@@ -166,6 +173,7 @@ public:
   llvm::Function *getAddrOfGlobalInjectionFunction(OneOfElementDecl *D);
   llvm::Function *getAddrOfGetter(ValueDecl *D, ExplosionKind kind);
   llvm::Function *getAddrOfSetter(ValueDecl *D, ExplosionKind kind);
+  llvm::Function *getAddrOfValueWitness(Type concreteType, ValueWitness index);
 };
 
 } // end namespace irgen

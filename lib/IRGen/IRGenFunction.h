@@ -238,6 +238,8 @@ public:
   void emitMemCpy(llvm::Value *dest, llvm::Value *src,
                   Size size, Alignment align);
   void emitMemCpy(Address dest, Address src, Size size);
+  llvm::Value *emitAllocRawCall(llvm::Value *size, llvm::Value *align);
+  void emitDeallocRawCall(llvm::Value *pointer, llvm::Value *size);
 private:
   llvm::Instruction *AllocaIP;
 
