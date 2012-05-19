@@ -166,6 +166,26 @@ public:
     }
   }
 
+  void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
+    for (auto &field : getFields()) {
+      if (field.isEmpty()) continue;
+
+      Address destField = field.projectAddress(IGF, dest);
+      Address srcField = field.projectAddress(IGF, src);
+      field.getTypeInfo().assignWithCopy(IGF, destField, srcField);
+    }
+  }
+
+  void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const {
+    for (auto &field : getFields()) {
+      if (field.isEmpty()) continue;
+
+      Address destField = field.projectAddress(IGF, dest);
+      Address srcField = field.projectAddress(IGF, src);
+      field.getTypeInfo().assignWithTake(IGF, destField, srcField);
+    }
+  }
+
   void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
     for (auto &field : getFields()) {
       if (field.isEmpty()) continue;

@@ -21,6 +21,7 @@ namespace swift {
   class MemberRefExpr;
   class RequalifyExpr;
   class SubscriptExpr;
+  template <class T> class Optional;
 
 namespace irgen {
   class Address;
@@ -41,6 +42,10 @@ namespace irgen {
 
   /// Emit an l-value for a subscripting.
   LValue emitSubscriptLValue(IRGenFunction &IGF, SubscriptExpr *E);
+
+  /// Try to emit a member reference as an address.
+  Optional<Address> tryEmitMemberRefAsAddress(IRGenFunction &IGF,
+                                              MemberRefExpr *E);
 
 } // end namespace irgen
 } // end namespace swift

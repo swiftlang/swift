@@ -23,6 +23,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Optional.h"
+#include "ASTVisitor.h"
 #include "GenClass.h"
 #include "GenFunc.h"
 #include "GenInit.h"
@@ -32,6 +33,7 @@
 #include "IRGenModule.h"
 #include "Explosion.h"
 #include "LValue.h"
+#include "ScalarTypeInfo.h"
 
 using namespace swift;
 using namespace irgen;
@@ -122,12 +124,51 @@ void swift::irgen::emitLoadAsInit(IRGenFunction &IGF, const LValue &lvalue,
   return destTI.initializeWithCopy(IGF, dest, baseAddress);  
 }
 
+namespace {
+  /// A visitor for emitting an assignment to a physical object.
+  class AssignEmitter : public irgen::ASTVisitor<AssignEmitter> {
+    IRGenFunction &IGF;
+    Address Dest;
+    const TypeInfo &ObjectTI;
+
+  public:
+    AssignEmitter(IRGenFunction &IGF, Address dest, const TypeInfo &objectTI)
+      : IGF(IGF), Dest(dest), ObjectTI(objectTI) {}
+
+    /// If the expression is a load from something, try to emit that
+    /// as an address and then do a copy-assign.
+    void visitLoadExpr(LoadExpr *E) {
+      if (Optional<Address> src
+            = IGF.tryEmitAsAddress(E->getSubExpr(), ObjectTI))
+        return ObjectTI.assignWithCopy(IGF, Dest, src.getValue());
+      return visitExpr(E);
+    }
+
+    /// Default case.
+    void visitExpr(Expr *E) {
+      // TODO: if's natural to emit this r-value into memory, do so
+      // and emit a take-assign.
+
+      Explosion value(ExplosionKind::Maximal);
+      IGF.emitRValue(E, value);
+      ObjectTI.assign(IGF, value, Dest);
+    }
+  };
+}
+
+/// Emit the given expression for assignment into the given physical object.
+static void emitRValueAsAssign(IRGenFunction &IGF,
+                               Expr *E, Address object,
+                               const TypeInfo &objectTI) {
+  AssignEmitter(IGF, object, objectTI).visit(E);
+}
+
 /// Perform a store into the given path, given the base of the first
 /// component.
 static void emitAssignRecursive(IRGenFunction &IGF,
                                 Address base,
                                 const TypeInfo &finalType,
-                                Explosion &finalValue,
+                                Expr *finalExpr,
                                 LValue::const_iterator pathStart,
                                 LValue::const_iterator pathEnd) {
   // Drill into any physical components.
@@ -141,7 +182,7 @@ static void emitAssignRecursive(IRGenFunction &IGF,
 
     // If we reach the end, do an assignment and we're done.
     if (++pathStart == pathEnd) {
-      return finalType.assign(IGF, finalValue, base);
+      return emitRValueAsAssign(IGF, finalExpr, base, finalType);
     }
   }
 
@@ -152,7 +193,7 @@ static void emitAssignRecursive(IRGenFunction &IGF,
   
   // If this is the final component, just do a logical store.
   if (pathStart == pathEnd) {
-    return component.storeExplosion(IGF, finalValue, base, /*preserve*/ false);
+    return component.storeRValue(IGF, finalExpr, base, /*preserve*/ false);
   }
 
   // Otherwise, load and materialize into a temporary.
@@ -160,16 +201,16 @@ static void emitAssignRecursive(IRGenFunction &IGF,
                                               /*preserve*/ true);
 
   // Recursively perform the store.
-  emitAssignRecursive(IGF, temp, finalType, finalValue, pathStart, pathEnd);
+  emitAssignRecursive(IGF, temp, finalType, finalExpr, pathStart, pathEnd);
 
   // Store the temporary back.
   component.storeMaterialized(IGF, temp, base, /*preserve*/ false);
 }
                            
 
-void IRGenFunction::emitAssign(Explosion &rvalue, const LValue &lvalue,
+void IRGenFunction::emitAssign(Expr *E, const LValue &lvalue,
                               const TypeInfo &type) {
-  emitAssignRecursive(*this, Address(), type, rvalue,
+  emitAssignRecursive(*this, Address(), type, E,
                       lvalue.begin(), lvalue.end());
 }
 
@@ -211,21 +252,13 @@ void IRGenFunction::emitLValueAsScalar(const LValue &lvalue, OnHeap_t onHeap,
   }
 }
 
-void IRGenFunction::emitAssign(Expr *rhs, const LValue &lhs,
-                                   const TypeInfo &type) {
-  // We don't expect that l-value emission is generally going to admit
-  // maximally-exploded calls.
-  Explosion explosion(ExplosionKind::Minimal);
-  emitRValue(rhs, explosion);
-  emitAssign(explosion, lhs, type);
-}
-
 namespace {
   /// The type layout for [byref(heap)] types.
-  class HeapLValueTypeInfo : public TypeInfo {
+  class HeapLValueTypeInfo :
+    public ScalarTypeInfo<HeapLValueTypeInfo,TypeInfo> {
   public:
     HeapLValueTypeInfo(llvm::StructType *type, Size s, Alignment a)
-      : TypeInfo(type, s, a, IsNotPOD) {}
+      : ScalarTypeInfo(type, s, a, IsNotPOD) {}
 
     llvm::StructType *getStorageType() const {
       return cast<llvm::StructType>(TypeInfo::getStorageType());
@@ -290,10 +323,6 @@ namespace {
       // Store the owner, transferring the +1.
       IGF.emitInitializeRetained(e.forwardNext(IGF),
                                  projectOwner(IGF, address));
-    }
-
-    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      src.transferInto(dest, 2);
     }
 
     void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
@@ -563,12 +592,16 @@ namespace {
       emitVoidCall(IGF, setter, args);
     }
 
-    void storeExplosion(IRGenFunction &IGF, Explosion &raw,
-                        Address base, bool preserve) const {
-      Callee setter = Target.getSetter(IGF, raw.getKind());
+    void storeRValue(IRGenFunction &IGF, Expr *rvalue,
+                     Address base, bool preserve) const {
+      Callee setter = Target.getSetter(IGF, ExplosionKind::Maximal);
 
+      // Emit the r-value at the natural level of the setter we found.
+      Explosion value(setter.getExplosionLevel());
+      IGF.emitRValue(rvalue, value);
+      
       const TypeInfo &valueTI = IGF.getFragileTypeInfo(Target.getType());
-      store(IGF, setter, base, raw, valueTI, preserve);
+      store(IGF, setter, base, value, valueTI, preserve);
     }
 
     void storeMaterialized(IRGenFunction &IGF, Address temp,
@@ -700,6 +733,17 @@ LValue swift::irgen::emitMemberRefLValue(IRGenFunction &IGF, MemberRefExpr *E) {
   lvalue.add<GetterSetterComponent>(GetterSetterTarget::forByrefMemberVar(var));
 
   return lvalue;
+}
+
+/// Try to emit the given member-reference as an address.
+Optional<Address> irgen::tryEmitMemberRefAsAddress(IRGenFunction &IGF,
+                                                   MemberRefExpr *E) {
+  // Can't do anything if the member reference is logical.
+  if (isVarAccessLogical(IGF, E->getDecl()))
+    return Nothing;
+
+  // FIXME: actually implement this.
+  return Nothing;
 }
 
 /// Emit a reference to a global variable.

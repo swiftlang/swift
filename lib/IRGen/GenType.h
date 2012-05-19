@@ -147,6 +147,16 @@ public:
   virtual void assign(IRGenFunction &IGF, Explosion &explosion,
                       Address addr) const = 0;
 
+  /// Copy a value out of an object and into another, destroying the
+  /// old value.
+  virtual void assignWithCopy(IRGenFunction &IGF, Address dest,
+                              Address src) const = 0;
+
+  /// Move a value out of an object and into another, destroying the
+  /// old value there and leaving the source object in an invalid state.
+  virtual void assignWithTake(IRGenFunction &IGF, Address dest,
+                              Address src) const = 0;
+
   /// Initialize an address by consuming values out of an explosion.
   virtual void initialize(IRGenFunction &IGF, Explosion &explosion,
                           Address addr) const = 0;

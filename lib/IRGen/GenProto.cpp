@@ -281,23 +281,47 @@ static void setHelperAttributes(llvm::CallInst *call) {
   call->setAttributes(llvm::AttrListPtr::get(attrs.data(), attrs.size()));
 }
 
-/// Emit an 'initializeBufferWithCopyOfBuffer' operation.
-static void emitInitializeBufferWithCopyOfBuffer(IRGenFunction &IGF,
-                                                 llvm::Value *witnessTable,
-                                                 Address destBuffer,
-                                                 Address srcBuffer) {
+/// Emit a call to do an 'initializeBufferWithCopyOfBuffer' operation.
+static void emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
+                                                     llvm::Value *witnessTable,
+                                                     Address destBuffer,
+                                                     Address srcBuffer) {
   llvm::Value *copyFn = loadValueWitness(IGF, witnessTable,
                              ValueWitness::InitializeBufferWithCopyOfBuffer);
   llvm::CallInst *call =
     IGF.Builder.CreateCall3(copyFn, destBuffer.getAddress(),
                             srcBuffer.getAddress(), witnessTable);
   setHelperAttributesForAggResult(call, false);
-}                                            
+}
 
-/// Emit a 'destroyBuffer' operation.
-static void emitDestroyBuffer(IRGenFunction &IGF,
-                              llvm::Value *witnessTable,
-                              Address buffer) {
+/// Emit a call to do a 'projectBuffer' operation.
+static llvm::Value *emitProjectBufferCall(IRGenFunction &IGF,
+                                          llvm::Value *witnessTable,
+                                          Address buffer) {
+  llvm::Value *projectFn = loadValueWitness(IGF, witnessTable,
+                                            ValueWitness::ProjectBuffer);
+  llvm::CallInst *result =
+    IGF.Builder.CreateCall2(projectFn, buffer.getAddress(), witnessTable);
+  result->setDoesNotThrow();
+  return result;
+}
+
+/// Emit a call to do an 'assignWithCopy' operation.
+static void emitAssignWithCopyCall(IRGenFunction &IGF,
+                                   llvm::Value *witnessTable,
+                                   llvm::Value *destObject,
+                                   llvm::Value *srcObject) {
+  llvm::Value *copyFn = loadValueWitness(IGF, witnessTable,
+                                         ValueWitness::AssignWithCopy);
+  llvm::CallInst *call =
+    IGF.Builder.CreateCall3(copyFn, destObject, srcObject, witnessTable);
+  call->setDoesNotThrow();
+}
+
+/// Emit a call to do a 'destroyBuffer' operation.
+static void emitDestroyBufferCall(IRGenFunction &IGF,
+                                  llvm::Value *witnessTable,
+                                  Address buffer) {
   llvm::Value *fn = loadValueWitness(IGF, witnessTable,
                                      ValueWitness::DestroyBuffer);
   llvm::CallInst *call =
@@ -308,8 +332,11 @@ static void emitDestroyBuffer(IRGenFunction &IGF,
 /// Given the address of an existential object, destroy it.
 static void emitDestroyExistential(IRGenFunction &IGF, Address addr) {
   llvm::Value *table = loadWitnessTable(IGF, addr);
-  emitDestroyBuffer(IGF, table, projectExistentialBuffer(IGF, addr));
+  emitDestroyBufferCall(IGF, table, projectExistentialBuffer(IGF, addr));
 }
+
+static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
+                                                     llvm::Type *objectPtrTy);
 
 namespace {
   struct DestroyExistential : Cleanup {
@@ -463,10 +490,6 @@ namespace {
     }
 
     void assign(IRGenFunction &IGF, Explosion &in, Address dest) const {
-      // TODO: by this point, we've aleady lost some interesting
-      // dynamic optimization opportunities because of the implicit
-      // copy into a temporary to form the explosion.
-
       // Destroy the old value.  This is safe because the value in the
       // explosion is already +1, so even if there's any aliasing
       // going on, we're totally fine.
@@ -474,6 +497,19 @@ namespace {
 
       // Take the new value.
       ProtocolTypeInfo::initialize(IGF, in, dest);
+    }
+
+    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
+      auto objPtrTy = dest.getAddress()->getType();
+      auto fn = getAssignExistentialsFunction(IGF.IGM, objPtrTy);
+      auto call = IGF.Builder.CreateCall2(fn, dest.getAddress(),
+                                          src.getAddress());
+      call->setDoesNotThrow();
+    }
+
+    void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const {
+      emitDestroyExistential(IGF, dest);
+      IGF.emitMemCpy(dest, src, StorageSize);
     }
 
     void initialize(IRGenFunction &IGF, Explosion &in, Address dest) const {
@@ -492,7 +528,8 @@ namespace {
       // copy-initialize.
       Address srcBuffer = projectExistentialBuffer(IGF, src);
       Address destBuffer = projectExistentialBuffer(IGF, dest);
-      emitInitializeBufferWithCopyOfBuffer(IGF, table, destBuffer, srcBuffer);
+      emitInitializeBufferWithCopyOfBufferCall(IGF, table,
+                                               destBuffer, srcBuffer);
     }
 
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
@@ -950,7 +987,78 @@ static llvm::Function *shouldDefineHelper(llvm::Constant *fn) {
 
   def->setLinkage(llvm::Function::LinkOnceODRLinkage);
   def->setVisibility(llvm::Function::HiddenVisibility);
+  def->setDoesNotThrow();
   return def;
+}
+
+/// Return a function which performs an assignment operation on two
+/// existentials.
+///
+/// Existential types are nominal, so we potentially need to cast the
+/// function to the appropriate object-pointer type.
+static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
+                                                     llvm::Type *objectPtrTy) {
+  llvm::Type *argTys[] = { objectPtrTy, objectPtrTy };
+  llvm::FunctionType *fnTy =
+    llvm::FunctionType::get(IGM.VoidTy, argTys, false);
+  llvm::Constant *fn =
+    IGM.Module.getOrInsertFunction("__swift_assign_existentials", fnTy);
+
+  if (llvm::Function *def = shouldDefineHelper(fn)) {
+    IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
+                      ExplosionKind::Minimal, 0, def, Prologue::Bare);
+    auto it = def->arg_begin();
+    Address dest(it++, getFixedBufferAlignment(IGM));
+    Address src(it++, getFixedBufferAlignment(IGM));
+
+    // If doing a self-assignment, we're done.
+    llvm::BasicBlock *doneBB = IGF.createBasicBlock("done");
+    llvm::BasicBlock *contBB = IGF.createBasicBlock("cont");
+    llvm::Value *isSelfAssign =
+      IGF.Builder.CreateICmpEQ(dest.getAddress(), src.getAddress(),
+                               "isSelfAssign");
+    IGF.Builder.CreateCondBr(isSelfAssign, doneBB, contBB);
+
+    // Project down to the buffers.
+    IGF.Builder.emitBlock(contBB);
+    Address destBuffer = projectExistentialBuffer(IGF, dest);
+    Address srcBuffer = projectExistentialBuffer(IGF, src);
+
+    // Load the dest and source tables.
+    Address destTableSlot = projectWitnessTable(IGF, dest);
+    llvm::Value *destTable = IGF.Builder.CreateLoad(destTableSlot);
+    llvm::Value *srcTable = loadWitnessTable(IGF, src);
+
+    llvm::BasicBlock *matchBB = IGF.createBasicBlock("match");
+    llvm::BasicBlock *noMatchBB = IGF.createBasicBlock("no-match");
+
+    // Check whether the tables match.
+    llvm::Value *sameTable =
+      IGF.Builder.CreateICmpEQ(destTable, srcTable, "sameTable");
+    IGF.Builder.CreateCondBr(sameTable, matchBB, noMatchBB);
+
+    // If so, do a direct assignment.
+    IGF.Builder.emitBlock(matchBB);
+    llvm::Value *destObject =
+      emitProjectBufferCall(IGF, destTable, destBuffer);
+    llvm::Value *srcObject =
+      emitProjectBufferCall(IGF, destTable, srcBuffer);
+    emitAssignWithCopyCall(IGF, destTable, destObject, srcObject);
+    IGF.Builder.CreateBr(doneBB);
+
+    // Otherwise, destroy and copy-initialize.
+    IGF.Builder.emitBlock(noMatchBB);
+    IGF.Builder.CreateStore(srcTable, destTableSlot);
+    emitDestroyBufferCall(IGF, destTable, destBuffer);
+    emitInitializeBufferWithCopyOfBufferCall(IGF, srcTable,
+                                             destBuffer, srcBuffer);
+    IGF.Builder.CreateBr(doneBB);
+
+    // All done.
+    IGF.Builder.emitBlock(doneBB);
+    IGF.Builder.CreateRetVoid();
+  }
+  return fn;
 }
 
 /// Return a function which takes two pointer arguments and returns
@@ -1309,7 +1417,6 @@ ProtocolTypeInfo::getConformance(IRGenModule &IGM, Type concreteType,
   auto res = Conformances.insert(std::make_pair(conformance, info));
   return *res.first->second;
 }
-                                 
 
 const TypeInfo *
 TypeConverter::convertProtocolType(IRGenModule &IGM, ProtocolType *T) {

@@ -500,8 +500,7 @@ namespace {
     }
 
     Optional<Address> visitMemberRefExpr(MemberRefExpr *E) {
-      IGF.unimplemented(E->getLoc(), "emit address of MemberRefExpr");
-      return Optional<Address>();
+      return tryEmitMemberRefAsAddress(IGF, E);
     }
 
     // These expressions aren't naturally already in memory.

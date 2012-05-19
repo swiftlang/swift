@@ -120,13 +120,13 @@ protected:
   LogicalPathComponent() : PathComponent(false) {}
 
 public:
-  /// Perform a store operation with a value held in the given
-  /// explosion.
+  /// Perform a store operation with a value produced by the given
+  /// expression.
   ///
   /// \param preserve - if true, more operations on this lvalue
   ///    are forthcoming
-  virtual void storeExplosion(IRGenFunction &IGF, Explosion &rvalue,
-                              Address base, bool preserve) const = 0;
+  virtual void storeRValue(IRGenFunction &IGF, Expr *rvalue,
+                           Address base, bool preserve) const = 0;
 
   /// Perform a store operation with a value held in memory.
   ///

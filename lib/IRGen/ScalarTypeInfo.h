@@ -46,6 +46,18 @@ public:
     asDerived().Derived::initialize(IGF, temp, dest);
   }
 
+  void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
+    Explosion temp(ExplosionKind::Maximal);
+    asDerived().Derived::load(IGF, src, temp);
+    asDerived().Derived::assign(IGF, temp, dest);
+  }
+
+  void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const {
+    Explosion temp(ExplosionKind::Maximal);
+    asDerived().Derived::loadAsTake(IGF, src, temp);
+    asDerived().Derived::assign(IGF, temp, dest);
+  }
+
   void reexplode(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
     unsigned size = asDerived().Derived::getExplosionSize(in.getKind());
     in.transferInto(out, size);

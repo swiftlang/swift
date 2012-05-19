@@ -21,8 +21,8 @@
 #include "llvm/DerivedTypes.h"
 
 #include "Address.h"
-#include "GenType.h"
 #include "IRGenModule.h"
+#include "ScalarTypeInfo.h"
 
 #include "GenMeta.h"
 
@@ -30,16 +30,15 @@ using namespace swift;
 using namespace irgen;
 
 namespace {
-  struct EmptyTypeInfo : TypeInfo {
+  struct EmptyTypeInfo : ScalarTypeInfo<EmptyTypeInfo, TypeInfo> {
     EmptyTypeInfo(llvm::Type *ty)
-      : TypeInfo(ty, Size(0), Alignment(1), IsPOD) {}
+      : ScalarTypeInfo(ty, Size(0), Alignment(1), IsPOD) {}
     unsigned getExplosionSize(ExplosionKind kind) const { return 0; }
     void getSchema(ExplosionSchema &schema) const {}
     void load(IRGenFunction &IGF, Address addr, Explosion &e) const {}
     void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {}
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {}
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {}
-    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {}
     void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {}
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {}
     void destroy(IRGenFunction &IGF, Address addr) const {}

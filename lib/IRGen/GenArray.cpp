@@ -58,6 +58,14 @@ namespace {
       // FIXME
     }
 
+    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
+      // FIXME
+    }
+
+    void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const {
+      // FIXME
+    }
+
     void initialize(IRGenFunction &IGF, Explosion &explosion, Address addr) const {
       // FIXME
     }

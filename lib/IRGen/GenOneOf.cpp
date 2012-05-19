@@ -102,6 +102,14 @@ namespace {
       // FIXME
     }
 
+    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
+      // FIXME
+    }
+
+    void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const {
+      // FIXME
+    }
+
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
       // FIXME
     }
@@ -171,6 +179,20 @@ namespace {
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
       if (!Singleton) return;
       Singleton->assign(IGF, e, getSingletonAddress(IGF, addr));
+    }
+
+    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
+      if (!Singleton) return;
+      dest = getSingletonAddress(IGF, dest);
+      src = getSingletonAddress(IGF, src);
+      Singleton->assignWithCopy(IGF, dest, src);
+    }
+
+    void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const {
+      if (!Singleton) return;
+      dest = getSingletonAddress(IGF, dest);
+      src = getSingletonAddress(IGF, src);
+      Singleton->assignWithTake(IGF, dest, src);
     }
 
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
