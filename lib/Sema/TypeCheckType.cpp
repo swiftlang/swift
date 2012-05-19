@@ -35,6 +35,10 @@ static bool buildArraySliceType(TypeChecker &TC, ArraySliceType *sliceTy) {
     name = oneof->getDecl()->getName();
   } else if (StructType *st = baseTy->getAs<StructType>()) {
     name = st->getDecl()->getName();
+  } else if (ProtocolType *pt = baseTy->getAs<ProtocolType>()) {
+    name = pt->getDecl()->getName();
+  } else if (ClassType *ct = baseTy->getAs<ClassType>()) {
+    name = ct->getDecl()->getName();
   } else {
     TC.diagnose(loc, diag::base_of_array_slice_not_nominal, baseTy);
     return true;
