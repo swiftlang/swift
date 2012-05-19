@@ -22,6 +22,7 @@
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "ScalarTypeInfo.h"
 
 using namespace swift;
 using namespace irgen;
@@ -72,70 +73,27 @@ static void enterObjCReleaseCleanup(IRGenFunction &IGF, llvm::Value *value,
   out.add(ManagedValue(value, IGF.getCleanupsDepth()));
 }
 
-static void emitObjCRetain(IRGenFunction &IGF, llvm::Value *value,
-                           Explosion &out) {
-  enterObjCReleaseCleanup(IGF, emitObjCRetainCall(IGF, value), out);
-}
-
-static void emitObjCLoadRetained(IRGenFunction &IGF, Address address,
-                                 Explosion &out) {
-  llvm::Value *value = IGF.Builder.CreateLoad(address);
-  emitObjCRetain(IGF, value, out);
-}
-
-static void emitObjCAssignRetained(IRGenFunction &IGF, llvm::Value *newValue,
-                                   Address address) {
-  llvm::Value *oldValue = IGF.Builder.CreateLoad(address);
-  IGF.Builder.CreateStore(newValue, address);
-  emitObjCReleaseCall(IGF, oldValue);
-}
-
 namespace {
   /// A type-info implementation suitable for an ObjC pointer type.
-  class ObjCTypeInfo : public TypeInfo {
+  class ObjCTypeInfo : public SingleScalarTypeInfo<ObjCTypeInfo, TypeInfo> {
   public:
     ObjCTypeInfo(llvm::PointerType *storageType, Size size, Alignment align)
-      : TypeInfo(storageType, size, align, IsNotPOD) {
+      : SingleScalarTypeInfo(storageType, size, align, IsNotPOD) {
     }
 
-    unsigned getExplosionSize(ExplosionKind kind) const {
-      return 1;
+    static const bool IsScalarPOD = false;
+
+    void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {
+      emitObjCReleaseCall(IGF, value);
     }
 
-    void getSchema(ExplosionSchema &schema) const {
-      schema.add(ExplosionSchema::Element::forScalar(getStorageType()));
+    llvm::Value *emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
+      return emitObjCRetainCall(IGF, value);
     }
 
-    void load(IRGenFunction &IGF, Address address, Explosion &out) const {
-      emitObjCLoadRetained(IGF, address, out);
-    }
-
-    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &out) const {
-      enterObjCReleaseCleanup(IGF, IGF.Builder.CreateLoad(addr), out);
-    }
-
-    void assign(IRGenFunction &IGF, Explosion &e, Address address) const {
-      emitObjCAssignRetained(IGF, e.forwardNext(IGF), address);
-    }
-
-    void initialize(IRGenFunction &IGF, Explosion &e, Address address) const {
-      IGF.Builder.CreateStore(e.forwardNext(IGF), address);
-    }
-
-    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      src.transferInto(dest, 1);
-    }
-
-    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      emitObjCRetain(IGF, src.claimNext().getValue(), dest);
-    }
-
-    void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      dest.add(IGF.enterReleaseCleanup(src.claimUnmanagedNext()));
-    }
-
-    void destroy(IRGenFunction &IGF, Address addr) const {
-      emitObjCReleaseCall(IGF, IGF.Builder.CreateLoad(addr));
+    void enterScalarCleanup(IRGenFunction &IGF, llvm::Value *value,
+                            Explosion &out) const {
+      return enterObjCReleaseCleanup(IGF, value, out);
     }
   };
 }

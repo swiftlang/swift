@@ -72,6 +72,7 @@
 #include "IRGenModule.h"
 #include "LValue.h"
 #include "Condition.h"
+#include "ScalarTypeInfo.h"
 
 #include "GenFunc.h"
 
@@ -241,8 +242,8 @@ namespace {
     }
   };
 
-  /// The type-info class
-  class FuncTypeInfo : public TypeInfo {
+  /// The type-info class.
+  class FuncTypeInfo : public ScalarTypeInfo<FuncTypeInfo, TypeInfo> {
     /// Each possible currying of a function type has different function
     /// type variants along each of two orthogonal axes:
     ///   - the explosion kind desired
@@ -266,7 +267,8 @@ namespace {
 
     FuncTypeInfo(FunctionType *formalType, llvm::StructType *storageType,
                  Size size, Alignment align, unsigned numCurries)
-      : TypeInfo(storageType, size, align, IsNotPOD), FormalType(formalType) {
+      : ScalarTypeInfo(storageType, size, align, IsNotPOD),
+        FormalType(formalType) {
       
       // Initialize the curryings.
       for (unsigned i = 0; i != numCurries; ++i) {
@@ -356,10 +358,6 @@ namespace {
       // Store the data pointer, transferring the +1.
       Address dataAddr = projectData(IGF, address);
       IGF.emitInitializeRetained(e.forwardNext(IGF), dataAddr);
-    }
-
-    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      src.transferInto(dest, 2);
     }
 
     void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {

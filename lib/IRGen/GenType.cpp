@@ -28,6 +28,7 @@
 #include "Address.h"
 #include "Explosion.h"
 #include "Linking.h"
+#include "ScalarTypeInfo.h"
 
 using namespace swift;
 using namespace irgen;
@@ -99,50 +100,11 @@ llvm::Value *TypeInfo::getAlignmentOnly(IRGenFunction &IGF) const {
 static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
 
 namespace {
-  /// Basic IR generation for primitive types, which are always
-  /// represented as a single scalar.
-  class PrimitiveTypeInfo : public TypeInfo {
+  class PrimitiveTypeInfo :
+    public PODSingleScalarTypeInfo<PrimitiveTypeInfo, TypeInfo> {
   public:
-    PrimitiveTypeInfo(llvm::Type *Type, Size S, Alignment A)
-      : TypeInfo(Type, S, A, IsPOD) {}
-
-    unsigned getExplosionSize(ExplosionKind kind) const {
-      return 1;
-    }
-
-    void getSchema(ExplosionSchema &schema) const {
-      schema.add(ExplosionSchema::Element::forScalar(getStorageType()));
-    }
-
-    void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
-      e.addUnmanaged(IGF.Builder.CreateLoad(addr));
-    }
-
-    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
-      return PrimitiveTypeInfo::load(IGF, addr, e);
-    }
-
-    void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      IGF.Builder.CreateStore(e.claimUnmanagedNext(), addr);
-    }
-
-    void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      IGF.Builder.CreateStore(e.claimUnmanagedNext(), addr);
-    }
-
-    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      src.transferInto(dest, 1);
-    }
-
-    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      src.transferInto(dest, 1);
-    }
-
-    void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      src.transferInto(dest, 1);
-    }
-
-    void destroy(IRGenFunction &IGF, Address addr) const {}
+    PrimitiveTypeInfo(llvm::Type *storage, Size size, Alignment align)
+      : PODSingleScalarTypeInfo(storage, size, align) {}
   };
 }
 

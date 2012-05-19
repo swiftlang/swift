@@ -19,29 +19,34 @@
 #define SWIFT_IRGEN_HEAPTYPEINFO_H
 
 #include "llvm/DerivedTypes.h"
-#include "GenType.h"
+#include "ScalarTypeInfo.h"
 
 namespace swift {
 namespace irgen {
 
 /// HeapTypeInfo - A type designed for use implementing a type
 /// which consists solely of something reference-counted.
-class HeapTypeInfo : public TypeInfo {
+class HeapTypeInfo : public SingleScalarTypeInfo<HeapTypeInfo, TypeInfo> {
 public:
   HeapTypeInfo(llvm::PointerType *storage, Size size, Alignment align)
-    : TypeInfo(storage, size, align, IsNotPOD) {}
+    : SingleScalarTypeInfo(storage, size, align, IsNotPOD) {}
 
   bool isSingleRetainablePointer(ResilienceScope scope) const;
-  unsigned getExplosionSize(ExplosionKind kind) const;
-  void getSchema(ExplosionSchema &schema) const;
-  void load(IRGenFunction &IGF, Address addr, Explosion &e) const;
-  void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const;
-  void assign(IRGenFunction &IGF, Explosion &e, Address addr) const;
-  void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const;
-  void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const;
-  void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const;
-  void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const;
-  void destroy(IRGenFunction &IGF, Address addr) const;
+
+  static const bool IsScalarPOD = false;
+
+  void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {
+    IGF.emitRelease(value);
+  }
+
+  llvm::Value *emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
+    return IGF.emitRetainCall(value);
+  }
+
+  void enterScalarCleanup(IRGenFunction &IGF, llvm::Value *value,
+                          Explosion &out) const {
+    out.add(IGF.enterReleaseCleanup(value));
+  }
 };
 
 }

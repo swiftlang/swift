@@ -481,53 +481,6 @@ bool HeapTypeInfo::isSingleRetainablePointer(ResilienceScope scope) const {
   return true;
 }
 
-unsigned HeapTypeInfo::getExplosionSize(ExplosionKind kind) const {
-  return 1;
-}
-
-void HeapTypeInfo::getSchema(ExplosionSchema &schema) const {
-  schema.add(ExplosionSchema::Element::forScalar(getStorageType()));
-}
-
-void HeapTypeInfo::load(IRGenFunction &IGF, Address addr, Explosion &e) const {
-  IGF.emitLoadAndRetain(addr, e);
-}
-
-void HeapTypeInfo::loadAsTake(IRGenFunction &IGF, Address addr,
-                              Explosion &e) const {
-  e.addUnmanaged(IGF.Builder.CreateLoad(addr));
-}
-
-void HeapTypeInfo::assign(IRGenFunction &IGF, Explosion &e,
-                          Address addr) const {
-  IGF.emitAssignRetained(e.forwardNext(IGF), addr);
-}
-
-void HeapTypeInfo::initialize(IRGenFunction &IGF, Explosion &e,
-                              Address addr) const {
-  IGF.emitInitializeRetained(e.forwardNext(IGF), addr);
-}
-
-void HeapTypeInfo::reexplode(IRGenFunction &IGF, Explosion &src,
-                             Explosion &dest) const {
-  src.transferInto(dest, 1);
-}
-
-void HeapTypeInfo::copy(IRGenFunction &IGF, Explosion &src,
-                        Explosion &dest) const {
-  IGF.emitRetain(src.claimNext().getValue(), dest);
-}
-
-void HeapTypeInfo::manage(IRGenFunction &IGF, Explosion &src,
-                          Explosion &dest) const {
-  dest.add(IGF.enterReleaseCleanup(src.claimUnmanagedNext()));
-}
-
-void HeapTypeInfo::destroy(IRGenFunction &IGF, Address addr) const {
-  llvm::Value *value = IGF.Builder.CreateLoad(addr);
-  IGF.emitRelease(value);
-}
-
 const TypeInfo *TypeConverter::convertBuiltinObjectPointer(IRGenModule &IGM) {
   return new HeapTypeInfo(IGM.RefCountedPtrTy, IGM.getPointerSize(),
                           IGM.getPointerAlignment());

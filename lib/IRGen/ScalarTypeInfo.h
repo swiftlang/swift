@@ -1,0 +1,191 @@
+//===--- ScalarTypeInfo.h - Convenience class for scalar types --*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines ScalarTypeInfo, which is a convenient abstract
+// implementation of TypeInfo for working with types that are
+// efficiently scalarizable.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SWIFT_IRGEN_SCALARTYPEINFO_H
+#define SWIFT_IRGEN_SCALARTYPEINFO_H
+
+#include "Explosion.h"
+#include "GenType.h"
+#include "IRGenFunction.h"
+
+namespace swift {
+namespace irgen {
+
+/// ScalarTypeInfo - An abstract class designed for use when
+/// implementing a type which can be efficiently exploded and
+/// unexploded.
+template <class Derived, class Base>
+class ScalarTypeInfo : public Base {
+protected:
+  template <class... T> ScalarTypeInfo(T &&...args)
+    : Base(::std::forward<T>(args)...) {}
+
+  const Derived &asDerived() const {
+    return static_cast<const Derived &>(*this);
+  }
+
+public:
+  void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
+    Explosion temp(ExplosionKind::Maximal);
+    asDerived().Derived::load(IGF, src, temp);
+    asDerived().Derived::initialize(IGF, temp, dest);
+  }
+
+  void reexplode(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
+    unsigned size = asDerived().Derived::getExplosionSize(in.getKind());
+    in.transferInto(out, size);
+  }
+};
+
+/// SingleScalarTypeInfo - A further specialization of
+/// ScalarTypeInfo for types which consist of a single scalar
+/// which equals the storage type.
+template <class Derived, class Base>
+class SingleScalarTypeInfo : public ScalarTypeInfo<Derived, Base> {
+protected:
+  template <class... T> SingleScalarTypeInfo(T &&...args)
+    : ScalarTypeInfo<Derived,Base>(::std::forward<T>(args)...) {}
+
+  const Derived &asDerived() const {
+    return static_cast<const Derived &>(*this);
+  }
+
+public:
+  /// Return the type of the scalar.  Override this if it's not
+  /// just the storage type.
+  llvm::Type *getScalarType() const { return this->getStorageType(); }
+
+  /// Project to the address of the scalar.  Override this if it's not
+  /// just the storage type.
+  Address projectScalar(IRGenFunction &IGF, Address addr) const { return addr; }
+
+  // Subclasses must implement the following four operations:
+
+  // Is the scalar POD?
+  // static const bool IsScalarPOD;
+
+  // Add the scalar with the appropriate cleanup to the explosion.
+  // void enterScalarCleanup(IRGenFunction &IGF, llvm::Value *value,
+  //                         Explosion &out) const;
+
+  // Make the scalar +1.
+  // llvm::Value *emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const;
+
+  // Make the scalar -1.
+  // void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const;
+
+  unsigned getExplosionSize(ExplosionKind kind) const {
+    return 1;
+  }
+
+  void getSchema(ExplosionSchema &schema) const {
+    llvm::Type *ty = asDerived().getScalarType();
+    schema.add(ExplosionSchema::Element::forScalar(ty));
+  }
+
+  void initialize(IRGenFunction &IGF, Explosion &src, Address addr) const {
+    addr = asDerived().projectScalar(IGF, addr);
+    IGF.Builder.CreateStore(src.forwardNext(IGF), addr);
+  }
+
+  void load(IRGenFunction &IGF, Address addr, Explosion &out) const {
+    addr = asDerived().projectScalar(IGF, addr);
+    llvm::Value *value = IGF.Builder.CreateLoad(addr);
+    value = asDerived().emitScalarRetain(IGF, value);
+    asDerived().enterScalarCleanup(IGF, value, out);
+  }
+
+  void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &out) const {
+    addr = asDerived().projectScalar(IGF, addr);
+    llvm::Value *value = IGF.Builder.CreateLoad(addr);
+    asDerived().enterScalarCleanup(IGF, value, out);
+  }
+
+  void assign(IRGenFunction &IGF, Explosion &src, Address dest) const {
+    // Project down.
+    dest = asDerived().projectScalar(IGF, dest);
+
+    // Grab the old value if we need to.
+    llvm::Value *oldValue = nullptr;
+    if (!Derived::IsScalarPOD) {
+      oldValue = IGF.Builder.CreateLoad(dest, "oldValue");
+    }
+
+    // Store.
+    llvm::Value *newValue = src.forwardNext(IGF);
+    IGF.Builder.CreateStore(newValue, dest);
+
+    // Release the old value if we need to.
+    if (!Derived::IsScalarPOD) {
+      asDerived().emitScalarRelease(IGF, oldValue);
+    }
+  }
+
+  void copy(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
+    llvm::Value *value = in.claimNext().getValue();
+    value = asDerived().emitScalarRetain(IGF, value);
+    asDerived().enterScalarCleanup(IGF, value, out);
+  }
+
+  void manage(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
+    llvm::Value *value = in.claimUnmanagedNext();
+    asDerived().enterScalarCleanup(IGF, value, out);
+  }
+
+  void destroy(IRGenFunction &IGF, Address addr) const {
+    if (!Derived::IsScalarPOD) {
+      addr = asDerived().projectScalar(IGF, addr);
+      llvm::Value *value = IGF.Builder.CreateLoad(addr, "toDestroy");
+      asDerived().emitScalarRelease(IGF, value);
+    }
+  }
+};
+
+/// PODSingleScalarTypeInfo - A further specialization of
+/// SingleScalarTypeInfo for types which consist of a single POD
+/// scalar.  This is a complete implementation.
+template <class Derived, class Base>
+class PODSingleScalarTypeInfo : public SingleScalarTypeInfo<Derived, Base> {
+protected:
+  template <class StorageType, class... T> 
+  PODSingleScalarTypeInfo(StorageType *storage, Size size,
+                          Alignment align, T &&...args)
+    : SingleScalarTypeInfo<Derived, Base>(storage, size, align, IsPOD,
+                                          ::std::forward<T>(args)...) {}
+
+private:
+  friend class SingleScalarTypeInfo<Derived, Base>;
+  static const bool IsScalarPOD = true;
+
+  void enterScalarCleanup(IRGenFunction &IGF, llvm::Value *value,
+                          Explosion &out) const {
+    out.addUnmanaged(value);
+  }
+
+  llvm::Value *emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
+    return value;
+  }
+
+  void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {
+  }
+};
+
+}
+}
+
+#endif

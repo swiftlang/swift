@@ -32,11 +32,9 @@
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
 
-#include "GenType.h"
-#include "IRGenFunction.h"
+#include "ScalarTypeInfo.h"
 #include "IRGenModule.h"
 #include "LValue.h"
-#include "Explosion.h"
 
 #include "GenOneOf.h"
 
@@ -222,57 +220,20 @@ namespace {
   };
 
   /// A TypeInfo implementation for oneofs with no payload.
-  class EnumTypeInfo : public OneofTypeInfo {
+  class EnumTypeInfo :
+    public PODSingleScalarTypeInfo<EnumTypeInfo,OneofTypeInfo> {
   public:
     EnumTypeInfo(llvm::StructType *T, Size S, Alignment A)
-      : OneofTypeInfo(T, S, A, IsPOD) {}
+      : PODSingleScalarTypeInfo(T, S, A) {}
 
-    unsigned getExplosionSize(ExplosionKind kind) const {
+    llvm::Type *getScalarType() const {
       assert(isComplete());
-      return 1;
+      return getDiscriminatorType();
     }
 
-    void getSchema(ExplosionSchema &schema) const {
-      assert(isComplete());
-      schema.add(ExplosionSchema::Element::forScalar(getDiscriminatorType()));
-    }
-
-    static Address projectValue(IRGenFunction &IGF, Address addr) {
+    static Address projectScalar(IRGenFunction &IGF, Address addr) {
       return IGF.Builder.CreateStructGEP(addr, 0, Size(0));
     }
-
-    void load(IRGenFunction &IGF, Address addr, Explosion &e) const {
-      assert(isComplete());
-      e.addUnmanaged(IGF.Builder.CreateLoad(projectValue(IGF, addr),
-                                            addr->getName() + ".load"));
-    }
-
-    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
-      return EnumTypeInfo::load(IGF, addr, e);
-    }
-
-    void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      assert(isComplete());
-      IGF.Builder.CreateStore(e.claimUnmanagedNext(), projectValue(IGF, addr));
-    }
-
-    void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
-      EnumTypeInfo::assign(IGF, e, addr);
-    }
-
-    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      src.transferInto(dest, 1);
-    }
-
-    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      src.transferInto(dest, 1);
-    }
-
-    void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      src.transferInto(dest, 1);
-    }
-
-    void destroy(IRGenFunction &IGF, Address addr) const {}
 
     void emitInjectionFunctionBody(IRGenFunction &IGF,
                                    OneOfElementDecl *elt,
