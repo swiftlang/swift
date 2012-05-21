@@ -87,3 +87,26 @@ extern "C" bool _TNSs4Bool13getLogicValuefRS_FT_i1(bool* b) {
   return *b;
 }
 
+// FIXME: load_protocol and store_protocol are extremely ugly hacks.
+struct protocol {
+  void **witness_table;
+  char buffer[16];
+};
+
+extern "C"
+void
+load_protocol(protocol *retval, protocol *p) {
+  retval->witness_table = p->witness_table;
+  typedef void* (*copyTy)(void*, void*, void**);
+  copyTy initializeBufferWithCopyOfBuffer = (copyTy)(size_t)retval->witness_table[1];
+  initializeBufferWithCopyOfBuffer(&retval->buffer,&p->buffer,retval->witness_table);
+}
+
+extern "C"
+void
+store_protocol(protocol *value, protocol *p) {
+  p->witness_table = value->witness_table;
+  typedef void* (*copyTy)(void*, void*, void**);
+  copyTy initializeBufferWithCopyOfBuffer = (copyTy)(size_t)value->witness_table[1];
+  initializeBufferWithCopyOfBuffer(&p->buffer,&value->buffer,value->witness_table);
+}
