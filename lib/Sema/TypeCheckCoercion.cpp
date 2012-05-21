@@ -267,8 +267,6 @@ public:
       }
     }
 
-    // FIXME: We should be able to materialize values here, unless
-    // implicit(byref) goes away.
     if (Flags & CF_Apply) {
       diagnose(E->getLoc(), diag::no_candidates_ref,
                E->getDecls()[0]->getName());
