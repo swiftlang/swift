@@ -372,7 +372,10 @@ namespace {
     void visitInherited(ArrayRef<Type> inherited) {
       if (inherited.empty()) return;
 
-      // TODO: detect single-inheritance cases, use some more clever layout.
+      // TODO: We need to figure out all the guarantees we want here.
+      // It would be abstractly good to allow conversion to a base
+      // protocol to be trivial, but it's not clear that there's
+      // really a structural guarantee we can rely on here.
       for (Type baseType : inherited) {
         ProtocolDecl *baseProto = baseType->castTo<ProtocolType>()->getDecl();
         asDerived().addOutOfLineBaseProtocol(baseType, baseProto);
