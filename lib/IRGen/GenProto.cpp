@@ -348,6 +348,47 @@ namespace {
     }
   };
 
+  /// A CRTP class for visiting the witnesses of a protocol.
+  ///
+  /// The design here is that each entry (or small group of entries)
+  /// gets turned into a call to the implementation class describing
+  /// the exact variant of witness.  For example, for member
+  /// variables, there should be separate callbacks for adding a
+  /// getter/setter pair, for just adding a getter, and for adding a
+  /// physical projection (if we decide to support that).
+  template <class T> class WitnessVisitor {
+    T &asDerived() { return *static_cast<T*>(this); }
+
+  public:
+    void visit(ProtocolDecl *protocol) {
+      visitInherited(protocol->getInherited());
+      visitMembers(protocol->getMembers());
+    }
+
+  private:
+    void visitInherited(ArrayRef<Type> inherited) {
+    }
+
+    /// Visit the w
+    void visitInherited(Type type) {
+      ProtocolDecl *baseProto = type->castTo<ProtocolType>()->getDecl();
+
+      // TODO: detect single-inheritance cases, use some more clever layout.
+      asDerived().addOutOfLineBaseProtocol(baseProto);
+    }
+
+    /// Visit the witnesses for the direct members of a protocol.
+    void visitMembers(ArrayRef<Decl*> members) {
+      for (Decl *member : members) {
+        visitMember(member);
+      }
+    }
+
+    void visitMember(Decl *member) {
+      // TODO
+    }
+  };
+
   class ConformanceInfo;
 
   /// A witness to a specific element of a protocol.  Every
@@ -365,24 +406,17 @@ namespace {
     WitnessIndex BeginIndex;
   };
 
-  /// A class for laying out a witness table.
-  class WitnessTableLayout {
+  /// A class which lays out a witness table in the abstract.
+  class WitnessTableLayout : public WitnessVisitor<WitnessTableLayout> {
+    IRGenModule &IGM;
     unsigned NumWitnesses;
     SmallVector<WitnessTableEntry, 16> Entries;
 
   public:
-    WitnessTableLayout(ProtocolDecl *P) : NumWitnesses(NumValueWitnesses) {
-      for (Decl *member : P->getMembers())
-        addMember(member);
-      finalize();
-    }
+    WitnessTableLayout(IRGenModule &IGM) : IGM(IGM), NumWitnesses(0) {}
 
     unsigned getNumWitnesses() const { return NumWitnesses; }
     ArrayRef<WitnessTableEntry> getEntries() const { return Entries; }
-
-  private:
-    void addMember(Decl *member);
-    void finalize() { /*do nothing, for now*/ }
   };
 
   class ProtocolTypeInfo : public TypeInfo {
@@ -394,7 +428,7 @@ namespace {
 
     /// A table of all the conformance infos we've registered with
     /// this type.
-    mutable llvm::DenseMap<ProtocolConformance*, ConformanceInfo*>
+    mutable llvm::DenseMap<const ProtocolConformance*, ConformanceInfo*>
       Conformances;
 
     ProtocolTypeInfo(llvm::Type *ty, Size size, Alignment align,
@@ -432,7 +466,8 @@ namespace {
     const ConformanceInfo &getConformance(IRGenModule &IGM,
                                           Type concreteType,
                                           const TypeInfo &concreteTI,
-                                          ProtocolConformance *conf) const;
+                                          ProtocolDecl *protocol,
+                                          const ProtocolConformance &conf) const;
 
     /// Return the number of witnesses required by this protocol
     /// beyond the basic value-type witnesses.
@@ -595,11 +630,6 @@ ProtocolTypeInfo::~ProtocolTypeInfo() {
   for (auto &conf : Conformances) {
     delete conf.second;
   }
-}
-
-/// Add a member to the witness-table layout.
-void WitnessTableLayout::addMember(Decl *member) {
-  // FIXME
 }
 
 static FixedPacking computePacking(IRGenModule &IGM,
@@ -1365,13 +1395,34 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
   return asOpaquePtr(IGM, fn);
 }
 
+namespace {
+  /// A class which lays out a specific conformance to a protocol.
+  class WitnessTableBuilder : public WitnessVisitor<WitnessTableBuilder> {
+    IRGenModule &IGM;
+    SmallVectorImpl<llvm::Constant*> &Table;
+    FixedPacking Packing;
+    const TypeInfo &ConcreteTI;
+    const ProtocolConformance &Conformance;
+    
+  public:
+    WitnessTableBuilder(IRGenModule &IGM,
+                        SmallVectorImpl<llvm::Constant*> &table,
+                        FixedPacking packing,
+                        const TypeInfo &concreteTI,
+                        const ProtocolConformance &conformance)
+      : IGM(IGM), Table(table), Packing(packing), ConcreteTI(concreteTI),
+        Conformance(conformance) {}
+  };
+}
+
 /// Find the conformance information for a protocol.
 const ConformanceInfo &
 ProtocolTypeInfo::getConformance(IRGenModule &IGM, Type concreteType,
                                  const TypeInfo &concreteTI,
-                                 ProtocolConformance *conformance) const {
+                                 ProtocolDecl *protocol,
+                           const ProtocolConformance &conformance) const {
   // Check whether we've already cached this.
-  auto it = Conformances.find(conformance);
+  auto it = Conformances.find(&conformance);
   if (it != Conformances.end()) return *it->second;
 
   // We haven't.  First things first:  compute the packing.
@@ -1388,7 +1439,8 @@ ProtocolTypeInfo::getConformance(IRGenModule &IGM, Type concreteType,
   }
 
   // Next, build the protocol witnesses.
-  // FIXME
+  WitnessTableBuilder(IGM, witnesses, packing, concreteTI, conformance)
+    .visit(protocol);
 
   // We've got our global initializer.
   llvm::ArrayType *tableTy =
@@ -1414,7 +1466,7 @@ ProtocolTypeInfo::getConformance(IRGenModule &IGM, Type concreteType,
   info->Table = table;
   info->Packing = packing;
 
-  auto res = Conformances.insert(std::make_pair(conformance, info));
+  auto res = Conformances.insert(std::make_pair(&conformance, info));
   return *res.first->second;
 }
 
@@ -1428,7 +1480,8 @@ TypeConverter::convertProtocolType(IRGenModule &IGM, ProtocolType *T) {
   };
   type->setBody(fields);
 
-  WitnessTableLayout layout(T->getDecl());
+  WitnessTableLayout layout(IGM);
+  layout.visit(T->getDecl());
 
   Alignment align = getFixedBufferAlignment(IGM);
 
@@ -1460,15 +1513,17 @@ namespace {
 void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
                               Address dest, const TypeInfo &rawTI) {
   const ProtocolTypeInfo &protoTI = rawTI.as<ProtocolTypeInfo>();
+  ProtocolDecl *protocol = E->getType()->castTo<ProtocolType>()->getDecl();
 
   // Find the concrete type.
   Type concreteType = E->getSubExpr()->getType();
   const TypeInfo &concreteTI = IGF.getFragileTypeInfo(concreteType);
 
   // Compute the conformance information.
+  assert(E->getConformance());
   const ConformanceInfo &conformance =
     protoTI.getConformance(IGF.IGM, concreteType, concreteTI,
-                           E->getConformance());
+                           protocol, *E->getConformance());
 
   // First things first: compute the table and store that into the
   // destination.
