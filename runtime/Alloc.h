@@ -24,6 +24,8 @@
 extern "C" {
 #endif
 
+typedef unsigned long SwiftAllocIndex;
+
 /// The Swift heap-object header.
 struct SwiftHeapObject {
   /// This is always a valid pointer to a metadata object.
@@ -120,13 +122,13 @@ swift_slowAlloc(size_t bytes, uint64_t flags);
 // XXX FIXME -- adjust the algorithm to allow for 32-bit machines to use word
 // sized allocations on the small end of the tiny API.
 void *
-swift_alloc(size_t tinyIndex);
+swift_alloc(SwiftAllocIndex idx);
 void *
-swift_rawAlloc(size_t tinyIndex);
+swift_rawAlloc(SwiftAllocIndex idx);
 void *
-swift_tryAlloc(size_t tinyIndex);
+swift_tryAlloc(SwiftAllocIndex idx);
 void *
-swift_tryRawAlloc(size_t tinyIndex);
+swift_tryRawAlloc(SwiftAllocIndex idx);
 
 
 // Plain old memory deallocation
@@ -134,7 +136,7 @@ swift_tryRawAlloc(size_t tinyIndex);
 // Like swift allocation tiny index trick, but for deallocation
 // If bytes is knowable and fits within the tinyIndex rule:
 void
-swift_dealloc(void *ptr, size_t tinyIndex);
+swift_dealloc(void *ptr, SwiftAllocIndex idx);
 // If bytes is knowable but is large OR if bytes is not knowable,
 // then use the slow entry point and pass zero:
 void
@@ -143,7 +145,7 @@ swift_slowDealloc(void *ptr, size_t bytes);
 // If the caller cannot promise to zero the object during destruction,
 // then call these corresponding APIs:
 void
-swift_rawDealloc(void *ptr, size_t tinyIndex);
+swift_rawDealloc(void *ptr, SwiftAllocIndex idx);
 void
 swift_slowRawDealloc(void *ptr, size_t bytes);
 
