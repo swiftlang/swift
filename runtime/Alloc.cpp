@@ -16,7 +16,8 @@
 
 #include "Alloc.h"
 #include <llvm/Support/MathExtras.h>
-#include <System/pthread_machdep.h>
+// We'll include this and do per-thread clean up once we actually have threads
+//#include <System/pthread_machdep.h>
 #include <cstdlib>
 #include <unistd.h>
 
