@@ -200,6 +200,9 @@ namespace {
     explicit WitnessIndex(unsigned index) : Value(index) {}
 
     unsigned getValue() const { return Value; }
+
+    bool isZero() const { return Value == 0; }
+    bool isValueWitness() const { return Value < NumValueWitnesses; }
   };
 }
 
@@ -367,14 +370,13 @@ namespace {
 
   private:
     void visitInherited(ArrayRef<Type> inherited) {
-    }
-
-    /// Visit the w
-    void visitInherited(Type type) {
-      ProtocolDecl *baseProto = type->castTo<ProtocolType>()->getDecl();
+      if (inherited.empty()) return;
 
       // TODO: detect single-inheritance cases, use some more clever layout.
-      asDerived().addOutOfLineBaseProtocol(baseProto);
+      for (Type baseType : inherited) {
+        ProtocolDecl *baseProto = baseType->castTo<ProtocolType>()->getDecl();
+        asDerived().addOutOfLineBaseProtocol(baseType, baseProto);
+      }
     }
 
     /// Visit the witnesses for the direct members of a protocol.
@@ -401,9 +403,40 @@ namespace {
   ///   - a subscript requires two witnesses, a getter and a setter;
   ///   - a type requires a pointer to a witness for that type and
   ///     the protocols it obeys.
-  struct WitnessTableEntry {
+  class WitnessTableEntry {
     Decl *Member;
     WitnessIndex BeginIndex;
+
+    WitnessTableEntry(Decl *member, WitnessIndex begin)
+      : Member(member), BeginIndex(begin) {}
+
+  public:
+    WitnessTableEntry() = default;
+
+    Decl *getMember() const {
+      return Member;
+    }
+
+    static WitnessTableEntry forPrefixBase(ProtocolDecl *proto) {
+      return WitnessTableEntry(proto, WitnessIndex(0));
+    }
+
+    static WitnessTableEntry forOutOfLineBase(ProtocolDecl *proto,
+                                              WitnessIndex index) {
+      assert(!index.isValueWitness());
+      return WitnessTableEntry(proto, index);
+    }
+
+    /// Is this a base-protocol entry?
+    bool isBase() const { return isa<ProtocolDecl>(Member); }
+
+    /// Is the table for this base-protocol entry "out of line",
+    /// i.e. there is a witness which indirectly points to it, or is
+    /// it a prefix of the layout of this protocol?
+    bool isBaseOutOfLine() const {
+      assert(isBase());
+      return !BeginIndex.isZero();
+    }
   };
 
   /// A class which lays out a witness table in the abstract.
@@ -412,8 +445,19 @@ namespace {
     unsigned NumWitnesses;
     SmallVector<WitnessTableEntry, 16> Entries;
 
+    WitnessIndex getNextIndex() {
+      return WitnessIndex(NumWitnesses++);
+    }
+
   public:
-    WitnessTableLayout(IRGenModule &IGM) : IGM(IGM), NumWitnesses(0) {}
+    WitnessTableLayout(IRGenModule &IGM)
+      : IGM(IGM), NumWitnesses(NumValueWitnesses) {}
+
+    /// The next witness is an out-of-line base protocol.
+    void addOutOfLineBaseProtocol(Type baseType, ProtocolDecl *baseProto) {
+      Entries.push_back(
+             WitnessTableEntry::forOutOfLineBase(baseProto, getNextIndex()));
+    }
 
     unsigned getNumWitnesses() const { return NumWitnesses; }
     ArrayRef<WitnessTableEntry> getEntries() const { return Entries; }
@@ -482,7 +526,7 @@ namespace {
       // FIXME: do a binary search if the number of witnesses is large
       // enough.
       for (auto &witness : getTableEntries())
-        if (witness.Member == member)
+        if (witness.getMember() == member)
           return witness;
       llvm_unreachable("didn't find entry for member!");
     }
@@ -608,7 +652,7 @@ namespace {
     friend class ProtocolTypeInfo;
 
     /// The pointer to the table.  In practice, it's not really
-    /// reasonable for this to be always be a constant!  It probably
+    /// reasonable for this to always be a constant!  It probably
     /// needs to be managed by the runtime, and the information stored
     /// here would just indicate how to find the actual thing.
     llvm::Constant *Table;
@@ -617,6 +661,12 @@ namespace {
 
   public:
     llvm::Value *getTable(IRGenFunction &IGF) const {
+      return Table;
+    }
+
+    /// Try to get this table as a constant pointer.  This might just
+    /// not be supportable at all.
+    llvm::Constant *tryGetConstantTable() const {
       return Table;
     }
 
@@ -1401,6 +1451,7 @@ namespace {
     IRGenModule &IGM;
     SmallVectorImpl<llvm::Constant*> &Table;
     FixedPacking Packing;
+    Type ConcreteType;
     const TypeInfo &ConcreteTI;
     const ProtocolConformance &Conformance;
     
@@ -1408,10 +1459,27 @@ namespace {
     WitnessTableBuilder(IRGenModule &IGM,
                         SmallVectorImpl<llvm::Constant*> &table,
                         FixedPacking packing,
-                        const TypeInfo &concreteTI,
+                        Type concreteType, const TypeInfo &concreteTI,
                         const ProtocolConformance &conformance)
-      : IGM(IGM), Table(table), Packing(packing), ConcreteTI(concreteTI),
+      : IGM(IGM), Table(table), Packing(packing),
+        ConcreteType(concreteType), ConcreteTI(concreteTI),
         Conformance(conformance) {}
+
+    void addOutOfLineBaseProtocol(Type baseType, ProtocolDecl *baseProto) {
+      // Look for a protocol type info.
+      const ProtocolTypeInfo &baseTI =
+        IGM.getFragileTypeInfo(baseType).as<ProtocolTypeInfo>();
+      const ProtocolConformance *astConf =
+        Conformance.InheritedMapping.find(baseProto)->second;
+      assert(astConf && "couldn't find base conformance!");
+      const ConformanceInfo &conf =
+        baseTI.getConformance(IGM, ConcreteType, ConcreteTI,
+                              baseProto, *astConf);
+
+      llvm::Constant *baseWitness = conf.tryGetConstantTable();
+      assert(baseWitness && "couldn't get a constant table!");
+      Table.push_back(asOpaquePtr(IGM, baseWitness));
+    }
   };
 }
 
@@ -1439,8 +1507,8 @@ ProtocolTypeInfo::getConformance(IRGenModule &IGM, Type concreteType,
   }
 
   // Next, build the protocol witnesses.
-  WitnessTableBuilder(IGM, witnesses, packing, concreteTI, conformance)
-    .visit(protocol);
+  WitnessTableBuilder(IGM, witnesses, packing, concreteType, concreteTI,
+                      conformance).visit(protocol);
 
   // We've got our global initializer.
   llvm::ArrayType *tableTy =
