@@ -36,6 +36,8 @@ else
   SWIFT_OPTFLAG := -O0
 endif
 
+LDFLAGS += -framework Foundation
+
 SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
 $(ObjDir)/%.o: %.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER)
 	$(Echo) "Compiling $*.swift for $(BuildMode) build"

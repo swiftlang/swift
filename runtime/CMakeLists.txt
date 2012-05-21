@@ -15,6 +15,10 @@ if(SWIFT_OPTIMIZED)
  endif()
 endif()
 
+# Link against Foundation, for ObjC bridging.
+set_target_properties(swift_runtime PROPERTIES 
+                                    LINK_FLAGS "-framework Foundation")
+
 # FIXME: Install swift.swift
 
 if(XCODE)
