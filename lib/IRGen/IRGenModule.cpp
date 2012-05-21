@@ -106,7 +106,7 @@ llvm::Constant *IRGenModule::getAllocFn() {
   llvm::Type *types[] = { HeapMetadataPtrTy, SizeTy, SizeTy };
   llvm::FunctionType *fnType =
     llvm::FunctionType::get(RefCountedPtrTy, types, false);
-  AllocFn = Module.getOrInsertFunction("swift_alloc", fnType);
+  AllocFn = Module.getOrInsertFunction("swift_allocObject", fnType);
   return AllocFn;
 }
 
@@ -153,7 +153,7 @@ llvm::Constant *IRGenModule::getDeallocFn() {
 
   llvm::FunctionType *fnType =
     llvm::FunctionType::get(VoidTy, RefCountedPtrTy, false);
-  DeallocFn = Module.getOrInsertFunction("swift_dealloc", fnType);
+  DeallocFn = Module.getOrInsertFunction("swift_deallocObject", fnType);
   return DeallocFn;
 }
 
