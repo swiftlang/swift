@@ -19,6 +19,7 @@
 
 namespace swift {
   class ErasureExpr;
+  class SuperConversionExpr;
 
 namespace irgen {
   class Explosion;
@@ -172,6 +173,14 @@ namespace irgen {
   /// Emit an erasure expression as an initializer of memory.
   void emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
                          Address addr, const TypeInfo &addrTI);
+
+  /// Emit a super-conversion expression into an explosion.
+  void emitSuperConversion(IRGenFunction &IGF, SuperConversionExpr *E,
+                           Explosion &out);
+
+  /// Emit a super-conversion expression as an initializer of memory.
+  void emitSuperConversionAsInit(IRGenFunction &IGF, SuperConversionExpr *E,
+                                 Address addr, const TypeInfo &addrTI);
 
 } // end namespace irgen
 } // end namespace swift

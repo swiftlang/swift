@@ -433,9 +433,16 @@ namespace {
     /// Is the table for this base-protocol entry "out of line",
     /// i.e. there is a witness which indirectly points to it, or is
     /// it a prefix of the layout of this protocol?
-    bool isBaseOutOfLine() const {
+    bool isOutOfLineBase() const {
       assert(isBase());
       return !BeginIndex.isZero();
+    }
+
+    /// Return the index at which to find the table for this
+    /// base-protocol entry.
+    WitnessIndex getOutOfLineBaseIndex() const {
+      assert(isOutOfLineBase());
+      return BeginIndex;
     }
   };
 
@@ -517,15 +524,15 @@ namespace {
     /// beyond the basic value-type witnesses.
     unsigned getNumTableEntries() const { return NumTableEntries; }
 
-    ArrayRef<WitnessTableEntry> getTableEntries() const {
+    ArrayRef<WitnessTableEntry> getWitnessEntries() const {
       return ArrayRef<WitnessTableEntry>(getEntriesBuffer(),
                                          getNumTableEntries());
     }
 
-    const WitnessTableEntry &getTableEntry(Decl *member) {
+    const WitnessTableEntry &getWitnessEntry(Decl *member) const {
       // FIXME: do a binary search if the number of witnesses is large
       // enough.
-      for (auto &witness : getTableEntries())
+      for (auto &witness : getWitnessEntries())
         if (witness.getMember() == member)
           return witness;
       llvm_unreachable("didn't find entry for member!");
@@ -1640,6 +1647,61 @@ void irgen::emitErasure(IRGenFunction &IGF, ErasureExpr *E, Explosion &out) {
 
   // Initialize the temporary.
   emitErasureAsInit(IGF, E, temp, protoTI);
+
+  // Add that as something to destroy.
+  out.add(protoTI.enterCleanupForTemporary(IGF, temp));
+}
+
+/// Emit a super-conversion expression as an initializer for the given memory.
+void irgen::emitSuperConversionAsInit(IRGenFunction &IGF,
+                                      SuperConversionExpr *E,
+                                      Address dest, const TypeInfo &rawTI) {
+  ProtocolDecl *superProto = E->getType()->castTo<ProtocolType>()->getDecl();
+
+  Type derivedType = E->getSubExpr()->getType();
+  const ProtocolTypeInfo &derivedProtoTI =
+    IGF.getFragileTypeInfo(derivedType).as<ProtocolTypeInfo>();
+
+  // Compute the path to the super protocol.
+  auto &witnessEntry = derivedProtoTI.getWitnessEntry(superProto);
+  assert(witnessEntry.isBase());
+
+  // Emit the sub-expression in-place.  Bitcasting the destination is
+  // safe because every protocol type has identical representation.
+  // Regardless of the other decisions we make, we won't need to touch
+  // the buffer.
+  auto derivedPtrTy = derivedProtoTI.getStorageType()->getPointerTo();
+  dest = IGF.Builder.CreateBitCast(dest, derivedPtrTy);
+  IGF.emitRValueAsInit(E->getSubExpr(), dest, derivedProtoTI);
+
+  // If it's a prefix base, that's good enough.
+  if (!witnessEntry.isOutOfLineBase()) return;
+
+  // Otherwise, we need to map the witness down.  Find the old table.
+  Address tableSlot = projectWitnessTable(IGF, dest);
+  llvm::Value *oldTable = IGF.Builder.CreateLoad(tableSlot, "derived-table");
+
+  // Drill down to get the new table.
+  llvm::Value *newTable =
+    loadOpaqueWitness(IGF, oldTable, witnessEntry.getOutOfLineBaseIndex());
+  newTable = IGF.Builder.CreateBitCast(newTable, getWitnessTableTy(IGF.IGM));
+
+  // Drop it in place and we're done.
+  IGF.Builder.CreateStore(newTable, tableSlot);
+}
+
+/// Emit an expression which erases the concrete type of its value and
+/// replaces it with a generic type.
+void irgen::emitSuperConversion(IRGenFunction &IGF, SuperConversionExpr *E,
+                                Explosion &out) {
+  const ProtocolTypeInfo &protoTI =
+    IGF.getFragileTypeInfo(E->getType()).as<ProtocolTypeInfo>();
+
+  // Create a temporary of the appropriate type.
+  Address temp = protoTI.createTemporary(IGF);
+
+  // Initialize the temporary.
+  emitSuperConversionAsInit(IGF, E, temp, protoTI);
 
   // Add that as something to destroy.
   out.add(protoTI.enterCleanupForTemporary(IGF, temp));

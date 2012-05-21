@@ -224,7 +224,7 @@ namespace {
       emitErasure(IGF, E, Out);
     }
     void visitSuperConversionExpr(SuperConversionExpr *E) {
-      IGF.IGM.unimplemented(E->getLoc(), "SuperConversionExpr");
+      emitSuperConversion(IGF, E, Out);
     }
     void visitTupleElementExpr(TupleElementExpr *E) {
       emitTupleElement(IGF, E, Out);
@@ -325,7 +325,11 @@ namespace {
     }
 
     void visitErasureExpr(ErasureExpr *E) {
-      return emitErasureAsInit(IGF, E, Addr, AddrTI);
+      emitErasureAsInit(IGF, E, Addr, AddrTI);
+    }
+
+    void visitSuperConversionExpr(SuperConversionExpr *E) {
+      emitSuperConversionAsInit(IGF, E, Addr, AddrTI);
     }
 
     // TODO: Implement some other interesting cases that could
