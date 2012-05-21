@@ -360,7 +360,10 @@ namespace {
   /// getter/setter pair, for just adding a getter, and for adding a
   /// physical projection (if we decide to support that).
   template <class T> class WitnessVisitor {
-    T &asDerived() { return *static_cast<T*>(this); }
+  protected:
+    IRGenModule &IGM;
+
+    WitnessVisitor(IRGenModule &IGM) : IGM(IGM) {}
 
   public:
     void visit(ProtocolDecl *protocol) {
@@ -369,6 +372,8 @@ namespace {
     }
 
   private:
+    T &asDerived() { return *static_cast<T*>(this); }
+
     void visitInherited(ArrayRef<Type> inherited) {
       if (inherited.empty()) return;
 
@@ -390,7 +395,39 @@ namespace {
     }
 
     void visitMember(Decl *member) {
-      // TODO
+      switch (member->getKind()) {
+      case DeclKind::Import:
+      case DeclKind::Extension:
+      case DeclKind::PatternBinding:
+      case DeclKind::TopLevelCode:
+      case DeclKind::OneOf:
+      case DeclKind::Struct:
+      case DeclKind::Class:
+      case DeclKind::Protocol:
+      case DeclKind::TypeAlias: // this one might become legal?
+      case DeclKind::OneOfElement:
+        llvm_unreachable("declaration not legal as a protocol member");
+
+      case DeclKind::Func:
+        return visitFunc(cast<FuncDecl>(member));
+
+      case DeclKind::Subscript:
+        IGM.unimplemented(member->getLocStart(), "var declaration in protocol");
+        return;
+
+      case DeclKind::Var:
+        IGM.unimplemented(member->getLocStart(), "var declaration in protocol");
+        return;
+      }
+      llvm_unreachable("bad decl kind");
+    }
+
+    void visitFunc(FuncDecl *func) {
+      if (func->isStatic()) {
+        asDerived().addStaticMethod(func);
+      } else {
+        asDerived().addInstanceMethod(func);
+      }
     }
   };
 
@@ -447,11 +484,22 @@ namespace {
       assert(isOutOfLineBase());
       return BeginIndex;
     }
+
+    static WitnessTableEntry forFunction(FuncDecl *func, WitnessIndex index) {
+      assert(!index.isValueWitness());
+      return WitnessTableEntry(func, index);
+    }
+
+    bool isFunction() const { return isa<FuncDecl>(Member); }
+
+    WitnessIndex getFunctionIndex() const {
+      assert(isFunction());
+      return BeginIndex;
+    }
   };
 
   /// A class which lays out a witness table in the abstract.
   class WitnessTableLayout : public WitnessVisitor<WitnessTableLayout> {
-    IRGenModule &IGM;
     unsigned NumWitnesses;
     SmallVector<WitnessTableEntry, 16> Entries;
 
@@ -461,12 +509,20 @@ namespace {
 
   public:
     WitnessTableLayout(IRGenModule &IGM)
-      : IGM(IGM), NumWitnesses(NumValueWitnesses) {}
+      : WitnessVisitor(IGM), NumWitnesses(NumValueWitnesses) {}
 
     /// The next witness is an out-of-line base protocol.
     void addOutOfLineBaseProtocol(Type baseType, ProtocolDecl *baseProto) {
       Entries.push_back(
              WitnessTableEntry::forOutOfLineBase(baseProto, getNextIndex()));
+    }
+
+    void addStaticMethod(FuncDecl *func) {
+      Entries.push_back(WitnessTableEntry::forFunction(func, getNextIndex()));
+    }
+
+    void addInstanceMethod(FuncDecl *func) {
+      Entries.push_back(WitnessTableEntry::forFunction(func, getNextIndex()));
     }
 
     unsigned getNumWitnesses() const { return NumWitnesses; }
@@ -1458,7 +1514,6 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
 namespace {
   /// A class which lays out a specific conformance to a protocol.
   class WitnessTableBuilder : public WitnessVisitor<WitnessTableBuilder> {
-    IRGenModule &IGM;
     SmallVectorImpl<llvm::Constant*> &Table;
     FixedPacking Packing;
     Type ConcreteType;
@@ -1471,10 +1526,12 @@ namespace {
                         FixedPacking packing,
                         Type concreteType, const TypeInfo &concreteTI,
                         const ProtocolConformance &conformance)
-      : IGM(IGM), Table(table), Packing(packing),
+      : WitnessVisitor(IGM), Table(table), Packing(packing),
         ConcreteType(concreteType), ConcreteTI(concreteTI),
         Conformance(conformance) {}
 
+    /// A base protocol is witnessed by a pointer to the conformance
+    /// of this type to that protocol.
     void addOutOfLineBaseProtocol(Type baseType, ProtocolDecl *baseProto) {
       // Look for a protocol type info.
       const ProtocolTypeInfo &baseTI =
@@ -1489,6 +1546,17 @@ namespace {
       llvm::Constant *baseWitness = conf.tryGetConstantTable();
       assert(baseWitness && "couldn't get a constant table!");
       Table.push_back(asOpaquePtr(IGM, baseWitness));
+    }
+
+    /// A static method is just witnessed by the 
+    void addStaticMethod(FuncDecl *func) {
+      // FIXME
+      Table.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+    }
+
+    void addInstanceMethod(FuncDecl *func) {
+      // FIXME
+      Table.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
     }
   };
 }
