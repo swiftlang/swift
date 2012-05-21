@@ -242,7 +242,16 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     Attributes.Assignment = true;
     return false;    
   }
-      
+
+  case AttrName::conversion: {
+    if (Attributes.isConversion())
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+    consumeToken(tok::identifier);
+    
+    Attributes.Conversion = true;
+    return false;    
+  }
+
   /// FIXME: This is a temporary hack until we can import C modules.
   case AttrName::asmname: {
     SourceLoc TokLoc = Tok.getLoc();

@@ -119,9 +119,12 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
                            (OperatorSyntax && VD->getAttrs().isAssignment())))
       continue;
     
-    // FIXME: We don't want to require exact matching here.
-    if (DestTy && !FunctionTy->getResult()->isEqual(DestTy))
-      continue;
+    // Check whether we can coerce the result type.
+    if (DestTy) {
+      OpaqueValueExpr OVE(Arg->getLoc(), FunctionTy->getResult());
+      if (!isCoercibleToType(&OVE, DestTy))
+        continue;
+    }
     
     Viable.push_back(VD);
   }

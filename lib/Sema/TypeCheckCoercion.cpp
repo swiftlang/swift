@@ -20,6 +20,7 @@
 #include "NameLookup.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Attr.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SetVector.h"
@@ -75,6 +76,8 @@ namespace {
     CF_Assignment = 0x02,
     /// \brief The argument will be treated as an implicit lvalue.
     CF_ImplicitLValue = 0x04,
+    /// \brief The argument allows user-defined conversions.
+    CF_UserConversions = 0x08,
     
     /// \brief The basic set of "non-propagated" flags.
     CF_NotPropagated = CF_Assignment|CF_ImplicitLValue
@@ -171,6 +174,9 @@ class SemaCoerce : public ExprVisitor<SemaCoerce, CoercedResult> {
            "Cannot return a coerced expression when not applying");
     return CoercedResult(E);
   }  
+
+  /// \brief Try to perform a user-defined conversion.
+  CoercedResult tryUserConversion(Expr *E);
   
 public:
   CoercedResult visitErrorExpr(ErrorExpr *E) {
@@ -191,6 +197,9 @@ public:
     return unchanged(E);
   }
   CoercedResult visitNewReferenceExpr(NewReferenceExpr *E) {
+    return unchanged(E);
+  }
+  CoercedResult visitOpaqueValueExpr(OpaqueValueExpr *E) {
     return unchanged(E);
   }
   CoercedResult visitSubscriptExpr(SubscriptExpr *E) {
@@ -357,10 +366,10 @@ public:
   }
     
   CoercedResult visitTupleExpr(TupleExpr *E) {
-    if (!(Flags & CF_Apply) && !DestTy->isEqual(E->getType()))
-      return nullptr;
-    
-    return unchanged(E);
+    if (DestTy->isEqual(E->getType()))
+      return unchanged(E);
+      
+    return tryUserConversion(E);
   }
   
   CoercedResult visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
@@ -440,7 +449,8 @@ public:
     }
     
     // FIXME: Note that this was an explicit lvalue.
-    if (CoercedResult Sub = coerceToType(E->getSubExpr(), DestTy, TC, Flags)) {
+    if (CoercedResult Sub = coerceToType(E->getSubExpr(), DestTy, TC,
+                                         Flags & ~CF_UserConversions)) {
       if (!(Flags & CF_Apply))
         return DestTy;
       
@@ -742,6 +752,72 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
   return coerced(new (TC.Context) CallExpr(DRE, Intermediate, DestTy));
 }
 
+CoercedResult SemaCoerce::tryUserConversion(Expr *E) {
+  assert((Flags & CF_UserConversions)
+         && "Not allowed to perform user conversions!");
+  
+  Type SourceTy = E->getType();
+  if (LValueType *SourceLV = SourceTy->getAs<LValueType>())
+    SourceTy = SourceLV->getObjectType();
+  
+  MemberLookup Lookup(SourceTy, TC.Context.getIdentifier("__conversion"),
+                      TC.TU);
+  if (!Lookup.isSuccess())
+    return nullptr;
+  
+  SmallVector<ValueDecl *, 4> Viable;
+  for (auto R : Lookup.Results) {
+    switch (R.Kind) {
+    case MemberLookupResult::MemberProperty:
+    case MemberLookupResult::MetatypeMember:
+    case MemberLookupResult::TupleElement:
+      continue;
+      break;
+    
+    case MemberLookupResult::MemberFunction:
+      if (!R.D->getAttrs().isConversion())
+        continue;
+      break;
+    }
+    
+    Type ResultTy
+      = R.D->getType()->getAs<FunctionType>()->getResult()->
+          getAs<FunctionType>()->getResult();
+    if (ResultTy->isEqual(DestTy))
+      Viable.push_back(R.D);
+  }
+
+  // FIXME: Terrible diagnostics!
+  if (Viable.size() != 1)
+    return nullptr;
+  
+  if (!(Flags & CF_Apply))
+    return DestTy;
+  
+  // FIXME: Provide a specialized AST node for these conversions.
+  Expr *FnRef
+    = new (TC.Context) DeclRefExpr(Viable.front(), E->getStartLoc(),
+                                   Viable.front()->getTypeOfReference());
+  // FIXME: Terrible, terrible hack to get the source ranges to work for
+  // these implicit nodes.
+  FnRef = new (TC.Context) ParenExpr(E->getStartLoc(), FnRef, E->getEndLoc(),
+                                     FnRef->getType());
+  ApplyExpr *ApplyThis = new (TC.Context) DotSyntaxCallExpr(FnRef,
+                                                            SourceLoc(),
+                                                            E);
+  Expr *BoundFn = TC.semaApplyExpr(ApplyThis);
+  if (!BoundFn)
+    return nullptr;
+  
+  TupleExpr *Args = new (TC.Context) TupleExpr(E->getStartLoc(),
+                                               MutableArrayRef<Expr *>(),
+                                               nullptr, E->getEndLoc());
+  TC.semaTupleExpr(Args);
+
+  ApplyExpr *Call = new (TC.Context) CallExpr(BoundFn, Args);
+  return coerced(TC.semaApplyExpr(Call));
+}
+
 CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
                             InterpolatedStringLiteralExpr *E) {
   TypeDecl *DestTyDecl = 0;
@@ -764,7 +840,7 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
 
   for (auto &Segment : E->getSegments()) {
     // First, try coercing to the string type.
-    if (coerceToType(Segment, DestTy, TC, /*Flags=*/0)) {
+    if (coerceToType(Segment, DestTy, TC, Flags & ~CF_Apply)) {
       if (!(Flags & CF_Apply))
         continue;
       
@@ -1619,6 +1695,14 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
   if (E->getType()->isDependentType())
     return SemaCoerce(TC, DestTy, Flags).doIt(E);
 
+  // If there is an implicit conversion from the source to the destination
+  // type, use it.
+  if (Flags & CF_UserConversions) {
+    if (CoercedResult Coerced
+          = SemaCoerce(TC, DestTy, Flags).tryUserConversion(E))
+      return Coerced;
+  }
+  
   // If the source is an l-value, load from it.
   if (LValueType *LValue = E->getType()->getAs<LValueType>()) {
     if (CoercedResult Loaded = loadLValue(E, LValue, TC,
@@ -1695,7 +1779,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
 }
 
 Expr *TypeChecker::coerceToType(Expr *E, Type DestTy, bool Assignment) {
-  unsigned Flags = CF_Apply;
+  unsigned Flags = CF_Apply | CF_UserConversions;
   if (Assignment)
     Flags |= CF_Assignment;
   if (CoercedResult Res = SemaCoerce::coerceToType(E, DestTy, *this, Flags))
@@ -1705,7 +1789,7 @@ Expr *TypeChecker::coerceToType(Expr *E, Type DestTy, bool Assignment) {
 }
 
 bool TypeChecker::isCoercibleToType(Expr *E, Type Ty, bool Assignment) {
-  unsigned Flags = 0;
+  unsigned Flags = CF_UserConversions;
   if (Assignment)
     Flags |= CF_Assignment;
   return (bool)SemaCoerce::coerceToType(E, Ty, *this, Flags);

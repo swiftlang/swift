@@ -647,7 +647,12 @@ ERROR(assignment_without_byref,sema_tcd,none,
       "assignment operator must have an initial [byref] argument", ())
 ERROR(assignment_nonvoid,sema_tcd,none,
       "assignment operator must return 'Void' (not %0)", (Type))
-
+ERROR(conversion_not_instance_method,sema_tcd,none,
+      "conversion function %0 is not an instance method",
+      (Identifier))
+ERROR(conversion_params,sema_tcd,none,
+      "conversion function %0 has non-defaulted parameters", (Identifier))
+      
 ERROR(invalid_decl_attribute,sema_tcd,none,
       "attribute '%0' cannot be applied to declaration", (StringRef))
 

@@ -51,7 +51,7 @@ struct MemberLookupResult {
     MemberFunction,
 
     /// MetatypeMember - "A.x" refers to an "x" which is a member of the
-    /// metatype "A". "a.x" is equivalent to "A.x", where "A' si the the
+    /// metatype "A". "a.x" is equivalent to "A.x", where "A' is the
     /// metatype of the type of "a"; the base is evaluated and ignored.
     MetatypeMember,
 

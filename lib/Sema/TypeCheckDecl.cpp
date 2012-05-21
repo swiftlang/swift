@@ -387,6 +387,40 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     }
   }
 
+  if (Attrs.isConversion()) {
+    // Only instance members with no non-defaulted parameters can be
+    // conversions.
+    if (!isa<FuncDecl>(VD) || !VD->isInstanceMember()) {
+      TC.diagnose(VD->getLocStart(), diag::conversion_not_instance_method,
+                  VD->getName());
+      VD->getMutableAttrs().Conversion = false;
+    } else {
+      FunctionType *BoundMethodTy
+        = VD->getType()->getAs<FunctionType>()->getResult()
+            ->getAs<FunctionType>();
+      
+      bool AcceptsEmptyParamList = false;
+      Type InputTy = BoundMethodTy->getInput();
+      if (const TupleType *Tuple = InputTy->getAs<TupleType>()) {
+        bool AllDefaulted = true;
+        for (auto Elt : Tuple->getFields()) {
+          if (!Elt.hasInit()) {
+            AllDefaulted = false;
+            break;
+          }
+        }
+        
+        AcceptsEmptyParamList = AllDefaulted;
+      }
+      
+      if (!AcceptsEmptyParamList) {
+        TC.diagnose(VD->getLocStart(), diag::conversion_params,
+                    VD->getName());
+        VD->getMutableAttrs().Conversion = false;
+      }
+    }
+  }
+  
   if (VD->isOperator() && !VD->getAttrs().isInfix() && NumArguments != 1) {
     // If this declaration is defined in the translation unit, check whether
     // there are any other operators in this scope with the same name that are

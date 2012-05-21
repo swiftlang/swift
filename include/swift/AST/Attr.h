@@ -141,9 +141,11 @@ public:
   bool ByrefHeap;
   bool AutoClosure;
   bool Assignment;
+  bool Conversion;
   
   DeclAttributes() : Byref(false), ByrefHeap(false),
-                     AutoClosure(false), Assignment(false) { }
+                     AutoClosure(false), Assignment(false),
+                     Conversion(false) { }
 
   bool isValid() const { return LSquareLoc.isValid(); }
 
@@ -154,6 +156,7 @@ public:
   bool isByrefHeap() const { assert(isByref()); return ByrefHeap; }
   bool isAutoClosure() const { return AutoClosure; }
   bool isAssignment() const { return Assignment; }
+  bool isConversion() const { return Conversion; }
   
   bool empty() const {
     return !isInfix() && !getResilienceData().isValid() && !isByref() &&

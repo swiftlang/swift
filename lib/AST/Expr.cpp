@@ -561,6 +561,10 @@ public:
       printRec(bound.Value);
     OS << ')';
   }
+
+  void visitOpaqueValueExpr(OpaqueValueExpr *E) {
+    printCommon(E, "opaque_value_expr") << ')';
+  }
   
   void printApplyExpr(ApplyExpr *E, const char *NodeName) {
     printCommon(E, NodeName) << '\n';

@@ -544,6 +544,11 @@ public:
     return E;
   }
 
+  Expr *visitOpaqueValueExpr(OpaqueValueExpr *E) {
+    // OpaqueValueExpr is fully type-checked.
+    return E;
+  }
+    
   Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
     // DotSyntaxBaseIgnoredExpr is fully type checked.
     return E;

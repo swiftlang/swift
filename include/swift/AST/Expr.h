@@ -1377,6 +1377,25 @@ public:
   }
 };
 
+/// OpaqueValueExpr - An expression referring to an opaque object of a
+/// fixed type. It is used internally to perform type-checking when we require
+/// an expression but do not want to form a complete expression.
+class OpaqueValueExpr : public Expr {
+  SourceLoc Loc;
+  
+public:
+  explicit OpaqueValueExpr(SourceLoc Loc, Type Ty)
+    : Expr(ExprKind::OpaqueValue, Ty), Loc(Loc) { }
+  
+  SourceRange getSourceRange() const { return Loc; }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const OpaqueValueExpr *) { return true; }
+  static bool classof(const Expr *E) { 
+    return E->getKind() == ExprKind::OpaqueValue; 
+  }
+};
+
 /// ApplyExpr - Superclass of various function calls, which apply an argument to
 /// a function to get a result.
 class ApplyExpr : public Expr {

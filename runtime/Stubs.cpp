@@ -87,6 +87,16 @@ extern "C" bool _TNSs4Bool13getLogicValuefRS_FT_i1(bool* b) {
   return *b;
 }
 
+extern "C" void swift_NSStringToString(void *object, void *string) {
+  // FIXME: This is a placeholder.
+  abort();
+}
+
+extern "C" void swift_StringToNSString(void *string) {
+  // FIXME: This is a placeholder.
+  abort();
+}
+
 // FIXME: load_protocol and store_protocol are extremely ugly hacks.
 struct protocol {
   void **witness_table;
