@@ -248,10 +248,6 @@ namespace {
       emitNewReferenceExpr(IGF, E, Out);
     }
 
-    void visitOpaqueValueExpr(OpaqueValueExpr *E) {
-      llvm_unreachable("OpaqueValueExpr in AST?");
-    }
-
     void visitApplyExpr(ApplyExpr *E) {
       emitApplyExpr(IGF, E, Out);
     }
@@ -411,10 +407,6 @@ namespace {
     LValue visitSubscriptExpr(SubscriptExpr *E) {
       return emitSubscriptLValue(IGF, E);
     }
-    
-    LValue visitOpaqueValueExpr(OpaqueValueExpr *E) {
-      llvm_unreachable("OpaqueValueExpr in AST?");
-    }
   };
 }
 
@@ -485,10 +477,6 @@ namespace {
       return IGF.getLocalVar(D);
     }
 
-    Optional<Address> visitOpaqueValueExpr(OpaqueValueExpr *E) {
-      llvm_unreachable("OpaqueValueExpr in AST?");
-    }
-                                                    
     // Some call results will naturally come back in memory.
     Optional<Address> visitApplyExpr(ApplyExpr *E) {
       return tryEmitApplyAsAddress(IGF, E, ObjectType);
