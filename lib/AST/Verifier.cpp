@@ -104,6 +104,30 @@ namespace {
       llvm_unreachable("not all cases handled!");
     }
 
+    bool walkToDeclPre(Decl *D) {
+      switch (D->getKind()) {
+#define DISPATCH(ID) return dispatchVisitPre(static_cast<ID##Decl*>(D))
+#define DECL(ID, PARENT) \
+      case DeclKind::ID: \
+        DISPATCH(ID);
+#include "swift/AST/DeclNodes.def"
+#undef DISPATCH
+      }
+      llvm_unreachable("not all cases handled!");
+    }
+
+    bool walkToDeclPost(Decl *D) {
+      switch (D->getKind()) {
+#define DISPATCH(ID) dispatchVisitPost(static_cast<ID##Decl*>(D)); return true;
+#define DECL(ID, PARENT) \
+      case DeclKind::ID: \
+        DISPATCH(ID);
+#include "swift/AST/DeclNodes.def"
+#undef DISPATCH
+      }
+      llvm_unreachable("not all cases handled!");
+    }
+
   private:
     /// Helper template for dispatching pre-visitation.
     /// If we're visiting in pre-order, don't validate the node yet;
@@ -137,14 +161,18 @@ namespace {
     // Default cases for whether we should verify within the given subtree.
     bool shouldVerify(Expr *E) { return true; }
     bool shouldVerify(Stmt *S) { return true; }
+    bool shouldVerify(Decl *S) { return true; }
 
     // Base cases for the various stages of verification.
     void verifyParsed(Expr *E) {}
     void verifyParsed(Stmt *S) {}
+    void verifyParsed(Decl *D) {}
     void verifyBound(Expr *E) {}
     void verifyBound(Stmt *S) {}
+    void verifyBound(Decl *D) {}
     void verifyChecked(Expr *E) {}
     void verifyChecked(Stmt *S) {}
+    void verifyChecked(Decl *D) {}
 
     // Specialized verifiers.
 
@@ -524,6 +552,10 @@ namespace {
       }
       checkSourceRanges(S->getSourceRange(), Parent,
                         ^ { S->print(Out); });
+    }
+
+    void checkSourceRanges(Decl *D) {
+      // FIXME: Implement this!
     }
     
     /// \brief Verify that the given source ranges is contained within the
