@@ -45,12 +45,16 @@ bool TypeChecker::typeCheckPattern(Pattern *P) {
 
   // If we see an explicit type annotation, coerce the sub-pattern to
   // that type.
-  case PatternKind::Typed:
-    if (validateType(P->getType()))
-      return true;
-    if (coerceToType(cast<TypedPattern>(P)->getSubPattern(), P->getType()))
-      return true;
-    return false;
+  case PatternKind::Typed: {
+    bool hadError = false;
+    if (validateType(P->getType())) {
+      P->overwriteType(ErrorType::get(Context));
+      hadError = true;
+    }
+    hadError |= coerceToType(cast<TypedPattern>(P)->getSubPattern(),
+                             P->getType());
+    return hadError;
+  }
 
   // A wildcard or name pattern cannot appear by itself in a context
   // which requires an explicit type.
@@ -103,17 +107,19 @@ bool TypeChecker::coerceToType(Pattern *P, Type type) {
   // that type.
   case PatternKind::Typed: {
     TypedPattern *TP = cast<TypedPattern>(P);
-    if (validateType(TP->getType()))
-      return true;
-
-    // Complain if the types don't match exactly.
-    // TODO: allow implicit conversions?
-    if (!type->isEqual(TP->getType())) {
+    bool hadError = false;
+    if (validateType(TP->getType())) {
+      TP->overwriteType(ErrorType::get(Context));
+      hadError = true;
+    } else if (!type->isEqual(TP->getType()) && !type->is<ErrorType>()) {
+      // Complain if the types don't match exactly.
+      // TODO: allow implicit conversions?
       diagnose(P->getLoc(), diag::pattern_type_mismatch_context, type);
-      return true;
+      hadError = true;
     }
 
-    return coerceToType(TP->getSubPattern(), TP->getType());
+    hadError |= coerceToType(TP->getSubPattern(), TP->getType());
+    return hadError;
   }
 
   // For wildcard and name patterns, just set the type.
@@ -132,20 +138,24 @@ bool TypeChecker::coerceToType(Pattern *P, Type type) {
   // TODO: permit implicit conversions?
   case PatternKind::Tuple: {
     TuplePattern *TP = cast<TuplePattern>(P);
+    bool hadError = false;
+
+    if (type->is<ErrorType>())
+      hadError = true;
 
     // The context type must be a tuple.
     TupleType *tupleTy = type->getAs<TupleType>();
     if (!tupleTy) {
       diagnose(TP->getLParenLoc(), diag::tuple_pattern_in_non_tuple_context,
                type);
-      return true;
+      hadError = true;
     }
 
     // The number of elements must match exactly.
     // TODO: incomplete tuple patterns, with some syntax.
-    if (tupleTy->getFields().size() != TP->getNumFields()) {
+    if (!hadError && tupleTy->getFields().size() != TP->getNumFields()) {
       diagnose(TP->getLParenLoc(), diag::tuple_pattern_length_mismatch, type);
-      return true;
+      hadError = true;
     }
 
     // Coerce each tuple element to the respective type.
@@ -160,13 +170,19 @@ bool TypeChecker::coerceToType(Pattern *P, Type type) {
         diagnose(pattern->getLoc(), diag::coerced_tuple_pattern_has_init)
           << pattern->getSourceRange();
         elt.setInit(nullptr);
+        hadError = true;
       }
 
-      if (coerceToType(pattern, tupleTy->getFields()[i].getType()))
-        return true;
+      Type CoercionType;
+      if (hadError)
+        CoercionType = ErrorType::get(Context);
+      else
+        CoercionType = tupleTy->getFields()[i].getType();
+
+      hadError |= coerceToType(pattern, CoercionType);
     }
 
-    return false;
+    return hadError;
   }
   }
   llvm_unreachable("bad pattern kind!");

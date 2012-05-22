@@ -456,8 +456,10 @@ public:
   }
 
   Expr *visitNewArrayExpr(NewArrayExpr *E) {
-    if (TC.validateType(E->getElementType()))
+    if (TC.validateType(E->getElementType())) {
+      E->setElementType(ErrorType::get(TC.Context));
       return nullptr;
+    }
 
     Type resultType = E->getElementType();
     if (resultType->isDependentType()) {
@@ -533,8 +535,10 @@ public:
   }
 
   Expr *visitNewReferenceExpr(NewReferenceExpr *E) {
-    if (TC.validateType(E->getType()))
+    if (TC.validateType(E->getType())) {
+      E->setType(ErrorType::get(TC.Context));
       return nullptr;
+    }
 
     if (!E->getType()->is<ClassType>()) {
       TC.diagnose(E->getLoc(), diag::new_reference_not_class);

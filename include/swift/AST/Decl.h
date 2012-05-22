@@ -204,7 +204,8 @@ public:
   SourceLoc getExtensionLoc() const { return ExtensionLoc; }
   SourceLoc getLocStart() const { return ExtensionLoc; }
   Type getExtendedType() const { return ExtendedType; }
-  
+  void setExtendedType(Type t) { ExtendedType = t; }
+
   /// \brief Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
   MutableArrayRef<Type> getInherited() { return Inherited; }

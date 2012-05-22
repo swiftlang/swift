@@ -45,14 +45,17 @@ public:
                       bool &CheckConformance) {
     // Check the list of inherited protocols.
     bool ConformsToProtocols = false;
-    for (auto InheritedTy : Inherited) {
-      if (!TC.validateType(InheritedTy)) {
-        if (!InheritedTy->is<ProtocolType>()) {
-          // FIXME: Terrible location information.
-          TC.diagnose(D->getLocStart(), diag::nonprotocol_inherit, InheritedTy);
-        } else {
-          ConformsToProtocols = true;
-        }
+    for (unsigned i = 0, e = Inherited.size(); i != e; ++i) {
+      if (TC.validateType(Inherited[i])) {
+        Inherited[i] = ErrorType::get(TC.Context);
+        continue;
+      }
+
+      if (!Inherited[i]->is<ProtocolType>()) {
+        // FIXME: Terrible location information.
+        TC.diagnose(D->getLocStart(), diag::nonprotocol_inherit, Inherited[i]);
+      } else if (!Inherited[i]->is<ErrorType>()) {
+        ConformsToProtocols = true;
       }
     }
     
@@ -108,10 +111,10 @@ public:
       Type DestTy;
       if (PBD->getPattern()->hasType()) {
         DestTy = PBD->getPattern()->getType();
-        if (TC.validateType(DestTy))
-          return;
-        if (DestTy->isDependentType())
-          DestTy = Type();
+        if (TC.validateType(DestTy)) {
+          DestTy = ErrorType::get(TC.Context);
+          PBD->getPattern()->overwriteType(DestTy);
+        }
       }
       Expr *Init = PBD->getInit();
       if (TC.typeCheckExpression(Init, DestTy)) {
@@ -260,7 +263,9 @@ public:
   }
   void visitExtensionDecl(ExtensionDecl *ED) {
     bool CheckConformance;
-    if (!TC.validateType(ED->getExtendedType())) {
+    if (TC.validateType(ED->getExtendedType())) {
+      ED->setExtendedType(ErrorType::get(TC.Context));
+    } else {
       Type ExtendedTy = ED->getExtendedType();
       if (!ExtendedTy->is<OneOfType>() && !ExtendedTy->is<StructType>() &&
           !ExtendedTy->is<ClassType>() && !ExtendedTy->is<ErrorType>()) {
