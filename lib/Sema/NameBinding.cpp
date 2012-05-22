@@ -28,6 +28,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/system_error.h"
 #include "llvm/Support/Path.h"
+#include <algorithm>
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -68,7 +69,7 @@ namespace {
     /// resolving it or diagnosing the error as appropriate and return true on
     /// failure.  On failure, this leaves IdentifierType alone, otherwise it
     /// fills in the Components.
-    bool resolveIdentifierType(IdentifierType *DNT);
+    bool resolveIdentifierType(IdentifierType *DNT,  DeclContext *DC);
     
   private:
     /// getModule - Load a module referenced by an import statement,
@@ -206,18 +207,44 @@ addStandardLibraryImport(SmallVectorImpl<ImportedModule> &Result) {
 /// resolving it or diagnosing the error as appropriate and return true on
 /// failure.  On failure, this leaves IdentifierType alone, otherwise it fills
 /// in the Components.
-bool NameBinder::resolveIdentifierType(IdentifierType *DNT) {
+bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
   const MutableArrayRef<IdentifierType::Component> &Components =DNT->Components;
   
   // If name lookup for the base of the type didn't get resolved in the
-  // parsing phase, do a global lookup for it.
+  // parsing phase, perform lookup on it.
   if (Components[0].Value.isNull()) {
     Identifier Name = Components[0].Id;
     SourceLoc Loc = Components[0].Loc;
     
     // Perform an unqualified lookup.
     SmallVector<ValueDecl*, 4> Decls;
-    TU->lookupGlobalValue(Name, NLKind::UnqualifiedLookup, Decls);
+    
+    // FIXME: Abstract this out a bit.
+    bool FoundSomething = false;
+    for (; !DC->isModuleContext(); DC = DC->getParent()) {
+      if (DC->isTypeContext()) {
+        if (Type ExtendedTy = DC->getDeclaredTypeOfContext()) {
+          MemberLookup Lookup(ExtendedTy, Name, *TU);
+          if (Lookup.isSuccess()) {
+            for (auto Result : Lookup.Results) {
+              // FIXME: Once we have real constructors, there might be less
+              // of a reason to stick non-type declarations. For now, this
+              // is reasonable.
+              if (isa<TypeDecl>(Result.D)) {
+                FoundSomething = true;
+                Decls.push_back(Result.D);
+              }
+            }
+            
+            if (FoundSomething)
+              break;
+          }
+        }
+      }
+    }
+    
+    if (!FoundSomething)
+      TU->lookupGlobalValue(Name, NLKind::UnqualifiedLookup, Decls);
     
     // If we find multiple results, we have an ambiguity error.
     // FIXME: This should be reevaluated and probably turned into a new NLKind.
@@ -377,6 +404,17 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, FuncDecl *CurFD,
   return OverloadedDeclRefExpr::createWithCopy(Decls, Loc);
 }
 
+/// \brief Determine the number of type contexts from DC to the module
+/// context.
+static unsigned getDeclContextTypeDepth(DeclContext *DC) {
+  unsigned Depth = 0;
+  while (!DC->isModuleContext()) {
+    if (DC->isTypeContext())
+      ++Depth;
+    DC = DC->getParent();
+  }
+  return Depth;
+}
 
 /// performNameBinding - Once parsing is complete, this walks the AST to
 /// resolve names and do other top-level validation.
@@ -443,9 +481,24 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
   }
 
   // Loop over all the unresolved dotted types in the translation unit,
-  // resolving them if possible.
-  for (auto IdAndContext : TU->getUnresolvedIdentifierTypes()) {
-    if (Binder.resolveIdentifierType(IdAndContext.first)) {
+  // resolving them if possible. We first sort the types by their context
+  // depth, so they the outermost types (e.g., those on extension declarations)
+  // are resolved first.
+  // FIXME: This is far from perfect; we also need to deal with a.b.c types
+  // that occur in an outer context.
+  typedef TranslationUnit::IdentTypeAndContext IdentTypeAndContext;
+  SmallVector<IdentTypeAndContext, 4> UnresolvedIdTypes;
+  UnresolvedIdTypes.append(TU->getUnresolvedIdentifierTypes().begin(),
+                           TU->getUnresolvedIdentifierTypes().end());
+  std::stable_sort(UnresolvedIdTypes.begin(), UnresolvedIdTypes.end(),
+                   [](IdentTypeAndContext lhs, IdentTypeAndContext rhs) {
+                     return getDeclContextTypeDepth(lhs.second) <
+                            getDeclContextTypeDepth(rhs.second);
+                   });
+  
+  for (auto IdAndContext : UnresolvedIdTypes) {
+    if (Binder.resolveIdentifierType(IdAndContext.first,
+                                     IdAndContext.second)) {
       // This IdentifierType resolved to the error type.
       for (auto &C : IdAndContext.first->Components)
         C.Value = TU->Ctx.TheErrorType;
