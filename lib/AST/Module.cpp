@@ -17,6 +17,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/AST.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
@@ -238,14 +239,26 @@ void Module::lookupGlobalValue(Identifier Name, NLKind LookupKind,
   
   TranslationUnit &TU = *cast<TranslationUnit>(this);
 
+  bool CurModuleHasMetatype = false;
+  for (ValueDecl *VD : Result) {
+    CurModuleHasMetatype |= isa<MetaTypeType>(VD->getType());
+  }
+
   // If we still haven't found it, scrape through all of the imports, taking the
-  // first match of the name.
+  // first match of the name.l
+  // FIXME: Implement shadowing based on canonical type.
   llvm::SmallPtrSet<Module *, 16> Visited;
   for (auto &ImpEntry : TU.getImportedModules()) {
     if (!Visited.insert(ImpEntry.second))
       continue;
-    
-    ImpEntry.second->lookupValue(ImpEntry.first, Name, LookupKind, Result);
+
+    SmallVector<ValueDecl*, 8> ResultTemp;
+    ImpEntry.second->lookupValue(ImpEntry.first, Name, LookupKind, ResultTemp);
+    for (ValueDecl *VD : ResultTemp) {
+      if (!(CurModuleHasMetatype && isa<MetaTypeType>(VD->getType()))) {
+        Result.push_back(VD);
+      }
+    }
   }
 }
 
@@ -254,19 +267,26 @@ static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
                                     Module *CurModule,
                                     Module *BaseModule,
                                     SmallVectorImpl<ValueDecl*> &Result) {
+  bool CurModuleHasMetatype = false;
+
   // Find all extensions in this module.
   for (ExtensionDecl *ED : CurModule->lookupExtensions(BaseType)) {
     for (Decl *Member : ED->getMembers()) {
-      if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
-        if (VD->getName() == Name)
+      if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
+        if (VD->getName() == Name) {
           Result.push_back(VD);
+          CurModuleHasMetatype |= isa<MetaTypeType>(VD->getType());
+        }
+      }
     }
   }
 
   if (BaseModule == CurModule) {
     for (ValueDecl *VD : BaseMembers) {
-      if (VD->getName() == Name)
+      if (VD->getName() == Name) {
         Result.push_back(VD);
+        CurModuleHasMetatype |= isa<MetaTypeType>(VD->getType());
+      }
     }
   }
 
@@ -276,8 +296,8 @@ static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
   TranslationUnit &TU = *cast<TranslationUnit>(CurModule);
 
   // Otherwise, check our imported extensions as well.
-  // FIXME: Is this actually looking in the right order?  What happens when
-  // one module imports two other modules which extend the same type?  
+  // FIXME: Implement DAG-based shadowing rules.
+  // FIXME: Implement shadowing based on canonical type.
   llvm::SmallPtrSet<Module *, 16> Visited;
   for (auto &ImpEntry : TU.getImportedModules()) {
     if (!Visited.insert(ImpEntry.second))
@@ -286,20 +306,17 @@ static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
     for (ExtensionDecl *ED : ImpEntry.second->lookupExtensions(BaseType)) {
       for (Decl *Member : ED->getMembers()) {
         if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
-          if (VD->getName() == Name)
+          if (VD->getName() == Name &&
+              !(CurModuleHasMetatype && isa<MetaTypeType>(VD->getType())))
             Result.push_back(VD);
       }
     }
+  }
 
-    if (BaseModule == ImpEntry.second) {
-      for (ValueDecl *VD : BaseMembers) {
-        if (VD->getName() == Name)
-          Result.push_back(VD);
-      }
-    }
-
-    // If we found something in an imported module, it wins.
-    if (!Result.empty()) return;
+  for (ValueDecl *VD : BaseMembers) {
+    if (VD->getName() == Name &&
+        !(CurModuleHasMetatype && isa<MetaTypeType>(VD->getType())))
+      Result.push_back(VD);
   }
 }
 
