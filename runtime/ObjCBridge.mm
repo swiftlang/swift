@@ -45,6 +45,9 @@ swift_StringToNSString(void *string);
 {
   return _TNSs6String4sizefRS_FT_NSs5Int64(&swiftString);
 }
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wobjc-missing-super-calls"
 - (void)dealloc
 {
   swift_release(static_cast<struct SwiftHeapObject *>(swiftString.owner));
@@ -52,6 +55,8 @@ swift_StringToNSString(void *string);
   swift_rawDealloc(self, 4);
 }
 @end
+#pragma clang diagnostic pop
+
 
 static Class stringClasses[] = {
   [_NSSwiftString self],
