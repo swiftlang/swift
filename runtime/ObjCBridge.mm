@@ -46,6 +46,7 @@ swift_StringToNSString(void *string);
 - (void)dealloc
 {
   swift_release(reinterpret_cast<struct SwiftHeapObject *>(swiftString.magic));
+  objc_destructInstance(self); // fixup weak references
   swift_rawDealloc(self, 4);
 }
 @end
@@ -61,22 +62,24 @@ swift_NSStringToString(void *object, void *string)
 {
   auto boxedString = static_cast<_NSSwiftString *>(object);
   auto swiftString = static_cast<SwiftString *>(string);
-  size_t i;
+  
   if (*(Class *)boxedString == stringClasses[0]) {
     *swiftString = boxedString->swiftString;
     swift_retain(reinterpret_cast<struct SwiftHeapObject *>(swiftString->magic));
-    return;
+  } else if (*(Class *)boxedString == stringClasses[1]) {
+    // constant string
+    // XXX FIXME -- detect and deal with non-ASCII/UTF8 pains
+    swiftString->magic[0] = 0;
+    swiftString->magic[1] = reinterpret_cast<uintptr_t>(
+                              [(NSString *)object UTF8String]);
+    swiftString->magic[2] = [(NSString *)object length];
+  } else {
+    // XXX FIXME -- leaking and we need to sort out intermediate boxing
+    swiftString->magic[0] = 0;
+    swiftString->magic[1] = reinterpret_cast<uintptr_t>(
+                              [(NSString *)object UTF8String]);
+    swiftString->magic[2] = [(NSString *)object length];
   }
-  // XXX FIXME -- handle known classes and copy the rest
-#if 0
-  for (i = 1; i < (sizeof(stringClasses) / sizeof(stringClasses[0])); i++) {
-    if (*c != stringClasses[i]) {
-      continue;
-    }
-    return;
-  }
-#endif
-  __builtin_trap();
 }
 
 void *
