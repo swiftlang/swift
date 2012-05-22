@@ -974,6 +974,13 @@ public:
   }
 };
 
+/// ArchetypeType - An archetype is a type that is a stand-in used to describe
+/// type parameters and associated types in generic definition and protocols.
+/// Archetypes will be replaced with actualy, concrete types at some later
+/// point in time, whether it be at compile time due to a direct binding or
+/// at run time due to the use of generic types.
+///
+/// FIXME: Same-type constraints.
 class ArchetypeType : public TypeBase {
   StringRef DisplayName;
   
