@@ -513,7 +513,7 @@ void IdentifierType::print(raw_ostream &OS) const {
 }
 
 void OneOfType::print(raw_ostream &OS) const {
-  OS << TheDecl->getName().get();
+  OS << getDecl()->getName().get();
 }
 
 void MetaTypeType::print(raw_ostream &OS) const {
@@ -558,7 +558,7 @@ void ArrayType::print(raw_ostream &OS) const {
 }
 
 void ProtocolType::print(raw_ostream &OS) const {
-  OS << TheDecl->getName().str();
+  OS << getDecl()->getName().str();
 }
 
 void LValueType::print(raw_ostream &OS) const {
@@ -586,9 +586,9 @@ void LValueType::print(raw_ostream &OS) const {
 }
 
 void StructType::print(raw_ostream &OS) const {
-  OS << TheDecl->getName().get();
+  OS << getDecl()->getName().get();
 }
 
 void ClassType::print(raw_ostream &OS) const {
-  OS << TheDecl->getName().get();
+  OS << getDecl()->getName().get();
 }

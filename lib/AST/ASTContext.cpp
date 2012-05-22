@@ -170,19 +170,13 @@ TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
 }
 
 OneOfType::OneOfType(OneOfDecl *TheDecl, ASTContext &C)
-: TypeBase(TypeKind::OneOf, &C, /*Dependent=*/false),
-  TheDecl(TheDecl) {
-}
+  : NominalType(TypeKind::OneOf, &C, TheDecl) { }
 
 StructType::StructType(StructDecl *TheDecl, ASTContext &C)
-: TypeBase(TypeKind::Struct, &C, /*Dependent=*/false),
-  TheDecl(TheDecl) {
-}
+  : NominalType(TypeKind::Struct, &C, TheDecl) { }
 
 ClassType::ClassType(ClassDecl *TheDecl, ASTContext &C)
-: TypeBase(TypeKind::Class, &C, /*Dependent=*/false),
-  TheDecl(TheDecl) {
-}
+  : NominalType(TypeKind::Class, &C, TheDecl) { }
 
 IdentifierType *IdentifierType::getNew(ASTContext &C,
                                        MutableArrayRef<Component> Components) {
@@ -274,9 +268,7 @@ ProtocolType *ProtocolType::getNew(ProtocolDecl *TheDecl) {
 }
 
 ProtocolType::ProtocolType(ProtocolDecl *TheDecl)
-  : TypeBase(TypeKind::Protocol, &TheDecl->getASTContext(),
-             /*Dependent=*/false),
-    TheDecl(TheDecl) { }
+  : NominalType(TypeKind::Protocol, &TheDecl->getASTContext(), TheDecl) { }
 
 LValueType *LValueType::get(Type objectTy, Qual quals, ASTContext &C) {
   auto key = std::make_pair(objectTy, quals.getOpaqueData());

@@ -35,6 +35,7 @@ namespace swift {
   class Identifier;
   class TypeAliasDecl;
   class TypeDecl;
+  class NominalTypeDecl;
   class OneOfDecl;
   class OneOfElementDecl;
   class StructDecl;
@@ -44,6 +45,8 @@ namespace swift {
   
   enum class TypeKind {
 #define TYPE(id, parent) id,
+#define TYPE_RANGE(Id, FirstId, LastId) \
+  First_##Id##Type = FirstId, Last_##Id##Type = LastId,
 #include "swift/AST/TypeNodes.def"
   };
   
@@ -528,15 +531,37 @@ private:
   TupleType(ArrayRef<TupleTypeElt> fields, ASTContext *CanCtx);
 };
 
-/// OneOfType - This represents the type declared by a OneOfDecl.
-class OneOfType : public TypeBase {  
+/// NominalType - Represents a type with a name that is significant, such that
+/// the name distinguishes it from other structurally-similar types that have
+/// different names. Nominal types are always canonical.
+class NominalType : public TypeBase {
   /// TheDecl - This is the TypeDecl which declares the given type. It
   /// specifies the name and other useful information about this type.
-  OneOfDecl * const TheDecl;
+  NominalTypeDecl * const TheDecl;
+
+protected:
+  NominalType(TypeKind K, ASTContext *C, NominalTypeDecl *TheDecl)
+    : TypeBase(K, C, /*Dependent=*/false), TheDecl(TheDecl) { }
+
+public:
+  /// \brief Returns the declaration that declares this type.
+  NominalTypeDecl *getDecl() const { return TheDecl; }
   
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const NominalType *) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->getKind() >= TypeKind::First_NominalType &&
+           T->getKind() <= TypeKind::Last_NominalType;
+  }
+};
+
+/// OneOfType - This represents the type declared by a OneOfDecl.
+class OneOfType : public NominalType {
 public:
   /// getDecl() - Returns the decl which declares this type.
-  OneOfDecl *getDecl() const { return TheDecl; }
+  OneOfDecl *getDecl() const {
+    return reinterpret_cast<OneOfDecl *>(NominalType::getDecl());
+  }
 
   void print(raw_ostream &O) const;
   
@@ -552,14 +577,12 @@ private:
 };
 
 /// StructType - This represents the type declared by a StructDecl.
-class StructType : public TypeBase {  
-  /// TheDecl - This is the TypeDecl which declares the given type. It
-  /// specifies the name and other useful information about this type.
-  StructDecl * const TheDecl;
-  
+class StructType : public NominalType {  
 public:
   /// getDecl() - Returns the decl which declares this type.
-  StructDecl *getDecl() const { return TheDecl; }
+  StructDecl *getDecl() const {
+    return reinterpret_cast<StructDecl *>(NominalType::getDecl());
+  }
 
   void print(raw_ostream &O) const;
   
@@ -575,14 +598,12 @@ private:
 };
 
 /// ClassType - This represents the type declared by a ClassDecl.
-class ClassType : public TypeBase {  
-  /// TheDecl - This is the TypeDecl which declares the given type. It
-  /// specifies the name and other useful information about this type.
-  ClassDecl * const TheDecl;
-  
+class ClassType : public NominalType {  
 public:
   /// getDecl() - Returns the decl which declares this type.
-  ClassDecl *getDecl() const { return TheDecl; }
+  ClassDecl *getDecl() const {
+    return reinterpret_cast<ClassDecl *>(NominalType::getDecl());
+  }
 
   void print(raw_ostream &O) const;
   
@@ -773,18 +794,16 @@ public:
 
 /// ProtocolType - A protocol type describes an abstract interface implemented
 /// by another type.
-class ProtocolType : public TypeBase {
-  /// TheDecl - The protocol declaration, which stores most of the information
-  /// about the protocol type.
-  ProtocolDecl * const TheDecl;
-  
+class ProtocolType : public NominalType {
 public:
   /// getNew - Return a new instance of a protocol type.  These are never
   /// uniqued since each syntactic instance of them is semantically considered
   /// to be a different type.
   static ProtocolType *getNew(ProtocolDecl *TheDecl);
   
-  ProtocolDecl *getDecl() const { return TheDecl; }
+  ProtocolDecl *getDecl() const {
+    return reinterpret_cast<ProtocolDecl *>(NominalType::getDecl());
+  }
   
   void print(raw_ostream &OS) const;
   

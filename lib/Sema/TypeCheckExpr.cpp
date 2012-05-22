@@ -669,10 +669,11 @@ Expr *TypeChecker::buildArrayInjectionFnRef(ArraySliceType *sliceType,
   // FIXME: There should be a better way to handle this.
   if (isa<NameAliasType>(implType))
     implTypeDecl = cast<NameAliasType>(implType)->getDecl();
-  else if (isa<StructType>(implType))
-    implTypeDecl = cast<StructType>(implType)->getDecl();
+  else if (NominalType *Nominal = dyn_cast<NominalType>(implType))
+    implTypeDecl = Nominal->getDecl();
   else
-    implTypeDecl = cast<OneOfType>(implType)->getDecl();
+    llvm_unreachable("Non-nominal slice type");
+  
   Expr *sliceTypeRef =
     recheckTypes(new (Context) DeclRefExpr(implTypeDecl, Loc));
   if (!sliceTypeRef) return nullptr;

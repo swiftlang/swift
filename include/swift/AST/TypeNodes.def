@@ -37,12 +37,24 @@
 #define ALWAYS_CANONICAL_TYPE(id, parent) TYPE(id, parent)
 #endif
 
+/// Most metaprograms do not care about abstract types, so the default
+/// is to ignore them.
+#ifndef ABSTRACT_TYPE
+#define ABSTRACT_TYPE(Id, Parent)
+#endif
+
 #ifndef SUGARED_TYPE
 #define SUGARED_TYPE(id, parent) TYPE(id, parent)
 #endif
 
 #ifndef UNCHECKED_TYPE
 #define UNCHECKED_TYPE(id, parent) TYPE(id, parent)
+#endif
+
+/// A convenience for determining the range of types.  These will always
+/// appear immediately after the last member.
+#ifndef TYPE_RANGE
+#define TYPE_RANGE(Id, First, Last)
 #endif
 
 UNCHECKED_TYPE(Error, Type)
@@ -56,18 +68,22 @@ SUGARED_TYPE(NameAlias, Type)
 SUGARED_TYPE(Identifier, Type)
 SUGARED_TYPE(Paren, Type)
 TYPE(Tuple, Type)
-ALWAYS_CANONICAL_TYPE(OneOf, Type)
-ALWAYS_CANONICAL_TYPE(Struct, Type)
-ALWAYS_CANONICAL_TYPE(Class, Type)
+ABSTRACT_TYPE(Nominal, Type)
+  ALWAYS_CANONICAL_TYPE(OneOf, NominalType)
+  ALWAYS_CANONICAL_TYPE(Struct, NominalType)
+  ALWAYS_CANONICAL_TYPE(Class, NominalType)
+  ALWAYS_CANONICAL_TYPE(Protocol, NominalType)
+  TYPE_RANGE(Nominal, OneOf, Protocol)
 ALWAYS_CANONICAL_TYPE(MetaType, Type)
 ALWAYS_CANONICAL_TYPE(Module, Type)
 TYPE(Function, Type)
 TYPE(Array, Type)
 SUGARED_TYPE(ArraySlice, Type)
-ALWAYS_CANONICAL_TYPE(Protocol, Type)
 TYPE(LValue, Type)
 
+#undef TYPE_RANGE
 #undef UNCHECKED_TYPE
 #undef SUGARED_TYPE
+#undef ABSTRACT_TYPE
 #undef ALWAYS_CANONICAL_TYPE
 #undef TYPE

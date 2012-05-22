@@ -754,9 +754,15 @@ CoercedResult SemaCoerce::tryUserConversion(Expr *E) {
   assert((Flags & CF_UserConversions)
          && "Not allowed to perform user conversions!");
   
+  // The source type may already be an lvalue; just look into the underlying
+  // object type.
   Type SourceTy = E->getType();
   if (LValueType *SourceLV = SourceTy->getAs<LValueType>())
     SourceTy = SourceLV->getObjectType();
+  
+  // We can only perform implicit conversions from nominal types.
+  if (!SourceTy->is<NominalType>())
+    return nullptr;
   
   MemberLookup Lookup(SourceTy, TC.Context.getIdentifier("__conversion"),
                       TC.TU);
@@ -819,12 +825,8 @@ CoercedResult SemaCoerce::tryUserConversion(Expr *E) {
 CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
                             InterpolatedStringLiteralExpr *E) {
   TypeDecl *DestTyDecl = 0;
-  if (OneOfType *OneOfTy = DestTy->getAs<OneOfType>())
-    DestTyDecl = OneOfTy->getDecl();
-  else if (StructType *StructTy = DestTy->getAs<StructType>())
-    DestTyDecl = StructTy->getDecl();
-  else if (ProtocolType *ProtoTy = DestTy->getAs<ProtocolType>())
-    DestTyDecl = ProtoTy->getDecl();
+  if (NominalType *Nominal = DestTy->getAs<NominalType>())
+    DestTyDecl = Nominal->getDecl();
   else {
     if (Flags & CF_Apply)
       diagnose(E->getLoc(), diag::nonstring_interpolation_type, DestTy);

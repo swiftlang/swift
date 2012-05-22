@@ -31,14 +31,8 @@ static bool buildArraySliceType(TypeChecker &TC, ArraySliceType *sliceTy) {
   // As our current hack for array slices, require the base type to be
   // a nominal type X, then look for a type SliceX.
   Identifier name;
-  if (OneOfType *oneof = baseTy->getAs<OneOfType>()) {
-    name = oneof->getDecl()->getName();
-  } else if (StructType *st = baseTy->getAs<StructType>()) {
-    name = st->getDecl()->getName();
-  } else if (ProtocolType *pt = baseTy->getAs<ProtocolType>()) {
-    name = pt->getDecl()->getName();
-  } else if (ClassType *ct = baseTy->getAs<ClassType>()) {
-    name = ct->getDecl()->getName();
+  if (NominalType *Nominal = baseTy->getAs<NominalType>()) {
+    name = Nominal->getDecl()->getName();
   } else {
     TC.diagnose(loc, diag::base_of_array_slice_not_nominal, baseTy);
     return true;
