@@ -30,9 +30,11 @@ namespace {
     TranslationUnit *TU;
     ASTContext &Ctx;
     llvm::raw_ostream &Out;
+    bool HadError;
 
   public:
-    Verifier(TranslationUnit *TU) : TU(TU), Ctx(TU->Ctx), Out(llvm::errs()) {}
+    Verifier(TranslationUnit *TU) : TU(TU), Ctx(TU->Ctx), Out(llvm::errs()),
+                                    HadError(TU->Ctx.hadError()) {}
 
     bool walkToExprPre(Expr *E) {
       switch (E->getKind()) {
@@ -42,7 +44,7 @@ namespace {
         DISPATCH(ID);
 #define UNCHECKED_EXPR(ID, PARENT) \
       case ExprKind::ID: \
-        assert(TU->ASTStage < TranslationUnit::TypeChecked && \
+        assert((TU->ASTStage < TranslationUnit::TypeChecked || HadError) && \
                #ID "in wrong phase");\
         DISPATCH(ID);
 #define UNBOUND_EXPR(ID, PARENT) \
@@ -64,7 +66,7 @@ namespace {
         DISPATCH(ID);
 #define UNCHECKED_EXPR(ID, PARENT) \
       case ExprKind::ID: \
-        assert(TU->ASTStage < TranslationUnit::TypeChecked && \
+        assert((TU->ASTStage < TranslationUnit::TypeChecked || HadError) && \
                #ID "in wrong phase");\
         DISPATCH(ID);
 #define UNBOUND_EXPR(ID, PARENT) \
@@ -123,7 +125,9 @@ namespace {
         verifyBound(node);
 
       // If we've checked types already, do some extra verification.
-      if (TU->ASTStage >= TranslationUnit::TypeChecked)
+      // FIXME: The check for HadError should be pushed down into the
+      // verifyChecked implementations.
+      if (TU->ASTStage >= TranslationUnit::TypeChecked && !HadError)
         verifyChecked(node);
 
       // Always continue.
@@ -567,9 +571,6 @@ namespace {
 }
 
 void swift::verify(TranslationUnit *TUnit) {
-  // FIXME: For now, punt if there are errors in the translation unit.
-  if (TUnit->Ctx.hadError()) return;
-
   Verifier verifier(TUnit);
   for (Decl *D : TUnit->Decls)
     D->walk(verifier);

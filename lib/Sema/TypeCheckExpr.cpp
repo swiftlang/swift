@@ -1151,16 +1151,18 @@ static bool convertWithMethod(TypeChecker &TC, Expr *&E, Identifier method,
     UnresolvedDotExpr *UDE =
       new (TC.Context) UnresolvedDotExpr(E, E->getStartLoc(), method,
                                          E->getEndLoc());
-    E = TC.semaUnresolvedDotExpr(UDE);
-    if (!E) return true;
+    Expr *checkedDot = TC.semaUnresolvedDotExpr(UDE);
+    if (!checkedDot) return true;
+    E = checkedDot;
 
     TupleExpr *callArgs =
       new (TC.Context) TupleExpr(E->getStartLoc(), MutableArrayRef<Expr *>(), 0,
                                  E->getEndLoc(),
                                  TupleType::getEmpty(TC.Context));
     CallExpr *CE = new (TC.Context) CallExpr(E, callArgs, Type());
-    E = TC.semaApplyExpr(CE);
-    if (!E) return true;
+    Expr *CheckedCall = TC.semaApplyExpr(CE);
+    if (!CheckedCall) return true;
+    E = CheckedCall;
 
     // We're done as soon as we reach an acceptable type.
     if (isTypeOkay(E->getType())) return false;
