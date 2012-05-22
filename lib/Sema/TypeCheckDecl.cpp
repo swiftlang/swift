@@ -243,10 +243,6 @@ public:
     }
 
     visitValueDecl(FD);
-
-    assert((!FD->getBody() ||
-            FD->getType()->isEqual(FD->getBody()->getType())) &&
-           "Unexpected func body");
   }
   void visitOneOfElementDecl(OneOfElementDecl *ED) {
     // Ignore element decls that carry no type.
