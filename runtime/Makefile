@@ -15,7 +15,7 @@ SWIFT_LEVEL := ..
 LIBRARYNAME := swift_runtime
 LINK_LIBS_IN_SHARED := 1
 SHARED_LIBRARY := 1
-SOURCES := Alloc.cpp Stubs.cpp swift.swift
+SOURCES := Alloc.cpp Stubs.cpp ObjCBridge.mm swift.swift
 NO_BUILD_ARCHIVE := 1
 
 include $(SWIFT_LEVEL)/../../Makefile.config

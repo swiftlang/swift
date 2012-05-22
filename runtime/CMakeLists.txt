@@ -3,6 +3,7 @@ set(SHARED_LIBRARY ON)
 add_swift_library(swift_runtime
   Alloc.cpp
   Stubs.cpp
+  ObjCBridge.mm
   swift.swift)
 
 if(SWIFT_OPTIMIZED)
