@@ -23,9 +23,9 @@ swift_StringToNSString(void *string);
 {
 @public
   struct SwiftString {
-    const void *base;
+    const char *base;
     size_t len;
-    void *owner;
+    SwiftHeapObject *owner;
   } swiftString;
 }
 - (unichar)characterAtIndex: (NSUInteger)index;
@@ -50,7 +50,7 @@ swift_StringToNSString(void *string);
 #pragma clang diagnostic ignored "-Wobjc-missing-super-calls"
 - (void)dealloc
 {
-  swift_release(static_cast<struct SwiftHeapObject *>(swiftString.owner));
+  swift_release(swiftString.owner);
   objc_destructInstance(self); // fixup weak references
   swift_rawDealloc(self, 4);
 }
@@ -72,18 +72,20 @@ swift_NSStringToString(void *object, void *string)
   
   if (*(Class *)boxedString == stringClasses[0]) {
     *swiftString = boxedString->swiftString;
-    swift_retain(static_cast<struct SwiftHeapObject *>(swiftString->owner));
+    swift_retain(swiftString->owner);
   } else if (*(Class *)boxedString == stringClasses[1]) {
     // constant string
     // XXX FIXME -- detect and deal with non-ASCII/UTF8 pains
-    swiftString->base  = static_cast<const void *>([(NSString *)object UTF8String]);
+    swiftString->base  = [(NSString *)object UTF8String];
+    swiftString->len   = [(NSString *)object length];
+    swiftString->owner = 0;
+  } else if (*(Class *)boxedString == stringClasses[2]) {
+    // XXX FIXME -- leaking and we need to sort out intermediate boxing
+    swiftString->base  = strdup([(NSString *)object UTF8String]);
     swiftString->len   = [(NSString *)object length];
     swiftString->owner = 0;
   } else {
-    // XXX FIXME -- leaking and we need to sort out intermediate boxing
-    swiftString->base  = static_cast<const void *>([(NSString *)object UTF8String]);
-    swiftString->len   = [(NSString *)object length];
-    swiftString->owner = 0;
+    __builtin_trap();
   }
 }
 
@@ -94,6 +96,6 @@ swift_StringToNSString(void *string)
   auto r = static_cast<_NSSwiftString *>(swift_rawAlloc(4));
   *((Class *)r) = stringClasses[0];
   r->swiftString = *static_cast<SwiftString *>(string);
-  swift_retain(static_cast<struct SwiftHeapObject *>(r->swiftString.owner));
+  swift_retain(r->swiftString.owner);
   return r;
 }
