@@ -101,26 +101,25 @@ swift_slowAlloc(size_t bytes, uint64_t flags);
 //   tinyIndex = 0;
 // } else {
 //   --bytes;
-//   if (bytes < 0x80) {
-//     _slot = (bytes >> 3);
-//   } else if (bytes < 0x100) {
-//     _slot = (bytes >> 4) + 0x8;
-//   } else if (bytes < 0x200) {
-//     _slot = (bytes >> 5) + 0x10;
-//   } else if (bytes < 0x400) {
-//     _slot = (bytes >> 6) + 0x18;
-//   } else if (bytes < 0x800) {
-//     _slot = (bytes >> 7) + 0x20;
-//   } else if (bytes < 0x1000) {
-//     _slot = (bytes >> 8) + 0x28;
-//   } else {
-//     __builtin_trap();
-//   }
+// #ifdef __LP64__
+//   if      (bytes < 0x80)   { idx = (bytes >> 3);        }
+//   else if (bytes < 0x100)  { idx = (bytes >> 4) + 0x8;  }
+//   else if (bytes < 0x200)  { idx = (bytes >> 5) + 0x10; }
+//   else if (bytes < 0x400)  { idx = (bytes >> 6) + 0x18; }
+//   else if (bytes < 0x800)  { idx = (bytes >> 7) + 0x20; }
+//   else if (bytes < 0x1000) { idx = (bytes >> 8) + 0x28; }
+// #else
+//   if      (bytes < 0x40)   { idx = (bytes >> 2);        }
+//   else if (bytes < 0x80)   { idx = (bytes >> 3) + 0x8;  }
+//   else if (bytes < 0x100)  { idx = (bytes >> 4) + 0x10; }
+//   else if (bytes < 0x200)  { idx = (bytes >> 5) + 0x18; }
+//   else if (bytes < 0x400)  { idx = (bytes >> 6) + 0x20; }
+//   else if (bytes < 0x800)  { idx = (bytes >> 7) + 0x28; }
+//   else if (bytes < 0x1000) { idx = (bytes >> 8) + 0x30; }
+// #endif
+//   else                     { __builtin_trap();          }
 // }
-// swift_alloc(tinyIndex);
-//
-// XXX FIXME -- adjust the algorithm to allow for 32-bit machines to use word
-// sized allocations on the small end of the tiny API.
+// return swift_alloc(tinyIndex);
 void *
 swift_alloc(SwiftAllocIndex idx);
 void *
