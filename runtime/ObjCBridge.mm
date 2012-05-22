@@ -8,8 +8,8 @@ int64_t
 _TNSs6String4sizefRS_FT_NSs5Int64(void *swiftString);
 
 uint32_t
-_TNSs6String11__subscriptFT3idxNSs5Int64_NSs4Charg(void *swiftString,
-                                                   uint64_t idx);
+_TNSs6String11__subscriptFT3idxNSs5Int64_NSs4Charg(uint64_t idx,
+                                                   void *swiftString);
 
 void
 swift_NSStringToString(void *object, void *string);
@@ -23,7 +23,9 @@ swift_StringToNSString(void *string);
 {
 @public
   struct SwiftString {
-    uintptr_t magic[3];
+    const void *base;
+    size_t len;
+    void *owner;
   } swiftString;
 }
 - (unichar)characterAtIndex: (NSUInteger)index;
@@ -37,7 +39,7 @@ swift_StringToNSString(void *string);
   // XXX FIXME
   // Become bug-for-bug compatible with NSString being UTF16.
   // In practice, this API is oblivious to UTF16 surrogate pairs.
-  return _TNSs6String11__subscriptFT3idxNSs5Int64_NSs4Charg(&swiftString, idx);
+  return _TNSs6String11__subscriptFT3idxNSs5Int64_NSs4Charg(idx, &swiftString);
 }
 - (NSUInteger)length
 {
@@ -45,7 +47,7 @@ swift_StringToNSString(void *string);
 }
 - (void)dealloc
 {
-  swift_release(reinterpret_cast<struct SwiftHeapObject *>(swiftString.magic));
+  swift_release(static_cast<struct SwiftHeapObject *>(swiftString.owner));
   objc_destructInstance(self); // fixup weak references
   swift_rawDealloc(self, 4);
 }
@@ -65,20 +67,18 @@ swift_NSStringToString(void *object, void *string)
   
   if (*(Class *)boxedString == stringClasses[0]) {
     *swiftString = boxedString->swiftString;
-    swift_retain(reinterpret_cast<struct SwiftHeapObject *>(swiftString->magic));
+    swift_retain(static_cast<struct SwiftHeapObject *>(swiftString->owner));
   } else if (*(Class *)boxedString == stringClasses[1]) {
     // constant string
     // XXX FIXME -- detect and deal with non-ASCII/UTF8 pains
-    swiftString->magic[0] = 0;
-    swiftString->magic[1] = reinterpret_cast<uintptr_t>(
-                              [(NSString *)object UTF8String]);
-    swiftString->magic[2] = [(NSString *)object length];
+    swiftString->base  = static_cast<const void *>([(NSString *)object UTF8String]);
+    swiftString->len   = [(NSString *)object length];
+    swiftString->owner = 0;
   } else {
     // XXX FIXME -- leaking and we need to sort out intermediate boxing
-    swiftString->magic[0] = 0;
-    swiftString->magic[1] = reinterpret_cast<uintptr_t>(
-                              [(NSString *)object UTF8String]);
-    swiftString->magic[2] = [(NSString *)object length];
+    swiftString->base  = static_cast<const void *>([(NSString *)object UTF8String]);
+    swiftString->len   = [(NSString *)object length];
+    swiftString->owner = 0;
   }
 }
 
@@ -89,6 +89,6 @@ swift_StringToNSString(void *string)
   auto r = static_cast<_NSSwiftString *>(swift_rawAlloc(4));
   *((Class *)r) = stringClasses[0];
   r->swiftString = *static_cast<SwiftString *>(string);
-  swift_retain(reinterpret_cast<struct SwiftHeapObject *>(r->swiftString.magic));
+  swift_retain(static_cast<struct SwiftHeapObject *>(r->swiftString.owner));
   return r;
 }
