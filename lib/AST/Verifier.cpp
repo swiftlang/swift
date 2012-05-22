@@ -258,7 +258,7 @@ namespace {
       }
       if (InputExprTy != FT->getInput()->getCanonicalType()) {
         TupleType *TT = FT->getInput()->getAs<TupleType>();
-        if (isa<DotSyntaxCallExpr>(E)) {
+        if (isa<ThisApplyExpr>(E)) {
           LValueType::Qual InputExprQuals;
           Type InputExprObjectTy;
           if (InputExprTy->hasReferenceSemantics())

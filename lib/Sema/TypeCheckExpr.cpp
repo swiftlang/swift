@@ -241,7 +241,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // expected type of the function.
     // If this is, syntactically, an expression x.f where 'f' is a method in
     // the type of 'x', we're coercing the object argument ('this').
-    if (isa<DotSyntaxCallExpr>(E))
+    if (isa<ThisApplyExpr>(E))
       E2 = coerceObjectArgument(E2, FT->getInput());
     else
       E2 = coerceToType(E2, FT->getInput(), Assignment);

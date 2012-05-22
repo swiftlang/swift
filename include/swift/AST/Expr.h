@@ -1504,15 +1504,35 @@ public:
   }
 };
 
+/// ThisApplyExpr - Abstract application that provides the 'this' pointer for
+/// a method curried as (this : This) -> (params) -> result.
+///
+/// The application of a curried method to 'this' semantically differs from
+/// normal function application because the 'this' parameter can be implicitly
+/// materialized from an rvalue.
+class ThisApplyExpr : public ApplyExpr {
+protected:
+  ThisApplyExpr(ExprKind K, Expr *FnExpr, Expr *BaseExpr, Type Ty)
+    : ApplyExpr(K, FnExpr, BaseExpr, Ty) { }
+  
+public:
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ThisApplyExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() >= ExprKind::First_ThisApplyExpr &&
+           E->getKind() <= ExprKind::Last_ThisApplyExpr;
+  }
+};
+
 /// DotSyntaxCallExpr - Refer to a method of a type, e.g. P.x.  'x'
 /// is modeled as a DeclRefExpr or OverloadSetRefExpr on the method.
-class DotSyntaxCallExpr : public ApplyExpr {
+class DotSyntaxCallExpr : public ThisApplyExpr {
   SourceLoc DotLoc;
   
 public:
   DotSyntaxCallExpr(Expr *FnExpr, SourceLoc DotLoc, Expr *BaseExpr,
                     Type Ty = Type())
-    : ApplyExpr(ExprKind::DotSyntaxCall, FnExpr, BaseExpr, Ty),
+    : ThisApplyExpr(ExprKind::DotSyntaxCall, FnExpr, BaseExpr, Ty),
       DotLoc(DotLoc) {
   }
 
