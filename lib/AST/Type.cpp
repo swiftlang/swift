@@ -85,6 +85,7 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
   case TypeKind::MetaType:
   case TypeKind::Module:
   case TypeKind::Protocol:
+  case TypeKind::Archetype:
     return this;
 
   case TypeKind::NameAlias:
@@ -409,6 +410,16 @@ void TupleType::updateInitializedElementType(unsigned EltNo, Type NewTy,
   Elt = TupleTypeElt(NewTy, Elt.getName(), NewInit);
 }
 
+ArchetypeType *ArchetypeType::getNew(StringRef DisplayName, ASTContext &Ctx) {
+  void *Mem = Ctx.Allocate(sizeof(ArchetypeType) + DisplayName.size(),
+                           llvm::alignOf<ArchetypeType>());
+  char *StoredStringData = (char*)Mem + sizeof(ArchetypeType);
+  memcpy(StoredStringData, DisplayName.data(), DisplayName.size());
+  return ::new (Mem) ArchetypeType(StringRef(StoredStringData,
+                                             DisplayName.size()),
+                                   Ctx);
+}
+
 //===----------------------------------------------------------------------===//
 //  Type Printing
 //===----------------------------------------------------------------------===//
@@ -591,4 +602,8 @@ void StructType::print(raw_ostream &OS) const {
 
 void ClassType::print(raw_ostream &OS) const {
   OS << getDecl()->getName().get();
+}
+
+void ArchetypeType::print(raw_ostream &OS) const {
+  OS << DisplayName;
 }

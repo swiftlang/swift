@@ -169,7 +169,7 @@ public:
   static bool classof(const TypeBase *) { return true; }
 
 private:
-  // Make placement new and vanilla new/delete illegal for Types.
+  // Make vanilla new/delete illegal for Types.
   void *operator new(size_t Bytes) throw() = delete;
   void operator delete(void *Data) throw() = delete;
   void *operator new(size_t Bytes, void *Mem) throw() = delete;
@@ -972,6 +972,27 @@ public:
   static bool classof(const TypeBase *type) {
     return type->getKind() == TypeKind::LValue;
   }
+};
+
+class ArchetypeType : public TypeBase {
+  StringRef DisplayName;
+  
+public:
+  /// getNew - Create a new archetype with the given name.
+  static ArchetypeType *getNew(StringRef DisplayName, ASTContext &Ctx);
+  
+  void print(raw_ostream &OS) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ArchetypeType *) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Archetype;
+  }
+  
+private:
+  ArchetypeType(StringRef DisplayName, ASTContext &Ctx)
+    : TypeBase(TypeKind::Archetype, &Ctx, /*Dependent=*/false),
+      DisplayName(DisplayName){ }
 };
 
 inline bool TypeBase::isDependentType() const {

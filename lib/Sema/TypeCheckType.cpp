@@ -102,6 +102,7 @@ bool TypeChecker::validateType(Type InTy) {
   case TypeKind::OneOf:
   case TypeKind::Struct:
   case TypeKind::Class:
+  case TypeKind::Archetype:
     // These types are already canonical anyway.
     return false;
       

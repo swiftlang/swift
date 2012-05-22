@@ -233,6 +233,11 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, CanType canTy) {
     return convertArrayType(IGM, cast<ArrayType>(ty));
   case TypeKind::Protocol:
     return convertProtocolType(IGM, cast<ProtocolType>(ty));
+      
+  case TypeKind::Archetype:
+    // FIXME: In generics, these will have a representation. Will it simply
+    // be a fixed buffer?
+    llvm_unreachable("Archetype types are unimplemented");
   }
   llvm_unreachable("bad type kind");
 }

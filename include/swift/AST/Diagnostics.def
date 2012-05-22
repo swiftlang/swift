@@ -199,6 +199,8 @@ ERROR(expected_colon_in_typealias,decl_parsing,none,
       "expected ':' in typealias declaration", ())
 ERROR(expected_type_in_typealias,decl_parsing,none,
       "expected type in var declaration", ())
+ERROR(associated_type_def,decl_parsing,none,
+      "typealias %0 in protocol cannot have a definition", (Identifier))
 
 // Func
 ERROR(func_decl_without_paren,decl_parsing,none,
@@ -674,8 +676,14 @@ NOTE(ambiguous_witnesses,sema_tcd,none,
      "multiple matching "
      "%select{functions named %1|properties named %1|subscript operators}0 "
      "with type %2", (int, Identifier, Type))
+NOTE(no_witnesses_type,sema_tcd,none,
+     "protocol requires nested type %0", (Identifier))
 NOTE(protocol_witness,sema_tcd,none,
      "possibly intended match with type %0", (Type))
+NOTE(ambiguous_witnesses_type,sema_tcd,none,
+     "multiple matching types named %0", (Identifier))
+NOTE(protocol_witness_type,sema_tcd,none,
+     "possibly intended match", ())
 ERROR(circular_protocol_def,sema_tcd,none,
       "circular protocol inheritance %0", (StringRef))
 NOTE(protocol_here,sema_tcd,none,

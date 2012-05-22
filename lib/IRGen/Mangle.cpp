@@ -250,7 +250,9 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     llvm_unreachable("Cannot mangle metatype yet");
   case TypeKind::Module:
     llvm_unreachable("Cannot mangle module type yet");
-
+  case TypeKind::Archetype:
+    llvm_unreachable("Cannot mangle archetype yet");
+      
   // We don't care about these types being a bit verbose because we
   // don't expect them to come up that often in API names.
   case TypeKind::BuiltinFloat:

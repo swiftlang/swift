@@ -78,10 +78,11 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
         if (VD->getName() != MemberName) continue;
         if (isa<VarDecl>(VD) || isa<SubscriptDecl>(VD)) {
           Results.push_back(Result::getMemberProperty(VD));
-        } else {
-          assert(isa<FuncDecl>(VD) &&
-                 "Other protocol members not yet implemented");
+        } else if (isa<FuncDecl>(VD)) {
           Results.push_back(Result::getMemberFunction(VD));
+        } else {
+          assert(isa<TypeDecl>(VD) && "Unhandled protocol member");
+          Results.push_back(Result::getMetatypeMember(VD));
         }
       }
     }

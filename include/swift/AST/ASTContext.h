@@ -51,6 +51,10 @@ public:
   /// the declarations that satisfy those requirements.
   llvm::DenseMap<ValueDecl *, ValueDecl *> Mapping;
   
+  /// \brief The mapping of individual archetypes in the protocol over to
+  /// the types used to satisy the type requirements.
+  llvm::DenseMap<Type, Type> TypeMapping;
+  
   /// \brief The mapping from any directly-inherited protocols over to the
   /// protocol conformance structures that indicate how the given type meets
   /// the requirements of those protocols.

@@ -216,6 +216,16 @@ public:
     checkInherited(PD, PD->getDeclaredType(), PD->getInherited(),
                    CheckConformance);
     
+    // Assign archetypes each of the associated types.
+    // FIXME: We need to build equivalence classes of associated types first,
+    // then assign an archtype to each equivalence class.
+    for (auto Member : PD->getMembers()) {
+      if (auto AssocType = dyn_cast<TypeAliasDecl>(Member)) {
+        AssocType->setUnderlyingType(
+          ArchetypeType::getNew(AssocType->getName().str(), TC.Context));
+      }
+    }
+    
     // Check the members.
     for (auto Member : PD->getMembers())
       visit(Member);

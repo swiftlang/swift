@@ -47,6 +47,7 @@ static std::unique_ptr<ProtocolConformance>
 checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                         SourceLoc ComplainLoc) {
   llvm::DenseMap<ValueDecl *, ValueDecl *> Mapping;
+  llvm::DenseMap<Type, Type> TypeMapping;
   llvm::DenseMap<ProtocolDecl *, ProtocolConformance *> InheritedMapping;
 
   // Check that T conforms to all inherited protocols.
@@ -69,13 +70,97 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     }
   }
   
-  // Check that T provides all of the required members.
   bool Complained = false;
+  
+  // First, resolve any associated type members. They'll be used for checking
+  // other members.
+  
+  // FIXME: This algorithm is totally busted. We want to allow deduction of
+  // associated type witnesses from the parameter/return types of other
+  // witnesses, or to figure out an associated type based on one of its other
+  // names, which means we need a rather more sophisticated algorithm.
+  for (auto Member : Proto->getMembers()) {
+    auto AssociatedType = dyn_cast<TypeAliasDecl>(Member);
+    if (!AssociatedType)
+      continue;
+    
+    MemberLookup Lookup(T, AssociatedType->getName(), TC.TU);
+    if (Lookup.isSuccess()) {
+      SmallVector<TypeDecl *, 2> Viable;
+      
+      for (auto Candidate : Lookup.Results) {
+        switch (Candidate.Kind) {
+          case MemberLookupResult::MetatypeMember:
+            // FIXME: Check this type against the protocol requirements.
+            if (auto Type = dyn_cast<TypeDecl>(Candidate.D))
+              Viable.push_back(Type);
+            break;
+            
+          case MemberLookupResult::MemberProperty:
+          case MemberLookupResult::MemberFunction:
+            // Fall-through
+            
+          case MemberLookupResult::TupleElement:
+            // Tuple elements cannot satisfy requirements.
+            break;
+        }
+      }
+      
+      if (Viable.size() == 1) {
+        TypeMapping[AssociatedType->getUnderlyingType()]
+          = Viable.front()->getDeclaredType();
+        continue;
+      }
+      
+      if (ComplainLoc.isInvalid())
+        return nullptr;
+      
+      if (!Viable.empty()) {
+        if (!Complained) {
+          TC.diagnose(ComplainLoc, diag::type_does_not_conform,
+                      T, Proto->getDeclaredType());
+          Complained = true;
+        }
+        
+        TC.diagnose(AssociatedType->getLocStart(),
+                    diag::ambiguous_witnesses_type,
+                    AssociatedType->getName());
+        
+        for (auto Candidate : Viable)
+          TC.diagnose(Candidate->getLocStart(), diag::protocol_witness_type);
+      }
+    }
+    
+    if (ComplainLoc.isValid()) {
+      if (!Complained) {
+        TC.diagnose(ComplainLoc, diag::type_does_not_conform,
+                    T, Proto->getDeclaredType());
+        Complained = true;
+      }
+      
+      TC.diagnose(AssociatedType->getLocStart(), diag::no_witnesses_type,
+                  AssociatedType->getName());
+      for (auto Candidate : Lookup.Results) {
+        if (Candidate.hasDecl())
+          TC.diagnose(Candidate.D->getLocStart(), diag::protocol_witness_type);
+      }
+    } else {
+      return nullptr;
+    }
+
+  }
+
+  // Check that T provides all of the required func/variable/subscript members.
   for (auto Member : Proto->getMembers()) {
     auto Requirement = dyn_cast<ValueDecl>(Member);
     if (!Requirement)
       continue;
 
+    // Associated type requirements handled above.
+    if (isa<TypeAliasDecl>(Requirement))
+      continue;
+    
+    // Variable/function/subscript requirements.
     MemberLookup Lookup(T, Requirement->getName(), TC.TU);
 
     if (Lookup.isSuccess()) {
@@ -155,6 +240,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   std::unique_ptr<ProtocolConformance> Result(new ProtocolConformance);
   // FIXME: Make DenseMap movable to make this efficient.
   Result->Mapping = std::move(Mapping);
+  Result->TypeMapping = std::move(TypeMapping);
   Result->InheritedMapping = std::move(InheritedMapping);
   return Result;
 }

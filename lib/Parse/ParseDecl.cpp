@@ -355,7 +355,7 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     HadParseError = parseDeclVar(Flags & PD_HasContainerType, Entries);
     break;
   case tok::kw_typealias:
-    Entries.push_back(parseDeclTypeAlias());
+    Entries.push_back(parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef)));
     break;
   case tok::kw_oneof:
     HadParseError = parseDeclOneOf(Entries);
@@ -418,8 +418,8 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
           diagnose(Func->getBody()->getLoc(), diag::disallowed_func_def);
       }
       
-      if (auto Type = dyn_cast<TypeDecl>(VD)) {
-        if (Flags & PD_DisallowTypes)
+      if (auto Type = dyn_cast<NominalTypeDecl>(VD)) {
+        if (Flags & PD_DisallowNominalTypes)
           diagnose(Type->getLocStart(), diag::disallowed_type);
       }
     } else if (auto Pattern = dyn_cast<PatternBindingDecl>(D)) {
@@ -546,15 +546,27 @@ Decl *Parser::parseExtensionBody(SourceLoc ExtensionLoc, Type Ty,
 /// parseDeclTypeAlias
 ///   decl-typealias:
 ///     'typealias' identifier ':' type
-TypeAliasDecl *Parser::parseDeclTypeAlias() {
+///
+/// FIXME: Grammar is wrong and icky.
+TypeAliasDecl *Parser::parseDeclTypeAlias(bool WantDefinition) {
   SourceLoc TypeAliasLoc = consumeToken(tok::kw_typealias);
   
   Identifier Id;
   Type Ty;
-  if (parseIdentifier(Id, diag::expected_identifier_in_decl, "typealias") ||
-      parseToken(tok::colon, diag::expected_colon_in_typealias) ||
-      parseType(Ty, diag::expected_type_in_typealias))
-    return 0;
+  SourceLoc IdLoc = Tok.getLoc();
+  if (parseIdentifier(Id, diag::expected_identifier_in_decl, "typealias"))
+    return nullptr;
+  
+  if (WantDefinition || Tok.is(tok::colon)) {
+    if (parseToken(tok::colon, diag::expected_colon_in_typealias) ||
+        parseType(Ty, diag::expected_type_in_typealias))
+      return nullptr;
+    
+    if (!WantDefinition) {
+      diagnose(IdLoc, diag::associated_type_def, Id);
+      Ty = Type();
+    }
+  }
 
   TypeAliasDecl *TAD =
     new (Context) TypeAliasDecl(TypeAliasLoc, Id, Ty, CurDeclContext);
@@ -1463,8 +1475,8 @@ bool Parser::parseProtocolBody(SourceLoc ProtocolLoc,
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
     if (parseDecl(Members,
                   PD_HasContainerType|PD_DisallowProperty|PD_DisallowOperators|
-                  PD_DisallowStatic|PD_DisallowFuncDef|PD_DisallowTypes|
-                  PD_DisallowInit)) {
+                  PD_DisallowStatic|PD_DisallowFuncDef|PD_DisallowNominalTypes|
+                  PD_DisallowInit|PD_DisallowTypeAliasDef)) {
       skipUntilDeclRBrace();
       HadError = true;
     }
