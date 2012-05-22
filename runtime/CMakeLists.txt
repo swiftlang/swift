@@ -19,6 +19,7 @@ endif()
 # Link against Foundation, for ObjC bridging.
 set_target_properties(swift_runtime PROPERTIES 
                                     LINK_FLAGS "-framework Foundation")
+add_dependencies(swift_runtime swift)
 
 # FIXME: Install swift.swift
 
