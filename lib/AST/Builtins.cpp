@@ -305,6 +305,7 @@ static Type DecodeFixedType(unsigned &NextElt, ArrayRef<unsigned char> Infos,
   case IIT_V32:
   case IIT_EXTEND_VEC_ARG:
   case IIT_TRUNC_VEC_ARG:
+  case IIT_ANYPTR:
     // These types cannot be expressed in swift yet.
     return Type();
   case IIT_EMPTYSTRUCT:
