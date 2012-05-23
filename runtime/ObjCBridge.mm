@@ -2,6 +2,8 @@
 #include <objc/runtime.h>
 #include "Alloc.h"
 
+struct SwiftString;
+
 extern "C" {
 
 int64_t
@@ -12,12 +14,13 @@ _TNSs6String11__subscriptFT3idxNSs5Int64_NSs4Charg(uint64_t idx,
                                                    void *swiftString);
 
 void
-swift_NSStringToString(void *object, void *string);
+swift_NSStringToString(NSString *nsstring, SwiftString *string);
 
-void *
-swift_StringToNSString(void *string);
+NSString *
+swift_StringToNSString(SwiftString *string);
 
 }; // extern "C"
+
 
 @interface _NSSwiftString : NSString
 {
@@ -57,7 +60,6 @@ swift_StringToNSString(void *string);
 @end
 #pragma clang diagnostic pop
 
-
 static Class stringClasses[] = {
   [_NSSwiftString self],
   objc_lookUpClass("__NSCFConstantString"),
@@ -65,37 +67,52 @@ static Class stringClasses[] = {
 };
 
 void
-swift_NSStringToString(void *object, void *string)
+swift_NSStringToString(NSString *nsstring, SwiftString *string)
 {
-  auto boxedString = static_cast<_NSSwiftString *>(object);
-  auto swiftString = static_cast<SwiftString *>(string);
-  
-  if (*(Class *)boxedString == stringClasses[0]) {
-    *swiftString = boxedString->swiftString;
-    swift_retain(swiftString->owner);
-  } else if (*(Class *)boxedString == stringClasses[1]) {
+  // XXX FIXME -- NSString is oblivious to surrogate pairs
+
+  string->owner = 0;
+
+  if (*(Class *)nsstring == stringClasses[0]) {
+    auto boxedString = static_cast<_NSSwiftString *>(nsstring);
+    *string = boxedString->swiftString;
+    swift_retain(string->owner);
+  } else if (*(Class *)nsstring == stringClasses[1]) {
     // constant string
-    // XXX FIXME -- detect and deal with non-ASCII/UTF8 pains
-    swiftString->base  = [(NSString *)object UTF8String];
-    swiftString->len   = [(NSString *)object length];
-    swiftString->owner = 0;
-  } else if (*(Class *)boxedString == stringClasses[2]) {
+    string->base  = [nsstring UTF8String];
+    string->len   = [nsstring length];
+  } else if (*(Class *)nsstring == stringClasses[2]) {
     // XXX FIXME -- leaking and we need to sort out intermediate boxing
-    swiftString->base  = strdup([(NSString *)object UTF8String]);
-    swiftString->len   = [(NSString *)object length];
-    swiftString->owner = 0;
-  } else {
+    string->base  = [nsstring UTF8String];
+    string->len   = [nsstring length];
+    if (string->base) {
+      string->base = strdup(string->base);
+    }
+  }
+
+  if (string->base) {
+    return;
+  }
+
+  size_t len = [nsstring length];
+  size_t bufSize = len * 2 + 1;
+  char *buf = static_cast<char *>(malloc(bufSize));
+  assert(buf);
+  if (![nsstring getCString: buf maxLength: bufSize
+                   encoding: NSUTF8StringEncoding]) {
     __builtin_trap();
   }
+  string->base  = buf;
+  string->len   = len;
 }
 
-void *
-swift_StringToNSString(void *string)
+NSString *
+swift_StringToNSString(SwiftString *string)
 {
   // sizeof(_NSSwiftString) is not allowed
   auto r = static_cast<_NSSwiftString *>(swift_rawAlloc(4));
   *((Class *)r) = stringClasses[0];
-  r->swiftString = *static_cast<SwiftString *>(string);
+  r->swiftString = *string;
   swift_retain(r->swiftString.owner);
   return r;
 }
