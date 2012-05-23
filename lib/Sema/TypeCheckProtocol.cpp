@@ -19,14 +19,17 @@
 #include "NameLookup.h"
 using namespace swift;
 
-static Type getInstanceUsageType(ValueDecl *Value) {
+static Type getInstanceUsageType(ValueDecl *Value, ASTContext &Context) {
   Type Ty = Value->getType();
   if (FuncDecl *Func = dyn_cast<FuncDecl>(Value)) {
-    if (!Func->isStatic())
-      return Ty->getAs<FunctionType>()->getResult();
+    // FIXME: Revisit when we add 'this' to static functions.
+    if (!Func->isStatic()) {
+      if (auto FuncTy = dyn_cast<FunctionType>(Func->getType()))
+        return FuncTy->getResult()->getUnlabeledType(Context);
+    }
   }
   
-  return Ty;
+  return Ty->getUnlabeledType(Context);
 }
 
 /// \brief Retrieve the kind of requirement described by the given declaration,
@@ -175,7 +178,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       SmallVector<ValueDecl *, 2> Viable;
       // Determine the type that we require the witness to have, substituting
       // in the witnesses we've collected for our archetypes.
-      Type RequiredTy = TC.substType(getInstanceUsageType(Requirement),
+      Type RequiredTy = TC.substType(getInstanceUsageType(Requirement,
+                                                          TC.Context),
                                      TypeMapping);
       
       for (auto Candidate : Lookup.Results) {
@@ -188,7 +192,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         case MemberLookupResult::MemberProperty:
         case MemberLookupResult::MemberFunction:
           if (Candidate.D->getKind() == Requirement->getKind() &&
-              RequiredTy->isEqual(getInstanceUsageType(Candidate.D)))
+              RequiredTy->isEqual(getInstanceUsageType(Candidate.D,
+                                                       TC.Context)))
             Viable.push_back(Candidate.D);
           break;
 
@@ -220,7 +225,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         
         for (auto Candidate : Viable)
           TC.diagnose(Candidate->getLocStart(), diag::protocol_witness,
-                      getInstanceUsageType(Candidate));
+                      getInstanceUsageType(Candidate, TC.Context));
       }
     }
 
@@ -234,11 +239,11 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       TC.diagnose(Requirement->getLocStart(), diag::no_witnesses,
                   getRequirementKind(Requirement),
                   Requirement->getName(),
-                  getInstanceUsageType(Requirement));
+                  getInstanceUsageType(Requirement, TC.Context));
       for (auto Candidate : Lookup.Results) {
         if (Candidate.hasDecl())
           TC.diagnose(Candidate.D->getLocStart(), diag::protocol_witness,
-                      getInstanceUsageType(Candidate.D));
+                      getInstanceUsageType(Candidate.D, TC.Context));
       }
     } else {
       return nullptr;
