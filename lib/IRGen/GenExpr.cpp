@@ -279,6 +279,10 @@ namespace {
                              isOnHeap(E->getType()), Out);
     }
     
+    void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
+      IGF.unimplemented(E->getLoc(), "existential member references");
+    }
+    
     void visitCapturingExpr(CapturingExpr *E) {
       emitClosure(IGF, E, Out);
     }
@@ -404,6 +408,11 @@ namespace {
       return emitMemberRefLValue(IGF, E);
     }
     
+    LValue visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
+      IGF.unimplemented(E->getLoc(), "existential member references");
+      return LValue();
+    }
+
     LValue visitSubscriptExpr(SubscriptExpr *E) {
       return emitSubscriptLValue(IGF, E);
     }
@@ -523,6 +532,7 @@ namespace {
     NON_LOCATEABLE(NewReferenceExpr)
     NON_LOCATEABLE(NewArrayExpr)
     NON_LOCATEABLE(CoerceExpr)
+    NON_LOCATEABLE(ExistentialMemberRefExpr)
                                                     
     // FIXME: We may want to specialize IR generation for array subscripts.
     NON_LOCATEABLE(SubscriptExpr);

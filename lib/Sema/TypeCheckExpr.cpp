@@ -420,6 +420,66 @@ public:
                                TC.Context));
     return E;
   }
+    
+  Expr *visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
+    if (E->getDecl()->getType()->is<ErrorType>())
+      return nullptr;
+    
+    // Ensure that the base is an lvalue, materializing it if is not an
+    // lvalue yet.
+    Type ContainerTy
+      = E->getDecl()->getDeclContext()->getDeclaredTypeOfContext();
+    if (Expr *Base = TC.coerceObjectArgument(E->getBase(), ContainerTy))
+      E->setBase(Base);
+    else
+      return nullptr;
+    
+    // Determine the type of the member.
+    Type MemberTy = E->getDecl()->getType();
+    if (auto Method = dyn_cast<FuncDecl>(E->getDecl())) {
+      if (!Method->isStatic()) {
+        if (auto FuncTy = dyn_cast<FunctionType>(MemberTy))
+          MemberTy = FuncTy->getResult();
+      }
+    } else {
+      MemberTy = LValueType::get(MemberTy,
+                                 LValueType::Qual::DefaultForMemberAccess,
+                                 TC.Context);
+    }
+      
+    // For each of the archetypes in the protocol, substitute an existential
+    // type that meets the same requirements.
+    ProtocolDecl *Proto = ContainerTy->getAs<ProtocolType>()->getDecl();
+    TypeSubstitutionMap Substitutions;
+    for (auto Member : Proto->getMembers()) {
+      auto AssocType = dyn_cast<TypeAliasDecl>(Member);
+      if (!AssocType)
+        continue;
+      
+      ArchetypeType *Archetype
+        = AssocType->getDeclaredType()->castTo<ArchetypeType>();
+      
+      // FIXME: This is all a gross hack. Actually bake protocol constraints
+      // into the archetypes, so we can ready-made existential types here.
+      if (AssocType->getName().str().equals("This"))
+        Substitutions[Archetype] = ContainerTy;
+      else
+        Substitutions[Archetype]
+          = TC.getAnyProtocol(E->getDotLoc())->getDeclaredType();
+    }
+    
+    // Substitute the existential types into the member type.
+    MemberTy = TC.substType(MemberTy, Substitutions);
+    if (!MemberTy) {
+      E->setType(ErrorType::get(TC.Context));
+      return nullptr;
+    }
+    
+    
+    E->setType(MemberTy);
+    return E;
+  }
+
   Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     E->setType(UnstructuredUnresolvedType::get(TC.Context));
     return E;

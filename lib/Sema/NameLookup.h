@@ -57,6 +57,9 @@ struct MemberLookupResult {
 
     /// TupleElement - "a.x" is a direct reference to a field of a tuple.
     TupleElement,
+    
+    /// ExistentialMember - "a.x" refers to a member of an existential type.
+    ExistentialMember
   } Kind;
   
   static MemberLookupResult getMemberProperty(ValueDecl *D) {
@@ -81,6 +84,12 @@ struct MemberLookupResult {
     MemberLookupResult R;
     R.TupleFieldNo = Elt;
     R.Kind = TupleElement;
+    return R;
+  }
+  static MemberLookupResult getExistentialMember(ValueDecl *D) {
+    MemberLookupResult R;
+    R.D = D;
+    R.Kind = ExistentialMember;
     return R;
   }
   

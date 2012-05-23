@@ -469,8 +469,49 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::MemberRef;
   }
-};
+};  
+
+/// ExistentialMemberRefExpr - This represents 'a.b' where we are referring to
+/// a member of an existential type (e.g., a protocol member).
+///
+/// \code
+/// protocol Printable {
+///   func print(format : Format)
+/// }
+///
+/// var p : Printable
+/// p.print // An ExistentialMemberRefExpr with type (format : Format) -> ()
+/// \endcode
+class ExistentialMemberRefExpr : public Expr {
+  Expr *Base;
+  ValueDecl *Value;
+  SourceLoc DotLoc;
+  SourceLoc NameLoc;
   
+public:  
+  ExistentialMemberRefExpr(Expr *Base, SourceLoc DotLoc, ValueDecl *Value,
+                           SourceLoc NameLoc);
+  Expr *getBase() const { return Base; }
+  ValueDecl *getDecl() const { return Value; }
+  SourceLoc getNameLoc() const { return NameLoc; }
+  SourceLoc getDotLoc() const { return DotLoc; }
+  
+  void setBase(Expr *E) { Base = E; }
+  
+  SourceLoc getLoc() const { return NameLoc; }
+  SourceRange getSourceRange() const {
+    if (Base->isImplicit())
+      return SourceRange(NameLoc);
+    
+    return SourceRange(Base->getStartLoc(), NameLoc);
+  }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ExistentialMemberRefExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ExistentialMemberRef;
+  }
+};
 
 /// UnresolvedMemberExpr - This represents '.foo', an unresolved reference to a
 /// member, which is to be resolved with context sensitive type information into

@@ -128,6 +128,11 @@ MemberRefExpr::MemberRefExpr(Expr *Base, SourceLoc DotLoc, VarDecl *Value,
   : Expr(ExprKind::MemberRef), Base(Base),
     Value(Value), DotLoc(DotLoc), NameLoc(NameLoc) { }
 
+ExistentialMemberRefExpr::ExistentialMemberRefExpr(Expr *Base, SourceLoc DotLoc,
+                                                   ValueDecl *Value,
+                                                   SourceLoc NameLoc)
+  : Expr(ExprKind::ExistentialMemberRef), Base(Base), Value(Value),
+    DotLoc(DotLoc), NameLoc(NameLoc) { }
 
 Type OverloadSetRefExpr::getBaseType() const {
   if (isa<OverloadedDeclRefExpr>(this))
@@ -185,6 +190,14 @@ Expr *OverloadedMemberRefExpr::createWithCopy(Expr *Base, SourceLoc DotLoc,
   ASTContext &C = Decls[0]->getASTContext();
 
   if (Decls.size() == 1) {
+    Type BaseTy = Base->getType();
+    if (auto BaseLV = BaseTy->getAs<LValueType>())
+      BaseTy = BaseLV->getObjectType();
+    if (BaseTy->getAs<ProtocolType>()) {
+      return new (C) ExistentialMemberRefExpr(Base, DotLoc, Decls[0],
+                                              MemberLoc);
+    }
+    
     Expr *Fn = new (C) DeclRefExpr(Decls[0], MemberLoc,
                                    Decls[0]->getTypeOfReference());
     // FIXME: If metatype types ever get a runtime representation, we'll need
@@ -416,7 +429,12 @@ public:
     printRec(E->getBase());
     OS << ')';
   }
-  
+  void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
+    printCommon(E, "existential_member_ref_expr")
+    << " decl=" << E->getDecl()->getName() << '\n';
+    printRec(E->getBase());
+    OS << ')';
+  }
   void visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     printCommon(E, "unresolved_member_expr")
       << " name='" << E->getName() << "')";

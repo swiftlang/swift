@@ -29,11 +29,16 @@ public:
   
 private:
   
+  /// \brief The 'Any' protocol, used when reinfying existential member
+  /// references.
+  ProtocolDecl *AnyProto;
+  
   /// \brief The 'Range' protocol, used by the for-each loop.
   ProtocolDecl *RangeProto;
     
 public:
-  TypeChecker(TranslationUnit &TU) : TU(TU), Context(TU.Ctx), RangeProto(0) {}
+  TypeChecker(TranslationUnit &TU)
+    : TU(TU), Context(TU.Ctx), AnyProto(0), RangeProto(0) {}
   
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(ArgTypes... Args) {
@@ -183,7 +188,11 @@ public:
   /// candidate.
   Expr *buildFilteredOverloadSet(OverloadSetRefExpr *OSE, ValueDecl *Best);
   /// @}
-  
+
+  /// \brief Retrieve the Any protocol declaration, or build one if none
+  /// exists.
+  ProtocolDecl *getAnyProtocol(SourceLoc Loc);
+
   /// \brief Retrieve the Range protocol declaration, if it exists.
   ProtocolDecl *getRangeProtocol();
 };

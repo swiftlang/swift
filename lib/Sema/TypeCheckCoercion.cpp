@@ -193,6 +193,9 @@ public:
   CoercedResult visitMemberRefExpr(MemberRefExpr *E) {
     return unchanged(E);
   }
+  CoercedResult visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
+    return unchanged(E);
+  }
   CoercedResult visitNewArrayExpr(NewArrayExpr *E) {
     return unchanged(E);
   }
@@ -775,8 +778,8 @@ CoercedResult SemaCoerce::tryUserConversion(Expr *E) {
     case MemberLookupResult::MemberProperty:
     case MemberLookupResult::MetatypeMember:
     case MemberLookupResult::TupleElement:
+    case MemberLookupResult::ExistentialMember:  // FIXME: Should work?
       continue;
-      break;
     
     case MemberLookupResult::MemberFunction:
       if (!R.D->getAttrs().isConversion())

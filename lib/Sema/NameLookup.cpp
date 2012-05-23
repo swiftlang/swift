@@ -76,10 +76,8 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
     for (auto Member : PT->getDecl()->getMembers()) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
         if (VD->getName() != MemberName) continue;
-        if (isa<VarDecl>(VD) || isa<SubscriptDecl>(VD)) {
-          Results.push_back(Result::getMemberProperty(VD));
-        } else if (isa<FuncDecl>(VD)) {
-          Results.push_back(Result::getMemberFunction(VD));
+        if (isa<VarDecl>(VD) || isa<SubscriptDecl>(VD) || isa<FuncDecl>(VD)) {
+          Results.push_back(Result::getExistentialMember(VD));
         } else {
           assert(isa<TypeDecl>(VD) && "Unhandled protocol member");
           Results.push_back(Result::getMetatypeMember(VD));
@@ -200,6 +198,8 @@ Expr *MemberLookup::createResultAST(Expr *Base, SourceLoc DotLoc,
                                             R.D->getTypeOfReference());
       return new (Context) DotSyntaxBaseIgnoredExpr(Base, DotLoc, RHS);
     }
+    case MemberLookupResult::ExistentialMember:
+      return new (Context) ExistentialMemberRefExpr(Base, DotLoc, R.D, NameLoc);
     }
 
     Expr *BadExpr = new (Context) UnresolvedDotExpr(Base, DotLoc,

@@ -109,6 +109,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
           
         case MemberLookupResult::MemberProperty:
         case MemberLookupResult::MemberFunction:
+        case MemberLookupResult::ExistentialMember:
           // Fall-through
           
         case MemberLookupResult::TupleElement:
@@ -197,6 +198,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
             
         case MemberLookupResult::MemberProperty:
         case MemberLookupResult::MemberFunction:
+        case MemberLookupResult::ExistentialMember:
           if (Candidate.D->getKind() == Requirement->getKind() &&
               RequiredTy->isEqual(getInstanceUsageType(Candidate.D,
                                                        TC.Context)))

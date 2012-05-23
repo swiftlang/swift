@@ -19,6 +19,34 @@
 #include "TypeChecker.h"
 using namespace swift;
 
+ProtocolDecl *TypeChecker::getAnyProtocol(SourceLoc Loc) {
+  if (!AnyProto) {
+    SmallVector<ValueDecl *, 1> Values;
+    TU.lookupGlobalValue(Context.getIdentifier("Any"),
+                         NLKind::QualifiedLookup, Values);
+    if (Values.size() == 1)
+      AnyProto = dyn_cast<ProtocolDecl>(Values.front());
+  }
+  
+  if (!AnyProto) {
+    // FIXME: Ugly hack. We shouldn't try to do this.
+    AnyProto = new (Context) ProtocolDecl(&TU, Loc, Loc,
+                                          Context.getIdentifier("Any"),
+                                          MutableArrayRef<Type>());
+    llvm::SmallVector<Decl *, 1> Members;
+    Members.push_back(new (Context) TypeAliasDecl(Loc,
+                                                  Context.getIdentifier("This"),
+                                                  Type(),  AnyProto));
+    AnyProto->setMembers(Context.AllocateCopy(Members),
+                         SourceRange(Loc, Loc));
+    AnyProto->setDeclaredType(ProtocolType::getNew(AnyProto));
+    AnyProto->setType(MetaTypeType::get(AnyProto));
+    typeCheckDecl(AnyProto, true);
+  }
+  
+  return AnyProto;
+}
+
 ProtocolDecl *TypeChecker::getRangeProtocol() {
   if (!RangeProto) {
     SmallVector<ValueDecl *, 1> Values;
