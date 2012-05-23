@@ -50,6 +50,7 @@ namespace swift {
 #include "swift/AST/TypeNodes.def"
   };
   
+
 /// TypeBase - Base class for all types in Swift.
 class TypeBase {
   friend class ASTContext;
@@ -161,7 +162,7 @@ public:
   /// \endcode
   /// the result would be the (parenthesized) type ((int, int)).
   Type getUnlabeledType(ASTContext &Context);
-  
+                    
   void dump() const;
   void print(raw_ostream &OS) const;
   
@@ -1000,6 +1001,40 @@ private:
   ArchetypeType(StringRef DisplayName, ASTContext &Ctx)
     : TypeBase(TypeKind::Archetype, &Ctx, /*Dependent=*/false),
       DisplayName(DisplayName){ }
+};
+
+/// SubstArchetypeType - An archetype that has been substituted for a
+/// concrete type that meets all of the requirements of the archetype.
+class SubstArchetypeType : public TypeBase {
+  // SubstArchetypeTypes are never canonical.
+  explicit SubstArchetypeType(ArchetypeType *Archetype, Type Subst)
+    : TypeBase(TypeKind::SubstArchetype, nullptr, /*Dependent=*/false),
+      Archetype(Archetype), Subst(Subst) {}
+  
+  ArchetypeType *Archetype;
+  Type Subst;
+  
+public:
+  static SubstArchetypeType *get(ArchetypeType *Archetype, Type Subst,
+                                 ASTContext &C);
+  
+  /// \brief Retrieve the archetype that is being replaced.
+  ArchetypeType *getArchetype() const { return Archetype; }
+  
+  /// \brief Retrieve the type that is substituted in for the archetype.
+  Type getSubstType() const { return Subst; }
+  
+  /// getDesugaredType - If this type is a sugared type, remove all levels of
+  /// sugar until we get down to a non-sugar type.
+  TypeBase *getDesugaredType();
+  
+  void print(raw_ostream &OS) const;
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const SubstArchetypeType *) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::SubstArchetype;
+  }
 };
 
 inline bool TypeBase::isDependentType() const {

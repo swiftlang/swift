@@ -40,6 +40,8 @@ public:
   bool validateType(ValueDecl *VD);
   bool validateType(Type T);
 
+  Type substType(Type T, TypeSubstitutionMap &Substitutions);
+  
   bool isSubtypeOf(Type T1, Type T2, bool &Trivial);
   
   bool semaFunctionSignature(FuncExpr *FE);

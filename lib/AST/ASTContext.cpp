@@ -40,6 +40,8 @@ struct ASTContext::Implementation {
   llvm::DenseMap<Type, ParenType*> ParenTypes;
   llvm::DenseMap<std::pair<Type, LValueType::Qual::opaque_type>, LValueType*>
     LValueTypes;
+  llvm::DenseMap<std::pair<ArchetypeType *, Type>, SubstArchetypeType *>
+    SubstArchetypeTypes;
 };
 ASTContext::Implementation::Implementation()
  : IdentifierTable(Allocator) {}
@@ -279,4 +281,13 @@ LValueType *LValueType::get(Type objectTy, Qual quals, ASTContext &C) {
   LValueType *type = new (C) LValueType(objectTy, quals, canonicalContext);
   C.Impl.LValueTypes.insert(std::make_pair(key, type));
   return type;
+}
+
+/// Return a uniqued substituted archetype type.
+SubstArchetypeType *SubstArchetypeType::get(ArchetypeType *Archetype,
+                                            Type Subst, ASTContext &C) {
+  SubstArchetypeType *&Known = C.Impl.SubstArchetypeTypes[{Archetype, Subst}];
+  if (!Known)
+    Known = new (C) SubstArchetypeType(Archetype, Subst);
+  return Known;
 }

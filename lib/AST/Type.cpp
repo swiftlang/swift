@@ -191,6 +191,15 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
       return LValueType::get(ObjectTy, LValueTy->getQualifiers(), Context);
     return this;
   }
+      
+  case TypeKind::SubstArchetype: {
+    SubstArchetypeType *SubstTy = cast<SubstArchetypeType>(this);
+    Type NewSubstTy = SubstTy->getSubstType()->getUnlabeledType(Context);
+    if (NewSubstTy.getPointer() != SubstTy->getSubstType().getPointer())
+      return SubstArchetypeType::get(SubstTy->getArchetype(), NewSubstTy,
+                                     Context);
+    return this;
+  }
   }
 }
 
@@ -297,6 +306,8 @@ TypeBase *TypeBase::getDesugaredType() {
     return cast<NameAliasType>(this)->getDesugaredType();
   case TypeKind::ArraySlice:
     return cast<ArraySliceType>(this)->getDesugaredType();
+  case TypeKind::SubstArchetype:
+    return cast<SubstArchetypeType>(this)->getDesugaredType();
   }
 
   llvm_unreachable("Unknown type kind");
@@ -316,6 +327,10 @@ TypeBase *IdentifierType::getDesugaredType() {
 
 TypeBase *ArraySliceType::getDesugaredType() {
   return getImplementationType()->getDesugaredType();
+}
+
+TypeBase *SubstArchetypeType::getDesugaredType() {
+  return getSubstType()->getDesugaredType();
 }
 
 const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {
@@ -607,3 +622,8 @@ void ClassType::print(raw_ostream &OS) const {
 void ArchetypeType::print(raw_ostream &OS) const {
   OS << DisplayName;
 }
+
+void SubstArchetypeType::print(raw_ostream &OS) const {
+  getSubstType()->print(OS);
+}
+

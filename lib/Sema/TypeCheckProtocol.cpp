@@ -47,7 +47,7 @@ static std::unique_ptr<ProtocolConformance>
 checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                         SourceLoc ComplainLoc) {
   llvm::DenseMap<ValueDecl *, ValueDecl *> Mapping;
-  llvm::DenseMap<Type, Type> TypeMapping;
+  llvm::DenseMap<ArchetypeType *, Type> TypeMapping;
   llvm::DenseMap<ProtocolDecl *, ProtocolConformance *> InheritedMapping;
 
   // Check that T conforms to all inherited protocols.
@@ -90,24 +90,24 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       
       for (auto Candidate : Lookup.Results) {
         switch (Candidate.Kind) {
-          case MemberLookupResult::MetatypeMember:
-            // FIXME: Check this type against the protocol requirements.
-            if (auto Type = dyn_cast<TypeDecl>(Candidate.D))
-              Viable.push_back(Type);
-            break;
-            
-          case MemberLookupResult::MemberProperty:
-          case MemberLookupResult::MemberFunction:
-            // Fall-through
-            
-          case MemberLookupResult::TupleElement:
-            // Tuple elements cannot satisfy requirements.
-            break;
+        case MemberLookupResult::MetatypeMember:
+          // FIXME: Check this type against the protocol requirements.
+          if (auto Type = dyn_cast<TypeDecl>(Candidate.D))
+            Viable.push_back(Type);
+          break;
+          
+        case MemberLookupResult::MemberProperty:
+        case MemberLookupResult::MemberFunction:
+          // Fall-through
+          
+        case MemberLookupResult::TupleElement:
+          // Tuple elements cannot satisfy requirements.
+          break;
         }
       }
       
       if (Viable.size() == 1) {
-        TypeMapping[AssociatedType->getUnderlyingType()]
+        TypeMapping[AssociatedType->getUnderlyingType()->getAs<ArchetypeType>()]
           = Viable.front()->getDeclaredType();
         continue;
       }
@@ -165,7 +165,10 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
     if (Lookup.isSuccess()) {
       SmallVector<ValueDecl *, 2> Viable;
-      Type RequiredTy = getInstanceUsageType(Requirement);
+      // Determine the type that we require the witness to have, substituting
+      // in the witnesses we've collected for our archetypes.
+      Type RequiredTy = TC.substType(getInstanceUsageType(Requirement),
+                                     TypeMapping);
       
       for (auto Candidate : Lookup.Results) {
         switch (Candidate.Kind) {

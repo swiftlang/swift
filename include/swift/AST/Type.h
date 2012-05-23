@@ -70,7 +70,6 @@ public:
 
 };
   
-  
 } // end namespace swift
 
 namespace llvm {

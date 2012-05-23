@@ -109,6 +109,7 @@ bool TypeChecker::validateType(Type InTy) {
   case TypeKind::MetaType:
   case TypeKind::Module:
   case TypeKind::Protocol:
+  case TypeKind::SubstArchetype:
     // Nothing to validate.
     break;
 
@@ -342,4 +343,174 @@ bool TypeChecker::isSubtypeOf(Type T1, Type T2, bool &Trivial) {
   Trivial = true;
   unsigned Flags = ST_AllowNonTrivial | ST_AllowNonTrivialFunction;
   return ::isSubtypeOf(*this, T1, T2, Flags, Trivial);
+}
+
+/// \brief Substitute the given archetypes for their substitution types
+/// within the given type.
+///
+/// \returns The substituted type, or null if the substitution failed.
+///
+/// FIXME: We probably want to have both silent and loud failure modes. However,
+/// the only possible failure now is from array slice types, which occur
+/// simply because we don't have Slice<T> yet.
+Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
+  if (ArchetypeType *Archetype = dyn_cast<ArchetypeType>(T)) {
+    TypeSubstitutionMap::const_iterator Known = Substitutions.find(Archetype);
+    assert((Known != Substitutions.end()) && "Missing archetype substitution");
+    return SubstArchetypeType::get(Archetype, Known->second, Context);
+  }
+  
+  switch (T->getKind()) {
+#define ALWAYS_CANONICAL_TYPE(Id, Parent) \
+  case TypeKind::Id:                    \
+    return T;
+#define UNCHECKED_TYPE(Id, Parent) ALWAYS_CANONICAL_TYPE(Id, Parent)
+#define TYPE(Id, Parent)
+#include "swift/AST/TypeNodes.def"
+
+  case TypeKind::NameAlias: {
+    auto Alias = cast<NameAliasType>(T);
+    auto UnderlyingTy = substType(Alias->getDecl()->getUnderlyingType(),
+                                  Substitutions);
+    if (!UnderlyingTy)
+      return Type();
+    
+    if (UnderlyingTy.getPointer()
+          == Alias->getDecl()->getUnderlyingType().getPointer())
+      return T;
+    
+    // FIXME: Loses the structure of the NameAliasType!
+    return UnderlyingTy;
+  }
+      
+  case TypeKind::Identifier: {
+    auto Id = cast<IdentifierType>(T);
+    if (!Id->isMapped())
+      return T;
+    
+    auto MappedTy = substType(Id->getMappedType(), Substitutions);
+    if (!MappedTy)
+      return Type();
+    
+    if (MappedTy.getPointer() == Id->getMappedType().getPointer())
+      return T;
+    
+    // FIXME: Loses the structure of the IdentifierType!
+    return MappedTy;
+  }
+      
+  case TypeKind::Paren: {
+    auto Paren = cast<ParenType>(T);
+    Type Underlying = substType(Paren->getUnderlyingType(), Substitutions);
+    if (!Underlying)
+      return Type();
+    
+    if (Underlying.getPointer() == Paren->getUnderlyingType().getPointer())
+      return T;
+    
+    return ParenType::get(Context, Underlying);
+  }
+
+  case TypeKind::Tuple: {
+    auto Tuple = cast<TupleType>(T);
+    bool AnyChanged = false;
+    SmallVector<TupleTypeElt, 4> Elements;
+    unsigned Index = 0;
+    for (auto Elt : Tuple->getFields()) {
+      Type EltTy = substType(Elt.getType(), Substitutions);
+      if (!EltTy)
+        return Type();
+      
+      if (EltTy.getPointer() == Elt.getType().getPointer()) {
+        if (AnyChanged)
+          Elements.push_back(Elt);
+        ++Index;
+        break;
+      }
+      
+      if (!AnyChanged) {
+        Elements.reserve(Tuple->getFields().size());
+        Elements.append(Tuple->getFields().begin(),
+                        Tuple->getFields().begin() + Index);
+        AnyChanged = true;
+      }
+      
+      // Add the new tuple element, with the new type.
+      Elements.push_back(Elt.getWithType(EltTy));
+      ++Index;
+    }
+    
+    if (!AnyChanged)
+      return T;
+    
+    return TupleType::get(Elements, Context);
+  }
+      
+  case TypeKind::SubstArchetype: {
+    auto SubstAT = cast<SubstArchetypeType>(T);
+    auto Subst = substType(SubstAT->getSubstType(), Substitutions);
+    if (!Subst)
+      return Type();
+    
+    if (Subst.getPointer() == SubstAT->getSubstType().getPointer())
+      return T;
+    
+    return SubstArchetypeType::get(SubstAT->getArchetype(), Subst, Context);
+  }
+      
+  case TypeKind::Function: {
+    auto Function = cast<FunctionType>(T);
+    auto InputTy = substType(Function->getInput(), Substitutions);
+    if (!InputTy)
+      return Type();
+    auto ResultTy = substType(Function->getResult(), Substitutions);
+    if (!ResultTy)
+      return Type();
+    
+    if (InputTy.getPointer() == Function->getInput().getPointer() &&
+        ResultTy.getPointer() == Function->getResult().getPointer())
+      return T;
+    
+    return FunctionType::get(InputTy, ResultTy, Function->isAutoClosure(),
+                             Context);
+  }
+      
+  case TypeKind::Array: {
+    auto Array = cast<ArrayType>(T);
+    auto BaseTy = substType(Array->getBaseType(), Substitutions);
+    if (!BaseTy)
+      return Type();
+    
+    if (BaseTy.getPointer() == Array->getBaseType().getPointer())
+      return T;
+    
+    return ArrayType::get(BaseTy, Array->getSize(), Context);
+  }
+      
+  case TypeKind::ArraySlice: {
+    auto Slice = cast<ArraySliceType>(T);
+    auto BaseTy = substType(Slice->getBaseType(), Substitutions);
+    if (!BaseTy)
+      return Type();
+    
+    if (BaseTy.getPointer() == Slice->getBaseType().getPointer())
+      return T;
+    
+    return getArraySliceType(Slice->getFirstRefLoc(), BaseTy);
+  }
+      
+  case TypeKind::LValue: {
+    auto LValue = cast<LValueType>(T);
+    auto ObjectTy = substType(LValue->getObjectType(), Substitutions);
+    if (!ObjectTy)
+      return Type();
+    
+    if (ObjectTy.getPointer() == LValue->getObjectType().getPointer())
+      return T;
+    
+    return LValueType::get(ObjectTy, LValue->getQualifiers(), Context);
+  }
+  }
+  
+  llvm_unreachable("Unhandled type in substitution");
 }

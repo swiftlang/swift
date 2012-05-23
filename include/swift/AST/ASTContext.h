@@ -33,6 +33,7 @@ namespace swift {
   class Type;
   class TupleType;
   class FunctionType;
+  class ArchetypeType;
   class ArrayType;
   class Identifier;
   class Module;
@@ -42,6 +43,9 @@ namespace swift {
   class ValueDecl;
   class DiagnosticEngine;
   
+/// \brief Type substitution mapping from archetypes to their replacements.
+typedef llvm::DenseMap<ArchetypeType *, Type> TypeSubstitutionMap;
+
 /// \brief Describes how a particular type conforms to a given protocol,
 /// providing the mapping from the protocol members to the type (or extension)
 /// members that provide the functionality for the concrete type.
@@ -53,7 +57,7 @@ public:
   
   /// \brief The mapping of individual archetypes in the protocol over to
   /// the types used to satisy the type requirements.
-  llvm::DenseMap<Type, Type> TypeMapping;
+  TypeSubstitutionMap TypeMapping;
   
   /// \brief The mapping from any directly-inherited protocols over to the
   /// protocol conformance structures that indicate how the given type meets
