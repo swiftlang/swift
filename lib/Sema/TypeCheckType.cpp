@@ -429,25 +429,42 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
       Type EltTy = substType(Elt.getType(), Substitutions);
       if (!EltTy)
         return Type();
-      
-      // FIXME: Substitute into default arguments!
+            
+      // FIXME: Substitute into default arguments rather than simply dropping
+      // them.
 
-      if (EltTy.getPointer() == Elt.getType().getPointer()) {
-        if (AnyChanged)
-          Elements.push_back(Elt);
+      // If nothing has changd, just keep going.
+      if (!AnyChanged && !Elt.hasInit() &&
+          EltTy.getPointer() == Elt.getType().getPointer()) {
         ++Index;
-        break;
+        continue;
       }
       
+      // If this is the first change we've seen, copy all of the previous
+      // elements.
       if (!AnyChanged) {
-        Elements.reserve(Tuple->getFields().size());
-        Elements.append(Tuple->getFields().begin(),
-                        Tuple->getFields().begin() + Index);
+        // Copy all of the previous elements.
+        for (unsigned I = 0; I != Index; ++I) {
+          const TupleTypeElt &FromElt =Tuple->getFields()[I];
+          Elements.push_back(TupleTypeElt(FromElt.getType(), FromElt.getName(),
+                                          /*Init=*/nullptr,
+                                          FromElt.getVarargBaseTy()));
+        }
+        
         AnyChanged = true;
       }
+
+      // Substitute into the base type of a variadic tuple.
+      Type VarargBaseTy;
+      if (Elt.isVararg()) {
+        VarargBaseTy = substType(Elt.getVarargBaseTy(), Substitutions);
+        if (!VarargBaseTy)
+          return Type();
+      }
       
-      // Add the new tuple element, with the new type.
-      Elements.push_back(Elt.getWithType(EltTy));
+      // Add the new tuple element, with the new type, no initializer,
+      Elements.push_back(TupleTypeElt(EltTy, Elt.getName(), /*Init=*/nullptr,
+                                      VarargBaseTy));
       ++Index;
     }
     
