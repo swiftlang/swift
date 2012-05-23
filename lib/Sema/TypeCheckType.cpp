@@ -430,6 +430,8 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
       if (!EltTy)
         return Type();
       
+      // FIXME: Substitute into default arguments!
+
       if (EltTy.getPointer() == Elt.getType().getPointer()) {
         if (AnyChanged)
           Elements.push_back(Elt);

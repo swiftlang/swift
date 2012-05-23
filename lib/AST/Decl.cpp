@@ -293,6 +293,7 @@ Type FuncDecl::computeThisType() const {
   Type ContainerType = getExtensionType();
   if (ContainerType.isNull()) return ContainerType;
   
+  
   if (ContainerType->hasReferenceSemantics())
     return ContainerType;
   

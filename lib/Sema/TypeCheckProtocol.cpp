@@ -84,6 +84,14 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     if (!AssociatedType)
       continue;
     
+    // Bind the implicit 'This' type to the type T.
+    // FIXME: Should have some kind of 'implicit' bit to detect this.
+    if (AssociatedType->getName().str().equals("This")) {
+      TypeMapping[AssociatedType->getUnderlyingType()->getAs<ArchetypeType>()]
+        = T;
+      continue;
+    }
+    
     MemberLookup Lookup(T, AssociatedType->getName(), TC.TU);
     if (Lookup.isSuccess()) {
       SmallVector<TypeDecl *, 2> Viable;

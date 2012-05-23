@@ -1471,6 +1471,13 @@ bool Parser::parseProtocolBody(SourceLoc ProtocolLoc,
   
   // Parse the list of protocol elements.
   SmallVector<Decl*, 8> Members;
+  
+  // Add the implicit 'This' associated type.
+  // FIXME: Mark as 'implicit'.
+  Members.push_back(new (Context) TypeAliasDecl(ProtocolLoc,
+                                                Context.getIdentifier("This"),
+                                                Type(),  CurDeclContext));
+  
   bool HadError = false;
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
     if (parseDecl(Members,

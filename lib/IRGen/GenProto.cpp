@@ -404,7 +404,6 @@ namespace {
       case DeclKind::Struct:
       case DeclKind::Class:
       case DeclKind::Protocol:
-      case DeclKind::TypeAlias: // this one might become legal?
       case DeclKind::OneOfElement:
         llvm_unreachable("declaration not legal as a protocol member");
 
@@ -417,6 +416,11 @@ namespace {
 
       case DeclKind::Var:
         IGM.unimplemented(member->getLocStart(), "var declaration in protocol");
+        return;
+
+      case DeclKind::TypeAlias:
+        // Nothing to do for associated types.
+        // FIXME: Is this always true? We might want a type descriptor.
         return;
       }
       llvm_unreachable("bad decl kind");

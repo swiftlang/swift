@@ -464,7 +464,7 @@ public:
 
   /// \brief Retrieve a copy of this tuple type element with the type replaced.
   TupleTypeElt getWithType(Type T) const {
-    TupleTypeElt Result;
+    TupleTypeElt Result(*this);
     Result.Ty = T;
     return Result;
   }
