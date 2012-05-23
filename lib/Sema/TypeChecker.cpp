@@ -19,7 +19,16 @@
 #include "TypeChecker.h"
 using namespace swift;
 
-// Dummy definition to avoid warning.
-namespace swift { int x; }
-
-
+ProtocolDecl *TypeChecker::getRangeProtocol() {
+  if (!RangeProto) {
+    SmallVector<ValueDecl *, 1> Values;
+    TU.lookupGlobalValue(Context.getIdentifier("Range"),
+                         NLKind::QualifiedLookup, Values);
+    if (Values.size() != 1)
+      return nullptr;
+    
+    RangeProto = dyn_cast<ProtocolDecl>(Values.front());
+  }
+  
+  return RangeProto;
+}

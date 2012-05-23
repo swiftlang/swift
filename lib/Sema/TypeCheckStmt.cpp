@@ -177,6 +177,29 @@ public:
     return FS;
   }
   
+  /// callNullaryMethodOf - Form a call (with no arguments) to the given
+  /// method of the given base.
+  Expr *callNullaryMethodOf(Expr *Base, FuncDecl *Method, SourceLoc Loc) {
+    // Reference the method.
+    Expr *Fn = new (TC.Context) DeclRefExpr(Method, Loc,
+                                            Method->getTypeOfReference());
+    
+    // Form the method reference.
+    // FIXME: Deal with protocols, when they get their own AST.
+    Expr *Mem = new (TC.Context) DotSyntaxCallExpr(Fn, Loc, Base);
+    Mem = TC.recheckTypes(Mem);
+    if (!Mem) return nullptr;
+    
+    // Call the method.
+    Expr *EmptyArgs
+      = new (TC.Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, Loc,
+                                   TupleType::getEmpty(TC.Context));
+    ApplyExpr *Call = new (TC.Context) CallExpr(Mem, EmptyArgs);
+    Expr *Result = TC.semaApplyExpr(Call);
+    if (!Result) return nullptr;
+    return TC.convertToRValue(Result);
+  }
+  
   /// callNullaryMemberOf - Form a call (with no arguments) to a method of the
   /// given base.
   Expr *callNullaryMethodOf(Expr *Base, Identifier Name, SourceLoc Loc,
@@ -186,7 +209,7 @@ public:
     if (LValueType *BaseLV = BaseType->getAs<LValueType>())
       BaseType = BaseLV->getObjectType();
     
-    // Look for getElements.
+    // Look for name.
     MemberLookup Lookup(BaseType, Name, TC.TU);
     if (!Lookup.isSuccess()) {
       TC.diagnose(Loc, MissingMember, BaseType)
@@ -206,15 +229,15 @@ public:
       return nullptr;
     }
     
-    // Form container.getElements
+    // Form base.name
     Expr *Mem = Lookup.createResultAST(Base, Loc, Loc, TC.Context);
     Mem = TC.recheckTypes(Mem);
     if (!Mem) return nullptr;
     
-    // Call container.getElements().
+    // Call base.name()
     Expr *EmptyArgs
-    = new (TC.Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, Loc,
-                                 TupleType::getEmpty(TC.Context));
+      = new (TC.Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, Loc,
+                                   TupleType::getEmpty(TC.Context));
     ApplyExpr *Call = new (TC.Context) CallExpr(Mem, EmptyArgs);
     Expr *Result = TC.semaApplyExpr(Call);
     if (!Result) return nullptr;
@@ -227,9 +250,13 @@ public:
     if (TC.typeCheckExpression(Container)) return nullptr;
     S->setContainer(Container);
 
-    // FIXME: When protocols come along, we'll have a protocol to check here,
-    // which will make this logic less hackish.
-
+    // Retrieve the 'Range' protocol.
+    ProtocolDecl *RangeProto = TC.getRangeProtocol();
+    if (!RangeProto) {
+      TC.diagnose(S->getForLoc(), diag::foreach_missing_range);
+      return nullptr;
+    }
+    
     // Figure out the declaration context we're in.
     DeclContext *DC = &TC.TU;
     if (TheFunc)
@@ -275,14 +302,46 @@ public:
                                                       DC));
     }
     
+    // FIXME: Would like to customize the diagnostic emitted in
+    // conformsToProtocol().
+    ProtocolConformance *Conformance
+      = TC.conformsToProtocol(RangeTy, RangeProto, Container->getLoc());
+    if (!Conformance)
+      return nullptr;
+    
+    // Gather the witnesses from the Range protocol conformance. These are
+    // the functions we'll call.
+    FuncDecl *isEmptyFn = 0;
+    FuncDecl *getFirstAndAdvanceFn = 0;
+    Type ElementTy;
+    
+    for (auto Member : RangeProto->getMembers()) {
+      auto Value = dyn_cast<ValueDecl>(Member);
+      if (!Value)
+        continue;
+      
+      StringRef Name = Value->getName().str();
+      if (Name.equals("Element") && isa<TypeDecl>(Value)) {
+        ArchetypeType *Archetype
+          = cast<TypeDecl>(Value)->getDeclaredType()->getAs<ArchetypeType>();
+        ElementTy = Conformance->TypeMapping[Archetype];
+      } else if (Name.equals("isEmpty") && isa<FuncDecl>(Value))
+        isEmptyFn = cast<FuncDecl>(Conformance->Mapping[Value]);
+      else if (Name.equals("getFirstAndAdvance") && isa<FuncDecl>(Value))
+        getFirstAndAdvanceFn = cast<FuncDecl>(Conformance->Mapping[Value]);
+    }
+    
+    if (!isEmptyFn || !getFirstAndAdvanceFn || !ElementTy) {
+      TC.diagnose(RangeProto->getLoc(), diag::range_protocol_broken);
+      return nullptr;
+    }
+    
     // Compute the expression that determines whether the range is empty.
     Expr *Empty
       = callNullaryMethodOf(
           new (TC.Context) DeclRefExpr(Range, S->getInLoc(),
                                        Range->getTypeOfReference()),
-          TC.Context.getIdentifier("isEmpty"),
-          S->getInLoc(), diag::foreach_range_isempty,
-          diag::foreach_nonfunc_range_isempty);
+          isEmptyFn, S->getInLoc());
     if (!Empty) return nullptr;
     if (TC.typeCheckCondition(Empty)) return nullptr;
     S->setRangeEmpty(Empty);
@@ -292,18 +351,10 @@ public:
       = callNullaryMethodOf(
           new (TC.Context) DeclRefExpr(Range, S->getInLoc(),
                                        Range->getTypeOfReference()),
-          TC.Context.getIdentifier("getFirstAndAdvance"),
-          S->getInLoc(), diag::foreach_range_getfirstandadvance,
-          diag::foreach_nonfunc_range_getfirstandadvance);
+          getFirstAndAdvanceFn,
+          S->getInLoc());
     if (!GetFirstAndAdvance) return nullptr;
     
-    // Make sure our element type is materializable.
-    if (!GetFirstAndAdvance->getType()->isMaterializable()) {
-      TC.diagnose(S->getInLoc(), diag::foreach_nonmaterializable_element,
-                  GetFirstAndAdvance->getType(), RangeTy)
-        << Container->getSourceRange();
-      return nullptr;
-    }
     S->setElementInit(new (TC.Context) PatternBindingDecl(S->getForLoc(),
                                                           S->getPattern(),
                                                           GetFirstAndAdvance,
@@ -311,7 +362,6 @@ public:
 
     // Coerce the pattern to the element type, now that we know the element
     // type.
-    Type ElementTy = GetFirstAndAdvance->getType();
     if (TC.coerceToType(S->getPattern(), ElementTy, /*isFirstPass*/false))
       return nullptr;
     

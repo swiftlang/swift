@@ -47,7 +47,7 @@ public:
   /// declares or extends nominal type Ty).
   ///
   /// \param CheckConformance Will be set true if the caller needs to call
-  /// checkExplicitConformance() for this declaration once its member have
+  /// checkExplicitConformance() for this declaration once its members have
   /// been type-checked. Otherwise, the conformance check can be delayed.
   void checkInherited(Decl *D, Type T, MutableArrayRef<Type> Inherited,
                       bool &CheckConformance) {

@@ -26,7 +26,14 @@ class TypeChecker {
 public:
   TranslationUnit &TU;
   ASTContext &Context;
-  TypeChecker(TranslationUnit &TU) : TU(TU), Context(TU.Ctx) {}
+  
+private:
+  
+  /// \brief The 'Range' protocol, used by the for-each loop.
+  ProtocolDecl *RangeProto;
+    
+public:
+  TypeChecker(TranslationUnit &TU) : TU(TU), Context(TU.Ctx), RangeProto(0) {}
   
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(ArgTypes... Args) {
@@ -175,7 +182,10 @@ public:
   /// chosen a best candidate,return an expression that refers to that
   /// candidate.
   Expr *buildFilteredOverloadSet(OverloadSetRefExpr *OSE, ValueDecl *Best);
-/// @}
+  /// @}
+  
+  /// \brief Retrieve the Range protocol declaration, if it exists.
+  ProtocolDecl *getRangeProtocol();
 };
 
   
