@@ -196,7 +196,7 @@ public:
   }
 
   ArrayRef<TupleTypeAndContext> getTypesWithDefaultValues() const {
-    assert(ASTStage == Parsed);
+    assert(ASTStage == NameBound);
     return TypesWithDefaultValues;
   }
   void setTypesWithDefaultValues(ArrayRef<TupleTypeAndContext> T) {

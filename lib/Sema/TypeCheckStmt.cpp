@@ -642,6 +642,86 @@ bool checkProtocolCircularity(TypeChecker &TC, ProtocolDecl *Proto,
   return false;
 }
 
+/// BindNameToIVar - We have an unresolved reference to an identifier in some
+/// FuncDecl.  Check to see if this is a reference to an instance variable,
+/// and return an AST for the reference if so.  If not, return null with no
+/// error emitted.
+static Expr *BindNameToIVar(UnresolvedDeclRefExpr *UDRE, FuncDecl *CurFD, 
+                            TypeChecker &TC) {
+  Type ExtendedType = CurFD->getExtensionType();
+  if (ExtendedType.isNull()) return 0;
+
+  // For a static method, we perform name lookup in the corresponding metatype.
+  TypeDecl *StaticAlias = 0;
+  if (CurFD->isStatic()) {
+    if (NominalType *Nominal = ExtendedType->getAs<NominalType>())
+      StaticAlias = Nominal->getDecl();
+    else
+      return 0;
+    
+    ExtendedType = MetaTypeType::get(StaticAlias);
+  }
+  
+  // Do a full "dot syntax" name lookup with the implicit 'this' base.
+  MemberLookup Lookup(ExtendedType, UDRE->getName(), TC.TU);
+  
+  // On failure, this isn't an member reference.
+  if (!Lookup.isSuccess()) return 0;
+  
+  // On success, this is a member reference. Build either a reference to the
+  // implicit 'this' VarDecl (for instance methods) or to the metaclass
+  // instance (for static methods).
+  Expr *BaseExpr;
+  if (StaticAlias) {
+    BaseExpr = new (TC.Context) DeclRefExpr(StaticAlias, SourceLoc(),
+                                      StaticAlias->getTypeOfReference());
+  } else {
+    VarDecl *ThisDecl = CurFD->getImplicitThisDecl();
+    assert(ThisDecl && "Couldn't find decl for 'this'");
+    BaseExpr = new (TC.Context) DeclRefExpr(ThisDecl, SourceLoc(),
+                                                ThisDecl->getTypeOfReference());
+  }
+  
+  return Lookup.createResultAST(BaseExpr, SourceLoc(), UDRE->getLoc(),
+                                TC.Context);
+}
+
+/// BindName - Bind an UnresolvedDeclRefExpr by performing name lookup and
+/// returning the resultant expression.  If this reference is inside of a
+/// FuncDecl (i.e. in a function body, not at global scope) then CurFD is the
+/// innermost function, otherwise null.
+static Expr *BindName(UnresolvedDeclRefExpr *UDRE, FuncDecl *CurFD,
+                      TypeChecker &TC) {
+  
+  // If we are inside of a method, check to see if there are any ivars in scope,
+  // and if so, whether this is a reference to one of them.
+  if (CurFD)
+    if (Expr *E = BindNameToIVar(UDRE, CurFD, TC))
+      return E;
+
+  // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
+  Identifier Name = UDRE->getName();
+  SourceLoc Loc = UDRE->getLoc();
+  SmallVector<ValueDecl*, 4> Decls;
+  // Perform standard value name lookup.
+  TC.TU.lookupGlobalValue(Name, NLKind::UnqualifiedLookup, Decls);
+
+  // If that fails, this may be the name of a module, try looking that up.
+  if (Decls.empty()) {
+    for (const auto &ImpEntry : TC.TU.getImportedModules())
+      if (ImpEntry.second->Name == Name) {
+        ModuleType *MT = ModuleType::get(ImpEntry.second);
+        return new (TC.Context) ModuleExpr(Loc, MT);
+      }
+  }
+
+  if (Decls.empty()) {
+    TC.diagnose(Loc, diag::use_unresolved_identifier, Name);
+    return new (TC.Context) ErrorExpr(Loc);
+  }
+
+  return OverloadedDeclRefExpr::createWithCopy(Decls, Loc);
+}
 
 /// performTypeChecking - Once parsing and namebinding are complete, these
 /// walks the AST to resolve types and diagnose problems therein.
@@ -649,7 +729,73 @@ bool checkProtocolCircularity(TypeChecker &TC, ProtocolDecl *Proto,
 /// FIXME: This should be moved out to somewhere else.
 void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   TypeChecker TC(*TU);
-  
+
+  struct NameBindingWalker : public ASTWalker {
+    TypeChecker &TC;
+    NameBindingWalker(TypeChecker &TC) : TC(TC) {}
+    
+    /// CurFuncDecls - This is the stack of FuncDecls that we're nested in.
+    SmallVector<FuncDecl*, 4> CurFuncDecls;
+    
+    virtual bool walkToDeclPre(Decl *D) {
+      if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
+        CurFuncDecls.push_back(FD);
+        
+        // If this is an instance method with a body, set the type of it's
+        // implicit 'this' variable.
+        if (FD->getBody())
+          if (Type ThisTy = FD->computeThisType()) {
+            // References to the 'this' declaration will add back the lvalue
+            // type as appropriate.
+            if (LValueType *LValue = ThisTy->getAs<LValueType>())
+              ThisTy = LValue->getObjectType();
+            
+            FD->getImplicitThisDecl()->setType(ThisTy);
+          }
+      }
+      return true;
+    }
+    
+    virtual bool walkToDeclPost(Decl *D) {
+      if (isa<FuncDecl>(D)) {
+        assert(CurFuncDecls.back() == D && "Decl misbalance");
+        CurFuncDecls.pop_back();
+      }
+      return true;
+    }
+    
+    Expr *walkToExprPost(Expr *E) {
+      if (UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
+        return BindName(UDRE, CurFuncDecls.empty() ? 0 : CurFuncDecls.back(),
+                        TC);
+      }
+      return E;
+    }
+  };
+
+  NameBindingWalker walker(TC);
+
+  // Now that we know the top-level value names, go through and resolve any
+  // UnresolvedDeclRefExprs that exist.
+  for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i)
+    TU->Decls[i]->walk(walker);
+
+  // Also resolve UnresolvedDeclRefExprs in TupleTypes.
+  // FIXME: This code doesn't handle TupleTypes declared in the
+  // lexical context of an extension correctly yet.
+  for (auto TypeAndContext : TU->getTypesWithDefaultValues()) {
+    TupleType *TT = TypeAndContext.first;
+    for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i) {
+      const TupleTypeElt& Elt = TT->getFields()[i];
+      if (Elt.hasInit()) {
+        Expr *Init = Elt.getInit();
+        Init = Init->walk(walker);
+        TT->updateInitializedElementType(i, Elt.getType(), Init);
+      }
+    }
+  }
+  TU->clearTypesWithDefaultValues();
+
   // Find all the FuncExprs in the translation unit and collapse all
   // the sequences.
   struct PrePassWalker : ASTWalker {
