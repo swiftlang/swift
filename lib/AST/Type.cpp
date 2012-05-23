@@ -90,15 +90,21 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
 
   case TypeKind::NameAlias:
     if (TypeAliasDecl *D = cast<NameAliasType>(this)->getDecl())
-      if (D->hasUnderlyingType())
-        return D->getUnderlyingType()->getUnlabeledType(Context);
+      if (D->hasUnderlyingType()) {
+        Type UnderlingTy = D->getUnderlyingType()->getUnlabeledType(Context);
+        if (UnderlingTy.getPointer() != D->getUnderlyingType().getPointer())
+          return UnderlingTy;
+      }
     
     return this;
       
   case TypeKind::Identifier: {
     IdentifierType *IdentTy = cast<IdentifierType>(this);
-    if (IdentTy->isMapped())
-      return IdentTy->getMappedType()->getUnlabeledType(Context);
+    if (IdentTy->isMapped()) {
+      Type MappedTy = IdentTy->getMappedType()->getUnlabeledType(Context);
+      if (MappedTy.getPointer() != IdentTy->getMappedType().getPointer())
+        return MappedTy;
+    }
     return this;
   }
   
