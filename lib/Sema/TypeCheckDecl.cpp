@@ -25,8 +25,16 @@ class DeclChecker : public DeclVisitor<DeclChecker> {
   
 public:
   TypeChecker &TC;
-  
-  DeclChecker(TypeChecker &TC) : TC(TC) {}
+
+  // For library-style parsing, we need to make two passes over the global
+  // scope.  These booleans indicate whether this is currently the first or
+  // second pass over the global scope (or neither, if we're in a context where
+  // we only visit each decl once).
+  bool IsFirstPass;
+  bool IsSecondPass;
+
+  DeclChecker(TypeChecker &TC, bool IsFirstPass, bool IsSecondPass)
+      : TC(TC), IsFirstPass(IsFirstPass), IsSecondPass(IsSecondPass) {}
 
   //===--------------------------------------------------------------------===//
   // Helper Functions.
@@ -106,8 +114,21 @@ public:
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
-    if (PBD->getInit() && ((TC.TU.Kind != TranslationUnit::Library) ||
-                           PBD->getDeclContext()->isLocalContext())) {
+    if (IsSecondPass) {
+      if (PBD->getInit() && PBD->getPattern()->hasType()) {
+        Expr *Init = PBD->getInit();
+        Type DestTy = PBD->getPattern()->getType();
+        if (TC.typeCheckExpression(Init, DestTy)) {
+          if (DestTy)
+            TC.diagnose(PBD->getLocStart(), diag::while_converting_var_init,
+                        DestTy);
+        } else {
+          PBD->setInit(Init);
+        }
+      }
+      return;
+    }
+    if (PBD->getInit() && !IsFirstPass) {
       Type DestTy;
       if (PBD->getPattern()->hasType()) {
         DestTy = PBD->getPattern()->getType();
@@ -143,6 +164,9 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
+    if (IsSecondPass)
+      return;
+
     // The getter and setter functions will be type-checked separately.
     if (!SD->getDeclContext()->isTypeContext())
       TC.diagnose(SD->getLocStart(), diag::subscript_not_member);
@@ -155,10 +179,16 @@ public:
   }
   
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
+    if (IsSecondPass)
+      return;
+
     TC.validateType(TAD->getAliasType());
   }
-  
+
   void visitOneOfDecl(OneOfDecl *OOD) {
+    if (IsSecondPass)
+      return;
+
     bool CheckConformance;
     checkInherited(OOD, OOD->getDeclaredType(), OOD->getInherited(),
                    CheckConformance);
@@ -172,6 +202,9 @@ public:
   }
 
   void visitStructDecl(StructDecl *SD) {
+    if (IsSecondPass)
+      return;
+
     bool CheckConformance;
     checkInherited(SD, SD->getDeclaredType(), SD->getInherited(),
                    CheckConformance);
@@ -198,6 +231,9 @@ public:
   }
 
   void visitClassDecl(ClassDecl *CD) {
+    if (IsSecondPass)
+      return;
+
     bool CheckConformance;
     checkInherited(CD, CD->getDeclaredType(), CD->getInherited(),
                    CheckConformance);
@@ -212,6 +248,9 @@ public:
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
+    if (IsSecondPass)
+      return;
+
     bool CheckConformance;
     checkInherited(PD, PD->getDeclaredType(), PD->getInherited(),
                    CheckConformance);
@@ -237,6 +276,9 @@ public:
   }
 
   void visitFuncDecl(FuncDecl *FD) {
+    if (IsSecondPass)
+      return;
+
     // Before anything else, set up the 'this' argument correctly.
     if (Type thisType = FD->computeThisType()) {
       FunctionType *fnType = cast<FunctionType>(FD->getType());
@@ -255,6 +297,9 @@ public:
     visitValueDecl(FD);
   }
   void visitOneOfElementDecl(OneOfElementDecl *ED) {
+    if (IsSecondPass)
+      return;
+
     // Ignore element decls that carry no type.
     if (ED->getArgumentType().isNull()) return;
       
@@ -268,6 +313,9 @@ public:
     }
   }
   void visitExtensionDecl(ExtensionDecl *ED) {
+    if (IsSecondPass)
+      return;
+
     bool CheckConformance;
     if (TC.validateType(ED->getExtendedType())) {
       ED->setExtendedType(ErrorType::get(TC.Context));
@@ -298,8 +346,10 @@ public:
 }; // end anonymous namespace.
 
 
-void TypeChecker::typeCheckDecl(Decl *D) {
-  DeclChecker(*this).visit(D);
+void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
+  bool isSecondPass = !isFirstPass && TU.Kind == TranslationUnit::Library &&
+                      D->getDeclContext()->isModuleContext();
+  DeclChecker(*this, isFirstPass, isSecondPass).visit(D);
 }
 
 bool DeclChecker::visitValueDecl(ValueDecl *VD) {

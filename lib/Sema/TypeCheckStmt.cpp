@@ -153,7 +153,7 @@ public:
   Stmt *visitForStmt(ForStmt *FS) {
     // Type check any var decls in the initializer.
     for (auto D : FS->getInitializerVarDecls())
-      TC.typeCheckDecl(D);
+      TC.typeCheckDecl(D, /*isFirstPass*/false);
 
     PointerUnion<Expr*, AssignStmt*> Tmp = FS->getInitializer();
     if (typeCheck(Tmp)) return 0;
@@ -340,7 +340,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
       if (!typeCheckStmt(SubStmt))
         BS->setElement(i, SubStmt);
     } else {
-      TC.typeCheckDecl(BS->getElement(i).get<Decl*>());
+      TC.typeCheckDecl(BS->getElement(i).get<Decl*>(), /*isFirstPass*/false);
     }
   }
   
@@ -856,7 +856,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
         TLCD->setBody(S);
       }
     } else {
-      TC.typeCheckDecl(D);
+      TC.typeCheckDecl(D, /*isFirstPass*/TU->Kind == TranslationUnit::Library);
       if (TU->Kind == TranslationUnit::Repl && !TC.Context.hadError())
         if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D))
           REPLCheckPatternBinding(PBD, TC);
@@ -915,21 +915,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // If we're in a library, we skip type-checking global initializers in the
   // first pass.  Type-check them now.
   if (TU->Kind == TranslationUnit::Library && !TC.Context.hadError()) {
-    for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
-      Decl *D = TU->Decls[i];
-      if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D)) {
-        if (PBD->getInit()) {
-          Expr *Init = PBD->getInit();
-          Type DestTy = PBD->getPattern()->getType();
-          if (TC.typeCheckExpression(Init, DestTy)) {
-            TC.diagnose(PBD->getLocStart(), diag::while_converting_var_init,
-                        DestTy);
-            continue;
-          }
-          PBD->setInit(Init);
-        }
-      }
-    }
+    for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i)
+      TC.typeCheckDecl(TU->Decls[i], /*isFirstPass*/false);
   }
 
   // Check overloaded vars/funcs.

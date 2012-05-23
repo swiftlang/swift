@@ -57,9 +57,10 @@ public:
   /// Rechecking typically occurs when one has resolved name lookup and built a
   /// new AST node that then needs to be type-checked.
   Expr *recheckTypes(Expr *E);
-  
+
+  void typeCheckDecl(Decl *D, bool isFirstPass);
+
   bool typeCheckExpression(Expr *&E, Type ConvertType = Type());
-  void typeCheckDecl(Decl *D);
   bool typeCheckPattern(Pattern *P);
   bool coerceToType(Pattern *P, Type Ty);
   bool typeCheckCondition(Expr *&E);
