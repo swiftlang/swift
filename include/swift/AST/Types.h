@@ -66,8 +66,8 @@ class TypeBase {
   const TypeKind Kind;
 
   struct TypeBaseBits {
-    /// Dependent - Whether this type is dependent.
-    unsigned Dependent : 1;
+    /// Unresolved - Whether this type is unresolved.
+    unsigned Unresolved : 1;
   };
   static const unsigned NumTypeBaseBits = 1;
   
@@ -76,17 +76,17 @@ class TypeBase {
   } TypeBits;
   
 protected:
-  TypeBase(TypeKind kind, ASTContext *CanTypeCtx, bool Dependent)
+  TypeBase(TypeKind kind, ASTContext *CanTypeCtx, bool Unresolved)
     : CanonicalType((TypeBase*)nullptr), Kind(kind) {
     // If this type is canonical, switch the CanonicalType union to ASTContext.
     if (CanTypeCtx)
       CanonicalType = CanTypeCtx;
     
-    setDependent(Dependent);
+    setUnresolved(Unresolved);
   }
 
-  /// \brief Mark this bit as dependent
-  void setDependent(bool D = true) { TypeBits.TypeBase.Dependent = D; }
+  /// \brief Mark this type as unresolved.
+  void setUnresolved(bool D = true) { TypeBits.TypeBase.Unresolved = D; }
   
 public:
   /// getKind - Return what kind of type this is.
@@ -150,10 +150,10 @@ public:
   /// semantics?
   bool hasReferenceSemantics();
   
-  /// isDependentType() - Determines whether this type is a dependent
+  /// isUnresolvedType() - Determines whether this type is an unresolved
   /// type, meaning that part of the type depends on the context in which
   /// the type occurs.
-  bool isDependentType() const;
+  bool isUnresolvedType() const;
   
   /// getUnlabeledType - Retrieve a version of this type with all labels
   /// removed at every level. For example, given a tuple type 
@@ -189,7 +189,7 @@ class ErrorType : public TypeBase {
   friend class ASTContext;
   // The Error type is always canonical.
   ErrorType(ASTContext &C) 
-    : TypeBase(TypeKind::Error, &C, /*Dependent=*/false) { }
+    : TypeBase(TypeKind::Error, &C, /*Unresolved=*/false) { }
 public:
   static Type get(ASTContext &C);
   
@@ -207,7 +207,7 @@ public:
 class BuiltinRawPointerType : public TypeBase {
   friend class ASTContext;
   BuiltinRawPointerType(ASTContext &C)
-    : TypeBase(TypeKind::BuiltinRawPointer, &C, /*Dependent=*/false) {}
+    : TypeBase(TypeKind::BuiltinRawPointer, &C, /*Unresolved=*/false) {}
 public:
   void print(raw_ostream &OS) const;
   
@@ -224,7 +224,7 @@ public:
 class BuiltinObjectPointerType : public TypeBase {
   friend class ASTContext;
   BuiltinObjectPointerType(ASTContext &C)
-    : TypeBase(TypeKind::BuiltinObjectPointer, &C, /*Dependent=*/false) {}
+    : TypeBase(TypeKind::BuiltinObjectPointer, &C, /*Unresolved=*/false) {}
 public:
   void print(raw_ostream &OS) const;
 
@@ -239,7 +239,7 @@ public:
 class BuiltinObjCPointerType : public TypeBase {
   friend class ASTContext;
   BuiltinObjCPointerType(ASTContext &C)
-    : TypeBase(TypeKind::BuiltinObjCPointer, &C, /*Dependent=*/false) {}
+    : TypeBase(TypeKind::BuiltinObjCPointer, &C, /*Unresolved=*/false) {}
 public:
   void print(raw_ostream &OS) const;
 
@@ -256,7 +256,7 @@ class BuiltinIntegerType : public TypeBase {
   friend class ASTContext;
   unsigned BitWidth;
   BuiltinIntegerType(unsigned BitWidth, ASTContext &C)
-    : TypeBase(TypeKind::BuiltinInteger, &C, /*Dependent=*/false), 
+    : TypeBase(TypeKind::BuiltinInteger, &C, /*Unresolved=*/false), 
       BitWidth(BitWidth) {}
 public:
   
@@ -286,7 +286,7 @@ private:
   FPKind Kind;
   
   BuiltinFloatType(FPKind Kind, ASTContext &C)
-    : TypeBase(TypeKind::BuiltinFloat, &C, /*Dependent=*/false), 
+    : TypeBase(TypeKind::BuiltinFloat, &C, /*Unresolved=*/false), 
       Kind(Kind) {}
 public:
   
@@ -305,26 +305,26 @@ public:
   }
 };
   
-/// UnstructuredDependentType - This is a expression type whose actual kind
+/// UnstructuredUnresolvedType - This is a expression type whose actual kind
 /// is specified by context which hasn't been provided yet, and which
 /// has no known structure. For example, a tuple element ".foo" will have
-/// an unstructured dependent type. however, a tuple "(x, .foo)" would have
-/// a dependent type that is not an UnstructuredDependentType, because it is
+/// an unstructured unresolved type. however, a tuple "(x, .foo)" would have
+/// an unresolved type that is not an UnstructuredUnresolvedType, because it is
 /// known to be a tuple type and have a first element of the type of x.
-class UnstructuredDependentType : public TypeBase {
+class UnstructuredUnresolvedType : public TypeBase {
   friend class ASTContext;
-  // The Dependent type is always canonical.
-  UnstructuredDependentType(ASTContext &C) 
-    : TypeBase(TypeKind::UnstructuredDependent, &C, /*Dependent=*/true) {}
+  // The Unresolved type is always canonical.
+  UnstructuredUnresolvedType(ASTContext &C) 
+    : TypeBase(TypeKind::UnstructuredUnresolved, &C, /*Unresolved=*/true) {}
 public:
   static Type get(ASTContext &C);
 
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const UnstructuredDependentType *) { return true; }
+  static bool classof(const UnstructuredUnresolvedType *) { return true; }
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::UnstructuredDependent;
+    return T->getKind() == TypeKind::UnstructuredUnresolved;
   }
 };
 
@@ -334,7 +334,7 @@ class NameAliasType : public TypeBase {
   friend class TypeAliasDecl;
   // NameAliasType are never canonical.
   NameAliasType(TypeAliasDecl *d) 
-    : TypeBase(TypeKind::NameAlias, nullptr, /*Dependent=*/false), 
+    : TypeBase(TypeKind::NameAlias, nullptr, /*Unresolved=*/false), 
       TheDecl(d) {}
   TypeAliasDecl *const TheDecl;
 
@@ -373,7 +373,7 @@ public:
 private:
   // IdentifierType are never canonical.
   IdentifierType(MutableArrayRef<Component> Components)
-    : TypeBase(TypeKind::Identifier, nullptr, /*Dependent=*/false), 
+    : TypeBase(TypeKind::Identifier, nullptr, /*Unresolved=*/false), 
       Components(Components) {}
 public:
   
@@ -413,7 +413,7 @@ class ParenType : public TypeBase {
 
   friend class ASTContext;
   ParenType(Type UnderlyingType)
-    : TypeBase(TypeKind::Paren, nullptr, UnderlyingType->isDependentType()), 
+    : TypeBase(TypeKind::Paren, nullptr, UnderlyingType->isUnresolvedType()), 
       UnderlyingType(UnderlyingType) {}
 public:
   Type getUnderlyingType() const { return UnderlyingType; }
@@ -542,7 +542,7 @@ class NominalType : public TypeBase {
 
 protected:
   NominalType(TypeKind K, ASTContext *C, NominalTypeDecl *TheDecl)
-    : TypeBase(K, C, /*Dependent=*/false), TheDecl(TheDecl) { }
+    : TypeBase(K, C, /*Unresolved=*/false), TheDecl(TheDecl) { }
 
 public:
   /// \brief Returns the declaration that declares this type.
@@ -670,7 +670,7 @@ public:
 private:
   ModuleType(Module *M, ASTContext &Ctx)
     : TypeBase(TypeKind::Module, &Ctx, // Always canonical
-               /*Dependent=*/false),
+               /*Unresolved=*/false),
       TheModule(M) {
   }
 };
@@ -751,7 +751,7 @@ private:
 class ArraySliceType : public TypeBase {
   // ArraySliceTypes are never canonical.
   ArraySliceType(SourceLoc loc, Type base)
-    : TypeBase(TypeKind::ArraySlice, nullptr, /*Dependent=*/false),
+    : TypeBase(TypeKind::ArraySlice, nullptr, /*Unresolved=*/false),
       FirstRef(loc), Base(base) {}
 
   SourceLoc FirstRef;
@@ -945,7 +945,7 @@ private:
 
   LValueType(Type objectTy, Qual quals, ASTContext *canonicalContext)
     : TypeBase(TypeKind::LValue, canonicalContext, 
-               objectTy->isDependentType()),
+               objectTy->isUnresolvedType()),
       ObjectTy(objectTy), Quals(quals) {}
 
 public:
@@ -999,7 +999,7 @@ public:
   
 private:
   ArchetypeType(StringRef DisplayName, ASTContext &Ctx)
-    : TypeBase(TypeKind::Archetype, &Ctx, /*Dependent=*/false),
+    : TypeBase(TypeKind::Archetype, &Ctx, /*Unresolved=*/false),
       DisplayName(DisplayName){ }
 };
 
@@ -1008,7 +1008,7 @@ private:
 class SubstArchetypeType : public TypeBase {
   // SubstArchetypeTypes are never canonical.
   explicit SubstArchetypeType(ArchetypeType *Archetype, Type Subst)
-    : TypeBase(TypeKind::SubstArchetype, nullptr, /*Dependent=*/false),
+    : TypeBase(TypeKind::SubstArchetype, nullptr, /*Unresolved=*/false),
       Archetype(Archetype), Subst(Subst) {}
   
   ArchetypeType *Archetype;
@@ -1037,8 +1037,8 @@ public:
   }
 };
 
-inline bool TypeBase::isDependentType() const {
-  return TypeBits.TypeBase.Dependent;
+inline bool TypeBase::isUnresolvedType() const {
+  return TypeBits.TypeBase.Unresolved;
 }
 
 } // end namespace swift

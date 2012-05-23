@@ -167,11 +167,11 @@ public:
   const Type TheObjCPointerType; /// Builtin.ObjCPointer
   const Type TheRawPointerType;  /// Builtin.RawPointer
   
-  /// TheUnstructuredDependentType - Dependent on context.  This is given to an 
+  /// TheUnstructuredUnresolvedType - Unresolved on context.  This is given to an 
   /// anonymous closure argument (e.g. $4) and to UnresolvedMemberExprs 
   /// (e.g. .foo) during type checking until they are resolved to something with 
   /// concrete type.
-  const Type TheUnstructuredDependentType;
+  const Type TheUnstructuredUnresolvedType;
   const Type TheIEEE32Type;     /// TheIEEE32Type  - 32-bit IEEE floating point
   const Type TheIEEE64Type;     /// TheIEEE64Type  - 64-bit IEEE floating point
   

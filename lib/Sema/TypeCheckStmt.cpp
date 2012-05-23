@@ -995,7 +995,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       // FIXME: I'm not sure this check is really correct.
       if (VD->getName().empty())
         continue;
-      if (VD->getType()->is<ErrorType>() || VD->getType()->isDependentType())
+      if (VD->getType()->is<ErrorType>() || VD->getType()->isUnresolvedType())
         continue;
       auto &PrevOv = CheckOverloads[VD->getName()];
       if (i >= StartElem) {

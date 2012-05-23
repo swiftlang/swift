@@ -287,9 +287,9 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     }
   }
   
-  // Otherwise, the function's type must be dependent.  If it is something else,
-  // we have a type error.
-  if (!E1->getType()->isDependentType()) {
+  // Otherwise, the function's type must be unresolved.  If it is something
+  // else, we have a type error.
+  if (!E1->getType()->isUnresolvedType()) {
     diagnose(E1->getLoc(), diag::called_expr_isnt_function);
     return 0;
   }
@@ -298,8 +298,8 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // resolve which overload member is based on the argument type.
   OverloadSetRefExpr *OS = dyn_cast<OverloadSetRefExpr>(E1);
   if (!OS) {
-    // If not, just use the dependent type.
-    E->setType(UnstructuredDependentType::get(Context));
+    // If not, just use the unresolved type.
+    E->setType(UnstructuredUnresolvedType::get(Context));
     return E;
   }
 
@@ -325,7 +325,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   
   // We have more than one viable candidate. This might be resolved when/if
   // we get a destination type to coerce to.  
-  E->setType(UnstructuredDependentType::get(Context));
+  E->setType(UnstructuredUnresolvedType::get(Context));
   if (Viable.size() == OS->getDecls().size())
     return E;
   
@@ -346,7 +346,7 @@ namespace {
 /// analyzing 1 and 4 before the + in "1+4") semantic analysis of an
 /// already-existing expression tree.  This is performed when a closure is
 /// formed and anonymous decls like "$4" get a concrete type associated with
-/// them.  During the initial parse, these decls get a 'dependent' type, which
+/// them.  During the initial parse, these decls get a 'unresolved' type, which
 /// disables most semantic analysis associated with them.
 ///
 /// When the expression tree is bound to a context, the anonymous decls get a
@@ -367,7 +367,7 @@ public:
 
   Expr *visitLiteralExpr(LiteralExpr *E) {
     if (E->getType().isNull())
-      E->setType(UnstructuredDependentType::get(TC.Context));
+      E->setType(UnstructuredUnresolvedType::get(TC.Context));
     return E;
   }
   Expr *visitDeclRefExpr(DeclRefExpr *E) {
@@ -376,10 +376,10 @@ public:
       return 0;
     }
 
-    // If the type of a decl is not computed yet, make the declref dependent;
+    // If the type of a decl is not computed yet, make the declref unresolved;
     // this can happen for references to "$0" etc.
     if (!E->getDecl()->hasType()) {
-      E->setType(UnstructuredDependentType::get(TC.Context));
+      E->setType(UnstructuredUnresolvedType::get(TC.Context));
       return E;
     }
 
@@ -394,7 +394,7 @@ public:
     return E;
   }
   Expr *visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
-    E->setType(UnstructuredDependentType::get(TC.Context));
+    E->setType(UnstructuredUnresolvedType::get(TC.Context));
     return E;
   }
   Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
@@ -421,7 +421,7 @@ public:
     return E;
   }
   Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
-    E->setType(UnstructuredDependentType::get(TC.Context));
+    E->setType(UnstructuredUnresolvedType::get(TC.Context));
     return E;
   }
 
@@ -440,7 +440,7 @@ public:
     return TC.semaSubscriptExpr(E);
   }
   Expr *visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *E) {
-    E->setType(UnstructuredDependentType::get(TC.Context));
+    E->setType(UnstructuredUnresolvedType::get(TC.Context));
     return E;
   }
     
@@ -451,7 +451,7 @@ public:
   Expr *visitTupleElementExpr(TupleElementExpr *E) {
     // TupleElementExpr is fully resolved.
     // FIXME: This will not always be the case?
-    assert(!E->getType()->isDependentType());
+    assert(!E->getType()->isUnresolvedType());
     return E;
   }
 
@@ -462,8 +462,8 @@ public:
     }
 
     Type resultType = E->getElementType();
-    if (resultType->isDependentType()) {
-      E->setType(UnstructuredDependentType::get(TC.Context));
+    if (resultType->isUnresolvedType()) {
+      E->setType(UnstructuredUnresolvedType::get(TC.Context));
       return E;
     } else if (resultType->is<ErrorType>()) {
       E->setType(resultType);
@@ -514,8 +514,9 @@ public:
     if (resultType.isNull()) return nullptr;
     E->setType(resultType);
 
-    // Delay checking the injection function while the bounds type is dependent.
-    if (outerBound.Value->getType()->isDependentType())
+    // Delay checking the injection function while the bounds type is
+    // unresolved.
+    if (outerBound.Value->getType()->isUnresolvedType())
       return E;
 
     // Find the appropriate injection function.
@@ -559,12 +560,12 @@ public:
   }
 
   Expr *visitCoerceExpr(CoerceExpr *E) {
-    assert(!E->getType()->isDependentType());
+    assert(!E->getType()->isUnresolvedType());
     return E;
   }
     
   Expr *visitImplicitConversionExpr(ImplicitConversionExpr *E) {
-    assert(!E->getType()->isDependentType());
+    assert(!E->getType()->isUnresolvedType());
     // Implicit conversions have been fully checked.
     return E;
   }
@@ -582,8 +583,8 @@ public:
     }
 
     // Propagate out dependence.
-    if (E->getSubExpr()->getType()->isDependentType()) {
-      E->setType(UnstructuredDependentType::get(TC.Context));
+    if (E->getSubExpr()->getType()->isUnresolvedType()) {
+      E->setType(UnstructuredUnresolvedType::get(TC.Context));
       return E;
     }
 
@@ -604,14 +605,14 @@ public:
   
   Expr *visitModuleExpr(ModuleExpr *E) {
     // ModuleExpr is fully resolved.
-    assert(!E->getType()->isDependentType());
+    assert(!E->getType()->isUnresolvedType());
     return E;
   }
 
   Expr *visitExplicitClosureExpr(ExplicitClosureExpr *E) {
     assert(E->getType().isNull() &&
            "Shouldn't walk into typed ExplicitClosures");
-    E->setType(UnstructuredDependentType::get(TC.Context));
+    E->setType(UnstructuredUnresolvedType::get(TC.Context));
     return E;
   }
   Expr *visitImplicitClosureExpr(ImplicitClosureExpr *E) {
@@ -645,7 +646,7 @@ public:
     if (isa<FuncExpr>(E)) return false;
 
     // Only walk into Explicit Closures if they haven't been seen at all yet.
-    // This ensures that everything gets a type, even if it is a UnstructuredDependentType.
+    // This ensures that everything gets a type, even if it is a UnstructuredUnresolvedType.
     return !isa<ExplicitClosureExpr>(E) || E->getType().isNull();
   }
 
@@ -721,8 +722,8 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
   Type BaseTy = Base->getType();
   Identifier MemberName = E->getName();
   
-  if (BaseTy->isDependentType()) {
-    E->setType(UnstructuredDependentType::get(Context));
+  if (BaseTy->isUnresolvedType()) {
+    E->setType(UnstructuredUnresolvedType::get(Context));
     return E;
   }
   
@@ -940,21 +941,21 @@ namespace {
     DependenceWalker() { reset(); }
     
     void reset() {
-      OneDependentExpr = nullptr;
-      HasDependentLiterals = false;
+      OneUnresolvedExpr = nullptr;
+      HasUnresolvedLiterals = false;
     }
     
     Expr *walkToExprPost(Expr *E) {    
       assert(!isa<SequenceExpr>(E) && "Should have resolved this");
       
-      if (E->getType()->isDependentType()) {
-        // Remember the first dependent expression we come across.
-        if (OneDependentExpr == 0)
-          OneDependentExpr = E;
+      if (E->getType()->isUnresolvedType()) {
+        // Remember the first unresolved expression we come across.
+        if (OneUnresolvedExpr == 0)
+          OneUnresolvedExpr = E;
         
-        // Also remember if we see any literals with dependent types.
+        // Also remember if we see any literals with unresolved types.
         if (isa<LiteralExpr>(E))
-          HasDependentLiterals = true;
+          HasUnresolvedLiterals = true;
       }
       return E;
     }
@@ -964,18 +965,18 @@ namespace {
       return false;
     }
     
-    Expr *OneDependentExpr;
-    bool HasDependentLiterals;
+    Expr *OneUnresolvedExpr;
+    bool HasUnresolvedLiterals;
   }; 
 }
 
-bool TypeChecker::resolveDependentLiterals(Expr *&E) {
+bool TypeChecker::resolveUnresolvedLiterals(Expr *&E) {
   struct UpdateWalker : ASTWalker {
     UpdateWalker(TypeChecker &TC) : TC(TC) {}
     
     Expr *walkToExprPost(Expr *E) {
-      // Process dependent literals.
-      if (E->getType()->isDependentType()) {
+      // Process unresolved literals.
+      if (E->getType()->isUnresolvedType()) {
         if (IntegerLiteralExpr *lit = dyn_cast<IntegerLiteralExpr>(E))
           return TC.coerceToType(lit, getIntLiteralType(lit->getLoc()));
         
@@ -1064,7 +1065,7 @@ bool TypeChecker::resolveDependentLiterals(Expr *&E) {
     return true;
   
   // Now that we've added some types to the mix, re-type-check the expression
-  // tree and recheck for dependent types.
+  // tree and recheck for unresolved types.
   SemaExpressionTree SET(*this);
   E = SET.doIt(E);
   return E == nullptr;
@@ -1085,14 +1086,14 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
   DependenceWalker dependence;
   E->walk(dependence);
 
-  // Fast path: if we found nothing dependent, we're done.
-  if (!dependence.OneDependentExpr)
+  // Fast path: if we found nothing unresolved, we're done.
+  if (!dependence.OneUnresolvedExpr)
     return false;
 
-  // Otherwise, if we found any dependent literals, then force them to
+  // Otherwise, if we found any unresolved literals, then force them to
   // the library specified default type for the appropriate literal kind.
-  if (dependence.HasDependentLiterals) {
-    if (resolveDependentLiterals(E))
+  if (dependence.HasUnresolvedLiterals) {
+    if (resolveUnresolvedLiterals(E))
       return true;
     
     // If our context specifies a type, apply it to the expression.
@@ -1105,13 +1106,13 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
     E->walk(dependence);
   }
   
-  // If there are no dependent expressions, then we're done.
-  if (dependence.OneDependentExpr == 0) return false;
+  // If there are no unresolved expressions, then we're done.
+  if (dependence.OneUnresolvedExpr == 0) return false;
 
   // Otherwise, emit an error about the ambiguity.
-  diagnose(dependence.OneDependentExpr->getLoc(),
+  diagnose(dependence.OneUnresolvedExpr->getLoc(),
            diag::ambiguous_expression_unresolved)
-    << dependence.OneDependentExpr->getSourceRange();
+    << dependence.OneUnresolvedExpr->getSourceRange();
   E = 0;
   return true;
 }
@@ -1199,8 +1200,8 @@ bool TypeChecker::typeCheckArrayBound(Expr *&E, bool constantRequired) {
     return true;
   }
 
-  // Just quietly accept if the type is dependent.
-  if (E->getType()->isDependentType())
+  // Just quietly accept if the type is unresolved.
+  if (E->getType()->isUnresolvedType())
     return false;
 
   // Otherwise, apply .getArrayBoundValue() until we get an acceptable
@@ -1237,44 +1238,44 @@ bool TypeChecker::typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc,
   Src = SET.doIt(Src);
   if (!Src) return true;
   
-  // Determine whether the destination and source have dependent expressions.
+  // Determine whether the destination and source have unresolved expressions.
   DependenceWalker DestDependence;
   Dest->walk(DestDependence);
 
   DependenceWalker SrcDependence;
   Src->walk(SrcDependence);
 
-  bool IsDestDependent = DestDependence.OneDependentExpr != nullptr;
-  bool IsSrcDependent = SrcDependence.OneDependentExpr != nullptr;
+  bool IsDestUnresolved = DestDependence.OneUnresolvedExpr != nullptr;
+  bool IsSrcUnresolved = SrcDependence.OneUnresolvedExpr != nullptr;
 
-  // If both destination and source are dependent, try resolving dependent
+  // If both destination and source are unresolved, try resolving unresolved
   // literals.
-  if (IsDestDependent && IsSrcDependent) {
-    // Resolve dependent literals in the destination, first.
-    if (resolveDependentLiterals(Dest))
+  if (IsDestUnresolved && IsSrcUnresolved) {
+    // Resolve unresolved literals in the destination, first.
+    if (resolveUnresolvedLiterals(Dest))
       return true;
 
-    // Is the destination still dependent?
+    // Is the destination still unresolved?
     DestDependence.reset();
     Dest->walk(DestDependence);
-    IsDestDependent = DestDependence.OneDependentExpr != nullptr;
+    IsDestUnresolved = DestDependence.OneUnresolvedExpr != nullptr;
     
-    // If the destination is still dependent, resolve dependent literals in
+    // If the destination is still unresolved, resolve unresolved literals in
     // the source as well.
-    if (IsDestDependent) {
-      if (resolveDependentLiterals(Src))
+    if (IsDestUnresolved) {
+      if (resolveUnresolvedLiterals(Src))
         return true;
       
-      // Is the destination still dependent?
+      // Is the destination still unresolved?
       SrcDependence.reset();
       Src->walk(SrcDependence);
-      IsSrcDependent = SrcDependence.OneDependentExpr != nullptr;
+      IsSrcUnresolved = SrcDependence.OneUnresolvedExpr != nullptr;
     }
   }
   
-  // If the destination is not dependent, coerce the source to the object type
+  // If the destination is not unresolved, coerce the source to the object type
   // of the destination.
-  if (!IsDestDependent) {
+  if (!IsDestUnresolved) {
     Type DestTy = Dest->getType();
     if (LValueType *DestLV = DestTy->getAs<LValueType>())
       DestTy = DestLV->getObjectType();
@@ -1290,9 +1291,9 @@ bool TypeChecker::typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc,
     return Src == nullptr;    
   }
 
-  // If the source is not dependent (but the destination is), coerce the
+  // If the source is not unresolved (but the destination is), coerce the
   // destination to an lvalue of the source type.
-  if (!IsSrcDependent) {
+  if (!IsSrcUnresolved) {
     Src = convertToRValue(Src);
     if (!Src) return true;
     
@@ -1305,9 +1306,9 @@ bool TypeChecker::typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc,
     return Dest == nullptr;
   }
   
-  // Both source and destination are still dependent.
-  diagnose(DestDependence.OneDependentExpr->getLoc(),
+  // Both source and destination are still unresolved.
+  diagnose(DestDependence.OneUnresolvedExpr->getLoc(),
            diag::ambiguous_expression_unresolved)
-    << DestDependence.OneDependentExpr->getSourceRange();
+    << DestDependence.OneUnresolvedExpr->getSourceRange();
   return true;
 }

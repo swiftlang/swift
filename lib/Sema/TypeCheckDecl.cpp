@@ -290,7 +290,7 @@ public:
         body->setType(FD->getType());
         TypedPattern *thisPattern =
           cast<TypedPattern>(body->getParamPatterns()[0]);
-        assert(thisPattern->getType()->isDependentType());
+        assert(thisPattern->getType()->isUnresolvedType());
         thisPattern->overwriteType(thisType);
       }
     }

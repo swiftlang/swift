@@ -595,7 +595,7 @@ void Parser::addVarsToScope(Pattern *Pat,
     VarDecl *VD = cast<NamedPattern>(Pat)->getDecl();
     VD->setDeclContext(CurDeclContext);
     if (!VD->hasType())
-      VD->setType(UnstructuredDependentType::get(Context));
+      VD->setType(UnstructuredUnresolvedType::get(Context));
     if (Attributes.isValid())
       VD->getMutableAttrs() = Attributes;
 
@@ -1079,7 +1079,7 @@ Pattern *Parser::buildImplicitThisParameter() {
     = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
                             Type(), CurDeclContext);
   Pattern *P = new (Context) NamedPattern(D);
-  return new (Context) TypedPattern(P, UnstructuredDependentType::get(Context));
+  return new (Context) TypedPattern(P, UnstructuredUnresolvedType::get(Context));
 }
 
 /// parseDeclFunc - Parse a 'func' declaration, returning null on error.  The

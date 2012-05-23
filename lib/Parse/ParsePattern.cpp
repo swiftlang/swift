@@ -38,7 +38,7 @@ bool Parser::checkFullyTyped(Type type) {
   case TypeKind::Class:
   case TypeKind::MetaType:
   case TypeKind::Module:
-  case TypeKind::UnstructuredDependent:
+  case TypeKind::UnstructuredUnresolved:
   case TypeKind::Archetype:
   case TypeKind::SubstArchetype:
     return false;

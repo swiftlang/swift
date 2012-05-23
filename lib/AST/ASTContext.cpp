@@ -57,7 +57,7 @@ ASTContext::ASTContext(llvm::SourceMgr &sourcemgr, DiagnosticEngine &Diags)
     TheObjectPointerType(new (*this) BuiltinObjectPointerType(*this)),
     TheObjCPointerType(new (*this) BuiltinObjCPointerType(*this)),
     TheRawPointerType(new (*this) BuiltinRawPointerType(*this)),
-    TheUnstructuredDependentType(new (*this) UnstructuredDependentType(*this)),
+    TheUnstructuredUnresolvedType(new (*this) UnstructuredUnresolvedType(*this)),
     TheIEEE32Type(new (*this) BuiltinFloatType(BuiltinFloatType::IEEE32,*this)),
     TheIEEE64Type(new (*this) BuiltinFloatType(BuiltinFloatType::IEEE64,*this)),
     TheIEEE16Type(new (*this) BuiltinFloatType(BuiltinFloatType::IEEE16,*this)),
@@ -98,8 +98,8 @@ bool ASTContext::hadError() const {
 
 // Simple accessors.
 Type ErrorType::get(ASTContext &C) { return C.TheErrorType; }
-Type UnstructuredDependentType::get(ASTContext &C) { 
-  return C.TheUnstructuredDependentType; 
+Type UnstructuredUnresolvedType::get(ASTContext &C) { 
+  return C.TheUnstructuredUnresolvedType; 
 }
 
 
@@ -200,7 +200,7 @@ MetaTypeType *MetaTypeType::get(TypeDecl *Type) {
 }
 
 MetaTypeType::MetaTypeType(TypeDecl *Type, ASTContext *C)
-  : TypeBase(TypeKind::MetaType, C, /*Dependent=*/false),
+  : TypeBase(TypeKind::MetaType, C, /*Unresolved=*/false),
     TheType(Type) {
 }
 
@@ -231,7 +231,7 @@ FunctionType::FunctionType(Type input, Type result, bool isAutoClosure)
   : TypeBase(TypeKind::Function,
              (input->isCanonical() && result->isCanonical()) ?
                &input->getASTContext() : 0,
-             (input->isDependentType() || result->isDependentType())),
+             (input->isUnresolvedType() || result->isUnresolvedType())),
     Input(input), Result(result), AutoClosure(isAutoClosure) { }
 
 
@@ -249,7 +249,7 @@ ArrayType *ArrayType::get(Type BaseType, uint64_t Size, ASTContext &C) {
 ArrayType::ArrayType(Type base, uint64_t size)
   : TypeBase(TypeKind::Array, 
              base->isCanonical() ? &base->getASTContext() : 0,
-             base->isDependentType()),
+             base->isUnresolvedType()),
     Base(base), Size(size) {}
 
 

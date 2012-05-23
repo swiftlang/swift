@@ -474,7 +474,7 @@ public:
 
 /// UnresolvedMemberExpr - This represents '.foo', an unresolved reference to a
 /// member, which is to be resolved with context sensitive type information into
-/// bar.foo.  These always have dependent type.
+/// bar.foo.  These always have unresolved type.
 class UnresolvedMemberExpr : public Expr {
   SourceLoc ColonLoc;
   SourceLoc NameLoc;
@@ -696,8 +696,8 @@ public:
   }
 };
 
-/// UnresolvedDotExpr - A field access (foo.bar) on an expression with dependent
-/// type.
+/// UnresolvedDotExpr - A field access (foo.bar) on an expression with
+/// unresolved type.
 class UnresolvedDotExpr : public Expr {
   Expr *SubExpr;
   SourceLoc DotLoc;

@@ -575,8 +575,8 @@ ERROR(use_undeclared_type,sema_nb,none,
 // Type Check Coercions
 //------------------------------------------------------------------------------
 
-ERROR(cannot_convert_dependent_reference,sema_tcc,none,
-      "dependent reference to member %0 cannot convert to %1",
+ERROR(cannot_convert_unresolved_reference,sema_tcc,none,
+      "unresolved reference to member %0 cannot convert to %1",
       (Identifier,Type))
 ERROR(invalid_member_in_type,sema_tcc,none,
       "type %0 has no member named %1", (Type, Identifier))

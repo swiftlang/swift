@@ -74,10 +74,10 @@ public:
   bool typeCheckArrayBound(Expr *&E, bool requireConstant);
   bool typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc, Expr *&Src);
   
-  /// resolveDependentLiterals - Given an expression containg dependent
-  /// literals, resolve those dependent literals to their default types and
+  /// resolveUnresolvedLiterals - Given an expression containing unresolved
+  /// literals, resolve those unresolved literals to their default types and
   /// type-check the expression again.
-  bool resolveDependentLiterals(Expr *&E);
+  bool resolveUnresolvedLiterals(Expr *&E);
   
   /// coerceToType - Do semantic analysis of an expression in a context that
   /// expects a particular type.  This performs a conversion to that type if

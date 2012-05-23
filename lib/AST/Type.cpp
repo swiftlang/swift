@@ -78,7 +78,7 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
   case TypeKind::BuiltinObjCPointer:
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinFloat:
-  case TypeKind::UnstructuredDependent:
+  case TypeKind::UnstructuredUnresolved:
   case TypeKind::OneOf:
   case TypeKind::Struct:
   case TypeKind::Class:
@@ -363,12 +363,12 @@ Type IdentifierType::getMappedType() {
 }
 
 TupleType::TupleType(ArrayRef<TupleTypeElt> fields, ASTContext *CanCtx)
-  : TypeBase(TypeKind::Tuple, CanCtx, /*Dependent=*/false), Fields(fields) 
+  : TypeBase(TypeKind::Tuple, CanCtx, /*Unresolved=*/false), Fields(fields) 
 {
-  // Determine whether this tuple type is dependent.
+  // Determine whether this tuple type is unresolved.
   for (const auto &F : Fields) {
-    if (!F.getType().isNull() && F.getType()->isDependentType()) {
-      setDependent();
+    if (!F.getType().isNull() && F.getType()->isUnresolvedType()) {
+      setUnresolved();
       break;
     }
   }
@@ -478,8 +478,8 @@ std::string TypeBase::getString() const {
 
 void TypeBase::dump() const {
   print(llvm::errs());
-  if (isDependentType())
-    llvm::errs() << " [dependent]";
+  if (isUnresolvedType())
+    llvm::errs() << " [unresolved]";
   llvm::errs() << '\n';
 }
 
@@ -523,8 +523,8 @@ void ErrorType::print(raw_ostream &OS) const {
   OS << "<<error type>>";
 }
 
-void UnstructuredDependentType::print(raw_ostream &OS) const {
-  OS << "<<dependent type>>";
+void UnstructuredUnresolvedType::print(raw_ostream &OS) const {
+  OS << "<<unresolved type>>";
 }
 
 void ParenType::print(raw_ostream &OS) const {

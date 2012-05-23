@@ -27,7 +27,7 @@ static Identifier getFirstOverloadedIdentifier(const Expr *Fn) {
 }
 
 static bool displayOperandType(Type T) {
-  return !T->isDependentType() && !isa<ErrorType>(T);
+  return !T->isUnresolvedType() && !isa<ErrorType>(T);
 }
 
 void TypeChecker::diagnoseEmptyOverloadSet(Expr *E,
@@ -43,7 +43,7 @@ void TypeChecker::diagnoseEmptyOverloadSet(Expr *E,
     SourceLoc L = Fn->getLoc();
     Identifier I = getFirstOverloadedIdentifier(Fn);
     // Issue an error indicating the types of the operands, but only do
-    // so if they are both dependent types and not "error types".
+    // so if they are both unresolved types and not "error types".
     Type TypeA = Elements[0]->getType();
     Type TypeB = Elements[1]->getType();
     if (displayOperandType(TypeA) && displayOperandType(TypeB)) {
@@ -64,7 +64,7 @@ void TypeChecker::diagnoseEmptyOverloadSet(Expr *E,
     const Expr *Arg = UE->getArg();
     Identifier I = getFirstOverloadedIdentifier(Fn);
     // Issue a note indicating the types of the operand, but only do
-    // so if it is a dependent type.  Otherwise, the diagnostic is confusing.
+    // so if it is a unresolved type.  Otherwise, the diagnostic is confusing.
     Type TypeArg = Arg->getType();
     if (displayOperandType(TypeArg)) {      
       diagnose(Arg->getLoc(), diag::no_candidates_unary, I, TypeArg)

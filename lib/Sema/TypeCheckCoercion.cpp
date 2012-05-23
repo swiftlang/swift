@@ -87,7 +87,7 @@ namespace {
 /// SemaCoerce - This class implements top-down semantic analysis (aka "root to
 /// leaf", using the type of "+" to infer the type of "a" in "a+1") of an
 /// already-existing expression tree.  This is performed when an expression with
-/// dependent type is used in a context that forces a specific type.  
+/// unresolved type is used in a context that forces a specific type.
 ///
 /// Each visit method reanalyzes the node to see if the type can be propagated
 /// into it.  If not, it returns it.  If so it checks to see if the type
@@ -330,7 +330,7 @@ public:
     // The only valid type for an UME is a OneOfType.
     OneOfType *DT = DestTy->getAs<OneOfType>();
     if (DT == 0) {
-      diagnose(UME->getLoc(), diag::cannot_convert_dependent_reference,
+      diagnose(UME->getLoc(), diag::cannot_convert_unresolved_reference,
                UME->getName(), DestTy);
       return nullptr;
     }
@@ -387,7 +387,7 @@ public:
 
   CoercedResult visitTupleElementExpr(TupleElementExpr *E) {
     // TupleElementExpr is fully resolved.
-    llvm_unreachable("This node doesn't exist for dependent types");
+    llvm_unreachable("This node doesn't exist for unresolved types");
   }
   
   
@@ -463,7 +463,7 @@ public:
   SemaCoerce(TypeChecker &TC, Type DestTy, unsigned Flags)
     : TC(TC), DestTy(DestTy), Flags(Flags)
   {
-    assert(!DestTy->isDependentType());
+    assert(!DestTy->isUnresolvedType());
   }
   
   CoercedResult doIt(Expr *E) {
@@ -586,7 +586,7 @@ SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralType LitTy) {
 }
 
 CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
-  assert(E->getType()->isDependentType() && "only accepts dependent types");
+  assert(E->getType()->isUnresolvedType() && "only accepts unresolved types");
   LiteralType LitTy;
   if (isa<IntegerLiteralExpr>(E))
     LitTy = LiteralType::Int;
@@ -942,7 +942,7 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
 
 CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
   // TODO: We would really like to propagate something like
-  // "DependentTy->DestTy" up into the Fn argument, eliminating these special
+  // "UnresolvedTy->DestTy" up into the Fn argument, eliminating these special
   // cases.  See the 'syntactic' FIXME's below.
   
   // Given a CallExpr a(b) where "a" is an overloaded value, we may be able to
@@ -1550,8 +1550,8 @@ namespace {
 /// coerceToType.  It produces diagnostics and returns null on failure.
 CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
                                        unsigned Flags) {
-  assert(!DestTy->isDependentType() &&
-         "Result of conversion can't be dependent");
+  assert(!DestTy->isUnresolvedType() &&
+         "Result of conversion can't be unresolved");
 
   // Don't bother trying to perform a conversion to or from error type.
   if (DestTy->is<ErrorType>() || E->getType()->is<ErrorType>())
@@ -1604,7 +1604,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
   if (E->getType()->isEqual(DestTy))
     return unchanged(E, Flags);
   
-  // If the expression is a grouping parenthesis and it has a dependent type,
+  // If the expression is a grouping parenthesis and it has an unresolved type,
   // just force the type through it, regardless of what DestTy is.
   if (ParenExpr *PE = dyn_cast<ParenExpr>(E)) {
     CoercedResult Sub = coerceToType(PE->getSubExpr(), DestTy, TC, Flags);
@@ -1623,9 +1623,9 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
     Type SrcTy = E->getType();
     LValueType *SrcLT = SrcTy->getAs<LValueType>();
 
-    // If the input expression has a dependent type, try to coerce it to an
+    // If the input expression has an unresolved type, try to coerce it to an
     // appropriate type.
-    if (SrcTy->isDependentType())
+    if (SrcTy->isUnresolvedType())
       return SemaCoerce(TC, DestTy, Flags).doIt(E);
 
     if ((Flags & CF_ImplicitLValue) ||
@@ -1676,8 +1676,8 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
     // could be parsed as either ((4,5), 6) or ((4,3),5), but the later one is
     // the "right" answer.
     
-    // If the element of the tuple has dependent type and is a TupleExpr, try to
-    // convert it.
+    // If the element of the tuple has unresolved type and is a TupleExpr, try
+    // to convert it.
     if (TupleExpr *TE = dyn_cast<TupleExpr>(E))
       return convertTupleToTupleType(TE, TE->getNumElements(), TT, TC, Flags);
 
@@ -1692,9 +1692,9 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
       return convertTupleToTupleType(E, ETy->getFields().size(), TT, TC, Flags);
   }
   
-  // If the input expression has a dependent type, try to coerce it to an
+  // If the input expression has an unresolved type, try to coerce it to an
   // appropriate type.
-  if (E->getType()->isDependentType())
+  if (E->getType()->isUnresolvedType())
     return SemaCoerce(TC, DestTy, Flags).doIt(E);
 
   // If there is an implicit conversion from the source to the destination

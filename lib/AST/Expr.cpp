@@ -174,7 +174,7 @@ Expr *OverloadedDeclRefExpr::createWithCopy(ArrayRef<ValueDecl*> Decls,
   // Otherwise, copy the overload set into ASTContext memory and return the
   // overload set.
   return new (C) OverloadedDeclRefExpr(C.AllocateCopy(Decls), Loc,
-                                       UnstructuredDependentType::get(C));
+                                       UnstructuredUnresolvedType::get(C));
 }
 
 Expr *OverloadedMemberRefExpr::createWithCopy(Expr *Base, SourceLoc DotLoc,
@@ -204,7 +204,7 @@ Expr *OverloadedMemberRefExpr::createWithCopy(Expr *Base, SourceLoc DotLoc,
   // Otherwise, copy the overload set into the ASTContext's memory.
   return new (C) OverloadedMemberRefExpr(Base, DotLoc, C.AllocateCopy(Decls),
                                          MemberLoc,
-                                         UnstructuredDependentType::get(C));
+                                         UnstructuredUnresolvedType::get(C));
 }
 
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
@@ -256,7 +256,7 @@ Expr *OverloadedSubscriptExpr::createWithCopy(Expr *Base,
   // Otherwise, copy the overload set into the ASTContext's memory.
   return new (C) OverloadedSubscriptExpr(Base, C.AllocateCopy(Decls),
                                          LBracketLoc, Index, RBracketLoc,
-                                         UnstructuredDependentType::get(C));
+                                         UnstructuredUnresolvedType::get(C));
 }
 
 FuncExpr *FuncExpr::create(ASTContext &C, SourceLoc funcLoc,
@@ -359,7 +359,7 @@ public:
 
   void visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
     printCommon(E, "integer_literal_expr") << " value=";
-    if (E->getType().isNull() || E->getType()->isDependentType())
+    if (E->getType().isNull() || E->getType()->isUnresolvedType())
       OS << E->getText();
     else
       OS << E->getValue();

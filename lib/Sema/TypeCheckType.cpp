@@ -98,7 +98,7 @@ bool TypeChecker::validateType(Type InTy, bool isFirstPass) {
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinObjCPointer:
-  case TypeKind::UnstructuredDependent:
+  case TypeKind::UnstructuredUnresolved:
   case TypeKind::OneOf:
   case TypeKind::Struct:
   case TypeKind::Class:
