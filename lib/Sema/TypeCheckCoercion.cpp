@@ -1133,6 +1133,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   SmallVector<bool, 16> UsedElements(NumExprElements);
   SmallVector<int, 16>  DestElementSources(DestTy->getFields().size(), -1);
   SmallVector<int, 16>  VarargElementSources;
+  bool hasVarargDest = false;
 
   if (TupleType *ETy = E->getType()->getAs<TupleType>()) {
     assert(ETy->getFields().size() == NumExprElements && "#elements mismatch!");
@@ -1177,6 +1178,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
         }
         ++NextInputValue;
       }
+      hasVarargDest = true;
       DestElementSources[i] = -3;
       break;
     }
@@ -1315,7 +1317,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
   }
 
   Expr *injectionFn = 0;
-  if (!VarargElementSources.empty()) {
+  if (hasVarargDest) {
     Type DestEltTy = DestTy->getFields().back().getVarargBaseTy();
     unsigned SubFlags = Flags & ~CF_NotPropagated;
     for (int SrcField : VarargElementSources) {
