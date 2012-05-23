@@ -26,7 +26,7 @@ class TypeChecker {
 public:
   TranslationUnit &TU;
   ASTContext &Context;
-  
+    
 private:
   
   /// \brief The 'Any' protocol, used when reinfying existential member
@@ -35,7 +35,12 @@ private:
   
   /// \brief The 'Range' protocol, used by the for-each loop.
   ProtocolDecl *RangeProto;
-    
+  
+  Type IntLiteralType;
+  Type FloatLiteralType;
+  Type CharacterLiteralType;
+  Type StringLiteralType;
+
 public:
   TypeChecker(TranslationUnit &TU)
     : TU(TU), Context(TU.Ctx), AnyProto(0), RangeProto(0) {}
@@ -78,6 +83,10 @@ public:
   bool typeCheckCondition(Expr *&E);
   bool typeCheckArrayBound(Expr *&E, bool requireConstant);
   bool typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc, Expr *&Src);
+  
+  /// \brief Retrieve the default literal type for the given literal
+  /// expression.
+  Type getDefaultLiteralType(LiteralExpr *E);
   
   /// resolveUnresolvedLiterals - Given an expression containing unresolved
   /// literals, resolve those unresolved literals to their default types and

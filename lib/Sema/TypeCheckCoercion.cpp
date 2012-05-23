@@ -590,6 +590,23 @@ SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralType LitTy) {
 
 CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
   assert(E->getType()->isUnresolvedType() && "only accepts unresolved types");
+
+  // If the destination type is a protocol, use the default literal type
+  // and check whether it conforms to the given protocol.
+  if (auto DestProto = DestTy->getAs<ProtocolType>()) {
+    Type DefaultLitTy = TC.getDefaultLiteralType(E);
+    if (CoercedResult Result = coerceToType(E, DefaultLitTy, TC, Flags)) {
+      if (Flags & CF_Apply)
+        return coerceToType(Result.getExpr(), DestTy, TC, Flags);
+      
+      if (TC.conformsToProtocol(DefaultLitTy, DestProto->getDecl()))
+        return DestTy;
+      
+      return nullptr;
+    }
+    return nullptr;
+  }
+  
   LiteralType LitTy;
   if (isa<IntegerLiteralExpr>(E))
     LitTy = LiteralType::Int;

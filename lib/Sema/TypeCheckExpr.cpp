@@ -1030,6 +1030,61 @@ namespace {
   }; 
 }
 
+static Type lookupGlobalType(TypeChecker &TC, StringRef name) {
+  SmallVector<ValueDecl*, 8> Decls;
+  TC.TU.lookupGlobalValue(TC.Context.getIdentifier(name),
+                          NLKind::UnqualifiedLookup, Decls);
+  if (Decls.size() != 1 || !isa<TypeDecl>(Decls.back()))
+    return nullptr;
+  return cast<TypeDecl>(Decls.back())->getDeclaredType();
+}
+
+Type TypeChecker::getDefaultLiteralType(LiteralExpr *E) {
+  if (isa<IntegerLiteralExpr>(E)) {
+    if (!IntLiteralType) {
+      IntLiteralType = lookupGlobalType(*this, "IntegerLiteralType");
+      if (!IntLiteralType) {
+        diagnose(E->getLoc(), diag::no_IntegerLiteralType_found);
+        IntLiteralType = BuiltinIntegerType::get(32, Context);
+      }
+    }
+    return IntLiteralType;
+  }
+  
+  if (isa<FloatLiteralExpr>(E)) {
+    if (!FloatLiteralType) {
+      FloatLiteralType = lookupGlobalType(*this, "FloatLiteralType");
+      if (!FloatLiteralType) {
+        diagnose(E->getLoc(), diag::no_FloatLiteralType_found);
+        FloatLiteralType = Context.TheIEEE64Type;
+      }
+    }
+    return FloatLiteralType;
+  }
+  
+  if (isa<CharacterLiteralExpr>(E)) {
+    if (!CharacterLiteralType) {
+      CharacterLiteralType = lookupGlobalType(*this, "CharacterLiteralType");
+      if (!CharacterLiteralType) {
+        diagnose(E->getLoc(), diag::no_CharacterLiteralType_found);
+        CharacterLiteralType = BuiltinIntegerType::get(32, Context);
+      }
+    }
+    return CharacterLiteralType;
+  }
+  
+  assert((isa<StringLiteralExpr>(E) || isa<InterpolatedStringLiteralExpr>(E)) &&
+         "Unknown literal type");
+  if (!StringLiteralType) {
+    StringLiteralType = lookupGlobalType(*this, "StringLiteralType");
+    if (!StringLiteralType) {
+      diagnose(E->getLoc(), diag::no_StringLiteralType_found);
+      StringLiteralType = Context.TheRawPointerType;
+    }
+  }
+  return StringLiteralType;
+}
+
 bool TypeChecker::resolveUnresolvedLiterals(Expr *&E) {
   struct UpdateWalker : ASTWalker {
     UpdateWalker(TypeChecker &TC) : TC(TC) {}
@@ -1037,21 +1092,8 @@ bool TypeChecker::resolveUnresolvedLiterals(Expr *&E) {
     Expr *walkToExprPost(Expr *E) {
       // Process unresolved literals.
       if (E->getType()->isUnresolvedType()) {
-        if (IntegerLiteralExpr *lit = dyn_cast<IntegerLiteralExpr>(E))
-          return TC.coerceToType(lit, getIntLiteralType(lit->getLoc()));
-        
-        if (FloatLiteralExpr *lit = dyn_cast<FloatLiteralExpr>(E))
-          return TC.coerceToType(lit, getFloatLiteralType(lit->getLoc()));
-        
-        if (CharacterLiteralExpr *lit = dyn_cast<CharacterLiteralExpr>(E))
-          return TC.coerceToType(lit, getCharacterLiteralType(lit->getLoc()));
-        
-        if (StringLiteralExpr *lit = dyn_cast<StringLiteralExpr>(E))
-          return TC.coerceToType(lit, getStringLiteralType(lit->getLoc()));
-
-        if (InterpolatedStringLiteralExpr *lit 
-              = dyn_cast<InterpolatedStringLiteralExpr>(E))
-          return TC.coerceToType(lit, getStringLiteralType(lit->getLoc()));
+        if (LiteralExpr *Lit = dyn_cast<LiteralExpr>(E))
+          return TC.coerceToType(Lit, TC.getDefaultLiteralType(Lit));        
       }
       return E;
     }
@@ -1061,59 +1103,7 @@ bool TypeChecker::resolveUnresolvedLiterals(Expr *&E) {
       return false;
     }
     
-  private:
-    Type lookupGlobalType(StringRef name) {
-      SmallVector<ValueDecl*, 8> Decls;
-      TC.TU.lookupGlobalValue(TC.Context.getIdentifier(name),
-                              NLKind::UnqualifiedLookup, Decls);
-      if (Decls.size() != 1 || !isa<TypeDecl>(Decls.back()))
-        return nullptr;
-      return cast<TypeDecl>(Decls.back())->getDeclaredType();
-    }
-    
-    Type getIntLiteralType(SourceLoc loc) {
-      if (IntLiteralType.isNull()) {
-        IntLiteralType = lookupGlobalType("IntegerLiteralType");
-        if (IntLiteralType.isNull()) {
-          TC.diagnose(loc, diag::no_IntegerLiteralType_found);
-          IntLiteralType = BuiltinIntegerType::get(32, TC.Context);
-        }
-      }
-      return IntLiteralType;
-    }
-    
-    Type getFloatLiteralType(SourceLoc loc) {
-      if (FloatLiteralType.isNull()) {
-        FloatLiteralType = lookupGlobalType("FloatLiteralType");
-        if (FloatLiteralType.isNull()) {
-          TC.diagnose(loc, diag::no_FloatLiteralType_found);
-          FloatLiteralType = TC.Context.TheIEEE64Type;
-        }
-      }
-      return FloatLiteralType;
-    }
-    Type getCharacterLiteralType(SourceLoc loc) {
-      if (CharacterLiteralType.isNull()) {
-        CharacterLiteralType = lookupGlobalType("CharacterLiteralType");
-        if (CharacterLiteralType.isNull()) {
-          TC.diagnose(loc, diag::no_CharacterLiteralType_found);
-          CharacterLiteralType = BuiltinIntegerType::get(32, TC.Context);
-        }
-      }
-      return CharacterLiteralType;
-    }
-
-    Type getStringLiteralType(SourceLoc loc) {
-      if (StringLiteralType.isNull()) {
-        StringLiteralType = lookupGlobalType("StringLiteralType");
-        if (StringLiteralType.isNull()) {
-          TC.diagnose(loc, diag::no_StringLiteralType_found);
-          StringLiteralType = TC.Context.TheRawPointerType;
-        }
-      }
-      return StringLiteralType;
-    }
-    
+  private:    
     TypeChecker &TC;
     Type IntLiteralType, FloatLiteralType, CharacterLiteralType;
     Type StringLiteralType;
