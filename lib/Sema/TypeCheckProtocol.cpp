@@ -139,6 +139,10 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         
         for (auto Candidate : Viable)
           TC.diagnose(Candidate->getLocStart(), diag::protocol_witness_type);
+        
+        TypeMapping[AssociatedType->getUnderlyingType()->getAs<ArchetypeType>()]
+          = ErrorType::get(TC.Context);
+        continue;
       }
     }
     
@@ -155,10 +159,12 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         if (Candidate.hasDecl())
           TC.diagnose(Candidate.D->getLocStart(), diag::protocol_witness_type);
       }
+      
+      TypeMapping[AssociatedType->getUnderlyingType()->getAs<ArchetypeType>()]
+        = ErrorType::get(TC.Context);
     } else {
       return nullptr;
     }
-
   }
 
   // Check that T provides all of the required func/variable/subscript members.
@@ -226,6 +232,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         for (auto Candidate : Viable)
           TC.diagnose(Candidate->getLocStart(), diag::protocol_witness,
                       getInstanceUsageType(Candidate, TC.Context));
+        
+        continue;
       }
     }
 
