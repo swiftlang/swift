@@ -54,7 +54,7 @@ public:
     // Check the list of inherited protocols.
     bool ConformsToProtocols = false;
     for (unsigned i = 0, e = Inherited.size(); i != e; ++i) {
-      if (TC.validateType(Inherited[i])) {
+      if (TC.validateType(Inherited[i], IsFirstPass)) {
         Inherited[i] = ErrorType::get(TC.Context);
         continue;
       }
@@ -132,7 +132,7 @@ public:
       Type DestTy;
       if (PBD->getPattern()->hasType()) {
         DestTy = PBD->getPattern()->getType();
-        if (TC.validateType(DestTy)) {
+        if (TC.validateType(DestTy, IsFirstPass)) {
           DestTy = ErrorType::get(TC.Context);
           PBD->getPattern()->overwriteType(DestTy);
         }
@@ -150,14 +150,15 @@ public:
       }
       PBD->setInit(Init);
       if (!DestTy) {
-        if (TC.coerceToType(PBD->getPattern(), Init->getType()))
+        if (TC.coerceToType(PBD->getPattern(), Init->getType(),
+                            /*isFirstPass*/false))
           return;
       } else {
-        if (TC.typeCheckPattern(PBD->getPattern()))
+        if (TC.typeCheckPattern(PBD->getPattern(), /*isFirstPass*/false))
           return;
       }
     } else {
-      if (TC.typeCheckPattern(PBD->getPattern()))
+      if (TC.typeCheckPattern(PBD->getPattern(), IsFirstPass))
         return;
     }
     visitBoundVars(PBD->getPattern());
@@ -182,7 +183,7 @@ public:
     if (IsSecondPass)
       return;
 
-    TC.validateType(TAD->getAliasType());
+    TC.validateType(TAD->getAliasType(), IsFirstPass);
   }
 
   void visitOneOfDecl(OneOfDecl *OOD) {
@@ -304,7 +305,7 @@ public:
     if (ED->getArgumentType().isNull()) return;
       
     // Validate the function type.
-    if (TC.validateType(ED)) return;
+    if (TC.validateType(ED, IsFirstPass)) return;
 
     // Require the carried type to be materializable.
     if (!ED->getArgumentType()->isMaterializable()) {
@@ -317,7 +318,7 @@ public:
       return;
 
     bool CheckConformance;
-    if (TC.validateType(ED->getExtendedType())) {
+    if (TC.validateType(ED->getExtendedType(), IsFirstPass)) {
       ED->setExtendedType(ErrorType::get(TC.Context));
     } else {
       Type ExtendedTy = ED->getExtendedType();
@@ -353,7 +354,7 @@ void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
 }
 
 bool DeclChecker::visitValueDecl(ValueDecl *VD) {
-  if (TC.validateType(VD))
+  if (TC.validateType(VD, IsFirstPass))
     return true;
 
   if (!VD->getType()->isMaterializable()) {

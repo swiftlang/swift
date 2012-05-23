@@ -31,13 +31,13 @@ using namespace swift;
 
 /// Perform bottom-up type-checking on a pattern.  If this returns
 /// false, the type of the pattern will have been set.
-bool TypeChecker::typeCheckPattern(Pattern *P) {
+bool TypeChecker::typeCheckPattern(Pattern *P, bool isFirstPass) {
   switch (P->getKind()) {
   // Type-check paren patterns by checking the sub-pattern and
   // propagating that type out.
   case PatternKind::Paren: {
     Pattern *SP = cast<ParenPattern>(P)->getSubPattern();
-    if (typeCheckPattern(SP))
+    if (typeCheckPattern(SP, isFirstPass))
       return true;
     SET_TYPE(P, SP->getType());
     return false;
@@ -47,12 +47,12 @@ bool TypeChecker::typeCheckPattern(Pattern *P) {
   // that type.
   case PatternKind::Typed: {
     bool hadError = false;
-    if (validateType(P->getType())) {
+    if (validateType(P->getType(), isFirstPass)) {
       P->overwriteType(ErrorType::get(Context));
       hadError = true;
     }
     hadError |= coerceToType(cast<TypedPattern>(P)->getSubPattern(),
-                             P->getType());
+                             P->getType(), isFirstPass);
     return hadError;
   }
 
@@ -77,7 +77,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P) {
           << pattern->getSourceRange();
         elt.setInit(nullptr);
         hadError = true;
-      } else if (typeCheckPattern(pattern)) {
+      } else if (typeCheckPattern(pattern, isFirstPass)) {
         hadError = true;
       } else {
         type = pattern->getType();
@@ -96,19 +96,20 @@ bool TypeChecker::typeCheckPattern(Pattern *P) {
 }
 
 /// Perform top-down type coercion on the given pattern.
-bool TypeChecker::coerceToType(Pattern *P, Type type) {
+bool TypeChecker::coerceToType(Pattern *P, Type type, bool isFirstPass) {
   switch (P->getKind()) {
   // For parens, just set the type annotation and propagate inwards.
   case PatternKind::Paren:
     P->setType(type);
-    return coerceToType(cast<ParenPattern>(P)->getSubPattern(), type);
+    return coerceToType(cast<ParenPattern>(P)->getSubPattern(), type,
+                        isFirstPass);
 
   // If we see an explicit type annotation, coerce the sub-pattern to
   // that type.
   case PatternKind::Typed: {
     TypedPattern *TP = cast<TypedPattern>(P);
     bool hadError = false;
-    if (validateType(TP->getType())) {
+    if (validateType(TP->getType(), isFirstPass)) {
       TP->overwriteType(ErrorType::get(Context));
       hadError = true;
     } else if (!type->isEqual(TP->getType()) && !type->is<ErrorType>()) {
@@ -118,7 +119,7 @@ bool TypeChecker::coerceToType(Pattern *P, Type type) {
       hadError = true;
     }
 
-    hadError |= coerceToType(TP->getSubPattern(), TP->getType());
+    hadError |= coerceToType(TP->getSubPattern(), TP->getType(), isFirstPass);
     return hadError;
   }
 
@@ -179,7 +180,7 @@ bool TypeChecker::coerceToType(Pattern *P, Type type) {
       else
         CoercionType = tupleTy->getFields()[i].getType();
 
-      hadError |= coerceToType(pattern, CoercionType);
+      hadError |= coerceToType(pattern, CoercionType, isFirstPass);
     }
 
     return hadError;

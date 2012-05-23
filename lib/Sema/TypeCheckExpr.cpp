@@ -456,7 +456,7 @@ public:
   }
 
   Expr *visitNewArrayExpr(NewArrayExpr *E) {
-    if (TC.validateType(E->getElementType())) {
+    if (TC.validateType(E->getElementType(), /*isFirstPass*/false)) {
       E->setElementType(ErrorType::get(TC.Context));
       return nullptr;
     }
@@ -535,7 +535,7 @@ public:
   }
 
   Expr *visitNewReferenceExpr(NewReferenceExpr *E) {
-    if (TC.validateType(E->getType())) {
+    if (TC.validateType(E->getType(), /*isFirstPass*/false)) {
       E->setType(ErrorType::get(TC.Context));
       return nullptr;
     }
@@ -1120,7 +1120,7 @@ bool TypeChecker::semaFunctionSignature(FuncExpr *FE) {
   bool hadError = false;
   for (unsigned i = FE->getParamPatterns().size(); i != 0; --i) {
     Pattern *pattern = FE->getParamPatterns()[i - 1];
-    if (typeCheckPattern(pattern)) {
+    if (typeCheckPattern(pattern, /*isFirstPass*/false)) {
       hadError = true;
       continue;
     }

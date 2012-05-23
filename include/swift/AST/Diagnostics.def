@@ -857,6 +857,10 @@ ERROR(slice_type_not_found,sema_tct,none,
 ERROR(tuple_default_local_ref,sema_tct,none,
       "cannot refer to local declaration from default value of"
       " tuple element", ())
+ERROR(tuple_global_missing_type,sema_tct,none,
+      "a tuple type specifying the type of a global must explicitly state "
+      "the type of each tuple element", ())
+
 
 //==============================================================================
 // IR Generation Diagnostics

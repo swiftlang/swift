@@ -66,8 +66,8 @@ Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
 
 /// validateType - Recursively check to see if the type of a decl is valid.  If
 /// not, diagnose the problem and collapse it to an ErrorType.
-bool TypeChecker::validateType(ValueDecl *VD) {
-  if (!validateType(VD->getType())) return false;
+bool TypeChecker::validateType(ValueDecl *VD, bool isFirstPass) {
+  if (!validateType(VD->getType(), isFirstPass)) return false;
   
   VD->overwriteType(ErrorType::get(Context));
   return true;
@@ -78,7 +78,7 @@ bool TypeChecker::validateType(ValueDecl *VD) {
 /// expressions are valid and that they have the appropriate conversions etc.
 ///
 /// This returns true if the type is invalid.
-bool TypeChecker::validateType(Type InTy) {
+bool TypeChecker::validateType(Type InTy, bool isFirstPass) {
   assert(InTy && "Cannot validate null types!");
 
   TypeBase *T = InTy.getPointer();
@@ -115,15 +115,16 @@ bool TypeChecker::validateType(Type InTy) {
 
   case TypeKind::NameAlias: {
     TypeAliasDecl *D = cast<NameAliasType>(T)->getDecl();
-    IsInvalid = !D->hasUnderlyingType() || validateType(D->getUnderlyingType());
+    IsInvalid = !D->hasUnderlyingType() ||
+                validateType(D->getUnderlyingType(), isFirstPass);
     if (IsInvalid)
       D->overwriteUnderlyingType(ErrorType::get(Context));
     break;
   }
   case TypeKind::Identifier:
-    return validateType(cast<IdentifierType>(T)->getMappedType());
+    return validateType(cast<IdentifierType>(T)->getMappedType(), isFirstPass);
   case TypeKind::Paren:
-    return validateType(cast<ParenType>(T)->getUnderlyingType());
+    return validateType(cast<ParenType>(T)->getUnderlyingType(), isFirstPass);
   case TypeKind::Tuple: {
     TupleType *TT = cast<TupleType>(T);
     
@@ -133,14 +134,23 @@ bool TypeChecker::validateType(Type InTy) {
       // The element has *at least* a type or an initializer, so we start by
       // verifying each individually.
       Type EltTy = TT->getFields()[i].getType();
-      if (EltTy && validateType(EltTy)) {
+      if (EltTy && validateType(EltTy, isFirstPass)) {
         IsInvalid = true;
         break;
       }
 
       Expr *EltInit = TT->getFields()[i].getInit();
       if (EltInit == 0) continue;
-      
+
+      if (isFirstPass) {
+        if (!EltTy) {
+          diagnose(EltInit->getLoc(), diag::tuple_global_missing_type);
+          IsInvalid = true;
+          break;
+        }
+        continue;
+      } 
+
       Expr *OldInit = EltInit;
       if (typeCheckExpression(EltInit, EltTy)) {
         diagnose(OldInit->getLoc(),diag::while_converting_default_tuple_value,
@@ -181,25 +191,26 @@ bool TypeChecker::validateType(Type InTy) {
 
   case TypeKind::LValue:
     // FIXME: diagnose non-materializability of object type!
-    IsInvalid = validateType(cast<LValueType>(T)->getObjectType());
+    IsInvalid = validateType(cast<LValueType>(T)->getObjectType(), isFirstPass);
     break;
       
   case TypeKind::Function: {
     FunctionType *FT = cast<FunctionType>(T);
-    IsInvalid = validateType(FT->getInput()) || validateType(FT->getResult());
+    IsInvalid = validateType(FT->getInput(), isFirstPass) ||
+                validateType(FT->getResult(), isFirstPass);
     // FIXME: diagnose non-materializability of result type!
     break;
   }
   case TypeKind::Array: {
     ArrayType *AT = cast<ArrayType>(T);
-    IsInvalid = validateType(AT->getBaseType());
+    IsInvalid = validateType(AT->getBaseType(), isFirstPass);
     // FIXME: diagnose non-materializability of element type!
     // FIXME: We need to check AT->Size! (It also has to be convertible to int).
     break;
   }
   case TypeKind::ArraySlice: {
     ArraySliceType *AT = cast<ArraySliceType>(T);
-    IsInvalid = validateType(AT->getBaseType());
+    IsInvalid = validateType(AT->getBaseType(), isFirstPass);
     // FIXME: diagnose non-materializability of element type?
     if (!IsInvalid)
       IsInvalid = buildArraySliceType(*this, AT);
@@ -208,10 +219,8 @@ bool TypeChecker::validateType(Type InTy) {
   }
 
   // If we determined that this type is invalid, erase it in the caller.
-  if (IsInvalid) {
-    InTy = ErrorType::get(Context);
+  if (IsInvalid)
     return true;
-  }
 
   // Now that we decided that this type is ok, get the canonical type for it so
   // that we never reanalyze it again.

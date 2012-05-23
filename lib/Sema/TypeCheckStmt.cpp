@@ -312,8 +312,8 @@ public:
     // Coerce the pattern to the element type, now that we know the element
     // type.
     Type ElementTy = GetFirstAndAdvance->getType();
-    if (TC.coerceToType(S->getPattern(), ElementTy)) return nullptr;
-    
+    if (TC.coerceToType(S->getPattern(), ElementTy, /*isFirstPass*/false))
+      return nullptr;
     
     // Type-check the body of the loop.
     BraceStmt *Body = S->getBody();
@@ -794,7 +794,6 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       }
     }
   }
-  TU->clearTypesWithDefaultValues();
 
   // Find all the FuncExprs in the translation unit and collapse all
   // the sequences.
@@ -911,6 +910,22 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       }
     }
   }
+
+  for (auto TypeAndContext : TU->getTypesWithDefaultValues()) {
+    TupleType *TT = TypeAndContext.first;
+    if (TT->hasCanonicalTypeComputed()) {
+      for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i) {
+        const TupleTypeElt& Elt = TT->getFields()[i];
+        if (Elt.hasInit()) {
+          Expr *Init = Elt.getInit();
+          if (TC.typeCheckExpression(Init, Elt.getType()))
+            continue;
+          TT->updateInitializedElementType(i, Elt.getType(), Init);
+        }
+      }
+    }
+  }
+  TU->clearTypesWithDefaultValues();
   
   // If we're in a library, we skip type-checking global initializers in the
   // first pass.  Type-check them now.

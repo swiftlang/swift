@@ -37,8 +37,8 @@ public:
   Expr *buildArrayInjectionFnRef(ArraySliceType *sliceType,
                                  Type lenTy, SourceLoc Loc);
 
-  bool validateType(ValueDecl *VD);
-  bool validateType(Type T);
+  bool validateType(ValueDecl *VD, bool isFirstPass);
+  bool validateType(Type T, bool isFirstPass);
 
   Type substType(Type T, TypeSubstitutionMap &Substitutions);
   
@@ -61,8 +61,8 @@ public:
   void typeCheckDecl(Decl *D, bool isFirstPass);
 
   bool typeCheckExpression(Expr *&E, Type ConvertType = Type());
-  bool typeCheckPattern(Pattern *P);
-  bool coerceToType(Pattern *P, Type Ty);
+  bool typeCheckPattern(Pattern *P, bool isFirstPass);
+  bool coerceToType(Pattern *P, Type Ty, bool isFirstPass);
   bool typeCheckCondition(Expr *&E);
   bool typeCheckArrayBound(Expr *&E, bool requireConstant);
   bool typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc, Expr *&Src);
