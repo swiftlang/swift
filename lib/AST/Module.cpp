@@ -233,8 +233,7 @@ void Module::lookupGlobalValue(Identifier Name, NLKind LookupKind,
   // Do a local lookup within the current module.
   lookupValue(AccessPathTy(), Name, LookupKind, Result);
 
-  // If we get any hits, we're done.  Also, the builtin module never has
-  // imports, so it is always done at this point.
+  // The builtin module has no imports.
   if (isa<BuiltinModule>(this)) return;
   
   TranslationUnit &TU = *cast<TranslationUnit>(this);
@@ -281,17 +280,17 @@ static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
     }
   }
 
-  if (BaseModule == CurModule) {
-    for (ValueDecl *VD : BaseMembers) {
-      if (VD->getName() == Name) {
-        Result.push_back(VD);
+  for (ValueDecl *VD : BaseMembers) {
+    if (VD->getName() == Name) {
+      Result.push_back(VD);
+      if (BaseModule == CurModule) {
         CurModuleHasMetatype |= isa<MetaTypeType>(VD->getType());
       }
     }
   }
 
-  // If we found anything in local extensions, they shadow imports.
-  if (!Result.empty() || isa<BuiltinModule>(CurModule)) return;
+  // The builtin module has no imports.
+  if (isa<BuiltinModule>(CurModule)) return;
 
   TranslationUnit &TU = *cast<TranslationUnit>(CurModule);
 
@@ -311,12 +310,6 @@ static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
             Result.push_back(VD);
       }
     }
-  }
-
-  for (ValueDecl *VD : BaseMembers) {
-    if (VD->getName() == Name &&
-        !(CurModuleHasMetatype && isa<MetaTypeType>(VD->getType())))
-      Result.push_back(VD);
   }
 }
 
