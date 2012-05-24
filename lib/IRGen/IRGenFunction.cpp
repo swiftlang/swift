@@ -56,31 +56,94 @@ void IRGenFunction::emitMemCpy(Address dest, Address src, Size size) {
              std::min(dest.getAlignment(), src.getAlignment()));
 }
 
-llvm::Value *IRGenFunction::emitAllocRawCall(llvm::Value *size,
-                                             llvm::Value *align) {
-  // For now, always emit the most general call.  Eventually
-  // we should probably have specialized entry points for specific
-  // small allocations.
-  llvm::CallInst *call =
-    Builder.CreateCall2(IGM.getAllocRawFn(), size, align);
-
-  // Set as nounwind noalias.
-  llvm::SmallVector<llvm::AttributeWithIndex, 1> attrs;
-  attrs.push_back(llvm::AttributeWithIndex::get(0, llvm::Attribute::NoAlias));
-  attrs.push_back(llvm::AttributeWithIndex::get(~0, llvm::Attribute::NoUnwind));
-  call->setAttributes(llvm::AttrListPtr::get(attrs.data(), attrs.size()));  
-
-  return call;  
+/// Given a size, try to turn it into an alloc token.
+typedef unsigned AllocToken;
+const AllocToken InvalidAllocToken = ~0U;
+static AllocToken getAllocToken(IRGenModule &IGM, uint64_t size) {
+  // This is meant to exactly match the algorithm in the runtime's Alloc.h.
+  if (size >= 0x1000) return InvalidAllocToken;
+  if (size == 0) return 0;
+  --size;
+  if (IGM.getPointerSize() == Size(8)) {
+    if      (size < 0x80)   return (size >> 3);
+    else if (size < 0x100)  return (size >> 4) + 0x8;
+    else if (size < 0x200)  return (size >> 5) + 0x10;
+    else if (size < 0x400)  return (size >> 6) + 0x18;
+    else if (size < 0x800)  return (size >> 7) + 0x20;
+    else if (size < 0x1000) return (size >> 8) + 0x28;
+  } else {
+    assert(IGM.getPointerSize() == Size(4));
+    if      (size < 0x40)   return (size >> 2);
+    else if (size < 0x80)   return (size >> 3) + 0x8;
+    else if (size < 0x100)  return (size >> 4) + 0x10;
+    else if (size < 0x200)  return (size >> 5) + 0x18;
+    else if (size < 0x400)  return (size >> 6) + 0x20;
+    else if (size < 0x800)  return (size >> 7) + 0x28;
+    else if (size < 0x1000) return (size >> 8) + 0x30;
+  }
+  llvm_unreachable("everything is terrible");
 }
 
-void IRGenFunction::emitDeallocRawCall(llvm::Value *pointer,
-                                       llvm::Value *align) {
-  // For now, always emit the most general call.  Eventually
-  // we should probably have specialized entry points for specific
-  // small allocations.
-  llvm::CallInst *call =
-    Builder.CreateCall2(IGM.getDeallocRawFn(), pointer, align);
+static llvm::AttrListPtr getAllocAttrs() {
+  llvm::AttributeWithIndex attrValues[] = {
+    llvm::AttributeWithIndex::get(0, llvm::Attribute::NoAlias),
+    llvm::AttributeWithIndex::get(~0, llvm::Attribute::NoUnwind)
+  };
+  return llvm::AttrListPtr::get(attrValues, 2);
+}
+
+static llvm::Value *emitAllocatingCall(IRGenFunction &IGF,
+                                       llvm::Value *fn,
+                                       llvm::Value *arg) {
+  static auto allocAttrs = getAllocAttrs();
+  llvm::CallInst *call = IGF.Builder.CreateCall(fn, arg);
+  call->setAttributes(allocAttrs);
+  return call;
+}
+
+/// Emit a 'raw' allocation, which has no heap pointer and is
+/// not guaranteed to be zero-initialized.
+llvm::Value *IRGenFunction::emitAllocRawCall(llvm::Value *size,
+                                             llvm::Value *align) {
+
+  // Try to use swift_rawAlloc.
+  if (auto csize = dyn_cast<llvm::ConstantInt>(size)) {
+    AllocToken allocToken = getAllocToken(IGM, csize->getZExtValue());
+    if (allocToken != InvalidAllocToken) {
+      return emitAllocatingCall(*this, IGM.getRawAllocFn(),
+                             llvm::ConstantInt::get(IGM.SizeTy, allocToken));
+    }
+
+    assert(isa<llvm::ConstantInt>(align));
+    assert(csize->getZExtValue() % cast<llvm::ConstantInt>(align)->getZExtValue()
+             == 0 && "size not a multiple of alignment!");
+  }
+
+  // Okay, fall back to swift_slowRawAlloc.
+  return emitAllocatingCall(*this, IGM.getSlowRawAllocFn(), size);
+}
+
+static void emitDeallocatingCall(IRGenFunction &IGF, llvm::Constant *fn,
+                                 llvm::Value *pointer, llvm::Value *arg) {
+  llvm::CallInst *call = IGF.Builder.CreateCall2(fn, pointer, arg);
   call->setDoesNotThrow();
+}
+
+/// Emit a 'raw' deallocation, which has no heap pointer and is not
+/// guaranteed to be zero-initialized.
+void IRGenFunction::emitDeallocRawCall(llvm::Value *pointer,
+                                       llvm::Value *size) {
+  // Try to use swift_rawDealloc.
+  if (auto csize = dyn_cast<llvm::ConstantInt>(size)) {
+    AllocToken allocToken = getAllocToken(IGM, csize->getZExtValue());
+    if (allocToken != InvalidAllocToken) {
+      return emitDeallocatingCall(*this, IGM.getRawDeallocFn(), pointer,
+                             llvm::ConstantInt::get(IGM.SizeTy, allocToken));
+    }
+  }
+
+  // Okay, fall back to swift_slowRawDealloc.
+  return emitDeallocatingCall(*this, IGM.getSlowRawDeallocFn(), pointer, size);
 }
 
 void IRGenFunction::unimplemented(SourceLoc Loc, StringRef Message) {
