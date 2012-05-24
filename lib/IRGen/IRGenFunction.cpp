@@ -66,9 +66,8 @@ llvm::Value *IRGenFunction::emitAllocRawCall(llvm::Value *size,
 
   // Set as nounwind noalias.
   llvm::SmallVector<llvm::AttributeWithIndex, 1> attrs;
-  attrs.push_back(llvm::AttributeWithIndex::get(~0,
-                                llvm::Attribute::NoUnwind |
-                                llvm::Attribute::NoAlias));
+  attrs.push_back(llvm::AttributeWithIndex::get(0, llvm::Attribute::NoAlias));
+  attrs.push_back(llvm::AttributeWithIndex::get(~0, llvm::Attribute::NoUnwind));
   call->setAttributes(llvm::AttrListPtr::get(attrs.data(), attrs.size()));  
 
   return call;  
