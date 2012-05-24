@@ -300,8 +300,13 @@ public:
   unsigned size() const { return Elements.size(); }
   bool empty() const { return Elements.empty(); }
 
-  /// Does this explosion contain an aggregate?
+  /// Does this schema contain an aggregate element?
   bool containsAggregate() const { return ContainsAggregate; }
+
+  /// Does this schema consist solely of one aggregate element?
+  bool isSingleAggregate() const {
+    return size() == 1 && containsAggregate();
+  }
 
   bool requiresIndirectResult() const {
     return containsAggregate() || size() > MaxScalarsForDirectResult;
