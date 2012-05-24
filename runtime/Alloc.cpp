@@ -57,10 +57,7 @@ swift_allocObject(struct SwiftHeapMetadata *metadata,
 struct SwiftHeapObject *
 swift_retain(struct SwiftHeapObject *object)
 {
-  if (object) {
-    ++object->refCount;
-  }
-  return object;
+  return _swift_retain(object);
 }
 
 static void

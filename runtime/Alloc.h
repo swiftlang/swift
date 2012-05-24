@@ -164,6 +164,16 @@ swift_slowRawDealloc(void *ptr, size_t bytes);
 struct SwiftHeapObject *
 swift_retain(struct SwiftHeapObject *object);
 
+static inline struct SwiftHeapObject *
+_swift_retain(struct SwiftHeapObject *object)
+{
+  if (object) {
+    ++object->refCount;
+  }
+  return object;
+}
+
+
 /// Atomically decrements the retain count of an object.  If the
 /// retain count reaches zero, the object is destroyed as follows:
 ///

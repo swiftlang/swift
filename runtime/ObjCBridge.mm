@@ -21,15 +21,21 @@ swift_StringToNSString(SwiftString *string);
 
 }; // extern "C"
 
+struct SwiftString {
+  const char *base;
+  size_t len;
+  SwiftHeapObject *owner;
+};
+
+struct _NSSwiftString_s {
+  Class isa;
+  SwiftString swiftString;
+};
 
 @interface _NSSwiftString : NSString
 {
 @public
-  struct SwiftString {
-    const char *base;
-    size_t len;
-    SwiftHeapObject *owner;
-  } swiftString;
+  SwiftString swiftString;
 }
 - (unichar)characterAtIndex: (NSUInteger)index;
 - (NSUInteger)length;
@@ -66,22 +72,15 @@ static Class stringClasses[] = {
   objc_lookUpClass("__NSCFString"),
 };
 
-void
-swift_NSStringToString(NSString *nsstring, SwiftString *string)
+__attribute__((noinline,used))
+static void
+_swift_NSStringToString_slow(NSString *nsstring, SwiftString *string)
 {
   // XXX FIXME -- NSString is oblivious to surrogate pairs
 
   string->owner = 0;
 
-  if (*(Class *)nsstring == stringClasses[0]) {
-    auto boxedString = static_cast<_NSSwiftString *>(nsstring);
-    *string = boxedString->swiftString;
-    swift_retain(string->owner);
-  } else if (*(Class *)nsstring == stringClasses[1]) {
-    // constant string
-    string->base  = [nsstring UTF8String];
-    string->len   = [nsstring length];
-  } else if (*(Class *)nsstring == stringClasses[2]) {
+  if (*(Class *)nsstring == stringClasses[2]) {
     // XXX FIXME -- leaking and we need to sort out intermediate boxing
     string->base  = [nsstring UTF8String];
     string->len   = [nsstring length];
@@ -93,6 +92,8 @@ swift_NSStringToString(NSString *nsstring, SwiftString *string)
   if (string->base) {
     return;
   }
+
+  __builtin_trap();
 
   size_t len = [nsstring length];
   size_t bufSize = len * 2 + 1;
@@ -106,6 +107,27 @@ swift_NSStringToString(NSString *nsstring, SwiftString *string)
   string->len   = len;
 }
 
+void
+swift_NSStringToString(NSString *nsstring, SwiftString *string)
+{
+  auto boxedString = reinterpret_cast<_NSSwiftString_s *>(nsstring);
+  if (boxedString->isa == stringClasses[0]) {
+    string->base  = boxedString->swiftString.base;
+    string->len   = boxedString->swiftString.len;
+    string->owner = boxedString->swiftString.owner;
+    _swift_retain(string->owner);
+    return;
+  } else if (*(Class *)nsstring == stringClasses[1]) {
+    // constant string
+    string->base  = ((char **)nsstring)[2];
+    string->len   = ((size_t *)nsstring)[3];
+    string->owner = NULL;
+    return;
+  }
+  _swift_NSStringToString_slow(nsstring, string);
+}
+
+
 NSString *
 swift_StringToNSString(SwiftString *string)
 {
@@ -113,6 +135,6 @@ swift_StringToNSString(SwiftString *string)
   auto r = static_cast<_NSSwiftString *>(swift_rawAlloc(4));
   *((Class *)r) = stringClasses[0];
   r->swiftString = *string;
-  swift_retain(r->swiftString.owner);
+  _swift_retain(r->swiftString.owner);
   return r;
 }
