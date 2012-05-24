@@ -20,9 +20,11 @@
 namespace swift {
   class ErasureExpr;
   class ExistentialMemberRefExpr;
+  class FuncDecl;
   class SuperConversionExpr;
 
 namespace irgen {
+  class AbstractCallee;
   class Explosion;
   class IRGenFunction;
   class LValue;
@@ -191,6 +193,10 @@ namespace irgen {
   /// Emit an existential member reference as an l-value.
   LValue emitExistentialMemberRefLValue(IRGenFunction &IGF,
                                         ExistentialMemberRefExpr *E);
+
+  /// Determine the natural limits on how we can call the given
+  /// protocol member function.
+  AbstractCallee getAbstractProtocolCallee(IRGenFunction &IGF, FuncDecl *fn);
 
 } // end namespace irgen
 } // end namespace swift

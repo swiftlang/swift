@@ -67,6 +67,7 @@
 #include "Explosion.h"
 #include "GenHeap.h"
 #include "GenInit.h"
+#include "GenProto.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -502,6 +503,22 @@ IRGenModule::getFunctionType(Type type, ExplosionKind explosionKind,
   return sig.getType();
 }
 
+/// Construct the best known limits on how we can call the given function.
+static AbstractCallee getAbstractDirectCallee(IRGenFunction &IGF,
+                                              FuncDecl *fn) {
+  // FIXME: be more aggressive about all this.
+  ExplosionKind level = ExplosionKind::Minimal;
+
+  unsigned minUncurry = 0;
+  if (fn->isStatic() && isa<ExtensionDecl>(fn->getDeclContext()))
+    minUncurry = 1;
+  unsigned maxUncurry = getNaturalUncurryLevel(fn);
+  
+  bool needsData = fn->getDeclContext()->isLocalContext();
+
+  return AbstractCallee(level, minUncurry, maxUncurry, needsData);
+}
+
 /// Return the appropriate function pointer type at which to call the
 /// given function.
 llvm::PointerType *Callee::getFunctionPointerType(IRGenModule &IGM,
@@ -539,13 +556,12 @@ Callee Callee::forIndirectCall(llvm::Value *fn, ManagedValue data) {
 /// up to given limits.
 static Callee emitCallee(IRGenFunction &IGF, FuncDecl *fn,
                          ExplosionKind bestExplosion, unsigned bestUncurry) {
-  // Use the apparent natural uncurrying level of a function as a
-  // maximum on the uncurrying to do.
-  if (bestUncurry != 0)
-    bestUncurry = std::min(bestUncurry, getNaturalUncurryLevel(fn));
+  AbstractCallee absCallee = getAbstractDirectCallee(IGF, fn);
 
-  // TODO: be less conservative
-  bestExplosion = ExplosionKind::Minimal;
+  if (bestUncurry != 0)
+    bestUncurry = std::min(bestUncurry, absCallee.getMaxUncurryLevel());
+  if (bestExplosion != ExplosionKind::Minimal)
+    bestExplosion = absCallee.getBestExplosionLevel();
 
   if (!fn->getDeclContext()->isLocalContext()) {
     llvm::Constant *fnPtr =
@@ -564,6 +580,117 @@ static Callee emitCallee(IRGenFunction &IGF, FuncDecl *fn,
   llvm::Value *fnPtr = e.claimUnmanagedNext();
   ManagedValue data = e.claimNext();
   return Callee::forKnownFunction(fnPtr, data, bestExplosion, bestUncurry);
+}
+
+namespace {
+  struct CalleeSource {
+  public:
+    enum class Kind {
+      Indirect, Direct, DirectWithSideEffects, Existential
+    };
+
+  private:
+    union {
+      struct {
+        Expr *Fn;
+      } Indirect;
+      struct {
+        FuncDecl *Fn;
+        Expr *SideEffects;
+      } Direct;
+      struct {
+        ExistentialMemberRefExpr *Fn;
+      } Existential;
+    };
+    Kind TheKind;
+
+  public:
+    static CalleeSource forIndirect(Expr *fn) {
+      CalleeSource result;
+      result.TheKind = Kind::Indirect;
+      result.Indirect.Fn = fn;
+      return result;
+    }
+
+    static CalleeSource forDirect(FuncDecl *fn) {
+      CalleeSource result;
+      result.TheKind = Kind::Direct;
+      result.Direct.Fn = fn;
+      return result;
+    }
+
+    static CalleeSource forDirectWithSideEffects(FuncDecl *fn,
+                                                 Expr *sideEffects) {
+      CalleeSource result;
+      result.TheKind = Kind::DirectWithSideEffects;
+      result.Direct.Fn = fn;
+      result.Direct.SideEffects = sideEffects;
+      return result;
+    }
+
+    static CalleeSource forExistential(ExistentialMemberRefExpr *fn) {
+      CalleeSource result;
+      result.TheKind = Kind::Existential;
+      result.Existential.Fn = fn;
+      return result;
+    }
+
+    Kind getKind() const { return TheKind; }
+
+    FuncDecl *getDirectFunction() const {
+      assert(getKind() == Kind::Direct ||
+             getKind() == Kind::DirectWithSideEffects);
+      return Direct.Fn;
+    }
+
+    Expr *getDirectSideEffects() const {
+      assert(getKind() == Kind::DirectWithSideEffects);
+      return Direct.SideEffects;
+    }
+
+    Expr *getIndirectFunction() const {
+      assert(getKind() == Kind::Indirect);
+      return Indirect.Fn;
+    }
+
+    AbstractCallee getAbstractCallee(IRGenFunction &IGF) const {
+      switch (getKind()) {
+      case Kind::Indirect:
+        return AbstractCallee::forIndirect();
+
+      case Kind::Direct:
+      case Kind::DirectWithSideEffects:
+        return getAbstractDirectCallee(IGF, Direct.Fn);
+
+      case Kind::Existential:
+        return getAbstractProtocolCallee(IGF,
+                                  cast<FuncDecl>(Existential.Fn->getDecl()));
+      }
+      llvm_unreachable("bad source kind!");
+    }
+
+    Callee emitCallee(IRGenFunction &IGF,
+                      unsigned maxUncurry = ~0U,
+                      ExplosionKind maxExplosion = ExplosionKind::Maximal) {
+      switch (getKind()) {
+      case Kind::DirectWithSideEffects:
+        IGF.emitIgnored(getDirectSideEffects());
+        // fallthough
+      case Kind::Direct:
+        return ::emitCallee(IGF, getDirectFunction(), maxExplosion, maxUncurry);
+      case Kind::Indirect: {
+        Explosion fnValues(ExplosionKind::Maximal);
+        IGF.emitRValue(getIndirectFunction(), fnValues);
+        llvm::Value *fnPtr = fnValues.claimUnmanagedNext();
+        ManagedValue dataPtr = fnValues.claimNext();
+        return Callee::forIndirectCall(fnPtr, dataPtr);
+      }
+      case Kind::Existential:
+        llvm_unreachable("bad!");
+      }
+      llvm_unreachable("bad CalleeSource kind");
+    }
+  };
 }
 
 /// Emit a reference to the given function as a generic function pointer.
@@ -770,19 +897,13 @@ namespace {
     /// call sites are in reversed order of application, i.e. the
     /// first site is the last call which will logically be performed.
     llvm::SmallVector<CallSite, 8> CallSites;
-    Expr *NontrivialFn;
-    FuncDecl *KnownFn;
+
+    CalleeSource CalleeSrc;
 
     /// getFinalResultExplosionLevel - Returns the explosion level at
     /// which we will naturally emit the last call.
     ExplosionKind getFinalResultExplosionLevel(IRGenFunction &IGF) const {
-      // If we don't have a known function, we have to use
-      // indirect-call rules.
-      if (!KnownFn) return ExplosionKind::Minimal;
-
-      Callee callee = emitCallee(IGF, KnownFn, ExplosionKind::Maximal,
-                                 CallSites.size() - 1);
-      return callee.getExplosionLevel();
+      return CalleeSrc.getAbstractCallee(IGF).getBestExplosionLevel();
     }
 
     void emit(IRGenFunction &IGF, CallResult &result,
@@ -801,58 +922,61 @@ static Expr *uncurry(ApplyExpr *E, SmallVectorImpl<CallSite> &callSites) {
   return fnExpr;
 }
 
-static void decomposeFunctionReference(CallPlan &plan, DeclRefExpr *E) {
-  plan.KnownFn = dyn_cast<FuncDecl>(E->getDecl());
-  plan.NontrivialFn = (plan.KnownFn ? nullptr : E);
+static CalleeSource decomposeFunctionReference(DeclRefExpr *E) {
+  if (FuncDecl *fn = dyn_cast<FuncDecl>(E->getDecl()))
+    return CalleeSource::forDirect(fn);
+  return CalleeSource::forIndirect(E);
 }
 
 /// Try to decompose a function reference into a known function
 /// declaration.
-static void decomposeFunctionReference(CallPlan &plan, Expr *E) {
+static CalleeSource decomposeFunctionReference(Expr *E) {
   E = E->getSemanticsProvidingExpr();
-  if (DeclRefExpr *declRef = dyn_cast<DeclRefExpr>(E))
-    return decomposeFunctionReference(plan, declRef);
-  if (DotSyntaxBaseIgnoredExpr *baseIgnored
-        = dyn_cast<DotSyntaxBaseIgnoredExpr>(E)) {
-    decomposeFunctionReference(plan, baseIgnored->getRHS());
-    plan.NontrivialFn = E; // overwrite
-    return;
+  if (auto declRef = dyn_cast<DeclRefExpr>(E))
+    return decomposeFunctionReference(declRef);
+  if (auto baseIgnored = dyn_cast<DotSyntaxBaseIgnoredExpr>(E)) {
+    CalleeSource src =
+      decomposeFunctionReference(cast<DeclRefExpr>(baseIgnored->getRHS()));
+    if (src.getKind() != CalleeSource::Kind::Direct)
+      return CalleeSource::forIndirect(E);
+    return CalleeSource::forDirectWithSideEffects(src.getDirectFunction(), E);
   }
+  if (auto existMember = dyn_cast<ExistentialMemberRefExpr>(E))
+    return CalleeSource::forExistential(existMember);
 
-  plan.KnownFn = nullptr;
-  plan.NontrivialFn = E;
+  return CalleeSource::forIndirect(E);
 }
 
 /// Compute the plan for performing a sequence of call expressions.
 static CallPlan getCallPlan(IRGenModule &IGM, ApplyExpr *E) {
   CallPlan plan;
-  decomposeFunctionReference(plan, uncurry(E, plan.CallSites));
+  plan.CalleeSrc = decomposeFunctionReference(uncurry(E, plan.CallSites));
   return plan;
 }
 
 /// Emit an expression as a callee suitable for being passed to
 /// swift::irgen::emitCall or one its variants.
-Callee swift::irgen::emitCallee(IRGenFunction &IGF, Expr *fn,
-                                ExplosionKind bestExplosion,
-                                unsigned addedUncurrying,
-                                llvm::SmallVectorImpl<Arg> &args) {
-  assert(addedUncurrying == 0);
+Callee irgen::emitCallee(IRGenFunction &IGF, Expr *fn,
+                         ExplosionKind bestExplosion,
+                         unsigned addedUncurrying,
+                         llvm::SmallVectorImpl<Arg> &args) {
+  // TODO: uncurry, accumulate arguments.
+  CalleeSource source = decomposeFunctionReference(fn);
+  Callee callee = source.emitCallee(IGF, 0, bestExplosion);
 
-  // FIXME: be less lazy about this.
-  Explosion fnValues(ExplosionKind::Maximal);
-  IGF.emitRValue(fn, fnValues);
-
-  auto fnPtr = fnValues.claimUnmanagedNext();
-  auto dataPtr = fnValues.claimNext();
-
-  bool hasDataPtr = !isa<llvm::ConstantPointerNull>(dataPtr.getValue());
-  if (!hasDataPtr) dataPtr = ManagedValue(nullptr);
-
+  // We need the callee to actually be appropriately typed.
   llvm::FunctionType *fnType =
-    IGF.IGM.getFunctionType(fn->getType(), ExplosionKind::Minimal,
-                            /*uncurrying*/ 0, hasDataPtr);
-  fnPtr = IGF.Builder.CreateBitCast(fnPtr, fnType->getPointerTo());
-  return Callee::forKnownFunction(fnPtr, dataPtr, ExplosionKind::Minimal, 0);
+    IGF.IGM.getFunctionType(fn->getType(), callee.getExplosionLevel(),
+                            0, callee.hasDataPointer());
+  llvm::Value *fnPtr = IGF.Builder.CreateBitCast(callee.getRawFunctionPointer(),
+                                                 fnType->getPointerTo());
+
+  ManagedValue dataPtr =
+    (callee.hasDataPointer() ? callee.getDataPointer(IGF)
+                             : ManagedValue(nullptr));
+  return Callee::forKnownFunction(fnPtr, dataPtr,
+                                  callee.getExplosionLevel(),
+                                  callee.getUncurryLevel());
 }
 
 /// Set attributes on the given call site consistent with it returning
@@ -1184,15 +1308,20 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
   // 1.  Emit the function expression.
   Callee callee;
 
+  switch (CalleeSrc.getKind()) {
+
   // We can do a lot if we know we're calling a known function.
-  if (KnownFn) {
+  case CalleeSource::Kind::DirectWithSideEffects:
     // Go ahead and emit the nontrivial function expression if we found one.
-    if (NontrivialFn) IGF.emitIgnored(NontrivialFn);
+    IGF.emitIgnored(CalleeSrc.getDirectSideEffects());
+    // fallthrough
+  case CalleeSource::Kind::Direct: {
+    FuncDecl *knownFn = CalleeSrc.getDirectFunction();
 
     // Handle calls to builtin functions.  These are never curried, but they
     // might return a function pointer.
-    if (isa<BuiltinModule>(KnownFn->getDeclContext())) {
-      emitBuiltinCall(IGF, KnownFn, CallSites.back().Arg, result);
+    if (isa<BuiltinModule>(knownFn->getDeclContext())) {
+      emitBuiltinCall(IGF, knownFn, CallSites.back().Arg, result);
 
       // If there are no trailing calls, we're done.
       if (CallSites.size() == 1) return;
@@ -1200,24 +1329,20 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
       // Otherwise, pop that call site off and set up the callee conservatively.
       callee = result.getDirectValuesAsIndirectCallee();
       result.reset();
+      break;
 
-    } else if (emitKnownCall(IGF, KnownFn, CallSites, result)) {
+    } else if (emitKnownCall(IGF, knownFn, CallSites, result)) {
       return;
-
-    // Otherwise, compute information about the function we're calling.
-    } else {
-      callee = ::emitCallee(IGF, KnownFn, ExplosionKind::Maximal,
-                            CallSites.size() - 1);
     }
 
-  // Otherwise, emit as a function pointer and use the pessimistic
-  // rules for calling such.
-  } else {
-    Explosion fnValues(ExplosionKind::Maximal);
-    IGF.emitRValue(NontrivialFn, fnValues);
-    llvm::Value *fnPtr = fnValues.claimUnmanagedNext();
-    ManagedValue dataPtr = fnValues.claimNext();
-    callee = Callee::forIndirectCall(fnPtr, dataPtr);
+    // fallthrough
+  }
+
+  // Otherwise, just use the normal rules for the kind.
+  case CalleeSource::Kind::Indirect:
+  case CalleeSource::Kind::Existential:
+    callee = CalleeSrc.emitCallee(IGF, CallSites.size() - 1);
+    break;
   }
 
   // 3. Emit arguments and call.

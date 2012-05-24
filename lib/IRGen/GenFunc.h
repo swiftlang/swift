@@ -33,6 +33,46 @@ namespace irgen {
   class Address;
   class TypeInfo;
 
+  /// Abstract information about how we can emit a call.
+  class AbstractCallee {
+    /// The best explosion level available for the call.
+    unsigned ExplosionLevel : 1;
+
+    /// Whether the function takes a data pointer.
+    unsigned NeedsData : 1;
+
+    /// The min uncurrying level available for the function.
+    unsigned MinUncurryLevel : 2;
+
+    /// The max uncurrying level available for the function.
+    unsigned MaxUncurryLevel : 12;
+
+  public:
+    AbstractCallee(ExplosionKind level, unsigned minUncurry,
+                   unsigned maxUncurry, bool needsData)
+      : ExplosionLevel(unsigned(level)), NeedsData(needsData),
+        MinUncurryLevel(minUncurry), MaxUncurryLevel(maxUncurry) {}
+
+    static AbstractCallee forIndirect() {
+      return AbstractCallee(ExplosionKind::Minimal, 0, 0, true);
+    }
+
+    /// Returns the best explosion level at which we can emit this
+    /// call.  We assume that we can call it at lower levels.
+    ExplosionKind getBestExplosionLevel() const {
+      return ExplosionKind(ExplosionLevel);
+    }
+
+    /// Whether the function requires a data pointer.
+    bool needsDataPointer() const { return NeedsData; }
+
+    /// The maximum uncurrying level at which the function can be called.
+    unsigned getMaxUncurryLevel() const { return MaxUncurryLevel; }
+
+    /// The minimum uncurrying level at which the function can be called.
+    unsigned getMinUncurryLevel() const { return MinUncurryLevel; }
+  };
+
   class Callee {
     /// The kind of explosion supported by this function.
     ExplosionKind ExplosionLevel;

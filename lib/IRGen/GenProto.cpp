@@ -39,6 +39,7 @@
 
 #include "Cleanup.h"
 #include "Explosion.h"
+#include "GenFunc.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -2265,4 +2266,14 @@ LValue irgen::emitExistentialMemberRefLValue(IRGenFunction &IGF,
   IGF.unimplemented(E->getLoc(),
                     "using existential member reference as l-value");
   return IGF.emitFakeLValue(IGF.getFragileTypeInfo(E->getType()));
+}
+
+/// Determine the natural limits on how we can call the given protocol
+/// member function.
+AbstractCallee irgen::getAbstractProtocolCallee(IRGenFunction &IGF,
+                                                FuncDecl *fn) {
+  // TODO: consider adding non-minimal or curried entrypoints.
+  if (fn->isStatic())
+    return AbstractCallee(ExplosionKind::Minimal, 0, 0, false);
+  return AbstractCallee(ExplosionKind::Minimal, 1, 1, false);
 }
