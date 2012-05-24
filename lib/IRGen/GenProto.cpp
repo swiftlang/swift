@@ -42,6 +42,7 @@
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "LValue.h"
 
 #include "GenProto.h"
 
@@ -2237,4 +2238,31 @@ void irgen::emitSuperConversion(IRGenFunction &IGF, SuperConversionExpr *E,
 
   // Add that as something to destroy.
   out.add(protoTI.enterCleanupForTemporary(IGF, temp));
+}
+
+/// Emit an expression which accesses a member out of an existential type.
+void irgen::emitExistentialMemberRef(IRGenFunction &IGF,
+                                     ExistentialMemberRefExpr *E,
+                                     Explosion &out) {
+  // The l-value case should have been weeded out.
+  assert(!E->getType()->is<LValueType>());
+
+  // The remaining case is to construct an implicit closure.
+  // Just refuse to do this for now.
+  assert(E->getType()->is<FunctionType>());
+  IGF.unimplemented(E->getLoc(),
+              "forming implicit closure over existential member reference");
+  IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), out);
+}
+
+/// Emit an expression which accesses a member out of an existential type.
+LValue irgen::emitExistentialMemberRefLValue(IRGenFunction &IGF,
+                                             ExistentialMemberRefExpr *E) {
+
+  ValueDecl *decl = E->getDecl();
+  assert(isa<VarDecl>(decl) || isa<SubscriptDecl>(decl));
+
+  IGF.unimplemented(E->getLoc(),
+                    "using existential member reference as l-value");
+  return IGF.emitFakeLValue(IGF.getFragileTypeInfo(E->getType()));
 }

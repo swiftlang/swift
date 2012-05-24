@@ -280,7 +280,14 @@ namespace {
     }
     
     void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
-      IGF.unimplemented(E->getLoc(), "existential member references");
+      if (isa<VarDecl>(E->getDecl()) || isa<SubscriptDecl>(E->getDecl())) {
+        assert(E->getType()->is<LValueType>());
+        return IGF.emitLValueAsScalar(emitExistentialMemberRefLValue(IGF, E),
+                                      isOnHeap(E->getType()), Out);
+      }
+
+      assert(!E->getType()->is<LValueType>());
+      emitExistentialMemberRef(IGF, E, Out);
     }
     
     void visitCapturingExpr(CapturingExpr *E) {
@@ -409,8 +416,7 @@ namespace {
     }
     
     LValue visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
-      IGF.unimplemented(E->getLoc(), "existential member references");
-      return LValue();
+      return emitExistentialMemberRefLValue(IGF, E);
     }
 
     LValue visitSubscriptExpr(SubscriptExpr *E) {

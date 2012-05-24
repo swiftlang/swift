@@ -19,11 +19,13 @@
 
 namespace swift {
   class ErasureExpr;
+  class ExistentialMemberRefExpr;
   class SuperConversionExpr;
 
 namespace irgen {
   class Explosion;
   class IRGenFunction;
+  class LValue;
 
   /// The members required to attest that a type is a value type.
   ///
@@ -181,6 +183,14 @@ namespace irgen {
   /// Emit a super-conversion expression as an initializer of memory.
   void emitSuperConversionAsInit(IRGenFunction &IGF, SuperConversionExpr *E,
                                  Address addr, const TypeInfo &addrTI);
+
+  /// Emit an existential member reference into an explosion.
+  void emitExistentialMemberRef(IRGenFunction &IGF, ExistentialMemberRefExpr *E,
+                                Explosion &out);
+
+  /// Emit an existential member reference as an l-value.
+  LValue emitExistentialMemberRefLValue(IRGenFunction &IGF,
+                                        ExistentialMemberRefExpr *E);
 
 } // end namespace irgen
 } // end namespace swift
