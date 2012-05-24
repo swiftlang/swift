@@ -1121,6 +1121,11 @@ namespace {
     }
 
     void emitArgs() {
+      // The callee-determined arguments are the first logical arguments.
+      for (auto &arg : CalleeArgs) {
+        emitArg(arg.getValue());
+      }
+
       // Emit all of the arguments we need to pass here.
       for (unsigned i = TheCallee.getUncurryLevel() + 1 - CalleeArgs.size();
              i != 0; --i) {
@@ -1132,11 +1137,6 @@ namespace {
         IGF.emitRValue(arg, argExplosion);
 
         emitArg(argExplosion);
-      }
-
-      // Add all the callee-determined arguments.
-      for (auto &arg : CalleeArgs) {
-        emitArg(arg.getValue());
       }
     }
   };
