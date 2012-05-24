@@ -223,23 +223,30 @@ OwnedAddress IRGenFunction::emitAddressForPhysicalLValue(const LValue &lvalue) {
   return address;
 }
 
-void IRGenFunction::emitLValueAsScalar(const LValue &lvalue, OnHeap_t onHeap,
-                                       Explosion &explosion) {
+static OwnedAddress emitMaterializeWithWriteback(IRGenFunction &IGF,
+                                                 LValue &&lvalue,
+                                                 OnHeap_t onHeap) {
   OwnedAddress address;
   for (auto &component : lvalue) {
     if (component.isLogical()) {
       // FIXME: we only need to materialize the *final* logical value
       // to the heap.
-      address = component.asLogical().loadAndMaterialize(*this, onHeap,
-                                                         address,
+      address = component.asLogical().loadAndMaterialize(IGF, onHeap, address,
                                                          /*preserve*/ false);
     } else {
-      address = component.asPhysical().offset(*this, address);
+      address = component.asPhysical().offset(IGF, address);
     }
   }
 
   // FIXME: writebacks
   // FIXME: rematerialize if inadequate alignment
+  return address;
+}
+
+void IRGenFunction::emitLValueAsScalar(LValue &&lvalue, OnHeap_t onHeap,
+                                       Explosion &explosion) {
+  OwnedAddress address =
+    ::emitMaterializeWithWriteback(*this, std::move(lvalue), onHeap);
 
   // Add the address.
   explosion.addUnmanaged(address.getAddressPointer());
@@ -250,6 +257,12 @@ void IRGenFunction::emitLValueAsScalar(const LValue &lvalue, OnHeap_t onHeap,
     // until here, but that may not be safe in general.
     emitRetain(address.getOwner(), explosion);
   }
+}
+
+/// Given an l-value, locate it in memory, using the appropriate writeback.
+Address IRGenFunction::emitMaterializeWithWriteback(LValue &&lvalue,
+                                                    OnHeap_t onHeap) {
+  return ::emitMaterializeWithWriteback(*this, std::move(lvalue), onHeap);
 }
 
 namespace {
@@ -485,8 +498,8 @@ namespace {
       if (isByrefMember()) uncurryLevel++;
 
       llvm::Constant *fn = IGF.IGM.getAddrOfGetter(getDecl(), explosionLevel);
-
-      return Callee::forGlobalFunction(fn, explosionLevel, uncurryLevel);
+      return Callee::forGlobalFunction(Type(), fn,
+                                       explosionLevel, uncurryLevel);
     }
 
     /// Find the address of the getter function.
@@ -499,8 +512,8 @@ namespace {
       if (isByrefMember()) uncurryLevel++;
 
       llvm::Constant *fn = IGF.IGM.getAddrOfSetter(getDecl(), explosionLevel);
-
-      return Callee::forGlobalFunction(fn, explosionLevel, uncurryLevel);
+      return Callee::forGlobalFunction(Type(), fn,
+                                       explosionLevel, uncurryLevel);
     }
 
   private:

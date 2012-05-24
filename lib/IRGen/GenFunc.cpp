@@ -191,13 +191,13 @@ namespace {
     bool isDirect() const { return CurState == State::Direct; }
     bool isIndirect() const { return CurState == State::Indirect; }
 
-    Callee getDirectValuesAsIndirectCallee() {
+    Callee getDirectValuesAsIndirectCallee(Type formalType) {
       assert(isDirect());
       Explosion &values = getDirectValues();
       assert(values.size() == 2);
       llvm::Value *fn = values.claimUnmanagedNext();
       ManagedValue data = values.claimNext();
-      return Callee::forIndirectCall(fn, data);
+      return Callee::forIndirectCall(formalType, fn, data);
     }
 
     Explosion &getDirectValues() {
@@ -546,10 +546,11 @@ ManagedValue Callee::getDataPointer(IRGenFunction &IGF) const {
   return ManagedValue(IGF.IGM.RefCountedNull);
 }
 
-Callee Callee::forIndirectCall(llvm::Value *fn, ManagedValue data) {
+Callee Callee::forIndirectCall(Type formalType, llvm::Value *fn,
+                               ManagedValue data) {
   if (isa<llvm::ConstantPointerNull>(data.getValue()))
     data = ManagedValue(nullptr);
-  return forKnownFunction(fn, data, ExplosionKind::Minimal, 0);
+  return forKnownFunction(formalType, fn, data, ExplosionKind::Minimal, 0);
 }
 
 /// Emit a reference to a function, using the best parameters possible
@@ -566,20 +567,23 @@ static Callee emitCallee(IRGenFunction &IGF, FuncDecl *fn,
   if (!fn->getDeclContext()->isLocalContext()) {
     llvm::Constant *fnPtr =
       IGF.IGM.getAddrOfGlobalFunction(fn, bestExplosion, bestUncurry);
-    return Callee::forGlobalFunction(fnPtr, bestExplosion, bestUncurry);
+    return Callee::forGlobalFunction(fn->getType(), fnPtr,
+                                     bestExplosion, bestUncurry);
   }
 
   if (bestUncurry != 0) {
     IGF.unimplemented(fn->getLocStart(), "curried local function emission");
     llvm::Constant *undef = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
-    return Callee::forGlobalFunction(undef, bestExplosion, bestUncurry);
+    return Callee::forGlobalFunction(fn->getType(), undef,
+                                     bestExplosion, bestUncurry);
   }
 
   Explosion e(ExplosionKind::Maximal);
   IGF.getFragileTypeInfo(fn->getType()).load(IGF, IGF.getLocalFunc(fn), e);
   llvm::Value *fnPtr = e.claimUnmanagedNext();
   ManagedValue data = e.claimNext();
-  return Callee::forKnownFunction(fnPtr, data, bestExplosion, bestUncurry);
+  return Callee::forKnownFunction(fn->getType(), fnPtr, data,
+                                  bestExplosion, bestUncurry);
 }
 
 namespace {
@@ -653,6 +657,11 @@ namespace {
       return Indirect.Fn;
     }
 
+    ExistentialMemberRefExpr *getExistentialFunction() const {
+      assert(getKind() == Kind::Existential);
+      return Existential.Fn;
+    }
+
     AbstractCallee getAbstractCallee(IRGenFunction &IGF) const {
       switch (getKind()) {
       case Kind::Indirect:
@@ -670,6 +679,7 @@ namespace {
     }
 
     Callee emitCallee(IRGenFunction &IGF,
+                      SmallVectorImpl<Arg> &calleeArgs,
                       unsigned maxUncurry = ~0U,
                       ExplosionKind maxExplosion = ExplosionKind::Maximal) {
       switch (getKind()) {
@@ -680,13 +690,16 @@ namespace {
         return ::emitCallee(IGF, getDirectFunction(), maxExplosion, maxUncurry);
       case Kind::Indirect: {
         Explosion fnValues(ExplosionKind::Maximal);
-        IGF.emitRValue(getIndirectFunction(), fnValues);
+        Expr *fn = getIndirectFunction();
+        IGF.emitRValue(fn, fnValues);
         llvm::Value *fnPtr = fnValues.claimUnmanagedNext();
         ManagedValue dataPtr = fnValues.claimNext();
-        return Callee::forIndirectCall(fnPtr, dataPtr);
+        return Callee::forIndirectCall(fn->getType(), fnPtr, dataPtr);
       }
       case Kind::Existential:
-        llvm_unreachable("bad!");
+        return emitExistentialMemberRefCallee(IGF, getExistentialFunction(),
+                                              calleeArgs, maxExplosion,
+                                              maxUncurry);
       }
       llvm_unreachable("bad CalleeSource kind");
     }
@@ -962,7 +975,7 @@ Callee irgen::emitCallee(IRGenFunction &IGF, Expr *fn,
                          llvm::SmallVectorImpl<Arg> &args) {
   // TODO: uncurry, accumulate arguments.
   CalleeSource source = decomposeFunctionReference(fn);
-  Callee callee = source.emitCallee(IGF, 0, bestExplosion);
+  Callee callee = source.emitCallee(IGF, args, 0, bestExplosion);
 
   // We need the callee to actually be appropriately typed.
   llvm::FunctionType *fnType =
@@ -974,7 +987,7 @@ Callee irgen::emitCallee(IRGenFunction &IGF, Expr *fn,
   ManagedValue dataPtr =
     (callee.hasDataPointer() ? callee.getDataPointer(IGF)
                              : ManagedValue(nullptr));
-  return Callee::forKnownFunction(fnPtr, dataPtr,
+  return Callee::forKnownFunction(fn->getType(), fnPtr, dataPtr,
                                   callee.getExplosionLevel(),
                                   callee.getUncurryLevel());
 }
@@ -1092,21 +1105,25 @@ namespace {
   /// CallSiteCallEmitter - A helper class for emitting a single call
   /// based on a stack of CallSites.
   class CallSiteCallEmitter : public CallEmitter {
-    llvm::SmallVectorImpl<CallSite> &CallSites;
+    ArrayRef<Arg> CalleeArgs;
+    SmallVectorImpl<CallSite> &CallSites;
 
   public:
     CallSiteCallEmitter(IRGenFunction &IGF, const Callee &callee,
-                        llvm::SmallVectorImpl<CallSite> &callSites,
+                        ArrayRef<Arg> calleeArgs,
+                        SmallVectorImpl<CallSite> &callSites,
                         const TypeInfo &resultTI, CallResult &result,
                         Address finalAddress)
       : CallEmitter(IGF, callee, resultTI, result, finalAddress),
-        CallSites(callSites) {
-      assert(TheCallee.getUncurryLevel() < CallSites.size());
+        CalleeArgs(calleeArgs), CallSites(callSites) {
+      assert(TheCallee.getUncurryLevel() <
+               CallSites.size() + calleeArgs.size());
     }
 
     void emitArgs() {
       // Emit all of the arguments we need to pass here.
-      for (unsigned i = TheCallee.getUncurryLevel() + 1; i != 0; --i) {
+      for (unsigned i = TheCallee.getUncurryLevel() + 1 - CalleeArgs.size();
+             i != 0; --i) {
         Expr *arg = CallSites.back().Arg;
         CallSites.pop_back();
 
@@ -1115,6 +1132,11 @@ namespace {
         IGF.emitRValue(arg, argExplosion);
 
         emitArg(argExplosion);
+      }
+
+      // Add all the callee-determined arguments.
+      for (auto &arg : CalleeArgs) {
+        emitArg(arg.getValue());
       }
     }
   };
@@ -1307,6 +1329,7 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
 
   // 1.  Emit the function expression.
   Callee callee;
+  SmallVector<Arg, 2> calleeArgs;
 
   switch (CalleeSrc.getKind()) {
 
@@ -1327,7 +1350,9 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
       if (CallSites.size() == 1) return;
 
       // Otherwise, pop that call site off and set up the callee conservatively.
-      callee = result.getDirectValuesAsIndirectCallee();
+      Type formalResult =
+        knownFn->getType()->castTo<FunctionType>()->getResult();
+      callee = result.getDirectValuesAsIndirectCallee(formalResult);
       result.reset();
       break;
 
@@ -1341,28 +1366,30 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
   // Otherwise, just use the normal rules for the kind.
   case CalleeSource::Kind::Indirect:
   case CalleeSource::Kind::Existential:
-    callee = CalleeSrc.emitCallee(IGF, CallSites.size() - 1);
+    callee = CalleeSrc.emitCallee(IGF, calleeArgs, CallSites.size() - 1);
     break;
   }
 
   // 3. Emit arguments and call.
   while (true) {
-    assert(callee.getUncurryLevel() < CallSites.size());
+    assert(callee.getUncurryLevel() < CallSites.size() + calleeArgs.size());
 
     // Find the formal type of the function we're calling.  This is the
     // least-uncurried function type.
-    Type calleeFormalType = CallSites.back().FnType;
+    Type calleeFormalType = callee.getFormalType();
     llvm::Value *fnPtr =
       callee.getFunctionPointer(IGF, calleeFormalType);
 
     // Additionally compute the information for the formal result
     // type.  This is the result of the uncurried function type.
     Type formalResultType =
-      CallSites[CallSites.size() - callee.getUncurryLevel() - 1]
+      CallSites[CallSites.size() + calleeArgs.size()
+                  - callee.getUncurryLevel() - 1]
         .FnType->castTo<FunctionType>()->getResult();
     const TypeInfo &resultTI = IGF.IGM.getFragileTypeInfo(formalResultType);
 
-    CallSiteCallEmitter(IGF, callee, CallSites, resultTI, result, finalAddress)
+    CallSiteCallEmitter(IGF, callee, calleeArgs, CallSites,
+                        resultTI, result, finalAddress)
       .emit(fnPtr);
 
     // If this is the end of the call sites, we're done.
@@ -1372,7 +1399,8 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
 
     // Otherwise, we must have gotten a function back.  Set ourselves
     // up to call it, then continue emitting calls.
-    callee = result.getDirectValuesAsIndirectCallee();
+    callee = result.getDirectValuesAsIndirectCallee(formalResultType);
+    calleeArgs.clear();
     result.reset();
   }
 }

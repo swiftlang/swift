@@ -287,7 +287,7 @@ static void setHelperAttributes(llvm::CallInst *call) {
 }
 
 /// Emit a call to do an 'initializeBufferWithCopyOfBuffer' operation.
-static void emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
+static llvm::Value *emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
                                                      llvm::Value *witnessTable,
                                                      Address destBuffer,
                                                      Address srcBuffer) {
@@ -297,6 +297,8 @@ static void emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
     IGF.Builder.CreateCall3(copyFn, destBuffer.getAddress(),
                             srcBuffer.getAddress(), witnessTable);
   setHelperAttributesForAggResult(call, false);
+
+  return call;
 }
 
 /// Emit a call to do a 'projectBuffer' operation.
@@ -344,6 +346,17 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
                                                      llvm::Type *objectPtrTy);
 
 namespace {
+  struct DestroyBuffer : Cleanup {
+    Address Buffer;
+    llvm::Value *Table;
+    DestroyBuffer(Address buffer, llvm::Value *table)
+      : Buffer(buffer), Table(table) {}
+
+    void emit(IRGenFunction &IGF) const {
+      emitDestroyBufferCall(IGF, Table, Buffer);
+    }
+  };
+
   struct DestroyExistential : Cleanup {
     Address Addr;
     DestroyExistential(Address addr) : Addr(addr) {}
@@ -752,6 +765,12 @@ ProtocolTypeInfo::~ProtocolTypeInfo() {
   for (auto &conf : Conformances) {
     delete conf.second;
   }
+}
+
+static const ProtocolTypeInfo &getProtocolTypeInfo(IRGenFunction &IGF,
+                                                   ProtocolDecl *proto) {
+  Type ty = proto->getDeclaredType();
+  return IGF.getFragileTypeInfo(ty).as<ProtocolTypeInfo>();
 }
 
 static FixedPacking computePacking(IRGenModule &IGM,
@@ -2266,6 +2285,107 @@ LValue irgen::emitExistentialMemberRefLValue(IRGenFunction &IGF,
   IGF.unimplemented(E->getLoc(),
                     "using existential member reference as l-value");
   return IGF.emitFakeLValue(IGF.getFragileTypeInfo(E->getType()));
+}
+
+/// Find the path of base protocols necessary to reach the given
+/// function.
+/// TODO: try to find an optimal path, not just the first path.
+static bool findBasePath(SmallVectorImpl<ProtocolDecl*> &path,
+                         ProtocolDecl *from, ProtocolDecl *to) {
+  if (from == to) return true;
+  for (Type ty : from->getInherited()) {
+    ProtocolDecl *next = ty->castTo<ProtocolType>()->getDecl();
+    path.push_back(next);
+    if (findBasePath(path, next, to))
+      return true;
+    path.pop_back();
+  }
+  return false;
+}
+                         
+
+/// Emit an existential member reference as a callee.
+Callee irgen::emitExistentialMemberRefCallee(IRGenFunction &IGF,
+                                             ExistentialMemberRefExpr *E,
+                                             SmallVectorImpl<Arg> &calleeArgs,
+                                             ExplosionKind maxExplosionLevel,
+                                             unsigned maxUncurry) {
+  // The base of an existential member reference is always an l-value.
+  LValue lvalue = IGF.emitLValue(E->getBase());
+  Address existAddr = IGF.emitMaterializeWithWriteback(std::move(lvalue),
+                                                       NotOnHeap);
+
+  FuncDecl *fn = cast<FuncDecl>(E->getDecl());
+
+  Type baseTy = E->getBase()->getType();
+  baseTy = baseTy->castTo<LValueType>()->getObjectType();
+  assert(baseTy->is<ProtocolType>() && "base is not a protocol lvalue");
+  ProtocolDecl *proto = baseTy->castTo<ProtocolType>()->getDecl();
+
+  // Find a path to the protocol which declares the method.
+  SmallVector<ProtocolDecl*, 4> basePath;
+  bool foundPath =
+    findBasePath(basePath, proto, cast<ProtocolDecl>(fn->getDeclContext()));
+  assert(foundPath && "no path to protocol declaring method!");
+  (void) foundPath;
+
+  // Load the witness table.
+  llvm::Value *table = loadWitnessTable(IGF, existAddr);
+
+  // Use the first-level witness table to copy into a new buffer.
+  // This is important for safety.
+  // TODO: just do a project when the source object is obviously not
+  // aliased.
+  Address copyBuffer = IGF.createAlloca(IGF.IGM.getFixedBufferTy(),
+                                        getFixedBufferAlignment(IGF.IGM),
+                                        "copy-for-call");
+  Address srcBuffer = projectExistentialBuffer(IGF, existAddr);
+
+  // The result of the copy is an i8* which points at the new object.
+  llvm::Value *copy =
+    emitInitializeBufferWithCopyOfBufferCall(IGF, table, copyBuffer,
+                                             srcBuffer);
+
+  // Enter a cleanup for the temporary.  
+  IGF.pushFullExprCleanup<DestroyBuffer>(copyBuffer, table);
+
+  for (unsigned i = 0, e = basePath.size(); i != e; ++i) {
+    ProtocolDecl *derived = (i == 0 ? proto : basePath[i-1]);
+    ProtocolDecl *base = basePath[i];
+
+    // Find the witness table index for the base protocol.
+    auto &derivedTI = getProtocolTypeInfo(IGF, derived);
+    auto &witnessEntry = derivedTI.getWitnessEntry(base);
+    assert(witnessEntry.isBase());
+
+    // If it's an inline base, the conversion is trivial.
+    if (!witnessEntry.isOutOfLineBase()) continue;
+
+    // If it's out-of-line, we have to drill down.
+    table = loadOpaqueWitness(IGF, table, witnessEntry.getOutOfLineBaseIndex());
+    table = IGF.Builder.CreateBitCast(table, getWitnessTableTy(IGF.IGM));
+  }
+
+  // Pull out the function witness.
+  auto &ownerTI = getProtocolTypeInfo(IGF,
+                                   cast<ProtocolDecl>(fn->getDeclContext()));
+  auto &witnessEntry = ownerTI.getWitnessEntry(fn);
+  llvm::Value *witness =
+    loadOpaqueWitness(IGF, table, witnessEntry.getFunctionIndex());
+
+  // Add the temporary address as a callee arg.
+  // We have to bitcast it because the AST claims that 'this' on the
+  // protocol method has type [byref] P, which is just wrong.
+  copy = IGF.Builder.CreateBitCast(copy,
+                                   ownerTI.getStorageType()->getPointerTo(),
+                                   "workaround-cast");
+  Explosion *arg = new Explosion(ExplosionKind::Minimal);
+  arg->addUnmanaged(copy);
+  calleeArgs.push_back(Arg::forOwned(arg));
+
+  // FIXME: writeback
+  return Callee::forKnownFunction(fn->getType(), witness, ManagedValue(nullptr),
+                                  ExplosionKind::Minimal, 1);
 }
 
 /// Determine the natural limits on how we can call the given protocol

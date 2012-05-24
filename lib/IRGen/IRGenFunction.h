@@ -283,8 +283,9 @@ public:
   Optional<Address> tryEmitAsAddress(Expr *E, const TypeInfo &type);
   LValue emitAddressLValue(OwnedAddress addr);
   OwnedAddress emitAddressForPhysicalLValue(const LValue &lvalue);
-  void emitLValueAsScalar(const LValue &lvalue, OnHeap_t onHeap,
+  void emitLValueAsScalar(LValue &&lvalue, OnHeap_t onHeap,
                           Explosion &explosion);
+  Address emitMaterializeWithWriteback(LValue &&lvalue, OnHeap_t onHeap);
 
   void emitRValueAsInit(Expr *E, Address addr, const TypeInfo &type);
   void emitRValue(Expr *E, Explosion &explosion);

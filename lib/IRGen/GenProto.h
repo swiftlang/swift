@@ -25,7 +25,10 @@ namespace swift {
 
 namespace irgen {
   class AbstractCallee;
+  class Arg;
   class Explosion;
+  enum class ExplosionKind : unsigned;
+  class Callee;
   class IRGenFunction;
   class LValue;
 
@@ -193,6 +196,13 @@ namespace irgen {
   /// Emit an existential member reference as an l-value.
   LValue emitExistentialMemberRefLValue(IRGenFunction &IGF,
                                         ExistentialMemberRefExpr *E);
+
+  /// Emit an existential member reference as a callee.
+  Callee emitExistentialMemberRefCallee(IRGenFunction &IGF,
+                                        ExistentialMemberRefExpr *E,
+                                        SmallVectorImpl<Arg> &calleeArgs,
+                                        ExplosionKind maxExplosionLevel,
+                                        unsigned maxUncurry);
 
   /// Determine the natural limits on how we can call the given
   /// protocol member function.

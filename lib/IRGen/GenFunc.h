@@ -81,6 +81,9 @@ namespace irgen {
     /// being called.
     unsigned UncurryLevel;
 
+    /// The function type being called.
+    Type FormalType;
+
     /// The pointer to the actual function.
     llvm::Value *FnPtr;
 
@@ -93,27 +96,32 @@ namespace irgen {
 
     /// Prepare a callee for a known global function that requires no
     /// data pointer.
-    static Callee forGlobalFunction(llvm::Constant *fn,
+    static Callee forGlobalFunction(Type formalType, llvm::Constant *fn,
                                     ExplosionKind explosionLevel,
                                     unsigned uncurryLevel) {
-      return forKnownFunction(fn, ManagedValue(nullptr), explosionLevel,
-                              uncurryLevel);
+      return forKnownFunction(formalType, fn, ManagedValue(nullptr),
+                              explosionLevel, uncurryLevel);
     }
 
     /// Prepare a callee for a known function with a known data pointer.
-    static Callee forKnownFunction(llvm::Value *fn, ManagedValue data,
+    static Callee forKnownFunction(Type formalType, llvm::Value *fn,
+                                   ManagedValue data,
                                    ExplosionKind explosionLevel,
                                    unsigned uncurryLevel) {
       Callee result;
       result.ExplosionLevel = explosionLevel;
       result.UncurryLevel = uncurryLevel;
+      result.FormalType = formalType;
       result.FnPtr = fn;
       result.DataPtr = data;
       return result;
     }
 
     /// Prepare a callee for an indirect call to a function.
-    static Callee forIndirectCall(llvm::Value *fn, ManagedValue data);
+    static Callee forIndirectCall(Type formalType, llvm::Value *fn,
+                                  ManagedValue data);
+
+    Type getFormalType() const { return FormalType; }
 
     ExplosionKind getExplosionLevel() const { return ExplosionLevel; }
     unsigned getUncurryLevel() const { return UncurryLevel; }
