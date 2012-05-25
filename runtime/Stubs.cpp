@@ -110,3 +110,14 @@ store_protocol(protocol *value, protocol *p) {
   copyTy initializeBufferWithCopyOfBuffer = (copyTy)(size_t)value->witness_table[1];
   initializeBufferWithCopyOfBuffer(&p->buffer,&value->buffer,value->witness_table);
 }
+
+extern "C"
+uint32_t
+swift_replOutputIsUTF8(void)
+{
+  const char *lang = getenv("LANG");
+  if (lang && strstr(lang, "UTF-8")) {
+    return 1;
+  }
+  return 0;
+}
