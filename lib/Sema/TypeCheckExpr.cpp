@@ -83,20 +83,7 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
   SmallVector<TupleTypeElt, 8> ResultTyElts(TE->getNumElements());
 
   for (unsigned i = 0, e = TE->getNumElements(); i != e; ++i) {
-    Type EltTy;
-    
-    // If the element value is missing, it has the value of the default
-    // expression of the result type, which must be known.
-    Expr *Elt = TE->getElement(i);
-    if (Elt == 0) {
-      assert(TE->getType() && isa<TupleType>(TE->getType()) && 
-             "Can't have default value without a result type");
-      EltTy = cast<TupleType>(TE->getType())->getElementType(i);
-    } else {
-      EltTy = Elt->getType();
-    }
-
-    // If a name was specified for this element, use it.
+    Type EltTy = TE->getElement(i)->getType();
     Identifier Name = TE->getElementName(i);
     ResultTyElts[i] = TupleTypeElt(EltTy, Name);
   }
