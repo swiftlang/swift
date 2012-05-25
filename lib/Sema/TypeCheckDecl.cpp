@@ -49,27 +49,19 @@ public:
   /// \param CheckConformance Will be set true if the caller needs to call
   /// checkExplicitConformance() for this declaration once its members have
   /// been type-checked. Otherwise, the conformance check can be delayed.
-  void checkInherited(Decl *D, Type T, MutableArrayRef<Type> Inherited,
-                      bool &CheckConformance) {
+  void checkInherited(Decl *D, Type T, MutableArrayRef<Type> Inherited) {
     // Check the list of inherited protocols.
-    bool ConformsToProtocols = false;
     for (unsigned i = 0, e = Inherited.size(); i != e; ++i) {
       if (TC.validateType(Inherited[i], IsFirstPass)) {
         Inherited[i] = ErrorType::get(TC.Context);
         continue;
       }
 
-      if (!Inherited[i]->is<ProtocolType>()) {
+      if (!Inherited[i]->is<ProtocolType>() && !Inherited[i]->is<ErrorType>()) {
         // FIXME: Terrible location information.
         TC.diagnose(D->getLocStart(), diag::nonprotocol_inherit, Inherited[i]);
-      } else if (!Inherited[i]->is<ErrorType>()) {
-        ConformsToProtocols = true;
       }
     }
-    
-    CheckConformance = ConformsToProtocols &&
-      !D->getDeclContext()->isModuleContext() &&
-      !isa<ProtocolDecl>(D);
   }
 
   void checkExplicitConformance(Decl *D, Type T,
@@ -187,28 +179,36 @@ public:
   }
 
   void visitOneOfDecl(OneOfDecl *OOD) {
-    if (IsSecondPass)
-      return;
+    if (IsSecondPass) {
+      for (auto elt : OOD->getElements())
+        visitOneOfElementDecl(elt);
 
-    bool CheckConformance;
-    checkInherited(OOD, OOD->getDeclaredType(), OOD->getInherited(),
-                   CheckConformance);
+      checkExplicitConformance(OOD, OOD->getDeclaredType(),
+                               OOD->getInherited());
+      return;
+    }
+
+    checkInherited(OOD, OOD->getDeclaredType(), OOD->getInherited());
     
     for (auto elt : OOD->getElements())
       visitOneOfElementDecl(elt);
     
-    if (CheckConformance)
+    if (!IsFirstPass)
       checkExplicitConformance(OOD, OOD->getDeclaredType(),
                                OOD->getInherited());
   }
 
   void visitStructDecl(StructDecl *SD) {
-    if (IsSecondPass)
-      return;
+    if (IsSecondPass) {
+      for (Decl *Member : SD->getMembers())
+        visit(Member);
 
-    bool CheckConformance;
-    checkInherited(SD, SD->getDeclaredType(), SD->getInherited(),
-                   CheckConformance);
+      checkExplicitConformance(SD, SD->getDeclaredType(),
+                               SD->getInherited());
+      return;
+    }
+
+    checkInherited(SD, SD->getDeclaredType(), SD->getInherited());
     
     for (Decl *Member : SD->getMembers()) {
       visit(Member);
@@ -226,24 +226,28 @@ public:
     cast<OneOfElementDecl>(SD->getMembers().back())->setType(CreateTy);
     cast<OneOfElementDecl>(SD->getMembers().back())->setArgumentType(TT);
     
-    if (CheckConformance)
+    if (!IsFirstPass)
       checkExplicitConformance(SD, SD->getDeclaredType(),
                                SD->getInherited());
   }
 
   void visitClassDecl(ClassDecl *CD) {
-    if (IsSecondPass)
-      return;
+    if (IsSecondPass) {
+      for (Decl *Member : CD->getMembers())
+        visit(Member);
 
-    bool CheckConformance;
-    checkInherited(CD, CD->getDeclaredType(), CD->getInherited(),
-                   CheckConformance);
+      checkExplicitConformance(CD, CD->getDeclaredType(),
+                               CD->getInherited());
+      return;
+    }
+
+    checkInherited(CD, CD->getDeclaredType(), CD->getInherited());
 
     for (Decl *Member : CD->getMembers()) {
       visit(Member);
     }
     
-    if (CheckConformance)
+    if (!IsFirstPass)
       checkExplicitConformance(CD, CD->getDeclaredType(),
                                CD->getInherited());
   }
@@ -252,9 +256,7 @@ public:
     if (IsSecondPass)
       return;
 
-    bool CheckConformance;
-    checkInherited(PD, PD->getDeclaredType(), PD->getInherited(),
-                   CheckConformance);
+    checkInherited(PD, PD->getDeclaredType(), PD->getInherited());
     
     // Assign archetypes each of the associated types.
     // FIXME: We need to build equivalence classes of associated types first,
@@ -297,6 +299,7 @@ public:
 
     visitValueDecl(FD);
   }
+
   void visitOneOfElementDecl(OneOfElementDecl *ED) {
     if (IsSecondPass)
       return;
@@ -313,11 +316,19 @@ public:
                   diag::oneof_element_not_materializable);
     }
   }
-  void visitExtensionDecl(ExtensionDecl *ED) {
-    if (IsSecondPass)
-      return;
 
-    bool CheckConformance;
+  void visitExtensionDecl(ExtensionDecl *ED) {
+    if (IsSecondPass) {
+      for (Decl *Member : ED->getMembers())
+        // First recursively type check each thing in the extension.
+        visit(Member);
+
+      checkExplicitConformance(ED, ED->getExtendedType(),
+                               ED->getInherited());
+      return;
+    }
+
+
     if (TC.validateType(ED->getExtendedType(), IsFirstPass)) {
       ED->setExtendedType(ErrorType::get(TC.Context));
     } else {
@@ -330,13 +341,17 @@ public:
         // declaration, if any.
       }
       
-      checkInherited(ED, ExtendedTy, ED->getInherited(), CheckConformance);
+      checkInherited(ED, ExtendedTy, ED->getInherited());
     }
     
     for (Decl *Member : ED->getMembers()) {
       // First recursively type check each thing in the extension.
       visit(Member);
     }
+
+    if (!IsFirstPass)
+      checkExplicitConformance(ED, ED->getExtendedType(),
+                               ED->getInherited());
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {

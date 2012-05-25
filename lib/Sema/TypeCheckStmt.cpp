@@ -686,15 +686,6 @@ static void REPLCheckPatternBinding(PatternBindingDecl *D, TypeChecker &TC) {
   D->setInit(TC.semaApplyExpr(CE));
 }
 
-/// \brief Check for explicit protocol conformance.
-static void checkExplicitConformance(TypeChecker &TC, Decl *D, Type Ty,
-                                     ArrayRef<Type> Inherited) {
-  for (auto InheritedTy : Inherited) {
-    if (ProtocolType *Proto = InheritedTy->getAs<ProtocolType>())
-      TC.conformsToProtocol(Ty, Proto->getDecl(), D->getLocStart());
-  }
-}
-
 /// \brief Check for circular inheritance of protocols.
 ///
 /// \param Path The circular path through the protocol inheritance hierarchy,
@@ -946,21 +937,10 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // Check for explicit conformance to protocols and for circularity in
   // protocol definitions.
   {
+    // FIXME: This check should be in TypeCheckDecl.
     llvm::SmallPtrSet<ProtocolDecl *, 16> VisitedProtocols;
     for (auto D : TU->Decls) {
-      if (auto Struct = dyn_cast<StructDecl>(D))
-        checkExplicitConformance(TC, Struct, Struct->getDeclaredType(),
-                                 Struct->getInherited());
-      else if (auto Class = dyn_cast<ClassDecl>(D))
-        checkExplicitConformance(TC, Class, Class->getDeclaredType(),
-                                 Class->getInherited());
-      else if (auto OneOf = dyn_cast<OneOfDecl>(D))
-        checkExplicitConformance(TC, OneOf, OneOf->getDeclaredType(),
-                                 OneOf->getInherited());
-      else if (auto Extension = dyn_cast<ExtensionDecl>(D))
-        checkExplicitConformance(TC, Extension, Extension->getExtendedType(),
-                                 Extension->getInherited());
-      else if (auto Protocol = dyn_cast<ProtocolDecl>(D)) {
+      if (auto Protocol = dyn_cast<ProtocolDecl>(D)) {
         // Check for circular protocol definitions.
         llvm::SmallPtrSet<ProtocolDecl *, 16> LocalVisited;
         llvm::SmallVector<ProtocolDecl *, 4> Path;
