@@ -28,11 +28,16 @@ struct AllocCacheEntry {
 // XXX FIXME -- we need to clean this up when the project isn't a secret.
 // There are only 256 slots, and the latter half is basically unused. We can
 // go lower than 128, but we eventually begin to stomp on other frameworks.
+#ifdef __LP64__
+#define ALLOC_CACHE_BUCKETS 56
+#else
+#define ALLOC_CACHE_BUCKETS 64
+#endif
 static __attribute__((address_space(256)))
 struct TSD {
   uintptr_t junk[128];
-  AllocCacheEntry *cache[64];
-  AllocCacheEntry *rawCache[64];
+  AllocCacheEntry *cache[ALLOC_CACHE_BUCKETS];
+  AllocCacheEntry *rawCache[ALLOC_CACHE_BUCKETS];
 } *tsd = 0;
 
 struct SwiftHeapObject *
@@ -92,24 +97,29 @@ swift_deallocObject(struct SwiftHeapObject *object, size_t allocatedSize)
 
 __attribute__((noinline,used))
 static void *
-_swift_slowAlloc_fixup(size_t off, uint64_t flags)
+_swift_slowAlloc_fixup(SwiftAllocIndex idx, uint64_t flags)
 {
   size_t sz;
 
-  off++;
+  idx++;
 
-  if (off <= 16) {
-    sz = off << 3;
-  } else if (off <= 24) {
-    sz = (off - 8) << 4;
-  } else if (off <= 32) {
-    sz = (off - 16) << 5;
-  } else if (off <= 40) {
-    sz = (off - 24) << 6;
-  } else if (off <= 48) {
-    sz = (off - 32) << 7;
-  } else if (off <= 56) {
-    sz = (off - 40) << 8;
+  // we could do a table based lookup if we think it worthwhile
+#ifdef __LP64__
+  if        (idx <= 16) { sz =  idx       << 3;
+  } else if (idx <= 24) { sz = (idx -  8) << 4;
+  } else if (idx <= 32) { sz = (idx - 16) << 5;
+  } else if (idx <= 40) { sz = (idx - 24) << 6;
+  } else if (idx <= 48) { sz = (idx - 32) << 7;
+  } else if (idx <= 56) { sz = (idx - 40) << 8;
+#else
+  if        (idx <= 16) { sz =  idx       << 2;
+  } else if (idx <= 24) { sz = (idx -  8) << 3;
+  } else if (idx <= 32) { sz = (idx - 16) << 4;
+  } else if (idx <= 40) { sz = (idx - 24) << 5;
+  } else if (idx <= 48) { sz = (idx - 32) << 6;
+  } else if (idx <= 56) { sz = (idx - 40) << 7;
+  } else if (idx <= 64) { sz = (idx - 48) << 8;
+#endif
   } else {
     __builtin_trap();
   }
@@ -202,27 +212,32 @@ swift_slowDealloc(void *ptr, size_t bytes)
 {
   SwiftAllocIndex idx;
 
+  if (bytes == 0) {
+    // the caller either doesn't know the size
+    // or the caller really does think the size is zero
+    // in any case, punt!
+    free(ptr);
+  }
+
   bytes--;
 
-  if (bytes == SIZE_MAX) {
-    // bytes was zero, therefore bucket 0
-    idx = 0;
-  } else if (bytes < 0x80) {
-    // about 90% of allocations
-    idx = (bytes >> 3);
-  } else if (bytes < 0x100) {
-    idx = (bytes >> 4) + 0x8;
-  } else if (bytes < 0x200) {
-    idx = (bytes >> 5) + 0x10;
-  } else if (bytes < 0x400) {
-    idx = (bytes >> 6) + 0x18;
-  } else if (bytes < 0x800) {
-    idx = (bytes >> 7) + 0x20;
-  } else if (bytes < 0x1000) {
-    idx = (bytes >> 8) + 0x28;
-  } else {
-    // about 1% of allocations
-    return free(ptr);
+#ifdef __LP64__
+  if        (bytes < 0x80)   { idx = (bytes >> 3);
+  } else if (bytes < 0x100)  { idx = (bytes >> 4) + 0x8;
+  } else if (bytes < 0x200)  { idx = (bytes >> 5) + 0x10;
+  } else if (bytes < 0x400)  { idx = (bytes >> 6) + 0x18;
+  } else if (bytes < 0x800)  { idx = (bytes >> 7) + 0x20;
+  } else if (bytes < 0x1000) { idx = (bytes >> 8) + 0x28;
+#else
+  if        (bytes < 0x40)   { idx = (bytes >> 2);
+  } else if (bytes < 0x80)   { idx = (bytes >> 3) + 0x8;
+  } else if (bytes < 0x100)  { idx = (bytes >> 4) + 0x10;
+  } else if (bytes < 0x200)  { idx = (bytes >> 5) + 0x18;
+  } else if (bytes < 0x400)  { idx = (bytes >> 6) + 0x20;
+  } else if (bytes < 0x800)  { idx = (bytes >> 7) + 0x28;
+  } else if (bytes < 0x1000) { idx = (bytes >> 8) + 0x30;
+#endif
+  } else { return free(ptr);
   }
 
   swift_dealloc(ptr, idx);
@@ -233,27 +248,32 @@ swift_slowRawDealloc(void *ptr, size_t bytes)
 {
   SwiftAllocIndex idx;
 
+  if (bytes == 0) {
+    // the caller either doesn't know the size
+    // or the caller really does think the size is zero
+    // in any case, punt!
+    free(ptr);
+  }
+
   bytes--;
 
-  if (bytes == SIZE_MAX) {
-    // bytes was zero, therefore bucket 0
-    idx = 0;
-  } else if (bytes < 0x80) {
-    // about 90% of allocations
-    idx = (bytes >> 3);
-  } else if (bytes < 0x100) {
-    idx = (bytes >> 4) + 0x8;
-  } else if (bytes < 0x200) {
-    idx = (bytes >> 5) + 0x10;
-  } else if (bytes < 0x400) {
-    idx = (bytes >> 6) + 0x18;
-  } else if (bytes < 0x800) {
-    idx = (bytes >> 7) + 0x20;
-  } else if (bytes < 0x1000) {
-    idx = (bytes >> 8) + 0x28;
-  } else {
-    // about 1% of allocations
-    return free(ptr);
+#ifdef __LP64__
+  if        (bytes < 0x80)   { idx = (bytes >> 3);
+  } else if (bytes < 0x100)  { idx = (bytes >> 4) + 0x8;
+  } else if (bytes < 0x200)  { idx = (bytes >> 5) + 0x10;
+  } else if (bytes < 0x400)  { idx = (bytes >> 6) + 0x18;
+  } else if (bytes < 0x800)  { idx = (bytes >> 7) + 0x20;
+  } else if (bytes < 0x1000) { idx = (bytes >> 8) + 0x28;
+#else
+  if        (bytes < 0x40)   { idx = (bytes >> 2);
+  } else if (bytes < 0x80)   { idx = (bytes >> 3) + 0x8;
+  } else if (bytes < 0x100)  { idx = (bytes >> 4) + 0x10;
+  } else if (bytes < 0x200)  { idx = (bytes >> 5) + 0x18;
+  } else if (bytes < 0x400)  { idx = (bytes >> 6) + 0x20;
+  } else if (bytes < 0x800)  { idx = (bytes >> 7) + 0x28;
+  } else if (bytes < 0x1000) { idx = (bytes >> 8) + 0x30;
+#endif
+  } else { return free(ptr);
   }
 
   swift_rawDealloc(ptr, idx);
