@@ -1144,9 +1144,9 @@ class CapturingExpr : public Expr, public DeclContext {
   bool IsNotCaptured;
 
 public:
-  CapturingExpr(ExprKind Kind, Type FnType, DeclContextKind DCKind,
-                DeclContext *Parent)
-    : Expr(Kind, FnType), DeclContext(DCKind, Parent), IsNotCaptured(false) {}
+  CapturingExpr(ExprKind Kind, Type FnType, DeclContext *Parent)
+    : Expr(Kind, FnType), DeclContext(DeclContextKind::CapturingExpr, Parent),
+      IsNotCaptured(false) {}
 
   ArrayRef<ValueDecl*> getCaptures() { return Captures; }
   void setCaptures(ArrayRef<ValueDecl*> C) { Captures = C; }
@@ -1183,8 +1183,7 @@ class FuncExpr : public CapturingExpr {
   
   FuncExpr(SourceLoc FuncLoc, unsigned NumPatterns, Type FnType,
            BraceStmt *Body, DeclContext *Parent)
-    : CapturingExpr(ExprKind::Func, FnType,
-                    DeclContextKind::CapturingExpr, Parent),
+    : CapturingExpr(ExprKind::Func, FnType, Parent),
       FuncLoc(FuncLoc), NumPatterns(NumPatterns), Body(Body) {}
 public:
   static FuncExpr *create(ASTContext &Context, SourceLoc FuncLoc,
@@ -1227,9 +1226,9 @@ class ClosureExpr : public CapturingExpr {
   Pattern *Pat;
 
 public:
-  ClosureExpr(ExprKind Kind, Expr *Body, DeclContextKind DCKind,
-              DeclContext *Parent, Type ResultTy = Type())
-    : CapturingExpr(Kind, ResultTy, DCKind, Parent), Body(Body), Pat(0) {}
+  ClosureExpr(ExprKind Kind, Expr *Body, DeclContext *Parent,
+              Type ResultTy = Type())
+    : CapturingExpr(Kind, ResultTy, Parent), Body(Body), Pat(0) {}
 
   Expr *getBody() const { return Body; }
   void setBody(Expr *e) { Body = e; }
@@ -1264,8 +1263,7 @@ class ExplicitClosureExpr : public ClosureExpr {
 public:
   ExplicitClosureExpr(SourceLoc LBraceLoc, DeclContext *Parent,
                       Expr *Body = 0, SourceLoc RBraceLoc = SourceLoc())
-    : ClosureExpr(ExprKind::ExplicitClosure, Body,
-                  DeclContextKind::CapturingExpr, Parent),
+    : ClosureExpr(ExprKind::ExplicitClosure, Body, Parent),
       LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc) {}
   
   void setRBraceLoc(SourceLoc L) {
@@ -1303,8 +1301,7 @@ public:
 class ImplicitClosureExpr : public ClosureExpr {
 public:
   ImplicitClosureExpr(Expr *Body, DeclContext *Parent, Type ResultTy)
-    : ClosureExpr(ExprKind::ImplicitClosure, Body,
-                  DeclContextKind::CapturingExpr, Parent, ResultTy) {}
+    : ClosureExpr(ExprKind::ImplicitClosure, Body, Parent, ResultTy) {}
   
   SourceRange getSourceRange() const { return getBody()->getSourceRange(); }
 
