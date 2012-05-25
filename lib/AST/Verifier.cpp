@@ -47,11 +47,6 @@ namespace {
         assert((TU->ASTStage < TranslationUnit::TypeChecked || HadError) && \
                #ID "in wrong phase");\
         DISPATCH(ID);
-#define UNBOUND_EXPR(ID, PARENT) \
-      case ExprKind::ID: \
-        assert(TU->ASTStage < TranslationUnit::NameBound && \
-               #ID "in wrong phase"); \
-        DISPATCH(ID);
 #include "swift/AST/ExprNodes.def"
 #undef DISPATCH
       }
@@ -68,11 +63,6 @@ namespace {
       case ExprKind::ID: \
         assert((TU->ASTStage < TranslationUnit::TypeChecked || HadError) && \
                #ID "in wrong phase");\
-        DISPATCH(ID);
-#define UNBOUND_EXPR(ID, PARENT) \
-      case ExprKind::ID: \
-        assert(TU->ASTStage < TranslationUnit::NameBound && \
-               #ID "in wrong phase"); \
         DISPATCH(ID);
 #include "swift/AST/ExprNodes.def"
 #undef DISPATCH
