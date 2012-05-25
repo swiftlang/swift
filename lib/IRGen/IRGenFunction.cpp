@@ -94,9 +94,11 @@ static llvm::AttrListPtr getAllocAttrs() {
 
 static llvm::Value *emitAllocatingCall(IRGenFunction &IGF,
                                        llvm::Value *fn,
-                                       llvm::Value *arg) {
+                                       std::initializer_list<llvm::Value*> args,
+                                       const llvm::Twine &name) {
   static auto allocAttrs = getAllocAttrs();
-  llvm::CallInst *call = IGF.Builder.CreateCall(fn, arg);
+  llvm::CallInst *call =
+    IGF.Builder.CreateCall(fn, makeArrayRef(args.begin(), args.size()));
   call->setAttributes(allocAttrs);
   return call;
 }
@@ -104,14 +106,16 @@ static llvm::Value *emitAllocatingCall(IRGenFunction &IGF,
 /// Emit a 'raw' allocation, which has no heap pointer and is
 /// not guaranteed to be zero-initialized.
 llvm::Value *IRGenFunction::emitAllocRawCall(llvm::Value *size,
-                                             llvm::Value *align) {
+                                             llvm::Value *align,
+                                             const llvm::Twine &name) {
 
   // Try to use swift_rawAlloc.
   if (auto csize = dyn_cast<llvm::ConstantInt>(size)) {
     AllocToken allocToken = getAllocToken(IGM, csize->getZExtValue());
     if (allocToken != InvalidAllocToken) {
       return emitAllocatingCall(*this, IGM.getRawAllocFn(),
-                             llvm::ConstantInt::get(IGM.SizeTy, allocToken));
+                          { llvm::ConstantInt::get(IGM.SizeTy, allocToken) },
+                                name);
     }
 
     assert(isa<llvm::ConstantInt>(align));
@@ -119,8 +123,22 @@ llvm::Value *IRGenFunction::emitAllocRawCall(llvm::Value *size,
              == 0 && "size not a multiple of alignment!");
   }
 
-  // Okay, fall back to swift_slowRawAlloc.
-  return emitAllocatingCall(*this, IGM.getSlowRawAllocFn(), size);
+  // Okay, fall back to swift_slowAlloc.  The flags here are:
+  //  0x1 - 'try', i.e. returning null is acceptable
+  //  0x2 - 'raw', i.e. returning uninitialized memory is acceptable
+  return emitAllocatingCall(*this, IGM.getSlowAllocFn(),
+                            { size, llvm::ConstantInt::get(IGM.SizeTy, 2) },
+                            name);
+}
+
+/// Emit a heap allocation.
+llvm::Value *IRGenFunction::emitAllocObjectCall(llvm::Value *metadata,
+                                                llvm::Value *size,
+                                                llvm::Value *align,
+                                                const llvm::Twine &name) {
+  // For now, all we have is swift_allocObject.
+  return emitAllocatingCall(*this, IGM.getAllocObjectFn(),
+                            { metadata, size, align }, name);
 }
 
 static void emitDeallocatingCall(IRGenFunction &IGF, llvm::Constant *fn,
@@ -144,6 +162,13 @@ void IRGenFunction::emitDeallocRawCall(llvm::Value *pointer,
 
   // Okay, fall back to swift_slowRawDealloc.
   return emitDeallocatingCall(*this, IGM.getSlowRawDeallocFn(), pointer, size);
+}
+
+/// Deallocate an object which was allocated but has not actually been
+/// initialized.
+void IRGenFunction::emitDeallocObjectCall(llvm::Value *ptr, llvm::Value *size) {
+  // For now, all we have is swift_deallocObject.
+  return emitDeallocatingCall(*this, IGM.getDeallocObjectFn(), ptr, size);
 }
 
 void IRGenFunction::unimplemented(SourceLoc Loc, StringRef Message) {

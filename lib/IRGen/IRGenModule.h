@@ -130,14 +130,14 @@ private:
 
 //--- Runtime ---------------------------------------------------------------
 public:
-  llvm::Constant *getAllocFn();
+  llvm::Constant *getAllocObjectFn();
   llvm::Constant *getRetainFn();
   llvm::Constant *getReleaseFn();
-  llvm::Constant *getDeallocFn();
+  llvm::Constant *getDeallocObjectFn();
 
   llvm::Constant *getRawAllocFn();
   llvm::Constant *getRawDeallocFn();
-  llvm::Constant *getSlowRawAllocFn();
+  llvm::Constant *getSlowAllocFn();
   llvm::Constant *getSlowRawDeallocFn();
 
   llvm::Constant *getObjCRetainFn();
@@ -145,15 +145,15 @@ public:
 
 private:
   llvm::Function *MemCpyFn;
-  llvm::Constant *AllocFn;
+  llvm::Constant *AllocObjectFn;
   llvm::Constant *RetainFn;
   llvm::Constant *ReleaseFn;
   llvm::Constant *ObjCRetainFn;
   llvm::Constant *ObjCReleaseFn;
-  llvm::Constant *DeallocFn;
+  llvm::Constant *DeallocObjectFn;
   llvm::Constant *RawAllocFn;
   llvm::Constant *RawDeallocFn;
-  llvm::Constant *SlowRawAllocFn;
+  llvm::Constant *SlowAllocFn;
   llvm::Constant *SlowRawDeallocFn;
 
 //--- Generic ---------------------------------------------------------------

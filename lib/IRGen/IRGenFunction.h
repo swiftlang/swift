@@ -238,7 +238,13 @@ public:
   void emitMemCpy(llvm::Value *dest, llvm::Value *src,
                   Size size, Alignment align);
   void emitMemCpy(Address dest, Address src, Size size);
-  llvm::Value *emitAllocRawCall(llvm::Value *size, llvm::Value *align);
+
+  llvm::Value *emitAllocObjectCall(llvm::Value *metadata, llvm::Value *size,
+                                   llvm::Value *align,
+                                   const llvm::Twine &name = "");
+  void emitDeallocObjectCall(llvm::Value *pointer, llvm::Value *size);
+  llvm::Value *emitAllocRawCall(llvm::Value *size, llvm::Value *align,
+                                const llvm::Twine &name ="");
   void emitDeallocRawCall(llvm::Value *pointer, llvm::Value *size);
 private:
   llvm::Instruction *AllocaIP;
@@ -248,7 +254,8 @@ public:
   ManagedValue emitAlloc(const HeapLayout &layout, const llvm::Twine &name);
   llvm::Value *emitUnmanagedAlloc(const HeapLayout &layout,
                                   const llvm::Twine &name);
-  CleanupsDepth pushDeallocCleanup(llvm::Value *allocation);
+  CleanupsDepth pushDeallocCleanup(llvm::Value *allocation,
+                                   llvm::Value *size);
   void emitLoadAndRetain(Address addr, Explosion &explosion);
   void emitAssignRetained(llvm::Value *value, Address addr);
   void emitInitializeRetained(llvm::Value *value, Address addr);

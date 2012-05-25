@@ -184,15 +184,16 @@ Initialization::emitLocalAllocation(IRGenFunction &IGF, Object object,
 
   // Allocate a new object.
   // TODO: lifetime intrinsics?
-  llvm:: Value *allocation = IGF.emitUnmanagedAlloc(layout, name + ".alloc");
+  llvm::Value *allocation = IGF.emitUnmanagedAlloc(layout, name + ".alloc");
 
   // Cast and GEP down to the element.
   Address rawAddr = layout.emitCastOfAlloc(IGF, allocation);
   rawAddr = elt.project(IGF, rawAddr, name);
 
   // Push a cleanup to dealloc the allocation.
+  // FIXME: don't emit the size twice!
   IRGenFunction::CleanupsDepth deallocCleanup
-    = IGF.pushDeallocCleanup(allocation);
+    = IGF.pushDeallocCleanup(allocation, layout.emitSize(IGF));
 
   OwnedAddress addr(rawAddr, allocation);
   markAllocated(IGF, object, addr, deallocCleanup);

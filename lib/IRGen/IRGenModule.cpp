@@ -50,15 +50,15 @@ IRGenModule::IRGenModule(ASTContext &Context,
   Int8PtrTy = llvm::Type::getInt8PtrTy(getLLVMContext());
   SizeTy = TargetData.getIntPtrType(getLLVMContext());
   MemCpyFn = nullptr;
-  AllocFn = nullptr;
+  AllocObjectFn = nullptr;
   RetainFn = nullptr;
   ReleaseFn = nullptr;
-  DeallocFn = nullptr;
+  DeallocObjectFn = nullptr;
   ObjCRetainFn = nullptr;
   ObjCReleaseFn = nullptr;
   RawAllocFn = nullptr;
   RawDeallocFn = nullptr;
-  SlowRawAllocFn = nullptr;
+  SlowAllocFn = nullptr;
   SlowRawDeallocFn = nullptr;
 
   RefCountedStructTy =
@@ -102,14 +102,14 @@ llvm::StructType *IRGenModule::getOpaqueStructTy() {
   return OpaqueStructTy;
 }
 
-llvm::Constant *IRGenModule::getAllocFn() {
-  if (AllocFn) return AllocFn;
+llvm::Constant *IRGenModule::getAllocObjectFn() {
+  if (AllocObjectFn) return AllocObjectFn;
 
   llvm::Type *types[] = { HeapMetadataPtrTy, SizeTy, SizeTy };
   llvm::FunctionType *fnType =
     llvm::FunctionType::get(RefCountedPtrTy, types, false);
-  AllocFn = Module.getOrInsertFunction("swift_allocObject", fnType);
-  return AllocFn;
+  AllocObjectFn = Module.getOrInsertFunction("swift_allocObject", fnType);
+  return AllocObjectFn;
 }
 
 llvm::Constant *IRGenModule::getRawAllocFn() {
@@ -133,14 +133,14 @@ llvm::Constant *IRGenModule::getRawDeallocFn() {
   return RawDeallocFn;
 }
 
-llvm::Constant *IRGenModule::getSlowRawAllocFn() {
-  if (SlowRawAllocFn) return SlowRawAllocFn;
+llvm::Constant *IRGenModule::getSlowAllocFn() {
+  if (SlowAllocFn) return SlowAllocFn;
 
-  /// void *swift_slowRawAlloc(size_t size);
+  /// void *swift_slowAlloc(size_t size, size_t flags);
   llvm::FunctionType *fnType =
     llvm::FunctionType::get(Int8PtrTy, SizeTy, false);
-  SlowRawAllocFn = Module.getOrInsertFunction("swift_slowRawAlloc", fnType);
-  return SlowRawAllocFn;
+  SlowAllocFn = Module.getOrInsertFunction("swift_slowAlloc", fnType);
+  return SlowAllocFn;
 }
 
 llvm::Constant *IRGenModule::getSlowRawDeallocFn() {
@@ -151,7 +151,7 @@ llvm::Constant *IRGenModule::getSlowRawDeallocFn() {
   llvm::FunctionType *fnType =
     llvm::FunctionType::get(VoidTy, types, false);
   SlowRawDeallocFn = Module.getOrInsertFunction("swift_slowRawDealloc", fnType);
-  return DeallocFn;
+  return SlowRawDeallocFn;
 }
 
 llvm::Constant *IRGenModule::getRetainFn() {
@@ -172,13 +172,14 @@ llvm::Constant *IRGenModule::getReleaseFn() {
   return ReleaseFn;
 }
 
-llvm::Constant *IRGenModule::getDeallocFn() {
-  if (DeallocFn) return DeallocFn;
+llvm::Constant *IRGenModule::getDeallocObjectFn() {
+  if (DeallocObjectFn) return DeallocObjectFn;
 
+  llvm::Type *argTypes[] = { RefCountedPtrTy, SizeTy };
   llvm::FunctionType *fnType =
-    llvm::FunctionType::get(VoidTy, RefCountedPtrTy, false);
-  DeallocFn = Module.getOrInsertFunction("swift_deallocObject", fnType);
-  return DeallocFn;
+    llvm::FunctionType::get(VoidTy, argTypes, false);
+  DeallocObjectFn = Module.getOrInsertFunction("swift_deallocObject", fnType);
+  return DeallocObjectFn;
 }
 
 void IRGenModule::unimplemented(SourceLoc Loc, StringRef Message) {

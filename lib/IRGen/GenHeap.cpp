@@ -45,20 +45,6 @@ static llvm::ConstantInt *getSizeMax(IRGenFunction &IGF) {
   return llvm::ConstantInt::getSigned(IGF.IGM.SizeTy, -1);
 }
 
-/// Perform a simple call to allocate the given object.
-static llvm::Value *emitUnmanagedAllocCall(IRGenFunction &IGF,
-                                           llvm::Value *metadata,
-                                           llvm::Value *size,
-                                           llvm::Value *align,
-                                           const llvm::Twine &name) {
-  llvm::Value *args[] = { metadata, size, align };
-  llvm::CallInst *alloc =
-    IGF.Builder.CreateCall(IGF.IGM.getAllocFn(), args, name);
-  alloc->setDoesNotThrow();
-
-  return alloc;
-}
-
 /// Perform the layout required for a heap object.
 HeapLayout::HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,
                        llvm::ArrayRef<const TypeInfo *> fields,
@@ -424,8 +410,8 @@ ManagedValue ArrayHeapLayout::emitAlloc(IRGenFunction &IGF,
   llvm::Value *align = getSize(IGF, Size(Align.getValue()));
 
   // Perform the allocation.
-  llvm::Value *alloc = emitUnmanagedAllocCall(IGF, metadata, size, align,
-                                              "array.alloc");
+  llvm::Value *alloc =
+    IGF.emitAllocObjectCall(metadata, size, align, "array.alloc");
 
   // Find the begin pointer.
   llvm::Value *beginPtr = getBeginPointer(IGF, alloc);
@@ -458,7 +444,7 @@ llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
   llvm::Value *size = layout.emitSize(*this);
   llvm::Value *align = layout.emitAlign(*this);
 
-  return emitUnmanagedAllocCall(*this, metadata, size, align, name);
+  return emitAllocObjectCall(metadata, size, align, name);
 }
 
 ManagedValue IRGenFunction::emitAlloc(const HeapLayout &layout,
@@ -598,26 +584,15 @@ ManagedValue IRGenFunction::enterReleaseCleanup(llvm::Value *value) {
   return ManagedValue(value, getCleanupsDepth());
 }
 
-/// Emit a call to swift_dealloc.
-static void emitDeallocCall(IRGenFunction &IGF, llvm::Value *allocation) {
-  llvm::Constant *fn = IGF.IGM.getDeallocFn();
-  if (allocation->getType() != IGF.IGM.RefCountedPtrTy) {
-    llvm::FunctionType *fnType =
-      llvm::FunctionType::get(IGF.IGM.VoidTy, allocation->getType(), false);
-    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
-  }
-
-  llvm::CallInst *call = IGF.Builder.CreateCall(fn, allocation);
-  call->setDoesNotThrow();
-}
-
 namespace {
   class CallDealloc : public Cleanup {
     llvm::Value *Allocation;
+    llvm::Value *Size;
   public:
-    CallDealloc(llvm::Value *allocation) : Allocation(allocation) {}
+    CallDealloc(llvm::Value *allocation, llvm::Value *size)
+      : Allocation(allocation), Size(size) {}
     void emit(IRGenFunction &IGF) const {
-      emitDeallocCall(IGF, Allocation);
+      IGF.emitDeallocObjectCall(Allocation, Size);
     }
   };
 }
@@ -626,7 +601,8 @@ namespace {
 /// This cleanup will usually be deactivated as soon as the
 /// initializer completes.
 IRGenFunction::CleanupsDepth
-IRGenFunction::pushDeallocCleanup(llvm::Value *allocation) {
-  pushFullExprCleanup<CallDealloc>(allocation);
+IRGenFunction::pushDeallocCleanup(llvm::Value *allocation,
+                                  llvm::Value *size) {
+  pushFullExprCleanup<CallDealloc>(allocation, size);
   return getCleanupsDepth();
 }
