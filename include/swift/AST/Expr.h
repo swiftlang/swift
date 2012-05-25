@@ -1578,9 +1578,11 @@ public:
   }
 
   SourceLoc getDotLoc() const { return DotLoc; }
-  SourceLoc getLoc() const { return getArg()->getStartLoc(); }
+  SourceLoc getLoc() const {
+    return DotLoc.isValid() ? getArg()->getStartLoc() : getFn()->getStartLoc();
+  }
   SourceLoc getEndLoc() const {
-    return DotLoc.isValid()? getFn()->getEndLoc() : getArg()->getEndLoc();
+    return getFn()->getEndLoc();
   }
   
   SourceRange getSourceRange() const {
