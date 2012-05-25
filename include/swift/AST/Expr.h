@@ -38,6 +38,7 @@ namespace swift {
   class ASTWalker;
   class VarDecl;
   class ProtocolConformance;
+  class FuncDecl;
   
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -1174,6 +1175,8 @@ class FuncExpr : public CapturingExpr {
   
   BraceStmt *Body;
 
+  FuncDecl *TheFuncDecl;
+
   Pattern **getParamsBuffer() {
     return reinterpret_cast<Pattern**>(this+1);
   }
@@ -1184,7 +1187,8 @@ class FuncExpr : public CapturingExpr {
   FuncExpr(SourceLoc FuncLoc, unsigned NumPatterns, Type FnType,
            BraceStmt *Body, DeclContext *Parent)
     : CapturingExpr(ExprKind::Func, FnType, Parent),
-      FuncLoc(FuncLoc), NumPatterns(NumPatterns), Body(Body) {}
+      FuncLoc(FuncLoc), NumPatterns(NumPatterns), Body(Body),
+      TheFuncDecl(nullptr) {}
 public:
   static FuncExpr *create(ASTContext &Context, SourceLoc FuncLoc,
                           ArrayRef<Pattern*> Params, Type FnType,
@@ -1197,6 +1201,8 @@ public:
     return ArrayRef<Pattern*>(getParamsBuffer(), NumPatterns);
   }
   
+  FuncDecl *getDecl() const { return TheFuncDecl; }
+  void setDecl(FuncDecl *f) { TheFuncDecl = f; }
 
   /// Returns the location of the 'func' keyword.
   SourceLoc getFuncLoc() const { return FuncLoc; }

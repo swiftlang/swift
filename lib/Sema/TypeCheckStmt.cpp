@@ -722,22 +722,8 @@ bool checkProtocolCircularity(TypeChecker &TC, ProtocolDecl *Proto,
 /// FuncDecl.  Check to see if this is a reference to an instance variable,
 /// and return an AST for the reference if so.  If not, return null with no
 /// error emitted.
-static Expr *BindNameToIVar(UnresolvedDeclRefExpr *UDRE, FuncDecl *CurFD, 
-                            TypeChecker &TC) {
-  Type ExtendedType = CurFD->getExtensionType();
-  if (ExtendedType.isNull()) return 0;
-
-  // For a static method, we perform name lookup in the corresponding metatype.
-  TypeDecl *StaticAlias = 0;
-  if (CurFD->isStatic()) {
-    if (NominalType *Nominal = ExtendedType->getAs<NominalType>())
-      StaticAlias = Nominal->getDecl();
-    else
-      return 0;
-    
-    ExtendedType = MetaTypeType::get(StaticAlias);
-  }
-  
+static Expr *BindNameToIVar(UnresolvedDeclRefExpr *UDRE, Type ExtendedType,
+                            ValueDecl *BaseDecl, TypeChecker &TC) {
   // Do a full "dot syntax" name lookup with the implicit 'this' base.
   MemberLookup Lookup(ExtendedType, UDRE->getName(), TC.TU);
   
@@ -747,33 +733,44 @@ static Expr *BindNameToIVar(UnresolvedDeclRefExpr *UDRE, FuncDecl *CurFD,
   // On success, this is a member reference. Build either a reference to the
   // implicit 'this' VarDecl (for instance methods) or to the metaclass
   // instance (for static methods).
-  Expr *BaseExpr;
-  if (StaticAlias) {
-    BaseExpr = new (TC.Context) DeclRefExpr(StaticAlias, SourceLoc(),
-                                      StaticAlias->getTypeOfReference());
-  } else {
-    VarDecl *ThisDecl = CurFD->getImplicitThisDecl();
-    assert(ThisDecl && "Couldn't find decl for 'this'");
-    BaseExpr = new (TC.Context) DeclRefExpr(ThisDecl, SourceLoc(),
-                                                ThisDecl->getTypeOfReference());
-  }
+  Expr *BaseExpr = new (TC.Context) DeclRefExpr(BaseDecl, SourceLoc(),
+                                               BaseDecl->getTypeOfReference());
   
   return Lookup.createResultAST(BaseExpr, SourceLoc(), UDRE->getLoc(),
                                 TC.Context);
 }
 
 /// BindName - Bind an UnresolvedDeclRefExpr by performing name lookup and
-/// returning the resultant expression.  If this reference is inside of a
-/// FuncDecl (i.e. in a function body, not at global scope) then CurFD is the
-/// innermost function, otherwise null.
-static Expr *BindName(UnresolvedDeclRefExpr *UDRE, FuncDecl *CurFD,
+/// returning the resultant expression.  Context is the DeclContext used
+/// for the lookup.
+static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
                       TypeChecker &TC) {
-  
   // If we are inside of a method, check to see if there are any ivars in scope,
   // and if so, whether this is a reference to one of them.
-  if (CurFD)
-    if (Expr *E = BindNameToIVar(UDRE, CurFD, TC))
-      return E;
+  while (!Context->isModuleContext()) {
+    ValueDecl *BaseDecl = 0;
+    Type ExtendedType;
+    if (FuncExpr *FE = dyn_cast<FuncExpr>(Context)) {
+      FuncDecl *FD = FE->getDecl();
+      if (FD && FD->getExtensionType() && !FD->isStatic()) {
+        ExtendedType = FD->getExtensionType();
+        BaseDecl = FD->getImplicitThisDecl();
+        Context = Context->getParent();
+      }
+    } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(Context)) {
+      ExtendedType = ED->getExtendedType();
+      BaseDecl = ExtendedType->castTo<NominalType>()->getDecl();
+    } else if (NominalTypeDecl *ND = dyn_cast<NominalTypeDecl>(Context)) {
+      ExtendedType = ND->getDeclaredType();
+      BaseDecl = ND;
+    }
+
+    if (BaseDecl)
+      if (Expr *E = BindNameToIVar(UDRE, ExtendedType, BaseDecl, TC))
+        return E;
+
+    Context = Context->getParent();
+  }
 
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
   Identifier Name = UDRE->getName();
@@ -806,22 +803,26 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, FuncDecl *CurFD,
 void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   TypeChecker TC(*TU);
 
-  struct ExprPrePassWalker : public ASTWalker {
+  struct ExprPrePassWalker : private ASTWalker {
     TypeChecker &TC;
 
     ExprPrePassWalker(TypeChecker &TC) : TC(TC) {}
     
-    /// CurFuncDecls - This is the stack of FuncDecls that we're nested in.
-    SmallVector<FuncDecl*, 4> CurFuncDecls;
+    /// CurDeclContexts - This is the stack of DeclContexts that
+    /// we're nested in.
+    SmallVector<DeclContext*, 4> CurDeclContexts;
 
     // FuncExprs - This is a list of all the FuncExprs we need to analyze, in
     // an appropriate order.
     SmallVector<FuncExpr*, 32> FuncExprs;
 
     virtual bool walkToDeclPre(Decl *D) {
+      if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D))
+        CurDeclContexts.push_back(NTD);
+      else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D))
+        CurDeclContexts.push_back(ED);
+
       if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
-        CurFuncDecls.push_back(FD);
-        
         // If this is an instance method with a body, set the type of it's
         // implicit 'this' variable.
         if (FD->getBody())
@@ -838,25 +839,55 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     }
     
     virtual bool walkToDeclPost(Decl *D) {
-      if (isa<FuncDecl>(D)) {
-        assert(CurFuncDecls.back() == D && "Decl misbalance");
-        CurFuncDecls.pop_back();
+      if (isa<NominalTypeDecl>(D)) {
+        assert(CurDeclContexts.back() == cast<NominalTypeDecl>(D) &&
+               "Context misbalance");
+        CurDeclContexts.pop_back();
+      } else if (isa<ExtensionDecl>(D)) {
+        assert(CurDeclContexts.back() == cast<ExtensionDecl>(D) &&
+               "Context misbalance");
+        CurDeclContexts.pop_back();
       }
+
       return true;
     }
 
     bool walkToExprPre(Expr *E) {
       if (FuncExpr *FE = dyn_cast<FuncExpr>(E))
         FuncExprs.push_back(FE);
+
+      if (CapturingExpr *CE = dyn_cast<CapturingExpr>(E))
+        CurDeclContexts.push_back(CE);
+
       return true;
     }
 
     Expr *walkToExprPost(Expr *E) {
       if (UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
-        return BindName(UDRE, CurFuncDecls.empty() ? 0 : CurFuncDecls.back(),
+        return BindName(UDRE, CurDeclContexts.back(),
                         TC);
       }
+
+      if (isa<CapturingExpr>(E)) {
+        assert(CurDeclContexts.back() == cast<CapturingExpr>(E) &&
+               "Context misbalance");
+        CurDeclContexts.pop_back();
+      }
+
       return E;
+    }
+
+    Expr *doWalk(Expr *E, DeclContext *DC) {
+      CurDeclContexts.push_back(DC);
+      E = E->walk(*this);
+      CurDeclContexts.pop_back();
+      return E;
+    }
+
+    void doWalk(Decl *D) {
+      CurDeclContexts.push_back(D->getDeclContext());
+      D->walk(*this);
+      CurDeclContexts.pop_back();
     }
   };
   ExprPrePassWalker prePass(TC);
@@ -873,7 +904,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
           // default value; conceptually, we should be appending to the list
           // in source order.
           Expr *Init = Elt.getInit();
-          Init = Init->walk(prePass);
+          Init = prePass.doWalk(Init, TypeAndContext.second);
           TT->updateInitializedElementType(i, Elt.getType(), Init);
         }
       }
@@ -886,7 +917,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     Decl *D = TU->Decls[i];
     if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       // Immediately perform global name-binding etc.
-      TLCD->walk(prePass);
+      prePass.doWalk(TLCD);
 
       // Tell the statement checker that we have top-level code.
       struct TopLevelCodeRAII {
@@ -923,7 +954,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       if (!isFirstPass) {
         // If we aren't in a library, immediately perform global
         // name-binding etc.
-        D->walk(prePass);
+        prePass.doWalk(D);
       }
       TC.typeCheckDecl(D, isFirstPass);
       if (TU->Kind == TranslationUnit::Repl && !TC.Context.hadError())
@@ -984,7 +1015,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
           // default value; conceptually, we should be appending to the list
           // in source order.
           Expr *Init = Elt.getInit();
-          Init = Init->walk(prePass);
+          Init = prePass.doWalk(Init, TypeAndContext.second);
           TT->updateInitializedElementType(i, Elt.getType(), Init);
 
           if (TT->hasCanonicalTypeComputed()) {
@@ -999,7 +1030,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
 
     for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
       Decl *D = TU->Decls[i];
-      D->walk(prePass);
+      prePass.doWalk(D);
       TC.typeCheckDecl(D, /*isFirstPass*/false);
     }
   }

@@ -793,6 +793,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       
       Get = new (Context) FuncDecl(/*StaticLoc=*/SourceLoc(), GetLoc,
                                    Identifier(), FuncTy, GetFn, CurDeclContext);
+      GetFn->setDecl(Get);
       continue;
     }
     
@@ -913,6 +914,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     
     Set = new (Context) FuncDecl(/*StaticLoc=*/SourceLoc(), SetLoc,
                                  Identifier(), FuncTy, SetFn, CurDeclContext);
+    SetFn->setDecl(Set);
   }
   
   return Invalid;
@@ -1174,6 +1176,8 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   // Create the decl for the func and add it to the parent scope.
   FuncDecl *FD = new (Context) FuncDecl(StaticLoc, FuncLoc, Name,
                                         FuncTy, FE, CurDeclContext);
+  if (FE)
+    FE->setDecl(FD);
   if (Attributes.isValid()) FD->getMutableAttrs() = Attributes;
   ScopeInfo.addToScope(FD);
   return FD;
