@@ -1167,16 +1167,50 @@ static llvm::Constant *asOpaquePtr(IRGenModule &IGM, llvm::Constant *in) {
   return llvm::ConstantExpr::getBitCast(in, IGM.Int8PtrTy);
 }
 
+static llvm::Function::LinkageTypes getPrivateLinkage() {
+#if STOP_USING_THIS_TERRIBLE_HACK
+  return llvm::Function::LinkOnceODRLinkage;
+#else
+  return llvm::Function::InternalLinkage;
+#endif
+}
+
+static llvm::Function::VisibilityTypes getPrivateVisibility() {
+#if STOP_USING_THIS_TERRIBLE_HACK
+  return llvm::Function::HiddenVisibility;
+#else
+  return llvm::Function::DefaultVisibility;
+#endif
+}
+
 /// Should we be defining the given helper function?
 static llvm::Function *shouldDefineHelper(llvm::Constant *fn) {
   llvm::Function *def = dyn_cast<llvm::Function>(fn);
   if (!def) return nullptr;
   if (!def->empty()) return nullptr;
 
-  def->setLinkage(llvm::Function::LinkOnceODRLinkage);
-  def->setVisibility(llvm::Function::HiddenVisibility);
+  def->setLinkage(getPrivateLinkage());
+  def->setVisibility(getPrivateVisibility());
   def->setDoesNotThrow();
   return def;
+}
+
+/// Find the prototype for a support function.
+///
+/// This is basically getOrInsertFunction except it doesn't do crazy
+/// things if the support function has internal linkage.
+static llvm::Constant *getSupportFunction(IRGenModule &IGM, StringRef name,
+                                          llvm::FunctionType *ty) {
+  if (llvm::Constant *global = IGM.Module.getNamedValue(name)) {
+    if (cast<llvm::PointerType>(global->getType())->getElementType() == ty)
+      return global;
+    return llvm::ConstantExpr::getBitCast(global, ty->getPointerTo(0));
+  }
+
+  llvm::Function *fn =
+    llvm::Function::Create(ty, llvm::Function::ExternalLinkage, name,
+                           &IGM.Module);
+  return fn;
 }
 
 /// Return a function which performs an assignment operation on two
@@ -1190,7 +1224,7 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(IGM.VoidTy, argTys, false);
   llvm::Constant *fn =
-    IGM.Module.getOrInsertFunction("__swift_assign_existentials", fnTy);
+    getSupportFunction(IGM, "__swift_assign_existentials", fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(fn)) {
     IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
@@ -1256,7 +1290,7 @@ static llvm::Constant *getNoOpVoidFunction(IRGenModule &IGM) {
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(IGM.VoidTy, argTys, false);
   llvm::Constant *fn =
-    IGM.Module.getOrInsertFunction("__swift_noop_void_return", fnTy);
+    getSupportFunction(IGM, "__swift_noop_void_return", fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(fn)) {
     llvm::BasicBlock *entry =
@@ -1273,7 +1307,7 @@ static llvm::Constant *getReturnSelfFunction(IRGenModule &IGM) {
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(IGM.Int8PtrTy, argTys, false);
   llvm::Constant *fn =
-    IGM.Module.getOrInsertFunction("__swift_noop_self_return", fnTy);
+    getSupportFunction(IGM, "__swift_noop_self_return", fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(fn)) {
     llvm::BasicBlock *entry =
@@ -1294,7 +1328,7 @@ static llvm::Constant *getAssignWithCopyStrongFunction(IRGenModule &IGM) {
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(ptrPtrTy, argTys, false);
   llvm::Constant *fn =
-    IGM.Module.getOrInsertFunction("__swift_assignWithCopy_strong", fnTy);
+    getSupportFunction(IGM, "__swift_assignWithCopy_strong", fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(fn)) {
     IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
@@ -1324,7 +1358,7 @@ static llvm::Constant *getAssignWithTakeStrongFunction(IRGenModule &IGM) {
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(ptrPtrTy, argTys, false);
   llvm::Constant *fn =
-    IGM.Module.getOrInsertFunction("__swift_assignWithTake_strong", fnTy);
+    getSupportFunction(IGM, "__swift_assignWithTake_strong", fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(fn)) {
     IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
@@ -1352,7 +1386,7 @@ static llvm::Constant *getInitWithCopyStrongFunction(IRGenModule &IGM) {
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(ptrPtrTy, argTys, false);
   llvm::Constant *fn =
-    IGM.Module.getOrInsertFunction("__swift_initWithCopy_strong", fnTy);
+    getSupportFunction(IGM, "__swift_initWithCopy_strong", fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(fn)) {
     IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
@@ -1377,7 +1411,7 @@ static llvm::Constant *getDestroyStrongFunction(IRGenModule &IGM) {
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(IGM.VoidTy, argTys, false);
   llvm::Constant *fn =
-    IGM.Module.getOrInsertFunction("__swift_destroy_strong", fnTy);
+    getSupportFunction(IGM, "__swift_destroy_strong", fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(fn)) {
     IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
@@ -1409,7 +1443,7 @@ static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
     nameStream << type.StorageAlignment.getValue();
   }
 
-  llvm::Constant *fn = IGM.Module.getOrInsertFunction(name, fnTy);
+  llvm::Constant *fn = getSupportFunction(IGM, name, fnTy);
   if (llvm::Function *def = shouldDefineHelper(fn)) {
     IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
                       ExplosionKind::Minimal, 0, def, Prologue::Bare);
@@ -1442,7 +1476,7 @@ static llvm::Constant *getSizeAndAlignmentFunction(IRGenModule &IGM,
     nameStream << type.StorageAlignment.getValue();
   }
 
-  llvm::Constant *fn = IGM.Module.getOrInsertFunction(name, fnTy);
+  llvm::Constant *fn = getSupportFunction(IGM, name, fnTy);
   if (llvm::Function *def = shouldDefineHelper(fn)) {
     IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
                       ExplosionKind::Minimal, 0, def, Prologue::Bare);
@@ -1799,9 +1833,9 @@ namespace {
       // Create the function.
       auto fnTy = IGM.getFunctionType(SignatureTy, ExplosionKind::Minimal,
                                       UncurryLevel, /*withData*/ false);
-      fn = llvm::Function::Create(fnTy, llvm::Function::LinkOnceODRLinkage,
+      fn = llvm::Function::Create(fnTy, getPrivateLinkage(),
                                   name.str(), &IGM.Module);
-      fn->setVisibility(llvm::Function::HiddenVisibility);
+      fn->setVisibility(getPrivateVisibility());
 
       // Start building it.
       IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
