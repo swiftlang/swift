@@ -179,16 +179,8 @@ public:
   }
 
   void visitOneOfDecl(OneOfDecl *OOD) {
-    if (IsSecondPass) {
-      for (auto elt : OOD->getElements())
-        visitOneOfElementDecl(elt);
-
-      checkExplicitConformance(OOD, OOD->getDeclaredType(),
-                               OOD->getInherited());
-      return;
-    }
-
-    checkInherited(OOD, OOD->getDeclaredType(), OOD->getInherited());
+    if (!IsSecondPass)
+      checkInherited(OOD, OOD->getDeclaredType(), OOD->getInherited());
     
     for (auto elt : OOD->getElements())
       visitOneOfElementDecl(elt);
@@ -199,53 +191,39 @@ public:
   }
 
   void visitStructDecl(StructDecl *SD) {
-    if (IsSecondPass) {
-      for (Decl *Member : SD->getMembers())
-        visit(Member);
-
-      checkExplicitConformance(SD, SD->getDeclaredType(),
-                               SD->getInherited());
-      return;
-    }
-
-    checkInherited(SD, SD->getDeclaredType(), SD->getInherited());
+    if (!IsSecondPass)
+      checkInherited(SD, SD->getDeclaredType(), SD->getInherited());
     
     for (Decl *Member : SD->getMembers()) {
       visit(Member);
     }
-    
-    // FIXME: We should come up with a better way to represent this implied
-    // constructor.
-    SmallVector<TupleTypeElt, 8> TupleElts;
-    for (Decl *Member : SD->getMembers())
-      if (VarDecl *VarD = dyn_cast<VarDecl>(Member))
-        if (!VarD->isProperty())
-          TupleElts.push_back(TupleTypeElt(VarD->getType(), VarD->getName()));
-    TupleType *TT = TupleType::get(TupleElts, TC.Context);
-    Type CreateTy = FunctionType::get(TT, SD->getDeclaredType(), TC.Context);
-    cast<OneOfElementDecl>(SD->getMembers().back())->setType(CreateTy);
-    cast<OneOfElementDecl>(SD->getMembers().back())->setArgumentType(TT);
-    
+
+    if (!IsSecondPass) {
+      // FIXME: We should come up with a better way to represent this implied
+      // constructor.
+      SmallVector<TupleTypeElt, 8> TupleElts;
+      for (Decl *Member : SD->getMembers())
+        if (VarDecl *VarD = dyn_cast<VarDecl>(Member))
+          if (!VarD->isProperty())
+            TupleElts.push_back(TupleTypeElt(VarD->getType(),
+                                             VarD->getName()));
+      TupleType *TT = TupleType::get(TupleElts, TC.Context);
+      Type CreateTy = FunctionType::get(TT, SD->getDeclaredType(), TC.Context);
+      cast<OneOfElementDecl>(SD->getMembers().back())->setType(CreateTy);
+      cast<OneOfElementDecl>(SD->getMembers().back())->setArgumentType(TT);
+    }
+
     if (!IsFirstPass)
       checkExplicitConformance(SD, SD->getDeclaredType(),
                                SD->getInherited());
   }
 
   void visitClassDecl(ClassDecl *CD) {
-    if (IsSecondPass) {
-      for (Decl *Member : CD->getMembers())
-        visit(Member);
+    if (!IsSecondPass)
+      checkInherited(CD, CD->getDeclaredType(), CD->getInherited());
 
-      checkExplicitConformance(CD, CD->getDeclaredType(),
-                               CD->getInherited());
-      return;
-    }
-
-    checkInherited(CD, CD->getDeclaredType(), CD->getInherited());
-
-    for (Decl *Member : CD->getMembers()) {
+    for (Decl *Member : CD->getMembers())
       visit(Member);
-    }
     
     if (!IsFirstPass)
       checkExplicitConformance(CD, CD->getDeclaredType(),
@@ -318,36 +296,25 @@ public:
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
-    if (IsSecondPass) {
-      for (Decl *Member : ED->getMembers())
-        // First recursively type check each thing in the extension.
-        visit(Member);
-
-      checkExplicitConformance(ED, ED->getExtendedType(),
-                               ED->getInherited());
-      return;
-    }
-
-
-    if (TC.validateType(ED->getExtendedType(), IsFirstPass)) {
-      ED->setExtendedType(ErrorType::get(TC.Context));
-    } else {
-      Type ExtendedTy = ED->getExtendedType();
-      if (!ExtendedTy->is<OneOfType>() && !ExtendedTy->is<StructType>() &&
-          !ExtendedTy->is<ClassType>() && !ExtendedTy->is<ErrorType>()) {
-        TC.diagnose(ED->getLocStart(), diag::non_nominal_extension,
-                    ExtendedTy->is<ProtocolType>(), ExtendedTy);
-        // FIXME: It would be nice to point out where we found the named type
-        // declaration, if any.
-      }
+    if (!IsSecondPass) {
+      if (TC.validateType(ED->getExtendedType(), IsFirstPass)) {
+        ED->setExtendedType(ErrorType::get(TC.Context));
+      } else {
+        Type ExtendedTy = ED->getExtendedType();
+        if (!ExtendedTy->is<OneOfType>() && !ExtendedTy->is<StructType>() &&
+            !ExtendedTy->is<ClassType>() && !ExtendedTy->is<ErrorType>()) {
+          TC.diagnose(ED->getLocStart(), diag::non_nominal_extension,
+                      ExtendedTy->is<ProtocolType>(), ExtendedTy);
+          // FIXME: It would be nice to point out where we found the named type
+          // declaration, if any.
+        }
       
-      checkInherited(ED, ExtendedTy, ED->getInherited());
+        checkInherited(ED, ExtendedTy, ED->getInherited());
+      }
     }
-    
-    for (Decl *Member : ED->getMembers()) {
-      // First recursively type check each thing in the extension.
+
+    for (Decl *Member : ED->getMembers())
       visit(Member);
-    }
 
     if (!IsFirstPass)
       checkExplicitConformance(ED, ED->getExtendedType(),
