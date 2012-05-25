@@ -856,8 +856,6 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
         return BindName(UDRE, CurFuncDecls.empty() ? 0 : CurFuncDecls.back(),
                         TC);
       }
-      if (SequenceExpr *SE = dyn_cast<SequenceExpr>(E))
-        return TC.foldSequence(SE);
       return E;
     }
   };

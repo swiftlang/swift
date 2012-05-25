@@ -1457,7 +1457,11 @@ public:
   void setFn(Expr *e) { Fn = e; }
 
   Expr *getArg() const { return Arg; }
-  void setArg(Expr *e) { Arg = e; }
+  void setArg(Expr *e) {
+    assert((getKind() != ExprKind::Binary || isa<TupleExpr>(e)) &&
+           "BinaryExprs must have a TupleExpr as the argument");
+    Arg = e;
+  }
 
   ValueDecl *getCalledValue() const;
 
@@ -1513,10 +1517,12 @@ public:
     : ApplyExpr(ExprKind::Binary, Fn, Arg, Ty) {}
 
   SourceLoc getLoc() const { return getFn()->getLoc(); }
-                 
+
   SourceRange getSourceRange() const {
     return getArg()->getSourceRange();
   }  
+
+  TupleExpr *getArg() const { return cast<TupleExpr>(ApplyExpr::getArg()); }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const BinaryExpr *) { return true; }
