@@ -153,6 +153,7 @@ public:
     return LINKENTITY_GET_FIELD(Data, UncurryLevel);
   }
 
+  bool isValueWitness() const { return getKind() == Kind::ValueWitness; }
   Type getType() const {
     assert(isTypeKind(getKind()));
     return reinterpret_cast<TypeBase*>(Pointer);

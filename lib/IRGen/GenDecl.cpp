@@ -120,10 +120,18 @@ LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity) {
 
   llvm::raw_svector_ostream nameStream(result.Name);
   entity.mangle(nameStream);
-  
-  // TODO, obviously.
-  result.Linkage = llvm::GlobalValue::ExternalLinkage;
-  result.Visibility = llvm::GlobalValue::DefaultVisibility;
+
+  // The linkage for a value witness is linkonce_odr.
+  if (entity.isValueWitness()) {
+    result.Linkage = llvm::GlobalValue::LinkOnceODRLinkage;
+    result.Visibility = llvm::GlobalValue::HiddenVisibility;
+
+  // Give everything else external linkage.
+  } else {
+    result.Linkage = llvm::GlobalValue::ExternalLinkage;
+    result.Visibility = llvm::GlobalValue::DefaultVisibility;
+  }
+
   return result;
 }
 
