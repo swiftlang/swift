@@ -815,13 +815,18 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, FuncDecl *CurFD,
 void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   TypeChecker TC(*TU);
 
-  struct NameBindingWalker : public ASTWalker {
+  struct ExprPrePassWalker : public ASTWalker {
     TypeChecker &TC;
-    NameBindingWalker(TypeChecker &TC) : TC(TC) {}
+
+    ExprPrePassWalker(TypeChecker &TC) : TC(TC) {}
     
     /// CurFuncDecls - This is the stack of FuncDecls that we're nested in.
     SmallVector<FuncDecl*, 4> CurFuncDecls;
-    
+
+    // FuncExprs - This is a list of all the FuncExprs we need to analyze, in
+    // an appropriate order.
+    SmallVector<FuncExpr*, 32> FuncExprs;
+
     virtual bool walkToDeclPre(Decl *D) {
       if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
         CurFuncDecls.push_back(FD);
@@ -848,45 +853,6 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       }
       return true;
     }
-    
-    Expr *walkToExprPost(Expr *E) {
-      if (UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
-        return BindName(UDRE, CurFuncDecls.empty() ? 0 : CurFuncDecls.back(),
-                        TC);
-      }
-      return E;
-    }
-  };
-
-  NameBindingWalker walker(TC);
-
-  // Now that we know the top-level value names, go through and resolve any
-  // UnresolvedDeclRefExprs that exist.
-  for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i)
-    TU->Decls[i]->walk(walker);
-
-  // Also resolve UnresolvedDeclRefExprs in TupleTypes.
-  // FIXME: This code doesn't handle TupleTypes declared in the
-  // lexical context of an extension correctly yet.
-  for (auto TypeAndContext : TU->getTypesWithDefaultValues()) {
-    TupleType *TT = TypeAndContext.first;
-    for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i) {
-      const TupleTypeElt& Elt = TT->getFields()[i];
-      if (Elt.hasInit()) {
-        Expr *Init = Elt.getInit();
-        Init = Init->walk(walker);
-        TT->updateInitializedElementType(i, Elt.getType(), Init);
-      }
-    }
-  }
-
-  // Find all the FuncExprs in the translation unit and collapse all
-  // the sequences.
-  struct PrePassWalker : ASTWalker {
-    TypeChecker &TC;
-    SmallVector<FuncExpr*, 32> FuncExprs;
-
-    PrePassWalker(TypeChecker &TC) : TC(TC) {}
 
     bool walkToExprPre(Expr *E) {
       if (FuncExpr *FE = dyn_cast<FuncExpr>(E))
@@ -895,20 +861,44 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     }
 
     Expr *walkToExprPost(Expr *E) {
+      if (UnresolvedDeclRefExpr *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
+        return BindName(UDRE, CurFuncDecls.empty() ? 0 : CurFuncDecls.back(),
+                        TC);
+      }
       if (SequenceExpr *SE = dyn_cast<SequenceExpr>(E))
         return TC.foldSequence(SE);
       return E;
     }
   };
-  PrePassWalker prePass(TC);
-  for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i)
-    TU->Decls[i]->walk(prePass);
+  ExprPrePassWalker prePass(TC);
+
+  if (TU->Kind != TranslationUnit::Library) {
+    // FIXME: This loop is duplicated!
+    for (auto TypeAndContext : TU->getTypesWithDefaultValues()) {
+      TupleType *TT = TypeAndContext.first;
+      for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i) {
+        const TupleTypeElt& Elt = TT->getFields()[i];
+        if (Elt.hasInit()) {
+          // Perform global name-binding etc. for all tuple default values.
+          // FIXME: This screws up the FuncExprs list for FuncExprs in a
+          // default value; conceptually, we should be appending to the list
+          // in source order.
+          Expr *Init = Elt.getInit();
+          Init = Init->walk(prePass);
+          TT->updateInitializedElementType(i, Elt.getType(), Init);
+        }
+      }
+    }
+  }
 
   // Type check the top-level elements of the translation unit.
   StmtChecker checker(TC, 0);
   for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
     Decl *D = TU->Decls[i];
     if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+      // Immediately perform global name-binding etc.
+      TLCD->walk(prePass);
+
       // Tell the statement checker that we have top-level code.
       struct TopLevelCodeRAII {
         StmtChecker &Checker;
@@ -940,7 +930,13 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
         TLCD->setBody(S);
       }
     } else {
-      TC.typeCheckDecl(D, /*isFirstPass*/TU->Kind == TranslationUnit::Library);
+      bool isFirstPass = TU->Kind == TranslationUnit::Library;
+      if (!isFirstPass) {
+        // If we aren't in a library, immediately perform global
+        // name-binding etc.
+        D->walk(prePass);
+      }
+      TC.typeCheckDecl(D, isFirstPass);
       if (TU->Kind == TranslationUnit::Repl && !TC.Context.hadError())
         if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D))
           REPLCheckPatternBinding(PBD, TC);
@@ -996,28 +992,40 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     }
   }
 
-  for (auto TypeAndContext : TU->getTypesWithDefaultValues()) {
-    TupleType *TT = TypeAndContext.first;
-    if (TT->hasCanonicalTypeComputed()) {
+  // If we're in a library, we don't know the types of all the global
+  // declarations in the first pass, which means we can't completely analyze
+  // everything. Perform the second pass now.
+  if (TU->Kind == TranslationUnit::Library && !TC.Context.hadError()) {
+    for (auto TypeAndContext : TU->getTypesWithDefaultValues()) {
+      TupleType *TT = TypeAndContext.first;
       for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i) {
         const TupleTypeElt& Elt = TT->getFields()[i];
         if (Elt.hasInit()) {
+          // Perform global name-binding etc. for all tuple default values.
+          // FIXME: This screws up the FuncExprs list for FuncExprs in a
+          // default value; conceptually, we should be appending to the list
+          // in source order.
           Expr *Init = Elt.getInit();
-          if (TC.typeCheckExpression(Init, Elt.getType()))
-            continue;
+          Init = Init->walk(prePass);
           TT->updateInitializedElementType(i, Elt.getType(), Init);
+
+          if (TT->hasCanonicalTypeComputed()) {
+            // If we already examined a tuple in the first pass, we didn't
+            // get a chance to type-check it; do that now.
+            if (!TC.typeCheckExpression(Init, Elt.getType()))
+              TT->updateInitializedElementType(i, Elt.getType(), Init);
+          }
         }
       }
     }
+
+    for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
+      Decl *D = TU->Decls[i];
+      D->walk(prePass);
+      TC.typeCheckDecl(D, /*isFirstPass*/false);
+    }
   }
   TU->clearTypesWithDefaultValues();
-  
-  // If we're in a library, we skip type-checking global initializers in the
-  // first pass.  Type-check them now.
-  if (TU->Kind == TranslationUnit::Library && !TC.Context.hadError()) {
-    for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i)
-      TC.typeCheckDecl(TU->Decls[i], /*isFirstPass*/false);
-  }
 
   // Check overloaded vars/funcs.
   // FIXME: This is quadratic time for TUs with multiple chunks.
