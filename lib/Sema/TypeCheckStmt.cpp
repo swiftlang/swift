@@ -460,8 +460,14 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
                                              Arg->getTypeOfReference());
     ArgRef = TC.convertToRValue(ArgRef);
     for (unsigned i : MemberIndexes) {
-      // For each index, we look through a TupleType or transparent OneOfType.
+      // For each index, we look through a TupleType or StructType.
       CanType CurT = ArgRef->getType()->getCanonicalType();
+      if (StructType *ST = dyn_cast<StructType>(CurT)) {
+        VarDecl *VD = cast<VarDecl>(ST->getDecl()->getMembers()[i]);
+        ArgRef = new (Context) MemberRefExpr(ArgRef, Loc, VD, Loc);
+        ArgRef = TC.recheckTypes(ArgRef);
+        continue;
+      }
       TupleType *TT = cast<TupleType>(CurT);
       ArgRef = new (Context) SyntacticTupleElementExpr(ArgRef, Loc, i, Loc,
                                                        TT->getElementType(i));
@@ -481,7 +487,36 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
     return;
   }
 
-  // FIXME: We should handle StructTypes!
+  if (StructType *ST = dyn_cast<StructType>(T)) {
+    // We print a struct by printing each non-property member variable.
+    PrintLiteralString(ST->getDecl()->getName().str(), Context, Loc,
+                       PrintDecls, BodyContent);
+    PrintLiteralString("(", Context, Loc, PrintDecls, BodyContent);
+
+    unsigned idx = 0;
+    bool isFirstMember = true;
+    for (Decl *D : ST->getDecl()->getMembers()) {
+      if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
+        if (!VD->isProperty()) {
+          if (isFirstMember)
+            isFirstMember = false;
+          else
+            PrintLiteralString(", ", Context, Loc, PrintDecls, BodyContent);
+
+          MemberIndexes.push_back(idx);
+          CanType SubType = VD->getType()->getCanonicalType();
+          PrintReplExpr(TC, Arg, SubType, Loc, EndLoc, MemberIndexes,
+                        BodyContent, PrintDecls);
+          MemberIndexes.pop_back();
+        }
+      }
+      ++idx;
+    }
+    PrintLiteralString(")", Context, Loc, PrintDecls, BodyContent);
+    return;
+  }
+
+  // FIXME: Handle ClassTypes?
 
   // FIXME: We should handle OneOfTypes at some point, but
   // it's tricky to represent in the AST without a "match" statement.
