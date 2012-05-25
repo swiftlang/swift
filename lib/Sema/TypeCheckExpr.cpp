@@ -682,15 +682,6 @@ public:
   Expr *visitApplyExpr(ApplyExpr *E) {
     return TC.semaApplyExpr(E);
   }
-  Expr *visitBinaryExpr(BinaryExpr *E) {
-    // This is necessary because ASTWalker doesn't visit the
-    // TupleExpr right now.
-    if (TupleExpr *Tuple = dyn_cast<TupleExpr>(E->getArg())) {
-      if (TC.semaTupleExpr(Tuple))
-        return 0;
-    }
-    return visitApplyExpr(E);
-  }
   
   SemaExpressionTree(TypeChecker &tc) : TC(tc) {}
   
