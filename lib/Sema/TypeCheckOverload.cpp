@@ -129,7 +129,7 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     Viable.push_back(VD);
   }
   
-  return Viable.size() == 1? Viable[0] : 0;
+  return Viable.size() == 1 ? Viable[0] : 0;
 }
 
 Expr *TypeChecker::buildFilteredOverloadSet(OverloadSetRefExpr *OSE,
