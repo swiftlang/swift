@@ -998,8 +998,6 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
   // prune the second one, and then recursively apply 'int' to b.
   //
 
-  // FIXME: Handling this syntactically causes us to reject "(:f)(x)" as
-  // ambiguous.
   if (OverloadSetRefExpr *OSE = dyn_cast<OverloadSetRefExpr>(E->getFn())) {
     SmallVector<ValueDecl*, 4> Viable;
     if (ValueDecl *Best = TC.filterOverloadSet(OSE->getDecls(),
