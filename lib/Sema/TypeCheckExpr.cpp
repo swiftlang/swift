@@ -686,7 +686,8 @@ public:
     if (isa<FuncExpr>(E)) return false;
 
     // Only walk into Explicit Closures if they haven't been seen at all yet.
-    // This ensures that everything gets a type, even if it is a UnstructuredUnresolvedType.
+    // This ensures that everything gets a type, even if it is an
+    // UnstructuredUnresolvedType.
     return !isa<ExplicitClosureExpr>(E) || E->getType().isNull();
   }
 

@@ -60,6 +60,10 @@ public:
   Type substType(Type T, TypeSubstitutionMap &Substitutions);
   
   bool isSubtypeOf(Type T1, Type T2, bool &Trivial);
+  bool isSubtypeOf(Type T1, Type T2) {
+    bool Trivial = false;
+    return isSubtypeOf(T1, T2, Trivial);
+  }
   
   bool semaFunctionSignature(FuncExpr *FE);
   bool semaTupleExpr(TupleExpr *TE);
@@ -167,7 +171,7 @@ public:
   /// \param BaseTy The type of the object that will become the 'this' pointer
   /// for a call to a method. If not provided, then there is no 'this' object.
   ///
-  /// \param Arg The calll argument, to be passed to the function that is
+  /// \param Arg The call argument, to be passed to the function that is
   /// eventually selected by overload resolution.
   ///
   /// \param DestTy The type to which the result should be coerced, or null if
