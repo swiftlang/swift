@@ -361,14 +361,19 @@ public:
     OneOfElementDecl *DED = D->getElement(UME->getName());
     if (DED == 0) {
       diagnose(UME->getLoc(), diag::invalid_member_in_type,
-               DestTy, UME->getName());
+               DT, UME->getName());
       diagnose(D->getOneOfLoc(), diag::type_declared_here);
       return nullptr;
     }
 
     if (DED->getType()->is<FunctionType>() != DestTy->is<FunctionType>()) {
-      diagnose(UME->getLoc(), diag::call_element_function_type,
-               DestTy, UME->getName());
+      if (DED->getType()->is<FunctionType>())
+        diagnose(UME->getLoc(), diag::call_element_function_type,
+                 DestTy, UME->getName());
+      else
+        diagnose(UME->getLoc(), diag::call_element_not_function_type,
+                 DED->getType(), UME->getName());
+
       return nullptr;
     }
 
@@ -400,9 +405,17 @@ public:
   }
   CoercedResult visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     // FIXME: Is this an error-recovery case?
-    if (!(Flags & CF_Apply) && !DestTy->isEqual(E->getType()))
+    if (!(Flags & CF_Apply) &&
+        // If we found something that contradicts an already established type,
+        // fail.
+        !E->getType()->isUnresolvedType() &&
+        !DestTy->isEqual(E->getType()))
       return nullptr;
     
+    // We can't do much with this an inferred result type here.  Say that we
+    // infer the result type to be "Int".  This means that the field must have
+    // some type "T -> Int", but we have to know what T is to do a lookup to
+    // resolve anything on the base.
     return unchanged(E);
   }
 
@@ -759,8 +772,7 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
     // If this a 'chaining' case, recursively convert the literal to the
     // intermediate type, then use our conversion function to finish the
     // translation.
-    if (CoercedResult IntermediateRes
-          = coerceToType(E, ArgType, TC, Flags)) {
+    if (CoercedResult IntermediateRes = coerceToType(E, ArgType, TC, Flags)) {
       if (!(Flags & CF_Apply))
         return DestTy;
       
@@ -985,21 +997,6 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
   // type is 'int', and we had "(int) -> int" and "(SomeTy) -> float", we can
   // prune the second one, and then recursively apply 'int' to b.
   //
-  if (0) {
-  Type FnTy = FunctionType::get(E->getArg()->getType(), DestTy, TC.Context);
-  
-  if (Expr *NewFn = TC.coerceToType(E->getFn(), FnTy)) {
-    if (!(Flags & CF_Apply))
-      return DestTy;
-    
-    E->setFn(NewFn);
-    
-    // FIXME: is this needed?
-    if (Expr *Result = TC.semaApplyExpr(E))
-      return coerced(Result);
-    return nullptr;
-  }
-  }
 
   // FIXME: Handling this syntactically causes us to reject "(:f)(x)" as
   // ambiguous.
@@ -1046,43 +1043,20 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
     return nullptr;
   }
   
-  // If we have ".f(x)" and the result type of the call is a OneOfType, then
-  // .f must be an element constructor for the oneof value.
-  //
-  // FIXME: Handling this syntactically causes us to reject "(:f)(x)" as
-  // ambiguous.
-  if (UnresolvedMemberExpr *UME =
-      dyn_cast<UnresolvedMemberExpr>(E->getFn())) {
-    if (OneOfType *DT = DestTy->getAs<OneOfType>()) {
-      // The oneof type must have an element of the specified name.
-      OneOfDecl *D = DT->getDecl();
-      OneOfElementDecl *DED = D->getElement(UME->getName());
-      if (DED == 0) {
-        diagnose(UME->getLoc(), diag::invalid_member_in_type,
-                    DestTy, UME->getName());
-        diagnose(D->getOneOfLoc(), diag::type_declared_here);
-        return 0;
-      }
-      
-      if (!DED->getType()->is<FunctionType>()) {
-        diagnose(UME->getLoc(), diag::call_element_not_function_type,
-                 DestTy, UME->getName());
-        return 0;
-      }
-      
-      // FIXME: Preserve source locations.
-      E->setFn(new (TC.Context) DeclRefExpr(DED, UME->getColonLoc(),
-                                            DED->getType()));
-      // FIXME: We need to be able to perform type-checking here without
-      // emitting diagnostics in the failure case.
-      Expr *Result = TC.semaApplyExpr(E);
-      if (!Result)
-        return nullptr;
-      return unchanged(Result);
-    }
-  }
+  Type FnTy = FunctionType::get(E->getArg()->getType(), DestTy, TC.Context);
   
-  return unchanged(E);
+  if (auto CoRes = SemaCoerce::coerceToType(E->getFn(), FnTy, TC,
+                                            Flags & CF_Apply)) {
+    if (!(Flags & CF_Apply))
+      return DestTy;
+    
+    E->setFn(CoRes.getExpr());
+    
+    // FIXME: is this needed?
+    if (Expr *Result = TC.semaApplyExpr(E))
+      return coerced(Result);
+  }
+  return nullptr;
 }
 
 
