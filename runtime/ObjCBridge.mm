@@ -1,3 +1,20 @@
+//===--- ObjCBridge.mm - Swift <-> Objective-C Bridging -------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This implements runtime support for bridging between Swift and Objective-C
+// types in cases where they aren't trivial.
+//
+//===----------------------------------------------------------------------===//
+
 #include <Foundation/Foundation.h>
 #include <objc/runtime.h>
 #include "Alloc.h"
@@ -32,8 +49,7 @@ struct _NSSwiftString_s {
   SwiftString swiftString;
 };
 
-@interface _NSSwiftString : NSString
-{
+@interface _NSSwiftString : NSString {
 @public
   SwiftString swiftString;
 }
@@ -42,23 +58,23 @@ struct _NSSwiftString_s {
 @end
 
 @implementation _NSSwiftString
-- (unichar)characterAtIndex: (NSUInteger)idx
-{
+- (unichar)characterAtIndex: (NSUInteger)idx {
   static_assert(sizeof(unichar) == 2, "NSString is no longer UTF16?");
   // XXX FIXME
   // Become bug-for-bug compatible with NSString being UTF16.
   // In practice, this API is oblivious to UTF16 surrogate pairs.
   return _TNSs6String11__subscriptFT3idxNSs5Int64_NSs4Charg(idx, &swiftString);
 }
-- (NSUInteger)length
-{
+
+- (NSUInteger)length {
   return _TNSs6String4sizefRS_FT_NSs5Int64(&swiftString);
 }
 
+// Disable the warning about chaining dealloc to super, we *specifically* don't
+// want to do that here.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wobjc-missing-super-calls"
-- (void)dealloc
-{
+- (void)dealloc {
   swift_release(swiftString.owner);
   objc_destructInstance(self); // fixup weak references
   swift_rawDealloc(self, 4);
@@ -66,7 +82,9 @@ struct _NSSwiftString_s {
 @end
 #pragma clang diagnostic pop
 
-static Class stringClasses[] = {
+// FIXME: This causes static constructors, which isn't awesome.  It would be
+// spiffier to use ifunc's if possible.
+static const Class stringClasses[] = {
   [_NSSwiftString self],
   objc_lookUpClass("__NSCFConstantString"),
   objc_lookUpClass("__NSCFString"),
@@ -74,10 +92,8 @@ static Class stringClasses[] = {
 
 __attribute__((noinline,used))
 static void
-_swift_NSStringToString_slow(NSString *nsstring, SwiftString *string)
-{
+_swift_NSStringToString_slow(NSString *nsstring, SwiftString *string) {
   // XXX FIXME -- NSString is oblivious to surrogate pairs
-
   string->owner = 0;
 
   if (*(Class *)nsstring == stringClasses[2]) {
@@ -108,8 +124,7 @@ _swift_NSStringToString_slow(NSString *nsstring, SwiftString *string)
 }
 
 void
-swift_NSStringToString(NSString *nsstring, SwiftString *string)
-{
+swift_NSStringToString(NSString *nsstring, SwiftString *string) {
   auto boxedString = reinterpret_cast<_NSSwiftString_s *>(nsstring);
   if (boxedString->isa == stringClasses[0]) {
     string->base  = boxedString->swiftString.base;
@@ -129,8 +144,7 @@ swift_NSStringToString(NSString *nsstring, SwiftString *string)
 
 
 NSString *
-swift_StringToNSString(SwiftString *string)
-{
+swift_StringToNSString(SwiftString *string) {
   // sizeof(_NSSwiftString) is not allowed
   auto r = static_cast<_NSSwiftString *>(swift_rawAlloc(4));
   *((Class *)r) = stringClasses[0];
