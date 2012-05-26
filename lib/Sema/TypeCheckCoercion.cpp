@@ -286,6 +286,9 @@ public:
     if (LValueType *lv = DestTy->getAs<LValueType>())
       return coerceOverloadToLValue(E, lv);
 
+    // If DestFT is a FunctionType, get it as one.
+    FunctionType *DestFT = DestTy->getAs<FunctionType>();
+    
     // Determine which declarations are viable.
     SmallVector<ValueDecl *, 4> Viable;
     for (ValueDecl *Val : E->getDecls()) {
@@ -296,6 +299,17 @@ public:
       if (FuncDecl *Func = dyn_cast<FuncDecl>(Val))
         if (!Func->isStatic() && E->getBaseType())
           srcTy = srcTy->getAs<FunctionType>()->getResult();
+      
+      // If we're trying to coerce the overload set to function type that is
+      // partially specified, filter based on what we know.
+      if (DestFT && DestFT->getInput()->isUnresolvedType()) {
+        if (FunctionType *SFT = srcTy->getAs<FunctionType>())
+          if (TC.isSubtypeOf(SFT->getResult(), DestFT->getResult())) {
+            Viable.push_back(Val);
+            continue;
+          }
+      }
+      
       
       DeclRefExpr DRE(Val, E->getLoc(), srcTy);
       if (!TC.isCoercibleToType(&DRE, DestTy))
@@ -330,8 +344,12 @@ public:
   // If this is an UnresolvedMemberExpr, then this provides the type we've
   // been looking for!
   CoercedResult visitUnresolvedMemberExpr(UnresolvedMemberExpr *UME) {
-    // The only valid type for an UME is a OneOfType.
+    // The only valid type for an UME is a OneOfType or function producing one.
     OneOfType *DT = DestTy->getAs<OneOfType>();
+    if (DT == 0)
+      if (FunctionType *FT = DestTy->getAs<FunctionType>())
+        DT = FT->getResult()->getAs<OneOfType>();
+      
     if (DT == 0) {
       diagnose(UME->getLoc(), diag::cannot_convert_unresolved_reference,
                UME->getName(), DestTy);
@@ -348,7 +366,7 @@ public:
       return nullptr;
     }
 
-    if (DED->getType()->is<FunctionType>()) {
+    if (DED->getType()->is<FunctionType>() != DestTy->is<FunctionType>()) {
       diagnose(UME->getLoc(), diag::call_element_function_type,
                DestTy, UME->getName());
       return nullptr;
@@ -464,9 +482,8 @@ public:
   }
 
   SemaCoerce(TypeChecker &TC, Type DestTy, unsigned Flags)
-    : TC(TC), DestTy(DestTy), Flags(Flags)
-  {
-    assert(!DestTy->isUnresolvedType());
+    : TC(TC), DestTy(DestTy), Flags(Flags) {
+    assert(!isa<UnstructuredUnresolvedType>(DestTy));
   }
   
   CoercedResult doIt(Expr *E) {
@@ -961,10 +978,6 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
 }
 
 CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
-  // TODO: We would really like to propagate something like
-  // "UnresolvedTy->DestTy" up into the Fn argument, eliminating these special
-  // cases.  See the 'syntactic' FIXME's below.
-  
   // Given a CallExpr a(b) where "a" is an overloaded value, we may be able to
   // prune the overload set based on the known result type.  Doing this may
   // allow the ambiguity to resolve by removing candidates
@@ -972,6 +985,22 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
   // type is 'int', and we had "(int) -> int" and "(SomeTy) -> float", we can
   // prune the second one, and then recursively apply 'int' to b.
   //
+  if (0) {
+  Type FnTy = FunctionType::get(E->getArg()->getType(), DestTy, TC.Context);
+  
+  if (Expr *NewFn = TC.coerceToType(E->getFn(), FnTy)) {
+    if (!(Flags & CF_Apply))
+      return DestTy;
+    
+    E->setFn(NewFn);
+    
+    // FIXME: is this needed?
+    if (Expr *Result = TC.semaApplyExpr(E))
+      return coerced(Result);
+    return nullptr;
+  }
+  }
+
   // FIXME: Handling this syntactically causes us to reject "(:f)(x)" as
   // ambiguous.
   if (OverloadSetRefExpr *OSE = dyn_cast<OverloadSetRefExpr>(E->getFn())) {
@@ -1570,7 +1599,7 @@ namespace {
 /// coerceToType.  It produces diagnostics and returns null on failure.
 CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
                                        unsigned Flags) {
-  assert(!DestTy->isUnresolvedType() &&
+  assert(!isa<UnstructuredUnresolvedType>(DestTy) &&
          "Result of conversion can't be unresolved");
 
   // Don't bother trying to perform a conversion to or from error type.
