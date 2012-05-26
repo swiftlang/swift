@@ -111,13 +111,15 @@ store_protocol(protocol *value, protocol *p) {
   initializeBufferWithCopyOfBuffer(&p->buffer,&value->buffer,value->witness_table);
 }
 
+static bool
+_swift_replOutputIsUTF8(void) {
+  const char *lang = getenv("LANG");
+  return lang && strstr(lang, "UTF-8");
+}
+
 extern "C"
 uint32_t
-swift_replOutputIsUTF8(void)
-{
-  const char *lang = getenv("LANG");
-  if (lang && strstr(lang, "UTF-8")) {
-    return 1;
-  }
-  return 0;
+swift_replOutputIsUTF8(void) {
+  static auto rval = _swift_replOutputIsUTF8();
+  return rval;
 }
