@@ -15,7 +15,7 @@ SWIFT_LEVEL := ..
 LIBRARYNAME := swift_runtime
 LINK_LIBS_IN_SHARED := 1
 SHARED_LIBRARY := 1
-SOURCES := Alloc.cpp Stubs.cpp ObjCBridge.mm swift.swift
+SOURCES := FastEntryPoints.s Alloc.cpp Stubs.cpp ObjCBridge.mm swift.swift
 NO_BUILD_ARCHIVE := 1
 
 include $(SWIFT_LEVEL)/../../Makefile.config
@@ -47,5 +47,10 @@ HeaderDir := $(PROJ_OBJ_ROOT)/$(BuildMode)/lib/swift/
 $(HeaderDir)/swift.swift: $(PROJ_SRC_DIR)/swift.swift $(HeaderDir)/.dir
 	$(Verb) cp $< $@
 	$(Echo) Copying $(notdir $<) to build dir
+
+$(ObjDir)/%.o: %.s $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE)
+	$(Echo) "Compiling $*.s for $(BuildMode) build" $(PIC_FLAG)
+	$(Verb) if $(Compile.C) $(DEPEND_OPTIONS) $< -o $(ObjDir)/$*.o ; \
+	        $(DEPEND_MOVEFILE)
 
 all-local:: $(HeaderDir)/swift.swift

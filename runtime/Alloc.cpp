@@ -28,11 +28,11 @@ struct AllocCacheEntry {
 // XXX FIXME -- we need to clean this up when the project isn't a secret.
 // There are only 256 slots, and the latter half is basically unused. We can
 // go lower than 128, but we eventually begin to stomp on other frameworks.
-#ifdef __LP64__
-#define ALLOC_CACHE_BUCKETS 56
-#else
+//#ifdef __LP64__
+//#define ALLOC_CACHE_BUCKETS 56
+//#else
 #define ALLOC_CACHE_BUCKETS 64
-#endif
+//#endif
 static __attribute__((address_space(256)))
 struct TSD {
   uintptr_t junk[128];
@@ -43,8 +43,7 @@ struct TSD {
 struct SwiftHeapObject *
 swift_allocObject(struct SwiftHeapMetadata *metadata,
                   size_t requiredSize,
-                  size_t requiredAlignment)
-{
+                  size_t requiredAlignment) {
   struct SwiftHeapObject *object;
   for (;;) {
     object = reinterpret_cast<struct SwiftHeapObject *>(
@@ -55,31 +54,30 @@ swift_allocObject(struct SwiftHeapMetadata *metadata,
     sleep(1); // XXX FIXME -- Enqueue this thread and resume after free()
   }
   object->metadata = metadata;
-  object->refCount = 1;
+  object->refCount = 2;
   return object;
 }
 
-struct SwiftHeapObject *
-swift_retain(struct SwiftHeapObject *object)
-{
-  return _swift_retain(object);
-}
-
-static void
+extern "C" void
 _swift_release_slow(struct SwiftHeapObject *object)
   __attribute__((noinline,used));
 
+#ifndef __x86_64__
+struct SwiftHeapObject *
+swift_retain(struct SwiftHeapObject *object) {
+  return _swift_retain(object);
+}
+
 void
-swift_release(struct SwiftHeapObject *object)
-{
+swift_release(struct SwiftHeapObject *object) {
   if (object && (--object->refCount == 0)) {
     _swift_release_slow(object);
   }
 }
+#endif
 
 void
-_swift_release_slow(struct SwiftHeapObject *object)
-{
+_swift_release_slow(struct SwiftHeapObject *object) {
   size_t allocSize = object->metadata->destroy(object);
   if (allocSize) {
     swift_deallocObject(object, allocSize);
@@ -87,8 +85,7 @@ _swift_release_slow(struct SwiftHeapObject *object)
 }
 
 void
-swift_deallocObject(struct SwiftHeapObject *object, size_t allocatedSize)
-{
+swift_deallocObject(struct SwiftHeapObject *object, size_t allocatedSize) {
   free(object);
 }
 
@@ -127,7 +124,18 @@ _swift_slowAlloc_fixup(SwiftAllocIndex idx, uint64_t flags)
   return swift_slowAlloc(sz, flags);
 }
 
-
+extern "C" void
+_swift_refillThreadAllocCache(SwiftAllocIndex idx, uint64_t flags) {
+  void *tmp = _swift_slowAlloc_fixup(idx, flags);
+  if (!tmp) {
+    return;
+  }
+  if (flags & SWIFT_RAWALLOC) {
+    swift_rawDealloc(tmp, idx);
+  } else {
+    swift_dealloc(tmp, idx);
+  }
+}
 
 void *
 swift_slowAlloc(size_t bytes, uint64_t flags)
@@ -145,6 +153,7 @@ swift_slowAlloc(size_t bytes, uint64_t flags)
   return r;
 }
 
+#ifndef __x86_64__
 void *
 swift_alloc(SwiftAllocIndex idx)
 {
@@ -206,6 +215,7 @@ swift_rawDealloc(void *ptr, SwiftAllocIndex idx)
   cur->next = prev;
   tsd->rawCache[idx] = cur;
 }
+#endif
 
 void
 swift_slowDealloc(void *ptr, size_t bytes)

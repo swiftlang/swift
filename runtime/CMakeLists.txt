@@ -1,6 +1,7 @@
 set(SHARED_LIBRARY ON)
 
 add_swift_library(swift_runtime
+  FastEntryPoints.s
   Alloc.cpp
   Stubs.cpp
   ObjCBridge.mm
