@@ -284,64 +284,47 @@ unsigned swift::getLLVMIntrinsicID(StringRef InName, bool hasArgTypes) {
   return llvm::Intrinsic::not_intrinsic;
 }
 
-
-// Get information about the LLVM IR types for intrinsics.
-#define GET_INTRINSIC_GENERATOR_GLOBAL
-#include "llvm/Intrinsics.gen"
-#undef GET_INTRINSIC_GENERATOR_GLOBAL
-
-static Type DecodeFixedType(unsigned &NextElt, ArrayRef<unsigned char> Infos,
-                             ArrayRef<Type> Tys, ASTContext &Context) {
-  IIT_Info Info = IIT_Info(Infos[NextElt++]);
-  unsigned StructElts = 2;
-  
-  switch (Info) {
-  case IIT_MMX:
-  case IIT_METADATA:
-  case IIT_V2:
-  case IIT_V4:
-  case IIT_V8:
-  case IIT_V16:
-  case IIT_V32:
-  case IIT_EXTEND_VEC_ARG:
-  case IIT_TRUNC_VEC_ARG:
-  case IIT_ANYPTR:
+static Type DecodeIntrinsicType(ArrayRef<llvm::Intrinsic::IITDescriptor> &Table,
+                                ArrayRef<Type> Tys, ASTContext &Context) {
+  typedef llvm::Intrinsic::IITDescriptor IITDescriptor;
+  IITDescriptor D = Table.front();
+  Table = Table.slice(1);
+  switch (D.Kind) {
+  case IITDescriptor::MMX:
+  case IITDescriptor::Metadata:
+  case IITDescriptor::Vector:
+  case IITDescriptor::ExtendVecArgument:
+  case IITDescriptor::TruncVecArgument:
     // These types cannot be expressed in swift yet.
     return Type();
-  case IIT_EMPTYSTRUCT:
-  case IIT_Done:
-    // "{}" and "void" IR types both map to ().
-    return TupleType::getEmpty(Context);
-  case IIT_I1:  return BuiltinIntegerType::get(1, Context);
-  case IIT_I8:  return BuiltinIntegerType::get(8, Context);
-  case IIT_I16: return BuiltinIntegerType::get(16, Context);
-  case IIT_I32: return BuiltinIntegerType::get(32, Context);
-  case IIT_I64: return BuiltinIntegerType::get(64, Context);
-  case IIT_F32: return Context.TheIEEE32Type;
-  case IIT_F64: return Context.TheIEEE64Type;
-  case IIT_PTR:
+
+  case IITDescriptor::Void: return TupleType::getEmpty(Context);
+  case IITDescriptor::Float: return Context.TheIEEE32Type;
+  case IITDescriptor::Double: return Context.TheIEEE64Type;
+
+  case IITDescriptor::Integer:
+    return BuiltinIntegerType::get(D.Integer_Width, Context);
+  case IITDescriptor::Pointer:
+    if (D.Pointer_AddressSpace)
+      return Type();  // Reject non-default address space pointers.
+      
     // Decode but ignore the pointee.  Just decode all IR pointers to unsafe
     // pointer type.
-    (void)DecodeFixedType(NextElt, Infos, Tys, Context);
+    (void)DecodeIntrinsicType(Table, Tys, Context);
     return Context.TheRawPointerType;
-  case IIT_ARG: {
-    unsigned ArgNo = NextElt == Infos.size() ? 0 : Infos[NextElt++];
-    if (ArgNo >= Tys.size())
+  case IITDescriptor::Argument:
+    if (D.getArgumentNumber() >= Tys.size())
       return Type();
-    return Tys[ArgNo];
-  }
-  case IIT_STRUCT5: ++StructElts; // FALL THROUGH.
-  case IIT_STRUCT4: ++StructElts; // FALL THROUGH.
-  case IIT_STRUCT3: ++StructElts; // FALL THROUGH.
-  case IIT_STRUCT2: {
-    TupleTypeElt Elts[5];
-    for (unsigned i = 0; i != StructElts; ++i) {
-      Type T = DecodeFixedType(NextElt, Infos, Tys, Context);
+    return Tys[D.getArgumentNumber()];
+  case IITDescriptor::Struct: {
+    SmallVector<TupleTypeElt, 5> Elts;
+    for (unsigned i = 0; i != D.Struct_NumElements; ++i) {
+      Type T = DecodeIntrinsicType(Table, Tys, Context);
       if (!T) return Type();
       
-      Elts[i] = TupleTypeElt(T, Identifier());
+      Elts.push_back(TupleTypeElt(T, Identifier()));
     }
-    return TupleType::get(ArrayRef<TupleTypeElt>(Elts, StructElts), Context);
+    return TupleType::get(Elts, Context);
   }
   }
   llvm_unreachable("unhandled");
@@ -351,36 +334,19 @@ static Type DecodeFixedType(unsigned &NextElt, ArrayRef<unsigned char> Infos,
 static Type getSwiftFunctionTypeForIntrinsic(unsigned iid,
                                              ArrayRef<Type> TypeArgs,
                                              ASTContext &Context) {
-  // Check to see if the intrinsic's type was expressible by the table.
-  unsigned TableVal = IIT_Table[iid-1];
-  
-  // Decode the TableVal into an array of IITValues.
-  SmallVector<unsigned char, 8> IITValues;
-  ArrayRef<unsigned char> IITEntries;
-  unsigned NextElt = 0;
-  if ((TableVal >> 31) != 0) {
-    // This is an offset into the IIT_LongEncodingTable.
-    IITEntries = IIT_LongEncodingTable;
-    
-    // Strip sentinel bit.
-    NextElt = (TableVal << 1) >> 1;
-  } else {
-    do {
-      IITValues.push_back(TableVal & 0xF);
-      TableVal >>= 4;
-    } while (TableVal);
-    
-    IITEntries = IITValues;
-    NextElt = 0;
-  }
+  typedef llvm::Intrinsic::IITDescriptor IITDescriptor;
+  SmallVector<IITDescriptor, 8> Table;
+  getIntrinsicInfoTableEntries((llvm::Intrinsic::ID)iid, Table);
+
+  ArrayRef<IITDescriptor> TableRef = Table;
 
   // Decode the intrinsic's LLVM IR type, and map it to swift builtin types.
-  Type ResultTy = DecodeFixedType(NextElt, IITEntries, TypeArgs, Context);
+  Type ResultTy = DecodeIntrinsicType(TableRef, TypeArgs, Context);
   if (!ResultTy) return Type();
   
   SmallVector<TupleTypeElt, 8> ArgTys;
-  while (NextElt != IITEntries.size() && IITEntries[NextElt] != 0) {
-    Type ArgTy = DecodeFixedType(NextElt, IITEntries, TypeArgs, Context);
+  while (!TableRef.empty()) {
+    Type ArgTy = DecodeIntrinsicType(TableRef, TypeArgs, Context);
     if (!ArgTy) return Type();
     ArgTys.push_back(TupleTypeElt(ArgTy, Identifier()));
   }
