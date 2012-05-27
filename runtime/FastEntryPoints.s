@@ -201,6 +201,4 @@ ALLOC_FUNC _swift_tryAlloc, SWIFT_TSD_ALLOC_BASE, SWIFT_TRYALLOC
 ALLOC_FUNC _swift_rawAlloc, SWIFT_TSD_RAW_ALLOC_BASE, SWIFT_RAWALLOC
 ALLOC_FUNC _swift_tryRawAlloc, SWIFT_TSD_RAW_ALLOC_BASE, SWIFT_TRYRAWALLOC
 
-#else
-#error "arch not supported"
 #endif
