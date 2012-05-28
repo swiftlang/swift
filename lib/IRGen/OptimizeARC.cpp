@@ -173,9 +173,10 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
       //
       // NOTE: If this occurs frequently, maybe we can have a release(Obj, N)
       // API to drop multiple retain counts at once.
-      CallInst &Retain = cast<CallInst>(*BBI);
-      Value *ThisReleasedObject = Retain.getArgOperand(0);
+      CallInst &ThisRelease = cast<CallInst>(*BBI);
+      Value *ThisReleasedObject = ThisRelease.getArgOperand(0);
       if (ThisReleasedObject == ReleasedObject) {
+        //Release.dump(); ThisRelease.dump(); BB.getParent()->dump();
         ++BBI;
         goto OutOfLoop;
       }
@@ -215,6 +216,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
       //   B = bitcast A to object
       //   release(B)
       if (ReleasedObject != &Allocation) {
+        // Release.dump(); BB.getParent()->dump();
         ++BBI;
         goto OutOfLoop;
       }
@@ -229,6 +231,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
     }
 
     case RT_Unknown:
+      // BBI->dump();
       // Otherwise, we get to something unknown/unhandled.  Bail out for now.
       ++BBI;
       goto OutOfLoop;
