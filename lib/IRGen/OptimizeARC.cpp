@@ -157,7 +157,10 @@ static bool canonicalizeArgumentReturnFunctions(Function &F) {
     }
     case RT_Retain: {
       // If any x = swift_retain(y)'s got here, canonicalize them into:
-      // x = y; swift_retain_noresult(y).
+      //   x = y; swift_retain_noresult(y).
+      // This is important even though the front-end doesn't generate them,
+      // because inlined functions can be ARC optimized, and thus may contain
+      // swift_retain calls.
       CallInst &CI = cast<CallInst>(Inst);
       Value *ArgVal = CI.getArgOperand(0);
 
@@ -505,6 +508,7 @@ llvm::FunctionPass *swift::irgen::createSwiftARCOptPass() {
 
 bool SwiftARCOpt::runOnFunction(Function &F) {
   bool Changed = false;
+  
   // First thing: canonicalize swift_retain and similar calls so that nothing
   // uses their result.  This exposes the copy that the function does to the
   // optimizer.

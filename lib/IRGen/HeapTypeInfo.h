@@ -39,8 +39,8 @@ public:
     IGF.emitRelease(value);
   }
 
-  llvm::Value *emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
-    return IGF.emitRetainCall(value);
+  void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
+    IGF.emitRetainCall(value);
   }
 
   void enterScalarCleanup(IRGenFunction &IGF, llvm::Value *value,

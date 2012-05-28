@@ -260,7 +260,7 @@ public:
   void emitAssignRetained(llvm::Value *value, Address addr);
   void emitInitializeRetained(llvm::Value *value, Address addr);
   void emitRetain(llvm::Value *value, Explosion &explosion);
-  llvm::Value *emitRetainCall(llvm::Value *value);
+  void emitRetainCall(llvm::Value *value);
   void emitRelease(llvm::Value *value);
   ManagedValue enterReleaseCleanup(llvm::Value *value);
 

@@ -1304,7 +1304,7 @@ static llvm::Constant *getAssignWithCopyStrongFunction(IRGenModule &IGM) {
     Address src(it++, IGM.getPointerAlignment());
 
     llvm::Value *newValue = IGF.Builder.CreateLoad(src, "new");
-    newValue = IGF.emitRetainCall(newValue);
+    IGF.emitRetainCall(newValue);
     llvm::Value *oldValue = IGF.Builder.CreateLoad(dest, "old");
     IGF.Builder.CreateStore(newValue, dest);
     IGF.emitRelease(oldValue);
@@ -1362,7 +1362,7 @@ static llvm::Constant *getInitWithCopyStrongFunction(IRGenModule &IGM) {
     Address src(it++, IGM.getPointerAlignment());
 
     llvm::Value *newValue = IGF.Builder.CreateLoad(src, "new");
-    newValue = IGF.emitRetainCall(newValue);
+    IGF.emitRetainCall(newValue);
     IGF.Builder.CreateStore(newValue, dest);
 
     IGF.Builder.CreateRet(dest.getAddress());

@@ -96,7 +96,7 @@ public:
   //                         Explosion &out) const;
 
   // Make the scalar +1.
-  // llvm::Value *emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const;
+  // void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const;
 
   // Make the scalar -1.
   // void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const;
@@ -118,7 +118,7 @@ public:
   void load(IRGenFunction &IGF, Address addr, Explosion &out) const {
     addr = asDerived().projectScalar(IGF, addr);
     llvm::Value *value = IGF.Builder.CreateLoad(addr);
-    value = asDerived().emitScalarRetain(IGF, value);
+    asDerived().emitScalarRetain(IGF, value);
     asDerived().enterScalarCleanup(IGF, value, out);
   }
 
@@ -150,7 +150,7 @@ public:
 
   void copy(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
     llvm::Value *value = in.claimNext().getValue();
-    value = asDerived().emitScalarRetain(IGF, value);
+    asDerived().emitScalarRetain(IGF, value);
     asDerived().enterScalarCleanup(IGF, value, out);
   }
 
@@ -189,8 +189,7 @@ private:
     out.addUnmanaged(value);
   }
 
-  llvm::Value *emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
-    return value;
+  void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
   }
 
   void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {

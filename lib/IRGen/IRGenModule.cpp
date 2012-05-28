@@ -51,7 +51,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
   SizeTy = TargetData.getIntPtrType(getLLVMContext());
   MemCpyFn = nullptr;
   AllocObjectFn = nullptr;
-  RetainFn = nullptr;
+  RetainNoResultFn = nullptr;
   ReleaseFn = nullptr;
   DeallocObjectFn = nullptr;
   ObjCRetainFn = nullptr;
@@ -154,19 +154,24 @@ llvm::Constant *IRGenModule::getSlowRawDeallocFn() {
   return SlowRawDeallocFn;
 }
 
-llvm::Constant *IRGenModule::getRetainFn() {
-  if (RetainFn) return RetainFn;
+llvm::Constant *IRGenModule::getRetainNoResultFn() {
+  if (RetainNoResultFn) return RetainNoResultFn;
 
-  RetainFn = Module.getOrInsertFunction("swift_retain", RefCountedPtrTy,
-                                        RefCountedPtrTy, NULL);
-  return RetainFn;
+  llvm::AttributeWithIndex Attrs[] = {
+    { llvm::Attribute::NoCapture, 1 },
+    { llvm::Attribute::NoUnwind, ~0U },
+  };
+  auto AttrList = llvm::AttrListPtr::get(Attrs);
+  return RetainNoResultFn =
+    Module.getOrInsertFunction("swift_retain_noresult", AttrList,
+                               VoidTy, RefCountedPtrTy, NULL);
 }
 
 llvm::Constant *IRGenModule::getReleaseFn() {
   if (ReleaseFn) return ReleaseFn;
 
   llvm::AttributeWithIndex AttrList[] = { 
-    llvm::AttributeWithIndex::get(1, llvm::Attribute::NoCapture)
+    { llvm::Attribute::NoCapture, 1 },
   };
   auto Attrs = llvm::AttrListPtr::get(AttrList);
   ReleaseFn = Module.getOrInsertFunction("swift_release", Attrs, VoidTy, 

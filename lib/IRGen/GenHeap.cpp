@@ -478,30 +478,21 @@ static bool doesNotRequireRefCounting(llvm::Value *value) {
   return isa<llvm::Constant>(value);
 }
 
-/// Emit a call to swift_retain.  In general, you should not be using
+/// Emit a call to swift_retain_noresult.  In general, you should not be using
 /// this routine; instead you should use emitRetain, which properly
 /// balances the retain.
-llvm::Value *IRGenFunction::emitRetainCall(llvm::Value *value) {
-  // Instead of casting the input, retaining, and casting back, we
-  // cast the function to the right type.  This tends to produce less
-  // IR, but it might be evil.
-  llvm::Constant *fn = IGM.getRetainFn();
-  if (value->getType() != IGM.RefCountedPtrTy) {
-    llvm::FunctionType *fnType =
-      llvm::FunctionType::get(value->getType(), value->getType(), false);
-    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
-  }
-
+void IRGenFunction::emitRetainCall(llvm::Value *value) {
+  // Make sure the input pointer is the right type.
+  if (value->getType() != IGM.RefCountedPtrTy)
+    value = Builder.CreateBitCast(value, IGM.RefCountedPtrTy);
+  
   // Emit the call.
-  llvm::CallInst *call = Builder.CreateCall(fn, value);
-  call->setDoesNotThrow();
-
-  return call;
+  Builder.CreateCall(IGM.getRetainNoResultFn(), value);
 }
 
 static void emitRetainAndManage(IRGenFunction &IGF, llvm::Value *value,
                                 Explosion &out) {
-  value = IGF.emitRetainCall(value);
+  IGF.emitRetainCall(value);
   out.add(IGF.enterReleaseCleanup(value));
 }
 
