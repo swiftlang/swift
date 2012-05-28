@@ -31,6 +31,8 @@ STATISTIC(NumNoopDeleted,
           "Number of no-op swift calls eliminated");
 STATISTIC(NumRetainReleasePairs,
           "Number of swift retain/release pairs eliminated");
+STATISTIC(NumAllocateReleasePairs,
+          "Number of swift allocate/release pairs eliminated");
 
 //===----------------------------------------------------------------------===//
 //                            Utility Functions
@@ -203,8 +205,30 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
       goto OutOfLoop;
     }
 
+    case RT_AllocObject: {   // %obj = swift_alloc(...)
+      CallInst &Allocation = cast<CallInst>(*BBI);
+        
+      // If this is an allocation of an unrelated object, just ignore it.
+      // TODO: This is not safe without proving the object being released is not
+      // related to the allocated object.  Consider something silly like this:
+      //   A = allocate()
+      //   B = bitcast A to object
+      //   release(B)
+      if (ReleasedObject != &Allocation) {
+        ++BBI;
+        goto OutOfLoop;
+      }
+
+      // If this is a release right after an allocation of the object, then we
+      // can zap both.
+      Allocation.replaceAllUsesWith(UndefValue::get(Allocation.getType()));
+      Allocation.eraseFromParent();
+      Release.eraseFromParent();
+      ++NumAllocateReleasePairs;
+      return true;
+    }
+
     case RT_Unknown:
-    case RT_AllocObject:
       // Otherwise, we get to something unknown/unhandled.  Bail out for now.
       ++BBI;
       goto OutOfLoop;
