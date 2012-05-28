@@ -15,24 +15,31 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "swift-optimize"
 #include "IRGen.h"
 #include "llvm/Instructions.h"
 #include "llvm/Pass.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/InstIterator.h"
 using namespace llvm;
+
+STATISTIC(NumNoopDeleted,
+          "Number of no-op swift calls eliminated");
+STATISTIC(NumRetainReleasePairs,
+          "Number of swift retain/release pairs eliminated");
 
 //===----------------------------------------------------------------------===//
 //                            Utility Functions
 //===----------------------------------------------------------------------===//
 
 enum RT_Kind {
-  /// This is not a runtime function that we support.  Maybe it is not a call,
-  /// or is a call to something we don't care about.
-  RT_Unknown,
+  /// An instruction with this classification is known to not access (read or
+  /// write) memory.
+  RT_NoMemoryAccessed,
   
   /// SwiftHeapObject *swift_retain(SwiftHeapObject *object)
   RT_Retain,
@@ -43,13 +50,20 @@ enum RT_Kind {
   /// SwiftHeapObject *swift_allocObject(SwiftHeapMetadata *metadata,
   ///                                    size_t size, size_t alignment)
   RT_AllocObject,
+  
+  /// This is not a runtime function that we support.  Maybe it is not a call,
+  /// or is a call to something we don't care about.
+  RT_Unknown,
 };
 
 /// classifyInstruction - Take a look at the specified instruction and classify
 /// it into what kind of runtime entrypoint it is, if any.
-static RT_Kind classifyInstruction(Instruction *I) {
+static RT_Kind classifyInstruction(const Instruction &I) {
+  if (!I.mayReadOrWriteMemory())
+    return RT_NoMemoryAccessed;
+  
   // Non-calls or calls to indirect functions are unknown.
-  CallInst *CI = dyn_cast<CallInst>(I);
+  const CallInst *CI = dyn_cast<CallInst>(&I);
   if (CI == 0) return RT_Unknown;
   Function *F = CI->getCalledFunction();
   if (F == 0) return RT_Unknown;
@@ -74,20 +88,21 @@ static RT_Kind classifyInstruction(Instruction *I) {
 static bool canonicalizeArgumentReturnFunctions(Function &F) {
   bool Changed = false;
   for (inst_iterator I = inst_begin(&F), E = inst_end(&F); I != E; ) {
-    Instruction *Inst = &*I++;
+    Instruction &Inst = *I++;
     
     switch (classifyInstruction(Inst)) {
     case RT_Unknown:
     case RT_AllocObject:
+    case RT_NoMemoryAccessed:
       break;
     case RT_Retain: {
-      CallInst &CI = cast<CallInst>(*Inst);
+      CallInst &CI = cast<CallInst>(Inst);
       Value *ArgVal = CI.getArgOperand(0);
         
       // Ignore functions with no uses.
-      if (!Inst->use_empty()) {
+      if (!Inst.use_empty()) {
         // swift_retain returns its first argument.
-        Inst->replaceAllUsesWith(ArgVal);
+        Inst.replaceAllUsesWith(ArgVal);
         Changed = true;
       }
       
@@ -95,17 +110,19 @@ static bool canonicalizeArgumentReturnFunctions(Function &F) {
       if (isa<ConstantPointerNull>(ArgVal)) {
         CI.eraseFromParent();
         Changed = true;
+        ++NumNoopDeleted;
         continue;
       }
       break;
     }
     case RT_Release: {
-      CallInst &CI = cast<CallInst>(*Inst);
+      CallInst &CI = cast<CallInst>(Inst);
       // swift_release(null) is a noop, zap it. 
       Value *ArgVal = CI.getArgOperand(0);
       if (isa<ConstantPointerNull>(ArgVal)) {
         CI.eraseFromParent();
         Changed = true;
+        ++NumNoopDeleted;
         continue;
       }
     }
@@ -113,6 +130,104 @@ static bool canonicalizeArgumentReturnFunctions(Function &F) {
   }
   return Changed;
 }
+
+//===----------------------------------------------------------------------===//
+//                         Release() Motion
+//===----------------------------------------------------------------------===//
+
+/// performLocalReleaseMotion - Scan backwards from the specified release,
+/// moving it earlier in the function if possible, over instructions that do not
+/// access the released object.  If we get to a retain or allocation of the
+/// object, zap both.
+static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
+  // FIXME: Call classifier should identify the object for us.  Too bad C++
+  // doesn't have convenient oneof's.
+  Value *ReleasedObject = Release.getArgOperand(0);
+  
+  BasicBlock::iterator BBI = &Release;
+  
+  // Scan until we get to the top of the block.
+  while (BBI != BB.begin()) {
+    --BBI;
+  
+    // Don't analyze PHI nodes.  We can't move retains before them and they 
+    // aren't "interesting".
+    if (isa<PHINode>(BBI)) {
+      ++BBI;
+      goto OutOfLoop;
+    }
+    
+    switch (classifyInstruction(*BBI)) {
+    case RT_NoMemoryAccessed:
+      // Skip over random instructions that don't touch memory.  They don't need
+      // protection by retain/release.
+      continue;
+
+    case RT_Retain: {  // swift_retain returns its first argument.
+      CallInst &Retain = cast<CallInst>(*BBI);
+      Value *RetainedObject = Retain.getArgOperand(0);
+      
+      // If the retain and release are to obviously pointer-equal objects, then
+      // we can delete both of them.  We have proven that they do not protect
+      // anything of value.
+      if (RetainedObject == ReleasedObject) {
+        // Note: this assumes the retain was properly canonicalized!
+        Retain.eraseFromParent();
+        Release.eraseFromParent();
+        ++NumRetainReleasePairs;
+        return true;
+      }
+      
+      // Otherwise, this is a retain of an object that is not statically known
+      // to be the same object.  It may still be dynamically the same object
+      // though.  In this case, we can't move the release past it.
+      // TODO: Strengthen analysis.
+      ++BBI;
+      goto OutOfLoop;
+    }
+    case RT_Unknown:
+    case RT_Release:
+    case RT_AllocObject:
+      // Otherwise, we get to something unknown/unhandled.  Bail out for now.
+      ++BBI;
+      goto OutOfLoop;
+    }
+  }
+OutOfLoop:
+
+  
+  // If we got to the top of the block, (and if the instruction didn't start
+  // there) move the release to the top of the block.
+  // TODO: This is where we'd plug in some global algorithms someday.
+  if (&*BBI != &Release) {
+    Release.moveBefore(BBI);
+    return true;
+  }
+  
+  return false;
+}
+
+/// performReleaseMotion - this moves releaes functions earlier, past
+/// instructions that are known to not access an object.  If they are moved to
+/// touch a retain of the same object, destructive annihilation occurs!
+static bool performReleaseMotion(Function &F) {
+  bool Changed = false;
+  
+  // TODO: This is a really trivial local algorithm.  It could be much better.
+  for (BasicBlock &BB : F) {
+    for (auto BBI = BB.begin(), E = BB.end(); BBI != E; ) {
+      // Preincrement the iterator to avoid invalidation and out trouble.
+      Instruction &I = *BBI++;
+      
+      // Ignore instructions that are not releases.  Try to optimize ones that
+      // are.
+      if (classifyInstruction(I) == RT_Release)
+        Changed |= performLocalReleaseMotion(cast<CallInst>(I), BB);
+    }
+  }
+  return Changed;
+}
+
 
 //===----------------------------------------------------------------------===//
 //                      Return Argument Optimizer
@@ -142,7 +257,7 @@ static bool optimizeArgumentReturnFunctions(Function &F) {
   DenseMap<Value*, Value*> LocalUpdates;
   for (BasicBlock &BB : F) {
     for (Instruction &Inst : BB) {
-      switch (classifyInstruction(&Inst)) {
+      switch (classifyInstruction(Inst)) {
       case RT_Retain: {  // swift_retain returns its first argument.
         CallInst &CI = cast<CallInst>(Inst);
         Value *ArgVal = CI.getArgOperand(0);
@@ -171,6 +286,7 @@ static bool optimizeArgumentReturnFunctions(Function &F) {
       case RT_Unknown:
       case RT_Release:
       case RT_AllocObject:
+      case RT_NoMemoryAccessed:
         // Check to see if there are any uses of a value in the LocalUpdates
         // map.  If so, remap it now to the locally defined version.
         for (unsigned i = 0, e = Inst.getNumOperands(); i != e; ++i)
@@ -276,6 +392,11 @@ bool SwiftARCOpt::runOnFunction(Function &F) {
   // uses their result.  This exposes the copy that the function does to the
   // optimizer.
   Changed |= canonicalizeArgumentReturnFunctions(F);
+  
+  // Next, perform release() motion, eliminating retain/release pairs when it
+  // turns out that a pair is not protecting anything that accesses the guarded
+  // heap object.
+  Changed |= performReleaseMotion(F);
   
   // Finally, rewrite remaining heap object uses to make use of the implicit
   // copy that swift_retain and similar functions perform.
