@@ -162,6 +162,23 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
       // Skip over random instructions that don't touch memory.  They don't need
       // protection by retain/release.
       continue;
+        
+    case RT_Release: {
+      // If we get to a release, we can generally ignore it and scan past it.
+      // However, if we get to a release of obviously the same object, we stop
+      // scanning here because it should have already be moved as early as
+      // possible, so there is no reason to move its friend to the same place.
+      //
+      // NOTE: If this occurs frequently, maybe we can have a release(Obj, N)
+      // API to drop multiple retain counts at once.
+      CallInst &Retain = cast<CallInst>(*BBI);
+      Value *ThisReleasedObject = Retain.getArgOperand(0);
+      if (ThisReleasedObject == ReleasedObject) {
+        ++BBI;
+        goto OutOfLoop;
+      }
+      continue;
+    }
 
     case RT_Retain: {  // swift_retain returns its first argument.
       CallInst &Retain = cast<CallInst>(*BBI);
@@ -185,8 +202,8 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
       ++BBI;
       goto OutOfLoop;
     }
+
     case RT_Unknown:
-    case RT_Release:
     case RT_AllocObject:
       // Otherwise, we get to something unknown/unhandled.  Bail out for now.
       ++BBI;
