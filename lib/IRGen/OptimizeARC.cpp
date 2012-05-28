@@ -52,7 +52,7 @@ bool SwiftARCOpt::runOnFunction(Function &F) {
   bool Changed = false;
   for (inst_iterator I = inst_begin(&F), E = inst_end(&F); I != E; ++I) {
     Instruction *Inst = &*I;
-    (void)Inst);
+    (void)Inst;
   }
   
   return Changed;
