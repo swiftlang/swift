@@ -19,6 +19,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include "FastEntryPoints.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -170,7 +171,7 @@ static inline struct SwiftHeapObject *
 _swift_retain(struct SwiftHeapObject *object)
 {
   if (object) {
-    ++object->refCount;
+    object->refCount += RC_INTERVAL;
   }
   return object;
 }

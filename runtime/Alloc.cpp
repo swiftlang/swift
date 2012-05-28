@@ -45,6 +45,9 @@ swift_allocObject(struct SwiftHeapMetadata *metadata,
                   size_t requiredSize,
                   size_t requiredAlignment) {
   struct SwiftHeapObject *object;
+  static_assert(offsetof(TSD, cache) == SWIFT_TSD_ALLOC_BASE, "Fix ASM");
+  static_assert(offsetof(TSD, rawCache) == SWIFT_TSD_RAW_ALLOC_BASE, "Fix ASM");
+  (void)tsd;
   for (;;) {
     object = reinterpret_cast<struct SwiftHeapObject *>(
       calloc(1, llvm::RoundUpToAlignment(requiredSize, requiredAlignment)));
@@ -54,7 +57,7 @@ swift_allocObject(struct SwiftHeapMetadata *metadata,
     sleep(1); // XXX FIXME -- Enqueue this thread and resume after free()
   }
   object->metadata = metadata;
-  object->refCount = 2;
+  object->refCount = RC_INTERVAL;
   return object;
 }
 
@@ -75,7 +78,7 @@ swift_retain(struct SwiftHeapObject *object) {
 
 void
 swift_release(struct SwiftHeapObject *object) {
-  if (object && (--object->refCount == 0)) {
+  if (object && ((object->refCount -= RC_INTERVAL) == 0)) {
     _swift_release_slow(object);
   }
 }
