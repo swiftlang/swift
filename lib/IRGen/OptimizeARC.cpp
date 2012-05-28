@@ -88,8 +88,14 @@ static RT_Kind classifyInstruction(const Instruction &I) {
 /// faster.
 static Constant *getRetain(Function &F, Type *ObjectPtrTy, Constant *&Cache) {
   if (Cache) return Cache;
+  
+  AttributeWithIndex Attrs[] = {
+    { Attribute::NoUnwind, ~0U }
+  };
+  auto AttrList = AttrListPtr::get(Attrs);
+
   Module *M = F.getParent();
-  return Cache = M->getOrInsertFunction("swift_retain",
+  return Cache = M->getOrInsertFunction("swift_retain", AttrList,
                                         ObjectPtrTy, ObjectPtrTy, NULL);
 }
 
@@ -101,11 +107,13 @@ static Constant *getRetainNoResult(Function &F, Type *ObjectPtrTy,
                                    Constant *&Cache) {
   if (Cache) return Cache;
  
-  AttributeWithIndex NoCapture = { Attribute::NoCapture, 1 };
-  auto AttrList = AttrListPtr::get(NoCapture);
+  AttributeWithIndex Attrs[] = {
+    { Attribute::NoCapture, 1 },
+    { Attribute::NoUnwind, ~0U },
+  };
+  auto AttrList = AttrListPtr::get(Attrs);
   Module *M = F.getParent();
-  return Cache = M->getOrInsertFunction("swift_retain_noresult",
-                                        AttrList,
+  return Cache = M->getOrInsertFunction("swift_retain_noresult", AttrList,
                                         Type::getVoidTy(F.getContext()),
                                         ObjectPtrTy, NULL);
 }
