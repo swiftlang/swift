@@ -69,24 +69,46 @@ static RT_Kind classifyInstruction(Instruction *I) {
 /// argument as a low-level performance optimization.  This makes it difficult
 /// to reason about pointer equality though, so undo it as an initial
 /// canonicalization step.
+///
+/// This also does some trivial peep-hole optimizations as we go.
 static bool canonicalizeArgumentReturnFunctions(Function &F) {
   bool Changed = false;
-  for (inst_iterator I = inst_begin(&F), E = inst_end(&F); I != E; ++I) {
-    Instruction *Inst = &*I;
-    
-    // Ignore functions with no uses.
-    if (Inst->use_empty()) continue;
+  for (inst_iterator I = inst_begin(&F), E = inst_end(&F); I != E; ) {
+    Instruction *Inst = &*I++;
     
     switch (classifyInstruction(Inst)) {
     case RT_Unknown:
-    case RT_Release:
     case RT_AllocObject:
       break;
-    case RT_Retain:
-      // swift_retain returns its first argument.
-      Inst->replaceAllUsesWith(cast<CallInst>(Inst)->getArgOperand(0));
-      Changed = true;
+    case RT_Retain: {
+      CallInst &CI = cast<CallInst>(*Inst);
+      Value *ArgVal = CI.getArgOperand(0);
+        
+      // Ignore functions with no uses.
+      if (!Inst->use_empty()) {
+        // swift_retain returns its first argument.
+        Inst->replaceAllUsesWith(ArgVal);
+        Changed = true;
+      }
+      
+      // retain of null is a no-op.
+      if (isa<ConstantPointerNull>(ArgVal)) {
+        CI.eraseFromParent();
+        Changed = true;
+        continue;
+      }
       break;
+    }
+    case RT_Release: {
+      CallInst &CI = cast<CallInst>(*Inst);
+      // swift_release(null) is a noop, zap it. 
+      Value *ArgVal = CI.getArgOperand(0);
+      if (isa<ConstantPointerNull>(ArgVal)) {
+        CI.eraseFromParent();
+        Changed = true;
+        continue;
+      }
+    }
     }
   }
   return Changed;
