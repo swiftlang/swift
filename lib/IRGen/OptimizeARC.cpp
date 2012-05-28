@@ -18,6 +18,7 @@
 #define DEBUG_TYPE "swift-optimize"
 #include "IRGen.h"
 #include "llvm/Instructions.h"
+#include "llvm/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
 #include "llvm/ADT/DenseMap.h"
@@ -46,6 +47,9 @@ enum RT_Kind {
   /// SwiftHeapObject *swift_retain(SwiftHeapObject *object)
   RT_Retain,
   
+  // void swift_retain_noresult(SwiftHeapObject *object)
+  RT_RetainNoResult,
+  
   /// void swift_release(SwiftHeapObject *object)
   RT_Release,
   
@@ -72,10 +76,40 @@ static RT_Kind classifyInstruction(const Instruction &I) {
   
   return StringSwitch<RT_Kind>(F->getName())
     .Case("swift_retain", RT_Retain)
+    .Case("swift_retain_noresult", RT_RetainNoResult)
     .Case("swift_release", RT_Release)
     .Case("swift_allocObject", RT_AllocObject)
     .Default(RT_Unknown);
 }
+
+/// getRetain - Return a callable function for swift_retain.  F is the function
+/// being operated on, ObjectPtrTy is an instance of the object pointer type to
+/// use, and Cache is a null-initialized place to make subsequent requests
+/// faster.
+static Constant *getRetain(Function &F, Type *ObjectPtrTy, Constant *&Cache) {
+  if (Cache) return Cache;
+  Module *M = F.getParent();
+  return Cache = M->getOrInsertFunction("swift_retain",
+                                        ObjectPtrTy, ObjectPtrTy, NULL);
+}
+
+/// getRetainNoResult - Return a callable function for swift_retain_noresult.
+/// F is the function being operated on, ObjectPtrTy is an instance of the
+/// object pointer type to use, and Cache is a null-initialized place to make
+/// subsequent requests faster.
+static Constant *getRetainNoResult(Function &F, Type *ObjectPtrTy,
+                                   Constant *&Cache) {
+  if (Cache) return Cache;
+ 
+  AttributeWithIndex NoCapture = { Attribute::NoCapture, 1 };
+  auto AttrList = AttrListPtr::get(NoCapture);
+  Module *M = F.getParent();
+  return Cache = M->getOrInsertFunction("swift_retain_noresult",
+                                        AttrList,
+                                        Type::getVoidTy(F.getContext()),
+                                        ObjectPtrTy, NULL);
+}
+
 
 //===----------------------------------------------------------------------===//
 //                      Return Argument Canonicalizer
@@ -84,12 +118,16 @@ static RT_Kind classifyInstruction(const Instruction &I) {
 /// canonicalizeArgumentReturnFunctions - Functions like swift_retain return an
 /// argument as a low-level performance optimization.  This makes it difficult
 /// to reason about pointer equality though, so undo it as an initial
-/// canonicalization step.
+/// canonicalization step.  After this step, all swift_retain's have been
+/// replaced with swift_retain_noresult.
 ///
 /// This also does some trivial peep-hole optimizations as we go.
 static bool canonicalizeArgumentReturnFunctions(Function &F) {
+  Constant *RetainNoResultCache = 0;
+  
   bool Changed = false;
-  for (inst_iterator I = inst_begin(&F), E = inst_end(&F); I != E; ) {
+  for (auto &BB : F)
+  for (auto I = BB.begin(); I != BB.end(); ) {
     Instruction &Inst = *I++;
     
     switch (classifyInstruction(Inst)) {
@@ -97,24 +135,37 @@ static bool canonicalizeArgumentReturnFunctions(Function &F) {
     case RT_AllocObject:
     case RT_NoMemoryAccessed:
       break;
-    case RT_Retain: {
+    case RT_RetainNoResult: {
       CallInst &CI = cast<CallInst>(Inst);
       Value *ArgVal = CI.getArgOperand(0);
-        
-      // Ignore functions with no uses.
-      if (!Inst.use_empty()) {
-        // swift_retain returns its first argument.
-        Inst.replaceAllUsesWith(ArgVal);
-        Changed = true;
-      }
-      
-      // retain of null is a no-op.
+      // retain_noresult(null) is a no-op.
       if (isa<ConstantPointerNull>(ArgVal)) {
         CI.eraseFromParent();
         Changed = true;
         ++NumNoopDeleted;
         continue;
       }
+      break;
+    }
+    case RT_Retain: {
+      // If any x = swift_retain(y)'s got here, canonicalize them into:
+      // x = y; swift_retain_noresult(y).
+      CallInst &CI = cast<CallInst>(Inst);
+      Value *ArgVal = CI.getArgOperand(0);
+
+      // Rewrite uses of the result to use the argument.
+      if (!CI.use_empty()) {
+        Inst.replaceAllUsesWith(ArgVal);
+        Changed = true;
+      }
+      
+      // Insert a call to swift_retain_noresult to replace this and reset the
+      // iterator so that we visit it next.
+      I = CallInst::Create(getRetainNoResult(F, ArgVal->getType(),
+                                             RetainNoResultCache),
+                           ArgVal, "", &CI);
+      CI.eraseFromParent();
+      Changed = true;
       break;
     }
     case RT_Release: {
@@ -160,6 +211,8 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
     }
     
     switch (classifyInstruction(*BBI)) {
+    case RT_Retain: // Canonicalized away, shouldn't exist.
+      assert(0 && "swift_retain should be canonicalized away");
     case RT_NoMemoryAccessed:
       // Skip over random instructions that don't touch memory.  They don't need
       // protection by retain/release.
@@ -183,7 +236,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
       continue;
     }
 
-    case RT_Retain: {  // swift_retain returns its first argument.
+    case RT_RetainNoResult: {  // swift_retain_noresult(obj)
       CallInst &Retain = cast<CallInst>(*BBI);
       Value *RetainedObject = Retain.getArgOperand(0);
       
@@ -284,6 +337,7 @@ static bool performReleaseMotion(Function &F) {
 /// Coming into this function, we assume that the code is in canonical form:
 /// none of these calls have any uses of their return values.
 static bool optimizeArgumentReturnFunctions(Function &F) {
+  Constant *RetainCache = nullptr;
   bool Changed = false;
   
   // Since all of the calls are canonicalized, we know that we can just walk
@@ -300,11 +354,22 @@ static bool optimizeArgumentReturnFunctions(Function &F) {
   // SSAUpdater doesn't handle them.
   DenseMap<Value*, Value*> LocalUpdates;
   for (BasicBlock &BB : F) {
-    for (Instruction &Inst : BB) {
+    for (auto II = BB.begin(), E = BB.end(); II != E; ) {
+      // Preincrement iterator to avoid iteration issues in the loop.
+      Instruction &Inst = *II++;
+      
       switch (classifyInstruction(Inst)) {
-      case RT_Retain: {  // swift_retain returns its first argument.
-        CallInst &CI = cast<CallInst>(Inst);
-        Value *ArgVal = CI.getArgOperand(0);
+      case RT_Retain: assert(0 && "This should be canonicalized away!");
+      case RT_RetainNoResult: {
+        Value *ArgVal = cast<CallInst>(Inst).getArgOperand(0);
+
+        // First step: rewrite swift_retain_noresult to swift_retain, exposing
+        // the result value.
+        CallInst &CI =
+           *CallInst::Create(getRetain(F, ArgVal->getType(), RetainCache),
+                             ArgVal, "", &Inst);
+        Inst.eraseFromParent();
+
         TinyPtrVector<Instruction*> &GlobalEntry = DefsOfValue[ArgVal];
 
         // If this is the first definition of a value for the argument that
@@ -323,8 +388,8 @@ static bool optimizeArgumentReturnFunctions(Function &F) {
           GlobalEntry.pop_back();
         }
         
-        LocalEntry = &Inst;
-        GlobalEntry.push_back(&Inst);
+        LocalEntry = &CI;
+        GlobalEntry.push_back(&CI);
         break;
       }
       case RT_Unknown:
