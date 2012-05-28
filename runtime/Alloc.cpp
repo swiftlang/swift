@@ -62,6 +62,11 @@ extern "C" void
 _swift_release_slow(struct SwiftHeapObject *object)
   __attribute__((noinline,used));
 
+void
+_swift_retain_noresult(struct SwiftHeapObject *object) {
+  _swift_retain(object);
+}
+
 #ifndef __x86_64__
 struct SwiftHeapObject *
 swift_retain(struct SwiftHeapObject *object) {

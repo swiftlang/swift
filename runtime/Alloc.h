@@ -163,6 +163,8 @@ swift_slowRawDealloc(void *ptr, size_t bytes);
 /// which preserves a larger set of registers.
 struct SwiftHeapObject *
 swift_retain(struct SwiftHeapObject *object);
+void
+_swift_retain_noresult(struct SwiftHeapObject *object);
 
 static inline struct SwiftHeapObject *
 _swift_retain(struct SwiftHeapObject *object)
