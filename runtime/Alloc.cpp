@@ -64,7 +64,7 @@ _swift_release_slow(struct SwiftHeapObject *object)
 
 void
 swift_retain_noresult(struct SwiftHeapObject *object) {
-  _swift_retain(object);
+  swift_retain(object);
 }
 
 #ifndef __x86_64__
