@@ -164,7 +164,7 @@ swift_slowRawDealloc(void *ptr, size_t bytes);
 struct SwiftHeapObject *
 swift_retain(struct SwiftHeapObject *object);
 void
-_swift_retain_noresult(struct SwiftHeapObject *object);
+swift_retain_noresult(struct SwiftHeapObject *object);
 
 static inline struct SwiftHeapObject *
 _swift_retain(struct SwiftHeapObject *object)
