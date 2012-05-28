@@ -995,11 +995,12 @@ Callee irgen::emitCallee(IRGenFunction &IGF, Expr *fn,
 /// Set attributes on the given call site consistent with it returning
 /// an aggregate result.
 static void setAggResultAttributes(llvm::CallSite call) {
-  llvm::SmallVector<llvm::AttributeWithIndex, 1> attrs;
-  attrs.push_back(llvm::AttributeWithIndex::get(1,
-                                llvm::Attribute::StructRet |
-                                llvm::Attribute::NoAlias));
-  call.setAttributes(llvm::AttrListPtr::get(attrs.data(), attrs.size()));
+  llvm::AttributeWithIndex attrs[] = {
+    llvm::AttributeWithIndex::get(1,
+                                  llvm::Attribute::StructRet |
+                                  llvm::Attribute::NoAlias)
+  };
+  call.setAttributes(llvm::AttrListPtr::get(attrs));
 }
 
 /// Extract the direct scalar results of a call instruction into an

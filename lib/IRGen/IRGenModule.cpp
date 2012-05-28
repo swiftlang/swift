@@ -157,18 +157,20 @@ llvm::Constant *IRGenModule::getSlowRawDeallocFn() {
 llvm::Constant *IRGenModule::getRetainFn() {
   if (RetainFn) return RetainFn;
 
-  llvm::FunctionType *fnType =
-    llvm::FunctionType::get(RefCountedPtrTy, RefCountedPtrTy, false);
-  RetainFn = Module.getOrInsertFunction("swift_retain", fnType);
+  RetainFn = Module.getOrInsertFunction("swift_retain", RefCountedPtrTy,
+                                        RefCountedPtrTy, NULL);
   return RetainFn;
 }
 
 llvm::Constant *IRGenModule::getReleaseFn() {
   if (ReleaseFn) return ReleaseFn;
 
-  llvm::FunctionType *fnType =
-    llvm::FunctionType::get(VoidTy, RefCountedPtrTy, false);
-  ReleaseFn = Module.getOrInsertFunction("swift_release", fnType);
+  llvm::AttributeWithIndex AttrList[] = { 
+    llvm::AttributeWithIndex::get(1, llvm::Attribute::NoCapture)
+  };
+  auto Attrs = llvm::AttrListPtr::get(AttrList);
+  ReleaseFn = Module.getOrInsertFunction("swift_release", Attrs, VoidTy, 
+                                         RefCountedPtrTy, NULL);
   return ReleaseFn;
 }
 

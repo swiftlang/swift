@@ -89,7 +89,7 @@ static llvm::AttrListPtr getAllocAttrs() {
     llvm::AttributeWithIndex::get(0, llvm::Attribute::NoAlias),
     llvm::AttributeWithIndex::get(~0, llvm::Attribute::NoUnwind)
   };
-  return llvm::AttrListPtr::get(attrValues, 2);
+  return llvm::AttrListPtr::get(attrValues);
 }
 
 static llvm::Value *emitAllocatingCall(IRGenFunction &IGF,
