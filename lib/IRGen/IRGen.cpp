@@ -52,6 +52,12 @@ static bool isBinaryOutput(OutputKind kind) {
   llvm_unreachable("bad output kind!");
 }
 
+static void addSwiftARCOptPass(const PassManagerBuilder &Builder,
+                               PassManagerBase &PM) {
+  if (Builder.OptLevel > 0)
+    PM.add(createSwiftARCOptPass());
+}
+
 void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
                                 TranslationUnit *TU, unsigned StartElem) {
   assert(!TU->Ctx.hadError());
@@ -183,6 +189,9 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   if (Opts.OptLevel != 0)
     PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
 
+  PMBuilder.addExtension(PassManagerBuilder::EP_ScalarOptimizerLate,
+                         addSwiftARCOptPass);
+  
   // Configure the function passes.
   FunctionPassManager FunctionPasses(Module);
   FunctionPasses.add(new llvm::TargetData(*TargetData));

@@ -49,6 +49,7 @@ add_swift_library(swiftIRGen
   LValue.h
   Linking.h
   Mangle.cpp
+  OptimizeARC.cpp
   Scope.h
   StructLayout.cpp
   StructLayout.h
