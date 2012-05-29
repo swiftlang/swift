@@ -36,6 +36,8 @@ else
   SWIFT_OPTFLAG := -O0
 endif
 
+SWIFT_OPTFLAG := -O3
+
 LDFLAGS += -framework Foundation
 
 SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
