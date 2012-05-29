@@ -1,5 +1,8 @@
 set(SHARED_LIBRARY ON)
 
+# FIXME: We'd love to just enable the assembler support in CMake, but
+# it doesn't work with the Xcode generator. Lame!
+
 add_swift_library(swift_runtime
   FastEntryPoints.s
   Alloc.cpp

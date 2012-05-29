@@ -136,6 +136,46 @@ function(compile_swift_file file target objectvar)
   set(${objectvar} "${objfile}" PARENT_SCOPE)
 endfunction()
 
+# Compile an assembler file into an object file.
+#
+# Usage:
+#   compile_assembler_file(file     # Name of the source file, e.g., swift.swift)
+#     target                        # The target of which this file is a part
+#     objectvar)                    # Variable to receive the object file name
+function(compile_assembler_file file target objectvar)
+  # Determine where this file is.
+  get_filename_component(file_path ${file} PATH) 
+  if(IS_ABSOLUTE "${file_path}")
+    set(source_file "${file}")
+  else()
+    set(source_file "${CMAKE_CURRENT_SOURCE_DIR}/${file}")
+  endif()
+
+  get_filename_component(file_name ${file} NAME_WE)
+  set(objfile
+    "${CMAKE_CURRENT_BINARY_DIR}/${file_name}${CMAKE_C_OUTPUT_EXTENSION}")
+  add_custom_command(
+    OUTPUT ${objfile}
+    COMMAND "clang" "-c" "-o" "${objfile}" "${source_file}"
+    DEPENDS ${source_file}
+#    MAIN_DEPENDENCY ${target}
+    COMMENT "Compiling ${file_name}${CMAKE_C_OUTPUT_EXTENSION}")
+  
+  # Make sure the build system knows the file is a generated object file.
+  set_source_files_properties(${objfile}
+    PROPERTIES 
+    GENERATED true 
+    EXTERNAL_OBJECT true
+    OBJECT_DEPENDS "${source_file}")
+
+  # Make sure this object file gets cleaned up.
+  set_directory_properties(
+    PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${objfile}")
+
+  # Pass the object file name back to the caller.
+  set(${objectvar} "${objfile}" PARENT_SCOPE)
+endfunction()
+
 # Process the sources within the given variable, pulling out any Swift
 # sources to be compiled with 'swift' directly. This updates
 # ${sourcesvar} in place with the resulting list.
@@ -149,6 +189,10 @@ function(handle_swift_sources sourcesvar target)
     if(extension STREQUAL ".swift")
       # We have a swift file; compile it.
       compile_swift_file(${src} ${target} "obj")
+      list(APPEND result ${obj})
+    elseif(extension STREQUAL ".s")
+      # We have an assmelber file; compile it.
+      compile_assembler_file(${src} ${target} "obj")
       list(APPEND result ${obj})
     else()
       list(APPEND result ${src})
