@@ -18,14 +18,17 @@
 #define DEBUG_TYPE "swift-optimize"
 #include "IRGen.h"
 #include "llvm/Instructions.h"
+#include "llvm/IntrinsicInst.h"
 #include "llvm/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/InstIterator.h"
+#include "llvm/Support/raw_ostream.h"
 using namespace llvm;
 
 STATISTIC(NumNoopDeleted,
@@ -34,6 +37,8 @@ STATISTIC(NumRetainReleasePairs,
           "Number of swift retain/release pairs eliminated");
 STATISTIC(NumAllocateReleasePairs,
           "Number of swift allocate/release pairs eliminated");
+STATISTIC(NumStoreOnlyObjectsEliminated,
+          "Number of swift stored-only objects eliminated");
 
 //===----------------------------------------------------------------------===//
 //                            Utility Functions
@@ -315,22 +320,142 @@ OutOfLoop:
   return false;
 }
 
-/// performReleaseMotion - this moves releaes functions earlier, past
-/// instructions that are known to not access an object.  If they are moved to
-/// touch a retain of the same object, destructive annihilation occurs!
-static bool performReleaseMotion(Function &F) {
+//===----------------------------------------------------------------------===//
+//                       Store-Only Object Elimination
+//===----------------------------------------------------------------------===//
+
+/// performStoreOnlyObjectElimination - Scan the graph of uses of the specified
+/// object allocation.  If the object does not escape and is only stored to
+/// (this happens because GVN and other optimizations hoists forward substitutes
+/// all stores to the object to eliminate all loads from it), then zap the
+/// object and all accesses related to it.
+static bool performStoreOnlyObjectElimination(CallInst &Allocation,
+                                              BasicBlock::iterator &BBI) {
+  // Do a depth first search exploring all of the uses of the object pointer,
+  // following through casts, pointer adjustments etc.  If we find any loads or
+  // any escape sites of the object, we give up.  If we succeed in walking the
+  // entire graph of uses, we can remove the resultant set.
+  SmallSetVector<Instruction*, 16> InvolvedInstructions;
+  SmallVector<Instruction*, 16> Worklist;
+  Worklist.push_back(&Allocation);
+  
+  // Stores - Keep track of all of the store instructions we see.
+  SmallVector<StoreInst*, 16> Stores;
+
+  while (!Worklist.empty()) {
+    Instruction *I = Worklist.pop_back_val();
+    
+    // Insert the instruction into our InvolvedInstructions set.  If we have
+    // already seen it, then don't reprocess all of the uses.
+    if (!InvolvedInstructions.insert(I)) continue;
+    
+    // Okay, this is the first time we've seen this instruction, proceed.
+    switch (classifyInstruction(*I)) {
+    case RT_AllocObject:
+      // If this is a different swift_allocObject than we started with, then
+      // there is some computation feeding into a size or alignment computation
+      // that we have to keep... unless we can delete *that* entire object as
+      // well.
+      break;
+
+      // If no memory is accessed, then something is being done with the
+      // pointer: maybe it is bitcast or GEP'd. Since there are no side effects,
+      // it is perfectly fine to delete this instruction if all uses of the
+      // instruction are also eliminable.
+    case RT_NoMemoryAccessed:
+      if (I->mayHaveSideEffects() || isa<TerminatorInst>(I))
+        return false;
+      break;
+        
+      // It is perfectly fine to eliminate various retains and releases of this
+      // object: we are zapping all accesses or none.
+    case RT_Retain:
+    case RT_RetainNoResult:
+    case RT_Release:
+      break;
+        
+      // If this is an unknown instruction, we have more interesting things to
+      // consider.
+    case RT_Unknown:
+      // Otherwise, this really is some unhandled instruction.  Bail out.
+      return false;
+    }
+    
+    // Okay, if we got here, the instruction can be eaten so-long as all of its
+    // uses can be.  Scan through the uses and add them to the worklist for
+    // recursive processing.
+    for (auto UI = I->use_begin(), E = I->use_end(); UI != E; ++UI) {
+      Instruction *User = cast<Instruction>(*UI);
+      
+      // Handle stores as a special case here: we want to make sure that the
+      // object is being stored *to*, not itself being stored (which would be an
+      // escape point).  Since stores themselves don't have any uses, we can
+      // short-cut the classification scheme above.
+      if (StoreInst *SI = dyn_cast<StoreInst>(User)) {
+        // If this is a store *to* the object, we can zap it.
+        if (UI.getOperandNo() == StoreInst::getPointerOperandIndex()) {
+          InvolvedInstructions.insert(SI);
+          continue;
+        }
+        // Otherwise, using the object as a source (or size) is an escape.
+        return false;
+      }
+      if (MemIntrinsic *MI = dyn_cast<MemIntrinsic>(User)) {
+        // If this is a memset/memcpy/memmove *to* the object, we can zap it.
+        if (UI.getOperandNo() == 0) {
+          InvolvedInstructions.insert(MI);
+          continue;
+        }
+        // Otherwise, using the object as a source (or size) is an escape.
+        return false;
+      }
+      
+      // Otherwise, normal instructions just go on the worklist for processing.
+      Worklist.push_back(User);
+    }
+  }
+  
+  // Ok, we succeeded!  This means we can zap all of the instructions that use
+  // the object.  One thing we have to be careful of is to make sure that we
+  // don't invalidate "BBI" (the iterator the outer walk of the optimization
+  // pass is using, and indicates the next instruction to process).  This would
+  // happen if we delete the instruction it is pointing to.  Advance the
+  // iterator if that would happen.
+  while (InvolvedInstructions.count(BBI))
+    ++BBI;
+  
+  // Zap all of the instructions.
+  for (auto I : InvolvedInstructions) {
+    if (!I->use_empty())
+      I->replaceAllUsesWith(UndefValue::get(I->getType()));
+    I->eraseFromParent();
+  }
+  
+  ++NumStoreOnlyObjectsEliminated;
+  return true;
+}
+
+/// performGeneralOptimizations - This does a forward scan over basic blocks,
+/// looking for interesting local optimizations that can be done.
+static bool performGeneralOptimizations(Function &F) {
   bool Changed = false;
   
   // TODO: This is a really trivial local algorithm.  It could be much better.
   for (BasicBlock &BB : F) {
-    for (auto BBI = BB.begin(), E = BB.end(); BBI != E; ) {
+    for (BasicBlock::iterator BBI = BB.begin(), E = BB.end(); BBI != E; ) {
       // Preincrement the iterator to avoid invalidation and out trouble.
       Instruction &I = *BBI++;
-      
-      // Ignore instructions that are not releases.  Try to optimize ones that
-      // are.
-      if (classifyInstruction(I) == RT_Release)
+
+      // Do various optimizations based on the instruction we find.
+      switch (classifyInstruction(I)) {
+      default: break;
+      case RT_Release:
         Changed |= performLocalReleaseMotion(cast<CallInst>(I), BB);
+        break;
+      case RT_AllocObject:
+        Changed |= performStoreOnlyObjectElimination(cast<CallInst>(I), BBI);
+        break;
+      }
     }
   }
   return Changed;
@@ -514,10 +639,14 @@ bool SwiftARCOpt::runOnFunction(Function &F) {
   // optimizer.
   Changed |= canonicalizeArgumentReturnFunctions(F);
   
-  // Next, perform release() motion, eliminating retain/release pairs when it
-  // turns out that a pair is not protecting anything that accesses the guarded
-  // heap object.
-  Changed |= performReleaseMotion(F);
+  // Next, do a pass with a couple of optimizations:
+  // 1) release() motion, eliminating retain/release pairs when it turns out
+  //    that a pair is not protecting anything that accesses the guarded heap
+  //    object.
+  // 2) deletion of stored-only objects - objects that are allocated and
+  //    potentially retained and released, but are only stored to and don't
+  //    escape.
+  Changed |= performGeneralOptimizations(F);
   
   // Finally, rewrite remaining heap object uses to make use of the implicit
   // copy that swift_retain and similar functions perform.
