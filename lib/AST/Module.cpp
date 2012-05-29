@@ -238,14 +238,19 @@ void Module::lookupGlobalValue(Identifier Name, NLKind LookupKind,
   
   TranslationUnit &TU = *cast<TranslationUnit>(this);
 
-  bool CurModuleHasMetatype = false;
+  bool NameBindingLookup = TU.ASTStage == Module::Parsed;
+  llvm::SmallPtrSet<CanType, 8> CurModuleTypes;
   for (ValueDecl *VD : Result) {
-    CurModuleHasMetatype |= isa<MetaTypeType>(VD->getType());
+    // If we find a type in the current module, don't look into any
+    // imported modules.
+    if (isa<TypeDecl>(VD))
+      return;
+    if (!NameBindingLookup)
+      CurModuleTypes.insert(VD->getType()->getCanonicalType());
   }
 
-  // If we still haven't found it, scrape through all of the imports, taking the
-  // first match of the name.l
-  // FIXME: Implement shadowing based on canonical type.
+  // Scrape through all of the imports looking for additional results.
+  // FIXME: Implement DAG-based shadowing rules.
   llvm::SmallPtrSet<Module *, 16> Visited;
   for (auto &ImpEntry : TU.getImportedModules()) {
     if (!Visited.insert(ImpEntry.second))
@@ -254,7 +259,8 @@ void Module::lookupGlobalValue(Identifier Name, NLKind LookupKind,
     SmallVector<ValueDecl*, 8> ResultTemp;
     ImpEntry.second->lookupValue(ImpEntry.first, Name, LookupKind, ResultTemp);
     for (ValueDecl *VD : ResultTemp) {
-      if (!(CurModuleHasMetatype && isa<MetaTypeType>(VD->getType()))) {
+      if (NameBindingLookup || isa<TypeDecl>(VD) ||
+          !CurModuleTypes.count(VD->getType()->getCanonicalType())) {
         Result.push_back(VD);
       }
     }
@@ -266,7 +272,10 @@ static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
                                     Module *CurModule,
                                     Module *BaseModule,
                                     SmallVectorImpl<ValueDecl*> &Result) {
-  bool CurModuleHasMetatype = false;
+  bool CurModuleHasTypeDecl = false;
+  llvm::SmallPtrSet<CanType, 8> CurModuleTypes;
+
+  bool NameBindingLookup = CurModule->ASTStage == Module::Parsed;
 
   // Find all extensions in this module.
   for (ExtensionDecl *ED : CurModule->lookupExtensions(BaseType)) {
@@ -274,17 +283,21 @@ static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
       if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
         if (VD->getName() == Name) {
           Result.push_back(VD);
-          CurModuleHasMetatype |= isa<MetaTypeType>(VD->getType());
+          if (!NameBindingLookup)
+            CurModuleTypes.insert(VD->getType()->getCanonicalType());
+          CurModuleHasTypeDecl |= isa<MetaTypeType>(VD->getType());
         }
       }
     }
   }
 
-  for (ValueDecl *VD : BaseMembers) {
-    if (VD->getName() == Name) {
-      Result.push_back(VD);
-      if (BaseModule == CurModule) {
-        CurModuleHasMetatype |= isa<MetaTypeType>(VD->getType());
+  if (BaseModule == CurModule) {
+    for (ValueDecl *VD : BaseMembers) {
+      if (VD->getName() == Name) {
+        Result.push_back(VD);
+        if (!NameBindingLookup)
+          CurModuleTypes.insert(VD->getType()->getCanonicalType());
+        CurModuleHasTypeDecl |= isa<MetaTypeType>(VD->getType());
       }
     }
   }
@@ -292,11 +305,14 @@ static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
   // The builtin module has no imports.
   if (isa<BuiltinModule>(CurModule)) return;
 
+  // If we find a type in the current module, don't look into any
+  // imported modules.
+  if (CurModuleHasTypeDecl) return;
+
   TranslationUnit &TU = *cast<TranslationUnit>(CurModule);
 
   // Otherwise, check our imported extensions as well.
   // FIXME: Implement DAG-based shadowing rules.
-  // FIXME: Implement shadowing based on canonical type.
   llvm::SmallPtrSet<Module *, 16> Visited;
   for (auto &ImpEntry : TU.getImportedModules()) {
     if (!Visited.insert(ImpEntry.second))
@@ -304,10 +320,23 @@ static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
     
     for (ExtensionDecl *ED : ImpEntry.second->lookupExtensions(BaseType)) {
       for (Decl *Member : ED->getMembers()) {
-        if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
+        if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
           if (VD->getName() == Name &&
-              !(CurModuleHasMetatype && isa<MetaTypeType>(VD->getType())))
+              (NameBindingLookup || isa<TypeDecl>(VD) ||
+               !CurModuleTypes.count(VD->getType()->getCanonicalType()))) {
             Result.push_back(VD);
+          }
+        }
+      }
+    }
+  }
+
+  if (BaseModule != CurModule) {
+    for (ValueDecl *VD : BaseMembers) {
+      if (VD->getName() == Name &&
+          (NameBindingLookup || isa<TypeDecl>(VD) ||
+           !CurModuleTypes.count(VD->getType()->getCanonicalType()))) {
+        Result.push_back(VD);
       }
     }
   }

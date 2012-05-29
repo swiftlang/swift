@@ -2456,7 +2456,15 @@ ill-formed if the type does not conform to the protocol.</p>
       import directive in a file (e.g. between func decls) does not affect name
       lookup, but the order of imports w.r.t. each other does.</li>
   </ul>
-    
+
+  <p>Shadowing: Given a ValueDecl D1 in the current module and a ValueDecl D2
+  in an imported module with the same name and a member of the same type (if
+  relevant): 1. If D1 is a TypeDecl, D2 is shadowed. 2. If neither D1 nor D2
+  is a TypeDecl, and they have the same type, D2 is shadowed.  If a
+  declaration in an imported module is shadowed by any declaration in the
+  current module, it is not found by unqualified global lookup or lookup for
+  members of a type.</p>
+
   <h3 id="namebind_dot">Name Lookup for Dot Expressions</h3>
     
   <p>
