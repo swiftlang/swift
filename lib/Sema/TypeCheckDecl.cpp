@@ -106,7 +106,9 @@ public:
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
-    if (IsSecondPass) {
+    bool DelayCheckingPattern = TC.TU.Kind != TranslationUnit::Library &&
+                                PBD->getDeclContext()->isModuleContext();
+    if (IsSecondPass && !DelayCheckingPattern) {
       if (PBD->getInit() && PBD->getPattern()->hasType()) {
         Expr *Init = PBD->getInit();
         Type DestTy = PBD->getPattern()->getType();
@@ -149,7 +151,7 @@ public:
         if (TC.typeCheckPattern(PBD->getPattern(), /*isFirstPass*/false))
           return;
       }
-    } else {
+    } else if (!IsFirstPass || !DelayCheckingPattern) {
       if (TC.typeCheckPattern(PBD->getPattern(), IsFirstPass))
         return;
     }
@@ -330,8 +332,7 @@ public:
 
 
 void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
-  bool isSecondPass = !isFirstPass && TU.Kind == TranslationUnit::Library &&
-                      D->getDeclContext()->isModuleContext();
+  bool isSecondPass = !isFirstPass && D->getDeclContext()->isModuleContext();
   DeclChecker(*this, isFirstPass, isSecondPass).visit(D);
 }
 

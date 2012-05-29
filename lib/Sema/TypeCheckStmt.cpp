@@ -892,75 +892,14 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   };
   ExprPrePassWalker prePass(TC);
 
-  if (TU->Kind != TranslationUnit::Library) {
-    // FIXME: This loop is duplicated!
-    for (auto TypeAndContext : TU->getTypesWithDefaultValues()) {
-      TupleType *TT = TypeAndContext.first;
-      for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i) {
-        const TupleTypeElt& Elt = TT->getFields()[i];
-        if (Elt.hasInit()) {
-          // Perform global name-binding etc. for all tuple default values.
-          // FIXME: This screws up the FuncExprs list for FuncExprs in a
-          // default value; conceptually, we should be appending to the list
-          // in source order.
-          Expr *Init = Elt.getInit();
-          Init = prePass.doWalk(Init, TypeAndContext.second);
-          TT->updateInitializedElementType(i, Elt.getType(), Init);
-        }
-      }
-    }
-  }
-
   // Type check the top-level elements of the translation unit.
   StmtChecker checker(TC, 0);
   for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
     Decl *D = TU->Decls[i];
-    if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
-      // Immediately perform global name-binding etc.
-      prePass.doWalk(TLCD);
+    if (isa<TopLevelCodeDecl>(D))
+      continue;
 
-      // Tell the statement checker that we have top-level code.
-      struct TopLevelCodeRAII {
-        StmtChecker &Checker;
-        TopLevelCodeDecl *Old;
-        
-      public:
-        TopLevelCodeRAII(StmtChecker &Checker, TopLevelCodeDecl *TLC)
-        : Checker(Checker), Old(Checker.TopLevelCode)
-        {
-          Checker.setTopLevelCode(TLC);
-        }
-        
-        ~TopLevelCodeRAII() {
-          Checker.setTopLevelCode(Old);
-        }
-      } IntroduceTopLevelCode(checker, TLCD);
-
-      auto Elem = TLCD->getBody();
-      if (Expr *E = Elem.dyn_cast<Expr*>()) {
-        if (checker.typeCheckExpr(E)) continue;
-        if (TU->Kind == TranslationUnit::Repl)
-          TC.typeCheckTopLevelReplExpr(E, TLCD);
-        else
-          TC.typeCheckIgnoredExpr(E);
-        TLCD->setBody(E);
-      } else {
-        Stmt *S = Elem.get<Stmt*>();
-        if (checker.typeCheckStmt(S)) continue;
-        TLCD->setBody(S);
-      }
-    } else {
-      bool isFirstPass = TU->Kind == TranslationUnit::Library;
-      if (!isFirstPass) {
-        // If we aren't in a library, immediately perform global
-        // name-binding etc.
-        prePass.doWalk(D);
-      }
-      TC.typeCheckDecl(D, isFirstPass);
-      if (TU->Kind == TranslationUnit::Repl && !TC.Context.hadError())
-        if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D))
-          REPLCheckPatternBinding(PBD, TC);
-    }
+    TC.typeCheckDecl(D, /*isFirstPass*/true);
   }
 
   // Check for explicit conformance to protocols and for circularity in
@@ -1001,40 +940,77 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     }
   }
 
-  // If we're in a library, we don't know the types of all the global
-  // declarations in the first pass, which means we can't completely analyze
-  // everything. Perform the second pass now.
-  if (TU->Kind == TranslationUnit::Library && !TC.Context.hadError()) {
-    for (auto TypeAndContext : TU->getTypesWithDefaultValues()) {
-      TupleType *TT = TypeAndContext.first;
-      for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i) {
-        const TupleTypeElt& Elt = TT->getFields()[i];
-        if (Elt.hasInit()) {
-          // Perform global name-binding etc. for all tuple default values.
-          // FIXME: This screws up the FuncExprs list for FuncExprs in a
-          // default value; conceptually, we should be appending to the list
-          // in source order.
-          Expr *Init = Elt.getInit();
-          Init = prePass.doWalk(Init, TypeAndContext.second);
-          TT->updateInitializedElementType(i, Elt.getType(), Init);
+  // We don't know the types of all the global declarations in the first
+  // pass, which means we can't completely analyze everything. Perform the
+  // second pass now.
+  for (auto TypeAndContext : TU->getTypesWithDefaultValues()) {
+    TupleType *TT = TypeAndContext.first;
+    for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i) {
+      const TupleTypeElt& Elt = TT->getFields()[i];
+      if (Elt.hasInit()) {
+        // Perform global name-binding etc. for all tuple default values.
+        // FIXME: This screws up the FuncExprs list for FuncExprs in a
+        // default value; conceptually, we should be appending to the list
+        // in source order.
+        Expr *Init = Elt.getInit();
+        Init = prePass.doWalk(Init, TypeAndContext.second);
+        TT->updateInitializedElementType(i, Elt.getType(), Init);
 
-          if (TT->hasCanonicalTypeComputed()) {
-            // If we already examined a tuple in the first pass, we didn't
-            // get a chance to type-check it; do that now.
-            if (!TC.typeCheckExpression(Init, Elt.getType()))
-              TT->updateInitializedElementType(i, Elt.getType(), Init);
-          }
+        if (TT->hasCanonicalTypeComputed()) {
+          // If we already examined a tuple in the first pass, we didn't
+          // get a chance to type-check it; do that now.
+          if (!TC.typeCheckExpression(Init, Elt.getType()))
+            TT->updateInitializedElementType(i, Elt.getType(), Init);
         }
       }
     }
+  }
+  TU->clearTypesWithDefaultValues();
 
-    for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
-      Decl *D = TU->Decls[i];
+  for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
+    Decl *D = TU->Decls[i];
+    if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+      // Immediately perform global name-binding etc.
+      prePass.doWalk(TLCD);
+
+      // Tell the statement checker that we have top-level code.
+      struct TopLevelCodeRAII {
+        StmtChecker &Checker;
+        TopLevelCodeDecl *Old;
+
+      public:
+        TopLevelCodeRAII(StmtChecker &Checker, TopLevelCodeDecl *TLC)
+        : Checker(Checker), Old(Checker.TopLevelCode)
+        {
+          Checker.setTopLevelCode(TLC);
+        }
+
+        ~TopLevelCodeRAII() {
+          Checker.setTopLevelCode(Old);
+        }
+      } IntroduceTopLevelCode(checker, TLCD);
+
+      auto Elem = TLCD->getBody();
+      if (Expr *E = Elem.dyn_cast<Expr*>()) {
+        if (checker.typeCheckExpr(E)) continue;
+        if (TU->Kind == TranslationUnit::Repl)
+          TC.typeCheckTopLevelReplExpr(E, TLCD);
+        else
+          TC.typeCheckIgnoredExpr(E);
+        TLCD->setBody(E);
+      } else {
+        Stmt *S = Elem.get<Stmt*>();
+        if (checker.typeCheckStmt(S)) continue;
+        TLCD->setBody(S);
+      }
+    } else {
       prePass.doWalk(D);
       TC.typeCheckDecl(D, /*isFirstPass*/false);
     }
+    if (TU->Kind == TranslationUnit::Repl && !TC.Context.hadError())
+      if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D))
+        REPLCheckPatternBinding(PBD, TC);
   }
-  TU->clearTypesWithDefaultValues();
 
   // Check overloaded vars/funcs.
   // FIXME: This is quadratic time for TUs with multiple chunks.
