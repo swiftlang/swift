@@ -191,7 +191,7 @@ function(handle_swift_sources sourcesvar target)
       compile_swift_file(${src} ${target} "obj")
       list(APPEND result ${obj})
     elseif(extension STREQUAL ".s")
-      # We have an assmelber file; compile it.
+      # We have an assembler file; compile it.
       compile_assembler_file(${src} ${target} "obj")
       list(APPEND result ${obj})
     else()
