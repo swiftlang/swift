@@ -43,7 +43,7 @@ extern "C" void _TSs5printFT3valNSs6Double_T_(double l) {
 
 // static func String(v : Int128, radix : Int) -> String
 extern "C"
-long long
+unsigned long long
 print_int(char* TmpBuffer, __int64_t buf_len, __int128_t X, uint64_t Radix) {
   assert(Radix != 0 && Radix <= 36 && "Invalid radix for string conversion");
   char *P = TmpBuffer;
@@ -68,17 +68,20 @@ print_int(char* TmpBuffer, __int64_t buf_len, __int128_t X, uint64_t Radix) {
   
   if (WasNeg) *P++ = '-';
   std::reverse(TmpBuffer, P);
-  return P - TmpBuffer;
+  return size_t(P - TmpBuffer);
 }
 
 // static func String(v : Double) -> String
 extern "C"
-long long
+unsigned long long
 print_double(char* Buffer, double X) {
   long long i = sprintf(Buffer, "%g", X);
   if (strchr(Buffer, 'e') == nullptr && strchr(Buffer, '.') == nullptr) {
     Buffer[i++] = '.';
     Buffer[i++] = '0';
+  }
+  if (i < 0) {
+    __builtin_trap();
   }
   return i;
 }
