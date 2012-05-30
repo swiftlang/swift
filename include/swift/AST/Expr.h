@@ -1657,8 +1657,8 @@ class CoerceExpr : public Expr {
   Expr *RHS;
   
 public:
-  CoerceExpr(Expr *LHS, Expr *RHS, Type Ty)
-    : Expr(ExprKind::Coerce, Ty), LHS(LHS), RHS(RHS) { }
+  CoerceExpr(Expr *LHS, Expr *RHS)
+    : Expr(ExprKind::Coerce, RHS->getType()), LHS(LHS), RHS(RHS) { }
            
   Expr *getLHS() const { return LHS; }
   Expr *getRHS() const { return RHS; }
