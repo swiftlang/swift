@@ -195,8 +195,8 @@ ERROR(expected_rbrace_extension,type_parsing,none,
       "expected '}' at end of extension", ())
 
 // TypeAlias
-ERROR(expected_colon_in_typealias,decl_parsing,none,
-      "expected ':' in typealias declaration", ())
+ERROR(expected_equal_in_typealias,decl_parsing,none,
+      "expected '=' in typealias declaration", ())
 ERROR(expected_type_in_typealias,decl_parsing,none,
       "expected type in var declaration", ())
 ERROR(associated_type_def,decl_parsing,none,

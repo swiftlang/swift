@@ -725,7 +725,7 @@ token following the opening '{' is either 'set' or 'get'.</p>
 
   
   <pre class="grammar">
-    decl-typealias ::= 'typealias' <a href="#identifier">identifier</a> ':' <a href="#type">type</a>
+    decl-typealias ::= 'typealias' <a href="#identifier">identifier</a> '=' <a href="#type">type</a>
   </pre>
 
   <p>'typealias' makes a named alias of a type, like a typedef in C.  From that
@@ -735,10 +735,10 @@ token following the opening '{' is either 'set' or 'get'.</p>
   
   <pre class="example">
     <i>// location is an alias for a tuple of ints.</i>
-    typealias location : (x : Int, y : Int)
+    typealias location = (x : Int, y : Int)
       
     <i>// pair_fn is a function that takes two ints and returns a tuple.</i>
-    typealias pair_fn : (Int) -&gt; (Int) -&gt; (first : Int, second : Int)
+    typealias pair_fn = (Int) -&gt; (Int) -&gt; (first : Int, second : Int)
   </pre>
   
   <!-- ===================================================================== -->
@@ -863,7 +863,7 @@ token following the opening '{' is either 'set' or 'get'.</p>
       origin : Point,
       size : Size
 
-      typealias CoordinateType : Int
+      typealias CoordinateType = Int
     
       func area() -> Int { return size.width*size.height }
     }
@@ -1247,7 +1247,7 @@ if vec[3] {
      through type declarations that expand to one.</p>
 
   <pre class="example">
-    typealias location : (x : Int, y : Int)
+    typealias location = (x : Int, y : Int)
     var x : location      <i>// use of a named type.</i>
   </pre>
   
@@ -2539,7 +2539,7 @@ ill-formed if the type does not conform to the protocol.</p>
   
   <pre class="stdlib">
     <i>// Void is just a type alias for the empty tuple.</i>
-    typealias Void : ()
+    typealias Void = ()
   </pre>
   
   <div class="commentary">
@@ -2561,7 +2561,7 @@ ill-formed if the type does not conform to the protocol.</p>
     struct Int128 { value : Builtin.Int128 }
 
     <i>// Int is just an alias for the 64-bit integer type.</i>
-    typealias Int : Int64
+    typealias Int = Int64
   </pre>
 
   <h4 id="stdlib-Int">Int, Int8, Int16, Int32, Int64</h4>

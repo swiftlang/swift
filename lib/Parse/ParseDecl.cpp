@@ -546,9 +546,8 @@ Decl *Parser::parseExtensionBody(SourceLoc ExtensionLoc, Type Ty,
 
 /// parseDeclTypeAlias
 ///   decl-typealias:
-///     'typealias' identifier ':' type
+///     'typealias' identifier '=' type
 ///
-/// FIXME: Grammar is wrong and icky.
 TypeAliasDecl *Parser::parseDeclTypeAlias(bool WantDefinition) {
   SourceLoc TypeAliasLoc = consumeToken(tok::kw_typealias);
   
@@ -558,8 +557,8 @@ TypeAliasDecl *Parser::parseDeclTypeAlias(bool WantDefinition) {
   if (parseIdentifier(Id, diag::expected_identifier_in_decl, "typealias"))
     return nullptr;
   
-  if (WantDefinition || Tok.is(tok::colon)) {
-    if (parseToken(tok::colon, diag::expected_colon_in_typealias) ||
+  if (WantDefinition || Tok.is(tok::equal)) {
+    if (parseToken(tok::equal, diag::expected_equal_in_typealias) ||
         parseType(Ty, diag::expected_type_in_typealias))
       return nullptr;
     
