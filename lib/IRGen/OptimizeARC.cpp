@@ -222,7 +222,10 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
   
     // Don't analyze PHI nodes.  We can't move retains before them and they 
     // aren't "interesting".
-    if (isa<PHINode>(BBI)) {
+    if (isa<PHINode>(BBI) ||
+        // If we found the instruction that defines the value we're releasing,
+        // don't push the release past it.
+        &*BBI == ReleasedObject) {
       ++BBI;
       goto OutOfLoop;
     }
