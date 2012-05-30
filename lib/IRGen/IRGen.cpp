@@ -210,6 +210,8 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   PassManager ModulePasses;
   ModulePasses.add(new llvm::TargetData(*TargetData));
   PMBuilder.populateModulePassManager(ModulePasses);
+  if (Opts.Verify)
+    ModulePasses.add(createVerifierPass());
 
   // Do it.
   ModulePasses.run(*Module);
