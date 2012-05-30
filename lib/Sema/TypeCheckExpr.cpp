@@ -260,7 +260,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // and the argument is coercible to that type, this is a type cast.
     if (isDirectTypeReference(E1) && isCoercibleToType(E2, Ty)) {
       assert(!Ty->is<LValueType>() && "Cannot coerce to lvalue type!");
-      return new (Context) CoerceExpr(E1, coerceToType(E2, Ty));
+      return new (Context) CoerceExpr(E1, coerceToType(E2, Ty), Ty);
     }
 
     // Check for a type with a constructor.
@@ -607,7 +607,12 @@ public:
   }
 
   Expr *visitCoerceExpr(CoerceExpr *E) {
-    assert(!E->getType()->isUnresolvedType());
+    // The type of the expr is always the type that the MetaType LHS specifies.
+    assert(!E->getType()->isUnresolvedType() &&"Type always specified by cast");
+    
+    // If we didn't successfully apply a type to the RHS, keep trying.
+    if (E->getRHS()->getType()->isUnresolvedType())
+      E->setRHS(TC.coerceToType(E->getRHS(), E->getType()));
     return E;
   }
     

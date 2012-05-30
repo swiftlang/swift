@@ -1649,13 +1649,16 @@ public:
 /// CoerceExpr - Represents a function application a(b) that is actually a
 /// type coercion of the expression 'b' to the type 'a'. This expression
 /// is not used for actual casts, because those are constructor calls.
+///
+/// "a" is always a DeclRefExpr of MetaTypeType, e.g. "Int64" in "Int64(2)"
+///
 class CoerceExpr : public Expr {
   Expr *LHS;
   Expr *RHS;
   
 public:
-  CoerceExpr(Expr *LHS, Expr *RHS)
-    : Expr(ExprKind::Coerce, RHS->getType()), LHS(LHS), RHS(RHS) { }
+  CoerceExpr(Expr *LHS, Expr *RHS, Type Ty)
+    : Expr(ExprKind::Coerce, Ty), LHS(LHS), RHS(RHS) { }
            
   Expr *getLHS() const { return LHS; }
   Expr *getRHS() const { return RHS; }
