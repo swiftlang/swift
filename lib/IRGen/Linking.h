@@ -140,6 +140,7 @@ public:
   }
 
   void mangle(llvm::raw_ostream &out) const;
+  bool isLocalLinkage() const;
 
   ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));

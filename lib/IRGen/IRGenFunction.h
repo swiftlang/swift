@@ -321,8 +321,6 @@ public:
   void setLocalFunc(FuncDecl*, Address);
   void emitLocalFunction(FuncDecl *func);
 
-  llvm::Function *getAddrOfLocalInjectionFunction(OneOfElementDecl*);
-
 private:
   llvm::DenseMap<FuncDecl*, Address> LocalFuncs;
   llvm::DenseMap<VarDecl*, OwnedAddress> LocalVars;

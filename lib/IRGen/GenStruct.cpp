@@ -27,6 +27,7 @@
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "Linking.h"
 #include "LValue.h"
 #include "Explosion.h"
 
@@ -197,7 +198,7 @@ void IRGenModule::emitStructType(StructType *st) {
       const StructTypeInfo &typeInfo =
           getFragileTypeInfo(st).as<StructTypeInfo>();
       OneOfElementDecl *elt = cast<OneOfElementDecl>(member);
-      llvm::Function *fn = getAddrOfGlobalInjectionFunction(elt);
+      llvm::Function *fn = getAddrOfInjectionFunction(elt);
       emitInjectionFunction(*this, fn, typeInfo, elt);
       continue;
     }
@@ -250,7 +251,7 @@ void IRGenFunction::emitStructType(StructType *st) {
           getFragileTypeInfo(st).as<StructTypeInfo>();
       OneOfElementDecl *elt =
           cast<OneOfElementDecl>(st->getDecl()->getMembers().back());
-      llvm::Function *fn = getAddrOfLocalInjectionFunction(elt);
+      llvm::Function *fn = IGM.getAddrOfInjectionFunction(elt);
       emitInjectionFunction(IGM, fn, typeInfo, elt);
       continue;
     }

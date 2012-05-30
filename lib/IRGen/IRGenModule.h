@@ -180,7 +180,7 @@ public:
   Address getAddrOfGlobalVariable(VarDecl *D);
   llvm::Function *getAddrOfGlobalFunction(FuncDecl *D, ExplosionKind kind,
                                           unsigned curryingLevel);
-  llvm::Function *getAddrOfGlobalInjectionFunction(OneOfElementDecl *D);
+  llvm::Function *getAddrOfInjectionFunction(OneOfElementDecl *D);
   llvm::Function *getAddrOfGetter(ValueDecl *D, ExplosionKind kind);
   llvm::Function *getAddrOfSetter(ValueDecl *D, ExplosionKind kind);
   llvm::Function *getAddrOfValueWitness(Type concreteType, ValueWitness index);

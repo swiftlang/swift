@@ -115,19 +115,109 @@ void IRGenFunction::emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem) 
   }
 }
 
+static bool isLocalLinkageDecl(Decl *D) {
+  DeclContext *DC = D->getDeclContext();
+  while (!DC->isModuleContext()) {
+    if (DC->isLocalContext())
+      return true;
+    DC = DC->getParent();
+  }
+  return false;
+}
+
+static bool isLocalLinkageType(Type type) {
+  TypeBase *base = type.getPointer();
+
+  switch (base->getKind()) {
+  case TypeKind::Error:
+    llvm_unreachable("error type in IRGen");
+  case TypeKind::UnstructuredUnresolved:
+    llvm_unreachable("unresolved type in IRGen");
+  case TypeKind::Archetype:
+    llvm_unreachable("can't build a LinkEntity for an archetype!");
+
+  case TypeKind::MetaType:
+    return isLocalLinkageDecl(cast<MetaTypeType>(base)->getTypeDecl());
+  case TypeKind::Module:
+    return false;
+
+  // We don't care about these types being a bit verbose because we
+  // don't expect them to come up that often in API names.
+  case TypeKind::BuiltinFloat:
+  case TypeKind::BuiltinInteger:
+  case TypeKind::BuiltinRawPointer:
+  case TypeKind::BuiltinObjectPointer:
+  case TypeKind::BuiltinObjCPointer:
+    return false;
+
+#define SUGARED_TYPE(id, parent) \
+  case TypeKind::id: \
+    return isLocalLinkageType(cast<id##Type>(base)->getDesugaredType());
+#define TYPE(id, parent)
+#include "swift/AST/TypeNodes.def"
+
+  case TypeKind::LValue:
+    return isLocalLinkageType(cast<LValueType>(base)->getObjectType());
+
+  case TypeKind::Tuple: {
+    TupleType *tuple = cast<TupleType>(base);
+    for (auto &field : tuple->getFields()) {
+      if (isLocalLinkageType(field.getType()))
+        return true;
+    }
+    return false;
+  }
+
+  case TypeKind::OneOf:
+  case TypeKind::Struct:
+  case TypeKind::Class:
+  case TypeKind::Protocol:
+    return isLocalLinkageDecl(cast<NominalType>(base)->getDecl());
+
+  case TypeKind::Function: {
+    FunctionType *fn = cast<FunctionType>(base);
+    return isLocalLinkageType(fn->getInput()) ||
+           isLocalLinkageType(fn->getResult());
+  }
+
+  case TypeKind::Array:
+    return isLocalLinkageType(cast<ArrayType>(base)->getBaseType());
+
+  case TypeKind::ProtocolComposition:
+    for (Type t : cast<ProtocolCompositionType>(base)->getProtocols())
+      if (isLocalLinkageType(t))
+        return true;
+    return false;
+  }
+  llvm_unreachable("bad type kind");
+}
+
+bool LinkEntity::isLocalLinkage() const {
+  if (getKind() == Kind::ValueWitness) {
+    return isLocalLinkageType(getType());
+  }
+  assert(isDeclKind(getKind()));
+  return isLocalLinkageDecl(getDecl());
+}
+
 LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity) {
   LinkInfo result;
 
   llvm::raw_svector_ostream nameStream(result.Name);
   entity.mangle(nameStream);
 
-  // The linkage for a value witness is linkonce_odr.
-  if (entity.isValueWitness()) {
+  if (entity.isLocalLinkage()) {
+    // If an entity isn't visible outside this translation unit,
+    // it has internal linkage.
+    result.Linkage = llvm::GlobalValue::InternalLinkage;
+    result.Visibility = llvm::GlobalValue::DefaultVisibility;
+    return result;
+  } else if (entity.isValueWitness()) {
+    // The linkage for a value witness is linkonce_odr.
     result.Linkage = llvm::GlobalValue::LinkOnceODRLinkage;
     result.Visibility = llvm::GlobalValue::HiddenVisibility;
-
-  // Give everything else external linkage.
   } else {
+    // Give everything else external linkage.
     result.Linkage = llvm::GlobalValue::ExternalLinkage;
     result.Visibility = llvm::GlobalValue::DefaultVisibility;
   }
@@ -263,7 +353,7 @@ static llvm::FunctionType *getInjectionFunctionType(OneOfElementDecl *D,
 /// getAddrOfGlobalInjectionFunction - Get the address of the function to
 /// perform a particular injection into a oneof type.
 llvm::Function *
-IRGenModule::getAddrOfGlobalInjectionFunction(OneOfElementDecl *D) {
+IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
   LinkEntity entity = LinkEntity::forFunction(D, ExplosionKind::Minimal, 0);
 
   llvm::Function *&entry = GlobalFuncs[entity];
@@ -273,31 +363,6 @@ IRGenModule::getAddrOfGlobalInjectionFunction(OneOfElementDecl *D) {
   LinkInfo link = LinkInfo::get(*this, entity);
   entry = link.getOrCreateFunction(*this, fnType);
   return entry;
-}
-
-/// getAddrOfLocalInjectionFunction - Get the address of the function to
-/// perform a particular injection into a oneof type.
-llvm::Function *
-IRGenFunction::getAddrOfLocalInjectionFunction(OneOfElementDecl *D) {
-  llvm::Function *&entry = LocalInjectionFuncs[D];
-  if (entry) return entry;
-
-  llvm::FunctionType *fnType = getInjectionFunctionType(D, IGM);
-  ValueDecl *ParentOneOf;
-  // FIXME: OneOfElementDecl in struct is a hack.
-  if (isa<StructDecl>(D->getDeclContext()))
-    ParentOneOf = cast<StructDecl>(D->getDeclContext());
-  else
-    ParentOneOf = cast<OneOfDecl>(D->getDeclContext());
-  llvm::SmallString<64> InjectionName = ParentOneOf->getName().str();
-  InjectionName += '.';
-  InjectionName += D->getName().str();
-  InjectionName += ".injection";
-  llvm::Function *addr =
-      llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
-                             InjectionName.str(), &IGM.Module);
-  entry = addr;
-  return addr;
 }
 
 /// Returns the address of a value-witness function.

@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Attr.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
@@ -174,10 +175,18 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     return;
 
   case DeclContextKind::CapturingExpr:
+    // FIXME: We need a real solution here for local types.
+    if (FuncExpr *FE = dyn_cast<FuncExpr>(ctx)) {
+      if (FE->getDecl()) {
+        mangleDeclName(FE->getDecl());
+        return;
+      }
+    }
+    llvm_unreachable("unnamed closure mangling not yet implemented");
+
   case DeclContextKind::TopLevelCodeDecl:
-    // FIXME: we don't need to agree about these across components, but
-    // that's no excuse for not mangling *something* in here.
-    break;
+    // FIXME: I'm not sure this is correct.
+    return;
   }
 
   llvm_unreachable("bad decl context");
@@ -444,6 +453,9 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 
   // Add the prefix.
   buffer << "_T"; // T is for Tigger
+
+  if (isLocalLinkage())
+    buffer << "L";
 
   Mangler mangler(buffer);
 

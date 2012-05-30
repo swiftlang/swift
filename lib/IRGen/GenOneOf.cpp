@@ -374,18 +374,8 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
 void swift::irgen::emitOneOfElementRef(IRGenFunction &IGF,
                                        OneOfElementDecl *elt,
                                        Explosion &result) {
-  // Find the injection function.
-  llvm::Function *injection;
-  Decl *ParentOneOf;
-  // FIXME: OneOfElement in Struct is a hack!
-  if (isa<StructDecl>(elt->getDeclContext()))
-    ParentOneOf = cast<StructDecl>(elt->getDeclContext());
-  else
-    ParentOneOf = cast<OneOfDecl>(elt->getDeclContext());
-  if (ParentOneOf->getDeclContext()->isLocalContext())
-    injection = IGF.getAddrOfLocalInjectionFunction(elt);
-  else
-    injection = IGF.IGM.getAddrOfGlobalInjectionFunction(elt);
+  // Get the injection function.
+  llvm::Function *injection = IGF.IGM.getAddrOfInjectionFunction(elt);
 
   // If the element is of function type, just emit this as a function
   // reference.  It will always literally be of function type when
@@ -420,7 +410,7 @@ static void emitInjectionFunction(IRGenModule &IGM,
 void IRGenModule::emitOneOfType(OneOfType *oneof) {
   const OneofTypeInfo &typeInfo = getFragileTypeInfo(oneof).as<OneofTypeInfo>();
   for (auto elt : oneof->getDecl()->getElements()) {
-    llvm::Function *fn = getAddrOfGlobalInjectionFunction(elt);
+    llvm::Function *fn = getAddrOfInjectionFunction(elt);
     emitInjectionFunction(*this, fn, typeInfo, elt);
   }
 }
@@ -428,7 +418,7 @@ void IRGenModule::emitOneOfType(OneOfType *oneof) {
 void IRGenFunction::emitOneOfType(OneOfType *oneof) {
   const OneofTypeInfo &typeInfo = getFragileTypeInfo(oneof).as<OneofTypeInfo>();
   for (auto elt : oneof->getDecl()->getElements()) {
-    llvm::Function *fn = getAddrOfLocalInjectionFunction(elt);
+    llvm::Function *fn = IGM.getAddrOfInjectionFunction(elt);
     emitInjectionFunction(IGM, fn, typeInfo, elt);
   }
 }
