@@ -113,6 +113,30 @@ SourceLoc Parser::consumeToken() {
   return Loc;
 }
 
+SourceLoc Parser::consumeStartingLess() {
+  assert(startsWithLess(Tok) && "Token does not start with '<'");
+  
+  if (Tok.getLength() == 1)
+    return consumeToken();
+  
+  // Skip the starting '<' in the existing token.
+  SourceLoc Loc = Tok.getLoc();
+  Tok.setText(Tok.getText().substr(1));
+  return Loc;
+}
+
+SourceLoc Parser::consumeStartingGreater() {
+  assert(startsWithGreater(Tok) && "Token does not start with '>'");
+  
+  if (Tok.getLength() == 1)
+    return consumeToken();
+  
+  // Skip the starting '>' in the existing token.
+  SourceLoc Loc = Tok.getLoc();
+  Tok.setText(Tok.getText().substr(1));
+  return Loc;
+}
+
 /// skipUntil - Read tokens until we get to the specified token, then return.
 /// Because we cannot guarantee that the token will ever occur, this skips to
 /// some likely good stopping point.

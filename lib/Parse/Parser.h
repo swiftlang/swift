@@ -138,7 +138,27 @@ public:
   InFlightDiagnostic diagnose(Token Tok, ArgTypes... Args) {
     return Diags.diagnose(Tok.getLoc(), Diagnostic(Args...));
   }
-                   
+     
+  /// \brief Check whether the current token starts with '<'.
+  bool startsWithLess(Token Tok) {
+    return Tok.is(tok::oper) && Tok.getText()[0] == '<';
+  }
+
+  /// \brief Check whether the current token starts with '>'.
+  bool startsWithGreater(Token Tok) {
+    return Tok.is(tok::oper) && Tok.getText()[0] == '>';
+  }
+
+  /// \brief Consume the starting '<' of the current token, which may either
+  /// be a complete '<' token or some kind of operator token starting with '<',
+  /// e.g., '<>'.
+  SourceLoc consumeStartingLess();
+
+  /// \brief Consume the starting '>' of the current token, which may either
+  /// be a complete '>' token or some kind of operator token starting with '>',
+  /// e.g., '>>'.
+  SourceLoc consumeStartingGreater();
+
   //===--------------------------------------------------------------------===//
   // Primitive Parsing
 
@@ -260,6 +280,7 @@ public:
   bool parseTypeAnnotation(Type &Result);
   bool parseTypeAnnotation(Type &Result, Diag<> ID);
   bool parseTypeIdentifier(Type &Result);
+  bool parseTypeComposition(Type &Result);
   bool parseTypeTupleBody(SourceLoc LPLoc, Type &Result);
   
   bool parseTypeArray(Type &result);

@@ -818,6 +818,64 @@ private:
   ProtocolType(ProtocolDecl *TheDecl);
 };
 
+/// ProtocolCompositionType - A type that composes some number of protocols
+/// together to represent types that conform to all of the named protocols.
+///
+/// \code
+/// protocol P { /* ... */ }
+/// protocol Q { /* ... */ }
+/// var x : protocol<P, Q>
+/// \endcode
+///
+/// Here, the type of x is a a composition of the protocols 'P' and 'Q'.
+///
+/// The canonical form of a protocol composition type is based on a sorted (by
+/// module and name), minimized (based on redundancy due to protocol
+/// inheritance) protocol list. If the sorted, minimized list is a single
+/// protocol, then the canonical type is that protocol type. Otherwise, it is
+/// a composition of the protocols in that list.
+class ProtocolCompositionType : public TypeBase, public llvm::FoldingSetNode {
+  ASTContext &Ctx; // Note: Needed for canonicalization of the empty case.
+  SourceLoc FirstLoc; // FIXME: Egregious hack due to lack of TypeLocs
+  ArrayRef<Type> Protocols;
+  
+public:
+  /// \brief Retrieve an instance of a protocol composition type with the
+  /// given set of protocols.
+  static ProtocolCompositionType *
+  get(ASTContext &C, SourceLoc FirstLoc, ArrayRef<Type> Protocols);
+  
+  /// \brief Retrieve the source location where this type was first uttered.
+  /// FIXME: This is a hackaround for the lack of TypeLocs.
+  SourceLoc getFirstLoc() const { return FirstLoc; }
+  
+  /// \brief Retrieve the AST context of this type.
+  ASTContext &getASTContext() const { return Ctx; }
+  
+  /// \brief Retrieve the set of protocols composed to create this type.
+  ArrayRef<Type> getProtocols() const { return Protocols; }
+  
+  void print(raw_ostream &OS) const;
+  
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, Protocols);
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID, ArrayRef<Type> Protocols);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ProtocolCompositionType *) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::ProtocolComposition;
+  }
+  
+private:
+  ProtocolCompositionType(ASTContext &Ctx, SourceLoc FirstLoc,
+                          ArrayRef<Type> Protocols)
+    : TypeBase(TypeKind::ProtocolComposition, /*Context=*/nullptr,
+               /*Unresolved=*/false),
+      Ctx(Ctx), FirstLoc(FirstLoc), Protocols(Protocols) { }
+};
+
 /// LValueType - An l-value is a handle to a physical object.  The
 /// type of that object uniquely determines the type of an l-value
 /// for it.

@@ -223,6 +223,7 @@ void Mangler::mangleDeclName(ValueDecl *decl) {
 /// Type manglings should never start with [0-9_].
 ///
 /// <type> ::= A <natural> <type>    # fixed-sized arrays
+/// <type> ::= C <type>* _           # protocol composition (substitutable)
 /// <type> ::= F <type> <type>       # function type
 /// <type> ::= f <type> <type>       # uncurried function type
 /// <type> ::= f <natural>           # Builtin.Float
@@ -382,6 +383,18 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     return;
   }
 
+  case TypeKind::ProtocolComposition: {
+    if (tryMangleSubstitution(base))
+      return;
+    
+    // <type> ::= C <type>* _
+    Buffer << 'C';
+    for (auto Proto : cast<ProtocolCompositionType>(base)->getProtocols())
+      mangleType(Proto, ExplosionKind::Minimal, 0);
+    Buffer << '_';
+    addSubstitution(base);
+    return;
+  }
   }
   llvm_unreachable("bad type kind");
 }

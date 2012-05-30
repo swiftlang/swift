@@ -81,6 +81,7 @@ SUGARED_TYPE(SubstArchetype, Type)
 TYPE(Function, Type)
 TYPE(Array, Type)
 SUGARED_TYPE(ArraySlice, Type)
+TYPE(ProtocolComposition, Type)
 TYPE(LValue, Type)
 
 #undef TYPE_RANGE

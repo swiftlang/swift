@@ -89,6 +89,7 @@ bool Parser::parseType(Type &Result) {
 ///   type-simple:
 ///     type-identifier
 ///     type-tuple
+///     type-composition
 ///
 bool Parser::parseType(Type &Result, Diag<> MessageID) {
   // Parse type-simple first.
@@ -97,6 +98,10 @@ bool Parser::parseType(Type &Result, Diag<> MessageID) {
   switch (Tok.getKind()) {
   case tok::identifier:
     if (parseTypeIdentifier(Result))
+      return true;
+    break;
+  case tok::kw_protocol:
+    if (parseTypeComposition(Result))
       return true;
     break;
   case tok::l_paren:
@@ -170,7 +175,73 @@ bool Parser::parseTypeIdentifier(Type &Result) {
   return false;
 }
 
+/// parseTypeComposition
+///   
+///   type-composition:
+///     'protocol' '<' type-composition-list? '>'
+///
+///   type-composition-list:
+///     type-identifier (',' type-identifier)*
+///
+bool Parser::parseTypeComposition(Type &Result) {
+  SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
+ 
+  // Check for the starting '<'.
+  if (!startsWithLess(Tok)) {
+    diagnose(Tok.getLoc(), diag::expected_langle_protocol);
+    return true;
+  }
+  SourceLoc LAngleLoc = consumeStartingLess();
+  
+  // Check for empty protocol composition.
+  if (startsWithGreater(Tok)) {
+    consumeStartingGreater();
+    Result = ProtocolCompositionType::get(Context, ProtocolLoc,
+                                          ArrayRef<Type>());
+    return false;
+  }
+  
+  // Parse the type-composition-list.
+  bool Invalid = false;
+  SmallVector<Type, 4> Protocols;
+  do {
+    // Parse the type-identifier.
+    Type Protocol;
+    if (parseTypeIdentifier(Protocol)) {
+      Invalid = true;
+      break;
+    }
+    
+    Protocols.push_back(Protocol);
+    
+    if (Tok.is(tok::comma)) {
+      consumeToken();
+      continue;
+    }
+    
+    break;
+  } while (true);
+  
+  // Check for the terminating '>'.
+  if (!startsWithGreater(Tok)) {
+    if (!Invalid) {
+      diagnose(Tok.getLoc(), diag::expected_rangle_protocol);
+      diagnose(LAngleLoc, diag::opening_angle);
+    }
 
+    // Skip until we hit the '>'.
+    skipUntil(tok::oper);
+    if (startsWithGreater(Tok))
+      consumeStartingGreater();
+    
+  } else {
+    consumeStartingGreater();
+  }
+  
+  Result = ProtocolCompositionType::get(Context, ProtocolLoc,
+                                        Context.AllocateCopy(Protocols));
+  return false;
+}
 
 /// parseTypeTupleBody
 ///   type-tuple:

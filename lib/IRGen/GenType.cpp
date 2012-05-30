@@ -234,6 +234,9 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, CanType canTy) {
   case TypeKind::Protocol:
     return convertProtocolType(IGM, cast<ProtocolType>(ty));
       
+  case TypeKind::ProtocolComposition:
+      llvm_unreachable("ProtocolComposition types are unimplemented");
+      
   case TypeKind::Archetype:
     // FIXME: In generics, these will have a representation. Will it simply
     // be a fixed buffer?

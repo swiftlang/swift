@@ -53,6 +53,8 @@ NOTE(opening_bracket,parsing,none,
      "to match this opening '['", ())
 NOTE(opening_paren,parsing,none,
      "to match this opening '('", ())
+NOTE(opening_angle,parsing,none,
+     "to match this opening '<'", ())
 NOTE(previous_decldef,parsing,none,
      "previous %select{declaration|definition}0 of %1 is here", 
      (bool, Identifier))
@@ -304,6 +306,10 @@ ERROR(expected_lbrace_protocol_type,type_parsing,none,
       "expected '{' in protocol type", ())
 ERROR(expected_protocol_member,type_parsing,none,
       "expected a function or variable declaration in protocol", ())
+ERROR(expected_langle_protocol,type_parsing,none,
+      "expected '<' in protocol composition type", ())
+ERROR(expected_rangle_protocol,type_parsing,none,
+      "expected '>' to complete protocol composition type", ())
 
 //------------------------------------------------------------------------------
 // Pattern parsing diagnostics
@@ -688,6 +694,8 @@ ERROR(circular_protocol_def,sema_tcd,none,
       "circular protocol inheritance %0", (StringRef))
 NOTE(protocol_here,sema_tcd,none,
      "protocol %0 declared here", (Identifier))
+ERROR(protocol_composition_not_protocol,sema_tcd,none, 
+      "non-protocol type %0 cannot be used within 'protocol<...>'", (Type))
 
 //------------------------------------------------------------------------------
 // Type Check Expressions

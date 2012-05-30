@@ -216,6 +216,23 @@ bool TypeChecker::validateType(Type InTy, bool isFirstPass) {
       IsInvalid = buildArraySliceType(*this, AT);
     break;
   }
+      
+  case TypeKind::ProtocolComposition: {
+    ProtocolCompositionType *PC = cast<ProtocolCompositionType>(T);
+    for (auto Proto : PC->getProtocols()) {
+      if (validateType(Proto, isFirstPass))
+        IsInvalid = true;
+      else if (isFirstPass &&
+               !Proto->is<ProtocolType>() &&
+               !Proto->is<ProtocolCompositionType>()) {
+        // FIXME: Terrible source-location information.
+        diagnose(PC->getFirstLoc(), diag::protocol_composition_not_protocol,
+                 Proto);
+        IsInvalid = true;
+      }
+    }
+    break;
+  }
   }
 
   // If we determined that this type is invalid, erase it in the caller.
@@ -537,6 +554,37 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
       return T;
     
     return LValueType::get(ObjectTy, LValue->getQualifiers(), Context);
+  }
+      
+  case TypeKind::ProtocolComposition: {
+    auto PC = cast<ProtocolCompositionType>(T);
+    SmallVector<Type, 4> Protocols;
+    bool AnyChanged = false;
+    unsigned Index = 0;
+    for (auto Proto : PC->getProtocols()) {
+      auto SubstProto = substType(Proto, Substitutions);
+      if (!SubstProto)
+        return Type();
+      
+      if (AnyChanged) {
+        Protocols.push_back(SubstProto);
+        ++Index;
+        continue;
+      }
+      
+      if (SubstProto.getPointer() != Proto.getPointer()) {
+        AnyChanged = true;
+        Protocols.append(Protocols.begin(), Protocols.begin() + Index);
+        Protocols.push_back(SubstProto);
+      }
+      
+      ++Index;
+    }
+    
+    if (!AnyChanged)
+      return T;
+    
+    return ProtocolCompositionType::get(Context, PC->getFirstLoc(), Protocols);
   }
   }
   

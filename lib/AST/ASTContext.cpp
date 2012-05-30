@@ -42,7 +42,9 @@ struct ASTContext::Implementation {
     LValueTypes;
   llvm::DenseMap<std::pair<ArchetypeType *, Type>, SubstArchetypeType *>
     SubstArchetypeTypes;
+  llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
 };
+
 ASTContext::Implementation::Implementation()
  : IdentifierTable(Allocator) {}
 ASTContext::Implementation::~Implementation() {}
@@ -184,6 +186,24 @@ IdentifierType *IdentifierType::getNew(ASTContext &C,
                                        MutableArrayRef<Component> Components) {
   Components = C.AllocateCopy(Components);
   return new (C) IdentifierType(Components);
+}
+
+ProtocolCompositionType *
+ProtocolCompositionType::get(ASTContext &C, SourceLoc FirstLoc,
+                             ArrayRef<Type> Protocols) {
+  // Check to see if we've already seen this protocol composition before.
+  void *InsertPos = 0;
+  llvm::FoldingSetNodeID ID;
+  ProtocolCompositionType::Profile(ID, Protocols);
+  if (ProtocolCompositionType *Result
+        = C.Impl.ProtocolCompositionTypes.FindNodeOrInsertPos(ID, InsertPos))
+    return Result;
+  
+  // Create a new protocol composition type.
+  ProtocolCompositionType *New = new (C) ProtocolCompositionType(C, FirstLoc,
+                                                                 Protocols);
+  C.Impl.ProtocolCompositionTypes.InsertNode(New, InsertPos);
+  return New;
 }
 
 

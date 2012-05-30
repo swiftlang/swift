@@ -18,7 +18,12 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/AST.h"
 #include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/SmallMap.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
+#include <algorithm>
+#include <iterator>
 using namespace swift;
 
 // Only allow allocation of Stmts using the allocator in ASTContext.
@@ -86,6 +91,7 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
   case TypeKind::Module:
   case TypeKind::Protocol:
   case TypeKind::Archetype:
+  case TypeKind::ProtocolComposition:
     return this;
 
   case TypeKind::NameAlias:
@@ -209,6 +215,116 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
   }
 }
 
+/// \brief Collect the protocols in the existential type T into the given
+/// vector.
+static void addProtocols(Type T, SmallVectorImpl<ProtocolDecl *> &Protocols) {
+  if (auto Proto = T->getAs<ProtocolType>()) {
+    Protocols.push_back(Proto->getDecl());
+  } else if (auto PC = T->getAs<ProtocolCompositionType>()) {
+    for (auto P : PC->getProtocols())
+      addProtocols(P, Protocols);
+  }
+}
+
+/// \brief Add the protocol (or protocols) in the type T to the stack of
+/// protocols, checking whether any of the protocols had already been seen and
+/// zapping those in the original list that we find again.
+static void addMinimumProtocols(Type T,
+                                SmallVectorImpl<ProtocolDecl *> &Protocols,
+                                llvm::SmallMap<ProtocolDecl *, unsigned> &Known,
+                                llvm::SmallPtrSet<ProtocolDecl *, 16> &Visited,
+                                SmallVector<ProtocolDecl *, 16> &Stack,
+                                bool &ZappedAny) {
+  if (auto Proto = T->getAs<ProtocolType>()) {
+    llvm::SmallMap<ProtocolDecl *, unsigned>::iterator KnownPos
+      = Known.find(Proto->getDecl());
+    if (KnownPos != Known.end()) {
+      // We've come across a protocol that is in our original list. Zap it.
+      Protocols[KnownPos->second] = nullptr;
+      ZappedAny = true;
+    }
+
+    if (Visited.insert(Proto->getDecl())) {
+      for (auto Inherited : Proto->getDecl()->getInherited())
+        addProtocols(Inherited, Stack);
+    }
+    return;
+  }
+  
+  if (auto PC = T->getAs<ProtocolCompositionType>()) {
+    for (auto C : PC->getProtocols()) {
+      addMinimumProtocols(C, Protocols, Known, Visited, Stack, ZappedAny);
+    }
+  }
+}
+
+/// \brief 'Minimize' the given set of protocols by eliminating any mentions of
+/// protocols that are already covered by inheritance due to other entries in
+/// the protocol list.
+static void minimizeProtocols(SmallVectorImpl<ProtocolDecl *> &Protocols) {
+  llvm::SmallMap<ProtocolDecl *, unsigned> Known;
+  llvm::SmallPtrSet<ProtocolDecl *, 16> Visited;
+  SmallVector<ProtocolDecl *, 16> Stack;
+  bool ZappedAny = false;
+
+  // Seed the stack with the protocol declarations in the original list.
+  // Zap any obvious duplicates along the way.
+  for (unsigned I = 0, N = Protocols.size(); I != N; ++I) {
+    // Check whether we've seen this protocol before.
+    llvm::SmallMap<ProtocolDecl *, unsigned>::iterator KnownPos
+      = Known.find(Protocols[I]);
+    
+    // If we have not seen this protocol before, record it's index.
+    if (KnownPos == Known.end()) {
+      Known[Protocols[I]] = I;
+      Stack.push_back(Protocols[I]);
+      continue;
+    }
+    
+    // We have seen this protocol before; zap this occurrance.
+    Protocols[I] = 0;
+    ZappedAny = true;
+  }
+  
+  // Walk the inheritance hierarchies of all of the protocols. If we run into
+  // one of the known protocols, zap it from the original list.
+  while (!Stack.empty()) {
+    ProtocolDecl *Current = Stack.back();
+    Stack.pop_back();
+    
+    // Add the protocols we inherited.
+    for (auto Inherited : Current->getInherited()) {
+      addMinimumProtocols(Inherited, Protocols, Known, Visited, Stack,
+                          ZappedAny);
+    }
+  }
+  
+  if (ZappedAny)
+    Protocols.erase(std::remove(Protocols.begin(), Protocols.end(), nullptr),
+                    Protocols.end());
+}
+
+/// \brief Compare two protocols to establish an ordering between them.
+static int compareProtocols(const void *V1, const void *V2) {
+  const ProtocolDecl *P1 = *reinterpret_cast<const ProtocolDecl *const *>(V1);
+  const ProtocolDecl *P2 = *reinterpret_cast<const ProtocolDecl *const *>(V2);
+ 
+  DeclContext *DC1 = P1->getDeclContext();
+  while (!DC1->isModuleContext())
+    DC1 = DC1->getParent();
+  DeclContext *DC2 = P2->getDeclContext();
+  while (!DC2->isModuleContext())
+    DC2 = DC2->getParent();
+  
+  // Try ordering based on module name, first.
+  if (int result
+        = cast<Module>(DC1)->Name.str().compare(cast<Module>(DC2)->Name.str()))
+    return result;
+  
+  // Order based on protocol name.
+  return P1->getName().str().compare(P2->getName().str());
+}
+
 /// getCanonicalType - Return the canonical version of this type, which has
 /// sugar from all levels stripped off.
 CanType TypeBase::getCanonicalType() {
@@ -277,11 +393,51 @@ CanType TypeBase::getCanonicalType() {
                                In->getASTContext());
     break;
   }
-  case TypeKind::Array:
+  case TypeKind::Array: {
     ArrayType *AT = cast<ArrayType>(this);
     Type EltTy = AT->getBaseType()->getCanonicalType();
     Result = ArrayType::get(EltTy, AT->getSize(), EltTy->getASTContext());
     break;
+  }
+  case TypeKind::ProtocolComposition: {
+    // Collect all of the protocols composed together.
+    auto PC = cast<ProtocolCompositionType>(this);
+    SmallVector<ProtocolDecl *, 4> Protocols;
+    addProtocols(this, Protocols);
+    
+    // Minimize the set of protocols composed together.
+    minimizeProtocols(Protocols);
+    
+    // If one protocol remains, its nominal type is the canonical type.
+    if (Protocols.size() == 1)
+      Result = Protocols.front()->getDeclaredType().getPointer();
+    else {
+      // Sort the set of protocols by module + name, to give a stable
+      // ordering.
+      // FIXME: Consider namespaces here as well.
+      llvm::array_pod_sort(Protocols.begin(),Protocols.end(), compareProtocols);
+      
+      // Form the set of canonical protocol types from the protocol
+      // declarations, and use that to buid the canonical composition type.
+      SmallVector<Type, 4> ProtocolTypes;
+      std::transform(Protocols.begin(), Protocols.end(),
+                     std::back_inserter(ProtocolTypes),
+                     [](ProtocolDecl *Proto) {
+                       return Proto->getDeclaredType();
+                     });
+      
+      Result = ProtocolCompositionType::get(PC->getASTContext(),
+                                            PC->getFirstLoc(),
+                                            ProtocolTypes);
+      // We now know that the result type we computed is canonical; make it so.
+      Result->CanonicalType = &PC->getASTContext();
+    }
+    
+    // If the result type we found was ourselves, we're done.
+    if (this == Result)
+      return CanType(Result);
+    break;
+  }
   }
     
   
@@ -302,6 +458,7 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::Function:
   case TypeKind::Array:
   case TypeKind::LValue:
+  case TypeKind::ProtocolComposition:
     // None of these types have sugar at the outer level.
     return this;
   case TypeKind::Paren:
@@ -440,6 +597,13 @@ ArchetypeType *ArchetypeType::getNew(StringRef DisplayName, ASTContext &Ctx) {
                                              DisplayName.size()),
                                    Ctx);
 }
+
+void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,
+                                      ArrayRef<Type> Protocols) {
+  for (auto P : Protocols)
+    ID.AddPointer(P.getPointer());
+}
+
 
 //===----------------------------------------------------------------------===//
 //  Type Printing
@@ -591,6 +755,19 @@ void ArrayType::print(raw_ostream &OS) const {
 
 void ProtocolType::print(raw_ostream &OS) const {
   OS << getDecl()->getName().str();
+}
+
+void ProtocolCompositionType::print(raw_ostream &OS) const {
+  OS << "protocol<";
+  bool First = true;
+  for (auto Proto : Protocols) {
+    if (First)
+      First = false;
+    else
+      OS << ", ";
+    Proto->print(OS);
+  }
+  OS << ">";
 }
 
 void LValueType::print(raw_ostream &OS) const {
