@@ -397,7 +397,27 @@ namespace {
       checkSameOrSubType(BaseTy, ContainerTy,
                          "subscript base and subscript container");
     }
-      
+
+    void verifyChecked(CoerceExpr *E) {
+      DeclRefExpr *LHS = dyn_cast_or_null<DeclRefExpr>(E->getLHS());
+      if (!LHS) {
+        Out << "CoerceExpr LHS must be a DeclRefExpr\n";
+        abort();
+      }
+      TypeDecl *TD = dyn_cast_or_null<TypeDecl>(LHS->getDecl());
+      if (!TD) {
+        Out << "CoerceExpr LHS must refer to a TypeDecl\n";
+        abort();
+      }
+      Type Ty = TD->getDeclaredType();
+      if (!Ty->isEqual(E->getType()) ||
+          !Ty->isEqual(E->getRHS()->getType())) {
+        Out << "CoerceExpr types don't match\n";
+        abort();
+      }
+    }
+
+
     void verifyParsed(NewArrayExpr *E) {
       if (E->getBounds().empty()) {
         Out << "NewArrayExpr has an empty bounds list\n";

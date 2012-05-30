@@ -1650,7 +1650,7 @@ public:
 /// type coercion of the expression 'b' to the type 'a'. This expression
 /// is not used for actual casts, because those are constructor calls.
 ///
-/// "a" is always a DeclRefExpr of MetaTypeType, e.g. "Int64" in "Int64(2)"
+/// "a" is always a DeclRefExpr for a TypeDecl, e.g. "Int64" in "Int64(2)"
 ///
 class CoerceExpr : public Expr {
   Expr *LHS;
