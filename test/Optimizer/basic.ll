@@ -5,7 +5,9 @@ target triple = "x86_64-apple-darwin11.3.0"
 %swift.refcounted = type { %swift.heapmetadata*, i64 }
 %swift.heapmetadata = type { i64 (%swift.refcounted*)*, i64 (%swift.refcounted*)* }
 
+declare %swift.refcounted* @swift_allocObject(%swift.heapmetadata* , i64, i64) nounwind
 declare void @swift_release(%swift.refcounted* nocapture)
+declare %swift.refcounted* @swift_retain(%swift.refcounted* ) nounwind
 declare void @swift_retain_noresult(%swift.refcounted* nocapture) nounwind
 
 
@@ -19,3 +21,18 @@ entry:
 ; CHECK: @trivial_retain_release(
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT: ret void
+
+
+; rdar://11542743
+define i64 @max_test(i64 %x) nounwind {
+entry:
+  %0 = tail call noalias %swift.refcounted* @swift_allocObject(%swift.heapmetadata* null, i64 24, i64 8) nounwind
+  %1 = tail call %swift.refcounted* @swift_retain(%swift.refcounted* %0) nounwind
+  tail call void @swift_release(%swift.refcounted* %0) nounwind
+  %2 = icmp sgt i64 %x, 0
+  %x.y.i = select i1 %2, i64 %x, i64 0
+  %3 = tail call %swift.refcounted* @swift_retain(%swift.refcounted* %1) nounwind
+  tail call void @swift_release(%swift.refcounted* %3) nounwind
+  tail call void @swift_release(%swift.refcounted* %1) nounwind
+  ret i64 %x.y.i
+}
