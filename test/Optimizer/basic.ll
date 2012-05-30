@@ -36,3 +36,8 @@ entry:
   tail call void @swift_release(%swift.refcounted* %1) nounwind
   ret i64 %x.y.i
 }
+; CHECK: @max_test
+; CHECK-NEXT: entry:
+; CHECK-NEXT: icmp
+; CHECK-NEXT: select
+; CHECK-NEXT: ret
