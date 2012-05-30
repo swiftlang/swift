@@ -243,6 +243,7 @@ void IRGenFunction::emitStructType(StructType *st) {
     case DeclKind::Func: {
       FuncDecl *func = cast<FuncDecl>(member);
       unimplemented(func->getLocStart(), "local member function");
+      continue;
     }
     case DeclKind::OneOfElement: {
       const StructTypeInfo &typeInfo =
