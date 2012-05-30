@@ -19,6 +19,7 @@
 
 namespace llvm {
   class Module;
+  class FunctionPass;
 }
 
 namespace swift {
@@ -66,6 +67,8 @@ namespace swift {
   void performIRGeneration(irgen::Options &Opts, llvm::Module *Module,
                            TranslationUnit *TU, unsigned StartElem = 0);
 
+  // Optimization passes.
+  llvm::FunctionPass *createSwiftARCOptPass();
 } // end namespace swift
 
 #endif

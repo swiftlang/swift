@@ -23,16 +23,11 @@
 
 namespace llvm {
   class Value;
-  class FunctionPass;
 }
 
 namespace swift {
 namespace irgen {
 
-// Optimization passes.
-llvm::FunctionPass *createSwiftARCOptPass();
-
-  
 class Size;
 
 /// Whether or not an object should be emitted on the heap.

@@ -16,7 +16,8 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "swift-optimize"
-#include "IRGen.h"
+#include "swift/Subsystems.h"
+//#include "IRGen.h"
 #include "llvm/Instructions.h"
 #include "llvm/IntrinsicInst.h"
 #include "llvm/Module.h"
@@ -626,7 +627,7 @@ INITIALIZE_PASS(SwiftARCOpt,
                 "swift-arc-optimize", "Swift ARC optimization", false, false)
 
 // Optimization passes.
-llvm::FunctionPass *swift::irgen::createSwiftARCOptPass() {
+llvm::FunctionPass *swift::createSwiftARCOptPass() {
   return new SwiftARCOpt();
 }
 
