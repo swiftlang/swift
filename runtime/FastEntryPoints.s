@@ -94,6 +94,12 @@ $0:
 
 // XXX FIXME -- We need to change this to return "void"
 BEGIN_FUNC _swift_retain
+  mov   %rdi, %rsi
+// fall through
+END_FUNC
+// XXX FIXME -- hack until we have tinycc
+// func swift_retainAndReturnThree(obj,(rsi,rdx,rcx)) -> (rax,rdx,rcx)
+BEGIN_FUNC _swift_retainAndReturnThree
   test  %rdi, %rdi
   jz    1f
   testb $RC_ATOMIC_BIT, RC_OFFSET(%rdi)
@@ -101,7 +107,7 @@ BEGIN_FUNC _swift_retain
   addl  $RC_INTERVAL, RC_OFFSET(%rdi)
   jc    2f
 1:
-  mov   %rdi, %rax
+  mov   %rsi, %rax
   ret
 2:
   int3
