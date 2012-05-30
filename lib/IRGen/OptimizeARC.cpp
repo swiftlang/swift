@@ -17,7 +17,6 @@
 
 #define DEBUG_TYPE "swift-optimize"
 #include "swift/Subsystems.h"
-//#include "IRGen.h"
 #include "llvm/Instructions.h"
 #include "llvm/IntrinsicInst.h"
 #include "llvm/Module.h"
