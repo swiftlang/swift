@@ -158,6 +158,7 @@ void IRGenFunction::emitClassType(ClassType *ct) {
     case DeclKind::TopLevelCode:
     case DeclKind::Protocol:
     case DeclKind::OneOfElement:
+    case DeclKind::Extension:
       llvm_unreachable("decl not allowed in class!");
 
     // We can have meaningful initializers for variables, but
@@ -167,9 +168,6 @@ void IRGenFunction::emitClassType(ClassType *ct) {
 
     case DeclKind::Subscript:
       // Getter/setter will be handled separately.
-      continue;
-    case DeclKind::Extension:
-      emitExtension(cast<ExtensionDecl>(member));
       continue;
     case DeclKind::TypeAlias:
       continue;

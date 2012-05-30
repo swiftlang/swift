@@ -333,7 +333,6 @@ public:
   void emitOneOfType(OneOfType *type);
   void emitStructType(StructType *type);
   void emitClassType(ClassType *type);
-  void emitExtension(ExtensionDecl *ext);
 
 //--- Global context emission --------------------------------------------------
 public:

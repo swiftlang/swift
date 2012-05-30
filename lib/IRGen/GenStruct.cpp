@@ -214,6 +214,7 @@ void IRGenFunction::emitStructType(StructType *st) {
     case DeclKind::Import:
     case DeclKind::TopLevelCode:
     case DeclKind::Protocol:
+    case DeclKind::Extension:
       llvm_unreachable("decl not allowed in struct!");
 
     // We can have meaningful initializers for variables, but
@@ -223,9 +224,6 @@ void IRGenFunction::emitStructType(StructType *st) {
 
     case DeclKind::Subscript:
       // Getter/setter will be handled separately.
-      continue;
-    case DeclKind::Extension:
-      emitExtension(cast<ExtensionDecl>(member));
       continue;
     case DeclKind::TypeAlias:
       continue;
