@@ -57,14 +57,13 @@
   .globl $0
   .align 4
 $0:
-  .cfi_startproc
 .endmacro
 
 .macro END_FUNC
-  .cfi_endproc
 .endmacro
 
 .macro SaveRegisters
+  .cfi_startproc
   push  %rbp
   mov   %rsp, %rbp
   // potentially align the stack
@@ -90,6 +89,7 @@ $0:
   pop   %rax
   // the stack may have been aligned, therefore LEAVE instead of POP %rbp
   leave
+  .cfi_endproc
 .endmacro
 
 // XXX FIXME -- We need to change this to return "void"
