@@ -124,9 +124,11 @@ BEGIN_FUNC _swift_release
 1:
   ret
 2:
-  movl  $RC_INTERVAL, %r11d
+  // workaround lack of "xsub" instruction via xadd then sub
+  movl  $-RC_INTERVAL, %r11d
   lock
   xaddl %r11d, RC_OFFSET(%rdi)
+  sub   $RC_INTERVAL, %r11d
   jc    3f
   andl  $RC_MASK, %r11d
   jz    4f
