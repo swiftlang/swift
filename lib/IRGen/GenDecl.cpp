@@ -163,11 +163,8 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
   case DeclKind::Subscript:
     llvm_unreachable("there are no global subscript operations");
       
-  // oneof elements can be found at the top level because of struct
-  // "constructor" injection.  Just ignore them here; we'll get them
-  // as part of the struct.
   case DeclKind::OneOfElement:
-    return;
+    llvm_unreachable("there are no global oneof elements");
 
   case DeclKind::TypeAlias:
     return;
@@ -491,6 +488,7 @@ void IRGenFunction::emitLocal(Decl *D) {
   case DeclKind::TopLevelCode:
   case DeclKind::Protocol:
   case DeclKind::Extension:
+  case DeclKind::OneOfElement:
     llvm_unreachable("declaration cannot appear in local scope");
 
   case DeclKind::OneOf:
@@ -503,7 +501,6 @@ void IRGenFunction::emitLocal(Decl *D) {
     return emitClassType(cast<ClassDecl>(D)->getDeclaredType());
 
   case DeclKind::TypeAlias:
-  case DeclKind::OneOfElement:
     // no IR generation support required.
     return;
 
