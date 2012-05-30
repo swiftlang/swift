@@ -397,7 +397,8 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
 
     // FIXME: Mark decls erroneous.
     // FIXME: Specialize diagnostics based on our context.
-    if (isa<ImportDecl>(D) && !(Flags & PD_AllowTopLevel))
+    if ((isa<ImportDecl>(D) || isa<ExtensionDecl>(D) || isa<ProtocolDecl>(D)) &&
+        !(Flags & PD_AllowTopLevel))
       diagnose(D->getLocStart(), diag::decl_inner_scope);
     if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
       if (VD->isOperator() && (Flags & PD_DisallowOperators))
