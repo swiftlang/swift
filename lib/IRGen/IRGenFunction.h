@@ -23,6 +23,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "DiverseStack.h"
 #include "IRBuilder.h"
+#include "JumpDest.h"
 
 namespace llvm {
   class AllocaInst;
@@ -33,7 +34,9 @@ namespace llvm {
 namespace swift {
   class AssignStmt;
   class BraceStmt;
+  class BreakStmt;
   class ClassType;
+  class ContinueStmt;
   class Decl;
   class Expr;
   class ExtensionDecl;
@@ -56,13 +59,11 @@ namespace swift {
   class WhileStmt;
 
 namespace irgen {
-  class Cleanup;
   class Condition;
   class Explosion;
   enum class ExplosionKind : unsigned;
   class HeapLayout;
   class IRGenModule;
-  class JumpDest;
   class LinkEntity;
   class LValue;
   class ManagedValue;
@@ -175,8 +176,6 @@ public:
     return pushCleanupInState<T, A...>(state, ::std::forward<A>(args)...);
   }
 
-  typedef DiverseStackImpl<Cleanup>::stable_iterator CleanupsDepth;
-
   /// Retun a stable reference to the current cleanup.
   CleanupsDepth getCleanupsDepth() const {
     return Cleanups.stable_begin();
@@ -208,6 +207,8 @@ private:
   llvm::BasicBlock *UnreachableBB;
   llvm::Instruction *JumpDestSlot;
   CleanupsDepth InnermostScope;
+  std::vector<JumpDest> BreakDestStack;
+  std::vector<JumpDest> ContinueDestStack;
 
   friend class Scope;
   Cleanup &initCleanup(Cleanup &cleanup, size_t allocSize, CleanupState state);
@@ -276,6 +277,8 @@ private:
   void emitWhileStmt(WhileStmt *S);
   void emitForStmt(ForStmt *S);
   void emitForEachStmt(ForEachStmt *S);
+  void emitBreakStmt(BreakStmt *S);
+  void emitContinueStmt(ContinueStmt *S);
 
 //--- Expression emission ------------------------------------------------------
 public:

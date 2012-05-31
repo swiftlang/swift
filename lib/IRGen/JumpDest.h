@@ -17,7 +17,7 @@
 #ifndef SWIFT_IRGEN_JUMPDEST_H
 #define SWIFT_IRGEN_JUMPDEST_H
 
-#include "IRGenFunction.h"
+#include "DiverseStack.h"
 
 namespace llvm {
   class BasicBlock;
@@ -26,18 +26,21 @@ namespace llvm {
 namespace swift {
 namespace irgen {
 
+class Cleanup;
+typedef DiverseStackImpl<Cleanup>::stable_iterator CleanupsDepth;
+
 /// The destination of a direct jump.  Swift currently does not
 /// support indirect branches or goto, so the jump mechanism only
 /// needs to worry about branches into scopes, not out of them.
 class JumpDest {
   llvm::BasicBlock *Block;
-  IRGenFunction::CleanupsDepth Depth;
+  CleanupsDepth Depth;
 public:
-  JumpDest(llvm::BasicBlock *block, IRGenFunction::CleanupsDepth depth)
+  JumpDest(llvm::BasicBlock *block, CleanupsDepth depth)
     : Block(block), Depth(depth) {}
 
   llvm::BasicBlock *getBlock() const { return Block; }
-  IRGenFunction::CleanupsDepth getDepth() const { return Depth; }
+  CleanupsDepth getDepth() const { return Depth; }
 };
 
 } // end namespace irgen

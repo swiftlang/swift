@@ -26,8 +26,8 @@ namespace irgen {
 /// statement) has been entered.
 class Scope {
   IRGenFunction &IGF;
-  IRGenFunction::CleanupsDepth Depth;
-  IRGenFunction::CleanupsDepth SavedInnermostScope;
+  CleanupsDepth Depth;
+  CleanupsDepth SavedInnermostScope;
 
   void popImpl() {
     IGF.Cleanups.checkIterator(Depth);
@@ -51,7 +51,7 @@ public:
   void pop() {
     assert(Depth.isValid() && "popping a scope twice!");
     popImpl();
-    Depth = IRGenFunction::CleanupsDepth::invalid();
+    Depth = CleanupsDepth::invalid();
   }
 
   ~Scope() {

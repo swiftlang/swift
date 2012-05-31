@@ -21,7 +21,6 @@
 
 namespace swift {
 namespace irgen {
-  class IRGenFunction;
 
 // These classes are private to GenCleanup.cpp.
 class CleanupControl;

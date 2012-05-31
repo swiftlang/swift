@@ -57,12 +57,10 @@ void IRGenFunction::emitStmt(Stmt *S) {
     return emitForEachStmt(cast<ForEachStmt>(S));
 
   case StmtKind::Break:
-    unimplemented(cast<BreakStmt>(S)->getLoc(), "break statement");
-    return;
+    return emitBreakStmt(cast<BreakStmt>(S));
 
   case StmtKind::Continue:
-    unimplemented(cast<ContinueStmt>(S)->getLoc(), "continue statement");
-    return;
+    return emitContinueStmt(cast<ContinueStmt>(S));
   }
   llvm_unreachable("bad statement kind!");
 }
@@ -136,11 +134,28 @@ void IRGenFunction::emitReturnStmt(ReturnStmt *S) {
   Builder.ClearInsertionPoint();
 }
 
+static void emitOrDeleteBlock(IRGenFunction &IGF, llvm::BasicBlock *BB) {
+  if (BB->use_empty()) {
+    // If the block is unused, we don't need it; just delete it.
+    delete BB;
+  } else {
+    // Otherwise, continue emitting code in BB.
+    if (IGF.Builder.hasValidIP())
+      IGF.Builder.CreateBr(BB);
+    IGF.Builder.emitBlockAnywhere(BB);
+  }
+}
+
 void IRGenFunction::emitWhileStmt(WhileStmt *S) {
   // Create a new basic block and jump into it.
   llvm::BasicBlock *loopBB = createBasicBlock("while");
   Builder.CreateBr(loopBB);
   Builder.emitBlock(loopBB);
+
+  // Set the destinations for 'break' and 'continue'
+  llvm::BasicBlock *endBB = createBasicBlock("while.end");
+  BreakDestStack.emplace_back(endBB, getCleanupsDepth());
+  ContinueDestStack.emplace_back(loopBB, getCleanupsDepth());
 
   // Evaluate the condition with the false edge leading directly
   // to the continuation block.
@@ -159,6 +174,10 @@ void IRGenFunction::emitWhileStmt(WhileStmt *S) {
 
   // Complete the conditional execution.
   cond.complete(*this);
+
+  emitOrDeleteBlock(*this, endBB);
+  BreakDestStack.pop_back();
+  ContinueDestStack.pop_back();
 }
 
 void IRGenFunction::emitForStmt(ForStmt *S) {
@@ -184,7 +203,13 @@ void IRGenFunction::emitForStmt(ForStmt *S) {
   llvm::BasicBlock *loopBB = createBasicBlock("for.condition");
   Builder.CreateBr(loopBB);
   Builder.emitBlock(loopBB);
-  
+
+  // Set the destinations for 'break' and 'continue'
+  llvm::BasicBlock *incBB = createBasicBlock("for.inc");
+  llvm::BasicBlock *endBB = createBasicBlock("for.end");
+  BreakDestStack.emplace_back(endBB, getCleanupsDepth());
+  ContinueDestStack.emplace_back(incBB, getCleanupsDepth());
+
   // Evaluate the condition with the false edge leading directly
   // to the continuation block.
   Condition cond = S->getCond().isNonNull() ?
@@ -195,7 +220,9 @@ void IRGenFunction::emitForStmt(ForStmt *S) {
   if (cond.hasTrue()) {
     cond.enterTrue(*this);
     emitStmt(S->getBody());
-    
+
+    emitOrDeleteBlock(*this, incBB);
+
     if (Builder.hasValidIP() && !S->getIncrement().isNull()) {
       if (Expr *E = S->getIncrement().dyn_cast<Expr*>()) {
         FullExpr scope(*this);
@@ -215,6 +242,9 @@ void IRGenFunction::emitForStmt(ForStmt *S) {
   // Complete the conditional execution.
   cond.complete(*this);
 
+  emitOrDeleteBlock(*this, endBB);
+  BreakDestStack.pop_back();
+  ContinueDestStack.pop_back();
 }
 
 void IRGenFunction::emitForEachStmt(ForEachStmt *S) {
@@ -227,9 +257,14 @@ void IRGenFunction::emitForEachStmt(ForEachStmt *S) {
   if (!Builder.hasValidIP()) return;
 
   // Create a new basic block and jump into it.
-  llvm::BasicBlock *LoopBB = createBasicBlock("foreach.cond");
-  Builder.CreateBr(LoopBB);
-  Builder.emitBlock(LoopBB);
+  llvm::BasicBlock *loopBB = createBasicBlock("foreach.cond");
+  Builder.CreateBr(loopBB);
+  Builder.emitBlock(loopBB);
+
+  // Set the destinations for 'break' and 'continue'
+  llvm::BasicBlock *endBB = createBasicBlock("foreach.end");
+  BreakDestStack.emplace_back(endBB, getCleanupsDepth());
+  ContinueDestStack.emplace_back(loopBB, getCleanupsDepth());
 
   Condition Cond = emitCondition(S->getRangeEmpty(), /*hasFalseCode=*/false,
                                  /*invertValue=*/true);
@@ -247,13 +282,26 @@ void IRGenFunction::emitForEachStmt(ForEachStmt *S) {
     
     // Loop back to the header.
     if (Builder.hasValidIP()) {
-      Builder.CreateBr(LoopBB);
+      Builder.CreateBr(loopBB);
       Builder.ClearInsertionPoint();
     }
     Cond.exitTrue(*this);
   }
   
   // Complete the conditional execution.
-  Cond.complete(*this);  
+  Cond.complete(*this);
+
+  emitOrDeleteBlock(*this, endBB);
+  BreakDestStack.pop_back();
+  ContinueDestStack.pop_back();
 }
 
+void IRGenFunction::emitBreakStmt(BreakStmt *S) {
+  emitBranch(BreakDestStack.back());
+  Builder.ClearInsertionPoint();
+}
+
+void IRGenFunction::emitContinueStmt(ContinueStmt *S) {
+  emitBranch(ContinueDestStack.back());
+  Builder.ClearInsertionPoint();
+}

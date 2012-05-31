@@ -1828,8 +1828,7 @@ namespace {
 
       // Pull off the outer result.
       FixedPacking innerResultPacking;
-      IRGenFunction::CleanupsDepth outerResultCleanup
-        = IRGenFunction::CleanupsDepth::invalid();
+      CleanupsDepth outerResultCleanup = CleanupsDepth::invalid();
       if (HasAbstractedResult) {
         outerResult = Address(outerArgs.claimUnmanagedNext(),
                               getFixedBufferAlignment(IGM));
@@ -2182,7 +2181,7 @@ void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
   Address object = emitAllocateBuffer(IGF, buffer, packing, concreteTI);
 
   // Push a cleanup to destroy that.
-  IRGenFunction::CleanupsDepth deallocCleanup;
+  CleanupsDepth deallocCleanup;
   bool needsDeallocCleanup = !isNeverAllocated(packing);
   if (needsDeallocCleanup) {
     IGF.pushFullExprCleanup<DeallocateBuffer>(buffer, packing, concreteTI);

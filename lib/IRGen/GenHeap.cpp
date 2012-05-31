@@ -591,7 +591,7 @@ namespace {
 /// Enter a cleanup to call swift_dealloc on the given pointer.
 /// This cleanup will usually be deactivated as soon as the
 /// initializer completes.
-IRGenFunction::CleanupsDepth
+CleanupsDepth
 IRGenFunction::pushDeallocCleanup(llvm::Value *allocation,
                                   llvm::Value *size) {
   pushFullExprCleanup<CallDealloc>(allocation, size);

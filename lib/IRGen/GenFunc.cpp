@@ -1040,7 +1040,7 @@ namespace {
 
     unsigned LastArgWritten;
     SmallVector<llvm::Value*, 16> Args;
-    SmallVector<IRGenFunction::CleanupsDepth, 16> ArgCleanups;
+    SmallVector<CleanupsDepth, 16> ArgCleanups;
     
   protected:
     CallEmitter(IRGenFunction &IGF, const Callee &callee,

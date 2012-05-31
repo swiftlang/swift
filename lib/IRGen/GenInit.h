@@ -46,8 +46,8 @@ namespace irgen {
 /// variable initialization.
 class Initialization {
   struct ValueRecord {
-    IRGenFunction::CleanupsDepth DeallocCleanup;
-    IRGenFunction::CleanupsDepth DestroyCleanup;
+    CleanupsDepth DeallocCleanup;
+    CleanupsDepth DestroyCleanup;
   };
 
   llvm::DenseMap<void *, ValueRecord> Records;
@@ -108,14 +108,14 @@ public:
   /// trivial and there isn't a dealloc cleanup.
   void markAllocated(IRGenFunction &IGF, Object object,
                      OwnedAddress address,
-                     IRGenFunction::CleanupsDepth dealloc);
+                     CleanupsDepth dealloc);
 
   /// Mark that the value has reached its instant of initialization.
   void markInitialized(IRGenFunction &IGF, Object object);
 
 private:
   /// Add an object that is going to be initialized.
-  void registerObject(Object object, IRGenFunction::CleanupsDepth destroy);
+  void registerObject(Object object, CleanupsDepth destroy);
 };
 
 } // end namespace irgen

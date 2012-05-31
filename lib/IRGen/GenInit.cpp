@@ -70,7 +70,7 @@ static OnHeap_t isOnHeap(VarDecl *var) {
 void Initialization::registerObject(IRGenFunction &IGF, Object object,
                                     OnHeap_t onHeap, const TypeInfo &objectTI) {
   // Create the appropriate destroy cleanup.
-  IRGenFunction::CleanupsDepth destroy;
+  CleanupsDepth destroy;
 
   // We need a destroy cleanup if the object is on the heap or non-POD.
   if (onHeap || !objectTI.isPOD(ResilienceScope::Local)) {
@@ -78,24 +78,24 @@ void Initialization::registerObject(IRGenFunction &IGF, Object object,
                                                    objectTI);
     destroy = IGF.getCleanupsDepth();
   } else {
-    destroy = IRGenFunction::CleanupsDepth::invalid();
+    destroy = CleanupsDepth::invalid();
   }
 
   registerObject(object, destroy);
 }
 
 void Initialization::registerObjectWithoutDestroy(Object object) {
-  registerObject(object, IRGenFunction::CleanupsDepth::invalid());
+  registerObject(object, CleanupsDepth::invalid());
 }
 
 /// Register an object with the initialization process.
 void Initialization::registerObject(Object object,
-                                    IRGenFunction::CleanupsDepth destroy) {
+                                    CleanupsDepth destroy) {
   // The invariant is that the cleanup has to be an
   // UnboundDestroy if it's valid.
 
   ValueRecord record = {
-    IRGenFunction::CleanupsDepth::invalid(), destroy
+    CleanupsDepth::invalid(), destroy
   };
   Records.insert(std::make_pair(object.Opaque, record));
 }
@@ -103,7 +103,7 @@ void Initialization::registerObject(Object object,
 /// Mark that an object has been allocated.
 void Initialization::markAllocated(IRGenFunction &IGF, Object object,
                                    OwnedAddress address,
-                                   IRGenFunction::CleanupsDepth dealloc) {
+                                   CleanupsDepth dealloc) {
   ValueRecord &record = Records.find(object.Opaque)->second;
   record.DeallocCleanup = dealloc;
 
@@ -161,7 +161,7 @@ Initialization::emitLocalAllocation(IRGenFunction &IGF, Object object,
   // If the type is known to be empty, don't actually allocate anything.
   if (type.isEmpty(ResilienceScope::Local)) {
     OwnedAddress addr = createEmptyAlloca(IGF.IGM, type);
-    markAllocated(IGF, object, addr, IRGenFunction::CleanupsDepth::invalid());
+    markAllocated(IGF, object, addr, CleanupsDepth::invalid());
     return addr;
   }
 
@@ -173,7 +173,7 @@ Initialization::emitLocalAllocation(IRGenFunction &IGF, Object object,
     // TODO: lifetime intrinsics?
 
     OwnedAddress addr(rawAddr, IGF.IGM.RefCountedNull);
-    markAllocated(IGF, object, addr, IRGenFunction::CleanupsDepth::invalid());
+    markAllocated(IGF, object, addr, CleanupsDepth::invalid());
     return addr;
   }
 
@@ -192,7 +192,7 @@ Initialization::emitLocalAllocation(IRGenFunction &IGF, Object object,
 
   // Push a cleanup to dealloc the allocation.
   // FIXME: don't emit the size twice!
-  IRGenFunction::CleanupsDepth deallocCleanup
+  CleanupsDepth deallocCleanup
     = IGF.pushDeallocCleanup(allocation, layout.emitSize(IGF));
 
   OwnedAddress addr(rawAddr, allocation);
@@ -201,7 +201,7 @@ Initialization::emitLocalAllocation(IRGenFunction &IGF, Object object,
 }
 
 static void maybeSetCleanupState(IRGenFunction &IGF,
-                                 IRGenFunction::CleanupsDepth maybeCleanup,
+                                 CleanupsDepth maybeCleanup,
                                  CleanupState newState) {
   if (maybeCleanup.isValid())
     IGF.setCleanupState(maybeCleanup, newState);

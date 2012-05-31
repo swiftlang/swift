@@ -33,13 +33,13 @@ namespace irgen {
 /// cleanup.
 class ManagedValue {
   llvm::Value *Value;
-  IRGenFunction::CleanupsDepth Cleanup;
+  CleanupsDepth Cleanup;
 
 public:
   ManagedValue() = default;
   explicit ManagedValue(llvm::Value *value)
-    : Value(value), Cleanup(IRGenFunction::CleanupsDepth::invalid()) {}
-  ManagedValue(llvm::Value *value, IRGenFunction::CleanupsDepth cleanup)
+    : Value(value), Cleanup(CleanupsDepth::invalid()) {}
+  ManagedValue(llvm::Value *value, CleanupsDepth cleanup)
     : Value(value), Cleanup(cleanup) {}
 
   llvm::Value *getUnmanagedValue() const {
@@ -49,7 +49,7 @@ public:
   llvm::Value *getValue() const { return Value; }
 
   bool hasCleanup() const { return Cleanup.isValid(); }
-  IRGenFunction::CleanupsDepth getCleanup() const { return Cleanup; }
+  CleanupsDepth getCleanup() const { return Cleanup; }
 
   /// Forward this value, deactivating the cleanup and returning the
   /// underlying value.
@@ -60,8 +60,7 @@ public:
   }
 
   /// Split this value into its underlying value and, if present, its cleanup.
-  llvm::Value *split(llvm::SmallVectorImpl<IRGenFunction::CleanupsDepth>
-                       &cleanups) {
+  llvm::Value *split(llvm::SmallVectorImpl<CleanupsDepth> &cleanups) {
     if (hasCleanup()) cleanups.push_back(getCleanup());
     return getValue();
   }

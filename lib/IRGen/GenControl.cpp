@@ -663,7 +663,7 @@ static void popAndEmitTopCleanup(IRGenFunction &IGF,
 /// Remove all the dead cleanups on the top of the cleanup stack.
 static void popAndEmitTopDeadCleanups(IRGenFunction &IGF,
                                       DiverseStackImpl<Cleanup> &stack,
-                                      IRGenFunction::CleanupsDepth end) {
+                                      CleanupsDepth end) {
   stack.checkIterator(end);
 
   while (stack.stable_begin() != end && stack.begin()->isDead()) {
