@@ -21,6 +21,7 @@
 #include "llvm/IntrinsicInst.h"
 #include "llvm/Module.h"
 #include "llvm/Pass.h"
+#include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
 #include "llvm/Transforms/Utils/Local.h"
@@ -156,6 +157,53 @@ static Constant *getRetainAndReturnThree(Function &F, Type *ObjectPtrTy,
 //                          Input Function Canonicalizer
 //===----------------------------------------------------------------------===//
 
+/// updateCallValueUses - We have something like this:
+///   %z = ptrtoint %swift.refcounted* %2 to i64
+///   %3 = call { i64, i64, i64 } 
+///           @swift_retainAndReturnThree(..., i64 %x, i64 %1, i64 %z)
+///   %a = extractvalue { i64, i64, i64 } %3, 0
+///   %b = extractvalue { i64, i64, i64 } %3, 1
+///   %c = extractvalue { i64, i64, i64 } %3, 2
+///   %a1 = inttoptr i64 %a to i8*
+///   %c1 = inttoptr i64 %c to %swift.refcounted*
+///
+/// This function is invoked three times (once each for the three arg/retvalues
+/// that need to be replaced) and tries a best effort to patch up things to
+/// avoid all the casts.  "Inst" coming into here is the call to
+/// swift_retainAndReturnThree or to an extract that returns all three words.
+///
+static void updateCallValueUses(CallInst &CI, unsigned EltNo) {
+  Value *Op = CI.getArgOperand(1+EltNo);
+  for (auto UI = CI.use_begin(), E = CI.use_end(); UI != E; ++UI) {
+    ExtractValueInst *Extract = dyn_cast<ExtractValueInst>(*UI);
+
+    // Make sure this extract is relevant to EltNo.
+    if (Extract == 0 || Extract->getNumIndices() != 1 ||
+        Extract->getIndices()[0] != EltNo)
+      continue;
+
+    // Both the input and result should be i64's.  
+    assert(Extract->getType() == Op->getType() && "Should have i64's here");
+
+    for (auto UI2 = Extract->use_begin(), E = Extract->use_end(); UI2 != E; ) {
+      IntToPtrInst *ExtractUser = dyn_cast<IntToPtrInst>(*UI2++);
+      PtrToIntInst *OpCast = dyn_cast<PtrToIntInst>(Op);
+      if (ExtractUser && OpCast &&
+          OpCast->getOperand(0)->getType() == ExtractUser->getType()) {
+        ExtractUser->replaceAllUsesWith(OpCast->getOperand(0));
+        ExtractUser->eraseFromParent();
+      }
+    }
+    
+    // Stitch up anything other than the ptrtoint -> inttoptr.
+    Extract->replaceAllUsesWith(Op);
+
+    // Zap the dead ExtractValue's.
+    RecursivelyDeleteTriviallyDeadInstructions(Extract);
+    return;
+  }
+}
+
 /// canonicalizeInputFunction - Functions like swift_retain return an
 /// argument as a low-level performance optimization.  This makes it difficult
 /// to reason about pointer equality though, so undo it as an initial
@@ -228,19 +276,36 @@ static bool canonicalizeInputFunction(Function &F) {
       // (a,b,c) = swift_retainAndReturnThree(obj, d,e,f)
       // -> swift_retain_noresult(obj)
       // -> (a,b,c) = (d,e,f)
+      //
+      // The important case of doing this is when this function has been inlined
+      // into another function.  In this case, there is no return anymore.
       CallInst &CI = cast<CallInst>(Inst);
-      Type *HeapObjectTy = CI.getArgOperand(0)->getType();
       
       IRBuilder<> B(&CI);
+      Type *HeapObjectTy = CI.getArgOperand(0)->getType();
       
       // Reprocess starting at the new swift_retain_noresult.
       I = B.CreateCall(getRetainNoResult(F, HeapObjectTy, RetainNoResultCache),
                        CI.getArgOperand(0));
-      Value *V = UndefValue::get(CI.getType());
-      V = B.CreateInsertValue(V, CI.getArgOperand(1), 0U);
-      V = B.CreateInsertValue(V, CI.getArgOperand(2), 1U);
-      V = B.CreateInsertValue(V, CI.getArgOperand(3), 2U);
-      CI.replaceAllUsesWith(V);
+      
+      // See if we can eliminate all of the extractvalue's that are hanging off
+      // the swift_retainAndReturnThree.  This is important to eliminate casts
+      // that will block optimizations and generally results in better IR.  Note
+      // that this is just a best-effort attempt though.
+      updateCallValueUses(CI, 0);
+      updateCallValueUses(CI, 1);
+      updateCallValueUses(CI, 2);
+      
+      // If our best-effort wasn't good enough, fall back to generating terrible
+      // but correct code.
+      if (!CI.use_empty()) {
+        Value *V = UndefValue::get(CI.getType());
+        V = B.CreateInsertValue(V, CI.getArgOperand(1), 0U);
+        V = B.CreateInsertValue(V, CI.getArgOperand(2), 1U);
+        V = B.CreateInsertValue(V, CI.getArgOperand(3), 2U);
+        CI.replaceAllUsesWith(V);
+      }
+
       CI.eraseFromParent();
       Changed = true;
       break;

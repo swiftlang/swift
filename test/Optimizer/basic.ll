@@ -9,7 +9,7 @@ declare %swift.refcounted* @swift_allocObject(%swift.heapmetadata* , i64, i64) n
 declare void @swift_release(%swift.refcounted* nocapture)
 declare %swift.refcounted* @swift_retain(%swift.refcounted* ) nounwind
 declare void @swift_retain_noresult(%swift.refcounted* nocapture) nounwind
-
+declare { i64, i64, i64 } @swift_retainAndReturnThree(%swift.refcounted* , i64, i64 , i64 )
 
 define void @trivial_retain_release(%swift.refcounted* %P) {
 entry:
@@ -56,3 +56,24 @@ entry:
 ; CHECK: @retain3_test1
 ; CHECK: swift_retainAndReturnThree
 ; CHECK: ret
+
+
+; retain3_test2 - This shows a case where something else (eg inlining an already
+; optimized function) has given us a swift_retainAndReturnThree that we need to
+; destructure and reassemble.
+define { i8*, i64, %swift.refcounted* } @retain3_test2(i8*, i64, %swift.refcounted*) nounwind {
+entry:
+  %x = ptrtoint i8* %0 to i64
+  %z = ptrtoint %swift.refcounted* %2 to i64
+  
+  %3 = call { i64, i64, i64 } @swift_retainAndReturnThree(%swift.refcounted* %2, i64 %x, i64 %1, i64 %z)
+  %a = extractvalue { i64, i64, i64 } %3, 0
+  %b = extractvalue { i64, i64, i64 } %3, 1
+  %c = extractvalue { i64, i64, i64 } %3, 2
+  %a1 = inttoptr i64 %a to i8*
+  %c1 = inttoptr i64 %c to %swift.refcounted*
+  %4 = insertvalue { i8*, i64, %swift.refcounted* } undef, i8* %a1, 0
+  %5 = insertvalue { i8*, i64, %swift.refcounted* } %4, i64 %b, 1
+  %6 = insertvalue { i8*, i64, %swift.refcounted* } %5, %swift.refcounted* %c1, 2
+  ret { i8*, i64, %swift.refcounted* } %6
+}
