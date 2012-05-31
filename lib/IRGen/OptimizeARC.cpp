@@ -676,8 +676,9 @@ static bool optimizeReturn3(ReturnInst *TheReturn) {
     // i64's.
     Function &F = *TheReturn->getParent()->getParent();
     Value *LibCall = getRetainAndReturnThree(F,RetainedObject->getType(),Cache);
-    Value *NR = B.CreateCall4(LibCall, RetainedObject, RetVals[0], RetVals[1],
-                              RetVals[2]);
+    CallInst *NR = B.CreateCall4(LibCall, RetainedObject, RetVals[0],RetVals[1],
+                                 RetVals[2]);
+    NR->setTailCall(true);
 
     // The return type of the libcall is (i64,i64,i64).  Since at least one of
     // the pointers is a pointer (we retained it afterall!) we have to unpack
@@ -750,6 +751,7 @@ static bool optimizeArgumentReturnFunctions(Function &F) {
         CallInst &CI =
            *CallInst::Create(getRetain(F, ArgVal->getType(), RetainCache),
                              ArgVal, "", &Inst);
+        CI.setTailCall(true);
         Inst.eraseFromParent();
 
         TinyPtrVector<Instruction*> &GlobalEntry = DefsOfValue[ArgVal];

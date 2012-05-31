@@ -54,7 +54,7 @@ entry:
 }
 
 ; CHECK: @retain3_test1
-; CHECK: swift_retainAndReturnThree
+; CHECK: tail call {{.*}} @swift_retainAndReturnThree
 ; CHECK: ret
 
 
@@ -77,3 +77,7 @@ entry:
   %6 = insertvalue { i8*, i64, %swift.refcounted* } %5, %swift.refcounted* %c1, 2
   ret { i8*, i64, %swift.refcounted* } %6
 }
+
+; CHECK: @retain3_test2
+; CHECK: tail call {{.*}} @swift_retainAndReturnThree
+; CHECK: ret
