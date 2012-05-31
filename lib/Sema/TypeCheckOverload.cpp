@@ -84,7 +84,7 @@ void TypeChecker::diagnoseEmptyOverloadSet(Expr *E,
 
 void TypeChecker::printOverloadSetCandidates(ArrayRef<ValueDecl *> Candidates) {
   for (auto TheDecl : Candidates)
-    diagnose(TheDecl->getLocStart(), diag::found_candidate);
+    diagnose(TheDecl->getStartLoc(), diag::found_candidate);
 }
 
 ValueDecl *

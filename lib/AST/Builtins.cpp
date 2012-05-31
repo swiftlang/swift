@@ -90,7 +90,7 @@ namespace {
 
 /// Build a builtin function declarations.
 static FuncDecl *getBuiltinFunction(ASTContext &Context, Identifier Id, Type T){
-  return new (Context) FuncDecl(SourceLoc(), SourceLoc(), Id, T,
+  return new (Context) FuncDecl(SourceLoc(), SourceLoc(), Id, SourceLoc(), T,
                                 /*init*/ nullptr, Context.TheBuiltinModule);
 }
 

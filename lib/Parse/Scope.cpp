@@ -39,8 +39,8 @@ Scope::Scope(Parser *P) : SI(P->ScopeInfo), ValueHTScope(SI.ValueScopeHT),
 
 static void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New, Parser &P) {
   assert(New != Prev && "Cannot conflict with self");
-  P.diagnose(New->getLocStart(), diag::decl_redefinition, New->isDefinition());
-  P.diagnose(Prev->getLocStart(), diag::previous_decldef, Prev->isDefinition(),
+  P.diagnose(New->getLoc(), diag::decl_redefinition, New->isDefinition());
+  P.diagnose(Prev->getLoc(), diag::previous_decldef, Prev->isDefinition(),
              Prev->getName());
 }
 
@@ -52,10 +52,10 @@ static bool checkValidOverload(const ValueDecl *D1, const ValueDecl *D2,
                                Parser &P) {
   if (D1->getAttrs().isInfix() && D2->getAttrs().isInfix() &&
       D1->getAttrs().getInfixData() != D2->getAttrs().getInfixData()) {
-    P.diagnose(D1->getLocStart(), diag::precedence_overload);
+    P.diagnose(D1->getLoc(), diag::precedence_overload);
     // FIXME: Pass identifier through, when the diagnostics system can handle
     // it.
-    P.diagnose(D2->getLocStart(), diag::previous_declaration, D2->getName());
+    P.diagnose(D2->getLoc(), diag::previous_declaration, D2->getName());
     return true;
   }
   

@@ -115,7 +115,7 @@ void PrettyStackTraceDecl::print(llvm::raw_ostream &out) const {
     out << "declaration";
   }
   out << " at ";
-  printSourceLoc(out, TheDecl->getLocStart(), TheDecl->getASTContext());
+  printSourceLoc(out, TheDecl->getStartLoc(), TheDecl->getASTContext());
   out << '\n';
 }
 

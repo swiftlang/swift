@@ -116,8 +116,10 @@ public:
     return Context->getASTContext();
   }
   
-  SourceLoc getLocStart() const;
- 
+  SourceLoc getStartLoc() const;
+  SourceLoc getLoc() const;
+  // FIXME: We also want getSourceRange().
+
   void dump() const;
   void print(raw_ostream &OS, unsigned Indent = 0) const;
 
@@ -171,8 +173,12 @@ public:
   ArrayRef<AccessPathElement> getAccessPath() const {
     return ArrayRef<AccessPathElement>(getPathBuffer(), NumPathElements);
   }
-  
-  SourceLoc getLocStart() const { return ImportLoc; }
+
+  SourceLoc getStartLoc() const { return ImportLoc; }
+  SourceLoc getLoc() const { return ImportLoc; }
+  SourceRange getSourceRange() const {
+    return SourceRange(ImportLoc, getAccessPath().back().second);
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -186,7 +192,8 @@ public:
 /// there are no runtime values of the Extension's type.  
 class ExtensionDecl : public Decl, public DeclContext {
   SourceLoc ExtensionLoc;  // Location of 'extension' keyword.
-  
+  SourceLoc NameLoc; // Location of the extended type.
+
   /// ExtendedType - The type being extended.
   Type ExtendedType;
   MutableArrayRef<Type> Inherited;
@@ -194,16 +201,18 @@ class ExtensionDecl : public Decl, public DeclContext {
 public:
 
   ExtensionDecl(SourceLoc ExtensionLoc, Type ExtendedType,
+                SourceLoc NameLoc,
                 MutableArrayRef<Type> Inherited,
                 DeclContext *Parent)
     : Decl(DeclKind::Extension, Parent),
       DeclContext(DeclContextKind::ExtensionDecl, Parent),
-      ExtensionLoc(ExtensionLoc),
+      ExtensionLoc(ExtensionLoc), NameLoc(NameLoc),
       ExtendedType(ExtendedType), Inherited(Inherited) {
   }
   
-  SourceLoc getExtensionLoc() const { return ExtensionLoc; }
-  SourceLoc getLocStart() const { return ExtensionLoc; }
+  SourceLoc getStartLoc() const { return ExtensionLoc; }
+  SourceLoc getLoc() const { return NameLoc; }
+
   Type getExtendedType() const { return ExtendedType; }
   void setExtendedType(Type t) { ExtendedType = t; }
 
@@ -243,8 +252,8 @@ public:
       Init(E) {
   }
 
-  SourceLoc getVarLoc() const { return VarLoc; }
-  SourceLoc getLocStart() const { return VarLoc; }
+  SourceLoc getStartLoc() const { return VarLoc; }
+  SourceLoc getLoc() const { return VarLoc; }
 
   Pattern *getPattern() const { return Pat; }
   void setPattern(Pattern *P) { Pat = P; }
@@ -283,7 +292,8 @@ public:
   void setBody(Expr *E) { Body = E; }
   void setBody(Stmt *S) { Body = S; }
 
-  SourceLoc getLocStart() const;
+  SourceLoc getStartLoc() const;
+  SourceLoc getLoc() const { return getStartLoc(); }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::TopLevelCode;
@@ -406,15 +416,16 @@ class TypeAliasDecl : public TypeDecl {
   /// The type that represents this (sugared) name alias.
   mutable NameAliasType *AliasTy;
 
-  SourceLoc TypeAliasLoc;
+  SourceLoc TypeAliasLoc; // The location of the 'typalias' keyword
+  SourceLoc NameLoc; // The location of the declared type
   Type UnderlyingTy;
   
 public:
   TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
-                Type Underlyingty, DeclContext *DC);
-  
-  SourceLoc getTypeAliasLoc() const { return TypeAliasLoc; }
-  void setTypeAliasLoc(SourceLoc loc) { TypeAliasLoc = loc; }
+                SourceLoc NameLoc, Type Underlyingty, DeclContext *DC);
+
+  SourceLoc getStartLoc() const { return TypeAliasLoc; }
+  SourceLoc getLoc() const { return NameLoc; }
 
   /// hasUnderlyingType - Returns whether the underlying type has been set.
   bool hasUnderlyingType() const {
@@ -441,8 +452,6 @@ public:
   void overwriteUnderlyingType(Type T) {
     UnderlyingTy = T;
   }
-
-  SourceLoc getLocStart() const { return TypeAliasLoc; }
 
   /// getAliasType - Return the sugared version of this decl as a Type.
   NameAliasType *getAliasType() const;
@@ -481,19 +490,20 @@ public:
 /// to get the declared type ("Bool" in the above example).
 class OneOfDecl : public NominalTypeDecl {
   SourceLoc OneOfLoc;
+  SourceLoc NameLoc;
   MutableArrayRef<Type> Inherited;
   ArrayRef<Decl*> Members;
   OneOfType *OneOfTy;
 
 public:
-  OneOfDecl(SourceLoc OneOfLoc, Identifier Name,
+  OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
             MutableArrayRef<Type> Inherited, DeclContext *DC);
 
   ArrayRef<Decl*> getMembers() const { return Members; }
   void setMembers(ArrayRef<Decl*> elems) { Members = elems; }
 
-  SourceLoc getOneOfLoc() const { return OneOfLoc; }
-  SourceLoc getLocStart() const { return OneOfLoc; }
+  SourceLoc getStartLoc() const { return OneOfLoc; }
+  SourceLoc getLoc() const { return NameLoc; }
 
   /// \brief Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
@@ -525,16 +535,17 @@ public:
 /// to get the declared type ("Complex" in the above example).
 class StructDecl : public NominalTypeDecl {
   SourceLoc StructLoc;
+  SourceLoc NameLoc;
   MutableArrayRef<Type> Inherited;
   ArrayRef<Decl*> Members;
   StructType *StructTy;
 
 public:
-  StructDecl(SourceLoc StructLoc, Identifier Name,
+  StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
              MutableArrayRef<Type> Inherited, DeclContext *DC);
 
-  SourceLoc getStructLoc() const { return StructLoc; }
-  SourceLoc getLocStart() const { return StructLoc; }
+  SourceLoc getStartLoc() const { return StructLoc; }
+  SourceLoc getLoc() const { return NameLoc; }
 
   /// \brief Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
@@ -567,16 +578,17 @@ public:
 /// to get the declared type ("Complex" in the above example).
 class ClassDecl : public NominalTypeDecl {
   SourceLoc ClassLoc;
+  SourceLoc NameLoc;
   MutableArrayRef<Type> Inherited;
   ArrayRef<Decl*> Members;
   ClassType *ClassTy;
 
 public:
-  ClassDecl(SourceLoc ClassLoc, Identifier Name,
+  ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
             MutableArrayRef<Type> Inherited, DeclContext *DC);
 
-  SourceLoc getClassLoc() const { return ClassLoc; }
-  SourceLoc getLocStart() const { return ClassLoc; }
+  SourceLoc getStartLoc() const { return ClassLoc; }
+  SourceLoc getLoc() const { return NameLoc; }
 
   /// \brief Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
@@ -646,7 +658,7 @@ public:
   Type getDeclaredType() const { return ProtocolTy; }
   void setDeclaredType(Type Ty) { ProtocolTy = Ty; }
   
-  SourceLoc getLocStart() const { return ProtocolLoc; }
+  SourceLoc getStartLoc() const { return ProtocolLoc; }
   SourceLoc getLoc() const { return NameLoc; }
   SourceRange getSourceRange() { return SourceRange(ProtocolLoc, Braces.End); }
   
@@ -681,10 +693,9 @@ public:
     : ValueDecl(DeclKind::Var, DC, Name, Ty),
       VarLoc(VarLoc), GetSet() {}
 
-  /// getVarLoc - The location of the 'var' token.
-  SourceLoc getVarLoc() const { return VarLoc; }
-  
-  SourceLoc getLocStart() const { return VarLoc; }
+  SourceLoc getLoc() const { return VarLoc; }
+  SourceLoc getStartLoc() const { return VarLoc; }
+  SourceRange getSourceRange() const { return VarLoc; }
 
   /// \brief Determine whether this variable is actually a property, which
   /// has no storage but does have a user-defined getter or setter.
@@ -711,14 +722,15 @@ public:
 class FuncDecl : public ValueDecl {
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
+  SourceLoc NameLoc;
   FuncExpr *Body;
   llvm::PointerIntPair<Decl *, 1, bool> GetOrSetDecl;
   
 public:
   FuncDecl(SourceLoc StaticLoc, SourceLoc FuncLoc, Identifier Name,
-           Type Ty, FuncExpr *Body, DeclContext *DC)
+           SourceLoc NameLoc, Type Ty, FuncExpr *Body, DeclContext *DC)
     : ValueDecl(DeclKind::Func, DC, Name, Ty), StaticLoc(StaticLoc),
-      FuncLoc(FuncLoc), Body(Body) {
+      FuncLoc(FuncLoc), NameLoc(NameLoc), Body(Body) {
   }
   
   bool isStatic() const { return StaticLoc.isValid(); }
@@ -748,10 +760,11 @@ public:
   
   SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }
-    
-  SourceLoc getLocStart() const {
+
+  SourceLoc getStartLoc() const {
     return StaticLoc.isValid() ? StaticLoc : FuncLoc;
   }
+  SourceLoc getLoc() const { return NameLoc; }
   
   /// makeGetter - Note that this function is the getter for the given
   /// declaration, which may be either a variable or a subscript declaration.
@@ -810,9 +823,9 @@ public:
   Type getArgumentType() const { return ArgumentType; }
   void setArgumentType(Type t) { ArgumentType = t; }
 
-  SourceLoc getIdentifierLoc() const { return IdentifierLoc; }
-  SourceLoc getLocStart() const { return IdentifierLoc; }
-  
+  SourceLoc getStartLoc() const { return IdentifierLoc; }
+  SourceLoc getLoc() const { return IdentifierLoc; }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::OneOfElement;
@@ -867,8 +880,9 @@ public:
       ArrowLoc(ArrowLoc), Indices(Indices), ElementTy(ElementTy),
       Braces(Braces), Get(Get), Set(Set) { }
   
-  SourceLoc getLocStart() const { return SubscriptLoc; }
-  
+  SourceLoc getStartLoc() const { return SubscriptLoc; }
+  SourceLoc getLoc() const;
+
   /// \brief Retrieve the indices for this subscript operation.
   Pattern *getIndices() const { return Indices; }
   

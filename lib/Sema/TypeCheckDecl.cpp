@@ -59,7 +59,7 @@ public:
 
       if (!Inherited[i]->isExistentialType() && !Inherited[i]->is<ErrorType>()) {
         // FIXME: Terrible location information.
-        TC.diagnose(D->getLocStart(), diag::nonprotocol_inherit, Inherited[i]);
+        TC.diagnose(D->getStartLoc(), diag::nonprotocol_inherit, Inherited[i]);
       }
     }
   }
@@ -71,7 +71,7 @@ public:
       SmallVector<ProtocolDecl *, 4> InheritedProtos;
       if (InheritedTy->isExistentialType(InheritedProtos))
         for (auto Proto : InheritedProtos)
-          TC.conformsToProtocol(T, Proto, D->getLocStart());
+          TC.conformsToProtocol(T, Proto, D->getStartLoc());
     }
   }
   
@@ -116,7 +116,7 @@ public:
         Type DestTy = PBD->getPattern()->getType();
         if (TC.typeCheckExpression(Init, DestTy)) {
           if (DestTy)
-            TC.diagnose(PBD->getLocStart(), diag::while_converting_var_init,
+            TC.diagnose(PBD->getStartLoc(), diag::while_converting_var_init,
                         DestTy);
         } else {
           PBD->setInit(Init);
@@ -136,7 +136,7 @@ public:
       Expr *Init = PBD->getInit();
       if (TC.typeCheckExpression(Init, DestTy)) {
         if (DestTy)
-          TC.diagnose(PBD->getLocStart(), diag::while_converting_var_init,
+          TC.diagnose(PBD->getStartLoc(), diag::while_converting_var_init,
                       DestTy);
         return;
       }
@@ -166,7 +166,7 @@ public:
 
     // The getter and setter functions will be type-checked separately.
     if (!SD->getDeclContext()->isTypeContext())
-      TC.diagnose(SD->getLocStart(), diag::subscript_not_member);
+      TC.diagnose(SD->getStartLoc(), diag::subscript_not_member);
     
     if (SD->getIndices()->hasType())
       SD->setType(FunctionType::get(SD->getIndices()->getType(),
@@ -294,7 +294,7 @@ public:
 
     // Require the carried type to be materializable.
     if (!ED->getArgumentType()->isMaterializable()) {
-      TC.diagnose(ED->getIdentifierLoc(),
+      TC.diagnose(ED->getLoc(),
                   diag::oneof_element_not_materializable);
     }
   }
@@ -307,7 +307,7 @@ public:
         Type ExtendedTy = ED->getExtendedType();
         if (!ExtendedTy->is<OneOfType>() && !ExtendedTy->is<StructType>() &&
             !ExtendedTy->is<ClassType>() && !ExtendedTy->is<ErrorType>()) {
-          TC.diagnose(ED->getLocStart(), diag::non_nominal_extension,
+          TC.diagnose(ED->getStartLoc(), diag::non_nominal_extension,
                       ExtendedTy->is<ProtocolType>(), ExtendedTy);
           // FIXME: It would be nice to point out where we found the named type
           // declaration, if any.
@@ -343,7 +343,7 @@ bool DeclChecker::visitValueDecl(ValueDecl *VD) {
     return true;
 
   if (!VD->getType()->isMaterializable()) {
-    TC.diagnose(VD->getLocStart(), diag::var_type_not_materializable,
+    TC.diagnose(VD->getStartLoc(), diag::var_type_not_materializable,
                 VD->getType());
     VD->overwriteType(ErrorType::get(TC.Context));
   }
@@ -366,13 +366,13 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
 
   // Operators must be declared with 'func', not 'var'.
   if (VD->isOperator() && !isa<FuncDecl>(VD)) {
-    TC.diagnose(VD->getLocStart(), diag::operator_not_func);
+    TC.diagnose(VD->getStartLoc(), diag::operator_not_func);
     // FIXME: Set the 'isError' bit on the decl.
     return;
   }
   
   if (VD->isOperator() && (NumArguments == 0 || NumArguments > 2)) {
-    TC.diagnose(VD->getLocStart(), diag::invalid_arg_count_for_operator);
+    TC.diagnose(VD->getStartLoc(), diag::invalid_arg_count_for_operator);
     VD->getMutableAttrs().Infix = InfixData();
     // FIXME: Set the 'isError' bit on the decl.
     return;
@@ -383,7 +383,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
   // anyway.
   if (VD->isOperator() && NumArguments == 1 &&
       VD->getName().str() == "&") {
-    TC.diagnose(VD->getLocStart(), diag::custom_operator_addressof);
+    TC.diagnose(VD->getStartLoc(), diag::custom_operator_addressof);
     return;
   }
   
@@ -397,7 +397,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
   }
 
   if (Attrs.isInfix() && !VD->isOperator()) {
-    TC.diagnose(VD->getLocStart(), diag::infix_left_not_an_operator);
+    TC.diagnose(VD->getStartLoc(), diag::infix_left_not_an_operator);
     VD->getMutableAttrs().Infix = InfixData();
     // FIXME: Set the 'isError' bit on the decl.
     return;
@@ -405,17 +405,17 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
 
   // Only var and func decls can be infix.
   if (Attrs.isInfix() && !isa<VarDecl>(VD) && !isa<FuncDecl>(VD)) {
-    TC.diagnose(VD->getLocStart(), diag::infix_left_invalid_on_decls);
+    TC.diagnose(VD->getStartLoc(), diag::infix_left_invalid_on_decls);
     VD->getMutableAttrs().Infix = InfixData();
   }
 
   if (Attrs.isAssignment()) {
     // Only function declarations can be assignments.
     if (!isa<FuncDecl>(VD) || !VD->isOperator()) {
-      TC.diagnose(VD->getLocStart(), diag::invalid_decl_attribute,"assignment");
+      TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute,"assignment");
       VD->getMutableAttrs().Assignment = false;
     } else if (NumArguments < 1) {
-      TC.diagnose(VD->getLocStart(), diag::assignment_without_byref);
+      TC.diagnose(VD->getStartLoc(), diag::assignment_without_byref);
       VD->getMutableAttrs().Assignment = false;
     } else {
       auto FT = VD->getType()->castTo<FunctionType>();
@@ -425,10 +425,10 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
         ParamType = ParamTT->getElementType(0);
       
       if (!ParamType->is<LValueType>()) {
-        TC.diagnose(VD->getLocStart(), diag::assignment_without_byref);
+        TC.diagnose(VD->getStartLoc(), diag::assignment_without_byref);
         VD->getMutableAttrs().Assignment = false;
       } else if (!FT->getResult()->isEqual(TupleType::getEmpty(TC.Context))) {
-        TC.diagnose(VD->getLocStart(), diag::assignment_nonvoid,
+        TC.diagnose(VD->getStartLoc(), diag::assignment_nonvoid,
                     FT->getResult());
       }
     }
@@ -438,7 +438,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     // Only instance members with no non-defaulted parameters can be
     // conversions.
     if (!isa<FuncDecl>(VD) || !VD->isInstanceMember()) {
-      TC.diagnose(VD->getLocStart(), diag::conversion_not_instance_method,
+      TC.diagnose(VD->getStartLoc(), diag::conversion_not_instance_method,
                   VD->getName());
       VD->getMutableAttrs().Conversion = false;
     } else {
@@ -461,7 +461,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
       }
       
       if (!AcceptsEmptyParamList) {
-        TC.diagnose(VD->getLocStart(), diag::conversion_params,
+        TC.diagnose(VD->getStartLoc(), diag::conversion_params,
                     VD->getName());
         VD->getMutableAttrs().Conversion = false;
       }
@@ -511,16 +511,16 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     }
     
     if (!VD->getAttrs().isInfix())
-      TC.diagnose(VD->getLocStart(), diag::binops_infix_left);
+      TC.diagnose(VD->getStartLoc(), diag::binops_infix_left);
   }
 
   if (Attrs.isByref()) {
-    TC.diagnose(VD->getLocStart(), diag::invalid_decl_attribute, "byref");
+    TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "byref");
     VD->getMutableAttrs().Byref = false;
   }
 
   if (Attrs.isAutoClosure()) {
-    TC.diagnose(VD->getLocStart(), diag::invalid_decl_attribute, "auto_closure");
+    TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "auto_closure");
     VD->getMutableAttrs().AutoClosure = false;
   }  
 }

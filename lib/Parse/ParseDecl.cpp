@@ -399,16 +399,16 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     // FIXME: Specialize diagnostics based on our context.
     if ((isa<ImportDecl>(D) || isa<ExtensionDecl>(D) || isa<ProtocolDecl>(D)) &&
         !(Flags & PD_AllowTopLevel))
-      diagnose(D->getLocStart(), diag::decl_inner_scope);
+      diagnose(D->getStartLoc(), diag::decl_inner_scope);
     if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
       if (VD->isOperator() && (Flags & PD_DisallowOperators))
-        diagnose(VD->getLocStart(), diag::operator_in_decl);
+        diagnose(VD->getStartLoc(), diag::operator_in_decl);
       
       if (auto Var = dyn_cast<VarDecl>(VD)) {
         if ((Flags & PD_DisallowVar) && !Var->isProperty())
-          diagnose(D->getLocStart(), diag::disallowed_var_decl);
+          diagnose(D->getStartLoc(), diag::disallowed_var_decl);
         else if ((Flags & PD_DisallowProperty) && Var->isProperty())
-          diagnose(D->getLocStart(), diag::disallowed_property_decl);
+          diagnose(D->getStartLoc(), diag::disallowed_property_decl);
       }
       
       if (auto Func = dyn_cast<FuncDecl>(VD)) {
@@ -421,11 +421,11 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
       
       if (auto Type = dyn_cast<NominalTypeDecl>(VD)) {
         if (Flags & PD_DisallowNominalTypes)
-          diagnose(Type->getLocStart(), diag::disallowed_type);
+          diagnose(Type->getStartLoc(), diag::disallowed_type);
       }
     } else if (auto Pattern = dyn_cast<PatternBindingDecl>(D)) {
       if ((Flags & PD_DisallowInit) && Pattern->getInit())
-        diagnose(Pattern->getLocStart(), diag::disallowed_init)
+        diagnose(Pattern->getStartLoc(), diag::disallowed_init)
           << Pattern->getInit()->getSourceRange();
     }
     // FIXME: Diagnose top-level subscript
@@ -503,6 +503,7 @@ Decl *Parser::parseDeclExtension() {
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
 
   Type Ty;
+  SourceLoc TyLoc = Tok.getLoc();
   SourceLoc LBLoc, RBLoc;
   if (parseTypeIdentifier(Ty))
     return nullptr;
@@ -515,20 +516,8 @@ Decl *Parser::parseDeclExtension() {
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_oneof_type))
     return nullptr;
   
-  Decl *ED = parseExtensionBody(ExtensionLoc, Ty, Inherited);
-
-  parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_extension,
-                     LBLoc, diag::opening_brace);
-
-  return ED;
-}
-
-/// parseExtensionBody - Parse the body of an 'extension', or the
-/// extended body of a 'oneof'.
-Decl *Parser::parseExtensionBody(SourceLoc ExtensionLoc, Type Ty,
-                                 MutableArrayRef<Type> Inherited) {
   ExtensionDecl *ED
-    = new (Context) ExtensionDecl(ExtensionLoc, Ty,
+    = new (Context) ExtensionDecl(ExtensionLoc, Ty, TyLoc,
                                   Context.AllocateCopy(Inherited),
                                   CurDeclContext);
   ContextChange CC(*this, ED);
@@ -541,6 +530,10 @@ Decl *Parser::parseExtensionBody(SourceLoc ExtensionLoc, Type Ty,
   }
 
   ED->setMembers(Context.AllocateCopy(MemberDecls));
+
+  parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_extension,
+                     LBLoc, diag::opening_brace);
+
   return ED;
 }
 
@@ -569,7 +562,7 @@ TypeAliasDecl *Parser::parseDeclTypeAlias(bool WantDefinition) {
   }
 
   TypeAliasDecl *TAD =
-    new (Context) TypeAliasDecl(TypeAliasLoc, Id, Ty, CurDeclContext);
+    new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc, Ty, CurDeclContext);
   ScopeInfo.addToScope(TAD);
   return TAD;
 }
@@ -725,7 +718,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       // Have we already parsed a get clause?
       if (Get) {
         diagnose(Tok.getLoc(), diag::duplicate_getset, false);
-        diagnose(Get->getLocStart(), diag::previous_getset, false);
+        diagnose(Get->getLoc(), diag::previous_getset, false);
         
         // Forget the previous version.
         Get = 0;
@@ -792,7 +785,8 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       LastValidLoc = Body.get()->getRBraceLoc();
       
       Get = new (Context) FuncDecl(/*StaticLoc=*/SourceLoc(), GetLoc,
-                                   Identifier(), FuncTy, GetFn, CurDeclContext);
+                                   Identifier(), GetLoc, FuncTy, GetFn,
+                                   CurDeclContext);
       GetFn->setDecl(Get);
       continue;
     }
@@ -809,8 +803,8 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     // Have we already parsed a var-set clause?
     if (Set) {
       diagnose(Tok.getLoc(), diag::duplicate_getset, true);
-      diagnose(Set->getLocStart(), diag::previous_getset, true);
-      
+      diagnose(Set->getLoc(), diag::previous_getset, true);
+
       // Forget the previous setter.
       Set = 0;
     }
@@ -913,7 +907,8 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     LastValidLoc = Body.get()->getRBraceLoc();
     
     Set = new (Context) FuncDecl(/*StaticLoc=*/SourceLoc(), SetLoc,
-                                 Identifier(), FuncTy, SetFn, CurDeclContext);
+                                 Identifier(), SetLoc, FuncTy, SetFn,
+                                 CurDeclContext);
     SetFn->setDecl(Set);
   }
   
@@ -977,7 +972,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool hasContainerType) {
   
   if (Set && !Get) {
     if (!Invalid)
-      diagnose(Set->getLocStart(), diag::var_set_without_get);
+      diagnose(Set->getLoc(), diag::var_set_without_get);
     
     Set = nullptr;
     Invalid = true;
@@ -1114,6 +1109,7 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   parseAttributeList(Attributes);
 
   Identifier Name;
+  SourceLoc NameLoc = Tok.getLoc();
   if (parseAnyIdentifier(Name, diag::expected_identifier_in_decl, "func"))
     return 0;
 
@@ -1174,7 +1170,7 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   }
   
   // Create the decl for the func and add it to the parent scope.
-  FuncDecl *FD = new (Context) FuncDecl(StaticLoc, FuncLoc, Name,
+  FuncDecl *FD = new (Context) FuncDecl(StaticLoc, FuncLoc, Name, NameLoc,
                                         FuncTy, FE, CurDeclContext);
   if (FE)
     FE->setDecl(FD);
@@ -1201,6 +1197,7 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
   parseAttributeList(Attributes);
   
   Identifier OneOfName;
+  SourceLoc OneOfNameLoc = Tok.getLoc();
   if (parseIdentifier(OneOfName, diag::expected_identifier_in_decl, "oneof"))
     return true;
 
@@ -1213,7 +1210,7 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_oneof_type))
     return true;
 
-  OneOfDecl *OOD = new (Context) OneOfDecl(OneOfLoc, OneOfName,
+  OneOfDecl *OOD = new (Context) OneOfDecl(OneOfLoc, OneOfName, OneOfNameLoc,
                                            Context.AllocateCopy(Inherited),
                                            CurDeclContext);
   Decls.push_back(OOD);
@@ -1279,7 +1276,7 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
     if (!insertRes.second) {
       diagnose(Elt.NameLoc, diag::duplicate_oneof_element, Elt.Name);
       
-      diagnose(insertRes.first->second->getLocStart(),
+      diagnose(insertRes.first->second->getLoc(),
                diag::previous_definition, NameI);
       
       // Don't copy this element into NewElements.
@@ -1325,6 +1322,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   parseAttributeList(Attributes);
 
   Identifier StructName;
+  SourceLoc StructNameLoc = Tok.getLoc();
   SourceLoc LBLoc, RBLoc;
   if (parseIdentifier(StructName, diag::expected_identifier_in_decl, "struct"))
     return true;
@@ -1338,6 +1336,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
     return true;
 
   StructDecl *SD = new (Context) StructDecl(StructLoc, StructName,
+                                            StructNameLoc,
                                             Context.AllocateCopy(Inherited),
                                             CurDeclContext);
   Decls.push_back(SD);
@@ -1378,12 +1377,13 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
 ///      decl*
 ///
 bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
-  SourceLoc StructLoc = consumeToken(tok::kw_class);
+  SourceLoc ClassLoc = consumeToken(tok::kw_class);
   
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
 
   Identifier ClassName;
+  SourceLoc ClassNameLoc = Tok.getLoc();
   SourceLoc LBLoc, RBLoc;
   if (parseIdentifier(ClassName, diag::expected_identifier_in_decl, "class"))
     return true;
@@ -1396,7 +1396,7 @@ bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class))
     return true;
 
-  ClassDecl *CD = new (Context) ClassDecl(StructLoc, ClassName,
+  ClassDecl *CD = new (Context) ClassDecl(ClassLoc, ClassName, ClassNameLoc,
                                           Context.AllocateCopy(Inherited),
                                           CurDeclContext);
   Decls.push_back(CD);
@@ -1478,7 +1478,8 @@ bool Parser::parseProtocolBody(SourceLoc ProtocolLoc,
   // FIXME: Mark as 'implicit'.
   Members.push_back(new (Context) TypeAliasDecl(ProtocolLoc,
                                                 Context.getIdentifier("This"),
-                                                Type(),  CurDeclContext));
+                                                ProtocolLoc, Type(),
+                                                CurDeclContext));
   
   bool HadError = false;
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
@@ -1595,7 +1596,7 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
 
   if (Set && !Get) {
     if (!Invalid)
-      diagnose(Set->getLocStart(), diag::set_without_get_subscript);
+      diagnose(Set->getLoc(), diag::set_without_get_subscript);
     
     Set = nullptr;
     Invalid = true;

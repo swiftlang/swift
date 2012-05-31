@@ -236,7 +236,7 @@ public:
       TC.diagnose(Loc, NonFuncMember, BaseType)
         << Base->getSourceRange();
       if (!Lookup.Results.front().Kind == MemberLookupResult::TupleElement)
-        TC.diagnose(Lookup.Results.front().D->getLocStart(),
+        TC.diagnose(Lookup.Results.front().D->getStartLoc(),
                     diag::decl_declared_here,
                     Lookup.Results.front().D->getName());
       return nullptr;
@@ -798,8 +798,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       if (i >= StartElem) {
         for (ValueDecl *PrevD : PrevOv) {
           if (PrevD->getType()->isEqual(VD->getType())) {
-            TC.diagnose(VD->getLocStart(), diag::invalid_redecl);
-            TC.diagnose(PrevD->getLocStart(), diag::invalid_redecl_prev,
+            TC.diagnose(VD->getStartLoc(), diag::invalid_redecl);
+            TC.diagnose(PrevD->getStartLoc(), diag::invalid_redecl_prev,
                         VD->getName());
           }
         }

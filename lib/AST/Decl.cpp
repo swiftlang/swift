@@ -59,11 +59,32 @@ void *Module::operator new(size_t Bytes, ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
+// Helper functions to verify statically whether source-location
+// functions have been overridden.
+typedef const char (&TwoChars)[2];
+template<typename Class> 
+inline char checkSourceLocType(SourceLoc (Class::*)() const);
+inline TwoChars checkSourceLocType(SourceLoc (Decl::*)() const);
 
-SourceLoc Decl::getLocStart() const {
+
+SourceLoc Decl::getStartLoc() const {
   switch (getKind()) {
-#define DECL(NAME, X) \
-  case DeclKind::NAME: return cast<NAME##Decl>(this)->getLocStart();
+#define DECL(ID, PARENT) \
+static_assert(sizeof(checkSourceLocType(&ID##Decl::getStartLoc)) == 1, \
+              #ID "Decl is missing getStartLoc()"); \
+case DeclKind::ID: return cast<ID##Decl>(this)->getStartLoc();
+#include "swift/AST/DeclNodes.def"
+  }
+
+  llvm_unreachable("Unknown decl kind");
+}
+
+SourceLoc Decl::getLoc() const {
+  switch (getKind()) {
+#define DECL(ID, X) \
+static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 1, \
+              #ID "Decl is missing getLoc()"); \
+case DeclKind::ID: return cast<ID##Decl>(this)->getLoc();
 #include "swift/AST/DeclNodes.def"
   }
 
@@ -96,7 +117,7 @@ ImportDecl::ImportDecl(DeclContext *DC, SourceLoc ImportLoc,
   memcpy(getPathBuffer(), Path.data(), Path.size() * sizeof(AccessPathElement));
 }
 
-SourceLoc TopLevelCodeDecl::getLocStart() const {
+SourceLoc TopLevelCodeDecl::getStartLoc() const {
   if (Body.is<Expr*>())
     return Body.get<Expr*>()->getStartLoc();
   return Body.get<Stmt*>()->getStartLoc();
@@ -173,38 +194,39 @@ Type TypeDecl::getDeclaredType() const {
 }
 
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
-                             Type Underlyingty, DeclContext *DC)
+                             SourceLoc NameLoc, Type Underlyingty,
+                             DeclContext *DC)
   : TypeDecl(DeclKind::TypeAlias, DC, Name, Type()), AliasTy(0),
-    TypeAliasLoc(TypeAliasLoc), UnderlyingTy(Underlyingty) {
+    TypeAliasLoc(TypeAliasLoc), NameLoc(NameLoc), UnderlyingTy(Underlyingty) {
   // Set the type of the TypeAlias to the right MetaTypeType.
   // FIXME: Is this the right thing to do?
   setType(MetaTypeType::get(this));
 }
 
-OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name,
+OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
                      MutableArrayRef<Type> Inherited, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::OneOf, Parent, Name, Type()), 
-    OneOfLoc(OneOfLoc), Inherited(Inherited) {
+    OneOfLoc(OneOfLoc), NameLoc(NameLoc), Inherited(Inherited) {
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(this));
   // Compute the associated type for this OneOfDecl.
   OneOfTy = new (Parent->getASTContext()) OneOfType(this, Parent->getASTContext());
 }
 
-StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name,
+StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
                        MutableArrayRef<Type> Inherited, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::Struct, Parent, Name, Type()), 
-    StructLoc(StructLoc), Inherited(Inherited) {
+    StructLoc(StructLoc), NameLoc(NameLoc), Inherited(Inherited) {
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(this));
   // Compute the associated type for this StructDecl.
   StructTy = new (Parent->getASTContext()) StructType(this, Parent->getASTContext());
 }
 
-ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name,
+ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
                      MutableArrayRef<Type> Inherited, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::Class, Parent, Name, Type()), 
-    ClassLoc(ClassLoc), Inherited(Inherited) {
+    ClassLoc(ClassLoc), NameLoc(NameLoc), Inherited(Inherited) {
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(this));
   // Compute the associated type for this ClassDecl.
@@ -345,6 +367,10 @@ VarDecl *FuncDecl::getImplicitThisDecl() {
   if (NP && NP->getBoundName().str() == "this" && !NP->getLoc().isValid())
     return NP->getDecl();
   return 0;
+}
+
+SourceLoc SubscriptDecl::getLoc() const {
+  return Indices->getStartLoc();
 }
 
 //===----------------------------------------------------------------------===//

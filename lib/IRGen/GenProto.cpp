@@ -429,11 +429,11 @@ namespace {
         return visitFunc(cast<FuncDecl>(member));
 
       case DeclKind::Subscript:
-        IGM.unimplemented(member->getLocStart(), "var declaration in protocol");
+        IGM.unimplemented(member->getLoc(), "var declaration in protocol");
         return;
 
       case DeclKind::Var:
-        IGM.unimplemented(member->getLocStart(), "var declaration in protocol");
+        IGM.unimplemented(member->getLoc(), "var declaration in protocol");
         return;
 
       case DeclKind::TypeAlias:

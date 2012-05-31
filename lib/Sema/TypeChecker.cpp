@@ -36,7 +36,7 @@ ProtocolDecl *TypeChecker::getAnyProtocol(SourceLoc Loc) {
     llvm::SmallVector<Decl *, 1> Members;
     Members.push_back(new (Context) TypeAliasDecl(Loc,
                                                   Context.getIdentifier("This"),
-                                                  Type(),  AnyProto));
+                                                  Loc, Type(),  AnyProto));
     AnyProto->setMembers(Context.AllocateCopy(Members),
                          SourceRange(Loc, Loc));
     AnyProto->setDeclaredType(ProtocolType::getNew(AnyProto));

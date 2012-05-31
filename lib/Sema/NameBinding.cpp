@@ -198,7 +198,7 @@ addStandardLibraryImport(SmallVectorImpl<ImportedModule> &Result) {
     return;
 
   Identifier SwiftID = Context.getIdentifier("swift");
-  Module *M = getModule(std::make_pair(SwiftID, TU->Decls[0]->getLocStart()));
+  Module *M = getModule(std::make_pair(SwiftID, TU->Decls[0]->getStartLoc()));
   if (M == 0) return;
   Result.push_back(std::make_pair(Module::AccessPathTy(), M));
 }
@@ -253,7 +253,7 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
       diagnose(Loc, diag::abiguous_type_base, Name)
         << SourceRange(Loc, Components.back().Loc);
       for (ValueDecl *D : Decls)
-        diagnose(D->getLocStart(), diag::found_candidate);
+        diagnose(D->getStartLoc(), diag::found_candidate);
       return true;
     }
     
@@ -391,8 +391,8 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
       if (i >= StartElem) {
         if (PrevD && !((isa<VarDecl>(VD)    || isa<FuncDecl>(VD)) &&
                        (isa<VarDecl>(PrevD) || isa<FuncDecl>(PrevD)))) {
-          Binder.diagnose(VD->getLocStart(), diag::invalid_redecl);
-          Binder.diagnose(PrevD->getLocStart(), diag::invalid_redecl_prev,
+          Binder.diagnose(VD->getStartLoc(), diag::invalid_redecl);
+          Binder.diagnose(PrevD->getStartLoc(), diag::invalid_redecl_prev,
                           VD->getName());
         }
       }

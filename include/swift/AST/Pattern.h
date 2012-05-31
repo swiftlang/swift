@@ -204,7 +204,7 @@ public:
   VarDecl *getDecl() const { return Var; }
   Identifier getBoundName() const { return Var->getName(); }
 
-  SourceLoc getLoc() const { return Var->getLocStart(); }
+  SourceLoc getLoc() const { return Var->getLoc(); }
   SourceRange getSourceRange() const { return getLoc(); }
 
   static bool classof(const Pattern *P) {

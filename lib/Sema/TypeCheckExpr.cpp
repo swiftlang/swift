@@ -823,8 +823,8 @@ static InfixData getInfixData(TypeChecker &TC, Expr *E) {
       
       if (Infix.isValid() && Infix != D->getAttrs().getInfixData()) {
         TC.diagnose(OO->getLoc(), diag::binop_mismatched_infix);
-        TC.diagnose(FirstDecl->getLocStart(), diag::first_declaration);
-        TC.diagnose(D->getLocStart(), diag::second_declaration);
+        TC.diagnose(FirstDecl->getStartLoc(), diag::first_declaration);
+        TC.diagnose(D->getStartLoc(), diag::second_declaration);
         return Infix;
       }
       

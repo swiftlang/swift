@@ -572,7 +572,7 @@ static Callee emitCallee(IRGenFunction &IGF, FuncDecl *fn,
   }
 
   if (bestUncurry != 0) {
-    IGF.unimplemented(fn->getLocStart(), "curried local function emission");
+    IGF.unimplemented(fn->getLoc(), "curried local function emission");
     llvm::Constant *undef = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
     return Callee::forGlobalFunction(fn->getType(), undef,
                                      bestExplosion, bestUncurry);

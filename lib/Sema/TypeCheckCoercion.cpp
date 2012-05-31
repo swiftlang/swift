@@ -363,7 +363,7 @@ public:
     if (DED == 0) {
       diagnose(UME->getLoc(), diag::invalid_member_in_type,
                DT, UME->getName());
-      diagnose(D->getOneOfLoc(), diag::type_declared_here);
+      diagnose(D->getLoc(), diag::type_declared_here);
       return nullptr;
     }
 
@@ -579,7 +579,7 @@ SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralType LitTy) {
     for (MemberLookupResult Res : Lookup.Results) {
       assert(Res.Kind != MemberLookupResult::TupleElement &&
              "Unexpected lookup result in non-tuple");
-      diagnose(Res.D->getLocStart(), diag::found_candidate);
+      diagnose(Res.D->getLoc(), diag::found_candidate);
     }
     return std::pair<FuncDecl*, Type>();
   }
@@ -590,7 +590,7 @@ SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralType LitTy) {
          "Unexpected lookup result in non-tuple");
   if (LookupResult.Kind != MemberLookupResult::MetatypeMember ||
       !isa<FuncDecl>(LookupResult.D)) {
-    diagnose(LookupResult.D->getLocStart(), diag::type_literal_conversion_not_static,
+    diagnose(LookupResult.D->getLoc(), diag::type_literal_conversion_not_static,
              Ty, MethodName);
     return std::pair<FuncDecl*, Type>();
   }
@@ -602,7 +602,7 @@ SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralType LitTy) {
   
   // The result of the convert function must be the destination type.
   if (!FT->getResult()->isEqual(Ty)) {
-    diagnose(Method->getLocStart(), 
+    diagnose(Method->getLoc(), 
              diag::literal_conversion_wrong_return_type, Ty, MethodName);
     diagnose(Loc, diag::while_converting_literal, Ty);
     return std::pair<FuncDecl*, Type>();
@@ -753,7 +753,7 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
     // conversion from a Builtin type.
     LiteralInfo = isLiteralCompatibleType(ArgType, E->getLoc(), LitTy);
     if (LiteralInfo.first == 0) {
-      diagnose(Method->getLocStart(),
+      diagnose(Method->getLoc(),
                diag::while_processing_literal_conversion_function, DestTy);
       return nullptr;
     }
@@ -773,7 +773,7 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
                LiteralInfo.second->is<BuiltinRawPointerType>()) {
       // ok.
     } else {
-      diagnose(Method->getLocStart(),
+      diagnose(Method->getLoc(),
                diag::type_literal_conversion_defined_wrong, DestTy);
       diagnose(E->getLoc(), diag::while_converting_literal, DestTy);
       return nullptr;

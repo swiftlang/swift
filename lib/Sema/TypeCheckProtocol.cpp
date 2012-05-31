@@ -69,7 +69,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         // Recursive call already diagnosed this problem, but tack on a note
         // to establish the relationship.
         if (ComplainLoc.isValid()) {
-          TC.diagnose(Proto->getLocStart(),
+          TC.diagnose(Proto->getStartLoc(),
                       diag::inherited_protocol_does_not_conform, T, Inherited);
         }
         return nullptr;
@@ -138,12 +138,12 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
           Complained = true;
         }
         
-        TC.diagnose(AssociatedType->getLocStart(),
+        TC.diagnose(AssociatedType->getStartLoc(),
                     diag::ambiguous_witnesses_type,
                     AssociatedType->getName());
         
         for (auto Candidate : Viable)
-          TC.diagnose(Candidate->getLocStart(), diag::protocol_witness_type);
+          TC.diagnose(Candidate->getStartLoc(), diag::protocol_witness_type);
         
         TypeMapping[AssociatedType->getUnderlyingType()->getAs<ArchetypeType>()]
           = ErrorType::get(TC.Context);
@@ -158,11 +158,11 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         Complained = true;
       }
       
-      TC.diagnose(AssociatedType->getLocStart(), diag::no_witnesses_type,
+      TC.diagnose(AssociatedType->getStartLoc(), diag::no_witnesses_type,
                   AssociatedType->getName());
       for (auto Candidate : Lookup.Results) {
         if (Candidate.hasDecl())
-          TC.diagnose(Candidate.D->getLocStart(), diag::protocol_witness_type);
+          TC.diagnose(Candidate.D->getStartLoc(), diag::protocol_witness_type);
       }
       
       TypeMapping[AssociatedType->getUnderlyingType()->getAs<ArchetypeType>()]
@@ -230,13 +230,13 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
           Complained = true;
         }
         
-        TC.diagnose(Requirement->getLocStart(), diag::ambiguous_witnesses,
+        TC.diagnose(Requirement->getStartLoc(), diag::ambiguous_witnesses,
                     getRequirementKind(Requirement),
                     Requirement->getName(),
                     RequiredTy);
         
         for (auto Candidate : Viable)
-          TC.diagnose(Candidate->getLocStart(), diag::protocol_witness,
+          TC.diagnose(Candidate->getStartLoc(), diag::protocol_witness,
                       getInstanceUsageType(Candidate, TC.Context));
         
         continue;
@@ -250,13 +250,13 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         Complained = true;
       }
 
-      TC.diagnose(Requirement->getLocStart(), diag::no_witnesses,
+      TC.diagnose(Requirement->getStartLoc(), diag::no_witnesses,
                   getRequirementKind(Requirement),
                   Requirement->getName(),
                   getInstanceUsageType(Requirement, TC.Context));
       for (auto Candidate : Lookup.Results) {
         if (Candidate.hasDecl())
-          TC.diagnose(Candidate.D->getLocStart(), diag::protocol_witness,
+          TC.diagnose(Candidate.D->getStartLoc(), diag::protocol_witness,
                       getInstanceUsageType(Candidate.D, TC.Context));
       }
     } else {
