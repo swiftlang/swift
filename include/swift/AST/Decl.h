@@ -24,6 +24,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include <cstddef>
 
 namespace swift {
@@ -638,6 +639,9 @@ public:
   /// \brief Determine whether this protocol inherits from the given ("super")
   /// protocol.
   bool inheritsFrom(const ProtocolDecl *Super) const;
+  
+  /// \brief Collect all of the inherited protocols into the given set.
+  void collectInherited(llvm::SmallPtrSet<ProtocolDecl *, 4> &Inherited);
   
   Type getDeclaredType() const { return ProtocolTy; }
   void setDeclaredType(Type Ty) { ProtocolTy = Ty; }

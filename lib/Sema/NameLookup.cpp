@@ -87,6 +87,14 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
     return;
   }
   
+  // If the base is a protocol composition, see if this is a reference to a
+  // declared protocol member in any of the protocols.
+  if (auto PC = BaseTy->getAs<ProtocolCompositionType>()) {
+    for (auto Proto : PC->getProtocols())
+      doIt(Proto, M, Visited);
+    return;
+  }
+    
   // Check to see if this is a reference to a tuple field.
   if (TupleType *TT = BaseTy->getAs<TupleType>()) {
     // If the field name exists, we win.  Otherwise, if the field name is a

@@ -193,7 +193,7 @@ Expr *OverloadedMemberRefExpr::createWithCopy(Expr *Base, SourceLoc DotLoc,
     Type BaseTy = Base->getType();
     if (auto BaseLV = BaseTy->getAs<LValueType>())
       BaseTy = BaseLV->getObjectType();
-    if (BaseTy->getAs<ProtocolType>()) {
+    if (BaseTy->isExistentialType()) {
       return new (C) ExistentialMemberRefExpr(Base, DotLoc, Decls[0],
                                               MemberLoc);
     }

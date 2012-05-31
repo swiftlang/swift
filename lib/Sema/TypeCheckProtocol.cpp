@@ -55,21 +55,23 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
   // Check that T conforms to all inherited protocols.
   for (auto Inherited : Proto->getInherited()) {
-    ProtocolType *InheritedProto = Inherited->getAs<ProtocolType>();
-    if (!InheritedProto)
+    SmallVector<ProtocolDecl *, 4> InheritedProtos;
+    if (!Inherited->isExistentialType(InheritedProtos))
       return nullptr;
     
-    if (auto Conformance = TC.conformsToProtocol(T, InheritedProto->getDecl(),
-                                                 ComplainLoc))
-      InheritedMapping[InheritedProto->getDecl()] = Conformance;
-    else {
-      // Recursive call already diagnosed this problem, but tack on a note
-      // to establish the relationship.
-      if (ComplainLoc.isValid()) {
-        TC.diagnose(Proto->getLocStart(),
-                    diag::inherited_protocol_does_not_conform, T, Inherited);
+    for (auto InheritedProto : InheritedProtos) {
+      if (auto Conformance = TC.conformsToProtocol(T, InheritedProto,
+                                                   ComplainLoc))
+        InheritedMapping[InheritedProto] = Conformance;
+      else {
+        // Recursive call already diagnosed this problem, but tack on a note
+        // to establish the relationship.
+        if (ComplainLoc.isValid()) {
+          TC.diagnose(Proto->getLocStart(),
+                      diag::inherited_protocol_does_not_conform, T, Inherited);
+        }
+        return nullptr;
       }
-      return nullptr;
     }
   }
   

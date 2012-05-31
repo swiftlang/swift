@@ -222,9 +222,7 @@ bool TypeChecker::validateType(Type InTy, bool isFirstPass) {
     for (auto Proto : PC->getProtocols()) {
       if (validateType(Proto, isFirstPass))
         IsInvalid = true;
-      else if (isFirstPass &&
-               !Proto->is<ProtocolType>() &&
-               !Proto->is<ProtocolCompositionType>()) {
+      else if (isFirstPass && !Proto->isExistentialType()) {
         // FIXME: Terrible source-location information.
         diagnose(PC->getFirstLoc(), diag::protocol_composition_not_protocol,
                  Proto);
@@ -280,13 +278,16 @@ static bool isSubtypeOf(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
   // to that protocol type. This is a non-trivial conversion, because it
   // requires the introduction of a new protocol mapping.
   if (Flags & ST_AllowNonTrivial) {
-    if (auto Proto2 = T2->getAs<ProtocolType>()) {
-      if (TC.conformsToProtocol(T1, Proto2->getDecl())) {
-        Trivial = false;
-        return true;
+    SmallVector<ProtocolDecl *, 4> T2Protos;
+    if (T2->isExistentialType(T2Protos)) {
+      for (auto Proto2 : T2Protos) {
+        if (!TC.conformsToProtocol(T1, Proto2)) {
+          return false;
+        }
       }
-    
-      return false;
+      
+      Trivial = false;
+      return true;
     }
   }
   
@@ -584,7 +585,8 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
     if (!AnyChanged)
       return T;
     
-    return ProtocolCompositionType::get(Context, PC->getFirstLoc(), Protocols);
+    return ProtocolCompositionType::get(Context, PC->getFirstLoc(),
+                                        Context.AllocateCopy(Protocols));
   }
   }
   

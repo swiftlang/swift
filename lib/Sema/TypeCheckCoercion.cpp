@@ -24,6 +24,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 #include <utility>
@@ -623,15 +624,24 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
 
   // If the destination type is a protocol, use the default literal type
   // and check whether it conforms to the given protocol.
-  if (auto DestProto = DestTy->getAs<ProtocolType>()) {
+  SmallVector<ProtocolDecl *, 4> DestProtocols;
+  if (DestTy->isExistentialType(DestProtocols)) {
     Type DefaultLitTy = TC.getDefaultLiteralType(E);
     if (CoercedResult Result = coerceToType(E, DefaultLitTy, TC, Flags)) {
       if (Flags & CF_Apply)
         return coerceToType(Result.getExpr(), DestTy, TC, Flags);
       
-      if (TC.conformsToProtocol(DefaultLitTy, DestProto->getDecl()))
+      bool ConformstoAll = true;
+      for (auto DestProto : DestProtocols) {
+        if (!TC.conformsToProtocol(DefaultLitTy, DestProto)) {
+          ConformstoAll = false;
+          break;
+        }
+      }
+
+      if (ConformstoAll)
         return DestTy;
-      
+
       return nullptr;
     }
     return nullptr;
@@ -1462,6 +1472,32 @@ CoercedResult SemaCoerce::convertScalarToTupleType(Expr *E, TupleType *DestTy,
   return convertTupleToTupleType(TE, 1, DestTy, TC, Flags);
 }
 
+/// \brief Determine whether the protocol set X is a subset of (or equivalent
+/// to) the protocol set Y.
+static bool
+isProtocolSubset(ArrayRef<ProtocolDecl *> X, ArrayRef<ProtocolDecl *> Y) {
+  if (X.empty())
+    return true;
+  
+  if (Y.empty())
+    return false;
+  
+  // Gather the set of protocols in Y and anything they inherit.
+  llvm::SmallPtrSet<ProtocolDecl *, 4> YProtos;
+  for (auto YProto : Y) {
+    if (YProtos.insert(YProto))
+      YProto->collectInherited(YProtos);
+  }
+  
+  // Check whether each of the Xs has been found in Y.
+  for (auto XProto : X) {
+    if (!YProtos.count(XProto))
+      return false;
+  }
+  
+  return true;
+}
+
 /// \brief Coerce the object argument for a member reference (.) or function
 /// application.
 CoercedResult
@@ -1487,11 +1523,13 @@ SemaCoerce::coerceObjectArgument(Expr *E, Type ContainerTy, TypeChecker &TC,
   bool Convertible = false;
   if (SrcObjectTy->isEqual(ContainerTy)) {
     Convertible = true;
-  } else if (auto DestProto = ContainerTy->getAs<ProtocolType>()) {
-    if (auto SrcProto = SrcObjectTy->getAs<ProtocolType>()) {
-      if (SrcProto->getDecl()->inheritsFrom(DestProto->getDecl()))
-        Convertible = true;
-    }
+  } else {
+    SmallVector<ProtocolDecl *, 4> DestProtocols;
+    SmallVector<ProtocolDecl *, 4> SrcProtocols;
+    if (ContainerTy->isExistentialType(DestProtocols) &&
+        SrcObjectTy->isExistentialType(SrcProtocols) &&
+        isProtocolSubset(DestProtocols, SrcProtocols))
+      Convertible = true;
   }
   
   // Complain if no conversion is possible.
@@ -1743,35 +1781,51 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
     return nullptr;
   }
 
-  // A value of any given type can be converted to a value of protocol type if
-  // the value's type conforms to the protocol.
-  if (auto DestProto = DestTy->getAs<ProtocolType>()) {
-    // Simple case: the source protocol inherits from the destination protocol.
-    if (auto SrcProto = E->getType()->getAs<ProtocolType>()) {
-      if (SrcProto->getDecl()->inheritsFrom(DestProto->getDecl())) {
-        if (!(Flags & CF_Apply))
-          return DestTy;
-
-        return coerced(new (TC.Context) SuperConversionExpr(E, DestTy), Flags);
-      }
-    }
+  {
+    // A value of any given type can be converted to a value of existential if
+    // the value's type conforms to each of the protocols.
+    SmallVector<ProtocolDecl *, 4> DestProtocols;
     
-    // Non-trivial case: source type (which may be a protocol) satisfies the
-    // requirements of the destination protocol.
-    if (ProtocolConformance *Conformance
-          = TC.conformsToProtocol(E->getType(), DestProto->getDecl())) {
+    if (DestTy->isExistentialType(DestProtocols)) {
+      // Simple case: the source protocol inherits from the (only) destination
+      // protocol.
+      if (DestProtocols.size() == 1) {
+        if (auto SrcProto = E->getType()->getAs<ProtocolType>()) {
+          if (SrcProto->getDecl()->inheritsFrom(DestProtocols[0])) {
+            if (!(Flags & CF_Apply))
+              return DestTy;
+
+            return coerced(new (TC.Context) SuperConversionExpr(E, DestTy),
+                           Flags);
+          }
+        }
+      }
+      
+      // Non-trivial case: source type (which may be an existential type)
+      // satisfies the requirements of all of the destination protocols.
+      SmallVector<ProtocolConformance *, 4> Conformances;
+      for (auto DestProto : DestProtocols) {
+        if (ProtocolConformance *Conformance
+              = TC.conformsToProtocol(E->getType(), DestProto)) {
+          Conformances.push_back(Conformance);
+          continue;
+        }
+        
+        if (Flags & CF_Apply) // FIXME: Say *why* it doesn't conform.
+          TC.diagnose(E->getLoc(), diag::invalid_implicit_protocol_conformance,
+                      E->getType(), DestProto->getDeclaredType());
+
+        return nullptr;
+      }
+      
       if (!(Flags & CF_Apply))
         return DestTy;
-
-      return coerced(new (TC.Context) ErasureExpr(E, DestTy, Conformance),
-                     Flags);
+      
+      return coerced(
+               new (TC.Context) ErasureExpr(E, DestTy,
+                                  TC.Context.AllocateCopy(Conformances)),
+                    Flags);
     }
-    
-    if (Flags & CF_Apply) // FIXME: Say *why* it doesn't conform.
-      TC.diagnose(E->getLoc(), diag::invalid_implicit_protocol_conformance,
-                  E->getType(), DestTy);
-    
-    return nullptr;
   }
 
   // A value of function type can be converted to a value of another function

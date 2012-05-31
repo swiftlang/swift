@@ -697,8 +697,11 @@ bool checkProtocolCircularity(TypeChecker &TC, ProtocolDecl *Proto,
                               llvm::SmallPtrSet<ProtocolDecl *, 16> &Local,
                               llvm::SmallVectorImpl<ProtocolDecl *> &Path) {
   for (auto InheritedTy : Proto->getInherited()) {
-    if (ProtocolType *InheritedProtoTy = InheritedTy->getAs<ProtocolType>()) {
-      ProtocolDecl *InheritedProto = InheritedProtoTy->getDecl();
+    SmallVector<ProtocolDecl *, 4> InheritedProtos;
+    if (!InheritedTy->isExistentialType(InheritedProtos))
+      continue;
+    
+    for (auto InheritedProto : InheritedProtos) {
       if (Visited.count(InheritedProto)) {
         // We've seen this protocol as part of another protocol search;
         // it's not circular.

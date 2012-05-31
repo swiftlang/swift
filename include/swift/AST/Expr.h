@@ -1016,16 +1016,21 @@ public:
 /// var printable : Printable = Book() // erases type
 /// \endcode
 class ErasureExpr : public ImplicitConversionExpr {
-  ProtocolConformance *Conformance;
+  ArrayRef<ProtocolConformance *> Conformances;
   
 public:
-  ErasureExpr(Expr *SubExpr, Type Ty, ProtocolConformance *Conformance)
+  ErasureExpr(Expr *SubExpr, Type Ty,
+              ArrayRef<ProtocolConformance *> Conformances)
     : ImplicitConversionExpr(ExprKind::Erasure, SubExpr, Ty),
-      Conformance(Conformance) {}
+      Conformances(Conformances) {}
   
   /// \brief Retrieve the mapping specifying how the type of the subexpression
-  /// maps to the resulting protocol type.
-  ProtocolConformance *getConformance() const { return Conformance; }
+  /// maps to the resulting existential type. If the resulting existential
+  /// type involves several different protocols, there will be mappings for each
+  /// of those protocols.
+  ArrayRef<ProtocolConformance *> getConformances() const {
+    return Conformances;
+  }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ErasureExpr *) { return true; }

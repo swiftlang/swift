@@ -436,7 +436,7 @@ public:
       
     // For each of the archetypes in the protocol, substitute an existential
     // type that meets the same requirements.
-    ProtocolDecl *Proto = ContainerTy->getAs<ProtocolType>()->getDecl();
+    ProtocolDecl *Proto = ContainerTy->castTo<ProtocolType>()->getDecl();
     TypeSubstitutionMap Substitutions;
     for (auto Member : Proto->getMembers()) {
       auto AssocType = dyn_cast<TypeAliasDecl>(Member);

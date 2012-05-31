@@ -155,6 +155,21 @@ public:
   /// the type occurs.
   bool isUnresolvedType() const;
   
+  /// isExistentialType - Determines whether this type is an existential type,
+  /// whose real (runtime) type is unknown but which is known to conform to
+  /// some set of protocols. Protocol and protocol-conformance types are
+  /// existential types.
+  bool isExistentialType();
+
+  /// isExistentialType - Determines whether this type is an existential type,
+  /// whose real (runtime) type is unknown but which is known to conform to
+  /// some set of protocols. Protocol and protocol-conformance types are
+  /// existential types.
+  ///
+  /// \param Protocols If the type is an existential type, this vector is
+  /// populated with the set of protocols
+  bool isExistentialType(SmallVectorImpl<ProtocolDecl *> &Protocols);
+
   /// getUnlabeledType - Retrieve a version of this type with all labels
   /// removed at every level. For example, given a tuple type 
   /// \code
@@ -1098,6 +1113,13 @@ public:
 inline bool TypeBase::isUnresolvedType() const {
   return TypeBits.TypeBase.Unresolved;
 }
+
+inline bool TypeBase::isExistentialType() {
+  CanType T = getCanonicalType();
+  return T->getKind() == TypeKind::Protocol
+         || T->getKind() == TypeKind::ProtocolComposition;
+}
+
 
 } // end namespace swift
 

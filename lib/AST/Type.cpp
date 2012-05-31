@@ -75,6 +75,23 @@ bool TypeBase::hasReferenceSemantics() {
   return is<BuiltinObjectPointerType>() || is<ClassType>() || is<FunctionType>();
 }
 
+bool TypeBase::isExistentialType(SmallVectorImpl<ProtocolDecl *> &Protocols) {
+  CanType T = getCanonicalType();
+  if (auto Proto = dyn_cast<ProtocolType>(T)) {
+    Protocols.push_back(Proto->getDecl());
+    return true;
+  }
+  
+  if (auto PC = dyn_cast<ProtocolCompositionType>(T)) {
+    std::transform(PC->getProtocols().begin(), PC->getProtocols().end(),
+                   std::back_inserter(Protocols),
+                   [](Type T) { return T->castTo<ProtocolType>()->getDecl(); });
+    return true;
+  }
+  
+  return false;
+}
+
 Type TypeBase::getUnlabeledType(ASTContext &Context) {
   switch (getKind()) {
   case TypeKind::Error: 
@@ -426,9 +443,11 @@ CanType TypeBase::getCanonicalType() {
                        return Proto->getDeclaredType();
                      });
       
-      Result = ProtocolCompositionType::get(PC->getASTContext(),
-                                            PC->getFirstLoc(),
-                                            ProtocolTypes);
+      Result = ProtocolCompositionType::get(
+                 PC->getASTContext(),
+                 PC->getFirstLoc(),
+                 PC->getASTContext().AllocateCopy(ProtocolTypes));
+      
       // We now know that the result type we computed is canonical; make it so.
       Result->CanonicalType = &PC->getASTContext();
     }
@@ -669,7 +688,7 @@ void BuiltinObjCPointerType::print(raw_ostream &OS) const {
 }
 
 void BuiltinIntegerType::print(raw_ostream &OS) const {
-  OS << "Builtin.int" << cast<BuiltinIntegerType>(this)->getBitWidth();
+  OS << "Builtin.Int" << cast<BuiltinIntegerType>(this)->getBitWidth();
 }
 
 void BuiltinFloatType::print(raw_ostream &OS) const {

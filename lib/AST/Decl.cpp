@@ -234,16 +234,41 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *Super) const {
     Stack.pop_back();
     
     for (auto Inherited : Current->getInherited()) {
-      if (auto InheritedProto = Inherited->getAs<ProtocolType>()) {
-        if (InheritedProto->getDecl() == Super)
-          return true;
-        else if (Visited.insert(InheritedProto->getDecl()))
-          Stack.push_back(InheritedProto->getDecl());
+      SmallVector<ProtocolDecl *, 4> InheritedDecls;
+      if (Inherited->isExistentialType(InheritedDecls)) {
+        for (auto InheritedProto : InheritedDecls) {
+          if (InheritedProto == Super)
+            return true;
+            
+          else if (Visited.insert(InheritedProto))
+            Stack.push_back(InheritedProto);
+        }
       }
     }
   }
   
   return false;
+}
+
+void ProtocolDecl::collectInherited(
+       llvm::SmallPtrSet<ProtocolDecl *, 4> &Inherited) {
+  SmallVector<const ProtocolDecl *, 4> Stack;
+  
+  Stack.push_back(this);
+  while (!Stack.empty()) {
+    const ProtocolDecl *Current = Stack.back();
+    Stack.pop_back();
+    
+    for (auto IType : Current->getInherited()) {
+      SmallVector<ProtocolDecl *, 4> InheritedDecls;
+      if (IType->isExistentialType(InheritedDecls)) {
+        for (auto InheritedProto : InheritedDecls) {
+          if (Inherited.insert(InheritedProto))
+            Stack.push_back(InheritedProto);
+        }
+      }
+    }
+  }
 }
 
 void VarDecl::setProperty(ASTContext &Context, SourceLoc LBraceLoc,

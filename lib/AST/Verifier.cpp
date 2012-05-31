@@ -529,6 +529,10 @@ namespace {
           if (Proto0->getDecl()->inheritsFrom(Proto1->getDecl()))
             return;
       
+      // FIXME: Actually check this?
+      if (T0->isExistentialType() || T1->isExistentialType())
+        return;
+      
       Out << "incompatible types for " << what << ": ";
       T0.print(Out);
       Out << " vs. ";

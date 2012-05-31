@@ -57,7 +57,7 @@ public:
         continue;
       }
 
-      if (!Inherited[i]->is<ProtocolType>() && !Inherited[i]->is<ErrorType>()) {
+      if (!Inherited[i]->isExistentialType() && !Inherited[i]->is<ErrorType>()) {
         // FIXME: Terrible location information.
         TC.diagnose(D->getLocStart(), diag::nonprotocol_inherit, Inherited[i]);
       }
@@ -68,8 +68,10 @@ public:
                                 MutableArrayRef<Type> Inherited) {
     for (auto InheritedTy : Inherited) {
       // FIXME: Poor location info.
-      if (auto Proto = InheritedTy->getAs<ProtocolType>())
-        TC.conformsToProtocol(T, Proto->getDecl(), D->getLocStart());
+      SmallVector<ProtocolDecl *, 4> InheritedProtos;
+      if (InheritedTy->isExistentialType(InheritedProtos))
+        for (auto Proto : InheritedProtos)
+          TC.conformsToProtocol(T, Proto, D->getLocStart());
     }
   }
   

@@ -397,8 +397,11 @@ namespace {
       // protocol to be trivial, but it's not clear that there's
       // really a structural guarantee we can rely on here.
       for (Type baseType : inherited) {
-        ProtocolDecl *baseProto = baseType->castTo<ProtocolType>()->getDecl();
-        asDerived().addOutOfLineBaseProtocol(baseType, baseProto);
+        SmallVector<ProtocolDecl *, 4> baseProtos;
+        baseType->isExistentialType(baseProtos);
+        for (auto baseProto : baseProtos) {
+          asDerived().addOutOfLineBaseProtocol(baseType, baseProto);
+        }
       }
     }
 
@@ -2147,11 +2150,17 @@ void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
   Type concreteType = E->getSubExpr()->getType();
   const TypeInfo &concreteTI = IGF.getFragileTypeInfo(concreteType);
 
+  // FIXME: Cope with multiple (or zero!) protocol-conformance entries.
+  if (E->getConformances().size() != 1) {
+    IGF.unimplemented(E->getLoc(), "multiple-conformance erasures");
+    return;
+  }
+  
   // Compute the conformance information.
-  assert(E->getConformance());
+  assert(E->getConformances()[0]);
   const ConformanceInfo &conformance =
     protoTI.getConformance(IGF.IGM, concreteType, concreteTI,
-                           protocol, *E->getConformance());
+                           protocol, *E->getConformances()[0]);
 
   // First things first: compute the table and store that into the
   // destination.
