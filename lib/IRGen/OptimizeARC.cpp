@@ -523,10 +523,10 @@ static bool performGeneralOptimizations(Function &F) {
 //                      Return Argument Optimizer
 //===----------------------------------------------------------------------===//
 
-/// isInstructionRangeInserts - Return true if the range [I+1,E) just contains
-/// insertelement instructions.
-static bool isInstructionRangeInserts(BasicBlock::iterator I, 
-                                      BasicBlock::iterator E) {
+/// isInstructionRangeNoops - Return true if the range [I+1,E) just contains
+/// insertvalue and other noop instructions.
+static bool isInstructionRangeNoops(BasicBlock::iterator I, 
+                                    BasicBlock::iterator E) {
   for (++I; I != E; ++I)
     if (!isa<InsertValueInst>(*I) && !isa<ExtractValueInst>(*I) &&
         !isa<IntToPtrInst>(*I))
@@ -583,7 +583,7 @@ static bool optimizeReturn3(ReturnInst *TheReturn) {
       
     // Okay, we have a retain.  See if there is anything "scary" between the
     // retain and the return.
-    if (!isInstructionRangeInserts(InsertedElt, TheReturn))
+    if (!isInstructionRangeNoops(InsertedElt, TheReturn))
       continue;
     
     CallInst &TheRetain = cast<CallInst>(*InsertedElt);

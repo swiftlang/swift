@@ -43,7 +43,7 @@ entry:
 ; CHECK-NEXT: ret
 
 
-; rdar://11563395 - 
+; rdar://11563395 - Synthesize calls to swift_retainAndReturnThree for better codegen
 define { i8*, i64, %swift.refcounted* } @retain3_test1(i8*, i64, %swift.refcounted*) nounwind {
 entry:
   %3 = call %swift.refcounted* @swift_retain(%swift.refcounted* %2)
