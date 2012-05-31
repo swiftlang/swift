@@ -9,6 +9,7 @@ add_swift_library(swiftAST
   Expr.cpp
   Identifier.cpp
   Module.cpp
+  NameLookup.cpp
   Pattern.cpp
   PrettyStackTrace.cpp
   Stmt.cpp
