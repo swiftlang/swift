@@ -512,8 +512,8 @@ public:
           return true;
       }
     } else if (OneOfDecl *OOD = dyn_cast<OneOfDecl>(D)) {
-      for (OneOfElementDecl *Element : OOD->getElements())
-        if (doIt(Element))
+      for (Decl *Member : OOD->getMembers())
+        if (doIt(Member))
           return true;
     } else if (StructDecl *SD = dyn_cast<StructDecl>(D)) {
       for (Decl *Member : SD->getMembers())

@@ -482,15 +482,15 @@ public:
 class OneOfDecl : public NominalTypeDecl {
   SourceLoc OneOfLoc;
   MutableArrayRef<Type> Inherited;
-  ArrayRef<OneOfElementDecl*> Elements;
+  ArrayRef<Decl*> Members;
   OneOfType *OneOfTy;
 
 public:
   OneOfDecl(SourceLoc OneOfLoc, Identifier Name,
             MutableArrayRef<Type> Inherited, DeclContext *DC);
 
-  ArrayRef<OneOfElementDecl*> getElements() { return Elements; }
-  void setElements(ArrayRef<OneOfElementDecl*> elems) { Elements = elems; }
+  ArrayRef<Decl*> getMembers() const { return Members; }
+  void setMembers(ArrayRef<Decl*> elems) { Members = elems; }
 
   SourceLoc getOneOfLoc() const { return OneOfLoc; }
   SourceLoc getLocStart() const { return OneOfLoc; }

@@ -186,8 +186,8 @@ public:
     if (!IsSecondPass)
       checkInherited(OOD, OOD->getDeclaredType(), OOD->getInherited());
     
-    for (auto elt : OOD->getElements())
-      visitOneOfElementDecl(elt);
+    for (Decl *member : OOD->getMembers())
+      visit(member);
     
     if (!IsFirstPass)
       checkExplicitConformance(OOD, OOD->getDeclaredType(),

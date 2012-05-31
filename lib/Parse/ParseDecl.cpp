@@ -22,7 +22,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PathV2.h"
 #include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallMap.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
@@ -1217,6 +1217,12 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
                                            Context.AllocateCopy(Inherited),
                                            CurDeclContext);
   Decls.push_back(OOD);
+
+  struct OneOfElementInfo {
+    SourceLoc NameLoc;
+    StringRef Name;
+    Type EltType;
+  };
   SmallVector<OneOfElementInfo, 8> ElementInfos;
 
   {
@@ -1247,70 +1253,62 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
     }
   }
 
-  actOnOneOfDecl(OneOfLoc, Attributes, ElementInfos, OOD);
-
-  // Parse the extended body of the oneof.
-  if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof))
-    Decls.push_back(parseExtensionBody(OneOfLoc, OOD->getDeclaredType(),
-                                       MutableArrayRef<Type>()));
-  
-  parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_oneof_type,
-                     LBLoc, diag::opening_brace);
-  
-  return false;
-}
-
-/// actOnOneOfDecl - Generate a oneof type and wire it into the scope tree.
-/// This is functionality shared by the different sugared forms of oneof types.
-///
-void Parser::actOnOneOfDecl(SourceLoc OneOfLoc,
-                            const DeclAttributes &Attrs,
-                            ArrayRef<OneOfElementInfo> Elts,
-                            OneOfDecl *OOD) {
   // No attributes are valid on oneof types at this time.
-  if (!Attrs.empty())
-    diagnose(Attrs.LSquareLoc, diag::oneof_attributes);
+  if (!Attributes.empty())
+    diagnose(Attributes.LSquareLoc, diag::oneof_attributes);
   
-  llvm::SmallPtrSet<const char *, 16> SeenSoFar;
-  SmallVector<OneOfElementDecl *, 16> EltDecls;
+  llvm::SmallMap<Identifier, OneOfElementDecl*, 16> SeenSoFar;
+  SmallVector<Decl *, 16> MemberDecls;
 
   Type AliasTy = OOD->getDeclaredType();
 
-  for (const OneOfElementInfo &Elt : Elts) {
+  for (const OneOfElementInfo &Elt : ElementInfos) {
     Identifier NameI = Context.getIdentifier(Elt.Name);
-    
+
+    Type EltTy = AliasTy;
+    if (Type ArgTy = Elt.EltType)
+      EltTy = FunctionType::get(ArgTy, EltTy, Context);
+
+    // Create a decl for each element, giving each a temporary type.
+    OneOfElementDecl *OOED = new (Context) OneOfElementDecl(Elt.NameLoc, NameI,
+                                                            EltTy, Elt.EltType,
+                                                            OOD);
+
     // If this was multiply defined, reject it.
-    if (!SeenSoFar.insert(NameI.get())) {
+    auto insertRes = SeenSoFar.insert(std::make_pair(NameI, OOED));
+    if (!insertRes.second) {
       diagnose(Elt.NameLoc, diag::duplicate_oneof_element, Elt.Name);
       
-      // FIXME: Do we care enough to make this efficient?
-      for (unsigned I = 0, N = EltDecls.size(); I != N; ++I) {
-        if (EltDecls[I]->getName() == NameI) {
-          diagnose(EltDecls[I]->getLocStart(), diag::previous_definition,
-                   NameI);
-          break;
-        }
-      }
+      diagnose(insertRes.first->second->getLocStart(),
+               diag::previous_definition, NameI);
       
       // Don't copy this element into NewElements.
       continue;
     }
-    
-    Type EltTy = AliasTy;
-    if (Type ArgTy = Elt.EltType)
-      EltTy = FunctionType::get(ArgTy, EltTy, Context);
-    
-    // Create a decl for each element, giving each a temporary type.
-    EltDecls.push_back(new (Context) OneOfElementDecl(Elt.NameLoc, NameI,
-                                                      EltTy, Elt.EltType,
-                                                      OOD));
+
+    MemberDecls.push_back(OOED);
   }
 
-  OOD->setElements(Context.AllocateCopy(EltDecls));
+  // Parse the extended body of the oneof.
+  {
+    ContextChange CC(*this, OOD);
+    while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
+      if (parseDecl(MemberDecls,
+                    PD_HasContainerType|PD_DisallowOperators|PD_DisallowVar))
+        skipUntilDeclRBrace();
+    }
+  }
+
+  OOD->setMembers(Context.AllocateCopy(MemberDecls));
 
   ScopeInfo.addToScope(OOD);
-}
 
+  if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_oneof_type,
+                         LBLoc, diag::opening_brace))
+    return true;
+
+  return false;
+}
 
 /// parseDeclStruct - Parse a 'struct' declaration, returning true (and doing no
 /// token skipping) on error.

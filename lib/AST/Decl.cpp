@@ -214,9 +214,10 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name,
 
 OneOfElementDecl *OneOfDecl::getElement(Identifier Name) const {
   // FIXME: Linear search is not great for large oneof decls.
-  for (OneOfElementDecl *Elt : Elements)
-    if (Elt->getName() == Name)
-      return Elt;
+  for (Decl *D : getMembers())
+    if (OneOfElementDecl *Elt = dyn_cast<OneOfElementDecl>(D))
+      if (Elt->getName() == Name)
+        return Elt;
   return 0;
 }
 
@@ -514,9 +515,9 @@ namespace {
     void visitOneOfDecl(OneOfDecl *OOD) {
       printCommon(OOD, "oneof_decl");
       printInherited(OOD->getInherited());
-      for (OneOfElementDecl *OOED : OOD->getElements()) {
+      for (Decl *D : OOD->getMembers()) {
         OS << '\n';
-        printRec(OOED);
+        printRec(D);
       }
       OS << ')';
     }

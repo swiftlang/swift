@@ -263,15 +263,6 @@ public:
                           bool NeedDefinition,
                           SmallVectorImpl<Decl *> &Decls);
   
-  struct OneOfElementInfo {
-    SourceLoc NameLoc;
-    StringRef Name;
-    Type EltType;
-  };
-  
-  void actOnOneOfDecl(SourceLoc OneOfLoc, const DeclAttributes &Attrs,
-                      ArrayRef<OneOfElementInfo> Elts, OneOfDecl *OOD);
-  
   //===--------------------------------------------------------------------===//
   // Type Parsing
   

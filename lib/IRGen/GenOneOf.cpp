@@ -62,7 +62,8 @@ namespace {
     llvm::ConstantInt *getDiscriminatorIndex(OneOfElementDecl *target) const {
       // FIXME: using a linear search here is fairly ridiculous.
       unsigned index = 0;
-      for (auto elt : cast<OneOfDecl>(target->getDeclContext())->getElements()) {
+      for (auto elt : cast<OneOfDecl>(target->getDeclContext())->getMembers()) {
+        if (!isa<OneOfElementDecl>(elt)) continue;
         if (elt == target) break;
         index++;
       }
@@ -270,14 +271,20 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
   OneOfDecl *D = T->getDecl();
   llvm::StructType *convertedStruct = IGM.createNominalType(D);
 
+  unsigned numElements = 0;
+  for (auto elt : D->getMembers())
+    if (isa<OneOfElementDecl>(elt))
+      ++numElements;
+
   // We don't need a discriminator if this is a singleton ADT.
-  if (D->getElements().size() == 1) {
+  if (numElements == 1) {
     SingletonOneofTypeInfo *convertedTInfo =
       new SingletonOneofTypeInfo(convertedStruct, Size(0), Alignment(0), IsPOD);
     assert(!IGM.Types.Converted.count(T));
     IGM.Types.Converted.insert(std::make_pair(T, convertedTInfo));
 
-    Type eltType = D->getElements()[0]->getArgumentType();
+    Type eltType =
+        cast<OneOfElementDecl>(D->getMembers()[0])->getArgumentType();
 
     llvm::Type *storageType;
     if (eltType.isNull()) {
@@ -303,13 +310,13 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
   // Otherwise, we need a discriminator.
   llvm::Type *discriminatorType;
   Size discriminatorSize;
-  if (D->getElements().size() == 2) {
+  if (numElements == 2) {
     discriminatorType = IGM.Int1Ty;
     discriminatorSize = Size(1);
-  } else if (D->getElements().size() <= (1 << 8)) {
+  } else if (numElements <= (1 << 8)) {
     discriminatorType = IGM.Int8Ty;
     discriminatorSize = Size(1);
-  } else if (D->getElements().size() <= (1 << 16)) {
+  } else if (numElements <= (1 << 16)) {
     discriminatorType = IGM.Int16Ty;
     discriminatorSize = Size(2);
   } else {
@@ -325,7 +332,11 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
   IsPOD_t isPOD = IsPOD;
 
   // Figure out how much storage we need for the union.
-  for (auto &elt : D->getElements()) {
+  for (Decl *member : D->getMembers()) {
+    OneOfElementDecl *elt = dyn_cast<OneOfElementDecl>(member);
+    if (!elt)
+      continue;
+
     // Ignore variants that carry no data.
     Type eltType = elt->getArgumentType();
     if (eltType.isNull()) continue;
@@ -408,9 +419,60 @@ static void emitInjectionFunction(IRGenModule &IGM,
 
 /// emitOneOfType - Emit all the declarations associated with this oneof type.
 void IRGenModule::emitOneOfType(OneOfType *oneof) {
-  const OneofTypeInfo &typeInfo = getFragileTypeInfo(oneof).as<OneofTypeInfo>();
-  for (auto elt : oneof->getDecl()->getElements()) {
-    llvm::Function *fn = getAddrOfInjectionFunction(elt);
-    emitInjectionFunction(*this, fn, typeInfo, elt);
+  // FIXME: This is mostly copy-paste from emitExtension;
+  // figure out how to refactor! 
+  for (Decl *member : oneof->getDecl()->getMembers()) {
+    switch (member->getKind()) {
+    case DeclKind::Import:
+    case DeclKind::TopLevelCode:
+    case DeclKind::Protocol:
+    case DeclKind::Extension:
+      llvm_unreachable("decl not allowed in struct!");
+
+    // We can't have meaningful initializers for variables; these just show
+    // up as part of parsing properties.
+    case DeclKind::PatternBinding:
+      continue;
+
+    case DeclKind::Subscript:
+      // Getter/setter will be handled separately.
+      continue;
+    case DeclKind::TypeAlias:
+      continue;
+    case DeclKind::OneOf:
+      emitOneOfType(cast<OneOfDecl>(member)->getDeclaredType());
+      continue;
+    case DeclKind::Struct:
+      emitStructType(cast<StructDecl>(member)->getDeclaredType());
+      continue;
+    case DeclKind::Class:
+      emitClassType(cast<ClassDecl>(member)->getDeclaredType());
+      continue;
+    case DeclKind::Var:
+      if (cast<VarDecl>(member)->isProperty())
+        // Getter/setter will be handled separately.
+        continue;
+      // FIXME: Will need an implementation here for resilience
+      continue;
+    case DeclKind::Func: {
+      FuncDecl *func = cast<FuncDecl>(member);
+      if (func->isStatic()) {
+        // Eventually this won't always be the right thing.
+        emitStaticMethod(func);
+      } else {
+        emitInstanceMethod(func);
+      }
+      continue;
+    }
+    case DeclKind::OneOfElement: {
+      const OneofTypeInfo &typeInfo =
+          getFragileTypeInfo(oneof).as<OneofTypeInfo>();
+      OneOfElementDecl *elt = cast<OneOfElementDecl>(member);
+      llvm::Function *fn = getAddrOfInjectionFunction(elt);
+      emitInjectionFunction(*this, fn, typeInfo, elt);
+      continue;
+    }
+    }
+    llvm_unreachable("bad extension member kind");
   }
 }

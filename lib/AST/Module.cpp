@@ -371,13 +371,11 @@ void Module::lookupMembers(Type BaseType, Identifier Name,
     }
     BaseMembers = BaseMembersStorage;
   } else if (OneOfType *OOT = BaseType->getAs<OneOfType>()) {
-    // FIXME: Refuse to look up "constructors" until we have real constructors.
-    if (OOT->getDecl()->getName() == Name)
-      return;
-
     D = OOT->getDecl();
-    if (OneOfElementDecl *OOED = OOT->getDecl()->getElement(Name))
-      BaseMembersStorage.push_back(OOED);
+    for (Decl* Member : OOT->getDecl()->getMembers()) {
+      if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
+        BaseMembersStorage.push_back(VD);
+    }
     BaseMembers = BaseMembersStorage;
   } else {
     return;
@@ -413,10 +411,14 @@ void Module::lookupValueConstructors(Type BaseType,
   } else if (OneOfType *OOT = BaseType->getAs<OneOfType>()) {
     D = OOT->getDecl();
     Name = OOT->getDecl()->getName();
-    // FIXME: Is this really supposed to happen?  If so, are we ever
-    // supposed to suppress it?
-    Result.append(OOT->getDecl()->getElements().begin(),
-                  OOT->getDecl()->getElements().end());
+    for (Decl* Member : OOT->getDecl()->getMembers()) {
+      // FIXME: We shouldn't be injecting OneOfElementDecls into the results
+      // like this.
+      if (OneOfElementDecl *OOED = dyn_cast<OneOfElementDecl>(Member))
+        Result.push_back(OOED);
+      else if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
+        BaseMembersStorage.push_back(VD);
+    }
   } else {
     return;
   }
