@@ -557,13 +557,13 @@ void IRGenFunction::emitLocal(Decl *D) {
     llvm_unreachable("declaration cannot appear in local scope");
 
   case DeclKind::OneOf:
-    return emitOneOfType(cast<OneOfDecl>(D)->getDeclaredType());
+    return IGM.emitOneOfType(cast<OneOfDecl>(D)->getDeclaredType());
 
   case DeclKind::Struct:
-    return emitStructType(cast<StructDecl>(D)->getDeclaredType());
+    return IGM.emitStructType(cast<StructDecl>(D)->getDeclaredType());
 
   case DeclKind::Class:
-    return emitClassType(cast<ClassDecl>(D)->getDeclaredType());
+    return IGM.emitClassType(cast<ClassDecl>(D)->getDeclaredType());
 
   case DeclKind::TypeAlias:
     // no IR generation support required.

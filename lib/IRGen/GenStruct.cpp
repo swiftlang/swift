@@ -207,59 +207,6 @@ void IRGenModule::emitStructType(StructType *st) {
   }
 }
 
-void IRGenFunction::emitStructType(StructType *st) {
-  for (Decl *member : st->getDecl()->getMembers()) {
-    switch (member->getKind()) {
-    case DeclKind::Import:
-    case DeclKind::TopLevelCode:
-    case DeclKind::Protocol:
-    case DeclKind::Extension:
-      llvm_unreachable("decl not allowed in struct!");
-
-    // We can have meaningful initializers for variables, but
-    // we can't handle them yet.  For the moment, just ignore them.
-    case DeclKind::PatternBinding:
-      continue;
-
-    case DeclKind::Subscript:
-      // Getter/setter will be handled separately.
-      continue;
-    case DeclKind::TypeAlias:
-      continue;
-    case DeclKind::OneOf:
-      emitOneOfType(cast<OneOfDecl>(member)->getDeclaredType());
-      continue;
-    case DeclKind::Struct:
-      emitStructType(cast<StructDecl>(member)->getDeclaredType());
-      continue;
-    case DeclKind::Class:
-      emitClassType(cast<ClassDecl>(member)->getDeclaredType());
-      continue;
-    case DeclKind::Var:
-      if (cast<VarDecl>(member)->isProperty())
-        // Getter/setter will be handled separately.
-        continue;
-      // FIXME: Will need an implementation here for resilience
-      continue;
-    case DeclKind::Func: {
-      FuncDecl *func = cast<FuncDecl>(member);
-      unimplemented(func->getLocStart(), "local member function");
-      continue;
-    }
-    case DeclKind::OneOfElement: {
-      const StructTypeInfo &typeInfo =
-          getFragileTypeInfo(st).as<StructTypeInfo>();
-      OneOfElementDecl *elt =
-          cast<OneOfElementDecl>(st->getDecl()->getMembers().back());
-      llvm::Function *fn = IGM.getAddrOfInjectionFunction(elt);
-      emitInjectionFunction(IGM, fn, typeInfo, elt);
-      continue;
-    }
-    }
-    llvm_unreachable("bad extension member kind");
-  }
-}
-
 const TypeInfo *
 TypeConverter::convertStructType(IRGenModule &IGM, StructType *T) {
   StructTypeBuilder builder(IGM, IGM.createNominalType(T->getDecl()));

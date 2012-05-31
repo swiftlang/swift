@@ -150,51 +150,6 @@ void IRGenModule::emitClassType(ClassType *ct) {
   }
 }
 
-void IRGenFunction::emitClassType(ClassType *ct) {
-  for (Decl *member : ct->getDecl()->getMembers()) {
-    switch (member->getKind()) {
-    case DeclKind::Import:
-    case DeclKind::TopLevelCode:
-    case DeclKind::Protocol:
-    case DeclKind::OneOfElement:
-    case DeclKind::Extension:
-      llvm_unreachable("decl not allowed in class!");
-
-    // We can have meaningful initializers for variables, but
-    // we can't handle them yet.  For the moment, just ignore them.
-    case DeclKind::PatternBinding:
-      continue;
-
-    case DeclKind::Subscript:
-      // Getter/setter will be handled separately.
-      continue;
-    case DeclKind::TypeAlias:
-      continue;
-    case DeclKind::OneOf:
-      emitOneOfType(cast<OneOfDecl>(member)->getDeclaredType());
-      continue;
-    case DeclKind::Struct:
-      emitStructType(cast<StructDecl>(member)->getDeclaredType());
-      continue;
-    case DeclKind::Class:
-      emitClassType(cast<ClassDecl>(member)->getDeclaredType());
-      continue;
-    case DeclKind::Var:
-      if (cast<VarDecl>(member)->isProperty())
-        // Getter/setter will be handled separately.
-        continue;
-      // FIXME: Will need an implementation here for resilience
-      continue;
-    case DeclKind::Func: {
-      FuncDecl *func = cast<FuncDecl>(member);
-      unimplemented(func->getLocStart(), "local member function");
-      continue;
-    }
-    }
-    llvm_unreachable("bad extension member kind");
-  }
-}
-
 const TypeInfo *
 TypeConverter::convertClassType(IRGenModule &IGM, ClassType *T) {
   // Collect all the fields from the type.

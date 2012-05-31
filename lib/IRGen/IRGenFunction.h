@@ -326,12 +326,6 @@ private:
   llvm::DenseMap<VarDecl*, OwnedAddress> LocalVars;
   llvm::DenseMap<OneOfElementDecl*, llvm::Function*> LocalInjectionFuncs;
 
-//--- Types -----------------------------------------------------------------
-public:
-  void emitOneOfType(OneOfType *type);
-  void emitStructType(StructType *type);
-  void emitClassType(ClassType *type);
-
 //--- Global context emission --------------------------------------------------
 public:
   void emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem);

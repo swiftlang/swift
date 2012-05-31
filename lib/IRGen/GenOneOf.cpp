@@ -414,11 +414,3 @@ void IRGenModule::emitOneOfType(OneOfType *oneof) {
     emitInjectionFunction(*this, fn, typeInfo, elt);
   }
 }
-
-void IRGenFunction::emitOneOfType(OneOfType *oneof) {
-  const OneofTypeInfo &typeInfo = getFragileTypeInfo(oneof).as<OneofTypeInfo>();
-  for (auto elt : oneof->getDecl()->getElements()) {
-    llvm::Function *fn = IGM.getAddrOfInjectionFunction(elt);
-    emitInjectionFunction(IGM, fn, typeInfo, elt);
-  }
-}
