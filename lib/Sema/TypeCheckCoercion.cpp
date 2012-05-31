@@ -17,7 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
-#include "NameLookup.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"

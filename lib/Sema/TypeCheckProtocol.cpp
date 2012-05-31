@@ -13,10 +13,12 @@
 // This file implements semantic analysis for protocols, in particular, checking
 // whether a given type conforms to a given protocol.
 //===----------------------------------------------------------------------===//
+
 #include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
-#include "NameLookup.h"
+#include "swift/AST/NameLookup.h"
+
 using namespace swift;
 
 static Type getInstanceUsageType(ValueDecl *Value, ASTContext &Context) {

@@ -14,12 +14,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/Stmt.h"
-#include "TypeChecker.h"
-#include "NameLookup.h"
 
 using namespace swift;
 

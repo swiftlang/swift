@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SEMA_NAME_LOOKUP_H
-#define SEMA_NAME_LOOKUP_H
+#ifndef SWIFT_AST_NAME_LOOKUP_H
+#define SWIFT_AST_NAME_LOOKUP_H
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
