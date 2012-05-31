@@ -28,6 +28,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/InstIterator.h"
+#include "llvm/Support/IRBuilder.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace llvm;
 
@@ -54,6 +55,9 @@ enum RT_Kind {
   
   // void swift_retain_noresult(SwiftHeapObject *object)
   RT_RetainNoResult,
+  
+  // (i64,i64,i64) swift_retainAndReturnThree(SwiftHeapObject *obj, i64,i64,i64)
+  RT_RetainAndReturnThree,
   
   /// void swift_release(SwiftHeapObject *object)
   RT_Release,
@@ -84,6 +88,7 @@ static RT_Kind classifyInstruction(const Instruction &I) {
     .Case("swift_retain_noresult", RT_RetainNoResult)
     .Case("swift_release", RT_Release)
     .Case("swift_allocObject", RT_AllocObject)
+    .Case("swift_retainAndReturnThree", RT_RetainAndReturnThree)
     .Default(RT_Unknown);
 }
 
@@ -123,19 +128,42 @@ static Constant *getRetainNoResult(Function &F, Type *ObjectPtrTy,
                                         ObjectPtrTy, NULL);
 }
 
+#if 0
+/// getRetainAndReturnThree - Return a callable function for
+/// swift_retainAndReturnThree.  F is the function being operated on,
+/// ObjectPtrTy is an instance of the object pointer type to use, and Cache is a
+/// null-initialized place to make subsequent requests faster.
+static Constant *getRetainAndReturnThree(Function &F, Type *ObjectPtrTy,
+                                         Constant *&Cache) {
+  if (Cache) return Cache;
+  
+  AttributeWithIndex Attrs[] = {
+    { Attribute::NoUnwind, ~0U },
+  };
+  auto AttrList = AttrListPtr::get(Attrs);
+  Module *M = F.getParent();
+  
+  Type *Int64Ty = Type::getInt64Ty(F.getContext());
+  Type *RetTy = StructType::get(Int64Ty, Int64Ty, Int64Ty, NULL);
+  
+  return Cache = M->getOrInsertFunction("swift_retainAndReturnThree", AttrList,
+                                        RetTy, ObjectPtrTy,
+                                        Int64Ty, Int64Ty, Int64Ty, NULL);
+}
+#endif
 
 //===----------------------------------------------------------------------===//
-//                      Return Argument Canonicalizer
+//                          Input Function Canonicalizer
 //===----------------------------------------------------------------------===//
 
-/// canonicalizeArgumentReturnFunctions - Functions like swift_retain return an
+/// canonicalizeInputFunction - Functions like swift_retain return an
 /// argument as a low-level performance optimization.  This makes it difficult
 /// to reason about pointer equality though, so undo it as an initial
 /// canonicalization step.  After this step, all swift_retain's have been
 /// replaced with swift_retain_noresult.
 ///
 /// This also does some trivial peep-hole optimizations as we go.
-static bool canonicalizeArgumentReturnFunctions(Function &F) {
+static bool canonicalizeInputFunction(Function &F) {
   Constant *RetainNoResultCache = 0;
   
   bool Changed = false;
@@ -194,6 +222,28 @@ static bool canonicalizeArgumentReturnFunctions(Function &F) {
         ++NumNoopDeleted;
         continue;
       }
+      break;
+    }
+    case RT_RetainAndReturnThree: {
+      // (a,b,c) = swift_retainAndReturnThree(obj, d,e,f)
+      // -> swift_retain_noresult(obj)
+      // -> (a,b,c) = (d,e,f)
+      CallInst &CI = cast<CallInst>(Inst);
+      Type *HeapObjectTy = CI.getArgOperand(0)->getType();
+      
+      IRBuilder<> B(&CI);
+      
+      // Reprocess starting at the new swift_retain_noresult.
+      I = B.CreateCall(getRetainNoResult(F, HeapObjectTy, RetainNoResultCache),
+                       CI.getArgOperand(0));
+      Value *V = UndefValue::get(CI.getType());
+      V = B.CreateInsertValue(V, CI.getArgOperand(1), 0U);
+      V = B.CreateInsertValue(V, CI.getArgOperand(2), 1U);
+      V = B.CreateInsertValue(V, CI.getArgOperand(3), 2U);
+      CI.replaceAllUsesWith(V);
+      CI.eraseFromParent();
+      Changed = true;
+      break;
     }
     }
   }
@@ -231,7 +281,8 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
     
     switch (classifyInstruction(*BBI)) {
     case RT_Retain: // Canonicalized away, shouldn't exist.
-      assert(0 && "swift_retain should be canonicalized away");
+      case RT_RetainAndReturnThree:
+      assert(0 && "these entrypoints should be canonicalized away");
     case RT_NoMemoryAccessed:
       // Skip over random instructions that don't touch memory.  They don't need
       // protection by retain/release.
@@ -354,6 +405,10 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
     
     // Okay, this is the first time we've seen this instruction, proceed.
     switch (classifyInstruction(*I)) {
+    case RT_Retain:
+    case RT_RetainAndReturnThree:
+      assert(0 && "These should be canonicalized away");
+
     case RT_AllocObject:
       // If this is a different swift_allocObject than we started with, then
       // there is some computation feeding into a size or alignment computation
@@ -372,9 +427,8 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
         
       // It is perfectly fine to eliminate various retains and releases of this
       // object: we are zapping all accesses or none.
-    case RT_Retain:
-    case RT_RetainNoResult:
     case RT_Release:
+    case RT_RetainNoResult:
       break;
         
       // If this is an unknown instruction, we have more interesting things to
@@ -499,6 +553,7 @@ static bool optimizeArgumentReturnFunctions(Function &F) {
       
       switch (classifyInstruction(Inst)) {
       case RT_Retain: assert(0 && "This should be canonicalized away!");
+      case RT_RetainAndReturnThree:
       case RT_RetainNoResult: {
         Value *ArgVal = cast<CallInst>(Inst).getArgOperand(0);
 
@@ -640,7 +695,7 @@ bool SwiftARCOpt::runOnFunction(Function &F) {
   // First thing: canonicalize swift_retain and similar calls so that nothing
   // uses their result.  This exposes the copy that the function does to the
   // optimizer.
-  Changed |= canonicalizeArgumentReturnFunctions(F);
+  Changed |= canonicalizeInputFunction(F);
   
   // Next, do a pass with a couple of optimizations:
   // 1) release() motion, eliminating retain/release pairs when it turns out
