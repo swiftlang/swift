@@ -41,3 +41,18 @@ entry:
 ; CHECK-NEXT: icmp
 ; CHECK-NEXT: select
 ; CHECK-NEXT: ret
+
+
+; rdar://11563395 - 
+define { i8*, i64, %swift.refcounted* } @retain3_test1(i8*, i64, %swift.refcounted*) nounwind {
+entry:
+  %3 = call %swift.refcounted* @swift_retain(%swift.refcounted* %2)
+  %4 = insertvalue { i8*, i64, %swift.refcounted* } undef, i8* %0, 0
+  %5 = insertvalue { i8*, i64, %swift.refcounted* } %4, i64 %1, 1
+  %6 = insertvalue { i8*, i64, %swift.refcounted* } %5, %swift.refcounted* %3, 2
+  ret { i8*, i64, %swift.refcounted* } %6
+}
+
+; CHECK: @retain3_test1
+; CHECK: swift_retainAndReturnThree
+; CHECK: ret

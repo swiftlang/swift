@@ -21,7 +21,9 @@
 #include "llvm/IntrinsicInst.h"
 #include "llvm/Module.h"
 #include "llvm/Pass.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
+#include "llvm/Transforms/Utils/Local.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -128,7 +130,6 @@ static Constant *getRetainNoResult(Function &F, Type *ObjectPtrTy,
                                         ObjectPtrTy, NULL);
 }
 
-#if 0
 /// getRetainAndReturnThree - Return a callable function for
 /// swift_retainAndReturnThree.  F is the function being operated on,
 /// ObjectPtrTy is an instance of the object pointer type to use, and Cache is a
@@ -150,7 +151,6 @@ static Constant *getRetainAndReturnThree(Function &F, Type *ObjectPtrTy,
                                         RetTy, ObjectPtrTy,
                                         Int64Ty, Int64Ty, Int64Ty, NULL);
 }
-#endif
 
 //===----------------------------------------------------------------------===//
 //                          Input Function Canonicalizer
@@ -523,6 +523,127 @@ static bool performGeneralOptimizations(Function &F) {
 //                      Return Argument Optimizer
 //===----------------------------------------------------------------------===//
 
+/// isInstructionRangeInserts - Return true if the range [I+1,E) just contains
+/// insertelement instructions.
+static bool isInstructionRangeInserts(BasicBlock::iterator I, 
+                                      BasicBlock::iterator E) {
+  for (++I; I != E; ++I)
+    if (!isa<InsertValueInst>(*I) && !isa<ExtractValueInst>(*I) &&
+        !isa<IntToPtrInst>(*I))
+      return false;
+  return true;
+}
+
+/// optimizeReturn3 - Look to see if we can optimize "ret (a,b,c)" - where one
+/// of the three values was retained right before the return, into a
+/// swift_retainAndReturnThree call.  This is particularly common when returning
+/// a string or array slice.
+static bool optimizeReturn3(ReturnInst *TheReturn) {
+  // Ignore ret void.
+  if (TheReturn->getNumOperands() == 0) return false;
+  
+  // See if this is a return of three things.
+  Value *RetVal = TheReturn->getOperand(0);
+  StructType *RetSTy = dyn_cast<StructType>(RetVal->getType());
+  if (RetSTy == 0 || RetSTy->getNumElements() != 3) return false;
+
+  // See if we can find scalars that feed into the return instruction.  If not,
+  // bail out.
+  Value *RetVals[3];
+  for (unsigned i = 0; i != 3; ++i) {
+    RetVals[i] = FindInsertedValue(RetVal, i);
+    if (RetVals[i] == 0) return false;
+    
+    // If the scalar isn't int64 or pointer type, we can't transform it.
+    if (!isa<PointerType>(RetVals[i]->getType()) &&
+        !RetVals[i]->getType()->isIntegerTy(64))
+      return false;
+  }
+  
+  Constant *Cache = 0;  // Not utilized.
+  
+  // Inevitably, we have a series of insertvalues (and sometimes casts)
+  // between the swift_retain and the return.  Check to see if any of the values
+  // returned is retained, and if so, if the instructions between the retain and
+  // the return are *just* bitcasts and inserts.
+  for (unsigned i = 0; i != 3; ++i) {
+    Instruction *InsertedElt = dyn_cast<Instruction>(RetVals[i]);
+    if (InsertedElt == 0 || InsertedElt->getParent() != TheReturn->getParent())
+      continue;
+    
+    // TODO: Skip noop ptr<->int casts if it matters.
+    
+    // See if we have a swift_retain.  Since this has to be in the same basic
+    // block, it must already have been lowered to swift_retain for it to be a
+    // candidate.
+    if (classifyInstruction(*InsertedElt) != RT_Retain ||
+        // The only use allowed is the insertelement that feeds return.
+        !InsertedElt->hasNUses(1))
+      continue;
+      
+    // Okay, we have a retain.  See if there is anything "scary" between the
+    // retain and the return.
+    if (!isInstructionRangeInserts(InsertedElt, TheReturn))
+      continue;
+    
+    CallInst &TheRetain = cast<CallInst>(*InsertedElt);
+    
+    // Okay, there isn't.  This means that we can perform the transformation.
+    // Get the argument to swift_retain (the result will be zapped when we zap
+    // the call) as the object to retain (of %swift.refcounted* type).
+    Value *RetainedObject = TheRetain.getArgOperand(0);
+    RetVals[i] = RetainedObject;
+
+    // Insert any new instructions before the return.
+    IRBuilder<> B(TheReturn);
+    Type *Int64Ty = B.getInt64Ty();
+
+    // The swift_retainAndReturnThree function takes the three arguments as i64.
+    // Cast the arguments to i64 if needed.
+    
+    // Update the element with a cast to i64 if needed.
+    for (Value *&Elt : RetVals) {
+      if (isa<PointerType>(Elt->getType()))
+        Elt = B.CreatePtrToInt(Elt, Int64Ty);
+    }
+    
+    // Call swift_retainAndReturnThree with our pointer to retain and the three
+    // i64's.
+    Function &F = *TheReturn->getParent()->getParent();
+    Value *LibCall = getRetainAndReturnThree(F,RetainedObject->getType(),Cache);
+    Value *NR = B.CreateCall4(LibCall, RetainedObject, RetVals[0], RetVals[1],
+                              RetVals[2]);
+
+    // The return type of the libcall is (i64,i64,i64).  Since at least one of
+    // the pointers is a pointer (we retained it afterall!) we have to unpack
+    // the elements, bitcast at least that one, and then repack to the proper
+    // type expected by the ret instruction.
+    for (unsigned i = 0; i != 3; ++i) {
+      RetVals[i] = B.CreateExtractValue(NR, i);
+      if (RetVals[i]->getType() != RetSTy->getElementType(i))
+        RetVals[i] = B.CreateIntToPtr(RetVals[i], RetSTy->getElementType(i));
+    }
+    
+    // Repack into an aggregate that can be returned.
+    Value *RV = UndefValue::get(RetVal->getType());
+    for (unsigned i = 0; i != 3; ++i)
+      RV = B.CreateInsertValue(RV, RetVals[i], i);
+    
+    // Return the right thing and zap any instruction tree of inserts that
+    // existed just to feed the old return.
+    TheReturn->setOperand(0, RV);
+    RecursivelyDeleteTriviallyDeadInstructions(RetVal);
+
+    // Zap the retain that we're subsuming and we're done!
+    if (!TheRetain.use_empty())
+      TheRetain.replaceAllUsesWith(UndefValue::get(TheRetain.getType()));
+    TheRetain.eraseFromParent();
+    return true;
+  }
+  
+  return false;
+}
+
 /// optimizeArgumentReturnFunctions - Functions like swift_retain return an
 /// argument as a low-level performance optimization.  Manually make use of this
 /// to reduce register pressure.
@@ -532,6 +653,8 @@ static bool performGeneralOptimizations(Function &F) {
 static bool optimizeArgumentReturnFunctions(Function &F) {
   Constant *RetainCache = nullptr;
   bool Changed = false;
+  
+  SmallVector<ReturnInst*, 8> Returns;
   
   // Since all of the calls are canonicalized, we know that we can just walk
   // through the function and collect the interesting heap object definitions by
@@ -584,21 +707,27 @@ static bool optimizeArgumentReturnFunctions(Function &F) {
         
         LocalEntry = &CI;
         GlobalEntry.push_back(&CI);
-        break;
+        continue;
       }
       case RT_Unknown:
       case RT_Release:
       case RT_AllocObject:
       case RT_NoMemoryAccessed:
-        // Check to see if there are any uses of a value in the LocalUpdates
-        // map.  If so, remap it now to the locally defined version.
-        for (unsigned i = 0, e = Inst.getNumOperands(); i != e; ++i)
-          if (Value *V = LocalUpdates.lookup(Inst.getOperand(i))) {
-            Changed = true;
-            Inst.setOperand(i, V);
-          }
+        // Remember returns in the first pass.
+        if (ReturnInst *RI = dyn_cast<ReturnInst>(&Inst))
+          Returns.push_back(RI);
+
+        // Just remap any uses in the value.
         break;
       }
+      
+      // Check to see if there are any uses of a value in the LocalUpdates
+      // map.  If so, remap it now to the locally defined version.
+      for (unsigned i = 0, e = Inst.getNumOperands(); i != e; ++i)
+        if (Value *V = LocalUpdates.lookup(Inst.getOperand(i))) {
+          Changed = true;
+          Inst.setOperand(i, V);
+        }
     }
     LocalUpdates.clear();
   }
@@ -651,8 +780,12 @@ static bool optimizeArgumentReturnFunctions(Function &F) {
       if (U.get() != Ptr)
         Changed = true;
     }
-    
   }
+
+  // Scan through all the returns to see if there are any that can be optimized.
+  for (ReturnInst *RI : Returns)
+    Changed |= optimizeReturn3(RI);
+  
   
   return Changed;
 }
