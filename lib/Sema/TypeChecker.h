@@ -71,7 +71,10 @@ public:
   Expr *semaApplyExpr(ApplyExpr *E);
   Expr *semaUnresolvedDotExpr(UnresolvedDotExpr *E);
   void typeCheckIgnoredExpr(Expr *E);
+  void typeCheckFunctionBody(FuncExpr *FE);
+
   void typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD);
+  void REPLCheckPatternBinding(PatternBindingDecl *D);
 
   /// \brief Perform a shallow recheck of the given newly-built AST node.
   ///
