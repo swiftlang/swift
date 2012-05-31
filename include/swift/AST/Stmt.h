@@ -397,7 +397,44 @@ public:
     return S->getKind() == StmtKind::ForEach;
   }
 };
+
+/// BreakStmt - The keyword "break".
+class BreakStmt : public Stmt {
+  SourceLoc Loc;
   
+public:
+  BreakStmt(SourceLoc Loc) : Stmt(StmtKind::Break), Loc(Loc) {}
+
+  SourceLoc getLoc() const { return Loc; }
+  
+  SourceRange getSourceRange() const { return Loc; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const BreakStmt *) { return true; }
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::Break;
+  }
+};
+
+/// ContinueStmt - The keyword "continue".
+class ContinueStmt : public Stmt {
+  SourceLoc Loc;
+  
+public:
+  ContinueStmt(SourceLoc Loc) : Stmt(StmtKind::Continue), Loc(Loc) {}
+
+  SourceLoc getLoc() const { return Loc; }
+  
+  SourceRange getSourceRange() const { return Loc; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ContinueStmt *) { return true; }
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::Continue;
+  }
+};
+
+
 } // end namespace swift
 
 #endif

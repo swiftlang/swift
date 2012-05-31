@@ -222,6 +222,12 @@ public:
     printRec(S->getBody());
     OS << ')';
   }
+  void visitBreakStmt(BreakStmt *S) {
+    OS.indent(Indent) << "(break_stmt)";
+  }
+  void visitContinueStmt(ContinueStmt *S) {
+    OS.indent(Indent) << "(continue_stmt)";
+  }
 };
 
 } // end anonymous namespace.

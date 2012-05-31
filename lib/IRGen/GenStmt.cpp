@@ -55,6 +55,14 @@ void IRGenFunction::emitStmt(Stmt *S) {
       
   case StmtKind::ForEach:
     return emitForEachStmt(cast<ForEachStmt>(S));
+
+  case StmtKind::Break:
+    unimplemented(cast<BreakStmt>(S)->getLoc(), "break statement");
+    return;
+
+  case StmtKind::Continue:
+    unimplemented(cast<ContinueStmt>(S)->getLoc(), "continue statement");
+    return;
   }
   llvm_unreachable("bad statement kind!");
 }

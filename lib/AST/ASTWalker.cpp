@@ -251,6 +251,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   Stmt *visitSemiStmt(SemiStmt *SS) {
     return SS;
   }
+
+  Stmt *visitBreakStmt(BreakStmt *BS) {
+    return BS;
+  }
+
+  Stmt *visitContinueStmt(ContinueStmt *CS) {
+    return CS;
+  }
   
   Stmt *visitAssignStmt(AssignStmt *AS) {
     if (Expr *E = doIt(AS->getDest()))

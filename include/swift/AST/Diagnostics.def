@@ -830,6 +830,11 @@ ERROR(foreach_missing_range,sema_tcs,none,
 ERROR(range_protocol_broken,sema_tcs,none,
       "Range protocol definition is broken", ())
 
+ERROR(break_outside_loop,sema_tcs,none,
+      "'break' is only allowed inside a loop", ())
+ERROR(continue_outside_loop,sema_tcs,none,
+      "'continue' is only allowed inside a loop", ())
+
 //------------------------------------------------------------------------------
 // Type Check Patterns
 //------------------------------------------------------------------------------

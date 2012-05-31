@@ -38,6 +38,8 @@ STMT(If, Stmt)
 STMT(While, Stmt)
 STMT(For, Stmt)
 STMT(ForEach, Stmt)
+STMT(Break, Stmt)
+STMT(Continue, Stmt)
 
 #undef ABSTRACT_STMT
 #undef STMT

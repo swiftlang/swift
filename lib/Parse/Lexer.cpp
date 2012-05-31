@@ -323,6 +323,8 @@ void Lexer::lexIdentifier() {
     .Case("for", tok::kw_for)
     .Case("while", tok::kw_while)
     .Case("return", tok::kw_return)
+    .Case("break", tok::kw_break)
+    .Case("continue", tok::kw_continue)
 
     // Expressions
     .Case("new", tok::kw_new)

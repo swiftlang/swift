@@ -43,9 +43,21 @@ public:
   /// TopLevelCode - This is the current top-level code declaration being
   /// checked, or null if we are in a function.
   TopLevelCodeDecl *TopLevelCode;
-  
+
+  unsigned LoopNestLevel;
+
+  struct AddLoopNest {
+    StmtChecker &SC;
+    AddLoopNest(StmtChecker &SC) : SC(SC) {
+      ++SC.LoopNestLevel;
+    }
+    ~AddLoopNest() {
+      --SC.LoopNestLevel;
+    }
+  };
+
   StmtChecker(TypeChecker &TC, FuncExpr *TheFunc)
-    : TC(TC), TheFunc(TheFunc), TopLevelCode() { }
+    : TC(TC), TheFunc(TheFunc), TopLevelCode(nullptr), LoopNestLevel(0) { }
 
   void setTopLevelCode(TopLevelCodeDecl *TLC) { TopLevelCode = TLC; }
   
@@ -144,6 +156,7 @@ public:
     if (TC.typeCheckCondition(E)) return 0;
     WS->setCond(E);
 
+    AddLoopNest loopNest(*this);
     Stmt *S = WS->getBody();
     if (typeCheckStmt(S)) return 0;
     WS->setBody(S);
@@ -169,7 +182,8 @@ public:
     Tmp = FS->getIncrement();
     if (typeCheck(Tmp)) return 0;
     FS->setIncrement(Tmp);
-    
+
+    AddLoopNest loopNest(*this);
     Stmt *S = FS->getBody();
     if (typeCheckStmt(S)) return 0;
     FS->setBody(S);
@@ -366,10 +380,27 @@ public:
       return nullptr;
     
     // Type-check the body of the loop.
+    AddLoopNest loopNest(*this);
     BraceStmt *Body = S->getBody();
     if (typeCheckStmt(Body)) return nullptr;
     S->setBody(Body);
     
+    return S;
+  }
+
+  Stmt *visitBreakStmt(BreakStmt *S) {
+    if (!LoopNestLevel) {
+      TC.diagnose(S->getLoc(), diag::break_outside_loop);
+      return nullptr;
+    }
+    return S;
+  }
+
+  Stmt *visitContinueStmt(ContinueStmt *S) {
+    if (!LoopNestLevel) {
+      TC.diagnose(S->getLoc(), diag::continue_outside_loop);
+      return nullptr;
+    }
     return S;
   }
 };

@@ -55,6 +55,8 @@ enum class tok {
   KEYWORD(for)
   KEYWORD(while)
   KEYWORD(return)
+  KEYWORD(break)
+  KEYWORD(continue)
 
   // Expressions
   KEYWORD(new)
