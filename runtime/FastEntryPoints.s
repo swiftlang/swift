@@ -59,6 +59,13 @@
 $0:
 .endmacro
 
+.macro STATIC_FUNC
+  .text
+  .private_extern $0
+  .align  4
+$0:
+.endmacro
+
 .macro END_FUNC
 .endmacro
 
@@ -95,7 +102,7 @@ $0:
 // XXX FIXME -- We need to change this to return "void"
 BEGIN_FUNC _swift_retain
   mov   %rdi, %rsi
-// fall through
+  // fall through
 END_FUNC
 // XXX FIXME -- hack until we have tinycc
 // func swift_retainAndReturnThree(obj,(rsi,rdx,rcx)) -> (rax,rdx,rcx)
@@ -117,6 +124,8 @@ BEGIN_FUNC _swift_retainAndReturnThree
   jc    2b
   mov   %rdi, %rax
   ret
+  // never reached -- used to trick the linker
+  jmp __swift_noDeadCodeStrip
 END_FUNC
 
 BEGIN_FUNC _swift_release
@@ -199,4 +208,20 @@ ALLOC_FUNC _swift_tryAlloc, SWIFT_TSD_ALLOC_BASE, SWIFT_TRYALLOC
 ALLOC_FUNC _swift_rawAlloc, SWIFT_TSD_RAW_ALLOC_BASE, SWIFT_RAWALLOC
 ALLOC_FUNC _swift_tryRawAlloc, SWIFT_TSD_RAW_ALLOC_BASE, SWIFT_TRYRAWALLOC
 
+// Someday when we reorder symbols, we must exclude this list from reordering:
+STATIC_FUNC __swift_noDeadCodeStrip
+  int3
+  jmp _swift_alloc
+  jmp _swift_tryAlloc
+  jmp _swift_rawAlloc
+  jmp _swift_tryRawAlloc
+  jmp _swift_dealloc
+  jmp _swift_rawDealloc
+  jmp _swift_retain
+  jmp _swift_retainAndReturnThree
+  jmp _swift_release
+END_FUNC
+
 #endif
+
+.subsections_via_symbols
