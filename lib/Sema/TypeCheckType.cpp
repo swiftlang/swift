@@ -43,12 +43,12 @@ static bool buildArraySliceType(TypeChecker &TC, ArraySliceType *sliceTy) {
   nameBuffer.append(name.str());
 
   UnqualifiedLookup sliceLookup(TC.Context.getIdentifier(nameBuffer), &TC.TU);
-  Type implementationType = sliceLookup.getSingleTypeResult();
+  TypeDecl *implementationType = sliceLookup.getSingleTypeResult();
   if (!implementationType) {
     TC.diagnose(loc, diag::slice_type_not_found, nameBuffer);
     return true;
   }
-  sliceTy->setImplementationType(implementationType);
+  sliceTy->setImplementationType(implementationType->getDeclaredType());
   return false;
 }
 

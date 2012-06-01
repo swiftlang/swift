@@ -172,8 +172,8 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
   UnqualifiedLookup PrintDeclLookup(Context.getIdentifier("print"), &TU);
   if (!PrintDeclLookup.isSuccess())
     return;
-  PrintDecls.append(PrintDeclLookup.Results.begin(),
-                    PrintDeclLookup.Results.end());
+  for (auto Result : PrintDeclLookup.Results)
+    PrintDecls.push_back(Result.getValueDecl());
 
   // Printing format is "Int = 0\n".
   auto TypeStr = Context.getIdentifier(E->getType()->getString()).str();
@@ -254,8 +254,8 @@ void TypeChecker::REPLCheckPatternBinding(PatternBindingDecl *D) {
   UnqualifiedLookup PrintDeclLookup(Context.getIdentifier("print"), &TU);
   if (!PrintDeclLookup.isSuccess())
     return;
-  PrintDecls.append(PrintDeclLookup.Results.begin(),
-                    PrintDeclLookup.Results.end());
+  for (auto Result : PrintDeclLookup.Results)
+    PrintDecls.push_back(Result.getValueDecl());
 
   // Build function of type T->T which prints the operand.
   Type FuncTy = T;

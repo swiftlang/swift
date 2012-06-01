@@ -234,13 +234,68 @@ Expr *MemberLookup::createResultAST(Expr *Base, SourceLoc DotLoc,
 /// the name.
 UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
                                      SourceLoc Loc) {
-  assert(DC->isModuleContext() && "Other contexts not yet implemented");
+  typedef UnqualifiedLookupResult Result;
 
-  Module &M = *cast<Module>(DC);
+  DeclContext *ModuleDC = DC;
+  while (!ModuleDC->isModuleContext())
+    ModuleDC = ModuleDC->getParent();
+
+  Module &M = *cast<Module>(ModuleDC);
+
+  // If we are inside of a method, check to see if there are any ivars in scope,
+  // and if so, whether this is a reference to one of them.
+  while (!DC->isModuleContext()) {
+    ValueDecl *BaseDecl = 0;
+    Type ExtendedType;
+    if (FuncExpr *FE = dyn_cast<FuncExpr>(DC)) {
+      FuncDecl *FD = FE->getDecl();
+      if (FD && FD->getExtensionType() && !FD->isStatic()) {
+        ExtendedType = FD->getExtensionType();
+        BaseDecl = FD->getImplicitThisDecl();
+        DC = DC->getParent();
+      }
+    } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(DC)) {
+      ExtendedType = ED->getExtendedType();
+      BaseDecl = ExtendedType->castTo<NominalType>()->getDecl();
+    } else if (NominalTypeDecl *ND = dyn_cast<NominalTypeDecl>(DC)) {
+      ExtendedType = ND->getDeclaredType();
+      BaseDecl = ND;
+    }
+
+    if (BaseDecl) {
+      MemberLookup Lookup(ExtendedType, Name, M);
+      
+      for (auto Result : Lookup.Results) {
+        switch (Result.Kind) {
+        case MemberLookupResult::MemberProperty:
+          Results.push_back(Result::getMemberProperty(BaseDecl, Result.D));
+          break;
+        case MemberLookupResult::MemberFunction:
+          Results.push_back(Result::getMemberFunction(BaseDecl, Result.D));
+          break;
+        case MemberLookupResult::MetatypeMember:
+          Results.push_back(Result::getMetatypeMember(BaseDecl, Result.D));
+          break;
+        case MemberLookupResult::ExistentialMember:
+          Results.push_back(Result::getExistentialMember(BaseDecl, Result.D));
+          break;
+        case MemberLookupResult::TupleElement:
+          llvm_unreachable("Can't have context with tuple type");
+        }
+      }
+      if (Lookup.isSuccess())
+        return;
+    }
+
+    DC = DC->getParent();
+  }
 
   // Do a local lookup within the current module.
+  llvm::SmallVector<ValueDecl*, 4> CurModuleResults;
   M.lookupValue(Module::AccessPathTy(), Name, NLKind::UnqualifiedLookup,
-                Results);
+                CurModuleResults);
+  for (ValueDecl *VD : CurModuleResults)
+    Results.push_back(Result::getModuleMember(VD));
 
   // The builtin module has no imports.
   if (isa<BuiltinModule>(M)) return;
@@ -249,7 +304,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
 
   bool NameBindingLookup = TU.ASTStage == Module::Parsed;
   llvm::SmallPtrSet<CanType, 8> CurModuleTypes;
-  for (ValueDecl *VD : Results) {
+  for (ValueDecl *VD : CurModuleResults) {
     // If we find a type in the current module, don't look into any
     // imported modules.
     if (isa<TypeDecl>(VD))
@@ -265,21 +320,28 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
     if (!Visited.insert(ImpEntry.second))
       continue;
 
-    SmallVector<ValueDecl*, 8> ResultTemp;
+    SmallVector<ValueDecl*, 8> ImportedModuleResults;
     ImpEntry.second->lookupValue(ImpEntry.first, Name, NLKind::UnqualifiedLookup,
-                                 ResultTemp);
-    for (ValueDecl *VD : ResultTemp) {
+                                 ImportedModuleResults);
+    for (ValueDecl *VD : ImportedModuleResults) {
       if (NameBindingLookup || isa<TypeDecl>(VD) ||
           !CurModuleTypes.count(VD->getType()->getCanonicalType())) {
-        Results.push_back(VD);
+        Results.push_back(Result::getModuleMember(VD));
       }
     }
   }
+
+  for (const auto &ImpEntry : TU.getImportedModules())
+    if (ImpEntry.second->Name == Name) {
+      Results.push_back(Result::getModuleName(ImpEntry.second));
+      break;
+    }
 }
 
 
-Type UnqualifiedLookup::getSingleTypeResult() {
-  if (Results.size() != 1 || !isa<TypeDecl>(Results.back()))
+TypeDecl* UnqualifiedLookup::getSingleTypeResult() {
+  if (Results.size() != 1 || !Results.back().hasValueDecl() ||
+      !isa<TypeDecl>(Results.back().getValueDecl()))
     return nullptr;
-  return cast<TypeDecl>(Results.back())->getDeclaredType();
+  return cast<TypeDecl>(Results.back().getValueDecl());
 }

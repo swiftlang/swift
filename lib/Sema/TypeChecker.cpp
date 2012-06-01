@@ -23,10 +23,7 @@ using namespace swift;
 ProtocolDecl *TypeChecker::getRangeProtocol() {
   if (!RangeProto) {
     UnqualifiedLookup Globals(Context.getIdentifier("Range"), &TU);
-    if (Globals.Results.size() != 1)
-      return nullptr;
-    
-    RangeProto = dyn_cast<ProtocolDecl>(Globals.Results.front());
+    RangeProto = dyn_cast_or_null<ProtocolDecl>(Globals.getSingleTypeResult());
   }
   
   return RangeProto;

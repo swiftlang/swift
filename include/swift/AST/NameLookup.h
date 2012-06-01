@@ -128,6 +128,117 @@ private:
   void doIt(Type BaseTy, Module &M, VisitedSet &Visited);
 };
 
+struct UnqualifiedLookupResult {
+private:
+  ValueDecl *Base;
+  union {
+    ValueDecl *Value;
+    Module *NamedModule;
+  };
+
+public:
+  /// Kind - The kind of reference.
+  enum KindTy {
+    /// ModuleMember - "x" refers to a value declared at module scope.
+    ModuleMember,
+
+    /// LocalType - "x" refers to a value declared in a local scope.
+    LocalDecl,
+
+    /// MemberProperty - "x" refers to an instance property of a type which
+    /// is a containing scope.
+    MemberProperty,
+
+    /// MemberFunction - "x" refers to an instance function of a type
+    /// is a containing scope.  If the lookup is inside an instance function
+    /// of the containing type, it refers to the instance function; otherwise,
+    /// it refers to the curried function on the metatype.
+    MemberFunction,
+
+    /// MetatypeMember - "x" refers to a member of a metatype "A", which is a
+    /// referred to by BaseDecl.
+    MetatypeMember,
+  
+    /// ExistentialMember - "x" refers to a member of an existential type,
+    /// which is referred to by BaseDecl.
+    ExistentialMember,
+
+    /// ModuleName - "x" refers to a module, either the current
+    /// module or an imported module.
+    ModuleName
+  } Kind;
+
+  bool hasValueDecl() {
+    return Kind != ModuleName;
+  }
+
+  ValueDecl *getValueDecl() {
+    assert(hasValueDecl());
+    return Value;
+  }
+
+  Module *getNamedModule() {
+    assert(Kind == ModuleName);
+    return NamedModule;
+  }
+
+  ValueDecl *getBaseDecl() {
+    return Base;
+  }
+
+  static UnqualifiedLookupResult getModuleMember(ValueDecl *value) {
+    UnqualifiedLookupResult R;
+    R.Base = nullptr;
+    R.Value = value;
+    R.Kind = ModuleMember;
+    return R;
+  }
+
+  static UnqualifiedLookupResult getMemberProperty(ValueDecl *base,
+                                                   ValueDecl *value) {
+    UnqualifiedLookupResult R;
+    R.Base = base;
+    R.Value = value;
+    R.Kind = MemberProperty;
+    return R;
+  }
+
+  static UnqualifiedLookupResult getMemberFunction(ValueDecl *base,
+                                                   ValueDecl *value) {
+    UnqualifiedLookupResult R;
+    R.Base = base;
+    R.Value = value;
+    R.Kind = MemberFunction;
+    return R;
+  }
+
+  static UnqualifiedLookupResult getMetatypeMember(ValueDecl *base,
+                                                   ValueDecl *value) {
+    UnqualifiedLookupResult R;
+    R.Base = base;
+    R.Value = value;
+    R.Kind = MetatypeMember;
+    return R;
+  }
+
+  static UnqualifiedLookupResult getExistentialMember(ValueDecl *base,
+                                                      ValueDecl *value) {
+    UnqualifiedLookupResult R;
+    R.Base = base;
+    R.Value = value;
+    R.Kind = ExistentialMember;
+    return R;
+  }
+
+  static UnqualifiedLookupResult getModuleName(Module *m) {
+    UnqualifiedLookupResult R;
+    R.Base = nullptr;
+    R.NamedModule = m;
+    R.Kind = ModuleName;
+    return R;
+  }
+};
+
 class UnqualifiedLookup {
   UnqualifiedLookup(const MemberLookup&) = delete;
   void operator=(const MemberLookup&) = delete;
@@ -139,16 +250,14 @@ public:
   UnqualifiedLookup(Identifier Name, DeclContext *DC,
                     SourceLoc Loc = SourceLoc());
 
-  /// Results - The constructor fills this vector in with all of the results.
-  /// If name lookup failed, this is empty.
-  llvm::SmallVector<ValueDecl*, 8> Results;
+  llvm::SmallVector<UnqualifiedLookupResult, 4> Results;
 
   /// isSuccess - Return true if anything was found by the name lookup.
   bool isSuccess() const { return !Results.empty(); }
 
   /// getSingleTypeResult - Get the result as a single type, or
   /// a null type if that fails.
-  Type getSingleTypeResult();
+  TypeDecl* getSingleTypeResult();
 };
 
 } // end namespace swift

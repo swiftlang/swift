@@ -217,65 +217,39 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
     SourceLoc Loc = Components[0].Loc;
     
     // Perform an unqualified lookup.
-    SmallVector<ValueDecl*, 4> Decls;
-    
-    // FIXME: Abstract this out a bit.
-    bool FoundSomething = false;
-    for (; !DC->isModuleContext(); DC = DC->getParent()) {
-      if (DC->isTypeContext()) {
-        if (Type ExtendedTy = DC->getDeclaredTypeOfContext()) {
-          MemberLookup Lookup(ExtendedTy, Name, *TU);
-          if (Lookup.isSuccess()) {
-            for (auto Result : Lookup.Results) {
-              // FIXME: Once we have real constructors, there might be less
-              // of a reason to stick non-type declarations. For now, this
-              // is reasonable.
-              if (isa<TypeDecl>(Result.D)) {
-                FoundSomething = true;
-                Decls.push_back(Result.D);
-              }
-            }
-            
-            if (FoundSomething)
-              break;
-          }
-        }
-      }
-    }
-    
-    if (!FoundSomething) {
-      UnqualifiedLookup Globals(Name, TU);
-      Decls.append(Globals.Results.begin(), Globals.Results.end());
-    }
-    
-    // If we find multiple results, we have an ambiguity error.
-    // FIXME: This should be reevaluated and probably turned into a new NLKind.
-    // Certain matches (e.g. of a function) should just be filtered out/ignored.
-    if (Decls.size() > 1) {
+    UnqualifiedLookup Globals(Name, DC);
+
+    if (Globals.Results.size() > 1) {
       diagnose(Loc, diag::abiguous_type_base, Name)
         << SourceRange(Loc, Components.back().Loc);
-      for (ValueDecl *D : Decls)
-        diagnose(D->getStartLoc(), diag::found_candidate);
+      for (auto Result : Globals.Results) {
+        if (Globals.Results[0].hasValueDecl())
+          diagnose(Result.getValueDecl()->getStartLoc(), diag::found_candidate);
+        else
+          diagnose(Loc, diag::found_candidate);
+      }
       return true;
     }
-    
-    if (!Decls.empty()) {
-      Components[0].Value = Decls[0];
-    } else {
-      // If that fails, this may be the name of a module, try looking that up.
-      for (const ImportedModule &ImpEntry : TU->getImportedModules())
-        if (ImpEntry.second->Name == Name) {
-          Components[0].Value = ImpEntry.second;
-          break;
-        }
-    
-      // If we still don't have anything, we fail.
-      if (Components[0].Value.isNull()) {
-        diagnose(Loc, Components.size() == 1 ? 
-                   diag::use_undeclared_type : diag::unknown_name_in_type, Name)
-          << SourceRange(Loc, Components.back().Loc);
-        return true;
-      }
+
+    if (Globals.Results.empty()) {
+      diagnose(Loc, Components.size() == 1 ? 
+                 diag::use_undeclared_type : diag::unknown_name_in_type, Name)
+        << SourceRange(Loc, Components.back().Loc);
+      return true;
+    }
+
+    switch (Globals.Results[0].Kind) {
+    case UnqualifiedLookupResult::ModuleMember:
+    case UnqualifiedLookupResult::LocalDecl:
+    case UnqualifiedLookupResult::MemberProperty:
+    case UnqualifiedLookupResult::MemberFunction:
+    case UnqualifiedLookupResult::MetatypeMember:
+    case UnqualifiedLookupResult::ExistentialMember:
+      Components[0].Value = Globals.Results[0].getValueDecl();
+      break;
+    case UnqualifiedLookupResult::ModuleName:
+      Components[0].Value = Globals.Results[0].getNamedModule();
+      break;
     }
   }
   

@@ -1019,7 +1019,10 @@ namespace {
 
 static Type lookupGlobalType(TypeChecker &TC, StringRef name) {
   UnqualifiedLookup lookup(TC.Context.getIdentifier(name), &TC.TU);
-  return lookup.getSingleTypeResult();
+  TypeDecl *TD = lookup.getSingleTypeResult();
+  if (!TD)
+    return Type();
+  return TD->getDeclaredType();
 }
 
 Type TypeChecker::getDefaultLiteralType(LiteralExpr *E) {

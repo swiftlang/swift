@@ -487,60 +487,11 @@ bool checkProtocolCircularity(TypeChecker &TC, ProtocolDecl *Proto,
   return false;
 }
 
-/// BindNameToIVar - We have an unresolved reference to an identifier in some
-/// FuncDecl.  Check to see if this is a reference to an instance variable,
-/// and return an AST for the reference if so.  If not, return null with no
-/// error emitted.
-static Expr *BindNameToIVar(UnresolvedDeclRefExpr *UDRE, Type ExtendedType,
-                            ValueDecl *BaseDecl, TypeChecker &TC) {
-  // Do a full "dot syntax" name lookup with the implicit 'this' base.
-  MemberLookup Lookup(ExtendedType, UDRE->getName(), TC.TU);
-  
-  // On failure, this isn't an member reference.
-  if (!Lookup.isSuccess()) return 0;
-  
-  // On success, this is a member reference. Build either a reference to the
-  // implicit 'this' VarDecl (for instance methods) or to the metaclass
-  // instance (for static methods).
-  Expr *BaseExpr = new (TC.Context) DeclRefExpr(BaseDecl, SourceLoc(),
-                                               BaseDecl->getTypeOfReference());
-  
-  return Lookup.createResultAST(BaseExpr, SourceLoc(), UDRE->getLoc(),
-                                TC.Context);
-}
-
 /// BindName - Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression.  Context is the DeclContext used
 /// for the lookup.
 static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
                       TypeChecker &TC) {
-  // If we are inside of a method, check to see if there are any ivars in scope,
-  // and if so, whether this is a reference to one of them.
-  while (!Context->isModuleContext()) {
-    ValueDecl *BaseDecl = 0;
-    Type ExtendedType;
-    if (FuncExpr *FE = dyn_cast<FuncExpr>(Context)) {
-      FuncDecl *FD = FE->getDecl();
-      if (FD && FD->getExtensionType() && !FD->isStatic()) {
-        ExtendedType = FD->getExtensionType();
-        BaseDecl = FD->getImplicitThisDecl();
-        Context = Context->getParent();
-      }
-    } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(Context)) {
-      ExtendedType = ED->getExtendedType();
-      BaseDecl = ExtendedType->castTo<NominalType>()->getDecl();
-    } else if (NominalTypeDecl *ND = dyn_cast<NominalTypeDecl>(Context)) {
-      ExtendedType = ND->getDeclaredType();
-      BaseDecl = ND;
-    }
-
-    if (BaseDecl)
-      if (Expr *E = BindNameToIVar(UDRE, ExtendedType, BaseDecl, TC))
-        return E;
-
-    Context = Context->getParent();
-  }
-
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
   Identifier Name = UDRE->getName();
   SourceLoc Loc = UDRE->getLoc();
@@ -548,21 +499,71 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
   // Perform standard value name lookup.
   UnqualifiedLookup Lookup(Name, Context);
 
-  // If that fails, this may be the name of a module, try looking that up.
-  if (Lookup.Results.empty()) {
-    for (const auto &ImpEntry : TC.TU.getImportedModules())
-      if (ImpEntry.second->Name == Name) {
-        ModuleType *MT = ModuleType::get(ImpEntry.second);
-        return new (TC.Context) ModuleExpr(Loc, MT);
-      }
-  }
-
-  if (Lookup.Results.empty()) {
+  if (!Lookup.isSuccess()) {
     TC.diagnose(Loc, diag::use_unresolved_identifier, Name);
     return new (TC.Context) ErrorExpr(Loc);
   }
 
-  return OverloadedDeclRefExpr::createWithCopy(Lookup.Results, Loc);
+  // FIXME: Need to refactor the way we build an AST node from a lookup result!
+
+  if (Lookup.Results.size() == 1 &&
+      Lookup.Results[0].Kind == UnqualifiedLookupResult::ModuleName) {
+    ModuleType *MT = ModuleType::get(Lookup.Results[0].getNamedModule());
+    return new (TC.Context) ModuleExpr(Loc, MT);
+  }
+
+  bool AllDeclRefs = true;
+  SmallVector<ValueDecl*, 4> ResultValues;
+  for (auto Result : Lookup.Results) {
+    switch (Result.Kind) {
+    case UnqualifiedLookupResult::ModuleMember:
+    case UnqualifiedLookupResult::LocalDecl:
+      ResultValues.push_back(Result.getValueDecl());
+      break;
+    case UnqualifiedLookupResult::MemberProperty:
+    case UnqualifiedLookupResult::MemberFunction:
+    case UnqualifiedLookupResult::MetatypeMember:
+    case UnqualifiedLookupResult::ExistentialMember:
+    case UnqualifiedLookupResult::ModuleName:
+      AllDeclRefs = false;
+      break;
+    }
+  }
+  if (AllDeclRefs)
+    return OverloadedDeclRefExpr::createWithCopy(ResultValues, Loc);
+
+  ResultValues.clear();
+  bool AllMemberRefs = true;
+  ValueDecl *Base = 0;
+  for (auto Result : Lookup.Results) {
+    switch (Result.Kind) {
+    case UnqualifiedLookupResult::MemberProperty:
+    case UnqualifiedLookupResult::MemberFunction:
+    case UnqualifiedLookupResult::MetatypeMember:
+    case UnqualifiedLookupResult::ExistentialMember:
+      ResultValues.push_back(Result.getValueDecl());
+      if (Base && Result.getBaseDecl() != Base) {
+        AllMemberRefs = false;
+        break;
+      }
+      Base = Result.getBaseDecl();
+      break;
+    case UnqualifiedLookupResult::ModuleMember:
+    case UnqualifiedLookupResult::LocalDecl:
+    case UnqualifiedLookupResult::ModuleName:
+      AllMemberRefs = false;
+      break;
+    }
+  }
+
+  if (AllMemberRefs) {
+    Expr *BaseExpr = new (TC.Context) DeclRefExpr(Base, Loc,
+                                                  Base->getTypeOfReference());
+    return OverloadedMemberRefExpr::createWithCopy(BaseExpr, SourceLoc(),
+                                                   ResultValues, Loc);
+  }
+
+  llvm_unreachable("Can't represent lookup result");
 }
 
 /// performTypeChecking - Once parsing and namebinding are complete, these

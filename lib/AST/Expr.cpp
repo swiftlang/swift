@@ -210,7 +210,11 @@ Expr *OverloadedMemberRefExpr::createWithCopy(Expr *Base, SourceLoc DotLoc,
       VarDecl *Var = cast<VarDecl>(Decls[0]);
       return new (C) MemberRefExpr(Base, DotLoc, Var, MemberLoc);
     }
-    
+
+    if (Decls[0]->isInstanceMember() && !isa<FuncDecl>(Decls[0]))
+      return new (C) UnresolvedDotExpr(Base, DotLoc, Decls[0]->getName(),
+                                       MemberLoc);
+
     return new (C) DotSyntaxBaseIgnoredExpr(Base, DotLoc, Fn);
   }
   

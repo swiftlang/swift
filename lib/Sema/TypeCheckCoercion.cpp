@@ -948,7 +948,10 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
   if (!(Flags & CF_Apply))
     return DestTy;
 
+  SmallVector<ValueDecl*, 8> plusResults;
   UnqualifiedLookup plus(TC.Context.getIdentifier("+"), &TC.TU);
+  for (auto result : plus.Results)
+    plusResults.push_back(result.getValueDecl());
 
   Expr *Result = nullptr;
   for (auto Segment : E->getSegments()) {
@@ -967,7 +970,7 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
     
     // Perform overload resolution.
     SmallVector<ValueDecl *, 16> Viable;
-    ValueDecl *Best = TC.filterOverloadSet(plus.Results,
+    ValueDecl *Best = TC.filterOverloadSet(plusResults,
                                            /*OperatorSyntax=*/true,
                                            Type(), Arg, Type(),
                                            Viable);
@@ -977,7 +980,7 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
         diagnose(E->getStartLoc(), diag::string_interpolation_overload_fail,
                  Result->getType(), Segment->getType());
         if (Viable.empty())
-          TC.printOverloadSetCandidates(plus.Results);
+          TC.printOverloadSetCandidates(plusResults);
         else
           TC.printOverloadSetCandidates(Viable);
       }
