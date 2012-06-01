@@ -99,7 +99,7 @@ struct MemberLookupResult {
 };
   
 /// MemberLookup - This class implements and represents the result of performing
-/// "dot" style member lookup and represents the result set.
+/// "dot" style member lookup.
 class MemberLookup {
   MemberLookup(const MemberLookup&) = delete;
   void operator=(const MemberLookup&) = delete;
@@ -128,6 +128,7 @@ private:
   void doIt(Type BaseTy, Module &M, VisitedSet &Visited);
 };
 
+/// UnqualifiedLookupResult - One result of unqualified lookup.
 struct UnqualifiedLookupResult {
 private:
   ValueDecl *Base;
@@ -239,6 +240,8 @@ public:
   }
 };
 
+/// UnqualifiedLookup - This class implements and represents the result of
+/// performing unqualified lookup (i.e. lookup for a plain identifier).
 class UnqualifiedLookup {
   UnqualifiedLookup(const MemberLookup&) = delete;
   void operator=(const MemberLookup&) = delete;
