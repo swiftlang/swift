@@ -544,12 +544,12 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
   Identifier Name = UDRE->getName();
   SourceLoc Loc = UDRE->getLoc();
-  SmallVector<ValueDecl*, 4> Decls;
+
   // Perform standard value name lookup.
-  TC.TU.lookupGlobalValue(Name, NLKind::UnqualifiedLookup, Decls);
+  UnqualifiedLookup Lookup(Name, Context);
 
   // If that fails, this may be the name of a module, try looking that up.
-  if (Decls.empty()) {
+  if (Lookup.Results.empty()) {
     for (const auto &ImpEntry : TC.TU.getImportedModules())
       if (ImpEntry.second->Name == Name) {
         ModuleType *MT = ModuleType::get(ImpEntry.second);
@@ -557,12 +557,12 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
       }
   }
 
-  if (Decls.empty()) {
+  if (Lookup.Results.empty()) {
     TC.diagnose(Loc, diag::use_unresolved_identifier, Name);
     return new (TC.Context) ErrorExpr(Loc);
   }
 
-  return OverloadedDeclRefExpr::createWithCopy(Decls, Loc);
+  return OverloadedDeclRefExpr::createWithCopy(Lookup.Results, Loc);
 }
 
 /// performTypeChecking - Once parsing and namebinding are complete, these

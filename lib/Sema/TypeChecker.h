@@ -203,10 +203,6 @@ public:
   Expr *buildFilteredOverloadSet(OverloadSetRefExpr *OSE, ValueDecl *Best);
   /// @}
 
-  /// \brief Retrieve the Any protocol declaration, or build one if none
-  /// exists.
-  ProtocolDecl *getAnyProtocol(SourceLoc Loc);
-
   /// \brief Retrieve the Range protocol declaration, if it exists.
   ProtocolDecl *getRangeProtocol();
 };

@@ -947,10 +947,8 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
   // than going through so many '+' operations.
   if (!(Flags & CF_Apply))
     return DestTy;
-    
-  SmallVector<ValueDecl *, 16> PlusDecls;
-  TC.TU.lookupGlobalValue(TC.Context.getIdentifier("+"),
-                          NLKind::UnqualifiedLookup, PlusDecls);
+
+  UnqualifiedLookup plus(TC.Context.getIdentifier("+"), &TC.TU);
 
   Expr *Result = nullptr;
   for (auto Segment : E->getSegments()) {
@@ -969,7 +967,7 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
     
     // Perform overload resolution.
     SmallVector<ValueDecl *, 16> Viable;
-    ValueDecl *Best = TC.filterOverloadSet(PlusDecls,
+    ValueDecl *Best = TC.filterOverloadSet(plus.Results,
                                            /*OperatorSyntax=*/true,
                                            Type(), Arg, Type(),
                                            Viable);
@@ -978,7 +976,10 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
         // FIXME: We want range information here.
         diagnose(E->getStartLoc(), diag::string_interpolation_overload_fail,
                  Result->getType(), Segment->getType());
-        TC.printOverloadSetCandidates(Viable.empty()? PlusDecls : Viable);
+        if (Viable.empty())
+          TC.printOverloadSetCandidates(plus.Results);
+        else
+          TC.printOverloadSetCandidates(Viable);
       }
       
       return nullptr;

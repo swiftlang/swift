@@ -228,3 +228,58 @@ Expr *MemberLookup::createResultAST(Expr *Base, SourceLoc DotLoc,
   return OverloadedMemberRefExpr::createWithCopy(Base, DotLoc, ResultSet,
                                                  NameLoc);
 }
+
+/// lookupGlobalValue - Perform a value lookup within the current Module.
+/// Unlike lookupValue, this does look through import declarations to resolve
+/// the name.
+UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
+                                     SourceLoc Loc) {
+  assert(DC->isModuleContext() && "Other contexts not yet implemented");
+
+  Module &M = *cast<Module>(DC);
+
+  // Do a local lookup within the current module.
+  M.lookupValue(Module::AccessPathTy(), Name, NLKind::UnqualifiedLookup,
+                Results);
+
+  // The builtin module has no imports.
+  if (isa<BuiltinModule>(M)) return;
+  
+  TranslationUnit &TU = cast<TranslationUnit>(M);
+
+  bool NameBindingLookup = TU.ASTStage == Module::Parsed;
+  llvm::SmallPtrSet<CanType, 8> CurModuleTypes;
+  for (ValueDecl *VD : Results) {
+    // If we find a type in the current module, don't look into any
+    // imported modules.
+    if (isa<TypeDecl>(VD))
+      return;
+    if (!NameBindingLookup)
+      CurModuleTypes.insert(VD->getType()->getCanonicalType());
+  }
+
+  // Scrape through all of the imports looking for additional results.
+  // FIXME: Implement DAG-based shadowing rules.
+  llvm::SmallPtrSet<Module *, 16> Visited;
+  for (auto &ImpEntry : TU.getImportedModules()) {
+    if (!Visited.insert(ImpEntry.second))
+      continue;
+
+    SmallVector<ValueDecl*, 8> ResultTemp;
+    ImpEntry.second->lookupValue(ImpEntry.first, Name, NLKind::UnqualifiedLookup,
+                                 ResultTemp);
+    for (ValueDecl *VD : ResultTemp) {
+      if (NameBindingLookup || isa<TypeDecl>(VD) ||
+          !CurModuleTypes.count(VD->getType()->getCanonicalType())) {
+        Results.push_back(VD);
+      }
+    }
+  }
+}
+
+
+Type UnqualifiedLookup::getSingleTypeResult() {
+  if (Results.size() != 1 || !isa<TypeDecl>(Results.back()))
+    return nullptr;
+  return cast<TypeDecl>(Results.back())->getDeclaredType();
+}

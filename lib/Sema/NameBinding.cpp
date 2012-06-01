@@ -243,8 +243,10 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
       }
     }
     
-    if (!FoundSomething)
-      TU->lookupGlobalValue(Name, NLKind::UnqualifiedLookup, Decls);
+    if (!FoundSomething) {
+      UnqualifiedLookup Globals(Name, TU);
+      Decls.append(Globals.Results.begin(), Globals.Results.end());
+    }
     
     // If we find multiple results, we have an ambiguity error.
     // FIXME: This should be reevaluated and probably turned into a new NLKind.

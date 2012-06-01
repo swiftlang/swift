@@ -169,10 +169,11 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
   SmallVector<unsigned, 4> MemberIndexes;
   SmallVector<BraceStmt::ExprStmtOrDecl, 4> BodyContent;
   SmallVector<ValueDecl*, 4> PrintDecls;
-  TU.lookupGlobalValue(Context.getIdentifier("print"),
-                       NLKind::UnqualifiedLookup, PrintDecls);
-  if (PrintDecls.empty())
+  UnqualifiedLookup PrintDeclLookup(Context.getIdentifier("print"), &TU);
+  if (!PrintDeclLookup.isSuccess())
     return;
+  PrintDecls.append(PrintDeclLookup.Results.begin(),
+                    PrintDeclLookup.Results.end());
 
   // Printing format is "Int = 0\n".
   auto TypeStr = Context.getIdentifier(E->getType()->getString()).str();
@@ -250,10 +251,11 @@ void TypeChecker::REPLCheckPatternBinding(PatternBindingDecl *D) {
   SourceLoc EndLoc = E->getEndLoc();
 
   SmallVector<ValueDecl*, 4> PrintDecls;
-  TU.lookupGlobalValue(Context.getIdentifier("print"),
-                       NLKind::UnqualifiedLookup, PrintDecls);
-  if (PrintDecls.empty())
+  UnqualifiedLookup PrintDeclLookup(Context.getIdentifier("print"), &TU);
+  if (!PrintDeclLookup.isSuccess())
     return;
+  PrintDecls.append(PrintDeclLookup.Results.begin(),
+                    PrintDeclLookup.Results.end());
 
   // Build function of type T->T which prints the operand.
   Type FuncTy = T;

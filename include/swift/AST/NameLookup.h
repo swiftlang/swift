@@ -20,11 +20,12 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "swift/AST/Identifier.h"
+#include "swift/Basic/SourceLoc.h"
 
 namespace swift {
   class ASTContext;
+  class DeclContext;
   class Expr;
-  class SourceLoc;
   class ValueDecl;
   class Type;
   class TypeDecl;
@@ -125,6 +126,29 @@ private:
   Identifier MemberName;
   typedef llvm::SmallPtrSet<TypeDecl *, 8> VisitedSet;
   void doIt(Type BaseTy, Module &M, VisitedSet &Visited);
+};
+
+class UnqualifiedLookup {
+  UnqualifiedLookup(const MemberLookup&) = delete;
+  void operator=(const MemberLookup&) = delete;
+public:
+  /// UnqualifiedLookup ctor - Lookup an unqualfied identifier 'Name' in the
+  /// context.  If the current DeclContext is nested in a FuncExpr, the
+  /// SourceLoc is used to determine which declarations in that FuncExpr's
+  /// context are visible.
+  UnqualifiedLookup(Identifier Name, DeclContext *DC,
+                    SourceLoc Loc = SourceLoc());
+
+  /// Results - The constructor fills this vector in with all of the results.
+  /// If name lookup failed, this is empty.
+  llvm::SmallVector<ValueDecl*, 8> Results;
+
+  /// isSuccess - Return true if anything was found by the name lookup.
+  bool isSuccess() const { return !Results.empty(); }
+
+  /// getSingleTypeResult - Get the result as a single type, or
+  /// a null type if that fails.
+  Type getSingleTypeResult();
 };
 
 } // end namespace swift

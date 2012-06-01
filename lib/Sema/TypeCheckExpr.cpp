@@ -452,7 +452,8 @@ public:
         Substitutions[Archetype] = ContainerTy;
       else
         Substitutions[Archetype]
-          = TC.getAnyProtocol(E->getDotLoc())->getDeclaredType();
+          = ProtocolCompositionType::get(TC.Context, SourceLoc(),
+                                         ArrayRef<Type>());
     }
     
     // Substitute the existential types into the member type.
@@ -1017,12 +1018,8 @@ namespace {
 }
 
 static Type lookupGlobalType(TypeChecker &TC, StringRef name) {
-  SmallVector<ValueDecl*, 8> Decls;
-  TC.TU.lookupGlobalValue(TC.Context.getIdentifier(name),
-                          NLKind::UnqualifiedLookup, Decls);
-  if (Decls.size() != 1 || !isa<TypeDecl>(Decls.back()))
-    return nullptr;
-  return cast<TypeDecl>(Decls.back())->getDeclaredType();
+  UnqualifiedLookup lookup(TC.Context.getIdentifier(name), &TC.TU);
+  return lookup.getSingleTypeResult();
 }
 
 Type TypeChecker::getDefaultLiteralType(LiteralExpr *E) {

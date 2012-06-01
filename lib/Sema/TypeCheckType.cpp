@@ -17,6 +17,7 @@
 
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/NameLookup.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
@@ -41,18 +42,13 @@ static bool buildArraySliceType(TypeChecker &TC, ArraySliceType *sliceTy) {
   llvm::SmallString<32> nameBuffer("Slice");
   nameBuffer.append(name.str());
 
-  SmallVector<ValueDecl*, 8> Decls;
-  TC.TU.lookupGlobalValue(TC.Context.getIdentifier(nameBuffer),
-                          NLKind::UnqualifiedLookup, Decls);
-  if (Decls.size() != 1 || !isa<TypeDecl>(Decls.back())) {
+  UnqualifiedLookup sliceLookup(TC.Context.getIdentifier(nameBuffer), &TC.TU);
+  Type implementationType = sliceLookup.getSingleTypeResult();
+  if (!implementationType) {
     TC.diagnose(loc, diag::slice_type_not_found, nameBuffer);
     return true;
   }
-
-  // FIXME: there's no reason to think that the alias type will have
-  // been validated in general.
-  TypeDecl *TD = cast<TypeDecl>(Decls.back());
-  sliceTy->setImplementationType(TD->getDeclaredType());
+  sliceTy->setImplementationType(implementationType);
   return false;
 }
 

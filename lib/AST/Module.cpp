@@ -222,51 +222,6 @@ void Module::lookupValue(AccessPathTy AccessPath, Identifier Name,
     .lookupValue(AccessPath, Name, LookupKind, TU, Result);
 }
 
-/// lookupGlobalValue - Perform a value lookup within the current Module.
-/// Unlike lookupValue, this does look through import declarations to resolve
-/// the name.
-void Module::lookupGlobalValue(Identifier Name, NLKind LookupKind, 
-                               SmallVectorImpl<ValueDecl*> &Result) {
-  assert(Result.empty() &&
-         "This expects that the input list is empty, could be generalized");
-  
-  // Do a local lookup within the current module.
-  lookupValue(AccessPathTy(), Name, LookupKind, Result);
-
-  // The builtin module has no imports.
-  if (isa<BuiltinModule>(this)) return;
-  
-  TranslationUnit &TU = *cast<TranslationUnit>(this);
-
-  bool NameBindingLookup = TU.ASTStage == Module::Parsed;
-  llvm::SmallPtrSet<CanType, 8> CurModuleTypes;
-  for (ValueDecl *VD : Result) {
-    // If we find a type in the current module, don't look into any
-    // imported modules.
-    if (isa<TypeDecl>(VD))
-      return;
-    if (!NameBindingLookup)
-      CurModuleTypes.insert(VD->getType()->getCanonicalType());
-  }
-
-  // Scrape through all of the imports looking for additional results.
-  // FIXME: Implement DAG-based shadowing rules.
-  llvm::SmallPtrSet<Module *, 16> Visited;
-  for (auto &ImpEntry : TU.getImportedModules()) {
-    if (!Visited.insert(ImpEntry.second))
-      continue;
-
-    SmallVector<ValueDecl*, 8> ResultTemp;
-    ImpEntry.second->lookupValue(ImpEntry.first, Name, LookupKind, ResultTemp);
-    for (ValueDecl *VD : ResultTemp) {
-      if (NameBindingLookup || isa<TypeDecl>(VD) ||
-          !CurModuleTypes.count(VD->getType()->getCanonicalType())) {
-        Result.push_back(VD);
-      }
-    }
-  }
-}
-
 static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
                                     ArrayRef<ValueDecl*> BaseMembers,
                                     Module *CurModule,

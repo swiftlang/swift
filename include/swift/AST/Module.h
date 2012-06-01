@@ -99,12 +99,6 @@ public:
   /// extending the specified type and return a list of them.
   ArrayRef<ExtensionDecl*> lookupExtensions(Type T);
 
-  /// lookupGlobalValue - Perform a value lookup within the current Module.
-  /// Unlike lookupValue, this does look through import declarations to resolve
-  /// the name.
-  void lookupGlobalValue(Identifier Name, NLKind LookupKind, 
-                         SmallVectorImpl<ValueDecl*> &Result);
-
   /// lookupMembers - Lookup the members for the specified BaseType with
   /// the specified name, and return them in Result.  This looks in both the
   /// type declaration itself and in extensions.
