@@ -28,7 +28,7 @@ Most types and functions in code are expressed in terms of a single, concrete se
           List *first;\
         \};\
 \
-where List<int>, List<string>, and List<DataRecord> are all distinct types that provide a linked list storing integers, strings, and DataRecords, respectively. Given such a data structure, one also needs to be able to implement generic functions that can operate on a list of any kind of elements, such as a simple, linear search algorithm:\
+where List<Int>, List<String>, and List<DataRecord> are all distinct types that provide a linked list storing integers, strings, and DataRecords, respectively. Given such a data structure, one also needs to be able to implement generic functions that can operate on a list of any kind of elements, such as a simple, linear search algorithm:\
 \
    template<typename T>\
    typename List<T>::Node *find(const List<T>&list, const T& value) \{\
@@ -77,8 +77,8 @@ Polymorphism allows one to use different data types with a uniform interface. Ov
 \i ad hoc
 \i0  polymorphism) in Swift. For example, given\
 \
-	func +(x : int, y : int) -> int \{ add\'85 \}\
-	func +(x : string, y : string) -> string \{ concat\'85 \}\
+	func +(x : Int, y : Int) -> Int \{ add\'85 \}\
+	func +(x : String, y : String) -> String \{ concat\'85 \}\
 \
 we can write the expression "x + y", which will work for both integers and strings. \
 \
@@ -99,10 +99,10 @@ In Swift, I suggest that we use the term
 In its most basic form, a protocol is a collection of function signatures:\
 \
 	protocol Document \{\
-	  func title() -> string\
+	  func title() -> String\
 	\}\
 \
-Document describes types that have a title() operation that accepts no arguments and returns a string. Note that there is implicitly a 'self' or 'this' type, which is the type that conforms to the protocol itself. This follows how most object-oriented languages describe interfaces, but deviates from Haskell type classes and C++ concepts, which require explicit type parameters for all of the types. We'll revisit this decision later.\
+Document describes types that have a title() operation that accepts no arguments and returns a String. Note that there is implicitly a 'self' or 'this' type, which is the type that conforms to the protocol itself. This follows how most object-oriented languages describe interfaces, but deviates from Haskell type classes and C++ concepts, which require explicit type parameters for all of the types. We'll revisit this decision later.\
 \
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
 
@@ -112,7 +112,7 @@ Document describes types that have a title() operation that accepts no arguments
 Composition of protocols is important to help programmers organize and understand a large number of protocols and the data types that conform to those protocols. For example, we could extend our Document protocol to cover documents that support versioning:\
 \
 	protocol VersionedDocument : Document \{\
-	  func version() -> int\
+	  func version() -> Int\
 	\}\
 \
 Multiple inheritance is permitted, allowing us to form a directed acyclic graph of protocols:\
@@ -205,7 +205,7 @@ One could write a Circle struct such as:\
 \
 	struct Circle \{\
 	  var center : Point\
-	  var radius : int\
+	  var radius : Int\
 \
 	  func draw() \{\
 	    // draw it\
@@ -268,9 +268,9 @@ When using a set of libraries, it's fairly common that one library defines a pro
 \
 In Swift, we provide support for retroactive modeling by allowing extensions, e.g.,\
 \
-	extension string : Collection \{\
+	extension String : Collection \{\
 	  typealias Element = char\
-              func forEach(callback : (value : Element) -> void) \{ /* use existing string routines to enumerate characters */ \}\
+              func forEach(callback : (value : Element) -> void) \{ /* use existing String routines to enumerate characters */ \}\
               func add(value : Element) \{ this += value /* append character */ \}\
 	\}\
 \
@@ -346,7 +346,7 @@ Naturally, such polymorphism is dynamic, and will require boxing of value types 
 	if x.isEqual(y) \{ // well-typed?\
 	\}\
 \
-Whether x.isEqual(y) is well-typed is not statically determinable, because the dynamic type of x may different from the dynamic type of y, even if they are both comparable (e.g., one is an int and the other a string). It can be implemented by the compiler as a dynamic type check, with some general failure mode (aborting, throwing an exception, etc.) if the dynamic type check fails.\
+Whether x.isEqual(y) is well-typed is not statically determinable, because the dynamic type of x may different from the dynamic type of y, even if they are both comparable (e.g., one is an Int and the other a String). It can be implemented by the compiler as a dynamic type check, with some general failure mode (aborting, throwing an exception, etc.) if the dynamic type check fails.\
 \
 To express types that meet the requirements of several protocols, one can just create a new protocol aggregating those protocols:\
 \
@@ -364,7 +364,7 @@ Here, doc has an existential type that is known to conform to both the Document 
 	typealias Any = protocol<>\
 \
 	var value : Any = 17 // an any can hold an integer\
-	value = "hello" // or a string\
+	value = "hello" // or a String\
 	value = (42, "hello", Red) // or anything else\
 \
 
@@ -403,7 +403,7 @@ Note that this insertAtBeginning function can operate on any type that meets the
 \b0 \cf0 \
 Within the type parameter list of a generic type or function (e.g., the <T : Copyable> in ListNode<T : Comparable>), the 'T' introduces a new type parameter and the (optional) ": type" names a protocol (or protocol composition) to which 'T' must conform. Within the body of the generic type or function, any of the functions or types described by the constraints are available. For example, let's implement a find() operation on lists:\
 \
-  func find<T : protocol<Copyable,Comparable>>(list : List<T>, value : T) -> int \{\
+  func find<T : protocol<Copyable,Comparable>>(list : List<T>, value : T) -> Int \{\
     var index = 0\
     var current = list.First\
     while current is Node \{ // now I'm just making stuff up\
@@ -419,14 +419,14 @@ Within the type parameter list of a generic type or function (e.g., the <T : Cop
 In addition to providing constraints on the type parameters, we also need to be able to constrain associated types. To do so, we introduce the notion of a requires clause, which follows the signature of the generic type or function. For example, let's generalize our find algorithm to work on any ordered collection:\
 \
 	protocol OrderedCollection : Collection \{\
-	  func size() -> int;\
-              func getAt(index : int) -> Element    // Element is an associated type\
+	  func size() -> Int;\
+              func getAt(index : Int) -> Element    // Element is an associated type\
 	\}\
 \
-            func find<C : OrderedCollection>(collection : C, value : C.Element)-> int \
+            func find<C : OrderedCollection>(collection : C, value : C.Element)-> Int \
 	   requires C.Element : Comparable\
 	\{\
-	  foreach index : int in range(0, collection.size()) \{ // making up syntax again\
+	  foreach index : Int in range(0, collection.size()) \{ // making up syntax again\
 	    if (collection.getAt(index) == value) \{ // okay: we know that C. Element is Comparable\
 	      return index;\
 	    \}\
@@ -436,7 +436,7 @@ In addition to providing constraints on the type parameters, we also need to be 
 \
 The requires clause is actually the more general way of expressing constraints, and the constraints expressed in the angle brackets (e.g., <C : OrderedCollection>)are just sugar for a requires clause. For example, the above find() signature is equivalent to\
 \
-            func find<C>(collection : C, value : C. Element)-> int \
+            func find<C>(collection : C, value : C. Element)-> Int \
 	   requires C : OrderedCollection, C. Element : Comparable\
 \
 Note that find<C> is shorthand for (and equivalent to) find<C : Any>, since every type conforms to the Any protocol composition.\
@@ -470,7 +470,7 @@ Note that the signature of both the first 'find' and 'insertAtBeginning' have so
 	  // \'85\
 	\}\
 \
-	func find<T :Comparable>(list : List<T>, value : T) -> int \{ // List<T> implies that T : Copyable \
+	func find<T :Comparable>(list : List<T>, value : T) -> Int \{ // List<T> implies that T : Copyable \
 	  // ...\
 	\}\
 \
@@ -481,18 +481,18 @@ Note that the signature of both the first 'find' and 'insertAtBeginning' have so
 \b0 \cf0 \
 As noted above, type arguments will be deduced from the call arguments to a generic function:\
 \
-	var values : list<int>\
-	insertAtBeginning(values, 17) // deduces T = int\
+	var values : list<Int>\
+	insertAtBeginning(values, 17) // deduces T = Int\
 \
 Since Swift already has top-down type inference (as well as the C++-like bottom-up inference), we can also deduce type arguments from the result type\
 \
 	func cast<T, U>(value : T) -> U \{ \'85 \} \
 	var x : any\
-	var y : int = cast(x) // deduces T=any, U = int\
+	var y : Int = cast(x) // deduces T=any, U = Int\
 \
 We require that all type parameters for a generic function be deducible. We introduce this restriction so that we can avoid introducing a syntax for explicitly specifying type arguments to a generic function, e.g.,\
 \
-	var y : int = cast<int>(x) // not permitted: < is the less-than operator\
+	var y : Int = cast<Int>(x) // not permitted: < is the less-than operator\
 \
 This syntax is horribly ambiguous in C++, and with good type argument deduction, should not be necessary in Swift.\
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
