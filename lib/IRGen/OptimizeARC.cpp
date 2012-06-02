@@ -21,6 +21,7 @@
 #include "llvm/IntrinsicInst.h"
 #include "llvm/Module.h"
 #include "llvm/Pass.h"
+#include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
@@ -152,6 +153,76 @@ static Constant *getRetainAndReturnThree(Function &F, Type *ObjectPtrTy,
                                         RetTy, ObjectPtrTy,
                                         Int64Ty, Int64Ty, Int64Ty, NULL);
 }
+
+//===----------------------------------------------------------------------===//
+//                            SwiftAliasAnalysis
+//===----------------------------------------------------------------------===//
+
+namespace llvm {
+void initializeSwiftAliasAnalysisPass(PassRegistry&);
+}
+
+namespace {
+  /// SwiftAliasAnalysis - This is a simple alias analysis implementation that
+  /// uses knowledge of swift constructs to answer queries.
+  ///
+  class SwiftAliasAnalysis : public ImmutablePass, public AliasAnalysis {
+  public:
+    static char ID; // Class identification, replacement for typeinfo
+    SwiftAliasAnalysis() : ImmutablePass(ID) {
+      initializeSwiftAliasAnalysisPass(*PassRegistry::getPassRegistry());
+    }
+    
+  private:
+    virtual void initializePass() {
+      InitializeAliasAnalysis(this);
+    }
+    
+    /// getAdjustedAnalysisPointer - This method is used when a pass implements
+    /// an analysis interface through multiple inheritance.  If needed, it
+    /// should override this to adjust the this pointer as needed for the
+    /// specified pass info.
+    virtual void *getAdjustedAnalysisPointer(const void *PI) {
+      if (PI == &AliasAnalysis::ID)
+        return static_cast<AliasAnalysis *>(this);
+      return this;
+    }
+    
+    void getAnalysisUsage(AnalysisUsage &AU) const {
+      AU.setPreservesAll();
+      AliasAnalysis::getAnalysisUsage(AU);
+    }
+    
+    virtual ModRefResult getModRefInfo(ImmutableCallSite CS,
+                                       const Location &Loc);
+  };
+}  // End of anonymous namespace
+
+// Register this pass...
+char SwiftAliasAnalysis::ID = 0;
+INITIALIZE_AG_PASS(SwiftAliasAnalysis, AliasAnalysis, "swift-aa",
+                   "Swift Alias Analysis", false, true, false)
+
+
+AliasAnalysis::ModRefResult
+SwiftAliasAnalysis::getModRefInfo(ImmutableCallSite CS, const Location &Loc) {
+  // We know the mod-ref behavior of various runtime functions.
+  switch (classifyInstruction(*CS.getInstruction())) {
+  case RT_AllocObject:
+  case RT_NoMemoryAccessed:
+  case RT_Retain:
+  case RT_RetainNoResult:
+  case RT_RetainAndReturnThree:
+  case RT_Release:
+    // These entrypoints don't modify any compiler-visible state.
+    return NoModRef;
+  case RT_Unknown:
+    break;
+  }
+  
+  return AliasAnalysis::getModRefInfo(CS, Loc);
+}
+
 
 //===----------------------------------------------------------------------===//
 //                          Input Function Canonicalizer
@@ -861,9 +932,15 @@ static bool optimizeArgumentReturnFunctions(Function &F) {
 //                            SwiftARCOpt Pass
 //===----------------------------------------------------------------------===//
 
+namespace llvm {
+  void initializeSwiftARCOptPass(PassRegistry&);
+}
+
+
 namespace {
   class SwiftARCOpt : public FunctionPass {
     virtual void getAnalysisUsage(AnalysisUsage &AU) const {
+      AU.addRequired<SwiftAliasAnalysis>();
       AU.setPreservesCFG();
     }
     virtual bool runOnFunction(Function &F);
@@ -871,17 +948,16 @@ namespace {
   public:
     static char ID;
     SwiftARCOpt() : FunctionPass(ID) {
-      initializeObjCARCExpandPass(*PassRegistry::getPassRegistry());
+      initializeSwiftARCOptPass(*PassRegistry::getPassRegistry());
     }
   };
 }
-namespace llvm {
-  void initializeSwiftARCOptPass(PassRegistry&);
-}
-
 char SwiftARCOpt::ID = 0;
-INITIALIZE_PASS(SwiftARCOpt,
-                "swift-arc-optimize", "Swift ARC optimization", false, false)
+INITIALIZE_PASS_BEGIN(SwiftARCOpt,
+                  "swift-arc-optimize", "Swift ARC optimization", false, false)
+INITIALIZE_PASS_DEPENDENCY(SwiftAliasAnalysis)
+INITIALIZE_PASS_END(SwiftARCOpt,
+                    "swift-arc-optimize", "Swift ARC optimization", false,false)
 
 // Optimization passes.
 llvm::FunctionPass *swift::createSwiftARCOptPass() {
