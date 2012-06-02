@@ -15,6 +15,7 @@ SWIFT_LEVEL := ..
 LIBRARYNAME := swift_runtime
 LINK_LIBS_IN_SHARED := 1
 SHARED_LIBRARY := 1
+SWIFT_SOURCES := Misc.swift
 SOURCES := FastEntryPoints.s Alloc.cpp Stubs.cpp ObjCBridge.mm swift.swift
 NO_BUILD_ARCHIVE := 1
 
@@ -40,15 +41,16 @@ SWIFT_OPTFLAG := -O3
 
 LDFLAGS += -framework Foundation
 
-SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
-$(ObjDir)/%.o: %.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER)
-	$(Echo) "Compiling $*.swift for $(BuildMode) build"
-	$(Verb) $(SWIFT_COMPILER) -c $< -o $(ObjDir)/swift.o -parse-as-library $(SWIFT_OPTFLAG)
-
 HeaderDir := $(PROJ_OBJ_ROOT)/$(BuildMode)/lib/swift/
-$(HeaderDir)/swift.swift: $(PROJ_SRC_DIR)/swift.swift $(HeaderDir)/.dir
-	$(Verb) cp $< $@
-	$(Echo) Copying $(notdir $<) to build dir
+PATH_TO_SWIFT_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(SWIFT_SOURCES))
+$(HeaderDir)/swift.swift: $(PATH_TO_SWIFT_SOURCES) $(HeaderDir)/.dir
+	$(Echo) FIXME -- HACK -- Concatenating $(SWIFT_SOURCES) to build dir
+	$(Verb) cat $(PATH_TO_SWIFT_SOURCES) > $@
+
+SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
+$(ObjDir)/swift.o: $(HeaderDir)/swift.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER)
+	$(Echo) "Compiling $(notdir $<) for $(BuildMode) build"
+	$(Verb) $(SWIFT_COMPILER) -c $< -o $@ -parse-as-library $(SWIFT_OPTFLAG)
 
 $(ObjDir)/%.o: %.s $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE)
 	$(Echo) "Compiling $*.s for $(BuildMode) build" $(PIC_FLAG)
