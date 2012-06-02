@@ -69,6 +69,7 @@ namespace swift {
 
   // Optimization passes.
   llvm::FunctionPass *createSwiftARCOptPass();
+  llvm::FunctionPass *createSwiftARCExpandPass();
 } // end namespace swift
 
 #endif

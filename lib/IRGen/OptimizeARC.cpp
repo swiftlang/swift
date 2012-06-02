@@ -656,6 +656,65 @@ static bool performGeneralOptimizations(Function &F) {
 
 
 //===----------------------------------------------------------------------===//
+//                            SwiftARCOpt Pass
+//===----------------------------------------------------------------------===//
+
+namespace llvm {
+  void initializeSwiftARCOptPass(PassRegistry&);
+}
+
+
+namespace {
+  class SwiftARCOpt : public FunctionPass {
+    virtual void getAnalysisUsage(AnalysisUsage &AU) const {
+      AU.addRequired<SwiftAliasAnalysis>();
+      AU.setPreservesCFG();
+    }
+    virtual bool runOnFunction(Function &F);
+    
+  public:
+    static char ID;
+    SwiftARCOpt() : FunctionPass(ID) {
+      initializeSwiftARCOptPass(*PassRegistry::getPassRegistry());
+    }
+  };
+}
+char SwiftARCOpt::ID = 0;
+INITIALIZE_PASS_BEGIN(SwiftARCOpt,
+                  "swift-arc-optimize", "Swift ARC optimization", false, false)
+INITIALIZE_PASS_DEPENDENCY(SwiftAliasAnalysis)
+INITIALIZE_PASS_END(SwiftARCOpt,
+                    "swift-arc-optimize", "Swift ARC optimization", false,false)
+
+// Optimization passes.
+llvm::FunctionPass *swift::createSwiftARCOptPass() {
+  return new SwiftARCOpt();
+}
+
+
+bool SwiftARCOpt::runOnFunction(Function &F) {
+  bool Changed = false;
+  
+  // First thing: canonicalize swift_retain and similar calls so that nothing
+  // uses their result.  This exposes the copy that the function does to the
+  // optimizer.
+  Changed |= canonicalizeInputFunction(F);
+  
+  // Next, do a pass with a couple of optimizations:
+  // 1) release() motion, eliminating retain/release pairs when it turns out
+  //    that a pair is not protecting anything that accesses the guarded heap
+  //    object.
+  // 2) deletion of stored-only objects - objects that are allocated and
+  //    potentially retained and released, but are only stored to and don't
+  //    escape.
+  Changed |= performGeneralOptimizations(F);
+  
+  return Changed;
+}
+
+
+
+//===----------------------------------------------------------------------===//
 //                      Return Argument Optimizer
 //===----------------------------------------------------------------------===//
 
@@ -781,13 +840,26 @@ static bool optimizeReturn3(ReturnInst *TheReturn) {
   return false;
 }
 
-/// optimizeArgumentReturnFunctions - Functions like swift_retain return an
-/// argument as a low-level performance optimization.  Manually make use of this
-/// to reduce register pressure.
+//===----------------------------------------------------------------------===//
+//                        SwiftARCExpandPass Pass
+//===----------------------------------------------------------------------===//
+
+/// performARCExpansion - This implements the very late (just before code 
+/// generation) lowering processes that we do to expose low level performance
+/// optimizations and take advantage of special features of the ABI.  These
+/// expansion steps can foil the general mid-level optimizer, so they are done
+/// very, very, late.
+///
+/// Expansions include:
+///   - Lowering retain calls to swift_retain (which return the retained
+///     argument) to lower register pressure.
+///   - Forming calls to swift_retainAndReturnThree when the last thing in a
+///     function is to retain one of its result values, and when it returns
+///     exactly three values.
 ///
 /// Coming into this function, we assume that the code is in canonical form:
 /// none of these calls have any uses of their return values.
-static bool optimizeArgumentReturnFunctions(Function &F) {
+static bool performARCExpansion(Function &F) {
   Constant *RetainCache = nullptr;
   bool Changed = false;
   
@@ -928,62 +1000,32 @@ static bool optimizeArgumentReturnFunctions(Function &F) {
   return Changed;
 }
 
-//===----------------------------------------------------------------------===//
-//                            SwiftARCOpt Pass
-//===----------------------------------------------------------------------===//
 
 namespace llvm {
-  void initializeSwiftARCOptPass(PassRegistry&);
+  void initializeSwiftARCExpandPassPass(PassRegistry&);
 }
 
-
 namespace {
-  class SwiftARCOpt : public FunctionPass {
+  class SwiftARCExpandPass : public FunctionPass {
     virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-      AU.addRequired<SwiftAliasAnalysis>();
       AU.setPreservesCFG();
     }
-    virtual bool runOnFunction(Function &F);
+    virtual bool runOnFunction(Function &F) {
+      return performARCExpansion(F);
+    }
     
   public:
     static char ID;
-    SwiftARCOpt() : FunctionPass(ID) {
-      initializeSwiftARCOptPass(*PassRegistry::getPassRegistry());
+    SwiftARCExpandPass() : FunctionPass(ID) {
+      initializeSwiftARCExpandPassPass(*PassRegistry::getPassRegistry());
     }
   };
 }
-char SwiftARCOpt::ID = 0;
-INITIALIZE_PASS_BEGIN(SwiftARCOpt,
-                  "swift-arc-optimize", "Swift ARC optimization", false, false)
-INITIALIZE_PASS_DEPENDENCY(SwiftAliasAnalysis)
-INITIALIZE_PASS_END(SwiftARCOpt,
-                    "swift-arc-optimize", "Swift ARC optimization", false,false)
 
-// Optimization passes.
-llvm::FunctionPass *swift::createSwiftARCOptPass() {
-  return new SwiftARCOpt();
-}
+char SwiftARCExpandPass::ID = 0;
+INITIALIZE_PASS(SwiftARCExpandPass,
+                "swift-arc-expand", "Swift ARC expansion", false, false)
 
-
-bool SwiftARCOpt::runOnFunction(Function &F) {
-  bool Changed = false;
-  
-  // First thing: canonicalize swift_retain and similar calls so that nothing
-  // uses their result.  This exposes the copy that the function does to the
-  // optimizer.
-  Changed |= canonicalizeInputFunction(F);
-  
-  // Next, do a pass with a couple of optimizations:
-  // 1) release() motion, eliminating retain/release pairs when it turns out
-  //    that a pair is not protecting anything that accesses the guarded heap
-  //    object.
-  // 2) deletion of stored-only objects - objects that are allocated and
-  //    potentially retained and released, but are only stored to and don't
-  //    escape.
-  Changed |= performGeneralOptimizations(F);
-  
-  // Finally, rewrite remaining heap object uses to make use of the implicit
-  // copy that swift_retain and similar functions perform.
-  Changed |= optimizeArgumentReturnFunctions(F);
-  return Changed;
+llvm::FunctionPass *swift::createSwiftARCExpandPass() {
+  return new SwiftARCExpandPass();
 }

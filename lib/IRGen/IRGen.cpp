@@ -58,6 +58,12 @@ static void addSwiftARCOptPass(const PassManagerBuilder &Builder,
     PM.add(createSwiftARCOptPass());
 }
 
+static void addSwiftExpandPass(const PassManagerBuilder &Builder,
+                               PassManagerBase &PM) {
+  if (Builder.OptLevel > 0)
+    PM.add(createSwiftARCExpandPass());
+}
+
 void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
                                 TranslationUnit *TU, unsigned StartElem) {
   assert(!TU->Ctx.hadError());
@@ -189,8 +195,12 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   if (Opts.OptLevel != 0)
     PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
 
+  // If the optimizer is enabled, we run the ARCOpt pass in the scalar optimizer
+  // and the Expand pass as late as possible.
   PMBuilder.addExtension(PassManagerBuilder::EP_ScalarOptimizerLate,
                          addSwiftARCOptPass);
+  PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                         addSwiftExpandPass);
   
   // Configure the function passes.
   FunctionPassManager FunctionPasses(Module);
