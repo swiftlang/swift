@@ -1,4 +1,4 @@
-; RUN: %swift %s -arc-optimize | %swift - -arc-expand | FileCheck %s
+; RUN: %swift %s -arc-optimize | FileCheck %s
 target datalayout = "e-p:64:64:64-S128-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f16:16:16-f32:32:32-f64:64:64-f128:128:128-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128-n8:16:32:64"
 target triple = "x86_64-apple-darwin11.3.0"
 
@@ -43,21 +43,6 @@ entry:
 ; CHECK-NEXT: ret
 
 
-; rdar://11563395 - Synthesize calls to swift_retainAndReturnThree for better codegen
-define { i8*, i64, %swift.refcounted* } @retain3_test1(i8*, i64, %swift.refcounted*) nounwind {
-entry:
-  %3 = call %swift.refcounted* @swift_retain(%swift.refcounted* %2)
-  %4 = insertvalue { i8*, i64, %swift.refcounted* } undef, i8* %0, 0
-  %5 = insertvalue { i8*, i64, %swift.refcounted* } %4, i64 %1, 1
-  %6 = insertvalue { i8*, i64, %swift.refcounted* } %5, %swift.refcounted* %3, 2
-  ret { i8*, i64, %swift.refcounted* } %6
-}
-
-; CHECK: @retain3_test1
-; CHECK: tail call {{.*}} @swift_retainAndReturnThree
-; CHECK: ret
-
-
 ; retain3_test2 - This shows a case where something else (eg inlining an already
 ; optimized function) has given us a swift_retainAndReturnThree that we need to
 ; destructure and reassemble.
@@ -79,5 +64,9 @@ entry:
 }
 
 ; CHECK: @retain3_test2
-; CHECK: tail call {{.*}} @swift_retainAndReturnThree
-; CHECK: ret
+; CHECK: call void @swift_retain_noresult(%swift.refcounted* %2)
+; CHECK-NEXT: insertvalue
+; CHECK-NEXT: insertvalue
+; CHECK-NEXT: insertvalue
+; CHECK-NEXT: ret
+
