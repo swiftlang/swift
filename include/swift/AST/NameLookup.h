@@ -143,7 +143,7 @@ public:
     /// ModuleMember - "x" refers to a value declared at module scope.
     ModuleMember,
 
-    /// LocalType - "x" refers to a value declared in a local scope.
+    /// LocalDecl - "x" refers to a value declared in a local scope.
     LocalDecl,
 
     /// MemberProperty - "x" refers to an instance property of a type which
@@ -192,6 +192,14 @@ public:
     R.Base = nullptr;
     R.Value = value;
     R.Kind = ModuleMember;
+    return R;
+  }
+
+  static UnqualifiedLookupResult getLocalDecl(ValueDecl *value) {
+    UnqualifiedLookupResult R;
+    R.Base = nullptr;
+    R.Value = value;
+    R.Kind = LocalDecl;
     return R;
   }
 
