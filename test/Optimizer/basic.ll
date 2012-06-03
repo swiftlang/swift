@@ -91,8 +91,8 @@ define void @retain_motion1(%swift.refcounted* %A) {
 
 
 
-; rdar://11583269 - 
-define void @objc_retain_release_null(%swift.refcounted* %P) {
+; rdar://11583269 - Optimize out objc_retain/release(null)
+define void @objc_retain_release_null() {
 entry:
   tail call void @objc_release(%objc_object* null) nounwind
   tail call %objc_object* @objc_retain(%objc_object* null)
@@ -103,5 +103,15 @@ entry:
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT: ret void
 
+; rdar://11583269 - Useless objc_retain/release optimization.
+define void @objc_retain_release_opt(%objc_object* %P, i32* %IP) {
+  tail call %objc_object* @objc_retain(%objc_object* %P) nounwind
+  store i32 42, i32* %IP
+  tail call void @objc_release(%objc_object* %P) nounwind
+  ret void
+}
 
+; CHECK: @objc_retain_release_opt(
+; CHECK-NEXT: store i32 42
+; CHECK-NEXT: ret void
 

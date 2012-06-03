@@ -41,6 +41,8 @@ STATISTIC(NumNoopDeleted,
           "Number of no-op swift calls eliminated");
 STATISTIC(NumRetainReleasePairs,
           "Number of swift retain/release pairs eliminated");
+STATISTIC(NumObjCRetainReleasePairs,
+          "Number of objc retain/release pairs eliminated");
 STATISTIC(NumAllocateReleasePairs,
           "Number of swift allocate/release pairs eliminated");
 STATISTIC(NumStoreOnlyObjectsEliminated,
@@ -567,6 +569,9 @@ OutOfLoop:
 /// performLocalRetainMotion - Scan forward from the specified retain, moving it
 /// later in the function if possible, over instructions that provably can't
 /// release the object.  If we get to a release of the object, zap both.
+///
+/// NOTE: this handles both objc_retain and swift_retain_noresult.
+///
 static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
   // FIXME: Call classifier should identify the object for us.  Too bad C++
   // doesn't have convenient oneof's.
@@ -574,6 +579,8 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
   
   BasicBlock::iterator BBI = &Retain, BBE = BB.getTerminator();
 
+  bool isObjCRetain = Retain.getCalledFunction()->getName() == "objc_retain";
+  
   bool MadeProgress = false;
   
   // Scan until we get to the end of the block.
@@ -593,12 +600,22 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
       // protection by retain/release.
       break;
         
+    case RT_RetainNoResult: {  // swift_retain_noresult(obj)
+      //CallInst &ThisRetain = cast<CallInst>(CurInst);
+      //Value *ThisRetainedObject = ThisRetain.getArgOperand(0);
+      
+      // If we see a retain of the same object, we can skip over it, but we
+      // can't count it as progress.  Just pushing a retain(x) past a retain(y)
+      // doesn't change the program.
+      continue;
+    }
+      
     case RT_Release: {
       // If we get to a release that is provably to this object, then we can zap
       // it and the retain.
       CallInst &ThisRelease = cast<CallInst>(CurInst);
       Value *ThisReleasedObject = ThisRelease.getArgOperand(0);
-      if (ThisReleasedObject == RetainedObject) {
+      if (!isObjCRetain && ThisReleasedObject == RetainedObject) {
         Retain.eraseFromParent();
         ThisRelease.eraseFromParent();
         ++NumRetainReleasePairs;
@@ -611,18 +628,25 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
       goto OutOfLoop;
     }
       
-    case RT_RetainNoResult: {  // swift_retain_noresult(obj)
-      //CallInst &ThisRetain = cast<CallInst>(CurInst);
-      //Value *ThisRetainedObject = ThisRetain.getArgOperand(0);
+    case RT_ObjCRelease: {
+      // If we get to an objc_release that is provably to this object, then we
+      // can zap it and the objc_retain.
+      CallInst &ThisRelease = cast<CallInst>(CurInst);
+      Value *ThisReleasedObject = ThisRelease.getArgOperand(0);
+      if (isObjCRetain && ThisReleasedObject == RetainedObject) {
+        Retain.eraseFromParent();
+        ThisRelease.eraseFromParent();
+        ++NumObjCRetainReleasePairs;
+        return true;
+      }
       
-      // If we see a retain of the same object, we can skip over it, but we
-      // can't count it as progress.  Just pushing a retain(x) past a retain(y)
-      // doesn't change the program.
-      continue;
+      // Otherwise, if this is some other pointer, we can only ignore it if we
+      // can prove that the two objects don't alias.
+      // Retain.dump(); ThisRelease.dump(); BB.getParent()->dump();
+      goto OutOfLoop;
     }
-      
+
     case RT_Unknown:
-    case RT_ObjCRelease:
     case RT_ObjCRetain:
 
       // Load, store, memcpy etc can't do a release.
@@ -792,7 +816,8 @@ static bool performGeneralOptimizations(Function &F) {
       case RT_Release:
         Changed |= performLocalReleaseMotion(cast<CallInst>(I), BB);
         break;
-      case RT_RetainNoResult: {
+      case RT_RetainNoResult:
+      case RT_ObjCRetain: {
         // Retain motion is a forward pass over the block.  Make sure we don't
         // invalidate our iterators by parking it on the instruction before I.
         BasicBlock::iterator Safe = &I;
