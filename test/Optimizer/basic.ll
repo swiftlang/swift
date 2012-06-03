@@ -4,7 +4,10 @@ target triple = "x86_64-apple-darwin11.3.0"
 
 %swift.refcounted = type { %swift.heapmetadata*, i64 }
 %swift.heapmetadata = type { i64 (%swift.refcounted*)*, i64 (%swift.refcounted*)* }
+%objc_object = type opaque
 
+declare %objc_object* @objc_retain(%objc_object*)
+declare void @objc_release(%objc_object*)
 declare %swift.refcounted* @swift_allocObject(%swift.heapmetadata* , i64, i64) nounwind
 declare void @swift_release(%swift.refcounted* nocapture)
 declare %swift.refcounted* @swift_retain(%swift.refcounted* ) nounwind
@@ -87,6 +90,18 @@ define void @retain_motion1(%swift.refcounted* %A) {
 ; CHECK-NEXT: ret void
 
 
+
+; rdar://11583269 - 
+define void @objc_retain_release_null(%swift.refcounted* %P) {
+entry:
+  tail call void @objc_release(%objc_object* null) nounwind
+  tail call %objc_object* @objc_retain(%objc_object* null)
+  ret void
+}
+
+; CHECK: @objc_retain_release_null(
+; CHECK-NEXT: entry:
+; CHECK-NEXT: ret void
 
 
 

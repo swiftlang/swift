@@ -73,6 +73,11 @@ enum RT_Kind {
   ///                                    size_t size, size_t alignment)
   RT_AllocObject,
   
+  /// void objc_release(%objc_object* %P)
+  RT_ObjCRelease,
+  /// %objc_object* objc_retain(%objc_object* %P)
+  RT_ObjCRetain,
+  
   /// This is not a runtime function that we support.  Maybe it is not a call,
   /// or is a call to something we don't care about.
   RT_Unknown,
@@ -96,6 +101,8 @@ static RT_Kind classifyInstruction(const Instruction &I) {
     .Case("swift_release", RT_Release)
     .Case("swift_allocObject", RT_AllocObject)
     .Case("swift_retainAndReturnThree", RT_RetainAndReturnThree)
+    .Case("objc_release", RT_ObjCRelease)
+    .Case("objc_retain", RT_ObjCRetain)
     .Default(RT_Unknown);
 }
 
@@ -216,7 +223,12 @@ SwiftAliasAnalysis::getModRefInfo(ImmutableCallSite CS, const Location &Loc) {
   case RT_Retain:
   case RT_RetainNoResult:
   case RT_RetainAndReturnThree:
+  case RT_ObjCRetain:
+      
+    // FIXME: release(x) *can* modify observable state, by freeing it.  This
+    // doesn't matter for any clients, but it is gross to model things this way.
   case RT_Release:
+  case RT_ObjCRelease:
     // These entrypoints don't modify any compiler-visible state.
     return NoModRef;
   case RT_Unknown:
@@ -384,6 +396,39 @@ static bool canonicalizeInputFunction(Function &F) {
       Changed = true;
       break;
     }
+        
+    case RT_ObjCRelease: {
+      CallInst &CI = cast<CallInst>(Inst);
+      Value *ArgVal = CI.getArgOperand(0);
+      // objc_release(null) is a noop, zap it. 
+      if (isa<ConstantPointerNull>(ArgVal)) {
+        CI.eraseFromParent();
+        Changed = true;
+        ++NumNoopDeleted;
+        continue;
+      }
+      break;
+    }
+        
+    case RT_ObjCRetain: {
+      // Canonicalize objc_retain so that nothing uses its result.
+      CallInst &CI = cast<CallInst>(Inst);
+      Value *ArgVal = CI.getArgOperand(0);
+      if (!CI.use_empty()) {
+        CI.replaceAllUsesWith(ArgVal);
+        Changed = true;
+      }
+ 
+      // objc_retain(null) is a noop, delete it.
+      if (isa<ConstantPointerNull>(ArgVal)) {
+        CI.eraseFromParent();
+        Changed = true;
+        ++NumNoopDeleted;
+        continue;
+      }
+      
+      break;
+    }
     }
   }
   return Changed;
@@ -426,7 +471,6 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
       // Skip over random instructions that don't touch memory.  They don't need
       // protection by retain/release.
       continue;
-        
     case RT_Release: {
       // If we get to a release, we can generally ignore it and scan past it.
       // However, if we get to a release of obviously the same object, we stop
@@ -493,6 +537,8 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
     }
 
     case RT_Unknown:
+    case RT_ObjCRelease:
+    case RT_ObjCRetain:
       // BBI->dump();
       // Otherwise, we get to something unknown/unhandled.  Bail out for now.
       ++BBI;
@@ -576,6 +622,9 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
     }
       
     case RT_Unknown:
+    case RT_ObjCRelease:
+    case RT_ObjCRetain:
+
       // Load, store, memcpy etc can't do a release.
       if (isa<LoadInst>(CurInst) || isa<StoreInst>(CurInst) ||
           isa<MemIntrinsic>(CurInst))
@@ -662,6 +711,9 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
       // If this is an unknown instruction, we have more interesting things to
       // consider.
     case RT_Unknown:
+    case RT_ObjCRelease:
+    case RT_ObjCRetain:
+
       // Otherwise, this really is some unhandled instruction.  Bail out.
       return false;
     }
@@ -1040,6 +1092,8 @@ static bool performARCExpansion(Function &F) {
       case RT_Release:
       case RT_AllocObject:
       case RT_NoMemoryAccessed:
+      case RT_ObjCRelease:
+      case RT_ObjCRetain:  // TODO: Could chain together objc_retains.
         // Remember returns in the first pass.
         if (ReturnInst *RI = dyn_cast<ReturnInst>(&Inst))
           Returns.push_back(RI);
