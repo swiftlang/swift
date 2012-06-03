@@ -417,7 +417,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
     
     switch (classifyInstruction(*BBI)) {
     case RT_Retain: // Canonicalized away, shouldn't exist.
-      case RT_RetainAndReturnThree:
+    case RT_RetainAndReturnThree:
       assert(0 && "these entrypoints should be canonicalized away");
     case RT_NoMemoryAccessed:
       // Skip over random instructions that don't touch memory.  They don't need
@@ -450,7 +450,6 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
       // we can delete both of them.  We have proven that they do not protect
       // anything of value.
       if (RetainedObject == ReleasedObject) {
-        // Note: this assumes the retain was properly canonicalized!
         Retain.eraseFromParent();
         Release.eraseFromParent();
         ++NumRetainReleasePairs;
@@ -461,7 +460,8 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
       // to be the same object.  It may still be dynamically the same object
       // though.  In this case, we can't move the release past it.
       // TODO: Strengthen analysis.
-      ++BBI;
+      //Release.dump(); ThisRelease.dump(); BB.getParent()->dump();
+     ++BBI;
       goto OutOfLoop;
     }
 
@@ -509,6 +509,95 @@ OutOfLoop:
   
   return false;
 }
+
+
+//===----------------------------------------------------------------------===//
+//                         Retain() Motion
+//===----------------------------------------------------------------------===//
+
+/// performLocalRetainMotion - Scan forward from the specified retain, moving it
+/// later in the function if possible, over instructions that provably can't
+/// release the object.  If we get to a release of the object, zap both.
+static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
+  // FIXME: Call classifier should identify the object for us.  Too bad C++
+  // doesn't have convenient oneof's.
+  Value *RetainedObject = Retain.getArgOperand(0);
+  
+  BasicBlock::iterator BBI = &Retain, BBE = BB.getTerminator();
+
+  bool MadeProgress = false;
+  
+  // Scan until we get to the end of the block.
+  for (++BBI; BBI != BBE; ++BBI) {
+    Instruction &CurInst = *BBI;
+    
+    // Classify the instruction. This switch does a "break" when the instruction
+    // can be skipped and is interesting, and a "continue" when it is a retain
+    // of the same pointer.
+    switch (classifyInstruction(CurInst)) {
+    case RT_Retain: // Canonicalized away, shouldn't exist.
+    case RT_RetainAndReturnThree:
+      assert(0 && "these entrypoints should be canonicalized away");
+    case RT_NoMemoryAccessed:
+    case RT_AllocObject:
+      // Skip over random instructions that don't touch memory.  They don't need
+      // protection by retain/release.
+      break;
+        
+    case RT_Release: {
+      // If we get to a release that is provably to this object, then we can zap
+      // it and the retain.
+      CallInst &ThisRelease = cast<CallInst>(CurInst);
+      Value *ThisReleasedObject = ThisRelease.getArgOperand(0);
+      if (ThisReleasedObject == RetainedObject) {
+        Retain.eraseFromParent();
+        ThisRelease.eraseFromParent();
+        ++NumRetainReleasePairs;
+        return true;
+      }
+      
+      // Otherwise, if this is some other pointer, we can only ignore it if we
+      // can prove that the two objects don't alias.
+      // Retain.dump(); ThisRelease.dump(); BB.getParent()->dump();
+      goto OutOfLoop;
+    }
+      
+    case RT_RetainNoResult: {  // swift_retain_noresult(obj)
+      //CallInst &ThisRetain = cast<CallInst>(CurInst);
+      //Value *ThisRetainedObject = ThisRetain.getArgOperand(0);
+      
+      // If we see a retain of the same object, we can skip over it, but we
+      // can't count it as progress.  Just pushing a retain(x) past a retain(y)
+      // doesn't change the program.
+      continue;
+    }
+      
+    case RT_Unknown:
+      // Load, store, memcpy etc can't do a release.
+      if (isa<LoadInst>(CurInst) || isa<StoreInst>(CurInst) ||
+          isa<MemIntrinsic>(CurInst))
+        break;
+        
+      // CurInst->dump(); BBI->dump();
+      // Otherwise, we get to something unknown/unhandled.  Bail out for now.
+      goto OutOfLoop;
+    }
+    
+    // If the switch did a break, we made some progress moving this retain.
+    MadeProgress = true;
+  }
+OutOfLoop:
+  
+  // If we were able to move the retain down, move it now.
+  // TODO: This is where we'd plug in some global algorithms someday.
+  if (MadeProgress) {
+    Retain.moveBefore(BBI);
+    return true;
+  }
+  
+  return false;
+}
+
 
 //===----------------------------------------------------------------------===//
 //                       Store-Only Object Elimination
@@ -642,12 +731,25 @@ static bool performGeneralOptimizations(Function &F) {
       // Do various optimizations based on the instruction we find.
       switch (classifyInstruction(I)) {
       default: break;
-      case RT_Release:
-        Changed |= performLocalReleaseMotion(cast<CallInst>(I), BB);
-        break;
       case RT_AllocObject:
         Changed |= performStoreOnlyObjectElimination(cast<CallInst>(I), BBI);
         break;
+      case RT_Release:
+        Changed |= performLocalReleaseMotion(cast<CallInst>(I), BB);
+        break;
+      case RT_RetainNoResult: {
+        // Retain motion is a forward pass over the block.  Make sure we don't
+        // invalidate our iterators by parking it on the instruction before I.
+        BasicBlock::iterator Safe = &I;
+        Safe = Safe != BB.begin() ? std::prev(Safe) : BB.end();
+        if (performLocalRetainMotion(cast<CallInst>(I), BB)) {
+          // If we zapped or moved the retain, reset the iterator on the
+          // instruction *newly* after the prev instruction.
+          BBI = Safe != BB.end() ? std::next(Safe) : BB.begin();
+          Changed = true;
+        }
+        break;
+      }
       }
     }
   }

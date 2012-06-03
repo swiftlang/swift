@@ -64,9 +64,29 @@ entry:
 }
 
 ; CHECK: @retain3_test2
-; CHECK: call void @swift_retain_noresult(%swift.refcounted* %2)
+; CHECK: insertvalue
 ; CHECK-NEXT: insertvalue
 ; CHECK-NEXT: insertvalue
-; CHECK-NEXT: insertvalue
+; CHECK-NEXT: call void @swift_retain_noresult(%swift.refcounted* %2)
 ; CHECK-NEXT: ret
+
+
+; retain_motion1 - This shows motion of a retain across operations that can't
+; release an object.  Release motion can't zap this.
+define void @retain_motion1(%swift.refcounted* %A) {
+  tail call void @swift_retain_noresult(%swift.refcounted* %A)
+  %B = bitcast %swift.refcounted* %A to i32*
+  store i32 42, i32* %B
+  tail call void @swift_release(%swift.refcounted* %A) nounwind
+  ret void
+}
+
+; CHECK: @retain_motion1(
+; CHECK-NEXT: bitcast
+; CHECK-NEXT: store i32
+; CHECK-NEXT: ret void
+
+
+
+
 
