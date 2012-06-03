@@ -28,6 +28,7 @@
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -44,6 +45,8 @@ STATISTIC(NumAllocateReleasePairs,
           "Number of swift allocate/release pairs eliminated");
 STATISTIC(NumStoreOnlyObjectsEliminated,
           "Number of swift stored-only objects eliminated");
+STATISTIC(NumReturnThreeTailCallsFormed,
+          "Number of swift_retainAndReturnThree tail calls formed");
 
 //===----------------------------------------------------------------------===//
 //                            Utility Functions
@@ -820,17 +823,6 @@ bool SwiftARCOpt::runOnFunction(Function &F) {
 //                      Return Argument Optimizer
 //===----------------------------------------------------------------------===//
 
-/// isInstructionRangeNoops - Return true if the range [I+1,E) just contains
-/// insertvalue and other noop instructions.
-static bool isInstructionRangeNoops(BasicBlock::iterator I, 
-                                    BasicBlock::iterator E) {
-  for (++I; I != E; ++I)
-    if (!isa<InsertValueInst>(*I) && !isa<ExtractValueInst>(*I) &&
-        !isa<IntToPtrInst>(*I))
-      return false;
-  return true;
-}
-
 /// optimizeReturn3 - Look to see if we can optimize "ret (a,b,c)" - where one
 /// of the three values was retained right before the return, into a
 /// swift_retainAndReturnThree call.  This is particularly common when returning
@@ -857,89 +849,112 @@ static bool optimizeReturn3(ReturnInst *TheReturn) {
       return false;
   }
   
-  Constant *Cache = 0;  // Not utilized.
+  // The ARC optimizer will push the retains to be immediately before the
+  // return, past any insertvalues.  We tolerate other non-memory instructions
+  // though, in case other optimizations have moved them around.  Collect all
+  // the retain candidates.
+  SmallMap<Value*, CallInst*, 8> RetainedPointers;
   
-  // Inevitably, we have a series of insertvalues (and sometimes casts)
-  // between the swift_retain and the return.  Check to see if any of the values
-  // returned is retained, and if so, if the instructions between the retain and
-  // the return are *just* bitcasts and inserts.
-  for (unsigned i = 0; i != 3; ++i) {
-    Instruction *InsertedElt = dyn_cast<Instruction>(RetVals[i]);
-    if (InsertedElt == 0 || InsertedElt->getParent() != TheReturn->getParent())
-      continue;
+  for (BasicBlock::iterator BBI = TheReturn,E = TheReturn->getParent()->begin();
+       BBI != E; ) {
+    Instruction &I = *--BBI;
     
-    // TODO: Skip noop ptr<->int casts if it matters.
-    
-    // See if we have a swift_retain.  Since this has to be in the same basic
-    // block, it must already have been lowered to swift_retain for it to be a
-    // candidate.
-    if (classifyInstruction(*InsertedElt) != RT_Retain ||
-        // The only use allowed is the insertelement that feeds return.
-        !InsertedElt->hasNUses(1))
-      continue;
-      
-    // Okay, we have a retain.  See if there is anything "scary" between the
-    // retain and the return.
-    if (!isInstructionRangeNoops(InsertedElt, TheReturn))
-      continue;
-    
-    CallInst &TheRetain = cast<CallInst>(*InsertedElt);
-    
-    // Okay, there isn't.  This means that we can perform the transformation.
-    // Get the argument to swift_retain (the result will be zapped when we zap
-    // the call) as the object to retain (of %swift.refcounted* type).
-    Value *RetainedObject = TheRetain.getArgOperand(0);
-    RetVals[i] = RetainedObject;
-
-    // Insert any new instructions before the return.
-    IRBuilder<> B(TheReturn);
-    Type *Int64Ty = B.getInt64Ty();
-
-    // The swift_retainAndReturnThree function takes the three arguments as i64.
-    // Cast the arguments to i64 if needed.
-    
-    // Update the element with a cast to i64 if needed.
-    for (Value *&Elt : RetVals) {
-      if (isa<PointerType>(Elt->getType()))
-        Elt = B.CreatePtrToInt(Elt, Int64Ty);
+    switch (classifyInstruction(I)) {
+    case RT_Retain: {
+      // Collect retained pointers.  If a pointer is multiply retained, it
+      // doesn't matter which one we aquire.
+      CallInst &TheRetain = cast<CallInst>(I);
+      RetainedPointers[TheRetain.getArgOperand(0)] = &TheRetain;
+      break;
     }
-    
-    // Call swift_retainAndReturnThree with our pointer to retain and the three
-    // i64's.
-    Function &F = *TheReturn->getParent()->getParent();
-    Value *LibCall = getRetainAndReturnThree(F,RetainedObject->getType(),Cache);
-    CallInst *NR = B.CreateCall4(LibCall, RetainedObject, RetVals[0],RetVals[1],
-                                 RetVals[2]);
-    NR->setTailCall(true);
-
-    // The return type of the libcall is (i64,i64,i64).  Since at least one of
-    // the pointers is a pointer (we retained it afterall!) we have to unpack
-    // the elements, bitcast at least that one, and then repack to the proper
-    // type expected by the ret instruction.
-    for (unsigned i = 0; i != 3; ++i) {
-      RetVals[i] = B.CreateExtractValue(NR, i);
-      if (RetVals[i]->getType() != RetSTy->getElementType(i))
-        RetVals[i] = B.CreateIntToPtr(RetVals[i], RetSTy->getElementType(i));
-    }
-    
-    // Repack into an aggregate that can be returned.
-    Value *RV = UndefValue::get(RetVal->getType());
-    for (unsigned i = 0; i != 3; ++i)
-      RV = B.CreateInsertValue(RV, RetVals[i], i);
-    
-    // Return the right thing and zap any instruction tree of inserts that
-    // existed just to feed the old return.
-    TheReturn->setOperand(0, RV);
-    RecursivelyDeleteTriviallyDeadInstructions(RetVal);
-
-    // Zap the retain that we're subsuming and we're done!
-    if (!TheRetain.use_empty())
-      TheRetain.replaceAllUsesWith(UndefValue::get(TheRetain.getType()));
-    TheRetain.eraseFromParent();
-    return true;
+    case RT_NoMemoryAccessed:
+      // If the instruction doesn't access memory, ignore it.
+      break;
+    default:
+      // Otherwise, break out of the for loop.
+      BBI = E;
+      break;
+    }        
   }
+
+  // If there are no retain candidates, we can't form a return3.
+  if (RetainedPointers.empty())
+    return false;
   
-  return false;
+  // Check to see if any of the values returned is retained.  If so, we can form
+  // a return3, which makes the retain a tail call.
+  CallInst *TheRetain = 0;
+  for (unsigned i = 0; i != 3; ++i) {
+    // If the return value is also retained, we found our retain.
+    TheRetain = RetainedPointers[RetVals[i]];
+    if (TheRetain) break;
+    
+    // If we're returning the result of a known retain, then we can also handle
+    // it.
+    if (CallInst *CI = dyn_cast<CallInst>(RetVals[i]))
+      if (classifyInstruction(*CI) == RT_Retain) {
+        TheRetain = RetainedPointers[CI->getArgOperand(0)];
+        if (TheRetain) break;
+      }
+  }
+
+  // If none of the three values was retained, we can't form a return3.
+  if (TheRetain == 0)
+    return false;
+  
+  // Okay, there is, which means we can perform the transformation.  Get the
+  // argument to swift_retain (the result will be zapped when we zap the call)
+  // as the object to retain (of %swift.refcounted* type).
+  Value *RetainedObject = TheRetain->getArgOperand(0);
+  
+  // Insert any new instructions before the return.
+  IRBuilder<> B(TheReturn);
+  Type *Int64Ty = B.getInt64Ty();
+
+  // The swift_retainAndReturnThree function takes the three arguments as i64.
+  // Cast the arguments to i64 if needed.
+    
+  // Update the element with a cast to i64 if needed.
+  for (Value *&Elt : RetVals) {
+    if (isa<PointerType>(Elt->getType()))
+      Elt = B.CreatePtrToInt(Elt, Int64Ty);
+  }
+    
+  // Call swift_retainAndReturnThree with our pointer to retain and the three
+  // i64's.
+  Function &F = *TheReturn->getParent()->getParent();
+  Constant *Cache = 0;  // Not utilized.
+  Value *LibCall = getRetainAndReturnThree(F,RetainedObject->getType(),Cache);
+  CallInst *NR = B.CreateCall4(LibCall, RetainedObject, RetVals[0],RetVals[1],
+                               RetVals[2]);
+  NR->setTailCall(true);
+
+  // The return type of the libcall is (i64,i64,i64).  Since at least one of
+  // the pointers is a pointer (we retained it afterall!) we have to unpack
+  // the elements, bitcast at least that one, and then repack to the proper
+  // type expected by the ret instruction.
+  for (unsigned i = 0; i != 3; ++i) {
+    RetVals[i] = B.CreateExtractValue(NR, i);
+    if (RetVals[i]->getType() != RetSTy->getElementType(i))
+      RetVals[i] = B.CreateIntToPtr(RetVals[i], RetSTy->getElementType(i));
+  }
+    
+  // Repack into an aggregate that can be returned.
+  Value *RV = UndefValue::get(RetVal->getType());
+  for (unsigned i = 0; i != 3; ++i)
+    RV = B.CreateInsertValue(RV, RetVals[i], i);
+    
+  // Return the right thing and zap any instruction tree of inserts that
+  // existed just to feed the old return.
+  TheReturn->setOperand(0, RV);
+  RecursivelyDeleteTriviallyDeadInstructions(RetVal);
+
+  // Zap the retain that we're subsuming and we're done!
+  if (!TheRetain->use_empty())
+    TheRetain->replaceAllUsesWith(RetainedObject);
+  TheRetain->eraseFromParent();
+  ++NumReturnThreeTailCallsFormed;
+  return true;
 }
 
 //===----------------------------------------------------------------------===//

@@ -42,3 +42,19 @@ entry:
 ; CHECK: @retain3_test2
 ; CHECK: tail call {{.*}} @swift_retainAndReturnThree
 ; CHECK: ret
+
+
+define { i8*, i64, %swift.refcounted* } @retain3_test3(i8*, i64, %swift.refcounted** %this.owner) nounwind {
+entry:
+  %2 = load %swift.refcounted** %this.owner, align 8
+  %3 = insertvalue { i8*, i64, %swift.refcounted* } undef, i8* %0, 0
+  %4 = insertvalue { i8*, i64, %swift.refcounted* } %3, i64 %1, 1
+  %5 = insertvalue { i8*, i64, %swift.refcounted* } %4, %swift.refcounted* %2, 2
+  call void @swift_retain_noresult(%swift.refcounted* %2)
+  ret { i8*, i64, %swift.refcounted* } %5
+}
+
+; CHECK: @retain3_test3
+; CHECK: tail call {{.*}} @swift_retainAndReturnThree
+; CHECK: ret
+
