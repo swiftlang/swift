@@ -450,9 +450,12 @@ public:
       if (AssocType->getName().str().equals("This"))
         Substitutions[Archetype] = ContainerTy;
       else {
-        Substitutions[Archetype]
-          = ProtocolCompositionType::get(TC.Context, SourceLoc(),
-                                         Archetype->getConformsTo());
+        if (Archetype->getConformsTo().size() == 1)
+          Substitutions[Archetype] = Archetype->getConformsTo().front();
+        else
+          Substitutions[Archetype]
+            = ProtocolCompositionType::get(TC.Context, SourceLoc(),
+                                           Archetype->getConformsTo());
       }
     }
     
