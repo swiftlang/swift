@@ -195,8 +195,8 @@ Type TypeDecl::getDeclaredType() const {
 
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                              SourceLoc NameLoc, Type Underlyingty,
-                             DeclContext *DC)
-  : TypeDecl(DeclKind::TypeAlias, DC, Name, MutableArrayRef<Type>(), Type()),
+                             DeclContext *DC, MutableArrayRef<Type> Inherited)
+  : TypeDecl(DeclKind::TypeAlias, DC, Name, Inherited, Type()),
     AliasTy(0), TypeAliasLoc(TypeAliasLoc), NameLoc(NameLoc),
     UnderlyingTy(Underlyingty)
 {
@@ -475,6 +475,7 @@ namespace {
       printCommon(TAD, "typealias");
       OS << " type='";
       TAD->getUnderlyingType()->print(OS);
+      printInherited(TAD->getInherited());
       OS << "')";
     }
 

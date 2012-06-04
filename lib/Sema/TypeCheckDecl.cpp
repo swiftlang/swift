@@ -176,10 +176,15 @@ public:
   }
   
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    if (IsSecondPass)
+    if (IsSecondPass) {
+      checkExplicitConformance(TAD, TAD->getDeclaredType(),
+                               TAD->getInherited());
       return;
+    }
 
     TC.validateType(TAD->getAliasType(), IsFirstPass);
+
+    checkInherited(TAD, TAD->getDeclaredType(), TAD->getInherited());
   }
 
   void visitOneOfDecl(OneOfDecl *OOD) {

@@ -430,7 +430,8 @@ class TypeAliasDecl : public TypeDecl {
   
 public:
   TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
-                SourceLoc NameLoc, Type Underlyingty, DeclContext *DC);
+                SourceLoc NameLoc, Type Underlyingty, DeclContext *DC,
+                MutableArrayRef<Type> Inherited);
 
   SourceLoc getStartLoc() const { return TypeAliasLoc; }
   SourceLoc getLoc() const { return NameLoc; }

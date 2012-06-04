@@ -725,11 +725,11 @@ token following the opening '{' is either 'set' or 'get'.</p>
 
   
   <pre class="grammar">
-    decl-typealias ::= 'typealias' <a href="#identifier">identifier</a> '=' <a href="#type">type</a>
+    decl-typealias ::= 'typealias' <a href="#identifier">identifier</a> <a href="#inheritance">inheritance</a>? '=' <a href="#type">type</a>
   </pre>
 
   <p>'typealias' makes a named alias of a type, like a typedef in C.  From that
-  point on, the alias may be used in all situations the specified name is.</p>
+  point on, the alias may be used in all situations the specified name is. If an <a href="#inheritance">inheritance</a> clause is provided, it specifies protocols to which the aliased type shall conform.</p>
   
   <p>Here are some examples of type aliases:</p>
   
@@ -944,9 +944,7 @@ token following the opening '{' is either 'set' or 'get'.</p>
   gets an implicit "this" argument of the protocol type and shall not
   be static.</p>
   
-  <p>TODO: var members and typealias members</p>
-  
-  <!-- _____________________________________________________________________ -->
+ <!-- _____________________________________________________________________ -->
   <h4 id="protocol-member-var">'var' protocol elements</h4>
   
   <pre class="grammar">

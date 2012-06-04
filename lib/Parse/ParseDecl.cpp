@@ -539,7 +539,7 @@ Decl *Parser::parseDeclExtension() {
 
 /// parseDeclTypeAlias
 ///   decl-typealias:
-///     'typealias' identifier '=' type
+///     'typealias' identifier inheritance? '=' type
 ///
 TypeAliasDecl *Parser::parseDeclTypeAlias(bool WantDefinition) {
   SourceLoc TypeAliasLoc = consumeToken(tok::kw_typealias);
@@ -549,7 +549,12 @@ TypeAliasDecl *Parser::parseDeclTypeAlias(bool WantDefinition) {
   SourceLoc IdLoc = Tok.getLoc();
   if (parseIdentifier(Id, diag::expected_identifier_in_decl, "typealias"))
     return nullptr;
-  
+
+  // Parse optional inheritance clause.
+  SmallVector<Type, 2> Inherited;
+  if (Tok.is(tok::colon))
+    parseInheritance(Inherited);
+
   if (WantDefinition || Tok.is(tok::equal)) {
     if (parseToken(tok::equal, diag::expected_equal_in_typealias) ||
         parseType(Ty, diag::expected_type_in_typealias))
@@ -562,7 +567,8 @@ TypeAliasDecl *Parser::parseDeclTypeAlias(bool WantDefinition) {
   }
 
   TypeAliasDecl *TAD =
-    new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc, Ty, CurDeclContext);
+    new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc, Ty, CurDeclContext,
+                                Context.AllocateCopy(Inherited));
   ScopeInfo.addToScope(TAD);
   return TAD;
 }
@@ -1479,7 +1485,8 @@ bool Parser::parseProtocolBody(SourceLoc ProtocolLoc,
   Members.push_back(new (Context) TypeAliasDecl(ProtocolLoc,
                                                 Context.getIdentifier("This"),
                                                 ProtocolLoc, Type(),
-                                                CurDeclContext));
+                                                CurDeclContext,
+                                                MutableArrayRef<Type>()));
   
   bool HadError = false;
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
