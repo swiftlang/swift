@@ -20,6 +20,16 @@
 #include "swift/AST/NameLookup.h"
 using namespace swift;
 
+ProtocolDecl *TypeChecker::getEnumerableProtocol() {
+  if (!EnumerableProto) {
+    UnqualifiedLookup Globals(Context.getIdentifier("Enumerable"), &TU);
+    EnumerableProto
+      = dyn_cast_or_null<ProtocolDecl>(Globals.getSingleTypeResult());
+  }
+  
+  return EnumerableProto;
+}
+
 ProtocolDecl *TypeChecker::getRangeProtocol() {
   if (!RangeProto) {
     UnqualifiedLookup Globals(Context.getIdentifier("Range"), &TU);

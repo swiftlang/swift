@@ -32,7 +32,10 @@ private:
   /// \brief The 'Any' protocol, used when reinfying existential member
   /// references.
   ProtocolDecl *AnyProto;
-  
+
+  /// \brief The 'Enumerable' protocol, used by the for-each loop.
+  ProtocolDecl *EnumerableProto;
+
   /// \brief The 'Range' protocol, used by the for-each loop.
   ProtocolDecl *RangeProto;
   
@@ -43,7 +46,7 @@ private:
 
 public:
   TypeChecker(TranslationUnit &TU)
-    : TU(TU), Context(TU.Ctx), AnyProto(0), RangeProto(0) {}
+    : TU(TU), Context(TU.Ctx), AnyProto(0), EnumerableProto(0), RangeProto(0) {}
   
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(ArgTypes... Args) {
@@ -202,6 +205,9 @@ public:
   /// candidate.
   Expr *buildFilteredOverloadSet(OverloadSetRefExpr *OSE, ValueDecl *Best);
   /// @}
+
+  /// \brief Retrieve the Enumerable protocol declaration, if it exists.
+  ProtocolDecl *getEnumerableProtocol();
 
   /// \brief Retrieve the Range protocol declaration, if it exists.
   ProtocolDecl *getRangeProtocol();

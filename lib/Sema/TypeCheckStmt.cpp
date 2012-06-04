@@ -263,6 +263,13 @@ public:
     if (TC.typeCheckExpression(Container)) return nullptr;
     S->setContainer(Container);
 
+    // Retrieve the 'Enumerable' protocol.
+    ProtocolDecl *EnumerableProto = TC.getEnumerableProtocol();
+    if (!EnumerableProto) {
+      TC.diagnose(S->getForLoc(), diag::foreach_missing_enumerable);
+      return nullptr;
+    }
+
     // Retrieve the 'Range' protocol.
     ProtocolDecl *RangeProto = TC.getRangeProtocol();
     if (!RangeProto) {
@@ -276,33 +283,51 @@ public:
       DC = TheFunc;
     else if (TopLevelCode)
       DC = TopLevelCode;
-    
-    // Invoke getElements() on the container to retrieve the range of elements.
+
+    // Verify that the container conforms to the Enumerable protocol, and
+    // invoke getElements() on it container to retrieve the range of elements.
     Type RangeTy;
     VarDecl *Range;
     {
       Type ContainerType = Container->getType();
       if (LValueType *ContainerLV = ContainerType->getAs<LValueType>())
         ContainerType = ContainerLV->getObjectType();
+
+      ProtocolConformance *Conformance
+        = TC.conformsToProtocol(ContainerType, EnumerableProto,
+                                Container->getLoc());
+      if (!Conformance)
+        return nullptr;
+
+      // Gather the witness from the Enumerable protocol conformance. This are
+      // the functions we'll call.
+      FuncDecl *getElementsFn = 0;
       
-      Expr *GetElements
-        = callNullaryMethodOf(Container,
-                              TC.Context.getIdentifier("getElements"),
-                              S->getInLoc(), diag::foreach_getelements,
-                              diag::foreach_nonfunc_getelements);
-      if (!GetElements) return nullptr;
-      
-      // Make sure our range type is materializable.
-      if (!GetElements->getType()->isMaterializable()) {
-        TC.diagnose(S->getInLoc(), diag::foreach_nonmaterializable_range,
-                    GetElements->getType(), ContainerType)
-          << Container->getSourceRange();
+      for (auto Member : EnumerableProto->getMembers()) {
+        auto Value = dyn_cast<ValueDecl>(Member);
+        if (!Value)
+          continue;
+        
+        StringRef Name = Value->getName().str();
+        if (Name.equals("Elements") && isa<TypeDecl>(Value)) {
+          ArchetypeType *Archetype
+            = cast<TypeDecl>(Value)->getDeclaredType()->getAs<ArchetypeType>();
+          RangeTy = Conformance->TypeMapping[Archetype];
+        } else if (Name.equals("getElements") && isa<FuncDecl>(Value))
+          getElementsFn = cast<FuncDecl>(Conformance->Mapping[Value]);
+      }
+
+      if (!getElementsFn || !RangeTy) {
+        TC.diagnose(EnumerableProto->getLoc(), diag::enumerable_protocol_broken);
         return nullptr;
       }
       
+      Expr *GetElements = callNullaryMethodOf(Container, getElementsFn,
+                                              S->getInLoc());
+      if (!GetElements) return nullptr;
+      
       // Create a local variable to capture the range.
       // FIXME: Mark declaration as implicit?
-      RangeTy = GetElements->getType();
       Range = new (TC.Context) VarDecl(S->getInLoc(),
                                        TC.Context.getIdentifier("__range"),
                                        RangeTy, DC);

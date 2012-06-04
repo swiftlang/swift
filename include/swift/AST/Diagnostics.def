@@ -819,14 +819,10 @@ ERROR(assignment_lhs_not_lvalue,sema_tcs,none,
       "cannot assign to the result of this expression", ())
 
 // ForEach Stmt
-ERROR(foreach_getelements,sema_tcs,none,
-      "no 'getElements' member in for-each container of type %0", (Type))
-ERROR(foreach_nonfunc_getelements,sema_tcs,none,
-      "'getElements' member of for-each container of type %0 is not a function",
-      (Type))
-ERROR(foreach_nonmaterializable_range,sema_tcs,none,
-      "non-materializable range type %0 returned by getElements() method of "
-      "type %1", (Type, Type))
+ERROR(foreach_missing_enumerable,sema_tcs,none,
+      "for-each loop requires the 'Enumerable' protocol to be defined", ())
+ERROR(enumerable_protocol_broken,sema_tcs,none,
+      "Enumerable protocol definition is broken", ())
 ERROR(foreach_missing_range,sema_tcs,none,
       "for-each loop requires the 'Range' protocol to be defined", ())
 ERROR(range_protocol_broken,sema_tcs,none,
