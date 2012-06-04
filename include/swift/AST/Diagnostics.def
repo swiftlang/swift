@@ -690,6 +690,8 @@ NOTE(ambiguous_witnesses_type,sema_tcd,none,
      "multiple matching types named %0", (Identifier))
 NOTE(protocol_witness_type,sema_tcd,none,
      "possibly intended match", ())
+NOTE(protocol_witness_nonconform_type,sema_tcd,none,
+     "possibly intended match %0 does not conform to %1", (Type, Type))
 ERROR(circular_protocol_def,sema_tcd,none,
       "circular protocol inheritance %0", (StringRef))
 NOTE(protocol_here,sema_tcd,none,

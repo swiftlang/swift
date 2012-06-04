@@ -102,15 +102,37 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     MemberLookup Lookup(T, AssociatedType->getName(), TC.TU);
     if (Lookup.isSuccess()) {
       SmallVector<TypeDecl *, 2> Viable;
-      
+      SmallVector<std::pair<TypeDecl *, ProtocolDecl *>, 2> NonViable;
+
       for (auto Candidate : Lookup.Results) {
         switch (Candidate.Kind) {
         case MemberLookupResult::MetatypeMember:
-          // FIXME: Check this type against the protocol requirements.
-          if (auto Type = dyn_cast<TypeDecl>(Candidate.D))
-            Viable.push_back(Type);
+          if (auto Type = dyn_cast<TypeDecl>(Candidate.D)) {
+            // Check this type against the protocol requirements.
+            bool SatisfiesRequirements = true;
+            for (auto Req : AssociatedType->getInherited()) {
+              SmallVector<ProtocolDecl *, 4> ReqProtos;
+              if (!Req->isExistentialType(ReqProtos))
+                return nullptr;
+
+              for (auto ReqProto : ReqProtos) {
+                if (!TC.conformsToProtocol(Type->getDeclaredType(), ReqProto)) {
+                  SatisfiesRequirements = false;
+
+                  NonViable.push_back({Type, ReqProto});
+                  break;
+                }
+              }
+
+              if (!SatisfiesRequirements)
+                break;
+            }
+
+            if (SatisfiesRequirements)
+              Viable.push_back(Type);
+          }
           break;
-          
+
         case MemberLookupResult::MemberProperty:
         case MemberLookupResult::MemberFunction:
         case MemberLookupResult::ExistentialMember:
@@ -149,6 +171,28 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
           = ErrorType::get(TC.Context);
         continue;
       }
+
+      if (!NonViable.empty()) {
+        if (!Complained) {
+          TC.diagnose(ComplainLoc, diag::type_does_not_conform,
+                      T, Proto->getDeclaredType());
+          Complained = true;
+        }
+
+        TC.diagnose(AssociatedType->getLoc(), diag::no_witnesses_type,
+                    AssociatedType->getName());
+
+        for (auto Candidate : NonViable) {
+          TC.diagnose(Candidate.first->getLoc(),
+                      diag::protocol_witness_nonconform_type,
+                      Candidate.first->getDeclaredType(),
+                      Candidate.second->getDeclaredType());
+        }
+
+        TypeMapping[AssociatedType->getUnderlyingType()->getAs<ArchetypeType>()]
+          = ErrorType::get(TC.Context);
+        continue;
+      }
     }
     
     if (ComplainLoc.isValid()) {
@@ -158,7 +202,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         Complained = true;
       }
       
-      TC.diagnose(AssociatedType->getStartLoc(), diag::no_witnesses_type,
+      TC.diagnose(AssociatedType->getLoc(), diag::no_witnesses_type,
                   AssociatedType->getName());
       for (auto Candidate : Lookup.Results) {
         if (Candidate.hasDecl())
@@ -171,6 +215,10 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       return nullptr;
     }
   }
+
+  // If we complain about any associated types, there is no point in continuing.
+  if (Complained)
+    return nullptr;
 
   // Check that T provides all of the required func/variable/subscript members.
   for (auto Member : Proto->getMembers()) {

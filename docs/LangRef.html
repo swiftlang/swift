@@ -725,7 +725,8 @@ token following the opening '{' is either 'set' or 'get'.</p>
 
   
   <pre class="grammar">
-    decl-typealias ::= 'typealias' <a href="#identifier">identifier</a> <a href="#inheritance">inheritance</a>? '=' <a href="#type">type</a>
+    decl-typealias ::= typealias-head '=' <a href="#type">type</a>
+    <a name="typealias-head"></a>typealias-head ::= 'typealias' <a href="#identifier">identifier</a> <a href="#inheritance">inheritance</a>?
   </pre>
 
   <p>'typealias' makes a named alias of a type, like a typedef in C.  From that
@@ -974,9 +975,28 @@ token following the opening '{' is either 'set' or 'get'.</p>
     end up doing this with some kind of 'const' or 'immutable'
     attribute.
  </div>
-    
-  <p>TODO: typealias members</p>
 
+   <!-- _____________________________________________________________________ -->
+  <h4 id="protocol-member-typealias">'typealias' protocol elements (associated types)</h4>
+  
+  <pre class="grammar">
+    protocol-member ::= <a href="#typealias-head">typealias-head</a>
+  </pre>
+
+  <p>'typealias' members of a protocol define associated types, which
+  are types used within the description of a protocol (typically in
+  the inputs and outputs of 'func' members) that vary from one
+  conforming type to another. When an associated type has an <a
+  href="#inheritance">inheritance</a> clause, any type meant to
+  satisfy the associated type requirement must conform to each of the
+  protocols specified within that inheritance clause.</p>
+
+  <pre class="example">
+    protocol Enumerable {
+      typename RangeType : Range
+      func getElements() -> RangeType
+    }
+</pre>
 
   <!-- ===================================================================== -->
   <h3 id="decl-subscript">subscript Declarations</h3>
