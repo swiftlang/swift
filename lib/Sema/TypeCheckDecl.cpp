@@ -248,13 +248,20 @@ public:
     // Assign archetypes each of the associated types.
     // FIXME: We need to build equivalence classes of associated types first,
     // then assign an archtype to each equivalence class.
+    // FIXME: As part of building the equivalence class, find all of the
+    // protocols that each archetype should conform to.
     for (auto Member : PD->getMembers()) {
       if (auto AssocType = dyn_cast<TypeAliasDecl>(Member)) {
+        SmallVector<Type, 4> ConformsTo;
+        ConformsTo.append(AssocType->getInherited().begin(),
+                          AssocType->getInherited().end());
+
         AssocType->setUnderlyingType(
-          ArchetypeType::getNew(AssocType->getName().str(), TC.Context));
+          ArchetypeType::getNew(TC.Context, AssocType->getName().str(),
+                                TC.Context.AllocateCopy(ConformsTo)));
       }
     }
-    
+
     // Check the members.
     for (auto Member : PD->getMembers())
       visit(Member);

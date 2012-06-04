@@ -445,15 +445,15 @@ public:
       
       ArchetypeType *Archetype
         = AssocType->getDeclaredType()->castTo<ArchetypeType>();
-      
-      // FIXME: This is all a gross hack. Actually bake protocol constraints
-      // into the archetypes, so we can ready-made existential types here.
+
+      // FIXME: Identify 'this' in a rather more sane way.
       if (AssocType->getName().str().equals("This"))
         Substitutions[Archetype] = ContainerTy;
-      else
+      else {
         Substitutions[Archetype]
           = ProtocolCompositionType::get(TC.Context, SourceLoc(),
-                                         ArrayRef<Type>());
+                                         Archetype->getConformsTo());
+      }
     }
     
     // Substitute the existential types into the member type.

@@ -27,12 +27,7 @@ public:
   TranslationUnit &TU;
   ASTContext &Context;
     
-private:
-  
-  /// \brief The 'Any' protocol, used when reinfying existential member
-  /// references.
-  ProtocolDecl *AnyProto;
-
+private:  
   /// \brief The 'Enumerable' protocol, used by the for-each loop.
   ProtocolDecl *EnumerableProto;
 
@@ -46,7 +41,7 @@ private:
 
 public:
   TypeChecker(TranslationUnit &TU)
-    : TU(TU), Context(TU.Ctx), AnyProto(0), EnumerableProto(0), RangeProto(0) {}
+    : TU(TU), Context(TU.Ctx), EnumerableProto(0), RangeProto(0) {}
   
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(ArgTypes... Args) {

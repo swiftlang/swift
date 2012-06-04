@@ -1057,13 +1057,18 @@ public:
 /// FIXME: Same-type constraints.
 class ArchetypeType : public TypeBase {
   StringRef DisplayName;
+  ArrayRef<Type> ConformsTo;
   
 public:
   /// getNew - Create a new archetype with the given name.
-  static ArchetypeType *getNew(StringRef DisplayName, ASTContext &Ctx);
+  static ArchetypeType *getNew(ASTContext &Ctx, StringRef DisplayName,
+                               ArrayRef<Type> ConformsTo);
   
   void print(raw_ostream &OS) const;
-  
+
+  /// getConformsTo - Retrieve the 
+  ArrayRef<Type> getConformsTo() const { return ConformsTo; }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ArchetypeType *) { return true; }
   static bool classof(const TypeBase *T) {
@@ -1071,9 +1076,10 @@ public:
   }
   
 private:
-  ArchetypeType(StringRef DisplayName, ASTContext &Ctx)
+  ArchetypeType(ASTContext &Ctx, StringRef DisplayName,
+                ArrayRef<Type> ConformsTo)
     : TypeBase(TypeKind::Archetype, &Ctx, /*Unresolved=*/false),
-      DisplayName(DisplayName){ }
+      DisplayName(DisplayName), ConformsTo(ConformsTo) { }
 };
 
 /// SubstArchetypeType - An archetype that has been substituted for a
