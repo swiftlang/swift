@@ -1522,7 +1522,7 @@ Decl *Parser::parseDeclProtocol() {
 ///
 ///   decl-subscript:
 ///     subscript-head get-set
-///   subscript-header
+///   subscript-head
 ///     'subscript' attribute-list pattern-tuple '->' type
 ///
 bool Parser::parseDeclSubscript(bool HasContainerType,
