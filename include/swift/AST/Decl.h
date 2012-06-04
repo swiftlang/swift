@@ -392,11 +392,19 @@ public:
 
 /// This is a common base class for declarations which declare a type.
 class TypeDecl : public ValueDecl {
+  MutableArrayRef<Type> Inherited;
+
 public:
-  TypeDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty) :
-    ValueDecl(K, DC, name, ty) {}
+  TypeDecl(DeclKind K, DeclContext *DC, Identifier name,
+           MutableArrayRef<Type> inherited, Type ty) :
+    ValueDecl(K, DC, name, ty), Inherited(inherited) {}
 
   Type getDeclaredType() const;
+
+  /// \brief Retrieve the set of protocols that this type inherits (i.e,
+  /// explicitly conforms to).
+  MutableArrayRef<Type> getInherited() { return Inherited; }
+  ArrayRef<Type> getInherited() const { return Inherited; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -467,8 +475,9 @@ public:
 /// decl is always a DeclContext.
 class NominalTypeDecl : public TypeDecl, public DeclContext {
 public:
-  NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty) :
-    TypeDecl(K, DC, name, ty),
+  NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
+                  MutableArrayRef<Type> inherited, Type ty) :
+    TypeDecl(K, DC, name, inherited, ty),
     DeclContext(DeclContextKind::NominalTypeDecl, DC) {}
 
   // Implement isa/cast/dyncast/etc.
@@ -491,7 +500,6 @@ public:
 class OneOfDecl : public NominalTypeDecl {
   SourceLoc OneOfLoc;
   SourceLoc NameLoc;
-  MutableArrayRef<Type> Inherited;
   ArrayRef<Decl*> Members;
   OneOfType *OneOfTy;
 
@@ -505,11 +513,6 @@ public:
   SourceLoc getStartLoc() const { return OneOfLoc; }
   SourceLoc getLoc() const { return NameLoc; }
 
-  /// \brief Retrieve the set of protocols that this type inherits (i.e,
-  /// explicitly conforms to).
-  MutableArrayRef<Type> getInherited() { return Inherited; }
-  ArrayRef<Type> getInherited() const { return Inherited; }
-  
   OneOfElementDecl *getElement(Identifier Name) const;
 
   OneOfType *getDeclaredType() const { return OneOfTy; }
@@ -536,7 +539,6 @@ public:
 class StructDecl : public NominalTypeDecl {
   SourceLoc StructLoc;
   SourceLoc NameLoc;
-  MutableArrayRef<Type> Inherited;
   ArrayRef<Decl*> Members;
   StructType *StructTy;
 
@@ -546,11 +548,6 @@ public:
 
   SourceLoc getStartLoc() const { return StructLoc; }
   SourceLoc getLoc() const { return NameLoc; }
-
-  /// \brief Retrieve the set of protocols that this type inherits (i.e,
-  /// explicitly conforms to).
-  MutableArrayRef<Type> getInherited() { return Inherited; }
-  ArrayRef<Type> getInherited() const { return Inherited; }
 
   ArrayRef<Decl*> getMembers() { return Members; }
   void setMembers(ArrayRef<Decl*> mems) { Members = mems; }
@@ -579,7 +576,6 @@ public:
 class ClassDecl : public NominalTypeDecl {
   SourceLoc ClassLoc;
   SourceLoc NameLoc;
-  MutableArrayRef<Type> Inherited;
   ArrayRef<Decl*> Members;
   ClassType *ClassTy;
 
@@ -589,11 +585,6 @@ public:
 
   SourceLoc getStartLoc() const { return ClassLoc; }
   SourceLoc getLoc() const { return NameLoc; }
-
-  /// \brief Retrieve the set of protocols that this type inherits (i.e,
-  /// explicitly conforms to).
-  MutableArrayRef<Type> getInherited() { return Inherited; }
-  ArrayRef<Type> getInherited() const { return Inherited; }
 
   ArrayRef<Decl*> getMembers() { return Members; }
   void setMembers(ArrayRef<Decl*> mems) { Members = mems; }
@@ -622,7 +613,6 @@ public:
 class ProtocolDecl : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
   SourceLoc NameLoc;
-  MutableArrayRef<Type> Inherited;
   SourceRange Braces;
   MutableArrayRef<Decl *> Members;
   Type ProtocolTy;
@@ -630,8 +620,8 @@ class ProtocolDecl : public NominalTypeDecl {
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
                Identifier Name, MutableArrayRef<Type> Inherited)
-    : NominalTypeDecl(DeclKind::Protocol, DC, Name, Type()),
-      ProtocolLoc(ProtocolLoc), NameLoc(NameLoc), Inherited(Inherited) { }
+    : NominalTypeDecl(DeclKind::Protocol, DC, Name, Inherited, Type()),
+      ProtocolLoc(ProtocolLoc), NameLoc(NameLoc) { }
   
   using Decl::getASTContext;
   
@@ -643,11 +633,6 @@ public:
     Braces = B;
   }
 
-  MutableArrayRef<Type> getInherited() { return Inherited; }
-  ArrayRef<Type> getInherited() const { return Inherited; }
-
-  void setInherited(MutableArrayRef<Type> I) { Inherited = I; }
-  
   /// \brief Determine whether this protocol inherits from the given ("super")
   /// protocol.
   bool inheritsFrom(const ProtocolDecl *Super) const;

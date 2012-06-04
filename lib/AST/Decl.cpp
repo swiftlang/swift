@@ -196,8 +196,10 @@ Type TypeDecl::getDeclaredType() const {
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                              SourceLoc NameLoc, Type Underlyingty,
                              DeclContext *DC)
-  : TypeDecl(DeclKind::TypeAlias, DC, Name, Type()), AliasTy(0),
-    TypeAliasLoc(TypeAliasLoc), NameLoc(NameLoc), UnderlyingTy(Underlyingty) {
+  : TypeDecl(DeclKind::TypeAlias, DC, Name, MutableArrayRef<Type>(), Type()),
+    AliasTy(0), TypeAliasLoc(TypeAliasLoc), NameLoc(NameLoc),
+    UnderlyingTy(Underlyingty)
+{
   // Set the type of the TypeAlias to the right MetaTypeType.
   // FIXME: Is this the right thing to do?
   setType(MetaTypeType::get(this));
@@ -205,8 +207,8 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
 
 OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
                      MutableArrayRef<Type> Inherited, DeclContext *Parent)
-  : NominalTypeDecl(DeclKind::OneOf, Parent, Name, Type()), 
-    OneOfLoc(OneOfLoc), NameLoc(NameLoc), Inherited(Inherited) {
+  : NominalTypeDecl(DeclKind::OneOf, Parent, Name, Inherited, Type()),
+    OneOfLoc(OneOfLoc), NameLoc(NameLoc) {
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(this));
   // Compute the associated type for this OneOfDecl.
@@ -215,8 +217,8 @@ OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
                        MutableArrayRef<Type> Inherited, DeclContext *Parent)
-  : NominalTypeDecl(DeclKind::Struct, Parent, Name, Type()), 
-    StructLoc(StructLoc), NameLoc(NameLoc), Inherited(Inherited) {
+  : NominalTypeDecl(DeclKind::Struct, Parent, Name, Inherited, Type()),
+    StructLoc(StructLoc), NameLoc(NameLoc) {
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(this));
   // Compute the associated type for this StructDecl.
@@ -225,8 +227,8 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
 
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
                      MutableArrayRef<Type> Inherited, DeclContext *Parent)
-  : NominalTypeDecl(DeclKind::Class, Parent, Name, Type()), 
-    ClassLoc(ClassLoc), NameLoc(NameLoc), Inherited(Inherited) {
+  : NominalTypeDecl(DeclKind::Class, Parent, Name, Inherited, Type()),
+    ClassLoc(ClassLoc), NameLoc(NameLoc) {
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(this));
   // Compute the associated type for this ClassDecl.
