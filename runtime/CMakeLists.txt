@@ -1,14 +1,28 @@
-set(SHARED_LIBRARY ON)
+# Concatenate all sources to form 'swift.swift' in the build
+# directory.
+set(SWIFTLIB_SOURCES
+    Bool.swift
+    FixedPoint.swift
+    FloatingPoint.swift
+    Misc.swift
+    String.swift)
+
+add_custom_command(
+  OUTPUT ${CMAKE_BINARY_DIR}/lib/swift.swift
+  COMMAND cat ${SWIFTLIB_SOURCES} > ${CMAKE_BINARY_DIR}/lib/swift.swift
+  DEPENDS ${SWIFTLIB_SOURCES}
+  COMMENT "FIXME: Concatenating Swift runtime sources into swift.swift"
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 # FIXME: We'd love to just enable the assembler support in CMake, but
 # it doesn't work with the Xcode generator. Lame!
-
+set(SHARED_LIBRARY ON)
 add_swift_library(swift_runtime
   FastEntryPoints.s
   Alloc.cpp
   Stubs.cpp
   ObjCBridge.mm
-  swift.swift)
+  ${CMAKE_BINARY_DIR}/lib/swift.swift)
 
 if(SWIFT_OPTIMIZED)
   if (CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
@@ -34,7 +48,7 @@ if(XCODE)
     COMMAND ln "-fs" "${CMAKE_BINARY_DIR}/lib/${CMAKE_CFG_INTDIR}"
             "${CMAKE_BINARY_DIR}/bin/lib"
     COMMAND mkdir "-p" "${CMAKE_BINARY_DIR}/lib/${CMAKE_CFG_INTDIR}/swift"
-    COMMAND ln "-fs" "${CMAKE_CURRENT_SOURCE_DIR}/swift.swift"
+    COMMAND ln "-fs" "${CMAKE_BINARY_DIR}/lib/swift.swift"
             "${CMAKE_BINARY_DIR}/lib/${CMAKE_CFG_INTDIR}/swift/swift.swift"
     COMMENT "Adding runtime symlinks for development builds")
 endif()
