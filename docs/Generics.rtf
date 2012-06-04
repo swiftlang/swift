@@ -377,23 +377,21 @@ Far more useful (and prevalent) is bounded parametric polymorphism, which allows
 \
 Protocols provide a natural way to express the constraints of a generic function in Swift. For example, one could define a generic linked list as:\
 \
-  struct ListNode<T : Copyable> \{\
+  struct ListNode<T> \{\
     var Value : T\
-    oneof NextNode \{ Node (: ListNode<T>), End \}\
+    oneof NextNode \{ Node : ListNode<T>, End \}\
     var Next : NextNode\
   \}\
 \
-  struct List<T : Copyable> \{\
+  struct List<T > \{\
     var First : ListNode<T>::NextNode\
   \}\
 \
-This list works on any type T, so long as that type T is Copyable (so that values can be copied into the list). One could then add a generic function that inserts at the beginning of the list:\
+This list works on any type T. One could then add a generic function that inserts at the beginning of the list:\
 \
-  func insertAtBeginning<T : Copyable>(list : List<T>, value : T) \{\
+  func insertAtBeginning<T>(list : List<T>, value : T) \{\
     list.First = ListNode<T>(value, list.First)\
   \}\
-\
-Note that this insertAtBeginning function can operate on any type that meets the Copyable requirements, including List<Copyable>, allowing us to freely mix dynamic polymorphism with bounded parametric polymorphism.\
 \
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
 
@@ -401,16 +399,15 @@ Note that this insertAtBeginning function can operate on any type that meets the
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
 
 \b0 \cf0 \
-Within the type parameter list of a generic type or function (e.g., the <T : Copyable> in ListNode<T : Comparable>), the 'T' introduces a new type parameter and the (optional) ": type" names a protocol (or protocol composition) to which 'T' must conform. Within the body of the generic type or function, any of the functions or types described by the constraints are available. For example, let's implement a find() operation on lists:\
+Within the type parameter list of a generic type or function (e.g., the <T> in ListNode<T>), the 'T' introduces a new type parameter and the (optional) ": type" names a protocol (or protocol composition) to which 'T' must conform. Within the body of the generic type or function, any of the functions or types described by the constraints are available. For example, let's implement a find() operation on lists:\
 \
-  func find<T : protocol<Copyable,Comparable>>(list : List<T>, value : T) -> Int \{\
+  func find<T : Comparable>(list : List<T>, value : T) -> Int \{\
     var index = 0\
-    var current = list.First\
-    while current is Node \{ // now I'm just making stuff up\
+    var current\
+    for (current = list.First; current is Node; current = current.Next) \{\
       if current.Value.isEqual(value) \{ // okay: T is Comparable\
         return index\
       \}\
-      current = current.Next\
       index = index + 1\
     \}\
     return -1\
@@ -426,18 +423,18 @@ In addition to providing constraints on the type parameters, we also need to be 
             func find<C : OrderedCollection>(collection : C, value : C.Element)-> Int \
 	   requires C.Element : Comparable\
 	\{\
-	  foreach index : Int in range(0, collection.size()) \{ // making up syntax again\
-	    if (collection.getAt(index) == value) \{ // okay: we know that C. Element is Comparable\
+	  for index in 0..collection.size() \{\
+	    if (collection.getAt(index) == value) \{ // okay: we know that C.Element is Comparable\
 	      return index;\
 	    \}\
 	  \}\
 	  return -1;\
 	\}\
 \
-The requires clause is actually the more general way of expressing constraints, and the constraints expressed in the angle brackets (e.g., <C : OrderedCollection>)are just sugar for a requires clause. For example, the above find() signature is equivalent to\
+The requires clause is actually the more general way of expressing constraints, and the constraints expressed in the angle brackets (e.g., <C : OrderedCollection>) are just sugar for a requires clause. For example, the above find() signature is equivalent to\
 \
-            func find<C>(collection : C, value : C. Element)-> Int \
-	   requires C : OrderedCollection, C. Element : Comparable\
+            func find<C>(collection : C, value : C.Element)-> Int \
+	   requires C : OrderedCollection, C.Element : Comparable\
 \
 Note that find<C> is shorthand for (and equivalent to) find<C : Any>, since every type conforms to the Any protocol composition.\
 \
@@ -453,7 +450,7 @@ Now, we want to express the notion of an enumerable collection, which provides a
 \
 	protocol EnumerableCollection : Collection \{\
 	  typealias RangeType : Range\
-              requires RangeType. Element == Element\
+              requires RangeType.Element == Element\
 	  func getRange() -> RangeType\
 	\}\
 \
@@ -464,15 +461,19 @@ Here, we are specifying constraints on an associated type (RangeType must confor
 \b \cf0 Constraint Inference
 \b0 \
 \
-Note that the signature of both the first 'find' and 'insertAtBeginning' have some redundancy of description: they both explicitly require that T be Copyable, but the use of the type List<T> already implies that T is Copyable. As such, we should infer any constraints that are directly implied by types that make up the signature of the function, so the signatures of these functions could be:\
+Generic types often constrain their type parameters. For example, a SortedDictionary, which provides dictionary functionality using some kind of balanced binary tree (as in C++'s std::map), would require that its key type be Comparable:\
 \
-	func insertAtBeginning<T>(list : List<T>, value : T) \{ // List<T> implies that T : Copyable\
-	  // \'85\
+	class SortedDictionary<Key : Comparable, Value> \{\
+		// ...\
 	\}\
 \
-	func find<T :Comparable>(list : List<T>, value : T) -> Int \{ // List<T> implies that T : Copyable \
-	  // ...\
-	\}\
+Naturally, one any generic operation on a SortedDictionary<T> would also require that T be Comparable, e.g.,\
+\
+	func forEachKey<Key : Comparable, Value>(c : SortedDictionary<Key, Value>, f : (Key) -> Void) \{ /* \'85 */ \}\
+\
+However, this specification of Key conforming to Comparable is redundant: one could not provide an argument for 'c' without the Key type of the SortedDictionary conforming to Comparable, because the SortedDictionary type itself could not be formed. Constraint inference infers these additional constraints within a generic function from the parameter and return types of the function, simplifying the specification of forEachKey:\
+\
+	func forEachKey<Key, Value>(c : SortedDictionary<Key, Value>, f : (Key) -> Void) \{ /* \'85 */ \}\
 \
 
 \b Type Parameter Deduction\
@@ -508,7 +509,7 @@ Because generics are constrained, a well-typed generic function or type can be t
 \
 The translation model is fairly simple. Consider the generic find() we implemented for lists, above:\
 \
-	func find<T : protocol<Copyable,Comparable>>(list : List<T>, value : T) -> Int \{\
+	func find<T : Comparable>(list : List<T>, value : T) -> Int \{\
 	  var index = 0\
 	  var current = list.First\
 	  while current is ListNode<T> \{ // now I'm just making stuff up\
@@ -521,7 +522,7 @@ The translation model is fairly simple. Consider the generic find() we implement
 	  return -1\
 	\}\
 \
-to translate this into executable code, we form a vtable for each of the constraints on the generic function. In this case, we'll have a vtable for Copyable T and Comparable T. Every operation within the body of this generic function type-checks to either an operation on some concrete type (e.g., the operations on Int), to an operation within a protocol (which requires indirection through the corresponding vtable), or to an operation on a generic type definition, all of which can easily be emitted as object code. \
+to translate this into executable code, we form a vtable for each of the constraints on the generic function. In this case, we'll have a vtable for Comparable T. Every operation within the body of this generic function type-checks to either an operation on some concrete type (e.g., the operations on Int), to an operation within a protocol (which requires indirection through the corresponding vtable), or to an operation on a generic type definition, all of which can be emitted as object code. \
 \
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
 
@@ -635,8 +636,15 @@ or\
 \
 Both Java and C# have this ambiguity. C# resolves the ambiguity by looking at the token after the closing '>' to decide which way to go; Java seems to do the same. We have a few options:\
 \
-	1) Follow C# and Java and implement the infinite lookahead needed to make this work, \
+	1) Follow C# and Java and implement the infinite lookahead needed to make this work. Note that we have true ambiguities, because one could make either of the above parse trees well-formed.  Suggestion: if a token sequence starting with identifier '<' matches the grammar for type, and the closing '>' is followed by a '(', '.', ')', or ';', then it is considered a type.\
 	2) Introduce some kind of special rule for '<' like we have for '(', such as: an identifier followed by an unspaced '<' is a type, while an identifier followed by spacing and then '<' is an expression, or\
 	3) Pick some syntax other than angle brackets, which is not ambiguous. Note that neither '(' nor '[' work, because they too have expression forms.\
+	4) Disambiguate between the two parses semantically.\
+\
+#4 means that our parse trees will be fairly useless until after (at least) name binding and, possible, semantic analysis. That's a rather unfortunate loss, given that we'd like some clients (e.g., an IDE, a code-formatting tool) to be able to operate with just the parsed representation.\
+\
+#3 means that our generics would have a significantly different usage syntax from C++, C#, and Java, which loses a valuable piece of familiarity.\
+\
+#1 seems like a better solution than #2, because cases where the ambiguity resolution in #1 is wrong should be very rare (x < y > z doesn't do what people want anyway) and can be addressed with good diagnostics. #2 might feel arbitrary or weird to programmers.\
 \
 }
