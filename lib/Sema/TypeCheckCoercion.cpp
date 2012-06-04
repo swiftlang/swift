@@ -1036,8 +1036,10 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
       Fn = TC.convertToRValue(Fn);
       E->setFn(Fn);
       
-      if (Expr *Result = TC.semaApplyExpr(E))
-        return coerced(Result);
+      if (Expr *Result = TC.semaApplyExpr(E)) {
+        if (Expr *CoercedResult = TC.coerceToType(Result, DestTy))
+          return coerced(CoercedResult);
+      }
       
       return nullptr;
     }
@@ -1398,13 +1400,16 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
     return Type(DestTy);
 
   // If we don't actually need to shuffle, skip building a shuffle.
-  bool NullShuffle = true;
-  for (int i = 0, e = NewElements.size(); i != e; i++) {
-    if (i != NewElements[i]) {
-      NullShuffle = false;
-      break;
+  bool NullShuffle = TE != 0;
+  if (NullShuffle) {
+    for (int i = 0, e = NewElements.size(); i != e; i++) {
+      if (i != NewElements[i]) {
+        NullShuffle = false;
+        break;
+      }
     }
   }
+  
   if (NullShuffle) {
     // Force the type of the expression to match the destination to make
     // the AST consistent.
