@@ -86,7 +86,16 @@ if ( XCODE )
   set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_INITIALIZER_NOT_FULLY_BRACKETED "YES")
   set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_HIDDEN_VIRTUAL_FUNCTIONS "YES")
   set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_UNINITIALIZED_AUTOS "YES")
-endif ( XCODE )
+
+  # Disable RTTI
+  set(CMAKE_XCODE_ATTRIBUTE_GCC_ENABLE_CPP_RTTI "NO")
+
+  # Disable exceptions
+  set(CMAKE_XCODE_ATTRIBUTE_GCC_ENABLE_CPP_EXCEPTIONS "NO") 
+else ()
+  # Compile without RTTI, exceptions
+  set(CMAKE_CXX_FLAGS "-fno-rtti -fno-exceptions")
+endif ()
 
 # Compile a swift file into an object file (as a library).
 #
