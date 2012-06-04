@@ -521,6 +521,7 @@ Decl *Parser::parseDeclExtension() {
                                   Context.AllocateCopy(Inherited),
                                   CurDeclContext);
   ContextChange CC(*this, ED);
+  Scope ExtensionScope(this, /*AllowLookup=*/false);
 
   SmallVector<Decl*, 8> MemberDecls;
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
@@ -764,9 +765,9 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
         Invalid = true;
         break;
       }
-      
-      Scope FnBodyScope(this);
-      
+
+      Scope FnBodyScope(this, /*AllowLookup=*/true);
+
       // Start the function.
       FuncExpr *GetFn = actOnFuncExprStart(GetLoc, FuncTy, Params);
       
@@ -886,9 +887,9 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       Invalid = true;
       break;
     }
-    
-    Scope FnBodyScope(this);
-    
+
+    Scope FnBodyScope(this, /*AllowLookup=*/true);
+
     // Start the function.
     FuncExpr *SetFn = actOnFuncExprStart(SetLoc, FuncTy, Params);
     
@@ -1144,8 +1145,8 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   // duplication.
   FuncExpr *FE = 0;
   {
-    Scope FnBodyScope(this);
-    
+    Scope FnBodyScope(this, /*AllowLookup=*/true);
+
     FE = actOnFuncExprStart(FuncLoc, FuncTy, Params);
 
     // Establish the new context.
@@ -1230,6 +1231,7 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
 
   {
     ContextChange CC(*this, OOD);
+    Scope OneofBodyScope(this, /*AllowLookup=*/false);
 
     // Parse the comma separated list of oneof elements.
     while (Tok.is(tok::identifier)) {
@@ -1295,6 +1297,7 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
   // Parse the extended body of the oneof.
   {
     ContextChange CC(*this, OOD);
+    Scope OneofBodyScope(this, /*AllowLookup=*/false);
     while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
       if (parseDecl(MemberDecls,
                     PD_HasContainerType|PD_DisallowOperators|PD_DisallowVar))
@@ -1351,6 +1354,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   SmallVector<Decl*, 8> MemberDecls;
   {
     ContextChange CC(*this, SD);
+    Scope StructBodyScope(this, /*AllowLookup=*/false);
     while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
       if (parseDecl(MemberDecls, PD_HasContainerType|PD_DisallowOperators))
         skipUntilDeclRBrace();
@@ -1411,6 +1415,7 @@ bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
   SmallVector<Decl*, 8> MemberDecls;
   {
     ContextChange CC(*this, CD);
+    Scope ClassBodyScope(this, /*AllowLookup=*/false);
     while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
       if (parseDecl(MemberDecls, PD_HasContainerType|PD_DisallowOperators))
         skipUntilDeclRBrace();
@@ -1466,6 +1471,7 @@ Decl *Parser::parseDeclProtocol() {
   Proto->setDeclaredType(ProtocolType::getNew(Proto));
   Proto->setType(MetaTypeType::get(Proto));
   ContextChange CC(*this, Proto);
+  Scope ProtocolBodyScope(this, /*AllowLookup=*/false);
 
   {
     // Parse the body.

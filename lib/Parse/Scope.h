@@ -42,6 +42,7 @@ private:
   Parser &TheParser;
   ValueScopeHTTy ValueScopeHT;
   Scope *CurScope;
+  unsigned ResolvableDepth;
 
 public:
   ScopeInfo(Parser &TheParser) : TheParser(TheParser), CurScope(0) {}
@@ -52,7 +53,7 @@ public:
     // We ignore results at the top-level because we may have overloading that
     // will be resolved properly by name binding.
     std::pair<unsigned, ValueDecl*> Res = ValueScopeHT.lookup(Name);
-    if (Res.first == 0) return 0;
+    if (Res.first < ResolvableDepth) return 0;
     return Res.second;
   }
 
@@ -74,12 +75,14 @@ class Scope {
                              ScopeInfo::ValueScopeEntry> ValueHTScope;
 
   Scope *PrevScope;
+  unsigned PrevResolvableDepth;
   unsigned Depth;
 public:
-  explicit Scope(Parser *P);
+  explicit Scope(Parser *P, bool ResolvableScope);
   ~Scope() {
     assert(SI.CurScope == this && "Scope mismatch");
     SI.CurScope = PrevScope;
+    SI.ResolvableDepth = PrevResolvableDepth;
   }
 
   unsigned getDepth() const {

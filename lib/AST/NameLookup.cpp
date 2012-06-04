@@ -406,8 +406,6 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       // Look for local variables in top-level code; normally, the parser
       // resolves these for us, but it can't do the right thing for
       // local types.
-      // FIXME: Need to suppress this for cases in name binding where we know
-      // it's a waste of time.
       FindLocalVal localVal(Loc, Name);
       localVal.checkTranslationUnit(TU);
       if (localVal.MatchingValue) {

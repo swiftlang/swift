@@ -133,7 +133,7 @@ bool Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
 void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
                                 bool IsTopLevel) {
   // This forms a lexical scope.
-  Scope BraceScope(this);
+  Scope BraceScope(this, !IsTopLevel);
     
   SmallVector<Decl*, 8> TmpDecls;
   
@@ -362,7 +362,7 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   NullablePtr<BraceStmt> Body;
   
   // Introduce a new scope to contain any var decls in the init value.
-  Scope ForScope(this);
+  Scope ForScope(this, /*AllowLookup=*/true);
   
   // Parse the first part, either a var, expr, or stmt-assign.
   if (Tok.is(tok::kw_var)) {
@@ -425,7 +425,7 @@ NullablePtr<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
   // scope.
   // FIXME: We may want to merge this scope with the scope introduced by
   // the stmt-brace, as in C++.
-  Scope ForEachScope(this);
+  Scope ForEachScope(this, /*AllowLookup=*/true);
   if (Pattern.isNonNull()) {
     SmallVector<Decl *, 2> Decls;
     DeclAttributes Attributes;

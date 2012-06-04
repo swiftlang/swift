@@ -599,7 +599,7 @@ NullablePtr<Expr> Parser::parseExprFunc() {
   }
   
   // The arguments to the func are defined in their own scope.
-  Scope FuncBodyScope(this);
+  Scope FuncBodyScope(this, /*AllowLookup=*/true);
   FuncExpr *FE = actOnFuncExprStart(FuncLoc, Ty, Params);
 
   // Establish the new context.

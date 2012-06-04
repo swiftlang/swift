@@ -24,13 +24,16 @@ using namespace swift;
 // Scope Implementation
 //===----------------------------------------------------------------------===//
 
-Scope::Scope(Parser *P) : SI(P->ScopeInfo), ValueHTScope(SI.ValueScopeHT),
-                          PrevScope(SI.CurScope) {
+Scope::Scope(Parser *P, bool ResolvableScope)
+  : SI(P->ScopeInfo), ValueHTScope(SI.ValueScopeHT), PrevScope(SI.CurScope),
+    PrevResolvableDepth(SI.ResolvableDepth) {
   if (SI.CurScope)
     Depth = SI.CurScope->Depth+1;
   else
     Depth = 0;
   SI.CurScope = this;
+  if (!ResolvableScope)
+    SI.ResolvableDepth = Depth + 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -75,11 +78,9 @@ void ScopeInfo::addToScope(ValueDecl *D) {
   if (EntryI != ValueScopeHT.end() && EntryI->first == CurScope->getDepth()) {
     ValueDecl *PrevDecl = EntryI->second;
     
-    // If this is at top-level scope, we allow overloading.  If not, we don't.
-    // FIXME: This should be tied to whether the scope corresponds to a
-    // DeclContext like a TranslationUnit or a Namespace.  Add a bit to Scope
-    // to track this?
-    if (CurScope->getDepth() != 0)
+    // If this is in a resolvable scope, diagnose redefinitions.  Later
+    // phases will handle scopes like module-scope, etc.
+    if (CurScope->getDepth() >= ResolvableDepth)
       return diagnoseRedefinition(PrevDecl, D, TheParser);
     
     // If this is at top-level scope, validate that the members of the overload
