@@ -254,8 +254,6 @@ public:
   Pattern *buildImplicitThisParameter();
   FuncDecl *parseDeclFunc(bool hasContainerType = false);
   Decl *parseDeclProtocol();
-  bool parseProtocolBody(SourceLoc ProtocolLoc, const DeclAttributes &Attrs,
-                         ProtocolDecl *Proto);
   
   bool parseDeclSubscript(bool HasContainerType,
                           bool NeedDefinition,

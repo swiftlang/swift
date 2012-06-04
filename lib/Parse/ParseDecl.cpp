@@ -1433,7 +1433,15 @@ bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
 /// doing no token skipping) on error.
 ///
 ///   decl-protocol:
-///      'protocol' attribute-list identifier inheritance? protocol-body
+///      protocol-head '{' protocol-member* '}'
+///
+///   protocol-head:
+///     'protocol' attribute-list identifier inheritance? 
+///
+///   protocol-member:
+///      decl-func
+///      decl-var-simple
+///      decl-typealias
 ///
 Decl *Parser::parseDeclProtocol() {
   SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
@@ -1458,66 +1466,55 @@ Decl *Parser::parseDeclProtocol() {
   Proto->setDeclaredType(ProtocolType::getNew(Proto));
   Proto->setType(MetaTypeType::get(Proto));
   ContextChange CC(*this, Proto);
-  if (parseProtocolBody(ProtocolLoc, Attributes, Proto))
-    return 0;
-  return Proto;
-}
 
-///   protocol-body:
-///      '{' protocol-member* '}'
-///   protocol-member:
-///      decl-func
-///      decl-var-simple
-///
-bool Parser::parseProtocolBody(SourceLoc ProtocolLoc, 
-                               const DeclAttributes &Attributes,
-                               ProtocolDecl *Proto) {
-  // Parse the body.
-  SourceLoc LBraceLoc = Tok.getLoc();
-  if (parseToken(tok::l_brace, diag::expected_lbrace_protocol_type))
-    return true;
-  
-  // Parse the list of protocol elements.
-  SmallVector<Decl*, 8> Members;
-  
-  // Add the implicit 'This' associated type.
-  // FIXME: Mark as 'implicit'.
-  Members.push_back(new (Context) TypeAliasDecl(ProtocolLoc,
-                                                Context.getIdentifier("This"),
-                                                ProtocolLoc, Type(),
-                                                CurDeclContext,
-                                                MutableArrayRef<Type>()));
-  
-  bool HadError = false;
-  while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-    if (parseDecl(Members,
-                  PD_HasContainerType|PD_DisallowProperty|PD_DisallowOperators|
-                  PD_DisallowStatic|PD_DisallowFuncDef|PD_DisallowNominalTypes|
-                  PD_DisallowInit|PD_DisallowTypeAliasDef)) {
-      skipUntilDeclRBrace();
-      HadError = true;
+  {
+    // Parse the body.
+    SourceLoc LBraceLoc = Tok.getLoc();
+    if (parseToken(tok::l_brace, diag::expected_lbrace_protocol_type))
+      return nullptr;
+    
+    // Parse the list of protocol elements.
+    SmallVector<Decl*, 8> Members;
+    
+    // Add the implicit 'This' associated type.
+    // FIXME: Mark as 'implicit'.
+    Members.push_back(new (Context) TypeAliasDecl(ProtocolLoc,
+                                                  Context.getIdentifier("This"),
+                                                  ProtocolLoc, Type(),
+                                                  CurDeclContext,
+                                                  MutableArrayRef<Type>()));
+    
+    bool HadError = false;
+    while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
+      if (parseDecl(Members,
+                    PD_HasContainerType|PD_DisallowProperty|PD_DisallowOperators|
+                    PD_DisallowStatic|PD_DisallowFuncDef|PD_DisallowNominalTypes|
+                    PD_DisallowInit|PD_DisallowTypeAliasDef)) {
+        skipUntilDeclRBrace();
+        HadError = true;
+      }
     }
+    
+    // Find the closing brace.
+    SourceLoc RBraceLoc = Tok.getLoc();
+    if (Tok.is(tok::r_brace))
+      consumeToken();
+    else if (!HadError) {
+      diagnose(Tok.getLoc(), diag::expected_rbrace_protocol);
+      diagnose(LBraceLoc, diag::opening_brace);      
+    }
+    
+    
+    // Handle attributes.
+    if (!Attributes.empty())
+      diagnose(Attributes.LSquareLoc, diag::protocol_attributes);
+    
+    // Install the protocol elements.
+    Proto->setMembers(Context.AllocateCopy(Members),
+                      SourceRange(LBraceLoc, RBraceLoc));
   }
-
-  // Find the closing brace.
-  SourceLoc RBraceLoc = Tok.getLoc();
-  if (Tok.is(tok::r_brace))
-    consumeToken();
-  else if (!HadError) {
-    diagnose(Tok.getLoc(), diag::expected_rbrace_protocol);
-    diagnose(LBraceLoc, diag::opening_brace);      
-  }
   
-  
-  // Handle attributes.
-  if (!Attributes.empty())
-    diagnose(Attributes.LSquareLoc, diag::protocol_attributes);
-
-  // Install the protocol elements.
-  Proto->setMembers(Context.AllocateCopy(Members),
-                    SourceRange(LBraceLoc, RBraceLoc));
-  
-  return false;
+  return Proto;
 }
 
 /// parseDeclSubscript - Parse a 'subscript' declaration, returning true
