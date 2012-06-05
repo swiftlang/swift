@@ -296,6 +296,7 @@ static llvm::Value *emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
   llvm::CallInst *call =
     IGF.Builder.CreateCall3(copyFn, destBuffer.getAddress(),
                             srcBuffer.getAddress(), witnessTable);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
   setHelperAttributesForAggResult(call, false);
 
   return call;
@@ -309,6 +310,7 @@ static llvm::Value *emitProjectBufferCall(IRGenFunction &IGF,
                                             ValueWitness::ProjectBuffer);
   llvm::CallInst *result =
     IGF.Builder.CreateCall2(projectFn, buffer.getAddress(), witnessTable);
+  result->setCallingConv(IGF.IGM.RuntimeCC);
   result->setDoesNotThrow();
   return result;
 }
@@ -322,6 +324,7 @@ static void emitAssignWithCopyCall(IRGenFunction &IGF,
                                          ValueWitness::AssignWithCopy);
   llvm::CallInst *call =
     IGF.Builder.CreateCall3(copyFn, destObject, srcObject, witnessTable);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotThrow();
 }
 
@@ -333,6 +336,7 @@ static void emitDestroyBufferCall(IRGenFunction &IGF,
                                      ValueWitness::DestroyBuffer);
   llvm::CallInst *call =
     IGF.Builder.CreateCall2(fn, buffer.getAddress(), witnessTable);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
   setHelperAttributes(call);
 }
 
@@ -671,6 +675,7 @@ namespace {
       auto fn = getAssignExistentialsFunction(IGF.IGM, objPtrTy);
       auto call = IGF.Builder.CreateCall2(fn, dest.getAddress(),
                                           src.getAddress());
+      call->setCallingConv(IGF.IGM.RuntimeCC);
       call->setDoesNotThrow();
     }
 
@@ -1137,7 +1142,8 @@ static llvm::Constant *asOpaquePtr(IRGenModule &IGM, llvm::Constant *in) {
 }
 
 /// Should we be defining the given helper function?
-static llvm::Function *shouldDefineHelper(llvm::Constant *fn) {
+static llvm::Function *shouldDefineHelper(IRGenModule &IGM,
+                                          llvm::Constant *fn) {
   llvm::Function *def = dyn_cast<llvm::Function>(fn);
   if (!def) return nullptr;
   if (!def->empty()) return nullptr;
@@ -1145,6 +1151,7 @@ static llvm::Function *shouldDefineHelper(llvm::Constant *fn) {
   def->setLinkage(llvm::Function::LinkOnceODRLinkage);
   def->setVisibility(llvm::Function::HiddenVisibility);
   def->setDoesNotThrow();
+  def->setCallingConv(IGM.RuntimeCC);
   return def;
 }
 
@@ -1161,7 +1168,7 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
   llvm::Constant *fn =
     IGM.Module.getOrInsertFunction("__swift_assign_existentials", fnTy);
 
-  if (llvm::Function *def = shouldDefineHelper(fn)) {
+  if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
                       ExplosionKind::Minimal, 0, def, Prologue::Bare);
     auto it = def->arg_begin();
@@ -1227,7 +1234,7 @@ static llvm::Constant *getNoOpVoidFunction(IRGenModule &IGM) {
   llvm::Constant *fn =
     IGM.Module.getOrInsertFunction("__swift_noop_void_return", fnTy);
 
-  if (llvm::Function *def = shouldDefineHelper(fn)) {
+  if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     llvm::BasicBlock *entry =
       llvm::BasicBlock::Create(IGM.getLLVMContext(), "entry", def);
     llvm::ReturnInst::Create(IGM.getLLVMContext(), entry);
@@ -1244,7 +1251,7 @@ static llvm::Constant *getReturnSelfFunction(IRGenModule &IGM) {
   llvm::Constant *fn =
     IGM.Module.getOrInsertFunction("__swift_noop_self_return", fnTy);
 
-  if (llvm::Function *def = shouldDefineHelper(fn)) {
+  if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     llvm::BasicBlock *entry =
       llvm::BasicBlock::Create(IGM.getLLVMContext(), "entry", def);
     llvm::ReturnInst::Create(IGM.getLLVMContext(),
@@ -1265,7 +1272,7 @@ static llvm::Constant *getAssignWithCopyStrongFunction(IRGenModule &IGM) {
   llvm::Constant *fn =
     IGM.Module.getOrInsertFunction("__swift_assignWithCopy_strong", fnTy);
 
-  if (llvm::Function *def = shouldDefineHelper(fn)) {
+  if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
                       ExplosionKind::Minimal, 0, def, Prologue::Bare);
     auto it = def->arg_begin();
@@ -1295,7 +1302,7 @@ static llvm::Constant *getAssignWithTakeStrongFunction(IRGenModule &IGM) {
   llvm::Constant *fn =
     IGM.Module.getOrInsertFunction("__swift_assignWithTake_strong", fnTy);
 
-  if (llvm::Function *def = shouldDefineHelper(fn)) {
+  if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
                       ExplosionKind::Minimal, 0, def, Prologue::Bare);
     auto it = def->arg_begin();
@@ -1323,7 +1330,7 @@ static llvm::Constant *getInitWithCopyStrongFunction(IRGenModule &IGM) {
   llvm::Constant *fn =
     IGM.Module.getOrInsertFunction("__swift_initWithCopy_strong", fnTy);
 
-  if (llvm::Function *def = shouldDefineHelper(fn)) {
+  if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
                       ExplosionKind::Minimal, 0, def, Prologue::Bare);
     auto it = def->arg_begin();
@@ -1348,7 +1355,7 @@ static llvm::Constant *getDestroyStrongFunction(IRGenModule &IGM) {
   llvm::Constant *fn =
     IGM.Module.getOrInsertFunction("__swift_destroy_strong", fnTy);
 
-  if (llvm::Function *def = shouldDefineHelper(fn)) {
+  if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
                       ExplosionKind::Minimal, 0, def, Prologue::Bare);
     Address arg(def->arg_begin(), IGM.getPointerAlignment());
@@ -1379,7 +1386,7 @@ static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
   }
 
   llvm::Constant *fn = IGM.Module.getOrInsertFunction(name, fnTy);
-  if (llvm::Function *def = shouldDefineHelper(fn)) {
+  if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
                       ExplosionKind::Minimal, 0, def, Prologue::Bare);
     auto it = def->arg_begin();
@@ -1412,7 +1419,7 @@ static llvm::Constant *getSizeAndAlignmentFunction(IRGenModule &IGM,
   }
 
   llvm::Constant *fn = IGM.Module.getOrInsertFunction(name, fnTy);
-  if (llvm::Function *def = shouldDefineHelper(fn)) {
+  if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, Type(), ArrayRef<Pattern*>(),
                       ExplosionKind::Minimal, 0, def, Prologue::Bare);
     auto sizeAndAlign = type.getSizeAndAlignment(IGF);

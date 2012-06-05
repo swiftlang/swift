@@ -90,6 +90,9 @@ IRGenModule::IRGenModule(ASTContext &Context,
 
   ObjCPtrTy = llvm::StructType::create(getLLVMContext(), "objc_object")
                 ->getPointerTo(0);
+
+  // TODO: use "tinycc" on platforms that support it
+  RuntimeCC = llvm::CallingConv::C;
 }
 
 IRGenModule::~IRGenModule() {
@@ -102,13 +105,21 @@ llvm::StructType *IRGenModule::getOpaqueStructTy() {
   return OpaqueStructTy;
 }
 
+static llvm::Constant *createRuntimeFunction(IRGenModule &IGM, StringRef name,
+                                             llvm::FunctionType *fnType) {
+  llvm::Constant *addr = IGM.Module.getOrInsertFunction(name, fnType);
+  if (auto fn = dyn_cast<llvm::Function>(addr))
+    fn->setCallingConv(IGM.RuntimeCC);
+  return addr;
+}
+
 llvm::Constant *IRGenModule::getAllocObjectFn() {
   if (AllocObjectFn) return AllocObjectFn;
 
   llvm::Type *types[] = { HeapMetadataPtrTy, SizeTy, SizeTy };
   llvm::FunctionType *fnType =
     llvm::FunctionType::get(RefCountedPtrTy, types, false);
-  AllocObjectFn = Module.getOrInsertFunction("swift_allocObject", fnType);
+  AllocObjectFn = createRuntimeFunction(*this, "swift_allocObject", fnType);
   return AllocObjectFn;
 }
 
@@ -118,7 +129,7 @@ llvm::Constant *IRGenModule::getRawAllocFn() {
   /// void *swift_rawAlloc(SwiftAllocIndex index);
   llvm::FunctionType *fnType =
     llvm::FunctionType::get(Int8PtrTy, SizeTy, false);
-  RawAllocFn = Module.getOrInsertFunction("swift_rawAlloc", fnType);
+  RawAllocFn = createRuntimeFunction(*this, "swift_rawAlloc", fnType);
   return RawAllocFn;
 }
 
@@ -129,7 +140,7 @@ llvm::Constant *IRGenModule::getRawDeallocFn() {
   llvm::Type *types[] = { Int8PtrTy, SizeTy };
   llvm::FunctionType *fnType =
     llvm::FunctionType::get(VoidTy, types, false);
-  RawDeallocFn = Module.getOrInsertFunction("swift_rawDealloc", fnType);
+  RawDeallocFn = createRuntimeFunction(*this, "swift_rawDealloc", fnType);
   return RawDeallocFn;
 }
 
@@ -139,7 +150,7 @@ llvm::Constant *IRGenModule::getSlowAllocFn() {
   /// void *swift_slowAlloc(size_t size, size_t flags);
   llvm::FunctionType *fnType =
     llvm::FunctionType::get(Int8PtrTy, SizeTy, false);
-  SlowAllocFn = Module.getOrInsertFunction("swift_slowAlloc", fnType);
+  SlowAllocFn = createRuntimeFunction(*this, "swift_slowAlloc", fnType);
   return SlowAllocFn;
 }
 
@@ -150,45 +161,49 @@ llvm::Constant *IRGenModule::getSlowRawDeallocFn() {
   llvm::Type *types[] = { Int8PtrTy, SizeTy };
   llvm::FunctionType *fnType =
     llvm::FunctionType::get(VoidTy, types, false);
-  SlowRawDeallocFn = Module.getOrInsertFunction("swift_slowRawDealloc", fnType);
+  SlowRawDeallocFn = createRuntimeFunction(*this, "swift_slowRawDealloc", fnType);
   return SlowRawDeallocFn;
 }
 
 llvm::Constant *IRGenModule::getRetainNoResultFn() {
   if (RetainNoResultFn) return RetainNoResultFn;
 
-  llvm::AttributeWithIndex Attrs[] = {
-    { llvm::Attribute::NoCapture, 1 },
-    { llvm::Attribute::NoUnwind, ~0U },
-  };
-  auto AttrList = llvm::AttrListPtr::get(Attrs);
-  return RetainNoResultFn =
-    Module.getOrInsertFunction("swift_retain_noresult", AttrList,
-                               VoidTy, RefCountedPtrTy, NULL);
+  // void swift_retainNoResult(void *ptr);
+  auto fnType = llvm::FunctionType::get(VoidTy, RefCountedPtrTy, false);
+  RetainNoResultFn = createRuntimeFunction(*this, "swift_retain_noresult", fnType);
+  if (auto fn = dyn_cast<llvm::Function>(RetainNoResultFn))
+    fn->setDoesNotCapture(1);
+  return RetainNoResultFn;
 }
 
 llvm::Constant *IRGenModule::getReleaseFn() {
   if (ReleaseFn) return ReleaseFn;
 
-  llvm::AttributeWithIndex AttrList[] = { 
-    { llvm::Attribute::NoCapture, 1 },
-  };
-  auto Attrs = llvm::AttrListPtr::get(AttrList);
-  ReleaseFn = Module.getOrInsertFunction("swift_release", Attrs, VoidTy, 
-                                         RefCountedPtrTy, NULL);
+  // void swift_release(void *ptr);
+  auto fnType = llvm::FunctionType::get(VoidTy, RefCountedPtrTy, false);
+  ReleaseFn = createRuntimeFunction(*this, "swift_release", fnType);
+  if (auto fn = dyn_cast<llvm::Function>(ReleaseFn))
+    fn->setDoesNotCapture(1);
   return ReleaseFn;
 }
 
 llvm::Constant *IRGenModule::getDeallocObjectFn() {
   if (DeallocObjectFn) return DeallocObjectFn;
 
+  // void swift_deallocObject(void *ptr, size_t size);
   llvm::Type *argTypes[] = { RefCountedPtrTy, SizeTy };
   llvm::FunctionType *fnType =
     llvm::FunctionType::get(VoidTy, argTypes, false);
-  DeallocObjectFn = Module.getOrInsertFunction("swift_deallocObject", fnType);
+  DeallocObjectFn = createRuntimeFunction(*this, "swift_deallocObject", fnType);
   return DeallocObjectFn;
 }
 
-void IRGenModule::unimplemented(SourceLoc Loc, StringRef Message) {
-  Context.Diags.diagnose(Loc, diag::irgen_unimplemented, Message);
+void IRGenModule::unimplemented(SourceLoc loc, StringRef message) {
+  Context.Diags.diagnose(loc, diag::irgen_unimplemented, message);
+}
+
+void IRGenModule::error(SourceLoc loc, const Twine &message) {
+  SmallVector<char, 128> buffer;
+  Context.Diags.diagnose(loc, diag::irgen_failure,
+                         message.toStringRef(buffer));
 }

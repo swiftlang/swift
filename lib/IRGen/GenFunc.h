@@ -18,6 +18,7 @@
 #ifndef SWIFT_IRGEN_GENFUNC_H
 #define SWIFT_IRGEN_GENFUNC_H
 
+#include "CallingConvention.h"
 #include "Explosion.h"
 
 namespace llvm {
@@ -32,18 +33,6 @@ namespace swift {
 namespace irgen {
   class Address;
   class TypeInfo;
-
-  /// An abstracted calling convention.
-  enum class AbstractCC : unsigned char {
-    /// The C calling convention.
-    C,
-
-    /// The calling convention used for calling a normal function.
-    Freestanding,
-
-    /// The calling convention used for calling an instance method.
-    Method
-  };
 
   /// Abstract information about how we can emit a call.
   class AbstractCallee {

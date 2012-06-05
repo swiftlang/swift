@@ -382,9 +382,9 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
   return convertedTInfo;
 }
 /// Emit a reference to a oneof element decl.
-void swift::irgen::emitOneOfElementRef(IRGenFunction &IGF,
-                                       OneOfElementDecl *elt,
-                                       Explosion &result) {
+void irgen::emitOneOfElementRef(IRGenFunction &IGF,
+                                OneOfElementDecl *elt,
+                                Explosion &result) {
   // Get the injection function.
   llvm::Function *injection = IGF.IGM.getAddrOfInjectionFunction(elt);
 

@@ -877,6 +877,7 @@ ERROR(error_codegen_init_fail,irgen,none,
 
 ERROR(irgen_unimplemented,irgen,none,
       "unimplemented IR generation feature %0", (StringRef))
+ERROR(irgen_failure,irgen,none, "IR generation failure: %0", (StringRef))
 
 #if defined(DIAG)
 #  undef DIAG

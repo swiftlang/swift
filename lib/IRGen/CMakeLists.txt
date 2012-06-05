@@ -2,6 +2,7 @@ add_swift_library(swiftIRGen
   ASTVisitor.h
   Address.h
   CMakeLists.txt
+  CallingConvention.h
   Cleanup.h
   Condition.h
   DiverseList.h

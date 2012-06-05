@@ -20,6 +20,7 @@
 
 #include "swift/AST/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/CallingConv.h"
 #include "IRGen.h"
 
 namespace llvm {
@@ -89,6 +90,7 @@ public:
   llvm::StructType *HeapMetadataStructTy; /// %swift.heapmetadata = type { ... }
   llvm::PointerType *HeapMetadataPtrTy;/// %swift.heapmetadata*
   llvm::PointerType *ObjCPtrTy;        /// %objc_object*
+  llvm::CallingConv::ID RuntimeCC;     /// lightweight calling convention
 
   Size getPointerSize() const { return PtrSize; }
   Alignment getPointerAlignment() const {
@@ -101,6 +103,7 @@ public:
   llvm::PointerType *getValueWitnessTy(ValueWitness index);
 
   void unimplemented(SourceLoc, StringRef Message);
+  void error(SourceLoc loc, const Twine &message);
 
 private:
   Size PtrSize;

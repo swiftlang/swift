@@ -25,6 +25,8 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "CallingConvention.h"
+#include "Explosion.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -226,13 +228,32 @@ LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity) {
 }
 
 /// Get or create an LLVM function with these linkage rules.
-llvm::Function *LinkInfo::getOrCreateFunction(IRGenModule &IGM,
-                                              llvm::FunctionType *fnType) {
-  llvm::Function *addr
-    = cast<llvm::Function>(IGM.Module.getOrInsertFunction(getName(), fnType));
-  addr->setLinkage(getLinkage());
-  addr->setVisibility(getVisibility());
-  return addr;
+llvm::Function *LinkInfo::createFunction(IRGenModule &IGM,
+                                         llvm::FunctionType *fnType,
+                                         llvm::CallingConv::ID cc,
+                                ArrayRef<llvm::AttributeWithIndex> attrs) {
+  llvm::GlobalValue *existing = IGM.Module.getNamedGlobal(getName());
+  if (existing) {
+    if (isa<llvm::Function>(existing) &&
+        cast<llvm::PointerType>(existing->getType())->getElementType()
+          == fnType)
+      return cast<llvm::Function>(existing);
+
+    IGM.error(SourceLoc(),
+              "program too clever: function collides with existing symbol "
+                + getName());
+
+    // Note that this will implicitly unique if the .unique name is also taken.
+    existing->setName(getName() + ".unique");
+  }
+
+  llvm::Function *fn
+    = llvm::Function::Create(fnType, getLinkage(), getName(), &IGM.Module);
+  fn->setVisibility(getVisibility());
+  fn->setCallingConv(cc);
+  if (!attrs.empty())
+    fn->setAttributes(llvm::AttrListPtr::get(attrs));
+  return fn;
 }
 
 /// Emit a global declaration.
@@ -317,6 +338,19 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var) {
   return Address(addr, align);
 }
 
+static bool hasIndirectResult(IRGenModule &IGM, Type type,
+                              ExplosionKind explosionLevel,
+                              unsigned uncurryLevel) {
+  uncurryLevel++;
+  while (uncurryLevel--) {
+    type = type->castTo<FunctionType>()->getResult();
+  }
+
+  ExplosionSchema schema(explosionLevel);
+  IGM.getSchema(type, schema);
+  return schema.requiresIndirectResult();
+}
+
 /// Fetch the declaration of the given global function.
 llvm::Function *IRGenModule::getAddrOfGlobalFunction(FuncDecl *func,
                                                      ExplosionKind kind,
@@ -330,38 +364,49 @@ llvm::Function *IRGenModule::getAddrOfGlobalFunction(FuncDecl *func,
   llvm::FunctionType *fnType =
     getFunctionType(func->getType(), kind, uncurryLevel, /*data*/ false);
 
+  AbstractCC convention = getAbstractCC(func);
+  bool indirectResult = hasIndirectResult(*this, func->getType(),
+                                          kind, uncurryLevel);
+
+  SmallVector<llvm::AttributeWithIndex, 4> attrs;
+  auto cc = expandAbstractCC(*this, convention, indirectResult, attrs);
+
   LinkInfo link = LinkInfo::get(*this, entity);
-  entry = link.getOrCreateFunction(*this, fnType);
+  entry = link.createFunction(*this, fnType, cc, attrs);
   return entry;
-}
-
-static llvm::FunctionType *getInjectionFunctionType(OneOfElementDecl *D,
-                                                    IRGenModule &IGM) {
-  // The formal type of the function is generally the type of the decl,
-  // but if that's not a function type, it's () -> that.
-  Type formalType = D->getType();
-  if (!isa<FunctionType>(formalType)) {
-    formalType = FunctionType::get(TupleType::getEmpty(IGM.Context),
-                                   formalType, IGM.Context);
-  }
-
-  // FIXME: pick the explosion kind better!
-  return IGM.getFunctionType(formalType, ExplosionKind::Minimal, /*uncurry*/ 0,
-                             /*data*/ false);
 }
 
 /// getAddrOfGlobalInjectionFunction - Get the address of the function to
 /// perform a particular injection into a oneof type.
-llvm::Function *
-IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
+llvm::Function *IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
   LinkEntity entity = LinkEntity::forFunction(D, ExplosionKind::Minimal, 0);
 
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return cast<llvm::Function>(entry);
 
-  llvm::FunctionType *fnType = getInjectionFunctionType(D, *this);
+  // The formal type of the function is generally the type of the decl,
+  // but if that's not a function type, it's () -> that.
+  Type formalType = D->getType();
+  if (!isa<FunctionType>(formalType)) {
+    formalType = FunctionType::get(TupleType::getEmpty(Context),
+                                   formalType, Context);
+  }
+
+  // TODO: emit at more optimal explosion kinds when reasonable!
+  ExplosionKind explosionLevel = ExplosionKind::Minimal;
+  unsigned uncurryLevel = 0;
+
+  bool indirectResult = hasIndirectResult(*this, formalType,
+                                          explosionLevel, uncurryLevel);
+
+  SmallVector<llvm::AttributeWithIndex, 1> attrs;
+  auto cc = expandAbstractCC(*this, AbstractCC::Freestanding,
+                             indirectResult, attrs);
+
+  llvm::FunctionType *fnType =
+    getFunctionType(formalType, explosionLevel, uncurryLevel, /*data*/ false);
   LinkInfo link = LinkInfo::get(*this, entity);
-  entry = link.getOrCreateFunction(*this, fnType);
+  entry = link.createFunction(*this, fnType, cc, attrs);
   return entry;
 }
 
@@ -380,7 +425,8 @@ llvm::Function *IRGenModule::getAddrOfValueWitness(Type concreteType,
       cast<llvm::PointerType>(getValueWitnessTy(index))
         ->getElementType());
   LinkInfo link = LinkInfo::get(*this, entity);
-  entry = link.getOrCreateFunction(*this, fnType);
+  entry = link.createFunction(*this, fnType, RuntimeCC,
+                              ArrayRef<llvm::AttributeWithIndex>());
   return entry;
 }
 
@@ -393,29 +439,22 @@ static Type addOwnerArgument(ASTContext &ctx, Type owner, Type resultType) {
   return FunctionType::get(argType, resultType, ctx);
 }
 
-static void addOwnerArgument(ASTContext &ctx, ValueDecl *value,
-                             Type &resultType, unsigned &uncurryLevel) {
+static AbstractCC addOwnerArgument(ASTContext &ctx, ValueDecl *value,
+                                   Type &resultType, unsigned &uncurryLevel) {
   DeclContext *DC = value->getDeclContext();
   switch (DC->getContextKind()) {
   case DeclContextKind::TranslationUnit:
   case DeclContextKind::BuiltinModule:
   case DeclContextKind::CapturingExpr:
   case DeclContextKind::TopLevelCodeDecl:
-    return;
+    return AbstractCC::Freestanding;
 
   case DeclContextKind::ExtensionDecl:
-    resultType =
-      addOwnerArgument(ctx, cast<ExtensionDecl>(DC)->getExtendedType(),
-                       resultType);
+  case DeclContextKind::NominalTypeDecl:
+    resultType = addOwnerArgument(ctx, DC->getDeclaredTypeOfContext(),
+                                  resultType);
     uncurryLevel++;
-    return;
-
-  case DeclContextKind::NominalTypeDecl: {
-    Type declTy = cast<NominalTypeDecl>(DC)->getDeclaredType();
-    resultType = addOwnerArgument(ctx, declTy, resultType);
-    uncurryLevel++;
-    return;
-  }
+    return AbstractCC::Method;
   }
   llvm_unreachable("bad decl context");
 }
@@ -433,7 +472,7 @@ llvm::Function *IRGenModule::getAddrOfGetter(ValueDecl *value,
   LinkEntity entity = LinkEntity::forGetter(value, explosionLevel);
 
   llvm::Function *&entry = GlobalFuncs[entity];
-  if (entry) return cast<llvm::Function>(entry);
+  if (entry) return entry;
 
   // The formal type of a getter function is one of:
   //   S -> () -> T (for a nontype member)
@@ -449,14 +488,17 @@ llvm::Function *IRGenModule::getAddrOfGetter(ValueDecl *value,
                                    formalType, Context);
     uncurryLevel++;
   }
-  addOwnerArgument(Context, value, formalType, uncurryLevel);
+  AbstractCC cc = addOwnerArgument(Context, value, formalType, uncurryLevel);
 
   llvm::FunctionType *fnType =
     getFunctionType(formalType, explosionLevel, uncurryLevel,
                     /*data*/ false);
 
+  SmallVector<llvm::AttributeWithIndex, 4> attrs;
+  auto convention = expandAbstractCC(*this, cc, false, attrs);
+
   LinkInfo link = LinkInfo::get(*this, entity);
-  entry = link.getOrCreateFunction(*this, fnType);
+  entry = link.createFunction(*this, fnType, convention, attrs);
   return entry;
 }
 
@@ -467,7 +509,7 @@ llvm::Function *IRGenModule::getAddrOfSetter(ValueDecl *value,
   LinkEntity entity = LinkEntity::forSetter(value, explosionLevel);
 
   llvm::Function *&entry = GlobalFuncs[entity];
-  if (entry) return cast<llvm::Function>(entry);
+  if (entry) return entry;
 
   // The formal type of a setter function is one of:
   //   (S, T) -> () (for a nontype member)
@@ -484,14 +526,18 @@ llvm::Function *IRGenModule::getAddrOfSetter(ValueDecl *value,
   }
   Type formalType = FunctionType::get(argType, TupleType::getEmpty(Context),
                                       Context);
-  addOwnerArgument(Context, value, formalType, uncurryLevel);
+
+  auto cc = addOwnerArgument(Context, value, formalType, uncurryLevel);
 
   llvm::FunctionType *fnType =
     getFunctionType(formalType, explosionLevel, uncurryLevel,
                     /*data*/ false);
 
+  SmallVector<llvm::AttributeWithIndex, 4> attrs;
+  auto convention = expandAbstractCC(*this, cc, false, attrs);
+
   LinkInfo link = LinkInfo::get(*this, entity);
-  entry = link.getOrCreateFunction(*this, fnType);
+  entry = link.createFunction(*this, fnType, convention, attrs);
   return entry;
 }
 

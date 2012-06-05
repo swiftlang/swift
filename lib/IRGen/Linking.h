@@ -23,10 +23,12 @@
 #include "swift/AST/Decl.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/CallingConv.h"
 #include "llvm/GlobalValue.h"
 #include "IRGen.h"
 
 namespace llvm {
+  struct AttributeWithIndex;
   class Value;
 }
 
@@ -190,8 +192,10 @@ public:
     return Visibility;
   }
 
-  llvm::Function *getOrCreateFunction(IRGenModule &IGM,
-                                      llvm::FunctionType *fnType);
+  llvm::Function *createFunction(IRGenModule &IGM,
+                                 llvm::FunctionType *fnType,
+                                 llvm::CallingConv::ID cc,
+                                 ArrayRef<llvm::AttributeWithIndex> attrs);
 };
 
 } // end namespace irgen

@@ -99,6 +99,7 @@ static llvm::Value *emitAllocatingCall(IRGenFunction &IGF,
   static auto allocAttrs = getAllocAttrs();
   llvm::CallInst *call =
     IGF.Builder.CreateCall(fn, makeArrayRef(args.begin(), args.size()));
+  call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setAttributes(allocAttrs);
   return call;
 }
@@ -144,6 +145,7 @@ llvm::Value *IRGenFunction::emitAllocObjectCall(llvm::Value *metadata,
 static void emitDeallocatingCall(IRGenFunction &IGF, llvm::Constant *fn,
                                  llvm::Value *pointer, llvm::Value *arg) {
   llvm::CallInst *call = IGF.Builder.CreateCall2(fn, pointer, arg);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotThrow();
 }
 

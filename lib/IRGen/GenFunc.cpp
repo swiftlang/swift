@@ -64,6 +64,7 @@
 #include "llvm/Support/CallSite.h"
 #include "llvm/Target/TargetData.h"
 
+#include "CallingConvention.h"
 #include "Explosion.h"
 #include "GenHeap.h"
 #include "GenInit.h"
@@ -122,6 +123,37 @@ static Type getResultType(Type type, unsigned uncurryLevel) {
 const TypeInfo &IRGenFunction::getResultTypeInfo() const {
   Type resultType = getResultType(CurFuncType, CurUncurryLevel);
   return IGM.getFragileTypeInfo(resultType);
+}
+
+static llvm::CallingConv::ID getFreestandingConvention(IRGenModule &IGM) {
+  // TODO: use a custom CC that returns three scalars efficiently
+  return llvm::CallingConv::C;
+}
+
+/// Expand the requirements of the given abstract calling convention
+/// into a "physical" calling convention and a set of attributes.
+llvm::CallingConv::ID irgen::expandAbstractCC(IRGenModule &IGM,
+                                              AbstractCC convention,
+                                              bool hasIndirectResult,
+                          SmallVectorImpl<llvm::AttributeWithIndex> &attrs) {
+  // If we have an indirect result, add the appropriate attributes.
+  if (hasIndirectResult) {
+    attrs.push_back(llvm::AttributeWithIndex::get(1,
+                                  llvm::Attribute::StructRet |
+                                  llvm::Attribute::NoAlias));
+  }
+
+  switch (convention) {
+  case AbstractCC::C:
+    return llvm::CallingConv::C;
+
+  case AbstractCC::Method:
+    //   TODO: maybe add 'inreg' to the first non-result argument.
+    // fallthrough
+  case AbstractCC::Freestanding:
+    return getFreestandingConvention(IGM);
+  }
+  llvm_unreachable("bad calling convention!");
 }
 
 namespace {
@@ -507,7 +539,7 @@ static bool isInstanceMethod(FuncDecl *fn) {
   return (!fn->isStatic() && fn->getDeclContext()->isTypeContext());
 }
 
-static AbstractCC getConventionForFunction(FuncDecl *fn) {
+AbstractCC irgen::getAbstractCC(FuncDecl *fn) {
   if (isInstanceMethod(fn))
     return AbstractCC::Method;
   return AbstractCC::Freestanding;
@@ -525,7 +557,7 @@ static AbstractCallee getAbstractDirectCallee(IRGenFunction &IGF,
   unsigned maxUncurry = getNaturalUncurryLevel(fn);
   
   bool needsData = fn->getDeclContext()->isLocalContext();
-  AbstractCC convention = getConventionForFunction(fn);
+  AbstractCC convention = getAbstractCC(fn);
 
   return AbstractCallee(convention, level, minUncurry, maxUncurry, needsData);
 }
@@ -1010,15 +1042,6 @@ Callee irgen::emitCallee(IRGenFunction &IGF, Expr *fn,
                                   callee.getUncurryLevel());
 }
 
-/// Set attributes on the given call site consistent with it returning
-/// an aggregate result.
-static void addAggResultAttributes(
-                            SmallVectorImpl<llvm::AttributeWithIndex> &attrs) {
-  attrs.push_back(llvm::AttributeWithIndex::get(1,
-                                  llvm::Attribute::StructRet |
-                                  llvm::Attribute::NoAlias));
-}
-
 /// Extract the direct scalar results of a call instruction into an
 /// explosion, registering cleanups as appropriate for the type.
 static void extractScalarResults(IRGenFunction &IGF, llvm::Value *call,
@@ -1082,24 +1105,6 @@ namespace {
 
   public:
     void emit(llvm::Value *fnPtr);    
-
-  private:
-    /// Process the formal calling convention.
-    llvm::CallingConv::ID
-    processConvention(SmallVectorImpl<llvm::AttributeWithIndex> &attrs,
-                      bool hasAggregateResult) {
-      switch (TheCallee.getConvention()) {
-      case AbstractCC::C: return llvm::CallingConv::C;
-
-      case AbstractCC::Method:
-        //   TODO: maybe add 'inreg' to the first non-result argument.
-        // fallthrough
-      case AbstractCC::Freestanding:
-        // TODO: use a custom CC that returns three scalars efficiently.
-        return llvm::CallingConv::C;
-      }
-      llvm_unreachable("bad calling convention!");
-    }
   };
 
   /// ArgCallEmitter - A helper class for emitting a single call based
@@ -1226,7 +1231,6 @@ void CallEmitter::emit(llvm::Value *fnPtr) {
     }
     Args[0] = resultAddress.getAddress();
     Result.setAsIndirectAddress(resultAddress);
-    addAggResultAttributes(attrs);
   }
 
   // Deactivate all the cleanups.
@@ -1234,7 +1238,8 @@ void CallEmitter::emit(llvm::Value *fnPtr) {
     IGF.setCleanupState(cleanup, CleanupState::Dead);
 
   // Determine the calling convention.
-  auto cc = processConvention(attrs, isAggregateResult);
+  auto cc = expandAbstractCC(IGF.IGM, TheCallee.getConvention(),
+                             isAggregateResult, attrs);
 
   // Make the call.
   llvm::CallSite call = IGF.emitInvoke(cc, fnPtr, Args,
@@ -2021,6 +2026,7 @@ namespace {
       llvm::Function *forwarder =
         llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
                                nextEntrypoint->getName() + ".curry");
+      forwarder->setCallingConv(getFreestandingConvention(IGM));
       IGM.Module.getFunctionList().insert(nextEntrypoint, forwarder);
 
       return forwarder;
@@ -2118,9 +2124,8 @@ namespace {
       llvm::SmallVector<llvm::Value*, 8> args;
       params.forward(IGF, params.size(), args);
 
-      // FIXME: calling convention!
       llvm::CallSite callSite =
-        IGF.emitInvoke(llvm::CallingConv::C, nextEntrypoint, args,
+        IGF.emitInvoke(nextEntrypoint->getCallingConv(), nextEntrypoint, args,
                        forwarder->getAttributes());
 
       llvm::CallInst *call = cast<llvm::CallInst>(callSite.getInstruction());

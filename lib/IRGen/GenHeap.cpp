@@ -487,7 +487,9 @@ void IRGenFunction::emitRetainCall(llvm::Value *value) {
     value = Builder.CreateBitCast(value, IGM.RefCountedPtrTy);
   
   // Emit the call.
-  Builder.CreateCall(IGM.getRetainNoResultFn(), value);
+  llvm::CallInst *call = Builder.CreateCall(IGM.getRetainNoResultFn(), value);
+  call->setCallingConv(IGM.RuntimeCC);
+  call->setDoesNotThrow();
 }
 
 static void emitRetainAndManage(IRGenFunction &IGF, llvm::Value *value,
@@ -546,6 +548,7 @@ static void emitReleaseCall(IRGenFunction &IGF, llvm::Value *value) {
 
   // The call itself can never throw.
   llvm::CallInst *call = IGF.Builder.CreateCall(fn, value);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotThrow();  
 }
 
