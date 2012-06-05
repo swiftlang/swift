@@ -54,7 +54,7 @@ using namespace irgen;
 /// If we align them more, we'll need to introduce padding to
 /// make protocol types work.
 static Size getFixedBufferSize(IRGenModule &IGM) {
-  return Size(16);
+  return 3 * IGM.getPointerSize();
 }
 static Alignment getFixedBufferAlignment(IRGenModule &IGM) {
   return IGM.getPointerAlignment();
