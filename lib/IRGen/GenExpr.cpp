@@ -101,6 +101,9 @@ static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E) {
       
   case DeclKind::Subscript:
     llvm_unreachable("subscript decl cannot be referenced");
+
+  case DeclKind::Constructor:
+    llvm_unreachable("constructor decl cannot be referenced");
   }
   llvm_unreachable("bad decl kind");
 }
@@ -135,6 +138,9 @@ static void emitDeclRef(IRGenFunction &IGF, DeclRefExpr *E,
 
   case DeclKind::Subscript:
     llvm_unreachable("subscript decl cannot be referenced");
+
+  case DeclKind::Constructor:
+    llvm_unreachable("constructor decl cannot be referenced");
   }
   llvm_unreachable("bad decl kind");
 }
@@ -482,6 +488,7 @@ namespace {
                                                     
     // FIXME: Not really a ValueDecl.
     NON_LOCATEABLE(SubscriptDecl);
+    NON_LOCATEABLE(ConstructorDecl);
                                                     
     // These we support.
     Optional<Address> visitVarDecl(VarDecl *D) {

@@ -259,7 +259,10 @@ public:
   bool parseDeclSubscript(bool HasContainerType,
                           bool NeedDefinition,
                           SmallVectorImpl<Decl *> &Decls);
-  
+
+  ConstructorDecl *parseDeclConstructor();
+
+
   //===--------------------------------------------------------------------===//
   // Type Parsing
   

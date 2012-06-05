@@ -244,6 +244,10 @@ ERROR(expected_lbrace_subscript,decl_parsing,none,
 ERROR(set_without_get_subscript,decl_parsing,none,
       "subscripting with a setter must also have a getter", ())
 
+// Constructor
+ERROR(expected_lbrace_constructor,decl_parsing,none,
+      "expected '{' for constructor", ())
+
 
 //------------------------------------------------------------------------------
 // Type parsing diagnostics
@@ -638,6 +642,8 @@ ERROR(oneof_element_not_materializable,sema_tcd,none,
       "type of oneof element is not materializable", ())
 ERROR(subscript_not_member,sema_tcd,none,
       "subscript declaration must be a member of a type", ())
+ERROR(constructor_not_member,sema_tcd,none,
+      "constructor declaration must be a member of a type", ())
 
 // Attributes
 ERROR(invalid_arg_count_for_operator,sema_tcd,none,

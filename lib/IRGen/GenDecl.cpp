@@ -277,6 +277,9 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
   case DeclKind::OneOfElement:
     llvm_unreachable("there are no global oneof elements");
 
+  case DeclKind::Constructor:
+    llvm_unreachable("there are no global constructor");
+
   case DeclKind::TypeAlias:
     return;
 
@@ -448,6 +451,7 @@ static AbstractCC addOwnerArgument(ASTContext &ctx, ValueDecl *value,
   case DeclContextKind::BuiltinModule:
   case DeclContextKind::CapturingExpr:
   case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::ConstructorDecl:
     return AbstractCC::Freestanding;
 
   case DeclContextKind::ExtensionDecl:
@@ -588,6 +592,9 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
       }
       continue;
     }
+    case DeclKind::Constructor: {
+      llvm_unreachable("Not yet implemented");
+    }
     }
     llvm_unreachable("bad extension member kind");
   }
@@ -601,6 +608,7 @@ void IRGenFunction::emitLocal(Decl *D) {
   case DeclKind::Protocol:
   case DeclKind::Extension:
   case DeclKind::OneOfElement:
+  case DeclKind::Constructor:
     llvm_unreachable("declaration cannot appear in local scope");
 
   case DeclKind::OneOf:

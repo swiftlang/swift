@@ -187,6 +187,10 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     }
     llvm_unreachable("unnamed closure mangling not yet implemented");
 
+  case DeclContextKind::ConstructorDecl:
+    mangleDeclName(cast<ConstructorDecl>(ctx), IncludeType::Yes);
+    return;
+
   case DeclContextKind::TopLevelCodeDecl:
     // FIXME: I'm not sure this is correct.
     return;

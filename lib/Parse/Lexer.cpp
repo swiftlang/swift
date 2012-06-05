@@ -305,6 +305,7 @@ void Lexer::lexIdentifier() {
   llvm::StringSwitch<tok>(StringRef(TokStart, CurPtr-TokStart))
     // decl and type keywords
     .Case("class", tok::kw_class)
+    .Case("constructor", tok::kw_constructor)
     .Case("extension", tok::kw_extension)
     .Case("func", tok::kw_func)
     .Case("import", tok::kw_import)

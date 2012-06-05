@@ -344,6 +344,26 @@ public:
     // See swift::performTypeChecking for TopLevelCodeDecl handling.
     llvm_unreachable("TopLevelCodeDecls are handled elsewhere");
   }
+
+  void visitConstructorDecl(ConstructorDecl *CD) {
+    if (IsSecondPass)
+      return;
+
+    // The getter and setter functions will be type-checked separately.
+    if (!CD->getDeclContext()->isTypeContext())
+      TC.diagnose(CD->getStartLoc(), diag::constructor_not_member);
+
+    Type Ty;
+    if (CD->getArguments()->hasType()) {
+      Type ThisTy = CD->getDeclContext()->getDeclaredTypeOfContext();
+      CD->setType(FunctionType::get(CD->getArguments()->getType(),
+                                    ThisTy, TC.Context));
+      CD->getImplicitThisDecl()->setType(ThisTy);
+    } else {
+      CD->setType(ErrorType::get(TC.Context));
+      CD->getImplicitThisDecl()->setType(ErrorType::get(TC.Context));
+    }
+  }
 };
 }; // end anonymous namespace.
 

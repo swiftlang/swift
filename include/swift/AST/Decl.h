@@ -893,6 +893,45 @@ public:
   static bool classof(const SubscriptDecl *D) { return true; }
 };
 
+class ConstructorDecl : public ValueDecl, public DeclContext {
+  SourceLoc ConstructorLoc;
+  Pattern *Arguments;
+  BraceStmt *Body;
+  VarDecl *ImplicitThisDecl;
+  
+public:
+  ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
+                  Pattern *Arguments, VarDecl *ImplicitThisDecl,
+                  DeclContext *Parent)
+    : ValueDecl(DeclKind::Constructor, Parent, NameHack, Type()),
+      DeclContext(DeclContextKind::ConstructorDecl, Parent),
+      ConstructorLoc(ConstructorLoc), Arguments(Arguments), Body(nullptr),
+      ImplicitThisDecl(ImplicitThisDecl) {}
+  
+  SourceLoc getStartLoc() const { return ConstructorLoc; }
+  SourceLoc getLoc() const;
+
+  Pattern *getArguments() { return Arguments; }
+
+  BraceStmt *getBody() const { return Body; }
+  void setBody(BraceStmt *b) { Body = b; }
+
+  /// getThisType - compute and return the type to be used for 'this'.
+  Type getThisType() const { return ImplicitThisDecl->getType(); }
+  
+  /// getImplicitThisDecl - This method returns the implicit 'this' decl.
+  VarDecl *getImplicitThisDecl() const { return ImplicitThisDecl; }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::Constructor;
+  }
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::ConstructorDecl;
+  }
+  static bool classof(const ConstructorDecl *D) { return true; }
+};
+
+
 } // end namespace swift
 
 #endif

@@ -62,6 +62,7 @@ ABSTRACT_DECL(Value, Decl)
   VALUE_DECL(Func, ValueDecl)
   VALUE_DECL(OneOfElement, ValueDecl)
   VALUE_DECL(Subscript, ValueDecl)
+  VALUE_DECL(Constructor, ValueDecl)
   DECL_RANGE(Value, TypeAlias, Subscript)
 
 #undef VALUE_DECL

@@ -37,6 +37,7 @@ Type DeclContext::getDeclaredTypeOfContext() const {
   case DeclContextKind::CapturingExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::TranslationUnit:
+  case DeclContextKind::ConstructorDecl:
     return Type();
     
   case DeclContextKind::ExtensionDecl:
@@ -146,6 +147,7 @@ bool ValueDecl::isDefinition() const {
   case DeclKind::PatternBinding:
   case DeclKind::Subscript:
   case DeclKind::TopLevelCode:
+  case DeclKind::Constructor:
     llvm_unreachable("non-value decls shouldn't get here");
       
   case DeclKind::Func:
@@ -320,6 +322,7 @@ Type FuncDecl::getExtensionType() const {
   case DeclContextKind::BuiltinModule:
   case DeclContextKind::CapturingExpr:
   case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::ConstructorDecl:
     return Type();
 
   case DeclContextKind::NominalTypeDecl:
@@ -373,6 +376,10 @@ VarDecl *FuncDecl::getImplicitThisDecl() {
 
 SourceLoc SubscriptDecl::getLoc() const {
   return Indices->getStartLoc();
+}
+
+SourceLoc ConstructorDecl::getLoc() const {
+  return Arguments->getStartLoc();
 }
 
 //===----------------------------------------------------------------------===//
@@ -602,6 +609,13 @@ namespace {
         OS << "set = ";
         printRec(Set);
       }
+      OS << ')';
+    }
+
+    void visitConstructorDecl(ConstructorDecl *CD) {
+      printCommon(CD, "constructor_decl");
+      OS << '\n';
+      printRec(CD->getBody());
       OS << ')';
     }
 

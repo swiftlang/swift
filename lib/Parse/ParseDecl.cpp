@@ -366,6 +366,9 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   case tok::kw_class:
     HadParseError = parseDeclClass(Entries);
     break;
+  case tok::kw_constructor:
+    Entries.push_back(parseDeclConstructor());
+    break;
   case tok::kw_protocol:
     Entries.push_back(parseDeclProtocol());
     break;
@@ -1648,5 +1651,85 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   return Invalid;
 }
 
+static void AddConstructorArgumentsToScope(Pattern *pat, ConstructorDecl *CD,
+                                           Parser &P) {
+  switch (pat->getKind()) {
+  case PatternKind::Named: {
+    // Reparent the decl and add it to the scope.
+    VarDecl *var = cast<NamedPattern>(pat)->getDecl();
+    var->setDeclContext(CD);
+    P.ScopeInfo.addToScope(var);
+    return;
+  }
+
+  case PatternKind::Any:
+    return;
+
+  case PatternKind::Paren:
+    AddConstructorArgumentsToScope(cast<ParenPattern>(pat)->getSubPattern(),
+                                   CD, P);
+    return;
+
+  case PatternKind::Typed:
+    AddConstructorArgumentsToScope(cast<TypedPattern>(pat)->getSubPattern(),
+                                   CD, P);
+    return;
+
+  case PatternKind::Tuple:
+    for (const TuplePatternElt &field : cast<TuplePattern>(pat)->getFields())
+      AddConstructorArgumentsToScope(field.getPattern(), CD, P);
+    return;
+  }
+  llvm_unreachable("bad pattern kind!");
+}
 
 
+ConstructorDecl *Parser::parseDeclConstructor() {
+  bool Invalid = false;
+  SourceLoc ConstructorLoc = consumeToken(tok::kw_constructor);
+  
+  // attribute-list
+  DeclAttributes Attributes;
+  parseAttributeList(Attributes);
+  
+  // pattern-tuple
+  if (Tok.isNotAnyLParen()) {
+    diagnose(Tok.getLoc(), diag::expected_lparen_subscript);
+    return nullptr;
+  }
+  
+  NullablePtr<Pattern> Indices = parsePatternTuple();
+  if (Indices.isNull())
+    return nullptr;
+  Type DummyTy; // FIXME: We actually need to use this type here!
+  if (checkFullyTyped(Indices.get(), DummyTy))
+    Invalid = true;
+  
+  // '{'
+  if (!Tok.is(tok::l_brace)) {
+    diagnose(Tok.getLoc(), diag::expected_lbrace_constructor);
+    return nullptr;
+  }
+
+  VarDecl *ThisDecl
+    = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
+                            Type(), CurDeclContext);
+
+  Scope ConstructorBodyScope(this, /*AllowLookup=*/true);
+  ConstructorDecl *CD =
+      new (Context) ConstructorDecl(Context.getIdentifier("constructor"),
+                                    ConstructorLoc, Indices.get(), ThisDecl,
+                                    CurDeclContext);
+  AddConstructorArgumentsToScope(Indices.get(), CD, *this);
+  ScopeInfo.addToScope(ThisDecl);
+  ContextChange CC(*this, CD);
+
+  NullablePtr<BraceStmt> Body = parseStmtBrace(diag::invalid_diagnostic);
+
+  if (!Body.isNull())
+    CD->setBody(Body.get());
+
+  if (Attributes.isValid()) CD->getMutableAttrs() = Attributes;
+
+  return CD;
+}

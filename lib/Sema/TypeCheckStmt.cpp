@@ -39,9 +39,8 @@ public:
   // top level code.
   FuncExpr *TheFunc;
   
-  /// TopLevelCode - This is the current top-level code declaration being
-  /// checked, or null if we are in a function.
-  TopLevelCodeDecl *TopLevelCode;
+  /// DC - This is the current DeclContext.
+  DeclContext *DC;
 
   unsigned LoopNestLevel;
 
@@ -56,10 +55,11 @@ public:
   };
 
   StmtChecker(TypeChecker &TC, FuncExpr *TheFunc)
-    : TC(TC), TheFunc(TheFunc), TopLevelCode(nullptr), LoopNestLevel(0) { }
+    : TC(TC), TheFunc(TheFunc), DC(TheFunc), LoopNestLevel(0) { }
 
-  void setTopLevelCode(TopLevelCodeDecl *TLC) { TopLevelCode = TLC; }
-  
+  StmtChecker(TypeChecker &TC, DeclContext *DC)
+    : TC(TC), TheFunc(nullptr), DC(DC), LoopNestLevel(0) { }
+
   //===--------------------------------------------------------------------===//
   // Helper Functions.
   //===--------------------------------------------------------------------===//
@@ -277,13 +277,6 @@ public:
       return nullptr;
     }
     
-    // Figure out the declaration context we're in.
-    DeclContext *DC = &TC.TU;
-    if (TheFunc)
-      DC = TheFunc;
-    else if (TopLevelCode)
-      DC = TopLevelCode;
-
     // Verify that the container conforms to the Enumerable protocol, and
     // invoke getElements() on it container to retrieve the range of elements.
     Type RangeTy;
@@ -609,7 +602,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
 
     // FuncExprs - This is a list of all the FuncExprs we need to analyze, in
     // an appropriate order.
-    SmallVector<FuncExpr*, 32> FuncExprs;
+    SmallVector<PointerUnion<FuncExpr*, ConstructorDecl*>, 32> FuncExprs;
 
     virtual bool walkToDeclPre(Decl *D) {
       if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D))
@@ -630,6 +623,10 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
             FD->getImplicitThisDecl()->setType(ThisTy);
           }
       }
+
+      if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(D))
+        FuncExprs.push_back(CD);
+
       return true;
     }
     
@@ -688,7 +685,6 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   ExprPrePassWalker prePass(TC);
 
   // Type check the top-level elements of the translation unit.
-  StmtChecker checker(TC, 0);
   for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
     Decl *D = TU->Decls[i];
     if (isa<TopLevelCodeDecl>(D))
@@ -768,26 +764,9 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       // Immediately perform global name-binding etc.
       prePass.doWalk(TLCD);
 
-      // Tell the statement checker that we have top-level code.
-      struct TopLevelCodeRAII {
-        StmtChecker &Checker;
-        TopLevelCodeDecl *Old;
-
-      public:
-        TopLevelCodeRAII(StmtChecker &Checker, TopLevelCodeDecl *TLC)
-        : Checker(Checker), Old(Checker.TopLevelCode)
-        {
-          Checker.setTopLevelCode(TLC);
-        }
-
-        ~TopLevelCodeRAII() {
-          Checker.setTopLevelCode(Old);
-        }
-      } IntroduceTopLevelCode(checker, TLCD);
-
       auto Elem = TLCD->getBody();
       if (Expr *E = Elem.dyn_cast<Expr*>()) {
-        if (checker.typeCheckExpr(E)) continue;
+        if (TC.typeCheckExpression(E)) continue;
         if (TU->Kind == TranslationUnit::Repl)
           TC.typeCheckTopLevelReplExpr(E, TLCD);
         else
@@ -795,7 +774,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
         TLCD->setBody(E);
       } else {
         Stmt *S = Elem.get<Stmt*>();
-        if (checker.typeCheckStmt(S)) continue;
+        if (StmtChecker(TC, TLCD).typeCheckStmt(S)) continue;
         TLCD->setBody(S);
       }
     } else {
@@ -837,7 +816,13 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // Type check the body of each of the FuncExpr in turn.  Note that outside
   // FuncExprs must be visited before nested FuncExprs for type-checking to
   // work correctly.
-  for (FuncExpr *FE : prePass.FuncExprs) {
+  for (auto func : prePass.FuncExprs) {
+    if (ConstructorDecl *CD = func.dyn_cast<ConstructorDecl*>()) {
+      Stmt *Body = CD->getBody();
+      StmtChecker(TC, CD).typeCheckStmt(Body);
+      continue;
+    }
+    FuncExpr *FE = func.get<FuncExpr*>();
     TC.semaFunctionSignature(FE);
 
     PrettyStackTraceExpr StackEntry(TC.Context, "type-checking", FE);

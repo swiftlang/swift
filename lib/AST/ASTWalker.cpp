@@ -534,6 +534,10 @@ public:
         S = doIt(S);
         TLCD->setBody(S);
       }
+    } else if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(D)) {
+      Stmt *S = CD->getBody();
+      S = doIt(S);
+      CD->setBody(cast<BraceStmt>(S));
     }
     
     return !Walker.walkToDeclPost(D);

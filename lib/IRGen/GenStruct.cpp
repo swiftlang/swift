@@ -202,6 +202,9 @@ void IRGenModule::emitStructType(StructType *st) {
       emitInjectionFunction(*this, fn, typeInfo, elt);
       continue;
     }
+    case DeclKind::Constructor: {
+      llvm_unreachable("Not yet implemented");
+    }
     }
     llvm_unreachable("bad extension member kind");
   }
