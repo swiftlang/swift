@@ -36,21 +36,41 @@ using namespace irgen;
 namespace {
   /// Layout information for class types.
   class ClassTypeInfo : public HeapTypeInfo {
-    HeapLayout Layout;
-    std::vector<ElementLayout> Elements;
+    ClassType *Ty;
+    mutable HeapLayout *Layout;
 
   public:
     ClassTypeInfo(llvm::PointerType *irType, Size size, Alignment align,
-                  HeapLayout &&layout)
-      : HeapTypeInfo(irType, size, align), Layout(layout) {
+                  ClassType *Ty)
+      : HeapTypeInfo(irType, size, align), Ty(Ty), Layout(nullptr) {
     }
 
-    const HeapLayout &getLayout() const { return Layout; }
-    Alignment getHeapAlignment() const {
-      return Layout.getAlignment();
+    ~ClassTypeInfo() {
+      delete Layout;
     }
-    llvm::ArrayRef<ElementLayout> getElements() const {
-      return Layout.getElements();
+
+    const HeapLayout &getLayout(IRGenModule &IGM) const {
+      if (Layout)
+        return *Layout;
+
+      // Collect all the fields from the type.
+      SmallVector<const TypeInfo*, 8> fieldTypes;
+      for (Decl *D : Ty->getDecl()->getMembers())
+        if (VarDecl *VD = dyn_cast<VarDecl>(D))
+          if (!VD->isProperty())
+            fieldTypes.push_back(&IGM.getFragileTypeInfo(VD->getType()));
+
+      llvm::PointerType *Ptr = cast<llvm::PointerType>(getStorageType());
+      llvm::StructType *STy = cast<llvm::StructType>(Ptr->getElementType());
+
+      Layout = new HeapLayout(IGM, LayoutStrategy::Optimal, fieldTypes, STy);
+      return *Layout;
+    }
+    Alignment getHeapAlignment(IRGenModule &IGM) const {
+      return getLayout(IGM).getAlignment();
+    }
+    llvm::ArrayRef<ElementLayout> getElements(IRGenModule &IGM) const {
+      return getLayout(IGM).getElements();
     }
   };
 }  // end anonymous namespace.
@@ -75,8 +95,8 @@ LValue swift::irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
       ++FieldIndex;
   }
 
-  Address baseAddr(baseVal.getValue(), info.getHeapAlignment());
-  const ElementLayout &element = info.getElements()[FieldIndex];
+  Address baseAddr(baseVal.getValue(), info.getHeapAlignment(IGF.IGM));
+  const ElementLayout &element = info.getElements(IGF.IGM)[FieldIndex];
   Address memberAddr = element.project(IGF, baseAddr);
   return IGF.emitAddressLValue(OwnedAddress(memberAddr, baseVal.getValue()));
 }
@@ -89,8 +109,9 @@ void swift::irgen::emitNewReferenceExpr(IRGenFunction &IGF,
 
   // Allocate the class using the given layout.
   // FIXME: Long-term, we clearly need a specialized runtime entry point.
-  llvm::Value *val = IGF.emitUnmanagedAlloc(info.getLayout(), "reference.new");
-  llvm::Type *destType = info.getLayout().getType()->getPointerTo();
+  llvm::Value *val = IGF.emitUnmanagedAlloc(info.getLayout(IGF.IGM),
+                                            "reference.new");
+  llvm::Type *destType = info.getLayout(IGF.IGM).getType()->getPointerTo();
   llvm::Value *castVal = IGF.Builder.CreateBitCast(val, destType);
 
   Out.add(IGF.enterReleaseCleanup(castVal));
@@ -152,18 +173,8 @@ void IRGenModule::emitClassType(ClassType *ct) {
 
 const TypeInfo *
 TypeConverter::convertClassType(IRGenModule &IGM, ClassType *T) {
-  // Collect all the fields from the type.
-  SmallVector<const TypeInfo*, 8> fieldTypes;
-  for (Decl *D : T->getDecl()->getMembers())
-    if (VarDecl *VD = dyn_cast<VarDecl>(D))
-      if (!VD->isProperty())
-        fieldTypes.push_back(&IGM.getFragileTypeInfo(VD->getType()));
-
-  HeapLayout layout(IGM, LayoutStrategy::Optimal, fieldTypes,
-                    IGM.createNominalType(T->getDecl()));
-
-  llvm::PointerType *irType = layout.getType()->getPointerTo();
+  llvm::StructType *ST = IGM.createNominalType(T->getDecl());
+  llvm::PointerType *irType = ST->getPointerTo();
   return new ClassTypeInfo(irType, IGM.getPointerSize(),
-                           IGM.getPointerAlignment(),
-                           std::move(layout));
+                           IGM.getPointerAlignment(), T);
 }
