@@ -16,6 +16,7 @@
 
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/CallSite.h"
 #include "llvm/Function.h"
 #include "Cleanup.h"
 #include "Condition.h"
@@ -296,6 +297,21 @@ llvm::BasicBlock *IRGenFunction::getUnreachableBlock() {
   
   return UnreachableBB;
 }
+
+//****************************************************************************//
+//******************************* EXCEPTIONS *********************************//
+//****************************************************************************//
+
+llvm::CallSite IRGenFunction::emitInvoke(llvm::CallingConv::ID convention,
+                                         llvm::Value *fn,
+                                         ArrayRef<llvm::Value*> args,
+                                         const llvm::AttrListPtr &attrs) {
+  // TODO: exceptions!
+  llvm::CallInst *call = Builder.CreateCall(fn, args);
+  call->setAttributes(attrs);
+  call->setCallingConv(convention);
+  return call;
+}                                        
 
 //****************************************************************************//
 //******************************** CLEANUPS **********************************//

@@ -33,6 +33,18 @@ namespace irgen {
   class Address;
   class TypeInfo;
 
+  /// An abstracted calling convention.
+  enum class AbstractCC : unsigned char {
+    /// The C calling convention.
+    C,
+
+    /// The calling convention used for calling a normal function.
+    Freestanding,
+
+    /// The calling convention used for calling an instance method.
+    Method
+  };
+
   /// Abstract information about how we can emit a call.
   class AbstractCallee {
     /// The best explosion level available for the call.
@@ -41,20 +53,30 @@ namespace irgen {
     /// Whether the function takes a data pointer.
     unsigned NeedsData : 1;
 
+    /// The abstract calling convention.
+    unsigned Convention : 2;
+
     /// The min uncurrying level available for the function.
     unsigned MinUncurryLevel : 2;
 
     /// The max uncurrying level available for the function.
-    unsigned MaxUncurryLevel : 12;
+    unsigned MaxUncurryLevel : 10;
 
   public:
-    AbstractCallee(ExplosionKind level, unsigned minUncurry,
-                   unsigned maxUncurry, bool needsData)
+    AbstractCallee(AbstractCC convention, ExplosionKind level,
+                   unsigned minUncurry, unsigned maxUncurry, bool needsData)
       : ExplosionLevel(unsigned(level)), NeedsData(needsData),
+        Convention(unsigned(convention)),
         MinUncurryLevel(minUncurry), MaxUncurryLevel(maxUncurry) {}
 
     static AbstractCallee forIndirect() {
-      return AbstractCallee(ExplosionKind::Minimal, 0, 0, true);
+      return AbstractCallee(AbstractCC::Freestanding, ExplosionKind::Minimal,
+                            /*min uncurry*/ 0, /*max uncurry*/ 0,
+                            /*data*/ true);
+    }
+
+    AbstractCC getConvention() const {
+      return AbstractCC(Convention);
     }
 
     /// Returns the best explosion level at which we can emit this
@@ -74,8 +96,11 @@ namespace irgen {
   };
 
   class Callee {
-    /// The kind of explosion supported by this function.
+    /// The explosion level to use for this function.
     ExplosionKind ExplosionLevel;
+
+    /// The abstract calling convention used by this function.
+    AbstractCC Convention;
 
     /// The number of function applications at which this function is
     /// being called.
@@ -94,22 +119,36 @@ namespace irgen {
   public:
     Callee() = default;
 
-    /// Prepare a callee for a known global function that requires no
-    /// data pointer.
-    static Callee forGlobalFunction(Type formalType, llvm::Constant *fn,
-                                    ExplosionKind explosionLevel,
-                                    unsigned uncurryLevel) {
-      return forKnownFunction(formalType, fn, ManagedValue(nullptr),
+    /// Prepare a callee for a known freestanding function that
+    /// requires no data pointer.
+    static Callee forFreestandingFunction(Type formalType,
+                                          llvm::Constant *fn,
+                                          ExplosionKind explosionLevel,
+                                          unsigned uncurryLevel) {
+      return forKnownFunction(AbstractCC::Freestanding, formalType,
+                              fn, ManagedValue(nullptr),
+                              explosionLevel, uncurryLevel);
+    }
+
+    /// Prepare a callee for a known instance method.  Methods never
+    /// require a data pointer.  The formal type here should
+    /// include the 'this' clause.
+    static Callee forMethod(Type formalType, llvm::Constant *fn,
+                            ExplosionKind explosionLevel,
+                            unsigned uncurryLevel) {
+      return forKnownFunction(AbstractCC::Method, formalType,
+                              fn, ManagedValue(nullptr),
                               explosionLevel, uncurryLevel);
     }
 
     /// Prepare a callee for a known function with a known data pointer.
-    static Callee forKnownFunction(Type formalType, llvm::Value *fn,
-                                   ManagedValue data,
+    static Callee forKnownFunction(AbstractCC convention, Type formalType,
+                                   llvm::Value *fn, ManagedValue data,
                                    ExplosionKind explosionLevel,
                                    unsigned uncurryLevel) {
       Callee result;
       result.ExplosionLevel = explosionLevel;
+      result.Convention = convention;
       result.UncurryLevel = uncurryLevel;
       result.FormalType = formalType;
       result.FnPtr = fn;
@@ -120,6 +159,8 @@ namespace irgen {
     /// Prepare a callee for an indirect call to a function.
     static Callee forIndirectCall(Type formalType, llvm::Value *fn,
                                   ManagedValue data);
+
+    AbstractCC getConvention() const { return Convention; }
 
     Type getFormalType() const { return FormalType; }
 

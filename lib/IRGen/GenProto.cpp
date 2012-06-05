@@ -2358,7 +2358,8 @@ Callee irgen::emitExistentialMemberRefCallee(IRGenFunction &IGF,
   calleeArgs.push_back(Arg::forOwned(arg));
 
   // FIXME: writeback
-  return Callee::forKnownFunction(fn->getType(), witness, ManagedValue(nullptr),
+  return Callee::forKnownFunction(AbstractCC::Method, fn->getType(), witness,
+                                  ManagedValue(nullptr),
                                   ExplosionKind::Minimal, 1);
 }
 
@@ -2368,6 +2369,8 @@ AbstractCallee irgen::getAbstractProtocolCallee(IRGenFunction &IGF,
                                                 FuncDecl *fn) {
   // TODO: consider adding non-minimal or curried entrypoints.
   if (fn->isStatic())
-    return AbstractCallee(ExplosionKind::Minimal, 0, 0, false);
-  return AbstractCallee(ExplosionKind::Minimal, 1, 1, false);
+    return AbstractCallee(AbstractCC::Freestanding, ExplosionKind::Minimal,
+                          0, 0, false);
+  return AbstractCallee(AbstractCC::Method, ExplosionKind::Minimal,
+                        1, 1, false);
 }

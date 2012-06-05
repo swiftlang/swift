@@ -503,6 +503,16 @@ IRGenModule::getFunctionType(Type type, ExplosionKind explosionKind,
   return sig.getType();
 }
 
+static bool isInstanceMethod(FuncDecl *fn) {
+  return (!fn->isStatic() && fn->getDeclContext()->isTypeContext());
+}
+
+static AbstractCC getConventionForFunction(FuncDecl *fn) {
+  if (isInstanceMethod(fn))
+    return AbstractCC::Method;
+  return AbstractCC::Freestanding;
+}
+
 /// Construct the best known limits on how we can call the given function.
 static AbstractCallee getAbstractDirectCallee(IRGenFunction &IGF,
                                               FuncDecl *fn) {
@@ -515,8 +525,9 @@ static AbstractCallee getAbstractDirectCallee(IRGenFunction &IGF,
   unsigned maxUncurry = getNaturalUncurryLevel(fn);
   
   bool needsData = fn->getDeclContext()->isLocalContext();
+  AbstractCC convention = getConventionForFunction(fn);
 
-  return AbstractCallee(level, minUncurry, maxUncurry, needsData);
+  return AbstractCallee(convention, level, minUncurry, maxUncurry, needsData);
 }
 
 /// Return the appropriate function pointer type at which to call the
@@ -550,7 +561,8 @@ Callee Callee::forIndirectCall(Type formalType, llvm::Value *fn,
                                ManagedValue data) {
   if (isa<llvm::ConstantPointerNull>(data.getValue()))
     data = ManagedValue(nullptr);
-  return forKnownFunction(formalType, fn, data, ExplosionKind::Minimal, 0);
+  return forKnownFunction(AbstractCC::Freestanding, formalType, fn, data,
+                          ExplosionKind::Minimal, 0);
 }
 
 /// Emit a reference to a function, using the best parameters possible
@@ -567,23 +579,28 @@ static Callee emitCallee(IRGenFunction &IGF, FuncDecl *fn,
   if (!fn->getDeclContext()->isLocalContext()) {
     llvm::Constant *fnPtr =
       IGF.IGM.getAddrOfGlobalFunction(fn, bestExplosion, bestUncurry);
-    return Callee::forGlobalFunction(fn->getType(), fnPtr,
-                                     bestExplosion, bestUncurry);
+    if (isInstanceMethod(fn)) {
+      return Callee::forMethod(fn->getType(), fnPtr,
+                               bestExplosion, bestUncurry);
+    } else {
+      return Callee::forFreestandingFunction(fn->getType(), fnPtr,
+                                             bestExplosion, bestUncurry);
+    }
   }
 
   if (bestUncurry != 0) {
     IGF.unimplemented(fn->getLoc(), "curried local function emission");
     llvm::Constant *undef = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
-    return Callee::forGlobalFunction(fn->getType(), undef,
-                                     bestExplosion, bestUncurry);
+    return Callee::forFreestandingFunction(fn->getType(), undef,
+                                           bestExplosion, bestUncurry);
   }
 
   Explosion e(ExplosionKind::Maximal);
   IGF.getFragileTypeInfo(fn->getType()).load(IGF, IGF.getLocalFunc(fn), e);
   llvm::Value *fnPtr = e.claimUnmanagedNext();
   ManagedValue data = e.claimNext();
-  return Callee::forKnownFunction(fn->getType(), fnPtr, data,
-                                  bestExplosion, bestUncurry);
+  return Callee::forKnownFunction(AbstractCC::Freestanding, fn->getType(),
+                                  fnPtr, data, bestExplosion, bestUncurry);
 }
 
 namespace {
@@ -987,20 +1004,19 @@ Callee irgen::emitCallee(IRGenFunction &IGF, Expr *fn,
   ManagedValue dataPtr =
     (callee.hasDataPointer() ? callee.getDataPointer(IGF)
                              : ManagedValue(nullptr));
-  return Callee::forKnownFunction(fn->getType(), fnPtr, dataPtr,
+  return Callee::forKnownFunction(callee.getConvention(),
+                                  fn->getType(), fnPtr, dataPtr,
                                   callee.getExplosionLevel(),
                                   callee.getUncurryLevel());
 }
 
 /// Set attributes on the given call site consistent with it returning
 /// an aggregate result.
-static void setAggResultAttributes(llvm::CallSite call) {
-  llvm::AttributeWithIndex attrs[] = {
-    llvm::AttributeWithIndex::get(1,
+static void addAggResultAttributes(
+                            SmallVectorImpl<llvm::AttributeWithIndex> &attrs) {
+  attrs.push_back(llvm::AttributeWithIndex::get(1,
                                   llvm::Attribute::StructRet |
-                                  llvm::Attribute::NoAlias)
-  };
-  call.setAttributes(llvm::AttrListPtr::get(attrs));
+                                  llvm::Attribute::NoAlias));
 }
 
 /// Extract the direct scalar results of a call instruction into an
@@ -1065,7 +1081,25 @@ namespace {
     }
 
   public:
-    void emit(llvm::Value *fnPtr);
+    void emit(llvm::Value *fnPtr);    
+
+  private:
+    /// Process the formal calling convention.
+    llvm::CallingConv::ID
+    processConvention(SmallVectorImpl<llvm::AttributeWithIndex> &attrs,
+                      bool hasAggregateResult) {
+      switch (TheCallee.getConvention()) {
+      case AbstractCC::C: return llvm::CallingConv::C;
+
+      case AbstractCC::Method:
+        //   TODO: maybe add 'inreg' to the first non-result argument.
+        // fallthrough
+      case AbstractCC::Freestanding:
+        // TODO: use a custom CC that returns three scalars efficiently.
+        return llvm::CallingConv::C;
+      }
+      llvm_unreachable("bad calling convention!");
+    }
   };
 
   /// ArgCallEmitter - A helper class for emitting a single call based
@@ -1150,6 +1184,8 @@ void CallEmitter::emit(llvm::Value *fnPtr) {
     cast<llvm::FunctionType>(cast<llvm::PointerType>(fnPtr->getType())
                              ->getElementType());
 
+  llvm::SmallVector<llvm::AttributeWithIndex, 4> attrs;
+
   // Build the arguments:
   unsigned numArgs = calleeType->getNumParams();
   Args.reserve(numArgs);
@@ -1190,15 +1226,19 @@ void CallEmitter::emit(llvm::Value *fnPtr) {
     }
     Args[0] = resultAddress.getAddress();
     Result.setAsIndirectAddress(resultAddress);
+    addAggResultAttributes(attrs);
   }
 
   // Deactivate all the cleanups.
   for (auto cleanup : ArgCleanups)
     IGF.setCleanupState(cleanup, CleanupState::Dead);
 
+  // Determine the calling convention.
+  auto cc = processConvention(attrs, isAggregateResult);
+
   // Make the call.
-  // TODO: exceptions, calling conventions
-  llvm::CallInst *call = IGF.Builder.CreateCall(fnPtr, Args);
+  llvm::CallSite call = IGF.emitInvoke(cc, fnPtr, Args,
+                                       llvm::AttrListPtr::get(attrs));
     
   // If we have an aggregate result, set the sret and noalias
   // attributes on the agg return slot, then return, since agg
@@ -1208,7 +1248,6 @@ void CallEmitter::emit(llvm::Value *fnPtr) {
     if (indirectResultObject.isValid())
       indirectInit.markInitialized(IGF, indirectResultObject);
 
-    setAggResultAttributes(call);
     assert(Result.isIndirect());
     return;
   }
@@ -1221,7 +1260,7 @@ void CallEmitter::emit(llvm::Value *fnPtr) {
 
   // Extract out the scalar results.
   Explosion &out = Result.initForDirectValues(TheCallee.getExplosionLevel());
-  extractScalarResults(IGF, call, ResultTI, out);
+  extractScalarResults(IGF, call.getInstruction(), ResultTI, out);
 }
 
 /// Emit a call with a set of arguments which have already been emitted.
@@ -1527,38 +1566,14 @@ void swift::irgen::emitVoidCall(IRGenFunction &IGF, const Callee &callee,
 void IRGenFunction::emitNullaryCall(llvm::Value *fnPtr,
                                     Type resultType,
                                     Explosion &resultExplosion) {
-  ExplosionSchema resultSchema(resultExplosion.getKind());
+  Callee callee =
+    Callee::forKnownFunction(AbstractCC::Freestanding, Type(),
+                             fnPtr, ManagedValue(nullptr),
+                             resultExplosion.getKind(),
+                             /*uncurry level*/ 0);
+
   const TypeInfo &resultTI = getFragileTypeInfo(resultType);
-  resultTI.getSchema(resultSchema);
-
-  llvm::SmallVector<llvm::Value*, 1> args;
-
-  // Build the aggregate result.
-  Initialization resultInit;
-  Initialization::Object resultObject = Initialization::Object::invalid();
-  Address resultAddress;
-  if (resultSchema.requiresIndirectResult()) {
-    resultObject = resultInit.getObjectForTemporary();
-    resultInit.registerObject(*this, resultObject, NotOnHeap, resultTI);
-    resultAddress =
-      resultInit.emitLocalAllocation(*this, resultObject, NotOnHeap,
-                                     resultTI, "call.aggresult");
-    args.push_back(resultAddress.getAddress());
-  }
-
-  // FIXME: exceptions, etc.
-  llvm::CallInst *call = Builder.CreateCall(fnPtr, args);
-
-  // Transfer control into an indirect result and then load out.
-  if (resultSchema.requiresIndirectResult()) {
-    setAggResultAttributes(call);
-
-    resultInit.markInitialized(*this, resultObject);
-    resultTI.load(*this, resultAddress, resultExplosion);
-    return;
-  }
-
-  extractScalarResults(*this, call, resultTI, resultExplosion);
+  irgen::emitCall(*this, callee, Arg(), resultTI, resultExplosion);
 }
 
 /// Initialize an Explosion with the parameters of the current
@@ -2103,7 +2118,12 @@ namespace {
       llvm::SmallVector<llvm::Value*, 8> args;
       params.forward(IGF, params.size(), args);
 
-      llvm::CallInst *call = IGF.Builder.CreateCall(nextEntrypoint, args);
+      // FIXME: calling convention!
+      llvm::CallSite callSite =
+        IGF.emitInvoke(llvm::CallingConv::C, nextEntrypoint, args,
+                       forwarder->getAttributes());
+
+      llvm::CallInst *call = cast<llvm::CallInst>(callSite.getInstruction());
       call->setTailCall();
 
       if (call->getType()->isVoidTy()) {

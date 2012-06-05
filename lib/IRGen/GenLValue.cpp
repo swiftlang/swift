@@ -433,6 +433,9 @@ namespace {
     static bool isByrefMemberKind(Kind kind) {
       return kind != Kind::IndependentVar;
     }
+    static bool isMemberKind(Kind kind) {
+      return kind != Kind::IndependentVar;
+    }
 
   private:
     GetterSetterTarget(Kind kind, ValueDecl *decl, unsigned indexSize = 0)
@@ -460,6 +463,7 @@ namespace {
     bool isSubscript() const { return isSubscriptKind(getKind()); }
     bool isVar() const { return !isSubscript(); }
     bool isByrefMember() const { return isByrefMemberKind(getKind()); }
+    bool isMember() const { return isMemberKind(getKind()); }
 
     ValueDecl *getDecl() const { return TargetAndKind.getPointer(); }
     VarDecl *getVarDecl() const {
@@ -493,13 +497,13 @@ namespace {
       // For now, always be pessimistic.
       explosionLevel = ExplosionKind::Minimal;
 
-      // The uncurry level is 0 unless we have a byref argument.
-      unsigned uncurryLevel = 0;
-      if (isByrefMember()) uncurryLevel++;
-
+      // The uncurry level is 0 unless we have a 'this' argument.
       llvm::Constant *fn = IGF.IGM.getAddrOfGetter(getDecl(), explosionLevel);
-      return Callee::forGlobalFunction(Type(), fn,
-                                       explosionLevel, uncurryLevel);
+      if (isMember()) {
+        return Callee::forMethod(Type(), fn, explosionLevel, 1);
+      } else {
+        return Callee::forFreestandingFunction(Type(), fn, explosionLevel, 0);
+      }
     }
 
     /// Find the address of the getter function.
@@ -507,13 +511,13 @@ namespace {
       // For now, always be pessimistic.
       explosionLevel = ExplosionKind::Minimal;
 
-      // The uncurry level is 0 unless we have a byref argument.
-      unsigned uncurryLevel = 0;
-      if (isByrefMember()) uncurryLevel++;
-
+      // The uncurry level is 0 unless we have a 'this' argument.
       llvm::Constant *fn = IGF.IGM.getAddrOfSetter(getDecl(), explosionLevel);
-      return Callee::forGlobalFunction(Type(), fn,
-                                       explosionLevel, uncurryLevel);
+      if (isMember()) {
+        return Callee::forMethod(Type(), fn, explosionLevel, 1);
+      } else {
+        return Callee::forFreestandingFunction(Type(), fn, explosionLevel, 0);
+      }
     }
 
   private:

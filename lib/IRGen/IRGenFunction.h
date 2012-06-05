@@ -21,12 +21,14 @@
 #include "swift/AST/LLVM.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/CallingConv.h"
 #include "DiverseStack.h"
 #include "IRBuilder.h"
 #include "JumpDest.h"
 
 namespace llvm {
   class AllocaInst;
+  class CallSite;
   class Constant;
   class Function;
 }
@@ -201,6 +203,10 @@ public:
   llvm::Value *getJumpDestSlot();
   static Alignment getJumpDestAlignment() { return Alignment(4); }
   llvm::BasicBlock *getUnreachableBlock();
+
+  llvm::CallSite emitInvoke(llvm::CallingConv::ID cc, llvm::Value *fn,
+                            ArrayRef<llvm::Value*> args,
+                            const llvm::AttrListPtr &attrs);
 
 private:
   DiverseStack<Cleanup, 128> Cleanups;

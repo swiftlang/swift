@@ -95,7 +95,7 @@ public:
   Alignment StorageAlignment;
 
 private:
-  /// Whether this type is POD.
+  /// Whether this type is known to be POD.
   unsigned POD : 1;
 
 public:
