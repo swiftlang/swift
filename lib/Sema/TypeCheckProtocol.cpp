@@ -239,7 +239,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       // in the witnesses we've collected for our archetypes.
       Type RequiredTy = TC.substType(getInstanceUsageType(Requirement,
                                                           TC.Context),
-                                     TypeMapping);
+                                     TypeMapping)->getUnlabeledType(TC.Context);
       
       for (auto Candidate : Lookup.Results) {
         switch (Candidate.Kind) {
