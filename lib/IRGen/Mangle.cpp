@@ -56,6 +56,8 @@ static char mangleOperatorChar(char op) {
 }
 
 namespace {
+  enum class IncludeType : bool { No, Yes };
+
   /// A class for mangling declarations.
   class Mangler {
     raw_ostream &Buffer;
@@ -63,12 +65,13 @@ namespace {
 
   public:
     Mangler(raw_ostream &buffer) : Buffer(buffer) {}
-    void mangleDeclName(ValueDecl *decl);
+    void mangleDeclName(ValueDecl *decl, IncludeType includeType);
     void mangleType(Type type, ExplosionKind kind, unsigned uncurryingLevel);
 
   private:
     void mangleDeclContext(DeclContext *ctx);
     void mangleIdentifier(Identifier ident);
+    void mangleGetterOrSetterType(FuncDecl *fn);
     bool tryMangleSubstitution(void *ptr);
     void addSubstitution(void *ptr);
   };
@@ -178,7 +181,7 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     // FIXME: We need a real solution here for local types.
     if (FuncExpr *FE = dyn_cast<FuncExpr>(ctx)) {
       if (FE->getDecl()) {
-        mangleDeclName(FE->getDecl());
+        mangleDeclName(FE->getDecl(), IncludeType::Yes);
         return;
       }
     }
@@ -192,39 +195,44 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
   llvm_unreachable("bad decl context");
 }
 
-void Mangler::mangleDeclName(ValueDecl *decl) {
+void Mangler::mangleGetterOrSetterType(FuncDecl *func) {
+  assert(func->isGetterOrSetter());
+  Decl *D = func->getGetterDecl();
+  if (!D) D = func->getSetterDecl();
+  assert(D && "no value type for getter/setter!");
+
+  // We mangle the type with a canonical set of parameters because
+  // objects nested within functions are shared across all expansions
+  // of the function.
+  assert(isa<VarDecl>(D) || isa<SubscriptDecl>(D));
+  mangleType(cast<ValueDecl>(D)->getType(),
+             ExplosionKind::Minimal,
+             /*uncurry*/ 0);
+
+  if (func->getGetterDecl()) {
+    Buffer << 'g';
+  } else {
+    Buffer << 's';
+  }
+}
+
+void Mangler::mangleDeclName(ValueDecl *decl, IncludeType includeType) {
   // decl ::= context identifier
   mangleDeclContext(decl->getDeclContext());
-  
-  // Special case: mangle getters and setters.
-  // FIXME: Come up with a more sane mangling.
-  if (FuncDecl *Func = dyn_cast<FuncDecl>(decl)) {
-    if (Decl *D = Func->getGetterDecl()) {
-      if (VarDecl *Var = dyn_cast<VarDecl>(D)) {
-        Buffer << "__get";
-        mangleIdentifier(Var->getName());
-        return;
-      }
-      
-      assert(isa<SubscriptDecl>(D) && "Unknown getter kind?");
-      Buffer << "__subset";
-      return;
-    }
 
-    if (Decl *D = Func->getSetterDecl()) {
-      if (VarDecl *Var = dyn_cast<VarDecl>(D)) {
-        Buffer << "__set";
-        mangleIdentifier(Var->getName());
-        return;
-      }
-      
-      assert(isa<SubscriptDecl>(D) && "Unknown setter kind?");
-      Buffer << "__subget";
-      return;
-    }
-  }
-  
   mangleIdentifier(decl->getName());
+
+  if (includeType == IncludeType::No) return;
+
+  // Special case for getters and setters.
+  if (auto func = dyn_cast<FuncDecl>(decl))
+    if (func->isGetterOrSetter())
+      return mangleGetterOrSetterType(func);
+
+  // We mangle the type with a canonical set of parameters because
+  // objects nested within functions are shared across all expansions
+  // of the function.
+  mangleType(decl->getType(), ExplosionKind::Minimal, /*uncurry*/ 0);
 }
 
 /// Mangle a type into the buffer.
@@ -322,7 +330,7 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
 
     // type ::= 'N' decl
     Buffer << 'N';
-    mangleDeclName(cast<OneOfType>(base)->getDecl());
+    mangleDeclName(cast<OneOfType>(base)->getDecl(), IncludeType::No);
 
     addSubstitution(base);
     return;
@@ -338,7 +346,7 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     // the mangling, but this should probably change eventually.
     // type ::= 'N' decl
     Buffer << 'N';
-    mangleDeclName(cast<StructType>(base)->getDecl());
+    mangleDeclName(cast<StructType>(base)->getDecl(), IncludeType::No);
 
     addSubstitution(base);
     return;
@@ -354,7 +362,7 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     // the mangling, but this should probably change eventually.
     // type ::= 'N' decl
     Buffer << 'N';
-    mangleDeclName(cast<ClassType>(base)->getDecl());
+    mangleDeclName(cast<ClassType>(base)->getDecl(), IncludeType::No);
 
     addSubstitution(base);
     return;
@@ -386,7 +394,7 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
 
     // type ::= 'P'
     Buffer << 'P';
-    mangleDeclName(cast<ProtocolType>(base)->getDecl());
+    mangleDeclName(cast<ProtocolType>(base)->getDecl(), IncludeType::No);
 
     addSubstitution(base);
     return;
@@ -458,8 +466,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     buffer << "L";
 
   Mangler mangler(buffer);
-
-  mangler.mangleDeclName(getDecl());
+  mangler.mangleDeclName(getDecl(), IncludeType::No);
 
   // Mangle in a type as well.  Note that we have to mangle the type
   // on all kinds of declarations, even variables, because at the
@@ -480,4 +487,5 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   }
 
   // TODO: mangle generics information here.
+  // Unless this should be in mangleDeclName?
 }

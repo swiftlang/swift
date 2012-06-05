@@ -2024,7 +2024,7 @@ namespace {
     /// the given interface.
     llvm::Constant *getInstanceMethodWitness(FuncDecl *impl, Type ifaceType) {
       llvm::Constant *implPtr =
-        IGM.getAddrOfGlobalFunction(impl, ExplosionKind::Minimal, 1);
+        IGM.getAddrOfFunction(impl, ExplosionKind::Minimal, 1, /*data*/ false);
       return getWitness(implPtr, impl->getType(), ifaceType, 1);
     }
 

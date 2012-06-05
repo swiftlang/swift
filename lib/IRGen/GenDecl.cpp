@@ -351,10 +351,11 @@ static bool hasIndirectResult(IRGenModule &IGM, Type type,
   return schema.requiresIndirectResult();
 }
 
-/// Fetch the declaration of the given global function.
-llvm::Function *IRGenModule::getAddrOfGlobalFunction(FuncDecl *func,
-                                                     ExplosionKind kind,
-                                                     unsigned uncurryLevel) {
+/// Fetch the declaration of the given known function.
+llvm::Function *IRGenModule::getAddrOfFunction(FuncDecl *func,
+                                               ExplosionKind kind,
+                                               unsigned uncurryLevel,
+                                               bool needsData) {
   LinkEntity entity = LinkEntity::forFunction(func, kind, uncurryLevel);
 
   // Check whether we've cached this.
@@ -362,7 +363,7 @@ llvm::Function *IRGenModule::getAddrOfGlobalFunction(FuncDecl *func,
   if (entry) return cast<llvm::Function>(entry);
 
   llvm::FunctionType *fnType =
-    getFunctionType(func->getType(), kind, uncurryLevel, /*data*/ false);
+    getFunctionType(func->getType(), kind, uncurryLevel, needsData);
 
   AbstractCC convention = getAbstractCC(func);
   bool indirectResult = hasIndirectResult(*this, func->getType(),
@@ -631,27 +632,45 @@ void IRGenFunction::emitLocal(Decl *D) {
 }
 
 OwnedAddress IRGenFunction::getLocalVar(VarDecl *D) {
-  auto I = LocalVars.find(D);
-  assert(I != LocalVars.end() && "no entry in local map!");
-  return I->second;
+  auto I = Locals.find(D);
+  assert(I != Locals.end() && "no entry in local map!");
+  return I->second.Var.Addr;
 }
 
 void IRGenFunction::setLocalVar(VarDecl *D, OwnedAddress addr) {
-  assert(!LocalVars.count(D));
+  assert(!Locals.count(D));
 
-  LocalVars.insert(std::make_pair(D, addr));
+  LocalEntry entry;
+  entry.Var.Addr = addr;
+  Locals.insert(std::make_pair(D, entry));
 }
 
-Address IRGenFunction::getLocalFunc(FuncDecl *D) {
-  auto I = LocalFuncs.find(D);
-  assert(I != LocalFuncs.end() && "no entry in local map!");
-  return I->second;
+llvm::Value *IRGenFunction::getLocalFuncData(FuncDecl *D) {
+  auto I = Locals.find(D);
+  assert(I != Locals.end() && "no entry in local map!");
+  return I->second.Func.Data;
 }
 
-void IRGenFunction::setLocalFunc(FuncDecl *D, Address addr) {
-  assert(!LocalFuncs.count(D));
+IRGenFunction *IRGenFunction::getLocalFuncDefiner(FuncDecl *D) {
+  auto I = Locals.find(D);
+  assert(I != Locals.end() && "no entry in local map!");
+  return I->second.Func.Definer;
+}
 
-  LocalFuncs.insert(std::make_pair(D, addr));
+/// Set all the information required in order to emit references to
+/// the given function.
+///
+/// \param data - the data pointer to use for the function
+/// \param definer - the IGF for the function which originally defined
+///   the local function
+void IRGenFunction::setLocalFuncData(FuncDecl *D, llvm::Value *data,
+                                     IRGenFunction *definer) {
+  assert(!Locals.count(D));
+
+  LocalEntry entry;
+  entry.Func.Data = data;
+  entry.Func.Definer = definer;
+  Locals.insert(std::make_pair(D, entry));
 }
 
 /// Create an allocation on the stack.

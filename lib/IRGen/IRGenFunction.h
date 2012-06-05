@@ -326,14 +326,29 @@ public:
   void setLocalVar(VarDecl *D, OwnedAddress addr);
   void emitPatternBindingDecl(PatternBindingDecl *D);
 
-  Address getLocalFunc(FuncDecl*);
-  void setLocalFunc(FuncDecl*, Address);
+  llvm::Value *getLocalFuncData(FuncDecl *fn);
+  IRGenFunction *getLocalFuncDefiner(FuncDecl *func);
+  void setLocalFuncData(FuncDecl *fn, llvm::Value *data,
+                        IRGenFunction *definingIGF);
   void emitLocalFunction(FuncDecl *func);
 
+  llvm::Function *getAddrOfLocalFunction(FuncDecl *func,
+                                         ExplosionKind explosionLevel,
+                                         unsigned uncurryLevel);
+
 private:
-  llvm::DenseMap<FuncDecl*, Address> LocalFuncs;
-  llvm::DenseMap<VarDecl*, OwnedAddress> LocalVars;
-  llvm::DenseMap<OneOfElementDecl*, llvm::Function*> LocalInjectionFuncs;
+  union LocalEntry {
+    struct {
+      OwnedAddress Addr;
+    } Var;
+    struct {
+      llvm::Value *Data;
+      IRGenFunction *Definer;
+    } Func;
+
+    LocalEntry() {}
+  };
+  llvm::DenseMap<Decl*, LocalEntry> Locals;
 
 //--- Global context emission --------------------------------------------------
 public:

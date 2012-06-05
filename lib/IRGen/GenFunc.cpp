@@ -548,15 +548,23 @@ AbstractCC irgen::getAbstractCC(FuncDecl *fn) {
 /// Construct the best known limits on how we can call the given function.
 static AbstractCallee getAbstractDirectCallee(IRGenFunction &IGF,
                                               FuncDecl *fn) {
+  bool isLocal = fn->getDeclContext()->isLocalContext();
+
   // FIXME: be more aggressive about all this.
-  ExplosionKind level = ExplosionKind::Minimal;
+  ExplosionKind level;
+  if (isLocal) {
+    level = ExplosionKind::Maximal;
+  } else {
+    level = ExplosionKind::Minimal;
+  }
 
   unsigned minUncurry = 0;
-  if (fn->isStatic() && isa<ExtensionDecl>(fn->getDeclContext()))
+  if (!fn->isStatic() && fn->getDeclContext()->isTypeContext())
     minUncurry = 1;
   unsigned maxUncurry = getNaturalUncurryLevel(fn);
   
-  bool needsData = fn->getDeclContext()->isLocalContext();
+  bool needsData =
+    (isLocal && !isa<llvm::ConstantPointerNull>(IGF.getLocalFuncData(fn)));
   AbstractCC convention = getAbstractCC(fn);
 
   return AbstractCallee(convention, level, minUncurry, maxUncurry, needsData);
@@ -601,16 +609,15 @@ Callee Callee::forIndirectCall(Type formalType, llvm::Value *fn,
 /// up to given limits.
 static Callee emitCallee(IRGenFunction &IGF, FuncDecl *fn,
                          ExplosionKind bestExplosion, unsigned bestUncurry) {
-  AbstractCallee absCallee = getAbstractDirectCallee(IGF, fn);
-
-  if (bestUncurry != 0)
+  if (bestUncurry != 0 || bestExplosion != ExplosionKind::Minimal) {
+    AbstractCallee absCallee = getAbstractDirectCallee(IGF, fn);
     bestUncurry = std::min(bestUncurry, absCallee.getMaxUncurryLevel());
-  if (bestExplosion != ExplosionKind::Minimal)
     bestExplosion = absCallee.getBestExplosionLevel();
+  }
 
   if (!fn->getDeclContext()->isLocalContext()) {
     llvm::Constant *fnPtr =
-      IGF.IGM.getAddrOfGlobalFunction(fn, bestExplosion, bestUncurry);
+      IGF.IGM.getAddrOfFunction(fn, bestExplosion, bestUncurry, /*data*/ false);
     if (isInstanceMethod(fn)) {
       return Callee::forMethod(fn->getType(), fnPtr,
                                bestExplosion, bestUncurry);
@@ -620,16 +627,9 @@ static Callee emitCallee(IRGenFunction &IGF, FuncDecl *fn,
     }
   }
 
-  if (bestUncurry != 0) {
-    IGF.unimplemented(fn->getLoc(), "curried local function emission");
-    llvm::Constant *undef = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
-    return Callee::forFreestandingFunction(fn->getType(), undef,
-                                           bestExplosion, bestUncurry);
-  }
-
+  auto fnPtr = IGF.getAddrOfLocalFunction(fn, bestExplosion, bestUncurry);
   Explosion e(ExplosionKind::Maximal);
-  IGF.getFragileTypeInfo(fn->getType()).load(IGF, IGF.getLocalFunc(fn), e);
-  llvm::Value *fnPtr = e.claimUnmanagedNext();
+  IGF.emitRetain(IGF.getLocalFuncData(fn), e);
   ManagedValue data = e.claimNext();
   return Callee::forKnownFunction(AbstractCC::Freestanding, fn->getType(),
                                   fnPtr, data, bestExplosion, bestUncurry);
@@ -2147,6 +2147,9 @@ static void emitFunction(IRGenModule &IGM, FuncDecl *func,
   if (!func->getBody()) return;
   FuncExpr *funcExpr = func->getBody();
 
+  // FIXME: support defining currying entrypoints for local functions.
+  bool needsData = false;
+
   // FIXME: variant currying levels!
   // FIXME: also emit entrypoints with maximal explosion when all types are known!
   unsigned naturalUncurryLevel = getNaturalUncurryLevel(func);
@@ -2161,8 +2164,8 @@ static void emitFunction(IRGenModule &IGM, FuncDecl *func,
   } else if (Decl *var = func->getSetterDecl()) {
     entrypoint = IGM.getAddrOfSetter(cast<ValueDecl>(var), explosionLevel);
   } else {
-    entrypoint = IGM.getAddrOfGlobalFunction(func, explosionLevel,
-                                             startingUncurryLevel);
+    entrypoint = IGM.getAddrOfFunction(func, explosionLevel,
+                                       startingUncurryLevel, needsData);
   }
 
   CurriedData curriedData(IGM, funcExpr, explosionLevel,
@@ -2173,7 +2176,8 @@ static void emitFunction(IRGenModule &IGM, FuncDecl *func,
   for (unsigned uncurryLevel = startingUncurryLevel;
          uncurryLevel != naturalUncurryLevel; ++uncurryLevel) {
     llvm::Function *nextEntrypoint =
-      IGM.getAddrOfGlobalFunction(func, explosionLevel, uncurryLevel + 1);
+      IGM.getAddrOfFunction(func, explosionLevel, uncurryLevel + 1,
+                            needsData);
 
     curriedData.emitCurriedEntrypoint(entrypoint, nextEntrypoint);
 

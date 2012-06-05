@@ -59,6 +59,7 @@ public:
     : Addr(address), Owner(owner) {}
 
   llvm::Value *getAddressPointer() const { return Addr.getAddress(); }
+  Alignment getAlignment() const { return Addr.getAlignment(); }
   Address getAddress() const { return Addr; }
   llvm::Value *getOwner() const { return Owner; }
 

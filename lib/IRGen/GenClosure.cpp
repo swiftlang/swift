@@ -16,6 +16,7 @@
 
 #include "GenClosure.h"
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
@@ -34,153 +35,318 @@
 using namespace swift;
 using namespace irgen;
 
-void swift::irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E,
-                               Explosion &explosion) {
-  assert(isa<FuncExpr>(E) || isa<ClosureExpr>(E));
+namespace {
+  class CaptureInfo {
+  public:
+    // Captured functions which do not require data pointers.
+    SmallVector<FuncDecl*, 4> TrivialFunctions;
 
-  ArrayRef<Pattern*> Patterns;
-  if (FuncExpr *FE = dyn_cast<FuncExpr>(E))
-    Patterns = FE->getParamPatterns();
-  else
-    Patterns = cast<ClosureExpr>(E)->getParamPatterns();
+    // Captures that do require interesting work, and (in parallel)
+    // the types by which they need to be captured.
+    SmallVector<Decl*, 4> Captures;
+    SmallVector<const TypeInfo *, 4> CaptureFields;
 
-  if (Patterns.size() != 1) {
-    IGF.unimplemented(E->getLoc(), "curried local functions");
-    return IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()),
-                                 explosion);
-  }
+    CaptureInfo(IRGenFunction &IGF, CapturingExpr *E);
 
-  for (ValueDecl *D : E->getCaptures()) {
-    if (!isa<VarDecl>(D) && !isa<FuncDecl>(D)) {
-      IGF.unimplemented(E->getLoc(), "capturing non-variables");
-      return IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()),
-                                  explosion);
+    bool requiresData() const { return !Captures.empty(); }
+
+  private:
+    void captureFunc(IRGenFunction &IGF, FuncDecl *fn);
+    void captureVar(IRGenFunction &IGF, VarDecl *var);
+
+    void addCapture(IRGenModule &IGM, Decl *capture, Type storageType) {
+      addCapture(capture, IGM.getFragileTypeInfo(storageType));
     }
-  }
 
-  bool HasCaptures = !E->getCaptures().empty();
-
-  // Create the IR function.
-  llvm::FunctionType *fnType =
-      IGF.IGM.getFunctionType(E->getType(), ExplosionKind::Minimal, 0,
-                              HasCaptures);
-  llvm::Function *fn =
-      llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
-                             "closure", &IGF.IGM.Module);
-
-  IRGenFunction innerIGF(IGF.IGM, E->getType(), Patterns,
-                         ExplosionKind::Minimal, /*uncurry level*/ 0, fn,
-                         HasCaptures ? Prologue::StandardWithContext :
-                                       Prologue::Standard);
-
-  ManagedValue contextPtr(IGF.IGM.RefCountedNull);
-
-  // There are two places we need to generate code for captures: in the
-  // current function, to store the captures to a capture block, and in the
-  // inner function, to load the captures from the capture block.
-  if (HasCaptures) {
-    SmallVector<const TypeInfo *, 4> Fields;
-    for (ValueDecl *D : E->getCaptures()) {
-      Type RefTy = D->getTypeOfReference();
-      const TypeInfo &typeInfo = IGF.getFragileTypeInfo(RefTy);
-      Fields.push_back(&typeInfo);
+    void addCapture(Decl *capture, const TypeInfo &storageTI) {
+      Captures.push_back(capture);
+      CaptureFields.push_back(&storageTI);
     }
-    HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, Fields);
+  };
+}
 
-    // Allocate the capture block.
-    if (E->isNotCaptured()) {
-      // FIXME: This doesn't compute the heap metadata pointer; do we need it?
-      // FIXME: This should be refactored if anything else has a use for it.
-      Address AllocatedPtr = IGF.createAlloca(layout.getType(),
-                                              layout.getAlignment(),
-                                              "closuretemp");
-      Address HeapPtr = IGF.Builder.CreateStructGEP(AllocatedPtr, 0, Size(0));
-      Address RefCntPtr = IGF.Builder.CreateStructGEP(HeapPtr, 1,
-                                                      IGF.IGM.getPointerSize());
-      IGF.Builder.CreateStore(IGF.Builder.getInt64(2), RefCntPtr);
-      contextPtr = 
-          ManagedValue(IGF.Builder.CreateBitCast(AllocatedPtr.getAddress(),
-                                                 IGF.IGM.RefCountedPtrTy));
+CaptureInfo::CaptureInfo(IRGenFunction &outerIGF, CapturingExpr *E) {
+  // Come up with a capturing strategy for all the captures.
+  for (auto capture : E->getCaptures()) {
+    if (auto var = dyn_cast<VarDecl>(capture)) {
+      captureVar(outerIGF, var);
+    } else if (auto fn = dyn_cast<FuncDecl>(capture)) {
+      captureFunc(outerIGF, fn);
     } else {
-      contextPtr = IGF.emitAlloc(layout, "closure-data.alloc");
+      outerIGF.unimplemented(E->getLoc(), "capturing non-variables");
+      // Just ignore it.  This is probably not best.
     }
+  }
+}
+
+void CaptureInfo::captureFunc(IRGenFunction &outerIGF, FuncDecl *fn) {
+  // Functions can be trivial if they don't require data.
+  llvm::Value *fnData = outerIGF.getLocalFuncData(fn);
+  if (isa<llvm::ConstantPointerNull>(fnData)) {
+    TrivialFunctions.push_back(fn);
+    return;
+  }
+
+  // Otherwise we need to capture the data (but that's it; no need to
+  // save the function pointer as well).
+  IRGenModule &IGM = outerIGF.IGM;
+  addCapture(IGM, fn, IGM.Context.TheObjectPointerType);
+}
+
+void CaptureInfo::captureVar(IRGenFunction &outerIGF, VarDecl *var) {
+  // Everything else gets captured according to its type.
+  // TODO: capture variables by value when feasible.
+  // TODO: avoid capturing the 'owner' of variables when this
+  // is obviously derivable.
+  addCapture(outerIGF.IGM, var, var->getTypeOfReference());
+}
+
+/// Emit the data pointer for a capturing expression.
+static ManagedValue emitClosureData(IRGenFunction &IGF, CapturingExpr *E,
+                                    const CaptureInfo &info,
+                                    const HeapLayout &layout) {
+  assert(info.requiresData());
+  ManagedValue data;
+
+  // Allocate the capture block.
+  if (E->isNotCaptured()) {
+    // FIXME: This doesn't compute the heap metadata pointer; do we need it?
+    // FIXME: This should be refactored if anything else has a use for it.
+    Address allocatedPtr = IGF.createAlloca(layout.getType(),
+                                            layout.getAlignment(),
+                                            "closuretemp");
+    Address refCntPtr =
+      IGF.Builder.CreateStructGEP(allocatedPtr, 1, IGF.IGM.getPointerSize());
+    IGF.Builder.CreateStore(IGF.Builder.getInt64(2), refCntPtr);
+    data = ManagedValue(IGF.Builder.CreateBitCast(allocatedPtr.getAddress(),
+                                                  IGF.IGM.RefCountedPtrTy));
+  } else {
+    data = IGF.emitAlloc(layout, "closure-data.alloc");
+  }
     
-    Address CaptureStruct =
-      layout.emitCastOfAlloc(IGF, contextPtr.getValue(), "closure-data");
-    Address InnerStruct =
-      layout.emitCastOfAlloc(innerIGF, innerIGF.ContextPtr, "closure-data");
+  Address object =
+    layout.emitCastOfAlloc(IGF, data.getValue(), "closure-data");
 
-    // Emit stores and loads for capture block
-    for (unsigned i = 0, e = E->getCaptures().size(); i != e; ++i) {
-      // FIXME: avoid capturing owner when this is obviously derivable.
+  // Emit stores and loads for objects actually captured.
+  for (unsigned i = 0, e = info.Captures.size(); i != e; ++i) {
+    Decl *D = info.Captures[i];
+    auto &elt = layout.getElements()[i];
 
-      ValueDecl *D = E->getCaptures()[i];
-      auto &elt = layout.getElements()[i];
+    Address capture = elt.project(IGF, object);
 
-      if (isa<FuncDecl>(D)) {
-        Explosion OuterExplosion(ExplosionKind::Maximal);
-        Address Func = IGF.getLocalFunc(cast<FuncDecl>(D));
-        elt.Type->load(IGF, Func, OuterExplosion);
-        Address CaptureAddr = elt.project(IGF, CaptureStruct);
-        elt.Type->initialize(IGF, OuterExplosion, CaptureAddr);
+    // If this a function, map the data pointer.
+    if (auto capturedFunc = dyn_cast<FuncDecl>(D)) {
+      llvm::Value *data = IGF.getLocalFuncData(capturedFunc);
+      assert(!isa<llvm::ConstantPointerNull>(data));
+        
+      // In the outer function, retain the data and use that to
+      // initialize the capture.
+      Explosion temp(ExplosionKind::Maximal);
+      IGF.emitRetain(data, temp);
+      elt.Type->initialize(IGF, temp, capture);
 
-        Address InnerAddr = elt.project(innerIGF, InnerStruct);
-        innerIGF.setLocalFunc(cast<FuncDecl>(D), InnerAddr);
+      continue;
+    }
+
+    // Otherwise, we have a variable.
+    VarDecl *capturedVar = cast<VarDecl>(D);
+
+    // In the outer function, take the address and copy it into place.
+    OwnedAddress outerVar = IGF.getLocalVar(capturedVar);
+    Explosion temp(ExplosionKind::Maximal);
+    temp.addUnmanaged(outerVar.getAddressPointer());
+    IGF.emitRetain(outerVar.getOwner(), temp);
+    elt.Type->initialize(IGF, temp, capture);
+  }
+
+  return data;
+}
+
+static HeapLayout getHeapLayout(IRGenModule &IGM, const CaptureInfo &info) {
+  return HeapLayout(IGM, LayoutStrategy::Optimal, info.CaptureFields);
+}
+
+/// Emit the data pointer for a capturing expression.
+static ManagedValue emitClosureData(IRGenFunction &IGF, CapturingExpr *E) {
+  CaptureInfo info(IGF, E);
+
+  // We're done if we don't actually capture anything non-trivial.
+  if (!info.requiresData())
+    return ManagedValue(IGF.IGM.RefCountedNull);
+
+  HeapLayout layout = getHeapLayout(IGF.IGM, info);
+  return emitClosureData(IGF, E, info, layout);
+}
+
+/// Emit the body of a local function.
+///
+/// \param definingIGF - the IGF for the function in which this local
+///   function is directly defined
+/// \param fn - the function for which to create the body
+static void emitLocalFunctionBody(IRGenFunction &definingIGF,
+                                  llvm::Function *fn,
+                                  CapturingExpr *E,
+                                  ExplosionKind explosionLevel,
+                                  unsigned uncurryLevel,
+                                  const CaptureInfo &info,
+                                  const HeapLayout *layout) {
+  IRGenModule &IGM = definingIGF.IGM;
+  assert(info.requiresData() == (layout != nullptr));
+
+  ArrayRef<Pattern*> patterns;
+  if (FuncExpr *func = dyn_cast<FuncExpr>(E))
+    patterns = func->getParamPatterns();
+  else
+    patterns = cast<ClosureExpr>(E)->getParamPatterns();
+
+  if (patterns.size() != uncurryLevel + 1) {
+    // Just leave it as a forward declaration.
+    IGM.unimplemented(E->getLoc(), "curried entrypoints for local function");
+    return;
+  }
+
+  IRGenFunction IGF(IGM, E->getType(), patterns,
+                    explosionLevel, uncurryLevel, fn,
+                    info.requiresData() ? Prologue::StandardWithContext
+                                        : Prologue::Standard);
+
+  // Map all the trivial captured functions.
+  for (auto capturedFunc : info.TrivialFunctions) {
+    IGF.setLocalFuncData(capturedFunc, IGM.RefCountedNull, nullptr);
+  }
+
+  // Map all the non-trivial captures.
+  if (info.requiresData()) {
+    Address data = layout->emitCastOfAlloc(IGF, IGF.ContextPtr, 
+                                           "closure-data");
+
+    // Emit stores and loads for objects actually captured.
+    for (unsigned i = 0, e = info.Captures.size(); i != e; ++i) {
+      Decl *D = info.Captures[i];
+      auto &elt = layout->getElements()[i];
+
+      Address capture = elt.project(IGF, data);
+
+      // If this a function, map the data pointer.
+      if (auto capturedFunc = dyn_cast<FuncDecl>(D)) {
+        // In the inner function, load unretained.
+        // FIXME: This probably needs to be retained so that the optimizer
+        // won't get confused.
+        auto value = IGF.Builder.CreateLoad(capture,
+                                    capturedFunc->getName().str() + ".data");
+        IGF.setLocalFuncData(capturedFunc, value,
+                             definingIGF.getLocalFuncDefiner(capturedFunc));
         continue;
       }
 
-      Explosion OuterExplosion(ExplosionKind::Maximal);
-      OwnedAddress Var = IGF.getLocalVar(cast<VarDecl>(D));
-      IGF.emitLValueAsScalar(IGF.emitAddressLValue(Var),
-                             OnHeap, OuterExplosion);
-      Address CaptureAddr = elt.project(IGF, CaptureStruct);
-      elt.Type->initialize(IGF, OuterExplosion, CaptureAddr);
+      // Otherwise, we have a variable.
+      VarDecl *capturedVar = cast<VarDecl>(D);
 
-      Address InnerAddr = elt.project(innerIGF, InnerStruct);
-      Address InnerValueAddr =
-        innerIGF.Builder.CreateStructGEP(InnerAddr, 0, Size(0));
-      Address InnerOwnerAddr =
-        innerIGF.Builder.CreateStructGEP(InnerAddr, 1, IGF.IGM.getPointerSize());
-      Address InnerValue(innerIGF.Builder.CreateLoad(InnerValueAddr),
-                         Var.getAddress().getAlignment());
-      OwnedAddress InnerLocal(InnerValue,
-                              innerIGF.Builder.CreateLoad(InnerOwnerAddr));
-      innerIGF.setLocalVar(cast<VarDecl>(D), InnerLocal);
+      // In the inner function, load unretained.
+      // FIXME: This probably needs to be retained so that the optimizer
+      // won't get confused.
+      llvm::Value *addr =
+          IGF.Builder.CreateLoad(
+            IGF.Builder.CreateStructGEP(capture, 0, Size(0)));
+      llvm::Value *owner =
+          IGF.Builder.CreateLoad(
+            IGF.Builder.CreateStructGEP(capture, 1, IGM.getPointerSize()));
+      Alignment alignment =
+        definingIGF.getLocalVar(capturedVar).getAlignment();
+      OwnedAddress innerVar(Address(addr, alignment), owner);
+      IGF.setLocalVar(capturedVar, innerVar);
     }
   }
 
   if (FuncExpr *FE = dyn_cast<FuncExpr>(E)) {
-    innerIGF.emitFunctionTopLevel(FE->getBody());
+    IGF.emitFunctionTopLevel(FE->getBody());
   } else {
     // Emit the body of the closure as if it were a single return
     // statement.
     ReturnStmt ret(SourceLoc(), cast<ClosureExpr>(E)->getBody());
-    innerIGF.emitStmt(&ret);
+    IGF.emitStmt(&ret);
+  }
+}
+
+/// Emit an anonymous closure expression.
+void irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E, Explosion &out) {
+  assert(isa<FuncExpr>(E) || isa<ClosureExpr>(E));
+
+  // Compute the closure information.
+  CaptureInfo info(IGF, E);
+
+  // The specs for an indirect call.
+  ExplosionKind explosionLevel = ExplosionKind::Minimal;
+  unsigned uncurryLevel = 0;
+
+  // Create the LLVM function declaration.
+  llvm::FunctionType *fnType =
+    IGF.IGM.getFunctionType(E->getType(), explosionLevel, uncurryLevel,
+                            info.requiresData());
+  llvm::Function *fn =
+    llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
+                           "closure", &IGF.IGM.Module);
+
+  ManagedValue data;
+  if (!info.requiresData()) {
+    emitLocalFunctionBody(IGF, fn, E, explosionLevel, uncurryLevel,
+                          info, /*layout*/ nullptr);
+    data = ManagedValue(IGF.IGM.RefCountedNull);
+  } else {
+    HeapLayout layout = getHeapLayout(IGF.IGM, info);
+    emitLocalFunctionBody(IGF, fn, E, explosionLevel, uncurryLevel,
+                          info, &layout);
+    data = emitClosureData(IGF, E, info, layout);
   }
 
-  // Build the explosion result.
-  explosion.addUnmanaged(IGF.Builder.CreateBitCast(fn, IGF.IGM.Int8PtrTy));
-  explosion.add(contextPtr);
+  out.addUnmanaged(IGF.Builder.CreateBitCast(fn, IGF.IGM.Int8PtrTy));
+  out.add(data);
 }
 
 /// Emit a function declaration, starting at the given uncurry level.
 void IRGenFunction::emitLocalFunction(FuncDecl *func) {
-  // Nothing to do if the function has no body.
-  if (!func->getBody()) return;
-  FuncExpr *funcExpr = func->getBody();
+  assert(func->getBody() && "local function without a body!");
 
-  Initialization I;
-  auto object = I.getObjectForDecl(func);
-  const TypeInfo &type = getFragileTypeInfo(func->getType());
-  I.registerObject(*this, object, NotOnHeap, type);
-  OwnedAddress addr =
-    I.emitLocalAllocation(*this, object, NotOnHeap, type,
-                          func->getName().str());
+  // Emit the data for a closure.  No need to emit a function body yet.
+  ManagedValue data = emitClosureData(*this, func->getBody());
 
-  Explosion e(ExplosionKind::Maximal);
-  emitClosure(*this, funcExpr, e);
-  type.initialize(*this, e, addr);
-
-  setLocalFunc(func, addr);
+  // Just let the cleanup be bound in the current scope.
+  setLocalFuncData(func, data.getValue(), this);
 }
 
+/// Get or create a definition for the given local function, emitting
+/// it if necessary.  The IGF doesn't need to be for the function
+/// which actually declares the function; it can also be for any
+/// function which has the function and all its captured declarations
+/// mapped.
+llvm::Function *
+IRGenFunction::getAddrOfLocalFunction(FuncDecl *func,
+                                      ExplosionKind explosionLevel,
+                                      unsigned uncurryLevel) {
+  assert(func->getBody() && "local function without a body!");
+
+  llvm::Value *data = getLocalFuncData(func);
+  bool needsData = !isa<llvm::ConstantPointerNull>(data);
+
+  // Find the function pointer.
+  llvm::Function *fn = IGM.getAddrOfFunction(func, explosionLevel,
+                                             uncurryLevel, needsData);
+
+  // If we already have a function body, we're set.
+  if (!fn->empty()) return fn;
+
+  // Find the defining IGF.
+  IRGenFunction *definingIGF = getLocalFuncDefiner(func);
+  assert(definingIGF && "no defining IGF for function that requires data!");
+
+  // Recompute capture information in that context.
+  CaptureInfo info(*definingIGF, func->getBody());
+  assert(info.requiresData());
+  HeapLayout layout = getHeapLayout(IGM, info);
+
+  // Emit the function body.
+  emitLocalFunctionBody(*definingIGF, fn, func->getBody(), explosionLevel,
+                        uncurryLevel, info, &layout);
+
+  return fn;
+}
