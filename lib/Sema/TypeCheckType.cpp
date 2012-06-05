@@ -218,7 +218,7 @@ bool TypeChecker::validateType(Type InTy, bool isFirstPass) {
     for (auto Proto : PC->getProtocols()) {
       if (validateType(Proto, isFirstPass))
         IsInvalid = true;
-      else if (isFirstPass && !Proto->isExistentialType()) {
+      else if (!Proto->isExistentialType()) {
         // FIXME: Terrible source-location information.
         diagnose(PC->getFirstLoc(), diag::protocol_composition_not_protocol,
                  Proto);

@@ -291,7 +291,10 @@ public:
       }
     }
 
-    visitValueDecl(FD);
+    if (visitValueDecl(FD)) {
+      if (FD->getBody())
+        FD->getBody()->setType(FD->getType());
+    }
   }
 
   void visitOneOfElementDecl(OneOfElementDecl *ED) {

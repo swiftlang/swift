@@ -1165,6 +1165,10 @@ bool TypeChecker::semaFunctionSignature(FuncExpr *FE) {
       continue;
     }
   }
+  if (!hadError && validateType(FE->getType(), /*isFirstPass*/false))
+    hadError = true;
+  if (hadError)
+    FE->setType(ErrorType::get(Context));
   return hadError;
 }
 

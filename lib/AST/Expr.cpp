@@ -303,6 +303,8 @@ SourceRange FuncExpr::getSourceRange() const {
 ///   func(x : int) -> (y : int) -> (int -> int)
 ///     The body result type is '(int -> int)'.
 Type FuncExpr::getBodyResultType() const {
+  if (getType()->is<ErrorType>())
+    return getType();
   unsigned n = getParamPatterns().size();
   Type ty = getType();
   do {
