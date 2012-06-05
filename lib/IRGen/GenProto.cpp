@@ -726,9 +726,6 @@ namespace {
     /// It fits at offset zero.
     OffsetZero,
 
-    /// It'll fit if it gets realigned.
-    Realign,
-
     /// It doesn't fit and needs to be side-allocated.
     Allocate
 
@@ -795,12 +792,6 @@ static FixedPacking computePacking(IRGenModule &IGM,
   if (bufferAlign >= requiredAlign)
     return FixedPacking::OffsetZero;
 
-  // We can always reliably realign as long as the max difference
-  // between the alignments doesn't exceed the spare room.
-  if (requiredSize + Size(requiredAlign.getValue() - bufferAlign.getValue())
-        <= bufferSize)
-    return FixedPacking::Realign;
-
   // TODO: consider using a slower mode that dynamically checks
   // whether the buffer size is small enough.
 
@@ -811,7 +802,6 @@ static FixedPacking computePacking(IRGenModule &IGM,
 static bool isNeverAllocated(FixedPacking packing) {
   switch (packing) {
   case FixedPacking::OffsetZero: return true;
-  case FixedPacking::Realign: return true;
   case FixedPacking::Allocate: return false;
   }
   llvm_unreachable("bad FixedPacking value");
@@ -835,28 +825,6 @@ static Address emitProjectBuffer(IRGenFunction &IGF,
     return IGF.Builder.CreateBitCast(buffer, resultTy, "object");
   }
     
-  case FixedPacking::Realign: {
-    // Round the buffer pointer up to the required alignment:
-
-    // Convert the buffer to an integer.
-    llvm::Value *addr = buffer.getAddress();
-    addr = IGF.Builder.CreatePtrToInt(addr, IGF.IGM.SizeTy);
-
-    // Add one less than the alignment.
-    llvm::Value *align = type.getAlignmentOnly(IGF);
-    llvm::Value *alignMask =
-      IGF.Builder.CreateSub(align,
-                            llvm::ConstantInt::get(IGF.IGM.SizeTy, 1),
-                            "alignMask");
-    addr = IGF.Builder.CreateAdd(addr, alignMask);
-
-    // Mask off the low bits.
-    alignMask = IGF.Builder.CreateNot(alignMask);
-    addr = IGF.Builder.CreateAnd(addr, alignMask, "addr-rounded");
-
-    addr = IGF.Builder.CreateIntToPtr(addr, resultTy, "object");
-    return Address(addr, type.StorageAlignment);
-  }
   }
   llvm_unreachable("bad packing!");
   
@@ -880,7 +848,6 @@ static Address emitAllocateBuffer(IRGenFunction &IGF,
   }
 
   case FixedPacking::OffsetZero:
-  case FixedPacking::Realign:
     return emitProjectBuffer(IGF, buffer, packing, type);
   }
   llvm_unreachable("bad packing!");
@@ -919,7 +886,6 @@ static void emitDeallocateBuffer(IRGenFunction &IGF,
   }
 
   case FixedPacking::OffsetZero:
-  case FixedPacking::Realign:
     return;
   }
   llvm_unreachable("bad packing!");
