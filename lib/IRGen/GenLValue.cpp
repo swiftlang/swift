@@ -584,7 +584,7 @@ namespace {
       // An explosion for the 'self' argument, if required.
       Explosion selfArg(setter.getExplosionLevel());
 
-      std::vector<Arg> args;
+      SmallVector<Arg, 2> args;
 
       // A byref member requires 'self' as its first argument.
       if (Target.isByrefMember()) {
@@ -638,7 +638,7 @@ namespace {
       Callee getter = Target.getGetter(IGF, out.getKind());
 
       // Build the arguments.
-      std::vector<Arg> args;
+      SmallVector<Arg, 2> args;
 
       // Byref members need a 'self' argument.
       Explosion selfArg(getter.getExplosionLevel());
@@ -671,7 +671,7 @@ namespace {
       Callee getter = Target.getGetter(IGF, ExplosionKind::Maximal);
 
       // Build the arguments.
-      std::vector<Arg> args;
+      SmallVector<Arg, 2> args;
 
       // Byref members need a 'self' argument.
       Explosion selfArg(getter.getExplosionLevel());

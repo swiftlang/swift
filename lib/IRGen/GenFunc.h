@@ -257,8 +257,6 @@ namespace irgen {
   /// Emit an expression as a callee.
   ///
   /// \param args - arguments to which any extras should be added.
-  ///   This has to be a <vector> because llvm::SmallVector doesn't
-  ///   support move-only types.
   Callee emitCallee(IRGenFunction &IGF, Expr *fn, ExplosionKind bestLevel,
                     unsigned additionalUncurrying,
                     llvm::SmallVectorImpl<Arg> &args);
