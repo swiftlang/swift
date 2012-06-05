@@ -16,25 +16,27 @@
 
 #include "Parser.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
-bool Parser::parseTypeAnnotation(Type &result) {
-  return parseTypeAnnotation(result, diag::expected_type);
+bool Parser::parseTypeAnnotation(Type &result, TypeLoc *&resultLoc) {
+  return parseTypeAnnotation(result, resultLoc, diag::expected_type);
 }
 
 /// parseTypeAnnotation
 ///   type-annotation:
 ///     attribute-list type
-bool Parser::parseTypeAnnotation(Type &result, Diag<> message) {
+bool Parser::parseTypeAnnotation(Type &result, TypeLoc *&resultLoc,
+                                 Diag<> message) {
   // Parse attributes.
   DeclAttributes attrs;
   parseAttributeList(attrs);
 
   // Parse the type.
-  if (parseType(result, message))
+  if (parseType(result, resultLoc, message))
     return true;
 
   // Apply those attributes that do apply.
@@ -45,6 +47,9 @@ bool Parser::parseTypeAnnotation(Type &result, Diag<> message) {
     if (!attrs.isByrefHeap()) quals |= LValueType::Qual::NonHeap;
     result = LValueType::get(result, quals, Context);
     attrs.Byref = false; // so that the empty() check below works
+    resultLoc = TypeLoc::get(Context,
+                             SourceRange(attrs.LSquareLoc,
+                                         resultLoc->getSourceRange().End));
   }
 
   // Handle the auto_closure attribute.
@@ -73,8 +78,8 @@ bool Parser::parseTypeAnnotation(Type &result, Diag<> message) {
   return false;
 }
 
-bool Parser::parseType(Type &Result) {
-  return parseType(Result, diag::expected_type);
+bool Parser::parseType(Type &Result, TypeLoc *&ResultLoc) {
+  return parseType(Result, ResultLoc, diag::expected_type);
 }
 
 /// parseType
@@ -91,24 +96,24 @@ bool Parser::parseType(Type &Result) {
 ///     type-tuple
 ///     type-composition
 ///
-bool Parser::parseType(Type &Result, Diag<> MessageID) {
+bool Parser::parseType(Type &Result, TypeLoc *&ResultLoc, Diag<> MessageID) {
   // Parse type-simple first.
-  SourceLoc TypeLoc = Tok.getLoc();
+  SourceLoc StartLoc = Tok.getLoc();
   bool isTupleType = false;
   switch (Tok.getKind()) {
   case tok::identifier:
-    if (parseTypeIdentifier(Result))
+    if (parseTypeIdentifier(Result, ResultLoc))
       return true;
     break;
   case tok::kw_protocol:
-    if (parseTypeComposition(Result))
+    if (parseTypeComposition(Result, ResultLoc))
       return true;
     break;
   case tok::l_paren:
   case tok::l_paren_space: {
     isTupleType = true;
     SourceLoc LPLoc = consumeToken(), RPLoc;
-    if (parseTypeTupleBody(LPLoc, Result) ||
+    if (parseTypeTupleBody(LPLoc, Result, ResultLoc) ||
         parseMatchingToken(tok::r_paren, RPLoc,
                            diag::expected_rparen_tuple_type_list,
                            LPLoc, diag::opening_paren))
@@ -124,19 +129,24 @@ bool Parser::parseType(Type &Result, Diag<> MessageID) {
   if (consumeIf(tok::arrow)) {
     // If the argument was not syntactically a tuple type, report an error.
     if (!isTupleType) {
-      diagnose(TypeLoc, diag::expected_function_argument_must_be_paren);
+      diagnose(StartLoc, diag::expected_function_argument_must_be_paren);
     }
     
     Type SecondHalf;
-    if (parseType(SecondHalf, diag::expected_type_function_result))
+    TypeLoc *SecondHalfLoc;
+    if (parseType(SecondHalf, SecondHalfLoc,
+                  diag::expected_type_function_result))
       return true;
     Result = FunctionType::get(Result, SecondHalf, Context);
+    SourceRange FnTypeRange{ ResultLoc->getSourceRange().Start,
+                             SecondHalfLoc->getSourceRange().End };
+    ResultLoc = TypeLoc::get(Context, FnTypeRange);
     return false;
   }
 
   // If there is a square bracket without a space, we have an array.
   if (Tok.is(tok::l_square))
-    return parseTypeArray(Result);
+    return parseTypeArray(Result, ResultLoc);
   
   return false;
 }
@@ -146,7 +156,8 @@ bool Parser::parseType(Type &Result, Diag<> MessageID) {
 ///   type-identifier:
 ///     identifier ('.' identifier)*
 ///
-bool Parser::parseTypeIdentifier(Type &Result) {
+bool Parser::parseTypeIdentifier(Type &Result, TypeLoc *&ResultLoc) {
+  SourceLoc StartLoc = Tok.getLoc();
   if (Tok.isNot(tok::identifier)) {
     diagnose(Tok.getLoc(), diag::expected_identifier_for_type);
     return true;
@@ -155,7 +166,7 @@ bool Parser::parseTypeIdentifier(Type &Result) {
   SmallVector<IdentifierType::Component, 4> Components;
   Components.push_back(IdentifierType::Component(Tok.getLoc(),
                                      Context.getIdentifier(Tok.getText())));
-  consumeToken(tok::identifier);
+  SourceLoc EndLoc = consumeToken(tok::identifier);
   
   while (consumeIf(tok::period)) {
     SourceLoc Loc = Tok.getLoc();
@@ -163,6 +174,7 @@ bool Parser::parseTypeIdentifier(Type &Result) {
     if (parseIdentifier(Name, diag::expected_identifier_in_dotted_type))
       return true;
     Components.push_back(IdentifierType::Component(Loc, Name));
+    EndLoc = Loc;
   }
 
   // Lookup element #0 through our current scope chains in case it is some thing
@@ -172,6 +184,7 @@ bool Parser::parseTypeIdentifier(Type &Result) {
   auto Ty = IdentifierType::getNew(Context, Components);
   UnresolvedIdentifierTypes.emplace_back(Ty, CurDeclContext);
   Result = Ty;
+  ResultLoc = TypeLoc::get(Context, SourceRange(StartLoc, EndLoc));
   return false;
 }
 
@@ -183,7 +196,7 @@ bool Parser::parseTypeIdentifier(Type &Result) {
 ///   type-composition-list:
 ///     type-identifier (',' type-identifier)*
 ///
-bool Parser::parseTypeComposition(Type &Result) {
+bool Parser::parseTypeComposition(Type &Result, TypeLoc *&ResultLoc) {
   SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
  
   // Check for the starting '<'.
@@ -207,7 +220,8 @@ bool Parser::parseTypeComposition(Type &Result) {
   do {
     // Parse the type-identifier.
     Type Protocol;
-    if (parseTypeIdentifier(Protocol)) {
+    TypeLoc *ProtocolLoc;
+    if (parseTypeIdentifier(Protocol, ProtocolLoc)) {
       Invalid = true;
       break;
     }
@@ -223,6 +237,7 @@ bool Parser::parseTypeComposition(Type &Result) {
   } while (true);
   
   // Check for the terminating '>'.
+  SourceLoc EndLoc = Tok.getLoc();
   if (!startsWithGreater(Tok)) {
     if (!Invalid) {
       diagnose(Tok.getLoc(), diag::expected_rangle_protocol);
@@ -232,14 +247,15 @@ bool Parser::parseTypeComposition(Type &Result) {
     // Skip until we hit the '>'.
     skipUntil(tok::oper);
     if (startsWithGreater(Tok))
-      consumeStartingGreater();
+      EndLoc = consumeStartingGreater();
     
   } else {
-    consumeStartingGreater();
+    EndLoc = consumeStartingGreater();
   }
   
   Result = ProtocolCompositionType::get(Context, ProtocolLoc,
                                         Context.AllocateCopy(Protocols));
+  ResultLoc = TypeLoc::get(Context, SourceRange(ProtocolLoc, EndLoc));
   return false;
 }
 
@@ -251,7 +267,7 @@ bool Parser::parseTypeComposition(Type &Result) {
 ///   type-tuple-element:
 ///     identifier value-specifier
 ///     type-annotation
-bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
+bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result, TypeLoc *&ResultLoc) {
   SmallVector<TupleTypeElt, 8> Elements;
   bool HadExpr = false;
 
@@ -269,7 +285,8 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
 
         NullablePtr<Expr> init;
         Type type;
-        if ((HadError = parseValueSpecifier(type, init)))
+        TypeLoc *loc;
+        if ((HadError = parseValueSpecifier(type, loc, init)))
           break;
 
         HadExpr |= init.isNonNull();
@@ -279,7 +296,8 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
 
       // Otherwise, this has to be a type.
       Type type;
-      if ((HadError = parseTypeAnnotation(type)))
+      TypeLoc *typeLoc;
+      if ((HadError = parseTypeAnnotation(type, typeLoc)))
         break;
 
       Elements.push_back(TupleTypeElt(type, Identifier(), nullptr));
@@ -304,6 +322,7 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
   if (Elements.size() == 1 && !Elements.back().hasName() && !HadEllipsis) {
     assert(!HadExpr && "Only TupleTypes have default values");
     Result = ParenType::get(Context, Elements.back().getType());
+    ResultLoc = TypeLoc::get(Context, SourceRange(LPLoc, Tok.getLoc()));
     return false;
   }
 
@@ -327,6 +346,7 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
   if (HadExpr)
     TypesWithDefaultValues.emplace_back(TT, CurDeclContext);
   Result = TT;
+  ResultLoc = TypeLoc::get(Context, SourceRange(LPLoc, Tok.getLoc()));
   return false;
 }
 
@@ -340,14 +360,16 @@ bool Parser::parseTypeTupleBody(SourceLoc LPLoc, Type &Result) {
 ///     type-array '[' ']'
 ///     type-array '[' expr ']'
 ///
-bool Parser::parseTypeArray(Type &result) {
+bool Parser::parseTypeArray(Type &result, TypeLoc *&resultLoc) {
   SourceLoc lsquareLoc = Tok.getLoc();
   consumeToken(tok::l_square);
 
   // Handle the [] production, meaning an array slice.
-  if (consumeIf(tok::r_square)) {
+  if (Tok.is(tok::r_square)) {
+    SourceLoc rsquareLoc = consumeToken(tok::r_square);
+
     // If we're starting another square-bracket clause, recurse.
-    if (Tok.is(tok::l_square) && parseTypeArray(result)) {
+    if (Tok.is(tok::l_square) && parseTypeArray(result, resultLoc)) {
       return true;
 
     // Propagate an error type out.
@@ -357,6 +379,8 @@ bool Parser::parseTypeArray(Type &result) {
 
     // Just build a normal array slice type.
     result = ArraySliceType::get(result, lsquareLoc, Context);
+    SourceRange arrayRange{ resultLoc->getSourceRange().Start, rsquareLoc };
+    resultLoc = TypeLoc::get(Context, arrayRange);
     return false;
   }
   
@@ -370,7 +394,7 @@ bool Parser::parseTypeArray(Type &result) {
     return true;
 
   // If we're starting another square-bracket clause, recurse.
-  if (Tok.is(tok::l_square) && parseTypeArray(result)) {
+  if (Tok.is(tok::l_square) && parseTypeArray(result, resultLoc)) {
     return true;
   
   // If we had a semantic error on the size or if the base type is invalid,

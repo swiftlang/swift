@@ -156,7 +156,7 @@ bool Parser::checkFullyTyped(Pattern *pattern, Type &funcTy) {
 ///   func-signature-result:
 ///     '->' type
 bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &params,
-                                    Type &type) {
+                                    Type &type, TypeLoc *&loc) {
   // Parse curried function argument clauses as long as we can.
   do {
     NullablePtr<Pattern> pattern = parsePatternTuple();
@@ -168,7 +168,7 @@ bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &params,
 
   // If there's a trailing arrow, parse the rest as the result type.
   if (consumeIf(tok::arrow)) {
-    if (parseType(type))
+    if (parseType(type, loc))
       return true;
 
     checkFullyTyped(type);
@@ -176,16 +176,17 @@ bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &params,
   // Otherwise, we implicitly return ().
   } else {
     type = TupleType::getEmpty(Context);
+    loc = nullptr;
   }
 
   // Now build up the function type.  We require all function
   // signatures to be fully-typed: that is, all top-down paths to a
   // leaf pattern must pass through a TypedPattern.
-  return buildFunctionSignature(params, type);
+  return buildFunctionSignature(params, type, loc);
 }
 
 bool Parser::buildFunctionSignature(SmallVectorImpl<Pattern*> &params,
-                                    Type &type) {
+                                    Type &type, TypeLoc *&loc) {
   // Now build up the function type.  We require all function
   // signatures to be fully-typed: that is, all top-down paths to a
   // leaf pattern must pass through a TypedPattern.
@@ -215,7 +216,8 @@ NullablePtr<Pattern> Parser::parsePattern() {
   // Now parse an optional type annotation.
   if (consumeIf(tok::colon)) {
     Type type;
-    if (parseTypeAnnotation(type))
+    TypeLoc *loc;
+    if (parseTypeAnnotation(type, loc))
       return nullptr;
 
     pattern = new (Context) TypedPattern(pattern.get(), type);

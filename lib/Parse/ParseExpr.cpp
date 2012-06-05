@@ -131,7 +131,8 @@ NullablePtr<Expr> Parser::parseExprNew() {
 
   // FIXME: this should probably be type-simple.
   Type elementTy;
-  if (parseTypeIdentifier(elementTy))
+  TypeLoc *elementLoc;
+  if (parseTypeIdentifier(elementTy, elementLoc))
     return nullptr;
 
   // TODO: we should probably allow a tuple-expr here as an initializer.
@@ -584,6 +585,7 @@ NullablePtr<Expr> Parser::parseExprFunc() {
 
   SmallVector<Pattern*, 4> Params;
   Type Ty;
+  TypeLoc *Loc;
   if (Tok.is(tok::l_brace)) {
     // If the func-signature isn't present, then this is a ()->() function.
     Params.push_back(TuplePattern::create(Context, SourceLoc(),
@@ -594,7 +596,7 @@ NullablePtr<Expr> Parser::parseExprFunc() {
   } else if (Tok.isNotAnyLParen()) {
     diagnose(Tok, diag::func_decl_without_paren);
     return 0;
-  } else if (parseFunctionSignature(Params, Ty)) {
+  } else if (parseFunctionSignature(Params, Ty, Loc)) {
     return 0;
   }
   

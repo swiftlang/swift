@@ -34,6 +34,7 @@ namespace swift {
   class DiagnosticEngine;
   class Lexer;
   class ScopeInfo;
+  class TypeLoc;
   class TupleType;
   
   struct OneOfElementInfo;
@@ -201,7 +202,7 @@ public:
                           SourceLoc OtherLoc, Diag<> OtherNote,
                           tok SkipToTok = tok::unknown);
   
-  bool parseValueSpecifier(Type &Ty, NullablePtr<Expr> &Init);
+  bool parseValueSpecifier(Type &Ty, TypeLoc *&Loc, NullablePtr<Expr> &Init);
 
   void parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Decls,
                           bool IsTopLevel);
@@ -262,21 +263,22 @@ public:
   //===--------------------------------------------------------------------===//
   // Type Parsing
   
-  bool parseType(Type &Result);
-  bool parseType(Type &Result, Diag<> ID);
-  bool parseTypeAnnotation(Type &Result);
-  bool parseTypeAnnotation(Type &Result, Diag<> ID);
-  bool parseTypeIdentifier(Type &Result);
-  bool parseTypeComposition(Type &Result);
-  bool parseTypeTupleBody(SourceLoc LPLoc, Type &Result);
-  
-  bool parseTypeArray(Type &result);
+  bool parseType(Type &Result, TypeLoc *&ResultLoc);
+  bool parseType(Type &Result, TypeLoc *&ResultLoc, Diag<> ID);
+  bool parseTypeAnnotation(Type &Result, TypeLoc *&ResultLoc);
+  bool parseTypeAnnotation(Type &Result, TypeLoc *&ResultLoc, Diag<> ID);
+  bool parseTypeIdentifier(Type &Result, TypeLoc *&ResultLoc);
+  bool parseTypeComposition(Type &Result, TypeLoc *&ResultLoc);
+  bool parseTypeTupleBody(SourceLoc LPLoc, Type &Result, TypeLoc *&ResultLoc);
+  bool parseTypeArray(Type &result, TypeLoc *&ResultLoc);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
 
-  bool parseFunctionSignature(SmallVectorImpl<Pattern*> &params, Type &type);
-  bool buildFunctionSignature(SmallVectorImpl<Pattern*> &params, Type &type);
+  bool parseFunctionSignature(SmallVectorImpl<Pattern*> &params, Type &type,
+                              TypeLoc *&loc);
+  bool buildFunctionSignature(SmallVectorImpl<Pattern*> &params, Type &type,
+                              TypeLoc *&loc);
   NullablePtr<Pattern> parsePattern();
   NullablePtr<Pattern> parsePatternTuple();
   NullablePtr<Pattern> parsePatternAtom();

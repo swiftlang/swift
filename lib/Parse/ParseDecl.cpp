@@ -476,7 +476,8 @@ bool Parser::parseInheritance(SmallVectorImpl<Type> &Inherited) {
   do {
     // Parse the inherited type (which must be a protocol).
     Type Ty;
-    if (parseTypeIdentifier(Ty))
+    TypeLoc *Loc;
+    if (parseTypeIdentifier(Ty, Loc))
       return true;
     
     // Record the type.
@@ -503,9 +504,10 @@ Decl *Parser::parseDeclExtension() {
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
 
   Type Ty;
-  SourceLoc TyLoc = Tok.getLoc();
+  SourceLoc TyStartLoc = Tok.getLoc();
+  TypeLoc *TyLoc;
   SourceLoc LBLoc, RBLoc;
-  if (parseTypeIdentifier(Ty))
+  if (parseTypeIdentifier(Ty, TyLoc))
     return nullptr;
   
   // Parse optional inheritance clause.
@@ -517,7 +519,7 @@ Decl *Parser::parseDeclExtension() {
     return nullptr;
   
   ExtensionDecl *ED
-    = new (Context) ExtensionDecl(ExtensionLoc, Ty, TyLoc,
+    = new (Context) ExtensionDecl(ExtensionLoc, Ty, TyStartLoc,
                                   Context.AllocateCopy(Inherited),
                                   CurDeclContext);
   ContextChange CC(*this, ED);
@@ -547,6 +549,7 @@ TypeAliasDecl *Parser::parseDeclTypeAlias(bool WantDefinition) {
   
   Identifier Id;
   Type Ty;
+  TypeLoc *TyLoc;
   SourceLoc IdLoc = Tok.getLoc();
   if (parseIdentifier(Id, diag::expected_identifier_in_decl, "typealias"))
     return nullptr;
@@ -558,7 +561,7 @@ TypeAliasDecl *Parser::parseDeclTypeAlias(bool WantDefinition) {
 
   if (WantDefinition || Tok.is(tok::equal)) {
     if (parseToken(tok::equal, diag::expected_equal_in_typealias) ||
-        parseType(Ty, diag::expected_type_in_typealias))
+        parseType(Ty, TyLoc, diag::expected_type_in_typealias))
       return nullptr;
     
     if (!WantDefinition) {
@@ -760,7 +763,8 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       
       // Getter has type: () -> T.
       Type FuncTy = ElementTy;
-      if (buildFunctionSignature(Params, FuncTy)) {
+      TypeLoc *FuncLoc = nullptr;
+      if (buildFunctionSignature(Params, FuncTy, FuncLoc)) {
         skipUntilDeclRBrace();
         Invalid = true;
         break;
@@ -882,7 +886,8 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     
     // Getter has type: (value : T) -> ()
     Type FuncTy = TupleType::getEmpty(Context);
-    if (buildFunctionSignature(Params, FuncTy)) {
+    TypeLoc *FuncLoc = nullptr;
+    if (buildFunctionSignature(Params, FuncTy, FuncLoc)) {
       skipUntilDeclRBrace();
       Invalid = true;
       break;
@@ -1137,7 +1142,8 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
     Params.push_back(buildImplicitThisParameter());
 
   Type FuncTy;
-  if (parseFunctionSignature(Params, FuncTy))
+  TypeLoc *FuncTyLoc;
+  if (parseFunctionSignature(Params, FuncTy, FuncTyLoc))
     return 0;
   
   // Enter the arguments for the function into a new function-body scope.  We
@@ -1226,6 +1232,7 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
     SourceLoc NameLoc;
     StringRef Name;
     Type EltType;
+    TypeLoc *EltTypeLoc;
   };
   SmallVector<OneOfElementInfo, 8> ElementInfos;
 
@@ -1244,7 +1251,7 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
     
       // See if we have a type specifier for this oneof element.  If so, parse it.
       if (consumeIf(tok::colon) &&
-          parseTypeAnnotation(ElementInfo.EltType,
+          parseTypeAnnotation(ElementInfo.EltType, ElementInfo.EltTypeLoc,
                               diag::expected_type_oneof_element)) {
         skipUntil(tok::r_brace);
         return true;
@@ -1563,7 +1570,9 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   
   // type
   Type ElementTy;
-  if (parseTypeAnnotation(ElementTy, diag::expected_type_subscript))
+  TypeLoc *ElementTyLoc;
+  if (parseTypeAnnotation(ElementTy, ElementTyLoc,
+                          diag::expected_type_subscript))
     return true;
   if (checkFullyTyped(ElementTy))
     Invalid = true;

@@ -17,6 +17,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/SmallMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -831,3 +832,17 @@ void SubstArchetypeType::print(raw_ostream &OS) const {
   getSubstType()->print(OS);
 }
 
+//===----------------------------------------------------------------------===//
+//  TypeLoc implementation
+//===----------------------------------------------------------------------===//
+
+TypeLoc::TypeLoc(SourceRange Range) : Range(Range) {}
+
+void *TypeLoc::operator new(size_t Bytes, ASTContext &C,
+                            unsigned Alignment) {
+  return C.Allocate(Bytes, Alignment);
+}
+
+TypeLoc *TypeLoc::get(ASTContext &Context, SourceRange Range) {
+  return new (Context) TypeLoc(Range);
+}
