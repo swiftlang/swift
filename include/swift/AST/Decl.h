@@ -893,6 +893,16 @@ public:
   static bool classof(const SubscriptDecl *D) { return true; }
 };
 
+/// ConstructorDecl - Declares a constructor for a type.  For example:
+///
+/// \code
+/// struct X {
+///   var x : Int
+///   constructor(i : Int) {
+///      x = i
+///   }
+/// }
+/// \endcode
 class ConstructorDecl : public ValueDecl, public DeclContext {
   SourceLoc ConstructorLoc;
   Pattern *Arguments;
@@ -916,8 +926,8 @@ public:
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *b) { Body = b; }
 
-  /// getThisType - compute and return the type to be used for 'this'.
-  Type getThisType() const { return ImplicitThisDecl->getType(); }
+  /// computeThisType - compute and return the type of 'this'.
+  Type computeThisType() const;
   
   /// getImplicitThisDecl - This method returns the implicit 'this' decl.
   VarDecl *getImplicitThisDecl() const { return ImplicitThisDecl; }

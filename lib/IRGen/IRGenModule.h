@@ -41,6 +41,7 @@ namespace swift {
   class ASTContext;
   class BraceStmt;
   class ClassType;
+  class ConstructorDecl;
   class Decl;
   class ExtensionDecl;
   class FuncDecl;
@@ -48,10 +49,12 @@ namespace swift {
   class OneOfDecl;
   class OneOfType;
   class SourceLoc;
+  class StructType;
   class TranslationUnit;
   class Type;
   class TypeAliasDecl;
   class TypeDecl;
+  class ValueDecl;
   class VarDecl;
 
 namespace irgen {
@@ -176,6 +179,7 @@ public:
   void emitGlobalFunction(FuncDecl *D);  
   void emitStaticMethod(FuncDecl *D);
   void emitInstanceMethod(FuncDecl *D);
+  void emitConstructor(ConstructorDecl *D);
 
   llvm::FunctionType *getFunctionType(Type fnType, ExplosionKind kind,
                                       unsigned uncurryLevel, bool withData);
@@ -187,6 +191,7 @@ public:
   llvm::Function *getAddrOfGetter(ValueDecl *D, ExplosionKind kind);
   llvm::Function *getAddrOfSetter(ValueDecl *D, ExplosionKind kind);
   llvm::Function *getAddrOfValueWitness(Type concreteType, ValueWitness index);
+  llvm::Function *getAddrOfConstructor(ConstructorDecl *D, ExplosionKind kind);
 };
 
 } // end namespace irgen

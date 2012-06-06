@@ -203,7 +203,8 @@ void IRGenModule::emitStructType(StructType *st) {
       continue;
     }
     case DeclKind::Constructor: {
-      llvm_unreachable("Not yet implemented");
+      emitConstructor(cast<ConstructorDecl>(member));
+      continue;
     }
     }
     llvm_unreachable("bad extension member kind");

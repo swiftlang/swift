@@ -385,8 +385,8 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
         }
       }
 
-      ExtendedType = CD->getThisType();
       BaseDecl = CD->getImplicitThisDecl();
+      ExtendedType = CD->getDeclContext()->getDeclaredTypeOfContext();
       DC = DC->getParent();
     }
 

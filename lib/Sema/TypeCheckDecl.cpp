@@ -353,11 +353,13 @@ public:
     if (!CD->getDeclContext()->isTypeContext())
       TC.diagnose(CD->getStartLoc(), diag::constructor_not_member);
 
-    Type Ty;
     if (CD->getArguments()->hasType()) {
-      Type ThisTy = CD->getDeclContext()->getDeclaredTypeOfContext();
-      CD->setType(FunctionType::get(CD->getArguments()->getType(),
-                                    ThisTy, TC.Context));
+      Type ThisTy = CD->computeThisType();
+      Type FnTy = FunctionType::get(CD->getArguments()->getType(),
+                                    TupleType::getEmpty(TC.Context),
+                                    TC.Context);
+      FnTy = FunctionType::get(ThisTy, FnTy, TC.Context);
+      CD->setType(FnTy);
       CD->getImplicitThisDecl()->setType(ThisTy);
     } else {
       CD->setType(ErrorType::get(TC.Context));

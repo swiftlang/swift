@@ -414,6 +414,30 @@ llvm::Function *IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
   return entry;
 }
 
+/// Fetch the declaration of the given known function.
+llvm::Function *IRGenModule::getAddrOfConstructor(ConstructorDecl *cons,
+                                                  ExplosionKind kind) {
+  LinkEntity entity = LinkEntity::forFunction(cons, kind, 1);
+
+  // Check whether we've cached this.
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) return cast<llvm::Function>(entry);
+
+  llvm::FunctionType *fnType =
+    getFunctionType(cons->getType(), kind, 1, /*needsData*/false);
+
+  bool indirectResult = hasIndirectResult(*this, cons->getType(),
+                                          kind, 1);
+
+  SmallVector<llvm::AttributeWithIndex, 4> attrs;
+  auto cc = expandAbstractCC(*this, AbstractCC::Method, indirectResult,
+                             attrs);
+
+  LinkInfo link = LinkInfo::get(*this, entity);
+  entry = link.createFunction(*this, fnType, cc, attrs);
+  return entry;
+}
+
 /// Returns the address of a value-witness function.
 llvm::Function *IRGenModule::getAddrOfValueWitness(Type concreteType,
                                                    ValueWitness index) {
@@ -593,7 +617,8 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
       continue;
     }
     case DeclKind::Constructor: {
-      llvm_unreachable("Not yet implemented");
+      emitConstructor(cast<ConstructorDecl>(member));
+      continue;
     }
     }
     llvm_unreachable("bad extension member kind");

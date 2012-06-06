@@ -382,6 +382,17 @@ SourceLoc ConstructorDecl::getLoc() const {
   return Arguments->getStartLoc();
 }
 
+Type ConstructorDecl::computeThisType() const {
+  Type ContainerType = getDeclContext()->getDeclaredTypeOfContext();
+
+  if (ContainerType->hasReferenceSemantics())
+    return ContainerType;
+  
+  // 'this' is accepts implicit l-values and doesn't force them to the heap.
+  return LValueType::get(ContainerType, LValueType::Qual::NonHeap,
+                         getParent()->getASTContext());
+}
+
 //===----------------------------------------------------------------------===//
 //  Decl printing.
 //===----------------------------------------------------------------------===//
