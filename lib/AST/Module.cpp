@@ -357,13 +357,11 @@ void Module::lookupValueConstructors(Type BaseType,
          "This expects that the input list is empty, could be generalized");
 
   TypeDecl *D;
-  Identifier Name;
   Identifier Constructor = Ctx.getIdentifier("constructor");
   ArrayRef<ValueDecl*> BaseMembers;
   SmallVector<ValueDecl*, 2> BaseMembersStorage;
   if (StructType *ST = BaseType->getAs<StructType>()) {
     D = ST->getDecl();
-    Name = ST->getDecl()->getName();
     for (Decl* Member : ST->getDecl()->getMembers()) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
         BaseMembersStorage.push_back(VD);
@@ -371,7 +369,6 @@ void Module::lookupValueConstructors(Type BaseType,
     BaseMembers = BaseMembersStorage;
   } else if (OneOfType *OOT = BaseType->getAs<OneOfType>()) {
     D = OOT->getDecl();
-    Name = OOT->getDecl()->getName();
     for (Decl* Member : OOT->getDecl()->getMembers()) {
       // FIXME: We shouldn't be injecting OneOfElementDecls into the results
       // like this.
@@ -387,14 +384,12 @@ void Module::lookupValueConstructors(Type BaseType,
   DeclContext *DC = D->getDeclContext();
   if (!DC->isModuleContext()) {
     for (ValueDecl *VD : BaseMembers) {
-      if (VD->getName() == Name || VD->getName() == Constructor)
+      if (VD->getName() == Constructor)
         Result.push_back(VD);
     }
     return;
   }
 
-  DoGlobalExtensionLookup(BaseType, Name, BaseMembers, this, cast<Module>(DC),
-                          Result);
   DoGlobalExtensionLookup(BaseType, Constructor, BaseMembers, this,
                           cast<Module>(DC), Result);
 }
