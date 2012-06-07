@@ -142,10 +142,11 @@ public:
   bool AutoClosure;
   bool Assignment;
   bool Conversion;
+  bool Postfix;
   
   DeclAttributes() : Byref(false), ByrefHeap(false),
                      AutoClosure(false), Assignment(false),
-                     Conversion(false) { }
+                     Conversion(false), Postfix(false) { }
 
   bool isValid() const { return LSquareLoc.isValid(); }
 
@@ -157,10 +158,12 @@ public:
   bool isAutoClosure() const { return AutoClosure; }
   bool isAssignment() const { return Assignment; }
   bool isConversion() const { return Conversion; }
+  bool isPostfix() const { return Postfix; }
   
   bool empty() const {
     return !isInfix() && !getResilienceData().isValid() && !isByref() &&
-           !isAutoClosure();
+           !isAutoClosure() && !isAssignment() && !isConversion() &&
+           !isPostfix();
   }
 };
   

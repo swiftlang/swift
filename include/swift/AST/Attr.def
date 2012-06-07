@@ -30,5 +30,6 @@ ATTR(born_fragile)
 ATTR(byref)
 ATTR(auto_closure)
 ATTR(asmname)
+ATTR(postfix)
 
 #undef ATTR

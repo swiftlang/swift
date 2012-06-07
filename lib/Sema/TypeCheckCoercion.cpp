@@ -1015,7 +1015,8 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
   if (OverloadSetRefExpr *OSE = dyn_cast<OverloadSetRefExpr>(E->getFn())) {
     SmallVector<ValueDecl*, 4> Viable;
     if (ValueDecl *Best = TC.filterOverloadSet(OSE->getDecls(),
-                                               (isa<UnaryExpr>(E) ||
+                                               (isa<PrefixUnaryExpr>(E) ||
+                                                isa<PostfixUnaryExpr>(E) ||
                                                 isa<BinaryExpr>(E)),
                                                OSE->getBaseType(),
                                                E->getArg(),

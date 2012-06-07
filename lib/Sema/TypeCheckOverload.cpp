@@ -55,7 +55,8 @@ void TypeChecker::diagnoseEmptyOverloadSet(Expr *E,
         << Elements[0]->getSourceRange() << Elements[1]->getSourceRange();
     }
   }
-  else if (const UnaryExpr *UE = dyn_cast<UnaryExpr>(E)) {
+  else if (isa<PrefixUnaryExpr>(E) || isa<PostfixUnaryExpr>(E)) {
+    const ApplyExpr *UE = cast<ApplyExpr>(E);
     // FIXME: this feels a bit ad hoc with how we dig through the AST, and
     // it possibly makes assumptions that aren't true or I don't understand.
     // Some of this structure would feel nice to put back into the AST

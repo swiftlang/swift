@@ -211,13 +211,14 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // If this is an operator, make sure that the declaration found was declared
     // as such.
     bool Assignment = false;
-    if (isa<UnaryExpr>(E) || isa<BinaryExpr>(E)) {
+    if (isa<PrefixUnaryExpr>(E) || isa<PostfixUnaryExpr>(E) ||
+        isa<BinaryExpr>(E)) {
       auto DRE = cast<DeclRefExpr>(E1);
       
       if (!DRE->getDecl()->isOperator()) {
         diagnose(E1->getLoc(),
-                 isa<UnaryExpr>(E) ? diag::unary_op_without_attribute
-                                  : diag::binary_op_without_attribute);
+                 !isa<BinaryExpr>(E) ? diag::unary_op_without_attribute
+                                     : diag::binary_op_without_attribute);
         return nullptr;
       }
       
@@ -293,7 +294,9 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // Perform overload resolution.
   llvm::SmallVector<ValueDecl *, 4> Viable;
   ValueDecl *Best = filterOverloadSet(OS->getDecls(),
-                                      (isa<UnaryExpr>(E) || isa<BinaryExpr>(E)),
+                                      (isa<PrefixUnaryExpr>(E) ||
+                                       isa<PostfixUnaryExpr>(E) ||
+                                       isa<BinaryExpr>(E)),
                                       OS->getBaseType(), E2,
                                       Type(), Viable);
   

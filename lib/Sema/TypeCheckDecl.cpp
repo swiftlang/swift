@@ -401,49 +401,66 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     if (TupleType *TT = dyn_cast<TupleType>(FT->getInput()))
       NumArguments = TT->getFields().size();
 
+  bool isOperator = VD->isOperator();
+
   // Operators must be declared with 'func', not 'var'.
-  if (VD->isOperator() && !isa<FuncDecl>(VD)) {
-    TC.diagnose(VD->getStartLoc(), diag::operator_not_func);
-    // FIXME: Set the 'isError' bit on the decl.
-    return;
+  if (isOperator) {
+    if (!isa<FuncDecl>(VD)) {
+      TC.diagnose(VD->getStartLoc(), diag::operator_not_func);
+      // FIXME: Set the 'isError' bit on the decl.
+      return;
+    }
+  
+    if (NumArguments == 0 || NumArguments > 2) {
+      TC.diagnose(VD->getStartLoc(), diag::invalid_arg_count_for_operator);
+      VD->getMutableAttrs().Infix = InfixData();
+      // FIXME: Set the 'isError' bit on the decl.
+      return;
+    }
+
+    // The unary operator '&' cannot be overloaded.  In an expression,
+    // the parser never interprets this as a normal unary operator
+    // anyway.
+    if (NumArguments == 1 && VD->getName().str() == "&") {
+      TC.diagnose(VD->getStartLoc(), diag::custom_operator_addressof);
+      return;
+    }
   }
   
-  if (VD->isOperator() && (NumArguments == 0 || NumArguments > 2)) {
-    TC.diagnose(VD->getStartLoc(), diag::invalid_arg_count_for_operator);
-    VD->getMutableAttrs().Infix = InfixData();
-    // FIXME: Set the 'isError' bit on the decl.
-    return;
+  if (Attrs.isInfix()) {
+    // Only operator functions can be infix.
+    if (!isOperator) {
+      TC.diagnose(VD->getStartLoc(), diag::infix_not_an_operator);
+      VD->getMutableAttrs().Infix = InfixData();
+      // FIXME: Set the 'isError' bit on the decl.
+      return;
+    }
+
+    // Only binary operators can be infix.
+    if (NumArguments != 2) {
+      TC.diagnose(Attrs.LSquareLoc, diag::invalid_infix_left_input);
+      VD->getMutableAttrs().Infix = InfixData();
+      // FIXME: Set the 'isError' bit on the decl.
+      return;
+    }
   }
 
-  // The unary operator '&' cannot be overloaded.  In an expression,
-  // the parser never interprets this as a normal unary operator
-  // anyway.
-  if (VD->isOperator() && NumArguments == 1 &&
-      VD->getName().str() == "&") {
-    TC.diagnose(VD->getStartLoc(), diag::custom_operator_addressof);
-    return;
-  }
-  
-  // If the decl has an infix precedence specified, then it must be a function
-  // whose input is a two element tuple.
-  if (Attrs.isInfix() && NumArguments != 2) {
-    TC.diagnose(Attrs.LSquareLoc, diag::invalid_infix_left_input);
-    VD->getMutableAttrs().Infix = InfixData();
-    // FIXME: Set the 'isError' bit on the decl.
-    return;
-  }
+  if (Attrs.isPostfix()) {
+    // Only operator functions can be postfix.
+    if (!isOperator) {
+      TC.diagnose(VD->getStartLoc(), diag::postfix_not_an_operator);
+      VD->getMutableAttrs().Postfix = false;
+      // FIXME: Set the 'isError' bit on the decl.
+      return;
+    }
 
-  if (Attrs.isInfix() && !VD->isOperator()) {
-    TC.diagnose(VD->getStartLoc(), diag::infix_left_not_an_operator);
-    VD->getMutableAttrs().Infix = InfixData();
-    // FIXME: Set the 'isError' bit on the decl.
-    return;
-  }
-
-  // Only var and func decls can be infix.
-  if (Attrs.isInfix() && !isa<VarDecl>(VD) && !isa<FuncDecl>(VD)) {
-    TC.diagnose(VD->getStartLoc(), diag::infix_left_invalid_on_decls);
-    VD->getMutableAttrs().Infix = InfixData();
+    // Only unary operators can be postfix.
+    if (NumArguments != 1) {
+      TC.diagnose(VD->getStartLoc(), diag::invalid_postfix_input);
+      VD->getMutableAttrs().Postfix = false;
+      // FIXME: Set the 'isError' bit on the decl.
+      return;
+    }
   }
 
   if (Attrs.isAssignment()) {

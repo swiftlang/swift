@@ -97,8 +97,17 @@ NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
   Expr *Operator = parseExprOperator();
 
   if (Expr *SubExpr = parseExprUnary(Message).getPtrOrNull())
-    return new (Context) UnaryExpr(Operator, SubExpr);
+    return new (Context) PrefixUnaryExpr(Operator, SubExpr);
   return 0;
+}
+
+static DeclRefKind getDeclRefKindForOperator(tok kind) {
+  switch (kind) {
+  case tok::oper_binary:  return DeclRefKind::BinaryOperator;
+  case tok::oper_postfix: return DeclRefKind::PostfixOperator;
+  case tok::oper_prefix:  return DeclRefKind::PrefixOperator;
+  default: llvm_unreachable("bad operator token kind");
+  }
 }
 
 /// parseExprOperator - Parse an operator reference expression.  These
@@ -106,11 +115,13 @@ NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
 /// operators.
 Expr *Parser::parseExprOperator() {
   assert(Tok.isAnyOperator());
-  SourceLoc Loc = Tok.getLoc();
-  Identifier Name = Context.getIdentifier(Tok.getText());
+  DeclRefKind refKind = getDeclRefKindForOperator(Tok.getKind());
+  SourceLoc loc = Tok.getLoc();
+  Identifier name = Context.getIdentifier(Tok.getText());
   consumeToken();
-  
-  return actOnIdentifierExpr(Name, Loc);
+
+  // Bypass local lookup.
+  return new (Context) UnresolvedDeclRefExpr(name, refKind, loc);
 }
 
 /// parseExprNew
@@ -342,7 +353,7 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     // Check for a postfix-operator suffix.
     if (Tok.is(tok::oper_postfix)) {
       Expr *oper = parseExprOperator();
-      Result = new (Context) UnaryExpr(oper, Result.get());
+      Result = new (Context) PostfixUnaryExpr(oper, Result.get());
       continue;
     }
         
@@ -487,11 +498,13 @@ Expr *Parser::parseExprAnonClosureArg() {
   return new (Context) DeclRefExpr(AnonClosureVars.back()[ArgNo], Loc);
 }
 
-Expr *Parser::actOnIdentifierExpr(Identifier Text, SourceLoc Loc) {
-  ValueDecl *D = ScopeInfo.lookupValueName(Text);
+Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
+  ValueDecl *D = ScopeInfo.lookupValueName(text);
   
-  if (D == 0)
-    return new (Context) UnresolvedDeclRefExpr(Text, Loc);
+  if (D == 0) {
+    auto refKind = DeclRefKind::Ordinary;
+    return new (Context) UnresolvedDeclRefExpr(text, refKind, loc);
+  }
 
   // Compute captures for local value declaration.
   DeclContext *ValDC = D->getDeclContext();
@@ -503,7 +516,7 @@ Expr *Parser::actOnIdentifierExpr(Identifier Text, SourceLoc Loc) {
       DC = DC->getParent();
     }
   }
-  return new (Context) DeclRefExpr(D, Loc);
+  return new (Context) DeclRefExpr(D, loc);
 }
 
 

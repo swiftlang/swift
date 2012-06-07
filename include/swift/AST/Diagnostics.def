@@ -578,6 +578,9 @@ ERROR(abiguous_type_base,sema_nb,none,
       "%0 is ambiguous for type look up in this context", (Identifier))
 ERROR(invalid_member_type,sema_nb,none,
       "%0 is not a member type of %1", (Identifier, Identifier))
+ERROR(use_nonmatching_operator,sema_nb,none,
+      "%0 is not a %select{binary|prefix unary|postfix unary}1 operator",
+      (Identifier, unsigned))
 ERROR(use_unresolved_identifier,sema_nb,none,
       "use of unresolved identifier %0", (Identifier))
 ERROR(use_undeclared_type,sema_nb,none,
@@ -653,12 +656,14 @@ ERROR(invalid_arg_count_for_operator,sema_tcd,none,
 ERROR(invalid_infix_left_input,sema_tcd,none,
   "function with 'infix_left' specified must take a two element tuple as input",
      ())
-ERROR(infix_left_not_an_operator,sema_tcd,none,
-      "only operators may be declared 'infix_left'", ())
-ERROR(infix_left_invalid_on_decls,sema_tcd,none,
-      "declaration cannot be declared 'infix_left'", ())
+ERROR(infix_not_an_operator,sema_tcd,none,
+      "only operator functions may be declared with an infix attribute", ())
 ERROR(binops_infix_left,sema_tcd,none,
-      "binary operators must be declared 'infix_left'", ())
+      "binary operators must be declared with an infix attribute", ())
+ERROR(postfix_not_an_operator,sema_tcd,none,
+      "only operator functions can be declared 'postfix'", ())
+ERROR(invalid_postfix_input,sema_tcd,none,
+      "only unary operators can be declared 'postfix'", ())
 ERROR(assignment_without_byref,sema_tcd,none,
       "assignment operator must have an initial [byref] argument", ())
 ERROR(assignment_nonvoid,sema_tcd,none,

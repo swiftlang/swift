@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -505,6 +506,36 @@ bool checkProtocolCircularity(TypeChecker &TC, ProtocolDecl *Proto,
   return false;
 }
 
+static unsigned getNumArgs(ValueDecl *value) {
+  if (!isa<FuncDecl>(value)) return ~0U;
+
+  Type argTy = cast<FunctionType>(value->getType())->getInput();
+  if (auto tuple = argTy->getAs<TupleType>()) {
+    return tuple->getFields().size();
+  } else {
+    return 1;
+  }
+}
+
+static bool matchesDeclRefKind(ValueDecl *value, DeclRefKind refKind) {
+  switch (refKind) {
+  // An ordinary reference doesn't ignore anything.
+  case DeclRefKind::Ordinary:
+    return true;
+
+  // A binary-operator reference only honors FuncDecls with a certain type.
+  case DeclRefKind::BinaryOperator:
+    return (getNumArgs(value) == 2);
+
+  case DeclRefKind::PrefixOperator:
+    return (!value->getAttrs().isPostfix() && getNumArgs(value) == 1);
+
+  case DeclRefKind::PostfixOperator:
+    return (value->getAttrs().isPostfix() && getNumArgs(value) == 1);    
+  }
+  llvm_unreachable("bad declaration reference kind");
+}
+
 /// BindName - Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression.  Context is the DeclContext used
 /// for the lookup.
@@ -535,9 +566,12 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
   for (auto Result : Lookup.Results) {
     switch (Result.Kind) {
     case UnqualifiedLookupResult::ModuleMember:
-    case UnqualifiedLookupResult::LocalDecl:
-      ResultValues.push_back(Result.getValueDecl());
+    case UnqualifiedLookupResult::LocalDecl: {
+      ValueDecl *D = Result.getValueDecl();
+      if (matchesDeclRefKind(D, UDRE->getRefKind()))
+        ResultValues.push_back(D);
       break;
+    }
     case UnqualifiedLookupResult::MemberProperty:
     case UnqualifiedLookupResult::MemberFunction:
     case UnqualifiedLookupResult::MetatypeMember:
@@ -547,8 +581,17 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
       break;
     }
   }
-  if (AllDeclRefs)
+  if (AllDeclRefs) {
+    // Diagnose uses of operators that found no matching candidates.
+    if (ResultValues.empty()) {
+      assert(UDRE->getRefKind() != DeclRefKind::Ordinary);
+      TC.diagnose(Loc, diag::use_nonmatching_operator, Name,
+                  UDRE->getRefKind() == DeclRefKind::BinaryOperator ? 0 :
+                  UDRE->getRefKind() == DeclRefKind::PrefixOperator ? 1 : 2);
+      return new (TC.Context) ErrorExpr(Loc);
+    }
     return OverloadedDeclRefExpr::createWithCopy(ResultValues, Loc);
+  }
 
   ResultValues.clear();
   bool AllMemberRefs = true;

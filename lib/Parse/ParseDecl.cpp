@@ -243,6 +243,15 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     return false;    
   }
 
+  case AttrName::postfix: {
+    if (Attributes.isPostfix())
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+
+    consumeToken(tok::identifier);
+    Attributes.Postfix = true;
+    return false;
+  }
+
   case AttrName::conversion: {
     if (Attributes.isConversion())
       diagnose(Tok, diag::duplicate_attribute, Tok.getText());

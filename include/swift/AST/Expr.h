@@ -418,13 +418,16 @@ public:
 class UnresolvedDeclRefExpr : public Expr {
   Identifier Name;
   SourceLoc Loc;
+  DeclRefKind RefKind;
 
 public:
-  UnresolvedDeclRefExpr(Identifier name, SourceLoc loc)
-    : Expr(ExprKind::UnresolvedDeclRef), Name(name), Loc(loc) {
+  UnresolvedDeclRefExpr(Identifier name, DeclRefKind refKind, SourceLoc loc)
+    : Expr(ExprKind::UnresolvedDeclRef), Name(name), Loc(loc),
+      RefKind(refKind) {
   }
   
   Identifier getName() const { return Name; }
+  DeclRefKind getRefKind() const { return RefKind; }
 
   SourceRange getSourceRange() const { return Loc; }
   
@@ -1500,11 +1503,11 @@ public:
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Call; }
 };
   
-/// UnaryExpr - Prefix unary expressions like '!y'.
-class UnaryExpr : public ApplyExpr {
+/// PrefixUnaryExpr - Prefix unary expressions like '!y'.
+class PrefixUnaryExpr : public ApplyExpr {
 public:
-  UnaryExpr(Expr *Fn, Expr *Arg, Type Ty = Type())
-    : ApplyExpr(ExprKind::Unary, Fn, Arg, Ty) {}
+  PrefixUnaryExpr(Expr *Fn, Expr *Arg, Type Ty = Type())
+    : ApplyExpr(ExprKind::PrefixUnary, Fn, Arg, Ty) {}
 
   SourceLoc getLoc() const { return getFn()->getStartLoc(); }
   
@@ -1513,8 +1516,29 @@ public:
   }  
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const UnaryExpr *) { return true; }
-  static bool classof(const Expr *E) { return E->getKind() == ExprKind::Unary; }
+  static bool classof(const PrefixUnaryExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::PrefixUnary;
+  }
+};
+
+/// PostfixUnaryExpr - Prefix unary expressions like '!y'.
+class PostfixUnaryExpr : public ApplyExpr {
+public:
+  PostfixUnaryExpr(Expr *Fn, Expr *Arg, Type Ty = Type())
+    : ApplyExpr(ExprKind::PostfixUnary, Fn, Arg, Ty) {}
+
+  SourceLoc getLoc() const { return getFn()->getStartLoc(); }
+  
+  SourceRange getSourceRange() const {
+    return SourceRange(getArg()->getStartLoc(), getFn()->getEndLoc()); 
+  }  
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const PostfixUnaryExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::PostfixUnary;
+  }
 };
   
 /// BinaryExpr - Infix binary expressions like 'x+y'.  The argument is always

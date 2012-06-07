@@ -601,8 +601,11 @@ public:
   void visitCallExpr(CallExpr *E) {
     printApplyExpr(E, "call_expr");
   }
-  void visitUnaryExpr(UnaryExpr *E) {
-    printApplyExpr(E, "unary_expr");
+  void visitPrefixUnaryExpr(PrefixUnaryExpr *E) {
+    printApplyExpr(E, "prefix_unary_expr");
+  }
+  void visitPostfixUnaryExpr(PostfixUnaryExpr *E) {
+    printApplyExpr(E, "postfix_unary_expr");
   }
   void visitBinaryExpr(BinaryExpr *E) {
     printApplyExpr(E, "binary_expr");

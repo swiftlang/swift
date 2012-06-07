@@ -28,6 +28,21 @@ namespace llvm {
 
 namespace swift {
   class ASTContext;
+
+/// DeclRefKind - The kind of reference to an identifier.
+enum class DeclRefKind {
+  /// An ordinary reference to an identifier, e.g. 'foo'.
+  Ordinary,
+
+  /// A reference to an identifier as a binary operator, e.g. '+' in 'a+b'.
+  BinaryOperator,
+
+  /// A reference to an identifier as a postfix unary operator, e.g. '++' in 'a++'.
+  PostfixOperator,
+
+  /// A reference to an identifier as a prefix unary operator, e.g. '--' in '--a'.
+  PrefixOperator
+};
   
 /// Identifier - This is an instance of a uniqued identifier created by
 /// ASTContext.  It just wraps a nul-terminated "const char*".
