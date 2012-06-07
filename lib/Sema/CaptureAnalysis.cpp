@@ -170,6 +170,11 @@ class CaptureAnalysisVisitor : public ASTWalker {
     if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
       VisitValueDecl(VD);
 
+    if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(D)) {
+      // Initialize flags for the constructor arguments.
+      WalkPattern(CD->getArguments());
+    }
+
     return true;
   }
 };

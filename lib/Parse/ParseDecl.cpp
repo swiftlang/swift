@@ -1729,6 +1729,7 @@ ConstructorDecl *Parser::parseDeclConstructor() {
       new (Context) ConstructorDecl(Context.getIdentifier("constructor"),
                                     ConstructorLoc, Indices.get(), ThisDecl,
                                     CurDeclContext);
+  ThisDecl->setDeclContext(CD);
   AddConstructorArgumentsToScope(Indices.get(), CD, *this);
   ScopeInfo.addToScope(ThisDecl);
   ContextChange CC(*this, CD);

@@ -652,6 +652,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
         CurDeclContexts.push_back(NTD);
       else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D))
         CurDeclContexts.push_back(ED);
+      else if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(D))
+        CurDeclContexts.push_back(CD);
 
       if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
         // If this is an instance method with a body, set the type of it's
@@ -680,6 +682,10 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
         CurDeclContexts.pop_back();
       } else if (isa<ExtensionDecl>(D)) {
         assert(CurDeclContexts.back() == cast<ExtensionDecl>(D) &&
+               "Context misbalance");
+        CurDeclContexts.pop_back();
+      } else if (isa<ConstructorDecl>(D)) {
+        assert(CurDeclContexts.back() == cast<ConstructorDecl>(D) &&
                "Context misbalance");
         CurDeclContexts.pop_back();
       }
