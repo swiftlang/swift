@@ -229,6 +229,10 @@ Expr *MemberLookup::createResultAST(Expr *Base, SourceLoc DotLoc,
                                                  NameLoc);
 }
 
+ConstructorLookup::ConstructorLookup(Type BaseTy, Module &M) {
+  M.lookupValueConstructors(BaseTy, Results);
+}
+
 struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   SourceLoc Loc;
   Identifier Name;

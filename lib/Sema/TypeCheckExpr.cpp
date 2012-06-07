@@ -258,25 +258,32 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     if (Ty->is<ErrorType>())
       return 0;  // Squelch an erroneous subexpression.
 
-    // If the 'function' is actually a direct reference to a type alias,
-    // and the argument is coercible to that type, this is a type cast.
-    if (isCoercibleToType(E2, Ty)) {
-      assert(!Ty->is<LValueType>() && "Cannot coerce to lvalue type!");
+    // If the 'function' is a direct reference to a type, and the type isn't
+    // a struct or oneof, this is a cast.  If the type is a struct or oneof,
+    // we first try to cast, then try to construct an object.
+    bool IsCast = true;
+    if (Ty->is<StructType>() || Ty->is<OneOfType>())
+      IsCast = isCoercibleToType(E2, Ty);
+    if (IsCast) {
       if (!isDirectTypeReference(E1)) {
         // FIXME: This should be an error, and we should check it on
         // both codepaths.
         E1 = new (Context) DeclRefExpr(MT->getTypeDecl(), E1->getStartLoc(),
                                        MT->getTypeDecl()->getTypeOfReference());
       }
-      return new (Context) CoerceExpr(E1, coerceToType(E2, Ty));
+      Expr *CoercedArg = coerceToType(E2, Ty);
+      if (!CoercedArg) {
+        E->setType(ErrorType::get(Context));
+        return 0;
+      }
+      return new (Context) CoerceExpr(E1, CoercedArg);
     }
 
-    // Check for a type with a constructor.
-    SmallVector<ValueDecl *, 4> Methods;
+    // Check for a struct or oneof with a constructor.
     SmallVector<ValueDecl *, 4> Viable;
-    TU.lookupValueConstructors(Ty, Methods);
-    if (!Methods.empty()) {
-      ValueDecl *Best = filterOverloadSet(Methods, false,
+    ConstructorLookup Ctors(Ty, TU);
+    if (Ctors.isSuccess()) {
+      ValueDecl *Best = filterOverloadSet(Ctors.Results, false,
                                           Ty, E2, Type(), Viable);
       ConstructorDecl *CD = dyn_cast_or_null<ConstructorDecl>(Best);
       if (CD) {
@@ -294,7 +301,8 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
         return new (Context) ConstructExpr(Ty, E1->getStartLoc(), CD, E2);
       }
       if (Best) {
-        E1 = OverloadedDeclRefExpr::createWithCopy(Methods, E1->getStartLoc());
+        E1 = OverloadedDeclRefExpr::createWithCopy(Ctors.Results,
+                                                   E1->getStartLoc());
         E->setFn(E1);
         return semaApplyExpr(E);
       }    

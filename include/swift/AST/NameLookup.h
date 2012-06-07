@@ -128,6 +128,24 @@ private:
   void doIt(Type BaseTy, Module &M, VisitedSet &Visited);
 };
 
+/// ConstructorLookup - This class implements and represents the result of
+/// looking up a constructor for a type.
+class ConstructorLookup {
+  ConstructorLookup(const ConstructorLookup&) = delete;
+  void operator=(const ConstructorLookup&) = delete;
+public:
+  /// ConstructorLookup ctor - Lookup constructors for the given type in the
+  /// given module.
+  ConstructorLookup(Type BaseTy, Module &M);
+
+  /// Results - The constructor fills this vector in with all of the results.
+  /// If name lookup failed, this is empty.
+  llvm::SmallVector<ValueDecl*, 4> Results;
+  
+  /// isSuccess - Return true if anything was found by the name lookup.
+  bool isSuccess() const { return !Results.empty(); }
+};
+
 /// UnqualifiedLookupResult - One result of unqualified lookup.
 struct UnqualifiedLookupResult {
 private:
