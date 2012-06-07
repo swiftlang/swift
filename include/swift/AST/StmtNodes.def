@@ -29,7 +29,6 @@
 #define ABSTRACT_STMT(Id, Parent)
 #endif
 
-STMT(Error, Stmt)
 STMT(Semi, Stmt)
 STMT(Assign, Stmt)
 STMT(Brace, Stmt)

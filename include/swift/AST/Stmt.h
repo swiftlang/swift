@@ -81,22 +81,6 @@ public:
   void *operator new(size_t Bytes, void *Mem) throw() = delete;
 
 };
-  
-/// ErrorStmt - Represents a semantically erroneous statement in the AST.
-class ErrorStmt : public Stmt {
-  SourceRange Range;
-public:
-  ErrorStmt(SourceRange Range) : Stmt(StmtKind::Error), Range(Range) {}
-  
-  SourceRange getSourceRange() const { return Range; }
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const ErrorStmt *) { return true; }
-  static bool classof(const Stmt *S) {
-    return S->getKind() == StmtKind::Error;
-  }
-};
-
 
 /// SemiStmt - A semicolon, the noop statement: ";"
 class SemiStmt : public Stmt {
@@ -140,7 +124,7 @@ public:
 
 
 /// BraceStmt - A brace enclosed sequence of expressions, stmts, or decls, like
-/// { 4; 5 }.
+/// { var x = 10; println(10) }.
 class BraceStmt : public Stmt {
 public:
   typedef llvm::PointerUnion3<Expr*, Stmt*, Decl*> ExprStmtOrDecl;
@@ -187,8 +171,8 @@ public:
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Brace; }
 };
 
-/// ReturnStmt - A return statement.  Return statements with no specified
-/// subexpression are expanded into a return of the empty tuple in the parser.
+/// ReturnStmt - A return statement.  The result is optional; "return" without
+/// an expression is semantically equivalent to "return ()".
 ///    return 42
 class ReturnStmt : public Stmt {
   SourceLoc ReturnLoc;
@@ -214,8 +198,8 @@ public:
 };
 
 /// IfStmt - if/then/else statement.  If no 'else' is specified, then the
-/// ElseLoc location is not specified and the Else statement is null.  The
-/// condition of the 'if' is required to have a Builtin.Int1 type.
+/// ElseLoc location is not specified and the Else statement is null. After
+/// type-checking, the condition is of type Builtin.Int1.
 class IfStmt : public Stmt {
   SourceLoc IfLoc;
   SourceLoc ElseLoc;
@@ -248,8 +232,8 @@ public:
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::If; }
 };
 
-/// WhileStmt - while statement.  The condition is required to have a
-/// Builtin.Int1 type.
+/// WhileStmt - while statement. After type-checking, the condition is of
+/// type Builtin.Int1.
 class WhileStmt : public Stmt {
   SourceLoc WhileLoc;
   Expr *Cond;
@@ -273,9 +257,9 @@ public:
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::While; }
 };
 
-/// ForStmt - for statement.  The condition is required to have a
-/// Builtin.Int1 type.  Note that the condition is optional.  If not present,
-/// it always evaluates to one.  The Initializer and Increment are also
+/// ForStmt - for statement.  After type-checking, the condition is of
+/// type Builtin.Int1.  Note that the condition is optional.  If not present,
+/// it always evaluates to true.  The Initializer and Increment are also
 /// optional.
 class ForStmt : public Stmt {
   SourceLoc ForLoc, Semi1Loc, Semi2Loc;

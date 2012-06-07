@@ -279,7 +279,6 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   void visitBreakStmt(BreakStmt *) {}
   void visitContinueStmt(ContinueStmt *) {}
   void visitSemiStmt(SemiStmt *) {}
-  void visitErrorStmt(ErrorStmt *) {}
   void visitAssignStmt(AssignStmt *) {}
   void visitReturnStmt(ReturnStmt *) {}
   void visitIfStmt(IfStmt * S) {
