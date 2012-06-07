@@ -38,6 +38,7 @@ namespace swift {
   class BraceStmt;
   class BreakStmt;
   class ClassType;
+  class ConstructorDecl;
   class ContinueStmt;
   class Decl;
   class Expr;
@@ -317,6 +318,8 @@ public:
   void emitNullaryCall(llvm::Value *fn, Type resultType, Explosion &result);
 
   Condition emitCondition(Expr *E, bool hasFalseCode, bool invertValue = false);
+
+  void constructObject(Address addr, ConstructorDecl *CD, Expr *Input);
 
 //--- Declaration emission -----------------------------------------------------
 public:

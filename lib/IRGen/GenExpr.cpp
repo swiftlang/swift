@@ -246,6 +246,21 @@ namespace {
       IGF.emitRValue(E->getRHS(), Out);
     }
 
+    void visitConstructExpr(ConstructExpr *E) {
+      const TypeInfo &type = IGF.getFragileTypeInfo(E->getType());
+
+      Initialization I;
+      Initialization::Object object = I.getObjectForTemporary();
+      I.registerObjectWithoutDestroy(object);
+      OwnedAddress addr =
+        I.emitLocalAllocation(IGF, object, NotOnHeap, type,
+                              "construction.temp");
+
+      IGF.constructObject(addr.getAddress(), E->getConstructor(),
+                          E->getInput());
+      type.loadAsTake(IGF, addr.getAddress(), Out);
+    }
+
     void visitNewArrayExpr(NewArrayExpr *E) {
       emitNewArrayExpr(IGF, E, Out);
     }
@@ -391,6 +406,7 @@ namespace {
     NOT_LVALUE_EXPR(NewArray)
     NOT_LVALUE_EXPR(NewReference)
     NOT_LVALUE_EXPR(DotSyntaxBaseIgnored)
+    NOT_LVALUE_EXPR(Construct)
     NOT_LVALUE_EXPR(Coerce)
     NOT_LVALUE_EXPR(Module)
 #undef NOT_LVALUE_EXPR
@@ -545,6 +561,7 @@ namespace {
     NON_LOCATEABLE(NewReferenceExpr)
     NON_LOCATEABLE(NewArrayExpr)
     NON_LOCATEABLE(CoerceExpr)
+    NON_LOCATEABLE(ConstructExpr)
     NON_LOCATEABLE(ExistentialMemberRefExpr)
                                                     
     // FIXME: We may want to specialize IR generation for array subscripts.

@@ -89,7 +89,6 @@ ABSTRACT_EXPR(Apply, Expr)
   EXPR(PrefixUnary, ApplyExpr)
   EXPR(PostfixUnary, ApplyExpr)
   EXPR(Binary, ApplyExpr)
-  EXPR(ConstructorCall, ApplyExpr)
   ABSTRACT_EXPR(ThisApply, ApplyExpr)
     EXPR(DotSyntaxCall, ThisApplyExpr)
     EXPR_RANGE(ThisApply, DotSyntaxCall, DotSyntaxCall)
@@ -104,6 +103,7 @@ ABSTRACT_EXPR(ImplicitConversion, Expr)
   EXPR(SuperConversion, ImplicitConversionExpr)
   EXPR_RANGE(ImplicitConversion, Load, SuperConversion)
 EXPR(Coerce, Expr)
+EXPR(Construct, Expr)
 
 #undef EXPR_RANGE
 #undef UNCHECKED_EXPR

@@ -16,14 +16,16 @@
 
 #include "IRGenModule.h"
 #include "IRGenFunction.h"
+#include "GenFunc.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/Types.h"
+#include "llvm/Function.h"
 
 using namespace swift;
 using namespace irgen;
 
 void IRGenModule::emitConstructor(ConstructorDecl *CD) {
-  llvm_unreachable("Not yet implemented!");
   llvm::Function *fn = getAddrOfConstructor(CD, ExplosionKind::Minimal);
 
   Pattern* pats[] = { new (Context) NamedPattern(CD->getImplicitThisDecl()),
@@ -32,4 +34,19 @@ void IRGenModule::emitConstructor(ConstructorDecl *CD) {
                     ExplosionKind::Minimal, 1, fn, Prologue::Standard);
 
   IGF.emitFunctionTopLevel(CD->getBody());
+}
+
+void IRGenFunction::constructObject(Address addr, ConstructorDecl *CD,
+                                    Expr *input) {
+  llvm::Function *fn = IGM.getAddrOfConstructor(CD, ExplosionKind::Minimal);
+  Callee c = Callee::forMethod(CD->getType(), fn, ExplosionKind::Minimal, 1);
+
+  Explosion inputE(ExplosionKind::Minimal);
+  emitRValue(input, inputE);
+  Explosion thisE(ExplosionKind::Minimal);
+  thisE.addUnmanaged(addr.getAddress());
+  Arg args[] = { Arg::forUnowned(thisE), Arg::forUnowned(inputE) };
+
+  Explosion Result(ExplosionKind::Minimal);
+  emitCall(*this, c, args, getFragileTypeInfo(TupleType::getEmpty(IGM.Context)), Result);
 }

@@ -254,25 +254,55 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // TypeAlias to see what we're dealing with.  If the typealias was erroneous
     // then silently squish this erroneous subexpression.
     Type Ty = MT->getTypeDecl()->getDeclaredType();
+    E->setType(Ty);
     if (Ty->is<ErrorType>())
       return 0;  // Squelch an erroneous subexpression.
 
     // If the 'function' is actually a direct reference to a type alias,
     // and the argument is coercible to that type, this is a type cast.
-    if (isDirectTypeReference(E1) && isCoercibleToType(E2, Ty)) {
+    if (isCoercibleToType(E2, Ty)) {
       assert(!Ty->is<LValueType>() && "Cannot coerce to lvalue type!");
+      if (!isDirectTypeReference(E1)) {
+        // FIXME: This should be an error, and we should check it on
+        // both codepaths.
+        E1 = new (Context) DeclRefExpr(MT->getTypeDecl(), E1->getStartLoc(),
+                                       MT->getTypeDecl()->getTypeOfReference());
+      }
       return new (Context) CoerceExpr(E1, coerceToType(E2, Ty));
     }
 
     // Check for a type with a constructor.
     SmallVector<ValueDecl *, 4> Methods;
+    SmallVector<ValueDecl *, 4> Viable;
     TU.lookupValueConstructors(Ty, Methods);
     if (!Methods.empty()) {
-      Expr *FnRef = OverloadedDeclRefExpr::createWithCopy(Methods,
-                                                          E1->getStartLoc());
-      // FIXME: This loses source information!
-      return semaApplyExpr(new (Context) ConstructorCallExpr(FnRef, E2));
+      ValueDecl *Best = filterOverloadSet(Methods, false,
+                                          Ty, E2, Type(), Viable);
+      ConstructorDecl *CD = dyn_cast_or_null<ConstructorDecl>(Best);
+      if (CD) {
+        E2 = coerceToType(E2, CD->getArguments()->getType());
+        if (E2 == 0) {
+          diagnose(E1->getLoc(), diag::while_converting_function_argument,
+                   CD->getArguments()->getType())
+            << E->getArg()->getSourceRange();
+          E->setType(ErrorType::get(Context));
+          return 0;
+        }
+        return new (Context) ConstructExpr(Ty, E1->getStartLoc(), CD, E2);
+      }
+      if (Best) {
+        E1 = OverloadedDeclRefExpr::createWithCopy(Methods, E1->getStartLoc());
+        E->setFn(E1);
+        return semaApplyExpr(E);
+      }    
     }
+    if (!E2->getType()->isUnresolvedType()) {
+      diagnose(E->getLoc(), diag::constructor_overload_fail, !Viable.empty(), Ty)
+        << E->getSourceRange();
+      printOverloadSetCandidates(Viable);
+      return 0;
+    }
+    return E;
   }
   
   // Otherwise, the function's type must be unresolved.  If it is something
@@ -618,7 +648,13 @@ public:
     assert(!E->getType()->isUnresolvedType() &&"Type always specified by cast");
     return E;
   }
-    
+
+  Expr *visitConstructExpr(ConstructExpr *E) {
+    // The type of the expr is always the type that the MetaType LHS specifies.
+    assert(!E->getType()->isUnresolvedType() &&"Type always specified by cast");
+    return E;
+  }
+
   Expr *visitImplicitConversionExpr(ImplicitConversionExpr *E) {
     assert(!E->getType()->isUnresolvedType());
     // Implicit conversions have been fully checked.

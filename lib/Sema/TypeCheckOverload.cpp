@@ -109,7 +109,8 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     // If we have a 'this' argument and the declaration is a non-static method,
     // the method's 'this' parameter has already been bound. Look instead at the
     // actual argument types.
-    if (BaseTy && isa<FuncDecl>(VD) && !cast<FuncDecl>(VD)->isStatic()) {
+    if (BaseTy && ((isa<FuncDecl>(VD) && !cast<FuncDecl>(VD)->isStatic()) ||
+                   isa<ConstructorDecl>(VD))) {
       // FIXME: Derived-to-base conversions will eventually be needed.
       FunctionTy = FunctionTy->getResult()->getAs<FunctionType>();
       assert(FunctionTy && "Method has incorrect type");

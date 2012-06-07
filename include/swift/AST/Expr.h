@@ -39,6 +39,7 @@ namespace swift {
   class VarDecl;
   class ProtocolConformance;
   class FuncDecl;
+  class ConstructorDecl;
   
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -1561,28 +1562,6 @@ public:
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Binary;}
 };
 
-/// ConstructorCallExpr - This is the application of an argument to a metatype,
-/// which resolves to construction of the type.  For example, "SomeType(1,2,3)".
-/// The function in the application is known to be one of the static methods to
-/// construct the type.  This is formed by Sema, and is just a sugared form of
-/// ApplyExpr.
-class ConstructorCallExpr : public ApplyExpr {
-public:
-  ConstructorCallExpr(Expr *FnExpr, Expr *ArgExpr, Type Ty = Type())
-    : ApplyExpr(ExprKind::ConstructorCall, FnExpr, ArgExpr, Ty) {
-  }
-
-  SourceRange getSourceRange() const {
-    return SourceRange(getFn()->getStartLoc(), getArg()->getEndLoc());
-  }
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const ConstructorCallExpr *) { return true; }
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ConstructorCall;
-  }
-};
-
 /// ThisApplyExpr - Abstract application that provides the 'this' pointer for
 /// a method curried as (this : This) -> (params) -> result.
 ///
@@ -1709,7 +1688,38 @@ public:
     return E->getKind() == ExprKind::Coerce;
   }
 };
-  
+
+class ConstructExpr : public Expr {
+  SourceLoc ConstructorLoc;
+  ConstructorDecl *Constructor;
+  Expr *Input;
+
+public:
+  ConstructExpr(Type T, SourceLoc ConstructorLoc,
+                ConstructorDecl *Constructor, Expr *Input)
+    : Expr(ExprKind::Construct, T), ConstructorLoc(ConstructorLoc),
+      Constructor(Constructor), Input(Input) { }
+
+  ConstructorDecl *getConstructor() const { return Constructor; }
+  Expr *getInput() const { return Input; }
+
+  void setInput(Expr *E) { Input = E; }
+
+  SourceLoc getStartLoc() const { return ConstructorLoc; }
+  SourceLoc getEndLoc() const { return Input->getEndLoc(); }
+
+  SourceRange getSourceRange() const {
+    return SourceRange(getStartLoc(), getEndLoc());
+  }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ConstructExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Construct;
+  }
+
+};
+
 } // end namespace swift
 
 #endif

@@ -454,7 +454,11 @@ public:
   CoercedResult visitCoerceExpr(CoerceExpr *E) {
     return unchanged(E);
   }
-  
+
+  CoercedResult visitConstructExpr(ConstructExpr *E) {
+    return unchanged(E);
+  }
+
   CoercedResult visitImplicitConversionExpr(ImplicitConversionExpr *E) {
     return unchanged(E);
   }
@@ -921,10 +925,26 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
     if (Best) {
       if (!(Flags & CF_Apply))
         continue;
-      
+
+      if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(Best)) {
+        Expr *CoercedS = TC.coerceToType(Segment,
+                                         CD->getArguments()->getType());
+        if (CoercedS == 0) {
+          diagnose(Segment->getLoc(), diag::while_converting_function_argument,
+                   CD->getArguments()->getType())
+            << Segment->getSourceRange();
+          E->setType(ErrorType::get(TC.Context));
+          return nullptr;
+        }
+        Segment = new (TC.Context) ConstructExpr(DestTy,
+                                                 CoercedS->getStartLoc(),
+                                                 CD, CoercedS);
+        continue;
+      }
+
       Expr *CtorRef = new (TC.Context) DeclRefExpr(Best, Segment->getStartLoc(),
                                                    Best->getTypeOfReference());
-      ApplyExpr *Call = new (TC.Context) ConstructorCallExpr(CtorRef, Segment);
+      ApplyExpr *Call = new (TC.Context) CallExpr(CtorRef, Segment);
       Expr *Checked = TC.semaApplyExpr(Call);
       if (!Checked)
         return nullptr;

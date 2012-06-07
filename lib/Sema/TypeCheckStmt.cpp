@@ -861,6 +861,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // work correctly.
   for (auto func : prePass.FuncExprs) {
     if (ConstructorDecl *CD = func.dyn_cast<ConstructorDecl*>()) {
+      TC.typeCheckPattern(CD->getArguments(), /*isFirstPass*/false);
       Stmt *Body = CD->getBody();
       StmtChecker(TC, CD).typeCheckStmt(Body);
       continue;

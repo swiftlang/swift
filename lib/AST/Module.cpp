@@ -394,6 +394,9 @@ void Module::lookupValueConstructors(Type BaseType,
 
   DoGlobalExtensionLookup(BaseType, Name, BaseMembers, this, cast<Module>(DC),
                           Result);
+  Name = Ctx.getIdentifier("constructor");
+  DoGlobalExtensionLookup(BaseType, Name, BaseMembers, this, cast<Module>(DC),
+                          Result);
 }
 
 //===----------------------------------------------------------------------===//

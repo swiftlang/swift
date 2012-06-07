@@ -610,9 +610,6 @@ public:
   void visitBinaryExpr(BinaryExpr *E) {
     printApplyExpr(E, "binary_expr");
   }
-  void visitConstructorCallExpr(ConstructorCallExpr *E) {
-    printApplyExpr(E, "constructor_call_expr");
-  }
   void visitDotSyntaxCallExpr(DotSyntaxCallExpr *E) {
     printApplyExpr(E, "dot_syntax_call_expr");
   }
@@ -628,6 +625,13 @@ public:
     printRec(E->getLHS());
     OS << '\n';
     printRec(E->getRHS());
+    OS << ')';
+  }
+  void visitConstructExpr(ConstructExpr *E) {
+    printCommon(E, "construct_expr") << '\n';
+    printRec(E->getConstructor());
+    OS << '\n';
+    printRec(E->getInput());
     OS << ')';
   }
 };
