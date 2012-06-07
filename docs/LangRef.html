@@ -394,8 +394,26 @@
             excludes '->', see <b>[2]</b>
             '..' is an operator, not two '.'s.
 
+    operator-binary ::= operator
+    operator-prefix ::= operator
+    operator-postfix ::= operator
+
+    left-binder ::= [ \r\n\t\(\[\{,;]
+
     any-identifier ::= identifier | operator
   </pre>
+
+  <p><tt>operator-binary</tt>, <tt>operator-prefix</tt>, and
+    <tt>operator-postfix</tt> are distinguished by immediate lexical
+    context.  An operator token is called <i>left-bound</i> if it
+    is immediately preceded by a character matching <tt>left-binder</tt>.
+    An operator token is called <i>right-bound</i> if it is immediately
+    followed by a character matching <tt>right-binder</tt>.  An operator
+    token is an <tt>operator-prefix</tt> if it is right-bound but not
+    left-bound, an <tt>operator-postfix</tt> if it is left-bound but
+    not right-bound, and an <tt>operator-binary</tt> in either of the
+    other two cases.
+  </p>
   </div>
   
   <!-- ===================================================================== -->
@@ -1701,6 +1719,7 @@ ill-formed if the type does not conform to the protocol.</p>
     expr-primary ::= <a href="#expr-func">expr-func</a>
 
     expr-postfix ::= expr-primary
+    expr-postfix ::= expr-postfix <a href="#operator">operator-postfix</a>
     expr-postfix ::= <a href="#expr-new">expr-new</a>
     expr-postfix ::= <a href="#expr-dot">expr-dot</a>
     expr-postfix ::= <a href="#expr-subscript">expr-subscript</a>
@@ -1709,12 +1728,12 @@ ill-formed if the type does not conform to the protocol.</p>
   </pre>
 
   <p>At the top level of the expression grammar, expressions are a
-    sequence of unary expressions joined by operators.  When parsing
-    an expr, any operator immediately following an expr-unary
-    continues the expression, and the program is ill-formed if it is
-    not then followed by another expr-unary.  This resolves an
-    ambiguity which could otherwise arise in statement contexts due to
-    semicolon elision.</p>
+    sequence of unary expressions joined by binary operators.  When
+    parsing an expr, a binary operator immediately following an
+    expr-unary continues the expression, and the program is ill-formed
+    if it is not then followed by another expr-unary.  This resolves
+    an ambiguity which could otherwise arise in statement contexts due
+    to semicolon elision.</p>
 
   <pre class="example">
     5 !- +~123 -+- ~+6
@@ -1741,7 +1760,7 @@ ill-formed if the type does not conform to the protocol.</p>
   </div>
   
   <pre class="grammar">
-    expr-binary ::= <a href="#operator">operator</a> <a href="#expr-unary">expr-unary</a>
+    expr-binary ::= <a href="#operator">operator-binary</a> <a href="#expr-unary">expr-unary</a>
   </pre>
 
   <p>Infix binary expressions are not formed during parsing.  Instead,
@@ -1759,18 +1778,13 @@ ill-formed if the type does not conform to the protocol.</p>
   <pre class="example">
     4 + 5 * 123
   </pre>
-
-  <p>Note: as a special restriction, the "<tt>++</tt>" and "<tt>--</tt>"
-  operators are never allowed as binary operators, they are always only parsed
-  as unary operators.</p>
-
   
   <!-- ===================================================================== -->
   <h3 id="expr-unary">Unary Operators</h3>
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    expr-unary   ::= <a href="#operator">operator</a>* <a href="#expr">expr-postfix</a>
+    expr-unary   ::= <a href="#operator">operator-prefix</a>* <a href="#expr">expr-postfix</a>
   </pre>
     
   <p>If an operator is used as a unary operator, but name resolution

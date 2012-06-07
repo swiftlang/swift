@@ -153,6 +153,15 @@ void Parser::skipUntil(tok T1, tok T2) {
   }
 }
 
+void Parser::skipUntilAnyOperator() {
+  while (Tok.isNot(tok::eof) && Tok.isNotAnyOperator()) {
+    switch (Tok.getKind()) {
+    default: consumeToken(); break;
+    // TODO: Handle paren/brace/bracket recovery.
+    }
+  }
+}
+
 /// skipUntilDeclRBrace - Skip to the next decl or '}'.
 void Parser::skipUntilDeclRBrace() {
   while (1) {
@@ -208,7 +217,7 @@ bool Parser::parseIdentifier(Identifier &Result, const Diagnostic &D) {
 /// parseAnyIdentifier - Consume an identifier or operator if present and return
 /// its name in Result.  Otherwise, emit an error and return true.
 bool Parser::parseAnyIdentifier(Identifier &Result, const Diagnostic &D) {
-  if (Tok.is(tok::identifier) || Tok.is(tok::oper)) {
+  if (Tok.is(tok::identifier) || Tok.isAnyOperator()) {
     Result = Context.getIdentifier(Tok.getText());
     consumeToken();
     return false;

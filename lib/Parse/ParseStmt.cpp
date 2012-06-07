@@ -49,7 +49,7 @@ static bool isFuncExpr(const Token &Tok1, const Token &Tok2) {
   
   // "func identifier" and "func [attribute]" is a func declaration,
   // otherwise we have a func expression.
-  return Tok2.isNot(tok::identifier) && Tok2.isNot(tok::oper) &&
+  return Tok2.isNot(tok::identifier) && Tok2.isNotAnyOperator() &&
          Tok2.isNotAnyLSquare();
 }
 

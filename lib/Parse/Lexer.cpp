@@ -335,6 +335,53 @@ void Lexer::lexIdentifier() {
   return formToken(Kind, TokStart);
 }
 
+/// Is the operator beginning at the given character "left-bound"?
+static bool isLeftBound(const char *tokBegin, const char *bufferBegin) {
+  // The first character in the file is not left-bound.
+  if (tokBegin == bufferBegin) return false;
+
+  switch (tokBegin[-1]) {
+  case ' ': case '\r': case '\n': case '\t': // whitespace
+  case '(': case '[': case '{':              // opening delimiters
+  case ',': case ';':                        // expression separators
+    return false;
+
+  default:
+    return true;
+  }
+}
+
+/// Is the operator ending at the given character (actually one past the end)
+/// "right-bound"?
+static bool isRightBound(const char *tokEnd) {
+  switch (*tokEnd) {
+  case ' ': case '\r': case '\n': case '\t': // whitespace
+  case ')': case ']': case '}':              // closing delimiters
+  case ',': case ';':                        // expression separators
+  case '\0':                                 // last character in file
+    return false;
+
+  default:
+    return true;
+  }
+}
+
+/// formOperatorToken - Form some kind of operator token.
+void Lexer::formOperatorToken(const char *TokStart) {
+  // Decide between the binary, prefix, and postfix cases.
+  bool leftBound = isLeftBound(TokStart, BufferStart);
+  bool rightBound = isRightBound(CurPtr);
+
+  // It's binary if either both sides are bound or both sides are not bound.
+  if (leftBound == rightBound) {
+    formToken(tok::oper_binary, TokStart);
+
+  // Otherwise, it's postfix if left-bound and prefix if right-bound.
+  } else {
+    formToken(leftBound ? tok::oper_postfix : tok::oper_prefix, TokStart);
+  }
+}
+
 /// lexOperatorIdentifier - Match identifiers formed out of punctuation.
 void Lexer::lexOperatorIdentifier() {
   const char *TokStart = CurPtr-1;
@@ -354,7 +401,7 @@ void Lexer::lexOperatorIdentifier() {
     }
   }
   
-  return formToken(tok::oper, TokStart);
+  formOperatorToken(TokStart);
 }
 
 /// lexDollarIdent - Match $[0-9a-zA-Z_$]*
@@ -899,7 +946,7 @@ Restart:
         ++CurPtr;
         return formToken(tok::ellipsis, TokStart);
       }
-      return formToken(tok::oper, TokStart);
+      return formOperatorToken(TokStart);
     }
 
     return formToken(tok::period, TokStart);

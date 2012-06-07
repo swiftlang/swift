@@ -27,7 +27,9 @@ enum class tok {
   unknown = 0,
   eof,
   identifier,
-  oper,
+  oper_binary,
+  oper_postfix,
+  oper_prefix,
   dollarident,
   integer_literal,
   floating_literal,
@@ -110,6 +112,14 @@ public:
   bool is(tok K) const { return Kind == K; }
   bool isNot(tok K) const { return Kind != K; }
   
+  bool isAnyOperator() const {
+    return Kind == tok::oper_binary
+        || Kind == tok::oper_postfix
+        || Kind == tok::oper_prefix;
+  }
+  bool isNotAnyOperator() const {
+    return !isAnyOperator();
+  }
   
   bool isAnyLParen() const {
     return Kind == tok::l_paren || Kind == tok::l_paren_space;

@@ -22,20 +22,11 @@
 using namespace swift;
 
 
-/// isBinaryOperator - Return true if the specified token is a binary operator.
-/// For unfortuante gramatical reasons, we prevent ++ and -- from being parsed
-/// as binary operators (allowing them to be used as prefix unary operators.
-static bool isBinaryOperator(const Token &Tok) {
-  if (Tok.isNot(tok::oper)) return false;
-  
-  return Tok.getText() != "--" && Tok.getText() != "++";
-}
-
 /// parseExpr
 ///   expr:
 ///     expr-unary expr-binary*
 ///   expr-binary:
-///     operator expr-unary
+///     operator-binary expr-unary
 ///
 /// The sequencing here is not structural, i.e. binary operators are
 /// not inherently right-associative.
@@ -50,7 +41,7 @@ NullablePtr<Expr> Parser::parseExpr(Diag<> Message) {
     SequencedExprs.push_back(Primary.get());
 
     // If the next token is not a binary operator, we're done.
-    if (!isBinaryOperator(Tok))
+    if (!Tok.is(tok::oper_binary))
       break;
 
     // Parse the operator.
@@ -76,20 +67,26 @@ NullablePtr<Expr> Parser::parseExpr(Diag<> Message) {
 ///   expr-unary:
 ///     expr-postfix
 ///     expr-new
-///     operator expr-unary
+///     operator-prefix expr-unary
 NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
   // If the next token is the keyword 'new', this must be expr-new.
   if (Tok.is(tok::kw_new))
     return parseExprNew();
 
+  // For recovery purposes, accept an oper_binary here.
+  if (Tok.is(tok::oper_binary)) {
+    diagnose(Tok.getLoc(), diag::expected_prefix_operator);
+    Tok.setKind(tok::oper_prefix);
+  }
+
   // If the next token is not an operator, just parse this as expr-postfix.
-  if (Tok.isNot(tok::oper))
+  if (Tok.isNot(tok::oper_prefix))
     return parseExprPostfix(Message);
 
   // '&' is a very special case.
   if (Tok.getText() == "&") {
     SourceLoc loc = Tok.getLoc();
-    consumeToken(tok::oper);
+    consumeToken(tok::oper_prefix);
 
     if (Expr *SubExpr = parseExprUnary(Message).getPtrOrNull())
       return new (Context) AddressOfExpr(loc, SubExpr, Type());
@@ -108,10 +105,10 @@ NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
 /// are not "proper" expressions; they can only appear in binary/unary
 /// operators.
 Expr *Parser::parseExprOperator() {
-  assert(Tok.is(tok::oper));
+  assert(Tok.isAnyOperator());
   SourceLoc Loc = Tok.getLoc();
   Identifier Name = Context.getIdentifier(Tok.getText());
-  consumeToken(tok::oper);
+  consumeToken();
   
   return actOnIdentifierExpr(Name, Loc);
 }
@@ -220,6 +217,7 @@ NullablePtr<Expr> Parser::parseExprNew() {
 ///     expr-dot
 ///     expr-subscript
 ///     expr-call
+///     expr-postfix operator-postfix
 ///
 NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
   NullablePtr<Expr> Result;
@@ -338,6 +336,13 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
         return 0;
       
       Result = new (Context) SubscriptExpr(Result.get(), LLoc, Idx.get(), RLoc);
+      continue;
+    }
+
+    // Check for a postfix-operator suffix.
+    if (Tok.is(tok::oper_postfix)) {
+      Expr *oper = parseExprOperator();
+      Result = new (Context) UnaryExpr(oper, Result.get());
       continue;
     }
         

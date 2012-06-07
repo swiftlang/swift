@@ -124,6 +124,7 @@ public:
   /// will ever occur, this skips to some likely good stopping point.
   ///
   void skipUntil(tok T1, tok T2 = tok::unknown);
+  void skipUntilAnyOperator();
   
   /// skipUntilDeclStmtRBrace - Skip to the next decl or '}'.
   void skipUntilDeclRBrace();
@@ -142,12 +143,12 @@ public:
      
   /// \brief Check whether the current token starts with '<'.
   bool startsWithLess(Token Tok) {
-    return Tok.is(tok::oper) && Tok.getText()[0] == '<';
+    return Tok.isAnyOperator() && Tok.getText()[0] == '<';
   }
 
   /// \brief Check whether the current token starts with '>'.
   bool startsWithGreater(Token Tok) {
-    return Tok.is(tok::oper) && Tok.getText()[0] == '>';
+    return Tok.isAnyOperator() && Tok.getText()[0] == '>';
   }
 
   /// \brief Consume the starting '<' of the current token, which may either

@@ -122,6 +122,7 @@ public:
 private:
   void lexImpl();
   void formToken(tok Kind, const char *TokStart);
+  void formOperatorToken(const char *TokStart);
   
   void skipSlashSlashComment();
   void skipSlashStarComment();

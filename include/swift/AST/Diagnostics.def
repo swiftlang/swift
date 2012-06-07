@@ -393,6 +393,8 @@ ERROR(expected_expr,expr_parsing,none,
 
 ERROR(expected_expr_after_operator,expr_parsing,none,
       "expected expression after operator", ())
+ERROR(expected_prefix_operator,expr_parsing,none,
+      "unary operator cannot be separated from its operand", ())
 
 ERROR(expected_field_name,expr_parsing,none,
       "expected field name following '.'", ())
