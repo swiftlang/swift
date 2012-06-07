@@ -1382,7 +1382,8 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
 
   // FIXME: We should come up with a better way to represent this implied
   // constructor.
-  MemberDecls.push_back(new (Context) OneOfElementDecl(StructLoc, StructName,
+  Identifier ConstructID = Context.getIdentifier("constructor");
+  MemberDecls.push_back(new (Context) OneOfElementDecl(StructLoc, ConstructID,
                                                        Type(), Type(), SD));
 
   if (!Attributes.empty())

@@ -358,6 +358,7 @@ void Module::lookupValueConstructors(Type BaseType,
 
   TypeDecl *D;
   Identifier Name;
+  Identifier Constructor = Ctx.getIdentifier("constructor");
   ArrayRef<ValueDecl*> BaseMembers;
   SmallVector<ValueDecl*, 2> BaseMembersStorage;
   if (StructType *ST = BaseType->getAs<StructType>()) {
@@ -386,7 +387,7 @@ void Module::lookupValueConstructors(Type BaseType,
   DeclContext *DC = D->getDeclContext();
   if (!DC->isModuleContext()) {
     for (ValueDecl *VD : BaseMembers) {
-      if (VD->getName() == Name)
+      if (VD->getName() == Name || VD->getName() == Constructor)
         Result.push_back(VD);
     }
     return;
@@ -394,9 +395,8 @@ void Module::lookupValueConstructors(Type BaseType,
 
   DoGlobalExtensionLookup(BaseType, Name, BaseMembers, this, cast<Module>(DC),
                           Result);
-  Name = Ctx.getIdentifier("constructor");
-  DoGlobalExtensionLookup(BaseType, Name, BaseMembers, this, cast<Module>(DC),
-                          Result);
+  DoGlobalExtensionLookup(BaseType, Constructor, BaseMembers, this,
+                          cast<Module>(DC), Result);
 }
 
 //===----------------------------------------------------------------------===//
