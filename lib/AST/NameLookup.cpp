@@ -21,6 +21,81 @@
 
 using namespace swift;
 
+static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
+                                    ArrayRef<ValueDecl*> BaseMembers,
+                                    Module *CurModule,
+                                    Module *BaseModule,
+                                    SmallVectorImpl<ValueDecl*> &Result) {
+  bool CurModuleHasTypeDecl = false;
+  llvm::SmallPtrSet<CanType, 8> CurModuleTypes;
+
+  bool NameBindingLookup = CurModule->ASTStage == Module::Parsed;
+
+  // Find all extensions in this module.
+  for (ExtensionDecl *ED : CurModule->lookupExtensions(BaseType)) {
+    for (Decl *Member : ED->getMembers()) {
+      if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
+        if (VD->getName() == Name) {
+          Result.push_back(VD);
+          if (!NameBindingLookup)
+            CurModuleTypes.insert(VD->getType()->getCanonicalType());
+          CurModuleHasTypeDecl |= isa<MetaTypeType>(VD->getType());
+        }
+      }
+    }
+  }
+
+  if (BaseModule == CurModule) {
+    for (ValueDecl *VD : BaseMembers) {
+      if (VD->getName() == Name) {
+        Result.push_back(VD);
+        if (!NameBindingLookup)
+          CurModuleTypes.insert(VD->getType()->getCanonicalType());
+        CurModuleHasTypeDecl |= isa<MetaTypeType>(VD->getType());
+      }
+    }
+  }
+
+  // The builtin module has no imports.
+  if (isa<BuiltinModule>(CurModule)) return;
+
+  // If we find a type in the current module, don't look into any
+  // imported modules.
+  if (CurModuleHasTypeDecl) return;
+
+  TranslationUnit &TU = *cast<TranslationUnit>(CurModule);
+
+  // Otherwise, check our imported extensions as well.
+  // FIXME: Implement DAG-based shadowing rules.
+  llvm::SmallPtrSet<Module *, 16> Visited;
+  for (auto &ImpEntry : TU.getImportedModules()) {
+    if (!Visited.insert(ImpEntry.second))
+      continue;
+    
+    for (ExtensionDecl *ED : ImpEntry.second->lookupExtensions(BaseType)) {
+      for (Decl *Member : ED->getMembers()) {
+        if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
+          if (VD->getName() == Name &&
+              (NameBindingLookup || isa<TypeDecl>(VD) ||
+               !CurModuleTypes.count(VD->getType()->getCanonicalType()))) {
+            Result.push_back(VD);
+          }
+        }
+      }
+    }
+  }
+
+  if (BaseModule != CurModule) {
+    for (ValueDecl *VD : BaseMembers) {
+      if (VD->getName() == Name &&
+          (NameBindingLookup || isa<TypeDecl>(VD) ||
+           !CurModuleTypes.count(VD->getType()->getCanonicalType()))) {
+        Result.push_back(VD);
+      }
+    }
+  }
+}
+
 MemberLookup::MemberLookup(Type BaseTy, Identifier Name, Module &M) {
   MemberName = Name;
   VisitedSet Visited;
@@ -111,11 +186,12 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
           Results.push_back(MemberLookupResult::getTupleElement(Value));
       }
     }
+    return;
   }
 
   // Look in any extensions that add methods to the base type.
   SmallVector<ValueDecl*, 8> ExtensionMethods;
-  M.lookupMembers(BaseTy, MemberName, ExtensionMethods);
+  lookupMembers(BaseTy, M, ExtensionMethods);
 
   for (ValueDecl *VD : ExtensionMethods) {
     if (TypeDecl *TAD = dyn_cast<TypeDecl>(VD)) {
@@ -137,6 +213,47 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
            "Unexpected extension member");
     Results.push_back(Result::getMemberProperty(VD));
   }
+}
+
+void MemberLookup::lookupMembers(Type BaseType, Module &M,
+                                 SmallVectorImpl<ValueDecl*> &Result) {
+  assert(Results.empty() &&
+         "This expects that the input list is empty, could be generalized");
+
+  TypeDecl *D;
+  ArrayRef<ValueDecl*> BaseMembers;
+  SmallVector<ValueDecl*, 2> BaseMembersStorage;
+  if (StructType *ST = BaseType->getAs<StructType>()) {
+    D = ST->getDecl();
+    for (Decl* Member : ST->getDecl()->getMembers()) {
+      if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
+        BaseMembersStorage.push_back(VD);
+    }
+    BaseMembers = BaseMembersStorage;
+  } else if (ClassType *CT = BaseType->getAs<ClassType>()) {
+    D = CT->getDecl();
+    for (Decl* Member : CT->getDecl()->getMembers()) {
+      if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
+        BaseMembersStorage.push_back(VD);
+    }
+    BaseMembers = BaseMembersStorage;
+  } else if (OneOfType *OOT = BaseType->getAs<OneOfType>()) {
+    D = OOT->getDecl();
+    for (Decl* Member : OOT->getDecl()->getMembers()) {
+      if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
+        BaseMembersStorage.push_back(VD);
+    }
+    BaseMembers = BaseMembersStorage;
+  } else {
+    return;
+  }
+
+  DeclContext *DC = D->getDeclContext();
+  while (!DC->isModuleContext())
+    DC = DC->getParent();
+
+  DoGlobalExtensionLookup(BaseType, MemberName, BaseMembers, &M,
+                          cast<Module>(DC), Result);
 }
 
 static Type makeSimilarLValue(Type objectType, Type lvalueType,
@@ -229,8 +346,48 @@ Expr *MemberLookup::createResultAST(Expr *Base, SourceLoc DotLoc,
                                                  NameLoc);
 }
 
-ConstructorLookup::ConstructorLookup(Type BaseTy, Module &M) {
-  M.lookupValueConstructors(BaseTy, Results);
+ConstructorLookup::ConstructorLookup(Type BaseType, Module &M) {
+  NominalType *NT = BaseType->getAs<NominalType>();
+  if (!NT)
+    return;
+
+  NominalTypeDecl *D = NT->getDecl();
+  SmallVector<ValueDecl*, 16> BaseMembers;
+  if (StructDecl *SD = dyn_cast<StructDecl>(D)) {
+    for (Decl* Member : SD->getMembers()) {
+      if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
+        BaseMembers.push_back(VD);
+    }
+  } else if (OneOfDecl *OOD = dyn_cast<OneOfDecl>(D)) {
+    for (Decl* Member : OOD->getMembers()) {
+      // FIXME: We shouldn't be injecting OneOfElementDecls into the results
+      // like this.
+      if (OneOfElementDecl *OOED = dyn_cast<OneOfElementDecl>(Member))
+        Results.push_back(OOED);
+      else if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
+        BaseMembers.push_back(VD);
+    }
+  } else if (ClassDecl *CD = dyn_cast<ClassDecl>(D)) {
+    for (Decl* Member : CD->getMembers()) {
+      if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
+        BaseMembers.push_back(VD);
+    }
+  } else {
+    return;
+  }
+
+  Identifier Constructor = M.Ctx.getIdentifier("constructor");
+  DeclContext *DC = D->getDeclContext();
+  if (!DC->isModuleContext()) {
+    for (ValueDecl *VD : BaseMembers) {
+      if (VD->getName() == Constructor)
+        Results.push_back(VD);
+    }
+    return;
+  }
+
+  DoGlobalExtensionLookup(BaseType, Constructor, BaseMembers, &M,
+                          cast<Module>(DC), Results);
 }
 
 struct FindLocalVal : public StmtVisitor<FindLocalVal> {
