@@ -920,18 +920,20 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
     SmallVector<ValueDecl *, 4> Viable;
     ValueDecl *Best = TC.filterOverloadSet(Methods,
                                            /*OperatorSyntax=*/true,
-                                           Type(), Segment, Type(),
+                                           DestTy, Segment, Type(),
                                            Viable);
     if (Best) {
       if (!(Flags & CF_Apply))
         continue;
 
       if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(Best)) {
-        Expr *CoercedS = TC.coerceToType(Segment,
-                                         CD->getArguments()->getType());
+        Type ArgTy = CD->getType();
+        ArgTy = ArgTy->castTo<FunctionType>()->getResult();
+        ArgTy = ArgTy->castTo<FunctionType>()->getInput();
+        Expr *CoercedS = TC.coerceToType(Segment, ArgTy);
         if (CoercedS == 0) {
           diagnose(Segment->getLoc(), diag::while_converting_function_argument,
-                   CD->getArguments()->getType())
+                   ArgTy)
             << Segment->getSourceRange();
           E->setType(ErrorType::get(TC.Context));
           return nullptr;

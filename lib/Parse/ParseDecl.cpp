@@ -1708,13 +1708,13 @@ ConstructorDecl *Parser::parseDeclConstructor() {
     return nullptr;
   }
   
-  NullablePtr<Pattern> Indices = parsePatternTuple();
-  if (Indices.isNull())
+  NullablePtr<Pattern> Arguments = parsePatternTuple();
+  if (Arguments.isNull())
     return nullptr;
-  Type DummyTy; // FIXME: We actually need to use this type here!
-  if (checkFullyTyped(Indices.get(), DummyTy))
+  Type ConstructorTy;
+  if (checkFullyTyped(Arguments.get(), ConstructorTy))
     Invalid = true;
-  
+
   // '{'
   if (!Tok.is(tok::l_brace)) {
     diagnose(Tok.getLoc(), diag::expected_lbrace_constructor);
@@ -1728,10 +1728,11 @@ ConstructorDecl *Parser::parseDeclConstructor() {
   Scope ConstructorBodyScope(this, /*AllowLookup=*/true);
   ConstructorDecl *CD =
       new (Context) ConstructorDecl(Context.getIdentifier("constructor"),
-                                    ConstructorLoc, Indices.get(), ThisDecl,
+                                    ConstructorLoc, Arguments.get(), ThisDecl,
                                     CurDeclContext);
+  CD->setType(ConstructorTy);
   ThisDecl->setDeclContext(CD);
-  AddConstructorArgumentsToScope(Indices.get(), CD, *this);
+  AddConstructorArgumentsToScope(Arguments.get(), CD, *this);
   ScopeInfo.addToScope(ThisDecl);
   ContextChange CC(*this, CD);
 

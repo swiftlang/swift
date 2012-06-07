@@ -349,22 +349,18 @@ public:
     if (IsSecondPass)
       return;
 
-    // The getter and setter functions will be type-checked separately.
     if (!CD->getDeclContext()->isTypeContext())
       TC.diagnose(CD->getStartLoc(), diag::constructor_not_member);
 
-    if (CD->getArguments()->hasType()) {
-      Type ThisTy = CD->computeThisType();
-      Type FnTy = FunctionType::get(CD->getArguments()->getType(),
-                                    TupleType::getEmpty(TC.Context),
-                                    TC.Context);
-      FnTy = FunctionType::get(ThisTy, FnTy, TC.Context);
-      CD->setType(FnTy);
-      CD->getImplicitThisDecl()->setType(ThisTy);
-    } else {
-      CD->setType(ErrorType::get(TC.Context));
-      CD->getImplicitThisDecl()->setType(ErrorType::get(TC.Context));
-    }
+    visitValueDecl(CD);
+
+    Type ThisTy = CD->computeThisType();
+    Type FnTy = FunctionType::get(CD->getType(), 
+                                 TupleType::getEmpty(TC.Context),
+                                 TC.Context);
+    FnTy = FunctionType::get(ThisTy, FnTy, TC.Context);
+    CD->overwriteType(FnTy);
+    CD->getImplicitThisDecl()->setType(ThisTy);
   }
 };
 }; // end anonymous namespace.

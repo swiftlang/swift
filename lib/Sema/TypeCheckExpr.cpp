@@ -280,10 +280,13 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
                                           Ty, E2, Type(), Viable);
       ConstructorDecl *CD = dyn_cast_or_null<ConstructorDecl>(Best);
       if (CD) {
-        E2 = coerceToType(E2, CD->getArguments()->getType());
+        Type ArgTy = CD->getType();
+        ArgTy = ArgTy->castTo<FunctionType>()->getResult();
+        ArgTy = ArgTy->castTo<FunctionType>()->getInput();
+        E2 = coerceToType(E2, ArgTy);
         if (E2 == 0) {
           diagnose(E1->getLoc(), diag::while_converting_function_argument,
-                   CD->getArguments()->getType())
+                   ArgTy)
             << E->getArg()->getSourceRange();
           E->setType(ErrorType::get(Context));
           return 0;

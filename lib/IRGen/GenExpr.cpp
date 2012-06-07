@@ -255,6 +255,7 @@ namespace {
       OwnedAddress addr =
         I.emitLocalAllocation(IGF, object, NotOnHeap, type,
                               "construction.temp");
+      I.emitZeroInit(IGF, object, addr, type);
 
       IGF.constructObject(addr.getAddress(), E->getConstructor(),
                           E->getInput());
