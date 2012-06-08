@@ -1,4 +1,4 @@
-//===--- GenClosure.cpp - Miscellaneous IR Generation for Expressions -----===//
+//===--- GenConstructor.cpp - IR Generation for Constructors --------------===//
 //
 // This source file is part of the Swift.org open source project
 //
