@@ -928,7 +928,10 @@ public:
 
   /// computeThisType - compute and return the type of 'this'.
   Type computeThisType() const;
-  
+
+  /// getArgumentType - get the type of the argument tuple
+  Type getArgumentType() const;
+
   /// getImplicitThisDecl - This method returns the implicit 'this' decl.
   VarDecl *getImplicitThisDecl() const { return ImplicitThisDecl; }
 

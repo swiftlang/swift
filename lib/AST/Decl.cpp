@@ -393,6 +393,14 @@ Type ConstructorDecl::computeThisType() const {
                          getParent()->getASTContext());
 }
 
+Type ConstructorDecl::getArgumentType() const {
+  Type ArgTy = getType();
+  ArgTy = ArgTy->castTo<FunctionType>()->getResult();
+  ArgTy = ArgTy->castTo<FunctionType>()->getInput();
+  return ArgTy;
+}
+
+
 //===----------------------------------------------------------------------===//
 //  Decl printing.
 //===----------------------------------------------------------------------===//

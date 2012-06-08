@@ -928,20 +928,12 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
         continue;
 
       if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(Best)) {
-        Type ArgTy = CD->getType();
-        ArgTy = ArgTy->castTo<FunctionType>()->getResult();
-        ArgTy = ArgTy->castTo<FunctionType>()->getInput();
-        Expr *CoercedS = TC.coerceToType(Segment, ArgTy);
-        if (CoercedS == 0) {
-          diagnose(Segment->getLoc(), diag::while_converting_function_argument,
-                   ArgTy)
-            << Segment->getSourceRange();
-          E->setType(ErrorType::get(TC.Context));
-          return nullptr;
-        }
+        Type ArgTy = CD->getArgumentType();
+        Segment = TC.coerceToType(Segment, ArgTy);
+        assert(Segment && "Coercion shouldn't fail!");
         Segment = new (TC.Context) ConstructExpr(DestTy,
-                                                 CoercedS->getStartLoc(),
-                                                 CD, CoercedS);
+                                                 Segment->getStartLoc(),
+                                                 CD, Segment);
         continue;
       }
 

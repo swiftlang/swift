@@ -287,17 +287,9 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
                                           Ty, E2, Type(), Viable);
       ConstructorDecl *CD = dyn_cast_or_null<ConstructorDecl>(Best);
       if (CD) {
-        Type ArgTy = CD->getType();
-        ArgTy = ArgTy->castTo<FunctionType>()->getResult();
-        ArgTy = ArgTy->castTo<FunctionType>()->getInput();
+        Type ArgTy = CD->getArgumentType();
         E2 = coerceToType(E2, ArgTy);
-        if (E2 == 0) {
-          diagnose(E1->getLoc(), diag::while_converting_function_argument,
-                   ArgTy)
-            << E->getArg()->getSourceRange();
-          E->setType(ErrorType::get(Context));
-          return 0;
-        }
+        assert(E2 && "Coercion shouldn't fail!");
         return new (Context) ConstructExpr(Ty, E1->getStartLoc(), CD, E2);
       }
       if (Best) {
@@ -654,7 +646,10 @@ public:
                                            CT, Arg, Type(), Viable);
 
     if (Best) {
-      E->setCtor(cast<ConstructorDecl>(Best));
+      ConstructorDecl *CD = cast<ConstructorDecl>(Best);
+      Arg = TC.coerceToType(Arg, CD->getArgumentType());
+      assert(Arg && "Coercion shouldn't fail!");
+      E->setCtor(CD);
       E->setCtorArg(Arg);
     } else if (!Viable.empty()) {
       TC.diagnose(E->getLoc(), diag::constructor_overload_fail, true, CT)
