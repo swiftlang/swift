@@ -320,8 +320,10 @@ static unsigned getDeclContextTypeDepth(DeclContext *DC) {
 void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
   // Make sure we skip adding the standard library imports if the
   // translation unit is empty.
-  if (TU->Decls.empty())
+  if (TU->Decls.empty()) {
+    TU->ASTStage = TranslationUnit::NameBound;
     return;
+  }
 
   bool IsInitialNameBinding = TU->getImportedModules().empty();
 
