@@ -425,23 +425,33 @@ namespace {
   class GetterSetterTarget {
   public:
     enum Kind {
-      IndependentVar, ByrefMemberVar, ByrefMemberSubscript
+      IndependentVar, ByrefMemberVar, ByvalMemberVar,
+      ByrefMemberSubscript, ByvalMemberSubscript
     };
     static bool isSubscriptKind(Kind kind) {
-      return kind == Kind::ByrefMemberSubscript;
+      return kind == ByrefMemberSubscript ||
+             kind == ByvalMemberSubscript;
     }
     static bool isByrefMemberKind(Kind kind) {
-      return kind != Kind::IndependentVar;
+      return kind == ByrefMemberVar ||
+             kind == ByrefMemberSubscript;
+    }
+    static bool isByvalMemberKind(Kind kind) {
+      return kind == ByvalMemberVar ||
+             kind == ByvalMemberSubscript;
     }
     static bool isMemberKind(Kind kind) {
-      return kind != Kind::IndependentVar;
+      return kind != IndependentVar;
     }
 
   private:
-    GetterSetterTarget(Kind kind, ValueDecl *decl, unsigned indexSize = 0)
-      : TargetAndKind(decl, kind), IndexExplosionSize(indexSize) {
+    GetterSetterTarget(Kind kind, ValueDecl *decl, unsigned baseSize = 0,
+                       unsigned indexSize = 0)
+      : Target(decl), TargetKind(kind), BaseExplosionSize(baseSize),
+        IndexExplosionSize(indexSize) {
       assert(!isSubscript() || isa<SubscriptDecl>(decl));
       assert(!isVar() || isa<VarDecl>(decl));
+      assert(isByvalMember() || baseSize == 0);
       assert(isSubscript() || indexSize == 0);
     }
 
@@ -449,23 +459,35 @@ namespace {
     static GetterSetterTarget forByrefMemberVar(VarDecl *var) {
       return GetterSetterTarget(Kind::ByrefMemberVar, var);
     }
+    static GetterSetterTarget forByvalMemberVar(VarDecl *var,
+                                                unsigned baseSize) {
+      return GetterSetterTarget(Kind::ByvalMemberVar, var, baseSize);
+    }
     static GetterSetterTarget forIndependentVar(VarDecl *var) {
       return GetterSetterTarget(Kind::IndependentVar, var);
     }
     static GetterSetterTarget
     forByrefMemberSubscript(SubscriptDecl *subscript,
-                            unsigned indexExplosionSize) {
+                            unsigned indexSize) {
       return GetterSetterTarget(Kind::ByrefMemberSubscript,
-                                subscript, indexExplosionSize);
+                                subscript, /*baseSize*/ 0, indexSize);
+    }
+    static GetterSetterTarget
+    forByvalMemberSubscript(SubscriptDecl *subscript,
+                            unsigned baseSize,
+                            unsigned indexSize) {
+      return GetterSetterTarget(Kind::ByvalMemberSubscript,
+                                subscript, baseSize, indexSize);
     }
 
-    Kind getKind() const { return TargetAndKind.getInt(); }
+    Kind getKind() const { return TargetKind; }
     bool isSubscript() const { return isSubscriptKind(getKind()); }
     bool isVar() const { return !isSubscript(); }
     bool isByrefMember() const { return isByrefMemberKind(getKind()); }
+    bool isByvalMember() const { return isByvalMemberKind(getKind()); }
     bool isMember() const { return isMemberKind(getKind()); }
 
-    ValueDecl *getDecl() const { return TargetAndKind.getPointer(); }
+    ValueDecl *getDecl() const { return Target; }
     VarDecl *getVarDecl() const {
       assert(!isSubscript());
       return cast<VarDecl>(getDecl());
@@ -473,6 +495,12 @@ namespace {
     SubscriptDecl *getSubscriptDecl() const {
       assert(isSubscript());
       return cast<SubscriptDecl>(getDecl());
+    }
+
+    /// Returns the size of the byval base as a maximal explosion.
+    unsigned getBaseExplosionSize() const {
+      assert(isByvalMember());
+      return BaseExplosionSize;
     }
 
     /// Returns the size of the index value as a maximal explosion.
@@ -486,6 +514,10 @@ namespace {
       if (isSubscript())
         return getSubscriptDecl()->getElementType();
       return getVarDecl()->getType();
+    }
+
+    Type getByvalType() const {
+      return getDecl()->getDeclContext()->getDeclaredTypeOfContext();
     }
 
     Type getIndexType() const {
@@ -521,18 +553,32 @@ namespace {
     }
 
   private:
-    llvm::PointerIntPair<ValueDecl*,2,Kind> TargetAndKind;
+    ValueDecl* Target;
+    Kind TargetKind;
+    unsigned BaseExplosionSize;
     unsigned IndexExplosionSize;
   };
 
   class GetterSetterComponent : public LogicalPathComponent {
     GetterSetterTarget Target;
 
-    const ManagedValue *getIndexValuesBuffer() const {
+    const ManagedValue *getBaseValuesBuffer() const {
       return reinterpret_cast<const ManagedValue*>(this + 1);
     }
-    ManagedValue *getIndexValuesBuffer() {
+    ManagedValue *getBaseValuesBuffer() {
       return reinterpret_cast<ManagedValue*>(this + 1);
+    }
+    const ManagedValue *getIndexValuesBuffer() const {
+      auto values = reinterpret_cast<const ManagedValue*>(this + 1);
+      if (Target.isByvalMember())
+        values += Target.getBaseExplosionSize();
+      return values;
+    }
+    ManagedValue *getIndexValuesBuffer() {
+      auto values = reinterpret_cast<ManagedValue*>(this + 1);
+      if (Target.isByvalMember())
+        values += Target.getBaseExplosionSize();
+      return values;
     }
 
   public:
@@ -540,8 +586,22 @@ namespace {
 
     /// Required by LValue::addWithExtra.
     static size_t extra_storage_size(const GetterSetterTarget &target) {
-      assert(target.isSubscript());
-      return sizeof(ManagedValue) * target.getIndexExplosionSize();
+      assert(target.isByvalMember() || target.isSubscript());
+      size_t size = 0;
+      if (target.isByvalMember())
+        size += sizeof(ManagedValue) * target.getBaseExplosionSize();
+      if (target.isSubscript())
+        size += sizeof(ManagedValue) * target.getIndexExplosionSize();
+      return size;
+    }
+
+    void initBaseValues(Explosion &values) {
+      assert(values.getKind() == ExplosionKind::Maximal &&
+             "cannot store non-maximal index explosion in "
+             "GetterSetterComponent!");
+      assert(values.size() == Target.getBaseExplosionSize());
+      std::memcpy(getBaseValuesBuffer(), values.claimAll().data(),
+                  sizeof(ManagedValue) * Target.getBaseExplosionSize());
     }
 
     void initIndexValues(Explosion &values) {
@@ -550,7 +610,31 @@ namespace {
              "GetterSetterComponent!");
       assert(values.size() == Target.getIndexExplosionSize());
       std::memcpy(getIndexValuesBuffer(), values.claimAll().data(),
-                  extra_storage_size(Target));
+                  sizeof(ManagedValue) * Target.getIndexExplosionSize());
+    }
+
+    /// Add the base values to the given explosion.
+    void addBaseValues(IRGenFunction &IGF, Explosion &out,
+                       bool preserve) const {
+      // The stored index values come from a maximal explosion.
+      ArrayRef<ManagedValue> storedValues(getBaseValuesBuffer(),
+                                          Target.getBaseExplosionSize());
+
+      // Just copy them in straight if the target is maximal.
+      if (!preserve && out.getKind() == ExplosionKind::Maximal)
+        return out.add(storedValues);
+
+      // Otherwise, reexplode.
+      Explosion storedExplosion(ExplosionKind::Maximal);
+      storedExplosion.add(storedValues);
+
+      Type byvalType = Target.getByvalType();
+      const TypeInfo &byvalTI = IGF.getFragileTypeInfo(byvalType);
+      if (preserve) {
+        byvalTI.copy(IGF, storedExplosion, out);
+      } else {
+        byvalTI.reexplode(IGF, storedExplosion, out);
+      }
     }
 
     /// Add the index values to the given explosion.
@@ -589,6 +673,9 @@ namespace {
       // A byref member requires 'self' as its first argument.
       if (Target.isByrefMember()) {
         selfArg.addUnmanaged(base.getAddress());
+        args.push_back(Arg::forUnowned(selfArg));
+      } else if (Target.isByvalMember()) {
+        addBaseValues(IGF, selfArg, preserve);
         args.push_back(Arg::forUnowned(selfArg));
       }
 
@@ -648,6 +735,9 @@ namespace {
         // We can use an untyped Arg because we perfectly match the
         // getter's explosion level.
         args.push_back(Arg::forUnowned(selfArg));
+      } else if (Target.isByvalMember()) {
+        addBaseValues(IGF, selfArg, preserve);
+        args.push_back(Arg::forUnowned(selfArg));
       }
 
       // The next argument is the "index".
@@ -680,6 +770,9 @@ namespace {
 
         // We can use an untyped Arg because we perfectly match the
         // getter's explosion level.
+        args.push_back(Arg::forUnowned(selfArg));
+      } else if (Target.isByvalMember()) {
+        addBaseValues(IGF, selfArg, preserve);
         args.push_back(Arg::forUnowned(selfArg));
       }
 
@@ -733,7 +826,17 @@ LValue swift::irgen::emitMemberRefLValue(IRGenFunction &IGF, MemberRefExpr *E) {
       llvm_unreachable("Unexpected physical lvalue MemberRefExpr");
     }
 
-    llvm_unreachable("Not yet implemented");
+    // Emit the base value.
+    Explosion base(ExplosionKind::Maximal);
+    IGF.emitRValue(E->getBase(), base);
+
+    // Build the logical lvalue.
+    LValue lvalue;
+    GetterSetterComponent &component =
+      lvalue.addWithExtra<GetterSetterComponent>(
+              GetterSetterTarget::forByvalMemberVar(var, base.size()));
+    component.initBaseValues(base);
+    return lvalue;
   }
 
   if (!isVarAccessLogical(IGF, var)) {
@@ -781,9 +884,26 @@ LValue IRGenFunction::getGlobal(VarDecl *var) {
 
 /// Emit an l-value for the given subscripted reference.
 LValue swift::irgen::emitSubscriptLValue(IRGenFunction &IGF, SubscriptExpr *E) {
-  // TODO: we need to take a slightly different path if the base is a
-  // reference type.
-  assert(!E->getBase()->getType()->hasReferenceSemantics());
+  if (E->getBase()->getType()->hasReferenceSemantics()) {
+    // Emit the base value.
+    Explosion base(ExplosionKind::Maximal);
+    IGF.emitRValue(E->getBase(), base);
+
+    // Emit the index.
+    Explosion index(ExplosionKind::Maximal);
+    IGF.emitRValue(E->getIndex(), index);
+
+    // Build the logical lvalue.
+    LValue lvalue;
+    GetterSetterComponent &component =
+      lvalue.addWithExtra<GetterSetterComponent>(
+                GetterSetterTarget::forByvalMemberSubscript(E->getDecl(),
+                                                            base.size(),
+                                                            index.size()));
+    component.initBaseValues(base);
+    component.initIndexValues(index);
+    return lvalue;
+  }
   
   // Emit the base l-value.
   LValue lvalue = IGF.emitLValue(E->getBase());

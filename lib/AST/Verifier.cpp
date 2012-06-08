@@ -355,11 +355,12 @@ namespace {
     }
     
     void verifyChecked(SubscriptExpr *E) {
-      if (!E->getBase()->getType()->is<LValueType>()) {
+      if (!E->getBase()->getType()->is<LValueType>() &&
+          !E->getBase()->getType()->hasReferenceSemantics()) {
         Out << "Subscript base type is not an lvalue";
         abort();
       }
-      
+
       if (!E->getType()->is<LValueType>()) {
         Out << "Subscript type is not an lvalue";
         abort();
