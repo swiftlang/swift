@@ -636,7 +636,8 @@ or\
 \
 Both Java and C# have this ambiguity. C# resolves the ambiguity by looking at the token after the closing '>' to decide which way to go; Java seems to do the same. We have a few options:\
 \
-	1) Follow C# and Java and implement the infinite lookahead needed to make this work. Note that we have true ambiguities, because one could make either of the above parse trees well-formed.  	2) Introduce some kind of special rule for '<' like we have for '(', such as: an identifier followed by an unspaced '<' is a type, while an identifier followed by spacing and then '<' is an expression, or\
+	1) Follow C# and Java and implement the infinite lookahead needed to make this work. Note that we have true ambiguities, because one could make either of the above parse trees well-formed.\
+	2) Introduce some kind of special rule for '<' like we have for '(', such as: an identifier followed by an unspaced '<' is a type, while an identifier followed by spacing and then '<' is an expression, or\
 	3) Pick some syntax other than angle brackets, which is not ambiguous. Note that neither '(' nor '[' work, because they too have expression forms.\
 	4) Disambiguate between the two parses semantically.\
 \
