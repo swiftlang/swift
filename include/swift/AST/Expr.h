@@ -1409,10 +1409,13 @@ public:
 class NewReferenceExpr : public Expr {
 private:
   SourceLoc NewLoc;
+  ConstructorDecl *Ctor;
+  Expr *CtorArg;
 
 public:
   NewReferenceExpr(Type ty, SourceLoc newLoc)
-    : Expr(ExprKind::NewReference, ty), NewLoc(newLoc) {}
+    : Expr(ExprKind::NewReference, ty), NewLoc(newLoc),
+      Ctor(nullptr), CtorArg(nullptr) {}
 
   /// Return the location of the 'new' keyword.
   SourceLoc getNewLoc() const { return NewLoc; }
@@ -1422,6 +1425,12 @@ public:
     return SourceRange(NewLoc, NewLoc);
   }
   SourceLoc getLoc() const { return NewLoc; }
+
+  ConstructorDecl *getCtor() { return Ctor; }
+  void setCtor(ConstructorDecl *c) { Ctor = c; }
+
+  Expr *getCtorArg() { return CtorArg; }
+  void setCtorArg(Expr *e) { CtorArg = e; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const NewReferenceExpr *) { return true; }

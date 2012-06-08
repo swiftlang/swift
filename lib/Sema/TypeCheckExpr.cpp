@@ -636,9 +636,33 @@ public:
       return nullptr;
     }
 
-    if (!E->getType()->is<ClassType>()) {
+    ClassType *CT = E->getType()->getAs<ClassType>();
+    if (!CT) {
       TC.diagnose(E->getLoc(), diag::new_reference_not_class);
       return nullptr;
+    }
+
+    // We don't have an explicit argument; fake one up.
+    Expr *Arg = new (TC.Context) TupleExpr(E->getLoc(),
+                                           MutableArrayRef<Expr *>(),
+                                           nullptr, E->getLoc());
+    Arg->setType(TupleType::getEmpty(TC.Context));
+
+    ConstructorLookup Ctors(CT, TC.TU);
+    llvm::SmallVector<ValueDecl *, 4> Viable;
+    ValueDecl *Best = TC.filterOverloadSet(Ctors.Results, false,
+                                           CT, Arg, Type(), Viable);
+
+    if (Best) {
+      E->setCtor(cast<ConstructorDecl>(Best));
+      E->setCtorArg(Arg);
+    } else if (!Viable.empty()) {
+      TC.diagnose(E->getLoc(), diag::constructor_overload_fail, true, CT)
+        << E->getSourceRange();
+      TC.printOverloadSetCandidates(Viable);
+    } else {
+      // FIXME: We should diagnose this once we synthesize
+      // default constructors yet.
     }
 
     return E;

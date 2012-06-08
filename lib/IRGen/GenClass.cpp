@@ -20,8 +20,10 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
 #include "llvm/DerivedTypes.h"
+#include "llvm/Function.h"
 
 #include "Explosion.h"
+#include "GenFunc.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -113,6 +115,24 @@ void swift::irgen::emitNewReferenceExpr(IRGenFunction &IGF,
                                             "reference.new");
   llvm::Type *destType = info.getLayout(IGF.IGM).getType()->getPointerTo();
   llvm::Value *castVal = IGF.Builder.CreateBitCast(val, destType);
+
+  // Call the constructor for the class.
+  if (ConstructorDecl *CD = E->getCtor()) {
+    llvm::Function *fn =
+        IGF.IGM.getAddrOfConstructor(CD, ExplosionKind::Minimal);
+    Callee c = Callee::forMethod(CD->getType(), fn, ExplosionKind::Minimal, 1);
+
+    Explosion inputE(ExplosionKind::Minimal);
+    IGF.emitRValue(E->getCtorArg(), inputE);
+    Explosion thisE(ExplosionKind::Minimal);
+    IGF.emitRetain(castVal, thisE);
+    Arg args[] = { Arg::forUnowned(thisE), Arg::forUnowned(inputE) };
+
+    Explosion Result(ExplosionKind::Minimal);
+    emitCall(IGF, c, args,
+             IGF.getFragileTypeInfo(TupleType::getEmpty(IGF.IGM.Context)),
+             Result);
+  }
 
   Out.add(IGF.enterReleaseCleanup(castVal));
 }
