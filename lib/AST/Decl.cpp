@@ -182,6 +182,16 @@ bool ValueDecl::isInstanceMember() const {
   return false;
 }
 
+bool ValueDecl::needsCapture() const {
+  // We don't need to capture anything from non-local contexts.
+  if (!getDeclContext()->isLocalContext())
+    return false;
+  // We don't need to capture types.
+  if (isa<TypeDecl>(this))
+    return false;
+  return true;
+}
+
 Type TypeDecl::getDeclaredType() const {
   if (auto TAD = dyn_cast<TypeAliasDecl>(this))
     return TAD->getAliasType();

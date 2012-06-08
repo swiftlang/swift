@@ -27,7 +27,7 @@
 using namespace swift;
 
 static void VisitValueDecl(ValueDecl *VD) {
-  if (VD->getDeclContext()->isLocalContext()) {
+  if (VD->needsCapture()) {
     // We assume that these flags are correct unless
     // we show otherwise in walkToExprPre.
     VD->setNeverUsedAsLValue(true);

@@ -507,8 +507,8 @@ Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
   }
 
   // Compute captures for local value declaration.
-  DeclContext *ValDC = D->getDeclContext();
-  if (ValDC->isLocalContext()) {
+  if (D->needsCapture()) {
+    DeclContext *ValDC = D->getDeclContext();
     DeclContext *DC = CurDeclContext;
     unsigned i = ValCaptures.size();
     while (DC != ValDC) {
