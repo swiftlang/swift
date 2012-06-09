@@ -146,7 +146,6 @@ public:
       }
       PBD->setInit(Init);
       if (!DestTy) {
-        // FIXME: Cope with unknowable coercions.
         if (TC.coerceToType(PBD->getPattern(), Init->getType(),
                             /*isFirstPass*/false))
           return;
