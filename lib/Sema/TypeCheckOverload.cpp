@@ -117,14 +117,15 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     }
     
     // Check whether arguments are suitable for this function.
-    if (!isCoercibleToType(Arg, FunctionTy->getInput(),
-                           (OperatorSyntax && VD->getAttrs().isAssignment())))
+    if (isCoercibleToType(Arg, FunctionTy->getInput(),
+                          (OperatorSyntax && VD->getAttrs().isAssignment()))
+          == CoercionResult::Failed)
       continue;
     
     // Check whether we can coerce the result type.
     if (DestTy) {
       OpaqueValueExpr OVE(Arg->getLoc(), FunctionTy->getResult());
-      if (!isCoercibleToType(&OVE, DestTy))
+      if (isCoercibleToType(&OVE, DestTy) == CoercionResult::Failed)
         continue;
     }
     

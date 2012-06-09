@@ -22,6 +22,50 @@
 
 namespace swift {
 
+class TypeChecker;
+
+/// CoercionResult - Describes the result of attempting to coerce an
+/// expression to a given type.
+enum class CoercionResult {
+  Succeeded,
+  Failed,
+  Unknowable
+};
+
+/// CoercedExpr - Describes the result of coercing an expression to a given
+/// type.
+class CoercedExpr {
+  TypeChecker &TC;
+  CoercionResult Kind;
+  Expr *E;
+  Type DestTy;
+
+  void diagnose() const;
+
+public:
+  CoercedExpr(TypeChecker &TC, CoercionResult Kind, Expr *E, Type DestTy)
+    : TC(TC), Kind(Kind), E(E), DestTy(DestTy) {}
+
+  CoercionResult getKind() const { return Kind; }
+  Expr *getExpr() const { return E; }
+
+  explicit operator bool() const { return Kind == CoercionResult::Succeeded; }
+
+  operator Expr*() const {
+    switch (Kind) {
+    case CoercionResult::Succeeded:
+      return E;
+
+    case CoercionResult::Unknowable:
+      diagnose();
+      // Fall-through
+
+    case CoercionResult::Failed:
+      return 0;
+    }
+  }
+};
+
 class TypeChecker {
 public:
   TranslationUnit &TU;
@@ -103,15 +147,21 @@ public:
   /// the types don't match and diagnoses cases where the conversion cannot be
   /// performed.
   ///
-  ///
   /// \param Assignment When true, treat this as an assignment.
   ///
-  /// This emits a diagnostic and returns null on error.
-  Expr *coerceToType(Expr *E, Type Ty, bool Assignment = false);
+  /// On success, returns the coerced expression. Otherwise, returns either
+  /// failure (in which case a diagnostic was produced) or 'unknowable', if
+  /// it is unknown whether the coercion can occur (e.g., due to literals that
+  /// have not been coerced to any specific type).
+  CoercedExpr coerceToType(Expr *E, Type Ty, bool Assignment = false);
   
   /// isCoercibleToType - Determine whether the given expression can be 
   /// coerced to the given type.
-  bool isCoercibleToType(Expr *E, Type Ty, bool Assignment = false);
+  ///
+  /// The result is a three-state value: the coercion may succeed, may fail, or
+  /// it may be unknowable whether it can ever succeed (for example, if
+  /// unresolved literals are involved).
+  CoercionResult isCoercibleToType(Expr *E, Type Ty, bool Assignment = false);
   
   /// coerceObjectArgument - Coerce the given expression to an object argument
   /// of the given container type.

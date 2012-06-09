@@ -231,8 +231,23 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // the type of 'x', we're coercing the object argument ('this').
     if (isa<ThisApplyExpr>(E))
       E2 = coerceObjectArgument(E2, FT->getInput());
-    else
-      E2 = coerceToType(E2, FT->getInput(), Assignment);
+    else {
+      CoercedExpr CoercedE2 = coerceToType(E2, FT->getInput(), Assignment);
+      switch (CoercedE2.getKind()) {
+      case CoercionResult::Succeeded:
+        E2 = CoercedE2.getExpr();
+        break;
+
+      case CoercionResult::Failed:
+        E2 = 0;
+        break;
+
+      case CoercionResult::Unknowable:
+        // Leave E2 as it is; we'll end up type-checking again later anyway.
+        break;
+      }
+    }
+    
     if (E2 == 0) {
       diagnose(E1->getLoc(), diag::while_converting_function_argument,
                FT->getInput())
@@ -262,8 +277,9 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // a struct or oneof, this is a cast.  If the type is a struct or oneof,
     // we first try to cast, then try to construct an object.
     bool IsCast = true;
+    // FIXME: Should this check for coercions to any nominal type?
     if (Ty->is<StructType>() || Ty->is<OneOfType>())
-      IsCast = isCoercibleToType(E2, Ty);
+      IsCast = isCoercibleToType(E2, Ty) != CoercionResult::Failed;
     if (IsCast) {
       if (!isDirectTypeReference(E1)) {
         // FIXME: This should be an error, and we should check it on
@@ -271,12 +287,21 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
         E1 = new (Context) DeclRefExpr(MT->getTypeDecl(), E1->getStartLoc(),
                                        MT->getTypeDecl()->getTypeOfReference());
       }
-      Expr *CoercedArg = coerceToType(E2, Ty);
-      if (!CoercedArg) {
+
+      CoercedExpr CoercedArg = coerceToType(E2, Ty);
+      switch (CoercedArg.getKind()) {
+      case CoercionResult::Succeeded:
+        return new (Context) CoerceExpr(E1, CoercedArg);
+
+      case CoercionResult::Failed:
         E->setType(ErrorType::get(Context));
-        return 0;
+        return nullptr;
+
+      case CoercionResult::Unknowable:
+        // Delay type checking. However, we do know the type of this expression.
+        E->setType(Ty);
+        return E;
       }
-      return new (Context) CoerceExpr(E1, CoercedArg);
     }
 
     // Check for a struct or oneof with a constructor.
@@ -288,7 +313,20 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
       ConstructorDecl *CD = dyn_cast_or_null<ConstructorDecl>(Best);
       if (CD) {
         Type ArgTy = CD->getArgumentType();
-        E2 = coerceToType(E2, ArgTy);
+        CoercedExpr CoercedE2 = coerceToType(E2, ArgTy);
+        switch (CoercedE2.getKind()) {
+        case CoercionResult::Succeeded:
+          E2 = CoercedE2.getExpr();
+          break;
+          
+        case CoercionResult::Failed:
+          E2 = 0;
+          break;
+          
+        case CoercionResult::Unknowable:
+          // Leave E2 as it is; we'll end up type-checking again later anyway.
+          break;
+        }
         assert(E2 && "Coercion shouldn't fail!");
         return new (Context) ConstructExpr(Ty, E1->getStartLoc(), CD, E2);
       }
@@ -1187,8 +1225,19 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
 
   // If our context specifies a type, apply it to the expression.
   if (ConvertType) {
-    E = coerceToType(E, ConvertType);
-    if (E == 0) return true;
+    CoercedExpr CoercedE = coerceToType(E, ConvertType);
+    switch (CoercedE.getKind()) {
+    case CoercionResult::Succeeded:
+      E = CoercedE;
+      break;
+
+    case CoercionResult::Failed:
+      return true;
+
+    case CoercionResult::Unknowable:
+      // We may have literals to resolve.
+      break;
+    }
   }
   
   DependenceWalker dependence;
