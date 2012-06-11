@@ -77,7 +77,10 @@ $0:
 .macro SaveRegisters
   .cfi_startproc
   push  %rbp
+  .cfi_def_cfa_offset 16
+  .cfi_offset %rbp, -16
   mov   %rsp, %rbp
+  .cfi_def_cfa_register %rbp
   // potentially align the stack
   and   $-16, %rsp
   push  %rax
@@ -128,7 +131,7 @@ BEGIN_FUNC _swift_retainAndReturnThree
   lock
   addl  $RC_INTERVAL, RC_OFFSET(%rdi)
   jc    2b
-  mov   %rdi, %rax
+  mov   %rsi, %rax
   ret
 END_FUNC
 
