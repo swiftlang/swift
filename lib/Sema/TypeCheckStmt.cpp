@@ -159,6 +159,19 @@ public:
     
     return WS;
   }
+  Stmt *visitDoWhileStmt(DoWhileStmt *WS) {
+    {
+      AddLoopNest loopNest(*this);
+      Stmt *S = WS->getBody();
+      if (typeCheckStmt(S)) return 0;
+      WS->setBody(S);
+    }
+    
+    Expr *E = WS->getCond();
+    if (TC.typeCheckCondition(E)) return 0;
+    WS->setCond(E);
+    return WS;
+  }
   Stmt *visitForStmt(ForStmt *FS) {
     // Type check any var decls in the initializer.
     for (auto D : FS->getInitializerVarDecls())

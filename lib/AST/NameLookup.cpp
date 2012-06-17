@@ -447,11 +447,14 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     if (S->getElseStmt())
       visit(S->getElseStmt());
   }
-  void visitWhileStmt (WhileStmt *S) {
+  void visitWhileStmt(WhileStmt *S) {
+    visit(S->getBody());
+  }
+  void visitDoWhileStmt(DoWhileStmt *S) {
     visit(S->getBody());
   }
 
-  void visitForStmt (ForStmt *S) {
+  void visitForStmt(ForStmt *S) {
     if (!IntersectsRange(S->getSourceRange()))
       return;
     visit(S->getBody());
@@ -462,7 +465,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
         checkValueDecl(VD);
     }
   }
-  void visitForEachStmt (ForEachStmt *S) {
+  void visitForEachStmt(ForEachStmt *S) {
     if (!IntersectsRange(S->getSourceRange()))
       return;
     visit(S->getBody());

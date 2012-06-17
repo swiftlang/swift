@@ -259,6 +259,7 @@
   </div>
 
   <pre class="grammar">
+    keyword ::= 'do'
     keyword ::= 'else'
     keyword ::= 'extension'
     keyword ::= 'if'
@@ -2354,6 +2355,35 @@ ill-formed if the type does not conform to the protocol.</p>
     while X == 4 {
       X = 3
     }
+  </pre>
+
+  <!-- ===================================================================== -->
+  <h3 id="stmt-do-while">'do-while' Statement</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    stmt-do-while ::= 'do' <a href="#stmt-brace">stmt-brace</a> 'while' '<a href="#expr">expr</a>
+  </pre>
+  
+  <p>'do-while' statements provide simple loop construct which (on each
+  iteration of the loop) evalutes the body, then evaluates the condition,
+  invoking the 'getLogicValue' member of the result if the result not a 'Bool',
+  then determines whether to keep looping. (Internally, the standard library
+  type 'Bool' has a getLogicValue member that returns a 'Builtin.Int1').  It is
+  an error if the type of the expression is context-dependent or some non-Bool
+  type.
+  </p>
+  
+  <p>Some examples include:</p>
+  
+  <pre class="example">
+    do {
+      /*...*/
+    } while true
+    
+    do {
+      X = 3
+    } while X == 4
   </pre>
 
   <!-- ===================================================================== -->

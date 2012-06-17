@@ -364,6 +364,14 @@ ERROR(expected_expr_while,stmt_parsing,none,
 ERROR(expected_lbrace_after_while,stmt_parsing,none,
       "expected '{' after 'while' condition", ())
 
+// Do/While Statement
+ERROR(expected_lbrace_after_do,stmt_parsing,none,
+      "expected '{' after 'do'", ())
+ERROR(expected_while_in_dowhile,stmt_parsing,none,
+      "expected 'while' in 'do-while' loop", ())
+ERROR(expected_expr_do_while,stmt_parsing,none,
+      "expected expresssion in 'do-while' condition", ())
+
 // C-Style For Stmt
 ERROR(expected_lparen_for_stmt,stmt_parsing,none,
       "expected '(' in 'for' statement", ())

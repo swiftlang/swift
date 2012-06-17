@@ -323,6 +323,7 @@ public:
   NullablePtr<Stmt> parseStmtReturn();
   NullablePtr<Stmt> parseStmtIf();
   NullablePtr<Stmt> parseStmtWhile();
+  NullablePtr<Stmt> parseStmtDoWhile();
   NullablePtr<Stmt> parseStmtFor();
   NullablePtr<Stmt> parseStmtForCStyle(SourceLoc ForLoc);
   NullablePtr<Stmt> parseStmtForEach(SourceLoc ForLoc);

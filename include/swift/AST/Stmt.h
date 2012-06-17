@@ -256,6 +256,31 @@ public:
   static bool classof(const WhileStmt *) { return true; }
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::While; }
 };
+  
+/// DoWhileStmt - do/while statement. After type-checking, the condition is of
+/// type Builtin.Int1.
+class DoWhileStmt : public Stmt {
+  SourceLoc DoLoc, WhileLoc;
+  Stmt *Body;
+  Expr *Cond;
+  
+public:
+  DoWhileStmt(SourceLoc DoLoc, Expr *Cond, SourceLoc WhileLoc, Stmt *Body)
+    : Stmt(StmtKind::DoWhile),
+    DoLoc(DoLoc), WhileLoc(WhileLoc), Body(Body), Cond(Cond) {}
+  
+  SourceRange getSourceRange() const;
+  
+  Stmt *getBody() const { return Body; }
+  void setBody(Stmt *s) { Body = s; }
+
+  Expr *getCond() const { return Cond; }
+  void setCond(Expr *e) { Cond = e; }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const DoWhileStmt *) { return true; }
+  static bool classof(const Stmt *S) {return S->getKind() == StmtKind::DoWhile;}
+};
 
 /// ForStmt - for statement.  After type-checking, the condition is of
 /// type Builtin.Int1.  Note that the condition is optional.  If not present,

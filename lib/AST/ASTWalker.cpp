@@ -345,6 +345,20 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return WS;
   }
 
+  Stmt *visitDoWhileStmt(DoWhileStmt *DWS) {
+    if (Stmt *S2 = doIt(DWS->getBody()))
+      DWS->setBody(S2);
+    else
+      return nullptr;
+    
+    if (Expr *E2 = doIt(DWS->getCond()))
+      DWS->setCond(E2);
+    else
+      return nullptr;
+
+    return DWS;
+  }
+
   Stmt *visitForStmt(ForStmt *FS) {
     // Visit any var decls in the initializer.
     for (auto D : FS->getInitializerVarDecls())

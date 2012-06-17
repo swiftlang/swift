@@ -93,6 +93,10 @@ SourceRange WhileStmt::getSourceRange() const {
   return SourceRange(WhileLoc, Body->getEndLoc());
 }
 
+SourceRange DoWhileStmt::getSourceRange() const {
+  return SourceRange(DoLoc, Cond->getEndLoc());
+}
+
 Pattern *ForEachStmt::getPattern() const {
   if (Pattern *P = Pat.dyn_cast<Pattern *>())
     return P;
@@ -176,6 +180,14 @@ public:
     printRec(S->getCond());
     OS << '\n';
     printRec(S->getBody());
+    OS << ')';
+  }
+
+  void visitDoWhileStmt(DoWhileStmt *S) {
+    OS.indent(Indent) << "(do_while_stmt\n";
+    printRec(S->getBody());
+    OS << '\n';
+    printRec(S->getCond());
     OS << ')';
   }
   void visitForStmt(ForStmt *S) {

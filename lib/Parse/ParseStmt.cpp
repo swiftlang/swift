@@ -35,6 +35,7 @@ bool Parser::isStartOfStmtOtherThanAssignment(const Token &Tok) {
   case tok::kw_return:
   case tok::kw_if:
   case tok::kw_while:
+  case tok::kw_do:
   case tok::kw_for:
   case tok::kw_break:
   case tok::kw_continue:
@@ -217,6 +218,7 @@ NullablePtr<Stmt> Parser::parseStmtOtherThanAssignment() {
   case tok::kw_return: return parseStmtReturn();
   case tok::kw_if:     return parseStmtIf();
   case tok::kw_while:  return parseStmtWhile();
+  case tok::kw_do:     return parseStmtDoWhile();
   case tok::kw_for:    return parseStmtFor();
   case tok::kw_break:
     return new (Context) BreakStmt(consumeToken(tok::kw_break));
@@ -323,6 +325,26 @@ NullablePtr<Stmt> Parser::parseStmtWhile() {
   // If our normal expression parsed correctly, build an AST.
   return new (Context) WhileStmt(WhileLoc, Condition.get(), Body.get());
 }
+
+/// 
+///   stmt-do-while:
+///     'do' stmt-brace 'while' expr
+NullablePtr<Stmt> Parser::parseStmtDoWhile() {
+  SourceLoc DoLoc = consumeToken(tok::kw_do), WhileLoc;
+
+  NullablePtr<BraceStmt> Body =
+    parseStmtBrace(diag::expected_lbrace_after_do);
+  if (Body.isNull()) return 0;
+
+  if (parseToken(tok::kw_while, WhileLoc, diag::expected_while_in_dowhile))
+    return 0;
+  
+  NullablePtr<Expr> Condition = parseExpr(diag::expected_expr_do_while);
+  if (Condition.isNull()) return 0;
+  
+  return new (Context) DoWhileStmt(DoLoc, Condition.get(), WhileLoc, Body.get());
+}
+
 
 NullablePtr<Stmt> Parser::parseStmtFor() {
   SourceLoc ForLoc = consumeToken(tok::kw_for);
