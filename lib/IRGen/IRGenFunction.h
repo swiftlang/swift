@@ -60,6 +60,7 @@ namespace swift {
   class ValueDecl;
   class VarDecl;
   class WhileStmt;
+  class DoWhileStmt;
 
 namespace irgen {
   class Condition;
@@ -282,6 +283,7 @@ private:
   void emitIfStmt(IfStmt *S);
   void emitReturnStmt(ReturnStmt *S);
   void emitWhileStmt(WhileStmt *S);
+  void emitDoWhileStmt(DoWhileStmt *S);
   void emitForStmt(ForStmt *S);
   void emitForEachStmt(ForEachStmt *S);
   void emitBreakStmt(BreakStmt *S);

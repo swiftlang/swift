@@ -48,7 +48,10 @@ void IRGenFunction::emitStmt(Stmt *S) {
 
   case StmtKind::While:
     return emitWhileStmt(cast<WhileStmt>(S));
-      
+
+  case StmtKind::DoWhile:
+    return emitDoWhileStmt(cast<DoWhileStmt>(S));
+
   case StmtKind::For:
     return emitForStmt(cast<ForStmt>(S));
       
@@ -178,6 +181,42 @@ void IRGenFunction::emitWhileStmt(WhileStmt *S) {
   BreakDestStack.pop_back();
   ContinueDestStack.pop_back();
 }
+
+void IRGenFunction::emitDoWhileStmt(DoWhileStmt *S) {
+  // Create a new basic block and jump into it.
+  llvm::BasicBlock *loopBB = createBasicBlock("dowhile");
+  Builder.CreateBr(loopBB);
+  Builder.emitBlock(loopBB);
+  
+  // Set the destinations for 'break' and 'continue'
+  llvm::BasicBlock *endBB = createBasicBlock("dowhile.end");
+  BreakDestStack.emplace_back(endBB, getCleanupsDepth());
+  ContinueDestStack.emplace_back(loopBB, getCleanupsDepth());
+
+  // Emit the body, which is always evaluated the first time around.
+  emitStmt(S->getBody());
+
+  if (Builder.hasValidIP()) {
+
+    // Evaluate the condition with the false edge leading directly
+    // to the continuation block.
+    Condition cond = emitCondition(S->getCond(), /*hasFalseCode*/ false);
+    
+    cond.enterTrue(*this);
+    if (Builder.hasValidIP()) {
+      Builder.CreateBr(loopBB);
+      Builder.ClearInsertionPoint();
+    }
+    cond.exitTrue(*this);
+    // Complete the conditional execution.
+    cond.complete(*this);
+  }
+  
+  emitOrDeleteBlock(*this, endBB);
+  BreakDestStack.pop_back();
+  ContinueDestStack.pop_back();
+}
+
 
 void IRGenFunction::emitForStmt(ForStmt *S) {
   // Enter a new scope.
