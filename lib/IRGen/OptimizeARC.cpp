@@ -28,7 +28,6 @@
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/SmallMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -930,7 +929,7 @@ static bool optimizeReturn3(ReturnInst *TheReturn) {
   // return, past any insertvalues.  We tolerate other non-memory instructions
   // though, in case other optimizations have moved them around.  Collect all
   // the retain candidates.
-  SmallMap<Value*, CallInst*, 8> RetainedPointers;
+  SmallDenseMap<Value*, CallInst*, 8> RetainedPointers;
   
   for (BasicBlock::iterator BBI = TheReturn,E = TheReturn->getParent()->begin();
        BBI != E; ) {

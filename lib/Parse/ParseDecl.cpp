@@ -22,7 +22,6 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PathV2.h"
 #include "llvm/ADT/PointerUnion.h"
-#include "llvm/ADT/SmallMap.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
@@ -1281,7 +1280,7 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
   if (!Attributes.empty())
     diagnose(Attributes.LSquareLoc, diag::oneof_attributes);
   
-  llvm::SmallMap<Identifier, OneOfElementDecl*, 16> SeenSoFar;
+  llvm::SmallDenseMap<Identifier, OneOfElementDecl*, 16> SeenSoFar;
   SmallVector<Decl *, 16> MemberDecls;
 
   Type AliasTy = OOD->getDeclaredType();

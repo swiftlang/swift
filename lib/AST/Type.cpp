@@ -19,7 +19,6 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/APFloat.h"
-#include "llvm/ADT/SmallMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
@@ -249,13 +248,12 @@ static void addProtocols(Type T, SmallVectorImpl<ProtocolDecl *> &Protocols) {
 /// zapping those in the original list that we find again.
 static void addMinimumProtocols(Type T,
                                 SmallVectorImpl<ProtocolDecl *> &Protocols,
-                                llvm::SmallMap<ProtocolDecl *, unsigned> &Known,
+                           llvm::SmallDenseMap<ProtocolDecl *, unsigned> &Known,
                                 llvm::SmallPtrSet<ProtocolDecl *, 16> &Visited,
                                 SmallVector<ProtocolDecl *, 16> &Stack,
                                 bool &ZappedAny) {
   if (auto Proto = T->getAs<ProtocolType>()) {
-    llvm::SmallMap<ProtocolDecl *, unsigned>::iterator KnownPos
-      = Known.find(Proto->getDecl());
+    auto KnownPos = Known.find(Proto->getDecl());
     if (KnownPos != Known.end()) {
       // We've come across a protocol that is in our original list. Zap it.
       Protocols[KnownPos->second] = nullptr;
@@ -280,7 +278,7 @@ static void addMinimumProtocols(Type T,
 /// protocols that are already covered by inheritance due to other entries in
 /// the protocol list.
 static void minimizeProtocols(SmallVectorImpl<ProtocolDecl *> &Protocols) {
-  llvm::SmallMap<ProtocolDecl *, unsigned> Known;
+  llvm::SmallDenseMap<ProtocolDecl *, unsigned> Known;
   llvm::SmallPtrSet<ProtocolDecl *, 16> Visited;
   SmallVector<ProtocolDecl *, 16> Stack;
   bool ZappedAny = false;
@@ -289,8 +287,7 @@ static void minimizeProtocols(SmallVectorImpl<ProtocolDecl *> &Protocols) {
   // Zap any obvious duplicates along the way.
   for (unsigned I = 0, N = Protocols.size(); I != N; ++I) {
     // Check whether we've seen this protocol before.
-    llvm::SmallMap<ProtocolDecl *, unsigned>::iterator KnownPos
-      = Known.find(Protocols[I]);
+    auto KnownPos = Known.find(Protocols[I]);
     
     // If we have not seen this protocol before, record it's index.
     if (KnownPos == Known.end()) {
