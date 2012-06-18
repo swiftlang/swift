@@ -1203,6 +1203,7 @@ if vec[3] {
     
     type-simple ::= <a href="#type-identifier">type-identifier</a>
     type-simple ::= <a href="#type-tuple">type-tuple</a>
+    type-simple ::= <a href="#type-composition">type-composition</a>
 
     type-annotation ::= <a href="#attribute-list">attribute-list</a> type
   </pre>
@@ -1543,7 +1544,50 @@ if vec[3] {
   </pre>
 
   <!-- _____________________________________________________________________ -->
-  <h3 id="inheritance">Type inheritance</h4>
+  <h3 id="type-composition">Protocol Composition Types</h4>
+  <pre class="grammar">
+   type-composition ::= 'protocol' '&lt;' type-composition-list? '&gt;'
+
+   type-composition-list ::= <a href="#type-identifier">type-identifier</a> (',' <a href="#type-identifier">type-identifier</a>)*
+  </pre>
+
+  <p>A protocol composition type composes together a number of
+  protocols to describe a type that meets the requirements of each of
+  those protocols. A protocol composition type <code>protocol&lt;A,
+  B&gt;</code> is similar to an explicitly-defined protocol that
+  inherits both <code>A</code> and <code>B</code></p>
+
+<pre class="example">
+protocol C : A, B { }
+</pre>
+
+  <p>but without the need to introduce a new name.</p>
+
+  <div class="commentary">
+    If we drop implicit conformance to protocols, protocol composition
+    types become much more important, because they allow you to give a
+    name to a composition without requiring types to explicitly
+    conform to that name.
+  </div>
+  
+  <p>Each of the types named in the
+  <code>type-composition-list</code> shall refer to either a protocol
+  or to a protocol composition. The list may be empty, in which case
+  every type conforms to the empty protocol composition. This is how
+  the <code>Any</code> type is defined in the standard library.</p>
+
+ <pre class="example">
+    <i>// A value that represents any type</i>
+    var any : protocol&lt;&gt; = 17
+
+    <i>// A value that conforms to both the Document and Range protocols</i>
+    var doc : protocol&lt;Document,Range&gt;
+    doc.isEmpty()       <i>// uses Range.isEmpty()</i>
+    doc.title = "Hello" <i>// uses Document.title</i>
+</pre>
+
+  <!-- _____________________________________________________________________ -->
+  <h3 id="inheritance">Type Inheritance</h4>
   <pre class="grammar">
     inheritance ::= ':' <a href="#type-identifier">type-identifier</a> (',' <a href="#type-identifier">type-identifier</a>)*
   </pre>
