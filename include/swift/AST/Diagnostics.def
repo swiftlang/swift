@@ -777,6 +777,9 @@ ERROR(no_convert_object_arg,sema_tca,none,
 ERROR(constructor_overload_fail,sema_tce,none,
       "%select{no matching function|ambiguous overloads}0 constructing "
       "type %1", (bool, Type))
+ERROR(existential_member_assoc_types,sema_tca,none,
+      "cannot refer to member %0 of protocol type %1 because its type (%2) "
+      "involves associated types", (Identifier, Type, Type))
 
 ERROR(closure_not_function_type,sema_tce,none,
       "closure inferred to have non-function type %0", (Type))

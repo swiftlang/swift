@@ -534,14 +534,23 @@ public:
     }
     
     // Substitute the existential types into the member type.
-    MemberTy = TC.substType(MemberTy, Substitutions);
-    if (!MemberTy) {
+    Type SubstMemberTy = TC.substType(MemberTy, Substitutions);
+    if (!SubstMemberTy) {
       E->setType(ErrorType::get(TC.Context));
       return nullptr;
     }
+
+    // FIXME: For now, we don't allow any associated types to show up. We
+    // may relax this restriction later.
+    if (!SubstMemberTy->isEqual(MemberTy)) {
+      TC.diagnose(E->getDotLoc(), diag::existential_member_assoc_types,
+                  E->getDecl()->getName(), Proto->getDeclaredType(),
+                  MemberTy);
+      TC.diagnose(E->getDecl()->getLoc(), diag::decl_declared_here,
+                  E->getDecl()->getName());
+    }
     
-    
-    E->setType(MemberTy);
+    E->setType(SubstMemberTy);
     return E;
   }
 
