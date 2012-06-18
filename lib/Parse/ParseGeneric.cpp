@@ -28,13 +28,13 @@ using namespace swift;
 ///     identifier
 ///     identifier ':' type-identifier
 ///     identifier ':' type-composition
-bool
-Parser::parseGenericParameters(SmallVectorImpl<GenericParam> &GenericParams) {
+GenericParamList *Parser::parseGenericParameters() {
   // Parse the opening '<'.
   assert(startsWithLess(Tok) && "Generic parameter list must start with '<'");
   SourceLoc LAngleLoc = consumeStartingLess();
 
   // Parse the generic parameter list.
+  SmallVector<GenericParam, 4> GenericParams;
   bool Invalid = false;
   while (true) {
     // Parse the name of the parameter.
@@ -100,5 +100,8 @@ Parser::parseGenericParameters(SmallVectorImpl<GenericParam> &GenericParams) {
     RAngleLoc = consumeStartingGreater();
   }
 
-  return Invalid;
+  if (GenericParams.empty())
+    return nullptr;
+
+  return GenericParamList::create(Context, LAngleLoc, GenericParams, RAngleLoc);
 }

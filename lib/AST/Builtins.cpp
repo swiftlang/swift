@@ -90,8 +90,9 @@ namespace {
 
 /// Build a builtin function declarations.
 static FuncDecl *getBuiltinFunction(ASTContext &Context, Identifier Id, Type T){
-  return new (Context) FuncDecl(SourceLoc(), SourceLoc(), Id, SourceLoc(), T,
-                                /*init*/ nullptr, Context.TheBuiltinModule);
+  return new (Context) FuncDecl(SourceLoc(), SourceLoc(), Id, SourceLoc(),
+                                /*generic=*/nullptr, T, /*init*/ nullptr,
+                                Context.TheBuiltinModule);
 }
 
 /// Build a getelementptr operation declaration.

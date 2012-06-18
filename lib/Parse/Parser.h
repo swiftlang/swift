@@ -330,7 +330,7 @@ public:
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing
-  bool parseGenericParameters(SmallVectorImpl<GenericParam> &GenericParams);
+  GenericParamList *parseGenericParameters();
 };
 
 } // end namespace swift

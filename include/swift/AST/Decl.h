@@ -169,6 +169,42 @@ public:
   void setDeclContext(DeclContext *DC);
 };
 
+/// GenericParamList - A list of generic parameters that is part of a generic
+/// function or type.
+class GenericParamList {
+  SourceRange Brackets;
+  unsigned NumParams;
+
+  GenericParamList(SourceLoc LAngleLoc,
+                   ArrayRef<GenericParam> Params,
+                   SourceLoc RAngleLoc);
+  
+public:
+  /// create - Create a new generic parameter list within the given AST context.
+  static GenericParamList *create(ASTContext &Context,
+                                  SourceLoc LAngleLoc,
+                                  ArrayRef<GenericParam> Params,
+                                  SourceLoc RAngleLoc);
+
+  MutableArrayRef<GenericParam> getParams() {
+    return MutableArrayRef<GenericParam>(
+             reinterpret_cast<GenericParam *>(this + 1), NumParams);
+  }
+
+  ArrayRef<GenericParam> getParams() const {
+    return ArrayRef<GenericParam>(
+             reinterpret_cast<const GenericParam *>(this + 1), NumParams);
+  }
+
+  unsigned size() const { return NumParams; }
+  GenericParam *begin() { return getParams().begin(); }
+  GenericParam *end()   { return getParams().end(); }
+  const GenericParam *begin() const { return getParams().begin(); }
+  const GenericParam *end()   const { return getParams().end(); }
+
+  SourceRange getSourceRange() const { return Brackets; }
+};
+
 /// ImportDecl - This represents a single import declaration, e.g.:
 ///   import swift
 ///   import swift.int
@@ -740,15 +776,17 @@ class FuncDecl : public ValueDecl {
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
   SourceLoc NameLoc;
+  GenericParamList *GenericParams;
   FuncExpr *Body;
   llvm::PointerIntPair<Decl *, 1, bool> GetOrSetDecl;
   
 public:
   FuncDecl(SourceLoc StaticLoc, SourceLoc FuncLoc, Identifier Name,
-           SourceLoc NameLoc, Type Ty, FuncExpr *Body, DeclContext *DC)
+           SourceLoc NameLoc, GenericParamList *GenericParams, Type Ty,
+           FuncExpr *Body, DeclContext *DC)
     : ValueDecl(DeclKind::Func, DC, Name, Ty), StaticLoc(StaticLoc),
-      FuncLoc(FuncLoc), NameLoc(NameLoc), Body(Body) {
-  }
+      FuncLoc(FuncLoc), NameLoc(NameLoc), GenericParams(GenericParams),
+      Body(Body) { }
   
   bool isStatic() const { return StaticLoc.isValid(); }
 
@@ -782,7 +820,16 @@ public:
     return StaticLoc.isValid() ? StaticLoc : FuncLoc;
   }
   SourceLoc getLoc() const { return NameLoc; }
-  
+
+  /// getGenericParams - Retrieve the set of parameters to a generic function,
+  /// or null if this function is not generic.
+  GenericParamList *getGenericParams() const { return GenericParams; }
+
+  /// isGeneric - Determine whether this is a generic function, which can only
+  /// be used when each of the archetypes is bound to a particular concrete
+  /// type.
+  bool isGeneric() const { return GenericParams != nullptr; }
+
   /// makeGetter - Note that this function is the getter for the given
   /// declaration, which may be either a variable or a subscript declaration.
   void makeGetter(Decl *D) {

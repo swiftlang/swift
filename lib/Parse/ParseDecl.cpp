@@ -807,8 +807,8 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       LastValidLoc = Body.get()->getRBraceLoc();
       
       Get = new (Context) FuncDecl(/*StaticLoc=*/SourceLoc(), GetLoc,
-                                   Identifier(), GetLoc, FuncTy, GetFn,
-                                   CurDeclContext);
+                                   Identifier(), GetLoc, /*generic=*/nullptr,
+                                   FuncTy, GetFn, CurDeclContext);
       GetFn->setDecl(Get);
       continue;
     }
@@ -930,8 +930,8 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     LastValidLoc = Body.get()->getRBraceLoc();
     
     Set = new (Context) FuncDecl(/*StaticLoc=*/SourceLoc(), SetLoc,
-                                 Identifier(), SetLoc, FuncTy, SetFn,
-                                 CurDeclContext);
+                                 Identifier(), SetLoc, /*generic=*/nullptr,
+                                 FuncTy, SetFn, CurDeclContext);
     SetFn->setDecl(Set);
   }
   
@@ -1141,16 +1141,16 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   Optional<Scope> GenericsScope(this, /*AllowLookup=*/true);
 
   // Parse the generic-params, if present.
-  SmallVector<GenericParam, 4> GenericParams;
+  GenericParamList *GenericParams = nullptr;
   if (startsWithLess(Tok)) {
-    parseGenericParameters(GenericParams);
+    GenericParams = parseGenericParameters();
 
     // If there were any generic parameters, introduce the new scope to
     // hold those generic parameters.
-    if (!GenericParams.empty()) {
+    if (GenericParams) {
       GenericsScope.emplace(this, /*AllowLookup=*/true);
       
-      for (auto Param : GenericParams) {
+      for (auto Param : *GenericParams) {
         ScopeInfo.addToScope(Param.getDecl());
       }
     }
@@ -1188,10 +1188,12 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
 
     // Now that we have a context, update the generic parameters with that
     // context.
-    for (auto Param : GenericParams) {
-      Param.setDeclContext(FE);
+    if (GenericParams) {
+      for (auto Param : *GenericParams) {
+        Param.setDeclContext(FE);
+      }
     }
-
+    
     // Establish the new context.
     ContextChange CC(*this, FE);
     
@@ -1224,7 +1226,8 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
 
   // Create the decl for the func and add it to the parent scope.
   FuncDecl *FD = new (Context) FuncDecl(StaticLoc, FuncLoc, Name, NameLoc,
-                                        FuncTy, FE, CurDeclContext);
+                                        GenericParams, FuncTy, FE,
+                                        CurDeclContext);
   if (FE)
     FE->setDecl(FD);
   if (Attributes.isValid()) FD->getMutableAttrs() = Attributes;

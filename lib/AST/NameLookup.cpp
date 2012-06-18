@@ -428,6 +428,14 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     }
   }
 
+  void checkGenericParams(GenericParamList *Params) {
+    if (!Params)
+      return;
+
+    for (auto P : *Params)
+      checkValueDecl(P.getDecl());
+  }
+
   void checkTranslationUnit(TranslationUnit *TU) {
     for (Decl *D : TU->Decls) {
       if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
@@ -505,6 +513,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
   // and if so, whether this is a reference to one of them.
   while (!DC->isModuleContext()) {
     ValueDecl *BaseDecl = 0;
+    GenericParamList *GenericParams = nullptr;
     Type ExtendedType;
     if (FuncExpr *FE = dyn_cast<FuncExpr>(DC)) {
       // Look for local variables; normally, the parser resolves these
@@ -528,6 +537,11 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
         BaseDecl = FD->getImplicitThisDecl();
         DC = DC->getParent();
       }
+
+      // Look in the generic parameters after checking our local declaration.
+      if (FD)
+        GenericParams = FD->getGenericParams();
+
     } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(DC)) {
       ExtendedType = ED->getExtendedType();
       BaseDecl = ExtendedType->castTo<NominalType>()->getDecl();
@@ -576,6 +590,17 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       }
       if (Lookup.isSuccess())
         return;
+    }
+
+    // Check the generic parameters for something with the given name.
+    if (GenericParams) {
+      FindLocalVal localVal(Loc, Name);
+      localVal.checkGenericParams(GenericParams);
+
+      if (localVal.MatchingValue) {
+        Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
+        return;
+      }
     }
 
     DC = DC->getParent();

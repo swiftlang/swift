@@ -92,6 +92,24 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLoc();
   llvm_unreachable("Unknown decl kind");
 }
 
+GenericParamList::GenericParamList(SourceLoc LAngleLoc,
+                                   ArrayRef<GenericParam> Params,
+                                   SourceLoc RAngleLoc)
+  : Brackets(LAngleLoc, RAngleLoc), NumParams(Params.size())
+{
+  memcpy(this + 1, Params.data(), NumParams * sizeof(GenericParam));
+}
+
+GenericParamList *GenericParamList::create(ASTContext &Context,
+                                           SourceLoc LAngleLoc,
+                                           ArrayRef<GenericParam> Params,
+                                           SourceLoc RAngleLoc) {
+  unsigned Size = sizeof(GenericParamList)
+                + sizeof(GenericParam) * Params.size();
+  void *Mem = Context.Allocate(Size, llvm::alignOf<GenericParamList>());
+  return new (Mem) GenericParamList(LAngleLoc, Params, RAngleLoc);
+}
+
 /// getAliasType - Return the sugared version of this decl as a Type.
 NameAliasType *TypeAliasDecl::getAliasType() const {
   // Lazily create AliasTy. 
@@ -461,6 +479,27 @@ namespace {
     void printRec(Expr *E) { E->print(OS, Indent+2); }
     void printRec(Stmt *S) { S->print(OS, Indent+2); }
 
+    void printGenericParameters(GenericParamList *Params) {
+      if (!Params)
+        return;
+
+      OS << '<';
+      bool First = true;
+      for (auto P : *Params) {
+        if (First) {
+          First = false;
+        } else {
+          OS << ", ";
+        }
+        OS << P.getDecl()->getName();
+        if (!P.getAsTypeParam()->getInherited().empty()) {
+          OS << " : ";
+          P.getAsTypeParam()->getInherited()[0]->print(OS);
+        }
+      }
+      OS << '>';
+    }
+
     void printCommon(Decl *D, const char *Name) {
       OS.indent(Indent) << "(" << Name;
     }
@@ -529,6 +568,8 @@ namespace {
       printCommon((Decl*)VD, Name);
       OS << ' ';
       printDeclName(VD);
+      if (FuncDecl *FD = dyn_cast<FuncDecl>(VD))
+        printGenericParameters(FD->getGenericParams());
       OS << " type='";
       if (VD->hasType())
         VD->getType()->print(OS);
