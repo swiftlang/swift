@@ -205,6 +205,36 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
                                                  SE->getRBracketLoc());
 }
 
+/// collectArchetypeToExistentialSubstitutions - Collect a set of substitutions
+/// from each archetype in the given protocol to a protocol composition type
+/// that describes the requirements placed on that archetype.
+static void
+collectArchetypeToExistentialSubstitutions(ASTContext &Context,
+                                           ProtocolDecl *Proto,
+                                           Type ThisTy,
+                                           TypeSubstitutionMap &Substitutions) {
+  for (auto Member : Proto->getMembers()) {
+    auto AssocType = dyn_cast<TypeAliasDecl>(Member);
+    if (!AssocType)
+      continue;
+    
+    ArchetypeType *Archetype
+      = AssocType->getDeclaredType()->castTo<ArchetypeType>();
+    
+    // FIXME: Identify 'this' in a rather more sane way.
+    if (AssocType->getName().str().equals("This"))
+      Substitutions[Archetype] = ThisTy;
+    else {
+      if (Archetype->getConformsTo().size() == 1)
+        Substitutions[Archetype] = Archetype->getConformsTo().front();
+      else
+        Substitutions[Archetype]
+          = ProtocolCompositionType::get(Context, SourceLoc(),
+                                         Archetype->getConformsTo());
+    }
+  }
+}
+
 Expr *TypeChecker::semaSubscriptExpr(ExistentialSubscriptExpr *E) {
   // Propagate errors up.
   if (E->getDecl()->getType()->is<ErrorType>()) {
@@ -225,30 +255,10 @@ Expr *TypeChecker::semaSubscriptExpr(ExistentialSubscriptExpr *E) {
 
   // For each of the archetypes in the protocol, substitute an existential
   // type that meets the same requirements.
-  // FIXME: Duplicate code in ExistentialMemberRefExpr.
   ProtocolDecl *Proto = ContainerTy->castTo<ProtocolType>()->getDecl();
   TypeSubstitutionMap Substitutions;
-  for (auto Member : Proto->getMembers()) {
-    auto AssocType = dyn_cast<TypeAliasDecl>(Member);
-    if (!AssocType)
-      continue;
-    
-    ArchetypeType *Archetype
-      = AssocType->getDeclaredType()->castTo<ArchetypeType>();
-    
-    // FIXME: Identify 'this' in a rather more sane way.
-    if (AssocType->getName().str().equals("This"))
-      Substitutions[Archetype] = ContainerTy;
-    else {
-      if (Archetype->getConformsTo().size() == 1)
-        Substitutions[Archetype] = Archetype->getConformsTo().front();
-      else
-        Substitutions[Archetype]
-        = ProtocolCompositionType::get(Context, SourceLoc(),
-                                       Archetype->getConformsTo());
-    }
-  }
-
+  collectArchetypeToExistentialSubstitutions(Context, Proto, ContainerTy,
+                                             Substitutions);
   SubscriptDecl *SubDecl = E->getDecl();
 
   // Determine the index type.
@@ -634,26 +644,8 @@ public:
     // type that meets the same requirements.
     ProtocolDecl *Proto = ContainerTy->castTo<ProtocolType>()->getDecl();
     TypeSubstitutionMap Substitutions;
-    for (auto Member : Proto->getMembers()) {
-      auto AssocType = dyn_cast<TypeAliasDecl>(Member);
-      if (!AssocType)
-        continue;
-
-      ArchetypeType *Archetype
-        = AssocType->getDeclaredType()->castTo<ArchetypeType>();
-
-      // FIXME: Identify 'this' in a rather more sane way.
-      if (AssocType->getName().str().equals("This"))
-        Substitutions[Archetype] = ContainerTy;
-      else {
-        if (Archetype->getConformsTo().size() == 1)
-          Substitutions[Archetype] = Archetype->getConformsTo().front();
-        else
-          Substitutions[Archetype]
-            = ProtocolCompositionType::get(TC.Context, SourceLoc(),
-                                           Archetype->getConformsTo());
-      }
-    }
+    collectArchetypeToExistentialSubstitutions(TC.Context, Proto, ContainerTy,
+                                               Substitutions);
     
     // Substitute the existential types into the member type.
     Type SubstMemberTy = TC.substType(MemberTy, Substitutions);
