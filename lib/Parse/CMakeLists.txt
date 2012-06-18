@@ -4,6 +4,7 @@ add_swift_library(swiftParse
   Parser.h
   ParseDecl.cpp
   ParseExpr.cpp
+  ParseGeneric.cpp
   ParsePattern.cpp
   ParseStmt.cpp
   ParseType.cpp

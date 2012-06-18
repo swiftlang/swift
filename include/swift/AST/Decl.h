@@ -47,6 +47,7 @@ namespace swift {
   class Stmt;
   class StructType;
   class TupleType;
+  class ValueDecl;
   
 enum class DeclKind {
 #define DECL(Id, Parent) Id,
@@ -140,6 +141,32 @@ public:
     assert(Mem); 
     return Mem; 
   }
+};
+
+/// GenericParam - A parameter to a generic function or type, as declared in
+/// the list of generic parameters, e.g., the T and U in:
+///
+/// \code
+/// func f<T : Range, U>(t : T, u : U) { /* ... */ }
+/// \endcode
+class GenericParam {
+  TypeAliasDecl *TypeParam;
+
+public:
+  /// Construct a generic parameter from a type parameter.
+  GenericParam(TypeAliasDecl *TypeParam) : TypeParam(TypeParam) { }
+
+  /// getDecl - Retrieve the generic parameter declaration.
+  ValueDecl *getDecl() const {
+    return reinterpret_cast<ValueDecl *>(TypeParam);
+  }
+
+  /// getAsTypeParam - Retrieve the generic parameter as a type parameter.
+  TypeAliasDecl *getAsTypeParam() const { return TypeParam; }
+
+  /// setDeclContext - Set the declaration context for the generic parameter,
+  /// once it is known.
+  void setDeclContext(DeclContext *DC);
 };
 
 /// ImportDecl - This represents a single import declaration, e.g.:
@@ -948,6 +975,9 @@ public:
   static bool classof(const ConstructorDecl *D) { return true; }
 };
 
+inline void GenericParam::setDeclContext(DeclContext *DC) {
+  TypeParam->setDeclContext(DC);
+}
 
 } // end namespace swift
 

@@ -247,8 +247,7 @@ bool Parser::parseTypeComposition(Type &Result, TypeLoc *&ResultLoc) {
     // Skip until we hit the '>'.
     skipUntilAnyOperator();
     if (startsWithGreater(Tok))
-      EndLoc = consumeStartingGreater();
-    
+      EndLoc = consumeStartingGreater();    
   } else {
     EndLoc = consumeStartingGreater();
   }

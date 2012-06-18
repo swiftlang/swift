@@ -107,7 +107,15 @@ namespace swift {
     }
     
     ~Optional() { reset(); }
-    
+
+    // Create a new object by constructing it in place with the given arguments.
+    template<typename ...ArgTypes>
+    void emplace(ArgTypes &&...Args) {
+      reset();
+      HasValue = true;
+      new (getPointer()) T(std::forward<ArgTypes>(Args)...);
+    }
+
     void reset() {
       if (!HasValue)
         return;

@@ -538,6 +538,17 @@ ERROR(asmname_expected_string_literal,attribute_parsing,none,
 ERROR(asmname_interpolated_string,attribute_parsing,none,
       "asmname cannot be an interpolated string literal", ())
       
+//------------------------------------------------------------------------------
+// Generics parsing diagnostics
+//------------------------------------------------------------------------------
+ERROR(expected_rangle_generics_param,parsing,none,
+      "expected '>' to complete generic parameter list", ())
+ERROR(expected_generics_parameter_name,parsing,none,
+      "expected an identifier to name generic parameter", ())
+ERROR(expected_generics_type_restriction,parsing,none,
+      "expected a type name or protocol composition restricting %0",
+      (Identifier))
+
 //==============================================================================
 // Semantic Analysis Diagnostics
 //==============================================================================

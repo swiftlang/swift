@@ -327,6 +327,10 @@ public:
   NullablePtr<Stmt> parseStmtFor();
   NullablePtr<Stmt> parseStmtForCStyle(SourceLoc ForLoc);
   NullablePtr<Stmt> parseStmtForEach(SourceLoc ForLoc);
+
+  //===--------------------------------------------------------------------===//
+  // Generics Parsing
+  bool parseGenericParameters(SmallVectorImpl<GenericParam> &GenericParams);
 };
 
 } // end namespace swift

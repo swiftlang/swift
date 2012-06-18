@@ -1107,8 +1107,8 @@ Pattern *Parser::buildImplicitThisParameter() {
 /// is true, we parse both productions.
 ///
 ///   decl-func:
-///     'static'? 'func' attribute-list any-identifier func-signature 
-///               stmt-brace?
+///     'static'? 'func' attribute-list any-identifier generic-params?
+///               func-signature stmt-brace?
 ///
 /// NOTE: The caller of this method must ensure that the token sequence is
 /// either 'func' or 'static' 'func'.
@@ -1136,6 +1136,26 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   if (parseAnyIdentifier(Name, diag::expected_identifier_in_decl, "func"))
     return 0;
 
+  // Placeholder that may hold a new scope containing the generic parameters,
+  // if there are any.
+  Optional<Scope> GenericsScope(this, /*AllowLookup=*/true);
+
+  // Parse the generic-params, if present.
+  SmallVector<GenericParam, 4> GenericParams;
+  if (startsWithLess(Tok)) {
+    parseGenericParameters(GenericParams);
+
+    // If there were any generic parameters, introduce the new scope to
+    // hold those generic parameters.
+    if (!GenericParams.empty()) {
+      GenericsScope.emplace(this, /*AllowLookup=*/true);
+      
+      for (auto Param : GenericParams) {
+        ScopeInfo.addToScope(Param.getDecl());
+      }
+    }
+  }
+
   // We force first type of a func declaration to be a tuple for consistency.
   if (Tok.isNotAnyLParen()) {
     diagnose(Tok, diag::func_decl_without_paren);
@@ -1143,7 +1163,7 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   }
 
   SmallVector<Pattern*, 8> Params;
-
+  
   // If we're within a container and this isn't a static method, add an
   // implicit first pattern to match the container type as an element
   // named 'this'.  This turns "(int)->int" on FooTy into "(this :
@@ -1163,8 +1183,14 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   FuncExpr *FE = 0;
   {
     Scope FnBodyScope(this, /*AllowLookup=*/true);
-
+    
     FE = actOnFuncExprStart(FuncLoc, FuncTy, Params);
+
+    // Now that we have a context, update the generic parameters with that
+    // context.
+    for (auto Param : GenericParams) {
+      Param.setDeclContext(FE);
+    }
 
     // Establish the new context.
     ContextChange CC(*this, FE);
@@ -1179,10 +1205,10 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
         FE = 0; // FIXME: Should do some sort of error recovery here.
       } else {
         FE->setBody(Body.get());
-
+        
         auto& Captures = ValCaptures.back();
         ValueDecl** CaptureCopy =
-            Context.AllocateCopy<ValueDecl*>(Captures.begin(), Captures.end());
+        Context.AllocateCopy<ValueDecl*>(Captures.begin(), Captures.end());
         FE->setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
       }
       
@@ -1192,7 +1218,10 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
       FE = 0;
     }
   }
-  
+
+  // Exit the scope introduced for the generic parameters, if we're in one.
+  GenericsScope.reset();
+
   // Create the decl for the func and add it to the parent scope.
   FuncDecl *FD = new (Context) FuncDecl(StaticLoc, FuncLoc, Name, NameLoc,
                                         FuncTy, FE, CurDeclContext);
