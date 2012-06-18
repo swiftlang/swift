@@ -165,6 +165,16 @@ InFlightDiagnostic Lexer::diagnose(const char *Loc, Diag<> ID) {
   return InFlightDiagnostic();
 }
 
+tok Lexer::getTokenKind(StringRef Text) {
+  assert(Text.data() >= BufferStart && Text.data() <= BufferEnd &&
+         "Text string does not fall within lexer's buffer");
+  Lexer L(StringRef(BufferStart, BufferEnd - BufferStart), SourceMgr, Diags,
+          Text.data());
+  Token Result;
+  L.lex(Result);
+  return Result.getKind();
+}
+
 void Lexer::formToken(tok Kind, const char *TokStart) {
   NextToken.setToken(Kind, StringRef(TokStart, CurPtr-TokStart));
 }

@@ -244,7 +244,7 @@
   </pre>
 
   <p>These are all reserved punctuation that are lexed into tokens.  Most other
-     punctuation is matched as <a href="identifier">identifiers</a>.
+     punctuation is matched as <a href="#identifier">identifiers</a>.
   </p>
 
   <!-- ===================================================================== -->
@@ -415,6 +415,17 @@
     not right-bound, and an <tt>operator-binary</tt> in either of the
     other two cases.
   </p>
+
+  <p>When parsing certain grammatical constructs that involve '&lt;' and
+  '&gt;' (such as <a href="#type-composition">protocol composition
+  types</a>), an <tt>operator</tt> with a leading '&lt;' or '&gt;' may
+  be split into two or more tokens: the leading '&lt;' or '&gt;' and
+  the remainder of the token, which may be an <tt>operator</tt> or
+  <tt>punctuation</tt> token that may itself be further split. This
+  rule allows us to parse nested constructs such as
+  <code>A&lt;B&lt;C&gt;&gt;</code> without requiring spaces between
+  the closing '&gt;'s.</p>
+  
   </div>
   
   <!-- ===================================================================== -->

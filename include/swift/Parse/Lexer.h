@@ -119,6 +119,11 @@ public:
   static SourceLoc getSourceLoc(const char *Loc) {
     return SourceLoc(llvm::SMLoc::getFromPointer(Loc));
   }
+
+  /// getTokenKind - Retrieve the token kind for the given text, which must
+  /// fall within the given source buffer.
+  tok getTokenKind(StringRef Text);
+
 private:
   void lexImpl();
   void formToken(tok Kind, const char *TokStart);
