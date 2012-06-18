@@ -661,7 +661,7 @@ public:
   Expr *getBase() const { return Base; }
   void setBase(Expr *E) { Base = E; }
   
-  /// getBase - Retrieve the index of the subscript expression, i.e., the
+  /// getIndex - Retrieve the index of the subscript expression, i.e., the
   /// "offset" into the base value.
   Expr *getIndex() const { return Index; }
   void setIndex(Expr *E) { Index = E; }
@@ -714,7 +714,7 @@ public:
   Expr *getBase() const { return Base; }
   void setBase(Expr *E) { Base = E; }
   
-  /// getBase - Retrieve the index of the subscript expression, i.e., the
+  /// getIndex - Retrieve the index of the subscript expression, i.e., the
   /// "offset" into the base value.
   Expr *getIndex() const { return Index; }
   void setIndex(Expr *E) { Index = E; }
