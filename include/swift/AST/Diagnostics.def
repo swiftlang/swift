@@ -810,6 +810,12 @@ ERROR(no_subscript_declaration,sema_tce,none,
 ERROR(subscript_overload_fail,sema_tce,none,
       "%select{no matching function|ambiguous overloads}0 subscripting base %1 "
       "with index of type %2", (bool, Type, Type))
+ERROR(existential_subscript_assoc_types,sema_tca,none,
+      "cannot subscript value of protocol type %0 because its "
+      "%select{index|value}1 type (%2) involves associated types",
+      (Type, bool, Type))
+NOTE(subscript_decl_here,sema_tca,none,
+     "subscript operator declared here", ())
 ERROR(condition_convert_limit_reached,sema_tce,none,
       "getLogicValue() for type %0 used in a conditional does not return "
       "a bool", (Type))

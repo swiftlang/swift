@@ -102,6 +102,22 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
   
   // If we already know what subscript declaration to use, do it now.
   if (SE->hasDecl()) {
+    // Determine the type of the container.
+    Type ContainerTy
+      = SE->getDecl()->getDeclContext()->getDeclaredTypeOfContext();
+    if (!ContainerTy)
+      return nullptr;
+    
+    assert(!ContainerTy->isExistentialType() &&
+           "Wrong expression kind for subscript into existential type");
+    
+    // Ensure that the base is an lvalue, materializing it if is not an
+    // lvalue yet.
+    if (Expr *Base = coerceObjectArgument(SE->getBase(), ContainerTy))
+      SE->setBase(Base);
+    else
+      return nullptr;
+
     // Convert the indices appropriately.
     SubscriptDecl *SubDecl = SE->getDecl();
     Type IndexType = SubDecl->getIndices()->getType();
@@ -114,19 +130,7 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
       return 0;
     }
     SE->setIndex(Index);
-    
-    Type ContainerTy
-      = SE->getDecl()->getDeclContext()->getDeclaredTypeOfContext();
-    if (!ContainerTy)
-      return nullptr;
-    
-    // Ensure that the base is an lvalue, materializing it if is not an
-    // lvalue yet.
-    if (Expr *Base = coerceObjectArgument(SE->getBase(), ContainerTy))
-      SE->setBase(Base);
-    else
-      return nullptr;
-    
+
     // Compute the final lvalue type and we're done.
     SE->setType(LValueType::get(SubDecl->getElementType(),
                                 LValueType::Qual::DefaultForMemberAccess,
@@ -161,7 +165,25 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
 
   if (Best) {
     // We have a candidate: use it.
-    SE->setDecl(cast<SubscriptDecl>(Best));
+    Type ContainerTy
+      = Best->getDeclContext()->getDeclaredTypeOfContext();
+    if (!ContainerTy)
+      return nullptr;
+
+    SubscriptDecl *Sub = cast<SubscriptDecl>(Best);
+    if (ContainerTy->isExistentialType()) {
+      // We picked a subscript operator in an existential type; create the
+      // appropriate AST node.
+      return semaSubscriptExpr(
+               new (Context) ExistentialSubscriptExpr(SE->getBase(),
+                                                      SE->getLBracketLoc(),
+                                                      SE->getIndex(),
+                                                      SE->getRBracketLoc(),
+                                                      Sub));
+    }
+
+    // Simple case: perform semantic analysis now that we have the declaration.
+    SE->setDecl(Sub);
     return semaSubscriptExpr(SE);
   }
   
@@ -181,6 +203,106 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
                                                  SE->getLBracketLoc(),
                                                  SE->getIndex(),
                                                  SE->getRBracketLoc());
+}
+
+Expr *TypeChecker::semaSubscriptExpr(ExistentialSubscriptExpr *E) {
+  // Propagate errors up.
+  if (E->getDecl()->getType()->is<ErrorType>()) {
+    E->setType(ErrorType::get(Context));
+    return nullptr;
+  }
+
+  // Ensure that the base is an lvalue, materializing it if is not an
+  // lvalue yet.
+  Type ContainerTy
+    = E->getDecl()->getDeclContext()->getDeclaredTypeOfContext();
+  if (Expr *Base = coerceObjectArgument(E->getBase(), ContainerTy))
+    E->setBase(Base);
+  else {
+    E->setType(ErrorType::get(Context));
+    return nullptr;
+  }
+
+  // For each of the archetypes in the protocol, substitute an existential
+  // type that meets the same requirements.
+  // FIXME: Duplicate code in ExistentialMemberRefExpr.
+  ProtocolDecl *Proto = ContainerTy->castTo<ProtocolType>()->getDecl();
+  TypeSubstitutionMap Substitutions;
+  for (auto Member : Proto->getMembers()) {
+    auto AssocType = dyn_cast<TypeAliasDecl>(Member);
+    if (!AssocType)
+      continue;
+    
+    ArchetypeType *Archetype
+      = AssocType->getDeclaredType()->castTo<ArchetypeType>();
+    
+    // FIXME: Identify 'this' in a rather more sane way.
+    if (AssocType->getName().str().equals("This"))
+      Substitutions[Archetype] = ContainerTy;
+    else {
+      if (Archetype->getConformsTo().size() == 1)
+        Substitutions[Archetype] = Archetype->getConformsTo().front();
+      else
+        Substitutions[Archetype]
+        = ProtocolCompositionType::get(Context, SourceLoc(),
+                                       Archetype->getConformsTo());
+    }
+  }
+
+  SubscriptDecl *SubDecl = E->getDecl();
+
+  // Determine the index type.
+  Type IndexType = SubDecl->getIndices()->getType();
+  Type SubstIndexType = substType(IndexType, Substitutions);
+  if (!SubstIndexType)
+    return nullptr;
+
+  // FIXME: For now, we don't allow any associated types to show up. We
+  // may relax this restriction later.
+  if (!SubstIndexType->isEqual(IndexType)) {
+    diagnose(E->getLBracketLoc(), diag::existential_subscript_assoc_types,
+             Proto->getDeclaredType(), true, IndexType);
+    diagnose(E->getDecl()->getLoc(), diag::subscript_decl_here);
+    
+    IndexType = SubstIndexType;
+  }
+
+  // Coerce the index argument to the index type.
+  Expr *Index = coerceToType(E->getIndex(), IndexType);
+  if (!Index) {
+    diagnose(E->getBase()->getLoc(), diag::while_converting_subscript_index,
+             IndexType)
+      << E->getIndex()->getSourceRange();
+    E->setType(ErrorType::get(Context));
+    return nullptr;
+  }
+  E->setIndex(Index);
+
+  // Determine the type of the member.
+  Type ValueType = SubDecl->getElementType();
+
+  // Substitute the existential types into the member type.
+  Type SubstValueType = substType(ValueType, Substitutions);
+  if (!SubstValueType) {
+    E->setType(ErrorType::get(Context));
+    return nullptr;
+  }
+  
+  // FIXME: For now, we don't allow any associated types to show up. We
+  // may relax this restriction later.
+  if (!SubstValueType->isEqual(ValueType)) {
+    diagnose(E->getLBracketLoc(), diag::existential_subscript_assoc_types,
+             Proto->getDeclaredType(), false, ValueType);
+    diagnose(E->getDecl()->getLoc(), diag::subscript_decl_here);
+    ValueType = SubstValueType;
+  }
+  
+  ValueType = LValueType::get(ValueType,
+                              LValueType::Qual::DefaultForMemberAccess,
+                              Context);
+  E->setType(ValueType);
+  return E;
+
 }
 
 /// \brief Determine whether this expression refers to a type directly (ignoring
@@ -516,7 +638,7 @@ public:
       auto AssocType = dyn_cast<TypeAliasDecl>(Member);
       if (!AssocType)
         continue;
-      
+
       ArchetypeType *Archetype
         = AssocType->getDeclaredType()->castTo<ArchetypeType>();
 
@@ -573,6 +695,10 @@ public:
   Expr *visitSubscriptExpr(SubscriptExpr *E) {
     return TC.semaSubscriptExpr(E);
   }
+  Expr *visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E) {
+    return TC.semaSubscriptExpr(E);
+  }
+
   Expr *visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *E) {
     E->setType(UnstructuredUnresolvedType::get(TC.Context));
     return E;

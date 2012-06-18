@@ -434,7 +434,8 @@ namespace {
         return visitFunc(cast<FuncDecl>(member));
 
       case DeclKind::Subscript:
-        IGM.unimplemented(member->getLoc(), "var declaration in protocol");
+        IGM.unimplemented(member->getLoc(),
+                          "subscript declaration in protocol");
         return;
 
       case DeclKind::Var:

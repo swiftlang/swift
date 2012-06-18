@@ -256,6 +256,9 @@ public:
   CoercedResult visitSubscriptExpr(SubscriptExpr *E) {
     return unchanged(E);
   }
+  CoercedResult visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E) {
+    return unchanged(E);
+  }
   CoercedResult visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *E) {
     Type BaseTy = E->getBase()->getType();
     if (LValueType *BaseLV = BaseTy->getAs<LValueType>())
@@ -278,7 +281,18 @@ public:
                                       TC.Context);
       if (!(Flags & CF_Apply))
         return ResultTy;
-      
+
+      Type ContainerTy = Best->getDeclContext()->getDeclaredTypeOfContext();
+      if (ContainerTy->isExistentialType()) {
+        ExistentialSubscriptExpr *Result
+          = new (TC.Context) ExistentialSubscriptExpr(E->getBase(),
+                                                      E->getLBracketLoc(),
+                                                      E->getIndex(),
+                                                      E->getRBracketLoc(),
+                                                      BestSub);
+        return coerced(TC.semaSubscriptExpr(Result));
+      }
+
       SubscriptExpr *Result
         = new (TC.Context) SubscriptExpr(E->getBase(), E->getLBracketLoc(),
                                          E->getIndex(), E->getRBracketLoc(),

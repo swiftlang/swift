@@ -219,6 +219,11 @@ namespace {
       IGF.emitLValueAsScalar(emitSubscriptLValue(IGF, E),
                              isOnHeap(E->getType()), Out);
     }
+
+    void visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E) {
+      IGF.unimplemented(E->getLBracketLoc(), "existential subscripts");
+    }
+
     void visitTupleShuffleExpr(TupleShuffleExpr *E) {
       emitTupleShuffle(IGF, E, Out);
     }
@@ -445,6 +450,11 @@ namespace {
     LValue visitSubscriptExpr(SubscriptExpr *E) {
       return emitSubscriptLValue(IGF, E);
     }
+
+    LValue visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E) {
+      IGF.unimplemented(E->getLBracketLoc(), "existential subscripts");
+      return LValue();
+    }
   };
 }
 
@@ -564,9 +574,10 @@ namespace {
     NON_LOCATEABLE(CoerceExpr)
     NON_LOCATEABLE(ConstructExpr)
     NON_LOCATEABLE(ExistentialMemberRefExpr)
-                                                    
+
     // FIXME: We may want to specialize IR generation for array subscripts.
     NON_LOCATEABLE(SubscriptExpr);
+    NON_LOCATEABLE(ExistentialSubscriptExpr)
 #undef NON_LOCATEABLE
   };
 }

@@ -256,7 +256,20 @@ SourceRange TupleExpr::getSourceRange() const {
 SubscriptExpr::SubscriptExpr(Expr *Base, SourceLoc LBracketLoc, Expr *Index,
                              SourceLoc RBracketLoc, SubscriptDecl *D)
   : Expr(ExprKind::Subscript, D? D->getElementType() : Type()),
-    D(D), Brackets(LBracketLoc, RBracketLoc), Base(Base), Index(Index) { }
+    D(D), Brackets(LBracketLoc, RBracketLoc), Base(Base), Index(Index) {
+  assert((!D ||
+          !D->getDeclContext()->getDeclaredTypeOfContext()->isExistentialType())
+         && "use ExistentialSubscriptExpr for existential type subscript");
+}
+
+ExistentialSubscriptExpr::
+ExistentialSubscriptExpr(Expr *Base, SourceLoc LBracketLoc, Expr *Index,
+                         SourceLoc RBracketLoc, SubscriptDecl *D)
+  : Expr(ExprKind::ExistentialSubscript, D? D->getElementType() : Type()),
+    D(D), Brackets(LBracketLoc, RBracketLoc), Base(Base), Index(Index) {
+  assert(D->getDeclContext()->getDeclaredTypeOfContext()->isExistentialType() &&
+         "use SubscriptExpr for non-existential type subscript");
+}
 
 Expr *OverloadedSubscriptExpr::createWithCopy(Expr *Base,
                                               ArrayRef<ValueDecl*> Decls,
@@ -267,8 +280,16 @@ Expr *OverloadedSubscriptExpr::createWithCopy(Expr *Base,
          "Cannot create an overloaded member ref with no decls");
   ASTContext &C = Decls[0]->getASTContext();
   
-  if (Decls.size() == 1)
-    return new (C) SubscriptExpr(Base, LBracketLoc, Index, RBracketLoc);
+  if (Decls.size() == 1) {
+    Type ContainerTy = Decls[0]->getDeclContext()->getDeclaredTypeOfContext();
+    if (ContainerTy->isExistentialType())
+      return new (C) ExistentialSubscriptExpr(Base, LBracketLoc, Index,
+                                              RBracketLoc,
+                                              cast<SubscriptDecl>(Decls[0]));
+
+    return new (C) SubscriptExpr(Base, LBracketLoc, Index, RBracketLoc,
+                                 cast<SubscriptDecl>(Decls[0]));
+  }
   
   // Otherwise, copy the overload set into the ASTContext's memory.
   return new (C) OverloadedSubscriptExpr(Base, C.AllocateCopy(Decls),
@@ -463,6 +484,14 @@ public:
   }
   void visitSubscriptExpr(SubscriptExpr *E) {
     printCommon(E, "subscript_expr");
+    OS << '\n';
+    printRec(E->getBase());
+    OS << '\n';
+    printRec(E->getIndex());
+    OS << ')';
+  }
+  void visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E) {
+    printCommon(E, "existential_subscript_expr");
     OS << '\n';
     printRec(E->getBase());
     OS << '\n';
