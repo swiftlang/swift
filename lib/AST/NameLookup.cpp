@@ -560,7 +560,8 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
 
     } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(DC)) {
       ExtendedType = ED->getExtendedType();
-      BaseDecl = ExtendedType->castTo<NominalType>()->getDecl();
+      if (NominalType *NT = ExtendedType->getAs<NominalType>())
+        BaseDecl = NT->getDecl();
     } else if (NominalTypeDecl *ND = dyn_cast<NominalTypeDecl>(DC)) {
       ExtendedType = ND->getDeclaredType();
       BaseDecl = ND;
