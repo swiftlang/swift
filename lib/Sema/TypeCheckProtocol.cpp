@@ -55,6 +55,10 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   llvm::DenseMap<ArchetypeType *, Type> TypeMapping;
   llvm::DenseMap<ProtocolDecl *, ProtocolConformance *> InheritedMapping;
 
+  // FIXME: When T is an archetype that is specified to conform to Proto,
+  // we can fast-path this. However, we would not have a ProtocolConformance
+  // structure to use.
+
   // Check that T conforms to all inherited protocols.
   for (auto Inherited : Proto->getInherited()) {
     SmallVector<ProtocolDecl *, 4> InheritedProtos;
@@ -252,12 +256,31 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         case MemberLookupResult::MemberProperty:
         case MemberLookupResult::MemberFunction:
         case MemberLookupResult::ExistentialMember:
-        case MemberLookupResult::ArchetypeMember:
           if (Candidate.D->getKind() == Requirement->getKind() &&
               RequiredTy->isEqual(getInstanceUsageType(Candidate.D,
                                                        TC.Context)))
             Viable.push_back(Candidate.D);
           break;
+
+        case MemberLookupResult::ArchetypeMember: {
+          if (Candidate.D->getKind() != Requirement->getKind())
+            break;
+
+          // Substitute all of the associated types used in the candidate
+          // declaration with the archetypes (or concrete types) to which they
+          // are bound.
+          Type CandidateTy = getInstanceUsageType(Candidate.D, TC.Context);
+          // FIXME: Copy of the map here is ueber-lame.
+          TypeSubstitutionMap Substitutions
+            = TC.Context.AssociatedTypeMap[T->castTo<ArchetypeType>()];
+          CandidateTy = TC.substType(CandidateTy, Substitutions);
+          if (!CandidateTy)
+            break;
+
+          if (RequiredTy->isEqual(CandidateTy))
+            Viable.push_back(Candidate.D);
+          break;
+        }
 
         case MemberLookupResult::TupleElement:
           // Tuple elements cannot satisfy requirements.
