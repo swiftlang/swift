@@ -102,7 +102,18 @@ public:
   /// ConformsTo - Caches the results of checking whether a given (canonical)
   /// type conforms to a given protocol.
   ConformsToMap ConformsTo;
-  
+
+  typedef llvm::DenseMap<const ArchetypeType*, TypeSubstitutionMap>
+    AssociatedTypeMapType;
+
+  /// AssociatedTypeMap - Mapping from an archetype to the type substitution
+  /// map to use when accessing a member of the archetype (which ends up finding
+  /// a member in a protocol to which that archetype conforms).
+  /// FIXME: We will need to stash this information within a generic context
+  /// (e.g., a generic function, generic class, or protocol) rather than making
+  /// it global, because we want to avoid this giant table.
+  AssociatedTypeMapType AssociatedTypeMap;
+
   /// Allocate - Allocate memory from the ASTContext bump pointer.
   void *Allocate(unsigned long Bytes, unsigned Alignment);
 

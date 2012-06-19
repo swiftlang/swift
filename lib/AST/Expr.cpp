@@ -134,6 +134,12 @@ ExistentialMemberRefExpr::ExistentialMemberRefExpr(Expr *Base, SourceLoc DotLoc,
   : Expr(ExprKind::ExistentialMemberRef), Base(Base), Value(Value),
     DotLoc(DotLoc), NameLoc(NameLoc) { }
 
+ArchetypeMemberRefExpr::ArchetypeMemberRefExpr(Expr *Base, SourceLoc DotLoc,
+                                               ValueDecl *Value,
+                                               SourceLoc NameLoc)
+  : Expr(ExprKind::ArchetypeMemberRef), Base(Base), Value(Value),
+    DotLoc(DotLoc), NameLoc(NameLoc) { }
+
 Type OverloadSetRefExpr::getBaseType() const {
   if (isa<OverloadedDeclRefExpr>(this))
     return Type();
@@ -196,6 +202,9 @@ Expr *OverloadedMemberRefExpr::createWithCopy(Expr *Base, SourceLoc DotLoc,
     if (BaseTy->isExistentialType()) {
       return new (C) ExistentialMemberRefExpr(Base, DotLoc, Decls[0],
                                               MemberLoc);
+    }
+    if (BaseTy->is<ArchetypeType>()) {
+      return new (C) ArchetypeMemberRefExpr(Base, DotLoc, Decls[0], MemberLoc);
     }
     
     Expr *Fn = new (C) DeclRefExpr(Decls[0], MemberLoc,
@@ -459,6 +468,12 @@ public:
   void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
     printCommon(E, "existential_member_ref_expr")
     << " decl=" << E->getDecl()->getName() << '\n';
+    printRec(E->getBase());
+    OS << ')';
+  }
+  void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E) {
+    printCommon(E, "archetype_member_ref_expr")
+      << " decl=" << E->getDecl()->getName() << '\n';
     printRec(E->getBase());
     OS << ')';
   }

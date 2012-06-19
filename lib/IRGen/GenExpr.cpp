@@ -316,7 +316,11 @@ namespace {
       assert(!E->getType()->is<LValueType>());
       emitExistentialMemberRef(IGF, E, Out);
     }
-    
+
+    void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E) {
+      IGF.unimplemented(E->getLoc(), "archetype member reference");
+    }
+
     void visitCapturingExpr(CapturingExpr *E) {
       emitClosure(IGF, E, Out);
     }
@@ -455,6 +459,12 @@ namespace {
       IGF.unimplemented(E->getLBracketLoc(), "existential subscripts");
       return LValue();
     }
+
+    LValue visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E) {
+      IGF.unimplemented(E->getLoc(), "archetype member reference");
+      return LValue();
+    }
+
   };
 }
 
@@ -574,6 +584,7 @@ namespace {
     NON_LOCATEABLE(CoerceExpr)
     NON_LOCATEABLE(ConstructExpr)
     NON_LOCATEABLE(ExistentialMemberRefExpr)
+    NON_LOCATEABLE(ArchetypeMemberRefExpr)
 
     // FIXME: We may want to specialize IR generation for array subscripts.
     NON_LOCATEABLE(SubscriptExpr);

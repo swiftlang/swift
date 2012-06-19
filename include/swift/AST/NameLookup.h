@@ -60,7 +60,11 @@ struct MemberLookupResult {
     TupleElement,
     
     /// ExistentialMember - "a.x" refers to a member of an existential type.
-    ExistentialMember
+    ExistentialMember,
+
+    /// ArchetypeMember - "a.x" refers to a member of an archetype (which was
+    /// actually found in a protocol to which that archetype conforms).
+    ArchetypeMember
   } Kind;
   
   static MemberLookupResult getMemberProperty(ValueDecl *D) {
@@ -93,7 +97,13 @@ struct MemberLookupResult {
     R.Kind = ExistentialMember;
     return R;
   }
-  
+  static MemberLookupResult getArchetypeMember(ValueDecl *D) {
+    MemberLookupResult R;
+    R.D = D;
+    R.Kind = ArchetypeMember;
+    return R;
+  }
+
   /// \brief Determine whether this result has a declaration.
   bool hasDecl() const { return Kind != TupleElement; }
 };
@@ -184,6 +194,10 @@ public:
     /// which is referred to by BaseDecl.
     ExistentialMember,
 
+    /// ArchetypeMember - "x" refers to a member of an archetype type,
+    /// which is referred to by BaseDecl.
+    ArchetypeMember,
+
     /// ModuleName - "x" refers to a module, either the current
     /// module or an imported module.
     ModuleName
@@ -256,6 +270,15 @@ public:
     R.Base = base;
     R.Value = value;
     R.Kind = ExistentialMember;
+    return R;
+  }
+
+  static UnqualifiedLookupResult getArchetypeMember(ValueDecl *base,
+                                                    ValueDecl *value) {
+    UnqualifiedLookupResult R;
+    R.Base = base;
+    R.Value = value;
+    R.Kind = ArchetypeMember;
     return R;
   }
 

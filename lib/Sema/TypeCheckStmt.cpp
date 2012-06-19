@@ -585,6 +585,7 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
     case UnqualifiedLookupResult::MemberFunction:
     case UnqualifiedLookupResult::MetatypeMember:
     case UnqualifiedLookupResult::ExistentialMember:
+    case UnqualifiedLookupResult::ArchetypeMember:
     case UnqualifiedLookupResult::ModuleName:
       AllDeclRefs = false;
       break;
@@ -622,6 +623,10 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
     case UnqualifiedLookupResult::LocalDecl:
     case UnqualifiedLookupResult::ModuleName:
       AllMemberRefs = false;
+      break;
+    case UnqualifiedLookupResult::ArchetypeMember:
+      // FIXME: We need to extend OverloadedMemberRefExpr to deal with this.
+      llvm_unreachable("Archetype members in overloaded member references");
       break;
     }
   }

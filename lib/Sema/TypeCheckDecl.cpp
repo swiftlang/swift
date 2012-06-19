@@ -289,9 +289,48 @@ public:
                        TypeParam->getInherited());
 
         // Create the archetype for this type parameter.
-        TypeParam->setUnderlyingType(
-          ArchetypeType::getNew(TC.Context, TypeParam->getName().str(),
-                                TypeParam->getInherited()));
+        ArchetypeType *Archetype
+          = ArchetypeType::getNew(TC.Context, TypeParam->getName().str(),
+                                  TypeParam->getInherited());
+        TypeParam->setUnderlyingType(Archetype);
+
+
+        // Create archetypes for each of the associated types in each protocol.
+        // FIXME: This should also be subject to same-type constraints, which
+        // come from either a protocol or are implied by the presence of
+        // same-named associated types in different protocols that our type
+        // parameter conforms to.
+        for (auto Inherited : TypeParam->getInherited()) {
+          SmallVector<ProtocolDecl *, 4> Protocols;
+          if (Inherited->isExistentialType(Protocols)) {
+            for (auto P : Protocols) {
+              for (auto Member : P->getMembers()) {
+                TypeAliasDecl *AssocType = dyn_cast<TypeAliasDecl>(Member);
+                if (!AssocType)
+                  continue;
+
+                ArchetypeType *AssocArchetype
+                  = AssocType->getDeclaredType()->getAs<ArchetypeType>();
+                if (!AssocArchetype)
+                  continue;
+                
+                // FIXME: Identify 'This' in some sane manner.
+                Type MappedTo;
+                if (AssocType->getName().str() == "This") {
+                  MappedTo = Archetype;
+                } else {
+                  MappedTo
+                    = ArchetypeType::getNew(TC.Context,
+                                            AssocType->getName().str(),
+                                            AssocType->getInherited());
+                }
+                
+                TC.Context.AssociatedTypeMap[Archetype][AssocArchetype]
+                  = MappedTo;
+              }
+            }
+          }
+        }
       }
     }
 

@@ -668,6 +668,50 @@ public:
     return E;
   }
 
+  Expr *visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E) {
+    if (E->getDecl()->getType()->is<ErrorType>())
+      return nullptr;
+    
+    // Ensure that the base is an lvalue, materializing it if is not an
+    // lvalue yet.
+    Type ContainerTy = E->getBase()->getType();
+    if (LValueType *ContainerLV = ContainerTy->getAs<LValueType>())
+      ContainerTy = ContainerLV->getObjectType();
+
+    if (Expr *Base = TC.coerceObjectArgument(E->getBase(), ContainerTy))
+      E->setBase(Base);
+    else
+      return nullptr;
+    
+    // Determine the type of the member.
+    Type MemberTy = E->getDecl()->getType();
+    if (auto Method = dyn_cast<FuncDecl>(E->getDecl())) {
+      if (!Method->isStatic()) {
+        if (auto FuncTy = dyn_cast<FunctionType>(MemberTy))
+          MemberTy = FuncTy->getResult();
+      }
+    } else {
+      MemberTy = LValueType::get(MemberTy,
+                                 LValueType::Qual::DefaultForMemberAccess,
+                                 TC.Context);
+    }
+
+    // Substitute each of the associated types into the member type.
+    ArchetypeType *Archetype = ContainerTy->castTo<ArchetypeType>();
+
+    // FIXME: This extraneous copy is super-lame, but important because
+    // the general associated type map might get reallocated. Obviously,
+    // we'll want to put the associated type map for a given archetype into
+    // some safe, stable place.
+    TypeSubstitutionMap Substitutions = TC.Context.AssociatedTypeMap[Archetype];
+    MemberTy = TC.substType(MemberTy, Substitutions);
+    if (!MemberTy)
+      return nullptr;
+
+    E->setType(MemberTy);
+    return E;
+  }
+
   Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     E->setType(UnstructuredUnresolvedType::get(TC.Context));
     return E;

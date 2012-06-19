@@ -245,6 +245,7 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
     case UnqualifiedLookupResult::MemberFunction:
     case UnqualifiedLookupResult::MetatypeMember:
     case UnqualifiedLookupResult::ExistentialMember:
+    case UnqualifiedLookupResult::ArchetypeMember:
       Components[0].Value = Globals.Results[0].getValueDecl();
       break;
     case UnqualifiedLookupResult::ModuleName:

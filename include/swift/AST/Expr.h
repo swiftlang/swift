@@ -518,6 +518,49 @@ public:
   }
 };
 
+/// ArchetypeMemberRefExpr - This represents 'a.b' where we are referring to
+/// a member of an archetype type (e.g., within a generic function).
+///
+/// \code
+/// protocol Printable {
+///   func print(format : Format)
+/// }
+///
+/// func doPrint<P : Printable>(p : P) {
+///   p.print(Format());
+/// }
+/// \endcode
+class ArchetypeMemberRefExpr : public Expr {
+  Expr *Base;
+  ValueDecl *Value;
+  SourceLoc DotLoc;
+  SourceLoc NameLoc;
+  
+public:  
+  ArchetypeMemberRefExpr(Expr *Base, SourceLoc DotLoc, ValueDecl *Value,
+                         SourceLoc NameLoc);
+  Expr *getBase() const { return Base; }
+  ValueDecl *getDecl() const { return Value; }
+  SourceLoc getNameLoc() const { return NameLoc; }
+  SourceLoc getDotLoc() const { return DotLoc; }
+  
+  void setBase(Expr *E) { Base = E; }
+  
+  SourceLoc getLoc() const { return NameLoc; }
+  SourceRange getSourceRange() const {
+    if (Base->isImplicit())
+      return SourceRange(NameLoc);
+    
+    return SourceRange(Base->getStartLoc(), NameLoc);
+  }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const ArchetypeMemberRefExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ArchetypeMemberRef;
+  }
+};
+
 /// UnresolvedMemberExpr - This represents '.foo', an unresolved reference to a
 /// member, which is to be resolved with context sensitive type information into
 /// bar.foo.  These always have unresolved type.

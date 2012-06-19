@@ -189,6 +189,20 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
     return;
   }
 
+  // Check to see if any of an archetype's requirements have the member.
+  if (ArchetypeType *Archetype = BaseTy->getAs<ArchetypeType>()) {
+    for (auto Proto : Archetype->getConformsTo())
+      doIt(Proto, M, Visited);
+
+    // Change existential members to archetype members, since we're in an
+    // archetype.
+    for (auto &Result : Results) {
+      if (Result.Kind == MemberLookupResult::ExistentialMember)
+        Result.Kind = MemberLookupResult::ArchetypeMember;
+    }
+    return;
+  }
+
   // Look in any extensions that add methods to the base type.
   SmallVector<ValueDecl*, 8> ExtensionMethods;
   lookupMembers(BaseTy, M, ExtensionMethods);
@@ -325,6 +339,8 @@ Expr *MemberLookup::createResultAST(Expr *Base, SourceLoc DotLoc,
     }
     case MemberLookupResult::ExistentialMember:
       return new (Context) ExistentialMemberRefExpr(Base, DotLoc, R.D, NameLoc);
+    case MemberLookupResult::ArchetypeMember:
+      return new (Context) ArchetypeMemberRefExpr(Base, DotLoc, R.D, NameLoc);
     }
 
     Expr *BadExpr = new (Context) UnresolvedDotExpr(Base, DotLoc,
@@ -583,6 +599,9 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
           break;
         case MemberLookupResult::ExistentialMember:
           Results.push_back(Result::getExistentialMember(BaseDecl, Result.D));
+          break;
+        case MemberLookupResult::ArchetypeMember:
+          Results.push_back(Result::getArchetypeMember(BaseDecl, Result.D));
           break;
         case MemberLookupResult::TupleElement:
           llvm_unreachable("Can't have context with tuple type");
