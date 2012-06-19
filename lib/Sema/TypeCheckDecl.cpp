@@ -283,6 +283,12 @@ public:
     if (GenericParamList *GenericParams = FD->getGenericParams()) {
       for (auto GP : *GenericParams) {
         auto TypeParam = GP.getAsTypeParam();
+
+        // Check the constraints on the type parameter.
+        checkInherited(TypeParam, TypeParam->getDeclaredType(),
+                       TypeParam->getInherited());
+
+        // Create the archetype for this type parameter.
         TypeParam->setUnderlyingType(
           ArchetypeType::getNew(TC.Context, TypeParam->getName().str(),
                                 TypeParam->getInherited()));
