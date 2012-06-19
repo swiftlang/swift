@@ -95,6 +95,12 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
                                Expr *Arg,
                                Type DestTy,
                                SmallVectorImpl<ValueDecl *> &Viable) {
+  // We want the actual underlying base type, not an lvalue of that type.
+  if (BaseTy) {
+    if (LValueType *BaseLV = BaseTy->getAs<LValueType>())
+      BaseTy = BaseLV->getObjectType();
+  }
+
   Viable.clear();
   for (ValueDecl *VD : Candidates) {
     Type VDType = VD->getType();
@@ -115,7 +121,21 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
       FunctionTy = FunctionTy->getResult()->getAs<FunctionType>();
       assert(FunctionTy && "Method has incorrect type");
     }
-    
+
+    // If this is a member reference into 
+    if (BaseTy) {
+      if (ArchetypeType *BaseArchetype = BaseTy->getAs<ArchetypeType>()) {
+        // FIXME: Lame that we're copying the substitutions here.
+        TypeSubstitutionMap Substitutions
+          = Context.AssociatedTypeMap[BaseArchetype];
+        Type SubstFunctionTy = substType(FunctionTy, Substitutions);
+        if (!SubstFunctionTy)
+          continue;
+
+        FunctionTy = SubstFunctionTy->castTo<FunctionType>();
+      }
+    }
+
     // Check whether arguments are suitable for this function.
     if (isCoercibleToType(Arg, FunctionTy->getInput(),
                           (OperatorSyntax && VD->getAttrs().isAssignment()))
