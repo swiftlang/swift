@@ -315,17 +315,25 @@ public:
 
   }
   
-  static Type matchLValueType(ValueDecl *val, LValueType *lv) {
-    if (val->isReferencedAsLValue() && 
-        val->getType()->isEqual(lv->getObjectType()))
-      return lv;
-    
+  Type matchLValueType(ValueDecl *val, LValueType *lv, Type BaseTy) {
+    if (!val->isReferencedAsLValue())
+      return Type();
+
+    Type valTy = val->getType();
+    valTy = TC.substMemberTypeWithBase(valTy, BaseTy);
+    if (!valTy)
+      return Type();
+
+    if (valTy->isEqual(lv->getObjectType()))
+      return valTy;
+
     return Type();
   }
 
   CoercedResult coerceOverloadToLValue(OverloadSetRefExpr *E, LValueType *lv) {
+    Type BaseTy = E->getBaseType();
     for (ValueDecl *val : E->getDecls()) {
-      if (Type Matched = matchLValueType(val, lv)) {
+      if (Type Matched = matchLValueType(val, lv, BaseTy)) {
         if (!(Flags & CF_Apply))
           return Matched;
         
@@ -364,7 +372,14 @@ public:
       if (FuncDecl *Func = dyn_cast<FuncDecl>(Val))
         if (!Func->isStatic() && E->getBaseType())
           srcTy = srcTy->getAs<FunctionType>()->getResult();
-      
+
+      // If this overloaded set refers to a member of an archetype, substitute
+      // the associated types that depend on that archetype through the
+      // source type.
+      srcTy = TC.substMemberTypeWithBase(srcTy, E->getBaseType());
+      if (!srcTy)
+        continue;
+
       // If we're trying to coerce the overload set to function type that is
       // partially specified, filter based on what we know.
       if (DestFT && DestFT->getInput()->isUnresolvedType()) {

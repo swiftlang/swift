@@ -177,7 +177,11 @@ public:
   /// \endcode
   /// the result would be the (parenthesized) type ((int, int)).
   Type getUnlabeledType(ASTContext &Context);
-                    
+
+  /// getRValueType - For an lvalue type, retrieves the underlying object type.
+  /// Otherwise, returns the type itself.
+  Type getRValueType();
+
   void dump() const;
   void print(raw_ostream &OS) const;
   
@@ -1126,6 +1130,12 @@ inline bool TypeBase::isExistentialType() {
          || T->getKind() == TypeKind::ProtocolComposition;
 }
 
+inline Type TypeBase::getRValueType() {
+  if (!is<LValueType>())
+    return this;
+
+  return castTo<LValueType>()->getObjectType();
+}
 
 } // end namespace swift
 

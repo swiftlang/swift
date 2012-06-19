@@ -588,3 +588,17 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
   
   llvm_unreachable("Unhandled type in substitution");
 }
+
+Type TypeChecker::substMemberTypeWithBase(Type T, Type BaseTy) {
+  if (!BaseTy)
+    return T;
+
+  auto BaseArchetype = BaseTy->getRValueType()->getAs<ArchetypeType>();
+  if (!BaseArchetype)
+    return T;
+
+  // FIXME: Lame that we need to copy the substitutions here, but the
+  // underlying DenseMap might get reallocated.
+  TypeSubstitutionMap Substitutions = Context.AssociatedTypeMap[BaseArchetype];
+  return substType(T, Substitutions);
+}

@@ -100,7 +100,11 @@ public:
   bool validateType(Type T, bool isFirstPass);
 
   Type substType(Type T, TypeSubstitutionMap &Substitutions);
-  
+
+  /// \brief Replace the type \c T of a protocol member given the type of the
+  /// base of a member access, \c BaseTy.
+  Type substMemberTypeWithBase(Type T, Type BaseTy);
+
   bool isSubtypeOf(Type T1, Type T2, bool &Trivial);
   bool isSubtypeOf(Type T1, Type T2) {
     bool Trivial = false;
