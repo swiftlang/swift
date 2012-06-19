@@ -266,14 +266,9 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
           if (Candidate.D->getKind() != Requirement->getKind())
             break;
 
-          // Substitute all of the associated types used in the candidate
-          // declaration with the archetypes (or concrete types) to which they
-          // are bound.
+          // Determine the effective type of the candidate.
           Type CandidateTy = getInstanceUsageType(Candidate.D, TC.Context);
-          // FIXME: Copy of the map here is ueber-lame.
-          TypeSubstitutionMap Substitutions
-            = TC.Context.AssociatedTypeMap[T->castTo<ArchetypeType>()];
-          CandidateTy = TC.substType(CandidateTy, Substitutions);
+          CandidateTy = TC.substMemberTypeWithBase(CandidateTy, T);
           if (!CandidateTy)
             break;
 

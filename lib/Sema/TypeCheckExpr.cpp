@@ -697,14 +697,7 @@ public:
     }
 
     // Substitute each of the associated types into the member type.
-    ArchetypeType *Archetype = ContainerTy->castTo<ArchetypeType>();
-
-    // FIXME: This extraneous copy is super-lame, but important because
-    // the general associated type map might get reallocated. Obviously,
-    // we'll want to put the associated type map for a given archetype into
-    // some safe, stable place.
-    TypeSubstitutionMap Substitutions = TC.Context.AssociatedTypeMap[Archetype];
-    MemberTy = TC.substType(MemberTy, Substitutions);
+    MemberTy = TC.substMemberTypeWithBase(MemberTy, ContainerTy);
     if (!MemberTy)
       return nullptr;
 

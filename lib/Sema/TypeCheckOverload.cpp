@@ -106,7 +106,7 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     Type VDType = VD->getType();
     if (LValueType *LValue = VDType->getAs<LValueType>())
       VDType = LValue->getObjectType();
-    
+
     // Must have function type to be called.
     FunctionType *FunctionTy = VDType->getAs<FunctionType>();
     if (!FunctionTy)
@@ -122,20 +122,12 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
       assert(FunctionTy && "Method has incorrect type");
     }
 
-    // If this is a member reference into 
-    if (BaseTy) {
-      if (ArchetypeType *BaseArchetype = BaseTy->getAs<ArchetypeType>()) {
-        // FIXME: Lame that we're copying the substitutions here.
-        TypeSubstitutionMap Substitutions
-          = Context.AssociatedTypeMap[BaseArchetype];
-        Type SubstFunctionTy = substType(FunctionTy, Substitutions);
-        if (!SubstFunctionTy)
-          continue;
-
-        FunctionTy = SubstFunctionTy->castTo<FunctionType>();
-      }
-    }
-
+    // Substitute into the type of this member, if indeed it is a member.
+    Type SubstFunctionTy = substMemberTypeWithBase(FunctionTy, BaseTy);
+    if (!SubstFunctionTy)
+      continue;
+    FunctionTy = SubstFunctionTy->castTo<FunctionType>();
+    
     // Check whether arguments are suitable for this function.
     if (isCoercibleToType(Arg, FunctionTy->getInput(),
                           (OperatorSyntax && VD->getAttrs().isAssignment()))
