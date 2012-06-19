@@ -276,6 +276,19 @@ public:
     if (IsSecondPass)
       return;
 
+    // Assign archetypes to each of the generic parameters.
+    // FIXME: Actually solve the various same-type constraints, written and
+    // implied, to compute the set of archetypes we need and the requirements
+    // on those archetypes.
+    if (GenericParamList *GenericParams = FD->getGenericParams()) {
+      for (auto GP : *GenericParams) {
+        auto TypeParam = GP.getAsTypeParam();
+        TypeParam->setUnderlyingType(
+          ArchetypeType::getNew(TC.Context, TypeParam->getName().str(),
+                                TypeParam->getInherited()));
+      }
+    }
+
     // Before anything else, set up the 'this' argument correctly.
     if (Type thisType = FD->computeThisType()) {
       FunctionType *fnType = cast<FunctionType>(FD->getType());
