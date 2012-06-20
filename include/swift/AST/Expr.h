@@ -320,7 +320,11 @@ public:
   /// given overload set, which is only non-null when dealing with an overloaded
   /// member reference.
   Type getBaseType() const;
-  
+
+  /// hasBaseObject - Determine whether this overloaded expression has a
+  /// concrete base object (which is not a metatype).
+  bool hasBaseObject() const;
+
   /// createFilteredWithCopy - Given a subset of the declarations in the given
   /// overloaded reference expression, return a new expression of the same
   /// form but with the restricted set of declarations. This is equivalent

@@ -597,6 +597,10 @@ Type TypeChecker::substMemberTypeWithBase(Type T, Type BaseTy) {
   if (!BaseTy)
     return T;
 
+  // Look through the metatype.
+  if (auto MetaBase = BaseTy->getAs<MetaTypeType>())
+    BaseTy = MetaBase->getTypeDecl()->getDeclaredType();
+  
   auto BaseArchetype = BaseTy->getRValueType()->getAs<ArchetypeType>();
   if (!BaseArchetype)
     return T;

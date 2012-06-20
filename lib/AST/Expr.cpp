@@ -165,19 +165,18 @@ Type OverloadSetRefExpr::getBaseType() const {
   if (isa<OverloadedDeclRefExpr>(this))
     return Type();
   if (const OverloadedMemberRefExpr *DRE
-      = dyn_cast<OverloadedMemberRefExpr>(this)) {
-    Type BaseTy = DRE->getBase()->getType();
-    
-    // Metatype types aren't considered to be base types.
-    // FIXME:: If metatypes stop being singletons, we'll have to change this
-    // and update all callers.
-    if (BaseTy->is<MetaTypeType>())
-      return Type();
-    
-    return BaseTy;
+        = dyn_cast<OverloadedMemberRefExpr>(this)) {
+    return DRE->getBase()->getType()->getRValueType();
   }
   
   llvm_unreachable("Unhandled overloaded set reference expression");
+}
+
+bool OverloadSetRefExpr::hasBaseObject() const {
+  if (Type BaseTy = getBaseType())
+    return !BaseTy->is<MetaTypeType>();
+
+  return false;
 }
 
 Expr *OverloadSetRefExpr::createFilteredWithCopy(ArrayRef<ValueDecl *> Decls) {

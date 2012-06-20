@@ -379,7 +379,7 @@ public:
       // If we have a non-static method along with an object argument,
       // look past the 'this'.
       if (FuncDecl *Func = dyn_cast<FuncDecl>(Val))
-        if (!Func->isStatic() && E->getBaseType())
+        if (!Func->isStatic() && E->hasBaseObject())
           srcTy = srcTy->getAs<FunctionType>()->getResult();
 
       // If this overloaded set refers to a member of an archetype, substitute
