@@ -21,7 +21,6 @@ namespace swift {
   class ErasureExpr;
   class ExistentialMemberRefExpr;
   class FuncDecl;
-  class SuperConversionExpr;
 
 namespace irgen {
   class AbstractCallee;
@@ -180,14 +179,6 @@ namespace irgen {
   /// Emit an erasure expression as an initializer of memory.
   void emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
                          Address addr, const TypeInfo &addrTI);
-
-  /// Emit a super-conversion expression into an explosion.
-  void emitSuperConversion(IRGenFunction &IGF, SuperConversionExpr *E,
-                           Explosion &out);
-
-  /// Emit a super-conversion expression as an initializer of memory.
-  void emitSuperConversionAsInit(IRGenFunction &IGF, SuperConversionExpr *E,
-                                 Address addr, const TypeInfo &addrTI);
 
   /// Emit an existential member reference into an explosion.
   void emitExistentialMemberRef(IRGenFunction &IGF, ExistentialMemberRefExpr *E,

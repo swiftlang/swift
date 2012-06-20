@@ -223,18 +223,6 @@ namespace {
                     "result and operand of MaterializeExpr");
     }
 
-    void verifyChecked(SuperConversionExpr *E) {
-      if (E->getType()->is<LValueType>()) {
-        Out << "supertype conversion cannot be an lvalue";
-        E->print(Out);
-        Out << "\n";
-        abort();
-      }
-
-      checkSameOrSubType(E->getSubExpr()->getType(), E->getType(),
-                         "supertype and subtype");
-    }
-    
     void verifyChecked(TupleElementExpr *E) {
       Type resultType = E->getType();
       Type baseType = E->getBase()->getType();

@@ -2117,19 +2117,62 @@ TypeConverter::convertProtocolType(IRGenModule &IGM, ProtocolType *T) {
 /// Emit an erasure expression as an initializer for the given memory.
 void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
                               Address dest, const TypeInfo &rawTI) {
-  const ProtocolTypeInfo &protoTI = rawTI.as<ProtocolTypeInfo>();
+  if (E->getConformances().size() != 1) {
+    IGF.unimplemented(E->getLoc(), "erasure to a protocol composition type");
+    return;
+  }
+
+  if (E->getSubExpr()->getType()->is<ArchetypeType>()) {
+    IGF.unimplemented(E->getLoc(), "erasure from an archetype");
+    return;
+  }
+
   ProtocolDecl *protocol = E->getType()->castTo<ProtocolType>()->getDecl();
+
+  if (!E->getConformances()[0]) {
+    // Special case: we're converting from an existential type to another
+    // existential type in some trivial manner (e.g., to an inherited protocol).
+    Type srcType = E->getSubExpr()->getType();
+    const ProtocolTypeInfo &srcProtoTI =
+    IGF.getFragileTypeInfo(srcType).as<ProtocolTypeInfo>();
+    
+    // Compute the path to the destination protocol.
+    auto &witnessEntry = srcProtoTI.getWitnessEntry(protocol);
+    assert(witnessEntry.isBase());
+    
+    // Emit the sub-expression in-place.  Bitcasting the destination is
+    // safe because every protocol type has identical representation.
+    // Regardless of the other decisions we make, we won't need to touch
+    // the buffer.
+    auto derivedPtrTy = srcProtoTI.getStorageType()->getPointerTo();
+    dest = IGF.Builder.CreateBitCast(dest, derivedPtrTy);
+    IGF.emitRValueAsInit(E->getSubExpr(), dest, srcProtoTI);
+    
+    // If it's a prefix base, that's good enough.
+    if (!witnessEntry.isOutOfLineBase()) return;
+    
+    // Otherwise, we need to map the witness down.  Find the old table.
+    Address tableSlot = projectWitnessTable(IGF, dest);
+    llvm::Value *oldTable = IGF.Builder.CreateLoad(tableSlot, "derived-table");
+    
+    // Drill down to get the new table.
+    llvm::Value *newTable =
+    loadOpaqueWitness(IGF, oldTable, witnessEntry.getOutOfLineBaseIndex());
+    newTable = IGF.Builder.CreateBitCast(newTable, getWitnessTableTy(IGF.IGM));
+    
+    // Drop it in place and we're done.
+    IGF.Builder.CreateStore(newTable, tableSlot);
+
+    return;
+  }
+
+  // We're converting from a concrete type to an existential type.
+  const ProtocolTypeInfo &protoTI = rawTI.as<ProtocolTypeInfo>();
 
   // Find the concrete type.
   Type concreteType = E->getSubExpr()->getType();
   const TypeInfo &concreteTI = IGF.getFragileTypeInfo(concreteType);
 
-  // FIXME: Cope with multiple (or zero!) protocol-conformance entries.
-  if (E->getConformances().size() != 1) {
-    IGF.unimplemented(E->getLoc(), "multiple-conformance erasures");
-    return;
-  }
-  
   // Compute the conformance information.
   assert(E->getConformances()[0]);
   const ConformanceInfo &conformance =
@@ -2183,61 +2226,6 @@ void irgen::emitErasure(IRGenFunction &IGF, ErasureExpr *E, Explosion &out) {
 
   // Initialize the temporary.
   emitErasureAsInit(IGF, E, temp, protoTI);
-
-  // Add that as something to destroy.
-  out.add(protoTI.enterCleanupForTemporary(IGF, temp));
-}
-
-/// Emit a super-conversion expression as an initializer for the given memory.
-void irgen::emitSuperConversionAsInit(IRGenFunction &IGF,
-                                      SuperConversionExpr *E,
-                                      Address dest, const TypeInfo &rawTI) {
-  ProtocolDecl *superProto = E->getType()->castTo<ProtocolType>()->getDecl();
-
-  Type derivedType = E->getSubExpr()->getType();
-  const ProtocolTypeInfo &derivedProtoTI =
-    IGF.getFragileTypeInfo(derivedType).as<ProtocolTypeInfo>();
-
-  // Compute the path to the super protocol.
-  auto &witnessEntry = derivedProtoTI.getWitnessEntry(superProto);
-  assert(witnessEntry.isBase());
-
-  // Emit the sub-expression in-place.  Bitcasting the destination is
-  // safe because every protocol type has identical representation.
-  // Regardless of the other decisions we make, we won't need to touch
-  // the buffer.
-  auto derivedPtrTy = derivedProtoTI.getStorageType()->getPointerTo();
-  dest = IGF.Builder.CreateBitCast(dest, derivedPtrTy);
-  IGF.emitRValueAsInit(E->getSubExpr(), dest, derivedProtoTI);
-
-  // If it's a prefix base, that's good enough.
-  if (!witnessEntry.isOutOfLineBase()) return;
-
-  // Otherwise, we need to map the witness down.  Find the old table.
-  Address tableSlot = projectWitnessTable(IGF, dest);
-  llvm::Value *oldTable = IGF.Builder.CreateLoad(tableSlot, "derived-table");
-
-  // Drill down to get the new table.
-  llvm::Value *newTable =
-    loadOpaqueWitness(IGF, oldTable, witnessEntry.getOutOfLineBaseIndex());
-  newTable = IGF.Builder.CreateBitCast(newTable, getWitnessTableTy(IGF.IGM));
-
-  // Drop it in place and we're done.
-  IGF.Builder.CreateStore(newTable, tableSlot);
-}
-
-/// Emit an expression which erases the concrete type of its value and
-/// replaces it with a generic type.
-void irgen::emitSuperConversion(IRGenFunction &IGF, SuperConversionExpr *E,
-                                Explosion &out) {
-  const ProtocolTypeInfo &protoTI =
-    IGF.getFragileTypeInfo(E->getType()).as<ProtocolTypeInfo>();
-
-  // Create a temporary of the appropriate type.
-  Address temp = protoTI.createTemporary(IGF);
-
-  // Initialize the temporary.
-  emitSuperConversionAsInit(IGF, E, temp, protoTI);
 
   // Add that as something to destroy.
   out.add(protoTI.enterCleanupForTemporary(IGF, temp));

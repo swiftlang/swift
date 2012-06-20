@@ -238,9 +238,6 @@ namespace {
     void visitErasureExpr(ErasureExpr *E) {
       emitErasure(IGF, E, Out);
     }
-    void visitSuperConversionExpr(SuperConversionExpr *E) {
-      emitSuperConversion(IGF, E, Out);
-    }
     void visitTupleElementExpr(TupleElementExpr *E) {
       emitTupleElement(IGF, E, Out);
     }
@@ -375,10 +372,6 @@ namespace {
       emitErasureAsInit(IGF, E, Addr, AddrTI);
     }
 
-    void visitSuperConversionExpr(SuperConversionExpr *E) {
-      emitSuperConversionAsInit(IGF, E, Addr, AddrTI);
-    }
-
     // TODO: Implement some other interesting cases that could
     // benefit from this:
     //   TupleExpr
@@ -412,7 +405,6 @@ namespace {
     NOT_LVALUE_EXPR(StringLiteral)
     NOT_LVALUE_EXPR(InterpolatedStringLiteral)
     NOT_LVALUE_EXPR(TupleShuffle)
-    NOT_LVALUE_EXPR(SuperConversion)
     NOT_LVALUE_EXPR(Erasure)
     NOT_LVALUE_EXPR(Func)
     NOT_LVALUE_EXPR(Closure)
@@ -584,7 +576,6 @@ namespace {
     NON_LOCATEABLE(StringLiteralExpr)
     NON_LOCATEABLE(InterpolatedStringLiteralExpr)
     NON_LOCATEABLE(TupleShuffleExpr)
-    NON_LOCATEABLE(SuperConversionExpr)
     NON_LOCATEABLE(ErasureExpr)
     NON_LOCATEABLE(CapturingExpr)
     NON_LOCATEABLE(ModuleExpr)

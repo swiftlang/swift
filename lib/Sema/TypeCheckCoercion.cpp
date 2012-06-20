@@ -1879,13 +1879,9 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
       // Check whether the source type conforms to each of the destination
       // protocols.
       SmallVector<ProtocolConformance *, 4> Conformances;
-      bool AllTrivial = true;
       for (auto DestProto : DestProtocols) {
         ProtocolConformance *Conformance = nullptr;
         if (TC.conformsToProtocol(E->getType(), DestProto, &Conformance)) {
-          if (Conformance)
-            AllTrivial = false;
-          
           Conformances.push_back(Conformance);
           continue;
         }
@@ -1899,13 +1895,6 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
       
       if (!(Flags & CF_Apply))
         return DestTy;
-
-      // If all of the conformance checks were trivial, then this is a trivial
-      // erasure.
-      if (AllTrivial) {
-        return coerced(new (TC.Context) SuperConversionExpr(E, DestTy),
-                       Flags);
-      }
 
       return coerced(
                new (TC.Context) ErasureExpr(E, DestTy,
