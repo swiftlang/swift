@@ -423,8 +423,6 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
       }
       
       if (auto Func = dyn_cast<FuncDecl>(VD)) {
-        if ((Flags & PD_DisallowStatic) && Func->isStatic())
-          diagnose(Func->getStaticLoc(), diag::disallowed_static_func);
         if ((Flags & PD_DisallowFuncDef) && Func->getBody() &&
             !Func->isGetterOrSetter())
           diagnose(Func->getBody()->getLoc(), diag::disallowed_func_def);
@@ -1545,7 +1543,7 @@ Decl *Parser::parseDeclProtocol() {
     while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
       if (parseDecl(Members,
                     PD_HasContainerType|PD_DisallowProperty|PD_DisallowOperators|
-                    PD_DisallowStatic|PD_DisallowFuncDef|PD_DisallowNominalTypes|
+                    PD_DisallowFuncDef|PD_DisallowNominalTypes|
                     PD_DisallowInit|PD_DisallowTypeAliasDef)) {
         skipUntilDeclRBrace();
         HadError = true;

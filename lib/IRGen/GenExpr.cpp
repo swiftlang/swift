@@ -323,6 +323,7 @@ namespace {
 
     void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E) {
       IGF.unimplemented(E->getLoc(), "archetype member reference");
+      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
     }
 
     void visitCapturingExpr(CapturingExpr *E) {

@@ -139,8 +139,6 @@ ERROR(disallowed_var_decl,decl_parsing,none,
       "'var' declarations not allowed here, use data members instead", ())
 ERROR(disallowed_property_decl,decl_parsing,none,
       "'var' declarations with getter/setter not allowed here", ())
-ERROR(disallowed_static_func,decl_parsing,none,
-      "static method not allowed here", ())
 ERROR(disallowed_func_def,decl_parsing,none,
       "function body not allowed here", ())
 ERROR(disallowed_type,decl_parsing,none,

@@ -48,6 +48,19 @@ int getRequirementKind(ValueDecl *VD) {
   return 2;
 }
 
+static bool valueMemberMatches(ValueDecl *Candidate, ValueDecl *Requirement,
+                               Type RequiredTy, ASTContext &Context) {
+  if (Candidate->getKind() != Requirement->getKind())
+    return false;
+  if (!RequiredTy->isEqual(getInstanceUsageType(Candidate, Context)))
+    return false;
+  if (FuncDecl *FD = dyn_cast<FuncDecl>(Candidate)) {
+    if (FD->isStatic() != cast<FuncDecl>(Requirement)->isStatic())
+      return false;
+  }
+  return true;
+}
+
 static std::unique_ptr<ProtocolConformance>
 checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                         SourceLoc ComplainLoc) {
@@ -249,16 +262,11 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       for (auto Candidate : Lookup.Results) {
         switch (Candidate.Kind) {
         case MemberLookupResult::MetatypeMember:
-          // Static members are ignored.
-          // FIXME: Diagnose if static members happen to match?
-          break;
-            
         case MemberLookupResult::MemberProperty:
         case MemberLookupResult::MemberFunction:
         case MemberLookupResult::ExistentialMember:
-          if (Candidate.D->getKind() == Requirement->getKind() &&
-              RequiredTy->isEqual(getInstanceUsageType(Candidate.D,
-                                                       TC.Context)))
+          if (valueMemberMatches(Candidate.D, Requirement, RequiredTy,
+                                 TC.Context))
             Viable.push_back(Candidate.D);
           break;
 

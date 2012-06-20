@@ -733,8 +733,6 @@ namespace {
                       ExplosionKind maxExplosion = ExplosionKind::Maximal) {
       switch (getKind()) {
       case Kind::DirectWithSideEffects:
-        IGF.emitIgnored(getDirectSideEffects());
-        // fallthough
       case Kind::Direct:
         return ::emitCallee(IGF, getDirectFunction(), maxExplosion, maxUncurry);
       case Kind::Indirect: {

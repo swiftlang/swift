@@ -2315,22 +2315,37 @@ Callee irgen::emitExistentialMemberRefCallee(IRGenFunction &IGF,
   // Load the witness table.
   llvm::Value *table = loadWitnessTable(IGF, existAddr);
 
-  // Use the first-level witness table to copy into a new buffer.
-  // This is important for safety.
-  // TODO: just do a project when the source object is obviously not
-  // aliased.
-  Address copyBuffer = IGF.createAlloca(IGF.IGM.getFixedBufferTy(),
-                                        getFixedBufferAlignment(IGF.IGM),
-                                        "copy-for-call");
-  Address srcBuffer = projectExistentialBuffer(IGF, existAddr);
+  auto &ownerTI = getProtocolTypeInfo(IGF,
+                                    cast<ProtocolDecl>(fn->getDeclContext()));
 
-  // The result of the copy is an i8* which points at the new object.
-  llvm::Value *copy =
-    emitInitializeBufferWithCopyOfBufferCall(IGF, table, copyBuffer,
-                                             srcBuffer);
+  if (!fn->isStatic()) {
+    // Use the first-level witness table to copy into a new buffer.
+    // This is important for safety.
+    // TODO: just do a project when the source object is obviously not
+    // aliased.
+    Address copyBuffer = IGF.createAlloca(IGF.IGM.getFixedBufferTy(),
+                                          getFixedBufferAlignment(IGF.IGM),
+                                          "copy-for-call");
+    Address srcBuffer = projectExistentialBuffer(IGF, existAddr);
 
-  // Enter a cleanup for the temporary.  
-  IGF.pushFullExprCleanup<DestroyBuffer>(copyBuffer, table);
+    // The result of the copy is an i8* which points at the new object.
+    llvm::Value *copy =
+      emitInitializeBufferWithCopyOfBufferCall(IGF, table, copyBuffer,
+                                               srcBuffer);
+
+    // Enter a cleanup for the temporary.  
+    IGF.pushFullExprCleanup<DestroyBuffer>(copyBuffer, table);
+
+    // Add the temporary address as a callee arg.
+    // We have to bitcast it because the AST claims that 'this' on the
+    // protocol method has type [byref] P, which is just wrong.
+    copy = IGF.Builder.CreateBitCast(copy,
+                                     ownerTI.getStorageType()->getPointerTo(),
+                                     "workaround-cast");
+    Explosion *arg = new Explosion(ExplosionKind::Minimal);
+    arg->addUnmanaged(copy);
+    calleeArgs.push_back(Arg::forOwned(arg));
+  }
 
   for (unsigned i = 0, e = basePath.size(); i != e; ++i) {
     ProtocolDecl *derived = (i == 0 ? proto : basePath[i-1]);
@@ -2350,21 +2365,14 @@ Callee irgen::emitExistentialMemberRefCallee(IRGenFunction &IGF,
   }
 
   // Pull out the function witness.
-  auto &ownerTI = getProtocolTypeInfo(IGF,
-                                   cast<ProtocolDecl>(fn->getDeclContext()));
   auto &witnessEntry = ownerTI.getWitnessEntry(fn);
   llvm::Value *witness =
     loadOpaqueWitness(IGF, table, witnessEntry.getFunctionIndex());
 
-  // Add the temporary address as a callee arg.
-  // We have to bitcast it because the AST claims that 'this' on the
-  // protocol method has type [byref] P, which is just wrong.
-  copy = IGF.Builder.CreateBitCast(copy,
-                                   ownerTI.getStorageType()->getPointerTo(),
-                                   "workaround-cast");
-  Explosion *arg = new Explosion(ExplosionKind::Minimal);
-  arg->addUnmanaged(copy);
-  calleeArgs.push_back(Arg::forOwned(arg));
+  if (fn->isStatic())
+    return Callee::forKnownFunction(AbstractCC::Method, fn->getType(), witness,
+                                    ManagedValue(nullptr),
+                                    ExplosionKind::Minimal, 0);
 
   // FIXME: writeback
   return Callee::forKnownFunction(AbstractCC::Method, fn->getType(), witness,
