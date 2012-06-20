@@ -162,14 +162,8 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
                                       Type(), Viable);
 
   if (Best) {
-    // We have a candidate: use it.
-    Type ContainerTy
-      = Best->getDeclContext()->getDeclaredTypeOfContext();
-    if (!ContainerTy)
-      return nullptr;
-
     SubscriptDecl *Sub = cast<SubscriptDecl>(Best);
-    if (ContainerTy->isExistentialType()) {
+    if (BaseTy->isExistentialType()) {
       // We picked a subscript operator in an existential type; create the
       // appropriate AST node.
       return semaSubscriptExpr(
@@ -178,6 +172,16 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
                                                       SE->getIndex(),
                                                       SE->getRBracketLoc(),
                                                       Sub));
+    }
+    if (BaseTy->is<ArchetypeType>()) {
+      // We picked a subscript operator in an archetype type; create the
+      // appropriate AST node.
+      return semaSubscriptExpr(
+               new (Context) ArchetypeSubscriptExpr(SE->getBase(),
+                                                    SE->getLBracketLoc(),
+                                                    SE->getIndex(),
+                                                    SE->getRBracketLoc(),
+                                                    Sub));
     }
 
     // Simple case: perform semantic analysis now that we have the declaration.
@@ -311,6 +315,59 @@ Expr *TypeChecker::semaSubscriptExpr(ExistentialSubscriptExpr *E) {
   E->setType(ValueType);
   return E;
 
+}
+
+Expr *TypeChecker::semaSubscriptExpr(ArchetypeSubscriptExpr *E) {
+  // Propagate errors up.
+  if (E->getDecl()->getType()->is<ErrorType>()) {
+    E->setType(ErrorType::get(Context));
+    return nullptr;
+  }
+
+  // Ensure that the base is an lvalue, materializing it if is not an
+  // lvalue yet.
+  Type ContainerTy = E->getBase()->getType()->getRValueType();
+  
+  if (Expr *Base = coerceObjectArgument(E->getBase(), ContainerTy))
+    E->setBase(Base);
+  else {
+    E->setType(ErrorType::get(Context));
+    return nullptr;
+  }
+
+  SubscriptDecl *SubDecl = E->getDecl();
+  
+  // Determine the index type.
+  Type IndexType = SubDecl->getIndices()->getType();
+  IndexType = substMemberTypeWithBase(IndexType, ContainerTy);
+  if (!IndexType)
+    return nullptr;
+  
+  // Coerce the index argument to the index type.
+  Expr *Index = coerceToType(E->getIndex(), IndexType);
+  if (!Index) {
+    diagnose(E->getBase()->getLoc(), diag::while_converting_subscript_index,
+             IndexType)
+      << E->getIndex()->getSourceRange();
+    E->setType(ErrorType::get(Context));
+    return nullptr;
+  }
+  E->setIndex(Index);
+  
+  // Determine the value type.
+  Type ValueType = SubDecl->getElementType();
+  ValueType = substMemberTypeWithBase(ValueType, ContainerTy);
+  if (!ValueType) {
+    E->setType(ErrorType::get(Context));
+    return nullptr;
+  }
+  
+  ValueType = LValueType::get(ValueType,
+                              LValueType::Qual::DefaultForMemberAccess,
+                              Context);
+  E->setType(ValueType);
+  return E;
+  
 }
 
 /// \brief Determine whether this expression refers to a type directly (ignoring
@@ -721,6 +778,9 @@ public:
     return TC.semaSubscriptExpr(E);
   }
   Expr *visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E) {
+    return TC.semaSubscriptExpr(E);
+  }
+  Expr *visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E) {
     return TC.semaSubscriptExpr(E);
   }
 

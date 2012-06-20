@@ -115,6 +115,7 @@ public:
   bool semaTupleExpr(TupleExpr *TE);
   Expr *semaSubscriptExpr(SubscriptExpr *SE);
   Expr *semaSubscriptExpr(ExistentialSubscriptExpr *SE);
+  Expr *semaSubscriptExpr(ArchetypeSubscriptExpr *SE);
   Expr *semaApplyExpr(ApplyExpr *E);
   Expr *semaUnresolvedDotExpr(UnresolvedDotExpr *E);
   void typeCheckIgnoredExpr(Expr *E);

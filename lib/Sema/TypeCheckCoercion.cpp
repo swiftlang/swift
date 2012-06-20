@@ -262,6 +262,9 @@ public:
   CoercedResult visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E) {
     return unchanged(E);
   }
+  CoercedResult visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E) {
+    return unchanged(E);
+  }
   CoercedResult visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *E) {
     Type BaseTy = E->getBase()->getType()->getRValueType();
 
@@ -289,6 +292,16 @@ public:
                                                       E->getIndex(),
                                                       E->getRBracketLoc(),
                                                       BestSub);
+        return coerced(TC.semaSubscriptExpr(Result));
+      }
+      
+      if (ContainerTy->is<ArchetypeType>()) {
+        ArchetypeSubscriptExpr *Result
+          = new (TC.Context) ArchetypeSubscriptExpr(E->getBase(),
+                                                    E->getLBracketLoc(),
+                                                    E->getIndex(),
+                                                    E->getRBracketLoc(),
+                                                    BestSub);
         return coerced(TC.semaSubscriptExpr(Result));
       }
 

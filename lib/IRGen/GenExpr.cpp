@@ -224,6 +224,10 @@ namespace {
       IGF.unimplemented(E->getLBracketLoc(), "existential subscripts");
     }
 
+    void visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E) {
+      IGF.unimplemented(E->getLBracketLoc(), "archetype subscripts");
+    }
+
     void visitTupleShuffleExpr(TupleShuffleExpr *E) {
       emitTupleShuffle(IGF, E, Out);
     }
@@ -460,6 +464,11 @@ namespace {
       return LValue();
     }
 
+    LValue visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E) {
+      IGF.unimplemented(E->getLBracketLoc(), "archetype subscripts");
+      return LValue();
+    }
+
     LValue visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E) {
       IGF.unimplemented(E->getLoc(), "archetype member reference");
       return LValue();
@@ -589,6 +598,7 @@ namespace {
     // FIXME: We may want to specialize IR generation for array subscripts.
     NON_LOCATEABLE(SubscriptExpr);
     NON_LOCATEABLE(ExistentialSubscriptExpr)
+    NON_LOCATEABLE(ArchetypeSubscriptExpr)
 #undef NON_LOCATEABLE
   };
 }

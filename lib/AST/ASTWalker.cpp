@@ -148,6 +148,19 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     
     return E;
   }
+  Expr *visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E) {
+    if (Expr *Base = doIt(E->getBase()))
+      E->setBase(Base);
+    else
+      return nullptr;
+    
+    if (Expr *Index = doIt(E->getIndex()))
+      E->setIndex(Index);
+    else
+      return nullptr;
+    
+    return E;
+  }
   Expr *visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *E) { return E; }
   Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     if (!E->getBase())

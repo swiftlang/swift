@@ -274,8 +274,17 @@ ExistentialSubscriptExpr(Expr *Base, SourceLoc LBracketLoc, Expr *Index,
                          SourceLoc RBracketLoc, SubscriptDecl *D)
   : Expr(ExprKind::ExistentialSubscript, D? D->getElementType() : Type()),
     D(D), Brackets(LBracketLoc, RBracketLoc), Base(Base), Index(Index) {
-  assert(D->getDeclContext()->getDeclaredTypeOfContext()->isExistentialType() &&
+  assert(Base->getType()->getRValueType()->isExistentialType() &&
          "use SubscriptExpr for non-existential type subscript");
+}
+
+ArchetypeSubscriptExpr::
+ArchetypeSubscriptExpr(Expr *Base, SourceLoc LBracketLoc, Expr *Index,
+                       SourceLoc RBracketLoc, SubscriptDecl *D)
+  : Expr(ExprKind::ArchetypeSubscript, D? D->getElementType() : Type()),
+    D(D), Brackets(LBracketLoc, RBracketLoc), Base(Base), Index(Index) {
+  assert(Base->getType()->getRValueType()->is<ArchetypeType>() &&
+         "use SubscriptExpr for non-archetype type subscript");
 }
 
 Expr *OverloadedSubscriptExpr::createWithCopy(Expr *Base,
@@ -293,6 +302,10 @@ Expr *OverloadedSubscriptExpr::createWithCopy(Expr *Base,
       return new (C) ExistentialSubscriptExpr(Base, LBracketLoc, Index,
                                               RBracketLoc,
                                               cast<SubscriptDecl>(Decls[0]));
+    if (ContainerTy->is<ArchetypeType>())
+      return new (C) ArchetypeSubscriptExpr(Base, LBracketLoc, Index,
+                                            RBracketLoc,
+                                            cast<SubscriptDecl>(Decls[0]));
 
     return new (C) SubscriptExpr(Base, LBracketLoc, Index, RBracketLoc,
                                  cast<SubscriptDecl>(Decls[0]));
@@ -505,6 +518,14 @@ public:
   }
   void visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E) {
     printCommon(E, "existential_subscript_expr");
+    OS << '\n';
+    printRec(E->getBase());
+    OS << '\n';
+    printRec(E->getIndex());
+    OS << ')';
+  }
+  void visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E) {
+    printCommon(E, "archetype_subscript_expr");
     OS << '\n';
     printRec(E->getBase());
     OS << '\n';
