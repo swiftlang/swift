@@ -140,6 +140,27 @@ ArchetypeMemberRefExpr::ArchetypeMemberRefExpr(Expr *Base, SourceLoc DotLoc,
   : Expr(ExprKind::ArchetypeMemberRef), Base(Base), Value(Value),
     DotLoc(DotLoc), NameLoc(NameLoc) { }
 
+ArchetypeType *ArchetypeMemberRefExpr::getArchetype() const {
+  Type BaseTy = getBase()->getType()->getRValueType();
+  if (auto Meta = BaseTy->getAs<MetaTypeType>())
+    return Meta->getTypeDecl()->getDeclaredType()->castTo<ArchetypeType>();
+
+  return BaseTy->castTo<ArchetypeType>();
+}
+
+bool ArchetypeMemberRefExpr::isBaseIgnored() const {
+  if (getBase()->getType()->getRValueType()->is<MetaTypeType>())
+    return true;
+
+  if (isa<TypeDecl>(Value))
+    return true;
+
+  if (auto Func = dyn_cast<FuncDecl>(Value))
+    return Func->isStatic();
+
+  return false;
+}
+
 Type OverloadSetRefExpr::getBaseType() const {
   if (isa<OverloadedDeclRefExpr>(this))
     return Type();

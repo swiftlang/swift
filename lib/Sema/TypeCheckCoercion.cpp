@@ -895,6 +895,7 @@ CoercedResult SemaCoerce::tryUserConversion(Expr *E) {
     switch (R.Kind) {
     case MemberLookupResult::MemberProperty:
     case MemberLookupResult::MetatypeMember:
+    case MemberLookupResult::MetaArchetypeMember:
     case MemberLookupResult::TupleElement:
     case MemberLookupResult::ExistentialMember:  // FIXME: Should work?
     case MemberLookupResult::ArchetypeMember:    // FIXME: Should work?

@@ -26,6 +26,7 @@
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
+  class ArchetypeType;
   class ASTContext;
   class Type;
   class ValueDecl;
@@ -553,7 +554,15 @@ public:
     
     return SourceRange(Base->getStartLoc(), NameLoc);
   }
-  
+
+  /// getArchetype - Retrieve the archetype whose member is being accessed.
+  ArchetypeType *getArchetype() const;
+
+  /// isBaseIgnored - Determine whether the base expression is actually ignored,
+  /// rather than being used as, e.g.,  the 'this' argument passed to an
+  /// instance method or the base of a variable access.
+  bool isBaseIgnored() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ArchetypeMemberRefExpr *) { return true; }
   static bool classof(const Expr *E) {

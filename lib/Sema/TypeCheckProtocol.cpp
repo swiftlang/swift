@@ -120,20 +120,27 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
       for (auto Candidate : Lookup.Results) {
         switch (Candidate.Kind) {
+        case swift::MemberLookupResult::MetaArchetypeMember:
         case MemberLookupResult::MetatypeMember:
-          if (auto Type = dyn_cast<TypeDecl>(Candidate.D)) {
+          if (auto TypeD = dyn_cast<TypeDecl>(Candidate.D)) {
             // Check this type against the protocol requirements.
             bool SatisfiesRequirements = true;
+
+            Type T = TypeD->getDeclaredType();
+
+            // FIXME: When this is a meta-archetype member (i.e., an associated
+            // type), map down to the archetype it models.
+
             for (auto Req : AssociatedType->getInherited()) {
               SmallVector<ProtocolDecl *, 4> ReqProtos;
               if (!Req->isExistentialType(ReqProtos))
                 return nullptr;
 
               for (auto ReqProto : ReqProtos) {
-                if (!TC.conformsToProtocol(Type->getDeclaredType(), ReqProto)) {
+                if (!TC.conformsToProtocol(T, ReqProto)) {
                   SatisfiesRequirements = false;
 
-                  NonViable.push_back({Type, ReqProto});
+                  NonViable.push_back({TypeD, ReqProto});
                   break;
                 }
               }
@@ -143,7 +150,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
             }
 
             if (SatisfiesRequirements)
-              Viable.push_back(Type);
+              Viable.push_back(TypeD);
           }
           break;
 
@@ -259,9 +266,11 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       for (auto Candidate : Lookup.Results) {
         switch (Candidate.Kind) {
         case MemberLookupResult::MetatypeMember:
+        case MemberLookupResult::MetaArchetypeMember:
         case MemberLookupResult::MemberProperty:
         case MemberLookupResult::MemberFunction:
         case MemberLookupResult::ExistentialMember:
+          // FIXME: Handle substitution for meta-archetype members.
           if (valueMemberMatches(Candidate.D, Requirement, RequiredTy,
                                  TC.Context))
             Viable.push_back(Candidate.D);

@@ -726,15 +726,19 @@ public:
   Expr *visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E) {
     if (E->getDecl()->getType()->is<ErrorType>())
       return nullptr;
-    
-    // Ensure that the base is an lvalue, materializing it if is not an
-    // lvalue yet.
-    Type ContainerTy = E->getBase()->getType()->getRValueType();
 
-    if (Expr *Base = TC.coerceObjectArgument(E->getBase(), ContainerTy))
-      E->setBase(Base);
-    else
-      return nullptr;
+    Type Archetype = E->getArchetype();
+
+    // If we're going to use the base, make sure it's an lvalue, materializing
+    // it if needed.
+    if (!E->isBaseIgnored()) {
+      // Ensure that the base is an lvalue, materializing it if is not an
+      // lvalue yet.
+      if (Expr *Base = TC.coerceObjectArgument(E->getBase(), Archetype))
+        E->setBase(Base);
+      else
+        return nullptr;
+    }
     
     // Determine the type of the member.
     Type MemberTy = E->getDecl()->getType();
@@ -750,7 +754,7 @@ public:
     }
 
     // Substitute each of the associated types into the member type.
-    MemberTy = TC.substMemberTypeWithBase(MemberTy, ContainerTy);
+    MemberTy = TC.substMemberTypeWithBase(MemberTy, Archetype);
     if (!MemberTy)
       return nullptr;
 

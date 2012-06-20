@@ -64,7 +64,13 @@ struct MemberLookupResult {
 
     /// ArchetypeMember - "a.x" refers to a member of an archetype (which was
     /// actually found in a protocol to which that archetype conforms).
-    ArchetypeMember
+    ArchetypeMember,
+
+    /// MetaArchetypeMember - "A.x"  refers to an "x" which is a member of
+    /// the metatype A of an archetype (A'). May also occur for "a.x" when "x"
+    /// is not an instance member, e.g., it is a type or a static function.
+    /// In either case, the base is evaluated and ignored.
+    MetaArchetypeMember
   } Kind;
   
   static MemberLookupResult getMemberProperty(ValueDecl *D) {
@@ -101,6 +107,13 @@ struct MemberLookupResult {
     MemberLookupResult R;
     R.D = D;
     R.Kind = ArchetypeMember;
+    return R;
+  }
+
+  static MemberLookupResult getMetaArchetypeMember(ValueDecl *D) {
+    MemberLookupResult R;
+    R.D = D;
+    R.Kind = MetaArchetypeMember;
     return R;
   }
 
@@ -198,6 +211,11 @@ public:
     /// which is referred to by BaseDecl.
     ArchetypeMember,
 
+    /// MetaArchetypeMember - "x" refers to a member of the metatype of an
+    /// archetype type, which is referred to by BaseDecl. The base is evaluated
+    /// and ignored.
+    MetaArchetypeMember,
+
     /// ModuleName - "x" refers to a module, either the current
     /// module or an imported module.
     ModuleName
@@ -279,6 +297,15 @@ public:
     R.Base = base;
     R.Value = value;
     R.Kind = ArchetypeMember;
+    return R;
+  }
+
+  static UnqualifiedLookupResult getMetaArchetypeMember(ValueDecl *base,
+                                                        ValueDecl *value) {
+    UnqualifiedLookupResult R;
+    R.Base = base;
+    R.Value = value;
+    R.Kind = MetaArchetypeMember;
     return R;
   }
 

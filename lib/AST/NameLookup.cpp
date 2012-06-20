@@ -133,8 +133,9 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
     SmallVector<ValueDecl*, 8> Decls;
     MT->getModule()->lookupValue(Module::AccessPathTy(), MemberName,
                                  NLKind::QualifiedLookup, Decls);
-    for (ValueDecl *VD : Decls)
+    for (ValueDecl *VD : Decls) {
       Results.push_back(Result::getMetatypeMember(VD));
+    }
     return;
   }
 
@@ -193,11 +194,26 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
     for (auto Proto : Archetype->getConformsTo())
       doIt(Proto, M, Visited);
 
-    // Change existential members to archetype members, since we're in an
-    // archetype.
+    // Change existential and metatype members to archetype members, since
+    // we're in an archetype.
     for (auto &Result : Results) {
-      if (Result.Kind == MemberLookupResult::ExistentialMember)
+      switch (Result.Kind) {
+      case MemberLookupResult::ExistentialMember:
         Result.Kind = MemberLookupResult::ArchetypeMember;
+        break;
+
+      case MemberLookupResult::MetatypeMember:
+        Result.Kind = MemberLookupResult::MetaArchetypeMember;
+        break;
+
+      case MemberLookupResult::MetaArchetypeMember:
+      case MemberLookupResult::MemberProperty:
+      case MemberLookupResult::MemberFunction:
+      case MemberLookupResult::ArchetypeMember:
+      case MemberLookupResult::TupleElement:
+        llvm_unreachable("wrong member lookup result in archetype");
+        break;
+      }
     }
     return;
   }
@@ -339,6 +355,7 @@ Expr *MemberLookup::createResultAST(Expr *Base, SourceLoc DotLoc,
     case MemberLookupResult::ExistentialMember:
       return new (Context) ExistentialMemberRefExpr(Base, DotLoc, R.D, NameLoc);
     case MemberLookupResult::ArchetypeMember:
+    case MemberLookupResult::MetaArchetypeMember:
       return new (Context) ArchetypeMemberRefExpr(Base, DotLoc, R.D, NameLoc);
     }
 
@@ -602,6 +619,9 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
           break;
         case MemberLookupResult::ArchetypeMember:
           Results.push_back(Result::getArchetypeMember(BaseDecl, Result.D));
+          break;
+        case MemberLookupResult::MetaArchetypeMember:
+          Results.push_back(Result::getMetaArchetypeMember(BaseDecl, Result.D));
           break;
         case MemberLookupResult::TupleElement:
           llvm_unreachable("Can't have context with tuple type");

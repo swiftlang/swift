@@ -253,6 +253,11 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC,
     case UnqualifiedLookupResult::ModuleName:
       Components[0].Value = Globals.Results[0].getNamedModule();
       break;
+
+    case UnqualifiedLookupResult::MetaArchetypeMember:
+      // FIXME: This is actually possible in protocols.
+      llvm_unreachable("meta-archetype member in unqualified name lookup");
+      break;
     }
   }
 
