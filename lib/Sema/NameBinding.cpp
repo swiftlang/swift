@@ -69,8 +69,9 @@ namespace {
     /// resolving it or diagnosing the error as appropriate and return true on
     /// failure.  On failure, this leaves IdentifierType alone, otherwise it
     /// fills in the Components.
-    bool resolveIdentifierType(IdentifierType *DNT,  DeclContext *DC);
-    
+    bool resolveIdentifierType(IdentifierType *DNT, DeclContext *DC,
+                               bool NoMemberLookup = false);
+
   private:
     /// getModule - Load a module referenced by an import statement,
     /// emitting an error at the specified location and returning null on
@@ -207,15 +208,16 @@ addStandardLibraryImport(SmallVectorImpl<ImportedModule> &Result) {
 /// resolving it or diagnosing the error as appropriate and return true on
 /// failure.  On failure, this leaves IdentifierType alone, otherwise it fills
 /// in the Components.
-bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
-  const MutableArrayRef<IdentifierType::Component> &Components =DNT->Components;
-  
+bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC,
+                                       bool NoMemberLookup) {
+  MutableArrayRef<IdentifierType::Component> Components = DNT->Components;
+
   // If name lookup for the base of the type didn't get resolved in the
   // parsing phase, perform lookup on it.
   if (Components[0].Value.isNull()) {
     Identifier Name = Components[0].Id;
     SourceLoc Loc = Components[0].Loc;
-    
+
     // Perform an unqualified lookup.
     UnqualifiedLookup Globals(Name, DC);
 
@@ -253,34 +255,48 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
       break;
     }
   }
-  
+
   assert(!Components[0].Value.isNull() && "Failed to get a base");
-  
+
   // Now that we have a base, iteratively resolve subsequent member entries.
   auto LastOne = Components[0];
   for (auto &C : Components.slice(1, Components.size()-1)) {
-    // TODO: Only support digging into modules so far.
     if (auto M = LastOne.Value.dyn_cast<Module*>()) {
+      // Lookup into a named module.
       SmallVector<ValueDecl*, 8> Decls;
       M->lookupValue(Module::AccessPathTy(), C.Id, 
                      NLKind::QualifiedLookup, Decls);
       if (Decls.size() == 1 && isa<TypeDecl>(Decls.back()))
         C.Value = cast<TypeDecl>(Decls.back());
+    } else if (auto VD = LastOne.Value.dyn_cast<ValueDecl*>()) {
+      // Lookup into a type.
+      if (auto TD = dyn_cast<TypeDecl>(VD)) {
+        if (NoMemberLookup) {
+          diagnose(C.Loc, diag::cannot_resolve_extension_dot)
+            << SourceRange(Components[0].Loc, Components.back().Loc);
+          return true;
+        }
+
+        MemberLookup ML(TD->getDeclaredType(), C.Id, *TU);
+        if (ML.Results.size() == 1 && ML.Results.back().hasDecl() &&
+            isa<TypeDecl>(ML.Results.back().D))
+          C.Value = cast<TypeDecl>(ML.Results.back().D);
+      }
     } else {
       diagnose(C.Loc, diag::unknown_dotted_type_base, LastOne.Id)
         << SourceRange(Components[0].Loc, Components.back().Loc);
       return true;
     }
-    
+
     if (C.Value.isNull()) {
       diagnose(C.Loc, diag::invalid_member_type, C.Id, LastOne.Id)
-      << SourceRange(Components[0].Loc, Components.back().Loc);
+        << SourceRange(Components[0].Loc, Components.back().Loc);
       return true;
     }
-    
+
     LastOne = C;
   }
-  
+
   // Finally, sanity check that the last value is a type.
   if (ValueDecl *Last = Components.back().Value.dyn_cast<ValueDecl*>())
     if (auto TAD = dyn_cast<TypeDecl>(Last)) {
@@ -299,18 +315,6 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
 //===----------------------------------------------------------------------===//
 // performNameBinding
 //===----------------------------------------------------------------------===//
-
-/// \brief Determine the number of type contexts from DC to the module
-/// context.
-static unsigned getDeclContextTypeDepth(DeclContext *DC) {
-  unsigned Depth = 0;
-  while (!DC->isModuleContext()) {
-    if (DC->isTypeContext())
-      ++Depth;
-    DC = DC->getParent();
-  }
-  return Depth;
-}
 
 /// performNameBinding - Once parsing is complete, this walks the AST to
 /// resolve names and do other top-level validation.
@@ -378,27 +382,69 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
     }
   }
 
-  // Loop over all the unresolved dotted types in the translation unit,
-  // resolving them if possible. We first sort the types by their context
-  // depth, so they the outermost types (e.g., those on extension declarations)
-  // are resolved first.
-  // FIXME: This is far from perfect; we also need to deal with a.b.c types
-  // that occur in an outer context.
+  // FIXME:
+  // The rule we want:
+  // If a type is defined in an extension in the current module, and you're
+  // trying to refer to it from an extension declaration, and the number of
+  // dots you're using to refer to it is greater than its natural nesting depth,
+  // it is an error.
+  //
+  // The current rule:
+  // If you're trying to refer to a type from an extension declaration, and you
+  // need to resolve any dots to find the type, it's an error.
+  //
+  // The really tricky part about making everything work correctly is
+  // shadowing: if an extension defines a type which shadows a type in an
+  // imported module, we have to make sure we don't choose a type which shouldn't
+  // be visible.
+  //
+  // After this loop finishes, we can perform normal member lookup.
+  for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
+    if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(TU->Decls[i])) {
+      IdentifierType *DNT = dyn_cast<IdentifierType>(ED->getExtendedType());
+      while (true) {
+        if (Binder.resolveIdentifierType(DNT, TU, /*NoMemberLookup*/true)) {
+          for (auto &C : DNT->Components)
+            C.Value = TU->Ctx.TheErrorType;
+
+          break;
+        } else {
+          // We need to make sure the extended type is canonical. There are
+          // two possibilities here:
+          // 1. The type is already canonical, because it's either a NominalType
+          // or comes from an imported module.
+          // 2. The type is a NameAliasType from the current module, which
+          // we need to resolve immediately because we can't leave a
+          // non-canonical type here in the AST.
+          Type FoundType = DNT->Components.back().Value.get<Type>();
+          if (FoundType->hasCanonicalTypeComputed())
+            break;
+
+          TypeAliasDecl *TAD = cast<NameAliasType>(FoundType)->getDecl();
+          DNT = dyn_cast<IdentifierType>(TAD->getUnderlyingType());
+
+          if (!DNT) {
+            Binder.diagnose(ED->getLoc(), diag::non_nominal_extension,
+                            false, ED->getExtendedType());
+            ED->setExtendedType(ErrorType::get(Binder.Context));
+            break;
+          }
+        }
+      }
+    }
+  }
+
   typedef TranslationUnit::IdentTypeAndContext IdentTypeAndContext;
-  SmallVector<IdentTypeAndContext, 4> UnresolvedIdTypes;
-  UnresolvedIdTypes.append(TU->getUnresolvedIdentifierTypes().begin(),
-                           TU->getUnresolvedIdentifierTypes().end());
-  std::stable_sort(UnresolvedIdTypes.begin(), UnresolvedIdTypes.end(),
-                   [](IdentTypeAndContext lhs, IdentTypeAndContext rhs) {
-                     return getDeclContextTypeDepth(lhs.second) <
-                            getDeclContextTypeDepth(rhs.second);
-                   });
-  
-  for (auto IdAndContext : UnresolvedIdTypes) {
-    if (Binder.resolveIdentifierType(IdAndContext.first,
-                                     IdAndContext.second)) {
-      // This IdentifierType resolved to the error type.
-      for (auto &C : IdAndContext.first->Components)
+  for (auto IdAndContext : TU->getUnresolvedIdentifierTypes()) {
+    IdentifierType *DNT = IdAndContext.first;
+    DeclContext *DC = IdAndContext.second;
+
+    // Make sure we don't try to resolve a type twice.
+    if (DNT->Components.back().Value.is<Type>())
+      continue;
+
+    if (Binder.resolveIdentifierType(DNT, DC)) {
+      for (auto &C : DNT->Components)
         C.Value = TU->Ctx.TheErrorType;
     }
   }
