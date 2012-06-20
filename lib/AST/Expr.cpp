@@ -196,9 +196,7 @@ Expr *OverloadedMemberRefExpr::createWithCopy(Expr *Base, SourceLoc DotLoc,
   ASTContext &C = Decls[0]->getASTContext();
 
   if (Decls.size() == 1) {
-    Type BaseTy = Base->getType();
-    if (auto BaseLV = BaseTy->getAs<LValueType>())
-      BaseTy = BaseLV->getObjectType();
+    Type BaseTy = Base->getType()->getRValueType();
     if (BaseTy->isExistentialType()) {
       return new (C) ExistentialMemberRefExpr(Base, DotLoc, Decls[0],
                                               MemberLoc);

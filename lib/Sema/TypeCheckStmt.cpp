@@ -228,10 +228,8 @@ public:
   Expr *callNullaryMethodOf(Expr *Base, Identifier Name, SourceLoc Loc,
                             Diag<Type> MissingMember,
                             Diag<Type> NonFuncMember) {
-    Type BaseType = Base->getType();
-    if (LValueType *BaseLV = BaseType->getAs<LValueType>())
-      BaseType = BaseLV->getObjectType();
-    
+    Type BaseType = Base->getType()->getRValueType();
+
     // Look for name.
     MemberLookup Lookup(BaseType, Name, TC.TU);
     if (!Lookup.isSuccess()) {
@@ -292,9 +290,7 @@ public:
     Type RangeTy;
     VarDecl *Range;
     {
-      Type ContainerType = Container->getType();
-      if (LValueType *ContainerLV = ContainerType->getAs<LValueType>())
-        ContainerType = ContainerLV->getObjectType();
+      Type ContainerType = Container->getType()->getRValueType();
 
       ProtocolConformance *Conformance
         = TC.conformsToProtocol(ContainerType, EnumerableProto,
@@ -676,10 +672,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
           if (Type ThisTy = FD->computeThisType()) {
             // References to the 'this' declaration will add back the lvalue
             // type as appropriate.
-            if (LValueType *LValue = ThisTy->getAs<LValueType>())
-              ThisTy = LValue->getObjectType();
-            
-            FD->getImplicitThisDecl()->setType(ThisTy);
+            FD->getImplicitThisDecl()->setType(ThisTy->getRValueType());
           }
       }
 

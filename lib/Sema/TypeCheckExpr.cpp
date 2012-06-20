@@ -139,10 +139,8 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
   }
   
   // Determine the type of the base of this subscript expression.
-  Type BaseTy = SE->getBase()->getType();
-  if (LValueType *BaseLV = BaseTy->getAs<LValueType>())
-    BaseTy = BaseLV->getObjectType();
-  
+  Type BaseTy = SE->getBase()->getType()->getRValueType();
+
   // Look for subscript operators in the base type.
   // FIXME: hard-coding of the name __subscript is ueber-lame.
   MemberLookup Lookup(BaseTy, Context.getIdentifier("__subscript"), TU);
@@ -674,9 +672,7 @@ public:
     
     // Ensure that the base is an lvalue, materializing it if is not an
     // lvalue yet.
-    Type ContainerTy = E->getBase()->getType();
-    if (LValueType *ContainerLV = ContainerTy->getAs<LValueType>())
-      ContainerTy = ContainerLV->getObjectType();
+    Type ContainerTy = E->getBase()->getType()->getRValueType();
 
     if (Expr *Base = TC.coerceObjectArgument(E->getBase(), ContainerTy))
       E->setBase(Base);

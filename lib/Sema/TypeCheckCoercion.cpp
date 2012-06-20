@@ -263,14 +263,10 @@ public:
     return unchanged(E);
   }
   CoercedResult visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *E) {
-    Type BaseTy = E->getBase()->getType();
-    if (LValueType *BaseLV = BaseTy->getAs<LValueType>())
-      BaseTy = BaseLV->getObjectType();
-    
-    Type DestElementTy = DestTy;
-    if (LValueType *DestElementLV = DestElementTy->getAs<LValueType>())
-      DestElementTy = DestElementLV->getObjectType();
-    
+    Type BaseTy = E->getBase()->getType()->getRValueType();
+
+    Type DestElementTy = DestTy->getRValueType();
+
     llvm::SmallVector<ValueDecl *, 2> Viable;
     ValueDecl *Best = TC.filterOverloadSet(E->getDecls(),
                                            /*OperatorSyntax=*/true,
@@ -870,10 +866,8 @@ CoercedResult SemaCoerce::tryUserConversion(Expr *E) {
   
   // The source type may already be an lvalue; just look into the underlying
   // object type.
-  Type SourceTy = E->getType();
-  if (LValueType *SourceLV = SourceTy->getAs<LValueType>())
-    SourceTy = SourceLV->getObjectType();
-  
+  Type SourceTy = E->getType()->getRValueType();
+
   // We can only perform implicit conversions from nominal types.
   if (!SourceTy->is<NominalType>())
     return nullptr;
@@ -1097,10 +1091,8 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
                                                DestTy, Viable)) {
       if (!(Flags & CF_Apply)) {
         // Determine the type of the resulting call expression.
-        Type Ty = Best->getType();
-        if (LValueType *LValue = Ty->getAs<LValueType>())
-          Ty = LValue->getObjectType();
-        
+        Type Ty = Best->getType()->getRValueType();
+
         if (FunctionType *FnTy = Ty->getAs<FunctionType>())
           return FnTy->getResult();
         
@@ -1594,9 +1586,8 @@ SemaCoerce::coerceObjectArgument(Expr *E, Type ContainerTy, TypeChecker &TC,
 
   // The type we're converting to is always an lvalue of the given container
   // type.
-  if (auto DestLV = ContainerTy->getAs<LValueType>())
-    ContainerTy = DestLV->getObjectType();
-  
+  ContainerTy = ContainerTy->getRValueType();
+
   // Determine the type we're converting from, and whether we need to
   // materialize the source.
   Type SrcTy = E->getType();
@@ -1971,13 +1962,9 @@ Expr *TypeChecker::coerceObjectArgument(Expr *E, Type ContainerTy) {
                                                            *this, CF_Apply))
     return Res.getExpr();
   else if (Res.getKind() == CoercionResult::Unknowable) {
-    if (auto DestLV = ContainerTy->getAs<LValueType>())
-      ContainerTy = DestLV->getObjectType();
-    
-    Type SrcTy = E->getType();
-    LValueType *SrcLV = SrcTy->getAs<LValueType>();
-    Type SrcObjectTy = SrcLV ? SrcLV->getObjectType() : SrcTy;
-    
+    ContainerTy = ContainerTy->getRValueType();
+
+    Type SrcObjectTy = E->getType()->getRValueType();
     diagnose(E->getLoc(), diag::no_convert_object_arg, SrcObjectTy,
              ContainerTy);
   }

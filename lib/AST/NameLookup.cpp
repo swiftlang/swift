@@ -110,8 +110,7 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
   typedef MemberLookupResult Result;
   
   // Just look through l-valueness.  It doesn't affect name lookup.
-  if (LValueType *LV = BaseTy->getAs<LValueType>())
-    BaseTy = LV->getObjectType();
+  BaseTy = BaseTy->getRValueType();
 
   // Type check metatype references, as in "some_type.some_member".  These are
   // special and can't have extensions.

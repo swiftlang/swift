@@ -95,17 +95,9 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
                                Expr *Arg,
                                Type DestTy,
                                SmallVectorImpl<ValueDecl *> &Viable) {
-  // We want the actual underlying base type, not an lvalue of that type.
-  if (BaseTy) {
-    if (LValueType *BaseLV = BaseTy->getAs<LValueType>())
-      BaseTy = BaseLV->getObjectType();
-  }
-
   Viable.clear();
   for (ValueDecl *VD : Candidates) {
-    Type VDType = VD->getType();
-    if (LValueType *LValue = VDType->getAs<LValueType>())
-      VDType = LValue->getObjectType();
+    Type VDType = VD->getType()->getRValueType();
 
     // Must have function type to be called.
     FunctionType *FunctionTy = VDType->getAs<FunctionType>();
