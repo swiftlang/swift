@@ -292,10 +292,9 @@ public:
     {
       Type ContainerType = Container->getType()->getRValueType();
 
-      ProtocolConformance *Conformance
-        = TC.conformsToProtocol(ContainerType, EnumerableProto,
-                                Container->getLoc());
-      if (!Conformance)
+      ProtocolConformance *Conformance = nullptr;
+      if (!TC.conformsToProtocol(ContainerType, EnumerableProto, &Conformance,
+                                 Container->getLoc()))
         return nullptr;
 
       // Gather the witness from the Enumerable protocol conformance. This are
@@ -309,11 +308,19 @@ public:
         
         StringRef Name = Value->getName().str();
         if (Name.equals("Elements") && isa<TypeDecl>(Value)) {
-          ArchetypeType *Archetype
-            = cast<TypeDecl>(Value)->getDeclaredType()->getAs<ArchetypeType>();
-          RangeTy = Conformance->TypeMapping[Archetype];
-        } else if (Name.equals("getElements") && isa<FuncDecl>(Value))
-          getElementsFn = cast<FuncDecl>(Conformance->Mapping[Value]);
+          if (Conformance) {
+            ArchetypeType *Archetype
+              = cast<TypeDecl>(Value)->getDeclaredType()->getAs<ArchetypeType>();
+            RangeTy = Conformance->TypeMapping[Archetype];
+          } else {
+            RangeTy = cast<TypeDecl>(Value)->getDeclaredType();
+          }
+        } else if (Name.equals("getElements") && isa<FuncDecl>(Value)) {
+          if (Conformance)
+            getElementsFn = cast<FuncDecl>(Conformance->Mapping[Value]);
+          else
+            getElementsFn = cast<FuncDecl>(Value);
+        }
       }
 
       if (!getElementsFn || !RangeTy) {
@@ -341,9 +348,9 @@ public:
     
     // FIXME: Would like to customize the diagnostic emitted in
     // conformsToProtocol().
-    ProtocolConformance *Conformance
-      = TC.conformsToProtocol(RangeTy, RangeProto, Container->getLoc());
-    if (!Conformance)
+    ProtocolConformance *Conformance = nullptr;
+    if (!TC.conformsToProtocol(RangeTy, RangeProto, &Conformance,
+                               Container->getLoc()))
       return nullptr;
     
     // Gather the witnesses from the Range protocol conformance. These are
@@ -359,13 +366,25 @@ public:
       
       StringRef Name = Value->getName().str();
       if (Name.equals("Element") && isa<TypeDecl>(Value)) {
-        ArchetypeType *Archetype
-          = cast<TypeDecl>(Value)->getDeclaredType()->getAs<ArchetypeType>();
-        ElementTy = Conformance->TypeMapping[Archetype];
-      } else if (Name.equals("isEmpty") && isa<FuncDecl>(Value))
-        isEmptyFn = cast<FuncDecl>(Conformance->Mapping[Value]);
-      else if (Name.equals("getFirstAndAdvance") && isa<FuncDecl>(Value))
-        getFirstAndAdvanceFn = cast<FuncDecl>(Conformance->Mapping[Value]);
+        if (Conformance) {
+          ArchetypeType *Archetype
+            = cast<TypeDecl>(Value)->getDeclaredType()->getAs<ArchetypeType>();
+          ElementTy = Conformance->TypeMapping[Archetype];
+        } else {
+          ElementTy = cast<TypeDecl>(Value)->getDeclaredType();
+        }
+      } else if (Name.equals("isEmpty") && isa<FuncDecl>(Value)) {
+        if (Conformance)
+          isEmptyFn = cast<FuncDecl>(Conformance->Mapping[Value]);
+        else
+          isEmptyFn = cast<FuncDecl>(Value);
+      }
+      else if (Name.equals("getFirstAndAdvance") && isa<FuncDecl>(Value)) {
+        if (Conformance)
+          getFirstAndAdvanceFn = cast<FuncDecl>(Conformance->Mapping[Value]);
+        else
+          getFirstAndAdvanceFn = cast<FuncDecl>(Value);
+      }
     }
     
     if (!isEmptyFn || !getFirstAndAdvanceFn || !ElementTy) {

@@ -175,7 +175,7 @@ public:
   /// The resulting expression will always be an lvalue, but may be an lvalue
   /// to a subtype of the requested container type.
   Expr *coerceObjectArgument(Expr *E, Type ContainerTy);
-  
+
   /// isCoercibleObjectArgument - Determine whether the given expression can
   /// be coerced to an object argument for a member of the given type.
   bool isCoercibleObjectArgument(Expr *E, Type ContainerTy);
@@ -187,13 +187,22 @@ public:
   /// conformsToProtocol - Determine whether the given type conforms to the
   /// given protocol.
   ///
+  /// \param Conformance If non-NULL, and the type does conform to the given
+  /// protocol, this will be set to the protocol conformance mapping that
+  /// maps the given type \c T to the protocol \c Proto. The mapping may be
+  /// NULL, if the mapping is trivial due to T being either an archetype or
+  /// an existential type that directly implies conformance to \c Proto.
+  ///
   /// \param ComplainLoc If valid, then this function will emit diagnostics if
   /// T does not conform to the given protocol. The primary diagnostic will
   /// be placed at this location, with notes for each of the protocol
   /// requirements not satisfied.
-  ProtocolConformance *conformsToProtocol(Type T, ProtocolDecl *Proto,
-                                          SourceLoc ComplainLoc = SourceLoc());
-  
+  ///
+  /// \returns true if T conforms to the protocol Proto, false otherwise.
+  bool conformsToProtocol(Type T, ProtocolDecl *Proto,
+                          ProtocolConformance **Conformance = 0,
+                          SourceLoc ComplainLoc = SourceLoc());
+
   /// \name Overload resolution
   ///
   /// Routines that perform overload resolution or provide diagnostics related

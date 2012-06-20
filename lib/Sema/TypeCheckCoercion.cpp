@@ -1876,26 +1876,16 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
     SmallVector<ProtocolDecl *, 4> DestProtocols;
     
     if (DestTy->isExistentialType(DestProtocols)) {
-      // Simple case: the source protocol inherits from the (only) destination
-      // protocol.
-      if (DestProtocols.size() == 1) {
-        if (auto SrcProto = E->getType()->getAs<ProtocolType>()) {
-          if (SrcProto->getDecl()->inheritsFrom(DestProtocols[0])) {
-            if (!(Flags & CF_Apply))
-              return DestTy;
-
-            return coerced(new (TC.Context) SuperConversionExpr(E, DestTy),
-                           Flags);
-          }
-        }
-      }
-      
-      // Non-trivial case: source type (which may be an existential type)
-      // satisfies the requirements of all of the destination protocols.
+      // Check whether the source type conforms to each of the destination
+      // protocols.
       SmallVector<ProtocolConformance *, 4> Conformances;
+      bool AllTrivial = true;
       for (auto DestProto : DestProtocols) {
-        if (ProtocolConformance *Conformance
-              = TC.conformsToProtocol(E->getType(), DestProto)) {
+        ProtocolConformance *Conformance = nullptr;
+        if (TC.conformsToProtocol(E->getType(), DestProto, &Conformance)) {
+          if (Conformance)
+            AllTrivial = false;
+          
           Conformances.push_back(Conformance);
           continue;
         }
@@ -1909,7 +1899,14 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy, TypeChecker &TC,
       
       if (!(Flags & CF_Apply))
         return DestTy;
-      
+
+      // If all of the conformance checks were trivial, then this is a trivial
+      // erasure.
+      if (AllTrivial) {
+        return coerced(new (TC.Context) SuperConversionExpr(E, DestTy),
+                       Flags);
+      }
+
       return coerced(
                new (TC.Context) ErasureExpr(E, DestTy,
                                   TC.Context.AllocateCopy(Conformances)),

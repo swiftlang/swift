@@ -271,8 +271,12 @@ static bool isSubtypeOf(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
     return true;
   
   // A value of a given type is a subtype of a protocol type if it conforms
-  // to that protocol type. This is a non-trivial conversion, because it
-  // requires the introduction of a new protocol mapping.
+  // to that protocol type. We always consider this a non-trivial conversion,
+  // because it may require the introduction of a new protocol mapping.
+  // FIXME: Depending on our implementation model for protocols, some cases
+  // (such as selecting a subset of protocols in an existential type, or
+  // selecting a protocol from which the protocol T1 inherits) might actually
+  // be considered trivial.
   if (Flags & ST_AllowNonTrivial) {
     SmallVector<ProtocolDecl *, 4> T2Protos;
     if (T2->isExistentialType(T2Protos)) {

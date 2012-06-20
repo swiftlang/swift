@@ -68,10 +68,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   llvm::DenseMap<ArchetypeType *, Type> TypeMapping;
   llvm::DenseMap<ProtocolDecl *, ProtocolConformance *> InheritedMapping;
 
-  // FIXME: When T is an archetype that is specified to conform to Proto,
-  // we can fast-path this. However, we would not have a ProtocolConformance
-  // structure to use.
-
   // Check that T conforms to all inherited protocols.
   for (auto Inherited : Proto->getInherited()) {
     SmallVector<ProtocolDecl *, 4> InheritedProtos;
@@ -79,9 +75,10 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       return nullptr;
     
     for (auto InheritedProto : InheritedProtos) {
-      if (auto Conformance = TC.conformsToProtocol(T, InheritedProto,
-                                                   ComplainLoc))
-        InheritedMapping[InheritedProto] = Conformance;
+      ProtocolConformance *InheritedConformance = nullptr;
+      if (TC.conformsToProtocol(T, InheritedProto, &InheritedConformance,
+                                ComplainLoc))
+        InheritedMapping[InheritedProto] = InheritedConformance;
       else {
         // Recursive call already diagnosed this problem, but tack on a note
         // to establish the relationship.
@@ -351,23 +348,59 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   return Result;
 }
 
-ProtocolConformance *
-TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
-                                SourceLoc ComplainLoc) {
+bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
+                                     ProtocolConformance **Conformance,
+                                     SourceLoc ComplainLoc) {
+  if (Conformance)
+    *Conformance = nullptr;
+
+  // If we have an archetype, check whether this archetype's requirements
+  // include this protocol (or something that inherits from it).
+  if (auto Archetype = T->getAs<ArchetypeType>()) {
+    for (auto APType : Archetype->getConformsTo()) {
+      SmallVector<ProtocolDecl *, 4> AProtos;
+      if (APType->isExistentialType(AProtos)) {
+        for (auto AP : AProtos) {
+          if (AP == Proto || AP->inheritsFrom(Proto))
+            return true;
+        }
+      }
+    }
+  }
+
+  // If we have an existential type, check whether this type includes this
+  // protocol we're looking for (or something that inherits from it).
+  {
+    SmallVector<ProtocolDecl *, 4> AProtos;
+    if (T->isExistentialType(AProtos)) {
+      for (auto AP : AProtos) {
+        if (AP == Proto || AP->inheritsFrom(Proto))
+          return true;
+      }
+    }
+  }
+
   ASTContext::ConformsToMap::key_type Key(T->getCanonicalType(), Proto);
   ASTContext::ConformsToMap::iterator Known = Context.ConformsTo.find(Key);
-  if (Known != Context.ConformsTo.end())
-    return Known->second;
+  if (Known != Context.ConformsTo.end()) {
+    if (Conformance)
+      *Conformance = Known->second;
+    
+    return Known->second != nullptr;
+  }
   
   // Assume that the type does not conform to this protocol while checking
   // whether it does in fact conform. This eliminates both infinite recursion
   // (if the protocol hierarchies are circular) as well as tautologies.
   Context.ConformsTo[Key] = nullptr;
-  if (std::unique_ptr<ProtocolConformance> Conformance
+  if (std::unique_ptr<ProtocolConformance> ComputedConformance
         = checkConformsToProtocol(*this, T, Proto, ComplainLoc)) {
-    auto result = Conformance.release();
+    auto result = ComputedConformance.release();
     Context.ConformsTo[Key] = result;
-    return result;
+
+    if (Conformance)
+      *Conformance = result;
+    return true;
   }
   return nullptr;
 }

@@ -1135,8 +1135,8 @@ public:
   }
 };
 
-/// ErasureExpr - Perform type erasure by converting a value to protocol type.
-/// For example:
+/// ErasureExpr - Perform type erasure by converting a value to existential
+/// type. For example:
 ///
 /// \code
 /// protocol Printable {
@@ -1161,7 +1161,13 @@ public:
   /// \brief Retrieve the mapping specifying how the type of the subexpression
   /// maps to the resulting existential type. If the resulting existential
   /// type involves several different protocols, there will be mappings for each
-  /// of those protocols.
+  /// of those protocols, in the order in which the existential type expands
+  /// its properties.
+  ///
+  /// The entries in this array may be null, indicating that the conformance
+  /// to the corresponding protocol is trivial (because the source
+  /// type is either an archetype or an existential type that conforms to
+  /// that corresponding protocol).
   ArrayRef<ProtocolConformance *> getConformances() const {
     return Conformances;
   }

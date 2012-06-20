@@ -71,7 +71,7 @@ public:
       SmallVector<ProtocolDecl *, 4> InheritedProtos;
       if (InheritedTy->isExistentialType(InheritedProtos))
         for (auto Proto : InheritedProtos)
-          TC.conformsToProtocol(T, Proto, D->getStartLoc());
+          TC.conformsToProtocol(T, Proto, nullptr, D->getStartLoc());
     }
   }
   
