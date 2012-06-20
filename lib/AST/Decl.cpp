@@ -374,10 +374,29 @@ Type FuncDecl::computeThisType() const {
   Type ContainerType = getExtensionType();
   if (ContainerType.isNull()) return ContainerType;
   
-  
   if (ContainerType->hasReferenceSemantics())
     return ContainerType;
-  
+
+  // For a protocol, the type of 'this' is the associated type 'This', not
+  // the protocol itself.
+  if (auto Protocol = ContainerType->getAs<ProtocolType>()) {
+    TypeAliasDecl *This = 0;
+    for (auto Member : Protocol->getDecl()->getMembers()) {
+      This = dyn_cast<TypeAliasDecl>(Member);
+      if (!This)
+        continue;
+
+      // FIXME: Sane way to identify 'This'?
+      if (This->getName().str() == "This")
+        break;
+
+      This = nullptr;
+    }
+
+    assert(This && "Missing 'This' associated type in protocol");
+    ContainerType = This->getDeclaredType();
+  }
+
   // 'this' is accepts implicit l-values and doesn't force them to the heap.
   return LValueType::get(ContainerType, LValueType::Qual::NonHeap,
                          getASTContext());

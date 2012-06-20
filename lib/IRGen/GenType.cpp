@@ -237,10 +237,15 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, CanType canTy) {
   case TypeKind::ProtocolComposition:
       llvm_unreachable("ProtocolComposition types are unimplemented");
       
-  case TypeKind::Archetype:
-    // FIXME: In generics, these will have a representation. Will it simply
-    // be a fixed buffer?
-    llvm_unreachable("Archetype types are unimplemented");
+  case TypeKind::Archetype: {
+    // FIXME: This is very wrong. We actually want an ArchetypeTypeInfo
+    // that knows how to query the local context to get the witness table from
+    // the current context (== a generic function) and use that for all init/
+    // assign/destroy/etc. operations.
+    llvm::Type *BufferTy = IGM.getFixedBufferTy();
+    return createPrimitive(BufferTy, Size(BufferTy->getScalarSizeInBits()/8U),
+                           IGM.getPointerAlignment());
+  }
   }
   llvm_unreachable("bad type kind");
 }

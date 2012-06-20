@@ -2325,11 +2325,13 @@ Callee irgen::emitExistentialMemberRefCallee(IRGenFunction &IGF,
     IGF.pushFullExprCleanup<DestroyBuffer>(copyBuffer, table);
 
     // Add the temporary address as a callee arg.
-    // We have to bitcast it because the AST claims that 'this' on the
-    // protocol method has type [byref] P, which is just wrong.
+    // This argument is bitcast to the type of the 'this' argument (a
+    // [byref] to the archetype This), although the underlying function actually
+    // takes the underlying object pointer.
+    Type ThisParamTy = fn->getType()->castTo<FunctionType>()->getInput();
     copy = IGF.Builder.CreateBitCast(copy,
-                                     ownerTI.getStorageType()->getPointerTo(),
-                                     "workaround-cast");
+                                     IGF.IGM.getFragileType(ThisParamTy),
+                                     "object-pointer");
     Explosion *arg = new Explosion(ExplosionKind::Minimal);
     arg->addUnmanaged(copy);
     calleeArgs.push_back(Arg::forOwned(arg));
