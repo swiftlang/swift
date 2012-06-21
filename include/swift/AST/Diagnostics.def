@@ -783,6 +783,9 @@ ERROR(field_number_too_large,sema_tce,none,
       "field number is too large for tuple", ())
 ERROR(no_valid_dot_expression,sema_tce,none,
       "base type %0 has no valid '.' expression for this field", (Type))
+ERROR(member_ref_metatype_variable,sema_tce,none,
+      "reference to member variable %0 requires base object of type %1",
+      (Identifier, Type))
 ERROR(no_convert_object_arg,sema_tca,none,
       "cannot convert object argument %0 to type %1", (Type, Type))
 ERROR(constructor_overload_fail,sema_tce,none,

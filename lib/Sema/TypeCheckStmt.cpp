@@ -616,7 +616,8 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
                   UDRE->getRefKind() == DeclRefKind::PrefixOperator ? 1 : 2);
       return new (TC.Context) ErrorExpr(Loc);
     }
-    return OverloadedDeclRefExpr::createWithCopy(ResultValues, Loc);
+
+    return TC.buildRefExpr(ResultValues, Loc);
   }
 
   ResultValues.clear();
@@ -651,8 +652,7 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
   if (AllMemberRefs) {
     Expr *BaseExpr = new (TC.Context) DeclRefExpr(Base, Loc,
                                                   Base->getTypeOfReference());
-    return OverloadedMemberRefExpr::createWithCopy(BaseExpr, SourceLoc(),
-                                                   ResultValues, Loc);
+    return TC.buildMemberRefExpr(BaseExpr, SourceLoc(), ResultValues, Loc);
   }
 
   llvm_unreachable("Can't represent lookup result");

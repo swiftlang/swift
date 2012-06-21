@@ -325,13 +325,6 @@ public:
   /// concrete base object (which is not a metatype).
   bool hasBaseObject() const;
 
-  /// createFilteredWithCopy - Given a subset of the declarations in the given
-  /// overloaded reference expression, return a new expression of the same
-  /// form but with the restricted set of declarations. This is equivalent
-  /// to calling createWithCopy() on the appropriate subclass of
-  /// OverloadSetRefExpr with arguments derived from the current expression.
-  Expr *createFilteredWithCopy(ArrayRef<ValueDecl *> Decls);
-  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const OverloadSetRefExpr *) { return true; }
   static bool classof(const Expr *E) {

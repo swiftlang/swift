@@ -518,8 +518,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
         return new (Context) ConstructExpr(Ty, E1->getStartLoc(), CD, E2);
       }
       if (Best) {
-        E1 = OverloadedDeclRefExpr::createWithCopy(Ctors.Results,
-                                                   E1->getStartLoc());
+        E1 = buildRefExpr(Ctors.Results, E1->getStartLoc());
         E->setFn(E1);
         return semaApplyExpr(E);
       }    
@@ -1098,6 +1097,10 @@ Expr *TypeChecker::buildArrayInjectionFnRef(ArraySliceType *sliceType,
 
 
 Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
+  // If we already diagnosed this as an error, don't complain again.
+  if (E->getType() && E->getType()->is<ErrorType>())
+    return nullptr;
+
   Expr *Base = E->getBase();
   Type BaseTy = Base->getType();
   Identifier MemberName = E->getName();

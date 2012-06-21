@@ -24,11 +24,12 @@
 using namespace swift;
 
 void
-PrintLiteralString(StringRef Str, ASTContext &Context, SourceLoc Loc,
+PrintLiteralString(StringRef Str, TypeChecker &TC, SourceLoc Loc,
                    SmallVectorImpl<ValueDecl*> &PrintDecls,
                    SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent) {
+  ASTContext &Context = TC.Context;
   Expr *PrintStr = new (Context) StringLiteralExpr(Str, Loc);
-  Expr *PrintStrFn = OverloadedDeclRefExpr::createWithCopy(PrintDecls, Loc);
+  Expr *PrintStrFn = TC.buildRefExpr(PrintDecls, Loc);
   BodyContent.push_back(new (Context) CallExpr(PrintStrFn, PrintStr));
 }
 
@@ -43,7 +44,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
 
   if (TupleType *TT = dyn_cast<TupleType>(T)) {
     // We print a tuple by printing each element.
-    PrintLiteralString("(", Context, Loc, PrintDecls, BodyContent);
+    PrintLiteralString("(", TC, Loc, PrintDecls, BodyContent);
 
     for (unsigned i = 0, e = TT->getFields().size(); i < e; ++i) {
       MemberIndexes.push_back(i);
@@ -53,10 +54,10 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
       MemberIndexes.pop_back();
 
       if (i + 1 != e)
-        PrintLiteralString(", ", Context, Loc, PrintDecls, BodyContent);
+        PrintLiteralString(", ", TC, Loc, PrintDecls, BodyContent);
     }
 
-    PrintLiteralString(")", Context, Loc, PrintDecls, BodyContent);
+    PrintLiteralString(")", TC, Loc, PrintDecls, BodyContent);
     return;
   }
 
@@ -96,9 +97,9 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
 
   if (StructType *ST = dyn_cast<StructType>(T)) {
     // We print a struct by printing each non-property member variable.
-    PrintLiteralString(ST->getDecl()->getName().str(), Context, Loc,
+    PrintLiteralString(ST->getDecl()->getName().str(), TC, Loc,
                        PrintDecls, BodyContent);
-    PrintLiteralString("(", Context, Loc, PrintDecls, BodyContent);
+    PrintLiteralString("(", TC, Loc, PrintDecls, BodyContent);
 
     unsigned idx = 0;
     bool isFirstMember = true;
@@ -108,7 +109,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
           if (isFirstMember)
             isFirstMember = false;
           else
-            PrintLiteralString(", ", Context, Loc, PrintDecls, BodyContent);
+            PrintLiteralString(", ", TC, Loc, PrintDecls, BodyContent);
 
           MemberIndexes.push_back(idx);
           CanType SubType = VD->getType()->getCanonicalType();
@@ -119,7 +120,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
       }
       ++idx;
     }
-    PrintLiteralString(")", Context, Loc, PrintDecls, BodyContent);
+    PrintLiteralString(")", TC, Loc, PrintDecls, BodyContent);
     return;
   }
 
@@ -128,7 +129,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
   // FIXME: We should handle OneOfTypes at some point, but
   // it's tricky to represent in the AST without a "match" statement.
 
-  PrintLiteralString("<unprintable value>", Context, Loc, PrintDecls,
+  PrintLiteralString("<unprintable value>", TC, Loc, PrintDecls,
                      BodyContent);
 }
 
@@ -177,11 +178,11 @@ void TypeChecker::typeCheckTopLevelReplExpr(Expr *&E, TopLevelCodeDecl *TLCD) {
 
   // Printing format is "Int = 0\n".
   auto TypeStr = Context.getIdentifier(E->getType()->getString()).str();
-  PrintLiteralString(TypeStr, Context, Loc, PrintDecls, BodyContent);
-  PrintLiteralString(" = ", Context, Loc, PrintDecls, BodyContent);
+  PrintLiteralString(TypeStr, *this, Loc, PrintDecls, BodyContent);
+  PrintLiteralString(" = ", *this, Loc, PrintDecls, BodyContent);
   PrintReplExpr(*this, Arg, T, Loc, EndLoc, MemberIndexes, BodyContent,
                 PrintDecls);
-  PrintLiteralString("\n", Context, Loc, PrintDecls, BodyContent);
+  PrintLiteralString("\n", *this, Loc, PrintDecls, BodyContent);
 
   // Typecheck the function.
   BraceStmt *Body = BraceStmt::create(Context, Loc, BodyContent, EndLoc);
@@ -197,17 +198,18 @@ struct PatternBindingPrintLHS : public ASTVisitor<PatternBindingPrintLHS> {
   SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent;
   SmallVectorImpl<ValueDecl*> &PrintDecls;
   SourceLoc Loc;
+  TypeChecker &TC;
   ASTContext &Context;
 
   PatternBindingPrintLHS(SmallVectorImpl<BraceStmt::ExprStmtOrDecl>&BodyContent,
                          SmallVectorImpl<ValueDecl*> &PrintDecls,
                          SourceLoc Loc,
-                         ASTContext &Context)
+                         TypeChecker &TC)
     : BodyContent(BodyContent), PrintDecls(PrintDecls), Loc(Loc),
-      Context(Context) {}
+      TC(TC), Context(TC.Context) {}
 
   void print(StringRef Str) {
-    PrintLiteralString(Str, Context, Loc, PrintDecls, BodyContent);
+    PrintLiteralString(Str, TC, Loc, PrintDecls, BodyContent);
   }
 
   void visitTuplePattern(TuplePattern *P) {
@@ -272,16 +274,16 @@ void TypeChecker::REPLCheckPatternBinding(PatternBindingDecl *D) {
   
   // Fill in body of function.
   SmallVector<BraceStmt::ExprStmtOrDecl, 4> BodyContent;
-  PatternBindingPrintLHS PatPrinter(BodyContent, PrintDecls, Loc, Context);
+  PatternBindingPrintLHS PatPrinter(BodyContent, PrintDecls, Loc, *this);
   PatPrinter.visit(D->getPattern());
-  PrintLiteralString(" : ", Context, Loc, PrintDecls, BodyContent);
+  PrintLiteralString(" : ", *this, Loc, PrintDecls, BodyContent);
   auto TypeStr = Context.getIdentifier(E->getType()->getString()).str();
-  PrintLiteralString(TypeStr, Context, Loc, PrintDecls, BodyContent);
-  PrintLiteralString(" = ", Context, Loc, PrintDecls, BodyContent);
+  PrintLiteralString(TypeStr, *this, Loc, PrintDecls, BodyContent);
+  PrintLiteralString(" = ", *this, Loc, PrintDecls, BodyContent);
   SmallVector<unsigned, 4> MemberIndexes;
   PrintReplExpr(*this, Arg, T, Loc, EndLoc, MemberIndexes, BodyContent,
                 PrintDecls);
-  PrintLiteralString("\n", Context, Loc, PrintDecls, BodyContent);
+  PrintLiteralString("\n", *this, Loc, PrintDecls, BodyContent);
   Expr *ArgRef = new (Context) DeclRefExpr(Arg, Loc, Arg->getTypeOfReference());
   BodyContent.push_back(new (Context) ReturnStmt(Loc, ArgRef));
 

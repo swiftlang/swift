@@ -179,17 +179,6 @@ bool OverloadSetRefExpr::hasBaseObject() const {
   return false;
 }
 
-Expr *OverloadSetRefExpr::createFilteredWithCopy(ArrayRef<ValueDecl *> Decls) {
-  if (OverloadedDeclRefExpr *DRE = dyn_cast<OverloadedDeclRefExpr>(this))
-    return OverloadedDeclRefExpr::createWithCopy(Decls, DRE->getLoc());
-  if (OverloadedMemberRefExpr *DRE = dyn_cast<OverloadedMemberRefExpr>(this))
-    return OverloadedMemberRefExpr::createWithCopy(DRE->getBase(),
-                                                   DRE->getDotLoc(), Decls,
-                                                   DRE->getMemberLoc());
-  
-  llvm_unreachable("Unhandled overloaded set reference expression");
-}
-
 /// createWithCopy - Create and return a new OverloadedDeclRefExpr or a new
 /// DeclRefExpr (if the list of decls has a single entry) from the specified
 /// (non-empty) list of decls.  If we end up creating an overload set, this

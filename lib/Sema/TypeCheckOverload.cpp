@@ -142,8 +142,16 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
 
 Expr *TypeChecker::buildFilteredOverloadSet(OverloadSetRefExpr *OSE,
                                             ArrayRef<ValueDecl *> Remaining) {
-  assert(!Remaining.empty() && "Cannot handle empty overload set");
-  return recheckTypes(OSE->createFilteredWithCopy(Remaining));
+  Expr *result;
+  if (auto DRE = dyn_cast<OverloadedDeclRefExpr>(OSE))
+    result = buildRefExpr(Remaining, DRE->getLoc());
+  else {
+    auto MRE = cast<OverloadedMemberRefExpr>(OSE);
+    result = buildMemberRefExpr(MRE->getBase(), MRE->getDotLoc(),
+                                Remaining, MRE->getMemberLoc());
+  }
+
+  return recheckTypes(result);
 }
 
 Expr *TypeChecker::buildFilteredOverloadSet(OverloadSetRefExpr *OSE,
@@ -151,3 +159,98 @@ Expr *TypeChecker::buildFilteredOverloadSet(OverloadSetRefExpr *OSE,
   llvm::SmallVector<ValueDecl *, 1> Remaining(1, Best);
   return buildFilteredOverloadSet(OSE, ArrayRef<ValueDecl *>(&Best, 1));
 }
+
+Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc,
+                                bool DeclArrayInASTContext) {
+  assert(!Decls.empty() && "Must have at least one declaration");
+
+  if (Decls.size() == 1) {
+    return new (Context) DeclRefExpr(Decls[0], NameLoc,
+                                     Decls[0]->getTypeOfReference());
+  }
+
+  // If the declaration array isn't already in the AST context, copy it there.
+  if (!DeclArrayInASTContext)
+    Decls = Context.AllocateCopy(Decls);
+
+  return new (Context) OverloadedDeclRefExpr(Decls, NameLoc,
+                         UnstructuredUnresolvedType::get(Context));
+}
+
+Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
+                                      ArrayRef<ValueDecl *> Decls,
+                                      SourceLoc MemberLoc,
+                                      bool DeclArrayInASTContext) {
+  assert(!Decls.empty() && "Must have at least one declaration");
+  
+  // Figure out the actual base type, and whether we have an instance of that
+  // type or its metatype.
+  Type baseTy = Base->getType()->getRValueType();
+  bool baseIsInstance = true;
+  if (auto baseMeta = baseTy->getAs<MetaTypeType>()) {
+    baseIsInstance = false;
+    baseTy = baseMeta->getTypeDecl()->getDeclaredType();
+  }
+
+  // Check whether the first declaration is valid. If it is, they're all
+  // potential candidates, because we don't allow overloading across different
+  // classes of entities (e.g., variables and types cannot be overloaded).
+  // If not, complain now.
+  if (!baseIsInstance && isa<VarDecl>(Decls[0])) {
+    diagnose(MemberLoc, diag::member_ref_metatype_variable,
+             Decls[0]->getName(), baseTy);
+    diagnose(Decls[0]->getLoc(), diag::decl_declared_here, Decls[0]->getName());
+
+    Expr *BadExpr = new (Context) UnresolvedDotExpr(Base, DotLoc,
+                                                    Decls[0]->getName(),
+                                                    MemberLoc);
+    BadExpr->setType(ErrorType::get(Context));
+    return BadExpr;
+  }
+
+  // If we have a single declaration, build an AST for it.
+  if (Decls.size() == 1) {
+    Type BaseTy = Base->getType()->getRValueType();
+    ValueDecl *Member = Decls[0];
+
+    // Okay to refer to the member of an existential type.
+    // FIXME: ExistentialMemberRefExpr needs to cope with a base of metatype
+    // type.
+    if (BaseTy->isExistentialType()) {
+      return new (Context) ExistentialMemberRefExpr(Base, DotLoc, Member,
+                                                    MemberLoc);
+    }
+
+    // Okay to refer to a member of an archetype.
+    if (BaseTy->is<ArchetypeType>()) {
+      return new (Context) ArchetypeMemberRefExpr(Base, DotLoc, Member,
+                                                  MemberLoc);
+    }
+
+    // Refer to a member variable of an instance.
+    if (auto Var = dyn_cast<VarDecl>(Member)) {
+      assert(baseIsInstance && "Referencing variable of metatype!");
+      return new (Context) MemberRefExpr(Base, DotLoc, Var, MemberLoc);
+    }
+
+    Expr *Ref = new (Context) DeclRefExpr(Member, MemberLoc,
+                                          Member->getTypeOfReference());
+
+    // Refer to a non-static member function that binds 'this':
+    if (baseIsInstance && Member->isInstanceMember()) {
+      return new (Context) DotSyntaxCallExpr(Ref, DotLoc, Base);
+    }
+
+    // FIXME: If metatype types ever get a runtime representation, we'll need
+    // to evaluate the object.
+    return new (Context) DotSyntaxBaseIgnoredExpr(Base, DotLoc, Ref);
+  }
+
+  // We have multiple declarations. Build an overloaded member reference.
+  if (!DeclArrayInASTContext)
+    Decls = Context.AllocateCopy(Decls);
+  return new (Context) OverloadedMemberRefExpr(Base, DotLoc, Decls, MemberLoc,
+                         UnstructuredUnresolvedType::get(Context));
+}
+
+
