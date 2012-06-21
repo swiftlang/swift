@@ -345,18 +345,6 @@ public:
   SourceLoc getLoc() const { return Loc; }
   SourceRange getSourceRange() const { return Loc; }
 
-  /// createWithCopy - Create and return a new OverloadedDeclRefExpr or a new
-  /// DeclRefExpr (if the list of decls has a single entry) from the specified
-  /// (non-empty) list of decls.  If we end up creating an overload set, this
-  /// method handles copying the list of decls into ASTContext memory.
-  static Expr *createWithCopy(ArrayRef<ValueDecl*> Decls, SourceLoc Loc);
-  
-  template <typename T>
-  static Expr *createWithCopy(ArrayRef<T*> Decls, SourceLoc Loc) {
-    llvm::SmallVector<ValueDecl*, 4> ValueDecls(Decls.begin(), Decls.end());
-    return createWithCopy(ValueDecls, Loc);
-  }
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const OverloadedDeclRefExpr *) { return true; }
   static bool classof(const Expr *E) {
@@ -392,15 +380,6 @@ public:
   SourceRange getSourceRange() const {
     return SourceRange(getStartLoc(), MemberLoc);
   }
-
-  /// createWithCopy - Create and return a new OverloadedMemberRefExpr or a new
-  /// DotSyntaxCallExpr (if the list of decls has a single entry) from the
-  /// specified (non-empty) list of decls and with the given base.  If we end up
-  /// creating an overload set, this method handles copying the list of decls
-  /// into ASTContext memory.
-  static Expr *createWithCopy(Expr *Base, SourceLoc DotLoc,
-                              ArrayRef<ValueDecl*> Decls,
-                              SourceLoc MemberLoc);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const OverloadedMemberRefExpr *) { return true; }

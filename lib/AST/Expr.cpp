@@ -179,67 +179,6 @@ bool OverloadSetRefExpr::hasBaseObject() const {
   return false;
 }
 
-/// createWithCopy - Create and return a new OverloadedDeclRefExpr or a new
-/// DeclRefExpr (if the list of decls has a single entry) from the specified
-/// (non-empty) list of decls.  If we end up creating an overload set, this
-/// method handles copying the list of decls into ASTContext memory.
-Expr *OverloadedDeclRefExpr::createWithCopy(ArrayRef<ValueDecl*> Decls,
-                                            SourceLoc Loc) {
-  assert(!Decls.empty() &&
-         "Cannot create a decl ref with an empty list of decls");
-  ASTContext &C = Decls[0]->getASTContext();
-  if (Decls.size() == 1)
-    return new (C) DeclRefExpr(Decls[0], Loc, Decls[0]->getTypeOfReference());
-  
-  // Otherwise, copy the overload set into ASTContext memory and return the
-  // overload set.
-  return new (C) OverloadedDeclRefExpr(C.AllocateCopy(Decls), Loc,
-                                       UnstructuredUnresolvedType::get(C));
-}
-
-Expr *OverloadedMemberRefExpr::createWithCopy(Expr *Base, SourceLoc DotLoc,
-                                              ArrayRef<ValueDecl*> Decls,
-                                              SourceLoc MemberLoc) {
-  assert(!Decls.empty() &&
-         "Cannot create an overloaded member ref with no decls");
-  ASTContext &C = Decls[0]->getASTContext();
-
-  if (Decls.size() == 1) {
-    Type BaseTy = Base->getType()->getRValueType();
-    if (BaseTy->isExistentialType()) {
-      return new (C) ExistentialMemberRefExpr(Base, DotLoc, Decls[0],
-                                              MemberLoc);
-    }
-    if (BaseTy->is<ArchetypeType>()) {
-      return new (C) ArchetypeMemberRefExpr(Base, DotLoc, Decls[0], MemberLoc);
-    }
-    
-    Expr *Fn = new (C) DeclRefExpr(Decls[0], MemberLoc,
-                                   Decls[0]->getTypeOfReference());
-    // FIXME: If metatype types ever get a runtime representation, we'll need
-    // to evaluate the object.
-    if (Decls[0]->isInstanceMember() &&
-        !Base->getType()->is<MetaTypeType>()) {
-      if (isa<FuncDecl>(Decls[0]))
-        return new (C) DotSyntaxCallExpr(Fn, DotLoc, Base);
-      
-      VarDecl *Var = cast<VarDecl>(Decls[0]);
-      return new (C) MemberRefExpr(Base, DotLoc, Var, MemberLoc);
-    }
-
-    if (Decls[0]->isInstanceMember() && !isa<FuncDecl>(Decls[0]))
-      return new (C) UnresolvedDotExpr(Base, DotLoc, Decls[0]->getName(),
-                                       MemberLoc);
-
-    return new (C) DotSyntaxBaseIgnoredExpr(Base, DotLoc, Fn);
-  }
-  
-  // Otherwise, copy the overload set into the ASTContext's memory.
-  return new (C) OverloadedMemberRefExpr(Base, DotLoc, C.AllocateCopy(Decls),
-                                         MemberLoc,
-                                         UnstructuredUnresolvedType::get(C));
-}
-
 SequenceExpr *SequenceExpr::create(ASTContext &ctx, ArrayRef<Expr*> elements) {
   void *Buffer = ctx.Allocate(sizeof(SequenceExpr) +
                               elements.size() * sizeof(Expr*),
