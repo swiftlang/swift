@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/NameLookup.h"
 using namespace swift;
 
 static Identifier getFirstOverloadedIdentifier(const Expr *Fn) {
@@ -210,19 +211,18 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
 
   // If we have a single declaration, build an AST for it.
   if (Decls.size() == 1) {
-    Type BaseTy = Base->getType()->getRValueType();
     ValueDecl *Member = Decls[0];
 
     // Okay to refer to the member of an existential type.
     // FIXME: ExistentialMemberRefExpr needs to cope with a base of metatype
     // type.
-    if (BaseTy->isExistentialType()) {
+    if (baseTy->isExistentialType()) {
       return new (Context) ExistentialMemberRefExpr(Base, DotLoc, Member,
                                                     MemberLoc);
     }
 
     // Okay to refer to a member of an archetype.
-    if (BaseTy->is<ArchetypeType>()) {
+    if (baseTy->is<ArchetypeType>()) {
       return new (Context) ArchetypeMemberRefExpr(Base, DotLoc, Member,
                                                   MemberLoc);
     }
@@ -253,4 +253,72 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
                          UnstructuredUnresolvedType::get(Context));
 }
 
+static Type makeSimilarLValue(Type objectType, Type lvalueType,
+                              ASTContext &Context) {
+  LValueType::Qual qs = cast<LValueType>(lvalueType)->getQualifiers();
+  return LValueType::get(objectType, qs, Context);
+}
+
+static Expr *buildTupleElementExpr(Expr *Base, SourceLoc DotLoc,
+                                   SourceLoc NameLoc, unsigned FieldIndex,
+                                   ASTContext &Context) {
+  Type BaseTy = Base->getType();
+  bool IsLValue = false;
+  if (LValueType *LV = BaseTy->getAs<LValueType>()) {
+    IsLValue = true;
+    BaseTy = LV->getObjectType();
+  }
+  
+  Type FieldType = BaseTy->castTo<TupleType>()->getElementType(FieldIndex);
+  if (IsLValue)
+    FieldType = makeSimilarLValue(FieldType, Base->getType(), Context);
+  
+  if (DotLoc.isValid())
+    return new (Context) SyntacticTupleElementExpr(Base, DotLoc, FieldIndex,
+                                                   NameLoc, FieldType);
+  
+  return new (Context) ImplicitThisTupleElementExpr(Base, FieldIndex, NameLoc,
+                                                    FieldType);
+}
+
+Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
+                                      MemberLookup &Results,
+                                      SourceLoc MemberLoc) {
+  assert(Results.isSuccess() && "Cannot build non-successful member reference");
+
+  // If we found a tuple element, check it.
+  if (Results.Results[0].Kind == MemberLookupResult::TupleElement) {
+    assert(Results.Results.size() == 1 && "Duplicate tuple element results");
+
+    Type baseTy = Base->getType()->getRValueType();
+    bool baseIsInstance = true;
+    if (auto baseMeta = baseTy->getAs<MetaTypeType>()) {
+      baseIsInstance = false;
+      baseTy = baseMeta->getTypeDecl()->getDeclaredType();
+    }
+
+    if (!baseIsInstance) {
+      diagnose(MemberLoc, diag::member_ref_metatype_tuple,
+               Results.getMemberName(), baseTy);
+      
+      Expr *BadExpr = new (Context) UnresolvedDotExpr(Base, DotLoc,
+                                                      Results.getMemberName(),
+                                                      MemberLoc);
+      BadExpr->setType(ErrorType::get(Context));
+      return BadExpr;
+    }
+
+    return buildTupleElementExpr(Base, DotLoc, MemberLoc,
+                                 Results.Results[0].TupleFieldNo,Context);
+  }
+
+  // If we have an ambiguous result, build an overload set.
+  SmallVector<ValueDecl*, 8> ResultSet;
+  for (MemberLookupResult X : Results.Results) {
+    assert(X.Kind != MemberLookupResult::TupleElement);
+    ResultSet.push_back(X.D);
+  }
+
+  return buildMemberRefExpr(Base, DotLoc, ResultSet, MemberLoc);
+}
 

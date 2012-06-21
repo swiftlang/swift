@@ -251,7 +251,7 @@ public:
     }
     
     // Form base.name
-    Expr *Mem = Lookup.createResultAST(Base, Loc, Loc, TC.Context);
+    Expr *Mem = TC.buildMemberRefExpr(Base, Loc, Lookup, Loc);
     Mem = TC.recheckTypes(Mem);
     if (!Mem) return nullptr;
     

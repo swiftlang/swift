@@ -1138,8 +1138,8 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
   if (!Base->getType()->is<LValueType>())
     Base = convertToMaterializable(Base);
 
-  return recheckTypes(Lookup.createResultAST(Base, E->getDotLoc(),
-                                             E->getNameLoc(), Context));
+  return recheckTypes(buildMemberRefExpr(Base, E->getDotLoc(), Lookup,
+                                         E->getNameLoc()));
 }
 
 

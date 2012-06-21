@@ -140,10 +140,8 @@ public:
   /// isSuccess - Return true if anything was found by the name lookup.
   bool isSuccess() const { return !Results.empty(); }
   
-  /// createResultAST - Build an AST to represent this lookup, with the
-  /// specified base expression.
-  Expr *createResultAST(Expr *Base, SourceLoc DotLoc, SourceLoc NameLoc,
-                        ASTContext &Context);
+  /// getMemberName - Retrieve the name of the member this lookup searched for.
+  Identifier getMemberName() const { return MemberName; }
   
 private:
   Identifier MemberName;

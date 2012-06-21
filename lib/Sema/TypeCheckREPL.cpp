@@ -80,8 +80,8 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
       ArgRef = new (Context) SyntacticTupleElementExpr(ArgRef, Loc, i, Loc,
                                                        TT->getElementType(i));
     }
-    Expr *Res = TC.recheckTypes(Lookup.createResultAST(ArgRef, Loc, EndLoc,
-                                                       Context));
+    Expr *Res = TC.recheckTypes(TC.buildMemberRefExpr(ArgRef, Loc, Lookup,
+                                                      EndLoc));
     if (!Res)
       return;
     TupleExpr *CallArgs =

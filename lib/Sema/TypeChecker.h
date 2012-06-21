@@ -22,6 +22,7 @@
 
 namespace swift {
 
+class MemberLookup;
 class TypeChecker;
 
 /// CoercionResult - Describes the result of attempting to coerce an
@@ -276,6 +277,12 @@ public:
                            ArrayRef<ValueDecl *> Decls,
                            SourceLoc MemberLoc,
                            bool DeclArrayInASTContext = false);
+
+  /// \brief Build a reference to a member of the given base expression,
+  /// given the results of a successful member lookup.
+  Expr *buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
+                           MemberLookup &Results,
+                           SourceLoc NameLoc);
   /// @}
 
   /// \brief Retrieve the Enumerable protocol declaration, if it exists.
