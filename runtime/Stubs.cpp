@@ -93,7 +93,7 @@ extern "C" bool _TNSs4Bool13getLogicValuefRS_FT_i1(bool* b) {
 // FIXME: load_protocol and store_protocol are extremely ugly hacks.
 struct protocol {
   void **witness_table;
-  char buffer[16];
+  char buffer[24];
 };
 
 extern "C"
