@@ -1095,6 +1095,12 @@ Expr *TypeChecker::buildArrayInjectionFnRef(ArraySliceType *sliceType,
   return coerceToType(injectionFn, fnTy);
 }
 
+static Type makeSimilarLValue(Type objectType, Type lvalueType,
+                              ASTContext &Context) {
+  LValueType::Qual qs = cast<LValueType>(lvalueType)->getQualifiers();
+  return LValueType::get(objectType, qs, Context);
+}
+
 
 Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
   // If we already diagnosed this as an error, don't complain again.
@@ -1113,6 +1119,34 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
   if (BaseTy->is<ErrorType>())
     return 0;  // Squelch an erroneous subexpression.
 
+  if (TupleType *TT = BaseTy->getRValueType()->getAs<TupleType>()) {
+    // Try to look up the field by name; if that doesn't work, look for a
+    // numbered field.
+    int FieldNo = TT->getNamedElementId(MemberName);
+    if (FieldNo == -1) {
+      StringRef NameStr = MemberName.str();
+      if (NameStr.startswith("$")) {
+        unsigned Value = 0;
+        if (!NameStr.substr(1).getAsInteger(10, Value) &&
+            Value < TT->getFields().size())
+          FieldNo = Value;
+      }
+    }
+    if (FieldNo == -1) {
+      // FIXME: This diagnostic is a bit painful.
+      diagnose(E->getDotLoc(), diag::no_valid_dot_expression, BaseTy)
+        << Base->getSourceRange() << SourceRange(E->getNameLoc());
+      return 0;
+    }
+
+    Type FieldType = TT->getElementType(FieldNo);
+    if (BaseTy->is<LValueType>())
+      FieldType = makeSimilarLValue(FieldType, Base->getType(), Context);
+
+    return new (Context) TupleElementExpr(Base, E->getDotLoc(), FieldNo,
+                                          E->getNameLoc(), FieldType);
+  }
+
   // Perform name lookup.
   MemberLookup Lookup(BaseTy, MemberName, TU);
   
@@ -1126,8 +1160,7 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
   bool IsMetatypeBase = Base->getType()->is<MetaTypeType>();
   if (IsMetatypeBase && Lookup.Results.size() == 1) {
     MemberLookupResult R = Lookup.Results[0];
-    if (R.Kind == MemberLookupResult::TupleElement ||
-        R.Kind == MemberLookupResult::MemberProperty) {
+    if (R.Kind == MemberLookupResult::MemberProperty) {
       diagnose(E->getNameLoc(), diag::no_valid_dot_expression, Base->getType());
       return 0;
     }

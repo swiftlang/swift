@@ -239,14 +239,12 @@ public:
     }
     
     // Make sure we found a function (which may be overloaded, of course).
-    if (Lookup.Results.front().Kind == MemberLookupResult::TupleElement ||
-        !isa<FuncDecl>(Lookup.Results.front().D)) {
+    if (!isa<FuncDecl>(Lookup.Results.front().D)) {
       TC.diagnose(Loc, NonFuncMember, BaseType)
         << Base->getSourceRange();
-      if (!Lookup.Results.front().Kind == MemberLookupResult::TupleElement)
-        TC.diagnose(Lookup.Results.front().D->getStartLoc(),
-                    diag::decl_declared_here,
-                    Lookup.Results.front().D->getName());
+      TC.diagnose(Lookup.Results.front().D->getStartLoc(),
+                  diag::decl_declared_here,
+                  Lookup.Results.front().D->getName());
       return nullptr;
     }
     

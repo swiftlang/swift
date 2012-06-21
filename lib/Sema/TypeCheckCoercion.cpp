@@ -660,18 +660,13 @@ SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralType LitTy) {
 
   if (Lookup.Results.size() != 1) {
     diagnose(Loc, diag::type_ambiguous_literal_conversion, Ty, MethodName);
-    for (MemberLookupResult Res : Lookup.Results) {
-      assert(Res.Kind != MemberLookupResult::TupleElement &&
-             "Unexpected lookup result in non-tuple");
+    for (MemberLookupResult Res : Lookup.Results)
       diagnose(Res.D->getLoc(), diag::found_candidate);
-    }
     return std::pair<FuncDecl*, Type>();
   }
   
   // Verify that the implementation is a metatype 'static' func.
   MemberLookupResult LookupResult = Lookup.Results[0];
-  assert(LookupResult.Kind != MemberLookupResult::TupleElement &&
-         "Unexpected lookup result in non-tuple");
   if (LookupResult.Kind != MemberLookupResult::MetatypeMember ||
       !isa<FuncDecl>(LookupResult.D)) {
     diagnose(LookupResult.D->getLoc(), diag::type_literal_conversion_not_static,
@@ -896,7 +891,6 @@ CoercedResult SemaCoerce::tryUserConversion(Expr *E) {
     case MemberLookupResult::MemberProperty:
     case MemberLookupResult::MetatypeMember:
     case MemberLookupResult::MetaArchetypeMember:
-    case MemberLookupResult::TupleElement:
     case MemberLookupResult::ExistentialMember:  // FIXME: Should work?
     case MemberLookupResult::ArchetypeMember:    // FIXME: Should work?
       continue;

@@ -786,9 +786,6 @@ ERROR(no_valid_dot_expression,sema_tce,none,
 ERROR(member_ref_metatype_variable,sema_tce,none,
       "reference to member variable %0 requires base object of type %1",
       (Identifier, Type))
-ERROR(member_ref_metatype_tuple,sema_tce,none,
-      "reference to element %0 requires base object of tuple type %1",
-      (Identifier, Type))
 ERROR(no_convert_object_arg,sema_tca,none,
       "cannot convert object argument %0 to type %1", (Type, Type))
 ERROR(constructor_overload_fail,sema_tce,none,

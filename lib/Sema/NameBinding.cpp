@@ -283,8 +283,7 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC,
         }
 
         MemberLookup ML(TD->getDeclaredType(), C.Id, *TU);
-        if (ML.Results.size() == 1 && ML.Results.back().hasDecl() &&
-            isa<TypeDecl>(ML.Results.back().D))
+        if (ML.Results.size() == 1 && isa<TypeDecl>(ML.Results.back().D))
           C.Value = cast<TypeDecl>(ML.Results.back().D);
       }
     } else {

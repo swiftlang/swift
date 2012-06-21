@@ -34,11 +34,8 @@ namespace swift {
 
 /// MemberLookupResult - One result of member name lookup.
 struct MemberLookupResult {
-  /// D - The decl found or tuple element referenced.
-  union {
-    ValueDecl *D;
-    unsigned TupleFieldNo;
-  };
+  /// D - The decl found.
+  ValueDecl *D;
 
   /// Kind - The kind of reference.
   enum KindTy {
@@ -55,9 +52,6 @@ struct MemberLookupResult {
     /// metatype "A". "a.x" is equivalent to "A.x", where "A' is the
     /// metatype of the type of "a"; the base is evaluated and ignored.
     MetatypeMember,
-
-    /// TupleElement - "a.x" is a direct reference to a field of a tuple.
-    TupleElement,
     
     /// ExistentialMember - "a.x" refers to a member of an existential type.
     ExistentialMember,
@@ -91,12 +85,6 @@ struct MemberLookupResult {
     R.Kind = MetatypeMember;
     return R;
   }
-  static MemberLookupResult getTupleElement(unsigned Elt) {
-    MemberLookupResult R;
-    R.TupleFieldNo = Elt;
-    R.Kind = TupleElement;
-    return R;
-  }
   static MemberLookupResult getExistentialMember(ValueDecl *D) {
     MemberLookupResult R;
     R.D = D;
@@ -116,9 +104,6 @@ struct MemberLookupResult {
     R.Kind = MetaArchetypeMember;
     return R;
   }
-
-  /// \brief Determine whether this result has a declaration.
-  bool hasDecl() const { return Kind != TupleElement; }
 };
   
 /// MemberLookup - This class implements and represents the result of performing

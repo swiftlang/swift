@@ -500,20 +500,12 @@ public:
   void visitModuleExpr(ModuleExpr *E) {
     printCommon(E, "module_expr") << ')';
   }
-  void visitSyntacticTupleElementExpr(TupleElementExpr *E) {
-    printCommon(E, "syntactic_tuple_element_expr")
+  void visitTupleElementExpr(TupleElementExpr *E) {
+    printCommon(E, "tuple_element_expr")
       << " field #" << E->getFieldNumber() << '\n';
     printRec(E->getBase());
     OS << ')';
   }
-  void visitImplicitThisTupleElementExpr(TupleElementExpr *E) {
-    printCommon(E, "implicit_this_tuple_element_expr")
-    << " field #" << E->getFieldNumber() << '\n';
-    printRec(E->getBase());
-    OS << ')';
-  }
-  
-
   void visitTupleShuffleExpr(TupleShuffleExpr *E) {
     printCommon(E, "tuple_shuffle_expr") << " elements=[";
     for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {

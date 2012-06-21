@@ -912,18 +912,19 @@ public:
 };
 
 
-/// TupleElementExpr - Common base class of syntactic forms that access tuple
-/// elements.
+/// TupleElementExpr - Refer to an element of a tuple,
+/// e.g. "(1,field=2).field".
 class TupleElementExpr : public Expr {
   Expr *SubExpr;
   SourceLoc NameLoc;
   unsigned FieldNo;
-  
-protected:
-  TupleElementExpr(ExprKind Kind, Expr *SubExpr, unsigned FieldNo,
-                   SourceLoc NameLoc, Type Ty)
-    : Expr(Kind, Ty), SubExpr(SubExpr), NameLoc(NameLoc), FieldNo(FieldNo) {}
+  SourceLoc DotLoc;
+
 public:
+  TupleElementExpr(Expr *SubExpr, SourceLoc DotLoc, unsigned FieldNo,
+                   SourceLoc NameLoc, Type Ty)
+    : Expr(ExprKind::TupleElement, Ty), SubExpr(SubExpr),
+      NameLoc(NameLoc), FieldNo(FieldNo), DotLoc(DotLoc) {}
 
   SourceLoc getLoc() const { return NameLoc; }
   Expr *getBase() const { return SubExpr; }
@@ -931,64 +932,17 @@ public:
 
   unsigned getFieldNumber() const { return FieldNo; }
   SourceLoc getNameLoc() const { return NameLoc; }  
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TupleElementExpr *) { return true; }
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::SyntacticTupleElement ||
-           E->getKind() == ExprKind::ImplicitThisTupleElement;
-  }
-};
-  
-  
-/// SyntacticTupleElementExpr - Dot syntact used to refer to an element of a tuple,
-/// e.g. "(1,field=2).field".
-class SyntacticTupleElementExpr : public TupleElementExpr {
-  SourceLoc DotLoc;
-public:
-  SourceLoc getDotLoc() const { return DotLoc; }
 
   SourceRange getSourceRange() const { 
     return SourceRange(getBase()->getStartLoc(), getNameLoc());
   }
 
-  SyntacticTupleElementExpr(Expr *SubExpr, SourceLoc DotLoc,
-                            unsigned FieldNo, SourceLoc NameLoc, Type Ty)
-    : TupleElementExpr(ExprKind::SyntacticTupleElement, SubExpr, FieldNo,
-                       NameLoc, Ty),
-      DotLoc(DotLoc) {}
-
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const SyntacticTupleElementExpr *) { return true; }
+  static bool classof(const TupleElementExpr *) { return true; }
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::SyntacticTupleElement;
+    return E->getKind() == ExprKind::TupleElement;
   }
 };
-
-/// ImplicitThisTupleElementExpr - Reference to a tuple element inside of a
-/// context that has an implicit this member.  We represent the AST with an
-/// explicit reference to 'this', but use this node so that clients have
-/// accurate source ranges and other location information.
-class ImplicitThisTupleElementExpr : public TupleElementExpr {
-public:
-  
-  // The name is the only thing that was written in the code.
-  SourceRange getSourceRange() const { 
-    return SourceRange(getNameLoc(), getNameLoc());
-  }
-  
-  ImplicitThisTupleElementExpr(Expr *SubExpr,
-                               unsigned FieldNo, SourceLoc NameLoc, Type Ty)
-    : TupleElementExpr(ExprKind::ImplicitThisTupleElement, SubExpr, FieldNo,
-                     NameLoc, Ty) {}
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const ImplicitThisTupleElementExpr *) { return true; }
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ImplicitThisTupleElement;
-  }
-};
-
 
 /// ImplicitConversionExpr - An abstract class for expressions which
 /// implicitly convert the value of an expression in some way.

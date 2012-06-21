@@ -77,8 +77,8 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg, CanType T, SourceLoc Loc,
         continue;
       }
       TupleType *TT = cast<TupleType>(CurT);
-      ArgRef = new (Context) SyntacticTupleElementExpr(ArgRef, Loc, i, Loc,
-                                                       TT->getElementType(i));
+      ArgRef = new (Context) TupleElementExpr(ArgRef, Loc, i, Loc,
+                                              TT->getElementType(i));
     }
     Expr *Res = TC.recheckTypes(TC.buildMemberRefExpr(ArgRef, Loc, Lookup,
                                                       EndLoc));

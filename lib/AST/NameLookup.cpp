@@ -169,25 +169,6 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
       doIt(Proto, M, Visited);
     return;
   }
-    
-  // Check to see if this is a reference to a tuple field.
-  if (TupleType *TT = BaseTy->getAs<TupleType>()) {
-    // If the field name exists, we win.  Otherwise, if the field name is a
-    // dollarident like $4, process it as a field index.
-    int FieldNo = TT->getNamedElementId(MemberName);
-    if (FieldNo != -1) {
-      Results.push_back(MemberLookupResult::getTupleElement(FieldNo));
-    } else {
-      StringRef NameStr = MemberName.str();
-      if (NameStr.startswith("$")) {
-        unsigned Value = 0;
-        if (!NameStr.substr(1).getAsInteger(10, Value) &&
-            Value < TT->getFields().size())
-          Results.push_back(MemberLookupResult::getTupleElement(Value));
-      }
-    }
-    return;
-  }
 
   // Check to see if any of an archetype's requirements have the member.
   if (ArchetypeType *Archetype = BaseTy->getAs<ArchetypeType>()) {
@@ -210,7 +191,6 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
       case MemberLookupResult::MemberProperty:
       case MemberLookupResult::MemberFunction:
       case MemberLookupResult::ArchetypeMember:
-      case MemberLookupResult::TupleElement:
         llvm_unreachable("wrong member lookup result in archetype");
         break;
       }
@@ -530,8 +510,6 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
         case MemberLookupResult::MetaArchetypeMember:
           Results.push_back(Result::getMetaArchetypeMember(BaseDecl, Result.D));
           break;
-        case MemberLookupResult::TupleElement:
-          llvm_unreachable("Can't have context with tuple type");
         }
       }
       if (Lookup.isSuccess())

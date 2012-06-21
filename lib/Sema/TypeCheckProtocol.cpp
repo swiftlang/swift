@@ -120,7 +120,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
       for (auto Candidate : Lookup.Results) {
         switch (Candidate.Kind) {
-        case swift::MemberLookupResult::MetaArchetypeMember:
+        case MemberLookupResult::MetaArchetypeMember:
         case MemberLookupResult::MetatypeMember:
           if (auto TypeD = dyn_cast<TypeDecl>(Candidate.D)) {
             // Check this type against the protocol requirements.
@@ -158,10 +158,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         case MemberLookupResult::MemberFunction:
         case MemberLookupResult::ExistentialMember:
         case MemberLookupResult::ArchetypeMember:
-          // Fall-through
-          
-        case MemberLookupResult::TupleElement:
-          // Tuple elements cannot satisfy requirements.
+          // These results cannot satisfy type requirements.
           break;
         }
       }
@@ -226,10 +223,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       
       TC.diagnose(AssociatedType->getLoc(), diag::no_witnesses_type,
                   AssociatedType->getName());
-      for (auto Candidate : Lookup.Results) {
-        if (Candidate.hasDecl())
-          TC.diagnose(Candidate.D->getStartLoc(), diag::protocol_witness_type);
-      }
+      for (auto Candidate : Lookup.Results)
+        TC.diagnose(Candidate.D->getStartLoc(), diag::protocol_witness_type);
       
       TypeMapping[AssociatedType->getUnderlyingType()->getAs<ArchetypeType>()]
         = ErrorType::get(TC.Context);
@@ -290,10 +285,6 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
             Viable.push_back(Candidate.D);
           break;
         }
-
-        case MemberLookupResult::TupleElement:
-          // Tuple elements cannot satisfy requirements.
-          break;
         }
       }
       
@@ -336,11 +327,9 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                   getRequirementKind(Requirement),
                   Requirement->getName(),
                   getInstanceUsageType(Requirement, TC.Context));
-      for (auto Candidate : Lookup.Results) {
-        if (Candidate.hasDecl())
-          TC.diagnose(Candidate.D->getStartLoc(), diag::protocol_witness,
-                      getInstanceUsageType(Candidate.D, TC.Context));
-      }
+      for (auto Candidate : Lookup.Results)
+        TC.diagnose(Candidate.D->getStartLoc(), diag::protocol_witness,
+                    getInstanceUsageType(Candidate.D, TC.Context));
     } else {
       return nullptr;
     }
