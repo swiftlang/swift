@@ -161,8 +161,7 @@ Expr *TypeChecker::buildFilteredOverloadSet(OverloadSetRefExpr *OSE,
   return buildFilteredOverloadSet(OSE, ArrayRef<ValueDecl *>(&Best, 1));
 }
 
-Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc,
-                                bool DeclArrayInASTContext) {
+Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc) {
   assert(!Decls.empty() && "Must have at least one declaration");
 
   if (Decls.size() == 1) {
@@ -170,18 +169,14 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc,
                                      Decls[0]->getTypeOfReference());
   }
 
-  // If the declaration array isn't already in the AST context, copy it there.
-  if (!DeclArrayInASTContext)
-    Decls = Context.AllocateCopy(Decls);
-
+  Decls = Context.AllocateCopy(Decls);
   return new (Context) OverloadedDeclRefExpr(Decls, NameLoc,
                          UnstructuredUnresolvedType::get(Context));
 }
 
 Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
                                       ArrayRef<ValueDecl *> Decls,
-                                      SourceLoc MemberLoc,
-                                      bool DeclArrayInASTContext) {
+                                      SourceLoc MemberLoc) {
   assert(!Decls.empty() && "Must have at least one declaration");
   
   // Figure out the actual base type, and whether we have an instance of that
@@ -247,8 +242,7 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
   }
 
   // We have multiple declarations. Build an overloaded member reference.
-  if (!DeclArrayInASTContext)
-    Decls = Context.AllocateCopy(Decls);
+  Decls = Context.AllocateCopy(Decls);
   return new (Context) OverloadedMemberRefExpr(Base, DotLoc, Decls, MemberLoc,
                          UnstructuredUnresolvedType::get(Context));
 }
