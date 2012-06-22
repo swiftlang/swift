@@ -634,9 +634,23 @@ public:
     // just propagate it up.
     if (E->getDecl()->getType()->is<ErrorType>())
       return 0;
-    
+
     // TODO: QOI: If the decl had an "invalid" bit set, then return the error
     // object to improve error recovery.
+
+    // Generic functions are always considered to overloaded (since there are
+    // make potential type bindings), so references to generic functions
+    // produce overloaded declaration references.
+    if (auto Func = dyn_cast<FuncDecl>(E->getDecl())) {
+      if (Func->isGeneric()) {
+        SmallVector<ValueDecl *, 1> decls;
+        decls.push_back(E->getDecl());
+        return new (TC.Context) OverloadedDeclRefExpr(
+                                  TC.Context.AllocateCopy(decls), E->getLoc(),
+                                  UnstructuredUnresolvedType::get(TC.Context));
+      }
+    }
+
     E->setType(E->getDecl()->getTypeOfReference());
     return E;
   }
