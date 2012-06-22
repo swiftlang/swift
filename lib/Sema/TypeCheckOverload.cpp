@@ -89,14 +89,14 @@ void TypeChecker::printOverloadSetCandidates(ArrayRef<ValueDecl *> Candidates) {
     diagnose(TheDecl->getStartLoc(), diag::found_candidate);
 }
 
-ValueDecl *
+OverloadCandidate
 TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
                                bool OperatorSyntax,
                                Type BaseTy,
                                Expr *Arg,
                                Type DestTy,
                                SmallVectorImpl<ValueDecl *> &Viable) {
-  Viable.clear();
+  SmallVector<OverloadCandidate, 4> ViableCandidates;
   bool hasThis = BaseTy && !BaseTy->is<MetaTypeType>();
   for (ValueDecl *VD : Candidates) {
     Type VDType = VD->getType()->getRValueType();
@@ -134,11 +134,21 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
       if (isCoercibleToType(&OVE, DestTy) == CoercionResult::Failed)
         continue;
     }
-    
-    Viable.push_back(VD);
+
+    ViableCandidates.push_back(OverloadCandidate(VD, FunctionTy,
+                                                 /*Complete=*/true));
   }
-  
-  return Viable.size() == 1 ? Viable[0] : 0;
+
+  // If we found a fully-resolved a viable candidate, we're done.
+  if (ViableCandidates.size() == 1 && ViableCandidates[0].isComplete())
+    return ViableCandidates[0];
+
+  // Create the resulting viable-candidates vector.
+  Viable.clear();
+  for (auto const& VC : ViableCandidates)
+    Viable.push_back(VC.getDecl());
+
+  return OverloadCandidate();
 }
 
 Expr *TypeChecker::buildFilteredOverloadSet(OverloadSetRefExpr *OSE,
@@ -155,10 +165,22 @@ Expr *TypeChecker::buildFilteredOverloadSet(OverloadSetRefExpr *OSE,
   return recheckTypes(result);
 }
 
-Expr *TypeChecker::buildFilteredOverloadSet(OverloadSetRefExpr *OSE,
-                                            ValueDecl *Best) {
-  llvm::SmallVector<ValueDecl *, 1> Remaining(1, Best);
-  return buildFilteredOverloadSet(OSE, ArrayRef<ValueDecl *>(&Best, 1));
+Expr *
+TypeChecker::buildFilteredOverloadSet(OverloadSetRefExpr *OSE,
+                                      const OverloadCandidate &Candidate){
+  assert(Candidate.isComplete() && "Incomplete overload candidate!");
+
+  if (auto DRE = dyn_cast<OverloadedDeclRefExpr>(OSE)) {
+    return buildRefExpr(Candidate, DRE->getLoc());
+  }
+
+  // FIXME: Build directly, then specialize.
+  auto MRE = cast<OverloadedMemberRefExpr>(OSE);
+  SmallVector<ValueDecl *, 1> decls(1, Candidate.getDecl());
+  auto result = buildMemberRefExpr(MRE->getBase(), MRE->getDotLoc(),
+                                   decls, MRE->getMemberLoc());
+
+  return recheckTypes(result);
 }
 
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc) {
@@ -172,6 +194,23 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc) 
   Decls = Context.AllocateCopy(Decls);
   return new (Context) OverloadedDeclRefExpr(Decls, NameLoc,
                          UnstructuredUnresolvedType::get(Context));
+}
+
+Expr *TypeChecker::buildRefExpr(const OverloadCandidate &Candidate,
+                                SourceLoc NameLoc) {
+  auto decl = Candidate.getDecl();
+  Expr *result = new (Context) DeclRefExpr(decl, NameLoc,
+                                           decl->getTypeOfReference());
+
+  // If the types don't match, it's because the declaration has been
+  // specialized.
+  // FIXME: Ask the OverloadCandidate for this information, rather than
+  // guessing at it.
+  if (!result->getType()->isEqual(Candidate.getType())) {
+    result = new (Context) SpecializeExpr(result, Candidate.getType());
+  }
+
+  return recheckTypes(result);
 }
 
 Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,

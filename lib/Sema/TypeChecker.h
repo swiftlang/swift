@@ -67,6 +67,33 @@ public:
   }
 };
 
+/// \brief An overload candidate.
+/// FIXME: Encode the actual substitutions here in some efficient manner.
+class OverloadCandidate {
+  llvm::PointerIntPair<ValueDecl *, 1, bool> DeclAndComplete;
+  Type Ty;
+
+public:
+  OverloadCandidate() : DeclAndComplete(0, false), Ty() { }
+  OverloadCandidate(ValueDecl *Value, Type Ty, bool Complete)
+    : DeclAndComplete(Value, Complete), Ty(Ty) { }
+
+  /// \brief Whether this overload candidate is 'complete', meaning that we
+  /// can use the declaration (possibly by applying the given substitutions)
+  /// immediately.
+  bool isComplete() const { return DeclAndComplete.getInt(); }
+
+  /// \brief Retrieve the declaration 
+  ValueDecl *getDecl() const { return DeclAndComplete.getPointer(); }
+
+  /// \brief Retrieve the type of a reference to this overload candidate,
+  /// after substitution.
+  Type getType() const { return Ty; }
+
+  /// \brief Evaluates true if the selected candidate is complete.
+  explicit operator bool() const { return isComplete(); }
+};
+
 class TypeChecker {
 public:
   TranslationUnit &TU;
@@ -244,16 +271,16 @@ public:
   /// \param DestTy The type to which the result should be coerced, or null if
   /// not known.
   ///
-  /// \param Viable Output vector to which all of the viable candidates will be
-  /// added.
+  /// \param Viable If there is no single, complete vialbe candidate, output
+  /// vector to which all of the viable candidates will be added.
   ///
   /// \returns The best candidate, if there is one.
-  ValueDecl *filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
-                               bool OperatorSyntax,
-                               Type BaseTy,
-                               Expr *Arg,
-                               Type DestTy,
-                               SmallVectorImpl<ValueDecl *> &Viable);
+  OverloadCandidate filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
+                                      bool OperatorSyntax,
+                                      Type BaseTy,
+                                      Expr *Arg,
+                                      Type DestTy,
+                                      SmallVectorImpl<ValueDecl *> &Viable);
   
   /// buildFilteredOverloadSet - Given an overload set that has already been
   /// filtered, produce a new overload set with just the given set of
@@ -262,13 +289,17 @@ public:
                                  ArrayRef<ValueDecl *> Remaining);
 
   /// buildFilteredOverloadSet - Given an overload set for which we have
-  /// chosen a best candidate,return an expression that refers to that
+  /// chosen a best candidate, return an expression that refers to that
   /// candidate.
-  Expr *buildFilteredOverloadSet(OverloadSetRefExpr *OSE, ValueDecl *Best);
+  Expr *buildFilteredOverloadSet(OverloadSetRefExpr *OSE,
+                                 const OverloadCandidate &Candidate);
 
   /// \brief Build a reference to a declaration, where name lookup returned
   /// the given set of declarations.
   Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc);
+
+  /// \brief Build a reference to a (non-member) overload candidate.
+  Expr *buildRefExpr(const OverloadCandidate &Candidate, SourceLoc NameLoc);
 
   /// \brief Build a reference to a member of the given base expression, where
   /// name lookup for the member returned the given set of declarations. 

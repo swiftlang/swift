@@ -271,20 +271,21 @@ public:
     Type DestElementTy = DestTy->getRValueType();
 
     llvm::SmallVector<ValueDecl *, 2> Viable;
-    ValueDecl *Best = TC.filterOverloadSet(E->getDecls(),
-                                           /*OperatorSyntax=*/true,
-                                           BaseTy, E->getIndex(),
-                                           DestElementTy, Viable);
+    auto Best = TC.filterOverloadSet(E->getDecls(), /*OperatorSyntax=*/true,
+                                     BaseTy, E->getIndex(), DestElementTy,
+                                     Viable);
     
     if (Best) {
-      SubscriptDecl *BestSub = cast<SubscriptDecl>(Best);      
+      // FIXME: Deal with substitution here!
+      SubscriptDecl *BestSub = cast<SubscriptDecl>(Best.getDecl());
       Type ResultTy = LValueType::get(BestSub->getElementType(),
                                       LValueType::Qual::NonHeap,
                                       TC.Context);
       if (!(Flags & CF_Apply))
         return ResultTy;
 
-      Type ContainerTy = Best->getDeclContext()->getDeclaredTypeOfContext();
+      Type ContainerTy
+        = Best.getDecl()->getDeclContext()->getDeclaredTypeOfContext();
       if (ContainerTy->isExistentialType()) {
         ExistentialSubscriptExpr *Result
           = new (TC.Context) ExistentialSubscriptExpr(E->getBase(),
@@ -976,15 +977,13 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
 
     // Second, try to find a constructor to explicitly perform the conversion.
     SmallVector<ValueDecl *, 4> Viable;
-    ValueDecl *Best = TC.filterOverloadSet(Ctors.Results,
-                                           /*OperatorSyntax=*/true,
-                                           DestTy, Segment, Type(),
-                                           Viable);
+    auto Best = TC.filterOverloadSet(Ctors.Results, /*OperatorSyntax=*/true,
+                                     DestTy, Segment, Type(), Viable);
     if (Best) {
       if (!(Flags & CF_Apply))
         continue;
 
-      if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(Best)) {
+      if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(Best.getDecl())) {
         Type ArgTy = CD->getArgumentType();
         if (CoercedResult CoercedS = coerceToType(Segment, ArgTy, TC, Flags)) {
           Segment = new (TC.Context) ConstructExpr(
@@ -998,8 +997,7 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
         }
       }
 
-      Expr *CtorRef = new (TC.Context) DeclRefExpr(Best, Segment->getStartLoc(),
-                                                   Best->getTypeOfReference());
+      Expr *CtorRef = TC.buildRefExpr(Best, Segment->getStartLoc());
       ApplyExpr *Call = new (TC.Context) CallExpr(CtorRef, Segment);
       Expr *Checked = TC.semaApplyExpr(Call);
       if (!Checked)
@@ -1046,10 +1044,8 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
     
     // Perform overload resolution.
     SmallVector<ValueDecl *, 16> Viable;
-    ValueDecl *Best = TC.filterOverloadSet(plusResults,
-                                           /*OperatorSyntax=*/true,
-                                           Type(), Arg, Type(),
-                                           Viable);
+    auto Best = TC.filterOverloadSet(plusResults, /*OperatorSyntax=*/true,
+                                     Type(), Arg, Type(), Viable);
     if (!Best) {
       if (Flags & CF_Apply) {
         // FIXME: We want range information here.
@@ -1063,9 +1059,8 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
       
       return nullptr;
     }
-    
-    Expr *Fn = new (TC.Context) DeclRefExpr(Best, Segment->getStartLoc(),
-                                            Best->getTypeOfReference());
+
+    Expr *Fn = TC.buildRefExpr(Best, Segment->getStartLoc());
     Result = TC.semaApplyExpr(new (TC.Context) BinaryExpr(Fn, Arg));
     if (!Result)
       return nullptr;
@@ -1090,16 +1085,16 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
 
   if (OverloadSetRefExpr *OSE = dyn_cast<OverloadSetRefExpr>(E->getFn())) {
     SmallVector<ValueDecl*, 4> Viable;
-    if (ValueDecl *Best = TC.filterOverloadSet(OSE->getDecls(),
-                                               (isa<PrefixUnaryExpr>(E) ||
-                                                isa<PostfixUnaryExpr>(E) ||
-                                                isa<BinaryExpr>(E)),
-                                               OSE->getBaseType(),
-                                               E->getArg(),
-                                               DestTy, Viable)) {
+    if (auto Best = TC.filterOverloadSet(OSE->getDecls(),
+                                         (isa<PrefixUnaryExpr>(E) ||
+                                          isa<PostfixUnaryExpr>(E) ||
+                                          isa<BinaryExpr>(E)),
+                                          OSE->getBaseType(),
+                                          E->getArg(),
+                                          DestTy, Viable)) {
       if (!(Flags & CF_Apply)) {
         // Determine the type of the resulting call expression.
-        Type Ty = Best->getType()->getRValueType();
+        Type Ty = Best.getType()->getRValueType();
 
         if (FunctionType *FnTy = Ty->getAs<FunctionType>())
           return FnTy->getResult();

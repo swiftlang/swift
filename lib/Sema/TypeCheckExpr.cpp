@@ -156,13 +156,12 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
   for (const auto &R : Lookup.Results)
     LookupResults.push_back(R.D);
   llvm::SmallVector<ValueDecl *, 4> Viable;
-  ValueDecl *Best = filterOverloadSet(LookupResults,
-                                      /*OperatorSyntax=*/true,
-                                      BaseTy, SE->getIndex(),
-                                      Type(), Viable);
+  auto Best = filterOverloadSet(LookupResults, /*OperatorSyntax=*/true,
+                                BaseTy, SE->getIndex(), Type(), Viable);
 
   if (Best) {
-    SubscriptDecl *Sub = cast<SubscriptDecl>(Best);
+    // FIXME: Deal with substitution here.
+    SubscriptDecl *Sub = cast<SubscriptDecl>(Best.getDecl());
     if (BaseTy->isExistentialType()) {
       // We picked a subscript operator in an existential type; create the
       // appropriate AST node.
@@ -495,11 +494,11 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     SmallVector<ValueDecl *, 4> Viable;
     ConstructorLookup Ctors(Ty, TU);
     if (Ctors.isSuccess()) {
-      ValueDecl *Best = filterOverloadSet(Ctors.Results, false,
-                                          Ty, E2, Type(), Viable);
-      ConstructorDecl *CD = dyn_cast_or_null<ConstructorDecl>(Best);
+      auto Best = filterOverloadSet(Ctors.Results, false, Ty, E2, Type(),
+                                    Viable);
+      ConstructorDecl *CD = dyn_cast_or_null<ConstructorDecl>(Best.getDecl());
       if (CD) {
-        Type ArgTy = CD->getArgumentType();
+        Type ArgTy = Best.getType()->castTo<FunctionType>()->getInput();
         CoercedExpr CoercedE2 = coerceToType(E2, ArgTy);
         switch (CoercedE2.getKind()) {
         case CoercionResult::Succeeded:
@@ -514,6 +513,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
           // Leave E2 as it is; we'll end up type-checking again later anyway.
           break;
         }
+        // FIXME: Record substitution
         assert(E2 && "Coercion shouldn't fail!");
         return new (Context) ConstructExpr(Ty, E1->getStartLoc(), CD, E2);
       }
@@ -550,12 +550,12 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
 
   // Perform overload resolution.
   llvm::SmallVector<ValueDecl *, 4> Viable;
-  ValueDecl *Best = filterOverloadSet(OS->getDecls(),
-                                      (isa<PrefixUnaryExpr>(E) ||
-                                       isa<PostfixUnaryExpr>(E) ||
-                                       isa<BinaryExpr>(E)),
-                                      OS->getBaseType(), E2,
-                                      Type(), Viable);
+  auto Best = filterOverloadSet(OS->getDecls(),
+                                (isa<PrefixUnaryExpr>(E) ||
+                                 isa<PostfixUnaryExpr>(E) ||
+                                 isa<BinaryExpr>(E)),
+                                 OS->getBaseType(), E2,
+                                 Type(), Viable);
   
   // If we have a best candidate, build a call to it now.
   if (Best) {
@@ -920,11 +920,12 @@ public:
 
     ConstructorLookup Ctors(CT, TC.TU);
     llvm::SmallVector<ValueDecl *, 4> Viable;
-    ValueDecl *Best = TC.filterOverloadSet(Ctors.Results, false,
-                                           CT, Arg, Type(), Viable);
+    auto Best = TC.filterOverloadSet(Ctors.Results, false, CT, Arg, Type(),
+                                     Viable);
 
     if (Best) {
-      ConstructorDecl *CD = cast<ConstructorDecl>(Best);
+      // FIXME: Handle substitutions here.
+      ConstructorDecl *CD = cast<ConstructorDecl>(Best.getDecl());
       Arg = TC.coerceToType(Arg, CD->getArgumentType());
       assert(Arg && "Coercion shouldn't fail!");
       E->setCtor(CD);
