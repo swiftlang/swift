@@ -923,28 +923,18 @@ void IRGenFunction::emitBranch(JumpDest dest) {
 
   assert(outermost->isActive());
 
-  // First, look for an existing outflow for this destination block on
-  // the outermost cleanup.  Note that there might be other labels
-  // leading to this same block on different cleanup scopes (due to
-  // the branches occuring with different cleanups active).  That's okay.
-  llvm::ConstantInt *labelValue = nullptr;
+  // Create a new label for branching with our given combination of
+  // destination and cleanups.
+  // FIXME: We should reuse labels for multiple jumps to the same
+  // destination.
   CleanupOutflows *outs = getOrCreateOutflows(*outermost);
-  for (auto &outflow : outs->Outflows) {
-    if (outflow.DestBlock == dest.getBlock()) {
-      labelValue = outflow.DestLabel;
-      break;
-    }
-  }
+  llvm::ConstantInt *labelValue = llvm::ConstantInt::get(IGM.Int32Ty,
+                                                         destLabel);
+  outs->add(labelValue, dest.getBlock());
 
-  // If we didn't find a label, create it (and remember that we did).
-  bool hadExistingLabel = (labelValue != nullptr);
-  if (!hadExistingLabel) {
-    labelValue = llvm::ConstantInt::get(IGM.Int32Ty, destLabel);
-    outs->add(labelValue, dest.getBlock());
-
-    outermost->addActiveUse();
-    outermost->setNextDestLabel(destLabel + 1);
-  }
+  // Add the label to the outermost cleanup.
+  outermost->addActiveUse();
+  outermost->setNextDestLabel(destLabel + 1);
 
   // Set the destination and branch to the innermost cleanup.
   Builder.CreateStore(labelValue, getJumpDestSlot(), getJumpDestAlignment());
@@ -956,7 +946,7 @@ void IRGenFunction::emitBranch(JumpDest dest) {
     it->addFallthroughOutflow();
 
     // And tell each cleanup that the new label value has been reserved.
-    if (!hadExistingLabel) it->setNextDestLabel(destLabel + 1);
+    it->setNextDestLabel(destLabel + 1);
   }
 }
 
