@@ -238,6 +238,9 @@ namespace {
     void visitErasureExpr(ErasureExpr *E) {
       emitErasure(IGF, E, Out);
     }
+    void visitSpecializeExpr(SpecializeExpr *E) {
+      IGF.unimplemented(E->getLoc(), "specialize expressions");
+    }
     void visitTupleElementExpr(TupleElementExpr *E) {
       emitTupleElement(IGF, E, Out);
     }
@@ -406,6 +409,7 @@ namespace {
     NOT_LVALUE_EXPR(InterpolatedStringLiteral)
     NOT_LVALUE_EXPR(TupleShuffle)
     NOT_LVALUE_EXPR(Erasure)
+    NOT_LVALUE_EXPR(Specialize) // FIXME: Generic subscripts?
     NOT_LVALUE_EXPR(Func)
     NOT_LVALUE_EXPR(Closure)
     NOT_LVALUE_EXPR(Load)
@@ -577,6 +581,7 @@ namespace {
     NON_LOCATEABLE(InterpolatedStringLiteralExpr)
     NON_LOCATEABLE(TupleShuffleExpr)
     NON_LOCATEABLE(ErasureExpr)
+    NON_LOCATEABLE(SpecializeExpr) // FIXME: Generic subscripts?
     NON_LOCATEABLE(CapturingExpr)
     NON_LOCATEABLE(ModuleExpr)
     NON_LOCATEABLE(DotSyntaxBaseIgnoredExpr)

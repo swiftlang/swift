@@ -1117,7 +1117,34 @@ public:
     return E->getKind() == ExprKind::Erasure;
   }
 };
+
+/// SpecializeExpr - Specializes a reference to a generic entity by binding
+/// each of its type parameters to a specific type.
+///
+/// In a type-checked AST, every reference to a generic entity will be bound
+/// (at some point) by a SpecializeExpr. The type of a SpecializeExpr is the
+/// type of the entity with all of the type parameters substituted.
+///
+/// An example:
+/// \code
+/// func identity(x : T) -> T { return x }
+///
+/// var i : Int = identity(17) // 'identity' is specialized to (x : Int) -> Int
+/// \endcode
+class SpecializeExpr : public ImplicitConversionExpr {
+  // FIXME: Record the actual substitutions performed!
   
+public:
+  SpecializeExpr(Expr *SubExpr, Type Ty)
+    : ImplicitConversionExpr(ExprKind::Specialize, SubExpr, Ty) { }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const SpecializeExpr *) { return true; }
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Specialize;
+  }
+};
+
 /// AddressOfExpr - Using the builtin unary '&' operator, convert the
 /// given l-value into an explicit l-value.
 class AddressOfExpr : public Expr {
