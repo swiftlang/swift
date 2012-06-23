@@ -383,7 +383,9 @@ bool TypeChecker::isSubtypeOf(Type T1, Type T2, bool &Trivial) {
 Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
   if (ArchetypeType *Archetype = dyn_cast<ArchetypeType>(T)) {
     TypeSubstitutionMap::const_iterator Known = Substitutions.find(Archetype);
-    assert((Known != Substitutions.end()) && "Missing archetype substitution");
+    if (Known == Substitutions.end() || !Known->second)
+      return T;
+
     return SubstArchetypeType::get(Archetype, Known->second, Context);
   }
   

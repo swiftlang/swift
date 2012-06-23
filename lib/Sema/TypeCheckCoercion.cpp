@@ -2062,12 +2062,9 @@ CoercedExpr TypeChecker::coerceToType(Expr *E, Type DestTy, bool Assignment,
     }
 
     // Substitute the deduced arguments into the type.
-    // FIXME: We should be able to support partial substitution here.
-    if (CC->hasCompleteSubstitutions()) {
-      DestTy = substType(DestTy, CC->Substitutions);
-      if (!DestTy)
-        return CoercedExpr(*this, CoercionResult::Failed, E, DestTy);
-    }
+    DestTy = substType(DestTy, CC->Substitutions);
+    if (!DestTy)
+      return CoercedExpr(*this, CoercionResult::Failed, E, DestTy);
   }
 
   CoercedResult Res = SemaCoerce::coerceToType(E, DestTy, *CC, Flags);
@@ -2100,12 +2097,9 @@ CoercionResult TypeChecker::isCoercibleToType(Expr *E, Type Ty,
     }
 
     // Substitute the deduced arguments into the type.
-    // FIXME: We should be able to support partial substitution here.
-    if (CC->hasCompleteSubstitutions()) {
-      Ty = substType(Ty, CC->Substitutions);
-      if (!Ty)
-        return CoercionResult::Failed;
-    }
+    Ty = substType(Ty, CC->Substitutions);
+    if (!Ty)
+      return CoercionResult::Failed;
   }
 
   return SemaCoerce::coerceToType(E, Ty, *CC, Flags).getKind();

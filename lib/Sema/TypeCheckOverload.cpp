@@ -142,8 +142,7 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
 
     // If we need substitution, substitute into the function type before
     // continuing.
-    // FIXME: Allow partial substitutions.
-    if (CC.requiresSubstitution() && CC.hasCompleteSubstitutions()) {
+    if (CC.requiresSubstitution()) {
       SubstFunctionTy = substType(FunctionTy, CC.Substitutions);
       if (!SubstFunctionTy)
         continue;
