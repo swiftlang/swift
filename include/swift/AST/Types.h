@@ -1070,8 +1070,13 @@ public:
   
   void print(raw_ostream &OS) const;
 
-  /// getConformsTo - Retrieve the 
+  /// getConformsTo - Retrieve the set of protocols (or compositions thereof)
+  /// to which this archetype conforms.
   ArrayRef<Type> getConformsTo() const { return ConformsTo; }
+
+  /// getDisplayName - Retrieve the name that should be used to display
+  /// this archetype.
+  StringRef getDisplayName() const { return DisplayName; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ArchetypeType *) { return true; }

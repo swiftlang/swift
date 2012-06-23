@@ -94,6 +94,42 @@ public:
   explicit operator bool() const { return isComplete(); }
 };
 
+/// \brief Captures information about the context of a type coercion, including
+/// the type checker instance and the type substitutions deduced by the
+/// coercion.
+struct CoercionContext {
+  CoercionContext(TypeChecker &TC) : TC(TC) { }
+  
+  TypeChecker &TC;
+  TypeSubstitutionMap Substitutions;
+
+  /// \brief Identify the set of generic parameters for which we want to
+  /// compute substitutions.
+  void requestSubstitutionsFor(ArrayRef<GenericParam> Params);
+  
+  /// \brief Retrieve the substitution for the given deduced archetype, if
+  /// known.
+  Type getSubstitution(ArchetypeType *Archetype) const {
+    TypeSubstitutionMap::const_iterator Pos = Substitutions.find(Archetype);
+    assert(Pos != Substitutions.end() && "Not deducible");
+    return Pos->second;
+  }
+
+  /// \brief Determine whether the given archetype is deducible in this
+  /// context.
+  bool isDeducible(ArchetypeType *Archetype) const {
+    return Substitutions.find(Archetype) != Substitutions.end();
+  }
+
+  /// \brief Determine whether the given coercion context requires
+  /// substitutions.
+  bool requiresSubstitution() const { return !Substitutions.empty(); }
+
+  /// \brief Determine whether this coercion context has complete substitution
+  /// information.
+  bool hasCompleteSubstitutions() const;
+};
+
 class TypeChecker {
 public:
   TranslationUnit &TU;
@@ -187,26 +223,36 @@ public:
   /// failure (in which case a diagnostic was produced) or 'unknowable', if
   /// it is unknown whether the coercion can occur (e.g., due to literals that
   /// have not been coerced to any specific type).
-  CoercedExpr coerceToType(Expr *E, Type Ty, bool Assignment = false);
+  CoercedExpr coerceToType(Expr *E, Type Ty, bool Assignment = false,
+                           CoercionContext *CC = nullptr);
   
   /// isCoercibleToType - Determine whether the given expression can be 
   /// coerced to the given type.
   ///
+  /// If a non-NULL coercion context is provided, that coercion context
+  /// will be used (and updated) based on this coercion.
+  ///
   /// The result is a three-state value: the coercion may succeed, may fail, or
   /// it may be unknowable whether it can ever succeed (for example, if
   /// unresolved literals are involved).
-  CoercionResult isCoercibleToType(Expr *E, Type Ty, bool Assignment = false);
+  CoercionResult isCoercibleToType(Expr *E, Type Ty, bool Assignment = false,
+                                   CoercionContext *CC = nullptr);
   
   /// coerceObjectArgument - Coerce the given expression to an object argument
   /// of the given container type.
   ///
   /// The resulting expression will always be an lvalue, but may be an lvalue
   /// to a subtype of the requested container type.
-  Expr *coerceObjectArgument(Expr *E, Type ContainerTy);
+  Expr *coerceObjectArgument(Expr *E, Type ContainerTy,
+                             CoercionContext *CC = nullptr);
 
   /// isCoercibleObjectArgument - Determine whether the given expression can
   /// be coerced to an object argument for a member of the given type.
-  bool isCoercibleObjectArgument(Expr *E, Type ContainerTy);
+  ///
+  /// If a non-NULL coercion context is provided, that coercion context
+  /// will be used (and updated) based on this coercion.
+  bool isCoercibleObjectArgument(Expr *E, Type ContainerTy,
+                                 CoercionContext *CC = nullptr);
   
   Expr *convertToRValue(Expr *E);
   Expr *convertLValueToRValue(LValueType *SrcLT, Expr *E);
@@ -241,7 +287,7 @@ public:
   /// possible candidates in an overload set of a call.
   void diagnoseEmptyOverloadSet(Expr *E, ArrayRef<ValueDecl *> Candidates);
   void printOverloadSetCandidates(ArrayRef<ValueDecl *> Candidates);
-  
+
   /// filterOverloadSet - Filter a set of overload candidates based on the 
   /// the given argument type (for a call) or result type (if the context 
   /// provides such a type). 

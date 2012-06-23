@@ -649,6 +649,9 @@ ERROR(explicit_lvalue,sema_tcc,none,
       "'&' is only needed when passing values by reference", ())
 ERROR(invalid_implicit_protocol_conformance,sema_tcc,none,
       "type %0 does not conform to protocol %1", (Type,Type))
+ERROR(inconsistent_deduction,sema_tcc,none,
+      "inconsistent deduction for type parameter %0 (%1 vs. %2)",
+      (StringRef, Type, Type))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations

@@ -16,6 +16,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/Types.h"
 using namespace swift;
 
 static Identifier getFirstOverloadedIdentifier(const Expr *Fn) {
@@ -121,22 +122,44 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     if (!SubstFunctionTy)
       continue;
     FunctionTy = SubstFunctionTy->castTo<FunctionType>();
-    
+
+    // Establish the coercion context, which is required when this coercion
+    // involves generic functions.
+    CoercionContext CC(*this);
+    if (FuncDecl *Func = dyn_cast<FuncDecl>(VD)) {
+      if (Func->isGeneric()) {
+        // Request substitutions for the generic parameters of this function.
+        CC.requestSubstitutionsFor(Func->getGenericParams()->getParams());
+      }
+    }
+
     // Check whether arguments are suitable for this function.
     if (isCoercibleToType(Arg, FunctionTy->getInput(),
-                          (OperatorSyntax && VD->getAttrs().isAssignment()))
+                          (OperatorSyntax && VD->getAttrs().isAssignment()),
+                          &CC)
           == CoercionResult::Failed)
       continue;
-    
+
+    // If we need substitution, substitute into the function type before
+    // continuing.
+    // FIXME: Allow partial substitutions.
+    if (CC.requiresSubstitution() && CC.hasCompleteSubstitutions()) {
+      SubstFunctionTy = substType(FunctionTy, CC.Substitutions);
+      if (!SubstFunctionTy)
+        continue;
+
+      FunctionTy = SubstFunctionTy->castTo<FunctionType>();
+    }
+
     // Check whether we can coerce the result type.
     if (DestTy) {
       OpaqueValueExpr OVE(Arg->getLoc(), FunctionTy->getResult());
-      if (isCoercibleToType(&OVE, DestTy) == CoercionResult::Failed)
+      if (isCoercibleToType(&OVE, DestTy, &CC) == CoercionResult::Failed)
         continue;
     }
 
     ViableCandidates.push_back(OverloadCandidate(VD, FunctionTy,
-                                                 /*Complete=*/true));
+                                 /*Complete=*/CC.hasCompleteSubstitutions()));
   }
 
   // If we found a fully-resolved a viable candidate, we're done.
