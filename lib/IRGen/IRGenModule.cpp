@@ -101,7 +101,7 @@ IRGenModule::~IRGenModule() {
 
 llvm::StructType *IRGenModule::getOpaqueStructTy() {
   if (OpaqueStructTy) return OpaqueStructTy;
-  OpaqueStructTy = llvm::StructType::create(LLVMContext);
+  OpaqueStructTy = llvm::StructType::create(LLVMContext, "swift.opaque");
   return OpaqueStructTy;
 }
 
