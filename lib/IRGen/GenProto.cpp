@@ -44,6 +44,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LValue.h"
+#include "TypeInfo.h"
 
 #include "GenProto.h"
 

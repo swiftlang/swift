@@ -21,7 +21,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Explosion.h"
-#include "GenType.h"
+#include "TypeInfo.h"
 #include "StructLayout.h"
 
 namespace swift {

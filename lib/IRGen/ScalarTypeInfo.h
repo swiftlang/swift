@@ -20,7 +20,7 @@
 #define SWIFT_IRGEN_SCALARTYPEINFO_H
 
 #include "Explosion.h"
-#include "GenType.h"
+#include "TypeInfo.h"
 #include "IRGenFunction.h"
 
 namespace swift {

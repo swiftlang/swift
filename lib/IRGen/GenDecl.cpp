@@ -27,11 +27,11 @@
 
 #include "CallingConvention.h"
 #include "Explosion.h"
-#include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Linking.h"
 #include "LValue.h"
+#include "TypeInfo.h"
 
 using namespace swift;
 using namespace irgen;

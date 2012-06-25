@@ -23,6 +23,7 @@
 #include "Address.h"
 #include "IRGenModule.h"
 #include "ScalarTypeInfo.h"
+#include "GenType.h"
 
 #include "GenMeta.h"
 

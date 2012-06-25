@@ -25,10 +25,10 @@
 #include "Explosion.h"
 #include "GenHeap.h"
 #include "GenTuple.h"
-#include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Scope.h"
+#include "TypeInfo.h"
 
 #include "GenInit.h"
 

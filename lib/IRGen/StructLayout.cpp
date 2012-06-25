@@ -20,8 +20,8 @@
 
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "GenType.h"
 #include "StructLayout.h"
+#include "TypeInfo.h"
 
 using namespace swift;
 using namespace irgen;

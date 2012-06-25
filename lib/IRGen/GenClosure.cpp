@@ -29,8 +29,8 @@
 #include "Explosion.h"
 #include "GenHeap.h"
 #include "GenInit.h"
-#include "GenType.h"
 #include "LValue.h"
+#include "TypeInfo.h"
 
 using namespace swift;
 using namespace irgen;

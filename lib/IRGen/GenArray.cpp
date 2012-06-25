@@ -27,6 +27,7 @@
 #include "GenHeap.h"
 #include "GenType.h"
 #include "IRGenModule.h"
+#include "TypeInfo.h"
 
 #include "GenArray.h"
 

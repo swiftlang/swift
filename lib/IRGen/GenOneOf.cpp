@@ -32,6 +32,7 @@
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
 
+#include "GenType.h"
 #include "ScalarTypeInfo.h"
 #include "IRGenModule.h"
 #include "LValue.h"

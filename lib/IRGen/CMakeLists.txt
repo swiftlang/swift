@@ -55,4 +55,5 @@ add_swift_library(swiftIRGen
   Scope.h
   StructLayout.cpp
   StructLayout.h
+  TypeInfo.h
   DEPENDS swiftAST)
