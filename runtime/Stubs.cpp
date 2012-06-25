@@ -185,9 +185,9 @@ _swift_initBenchmark() {
   assert(r == 0);
 
   // XXX -- There doesn't seem to be an API to figure out the max value
-  struct sched_param pthr_sched_param;
-  pthr_sched_param.sched_priority = 79;
-  r = pthread_setschedparam(pthread_self(), SCHED_FIFO, &pthr_sched_param);
+  sched_param schedParam;
+  schedParam.sched_priority = 79;
+  r = pthread_setschedparam(pthread_self(), SCHED_FIFO, &schedParam);
   assert(r == 0);
 
   eax = 0x80000002;
