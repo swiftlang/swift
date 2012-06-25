@@ -2083,7 +2083,7 @@ const TypeInfo *TypeConverter::convertProtocolType(ProtocolType *T) {
 const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *T) {
   // For now, just always use the same type.
   // TODO: also store something about the protocols we conform to?
-  llvm::Type *storageType = IGM.getFixedBufferTy();
+  llvm::Type *storageType = IGM.getOpaqueStructTy();
   return new ArchetypeTypeInfo(storageType);
 }
 
