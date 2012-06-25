@@ -21,6 +21,7 @@
 #include "llvm/ADT/DenseMap.h"
 
 namespace swift {
+  class ArchetypeType;
   class ArrayType;
   class CanType;
   class ClassType;
@@ -60,6 +61,7 @@ class TypeConverter {
   const TypeInfo *convertStructType(StructType *T);
   const TypeInfo *convertClassType(ClassType *T);
   const TypeInfo *convertFunctionType(FunctionType *T);
+  const TypeInfo *convertArchetypeType(ArchetypeType *T);
   const TypeInfo *convertArrayType(ArrayType *T);
   const TypeInfo *convertLValueType(LValueType *T);
   const TypeInfo *convertMetaTypeType(MetaTypeType *T);

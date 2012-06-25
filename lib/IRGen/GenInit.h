@@ -44,6 +44,18 @@ namespace irgen {
 
 /// An Initialization object manages the cleanups and lifetimes of a
 /// variable initialization.
+///
+/// To use this, you need to:
+///   - create an abstract Object for the object you'd like to initialize,
+///     using one of the getObject* methods;
+///   - register that Object with the Initialization using one of the
+///     registerObject* methods;
+///   - mark when that object has been allocated using markAllocated; and
+///   - mark when that object has been initialization using
+///     markInitialized.
+///
+/// This class also provides several convenience methods for
+/// performing one or more stages of this process.
 class Initialization {
   struct ValueRecord {
     CleanupsDepth DeallocCleanup;
@@ -75,20 +87,35 @@ public:
     return Object(reinterpret_cast<void*>(1));
   }
 
-  /// Allocate a variable for the array.
+  /// Create a variable.  The abstract object for the variable is the
+  /// one returned by getObjectForDecl(var).
+  /// 
+  /// Precondition: the abstract object has been registered
+  ///   with this Initialization, but is not marked as allocated
+  ///   or initialized.
+  /// Postcondition: the abstract object will have been marked as
+  ///   allocated, but not marked as initialized.
   OwnedAddress emitVariable(IRGenFunction &IGF, VarDecl *var,
                             const TypeInfo &type);
 
   /// Create a local variable.
+  ///
+  /// Same pre/postconditions as emitVariable.
   OwnedAddress emitLocalAllocation(IRGenFunction &IGF, Object object,
                                    OnHeap_t onHeap, const TypeInfo &type,
                                    const Twine &name);
 
   /// Create a global variable.
+  ///
+  /// Same pre/postconditions as emitVariable.
   OwnedAddress emitGlobalVariable(IRGenFunction &IGF, VarDecl *var,
                                   const TypeInfo &type);
 
   /// Emit an initializer into the given address.
+  ///
+  /// Precondition: the object has been marked as allocated at the
+  ///   given address.
+  /// Postcondition: the object will have been marked as initialized.
   void emitInit(IRGenFunction &IGF, Object object, Address address,
                 Expr *init, const TypeInfo &type);
   void emitZeroInit(IRGenFunction &IGF, Object object, Address address,
@@ -96,8 +123,8 @@ public:
 
   /// Add an object that is going to be initialized; use the
   /// appropriate destroy cleanup for the given type.
-  void registerObject(IRGenFunction &IGF, Object object, OnHeap_t onHeap,
-                      const TypeInfo &objectTI);
+  CleanupsDepth registerObject(IRGenFunction &IGF, Object object,
+                               OnHeap_t onHeap, const TypeInfo &objectTI);
 
   /// Add an object that is going to be initialized, but which does not
   /// need a destroy cleanup.

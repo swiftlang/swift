@@ -197,6 +197,9 @@ public:
   void endScope(CleanupsDepth depth);
   void endSingleCleanupScope();
 
+  void enterDestroyCleanup(Address addr, const TypeInfo &addrTI,
+                           Explosion &out);
+
   /// Is the current emission point conditionally evaluated?  Right
   /// now we don't have any expressions which introduce conditional
   /// evaluation, but it's not at all unlikely that this will change.

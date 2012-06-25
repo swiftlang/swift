@@ -61,14 +61,31 @@ namespace {
   };
 }
 
+/// Enter a cleanup to destroy an object of arbitrary type.  Adds the
+/// address value to the given explosion, along with the appropriate
+/// cleanup.
+void IRGenFunction::enterDestroyCleanup(Address addr,
+                                        const TypeInfo &addrTI,
+                                        Explosion &out) {
+  assert(!addrTI.isPOD(ResilienceScope::Local) &&
+         "destroying something known to be POD");
+
+  // The use of UnboundDestroy here is not important.
+  UnboundDestroy &destroy = pushCleanup<UnboundDestroy>(addrTI);
+  destroy.setAddress(OwnedAddress(addr, nullptr));
+
+  out.add(ManagedValue(addr.getAddress(), getCleanupsDepth()));
+}
+
 /// Should the given variable be allocated on the heap?
 static OnHeap_t isOnHeap(VarDecl *var) {
   return (var->hasFixedLifetime() ? NotOnHeap : OnHeap);
 }
 
 /// Register an object with the initialization process.
-void Initialization::registerObject(IRGenFunction &IGF, Object object,
-                                    OnHeap_t onHeap, const TypeInfo &objectTI) {
+CleanupsDepth Initialization::registerObject(IRGenFunction &IGF, Object object,
+                                             OnHeap_t onHeap,
+                                             const TypeInfo &objectTI) {
   // Create the appropriate destroy cleanup.
   CleanupsDepth destroy;
 
@@ -82,6 +99,8 @@ void Initialization::registerObject(IRGenFunction &IGF, Object object,
   }
 
   registerObject(object, destroy);
+
+  return destroy;
 }
 
 void Initialization::registerObjectWithoutDestroy(Object object) {

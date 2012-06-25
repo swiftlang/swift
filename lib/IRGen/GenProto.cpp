@@ -41,6 +41,7 @@
 #include "Explosion.h"
 #include "GenFunc.h"
 #include "GenType.h"
+#include "IndirectTypeInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LValue.h"
@@ -291,6 +292,19 @@ static llvm::Value *emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
   return call;
 }
 
+/// Emit a call to do an 'allocateBuffer' operation.
+static llvm::Value *emitAllocateBufferCall(IRGenFunction &IGF,
+                                           llvm::Value *witnessTable,
+                                           Address buffer) {
+  llvm::Value *allocateFn = loadValueWitness(IGF, witnessTable,
+                                             ValueWitness::AllocateBuffer);
+  llvm::CallInst *result =
+    IGF.Builder.CreateCall2(allocateFn, buffer.getAddress(), witnessTable);
+  result->setCallingConv(IGF.IGM.RuntimeCC);
+  result->setDoesNotThrow();
+  return result;
+}
+
 /// Emit a call to do a 'projectBuffer' operation.
 static llvm::Value *emitProjectBufferCall(IRGenFunction &IGF,
                                           llvm::Value *witnessTable,
@@ -302,6 +316,19 @@ static llvm::Value *emitProjectBufferCall(IRGenFunction &IGF,
   result->setCallingConv(IGF.IGM.RuntimeCC);
   result->setDoesNotThrow();
   return result;
+}
+
+/// Emit a call to do an 'initializeWithCopy' operation.
+static void emitInitializeWithCopyCall(IRGenFunction &IGF,
+                                       llvm::Value *witnessTable,
+                                       llvm::Value *destObject,
+                                       llvm::Value *srcObject) {
+  llvm::Value *copyFn = loadValueWitness(IGF, witnessTable,
+                                         ValueWitness::InitializeWithCopy);
+  llvm::CallInst *call =
+    IGF.Builder.CreateCall3(copyFn, destObject, srcObject, witnessTable);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setDoesNotThrow();
 }
 
 /// Emit a call to do an 'assignWithCopy' operation.
@@ -317,12 +344,34 @@ static void emitAssignWithCopyCall(IRGenFunction &IGF,
   call->setDoesNotThrow();
 }
 
+/// Emit a call to do a 'destroy' operation.
+static void emitDestroyCall(IRGenFunction &IGF,
+                            llvm::Value *witnessTable,
+                            llvm::Value *object) {
+  llvm::Value *fn = loadValueWitness(IGF, witnessTable, ValueWitness::Destroy);
+  llvm::CallInst *call = IGF.Builder.CreateCall2(fn, object, witnessTable);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  setHelperAttributes(call);
+}
+
 /// Emit a call to do a 'destroyBuffer' operation.
 static void emitDestroyBufferCall(IRGenFunction &IGF,
                                   llvm::Value *witnessTable,
                                   Address buffer) {
   llvm::Value *fn = loadValueWitness(IGF, witnessTable,
                                      ValueWitness::DestroyBuffer);
+  llvm::CallInst *call =
+    IGF.Builder.CreateCall2(fn, buffer.getAddress(), witnessTable);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  setHelperAttributes(call);
+}
+
+/// Emit a call to do a 'deallocateBuffer' operation.
+static void emitDeallocateBufferCall(IRGenFunction &IGF,
+                                     llvm::Value *witnessTable,
+                                     Address buffer) {
+  llvm::Value *fn = loadValueWitness(IGF, witnessTable,
+                                     ValueWitness::DeallocateBuffer);
   llvm::CallInst *call =
     IGF.Builder.CreateCall2(fn, buffer.getAddress(), witnessTable);
   call->setCallingConv(IGF.IGM.RuntimeCC);
@@ -347,6 +396,17 @@ namespace {
 
     void emit(IRGenFunction &IGF) const {
       emitDestroyBufferCall(IGF, Table, Buffer);
+    }
+  };
+
+  struct DeallocateBuffer : Cleanup {
+    Address Buffer;
+    llvm::Value *Table;
+    DeallocateBuffer(Address buffer, llvm::Value *table)
+      : Buffer(buffer), Table(table) {}
+
+    void emit(IRGenFunction &IGF) const {
+      emitDeallocateBufferCall(IGF, Table, Buffer);
     }
   };
 
@@ -479,12 +539,18 @@ namespace {
     ArrayRef<WitnessTableEntry> getEntries() const { return Entries; }
   };
 
-  class ProtocolTypeInfo : public TypeInfo {
+  /// A TypeInfo implementation for "protocol types", i.e. types like:
+  ///   Printable
+  /// with the semantic translation:
+  ///   \exists t : Printable . t
+  /// t here is an ArchetypeType, and a more generic protocol<> type
+  /// is a ProtocolCompositionType.
+  class ProtocolTypeInfo : public IndirectTypeInfo<ProtocolTypeInfo, TypeInfo> {
     const ProtocolInfo &Protocol;
 
     ProtocolTypeInfo(llvm::Type *ty, Size size, Alignment align,
                      const ProtocolInfo &protocol)
-      : TypeInfo(ty, size, align, IsNotPOD), Protocol(protocol) {}
+      : IndirectTypeInfo(ty, size, align, IsNotPOD), Protocol(protocol) {}
 
   public:
     static const ProtocolTypeInfo *create(llvm::Type *ty, Size size,
@@ -495,51 +561,24 @@ namespace {
 
     const ProtocolInfo &getProtocol() const { return Protocol; }
 
-    /// Create an uninitialized existential object.
-    Address createTemporary(IRGenFunction &IGF) const {
+    Address allocate(IRGenFunction &IGF) const {
       return IGF.createAlloca(getStorageType(), StorageAlignment,
                               "protocol.temporary");
+    }
+
+    /// Create an uninitialized existential object.
+    Address allocate(IRGenFunction &IGF, Initialization &init,
+                     Initialization::Object object) const {
+      Address address = allocate(IGF);
+      init.markAllocated(IGF, object, OwnedAddress(address, nullptr),
+                         CleanupsDepth::invalid());
+      return address;
     }
 
     static ManagedValue enterCleanupForTemporary(IRGenFunction &IGF,
                                                  Address dest) {
       IGF.pushFullExprCleanup<DestroyExistential>(dest);
       return ManagedValue(dest.getAddress(), IGF.getCleanupsDepth());
-    }
-
-    void getSchema(ExplosionSchema &schema) const {
-      schema.add(ExplosionSchema::Element::forAggregate(getStorageType(),
-                                                        StorageAlignment));
-    }
-    unsigned getExplosionSize(ExplosionKind kind) const { return 1; }
-
-    void load(IRGenFunction &IGF, Address src, Explosion &out) const {
-      // Create a temporary.
-      Address dest = createTemporary(IGF);
-
-      // Initialize it with a copy of the source.
-      ProtocolTypeInfo::initializeWithCopy(IGF, dest, src);
-
-      // Enter a cleanup for the temporary.
-      out.add(enterCleanupForTemporary(IGF, dest));
-    }
-
-    void loadAsTake(IRGenFunction &IGF, Address src, Explosion &out) const {
-      // Create a temporary and memcpy into it, then enter a cleanup
-      // to destroy that.
-      Address dest = createTemporary(IGF);
-      IGF.emitMemCpy(dest, src, StorageSize);
-      out.add(enterCleanupForTemporary(IGF, dest));
-    }
-
-    void assign(IRGenFunction &IGF, Explosion &in, Address dest) const {
-      // Destroy the old value.  This is safe because the value in the
-      // explosion is already +1, so even if there's any aliasing
-      // going on, we're totally fine.
-      emitDestroyExistential(IGF, dest);
-
-      // Take the new value.
-      ProtocolTypeInfo::initialize(IGF, in, dest);
     }
 
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
@@ -549,17 +588,6 @@ namespace {
                                           src.getAddress());
       call->setCallingConv(IGF.IGM.RuntimeCC);
       call->setDoesNotThrow();
-    }
-
-    void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const {
-      emitDestroyExistential(IGF, dest);
-      IGF.emitMemCpy(dest, src, StorageSize);
-    }
-
-    void initialize(IRGenFunction &IGF, Explosion &in, Address dest) const {
-      // Take ownership of the temporary and memcpy it into place.
-      llvm::Value *src = in.forwardNext(IGF);
-      IGF.emitMemCpy(dest, Address(src, StorageAlignment), StorageSize);
     }
 
     void initializeWithCopy(IRGenFunction &IGF,
@@ -576,26 +604,67 @@ namespace {
                                                destBuffer, srcBuffer);
     }
 
-    void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      dest.add(src.claimNext());
-    }
-
-    void copy(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
-      auto srcManaged = in.claimNext();
-      Address src(srcManaged.getValue(), StorageAlignment);
-      ProtocolTypeInfo::load(IGF, src, out);
-      // Force the cleanup here?
-    }
-
-    void manage(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
-      llvm::Value *srcAddr = in.claimUnmanagedNext();
-      out.add(enterCleanupForTemporary(IGF,
-                                       Address(srcAddr, StorageAlignment)));
-    }
-
     void destroy(IRGenFunction &IGF, Address addr) const {
       emitDestroyExistential(IGF, addr);
     }
+  };
+
+  /// A type implementation for an ArchetypeType, otherwise known as a
+  /// type variable: for example, This in a protocol declaration, or T
+  /// in a generic declaration like foo<T>(x : T) -> T.  The critical
+  /// thing here is that performing an operation involving archetypes
+  /// is dependent on the witness binding we can see.
+  class ArchetypeTypeInfo :
+      public IndirectTypeInfo<ArchetypeTypeInfo, TypeInfo> {
+
+    /// The current witness-table pointer registered with this type.
+    llvm::Value *WTable = nullptr;
+    
+  public:
+    ArchetypeTypeInfo(llvm::Type *type)
+      : IndirectTypeInfo(type, Size(1), Alignment(1), IsNotPOD) {}
+
+    /// Return the witness table that's been set for this type.
+    llvm::Value *getWitnessTable(IRGenFunction &IGF) const{
+      assert(WTable && "witness table not set!");
+      return WTable;
+    }
+
+    /// Create an uninitialized archetype object.
+    Address allocate(IRGenFunction &IGF, Initialization &init,
+                     Initialization::Object object) const {
+      // Make a fixed-size buffer.
+      Address buffer = IGF.createAlloca(IGF.IGM.getFixedBufferTy(),
+                                        getFixedBufferAlignment(IGF.IGM),
+                                        "protocol.temporary");
+
+      // Allocate an object of the appropriate type within it.
+      llvm::Value *wtable = getWitnessTable(IGF);
+      Address allocated(emitAllocateBufferCall(IGF, wtable, buffer),
+                        Alignment(1));
+
+      // Push a cleanup to dealloc it.
+      IGF.pushCleanup<DeallocateBuffer>(buffer, wtable);
+      CleanupsDepth dealloc = IGF.getCleanupsDepth();
+      init.markAllocated(IGF, object, OwnedAddress(allocated, nullptr), dealloc);
+
+      return allocated;
+    }
+
+    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
+      emitAssignWithCopyCall(IGF, getWitnessTable(IGF),
+                             dest.getAddress(), src.getAddress());
+    }
+
+    void initializeWithCopy(IRGenFunction &IGF,
+                            Address dest, Address src) const {
+      emitInitializeWithCopyCall(IGF, getWitnessTable(IGF),
+                                 dest.getAddress(), src.getAddress());
+    }
+
+    void destroy(IRGenFunction &IGF, Address addr) const {
+      emitDestroyCall(IGF, getWitnessTable(IGF), addr.getAddress());
+    }    
   };
 
   /// Ways in which an object can fit into a fixed-size buffer.
@@ -757,14 +826,16 @@ static void emitDeallocateBuffer(IRGenFunction &IGF,
 }
 
 namespace {
-  class DeallocateBuffer : public Cleanup {
+  /// A cleanup for deallocating a buffer when the concrete type
+  /// stored there is known.
+  class DeallocateConcreteBuffer : public Cleanup {
     Address Buffer;
     FixedPacking Packing;
     const TypeInfo &ConcreteTI;
 
   public:
-    DeallocateBuffer(Address buffer, FixedPacking packing,
-                     const TypeInfo &concreteTI)
+    DeallocateConcreteBuffer(Address buffer, FixedPacking packing,
+                             const TypeInfo &concreteTI)
       : Buffer(buffer), Packing(packing), ConcreteTI(concreteTI) {}
 
     void emit(IRGenFunction &IGF) const {
@@ -1673,9 +1744,9 @@ namespace {
 
         // Enter a deallocate cleanup if necessary.
         if (!isNeverAllocated(innerResultPacking)) {
-          IGF.pushFullExprCleanup<DeallocateBuffer>(outerResult,
-                                                    innerResultPacking,
-                                                    innerResultTI);
+          IGF.pushFullExprCleanup<DeallocateConcreteBuffer>(outerResult,
+                                                            innerResultPacking,
+                                                            innerResultTI);
           outerResultCleanup = IGF.getCleanupsDepth();
         }
       } else if (innerHasIndirectResult) {
@@ -2014,6 +2085,13 @@ const TypeInfo *TypeConverter::convertProtocolType(ProtocolType *T) {
   return ProtocolTypeInfo::create(type, size, align, protocol);
 }
 
+const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *T) {
+  // For now, just always use the same type.
+  // TODO: also store something about the protocols we conform to?
+  llvm::Type *storageType = IGM.getFixedBufferTy();
+  return new ArchetypeTypeInfo(storageType);
+}
+
 /// Emit an erasure expression as an initializer for the given memory.
 void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
                               Address dest, const TypeInfo &rawTI) {
@@ -2102,7 +2180,7 @@ void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
   CleanupsDepth deallocCleanup;
   bool needsDeallocCleanup = !isNeverAllocated(packing);
   if (needsDeallocCleanup) {
-    IGF.pushFullExprCleanup<DeallocateBuffer>(buffer, packing, concreteTI);
+    IGF.pushFullExprCleanup<DeallocateConcreteBuffer>(buffer, packing, concreteTI);
     deallocCleanup = IGF.getCleanupsDepth();
   }
 
@@ -2122,7 +2200,7 @@ void irgen::emitErasure(IRGenFunction &IGF, ErasureExpr *E, Explosion &out) {
     IGF.getFragileTypeInfo(E->getType()).as<ProtocolTypeInfo>();
 
   // Create a temporary of the appropriate type.
-  Address temp = protoTI.createTemporary(IGF);
+  Address temp = protoTI.allocate(IGF);
 
   // Initialize the temporary.
   emitErasureAsInit(IGF, E, temp, protoTI);

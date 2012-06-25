@@ -226,6 +226,9 @@ const TypeInfo *TypeConverter::convertType(CanType canTy) {
     return createPrimitive(llvm::IntegerType::get(Ctx, BitWidth),
                            Size(ByteSize), Alignment(ByteSize));
   }
+
+  case TypeKind::Archetype:
+    return convertArchetypeType(cast<ArchetypeType>(ty));
   case TypeKind::LValue:
     return convertLValueType(cast<LValueType>(ty));
   case TypeKind::Tuple:
@@ -245,16 +248,6 @@ const TypeInfo *TypeConverter::convertType(CanType canTy) {
       
   case TypeKind::ProtocolComposition:
       llvm_unreachable("ProtocolComposition types are unimplemented");
-      
-  case TypeKind::Archetype: {
-    // FIXME: This is very wrong. We actually want an ArchetypeTypeInfo
-    // that knows how to query the local context to get the witness table from
-    // the current context (== a generic function) and use that for all init/
-    // assign/destroy/etc. operations.
-    llvm::Type *BufferTy = IGM.getFixedBufferTy();
-    return createPrimitive(BufferTy, Size(BufferTy->getScalarSizeInBits()/8U),
-                           IGM.getPointerAlignment());
-  }
   }
   llvm_unreachable("bad type kind");
 }
