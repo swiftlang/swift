@@ -1121,6 +1121,8 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
           << E->getSourceRange();
         TC.printOverloadSetCandidates(Viable);
       }
+      E->setType(ErrorType::get(TC.Context));
+      OSE->setType(ErrorType::get(TC.Context));
     }
     
     return nullptr;
@@ -1737,6 +1739,28 @@ static bool recordDeduction(CoercionContext &CC, SourceLoc Loc,
 
   // Record this new deduction.
   CC.Substitutions[Archetype] = DeducedTy;
+
+  // Check that the deduced type meets all of the requirements placed on the
+  // archetype.
+  TypeChecker &TC = CC.TC;
+  SmallVectorImpl<ProtocolConformance *> &MyConformances
+    = CC.Conformance[Archetype];
+  for (auto Proto : Archetype->getConformsTo()) {
+    ProtocolConformance *Conformance = nullptr;
+    if (TC.conformsToProtocol(DeducedTy, Proto, &Conformance)) {
+      MyConformances.push_back(Conformance);
+      continue;
+    }
+
+    if (Flags & CF_Apply) {
+      TC.diagnose(Loc, diag::type_does_not_conform, DeducedTy,
+                  Proto->getDeclaredType());
+      TC.diagnose(Proto->getLoc(), diag::protocol_here, Proto->getName());
+    }
+
+    return true;
+  }
+
   return false;
 }
 
@@ -1814,6 +1838,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
 
       // We always deduce an object type (never a reference type).
       Type DeducedTy = E->getType()->getRValueType();
+
       if (recordDeduction(CC, E->getLoc(), Archetype, DeducedTy, Flags))
         return nullptr;
 

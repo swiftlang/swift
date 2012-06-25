@@ -103,6 +103,11 @@ struct CoercionContext {
   TypeChecker &TC;
   TypeSubstitutionMap Substitutions;
 
+  /// \brief Mapping from each of the archetypes to the set of protocol-
+  /// conformance mappings for each of the requirements on the archetype.
+  llvm::DenseMap<ArchetypeType *, SmallVector<ProtocolConformance *, 2>>
+    Conformance;
+
   /// \brief Identify the set of generic parameters for which we want to
   /// compute substitutions.
   void requestSubstitutionsFor(ArrayRef<GenericParam> Params);
