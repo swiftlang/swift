@@ -15,6 +15,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <mach/mach_time.h>
+#include <sys/resource.h>
+#include <sys/errno.h>
 #include <cstring>
 #include <cstdint>
 #include <cstdio>
@@ -124,5 +127,98 @@ extern "C"
 uint32_t
 swift_replOutputIsUTF8(void) {
   static auto rval = _swift_replOutputIsUTF8();
+  return rval;
+}
+
+#if defined(__i386__) || defined(__x86_64__)
+static inline uint64_t
+rdtsc() {
+  uint32_t lo, hi;
+  asm("rdtsc" : "=a" (lo), "=d" (hi));
+  return uint64_t(hi) << 32 | lo;
+}
+#else
+#error "not supported"
+#endif
+
+static bool _swift_initBenchmark();
+
+extern "C"
+uint64_t
+swift_startBenchmark(void) {
+  __attribute__((unused)) static auto tmp = _swift_initBenchmark();
+  return rdtsc();
+}
+
+extern "C"
+void
+swift_printBenchmark(uint64_t start, uint64_t laps, char *buffer, int64_t len) {
+  double val = (rdtsc() - start) / double(laps);
+  printf("%12.2f  %*s\n", val, (int)len, buffer);
+}
+#include <stdio.h>
+#include <string.h>
+
+static bool
+_swift_initBenchmark() {
+  union {
+    unsigned reg[4*3];
+    char brand[48];
+  } u;
+  char brand[48];
+  char *s2 = u.brand;
+  char *s1 = brand;
+  unsigned eax, ebx, ecx, edx;
+  memset(&u, 0, sizeof(u));
+
+  eax = 0x80000002;
+  asm("cpuid" : "+a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx));
+  u.reg[0] = eax;
+  u.reg[1] = ebx;
+  u.reg[2] = ecx;
+  u.reg[3] = edx;
+
+  eax = 0x80000003;
+  asm("cpuid" : "+a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx));
+  u.reg[4] = eax;
+  u.reg[5] = ebx;
+  u.reg[6] = ecx;
+  u.reg[7] = edx;
+
+  eax = 0x80000004;
+  asm("cpuid" : "+a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx));
+  u.reg[8] = eax;
+  u.reg[9] = ebx;
+  u.reg[10] = ecx;
+  u.reg[11] = edx;
+
+  while (*s2 == ' ') {
+    s2++;
+  }
+  do {
+    while (s2[0] == ' ' && s2[1] == ' ') {
+      s2++;
+    }
+  } while ((*s1++ = *s2++));
+  printf("Processor: %s\n\n", brand);
+
+  eax = 6;
+  asm("cpuid" : "+a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx));
+
+  bool rval = eax & 2;
+  if (rval) {
+    fprintf(stderr, "WARNING: TurboBoost. Results will be less reliable.\n");
+    fprintf(stderr, "         Consider: sudo /usr/local/bin/pstates -D\n\n");
+  }
+
+  // Sigh... getpriority() can legitimately return -1
+  errno = 0;
+  int pri = getpriority(PRIO_PROCESS, 0);
+  assert(errno == 0);
+  if (pri >= 0) {
+    fprintf(stderr, "WARNING: Non-elevated priority. Results will be less reliable.\n");
+    fprintf(stderr, "         Consider: sudo nice -n -15 ./myBench\n\n");
+  }
+
   return rval;
 }
