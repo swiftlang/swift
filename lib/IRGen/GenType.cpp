@@ -28,6 +28,7 @@
 #include "Address.h"
 #include "Explosion.h"
 #include "Linking.h"
+#include "ProtocolInfo.h"
 #include "ScalarTypeInfo.h"
 
 using namespace swift;
@@ -97,8 +98,6 @@ llvm::Value *TypeInfo::getAlignmentOnly(IRGenFunction &IGF) const {
   return getSizeAndAlignment(IGF).second;
 }
 
-static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
-
 namespace {
   class PrimitiveTypeInfo :
     public PODSingleScalarTypeInfo<PrimitiveTypeInfo, TypeInfo> {
@@ -115,13 +114,23 @@ const TypeInfo *TypeConverter::createPrimitive(llvm::Type *type,
   return new PrimitiveTypeInfo(type, size, align);
 }
 
+static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
+static ProtocolInfo *invalidProtocolInfo() { return (ProtocolInfo*) 1; }
+
 TypeConverter::TypeConverter(IRGenModule &IGM)
-  : IGM(IGM), FirstConverted(invalidTypeInfo()) {}
+  : IGM(IGM), FirstType(invalidTypeInfo()),
+    FirstProtocol(invalidProtocolInfo()) {}
 
 TypeConverter::~TypeConverter() {
   // Delete all the converted type infos.
-  for (const TypeInfo *I = FirstConverted; I != invalidTypeInfo(); ) {
+  for (const TypeInfo *I = FirstType; I != invalidTypeInfo(); ) {
     const TypeInfo *Cur = I;
+    I = Cur->NextConverted;
+    delete Cur;
+  }
+
+  for (const ProtocolInfo *I = FirstProtocol; I != invalidProtocolInfo(); ) {
+    const ProtocolInfo *Cur = I;
     I = Cur->NextConverted;
     delete Cur;
   }
@@ -146,17 +155,17 @@ const TypeInfo &TypeConverter::getFragileTypeInfo(Type sugaredTy) {
   assert(!sugaredTy.isNull());
   CanType canonicalTy = sugaredTy->getCanonicalType();
 
-  auto entry = IGM.Types.Converted.find(canonicalTy.getPointer());
-  if (entry != IGM.Types.Converted.end())
+  auto entry = Types.find(canonicalTy.getPointer());
+  if (entry != Types.end())
     return *entry->second;
 
   const TypeInfo *result = convertType(canonicalTy);
-  IGM.Types.Converted[canonicalTy.getPointer()] = result;
+  Types[canonicalTy.getPointer()] = result;
 
   // If the type info hasn't been added to the list of types, do so.
   if (!result->NextConverted) {
-    result->NextConverted = IGM.Types.FirstConverted;
-    IGM.Types.FirstConverted = result;
+    result->NextConverted = FirstType;
+    FirstType = result;
   }
 
   return *result;

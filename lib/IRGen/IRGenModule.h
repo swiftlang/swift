@@ -48,6 +48,7 @@ namespace swift {
   class OneOfElementDecl;
   class OneOfDecl;
   class OneOfType;
+  class ProtocolDecl;
   class SourceLoc;
   class StructType;
   class TranslationUnit;
@@ -63,6 +64,7 @@ namespace irgen {
   class ExplosionSchema;
   class LinkEntity;
   class Options;
+  class ProtocolInfo;
   class TypeConverter;
   class TypeInfo;
   enum class ValueWitness : unsigned;
@@ -118,6 +120,7 @@ private:
 
 //--- Types -----------------------------------------------------------------
 public:
+  const ProtocolInfo &getProtocolInfo(ProtocolDecl *D);
   const TypeInfo &getFragileTypeInfo(Type T);
   llvm::Type *getFragileType(Type T);
   llvm::StructType *createNominalType(TypeDecl *D);

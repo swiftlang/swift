@@ -52,8 +52,10 @@ add_swift_library(swiftIRGen
   Linking.h
   Mangle.cpp
   OptimizeARC.cpp
+  ProtocolInfo.h
   Scope.h
   StructLayout.cpp
   StructLayout.h
   TypeInfo.h
+  ValueWitness.h
   DEPENDS swiftAST)

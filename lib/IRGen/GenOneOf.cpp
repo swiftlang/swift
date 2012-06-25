@@ -280,8 +280,8 @@ const TypeInfo *TypeConverter::convertOneOfType(OneOfType *T) {
   if (numElements == 1) {
     SingletonOneofTypeInfo *convertedTInfo =
       new SingletonOneofTypeInfo(convertedStruct, Size(0), Alignment(0), IsPOD);
-    assert(!IGM.Types.Converted.count(T));
-    IGM.Types.Converted.insert(std::make_pair(T, convertedTInfo));
+    assert(!Types.count(T));
+    Types.insert(std::make_pair(T, convertedTInfo));
 
     Type eltType =
         cast<OneOfElementDecl>(D->getMembers()[0])->getArgumentType();

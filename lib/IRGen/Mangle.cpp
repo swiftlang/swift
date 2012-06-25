@@ -24,10 +24,10 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/ErrorHandling.h"
 
-#include "IRGenModule.h"
-#include "GenProto.h"
-#include "Linking.h"
 #include "IRGen.h"
+#include "IRGenModule.h"
+#include "Linking.h"
+#include "ValueWitness.h"
 
 using namespace swift;
 using namespace irgen;

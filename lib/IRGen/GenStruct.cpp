@@ -222,7 +222,7 @@ const TypeInfo *TypeConverter::convertStructType(StructType *T) {
 
   // Allocate the TypeInfo and register it as a forward-declaration.
   auto structTI = builder.create(fields);
-  IGM.Types.Converted.insert(std::make_pair(T, structTI));
+  Types.insert(std::make_pair(T, structTI));
 
   // Complete the type and return it.
   return builder.complete(fields);

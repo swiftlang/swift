@@ -44,6 +44,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LValue.h"
+#include "ProtocolInfo.h"
 #include "TypeInfo.h"
 
 #include "GenProto.h"
@@ -194,19 +195,6 @@ static llvm::StringRef getValueWitnessLabel(ValueWitness index) {
 }
 
 namespace {
-  /// A class which encapsulates an index into a witness table.
-  class WitnessIndex {
-    unsigned Value;
-  public:
-    WitnessIndex() = default;
-    WitnessIndex(ValueWitness index) : Value(unsigned(index)) {}
-    explicit WitnessIndex(unsigned index) : Value(index) {}
-
-    unsigned getValue() const { return Value; }
-
-    bool isZero() const { return Value == 0; }
-    bool isValueWitness() const { return Value < NumValueWitnesses; }
-  };
 }
 
 /// Given the offset of the buffer within an existential type.
@@ -460,73 +448,6 @@ namespace {
     }
   };
 
-  class ConformanceInfo;
-
-  /// A witness to a specific element of a protocol.  Every
-  /// ProtocolTypeInfo stores one of these for each declaration in the
-  /// protocol.
-  /// 
-  /// The structure of a witness varies by the type of declaration:
-  ///   - a function requires a single witness, the function;
-  ///   - a variable requires two witnesses, a getter and a setter;
-  ///   - a subscript requires two witnesses, a getter and a setter;
-  ///   - a type requires a pointer to a witness for that type and
-  ///     the protocols it obeys.
-  class WitnessTableEntry {
-    Decl *Member;
-    WitnessIndex BeginIndex;
-
-    WitnessTableEntry(Decl *member, WitnessIndex begin)
-      : Member(member), BeginIndex(begin) {}
-
-  public:
-    WitnessTableEntry() = default;
-
-    Decl *getMember() const {
-      return Member;
-    }
-
-    static WitnessTableEntry forPrefixBase(ProtocolDecl *proto) {
-      return WitnessTableEntry(proto, WitnessIndex(0));
-    }
-
-    static WitnessTableEntry forOutOfLineBase(ProtocolDecl *proto,
-                                              WitnessIndex index) {
-      assert(!index.isValueWitness());
-      return WitnessTableEntry(proto, index);
-    }
-
-    /// Is this a base-protocol entry?
-    bool isBase() const { return isa<ProtocolDecl>(Member); }
-
-    /// Is the table for this base-protocol entry "out of line",
-    /// i.e. there is a witness which indirectly points to it, or is
-    /// it a prefix of the layout of this protocol?
-    bool isOutOfLineBase() const {
-      assert(isBase());
-      return !BeginIndex.isZero();
-    }
-
-    /// Return the index at which to find the table for this
-    /// base-protocol entry.
-    WitnessIndex getOutOfLineBaseIndex() const {
-      assert(isOutOfLineBase());
-      return BeginIndex;
-    }
-
-    static WitnessTableEntry forFunction(FuncDecl *func, WitnessIndex index) {
-      assert(!index.isValueWitness());
-      return WitnessTableEntry(func, index);
-    }
-
-    bool isFunction() const { return isa<FuncDecl>(Member); }
-
-    WitnessIndex getFunctionIndex() const {
-      assert(isFunction());
-      return BeginIndex;
-    }
-  };
-
   /// A class which lays out a witness table in the abstract.
   class WitnessTableLayout : public WitnessVisitor<WitnessTableLayout> {
     unsigned NumWitnesses;
@@ -559,72 +480,20 @@ namespace {
   };
 
   class ProtocolTypeInfo : public TypeInfo {
-    /// The number of witnesses in this protocol.
-    unsigned NumWitnesses;
-
-    /// The number of WitnessTableEntry objects stored here.
-    unsigned NumTableEntries;
-
-    /// A table of all the conformance infos we've registered with
-    /// this type.
-    mutable llvm::DenseMap<const ProtocolConformance*, ConformanceInfo*>
-      Conformances;
+    const ProtocolInfo &Protocol;
 
     ProtocolTypeInfo(llvm::Type *ty, Size size, Alignment align,
-                     unsigned numWitnesses, unsigned numEntries)
-      : TypeInfo(ty, size, align, IsNotPOD),
-        NumWitnesses(numWitnesses), NumTableEntries(numEntries) {}
-
-    WitnessTableEntry *getEntriesBuffer() {
-      return reinterpret_cast<WitnessTableEntry*>(this+1);
-    }
-    const WitnessTableEntry *getEntriesBuffer() const {
-      return reinterpret_cast<const WitnessTableEntry*>(this+1);
-    }
+                     const ProtocolInfo &protocol)
+      : TypeInfo(ty, size, align, IsNotPOD), Protocol(protocol) {}
 
   public:
-    ~ProtocolTypeInfo();
-
     static const ProtocolTypeInfo *create(llvm::Type *ty, Size size,
                                           Alignment align,
-                                          const WitnessTableLayout &layout) {
-      unsigned numEntries = layout.getEntries().size();
-      size_t bufferSize = sizeof(ProtocolTypeInfo)
-                        + numEntries * sizeof(WitnessTableEntry);
-      void *buffer = ::operator new(bufferSize);
-      auto result = new(buffer) ProtocolTypeInfo(ty, size, align,
-                                                 layout.getNumWitnesses(),
-                                                 numEntries);
-
-      memcpy(result->getEntriesBuffer(), layout.getEntries().data(),
-             numEntries * sizeof(WitnessTableEntry));
-
-      return result;
+                                          const ProtocolInfo &protocol) {
+      return new ProtocolTypeInfo(ty, size, align, protocol);
     }
 
-    const ConformanceInfo &getConformance(IRGenModule &IGM,
-                                          Type concreteType,
-                                          const TypeInfo &concreteTI,
-                                          ProtocolDecl *protocol,
-                                          const ProtocolConformance &conf) const;
-
-    /// Return the number of witnesses required by this protocol
-    /// beyond the basic value-type witnesses.
-    unsigned getNumTableEntries() const { return NumTableEntries; }
-
-    ArrayRef<WitnessTableEntry> getWitnessEntries() const {
-      return ArrayRef<WitnessTableEntry>(getEntriesBuffer(),
-                                         getNumTableEntries());
-    }
-
-    const WitnessTableEntry &getWitnessEntry(Decl *member) const {
-      // FIXME: do a binary search if the number of witnesses is large
-      // enough.
-      for (auto &witness : getWitnessEntries())
-        if (witness.getMember() == member)
-          return witness;
-      llvm_unreachable("didn't find entry for member!");
-    }
+    const ProtocolInfo &getProtocol() const { return Protocol; }
 
     /// Create an uninitialized existential object.
     Address createTemporary(IRGenFunction &IGF) const {
@@ -739,47 +608,35 @@ namespace {
 
     // Resilience: it needs to be checked dynamically.
   };
-
-  /// Detail about how an object conforms to a protocol.
-  class ConformanceInfo {
-    friend class ProtocolTypeInfo;
-
-    /// The pointer to the table.  In practice, it's not really
-    /// reasonable for this to always be a constant!  It probably
-    /// needs to be managed by the runtime, and the information stored
-    /// here would just indicate how to find the actual thing.
-    llvm::Constant *Table;
-
-    FixedPacking Packing;
-
-  public:
-    llvm::Value *getTable(IRGenFunction &IGF) const {
-      return Table;
-    }
-
-    /// Try to get this table as a constant pointer.  This might just
-    /// not be supportable at all.
-    llvm::Constant *tryGetConstantTable() const {
-      return Table;
-    }
-
-    FixedPacking getPacking() const {
-      return Packing;
-    }
-  };
 }
 
-ProtocolTypeInfo::~ProtocolTypeInfo() {
-  for (auto &conf : Conformances) {
-    delete conf.second;
+/// Detail about how an object conforms to a protocol.
+class irgen::ConformanceInfo {
+  friend class ProtocolInfo;
+
+  /// The pointer to the table.  In practice, it's not really
+  /// reasonable for this to always be a constant!  It probably
+  /// needs to be managed by the runtime, and the information stored
+  /// here would just indicate how to find the actual thing.
+  llvm::Constant *Table;
+
+  FixedPacking Packing;
+
+public:
+  llvm::Value *getTable(IRGenFunction &IGF) const {
+    return Table;
   }
-}
 
-static const ProtocolTypeInfo &getProtocolTypeInfo(IRGenFunction &IGF,
-                                                   ProtocolDecl *proto) {
-  Type ty = proto->getDeclaredType();
-  return IGF.getFragileTypeInfo(ty).as<ProtocolTypeInfo>();
-}
+  /// Try to get this table as a constant pointer.  This might just
+  /// not be supportable at all.
+  llvm::Constant *tryGetConstantTable() const {
+    return Table;
+  }
+
+  FixedPacking getPacking() const {
+    return Packing;
+  }
+};
 
 static FixedPacking computePacking(IRGenModule &IGM,
                                    const TypeInfo &concreteTI) {
@@ -2004,8 +1861,8 @@ namespace {
         Conformance.InheritedMapping.find(baseProto)->second;
       assert(astConf && "couldn't find base conformance!");
       const ConformanceInfo &conf =
-        baseTI.getConformance(IGM, ConcreteType, ConcreteTI,
-                              baseProto, *astConf);
+        baseTI.getProtocol().getConformance(IGM, ConcreteType, ConcreteTI,
+                                            baseProto, *astConf);
 
       llvm::Constant *baseWitness = conf.tryGetConstantTable();
       assert(baseWitness && "couldn't get a constant table!");
@@ -2038,12 +1895,56 @@ namespace {
   };
 }
 
+/// Do a memoized witness-table layout for a protocol.
+const ProtocolInfo &IRGenModule::getProtocolInfo(ProtocolDecl *protocol) {
+  return Types.getProtocolInfo(protocol);
+}
+
+/// Do a memoized witness-table layout for a protocol.
+const ProtocolInfo &TypeConverter::getProtocolInfo(ProtocolDecl *protocol) {
+  // Check whether we've already translated this protocol.
+  auto it = Protocols.find(protocol);
+  if (it != Protocols.end()) return *it->second;
+
+  // If not, layout the protocol's witness table.
+  WitnessTableLayout layout(IGM);
+  layout.visit(protocol);
+
+  // Create a ProtocolInfo object from the layout.
+  ProtocolInfo *info = ProtocolInfo::create(layout.getNumWitnesses(),
+                                            layout.getEntries());
+  info->NextConverted = FirstProtocol;
+  FirstProtocol = info;
+
+  // Memoize.
+  Protocols.insert(std::make_pair(protocol, info));
+
+  // Done.
+  return *info;
+}
+
+/// Allocate a new ProtocolInfo.
+ProtocolInfo *ProtocolInfo::create(unsigned numWitnesses,
+                                   ArrayRef<WitnessTableEntry> table) {
+  unsigned numEntries = table.size();
+  size_t bufferSize =
+    sizeof(ProtocolInfo) + numEntries * sizeof(WitnessTableEntry);
+  void *buffer = ::operator new(bufferSize);
+  return new(buffer) ProtocolInfo(numWitnesses, table);
+}
+
+ProtocolInfo::~ProtocolInfo() {
+  for (auto &conf : Conformances) {
+    delete conf.second;
+  }
+}
+
 /// Find the conformance information for a protocol.
 const ConformanceInfo &
-ProtocolTypeInfo::getConformance(IRGenModule &IGM, Type concreteType,
-                                 const TypeInfo &concreteTI,
-                                 ProtocolDecl *protocol,
-                           const ProtocolConformance &conformance) const {
+ProtocolInfo::getConformance(IRGenModule &IGM, Type concreteType,
+                             const TypeInfo &concreteTI,
+                             ProtocolDecl *protocol,
+                             const ProtocolConformance &conformance) const {
   // Check whether we've already cached this.
   auto it = Conformances.find(&conformance);
   if (it != Conformances.end()) return *it->second;
@@ -2102,8 +2003,7 @@ const TypeInfo *TypeConverter::convertProtocolType(ProtocolType *T) {
   };
   type->setBody(fields);
 
-  WitnessTableLayout layout(IGM);
-  layout.visit(T->getDecl());
+  const ProtocolInfo &protocol = getProtocolInfo(T->getDecl());
 
   Alignment align = getFixedBufferAlignment(IGM);
 
@@ -2111,7 +2011,7 @@ const TypeInfo *TypeConverter::convertProtocolType(ProtocolType *T) {
   assert(size.roundUpToAlignment(align) == size);
   size += getFixedBufferSize(IGM);
 
-  return ProtocolTypeInfo::create(type, size, align, layout);
+  return ProtocolTypeInfo::create(type, size, align, protocol);
 }
 
 /// Emit an erasure expression as an initializer for the given memory.
@@ -2134,10 +2034,10 @@ void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
     // existential type in some trivial manner (e.g., to an inherited protocol).
     Type srcType = E->getSubExpr()->getType();
     const ProtocolTypeInfo &srcProtoTI =
-    IGF.getFragileTypeInfo(srcType).as<ProtocolTypeInfo>();
+      IGF.getFragileTypeInfo(srcType).as<ProtocolTypeInfo>();
     
     // Compute the path to the destination protocol.
-    auto &witnessEntry = srcProtoTI.getWitnessEntry(protocol);
+    auto &witnessEntry = srcProtoTI.getProtocol().getWitnessEntry(protocol);
     assert(witnessEntry.isBase());
     
     // Emit the sub-expression in-place.  Bitcasting the destination is
@@ -2167,7 +2067,7 @@ void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
   }
 
   // We're converting from a concrete type to an existential type.
-  const ProtocolTypeInfo &protoTI = rawTI.as<ProtocolTypeInfo>();
+  auto &protoI = rawTI.as<ProtocolTypeInfo>().getProtocol();
 
   // Find the concrete type.
   Type concreteType = E->getSubExpr()->getType();
@@ -2176,8 +2076,8 @@ void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
   // Compute the conformance information.
   assert(E->getConformances()[0]);
   const ConformanceInfo &conformance =
-    protoTI.getConformance(IGF.IGM, concreteType, concreteTI,
-                           protocol, *E->getConformances()[0]);
+    protoI.getConformance(IGF.IGM, concreteType, concreteTI,
+                          protocol, *E->getConformances()[0]);
 
   // First things first: compute the table and store that into the
   // destination.
@@ -2303,8 +2203,8 @@ Callee irgen::emitExistentialMemberRefCallee(IRGenFunction &IGF,
   // Load the witness table.
   llvm::Value *table = loadWitnessTable(IGF, existAddr);
 
-  auto &ownerTI = getProtocolTypeInfo(IGF,
-                                    cast<ProtocolDecl>(fn->getDeclContext()));
+  auto &ownerPI =
+    IGF.IGM.getProtocolInfo(cast<ProtocolDecl>(fn->getDeclContext()));
 
   if (!fn->isStatic()) {
     // Use the first-level witness table to copy into a new buffer.
@@ -2342,8 +2242,8 @@ Callee irgen::emitExistentialMemberRefCallee(IRGenFunction &IGF,
     ProtocolDecl *base = basePath[i];
 
     // Find the witness table index for the base protocol.
-    auto &derivedTI = getProtocolTypeInfo(IGF, derived);
-    auto &witnessEntry = derivedTI.getWitnessEntry(base);
+    auto &derivedPI = IGF.IGM.getProtocolInfo(derived);
+    auto &witnessEntry = derivedPI.getWitnessEntry(base);
     assert(witnessEntry.isBase());
 
     // If it's an inline base, the conversion is trivial.
@@ -2355,7 +2255,7 @@ Callee irgen::emitExistentialMemberRefCallee(IRGenFunction &IGF,
   }
 
   // Pull out the function witness.
-  auto &witnessEntry = ownerTI.getWitnessEntry(fn);
+  auto &witnessEntry = ownerPI.getWitnessEntry(fn);
   llvm::Value *witness =
     loadOpaqueWitness(IGF, table, witnessEntry.getFunctionIndex());
 

@@ -29,6 +29,7 @@ namespace swift {
   class MetaTypeType;
   class ModuleType;
   class OneOfType;
+  class ProtocolDecl;
   class ProtocolType;
   class StructType;
   class TupleType;
@@ -38,18 +39,21 @@ namespace swift {
 namespace irgen {
   class Alignment;
   class IRGenModule;
+  class ProtocolInfo;
   class Size;
   class TypeInfo;
 
 /// The helper class for generating types.
 class TypeConverter {
   IRGenModule &IGM;
-  llvm::DenseMap<TypeBase*, const TypeInfo*> Converted;
-  const TypeInfo *FirstConverted;
+  llvm::DenseMap<TypeBase*, const TypeInfo*> Types;
+  llvm::DenseMap<ProtocolDecl*, const ProtocolInfo*> Protocols;
+  const TypeInfo *FirstType;
+  const ProtocolInfo *FirstProtocol;
 
   static const TypeInfo *createPrimitive(llvm::Type *T,
                                          Size size, Alignment align);
-    
+
   const TypeInfo *convertType(CanType T);
   const TypeInfo *convertTupleType(TupleType *T);
   const TypeInfo *convertOneOfType(OneOfType *T);
@@ -64,10 +68,11 @@ class TypeConverter {
   const TypeInfo *convertBuiltinObjectPointer();
   const TypeInfo *convertBuiltinObjCPointer();
 
- public:
+public:
   TypeConverter(IRGenModule &IGM);
   ~TypeConverter();
   const TypeInfo &getFragileTypeInfo(Type T);
+  const ProtocolInfo &getProtocolInfo(ProtocolDecl *P);
 };
 
 } // end namespace irgen
