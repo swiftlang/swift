@@ -606,7 +606,8 @@ namespace {
       public IndirectTypeInfo<ArchetypeTypeInfo, TypeInfo> {
 
     /// The current witness-table pointer registered with this type.
-    llvm::Value *WTable = nullptr;
+    /// I'm not really sure this is a good idea.
+    mutable llvm::Value *WTable = nullptr;
     
   public:
     ArchetypeTypeInfo(llvm::Type *type)
@@ -616,6 +617,10 @@ namespace {
     llvm::Value *getWitnessTable(IRGenFunction &IGF) const{
       assert(WTable && "witness table not set!");
       return WTable;
+    }
+
+    void setWitnessTable(llvm::Value *wtable) const {
+      WTable = wtable;
     }
 
     /// Create an uninitialized archetype object.
@@ -2085,6 +2090,13 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *T) {
   // TODO: also store something about the protocols we conform to?
   llvm::Type *storageType = IGM.getOpaqueStructTy();
   return new ArchetypeTypeInfo(storageType);
+}
+
+/// Inform IRGenFunction that the given archetype has the given value
+/// witness value within this scope.
+void IRGenFunction::bindArchetype(ArchetypeType *type, llvm::Value *wtable) {
+  auto &ti = getFragileTypeInfo(type).as<ArchetypeTypeInfo>();
+  ti.setWitnessTable(wtable);
 }
 
 /// Emit an erasure expression as an initializer for the given memory.

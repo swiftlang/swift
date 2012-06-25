@@ -34,6 +34,7 @@ namespace llvm {
 }
 
 namespace swift {
+  class ArchetypeType;
   class AssignStmt;
   class BraceStmt;
   class BreakStmt;
@@ -343,6 +344,8 @@ public:
   llvm::Function *getAddrOfLocalFunction(FuncDecl *func,
                                          ExplosionKind explosionLevel,
                                          unsigned uncurryLevel);
+
+  void bindArchetype(ArchetypeType *type, llvm::Value *wtable);
 
 private:
   union LocalEntry {
