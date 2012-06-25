@@ -141,6 +141,9 @@ rdtsc() {
 #error "not supported"
 #endif
 
+static double interruptOverhead;
+static double loopOverhead;
+
 static uint64_t
 _swift_startBenchmark(void) {
   return rdtsc();
@@ -149,16 +152,19 @@ _swift_startBenchmark(void) {
 extern "C"
 void
 swift_printBenchmark(uint64_t start, uint64_t laps, char *buffer, int64_t len) {
-  double val = (rdtsc() - start) / double(laps);
+  double val = rdtsc() - start;
+  val /= laps;
+  val /= interruptOverhead;
+  val -= loopOverhead;
   printf("%12.2f  %*s\n", val, (int)len, buffer);
 }
 
 extern "C"
 __attribute__((noinline,used))
-typeof(&_swift_startBenchmark)
+__typeof__(&_swift_startBenchmark)
 _swift_initBenchmark() asm("_swift_startBenchmark");
 
-typeof(&_swift_startBenchmark)
+__typeof__(&_swift_startBenchmark)
 _swift_initBenchmark() {
   asm(".symbol_resolver _swift_startBenchmark");
   union {
@@ -170,6 +176,7 @@ _swift_initBenchmark() {
   char *s1 = brand;
   unsigned eax, ebx, ecx, edx;
   memset(&u, 0, sizeof(u));
+
 
   eax = 0x80000002;
   asm("cpuid" : "+a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx));
@@ -201,6 +208,21 @@ _swift_initBenchmark() {
     }
   } while ((*s1++ = *s2++));
   printf("Processor: %s\n\n", brand);
+
+  uint64_t start = rdtsc();
+  for (unsigned long i = 0; i < 1000000000ull; i++) {
+    asm("");
+  }
+  double delta = (rdtsc() - start) / 1000000000.0;
+  assert((delta >= 1.0 && delta < 1.05) || (delta >= 2.0 && delta < 2.05));
+  if (delta >= 2.0) {
+    loopOverhead = 2.0;
+    interruptOverhead = delta / 2.0;
+  } else {
+    loopOverhead = 1.0;
+    interruptOverhead = delta / 1.0;
+  }
+  assert((interruptOverhead - 1.0) < 0.01);
 
   eax = 6;
   asm("cpuid" : "+a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx));
