@@ -21,6 +21,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Explosion.h"
+#include "FixedTypeInfo.h"
 #include "TypeInfo.h"
 #include "StructLayout.h"
 
@@ -95,7 +96,7 @@ public:
 
 /// A metaprogrammed TypeInfo implementation for sequential types.
 template <class Impl, class FieldImpl_>
-class SequentialTypeInfo : public TypeInfo {
+class SequentialTypeInfo : public FixedTypeInfo { // FIXME: not true!
 public:
   typedef FieldImpl_ FieldImpl;
 
@@ -115,7 +116,7 @@ private:
 
 protected:
   SequentialTypeInfo(llvm::Type *ty, unsigned numFields)
-    : TypeInfo(ty, Size(0), Alignment(0), IsPOD), NumFields(numFields) {
+    : FixedTypeInfo(ty, Size(0), Alignment(0), IsPOD), NumFields(numFields) {
     assert(!isComplete());
   }
 

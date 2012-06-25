@@ -33,6 +33,7 @@
 #include "IRGenModule.h"
 #include "Explosion.h"
 #include "LValue.h"
+#include "FixedTypeInfo.h"
 #include "ScalarTypeInfo.h"
 
 using namespace swift;
@@ -268,7 +269,7 @@ Address IRGenFunction::emitMaterializeWithWriteback(LValue &&lvalue,
 namespace {
   /// The type layout for [byref(heap)] types.
   class HeapLValueTypeInfo :
-    public ScalarTypeInfo<HeapLValueTypeInfo,TypeInfo> {
+    public ScalarTypeInfo<HeapLValueTypeInfo,FixedTypeInfo> {
   public:
     HeapLValueTypeInfo(llvm::StructType *type, Size s, Alignment a)
       : ScalarTypeInfo(type, s, a, IsNotPOD) {}

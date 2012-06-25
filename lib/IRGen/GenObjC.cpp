@@ -19,6 +19,7 @@
 
 #include "Cleanup.h"
 #include "Explosion.h"
+#include "FixedTypeInfo.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -75,7 +76,7 @@ static void enterObjCReleaseCleanup(IRGenFunction &IGF, llvm::Value *value,
 
 namespace {
   /// A type-info implementation suitable for an ObjC pointer type.
-  class ObjCTypeInfo : public SingleScalarTypeInfo<ObjCTypeInfo, TypeInfo> {
+  class ObjCTypeInfo : public SingleScalarTypeInfo<ObjCTypeInfo, FixedTypeInfo> {
   public:
     ObjCTypeInfo(llvm::PointerType *storageType, Size size, Alignment align)
       : SingleScalarTypeInfo(storageType, size, align, IsNotPOD) {

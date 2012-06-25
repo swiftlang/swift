@@ -74,6 +74,7 @@
 #include "IRGenModule.h"
 #include "LValue.h"
 #include "Condition.h"
+#include "FixedTypeInfo.h"
 #include "ScalarTypeInfo.h"
 
 #include "GenFunc.h"
@@ -276,7 +277,7 @@ namespace {
   };
 
   /// The type-info class.
-  class FuncTypeInfo : public ScalarTypeInfo<FuncTypeInfo, TypeInfo> {
+  class FuncTypeInfo : public ScalarTypeInfo<FuncTypeInfo, FixedTypeInfo> {
     /// Each possible currying of a function type has different function
     /// type variants along each of two orthogonal axes:
     ///   - the explosion kind desired

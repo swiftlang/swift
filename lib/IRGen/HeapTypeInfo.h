@@ -19,6 +19,7 @@
 #define SWIFT_IRGEN_HEAPTYPEINFO_H
 
 #include "llvm/DerivedTypes.h"
+#include "FixedTypeInfo.h"
 #include "ScalarTypeInfo.h"
 
 namespace swift {
@@ -26,7 +27,7 @@ namespace irgen {
 
 /// HeapTypeInfo - A type designed for use implementing a type
 /// which consists solely of something reference-counted.
-class HeapTypeInfo : public SingleScalarTypeInfo<HeapTypeInfo, TypeInfo> {
+class HeapTypeInfo : public SingleScalarTypeInfo<HeapTypeInfo, FixedTypeInfo> {
 public:
   HeapTypeInfo(llvm::PointerType *storage, Size size, Alignment align)
     : SingleScalarTypeInfo(storage, size, align, IsNotPOD) {}

@@ -27,7 +27,7 @@
 #include "GenHeap.h"
 #include "GenType.h"
 #include "IRGenModule.h"
-#include "TypeInfo.h"
+#include "FixedTypeInfo.h"
 
 #include "GenArray.h"
 
@@ -35,9 +35,9 @@ using namespace swift;
 using namespace irgen;
 
 namespace {
-  class ArrayTypeInfo : public TypeInfo {
+  class ArrayTypeInfo : public FixedTypeInfo {
   public:
-    ArrayTypeInfo() : TypeInfo(nullptr, Size(0), Alignment(0), IsPOD) {}
+    ArrayTypeInfo() : FixedTypeInfo(nullptr, Size(0), Alignment(0), IsPOD) {}
 
     unsigned getExplosionSize(ExplosionKind kind) const {
       return 1;

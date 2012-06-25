@@ -28,7 +28,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Scope.h"
-#include "TypeInfo.h"
+#include "FixedTypeInfo.h"
 
 #include "GenInit.h"
 
@@ -72,7 +72,7 @@ void IRGenFunction::enterDestroyCleanup(Address addr,
 
   // The use of UnboundDestroy here is not important.
   UnboundDestroy &destroy = pushCleanup<UnboundDestroy>(addrTI);
-  destroy.setAddress(OwnedAddress(addr, nullptr));
+  destroy.setAddress(OwnedAddress(addr, IGM.RefCountedNull));
 
   out.add(ManagedValue(addr.getAddress(), getCleanupsDepth()));
 }
@@ -179,28 +179,35 @@ Initialization::emitLocalAllocation(IRGenFunction &IGF,
                                     InitializedObject object,
                                     OnHeap_t allocateOnHeap,
                                     const TypeInfo &type, const Twine &name) {
+  return type.allocate(IGF, *this, object, allocateOnHeap, name);
+}
 
+/// Allocate an object with fixed layout.
+OwnedAddress FixedTypeInfo::allocate(IRGenFunction &IGF, Initialization &init,
+                                     InitializedObject object,
+                                     OnHeap_t onHeap,
+                                     const Twine &name) const {
   // If the type is known to be empty, don't actually allocate anything.
-  if (type.isEmpty(ResilienceScope::Local)) {
-    OwnedAddress addr = createEmptyAlloca(IGF.IGM, type);
-    markAllocated(IGF, object, addr, CleanupsDepth::invalid());
+  if (isEmpty(ResilienceScope::Local)) {
+    OwnedAddress addr = createEmptyAlloca(IGF.IGM, *this);
+    init.markAllocated(IGF, object, addr, CleanupsDepth::invalid());
     return addr;
   }
 
   // If the object does not need to be allocated on the heap,
   // allocate it on the stack.
-  if (!allocateOnHeap) {
+  if (!onHeap) {
     Address rawAddr =
-      IGF.createAlloca(type.getStorageType(), type.StorageAlignment, name);
+      IGF.createAlloca(getStorageType(), StorageAlignment, name);
     // TODO: lifetime intrinsics?
 
     OwnedAddress addr(rawAddr, IGF.IGM.RefCountedNull);
-    markAllocated(IGF, object, addr, CleanupsDepth::invalid());
+    init.markAllocated(IGF, object, addr, CleanupsDepth::invalid());
     return addr;
   }
 
   // Lay out the type as a heap object.
-  HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, &type);
+  HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, this);
   assert(!layout.empty() && "non-empty type had empty layout?");
   auto &elt = layout.getElements()[0];
 
@@ -218,7 +225,7 @@ Initialization::emitLocalAllocation(IRGenFunction &IGF,
     = IGF.pushDeallocCleanup(allocation, layout.emitSize(IGF));
 
   OwnedAddress addr(rawAddr, allocation);
-  markAllocated(IGF, object, addr, deallocCleanup);
+  init.markAllocated(IGF, object, addr, deallocCleanup);
   return addr;
 }
 

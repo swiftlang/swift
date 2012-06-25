@@ -22,6 +22,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Target/TargetData.h"
 
+#include "FixedTypeInfo.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -100,7 +101,7 @@ llvm::Value *TypeInfo::getAlignmentOnly(IRGenFunction &IGF) const {
 
 namespace {
   class PrimitiveTypeInfo :
-    public PODSingleScalarTypeInfo<PrimitiveTypeInfo, TypeInfo> {
+    public PODSingleScalarTypeInfo<PrimitiveTypeInfo, FixedTypeInfo> {
   public:
     PrimitiveTypeInfo(llvm::Type *storage, Size size, Alignment align)
       : PODSingleScalarTypeInfo(storage, size, align) {}

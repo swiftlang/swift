@@ -31,7 +31,8 @@ namespace irgen {
 /// implementing a type which is always passed indirectly.
 ///
 /// Subclasses must implement the following operations:
-///   Address allocate(IRGenFunction &IGF, Initialization &init, Object obj) const;
+///   OwnedAddress allocate(IRGenFunction &IGF, Initialization &init, Object obj,
+///                         OnHeap_t onHeap, const llvm::Twine &name) const;
 ///   void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const;
 ///   void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src) const;
 ///   void destroy(IRGenFunction &IGF, Address obj) const;
@@ -62,7 +63,8 @@ public:
     Initialization init;
     auto temp = init.getObjectForTemporary();
     auto cleanup = init.registerObject(IGF, temp, NotOnHeap, *this);
-    Address dest = asDerived().Derived::allocate(IGF, init, temp);
+    Address dest = asDerived().Derived::allocate(IGF, init, temp, NotOnHeap,
+                                                 "temporary.forLoad");
 
     // Initialize it with a copy of the source.
     asDerived().Derived::initializeWithCopy(IGF, dest, src);
@@ -78,7 +80,8 @@ public:
     Initialization init;
     auto temp = init.getObjectForTemporary();
     auto cleanup = init.registerObject(IGF, temp, NotOnHeap, *this);
-    Address dest = asDerived().Derived::allocate(IGF, init, temp);
+    Address dest = asDerived().Derived::allocate(IGF, init, temp, NotOnHeap,
+                                                 "temporary.forLoad");
 
     // Initialize it with a take of the source.
     asDerived().Derived::initializeWithTake(IGF, dest, src);

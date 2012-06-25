@@ -39,6 +39,7 @@
 
 #include "Cleanup.h"
 #include "Explosion.h"
+#include "FixedTypeInfo.h"
 #include "GenFunc.h"
 #include "GenType.h"
 #include "IndirectTypeInfo.h"
@@ -545,7 +546,8 @@ namespace {
   ///   \exists t : Printable . t
   /// t here is an ArchetypeType, and a more generic protocol<> type
   /// is a ProtocolCompositionType.
-  class ProtocolTypeInfo : public IndirectTypeInfo<ProtocolTypeInfo, TypeInfo> {
+  class ProtocolTypeInfo :
+      public IndirectTypeInfo<ProtocolTypeInfo, FixedTypeInfo> {
     const ProtocolInfo &Protocol;
 
     ProtocolTypeInfo(llvm::Type *ty, Size size, Alignment align,
@@ -561,24 +563,10 @@ namespace {
 
     const ProtocolInfo &getProtocol() const { return Protocol; }
 
-    Address allocate(IRGenFunction &IGF) const {
-      return IGF.createAlloca(getStorageType(), StorageAlignment,
-                              "protocol.temporary");
-    }
-
-    /// Create an uninitialized existential object.
-    Address allocate(IRGenFunction &IGF, Initialization &init,
-                     InitializedObject object) const {
-      Address address = allocate(IGF);
-      init.markAllocated(IGF, object, OwnedAddress(address, nullptr),
-                         CleanupsDepth::invalid());
-      return address;
-    }
-
-    static ManagedValue enterCleanupForTemporary(IRGenFunction &IGF,
-                                                 Address dest) {
-      IGF.pushFullExprCleanup<DestroyExistential>(dest);
-      return ManagedValue(dest.getAddress(), IGF.getCleanupsDepth());
+    using FixedTypeInfo::allocate;
+    Address allocate(IRGenFunction &IGF,
+                     const Twine &name = "protocol.temporary") const {
+      return IGF.createAlloca(getStorageType(), StorageAlignment, name);
     }
 
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
@@ -631,24 +619,31 @@ namespace {
     }
 
     /// Create an uninitialized archetype object.
-    Address allocate(IRGenFunction &IGF, Initialization &init,
-                     InitializedObject object) const {
+    OwnedAddress allocate(IRGenFunction &IGF, Initialization &init,
+                          InitializedObject object, OnHeap_t onHeap,
+                          const llvm::Twine &name) const {
+      if (onHeap) {
+        IGF.IGM.unimplemented(SourceLoc(),
+                              "on-heap emission of archetype object");
+        // Just fall into the NotOnHeap path.
+      }
+
       // Make a fixed-size buffer.
       Address buffer = IGF.createAlloca(IGF.IGM.getFixedBufferTy(),
                                         getFixedBufferAlignment(IGF.IGM),
-                                        "protocol.temporary");
+                                        name);
 
       // Allocate an object of the appropriate type within it.
       llvm::Value *wtable = getWitnessTable(IGF);
       Address allocated(emitAllocateBufferCall(IGF, wtable, buffer),
                         Alignment(1));
+      OwnedAddress ownedAddr(allocated, IGF.IGM.RefCountedNull);
 
       // Push a cleanup to dealloc it.
       IGF.pushCleanup<DeallocateBuffer>(buffer, wtable);
       CleanupsDepth dealloc = IGF.getCleanupsDepth();
-      init.markAllocated(IGF, object, OwnedAddress(allocated, nullptr), dealloc);
-
-      return allocated;
+      init.markAllocated(IGF, object, ownedAddr, dealloc);
+      return ownedAddr;
     }
 
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
@@ -2206,7 +2201,7 @@ void irgen::emitErasure(IRGenFunction &IGF, ErasureExpr *E, Explosion &out) {
   emitErasureAsInit(IGF, E, temp, protoTI);
 
   // Add that as something to destroy.
-  out.add(protoTI.enterCleanupForTemporary(IGF, temp));
+  IGF.enterDestroyCleanup(temp, protoTI, out);
 }
 
 /// Emit an expression which accesses a member out of an existential type.

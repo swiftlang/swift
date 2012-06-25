@@ -32,10 +32,11 @@
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
 
+#include "FixedTypeInfo.h"
 #include "GenType.h"
-#include "ScalarTypeInfo.h"
 #include "IRGenModule.h"
 #include "LValue.h"
+#include "ScalarTypeInfo.h"
 
 #include "GenOneOf.h"
 
@@ -44,10 +45,10 @@ using namespace irgen;
 
 namespace {
   /// An abstract base class for TypeInfo implementations of oneof types.
-  class OneofTypeInfo : public TypeInfo {
+  class OneofTypeInfo : public FixedTypeInfo { // FIXME: not always fixed!
   public:
     OneofTypeInfo(llvm::StructType *T, Size S, Alignment A, IsPOD_t isPOD)
-      : TypeInfo(T, S, A, isPOD) {}
+      : FixedTypeInfo(T, S, A, isPOD) {}
 
     llvm::StructType *getStorageType() const {
       return cast<llvm::StructType>(TypeInfo::getStorageType());

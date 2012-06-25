@@ -22,16 +22,21 @@
 
 
 namespace llvm {
+  class Twine;
   class Type;
 }
 
 namespace swift {
 namespace irgen {
   class IRGenFunction;
+  class Initialization;
+  class InitializedObject;
   class Address;
   class Explosion;
   enum class ExplosionKind : unsigned;
   class ExplosionSchema;
+  enum OnHeap_t : unsigned char;
+  class OwnedAddress;
   class RValue;
   class RValueSchema;
 
@@ -52,11 +57,12 @@ class TypeInfo {
   friend class TypeConverter;
   mutable const TypeInfo *NextConverted;
 
-public:
+protected:
   TypeInfo(llvm::Type *Type, Size S, Alignment A, IsPOD_t pod)
     : NextConverted(0), StorageType(Type), StorageSize(S),
       StorageAlignment(A), POD(pod) {}
 
+public:
   virtual ~TypeInfo() = default;
 
   /// Unsafely cast this to the given subtype.
@@ -114,6 +120,13 @@ public:
 
   /// Return the number of elements in an explosion of this type.
   virtual unsigned getExplosionSize(ExplosionKind kind) const = 0;
+
+  /// Allocate a variable of this type.
+  virtual OwnedAddress allocate(IRGenFunction &IGF,
+                                Initialization &init,
+                                InitializedObject object,
+                                OnHeap_t onHeap,
+                                const llvm::Twine &name) const = 0;
 
   /// Load an explosion of values from an address.
   virtual void load(IRGenFunction &IGF, Address addr,

@@ -21,9 +21,10 @@
 #include "llvm/DerivedTypes.h"
 
 #include "Address.h"
+#include "FixedTypeInfo.h"
+#include "GenType.h"
 #include "IRGenModule.h"
 #include "ScalarTypeInfo.h"
-#include "GenType.h"
 
 #include "GenMeta.h"
 
@@ -31,7 +32,7 @@ using namespace swift;
 using namespace irgen;
 
 namespace {
-  struct EmptyTypeInfo : ScalarTypeInfo<EmptyTypeInfo, TypeInfo> {
+  struct EmptyTypeInfo : ScalarTypeInfo<EmptyTypeInfo, FixedTypeInfo> {
     EmptyTypeInfo(llvm::Type *ty)
       : ScalarTypeInfo(ty, Size(0), Alignment(1), IsPOD) {}
     unsigned getExplosionSize(ExplosionKind kind) const { return 0; }
