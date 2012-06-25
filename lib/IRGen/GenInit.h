@@ -42,6 +42,17 @@ namespace swift {
 
 namespace irgen {
 
+/// An opaque means of identifying an object being initialized.
+class InitializedObject {
+  void *Opaque;
+  InitializedObject(void *opaque) : Opaque(opaque) {}
+  friend class Initialization;
+
+public:
+  static InitializedObject invalid() { return InitializedObject(nullptr); }
+  bool isValid() const { return Opaque != nullptr; }
+};
+
 /// An Initialization object manages the cleanups and lifetimes of a
 /// variable initialization.
 ///
@@ -65,26 +76,15 @@ class Initialization {
   llvm::DenseMap<void *, ValueRecord> Records;
 
 public:
-  /// An opaque means of identifying an object being initialized.
-  class Object {
-    void *Opaque;
-    Object(void *opaque) : Opaque(opaque) {}
-    friend class Initialization;
-
-  public:
-    static Object invalid() { return Object(nullptr); }
-    bool isValid() const { return Opaque != nullptr; }
-  };
-
   /// Create an object reference for the given local declaration.
-  Object getObjectForDecl(ValueDecl *value) {
-    return Object(value);
+  InitializedObject getObjectForDecl(ValueDecl *value) {
+    return InitializedObject(value);
   }
 
   /// Create an object reference for the given temporary.
-  Object getObjectForTemporary() {
+  InitializedObject getObjectForTemporary() {
     // For now, we only support one of these.
-    return Object(reinterpret_cast<void*>(1));
+    return InitializedObject(reinterpret_cast<void*>(1));
   }
 
   /// Create a variable.  The abstract object for the variable is the
@@ -101,7 +101,7 @@ public:
   /// Create a local variable.
   ///
   /// Same pre/postconditions as emitVariable.
-  OwnedAddress emitLocalAllocation(IRGenFunction &IGF, Object object,
+  OwnedAddress emitLocalAllocation(IRGenFunction &IGF, InitializedObject object,
                                    OnHeap_t onHeap, const TypeInfo &type,
                                    const Twine &name);
 
@@ -116,33 +116,33 @@ public:
   /// Precondition: the object has been marked as allocated at the
   ///   given address.
   /// Postcondition: the object will have been marked as initialized.
-  void emitInit(IRGenFunction &IGF, Object object, Address address,
+  void emitInit(IRGenFunction &IGF, InitializedObject object, Address address,
                 Expr *init, const TypeInfo &type);
-  void emitZeroInit(IRGenFunction &IGF, Object object, Address address,
-                    const TypeInfo &type);
+  void emitZeroInit(IRGenFunction &IGF, InitializedObject object,
+                    Address address, const TypeInfo &type);
 
   /// Add an object that is going to be initialized; use the
   /// appropriate destroy cleanup for the given type.
-  CleanupsDepth registerObject(IRGenFunction &IGF, Object object,
+  CleanupsDepth registerObject(IRGenFunction &IGF, InitializedObject object,
                                OnHeap_t onHeap, const TypeInfo &objectTI);
 
   /// Add an object that is going to be initialized, but which does not
   /// need a destroy cleanup.
-  void registerObjectWithoutDestroy(Object object);
+  void registerObjectWithoutDestroy(InitializedObject object);
 
   /// Mark that an object has been allocated, and associate a dealloc
   /// cleanup with it.  This should be called even if allocation is
   /// trivial and there isn't a dealloc cleanup.
-  void markAllocated(IRGenFunction &IGF, Object object,
+  void markAllocated(IRGenFunction &IGF, InitializedObject object,
                      OwnedAddress address,
                      CleanupsDepth dealloc);
 
   /// Mark that the value has reached its instant of initialization.
-  void markInitialized(IRGenFunction &IGF, Object object);
+  void markInitialized(IRGenFunction &IGF, InitializedObject object);
 
 private:
   /// Add an object that is going to be initialized.
-  void registerObject(Object object, CleanupsDepth destroy);
+  void registerObject(InitializedObject object, CleanupsDepth destroy);
 };
 
 } // end namespace irgen

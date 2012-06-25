@@ -83,7 +83,8 @@ static OnHeap_t isOnHeap(VarDecl *var) {
 }
 
 /// Register an object with the initialization process.
-CleanupsDepth Initialization::registerObject(IRGenFunction &IGF, Object object,
+CleanupsDepth Initialization::registerObject(IRGenFunction &IGF,
+                                             InitializedObject object,
                                              OnHeap_t onHeap,
                                              const TypeInfo &objectTI) {
   // Create the appropriate destroy cleanup.
@@ -103,12 +104,12 @@ CleanupsDepth Initialization::registerObject(IRGenFunction &IGF, Object object,
   return destroy;
 }
 
-void Initialization::registerObjectWithoutDestroy(Object object) {
+void Initialization::registerObjectWithoutDestroy(InitializedObject object) {
   registerObject(object, CleanupsDepth::invalid());
 }
 
 /// Register an object with the initialization process.
-void Initialization::registerObject(Object object,
+void Initialization::registerObject(InitializedObject object,
                                     CleanupsDepth destroy) {
   // The invariant is that the cleanup has to be an
   // UnboundDestroy if it's valid.
@@ -120,7 +121,8 @@ void Initialization::registerObject(Object object,
 }
 
 /// Mark that an object has been allocated.
-void Initialization::markAllocated(IRGenFunction &IGF, Object object,
+void Initialization::markAllocated(IRGenFunction &IGF,
+                                   InitializedObject object,
                                    OwnedAddress address,
                                    CleanupsDepth dealloc) {
   ValueRecord &record = Records.find(object.Opaque)->second;
@@ -173,7 +175,8 @@ static OwnedAddress createEmptyAlloca(IRGenModule &IGM, const TypeInfo &type) {
 
 /// Allocate an object in local scope.
 OwnedAddress
-Initialization::emitLocalAllocation(IRGenFunction &IGF, Object object,
+Initialization::emitLocalAllocation(IRGenFunction &IGF,
+                                    InitializedObject object,
                                     OnHeap_t allocateOnHeap,
                                     const TypeInfo &type, const Twine &name) {
 
@@ -227,7 +230,8 @@ static void maybeSetCleanupState(IRGenFunction &IGF,
 }
 
 /// Mark that a value has reached its initialization point.
-void Initialization::markInitialized(IRGenFunction &IGF, Object object) {
+void Initialization::markInitialized(IRGenFunction &IGF,
+                                     InitializedObject object) {
   auto it = Records.find(object.Opaque);
   assert(it != Records.end());
 
@@ -239,7 +243,7 @@ void Initialization::markInitialized(IRGenFunction &IGF, Object object) {
 }
 
 /// Emit an expression as an initializer for the given location.
-void Initialization::emitInit(IRGenFunction &IGF, Object object,
+void Initialization::emitInit(IRGenFunction &IGF, InitializedObject object,
                               Address addr, Expr *E, const TypeInfo &type) {
   IGF.emitRValueAsInit(E, addr, type);
 
@@ -259,7 +263,7 @@ void IRGenFunction::emitInit(Expr *E, Address addr, const TypeInfo &type) {
 }
 
 /// Zero-initialize the given memory location.
-void Initialization::emitZeroInit(IRGenFunction &IGF, Object object,
+void Initialization::emitZeroInit(IRGenFunction &IGF, InitializedObject object,
                                   Address addr, const TypeInfo &type) {
   // Zero-initialization always has trivial outwards control flow; go
   // ahead and immediately switch the cleanups.

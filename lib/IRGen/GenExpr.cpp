@@ -169,7 +169,7 @@ static OwnedAddress emitMaterializeExpr(IRGenFunction &IGF,
 
   // Begin the initialization.
   Initialization I;
-  Initialization::Object object = I.getObjectForTemporary();
+  InitializedObject object = I.getObjectForTemporary();
   I.registerObject(IGF, object, onHeap, objectTI);
 
   // Allocate.
@@ -259,7 +259,7 @@ namespace {
       const TypeInfo &type = IGF.getFragileTypeInfo(E->getType());
 
       Initialization I;
-      Initialization::Object object = I.getObjectForTemporary();
+      InitializedObject object = I.getObjectForTemporary();
       I.registerObjectWithoutDestroy(object);
       OwnedAddress addr =
         I.emitLocalAllocation(IGF, object, NotOnHeap, type,

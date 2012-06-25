@@ -794,7 +794,7 @@ namespace {
     OwnedAddress loadAndMaterialize(IRGenFunction &IGF, OnHeap_t onHeap,
                                     Address base, bool preserve) const {
       Initialization init;
-      Initialization::Object object = init.getObjectForTemporary();
+      InitializedObject object = init.getObjectForTemporary();
 
       const TypeInfo &valueTI = IGF.getFragileTypeInfo(Target.getType());
       init.registerObject(IGF, object, onHeap, valueTI);

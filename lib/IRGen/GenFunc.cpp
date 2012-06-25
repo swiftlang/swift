@@ -1203,8 +1203,7 @@ void CallEmitter::emit(llvm::Value *fnPtr) {
   emitArgs();
 
   Initialization indirectInit;
-  Initialization::Object indirectResultObject
-    = Initialization::Object::invalid();
+  InitializedObject indirectResultObject = InitializedObject::invalid();
 
   // Emit and insert the result slot if required.
   assert(LastArgWritten == 0 || LastArgWritten == 1);
@@ -1631,7 +1630,7 @@ OwnedAddress IRGenFunction::getAddrForParameter(VarDecl *param,
 
     // Otherwise, we have to move it to the heap.
     Initialization paramInit;
-    Initialization::Object paramObj = paramInit.getObjectForDecl(param);
+    InitializedObject paramObj = paramInit.getObjectForDecl(param);
     paramInit.registerObject(*this, paramObj, OnHeap, paramType);
 
     OwnedAddress paramHeapAddr =
@@ -1647,7 +1646,7 @@ OwnedAddress IRGenFunction::getAddrForParameter(VarDecl *param,
 
   // Otherwise, make an alloca and load into it.
   Initialization paramInit;
-  Initialization::Object paramObj = paramInit.getObjectForDecl(param);
+  InitializedObject paramObj = paramInit.getObjectForDecl(param);
   paramInit.registerObject(*this, paramObj, onHeap, paramType);
 
   OwnedAddress paramAddr =

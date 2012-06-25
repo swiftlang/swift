@@ -568,7 +568,7 @@ namespace {
 
     /// Create an uninitialized existential object.
     Address allocate(IRGenFunction &IGF, Initialization &init,
-                     Initialization::Object object) const {
+                     InitializedObject object) const {
       Address address = allocate(IGF);
       init.markAllocated(IGF, object, OwnedAddress(address, nullptr),
                          CleanupsDepth::invalid());
@@ -632,7 +632,7 @@ namespace {
 
     /// Create an uninitialized archetype object.
     Address allocate(IRGenFunction &IGF, Initialization &init,
-                     Initialization::Object object) const {
+                     InitializedObject object) const {
       // Make a fixed-size buffer.
       Address buffer = IGF.createAlloca(IGF.IGM.getFixedBufferTy(),
                                         getFixedBufferAlignment(IGF.IGM),
