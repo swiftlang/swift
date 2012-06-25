@@ -1061,18 +1061,20 @@ public:
 /// FIXME: Same-type constraints.
 class ArchetypeType : public TypeBase {
   StringRef DisplayName;
-  ArrayRef<Type> ConformsTo;
+  ArrayRef<ProtocolDecl *> ConformsTo;
   
 public:
   /// getNew - Create a new archetype with the given name.
+  ///
+  /// The ConformsTo array will be copied into the ASTContext by this routine.
   static ArchetypeType *getNew(ASTContext &Ctx, StringRef DisplayName,
                                ArrayRef<Type> ConformsTo);
   
   void print(raw_ostream &OS) const;
 
-  /// getConformsTo - Retrieve the set of protocols (or compositions thereof)
-  /// to which this archetype conforms.
-  ArrayRef<Type> getConformsTo() const { return ConformsTo; }
+  /// getConformsTo - Retrieve the set of protocols to which this archetype
+  /// conforms.
+  ArrayRef<ProtocolDecl *> getConformsTo() const { return ConformsTo; }
 
   /// getDisplayName - Retrieve the name that should be used to display
   /// this archetype.
@@ -1086,7 +1088,7 @@ public:
   
 private:
   ArchetypeType(ASTContext &Ctx, StringRef DisplayName,
-                ArrayRef<Type> ConformsTo)
+                ArrayRef<ProtocolDecl *> ConformsTo)
     : TypeBase(TypeKind::Archetype, &Ctx, /*Unresolved=*/false),
       DisplayName(DisplayName), ConformsTo(ConformsTo) { }
 };

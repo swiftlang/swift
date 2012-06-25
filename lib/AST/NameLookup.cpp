@@ -173,7 +173,7 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
   // Check to see if any of an archetype's requirements have the member.
   if (ArchetypeType *Archetype = BaseTy->getAs<ArchetypeType>()) {
     for (auto Proto : Archetype->getConformsTo())
-      doIt(Proto, M, Visited);
+      doIt(Proto->getDeclaredType(), M, Visited);
 
     // Change existential and metatype members to archetype members, since
     // we're in an archetype.

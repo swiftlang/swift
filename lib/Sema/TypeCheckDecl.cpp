@@ -258,7 +258,7 @@ public:
 
         AssocType->setUnderlyingType(
           ArchetypeType::getNew(TC.Context, AssocType->getName().str(),
-                                TC.Context.AllocateCopy(ConformsTo)));
+                                ConformsTo));
       }
     }
 

@@ -611,10 +611,20 @@ ArchetypeType *ArchetypeType::getNew(ASTContext &Ctx, StringRef DisplayName,
                            llvm::alignOf<ArchetypeType>());
   char *StoredStringData = (char*)Mem + sizeof(ArchetypeType);
   memcpy(StoredStringData, DisplayName.data(), DisplayName.size());
+
+  // Gather the set of protocol declarations to which this archetype conforms.
+  SmallVector<ProtocolDecl *, 4> ConformsToProtos;
+  for (auto P : ConformsTo) {
+    addProtocols(P, ConformsToProtos);
+  }
+  minimizeProtocols(ConformsToProtos);
+  llvm::array_pod_sort(ConformsToProtos.begin(), ConformsToProtos.end(),
+                       compareProtocols);
+
   return ::new (Mem) ArchetypeType(Ctx,
                                    StringRef(StoredStringData,
                                              DisplayName.size()),
-                                   ConformsTo);
+                                   Ctx.AllocateCopy(ConformsToProtos));
 }
 
 void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,

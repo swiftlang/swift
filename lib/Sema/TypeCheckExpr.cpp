@@ -227,11 +227,18 @@ collectArchetypeToExistentialSubstitutions(ASTContext &Context,
       Substitutions[Archetype] = ThisTy;
     else {
       if (Archetype->getConformsTo().size() == 1)
-        Substitutions[Archetype] = Archetype->getConformsTo().front();
-      else
+        Substitutions[Archetype]
+          = Archetype->getConformsTo().front()->getDeclaredType();
+      else {
+        SmallVector<Type, 4> ConformsTo;
+        std::transform(Archetype->getConformsTo().begin(),
+                       Archetype->getConformsTo().end(),
+                       std::back_inserter(ConformsTo),
+                       [](ProtocolDecl *P) { return P->getDeclaredType(); });
         Substitutions[Archetype]
           = ProtocolCompositionType::get(Context, SourceLoc(),
-                                         Archetype->getConformsTo());
+                                         Context.AllocateCopy(ConformsTo));
+      }
     }
   }
 }

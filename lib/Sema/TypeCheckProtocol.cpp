@@ -355,14 +355,9 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   // If we have an archetype, check whether this archetype's requirements
   // include this protocol (or something that inherits from it).
   if (auto Archetype = T->getAs<ArchetypeType>()) {
-    for (auto APType : Archetype->getConformsTo()) {
-      SmallVector<ProtocolDecl *, 4> AProtos;
-      if (APType->isExistentialType(AProtos)) {
-        for (auto AP : AProtos) {
-          if (AP == Proto || AP->inheritsFrom(Proto))
-            return true;
-        }
-      }
+    for (auto AP : Archetype->getConformsTo()) {
+      if (AP == Proto || AP->inheritsFrom(Proto))
+        return true;
     }
   }
 
