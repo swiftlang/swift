@@ -606,7 +606,8 @@ void TupleType::updateInitializedElementType(unsigned EltNo, Type NewTy,
 }
 
 ArchetypeType *ArchetypeType::getNew(ASTContext &Ctx, StringRef DisplayName,
-                                     ArrayRef<Type> ConformsTo) {
+                                     ArrayRef<Type> ConformsTo,
+                                     Optional<unsigned> Index) {
   void *Mem = Ctx.Allocate(sizeof(ArchetypeType) + DisplayName.size(),
                            llvm::alignOf<ArchetypeType>());
   char *StoredStringData = (char*)Mem + sizeof(ArchetypeType);
@@ -624,7 +625,8 @@ ArchetypeType *ArchetypeType::getNew(ASTContext &Ctx, StringRef DisplayName,
   return ::new (Mem) ArchetypeType(Ctx,
                                    StringRef(StoredStringData,
                                              DisplayName.size()),
-                                   Ctx.AllocateCopy(ConformsToProtos));
+                                   Ctx.AllocateCopy(ConformsToProtos),
+                                   Index);
 }
 
 void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,

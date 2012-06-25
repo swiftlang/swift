@@ -256,9 +256,13 @@ public:
         ConformsTo.append(AssocType->getInherited().begin(),
                           AssocType->getInherited().end());
 
+        Optional<unsigned> Index;
+        // FIXME: Find a better way to identify the 'This' archetype.
+        if (AssocType->getName().str().equals("This"))
+          Index = 0;
         AssocType->setUnderlyingType(
           ArchetypeType::getNew(TC.Context, AssocType->getName().str(),
-                                ConformsTo));
+                                ConformsTo, Index));
       }
     }
 
@@ -281,6 +285,7 @@ public:
     // implied, to compute the set of archetypes we need and the requirements
     // on those archetypes.
     if (GenericParamList *GenericParams = FD->getGenericParams()) {
+      unsigned Index = 0;
       for (auto GP : *GenericParams) {
         auto TypeParam = GP.getAsTypeParam();
 
@@ -291,7 +296,7 @@ public:
         // Create the archetype for this type parameter.
         ArchetypeType *Archetype
           = ArchetypeType::getNew(TC.Context, TypeParam->getName().str(),
-                                  TypeParam->getInherited());
+                                  TypeParam->getInherited(), Index);
         TypeParam->setUnderlyingType(Archetype);
 
 

@@ -20,6 +20,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Identifier.h"
+#include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -1062,13 +1063,15 @@ public:
 class ArchetypeType : public TypeBase {
   StringRef DisplayName;
   ArrayRef<ProtocolDecl *> ConformsTo;
-  
+  unsigned IndexIfPrimary;
+
 public:
   /// getNew - Create a new archetype with the given name.
   ///
   /// The ConformsTo array will be copied into the ASTContext by this routine.
   static ArchetypeType *getNew(ASTContext &Ctx, StringRef DisplayName,
-                               ArrayRef<Type> ConformsTo);
+                               ArrayRef<Type> ConformsTo,
+                               Optional<unsigned> Index = Optional<unsigned>());
   
   void print(raw_ostream &OS) const;
 
@@ -1080,6 +1083,16 @@ public:
   /// this archetype.
   StringRef getDisplayName() const { return DisplayName; }
 
+  /// isPrimary - Determine whether this is the archetype for a 'primary'
+  /// archetype, e.g., 
+  bool isPrimary() const { return IndexIfPrimary > 0; }
+
+  // getPrimaryIndex - For a primary archetype, return the zero-based index.
+  unsigned getPrimaryIndex() const {
+    assert(isPrimary() && "Non-primary archetype does not have index");
+    return IndexIfPrimary - 1;
+  }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const ArchetypeType *) { return true; }
   static bool classof(const TypeBase *T) {
@@ -1088,9 +1101,11 @@ public:
   
 private:
   ArchetypeType(ASTContext &Ctx, StringRef DisplayName,
-                ArrayRef<ProtocolDecl *> ConformsTo)
+                ArrayRef<ProtocolDecl *> ConformsTo,
+                Optional<unsigned> Index)
     : TypeBase(TypeKind::Archetype, &Ctx, /*Unresolved=*/false),
-      DisplayName(DisplayName), ConformsTo(ConformsTo) { }
+      DisplayName(DisplayName), ConformsTo(ConformsTo),
+      IndexIfPrimary(Index? *Index + 1 : 1){ }
 };
 
 /// SubstArchetypeType - An archetype that has been substituted for a

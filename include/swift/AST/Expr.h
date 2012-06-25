@@ -1133,11 +1133,11 @@ public:
 /// \endcode
 class SpecializeExpr : public ImplicitConversionExpr {
   // FIXME: Record the actual substitutions performed!
-  
+
 public:
   SpecializeExpr(Expr *SubExpr, Type Ty)
     : ImplicitConversionExpr(ExprKind::Specialize, SubExpr, Ty) { }
-  
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const SpecializeExpr *) { return true; }
   static bool classof(const Expr *E) {
