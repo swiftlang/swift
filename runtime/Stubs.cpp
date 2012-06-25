@@ -176,7 +176,11 @@ _swift_initBenchmark() {
   char *s1 = brand;
   unsigned eax, ebx, ecx, edx;
   memset(&u, 0, sizeof(u));
+  int r;
 
+  // Let's not have the OS compete with our CPU time if we can avoid it
+  r = setvbuf(stdout, 0, _IOFBF, 0);
+  assert(r == 0);
 
   eax = 0x80000002;
   asm("cpuid" : "+a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx));
