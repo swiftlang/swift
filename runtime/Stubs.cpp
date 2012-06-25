@@ -141,12 +141,8 @@ rdtsc() {
 #error "not supported"
 #endif
 
-static bool _swift_initBenchmark();
-
-extern "C"
-uint64_t
-swift_startBenchmark(void) {
-  __attribute__((unused)) static auto tmp = _swift_initBenchmark();
+static uint64_t
+_swift_startBenchmark(void) {
   return rdtsc();
 }
 
@@ -156,11 +152,15 @@ swift_printBenchmark(uint64_t start, uint64_t laps, char *buffer, int64_t len) {
   double val = (rdtsc() - start) / double(laps);
   printf("%12.2f  %*s\n", val, (int)len, buffer);
 }
-#include <stdio.h>
-#include <string.h>
 
-static bool
+extern "C"
+__attribute__((noinline,used))
+typeof(&_swift_startBenchmark)
+_swift_initBenchmark() asm("_swift_startBenchmark");
+
+typeof(&_swift_startBenchmark)
 _swift_initBenchmark() {
+  asm(".symbol_resolver _swift_startBenchmark");
   union {
     unsigned reg[4*3];
     char brand[48];
@@ -205,8 +205,7 @@ _swift_initBenchmark() {
   eax = 6;
   asm("cpuid" : "+a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx));
 
-  bool rval = eax & 2;
-  if (rval) {
+  if (eax & 2) {
     fprintf(stderr, "WARNING: TurboBoost. Results will be less reliable.\n");
     fprintf(stderr, "         Consider: sudo /usr/local/bin/pstates -D\n\n");
   }
@@ -220,5 +219,5 @@ _swift_initBenchmark() {
     fprintf(stderr, "         Consider: sudo nice -n -15 ./myBench\n\n");
   }
 
-  return rval;
+  return _swift_startBenchmark;
 }
