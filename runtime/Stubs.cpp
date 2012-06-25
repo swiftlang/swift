@@ -18,6 +18,8 @@
 #include <mach/mach_time.h>
 #include <sys/resource.h>
 #include <sys/errno.h>
+#include <pthread.h>
+#include <unistd.h>
 #include <cstring>
 #include <cstdint>
 #include <cstdio>
@@ -182,6 +184,12 @@ _swift_initBenchmark() {
   r = setvbuf(stdout, 0, _IOFBF, 0);
   assert(r == 0);
 
+  // XXX -- There doesn't seem to be an API to figure out the max value
+  struct sched_param pthr_sched_param;
+  pthr_sched_param.sched_priority = 79;
+  r = pthread_setschedparam(pthread_self(), SCHED_FIFO, &pthr_sched_param);
+  assert(r == 0);
+
   eax = 0x80000002;
   asm("cpuid" : "+a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx));
   u.reg[0] = eax;
@@ -236,13 +244,9 @@ _swift_initBenchmark() {
     fprintf(stderr, "         Consider: sudo /usr/local/bin/pstates -D\n\n");
   }
 
-  // Sigh... getpriority() can legitimately return -1
-  errno = 0;
-  int pri = getpriority(PRIO_PROCESS, 0);
-  assert(errno == 0);
-  if (pri >= 0) {
+  if (geteuid()) {
     fprintf(stderr, "WARNING: Non-elevated priority. Results will be less reliable.\n");
-    fprintf(stderr, "         Consider: sudo nice -n -15 ./myBench\n\n");
+    fprintf(stderr, "         Consider: sudo ./myBench\n\n");
   }
 
   return _swift_startBenchmark;
