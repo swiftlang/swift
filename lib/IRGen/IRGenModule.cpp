@@ -40,7 +40,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
                          const llvm::TargetData &TargetData)
   : Context(Context), Opts(Opts),
     Module(Module), LLVMContext(Module.getContext()),
-    TargetData(TargetData), Types(*new TypeConverter()) {
+    TargetData(TargetData), Types(*new TypeConverter(*this)) {
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
   Int8Ty = llvm::Type::getInt8Ty(getLLVMContext());

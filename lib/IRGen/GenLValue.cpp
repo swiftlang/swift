@@ -357,8 +357,7 @@ namespace {
 /// Convert an l-value type.  For non-heap l-values, this is always
 /// just a bare pointer.  For heap l-values, this is a pair of a bare
 /// pointer with an object reference.
-const TypeInfo *TypeConverter::convertLValueType(IRGenModule &IGM,
-                                                 LValueType *T) {
+const TypeInfo *TypeConverter::convertLValueType(LValueType *T) {
   const TypeInfo &objectTI = IGM.getFragileTypeInfo(T->getObjectType());
   llvm::PointerType *referenceType = objectTI.StorageType->getPointerTo();
 

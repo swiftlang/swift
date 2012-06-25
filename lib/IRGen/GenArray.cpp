@@ -89,8 +89,7 @@ namespace {
   };
 }
 
-const TypeInfo *
-TypeConverter::convertArrayType(IRGenModule &IGM, ArrayType *T) {
+const TypeInfo *TypeConverter::convertArrayType(ArrayType *T) {
   // FIXME
   return new ArrayTypeInfo();
 }

@@ -2093,8 +2093,7 @@ ProtocolTypeInfo::getConformance(IRGenModule &IGM, Type concreteType,
   return *res.first->second;
 }
 
-const TypeInfo *
-TypeConverter::convertProtocolType(IRGenModule &IGM, ProtocolType *T) {
+const TypeInfo *TypeConverter::convertProtocolType(ProtocolType *T) {
   // Protocol types are nominal.
   llvm::StructType *type = IGM.createNominalType(T->getDecl());
   llvm::Type *fields[] = {

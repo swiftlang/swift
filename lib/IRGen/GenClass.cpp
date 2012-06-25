@@ -77,12 +77,12 @@ namespace {
   };
 }  // end anonymous namespace.
 
-LValue swift::irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
-                                                   MemberRefExpr *E) {
+LValue irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
+                                            MemberRefExpr *E) {
   ClassDecl *CD = cast<ClassDecl>(E->getDecl()->getDeclContext());
   ClassType *T = CD->getDeclaredType();
   const ClassTypeInfo &info =
-    TypeConverter::getFragileTypeInfo(IGF.IGM, T).as<ClassTypeInfo>();
+    IGF.getFragileTypeInfo(T).as<ClassTypeInfo>();
   Explosion explosion(ExplosionKind::Maximal);
   // FIXME: Can we avoid the retain/release here in some cases?
   IGF.emitRValue(E->getBase(), explosion);
@@ -195,8 +195,7 @@ void IRGenModule::emitClassType(ClassType *ct) {
   }
 }
 
-const TypeInfo *
-TypeConverter::convertClassType(IRGenModule &IGM, ClassType *T) {
+const TypeInfo *TypeConverter::convertClassType(ClassType *T) {
   llvm::StructType *ST = IGM.createNominalType(T->getDecl());
   llvm::PointerType *irType = ST->getPointerTo();
   return new ClassTypeInfo(irType, IGM.getPointerSize(),

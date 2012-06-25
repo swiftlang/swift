@@ -129,8 +129,7 @@ LValue swift::irgen::emitPhysicalStructMemberLValue(IRGenFunction &IGF,
                                                     MemberRefExpr *E) {
   LValue lvalue = IGF.emitLValue(E->getBase());
   StructType *T = cast<StructDecl>(E->getDecl()->getDeclContext())->getDeclaredType();
-  const StructTypeInfo &info =
-    TypeConverter::getFragileTypeInfo(IGF.IGM, T).as<StructTypeInfo>();
+  const StructTypeInfo &info = IGF.getFragileTypeInfo(T).as<StructTypeInfo>();
 
   // FIXME: This field index computation is an ugly hack.
   unsigned FieldIndex = 0;
@@ -211,8 +210,7 @@ void IRGenModule::emitStructType(StructType *st) {
   }
 }
 
-const TypeInfo *
-TypeConverter::convertStructType(IRGenModule &IGM, StructType *T) {
+const TypeInfo *TypeConverter::convertStructType(StructType *T) {
   StructTypeBuilder builder(IGM, IGM.createNominalType(T->getDecl()));
 
   // Collect all the fields from the type.

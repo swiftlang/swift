@@ -267,8 +267,7 @@ namespace {
   };
 }
 
-const TypeInfo *
-TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
+const TypeInfo *TypeConverter::convertOneOfType(OneOfType *T) {
   OneOfDecl *D = T->getDecl();
   llvm::StructType *convertedStruct = IGM.createNominalType(D);
 
@@ -293,7 +292,7 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
       convertedTInfo->StorageAlignment = Alignment(1);
       convertedTInfo->Singleton = nullptr;
     } else {
-      const TypeInfo &eltTInfo = getFragileTypeInfo(IGM, eltType);
+      const TypeInfo &eltTInfo = getFragileTypeInfo(eltType);
       assert(eltTInfo.isComplete());
       storageType = eltTInfo.StorageType;
       convertedTInfo->StorageSize = eltTInfo.StorageSize;
@@ -344,7 +343,7 @@ TypeConverter::convertOneOfType(IRGenModule &IGM, OneOfType *T) {
 
     // Compute layout for the type, and ignore variants with
     // zero-size data.
-    const TypeInfo &eltTInfo = getFragileTypeInfo(IGM, eltType);
+    const TypeInfo &eltTInfo = getFragileTypeInfo(eltType);
     assert(eltTInfo.isComplete());
     if (eltTInfo.isEmpty(ResilienceScope::Local)) continue;
 

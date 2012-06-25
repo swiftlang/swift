@@ -46,13 +46,11 @@ namespace {
   };
 }
 
-const TypeInfo *
-TypeConverter::convertMetaTypeType(IRGenModule &IGM, MetaTypeType *T) {
+const TypeInfo *TypeConverter::convertMetaTypeType(MetaTypeType *T) {
   return new EmptyTypeInfo(IGM.Int8Ty);
 }
 
-const TypeInfo *
-TypeConverter::convertModuleType(IRGenModule &IGM, ModuleType *T) {
+const TypeInfo *TypeConverter::convertModuleType(ModuleType *T) {
   return new EmptyTypeInfo(IGM.Int8Ty);
 }
 

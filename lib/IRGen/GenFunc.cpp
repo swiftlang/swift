@@ -409,8 +409,7 @@ namespace {
   };
 }
 
-const TypeInfo *
-TypeConverter::convertFunctionType(IRGenModule &IGM, FunctionType *T) {
+const TypeInfo *TypeConverter::convertFunctionType(FunctionType *T) {
   return FuncTypeInfo::create(T, IGM.FunctionPairTy,
                               IGM.getPointerSize() * 2,
                               IGM.getPointerAlignment());

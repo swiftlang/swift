@@ -43,30 +43,31 @@ namespace irgen {
 
 /// The helper class for generating types.
 class TypeConverter {
+  IRGenModule &IGM;
   llvm::DenseMap<TypeBase*, const TypeInfo*> Converted;
   const TypeInfo *FirstConverted;
 
   static const TypeInfo *createPrimitive(llvm::Type *T,
                                          Size size, Alignment align);
     
-  static const TypeInfo *convertType(IRGenModule &IGM, CanType T);
-  static const TypeInfo *convertTupleType(IRGenModule &IGM, TupleType *T);
-  static const TypeInfo *convertOneOfType(IRGenModule &IGM, OneOfType *T);
-  static const TypeInfo *convertStructType(IRGenModule &IGM, StructType *T);
-  static const TypeInfo *convertClassType(IRGenModule &IGM, ClassType *T);
-  static const TypeInfo *convertFunctionType(IRGenModule &IGM, FunctionType *T);
-  static const TypeInfo *convertArrayType(IRGenModule &IGM, ArrayType *T);
-  static const TypeInfo *convertLValueType(IRGenModule &IGM, LValueType *T);
-  static const TypeInfo *convertMetaTypeType(IRGenModule &IGM, MetaTypeType *T);
-  static const TypeInfo *convertModuleType(IRGenModule &IGM, ModuleType *T);
-  static const TypeInfo *convertProtocolType(IRGenModule &IGM, ProtocolType *T);
-  static const TypeInfo *convertBuiltinObjectPointer(IRGenModule &IGM);
-  static const TypeInfo *convertBuiltinObjCPointer(IRGenModule &IGM);
+  const TypeInfo *convertType(CanType T);
+  const TypeInfo *convertTupleType(TupleType *T);
+  const TypeInfo *convertOneOfType(OneOfType *T);
+  const TypeInfo *convertStructType(StructType *T);
+  const TypeInfo *convertClassType(ClassType *T);
+  const TypeInfo *convertFunctionType(FunctionType *T);
+  const TypeInfo *convertArrayType(ArrayType *T);
+  const TypeInfo *convertLValueType(LValueType *T);
+  const TypeInfo *convertMetaTypeType(MetaTypeType *T);
+  const TypeInfo *convertModuleType(ModuleType *T);
+  const TypeInfo *convertProtocolType(ProtocolType *T);
+  const TypeInfo *convertBuiltinObjectPointer();
+  const TypeInfo *convertBuiltinObjCPointer();
 
  public:
-  TypeConverter();
+  TypeConverter(IRGenModule &IGM);
   ~TypeConverter();
-  static const TypeInfo &getFragileTypeInfo(IRGenModule &IGM, Type T);
+  const TypeInfo &getFragileTypeInfo(Type T);
 };
 
 } // end namespace irgen

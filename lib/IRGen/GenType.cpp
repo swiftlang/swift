@@ -115,7 +115,8 @@ const TypeInfo *TypeConverter::createPrimitive(llvm::Type *type,
   return new PrimitiveTypeInfo(type, size, align);
 }
 
-TypeConverter::TypeConverter() : FirstConverted(invalidTypeInfo()) {}
+TypeConverter::TypeConverter(IRGenModule &IGM)
+  : IGM(IGM), FirstConverted(invalidTypeInfo()) {}
 
 TypeConverter::~TypeConverter() {
   // Delete all the converted type infos.
@@ -138,11 +139,10 @@ llvm::Type *IRGenModule::getFragileType(Type T) {
 
 /// Get the fragile type information for the given type.
 const TypeInfo &IRGenModule::getFragileTypeInfo(Type T) {
-  return TypeConverter::getFragileTypeInfo(*this, T);
+  return Types.getFragileTypeInfo(T);
 }
 
-const TypeInfo &TypeConverter::getFragileTypeInfo(IRGenModule &IGM,
-                                                  Type sugaredTy) {
+const TypeInfo &TypeConverter::getFragileTypeInfo(Type sugaredTy) {
   assert(!sugaredTy.isNull());
   CanType canonicalTy = sugaredTy->getCanonicalType();
 
@@ -150,7 +150,7 @@ const TypeInfo &TypeConverter::getFragileTypeInfo(IRGenModule &IGM,
   if (entry != IGM.Types.Converted.end())
     return *entry->second;
 
-  const TypeInfo *result = convertType(IGM, canonicalTy);
+  const TypeInfo *result = convertType(canonicalTy);
   IGM.Types.Converted[canonicalTy.getPointer()] = result;
 
   // If the type info hasn't been added to the list of types, do so.
@@ -162,7 +162,7 @@ const TypeInfo &TypeConverter::getFragileTypeInfo(IRGenModule &IGM,
   return *result;
 }
 
-const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, CanType canTy) {
+const TypeInfo *TypeConverter::convertType(CanType canTy) {
   llvm::LLVMContext &Ctx = IGM.getLLVMContext();
   TypeBase *ty = canTy.getPointer();
   switch (ty->getKind()) {
@@ -175,16 +175,16 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, CanType canTy) {
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
   case TypeKind::MetaType:
-    return convertMetaTypeType(IGM, cast<MetaTypeType>(ty));
+    return convertMetaTypeType(cast<MetaTypeType>(ty));
   case TypeKind::Module:
-    return convertModuleType(IGM, cast<ModuleType>(ty));
+    return convertModuleType(cast<ModuleType>(ty));
   case TypeKind::BuiltinRawPointer:
     return createPrimitive(IGM.Int8PtrTy, IGM.getPointerSize(),
                            IGM.getPointerAlignment());
   case TypeKind::BuiltinObjectPointer:
-    return convertBuiltinObjectPointer(IGM);
+    return convertBuiltinObjectPointer();
   case TypeKind::BuiltinObjCPointer:
-    return convertBuiltinObjCPointer(IGM);
+    return convertBuiltinObjCPointer();
   case TypeKind::BuiltinFloat:
     switch (cast<BuiltinFloatType>(ty)->getFPKind()) {
     case BuiltinFloatType::IEEE16:
@@ -218,21 +218,21 @@ const TypeInfo *TypeConverter::convertType(IRGenModule &IGM, CanType canTy) {
                            Size(ByteSize), Alignment(ByteSize));
   }
   case TypeKind::LValue:
-    return convertLValueType(IGM, cast<LValueType>(ty));
+    return convertLValueType(cast<LValueType>(ty));
   case TypeKind::Tuple:
-    return convertTupleType(IGM, cast<TupleType>(ty));
+    return convertTupleType(cast<TupleType>(ty));
   case TypeKind::OneOf:
-    return convertOneOfType(IGM, cast<OneOfType>(ty));
+    return convertOneOfType(cast<OneOfType>(ty));
   case TypeKind::Struct:
-    return convertStructType(IGM, cast<StructType>(ty));
+    return convertStructType(cast<StructType>(ty));
   case TypeKind::Class:
-    return convertClassType(IGM, cast<ClassType>(ty));
+    return convertClassType(cast<ClassType>(ty));
   case TypeKind::Function:
-    return convertFunctionType(IGM, cast<FunctionType>(ty));
+    return convertFunctionType(cast<FunctionType>(ty));
   case TypeKind::Array:
-    return convertArrayType(IGM, cast<ArrayType>(ty));
+    return convertArrayType(cast<ArrayType>(ty));
   case TypeKind::Protocol:
-    return convertProtocolType(IGM, cast<ProtocolType>(ty));
+    return convertProtocolType(cast<ProtocolType>(ty));
       
   case TypeKind::ProtocolComposition:
       llvm_unreachable("ProtocolComposition types are unimplemented");

@@ -467,7 +467,7 @@ bool HeapTypeInfo::isSingleRetainablePointer(ResilienceScope scope) const {
   return true;
 }
 
-const TypeInfo *TypeConverter::convertBuiltinObjectPointer(IRGenModule &IGM) {
+const TypeInfo *TypeConverter::convertBuiltinObjectPointer() {
   return new HeapTypeInfo(IGM.RefCountedPtrTy, IGM.getPointerSize(),
                           IGM.getPointerAlignment());
 }

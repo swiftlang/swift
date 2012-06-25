@@ -98,7 +98,7 @@ namespace {
   };
 }
 
-const TypeInfo *TypeConverter::convertBuiltinObjCPointer(IRGenModule &IGM) {
+const TypeInfo *TypeConverter::convertBuiltinObjCPointer() {
   return new ObjCTypeInfo(IGM.ObjCPtrTy, IGM.getPointerSize(),
                           IGM.getPointerAlignment());
 }

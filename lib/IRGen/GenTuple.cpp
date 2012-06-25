@@ -108,8 +108,7 @@ static const TupleTypeInfo &getAsTupleTypeInfo(IRGenFunction &IGF, Type type) {
   return getAsTupleTypeInfo(IGF.getFragileTypeInfo(type));
 }
 
-const TypeInfo *
-TypeConverter::convertTupleType(IRGenModule &IGM, TupleType *T) {
+const TypeInfo *TypeConverter::convertTupleType(TupleType *T) {
   TupleTypeBuilder builder(IGM);
   builder.create(T->getFields());
   return builder.complete(T->getFields());
