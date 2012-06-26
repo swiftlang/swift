@@ -398,7 +398,39 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // Perform lvalue-to-rvalue conversion on the function.
   E1 = convertToRValue(E1);
   if (!E1) return nullptr;
-  
+
+  // If we're referring to a single generic function, try to resolve it.
+  // FIXME: We should check for a PolyFunctionType here!
+  // FIXME: Refactor with other overload resolution code.
+  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E1)) {
+    if (FuncDecl *FD = dyn_cast<FuncDecl>(DRE->getDecl())) {
+      if (FD->isGeneric()) {
+        // Perform overload resolution.
+        llvm::SmallVector<ValueDecl *, 2> Viable;
+        auto Best = filterOverloadSet(FD,
+                                      (isa<PrefixUnaryExpr>(E) ||
+                                       isa<PostfixUnaryExpr>(E) ||
+                                       isa<BinaryExpr>(E)),
+                                       Type(), E2,
+                                       Type(), Viable);
+        // If overload resolution resolves, resolve it.
+        if (Best) {
+          E1 = buildRefExpr(Best, DRE->getLoc());
+          E->setFn(convertToRValue(E1));
+          return semaApplyExpr(E);
+        }
+        // If the referenced decl isn't viable, complain.
+        if (Viable.empty()) {
+          diagnoseEmptyOverloadSet(E, FD);
+          return nullptr;
+        }
+        // Otherwise, wait, and try to resolve again later.
+        E->setType(UnstructuredUnresolvedType::get(Context));
+        return E;
+      }
+    }
+  }
+
   // If we have a concrete function type, then we win.
   if (FunctionType *FT = E1->getType()->getAs<FunctionType>()) {
     // If this is an operator, make sure that the declaration found was declared
@@ -644,19 +676,6 @@ public:
 
     // TODO: QOI: If the decl had an "invalid" bit set, then return the error
     // object to improve error recovery.
-
-    // Generic functions are always considered to overloaded (since there are
-    // make potential type bindings), so references to generic functions
-    // produce overloaded declaration references.
-    if (auto Func = dyn_cast<FuncDecl>(E->getDecl())) {
-      if (Func->isGeneric()) {
-        SmallVector<ValueDecl *, 1> decls;
-        decls.push_back(E->getDecl());
-        return new (TC.Context) OverloadedDeclRefExpr(
-                                  TC.Context.AllocateCopy(decls), E->getLoc(),
-                                  UnstructuredUnresolvedType::get(TC.Context));
-      }
-    }
 
     E->setType(E->getDecl()->getTypeOfReference());
     return E;
