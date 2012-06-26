@@ -1132,11 +1132,27 @@ public:
 /// var i : Int = identity(17) // 'identity' is specialized to (x : Int) -> Int
 /// \endcode
 class SpecializeExpr : public ImplicitConversionExpr {
-  // FIXME: Record the actual substitutions performed!
+public:
+  struct Substitution {
+    ArchetypeType *Archetype; // FIXME: We want GenericParams here, I think.
+    Type Replacement;
+    ArrayRef<ProtocolConformance *> Conformance;
+  };
+
+private:
+  ArrayRef<Substitution> Substitutions;
 
 public:
-  SpecializeExpr(Expr *SubExpr, Type Ty)
-    : ImplicitConversionExpr(ExprKind::Specialize, SubExpr, Ty) { }
+  SpecializeExpr(Expr *SubExpr, Type Ty, ArrayRef<Substitution> Substitutions)
+    : ImplicitConversionExpr(ExprKind::Specialize, SubExpr, Ty),
+      Substitutions(Substitutions) { }
+
+  /// \brief Retrieve the set of substitutions applied to specialize the
+  /// subexpression.
+  ///
+  /// Each substitution contains the archetype being substitued, the type it is
+  /// being replaced with.
+  ArrayRef<Substitution> getSubstitutions() const { return Substitutions; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const SpecializeExpr *) { return true; }

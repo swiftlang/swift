@@ -67,16 +67,34 @@ public:
   }
 };
 
+/// \brief A mapping from archetypes to the protocol-conformance 
+typedef llvm::DenseMap<ArchetypeType *, SmallVector<ProtocolConformance *, 2>>
+  ConformanceMap;
+
 /// \brief An overload candidate.
 /// FIXME: Encode the actual substitutions here in some efficient manner.
 class OverloadCandidate {
+public:
+  /// SubstitutionInfoType - Information about the substitution of generic
+  /// parameters required to produce this overload candidate.
+  struct SubstitutionInfoType {
+    TypeSubstitutionMap Substitutions;
+    ConformanceMap Conformances;
+  };
+
+private:
   llvm::PointerIntPair<ValueDecl *, 1, bool> DeclAndComplete;
   Type Ty;
+  std::unique_ptr<SubstitutionInfoType> SubstitutionInfo;
 
 public:
   OverloadCandidate() : DeclAndComplete(0, false), Ty() { }
   OverloadCandidate(ValueDecl *Value, Type Ty, bool Complete)
     : DeclAndComplete(Value, Complete), Ty(Ty) { }
+  OverloadCandidate(ValueDecl *Value, Type Ty,
+                    SubstitutionInfoType &&SubstitutionInfo)
+    : DeclAndComplete(Value, true), Ty(Ty),
+      SubstitutionInfo(new SubstitutionInfoType(std::move(SubstitutionInfo))) {}
 
   /// \brief Whether this overload candidate is 'complete', meaning that we
   /// can use the declaration (possibly by applying the given substitutions)
@@ -92,6 +110,22 @@ public:
 
   /// \brief Evaluates true if the selected candidate is complete.
   explicit operator bool() const { return isComplete(); }
+
+  /// \brief Determine whether this overload candidate has any substitutions.
+  bool hasSubstitutions() const { return SubstitutionInfo != nullptr; }
+
+  /// \brief Retrieve the substitutions for this overload candidate.
+  TypeSubstitutionMap &getSubstitutions() const {
+    assert(hasSubstitutions() && "Candidate does not have substitutions");
+    return SubstitutionInfo->Substitutions;
+  }
+
+  /// \brief Retrieve the set of protocol conformance records that go with the
+  /// substitutions.
+  ConformanceMap &getConformances() const {
+    assert(hasSubstitutions() && "Candidate does not have substitutions");
+    return SubstitutionInfo->Conformances;
+  }
 };
 
 /// \brief Captures information about the context of a type coercion, including

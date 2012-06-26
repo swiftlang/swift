@@ -1105,7 +1105,7 @@ private:
                 Optional<unsigned> Index)
     : TypeBase(TypeKind::Archetype, &Ctx, /*Unresolved=*/false),
       DisplayName(DisplayName), ConformsTo(ConformsTo),
-      IndexIfPrimary(Index? *Index + 1 : 1){ }
+      IndexIfPrimary(Index? *Index + 1 : 0) { }
 };
 
 /// SubstArchetypeType - An archetype that has been substituted for a

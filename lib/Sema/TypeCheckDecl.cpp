@@ -296,7 +296,7 @@ public:
         // Create the archetype for this type parameter.
         ArchetypeType *Archetype
           = ArchetypeType::getNew(TC.Context, TypeParam->getName().str(),
-                                  TypeParam->getInherited(), Index);
+                                  TypeParam->getInherited(), Index++);
         TypeParam->setUnderlyingType(Archetype);
 
 

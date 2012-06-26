@@ -528,6 +528,10 @@ public:
   }
   void visitSpecializeExpr(SpecializeExpr *E) {
     printCommon(E, "specialize_expr") << '\n';
+    for (auto S : E->getSubstitutions()) {
+      OS.indent(Indent + 2) << "(with " << S.Archetype->getDisplayName()
+        << " ::= " << S.Replacement.getString() << ")\n";
+    }
     printRec(E->getSubExpr());
     OS << ')';
   }

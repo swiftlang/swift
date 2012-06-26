@@ -157,13 +157,23 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
         continue;
     }
 
+    // Add without substitutions.
+    if (!CC.requiresSubstitution() || !CC.hasCompleteSubstitutions()) {
+      ViableCandidates.push_back(
+        OverloadCandidate(VD, FunctionTy, CC.hasCompleteSubstitutions()));
+      continue;
+    }
+
+    // Add with substitutions.
+    OverloadCandidate::SubstitutionInfoType SubstitutionInfo
+      = { std::move(CC.Substitutions), std::move(CC.Conformance) };
     ViableCandidates.push_back(OverloadCandidate(VD, FunctionTy,
-                                 /*Complete=*/CC.hasCompleteSubstitutions()));
+                                                 std::move(SubstitutionInfo)));
   }
 
   // If we found a fully-resolved a viable candidate, we're done.
   if (ViableCandidates.size() == 1 && ViableCandidates[0].isComplete())
-    return ViableCandidates[0];
+    return std::move(ViableCandidates[0]);
 
   // Create the resulting viable-candidates vector.
   Viable.clear();
@@ -224,12 +234,22 @@ Expr *TypeChecker::buildRefExpr(const OverloadCandidate &Candidate,
   Expr *result = new (Context) DeclRefExpr(decl, NameLoc,
                                            decl->getTypeOfReference());
 
-  // If the types don't match, it's because the declaration has been
-  // specialized.
-  // FIXME: Ask the OverloadCandidate for this information, rather than
-  // guessing at it.
-  if (!result->getType()->isEqual(Candidate.getType())) {
-    result = new (Context) SpecializeExpr(result, Candidate.getType());
+  // If matching the candidate required substitutions, introduce a
+  // specialization expression that encodes those substitutions and provides
+  // a concrete type.
+  if (Candidate.hasSubstitutions()) {
+    SmallVector<SpecializeExpr::Substitution, 2> Substitutions;
+    Substitutions.resize(Candidate.getSubstitutions().size());
+    auto &Conformances = Candidate.getConformances();
+    for (auto S : Candidate.getSubstitutions()) {
+      unsigned Index = S.first->getPrimaryIndex();
+      Substitutions[Index].Archetype = S.first;
+      Substitutions[Index].Replacement = S.second;
+      Substitutions[Index].Conformance
+        = Context.AllocateCopy(Conformances[S.first]);
+    }
+    result = new (Context) SpecializeExpr(result, Candidate.getType(),
+                                          Context.AllocateCopy(Substitutions));
   }
 
   return recheckTypes(result);

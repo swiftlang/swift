@@ -59,7 +59,12 @@ namespace swift {
     Optional(ArgTypes &&...Args) : HasValue(true) {
       new (getPointer()) T(std::forward<ArgTypes>(Args)...);
     }
-    
+
+    Optional(Optional &Other) : HasValue(Other.HasValue) {
+      if (Other)
+        new (getPointer()) T(Other.getValue());
+    }
+
     Optional(const Optional &Other) : HasValue(Other.HasValue) {
       if (Other)
         new (getPointer()) T(Other.getValue());
