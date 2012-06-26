@@ -1110,22 +1110,27 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
       if (Expr *Result = TC.semaApplyExpr(E))
         return coerceToType(Result, DestTy, CC, Flags);
       
-      return nullptr;
+      return CoercionResult::Failed;
     }
     
     if (Flags & CF_Apply) {
-      if (Viable.empty())
+      if (Viable.empty()) {
         TC.diagnoseEmptyOverloadSet(E, OSE->getDecls());
-      else {
+      } else if (E->getArg()->getType()->isUnresolvedType()) {
+        return CoercionResult::Unknowable;
+      } else {
         diagnose(E->getFn()->getLoc(), diag::overloading_ambiguity)
           << E->getSourceRange();
         TC.printOverloadSetCandidates(Viable);
       }
       E->setType(ErrorType::get(TC.Context));
       OSE->setType(ErrorType::get(TC.Context));
+      return CoercionResult::Failed;
     }
-    
-    return nullptr;
+
+    if (!Viable.empty() && E->getArg()->getType()->isUnresolvedType())
+      return CoercionResult::Unknowable;
+    return CoercionResult::Failed;
   }
   
   Type FnTy = FunctionType::get(E->getArg()->getType(), DestTy, TC.Context);
