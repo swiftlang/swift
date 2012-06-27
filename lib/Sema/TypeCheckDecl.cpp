@@ -456,7 +456,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
   
   // Get the number of lexical arguments, for semantic checks below.
   int NumArguments = -1;
-  if (FunctionType *FT = dyn_cast<FunctionType>(Ty))
+  if (AnyFunctionType *FT = dyn_cast<AnyFunctionType>(Ty))
     if (TupleType *TT = dyn_cast<TupleType>(FT->getInput()))
       NumArguments = TT->getFields().size();
 
@@ -531,7 +531,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
       TC.diagnose(VD->getStartLoc(), diag::assignment_without_byref);
       VD->getMutableAttrs().Assignment = false;
     } else {
-      auto FT = VD->getType()->castTo<FunctionType>();
+      auto FT = VD->getType()->castTo<AnyFunctionType>();
       Type ParamType = FT->getInput();
       TupleType *ParamTT = ParamType->getAs<TupleType>();
       if (ParamTT)
@@ -555,9 +555,9 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
                   VD->getName());
       VD->getMutableAttrs().Conversion = false;
     } else {
-      FunctionType *BoundMethodTy
-        = VD->getType()->getAs<FunctionType>()->getResult()
-            ->getAs<FunctionType>();
+      AnyFunctionType *BoundMethodTy
+        = VD->getType()->castTo<AnyFunctionType>()->getResult()
+            ->castTo<AnyFunctionType>();
       
       bool AcceptsEmptyParamList = false;
       Type InputTy = BoundMethodTy->getInput();

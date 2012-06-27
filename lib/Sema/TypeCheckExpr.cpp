@@ -400,7 +400,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   if (!E1) return nullptr;
 
   // If we're referring to a single generic function, try to resolve it.
-  // FIXME: We should check for a PolyFunctionType here!
+  // FIXME: This should just check for a PolymorphicFunctionType!
   // FIXME: Refactor with other overload resolution code.
   if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E1)) {
     if (FuncDecl *FD = dyn_cast<FuncDecl>(DRE->getDecl())) {
@@ -432,7 +432,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   }
 
   // If we have a concrete function type, then we win.
-  if (FunctionType *FT = E1->getType()->getAs<FunctionType>()) {
+  if (AnyFunctionType *FT = E1->getType()->getAs<AnyFunctionType>()) {
     // If this is an operator, make sure that the declaration found was declared
     // as such.
     bool Assignment = false;
@@ -537,6 +537,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
                                     Viable);
       ConstructorDecl *CD = dyn_cast_or_null<ConstructorDecl>(Best.getDecl());
       if (CD) {
+        // FIXME: PolymorphicFunctionType!
         Type ArgTy = Best.getType()->castTo<FunctionType>()->getInput();
         CoercedExpr CoercedE2 = coerceToType(E2, ArgTy);
         switch (CoercedE2.getKind()) {

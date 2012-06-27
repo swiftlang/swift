@@ -241,7 +241,8 @@ const TypeInfo *TypeConverter::convertType(CanType canTy) {
   case TypeKind::Class:
     return convertClassType(cast<ClassType>(ty));
   case TypeKind::Function:
-    return convertFunctionType(cast<FunctionType>(ty));
+  case TypeKind::PolymorphicFunction:
+    return convertFunctionType(cast<AnyFunctionType>(ty));
   case TypeKind::Array:
     return convertArrayType(cast<ArrayType>(ty));
   case TypeKind::Protocol:

@@ -480,7 +480,7 @@ void TypeChecker::typeCheckIgnoredExpr(Expr *E) {
   // Complain about functions that aren't called.
   // TODO: What about tuples which contain functions by-value that are
   // dead?
-  if (E->getType()->is<FunctionType>()) {
+  if (E->getType()->is<AnyFunctionType>()) {
     diagnose(E->getLoc(), diag::expression_unused_function)
       << E->getSourceRange();
     return;
@@ -531,7 +531,7 @@ bool checkProtocolCircularity(TypeChecker &TC, ProtocolDecl *Proto,
 static unsigned getNumArgs(ValueDecl *value) {
   if (!isa<FuncDecl>(value)) return ~0U;
 
-  Type argTy = cast<FunctionType>(value->getType())->getInput();
+  Type argTy = cast<AnyFunctionType>(value->getType())->getInput();
   if (auto tuple = argTy->getAs<TupleType>()) {
     return tuple->getFields().size();
   } else {

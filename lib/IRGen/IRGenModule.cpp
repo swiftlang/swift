@@ -48,6 +48,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
   Int32Ty = llvm::Type::getInt32Ty(getLLVMContext());
   Int64Ty = llvm::Type::getInt64Ty(getLLVMContext());
   Int8PtrTy = llvm::Type::getInt8PtrTy(getLLVMContext());
+  Int8PtrPtrTy = Int8PtrTy->getPointerTo(0);
   SizeTy = TargetData.getIntPtrType(getLLVMContext());
   MemCpyFn = nullptr;
   AllocObjectFn = nullptr;

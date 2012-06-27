@@ -84,11 +84,11 @@ using namespace irgen;
 
 /// Return the number of potential curries of this function type.
 /// This is equal to the number of "straight-line" arrows in the type.
-static unsigned getNumCurries(FunctionType *type) {
+static unsigned getNumCurries(AnyFunctionType *type) {
   unsigned count = 0;
   do {
     count++;
-    type = type->getResult()->getAs<FunctionType>();
+    type = type->getResult()->getAs<AnyFunctionType>();
   } while (type);
 
   return count;
@@ -101,14 +101,14 @@ static unsigned getNaturalUncurryLevel(FuncDecl *func) {
   if (func->getBody())
     return func->getBody()->getParamPatterns().size() - 1;
 
-  FunctionType *type = func->getType()->castTo<FunctionType>();
+  AnyFunctionType *type = func->getType()->castTo<AnyFunctionType>();
   unsigned count = 0;
   do {
     count++;
-    type = dyn_cast<FunctionType>(type->getResult());
+    type = dyn_cast<AnyFunctionType>(type->getResult());
   } while (type);
 
-  assert(count <= getNumCurries(func->getType()->castTo<FunctionType>()));
+  assert(count <= getNumCurries(func->getType()->castTo<AnyFunctionType>()));
   return count - 1;
 }
 
@@ -116,7 +116,7 @@ static unsigned getNaturalUncurryLevel(FuncDecl *func) {
 /// uncurrying level.  For 'a -> b -> c', this is 'b' at 0 and 'c' at 1.
 static Type getResultType(Type type, unsigned uncurryLevel) {
   do {
-    type = type->castTo<FunctionType>()->getResult();
+    type = type->castTo<AnyFunctionType>()->getResult();
   } while (uncurryLevel--);
   return type;
 }
@@ -291,7 +291,7 @@ namespace {
     };
 
     /// The Swift function type being represented.
-    FunctionType * const FormalType;
+    AnyFunctionType * const FormalType;
 
     /// An array of Curryings is stored immediately after the FuncTypeInfo.
     /// A Currying is a cache, so the entire thing is effective mutable.
@@ -299,7 +299,7 @@ namespace {
       return const_cast<Currying*>(reinterpret_cast<const Currying*>(this+1));
     }
 
-    FuncTypeInfo(FunctionType *formalType, llvm::StructType *storageType,
+    FuncTypeInfo(AnyFunctionType *formalType, llvm::StructType *storageType,
                  Size size, Alignment align, unsigned numCurries)
       : ScalarTypeInfo(storageType, size, align, IsNotPOD),
         FormalType(formalType) {
@@ -311,7 +311,7 @@ namespace {
     }
 
   public:
-    static const FuncTypeInfo *create(FunctionType *formalType,
+    static const FuncTypeInfo *create(AnyFunctionType *formalType,
                                       llvm::StructType *storageType,
                                       Size size, Alignment align) {
       unsigned numCurries = getNumCurries(formalType);
@@ -410,10 +410,25 @@ namespace {
   };
 }
 
-const TypeInfo *TypeConverter::convertFunctionType(FunctionType *T) {
+const TypeInfo *TypeConverter::convertFunctionType(AnyFunctionType *T) {
   return FuncTypeInfo::create(T, IGM.FunctionPairTy,
                               IGM.getPointerSize() * 2,
                               IGM.getPointerAlignment());
+}
+
+static void expandPolymorphicSignature(IRGenModule &IGM,
+                                       PolymorphicFunctionType *fn,
+                                       SmallVectorImpl<llvm::Type*> &out) {
+  for (auto &param : fn->getGenericParams()) {
+    TypeAliasDecl *paramType = param.getAsTypeParam();
+    assert(paramType);
+
+    // For now, pass each signature requirement separately.  We always
+    // need to pass at least one witness table in order to know how to
+    // manipulate the type.
+    unsigned n = std::min(unsigned(paramType->getInherited().size()), 1U);
+    while (n--) out.push_back(IGM.WitnessTablePtrTy);
+  }
 }
 
 /// Decompose a function type into its exploded parameter types
@@ -431,30 +446,37 @@ const TypeInfo *TypeConverter::convertFunctionType(FunctionType *T) {
 /// retainable pointer which becomes the only curried argument
 /// (and therefore the final argument) to a method call.
 ///
+/// Generic arguments come last in a clause, also in order to make it
+/// easier to drop or ignore them.
+///
 /// This is all somewhat optimized for register-passing CCs; it
 /// probably makes extra work when the stack gets involved.
-static Type decomposeFunctionType(IRGenModule &IGM, FunctionType *fn,
+static Type decomposeFunctionType(IRGenModule &IGM, AnyFunctionType *fn,
                                   ExplosionKind explosionKind,
                                   unsigned uncurryLevel,
                                   SmallVectorImpl<llvm::Type*> &argTypes) {
   // Save up the formal parameter types in reverse order.
-  llvm::SmallVector<Type, 8> formalArgTypes(uncurryLevel + 1);
-  formalArgTypes[uncurryLevel] = fn->getInput();
+  llvm::SmallVector<AnyFunctionType*, 8> formalFnTypes(uncurryLevel + 1);
+  formalFnTypes[uncurryLevel] = fn;
   while (uncurryLevel--) {
-    fn = fn->getResult()->castTo<FunctionType>();
-    formalArgTypes[uncurryLevel] = fn->getInput();
+    fn = fn->getResult()->castTo<AnyFunctionType>();
+    formalFnTypes[uncurryLevel] = fn;
   }
 
   // Explode the argument clusters in that reversed order.
-  for (Type type : formalArgTypes) {
+  for (AnyFunctionType *fnTy : formalFnTypes) {
     ExplosionSchema schema(explosionKind);
-    IGM.getSchema(type, schema);
+    IGM.getSchema(fnTy->getInput(), schema);
 
     for (ExplosionSchema::Element &elt : schema) {
       if (elt.isAggregate())
         argTypes.push_back(elt.getAggregateType()->getPointerTo());
       else
         argTypes.push_back(elt.getScalarType());
+    }
+
+    if (auto polyTy = dyn_cast<PolymorphicFunctionType>(fnTy)) {
+      expandPolymorphicSignature(IGM, polyTy, argTypes);
     }
   }
 
@@ -528,7 +550,7 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
 llvm::FunctionType *
 IRGenModule::getFunctionType(Type type, ExplosionKind explosionKind,
                              unsigned curryingLevel, bool withData) {
-  assert(type->is<FunctionType>());
+  assert(type->is<AnyFunctionType>());
   const FuncTypeInfo &fnTypeInfo = getFragileTypeInfo(type).as<FuncTypeInfo>();
   Signature sig = fnTypeInfo.getSignature(*this, explosionKind,
                                           curryingLevel, withData);
@@ -789,7 +811,7 @@ static void emitCastBuiltin(llvm::Instruction::CastOps opcode, FuncDecl *Fn,
                             IRGenFunction &IGF, ArgList &args,
                             CallResult &result) {
   llvm::Value *input = args.Values.claimUnmanagedNext();
-  Type DestType = Fn->getType()->getAs<FunctionType>()->getResult();
+  Type DestType = Fn->getType()->castTo<AnyFunctionType>()->getResult();
   llvm::Type *destTy = IGF.IGM.getFragileTypeInfo(DestType).getStorageType();
   assert(args.Values.empty() && "wrong operands to cast operation");
   llvm::Value *output = IGF.Builder.CreateCast(opcode, input, destTy);
@@ -889,7 +911,7 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
 
   if (BuiltinName == "load") {
     // The type of the operation is the result type of the load function.
-    Type valueTy = Fn->getType()->castTo<FunctionType>()->getResult();
+    Type valueTy = Fn->getType()->castTo<AnyFunctionType>()->getResult();
     const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
     
     // Treat the raw pointer as a physical l-value of that type.
@@ -905,7 +927,7 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
   if (BuiltinName == "assign") {
     // The type of the operation is the type of the first argument of
     // the store function.
-    Type valueTy = Fn->getType()->castTo<FunctionType>()->getInput()
+    Type valueTy = Fn->getType()->castTo<AnyFunctionType>()->getInput()
       ->castTo<TupleType>()->getElementType(0);
     const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
     
@@ -923,7 +945,7 @@ static void emitBuiltinCall(IRGenFunction &IGF, FuncDecl *Fn,
   if (BuiltinName == "init") {
     // The type of the operation is the type of the first argument of
     // the store function.
-    Type valueTy = Fn->getType()->castTo<FunctionType>()->getInput()
+    Type valueTy = Fn->getType()->castTo<AnyFunctionType>()->getInput()
       ->castTo<TupleType>()->getElementType(0);
     const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
     
@@ -1393,7 +1415,7 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
 
       // Otherwise, pop that call site off and set up the callee conservatively.
       Type formalResult =
-        knownFn->getType()->castTo<FunctionType>()->getResult();
+        knownFn->getType()->castTo<AnyFunctionType>()->getResult();
       callee = result.getDirectValuesAsIndirectCallee(formalResult);
       result.reset();
       break;
@@ -1427,7 +1449,7 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
     Type formalResultType =
       CallSites[CallSites.size() + calleeArgs.size()
                   - callee.getUncurryLevel() - 1]
-        .FnType->castTo<FunctionType>()->getResult();
+        .FnType->castTo<AnyFunctionType>()->getResult();
     const TypeInfo &resultTI = IGF.IGM.getFragileTypeInfo(formalResultType);
 
     CallSiteCallEmitter(IGF, callee, calleeArgs, CallSites,
@@ -1986,12 +2008,13 @@ namespace {
       unsigned clauseIndex = Clauses.size();
       Clauses.push_back(Clause());
 
-      FunctionType *fn = cast<FunctionType>(fnType);
+      AnyFunctionType *fn = cast<AnyFunctionType>(fnType);
       accumulateClauses(fn->getResult(), maxUncurryLevel - 1);
 
       Clauses[clauseIndex].DataTypesBeginIndex = AllDataTypes.size();
       Clauses[clauseIndex].ForwardingFnType = fn->getResult();
 
+      assert(!isa<PolymorphicFunctionType>(fn) && "not implemented!");
       accumulateParameterDataTypes(fn->getInput());
     }
 

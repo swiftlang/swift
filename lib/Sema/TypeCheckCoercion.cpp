@@ -369,6 +369,7 @@ public:
       return coerceOverloadToLValue(E, lv);
 
     // If DestFT is a FunctionType, get it as one.
+    // FIXME: PolymorphicFunctionType?
     FunctionType *DestFT = DestTy->getAs<FunctionType>();
     
     // Determine which declarations are viable.
@@ -679,7 +680,9 @@ SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralType LitTy) {
   
   // Check that the type of the 'convertFrom*Literal' method makes
   // sense.  We want a type of "S -> DestTy" where S is the expected type.
-  FunctionType *FT = Method->getType()->castTo<FunctionType>();
+  AnyFunctionType *FT = cast<AnyFunctionType>(Method->getType());
+
+  // FIXME: PolymorphicFunctionType?
   
   // The result of the convert function must be the destination type.
   if (!FT->getResult()->isEqual(Ty)) {
@@ -903,9 +906,10 @@ CoercedResult SemaCoerce::tryUserConversion(Expr *E) {
       break;
     }
     
+    // FIXME: PolymorphicFunctionType
     Type ResultTy
-      = R.D->getType()->getAs<FunctionType>()->getResult()->
-          getAs<FunctionType>()->getResult();
+      = R.D->getType()->castTo<FunctionType>()->getResult()->
+          castTo<AnyFunctionType>()->getResult();
     if (ResultTy->isEqual(DestTy))
       Viable.push_back(R.D);
   }
@@ -1097,7 +1101,7 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
         // Determine the type of the resulting call expression.
         Type Ty = Best.getType()->getRValueType();
 
-        if (FunctionType *FnTy = Ty->getAs<FunctionType>())
+        if (AnyFunctionType *FnTy = Ty->getAs<AnyFunctionType>())
           return FnTy->getResult();
         
         return Ty;
@@ -2018,7 +2022,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
 
   // A value of function type can be converted to a value of another function
   // type, so long as the source is a subtype of the destination.
-  if (E->getType()->is<FunctionType>() && DestTy->is<FunctionType>()) {
+  if (E->getType()->is<AnyFunctionType>() && DestTy->is<AnyFunctionType>()) {
     bool Trivial;
     if (TC.isSubtypeOf(E->getType(), DestTy, Trivial)) {
       if (!(Flags & CF_Apply))

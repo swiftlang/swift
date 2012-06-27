@@ -178,14 +178,23 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
     return TupleType::get(Elements, Context);
   }
       
-  case TypeKind::Function: {
-    FunctionType *FunctionTy = cast<FunctionType>(this);
+  case TypeKind::Function:
+  case TypeKind::PolymorphicFunction: {
+    AnyFunctionType *FunctionTy = cast<AnyFunctionType>(this);
     Type InputTy = FunctionTy->getInput()->getUnlabeledType(Context);
     Type ResultTy = FunctionTy->getResult()->getUnlabeledType(Context);
     if (InputTy.getPointer() != FunctionTy->getInput().getPointer() ||
-        ResultTy.getPointer() != FunctionTy->getResult().getPointer())
-      return FunctionType::get(InputTy, ResultTy, FunctionTy->isAutoClosure(),
-                               Context);
+        ResultTy.getPointer() != FunctionTy->getResult().getPointer()) {
+      if (auto monoFn = dyn_cast<FunctionType>(FunctionTy)) {
+        return FunctionType::get(InputTy, ResultTy,
+                                 monoFn->isAutoClosure(), Context);
+      } else {
+        auto polyFn = cast<PolymorphicFunctionType>(FunctionTy);
+        return PolymorphicFunctionType::get(InputTy, ResultTy,
+                                            &polyFn->getGenericParams(),
+                                            Context);
+      }
+    }
     
     return this;
   }
@@ -400,6 +409,8 @@ CanType TypeBase::getCanonicalType() {
                              objectType->getASTContext());
     break;
   }
+  case TypeKind::PolymorphicFunction:
+    llvm_unreachable("polymorphic functions are always canonical for now");
   case TypeKind::Function: {
     FunctionType *FT = cast<FunctionType>(this);
     Type In = FT->getInput()->getCanonicalType();
@@ -473,6 +484,7 @@ TypeBase *TypeBase::getDesugaredType() {
 #include "swift/AST/TypeNodes.def"
   case TypeKind::Tuple:
   case TypeKind::Function:
+  case TypeKind::PolymorphicFunction:
   case TypeKind::Array:
   case TypeKind::LValue:
   case TypeKind::ProtocolComposition:
@@ -773,7 +785,23 @@ void TupleType::print(raw_ostream &OS) const {
 void FunctionType::print(raw_ostream &OS) const {
   if (isAutoClosure())
     OS << "[auto_closure]";
-  OS << Input << " -> " << Result;
+  OS << getInput() << " -> " << getResult();
+}
+
+void PolymorphicFunctionType::print(raw_ostream &OS) const {
+  OS << '<';
+  auto params = getGenericParams().getParams();
+  for (unsigned i = 0, e = params.size(); i != e; ++i) {
+    if (i) OS << ", ";
+
+    TypeAliasDecl *paramTy = params[i].getAsTypeParam();
+    OS << paramTy->getName().str();
+    auto inherited = paramTy->getInherited();
+    for (unsigned ii = 0, ie = inherited.size(); ii != ie; ++ii) {
+      OS << (ii ? StringRef(", ") : " : ") << inherited[ii];
+    }
+  }
+  OS << "> " << getInput() << " -> " << getResult();
 }
 
 void ArraySliceType::print(raw_ostream &OS) const {

@@ -190,8 +190,9 @@ bool TypeChecker::validateType(Type InTy, bool isFirstPass) {
     IsInvalid = validateType(cast<LValueType>(T)->getObjectType(), isFirstPass);
     break;
       
-  case TypeKind::Function: {
-    FunctionType *FT = cast<FunctionType>(T);
+  case TypeKind::Function:
+  case TypeKind::PolymorphicFunction: {
+    AnyFunctionType *FT = cast<AnyFunctionType>(T);
     IsInvalid = validateType(FT->getInput(), isFirstPass) ||
                 validateType(FT->getResult(), isFirstPass);
     // FIXME: diagnose non-materializability of result type!
@@ -506,8 +507,9 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
     return SubstArchetypeType::get(SubstAT->getArchetype(), Subst, Context);
   }
       
-  case TypeKind::Function: {
-    auto Function = cast<FunctionType>(T);
+  case TypeKind::Function:
+  case TypeKind::PolymorphicFunction: {
+    auto Function = cast<AnyFunctionType>(T);
     auto InputTy = substType(Function->getInput(), Substitutions);
     if (!InputTy)
       return Type();
@@ -519,8 +521,15 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
         ResultTy.getPointer() == Function->getResult().getPointer())
       return T;
     
-    return FunctionType::get(InputTy, ResultTy, Function->isAutoClosure(),
-                             Context);
+    if (auto polyFn = dyn_cast<PolymorphicFunctionType>(T)) {
+      return PolymorphicFunctionType::get(InputTy, ResultTy,
+                                          &polyFn->getGenericParams(),
+                                          Context);
+    } else {
+      auto fn = cast<FunctionType>(T);
+      return FunctionType::get(InputTy, ResultTy, fn->isAutoClosure(),
+                               Context);
+    }
   }
       
   case TypeKind::Array: {

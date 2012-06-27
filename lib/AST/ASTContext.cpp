@@ -247,13 +247,30 @@ FunctionType *FunctionType::get(Type Input, Type Result, bool isAutoClosure,
 }
 
 // If the input and result types are canonical, then so is the result.
-FunctionType::FunctionType(Type input, Type result, bool isAutoClosure)
-  : TypeBase(TypeKind::Function,
-             (input->isCanonical() && result->isCanonical()) ?
+FunctionType::FunctionType(Type input, Type output, bool isAutoClosure)
+  : AnyFunctionType(TypeKind::Function,
+             (input->isCanonical() && output->isCanonical()) ?
                &input->getASTContext() : 0,
-             (input->isUnresolvedType() || result->isUnresolvedType())),
-    Input(input), Result(result), AutoClosure(isAutoClosure) { }
+             input, output,
+             (input->isUnresolvedType() || output->isUnresolvedType())),
+    AutoClosure(isAutoClosure) { }
 
+
+/// FunctionType::get - Return a uniqued function type with the specified
+/// input and result.
+PolymorphicFunctionType *PolymorphicFunctionType::get(Type input, Type output,
+                                                      GenericParamList *params,
+                                                      ASTContext &C) {
+  // FIXME: one day we should do canonicalization properly.
+  return new (C) PolymorphicFunctionType(input, output, params, C);
+}
+
+PolymorphicFunctionType::PolymorphicFunctionType(Type input, Type output,
+                                                 GenericParamList *params,
+                                                 ASTContext &C)
+  : AnyFunctionType(TypeKind::PolymorphicFunction, &C, input, output,
+                    (input->isUnresolvedType() || output->isUnresolvedType())),
+    Params(params) { }
 
 /// Return a uniqued array type with the specified base type and the
 /// specified size.

@@ -56,8 +56,9 @@ bool Parser::checkFullyTyped(Type type) {
   case TypeKind::ArraySlice:
     return checkFullyTyped(cast<ArraySliceType>(type)->getBaseType());
 
-  case TypeKind::Function: {
-    FunctionType *fn = cast<FunctionType>(type);
+  case TypeKind::Function:
+  case TypeKind::PolymorphicFunction: {
+    AnyFunctionType *fn = cast<AnyFunctionType>(type);
     return checkFullyTyped(fn->getInput())
          | checkFullyTyped(fn->getResult());
   }

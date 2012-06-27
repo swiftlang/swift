@@ -25,7 +25,7 @@ namespace swift {
   class ArrayType;
   class CanType;
   class ClassType;
-  class FunctionType;
+  class AnyFunctionType;
   class LValueType;
   class MetaTypeType;
   class ModuleType;
@@ -60,7 +60,7 @@ class TypeConverter {
   const TypeInfo *convertOneOfType(OneOfType *T);
   const TypeInfo *convertStructType(StructType *T);
   const TypeInfo *convertClassType(ClassType *T);
-  const TypeInfo *convertFunctionType(FunctionType *T);
+  const TypeInfo *convertFunctionType(AnyFunctionType *T);
   const TypeInfo *convertArchetypeType(ArchetypeType *T);
   const TypeInfo *convertArrayType(ArrayType *T);
   const TypeInfo *convertLValueType(LValueType *T);

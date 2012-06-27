@@ -69,6 +69,8 @@ namespace {
     void mangleType(Type type, ExplosionKind kind, unsigned uncurryingLevel);
 
   private:
+    void mangleFunctionType(AnyFunctionType *fn, ExplosionKind explosionKind,
+                            unsigned uncurryingLevel);
     void mangleDeclContext(DeclContext *ctx);
     void mangleIdentifier(Identifier ident);
     void mangleGetterOrSetterType(FuncDecl *fn);
@@ -272,8 +274,6 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     llvm_unreachable("Cannot mangle metatype yet");
   case TypeKind::Module:
     llvm_unreachable("Cannot mangle module type yet");
-  case TypeKind::Archetype:
-    llvm_unreachable("Cannot mangle archetype yet");
       
   // We don't care about these types being a bit verbose because we
   // don't expect them to come up that often in API names.
@@ -372,16 +372,29 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     return;
   }
 
-  case TypeKind::Function: {
-    // type ::= 'F' type type (curried)
-    // type ::= 'f' type type (uncurried)
-    FunctionType *fn = cast<FunctionType>(base);
-    Buffer << (uncurryLevel > 0 ? 'f' : 'F');
-    mangleType(fn->getInput(), explosion, 0);
-    mangleType(fn->getResult(), explosion,
-               (uncurryLevel > 0 ? uncurryLevel - 1 : 0));
+  case TypeKind::Archetype:
+    llvm_unreachable("Cannot mangle archetype yet");
+
+  case TypeKind::PolymorphicFunction: {
+    // type ::= 'U' generic-parameter-list type
+    // 'U' is for "universal qualification".
+    // The nested type is always a function type.
+    PolymorphicFunctionType *fn = cast<PolymorphicFunctionType>(base);
+    Buffer << 'U';
+
+    for (auto &param : fn->getGenericParams()) {
+      (void) param;
+      // TODO: bind the archetypes here.
+      // TODO: mangle the parameter somehow.
+    }
+    mangleFunctionType(cast<FunctionType>(base), explosion, uncurryLevel);
+    // TODO: unbind the archetypes
     return;
   }
+
+  case TypeKind::Function:
+    mangleFunctionType(cast<FunctionType>(base), explosion, uncurryLevel);
+    return;
 
   case TypeKind::Array: {
     // type ::= 'A' integer type
@@ -418,6 +431,17 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
   }
   }
   llvm_unreachable("bad type kind");
+}
+
+void Mangler::mangleFunctionType(AnyFunctionType *fn,
+                                 ExplosionKind explosion,
+                                 unsigned uncurryLevel) {
+  // type ::= 'F' type type (curried)
+  // type ::= 'f' type type (uncurried)
+  Buffer << (uncurryLevel > 0 ? 'f' : 'F');
+  mangleType(fn->getInput(), explosion, 0);
+  mangleType(fn->getResult(), explosion,
+             (uncurryLevel > 0 ? uncurryLevel - 1 : 0));
 }
 
 static StringRef mangleValueWitness(ValueWitness witness) {

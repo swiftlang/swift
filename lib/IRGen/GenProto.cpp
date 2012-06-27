@@ -73,11 +73,6 @@ llvm::Type *IRGenModule::getFixedBufferTy() {
   return FixedBufferTy;
 }
 
-/// A witness table is an i8**.
-static llvm::PointerType *getWitnessTableTy(IRGenModule &IGM) {
-  return IGM.Int8PtrTy->getPointerTo(0);
-}
-
 static llvm::StructType *getSizeAndAlignmentResultType(IRGenModule &IGM) {
   llvm::Type *resultElts[] = { IGM.SizeTy, IGM.SizeTy };
   return llvm::StructType::get(IGM.getLLVMContext(), resultElts, false);
@@ -92,20 +87,20 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
   case ValueWitness::DeallocateBuffer:
   case ValueWitness::DestroyBuffer: {
     llvm::Type *bufPtrTy = IGM.getFixedBufferTy()->getPointerTo(0);
-    llvm::Type *args[] = { bufPtrTy, getWitnessTableTy(IGM) };
+    llvm::Type *args[] = { bufPtrTy, IGM.WitnessTablePtrTy };
     return llvm::FunctionType::get(IGM.VoidTy, args, false);
   }
 
   // void (*destroy)(T *object, witness_t *self);
   case ValueWitness::Destroy: {
-    llvm::Type *args[] = { IGM.Int8PtrTy, getWitnessTableTy(IGM) };
+    llvm::Type *args[] = { IGM.Int8PtrTy, IGM.WitnessTablePtrTy };
     return llvm::FunctionType::get(IGM.VoidTy, args, false);
   }
 
   // T *(*initializeBufferWithCopyOfBuffer)(B *dest, B *src, W *self);
   case ValueWitness::InitializeBufferWithCopyOfBuffer: {
     llvm::Type *bufPtrTy = IGM.getFixedBufferTy()->getPointerTo(0);
-    llvm::Type *args[] = { bufPtrTy, bufPtrTy, getWitnessTableTy(IGM) };
+    llvm::Type *args[] = { bufPtrTy, bufPtrTy, IGM.WitnessTablePtrTy };
     return llvm::FunctionType::get(IGM.Int8PtrTy, args, false);
   }
 
@@ -114,7 +109,7 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
   case ValueWitness::AllocateBuffer:
   case ValueWitness::ProjectBuffer: {
     llvm::Type *bufPtrTy = IGM.getFixedBufferTy()->getPointerTo(0);
-    llvm::Type *args[] = { bufPtrTy, getWitnessTableTy(IGM) };
+    llvm::Type *args[] = { bufPtrTy, IGM.WitnessTablePtrTy };
     return llvm::FunctionType::get(IGM.Int8PtrTy, args, false);
   }
 
@@ -123,7 +118,7 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
   case ValueWitness::InitializeBufferWithCopy:
   case ValueWitness::InitializeBufferWithTake: {
     llvm::Type *bufPtrTy = IGM.getFixedBufferTy()->getPointerTo(0);
-    llvm::Type *args[] = { bufPtrTy, IGM.Int8PtrTy, getWitnessTableTy(IGM) };
+    llvm::Type *args[] = { bufPtrTy, IGM.Int8PtrTy, IGM.WitnessTablePtrTy };
     return llvm::FunctionType::get(IGM.Int8PtrTy, args, false);
   }
 
@@ -136,7 +131,7 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
   case ValueWitness::InitializeWithCopy:
   case ValueWitness::InitializeWithTake: {
     llvm::Type *ptrTy = IGM.Int8PtrTy;
-    llvm::Type *args[] = { ptrTy, ptrTy, getWitnessTableTy(IGM) };
+    llvm::Type *args[] = { ptrTy, ptrTy, IGM.WitnessTablePtrTy };
     return llvm::FunctionType::get(ptrTy, args, false);
   }
 
@@ -144,7 +139,7 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
   // layout_t (*sizeAndAlignment)(W *self);
   case ValueWitness::SizeAndAlignment: {
     llvm::StructType *resultTy = getSizeAndAlignmentResultType(IGM);
-    return llvm::FunctionType::get(resultTy, getWitnessTableTy(IGM), false);
+    return llvm::FunctionType::get(resultTy, IGM.WitnessTablePtrTy, false);
   }
 
   }
@@ -227,7 +222,7 @@ static llvm::Value *loadWitnessTable(IRGenFunction &IGF, Address addr) {
 static llvm::Value *loadOpaqueWitness(IRGenFunction &IGF,
                                       llvm::Value *table,
                                       WitnessIndex index) {
-  assert(table->getType() == IGF.IGM.Int8PtrTy->getPointerTo());
+  assert(table->getType() == IGF.IGM.WitnessTablePtrTy);
 
   // GEP to the appropriate index, avoiding spurious IR in the trivial case.
   llvm::Value *slot = table;
@@ -774,8 +769,7 @@ static Address emitAllocateBuffer(IRGenFunction &IGF,
     auto sizeAndAlign = type.getSizeAndAlignment(IGF);
     llvm::Value *addr =
       IGF.emitAllocRawCall(sizeAndAlign.first, sizeAndAlign.second);
-    buffer = IGF.Builder.CreateBitCast(buffer,
-                                       IGF.IGM.Int8PtrTy->getPointerTo());
+    buffer = IGF.Builder.CreateBitCast(buffer, IGF.IGM.Int8PtrPtrTy);
     IGF.Builder.CreateStore(addr, buffer);
     return IGF.Builder.CreateBitCast(Address(addr, type.StorageAlignment),
                                      type.getStorageType()->getPointerTo());
@@ -813,7 +807,7 @@ static void emitDeallocateBuffer(IRGenFunction &IGF,
   switch (packing) {
   case FixedPacking::Allocate: {
     Address slot =
-      IGF.Builder.CreateBitCast(buffer, IGF.IGM.Int8PtrTy->getPointerTo());
+      IGF.Builder.CreateBitCast(buffer, IGF.IGM.Int8PtrPtrTy);
     llvm::Value *addr = IGF.Builder.CreateLoad(slot, "storage");
     IGF.emitDeallocRawCall(addr, type.getSizeOnly(IGF));
     return;
@@ -1280,7 +1274,7 @@ static llvm::Constant *getInitWithCopyStrongFunction(IRGenModule &IGM) {
 /// Return a function which takes two pointer arguments, loads a
 /// pointer from the first, and calls swift_release on it immediately.
 static llvm::Constant *getDestroyStrongFunction(IRGenModule &IGM) {
-  llvm::Type *argTys[] = { IGM.Int8PtrTy->getPointerTo(), IGM.Int8PtrTy };
+  llvm::Type *argTys[] = { IGM.Int8PtrPtrTy, IGM.Int8PtrTy };
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(IGM.VoidTy, argTys, false);
   llvm::Constant *fn =
@@ -2069,7 +2063,7 @@ const TypeInfo *TypeConverter::convertProtocolType(ProtocolType *T) {
   // Protocol types are nominal.
   llvm::StructType *type = IGM.createNominalType(T->getDecl());
   llvm::Type *fields[] = {
-    IGM.Int8PtrTy->getPointerTo(0),  // witness table
+    IGM.WitnessTablePtrTy,           // witness table
     IGM.getFixedBufferTy()           // value buffer
   };
   type->setBody(fields);
@@ -2143,7 +2137,7 @@ void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
     // Drill down to get the new table.
     llvm::Value *newTable =
     loadOpaqueWitness(IGF, oldTable, witnessEntry.getOutOfLineBaseIndex());
-    newTable = IGF.Builder.CreateBitCast(newTable, getWitnessTableTy(IGF.IGM));
+    newTable = IGF.Builder.CreateBitCast(newTable, IGF.IGM.WitnessTablePtrTy);
     
     // Drop it in place and we're done.
     IGF.Builder.CreateStore(newTable, tableSlot);
@@ -2336,7 +2330,7 @@ Callee irgen::emitExistentialMemberRefCallee(IRGenFunction &IGF,
 
     // If it's out-of-line, we have to drill down.
     table = loadOpaqueWitness(IGF, table, witnessEntry.getOutOfLineBaseIndex());
-    table = IGF.Builder.CreateBitCast(table, getWitnessTableTy(IGF.IGM));
+    table = IGF.Builder.CreateBitCast(table, IGF.IGM.WitnessTablePtrTy);
   }
 
   // Pull out the function witness.

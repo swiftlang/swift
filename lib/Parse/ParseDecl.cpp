@@ -1100,6 +1100,21 @@ Pattern *Parser::buildImplicitThisParameter() {
   return new (Context) TypedPattern(P, UnstructuredUnresolvedType::get(Context));
 }
 
+/// Given a FunctionType structure built by parseFunctionSignature,
+/// rebuild it as a polymorphic type.
+static Type buildPolymorphicType(ASTContext &C, Type sigTy,
+                                 GenericParamList *params,
+                                 bool hasContainerType) {
+  assert(params);
+  FunctionType *fnType = cast<FunctionType>(sigTy);
+  if (hasContainerType) {
+    Type output = buildPolymorphicType(C, fnType->getResult(), params, false);
+    return FunctionType::get(fnType->getInput(), output, C);
+  }
+  return PolymorphicFunctionType::get(fnType->getInput(), fnType->getResult(),
+                                      params, C);
+}
+
 /// parseDeclFunc - Parse a 'func' declaration, returning null on error.  The
 /// caller handles this case and does recovery as appropriate.  If AllowScoped
 /// is true, we parse both productions.
@@ -1174,6 +1189,12 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   TypeLoc *FuncTyLoc;
   if (parseFunctionSignature(Params, FuncTy, FuncTyLoc))
     return 0;
+
+  // FIXME: for efficiency, do this as part of the previous operation.
+  if (GenericParams) {
+    FuncTy = buildPolymorphicType(Context, FuncTy, GenericParams,
+                                  hasContainerType);
+  }
   
   // Enter the arguments for the function into a new function-body scope.  We
   // need this even if there is no function body to detect argument name

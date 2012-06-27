@@ -33,6 +33,7 @@ namespace swift {
   class ASTContext;
   class ClassDecl;
   class Expr;
+  class GenericParamList;
   class Identifier;
   class TypeAliasDecl;
   class TypeDecl;
@@ -695,23 +696,45 @@ private:
   }
 };
   
-/// FunctionType - A function type has a single input and result, but these
-/// types may be a tuple, for example:
+/// AnyFunctionType - A function type has a single input and result, but
+/// these types may be tuples, for example:
 ///   "(int) -> int" or "(a : int, b : int) -> (int, int)".
 /// Note that the parser requires that the input to a function type be a Tuple
 /// or ParenType, but ParenType desugars to its element, so the input to a
 /// function may be an arbitrary type.
+///
+/// There are two kinds of function types:  monomorphic (FunctionType) and
+/// polymorphic (PolymorphicFunctionType).
+class AnyFunctionType : public TypeBase {
+  const Type Input;
+  const Type Output;
+protected:
+  AnyFunctionType(TypeKind kind, ASTContext *canTypeContext,
+                  Type input, Type output, bool isUnresolved)
+    : TypeBase(kind, canTypeContext, /*unresolved*/ false),
+      Input(input), Output(output) {
+  }
+
+public:
+  Type getInput() const { return Input; }
+  Type getResult() const { return Output; }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const AnyFunctionType *) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->getKind() >= TypeKind::First_AnyFunctionType &&
+           T->getKind() <= TypeKind::Last_AnyFunctionType;
+  }
+};
+
+/// FunctionType - A monomorphic function type.
 ///
 /// If the AutoClosure bit is set to true, then the input type is known to be ()
 /// and a value of this function type is only assignable (in source code) from
 /// the destination type of the function.  Sema inserts an ImplicitClosure to
 /// close over the value.  For example:
 ///   var x : [auto_closure] () -> int = 4
-///
-class FunctionType : public TypeBase {
-  const Type Input;
-  const Type Result;
-
+class FunctionType : public AnyFunctionType {
   bool AutoClosure;
 public:
   /// 'Constructor' Factory Function
@@ -721,8 +744,6 @@ public:
   static FunctionType *get(Type Input, Type Result, bool isAutoClosure,
                            ASTContext &C);
 
-  Type getInput() const { return Input; }
-  Type getResult() const { return Result; }
   bool isAutoClosure() const { return AutoClosure; }
   
   void print(raw_ostream &OS) const;
@@ -736,7 +757,38 @@ public:
 private:
   FunctionType(Type Input, Type Result, bool isAutoClosure);
 };
+
+/// PolymorphicFunctionType - A polymorphic function type.
+///
+/// If the AutoClosure bit is set to true, then the input type is known to be ()
+/// and a value of this function type is only assignable (in source code) from
+/// the destination type of the function.  Sema inserts an ImplicitClosure to
+/// close over the value.  For example:
+///   var x : [auto_closure] () -> int = 4
+class PolymorphicFunctionType : public AnyFunctionType {
+  // TODO: storing a GenericParamList* here is really the wrong solution;
+  // we should be able to store something readily canonicalizable.
+  GenericParamList *Params;
+public:
+  /// 'Constructor' Factory Function
+  static PolymorphicFunctionType *get(Type input, Type output,
+                                      GenericParamList *params,
+                                      ASTContext &C);
+
+  GenericParamList &getGenericParams() const { return *Params; }
+
+  void print(raw_ostream &OS) const;
   
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const PolymorphicFunctionType *) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::PolymorphicFunction;
+  }
+  
+private:
+  PolymorphicFunctionType(Type input, Type output, GenericParamList *params,
+                          ASTContext &C);
+};  
   
 /// ArrayType - An array type has a base type and either an unspecified or a
 /// constant size.  For example "int[]" and "int[4]".  Array types cannot have

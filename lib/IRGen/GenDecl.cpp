@@ -127,6 +127,18 @@ static bool isLocalLinkageDecl(Decl *D) {
   return false;
 }
 
+static bool isLocalLinkageType(Type type);
+static bool isLocalLinkageGenericClause(const GenericParamList &params) {
+  // Type parameters are local-linkage if any of their constraining
+  // types are.
+  for (auto &param : params) {
+    for (auto inherited : param.getAsTypeParam()->getInherited())
+      if (isLocalLinkageType(inherited))
+        return true;
+  }
+  return false;
+}
+
 static bool isLocalLinkageType(Type type) {
   TypeBase *base = type.getPointer();
 
@@ -135,12 +147,13 @@ static bool isLocalLinkageType(Type type) {
     llvm_unreachable("error type in IRGen");
   case TypeKind::UnstructuredUnresolved:
     llvm_unreachable("unresolved type in IRGen");
-  case TypeKind::Archetype:
-    llvm_unreachable("can't build a LinkEntity for an archetype!");
 
   case TypeKind::MetaType:
     return isLocalLinkageDecl(cast<MetaTypeType>(base)->getTypeDecl());
   case TypeKind::Module:
+    return false;
+
+  case TypeKind::Archetype:
     return false;
 
   // We don't care about these types being a bit verbose because we
@@ -176,8 +189,14 @@ static bool isLocalLinkageType(Type type) {
   case TypeKind::Protocol:
     return isLocalLinkageDecl(cast<NominalType>(base)->getDecl());
 
+  case TypeKind::PolymorphicFunction: {
+    auto fn = cast<PolymorphicFunctionType>(base);
+    if (isLocalLinkageGenericClause(fn->getGenericParams()))
+      return true;
+    // fallthrough
+  }
   case TypeKind::Function: {
-    FunctionType *fn = cast<FunctionType>(base);
+    AnyFunctionType *fn = cast<AnyFunctionType>(base);
     return isLocalLinkageType(fn->getInput()) ||
            isLocalLinkageType(fn->getResult());
   }

@@ -297,7 +297,7 @@ Type FuncExpr::getBodyResultType() const {
   unsigned n = getParamPatterns().size();
   Type ty = getType();
   do {
-    ty = cast<FunctionType>(ty)->getResult();
+    ty = cast<AnyFunctionType>(ty)->getResult();
   } while (--n);
   return ty;
 }

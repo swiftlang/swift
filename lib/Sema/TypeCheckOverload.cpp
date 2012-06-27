@@ -103,7 +103,7 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     Type VDType = VD->getType()->getRValueType();
 
     // Must have function type to be called.
-    FunctionType *FunctionTy = VDType->getAs<FunctionType>();
+    AnyFunctionType *FunctionTy = VDType->getAs<AnyFunctionType>();
     if (!FunctionTy)
       continue;
 
@@ -113,24 +113,21 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     if (hasThis && ((isa<FuncDecl>(VD) && !cast<FuncDecl>(VD)->isStatic()) ||
                    isa<ConstructorDecl>(VD))) {
       // FIXME: Derived-to-base conversions will eventually be needed.
-      FunctionTy = FunctionTy->getResult()->getAs<FunctionType>();
-      assert(FunctionTy && "Method has incorrect type");
+      FunctionTy = FunctionTy->getResult()->castTo<AnyFunctionType>();
     }
 
     // Substitute into the type of this member, if indeed it is a member.
     Type SubstFunctionTy = substMemberTypeWithBase(FunctionTy, BaseTy);
     if (!SubstFunctionTy)
       continue;
-    FunctionTy = SubstFunctionTy->castTo<FunctionType>();
+    FunctionTy = SubstFunctionTy->castTo<AnyFunctionType>();
 
     // Establish the coercion context, which is required when this coercion
     // involves generic functions.
     CoercionContext CC(*this);
-    if (FuncDecl *Func = dyn_cast<FuncDecl>(VD)) {
-      if (Func->isGeneric()) {
-        // Request substitutions for the generic parameters of this function.
-        CC.requestSubstitutionsFor(Func->getGenericParams()->getParams());
-      }
+    if (auto polyFn = dyn_cast<PolymorphicFunctionType>(FunctionTy)) {
+      // Request substitutions for the generic parameters of this function.
+      CC.requestSubstitutionsFor(polyFn->getGenericParams().getParams());
     }
 
     // Check whether arguments are suitable for this function.
@@ -147,7 +144,7 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
       if (!SubstFunctionTy)
         continue;
 
-      FunctionTy = SubstFunctionTy->castTo<FunctionType>();
+      FunctionTy = SubstFunctionTy->castTo<AnyFunctionType>();
     }
 
     // Check whether we can coerce the result type.
