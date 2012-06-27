@@ -15,7 +15,7 @@ SWIFT_LEVEL := ..
 LIBRARYNAME := swift_runtime
 LINK_LIBS_IN_SHARED := 1
 SHARED_LIBRARY := 1
-SWIFT_SOURCES := Bool.swift FixedPoint.swift FloatingPoint.swift String.swift Misc.swift
+SWIFT_SOURCES := Bool.swift FixedPoint.swift FloatingPoint.swift String.swift Misc.swift demangle.swift
 SOURCES := FastEntryPoints.s Alloc.cpp Stubs.cpp ObjCBridge.mm swift.swift
 NO_BUILD_ARCHIVE := 1
 
