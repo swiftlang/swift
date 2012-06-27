@@ -381,7 +381,7 @@ public:
       // look past the 'this'.
       if (FuncDecl *Func = dyn_cast<FuncDecl>(Val))
         if (!Func->isStatic() && E->hasBaseObject())
-          srcTy = srcTy->getAs<FunctionType>()->getResult();
+          srcTy = srcTy->castTo<FunctionType>()->getResult();
 
       // If this overloaded set refers to a member of an archetype, substitute
       // the associated types that depend on that archetype through the

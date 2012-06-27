@@ -387,7 +387,7 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
       // TODO: bind the archetypes here.
       // TODO: mangle the parameter somehow.
     }
-    mangleFunctionType(cast<FunctionType>(base), explosion, uncurryLevel);
+    mangleFunctionType(fn, explosion, uncurryLevel);
     // TODO: unbind the archetypes
     return;
   }

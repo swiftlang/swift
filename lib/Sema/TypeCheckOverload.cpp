@@ -125,7 +125,7 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     // Establish the coercion context, which is required when this coercion
     // involves generic functions.
     CoercionContext CC(*this);
-    if (auto polyFn = dyn_cast<PolymorphicFunctionType>(FunctionTy)) {
+    if (auto polyFn = FunctionTy->getAs<PolymorphicFunctionType>()) {
       // Request substitutions for the generic parameters of this function.
       CC.requestSubstitutionsFor(polyFn->getGenericParams().getParams());
     }
@@ -145,6 +145,10 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
         continue;
 
       FunctionTy = SubstFunctionTy->castTo<AnyFunctionType>();
+      // FIXME: Is this really the correct thing to do here?
+      FunctionTy = FunctionType::get(FunctionTy->getInput(),
+                                     FunctionTy->getResult(),
+                                     Context);
     }
 
     // Check whether we can coerce the result type.

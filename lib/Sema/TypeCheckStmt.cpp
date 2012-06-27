@@ -203,16 +203,12 @@ public:
   /// callNullaryMethodOf - Form a call (with no arguments) to the given
   /// method of the given base.
   Expr *callNullaryMethodOf(Expr *Base, FuncDecl *Method, SourceLoc Loc) {
-    // Reference the method.
-    Expr *Fn = new (TC.Context) DeclRefExpr(Method, Loc,
-                                            Method->getTypeOfReference());
-    
     // Form the method reference.
-    // FIXME: Deal with protocols, when they get their own AST.
-    Expr *Mem = new (TC.Context) DotSyntaxCallExpr(Fn, Loc, Base);
+    Expr *Mem = TC.buildMemberRefExpr(Base, Loc, Method, Loc);
+    if (!Mem) return nullptr;
     Mem = TC.recheckTypes(Mem);
     if (!Mem) return nullptr;
-    
+
     // Call the method.
     Expr *EmptyArgs
       = new (TC.Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, Loc,

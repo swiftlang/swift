@@ -365,7 +365,7 @@ static bool hasIndirectResult(IRGenModule &IGM, Type type,
                               unsigned uncurryLevel) {
   uncurryLevel++;
   while (uncurryLevel--) {
-    type = type->castTo<FunctionType>()->getResult();
+    type = type->castTo<AnyFunctionType>()->getResult();
   }
 
   ExplosionSchema schema(explosionLevel);

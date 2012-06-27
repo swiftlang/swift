@@ -268,7 +268,9 @@ PolymorphicFunctionType *PolymorphicFunctionType::get(Type input, Type output,
 PolymorphicFunctionType::PolymorphicFunctionType(Type input, Type output,
                                                  GenericParamList *params,
                                                  ASTContext &C)
-  : AnyFunctionType(TypeKind::PolymorphicFunction, &C, input, output,
+  : AnyFunctionType(TypeKind::PolymorphicFunction,
+                    (input->isCanonical() && output->isCanonical()) ?&C : 0,
+                    input, output,
                     (input->isUnresolvedType() || output->isUnresolvedType())),
     Params(params) { }
 

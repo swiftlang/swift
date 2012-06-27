@@ -409,8 +409,14 @@ CanType TypeBase::getCanonicalType() {
                              objectType->getASTContext());
     break;
   }
-  case TypeKind::PolymorphicFunction:
-    llvm_unreachable("polymorphic functions are always canonical for now");
+  case TypeKind::PolymorphicFunction: {
+    PolymorphicFunctionType *FT = cast<PolymorphicFunctionType>(this);
+    Type In = FT->getInput()->getCanonicalType();
+    Type Out = FT->getResult()->getCanonicalType();
+    Result = PolymorphicFunctionType::get(In, Out, &FT->getGenericParams(),
+                                          In->getASTContext());
+    break;
+  }
   case TypeKind::Function: {
     FunctionType *FT = cast<FunctionType>(this);
     Type In = FT->getInput()->getCanonicalType();
