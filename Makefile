@@ -17,7 +17,7 @@ ifndef SWIFT_LEVEL
 
 IS_TOP_LEVEL := 1
 SWIFT_LEVEL := .
-DIRS := lib tools runtime   # include docs
+DIRS := lib tools runtime benchmark   # include docs
 
 PARALLEL_DIRS :=
 
