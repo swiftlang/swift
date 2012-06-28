@@ -64,6 +64,7 @@
 #include "llvm/Support/CallSite.h"
 #include "llvm/Target/TargetData.h"
 
+#include "ASTVisitor.h"
 #include "CallingConvention.h"
 #include "Explosion.h"
 #include "GenHeap.h"
@@ -416,21 +417,6 @@ const TypeInfo *TypeConverter::convertFunctionType(AnyFunctionType *T) {
                               IGM.getPointerAlignment());
 }
 
-static void expandPolymorphicSignature(IRGenModule &IGM,
-                                       PolymorphicFunctionType *fn,
-                                       SmallVectorImpl<llvm::Type*> &out) {
-  for (auto &param : fn->getGenericParams()) {
-    TypeAliasDecl *paramType = param.getAsTypeParam();
-    assert(paramType);
-
-    // For now, pass each signature requirement separately.  We always
-    // need to pass at least one witness table in order to know how to
-    // manipulate the type.
-    unsigned n = std::min(unsigned(paramType->getInherited().size()), 1U);
-    while (n--) out.push_back(IGM.WitnessTablePtrTy);
-  }
-}
-
 /// Decompose a function type into its exploded parameter types
 /// and its formal result type.
 ///
@@ -475,9 +461,8 @@ static Type decomposeFunctionType(IRGenModule &IGM, AnyFunctionType *fn,
         argTypes.push_back(elt.getScalarType());
     }
 
-    if (auto polyTy = dyn_cast<PolymorphicFunctionType>(fnTy)) {
-      expandPolymorphicSignature(IGM, polyTy, argTypes);
-    }
+    if (auto polyTy = dyn_cast<PolymorphicFunctionType>(fnTy))
+      expandPolymorphicSignature(IGM, polyTy->getGenericParams(), argTypes);
   }
 
   return fn->getResult();
@@ -1648,8 +1633,13 @@ OwnedAddress IRGenFunction::getAddrForParameter(VarDecl *param,
 
     // If we don't locally need the variable on the heap, just use the
     // original address.
-    if (!onHeap)
+    if (!onHeap) {
+      // Enter a cleanup to destroy the element.
+      if (!paramType.isPOD(ResilienceScope::Local))
+        enterDestroyCleanup(paramAddr, paramType);
+
       return OwnedAddress(paramAddr, IGM.RefCountedNull);
+    }
 
     // Otherwise, we have to move it to the heap.
     Initialization paramInit;
@@ -1694,60 +1684,71 @@ OwnedAddress IRGenFunction::getAddrForParameter(VarDecl *param,
   return paramAddr;
 }
 
-/// Emit a specific parameter clause by walking into any literal tuple
-/// types and matching 
-static void emitParameterClause(IRGenFunction &IGF, Pattern *param,
-                                Explosion &paramValues) {
-  switch (param->getKind()) {
-  // Explode tuple patterns.
-  case PatternKind::Tuple:
-    for (auto &field : cast<TuplePattern>(param)->getFields())
-      emitParameterClause(IGF, field.getPattern(), paramValues);
-    return;
+namespace {
+  /// A recursive emitter for parameter patterns.
+  class ParamPatternEmitter :
+      public irgen::PatternVisitor<ParamPatternEmitter> {
+    IRGenFunction &IGF;
+    Explosion &Args;
 
-  // Look through a couple kinds of patterns.
-  case PatternKind::Paren:
-    return emitParameterClause(IGF, cast<ParenPattern>(param)->getSubPattern(),
-                               paramValues);
-  case PatternKind::Typed:
-    return emitParameterClause(IGF, cast<TypedPattern>(param)->getSubPattern(),
-                               paramValues);
+  public:
+    ParamPatternEmitter(IRGenFunction &IGF, Explosion &args)
+      : IGF(IGF), Args(args) {}
 
-  // Bind names.
-  case PatternKind::Named: {
-    VarDecl *decl = cast<NamedPattern>(param)->getDecl();
-    OwnedAddress addr = IGF.getAddrForParameter(decl, paramValues);
+    void visitTuplePattern(TuplePattern *tuple) {
+      for (auto &field : tuple->getFields())
+        visit(field.getPattern());
+    }
 
-    // FIXME: heap byrefs.
-    IGF.setLocalVar(decl, addr);
-    return;
-  }
+    void visitNamedPattern(NamedPattern *pattern) {
+      VarDecl *decl = pattern->getDecl();
+      OwnedAddress addr = IGF.getAddrForParameter(decl, Args);
 
-  // Ignore ignored parameters by consuming the right number of values.
-  case PatternKind::Any: {
-    ExplosionSchema paramSchema(paramValues.getKind());
-    IGF.IGM.getSchema(param->getType(), paramSchema);
-    paramValues.claim(paramSchema.size());
-    return;
-  }
-  }
-  llvm_unreachable("bad pattern kind!");
+      // FIXME: heap byrefs.
+      IGF.setLocalVar(decl, addr);
+    }
+
+    void visitAnyPattern(AnyPattern *pattern) {
+      unsigned numIgnored =
+        IGF.IGM.getExplosionSize(pattern->getType(), Args.getKind());
+      Args.claim(numIgnored);
+    }
+  };
+}
+
+/// Emit a specific parameter clause.
+static void emitParameterClause(IRGenFunction &IGF, AnyFunctionType *fnType,
+                                Pattern *param, Explosion &args) {
+  // This assertion doesn't quite hold because Parser::checkFullyTyped
+  // erases default arguments in the pattern type for some reason.
+  // assert(param->getType()->isEqual(fnType->getInput()));
+
+  // Emit the pattern.
+  ParamPatternEmitter(IGF, args).visit(param);
+
+  // If the function type at this level is polymorphic, bind all the
+  // archetypes.
+  if (auto polyFn = dyn_cast<PolymorphicFunctionType>(fnType))
+    emitPolymorphicParameters(IGF, polyFn->getGenericParams(), args);
 }
 
 /// Emit all the parameter clauses of the given function type.  This
 /// is basically making sure that we have mappings for all the
 /// VarDecls bound by the pattern.
 static void emitParameterClauses(IRGenFunction &IGF,
-                                 llvm::ArrayRef<Pattern*> params,
-                                 Explosion &paramValues) {
-  assert(!params.empty());
+                                 Type type,
+                                 llvm::ArrayRef<Pattern*> paramClauses,
+                                 Explosion &args) {
+  assert(!paramClauses.empty());
+
+  AnyFunctionType *fnType = type->castTo<AnyFunctionType>();
 
   // When uncurrying, later argument clauses are emitted first.
-  if (params.size() != 1)
-    emitParameterClauses(IGF, params.slice(1), paramValues);
+  if (paramClauses.size() != 1)
+    emitParameterClauses(IGF, fnType->getResult(), paramClauses.slice(1), args);
 
   // Finally, emit this clause.
-  emitParameterClause(IGF, params[0], paramValues);
+  emitParameterClause(IGF, fnType, paramClauses[0], args);
 }
 
 /// Emit the prologue for the function.
@@ -1805,7 +1806,7 @@ void IRGenFunction::emitPrologue() {
 
   // Set up the parameters.
   auto params = CurFuncParamPatterns.slice(0, CurUncurryLevel + 1);
-  emitParameterClauses(*this, params, values);
+  emitParameterClauses(*this, CurFuncType, params, values);
 
   if (CurPrologue == Prologue::StandardWithContext) {
     ContextPtr = values.claimUnmanagedNext();

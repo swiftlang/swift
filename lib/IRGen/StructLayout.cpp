@@ -127,7 +127,7 @@ StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
     assert(!storageTypes.empty() == requiresHeapHeader(layoutKind));
     Align = Alignment(1);
     TotalSize = Size(0);
-    Ty = (typeToFill ? typeToFill : IGM.getOpaqueStructTy());
+    Ty = (typeToFill ? typeToFill : IGM.OpaquePtrTy->getElementType());
   } else {
     Align = storageAlign;
     TotalSize = storageSize;

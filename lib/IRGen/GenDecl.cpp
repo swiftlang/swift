@@ -56,8 +56,9 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
   FunctionType *unitToUnit = FunctionType::get(emptyTuple, emptyTuple, Context);
   Pattern *params[] = {
     TuplePattern::create(Context, SourceLoc(),
-                         llvm::ArrayRef<TuplePatternElt>(), SourceLoc())
+                         ArrayRef<TuplePatternElt>(), SourceLoc())
   };
+  params[0]->setType(TupleType::getEmpty(Context));
 
   llvm::FunctionType *fnType =
       getFunctionType(unitToUnit, ExplosionKind::Minimal, 0, false);

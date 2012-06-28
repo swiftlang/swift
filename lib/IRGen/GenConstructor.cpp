@@ -28,8 +28,14 @@ using namespace irgen;
 void IRGenModule::emitConstructor(ConstructorDecl *CD) {
   llvm::Function *fn = getAddrOfConstructor(CD, ExplosionKind::Minimal);
 
-  Pattern* pats[] = { new (Context) NamedPattern(CD->getImplicitThisDecl()),
-                      CD->getArguments() };
+
+  auto thisDecl = CD->getImplicitThisDecl();
+  Pattern* pats[] = {
+    new (Context) NamedPattern(thisDecl),
+    CD->getArguments()
+  };
+  pats[0]->setType(thisDecl->getType());
+
   IRGenFunction IGF(*this, CD->getType(), pats,
                     ExplosionKind::Minimal, 1, fn, Prologue::Standard);
 

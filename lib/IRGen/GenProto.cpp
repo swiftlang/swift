@@ -93,7 +93,7 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
 
   // void (*destroy)(T *object, witness_t *self);
   case ValueWitness::Destroy: {
-    llvm::Type *args[] = { IGM.Int8PtrTy, IGM.WitnessTablePtrTy };
+    llvm::Type *args[] = { IGM.OpaquePtrTy, IGM.WitnessTablePtrTy };
     return llvm::FunctionType::get(IGM.VoidTy, args, false);
   }
 
@@ -101,7 +101,7 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
   case ValueWitness::InitializeBufferWithCopyOfBuffer: {
     llvm::Type *bufPtrTy = IGM.getFixedBufferTy()->getPointerTo(0);
     llvm::Type *args[] = { bufPtrTy, bufPtrTy, IGM.WitnessTablePtrTy };
-    return llvm::FunctionType::get(IGM.Int8PtrTy, args, false);
+    return llvm::FunctionType::get(IGM.OpaquePtrTy, args, false);
   }
 
   // T *(*allocateBuffer)(B *buffer, W *self);
@@ -110,7 +110,7 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
   case ValueWitness::ProjectBuffer: {
     llvm::Type *bufPtrTy = IGM.getFixedBufferTy()->getPointerTo(0);
     llvm::Type *args[] = { bufPtrTy, IGM.WitnessTablePtrTy };
-    return llvm::FunctionType::get(IGM.Int8PtrTy, args, false);
+    return llvm::FunctionType::get(IGM.OpaquePtrTy, args, false);
   }
 
   // T *(*initializeBufferWithCopy)(B *dest, T *src, W *self);
@@ -118,8 +118,8 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
   case ValueWitness::InitializeBufferWithCopy:
   case ValueWitness::InitializeBufferWithTake: {
     llvm::Type *bufPtrTy = IGM.getFixedBufferTy()->getPointerTo(0);
-    llvm::Type *args[] = { bufPtrTy, IGM.Int8PtrTy, IGM.WitnessTablePtrTy };
-    return llvm::FunctionType::get(IGM.Int8PtrTy, args, false);
+    llvm::Type *args[] = { bufPtrTy, IGM.OpaquePtrTy, IGM.WitnessTablePtrTy };
+    return llvm::FunctionType::get(IGM.OpaquePtrTy, args, false);
   }
 
   // T *(*assignWithCopy)(T *dest, T *src, W *self);
@@ -130,7 +130,7 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
   case ValueWitness::AssignWithTake:
   case ValueWitness::InitializeWithCopy:
   case ValueWitness::InitializeWithTake: {
-    llvm::Type *ptrTy = IGM.Int8PtrTy;
+    llvm::Type *ptrTy = IGM.OpaquePtrTy;
     llvm::Type *args[] = { ptrTy, ptrTy, IGM.WitnessTablePtrTy };
     return llvm::FunctionType::get(ptrTy, args, false);
   }
@@ -947,7 +947,7 @@ static void buildValueWitness(IRGenModule &IGM,
   case ValueWitness::AllocateBuffer: {
     Address buffer = getArgAsBuffer(IGF, argv, "buffer");
     Address result = emitAllocateBuffer(IGF, buffer, packing, type);
-    result = IGF.Builder.CreateBitCast(result, IGF.IGM.Int8PtrTy);
+    result = IGF.Builder.CreateBitCast(result, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(result.getAddress());
     return;
   }
@@ -956,7 +956,7 @@ static void buildValueWitness(IRGenModule &IGM,
     Address dest = getArgAs(IGF, argv, type, "dest");
     Address src = getArgAs(IGF, argv, type, "src");
     emitAssignWithCopy(IGF, src, dest, type);
-    dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.Int8PtrTy);
+    dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
     return;
   }
@@ -965,7 +965,7 @@ static void buildValueWitness(IRGenModule &IGM,
     Address dest = getArgAs(IGF, argv, type, "dest");
     Address src = getArgAs(IGF, argv, type, "src");
     emitAssignWithTake(IGF, src, dest, type);
-    dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.Int8PtrTy);
+    dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
     return;
   }
@@ -996,7 +996,7 @@ static void buildValueWitness(IRGenModule &IGM,
     Address src = getArgAsBuffer(IGF, argv, "src");
     Address result =
       emitInitializeBufferWithCopyOfBuffer(IGF, dest, src, packing, type);
-    result = IGF.Builder.CreateBitCast(result, IGF.IGM.Int8PtrTy);
+    result = IGF.Builder.CreateBitCast(result, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(result.getAddress());
     return;
   }
@@ -1006,7 +1006,7 @@ static void buildValueWitness(IRGenModule &IGM,
     Address src = getArgAs(IGF, argv, type, "src");
     Address result =
       emitInitializeBufferWithCopy(IGF, dest, src, packing, type);
-    result = IGF.Builder.CreateBitCast(result, IGF.IGM.Int8PtrTy);
+    result = IGF.Builder.CreateBitCast(result, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(result.getAddress());
     return;
   }
@@ -1016,7 +1016,7 @@ static void buildValueWitness(IRGenModule &IGM,
     Address src = getArgAs(IGF, argv, type, "src");
     Address result =
       emitInitializeBufferWithTake(IGF, dest, src, packing, type);
-    result = IGF.Builder.CreateBitCast(result, IGF.IGM.Int8PtrTy);
+    result = IGF.Builder.CreateBitCast(result, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(result.getAddress());
     return;
   }
@@ -1025,7 +1025,7 @@ static void buildValueWitness(IRGenModule &IGM,
     Address dest = getArgAs(IGF, argv, type, "dest");
     Address src = getArgAs(IGF, argv, type, "src");
     emitInitializeWithCopy(IGF, dest, src, type);
-    dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.Int8PtrTy);
+    dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
     return;
   }
@@ -1034,7 +1034,7 @@ static void buildValueWitness(IRGenModule &IGM,
     Address dest = getArgAs(IGF, argv, type, "dest");
     Address src = getArgAs(IGF, argv, type, "src");
     emitInitializeWithTake(IGF, dest, src, type);
-    dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.Int8PtrTy);
+    dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
     return;
   }
@@ -1042,7 +1042,7 @@ static void buildValueWitness(IRGenModule &IGM,
   case ValueWitness::ProjectBuffer: {
     Address buffer = getArgAsBuffer(IGF, argv, "buffer");
     Address result = emitProjectBuffer(IGF, buffer, packing, type);
-    result = IGF.Builder.CreateBitCast(result, IGF.IGM.Int8PtrTy);
+    result = IGF.Builder.CreateBitCast(result, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(result.getAddress());
     return;
   }
@@ -1153,7 +1153,7 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
 /// Return a function which takes two pointer arguments and returns
 /// void immediately.
 static llvm::Constant *getNoOpVoidFunction(IRGenModule &IGM) {
-  llvm::Type *argTys[] = { IGM.Int8PtrTy, IGM.Int8PtrTy };
+  llvm::Type *argTys[] = { IGM.Int8PtrTy, IGM.WitnessTablePtrTy };
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(IGM.VoidTy, argTys, false);
   llvm::Constant *fn =
@@ -1170,7 +1170,7 @@ static llvm::Constant *getNoOpVoidFunction(IRGenModule &IGM) {
 /// Return a function which takes two pointer arguments and returns
 /// the first one immediately.
 static llvm::Constant *getReturnSelfFunction(IRGenModule &IGM) {
-  llvm::Type *argTys[] = { IGM.Int8PtrTy, IGM.Int8PtrTy };
+  llvm::Type *argTys[] = { IGM.Int8PtrTy, IGM.WitnessTablePtrTy };
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(IGM.Int8PtrTy, argTys, false);
   llvm::Constant *fn =
@@ -1191,7 +1191,7 @@ static llvm::Constant *getReturnSelfFunction(IRGenModule &IGM) {
 /// new pointer in the first, and releases the old pointer.
 static llvm::Constant *getAssignWithCopyStrongFunction(IRGenModule &IGM) {
   llvm::Type *ptrPtrTy = IGM.RefCountedPtrTy->getPointerTo();
-  llvm::Type *argTys[] = { ptrPtrTy, ptrPtrTy, IGM.Int8PtrTy };
+  llvm::Type *argTys[] = { ptrPtrTy, ptrPtrTy, IGM.WitnessTablePtrTy };
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(ptrPtrTy, argTys, false);
   llvm::Constant *fn =
@@ -1221,7 +1221,7 @@ static llvm::Constant *getAssignWithCopyStrongFunction(IRGenModule &IGM) {
 /// new pointer in the first, and releases the old pointer.
 static llvm::Constant *getAssignWithTakeStrongFunction(IRGenModule &IGM) {
   llvm::Type *ptrPtrTy = IGM.RefCountedPtrTy->getPointerTo();
-  llvm::Type *argTys[] = { ptrPtrTy, ptrPtrTy, IGM.Int8PtrTy };
+  llvm::Type *argTys[] = { ptrPtrTy, ptrPtrTy, IGM.WitnessTablePtrTy };
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(ptrPtrTy, argTys, false);
   llvm::Constant *fn =
@@ -1249,7 +1249,7 @@ static llvm::Constant *getAssignWithTakeStrongFunction(IRGenModule &IGM) {
 /// the second, retains it, and stores that in the first.
 static llvm::Constant *getInitWithCopyStrongFunction(IRGenModule &IGM) {
   llvm::Type *ptrPtrTy = IGM.RefCountedPtrTy->getPointerTo();
-  llvm::Type *argTys[] = { ptrPtrTy, ptrPtrTy, IGM.Int8PtrTy };
+  llvm::Type *argTys[] = { ptrPtrTy, ptrPtrTy, IGM.WitnessTablePtrTy };
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(ptrPtrTy, argTys, false);
   llvm::Constant *fn =
@@ -1274,7 +1274,7 @@ static llvm::Constant *getInitWithCopyStrongFunction(IRGenModule &IGM) {
 /// Return a function which takes two pointer arguments, loads a
 /// pointer from the first, and calls swift_release on it immediately.
 static llvm::Constant *getDestroyStrongFunction(IRGenModule &IGM) {
-  llvm::Type *argTys[] = { IGM.Int8PtrPtrTy, IGM.Int8PtrTy };
+  llvm::Type *argTys[] = { IGM.Int8PtrPtrTy, IGM.WitnessTablePtrTy };
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(IGM.VoidTy, argTys, false);
   llvm::Constant *fn =
@@ -1294,7 +1294,7 @@ static llvm::Constant *getDestroyStrongFunction(IRGenModule &IGM) {
 /// from the second to the first, and returns the first argument.
 static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
                                          const TypeInfo &type) {
-  llvm::Type *argTys[] = { IGM.Int8PtrTy, IGM.Int8PtrTy, IGM.Int8PtrTy };
+  llvm::Type *argTys[] = { IGM.Int8PtrTy, IGM.Int8PtrTy, IGM.WitnessTablePtrTy };
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(IGM.Int8PtrTy, argTys, false);
 
@@ -1327,7 +1327,7 @@ static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
 /// constant size and alignment.
 static llvm::Constant *getSizeAndAlignmentFunction(IRGenModule &IGM,
                                                    const TypeInfo &type) {
-  llvm::Type *argTys[] = { IGM.Int8PtrTy };
+  llvm::Type *argTys[] = { IGM.WitnessTablePtrTy };
   llvm::Type *resultTy = getSizeAndAlignmentResultType(IGM);
   llvm::FunctionType *fnTy = llvm::FunctionType::get(resultTy, argTys, false);
 
@@ -1780,7 +1780,7 @@ namespace {
           IGF.setCleanupState(outerResultCleanup, CleanupState::Dead);
 
         llvm::Value *addr = innerResult.getAddress();
-        addr = IGF.Builder.CreateBitCast(addr, IGM.Int8PtrTy);
+        addr = IGF.Builder.CreateBitCast(addr, IGM.OpaquePtrTy);
         IGF.Builder.CreateRet(addr);
 
       // Otherwise we're just using the call return.
@@ -2082,7 +2082,7 @@ const TypeInfo *TypeConverter::convertProtocolType(ProtocolType *T) {
 const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *T) {
   // For now, just always use the same type.
   // TODO: also store something about the protocols we conform to?
-  llvm::Type *storageType = IGM.getOpaqueStructTy();
+  llvm::Type *storageType = IGM.OpaquePtrTy->getElementType();
   return new ArchetypeTypeInfo(storageType);
 }
 
@@ -2091,6 +2091,47 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *T) {
 void IRGenFunction::bindArchetype(ArchetypeType *type, llvm::Value *wtable) {
   auto &ti = getFragileTypeInfo(type).as<ArchetypeTypeInfo>();
   ti.setWitnessTable(wtable);
+}
+
+/// Perform all the bindings necessary to emit the given declaration.
+void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
+                                      const GenericParamList &generics,
+                                      Explosion &in) {
+  // For now, treat all generic clauses independently.
+  for (auto &param : generics) {
+    TypeAliasDecl *typeParam = param.getAsTypeParam();
+    assert(typeParam && "unknown generic parameter kind!");
+    auto archetype = cast<ArchetypeType>(typeParam->getUnderlyingType());
+    auto &archetypeTI =
+      IGF.getFragileTypeInfo(archetype).as<ArchetypeTypeInfo>();
+
+    // There's always at least one witness table.
+    llvm::Value *wtable = in.claimUnmanagedNext();
+    wtable->setName(typeParam->getName().str());
+    archetypeTI.setWitnessTable(wtable);
+
+    // Ignore the remaining ones.  FIXME: save all of these
+    auto protocols = typeParam->getInherited();
+    if (!protocols.empty()) {
+      in.ignoreUnmanaged(protocols.size() - 1);
+    }
+  }
+}
+
+/// Given a generic signature, add the argument types required in order to call it.
+void irgen::expandPolymorphicSignature(IRGenModule &IGM,
+                                       const GenericParamList &generics,
+                                       SmallVectorImpl<llvm::Type*> &out) {
+  for (auto &param : generics) {
+    TypeAliasDecl *paramType = param.getAsTypeParam();
+    assert(paramType);
+
+    // For now, pass each signature requirement separately.  We always
+    // need to pass at least one witness table in order to know how to
+    // manipulate the type.
+    unsigned n = std::max(unsigned(paramType->getInherited().size()), 1U);
+    while (n--) out.push_back(IGM.WitnessTablePtrTy);
+  }
 }
 
 /// Emit an erasure expression as an initializer for the given memory.

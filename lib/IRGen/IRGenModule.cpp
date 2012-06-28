@@ -84,7 +84,9 @@ IRGenModule::IRGenModule(ASTContext &Context,
   FunctionPairTy = llvm::StructType::get(LLVMContext, funcElts,
                                          /*packed*/ false);
 
-  OpaqueStructTy = nullptr;
+  OpaquePtrTy = llvm::StructType::create(LLVMContext, "swift.opaque")
+                  ->getPointerTo(0);
+
   FixedBufferTy = nullptr;
   for (unsigned i = 0; i != NumValueWitnesses; ++i)
     ValueWitnessTys[i] = nullptr;
@@ -98,12 +100,6 @@ IRGenModule::IRGenModule(ASTContext &Context,
 
 IRGenModule::~IRGenModule() {
   delete &Types;
-}
-
-llvm::StructType *IRGenModule::getOpaqueStructTy() {
-  if (OpaqueStructTy) return OpaqueStructTy;
-  OpaqueStructTy = llvm::StructType::create(LLVMContext, "swift.opaque");
-  return OpaqueStructTy;
 }
 
 static llvm::Constant *createRuntimeFunction(IRGenModule &IGM, StringRef name,

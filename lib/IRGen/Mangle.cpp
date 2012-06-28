@@ -258,6 +258,7 @@ void Mangler::mangleDeclName(ValueDecl *decl, IncludeType includeType) {
 /// <type> ::= p                     # Builtin.RawPointer
 /// <type> ::= R <type>              # lvalue
 /// <type> ::= T <tuple-element>* _  # tuple
+/// <type> ::= V                     # an archetype (provisional, obviously)
 ///
 /// <tuple-element> ::= <identifier>? <type>
 void Mangler::mangleType(Type type, ExplosionKind explosion,
@@ -373,7 +374,9 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
   }
 
   case TypeKind::Archetype:
-    llvm_unreachable("Cannot mangle archetype yet");
+    // FIXME
+    Buffer << 'V';
+    return;
 
   case TypeKind::PolymorphicFunction: {
     // type ::= 'U' generic-parameter-list type

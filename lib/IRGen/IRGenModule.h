@@ -99,6 +99,7 @@ public:
   llvm::StructType *HeapMetadataStructTy; /// %swift.heapmetadata = type { ... }
   llvm::PointerType *HeapMetadataPtrTy;/// %swift.heapmetadata*
   llvm::PointerType *ObjCPtrTy;        /// %objc_object*
+  llvm::PointerType *OpaquePtrTy;      /// %swift.opaque*
   llvm::CallingConv::ID RuntimeCC;     /// lightweight calling convention
 
   Size getPointerSize() const { return PtrSize; }
@@ -107,7 +108,6 @@ public:
     return Alignment(PtrSize.getValue());
   }
 
-  llvm::StructType *getOpaqueStructTy();
   llvm::Type *getFixedBufferTy();
   llvm::PointerType *getValueWitnessTy(ValueWitness index);
 
@@ -116,7 +116,6 @@ public:
 
 private:
   Size PtrSize;
-  llvm::StructType *OpaqueStructTy;    /// %swift.opaquestruct
   llvm::Type *FixedBufferTy;           /// [16 x i8]
 
   enum { NumValueWitnesses = 13 };
@@ -129,6 +128,7 @@ public:
   llvm::Type *getFragileType(Type T);
   llvm::StructType *createNominalType(TypeDecl *D);
   void getSchema(Type T, ExplosionSchema &schema);
+  unsigned getExplosionSize(Type T, ExplosionKind kind);
 
 private:
   TypeConverter &Types;

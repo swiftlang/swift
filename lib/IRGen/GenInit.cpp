@@ -67,14 +67,19 @@ namespace {
 void IRGenFunction::enterDestroyCleanup(Address addr,
                                         const TypeInfo &addrTI,
                                         Explosion &out) {
+  enterDestroyCleanup(addr, addrTI);
+  out.add(ManagedValue(addr.getAddress(), getCleanupsDepth()));
+}
+
+/// Enter a cleanup to destroy an object of arbitrary type.
+void IRGenFunction::enterDestroyCleanup(Address addr,
+                                        const TypeInfo &addrTI) {
   assert(!addrTI.isPOD(ResilienceScope::Local) &&
          "destroying something known to be POD");
 
   // The use of UnboundDestroy here is not important.
   UnboundDestroy &destroy = pushCleanup<UnboundDestroy>(addrTI);
   destroy.setAddress(OwnedAddress(addr, IGM.RefCountedNull));
-
-  out.add(ManagedValue(addr.getAddress(), getCleanupsDepth()));
 }
 
 /// Should the given variable be allocated on the heap?

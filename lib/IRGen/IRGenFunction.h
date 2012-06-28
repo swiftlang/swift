@@ -200,6 +200,7 @@ public:
 
   void enterDestroyCleanup(Address addr, const TypeInfo &addrTI,
                            Explosion &out);
+  void enterDestroyCleanup(Address addr, const TypeInfo &addrTI);
 
   /// Is the current emission point conditionally evaluated?  Right
   /// now we don't have any expressions which introduce conditional

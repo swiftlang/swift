@@ -17,10 +17,15 @@
 #ifndef SWIFT_IRGEN_GENPROTO_H
 #define SWIFT_IRGEN_GENPROTO_H
 
+namespace llvm {
+  class Type;
+}
+
 namespace swift {
   class ErasureExpr;
   class ExistentialMemberRefExpr;
   class FuncDecl;
+  class GenericParamList;
 
 namespace irgen {
   class AbstractCallee;
@@ -57,6 +62,19 @@ namespace irgen {
   /// Determine the natural limits on how we can call the given
   /// protocol member function.
   AbstractCallee getAbstractProtocolCallee(IRGenFunction &IGF, FuncDecl *fn);
+
+  /// Add the witness arguments necessary for calling a function with
+  /// the given generics clause.
+  void expandPolymorphicSignature(IRGenModule &IGM,
+                                  const GenericParamList &generics,
+                                  SmallVectorImpl<llvm::Type*> &types);
+
+  /// In the prelude of a generic function, perform the bindings for a
+  /// generics clause.
+  void emitPolymorphicParameters(IRGenFunction &IGF,
+                                 const GenericParamList &generics,
+                                 Explosion &args);
+
 
 } // end namespace irgen
 } // end namespace swift

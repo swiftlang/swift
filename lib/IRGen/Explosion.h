@@ -156,6 +156,16 @@ public:
     markClaimed(n);
   }
 
+  /// The next N values are being ignored.  They are all unmanaged.
+  void ignoreUnmanaged(unsigned n) {
+#ifndef NDEBUG
+    assert(NextValue + n <= Values.size());
+    for (auto i = NextValue, e = NextValue + n; i != e; ++i)
+      assert(!Values[i].hasCleanup());
+#endif
+    markClaimed(n);
+  }
+
   /// The next N values have been claimed in some indirect way (e.g.
   /// using getRange() and the like); just give up on them.
   void markClaimed(unsigned n) {
