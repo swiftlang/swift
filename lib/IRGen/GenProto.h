@@ -59,6 +59,13 @@ namespace irgen {
                                         ExplosionKind maxExplosionLevel,
                                         unsigned maxUncurry);
 
+  /// Emit an existential member reference as a callee.
+  Callee emitArchetypeMemberRefCallee(IRGenFunction &IGF,
+                                      ArchetypeMemberRefExpr *E,
+                                      SmallVectorImpl<Arg> &calleeArgs,
+                                      ExplosionKind maxExplosionLevel,
+                                      unsigned maxUncurry);
+
   /// Determine the natural limits on how we can call the given
   /// protocol member function.
   AbstractCallee getAbstractProtocolCallee(IRGenFunction &IGF, FuncDecl *fn);

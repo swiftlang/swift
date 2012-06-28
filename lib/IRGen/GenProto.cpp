@@ -2293,72 +2293,26 @@ static bool findBasePath(SmallVectorImpl<ProtocolDecl*> &path,
   }
   return false;
 }
-                         
 
-/// Emit an existential member reference as a callee.
-Callee irgen::emitExistentialMemberRefCallee(IRGenFunction &IGF,
-                                             ExistentialMemberRefExpr *E,
-                                             SmallVectorImpl<Arg> &calleeArgs,
-                                             ExplosionKind maxExplosionLevel,
-                                             unsigned maxUncurry) {
-  // The base of an existential member reference is always an l-value.
-  LValue lvalue = IGF.emitLValue(E->getBase());
-  Address existAddr = IGF.emitMaterializeWithWriteback(std::move(lvalue),
-                                                       NotOnHeap);
-
-  FuncDecl *fn = cast<FuncDecl>(E->getDecl());
-
-  Type baseTy = E->getBase()->getType();
-  baseTy = baseTy->castTo<LValueType>()->getObjectType();
-  assert(baseTy->is<ProtocolType>() && "base is not a protocol lvalue");
-  ProtocolDecl *proto = baseTy->castTo<ProtocolType>()->getDecl();
+/// Given a witness table and the protocol it testifies to, find a
+/// witness for the given declaration.  The table will be left
+/// pointing at the appropriate witness table for the protocol.
+static llvm::Value *findWitness(IRGenFunction &IGF,
+                                llvm::Value *&table,
+                                ProtocolDecl *tableProtocol,
+                                Decl *target,
+                       WitnessIndex (WitnessTableEntry::*getIndex)() const) {
+  ProtocolDecl *owner = cast<ProtocolDecl>(target->getDeclContext());
 
   // Find a path to the protocol which declares the method.
   SmallVector<ProtocolDecl*, 4> basePath;
-  bool foundPath =
-    findBasePath(basePath, proto, cast<ProtocolDecl>(fn->getDeclContext()));
+  bool foundPath = findBasePath(basePath, tableProtocol, owner);
   assert(foundPath && "no path to protocol declaring method!");
   (void) foundPath;
 
-  // Load the witness table.
-  llvm::Value *table = loadWitnessTable(IGF, existAddr);
-
-  auto &ownerPI =
-    IGF.IGM.getProtocolInfo(cast<ProtocolDecl>(fn->getDeclContext()));
-
-  if (!fn->isStatic()) {
-    // Use the first-level witness table to copy into a new buffer.
-    // This is important for safety.
-    // TODO: just do a project when the source object is obviously not
-    // aliased.
-    Address copyBuffer = IGF.createAlloca(IGF.IGM.getFixedBufferTy(),
-                                          getFixedBufferAlignment(IGF.IGM),
-                                          "copy-for-call");
-    Address srcBuffer = projectExistentialBuffer(IGF, existAddr);
-
-    // The result of the copy is an i8* which points at the new object.
-    llvm::Value *copy =
-      emitInitializeBufferWithCopyOfBufferCall(IGF, table, copyBuffer,
-                                               srcBuffer);
-
-    // Enter a cleanup for the temporary.  
-    IGF.pushFullExprCleanup<DestroyBuffer>(copyBuffer, table);
-
-    // Add the temporary address as a callee arg.
-    // This argument is bitcast to the type of the 'this' argument (a
-    // [byref] to the archetype This), although the underlying function actually
-    // takes the underlying object pointer.
-    Type ThisParamTy = fn->getType()->castTo<FunctionType>()->getInput();
-    copy = IGF.Builder.CreateBitCast(copy,
-                                     IGF.IGM.getFragileType(ThisParamTy),
-                                     "object-pointer");
-    Explosion *arg = new Explosion(ExplosionKind::Minimal);
-    arg->addUnmanaged(copy);
-    calleeArgs.push_back(Arg::forOwned(arg));
-  }
-
+  // Walk through the protocols.
   for (unsigned i = 0, e = basePath.size(); i != e; ++i) {
-    ProtocolDecl *derived = (i == 0 ? proto : basePath[i-1]);
+    ProtocolDecl *derived = (i == 0 ? tableProtocol : basePath[i-1]);
     ProtocolDecl *base = basePath[i];
 
     // Find the witness table index for the base protocol.
@@ -2375,20 +2329,146 @@ Callee irgen::emitExistentialMemberRefCallee(IRGenFunction &IGF,
   }
 
   // Pull out the function witness.
-  auto &witnessEntry = ownerPI.getWitnessEntry(fn);
-  llvm::Value *witness =
-    loadOpaqueWitness(IGF, table, witnessEntry.getFunctionIndex());
+  auto &ownerPI = IGF.IGM.getProtocolInfo(owner);
+  auto &witnessEntry = ownerPI.getWitnessEntry(target);
+  return loadOpaqueWitness(IGF, table, (witnessEntry.*getIndex)());
+}
 
+/// Emit a callee for a protocol method.
+///
+/// \param fn - the protocol member being called
+/// \param witness - the actual function address being called
+/// \param wtable - the witness table from which the witness was loaded
+/// \param thisObject - the object (if applicable) to call the method on
+static Callee emitProtocolMethodCallee(IRGenFunction &IGF, FuncDecl *fn,
+                                       llvm::Value *witness,
+                                       SmallVectorImpl<Arg> &calleeArgs,
+                                       llvm::Value *wtable,
+                                       Address thisObject) {
   if (fn->isStatic())
     return Callee::forKnownFunction(AbstractCC::Method, fn->getType(), witness,
                                     ManagedValue(nullptr),
                                     ExplosionKind::Minimal, 0);
+
+  // Add the temporary address as a callee arg.
+  // This argument is bitcast to the type of the 'this' argument (a
+  // [byref] to the archetype This), although the underlying function
+  // actually takes the underlying object pointer.
+  thisObject = IGF.Builder.CreateBitCast(thisObject, IGF.IGM.OpaquePtrTy,
+                                         "object-pointer");
+  Explosion *arg = new Explosion(ExplosionKind::Minimal);
+  arg->addUnmanaged(thisObject.getAddress());
+  calleeArgs.push_back(Arg::forOwned(arg));
 
   // FIXME: writeback
   return Callee::forKnownFunction(AbstractCC::Method, fn->getType(), witness,
                                   ManagedValue(nullptr),
                                   ExplosionKind::Minimal, 1);
 }
+
+/// Emit an existential member reference as a callee.
+Callee irgen::emitExistentialMemberRefCallee(IRGenFunction &IGF,
+                                             ExistentialMemberRefExpr *E,
+                                             SmallVectorImpl<Arg> &calleeArgs,
+                                             ExplosionKind maxExplosionLevel,
+                                             unsigned maxUncurry) {
+  // The protocol we're calling on.
+  // TODO: support protocol compositions here.
+  Type baseTy = E->getBase()->getType();
+  baseTy = baseTy->castTo<LValueType>()->getObjectType();
+  ProtocolDecl *proto = baseTy->castTo<ProtocolType>()->getDecl();
+
+  // The function we're going to call.
+  FuncDecl *fn = cast<FuncDecl>(E->getDecl());
+
+  // The base of an existential member reference is always an l-value.
+  LValue lvalue = IGF.emitLValue(E->getBase());
+  Address existAddr = IGF.emitMaterializeWithWriteback(std::move(lvalue),
+                                                       NotOnHeap);
+
+  // Load the witness table.
+  llvm::Value *wtable = loadWitnessTable(IGF, existAddr);
+
+  // The thing we're going to invoke a method on.
+  Address thisObject;
+
+  // For a non-static method, copy the object into a new buffer.
+  // This is important for type-safety, because someone might assign
+  // to the object while the call is in progress.
+  //
+  // TODO: we have a proposal to avoid this copy by "locking" the
+  //   existential object from any assignment.  Do that instead.
+  // TODO: Or just do a project when the source object is obviously
+  //   not aliased.
+  if (!fn->isStatic()) {
+    Address copyBuffer = IGF.createAlloca(IGF.IGM.getFixedBufferTy(),
+                                          getFixedBufferAlignment(IGF.IGM),
+                                          "copy-for-call");
+    Address srcBuffer = projectExistentialBuffer(IGF, existAddr);
+
+    // The result of the copy is an i8* which points at the new object.
+    llvm::Value *copy =
+      emitInitializeBufferWithCopyOfBufferCall(IGF, wtable, copyBuffer,
+                                               srcBuffer);
+
+    // Enter a cleanup for the temporary.  
+    IGF.pushFullExprCleanup<DestroyBuffer>(copyBuffer, wtable);
+
+    thisObject = Address(copy, Alignment(1));
+  }
+
+  // Find the actual witness.
+  llvm::Value *witness = findWitness(IGF, wtable, proto, fn,
+                                     &WitnessTableEntry::getFunctionIndex);
+
+  // Emit the callee.
+  return emitProtocolMethodCallee(IGF, fn, witness, calleeArgs,
+                                  wtable, thisObject);
+}
+
+/// Emit an existential member reference as a callee.
+Callee irgen::emitArchetypeMemberRefCallee(IRGenFunction &IGF,
+                                           ArchetypeMemberRefExpr *E,
+                                           SmallVectorImpl<Arg> &calleeArgs,
+                                           ExplosionKind maxExplosionLevel,
+                                           unsigned maxUncurry) {
+  // The function we're going to call.
+  FuncDecl *fn = cast<FuncDecl>(E->getDecl());
+
+  // The base of an archetype member reference is always an l-value.
+  // If we're accessing a static function, though, the l-value is
+  // unnecessary.
+  Address thisObject;
+  if (fn->isStatic()) {
+    IGF.emitIgnored(E->getBase());
+  } else {
+    LValue lvalue = IGF.emitLValue(E->getBase());
+    thisObject = IGF.emitMaterializeWithWriteback(std::move(lvalue), NotOnHeap);
+  }
+
+  // Find the archetype we're calling on.
+  Type baseTy = E->getBase()->getType();
+  baseTy = baseTy->castTo<LValueType>()->getObjectType();
+  ArchetypeType *archetype = baseTy->castTo<ArchetypeType>();
+
+  // The protocol we're calling on.
+  // TODO: support protocol compositions here.
+  assert(archetype->getConformsTo().size() == 1);
+  ProtocolDecl *proto = archetype->getConformsTo()[0];
+
+  // Find the witness table.
+  auto &archetypeTI = IGF.getFragileTypeInfo(archetype).as<ArchetypeTypeInfo>();
+  llvm::Value *wtable = archetypeTI.getWitnessTable(IGF);
+
+  // Find the actual witness.
+  llvm::Value *witness = findWitness(IGF, wtable, proto, fn,
+                                     &WitnessTableEntry::getFunctionIndex);
+
+  // Emit the callee.
+  return emitProtocolMethodCallee(IGF, fn, witness, calleeArgs,
+                                  wtable, thisObject);
+}
+
 
 /// Determine the natural limits on how we can call the given protocol
 /// member function.

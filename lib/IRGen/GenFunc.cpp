@@ -646,7 +646,7 @@ namespace {
   struct CalleeSource {
   public:
     enum class Kind {
-      Indirect, Direct, DirectWithSideEffects, Existential
+      Indirect, Direct, DirectWithSideEffects, Existential, Archetype
     };
 
   private:
@@ -661,6 +661,9 @@ namespace {
       struct {
         ExistentialMemberRefExpr *Fn;
       } Existential;
+      struct {
+        ArchetypeMemberRefExpr *Fn;
+      } Archetype;
     };
     Kind TheKind;
 
@@ -695,6 +698,13 @@ namespace {
       return result;
     }
 
+    static CalleeSource forArchetype(ArchetypeMemberRefExpr *fn) {
+      CalleeSource result;
+      result.TheKind = Kind::Archetype;
+      result.Archetype.Fn = fn;
+      return result;
+    }
+
     Kind getKind() const { return TheKind; }
 
     FuncDecl *getDirectFunction() const {
@@ -718,6 +728,11 @@ namespace {
       return Existential.Fn;
     }
 
+    ArchetypeMemberRefExpr *getArchetypeFunction() const {
+      assert(getKind() == Kind::Archetype);
+      return Archetype.Fn;
+    }
+
     AbstractCallee getAbstractCallee(IRGenFunction &IGF) const {
       switch (getKind()) {
       case Kind::Indirect:
@@ -730,6 +745,10 @@ namespace {
       case Kind::Existential:
         return getAbstractProtocolCallee(IGF,
                                   cast<FuncDecl>(Existential.Fn->getDecl()));
+
+      case Kind::Archetype:
+        return getAbstractProtocolCallee(IGF,
+                                    cast<FuncDecl>(Archetype.Fn->getDecl()));
       }
       llvm_unreachable("bad source kind!");
     }
@@ -754,6 +773,10 @@ namespace {
         return emitExistentialMemberRefCallee(IGF, getExistentialFunction(),
                                               calleeArgs, maxExplosion,
                                               maxUncurry);
+      case Kind::Archetype:
+        return emitArchetypeMemberRefCallee(IGF, getArchetypeFunction(),
+                                            calleeArgs, maxExplosion,
+                                            maxUncurry);
       }
       llvm_unreachable("bad CalleeSource kind");
     }
@@ -1010,6 +1033,8 @@ static CalleeSource decomposeFunctionReference(Expr *E) {
   }
   if (auto existMember = dyn_cast<ExistentialMemberRefExpr>(E))
     return CalleeSource::forExistential(existMember);
+  if (auto archMember = dyn_cast<ArchetypeMemberRefExpr>(E))
+    return CalleeSource::forArchetype(archMember);
 
   return CalleeSource::forIndirect(E);
 }
@@ -1415,6 +1440,7 @@ void CallPlan::emit(IRGenFunction &IGF, CallResult &result,
   // Otherwise, just use the normal rules for the kind.
   case CalleeSource::Kind::Indirect:
   case CalleeSource::Kind::Existential:
+  case CalleeSource::Kind::Archetype:
     callee = CalleeSrc.emitCallee(IGF, calleeArgs, CallSites.size() - 1);
     break;
   }
