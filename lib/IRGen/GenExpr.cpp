@@ -240,6 +240,7 @@ namespace {
     }
     void visitSpecializeExpr(SpecializeExpr *E) {
       IGF.unimplemented(E->getLoc(), "specialize expressions");
+      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
     }
     void visitTupleElementExpr(TupleElementExpr *E) {
       emitTupleElement(IGF, E, Out);

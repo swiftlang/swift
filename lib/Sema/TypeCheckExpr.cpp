@@ -435,7 +435,11 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     bool Assignment = false;
     if (isa<PrefixUnaryExpr>(E) || isa<PostfixUnaryExpr>(E) ||
         isa<BinaryExpr>(E)) {
-      auto DRE = cast<DeclRefExpr>(E1);
+      DeclRefExpr *DRE;
+      if (SpecializeExpr *SE = dyn_cast<SpecializeExpr>(E1))
+        DRE = cast<DeclRefExpr>(SE->getSubExpr());
+      else
+        DRE = cast<DeclRefExpr>(E1);
       
       if (!DRE->getDecl()->isOperator()) {
         diagnose(E1->getLoc(),
