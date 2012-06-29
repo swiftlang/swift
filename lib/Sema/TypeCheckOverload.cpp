@@ -130,11 +130,11 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
       CC.requestSubstitutionsFor(polyFn->getGenericParams().getParams());
     }
     // As a temporary hack, manually introduce the substitutions for operators
-    // which are members of extensions.  (This will go away once we start using
+    // which are members of protocols.  (This will go away once we start using
     // PolymorphicFunctionTypes for protocol members.)
     if (VD->getName().isOperator()) {
       if (Type Extension = cast<FuncDecl>(VD)->getExtensionType()) {
-        if (ProtocolType *P = Extension->castTo<ProtocolType>()) {
+        if (ProtocolType *P = Extension->getAs<ProtocolType>()) {
           SmallVector<GenericParam, 4> Params;
           for (auto m : P->getDecl()->getMembers()) {
             if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(m))
