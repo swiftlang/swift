@@ -265,7 +265,7 @@ void TypeChecker::REPLCheckPatternBinding(PatternBindingDecl *D) {
     TupleTypeElt Elt(T, Context.getIdentifier("arg"));
     FuncTy = TupleType::get(Elt, Context);
   }
-  FuncTy = FunctionType::get(FuncTy, FuncTy, Context);
+  FuncTy = FunctionType::get(FuncTy, T, Context);
   VarDecl *Arg = new (Context) VarDecl(Loc, Context.getIdentifier("arg"), T,
                                        nullptr);
   Pattern* ParamPat = new (Context) NamedPattern(Arg);
