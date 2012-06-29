@@ -542,11 +542,16 @@ public:
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.  This
 /// decl is always a DeclContext.
 class NominalTypeDecl : public TypeDecl, public DeclContext {
+  ArrayRef<Decl*> Members;
+
 public:
   NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
                   MutableArrayRef<Type> inherited, Type ty) :
     TypeDecl(K, DC, name, inherited, ty),
     DeclContext(DeclContextKind::NominalTypeDecl, DC) {}
+
+  ArrayRef<Decl*> getMembers() const { return Members; }
+  void setMembers(ArrayRef<Decl*> elems) { Members = elems; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -568,15 +573,11 @@ public:
 class OneOfDecl : public NominalTypeDecl {
   SourceLoc OneOfLoc;
   SourceLoc NameLoc;
-  ArrayRef<Decl*> Members;
   OneOfType *OneOfTy;
 
 public:
   OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
             MutableArrayRef<Type> Inherited, DeclContext *DC);
-
-  ArrayRef<Decl*> getMembers() const { return Members; }
-  void setMembers(ArrayRef<Decl*> elems) { Members = elems; }
 
   SourceLoc getStartLoc() const { return OneOfLoc; }
   SourceLoc getLoc() const { return NameLoc; }
@@ -607,7 +608,6 @@ public:
 class StructDecl : public NominalTypeDecl {
   SourceLoc StructLoc;
   SourceLoc NameLoc;
-  ArrayRef<Decl*> Members;
   StructType *StructTy;
 
 public:
@@ -616,9 +616,6 @@ public:
 
   SourceLoc getStartLoc() const { return StructLoc; }
   SourceLoc getLoc() const { return NameLoc; }
-
-  ArrayRef<Decl*> getMembers() { return Members; }
-  void setMembers(ArrayRef<Decl*> mems) { Members = mems; }
 
   StructType *getDeclaredType() const { return StructTy; }
 
@@ -644,7 +641,6 @@ public:
 class ClassDecl : public NominalTypeDecl {
   SourceLoc ClassLoc;
   SourceLoc NameLoc;
-  ArrayRef<Decl*> Members;
   ClassType *ClassTy;
 
 public:
@@ -653,9 +649,6 @@ public:
 
   SourceLoc getStartLoc() const { return ClassLoc; }
   SourceLoc getLoc() const { return NameLoc; }
-
-  ArrayRef<Decl*> getMembers() { return Members; }
-  void setMembers(ArrayRef<Decl*> mems) { Members = mems; }
 
   ClassType *getDeclaredType() const { return ClassTy; }
 
@@ -682,7 +675,6 @@ class ProtocolDecl : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
   SourceLoc NameLoc;
   SourceRange Braces;
-  MutableArrayRef<Decl *> Members;
   Type ProtocolTy;
   
 public:
@@ -692,12 +684,9 @@ public:
       ProtocolLoc(ProtocolLoc), NameLoc(NameLoc) { }
   
   using Decl::getASTContext;
-  
-  MutableArrayRef<Decl *> getMembers() { return Members; }
-  ArrayRef<Decl *> getMembers() const { return Members; }
 
   void setMembers(MutableArrayRef<Decl *> M, SourceRange B) {
-    Members = M;
+    NominalTypeDecl::setMembers(M);
     Braces = B;
   }
 
@@ -788,7 +777,9 @@ public:
       FuncLoc(FuncLoc), NameLoc(NameLoc), GenericParams(GenericParams),
       Body(Body) { }
   
-  bool isStatic() const { return StaticLoc.isValid(); }
+  bool isStatic() const {
+    return StaticLoc.isValid() || getName().isOperator();
+  }
 
   FuncExpr *getBody() const { return Body; }
   void setBody(FuncExpr *NewBody) { Body = NewBody; }

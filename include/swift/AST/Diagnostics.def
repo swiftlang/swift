@@ -133,8 +133,6 @@ ERROR(precedence_overload,decl_parsing,none,
 ERROR(decl_redefinition,decl_parsing,none,
       "%select{declaration|definition}0 conflicts with previous value", 
       (bool))
-ERROR(operator_in_decl,decl_parsing,none,
-      "operator cannot be declared here, declare them at global scope", ())
 ERROR(disallowed_var_decl,decl_parsing,none,
       "'var' declarations not allowed here, use data members instead", ())
 ERROR(disallowed_property_decl,decl_parsing,none,

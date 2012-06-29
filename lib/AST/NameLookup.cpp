@@ -428,6 +428,10 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
 
   Module &M = *cast<Module>(ModuleDC);
 
+  // Never perform local lookup for operators.
+  if (Name.isOperator())
+    DC = ModuleDC;
+
   // If we are inside of a method, check to see if there are any ivars in scope,
   // and if so, whether this is a reference to one of them.
   while (!DC->isModuleContext()) {

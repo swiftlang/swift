@@ -218,13 +218,12 @@ public:
     PD_Default              = 0,
     PD_AllowTopLevel        = 1 << 1,
     PD_DisallowVar          = 1 << 2,
-    PD_DisallowOperators    = 1 << 3,
-    PD_HasContainerType     = 1 << 4,
-    PD_DisallowProperty     = 1 << 5,
-    PD_DisallowNominalTypes = 1 << 6,
-    PD_DisallowFuncDef      = 1 << 7,
-    PD_DisallowInit         = 1 << 8,
-    PD_DisallowTypeAliasDef = 1 << 9
+    PD_HasContainerType     = 1 << 3,
+    PD_DisallowProperty     = 1 << 4,
+    PD_DisallowNominalTypes = 1 << 5,
+    PD_DisallowFuncDef      = 1 << 6,
+    PD_DisallowInit         = 1 << 7,
+    PD_DisallowTypeAliasDef = 1 << 8
   };
   
   TypeAliasDecl *parseDeclTypeAlias(bool WantDefinition);

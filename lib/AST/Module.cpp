@@ -83,6 +83,7 @@ namespace {
   /// Module::LookupCachePimpl.
   class TUModuleCache {
     llvm::DenseMap<Identifier, TinyPtrVector<ValueDecl*>> TopLevelValues;
+    void doPopulateCache(ArrayRef<Decl*> decls, bool onlyOperators);
   public:
     typedef Module::AccessPathTy AccessPathTy;
     
@@ -107,14 +108,21 @@ static void freeTUCachePimpl(void *&Ptr) {
   Ptr = 0;
 }
 
+void TUModuleCache::doPopulateCache(ArrayRef<Decl*> decls, bool onlyOperators) {
+  for (Decl *D : decls) {
+    if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+      if (onlyOperators ? VD->getName().isOperator() : !VD->getName().empty())
+        TopLevelValues[VD->getName()].push_back(VD);
+    if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D))
+      doPopulateCache(NTD->getMembers(), true);
+    if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D))
+      doPopulateCache(ED->getMembers(), true);
+  }
+}
 
 /// Populate our cache on the first name lookup.
 TUModuleCache::TUModuleCache(TranslationUnit &TU) {
-  for (Decl *D : TU.Decls) {
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-      if (!VD->getName().empty())
-        TopLevelValues[VD->getName()].push_back(VD);
-  }
+  doPopulateCache(TU.Decls, false);
 }
 
 

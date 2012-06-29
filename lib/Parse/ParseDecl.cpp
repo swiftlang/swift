@@ -412,9 +412,6 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
         !(Flags & PD_AllowTopLevel))
       diagnose(D->getStartLoc(), diag::decl_inner_scope);
     if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
-      if (VD->isOperator() && (Flags & PD_DisallowOperators))
-        diagnose(VD->getStartLoc(), diag::operator_in_decl);
-      
       if (auto Var = dyn_cast<VarDecl>(VD)) {
         if ((Flags & PD_DisallowVar) && !Var->isProperty())
           diagnose(D->getStartLoc(), diag::disallowed_var_decl);
@@ -537,7 +534,7 @@ Decl *Parser::parseDeclExtension() {
   SmallVector<Decl*, 8> MemberDecls;
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
     if (parseDecl(MemberDecls,
-                  PD_HasContainerType|PD_DisallowVar|PD_DisallowOperators))
+                  PD_HasContainerType|PD_DisallowVar))
       skipUntilDeclRBrace();
   }
 
@@ -1182,8 +1179,11 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   // named 'this'.  This turns "(int)->int" on FooTy into "(this :
   // [byref] FooTy)->((int)->int)".  Note that we can't actually compute the
   // type here until Sema.
-  if (hasContainerType && !StaticLoc.isValid())
+  bool hasImplicitThis = false;
+  if (hasContainerType && !StaticLoc.isValid() && !Name.isOperator()) {
     Params.push_back(buildImplicitThisParameter());
+    hasImplicitThis = true;
+  }
 
   Type FuncTy;
   TypeLoc *FuncTyLoc;
@@ -1193,7 +1193,7 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   // FIXME: for efficiency, do this as part of the previous operation.
   if (GenericParams) {
     FuncTy = buildPolymorphicType(Context, FuncTy, GenericParams,
-                                  hasContainerType);
+                                  hasImplicitThis);
   }
   
   // Enter the arguments for the function into a new function-body scope.  We
@@ -1369,7 +1369,7 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
     Scope OneofBodyScope(this, /*AllowLookup=*/false);
     while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
       if (parseDecl(MemberDecls,
-                    PD_HasContainerType|PD_DisallowOperators|PD_DisallowVar))
+                    PD_HasContainerType|PD_DisallowVar))
         skipUntilDeclRBrace();
     }
   }
@@ -1425,7 +1425,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
     ContextChange CC(*this, SD);
     Scope StructBodyScope(this, /*AllowLookup=*/false);
     while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-      if (parseDecl(MemberDecls, PD_HasContainerType|PD_DisallowOperators))
+      if (parseDecl(MemberDecls, PD_HasContainerType))
         skipUntilDeclRBrace();
     }
   }
@@ -1487,7 +1487,7 @@ bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
     ContextChange CC(*this, CD);
     Scope ClassBodyScope(this, /*AllowLookup=*/false);
     while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
-      if (parseDecl(MemberDecls, PD_HasContainerType|PD_DisallowOperators))
+      if (parseDecl(MemberDecls, PD_HasContainerType))
         skipUntilDeclRBrace();
     }
   }
@@ -1563,7 +1563,7 @@ Decl *Parser::parseDeclProtocol() {
     bool HadError = false;
     while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof)) {
       if (parseDecl(Members,
-                    PD_HasContainerType|PD_DisallowProperty|PD_DisallowOperators|
+                    PD_HasContainerType|PD_DisallowProperty|
                     PD_DisallowFuncDef|PD_DisallowNominalTypes|
                     PD_DisallowInit|PD_DisallowTypeAliasDef)) {
         skipUntilDeclRBrace();
