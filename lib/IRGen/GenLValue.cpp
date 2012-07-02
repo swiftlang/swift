@@ -170,6 +170,7 @@ static void emitAssignRecursive(IRGenFunction &IGF,
                                 Address base,
                                 const TypeInfo &finalType,
                                 Expr *finalExpr,
+                                Explosion *finalExplosion,
                                 LValue::const_iterator pathStart,
                                 LValue::const_iterator pathEnd) {
   // Drill into any physical components.
@@ -183,7 +184,9 @@ static void emitAssignRecursive(IRGenFunction &IGF,
 
     // If we reach the end, do an assignment and we're done.
     if (++pathStart == pathEnd) {
-      return emitRValueAsAssign(IGF, finalExpr, base, finalType);
+      if (finalExpr)
+        return emitRValueAsAssign(IGF, finalExpr, base, finalType);
+      return finalType.assign(IGF, *finalExplosion, base);
     }
   }
 
@@ -194,7 +197,10 @@ static void emitAssignRecursive(IRGenFunction &IGF,
   
   // If this is the final component, just do a logical store.
   if (pathStart == pathEnd) {
-    return component.storeRValue(IGF, finalExpr, base, /*preserve*/ false);
+    if (finalExpr)
+      return component.storeRValue(IGF, finalExpr, base, /*preserve*/ false);
+    return component.storeExplosion(IGF, *finalExplosion, base,
+                                    /*preserve*/ false);
   }
 
   // Otherwise, load and materialize into a temporary.
@@ -202,7 +208,8 @@ static void emitAssignRecursive(IRGenFunction &IGF,
                                               /*preserve*/ true);
 
   // Recursively perform the store.
-  emitAssignRecursive(IGF, temp, finalType, finalExpr, pathStart, pathEnd);
+  emitAssignRecursive(IGF, temp, finalType, finalExpr, finalExplosion,
+                      pathStart, pathEnd);
 
   // Store the temporary back.
   component.storeMaterialized(IGF, temp, base, /*preserve*/ false);
@@ -211,7 +218,13 @@ static void emitAssignRecursive(IRGenFunction &IGF,
 
 void IRGenFunction::emitAssign(Expr *E, const LValue &lvalue,
                               const TypeInfo &type) {
-  emitAssignRecursive(*this, Address(), type, E,
+  emitAssignRecursive(*this, Address(), type, E, nullptr,
+                      lvalue.begin(), lvalue.end());
+}
+
+void IRGenFunction::emitAssign(Explosion &explosion, const LValue &lvalue,
+                              const TypeInfo &type) {
+  emitAssignRecursive(*this, Address(), type, nullptr, &explosion,
                       lvalue.begin(), lvalue.end());
 }
 
@@ -717,6 +730,13 @@ namespace {
       const TypeInfo &valueTI = IGF.getFragileTypeInfo(Target.getType());
       valueTI.load(IGF, temp, value);
 
+      store(IGF, setter, base, value, valueTI, preserve);
+    }
+
+    void storeExplosion(IRGenFunction &IGF, Explosion &value,
+                        Address base, bool preserve) const {
+      Callee setter = Target.getSetter(IGF, ExplosionKind::Maximal);
+      const TypeInfo &valueTI = IGF.getFragileTypeInfo(Target.getType());
       store(IGF, setter, base, value, valueTI, preserve);
     }
 

@@ -135,6 +135,13 @@ public:
   virtual void storeMaterialized(IRGenFunction &IGF, Address temp,
                                  Address base, bool preserve) const = 0;
 
+  /// Perform a store operation with a value from the given explosion.
+  ///
+  /// \param preserve - if true, more operations on this lvalue
+  ///    are forthcoming
+  virtual void storeExplosion(IRGenFunction &IGF, Explosion &value,
+                              Address base, bool preserve) const = 0;
+
   /// Perform a load operation from this path into the given
   /// explosion.
   ///

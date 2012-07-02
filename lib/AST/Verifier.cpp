@@ -176,8 +176,20 @@ namespace {
                     "while condition type");
     }
 
+    Type checkAssignDest(Expr *Dest) {
+      if (TupleExpr *TE = dyn_cast<TupleExpr>(Dest)) {
+        SmallVector<TupleTypeElt, 4> lhsTupleTypes;
+        for (unsigned i = 0; i != TE->getNumElements(); ++i) {
+          Type SubType = checkAssignDest(TE->getElement(i));
+          lhsTupleTypes.push_back(TupleTypeElt(SubType, TE->getElementName(i)));
+        }
+        return TupleType::get(lhsTupleTypes, Ctx);
+      }
+      return checkLValue(Dest->getType(), "LHS of assignment");
+    }
+
     void verifyChecked(AssignStmt *S) {
-      Type lhsTy = checkLValue(S->getDest()->getType(), "LHS of assignment");
+      Type lhsTy = checkAssignDest(S->getDest());
       checkSameType(lhsTy, S->getSrc()->getType(), "assignment operands");
     }
 

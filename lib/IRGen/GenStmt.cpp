@@ -16,14 +16,18 @@
 
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/Types.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "Condition.h"
+#include "Explosion.h"
 #include "Scope.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
+#include "IRGenModule.h"
 #include "JumpDest.h"
 #include "LValue.h"
+#include "TypeInfo.h"
 
 using namespace swift;
 using namespace irgen;
@@ -89,8 +93,33 @@ void IRGenFunction::emitBraceStmt(BraceStmt *BS) {
   }
 }
 
+static void emitAssignStmtRecursive(IRGenFunction &IGF, Explosion &value,
+                                    Expr *dest) {
+  // If the destination is a tuple, destructure.
+  if (TupleExpr *TE = dyn_cast<TupleExpr>(dest)) {
+    for (Expr *elem : TE->getElements())
+      emitAssignStmtRecursive(IGF, value, elem);
+    return;
+  }
+
+  // Emit the assignment.
+  LValueType *destty = dest->getType()->castTo<LValueType>();
+  const TypeInfo &type = IGF.getFragileTypeInfo(destty->getObjectType());
+  LValue Dest = IGF.emitLValue(dest);
+  IGF.emitAssign(value, Dest, type);
+}
+
 /// Emit an assignment statement.
 void IRGenFunction::emitAssignStmt(AssignStmt *S) {
+  if (isa<TupleExpr>(S->getDest())) {
+    // If the destination is a tuple, emit the source, then assign the
+    // exploded value.
+    // FIXME: Optimize if src is a TupleExpr or we can take its address.
+    Explosion value(ExplosionKind::Maximal);
+    emitRValue(S->getSrc(), value);
+    emitAssignStmtRecursive(*this, value, S->getDest());
+    return;
+  }
   const TypeInfo &type = getFragileTypeInfo(S->getSrc()->getType());
   LValue LV = emitLValue(S->getDest());
   emitAssign(S->getSrc(), LV, type);

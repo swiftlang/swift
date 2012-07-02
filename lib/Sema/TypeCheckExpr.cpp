@@ -1693,6 +1693,33 @@ bool TypeChecker::typeCheckCondition(Expr *&E) {
                            diag::condition_convert_limit_reached);
 }
 
+static Type ComputeAssignDestTy(TypeChecker &TC, Expr *Dest,
+                                SourceLoc EqualLoc) {
+  if (TupleExpr *TE = dyn_cast<TupleExpr>(Dest)) {
+    SmallVector<TupleTypeElt, 4> DestTupleTypes;
+    for (unsigned i = 0; i != TE->getNumElements(); ++i) {
+      Expr *SubExpr = TE->getElement(i);
+      Type ElemTy = ComputeAssignDestTy(TC, SubExpr, EqualLoc);
+      if (!ElemTy)
+        return Type();
+      DestTupleTypes.push_back(TupleTypeElt(ElemTy, TE->getElementName(i)));
+    }
+    return TupleType::get(DestTupleTypes, TC.Context);
+  }
+
+  Type DestTy = Dest->getType();
+  if (LValueType *DestLV = DestTy->getAs<LValueType>()) {
+    DestTy = DestLV->getObjectType();
+  } else {
+    if (!DestTy->is<ErrorType>())
+      TC.diagnose(EqualLoc, diag::assignment_lhs_not_lvalue)
+        << Dest->getSourceRange();
+  
+    return Type();
+  }
+  return DestTy;
+}
+
 bool TypeChecker::typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc,
                                       Expr *&Src) {
   SemaExpressionTree SET(*this);
@@ -1743,16 +1770,9 @@ bool TypeChecker::typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc,
   // If the destination is not unresolved, coerce the source to the object type
   // of the destination.
   if (!IsDestUnresolved) {
-    Type DestTy = Dest->getType();
-    if (LValueType *DestLV = DestTy->getAs<LValueType>())
-      DestTy = DestLV->getObjectType();
-    else {
-      if (!DestTy->is<ErrorType>())
-        diagnose(EqualLoc, diag::assignment_lhs_not_lvalue)
-          << Dest->getSourceRange();
-      
+    Type DestTy = ComputeAssignDestTy(*this, Dest, EqualLoc);
+    if (!DestTy)
       return true;
-    }
     
     Src = coerceToType(Src, DestTy);
     return Src == nullptr;    
@@ -1763,7 +1783,8 @@ bool TypeChecker::typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc,
   if (!IsSrcUnresolved) {
     Src = convertToRValue(Src);
     if (!Src) return true;
-    
+
+    // FIXME: Handle the case where the dest is a TupleExpr.
     Type SrcTy = Src->getType();
     Dest = coerceToType(Dest,
                         LValueType::get(SrcTy,

@@ -319,6 +319,8 @@ public:
   void emitLoad(const LValue &lvalue, const TypeInfo &type,
                 Explosion &explosion);
   void emitAssign(Expr *E, const LValue &lvalue, const TypeInfo &type);
+  void emitAssign(Explosion &explosion, const LValue &lvalue,
+                  const TypeInfo &type);
 
   OwnedAddress getAddrForParameter(VarDecl *param, Explosion &paramValues);
 
