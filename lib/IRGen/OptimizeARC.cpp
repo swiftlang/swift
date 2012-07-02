@@ -32,7 +32,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/InstIterator.h"
-#include "llvm/Support/IRBuilder.h"
+#include "llvm/IRBuilder.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace llvm;
 
