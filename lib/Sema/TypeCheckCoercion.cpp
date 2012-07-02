@@ -142,8 +142,12 @@ enum CoercionFlags {
 /// expression.
 class SemaCoerce : public ExprVisitor<SemaCoerce, CoercedResult> {
   enum class LiteralType {
-    Int, Float, Char, String
+    Int, Float, Char, UTFString, ASCIIString
   };
+  static bool isStringLiteral(LiteralType LitTy) {
+    return LitTy == LiteralType::UTFString ||
+           LitTy == LiteralType::ASCIIString;
+  }
   
   /// \brief Determine whether the given type is compatible with an integer
   /// or floating-point literal and what function would perform the conversion.
@@ -643,20 +647,35 @@ public:
 /// argument type that it expects.
 std::pair<FuncDecl*, Type> 
 SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralType LitTy) {
+  if (Ty->is<LValueType>()) {
+    diagnose(Loc, diag::type_not_compatible_literal, Ty);
+    return std::pair<FuncDecl*, Type>();
+  }
+
   // Look up the convertFrom*Literal method on the type.  If it is missing,
   // then the type isn't compatible with literals.  If it is present, it must
   // have a single argument.
   const char *MethodName = 0;
+  const char *AltMethodName = 0;
   switch (LitTy) {
   case LiteralType::Int:    MethodName = "convertFromIntegerLiteral"; break;
   case LiteralType::Float:  MethodName = "convertFromFloatLiteral"; break;
   case LiteralType::Char:   MethodName = "convertFromCharacterLiteral"; break;
-  case LiteralType::String: MethodName = "convertFromStringLiteral"; break;
+  case LiteralType::UTFString: MethodName = "convertFromStringLiteral"; break;
+  case LiteralType::ASCIIString:
+    MethodName = "convertFromASCIIStringLiteral";
+    AltMethodName = "convertFromStringLiteral";
+    break;
   }
   assert(MethodName && "Didn't know LitTy");
-  MemberLookup Lookup(Ty, TC.Context.getIdentifier(MethodName), TC.TU);
-  
-  if (!Lookup.isSuccess() || Ty->is<TupleType>() || Ty->is<LValueType>()) {
+
+  MemberLookup PrimaryLookup(Ty, TC.Context.getIdentifier(MethodName), TC.TU);
+  Optional<MemberLookup> AltLookup;
+  if (AltMethodName && !PrimaryLookup.isSuccess())
+    AltLookup.emplace(Ty, TC.Context.getIdentifier(AltMethodName), TC.TU);
+  MemberLookup &Lookup = AltLookup ? AltLookup.getValue() : PrimaryLookup;
+
+  if (!Lookup.isSuccess()) {
     diagnose(Loc, diag::type_not_compatible_literal, Ty);
     return std::pair<FuncDecl*, Type>();
   }
@@ -703,6 +722,24 @@ SemaCoerce::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralType LitTy) {
   return std::pair<FuncDecl*, Type>(Method, ArgType);
 }
 
+// Check for (Builtin.RawPointer, Builtin.Int64).
+static bool isRawPtrAndInt64(Type ty) {
+  TupleType *tt = ty->getAs<TupleType>();
+  if (!tt)
+    return false;
+  if (tt->getFields().size() != 2)
+    return false;
+  if (!tt->getElementType(0)->is<BuiltinRawPointerType>())
+    return false;
+  BuiltinIntegerType *IntTy =
+    tt->getElementType(1)->getAs<BuiltinIntegerType>();
+  if (!IntTy)
+    return false;
+  if (IntTy->getBitWidth() != 64)
+    return false;
+  return true;
+}
+
 CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
   assert(E->getType()->isUnresolvedType() && "only accepts unresolved types");
 
@@ -719,8 +756,14 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
   else if (isa<CharacterLiteralExpr>(E))
     LitTy = LiteralType::Char;
   else {
-    assert(isa<StringLiteralExpr>(E));
-    LitTy = LiteralType::String;
+    StringLiteralExpr *StringE = cast<StringLiteralExpr>(E);
+    LitTy = LiteralType::ASCIIString;
+    for (unsigned char c : StringE->getValue()) {
+      if (c > 127) {
+        LitTy = LiteralType::UTFString;
+        break;
+      }
+    }
   }
   
   // Check the destination type to see if it is compatible with literals,
@@ -799,8 +842,13 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
     if (Flags & CF_Apply)
       E->setType(ArgType);
     Intermediate = E;
-  } else if (LitTy == LiteralType::String &&
+  } else if (isStringLiteral(LitTy) &&
              ArgType->is<BuiltinRawPointerType>()) {
+    // Nothing to do.
+    if (Flags & CF_Apply)
+      E->setType(ArgType);
+    Intermediate = E;
+  } else if (isStringLiteral(LitTy) && isRawPtrAndInt64(ArgType)) {
     // Nothing to do.
     if (Flags & CF_Apply)
       E->setType(ArgType);
@@ -833,8 +881,10 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
          LiteralInfo.second->getAs<BuiltinIntegerType>()->getBitWidth() == 32) {
       // ok.
 
-    } else if (LitTy == LiteralType::String &&
+    } else if (isStringLiteral(LitTy) &&
                LiteralInfo.second->is<BuiltinRawPointerType>()) {
+      // ok.
+    } else if (isStringLiteral(LitTy) && isRawPtrAndInt64(LiteralInfo.second)) {
       // ok.
     } else {
       diagnose(Method->getLoc(),

@@ -70,11 +70,17 @@ static llvm::Value *emitCharacterLiteralExpr(IRGenFunction &IGF,
 }
 
 /// Emit an string literal expression.
-static llvm::Value *emitStringLiteralExpr(IRGenFunction &IGF,
-                                          StringLiteralExpr *E) {
-  assert(E->getType()->is<BuiltinRawPointerType>());
+static void emitStringLiteralExpr(IRGenFunction &IGF,
+                                  StringLiteralExpr *E, 
+                                  Explosion &explosion) {
   // CreateGlobalStringPtr adds our nul terminator.
-  return IGF.Builder.CreateGlobalStringPtr(E->getValue());
+  if (E->getType()->is<BuiltinRawPointerType>()) {
+    explosion.addUnmanaged(IGF.Builder.CreateGlobalStringPtr(E->getValue()));
+  } else {
+    assert(E->getType()->is<TupleType>());
+    explosion.addUnmanaged(IGF.Builder.CreateGlobalStringPtr(E->getValue()));
+    explosion.addUnmanaged(IGF.Builder.getInt64(E->getValue().size()));
+  }
 }
 
 static LValue emitDeclRefLValue(IRGenFunction &IGF, DeclRefExpr *E) {
@@ -296,7 +302,7 @@ namespace {
       Out.addUnmanaged(emitCharacterLiteralExpr(IGF, E));
     }
     void visitStringLiteralExpr(StringLiteralExpr *E) {
-      Out.addUnmanaged(emitStringLiteralExpr(IGF, E));
+      emitStringLiteralExpr(IGF, E, Out);
     }
     void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
       visit(E->getSemanticExpr());
