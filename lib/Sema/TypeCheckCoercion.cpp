@@ -1885,9 +1885,49 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
   if (LValueType *DestLT = DestTy->getAs<LValueType>()) {
     Type SrcTy = E->getType();
     LValueType *SrcLT = SrcTy->getAs<LValueType>();
+    Type SrcObjectTy = SrcLT? SrcLT->getObjectType() : SrcTy;
 
-    // FIXME: Cope with archetypes here.
-    
+    // If the destination type is an archetype, we can deduce it from the
+    // source.
+    if (auto Archetype = DestLT->getObjectType()->getAs<ArchetypeType>()) {
+      if (CC.isDeducible(Archetype)) {
+        // We have a deducible archetype. Check whether it has already been
+        // deduced.
+        Type ExistingTy = CC.getSubstitution(Archetype);
+
+        if (SrcTy->isUnresolvedType()) {
+          // If we already have a binding for this archetype, try to use it.
+          if (ExistingTy)
+            return coerceToType(E, 
+                                LValueType::get(SrcObjectTy,
+                                                DestLT->getQualifiers(),
+                                                TC.Context),
+                                CC, Flags);
+
+          // We don't have a binding, and cannot deduce anything from an
+          // unresolved type. Whether coercion will succeed is unknowable.
+          return CoercionResult::Unknowable;
+        }
+
+        // We always deduce an object type (never a reference type).
+        if (recordDeduction(CC, E->getLoc(), Archetype, SrcObjectTy, Flags))
+          return nullptr;
+
+        // Continue with the substituted declaration type.
+        DestLT = LValueType::get(SrcObjectTy,
+                                 DestLT->getQualifiers(),
+                                 TC.Context);
+        DestTy = DestLT;
+
+        // If the destination and source types are now equal, we're done.
+        if (DestTy->isEqual(SrcTy))
+          return unchanged(E, Flags);
+
+        // Continue along: we may allow implicit lvalues here or be
+        // able to provide a better failure mode.
+      }
+    }
+
     // If the input expression has an unresolved type, try to coerce it to an
     // appropriate type.
     if (SrcTy->isUnresolvedType())
