@@ -5,7 +5,8 @@ set(SWIFTLIB_SOURCES
     FixedPoint.swift
     FloatingPoint.swift
     Misc.swift
-    String.swift)
+    String.swift
+    demangle.swift)
 
 add_custom_command(
   OUTPUT ${CMAKE_BINARY_DIR}/lib/swift.swift
