@@ -208,10 +208,11 @@ public:
   /// base of a member access, \c BaseTy.
   Type substMemberTypeWithBase(Type T, Type BaseTy);
 
-  bool isSubtypeOf(Type T1, Type T2, bool &Trivial);
-  bool isSubtypeOf(Type T1, Type T2) {
+  bool isSubtypeOf(Type T1, Type T2, bool &Trivial,
+                   CoercionContext *CC = nullptr);
+  bool isSubtypeOf(Type T1, Type T2, CoercionContext *CC = nullptr) {
     bool Trivial = false;
-    return isSubtypeOf(T1, T2, Trivial);
+    return isSubtypeOf(T1, T2, Trivial, CC);
   }
   
   bool semaFunctionSignature(FuncExpr *FE);

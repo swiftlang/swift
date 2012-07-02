@@ -394,7 +394,7 @@ public:
       // partially specified, filter based on what we know.
       if (DestFT && DestFT->getInput()->isUnresolvedType()) {
         if (FunctionType *SFT = srcTy->getAs<FunctionType>())
-          if (TC.isSubtypeOf(SFT->getResult(), DestFT->getResult())) {
+          if (TC.isSubtypeOf(SFT->getResult(), DestFT->getResult(), &CC)) {
             Viable.push_back(Val);
             continue;
           }
@@ -2064,7 +2064,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
   // type, so long as the source is a subtype of the destination.
   if (E->getType()->is<AnyFunctionType>() && DestTy->is<AnyFunctionType>()) {
     bool Trivial;
-    if (TC.isSubtypeOf(E->getType(), DestTy, Trivial)) {
+    if (TC.isSubtypeOf(E->getType(), DestTy, Trivial, &CC)) {
       if (!(Flags & CF_Apply))
         return DestTy;
       
@@ -2076,7 +2076,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
 
   // Could not do the conversion.
   bool Trivial;
-  assert(!TC.isSubtypeOf(E->getType(), DestTy, Trivial) &&
+  assert(!TC.isSubtypeOf(E->getType(), DestTy, Trivial, &CC) &&
          "subtype relationship not handled by type coercion");
   (void)Trivial;
 
@@ -2238,7 +2238,7 @@ namespace {
 /// \brief Helper routine for TypeChecker::isSubtypeOf, that performs the
 /// actual 
 static bool isSubtypeOf(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
-                        bool &Trivial) {
+                        bool &Trivial, CoercionContext *CC) {
   assert((!(Flags & ST_AllowNonTrivialFunction) ||
           Flags & ST_AllowNonTrivial) &&
          "Non-trivial function input/result without non-trivial subtyping?");
@@ -2246,7 +2246,30 @@ static bool isSubtypeOf(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
   // If the types are equivalent, we're done.
   if (T1->isEqual(T2))
     return true;
-  
+
+  // If T1 or T2 is a deducible archetype, it gets deduced to T2 or T1,
+  // respectively.
+  // FIXME: This gets wacky when T1 and T2 are from the same generic function!
+  if (CC) {
+    if (ArchetypeType *Archetype1 = T1->getAs<ArchetypeType>()) {
+      if (CC->isDeducible(Archetype1) && !T2->isUnresolvedType()) {
+        // We have a deducible archetype. Record this deduction.
+        // FIXME: Would be useful to get the diagnostic back out, if
+        // deduction conflicts.
+        return !recordDeduction(*CC, SourceLoc(), Archetype1, T2, /*Flags=*/0);
+      }
+    }
+    
+    if (ArchetypeType *Archetype2 = T2->getAs<ArchetypeType>()) {
+      if (CC->isDeducible(Archetype2) && !T1->isUnresolvedType()) {
+        // We have a deducible archetype. Record this deduction.
+        // FIXME: Would be useful to get the diagnostic back out, if
+        // deduction conflicts.
+        return !recordDeduction(*CC, SourceLoc(), Archetype2, T1, /*Flags=*/0);
+      }
+    }
+  }
+
   // A value of a given type is a subtype of a protocol type if it conforms
   // to that protocol type. We always consider this a non-trivial conversion,
   // because it may require the introduction of a new protocol mapping.
@@ -2304,14 +2327,14 @@ static bool isSubtypeOf(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
     if (!isSubtypeOf(TC,
                      Func1->getResult()->getUnlabeledType(TC.Context),
                      Func2->getResult()->getUnlabeledType(TC.Context),
-                     SubFlags, Trivial))
+                     SubFlags, Trivial, CC))
       return false;
     
     // Input types can be contravariant, ignoring labels.
     return isSubtypeOf(TC,
                        Func2->getInput()->getUnlabeledType(TC.Context),
                        Func1->getInput()->getUnlabeledType(TC.Context),
-                       SubFlags, Trivial);
+                       SubFlags, Trivial, CC);
   }
   
   // Tuple types. The subtyping relationship for tuples is based on subtyping
@@ -2327,7 +2350,7 @@ static bool isSubtypeOf(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
                        Tuple1->getElementType(I),
                        Tuple2->getElementType(I),
                        Flags & ~ST_AllowNonTrivial,
-                       Trivial))
+                       Trivial, CC))
         return false;
     
     return true;
@@ -2343,8 +2366,9 @@ static bool isSubtypeOf(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
 /// representation change (such as introducing a protocol-conformance mapping).
 ///
 /// This checks for a non-strict subtyping relationship T1 <= T2.
-bool TypeChecker::isSubtypeOf(Type T1, Type T2, bool &Trivial) {
+bool TypeChecker::isSubtypeOf(Type T1, Type T2, bool &Trivial,
+                              CoercionContext *CC) {
   Trivial = true;
   unsigned Flags = ST_AllowNonTrivial | ST_AllowNonTrivialFunction;
-  return ::isSubtypeOf(*this, T1, T2, Flags, Trivial);
+  return ::isSubtypeOf(*this, T1, T2, Flags, Trivial, CC);
 }
