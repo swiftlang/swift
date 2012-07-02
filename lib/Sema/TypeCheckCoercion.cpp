@@ -2223,3 +2223,128 @@ Expr *TypeChecker::convertLValueToRValue(LValueType *srcLV, Expr *E) {
   return nullptr;
 }
 
+namespace {
+  /// \brief Flags that control how subtyping is checked.
+  enum SubTypeFlags {
+    /// \brief Whether to allow 'non-trivial' subtyping relationships, e.g.,
+    /// ones that change the representation of the object.
+    ST_AllowNonTrivial = 0x01,
+    /// \brief Whether to allow 'non-trivial' subtyping relationships in the
+    /// input/result of function types.
+    ST_AllowNonTrivialFunction = 0x02
+  };
+}
+
+/// \brief Helper routine for TypeChecker::isSubtypeOf, that performs the
+/// actual 
+static bool isSubtypeOf(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
+                        bool &Trivial) {
+  assert((!(Flags & ST_AllowNonTrivialFunction) ||
+          Flags & ST_AllowNonTrivial) &&
+         "Non-trivial function input/result without non-trivial subtyping?");
+  
+  // If the types are equivalent, we're done.
+  if (T1->isEqual(T2))
+    return true;
+  
+  // A value of a given type is a subtype of a protocol type if it conforms
+  // to that protocol type. We always consider this a non-trivial conversion,
+  // because it may require the introduction of a new protocol mapping.
+  // FIXME: Depending on our implementation model for protocols, some cases
+  // (such as selecting a subset of protocols in an existential type, or
+  // selecting a protocol from which the protocol T1 inherits) might actually
+  // be considered trivial.
+  if (Flags & ST_AllowNonTrivial) {
+    SmallVector<ProtocolDecl *, 4> T2Protos;
+    if (T2->isExistentialType(T2Protos)) {
+      for (auto Proto2 : T2Protos) {
+        if (!TC.conformsToProtocol(T1, Proto2)) {
+          return false;
+        }
+      }
+      
+      Trivial = false;
+      return true;
+    }
+  }
+  
+  // From here on, we require the types to have equivalent kind.
+  if (T1->getCanonicalType()->getKind() !=
+      T2->getCanonicalType()->getKind())
+    return false;
+  
+  // An lvalue type is a subtype of another lvalue type if their object types
+  // are the same and its qualifiers are a subset of the qualifiers of the
+  // other.
+  if (auto LV1 = T1->getAs<LValueType>()) {
+    auto LV2 = T2->getAs<LValueType>();
+    return LV1->getQualifiers() <= LV2->getQualifiers() &&
+           LV1->getObjectType()->isEqual(LV2->getObjectType());
+  }
+  
+  // Function types allow covariant result types and contravariant argument
+  // types, ignoring labels.
+  if (auto Func1 = T1->getAs<FunctionType>()) {
+    auto Func2 = T2->getAs<FunctionType>();
+
+    // Compute the flags to be used for the subtyping checks of the input
+    // and result types.
+    unsigned SubFlags = Flags;
+    if (Flags & ST_AllowNonTrivialFunction)
+      SubFlags = SubFlags & ~ST_AllowNonTrivialFunction;
+    else if (Flags & ST_AllowNonTrivial)
+      SubFlags = SubFlags & ~ST_AllowNonTrivial;
+    
+    // [auto_closure] types are subtypes of the corresponding
+    // non-[auto_closure] types.
+    if (Func2->isAutoClosure() && !Func1->isAutoClosure())
+      return false;
+    
+    // Result type can be covariant, ignoring labels.
+    if (!isSubtypeOf(TC,
+                     Func1->getResult()->getUnlabeledType(TC.Context),
+                     Func2->getResult()->getUnlabeledType(TC.Context),
+                     SubFlags, Trivial))
+      return false;
+    
+    // Input types can be contravariant, ignoring labels.
+    return isSubtypeOf(TC,
+                       Func2->getInput()->getUnlabeledType(TC.Context),
+                       Func1->getInput()->getUnlabeledType(TC.Context),
+                       SubFlags, Trivial);
+  }
+  
+  // Tuple types. The subtyping relationship for tuples is based on subtyping
+  // of the elements, ignoring field names and default arguments.
+  if (auto Tuple1 = T1->getAs<TupleType>()) {
+    auto Tuple2 = T2->getAs<TupleType>();
+    
+    if (Tuple1->getFields().size() != Tuple2->getFields().size())
+      return false;
+    
+    for (unsigned I = 0, N = Tuple1->getFields().size(); I != N; ++I)
+      if (!isSubtypeOf(TC,
+                       Tuple1->getElementType(I),
+                       Tuple2->getElementType(I),
+                       Flags & ~ST_AllowNonTrivial,
+                       Trivial))
+        return false;
+    
+    return true;
+  }
+  
+  return false;  
+}
+
+/// \brief Determine whether T1 is a subtype of (or equivalent to) T2.
+///
+/// \param Trivial Will be set to 'false' if there are any subtyping
+/// relationships that aren't 'trivial', in the sense that they require some
+/// representation change (such as introducing a protocol-conformance mapping).
+///
+/// This checks for a non-strict subtyping relationship T1 <= T2.
+bool TypeChecker::isSubtypeOf(Type T1, Type T2, bool &Trivial) {
+  Trivial = true;
+  unsigned Flags = ST_AllowNonTrivial | ST_AllowNonTrivialFunction;
+  return ::isSubtypeOf(*this, T1, T2, Flags, Trivial);
+}
