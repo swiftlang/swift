@@ -1882,6 +1882,10 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
       return coerced(ICE, Flags);
     }
 
+  // If we have an exact match, we're done.
+  if (E->getType()->isEqual(DestTy))
+    return unchanged(E, Flags);
+
   // If the destination is deducible, deduce it now (or check it against a
   // prior deduction).
   if (auto Deducible = DestTy->getAs<DeducibleGenericParamType>()) {
@@ -1912,12 +1916,23 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
 
     return unchanged(E, Flags);
   }
-    
-
-  // If we have an exact match, we're done.
-  if (E->getType()->isEqual(DestTy))
-    return unchanged(E, Flags);
   
+  // If the source is deducible, deduce it now (or check it against a
+  // prior deduction).
+  if (auto DeducibleSrc = E->getType()->getAs<DeducibleGenericParamType>()) {
+    // We always deduce an object type (never a reference type).
+    Type DeducedTy = DestTy->getRValueType();
+
+    // Record and check the deduction.
+    if (recordDeduction(CC, E->getLoc(), DeducibleSrc, DeducedTy, Flags))
+      return nullptr;
+
+    if (!(Flags & CF_Apply))
+      return DestTy;
+
+    return unchanged(E, Flags);
+  }
+
   // If the expression is a grouping parenthesis and it has an unresolved type,
   // just force the type through it, regardless of what DestTy is.
   if (ParenExpr *PE = dyn_cast<ParenExpr>(E)) {

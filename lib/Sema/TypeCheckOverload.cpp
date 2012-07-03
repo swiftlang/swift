@@ -189,24 +189,11 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
           == CoercionResult::Failed)
       continue;
 
-    // If we need substitution, substitute into the function type before
-    // continuing.
-    if (CC.requiresSubstitution()) {
-      SubstFunctionTy = substType(FunctionTy, CC.Substitutions);
-      if (!SubstFunctionTy)
-        continue;
-
-      FunctionTy = SubstFunctionTy->castTo<AnyFunctionType>();
-      // FIXME: Is this really the correct thing to do here?
-      FunctionTy = FunctionType::get(FunctionTy->getInput(),
-                                     FunctionTy->getResult(),
-                                     Context);
-    }
-
     // Check whether we can coerce the result type.
     if (DestTy) {
       OpaqueValueExpr OVE(Arg->getLoc(), FunctionTy->getResult());
-      if (isCoercibleToType(&OVE, DestTy, &CC) == CoercionResult::Failed)
+      if (isCoercibleToType(&OVE, DestTy, /*Assignment=*/false, &CC) 
+            == CoercionResult::Failed)
         continue;
     }
 
@@ -216,6 +203,20 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
         OverloadCandidate(VD, FunctionTy, CC.hasCompleteSubstitutions()));
       continue;
     }
+
+    // We have a complete set of substitutions. Apply them.
+    SubstFunctionTy = substType(FunctionTy, CC.Substitutions);
+    if (!SubstFunctionTy)
+      continue;
+
+    FunctionTy = SubstFunctionTy->castTo<AnyFunctionType>();
+
+    // We stared with a polymorphic function type, and have substituted away
+    // all of the generic parameters. Turn it into the corresponding
+    // monomorphic function type.
+    FunctionTy = FunctionType::get(FunctionTy->getInput(),
+                                   FunctionTy->getResult(),
+                                   Context);
 
     // Add with substitutions.
     OverloadCandidate::SubstitutionInfoType SubstitutionInfo
