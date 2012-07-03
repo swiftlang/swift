@@ -99,6 +99,7 @@ bool TypeChecker::validateType(Type InTy, bool isFirstPass) {
   case TypeKind::Struct:
   case TypeKind::Class:
   case TypeKind::Archetype:
+  case TypeKind::UnresolvedNominal:
     // These types are already canonical anyway.
     return false;
       

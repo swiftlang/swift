@@ -185,6 +185,9 @@ static bool isLocalLinkageType(Type type) {
     return false;
   }
 
+  case TypeKind::UnresolvedNominal:
+    return isLocalLinkageDecl(cast<UnresolvedNominalType>(base)->getDecl());
+
   case TypeKind::OneOf:
   case TypeKind::Struct:
   case TypeKind::Class:
@@ -305,13 +308,13 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
     return;
 
   case DeclKind::OneOf:
-    return IGM.emitOneOfType(cast<OneOfDecl>(D)->getDeclaredType());
+    return IGM.emitOneOfDecl(cast<OneOfDecl>(D));
 
   case DeclKind::Struct:
-    return IGM.emitStructType(cast<StructDecl>(D)->getDeclaredType());
+    return IGM.emitStructDecl(cast<StructDecl>(D));
 
   case DeclKind::Class:
-    return IGM.emitClassType(cast<ClassDecl>(D)->getDeclaredType());
+    return IGM.emitClassDecl(cast<ClassDecl>(D));
 
   // These declarations don't require IR-gen support.
   case DeclKind::Import:
@@ -614,13 +617,13 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     case DeclKind::TypeAlias:
       continue;
     case DeclKind::OneOf:
-      emitOneOfType(cast<OneOfDecl>(member)->getDeclaredType());
+      emitOneOfDecl(cast<OneOfDecl>(member));
       continue;
     case DeclKind::Struct:
-      emitStructType(cast<StructDecl>(member)->getDeclaredType());
+      emitStructDecl(cast<StructDecl>(member));
       continue;
     case DeclKind::Class:
-      emitClassType(cast<ClassDecl>(member)->getDeclaredType());
+      emitClassDecl(cast<ClassDecl>(member));
       continue;
     case DeclKind::Var:
       if (cast<VarDecl>(member)->isProperty())
@@ -658,13 +661,13 @@ void IRGenFunction::emitLocal(Decl *D) {
     llvm_unreachable("declaration cannot appear in local scope");
 
   case DeclKind::OneOf:
-    return IGM.emitOneOfType(cast<OneOfDecl>(D)->getDeclaredType());
+    return IGM.emitOneOfDecl(cast<OneOfDecl>(D));
 
   case DeclKind::Struct:
-    return IGM.emitStructType(cast<StructDecl>(D)->getDeclaredType());
+    return IGM.emitStructDecl(cast<StructDecl>(D));
 
   case DeclKind::Class:
-    return IGM.emitClassType(cast<ClassDecl>(D)->getDeclaredType());
+    return IGM.emitClassDecl(cast<ClassDecl>(D));
 
   case DeclKind::TypeAlias:
     // no IR generation support required.

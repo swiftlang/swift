@@ -548,7 +548,7 @@ class NominalTypeDecl : public TypeDecl, public DeclContext {
   GenericParamList *GenericParams;
 
 protected:
-  NominalType *DeclaredTy;
+  Type DeclaredTy;
   
 public:
   NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
@@ -564,7 +564,7 @@ public:
   GenericParamList *getGenericParams() const { return GenericParams; }
 
   /// getDeclaredType - Retrieve the type declared by this entity.
-  NominalType *getDeclaredType() const { return DeclaredTy; }
+  Type getDeclaredType() const { return DeclaredTy; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -597,10 +597,6 @@ public:
 
   OneOfElementDecl *getElement(Identifier Name) const;
 
-  OneOfType *getDeclaredType() const {
-    return reinterpret_cast<OneOfType *>(DeclaredTy);
-  }
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::OneOf;
@@ -632,10 +628,6 @@ public:
   SourceLoc getStartLoc() const { return StructLoc; }
   SourceLoc getLoc() const { return NameLoc; }
 
-  StructType *getDeclaredType() const {
-    return reinterpret_cast<StructType *>(DeclaredTy);
-  }
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Struct;
@@ -666,10 +658,6 @@ public:
 
   SourceLoc getStartLoc() const { return ClassLoc; }
   SourceLoc getLoc() const { return NameLoc; }
-
-  ClassType *getDeclaredType() const {
-    return reinterpret_cast<ClassType *>(DeclaredTy);
-  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -714,7 +702,7 @@ public:
   void collectInherited(llvm::SmallPtrSet<ProtocolDecl *, 4> &Inherited);
   
   ProtocolType *getDeclaredType() const {
-    return reinterpret_cast<ProtocolType *>(DeclaredTy);
+    return reinterpret_cast<ProtocolType *>(DeclaredTy.getPointer());
   }
   
   SourceLoc getStartLoc() const { return ProtocolLoc; }

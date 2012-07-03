@@ -109,6 +109,7 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
   case TypeKind::Protocol:
   case TypeKind::Archetype:
   case TypeKind::ProtocolComposition:
+  case TypeKind::UnresolvedNominal:
   case TypeKind::DeducibleGenericParam:
     return this;
 
@@ -865,6 +866,10 @@ void LValueType::print(raw_ostream &OS) const {
   }
   OS << "] ";
   getObjectType()->print(OS);
+}
+
+void UnresolvedNominalType::print(raw_ostream &OS) const {
+  OS << getDecl()->getName().get();
 }
 
 void StructType::print(raw_ostream &OS) const {

@@ -42,6 +42,7 @@ bool Parser::checkFullyTyped(Type type) {
   case TypeKind::Archetype:
   case TypeKind::Substituted:
   case TypeKind::ProtocolComposition:
+  case TypeKind::UnresolvedNominal:
   case TypeKind::DeducibleGenericParam:
     return false;
 

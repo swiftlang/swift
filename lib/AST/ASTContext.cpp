@@ -172,14 +172,17 @@ TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
   return New;
 }
 
-OneOfType::OneOfType(OneOfDecl *TheDecl, ASTContext &C)
-  : NominalType(TypeKind::OneOf, &C, TheDecl) { }
+OneOfType::OneOfType(OneOfDecl *TheDecl, ArrayRef<Type> ArgumentTypes,
+                     ASTContext &C)
+  : NominalType(TypeKind::OneOf, &C, TheDecl, ArgumentTypes) { }
 
-StructType::StructType(StructDecl *TheDecl, ASTContext &C)
-  : NominalType(TypeKind::Struct, &C, TheDecl) { }
+StructType::StructType(StructDecl *TheDecl, ArrayRef<Type> ArgumentTypes,
+                       ASTContext &C)
+  : NominalType(TypeKind::Struct, &C, TheDecl, ArgumentTypes) { }
 
-ClassType::ClassType(ClassDecl *TheDecl, ASTContext &C)
-  : NominalType(TypeKind::Class, &C, TheDecl) { }
+ClassType::ClassType(ClassDecl *TheDecl, ArrayRef<Type> ArgumentTypes,
+                    ASTContext &C)
+  : NominalType(TypeKind::Class, &C, TheDecl, ArgumentTypes) { }
 
 IdentifierType *IdentifierType::getNew(ASTContext &C,
                                        MutableArrayRef<Component> Components) {
@@ -300,7 +303,7 @@ ArraySliceType *ArraySliceType::get(Type base, SourceLoc loc, ASTContext &C) {
 }
 
 ProtocolType::ProtocolType(ProtocolDecl *TheDecl, ASTContext &Ctx)
-  : NominalType(TypeKind::Protocol, &Ctx, TheDecl) { }
+  : NominalType(TypeKind::Protocol, &Ctx, TheDecl, ArrayRef<Type>()) { }
 
 LValueType *LValueType::get(Type objectTy, Qual quals, ASTContext &C) {
   auto key = std::make_pair(objectTy, quals.getOpaqueData());

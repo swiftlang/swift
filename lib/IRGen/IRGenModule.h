@@ -40,17 +40,16 @@ namespace llvm {
 namespace swift {
   class ASTContext;
   class BraceStmt;
-  class ClassType;
+  class ClassDecl;
   class ConstructorDecl;
   class Decl;
   class ExtensionDecl;
   class FuncDecl;
   class OneOfElementDecl;
   class OneOfDecl;
-  class OneOfType;
   class ProtocolDecl;
   class SourceLoc;
-  class StructType;
+  class StructDecl;
   class TranslationUnit;
   class Type;
   class TypeAliasDecl;
@@ -179,9 +178,9 @@ public:
 
   void emitTranslationUnit(TranslationUnit *TU, unsigned StartElem);
 
-  void emitOneOfType(OneOfType *type);
-  void emitStructType(StructType *type);
-  void emitClassType(ClassType *type);
+  void emitOneOfDecl(OneOfDecl *D);
+  void emitStructDecl(StructDecl *D);
+  void emitClassDecl(ClassDecl *D);
   void emitExtension(ExtensionDecl *D);
   void emitGlobalFunction(FuncDecl *D);  
   void emitStaticMethod(FuncDecl *D);

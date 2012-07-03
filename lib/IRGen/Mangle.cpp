@@ -157,10 +157,10 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
       OneOfDecl *oneof = cast<OneOfDecl>(ctx);
 
       // FIXME: The mangling rule here is kind of weird.
-      if (tryMangleSubstitution(oneof->getDeclaredType())) return;
+      if (tryMangleSubstitution(oneof->getDeclaredType().getPointer())) return;
       mangleDeclContext(ctx->getParent());
       mangleIdentifier(oneof->getName());
-      addSubstitution(oneof->getDeclaredType());
+      addSubstitution(oneof->getDeclaredType().getPointer());
       return;
     }
     if (isa<StructDecl>(ctx) || isa<ClassDecl>(ctx)) {
@@ -271,6 +271,8 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
   case TypeKind::UnstructuredUnresolved:
   case TypeKind::DeducibleGenericParam:
     llvm_unreachable("mangling unresolved type");
+  case TypeKind::UnresolvedNominal:
+    llvm_unreachable("mangling UnresolvedNominal type");
 
   case TypeKind::MetaType:
     llvm_unreachable("Cannot mangle metatype yet");

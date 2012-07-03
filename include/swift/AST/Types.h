@@ -556,6 +556,35 @@ private:
   TupleType(ArrayRef<TupleTypeElt> fields, ASTContext *CanCtx);
 };
 
+/// UnresolvedNominalType - Represents a generic nominal type where the
+/// type arguments have not yet been resolved.
+class UnresolvedNominalType : public TypeBase {
+  /// TheDecl - This is the TypeDecl which declares the given type. It
+  /// specifies the name and other useful information about this type.
+  NominalTypeDecl * const TheDecl;
+
+private:
+  UnresolvedNominalType(NominalTypeDecl *TheDecl, ASTContext &C)
+    : TypeBase(TypeKind::UnresolvedNominal, &C, /*Unresolved=*/false),
+      TheDecl(TheDecl) { }
+  friend class OneOfDecl;
+  friend class StructDecl;
+  friend class ClassDecl;
+
+public:
+  /// \brief Returns the declaration that declares this type.
+  NominalTypeDecl *getDecl() const { return TheDecl; }
+
+  void print(raw_ostream &O) const;
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const UnresolvedNominalType *) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::UnresolvedNominal;
+  }
+};
+
+
 /// NominalType - Represents a type with a name that is significant, such that
 /// the name distinguishes it from other structurally-similar types that have
 /// different names. Nominal types are always canonical.
@@ -564,9 +593,13 @@ class NominalType : public TypeBase {
   /// specifies the name and other useful information about this type.
   NominalTypeDecl * const TheDecl;
 
+  ArrayRef<Type> ArgumentTypes;
+
 protected:
-  NominalType(TypeKind K, ASTContext *C, NominalTypeDecl *TheDecl)
-    : TypeBase(K, C, /*Unresolved=*/false), TheDecl(TheDecl) { }
+  NominalType(TypeKind K, ASTContext *C, NominalTypeDecl *TheDecl,
+              ArrayRef<Type> ArgumentTypes)
+    : TypeBase(K, C, /*Unresolved=*/false), TheDecl(TheDecl),
+      ArgumentTypes(ArgumentTypes) { }
 
 public:
   /// \brief Returns the declaration that declares this type.
@@ -597,7 +630,8 @@ public:
   }
   
 private:
-  OneOfType(OneOfDecl *TheDecl, ASTContext &Ctx);
+  OneOfType(OneOfDecl *TheDecl, ArrayRef<Type> ArgumentTypes,
+            ASTContext &Ctx);
   friend class OneOfDecl;
 };
 
@@ -618,7 +652,8 @@ public:
   }
   
 private:
-  StructType(StructDecl *TheDecl, ASTContext &Ctx);
+  StructType(StructDecl *TheDecl, ArrayRef<Type> ArgumentTypes,
+             ASTContext &Ctx);
   friend class StructDecl;
 };
 
@@ -639,7 +674,8 @@ public:
   }
   
 private:
-  ClassType(ClassDecl *TheDecl, ASTContext &Ctx);
+  ClassType(ClassDecl *TheDecl, ArrayRef<Type> ArgumentTypes,
+            ASTContext &Ctx);
   friend class ClassDecl;
 };
 

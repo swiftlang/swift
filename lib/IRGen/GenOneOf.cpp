@@ -419,10 +419,10 @@ static void emitInjectionFunction(IRGenModule &IGM,
 }
 
 /// emitOneOfType - Emit all the declarations associated with this oneof type.
-void IRGenModule::emitOneOfType(OneOfType *oneof) {
+void IRGenModule::emitOneOfDecl(OneOfDecl *oneof) {
   // FIXME: This is mostly copy-paste from emitExtension;
   // figure out how to refactor! 
-  for (Decl *member : oneof->getDecl()->getMembers()) {
+  for (Decl *member : oneof->getMembers()) {
     switch (member->getKind()) {
     case DeclKind::Import:
     case DeclKind::TopLevelCode:
@@ -441,13 +441,13 @@ void IRGenModule::emitOneOfType(OneOfType *oneof) {
     case DeclKind::TypeAlias:
       continue;
     case DeclKind::OneOf:
-      emitOneOfType(cast<OneOfDecl>(member)->getDeclaredType());
+      emitOneOfDecl(cast<OneOfDecl>(member));
       continue;
     case DeclKind::Struct:
-      emitStructType(cast<StructDecl>(member)->getDeclaredType());
+      emitStructDecl(cast<StructDecl>(member));
       continue;
     case DeclKind::Class:
-      emitClassType(cast<ClassDecl>(member)->getDeclaredType());
+      emitClassDecl(cast<ClassDecl>(member));
       continue;
     case DeclKind::Var:
       if (cast<VarDecl>(member)->isProperty())
@@ -466,8 +466,10 @@ void IRGenModule::emitOneOfType(OneOfType *oneof) {
       continue;
     }
     case DeclKind::OneOfElement: {
+      if (oneof->getGenericParams())
+        llvm_unreachable("don't know how to emit generic constructor yet");
       const OneofTypeInfo &typeInfo =
-          getFragileTypeInfo(oneof).as<OneofTypeInfo>();
+          getFragileTypeInfo(oneof->getDeclaredType()).as<OneofTypeInfo>();
       OneOfElementDecl *elt = cast<OneOfElementDecl>(member);
       llvm::Function *fn = getAddrOfInjectionFunction(elt);
       emitInjectionFunction(*this, fn, typeInfo, elt);

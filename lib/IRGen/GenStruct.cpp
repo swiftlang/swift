@@ -128,7 +128,8 @@ static void emitInjectionFunction(IRGenModule &IGM,
 LValue swift::irgen::emitPhysicalStructMemberLValue(IRGenFunction &IGF,
                                                     MemberRefExpr *E) {
   LValue lvalue = IGF.emitLValue(E->getBase());
-  StructType *T = cast<StructDecl>(E->getDecl()->getDeclContext())->getDeclaredType();
+  LValueType *lvalTy = E->getBase()->getType()->castTo<LValueType>();
+  StructType *T = lvalTy->getObjectType()->castTo<StructType>();
   const StructTypeInfo &info = IGF.getFragileTypeInfo(T).as<StructTypeInfo>();
 
   // FIXME: This field index computation is an ugly hack.
@@ -147,10 +148,10 @@ LValue swift::irgen::emitPhysicalStructMemberLValue(IRGenFunction &IGF,
 
 
 /// emitStructType - Emit all the declarations associated with this oneof type.
-void IRGenModule::emitStructType(StructType *st) {
+void IRGenModule::emitStructDecl(StructDecl *st) {
   // FIXME: This is mostly copy-paste from emitExtension;
   // figure out how to refactor! 
-  for (Decl *member : st->getDecl()->getMembers()) {
+  for (Decl *member : st->getMembers()) {
     switch (member->getKind()) {
     case DeclKind::Import:
     case DeclKind::TopLevelCode:
@@ -169,13 +170,13 @@ void IRGenModule::emitStructType(StructType *st) {
     case DeclKind::TypeAlias:
       continue;
     case DeclKind::OneOf:
-      emitOneOfType(cast<OneOfDecl>(member)->getDeclaredType());
+      emitOneOfDecl(cast<OneOfDecl>(member));
       continue;
     case DeclKind::Struct:
-      emitStructType(cast<StructDecl>(member)->getDeclaredType());
+      emitStructDecl(cast<StructDecl>(member));
       continue;
     case DeclKind::Class:
-      emitClassType(cast<ClassDecl>(member)->getDeclaredType());
+      emitClassDecl(cast<ClassDecl>(member));
       continue;
     case DeclKind::Var:
       if (cast<VarDecl>(member)->isProperty())
@@ -194,8 +195,10 @@ void IRGenModule::emitStructType(StructType *st) {
       continue;
     }
     case DeclKind::OneOfElement: {
+      if (st->getGenericParams())
+        llvm_unreachable("don't know how to emit generic constructor yet");
       const StructTypeInfo &typeInfo =
-          getFragileTypeInfo(st).as<StructTypeInfo>();
+          getFragileTypeInfo(st->getDeclaredType()).as<StructTypeInfo>();
       OneOfElementDecl *elt = cast<OneOfElementDecl>(member);
       llvm::Function *fn = getAddrOfInjectionFunction(elt);
       emitInjectionFunction(*this, fn, typeInfo, elt);

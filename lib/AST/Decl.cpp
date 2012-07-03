@@ -237,7 +237,10 @@ OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
   setType(MetaTypeType::get(this));
   // Compute the associated type for this OneOfDecl.
   ASTContext &Ctx = Parent->getASTContext();
-  DeclaredTy = new (Ctx) OneOfType(this, Ctx);
+  if (!GenericParams)
+    DeclaredTy = new (Ctx) OneOfType(this, ArrayRef<Type>(), Ctx);
+  else
+    DeclaredTy = new (Ctx) UnresolvedNominalType(this, Ctx);
 }
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
@@ -249,7 +252,10 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
   setType(MetaTypeType::get(this));
   // Compute the associated type for this StructDecl.
   ASTContext &Ctx = Parent->getASTContext();
-  DeclaredTy = new (Ctx) StructType(this, Ctx);
+  if (!GenericParams)
+    DeclaredTy = new (Ctx) StructType(this, ArrayRef<Type>(), Ctx);
+  else
+    DeclaredTy = new (Ctx) UnresolvedNominalType(this, Ctx);
 }
 
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
@@ -261,7 +267,10 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   setType(MetaTypeType::get(this));
   // Compute the associated type for this ClassDecl.
   ASTContext &Ctx = Parent->getASTContext();
-  DeclaredTy = new (Ctx) ClassType(this, Ctx);
+  if (!GenericParams)
+    DeclaredTy = new (Ctx) ClassType(this, ArrayRef<Type>(), Ctx);
+  else
+    DeclaredTy = new (Ctx) UnresolvedNominalType(this, Ctx);
 }
 
 

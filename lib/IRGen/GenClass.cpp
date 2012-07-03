@@ -79,8 +79,7 @@ namespace {
 
 LValue irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
                                             MemberRefExpr *E) {
-  ClassDecl *CD = cast<ClassDecl>(E->getDecl()->getDeclContext());
-  ClassType *T = CD->getDeclaredType();
+  ClassType *T = E->getBase()->getType()->castTo<ClassType>();
   const ClassTypeInfo &info =
     IGF.getFragileTypeInfo(T).as<ClassTypeInfo>();
   Explosion explosion(ExplosionKind::Maximal);
@@ -90,7 +89,7 @@ LValue irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
 
   // FIXME: This field index computation is an ugly hack.
   unsigned FieldIndex = 0;
-  for (Decl *D : CD->getMembers()) {
+  for (Decl *D : T->getDecl()->getMembers()) {
     if (D == E->getDecl())
       break;
     if (isa<VarDecl>(D) && !cast<VarDecl>(D)->isProperty())
@@ -138,10 +137,10 @@ void swift::irgen::emitNewReferenceExpr(IRGenFunction &IGF,
 }
 
 /// emitStructType - Emit all the declarations associated with this oneof type.
-void IRGenModule::emitClassType(ClassType *ct) {
+void IRGenModule::emitClassDecl(ClassDecl *D) {
   // FIXME: This is mostly copy-paste from emitExtension;
   // figure out how to refactor! 
-  for (Decl *member : ct->getDecl()->getMembers()) {
+  for (Decl *member : D->getMembers()) {
     switch (member->getKind()) {
     case DeclKind::Import:
     case DeclKind::TopLevelCode:
@@ -162,13 +161,13 @@ void IRGenModule::emitClassType(ClassType *ct) {
     case DeclKind::TypeAlias:
       continue;
     case DeclKind::OneOf:
-      emitOneOfType(cast<OneOfDecl>(member)->getDeclaredType());
+      emitOneOfDecl(cast<OneOfDecl>(member));
       continue;
     case DeclKind::Struct:
-      emitStructType(cast<StructDecl>(member)->getDeclaredType());
+      emitStructDecl(cast<StructDecl>(member));
       continue;
     case DeclKind::Class:
-      emitClassType(cast<ClassDecl>(member)->getDeclaredType());
+      emitClassDecl(cast<ClassDecl>(member));
       continue;
     case DeclKind::Var:
       if (cast<VarDecl>(member)->isProperty())
