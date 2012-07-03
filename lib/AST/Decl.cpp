@@ -110,16 +110,6 @@ GenericParamList *GenericParamList::create(ASTContext &Context,
   return new (Mem) GenericParamList(LAngleLoc, Params, RAngleLoc);
 }
 
-/// getAliasType - Return the sugared version of this decl as a Type.
-NameAliasType *TypeAliasDecl::getAliasType() const {
-  // Lazily create AliasTy. 
-  if (AliasTy == 0)
-    AliasTy = new (getASTContext()) NameAliasType(
-                                            const_cast<TypeAliasDecl*>(this));
-   
-  return AliasTy;
-}
-
 ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
                                SourceLoc ImportLoc,
                                ArrayRef<AccessPathElement> Path) {
@@ -220,12 +210,13 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                              SourceLoc NameLoc, Type Underlyingty,
                              DeclContext *DC, MutableArrayRef<Type> Inherited)
   : TypeDecl(DeclKind::TypeAlias, DC, Name, Inherited, Type()),
-    AliasTy(0), TypeAliasLoc(TypeAliasLoc), NameLoc(NameLoc),
+    TypeAliasLoc(TypeAliasLoc), NameLoc(NameLoc),
     UnderlyingTy(Underlyingty)
 {
   // Set the type of the TypeAlias to the right MetaTypeType.
-  // FIXME: Is this the right thing to do?
-  setType(MetaTypeType::get(this));
+  ASTContext &Ctx = getASTContext();
+  AliasTy = new (Ctx) NameAliasType(this);
+  setType(MetaTypeType::get(AliasTy, Ctx));
 }
 
 OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
@@ -233,14 +224,14 @@ OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
                      GenericParamList *GenericParams, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::OneOf, Parent, Name, Inherited, GenericParams),
     OneOfLoc(OneOfLoc), NameLoc(NameLoc) {
-  // Set the type of the OneOfDecl to the right MetaTypeType.
-  setType(MetaTypeType::get(this));
   // Compute the associated type for this OneOfDecl.
   ASTContext &Ctx = Parent->getASTContext();
   if (!GenericParams)
     DeclaredTy = new (Ctx) OneOfType(this, ArrayRef<Type>(), Ctx);
   else
     DeclaredTy = new (Ctx) UnresolvedNominalType(this, Ctx);
+  // Set the type of the OneOfDecl to the right MetaTypeType.
+  setType(MetaTypeType::get(DeclaredTy, Ctx));
 }
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
@@ -248,14 +239,14 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
                        GenericParamList *GenericParams, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::Struct, Parent, Name, Inherited, GenericParams),
     StructLoc(StructLoc), NameLoc(NameLoc){
-  // Set the type of the OneOfDecl to the right MetaTypeType.
-  setType(MetaTypeType::get(this));
   // Compute the associated type for this StructDecl.
   ASTContext &Ctx = Parent->getASTContext();
   if (!GenericParams)
     DeclaredTy = new (Ctx) StructType(this, ArrayRef<Type>(), Ctx);
   else
     DeclaredTy = new (Ctx) UnresolvedNominalType(this, Ctx);
+  // Set the type of the StructDecl to the right MetaTypeType.
+  setType(MetaTypeType::get(DeclaredTy, Ctx));
 }
 
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
@@ -263,14 +254,14 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
                      GenericParamList *GenericParams, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::Class, Parent, Name, Inherited, GenericParams),
     ClassLoc(ClassLoc), NameLoc(NameLoc) {
-  // Set the type of the OneOfDecl to the right MetaTypeType.
-  setType(MetaTypeType::get(this));
   // Compute the associated type for this ClassDecl.
   ASTContext &Ctx = Parent->getASTContext();
   if (!GenericParams)
     DeclaredTy = new (Ctx) ClassType(this, ArrayRef<Type>(), Ctx);
   else
     DeclaredTy = new (Ctx) UnresolvedNominalType(this, Ctx);
+  // Set the type of the ClassDecl to the right MetaTypeType.
+  setType(MetaTypeType::get(DeclaredTy, Ctx));
 }
 
 
@@ -289,11 +280,11 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   : NominalTypeDecl(DeclKind::Protocol, DC, Name, Inherited, nullptr),
     ProtocolLoc(ProtocolLoc), NameLoc(NameLoc)
 {
-  // Set the type of the OneOfDecl to the right MetaTypeType.
-  setType(MetaTypeType::get(this));
   // Compute the associated type for this ClassDecl.
   ASTContext &Ctx = DC->getASTContext();
   DeclaredTy = new (Ctx) ProtocolType(this, Ctx);
+  // Set the type of the ProtocolDecl to the right MetaTypeType.
+  setType(MetaTypeType::get(DeclaredTy, Ctx));
 }
 
 bool ProtocolDecl::inheritsFrom(const ProtocolDecl *Super) const {

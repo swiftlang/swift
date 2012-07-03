@@ -532,7 +532,7 @@ public:
   }
 
   /// getAliasType - Return the sugared version of this decl as a Type.
-  NameAliasType *getAliasType() const;
+  NameAliasType *getAliasType() const { return AliasTy; }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

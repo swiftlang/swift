@@ -30,7 +30,7 @@ struct ASTContext::Implementation {
   llvm::BumpPtrAllocator Allocator; // used in later initializations
   llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTable;
   llvm::FoldingSet<TupleType> TupleTypes;
-  llvm::DenseMap<TypeDecl*, MetaTypeType*> MetaTypeTypes;
+  llvm::DenseMap<Type, MetaTypeType*> MetaTypeTypes;
   llvm::DenseMap<Module*, ModuleType*> ModuleTypes;
   llvm::DenseMap<std::pair<Type,std::pair<Type,char>>,
                  FunctionType*> FunctionTypes;
@@ -209,21 +209,16 @@ ProtocolCompositionType::get(ASTContext &C, SourceLoc FirstLoc,
 }
 
 
-MetaTypeType *MetaTypeType::get(TypeDecl *Type) {
-  ASTContext &C = Type->getASTContext();
-
-  MetaTypeType *&Entry = C.Impl.MetaTypeTypes[Type];
+MetaTypeType *MetaTypeType::get(Type T, ASTContext &C) {
+  MetaTypeType *&Entry = C.Impl.MetaTypeTypes[T];
   if (Entry) return Entry;
 
-  // FIXME: Should we build a MetaTypeType for TypeAliasDecls.  If so,
-  // should it be canonical?
-  bool IsCanonical = true;
-  return Entry = new (C) MetaTypeType(Type, IsCanonical ? &C : 0);
+  return Entry = new (C) MetaTypeType(T, T->isCanonical() ? &C : 0);
 }
 
-MetaTypeType::MetaTypeType(TypeDecl *Type, ASTContext *C)
+MetaTypeType::MetaTypeType(Type T, ASTContext *C)
   : TypeBase(TypeKind::MetaType, C, /*Unresolved=*/false),
-    TheType(Type) {
+    InstanceType(T) {
 }
 
 ModuleType *ModuleType::get(Module *M) {

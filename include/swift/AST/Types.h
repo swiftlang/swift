@@ -686,13 +686,13 @@ private:
 ///  struct x { ... }  // declares type 'x' and metatype 'x'.
 ///  x.a()             // use of the metatype value since its a value context.
 class MetaTypeType : public TypeBase {
-  TypeDecl *const TheType;
+  Type InstanceType;
   
 public:
   /// get - Return the MetaTypeType for the specified type declaration.
-  static MetaTypeType *get(TypeDecl *Type);
+  static MetaTypeType *get(Type T, ASTContext &C);
 
-  TypeDecl *getTypeDecl() const { return TheType; }
+  Type getInstanceType() const { return InstanceType; }
 
   void print(raw_ostream &O) const;
   
@@ -703,7 +703,7 @@ public:
   }
   
 private:
-  MetaTypeType(TypeDecl *Type, ASTContext *Ctx);
+  MetaTypeType(Type T, ASTContext *Ctx);
   friend class TypeDecl;
 };
   

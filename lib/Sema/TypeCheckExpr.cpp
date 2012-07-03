@@ -379,9 +379,14 @@ Expr *TypeChecker::semaSubscriptExpr(ArchetypeSubscriptExpr *E) {
 /// \brief Determine whether this expression refers to a type directly (ignoring
 /// parentheses), rather than some variable of metatype type.
 static bool isDirectTypeReference(Expr *E) {
-  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E->getSemanticsProvidingExpr()))
+  E = E->getSemanticsProvidingExpr();
+
+  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
     return isa<TypeDecl>(DRE->getDecl());
-  
+
+  if (auto DSBIE = dyn_cast<DotSyntaxBaseIgnoredExpr>(E))
+    return isDirectTypeReference(DSBIE->getRHS());
+
   return false;
 }
 
@@ -465,10 +470,18 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     // The metatype represents an arbitrary named type: dig through the
     // TypeAlias to see what we're dealing with.  If the typealias was erroneous
     // then silently squish this erroneous subexpression.
-    Type Ty = MT->getTypeDecl()->getDeclaredType();
+    Type Ty = MT->getInstanceType();
     E->setType(Ty);
     if (Ty->is<ErrorType>())
       return 0;  // Squelch an erroneous subexpression.
+
+    // FIXME: This check isn't really sufficient; we can still end up dropping
+    // side-effects.
+    if (!isDirectTypeReference(E1)) {
+      // FIXME: Is it really appropriate to give an error here?
+      diagnose(E1->getLoc(), diag::called_expr_indirect_metatype);
+      return 0;
+    }
 
     // If the 'function' is a direct reference to a type, and the type isn't
     // a struct or oneof, this is a cast.  If the type is a struct or oneof,
@@ -478,13 +491,6 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     if (Ty->is<StructType>() || Ty->is<OneOfType>())
       IsCast = isCoercibleToType(E2, Ty) != CoercionResult::Failed;
     if (IsCast) {
-      if (!isDirectTypeReference(E1)) {
-        // FIXME: This should be an error, and we should check it on
-        // both codepaths.
-        E1 = new (Context) DeclRefExpr(MT->getTypeDecl(), E1->getStartLoc(),
-                                       MT->getTypeDecl()->getTypeOfReference());
-      }
-
       CoercedExpr CoercedArg = coerceToType(E2, Ty);
       switch (CoercedArg.getKind()) {
       case CoercionResult::Succeeded:

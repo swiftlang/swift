@@ -117,7 +117,7 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
   if (MetaTypeType *MTT = BaseTy->getAs<MetaTypeType>()) {
     // The metatype represents an arbitrary named type: dig through to the
     // declared type to see what we're dealing with.
-    Type Ty = MTT->getTypeDecl()->getDeclaredType();
+    Type Ty = MTT->getInstanceType();
 
     // Just perform normal dot lookup on the type with the specified
     // member name to see if we find extensions or anything else.  For example,

@@ -474,6 +474,12 @@ CanType TypeBase::getCanonicalType() {
       return CanType(Result);
     break;
   }
+  case TypeKind::MetaType: {
+    MetaTypeType *MT = cast<MetaTypeType>(this);
+    Type InstanceTy = MT->getInstanceType()->getCanonicalType();
+    Result = MetaTypeType::get(InstanceTy, InstanceTy->getASTContext());
+    break;
+  }
   }
     
   
@@ -496,6 +502,7 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::Array:
   case TypeKind::LValue:
   case TypeKind::ProtocolComposition:
+  case TypeKind::MetaType:
     // None of these types have sugar at the outer level.
     return this;
   case TypeKind::Paren:
@@ -771,7 +778,9 @@ void OneOfType::print(raw_ostream &OS) const {
 }
 
 void MetaTypeType::print(raw_ostream &OS) const {
-  OS << "metatype<" << TheType->getName() << '>';
+  OS << "metatype<";
+  InstanceType->print(OS);
+  OS << '>';
 }
 
 void ModuleType::print(raw_ostream &OS) const {

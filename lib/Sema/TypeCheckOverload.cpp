@@ -423,7 +423,7 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
   bool baseIsInstance = true;
   if (auto baseMeta = baseTy->getAs<MetaTypeType>()) {
     baseIsInstance = false;
-    baseTy = baseMeta->getTypeDecl()->getDeclaredType();
+    baseTy = baseMeta->getInstanceType();
   }
 
   // Check whether the first declaration is valid. If it is, they're all

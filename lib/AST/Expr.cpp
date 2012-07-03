@@ -143,7 +143,7 @@ ArchetypeMemberRefExpr::ArchetypeMemberRefExpr(Expr *Base, SourceLoc DotLoc,
 ArchetypeType *ArchetypeMemberRefExpr::getArchetype() const {
   Type BaseTy = getBase()->getType()->getRValueType();
   if (auto Meta = BaseTy->getAs<MetaTypeType>())
-    return Meta->getTypeDecl()->getDeclaredType()->castTo<ArchetypeType>();
+    return Meta->getInstanceType()->castTo<ArchetypeType>();
 
   return BaseTy->castTo<ArchetypeType>();
 }

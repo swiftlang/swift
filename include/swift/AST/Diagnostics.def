@@ -765,6 +765,8 @@ ERROR(unary_op_without_attribute,sema_tce,none,
       "use of unary operator without 'unary' attribute specified", ())
 ERROR(binary_op_without_attribute,sema_tce,none,
       "use of binary operator without 'infix' attribute specified", ())
+ERROR(called_expr_indirect_metatype,sema_tce,none,
+      "called expression is an indirect reference to a metatype", ())
 ERROR(called_expr_isnt_function,sema_tce,none,
       "called expression isn't a function", ())
 ERROR(overloading_ambiguity,sema_tce,none,

@@ -274,6 +274,19 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
 #define TYPE(Id, Parent)
 #include "swift/AST/TypeNodes.def"
 
+  case TypeKind::MetaType: {
+    auto Meta = cast<MetaTypeType>(T);
+    auto UnderlyingTy = substType(Meta->getInstanceType(),
+                                  Substitutions);
+    if (!UnderlyingTy)
+      return Type();
+    
+    if (UnderlyingTy.getPointer() == Meta->getInstanceType().getPointer())
+      return T;
+
+    return MetaTypeType::get(UnderlyingTy, Context);
+  }
+
   case TypeKind::NameAlias: {
     auto Alias = cast<NameAliasType>(T);
     auto UnderlyingTy = substType(Alias->getDecl()->getUnderlyingType(),
@@ -484,7 +497,7 @@ Type TypeChecker::substMemberTypeWithBase(Type T, Type BaseTy) {
 
   // Look through the metatype.
   if (auto MetaBase = BaseTy->getAs<MetaTypeType>())
-    BaseTy = MetaBase->getTypeDecl()->getDeclaredType();
+    BaseTy = MetaBase->getInstanceType();
   
   auto BaseArchetype = BaseTy->getRValueType()->getAs<ArchetypeType>();
   if (!BaseArchetype)
