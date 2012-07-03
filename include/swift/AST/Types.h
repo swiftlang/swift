@@ -1235,7 +1235,7 @@ class DeducibleGenericParamType : public SubstitutableType {
   DeducibleGenericParamType(ASTContext &Ctx, Identifier Name, unsigned Index,
                             ArrayRef<ProtocolDecl *> ConformsTo)
     : SubstitutableType(TypeKind::DeducibleGenericParam, &Ctx,
-                        /*Unresolved=*/false, ConformsTo),
+                        /*Unresolved=*/true, ConformsTo),
       Name(Name), Index(Index) { }
 
 public:

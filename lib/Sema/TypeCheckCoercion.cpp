@@ -228,7 +228,18 @@ class SemaCoerce : public ExprVisitor<SemaCoerce, CoercedResult> {
 
   /// \brief Try to perform a user-defined conversion.
   CoercedResult tryUserConversion(Expr *E);
-  
+
+  /// \brief Determine whether the given types are the same, deducing
+  /// any deducible arguments along the way.
+  static bool sameType(Type T1, Type T2, CoercionContext &CC) {
+    // FIXME: This is really an approximation of the behavior we want, which
+    // would be to check for identical type structure while potentially
+    // deducing at each step.
+    bool Trivial;
+    return CC.TC.isSubtypeOf(T1, T2, Trivial, &CC) && Trivial &&
+           CC.TC.isSubtypeOf(T2, T1, Trivial, &CC) && Trivial;
+  }
+
 public:
   CoercedResult visitErrorExpr(ErrorExpr *E) {
     return unchanged(E);
@@ -1488,7 +1499,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
         // Because we have coerced something in the source tuple, we need to
         // rebuild the type of that tuple.
         RebuildSourceType = true;
-      } else if (ETy && !ElementTy->isEqual(DestEltTy)) {
+      } else if (ETy && !sameType(ElementTy, DestEltTy, CC)) {
         // FIXME: Allow conversions when we don't have a tuple expression?
         if (Flags & CF_Apply)
           TC.diagnose(E->getLoc(), diag::tuple_element_type_mismatch, SrcField,
