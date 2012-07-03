@@ -1146,25 +1146,10 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
   if (parseAnyIdentifier(Name, diag::expected_identifier_in_decl, "func"))
     return 0;
 
-  // Placeholder that may hold a new scope containing the generic parameters,
-  // if there are any.
-  Optional<Scope> GenericsScope(this, /*AllowLookup=*/true);
-
   // Parse the generic-params, if present.
-  GenericParamList *GenericParams = nullptr;
-  if (startsWithLess(Tok)) {
-    GenericParams = parseGenericParameters();
-
-    // If there were any generic parameters, introduce the new scope to
-    // hold those generic parameters.
-    if (GenericParams) {
-      GenericsScope.emplace(this, /*AllowLookup=*/true);
-      
-      for (auto Param : *GenericParams) {
-        ScopeInfo.addToScope(Param.getDecl());
-      }
-    }
-  }
+  Optional<Scope> GenericsScope;
+  GenericParamList *GenericParams =
+    maybeParseGenericParamsIntoScope(GenericsScope, /*AllowLookup=*/true);
 
   // We force first type of a func declaration to be a tuple for consistency.
   if (Tok.isNotAnyLParen()) {
@@ -1258,9 +1243,10 @@ FuncDecl *Parser::parseDeclFunc(bool hasContainerType) {
 /// token skipping) on error.
 ///
 ///   decl-oneof:
-///      'oneof' attribute-list identifier inheritance? oneof-body
+///      'oneof' attribute-list identifier generic-params? inheritance?
+///          '{' oneof-body '}'
 ///   oneof-body:
-///      '{' oneof-element (',' oneof-element)* decl* '}'
+///      oneof-element (',' oneof-element)* decl*
 ///   oneof-element:
 ///      identifier
 ///      identifier ':' type-annotation
@@ -1276,6 +1262,11 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
   if (parseIdentifier(OneOfName, diag::expected_identifier_in_decl, "oneof"))
     return true;
 
+  // Parse the generic-params, if present.
+  Optional<Scope> GenericsScope;
+  GenericParamList *GenericParams =
+    maybeParseGenericParamsIntoScope(GenericsScope, /*AllowLookup=*/false);
+
   // Parse optional inheritance clause.
   SmallVector<Type, 2> Inherited;
   if (Tok.is(tok::colon))
@@ -1287,7 +1278,7 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
 
   OneOfDecl *OOD = new (Context) OneOfDecl(OneOfLoc, OneOfName, OneOfNameLoc,
                                            Context.AllocateCopy(Inherited),
-                                           CurDeclContext);
+                                           GenericParams, CurDeclContext);
   Decls.push_back(OOD);
 
   struct OneOfElementInfo {
@@ -1389,7 +1380,8 @@ bool Parser::parseDeclOneOf(SmallVectorImpl<Decl*> &Decls) {
 /// token skipping) on error.
 ///
 ///   decl-struct:
-///      'struct' attribute-list identifier inheritance? '{' decl-struct-body '}
+///      'struct' attribute-list identifier generic-params? inheritance?
+///          '{' decl-struct-body '}
 ///   decl-struct-body:
 ///      decl*
 ///
@@ -1404,7 +1396,12 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   SourceLoc LBLoc, RBLoc;
   if (parseIdentifier(StructName, diag::expected_identifier_in_decl, "struct"))
     return true;
-  
+
+  // Parse the generic-params, if present.
+  Optional<Scope> GenericsScope;
+  GenericParamList *GenericParams =
+    maybeParseGenericParamsIntoScope(GenericsScope, /*AllowLookup=*/false);
+
   // Parse optional inheritance clause.
   SmallVector<Type, 2> Inherited;
   if (Tok.is(tok::colon))
@@ -1416,6 +1413,7 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
   StructDecl *SD = new (Context) StructDecl(StructLoc, StructName,
                                             StructNameLoc,
                                             Context.AllocateCopy(Inherited),
+                                            GenericParams,
                                             CurDeclContext);
   Decls.push_back(SD);
 
@@ -1452,7 +1450,8 @@ bool Parser::parseDeclStruct(SmallVectorImpl<Decl*> &Decls) {
 /// token skipping) on error.  
 ///
 ///   decl-class:
-///      'class' attribute-list identifier inheritance? '{' decl-class-body '}
+///      'class' attribute-list identifier generic-params? inheritance?
+///          '{' decl-class-body '}
 ///   decl-class-body:
 ///      decl*
 ///
@@ -1467,7 +1466,12 @@ bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
   SourceLoc LBLoc, RBLoc;
   if (parseIdentifier(ClassName, diag::expected_identifier_in_decl, "class"))
     return true;
-  
+
+  // Parse the generic-params, if present.
+  Optional<Scope> GenericsScope;
+  GenericParamList *GenericParams =
+    maybeParseGenericParamsIntoScope(GenericsScope, /*AllowLookup=*/false);
+
   // Parse optional inheritance clause.
   SmallVector<Type, 2> Inherited;
   if (Tok.is(tok::colon))
@@ -1478,7 +1482,7 @@ bool Parser::parseDeclClass(SmallVectorImpl<Decl*> &Decls) {
 
   ClassDecl *CD = new (Context) ClassDecl(ClassLoc, ClassName, ClassNameLoc,
                                           Context.AllocateCopy(Inherited),
-                                          CurDeclContext);
+                                          GenericParams, CurDeclContext);
   Decls.push_back(CD);
 
   // Parse the body.

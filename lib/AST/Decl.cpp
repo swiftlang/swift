@@ -236,8 +236,9 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
 }
 
 OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
-                     MutableArrayRef<Type> Inherited, DeclContext *Parent)
-  : NominalTypeDecl(DeclKind::OneOf, Parent, Name, Inherited, Type()),
+                     MutableArrayRef<Type> Inherited,
+                     GenericParamList *GenericParams, DeclContext *Parent)
+  : NominalTypeDecl(DeclKind::OneOf, Parent, Name, Inherited, GenericParams),
     OneOfLoc(OneOfLoc), NameLoc(NameLoc) {
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(this));
@@ -246,9 +247,10 @@ OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
 }
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
-                       MutableArrayRef<Type> Inherited, DeclContext *Parent)
-  : NominalTypeDecl(DeclKind::Struct, Parent, Name, Inherited, Type()),
-    StructLoc(StructLoc), NameLoc(NameLoc) {
+                       MutableArrayRef<Type> Inherited,
+                       GenericParamList *GenericParams, DeclContext *Parent)
+  : NominalTypeDecl(DeclKind::Struct, Parent, Name, Inherited, GenericParams),
+    StructLoc(StructLoc), NameLoc(NameLoc){
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(this));
   // Compute the associated type for this StructDecl.
@@ -256,8 +258,9 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
 }
 
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
-                     MutableArrayRef<Type> Inherited, DeclContext *Parent)
-  : NominalTypeDecl(DeclKind::Class, Parent, Name, Inherited, Type()),
+                     MutableArrayRef<Type> Inherited,
+                     GenericParamList *GenericParams, DeclContext *Parent)
+  : NominalTypeDecl(DeclKind::Class, Parent, Name, Inherited, GenericParams),
     ClassLoc(ClassLoc), NameLoc(NameLoc) {
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(this));
@@ -589,6 +592,9 @@ namespace {
       printDeclName(VD);
       if (FuncDecl *FD = dyn_cast<FuncDecl>(VD))
         printGenericParameters(FD->getGenericParams());
+      if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(VD))
+        printGenericParameters(NTD->getGenericParams());
+
       OS << " type='";
       if (VD->hasType())
         VD->getType()->print(OS);

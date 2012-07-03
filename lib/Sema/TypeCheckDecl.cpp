@@ -74,7 +74,68 @@ public:
           TC.conformsToProtocol(T, Proto, nullptr, D->getStartLoc());
     }
   }
-  
+
+  void checkGenericParams(GenericParamList *GenericParams) {
+    if (!GenericParams)
+      return;
+
+    // Assign archetypes to each of the generic parameters.
+    // FIXME: Actually solve the various same-type constraints, written and
+    // implied, to compute the set of archetypes we need and the requirements
+    // on those archetypes.
+    unsigned Index = 0;
+    for (auto GP : *GenericParams) {
+      auto TypeParam = GP.getAsTypeParam();
+
+      // Check the constraints on the type parameter.
+      checkInherited(TypeParam, TypeParam->getDeclaredType(),
+                     TypeParam->getInherited());
+
+      // Create the archetype for this type parameter.
+      ArchetypeType *Archetype
+        = ArchetypeType::getNew(TC.Context, TypeParam->getName().str(),
+                                TypeParam->getInherited(), Index++);
+      TypeParam->setUnderlyingType(Archetype);
+
+      // Create archetypes for each of the associated types in each protocol.
+      // FIXME: This should also be subject to same-type constraints, which
+      // come from either a protocol or are implied by the presence of
+      // same-named associated types in different protocols that our type
+      // parameter conforms to.
+      for (auto Inherited : TypeParam->getInherited()) {
+        SmallVector<ProtocolDecl *, 4> Protocols;
+        if (Inherited->isExistentialType(Protocols)) {
+          for (auto P : Protocols) {
+            for (auto Member : P->getMembers()) {
+              TypeAliasDecl *AssocType = dyn_cast<TypeAliasDecl>(Member);
+              if (!AssocType)
+                continue;
+
+              ArchetypeType *AssocArchetype
+                = AssocType->getDeclaredType()->getAs<ArchetypeType>();
+              if (!AssocArchetype)
+                continue;
+              
+              // FIXME: Identify 'This' in some sane manner.
+              Type MappedTo;
+              if (AssocType->getName().str() == "This") {
+                MappedTo = Archetype;
+              } else {
+                MappedTo
+                  = ArchetypeType::getNew(TC.Context,
+                                          AssocType->getName().str(),
+                                          AssocType->getInherited());
+              }
+              
+              TC.Context.AssociatedTypeMap[Archetype][AssocArchetype]
+                = MappedTo;
+            }
+          }
+        }
+      }
+    }
+  }
+
   //===--------------------------------------------------------------------===//
   // Visit Methods.
   //===--------------------------------------------------------------------===//
@@ -188,8 +249,10 @@ public:
   }
 
   void visitOneOfDecl(OneOfDecl *OOD) {
-    if (!IsSecondPass)
+    if (!IsSecondPass) {
       checkInherited(OOD, OOD->getDeclaredType(), OOD->getInherited());
+      checkGenericParams(OOD->getGenericParams());
+    }
     
     for (Decl *member : OOD->getMembers())
       visit(member);
@@ -200,9 +263,11 @@ public:
   }
 
   void visitStructDecl(StructDecl *SD) {
-    if (!IsSecondPass)
+    if (!IsSecondPass) {
       checkInherited(SD, SD->getDeclaredType(), SD->getInherited());
-    
+      checkGenericParams(SD->getGenericParams());
+    }
+
     for (Decl *Member : SD->getMembers()) {
       visit(Member);
     }
@@ -228,8 +293,10 @@ public:
   }
 
   void visitClassDecl(ClassDecl *CD) {
-    if (!IsSecondPass)
+    if (!IsSecondPass) {
       checkInherited(CD, CD->getDeclaredType(), CD->getInherited());
+      checkGenericParams(CD->getGenericParams());
+    }
 
     for (Decl *Member : CD->getMembers())
       visit(Member);
@@ -280,64 +347,7 @@ public:
     if (IsSecondPass)
       return;
 
-    // Assign archetypes to each of the generic parameters.
-    // FIXME: Actually solve the various same-type constraints, written and
-    // implied, to compute the set of archetypes we need and the requirements
-    // on those archetypes.
-    if (GenericParamList *GenericParams = FD->getGenericParams()) {
-      unsigned Index = 0;
-      for (auto GP : *GenericParams) {
-        auto TypeParam = GP.getAsTypeParam();
-
-        // Check the constraints on the type parameter.
-        checkInherited(TypeParam, TypeParam->getDeclaredType(),
-                       TypeParam->getInherited());
-
-        // Create the archetype for this type parameter.
-        ArchetypeType *Archetype
-          = ArchetypeType::getNew(TC.Context, TypeParam->getName().str(),
-                                  TypeParam->getInherited(), Index++);
-        TypeParam->setUnderlyingType(Archetype);
-
-
-        // Create archetypes for each of the associated types in each protocol.
-        // FIXME: This should also be subject to same-type constraints, which
-        // come from either a protocol or are implied by the presence of
-        // same-named associated types in different protocols that our type
-        // parameter conforms to.
-        for (auto Inherited : TypeParam->getInherited()) {
-          SmallVector<ProtocolDecl *, 4> Protocols;
-          if (Inherited->isExistentialType(Protocols)) {
-            for (auto P : Protocols) {
-              for (auto Member : P->getMembers()) {
-                TypeAliasDecl *AssocType = dyn_cast<TypeAliasDecl>(Member);
-                if (!AssocType)
-                  continue;
-
-                ArchetypeType *AssocArchetype
-                  = AssocType->getDeclaredType()->getAs<ArchetypeType>();
-                if (!AssocArchetype)
-                  continue;
-                
-                // FIXME: Identify 'This' in some sane manner.
-                Type MappedTo;
-                if (AssocType->getName().str() == "This") {
-                  MappedTo = Archetype;
-                } else {
-                  MappedTo
-                    = ArchetypeType::getNew(TC.Context,
-                                            AssocType->getName().str(),
-                                            AssocType->getInherited());
-                }
-                
-                TC.Context.AssociatedTypeMap[Archetype][AssocArchetype]
-                  = MappedTo;
-              }
-            }
-          }
-        }
-      }
-    }
+    checkGenericParams(FD->getGenericParams());
 
     // Before anything else, set up the 'this' argument correctly.
     if (Type thisType = FD->computeThisType()) {

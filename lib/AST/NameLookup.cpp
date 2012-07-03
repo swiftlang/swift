@@ -232,26 +232,15 @@ void MemberLookup::lookupMembers(Type BaseType, Module &M,
   TypeDecl *D;
   ArrayRef<ValueDecl*> BaseMembers;
   SmallVector<ValueDecl*, 2> BaseMembersStorage;
-  if (StructType *ST = BaseType->getAs<StructType>()) {
-    D = ST->getDecl();
-    for (Decl* Member : ST->getDecl()->getMembers()) {
+  if (NominalType *NT = BaseType->getAs<NominalType>()) {
+    D = NT->getDecl();
+    for (Decl* Member : NT->getDecl()->getMembers()) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
         BaseMembersStorage.push_back(VD);
     }
-    BaseMembers = BaseMembersStorage;
-  } else if (ClassType *CT = BaseType->getAs<ClassType>()) {
-    D = CT->getDecl();
-    for (Decl* Member : CT->getDecl()->getMembers()) {
-      if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
-        BaseMembersStorage.push_back(VD);
-    }
-    BaseMembers = BaseMembersStorage;
-  } else if (OneOfType *OOT = BaseType->getAs<OneOfType>()) {
-    D = OOT->getDecl();
-    for (Decl* Member : OOT->getDecl()->getMembers()) {
-      if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
-        BaseMembersStorage.push_back(VD);
-    }
+    if (NT->getDecl()->getGenericParams())
+      for (auto param : *NT->getDecl()->getGenericParams())
+        BaseMembersStorage.push_back(param.getDecl());
     BaseMembers = BaseMembersStorage;
   } else {
     return;

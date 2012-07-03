@@ -543,15 +543,20 @@ public:
 /// decl is always a DeclContext.
 class NominalTypeDecl : public TypeDecl, public DeclContext {
   ArrayRef<Decl*> Members;
+  GenericParamList *GenericParams;
 
 public:
   NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
-                  MutableArrayRef<Type> inherited, Type ty) :
-    TypeDecl(K, DC, name, inherited, ty),
-    DeclContext(DeclContextKind::NominalTypeDecl, DC) {}
+                  MutableArrayRef<Type> inherited,
+                  GenericParamList *GenericParams) :
+    TypeDecl(K, DC, name, inherited, Type()),
+    DeclContext(DeclContextKind::NominalTypeDecl, DC),
+    GenericParams(GenericParams) {}
 
   ArrayRef<Decl*> getMembers() const { return Members; }
   void setMembers(ArrayRef<Decl*> elems) { Members = elems; }
+
+  GenericParamList *getGenericParams() const { return GenericParams; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -577,7 +582,8 @@ class OneOfDecl : public NominalTypeDecl {
 
 public:
   OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
-            MutableArrayRef<Type> Inherited, DeclContext *DC);
+            MutableArrayRef<Type> Inherited, GenericParamList *GenericParams,
+            DeclContext *DC);
 
   SourceLoc getStartLoc() const { return OneOfLoc; }
   SourceLoc getLoc() const { return NameLoc; }
@@ -612,7 +618,8 @@ class StructDecl : public NominalTypeDecl {
 
 public:
   StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
-             MutableArrayRef<Type> Inherited, DeclContext *DC);
+             MutableArrayRef<Type> Inherited, GenericParamList *GenericParams,
+             DeclContext *DC);
 
   SourceLoc getStartLoc() const { return StructLoc; }
   SourceLoc getLoc() const { return NameLoc; }
@@ -645,7 +652,8 @@ class ClassDecl : public NominalTypeDecl {
 
 public:
   ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
-            MutableArrayRef<Type> Inherited, DeclContext *DC);
+            MutableArrayRef<Type> Inherited, GenericParamList *GenericParams,
+            DeclContext *DC);
 
   SourceLoc getStartLoc() const { return ClassLoc; }
   SourceLoc getLoc() const { return NameLoc; }
@@ -680,7 +688,7 @@ class ProtocolDecl : public NominalTypeDecl {
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
                Identifier Name, MutableArrayRef<Type> Inherited)
-    : NominalTypeDecl(DeclKind::Protocol, DC, Name, Inherited, Type()),
+    : NominalTypeDecl(DeclKind::Protocol, DC, Name, Inherited, nullptr),
       ProtocolLoc(ProtocolLoc), NameLoc(NameLoc) { }
   
   using Decl::getASTContext;

@@ -105,3 +105,24 @@ GenericParamList *Parser::parseGenericParameters() {
 
   return GenericParamList::create(Context, LAngleLoc, GenericParams, RAngleLoc);
 }
+
+GenericParamList *Parser::maybeParseGenericParamsIntoScope(
+                              Optional<Scope>& scope,
+                              bool AllowLookup) {
+  if (!startsWithLess(Tok))
+    return nullptr;
+
+  GenericParamList *GenericParams = parseGenericParameters();
+
+  // If there were any generic parameters, introduce the new scope to
+  // hold those generic parameters.
+  if (GenericParams) {
+    scope.emplace(this, AllowLookup);
+    
+    for (auto Param : *GenericParams) {
+      ScopeInfo.addToScope(Param.getDecl());
+    }
+  }
+
+  return GenericParams;
+}
