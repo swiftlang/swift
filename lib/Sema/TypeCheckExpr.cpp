@@ -399,35 +399,6 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   E1 = convertToRValue(E1);
   if (!E1) return nullptr;
 
-  // If we're referring to a single generic function, try to resolve it.
-  // FIXME: Refactor with other overload resolution code.
-  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E1)) {
-    if (DRE->getType()->is<PolymorphicFunctionType>()) {
-      // Perform overload resolution.
-      llvm::SmallVector<ValueDecl *, 2> Viable;
-      auto Best = filterOverloadSet(DRE->getDecl(),
-                                    (isa<PrefixUnaryExpr>(E) ||
-                                     isa<PostfixUnaryExpr>(E) ||
-                                     isa<BinaryExpr>(E)),
-                                     Type(), E2,
-                                     Type(), Viable);
-      // If overload resolution resolves, resolve it.
-      if (Best) {
-        E1 = buildRefExpr(Best, DRE->getLoc());
-        E->setFn(convertToRValue(E1));
-        return semaApplyExpr(E);
-      }
-      // If the referenced decl isn't viable, complain.
-      if (Viable.empty()) {
-        diagnoseEmptyOverloadSet(E, DRE->getDecl());
-        return nullptr;
-      }
-      // Otherwise, wait, and try to resolve again later.
-      E->setType(UnstructuredUnresolvedType::get(Context));
-      return E;
-    }
-  }
-
   // If we have a concrete function type, then we win.
   if (FunctionType *FT = E1->getType()->getAs<FunctionType>()) {
     // If this is an operator, make sure that the declaration found was declared
@@ -572,18 +543,19 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     }
     return E;
   }
-  
-  // Otherwise, the function's type must be unresolved.  If it is something
-  // else, we have a type error.
-  if (!E1->getType()->isUnresolvedType()) {
+
+  // Otherwise, the function's type must be unresolved or generic.  If it is
+  // something else, we have a type error.
+  if (!E1->getType()->isUnresolvedType() &&
+      !E1->getType()->getAs<PolymorphicFunctionType>()) {
     diagnose(E1->getLoc(), diag::called_expr_isnt_function);
     return 0;
   }
   
-  // Otherwise, we must have an application to an overload set.  See if we can
+  // Otherwise, we must have an application to overloaded set.  See if we can
   // resolve which overload member is based on the argument type.
-  OverloadSetRefExpr *OS = dyn_cast<OverloadSetRefExpr>(E1);
-  if (!OS) {
+  OverloadedExpr Ovl = getOverloadedExpr(E1);
+  if (!Ovl) {
     // If not, just use the unresolved type.
     E->setType(UnstructuredUnresolvedType::get(Context));
     return E;
@@ -591,37 +563,37 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
 
   // Perform overload resolution.
   llvm::SmallVector<ValueDecl *, 4> Viable;
-  auto Best = filterOverloadSet(OS->getDecls(),
+  auto Best = filterOverloadSet(Ovl.getCandidates(),
                                 (isa<PrefixUnaryExpr>(E) ||
                                  isa<PostfixUnaryExpr>(E) ||
                                  isa<BinaryExpr>(E)),
-                                 OS->getBaseType(), E2,
+                                 Ovl.getBaseType(), E2,
                                  Type(), Viable);
   
   // If we have a best candidate, build a call to it now.
   if (Best) {
-    E1 = buildFilteredOverloadSet(OS, Best);
+    E1 = buildFilteredOverloadSet(Ovl, Best);
     E->setFn(convertToRValue(E1));
     return semaApplyExpr(E);
   }
   
   // If there are no more viable candidates, complain now.
   if (Viable.empty()) {
-    diagnoseEmptyOverloadSet(E, OS->getDecls());
+    diagnoseEmptyOverloadSet(E, Ovl.getCandidates());
     return nullptr;
   }
   
   // We have more than one viable candidate. This might be resolved when/if
   // we get a destination type to coerce to.  
   E->setType(UnstructuredUnresolvedType::get(Context));
-  if (Viable.size() == OS->getDecls().size())
+  if (Viable.size() == Ovl.getCandidates().size())
     return E;
   
   // We have trimmed the overload set; rebuild the overload set so that we
   // no longer have to consider those non-matching candidates.
   // FIXME: We may simple want to mark them as non-viable in the overload set
   // itself, so we can provide them in diagnostics.
-  E->setFn(buildFilteredOverloadSet(OS, Viable));
+  E->setFn(buildFilteredOverloadSet(Ovl, Viable));
   return E;
 }
 

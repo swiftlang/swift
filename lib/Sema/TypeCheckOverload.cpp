@@ -199,36 +199,139 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
   return OverloadCandidate();
 }
 
-Expr *TypeChecker::buildFilteredOverloadSet(OverloadSetRefExpr *OSE,
-                                            ArrayRef<ValueDecl *> Remaining) {
-  Expr *result;
-  if (auto DRE = dyn_cast<OverloadedDeclRefExpr>(OSE))
-    result = buildRefExpr(Remaining, DRE->getLoc());
-  else {
-    auto MRE = cast<OverloadedMemberRefExpr>(OSE);
-    result = buildMemberRefExpr(MRE->getBase(), MRE->getDotLoc(),
-                                Remaining, MRE->getMemberLoc());
+OverloadedExpr TypeChecker::getOverloadedExpr(Expr *E) {
+  Expr *expr = E->getSemanticsProvidingExpr();
+
+  // Handle overloaded set references.
+  if (auto OSE = dyn_cast<OverloadSetRefExpr>(expr)) {
+    return OverloadedExpr(E, OSE->getBaseType(), OSE->getDecls());
   }
 
-  return recheckTypes(result);
+  // Only expressions with polymorphic function type can be overloaded beyond
+  // this point.
+  if (!expr->getType()->is<PolymorphicFunctionType>()) {
+    return OverloadedExpr();
+  }
+
+  // Handle expressions that refer to a given overloadable declaration.
+  if (auto DRE = dyn_cast<DeclRefExpr>(expr)) {
+    return OverloadedExpr(E, Type(), DRE->getDecl());
+  }
+  if (auto AMR = dyn_cast<ArchetypeMemberRefExpr>(expr)) {
+    return OverloadedExpr(E, AMR->getBase()->getType(), AMR->getDecl());
+  }
+  if (auto ASR = dyn_cast<ArchetypeSubscriptExpr>(expr)) {
+    return OverloadedExpr(E, ASR->getBase()->getType(), ASR->getDecl());
+  }
+  if (auto EMR = dyn_cast<ExistentialMemberRefExpr>(expr)) {
+    return OverloadedExpr(E, EMR->getBase()->getType(), EMR->getDecl());
+  }
+  if (auto ESR = dyn_cast<ExistentialSubscriptExpr>(expr)) {
+    return OverloadedExpr(E, ESR->getBase()->getType(), ESR->getDecl());
+  }
+
+  // There is no declaration here to overload on.
+  return OverloadedExpr();
+}
+
+/// \brief Replace the original semantics-providing expression (\c Orig) with
+/// a new expression (\c New) within the given expression (\c E).
+///
+/// This also clears out the types for all of the 'sugar' expressions between
+/// \c E and \c Orig, since they will need to be type-checked again.
+static Expr *replaceSemanticsProvidingExpr(Expr *Orig, Expr *New, Expr *E) {
+  if (Orig == E)
+    return New;
+
+  if (auto parens = dyn_cast<ParenExpr>(E)) {
+    Expr *sub = replaceSemanticsProvidingExpr(Orig, New, parens->getSubExpr());
+    parens->setSubExpr(sub);
+    parens->setType(sub->getType());
+    return E;
+  }
+
+  llvm_unreachable("Unhandled expression sugar");
+}
+
+Expr *TypeChecker::buildFilteredOverloadSet(OverloadedExpr Ovl,
+                                            ArrayRef<ValueDecl *> Remaining) {
+  Expr *expr = Ovl.getExpr()->getSemanticsProvidingExpr();
+
+  // Create an appropriate expression to refer to the remaining set of
+  // declarations.
+  Expr *result;
+  if (auto DRE = dyn_cast<OverloadedDeclRefExpr>(expr)) {
+    result = buildRefExpr(Remaining, DRE->getLoc());
+  } else if (auto MRE = dyn_cast<OverloadedMemberRefExpr>(expr)) {
+    result = buildMemberRefExpr(MRE->getBase(), MRE->getDotLoc(),
+                                Remaining, MRE->getMemberLoc());
+    if (!result)
+      return nullptr;
+
+    result = recheckTypes(result);
+    if (!result)
+      return nullptr;
+  } else {
+    assert((isa<DeclRefExpr>(expr) || isa<MemberRefExpr>(expr) ||
+            isa<ExistentialMemberRefExpr>(expr) ||
+            isa<ArchetypeMemberRefExpr>(expr)) &&
+           "Not a declaration reference expression");
+    assert(Remaining.size() == 1);
+    return Ovl.getExpr();
+  }
+
+  // Replace the semantics-providing expression with the newly-built result.
+  return replaceSemanticsProvidingExpr(expr, result, Ovl.getExpr());
 }
 
 Expr *
-TypeChecker::buildFilteredOverloadSet(OverloadSetRefExpr *OSE,
+TypeChecker::buildFilteredOverloadSet(OverloadedExpr Ovl,
                                       const OverloadCandidate &Candidate){
   assert(Candidate.isComplete() && "Incomplete overload candidate!");
 
-  if (auto DRE = dyn_cast<OverloadedDeclRefExpr>(OSE)) {
-    return buildRefExpr(Candidate, DRE->getLoc());
+  Expr *expr = Ovl.getExpr()->getSemanticsProvidingExpr();
+
+  Expr *result = nullptr;
+  if (auto DRE = dyn_cast<OverloadedDeclRefExpr>(expr)) {
+    result = new (Context) DeclRefExpr(Candidate.getDecl(), DRE->getLoc(),
+                             Candidate.getDecl()->getTypeOfReference());
+    result = recheckTypes(result);
+    if (!result)
+      return nullptr;
+  } else if (auto MRE = dyn_cast<OverloadedMemberRefExpr>(expr)) {
+    SmallVector<ValueDecl *, 1> decls(1, Candidate.getDecl());
+    result = recheckTypes(buildMemberRefExpr(MRE->getBase(), MRE->getDotLoc(),
+                                             decls, MRE->getMemberLoc()));
+    if (!result)
+      return nullptr;
+  } else {
+    assert((isa<DeclRefExpr>(expr) || isa<MemberRefExpr>(expr) ||
+            isa<ExistentialMemberRefExpr>(expr) ||
+            isa<ArchetypeMemberRefExpr>(expr)) &&
+           "Not a declaration reference expression");
+    result = expr;
   }
 
-  // FIXME: Build directly, then specialize.
-  auto MRE = cast<OverloadedMemberRefExpr>(OSE);
-  SmallVector<ValueDecl *, 1> decls(1, Candidate.getDecl());
-  auto result = buildMemberRefExpr(MRE->getBase(), MRE->getDotLoc(),
-                                   decls, MRE->getMemberLoc());
+  // If matching the candidate required substitutions, introduce a
+  // specialization expression that encodes those substitutions and provides
+  // a concrete type.
+  if (Candidate.hasSubstitutions()) {
+    SmallVector<SpecializeExpr::Substitution, 2> Substitutions;
+    Substitutions.resize(Candidate.getSubstitutions().size());
+    auto &Conformances = Candidate.getConformances();
+    for (auto S : Candidate.getSubstitutions()) {
+      unsigned Index = S.first->getPrimaryIndex();
+      Substitutions[Index].Archetype = S.first;
+      Substitutions[Index].Replacement = S.second;
+      Substitutions[Index].Conformance
+        = Context.AllocateCopy(Conformances[S.first]);
+    }
+    result = new (Context) SpecializeExpr(result, Candidate.getType(),
+                                          Context.AllocateCopy(Substitutions));
+  }
 
-  return recheckTypes(result);
+  // Replace the semantics-providing expression with the newly-built result.
+  return replaceSemanticsProvidingExpr(expr, result, Ovl.getExpr());
 }
 
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc) {

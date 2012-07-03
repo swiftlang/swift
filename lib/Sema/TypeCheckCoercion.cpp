@@ -1138,13 +1138,13 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
   // prune the second one, and then recursively apply 'int' to b.
   //
 
-  if (OverloadSetRefExpr *OSE = dyn_cast<OverloadSetRefExpr>(E->getFn())) {
+  if (OverloadedExpr Ovl = TC.getOverloadedExpr(E->getFn())) {
     SmallVector<ValueDecl*, 4> Viable;
-    if (auto Best = TC.filterOverloadSet(OSE->getDecls(),
+    if (auto Best = TC.filterOverloadSet(Ovl.getCandidates(),
                                          (isa<PrefixUnaryExpr>(E) ||
                                           isa<PostfixUnaryExpr>(E) ||
                                           isa<BinaryExpr>(E)),
-                                          OSE->getBaseType(),
+                                          Ovl.getBaseType(),
                                           E->getArg(),
                                           DestTy, Viable)) {
       if (!(Flags & CF_Apply)) {
@@ -1157,7 +1157,7 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
         return Ty;
       }
       
-      Expr *Fn = TC.buildFilteredOverloadSet(OSE, Best);
+      Expr *Fn = TC.buildFilteredOverloadSet(Ovl, Best);
       Fn = TC.convertToRValue(Fn);
       E->setFn(Fn);
 
@@ -1169,7 +1169,7 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
     
     if (Flags & CF_Apply) {
       if (Viable.empty()) {
-        TC.diagnoseEmptyOverloadSet(E, OSE->getDecls());
+        TC.diagnoseEmptyOverloadSet(E, Ovl.getCandidates());
       } else if (E->getArg()->getType()->isUnresolvedType()) {
         return CoercionResult::Unknowable;
       } else {
@@ -1178,7 +1178,10 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
         TC.printOverloadSetCandidates(Viable);
       }
       E->setType(ErrorType::get(TC.Context));
-      OSE->setType(ErrorType::get(TC.Context));
+
+      // FIXME: Recursively set the 'error' type down to the semantics-providing
+      // expression?
+      Ovl.getExpr()->setType(ErrorType::get(TC.Context));
       return CoercionResult::Failed;
     }
 
@@ -1186,7 +1189,7 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
       return CoercionResult::Unknowable;
     return CoercionResult::Failed;
   }
-  
+
   Type FnTy = FunctionType::get(E->getArg()->getType(), DestTy, TC.Context);
   
   if (auto CoRes = SemaCoerce::coerceToType(E->getFn(), FnTy, CC,
