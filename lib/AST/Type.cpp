@@ -109,6 +109,7 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
   case TypeKind::Protocol:
   case TypeKind::Archetype:
   case TypeKind::ProtocolComposition:
+  case TypeKind::DeducibleGenericParam:
     return this;
 
   case TypeKind::NameAlias:
@@ -647,6 +648,13 @@ ArchetypeType *ArchetypeType::getNew(ASTContext &Ctx, StringRef DisplayName,
                                    Index);
 }
 
+DeducibleGenericParamType *
+DeducibleGenericParamType::getNew(ASTContext &Ctx, Identifier Name,
+                                  unsigned Index,
+                                  ArrayRef<ProtocolDecl *> ConformsTo) {
+  return new (Ctx) DeducibleGenericParamType(Ctx, Name, Index, ConformsTo);
+}
+
 void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,
                                       ArrayRef<Type> Protocols) {
   for (auto P : Protocols)
@@ -869,6 +877,10 @@ void ClassType::print(raw_ostream &OS) const {
 
 void ArchetypeType::print(raw_ostream &OS) const {
   OS << DisplayName;
+}
+
+void DeducibleGenericParamType::print(raw_ostream &OS) const {
+  OS << getName().str();
 }
 
 void SubstitutedType::print(raw_ostream &OS) const {

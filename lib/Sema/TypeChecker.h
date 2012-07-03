@@ -146,20 +146,14 @@ struct CoercionContext {
 
   /// \brief Identify the set of generic parameters for which we want to
   /// compute substitutions.
-  void requestSubstitutionsFor(ArrayRef<GenericParam> Params);
+  void requestSubstitutionsFor(ArrayRef<DeducibleGenericParamType *> Params);
   
-  /// \brief Retrieve the substitution for the given deduced archetype, if
-  /// known.
-  Type getSubstitution(ArchetypeType *Archetype) const {
-    TypeSubstitutionMap::const_iterator Pos = Substitutions.find(Archetype);
+  /// \brief Retrieve the substitution for the given deducible generic
+  /// parameter type.
+  Type getSubstitution(DeducibleGenericParamType *Deducible) const {
+    TypeSubstitutionMap::const_iterator Pos = Substitutions.find(Deducible);
     assert(Pos != Substitutions.end() && "Not deducible");
     return Pos->second;
-  }
-
-  /// \brief Determine whether the given archetype is deducible in this
-  /// context.
-  bool isDeducible(ArchetypeType *Archetype) const {
-    return Substitutions.find(Archetype) != Substitutions.end();
   }
 
   /// \brief Determine whether the given coercion context requires

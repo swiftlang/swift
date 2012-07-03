@@ -184,6 +184,9 @@ const TypeInfo *TypeConverter::convertType(CanType canTy) {
     llvm_unreachable("converting a " #id "Type after canonicalization");
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
+  case TypeKind::DeducibleGenericParam:
+    llvm_unreachable("deducible generic parameter");
+
   case TypeKind::MetaType:
     return convertMetaTypeType(cast<MetaTypeType>(ty));
   case TypeKind::Module:

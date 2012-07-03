@@ -766,7 +766,7 @@ public:
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Var; }
   static bool classof(const VarDecl *D) { return true; }
 };
-  
+
 
 /// FuncDecl - 'func' declaration.
 class FuncDecl : public ValueDecl {

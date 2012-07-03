@@ -106,6 +106,7 @@ bool TypeChecker::validateType(Type InTy, bool isFirstPass) {
   case TypeKind::Module:
   case TypeKind::Protocol:
   case TypeKind::Substituted:
+  case TypeKind::DeducibleGenericParam:
     // Nothing to validate.
     break;
 
@@ -256,12 +257,12 @@ bool TypeChecker::validateType(Type InTy, bool isFirstPass) {
 /// the only possible failure now is from array slice types, which occur
 /// simply because we don't have Slice<T> yet.
 Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
-  if (ArchetypeType *Archetype = dyn_cast<ArchetypeType>(T)) {
-    TypeSubstitutionMap::const_iterator Known = Substitutions.find(Archetype);
+  if (auto Original = dyn_cast<SubstitutableType>(T)) {
+    TypeSubstitutionMap::const_iterator Known = Substitutions.find(Original);
     if (Known == Substitutions.end() || !Known->second)
       return T;
 
-    return SubstitutedType::get(Archetype, Known->second, Context);
+    return SubstitutedType::get(Original, Known->second, Context);
   }
   
   switch (T->getKind()) {

@@ -150,9 +150,9 @@ Type ValueDecl::getTypeOfReference() const {
       return LValueType::get(LVT->getObjectType(),
                              LValueType::Qual::DefaultForVar, getASTContext());
     return LValueType::get(Ty, LValueType::Qual::DefaultForVar, getASTContext());
-  } else {
-    return Ty;
   }
+
+  return Ty;
 }
 
 /// isDefinition - Return true if this is a definition of a decl, not a

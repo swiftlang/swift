@@ -269,6 +269,7 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
   case TypeKind::Error:
     llvm_unreachable("mangling error type");
   case TypeKind::UnstructuredUnresolved:
+  case TypeKind::DeducibleGenericParam:
     llvm_unreachable("mangling unresolved type");
 
   case TypeKind::MetaType:

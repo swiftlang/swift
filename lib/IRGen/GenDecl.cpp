@@ -147,6 +147,7 @@ static bool isLocalLinkageType(Type type) {
   case TypeKind::Error:
     llvm_unreachable("error type in IRGen");
   case TypeKind::UnstructuredUnresolved:
+  case TypeKind::DeducibleGenericParam:
     llvm_unreachable("unresolved type in IRGen");
 
   case TypeKind::MetaType:

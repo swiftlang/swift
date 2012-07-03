@@ -90,6 +90,33 @@ void TypeChecker::printOverloadSetCandidates(ArrayRef<ValueDecl *> Candidates) {
     diagnose(TheDecl->getStartLoc(), diag::found_candidate);
 }
 
+/// \brief Form a version of the type \c T with all of the given generic
+/// parameters replaced by deducible parameters.
+///
+/// \param DeducibleParams Will be populated with the synthesized deducible
+/// generic parameters.
+static Type
+getDeducibleType(TypeChecker &TC, Type T,
+                 ArrayRef<GenericParam> GenericParams,
+                 SmallVectorImpl<DeducibleGenericParamType *> &DeducibleParams){
+  TypeSubstitutionMap PolySubstitutions;
+  SmallVector<DeducibleGenericParamType *, 2> DeducibleTypes;
+  DeducibleParams.reserve(GenericParams.size());
+  unsigned Index = 0;
+  for (auto GP : GenericParams) {
+    TypeAliasDecl *TypeParam = GP.getAsTypeParam();
+    auto Archetype = TypeParam->getDeclaredType()->getAs<ArchetypeType>();
+    auto Deducible = DeducibleGenericParamType::getNew(TC.Context,
+                                                       TypeParam->getName(),
+                                                       Index++,
+                                                    Archetype->getConformsTo());
+    DeducibleParams.push_back(Deducible);
+    PolySubstitutions[Archetype] = Deducible;
+  }
+
+  return TC.substType(T, PolySubstitutions);
+}
+
 OverloadCandidate
 TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
                                bool OperatorSyntax,
@@ -100,7 +127,7 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
   SmallVector<OverloadCandidate, 4> ViableCandidates;
   bool hasThis = BaseTy && !BaseTy->is<MetaTypeType>();
   for (ValueDecl *VD : Candidates) {
-    Type VDType = VD->getType()->getRValueType();
+    Type VDType = VD->getTypeOfReference()->getRValueType();
 
     // Must have function type to be called.
     AnyFunctionType *FunctionTy = VDType->getAs<AnyFunctionType>();
@@ -126,8 +153,13 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     // involves generic functions.
     CoercionContext CC(*this);
     if (auto polyFn = FunctionTy->getAs<PolymorphicFunctionType>()) {
-      // Request substitutions for the generic parameters of this function.
-      CC.requestSubstitutionsFor(polyFn->getGenericParams().getParams());
+      // Create a deducible form of the function type.
+      SmallVector<DeducibleGenericParamType *, 2> DeducibleParams;
+      FunctionTy = getDeducibleType(*this, FunctionTy,
+                                    polyFn->getGenericParams().getParams(),
+                                    DeducibleParams)
+                     ->castTo<AnyFunctionType>();
+      CC.requestSubstitutionsFor(DeducibleParams);
     }
     // As a temporary hack, manually introduce the substitutions for operators
     // which are members of protocols.  (This will go away once we start using
@@ -140,7 +172,12 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
             if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(m))
               Params.push_back(TAD);
           }
-          CC.requestSubstitutionsFor(Params);
+
+          SmallVector<DeducibleGenericParamType *, 2> DeducibleParams;
+          FunctionTy = getDeducibleType(*this, FunctionTy, Params,
+                                        DeducibleParams)
+                         ->castTo<AnyFunctionType>();
+          CC.requestSubstitutionsFor(DeducibleParams);
         }
       }
     }

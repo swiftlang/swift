@@ -1782,14 +1782,14 @@ namespace {
 /// type within a coercion context. If this deduction conflicts with a
 /// prior deduction, complain (if allowed) and return true to indicate failure.
 static bool recordDeduction(CoercionContext &CC, SourceLoc Loc,
-                            ArchetypeType *Archetype, Type DeducedTy,
+                            DeducibleGenericParamType *Deducible, Type DeducedTy,
                             unsigned Flags) {
-  if (Type ExistingTy = CC.getSubstitution(Archetype)) {
+  if (Type ExistingTy = CC.getSubstitution(Deducible)) {
     // Check that the previously-deduced type matches the given type.
     if (!ExistingTy->isEqual(DeducedTy)) {
       if (Flags & CF_Apply) {
         CC.TC.diagnose(Loc, diag::inconsistent_deduction,
-                       Archetype->getDisplayName(),
+                       Deducible->getName().str(),
                        ExistingTy, DeducedTy);
       }
       
@@ -1800,14 +1800,14 @@ static bool recordDeduction(CoercionContext &CC, SourceLoc Loc,
   }
 
   // Record this new deduction.
-  CC.Substitutions[Archetype] = DeducedTy;
+  CC.Substitutions[Deducible] = DeducedTy;
 
   // Check that the deduced type meets all of the requirements placed on the
   // archetype.
   TypeChecker &TC = CC.TC;
   SmallVectorImpl<ProtocolConformance *> &MyConformances
-    = CC.Conformance[Archetype];
-  for (auto Proto : Archetype->getConformsTo()) {
+    = CC.Conformance[Deducible];
+  for (auto Proto : Deducible->getConformsTo()) {
     ProtocolConformance *Conformance = nullptr;
     if (TC.conformsToProtocol(DeducedTy, Proto, &Conformance)) {
       MyConformances.push_back(Conformance);
@@ -1882,37 +1882,35 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
       return coerced(ICE, Flags);
     }
 
-  if (auto Archetype = DestTy->getAs<ArchetypeType>()) {
-    if (CC.isDeducible(Archetype)) {
-      // We have a deducible archetype. Check whether it has already been
-      // deduced.
-      Type ExistingTy = CC.getSubstitution(Archetype);
+  // If the destination is deducible, deduce it now (or check it against a
+  // prior deduction).
+  if (auto Deducible = DestTy->getAs<DeducibleGenericParamType>()) {
+    Type ExistingTy = CC.getSubstitution(Deducible);
 
-      if (E->getType()->isUnresolvedType()) {
-        // If we already have a binding for this archetype, try to use it.
-        if (ExistingTy)
-          return coerceToType(E, ExistingTy, CC, Flags);
+    if (E->getType()->isUnresolvedType()) {
+      // If we already have a binding for this archetype, try to use it.
+      if (ExistingTy)
+        return coerceToType(E, ExistingTy, CC, Flags);
 
-        // We don't have a binding, and cannot deduce anything from an
-        // unresolved type. Whether coercion will succeed is unknowable.
-        return CoercionResult::Unknowable;
-      }
-
-      // We always deduce an object type (never a reference type).
-      Type DeducedTy = E->getType()->getRValueType();
-
-      if (recordDeduction(CC, E->getLoc(), Archetype, DeducedTy, Flags))
-        return nullptr;
-
-      if (!(Flags & CF_Apply))
-        return DeducedTy;
-
-      // If the source is an lvalue, load from it.
-      if (auto SrcLV = E->getType()->getAs<LValueType>())
-        return loadLValue(E, SrcLV, CC, Flags & ~CF_NotPropagated);
-
-      return unchanged(E, Flags);
+      // We don't have a binding, and cannot deduce anything from an
+      // unresolved type. Whether coercion will succeed is unknowable.
+      return CoercionResult::Unknowable;
     }
+
+    // We always deduce an object type (never a reference type).
+    Type DeducedTy = E->getType()->getRValueType();
+
+    if (recordDeduction(CC, E->getLoc(), Deducible, DeducedTy, Flags))
+      return nullptr;
+
+    if (!(Flags & CF_Apply))
+      return DeducedTy;
+
+    // If the source is an lvalue, load from it.
+    if (auto SrcLV = E->getType()->getAs<LValueType>())
+      return loadLValue(E, SrcLV, CC, Flags & ~CF_NotPropagated);
+
+    return unchanged(E, Flags);
   }
     
 
@@ -1940,45 +1938,42 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
     LValueType *SrcLT = SrcTy->getAs<LValueType>();
     Type SrcObjectTy = SrcLT? SrcLT->getObjectType() : SrcTy;
 
-    // If the destination type is an archetype, we can deduce it from the
-    // source.
-    if (auto Archetype = DestLT->getObjectType()->getAs<ArchetypeType>()) {
-      if (CC.isDeducible(Archetype)) {
-        // We have a deducible archetype. Check whether it has already been
-        // deduced.
-        Type ExistingTy = CC.getSubstitution(Archetype);
+    // If the destination is deducible, deduce it now (or check it against a
+    // prior deduction).
+    if (auto Deducible
+               = DestLT->getObjectType()->getAs<DeducibleGenericParamType>()) {
+      Type ExistingTy = CC.getSubstitution(Deducible);
 
-        if (SrcTy->isUnresolvedType()) {
-          // If we already have a binding for this archetype, try to use it.
-          if (ExistingTy)
-            return coerceToType(E, 
-                                LValueType::get(SrcObjectTy,
-                                                DestLT->getQualifiers(),
-                                                TC.Context),
-                                CC, Flags);
+      if (SrcTy->isUnresolvedType()) {
+        // If we already have a binding for this archetype, try to use it.
+        if (ExistingTy)
+          return coerceToType(E, 
+                              LValueType::get(SrcObjectTy,
+                                              DestLT->getQualifiers(),
+                                              TC.Context),
+                              CC, Flags);
 
-          // We don't have a binding, and cannot deduce anything from an
-          // unresolved type. Whether coercion will succeed is unknowable.
-          return CoercionResult::Unknowable;
-        }
-
-        // We always deduce an object type (never a reference type).
-        if (recordDeduction(CC, E->getLoc(), Archetype, SrcObjectTy, Flags))
-          return nullptr;
-
-        // Continue with the substituted declaration type.
-        DestLT = LValueType::get(SrcObjectTy,
-                                 DestLT->getQualifiers(),
-                                 TC.Context);
-        DestTy = DestLT;
-
-        // If the destination and source types are now equal, we're done.
-        if (DestTy->isEqual(SrcTy))
-          return unchanged(E, Flags);
-
-        // Continue along: we may allow implicit lvalues here or be
-        // able to provide a better failure mode.
+        // We don't have a binding, and cannot deduce anything from an
+        // unresolved type. Whether coercion will succeed is unknowable.
+        return CoercionResult::Unknowable;
       }
+
+      // We always deduce an object type (never a reference type).
+      if (recordDeduction(CC, E->getLoc(), Deducible, SrcObjectTy, Flags))
+        return nullptr;
+
+      // Continue with the substituted declaration type.
+      DestLT = LValueType::get(SrcObjectTy,
+                               DestLT->getQualifiers(),
+                               TC.Context);
+      DestTy = DestLT;
+
+      // If the destination and source types are now equal, we're done.
+      if (DestTy->isEqual(SrcTy))
+        return unchanged(E, Flags);
+
+      // Continue along: we may allow implicit lvalues here or be
+      // able to provide a better failure mode.
     }
 
     // If the input expression has an unresolved type, try to coerce it to an
@@ -2145,12 +2140,10 @@ void CoercedExpr::diagnose() const {
     << E->getSourceRange();
 }
 
-void CoercionContext::requestSubstitutionsFor(ArrayRef<GenericParam> Params) {
+void CoercionContext::requestSubstitutionsFor(
+                                 ArrayRef<DeducibleGenericParamType *> Params) {
   for (auto GP : Params) {
-    auto TypeParam = GP.getAsTypeParam();
-    assert(TypeParam && "Unknown generic parameter type?");
-    auto Archetype = TypeParam->getDeclaredType()->castTo<ArchetypeType>();
-    Substitutions[Archetype] = Type();
+    Substitutions[GP] = Type();
   }
 }
 
@@ -2300,25 +2293,24 @@ static bool isSubtypeOf(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
   if (T1->isEqual(T2))
     return true;
 
-  // If T1 or T2 is a deducible archetype, it gets deduced to T2 or T1,
+  // If T1 or T2 is a deducible parameter, it gets deduced to T2 or T1,
   // respectively.
-  // FIXME: This gets wacky when T1 and T2 are from the same generic function!
   if (CC) {
-    if (ArchetypeType *Archetype1 = T1->getAs<ArchetypeType>()) {
-      if (CC->isDeducible(Archetype1) && !T2->isUnresolvedType()) {
-        // We have a deducible archetype. Record this deduction.
+    if (auto Deducible1 = T1->getAs<DeducibleGenericParamType>()) {
+      if (!T2->isUnresolvedType()) {
+        // Record this deduction.
         // FIXME: Would be useful to get the diagnostic back out, if
         // deduction conflicts.
-        return !recordDeduction(*CC, SourceLoc(), Archetype1, T2, /*Flags=*/0);
+        return !recordDeduction(*CC, SourceLoc(), Deducible1, T2, /*Flags=*/0);
       }
     }
     
-    if (ArchetypeType *Archetype2 = T2->getAs<ArchetypeType>()) {
-      if (CC->isDeducible(Archetype2) && !T1->isUnresolvedType()) {
-        // We have a deducible archetype. Record this deduction.
+    if (auto Deducible2 = T2->getAs<DeducibleGenericParamType>()) {
+      if (!T1->isUnresolvedType()) {
+        // Record this deduction.
         // FIXME: Would be useful to get the diagnostic back out, if
         // deduction conflicts.
-        return !recordDeduction(*CC, SourceLoc(), Archetype2, T1, /*Flags=*/0);
+        return !recordDeduction(*CC, SourceLoc(), Deducible2, T1, /*Flags=*/0);
       }
     }
   }

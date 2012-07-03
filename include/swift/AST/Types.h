@@ -1111,14 +1111,21 @@ public:
 /// SubstitutableType - A reference to a type that can be substituted, i.e.,
 /// an archetype or a generic parameter.
 class SubstitutableType : public TypeBase {
+  ArrayRef<ProtocolDecl *> ConformsTo;
+  
 protected:
-  SubstitutableType(TypeKind K, ASTContext *C, bool Unresolved)
-    : TypeBase(K, C, Unresolved) { }
+  SubstitutableType(TypeKind K, ASTContext *C, bool Unresolved,
+                    ArrayRef<ProtocolDecl *> ConformsTo)
+    : TypeBase(K, C, Unresolved), ConformsTo(ConformsTo) { }
 
 public:
   // FIXME: Temporary hack.
   bool isPrimary() const;
   unsigned getPrimaryIndex() const;
+
+  /// getConformsTo - Retrieve the set of protocols to which this substitutable
+  /// type shall conform.
+  ArrayRef<ProtocolDecl *> getConformsTo() const { return ConformsTo; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const SubstitutableType *) { return true; }
@@ -1137,7 +1144,6 @@ public:
 /// FIXME: Same-type constraints.
 class ArchetypeType : public SubstitutableType {
   StringRef DisplayName;
-  ArrayRef<ProtocolDecl *> ConformsTo;
   unsigned IndexIfPrimary;
 
 public:
@@ -1149,10 +1155,6 @@ public:
                                Optional<unsigned> Index = Optional<unsigned>());
   
   void print(raw_ostream &OS) const;
-
-  /// getConformsTo - Retrieve the set of protocols to which this archetype
-  /// conforms.
-  ArrayRef<ProtocolDecl *> getConformsTo() const { return ConformsTo; }
 
   /// getDisplayName - Retrieve the name that should be used to display
   /// this archetype.
@@ -1178,9 +1180,51 @@ private:
   ArchetypeType(ASTContext &Ctx, StringRef DisplayName,
                 ArrayRef<ProtocolDecl *> ConformsTo,
                 Optional<unsigned> Index)
-    : SubstitutableType(TypeKind::Archetype, &Ctx, /*Unresolved=*/false),
-      DisplayName(DisplayName), ConformsTo(ConformsTo),
-      IndexIfPrimary(Index? *Index + 1 : 0) { }
+    : SubstitutableType(TypeKind::Archetype, &Ctx, /*Unresolved=*/false,
+                        ConformsTo),
+      DisplayName(DisplayName), IndexIfPrimary(Index? *Index + 1 : 0) { }
+};
+
+/// DeducibleGenericParamType - A type that refers to a generic type parameter
+/// that can be deduced, specified, and substituted.
+///
+/// In the given generic function:
+///
+/// \code
+/// func identity<T>(x : T) { return x }
+/// \endcode
+///
+/// The type of 'identity', for the purpose of substitution, contains a
+/// \c DeducibleGenericParamType in the input type of the function.
+class DeducibleGenericParamType : public SubstitutableType {
+  Identifier Name;
+  unsigned Index;
+
+  DeducibleGenericParamType(ASTContext &Ctx, Identifier Name, unsigned Index,
+                            ArrayRef<ProtocolDecl *> ConformsTo)
+    : SubstitutableType(TypeKind::DeducibleGenericParam, &Ctx,
+                        /*Unresolved=*/false, ConformsTo),
+      Name(Name), Index(Index) { }
+
+public:
+  static DeducibleGenericParamType *getNew(ASTContext &Ctx, Identifier Name,
+                                           unsigned Index,
+                                           ArrayRef<ProtocolDecl *> ConformsTo);
+
+  /// getName - Retrieve the name of this deducible generic parameter.
+  Identifier getName() const { return Name; }
+
+  /// getIndex - Retrieve the index into the list of generic parameters in
+  /// which this generic parameter occurs.
+  unsigned getIndex() const { return Index; }
+
+  void print(raw_ostream &OS) const;
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const DeducibleGenericParamType *) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::DeducibleGenericParam;
+  }
 };
 
 /// SubstitutedType - A type that has been substituted for some other type,
@@ -1235,11 +1279,16 @@ inline Type TypeBase::getRValueType() {
 }
 
 inline bool SubstitutableType::isPrimary() const {
-  return cast<ArchetypeType>(this)->isPrimary();
+  if (auto Archetype = dyn_cast<ArchetypeType>(this))
+    return Archetype->isPrimary();
+
+  return true;
 }
 
 inline unsigned SubstitutableType::getPrimaryIndex() const {
-  return cast<ArchetypeType>(this)->getPrimaryIndex();
+  if (auto Archetype = dyn_cast<ArchetypeType>(this))
+    return Archetype->getPrimaryIndex();
+  return cast<DeducibleGenericParamType>(this)->getIndex();
 }
 
 } // end namespace swift
