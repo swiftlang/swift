@@ -151,10 +151,56 @@ bool Parser::parseType(Type &Result, TypeLoc *&ResultLoc, Diag<> MessageID) {
   return false;
 }
 
+bool Parser::parseGenericArguments(ArrayRef<Type> &Args) {
+  // Parse the opening '<'.
+  assert(startsWithLess(Tok) && "Generic parameter list must start with '<'");
+  SourceLoc LAngleLoc = consumeStartingLess();
+
+  SmallVector<Type, 4> GenericArgs;
+  
+  while (true) {
+    Type Result;
+    TypeLoc *ResultLoc;
+    if (parseType(Result, ResultLoc, diag::expected_type)) {
+      // Skip until we hit the '>'.
+      skipUntilAnyOperator();
+      if (startsWithGreater(Tok))
+        consumeStartingGreater();
+      return true;
+    }
+
+    GenericArgs.push_back(Result);
+
+    // Parse the comma, if the list continues.
+    if (Tok.is(tok::comma)) {
+      consumeToken();
+      continue;
+    }
+
+    break;
+  }
+
+  if (!startsWithGreater(Tok)) {
+    diagnose(Tok.getLoc(), diag::expected_rangle_generic_arg_list);
+    diagnose(LAngleLoc, diag::opening_angle);
+
+    // Skip until we hit the '>'.
+    skipUntilAnyOperator();
+    if (startsWithGreater(Tok))
+      consumeStartingGreater();
+    return true;
+  } else {
+    consumeStartingGreater();
+  }
+
+  Args = Context.AllocateCopy(GenericArgs);
+  return false;
+}
+
 /// parseTypeIdentifier
 ///   
 ///   type-identifier:
-///     identifier ('.' identifier)*
+///     identifier generic-args? ('.' identifier generic-args?)*
 ///
 bool Parser::parseTypeIdentifier(Type &Result, TypeLoc *&ResultLoc) {
   SourceLoc StartLoc = Tok.getLoc();
@@ -162,20 +208,24 @@ bool Parser::parseTypeIdentifier(Type &Result, TypeLoc *&ResultLoc) {
     diagnose(Tok.getLoc(), diag::expected_identifier_for_type);
     return true;
   }
-  
+
   SmallVector<IdentifierType::Component, 4> Components;
-  Components.push_back(IdentifierType::Component(Tok.getLoc(),
-                                     Context.getIdentifier(Tok.getText())));
-  SourceLoc EndLoc = consumeToken(tok::identifier);
-  
-  while (consumeIf(tok::period)) {
+  SourceLoc EndLoc;
+  do {
     SourceLoc Loc = Tok.getLoc();
     Identifier Name;
     if (parseIdentifier(Name, diag::expected_identifier_in_dotted_type))
       return true;
-    Components.push_back(IdentifierType::Component(Loc, Name));
+    ArrayRef<Type> GenericArgs;
+    if (startsWithLess(Tok)) {
+      // FIXME: There's an ambiguity here because code could be trying to
+      // refer to a unary '<' operator.
+      if (parseGenericArguments(GenericArgs))
+        return true;
+    }
+    Components.push_back(IdentifierType::Component(Loc, Name, GenericArgs));
     EndLoc = Loc;
-  }
+  } while (consumeIf(tok::period));
 
   // Lookup element #0 through our current scope chains in case it is some thing
   // local (this returns null if nothing is found).

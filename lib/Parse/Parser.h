@@ -269,6 +269,7 @@ public:
   bool parseType(Type &Result, TypeLoc *&ResultLoc, Diag<> ID);
   bool parseTypeAnnotation(Type &Result, TypeLoc *&ResultLoc);
   bool parseTypeAnnotation(Type &Result, TypeLoc *&ResultLoc, Diag<> ID);
+  bool parseGenericArguments(ArrayRef<Type> &Args);
   bool parseTypeIdentifier(Type &Result, TypeLoc *&ResultLoc);
   bool parseTypeComposition(Type &Result, TypeLoc *&ResultLoc);
   bool parseTypeTupleBody(SourceLoc LPLoc, Type &Result, TypeLoc *&ResultLoc);

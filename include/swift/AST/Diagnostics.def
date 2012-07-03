@@ -263,6 +263,9 @@ ERROR(expected_identifier_for_type,expr_parsing,none,
       "expected identifier for type name", ())
 ERROR(named_definition_isnt_type,expr_parsing,none,
       "%0 does not name a type", (Identifier))
+ERROR(expected_rangle_generic_arg_list,type_parsing,none,
+      "expected '>' to complete generic argument list", ())
+
 
 // Function types
 ERROR(expected_type_function_result,type_parsing,none,
