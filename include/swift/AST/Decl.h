@@ -41,7 +41,9 @@ namespace swift {
   class OneOfElementDecl;
   class OneOfType;
   class NameAliasType;
+  class NominalType;
   class Pattern;
+  class ProtocolType;
   enum class Resilience : unsigned char;
   class TypeAliasDecl;
   class Stmt;
@@ -545,18 +547,24 @@ class NominalTypeDecl : public TypeDecl, public DeclContext {
   ArrayRef<Decl*> Members;
   GenericParamList *GenericParams;
 
+protected:
+  NominalType *DeclaredTy;
+  
 public:
   NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
                   MutableArrayRef<Type> inherited,
                   GenericParamList *GenericParams) :
     TypeDecl(K, DC, name, inherited, Type()),
     DeclContext(DeclContextKind::NominalTypeDecl, DC),
-    GenericParams(GenericParams) {}
+    GenericParams(GenericParams), DeclaredTy(nullptr) {}
 
   ArrayRef<Decl*> getMembers() const { return Members; }
   void setMembers(ArrayRef<Decl*> elems) { Members = elems; }
 
   GenericParamList *getGenericParams() const { return GenericParams; }
+
+  /// getDeclaredType - Retrieve the type declared by this entity.
+  NominalType *getDeclaredType() const { return DeclaredTy; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -578,7 +586,6 @@ public:
 class OneOfDecl : public NominalTypeDecl {
   SourceLoc OneOfLoc;
   SourceLoc NameLoc;
-  OneOfType *OneOfTy;
 
 public:
   OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
@@ -590,7 +597,9 @@ public:
 
   OneOfElementDecl *getElement(Identifier Name) const;
 
-  OneOfType *getDeclaredType() const { return OneOfTy; }
+  OneOfType *getDeclaredType() const {
+    return reinterpret_cast<OneOfType *>(DeclaredTy);
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -614,7 +623,6 @@ public:
 class StructDecl : public NominalTypeDecl {
   SourceLoc StructLoc;
   SourceLoc NameLoc;
-  StructType *StructTy;
 
 public:
   StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
@@ -624,7 +632,9 @@ public:
   SourceLoc getStartLoc() const { return StructLoc; }
   SourceLoc getLoc() const { return NameLoc; }
 
-  StructType *getDeclaredType() const { return StructTy; }
+  StructType *getDeclaredType() const {
+    return reinterpret_cast<StructType *>(DeclaredTy);
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -648,7 +658,6 @@ public:
 class ClassDecl : public NominalTypeDecl {
   SourceLoc ClassLoc;
   SourceLoc NameLoc;
-  ClassType *ClassTy;
 
 public:
   ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
@@ -658,7 +667,9 @@ public:
   SourceLoc getStartLoc() const { return ClassLoc; }
   SourceLoc getLoc() const { return NameLoc; }
 
-  ClassType *getDeclaredType() const { return ClassTy; }
+  ClassType *getDeclaredType() const {
+    return reinterpret_cast<ClassType *>(DeclaredTy);
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -683,13 +694,10 @@ class ProtocolDecl : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
   SourceLoc NameLoc;
   SourceRange Braces;
-  Type ProtocolTy;
   
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
-               Identifier Name, MutableArrayRef<Type> Inherited)
-    : NominalTypeDecl(DeclKind::Protocol, DC, Name, Inherited, nullptr),
-      ProtocolLoc(ProtocolLoc), NameLoc(NameLoc) { }
+               Identifier Name, MutableArrayRef<Type> Inherited);
   
   using Decl::getASTContext;
 
@@ -705,8 +713,9 @@ public:
   /// \brief Collect all of the inherited protocols into the given set.
   void collectInherited(llvm::SmallPtrSet<ProtocolDecl *, 4> &Inherited);
   
-  Type getDeclaredType() const { return ProtocolTy; }
-  void setDeclaredType(Type Ty) { ProtocolTy = Ty; }
+  ProtocolType *getDeclaredType() const {
+    return reinterpret_cast<ProtocolType *>(DeclaredTy);
+  }
   
   SourceLoc getStartLoc() const { return ProtocolLoc; }
   SourceLoc getLoc() const { return NameLoc; }

@@ -213,14 +213,7 @@ bool ValueDecl::needsCapture() const {
 Type TypeDecl::getDeclaredType() const {
   if (auto TAD = dyn_cast<TypeAliasDecl>(this))
     return TAD->getAliasType();
-  if (auto SD = dyn_cast<StructDecl>(this))
-    return SD->getDeclaredType();
-  if (auto PD = dyn_cast<ProtocolDecl>(this))
-    return PD->getDeclaredType();
-  if (auto CD = dyn_cast<ClassDecl>(this))
-    return CD->getDeclaredType();
-  assert(isa<OneOfDecl>(this));
-  return cast<OneOfDecl>(this)->getDeclaredType();
+  return cast<NominalTypeDecl>(this)->getDeclaredType();
 }
 
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
@@ -243,7 +236,8 @@ OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(this));
   // Compute the associated type for this OneOfDecl.
-  OneOfTy = new (Parent->getASTContext()) OneOfType(this, Parent->getASTContext());
+  ASTContext &Ctx = Parent->getASTContext();
+  DeclaredTy = new (Ctx) OneOfType(this, Ctx);
 }
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
@@ -254,7 +248,8 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(this));
   // Compute the associated type for this StructDecl.
-  StructTy = new (Parent->getASTContext()) StructType(this, Parent->getASTContext());
+  ASTContext &Ctx = Parent->getASTContext();
+  DeclaredTy = new (Ctx) StructType(this, Ctx);
 }
 
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
@@ -265,7 +260,8 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(this));
   // Compute the associated type for this ClassDecl.
-  ClassTy = new (Parent->getASTContext()) ClassType(this, Parent->getASTContext());
+  ASTContext &Ctx = Parent->getASTContext();
+  DeclaredTy = new (Ctx) ClassType(this, Ctx);
 }
 
 
@@ -276,6 +272,19 @@ OneOfElementDecl *OneOfDecl::getElement(Identifier Name) const {
       if (Elt->getName() == Name)
         return Elt;
   return 0;
+}
+
+ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
+                           SourceLoc NameLoc, Identifier Name,
+                           MutableArrayRef<Type> Inherited)
+  : NominalTypeDecl(DeclKind::Protocol, DC, Name, Inherited, nullptr),
+    ProtocolLoc(ProtocolLoc), NameLoc(NameLoc)
+{
+  // Set the type of the OneOfDecl to the right MetaTypeType.
+  setType(MetaTypeType::get(this));
+  // Compute the associated type for this ClassDecl.
+  ASTContext &Ctx = DC->getASTContext();
+  DeclaredTy = new (Ctx) ProtocolType(this, Ctx);
 }
 
 bool ProtocolDecl::inheritsFrom(const ProtocolDecl *Super) const {

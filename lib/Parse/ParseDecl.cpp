@@ -1542,8 +1542,6 @@ Decl *Parser::parseDeclProtocol() {
     = new (Context) ProtocolDecl(CurDeclContext, ProtocolLoc, NameLoc,
                                  ProtocolName,
                                  Context.AllocateCopy(InheritedProtocols));
-  Proto->setDeclaredType(ProtocolType::getNew(Proto));
-  Proto->setType(MetaTypeType::get(Proto));
   ContextChange CC(*this, Proto);
   Scope ProtocolBodyScope(this, /*AllowLookup=*/false);
 

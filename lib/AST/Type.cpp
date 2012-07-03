@@ -443,7 +443,7 @@ CanType TypeBase::getCanonicalType() {
     
     // If one protocol remains, its nominal type is the canonical type.
     if (Protocols.size() == 1)
-      Result = Protocols.front()->getDeclaredType().getPointer();
+      Result = Protocols.front()->getDeclaredType();
     else {
       // Sort the set of protocols by module + name, to give a stable
       // ordering.

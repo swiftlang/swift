@@ -872,11 +872,6 @@ public:
 /// by another type.
 class ProtocolType : public NominalType {
 public:
-  /// getNew - Return a new instance of a protocol type.  These are never
-  /// uniqued since each syntactic instance of them is semantically considered
-  /// to be a different type.
-  static ProtocolType *getNew(ProtocolDecl *TheDecl);
-  
   ProtocolDecl *getDecl() const {
     return reinterpret_cast<ProtocolDecl *>(NominalType::getDecl());
   }
@@ -890,7 +885,8 @@ public:
   }
 
 private:
-  ProtocolType(ProtocolDecl *TheDecl);
+  friend class ProtocolDecl;
+  ProtocolType(ProtocolDecl *TheDecl, ASTContext &Ctx);
 };
 
 /// ProtocolCompositionType - A type that composes some number of protocols
