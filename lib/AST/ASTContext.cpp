@@ -40,8 +40,7 @@ struct ASTContext::Implementation {
   llvm::DenseMap<Type, ParenType*> ParenTypes;
   llvm::DenseMap<std::pair<Type, LValueType::Qual::opaque_type>, LValueType*>
     LValueTypes;
-  llvm::DenseMap<std::pair<ArchetypeType *, Type>, SubstArchetypeType *>
-    SubstArchetypeTypes;
+  llvm::DenseMap<std::pair<Type, Type>, SubstitutedType *> SubstitutedTypes;
   llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
 };
 
@@ -322,11 +321,11 @@ LValueType *LValueType::get(Type objectTy, Qual quals, ASTContext &C) {
   return type;
 }
 
-/// Return a uniqued substituted archetype type.
-SubstArchetypeType *SubstArchetypeType::get(ArchetypeType *Archetype,
-                                            Type Subst, ASTContext &C) {
-  SubstArchetypeType *&Known = C.Impl.SubstArchetypeTypes[{Archetype, Subst}];
+/// Return a uniqued substituted type.
+SubstitutedType *SubstitutedType::get(Type Original, Type Replacement,
+                                      ASTContext &C) {
+  SubstitutedType *&Known = C.Impl.SubstitutedTypes[{Original, Replacement}];
   if (!Known)
-    Known = new (C) SubstArchetypeType(Archetype, Subst);
+    Known = new (C) SubstitutedType(Original, Replacement);
   return Known;
 }

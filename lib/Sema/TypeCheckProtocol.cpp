@@ -65,7 +65,7 @@ static std::unique_ptr<ProtocolConformance>
 checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                         SourceLoc ComplainLoc) {
   llvm::DenseMap<ValueDecl *, ValueDecl *> Mapping;
-  llvm::DenseMap<ArchetypeType *, Type> TypeMapping;
+  TypeSubstitutionMap TypeMapping;
   llvm::DenseMap<ProtocolDecl *, ProtocolConformance *> InheritedMapping;
 
   // Check that T conforms to all inherited protocols.

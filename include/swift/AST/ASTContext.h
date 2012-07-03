@@ -40,11 +40,13 @@ namespace swift {
   class TupleTypeElt;
   class OneOfElementDecl;
   class ProtocolDecl;
+  class SubstitutableType;
   class ValueDecl;
   class DiagnosticEngine;
   
-/// \brief Type substitution mapping from archetypes to their replacements.
-typedef llvm::DenseMap<ArchetypeType *, Type> TypeSubstitutionMap;
+/// \brief Type substitution mapping from substitutable types to their
+/// replacements.
+typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
 
 /// \brief Describes how a particular type conforms to a given protocol,
 /// providing the mapping from the protocol members to the type (or extension)

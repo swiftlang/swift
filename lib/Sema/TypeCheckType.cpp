@@ -105,7 +105,7 @@ bool TypeChecker::validateType(Type InTy, bool isFirstPass) {
   case TypeKind::MetaType:
   case TypeKind::Module:
   case TypeKind::Protocol:
-  case TypeKind::SubstArchetype:
+  case TypeKind::Substituted:
     // Nothing to validate.
     break;
 
@@ -261,7 +261,7 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
     if (Known == Substitutions.end() || !Known->second)
       return T;
 
-    return SubstArchetypeType::get(Archetype, Known->second, Context);
+    return SubstitutedType::get(Archetype, Known->second, Context);
   }
   
   switch (T->getKind()) {
@@ -282,9 +282,8 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
     if (UnderlyingTy.getPointer()
           == Alias->getDecl()->getUnderlyingType().getPointer())
       return T;
-    
-    // FIXME: Loses the structure of the NameAliasType!
-    return UnderlyingTy;
+
+    return SubstitutedType::get(T, UnderlyingTy, Context);
   }
       
   case TypeKind::Identifier: {
@@ -299,8 +298,7 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
     if (MappedTy.getPointer() == Id->getMappedType().getPointer())
       return T;
     
-    // FIXME: Loses the structure of the IdentifierType!
-    return MappedTy;
+    return SubstitutedType::get(T, MappedTy, Context);
   }
       
   case TypeKind::Paren: {
@@ -369,16 +367,16 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
     return TupleType::get(Elements, Context);
   }
       
-  case TypeKind::SubstArchetype: {
-    auto SubstAT = cast<SubstArchetypeType>(T);
-    auto Subst = substType(SubstAT->getSubstType(), Substitutions);
+  case TypeKind::Substituted: {
+    auto SubstAT = cast<SubstitutedType>(T);
+    auto Subst = substType(SubstAT->getReplacementType(), Substitutions);
     if (!Subst)
       return Type();
     
-    if (Subst.getPointer() == SubstAT->getSubstType().getPointer())
+    if (Subst.getPointer() == SubstAT->getReplacementType().getPointer())
       return T;
     
-    return SubstArchetypeType::get(SubstAT->getArchetype(), Subst, Context);
+    return SubstitutedType::get(SubstAT->getOriginal(), Subst, Context);
   }
       
   case TypeKind::Function:

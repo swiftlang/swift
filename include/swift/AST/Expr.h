@@ -41,6 +41,7 @@ namespace swift {
   class ProtocolConformance;
   class FuncDecl;
   class ConstructorDecl;
+  class SubstitutableType;
   
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -1134,7 +1135,7 @@ public:
 class SpecializeExpr : public ImplicitConversionExpr {
 public:
   struct Substitution {
-    ArchetypeType *Archetype; // FIXME: We want GenericParams here, I think.
+    SubstitutableType *Subst; // FIXME: We want GenericParams here, I think.
     Type Replacement;
     ArrayRef<ProtocolConformance *> Conformance;
   };

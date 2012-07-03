@@ -1108,6 +1108,26 @@ public:
   }
 };
 
+/// SubstitutableType - A reference to a type that can be substituted, i.e.,
+/// an archetype or a generic parameter.
+class SubstitutableType : public TypeBase {
+protected:
+  SubstitutableType(TypeKind K, ASTContext *C, bool Unresolved)
+    : TypeBase(K, C, Unresolved) { }
+
+public:
+  // FIXME: Temporary hack.
+  bool isPrimary() const;
+  unsigned getPrimaryIndex() const;
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const SubstitutableType *) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->getKind() >= TypeKind::First_SubstitutableType &&
+           T->getKind() <= TypeKind::Last_SubstitutableType;
+  }
+};
+
 /// ArchetypeType - An archetype is a type that is a stand-in used to describe
 /// type parameters and associated types in generic definition and protocols.
 /// Archetypes will be replaced with actualy, concrete types at some later
@@ -1115,7 +1135,7 @@ public:
 /// at run time due to the use of generic types.
 ///
 /// FIXME: Same-type constraints.
-class ArchetypeType : public TypeBase {
+class ArchetypeType : public SubstitutableType {
   StringRef DisplayName;
   ArrayRef<ProtocolDecl *> ConformsTo;
   unsigned IndexIfPrimary;
@@ -1158,31 +1178,31 @@ private:
   ArchetypeType(ASTContext &Ctx, StringRef DisplayName,
                 ArrayRef<ProtocolDecl *> ConformsTo,
                 Optional<unsigned> Index)
-    : TypeBase(TypeKind::Archetype, &Ctx, /*Unresolved=*/false),
+    : SubstitutableType(TypeKind::Archetype, &Ctx, /*Unresolved=*/false),
       DisplayName(DisplayName), ConformsTo(ConformsTo),
       IndexIfPrimary(Index? *Index + 1 : 0) { }
 };
 
-/// SubstArchetypeType - An archetype that has been substituted for a
-/// concrete type that meets all of the requirements of the archetype.
-class SubstArchetypeType : public TypeBase {
-  // SubstArchetypeTypes are never canonical.
-  explicit SubstArchetypeType(ArchetypeType *Archetype, Type Subst)
-    : TypeBase(TypeKind::SubstArchetype, nullptr, /*Unresolved=*/false),
-      Archetype(Archetype), Subst(Subst) {}
+/// SubstitutedType - A type that has been substituted for some other type,
+/// which implies that the replacement type meets all of the requirements of
+/// the original type.
+class SubstitutedType : public TypeBase {
+  // SubstitutedTypes are never canonical.
+  explicit SubstitutedType(Type Original, Type Replacement)
+    : TypeBase(TypeKind::Substituted, nullptr, Replacement->isUnresolvedType()),
+      Original(Original), Replacement(Replacement) {}
   
-  ArchetypeType *Archetype;
-  Type Subst;
+  Type Original;
+  Type Replacement;
   
 public:
-  static SubstArchetypeType *get(ArchetypeType *Archetype, Type Subst,
-                                 ASTContext &C);
+  static SubstitutedType *get(Type Original, Type Replacement, ASTContext &C);
   
-  /// \brief Retrieve the archetype that is being replaced.
-  ArchetypeType *getArchetype() const { return Archetype; }
+  /// \brief Retrieve the original type that is being replaced.
+  Type getOriginal() const { return Replacement; }
   
-  /// \brief Retrieve the type that is substituted in for the archetype.
-  Type getSubstType() const { return Subst; }
+  /// \brief Retrieve the replacement type.
+  Type getReplacementType() const { return Replacement; }
   
   /// getDesugaredType - If this type is a sugared type, remove all levels of
   /// sugar until we get down to a non-sugar type.
@@ -1191,9 +1211,9 @@ public:
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const SubstArchetypeType *) { return true; }
+  static bool classof(const SubstitutedType *) { return true; }
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::SubstArchetype;
+    return T->getKind() == TypeKind::Substituted;
   }
 };
 
@@ -1212,6 +1232,14 @@ inline Type TypeBase::getRValueType() {
     return this;
 
   return castTo<LValueType>()->getObjectType();
+}
+
+inline bool SubstitutableType::isPrimary() const {
+  return cast<ArchetypeType>(this)->isPrimary();
+}
+
+inline unsigned SubstitutableType::getPrimaryIndex() const {
+  return cast<ArchetypeType>(this)->getPrimaryIndex();
 }
 
 } // end namespace swift

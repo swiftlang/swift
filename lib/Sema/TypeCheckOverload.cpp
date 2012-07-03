@@ -321,7 +321,7 @@ TypeChecker::buildFilteredOverloadSet(OverloadedExpr Ovl,
     auto &Conformances = Candidate.getConformances();
     for (auto S : Candidate.getSubstitutions()) {
       unsigned Index = S.first->getPrimaryIndex();
-      Substitutions[Index].Archetype = S.first;
+      Substitutions[Index].Subst = S.first;
       Substitutions[Index].Replacement = S.second;
       Substitutions[Index].Conformance
         = Context.AllocateCopy(Conformances[S.first]);
@@ -362,7 +362,7 @@ Expr *TypeChecker::buildRefExpr(const OverloadCandidate &Candidate,
     auto &Conformances = Candidate.getConformances();
     for (auto S : Candidate.getSubstitutions()) {
       unsigned Index = S.first->getPrimaryIndex();
-      Substitutions[Index].Archetype = S.first;
+      Substitutions[Index].Subst = S.first;
       Substitutions[Index].Replacement = S.second;
       Substitutions[Index].Conformance
         = Context.AllocateCopy(Conformances[S.first]);

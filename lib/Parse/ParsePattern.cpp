@@ -40,7 +40,7 @@ bool Parser::checkFullyTyped(Type type) {
   case TypeKind::Module:
   case TypeKind::UnstructuredUnresolved:
   case TypeKind::Archetype:
-  case TypeKind::SubstArchetype:
+  case TypeKind::Substituted:
   case TypeKind::ProtocolComposition:
     return false;
 

@@ -67,9 +67,10 @@ public:
   }
 };
 
-/// \brief A mapping from archetypes to the protocol-conformance 
-typedef llvm::DenseMap<ArchetypeType *, SmallVector<ProtocolConformance *, 2>>
-  ConformanceMap;
+/// \brief A mapping from substitutable types to the protocol-conformance
+/// mappings for those types.
+typedef llvm::DenseMap<SubstitutableType *,
+                       SmallVector<ProtocolConformance *, 2>> ConformanceMap;
 
 /// \brief An overload candidate.
 /// FIXME: Encode the actual substitutions here in some efficient manner.
@@ -137,9 +138,10 @@ struct CoercionContext {
   TypeChecker &TC;
   TypeSubstitutionMap Substitutions;
 
-  /// \brief Mapping from each of the archetypes to the set of protocol-
-  /// conformance mappings for each of the requirements on the archetype.
-  llvm::DenseMap<ArchetypeType *, SmallVector<ProtocolConformance *, 2>>
+  /// \brief Mapping from each of the substitutable types to the set of
+  /// protocol-conformance mappings for each of the requirements on the
+  /// type.
+  llvm::DenseMap<SubstitutableType *, SmallVector<ProtocolConformance *, 2>>
     Conformance;
 
   /// \brief Identify the set of generic parameters for which we want to
