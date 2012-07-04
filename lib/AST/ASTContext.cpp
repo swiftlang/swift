@@ -42,6 +42,7 @@ struct ASTContext::Implementation {
     LValueTypes;
   llvm::DenseMap<std::pair<Type, Type>, SubstitutedType *> SubstitutedTypes;
   llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
+  llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
 };
 
 ASTContext::Implementation::Implementation()
@@ -172,17 +173,65 @@ TupleType *TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
   return New;
 }
 
-OneOfType::OneOfType(OneOfDecl *TheDecl, ArrayRef<Type> ArgumentTypes,
-                     ASTContext &C)
-  : NominalType(TypeKind::OneOf, &C, TheDecl, ArgumentTypes) { }
+void BoundGenericType::Profile(llvm::FoldingSetNodeID &ID,
+                               NominalTypeDecl *TheDecl,
+                               ArrayRef<Type> GenericArgs) {
+  ID.AddPointer(TheDecl);
+  ID.AddInteger(GenericArgs.size());
+  for (Type Arg : GenericArgs)
+    ID.AddPointer(Arg.getPointer());
+}
 
-StructType::StructType(StructDecl *TheDecl, ArrayRef<Type> ArgumentTypes,
-                       ASTContext &C)
-  : NominalType(TypeKind::Struct, &C, TheDecl, ArgumentTypes) { }
+BoundGenericType::BoundGenericType(NominalTypeDecl *TheDecl, 
+                                   ArrayRef<Type> GenericArgs,
+                                   ASTContext *C)
+  : TypeBase(TypeKind::BoundGeneric, C, /*Unresolved=*/false),
+    TheDecl(TheDecl), GenericArgs(GenericArgs) 
+{
+  // Determine whether this type is unresolved.
+  for (Type Arg : GenericArgs) {
+    if (Arg->isUnresolvedType()) {
+      setUnresolved();
+      break;
+    }
+  }
+}
 
-ClassType::ClassType(ClassDecl *TheDecl, ArrayRef<Type> ArgumentTypes,
-                    ASTContext &C)
-  : NominalType(TypeKind::Class, &C, TheDecl, ArgumentTypes) { }
+BoundGenericType* BoundGenericType::get(NominalTypeDecl *TheDecl,
+                                        ArrayRef<Type> GenericArgs) {
+  ASTContext &C = TheDecl->getDeclContext()->getASTContext();
+  llvm::FoldingSetNodeID ID;
+  BoundGenericType::Profile(ID, TheDecl, GenericArgs);
+
+  void *InsertPos = 0;
+  if (BoundGenericType *BGT =
+          C.Impl.BoundGenericTypes.FindNodeOrInsertPos(ID, InsertPos))
+    return BGT;
+
+  ArrayRef<Type> ArgsCopy = C.AllocateCopy(GenericArgs);
+  bool IsCanonical = true;   // All canonical elts means this is canonical.
+  for (Type Arg : GenericArgs) {
+    if (!Arg->isCanonical()) {
+      IsCanonical = false;
+      break;
+    }
+  }
+
+  BoundGenericType *New = new (C) BoundGenericType(TheDecl, ArgsCopy,
+                                                   IsCanonical ? &C : 0);
+  C.Impl.BoundGenericTypes.InsertNode(New, InsertPos);
+
+  return New;
+}
+
+OneOfType::OneOfType(OneOfDecl *TheDecl, ASTContext &C)
+  : NominalType(TypeKind::OneOf, &C, TheDecl) { }
+
+StructType::StructType(StructDecl *TheDecl, ASTContext &C)
+  : NominalType(TypeKind::Struct, &C, TheDecl) { }
+
+ClassType::ClassType(ClassDecl *TheDecl, ASTContext &C)
+  : NominalType(TypeKind::Class, &C, TheDecl) { }
 
 IdentifierType *IdentifierType::getNew(ASTContext &C,
                                        MutableArrayRef<Component> Components) {
@@ -217,7 +266,7 @@ MetaTypeType *MetaTypeType::get(Type T, ASTContext &C) {
 }
 
 MetaTypeType::MetaTypeType(Type T, ASTContext *C)
-  : TypeBase(TypeKind::MetaType, C, /*Unresolved=*/false),
+  : TypeBase(TypeKind::MetaType, C, T->isUnresolvedType()),
     InstanceType(T) {
 }
 
@@ -298,7 +347,7 @@ ArraySliceType *ArraySliceType::get(Type base, SourceLoc loc, ASTContext &C) {
 }
 
 ProtocolType::ProtocolType(ProtocolDecl *TheDecl, ASTContext &Ctx)
-  : NominalType(TypeKind::Protocol, &Ctx, TheDecl, ArrayRef<Type>()) { }
+  : NominalType(TypeKind::Protocol, &Ctx, TheDecl) { }
 
 LValueType *LValueType::get(Type objectTy, Qual quals, ASTContext &C) {
   auto key = std::make_pair(objectTy, quals.getOpaqueData());

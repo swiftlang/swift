@@ -302,11 +302,21 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC,
   }
 
   // Finally, sanity check that the last value is a type.
-  if (ValueDecl *Last = Components.back().Value.dyn_cast<ValueDecl*>())
-    if (auto TAD = dyn_cast<TypeDecl>(Last)) {
-      Components[Components.size()-1].Value = TAD->getDeclaredType();
+  if (ValueDecl *Last = Components.back().Value.dyn_cast<ValueDecl*>()) {
+    auto GenericArgs = Components.back().GenericArgs;
+    if (!GenericArgs.empty()) {
+      if (auto NTD = dyn_cast<NominalTypeDecl>(Last)) {
+        if (Type Ty = NTD->getGenericTypeWithArgs(GenericArgs)) {
+          Components.back().Value = Ty;
+          return false;
+        }
+      }
+      // FIXME: Need better diagnostic here
+    } else if (auto TD = dyn_cast<TypeDecl>(Last)) {
+      Components.back().Value = TD->getDeclaredType();
       return false;
     }
+  }
 
   diagnose(Components.back().Loc,
            Components.size() == 1 ? diag::named_definition_isnt_type :

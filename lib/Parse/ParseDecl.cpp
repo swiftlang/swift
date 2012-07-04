@@ -1639,8 +1639,6 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   if (parseTypeAnnotation(ElementTy, ElementTyLoc,
                           diag::expected_type_subscript))
     return true;
-  if (checkFullyTyped(ElementTy))
-    Invalid = true;
   
   if (!NeedDefinition) {
     SubscriptDecl *Subscript

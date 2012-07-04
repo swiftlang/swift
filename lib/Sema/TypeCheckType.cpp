@@ -99,11 +99,10 @@ bool TypeChecker::validateType(Type InTy, bool isFirstPass) {
   case TypeKind::Struct:
   case TypeKind::Class:
   case TypeKind::Archetype:
-  case TypeKind::UnresolvedNominal:
+  case TypeKind::UnboundGeneric:
     // These types are already canonical anyway.
     return false;
       
-  case TypeKind::MetaType:
   case TypeKind::Module:
   case TypeKind::Protocol:
   case TypeKind::Substituted:
@@ -230,6 +229,24 @@ bool TypeChecker::validateType(Type InTy, bool isFirstPass) {
     }
     break;
   }
+
+  case TypeKind::MetaType: {
+    MetaTypeType *Meta = cast<MetaTypeType>(T);
+    IsInvalid = validateType(Meta->getInstanceType(), isFirstPass);
+    break;
+  }
+
+  case TypeKind::BoundGeneric: {
+    // FIXME: Add protocol conformance checking.
+    BoundGenericType *BGT = cast<BoundGenericType>(T);
+    for (Type Arg : BGT->getGenericArgs()) {
+      if (validateType(Arg, isFirstPass)) {
+        IsInvalid = true;
+        break;
+      }
+    }
+    break;
+  }
   }
 
   // If we determined that this type is invalid, erase it in the caller.
@@ -273,6 +290,25 @@ Type TypeChecker::substType(Type T, TypeSubstitutionMap &Substitutions) {
 #define UNCHECKED_TYPE(Id, Parent) ALWAYS_CANONICAL_TYPE(Id, Parent)
 #define TYPE(Id, Parent)
 #include "swift/AST/TypeNodes.def"
+
+  case TypeKind::BoundGeneric: {
+    auto BGT = cast<BoundGenericType>(T);
+    SmallVector<Type, 4> SubstArgs;
+    bool AnyChanged = false;
+    for (Type Arg : BGT->getGenericArgs()) {
+      Type SubstArg = substType(Arg, Substitutions);
+      if (!SubstArg)
+        return Type();
+      SubstArgs.push_back(SubstArg);
+      if (SubstArg.getPointer() != Arg.getPointer())
+        AnyChanged = true;
+    }
+
+    if (!AnyChanged)
+      return T;
+
+    return BoundGenericType::get(BGT->getDecl(), SubstArgs);
+  }
 
   case TypeKind::MetaType: {
     auto Meta = cast<MetaTypeType>(T);

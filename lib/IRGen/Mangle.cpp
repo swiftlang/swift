@@ -270,9 +270,11 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     llvm_unreachable("mangling error type");
   case TypeKind::UnstructuredUnresolved:
   case TypeKind::DeducibleGenericParam:
+  case TypeKind::UnboundGeneric:
     llvm_unreachable("mangling unresolved type");
-  case TypeKind::UnresolvedNominal:
-    llvm_unreachable("mangling UnresolvedNominal type");
+
+  case TypeKind::BoundGeneric:
+    llvm_unreachable("Cannot mangle generic type yet");
 
   case TypeKind::MetaType:
     llvm_unreachable("Cannot mangle metatype yet");

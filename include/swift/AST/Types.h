@@ -556,16 +556,14 @@ private:
   TupleType(ArrayRef<TupleTypeElt> fields, ASTContext *CanCtx);
 };
 
-/// UnresolvedNominalType - Represents a generic nominal type where the
+/// UnboundGenericType - Represents a generic nominal type where the
 /// type arguments have not yet been resolved.
-class UnresolvedNominalType : public TypeBase {
-  /// TheDecl - This is the TypeDecl which declares the given type. It
-  /// specifies the name and other useful information about this type.
-  NominalTypeDecl * const TheDecl;
+class UnboundGenericType : public TypeBase {
+  NominalTypeDecl *TheDecl;
 
 private:
-  UnresolvedNominalType(NominalTypeDecl *TheDecl, ASTContext &C)
-    : TypeBase(TypeKind::UnresolvedNominal, &C, /*Unresolved=*/false),
+  UnboundGenericType(NominalTypeDecl *TheDecl, ASTContext &C)
+    : TypeBase(TypeKind::UnboundGeneric, &C, /*Unresolved=*/true),
       TheDecl(TheDecl) { }
   friend class OneOfDecl;
   friend class StructDecl;
@@ -578,12 +576,45 @@ public:
   void print(raw_ostream &O) const;
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const UnresolvedNominalType *) { return true; }
+  static bool classof(const UnboundGenericType *) { return true; }
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::UnresolvedNominal;
+    return T->getKind() == TypeKind::UnboundGeneric;
   }
 };
 
+/// BoundGenericType - Represents a generic nominal type bound to the
+/// given type arguments.
+class BoundGenericType : public TypeBase, public llvm::FoldingSetNode {
+  NominalTypeDecl *TheDecl;
+  ArrayRef<Type> GenericArgs;
+
+private:
+  BoundGenericType(NominalTypeDecl *TheDecl, ArrayRef<Type> GenericArgs,
+                   ASTContext *C);
+
+public:
+  static BoundGenericType* get(NominalTypeDecl *TheDecl,
+                               ArrayRef<Type> GenericArgs);
+
+  /// \brief Returns the declaration that declares this type.
+  NominalTypeDecl *getDecl() const { return TheDecl; }
+
+  ArrayRef<Type> getGenericArgs() const { return GenericArgs; }
+
+  void print(raw_ostream &O) const;
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, TheDecl, GenericArgs);
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID, NominalTypeDecl *TheDecl,
+                      ArrayRef<Type> Protocols);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const BoundGenericType *) { return true; }
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BoundGeneric;
+  }
+};
 
 /// NominalType - Represents a type with a name that is significant, such that
 /// the name distinguishes it from other structurally-similar types that have
@@ -593,18 +624,14 @@ class NominalType : public TypeBase {
   /// specifies the name and other useful information about this type.
   NominalTypeDecl * const TheDecl;
 
-  ArrayRef<Type> ArgumentTypes;
-
 protected:
-  NominalType(TypeKind K, ASTContext *C, NominalTypeDecl *TheDecl,
-              ArrayRef<Type> ArgumentTypes)
-    : TypeBase(K, C, /*Unresolved=*/false), TheDecl(TheDecl),
-      ArgumentTypes(ArgumentTypes) { }
+  NominalType(TypeKind K, ASTContext *C, NominalTypeDecl *TheDecl)
+    : TypeBase(K, C, /*Unresolved=*/false), TheDecl(TheDecl) { }
 
 public:
   /// \brief Returns the declaration that declares this type.
   NominalTypeDecl *getDecl() const { return TheDecl; }
-  
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const NominalType *) { return true; }
   static bool classof(const TypeBase *T) {
@@ -630,8 +657,7 @@ public:
   }
   
 private:
-  OneOfType(OneOfDecl *TheDecl, ArrayRef<Type> ArgumentTypes,
-            ASTContext &Ctx);
+  OneOfType(OneOfDecl *TheDecl, ASTContext &Ctx);
   friend class OneOfDecl;
 };
 
@@ -652,8 +678,7 @@ public:
   }
   
 private:
-  StructType(StructDecl *TheDecl, ArrayRef<Type> ArgumentTypes,
-             ASTContext &Ctx);
+  StructType(StructDecl *TheDecl, ASTContext &Ctx);
   friend class StructDecl;
 };
 
@@ -674,8 +699,7 @@ public:
   }
   
 private:
-  ClassType(ClassDecl *TheDecl, ArrayRef<Type> ArgumentTypes,
-            ASTContext &Ctx);
+  ClassType(ClassDecl *TheDecl, ASTContext &Ctx);
   friend class ClassDecl;
 };
 

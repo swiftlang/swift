@@ -206,6 +206,16 @@ Type TypeDecl::getDeclaredType() const {
   return cast<NominalTypeDecl>(this)->getDeclaredType();
 }
 
+Type NominalTypeDecl::getGenericTypeWithArgs(ArrayRef<Type> Args) {
+  if (!GenericParams)
+    return Type();
+
+  if (GenericParams->size() != Args.size())
+    return Type();
+
+  return BoundGenericType::get(this, Args);
+}
+
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                              SourceLoc NameLoc, Type Underlyingty,
                              DeclContext *DC, MutableArrayRef<Type> Inherited)
@@ -227,9 +237,9 @@ OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
   // Compute the associated type for this OneOfDecl.
   ASTContext &Ctx = Parent->getASTContext();
   if (!GenericParams)
-    DeclaredTy = new (Ctx) OneOfType(this, ArrayRef<Type>(), Ctx);
+    DeclaredTy = new (Ctx) OneOfType(this, Ctx);
   else
-    DeclaredTy = new (Ctx) UnresolvedNominalType(this, Ctx);
+    DeclaredTy = new (Ctx) UnboundGenericType(this, Ctx);
   // Set the type of the OneOfDecl to the right MetaTypeType.
   setType(MetaTypeType::get(DeclaredTy, Ctx));
 }
@@ -242,9 +252,9 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
   // Compute the associated type for this StructDecl.
   ASTContext &Ctx = Parent->getASTContext();
   if (!GenericParams)
-    DeclaredTy = new (Ctx) StructType(this, ArrayRef<Type>(), Ctx);
+    DeclaredTy = new (Ctx) StructType(this, Ctx);
   else
-    DeclaredTy = new (Ctx) UnresolvedNominalType(this, Ctx);
+    DeclaredTy = new (Ctx) UnboundGenericType(this, Ctx);
   // Set the type of the StructDecl to the right MetaTypeType.
   setType(MetaTypeType::get(DeclaredTy, Ctx));
 }
@@ -257,9 +267,9 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   // Compute the associated type for this ClassDecl.
   ASTContext &Ctx = Parent->getASTContext();
   if (!GenericParams)
-    DeclaredTy = new (Ctx) ClassType(this, ArrayRef<Type>(), Ctx);
+    DeclaredTy = new (Ctx) ClassType(this, Ctx);
   else
-    DeclaredTy = new (Ctx) UnresolvedNominalType(this, Ctx);
+    DeclaredTy = new (Ctx) UnboundGenericType(this, Ctx);
   // Set the type of the ClassDecl to the right MetaTypeType.
   setType(MetaTypeType::get(DeclaredTy, Ctx));
 }

@@ -285,7 +285,6 @@ public:
   NullablePtr<Pattern> parsePattern();
   NullablePtr<Pattern> parsePatternTuple();
   NullablePtr<Pattern> parsePatternAtom();
-  bool checkFullyTyped(Type Ty);
   bool checkFullyTyped(Pattern *Param, Type &funcTy);
   
   //===--------------------------------------------------------------------===//

@@ -185,8 +185,19 @@ static bool isLocalLinkageType(Type type) {
     return false;
   }
 
-  case TypeKind::UnresolvedNominal:
-    return isLocalLinkageDecl(cast<UnresolvedNominalType>(base)->getDecl());
+  case TypeKind::UnboundGeneric:
+    return isLocalLinkageDecl(cast<UnboundGenericType>(base)->getDecl());
+
+  case TypeKind::BoundGeneric: {
+    BoundGenericType *BGT = cast<BoundGenericType>(base);
+    if (isLocalLinkageDecl(BGT->getDecl()))
+      return true;
+    for (Type Arg : BGT->getGenericArgs()) {
+      if (isLocalLinkageType(Arg))
+        return true;
+    }
+    return false;
+  }
 
   case TypeKind::OneOf:
   case TypeKind::Struct:

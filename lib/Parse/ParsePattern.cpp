@@ -17,82 +17,12 @@
 #include "Parser.h"
 using namespace swift;
 
-/// Check that the given type is fully-typed.
-/// FIXME: this is *terrible* for source locations.
-bool Parser::checkFullyTyped(Type type) {
-  switch (type->getKind()) {
-  // Any sort of non-structural type can be ignored here.
-  // Many of these are not actually possible to encounter in the
-  // parser, but it's okay.
-  case TypeKind::Error:
-  case TypeKind::BuiltinInteger:
-  case TypeKind::BuiltinFloat:
-  case TypeKind::BuiltinRawPointer:
-  case TypeKind::BuiltinObjectPointer:
-  case TypeKind::BuiltinObjCPointer:
-  case TypeKind::NameAlias: // FIXME: underlying type could be non-fully-typed!
-  case TypeKind::Identifier:
-  case TypeKind::Protocol:
-  case TypeKind::OneOf:
-  case TypeKind::Struct:
-  case TypeKind::Class:
-  case TypeKind::MetaType:
-  case TypeKind::Module:
-  case TypeKind::UnstructuredUnresolved:
-  case TypeKind::Archetype:
-  case TypeKind::Substituted:
-  case TypeKind::ProtocolComposition:
-  case TypeKind::UnresolvedNominal:
-  case TypeKind::DeducibleGenericParam:
-    return false;
-
-  case TypeKind::Paren:
-    return checkFullyTyped(cast<ParenType>(type)->getUnderlyingType());
-
-  case TypeKind::LValue:
-    return checkFullyTyped(cast<LValueType>(type)->getObjectType());
-
-  case TypeKind::Array:
-    return checkFullyTyped(cast<ArrayType>(type)->getBaseType());
-
-  case TypeKind::ArraySlice:
-    return checkFullyTyped(cast<ArraySliceType>(type)->getBaseType());
-
-  case TypeKind::Function:
-  case TypeKind::PolymorphicFunction: {
-    AnyFunctionType *fn = cast<AnyFunctionType>(type);
-    return checkFullyTyped(fn->getInput())
-         | checkFullyTyped(fn->getResult());
-  }
-
-  case TypeKind::Tuple: {
-    TupleType *tuple = cast<TupleType>(type);
-    bool isInvalid = false;
-    for (auto &elt : tuple->getFields()) {
-      if (elt.getType().isNull()) {
-        assert(elt.hasInit());
-        diagnose(elt.getInit()->getLoc(),
-                 diag::untyped_tuple_elt_in_function_signature)
-          << elt.getInit()->getSourceRange();
-        isInvalid = true;
-      } else {
-        isInvalid |= checkFullyTyped(elt.getType());
-      }
-    }
-    return isInvalid;
-  }
-  }
-  llvm_unreachable("bad type kind");
-}
-
 /// Check that the given pattern is fully-typed.
 bool Parser::checkFullyTyped(Pattern *pattern, Type &funcTy) {
   switch (pattern->getKind()) {
   // Any type with an explicit annotation is okay, as long as the
   // annotation is fully-typed.
   case PatternKind::Typed:
-    if (checkFullyTyped(pattern->getType()))
-      return true;
     funcTy = pattern->getType();
     return false;
 
@@ -173,8 +103,6 @@ bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &params,
   if (consumeIf(tok::arrow)) {
     if (parseType(type, loc))
       return true;
-
-    checkFullyTyped(type);
 
   // Otherwise, we implicitly return ().
   } else {

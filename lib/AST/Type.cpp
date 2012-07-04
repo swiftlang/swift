@@ -109,7 +109,8 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
   case TypeKind::Protocol:
   case TypeKind::Archetype:
   case TypeKind::ProtocolComposition:
-  case TypeKind::UnresolvedNominal:
+  case TypeKind::UnboundGeneric:
+  case TypeKind::BoundGeneric:
   case TypeKind::DeducibleGenericParam:
     return this;
 
@@ -480,6 +481,13 @@ CanType TypeBase::getCanonicalType() {
     Result = MetaTypeType::get(InstanceTy, InstanceTy->getASTContext());
     break;
   }
+  case TypeKind::BoundGeneric: {
+    BoundGenericType *BGT = cast<BoundGenericType>(this);
+    SmallVector<Type, 4> CanGenericArgs;
+    for (Type Arg : BGT->getGenericArgs())
+      CanGenericArgs.push_back(Arg->getCanonicalType());
+    Result = BoundGenericType::get(BGT->getDecl(), CanGenericArgs);
+  }
   }
     
   
@@ -503,6 +511,7 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::LValue:
   case TypeKind::ProtocolComposition:
   case TypeKind::MetaType:
+  case TypeKind::BoundGeneric:
     // None of these types have sugar at the outer level.
     return this;
   case TypeKind::Paren:
@@ -766,15 +775,30 @@ void NameAliasType::print(raw_ostream &OS) const {
   OS << TheDecl->getName().get();
 }
 
-void IdentifierType::print(raw_ostream &OS) const {
-  OS << Components[0].Id.get();
+static void printGenericArgs(raw_ostream &OS, ArrayRef<Type> Args) {
+  if (Args.empty())
+    return;
 
-  for (const Component &C : Components.slice(1, Components.size()-1))
-    OS << '.' << C.Id.get();
+  OS << '<';
+  bool First = true;
+  for (Type Arg : Args) {
+    if (First)
+      First = false;
+    else
+      OS << ", ";
+    Arg->print(OS);
+  }
+  OS << '>';
 }
 
-void OneOfType::print(raw_ostream &OS) const {
-  OS << getDecl()->getName().get();
+void IdentifierType::print(raw_ostream &OS) const {
+  OS << Components[0].Id.get();
+  printGenericArgs(OS, Components[0].GenericArgs);
+
+  for (const Component &C : Components.slice(1, Components.size()-1)) {
+    OS << '.' << C.Id.get();
+    printGenericArgs(OS, C.GenericArgs);
+  }
 }
 
 void MetaTypeType::print(raw_ostream &OS) const {
@@ -877,8 +901,13 @@ void LValueType::print(raw_ostream &OS) const {
   getObjectType()->print(OS);
 }
 
-void UnresolvedNominalType::print(raw_ostream &OS) const {
+void UnboundGenericType::print(raw_ostream &OS) const {
   OS << getDecl()->getName().get();
+}
+
+void BoundGenericType::print(raw_ostream &OS) const {
+  OS << getDecl()->getName().get();
+  printGenericArgs(OS, getGenericArgs());
 }
 
 void StructType::print(raw_ostream &OS) const {
@@ -886,6 +915,10 @@ void StructType::print(raw_ostream &OS) const {
 }
 
 void ClassType::print(raw_ostream &OS) const {
+  OS << getDecl()->getName().get();
+}
+
+void OneOfType::print(raw_ostream &OS) const {
   OS << getDecl()->getName().get();
 }
 

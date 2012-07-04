@@ -250,9 +250,10 @@ const TypeInfo *TypeConverter::convertType(CanType canTy) {
     return convertArrayType(cast<ArrayType>(ty));
   case TypeKind::Protocol:
     return convertProtocolType(cast<ProtocolType>(ty));
-      
   case TypeKind::ProtocolComposition:
-      llvm_unreachable("ProtocolComposition types are unimplemented");
+    llvm_unreachable("ProtocolComposition types are unimplemented");
+  case TypeKind::BoundGeneric:
+    llvm_unreachable("BoundGeneric types are unimplemented");
   }
   llvm_unreachable("bad type kind");
 }
