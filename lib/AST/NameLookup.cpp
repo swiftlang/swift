@@ -229,22 +229,27 @@ void MemberLookup::lookupMembers(Type BaseType, Module &M,
   assert(Results.empty() &&
          "This expects that the input list is empty, could be generalized");
 
-  TypeDecl *D;
+  NominalTypeDecl *D;
   ArrayRef<ValueDecl*> BaseMembers;
   SmallVector<ValueDecl*, 2> BaseMembersStorage;
-  if (NominalType *NT = BaseType->getAs<NominalType>()) {
+  if (BoundGenericType *BGT = BaseType->getAs<BoundGenericType>()) {
+    D = BGT->getDecl();
+  } else if (UnboundGenericType *UGT = BaseType->getAs<UnboundGenericType>()) {
+    D = UGT->getDecl();
+  } else if (NominalType *NT = BaseType->getAs<NominalType>()) {
     D = NT->getDecl();
-    for (Decl* Member : NT->getDecl()->getMembers()) {
-      if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
-        BaseMembersStorage.push_back(VD);
-    }
-    if (NT->getDecl()->getGenericParams())
-      for (auto param : *NT->getDecl()->getGenericParams())
-        BaseMembersStorage.push_back(param.getDecl());
-    BaseMembers = BaseMembersStorage;
   } else {
     return;
   }
+
+  for (Decl* Member : D->getMembers()) {
+    if (ValueDecl *VD = dyn_cast<ValueDecl>(Member))
+      BaseMembersStorage.push_back(VD);
+  }
+  if (D->getGenericParams())
+    for (auto param : *D->getGenericParams())
+      BaseMembersStorage.push_back(param.getDecl());
+  BaseMembers = BaseMembersStorage;
 
   DeclContext *DC = D->getDeclContext();
   while (!DC->isModuleContext())
